@@ -8,7 +8,7 @@ import { CircleNotch, EnvelopeSimple, Key, WarningCircle } from "@phosphor-icons
 import { createAuthClient, createOtpClient } from "@/lib/supabase/client";
 import { limparCookiesDemo } from "@/lib/demo/shared";
 import { SiteFooter } from "@/components/site-footer";
-import { fade, T } from "@/components/motion";
+import { fade, T, EASE } from "@/components/motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
@@ -349,12 +349,28 @@ export function LoginForm() {
     // encolhendo o viewport (resizes-content), o topo continua rolável.
     // flex, não grid: em grid o w-full do filho resolve contra o padding
     // box e vaza o padding lateral (1rem ou o safe-area, o que for maior)
-    <div className="flex min-h-[100dvh] flex-col bg-background pb-[calc(4rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
+    // lg:pl-[46%] reserva a metade esquerda pro painel fixo da marca
+    // (LoginHero) — o form continua centrado na metade que sobra
+    <div className="flex min-h-[100dvh] flex-col bg-background pb-[calc(4rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:pl-[46%]">
+      <LoginHero />
       <div className="m-auto w-full max-w-sm">
         <div className="mb-8">
           <Logo size="xl" />
           <h1 className="text-lg font-semibold tracking-tight mt-3">Programa de Mentoria Social</h1>
         </div>
+
+        {/* no mobile o painel ink não cabe — uma faixa só de foto real,
+            inclinada de leve, já traz o rosto do programa sem pesar a dobra */}
+        <motion.div {...fade} transition={T.enter} className="mb-8 rotate-[-1.5deg] lg:hidden">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/login/parceiros.webp"
+            alt=""
+            width={1400}
+            height={788}
+            className="aspect-[2/1] w-full rounded-2xl object-cover shadow-md ring-1 ring-border"
+          />
+        </motion.div>
 
         {/* feedback: crossfade form ↔ confirmação — o painel sucede o form no
             mesmo espaço em vez de corte seco (§2); ref/tabIndex de foco migram
@@ -584,5 +600,115 @@ export function LoginForm() {
         <SiteFooter className="mt-10" />
       </div>
     </div>
+  );
+}
+
+/** Painel institucional do /login — só desktop (lg+), position:fixed, não
+ *  entra no fluxo; a coluna reserva o espaço com lg:pl-[46%]. Superfície
+ *  ink da marca (a mesma do SiteFooter tone="ink") com fotos reais do
+ *  programa flutuando em bob lento e dessincronizado. O float é
+ *  transform/motion: o MotionConfig reducedMotion="user" do layout zera a
+ *  animação pra quem prefere menos movimento. O aside inteiro é
+ *  decorativo (aria-hidden) — a página já diz o que é no h1/logo. */
+function LoginHero() {
+  return (
+    <aside
+      aria-hidden="true"
+      className="fixed inset-y-0 left-0 hidden w-[46%] flex-col overflow-hidden bg-[var(--brand-ink)] p-10 lg:flex xl:p-14"
+    >
+      <div className="flex items-center justify-between gap-4">
+        {/* wordmark em texto puro — o PNG oficial some sobre ink no tema
+            claro; mesma construção do SiteFooter e da variante dark do Logo */}
+        <span className="text-2xl font-black italic tracking-tight">
+          <span className="text-white">REALIZA</span>
+          <span className="text-[var(--role-mentorado)]">.</span>
+          <span className="text-[var(--brand-lime)]">VC</span>
+        </span>
+        <span className="rounded-full border border-white/15 px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-white/65">
+          Mentoria Social
+        </span>
+      </div>
+
+      <p className="mt-12 max-w-md text-3xl font-semibold tracking-tight text-balance text-white xl:text-[2.5rem] xl:leading-[1.15]">
+        A jornada da mentoria,{" "}
+        <span className="text-[var(--brand-lime)]">toda num lugar só.</span>
+      </p>
+      <p className="mt-3 max-w-sm text-sm leading-relaxed text-white/60">
+        Encontros, registros e acompanhamento das duplas: mentores, jovens e
+        coordenação juntos no programa.
+      </p>
+
+      {/* colagem: entrada sobe uma vez no wrapper externo (que também segura
+          a rotação — rotate-* do Tailwind v4 usa a propriedade `rotate`, que
+          compõe com o translateY do float); o bob infinito mora no interno */}
+      <div className="relative mt-6 min-h-0 flex-1">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: EASE }}
+          className="absolute bottom-0 left-0 w-[68%] rotate-[-3deg]"
+        >
+          <motion.div
+            animate={{ y: [0, -9, 0] }}
+            transition={{ duration: 6.5, repeat: Infinity, ease: "easeInOut" }}
+            className="relative"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/login/parceiros.webp"
+              alt=""
+              width={1400}
+              height={788}
+              className="aspect-[16/10] w-full rounded-2xl object-cover shadow-2xl ring-1 ring-white/15"
+            />
+            <span className="absolute bottom-2.5 left-2.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+              Sede parceira
+            </span>
+          </motion.div>
+        </motion.div>
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5, ease: EASE, delay: 0.12 }}
+          className="absolute right-0 top-0 w-[38%] rotate-[3deg]"
+        >
+          <motion.div
+            animate={{ y: [0, -11, 0] }}
+            transition={{
+              duration: 7.5,
+              repeat: Infinity,
+              ease: "easeInOut",
+              delay: 0.9,
+            }}
+            className="relative"
+          >
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/login/formacao.webp"
+              alt=""
+              width={900}
+              height={1600}
+              className="aspect-[3/4] w-full rounded-2xl object-cover object-center shadow-2xl ring-1 ring-white/15"
+            />
+            <span className="absolute bottom-2.5 left-2.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
+              Equipe Realiza.vc
+            </span>
+          </motion.div>
+        </motion.div>
+      </div>
+
+      <div className="mt-8 flex flex-wrap gap-2">
+        {["Coordenação", "Supervisoras", "Mentores", "Jovens", "Especialistas"].map(
+          (papel) => (
+            <span
+              key={papel}
+              className="rounded-full border border-white/15 px-3 py-1 text-[11px] font-medium text-white/65"
+            >
+              {papel}
+            </span>
+          )
+        )}
+      </div>
+    </aside>
   );
 }

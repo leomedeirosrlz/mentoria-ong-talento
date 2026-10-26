@@ -24,8 +24,34 @@ function LoginFallback() {
     <div
       role="status"
       aria-label="Carregando"
-      className="flex min-h-[100dvh] flex-col bg-background pb-[calc(4rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]"
+      className="flex min-h-[100dvh] flex-col bg-background pb-[calc(4rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:pl-[46%]"
     >
+      {/* espelha o LoginHero: painel ink fixo à esquerda em lg+, com a mesma
+          anatomia (wordmark real, headline, colagem, chips) em skeleton */}
+      <aside
+        aria-hidden="true"
+        className="fixed inset-y-0 left-0 hidden w-[46%] flex-col overflow-hidden bg-[var(--brand-ink)] p-10 lg:flex xl:p-14"
+      >
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-2xl font-black italic tracking-tight">
+            <span className="text-white">REALIZA</span>
+            <span className="text-[var(--role-mentorado)]">.</span>
+            <span className="text-[var(--brand-lime)]">VC</span>
+          </span>
+          <Skeleton className="h-8 w-28 rounded-full bg-white/10" />
+        </div>
+        <Skeleton className="mt-12 h-9 w-4/5 bg-white/10" />
+        <Skeleton className="mt-3 h-4 w-3/5 bg-white/10" />
+        <div className="relative mt-6 min-h-0 flex-1">
+          <Skeleton className="absolute bottom-0 left-0 aspect-[16/10] w-[64%] rotate-[-3deg] rounded-2xl bg-white/10" />
+          <Skeleton className="absolute right-0 top-0 aspect-[3/4] w-[36%] rotate-[3deg] rounded-2xl bg-white/10" />
+        </div>
+        <div className="mt-8 flex gap-2">
+          <Skeleton className="h-7 w-24 rounded-full bg-white/10" />
+          <Skeleton className="h-7 w-20 rounded-full bg-white/10" />
+          <Skeleton className="h-7 w-16 rounded-full bg-white/10" />
+        </div>
+      </aside>
       <div className="m-auto w-full max-w-sm">
         <div className="mb-8">
           <Logo size="xl" />
@@ -33,6 +59,7 @@ function LoginFallback() {
             Programa de Mentoria Social
           </h1>
         </div>
+        <Skeleton className="mb-8 aspect-[2/1] w-full rotate-[-1.5deg] rounded-2xl lg:hidden" />
         <div className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6">
           <Skeleton className="h-11 w-full rounded-xl md:h-10" />
           <div className="mt-5 space-y-4">
