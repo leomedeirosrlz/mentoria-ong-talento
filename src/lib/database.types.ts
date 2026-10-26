@@ -5290,10 +5290,7 @@ export type Database = {
         Args: { p_id: string; p_visivel: boolean }
         Returns: Json
       }
-      desfecho_agregado: {
-        Args: { p_cronograma?: string }
-        Returns: Json
-      }
+      desfecho_agregado: { Args: { p_cronograma?: string }; Returns: Json }
       desfecho_elegiveis_6m: { Args: never; Returns: Json }
       desmarcar_encontro: { Args: { p_encontro: string }; Returns: Json }
       devolver_chamado_fila: { Args: { p_id: string }; Returns: undefined }
