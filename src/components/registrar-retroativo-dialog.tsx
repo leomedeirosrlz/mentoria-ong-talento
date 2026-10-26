@@ -166,7 +166,7 @@ export function RegistrarRetroativoDialog({
       }}
     >
       <DialogTrigger render={trigger} />
-      <DialogContent size="xl">
+      <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Registrar {nome} que já aconteceu</DialogTitle>
         </DialogHeader>

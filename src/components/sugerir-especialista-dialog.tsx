@@ -113,7 +113,7 @@ export function SugerirEspecialistaDialog({
           }
         />
       )}
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Sugerir especialista pro jovem</DialogTitle>
           <DialogDescription>

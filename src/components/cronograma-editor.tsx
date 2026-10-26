@@ -263,7 +263,7 @@ export function CronogramaAcoes({
             </Button>
           }
         />
-        <DialogContent size="xl">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Dados do cronograma</DialogTitle>
             <DialogDescription>

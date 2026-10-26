@@ -94,7 +94,7 @@ export function EncerrarTrilhaDialog({
           }
         />
       )}
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Encerrar a trilha de especialista</DialogTitle>
           <DialogDescription>

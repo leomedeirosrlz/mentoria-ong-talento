@@ -1003,7 +1003,7 @@ export function ChamadoDetalhe({
           if (!o) setResumo(""); // fechar (ou resolver) larga o rascunho
         }}
       >
-        <DialogContent size="xl">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Resolver {chamado.numero}</DialogTitle>
             <DialogDescription>

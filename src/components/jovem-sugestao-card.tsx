@@ -136,7 +136,7 @@ export function SugestaoEspecialistaCard({
       </div>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent size="xl">
+        <DialogContent size="lg">
           <DialogHeader>
             <DialogTitle>Confirmar pedido de especialista</DialogTitle>
             <DialogDescription>

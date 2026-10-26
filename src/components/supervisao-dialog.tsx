@@ -120,7 +120,7 @@ export function SupervisaoDialog({
           }
         />
       )}
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Registrar supervisão</DialogTitle>
           <DialogDescription>

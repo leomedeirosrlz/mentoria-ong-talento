@@ -79,7 +79,7 @@ export function EncerrarDuplaDialog({
           )
         }
       />
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Registrar encerramento</DialogTitle>
           <DialogDescription>

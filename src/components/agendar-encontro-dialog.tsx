@@ -248,7 +248,7 @@ export function AgendarEncontroDialog({
           )
         } />
       )}
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>{nome}</DialogTitle>
           <DialogDescription>

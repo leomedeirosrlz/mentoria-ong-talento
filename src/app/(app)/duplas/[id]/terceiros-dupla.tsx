@@ -372,7 +372,7 @@ function EditarContatoDialog({
   }
 
   return (
-    <DialogContent size="xl">
+    <DialogContent size="md">
       <DialogHeader>
         <DialogTitle>Editar contato</DialogTitle>
         <DialogDescription>
@@ -470,7 +470,7 @@ function NovoContatoDialog({
   }
 
   return (
-    <DialogContent size="xl">
+    <DialogContent size="md">
       <DialogHeader>
         <DialogTitle>Indicar pessoa</DialogTitle>
         <DialogDescription>
