@@ -65,12 +65,15 @@ test.describe("demo — contexto de turma (REALIZA-73 · fase A)", () => {
 
     // (3) navegar pra /duplas: o chip da T2 já vem ativo (contexto é inicial)
     await page.goto("/duplas");
-    const chipT2 = page.locator("button[aria-pressed]").filter({
+    // a página tem dois grupos com chip "Todas" (situação e turma) —
+    // o grupo "Filtrar por turma" desambigua
+    const grupoTurma = page.getByRole("group", { name: "Filtrar por turma" });
+    const chipT2 = grupoTurma.locator("button[aria-pressed]").filter({
       hasText: "Turma 2",
     });
     await expect(chipT2).toHaveAttribute("aria-pressed", "true");
     // ...e o contexto não trava — o chip local continua livre
-    const chipTodas = page
+    const chipTodas = grupoTurma
       .locator("button[aria-pressed]")
       .filter({ hasText: "Todas" });
     await chipTodas.click();
@@ -109,11 +112,14 @@ test.describe("demo — contexto de turma (REALIZA-73 · fase A)", () => {
     ).toBeVisible();
     await esperaCookie(page, T2);
 
-    // trocar pelo seletor — mesma gravação, sem sair da página
+    // trocar pelo seletor — mesma gravação, sem sair da página. A URL já
+    // tem ?turma= (estamos no foco T2): esperar pelo valor novo, não pelo
+    // param — /turma=/ resolveria na hora e correria com o router.replace
     await page.getByRole("combobox", { name: "Turma em foco" }).click();
     await page.getByRole("option", { name: /^Turma 1/ }).click();
-    await page.waitForURL(/turma=/);
-    expect(decodeURIComponent(page.url())).toContain(`turma=${T1}`);
+    await page.waitForURL((url) =>
+      decodeURIComponent(url.href).includes(`turma=${T1}`)
+    );
     await esperaCookie(page, T1);
 
     // param lixo → todas, sem erro, cookie preservado

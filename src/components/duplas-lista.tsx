@@ -1047,7 +1047,11 @@ function VisaoCoordenacao({
       {(turmas.length > 1 || supervisores.length > 0) && (
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           {turmas.length > 1 && (
-            <span className="flex flex-wrap items-center gap-1.5">
+            <span
+              className="flex flex-wrap items-center gap-1.5"
+              role="group"
+              aria-label="Filtrar por turma"
+            >
               <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
                 Turma
               </span>
