@@ -38,12 +38,16 @@ import {
   getSolicitacoesDaDupla,
 } from "@/lib/queries-especialista";
 import { getEncerramentoDaDupla, getAvaliacao360DaDupla } from "@/lib/queries-encerramento";
+import { getDesfechoDaDupla } from "@/lib/queries-desfecho";
 import {
   getAvaliacaoLinks,
   getAvaliacaoMediaDpp,
   getEspecialistaAvaliacoes,
 } from "@/lib/queries-avaliacao";
-import { getSupervisoesDaDupla } from "@/lib/queries-supervisao";
+import {
+  getSupervisaoAlvos,
+  getSupervisoesDaDupla,
+} from "@/lib/queries-supervisao";
 import { getFormularios, getInstrumentosDaDupla } from "@/lib/forms/queries";
 import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
 import { getPdmDaDupla, getPdmResumo } from "@/lib/queries-pdm";
@@ -100,6 +104,7 @@ import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
 import { TrilhaFechamento } from "@/components/trilha-fechamento";
 import { EncerramentoDupla } from "@/components/encerramento-dupla";
 import { ResumoJornadaSection } from "@/components/resumo-jornada";
+import { DesfechoDuplaCard } from "@/components/desfecho-dupla";
 import { PdmDupla } from "@/components/pdm-dupla";
 import { InstrumentosDupla } from "./instrumentos-dupla";
 import { TerceirosDupla } from "./terceiros-dupla";
@@ -229,7 +234,7 @@ export default async function DuplaPage({
   const { id } = await params;
   const { aba: abaParam } = await searchParams;
   const aba = parseAba(abaParam);
-  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, supervisoes, instrumentos, terceiros, pdm] =
+  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, supervisoes, instrumentos, terceiros, pdm, alvosSupervisao] =
     await Promise.all([
       getDupla(id),
       getCicloEventos(),
@@ -260,6 +265,10 @@ export default async function DuplaPage({
       getDupla(id).then((d) =>
         d?.trilha === "dpp" ? getPdmDaDupla(id) : null
       ),
+      // alvos de supervisão (0125): diretas + turma dele — o botão "Registrar
+      // supervisão" da ficha usa a mesma lista que alimenta o dialog e a
+      // action; pra não-supervisor a query nem roda (getMe cacheado + [] )
+      getSupervisaoAlvos(),
     ]);
   if (!dupla || !me) notFound();
 
@@ -275,11 +284,13 @@ export default async function DuplaPage({
   ]);
   const nomeVinculo = (v: DuplaVinculo) =>
     `${v.mentor?.nome ?? "—"} e ${v.mentorado?.nome ?? "—"}`;
-  // o supervisor da dupla registra a sessão daqui mesmo — alvo único, sem
-  // query extra (o dialog ganha mentor+dupla já resolvidos)
-  const podeRegistrarSupervisao =
-    dupla.supervisor?.id === me.id &&
-    (dupla.status === "ativa" || dupla.status === "pausada");
+  // quem supervisiona registra a sessão daqui mesmo — alvo único, sem
+  // query extra (o dialog ganha mentor+dupla já resolvidos). A lista de
+  // alvos já é o escopo 0125 (supervisionada direta ou turma dele, só
+  // ativas/pausadas) — estar nela é a permissão inteira
+  const podeRegistrarSupervisao = alvosSupervisao.some(
+    (a) => a.dupla_id === dupla.id
+  );
   const ehEsp = dupla.trilha === "especialista";
   // forms ativos pra "Enviar formulário" da ficha e pro link de avaliação
   // 360º do encerramento — escopo coord (a query já devolve [] pros demais)
@@ -289,6 +300,9 @@ export default async function DuplaPage({
   // data da resposta 360º oficial (0042) — escopo coord: a proveniência do
   // check é detalhe operacional, e a policy de respostas já é coord-only
   const avaliacao360Em = souCoord ? await getAvaliacao360DaDupla(id) : null;
+  // resposta individual do "Depois da mentoria" (0124) — escopo coord
+  // idem: a policy de links/respostas já barra os demais papéis
+  const desfechoEntregas = souCoord ? await getDesfechoDaDupla(id) : [];
   // passos do guia da trilha — ciclo_eventos (DPP, com datas) ou os 5 passos
   // do especialista (sem data: a dupla combina dentro dos 3 meses)
   const espEventos = ehEsp ? await getEspecialistaEventos() : [];
@@ -1039,6 +1053,9 @@ export default async function DuplaPage({
           {mostrarResumo && (
             <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
           )}
+          {souCoord && desfechoEntregas.length > 0 && (
+            <DesfechoDuplaCard entregas={desfechoEntregas} />
+          )}
         </>
       )}
     </>
@@ -1146,6 +1163,9 @@ export default async function DuplaPage({
       )}
       {!fechamentoEmFoco && mostrarResumo && (
         <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+      )}
+      {souCoord && desfechoEntregas.length > 0 && (
+        <DesfechoDuplaCard entregas={desfechoEntregas} />
       )}
     </>
   );

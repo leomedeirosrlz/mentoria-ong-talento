@@ -1,6 +1,12 @@
 "use client";
 
-import { useId, useMemo, useState, useTransition } from "react";
+import {
+  useId,
+  useMemo,
+  useState,
+  useTransition,
+  type ReactNode,
+} from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { toast } from "sonner";
@@ -15,6 +21,7 @@ import {
   WhatsappLogo,
 } from "@phosphor-icons/react";
 import {
+  enviarDesfechoLote,
   enviarInstrumentoLote,
   type LoteInstrumentoLinha,
 } from "@/lib/actions-email";
@@ -57,7 +64,26 @@ export type DuplaLote = {
   mentorNome: string;
   jovemTemEmail: boolean;
   mentorTemEmail: boolean;
+  /** Contexto extra da linha (ex.: "concluída em jan/2026" no lote 6m) —
+   *  entra como prefixo do detalhe quando presente. */
+  detalhe?: string;
 };
+
+/** Contrato do disparo — a action do lote (qualquer um dos dois tipos)
+ *  devolve o mesmo relatório por linha. */
+export type DisparoLote = (
+  duplaIds: string[]
+) => Promise<
+  | { error: string }
+  | {
+      ok: true;
+      enviados: number;
+      falhas: number;
+      pulados: number;
+      envioLiberado: boolean;
+      linhas: LoteInstrumentoLinha[];
+    }
+>;
 
 function destinoDe(d: DuplaLote): "jovem" | "mentor" | "nenhum" {
   if (d.jovemTemEmail) return "jovem";
@@ -71,22 +97,35 @@ const DESTINO_DETALHE: Record<ReturnType<typeof destinoDe>, string> = {
   nenhum: "sem e-mail: WhatsApp",
 };
 
-export function EnviarInstrumentoLote({
-  sistema,
+/** O dialog do lote — genérico: recebe o nome do instrumento, a copy do
+ *  cabeçalho, a prévia do e-mail e a action que dispara. As duas
+ *  especializações moram embaixo (instrumento da jornada e desfecho 6m). */
+export function EnviarLinkLote({
+  instrumento,
   estacaoTitulo,
+  descricao,
   linhas,
   envioLiberado,
   contador,
+  disparar: dispararAcao,
+  previewEmail,
 }: {
-  sistema: InstrumentoSistema;
-  /** Nome da estação do painel ("Visão", "Roda formal") — o cabeçalho diz
-   *  o que está sendo disparado; o e-mail leva o título oficial do form. */
+  /** Nome do formulário na copy ("Definindo Minhas Metas", "Depois da
+   *  mentoria") — vai na msg do WhatsApp e na prévia do e-mail. */
+  instrumento: string;
+  /** Nome do que está sendo disparado ("Visão", "Depois da mentoria · 6
+   *  meses") — o cabeçalho diz o que está sendo enviado. */
   estacaoTitulo: string;
+  /** Frase sob o título do dialog — explica o fluxo do lote em uma linha. */
+  descricao: string;
   linhas: DuplaLote[];
   envioLiberado: boolean;
   /** Contagem de elegíveis no gatilho ("Enviar em lote · N") — o icard do
    *  v5c traz o número de cara; sem ele o gatilho fica só o rótulo. */
   contador?: number;
+  disparar: DisparoLote;
+  /** Prévia do e-mail que sai (título + corpo de exemplo). */
+  previewEmail: { titulo: string; corpo: ReactNode };
 }) {
   const uid = useId();
   const listaId = `${uid}-duplas`;
@@ -99,7 +138,6 @@ export function EnviarInstrumentoLote({
   const [report, setReport] = useState<LoteInstrumentoLinha[] | null>(null);
   const [pending, start] = useTransition();
 
-  const instrumento = INSTRUMENTO_INFO[sistema].titulo;
   const porDupla = useMemo(
     () => new Map(linhas.map((l) => [l.duplaId, l])),
     [linhas]
@@ -127,7 +165,7 @@ export function EnviarInstrumentoLote({
     start(async () => {
       let r;
       try {
-        r = await enviarInstrumentoLote({ sistema, duplaIds });
+        r = await dispararAcao(duplaIds);
       } catch {
         toast.error("Sem conexão. Tente de novo.");
         return;
@@ -187,10 +225,7 @@ export function EnviarInstrumentoLote({
       <DialogContent size="2xl">
         <DialogHeader>
           <DialogTitle>Enviar “{estacaoTitulo}” em lote</DialogTitle>
-          <DialogDescription>
-            O link do instrumento sai por e-mail pro jovem. Quem não tem
-            e-mail cadastrado recebe pelo mentor.
-          </DialogDescription>
+          <DialogDescription>{descricao}</DialogDescription>
         </DialogHeader>
 
         <AnimatePresence mode="wait" initial={false}>
@@ -324,7 +359,7 @@ export function EnviarInstrumentoLote({
                     <li key={d.duplaId}>
                       <DestinoCheckRow
                         nome={d.jovemNome}
-                        detalhe={`mentor ${d.mentorNome.split(" ")[0]} · ${DESTINO_DETALHE[destinoDe(d)]}`}
+                        detalhe={`${d.detalhe ? `${d.detalhe} · ` : ""}mentor ${d.mentorNome.split(" ")[0]} · ${DESTINO_DETALHE[destinoDe(d)]}`}
                         checked={sel.has(d.duplaId)}
                         onToggle={() => toggle(d.duplaId)}
                       />
@@ -369,14 +404,9 @@ export function EnviarInstrumentoLote({
                   Prévia do e-mail
                 </summary>
                 <div className="mt-1.5 rounded-lg border border-border/60 bg-muted/40 px-3 py-2.5 text-xs leading-relaxed">
-                  <p className="font-semibold">
-                    {instrumento}: chegou a sua vez na jornada
-                  </p>
+                  <p className="font-semibold">{previewEmail.titulo}</p>
                   <p className="mt-1 text-muted-foreground">
-                    “Oi, Ana! Chegou a sua vez de responder{" "}
-                    <strong>{instrumento}</strong>, um exercício da sua
-                    jornada de mentoria. Responda no seu tempo, direto pelo
-                    botão, sem senha nem cadastro.” + o link pessoal.
+                    {previewEmail.corpo}
                   </p>
                 </div>
               </details>
@@ -458,5 +488,83 @@ function ResumoRelatorio({ linhas }: { linhas: LoteInstrumentoLinha[] }) {
         </span>
       )}
     </p>
+  );
+}
+
+/** Lote do instrumento da estação (REALIZA-51) — wrapper do
+ *  EnviarLinkLote com a action e a copy dos instrumentos da jornada. */
+export function EnviarInstrumentoLote({
+  sistema,
+  estacaoTitulo,
+  linhas,
+  envioLiberado,
+  contador,
+}: {
+  sistema: InstrumentoSistema;
+  /** Nome da estação do painel ("Visão", "Roda formal") — o cabeçalho diz
+   *  o que está sendo disparado; o e-mail leva o título oficial do form. */
+  estacaoTitulo: string;
+  linhas: DuplaLote[];
+  envioLiberado: boolean;
+  contador?: number;
+}) {
+  const instrumento = INSTRUMENTO_INFO[sistema].titulo;
+  return (
+    <EnviarLinkLote
+      instrumento={instrumento}
+      estacaoTitulo={estacaoTitulo}
+      descricao="O link do instrumento sai por e-mail pro jovem. Quem não tem e-mail cadastrado recebe pelo mentor."
+      linhas={linhas}
+      envioLiberado={envioLiberado}
+      contador={contador}
+      disparar={(duplaIds) => enviarInstrumentoLote({ sistema, duplaIds })}
+      previewEmail={{
+        titulo: `${instrumento}: chegou a sua vez na jornada`,
+        corpo: (
+          <>
+            “Oi, Ana! Chegou a sua vez de responder{" "}
+            <strong>{instrumento}</strong>, um exercício da sua jornada de
+            mentoria. Responda no seu tempo, direto pelo botão, sem senha
+            nem cadastro.” + o link pessoal.
+          </>
+        ),
+      }}
+    />
+  );
+}
+
+/** Lote do "Depois da mentoria · 6 meses" (REALIZA-216) — a fila são as
+ *  duplas concluídas há ≥180 dias; o disparo chama a action do desfecho
+ *  com a copy do questionário (não é exercício da jornada). */
+export function EnviarDesfechoLote({
+  linhas,
+  envioLiberado,
+  contador,
+}: {
+  linhas: DuplaLote[];
+  envioLiberado: boolean;
+  contador?: number;
+}) {
+  return (
+    <EnviarLinkLote
+      instrumento="Depois da mentoria"
+      estacaoTitulo="Depois da mentoria · 6 meses"
+      descricao="O questionário sai por e-mail pro jovem. Quem não tem e-mail cadastrado recebe pelo mentor."
+      linhas={linhas}
+      envioLiberado={envioLiberado}
+      contador={contador}
+      disparar={(duplaIds) => enviarDesfechoLote({ duplaIds })}
+      previewEmail={{
+        titulo: "Depois da mentoria: como você está?",
+        corpo: (
+          <>
+            “Oi, Ana! Faz um tempo que a sua mentoria terminou e a gente
+            quer saber: <strong>como você está?</strong> Estudando,
+            trabalhando, empreendendo? São 2 perguntinhas rápidas.” + o
+            link pessoal.
+          </>
+        ),
+      }}
+    />
   );
 }

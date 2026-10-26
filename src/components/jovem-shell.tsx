@@ -6,8 +6,8 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import {
   CalendarDots,
-  DotsThree,
   House,
+  List,
   Path,
   Sparkle,
   UserCircle,
@@ -20,10 +20,11 @@ import { NotificacoesBell, NotificacoesProvider } from "@/components/notificacoe
 import { SignOutButton } from "@/components/signout-button";
 import { SiteFooter } from "@/components/site-footer";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import type { Notificacao, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -41,17 +42,15 @@ const NAV = [
   { href: "/jovem/perfil", label: "Perfil", icon: UserCircle },
 ] as const;
 
-/** Bottom nav: 5 cells no máximo (mesmo contrato do AppShell — 6 labels a
- *  375px colidiam "EspecialistasPessoasJornada"). Primárias = o que ela
- *  abre todo dia: home, agenda, a jornada (é onde moram os links dos
- *  forms) e as pessoas. Especialistas e Perfil a 1 toque no "Mais". */
+/** Bottom nav: 4 destinos fixos + Menu (REALIZA-221). Primárias = o que
+ *  ela mais usa: home, o catálogo de especialistas, a jornada (é onde
+ *  moram os links dos forms e o acervo) e a agenda. Pessoas e Perfil
+ *  ficam no menu lateral, que tem a navegação inteira. */
 const MOBILE_PRIMEIRO = [
   "/jovem",
-  "/jovem/agenda",
-  "/jovem/materiais",
-  "/jovem/pessoas",
   "/jovem/especialistas",
-  "/jovem/perfil",
+  "/jovem/materiais",
+  "/jovem/agenda",
 ] as const;
 
 function ativo(pathname: string, href: string) {
@@ -72,24 +71,18 @@ export function JovemShell({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const [abertoMais, setAbertoMais] = useState(false);
+  const [menuAberto, setMenuAberto] = useState(false);
   // rodapé da sidebar: a pílula "float" da demo se encaixa aqui no desktop
   const [slotDemo, setSlotDemo] = useState<HTMLDivElement | null>(null);
-  const itemsMobile = [...NAV].sort(
-    (a, b) =>
-      MOBILE_PRIMEIRO.indexOf(a.href as (typeof MOBILE_PRIMEIRO)[number]) -
-      MOBILE_PRIMEIRO.indexOf(b.href as (typeof MOBILE_PRIMEIRO)[number])
-  );
-  const visiveis = itemsMobile.slice(0, 4);
-  const overflow = itemsMobile.slice(4);
-  const maisAtivo = overflow.some((i) => pathname.startsWith(i.href));
+  const visiveis = MOBILE_PRIMEIRO.map((href) => NAV.find((i) => i.href === href)!);
+  const menuAtivo = !visiveis.some((i) => ativo(pathname, i.href));
 
-  // navegar pelo popover (ou por fora) fecha o Mais — ajuste durante o
+  // navegar pelo menu (ou por fora) fecha o painel — ajuste durante o
   // render (padrão "props mudaram", igual ao AppShell)
   const [ultimoPath, setUltimoPath] = useState(pathname);
   if (pathname !== ultimoPath) {
     setUltimoPath(pathname);
-    setAbertoMais(false);
+    setMenuAberto(false);
   }
 
   // nome de uso primeiro — o cadastro guarda o civil, mas a tela chama pelo
@@ -230,8 +223,8 @@ export function JovemShell({
           <SiteFooter tone="ink" />
         </div>
 
-        {/* bottom nav mobile — 5 cells no máximo, overflow no "Mais"
-            (mesmo padrão do AppShell; 6 labels a 375px colidiam) */}
+        {/* bottom nav mobile — 4 destinos + Menu lateral (mesmo padrão do
+            AppShell; 6 labels a 375px colidiam) */}
         <nav
           aria-label="Navegação principal"
           className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:hidden"
@@ -264,23 +257,19 @@ export function JovemShell({
                 </Link>
               );
             })}
-            <Popover open={abertoMais} onOpenChange={setAbertoMais}>
-              <PopoverTrigger
-                aria-label={
-                  maisAtivo
-                    ? `Mais seções, seção atual em ${overflow.find((i) => pathname.startsWith(i.href))?.label}`
-                    : "Mais seções"
-                }
+            <Sheet open={menuAberto} onOpenChange={setMenuAberto}>
+              <SheetTrigger
+                aria-label={menuAtivo ? "Menu, seção atual fora da barra" : "Menu"}
                 className={cn(
                   "relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
-                  maisAtivo
+                  menuAtivo
                     ? "font-semibold text-[var(--brand-ink)]"
                     : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
                 )}
               >
-                {/* a rota atual mora no overflow → o indicador viaja pra
-                    cell Mais e ela veste o estilo ativo */}
-                {maisAtivo && (
+                {/* a rota atual mora no menu → o indicador viaja pra
+                    cell Menu e ela veste o estilo ativo */}
+                {menuAtivo && (
                   <motion.span
                     layoutId="nav-jovem-bottom"
                     transition={T.pill}
@@ -288,34 +277,52 @@ export function JovemShell({
                     className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--role-mentorado)]"
                   />
                 )}
-                <DotsThree size={20} weight={maisAtivo ? "bold" : "regular"} aria-hidden />
-                Mais
-              </PopoverTrigger>
-              <PopoverContent side="top" align="end" sideOffset={8} className="w-56 p-1.5">
-                <ul>
-                  {overflow.map((item) => {
+                <List size={20} weight={menuAtivo ? "bold" : "regular"} aria-hidden />
+                Menu
+              </SheetTrigger>
+              <SheetContent side="left" className="pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+                <div className="px-5 pt-5 pb-5">
+                  <SheetTitle className="sr-only">Menu</SheetTitle>
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src="/logo-realiza.png" alt="Realiza.vc" className="h-6 w-auto" />
+                  <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    Programa de Mentoria Social
+                  </p>
+                </div>
+                <nav aria-label="Menu" className="flex-1 space-y-1 px-3 pb-3">
+                  {NAV.map((item) => {
                     const at = ativo(pathname, item.href);
                     return (
-                      <li key={item.href}>
-                        <Link
-                          href={item.href}
-                          aria-current={at ? "page" : undefined}
-                          className={cn(
-                            "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors outline-none focus-visible:bg-muted",
-                            at
-                              ? "font-semibold text-[var(--brand-ink)]"
-                              : "text-foreground/80 hover:bg-muted"
-                          )}
-                        >
-                          <item.icon size={18} weight={at ? "fill" : "regular"} aria-hidden />
-                          {item.label}
-                        </Link>
-                      </li>
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        aria-current={at ? "page" : undefined}
+                        className={cn(
+                          "relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50",
+                          at
+                            ? "font-semibold text-[var(--brand-ink)]"
+                            : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                        )}
+                      >
+                        {at && (
+                          <motion.span
+                            layoutId="nav-jovem-sheet"
+                            transition={T.pill}
+                            aria-hidden
+                            className="absolute inset-0 -z-10 rounded-lg bg-[var(--role-mentorado)]"
+                          />
+                        )}
+                        <item.icon size={18} weight={at ? "fill" : "regular"} aria-hidden className="relative" />
+                        <span className="relative">{item.label}</span>
+                      </Link>
                     );
                   })}
-                </ul>
-              </PopoverContent>
-            </Popover>
+                </nav>
+                <div className="border-t border-sidebar-border px-3 pt-3 pb-4">
+                  <SignOutButton className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50" />
+                </div>
+              </SheetContent>
+            </Sheet>
           </div>
         </nav>
       </div>

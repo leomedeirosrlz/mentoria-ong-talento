@@ -400,6 +400,61 @@ export function emailInstrumentoRepasseMentor({
   });
 }
 
+/** "Depois da mentoria" pro JOVEM (REALIZA-216 — lote da coordenação,
+ *  6 meses depois da conclusão). Não é exercício da jornada: é a pergunta
+ *  de desfecho — a copy lembra de onde ele conhece o programa e diz pra
+ *  que serve a resposta (a finalidade LGPD do form, em linguagem simples). */
+export function emailDesfechoJovem({
+  primeiroNome,
+  link,
+}: {
+  primeiroNome: string;
+  link: string;
+}): string {
+  const instrumento = "Depois da mentoria";
+  return emailLayout({
+    titulo: instrumento,
+    tagline: "Programa de Mentoria",
+    conteudoHtml:
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${primeiroNome ? `, ${esc(primeiroNome)}` : ""}!</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Faz um tempo que a sua mentoria terminou e a gente quer saber: <strong>como você está?</strong> Estudando, trabalhando, empreendendo?</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">São 2 perguntinhas rápidas. Sua resposta ajuda o Instituto a medir se a mentoria funciona e a prestar contas a quem apoia o programa; a gente só publica números juntos, nunca a sua resposta sozinha.</p>`,
+    ctaLabel: "Responder agora",
+    ctaHref: link,
+    preheader:
+      "Como você está depois da mentoria? 2 perguntinhas, sem senha.",
+    rodapeExtra: `Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;">${esc(link)}</span><br>Este link é pessoal e só seu.`,
+  });
+}
+
+/** Repasse do desfecho pelo mentor (jovem sem e-mail cadastrado) — mesmo
+ *  arranjo do lote de instrumentos: o mentor é o canal, a resposta é da
+ *  jovem. */
+export function emailDesfechoRepasseMentor({
+  mentorNome,
+  jovemNome,
+  link,
+}: {
+  mentorNome: string;
+  jovemNome: string;
+  link: string;
+}): string {
+  const primeiroMentor = mentorNome.trim().split(/\s+/)[0] ?? "";
+  const primeiroJovem = jovemNome.trim().split(/\s+/)[0] ?? "";
+  return emailLayout({
+    titulo: "Depois da mentoria",
+    tagline: "Programa de Mentoria",
+    conteudoHtml:
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${primeiroMentor ? `, ${esc(primeiroMentor)}` : ""}!</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};"><strong>${esc(jovemNome)}</strong> não tem e-mail cadastrado, então o link do questionário <strong>Depois da mentoria</strong> veio pra você.</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Repasse pra ${esc(primeiroJovem) || "a jovem"} — são 2 perguntinhas sobre como ela está depois da jornada, e a resposta é dela. O link abre direto, sem senha.</p>`,
+    ctaLabel: "Abrir o link",
+    ctaHref: link,
+    preheader: `Depois da mentoria: o link de ${jovemNome} veio pra você repassar.`,
+    rodapeExtra: `Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;">${esc(link)}</span><br>Este link é de ${esc(jovemNome)}.`,
+  });
+}
+
 // 0084 — chamados unificados: urgência/origem jovem avisa a equipe por
 // e-mail (o sino não é garantia pra canal de segurança) e atualização
 // pública chega ao autor também fora do app.

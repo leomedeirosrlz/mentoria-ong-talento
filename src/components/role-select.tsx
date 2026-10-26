@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CircleNotch } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { setPessoaRole } from "@/lib/actions";
+import { EscopoAuxiliarDialog } from "@/components/escopo-auxiliar-dialog";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -31,6 +32,9 @@ export function RoleSelect({ profileId, role, nome }: { profileId: string; role:
   // em vez de aplicar direto; o value controlado segue mostrando o papel
   // atual até a pessoa confirmar
   const [confirmaCoord, setConfirmaCoord] = useState(false);
+  // auxiliar executivo pede o escopo (REALIZA-32): "só as duplas dele" ou
+  // "toda a turma" — o dialog aplica papel + escopo juntos
+  const [escopoAux, setEscopoAux] = useState(false);
   const router = useRouter();
 
   function aplicar(v: string | null) {
@@ -59,6 +63,7 @@ export function RoleSelect({ profileId, role, nome }: { profileId: string; role:
         items={ROLE_LABEL}
         onValueChange={(v) => {
           if (v === "coordenacao" && role !== "coordenacao") setConfirmaCoord(true);
+          else if (v === "supervisor" && role !== "supervisor") setEscopoAux(true);
           else aplicar(v);
         }}
       >
@@ -104,6 +109,14 @@ export function RoleSelect({ profileId, role, nome }: { profileId: string; role:
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <EscopoAuxiliarDialog
+        profileId={profileId}
+        nome={nome}
+        atribuir
+        open={escopoAux}
+        onOpenChange={setEscopoAux}
+      />
     </>
   );
 }
