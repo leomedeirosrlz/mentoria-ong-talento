@@ -25,6 +25,7 @@ import type {
 import { cn } from "@/lib/utils";
 import { AnexosRegistro } from "@/components/anexos-registro";
 import { Button } from "@/components/ui/button";
+import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -500,6 +501,7 @@ export function RegistroForm({
         autorId={posSave.autorId}
         aviso={posSave.aviso}
         onFechar={fecharPosSave}
+        embutido={embutido}
       />
     );
   }
@@ -898,39 +900,50 @@ export function RegistroForm({
 
       {/* rodapé do wizard — sticky pra Avançar/Salvar ficarem à mão no mobile
           (o painel inline usa overflow:clip — sem scrollport, o sticky segue
-          valendo pro documento) */}
-      <div
-        className={cn(
-          "sticky flex items-center gap-2 border-t py-3",
-          embutido
-            ? // no dialog o bottom-0 é do scrollport do popup — a bottom nav
-              // da página fica sob o overlay e não interfere
-              "bottom-0 -mx-4 -mb-4 bg-popover px-4"
-            : // inline (ficha da dupla): no mobile pula a bottom nav fixa
-              "bottom-[calc(4rem+env(safe-area-inset-bottom))] -mx-5 -mb-5 rounded-b-xl bg-card px-5 md:bottom-0"
-        )}
-      >
-        {etapa > 0 && (
-          <Button type="button" variant="ghost" onClick={() => irPara(etapa - 1)}>
-            <CaretLeft size={14} /> Voltar
-          </Button>
-        )}
-        {etapa < ETAPAS.length - 1 ? (
+          valendo pro documento). No dialog é o DialogFooter compartilhado;
+          inline (ficha da dupla) mantém o offset próprio pra pular a bottom
+          nav fixa do app */}
+      {(() => {
+        const botoes = (
           <>
-            {/* sem submit visível antes da etapa 3, Enter num input de texto
-                não teria pra onde ir — este escondido mantém a submissão
-                implícita viva, e o portão da avaliação devolve pra etapa 1 */}
-            <button type="submit" hidden />
-            <Button type="button" className="flex-1" onClick={avancar}>
-              Avançar <CaretRight size={14} />
-            </Button>
+            {etapa > 0 && (
+              <Button
+                type="button"
+                variant="ghost"
+                className={cn(embutido && "sm:me-auto")}
+                onClick={() => irPara(etapa - 1)}
+              >
+                <CaretLeft size={14} /> Voltar
+              </Button>
+            )}
+            {etapa < ETAPAS.length - 1 ? (
+              <>
+                {/* sem submit visível antes da etapa 3, Enter num input de
+                    texto não teria pra onde ir — este escondido mantém a
+                    submissão implícita viva, e o portão da avaliação devolve
+                    pra etapa 1 */}
+                <button type="submit" hidden />
+                <Button type="button" className="flex-1" onClick={avancar}>
+                  Avançar <CaretRight size={14} />
+                </Button>
+              </>
+            ) : (
+              <Button type="submit" className="flex-1" disabled={pending}>
+                {pending ? "Salvando…" : registro ? "Salvar alterações" : "Salvar registro"}
+              </Button>
+            )}
           </>
+        );
+        return embutido ? (
+          // no dialog o bottom-0 é do scrollport do popup — a bottom nav da
+          // página fica sob o overlay e não interfere
+          <DialogFooter sticky>{botoes}</DialogFooter>
         ) : (
-          <Button type="submit" className="flex-1" disabled={pending}>
-            {pending ? "Salvando…" : registro ? "Salvar alterações" : "Salvar registro"}
-          </Button>
-        )}
-      </div>
+          <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] -mx-5 -mb-5 flex items-center gap-2 rounded-b-xl border-t bg-card px-5 py-3 md:bottom-0">
+            {botoes}
+          </div>
+        );
+      })()}
     </form>
   );
 }
@@ -946,12 +959,16 @@ function PosSaveRegistro({
   autorId,
   aviso,
   onFechar,
+  embutido = false,
 }: {
   registroId: string;
   duplaId: string;
   autorId: string;
   aviso?: string;
   onFechar: () => void;
+  /** dentro de dialog o rodapé é o DialogFooter compartilhado; inline ele
+      segue a barrinha própria do card */
+  embutido?: boolean;
 }) {
   const router = useRouter();
   useEffect(() => () => router.refresh(), [router]);
@@ -975,11 +992,19 @@ function PosSaveRegistro({
         podeRemover
         anexos={SEM_ANEXOS}
       />
-      <div className="flex justify-end border-t pt-3">
-        <Button type="button" onClick={onFechar}>
-          Concluir
-        </Button>
-      </div>
+      {embutido ? (
+        <DialogFooter>
+          <Button type="button" onClick={onFechar}>
+            Concluir
+          </Button>
+        </DialogFooter>
+      ) : (
+        <div className="flex justify-end border-t pt-3">
+          <Button type="button" onClick={onFechar}>
+            Concluir
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

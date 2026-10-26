@@ -23,6 +23,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -259,12 +260,12 @@ export function PedirEspecialistaDialog({
       <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Pedir apoio de um especialista</DialogTitle>
+          <DialogDescription className="leading-relaxed">
+            Especialistas são mentores pra temas pontuais: uma prova, um
+            projeto, uma decisão. Você manda o pedido, a pessoa responde e
+            vocês marcam a sessão juntos.
+          </DialogDescription>
         </DialogHeader>
-        <DialogDescription className="leading-relaxed">
-          Especialistas são mentores pra temas pontuais: uma prova, um
-          projeto, uma decisão. Você manda o pedido, a pessoa responde e
-          vocês marcam a sessão juntos.
-        </DialogDescription>
         <form onSubmit={submit} className="space-y-4">
           <div className="grid gap-2 sm:grid-cols-2">
             <OpcaoAlvo
@@ -448,19 +449,29 @@ export function PedirEspecialistaDialog({
             </p>
           )}
 
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={!podeEnviar || !textoOk || pending}
-            aria-busy={pending}
-          >
-            {pending ? (
-              <CircleNotch size={16} className="animate-spin" aria-hidden />
-            ) : (
-              <CheckCircle size={16} aria-hidden />
-            )}
-            {pending ? "Enviando…" : "Enviar pedido"}
-          </Button>
+          {/* sticky: a lista de especialistas rola até 40dvh — o envio fica
+              preso no pé do popup */}
+          <DialogFooter sticky>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={!podeEnviar || !textoOk || pending}
+              aria-busy={pending}
+            >
+              {pending ? (
+                <CircleNotch size={16} className="animate-spin" aria-hidden />
+              ) : (
+                <CheckCircle size={16} aria-hidden />
+              )}
+              {pending ? "Enviando…" : "Enviar pedido"}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

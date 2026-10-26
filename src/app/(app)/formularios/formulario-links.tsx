@@ -718,7 +718,14 @@ export function FormularioLinks({
 
                   <ValidadeLinks value={validade} onChange={setValidade} />
 
-                  <DialogFooter>
+                  <DialogFooter sticky>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={() => aoAbrir(false)}
+                    >
+                      Cancelar
+                    </Button>
                     <Button
                       type="button"
                       onClick={gerarSelecionados}

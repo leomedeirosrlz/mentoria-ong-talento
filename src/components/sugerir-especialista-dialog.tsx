@@ -10,6 +10,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -196,9 +197,18 @@ export function SugerirEspecialistaDialog({
               </SelectContent>
             </Select>
           </div>
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Registrando…" : "Registrar sugestão"}
-          </Button>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Registrando…" : "Registrar sugestão"}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

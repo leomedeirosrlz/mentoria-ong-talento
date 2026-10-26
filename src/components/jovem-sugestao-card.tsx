@@ -16,6 +16,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -211,14 +212,18 @@ export function SugestaoEspecialistaCard({
                 </p>
               )}
             </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setOpen(false)}>
+              Cancelar
+            </Button>
             <Button
-              className="w-full"
               onClick={confirmar}
               disabled={pending || demanda.trim().length < 10}
             >
               {pending ? "Enviando…" : "Enviar pedido"}
             </Button>
-          </div>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

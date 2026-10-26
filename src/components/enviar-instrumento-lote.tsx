@@ -38,6 +38,7 @@ import { fade, T } from "@/components/motion";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -284,11 +285,25 @@ export function EnviarLinkLote({
                   );
                 })}
               </ul>
-              <DialogFooter showCloseButton>
+              {/* mesmo arranjo dos outros estados de relatório: voltar é
+                  terciária à esquerda, ação do estado por último */}
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="sm:me-auto"
+                  onClick={() => setReport(null)}
+                >
+                  Voltar à seleção
+                </Button>
+                <DialogClose
+                  render={<Button type="button" variant="outline" />}
+                >
+                  Fechar
+                </DialogClose>
                 {nFalhas > 0 && (
                   <Button
                     type="button"
-                    variant="outline"
                     disabled={pending}
                     onClick={() =>
                       disparar(
@@ -304,13 +319,6 @@ export function EnviarLinkLote({
                     Tentar de novo nas falhas
                   </Button>
                 )}
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setReport(null)}
-                >
-                  Voltar à seleção
-                </Button>
               </DialogFooter>
             </motion.div>
           ) : (
@@ -411,10 +419,16 @@ export function EnviarLinkLote({
                 </div>
               </details>
 
-              <DialogFooter>
+              <DialogFooter sticky>
                 <Button
                   type="button"
-                  className="w-full sm:w-auto"
+                  variant="outline"
+                  onClick={() => aoAbrir(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
                   onClick={() => disparar()}
                   disabled={pending || selecionadas.length === 0}
                 >

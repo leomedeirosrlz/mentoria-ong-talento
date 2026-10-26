@@ -12,6 +12,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -147,7 +148,7 @@ export function SaidaMentoradoDialog({
                 depois, aqui mesmo.
               </p>
             </div>
-            <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <DialogFooter>
               <Button variant="outline" onClick={() => onOpenChange(false)}>
                 Voltar
               </Button>
@@ -158,7 +159,7 @@ export function SaidaMentoradoDialog({
               >
                 Abrir a ficha da dupla
               </Button>
-            </div>
+            </DialogFooter>
           </div>
         ) : (
           <form onSubmit={submit} className="space-y-4">
@@ -266,13 +267,22 @@ export function SaidaMentoradoDialog({
               </p>
             )}
 
-            <Button type="submit" className="w-full" disabled={pending}>
-              {pending
-                ? "Registrando…"
-                : situacao === "desistente"
-                  ? "Registrar desistência"
-                  : "Marcar como concluída"}
-            </Button>
+            <DialogFooter sticky>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onOpenChange(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={pending}>
+                {pending
+                  ? "Registrando…"
+                  : situacao === "desistente"
+                    ? "Registrar desistência"
+                    : "Marcar como concluída"}
+              </Button>
+            </DialogFooter>
           </form>
         )}
       </DialogContent>

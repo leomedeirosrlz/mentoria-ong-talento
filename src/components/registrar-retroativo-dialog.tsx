@@ -8,7 +8,7 @@ import { registrarEncontroRetroativo } from "@/lib/actions";
 import { formatDate, type EncontroFaltante } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -169,13 +169,13 @@ export function RegistrarRetroativoDialog({
       <DialogContent size="md">
         <DialogHeader>
           <DialogTitle>Registrar {nome} que já aconteceu</DialogTitle>
+          <DialogDescription className="leading-relaxed">
+            Se encontraram sem agendar por aqui (combinaram por WhatsApp, por
+            exemplo), conte quando foi. {esp ? "A sessão" : "O encontro"} já
+            nasce como realizad{esp ? "a" : "o"} e você completa o registro em
+            seguida.
+          </DialogDescription>
         </DialogHeader>
-        <DialogDescription className="leading-relaxed">
-          Se encontraram sem agendar por aqui (combinaram por WhatsApp, por
-          exemplo), conte quando foi. {esp ? "A sessão" : "O encontro"} já
-          nasce como realizad{esp ? "a" : "o"} e você completa o registro em
-          seguida.
-        </DialogDescription>
         <form onSubmit={submit} className="space-y-4">
           <div className="space-y-2">
             <Label id="retro-numero-label">
@@ -218,10 +218,19 @@ export function RegistrarRetroativoDialog({
               onChange={(e) => setQuando(e.target.value)}
             />
           </div>
-          <Button type="submit" className="w-full" disabled={pending}>
-            <ClockCounterClockwise size={16} />
-            {pending ? "Salvando…" : `Registrar ${nome}`}
-          </Button>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending}>
+              <ClockCounterClockwise size={16} />
+              {pending ? "Salvando…" : `Registrar ${nome}`}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

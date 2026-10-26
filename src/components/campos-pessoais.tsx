@@ -20,6 +20,7 @@ import {
 import type { DiaSemana, Disponibilidade, Periodo } from "@/lib/types";
 import { TagInput } from "@/components/tag-input";
 import { Button } from "@/components/ui/button";
+import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -622,11 +623,17 @@ export function WizardFicha({
         </div>
       ))}
 
-      {/* rodapé do wizard — sticky pra Avançar/Salvar ficarem à mão com o
-          form rolado ao meio (o DialogContent é o scrollport) */}
-      <div className="sticky bottom-0 -mx-4 -mb-4 flex items-center gap-2 border-t bg-popover px-4 py-3">
+      {/* rodapé do wizard — o DialogFooter compartilhado no modo sticky
+          (o DialogContent é o scrollport): Voltar é nav de etapa, fica à
+          esquerda; Avançar/Salvar ocupa o resto da linha */}
+      <DialogFooter sticky>
         {etapa > 0 && (
-          <Button type="button" variant="ghost" onClick={() => irPara(etapa - 1)}>
+          <Button
+            type="button"
+            variant="ghost"
+            className="sm:me-auto"
+            onClick={() => irPara(etapa - 1)}
+          >
             <CaretLeft size={14} /> Voltar
           </Button>
         )}
@@ -639,7 +646,7 @@ export function WizardFicha({
             {pending ? pendingLabel : submitLabel}
           </Button>
         )}
-      </div>
+      </DialogFooter>
     </form>
   );
 }

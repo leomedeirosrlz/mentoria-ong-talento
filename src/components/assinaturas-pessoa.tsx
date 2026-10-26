@@ -45,6 +45,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -202,10 +203,19 @@ function ContraAssinaturaDialog() {
               {nomeArquivo ?? "PNG com fundo transparente, até 1 MB"}
             </span>
           </div>
-          <Button type="submit" size="sm" disabled={pending || !nomeArquivo}>
-            {pending && <CircleNotch size={14} className="animate-spin" />}
-            {pending ? "Enviando…" : "Subir imagem"}
-          </Button>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending || !nomeArquivo}>
+              {pending && <CircleNotch size={14} className="animate-spin" />}
+              {pending ? "Enviando…" : "Subir imagem"}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

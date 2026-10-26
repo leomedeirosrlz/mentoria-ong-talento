@@ -31,6 +31,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
+  DialogClose,
   DialogContent,
   DialogDescription,
   DialogFooter,
@@ -447,24 +448,13 @@ export function EnviarTermosDialog({
                 </div>
               )}
 
-              <div className="flex flex-wrap justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={copiarTodos}
-                >
-                  {copiouTodos ? (
-                    <Check aria-hidden className="text-[var(--ok)]" />
-                  ) : (
-                    <CopySimple aria-hidden />
-                  )}
-                  {copiouTodos ? "Copiados" : "Copiar todos"}
-                </Button>
+              {/* mesmo arranjo do LinksProntos: voltar é terciária à
+                  esquerda, ação de lote é a primária do estado */}
+              <DialogFooter>
                 <Button
                   type="button"
                   variant="ghost"
-                  size="sm"
+                  className="sm:me-auto"
                   onClick={() => {
                     setResultado(null);
                     setEnviado(false);
@@ -472,7 +462,20 @@ export function EnviarTermosDialog({
                 >
                   Emitir pra mais pessoas
                 </Button>
-              </div>
+                <DialogClose
+                  render={<Button type="button" variant="outline" />}
+                >
+                  Fechar
+                </DialogClose>
+                <Button type="button" onClick={copiarTodos}>
+                  {copiouTodos ? (
+                    <Check aria-hidden className="text-[var(--ok)]" />
+                  ) : (
+                    <CopySimple aria-hidden />
+                  )}
+                  {copiouTodos ? "Copiados" : "Copiar todos"}
+                </Button>
+              </DialogFooter>
             </motion.div>
           ) : docsDisponiveis.length === 0 ? (
             <motion.p
@@ -540,10 +543,16 @@ export function EnviarTermosDialog({
                 hora de assinar. Quem já assinou não recebe link de novo.
               </p>
 
-              <DialogFooter>
+              <DialogFooter sticky>
                 <Button
                   type="button"
-                  className="w-full sm:w-auto"
+                  variant="outline"
+                  onClick={() => aoAbrir(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  type="button"
                   onClick={emitir}
                   disabled={pending || !docSel || marcados.size === 0}
                   aria-busy={pending}

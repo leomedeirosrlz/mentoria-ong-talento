@@ -6,6 +6,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -173,14 +174,16 @@ function FormDisponibilidade({
   return (
     <div className="space-y-4">
       <CampoDisponibilidade value={disp} onChange={setDisp} />
-      <Button
-        type="button"
-        className="w-full"
-        onClick={salvar}
-        disabled={pending}
-      >
-        {pending ? "Salvando…" : "Salvar"}
-      </Button>
+      {/* sticky: a grade de disponibilidade é alta — a ação não rola pra
+          fora da viewport */}
+      <DialogFooter sticky>
+        <Button type="button" variant="outline" onClick={aoSalvar}>
+          Cancelar
+        </Button>
+        <Button type="button" onClick={salvar} disabled={pending}>
+          {pending ? "Salvando…" : "Salvar"}
+        </Button>
+      </DialogFooter>
     </div>
   );
 }

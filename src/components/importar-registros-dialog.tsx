@@ -20,7 +20,7 @@ import type { DuplaCandidata, LinhaReg } from "@/lib/importar-registros";
 import { formatDate } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -468,7 +468,10 @@ export function ImportarRegistrosDialog() {
                 ))}
               </ul>
             )}
-            <Button className="w-full" onClick={() => aoMudar(false)}>Fechar</Button>
+            {/* estado terminal: só o Fechar outline (mesmo do importar-csv) */}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => aoMudar(false)}>Fechar</Button>
+            </DialogFooter>
           </div>
         ) : linhas ? (
           <div ref={(el) => el?.focus()} tabIndex={-1} className="space-y-3 min-w-0 outline-none">
@@ -543,17 +546,19 @@ export function ImportarRegistrosDialog() {
               Encontro ou registro já existente é atualizado, nunca duplicado.
               Linha pendente não entra. Escolha a dupla ou marque &quot;ignorar&quot;.
             </p>
-            <div className="flex gap-2">
+            {/* sticky: a lista de revisão é alta (max-h-58vh) — Voltar e
+                Importar ficam visíveis sem rolar até o fim */}
+            <DialogFooter sticky>
               <Button variant="outline" onClick={() => { setLinhas(null); setEscolhas(new Map()); setBusca(""); }}>
                 Voltar
               </Button>
-              <Button className="flex-1" disabled={pending || importaveis === 0} onClick={importar}>
+              <Button disabled={pending || importaveis === 0} onClick={importar}>
                 <UploadSimple size={15} />
                 {pending
                   ? "Importando…"
                   : `Importar ${importaveis} ${importaveis === 1 ? "resposta" : "respostas"}`}
               </Button>
-            </div>
+            </DialogFooter>
           </div>
         ) : (
           <div className="space-y-4">
@@ -592,9 +597,17 @@ export function ImportarRegistrosDialog() {
                 className="font-mono text-xs"
               />
             </div>
-            <Button className="w-full" disabled={!texto.trim() || pending} onClick={() => preVisualizar()}>
-              {pending ? "Resolvendo duplas…" : "Pré-visualizar"}
-            </Button>
+            <DialogFooter sticky>
+              <Button
+                variant="outline"
+                onClick={() => aoMudar(false)}
+              >
+                Cancelar
+              </Button>
+              <Button disabled={!texto.trim() || pending} onClick={() => preVisualizar()}>
+                {pending ? "Resolvendo duplas…" : "Pré-visualizar"}
+              </Button>
+            </DialogFooter>
           </div>
         )}
       </DialogContent>

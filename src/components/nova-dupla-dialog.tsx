@@ -12,7 +12,7 @@ import { AfinidadePar } from "@/components/matching-afinidade";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -690,11 +690,22 @@ export function NovaDuplaDialog() {
                 : "Em branco, a dupla conta como existente desde o início do programa. Começando agora? Use a data de hoje."}
             </p>
           </div>
-          <Button type="submit" className="w-full" disabled={pending || mentorLotado}>
-            {pending ? "Salvando…" : "Formar dupla"}
-          </Button>
           </>
           )}
+          {/* sticky: o form é alto — a ação não pode rolar pra fora da
+              viewport (o DialogContent é o scrollport) */}
+          <DialogFooter sticky>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending || mentorLotado || !pronto}>
+              {pending ? "Salvando…" : "Formar dupla"}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

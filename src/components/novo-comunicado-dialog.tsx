@@ -159,7 +159,14 @@ export function NovoComunicadoDialog({
               ))}
             </div>
           </fieldset>
-          <DialogFooter>
+          <DialogFooter sticky>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancelar
+            </Button>
             <Button type="submit" disabled={pending}>
               {pending ? "Publicando…" : "Publicar aviso"}
             </Button>
