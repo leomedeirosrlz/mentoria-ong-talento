@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   chipsDaAgenda,
   deriveAgendaMinha,
+  encontrosCobertos,
   filtraAgenda,
   primeiroNomeDaDupla,
   rotuloChipDupla,
@@ -722,5 +723,79 @@ describe("secoesDaAgenda — estrutura pura", () => {
     const proximos = secoes.find((s) => s.id === "proximos")!;
     expect(proximos.grupos).toHaveLength(1);
     expect(proximos.grupos[0].rotulo).toContain("agendar");
+  });
+});
+
+describe("encontrosCobertos — as chaves duplaId:numero que a faixa suprime", () => {
+  it("item 'encontro' e aviso de pendência cobrem o mesmo encontro", () => {
+    const d = mkDupla({
+      encontros: [
+        // limbo (agendado vencido): mora no aviso, não tem item na lista —
+        // se a faixa só olhasse os itens, esse card reaparecia
+        mkEncontro({
+          id: "e-limbo",
+          numero: 6,
+          data_hora: "2026-10-05T19:00:00-03:00",
+        }),
+        // agendado amanhã: item "encontro" normal da lista
+        mkEncontro({
+          id: "e8",
+          numero: 8,
+          data_hora: `${AMANHA}T19:00:00-03:00`,
+        }),
+      ],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
+    expect([...encontrosCobertos(a)].sort()).toEqual(["d1:6", "d1:8"]);
+  });
+
+  it("'a agendar' sem row cobre o passo oficial — o card não volta na faixa", () => {
+    const eventos = [mkEvento(1, "2026-10-06"), mkEvento(2, "2026-10-13")];
+    const a = deriveAgendaMinha({
+      ...BASE,
+      duplas: [mkDupla()],
+      eventos,
+    });
+    // sem row nenhuma, o encontro 1 faltante vira o item "a agendar" —
+    // a chave sai por numero, sem depender de encontro.id
+    expect(encontrosCobertos(a).has("d1:1")).toBe(true);
+  });
+
+  it("sessão de especialista e supervisão não são o encontro — não cobrem", () => {
+    const d = mkDupla({
+      encontros: [
+        mkEncontro({
+          id: "e8",
+          numero: 8,
+          data_hora: `${AMANHA}T19:00:00-03:00`,
+        }),
+      ],
+    });
+    const a = deriveAgendaMinha({
+      ...BASE,
+      duplas: [d],
+      // a sessão tem duplaId+numero como os itens de encontro — só o tipo
+      // a separa; usar número diferente prova que ela não vaza pra chave
+      trilhas: {
+        d1: [
+          mkTrilha({
+            sessoes: [
+              mkSessao({
+                id: "s3",
+                numero: 3,
+                data_hora: `${AMANHA}T20:00:00-03:00`,
+              }),
+            ],
+          }),
+        ],
+      },
+      supervisoes: [mkSupervisao({ data: AMANHA, dupla_id: "d1" })],
+    });
+    expect([...encontrosCobertos(a)]).toEqual(["d1:8"]);
+  });
+
+  it("agenda vazia → conjunto vazio (a faixa mostra tudo que tiver)", () => {
+    const a = deriveAgendaMinha({ ...BASE, duplas: [] });
+    expect(encontrosCobertos(a).size).toBe(0);
   });
 });

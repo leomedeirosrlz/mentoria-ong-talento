@@ -131,9 +131,10 @@ export function NumerosSemanaSecao({
 
         {/* (b) situação das duplas — a mesma leitura da /duplas: em andamento
             particionado em risco, atenção e em dia; apoio aberto é pill à
-            parte e nunca tira a dupla da sua situação */}
+            parte e nunca tira a dupla da sua situação. Cada fatia com chip
+            lá é atalho pra lista já filtrada (?recorte=) */}
         <div className="rounded-xl border bg-card p-4">
-          <SaudePrograma saude={ag.saude} nivel="h3" />
+          <SaudePrograma saude={ag.saude} nivel="h3" linkBase="/duplas" />
         </div>
 
         {/* (c) pulso — sinais do registro semanal + a voz do jovem; cada
