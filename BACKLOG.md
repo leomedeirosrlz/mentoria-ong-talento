@@ -309,6 +309,22 @@ de tela é seco. Rodar como sprint com recon de inventário primeiro.
   pro DOM estável), + spec visual simples de transição se o mecanismo
   escolhido for verificável.
 
+## Tema & navegação — pendências (out/2026)
+
+Pedido do Thiago (perdido numa sessão anterior, resgatado em 24/out):
+
+- [ ] **Dark mode toggleável** — hoje `.dark` não existe (removido na
+  sprint polish). Voltar como tema opcional com toggle persistido;
+  tokens semânticos já cobrem a base (`--background`, `--card`, semáforo),
+  mas a auditoria de contraste por superfície precisa acontecer antes —
+  sem `dark:` hardcoded por componente, decidir o mecanismo (classe no
+  `html` + tokens, sem lib nova).
+- [ ] **Redesign da navegação** — a nav atual (sidebar desktop + bottom
+  bar mobile) não escala bem com as seções novas; prioridade é a
+  **navegação da coordenação** (superfícies operacionais cresceram:
+  chamados, turmas, relatórios, formulários). Recon de IA primeiro —
+  agrupamento por tarefa, não por entidade.
+
 ## Login & marca — pendências (out/2026)
 
 - [ ] **"Esqueci minha senha / e-mail" na tela de login** — recuperação
