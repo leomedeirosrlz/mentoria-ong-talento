@@ -434,6 +434,74 @@ export const getJovemDuplaIa = cache(
   }
 );
 
+// ---------- índice de duplas + agenda do período ----------
+
+/** Índice enxuto das duplas vivas no escopo do papel — é como o modelo
+ *  descobre `dupla_id` antes das tools por-id ("minha dupla" → a dele).
+ *  Sem encontros/registros: o detalhe vem de ficha_dupla/registros_da_dupla. */
+export const getDuplasResumoIa = cache(
+  async (supabase: SupabaseClient) => {
+    const { data, error } = await supabase
+      .from("duplas")
+      .select(
+        `id, trilha, status, turma,
+         mentor:profiles!duplas_mentor_id_fkey(nome),
+         mentorado:mentorados(nome)`
+      )
+      .in("status", ["ativa", "pausada"])
+      .order("turma")
+      .limit(60);
+    if (error) throw error;
+    return (data ?? []) as unknown as {
+      id: string;
+      trilha: Trilha;
+      status: DuplaStatus;
+      turma: string;
+      mentor: { nome: string } | null;
+      mentorado: { nome: string } | null;
+    }[];
+  }
+);
+
+/** Encontros numa janela — visíveis pela RLS (mentor vê os das próprias
+ *  duplas, supervisor as supervisionadas, coord tudo). O !inner na dupla
+ *  filtra de novo pelo lado do embed: encontro de dupla invisível não
+ *  aparece nem órfão. */
+export const getAgendaPeriodoIa = cache(
+  async (
+    supabase: SupabaseClient,
+    desdeIso: string,
+    ateIso: string
+  ) => {
+    const { data, error } = await supabase
+      .from("encontros")
+      .select(
+        `numero, status, data_hora, realizado_em,
+         dupla:duplas!inner(
+           id,
+           mentor:profiles!duplas_mentor_id_fkey(nome),
+           mentorado:mentorados(nome)
+         )`
+      )
+      .gte("data_hora", desdeIso)
+      .lte("data_hora", ateIso)
+      .order("data_hora", { ascending: true })
+      .limit(80);
+    if (error) throw error;
+    return (data ?? []) as unknown as {
+      numero: number;
+      status: string;
+      data_hora: string | null;
+      realizado_em: string | null;
+      dupla: {
+        id: string;
+        mentor: { nome: string } | null;
+        mentorado: { nome: string } | null;
+      };
+    }[];
+  }
+);
+
 // ---------- instrumentos da dupla (RPC homônima, 0080) ----------
 
 /** Respostas dos 4 instrumentos oficiais da dupla — a RPC security definer

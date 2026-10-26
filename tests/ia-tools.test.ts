@@ -50,6 +50,8 @@ function supaFake({
       select: () => b,
       in: () => b,
       eq: () => b,
+      gte: () => b,
+      lte: () => b,
       order: () => b,
       limit: () => b,
       maybeSingle: () =>
@@ -100,11 +102,13 @@ const dadosDe = (r: Awaited<ReturnType<typeof executarTool>>) => {
 };
 
 describe("registry", () => {
-  it("declara as 6 tools da fase 1 com descrição pt-BR e papéis", () => {
+  it("declara as 8 tools da fase 1 com descrição pt-BR e papéis", () => {
     expect(IA_TOOL_NOMES.sort()).toEqual(
       [
+        "agenda_do_periodo",
         "aguardando_par",
         "capacidade_mentores",
+        "duplas_do_usuario",
         "ficha_dupla",
         "instrumentos_da_dupla",
         "registros_da_dupla",
@@ -126,6 +130,10 @@ describe("registry", () => {
     ]);
     // jovem nunca lê follow-up estruturado do mentor
     expect(IA_TOOLS.registros_da_dupla.roles).not.toContain("mentorado");
+    // o índice de duplas e a agenda ignoram mentorado: sem grant em
+    // `duplas` (a ficha dele vem da view) e uma só dupla não pede índice
+    expect(IA_TOOLS.duplas_do_usuario.roles).not.toContain("mentorado");
+    expect(IA_TOOLS.agenda_do_periodo.roles).not.toContain("mentorado");
   });
 });
 
@@ -498,6 +506,83 @@ describe("executarTool — tools", () => {
       em_uso: 0,
       capacidade: 3,
     });
+  });
+
+  it("duplas_do_usuario devolve o índice com ids, sem contato", async () => {
+    const { supabase } = supaFake({
+      tabelas: {
+        duplas: [
+          {
+            id: "d-1",
+            trilha: "dpp",
+            status: "ativa",
+            turma: "T1",
+            mentor: { nome: "Ana" },
+            mentorado: { nome: "Luisa" },
+            // sujeira de select-* que não pode vazar
+            whatsapp: "119999",
+            demanda_interna: "x",
+          },
+        ],
+      },
+    });
+    const r = await executarTool("duplas_do_usuario", {}, supabase, "chat");
+    const dados = dadosDe(r) as {
+      total: number;
+      duplas: Record<string, unknown>[];
+    };
+    expect(dados.total).toBe(1);
+    expect(dados.duplas[0]).toMatchObject({
+      dupla_id: "d-1",
+      mentor: "Ana",
+      mentorado: "Luisa",
+      status: "ativa",
+    });
+    expect(dados.duplas[0]).not.toHaveProperty("whatsapp");
+    expect(dados.duplas[0]).not.toHaveProperty("demanda_interna");
+  });
+
+  it("agenda_do_periodo devolve encontros da janela com a dupla", async () => {
+    const { supabase } = supaFake({
+      tabelas: {
+        encontros: [
+          {
+            numero: 6,
+            status: "agendado",
+            data_hora: new Date(Date.now() + 5 * 86_400_000).toISOString(),
+            realizado_em: null,
+            dupla: {
+              id: "d-1",
+              mentor: { nome: "Ana" },
+              mentorado: { nome: "Luisa" },
+            },
+          },
+        ],
+      },
+    });
+    const r = await executarTool("agenda_do_periodo", {}, supabase, "chat");
+    const dados = dadosDe(r) as {
+      total: number;
+      encontros: Record<string, unknown>[];
+    };
+    expect(dados.total).toBe(1);
+    expect(dados.encontros[0]).toMatchObject({
+      dupla_id: "d-1",
+      numero: 6,
+      mentorado: "Luisa",
+    });
+  });
+
+  it("agenda_do_periodo rejeita janela fora da faixa", async () => {
+    const { supabase, fromCalls } = supaFake();
+    const r = await executarTool(
+      "agenda_do_periodo",
+      { dias: 365 },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(false);
+    expect(fromCalls).toHaveLength(0);
   });
 
   it("instrumentos_da_dupla repassa a RPC e propaga o erro de escopo", async () => {
