@@ -11,6 +11,7 @@ import {
 import { toast } from "sonner";
 import { deletePessoa, setPessoaAtivo, updatePessoa } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
+import { EscopoAuxiliarDialog } from "@/components/escopo-auxiliar-dialog";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { FotoField } from "@/components/foto-field";
 import { TagInput } from "@/components/tag-input";
@@ -69,6 +70,8 @@ export function PessoaActions({
 }) {
   const [editOpen, setEditOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
+  // escopo do auxiliar (REALIZA-32) — "só as duplas dele" × "toda a turma"
+  const [escopoOpen, setEscopoOpen] = useState(false);
   // desativar com duplas em andamento pede confirmação — o server devolve a
   // contagem num primeiro chamado e esse dialog conclui com forcar=true
   const [duplasEmCurso, setDuplasEmCurso] = useState(0);
@@ -82,6 +85,7 @@ export function PessoaActions({
   const router = useRouter();
   const ehDpp = temPapel(pessoa, "mentor_dpp");
   const ehEsp = temPapel(pessoa, "mentor_especialista");
+  const ehAuxiliar = temPapel(pessoa, "supervisor");
   const ehMentor = ehDpp || ehEsp;
   const hibrido = ehDpp && ehEsp;
   const primeiroNome = (pessoa.nome_social || pessoa.nome).split(" ")[0];
@@ -429,6 +433,12 @@ export function PessoaActions({
             <PencilSimple size={16} data-icon="inline-start" aria-hidden />{" "}
             Editar
           </DropdownMenuItem>
+          {ehAuxiliar && (
+            <DropdownMenuItem onClick={() => setEscopoOpen(true)}>
+              <PencilSimple size={16} data-icon="inline-start" aria-hidden />{" "}
+              Escopo do auxiliar
+            </DropdownMenuItem>
+          )}
           <DropdownMenuItem
             disabled={pending}
             onClick={() =>
@@ -507,6 +517,13 @@ export function PessoaActions({
           />
         </DialogContent>
       </Dialog>
+
+      <EscopoAuxiliarDialog
+        profileId={pessoa.id}
+        nome={pessoa.nome}
+        open={escopoOpen}
+        onOpenChange={setEscopoOpen}
+      />
 
       <ConfirmDeleteButton
         open={delOpen}

@@ -21,7 +21,7 @@ import {
   type RespostaValor,
   type RodaArea,
 } from "./forms/schema";
-import { TRILHA_LEN } from "./ciclo";
+import { toDateStr, TRILHA_LEN } from "./ciclo";
 import { turmaCurta, turmaLonga } from "./turma";
 
 export type EstacaoChave =
@@ -546,19 +546,69 @@ function resolveEstacao<
  *    "em dia · X de Y" — conta no progresso sem "fechar" nunca.
  */
 
-/** "Encontro corrente" da dupla — a régua compartilhada da jornada: o
- *  maior nº realizado + 1, teto no tamanho da trilha DPP (16 canônico;
- *  um cronograma estendido acima disso deixaria de liberar — edge
- *  documentado, o guia oficial é o limite hoje). Realizado, não
- *  agendado: o que conta é o que já aconteceu. A mesma âncora do hero
- *  da jovem e do `jornada_autoemit` (0099). */
+/** Folga da rede de segurança (REALIZA-215): o encontro oficial só avança
+ *  a régua depois de MAIS de 7 dias passados — a semana cobre o registro
+ *  tardio normal do mentor. */
+const FOLGA_OFICIAL_MS = 7 * 86400000;
+
+/** Os encontros oficiais do cronograma no shape que `encCorrenteDe`
+ *  consome — só tipo 'encontro' com nº e data reais (formação, recesso e
+ *  marco do ciclo não movem a régua do guia). */
+export function datasOficiaisDe(
+  cronograma: { numero: number | null; data: string | null; tipo: string }[]
+): { numero: number; data: string }[] {
+  return cronograma
+    .filter(
+      (e): e is { numero: number; data: string; tipo: string } =>
+        e.tipo === "encontro" && e.numero != null && e.data != null
+    )
+    .map((e) => ({ numero: e.numero, data: e.data }));
+}
+
+/** "Encontro corrente" da dupla — a régua compartilhada da jornada. O pino
+ *  principal é o maior nº realizado + 1 (realizado, não agendado: o que
+ *  conta é o que já aconteceu), teto no tamanho da trilha DPP (16
+ *  canônico; um cronograma estendido acima disso deixaria de liberar —
+ *  edge documentado, o guia oficial é o limite hoje). A mesma âncora do
+ *  hero da jovem e do `jornada_autoemit`.
+ *
+ *  `oficial` é a rede de segurança da data oficial (REALIZA-215): dupla
+ *  'ativa' cujo cronograma marcou o encontro N há MAIS de 7 dias avança a
+ *  régua pra N+1 mesmo sem registro — o mentor atrasado não segura a
+ *  jornada da jovem. É máximo, nunca regride; sem `datasOficiais` ou sem
+ *  `ativa` o comportamento é o de sempre. Mesma conta da migration 0123:
+ *  a data oficial é dia de calendário, então as duas pontas ancoram no
+ *  meio-dia de SP e a comparação é de dias completos, não de instantes. */
 export function encCorrenteDe(
-  encontros: { numero: number; status: string }[]
+  encontros: { numero: number; status: string }[],
+  oficial?: {
+    datasOficiais?: { numero: number; data: string }[];
+    hoje?: Date;
+    ativa?: boolean;
+    /** iniciada_em da dupla — só conta encontro oficial daí em diante
+     *  (ingresso tardio começa a própria jornada no 1º). */
+    inicio?: string | null;
+  }
 ): number {
   const max = encontros
     .filter((e) => e.status === "realizado")
     .reduce((m, e) => Math.max(m, e.numero), 0);
-  return Math.min(TRILHA_LEN.dpp, max + 1);
+  let corrente = max + 1;
+  if (oficial?.ativa && oficial.datasOficiais?.length) {
+    const hojeMs = Date.parse(
+      `${toDateStr(oficial.hoje ?? new Date())}T12:00:00-03:00`
+    );
+    // conta (não o nº oficial): quantos encontros da turma já passaram
+    // com folga desde que a dupla começou — mesma conta da 0123
+    const inicio = oficial.inicio ? oficial.inicio.slice(0, 10) : null;
+    const passados = oficial.datasOficiais.filter((ev) => {
+      if (inicio && ev.data < inicio) return false;
+      const ms = Date.parse(`${ev.data}T12:00:00-03:00`);
+      return hojeMs - ms > FOLGA_OFICIAL_MS;
+    }).length;
+    corrente = Math.max(corrente, passados + 1);
+  }
+  return Math.min(TRILHA_LEN.dpp, corrente);
 }
 
 /** Acervo progressivo (REALIZA-160): material com `encontro_num` libera
@@ -584,6 +634,11 @@ export function estacoesJornada(input: {
   encontros: EncontroJornada[];
   /** encontro_ids com avaliação respondida pela jovem. */
   avaliacoesFeitas: string[];
+  /** dupla 'ativa' — a rede de segurança da data oficial não avança
+   *  dupla pausada (o tempo dela está congelado). */
+  ativa?: boolean;
+  /** iniciada_em da dupla — a régua pela data conta só daí em diante. */
+  inicio?: string | null;
   agora?: Date;
 }): Estacao[] {
   const agora = input.agora ?? new Date();
@@ -597,10 +652,16 @@ export function estacoesJornada(input: {
   }
 
 
-  // encontro corrente = último realizado + 1 (teto 16) — realizado, não
-  // agendado: a régua é o que já aconteceu, não o que está marcado
+  // encontro corrente = último realizado + 1 (teto 16) + a rede de
+  // segurança da data oficial — a régua é o que já aconteceu ou o que o
+  // calendário da turma marcou há mais de 7 dias, nunca o agendado
   const realizados = input.encontros.filter((e) => e.status === "realizado");
-  const encCorrente = encCorrenteDe(input.encontros);
+  const encCorrente = encCorrenteDe(input.encontros, {
+    datasOficiais: datasOficiaisDe(input.cronograma),
+    hoje: agora,
+    ativa: input.ativa,
+    inicio: input.inicio,
+  });
 
   const instPorSistema = new Map(input.instrumentos.map((i) => [i.sistema, i]));
   const camposDe = (sistema: InstrumentoJornada["sistema"]): FormularioCampo[] => {

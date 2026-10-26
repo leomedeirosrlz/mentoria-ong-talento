@@ -34,6 +34,7 @@ import {
   toDateStr,
 } from "@/lib/ciclo";
 import { deriveAgendaMinha } from "@/lib/agenda-minha";
+import { duplaSupervisionada } from "@/lib/auxiliar-escopo";
 import { AgendaAuxiliar } from "@/components/agenda-auxiliar";
 import { AgendaCalendario } from "@/components/agenda-calendario";
 import { AgendaCoordenacao } from "@/components/agenda-coordenacao";
@@ -328,7 +329,9 @@ export default async function AgendaPage({
       souMentor
     )
   ) {
-    const supervisionadas = duplas.filter((d) => d.supervisor?.id === me.id);
+    // escopo da RLS (0125): supervisionadas + turma dele chegam em `duplas`
+    // — a peneira só tira o lado mentor (duplaSupervisionada)
+    const supervisionadas = duplas.filter((d) => duplaSupervisionada(d, me.id));
     const [alvos, supervisoesAux, nudgesAux] = await Promise.all([
       getSupervisaoAlvos(),
       getSupervisoesDaPessoa(me.id),

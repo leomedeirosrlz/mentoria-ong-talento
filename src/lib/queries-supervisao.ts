@@ -73,6 +73,10 @@ export const getSupervisaoAlvos = cache(async (): Promise<SupervisaoAlvo[]> => {
   const me = await getMe();
   if (!me || !podeSupervisionar(me.role)) return [];
   const supabase = await createClient();
+  // o escopo é da RLS (0125): supervisionada direta OU turma dele. O .or só
+  // tira o lado mentor da peneira — supervisionada por mim continua, a
+  // dupla que EU mentoro não é alvo de supervisão (mesma regra de
+  // duplaSupervisionada em lib/auxiliar-escopo)
   const { data, error } = await supabase
     .from("duplas")
     .select(
@@ -80,7 +84,7 @@ export const getSupervisaoAlvos = cache(async (): Promise<SupervisaoAlvo[]> => {
        mentor:profiles!duplas_mentor_id_fkey(id, nome),
        mentorado:mentorados!duplas_mentorado_id_fkey(nome)`
     )
-    .eq("supervisor_id", me.id)
+    .or(`supervisor_id.eq.${me.id},mentor_id.neq.${me.id}`)
     .in("status", ["ativa", "pausada"])
     .order("created_at", { ascending: true });
   if (error) {

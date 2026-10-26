@@ -182,10 +182,18 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // aconteceu (Eduardo), 1 sem data (Dandara)
     const barraT1 = linhaT1.getByRole("img");
     if (t1Vigente5) {
+      // os 3 agendados passam a "aguardando registro" um a um, conforme o
+      // horário de cada encontro passa — a soma é que é fixa
       await expect(barraT1).toHaveAttribute(
         "aria-label",
-        /3 (agendadas|aguardando registro), 1 sem data · total 4/
+        /, 1 sem data · total 4$/
       );
+      const rotulo = (await barraT1.getAttribute("aria-label")) ?? "";
+      const n = (re: RegExp) => Number(rotulo.match(re)?.[1] ?? 0);
+      expect(
+        n(/(\d) agendadas?/) + n(/(\d) aguardando registro/),
+        rotulo
+      ).toBe(3);
     } else {
       await expect(barraT1).toHaveAttribute(
         "aria-label",

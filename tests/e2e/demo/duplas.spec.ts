@@ -198,11 +198,19 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     }
 
     // o motivo vai em até 2 linhas com o texto íntegro no title — a
-    // linha nunca quebra a altura da tabela (a ficha tem o detalhe)
+    // linha nunca quebra a altura da tabela (a ficha tem o detalhe).
+    // Dupla em dia sem motivo mostra "Sem pendências" e não leva title;
+    // quantas linhas em dia caem entre as 6 primeiras depende do dia da
+    // semana (seg de madrugada o enc. vigente ainda não venceu).
     for (let i = 0; i < Math.min(n, 6); i++) {
-      const motivo = linhas.nth(i).locator("p.line-clamp-2[title]");
-      await expect(motivo).toHaveCount(1);
-      expect((await motivo.getAttribute("title"))?.length).toBeGreaterThan(0);
+      const linha = linhas.nth(i);
+      const comMotivo = linha.locator("p.line-clamp-2[title]");
+      if (await linha.getByText("Sem pendências", { exact: true }).count()) {
+        await expect(comMotivo).toHaveCount(0);
+        continue;
+      }
+      await expect(comMotivo).toHaveCount(1);
+      expect((await comMotivo.getAttribute("title"))?.length).toBeGreaterThan(0);
     }
 
     // a massa saudável colapsa num <details> quando passa de 5 — aberto,

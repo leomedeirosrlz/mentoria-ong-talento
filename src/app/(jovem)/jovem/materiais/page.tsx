@@ -39,6 +39,7 @@ import { formatDate, linkSeguro, TRILHA_LEN } from "@/lib/ciclo";
 import { turmaLonga } from "@/lib/turma";
 import { formularioPorToken } from "@/lib/forms/queries";
 import {
+  datasOficiaisDe,
   encCorrenteDe,
   estacoesJornada,
   materialLiberadoParaJovem,
@@ -166,7 +167,17 @@ export default async function JovemMateriais() {
         (d.status === "ativa" || d.status === "pausada")
     ) ?? null;
   const encAcervo = duplaDppViva
-    ? encCorrenteDe(encontros.filter((e) => e.dupla_id === duplaDppViva.id))
+    ? encCorrenteDe(encontros.filter((e) => e.dupla_id === duplaDppViva.id), {
+        // a rede de segurança da data oficial (0123) só se aplica quando o
+        // cronograma da RPC é DESTA dupla — a régua nunca empresta data de
+        // cronograma alheio
+        datasOficiais:
+          jornada?.dupla_id === duplaDppViva.id
+            ? datasOficiaisDe(jornada.cronograma)
+            : undefined,
+        ativa: duplaDppViva.status === "ativa",
+        inicio: duplaDppViva.iniciada_em,
+      })
     : null;
 
   // Fallbacks do plano §WP7: sem jornada (RPC null/erro), sem dupla ou sem
@@ -199,6 +210,8 @@ export default async function JovemMateriais() {
         data: e.realizado_em ?? e.data_hora,
       })),
       avaliacoesFeitas: avaliacoesDpp.map((a) => a.encontro_id),
+      ativa: dupla.status === "ativa",
+      inicio: dupla.iniciada_em,
     });
   } catch {
     estacoes = [];
@@ -209,8 +222,14 @@ export default async function JovemMateriais() {
     );
 
   // "encontro corrente" — a âncora compartilhada (lib): o maior nº de
-  // encontro realizado + 1, teto 16 (realizado, não agendado futuro).
-  const encontroCorrente = encCorrenteDe(encontrosDpp);
+  // encontro realizado + 1, teto 16, com a rede de segurança da data
+  // oficial (0123) — o calendário da turma destrava a régua quando o
+  // registro do mentor atrasa mais de uma semana
+  const encontroCorrente = encCorrenteDe(encontrosDpp, {
+    datasOficiais: datasOficiaisDe(jornada.cronograma),
+    ativa: dupla.status === "ativa",
+    inicio: dupla.iniciada_em,
+  });
 
   const passosGuia = jornada.cronograma
     .filter(

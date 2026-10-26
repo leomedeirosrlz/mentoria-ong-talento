@@ -419,12 +419,14 @@ export const getMinhasDuplas = cache(async (): Promise<Dupla[]> => {
   if (demo) return demoMinhasDuplas(demo);
   const me = await getMe();
   if (!me) return [];
+  // sem filtro TS: a RLS já devolve o escopo do papel — mentor as dele,
+  // auxiliar as supervisionadas + as da turma do escopo dele (0125). Um
+  // `.or(mentor_id|supervisor_id = me)` aqui esconderia a turma dele
   const supabase = await createClient();
   const [{ data, error }, contatos] = await Promise.all([
     supabase
       .from("duplas")
       .select(DUPLA_SELECT)
-      .or(`mentor_id.eq.${me.id},supervisor_id.eq.${me.id}`)
       .order("created_at", { ascending: true }),
     getContatos(),
   ]);

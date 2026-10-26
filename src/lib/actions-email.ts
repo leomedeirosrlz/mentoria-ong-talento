@@ -10,6 +10,8 @@ import {
 } from "@/lib/email";
 import {
   emailAviso,
+  emailDesfechoJovem,
+  emailDesfechoRepasseMentor,
   emailInstrumentoJovem,
   emailInstrumentoRepasseMentor,
   emailMaterial,
@@ -379,6 +381,7 @@ const MOTIVO_LOTE: Record<string, string> = {
   dupla_nao_encontrada: "dupla não encontrada",
   trilha_especialista: "trilha de especialista não usa os instrumentos da jornada",
   dupla_encerrada: "jornada encerrada",
+  dupla_nao_concluida: "jornada ainda não concluiu",
   ja_respondido: "já respondeu este instrumento",
   emit_falhou: "não foi possível emitir o link",
   sem_email: "sem e-mail do jovem nem do mentor — entregue à mão",
@@ -599,6 +602,234 @@ export async function enviarInstrumentoLote(input: {
       }))
     );
     if (errLog) console.error("enviarInstrumentoLote: log", errLog);
+  }
+
+  return {
+    ok: true,
+    enviados: linhas.filter((l) => l.status === "enviado").length,
+    falhas: linhas.filter((l) => l.status === "falha").length,
+    pulados: linhas.filter((l) => l.status === "pulado").length,
+    envioLiberado: EMAIL_ENVIO_LIBERADO,
+    linhas,
+  };
+}
+
+// ---------- REALIZA-216 — lote do "Depois da mentoria · 6 meses" ----------
+// Mesma mecânica do lote de instrumento: a RPC emitir_desfecho_6m_lote
+// (0124) emite/reusa os links com contexto.momento='6m' e devolve os
+// destinatários; aqui o Resend faz o fan-out individual com a copy do
+// desfecho (não é exercício da jornada — é a pergunta do 6 meses). O
+// disparo é gesto humano da coordenação, nunca automático.
+
+const DESFECHO_TITULO = "Depois da mentoria";
+
+export async function enviarDesfechoLote(input: {
+  duplaIds: string[];
+}): Promise<
+  | { error: string }
+  | {
+      ok: true;
+      enviados: number;
+      falhas: number;
+      pulados: number;
+      envioLiberado: boolean;
+      linhas: LoteInstrumentoLinha[];
+    }
+> {
+  const ids = [
+    ...new Set(
+      (Array.isArray(input?.duplaIds) ? input.duplaIds : [])
+        .map(String)
+        .filter((id) => UUID_RE.test(id))
+    ),
+  ];
+  if (!ids.length) return { error: "Nenhuma dupla válida selecionada." };
+  if (ids.length > 100) return { error: "O lote aceita até 100 duplas." };
+
+  // demo: relatório fake — o dialog abre, o fluxo se mostra, nada sai
+  if (await demoAtivo()) {
+    return {
+      ok: true,
+      enviados: 0,
+      falhas: 0,
+      pulados: 0,
+      envioLiberado: false,
+      linhas: ids.map((duplaId) => ({
+        duplaId,
+        status: "simulado" as const,
+        via: null,
+        motivo: MOTIVO_LOTE.simulado,
+        reutilizado: false,
+        token: null,
+        waFone: null,
+        waNome: null,
+      })),
+    };
+  }
+
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "coordenacao")
+    return { error: "Só a coordenação dispara o lote." };
+
+  const { data, error } = await supabase.rpc("emitir_desfecho_6m_lote", {
+    p_dupla_ids: ids,
+  });
+  if (error) return { error: erroAmigavel(error) };
+
+  const linhas: LoteInstrumentoLinha[] = [];
+  const mensagens: {
+    to: string;
+    subject: string;
+    html: string;
+    linha: LoteInstrumentoLinha;
+    linkId: string | null;
+    via: "jovem" | "mentor";
+  }[] = [];
+
+  for (const r of (data ?? []) as LinhaRpcLote[]) {
+    if (!r.ok) {
+      if (r.motivo === "emit_falhou")
+        console.error("emitir_desfecho_6m_lote:", r.dupla_id, r.erro);
+      linhas.push({
+        duplaId: r.dupla_id,
+        status: "pulado",
+        via: null,
+        motivo:
+          (r.motivo ? MOTIVO_LOTE[r.motivo] : null) ??
+          "não elegível pro lote",
+        reutilizado: false,
+        token: null,
+        waFone: null,
+        waNome: null,
+      });
+      continue;
+    }
+
+    // mesma régua do lote de instrumento: e-mail do jovem primeiro;
+    // sem mentorados.email cai pro mentor com copy de repasse
+    const emailJovem = r.jovem?.email?.trim() || null;
+    const emailMentor = r.mentor?.email?.trim() || null;
+    const via = emailJovem
+      ? ("jovem" as const)
+      : emailMentor
+        ? ("mentor" as const)
+        : null;
+    const waJovem = r.jovem?.whatsapp?.trim() || null;
+    const waMentor = r.mentor?.whatsapp?.trim() || null;
+    const waFone = waJovem ?? waMentor;
+    const waNome = waJovem
+      ? primeiroNome(r.jovem?.nome)
+      : primeiroNome(r.mentor?.nome);
+
+    if (!via) {
+      linhas.push({
+        duplaId: r.dupla_id,
+        status: "pulado",
+        via: null,
+        motivo: MOTIVO_LOTE.sem_email,
+        reutilizado: r.reutilizado === true,
+        token: r.token ?? null,
+        waFone,
+        waNome,
+      });
+      continue;
+    }
+
+    const link = `${SITE_URL}/f/${r.token}`;
+    const nomeDestino =
+      via === "jovem"
+        ? primeiroNome(r.jovem?.nome)
+        : primeiroNome(r.mentor?.nome);
+    const subject =
+      via === "jovem"
+        ? `${DESFECHO_TITULO} — como você está?`
+        : `${DESFECHO_TITULO} — link de ${primeiroNome(r.jovem?.nome) || "sua jovem"}`;
+    const html =
+      via === "jovem"
+        ? emailDesfechoJovem({ primeiroNome: nomeDestino, link })
+        : emailDesfechoRepasseMentor({
+            mentorNome: r.mentor?.nome ?? "",
+            jovemNome: r.jovem?.nome ?? "",
+            link,
+          });
+    const linha: LoteInstrumentoLinha = {
+      duplaId: r.dupla_id,
+      status: "enviado",
+      via,
+      motivo: null,
+      reutilizado: r.reutilizado === true,
+      token: null, // enviado não precisa do bearer no client-state
+      waFone: null,
+      waNome: null,
+    };
+    linhas.push(linha);
+    mensagens.push({
+      to: via === "jovem" ? emailJovem! : emailMentor!,
+      subject,
+      html,
+      linha,
+      linkId: r.link_id ?? null,
+      via,
+    });
+  }
+
+  const envio = mensagens.length
+    ? await enviarEmailsIndividuais({ mensagens })
+    : { enviados: 0, falhas: [] as string[] };
+
+  // linha não-enviada ganha o kit do fallback manual — token do link já
+  // emitido + o melhor wa pra mandar à mão (jovem primeiro, senão mentor)
+  const kitFallback = (linha: LoteInstrumentoLinha) => {
+    const rpc = (data as LinhaRpcLote[]).find(
+      (x) => x.dupla_id === linha.duplaId
+    );
+    linha.token = rpc?.token ?? null;
+    linha.waFone =
+      rpc?.jovem?.whatsapp?.trim() || rpc?.mentor?.whatsapp?.trim() || null;
+    linha.waNome = rpc?.jovem?.whatsapp?.trim()
+      ? primeiroNome(rpc.jovem?.nome)
+      : primeiroNome(rpc?.mentor?.nome);
+  };
+
+  // kill-switch/config: nada foi tentado — marca envio_desligado e devolve
+  // o kit manual (design: o lote emite mesmo desligado)
+  if (envio.error) {
+    for (const m of mensagens) {
+      m.linha.status = "envio_desligado";
+      m.linha.motivo = envio.error;
+      kitFallback(m.linha);
+    }
+  } else {
+    const falhou = new Set(envio.falhas);
+    for (const m of mensagens) {
+      if (falhou.has(m.to)) {
+        m.linha.status = "falha";
+        m.linha.motivo = MOTIVO_LOTE.email_falhou;
+        kitFallback(m.linha);
+      }
+    }
+  }
+
+  // log por destinatário — memória do disparo (sem endereço nem token:
+  // ref_id é o uuid do link; falha registra o papel, não o e-mail)
+  if (mensagens.length && !envio.error) {
+    const falhou = new Set(envio.falhas);
+    const { error: errLog } = await supabase.from("emails_enviados").insert(
+      mensagens.map((m) => ({
+        autor_id: eu.id,
+        tipo: "instrumento",
+        ref_id: m.linkId,
+        assunto: m.subject,
+        audiencia: [m.via === "jovem" ? "mentorado" : "mentor"],
+        destinatarios: 1,
+        enviados: falhou.has(m.to) ? 0 : 1,
+        falhas: falhou.has(m.to)
+          ? [`${m.via === "jovem" ? "mentorado" : "mentor"}: endereço recusado pelo provedor`]
+          : null,
+      }))
+    );
+    if (errLog) console.error("enviarDesfechoLote: log", errLog);
   }
 
   return {

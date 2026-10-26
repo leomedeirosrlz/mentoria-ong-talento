@@ -154,6 +154,8 @@
   --inst-intake-mentor-t: hsl(95 55% 92%);
   --inst-intake-mentorado: hsl(45 95% 34%);
   --inst-intake-mentorado-t: hsl(45 95% 92%);
+  --inst-desfecho: hsl(160 50% 30%);
+  --inst-desfecho-t: hsl(160 45% 92%);
   /* série categórica do mini-kit viz/ — 5 tons com distinção preattentiva
      sobre o papel, sempre como preenchimento/marcador (nunca texto).
      chart-1 e chart-2 leem ok×info por var(), então acompanham a troca de

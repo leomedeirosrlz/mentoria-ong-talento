@@ -251,7 +251,6 @@ describe("panoramaRegistros — recortes", () => {
     // só os 3 encontros oficiais da T2 viram coluna
     expect(p.slots.map((s) => s.numero)).toEqual([1, 2, 3]);
     expect(p.slots[0].celulas[0].esperadas).toBe(1);
-    expect(p.donut.total).toBe(1);
   });
 
   it("sem recorte as duas turmas dividem a mesma coluna por encontro", () => {
@@ -289,7 +288,6 @@ describe("panoramaRegistros — recortes", () => {
     });
     for (const s of p.slots)
       expect(s.celulas.every((c) => c.esperadas <= 1)).toBe(true);
-    expect(p.donut.total).toBe(1);
   });
 
   it("encontro = zoom num slot só", () => {
@@ -297,10 +295,9 @@ describe("panoramaRegistros — recortes", () => {
     expect(p.slots.map((s) => s.numero)).toEqual([3]);
   });
 
-  it("turma × dupla divergentes intersectam — recorte vazio zera colunas E donut", () => {
+  it("turma × dupla divergentes intersectam — recorte vazio zera as colunas", () => {
     // ?turma=T2&dupla=<dupla da T1>: a lista filtra pelos dois eixos e sai
-    // vazia — o donut não pode ignorar a turma e mostrar a dupla mesmo
-    // assim (leria um recorte que a página não mostra)
+    // vazia: o panorama acompanha (leria um recorte que a página não mostra)
     const p = panoramaRegistros({
       duplas: [mkDupla({ id: "d-1" }), duplaT2()],
       eventos: [...CICLO_16, ...CICLO_T2],
@@ -309,7 +306,6 @@ describe("panoramaRegistros — recortes", () => {
       hoje: HOJE,
     });
     expect(p.slots).toEqual([]);
-    expect(p.donut.total).toBe(0);
   });
 
   it("turma × dupla coerentes: o recorte vira o resumo dela dentro da turma", () => {
@@ -320,7 +316,6 @@ describe("panoramaRegistros — recortes", () => {
       recorte: { turma: CRON_T2, dupla: "d-t2" },
       hoje: HOJE,
     });
-    expect(p.donut.total).toBe(1);
     // a coluna só cobra a própria dupla — esperadas nunca passa de 1
     for (const s of p.slots)
       expect(s.celulas.every((c) => c.esperadas <= 1)).toBe(true);
@@ -342,7 +337,6 @@ describe("panoramaRegistros — recortes", () => {
     const p = base([mkDupla(), mkDupla({ id: "d-2" })], {
       recorte: { periodo: "4s" },
     });
-    expect(p.donut.total).toBe(2);
   });
 });
 
@@ -375,72 +369,15 @@ describe("panoramaRegistros — linha de avaliação", () => {
   });
 });
 
-describe("panoramaRegistros — donut / semáforo", () => {
-  /** Dupla "limpa" pra testar um eixo isolado do semáforo: todos os encontros
-   *  vencidos realizados + registro + ★, e o encontro da semana já agendado
-   *  (senão o preventivo de ≤5 dias acende atenção). */
-  const duplaEmDia = (id: string, apoio = false): Dupla =>
-    mkDupla({
-      id,
-      encontros: [
-        ...[1, 2, 3, 4].map((n) => ({
-          ...encRealizado(n, ev(n), mkRegistro({ precisa_apoio: apoio })),
-          avaliacao_jovem: mkAvaliacao({
-            id: `av-${id}-${n}`,
-            encontro_id: `e-${id}-${n}`,
-          }),
-        })),
-        encAgendado(5, ev(5)),
-      ],
-    });
-
-  it("apoio é fatia própria quando a dupla está bem; apoioTotal cobre todos os chamados", () => {
+describe("panoramaRegistros — trilhas de especialista", () => {
+  it("especialista fica fora das colunas e é contado à parte", () => {
     const p = base([
-      duplaEmDia("d-1"),
-      duplaEmDia("d-2", true), // pediu apoio num registro — jornada em dia
-    ]);
-    expect(p.donut.total).toBe(2);
-    expect(p.donut.apoio).toBe(1);
-    expect(p.donut.andamento).toBe(1);
-    expect(p.donut.apoioTotal).toBe(1);
-    // uma dupla por fatia
-    const soma =
-      p.donut.andamento +
-      p.donut.atencao +
-      p.donut.risco +
-      p.donut.apoio +
-      p.donut.pausada +
-      p.donut.concluida +
-      p.donut.encerrada;
-    expect(soma).toBe(p.donut.total);
-  });
-
-  it("pausada e encerrada são fatias; especialista entra no donut sem entrar nas colunas", () => {
-    const p = base([
-      mkDupla({ id: "d-1", status: "pausada" }),
-      mkDupla({ id: "d-2", status: "encerrada" }),
+      mkDupla({ id: "d-1" }),
       mkDupla({ id: "d-esp", trilha: "especialista", cronograma_id: null }),
     ]);
-    expect(p.donut.pausada).toBe(1);
-    expect(p.donut.encerrada).toBe(1);
-    expect(p.donut.total).toBe(3);
     expect(p.espNoRecorte).toBe(1);
     // especialista não tem cronograma — nenhuma coluna é dele
     expect(p.slots.every((s) => s.celulas.length === 1)).toBe(true);
-  });
-
-  it("recorte turma restringe o donut à turma", () => {
-    const p = panoramaRegistros({
-      duplas: [
-        mkDupla({ id: "d-1" }),
-        mkDupla({ id: "d-2", cronograma_id: CRON_T2, turma: "2026/2027" }),
-      ],
-      eventos: CICLO_16,
-      cronogramas: [mkCronograma(), mkCronograma({ id: CRON_T2, turma: "2026/2027" })],
-      recorte: { turma: CRON_T1 },
-      hoje: HOJE,
-    });
-    expect(p.donut.total).toBe(1);
   });
 });
 

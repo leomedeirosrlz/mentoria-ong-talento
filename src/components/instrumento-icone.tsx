@@ -68,6 +68,10 @@ export const INSTRUMENTO_TOM: Record<
     cor: "var(--inst-intake-mentorado)",
     tinta: "var(--inst-intake-mentorado-t)",
   },
+  desfecho: {
+    cor: "var(--inst-desfecho)",
+    tinta: "var(--inst-desfecho-t)",
+  },
 };
 
 /** Estreita `sistema` solto do banco (string) pra chave conhecida —
@@ -195,6 +199,14 @@ const GLIFO: Record<InstrumentoChave, ReactNode> = {
       <path d="M6.5 3.5h7l4 4v13h-11z" />
       <path d="M13.5 3.5V8H18" />
       <path d="m10 16.8 2.8-2.8 1.4 1.4-2.8 2.8H10z" />
+    </>
+  ),
+  // broto saindo do solo — o que o jovem virou depois da mentoria (0124)
+  desfecho: (
+    <>
+      <path d="M12 20.5v-8" />
+      <path d="M12 12.5C12 8.8 9.2 6 5.5 6c0 3.7 2.8 6.5 6.5 6.5z" />
+      <path d="M12 10.5c0-3.7 2.8-6.5 6.5-6.5 0 3.7-2.8 6.5-6.5 6.5z" />
     </>
   ),
 };
