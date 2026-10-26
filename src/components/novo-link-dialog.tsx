@@ -116,7 +116,7 @@ function ChipRecorte({
         "inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-semibold",
         tom === "lime" && "bg-[var(--brand-lime)] text-[var(--brand-ink)]",
         tom === "warn" &&
-          "border border-amber-300/70 bg-amber-50 text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200",
+          "border border-[var(--warn-border)] bg-[var(--warn-bg)] text-[var(--warn-text)]",
         (!tom || tom === "neutro") && "bg-foreground text-background"
       )}
     >
@@ -129,7 +129,7 @@ function ChipRecorte({
  *  aviso de contato sensível em /pessoas). */
 function AvisoExposicao({ children }: { children: React.ReactNode }) {
   return (
-    <p className="flex items-start gap-2 rounded-lg border border-amber-300/70 bg-amber-50 px-3 py-2 text-xs leading-relaxed text-amber-900 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-200">
+    <p className="flex items-start gap-2 rounded-lg border border-[var(--warn-border)] bg-[var(--warn-bg)] px-3 py-2 text-xs leading-relaxed text-[var(--warn-text)]">
       <Warning size={14} className="mt-0.5 shrink-0" aria-hidden />
       <span>{children}</span>
     </p>

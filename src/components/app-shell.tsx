@@ -20,6 +20,7 @@ import {
 import { papelCurto, papelLabel } from "@/lib/ciclo";
 import { Avatar } from "@/components/avatar";
 import { DemoSlotProvider } from "@/components/demo-bar";
+import { Logo } from "@/components/logo";
 import { T } from "@/components/motion";
 import { NotificacoesBell, NotificacoesProvider } from "@/components/notificacoes";
 import { SignOutButton } from "@/components/signout-button";
@@ -218,8 +219,7 @@ export function AppShell({
         <div className="flex min-w-0 items-center gap-3">
           {/* convenção logo→home; min-h-11 garante os 44px de toque */}
           <Link href="/" className="flex min-h-11 shrink-0 items-center">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-realiza.png" alt="Realiza.vc" className="h-5 w-auto" />
+            <Logo size="sm" />
           </Link>
           {demo ?? (
             <span className="text-xs text-muted-foreground truncate max-w-44" title={papelCurto(me.role)}>
@@ -245,8 +245,7 @@ export function AppShell({
         <div className="px-5 pt-6 pb-6">
           {/* convenção logo→home, igual à top bar mobile */}
           <Link href="/" className="inline-block">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/logo-realiza.png" alt="Realiza.vc" className="h-6 w-auto" />
+            <Logo />
           </Link>
           <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mt-2">Programa de Mentoria Social</p>
         </div>
@@ -325,7 +324,7 @@ export function AppShell({
                 aria-current={ativo ? "page" : undefined}
                 className={cn(
                   "group relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
-                  ativo ? "font-semibold text-[var(--brand-ink)]" : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
+                  ativo ? "font-semibold text-sidebar-foreground" : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
                 )}
               >
                 {/* continuidade espacial: o indicador desliza entre tabs na
@@ -359,7 +358,7 @@ export function AppShell({
               ].filter(Boolean).join(", ")}
               className={cn(
                 "group relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
-                menuAtivo ? "font-semibold text-[var(--brand-ink)]" : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
+                menuAtivo ? "font-semibold text-sidebar-foreground" : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
               )}
             >
               {/* a rota atual mora no menu → o indicador viaja pra cell
@@ -391,8 +390,7 @@ export function AppShell({
             <SheetContent side="left" className="pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
               <div className="px-5 pt-5 pb-5">
                 <SheetTitle className="sr-only">Menu</SheetTitle>
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src="/logo-realiza.png" alt="Realiza.vc" className="h-6 w-auto" />
+                <Logo />
                 <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                   Programa de Mentoria Social
                 </p>

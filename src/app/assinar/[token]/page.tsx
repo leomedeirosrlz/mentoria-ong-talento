@@ -34,6 +34,7 @@ import {
   preambuloMentorando,
 } from "@/lib/documentos/texto";
 import type { DadosAutorizacao, DadosCivis, ResponsavelCivis } from "@/lib/types";
+import { Logo } from "@/components/logo";
 
 const DESCRICAO_ASSINATURA =
   "Assinatura eletrônica de documento do Programa de Mentoria Social · Realiza.vc.";
@@ -99,8 +100,7 @@ function EstadoLink({
     // lateral (1rem ou o safe-area, o que for maior)
     <div className="flex min-h-[100dvh] flex-col bg-background py-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
       <div className="m-auto w-full max-w-sm animate-rise text-center">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-realiza.png" alt="Realiza.vc" className="mx-auto h-6 w-auto" />
+        <Logo className="mx-auto" />
         {demo && <AvisoDemo className="mt-6" />}
         <div className="mt-8 rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
           <Icone size={28} className="mx-auto text-muted-foreground" aria-hidden />
@@ -256,8 +256,7 @@ export default async function AssinarTokenPage({
   return (
     <div className="flex min-h-[100dvh] flex-col bg-background">
       <main className="mx-auto w-full max-w-2xl flex-1 py-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/logo-realiza.png" alt="Realiza.vc" className="h-6 w-auto" />
+        <Logo />
 
         {demo && <AvisoDemo className="mt-6" />}
 

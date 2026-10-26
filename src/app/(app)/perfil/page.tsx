@@ -1,10 +1,12 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { getMe, getMeuMentorProfile, getMeusDadosPessoais } from "@/lib/queries";
 import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { getMinhaGrade, getMinhasExcecoes } from "@/lib/queries-especialista";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import { temPapel } from "@/lib/types";
+import { TEMA_COOKIE, temaValido } from "@/lib/tema";
 import { EspecialistaHorarios } from "@/components/especialista-horarios";
 import { PerfilForm } from "./perfil-form";
 
@@ -32,9 +34,13 @@ export default async function PerfilPage() {
     ? await Promise.all([getMinhaGrade(), getMinhasExcecoes()])
     : [[], []];
   const perfil = pessoal ? { ...me, ...pessoal } : me;
+  // o toggle nasce marcado com a preferência do cookie — sem flash de
+  // "Sistema" esperando a hidratação
+  const tema = temaValido((await cookies()).get(TEMA_COOKIE)?.value);
   return (
     <PerfilForm
       me={perfil}
+      tema={tema}
       mentorProfile={mentorProfile}
       avatarUrl={me.avatar_path ? avatarPublicUrl(me.avatar_path) : null}
       gravatarUrl={gravatarUrl(me.email)}

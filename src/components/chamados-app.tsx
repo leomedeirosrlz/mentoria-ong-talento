@@ -1845,7 +1845,7 @@ function ChamadoComposer({
             // o ✓ ficaria disabled (campo limpo) — fora do disabled E sem
             // o opacity-50, senão o verde de sucesso saía apagado
             enviado &&
-              "bg-[var(--ok)] text-white hover:bg-[var(--ok)] disabled:opacity-100"
+              "bg-[var(--ok)] text-[var(--status-foreground)] hover:bg-[var(--ok)] disabled:opacity-100"
           )}
         >
           <AnimatePresence mode="wait" initial={false}>
@@ -1993,7 +1993,7 @@ function AutorComposer({
             // o ✓ ficaria disabled (campo limpo) — fora do disabled E sem
             // o opacity-50, senão o verde de sucesso saía apagado
             enviado &&
-              "bg-[var(--ok)] text-white hover:bg-[var(--ok)] disabled:opacity-100"
+              "bg-[var(--ok)] text-[var(--status-foreground)] hover:bg-[var(--ok)] disabled:opacity-100"
           )}
         >
           <AnimatePresence mode="wait" initial={false}>

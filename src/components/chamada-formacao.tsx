@@ -152,7 +152,7 @@ export function ChamadaFormacao({
                       className={cn(
                         "grid size-4.5 shrink-0 place-items-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card",
                         presente
-                          ? "border-[var(--ok)] bg-[var(--ok)] text-white"
+                          ? "border-[var(--ok)] bg-[var(--ok)] text-[var(--status-foreground)]"
                           : "border-muted-foreground/40 group-hover:border-foreground"
                       )}
                     >

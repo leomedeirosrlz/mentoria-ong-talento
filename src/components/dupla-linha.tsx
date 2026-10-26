@@ -202,7 +202,7 @@ export function DuplaLinha({
                     <span
                       key={n}
                       className={cn(
-                        "min-w-0 flex-1 rounded-[2px] bg-muted shadow-[inset_0_0_0_1px_hsl(75_6%_84%)]",
+                        "min-w-0 flex-1 rounded-[2px] bg-muted shadow-[inset_0_0_0_1px_var(--border)]",
                         realizados.has(n + 1) && QUADRADO_ON[situacao.tom]
                       )}
                     />

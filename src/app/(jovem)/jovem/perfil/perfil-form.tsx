@@ -29,6 +29,8 @@ import {
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { toast } from "sonner";
+import { TemaToggle } from "@/components/tema-toggle";
+import type { Tema } from "@/lib/tema";
 import type { Disponibilidade, Profile } from "@/lib/types";
 
 /** Perfil do jovem no desenho do /perfil de staff — mesmos primitivos
@@ -246,8 +248,8 @@ export function DisponibilidadeCard({
 }
 
 /** "Conta" — as mesmas linhas de credencial do perfil de staff:
- *  e-mail, senha e saída, cada uma abrindo seu Dialog/form real. */
-export function ContaSecao({ me }: { me: Profile }) {
+ *  e-mail, senha, aparência e saída, cada uma abrindo seu Dialog/form real. */
+export function ContaSecao({ me, tema }: { me: Profile; tema: Tema }) {
   return (
     <>
       <section className="rounded-xl bg-card shadow-[var(--shadow-border)]">
@@ -263,6 +265,14 @@ export function ContaSecao({ me }: { me: Profile }) {
           titulo="Senha"
           descricao="O link de e-mail continua valendo mesmo com senha definida."
           acao={<DialogoSenha email={me.email} />}
+          borda
+        />
+        {/* mesma linha do perfil de staff — preferência do dispositivo,
+            não do programa */}
+        <ContaLinha
+          titulo="Aparência"
+          descricao="Tema da interface neste dispositivo."
+          acao={<TemaToggle tema={tema} />}
           borda
         />
         <ContaLinha

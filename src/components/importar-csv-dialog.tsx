@@ -447,7 +447,7 @@ export function ImportarCsvDialog({
                         <td className="px-3 py-1.5 text-xs text-muted-foreground">
                           {extras ? `${extras} ${extras === 1 ? "campo" : "campos"}` : "—"}
                         </td>
-                        {/* de → para da normalização; o amber "revisar" marca
+                        {/* de → para da normalização; o warn "revisar" marca
                             resgate ambíguo ou valor descartado (não é erro —
                             a linha entra assim mesmo, a flag pede conferida) */}
                         <td className="max-w-52 px-3 py-1.5 text-xs">

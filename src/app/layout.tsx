@@ -1,8 +1,11 @@
 import type { Metadata, Viewport } from "next";
+import { cookies } from "next/headers";
 import { Mitr, JetBrains_Mono } from "next/font/google";
 import { MotionConfig } from "motion/react";
 import { Toaster } from "@/components/ui/sonner";
+import { TemaSync } from "@/components/tema-sync";
 import { demoRole } from "@/lib/demo/mode";
+import { TEMA_COOKIE, TEMA_SCRIPT, temaValido } from "@/lib/tema";
 import { sharedOg } from "@/lib/og";
 import { SITE_URL } from "@/lib/site";
 import "./globals.css";
@@ -46,7 +49,14 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#a2ca44",
+  // chrome do SO acompanha o tema: lime da marca no claro, o fundo quente
+  // escuro do --background no dark (matchMedia do themeColor é da página,
+  // não da preferência — quem fixou "claro" no app com SO dark recebe o
+  // lime mesmo, é detalhe de chrome aceitável)
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#a2ca44" },
+    { media: "(prefers-color-scheme: dark)", color: "#161513" },
+  ],
   // ativa os env(safe-area-inset-*) já escritos no código (sem isto valem 0)
   viewportFit: "cover",
   // teclado virtual encolhe o layout em vez de cobrir dialogs/footers
@@ -56,12 +66,28 @@ export const viewport: Viewport = {
 
 export default async function RootLayout({ children }: LayoutProps<"/">) {
   const demo = await demoRole();
+  // cookie `tema` (auto/claro/escuro — default auto) resolve a classe do
+  // <html> no server: "escuro" já sai com .dark; "auto" o script inline
+  // acende via matchMedia antes da primeira pintura (sem flash). data-tema
+  // é a fonte que o script e o TemaSync leem. suppressHydrationWarning: o
+  // script pode ter adicionado .dark antes do React hidratar o <html>.
+  const tema = temaValido((await cookies()).get(TEMA_COOKIE)?.value);
   return (
     <html
       lang="pt-BR"
-      className={`${mitr.variable} ${jbMono.variable} h-full antialiased`}
+      suppressHydrationWarning
+      data-tema={tema}
+      className={`${mitr.variable} ${jbMono.variable} h-full antialiased${
+        tema === "escuro" ? " dark" : ""
+      }`}
     >
       <body className="min-h-full flex flex-col">
+        {/* script crua antes de qualquer conteúdo: resolve o "auto" via
+            matchMedia no primeiro paint — a classe mora no <html>, que já
+            existe quando o body começa a parsear */}
+        <script dangerouslySetInnerHTML={{ __html: TEMA_SCRIPT }} />
+        {/* em "auto", troca de tema do SO acompanha sem reload */}
+        <TemaSync />
         {/* reducedMotion="user": o guard CSS de prefers-reduced-motion não cobre
             animação JS — aqui transform/layout viram instantâneos (fades ficam) */}
         <MotionConfig reducedMotion="user">{children}</MotionConfig>

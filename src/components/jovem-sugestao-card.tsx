@@ -96,7 +96,7 @@ export function SugestaoEspecialistaCard({
       <div className="flex items-start gap-3">
         <span
           aria-hidden
-          className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--role-mentorado)] text-[var(--brand-ink)]"
+          className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--role-mentorado)] text-[var(--destaque-foreground)]"
         >
           <Sparkle size={18} weight="fill" />
         </span>

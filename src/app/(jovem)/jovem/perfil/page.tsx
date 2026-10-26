@@ -1,5 +1,6 @@
 import { CaretDown, MapPin } from "@phosphor-icons/react/dist/ssr";
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { getJovemPerfil } from "@/lib/queries-jovem";
 import { getMe } from "@/lib/queries";
 import { getChamados, getChamadoDetalhe } from "@/lib/queries-chamados";
@@ -12,6 +13,7 @@ import { PessoaBanner } from "@/components/pessoa-banner";
 import { Linha } from "@/app/(app)/perfil/perfil-form";
 import { ContaSecao, DadosSecao, DisponibilidadeCard } from "./perfil-form";
 import { PrivacidadeCard } from "./privacidade-card";
+import { TEMA_COOKIE, temaValido } from "@/lib/tema";
 import type { Disponibilidade } from "@/lib/types";
 
 export const metadata = { title: "Meu perfil" };
@@ -31,6 +33,7 @@ export default async function JovemPerfil({
     getChamados(),
   ]);
   if (!me) redirect("/login"); // o layout já barra — convenção das páginas
+  const tema = temaValido((await cookies()).get(TEMA_COOKIE)?.value);
   const cSel = c && UUID_RE.test(c) ? c : null;
   const detalhe = cSel ? await getChamadoDetalhe(cSel) : null;
 
@@ -190,7 +193,7 @@ export default async function JovemPerfil({
         compartilhado={perfil?.contato_compartilhado ?? false}
         temWhatsapp={perfil?.whatsapp != null}
       />
-      <ContaSecao me={me} />
+      <ContaSecao me={me} tema={tema} />
     </div>
   );
 }

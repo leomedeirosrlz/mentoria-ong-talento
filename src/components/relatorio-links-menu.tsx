@@ -219,7 +219,7 @@ export function RelatorioLinksMenu({
                       {!l.protegido && est === "ativo" && (
                         <Badge
                           variant="outline"
-                          className="gap-1 border-amber-300/70 text-amber-700 dark:text-amber-300"
+                          className="gap-1 border-[var(--warn-border)] text-[var(--warn-text)]"
                         >
                           <LockOpen size={11} aria-hidden /> Sem senha
                         </Badge>
@@ -250,7 +250,7 @@ export function RelatorioLinksMenu({
                           : ""}
                       </span>
                       {l.falhas_24h > 0 && (
-                        <span className="font-medium text-amber-600">
+                        <span className="font-medium text-[var(--warn-text)]">
                           {l.falhas_24h} falha{l.falhas_24h === 1 ? "" : "s"}{" "}
                           em 24h
                         </span>

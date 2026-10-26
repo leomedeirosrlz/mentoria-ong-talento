@@ -20,6 +20,8 @@ import { Avatar } from "@/components/avatar";
 import { PessoaBanner } from "@/components/pessoa-banner";
 import { SignOutButton } from "@/components/signout-button";
 import { TagInput } from "@/components/tag-input";
+import { TemaToggle } from "@/components/tema-toggle";
+import type { Tema } from "@/lib/tema";
 import {
   CampoConsentimento,
   CampoDisponibilidade,
@@ -943,6 +945,7 @@ export function DialogoEmail({ email }: { email: string }) {
 
 export function PerfilForm({
   me,
+  tema,
   mentorProfile,
   avatarUrl,
   gravatarUrl,
@@ -950,6 +953,8 @@ export function PerfilForm({
   horarios,
 }: {
   me: Profile;
+  /** preferência de tema do cookie (lida na page) — alimenta o TemaToggle */
+  tema: Tema;
   mentorProfile: MentorProfile | null;
   avatarUrl: string | null;
   gravatarUrl: string;
@@ -1534,6 +1539,14 @@ export function PerfilForm({
               titulo="Senha"
               descricao="O link de e-mail continua valendo mesmo com senha definida."
               acao={<DialogoSenha email={me.email} />}
+              borda
+            />
+            {/* aparência é preferência do dispositivo — vive junto das
+                credenciais (Conta), não dos dados do programa */}
+            <ContaLinha
+              titulo="Aparência"
+              descricao="Tema da interface neste dispositivo."
+              acao={<TemaToggle tema={tema} />}
               borda
             />
             {/* saída — junto das outras credenciais */}
