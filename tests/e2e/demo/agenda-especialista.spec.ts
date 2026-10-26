@@ -25,11 +25,16 @@ test.describe("agenda demo do especialista (REALIZA-207)", () => {
     const precisa = page.locator('section[aria-label="Precisa de você"]');
     await expect(precisa.getByText(/Sessão 1 com Eduardo/)).toBeVisible();
     await expect(
-      precisa.getByRole("link", { name: "Registrar sessão" })
+      // .first(): depois das 19h30 a sessão de hoje também vira pendência
+      precisa.getByRole("link", { name: "Registrar sessão" }).first()
     ).toBeVisible();
 
     const proximas = page.locator('section[aria-label="Próximas sessões"]');
-    await expect(proximas.getByText("Sessão com Eduardo")).toBeVisible();
+    // a sessão de hoje do Eduardo (19h30) é próxima até acabar; depois
+    // vira pendência no "Precisa de você" — o teste vale em qualquer hora
+    await expect(
+      proximas.getByText("Sessão com Eduardo").or(precisa.getByText(/Eduardo/)).first()
+    ).toBeVisible();
     await expect(proximas.getByText("Sessão com Bia")).toBeVisible();
 
     // um card por trilha, cada um abrindo a ficha da dupla

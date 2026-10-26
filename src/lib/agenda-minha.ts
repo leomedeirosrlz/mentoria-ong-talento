@@ -962,13 +962,25 @@ export function filtraAgenda(
     vistos.add(i.eventoId);
     return true;
   };
+  // em "tudo" a faixa "Minha agenda" já mostra a semana do programa —
+  // evento oficial e supervisão desta semana, sem ação, seriam o mesmo
+  // card duas vezes. A lista fica com o que pede gesto e com o resto do
+  // calendário (encontros sempre ficam: carregam hora e ações da dupla)
+  const { seg, dom } = agenda.semana;
+  const repeteFaixa = (i: AgendaItem) =>
+    escopo === "tudo" &&
+    (i.tipo === "programa" || i.tipo === "supervisao") &&
+    i.acoes.length === 0 &&
+    i.dia != null &&
+    i.dia >= seg &&
+    i.dia <= dom;
   const secoes = agenda.secoes.map((s) => ({
     ...s,
     grupos: s.grupos
       .map((g) => ({
         ...g,
         itens: g.itens.filter(
-          (i) => itemNoEscopo(i, escopo) && dedupTudo(i)
+          (i) => itemNoEscopo(i, escopo) && dedupTudo(i) && !repeteFaixa(i)
         ),
       }))
       .filter((g) => g.itens.length > 0),

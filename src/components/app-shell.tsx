@@ -9,9 +9,9 @@ import {
   ChalkboardTeacher,
   ChartLineUp,
   ClipboardText,
-  DotsThree,
   FolderOpen,
   Lifebuoy,
+  List,
   ListChecks,
   Table,
   UserCircle,
@@ -25,10 +25,11 @@ import { NotificacoesBell, NotificacoesProvider } from "@/components/notificacoe
 import { SignOutButton } from "@/components/signout-button";
 import { SiteFooter } from "@/components/site-footer";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  Sheet,
+  SheetContent,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
 import type { Notificacao, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -68,6 +69,80 @@ function porGrupo<T extends { grupo: Grupo | null }>(itens: readonly T[]): Secao
 // só a coordenação, e ela agrupa por trabalho
 const LIMITE_LISTA_SIMPLES = 7;
 
+/** A lista de navegação agrupada — a mesma na sidebar do desktop e no
+ *  menu lateral do celular. `pill` nomeia o layoutId do indicador ativo
+ *  (cada superfície tem o seu: os dois coexistem no DOM). */
+function NavLista({
+  secoes,
+  pathname,
+  chamadosSemDono,
+  pill,
+}: {
+  secoes: Secao<Item>[];
+  pathname: string;
+  chamadosSemDono: number;
+  pill: string;
+}) {
+  return (
+    <>
+      {secoes.map((secao) => (
+        // mais espaço acima do título de grupo do que abaixo: o título
+        // fica preso ao grupo que ele nomeia
+        <div key={secao.titulo ?? "geral"} className="mt-5 space-y-1 first:mt-0">
+          {secao.titulo && (
+            <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              {secao.titulo}
+            </p>
+          )}
+          {secao.itens.map((item) => {
+            const ativo = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
+            return (
+              <Link
+                key={item.href}
+                href={item.href}
+                aria-current={ativo ? "page" : undefined}
+                className={cn(
+                  "relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 md:min-h-0",
+                  ativo
+                    ? "text-[var(--brand-ink)] font-semibold"
+                    : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+                )}
+              >
+                {/* continuidade espacial: a pill viaja pra nova seção na troca
+                    de rota — o AppShell persiste entre páginas (§2) */}
+                {ativo && (
+                  <motion.span
+                    layoutId={pill}
+                    transition={T.pill}
+                    aria-hidden
+                    className="absolute inset-0 -z-10 rounded-lg bg-[var(--brand-lime)]"
+                  />
+                )}
+                <item.icon size={18} weight={ativo ? "fill" : "regular"} aria-hidden className="relative" />
+                <span className="relative">{item.label}</span>
+                {item.href === "/chamados" && chamadosSemDono > 0 && (
+                  <span
+                    aria-label={`${chamadosSemDono} chamados na fila`}
+                    className="relative ml-auto grid min-w-5 place-items-center rounded-full bg-[var(--warn)]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warn-text)]"
+                  >
+                    {chamadosSemDono}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </div>
+      ))}
+    </>
+  );
+}
+
+/** Destinos fixos da barra do celular, em ordem de prioridade: o papel
+ *  pega os 4 primeiros que ele tem. Coordenação e auxiliar ficam com
+ *  Início/Duplas/Chamados/Agenda (chamado é trabalho diário com prazo);
+ *  mentor, sem Chamados, ganha Materiais. O resto mora no menu lateral. */
+const MOBILE_PRIMEIRO = ["/", "/duplas", "/chamados", "/agenda", "/materiais", "/pessoas"];
+
 export function AppShell({
   me,
   avatarUrl,
@@ -90,59 +165,34 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const items = NAV.filter((i) => !i.roles || (me.role && (i.roles as readonly string[]).includes(me.role)));
-  const [abertoMais, setAbertoMais] = useState(false);
+  const [menuAberto, setMenuAberto] = useState(false);
   // rodapé da sidebar: a pílula "float" da demo se encaixa aqui no desktop
   const [slotDemo, setSlotDemo] = useState<HTMLDivElement | null>(null);
 
-  // nav mobile com no máx. 5 cells — coordenação (10) e supervisor (7) passam
-  // disso; mentor tem 5 e o "Mais" nem aparece.
-  // Primárias = rotina diária da operação (Início/Duplas/Pessoas/Agenda); o
-  // resto (Chamados, Registros, Materiais, Formulários, Turmas, Relatórios)
-  // fica a 1 toque no "Mais". A ordem da sidebar desktop não muda — a
-  // prioridade mobile é só do bottom nav.
-  const MOBILE_PRIMEIRO = [
-    "/",
-    "/duplas",
-    "/pessoas",
-    "/agenda",
-    "/chamados",
-    "/registros",
-    "/materiais",
-    "/formularios",
-    "/turmas",
-    "/relatorios",
-  ];
-  // rota fora da lista vai pro fim; indexOf -1 subiria pro topo
-  const prioridade = (href: string) => {
-    const i = MOBILE_PRIMEIRO.indexOf(href);
-    return i === -1 ? Infinity : i;
-  };
-  // Infinity - Infinity dá NaN, que o sort trata como empate e mantém a
-  // ordem da NAV entre as rotas fora da lista
-  const itemsMobile =
-    items.length > 5
-      ? [...items].sort((a, b) => prioridade(a.href) - prioridade(b.href))
-      : items;
-  const visiveis = items.length > 5 ? itemsMobile.slice(0, 4) : items;
-  const overflow = items.length > 5 ? itemsMobile.slice(4) : [];
-  const maisAtivo = overflow.some((i) => pathname.startsWith(i.href));
-  const chamadosNoMais =
-    chamadosSemDono > 0 && overflow.some((i) => i.href === "/chamados");
+  // barra do celular: 4 destinos fixos do papel + Menu (a navegação inteira
+  // num painel lateral — o drop-up "Mais" saiu, REALIZA-221)
+  const visiveis = MOBILE_PRIMEIRO.map((href) => items.find((i) => i.href === href))
+    .filter((i): i is Item => i != null)
+    .slice(0, 4);
+  const rotaNaBarra = visiveis.some((i) =>
+    i.href === "/" ? pathname === "/" : pathname.startsWith(i.href)
+  );
+  // a rota atual fora da barra (Registros, Turmas, Perfil…) acende o Menu
+  const menuAtivo = !rotaNaBarra;
+  const chamadosForaDaBarra =
+    chamadosSemDono > 0 && !visiveis.some((i) => i.href === "/chamados");
 
   const agrupado = items.length > LIMITE_LISTA_SIMPLES;
   const secoesSidebar: Secao<Item>[] = agrupado
     ? porGrupo(items)
     : [{ titulo: null, itens: items }];
-  const secoesMais: Secao<Item>[] = agrupado
-    ? porGrupo(overflow)
-    : [{ titulo: null, itens: overflow }];
 
-  // navegar pelo popover (ou por fora) fecha o Mais — ajuste durante o
+  // navegar pelo menu (ou por fora) fecha o painel — ajuste durante o
   // render (padrão "props mudaram", igual ao provider de notificações)
   const [ultimoPath, setUltimoPath] = useState(pathname);
   if (pathname !== ultimoPath) {
     setUltimoPath(pathname);
-    setAbertoMais(false);
+    setMenuAberto(false);
   }
 
   return (
@@ -205,54 +255,12 @@ export function AppShell({
             baixas — ela rola e o rodapé (demo + usuário) fica sempre visível */}
         <nav aria-label="Navegação principal" className="min-h-0 flex-1 overflow-y-auto px-3 pb-3">
 
-          {secoesSidebar.map((secao) => (
-            // mais espaço acima do título de grupo do que abaixo: o título
-            // fica preso ao grupo que ele nomeia
-            <div key={secao.titulo ?? "geral"} className="mt-5 space-y-1 first:mt-0">
-              {secao.titulo && (
-                <p className="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  {secao.titulo}
-                </p>
-              )}
-              {secao.itens.map((item) => {
-                const ativo = item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    aria-current={ativo ? "page" : undefined}
-                    className={cn(
-                      "relative flex items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors",
-                      ativo
-                        ? "text-[var(--brand-ink)] font-semibold"
-                        : "text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-                    )}
-                  >
-                    {/* continuidade espacial: a pill viaja pra nova seção na troca
-                        de rota — o AppShell persiste entre páginas (§2) */}
-                    {ativo && (
-                      <motion.span
-                        layoutId="nav-side"
-                        transition={T.pill}
-                        aria-hidden
-                        className="absolute inset-0 -z-10 rounded-lg bg-[var(--brand-lime)]"
-                      />
-                    )}
-                    <item.icon size={18} weight={ativo ? "fill" : "regular"} aria-hidden className="relative" />
-                    <span className="relative">{item.label}</span>
-                    {item.href === "/chamados" && chamadosSemDono > 0 && (
-                      <span
-                        aria-label={`${chamadosSemDono} chamados na fila`}
-                        className="relative ml-auto grid min-w-5 place-items-center rounded-full bg-[var(--warn)]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warn-text)]"
-                      >
-                        {chamadosSemDono}
-                      </span>
-                    )}
-                  </Link>
-                );
-              })}
-            </div>
-          ))}
+          <NavLista
+            secoes={secoesSidebar}
+            pathname={pathname}
+            chamadosSemDono={chamadosSemDono}
+            pill="nav-side"
+          />
         </nav>
 
         <div className="border-t border-sidebar-border px-3 pb-4 pt-4">
@@ -343,94 +351,79 @@ export function AppShell({
               </Link>
             );
           })}
-          {overflow.length > 0 && (
-            <Popover open={abertoMais} onOpenChange={setAbertoMais}>
-              <PopoverTrigger
-                aria-label={[
-                  maisAtivo ? `Mais seções, seção atual em ${overflow.find((i) => pathname.startsWith(i.href))?.label}` : "Mais seções",
-                  chamadosNoMais ? `${chamadosSemDono} chamados na fila` : null,
-                ].filter(Boolean).join(", ")}
-                className={cn(
-                  "group relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
-                  maisAtivo ? "font-semibold text-[var(--brand-ink)]" : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
-                )}
-              >
-                {/* a rota atual mora no overflow → o indicador viaja pra cell
-                    Mais e ela veste o estilo ativo */}
-                {maisAtivo && (
-                  <motion.span
-                    layoutId="nav-bottom"
-                    transition={T.pill}
+          <Sheet open={menuAberto} onOpenChange={setMenuAberto}>
+            <SheetTrigger
+              aria-label={[
+                menuAtivo ? "Menu, seção atual fora da barra" : "Menu",
+                chamadosForaDaBarra ? `${chamadosSemDono} chamados na fila` : null,
+              ].filter(Boolean).join(", ")}
+              className={cn(
+                "group relative flex flex-1 flex-col items-center gap-1 py-2.5 text-[11px] transition-colors outline-none focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-inset",
+                menuAtivo ? "font-semibold text-[var(--brand-ink)]" : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground"
+              )}
+            >
+              {/* a rota atual mora no menu → o indicador viaja pra cell
+                  Menu e ela veste o estilo ativo */}
+              {menuAtivo && (
+                <motion.span
+                  layoutId="nav-bottom"
+                  transition={T.pill}
+                  aria-hidden
+                  className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--brand-lime)]"
+                />
+              )}
+              <span className="relative">
+                <List
+                  size={20}
+                  weight={menuAtivo ? "bold" : "regular"}
+                  aria-hidden
+                  className="transition-transform group-active:scale-90"
+                />
+                {chamadosForaDaBarra && (
+                  <span
                     aria-hidden
-                    className="absolute top-0 h-0.5 w-8 rounded-full bg-[var(--brand-lime)]"
+                    className="absolute -top-0.5 -right-1 size-2 rounded-full bg-[var(--warn)] ring-2 ring-sidebar"
                   />
                 )}
-                <span className="relative">
-                  <DotsThree
-                    size={20}
-                    weight={maisAtivo ? "bold" : "regular"}
-                    aria-hidden
-                    className="transition-transform group-active:scale-90"
-                  />
-                  {/* fila de chamados mora no Mais — sem o ponto a pendência
-                      só aparece abrindo o popover */}
-                  {chamadosNoMais && (
-                    <span
-                      aria-hidden
-                      className="absolute -top-0.5 -right-1 size-2 rounded-full bg-[var(--warn)] ring-2 ring-sidebar"
-                    />
-                  )}
-                </span>
-                Mais
-              </PopoverTrigger>
-              <PopoverContent
-                side="top"
-                align="end"
-                sideOffset={8}
-                className="w-56 p-1.5"
-              >
-                {secoesMais.map((secao) => (
-                  <div key={secao.titulo ?? "geral"} className="mt-1 first:mt-0">
-                    {secao.titulo && (
-                      <p className="px-3 pb-1 pt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                        {secao.titulo}
-                      </p>
-                    )}
-                    <ul>
-                      {secao.itens.map((item) => {
-                        const ativo = pathname.startsWith(item.href);
-                        return (
-                          <li key={item.href}>
-                            <Link
-                              href={item.href}
-                              aria-current={ativo ? "page" : undefined}
-                              className={cn(
-                                "flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm transition-colors outline-none focus-visible:bg-muted",
-                                ativo
-                                  ? "font-semibold text-[var(--brand-ink)]"
-                                  : "text-foreground/80 hover:bg-muted"
-                              )}
-                            >
-                              <item.icon size={18} weight={ativo ? "fill" : "regular"} aria-hidden />
-                              {item.label}
-                              {item.href === "/chamados" && chamadosSemDono > 0 && (
-                                <span
-                                  aria-label={`${chamadosSemDono} chamados na fila`}
-                                  className="ml-auto grid min-w-5 place-items-center rounded-full bg-[var(--warn)]/20 px-1.5 py-0.5 text-[10px] font-semibold text-[var(--warn-text)]"
-                                >
-                                  {chamadosSemDono}
-                                </span>
-                              )}
-                            </Link>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                ))}
-              </PopoverContent>
-            </Popover>
-          )}
+              </span>
+              Menu
+            </SheetTrigger>
+            <SheetContent side="left" className="pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
+              <div className="px-5 pt-5 pb-5">
+                <SheetTitle className="sr-only">Menu</SheetTitle>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src="/logo-realiza.png" alt="Realiza.vc" className="h-6 w-auto" />
+                <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Programa de Mentoria Social
+                </p>
+              </div>
+              <nav aria-label="Menu" className="flex-1 px-3 pb-3">
+                <NavLista
+                  secoes={secoesSidebar}
+                  pathname={pathname}
+                  chamadosSemDono={chamadosSemDono}
+                  pill="nav-sheet"
+                />
+              </nav>
+              <div className="border-t border-sidebar-border px-3 pt-3 pb-4">
+                <Link
+                  href="/perfil"
+                  aria-current={pathname === "/perfil" ? "page" : undefined}
+                  className="flex min-h-11 items-center gap-3 rounded-lg px-2 py-2 transition-colors outline-none hover:bg-sidebar-accent focus-visible:ring-3 focus-visible:ring-ring/50"
+                >
+                  <Avatar nome={me.nome} src={avatarUrl} fallbackSrc={gravatarUrl} size={32} />
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">{me.nome}</span>
+                    <span className="block truncate text-xs text-muted-foreground">{papelLabel(me.role)}</span>
+                  </span>
+                </Link>
+                <SignOutButton
+                  label={demo ? "Sair da demonstração" : "Sair"}
+                  className="mt-1 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground outline-none transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
         </div>
       </nav>
     </div>

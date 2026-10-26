@@ -940,6 +940,90 @@ export async function setPessoaRole(profileId: string, role: string | null) {
   return { ok: true };
 }
 
+/** Escopo do auxiliar executivo por pessoa (REALIZA-32, migration 0125). A
+ *  visão de turma é uma LINHA de papel: (supervisor, escopo_turma = T,
+ *  escopo_supervisao = 'turma') ao lado da linha-identidade global (escopo
+ *  null, 'duplas'), que é a que diz "a pessoa é auxiliar" e segura o
+ *  primário. A identidade vem antes de mexer nos grants: apagar a última
+ *  linha supervisor com o primário nela rebaixaria profiles.role no meio da
+ *  operação. "duplas" remove o grant; "turma" regrava (a UI escolhe uma
+ *  turma por vez). */
+export async function setEscopoAuxiliar(
+  profileId: string,
+  escopo: string,
+  turma: string | null
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação define o escopo do auxiliar." };
+  }
+  if (profileId === eu.id) {
+    return { error: "Não é possível alterar o próprio cadastro." };
+  }
+  if (escopo !== "duplas" && escopo !== "turma") {
+    return { error: "Escopo inválido." };
+  }
+  const turmaAlvo = (turma ?? "").trim();
+  if (escopo === "turma" && !turmaAlvo) {
+    return { error: "Escolha a turma que o auxiliar acompanha." };
+  }
+
+  const { data: papeis, error: pErr } = await supabase
+    .from("profile_papeis")
+    .select("id, papel, escopo_turma, escopo_supervisao")
+    .eq("profile_id", profileId)
+    .eq("papel", "supervisor");
+  if (pErr) return { error: erroAmigavel(pErr) };
+  if (!papeis?.length) {
+    return { error: "A pessoa precisa ter o papel de auxiliar executivo." };
+  }
+
+  // linha-identidade: "é auxiliar" existe independente do grant de turma
+  if (!papeis.some((r) => r.escopo_turma == null)) {
+    const { error: insErr } = await supabase.from("profile_papeis").insert({
+      profile_id: profileId,
+      papel: "supervisor",
+      escopo_turma: null,
+      escopo_supervisao: "duplas",
+    });
+    if (insErr) return { error: erroAmigavel(insErr) };
+  }
+
+  // o grant velho sai antes do novo — a UI grava uma turma por vez
+  const { error: delErr } = await supabase
+    .from("profile_papeis")
+    .delete()
+    .eq("profile_id", profileId)
+    .eq("papel", "supervisor")
+    .eq("escopo_supervisao", "turma");
+  if (delErr) return { error: erroAmigavel(delErr) };
+
+  if (escopo === "turma") {
+    // a linha escopada na mesma turma (papel sem grant, legado) vira o
+    // grant; senão nasce uma. Sem upsert: o unique é NULLS NOT DISTINCT e
+    // a inferência do ON CONFLICT nele é frágil — update/insert explícito
+    const existente = papeis.find((r) => r.escopo_turma === turmaAlvo);
+    const { error: escErr } = existente
+      ? await supabase
+          .from("profile_papeis")
+          .update({ escopo_supervisao: "turma" })
+          .eq("id", existente.id)
+      : await supabase.from("profile_papeis").insert({
+          profile_id: profileId,
+          papel: "supervisor",
+          escopo_turma: turmaAlvo,
+          escopo_supervisao: "turma",
+        });
+    if (escErr) return { error: erroAmigavel(escErr) };
+  }
+
+  revalidatePath("/pessoas");
+  revalidatePath(`/pessoas/${profileId}`);
+  return { ok: true };
+}
+
 // ---------- gestao ----------
 
 export async function updatePessoa(profileId: string, formData: FormData) {

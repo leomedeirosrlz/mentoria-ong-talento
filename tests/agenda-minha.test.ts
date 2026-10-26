@@ -566,9 +566,12 @@ describe("filtro de escopo", () => {
       supervisoes: [mkSupervisao({ data: HOJE })],
     });
 
-    // Tudo: itens da Ana (previsto), supervisão e formação
+    // Tudo: itens da Ana (previsto) e a formação; a supervisão de HOJE já
+    // está na faixa "Minha agenda" e não se repete na lista
     const tudo = filtraAgenda(agenda, "tudo");
     expect(tudo.avisos).toHaveLength(1); // registro do Caio
+    const itensTudo = tudo.secoes.flatMap((s) => s.grupos.flatMap((g) => g.itens));
+    expect(itensTudo.some((i) => i.tipo === "supervisao")).toBe(false);
     const soAna = filtraAgenda(agenda, "dupla:d1");
     expect(soAna.avisos).toHaveLength(0); // a pendência é do Caio
     expect(

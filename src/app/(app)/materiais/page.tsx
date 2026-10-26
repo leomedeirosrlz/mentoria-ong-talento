@@ -8,6 +8,7 @@ import {
   getPainelInstrumentosJornada,
 } from "@/lib/queries";
 import { getFormularios } from "@/lib/forms/queries";
+import { getDesfechoElegiveis6m } from "@/lib/queries-desfecho";
 import type { FormularioSistema } from "@/lib/forms/schema";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import {
@@ -140,14 +141,21 @@ export default async function MateriaisPage({
       ? ("supervisor" as const)
       : ("mentor" as const);
   const formIds = new Map<FormularioSistema, string>();
+  let desfechoElegiveis: Awaited<
+    ReturnType<typeof getDesfechoElegiveis6m>
+  > = [];
   if (ehCoord) {
-    const forms = await getFormularios().catch((e) => {
-      console.error("materiais/getFormularios:", e);
-      return [];
-    });
+    const [forms, eleg6m] = await Promise.all([
+      getFormularios().catch((e) => {
+        console.error("materiais/getFormularios:", e);
+        return [];
+      }),
+      getDesfechoElegiveis6m(),
+    ]);
     for (const f of forms) {
       if (f.sistema && !formIds.has(f.sistema)) formIds.set(f.sistema, f.id);
     }
+    desfechoElegiveis = eleg6m;
   }
   const fichasMentor = ehMentorDpp
     ? duplasPainel
@@ -275,6 +283,7 @@ export default async function MateriaisPage({
             duplasInfo={duplasInfo}
             formIds={formIds}
             envioLiberado={EMAIL_ENVIO_LIBERADO}
+            desfechoElegiveis={desfechoElegiveis}
             fichasMentor={fichasMentor}
             nudges={nudges}
             meuNome={me?.nome_social || me?.nome || ""}

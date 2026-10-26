@@ -45,6 +45,7 @@ import {
 } from "@/lib/ciclo";
 import { agrupaContatosPorPessoa } from "@/lib/jovem-contatos";
 import {
+  datasOficiaisDe,
   encCorrenteDe,
   materialLiberadoParaJovem,
 } from "@/lib/jornada";
@@ -55,6 +56,7 @@ import {
   getJovemDuplas,
   getJovemEncaminhamentos,
   getJovemEncontros,
+  getJovemJornada,
   getJovemPedidosEspecialista,
   getJovemPerfil,
   type JovemEncontro,
@@ -94,7 +96,7 @@ const TIPO_ICONE_MATERIAL = {
 // os adultos, e por fim o que é consulta (especialistas só com ação,
 // avaliações, combinados, documentos, avisos e materiais).
 export default async function JovemHome() {
-  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes, pedidosEsp] =
+  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes, pedidosEsp, jornada] =
     await Promise.all([
       getMe(),
       getJovemPerfil(),
@@ -107,6 +109,10 @@ export default async function JovemHome() {
       getMateriais(),
       getJovemAvaliacoes(),
       getJovemPedidosEspecialista(),
+      // além do cronograma oficial (a régua do acervo embaixo), a RPC é a
+      // auto-cura da jornada — chamar na visita da home já dispara a
+      // emissão do que a data oficial abriu (0123)
+      getJovemJornada().catch(() => null),
     ]);
   if (!me) return null; // o layout já barra — convenção das páginas
 
@@ -132,12 +138,20 @@ export default async function JovemHome() {
   // régua do acervo progressivo (REALIZA-160): a vitrine da home só mostra
   // o que já liberou — material marcado pra encontro futuro não vaza na
   // prévia. Só a dupla DPP ancora (trilha esp tem outra escala, 5 sessões);
-  // sem DPP viva → null = acervo livre.
+  // sem DPP viva → null = acervo livre. A rede de segurança da data
+  // oficial (0123) entra quando o cronograma da RPC é desta mesma dupla.
   const encCorrAcervo =
     duplaEmCurso &&
     duplaAtual?.id != null &&
     duplaAtual.trilha !== "especialista"
-      ? encCorrenteDe(encontros.filter((e) => e.dupla_id === duplaAtual.id))
+      ? encCorrenteDe(encontros.filter((e) => e.dupla_id === duplaAtual.id), {
+          datasOficiais:
+            jornada?.dupla_id === duplaAtual.id
+              ? datasOficiaisDe(jornada.cronograma)
+              : undefined,
+          ativa: duplaAtual.status === "ativa",
+          inicio: duplaAtual.iniciada_em,
+        })
       : null;
   const materiaisVisiveis = materiais.filter((m) =>
     materialLiberadoParaJovem(m, encCorrAcervo)

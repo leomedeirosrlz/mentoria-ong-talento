@@ -7,7 +7,6 @@ import {
   AVALIACAO_LABEL,
   eventosDoCronograma,
   formatDiaMes,
-  saudadeDaDupla,
   semanaBounds,
   toDateStr,
 } from "@/lib/ciclo";
@@ -154,10 +153,8 @@ export function agruparRegistros<T extends RegistroAgrupavel>(
 //    chegou lá);
 //  - a linha ★ usa avaliacoes_encontro.estrelas (1–5, do jovem) — NÃO o
 //    registros.avaliacao (4-pt qualitativo do mentor, que segue nos cards);
-//  - o donut é o semáforo das duplas (saudadeDaDupla), não contagem de
-//    registros; "apoio aberto" é eixo separado: entra como fatia só quando
-//    a dupla não está em atenção/risco (precedência de leitura, uma dupla
-//    por fatia — o total sempre bate com o universo).
+//  - a situação das duplas NÃO mora aqui: vem de saudeDoRecorte, a mesma
+//    contagem de /duplas, /agenda e da home.
 
 /** Recorte de período do painel: "ciclo" é o default implícito e não viaja
  *  na URL; "8s"/"4s" cortam as últimas N semanas pela DATA OFICIAL do
@@ -238,30 +235,14 @@ export type PanoramaTurma = {
   longa: string;
 };
 
-/** Semáforo das duplas do recorte — uma dupla por fatia, o total bate com
- *  o universo. `apoioTotal` é a contagem REAL do eixo apoio (pode exceder a
- *  fatia quando quem pede apoio já está em atenção/risco). */
-export type PanoramaDonut = {
-  andamento: number;
-  atencao: number;
-  risco: number;
-  apoio: number;
-  pausada: number;
-  concluida: number;
-  encerrada: number;
-  apoioTotal: number;
-  total: number;
-};
-
 export type RegistrosPanorama = {
   /** colunas do gráfico por nº de encontro, já no recorte (período/turma/
    *  dupla/encontro da URL). Vazio = nenhum encontro oficial no recorte. */
   slots: PanoramaSlot[];
   /** cronogramas que formam o eixo (ordem do banco — T1 antes da T2). */
   turmas: PanoramaTurma[];
-  donut: PanoramaDonut;
   /** trilhas de especialista no recorte — sem calendário oficial, ficam
-   *  fora das colunas e da linha (mas entram no donut). */
+   *  fora das colunas e da linha. */
   espNoRecorte: number;
 };
 
@@ -418,52 +399,9 @@ export function panoramaRegistros({
     (a, b) => a.numero - b.numero
   );
 
-  // ---- donut: semáforo das duplas do recorte ----
-  // "todas" cobre o ciclo VIGENTE: duplas de qualquer cronograma + trilhas
-  // de especialista (sem cronograma por desenho). DPP sem cronograma é
-  // histórica de outro ciclo (turma é texto legado) e fica de fora — ela
-  // responderia o panorama do ciclo DELA, não deste.
-  // turma × dupla INTERSECTAM como nos filtros da lista (?turma=T2&dupla=
-  // <id da T1> esvazia a lista): combinação divergente zera o universo e o
-  // donut zera junto — ignorar a turma e mostrar a dupla leria um recorte
-  // que a própria página não mostra.
-  const duplasDonut = duplas.filter((d) => {
-    if (recorte.dupla && d.id !== recorte.dupla) return false;
-    if (recorte.turma && d.cronograma_id !== recorte.turma) return false;
-    if (!recorte.dupla && !recorte.turma)
-      return d.trilha === "especialista" || d.cronograma_id != null;
-    return true;
-  });
-  const donut: PanoramaDonut = {
-    andamento: 0,
-    atencao: 0,
-    risco: 0,
-    apoio: 0,
-    pausada: 0,
-    concluida: 0,
-    encerrada: 0,
-    apoioTotal: 0,
-    total: duplasDonut.length,
-  };
-  for (const d of duplasDonut) {
-    const saude = saudadeDaDupla(d, eventos, hoje);
-    // precedência de leitura: quem está mal sai na frente; apoio aberto só
-    // vira fatia quando a dupla está "bem" (em atenção/risco o chamado já é
-    // visível pelo sinal) — uma dupla por fatia mantém a soma honesta
-    if (saude.semaforo === "risco") donut.risco++;
-    else if (saude.semaforo === "atencao") donut.atencao++;
-    else if (saude.apoio.aberto) donut.apoio++;
-    else if (d.status === "pausada") donut.pausada++;
-    else if (d.status === "concluida") donut.concluida++;
-    else if (d.status === "encerrada") donut.encerrada++;
-    else donut.andamento++;
-    if (saude.apoio.aberto) donut.apoioTotal++;
-  }
-
   return {
     slots,
     turmas,
-    donut,
     espNoRecorte: escopo.filter((d) => d.trilha === "especialista").length,
   };
 }

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { jornadaDaDupla, marcosEntre, passosDaTrilha } from "@/lib/ciclo";
 import {
+  datasOficiaisDe,
   encCorrenteDe,
   materialLiberadoParaJovem,
 } from "@/lib/jornada";
@@ -138,6 +139,133 @@ describe("encCorrenteDe — a âncora única", () => {
       encCorrenteDe([encRealizado(4, "2025-10-01"), encAgendado(5, "2025-10-08")])
     ).toBe(5);
     expect(encCorrenteDe([encRealizado(16, "2025-10-01")])).toBe(16);
+  });
+});
+
+// REALIZA-215 — a data oficial como rede de segurança: a régua avança
+// pelo calendário da turma quando o registro atrasa mais de 7 dias
+describe("encCorrenteDe — rede de segurança pela data oficial", () => {
+  const HOJE = dt("2025-11-12"); // qua — o enc. 5 oficial (04/11) passou há 8 dias
+  const OFICIAIS = [
+    { numero: 1, data: "2025-10-07" },
+    { numero: 2, data: "2025-10-14" },
+    { numero: 3, data: "2025-10-21" },
+    { numero: 4, data: "2025-10-28" }, // há 15 dias
+    { numero: 5, data: "2025-11-04" }, // há 8 dias
+    { numero: 6, data: "2025-11-11" }, // ontem — não passou de 7
+    { numero: 7, data: "2025-12-01" }, // futuro
+  ];
+
+  it("só realizado conta quando não há datasOficiais", () => {
+    expect(
+      encCorrenteDe([encRealizado(3, "2025-10-21")], { hoje: HOJE, ativa: true })
+    ).toBe(4);
+    expect(
+      encCorrenteDe([], { datasOficiais: [], hoje: HOJE, ativa: true })
+    ).toBe(1);
+  });
+
+  it("evento oficial passado há mais de 7 dias avança a régua sem realizado", () => {
+    expect(
+      encCorrenteDe([], { datasOficiais: OFICIAIS, hoje: HOJE, ativa: true })
+    ).toBe(6); // 5 encontros oficiais vencidos com folga → corrente 6
+  });
+
+  it("ingresso tardio: conta só os encontros oficiais desde o início da dupla", () => {
+    // a dupla começou em 25/10 — vencidos desde então: 28/10 e 04/11
+    expect(
+      encCorrenteDe([], {
+        datasOficiais: OFICIAIS,
+        hoje: HOJE,
+        ativa: true,
+        inicio: "2025-10-25",
+      })
+    ).toBe(3);
+    // nasceu hoje: nada passou ainda — começa no 1º, sem pular instrumentos
+    expect(
+      encCorrenteDe([], {
+        datasOficiais: OFICIAIS,
+        hoje: HOJE,
+        ativa: true,
+        inicio: "2025-11-12T10:00:00-03:00",
+      })
+    ).toBe(1);
+  });
+
+  it("há 6 dias ainda não avança — a folga de uma semana não venceu", () => {
+    expect(
+      encCorrenteDe([], {
+        datasOficiais: [{ numero: 5, data: "2025-11-06" }],
+        hoje: HOJE,
+        ativa: true,
+      })
+    ).toBe(1);
+    // exatos 7 dias idem — a regra exige MAIS de 7
+    expect(
+      encCorrenteDe([], {
+        datasOficiais: [{ numero: 5, data: "2025-11-05" }],
+        hoje: HOJE,
+        ativa: true,
+      })
+    ).toBe(1);
+  });
+
+  it("dupla pausada não avança pela data — o tempo dela está congelado", () => {
+    expect(
+      encCorrenteDe([], { datasOficiais: OFICIAIS, hoje: HOJE, ativa: false })
+    ).toBe(1);
+    // e sem o flag `ativa` o default é não aplicar a régua por data
+    expect(encCorrenteDe([], { datasOficiais: OFICIAIS, hoje: HOJE })).toBe(1);
+  });
+
+  it("nunca regride: o realizado vence quando está à frente do calendário", () => {
+    expect(
+      encCorrenteDe([encRealizado(8, "2025-11-10")], {
+        datasOficiais: OFICIAIS,
+        hoje: HOJE,
+        ativa: true,
+      })
+    ).toBe(9); // max(8+1, 5+1)
+  });
+
+  it("e o calendário destrava quando está à frente do realizado", () => {
+    expect(
+      encCorrenteDe([encRealizado(2, "2025-10-14")], {
+        datasOficiais: OFICIAIS,
+        hoje: HOJE,
+        ativa: true,
+      })
+    ).toBe(6); // max(2+1, 5+1)
+  });
+
+  it("teto 16 mesmo com o cronograma inteiro vencido", () => {
+    const cicloInteiro = CICLO_16.filter((e) => e.tipo === "encontro").map(
+      (e) => ({ numero: e.numero!, data: e.data! })
+    );
+    expect(
+      encCorrenteDe([], {
+        datasOficiais: cicloInteiro,
+        hoje: dt("2026-03-01"),
+        ativa: true,
+      })
+    ).toBe(16);
+  });
+});
+
+describe("datasOficiaisDe", () => {
+  it("só encontro com nº e data — formação, marco e etapa sem data ficam fora", () => {
+    expect(
+      datasOficiaisDe([
+        { numero: 1, data: "2025-10-07", tipo: "encontro" },
+        { numero: null, data: "2025-10-22", tipo: "formacao" },
+        { numero: null, data: null, tipo: "etapa_preparacao" },
+        { numero: 16, data: "2026-01-20", tipo: "evento_encerramento" },
+        { numero: 2, data: "2025-10-14", tipo: "encontro" },
+      ])
+    ).toEqual([
+      { numero: 1, data: "2025-10-07" },
+      { numero: 2, data: "2025-10-14" },
+    ]);
   });
 });
 

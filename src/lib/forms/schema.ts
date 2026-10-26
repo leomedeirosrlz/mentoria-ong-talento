@@ -90,7 +90,8 @@ export type FormularioSistema =
   | "pdm"
   | "roda_vida"
   | "intake_mentor"
-  | "intake_mentorado";
+  | "intake_mentorado"
+  | "desfecho";
 
 export const SISTEMA_LABEL: Record<FormularioSistema, string> = {
   anamnese: "Anamnese",
@@ -103,6 +104,7 @@ export const SISTEMA_LABEL: Record<FormularioSistema, string> = {
   roda_vida: "Roda da Vida",
   intake_mentor: "Inscrição de mentores",
   intake_mentorado: "Inscrição de mentorados",
+  desfecho: "Depois da mentoria",
 };
 
 /** Instrumentos de trabalho da dupla (0080) — os 4 que o mentor "entrega"
@@ -141,6 +143,7 @@ export const SISTEMAS_BORDO: readonly FormularioSistema[] = [
   "anamnese",
   "autoavaliacao_mentor",
   "avaliacao_especialista",
+  "desfecho",
 ];
 
 /** Resumo de uma linha da ficha da dupla — o que o instrumento é e quando

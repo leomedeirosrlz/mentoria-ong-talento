@@ -6,6 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 import { SiteFooter } from "@/components/site-footer";
 import { buttonVariants } from "@/components/ui/button";
 import { RelatorioCanvas } from "@/components/relatorio-canvas";
+import { ResumoDesfechoCard } from "@/components/resumo-desfecho";
 import { ResumoSenhaForm } from "@/components/resumo-senha-form";
 import { rastroAcesso, resumoCookie } from "@/lib/resumo-acesso";
 import {
@@ -23,6 +24,7 @@ import type {
   RelatorioLinkConfig,
 } from "@/lib/relatorio";
 import { formatDateTime } from "@/lib/ciclo";
+import { montaDesfechoCard, parseDesfechoAgregado } from "@/lib/desfecho";
 
 // Relatório público por link (167 + 170): o gate não é mais uma constante
 // nem um recorte na query — relatorio_link_info devolve o shell (existe/
@@ -232,6 +234,14 @@ export default async function ResumoPage({
 
   const titulo = info.titulo?.trim() || "Resumo da turma";
 
+  // desfecho (0124): a chave entra em dados pela mesma RPC com senha —
+  // agregado do recorte do relatório; momento com n < 5 já vem suprimido
+  const momentosDesfecho = montaDesfechoCard(
+    parseDesfechoAgregado(
+      (abertura.dados as Record<string, unknown> | undefined)?.desfecho
+    )
+  );
+
   return (
     <div className="flex min-h-[100dvh] flex-col">
       <main className="flex flex-1 flex-col px-4 py-8 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
@@ -260,6 +270,12 @@ export default async function ResumoPage({
               />
             </div>
           </div>
+
+          {momentosDesfecho.length > 0 && (
+            <div className="mx-auto mt-5 max-w-6xl">
+              <ResumoDesfechoCard momentos={momentosDesfecho} />
+            </div>
+          )}
         </div>
       </main>
       <SiteFooter />

@@ -183,36 +183,6 @@ export default async function JovemEspecialistasPage() {
         </p>
       </header>
 
-      {/* os três gestos separados na própria página (mock v6 .three) — a
-          confusão real era chamar tudo de "pedir especialista": o chamado
-          é outro sistema e a sessão não existe sem trilha */}
-      <div
-        role="note"
-        aria-label="Três coisas diferentes"
-        className="grid gap-2 text-xs leading-relaxed text-muted-foreground sm:grid-cols-3"
-      >
-        <p className="rounded-lg border border-[var(--role-mentorado)]/50 bg-[var(--role-mentorado)]/10 px-3 py-2.5">
-          <span className="block font-semibold text-foreground">
-            Pedir uma trilha
-          </span>
-          Ela é o que esta página faz. O pedido vai ao mural e um
-          especialista aceita.
-        </p>
-        <p className="rounded-lg border border-border px-3 py-2.5">
-          <span className="block font-semibold text-foreground">
-            Agendar uma sessão
-          </span>
-          Só dentro de uma trilha ativa, nos horários do especialista.
-        </p>
-        <p className="rounded-lg border border-border px-3 py-2.5">
-          <span className="block font-semibold text-foreground">
-            Pedir apoio à coordenação
-          </span>
-          É um chamado sobre agenda, método ou urgência. O link fica no fim
-          da página.
-        </p>
-      </div>
-
       {sugestoes.length > 0 && (
         <section aria-label="Sugestões do seu mentor" className="space-y-3">
           {sugestoes.map((s) => (
