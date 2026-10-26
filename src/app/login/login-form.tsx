@@ -351,26 +351,62 @@ export function LoginForm() {
     // box e vaza o padding lateral (1rem ou o safe-area, o que for maior)
     // lg:pl-[50%] reserva a metade esquerda pro painel fixo da marca
     // (LoginHero) — o form continua centrado na metade que sobra
-    <div className="flex min-h-[100dvh] flex-col bg-background pb-[calc(1.5rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:pl-[50%]">
+    <div className="flex min-h-[100dvh] flex-col bg-background lg:pl-[50%]">
       <LoginHero />
-      <div className="m-auto w-full max-w-sm lg:max-w-md">
-        <div className="mb-8">
-          <Logo size="xl" />
-          <h1 className="text-lg font-semibold tracking-tight mt-3">Programa de Mentoria Social</h1>
-        </div>
 
-        {/* no mobile o painel ink não cabe — uma faixa só de foto real,
-            inclinada de leve, já traz o rosto do programa sem pesar a dobra */}
-        <motion.div {...fade} transition={T.enter} className="mb-8 rotate-[-1.5deg] lg:hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/login/dupla.webp"
-            alt=""
-            width={1300}
-            height={731}
-            className="aspect-[2/1] w-full rounded-2xl object-cover shadow-md ring-1 ring-border"
-          />
-        </motion.div>
+      {/* cabeçalho mobile full-bleed: eco do painel desktop — fundo em
+          gradiente ink→verde, glow lime que respira, wordmark centralizado e
+          a colagem de fotos da turma; no lg+ o LoginHero assume esse papel e
+          o form traz a própria marca */}
+      <div className="relative overflow-hidden bg-[linear-gradient(165deg,var(--brand-ink),color-mix(in_srgb,var(--brand-ink)_80%,var(--brand-lime)))] px-6 pb-10 pt-[calc(2.5rem+env(safe-area-inset-top))] text-center lg:hidden">
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute -top-12 left-1/2 size-72 -translate-x-1/2 rounded-full bg-[var(--brand-lime)]/25 blur-3xl"
+          animate={{ scale: [1, 1.15, 1], opacity: [0.55, 0.85, 0.55] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <p className="relative text-3xl font-black italic tracking-tight">
+          <span className="text-white">REALIZA</span>
+          <span className="text-[var(--role-mentorado)]">.</span>
+          <span className="text-[var(--brand-lime)]">VC</span>
+        </p>
+        <h1 className="relative mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
+          Programa de Mentoria Social
+        </h1>
+        <div className="relative mt-6 flex items-end justify-center gap-3">
+          {[
+            { src: "/login/dupla.webp", w: 1300, h: 731, cls: "aspect-[4/3] w-[46%] rotate-[-2deg]", delay: 0.05 },
+            { src: "/login/aluna.webp", w: 900, h: 1600, cls: "aspect-[3/4] w-[27%] rotate-[2.5deg]", delay: 0.18 },
+            { src: "/login/atividade.webp", w: 900, h: 1600, cls: "aspect-[3/4] w-[27%] rotate-[-3deg]", delay: 0.31 },
+          ].map((f) => (
+            <motion.div
+              key={f.src}
+              initial={{ opacity: 0, y: 18, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.5, ease: EASE, delay: f.delay }}
+              className={f.cls}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={f.src}
+                alt=""
+                width={f.w}
+                height={f.h}
+                className="w-full rounded-2xl object-cover shadow-2xl ring-1 ring-white/15"
+              />
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      <div className="m-auto w-full max-w-sm pb-[calc(1.5rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-6 lg:max-w-md lg:pt-0">
+        {/* marca do form — só desktop; no mobile a banda ink já trouxe */}
+        <div className="mb-8 hidden lg:block">
+          <Logo size="xl" />
+          <h1 className="text-lg font-semibold tracking-tight mt-3">
+            Programa de Mentoria Social
+          </h1>
+        </div>
 
         {/* feedback: crossfade form ↔ confirmação — o painel sucede o form no
             mesmo espaço em vez de corte seco (§2); ref/tabIndex de foco migram
