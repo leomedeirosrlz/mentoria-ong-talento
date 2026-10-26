@@ -5408,13 +5408,13 @@ export type Database = {
       jornada_autoemit: { Args: { p_dupla_id: string }; Returns: undefined }
       jovem_jornada: { Args: never; Returns: Json }
       jovem_relacionado: { Args: { p_profile: string }; Returns: boolean }
-      marcar_combinado: {
-        Args: { p_feito: boolean; p_id: string }
-        Returns: undefined
-      }
       marcar_aconteceu_mentorado: {
         Args: { p_encontro: string }
         Returns: Json
+      }
+      marcar_combinado: {
+        Args: { p_feito: boolean; p_id: string }
+        Returns: undefined
       }
       marcar_nao_aconteceu_mentorado: {
         Args: { p_encontro: string }
