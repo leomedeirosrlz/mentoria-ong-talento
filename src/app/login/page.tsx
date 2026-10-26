@@ -4,7 +4,6 @@ import { sharedOg } from "@/lib/og";
 import { Skeleton } from "@/components/ui/skeleton";
 import { SiteFooter } from "@/components/site-footer";
 import { LoginForm } from "./login-form";
-import { Logo } from "@/components/logo";
 
 export const metadata: Metadata = {
   title: "Entrar",
@@ -76,10 +75,10 @@ function LoginFallback() {
       </div>
       <div className="m-auto w-full max-w-sm pb-[calc(1.5rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-6 lg:max-w-md lg:pt-0">
         <div className="mb-8 hidden lg:block">
-          <Logo size="xl" />
-          <h1 className="text-lg font-semibold tracking-tight mt-3">
-            Programa de Mentoria Social
-          </h1>
+          <h1 className="text-xl font-semibold tracking-tight">Entrar</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Use o e-mail cadastrado no programa.
+          </p>
         </div>
         <div className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6">
           <Skeleton className="h-11 w-full rounded-xl md:h-10" />
