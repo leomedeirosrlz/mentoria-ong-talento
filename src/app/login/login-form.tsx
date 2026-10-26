@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { type Session } from "@supabase/supabase-js";
-import { motion, AnimatePresence } from "motion/react";
+import { motion, AnimatePresence, useReducedMotion } from "motion/react";
 import { CircleNotch, EnvelopeSimple, Key, WarningCircle } from "@phosphor-icons/react";
 import { createAuthClient, createOtpClient } from "@/lib/supabase/client";
 import { limparCookiesDemo } from "@/lib/demo/shared";
@@ -14,7 +14,6 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { cn, pathInterno } from "@/lib/utils";
-import { Logo } from "@/components/logo";
 
 // janela do resend do supabase — quando o 429 traz "after N seconds" usa o N real
 const COOLDOWN = 60;
@@ -351,26 +350,51 @@ export function LoginForm() {
     // box e vaza o padding lateral (1rem ou o safe-area, o que for maior)
     // lg:pl-[50%] reserva a metade esquerda pro painel fixo da marca
     // (LoginHero) — o form continua centrado na metade que sobra
-    <div className="flex min-h-[100dvh] flex-col bg-background pb-[calc(1.5rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] lg:pl-[50%]">
+    <div className="flex min-h-[100dvh] flex-col bg-background lg:pl-[50%]">
       <LoginHero />
-      <div className="m-auto w-full max-w-sm lg:max-w-md">
-        <div className="mb-8">
-          <Logo size="xl" />
-          <h1 className="text-lg font-semibold tracking-tight mt-3">Programa de Mentoria Social</h1>
-        </div>
 
-        {/* no mobile o painel ink não cabe — uma faixa só de foto real,
-            inclinada de leve, já traz o rosto do programa sem pesar a dobra */}
-        <motion.div {...fade} transition={T.enter} className="mb-8 rotate-[-1.5deg] lg:hidden">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src="/login/dupla.webp"
-            alt=""
-            width={1300}
-            height={731}
-            className="aspect-[2/1] w-full rounded-2xl object-cover shadow-md ring-1 ring-border"
-          />
-        </motion.div>
+      {/* cabeçalho mobile full-bleed: eco do painel desktop — fundo em
+          gradiente ink→verde, glow lime que respira, wordmark centralizado e
+          a colagem de fotos da turma; no lg+ o LoginHero assume esse papel e
+          o form traz a própria marca */}
+      <div className="relative overflow-hidden bg-[linear-gradient(165deg,var(--brand-ink),color-mix(in_srgb,var(--brand-ink)_80%,var(--brand-lime)))] px-6 pb-10 pt-[calc(2.5rem+env(safe-area-inset-top))] text-center lg:hidden">
+        <motion.div
+          aria-hidden
+          className="pointer-events-none absolute -top-12 left-1/2 size-72 -translate-x-1/2 rounded-full bg-[var(--brand-lime)]/25 blur-3xl"
+          animate={{ scale: [1, 1.15, 1], opacity: [0.55, 0.85, 0.55] }}
+          transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        />
+        <p className="relative text-3xl font-black italic tracking-tight">
+          <span className="text-white">REALIZA</span>
+          <span className="text-[var(--role-mentorado)]">.</span>
+          <span className="text-[var(--brand-lime)]">VC</span>
+        </p>
+        <h1 className="relative mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
+          Programa de Mentoria Social
+        </h1>
+        <div className="relative mt-6 flex items-end justify-center gap-3">
+          {FOTOS_MOBILE.map((f) => (
+            <motion.div
+              key={f.fotos[0].src}
+              initial={{ opacity: 0, y: 18, scale: 0.95 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              transition={{ duration: 0.5, ease: EASE, delay: f.entradaDelay }}
+              className={f.cls}
+            >
+              <FotoCarrossel fotos={f.fotos} intervalo={f.intervalo} />
+            </motion.div>
+          ))}
+        </div>
+      </div>
+
+      <div className="m-auto w-full max-w-sm pb-[calc(1.5rem+env(safe-area-inset-bottom))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] pt-6 lg:max-w-md lg:pt-0">
+        {/* marca já veio no painel/banda — aqui vai o título da ação */}
+        <div className="mb-8 hidden lg:block">
+          <h1 className="text-xl font-semibold tracking-tight">Entrar</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Use o e-mail cadastrado no programa.
+          </p>
+        </div>
 
         {/* feedback: crossfade form ↔ confirmação — o painel sucede o form no
             mesmo espaço em vez de corte seco (§2); ref/tabIndex de foco migram
@@ -603,54 +627,61 @@ export function LoginForm() {
   );
 }
 
-type FotoHero = {
-  src: string;
-  w: number;
-  h: number;
+type Foto = { src: string; w: number; h: number; legenda?: string };
+
+const SEDE: Foto = { src: "/login/parceiros.webp", w: 1400, h: 788, legenda: "Sede parceira" };
+const DUPLA: Foto = { src: "/login/dupla.webp", w: 1300, h: 731, legenda: "Mentoria em dupla" };
+const GRUPO: Foto = { src: "/login/grupo.webp", w: 1300, h: 731, legenda: "Primeira turma" };
+const FORMACAO_TV: Foto = { src: "/login/formacao-tv.webp", w: 1300, h: 2311, legenda: "Formação" };
+const CONVERSA: Foto = { src: "/login/conversa.webp", w: 1300, h: 2311, legenda: "Encontro de mentoria" };
+const AULA: Foto = { src: "/login/aula.webp", w: 1300, h: 2311, legenda: "Aula do programa" };
+const ALUNA: Foto = { src: "/login/aluna.webp", w: 900, h: 1600, legenda: "Aluna em atividade" };
+const RETRATO: Foto = { src: "/login/retrato.webp", w: 900, h: 1600, legenda: "Voluntária" };
+const EDUCADOR: Foto = { src: "/login/educador.webp", w: 900, h: 1600, legenda: "Formação de educadores" };
+const ATIVIDADE: Foto = { src: "/login/atividade.webp", w: 900, h: 1600, legenda: "Roda da Vida" };
+const FORMACAO: Foto = { src: "/login/formacao.webp", w: 900, h: 1600, legenda: "Equipe Realiza" };
+const SELFIE: Foto = { src: "/login/selfie.webp", w: 900, h: 1600, legenda: "Turma 1" };
+
+type SlotHero = {
   /** classes de posicionamento + rotação de repouso (propriedade `rotate`
    *  do CSS — compõe com o transform do float no filho) */
   pos: string;
   /** aspect-[a/b] + largura relativa */
   ar: string;
   largura: string;
-  legenda?: string;
   entradaDelay: number;
   bobDur: number;
   bobAmp: number;
   bobDelay: number;
+  /** pool do carrossel — o slot alterna entre as fotos em crossfade */
+  fotos: Foto[];
+  intervalo: number;
 };
 
-const FOTOS: FotoHero[] = [
+const SLOTS: SlotHero[] = [
   {
-    src: "/login/parceiros.webp",
-    w: 1400,
-    h: 788,
     pos: "top-[2%] left-0 rotate-[-4deg]",
     ar: "aspect-[16/10]",
     largura: "w-[44%]",
-    legenda: "Sede parceira",
     entradaDelay: 0.05,
     bobDur: 6.5,
     bobAmp: -9,
     bobDelay: 0,
+    fotos: [SEDE, FORMACAO_TV, CONVERSA],
+    intervalo: 6200,
   },
   {
-    src: "/login/aluna.webp",
-    w: 900,
-    h: 1600,
     pos: "top-0 right-[1%] rotate-[3deg]",
     ar: "aspect-[3/4]",
     largura: "w-[29%]",
-    legenda: "Aluna em atividade",
     entradaDelay: 0.2,
     bobDur: 7.5,
     bobAmp: -12,
     bobDelay: 0.8,
+    fotos: [ALUNA, RETRATO, EDUCADOR],
+    intervalo: 7800,
   },
   {
-    src: "/login/atividade.webp",
-    w: 900,
-    h: 1600,
     pos: "bottom-[10%] left-[4%] rotate-[2.5deg]",
     ar: "aspect-[3/4]",
     largura: "w-[30%]",
@@ -658,29 +689,89 @@ const FOTOS: FotoHero[] = [
     bobDur: 8.5,
     bobAmp: -8,
     bobDelay: 1.6,
+    fotos: [ATIVIDADE, FORMACAO, SELFIE],
+    intervalo: 8400,
   },
   {
-    src: "/login/dupla.webp",
-    w: 1300,
-    h: 731,
     pos: "bottom-0 right-[5%] rotate-[-2.5deg]",
     ar: "aspect-[16/10]",
     largura: "w-[57%]",
-    legenda: "Mentoria em dupla",
     entradaDelay: 0.5,
     bobDur: 7,
     bobAmp: -10,
     bobDelay: 0.4,
+    fotos: [DUPLA, GRUPO, AULA],
+    intervalo: 7000,
   },
 ];
 
+/** mesmos pools do painel, reduzidos pra 3 slots no mobile */
+const FOTOS_MOBILE: { cls: string; entradaDelay: number; intervalo: number; fotos: Foto[] }[] = [
+  { cls: "aspect-[4/3] w-[46%] rotate-[-2deg]", entradaDelay: 0.05, intervalo: 6500, fotos: [DUPLA, AULA, GRUPO] },
+  { cls: "aspect-[3/4] w-[27%] rotate-[2.5deg]", entradaDelay: 0.18, intervalo: 8000, fotos: [ALUNA, EDUCADOR, RETRATO] },
+  { cls: "aspect-[3/4] w-[27%] rotate-[-3deg]", entradaDelay: 0.31, intervalo: 7300, fotos: [ATIVIDADE, SELFIE, FORMACAO] },
+];
+
+/** Carrossel de crossfade dentro de um slot da colagem: as fotos ficam
+ *  empilhadas em absolute (o container segura o aspect) e a ativa sobe de
+ *  opacidade; a legenda chip remonta junto. Com prefers-reduced-motion o
+ *  intervalo nem liga — fica sempre a primeira foto. */
+function FotoCarrossel({
+  fotos,
+  intervalo,
+  legenda,
+}: {
+  fotos: Foto[];
+  intervalo: number;
+  legenda?: boolean;
+}) {
+  const [i, setI] = useState(0);
+  const reduzir = useReducedMotion();
+  useEffect(() => {
+    if (reduzir || fotos.length < 2) return;
+    const t = setInterval(() => setI((v) => (v + 1) % fotos.length), intervalo);
+    return () => clearInterval(t);
+  }, [fotos.length, intervalo, reduzir]);
+  const atual = fotos[i];
+  return (
+    <>
+      {fotos.map((f, n) => (
+        <motion.img
+          key={f.src}
+          src={f.src}
+          alt=""
+          width={f.w}
+          height={f.h}
+          initial={false}
+          animate={{ opacity: n === i ? 1 : 0 }}
+          transition={{ duration: 0.9, ease: "easeInOut" }}
+          style={{ zIndex: n === i ? 1 : 0 }}
+          className="absolute inset-0 h-full w-full rounded-2xl object-cover shadow-2xl ring-1 ring-white/15"
+        />
+      ))}
+      {legenda && atual.legenda && (
+        <motion.span
+          key={i}
+          initial={{ opacity: 0, y: 4 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.4, ease: EASE }}
+          className="absolute bottom-2.5 left-2.5 z-[2] rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm"
+        >
+          {atual.legenda}
+        </motion.span>
+      )}
+    </>
+  );
+}
+
 /** Painel institucional do /login — só desktop (lg+), position:fixed, metade
- *  esquerda da tela; a coluna reserva o espaço com lg:pl-1/2. Superfície ink
+ *  esquerda da tela; a coluna reserva o espaço com lg:pl-[50%]. Superfície ink
  *  da marca com o wordmark centralizado sobre um glow lime que respira, e
- *  uma colagem de fotos reais do programa com entrada escalonada + bob
- *  dessincronizado (com sway de rotação). Tudo decorativo (aria-hidden) e
- *  transform/motion: o MotionConfig reducedMotion="user" do layout zera a
- *  animação pra quem prefere menos movimento. */
+ *  uma colagem em carrossel (FotoCarrossel) das fotos reais do programa com
+ *  entrada escalonada + bob dessincronizado (com sway de rotação). Tudo
+ *  decorativo (aria-hidden) e transform/motion: o MotionConfig
+ *  reducedMotion="user" do layout zera a animação pra quem prefere menos
+ *  movimento, e o carrossel desliga o intervalo via useReducedMotion. */
 function LoginHero() {
   return (
     <aside
@@ -712,12 +803,13 @@ function LoginHero() {
         </p>
       </div>
 
-      {/* colagem flutuante: cada foto sobe uma vez na entrada (wrapper com a
-          rotação de repouso) e o bob+sway infinito mora no filho interno */}
+      {/* colagem flutuante: cada slot sobe uma vez na entrada (wrapper com a
+          rotação de repouso), o bob+sway mora no filho e o FotoCarrossel
+          alterna as fotos em crossfade com cadência própria */}
       <div className="relative mt-4 min-h-0 flex-1">
-        {FOTOS.map((f) => (
+        {SLOTS.map((f) => (
           <motion.div
-            key={f.src}
+            key={f.fotos[0].src}
             // a largura tem que morar no absolute (o pai shrink-wrap);
             // w-% no filho resolveria contra um pai que depende dele
             className={`absolute ${f.pos} ${f.largura}`}
@@ -733,21 +825,9 @@ function LoginHero() {
                 ease: "easeInOut",
                 delay: f.bobDelay,
               }}
-              className="relative"
+              className={`relative ${f.ar}`}
             >
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={f.src}
-                alt=""
-                width={f.w}
-                height={f.h}
-                className={`${f.ar} w-full rounded-2xl object-cover shadow-2xl ring-1 ring-white/15`}
-              />
-              {f.legenda && (
-                <span className="absolute bottom-2.5 left-2.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur-sm">
-                  {f.legenda}
-                </span>
-              )}
+              <FotoCarrossel fotos={f.fotos} intervalo={f.intervalo} legenda />
             </motion.div>
           </motion.div>
         ))}
