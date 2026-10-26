@@ -167,9 +167,9 @@ export function NovoMaterialDialog({
       }}
     >
       <DialogTrigger render={<Button size="sm" variant={triggerVariant}><Plus size={16} /> {triggerLabel}</Button>} />
-      {/* lg: a linha tipo×encontro é grid de 2 colunas — abaixo disso
+      {/* lg: a linha tipo×audiência é grid de 2 colunas — abaixo disso
           os selects lado a lado ficavam apertados */}
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Adicionar material</DialogTitle>
           <DialogDescription>

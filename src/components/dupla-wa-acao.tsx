@@ -332,7 +332,7 @@ export function DuplaWaAcao({
       {/* "Ver texto da mensagem" — o mesmo texto que vai pro wa.me e pra
           notificação, lido antes de enviar */}
       <Dialog open={verTexto} onOpenChange={setVerTexto}>
-        <DialogContent className="sm:max-w-md">
+        <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>Texto da mensagem</DialogTitle>
             <DialogDescription>

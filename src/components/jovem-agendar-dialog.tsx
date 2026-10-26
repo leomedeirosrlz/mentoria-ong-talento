@@ -162,7 +162,7 @@ export function JovemAgendarDialog({
           </Button>
         )
       } />
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>
             {atual || numero ? `${numeroFinal ?? numero}º encontro` : "Agendar encontro"}

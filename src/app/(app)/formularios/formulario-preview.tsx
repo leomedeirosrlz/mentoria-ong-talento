@@ -38,7 +38,7 @@ export function FormularioPreview({
           </Button>
         }
       />
-      <DialogContent className="sm:max-w-xl">
+      <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Pré-visualização</DialogTitle>
           <DialogDescription>

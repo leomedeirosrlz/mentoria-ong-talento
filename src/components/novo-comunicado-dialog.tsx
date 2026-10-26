@@ -71,7 +71,7 @@ export function NovoComunicadoDialog({
         <Megaphone size={15} aria-hidden />
         Novo aviso
       </DialogTrigger>
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Novo aviso</DialogTitle>
           <DialogDescription>

@@ -135,7 +135,7 @@ export function EnviarEmailDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Enviar material por e-mail</DialogTitle>
           <DialogDescription>

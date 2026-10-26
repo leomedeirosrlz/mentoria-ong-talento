@@ -213,7 +213,7 @@ export function EnviarFormularioDialog({
           }
         />
       )}
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Enviar formulário</DialogTitle>
           <DialogDescription>

@@ -161,7 +161,7 @@ export function PromoverMentorDialog({
         }
       }}
     >
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Promover {primeiroNome} a mentor</DialogTitle>
           <DialogDescription>

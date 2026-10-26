@@ -107,7 +107,7 @@ export function SolicitarEspecialistaDialog({
           }
         />
       )}
-      <DialogContent size="xl">
+      <DialogContent size="lg">
         <DialogHeader>
           <DialogTitle>Solicitar mentor especialista</DialogTitle>
           <DialogDescription>
