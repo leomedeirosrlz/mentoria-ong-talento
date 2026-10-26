@@ -11,6 +11,7 @@ import {
   getEncontrosPorDuplas,
   getEspecialistaEventos,
   getMe,
+  getMetricasRegistro,
   getRegistros,
   getRegistrosPanorama,
   REGISTROS_PAGINA,
@@ -24,6 +25,7 @@ import {
   passoEsp,
   toDateStr,
 } from "@/lib/ciclo";
+import { MetricasRegistroCard } from "@/components/metricas-registro";
 import { RegistrosFiltros, type OrdemRegistros } from "@/components/registros-filtros";
 import { RegistrosPainel } from "@/components/registros-painel";
 import { RegistrosMestreDetalhe, type SecaoLista } from "@/components/registros-mestre-detalhe";
@@ -149,6 +151,7 @@ export default async function RegistrosPage({
     panorama,
     cronogramas,
     todasDuplas,
+    metricas,
   ] = await Promise.all([
     getRegistros(filtros),
     getDuplasOpcoes(),
@@ -157,6 +160,7 @@ export default async function RegistrosPage({
     getRegistrosPanorama(filtros),
     getCronogramas(),
     getDuplas(),
+    getMetricasRegistro(),
   ]);
   // situação das duplas: o mesmo resumo de /duplas, /agenda e da home, no
   // recorte de turma do painel (a URL é a fonte do recorte)
@@ -471,6 +475,11 @@ export default async function RegistrosPage({
         </div>
         <RegistrosPainel panorama={panorama} hoje={hoje} saude={saude} />
       </section>
+
+      {/* telemetria do form (REALIZA-217): tempo e abandono do
+          preenchimento, só pra coordenação — a query já devolve null pra
+          supervisor, o gate aqui deixa isso explícito */}
+      {souCoord && metricas && <MetricasRegistroCard metricas={metricas} />}
 
       {/* resumo operacional: o que pede ação vem logo antes da lista; clicar
           num número aplica o filtro correspondente */}
