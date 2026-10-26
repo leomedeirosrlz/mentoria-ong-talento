@@ -19,6 +19,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -602,11 +603,22 @@ export function RemanejarDuplaDialog({
                 </p>
               )}
 
-              <Button type="submit" className="w-full" disabled={pending || !novoId}>
-                {pending ? "Remanejando…" : "Remanejar a dupla"}
-              </Button>
             </>
           )}
+          {/* sticky: o form é alto — a ação não pode rolar pra fora da
+              viewport (o DialogContent é o scrollport) */}
+          <DialogFooter sticky>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending || !novoId || !pronto}>
+              {pending ? "Remanejando…" : "Remanejar a dupla"}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

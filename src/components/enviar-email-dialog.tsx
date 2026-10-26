@@ -209,6 +209,13 @@ export function EnviarEmailDialog({
             </div>
           </fieldset>
           <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancelar
+            </Button>
             <Button type="submit" disabled={pending || !selecionados.length}>
               {pending ? "Enviando…" : "Enviar e-mail"}
             </Button>

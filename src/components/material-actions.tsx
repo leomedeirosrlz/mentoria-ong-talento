@@ -402,6 +402,13 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
               </div>
             </div>
             <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setEditOpen(false)}
+              >
+                Cancelar
+              </Button>
               <Button type="submit" disabled={pending}>
                 {pending ? "Salvando…" : "Salvar"}
               </Button>

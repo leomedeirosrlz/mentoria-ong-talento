@@ -11,6 +11,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -195,13 +196,22 @@ export function EncerrarDuplaDialog({
             )}
           </fieldset>
 
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending
-              ? "Registrando…"
-              : tipo === "concluida"
-                ? "Concluir a jornada"
-                : "Encerrar a dupla"}
-          </Button>
+          <DialogFooter sticky>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending
+                ? "Registrando…"
+                : tipo === "concluida"
+                  ? "Concluir a jornada"
+                  : "Encerrar a dupla"}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

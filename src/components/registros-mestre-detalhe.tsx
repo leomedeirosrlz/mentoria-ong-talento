@@ -17,7 +17,12 @@ import {
   type KeyboardEvent,
   type ReactNode,
 } from "react";
-import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { RegistroDetalhe, type EntradaRegistro } from "@/components/registros-detalhe";
 import { AVALIACAO_LABEL, formatDiaMes, registroTardio } from "@/lib/ciclo";
@@ -196,11 +201,18 @@ export function RegistrosMestreDetalhe({
           if (!aberto) router.replace(hrefBase, { scroll: false });
         }}
       >
+        {/* shell transparente: o card do RegistroDetalhe é a superfície. O X
+            absoluto cai no canto do card — o pr-9 no h2 impede que título
+            longo corra por baixo dele (no desktop não há X, então a folga
+            mora só aqui) */}
         <DialogContent
           size="xl"
-          className="gap-0 bg-transparent p-0 shadow-none"
+          className="gap-0 bg-transparent p-0 shadow-none [&_h2]:pr-9"
         >
           <DialogTitle className="sr-only">Registro do encontro</DialogTitle>
+          <DialogDescription className="sr-only">
+            Registro completo do encontro selecionado na lista.
+          </DialogDescription>
           <RegistroDetalhe entrada={sel} souCoord={souCoord} />
         </DialogContent>
       </Dialog>

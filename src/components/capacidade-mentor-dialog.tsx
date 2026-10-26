@@ -9,6 +9,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -124,7 +125,7 @@ export function CapacidadeMentorDialog({
               {erro}
             </p>
           )}
-          <div className="flex justify-end gap-2">
+          <DialogFooter>
             <Button
               type="button"
               variant="outline"
@@ -135,7 +136,7 @@ export function CapacidadeMentorDialog({
             <Button type="submit" disabled={pending || cap < minimo}>
               {pending ? "Salvando…" : "Salvar"}
             </Button>
-          </div>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

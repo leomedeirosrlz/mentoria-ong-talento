@@ -10,6 +10,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -107,23 +108,32 @@ export function EditarLinkDialog({
               O horário continua o mesmo. Só o link muda.
             </p>
           </div>
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Salvando…" : "Salvar"}
-          </Button>
-          {/* remover é legítimo: a dupla pode ter migrado a chamada pra fora
-              — some quando não há o que remover */}
-          {linkAtual && (
+          <DialogFooter>
+            {/* remover é legítimo: a dupla pode ter migrado a chamada pra
+                fora — some quando não há o que remover. Fica à esquerda do
+                footer: ação terciária, longe do submit */}
+            {linkAtual && (
+              <Button
+                type="button"
+                variant="ghost"
+                className="text-muted-foreground sm:me-auto"
+                disabled={pending}
+                onClick={() => salvar(null)}
+              >
+                Remover link
+              </Button>
+            )}
             <Button
               type="button"
-              variant="ghost"
-              size="sm"
-              className="w-full text-muted-foreground"
-              disabled={pending}
-              onClick={() => salvar(null)}
+              variant="outline"
+              onClick={() => setOpen(false)}
             >
-              Remover link
+              Cancelar
             </Button>
-          )}
+            <Button type="submit" disabled={pending}>
+              {pending ? "Salvando…" : "Salvar"}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

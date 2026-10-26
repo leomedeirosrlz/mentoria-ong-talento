@@ -40,6 +40,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
@@ -455,7 +456,7 @@ function VisaoDialog({
           aria-label="Declaração de Visão"
         />
         <DialogFooter>
-          <Button variant="ghost" onClick={onFechar}>
+          <Button variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
           <Button
@@ -525,12 +526,7 @@ function ItemDialog({
         </DialogHeader>
         <div className="space-y-3">
           <div>
-            <label
-              htmlFor="pdm-titulo"
-              className="text-xs font-semibold text-foreground"
-            >
-              {ehMeta ? "Meta" : "Submeta"}
-            </label>
+            <Label htmlFor="pdm-titulo">{ehMeta ? "Meta" : "Submeta"}</Label>
             <Input
               id="pdm-titulo"
               value={titulo}
@@ -546,12 +542,9 @@ function ItemDialog({
           </div>
           {ehMeta && (
             <div>
-              <label
-                htmlFor="pdm-porque"
-                className="text-xs font-semibold text-foreground"
-              >
+              <Label htmlFor="pdm-porque">
                 Por que é importante (o porquê do jovem)
-              </label>
+              </Label>
               <Textarea
                 id="pdm-porque"
                 value={porque}
@@ -562,12 +555,9 @@ function ItemDialog({
             </div>
           )}
           <div>
-            <label
-              htmlFor="pdm-indicador"
-              className="text-xs font-semibold text-foreground"
-            >
+            <Label htmlFor="pdm-indicador">
               Indicador de sucesso (como saber que cumpriu)
-            </label>
+            </Label>
             <Input
               id="pdm-indicador"
               value={indicador}
@@ -579,12 +569,7 @@ function ItemDialog({
           <div className="grid gap-3 sm:grid-cols-2">
             {ehMeta && (
               <div>
-                <label
-                  htmlFor="pdm-area"
-                  className="text-xs font-semibold text-foreground"
-                >
-                  Área da vida
-                </label>
+                <Label htmlFor="pdm-area">Área da vida</Label>
                 <Select
                   value={areaVida}
                   onValueChange={(v) => setAreaVida(v as string | null)}
@@ -603,12 +588,7 @@ function ItemDialog({
               </div>
             )}
             <div>
-              <label
-                htmlFor="pdm-prazo"
-                className="text-xs font-semibold text-foreground"
-              >
-                Prazo-alvo
-              </label>
+              <Label htmlFor="pdm-prazo">Prazo-alvo</Label>
               <Input
                 id="pdm-prazo"
                 type="date"
@@ -619,7 +599,7 @@ function ItemDialog({
           </div>
         </div>
         <DialogFooter>
-          <Button variant="ghost" onClick={onFechar}>
+          <Button variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
           <Button
@@ -667,8 +647,11 @@ function ExcluirDialog({
             continua no documento.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="flex-col gap-2 sm:flex-row">
-          <Button variant="ghost" onClick={onFechar}>
+        {/* 3 ações: Cancelar outline primeiro, a destrutiva por último.
+            O "(recomendado)" não vai no botão — a descrição acima já carrega
+            o "prefira descartar" como microcopy */}
+        <DialogFooter>
+          <Button variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
           <Button
@@ -678,7 +661,7 @@ function ExcluirDialog({
               onFechar();
             }}
           >
-            Descartar (recomendado)
+            Descartar
           </Button>
           <Button
             variant="destructive"

@@ -10,6 +10,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -180,13 +181,22 @@ export function EncerrarTrilhaDialog({
             </p>
           </div>
 
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending
-              ? "Registrando…"
-              : tipo === "concluida"
-                ? "Concluir a trilha"
-                : "Encerrar a trilha"}
-          </Button>
+          <DialogFooter sticky>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending
+                ? "Registrando…"
+                : tipo === "concluida"
+                  ? "Concluir a trilha"
+                  : "Encerrar a trilha"}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

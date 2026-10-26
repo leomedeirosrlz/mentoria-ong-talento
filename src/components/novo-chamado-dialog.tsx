@@ -349,7 +349,14 @@ export function NovoChamadoDialog({
           )}
         </div>
 
-        <DialogFooter>
+        <DialogFooter sticky>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setOpen(false)}
+          >
+            Cancelar
+          </Button>
           <Button onClick={enviar} disabled={pending || !pronto}>
             {pending && <CircleNotch size={15} className="animate-spin" aria-hidden />}
             {jovem ? "Enviar pedido" : "Abrir chamado"}

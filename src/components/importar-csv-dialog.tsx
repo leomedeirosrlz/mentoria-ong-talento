@@ -19,7 +19,7 @@ import { parseCsvPares, type LinhaPar, type PreviewPar } from "@/lib/importar-du
 import { formatDate } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -305,7 +305,11 @@ export function ImportarCsvDialog({
                 ))}
               </ul>
             )}
-            <Button className="w-full" onClick={() => aoMudar(false)}>Fechar</Button>
+            {/* estado terminal: só o Fechar outline — sem Voltar porque a
+                sessão de importação acabou (reabrir começa do zero) */}
+            <DialogFooter>
+              <Button variant="outline" onClick={() => aoMudar(false)}>Fechar</Button>
+            </DialogFooter>
           </div>
         ) : previa && linhasPar ? (
           // prévia do pareamento — quem é quem, o que já existe e o que vai
@@ -380,13 +384,13 @@ export function ImportarCsvDialog({
               de exibição). Linha com problema não é criada. As prontas entram
               mesmo se houver puladas. Mentores e auxiliares executivos são avisados.
             </p>
-            <div className="flex gap-2">
+            <DialogFooter sticky>
               <Button variant="outline" onClick={() => { setPrevia(null); setLinhasPar(null); }}>Voltar</Button>
-              <Button className="flex-1" disabled={pending || prontas.length === 0} onClick={importar}>
+              <Button disabled={pending || prontas.length === 0} onClick={importar}>
                 <UploadSimple size={15} />
                 {pending ? "Importando…" : `Criar ${prontas.length} ${prontas.length === 1 ? "dupla" : "duplas"}`}
               </Button>
-            </div>
+            </DialogFooter>
           </div>
         ) : linhas ? (
           // ref callback leva o foco pra nova etapa — o botão que disparou
@@ -498,13 +502,13 @@ export function ImportarCsvDialog({
               trouxe torto e já entra corrigido (e-mail, telefone, data, link); o que
               pede revisão sai sinalizado.
             </p>
-            <div className="flex gap-2">
+            <DialogFooter sticky>
               <Button variant="outline" onClick={() => { setLinhas(null); setDiffs(null); }}>Voltar</Button>
-              <Button className="flex-1" disabled={pending || validas === 0} onClick={importar}>
+              <Button disabled={pending || validas === 0} onClick={importar}>
                 <UploadSimple size={15} />
                 {pending ? "Importando…" : `Importar ${validas} ${validas === 1 ? "cadastro" : "cadastros"}`}
               </Button>
-            </div>
+            </DialogFooter>
           </div>
         ) : (
           <div className="space-y-4">
@@ -570,9 +574,17 @@ export function ImportarCsvDialog({
                 className="font-mono text-xs"
               />
             </div>
-            <Button className="w-full" disabled={!texto.trim() || pending} onClick={() => preVisualizar()}>
-              {pending && tipo === "duplas" ? "Resolvendo pareamento…" : "Pré-visualizar"}
-            </Button>
+            <DialogFooter sticky>
+              <Button
+                variant="outline"
+                onClick={() => aoMudar(false)}
+              >
+                Cancelar
+              </Button>
+              <Button disabled={!texto.trim() || pending} onClick={() => preVisualizar()}>
+                {pending && tipo === "duplas" ? "Resolvendo pareamento…" : "Pré-visualizar"}
+              </Button>
+            </DialogFooter>
           </div>
         )}
       </DialogContent>

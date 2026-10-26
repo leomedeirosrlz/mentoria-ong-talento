@@ -122,16 +122,23 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
 function DialogFooter({
   className,
   showCloseButton = false,
+  sticky = false,
   children,
   ...props
 }: React.ComponentProps<"div"> & {
   showCloseButton?: boolean
+  /** Fixa o footer no pé da área rolante do popup — forms altos onde a
+   *  ação principal sumiria abaixo da dobra. O `-mb-4` do chrome faz o
+   *  padding inferior sangrar pra fora do scrollport quando preso, então
+   *  os botões ficam rentes à borda sem gap visível. */
+  sticky?: boolean
 }) {
   return (
     <div
       data-slot="dialog-footer"
       className={cn(
         "-mx-4 -mb-4 flex flex-col-reverse gap-2 rounded-b-xl border-t bg-muted/50 p-4 sm:flex-row sm:justify-end",
+        sticky && "sticky bottom-0",
         className
       )}
       {...props}

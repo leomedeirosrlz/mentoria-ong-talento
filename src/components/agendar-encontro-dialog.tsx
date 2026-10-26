@@ -16,7 +16,7 @@ import type { Encontro } from "@/lib/types";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -332,37 +332,46 @@ export function AgendarEncontroDialog({
               <Input id="link" name="link" type="url" placeholder="https://meet.google.com/…" defaultValue={atual?.link ?? ""} />
             </div>
           )}
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Salvando…" : ehRetroativo ? "Registrar encontro" : atual ? "Confirmar remarcação" : "Confirmar agendamento"}
-          </Button>
-          {/* desmarcar é a saída honesta pra um agendado futuro que não vai
-              rolar (0072 — RPC bilateral; passado vai pro "não aconteceu").
-              O mentor não tem delete por RLS (0047 coord-only) — a RPC é o
-              caminho dos dois lados. */}
-          {atual?.status === "agendado" &&
-            atual.data_hora != null &&
-            new Date(atual.data_hora) > new Date() && (
-            <ConfirmDeleteButton
-              titulo={`Desmarcar ${rotulo ? "a " : "o "}${nome}?`}
-              descricao="O encontro sai da agenda. Vocês podem marcar de novo quando combinarem."
-              acao="Desmarcar"
-              sucesso="Encontro desmarcado."
-              onConfirm={async () => {
-                const res = await desmarcarEncontro(atual.id);
-                if (!res?.error) mudaOpen(false);
-                return res;
-              }}
-              trigger={
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  className="w-full text-muted-foreground"
-                >
-                  Desmarcar encontro
-                </Button>
-              }
-            />
-          )}
+          <DialogFooter>
+            {/* desmarcar é a saída honesta pra um agendado futuro que não
+                vai rolar (0072 — RPC bilateral; passado vai pro "não
+                aconteceu"). O mentor não tem delete por RLS (0047
+                coord-only) — a RPC é o caminho dos dois lados. Fica à
+                esquerda do footer: ação terciária, longe do submit. */}
+            {atual?.status === "agendado" &&
+              atual.data_hora != null &&
+              new Date(atual.data_hora) > new Date() && (
+              <ConfirmDeleteButton
+                titulo={`Desmarcar ${rotulo ? "a " : "o "}${nome}?`}
+                descricao="O encontro sai da agenda. Vocês podem marcar de novo quando combinarem."
+                acao="Desmarcar"
+                sucesso="Encontro desmarcado."
+                onConfirm={async () => {
+                  const res = await desmarcarEncontro(atual.id);
+                  if (!res?.error) mudaOpen(false);
+                  return res;
+                }}
+                trigger={
+                  <Button
+                    variant="ghost"
+                    className="text-muted-foreground sm:me-auto"
+                  >
+                    Desmarcar encontro
+                  </Button>
+                }
+              />
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => mudaOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Salvando…" : ehRetroativo ? "Registrar encontro" : atual ? "Confirmar remarcação" : "Confirmar agendamento"}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

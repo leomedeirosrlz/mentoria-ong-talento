@@ -12,6 +12,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -295,17 +296,25 @@ export function PromoverMentorDialog({
 
           {/* sem conta E sem e-mail a RPC falha sempre — trava já aqui e o
               aviso acima diz o que falta (e-mail na ficha do jovem) */}
-          <Button
-            type="submit"
-            className="w-full"
-            disabled={
-              pending ||
-              (!mentorado.profile_id && !mentorado.email) ||
-              (papel === "mentor_dpp" && turmas.length === 0)
-            }
-          >
-            {pending ? "Promovendo…" : `Promover pra ${papel === "mentor_dpp" ? "jornada" : "especialista"}`}
-          </Button>
+          <DialogFooter sticky>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={
+                pending ||
+                (!mentorado.profile_id && !mentorado.email) ||
+                (papel === "mentor_dpp" && turmas.length === 0)
+              }
+            >
+              {pending ? "Promovendo…" : `Promover pra ${papel === "mentor_dpp" ? "jornada" : "especialista"}`}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

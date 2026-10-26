@@ -1024,6 +1024,12 @@ export function ChamadoDetalhe({
           </div>
           <DialogFooter>
             <Button
+              variant="outline"
+              onClick={() => setResolveOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button
               disabled={pending || resumo.trim().length < 2}
               onClick={() => {
                 acao(
@@ -1070,8 +1076,11 @@ export function ChamadoDetalhe({
             </SelectContent>
           </Select>
           <DialogFooter>
+            {/* ação secundária do próprio fluxo (devolve à fila) fica à
+                esquerda — não é um "cancelar" */}
             <Button
-              variant="outline"
+              variant="ghost"
+              className="sm:me-auto"
               disabled={pending || !chamado.atribuido_a}
               onClick={() => {
                 acao(() => atribuirChamado(chamado.id, null), "Chamado devolvido à fila.");
@@ -1079,6 +1088,12 @@ export function ChamadoDetalhe({
               }}
             >
               Tirar responsável
+            </Button>
+            <Button
+              variant="outline"
+              onClick={() => setAtribuirOpen(false)}
+            >
+              Cancelar
             </Button>
             <Button
               disabled={pending || !para}

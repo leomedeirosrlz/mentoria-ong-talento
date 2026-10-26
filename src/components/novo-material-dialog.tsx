@@ -9,7 +9,7 @@ import { TRILHA_LEN } from "@/lib/ciclo";
 import { createClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -310,9 +310,18 @@ export function NovoMaterialDialog({
                 : ""}
             </p>
           </div>
-          <Button type="submit" className="w-full" disabled={pending}>
-            {pending ? "Salvando…" : "Adicionar"}
-          </Button>
+          <DialogFooter sticky>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={pending}>
+              {pending ? "Salvando…" : "Adicionar"}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
