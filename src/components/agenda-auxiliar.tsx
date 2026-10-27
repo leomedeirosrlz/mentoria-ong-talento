@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
 import {
   CalendarPlus,
   ChatsCircle,
@@ -43,6 +44,7 @@ import { AuxCardAcoes } from "@/components/aux-card-acoes";
 import { DuplaWaAcao } from "@/components/dupla-wa-acao";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { SemanaDoPrograma } from "@/components/semana-do-programa";
+import { PAINEL_AGENDA } from "@/lib/agenda-abas";
 import { SaudePrograma } from "@/components/saude-programa";
 import { Button } from "@/components/ui/button";
 import {
@@ -79,6 +81,7 @@ export function AgendaAuxiliar({
   agora: agoraMs,
   comLinkDia,
   consolidada,
+  abas,
 }: {
   /** Só as duplas que eu supervisiono (a página filtra). */
   duplas: Dupla[];
@@ -103,9 +106,10 @@ export function AgendaAuxiliar({
   comLinkDia: boolean;
   /** Aba ativa — default "Por turma". */
   consolidada: boolean;
+  /** Barra de modos da página (AbasAgenda) — uma por página, no header. */
+  abas?: ReactNode;
 }) {
   const agora = new Date(agoraMs);
-  const { seg, dom } = semanaBounds(agora);
   const grupos = duplasPorTurma(duplas, cronogramas, eventos, agora);
   const itens = itensConsolidados(duplas, supervisoes, eventos, agora);
   const saudePorId = new Map(
@@ -121,14 +125,6 @@ export function AgendaAuxiliar({
   const correndo = duplas.filter(
     (d) => d.status === "ativa" || d.status === "pausada"
   );
-  // cabeçalho cita as turmas na forma narrativa — dedup já no label
-  // ("T1" e "T1 · 2026/2027" exibem a mesma "Turma 1")
-  const turmasTxt = [
-    ...new Set(
-      correndo.map((d) => turmaLonga(d.turma)).filter(Boolean)
-    ),
-  ];
-
   // coorte "sem encontro agendado" — as duplas atrás dos itens a_agendar
   // da consolidada (uma por dupla, na ordem da fila)
   const semAgenda = [
@@ -150,179 +146,160 @@ export function AgendaAuxiliar({
 
   return (
     <div className="space-y-6">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">
-          Agenda das minhas duplas
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {turmasTxt.join(" e ")}
-          {correndo.length > 0 &&
-            `${turmasTxt.length > 0 ? " · " : ""}semana ${semanaIso(hoje)}, ${Number(seg.slice(8, 10))} a ${Number(dom.slice(8, 10))} de ${mesLongo(dom)}`}
-        </p>
-      </header>
+      {/* header + barra compartilhados com a aba Calendário do supervisor+mentor:
+          trocar de aba não reescreve o h1 nem o recorte das turmas */}
+      <CabecalhoAuxiliar duplas={duplas} hoje={hoje} />
 
-      <AbasAuxiliar consolidada={consolidada} temCalendario={comLinkDia} />
+      {abas}
 
-      {/* a mesma faixa "Semana do programa" da coordenação (v8b), com o
-          denominador do escopo do auxiliar: os oficiais dos cronogramas
-          das supervisionadas + as supervisões dela. "o que cobre" porque
-          quem lê monitora — o card não agenda nada. */}
-      <SemanaDoPrograma
-        itens={itensDaSemanaPrograma(
-          // recorte do escopo: só eventos dos cronogramas das
-          // supervisionadas — a faixa da aux nunca mostra turma alheia
-          eventos.filter((e) => cronosDelas.has(e.cronograma_id)),
-          cronogramas.filter((c) => cronosDelas.has(c.id)),
-          supervisoes,
-          agora,
-          // meta "N duplas" conta as supervisionadas daquele cronograma
-          duplas
-        )}
-        hoje={hoje}
-        modo="coord"
-        comLinkDia={comLinkDia}
-        titulo="Semana do programa"
-        ariaLabel="Semana do programa"
-      />
-
-      {!consolidada ? (
-        <div className="space-y-6">
-          {correndo.length > 0 && (
-            <div className="rounded-xl border bg-card p-4">
-              <SaudePrograma
-                saude={saudeDoRecorte(duplas, eventos, agora)}
-                nivel="h2"
-                linkBase="/duplas"
-              />
-            </div>
+      <div id={PAINEL_AGENDA} role="tabpanel" className="space-y-6">
+        {/* a mesma faixa "Semana do programa" da coordenação (v8b), com o
+            denominador do escopo do auxiliar: os oficiais dos cronogramas
+            das supervisionadas + as supervisões dela. "o que cobre" porque
+            quem lê monitora — o card não agenda nada. */}
+        <SemanaDoPrograma
+          itens={itensDaSemanaPrograma(
+            // recorte do escopo: só eventos dos cronogramas das
+            // supervisionadas — a faixa da aux nunca mostra turma alheia
+            eventos.filter((e) => cronosDelas.has(e.cronograma_id)),
+            cronogramas.filter((c) => cronosDelas.has(c.id)),
+            supervisoes,
+            agora,
+            // meta "N duplas" conta as supervisionadas daquele cronograma
+            duplas
           )}
-
-          {grupos.length === 0 ? (
-            <p className="rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
-              Você ainda não supervisiona nenhuma dupla. Quando a coordenação
-              atribuir, elas aparecem aqui por turma.
-            </p>
-          ) : (
-            grupos.map((g) => {
-              // grupo sem cronograma = trilhas esp supervisionadas — "Sem
-              // turma" mentiria; quando toda a dupla é trilha, nomeia o tipo
-              const rotuloGrupo =
-                g.cronogramaId == null &&
-                g.duplas.every((d) => d.trilha === "especialista")
-                  ? "Trilhas de especialista"
-                  : g.rotulo;
-              return (
-              <section
-                key={g.cronogramaId ?? "sem-turma"}
-                aria-label={`Duplas da ${g.turma ? turmaLonga(g.turma) : "trilha de especialista"}`}
-                className="space-y-3"
-              >
-                <h2 className="text-base font-semibold">{rotuloGrupo}</h2>
-                <div className="grid items-start gap-4 lg:grid-cols-2">
-                  {g.duplas.map((d) => (
-                    <CardDuplaAux
-                      key={d.id}
-                      dupla={d}
-                      saude={saudePorId.get(d.id)!}
-                      contexto={contextoDuplaAux(d, eventos, agora)}
-                      alvo={
-                        alvos.find((a) => a.dupla_id === d.id) ?? null
-                      }
-                      nudge={
-                        nudges[d.id]?.tipo === "nudge" ? nudges[d.id] : null
-                      }
-                      eventos={eventos}
-                      meuNome={meuNome}
-                      agora={agora}
-                    />
-                  ))}
-                </div>
-              </section>
-              );
-            })
-          )}
-
-          {semAgenda.length > 0 && (
-            <div className="flex items-start gap-3 rounded-xl border border-dashed border-[var(--warn)]/60 bg-[var(--warn)]/[0.07] p-4">
-              <Warning
-                size={20}
-                aria-hidden
-                className="mt-0.5 shrink-0 text-[var(--warn-text)]"
-              />
-              <div>
-                <p className="text-sm font-semibold">
-                  Sem encontro agendado ({semAgenda.length})
-                </p>
-                <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
-                  {semAgenda.join(", ")}. Use{" "}
-                  <b className="font-medium text-foreground">Lembrar</b>. Quem
-                  agenda é a dupla.
-                </p>
-              </div>
-            </div>
-          )}
-        </div>
-      ) : (
-        <ConsolidadaAux
-          itens={itens}
-          alvos={alvos}
-          duplasPorId={duplasPorId}
-          nudges={nudges}
-          eventos={eventos}
-          meuNome={meuNome}
           hoje={hoje}
-          agora={agora}
+          modo="coord"
+          comLinkDia={comLinkDia}
+          titulo="Semana do programa"
+          ariaLabel="Semana do programa"
         />
-      )}
+
+        {!consolidada ? (
+          <div className="space-y-6">
+            {correndo.length > 0 && (
+              <div className="rounded-xl border bg-card p-4">
+                <SaudePrograma
+                  saude={saudeDoRecorte(duplas, eventos, agora)}
+                  nivel="h2"
+                  linkBase="/duplas"
+                />
+              </div>
+            )}
+
+            {grupos.length === 0 ? (
+              <p className="rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+                Você ainda não supervisiona nenhuma dupla. Quando a coordenação
+                atribuir, elas aparecem aqui por turma.
+              </p>
+            ) : (
+              grupos.map((g) => {
+                // grupo sem cronograma = trilhas esp supervisionadas — "Sem
+                // turma" mentiria; quando toda a dupla é trilha, nomeia o tipo
+                const rotuloGrupo =
+                  g.cronogramaId == null &&
+                  g.duplas.every((d) => d.trilha === "especialista")
+                    ? "Trilhas de especialista"
+                    : g.rotulo;
+                return (
+                <section
+                  key={g.cronogramaId ?? "sem-turma"}
+                  aria-label={`Duplas da ${g.turma ? turmaLonga(g.turma) : "trilha de especialista"}`}
+                  className="space-y-3"
+                >
+                  <h2 className="text-base font-semibold">{rotuloGrupo}</h2>
+                  <div className="grid items-start gap-4 lg:grid-cols-2">
+                    {g.duplas.map((d) => (
+                      <CardDuplaAux
+                        key={d.id}
+                        dupla={d}
+                        saude={saudePorId.get(d.id)!}
+                        contexto={contextoDuplaAux(d, eventos, agora)}
+                        alvo={
+                          alvos.find((a) => a.dupla_id === d.id) ?? null
+                        }
+                        nudge={
+                          nudges[d.id]?.tipo === "nudge" ? nudges[d.id] : null
+                        }
+                        eventos={eventos}
+                        meuNome={meuNome}
+                        agora={agora}
+                      />
+                    ))}
+                  </div>
+                </section>
+                );
+              })
+            )}
+
+            {semAgenda.length > 0 && (
+              <div className="flex items-start gap-3 rounded-xl border border-dashed border-[var(--warn)]/60 bg-[var(--warn)]/[0.07] p-4">
+                <Warning
+                  size={20}
+                  aria-hidden
+                  className="mt-0.5 shrink-0 text-[var(--warn-text)]"
+                />
+                <div>
+                  <p className="text-sm font-semibold">
+                    Sem encontro agendado ({semAgenda.length})
+                  </p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
+                    {semAgenda.join(", ")}. Use{" "}
+                    <b className="font-medium text-foreground">Lembrar</b>. Quem
+                    agenda é a dupla.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        ) : (
+          <ConsolidadaAux
+            itens={itens}
+            alvos={alvos}
+            duplasPorId={duplasPorId}
+            nudges={nudges}
+            eventos={eventos}
+            meuNome={meuNome}
+            hoje={hoje}
+            agora={agora}
+          />
+        )}
+      </div>
     </div>
   );
 }
 
-// ---------- abas ----------
-
-function AbasAuxiliar({
-  consolidada,
-  temCalendario,
+/** Header do auxiliar — o mesmo na aba Calendário de quem é supervisor+mentor
+ *  (a página monta o calendário com a superfície de equipe). Fora do
+ *  componente pra que as abas leiam um h1 só. */
+export function CabecalhoAuxiliar({
+  duplas,
+  hoje,
 }: {
-  consolidada: boolean;
-  /** supervisor+mentor tem a superfície de calendário dele atrás de
-   *  ?aba=calendario — sem a aba o guard da page existe sem porta de
-   *  entrada (o supervisor puro nunca a vê: calendário não é dele). */
-  temCalendario: boolean;
+  /** Duplas supervisionadas (a página já filtra pelo escopo). */
+  duplas: Dupla[];
+  hoje: string;
 }) {
+  const correndo = duplas.filter(
+    (d) => d.status === "ativa" || d.status === "pausada"
+  );
+  // cabeçalho cita as turmas na forma narrativa — dedup já no label
+  // ("T1" e "T1 · 2026/2027" exibem a mesma "Turma 1")
+  const turmasTxt = [
+    ...new Set(correndo.map((d) => turmaLonga(d.turma)).filter(Boolean)),
+  ];
+  const { seg, dom } = semanaBounds(new Date(`${hoje}T12:00:00Z`));
   return (
-    <div
-      role="tablist"
-      aria-label="Modos da agenda"
-      className="scroll-fina flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1"
-    >
-      {(
-        [
-          ["turma", "Por turma", "/agenda"],
-          ["consolidada", "Consolidada", "/agenda?aba=consolidada"],
-          ...(temCalendario
-            ? [["calendario", "Calendário", "/agenda?aba=calendario"] as const]
-            : []),
-        ] as const
-      ).map(([v, label, href]) => (
-        <Link
-          key={v}
-          role="tab"
-          aria-selected={
-            (v === "consolidada") === consolidada
-          }
-          href={href}
-          className={cn(
-            "inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium transition-colors sm:min-h-8",
-            (v === "consolidada") === consolidada
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          {label}
-        </Link>
-      ))}
-    </div>
+    <header>
+      <h1 className="text-2xl font-semibold tracking-tight">
+        Agenda das minhas duplas
+      </h1>
+      <p className="mt-1 text-sm text-muted-foreground">
+        {turmasTxt.join(" e ")}
+        {correndo.length > 0 &&
+          `${turmasTxt.length > 0 ? " · " : ""}semana ${semanaIso(hoje)}, ${Number(seg.slice(8, 10))} a ${Number(dom.slice(8, 10))} de ${mesLongo(dom)}`}
+      </p>
+    </header>
   );
 }
 

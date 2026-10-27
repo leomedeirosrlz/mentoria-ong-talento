@@ -112,6 +112,52 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     ).toBeVisible();
   });
 
+  test("um alternador só — tablist único, painel controlado e teclado", async ({
+    page,
+  }) => {
+    // REALIZA-246: a página tem UMA tablist (antes conviviam a da visão e a
+    // dos modos, com o mesmo aria-label)
+    const abas = page.getByRole("tablist", { name: "Modos da agenda" });
+    await expect(abas).toHaveCount(1);
+    await expect(abas.getByRole("tab")).toHaveCount(2);
+
+    const monitoramento = abas.getByRole("tab", { name: "Monitoramento" });
+    const calendario = abas.getByRole("tab", { name: "Calendário" });
+    // roving tabindex: só a aba ativa é parada de Tab
+    await expect(monitoramento).toHaveAttribute("tabindex", "0");
+    await expect(calendario).toHaveAttribute("tabindex", "-1");
+    // aria-controls aponta pro painel que a página renderiza
+    await expect(monitoramento).toHaveAttribute("aria-controls", "painel-agenda");
+    await expect(page.locator("#painel-agenda")).toHaveAttribute(
+      "role",
+      "tabpanel"
+    );
+
+    // seta direita ativa a próxima (o link navega — é o mesmo controle)
+    await monitoramento.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page).toHaveURL(/aba=calendario/, { timeout: 15_000 });
+    await expect(
+      page.getByRole("tab", { name: "Calendário" })
+    ).toHaveAttribute("aria-selected", "true");
+
+    // seta esquerda volta
+    await page.getByRole("tab", { name: "Calendário" }).focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page).toHaveURL(/\/agenda$/, { timeout: 15_000 });
+    await expect(
+      page.getByRole("tab", { name: "Monitoramento" })
+    ).toHaveAttribute("aria-selected", "true");
+
+    // End vai pra última, Home volta pra primeira
+    await page.getByRole("tab", { name: "Monitoramento" }).focus();
+    await page.keyboard.press("End");
+    await expect(page).toHaveURL(/aba=calendario/, { timeout: 15_000 });
+    await page.getByRole("tab", { name: "Calendário" }).focus();
+    await page.keyboard.press("Home");
+    await expect(page).toHaveURL(/\/agenda$/, { timeout: 15_000 });
+  });
+
   test("números da semana — cobertura honesta por turma, semáforo e recorte", async ({
     page,
   }) => {
@@ -648,6 +694,14 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     ).toHaveAttribute("aria-selected", "true");
     await expect(
       page.getByRole("navigation", { name: "Encontros da jornada" })
+    ).toBeVisible();
+    // REALIZA-247: a faixa "Semana do programa" é leitura de monitoramento e
+    // não existe no calendário — quem monitora está na outra aba
+    await expect(
+      page.locator('section[aria-label="Semana do programa"]')
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Agenda do programa", level: 1 })
     ).toBeVisible();
     await expect(
       page.getByRole("heading", { name: /Semana do \d+º encontro/ })

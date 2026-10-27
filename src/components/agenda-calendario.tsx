@@ -121,8 +121,6 @@ import { guiaDoEncontro } from "@/lib/como-conduzir";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import { cn, normaliza } from "@/lib/utils";
 import { BarraSegmentada } from "@/components/viz";
-import { itensDaSemanaPrograma } from "@/lib/agenda-coordenacao";
-import { SemanaDoPrograma } from "@/components/semana-do-programa";
 
 const DIAS_SEMANA = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 const DIAS_SEMANA_COMPLETOS = [
@@ -1960,47 +1958,20 @@ export function AgendaCalendario({
 
   if (eventosSel.length === 0) return null;
 
+  // A faixa "Semana do programa" NÃO mora aqui (decisão de produto, out/2026):
+  // ela é leitura de monitoramento e vive no monitoramento, na auxiliar e na
+  // Minha agenda. O calendário abre direto no board/semana/mês — nada ancora
+  // ou rola nela, e os deep-links ?dia= seguem intactos.
   return (
-    <div className="space-y-4">
-      {/* faixa "Semana do programa" compartilhada (REALIZA-195 · v8b) — a
-          mesma estrutura do monitoramento; no calendário o recorte é o
-          cronograma selecionado (o board é por turma) e supervisões ficam
-          na mesa de monitoramento — aqui só os oficiais. A faixa NÃO
-          depende de `materiais` (fetch tardio) — usa o evento + guia.
-          Fora do grid do painel pra não disputar a linha 1 */}
-      {ehCoordSup && (
-        <SemanaDoPrograma
-          itens={itensDaSemanaPrograma(
-            eventos.filter(
-              (e) =>
-                cronogramaSel == null || e.cronograma_id === cronogramaSel
-            ),
-            cronogramas,
-            [],
-            new Date(agoraMs),
-            // meta "N duplas" do encontro — o escopo que o RLS entrega
-            // (coorte pra coord; supervisionadas + própria pro híbrido)
-            duplas
-          )}
-          hoje={hoje}
-          modo="coord"
-          // "Abrir chamada" é da coordenação — o painel de presença é dela
-          // (sup+mentor lê a faixa mas nunca tem o CTA)
-          podeChamada={ehCoord}
-          titulo="Semana do programa"
-          ariaLabel="Semana do programa"
-        />
+    <div
+      className={cn(
+        "space-y-4",
+        // o grid de duas colunas (calendário + painel) existe nas visões
+        // com detalhe do dia; horarios e ciclo são coluna única full-width
+        comDetalheDia &&
+          "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)] lg:items-start lg:gap-5 lg:space-y-0"
       )}
-
-      <div
-        className={cn(
-          "space-y-4",
-          // o grid de duas colunas (calendário + painel) existe nas visões
-          // com detalhe do dia; horarios e ciclo são coluna única full-width
-          comDetalheDia &&
-            "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(300px,340px)] lg:items-start lg:gap-5 lg:space-y-0"
-        )}
-      >
+    >
       {/* ===== calendário / board da semana / lista do ciclo ===== */}
       <div className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)] lg:col-start-1 lg:row-start-1">
         {/* etapas de preparação (0062) — contexto do cronograma, não
@@ -3379,7 +3350,6 @@ export function AgendaCalendario({
         </div>
       </section>
       )}
-      </div>
     </div>
   );
 }

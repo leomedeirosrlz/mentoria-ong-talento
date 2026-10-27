@@ -16,11 +16,12 @@ export default function Loading() {
         <Skeleton className="mt-2 h-4 w-72 max-w-full" />
       </header>
 
-      {/* tabs de modo — pills do switcher (3 no mentor, 2 na coord/aux) */}
-      <div className="flex items-center gap-1.5">
-        <Skeleton className="h-11 w-28 rounded-full sm:h-8" />
-        <Skeleton className="h-11 w-32 rounded-full sm:h-8" />
-        <Skeleton className="h-11 w-28 rounded-full sm:h-8" />
+      {/* barra de modos — UM tablist (AbasAgenda: container muted com p-1 e
+          tabs de 44px no mobile / 32 no desktop, sem quebra) */}
+      <div className="flex w-fit items-center gap-1 rounded-lg bg-muted p-1">
+        <Skeleton className="h-11 w-28 rounded-md sm:h-8" />
+        <Skeleton className="h-11 w-32 rounded-md sm:h-8" />
+        <Skeleton className="h-11 w-24 rounded-md sm:h-8" />
       </div>
 
       {/* faixa "Semana do programa" — heading + caption + cards em scroll

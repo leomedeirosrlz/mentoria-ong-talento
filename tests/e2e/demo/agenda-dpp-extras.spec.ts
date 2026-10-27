@@ -26,6 +26,36 @@ test.describe("agenda demo do mentor DPP — Sua semana / Do programa / Lembrar 
     await page.goto("/agenda?aba=por-mentorado");
   });
 
+  test("uma barra só — três modos, roving tabindex e teclado", async ({
+    page,
+  }) => {
+    // REALIZA-246: os modos do mentor e a visão de especialista (quando
+    // houver) dividem a mesma tablist; aqui, DPP puro, são três abas
+    const abas = page.getByRole("tablist", { name: "Modos da agenda" });
+    await expect(abas).toHaveCount(1);
+    await expect(abas.getByRole("tab")).toHaveCount(3);
+    const porMentorado = abas.getByRole("tab", { name: "Por mentorado" });
+    await expect(porMentorado).toHaveAttribute("aria-selected", "true");
+    await expect(porMentorado).toHaveAttribute("tabindex", "0");
+    await expect(
+      abas.getByRole("tab", { name: "Minha agenda" })
+    ).toHaveAttribute("tabindex", "-1");
+
+    // End ativa a última aba (o link navega pro calendário)
+    await porMentorado.focus();
+    await page.keyboard.press("End");
+    await expect(page).toHaveURL(/aba=calendario/, { timeout: 15_000 });
+    await expect(
+      page.getByRole("tab", { name: "Calendário" })
+    ).toHaveAttribute("aria-selected", "true");
+
+    // REALIZA-247: o calendário não repete a faixa "Semana do programa" —
+    // ela fica no monitoramento, na auxiliar e na Minha agenda
+    await expect(
+      page.locator('section[aria-label="Semana do programa"]')
+    ).toHaveCount(0);
+  });
+
   test("sua semana — strip de 7 células com contadores", async ({
     page,
   }) => {
