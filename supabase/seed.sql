@@ -66,7 +66,6 @@ insert into public.materiais (titulo, descricao, tipo, url, audiencia, encontro_
   ('Mensagem de preparação do mentorado', 'Modelo para enviar antes do 1º encontro: história de vida, Roda da Vida e contatos para avaliação.', 'template', null, 'dpp', 1, 10),
   ('Instrumento: Construindo a sua Visão', 'Tarefa individual entre o 1º e o 2º encontro; origina a Declaração de Visão.', 'template', null, 'dpp', 1, 11),
   ('Mensagem às pessoas indicadas', 'Modelo de contato para a avaliação por terceiros (duas perguntas).', 'template', null, 'dpp', 1, 12),
-  ('Consolidação da avaliação por terceiros', 'Quadro para agrupar pontos fortes e de melhoria sem identificar quem respondeu.', 'template', null, 'dpp', 2, 13),
   ('Plano de Desenvolvimento do Mentorado (PDM)', 'Documento central da dupla: visão, metas SMART, indicadores e mapa de submetas.', 'template', null, 'dpp', 2, 14),
   ('Mensagem de encaminhamento entre encontros', 'Modelo curto para manter o vínculo e deixar a próxima tarefa clara.', 'template', null, 'dpp', null, 15),
   ('Roda da Vida: roteiro de aplicação', 'Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.', 'template', null, 'dpp', 12, 16),
