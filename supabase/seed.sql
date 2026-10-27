@@ -53,7 +53,7 @@ select cron.id, v.tipo, v.numero::smallint, v.data::date, v.titulo, v.fase,
   ('encontro', 14, '2026-12-15', 'Desdobramento e plano de continuidade', 'Roda da Vida', '{Roda da Vida,Modelo SMART}', null, 'pendente', null, 21),
   ('recesso',  null, '2026-12-16', 'Recesso de fim de ano', null, '{}', '2027-01-04', 'pendente', 'Sem encontros — retomada na 1ª terça de janeiro', 22),
   ('encontro', 15, '2027-01-05', 'Reflexão e reconhecimento', 'Encerrar e celebrar', '{PDM,Roda da Vida}', null, 'pendente', null, 23),
-  ('encontro', 16, '2027-01-12', 'Encerramento e celebração', 'Encerrar e celebrar', '{Avaliação 360º,Autoavaliação do mentor}', null, 'pendente', null, 24),
+  ('encontro', 16, '2027-01-12', 'Encerramento e celebração', 'Encerrar e celebrar', '{Avaliação final}', null, 'pendente', null, 24),
   -- seção 3 — encerramento
   ('evento_encerramento', null, '2027-01-15', 'Evento de encerramento do programa', null, '{}', null, 'pendente', null, 25)
 ) v(tipo, numero, data, titulo, fase, instrumentos, data_fim, status, observacao, ordem);
@@ -72,7 +72,6 @@ insert into public.materiais (titulo, descricao, tipo, url, audiencia, encontro_
   ('Roda da Vida: roteiro de aplicação', 'Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.', 'template', null, 'dpp', 12, 16),
   ('Checklist de competências do mentor', 'Autoavaliação antes do ciclo e novamente no 16º encontro.', 'template', null, 'todos', null, 17),
   ('Autoavaliação do mentor', 'Cinco perguntas de reflexão para o encerramento do ciclo.', 'template', null, 'todos', 16, 18),
-  ('Avaliação 360º', 'Único formulário de avaliação do programa — preenchido no 16º encontro, consolida o fechamento do ciclo.', 'template', null, 'dpp', 16, 19),
   ('Plataforma de mentoria', 'Onde os encontros oficiais são agendados e avaliados.', 'link', 'https://mentoria.realiza.vc', 'todos', null, 20),
   ('Formação EaD gratuita', 'Trilha opcional com certificado para mentores.', 'link', 'https://ead.realiza.vc', 'todos', null, 21);
 

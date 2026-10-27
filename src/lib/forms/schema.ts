@@ -141,9 +141,10 @@ export const SISTEMAS_REGUA: readonly FormularioSistema[] = [
  *  Anamnese Social e Autoavaliação saíram do programa (REALIZA-236): a
  *  leitura do ciclo é da avaliação final (REALIZA-230), entregue em dois
  *  instrumentos — um por lado da dupla. A do mentorado é a estação do
- *  encontro 16 na régua; a do mentor mora aqui. As linhas da anamnese e da
- *  autoavaliação foram apagadas na 0128; o vocabulário do CHECK segue com
- *  elas porque enum de texto não se encolhe sem recriar a constraint. */
+ *  encontro 16 na régua; a do mentor mora aqui. As linhas e o vocabulário
+ *  das duas saíram do CHECK na 0128 (a constraint foi recriada sem elas);
+ *  a avaliação final antiga, `avaliacao_360`, segue no vocabulário como
+ *  instrumento arquivado — a estação 16 ainda usa essa chave de slot. */
 export const SISTEMAS_BORDO: readonly FormularioSistema[] = [
   "intake_mentor",
   "intake_mentorado",

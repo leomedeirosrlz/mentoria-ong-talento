@@ -186,6 +186,25 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
 - [ ] **Termos da equipe executiva** (coordenação/supervisores): todo mundo que entra na plataforma deveria assinar, mas hoje só mentores (`termo-voluntario`) e mentorados (`termo-mentorando`/`autorizacao-responsavel`) têm documento. Quando o jurídico definir o modelo da equipe, vira mais um slug em `documento_templates` + renderer em `src/lib/documentos/` — a infra de assinatura/evidência/link já é genérica.
 - [ ] **Contra-assinatura do presidente**: subir o PNG em qualquer ficha → seção Assinaturas → engrenagem (ou `documentos/sistema/contra-assinatura.png` no storage). Os PDFs do termo já saem assinados pelo instituto quando a imagem existe.
 
+## REALIZA-238 — auditoria dos guias vs catálogo (out/2026)
+
+> Relatório completo: `docs/planos/feedback-leo-2026-10/auditoria-238.md` (22 itens, tabela de decisão + lacunas + ambiguidades). Resumo: **14 manter, 6 ajustar, 1 criar, 1 escalar**. O catálogo cobre a espinha da metodologia; o que falta é conteúdo de apoio.
+
+- [ ] **Materiais das ferramentas de condução** (M1–M4) — Perguntas Eficazes (existe só no `seed.sql`, não em prod), Feedback Construtivo, Escuta Ativa/CNV/quebra-gelo/check-in, Modelo SMART. Hoje o cronograma cita as cinco como "instrumento" e nenhuma tem material. Ou viram material, ou saem da coluna `instrumentos` e passam a competência.
+- [ ] **Templates sem arquivo** (M7) — sete linhas de `materiais` com `path`/`url` nulos (Mensagem de preparação, Mensagem às pessoas indicadas, Consolidação da avaliação por terceiros, PDM, Mensagem de encaminhamento, Checklist de competências, Autoavaliação do mentor). Renderizam "em breve".
+- [ ] **Consolidação da avaliação por terceiros** (M6) — o template PDF 56 não existe como instrumento; a coordenação lê contato por contato na ficha.
+- [ ] **`formularios` — checagens de revisão das metas** (F2) — o template oficial fecha com três perguntas de auto-revisão ("ajudam a chegar onde quero / são importantes / consigo explicar"); o form `metas` só tem prioridade implícita em `meta_1`.
+- [ ] **`formularios` — submetas por nível com IS e prazo** (F3) — o form `pdm` guarda um `texto_longo` por meta; o `pdm_itens` nativo já suporta árvore (`parent_id`) + indicador, mas nada o alimenta além de uma linha de texto.
+- [ ] **`formularios` — meta SMART por área da Roda** (F4) — `pdm_itens.area_vida` existe e nunca é populado.
+- [ ] **`intake_mentorado` — formação acadêmica** (F7) — o guia (PDF 31) cita "formação acadêmica ou curso atual" como dado do matching; o form da 0129 não pergunta. `mentorados.escolaridade` é select de 6 opções (não texto livre) — a decisão é qual dos dois o intake captura.
+- [ ] **Janela da Roda inicial** (S1) — o guia pede a Roda preenchida **antes** do encontro 1 ("peça a Roda da Vida preenchida", PDF 36); a estação abre no enc. 1 (`jornada.ts`).
+- [ ] **Especialista não registra meta no PDM** (S2) — o guia manda propor metas e "registrar tudo no PDM" (Esp PDF 34); `pdm_pode_editar` recusa `trilha='especialista'` e `pdm_itens.origem` não tem valor para especialista.
+- [ ] **Títulos 3 a 7 do cronograma divergem do guia** (S6) — paráfrases ("Declaração de Visão e metas SMART" no lugar de "Metas e checagem SMART"), e o mentor lê os dois lado a lado. Depende do Leo.
+- [ ] **Dataset demo com 13 materiais** (E6) — prod tem 22; quem testa a demo vê uma biblioteca que não existe.
+- [ ] **Duas linhas com `ordem = 17` em produção** (E7) — "Instrumento: Definindo Metas" e "Checklist de competências do mentor" empatam, ordenação indefinida.
+- [ ] **Anamnese Social e Autoavaliação do mentor** — decisões de produto que a 0128 deixou em aberto (o audit escalou com o Leo em §5.1/§5.2). Enquanto isso, o material "Autoavaliação do mentor" (ordem 18) segue em prod apontando para um instrumento que não existe.
+- [ ] **PDM do especialista e divergência "PDM fora da plataforma"** (E1/S2) — o app trouxe o PDM para dentro; o guia diz duas vezes que ele fica com a dupla. Manter a divergência, mas dizê-la ao mentor no onboarding (senão ele mantém duas cópias).
+
 ## Produção
 
 - [x] ~~Sender provisório `contato@thisux.tech`~~ — **feito 15/10**: consolidado na conta Resend do Léo ("tudo numa conta só"), `realiza.vc` verificado lá. Senders finais: `noreply@realiza.vc` (transacional, `EMAIL_FROM` em `.env.local` + Vercel prod/preview, key `realiza-transacional`) e `auth@realiza.vc` (SMTP do magic link no Supabase Auth, key `realiza-auth`). Atendimento humano/reply segue em `mentoria@realiza.vc` (caixa real no Google). Domínios `realiza.vc` e `mentoria.realiza.vc` removidos da conta thicosta (nunca enviaram).
