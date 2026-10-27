@@ -275,8 +275,11 @@ function EmblemaDial({ turma, tinta }: { turma: string; tinta: Tinta }) {
 
 /** Banner de perfil da turma — campo ink + relevo de arcos seedado pelo id
  *  do cronograma (a "impressão" dela), sigla fantasma sangrando na base,
- *  emblema-dial no canto e linha de dados mono. Decorativo: nome, ano e
- *  status aparecem como texto real no corpo. */
+ *  emblema-dial no canto e linha de dados mono. Um véu de ink no topo
+ *  separa texto e ornamento: a label fica em branco cheio sobre campo
+ *  chapado (≥ 9:1 em qualquer das tintas), e arcos/sigla só respiram
+ *  abaixo dela. Decorativo: nome, ano e status aparecem como texto real no
+ *  corpo. */
 export function TurmaBanner({
   cronograma: c,
   dados,
@@ -316,6 +319,12 @@ export function TurmaBanner({
     ? Math.max(48, Math.min(150, Math.round(860 / (ghost.length * 0.62))))
     : 0;
 
+  // scrim da linha de dados: o topo vira campo ink chapado (a label mora
+  // ali) e a sigla fantasma/arcos só aparecem abaixo — sem isso a água-forte
+  // sob o texto derrubava o contraste. Id por cronograma: o mesmo SVG pode
+  // aparecer no card e na capa do detalhe.
+  const scrimId = `turma-scrim-${c.id}`;
+
   return (
     <div
       aria-hidden
@@ -326,6 +335,30 @@ export function TurmaBanner({
         preserveAspectRatio="xMidYMid slice"
         className="block h-full w-full"
       >
+        <defs>
+          <linearGradient id={scrimId} x1="0" y1="0" x2="0" y2="1">
+            <stop
+              offset="0"
+              stopColor="var(--brand-ink)"
+              stopOpacity={0.94}
+            />
+            <stop
+              offset="0.34"
+              stopColor="var(--brand-ink)"
+              stopOpacity={0.9}
+            />
+            <stop
+              offset="0.62"
+              stopColor="var(--brand-ink)"
+              stopOpacity={0.34}
+            />
+            <stop
+              offset="0.84"
+              stopColor="var(--brand-ink)"
+              stopOpacity={0}
+            />
+          </linearGradient>
+        </defs>
         <rect width={800} height={150} fill="var(--brand-ink)" />
         <g fill="none" stroke={tinta.tt} strokeOpacity={0.13}>
           {a1.map((rr) => (
@@ -352,9 +385,12 @@ export function TurmaBanner({
             {ghost}
           </text>
         )}
+        {/* véu do topo — sobre o relevo, sob a label: a sigla fantasma e os
+            arcos somem na faixa da linha de dados e voltam na base */}
+        <rect width={800} height={150} fill={`url(#${scrimId})`} />
       </svg>
       {dados && (
-        <p className="absolute left-4 top-2.5 max-w-[calc(100%-5.5rem)] truncate font-mono text-xs sm:text-[10.5px] uppercase tracking-[0.12em] text-white/80">
+        <p className="absolute left-4 top-2.5 max-w-[calc(100%-5.5rem)] truncate font-mono text-xs uppercase tracking-[0.08em] text-white sm:text-[11px]">
           {dados}
         </p>
       )}
