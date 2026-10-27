@@ -53,6 +53,7 @@ import {
   disponibilidadeVazia,
   formatDate,
   formatMesAno,
+  formatTamanho,
   formatWhatsApp,
   GENERO_LABELS,
   idade,
@@ -1156,7 +1157,9 @@ export function PerfilForm({
 
   async function trocarFoto(file: File) {
     if (file.size > AVATAR_MAX_BYTES) {
-      toast.error("Imagem grande demais: use uma de até 2 MB.");
+      toast.error(
+        `Essa imagem tem ${formatTamanho(file.size)}. O limite é ${formatTamanho(AVATAR_MAX_BYTES)}.`
+      );
       return;
     }
     setUploading(true);
@@ -1301,9 +1304,6 @@ export function PerfilForm({
               {pendentesTotal === 1 ? "pendência" : "pendências"} no cadastro
             </Badge>
           )}
-          <p className="mt-3 text-xs text-muted-foreground">
-            PNG, JPG ou WebP até 2 MB. Sem foto, usamos a do seu e-mail.
-          </p>
         </div>
       </header>
 

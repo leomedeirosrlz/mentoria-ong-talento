@@ -1,7 +1,7 @@
 import { createHash } from "node:crypto";
 
 export const AVATAR_ACCEPT = ".png,.jpg,.jpeg,.webp";
-export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+export const AVATAR_MAX_BYTES = 10 * 1024 * 1024;
 
 /** URL pública do bucket `avatares` — path novo a cada upload, sem cache-bust.
  *  Paths "demo/*" são os retratos locais do modo demo (public/demo/*). */

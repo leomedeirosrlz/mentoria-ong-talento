@@ -28,7 +28,7 @@ import {
 import { concluirOnboarding, salvarOnboarding } from "@/lib/actions";
 import { recomecarDemo } from "@/lib/demo/actions";
 import { assinarTermo } from "@/lib/actions-assinaturas";
-import { AREAS_SUGESTOES } from "@/lib/ciclo";
+import { AREAS_SUGESTOES, formatTamanho } from "@/lib/ciclo";
 import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
 import { AssinaturaForm } from "@/components/assinatura-form";
 import { TagInput } from "@/components/tag-input";
@@ -278,7 +278,9 @@ export function OnboardingFlow({
       return;
     }
     if (f.size > AVATAR_MAX_BYTES) {
-      toast.error("Imagem grande demais: use uma de até 2 MB.");
+      toast.error(
+        `Essa imagem tem ${formatTamanho(f.size)}. O limite é ${formatTamanho(AVATAR_MAX_BYTES)}.`
+      );
       return;
     }
     if (objUrl.current) URL.revokeObjectURL(objUrl.current);
@@ -494,7 +496,7 @@ export function OnboardingFlow({
       case 1:
         return "O essencial da sua rotina no programa cabe nesta tela.";
       case 2:
-        return "PNG, JPG ou WebP até 2 MB. Aparece no seu perfil e nas duplas.";
+        return "Aparece no seu perfil e nas duplas.";
       case 3:
         return "O que você faz, o que estudou, o que te trouxe ao programa. Aparece no seu perfil pra equipe e pros mentorados.";
       case 4:

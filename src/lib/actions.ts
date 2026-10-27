@@ -12,12 +12,14 @@ import {
   PREF_GENEROS,
   UFS,
   cronogramaVigente,
+  formatTamanho,
   inicioDefaultDupla,
   maxEncontros,
   normLinkExterno,
   parseDisponibilidade,
   podeSupervisionar,
 } from "@/lib/ciclo";
+import { AVATAR_MAX_BYTES } from "@/lib/avatar";
 import { capitalizar, cpfValido, erroAmigavel, nomeProprio } from "@/lib/utils";
 import { snapshotDuplaHoje } from "@/lib/jobs";
 import { temPapel } from "@/lib/types";
@@ -87,7 +89,6 @@ async function me() {
 }
 
 const FOTO_TIPOS = ["image/png", "image/jpeg", "image/webp"];
-const FOTO_MAX = 2 * 1024 * 1024;
 
 type Supa = Awaited<ReturnType<typeof createClient>>;
 
@@ -104,8 +105,10 @@ async function subirFoto(
   if (!FOTO_TIPOS.includes(foto.type)) {
     return { aviso: "A foto não entrou. Use PNG, JPG ou WebP." };
   }
-  if (foto.size > FOTO_MAX) {
-    return { aviso: "A foto não entrou. Use uma imagem de até 2 MB." };
+  if (foto.size > AVATAR_MAX_BYTES) {
+    return {
+      aviso: `A foto não entrou: ela tem ${formatTamanho(foto.size)} e o limite é ${formatTamanho(AVATAR_MAX_BYTES)}.`,
+    };
   }
   const ext = foto.name.split(".").pop()?.toLowerCase() ?? "png";
   const path = `${pasta}/${crypto.randomUUID()}.${ext}`;
