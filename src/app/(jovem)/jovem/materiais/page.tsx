@@ -314,7 +314,7 @@ export default async function JovemMateriais() {
       chave === "avaliacao_encontro" ? ultimaAvaliacao : null,
     sistema:
       chave === "avaliacao_360"
-        ? ("avaliacao_360" as FormularioSistema)
+        ? ("avaliacao_final_mentorado" as FormularioSistema)
         : (SISTEMA_DA_ESTACAO[chave] ?? null),
     campos:
       chave === "avaliacao_360"
@@ -560,7 +560,7 @@ const SUB_ESTACAO: Record<EstacaoChave, string> = {
   pdm: "Plano de Desenvolvimento",
   avaliacao_encontro: "nota + comentário",
   roda_formal: "aplicação formal",
-  avaliacao_360: "e autoavaliação",
+  avaliacao_360: "mentor e mentorado",
 };
 
 /** Props compartilhadas dos cards — o que a página resolve por chave

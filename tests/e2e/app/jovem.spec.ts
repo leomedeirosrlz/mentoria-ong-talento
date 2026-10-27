@@ -338,7 +338,7 @@ test.describe("mentorado — shell /jovem", () => {
       "Avaliação por terceiros",
       "Avaliação do encontro",
       "Roda da Vida · aplicação formal",
-      "Avaliação 360º",
+      "Avaliação final",
     ]) {
       await expect(
         trilha.getByRole("heading", { name: titulo })

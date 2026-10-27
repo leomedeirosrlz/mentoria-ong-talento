@@ -469,7 +469,7 @@ function buildCicloEventos(cronogramaT1: string, cronogramaT2: string): CicloEve
     ev(cronogramaId, "recesso", null, addDias(dia(14), 1), "Recesso de fim de ano", null, [], addDias(dia(14), 18),
       { observacao: "Sem encontros — retomada na 1ª semana de janeiro" }),
     ev(cronogramaId, "encontro", 15, dia(15), "Reflexão e reconhecimento", F6, ["PDM", "Roda da Vida"]),
-    ev(cronogramaId, "encontro", 16, dia(16), "Encerramento e celebração", F6, ["Avaliação 360º"]),
+    ev(cronogramaId, "encontro", 16, dia(16), "Encerramento e celebração", F6, ["Avaliação final"]),
     // seção 3 — encerramento: evento compartilhável pelas turmas, mas cada
     // cronograma guarda a própria row (cronograma_id é NOT NULL): 15/01 no
     // real, +3d após o 16º encontro de cada uma

@@ -68,33 +68,38 @@ export const getEncerramentosPendentes = cache(
   }
 );
 
-/** Data da resposta 360º mais recente da dupla — derivação por join
- *  (resposta ← link ← form oficial), sem coluna nova em encerramentos: o
- *  checklist é vocabulário fechado e a resposta já sabe a que dupla/link
- *  pertence. null = nenhuma resposta oficial (marcação manual antiga) ou
- *  papel sem acesso aos forms — a UI só omite o "via formulário em dd/mm". */
+/** Data da resposta da avaliação final mais recente da dupla — derivação
+ *  por join (resposta ← link ← form oficial), sem coluna nova em
+ *  encerramentos: o checklist é vocabulário fechado e a resposta já sabe a
+ *  que dupla/link pertence. Depois da REALIZA-230 são dois instrumentos
+ *  (um por lado), então vale a resposta mais recente de qualquer um: o
+ *  item do checklist é "enviada ao mentor e ao mentorado". null = nenhuma
+ *  resposta oficial (marcação manual antiga) ou papel sem acesso aos
+ *  forms — a UI só omite o "via formulário em dd/mm". */
 export const getAvaliacao360DaDupla = cache(
   async (duplaId: string): Promise<string | null> => {
     const demo = await demoRole();
-    // demo: a resposta 360º da Luiza (dupla d-fim) — o "via formulário em
-    // dd/mm" do checklist aparece na ficha como na real
+    // demo: a resposta da avaliação final da dupla d-fim — o "via
+    // formulário em dd/mm" do checklist aparece na ficha como na real
     if (demo) return demoAvaliacao360DaDupla(demo, duplaId);
     const supabase = await createClient();
-    const { data: form, error } = await supabase
+    const { data: forms, error } = await supabase
       .from("formularios")
       .select("id")
-      .eq("sistema", "avaliacao_360")
-      .maybeSingle();
+      .in("sistema", ["avaliacao_final_mentorado", "avaliacao_final_mentor"]);
     if (error) {
-      console.error("getAvaliacao360DaDupla (form):", error);
+      console.error("getAvaliacao360DaDupla (forms):", error);
       return null;
     }
-    if (!form) return null;
+    if (!forms?.length) return null;
     const { data, error: e2 } = await supabase
       .from("formulario_respostas")
       .select("respondido_em, link:formulario_links!inner(id)")
       .eq("link.dupla_id", duplaId)
-      .eq("link.formulario_id", form.id)
+      .in(
+        "link.formulario_id",
+        forms.map((f) => f.id)
+      )
       .order("respondido_em", { ascending: false })
       .limit(1)
       .maybeSingle();
