@@ -59,6 +59,13 @@ type CardSpec = {
 
 const CARDS: CardSpec[] = [
   {
+    chave: "avaliacao_terceiros",
+    titulo: "Avaliação por terceiros",
+    descricao:
+      "Amigos e família respondem 2 perguntas; o programa consolida sem mostrar quem disse o quê. O mentor convida as pessoas.",
+    chips: ["Antes do enc. 1", "Devolutiva enc. 2"],
+  },
+  {
     chave: "roda_inicial",
     titulo: ESTACOES.roda_inicial.titulo,
     descricao:
@@ -93,13 +100,6 @@ const CARDS: CardSpec[] = [
     chips: ["Construir 1–4", "Revisar enc. 9"],
     estacao: "pdm",
     sistemaForm: "pdm",
-  },
-  {
-    chave: "avaliacao_terceiros",
-    titulo: "Avaliação por terceiros",
-    descricao:
-      "Amigos e família respondem 2 perguntas; o programa consolida sem mostrar quem disse o quê. O mentor convida as pessoas.",
-    chips: ["Antes do enc. 1", "Devolutiva enc. 2"],
   },
   {
     chave: "avaliacao_encontro",
@@ -364,12 +364,27 @@ export function InstrumentosPrograma({
           const formId = card.sistemaForm
             ? formIds.get(card.sistemaForm)
             : undefined;
+          // REALIZA-233: o card inteiro abre as respostas — stretched link
+          // cobre o article e a linha de ações sobe com relative pra seguir
+          // clicável. Só onde há página de respostas (coord + form ativo).
+          const verRespostas = ehCoord && formId && !trancado;
 
           return (
             <article
               key={card.chave}
-              className="flex flex-col gap-2.5 rounded-xl bg-card p-3.5 shadow-[var(--shadow-border)]"
+              className={cn(
+                "relative flex flex-col gap-2.5 rounded-xl bg-card p-3.5 shadow-[var(--shadow-border)]",
+                verRespostas &&
+                  "transition-shadow hover:shadow-[var(--shadow-border-hover)]"
+              )}
             >
+              {verRespostas && (
+                <Link
+                  href={`/formularios/${formId}`}
+                  aria-label={`Ver respostas — ${card.titulo}`}
+                  className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
+              )}
               <div className="flex items-start gap-2.5">
                 <InstrumentoEmblema
                   instrumento={card.chave}
@@ -415,7 +430,7 @@ export function InstrumentosPrograma({
               {(trancado && estacao) ||
               ehCoord ||
               (papel === "mentor" && fichasMentor.length > 0) ? (
-                <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+                <div className="relative mt-auto flex flex-wrap items-center gap-2 pt-1">
                   {trancado && estacao ? (
                     <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
                       <LockSimple size={12} aria-hidden />
@@ -457,18 +472,8 @@ export function InstrumentosPrograma({
                       </span>
                     )
                   ) : null}
-                  {ehCoord && formId && !trancado && (
-                    <Link
-                      href={`/formularios/${formId}`}
-                      className={buttonVariants({
-                        variant: "outline",
-                        size: "sm",
-                      })}
-                    >
-                      <Eye aria-hidden />
-                      Ver respostas
-                    </Link>
-                  )}
+                  {/* "Ver respostas" virou o próprio card (stretched link
+                      acima) — a ação explícita saía daqui (REALIZA-233) */}
                   {/* mentor — deep link pra seção de instrumentos da ficha
                       de cada dupla dele; com várias duplas, um link por
                       ficha rotulado pelo nome do jovem */}
@@ -504,7 +509,20 @@ export function InstrumentosPrograma({
             tempo de conclusão, não a janela do guia, e a emissão é gesto
             humano em lote (nunca automático) */}
         {ehCoord && (
-          <article className="flex flex-col gap-2.5 rounded-xl bg-card p-3.5 shadow-[var(--shadow-border)]">
+          <article
+            className={cn(
+              "relative flex flex-col gap-2.5 rounded-xl bg-card p-3.5 shadow-[var(--shadow-border)]",
+              formIds.get("desfecho") &&
+                "transition-shadow hover:shadow-[var(--shadow-border-hover)]"
+            )}
+          >
+            {formIds.get("desfecho") && (
+              <Link
+                href={`/formularios/${formIds.get("desfecho")}`}
+                aria-label="Ver respostas — Depois da mentoria · 6 meses"
+                className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
+            )}
             <div className="flex items-start gap-2.5">
               <InstrumentoEmblema instrumento="desfecho" />
               <div className="min-w-0">
@@ -526,7 +544,7 @@ export function InstrumentosPrograma({
               trabalhando ou empreendendo. Vai pra quem concluiu há pelo
               menos 6 meses e ainda não respondeu.
             </p>
-            <div className="mt-auto flex flex-wrap items-center gap-2 pt-1">
+            <div className="relative mt-auto flex flex-wrap items-center gap-2 pt-1">
               {desfechoElegiveis.length > 0 ? (
                 <EnviarDesfechoLote
                   linhas={desfechoElegiveis}
@@ -537,18 +555,6 @@ export function InstrumentosPrograma({
                 <span className="text-xs text-muted-foreground">
                   Nenhuma dupla chegou aos 6 meses sem resposta.
                 </span>
-              )}
-              {formIds.get("desfecho") && (
-                <Link
-                  href={`/formularios/${formIds.get("desfecho")}`}
-                  className={buttonVariants({
-                    variant: "outline",
-                    size: "sm",
-                  })}
-                >
-                  <Eye aria-hidden />
-                  Ver respostas
-                </Link>
               )}
             </div>
           </article>
