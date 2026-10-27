@@ -7,6 +7,7 @@ import {
   partesTurma,
   turmaAno,
   turmaCurta,
+  turmaDaDupla,
   turmaLonga,
   turmaNumero,
 } from "@/lib/turma";
@@ -159,5 +160,46 @@ describe("linhaDadosTurma — a linha mono do banner", () => {
     ).toBe(
       "E2E Turma de teste · Calendário oficial · Terças · Semana do enc. 5/16"
     );
+  });
+});
+
+// ---------- turmaDaDupla — o rótulo VIVO (REALIZA-223) ----------
+
+describe("turmaDaDupla — selo velho, rótulo vivo", () => {
+  const cron = (id: string, turma: string) =>
+    mkCronograma({ id, turma });
+
+  it("com cronograma_id, devolve o label ATUAL do cronograma", () => {
+    // o bug do Leo: selo congelou "2026/2027" no rename → a turma nova
+    // filtrava vazia; o resolver responde o rótulo vivo
+    const dupla = { cronograma_id: "c1", turma: "2026/2027" };
+    expect(
+      turmaDaDupla(dupla, [cron("c1", "Turma Aberta - Jovens de ONGs")])
+    ).toBe("Turma Aberta - Jovens de ONGs");
+  });
+
+  it("selo já sincronizado devolve o mesmo valor (idempotente)", () => {
+    const dupla = { cronograma_id: "c1", turma: "T1 · 2026/2027" };
+    expect(turmaDaDupla(dupla, [cron("c1", "T1 · 2026/2027")])).toBe(
+      "T1 · 2026/2027"
+    );
+  });
+
+  it("cronograma fora da lista recebida cai no selo — nunca perde o dado", () => {
+    const dupla = { cronograma_id: "cX", turma: "T2 · 2026/2027" };
+    expect(turmaDaDupla(dupla, [cron("c1", "T1 · 2026/2027")])).toBe(
+      "T2 · 2026/2027"
+    );
+  });
+
+  it("sem cronograma_id (trilha especialista) o selo é a turma", () => {
+    const dupla = { cronograma_id: null, turma: "T1 · 2026/2027" };
+    expect(turmaDaDupla(dupla, [])).toBe("T1 · 2026/2027");
+  });
+
+  it("sem cronograma nem selo → null (caller decide o 'Sem turma')", () => {
+    expect(
+      turmaDaDupla({ cronograma_id: null, turma: null }, [])
+    ).toBeNull();
   });
 });
