@@ -18,10 +18,10 @@ test.describe("demo — /formularios separa customs de instrumentos", () => {
     await entrarNaDemo(page, "coordenacao");
     await page.goto("/formularios");
 
-    // os 3 forms da coordenação seguem na lista
+    // os 2 forms da coordenação seguem na lista (a Anamnese Social é feita
+    // por fora da plataforma — decisão de out/2026)
     for (const titulo of [
       /Avaliação do encontro/,
-      /Anamnese social · família e contexto/,
       /Inscrição · ciclo 2026\/2027/,
     ]) {
       await expect(

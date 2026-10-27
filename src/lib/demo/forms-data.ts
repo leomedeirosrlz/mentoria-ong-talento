@@ -53,9 +53,6 @@ export const DEMO_TOKENS = {
   fernandaAvaliacao: "demo-tok-avalia-fernanda-x",
   joaoPedroAvaliacao: "demo-tok-avalia-joaopedro",
   genericoAvaliacao: "demo-tok-avalia-generico1",
-  dandaraAnamnese: "demo-tok-anamnese-dandara1",
-  eduardoAnamnese: "demo-tok-anamnese-eduardo1",
-  isabelaAnamnese: "demo-tok-anamnese-isabela1",
   genericoInscricao: "demo-tok-inscric-generico",
   genericoInscricaoVivo: "demo-tok-inscric-vivo-000",
   // instrumentos oficiais (0042)
@@ -146,41 +143,7 @@ export function getDemoFormularios(): DemoFormularios {
     updated_at: haDias(12),
   };
 
-  // ---------- 2. anamnese social (ativa, resposta parcial) ----------
-  const fAnamnese: Formulario = {
-    id: uid(0x4002),
-    titulo: "Anamnese social · família e contexto",
-    descricao:
-      "Ficha de conhecimento do contexto do jovem, preenchida com a família no início do acompanhamento.",
-    campos: [
-      { id: "moradia", tipo: "texto", label: "Quem mora com o jovem?", obrigatorio: true },
-      { id: "nascimento", tipo: "data", label: "Data de nascimento do jovem", obrigatorio: true },
-      {
-        id: "estudo", tipo: "select", label: "Situação de estudo e trabalho",
-        obrigatorio: true,
-        opcoes: [
-          "Só estuda",
-          "Estuda e trabalha",
-          "Só trabalha",
-          "Não estuda nem trabalha",
-        ],
-      },
-      {
-        id: "apoios", tipo: "multi_select", label: "Apoios que a família já recebe",
-        obrigatorio: false,
-        opcoes: ["Nenhum", "Bolsa Família", "CRAS", "Acompanhamento de saúde", "Outros"],
-      },
-      { id: "confirma", tipo: "checkbox", label: "Confirmo que as informações acima são verdadeiras", obrigatorio: true },
-      { id: "observacoes", tipo: "texto_longo", label: "Algo mais que queiram contar?", obrigatorio: false },
-    ],
-    ativo: true,
-    versao: 2,
-    created_by: marina,
-    created_at: haDias(30),
-    updated_at: haDias(6),
-  };
-
-  // ---------- 3. inscrição (encerrada — cobre o estado inativo) ----------
+  // ---------- 2. inscrição (encerrada — cobre o estado inativo) ----------
   const fInscricao: Formulario = {
     id: uid(0x4003),
     titulo: "Inscrição · ciclo 2026/2027",
@@ -639,25 +602,6 @@ export function getDemoFormularios(): DemoFormularios {
       dest_profile_id: null, dest_mentorado_id: null, dupla_id: null,
       contexto: {}, usado_em: null, expira_em: null, created_by: marina, created_at: haDias(5),
     },
-    // anamnese: dandara respondeu; eduardo e isabela pendentes
-    {
-      id: uid(0x4206), formulario_id: fAnamnese.id, token: DEMO_TOKENS.dandaraAnamnese,
-      dest_profile_id: null, dest_mentorado_id: ment("Dandara"),
-      dupla_id: duplaDe("Fernanda", "Dandara"), contexto: {},
-      usado_em: haDias(4, "18:32"), expira_em: null, created_by: marina, created_at: haDias(6),
-    },
-    {
-      id: uid(0x4207), formulario_id: fAnamnese.id, token: DEMO_TOKENS.eduardoAnamnese,
-      dest_profile_id: null, dest_mentorado_id: ment("Eduardo"),
-      dupla_id: duplaDe("João Pedro", "Eduardo"), contexto: {},
-      usado_em: null, expira_em: null, created_by: marina, created_at: haDias(6),
-    },
-    {
-      id: uid(0x4208), formulario_id: fAnamnese.id, token: DEMO_TOKENS.isabelaAnamnese,
-      dest_profile_id: null, dest_mentorado_id: ment("Isabela"),
-      dupla_id: duplaDe("Luiza", "Isabela"), contexto: {},
-      usado_em: null, expira_em: null, created_by: marina, created_at: haDias(6),
-    },
     // inscrição: um genérico respondido antes do encerramento + um pendente
     // — link vivo num form inativo mostra o estado "Formulário encerrado"
     // no /f/<token>
@@ -834,18 +778,6 @@ export function getDemoFormularios(): DemoFormularios {
         comentarios: "O Caio travou na parte de metas — pedi material de apoio no registro.",
       },
       respondido_em: haDias(2, "08:47"),
-    },
-    {
-      id: uid(0x4403), link_id: uid(0x4206),
-      respostas: {
-        moradia: "Mãe, padrasto e dois irmãos",
-        nascimento: "2009-04-17",
-        estudo: "Só estuda",
-        apoios: ["Bolsa Família", "CRAS"],
-        confirma: true,
-        observacoes: "A família topa participar dos encontros de pais.",
-      },
-      respondido_em: haDias(4, "18:32"),
     },
     {
       id: uid(0x4404), link_id: uid(0x4209),
@@ -1172,7 +1104,6 @@ export function getDemoFormularios(): DemoFormularios {
   return {
     formularios: [
       fAvaliacao,
-      fAnamnese,
       fInscricao,
       fAvaliacaoFinalMentorado,
       fAvaliacaoFinalMentor,

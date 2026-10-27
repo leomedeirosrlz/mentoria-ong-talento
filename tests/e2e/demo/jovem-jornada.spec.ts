@@ -177,23 +177,14 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await expect(acervo.getByText("Guias")).toHaveCount(0);
     await expect(acervo.getByText("em breve").first()).toBeVisible();
 
-    // acervo progressivo (REALIZA-160): a Ana está no enc. 5 — o material
-    // marcado pro enc. 16 sai da vitrine e recolhe no <details> apagado
-    const trancados = acervo.locator("details", {
-      hasText: "Mais adiante na jornada",
-    });
-    await expect(trancados).toBeVisible();
+    // REALIZA-236/237: a "Autoavaliação do mentor" saiu do programa — sem
+    // material de encontro futuro na audiência do mentorado, o recap "Mais
+    // adiante na jornada" não renderiza (a régua segue coberta em
+    // tests/ciclo-jornada.test.ts)
+    await expect(acervo.getByText(/Autoavaliação do mentor/)).toHaveCount(0);
     await expect(
-      trancados.getByText("Autoavaliação do mentor (enc. 16)")
-    ).toBeVisible();
-    // recolhido por padrão — o item não é clicável nem aparece na grid
-    await expect(
-      acervo.getByRole("link", { name: /Autoavaliação do mentor/ })
+      acervo.getByText("Mais adiante na jornada")
     ).toHaveCount(0);
-    await trancados.locator("summary").click();
-    await expect(
-      trancados.getByText(/Libera no encontro 16/)
-    ).toBeVisible();
   });
 
   // REALIZA-162/194 — a ordem física da página (hero → sub-nav → estante

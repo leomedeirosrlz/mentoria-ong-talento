@@ -3135,7 +3135,6 @@ function build(): DemoData {
     { id: uid(0x2008), titulo: "Mensagem de encaminhamento entre encontros", descricao: "Modelo curto para manter o vínculo e deixar a próxima tarefa clara.", tipo: "template", url: null, path: null, audiencia: "dpp", encontro_num: null, ordem: 15 },
     { id: uid(0x2009), titulo: "Roda da Vida: roteiro de aplicação", descricao: "Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.", tipo: "template", url: null, path: null, audiencia: "dpp", encontro_num: 12, ordem: 16 },
     { id: uid(0x2010), titulo: "Checklist de competências do mentor", descricao: "Autoavaliação antes do ciclo e novamente no 16º encontro.", tipo: "template", url: null, path: null, audiencia: "todos", encontro_num: null, ordem: 17 },
-    { id: uid(0x2011), titulo: "Autoavaliação do mentor", descricao: "Cinco perguntas de reflexão para o encerramento do ciclo.", tipo: "template", url: null, path: null, audiencia: "todos", encontro_num: 16, ordem: 18 },
     { id: uid(0x2012), titulo: "Plataforma de mentoria", descricao: "Onde os encontros oficiais são agendados e avaliados.", tipo: "link", url: "https://mentoria.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 20 },
     { id: uid(0x2013), titulo: "Formação EaD gratuita", descricao: "Trilha opcional com certificado para mentores.", tipo: "link", url: "https://ead.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 21 },
   ];
