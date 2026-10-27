@@ -1588,33 +1588,27 @@ export type Database = {
       }
       encerramentos: {
         Row: {
-          autoavaliacao_mentor: string | null
           checklist: Json
           created_at: string
           decidido_por: string | null
-          disponivel_proximo_ciclo: boolean | null
           dupla_id: string
           id: string
           resumo_jornada: string | null
           tipo: string | null
         }
         Insert: {
-          autoavaliacao_mentor?: string | null
           checklist?: Json
           created_at?: string
           decidido_por?: string | null
-          disponivel_proximo_ciclo?: boolean | null
           dupla_id: string
           id?: string
           resumo_jornada?: string | null
           tipo?: string | null
         }
         Update: {
-          autoavaliacao_mentor?: string | null
           checklist?: Json
           created_at?: string
           decidido_por?: string | null
-          disponivel_proximo_ciclo?: boolean | null
           dupla_id?: string
           id?: string
           resumo_jornada?: string | null
@@ -5748,10 +5742,6 @@ export type Database = {
       }
       revogar_assinatura: { Args: { p_id: string }; Returns: undefined }
       revogar_relatorio_link: { Args: { p_id: string }; Returns: Json }
-      salvar_autoavaliacao: {
-        Args: { p_disponivel: boolean; p_dupla: string; p_texto: string }
-        Returns: undefined
-      }
       salvar_consolidado_terceiros: {
         Args: {
           p_consolidado: string
@@ -5982,4 +5972,3 @@ export const Constants = {
     },
   },
 } as const
-
