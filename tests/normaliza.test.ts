@@ -6,6 +6,7 @@ import {
   normalizaEmail,
   normalizaEscolaridade,
   normalizaGenero,
+  normalizaNomeSocial,
   normalizaPapel,
   normalizaPorFormato,
   normalizaPrefGenero,
@@ -291,6 +292,48 @@ describe("enums — fuzzy pro vocabulário fechado", () => {
     expect(normalizaGenero("feminino").mudou).toBe(false);
     expect(normalizaGenero("Feminino").mudou).toBe(true);
     expect(normalizaPrefGenero("").valor).toBeNull();
+  });
+});
+
+describe("normalizaNomeSocial — resposta de outra pergunta (REALIZA-224)", () => {
+  it("pronome de preferência não vira nome", () => {
+    for (const v of ["Ele/Dele", "ela/dela", "Elu/Delu", "ele - dele", "Ela"]) {
+      const r = normalizaNomeSocial(v);
+      expect(r.valor).toBeNull();
+      expect(r.aviso).toMatch(/pronome/);
+    }
+  });
+
+  it("negativa e recusa literal", () => {
+    for (const v of ["Não tenho.", "não possuo", "Prefiro não dizer", "nenhuma", "N/A", "mesmo nome"]) {
+      const r = normalizaNomeSocial(v);
+      expect(r.valor).toBeNull();
+      expect(r.aviso).toMatch(/negativa|recusa/);
+    }
+  });
+
+  it("rótulo da pergunta colado no valor — descarta sem tentar resgatar", () => {
+    const r = normalizaNomeSocial("Nome Artistico: Andressa Venâncio");
+    expect(r.valor).toBeNull();
+    expect(r.aviso).toMatch(/rótulo/);
+    expect(normalizaNomeSocial("Nome social - Bia").valor).toBeNull();
+  });
+
+  it("nome social de verdade passa intacto", () => {
+    for (const v of ["Duda", "Elaine Souza", "Bia Nunes", "Eleonora"]) {
+      const r = normalizaNomeSocial(v);
+      expect(r.valor).toBe(v);
+      expect(r.aviso).toBeUndefined();
+    }
+    // vazio continua vazio, sem diff
+    expect(normalizaNomeSocial("   ")).toEqual({ valor: null, mudou: false });
+  });
+
+  it("espaço interno é colapsado mas continua sem flag", () => {
+    const r = normalizaNomeSocial("  Bia   Nunes ");
+    expect(r.valor).toBe("Bia Nunes");
+    expect(r.mudou).toBe(true);
+    expect(r.aviso).toBeUndefined();
   });
 });
 
