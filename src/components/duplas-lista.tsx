@@ -335,8 +335,15 @@ function LinhaMini({
   return (
     <div
       style={{ "--i": Math.min(i, 10) } as CSSProperties}
-      className="animate-enter grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-t border-border/60 px-3 py-2 text-[13px] @4xl:grid-cols-[minmax(190px,1.4fr)_150px_minmax(150px,1fr)_auto_auto] @4xl:px-5 @4xl:py-2.5"
+      className="relative animate-enter grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-t border-border/60 px-3 py-2 text-[13px] transition-colors hover:bg-muted/50 @4xl:grid-cols-[minmax(190px,1.4fr)_150px_minmax(150px,1fr)_auto_auto] @4xl:px-5 @4xl:py-2.5"
     >
+      {/* linha inteira abre a ficha (mesmo stretched link da DuplaLinha):
+          o WA sobe pra z-20 e o "Ver ficha" vira decorativo — 1 tab por linha */}
+      <Link
+        href={`/duplas/${d.id}`}
+        aria-label={`Ver ficha da dupla de ${d.mentorado.nome.split(" ")[0]}`}
+        className="absolute inset-0 z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
       <span className="flex min-w-0 flex-wrap items-center gap-1.5 font-medium">
         <DuplaNomes mentor={d.mentor.nome} mentorado={d.mentorado.nome} />
         {d.turma && (
@@ -386,19 +393,17 @@ function LinhaMini({
           colunas `auto` do fim do grid; no mobile ele é a célula de
           ações inteira (nomes à esquerda, ações à direita) */}
       <span className="flex items-center gap-1.5 @4xl:contents">
-        {wa}
-        <Link
-          href={`/duplas/${d.id}`}
-          aria-label={`Ver ficha da dupla de ${d.mentorado.nome.split(" ")[0]}`}
-          title="Ver ficha"
+        <span className="relative z-20">{wa}</span>
+        <span
+          aria-hidden
           className={cn(
             buttonVariants({ variant: "ghost", size: "sm" }),
-            "w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
+            "pointer-events-none w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
           )}
         >
           <span className="hidden whitespace-nowrap md:inline">Ver ficha</span>
-          <CaretRight weight="bold" aria-hidden />
-        </Link>
+          <CaretRight weight="bold" />
+        </span>
       </span>
     </div>
   );
