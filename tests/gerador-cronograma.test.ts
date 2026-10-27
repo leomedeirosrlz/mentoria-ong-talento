@@ -79,10 +79,9 @@ describe("gerarEventos — calendário oficial T1", () => {
       Array.from({ length: 16 }, (_, i) => i + 1)
     );
     expect(enc[0].instrumentos).toContain("PDM");
-    expect(enc[15].instrumentos).toEqual([
-      "Avaliação 360º",
-      "Autoavaliação do mentor",
-    ]);
+    // a autoavaliação do mentor saiu do programa (REALIZA-236) — o
+    // encerramento fecha com a 360º
+    expect(enc[15].instrumentos).toEqual(["Avaliação 360º"]);
   });
 
   it("a lista gerada passa na própria validação (CHECKs 0062)", () => {

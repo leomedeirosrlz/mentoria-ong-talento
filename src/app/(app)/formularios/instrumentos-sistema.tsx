@@ -11,8 +11,8 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 // REALIZA-199 — "Instrumentos do sistema": a prateleira dos formulários
-// oficiais que não são a régua DPP (anamnese, inscrições, autoavaliação,
-// avaliação da trilha). Read-only por natureza — o catálogo é imutável,
+// oficiais que não são a régua DPP (inscrições, avaliação da trilha,
+// desfecho). Read-only por natureza — o catálogo é imutável,
 // então a linha não tem ação de builder: abre a ficha do form, onde moram
 // links, respostas e prévia. Os instrumentos da régua (Visão, Metas, PDM,
 // Roda da Vida, 360º) não aparecem nem aqui — a casa deles é a seção

@@ -606,10 +606,10 @@ export function InstrumentosPrograma({
           ))}
         </p>
       )}
-      {/* coord-only: anamnese, intakes e autoavaliação moram em /formularios */}
+      {/* coord-only: intakes, avaliação da trilha e desfecho moram em /formularios */}
       {ehCoord && (
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Anamnese, intakes e autoavaliação ficam em{" "}
+          Intakes, avaliação da trilha e desfecho ficam em{" "}
           <Link
             href="/formularios"
             className="font-medium underline underline-offset-2 hover:text-foreground"

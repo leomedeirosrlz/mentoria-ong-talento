@@ -8,8 +8,8 @@
  * Erros dos mocks corrigidos aqui (plano §432): Roda inicial abre no
  * enc. 1 (não no 2); PDM é documento vivo construído nos enc. 1–4 com
  * revisão no 9; Roda formal nos enc. 12–14; 360º é terminal (enc. 16 /
- * encerramento). Anamnese e avaliação por terceiros ficam FORA da
- * jornada por decisão (C8/C10). "Avaliação do encontro" é recorrente —
+ * encerramento). Avaliação por terceiros fica FORA da jornada por decisão
+ * (C8/C10). "Avaliação do encontro" é recorrente —
  * "em dia · X de Y", nunca "fecha".
  */
 

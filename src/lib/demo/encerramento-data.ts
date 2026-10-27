@@ -3,11 +3,10 @@ import type { AppRole, Encerramento } from "../types";
 
 // Dados do fechamento de ciclo no modo demo — arquivo próprio pra não tocar
 // em data.ts. Dois encerramentos: o da d-fim (Luiza × Isabela, ciclo anterior
-// completo) mostra o estado final — checklist cheio, autoavaliação recebida,
-// resumo gerado; o da d-ok (Ricardo × Ana) está em andamento — rito aberto
-// com checklist parcial. A row da d-fim diz 'concluida' mesmo com a dupla
-// 'encerrada' no dataset: a 0037 ainda não rodou no banco da demo e a fixture
-// conta a história do estado final.
+// completo) mostra o estado final — checklist cheio, resumo gerado; o da
+// d-ok (Ricardo × Ana) está em andamento — rito aberto com checklist
+// parcial. A row da d-fim diz 'concluida' mesmo com a dupla 'encerrada' no
+// dataset: a fixture conta a história do estado final.
 
 const uid = (n: number): string =>
   `de000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -36,11 +35,10 @@ function noEscopo(role: AppRole, duplaId: string): boolean {
 
 // um encerramento por dupla (unique(dupla_id)): a d-fim mostra o rito
 // completo e decidido; a d-ok está em andamento — checklist parcial (360º
-// carimbada pela resposta do Ricardo, revisão do PDM marcada), autoavaliação
-// do mentor e decisão ainda pendentes — a ficha mostra o rito vivo; a
-// d-rito é o caso que a agenda cobra (REALIZA-172): dupla JÁ concluída
-// com a decisão aberta — a fila da coordenação aponta pra ficha e o card
-// do mentor sinaliza que a autoavaliação dele ainda falta
+// carimbada pela resposta do Ricardo, revisão do PDM marcada) e decisão
+// ainda pendente — a ficha mostra o rito vivo; a d-rito é o caso que a
+// agenda cobra (REALIZA-172): dupla JÁ concluída com a decisão aberta — a
+// fila da coordenação aponta pra ficha
 const ENCERRAMENTOS: Record<string, Encerramento> = {
   [D_FIM]: {
     id: uid(0x3201),
@@ -51,11 +49,7 @@ const ENCERRAMENTOS: Record<string, Encerramento> = {
       feedback_mutuo: true,
       revisao_pdm: true,
       avaliacao_360_enviada: true,
-      autoavaliacao: true,
     },
-    autoavaliacao_mentor:
-      "O que funcionou: as metas pequenas da Isabela — cada semana com uma vitória visível manteve o ritmo. Eu falei demais nos primeiros encontros; quando passei a perguntar antes de sugerir, ela se abriu. Competência que evoluiu: escuta ativa. A desenvolver: pedir feedback do jovem com mais frequência. O que aprendi com a Isa: persistência silenciosa vence talento com pressa.",
-    disponivel_proximo_ciclo: true,
     resumo_jornada: [
       "Resumo da jornada · Luiza Campos e Isabela Freitas",
       "Trilha DPP · 16 encontros realizados de 16",
@@ -74,8 +68,6 @@ const ENCERRAMENTOS: Record<string, Encerramento> = {
       revisao_pdm: true,
       avaliacao_360_enviada: true,
     },
-    autoavaliacao_mentor: null,
-    disponivel_proximo_ciclo: null,
     resumo_jornada: null,
     decidido_por: null,
     created_at: haDias(6),
@@ -88,8 +80,6 @@ const ENCERRAMENTOS: Record<string, Encerramento> = {
     checklist: {
       avaliacao_360_enviada: true,
     },
-    autoavaliacao_mentor: null, // a peça que o espelho do mentor cobra
-    disponivel_proximo_ciclo: null,
     resumo_jornada: null,
     decidido_por: null,
     created_at: haDias(24),
@@ -106,17 +96,12 @@ export function demoEncerramentoDaDupla(
 }
 
 /** Espelho do `.is("tipo", null)` real: ids das rows sem decisão no escopo
- *  do papel + a peça do mentor (autoavaliação chegou?). A d-ok entra aqui
- *  mas a dupla segue ativa — quem consome filtra o status, como na query. */
-export function demoEncerramentosPendentes(
-  role: AppRole
-): Record<string, { autoavaliacao: boolean }> {
-  const out: Record<string, { autoavaliacao: boolean }> = {};
-  for (const enc of Object.values(ENCERRAMENTOS)) {
-    if (enc.tipo != null || !noEscopo(role, enc.dupla_id)) continue;
-    out[enc.dupla_id] = { autoavaliacao: enc.autoavaliacao_mentor != null };
-  }
-  return out;
+ *  do papel. A d-ok entra aqui mas a dupla segue ativa — quem consome filtra
+ *  o status, como na query. */
+export function demoEncerramentosPendentes(role: AppRole): string[] {
+  return Object.values(ENCERRAMENTOS)
+    .filter((enc) => enc.tipo == null && noEscopo(role, enc.dupla_id))
+    .map((enc) => enc.dupla_id);
 }
 
 /** Fechamento da trilha de especialista atrelada a uma solicitação — a

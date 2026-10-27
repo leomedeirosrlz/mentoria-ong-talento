@@ -10,7 +10,7 @@ import {
 // da ficha da dupla NÃO pode entregar os 4 instrumentos da jornada (Visão,
 // Metas, PDM, Roda da Vida) — a entrega deles é do mentor pela seção
 // Instrumentos da ficha (a action recusa também). O select do dialog filtra
-// `ehInstrumento(f.sistema)`; 360º/anamnese/autoavaliação seguem oficiais e
+// `ehInstrumento(f.sistema)`; o 360º e os oficiais de bordo seguem
 // emissíveis pela coordenação.
 //
 // Spec read-only: abre o dialog, abre o select e confere a lista — nenhum
@@ -77,13 +77,10 @@ test.describe("guarda — Enviar formulário não oferece instrumentos da jornad
       ).toHaveCount(0);
     }
 
-    // e os oficiais de coordenação seguem emissíveis — 360º e anamnese são
-    // seleção válida pra dupla (pelo menos um precisa existir no ambiente)
+    // e os oficiais de coordenação seguem emissíveis — o 360º é seleção
+    // válida pra dupla no ambiente de teste
     await expect(
-      page
-        .getByRole("option", { name: /Avaliação 360º/ })
-        .or(page.getByRole("option", { name: /Anamnese/ }))
-        .first()
+      page.getByRole("option", { name: /Avaliação 360º/ }).first()
     ).toBeVisible();
   });
 });

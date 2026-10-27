@@ -39,9 +39,9 @@ describe("ehInstrumento — o dispatcher do /f/<token>", () => {
     for (const s of ["visao", "metas", "pdm", "roda_vida"] as const)
       expect(ehInstrumento(s)).toBe(true);
     for (const s of [
-      "anamnese",
       "avaliacao_360",
-      "autoavaliacao_mentor",
+      "avaliacao_especialista",
+      "intake_mentor",
       null,
       undefined,
     ] as const)

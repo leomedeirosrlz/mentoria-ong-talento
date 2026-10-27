@@ -19,13 +19,11 @@ import type {
 
 // ---------- checklist do fechamento (guia DPP, cap. encerramento) ----------
 
-/** Ordem canônica do checklist — a chave `autoavaliacao` não é marcada à mão:
- *  deriva de autoavaliacao_mentor (o mentor preenche na própria ficha). */
+/** Ordem canônica do checklist — todos os itens são atestação da coordenação;
+ *  a resposta 360º marca `avaliacao_360_enviada` sozinha quando chega (0042). */
 export const CHECKLIST_ENCERRAMENTO: {
   key: keyof EncerramentoChecklist;
   label: string;
-  /** true = vem dos dados, não do clique da coordenação */
-  derivado?: boolean;
 }[] = [
   {
     key: "feedback_final",
@@ -42,11 +40,6 @@ export const CHECKLIST_ENCERRAMENTO: {
   {
     key: "avaliacao_360_enviada",
     label: "Avaliação 360º enviada ao mentor e ao mentorado",
-  },
-  {
-    key: "autoavaliacao",
-    label: "Autoavaliação do mentor recebida",
-    derivado: true,
   },
 ];
 

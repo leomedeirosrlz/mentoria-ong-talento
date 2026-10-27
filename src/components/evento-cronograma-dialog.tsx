@@ -43,7 +43,6 @@ const INSTRUMENTOS_SUGESTOES = [
   "Modelo SMART",
   "Papel de modelo",
   "Avaliação 360º",
-  "Autoavaliação do mentor",
 ] as const;
 
 /** Form de um evento do cronograma — compartilhado pelo builder (/turmas/novo,

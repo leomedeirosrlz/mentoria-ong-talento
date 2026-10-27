@@ -14,8 +14,8 @@ import {
 } from "./schema";
 
 /** O sistema é um dos 4 instrumentos de jornada (0080) com experiência
- *  sob medida no /f/<token> — anamnese/360/autoavaliação e forms criados
- *  pela coordenação seguem no renderer genérico. */
+ *  sob medida no /f/<token> — 360/avaliação da trilha, intakes e forms
+ *  criados pela coordenação seguem no renderer genérico. */
 export function ehInstrumento(
   s: FormularioSistema | null | undefined
 ): s is InstrumentoSistema {

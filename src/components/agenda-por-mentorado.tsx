@@ -88,9 +88,9 @@ export type AgendaPorMentoradoProps = {
   supervisoes: Supervisao[];
   /** Último contato por dupla — o "Lembrar o jovem" só conta tipo nudge. */
   nudges: Record<string, Interacao>;
-  /** Rito de encerramento aberto por dupla (getEncerramentosPendentes) —
-   *  dupla_id → a peça do mentor já chegou?. Só a concluída cobra. */
-  encerramentosPendentes: Record<string, { autoavaliacao: boolean }>;
+  /** ids das duplas com rito de encerramento aberto
+   *  (getEncerramentosPendentes). Só a concluída cobra. */
+  encerramentosPendentes: string[];
   /** Os MESMOS itens da Minha agenda — o strip "Sua semana" os condensa. */
   itensSemana: AgendaItem[];
   /** staff+mentor e DPP+esp chegam via ?visao=dpp — o strip repassa ao
@@ -204,9 +204,8 @@ export function AgendaPorMentorado({
               nudges[dupla.id]?.tipo === "nudge" ? nudges[dupla.id] : null
             }
             encerramentoPendente={
-              dupla.status === "concluida"
-                ? (encerramentosPendentes[dupla.id] ?? null)
-                : null
+              dupla.status === "concluida" &&
+              encerramentosPendentes.includes(dupla.id)
             }
             meuNome={meuNome}
             agora={agora}
@@ -252,9 +251,8 @@ function CardMentorado({
   cronogramas: Cronograma[];
   /** Último `interacoes` tipo nudge da dupla — alimenta o cap de 48h. */
   nudge: Interacao | null;
-  /** Rito aberto desta dupla (só concluída) — a pendência que o card cobra:
-   *  a autoavaliação do mentor ainda não chegou, ou a decisão é da coord. */
-  encerramentoPendente: { autoavaliacao: boolean } | null;
+  /** Rito aberto desta dupla (só concluída) — a decisão é da coordenação. */
+  encerramentoPendente: boolean;
   /** Primeiro nome do mentor — assina o check-in do Lembrar. */
   meuNome: string;
   agora: Date;
@@ -308,7 +306,7 @@ function CardMentorado({
   const semPendencia =
     registrosPendentes.length === 0 &&
     combinadosVencidos.length === 0 &&
-    encerramentoPendente == null;
+    !encerramentoPendente;
 
   // trilhas: ativa/pausada rendem bloco aberto; concluída/encerrada viram
   // histórico colapsado (até 3 por jovem no domínio — a lista cabe)
@@ -537,9 +535,8 @@ function CardMentorado({
               </li>
             ))}
             {/* rito de encerramento aberto (REALIZA-172): a jornada concluiu
-                mas o fechamento não — a peça que falta depende de quem lê:
-                autoavaliação do mentor ou a decisão da coordenação, ambas na
-                ficha da dupla */}
+                mas o fechamento não — a decisão é da coordenação, na ficha
+                da dupla */}
             {encerramentoPendente && (
               <li className="flex flex-wrap items-center gap-3 rounded-lg bg-[var(--warn)]/8 px-3 py-2.5">
                 <FlagCheckered
@@ -552,9 +549,7 @@ function CardMentorado({
                     Rito de encerramento pendente
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {encerramentoPendente.autoavaliacao
-                      ? "sua autoavaliação já chegou. A coordenação conclui o rito na ficha"
-                      : "falta sua autoavaliação. O rito fecha na ficha da dupla"}
+                    A coordenação conclui o rito na ficha da dupla.
                   </p>
                 </div>
                 <Link

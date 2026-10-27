@@ -107,7 +107,7 @@ export default async function HomePage({
           pessoas={pessoas}
           avisos={avisos}
           solicitacoes={solicitacoes}
-          encerramentos={new Set(Object.keys(encerramentos))}
+          encerramentos={new Set(encerramentos)}
           turmas={[...new Set(cronogramas.map((c) => c.turma))]}
           meuNome={me?.nome.split(" ")[0]}
           termo={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
