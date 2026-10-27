@@ -169,13 +169,38 @@ test.describe("demo — Minha jornada do mentorado", () => {
       acervo.getByText(/Para ler e consultar quando quiser/)
     ).toBeVisible();
     // o acervo do mentorado é só audiencia='todos' (a policy do 0065):
-    // os Guias dos mentores não aparecem — os links prontos viram grid e
-    // o checklist sem destino fecha no grupo apagado "A caminho" com o
-    // estado legítimo "em breve" no badge (REALIZA-162)
+    // os Guias dos mentores não aparecem — os links prontos viram grid e o
+    // checklist abre como documento nativo no grupo "Modelos" (era o
+    // material "em breve" do dataset antes dos doc: da 0135)
     await expect(acervo.getByText("Links")).toBeVisible();
-    await expect(acervo.getByText("A caminho")).toBeVisible();
+    await expect(acervo.getByText("Modelos")).toBeVisible();
+    const docJovem = acervo.getByRole("link", {
+      name: /Checklist de competências do mentor/,
+    });
+    await expect(docJovem).toHaveAttribute(
+      "href",
+      "/jovem/materiais/documento/checklist-competencias"
+    );
+    // a rota nativa do jovem renderiza o documento de verdade e volta pro
+    // acervo — não pode vazar pra /materiais (layout app redireciona o papel)
+    await docJovem.click();
+    await expect(page).toHaveURL(
+      "/jovem/materiais/documento/checklist-competencias"
+    );
+    await expect(
+      page.getByRole("heading", {
+        name: "Checklist de competências do mentor",
+        level: 1,
+      })
+    ).toBeVisible();
+    await page
+      .getByRole("link", { name: "Acervo de materiais" })
+      .click();
+    await expect(page).toHaveURL(/\/jovem\/materiais#acervo/);
     await expect(acervo.getByText("Guias")).toHaveCount(0);
-    await expect(acervo.getByText("em breve").first()).toBeVisible();
+    // catálogo todo acionável: sem linha apagada nem badge "em breve"
+    await expect(acervo.getByText("A caminho")).toHaveCount(0);
+    await expect(acervo.getByText("em breve")).toHaveCount(0);
 
     // REALIZA-236/237: a "Autoavaliação do mentor" saiu do programa — sem
     // material de encontro futuro na audiência do mentorado, o recap "Mais
@@ -279,12 +304,13 @@ test.describe("demo — Minha jornada do mentorado", () => {
     if (!m1 || !m2) throw new Error("card do acervo sem bounding box");
     expect(m1.y).toBeLessThan(m2.y);
 
-    // "em breve" nunca entra na vitrine: mora no grupo apagado "A caminho"
+    // "em breve" nunca entra na vitrine — e o catálogo atual não tem
+    // material sem destino: nada apagado nem no grupo "A caminho"
     await expect(
       acervo.locator("div.grid").getByText("em breve")
     ).toHaveCount(0);
-    await expect(acervo.getByText("A caminho")).toBeVisible();
-    await expect(acervo.getByText("em breve").first()).toBeVisible();
+    await expect(acervo.getByText("A caminho")).toHaveCount(0);
+    await expect(acervo.getByText("em breve")).toHaveCount(0);
   });
 
   test("prefers-reduced-motion: a entrada não bloqueia a leitura", async ({
@@ -376,7 +402,8 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     for (const titulo of [
       "Roda da Vida · leitura inicial",
       "Avaliação por terceiros",
-      "Avaliação Geral - 360º",
+      "Avaliação Geral - 360º · mentorado(a)",
+      "Avaliação Geral - 360º · mentor(a)",
     ]) {
       await expect(
         instrumentos.getByRole("heading", { name: titulo })
@@ -404,7 +431,7 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     // card trancado é leitura pura pra TODO staff — o pill de liberação
     // não é gesto: zero link, zero botão dentro dele
     const cardTrancado = instrumentos.locator("article", {
-      hasText: "Avaliação final",
+      hasText: "Avaliação Geral - 360º · mentorado(a)",
     });
     await expect(cardTrancado.getByText("ainda não abriu")).toBeVisible();
     await expect(cardTrancado.getByRole("link")).toHaveCount(0);
@@ -415,17 +442,14 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
       instrumentos.getByRole("link", { name: "Formulários" })
     ).toBeVisible();
 
-    // a biblioteca mora na aba própria — grupos + badge "sem conteúdo"
-    // (rótulo staff; pro jovem o mesmo estado diz "em breve"). Com o hub
-    // por encontro (REALIZA-173) parte desses badges mora em <details>
-    // fechados — o primeiro match no DOM pode estar oculto; o filtro
-    // garante um visível (os transversais seguem abertos)
-    // REALIZA-210: a biblioteca é uma lista só, com busca — sem grupos
-    // por encontro/tipo; "sem conteúdo" é o rótulo staff do "em breve"
+    // a biblioteca mora na aba própria — REALIZA-210: lista única com
+    // busca, depois 250 agrupada por categoria; "sem conteúdo" é o rótulo
+    // staff do "em breve" e hoje não aparece: o catálogo é todo acionável
+    // (arquivo, link externo ou documento nativo doc:)
     await page.goto("/materiais?aba=biblioteca");
     const bib = page.locator('section[aria-labelledby="biblioteca-titulo"]');
     await expect(bib.getByRole("heading", { name: /Todos os materiais/ })).toBeVisible();
-    await expect(bib.getByText("sem conteúdo").first()).toBeVisible();
+    await expect(bib.getByText("sem conteúdo")).toHaveCount(0);
     await expect(page.locator("details")).toHaveCount(0);
     await bib.getByRole("searchbox", { name: "Buscar material" }).fill("guia do mentor");
     await expect(bib.getByText("Guia do Mentor DPP")).toBeVisible();

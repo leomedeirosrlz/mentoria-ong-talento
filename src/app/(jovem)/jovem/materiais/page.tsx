@@ -943,7 +943,14 @@ function TerceirosCard({ consolidado }: { consolidado: boolean }) {
 function MaterialCard({ m }: { m: Material }) {
   const Icone = TIPO_ICONE[m.tipo];
   const urlOk = linkSeguro(m.url);
-  const href = m.path ? `/api/material/${m.id}` : urlOk;
+  // "doc:<slug>" é documento nativo — abre na casa do jovem (a rota do app
+  // expulsa o papel mentorado) e navega na mesma aba, sem ícone de saída
+  const ehDoc = m.path?.startsWith("doc:") ?? false;
+  const href = ehDoc
+    ? `/jovem/materiais/documento/${m.path!.slice(4)}`
+    : m.path
+      ? `/api/material/${m.id}`
+      : urlOk;
   const interno = (
     <>
       <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
@@ -959,7 +966,9 @@ function MaterialCard({ m }: { m: Material }) {
         <span className="sr-only">
           {TIPO_LABEL[m.tipo]}
           {m.path
-            ? " · arquivo"
+            ? ehDoc
+              ? " · documento"
+              : " · arquivo"
             : urlOk && m.tipo !== "link"
               ? " · link externo"
               : ""}
@@ -989,17 +998,31 @@ function MaterialCard({ m }: { m: Material }) {
   );
   // a capa: arquivo → thumb curta (crop do topo da 1ª página, ≤96px —
   // MaterialThumb é o contrato global; o preview grande h-36 é de
-  // leitura, não de estante); só url → faixa de link externo com o
-  // domínio; sem destino ("em breve") não chega aqui como card
-  // clicável — vive no grupo "A caminho" embaixo
-  const capa = m.path ? <MaterialThumb m={m} /> : <PreviewLink m={m} />;
+  // leitura, não de estante); documento nativo → faixa na mesma régua com
+  // o ícone de documento; só url → faixa de link externo com o domínio;
+  // sem destino ("em breve") não chega aqui como card clicável — vive no
+  // grupo "A caminho" embaixo
+  const capa = ehDoc ? (
+    <div
+      aria-hidden
+      className="grid h-24 place-items-center bg-muted/60 text-muted-foreground"
+    >
+      <span className="flex flex-col items-center gap-1.5">
+        <FileText size={20} weight="duotone" aria-hidden />
+        <span className="text-[11px] font-medium">documento</span>
+      </span>
+    </div>
+  ) : m.path ? (
+    <MaterialThumb m={m} />
+  ) : (
+    <PreviewLink m={m} />
+  );
   return (
     <div className="relative overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
       {href ? (
         <a
           href={href}
-          target="_blank"
-          rel="noopener noreferrer"
+          {...(ehDoc ? {} : { target: "_blank", rel: "noopener noreferrer" })}
           className="group flex h-full flex-col outline-none transition-colors hover:bg-muted/50 active:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
         >
           {capa}
@@ -1019,7 +1042,7 @@ function MaterialCard({ m }: { m: Material }) {
           link): chip com backdrop pra ler sobre qualquer capa */}
       {href && (
         <div className="absolute right-2 top-2 z-10 rounded-lg bg-background/75 backdrop-blur-sm">
-          <MaterialMenu material={m} />
+          <MaterialMenu material={m} docBase="/jovem/materiais/documento" />
         </div>
       )}
     </div>

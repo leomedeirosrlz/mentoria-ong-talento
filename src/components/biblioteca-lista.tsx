@@ -82,10 +82,16 @@ function Linha({
   indice: number;
 }) {
   const Icone = TIPO_ICONE[m.tipo];
-  // arquivo oficial ganha da url externa; sem os dois o material ainda não
-  // chegou ("em breve" pro leitor, "sem conteúdo" pra coord que publica)
+  // arquivo oficial ganha da url externa; "doc:<slug>" é documento nativo
+  // (página do app); sem os três o material ainda não chegou ("em breve"
+  // pro leitor, "sem conteúdo" pra coord que publica)
   const urlOk = linkSeguro(m.url);
-  const href = m.path ? `/api/material/${m.id}` : urlOk;
+  const ehDoc = m.path?.startsWith("doc:") ?? false;
+  const href = ehDoc
+    ? `/materiais/documento/${m.path!.slice(4)}`
+    : m.path
+      ? `/api/material/${m.id}`
+      : urlOk;
   const meta = [
     TIPO_LABEL[m.tipo],
     m.encontro_num != null ? `Encontro ${m.encontro_num}` : null,
@@ -123,15 +129,14 @@ function Linha({
       {href ? (
         <a
           href={href}
-          target="_blank"
-          rel="noopener noreferrer"
+          {...(ehDoc ? {} : { target: "_blank", rel: "noopener noreferrer" })}
           className={cn(
             cls,
             "rounded-lg transition-colors hover:bg-muted/50 active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
           )}
         >
           {corpo}
-          {!ehCoord && (
+          {!ehCoord && !ehDoc && (
             <ArrowSquareOut size={17} aria-hidden className="shrink-0 text-muted-foreground" />
           )}
         </a>
