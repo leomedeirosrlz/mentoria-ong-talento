@@ -12,6 +12,7 @@ import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "@/lib/demo/mode";
 import { demoDuplas, demoMentorados, demoPessoas } from "@/lib/demo/queries";
 import { PageHeader } from "@/components/page-header";
+import { turmaDaDupla } from "@/lib/turma";
 import { RelatorioBuilder } from "./relatorio-builder";
 import type { DuplaFonte, PessoaFonte } from "@/lib/relatorio";
 
@@ -107,7 +108,7 @@ export default async function RelatoriosPage({
     const [dRes, pRes, mRes, contatos] = await Promise.all([
       supabase
         .from("duplas")
-        .select("id, turma, mentor_id, mentorado_id, supervisor_id, status, iniciada_em, demanda")
+        .select("id, turma, cronograma_id, mentor_id, mentorado_id, supervisor_id, status, iniciada_em, demanda")
         .order("iniciada_em"),
       // user_id alimenta o gate do e-mail editável na grade (conta
       // vinculada → e-mail só muda pelo sync do auth, 0060)
@@ -125,9 +126,13 @@ export default async function RelatoriosPage({
       whatsapp: contatos.get(p.id)?.whatsapp ?? null,
     }));
     mentorados = mRes.data ?? [];
-    turmas = [...new Set(duplas.map((d) => d.turma))].sort((a, b) =>
-      b.localeCompare(a, "pt-BR")
-    );
+    turmas = [
+      ...new Set(
+        duplas
+          .map((d) => turmaDaDupla(d, cronogramas))
+          .filter((t): t is string => !!t)
+      ),
+    ].sort((a, b) => b.localeCompare(a, "pt-BR"));
   }
 
   // turma que só existe na fila (T3 recém-inscrita, sem dupla ainda) também

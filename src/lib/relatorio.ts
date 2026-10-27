@@ -5,8 +5,8 @@ import {
   papelLabel,
   TRILHA_LABEL,
 } from "@/lib/ciclo";
-import { turmaLonga } from "@/lib/turma";
-import type { EncontroStatus, Trilha } from "@/lib/types";
+import { turmaDaDupla, turmaLonga } from "@/lib/turma";
+import type { Cronograma, EncontroStatus, Trilha } from "@/lib/types";
 
 // ---------- config ----------
 
@@ -261,10 +261,19 @@ export function montarLinhas(
   duplas: DuplaFonte[],
   profs: Map<string, PessoaFonte>,
   mentorados: Map<string, PessoaFonte>,
-  opts: { paraApp?: boolean; fila?: InscricaoFila[] } = {}
+  opts: {
+    paraApp?: boolean;
+    fila?: InscricaoFila[];
+    /** cronogramas pra resolver o rótulo vivo da turma (REALIZA-223) —
+     *  sem eles, `turmaDaDupla` cai no selo `d.turma` (= comportamento
+     *  anterior; o link público depende do selo já propagado pela 0127). */
+    cronogramas?: readonly Pick<Cronograma, "id" | "turma">[];
+  } = {}
 ): LinhaRelatorio[] {
-  const { paraApp = false, fila = [] } = opts;
-  const daTurma = duplas.filter((d) => !cfg.turma || d.turma === cfg.turma);
+  const { paraApp = false, fila = [], cronogramas = [] } = opts;
+  const daTurma = duplas.filter(
+    (d) => !cfg.turma || turmaDaDupla(d, cronogramas) === cfg.turma
+  );
 
   if (cfg.granularidade === "duplas") {
     return daTurma

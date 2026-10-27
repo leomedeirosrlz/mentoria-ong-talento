@@ -5,13 +5,18 @@
 // `turma` é TEXTO livre (cronogramas.turma) e snapshot textual
 // (duplas.turma, relatorio_links.turma, turma_inscricoes.turma,
 // profile_papeis.escopo_turma): estas funções só derivam RÓTULO de
-// exibição — nunca reescrevem nem normalizam o valor, que continua sendo
-// a chave de igualdade exata. O padrão novo é "T<N> · <período>"
-// ("T1 · 2026/2027", semeado na 0111); legado e texto livre
-// ("2026/2027", "Turma E2E", "E2E Turma de teste") devolvem o valor cru
-// — dado do usuário não é reescrito à força.
+// exibição — nunca reescrevem nem normalizam o valor. O padrão novo é
+// "T<N> · <período>" ("T1 · 2026/2027", semeado na 0111); legado e texto
+// livre ("2026/2027", "Turma E2E", "E2E Turma de teste") devolvem o
+// valor cru — dado do usuário não é reescrito à força.
 //
-// Domínio puro, sem imports: espelha a disciplina do ciclo.ts.
+// Filtro/recorte NÃO casa label-com-label (REALIZA-223): `duplas.turma`
+// é selo que congela no pareamento; quem compara resolve o rótulo vivo
+// via `turmaDaDupla`.
+//
+// Domínio puro (só import type): espelha a disciplina do ciclo.ts.
+
+import type { Cronograma } from "./types";
 
 /** "T1 · 2026/2027" → { nome: "Turma 1", ano: "2026/2027" } — o rótulo
  *  curto vira o nome forte e o ano perde peso visual (decisão REALIZA-151).
@@ -54,4 +59,24 @@ export function turmaAno(turma: string | null | undefined): string | null {
  *  Turma"), null/vazio → "" — o caller decide o fallback de leitura. */
 export function turmaNumero(turma: string | null | undefined): string {
   return turmaCurta(turma).replace(/^t/i, "");
+}
+
+/** O label VIVO da turma da dupla (REALIZA-223). `duplas.turma` é o selo
+ *  gravado no pareamento — congela quando a coordenação renomeia
+ *  `cronogramas.turma`, e quem filtra por label cru some com a dupla
+ *  ("turma nova aparece vazia"). Com `cronograma_id` o rótulo vem da
+ *  linha do cronograma; sem cronograma (trilha especialista) ou com
+ *  cronograma fora da lista recebida, resta o selo — a dupla nunca
+ *  perde o dado que tem. */
+export function turmaDaDupla(
+  dupla: { cronograma_id?: string | null; turma?: string | null },
+  cronogramas: readonly Pick<Cronograma, "id" | "turma">[]
+): string | null {
+  if (dupla.cronograma_id) {
+    const turma = cronogramas.find(
+      (c) => c.id === dupla.cronograma_id
+    )?.turma;
+    if (turma != null) return turma;
+  }
+  return dupla.turma ?? null;
 }

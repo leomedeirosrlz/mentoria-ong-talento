@@ -17,7 +17,7 @@ import {
   formatDiaSemanaMes,
 } from "@/lib/ciclo";
 import { saudeDoRecorte } from "@/lib/agenda-coordenacao";
-import { turmaAno, turmaLonga } from "@/lib/turma";
+import { turmaAno, turmaDaDupla, turmaLonga } from "@/lib/turma";
 import type { CicloEvento, Cronograma, Dupla } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { StatusBadge } from "@/components/cronograma-editor";
@@ -99,7 +99,9 @@ export function TurmaHub({
             <TurmaHubCard
               turma={t}
               cronogramas={cronogramas.filter((c) => c.turma === t)}
-              duplas={duplas.filter((d) => d.turma === t)}
+              duplas={duplas.filter(
+                (d) => turmaDaDupla(d, cronogramas) === t
+              )}
               eventos={eventos}
               hoje={hoje}
               ativa={foco === t}
@@ -121,7 +123,8 @@ export function TurmaHubCard({
   ativa = false,
   i = 0,
 }: {
-  /** label cru (`cronogramas.turma`) — a chave de igualdade do recorte. */
+  /** label cru (`cronogramas.turma`) — a turma do recorte. As duplas
+   *  chegam filtradas por `turmaDaDupla` (rótulo vivo), não pelo selo. */
   turma: string;
   /** cronogramas já filtrados pra turma (uma turma pode ter dois). */
   cronogramas: Cronograma[];

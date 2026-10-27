@@ -136,6 +136,7 @@ export function RelatorioBuilder({
   // ~60 linhas — reordenar/montar direto no render é ínfimo. paraApp traz os
   // metadados internos (__alvos/__links) que o resumo público nunca recebe.
   const linhas = montarLinhas(cfg, duplas, profsMap, mentsMap, {
+    cronogramas,
     paraApp: true,
     fila,
   });

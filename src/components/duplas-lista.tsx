@@ -30,12 +30,17 @@ import {
 import { prazoTrilhaEspecialista } from "@/lib/encerramento";
 import { saudeDoRecorte, type RecorteFatia } from "@/lib/agenda-coordenacao";
 import { gravarTurmaFocoClient } from "@/lib/turma-contexto";
-import { turmaLonga } from "@/lib/turma";
+import { turmaDaDupla, turmaLonga } from "@/lib/turma";
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
 import { acaoWhatsAppDupla, encontroPendente } from "@/lib/acao-lembrete";
 import type { Interacao } from "@/lib/interacoes";
 import type { SupervisaoAlvo } from "@/lib/queries-supervisao";
-import type { CicloEvento, Dupla, EspecialistaEvento } from "@/lib/types";
+import type {
+  CicloEvento,
+  Cronograma,
+  Dupla,
+  EspecialistaEvento,
+} from "@/lib/types";
 import { cn, normaliza } from "@/lib/utils";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
@@ -619,6 +624,7 @@ function EstadoVazio({
 
 export function DuplasLista({
   lista,
+  cronogramas = [],
   eventos,
   agora,
   visao,
@@ -632,6 +638,10 @@ export function DuplasLista({
   turmasContexto = [],
 }: {
   lista: Dupla[];
+  /** cronogramas pra resolver o rótulo vivo da turma (REALIZA-223) —
+   *  a page só paga a tabela nas visões com contexto (coord/auxiliar);
+   *  nas demais fica [] e o selo da dupla é o fallback. */
+  cronogramas?: Cronograma[];
   eventos: CicloEvento[];
   /** ISO timestamp vindo do server — hidratação idêntica ao render do servidor. */
   agora: string;
@@ -671,6 +681,7 @@ export function DuplasLista({
     return (
       <VisaoCoordenacao
         lista={lista}
+        cronogramas={cronogramas}
         eventos={eventos}
         hoje={hoje}
         hojeStr={hojeStr}
@@ -687,6 +698,7 @@ export function DuplasLista({
     return (
       <VisaoSupervisor
         lista={lista}
+        cronogramas={cronogramas}
         eventos={eventos}
         hoje={hoje}
         hojeStr={hojeStr}
@@ -778,6 +790,7 @@ export function DuplasLista({
 
 function VisaoCoordenacao({
   lista,
+  cronogramas = [],
   eventos,
   hoje,
   hojeStr,
@@ -790,6 +803,8 @@ function VisaoCoordenacao({
   turmasContexto = [],
 }: {
   lista: Dupla[];
+  /** pra resolver o rótulo vivo da turma nos chips/filtro (REALIZA-223). */
+  cronogramas?: Cronograma[];
   eventos: CicloEvento[];
   hoje: Date;
   hojeStr: string;
@@ -856,7 +871,11 @@ function VisaoCoordenacao({
   };
 
   const turmas = [
-    ...new Set(lista.map((d) => d.turma).filter((t): t is string => !!t)),
+    ...new Set(
+      lista
+        .map((d) => turmaDaDupla(d, cronogramas))
+        .filter((t): t is string => !!t)
+    ),
   ].sort((a, b) => a.localeCompare(b, "pt-BR"));
   const supervisores = [
     ...new Map(
@@ -878,7 +897,7 @@ function VisaoCoordenacao({
   // resumo é a do que está selecionado (sem recorte, é o programa inteiro)
   const recorte = lista.filter(
     (d) =>
-      (!turmaSel || d.turma === turmaSel) &&
+      (!turmaSel || turmaDaDupla(d, cronogramas) === turmaSel) &&
       (supSel === "todas" ||
         (supSel === "nenhum" ? !d.supervisor : d.supervisor?.id === supSel)) &&
       (!mentorSel || d.mentor.id === mentorSel)
@@ -1082,7 +1101,11 @@ function VisaoCoordenacao({
                       turmaSel === t ? "text-background/70" : "text-muted-foreground"
                     )}
                   >
-                    {lista.filter((d) => d.turma === t).length}
+                    {
+                      lista.filter(
+                        (d) => turmaDaDupla(d, cronogramas) === t
+                      ).length
+                    }
                   </span>
                 </button>
               ))}
@@ -1257,6 +1280,7 @@ function VisaoCoordenacao({
 
 function VisaoSupervisor({
   lista,
+  cronogramas = [],
   eventos,
   hoje,
   hojeStr,
@@ -1268,6 +1292,8 @@ function VisaoSupervisor({
   recorteInicial,
 }: {
   lista: Dupla[];
+  /** rótulo vivo da turma no agrupamento (REALIZA-223). */
+  cronogramas?: Cronograma[];
   eventos: CicloEvento[];
   hoje: Date;
   hojeStr: string;
@@ -1314,7 +1340,7 @@ function VisaoSupervisor({
   // misturar estados dentro da turma, a régua de critérios não se repete
   const grupos = new Map<string, Dupla[]>();
   for (const d of exibidas) {
-    const chave = d.turma || "Sem turma";
+    const chave = turmaDaDupla(d, cronogramas) || "Sem turma";
     grupos.set(chave, [...(grupos.get(chave) ?? []), d]);
   }
   const gruposOrdenados = [...grupos.entries()].sort(([a], [b]) =>

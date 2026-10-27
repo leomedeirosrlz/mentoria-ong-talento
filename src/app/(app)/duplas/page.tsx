@@ -20,6 +20,7 @@ import {
   turmasDisponiveis,
 } from "@/lib/turma-contexto";
 import { temPapel } from "@/lib/types";
+import { turmaDaDupla } from "@/lib/turma";
 import { DuplasLista, type VisaoDuplas } from "@/components/duplas-lista";
 import { TurmaFocoSync } from "@/components/turma-contexto-select";
 import { FaixaTurmaFoco } from "@/components/turma-hub";
@@ -111,7 +112,13 @@ export default async function DuplasPage({
   // lista, não só contexto.
   const escopoTurmas =
     visao === "supervisor"
-      ? [...new Set(lista.map((d) => d.turma).filter((t): t is string => !!t))]
+      ? [
+          ...new Set(
+            lista
+              .map((d) => turmaDaDupla(d, cronogramas))
+              .filter((t): t is string => !!t)
+          ),
+        ]
       : undefined;
   const foco =
     visao === "coordenacao" || visao === "supervisor"
@@ -129,7 +136,7 @@ export default async function DuplasPage({
     foco?.turma ??
     (turmaParam &&
     turmaParam !== TURMA_TODAS &&
-    lista.some((d) => d.turma === turmaParam)
+    lista.some((d) => turmaDaDupla(d, cronogramas) === turmaParam)
       ? turmaParam
       : null);
   // labels navegáveis da coordenação — os chips de turma escrevem contexto
@@ -141,7 +148,7 @@ export default async function DuplasPage({
   // (a faixa "Mostrando" no rodapé do header dá a saída óbvia)
   const listaFinal =
     visao === "supervisor" && foco?.turma
-      ? lista.filter((d) => d.turma === foco.turma)
+      ? lista.filter((d) => turmaDaDupla(d, cronogramas) === foco.turma)
       : lista;
 
   return (
@@ -159,6 +166,7 @@ export default async function DuplasPage({
       )}
       <DuplasLista
         lista={listaFinal}
+        cronogramas={cronogramas}
         eventos={eventos}
         agora={new Date().toISOString()}
         visao={visao}

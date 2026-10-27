@@ -25,6 +25,7 @@ import {
   TURMA_FOCO_COOKIE,
   turmasDisponiveis,
 } from "@/lib/turma-contexto";
+import { turmaDaDupla } from "@/lib/turma";
 import { DashboardCoordenacao } from "@/components/dashboard-coordenacao";
 import { TurmaContextoSelect } from "@/components/turma-contexto-select";
 import {
@@ -75,7 +76,7 @@ export default async function HomePage({
     });
     const navegaveis = turmasDisponiveis(cronogramas, { papel: me.role });
     const duplasFoco = foco.turma
-      ? duplas.filter((d) => d.turma === foco.turma)
+      ? duplas.filter((d) => turmaDaDupla(d, cronogramas) === foco.turma)
       : duplas;
     // o hub cobre as navegáveis + a turma em foco quando ela não é
     // navegável (encerrada com contexto ativo segue visível — aceitação 16)
@@ -180,7 +181,11 @@ export default async function HomePage({
     // o seletor nunca nomeia turma alheia (sdr.md). Mono-turma → nada
     // renderiza, como sempre.
     const escopoTurmas = [
-      ...new Set(duplas.map((d) => d.turma).filter((t): t is string => !!t)),
+      ...new Set(
+        duplas
+          .map((d) => turmaDaDupla(d, cronogramas))
+          .filter((t): t is string => !!t)
+      ),
     ];
     const focoSup = resolveTurmaFoco(sp.turma, cookieTurma, cronogramas, {
       papel: me.role,
@@ -191,7 +196,7 @@ export default async function HomePage({
       escopoTurmas,
     });
     const duplasSup = focoSup.turma
-      ? duplas.filter((d) => d.turma === focoSup.turma)
+      ? duplas.filter((d) => turmaDaDupla(d, cronogramas) === focoSup.turma)
       : duplas;
     return (
       <div className="space-y-8">
