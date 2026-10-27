@@ -360,21 +360,25 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     ).toBeVisible();
 
     // o nudge de ~20h atrás dispara o cap D5: a meta da linha diz
-    // "lembrete enviado dd/mm, aguardando a dupla" e o botão vem
-    // desabilitado
+    // "lembrete enviado dd/mm, aguardando a dupla" e, dentro do preview,
+    // o Lembrar-app vem "Lembrada dd/mm" desabilitado com a razão no title
     await expect(
       risco.getByText(/lembrete enviado \d{2}\/\d{2}/)
     ).toBeVisible();
     await expect(risco.getByText(/aguardando a dupla/)).toBeVisible();
-    const bloqueada = risco.getByRole("button", {
-      name: /^Lembrada \d{2}\/\d{2}$/,
-    });
+    await risco
+      .getByRole("button", { name: /ver a mensagem antes de enviar/ })
+      .click();
+    const bloqueada = page
+      .getByRole("dialog")
+      .getByRole("button", { name: /^Lembrada \d{2}\/\d{2}$/ });
     await expect(bloqueada).toBeVisible();
     await expect(bloqueada).toBeDisabled();
     await expect(bloqueada).toHaveAttribute(
       "title",
       /^1 lembrete a cada 48h por dupla\. Destrava \d{2}\/\d{2}$/
     );
+    await page.keyboard.press("Escape");
 
     // d-pend — entra e sai da fila com o relógio do enc. 4: registro vira
     // pendente só 24h depois do encontro (quarta de dia ela some; quarta à
@@ -438,11 +442,17 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     await expect(
       sofia.getByText(/sessão pendente|sessão agendada já passou/)
     ).toBeVisible();
+    // o botão da linha abre o preview — o lembrete sai do "Lembrar pelo
+    // app" lá dentro (o WhatsApp é o outro botão do mesmo dialog)
     const lembrarSofia = sofia.getByRole("button", {
-      name: /^Lembrar( registro)?$/,
+      name: /^Lembrar( registro)? .*ver a mensagem/,
     });
     await expect(lembrarSofia).toBeEnabled();
     await lembrarSofia.click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Lembrar pelo app" })
+      .click();
     await expect(
       page.getByText("Modo demo: nada é enviado de verdade.")
     ).toBeVisible();
@@ -454,7 +464,7 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       await expect(
         fila
           .locator("li", { hasText: nomes })
-          .getByRole("button", { name: /^Lembrar( .*)?$/ })
+          .getByRole("button", { name: /^Lembrar( .*)?ver a mensagem/ })
       ).toBeEnabled();
 
     // d-rito (Ricardo × Gustavo) — a concluída com o rito de encerramento

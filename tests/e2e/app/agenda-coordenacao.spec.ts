@@ -257,15 +257,20 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
       await expect(linha).toBeVisible({ timeout: 15_000 });
       await expect(linha).toContainText(/sem data|atrasad|pendente/i);
 
-      // se o mentor tiver whatsapp válido a UI abre o wa.me junto — fecha o
-      // popup sem deixar a aba pendurada no runner
+      // o botão da linha abre o preview da mensagem; o lembrete sai do
+      // "Lembrar pelo app" lá dentro — nunca abre wa.me (o popup-listener
+      // fica de guarda: se algum dia abrir, a aba não pendura o runner)
       page.on("popup", (popup) => popup.close().catch(() => {}));
 
       const lembrar = linha.getByRole("button", {
-        name: /^Lembrar( .*)?$/,
+        name: /^Lembrar( .*)?ver a mensagem/,
       });
       await expect(lembrar).toBeEnabled();
       await lembrar.click();
+      const preview = page.getByRole("dialog");
+      await preview
+        .getByRole("button", { name: "Lembrar pelo app" })
+        .click();
       await expect(page.getByText("Lembrete enviado.")).toBeVisible({
         timeout: 15_000,
       });
@@ -290,13 +295,17 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
       expect(notifs[0].titulo).toMatch(/^Lembrete: /);
       expect(notifs[0].href).toBe(`/duplas/${IDS.dupla2}`);
 
-      // o cap de 48h chega na UI: refresh → a linha mostra "Lembrada dd/mm"
-      // desabilitado com a razão no title
+      // o cap de 48h chega na UI: refresh → reabrindo o preview da linha o
+      // Lembrar-app vem "Lembrada dd/mm" desabilitado com a razão no title
       await page.reload();
-      const bloqueada = fila
-        .locator("li", {
-          has: page.locator(`a[href="/duplas/${IDS.dupla2}"]`),
-        })
+      const linhaDepois = fila.locator("li", {
+        has: page.locator(`a[href="/duplas/${IDS.dupla2}"]`),
+      });
+      await linhaDepois
+        .getByRole("button", { name: /ver a mensagem antes de enviar/ })
+        .click();
+      const bloqueada = page
+        .getByRole("dialog")
         .getByRole("button", { name: /^Lembrada \d{2}\/\d{2}$/ });
       await expect(bloqueada).toBeVisible({ timeout: 15_000 });
       await expect(bloqueada).toBeDisabled();
@@ -304,6 +313,7 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
         "title",
         /^1 lembrete a cada 48h por dupla\. Destrava \d{2}\/\d{2}$/
       );
+      await page.keyboard.press("Escape");
 
       // e o mesmo cap barra na RPC — segundo envio como coord devolve o
       // intervalo com o carimbo de quando libera

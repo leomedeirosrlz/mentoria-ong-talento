@@ -75,12 +75,19 @@ test.describe("agenda demo do mentor DPP — Sua semana / Do programa / Lembrar 
   test("lembrar o jovem — botão por card com o toast do modo demo", async ({
     page,
   }) => {
-    // um LembreteButton por card — destino "mentorado" e o primeiro nome de
-    // uso no rótulo ("Bia" é o nome social da Ana; "Matheus" o civil)
+    // um DuplaWaAcao por card — destino "mentorado" e o primeiro nome de
+    // uso no rótulo ("Bia" é o nome social da Ana; "Matheus" o civil). O
+    // botão abre o preview; o lembrete sai do "Lembrar pelo app" lá dentro
     const cardBia = page.locator("article").filter({ hasText: "Bia" });
-    const lembrarBia = cardBia.getByRole("button", { name: "Lembrar Bia" });
+    const lembrarBia = cardBia.getByRole("button", {
+      name: /^Lembrar Bia.*ver a mensagem/,
+    });
     await expect(lembrarBia).toBeEnabled();
     await lembrarBia.click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Lembrar pelo app" })
+      .click();
     await expect(
       page.getByText("Modo demo: nada é enviado de verdade.")
     ).toBeVisible();
@@ -89,7 +96,9 @@ test.describe("agenda demo do mentor DPP — Sua semana / Do programa / Lembrar 
       .locator("article")
       .filter({ hasText: "Matheus Gonçalves" });
     await expect(
-      cardMatheus.getByRole("button", { name: "Lembrar Matheus" })
+      cardMatheus.getByRole("button", {
+        name: /^Lembrar Matheus.*ver a mensagem/,
+      })
     ).toBeEnabled();
   });
 

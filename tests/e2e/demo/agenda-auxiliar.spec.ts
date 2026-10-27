@@ -273,8 +273,13 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
       await expect(
         aAgendar.getByText(/Caio com Carlos Menezes · Turma 1/)
       ).toBeVisible();
+      // o botão abre o preview — o lembrete sai do "Lembrar pelo app"
       await aAgendar
-        .getByRole("button", { name: "Lembrar", exact: true })
+        .getByRole("button", { name: /^Lembrar .*ver a mensagem/ })
+        .click();
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Lembrar pelo app" })
         .click();
       await expect(
         page.getByText("Modo demo: nada é enviado de verdade.")

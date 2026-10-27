@@ -40,7 +40,7 @@ import { avatarPublicUrl } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/avatar";
 import { AuxCardAcoes } from "@/components/aux-card-acoes";
-import { LembreteButton } from "@/components/lembrete-button";
+import { DuplaWaAcao } from "@/components/dupla-wa-acao";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { SemanaDoPrograma } from "@/components/semana-do-programa";
 import { SaudePrograma } from "@/components/saude-programa";
@@ -424,15 +424,17 @@ function CardDuplaAux({
         {/* primária visível (REALIZA-186): Lembrar — mostra o cap de 48h
             inline. Supervisão + ficha vão pro ⋯ quando as 3 existem */}
         {lembrete && (
-          <LembreteButton
+          <DuplaWaAcao
             duplaId={d.id}
-            destino="mentor"
-            rotulo="Lembrar"
+            destNome={d.mentor?.nome ?? "mentor"}
             telefone={d.mentor?.whatsapp ?? null}
-            titulo={lembrete.titulo}
-            corpo={lembrete.corpo}
-            href={`/duplas/${d.id}`}
-            bloqueadoAte={lembreteBloqueadoAte(nudge, agora)}
+            mensagem={lembrete.corpo}
+            nudge={{
+              destino: "mentor",
+              titulo: lembrete.titulo,
+              href: `/duplas/${d.id}`,
+              bloqueadoAte: lembreteBloqueadoAte(nudge, agora),
+            }}
           />
         )}
         <AuxCardAcoes
@@ -634,15 +636,17 @@ function LinhaConsolidada({
                   </Link>
                 )}
                 {lembrete && item.duplaId && (
-                  <LembreteButton
+                  <DuplaWaAcao
                     duplaId={item.duplaId}
-                    destino="mentor"
-                    rotulo="Lembrar"
+                    destNome={dupla?.mentor?.nome ?? "mentor"}
                     telefone={dupla?.mentor?.whatsapp ?? null}
-                    titulo={lembrete.titulo}
-                    corpo={lembrete.corpo}
-                    href={item.href ?? `/duplas/${item.duplaId}`}
-                    bloqueadoAte={lembreteBloqueadoAte(nudge, agora)}
+                    mensagem={lembrete.corpo}
+                    nudge={{
+                      destino: "mentor",
+                      titulo: lembrete.titulo,
+                      href: item.href ?? `/duplas/${item.duplaId}`,
+                      bloqueadoAte: lembreteBloqueadoAte(nudge, agora),
+                    }}
                   />
                 )}
               </div>
