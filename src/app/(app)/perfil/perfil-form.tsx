@@ -985,6 +985,14 @@ export function PerfilForm({
   // meus_dados_pessoais (0048) por cima do getMe. Conta simples: vazio/null
   // = pendente; e-mail não entra (credencial, sempre presente).
   const tem = (v: string | null | undefined) => Boolean(v?.trim());
+  // pareamento só existe pra quem vai ser pareado: mentor tem par (ficha ou
+  // papel, híbrido incluso) — coordenação e supervisão não têm, então a
+  // preferência de gênero do par some do cadastro delas (REALIZA-231). O
+  // dado já gravado não é apagado: o save de /perfil é parcial.
+  const ehMentor =
+    Boolean(mentorProfile) ||
+    temPapel(me, "mentor_dpp") ||
+    temPapel(me, "mentor_especialista");
   const anosNasc = idade(me.data_nascimento);
   // `valor` é a leitura do campo no <dl> do preview; `node` é o input que o
   // Dialog da seção renderiza — a mesma ordem nos dois lugares
@@ -1095,7 +1103,7 @@ export function PerfilForm({
       },
       node: <CampoConsentimento carimbadoEm={me.consent_lgpd_em} />,
     },
-  ];
+  ].filter((c) => ehMentor || c.key !== "pref_genero_par");
   const cadPendentes = camposCadastro.filter((c) => !c.ok);
   // o termo de voluntariado entra na conta de pendências da gaveta mesmo
   // não sendo campo — cadastro completo = dados + assinatura

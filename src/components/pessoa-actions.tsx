@@ -222,7 +222,7 @@ export function PessoaActions({
       ),
     },
     {
-      titulo: "Motivação e pareamento",
+      titulo: ehMentor ? "Motivação e pareamento" : "Motivação",
       conteudo: (
         <>
           <div className="space-y-2">
@@ -233,7 +233,12 @@ export function PessoaActions({
               placeholder="O que traz a pessoa ao programa"
             />
           </div>
-          <CampoPrefGenero defaultValue={pessoa.pref_genero_par ?? ""} />
+          {/* quem não é mentor não tem par — a preferência some da ficha
+              (REALIZA-231); o save de updatePessoa é parcial, então o valor
+              já gravado sobrevive a uma edição sem esse campo */}
+          {ehMentor && (
+            <CampoPrefGenero defaultValue={pessoa.pref_genero_par ?? ""} />
+          )}
         </>
       ),
     },
