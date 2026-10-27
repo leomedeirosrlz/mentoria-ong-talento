@@ -88,7 +88,8 @@ insert into public.materiais (titulo, descricao, tipo, url, audiencia, encontro_
   ('Cronograma do programa — Turma 1', null, 'conteudo', null, 'dpp', null, 26, 'materiais/84c8a989-48f0-4497-8b28-58754a2ca02e-cronograma-turma-1.pdf'),
   ('Cronograma do programa — Turma 2', null, 'conteudo', null, 'dpp', null, 27, 'materiais/6eabec09-3d3f-42ba-9407-8077e9373b6c-cronograma-turma-2.pdf'),
   ('Plataforma de mentoria', 'Onde os encontros oficiais são agendados e avaliados.', 'link', 'https://mentoria.realiza.vc', 'todos', null, 28, null),
-  ('Formação EaD gratuita', 'Trilha opcional com certificado para mentores.', 'link', 'https://ead.realiza.vc', 'todos', null, 29, null);
+  ('Formação EaD gratuita', 'Trilha opcional com certificado para mentores.', 'link', 'https://ead.realiza.vc', 'todos', null, 29, null)
+on conflict (path) do nothing;
 
 -- sem dados de pessoas/duplas: cadastro real acontece pela plataforma
 -- (pessoas -> magic link; duplas pela coordenação)
