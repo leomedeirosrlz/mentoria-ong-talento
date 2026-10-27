@@ -197,7 +197,7 @@ export function EncerramentoDupla({
               somenteConclusao={dupla.status === "concluida"}
             />
           )}
-          {(souMentor || (!souMentor && !souCoord)) && (
+          {!souCoord && (
             <p className="text-xs text-muted-foreground">
               A coordenação registra o fechamento no fim da jornada. O que já
               chegou aparece marcado acima.
