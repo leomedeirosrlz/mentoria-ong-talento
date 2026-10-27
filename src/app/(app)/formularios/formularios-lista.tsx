@@ -74,6 +74,9 @@ export function FormulariosLista({
           {CHIPS.map((c) => {
             const n = formularios.filter(c.bate).length;
             const ativo = filtro === c.id;
+            // chip com 0 resultado não filtra nada — esconde (o ativo
+            // fica pra não prender a pessoa num filtro sem saída)
+            if (c.id !== "todos" && n === 0 && !ativo) return null;
             return (
               <button
                 key={c.id}
@@ -135,7 +138,9 @@ export function FormulariosLista({
           </Button>
         </div>
       ) : (
-        <ul className="space-y-3">
+        // re-key por filtro/ordem — a troca re-roda o animate-enter das
+        // linhas em vez de um repaint seco (convenção)
+        <ul key={`${filtro}|${ordem}`} className="space-y-3">
           {exibidos.map((f, i) => (
             <li
               key={f.id}

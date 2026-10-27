@@ -127,6 +127,9 @@ export function FilaAcompanhar({ linhas }: { linhas: LinhaFila[] }) {
       >
         {FILTROS.map((f) => {
           const n = itens.filter(MATCH_FILTRO[f.id]).length;
+          // chip com 0 resultado não filtra nada — esconde (o ativo fica
+          // pra não prender a pessoa num filtro sem saída)
+          if (f.id !== "todas" && n === 0 && filtro !== f.id) return null;
           return (
             <button
               key={f.id}

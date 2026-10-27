@@ -165,6 +165,17 @@ export default async function RegistrosPage({
   // situação das duplas: o mesmo resumo de /duplas, /agenda e da home, no
   // recorte de turma do painel (a URL é a fonte do recorte)
   const saude = saudeDoRecorte(todasDuplas, eventos, new Date(), filtros.turma ?? null);
+  // pílula de encontro sem registro no escopo não filtra nada — o modal
+  // só oferece os nºs que existem de fato (regra de silêncio da 240)
+  const encontrosComRegistro = [
+    ...new Set(
+      todasDuplas.flatMap((d) =>
+        (d.encontros ?? [])
+          .filter((e) => e.registro != null && e.numero != null)
+          .map((e) => e.numero!)
+      )
+    ),
+  ].sort((a, b) => a - b);
 
   // ?r= de um registro fora da página carregada: sobe as páginas (cumulativas)
   // até achá-lo, para o link de um registro antigo abrir o registro certo
@@ -390,6 +401,7 @@ export default async function RegistrosPage({
         duplas={duplas}
         turmas={turmasPainel}
         maxEncontro={maxEncontro}
+        encontrosComRegistro={encontrosComRegistro}
         ordem={ordem}
         grupo={grupo}
       />
