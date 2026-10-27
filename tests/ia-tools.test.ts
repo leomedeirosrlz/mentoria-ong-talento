@@ -102,7 +102,7 @@ const dadosDe = (r: Awaited<ReturnType<typeof executarTool>>) => {
 };
 
 describe("registry", () => {
-  it("declara as 8 tools da fase 1 com descrição pt-BR e papéis", () => {
+  it("declara as 9 tools com descrição pt-BR e papéis", () => {
     expect(IA_TOOL_NOMES.sort()).toEqual(
       [
         "agenda_do_periodo",
@@ -110,6 +110,7 @@ describe("registry", () => {
         "capacidade_mentores",
         "duplas_do_usuario",
         "ficha_dupla",
+        "guia_consulta",
         "instrumentos_da_dupla",
         "registros_da_dupla",
         "resumo_semana",
@@ -663,5 +664,51 @@ describe("executarTool — auditoria", () => {
     expect(r.ok).toBe(true);
     expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();
+  });
+
+  it("guia_consulta devolve trechos citáveis sem o score", async () => {
+    const { supabase } = supaFake({
+      rpcData: {
+        match_ia_chunks: [
+          {
+            guia: "guia-mentor-dpp",
+            secao: "2º encontro",
+            pagina: 12,
+            trecho: "Apresente os resultados consolidados…",
+            score: 0.42,
+          },
+        ],
+      },
+    });
+    const r = await executarTool(
+      "guia_consulta",
+      { pergunta: "como conduzir o segundo encontro?" },
+      supabase,
+      "chat"
+    );
+    expect(dadosDe(r)).toEqual({
+      fontes: [
+        {
+          guia: "guia-mentor-dpp",
+          secao: "2º encontro",
+          pagina: 12,
+          trecho: "Apresente os resultados consolidados…",
+        },
+      ],
+    });
+  });
+
+  it("guia_consulta é pra todo papel — até o jovem pergunta de guia", async () => {
+    const { supabase } = supaFake({
+      papel: "mentorado",
+      rpcData: { match_ia_chunks: [] },
+    });
+    const r = await executarTool(
+      "guia_consulta",
+      { pergunta: "o que é a Roda da Vida?" },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(true);
   });
 });

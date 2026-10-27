@@ -518,3 +518,32 @@ export async function getInstrumentosDaDuplaIa(
   if (error) throw error;
   return (data ?? []) as unknown as InstrumentoDupla[];
 }
+
+// ---------- RAG dos guias (match_ia_chunks, 0136) ----------
+
+/** Um trecho citável dos guias oficiais — guia/secao/pagina são a referência
+ *  que o modelo cita na resposta ("Guia do Mentor DPP, cap. 10"). */
+export type FonteGuia = {
+  guia: string;
+  secao: string | null;
+  pagina: number | null;
+  trecho: string;
+  score: number;
+};
+
+/** Busca FTS portuguese no corpus dos guias (docs/rag/*.md ingeridos em
+ *  ia_chunks). A RPC é definer e o conteúdo é institucional (sem PII), mas
+ *  o client autenticado do caller segue sendo o transporte — mesmo padrão
+ *  das outras queries. */
+export async function matchGuiaIa(
+  supabase: SupabaseClient,
+  pergunta: string,
+  limite = 4
+): Promise<FonteGuia[]> {
+  const { data, error } = await supabase.rpc("match_ia_chunks", {
+    p_query: pergunta,
+    p_limit: limite,
+  });
+  if (error) throw error;
+  return (data ?? []) as unknown as FonteGuia[];
+}

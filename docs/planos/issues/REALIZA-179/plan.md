@@ -55,7 +55,8 @@ export async function POST(req: Request) {
 - `executarTool` recebe o client da sessão — **RLS faz o escopo**
   (mentor pergunta "minha dupla" e a query só vê a dupla dele).
 - Resposta JSON única (não-streaming v1); streaming fica como melhoria
-  documentada no sdd.
+  documentada no sdd. *(Implementado depois na REALIZA-244: SSE
+  `status/token/done/error` + fallback JSON por rodada.)*
 - Não grava transcript — só os `ia_eventos` por tool call (já dentro de
   `executarTool`).
 

@@ -15,6 +15,7 @@
     "auxiliares:sync": "node scripts/reatribuir-auxiliares.mjs",
     "audit:identidade": "node scripts/auditoria-identidade-mentorado.mjs",
     "seed:e2e": "node scripts/seed-e2e-staging.mjs",
+    "ingerir:guias": "node scripts/ingerir-guias.mjs",
     "seed:demo": "node scripts/seed-demo-staging.mjs"
   },
   "dependencies": {

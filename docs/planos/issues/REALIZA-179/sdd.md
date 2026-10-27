@@ -35,6 +35,9 @@ supabase/migrations/
   na v1** — trade-off registrado: SSE passthrough com tool-loop exige
   re-montar tool calls no meio do stream; ganho de UX não paga a
   complexidade agora. Bolha "pensando" cobre a espera (~3–8s típico).
+  *(Superseded pela REALIZA-244: o stream entrou — tool_calls são
+  remontadas por índice no provider e a rota emite SSE `status/token/
+  done/error`; o `chamarModelo` JSON fica como fallback por rodada.)*
 - `z.toJSONSchema(tool.args)` gera `parameters` (zod 4 nativo — sem dep).
 - Erros mapeados: timeout/5xx → `{error:"Assistente indisponível agora —
   tente de novo em instantes."}`; 401/403 (key) → mesmo texto pro usuário
