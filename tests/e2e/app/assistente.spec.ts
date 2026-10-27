@@ -5,13 +5,14 @@ import {
   test,
 } from "../helpers";
 
-// REALIZA-179 fase 1 (chat interno): a página /assistente entra no shell de
-// todos os papéis staff. Sem IA_API_* no ambiente de e2e a feature se
-// apresenta honesta: header + card de indisponível, composer escondido —
-// é o comportamento de rollback documentado no plan.
+// REALIZA-243/244 — o assistente saiu da nav e virou bolha flutuante
+// (FAB bottom-right → drop-up). A rota /assistente virou redirect pra /.
+// Sem IA_API_* no ambiente de e2e a feature se apresenta honesta: card de
+// indisponível no painel, composer escondido — comportamento de rollback.
 //
 // A API coberta por sessão: POST sem login não chega na rota — o proxy
-// desvia pra /login (a rota não entra na lista pública; a auth é o cookie).
+// desvia pra /login. As respostas de gate (503/429/400) seguem JSON —
+// o stream SSE só abre depois que tudo passa.
 
 const COORD_EMAIL = process.env.E2E_COORD_EMAIL ?? "e2e-coord@realiza.test";
 const COORD_SENHA = process.env.E2E_COORD_PASSWORD ?? "";
@@ -19,34 +20,50 @@ const COORD_SENHA = process.env.E2E_COORD_PASSWORD ?? "";
 test.describe("assistente", () => {
   test.skip(!appEnvOk(), "spec app — precisa das envs E2E_*");
 
-  test("nav mostra Assistente pra staff e a página abre honesta", async ({
+  test("staff vê a bolha, abre o painel e fecha com Escape", async ({
     page,
   }) => {
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
+
+    // fora do nav — nenhum link "Assistente" na sidebar
     await expect(
-      page.getByRole("link", { name: "Assistente" }).first()
-    ).toBeVisible();
-    await page.goto("/assistente");
+      page.getByRole("link", { name: "Assistente" })
+    ).not.toBeVisible();
+
+    const fab = page.getByRole("button", { name: "Abrir assistente" });
+    await expect(fab).toBeVisible();
+    await expect(fab).toHaveAttribute("aria-expanded", "false");
+    await fab.click();
+    await expect(fab).toHaveAttribute("aria-expanded", "true");
+
+    // painel: header + saudação + card de indisponível (provider fora do
+    // env de e2e — feature flag honesta, sem composer morto)
+    const painel = page.locator("#painel-assistente");
+    await expect(painel).toBeVisible();
+    await expect(painel.getByText(/Sou o assistente do Realiza/)).toBeVisible();
     await expect(
-      page.getByRole("heading", { name: "Assistente" })
-    ).toBeVisible();
-    await expect(page.getByText(/Sou o assistente do Realiza/)).toBeVisible();
-    // provider fora do ambiente de e2e → card de indisponível no lugar do
-    // composer (feature flag honesta — nada de composer morto)
-    await expect(
-      page.getByText(/assistente está indisponível/i)
+      painel.getByText(/assistente está indisponível/i)
     ).toBeVisible();
     await expect(
       page.getByRole("textbox", { name: "Mensagem pro assistente" })
     ).not.toBeVisible();
+
+    await page.keyboard.press("Escape");
+    await expect(painel).not.toBeVisible();
+    await expect(fab).toHaveAttribute("aria-expanded", "false");
+  });
+
+  test("/assistente redireciona pro início", async ({ page }) => {
+    await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
+    await page.goto("/assistente");
+    await expect(page).toHaveURL(/\/$/);
   });
 
   test("POST /api/ia/chat sem sessão é desviado pro login", async ({
     request,
   }) => {
-    // request fixture = contexto novo, sem cookies — mede o comportamento
-    // de quem bate na API de fora. O proxy responde 307 → /login (a auth da
-    // rota é a sessão; sem ela nem a rota roda)
+    // request fixture = contexto novo, sem cookies — o proxy responde
+    // 307 → /login (a auth da rota é a sessão; sem ela nem a rota roda)
     const res = await request.post("/api/ia/chat", {
       data: { messages: [{ role: "user", content: "oi" }] },
       maxRedirects: 0,

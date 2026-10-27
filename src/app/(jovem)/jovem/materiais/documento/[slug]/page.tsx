@@ -3,12 +3,12 @@ import { materialDocumento } from "@/lib/materiais-documentos";
 import { MaterialDocumento } from "@/components/material-documento";
 
 // Documento nativo na casa do jovem — o material "doc:<slug>" da audiência
-// "todos" (o checklist de competências é dele também) abre aqui; a rota de
-// /materiais vive no layout (app), que redireciona o papel mentorado.
+// "todos" abre aqui; a rota de /materiais vive no layout (app), que
+// redireciona o papel mentorado.
 
 export function generateStaticParams() {
   return [
-    { slug: "checklist-competencias" },
+    { slug: "feedback-construtivo" },
     { slug: "mensagem-preparacao" },
     { slug: "mensagem-indicadas" },
     { slug: "mensagem-encaminhamento" },

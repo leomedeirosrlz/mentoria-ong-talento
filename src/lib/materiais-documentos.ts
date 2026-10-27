@@ -21,53 +21,44 @@ export type MaterialDocumento = {
   blocos: DocBloco[];
 };
 
-const COMPETENCIAS: string[] = [
-  "Escutar sem interromper e sem antecipar conclusões",
-  "Fazer perguntas abertas em vez de dar respostas prontas",
-  "Sustentar o silêncio quando o outro está pensando",
-  "Dar feedback focado no comportamento, não na pessoa",
-  "Reconhecer e nomear progressos concretos",
-  "Admitir quando não sei algo",
-  "Manter postura não julgadora diante de escolhas diferentes das minhas",
-  "Cumprir combinados e avisar com antecedência quando preciso remarcar",
-  "Separar o meu projeto de vida do projeto do(a) jovem",
-  "Perceber quando uma questão extrapola o meu papel e acionar apoio",
-];
-
 export const MATERIAIS_DOCUMENTOS: Record<string, MaterialDocumento> = {
-  "checklist-competencias": {
-    slug: "checklist-competencias",
-    titulo: "Checklist de competências do mentor",
-    kicker: "TEMPLATE · CHECKLIST",
-    rotulo: "antes de começar · 16º encontro",
+  // instrumento citado pelo guia, extraído dele verbatim (a versão em PDF
+  // fica com a coordenação — enquanto isso o doc nativo atende)
+  "feedback-construtivo": {
+    slug: "feedback-construtivo",
+    titulo: "Feedback Construtivo",
+    kicker: "INSTRUMENTO",
+    rotulo: "uso contínuo · encontros 5–8",
     objetivo:
-      "Preencha antes de iniciar o ciclo e novamente ao final, no 16º encontro.",
+      "Como dar um retorno que desenvolve: o modelo de fala do guia e os cuidados para feedback sobre comportamento negativo.",
     blocos: [
       {
+        kind: "par",
+        html: "O feedback construtivo melhora a autoconsciência, contribui para o aumento da autoconfiança, estimula a aprendizagem, eleva a motivação e incrementa o desempenho. Mesmo quando for necessário apontar aspectos negativos, o feedback deve ser construtivo. <b>Não precisa ser agendado:</b> pode surgir espontaneamente, desde que feito com responsabilidade e respeito.",
+      },
+      {
         kind: "nota",
-        html: "<b>Como funciona:</b> marque como prioritário aquilo que você quer desenvolver e exercite esses pontos no dia a dia — com amigos, família e no trabalho — antes de aplicá-los na mentoria.",
-      },
-      {
-        kind: "tabela",
-        cabecalho: ["Competência", "Já faço bem", "Preciso desenvolver"],
-        linhas: COMPETENCIAS.map((c) => [c, "", ""]),
+        html: "<b>Modelo sugerido:</b> “Olha, quando acontece determinada situação, eu me sinto <i>(descreva como você se sente)</i>, porque <i>(explique o motivo)</i>. Eu gostaria que você considerasse <i>(apresente uma sugestão ou alternativa)</i>.” Em seguida, pergunte: “O que você pensa sobre o que acabei de dizer?”",
       },
       {
         kind: "par",
-        html: "<b>Ao encerrar o ciclo — autoavaliação.</b> Refaça a lista acima e reserve alguns minutos para responder:",
+        html: "<b>Feedback sobre comportamento negativo — relembrando:</b>",
       },
-      { kind: "pergunta", texto: "O que eu fiz nesta mentoria que funcionou bem e quero repetir?" },
-      { kind: "pergunta", texto: "Em que momentos eu falei mais do que escutei?" },
       {
-        kind: "pergunta",
-        texto:
-          "Que competência do checklist evoluiu ao longo do ciclo? Qual ainda preciso desenvolver?",
+        kind: "lista",
+        itens: [
+          "Aja no mesmo clima de acolhimento de todo o processo: atitude não julgadora, confiança e respeito.",
+          "Faça relatos baseados no que você realmente viu, percebeu ou sabe com segurança.",
+          "Não rotule negativamente o(a) mentorado(a).",
+          "Foque no comportamento, no fato ou no resultado, não na pessoa. Em vez de “Você não conseguiu concluir o trabalho”, diga “Percebi que o trabalho ainda não foi concluído”.",
+          "Cuidado com palavras absolutas: tudo, nada, sempre, nunca.",
+          "Pergunte o que ele(a) entendeu e abra espaço para discussão: “Você poderia resumir o que entendeu?”, “O que você acha sobre isso?”.",
+          "Demonstre atenção à reação emocional: “Como você está se sentindo?”.",
+        ],
       },
-      { kind: "pergunta", texto: "O que aprendi com este(a) jovem?" },
-      { kind: "pergunta", texto: "O que eu faria diferente em um próximo ciclo?" },
       {
         kind: "par",
-        html: "Registre também na <b>Avaliação Geral — 360º</b> a sua disponibilidade para o próximo ciclo e quantos jovens você pode acompanhar.",
+        html: "Todo feedback deve resultar em uma <b>ação relevante</b> para o desenvolvimento do(a) jovem. Antes de encerrar, converse sobre isso: “Como a nossa conversa contribuiu para o que você precisa alcançar?”, “O que você vai fazer agora?”.",
       },
     ],
   },
