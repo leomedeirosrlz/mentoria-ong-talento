@@ -38,8 +38,8 @@ export function EncerramentoDupla({
   const decidido = !!encerramento?.tipo;
   const aberta = dupla.status === "ativa" || dupla.status === "pausada";
   // fechamento automático (0102): o último encontro conclui a dupla e a row
-  // nasce pendente — o rito continua aberto aqui (autoavaliação do mentor,
-  // 360 tardio, checklist da coordenação) até a decisão
+  // nasce pendente — o rito continua aberto aqui (360 tardio, checklist da
+  // coordenação) até a decisão
   const ritoPendente = !aberta && encerramento != null && !decidido;
   const operavel = aberta || ritoPendente;
   // o rito é do fim da jornada — abre quando ela amadureceu (mesma janela

@@ -18,8 +18,8 @@ import { entrarNaDemo, expect, test } from "../helpers";
 //     (warnrow deep-linkável), encontro 3 em limbo e o pedido de especialista
 //     aberto no mural (stepper Pedido → Mural → Aceite → Trilha)
 //   · Gustavo Batista · 2025/2026 (d-rito) — a concluída do Ricardo com o
-//     rito de encerramento aberto: o card sinaliza a peça que falta (a
-//     autoavaliação dele) e aponta pra ficha (REALIZA-172)
+//     rito de encerramento aberto: o card sinaliza que a decisão é da
+//     coordenação e aponta pra ficha (REALIZA-172)
 // Público, sem writes: vale em qualquer deploy, produção inclusive.
 
 // a dupla D.t2c (0x060d) — id estável do dataset demo
@@ -225,8 +225,8 @@ test.describe("agenda demo do mentor DPP — Minha agenda / Por mentorado / Cale
     );
 
     // d-rito (Gustavo) — a concluída do Ricardo com o rito de encerramento
-    // aberto (REALIZA-172): a pendência sinaliza a peça que falta — a
-    // autoavaliação dele — e o CTA abre a ficha, onde o checklist vive
+    // aberto (REALIZA-172): a pendência sinaliza que a decisão é da
+    // coordenação e o CTA abre a ficha, onde o checklist vive
     const cardGustavo = page
       .locator("article")
       .filter({ hasText: "Gustavo Batista" });
@@ -245,7 +245,7 @@ test.describe("agenda demo do mentor DPP — Minha agenda / Por mentorado / Cale
       pendRito.getByText("Rito de encerramento pendente")
     ).toBeVisible();
     await expect(
-      pendRito.getByText(/falta sua autoavaliação/)
+      pendRito.getByText(/A coordenação conclui o rito na ficha/)
     ).toBeVisible();
     await expect(
       pendRito.getByRole("link", { name: "Abrir ficha" })
