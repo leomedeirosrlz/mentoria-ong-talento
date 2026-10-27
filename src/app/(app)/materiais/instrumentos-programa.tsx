@@ -28,9 +28,10 @@ import type { CicloEvento } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 // Aba "Instrumentos" de /materiais: a régua oficial da jornada DPP — os 7
-// instrumentos da régua + a avaliação por terceiros (0103), que não é
-// formulário `sistema` mas é instrumento do programa (o "quem disse o quê"
-// nunca aparece: o consolidado anonimizado mora na ficha). Pra staff cada
+// instrumentos da régua. A avaliação por terceiros ficou fora da plataforma
+// (decisão do Leo, out/2026: dinâmica pré-encontro 1 com dados confidenciais)
+// — o consolidado segue chegando por fora e morando na ficha da dupla.
+// Pra staff cada
 // card resume a coorte em 3 estados (responderam · aguardando · atrasados)
 // e a lista abaixo é a única fila de ação: jovem com instrumento fora do
 // prazo do guia, lembrado direto (o link já está na jornada dele, emitido
@@ -54,13 +55,6 @@ type CardSpec = {
 };
 
 const CARDS: CardSpec[] = [
-  {
-    chave: "avaliacao_terceiros",
-    titulo: "Avaliação por terceiros",
-    descricao:
-      "Amigos e família respondem 2 perguntas; o programa consolida sem mostrar quem disse o quê. O mentor convida as pessoas.",
-    chips: ["Antes do enc. 1", "Devolutiva enc. 2"],
-  },
   {
     chave: "roda_inicial",
     titulo: ESTACOES.roda_inicial.titulo,
@@ -454,8 +448,7 @@ export function InstrumentosPrograma({
                             : "Sem duplas no escopo ainda."}
                         </span>
                       )
-                    ) : estacao === "avaliacao_encontro" ||
-                      card.chave === "avaliacao_terceiros" ? (
+                    ) : estacao === "avaliacao_encontro" ? (
                       <Link
                         href="/duplas"
                         className={buttonVariants({

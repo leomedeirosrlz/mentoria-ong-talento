@@ -127,9 +127,13 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // que a página antiga passava
   const papeisIa =
     me.papeis && me.papeis.length ? me.papeis : me.role ? [me.role] : [];
-  const acessoIa = ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"].some(
-    (r) => papeisIa.includes(r as AppRole)
-  );
+  // a bolha fica escondida enquanto o assistente segue em desenvolvimento —
+  // NEXT_PUBLIC_IA_BOLHA=1 liga no build (e2e e ambientes de dev)
+  const acessoIa =
+    process.env.NEXT_PUBLIC_IA_BOLHA === "1" &&
+    ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"].some(
+      (r) => papeisIa.includes(r as AppRole)
+    );
 
   return (
     <AppShell

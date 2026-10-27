@@ -18,7 +18,6 @@ import {
   LockSimple,
   MapPin,
   PuzzlePiece,
-  UsersThree,
 } from "@phosphor-icons/react/dist/ssr";
 import {
   AvaliarPendenteButton,
@@ -61,7 +60,6 @@ import {
   getJovemEncontros,
   getJovemJornada,
 } from "@/lib/queries-jovem";
-import { getConsolidadoTerceirosJovem } from "@/lib/terceiros/queries";
 import { MaterialMenu } from "@/components/material-actions";
 import { PreviewLink } from "@/components/material-preview-pdf";
 import { MaterialThumb } from "@/components/material-thumb";
@@ -73,7 +71,7 @@ export const metadata: Metadata = { title: "Minha jornada" };
 // WP7 (REALIZA-140) + REALIZA-194 (spec v5c): /jovem/materiais é o hub
 // "Minha jornada" — os 7 instrumentos oficiais da régua do guia viram a
 // estante de cards-produto (capa símbolo + janela + estado honesto, o
-// card inteiro = gesto) com a devolutiva de terceiros entre eles, e a
+// card inteiro = gesto), e a
 // biblioteca de sempre continua embaixo como "Acervo". As datas saem do
 // cronograma da turma DELA (RPC jovem_jornada, 0096) — T1 e T2 veem janelas
 // diferentes pro mesmo encontro. Fallback decidido no plano: RPC fora,
@@ -140,7 +138,7 @@ function diaMesCurto(iso: string | null | undefined): string {
 }
 
 export default async function JovemMateriais() {
-  const [me, jornada, encontros, avaliacoes, duplas, materiais, consolidadoTerc] =
+  const [me, jornada, encontros, avaliacoes, duplas, materiais] =
     await Promise.all([
       getMe(),
       // a RPC fora do ar devolve a página ao formato anterior — nunca quebra
@@ -149,8 +147,6 @@ export default async function JovemMateriais() {
       getJovemAvaliacoes(),
       getJovemDuplas(),
       getMateriais(),
-      // o consolidado de terceiros publicado — cache()ada, a home já chama
-      getConsolidadoTerceirosJovem().catch(() => null),
     ]);
   if (!me) return null; // o layout já barra — convenção das páginas
 
@@ -452,24 +448,14 @@ export default async function JovemMateriais() {
               <strong className="font-semibold text-foreground">
                 Você não vê:
               </strong>{" "}
-              respostas de outros jovens, nem quem disse o quê na avaliação
-              por terceiros: ela chega como consolidado anônimo.
+              respostas de outros jovens.
             </p>
           </div>
         </div>
         <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {/* ordem do guia: as 4 de construção, a devolutiva de terceiros,
-              a recorrente e as duas de fechamento */}
-          {estacoes.slice(0, 4).map((est) => (
-            <InstrumentoCard
-              key={est.chave}
-              est={est}
-              primeiroNome={primeiroNome}
-              {...propsEstacao(est.chave)}
-            />
-          ))}
-          <TerceirosCard consolidado={consolidadoTerc != null} />
-          {estacoes.slice(4).map((est) => (
+          {/* ordem do guia: as 4 de construção, a recorrente e as duas
+              de fechamento */}
+          {estacoes.map((est) => (
             <InstrumentoCard
               key={est.chave}
               est={est}
@@ -489,32 +475,6 @@ export default async function JovemMateriais() {
           </span>
         </p>
       </section>
-
-      {/* Como as pessoas próximas te veem (0103): a síntese anônima que o
-          mentor publica. Saiu da home do jovem e mora aqui, junto da
-          devolutiva de terceiros que a origina */}
-      {consolidadoTerc && (
-        <section
-          aria-labelledby="terceiros-titulo"
-          className="scroll-mt-28 space-y-3 md:scroll-mt-14"
-        >
-          <h2 id="terceiros-titulo" className="flex items-center gap-2 text-base font-semibold">
-            <UsersThree size={18} className="text-muted-foreground" aria-hidden />
-            Como as pessoas próximas te veem
-          </h2>
-          <Card className="animate-enter">
-            <CardContent>
-              <p className="whitespace-pre-wrap text-sm leading-relaxed">
-                {consolidadoTerc.consolidado}
-              </p>
-              <p className="mt-3 border-t border-border/60 pt-2 text-xs text-muted-foreground">
-                Síntese que seu mentor fez das respostas. Quem respondeu fica
-                anônimo. Vale comparar com a sua autoavaliação.
-              </p>
-            </CardContent>
-          </Card>
-        </section>
-      )}
 
       {/* ---------- acervo: a biblioteca, agora progressiva (REALIZA-160 —
           material com encontro_num libera quando a jornada alcança) ------- */}
@@ -849,83 +809,6 @@ function InstrumentoCard(props: EstacaoProps) {
   }
   return (
     <article style={instrumentoVars(est.chave)} className={shell}>
-      {conteudo}
-    </article>
-  );
-}
-
-/** O card de terceiros (0103) — instrumento oficial que não é estação da
- *  régua: a jovem nunca emite link e nunca vê respostas individuais; o
- *  card explica o formato e, com o consolidado publicado, vira o link
- *  pra síntese anonimizada na home. */
-function TerceirosCard({ consolidado }: { consolidado: boolean }) {
-  const conteudo = (
-    <>
-      <span className="relative grid h-24 shrink-0 place-items-center bg-[var(--ict)] text-[var(--ic)]">
-        <InstrumentoIcone instrumento="avaliacao_terceiros" size={44} />
-      </span>
-      <span className="flex flex-1 flex-col gap-1.5 p-3.5">
-        <h3 className="text-sm font-semibold leading-snug tracking-tight">
-          Avaliação por terceiros
-          <span className="block text-xs font-normal text-muted-foreground sm:text-[11px]">
-            devolutiva
-          </span>
-        </h3>
-        <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">
-          Pessoas próximas respondem 2 perguntas: vira um consolidado,
-          sem quem disse o quê.
-        </p>
-        <span className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-2">
-          <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
-            Antes do enc. 1 · devolutiva enc. 2
-          </span>
-          {consolidado ? (
-            <Badge className="bg-[var(--ok)]/15 text-[var(--ok-text)]">
-              <CheckCircle data-icon="inline-start" aria-hidden />
-              Devolutiva no ar
-            </Badge>
-          ) : (
-            <Badge variant="outline" className="text-muted-foreground">
-              em coleta
-            </Badge>
-          )}
-          {consolidado && (
-            <CaretRight
-              size={16}
-              aria-hidden
-              className="ml-auto shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
-            />
-          )}
-        </span>
-        <span className="text-xs leading-snug text-muted-foreground sm:text-[11px]">
-          {consolidado
-            ? "Síntese que seu mentor publicou. Quem respondeu fica anônimo."
-            : "Seu mentor publica a síntese no encontro 2."}
-        </span>
-      </span>
-    </>
-  );
-  const shell =
-    "group relative flex flex-col overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]";
-  if (consolidado) {
-    return (
-      <Link
-        href="#terceiros-titulo"
-        style={instrumentoVars("avaliacao_terceiros")}
-        className={cn(
-          shell,
-          "outline-none transition-shadow hover:ring-2 hover:ring-[var(--ic)]/50 focus-visible:ring-2 focus-visible:ring-ring"
-        )}
-      >
-        {conteudo}
-      </Link>
-    );
-  }
-  return (
-    <article
-      style={instrumentoVars("avaliacao_terceiros")}
-      className={shell}
-    >
       {conteudo}
     </article>
   );
