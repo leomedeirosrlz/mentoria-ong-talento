@@ -177,7 +177,7 @@ export const getFormulario = cache(
       .from("formulario_links")
       .select(
         `*,
-        resposta:formulario_respostas(id, link_id, respostas, respondido_em, promovido_profile_id),
+        resposta:formulario_respostas(id, link_id, respostas, respondido_em, promovido_profile_id, promovido_mentorado_id),
         dest_profile:profiles!formulario_links_dest_profile_id_fkey(id, nome, role, avatar_path),
         dest_mentorado:mentorados!formulario_links_dest_mentorado_id_fkey(id, nome, whatsapp, avatar_path),
         dupla:duplas!formulario_links_dupla_id_fkey(

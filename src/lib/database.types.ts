@@ -2193,6 +2193,7 @@ export type Database = {
         Row: {
           id: string
           link_id: string
+          promovido_mentorado_id: string | null
           promovido_profile_id: string | null
           respondido_em: string
           respostas: Json
@@ -2200,6 +2201,7 @@ export type Database = {
         Insert: {
           id?: string
           link_id: string
+          promovido_mentorado_id?: string | null
           promovido_profile_id?: string | null
           respondido_em?: string
           respostas: Json
@@ -2207,6 +2209,7 @@ export type Database = {
         Update: {
           id?: string
           link_id?: string
+          promovido_mentorado_id?: string | null
           promovido_profile_id?: string | null
           respondido_em?: string
           respostas?: Json
@@ -2217,6 +2220,41 @@ export type Database = {
             columns: ["link_id"]
             isOneToOne: false
             referencedRelation: "formulario_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_respostas_promovido_mentorado_id_fkey"
+            columns: ["promovido_mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_perfil"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_respostas_promovido_mentorado_id_fkey"
+            columns: ["promovido_mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_respostas_promovido_mentorado_id_fkey"
+            columns: ["promovido_mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_curriculo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_respostas_promovido_mentorado_id_fkey"
+            columns: ["promovido_mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_respostas_promovido_mentorado_id_fkey"
+            columns: ["promovido_mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_turma"
             referencedColumns: ["id"]
           },
           {

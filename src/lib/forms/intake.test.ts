@@ -155,6 +155,34 @@ describe("prefillDoIntake", () => {
       "Formação Erlich Mentoring"
     );
   });
+
+  // via de mentorado (0129): o form do jovem não tem nome_civil só como
+  // origem nem chama a preferência de "pref_genero_mentorado"
+  it("cai pro nome/nome social quando falta o nome civil", () => {
+    expect(prefillDoIntake({ nome: "Beatriz Nunes" }).nome).toBe(
+      "Beatriz Nunes"
+    );
+    expect(prefillDoIntake({ nome_social: "Bia" }).nome).toBe("Bia");
+    expect(prefillDoIntake({}).nome).toBe("");
+  });
+
+  it("lê a preferência da via de mentorado (mentor homem/mulher)", () => {
+    expect(
+      prefillDoIntake({ pref_genero_mentor: "Mentor mulher" }).pref_genero_par
+    ).toBe("feminino");
+    expect(
+      prefillDoIntake({ pref_genero_mentor: "Mentor homem" }).pref_genero_par
+    ).toBe("masculino");
+    expect(
+      prefillDoIntake({ pref_genero_mentor: "Sem preferência" })
+        .pref_genero_par
+    ).toBe("indiferente");
+    expect(
+      prefillDoIntake({
+        pref_genero_mentor: "Não tenho preferência para o gênero do meu mentor.",
+      }).pref_genero_par
+    ).toBe("indiferente");
+  });
 });
 
 describe("camposArquivo", () => {
