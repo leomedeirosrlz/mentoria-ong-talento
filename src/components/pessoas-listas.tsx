@@ -25,7 +25,7 @@ import {
   comparaNome,
   foraDoPrograma,
   idade,
-  papelLabel,
+  papelLabelComposto,
   SITUACAO_MENTORADO_LABEL,
 } from "@/lib/ciclo";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -965,7 +965,7 @@ function PessoaRow({
         </Link>
         {!souCoord && p.role && (
           <Badge variant="outline" className="ml-auto shrink-0 text-xs font-normal">
-            {papelLabel(p.role)}
+            {papelLabelComposto(p)}
           </Badge>
         )}
         {souCoord && !p.ativo && !emInativos && (
@@ -1001,7 +1001,7 @@ function PessoaRow({
         {souCoord && (
           <div className="flex w-full items-center justify-between gap-2 sm:ml-auto sm:w-auto">
             <div className="w-full sm:w-40">
-              <RoleSelect profileId={p.id} role={p.role} nome={p.nome} />
+              <RoleSelect profileId={p.id} role={p.role} papeis={p.papeis} nome={p.nome} />
             </div>
             <PessoaActions
               pessoa={p}
