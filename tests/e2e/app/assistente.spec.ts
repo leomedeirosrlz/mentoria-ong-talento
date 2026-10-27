@@ -30,7 +30,7 @@ test.describe("assistente", () => {
       page.getByRole("link", { name: "Assistente" })
     ).not.toBeVisible();
 
-    const fab = page.getByRole("button", { name: "Abrir assistente" });
+    const fab = page.locator('[aria-controls="painel-assistente"]');
     await expect(fab).toBeVisible();
     await expect(fab).toHaveAttribute("aria-expanded", "false");
     await fab.click();

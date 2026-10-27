@@ -31,7 +31,7 @@ function envLocal(k) {
 }
 
 const SUPA_URL = process.env.SUPABASE_URL || envLocal("NEXT_PUBLIC_SUPABASE_URL");
-const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY ?? "";
+const KEY = process.env.SUPABASE_SERVICE_ROLE_KEY || envLocal("SUPABASE_SERVICE_ROLE_KEY");
 
 const PII_MARCADORES = [
   /\d{3}\.\d{3}\.\d{3}-\d{2}/, // CPF
