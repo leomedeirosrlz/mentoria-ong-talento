@@ -33,6 +33,9 @@ export function PageHeader({
         ) : (
           kicker
         ))}
+      {/* as ações ganham linha própria abaixo de lg: dividindo a linha com
+          título/meta elas espremiam a descrição numa coluna de duas palavras
+          (REALIZA-248) */}
       <div className="mt-2 flex flex-wrap items-center gap-x-4 gap-y-3">
         {media}
         <div className="min-w-0 flex-1">
@@ -40,13 +43,15 @@ export function PageHeader({
             {title}
           </h1>
           {meta != null && (
-            <div className="mt-1.5 text-sm text-muted-foreground">{meta}</div>
+            <div className="mt-1.5 text-sm text-pretty text-muted-foreground">
+              {meta}
+            </div>
           )}
           {children}
         </div>
         {actions != null && (
           // self-start: botões ficam na linha do título mesmo com meta alta
-          <div className="flex flex-wrap items-center gap-2 self-start">
+          <div className="flex basis-full flex-wrap items-center gap-2 self-start lg:basis-auto">
             {actions}
           </div>
         )}

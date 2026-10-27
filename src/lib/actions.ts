@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { AVATAR_MAX_BYTES, avisoImagemGrande } from "@/lib/avatar";
 import {
   COR_RACAS,
   DOCUMENTO_PESSOA_TIPOS,
@@ -87,7 +88,9 @@ async function me() {
 }
 
 const FOTO_TIPOS = ["image/png", "image/jpeg", "image/webp"];
-const FOTO_MAX = 2 * 1024 * 1024;
+// mesmo teto do browser (AVATAR_MAX_BYTES) — o server não pode recusar o que
+// o perfil aceitou
+const FOTO_MAX = AVATAR_MAX_BYTES;
 
 type Supa = Awaited<ReturnType<typeof createClient>>;
 
@@ -105,7 +108,7 @@ async function subirFoto(
     return { aviso: "A foto não entrou. Use PNG, JPG ou WebP." };
   }
   if (foto.size > FOTO_MAX) {
-    return { aviso: "A foto não entrou. Use uma imagem de até 2 MB." };
+    return { aviso: `A foto não entrou. ${avisoImagemGrande(foto.size)}` };
   }
   const ext = foto.name.split(".").pop()?.toLowerCase() ?? "png";
   const path = `${pasta}/${crypto.randomUUID()}.${ext}`;
