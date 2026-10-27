@@ -354,9 +354,14 @@ export function TurmaBanner({
         )}
       </svg>
       {dados && (
-        <p className="absolute left-4 top-2.5 max-w-[calc(100%-5.5rem)] truncate font-mono text-xs sm:text-[10.5px] uppercase tracking-[0.12em] text-white/80">
-          {dados}
-        </p>
+        <>
+          {/* scrim atrás do label — os arcos da tinta (lime/âmbar claros)
+              podem passar por baixo do texto e derrubar o contraste */}
+          <div className="pointer-events-none absolute left-0 top-0 h-9 w-2/3 bg-linear-to-r from-[var(--brand-ink)]/85 via-[var(--brand-ink)]/45 to-transparent" />
+          <p className="absolute left-4 top-2.5 max-w-[calc(100%-5.5rem)] truncate font-mono text-xs sm:text-[11px] uppercase tracking-[0.08em] text-white">
+            {dados}
+          </p>
+        </>
       )}
       <EmblemaDial turma={c.turma} tinta={tinta} />
       <span
