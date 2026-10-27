@@ -28,6 +28,7 @@ import {
   parseCsv,
   type LinhaImportada,
 } from "../src/lib/importar";
+import { normalizaNomeSocial } from "../src/lib/forms/normaliza";
 import { nomeProprio } from "../src/lib/utils";
 import { parseDisponibilidade } from "../src/lib/ciclo";
 
@@ -63,7 +64,20 @@ const supabase = createClient(
 );
 
 const puladas: string[] = [];
+const avisos: string[] = [];
 const ok = (s: string) => console.log(`  ok  ${s}`);
+const aviso = (s: string) => {
+  avisos.push(s);
+  console.log(`  !!  ${s}`);
+};
+/** REALIZA-224 — nome social que é resposta de outra pergunta nunca é
+ *  gravado (o fichaLinha já esvazia); aqui só aparece pro humano conferir. */
+function checaNomeSocial(nome: string, bruto: unknown): void {
+  const v = String(bruto ?? "").trim();
+  if (!v) return;
+  const r = normalizaNomeSocial(v);
+  if (r.valor === null) aviso(`${nome}: nome social descartado — ${r.aviso}`);
+}
 const pula = (s: string) => {
   puladas.push(s);
   console.log(`  >>  ${s}`);
@@ -121,6 +135,7 @@ async function importaEquipe(linhas: LinhaImportada[]) {
       pula(`${nome}: ${ficha.error}`);
       continue;
     }
+    checaNomeSocial(nome, r.nome_social);
     const exp = normNome(String(r.experiencia_previa ?? ""));
     const form = normNome(String(r.formacao_externa ?? ""));
     if (exp.length > 2000 || form.length > 2000) {
@@ -223,6 +238,7 @@ async function importaMentorados(linhas: LinhaImportada[]) {
       pula(`${nome}: ${ficha.error}`);
       continue;
     }
+    checaNomeSocial(nome, r.nome_social);
     const chave = nome.toLowerCase();
     if (
       nomes.has(chave) ||
@@ -420,4 +436,6 @@ if (!APPLY) {
 await importaEquipe(equipe);
 await importaMentorados(mentorados);
 await importaAnexos();
-console.log(`\n== fim (${APPLY ? "APLICADO" : "dry-run"}) — ${puladas.length} puladas`);
+console.log(
+  `\n== fim (${APPLY ? "APLICADO" : "dry-run"}) — ${puladas.length} puladas, ${avisos.length} avisos`
+);

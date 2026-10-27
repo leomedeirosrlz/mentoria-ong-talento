@@ -62,6 +62,61 @@ export function normalizaTextoLongo(s: string): NormResult {
   return { valor: v || null, mudou: v !== s.trim() };
 }
 
+/** Nome social — o campo é opcional e o respondente erra de pergunta nele
+ *  (REALIZA-224). Aparecem três lixos reais no form de matching:
+ *  pronome de preferência ("Ele/Dele"), negativa literal ("Não tenho.") e o
+ *  rótulo da própria pergunta colado no valor ("Nome Artistico: Fulana").
+ *  Como a jornada inteira resolve o nome por `coalesce(nome_social, nome)`,
+ *  isso vira nome de gente em lista, relatório e PDF.
+ *
+ *  Política: descarta (null) com aviso, nunca tenta adivinhar o nome por
+ *  trás do rótulo — a prévia do import marca em amber e a coordenação
+ *  confere a resposta original (o cru segue no form_bruto). */
+export function normalizaNomeSocial(s: string): NormResult {
+  const v = s.trim().replace(/\s+/g, " ");
+  if (!v) return { valor: null, mudou: v !== s.trim() };
+
+  // sem acento, sem pontuação de cola nas pontas — "Não tenho." → "nao tenho"
+  const chave = semAcento(v)
+    .replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N})]+$/gu, "")
+    .trim();
+
+  // rótulo copiado junto: "nome artistico: X", "nome social - X"
+  const rotulo = chave.match(/^([^:–—-]{2,40})\s*[:–—-]\s*\S/);
+  if (rotulo && /\b(nome|social|artistic|apelido|como)\b/.test(rotulo[1]))
+    return {
+      valor: null,
+      mudou: true,
+      aviso: "o rótulo da pergunta veio junto — descartado, confira a resposta",
+    };
+
+  // pronome de preferência no lugar do nome
+  if (
+    /^(ele|ela|elu|ele\s*\/\s*dele|ela\s*\/\s*dela|elu\s*\/\s*delu|ele\s*\/\s*dela|ele\s*[-–]\s*dele|ela\s*[-–]\s*dela)$/.test(
+      chave
+    )
+  )
+    return {
+      valor: null,
+      mudou: true,
+      aviso: "é pronome de preferência, não nome — descartado",
+    };
+
+  // negativa / recusa / "mesmo nome"
+  if (
+    /^(nao|nao tenho|nao possuo|nao sei|nao informado|prefiro nao dizer|nenhum|nenhuma|nada|n\/a|na|mesmo nome|mesma coisa)$/.test(
+      chave
+    )
+  )
+    return {
+      valor: null,
+      mudou: true,
+      aviso: "é negativa/recusa, não nome — descartado",
+    };
+
+  return { valor: v, mudou: v !== s.trim() };
+}
+
 // ---------- e-mail ----------
 
 /** Mesma régua do emailValido do import: um "@", domínio multi-label,
