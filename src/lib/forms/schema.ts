@@ -211,6 +211,8 @@ export type FormularioResposta = {
   respondido_em: string;
   /** carimbo da promoção (0115): a resposta de intake virou cadastro */
   promovido_profile_id?: string | null;
+  /** carimbo da via de mentorado (0129) — FK pra mentorados */
+  promovido_mentorado_id?: string | null;
 };
 
 /** upload resolvido por form_anexo_put + storage — path é o nome do

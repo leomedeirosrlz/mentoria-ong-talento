@@ -151,7 +151,11 @@ const GENERO_PARA_ENUM: Record<string, string> = {
 const PREF_PARA_ENUM: Record<string, string> = {
   "mentorado homem": "masculino",
   "mentorada mulher": "feminino",
+  // intake de mentorados (0129): a pergunta é sobre o mentor do par
+  "mentor homem": "masculino",
+  "mentor mulher": "feminino",
   "sem preferência": "indiferente",
+  "não tenho preferência para o gênero do meu mentor.": "indiferente",
 };
 
 const baixa = (s: string) =>
@@ -182,7 +186,13 @@ export function prefillDoIntake(
   const expPrevia = str(respostas.experiencia_previa);
   const expDescricao = str(respostas.experiencia_descricao);
   return {
-    nome: str(respostas.nome_civil),
+    // o intake de mentores pergunta "nome civil"; o de mentorados segue o
+    // mesmo id, mas forms criados pela coordenação podem usar "nome" — o
+    // mesmo fallback que a fila de candidatos usa (intake-respostas)
+    nome:
+      str(respostas.nome_civil) ||
+      str(respostas.nome) ||
+      str(respostas.nome_social),
     nome_social: str(respostas.nome_social),
     email: str(respostas.email),
     whatsapp: str(respostas.telefone),
@@ -198,7 +208,12 @@ export function prefillDoIntake(
     origem: "Inscrição pública (Matching de Mentores)",
     motivacao: str(respostas.objetivos),
     pref_genero_par:
-      PREF_PARA_ENUM[baixa(str(respostas.pref_genero_mentorado))] ?? "",
+      PREF_PARA_ENUM[
+        baixa(
+          str(respostas.pref_genero_mentorado) ||
+            str(respostas.pref_genero_mentor)
+        )
+      ] ?? "",
     disponibilidade: respostaParaDisponibilidade(respostas.disponibilidade),
     experiencia_previa:
       expPrevia === "sim"

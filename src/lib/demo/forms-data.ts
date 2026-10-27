@@ -462,6 +462,53 @@ export function getDemoFormularios(): DemoFormularios {
     updated_at: haDias(20, "09:00"),
   };
 
+  // ---------- 13. inscrição de mentorados (intake oficial, 0129 — as
+  // perguntas do Google Form de origem; sem grade e sem documentos) ----------
+  const fIntakeMentorado: Formulario = {
+    id: uid(0x400d),
+    titulo: "Inscrição de mentorados · Matching de Mentorados",
+    descricao:
+      "Inscrição de quem quer ser mentorado(a) no próximo ciclo. A coordenação revisa cada inscrição antes de cadastrar e parear.",
+    sistema: "intake_mentorado",
+    campos: [
+      { id: "sec_dados", tipo: "secao", label: "Dados pessoais", obrigatorio: false },
+      { id: "nome_civil", tipo: "texto", label: "Nome completo civil", obrigatorio: true },
+      { id: "nome_social", tipo: "texto", label: "Nome social", obrigatorio: false },
+      { id: "nascimento", tipo: "data", label: "Data de nascimento", obrigatorio: true },
+      {
+        id: "genero", tipo: "select", label: "Gênero", obrigatorio: true,
+        opcoes: ["Cisgênero feminino", "Cisgênero masculino", "Transgênero", "Não binário", "Prefiro não informar"],
+      },
+      {
+        id: "cor_raca", tipo: "select", label: "Cor/raça", obrigatorio: true,
+        opcoes: ["Negra", "Branca", "Amarela", "Parda", "Indígena"],
+        permite_outro: true,
+      },
+      { id: "cidade", tipo: "texto", label: "Estado/município de residência", obrigatorio: true },
+      { id: "sec_sobre", tipo: "secao", label: "Sobre você", obrigatorio: false },
+      { id: "hobbies", tipo: "texto_longo", label: "Hobbies", obrigatorio: true, descricao: "Conte um pouco sobre eles" },
+      { id: "gostos", tipo: "texto_longo", label: "Coisas de que você mais gosta", obrigatorio: true },
+      { id: "esportes", tipo: "texto_longo", label: "Esportes", obrigatorio: true, descricao: "Assistir ou também praticar" },
+      { id: "auto_descricao", tipo: "texto_longo", label: "Auto-descrição em um parágrafo", obrigatorio: true, descricao: "Suas características mais marcantes" },
+      { id: "terceiros", tipo: "texto_longo", label: "Como amigos e familiares lhe descreveriam?", obrigatorio: true },
+      { id: "sec_contato", tipo: "secao", label: "Dados de contato", obrigatorio: false },
+      { id: "email", tipo: "texto", label: "E-mail", obrigatorio: true, formato: "email" },
+      { id: "telefone", tipo: "texto", label: "Telefone", obrigatorio: true, formato: "telefone" },
+      { id: "sec_mentoria", tipo: "secao", label: "A mentoria", obrigatorio: false },
+      { id: "objetivos", tipo: "texto_longo", label: "Objetivos e expectativa com o programa", obrigatorio: true },
+      {
+        id: "pref_genero_mentor", tipo: "select", label: "Preferência de gênero do mentor", obrigatorio: true,
+        opcoes: ["Mentor homem", "Mentor mulher", "Sem preferência"],
+      },
+      { id: "curriculo", tipo: "arquivo", label: "Currículo", obrigatorio: true, max_mb: 10 },
+    ],
+    ativo: true,
+    versao: 1,
+    created_by: null,
+    created_at: haDias(20, "09:00"),
+    updated_at: haDias(20, "09:00"),
+  };
+
   // ---------- links ----------
   const links: FormularioLink[] = [
     // avaliação: ricardo e carlos já responderam; fernanda pendente;
@@ -657,6 +704,13 @@ export function getDemoFormularios(): DemoFormularios {
     // das respostas. A identidade da candidata vem do conteúdo, não do link.
     {
       id: uid(0x4230), formulario_id: fIntakeMentor.id, token: "demo-tok-intake-mentores-001",
+      dest_profile_id: null, dest_mentorado_id: null, dupla_id: null,
+      contexto: {}, multi_uso: true, origem: "intake",
+      usado_em: null, expira_em: null, created_by: marina, created_at: haDias(18),
+    },
+    // o par do lado do jovem (0129) — mesmo desenho: um link só, N respostas
+    {
+      id: uid(0x4231), formulario_id: fIntakeMentorado.id, token: "demo-tok-intake-mentorados-001",
       dest_profile_id: null, dest_mentorado_id: null, dupla_id: null,
       contexto: {}, multi_uso: true, origem: "intake",
       usado_em: null, expira_em: null, created_by: marina, created_at: haDias(18),
@@ -943,6 +997,54 @@ export function getDemoFormularios(): DemoFormularios {
       },
       respondido_em: haDias(6, "19:03"),
     },
+    // inscrição de mentorado na fila (0129) — o botão "Revisar e cadastrar"
+    // abre o prefill da via de mentorado
+    {
+      id: uid(0x4418), link_id: uid(0x4231),
+      respostas: {
+        nome_civil: "Beatriz Nunes de Oliveira",
+        nascimento: "2007-05-22",
+        genero: "Cisgênero feminino",
+        cor_raca: "Parda",
+        cidade: "Guarulhos/SP",
+        hobbies: "Dança no coletivo do bairro e desenho",
+        gostos: "Música, festas da família e conversar com gente mais velha",
+        esportes: "Vôlei na escola, só prática",
+        auto_descricao: "Sou curiosa e falo pouco até pegar confiança; quando pego, não paro.",
+        terceiros: "Que sou esforçada e cuido dos meus irmãos mais novos.",
+        email: "beatriz.nunes@exemplo.com",
+        telefone: "(11) 96655-2044",
+        objetivos: "Quero terminar o ensino médio e decidir o que estudar sem medo de errar.",
+        pref_genero_mentor: "Mentor mulher",
+        curriculo: { path: `${uid(0x4231)}/cv-beatriz.pdf`, nome: "curriculo-beatriz.pdf", tamanho: 148480 },
+      },
+      respondido_em: haDias(4, "17:28"),
+    },
+    // inscrição de mentorado já promovida — o carimbo aponta pra mentorada
+    // que hoje está na base demo
+    {
+      id: uid(0x4419), link_id: uid(0x4231),
+      promovido_mentorado_id: ment("Ana"),
+      respostas: {
+        nome_civil: "Ana Clara Souza Lima",
+        nome_social: "Ana",
+        nascimento: "2006-09-08",
+        genero: "Cisgênero feminino",
+        cor_raca: "Negra",
+        cidade: "São Paulo/SP",
+        hobbies: "Leitura e handebol",
+        gostos: "Livros de fantasia e cozinhar com a mãe",
+        esportes: "Handebol, prática e assiste",
+        auto_descricao: "Sou observadora, gosto de entender o porquê das coisas antes de opinar.",
+        terceiros: "Que sou determinada e um pouco teimosa.",
+        email: "ana.clara@exemplo.com",
+        telefone: "(11) 95544-8123",
+        objetivos: "Quero entrar numa universidade pública e ser a primeira da família a se formar.",
+        pref_genero_mentor: "Sem preferência",
+        curriculo: { path: `${uid(0x4231)}/cv-ana.pdf`, nome: "curriculo-ana.pdf", tamanho: 132096 },
+      },
+      respondido_em: haDias(30, "15:02"),
+    },
   ];
 
   // ---------- anexos do intake (0115) ----------
@@ -971,6 +1073,7 @@ export function getDemoFormularios(): DemoFormularios {
       fRodaVida,
       fAvaliacaoEsp,
       fIntakeMentor,
+      fIntakeMentorado,
     ],
     links,
     respostas,

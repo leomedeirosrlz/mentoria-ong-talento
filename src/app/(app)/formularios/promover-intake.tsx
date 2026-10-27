@@ -51,6 +51,14 @@ const PREF_LABEL: Record<string, string> = {
   indiferente: "Sem preferência",
 };
 
+/** No intake de mentorados a preferência é sobre o mentor do par — o
+ *  mesmo enum lido do outro lado (REALIZA-229). */
+const PREF_LABEL_MENTORADO: Record<string, string> = {
+  feminino: "Mentor mulher",
+  masculino: "Mentor homem",
+  indiferente: "Sem preferência",
+};
+
 function Linha({ rotulo, valor }: { rotulo: string; valor: string | null }) {
   if (!valor) return null;
   return (
@@ -64,9 +72,12 @@ function Linha({ rotulo, valor }: { rotulo: string; valor: string | null }) {
 export function PromoverIntakeButton({ respostaId }: { respostaId: string }) {
   const [open, setOpen] = useState(false);
   const [prefill, setPrefill] = useState<PrefillIntake | null>(null);
+  const [sistema, setSistema] = useState<string | null>(null);
   const [pronto, setPronto] = useState<{ url: string } | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
+  // a mesma dupla de passos serve as duas vias de intake (mentor × mentorado)
+  const ehMentorado = sistema === "intake_mentorado";
 
   function abrir() {
     start(async () => {
@@ -76,6 +87,7 @@ export function PromoverIntakeButton({ respostaId }: { respostaId: string }) {
         return;
       }
       setPrefill(r.prefill!);
+      setSistema(r.sistema ?? null);
       setPronto(null);
       setOpen(true);
     });
@@ -123,7 +135,9 @@ export function PromoverIntakeButton({ respostaId }: { respostaId: string }) {
             </DialogTitle>
             <DialogDescription>
               {pronto
-                ? "A pessoa entrou na base como mentor(a) DPP, capacidade 1."
+                ? ehMentorado
+                  ? "A pessoa entrou na base como mentorado(a), pronta pro matching."
+                  : "A pessoa entrou na base como mentor(a) DPP, capacidade 1."
                 : "Confira o que vira cadastro. O restante da inscrição (trajetória, documentos, horários finos) segue gravado na resposta."}
             </DialogDescription>
           </DialogHeader>
@@ -153,22 +167,33 @@ export function PromoverIntakeButton({ respostaId }: { respostaId: string }) {
                     null
                   }
                 />
-                <Linha rotulo="Cargo" valor={prefill.cargo} />
-                <Linha rotulo="Empresa" valor={prefill.empresa} />
-                <Linha
-                  rotulo="Disponibilidade"
-                  valor={
-                    nCelulas
-                      ? `${nCelulas} faixa${nCelulas === 1 ? "" : "s"} marcada${nCelulas === 1 ? "" : "s"}`
-                      : "Não informada"
-                  }
-                />
                 <Linha
                   rotulo="Preferência de par"
-                  valor={PREF_LABEL[prefill.pref_genero_par] ?? null}
+                  valor={
+                    (ehMentorado ? PREF_LABEL_MENTORADO : PREF_LABEL)[
+                      prefill.pref_genero_par
+                    ] ?? null
+                  }
                 />
-                <Linha rotulo="Experiência" valor={prefill.experiencia_previa} />
-                <Linha rotulo="Formação" valor={prefill.formacao_externa} />
+                {/* ficha de mentor × mentorado: os campos abaixo só existem
+                    na via de mentores (o form do jovem não pergunta grade
+                    nem trajetória profissional) */}
+                {!ehMentorado && (
+                  <>
+                    <Linha rotulo="Cargo" valor={prefill.cargo} />
+                    <Linha rotulo="Empresa" valor={prefill.empresa} />
+                    <Linha
+                      rotulo="Disponibilidade"
+                      valor={
+                        nCelulas
+                          ? `${nCelulas} faixa${nCelulas === 1 ? "" : "s"} marcada${nCelulas === 1 ? "" : "s"}`
+                          : "Não informada"
+                      }
+                    />
+                    <Linha rotulo="Experiência" valor={prefill.experiencia_previa} />
+                    <Linha rotulo="Formação" valor={prefill.formacao_externa} />
+                  </>
+                )}
                 <Linha rotulo="Motivação" valor={prefill.motivacao} />
               </div>
             )
@@ -187,7 +212,7 @@ export function PromoverIntakeButton({ respostaId }: { respostaId: string }) {
                   {pending ? (
                     <CircleNotch className="animate-spin" aria-hidden />
                   ) : null}
-                  {pending ? "Cadastrando…" : "Cadastrar mentor(a)"}
+                  {pending ? "Cadastrando…" : ehMentorado ? "Cadastrar mentorado(a)" : "Cadastrar mentor(a)"}
                 </Button>
               </>
             )}
