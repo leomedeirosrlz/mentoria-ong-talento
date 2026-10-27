@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Funnel, MagnifyingGlass, X } from "@phosphor-icons/react";
+import { Check, MagnifyingGlass, X } from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { FiltrosButton } from "@/components/ui/filtros-button";
 import {
   Dialog,
   DialogContent,
@@ -25,8 +26,6 @@ import {
   DIFICULDADE_LABEL,
 } from "@/lib/ciclo";
 import {
-  GRUPOS_REGISTROS,
-  GRUPO_REGISTROS_OPCAO,
   PERIODO_REGISTROS_OPCOES,
   type GrupoRegistros,
 } from "@/lib/registros";
@@ -157,6 +156,7 @@ export function RegistrosFiltros({
   duplas,
   turmas = [],
   maxEncontro,
+  encontrosComRegistro = [],
   ordem = "recentes",
   grupo = "dupla",
 }: {
@@ -165,6 +165,9 @@ export function RegistrosFiltros({
   /** cronogramas do recorte `?turma=` — alimenta o chip removível. */
   turmas?: Cronograma[];
   maxEncontro: number;
+  /** nºs de encontro que TÊM registro no escopo do papel — pílula sem
+   *  registro não filtra nada e não renderiza (regra de silêncio). */
+  encontrosComRegistro?: number[];
   /** `?ordem=` não faz parte de FiltrosRegistro; a prop mantém o modo
    *  ligado quando a coord aplica/limpa um filtro. */
   ordem?: OrdemRegistros;
@@ -344,30 +347,6 @@ export function RegistrosFiltros({
   if (filtros.tardio) chips.push({ rotulo: "Registros tardios", href: sem("tardio") });
   if (filtros.q) chips.push({ rotulo: `Busca: “${filtros.q}”`, href: sem("q") });
 
-  // trocar o agrupamento não é filtrar — preserva TODOS os params atuais,
-  // inclusive a pagina cumulativa (o conjunto de itens não muda, só a
-  // organização visual)
-  const hrefGrupo = (g: GrupoRegistros) => {
-    const p = new URLSearchParams();
-    const atual: Record<string, string | undefined> = {
-      encontro: filtros.encontro ? String(filtros.encontro) : undefined,
-      avaliacao: filtros.avaliacao,
-      apoio: filtros.apoio ? "1" : undefined,
-      tardio: filtros.tardio ? "1" : undefined,
-      dificuldade: filtros.dificuldade,
-      dupla: filtros.dupla,
-      turma: filtros.turma,
-      periodo: filtros.periodo,
-      q: filtros.q,
-      ordem: ordem !== "recentes" ? ordem : undefined,
-      grupo: g !== "dupla" ? g : undefined,
-      pagina: filtros.pagina > 1 ? String(filtros.pagina) : undefined,
-    };
-    for (const [chave, v] of Object.entries(atual)) if (v) p.set(chave, v);
-    const qs = p.toString();
-    return `/registros${qs ? `?${qs}` : ""}`;
-  };
-
   // "Limpar tudo" zera filtros mas mantém os controles de visão (ordem +
   // agrupamento) — são preferência de leitura, não filtro
   const hrefLimpo = (() => {
@@ -406,59 +385,13 @@ export function RegistrosFiltros({
               className="pl-8"
             />
           </div>
-          <Button
-            type="button"
-            variant="default"
+          <FiltrosButton
+            ativos={ativos}
             onClick={() => {
               setDraft(draftDe(filtrosRef.current, ordemRef.current));
               setAberto(true);
             }}
-            aria-label={
-              ativos > 0 ? `Filtros, ${ativos} ativos` : "Filtros"
-            }
-          >
-            <Funnel size={16} aria-hidden />
-            Filtros
-            {/* disco ink sobre lime — mesma gramática do indicador da
-                bottom-nav; lime-sobre-lime apagaria o contador */}
-            {ativos > 0 && (
-              <span
-                aria-hidden
-                className="grid size-5 place-items-center rounded-full bg-[var(--brand-ink)] text-[11px] font-bold text-white"
-              >
-                {ativos}
-              </span>
-            )}
-          </Button>
-        </div>
-
-        {/* eixo de agrupamento da lista — links de verdade (?grupo=),
-            mesma gramática dos chips: Cmd+click, back/forward e
-            aria-current de graça; "por dupla" é o default implícito */}
-        <div
-          role="group"
-          aria-label="Agrupar registros"
-          className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5"
-        >
-          <span className="text-xs text-muted-foreground">Agrupar:</span>
-          <div className="inline-flex items-center gap-0.5 rounded-full border bg-card p-0.5">
-            {GRUPOS_REGISTROS.map((g) => (
-              <Link
-                key={g}
-                href={hrefGrupo(g)}
-                scroll={false}
-                aria-current={grupo === g ? "page" : undefined}
-                className={cn(
-                  "inline-flex min-h-11 items-center rounded-full px-3 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-7",
-                  grupo === g
-                    ? "bg-muted font-semibold text-foreground"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                )}
-              >
-                {GRUPO_REGISTROS_OPCAO[g]}
-              </Link>
-            ))}
-          </div>
+          />
         </div>
 
         {chips.length > 0 && (
@@ -517,33 +450,41 @@ export function RegistrosFiltros({
               </div>
             </fieldset>
 
-            <fieldset>
-              <legend className={OVERLINE}>Encontro</legend>
-              <div className="mt-1.5 grid grid-cols-4 gap-1.5 sm:grid-cols-6">
-                <OpcaoPilula
-                  nome="flt-encontro"
-                  valor={TODAS}
-                  atual={draft.encontro}
-                  onSelect={sel("encontro")}
-                  className="col-span-2"
-                >
-                  Todos
-                </OpcaoPilula>
-                {Array.from({ length: maxEncontro }, (_, i) => i + 1).map(
-                  (n) => (
-                    <OpcaoPilula
-                      key={n}
-                      nome="flt-encontro"
-                      valor={String(n)}
-                      atual={draft.encontro}
-                      onSelect={sel("encontro")}
-                    >
-                      {n}º
-                    </OpcaoPilula>
-                  )
-                )}
-              </div>
-            </fieldset>
+            {/* sem encontro com registro o fieldset só teria "Todos" —
+                critério sem opção útil não renderiza (o nº ativo fica pra
+                não prender a pessoa num filtro sem saída) */}
+            {(encontrosComRegistro.length > 0 ||
+              draft.encontro !== TODAS) && (
+              <fieldset>
+                <legend className={OVERLINE}>Encontro</legend>
+                <div className="mt-1.5 grid grid-cols-4 gap-1.5 sm:grid-cols-6">
+                  <OpcaoPilula
+                    nome="flt-encontro"
+                    valor={TODAS}
+                    atual={draft.encontro}
+                    onSelect={sel("encontro")}
+                    className="col-span-2"
+                  >
+                    Todos
+                  </OpcaoPilula>
+                  {Array.from({ length: maxEncontro }, (_, i) => i + 1).map(
+                    (n) =>
+                      encontrosComRegistro.includes(n) ||
+                      draft.encontro === String(n) ? (
+                        <OpcaoPilula
+                          key={n}
+                          nome="flt-encontro"
+                          valor={String(n)}
+                          atual={draft.encontro}
+                          onSelect={sel("encontro")}
+                        >
+                          {n}º
+                        </OpcaoPilula>
+                      ) : null
+                  )}
+                </div>
+              </fieldset>
+            )}
 
             <fieldset>
               <legend className={OVERLINE}>Avaliação do encontro</legend>
@@ -606,6 +547,9 @@ export function RegistrosFiltros({
               </div>
             </fieldset>
 
+            {/* "Todas" + 1 dupla = 1 opção útil — select de uma dupla só
+                não renderiza (o valor ativo mantém o controle visível) */}
+            {(duplas.length >= 2 || draft.dupla !== TODAS) && (
             <fieldset>
               <legend id="flt-dupla-label" className={OVERLINE}>Dupla</legend>
               {/* lista longa demais pra pílula — o Select do kit rola no
@@ -641,6 +585,7 @@ export function RegistrosFiltros({
                 </Select>
               </div>
             </fieldset>
+            )}
 
             {/* ordenar não é filtro — não entra no contador de ativos nem
                 é desfeito pelo "Limpar" */}

@@ -53,6 +53,14 @@ import { DuplaWaAcao } from "@/components/dupla-wa-acao";
 import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { FiltrosButton } from "@/components/ui/filtros-button";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -67,6 +75,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+const OVERLINE =
+  "text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]";
 
 type Saude = ReturnType<typeof saudadeDaDupla>;
 
@@ -324,8 +335,15 @@ function LinhaMini({
   return (
     <div
       style={{ "--i": Math.min(i, 10) } as CSSProperties}
-      className="animate-enter grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-t border-border/60 px-3 py-2 text-[13px] @4xl:grid-cols-[minmax(190px,1.4fr)_150px_minmax(150px,1fr)_auto_auto] @4xl:px-5 @4xl:py-2.5"
+      className="relative animate-enter grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-1 border-t border-border/60 px-3 py-2 text-[13px] transition-colors hover:bg-muted/50 @4xl:grid-cols-[minmax(190px,1.4fr)_150px_minmax(150px,1fr)_auto_auto] @4xl:px-5 @4xl:py-2.5"
     >
+      {/* linha inteira abre a ficha (mesmo stretched link da DuplaLinha):
+          o WA sobe pra z-20 e o "Ver ficha" vira decorativo — 1 tab por linha */}
+      <Link
+        href={`/duplas/${d.id}`}
+        aria-label={`Ver ficha da dupla de ${d.mentorado.nome.split(" ")[0]}`}
+        className="absolute inset-0 z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      />
       <span className="flex min-w-0 flex-wrap items-center gap-1.5 font-medium">
         <DuplaNomes mentor={d.mentor.nome} mentorado={d.mentorado.nome} />
         {d.turma && (
@@ -375,19 +393,17 @@ function LinhaMini({
           colunas `auto` do fim do grid; no mobile ele é a célula de
           ações inteira (nomes à esquerda, ações à direita) */}
       <span className="flex items-center gap-1.5 @4xl:contents">
-        {wa}
-        <Link
-          href={`/duplas/${d.id}`}
-          aria-label={`Ver ficha da dupla de ${d.mentorado.nome.split(" ")[0]}`}
-          title="Ver ficha"
+        <span className="relative z-20">{wa}</span>
+        <span
+          aria-hidden
           className={cn(
             buttonVariants({ variant: "ghost", size: "sm" }),
-            "w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
+            "pointer-events-none w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
           )}
         >
           <span className="hidden whitespace-nowrap md:inline">Ver ficha</span>
-          <CaretRight weight="bold" aria-hidden />
-        </Link>
+          <CaretRight weight="bold" />
+        </span>
       </span>
     </div>
   );
@@ -829,7 +845,11 @@ function VisaoCoordenacao({
   const [turmaSel, setTurmaSel] = useState<string | null>(turmaInicial);
   const [supSel, setSupSel] = useState<string>("todas");
   const [mentorSel, setMentorSel] = useState<string | null>(null);
-  const [mentorAberto, setMentorAberto] = useState(false);
+  // supervisão/mentor são secundários — moram no painel "Filtros (n)",
+  // não na barra (o modal aplica de uma vez, como em /registros)
+  const [painelAberto, setPainelAberto] = useState(false);
+  const [draftSup, setDraftSup] = useState("todas");
+  const [draftMentor, setDraftMentor] = useState("todos");
 
   // link da home pousa aqui sem remontar a rota — realinha o chip quando
   // o contexto resolvido muda. Ajuste durante o render (padrão react.dev),
@@ -892,6 +912,18 @@ function VisaoCoordenacao({
   ]
     .map(([id, nome]) => ({ id, nome }))
     .sort((a, b) => comparaNome(a.nome, b.nome));
+
+  // critério secundário só existe com ≥2 opções úteis (regra de silêncio
+  // dos filtros); se um deles está ativo o controle fica — ninguém fica
+  // preso num filtro sem jeito de tirar
+  const supShow =
+    supervisores.length + (temSemSup ? 1 : 0) >= 2 || supSel !== "todas";
+  const mentorShow = mentores.length > 1 || mentorSel != null;
+  const temSecundarios = supShow || mentorShow;
+  const ativosSec =
+    (supSel !== "todas" ? 1 : 0) + (mentorSel != null ? 1 : 0);
+  const draftAtivos =
+    (draftSup !== "todas" ? 1 : 0) + (draftMentor !== "todos" ? 1 : 0);
 
   // o recorte da turma, do supervisor e do mentor: a situação mostrada no
   // resumo é a do que está selecionado (sem recorte, é o programa inteiro)
@@ -1048,22 +1080,30 @@ function VisaoCoordenacao({
           role="group"
           aria-label="Filtrar por situação"
         >
-          {CATS.map((c) => (
-            <CatChip
-              key={c.id}
-              nome={c.nome}
-              dot={c.dot}
-              apoio={c.id === "apoio"}
-              n={contagem(c.id)}
-              ativo={filtro === c.id}
-              onClick={() => setFiltro(filtro === c.id ? "todas" : c.id)}
-            />
-          ))}
+          {CATS.map((c) => {
+            const n = contagem(c.id);
+            // chip com 0 resultado não filtra nada — esconde (o ativo
+            // fica pra não prender a pessoa num filtro sem saída)
+            if (c.id !== "todas" && n === 0 && filtro !== c.id) return null;
+            return (
+              <CatChip
+                key={c.id}
+                nome={c.nome}
+                dot={c.dot}
+                apoio={c.id === "apoio"}
+                n={n}
+                ativo={filtro === c.id}
+                onClick={() => setFiltro(filtro === c.id ? "todas" : c.id)}
+              />
+            );
+          })}
         </div>
       )}
 
-      {/* filtros em linha única: turma + supervisão + "+ mentor" */}
-      {(turmas.length > 1 || supervisores.length > 0) && (
+      {/* filtros: turma é primária e fica em chips; supervisão/mentor são
+          secundários e moram no painel "Filtros (n)" — desktop e mobile
+          usam o mesmo Dialog (o padrão de /registros) */}
+      {(turmas.length > 1 || temSecundarios) && (
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           {turmas.length > 1 && (
             <span
@@ -1111,76 +1151,114 @@ function VisaoCoordenacao({
               ))}
             </span>
           )}
-          {supervisores.length > 0 && (
-            <span className="flex items-center gap-1.5">
-              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
-                Supervisão
-              </span>
-              <Select
-                value={supSel}
-                onValueChange={(v) => setSupSel(v ?? "todas")}
-                items={{
-                  todas: "Todas",
-                  ...Object.fromEntries(supervisores.map((s) => [s.id, s.nome])),
-                  ...(temSemSup ? { nenhum: "Sem supervisor" } : {}),
-                }}
-              >
-                <SelectTrigger size="sm" className="w-auto min-w-36 max-w-56" aria-label="Filtrar por supervisão">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas</SelectItem>
-                  {supervisores.map((s) => (
-                    <SelectItem key={s.id} value={s.id}>
-                      {s.nome}
-                    </SelectItem>
-                  ))}
-                  {temSemSup && (
-                    <SelectItem value="nenhum">Sem supervisor</SelectItem>
-                  )}
-                </SelectContent>
-              </Select>
-            </span>
-          )}
-          {mentores.length > 1 && (
-            <>
-              {!mentorAberto && !mentorSel ? (
-                <Button
-                  type="button"
-                  variant="link"
-                  size="sm"
-                  onClick={() => setMentorAberto(true)}
-                >
-                  + mentor
-                </Button>
-              ) : (
-                <Select
-                  value={mentorSel ?? "todos"}
-                  onValueChange={(v) =>
-                    setMentorSel(!v || v === "todos" ? null : v)
-                  }
-                  items={{
-                    todos: "Todos os mentores",
-                    ...Object.fromEntries(mentores.map((m) => [m.id, m.nome])),
-                  }}
-                >
-                  <SelectTrigger size="sm" className="w-auto min-w-40 max-w-56" aria-label="Filtrar por mentor">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="todos">Todos os mentores</SelectItem>
-                    {mentores.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </>
+          {temSecundarios && (
+            <FiltrosButton
+              ativos={ativosSec}
+              onClick={() => {
+                setDraftSup(supSel);
+                setDraftMentor(mentorSel ?? "todos");
+                setPainelAberto(true);
+              }}
+            />
           )}
         </div>
       )}
+
+      <Dialog open={painelAberto} onOpenChange={setPainelAberto}>
+        <DialogContent size="md">
+          <DialogHeader>
+            <DialogTitle>Filtros</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            {supShow && (
+              <fieldset>
+                <legend className={OVERLINE}>Supervisão</legend>
+                <div className="mt-1.5">
+                  <Select
+                    value={draftSup}
+                    onValueChange={(v) => setDraftSup(v ?? "todas")}
+                    items={{
+                      todas: "Todas",
+                      ...Object.fromEntries(
+                        supervisores.map((s) => [s.id, s.nome])
+                      ),
+                      ...(temSemSup ? { nenhum: "Sem supervisor" } : {}),
+                    }}
+                  >
+                    <SelectTrigger aria-label="Filtrar por supervisão">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todas">Todas</SelectItem>
+                      {supervisores.map((s) => (
+                        <SelectItem key={s.id} value={s.id}>
+                          {s.nome}
+                        </SelectItem>
+                      ))}
+                      {temSemSup && (
+                        <SelectItem value="nenhum">Sem supervisor</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </fieldset>
+            )}
+            {mentorShow && (
+              <fieldset>
+                <legend className={OVERLINE}>Mentor</legend>
+                <div className="mt-1.5">
+                  <Select
+                    value={draftMentor}
+                    onValueChange={(v) => setDraftMentor(v ?? "todos")}
+                    items={{
+                      todos: "Todos os mentores",
+                      ...Object.fromEntries(
+                        mentores.map((m) => [m.id, m.nome])
+                      ),
+                    }}
+                  >
+                    <SelectTrigger aria-label="Filtrar por mentor">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="todos">Todos os mentores</SelectItem>
+                      {mentores.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </fieldset>
+            )}
+          </div>
+          <DialogFooter sticky>
+            <Button
+              type="button"
+              variant="ghost"
+              className="sm:me-auto"
+              disabled={draftAtivos === 0}
+              onClick={() => {
+                setDraftSup("todas");
+                setDraftMentor("todos");
+              }}
+            >
+              Limpar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setSupSel(draftSup);
+                setMentorSel(draftMentor === "todos" ? null : draftMentor);
+                setPainelAberto(false);
+              }}
+            >
+              Aplicar{draftAtivos > 0 ? ` (${draftAtivos})` : ""}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* barra da lista: contagem viva + legenda dos dots */}
       <div className="mb-2 mt-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
@@ -1398,17 +1476,23 @@ function VisaoSupervisor({
           role="group"
           aria-label="Filtrar por situação"
         >
-          {CATS.map((c) => (
-            <CatChip
-              key={c.id}
-              nome={c.nome}
-              dot={c.dot}
-              apoio={c.id === "apoio"}
-              n={contagem(c.id)}
-              ativo={filtro === c.id}
-              onClick={() => setFiltro(filtro === c.id ? "todas" : c.id)}
-            />
-          ))}
+          {CATS.map((c) => {
+            const n = contagem(c.id);
+            // idem coordenação: chip com 0 resultado não filtra nada (o
+            // ativo fica pra não prender a pessoa num filtro sem saída)
+            if (c.id !== "todas" && n === 0 && filtro !== c.id) return null;
+            return (
+              <CatChip
+                key={c.id}
+                nome={c.nome}
+                dot={c.dot}
+                apoio={c.id === "apoio"}
+                n={n}
+                ativo={filtro === c.id}
+                onClick={() => setFiltro(filtro === c.id ? "todas" : c.id)}
+              />
+            );
+          })}
         </div>
       )}
 

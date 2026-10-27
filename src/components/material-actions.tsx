@@ -72,9 +72,12 @@ const AUDIENCIA_LABEL = {
   coordenacao: "Coordenação",
 } as const;
 
-/** Destino do material — o mesmo das linhas/cards: o arquivo oficial ganha
- *  da url externa; sem os dois não há link pra abrir/copiar. */
-function hrefMaterial(m: Material): string | null {
+/** Destino do material — o mesmo das linhas/cards: "doc:<slug>" é o
+ *  documento nativo (a base muda por casa: /materiais no staff, /jovem no
+ *  mentorado); arquivo oficial ganha da url externa; sem os três não há
+ *  link pra abrir/copiar. */
+function hrefMaterial(m: Material, docBase = "/materiais/documento"): string | null {
+  if (m.path?.startsWith("doc:")) return `${docBase}/${m.path.slice(4)}`;
   return m.path ? `/api/material/${m.id}` : linkSeguro(m.url);
 }
 
@@ -83,8 +86,8 @@ function hrefMaterial(m: Material): string | null {
  *  não é da audiência cai no 404 honesto); url externa copia como está.
  *  Mesma régua de erro do CopiarLinkAvaliacao: sem clipboard API (contexto
  *  não-seguro/permissão negada) ou falha → toast de erro, não silêncio. */
-async function copiarLinkMaterial(m: Material) {
-  const href = hrefMaterial(m);
+async function copiarLinkMaterial(m: Material, docBase?: string) {
+  const href = hrefMaterial(m, docBase);
   if (!href) return;
   const texto = m.path ? `${window.location.origin}${href}` : href;
   if (!navigator.clipboard?.writeText) {
@@ -123,8 +126,16 @@ function TriggerAcoes({ titulo, pending }: { titulo: string; pending?: boolean }
  *  o jovem nos cards do acervo: a linha/card inteiro já é o "Abrir"; aqui
  *  ficam os gestos secundários. Sem destino ("em breve") não renderiza —
  *  não há link pra abrir nem copiar. */
-export function MaterialMenu({ material }: { material: Material }) {
-  const href = hrefMaterial(material);
+export function MaterialMenu({
+  material,
+  docBase,
+}: {
+  material: Material;
+  /** casa do documento nativo — "/jovem/materiais/documento" pro acervo do
+   *  jovem (a rota do staff expulsa o papel dele); default é a do app. */
+  docBase?: string;
+}) {
+  const href = hrefMaterial(material, docBase);
   if (!href) return null;
   return (
     <DropdownMenu>
@@ -136,7 +147,7 @@ export function MaterialMenu({ material }: { material: Material }) {
           <ArrowSquareOut size={16} data-icon="inline-start" aria-hidden />
           Abrir em nova aba
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => copiarLinkMaterial(material)}>
+        <DropdownMenuItem onClick={() => copiarLinkMaterial(material, docBase)}>
           <LinkSimple size={16} data-icon="inline-start" aria-hidden />
           Copiar link
         </DropdownMenuItem>

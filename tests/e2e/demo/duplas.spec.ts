@@ -261,6 +261,57 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     await page.keyboard.press("Escape");
   });
 
+  // REALIZA-240/241 — o card inteiro é um link esticado (uma âncora por
+  // linha, nome da dupla no rótulo) e a régua de silêncio dos filtros:
+  // chip com 0 resultado não renderiza e supervisão/mentor moram no
+  // painel "Filtros", não na barra.
+  test("coordenação: card inteiro abre a ficha; critério vazio some e secundários vão pro painel", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/duplas");
+
+    // 240 — nenhum chip de situação com contador zero: o dataset cobre
+    // todas as fatias, então se a régua falhar um "… 0" aparece
+    const chips = page.getByRole("group", { name: "Filtrar por situação" });
+    await expect(chips.getByRole("button", { name: / 0$/ })).toHaveCount(0);
+
+    // 241 — uma âncora por linha com o nome da dupla; clicar no corpo do
+    // card (fora dos controles) abre a ficha via o link esticado
+    const linha = page.locator(LINHAS_COORD).first();
+    const ficha = linha.getByRole("link", {
+      name: /Ver ficha da dupla de /,
+    });
+    await expect(ficha).toHaveCount(1);
+    const href = await ficha.getAttribute("href");
+    expect(href).toMatch(/^\/duplas\//);
+    await linha.click({ position: { x: 120, y: 40 } });
+    await page.waitForURL(new RegExp(href!.replace(/\//g, "\\/") + "$"));
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.goBack();
+    await page.waitForURL(/\/duplas$/);
+
+    // 240 — supervisão e mentor saíram da barra: o gatilho "Filtros" abre
+    // o dialog com os dois critérios e aplica de uma vez (o contador do
+    // gatilho reflete os ativos)
+    await page.getByRole("button", { name: "Filtros" }).click();
+    const dlg = page.getByRole("dialog");
+    await expect(dlg.getByText("Supervisão")).toBeVisible();
+    await expect(dlg.getByText("Mentor", { exact: true })).toBeVisible();
+    await dlg
+      .getByRole("combobox", { name: "Filtrar por supervisão" })
+      .click();
+    await page.getByRole("option", { name: "Paulo Serra" }).click();
+    await dlg.getByRole("button", { name: /Aplicar/ }).click();
+    await expect(
+      page.getByRole("button", { name: "Filtros, 1 ativo" })
+    ).toBeVisible();
+    // o filtro morde de verdade: só duplas do Paulo na lista
+    await expect(
+      page.locator(LINHAS_COORD).getByText("Beatriz Lins")
+    ).toHaveCount(0);
+  });
+
   test("coordenação mobile: cards p-3/gap-2, ações no topo, toques ≥44px", async ({
     page,
   }) => {
@@ -293,7 +344,8 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
 
       // as ações moram na célula order-2 (topo à direita, ao lado das
       // pílulas): quadrado verde combinado (ação + opções num trigger só)
-      // 44px + ficha 44px
+      // 44px; o "Ver ficha" visual dela é decorativo — a âncora real é o
+      // link esticado que cobre o card inteiro (REALIZA-241)
       const celulaAcoes = card.locator(":scope > div > div.order-2");
       const wa = celulaAcoes.getByRole("button", {
         name: /: opções da mensagem$/,
@@ -302,18 +354,13 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
       const waBox = await wa.boundingBox();
       expect(waBox?.width).toBeGreaterThanOrEqual(44);
       expect(waBox?.height).toBeGreaterThanOrEqual(44);
-      const ficha = celulaAcoes.getByRole("link", { name: /Ver ficha/ });
+      await expect(
+        celulaAcoes.getByRole("link", { name: /Ver ficha/ })
+      ).toHaveCount(0);
+      const ficha = card.getByRole("link", { name: /Ver ficha/ });
       await expect(ficha).toHaveCount(1);
       const fichaBox = await ficha.boundingBox();
       expect(fichaBox?.height).toBeGreaterThanOrEqual(44);
-
-      // a faixa-footer morta não volta: fora da célula de ações não há
-      // link de ficha solto no card
-      await expect(
-        card
-          .locator(":scope > div > div:not(.order-2)")
-          .getByRole("link", { name: /Ver ficha/ })
-      ).toHaveCount(0);
     }
 
     // o quadrado verde abre o menu com a ação como 1º item — "Abrir

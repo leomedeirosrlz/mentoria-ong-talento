@@ -166,7 +166,7 @@ export function EncerramentoDupla({
                         nome: dupla.mentorado.nome,
                         whatsapp: dupla.mentorado.whatsapp,
                       }}
-                      sugestao="Avaliação final"
+                      sugestao="360"
                       trigger={
                         <Button type="button" variant="outline" size="xs">
                           <PaperPlaneTilt aria-hidden />

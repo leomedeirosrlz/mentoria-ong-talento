@@ -164,6 +164,32 @@ test.describe("mobile", () => {
     await expect(folha).toBeHidden();
     await expect(page).not.toHaveURL(/r=/);
   });
+
+  // REALIZA-249 — o agrupamento é controle de visualização, não filtro:
+  // no celular o segmented vira um botão compacto + popover (o desktop
+  // mantém os links "por dupla|semana|avaliação" à direita do contador)
+  test("agrupamento vira botão + popover no mobile", async ({ page }) => {
+    await abreRegistros(page);
+    // nada de segmented na largura estreita — o grupo nomeado não existe
+    await expect(
+      page.getByRole("group", { name: "Agrupar registros" })
+    ).toHaveCount(0);
+    const botao = page.getByRole("button", { name: /Agrupar por dupla/ });
+    await expect(botao).toBeVisible();
+    await botao.click();
+    // as opções são links de verdade (Cmd+click, back/forward) com
+    // aria-current na atual
+    const porDupla = page.getByRole("link", { name: "por dupla" });
+    const porSemana = page.getByRole("link", { name: "por semana" });
+    await expect(porDupla).toHaveAttribute("aria-current", "page");
+    await expect(porSemana).toHaveAttribute("href", /grupo=semana/);
+    await porSemana.click();
+    await page.waitForURL(/grupo=semana/);
+    // o botão reflete o novo grupo
+    await expect(
+      page.getByRole("button", { name: /Agrupar por semana/ })
+    ).toBeVisible();
+  });
 });
 
 // ---------- painel "Panorama" (REALIZA-198) ----------

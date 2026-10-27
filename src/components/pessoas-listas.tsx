@@ -354,41 +354,47 @@ export function PessoasListas({
         </div>
         {souCoord && (
           <>
-            <button
-              type="button"
-              aria-pressed={semDupla}
-              onClick={() => setSemDupla((v) => !v)}
-              className={filterChipCls(semDupla)}
-            >
-              Livres para dupla
-              <span
-                className={cn(
-                  "font-mono text-[11px] tabular-nums",
-                  semDupla ? "text-background/70" : "text-muted-foreground/70"
-                )}
+            {/* chip com 0 resultado não filtra nada — esconde (o ativo
+                fica pra não prender a pessoa num filtro sem saída) */}
+            {(livres > 0 || semDupla) && (
+              <button
+                type="button"
+                aria-pressed={semDupla}
+                onClick={() => setSemDupla((v) => !v)}
+                className={filterChipCls(semDupla)}
               >
-                {livres}
-              </span>
-            </button>
+                Livres para dupla
+                <span
+                  className={cn(
+                    "font-mono text-[11px] tabular-nums",
+                    semDupla ? "text-background/70" : "text-muted-foreground/70"
+                  )}
+                >
+                  {livres}
+                </span>
+              </button>
+            )}
             {/* quem saiu do programa (0077): inverte a seção Mentorados pra
                 mostrar só eles — a seção colapsável no fim continua sendo
                 o arquivo de sempre visível */}
-            <button
-              type="button"
-              aria-pressed={verFora}
-              onClick={() => setVerFora((v) => !v)}
-              className={filterChipCls(verFora)}
-            >
-              Fora do programa
-              <span
-                className={cn(
-                  "font-mono text-[11px] tabular-nums",
-                  verFora ? "text-background/70" : "text-muted-foreground/70"
-                )}
+            {(totalFora > 0 || verFora) && (
+              <button
+                type="button"
+                aria-pressed={verFora}
+                onClick={() => setVerFora((v) => !v)}
+                className={filterChipCls(verFora)}
               >
-                {totalFora}
-              </span>
-            </button>
+                Fora do programa
+                <span
+                  className={cn(
+                    "font-mono text-[11px] tabular-nums",
+                    verFora ? "text-background/70" : "text-muted-foreground/70"
+                  )}
+                >
+                  {totalFora}
+                </span>
+              </button>
+            )}
             {/* vale pras duas seções (Com acesso + Mentorados) — pendências
                 primeiro é a ordem de trabalho da coordenação */}
             <Select
@@ -449,7 +455,12 @@ export function PessoasListas({
         <h2 className="text-base font-semibold tabular-nums">
           {souCoord ? "Com acesso" : "Mentores e equipe"} ({filtrando ? `${pessoasExibidas.length} de ${totalPessoasSecao}` : totalPessoasSecao})
         </h2>
-        <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden">
+        {/* re-key por busca/filtro/ordem — a troca re-roda o animate-enter
+            das linhas em vez de um repaint seco (convenção) */}
+        <div
+          key={`${q}|${semDupla ? 1 : 0}|${ordem}`}
+          className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden"
+        >
           {basePessoas.length === 0 && (
             <div className="flex flex-col items-center gap-1.5 py-10 text-center">
               <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
@@ -533,7 +544,12 @@ export function PessoasListas({
         <h2 className="text-base font-semibold tabular-nums">
           {verFora ? "Fora do programa" : "Mentorados"} ({filtrando ? `${mentoradosExibidos.length} de ${totalMentoradosSecao}` : totalMentoradosSecao})
         </h2>
-        <div className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden">
+        {/* a troca de filtro (busca, livres, fora, ordem) re-monta a lista —
+            o animate-enter re-roda por linha (convenção) */}
+        <div
+          key={`${q}|${semDupla ? 1 : 0}|${verFora ? 1 : 0}|${ordem}`}
+          className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden"
+        >
           {mentorados.length === 0 &&
             (souCoord ? (
               <div className="flex flex-col items-center gap-1.5 py-10 text-center">

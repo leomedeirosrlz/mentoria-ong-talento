@@ -1,10 +1,6 @@
 import Link from "next/link";
 import { Check, Clock, Eye, LockSimple, Warning } from "@phosphor-icons/react/dist/ssr";
-import {
-  EnviarDesfechoLote,
-  EnviarInstrumentoLote,
-  type DuplaLote,
-} from "@/components/enviar-instrumento-lote";
+import { EnviarInstrumentoLote } from "@/components/enviar-instrumento-lote";
 import { LembreteButton } from "@/components/lembrete-button";
 import {
   InstrumentoEmblema,
@@ -119,13 +115,22 @@ const CARDS: CardSpec[] = [
     sistemaForm: "roda_vida",
   },
   {
-    chave: "avaliacao_360",
-    titulo: "Avaliação final da mentoria",
+    chave: "avaliacao_final_mentorado",
+    titulo: "Avaliação Geral - 360º · mentorado(a)",
     descricao:
-      "O fechamento do ciclo em dois instrumentos, um por lado: o jovem responde a avaliação final e o mentor também. A resposta marca o checklist de encerramento.",
+      "O jovem fecha o ciclo contando como foi a mentoria. A resposta marca o checklist de encerramento da dupla.",
     chips: ["Enc. 16"],
     estacao: "avaliacao_360",
     sistemaForm: "avaliacao_final_mentorado",
+  },
+  {
+    chave: "avaliacao_final_mentor",
+    titulo: "Avaliação Geral - 360º · mentor(a)",
+    descricao:
+      "O mentor avalia o programa e a própria experiência, e registra a disponibilidade pro próximo ciclo. Também marca o checklist de encerramento.",
+    chips: ["Enc. 16"],
+    estacao: "avaliacao_360",
+    sistemaForm: "avaliacao_final_mentor",
   },
 ];
 
@@ -296,7 +301,6 @@ export function InstrumentosPrograma({
   duplasInfo,
   formIds,
   envioLiberado,
-  desfechoElegiveis = [],
   fichasMentor = [],
   nudges = {},
   meuNome = "",
@@ -320,9 +324,6 @@ export function InstrumentosPrograma({
    *  "Ver respostas"; vazio pra não-coord (RLS do form é coord-only). */
   formIds: Map<FormularioSistema, string>;
   envioLiberado: boolean;
-  /** a fila do "Depois da mentoria · 6 meses" — concluídas há ≥180 dias
-   *  sem link 6m (desfecho_elegiveis_6m, 0124); só preenchida pra coord. */
-  desfechoElegiveis?: DuplaLote[];
   /** mentor: as duplas DPP vivas dele — o rodapé linka cada ficha. */
   fichasMentor?: { id: string; jovemNome: string }[];
   /** último nudge por dupla — o cap de 48h do Lembrar. */
@@ -505,60 +506,6 @@ export function InstrumentosPrograma({
             </article>
           );
         })}
-        {/* desfecho (0124): o card do 6 meses é coord-only — a régua é o
-            tempo de conclusão, não a janela do guia, e a emissão é gesto
-            humano em lote (nunca automático) */}
-        {ehCoord && (
-          <article
-            className={cn(
-              "relative flex flex-col gap-2.5 rounded-xl bg-card p-3.5 shadow-[var(--shadow-border)]",
-              formIds.get("desfecho") &&
-                "transition-shadow hover:shadow-[var(--shadow-border-hover)]"
-            )}
-          >
-            {formIds.get("desfecho") && (
-              <Link
-                href={`/formularios/${formIds.get("desfecho")}`}
-                aria-label="Ver respostas — Depois da mentoria · 6 meses"
-                className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            )}
-            <div className="flex items-start gap-2.5">
-              <InstrumentoEmblema instrumento="desfecho" />
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold leading-snug">
-                  Depois da mentoria · 6 meses
-                </h3>
-                <p className="mt-1 flex flex-wrap items-center gap-1.5">
-                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground sm:text-[11px]">
-                    6 meses depois
-                  </span>
-                  <Badge variant="outline" className="text-xs font-medium">
-                    sob demanda
-                  </Badge>
-                </p>
-              </div>
-            </div>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              O jovem conta como está depois da jornada: estudando,
-              trabalhando ou empreendendo. Vai pra quem concluiu há pelo
-              menos 6 meses e ainda não respondeu.
-            </p>
-            <div className="relative mt-auto flex flex-wrap items-center gap-2 pt-1">
-              {desfechoElegiveis.length > 0 ? (
-                <EnviarDesfechoLote
-                  linhas={desfechoElegiveis}
-                  envioLiberado={envioLiberado}
-                  contador={desfechoElegiveis.length}
-                />
-              ) : (
-                <span className="text-xs text-muted-foreground">
-                  Nenhuma dupla chegou aos 6 meses sem resposta.
-                </span>
-              )}
-            </div>
-          </article>
-        )}
       </div>
       {atrasados.length > 0 && (
         <section
@@ -606,10 +553,11 @@ export function InstrumentosPrograma({
           ))}
         </p>
       )}
-      {/* coord-only: intakes, avaliação da trilha e desfecho moram em /formularios */}
+      {/* coord-only: os instrumentos que sobraram em /formularios são os
+          intakes de matching — os fechamentos da jornada moram aqui */}
       {ehCoord && (
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Intakes, avaliação da trilha e desfecho ficam em{" "}
+          As inscrições de matching ficam em{" "}
           <Link
             href="/formularios"
             className="font-medium underline underline-offset-2 hover:text-foreground"
