@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { audienciasDe, veMaterial } from "@/lib/materiais";
 import { temPapel } from "@/lib/types";
 import {
   getCicloEventos,
@@ -442,16 +443,12 @@ export default async function AgendaPage({
     getMeuMentorProfile(),
     temEspecialista ? getEspecialistaEventos() : Promise.resolve([]),
   ]);
-  // audiência = mesma regra de /materiais: "todos" pra todo mundo, "dpp" e
-  // "especialista" pro papel correspondente, coordenação vê tudo
-  const materiaisVisiveis = materiais.filter((m) => {
-    if (m.audiencia === "todos") return true;
-    if (me?.role === "coordenacao") return true;
-    if (m.audiencia === "dpp") return temPapel(me, "mentor_dpp");
-    if (m.audiencia === "especialista")
-      return temPapel(me, "mentor_especialista");
-    return false;
-  });
+  // audiência = mesma régua do módulo de materiais (`veMaterial`): a lista
+  // por papel cobre auxiliar executivo e mentorando, e o legado de valor
+  // único é normalizado em `audienciasDe`
+  const materiaisVisiveis = materiais.filter((m) =>
+    veMaterial(audienciasDe(m), me)
+  );
   // chamada dos encontros de formação — só a coordenação marca; pros demais
   // papéis nem busca (a UI nem renderiza o painel fora da coordenação)
   const idsFormacao = eventos

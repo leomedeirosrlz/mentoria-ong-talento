@@ -528,7 +528,11 @@ export type Material = {
   url: string | null;
   /** Arquivo oficial no bucket `materiais` — quando presente, é o destino (a url não é usada). */
   path: string | null;
+  /** Audiência legada de valor único — normalizada por `audienciasDe`
+   *  (`src/lib/materiais.ts`). A coluna `audiencias` é a verdade. */
   audiencia: "todos" | "dpp" | "especialista" | "coordenacao";
+  /** Público por papel (0139) — cumulativo; `todos` inclui o jovem. */
+  audiencias?: string[] | null;
   encontro_num: number | null;
   ordem: number;
 };

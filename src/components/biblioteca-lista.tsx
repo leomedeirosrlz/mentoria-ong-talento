@@ -11,6 +11,7 @@ import {
   PuzzlePiece,
 } from "@phosphor-icons/react";
 import { linkSeguro } from "@/lib/ciclo";
+import { AUDIENCIA_LABEL, audienciasDe } from "@/lib/materiais";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -46,13 +47,6 @@ const CATEGORIAS: { tipo: Material["tipo"]; rotulo: string }[] = [
   { tipo: "conteudo", rotulo: "Conteúdos e roteiros" },
   { tipo: "link", rotulo: "Links" },
 ];
-
-const AUDIENCIA_LABEL = {
-  todos: "todos",
-  dpp: "mentores DPP",
-  especialista: "especialistas",
-  coordenacao: "coordenação",
-} as const;
 
 /** sem acento e minúsculo — "visao" acha "Visão". */
 function normaliza(s: string): string {
@@ -150,11 +144,15 @@ function Linha({
       )}
       {ehCoord && (
         <span className="flex shrink-0 items-center gap-2">
-          {m.audiencia !== "todos" && (
-            <Badge variant="outline" className="hidden text-xs sm:inline-flex">
-              {AUDIENCIA_LABEL[m.audiencia]}
-            </Badge>
-          )}
+          {(() => {
+            const aud = audienciasDe(m);
+            if (aud.includes("todos")) return null;
+            return (
+              <Badge variant="outline" className="hidden gap-1 text-xs sm:inline-flex">
+                {aud.map((a) => AUDIENCIA_LABEL[a]).join(" · ")}
+              </Badge>
+            );
+          })()}
           {!href && (
             <Badge variant="outline" className="text-xs text-muted-foreground">
               sem conteúdo

@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { audienciasDe, veMaterial } from "@/lib/materiais";
 import { createClient } from "@/lib/supabase/server";
 import { demoRole } from "@/lib/demo/mode";
 import { getDemoData } from "@/lib/demo/data";
@@ -25,11 +26,9 @@ export async function GET(
   if (demo) {
     const m = getDemoData().materiais.find((x) => x.id === id);
     // mesma régua da policy materiais_storage_select (0010): audiência filtra
-    const autorizado =
-      m?.audiencia === "todos" ||
-      demo === "coordenacao" ||
-      (m?.audiencia === "dpp" && demo === "mentor_dpp") ||
-      (m?.audiencia === "especialista" && demo === "mentor_especialista");
+    const autorizado = m
+      ? veMaterial(audienciasDe(m), { role: demo })
+      : false;
     if (!m?.path || m.path.startsWith("doc:") || !autorizado) {
       return apiErro("Material não encontrado.", { status: 404 });
     }

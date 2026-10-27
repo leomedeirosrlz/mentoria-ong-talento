@@ -23,6 +23,8 @@ import { linkSeguro, TRILHA_LEN } from "@/lib/ciclo";
 import { createClient } from "@/lib/supabase/client";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { AudienciasPicker } from "@/components/audiencias-picker";
+import { audienciasDe, type Audiencia } from "@/lib/materiais";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { EnviarEmailDialog } from "@/components/enviar-email-dialog";
@@ -64,12 +66,6 @@ const TIPO_LABEL = {
   template: "Modelo",
   conteudo: "Conteúdo",
   link: "Link",
-} as const;
-const AUDIENCIA_LABEL = {
-  todos: "Todos",
-  dpp: "Mentores DPP",
-  especialista: "Mentores especialistas",
-  coordenacao: "Coordenação",
 } as const;
 
 /** Destino do material — o mesmo das linhas/cards: "doc:<slug>" é o
@@ -164,9 +160,16 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
   // padrão dos encaminhamentos: o ConfirmDeleteButton sem trigger próprio)
   const [excluindo, setExcluindo] = useState(false);
   // audiência controlada — o teto de "encontro" segue a trilha dela
-  const [audiencia, setAudiencia] = useState(material.audiencia);
-  const maxEncontroSel =
-    audiencia === "especialista" ? TRILHA_LEN.especialista : (maxEncontro ?? 99);
+  const [audiencias, setAudiencias] = useState<Audiencia[]>(
+    audienciasDe(material)
+  );
+  const soEspecialista =
+    audiencias.includes("mentor_especialista") &&
+    !audiencias.includes("mentor_dpp") &&
+    !audiencias.includes("todos");
+  const maxEncontroSel = soEspecialista
+    ? TRILHA_LEN.especialista
+    : (maxEncontro ?? 99);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const href = hrefMaterial(material);
@@ -320,7 +323,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
           setEditOpen(o);
           // Select de audiência é defaultValue — sem o reset o estado fica
           // à frente do que ele exibe quando o dialog reabre
-          if (!o) setAudiencia(material.audiencia);
+          if (!o) setAudiencias(audienciasDe(material));
         }}
       >
         {/* mesmo teto do dialog de criação — os dois grids de 2 colunas
@@ -372,21 +375,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label id="mat-aud-label">Quem recebe</Label>
-                <Select
-                  name="audiencia"
-                  defaultValue={material.audiencia}
-                  onValueChange={(v) => setAudiencia((v ?? material.audiencia) as Material["audiencia"])}
-                >
-                  <SelectTrigger aria-labelledby="mat-aud-label"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(AUDIENCIA_LABEL).map(([v, l]) => (
-                      <SelectItem key={v} value={v}>{l}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <AudienciasPicker value={audiencias} onChange={setAudiencias} />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -397,7 +386,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
                   min={1} max={maxEncontroSel}
                   defaultValue={material.encontro_num ?? ""}
                 />
-                {audiencia === "todos" && (
+                {audiencias.includes("todos") && (
                   <p className="text-xs text-muted-foreground">
                     Pro jovem, libera quando a dupla chegar no encontro.
                   </p>

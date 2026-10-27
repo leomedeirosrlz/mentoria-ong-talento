@@ -1,4 +1,5 @@
 import { getDemoData, type DemoData } from "./data";
+import { audienciasDe, veMaterial } from "../materiais";
 import { comparaNome, registroTardio, semanaBounds } from "../ciclo";
 import { slotsLivresEspecialista } from "./agenda";
 import { normaliza } from "../utils";
@@ -413,16 +414,13 @@ export function demoSlotsLivres(profileId: string, dias = 21): string[] {
 export function demoMateriais(role: AppRole): Material[] {
   const data = getDemoData();
   const eu = data.personas[role];
+  // papéis efetivos da persona (profile_papeis do dataset) — é o que faz o
+  // híbrido ver os dois lados; o `role` sozinho perderia o secundário
+  const papeis = papeisDe(data, eu);
   return data.materiais
-    .filter(
-      (m) =>
-        m.audiencia === "todos" ||
-        role === "coordenacao" ||
-        // papeis (WP0b) em vez do role do cookie: o híbrido recebe a
-        // audiência dos dois lados — "as duas superfícies" do papel multi
-        (m.audiencia === "dpp" && temPapel(data, eu, "mentor_dpp")) ||
-        (m.audiencia === "especialista" &&
-          temPapel(data, eu, "mentor_especialista"))
+    .filter((m) =>
+      // mesma régua do app/RLS (0139): audiencias cumulativas por papel
+      veMaterial(audienciasDe(m), { role: eu.role, papeis })
     )
     .sort((a, b) => a.ordem - b.ordem);
 }

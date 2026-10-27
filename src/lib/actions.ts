@@ -47,6 +47,7 @@ import {
 } from "@/lib/importar-duplas";
 import { notificar } from "./notificar";
 import { bloqueioTrocaPapel } from "./papel-vinculo";
+import { AUDIENCIAS, audienciaLegada } from "./materiais";
 import { ROLES_POR_AUDIENCIA } from "@/lib/email";
 import {
   dispararComunicadoEmail,
@@ -3796,7 +3797,22 @@ export async function conflitoEncontro(
 // ---------- materiais ----------
 
 const TIPOS_MATERIAL = ["guia", "template", "conteudo", "link"] as const;
-const AUDIENCIAS_MATERIAL = ["todos", "dpp", "especialista", "coordenacao"] as const;
+const AUDIENCIAS_MATERIAL = AUDIENCIAS;
+
+/** Material fala por papel; o disparo de e-mail tem vocabulário próprio
+ *  (todos | dpp | especialista | equipe | coordenacao). Auxiliar executivo e
+ *  mentorando ainda não têm lista de e-mail própria — não entram no disparo
+ *  automático (o material continua visível pra eles no app). */
+function audienciasEmail(audiencias: readonly string[]): string[] {
+  const out = new Set<string>();
+  for (const a of audiencias) {
+    if (a === "todos") out.add("todos");
+    else if (a === "mentor_dpp") out.add("dpp");
+    else if (a === "mentor_especialista") out.add("especialista");
+    else if (a === "coordenacao") out.add("coordenacao");
+  }
+  return [...out];
+}
 
 /** Path do arquivo oficial — gerado no client como `materiais/{uuid}-{nome-saneado}`. */
 const MATERIAL_PATH_RE = /^materiais\/[0-9a-f-]{36}-[a-zA-Z0-9._-]+$/;
@@ -3808,9 +3824,15 @@ export async function salvarMaterial(formData: FormData) {
   const titulo = String(formData.get("titulo") ?? "").trim();
   if (!titulo) return { error: "Título é obrigatório." };
   const tipo = String(formData.get("tipo") || "link");
-  const audiencia = String(formData.get("audiencia") || "todos");
-  if (!(TIPOS_MATERIAL as readonly string[]).includes(tipo) ||
-      !(AUDIENCIAS_MATERIAL as readonly string[]).includes(audiencia)) {
+  const audiencias = String(formData.get("audiencias") || "todos")
+    .split(",")
+    .map((a) => a.trim())
+    .filter(Boolean);
+  if (
+    !(TIPOS_MATERIAL as readonly string[]).includes(tipo) ||
+    !audiencias.length ||
+    audiencias.some((a) => !(AUDIENCIAS_MATERIAL as readonly string[]).includes(a))
+  ) {
     return { error: "Revise os campos: um dos valores não é válido." };
   }
   const url = String(formData.get("url") ?? "").trim() || null;
@@ -3830,10 +3852,14 @@ export async function salvarMaterial(formData: FormData) {
   // numera dentro dos 5 passos dela, o resto dentro do ciclo DPP. O teto é
   // o maior nº entre TODOS os cronogramas (material não é por turma — a 0061
   // deixa o número solto até uma decisão de escopo própria)
-  const maxNumMat =
-    audiencia === "especialista"
-      ? maxEncontros("especialista")
-      : (maxEv?.numero ?? 16);
+  // material só da trilha de especialista numera dentro dos 5 passos dela
+  const soEspecialista =
+    audiencias.includes("mentor_especialista") &&
+    !audiencias.includes("mentor_dpp") &&
+    !audiencias.includes("todos");
+  const maxNumMat = soEspecialista
+    ? maxEncontros("especialista")
+    : (maxEv?.numero ?? 16);
   if (
     encontroRaw &&
     (!Number.isInteger(encontroNum) || encontroNum! < 1 || encontroNum! > maxNumMat)
@@ -3850,7 +3876,8 @@ export async function salvarMaterial(formData: FormData) {
     tipo,
     url,
     path,
-    audiencia,
+    audiencia: audienciaLegada(audiencias),
+    audiencias,
     encontro_num: encontroNum,
     ordem: (maxOrd?.ordem ?? 0) + 1,
   }).select("id").single();
@@ -3862,10 +3889,12 @@ export async function salvarMaterial(formData: FormData) {
   const email = await dispararMaterialEmail({
     supabase,
     material: { id: novo.id as string, titulo, descricao, tipo, url, path },
-    audiencias: [audiencia],
+    audiencias: audienciasEmail(audiencias),
     autorId: eu.id,
     excluirRoles:
-      audiencia === "todos" && encontroNum != null ? ["mentorado"] : undefined,
+      audiencias.includes("todos") && encontroNum != null
+        ? ["mentorado"]
+        : undefined,
   });
   revalidatePath("/materiais");
   // id volta pro client poder desfazer a row se o upload do arquivo falhar
@@ -3879,9 +3908,15 @@ export async function editarMaterial(id: string, formData: FormData) {
   const titulo = String(formData.get("titulo") ?? "").trim();
   if (!titulo) return { error: "Título é obrigatório." };
   const tipo = String(formData.get("tipo") || "link");
-  const audiencia = String(formData.get("audiencia") || "todos");
-  if (!(TIPOS_MATERIAL as readonly string[]).includes(tipo) ||
-      !(AUDIENCIAS_MATERIAL as readonly string[]).includes(audiencia)) {
+  const audiencias = String(formData.get("audiencias") || "todos")
+    .split(",")
+    .map((a) => a.trim())
+    .filter(Boolean);
+  if (
+    !(TIPOS_MATERIAL as readonly string[]).includes(tipo) ||
+    !audiencias.length ||
+    audiencias.some((a) => !(AUDIENCIAS_MATERIAL as readonly string[]).includes(a))
+  ) {
     return { error: "Revise os campos: um dos valores não é válido." };
   }
   const url = String(formData.get("url") ?? "").trim() || null;
@@ -3891,10 +3926,13 @@ export async function editarMaterial(id: string, formData: FormData) {
   const { data: maxEv } = await supabase
     .from("ciclo_eventos").select("numero")
     .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle();
-  const maxNumMat =
-    audiencia === "especialista"
-      ? maxEncontros("especialista")
-      : (maxEv?.numero ?? 16);
+  const soEspecialista =
+    audiencias.includes("mentor_especialista") &&
+    !audiencias.includes("mentor_dpp") &&
+    !audiencias.includes("todos");
+  const maxNumMat = soEspecialista
+    ? maxEncontros("especialista")
+    : (maxEv?.numero ?? 16);
   if (
     encontroRaw &&
     (!Number.isInteger(encontroNum) || encontroNum! < 1 || encontroNum! > maxNumMat)
@@ -3908,7 +3946,8 @@ export async function editarMaterial(id: string, formData: FormData) {
       descricao: String(formData.get("descricao") ?? "").trim() || null,
       tipo,
       url,
-      audiencia,
+      audiencia: audienciaLegada(audiencias),
+      audiencias,
       encontro_num: encontroNum,
     })
     .eq("id", id)

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { audienciasDe, veMaterial } from "@/lib/materiais";
 import Link from "next/link";
 import {
   getCicloEventos,
@@ -56,14 +57,7 @@ export default async function MateriaisPage({
   // vê e faz o que a RLS (has_papel) e a RPC de lote já autorizam
   const ehCoord = temPapel(me, "coordenacao");
 
-  const visiveis = materiais.filter((m) => {
-    if (m.audiencia === "todos") return true;
-    if (ehCoord) return true;
-    if (m.audiencia === "dpp") return temPapel(me, "mentor_dpp");
-    if (m.audiencia === "especialista")
-      return temPapel(me, "mentor_especialista");
-    return false;
-  });
+  const visiveis = materiais.filter((m) => veMaterial(audienciasDe(m), me));
 
   // encontro_num do material é por programa (o guia do 5º vale pras duas
   // turmas) — o teto do hub é o maior nº que existe, não a soma das linhas

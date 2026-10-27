@@ -2544,6 +2544,7 @@ export type Database = {
       materiais: {
         Row: {
           audiencia: string
+          audiencias: string[]
           created_at: string
           descricao: string | null
           encontro_num: number | null
@@ -2556,6 +2557,7 @@ export type Database = {
         }
         Insert: {
           audiencia?: string
+          audiencias?: string[]
           created_at?: string
           descricao?: string | null
           encontro_num?: number | null
@@ -2568,6 +2570,7 @@ export type Database = {
         }
         Update: {
           audiencia?: string
+          audiencias?: string[]
           created_at?: string
           descricao?: string | null
           encontro_num?: number | null

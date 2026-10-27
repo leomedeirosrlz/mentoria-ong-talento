@@ -92,5 +92,14 @@ insert into public.materiais (titulo, descricao, tipo, url, audiencia, encontro_
   ('Checklist de competências do mentor', 'As 10 competências do guia para marcar antes do ciclo e no 16º encontro.', 'template', null, 'dpp', null, 30, 'doc:checklist-competencias')
 on conflict do nothing;
 
+-- 0139: audiência granular derivada do legado — o seed nasce com a coluna
+-- no default ('todos'); o mapeamento é o mesmo da migration
+update public.materiais set audiencias = case audiencia
+  when 'dpp' then array['mentor_dpp']
+  when 'especialista' then array['mentor_especialista']
+  when 'coordenacao' then array['coordenacao']
+  else array['todos'] end
+where audiencia <> 'todos' and audiencias = array['todos'];
+
 -- sem dados de pessoas/duplas: cadastro real acontece pela plataforma
 -- (pessoas -> magic link; duplas pela coordenação)

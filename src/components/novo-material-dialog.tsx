@@ -18,6 +18,8 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
+import { AudienciasPicker } from "@/components/audiencias-picker";
+import type { Audiencia } from "@/lib/materiais";
 
 // labels registradas nos Selects — sem elas o trigger fechado mostra o valor
 // cru do enum ("dpp", "coordenacao")
@@ -27,13 +29,6 @@ const TIPO_LABEL = {
   conteudo: "Conteúdo",
   link: "Link",
 } as const;
-const AUDIENCIA_LABEL = {
-  todos: "Todos",
-  dpp: "Mentores DPP",
-  especialista: "Mentores especialistas",
-  coordenacao: "Coordenação",
-} as const;
-
 const LIMITE_BYTES = 20 * 1024 * 1024;
 const BUCKET = "materiais";
 // pílula de escolha exclusiva (arquivo × link): radio nativo sr-only dentro
@@ -75,7 +70,7 @@ export function NovoMaterialDialog({
   const [destino, setDestino] = useState<"link" | "arquivo">("arquivo");
   // audiência controlada — o teto de "encontro relacionado" segue a trilha
   // dela (5 no especialista, N do ciclo nas demais)
-  const [audiencia, setAudiencia] = useState("todos");
+  const [audiencias, setAudiencias] = useState<Audiencia[]>(["todos"]);
   // encontro controlado pelo mesmo motivo (defaultValue deixaria o valor
   // digitado sobreviver ao fechar/reabrir; defaultEncontro é o reset)
   const [encontroNum, setEncontroNum] = useState(
@@ -84,8 +79,15 @@ export function NovoMaterialDialog({
   // nome do arquivo escolhido — o input real é hidden (padrão dos anexos
   // do app); sem o state o nome ficaria invisível até o submit
   const [fileNome, setFileNome] = useState<string | null>(null);
-  const maxEncontroSel =
-    audiencia === "especialista" ? TRILHA_LEN.especialista : maxEncontro;
+  // teto de encontro: material só da trilha de especialista numera nos 5
+  // passos dela; qualquer outro público usa o ciclo DPP
+  const soEspecialista =
+    audiencias.includes("mentor_especialista") &&
+    !audiencias.includes("mentor_dpp") &&
+    !audiencias.includes("todos");
+  const maxEncontroSel = soEspecialista
+    ? TRILHA_LEN.especialista
+    : maxEncontro;
   const [pending, start] = useTransition();
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
@@ -138,7 +140,7 @@ export function NovoMaterialDialog({
         setOpen(false);
         // fecha programático não passa pelo onOpenChange — reseta aqui também
         setDestino("arquivo");
-        setAudiencia("todos");
+        setAudiencias(["todos"]);
         setEncontroNum(defaultEncontro?.toString() ?? "");
         setFileNome(null);
         if (fileRef.current) fileRef.current.value = "";
@@ -159,7 +161,7 @@ export function NovoMaterialDialog({
         // estado sobrevive e dessincroniza do que ele exibe na reabertura)
         if (!o) {
           setDestino("arquivo");
-          setAudiencia("todos");
+          setAudiencias(["todos"]);
           setEncontroNum(defaultEncontro?.toString() ?? "");
           setFileNome(null);
           if (fileRef.current) fileRef.current.value = "";
@@ -203,22 +205,7 @@ export function NovoMaterialDialog({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label id="mat-audiencia-label">Quem recebe</Label>
-              <Select
-                name="audiencia"
-                defaultValue="todos"
-                items={AUDIENCIA_LABEL}
-                onValueChange={(v) => setAudiencia(v ?? "todos")}
-              >
-                <SelectTrigger id="mat-audiencia-select" aria-labelledby="mat-audiencia-label mat-audiencia-select"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {Object.entries(AUDIENCIA_LABEL).map(([v, l]) => (
-                    <SelectItem key={v} value={v}>{l}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+            <AudienciasPicker value={audiencias} onChange={setAudiencias} />
           </div>
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium leading-none">Como publicar</legend>
@@ -304,8 +291,8 @@ export function NovoMaterialDialog({
             />
             <p className="text-xs text-muted-foreground">
               Opcional. Agrupa o material na seção daquele encontro na biblioteca
-              {audiencia === "especialista" ? " (a trilha tem 5)" : ""}.
-              {audiencia === "todos"
+              {soEspecialista ? " (a trilha tem 5)" : ""}.
+              {audiencias.includes("todos")
                 ? " Pro jovem, libera quando a dupla chegar nele."
                 : ""}
             </p>
