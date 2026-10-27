@@ -51,7 +51,7 @@ test.describe("demo — Minha jornada do mentorado", () => {
     ).toBeVisible();
 
     // a estante — os 5 instrumentos da janela como cards-produto, todos
-    // com a tag "Feito" + a data; a devolutiva de terceiros mora entre eles
+    // com a tag "Feito" + a data
     const trilha = page.locator(
       'section[aria-labelledby="meus-instrumentos-titulo"]'
     );
@@ -61,7 +61,6 @@ test.describe("demo — Minha jornada do mentorado", () => {
       "Definindo minhas metas",
       "PDM · Plano de Desenvolvimento",
       "Avaliação do encontro",
-      "Avaliação por terceiros",
     ]) {
       await expect(
         trilha.getByRole("heading", { name: titulo })
@@ -392,8 +391,8 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     }
 
     // a régua oficial separada da biblioteca (v5c), agora na própria aba:
-    // os 8 instrumentos do programa em cards — a devolutiva de terceiros
-    // entre eles, nunca material solto de acervo
+    // os instrumentos do programa em cards — nunca material solto de
+    // acervo
     await page.goto("/materiais?aba=instrumentos");
     const instrumentos = page.locator(
       'section[aria-labelledby="instrumentos-titulo"]'
@@ -401,7 +400,6 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     await expect(instrumentos).toBeVisible();
     for (const titulo of [
       "Roda da Vida · leitura inicial",
-      "Avaliação por terceiros",
       "Avaliação Geral - 360º · mentorado(a)",
       "Avaliação Geral - 360º · mentor(a)",
     ]) {

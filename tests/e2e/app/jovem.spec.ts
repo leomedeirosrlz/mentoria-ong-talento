@@ -322,7 +322,7 @@ test.describe("mentorado — shell /jovem", () => {
     ).toBeVisible();
 
     // a estante "Meus instrumentos" (v5c) — os 7 instrumentos sempre na
-    // ordem narrativa do guia + a devolutiva de terceiros entre eles.
+    // ordem narrativa do guia.
     // Com o realizado no lugar (enc. corrente 16) todos estão visíveis.
     const trilha = page.locator(
       'section[aria-labelledby="meus-instrumentos-titulo"]'
@@ -335,7 +335,6 @@ test.describe("mentorado — shell /jovem", () => {
       "Construindo a sua Visão",
       "Definindo minhas metas",
       "PDM · Plano de Desenvolvimento",
-      "Avaliação por terceiros",
       "Avaliação do encontro",
       "Roda da Vida · aplicação formal",
       "Avaliação final",

@@ -18,6 +18,7 @@ import {
   LockSimple,
   MapPin,
   PuzzlePiece,
+  UsersThree,
 } from "@phosphor-icons/react/dist/ssr";
 import {
   AvaliarPendenteButton,
@@ -60,6 +61,7 @@ import {
   getJovemEncontros,
   getJovemJornada,
 } from "@/lib/queries-jovem";
+import { getConsolidadoTerceirosJovem } from "@/lib/terceiros/queries";
 import { MaterialMenu } from "@/components/material-actions";
 import { PreviewLink } from "@/components/material-preview-pdf";
 import { MaterialThumb } from "@/components/material-thumb";
@@ -138,7 +140,7 @@ function diaMesCurto(iso: string | null | undefined): string {
 }
 
 export default async function JovemMateriais() {
-  const [me, jornada, encontros, avaliacoes, duplas, materiais] =
+  const [me, jornada, encontros, avaliacoes, duplas, materiais, consolidadoTerc] =
     await Promise.all([
       getMe(),
       // a RPC fora do ar devolve a página ao formato anterior — nunca quebra
@@ -147,6 +149,8 @@ export default async function JovemMateriais() {
       getJovemAvaliacoes(),
       getJovemDuplas(),
       getMateriais(),
+      // o consolidado de terceiros publicado — cache()ada, a home já chama
+      getConsolidadoTerceirosJovem().catch(() => null),
     ]);
   if (!me) return null; // o layout já barra — convenção das páginas
 
@@ -475,6 +479,32 @@ export default async function JovemMateriais() {
           </span>
         </p>
       </section>
+
+      {/* Como as pessoas próximas te veem (0103): a síntese anônima que o
+          mentor publica. A coleta ficou fora da plataforma (decisão Leo,
+          out/2026) — o que mora aqui é só a devolutiva já consolidada */}
+      {consolidadoTerc && (
+        <section
+          aria-labelledby="terceiros-titulo"
+          className="scroll-mt-28 space-y-3 md:scroll-mt-14"
+        >
+          <h2 id="terceiros-titulo" className="flex items-center gap-2 text-base font-semibold">
+            <UsersThree size={18} className="text-muted-foreground" aria-hidden />
+            Como as pessoas próximas te veem
+          </h2>
+          <Card className="animate-enter">
+            <CardContent>
+              <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                {consolidadoTerc.consolidado}
+              </p>
+              <p className="mt-3 border-t border-border/60 pt-2 text-xs text-muted-foreground">
+                Síntese que seu mentor fez das respostas. Quem respondeu fica
+                anônimo.
+              </p>
+            </CardContent>
+          </Card>
+        </section>
+      )}
 
       {/* ---------- acervo: a biblioteca, agora progressiva (REALIZA-160 —
           material com encontro_num libera quando a jornada alcança) ------- */}
