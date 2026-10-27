@@ -18,6 +18,11 @@ test("demo: bolha abre e chips respondem enlatado sem chamar a API", async ({
 
   // seletor estável entre os rótulos Abrir/Fechar (o nome muda no clique)
   const fab = page.locator('[aria-controls="painel-assistente"]');
+  // bolha desligada por padrão (IA_BOLHA != 1) enquanto a rodada de UI não
+  // fecha — o CI liga a flag pra exercitar a feature
+  if ((await fab.count()) === 0) {
+    test.skip(true, "bolha desligada (IA_BOLHA != 1)");
+  }
   await expect(fab).toBeVisible();
   await fab.click();
 

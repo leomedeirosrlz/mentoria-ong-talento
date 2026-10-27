@@ -127,9 +127,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // que a página antiga passava
   const papeisIa =
     me.papeis && me.papeis.length ? me.papeis : me.role ? [me.role] : [];
-  // a bolha está viva pra quem já podia abrir o assistente pelo nav; sem
-  // IA_API_* o próprio painel diz que está indisponível (o gate é de papel)
+  // a bolha está DESLIGADA por padrão enquanto o assistente fecha a rodada
+  // de UI (gravação da demo, out/2026). IA_BOLHA=1 liga no ambiente — o e2e
+  // do app liga explicitamente; sem a flag não há entrada nenhuma pra staff
   const acessoIa =
+    process.env.IA_BOLHA === "1" &&
     ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"].some(
       (r) => papeisIa.includes(r as AppRole)
     );
