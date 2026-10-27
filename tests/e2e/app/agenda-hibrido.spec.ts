@@ -61,14 +61,19 @@ test.describe("agenda do mentor híbrido", () => {
       tablistModos(page).getByRole("tab", { name: "Especialista" })
     ).toHaveAttribute("aria-selected", "true");
 
-    // volta pro DPP pela mesma barra — a aba DPP é alcançável (regressão do ALTA)
+    // volta pro DPP pela mesma barra — a aba DPP é alcançável (regressão do ALTA).
+    // No híbrido de primário DPP o link volta pra `?aba=minha` (o `?visao=dpp`
+    // só é obrigatório quando o default da página cai na visão esp); o que
+    // importa é o modo selecionado e o painel.
     await tablistModos(page)
       .getByRole("tab", { name: "Minha agenda" })
       .click();
-    await page.waitForURL((url) => url.searchParams.get("visao") === "dpp");
     await expect(
       tablistModos(page).getByRole("tab", { name: "Minha agenda" })
     ).toHaveAttribute("aria-selected", "true");
+    await expect(
+      page.getByRole("tabpanel", { name: "Minha agenda" })
+    ).toBeVisible();
   });
 
   test("esp-primário: cai na visão especialista e os modos DPP seguem alcançáveis", async ({
