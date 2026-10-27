@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   ArrowSquareOut,
@@ -17,11 +17,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { MaterialActions } from "@/components/material-actions";
 
-// Biblioteca em lista única (REALIZA-210): todos os materiais num card só,
-// sem agrupar por encontro, tipo ou público — o agrupamento adicionava
-// atrito (abrir dropdown pra achar um arquivo). O encontro vira um meta
-// discreto na linha; a busca resolve o "onde está". Ordem: referência do
-// programa primeiro (guias e modelos sem encontro), depois por encontro.
+// Biblioteca em seções por categoria (REALIZA-250): a lista única da
+// REALIZA-210 misturava guia, modelo, roteiro e link — a coordenação não
+// achava por tipo. Cada material cai em exatamente uma seção derivada de
+// `tipo`; o encontro segue meta discreto da linha e a busca filtra dentro
+// das seções (a que ficar vazia some). Ordem dentro de cada seção:
+// encontro → ordem → título.
 
 const TIPO_ICONE = {
   guia: BookOpen,
@@ -36,6 +37,15 @@ const TIPO_LABEL = {
   conteudo: "Conteúdo",
   link: "Link",
 } as const;
+
+/** Seções da biblioteca na ordem de leitura — todo `tipo` tem uma casa:
+ *  o material aparece em exatamente uma categoria, sem sobrar fora. */
+const CATEGORIAS: { tipo: Material["tipo"]; rotulo: string }[] = [
+  { tipo: "guia", rotulo: "Guias" },
+  { tipo: "template", rotulo: "Modelos e instrumentos" },
+  { tipo: "conteudo", rotulo: "Conteúdos e roteiros" },
+  { tipo: "link", rotulo: "Links" },
+];
 
 const AUDIENCIA_LABEL = {
   todos: "todos",
@@ -167,6 +177,7 @@ export function BibliotecaLista({
   titulo?: string;
 }) {
   const [busca, setBusca] = useState("");
+  const baseId = useId();
   const ordenados = useMemo(() => [...materiais].sort(ordena), [materiais]);
   const q = normaliza(busca.trim());
   const visiveis = q
@@ -207,23 +218,39 @@ export function BibliotecaLista({
           Nenhum material com “{busca.trim()}”.
         </p>
       ) : (
-        // re-key na busca: a lista remonta e a entrada anima (convenção de
-        // movimento — troca de filtro nunca é repaint seco)
-        <ul
-          key={q}
-          className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card py-1 shadow-[var(--shadow-border)]"
-        >
-          {visiveis.map((m, i) => (
-            <Linha
-              key={m.id}
-              m={m}
-              ehCoord={ehCoord}
-              maxEncontro={maxEncontro}
-              vigente={vigente}
-              indice={i}
-            />
-          ))}
-        </ul>
+        // re-key na busca: as seções remontam e a entrada anima (convenção
+        // de movimento — troca de filtro nunca é repaint seco)
+        <div key={q} className="space-y-5">
+          {CATEGORIAS.map(({ tipo, rotulo }) => {
+            const itens = visiveis.filter((m) => m.tipo === tipo);
+            if (itens.length === 0) return null;
+            return (
+              <section key={tipo} aria-labelledby={`${baseId}-${tipo}`}>
+                <h3
+                  id={`${baseId}-${tipo}`}
+                  className="mb-2 text-sm font-semibold"
+                >
+                  {rotulo}
+                  <span className="ml-1.5 font-normal tabular-nums text-muted-foreground">
+                    {itens.length}
+                  </span>
+                </h3>
+                <ul className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card py-1 shadow-[var(--shadow-border)]">
+                  {itens.map((m, i) => (
+                    <Linha
+                      key={m.id}
+                      m={m}
+                      ehCoord={ehCoord}
+                      maxEncontro={maxEncontro}
+                      vigente={vigente}
+                      indice={i}
+                    />
+                  ))}
+                </ul>
+              </section>
+            );
+          })}
+        </div>
       )}
     </section>
   );

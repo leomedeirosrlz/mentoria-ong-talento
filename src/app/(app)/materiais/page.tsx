@@ -330,8 +330,9 @@ export default async function MateriaisPage({
             }
           />
         ) : (
-          /* staff: a biblioteca inteira numa lista só (REALIZA-210) —
-             editar/anexar/excluir no ⋯ de cada linha pra coord */
+          /* staff: a biblioteca inteira agrupada por categoria
+             (REALIZA-250) — editar/anexar/excluir no ⋯ de cada linha
+             pra coord */
           <BibliotecaLista
             materiais={visiveis}
             ehCoord={ehCoord}

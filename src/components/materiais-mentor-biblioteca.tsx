@@ -251,8 +251,8 @@ export function MateriaisMentorBiblioteca({
   /** transversais pro mentor DPP; pro especialista, tudo que ele vê. */
   referenciais: Material[];
 }) {
-  // um card por turma com o encontro da semana; abaixo, o acervo inteiro
-  // numa lista só (REALIZA-210) — sem próximos/adiante/anteriores
+  // um card por turma com o encontro da semana; abaixo, o acervo agrupado
+  // por categoria (REALIZA-250) — sem próximos/adiante/anteriores
   const todos = new Map<string, Material>();
   for (const lista of porEncontro.values())
     for (const m of lista) todos.set(m.id, m);
