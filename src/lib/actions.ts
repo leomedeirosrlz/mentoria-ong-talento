@@ -1067,8 +1067,11 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   const apresentacao = camposApresentacao(formData, { areasKey: "areas_perfil" });
   if ("error" in apresentacao) return { error: apresentacao.error };
   // ficha pessoal/matching (0034) — a escrita é table-level: coord edita de
-  // qualquer um; os sensíveis que ela lê via view ela também grava aqui
-  const ficha = camposFicha(formData, { de: "pessoa" });
+  // qualquer um; os sensíveis que ela lê via view ela também grava aqui.
+  // Patch parcial de propósito: campo que o form não renderiza (a preferência
+  // de par de quem não é mentor, REALIZA-231) não pode virar null no save —
+  // o dado já gravado sobrevive a uma edição feita por outro recorte de papel.
+  const ficha = camposFicha(formData, { de: "pessoa", parcial: true });
   if ("error" in ficha) return { error: ficha.error };
   const mentorCampos = camposMentor(formData);
   if ("error" in mentorCampos) return { error: mentorCampos.error };

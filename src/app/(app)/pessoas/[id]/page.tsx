@@ -878,12 +878,19 @@ export default async function PessoaPerfilPage({
                                 sempre={souCoord}
                                 className="sm:col-span-2"
                               />
-                              <Linha
-                                icone={<Users size={15} />}
-                                rotulo="Pref. de par"
-                                valor={p.pref_genero_par ? PREF_GENERO_LABELS[p.pref_genero_par] : null}
-                                sempre={souCoord}
-                              />
+                              {/* preferência de par só existe pra quem é
+                                  pareado: mentorado e mentor (REALIZA-231) */}
+                              {(ment ||
+                                (prof &&
+                                  (temPapel(prof, "mentor_dpp") ||
+                                    temPapel(prof, "mentor_especialista")))) && (
+                                <Linha
+                                  icone={<Users size={15} />}
+                                  rotulo="Pref. de par"
+                                  valor={p.pref_genero_par ? PREF_GENERO_LABELS[p.pref_genero_par] : null}
+                                  sempre={souCoord}
+                                />
+                              )}
                               {/* consent_lgpd_em só existe em profiles — mentorado é
                                   coberto pela autorização do responsável. Trilha de
                                   compliance, não perfil: fora da visão de colega */}

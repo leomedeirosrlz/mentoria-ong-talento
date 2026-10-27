@@ -216,14 +216,16 @@ export function NovaPessoaDialog() {
       ),
     },
     {
-      titulo: "Motivação e pareamento",
+      titulo: ehMentor ? "Motivação e pareamento" : "Motivação",
       conteudo: (
         <>
           <div className="space-y-2">
             <Label htmlFor="n_motivacao">Motivação</Label>
             <Textarea id="n_motivacao" name="motivacao" rows={2} maxLength={2000} placeholder="O que traz a pessoa ao programa" />
           </div>
-          <CampoPrefGenero />
+          {/* preferência de par só existe pra quem vai ser pareado
+              (REALIZA-231) — coordenação/supervisão não têm par */}
+          {ehMentor && <CampoPrefGenero />}
         </>
       ),
     },
