@@ -26,15 +26,18 @@ import {
   toDateStr,
 } from "@/lib/ciclo";
 import { MetricasRegistroCard } from "@/components/metricas-registro";
+import { RegistrosAgrupar } from "@/components/registros-agrupar";
 import { RegistrosFiltros, type OrdemRegistros } from "@/components/registros-filtros";
 import { RegistrosPainel } from "@/components/registros-painel";
 import { RegistrosMestreDetalhe, type SecaoLista } from "@/components/registros-mestre-detalhe";
 import type { EntradaRegistro } from "@/components/registros-detalhe";
 import {
   agruparRegistros,
+  GRUPOS_REGISTROS,
   grupoRegistrosDe,
   PERIODO_REGISTROS_OPCOES,
   periodoRegistrosDe,
+  type GrupoRegistros,
 } from "@/lib/registros";
 import { saudeDoRecorte } from "@/lib/agenda-coordenacao";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
@@ -345,6 +348,15 @@ export default async function RegistrosPage({
     Math.ceil(itens.length / REGISTROS_PAGINA)
   );
   const hrefBase = hrefCom({ r: null });
+  // eixo de agrupamento: controle de visualização no cabeçalho da lista —
+  // os hrefs preservam TODOS os params (inclusive ?pagina= cumulativa,
+  // porque reorganizam os mesmos itens, não filtram)
+  const hrefsGrupo = Object.fromEntries(
+    GRUPOS_REGISTROS.map((g) => [
+      g,
+      hrefCom({ grupo: g === "dupla" ? null : g }),
+    ])
+  ) as Record<GrupoRegistros, string>;
   // filtro, busca, ordem ou agrupamento trocados remontam a lista (animam);
   // trocar só a seleção ou carregar mais não remonta
   const chaveLista = JSON.stringify([{ ...filtros, pagina: 0 }, ordem, grupo]);
@@ -493,10 +505,12 @@ export default async function RegistrosPage({
           supervisor, o gate aqui deixa isso explícito */}
       {souCoord && metricas && <MetricasRegistroCard metricas={metricas} />}
 
-      {/* resumo operacional: o que pede ação vem logo antes da lista; clicar
-          num número aplica o filtro correspondente */}
+      {/* cabeçalho da lista: contador operacional à esquerda (clicar num
+          número aplica o filtro correspondente), controle de agrupamento
+          à direita — agrupar é visão, não filtro, então sai da barra */}
       {(total > 0 || alertas.apoio > 0 || alertas.tardios > 0) && (
-        <p className="text-sm text-muted-foreground" aria-live="polite">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+          <p className="text-sm text-muted-foreground" aria-live="polite">
           {temFiltro ? (
             <Link
               href={hrefLimpo}
@@ -555,6 +569,8 @@ export default async function RegistrosPage({
             </>
           )}
         </p>
+        <RegistrosAgrupar grupo={grupo} hrefs={hrefsGrupo} />
+      </div>
       )}
 
       {ordenados.length === 0 ? (

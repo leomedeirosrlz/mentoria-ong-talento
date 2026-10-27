@@ -26,8 +26,6 @@ import {
   DIFICULDADE_LABEL,
 } from "@/lib/ciclo";
 import {
-  GRUPOS_REGISTROS,
-  GRUPO_REGISTROS_OPCAO,
   PERIODO_REGISTROS_OPCOES,
   type GrupoRegistros,
 } from "@/lib/registros";
@@ -349,30 +347,6 @@ export function RegistrosFiltros({
   if (filtros.tardio) chips.push({ rotulo: "Registros tardios", href: sem("tardio") });
   if (filtros.q) chips.push({ rotulo: `Busca: “${filtros.q}”`, href: sem("q") });
 
-  // trocar o agrupamento não é filtrar — preserva TODOS os params atuais,
-  // inclusive a pagina cumulativa (o conjunto de itens não muda, só a
-  // organização visual)
-  const hrefGrupo = (g: GrupoRegistros) => {
-    const p = new URLSearchParams();
-    const atual: Record<string, string | undefined> = {
-      encontro: filtros.encontro ? String(filtros.encontro) : undefined,
-      avaliacao: filtros.avaliacao,
-      apoio: filtros.apoio ? "1" : undefined,
-      tardio: filtros.tardio ? "1" : undefined,
-      dificuldade: filtros.dificuldade,
-      dupla: filtros.dupla,
-      turma: filtros.turma,
-      periodo: filtros.periodo,
-      q: filtros.q,
-      ordem: ordem !== "recentes" ? ordem : undefined,
-      grupo: g !== "dupla" ? g : undefined,
-      pagina: filtros.pagina > 1 ? String(filtros.pagina) : undefined,
-    };
-    for (const [chave, v] of Object.entries(atual)) if (v) p.set(chave, v);
-    const qs = p.toString();
-    return `/registros${qs ? `?${qs}` : ""}`;
-  };
-
   // "Limpar tudo" zera filtros mas mantém os controles de visão (ordem +
   // agrupamento) — são preferência de leitura, não filtro
   const hrefLimpo = (() => {
@@ -418,35 +392,6 @@ export function RegistrosFiltros({
               setAberto(true);
             }}
           />
-        </div>
-
-        {/* eixo de agrupamento da lista — links de verdade (?grupo=),
-            mesma gramática dos chips: Cmd+click, back/forward e
-            aria-current de graça; "por dupla" é o default implícito */}
-        <div
-          role="group"
-          aria-label="Agrupar registros"
-          className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5"
-        >
-          <span className="text-xs text-muted-foreground">Agrupar:</span>
-          <div className="inline-flex items-center gap-0.5 rounded-full border bg-card p-0.5">
-            {GRUPOS_REGISTROS.map((g) => (
-              <Link
-                key={g}
-                href={hrefGrupo(g)}
-                scroll={false}
-                aria-current={grupo === g ? "page" : undefined}
-                className={cn(
-                  "inline-flex min-h-11 items-center rounded-full px-3 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-7",
-                  grupo === g
-                    ? "bg-muted font-semibold text-foreground"
-                    : "text-muted-foreground hover:bg-muted/60 hover:text-foreground"
-                )}
-              >
-                {GRUPO_REGISTROS_OPCAO[g]}
-              </Link>
-            ))}
-          </div>
         </div>
 
         {chips.length > 0 && (
