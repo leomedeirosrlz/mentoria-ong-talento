@@ -45,8 +45,10 @@ export function PageHeader({
           {children}
         </div>
         {actions != null && (
-          // self-start: botões ficam na linha do título mesmo com meta alta
-          <div className="flex flex-wrap items-center gap-2 self-start">
+          // self-start: botões ficam na linha do título mesmo com meta alta.
+          // Abaixo de lg ocupam linha própria (w-full) — senão a copy da
+          // meta vira coluna de 1–2 palavras apertada contra os botões
+          <div className="flex w-full flex-wrap items-center gap-2 self-start lg:w-auto">
             {actions}
           </div>
         )}

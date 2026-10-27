@@ -54,12 +54,12 @@ export function Pdm({
   }));
 
   return (
-    <div className="xl:grid xl:grid-cols-[180px_1fr] xl:items-start xl:gap-5">
-      {/* sumário lateral — só telas extra-largas: até xl o documento fica
-          em fluxo único (o preview do form cabe inteiro assim) */}
+    <div className="@lg:grid @lg:grid-cols-[180px_1fr] @lg:items-start @lg:gap-5">
+      {/* sumário lateral — só colunas largas (o form é @container): em
+          coluna estreita o documento fica em fluxo único */}
       <nav
         aria-label="Capítulos do PDM"
-        className="sticky top-16 hidden self-start space-y-1 xl:block"
+        className="sticky top-16 hidden self-start space-y-1 @lg:block"
       >
         <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Seu PDM
@@ -281,7 +281,7 @@ function FichasPdm({
                 />
                 <ErroCampo campo={g.meta} msg={api.erros[g.meta.id]} />
               </div>
-              <div className="grid gap-3 md:grid-cols-[1fr_180px]">
+              <div className="grid gap-3 @md:grid-cols-[1fr_180px]">
                 {g.is && (
                   <div className="space-y-1.5" data-campo={g.is.id}>
                     <label

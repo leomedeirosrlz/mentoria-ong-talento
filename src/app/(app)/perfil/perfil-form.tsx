@@ -573,9 +573,12 @@ export function ContaLinha({
         borda && "border-t border-border/60"
       )}
     >
-      <div className="min-w-0 flex-1">
+      {/* min-w-40: sem piso a ação larga (ex.: TemaToggle ~236px) espreme a
+          copy do rail de 340px numa coluna de 1–2 palavras — com piso o
+          flex-wrap derruba a ação pra linha própria */}
+      <div className="min-w-40 flex-1">
         <p className="text-sm font-medium">{titulo}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">
+        <p className="mt-0.5 text-xs text-muted-foreground text-pretty [overflow-wrap:anywhere]">
           {descricao}
         </p>
       </div>

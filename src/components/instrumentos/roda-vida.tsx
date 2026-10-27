@@ -28,10 +28,10 @@ import { CampoGenerico, campoDomId, EntradaTextoLongo, ErroCampo } from "./campo
 // área é um slider (setas/Home/End no teclado, toque/arraste na trilha)
 // com o número exato. Sem eixo algum acessível fica de fora.
 //
-// REALIZA-143 (variante A): no desktop (lg+) a roda veste a coroa de
-// nomes de área — as 16 áreas nomeadas de uma vez, como no PDF oficial
-// (`rotuloEixos` do RodaSvg, segundo render `hidden lg:block`). Abaixo
-// de lg fica a moldura compacta com números — mobile/média intocados.
+// REALIZA-143 (variante A): em coluna larga (@lg+, ~512px do form) a roda
+// veste a coroa de nomes de área — as 16 áreas nomeadas de uma vez, como
+// no PDF oficial (`rotuloEixos` do RodaSvg, segundo render `hidden
+// @lg:block`). Abaixo fica a moldura compacta com números.
 // A hierarquia dentro do cartão: título do eixo em fundo branco entre as
 // setas lime (linha própria, acima) → roda → −/+ lime (área de ajuste).
 
@@ -171,15 +171,15 @@ export function RodaVida({
         </div>
 
         {/* duas molduras do mesmo desenho: a compacta (números 1–16)
-            serve mobile e telas médias; a rotulada (coroa de nomes,
-            REALIZA-143) assume no desktop — display:none a tira da
+            serve colunas estreitas; a rotulada (coroa de nomes,
+            REALIZA-143) assume em coluna larga — display:none a tira da
             árvore de a11y e dos eventos quando não está visível */}
         <RodaSvg
           roda={roda}
           ativo={ativo}
           onMudanca={escolher}
           onFim={fimGesto}
-          className="mt-3 md:max-w-[360px] lg:hidden"
+          className="mt-3 @md:max-w-[360px] @lg:hidden"
         />
         <RodaSvg
           roda={roda}
@@ -187,7 +187,7 @@ export function RodaVida({
           onMudanca={escolher}
           onFim={fimGesto}
           rotuloEixos
-          className="mt-3 hidden lg:block lg:max-w-[500px]"
+          className="mt-3 hidden @lg:block @lg:max-w-[500px]"
         />
         {/* anúncio do gesto pro leitor de tela — o svg é aria-hidden, a
             nota sai por aqui ao soltar o dedo */}
@@ -428,7 +428,7 @@ function AreaSlider({
         onPointerMove={(e) => {
           if (e.buttons & 1) porPonteiro(e);
         }}
-        className="relative h-6 w-20 shrink-0 touch-none sm:w-28"
+        className="relative h-6 w-20 shrink-0 touch-none @sm:w-28"
       >
         <span className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-muted">
           <span

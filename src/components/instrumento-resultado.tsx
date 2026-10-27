@@ -90,21 +90,23 @@ function RodaResultado({
   if (!roda) return null;
   const reflexao = valorDe(campos, respostas, "reflexao");
 
+  // @container próprio: o resultado responde à largura da coluna onde foi
+  // montado (ficha, jornada, preview) — não à viewport
   return (
-    <div className="space-y-4">
-      {/* ≥lg: a roda veste a coroa de nomes de área (variante A —
+    <div className="@container space-y-4">
+      {/* coluna larga: a roda veste a coroa de nomes de área (variante A —
           REALIZA-143) e empilha com a lista; abaixo disso fica a
           moldura compacta de sempre lado a lado com as notas */}
-      <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-center lg:grid-cols-1">
+      <div className="grid gap-4 @sm:grid-cols-[auto_1fr] @sm:items-center @lg:grid-cols-1">
         <div className="text-center">
           <RodaSvg
             roda={roda}
-            className="max-w-[280px] sm:max-w-[300px] lg:hidden"
+            className="max-w-[280px] @sm:max-w-[300px] @lg:hidden"
           />
           <RodaSvg
             roda={roda}
             rotuloEixos
-            className="hidden lg:block lg:max-w-[460px]"
+            className="hidden @lg:block @lg:max-w-[460px]"
           />
           <p className="mt-1 text-sm text-muted-foreground">
             {roda.media != null && (
@@ -122,7 +124,7 @@ function RodaResultado({
         </div>
         {/* nota por área agrupada por quadrante — a barra repete a leitura
             do polígono pra quem precisa do número exato */}
-        <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-x-6 lg:gap-y-4 lg:space-y-0 lg:self-start">
+        <div className="space-y-3 @lg:grid @lg:grid-cols-2 @lg:gap-x-6 @lg:gap-y-4 @lg:space-y-0 @lg:self-start">
           {roda.quadrantes.map((q) => (
             <div key={q.nome || "geral"}>
               {q.nome && (
@@ -136,7 +138,7 @@ function RodaResultado({
                     <span className="min-w-0 flex-1 truncate" title={a.label}>
                       {a.label}
                     </span>
-                    <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-muted sm:w-20">
+                    <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-muted @sm:w-20">
                       <span
                         className="block h-full rounded-full bg-[var(--brand-lime)]"
                         style={{ width: `${((a.nota ?? 0) / 10) * 100}%` }}
@@ -230,12 +232,12 @@ function MetasResultado({
     .sort((a, b) => a.n - b.n);
 
   return (
-    <div className="space-y-4">
+    <div className="@container space-y-4">
       <Declaracao texto={declaracao} />
 
       {reflexoes.length > 0 && (
         <Bloco titulo="Pra chegar na visão">
-          <dl className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
+          <dl className="grid gap-x-4 gap-y-2 @sm:grid-cols-2">
             {reflexoes.map((r) => (
               <div key={r.rotulo}>
                 <dt className="text-xs font-medium text-muted-foreground">

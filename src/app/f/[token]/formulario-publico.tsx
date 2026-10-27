@@ -366,6 +366,9 @@ function FormularioGenerico({
     .reverse()
     .find((c) => TIPOS_COM_ENTER.includes(c.tipo))?.id;
 
+  // @container: os pontos de quebra do instrumento (roda, pdm, meta) são
+  // container queries — a mesma ficha responde à coluna real que recebeu,
+  // não à viewport (o preview em dialog mede a largura do dialog)
   return (
     <AnimatePresence mode="wait" initial={false}>
       {enviado ? (
@@ -399,7 +402,7 @@ function FormularioGenerico({
           key="form"
           {...fade}
           transition={T.enter}
-          className="space-y-3"
+          className="@container space-y-3"
         >
           {/* progresso fora dos cards: pill sticky que acompanha o scroll de
               forms longos (safe-area no top, padrão do onboarding) */}
@@ -438,7 +441,7 @@ function FormularioGenerico({
               <h1 className="mt-1 text-xl font-semibold tracking-tight">
                 {titulo}
               </h1>
-              <p className="mt-1 text-xs whitespace-nowrap text-muted-foreground">
+              <p className="mt-1 text-xs @sm:whitespace-nowrap text-muted-foreground">
                 {total} {total === 1 ? "pergunta" : "perguntas"} · leva ~
                 {minutos} min
               </p>
@@ -987,7 +990,7 @@ function CampoRenderer({
           <legend>
             <Rotulo campo={campo} n={n} />
           </legend>
-          <div className="mt-1.5 grid grid-cols-5 gap-1 rounded-xl bg-muted p-1 sm:grid-cols-10">
+          <div className="mt-1.5 grid grid-cols-5 gap-1 rounded-xl bg-muted p-1 @sm:grid-cols-10">
             {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
               <label
                 key={num}

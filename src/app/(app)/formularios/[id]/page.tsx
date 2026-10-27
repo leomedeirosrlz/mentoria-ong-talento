@@ -151,7 +151,7 @@ export default async function FormularioPage({
         meta={
           <>
             {f.descricao && (
-              <p className="max-w-xl leading-relaxed">{f.descricao}</p>
+              <p className="leading-relaxed text-pretty">{f.descricao}</p>
             )}
             <p className="mt-1.5 text-xs">
               Criado em {formatDate(f.created_at)}
