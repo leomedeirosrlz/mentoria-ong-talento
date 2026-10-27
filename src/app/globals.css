@@ -160,10 +160,6 @@
   --inst-360-t: hsl(304 30% 93%);
   /* sistemas fora da régua DPP (sem cor travada no mock) — mesma
      gramática, matizes fora das faixas já ocupadas */
-  --inst-anamnese: hsl(300 40% 42%);
-  --inst-anamnese-t: hsl(300 45% 94%);
-  --inst-autoavaliacao: hsl(330 45% 42%);
-  --inst-autoavaliacao-t: hsl(330 50% 94%);
   --inst-avaliacao-especialista: hsl(140 55% 28%);
   --inst-avaliacao-especialista-t: hsl(140 45% 92%);
   --inst-intake-mentor: hsl(95 55% 32%);
@@ -290,10 +286,6 @@
   --inst-roda-formal-t: hsl(180 35% 16%);
   --inst-360: hsl(304 45% 70%);
   --inst-360-t: hsl(304 22% 19%);
-  --inst-anamnese: hsl(300 45% 68%);
-  --inst-anamnese-t: hsl(300 28% 18%);
-  --inst-autoavaliacao: hsl(330 55% 68%);
-  --inst-autoavaliacao-t: hsl(330 30% 18%);
   --inst-avaliacao-especialista: hsl(140 45% 60%);
   --inst-avaliacao-especialista-t: hsl(140 30% 16%);
   --inst-intake-mentor: hsl(95 55% 62%);

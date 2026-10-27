@@ -234,10 +234,10 @@ export default async function AgendaPage({
           ? getUltimasInteracoes(idsDpp, "nudge")
           : Promise.resolve({}),
         // rito de encerramento aberto (REALIZA-172) — o card do mentorado
-        // concluído sinaliza a peça que falta (autoavaliação do mentor)
+        // concluído sinaliza que a coordenação fecha na ficha
         aba === "por-mentorado"
           ? getEncerramentosPendentes()
-          : Promise.resolve({}),
+          : Promise.resolve([]),
       ]);
     // o strip "Sua semana" do Por mentorado mostra os MESMOS itens da Minha
     // agenda — a derivação é pura (sem query nova), reusa o que a página já
@@ -390,9 +390,7 @@ export default async function AgendaPage({
           cronogramas={cronogramas}
           nudges={nudgesCoord}
           supervisoes={supervisoesCoord}
-          encerramentosPendentes={
-            new Set(Object.keys(encerramentosPendentes))
-          }
+          encerramentosPendentes={new Set(encerramentosPendentes)}
           meuNome={me.nome.split(" ")[0]}
           hoje={hoje}
           agora={agora.getTime()}

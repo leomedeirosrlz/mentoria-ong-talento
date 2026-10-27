@@ -259,7 +259,7 @@ export async function gerarLinksFormulario(input: {
   // os 4 instrumentos de jornada têm via própria (RPC emitir_link_instrumento
   // pela seção Instrumentos da ficha — o mentor entrega no tempo do guia e o
   // link já nasce com o contexto certo). O caminho genérico geraria um link
-  // de fora da trilha. 360º/anamnese/autoavaliação seguem por aqui mesmo.
+  // de fora da trilha. 360º segue por aqui mesmo.
   // A avaliação da trilha de especialista (0104) é emitida sozinha pelo
   // encerramento — um link manual pra mesma (form, dest, dupla) seria
   // absorvido pelo dedup da RPC e a notificação não sairia.

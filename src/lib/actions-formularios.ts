@@ -70,7 +70,7 @@ export async function gerarLinksParaDupla(input: {
   // instrumento de jornada não sai pelo caminho genérico — a seção
   // Instrumentos da ficha emite com contexto próprio (o mentor entrega).
   // gerarLinksFormulario repete o guard; aqui ele falha antes de ler a
-  // dupla. 360º/anamnese/autoavaliação seguem emissíveis daqui.
+  // dupla. 360º segue emissível daqui.
   const { data: form, error: eForm } = await supabase
     .from("formularios")
     .select("id, sistema")
@@ -174,81 +174,6 @@ export async function gerarLinksParaDupla(input: {
     criados: r.criados ?? 0,
     reutilizados: r.reutilizados ?? 0,
     links: prontos,
-  };
-}
-
-/** "Enviar anamnese" na ficha do mentorado — atalho pro instrumento oficial
- *  (sistema='anamnese', 0042). O form não vem do cliente: quem decide qual
- *  definição é "a anamnese" é o banco, senão qualquer form comum poderia ser
- *  passado como oficial. Reusa o pendente se já houver link válido. */
-export async function enviarAnamneseMentorado(
-  mentoradoId: string
-): Promise<
-  | { error: string }
-  | { ok: true; token: string; formularioId: string; reutilizado: boolean }
-> {
-  if (await demoAtivo()) return { error: DEMO_MSG };
-  if (!UUID_RE.test(mentoradoId)) return { error: "Mentorado inválido." };
-
-  const supabase = await createClient();
-  const { data: claimsData } = await supabase.auth.getClaims();
-  const { data: eu } = await supabase
-    .from("profiles")
-    .select("id, role")
-    .eq("user_id", (claimsData?.claims?.sub as string) ?? "")
-    .maybeSingle();
-  if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  if (eu.role !== "coordenacao")
-    return { error: "Só a coordenação envia formulários." };
-
-  const { data: form, error: eForm } = await supabase
-    .from("formularios")
-    .select("id, ativo")
-    .eq("sistema", "anamnese")
-    .maybeSingle();
-  if (eForm) return { error: erroAmigavel(eForm) };
-  if (!form)
-    return { error: "A anamnese oficial ainda não está cadastrada no banco." };
-  if (!form.ativo)
-    return { error: "A anamnese oficial está encerrada. Reative-a em Formulários." };
-
-  const { data: alvo } = await supabase
-    .from("mentorados")
-    .select("id")
-    .eq("id", mentoradoId)
-    .maybeSingle();
-  if (!alvo) return { error: "Mentorado(a) não encontrado(a)." };
-
-  const r = await gerarLinksFormulario({
-    formularioId: form.id,
-    destinos: [{ tipo: "mentorado", id: mentoradoId }],
-    diasValidade: null,
-  });
-  if (!("ok" in r))
-    return {
-      error:
-        (r as { error?: string }).error ?? "Não foi possível gerar o link.",
-    };
-
-  // lê de volta o token vigente — criado agora ou pendente reutilizado
-  const { data: link, error: eLink } = await supabase
-    .from("formulario_links")
-    .select("token")
-    .eq("formulario_id", form.id)
-    .eq("dest_mentorado_id", mentoradoId)
-    .is("usado_em", null)
-    .order("created_at", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  if (eLink) return { error: erroAmigavel(eLink) };
-  if (!link?.token)
-    return { error: "Link gerado, mas o token não apareceu. Abra a ficha do formulário." };
-
-  return {
-    ok: true,
-    token: link.token,
-    formularioId: form.id,
-    reutilizado: (r.reutilizados ?? 0) > 0,
   };
 }
 

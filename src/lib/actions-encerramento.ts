@@ -100,11 +100,11 @@ export async function registrarEncerramento(
     };
   }
 
-  // a row pode já existir com a autoavaliação do mentor — o item do
-  // checklist deriva dela, não de um clique da coordenação
+  // a row pode já existir pendente (0102 cria no último encontro) — o
+  // checklist anterior é preservado no resave
   const { data: existente } = await supabase
     .from("encerramentos")
-    .select("id, tipo, checklist, autoavaliacao_mentor")
+    .select("id, tipo, checklist")
     .eq("dupla_id", duplaId)
     .maybeSingle();
   if (existente?.tipo) {
@@ -122,7 +122,6 @@ export async function registrarEncerramento(
     avaliacao_360_enviada:
       formData.get("avaliacao_360_enviada") === "on" ||
       !!prev.avaliacao_360_enviada,
-    autoavaliacao: !!existente?.autoavaliacao_mentor,
   };
 
   if (tipo === "concluida") {
@@ -228,36 +227,6 @@ export async function registrarEncerramento(
   void snapshotDuplaHoje(duplaId).catch(() => {});
   revalidatePath("/");
   revalidatePath("/duplas");
-  revalidatePath(`/duplas/${duplaId}`);
-  return { ok: true };
-}
-
-/** Autoavaliação do mentor — os 2 campos dele na row de encerramento da
- *  própria dupla, via RPC de escopo fino (checklist/tipo/decisão não passam
- *  pela mão dele). */
-export async function salvarAutoavaliacao(
-  duplaId: string,
-  formData: FormData
-) {
-  if (await demoAtivo()) return { error: DEMO_MSG };
-  const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada. Entre de novo." };
-
-  const texto = String(formData.get("autoavaliacao") ?? "").trim();
-  const disponivel = formData.get("disponivel_proximo_ciclo") === "on";
-  if (texto.length < 10 || texto.length > 4000) {
-    return {
-      error: "Conte como foi a jornada em 10 a 4.000 caracteres.",
-    };
-  }
-
-  const { error } = await supabase.rpc("salvar_autoavaliacao", {
-    p_dupla: duplaId,
-    p_texto: texto,
-    p_disponivel: disponivel,
-  });
-  if (error) return { error: erroAmigavel(error) };
-
   revalidatePath(`/duplas/${duplaId}`);
   return { ok: true };
 }

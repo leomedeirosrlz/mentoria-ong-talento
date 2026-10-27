@@ -39,7 +39,6 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { cn, maskCep, maskCpf } from "@/lib/utils";
 import { getDocumentosPessoa, getMe, getPessoaPerfil } from "@/lib/queries";
-import { getAnamneseMentorado } from "@/lib/forms/queries";
 import { getSupervisoesDaPessoa } from "@/lib/queries-supervisao";
 import { getResumoFormacao } from "@/lib/queries-presenca";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
@@ -61,7 +60,6 @@ import {
 } from "@/lib/ciclo";
 import { temPapel } from "@/lib/types";
 import type { DadosCivis } from "@/lib/types";
-import { AnamneseMentoradoChip } from "@/components/anamnese-mentorado";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { CurriculoMentorado } from "@/components/curriculo-mentorado";
 import { DocumentosPessoa } from "@/components/documentos-pessoa";
@@ -342,10 +340,6 @@ export default async function PessoaPerfilPage({
     mp && podeVerFormacao ? await getResumoFormacao(p.id) : null;
   const dispTxt = disponibilidadeTexto(mp?.disponibilidade);
   const dispMentoradoTxt = disponibilidadeTexto(ment?.disponibilidade);
-  // anamnese oficial do mentorado (0042) — escopo coord; null quando a
-  // migração ainda não rodou, então a página segue igual antes dela
-  const anamnese =
-    ehMentorado && souCoord ? await getAnamneseMentorado(p.id) : null;
   // documentos do intake (0054) — coord-only; pra outro papel a query
   // nem dispara
   const documentos = souCoord
@@ -1094,7 +1088,7 @@ export default async function PessoaPerfilPage({
             />
           )}
 
-          {/* documentos + termos + anamnese — coord-only ponta a ponta. A
+          {/* documentos + termos — coord-only ponta a ponta. A
               gaveta nasce fechada: o cabeçalho com a contagem já diz o que
               tem dentro e a ficha fica leve; id próprio porque o stat
               "Termo" pendente aponta pra cá */}
@@ -1132,16 +1126,6 @@ export default async function PessoaPerfilPage({
                         whatsapp={p.whatsapp}
                       />
                     </div>
-                    {/* Anamnese Social (0042) — o form oficial respondido
-                        pelo(a) jovem sem login; coord envia/reenvia daqui */}
-                    {anamnese && (
-                      <AnamneseMentoradoChip
-                        mentoradoId={p.id}
-                        nome={p.nome}
-                        whatsapp={p.whatsapp}
-                        anamnese={anamnese}
-                      />
-                    )}
                   </div>
                 </Collapsible.Panel>
               </Collapsible.Root>

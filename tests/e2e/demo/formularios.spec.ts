@@ -5,9 +5,8 @@ import { entrarNaDemo, expect, test } from "../helpers";
 // os 5 instrumentos da régua DPP (Visão, Metas, PDM, Roda da Vida, 360º)
 // saíram daqui e moram na seção "Instrumentos do programa" de /materiais
 // (REALIZA-194 — os cards de lá fazem deep-link pras respostas daqui).
-// Os oficiais "de bordo" (anamnese, inscrições, autoavaliação, avaliação
-// da trilha) ficam na prateleira read-only "Instrumentos do sistema" no
-// fim da página. Spec demo: sem writes — o builder roda inteiro em estado
+// Os oficiais "de bordo" (inscrições, avaliação da trilha, desfecho) ficam
+// na prateleira read-only "Instrumentos do sistema" no fim da página. Spec demo: sem writes — o builder roda inteiro em estado
 // local (o save falharia por DEMO_MSG, mas não é o que se testa).
 
 const URL_VISAO = "/formularios/de000000-0000-4000-8000-000000016391";
@@ -41,15 +40,14 @@ test.describe("demo — /formularios separa customs de instrumentos", () => {
       await expect(page.getByRole("link", { name: titulo })).toHaveCount(0);
     }
 
-    // os 4 oficiais de bordo moram na prateleira read-only
+    // os oficiais de bordo moram na prateleira read-only (a anamnese e a
+    // autoavaliação do mentor saíram do programa na REALIZA-236)
     const sec = page.locator("section", {
       hasText: "Instrumentos do sistema",
     });
     await expect(sec).toBeVisible();
-    await expect(sec.getByRole("listitem")).toHaveCount(4);
+    await expect(sec.getByRole("listitem")).toHaveCount(2);
     for (const titulo of [
-      /Anamnese Social/,
-      /Autoavaliação do mentor/,
       /Avaliação geral da trilha de especialista/,
       /Inscrição de mentores · Matching de Mentores/,
     ]) {

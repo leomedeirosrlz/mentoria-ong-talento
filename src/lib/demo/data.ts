@@ -469,7 +469,7 @@ function buildCicloEventos(cronogramaT1: string, cronogramaT2: string): CicloEve
     ev(cronogramaId, "recesso", null, addDias(dia(14), 1), "Recesso de fim de ano", null, [], addDias(dia(14), 18),
       { observacao: "Sem encontros — retomada na 1ª semana de janeiro" }),
     ev(cronogramaId, "encontro", 15, dia(15), "Reflexão e reconhecimento", F6, ["PDM", "Roda da Vida"]),
-    ev(cronogramaId, "encontro", 16, dia(16), "Encerramento e celebração", F6, ["Avaliação 360º", "Autoavaliação do mentor"]),
+    ev(cronogramaId, "encontro", 16, dia(16), "Encerramento e celebração", F6, ["Avaliação 360º"]),
     // seção 3 — encerramento: evento compartilhável pelas turmas, mas cada
     // cronograma guarda a própria row (cronograma_id é NOT NULL): 15/01 no
     // real, +3d após o 16º encontro de cada uma
@@ -3174,19 +3174,6 @@ function build(): DemoData {
         href: `/duplas/${uid(D.esp2)}`,
         lida_em: haDias(19, "08:00"),
         created_at: haDias(20, "18:05"),
-      },
-      // formulario_respondido (0042) — a RPC de submit avisa a coordenação;
-      // aqui é a resposta da anamnese oficial da Ana (ver forms-data.ts)
-      {
-        id: uid(0x3004),
-        tipo: "formulario_respondido",
-        titulo: "Resposta de formulário",
-        corpo: 'Ana Beatriz Silva respondeu "Anamnese Social"',
-        // uid(0x4004) = Anamnese Social oficial (forms-data) — id decimal,
-        // não o hex cru
-        href: `/formularios/${uid(0x4004)}`,
-        lida_em: haDias(31, "09:00"),
-        created_at: haDias(33, "19:12"),
       },
       {
         // canal de segurança do jovem → CHA-000142 (urgência, sem login:

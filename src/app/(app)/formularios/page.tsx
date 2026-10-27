@@ -30,9 +30,9 @@ export default async function FormulariosPage() {
   const formularios = await getFormularios();
   // REALIZA-199 — a lista é só dos forms da coordenação. Os oficiais
   // (`sistema`) saíram daqui: os 5 da régua DPP viraram cards em
-  // /materiais ("Instrumentos do programa") e os de bordo — anamnese,
-  // inscrições, autoavaliação, avaliação da trilha — moram na seção
-  // read-only "Instrumentos do sistema" no fim da página.
+  // /materiais ("Instrumentos do programa") e os de bordo — inscrições,
+  // avaliação da trilha, desfecho — moram na seção read-only "Instrumentos
+  // do sistema" no fim da página.
   const customs = formularios.filter((f) => !f.sistema);
   const bordo = formularios
     .filter((f) => f.sistema && !SISTEMAS_REGUA.includes(f.sistema))
@@ -66,7 +66,7 @@ export default async function FormulariosPage() {
           </div>
           <p className="mt-3 font-medium">Nenhum formulário ainda.</p>
           <p className="mt-1 max-w-sm text-sm text-muted-foreground">
-            Crie avaliações de encontro, anamneses ou inscrições. Cada pessoa
+            Crie avaliações de encontro, pesquisas ou inscrições. Cada pessoa
             responde por um link próprio, sem precisar de conta.
           </p>
           <Link

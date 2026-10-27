@@ -81,9 +81,7 @@ export type FormularioCampo = {
 /** Instrumento oficial do programa (0042, 0080) — vocabulário fechado
  *  espelhando o CHECK da coluna. null = form criado pela coordenação. */
 export type FormularioSistema =
-  | "anamnese"
   | "avaliacao_360"
-  | "autoavaliacao_mentor"
   | "avaliacao_especialista"
   | "visao"
   | "metas"
@@ -94,9 +92,7 @@ export type FormularioSistema =
   | "desfecho";
 
 export const SISTEMA_LABEL: Record<FormularioSistema, string> = {
-  anamnese: "Anamnese",
   avaliacao_360: "360º",
-  autoavaliacao_mentor: "Autoavaliação",
   avaliacao_especialista: "Avaliação da trilha",
   visao: "Visão",
   metas: "Metas",
@@ -134,14 +130,18 @@ export const SISTEMAS_REGUA: readonly FormularioSistema[] = [
 /** Sistemas "de bordo" — oficiais que NÃO são a régua DPP: seguem
  *  acessíveis de /formularios na seção "Instrumentos do sistema"
  *  (read-only — catálogo imutável, sem builder). A ordem de exibição é a
- *  do ciclo de vida: inscrição → anamnese → fechamentos da jornada. Um
- *  sistema novo que não estiver aqui nem na régua aparece no fim da seção
- *  (complemento defensivo — nunca fica órfão). */
+ *  do ciclo de vida: inscrição → fechamentos da jornada. Um sistema novo
+ *  que não estiver aqui nem na régua aparece no fim da seção (complemento
+ *  defensivo — nunca fica órfão).
+ *
+ *  Anamnese Social e Autoavaliação saíram do programa (REALIZA-236): a
+ *  leitura do ciclo é da 360º, que já pergunta disponibilidade pro próximo
+ *  ciclo. As linhas ficaram no banco como histórico morto? Não — foram
+ *  apagadas (0128); o vocabulário do CHECK segue com elas porque enum de
+ *  texto não se encolhe sem recriar a constraint. */
 export const SISTEMAS_BORDO: readonly FormularioSistema[] = [
   "intake_mentor",
   "intake_mentorado",
-  "anamnese",
-  "autoavaliacao_mentor",
   "avaliacao_especialista",
   "desfecho",
 ];

@@ -745,7 +745,6 @@ const FORM = {
   metas: "5eed0001-0000-4000-8000-000000000005",
   pdm: "5eed0001-0000-4000-8000-000000000006",
   roda: "5eed0001-0000-4000-8000-000000000007",
-  anamnese: "5eed0001-0000-4000-8000-000000000001",
 };
 const links = [], resps = [];
 let li = 0;
@@ -773,18 +772,6 @@ linkComResposta(D.d1, M.ana, FORM.roda, RODA(), 1,
 linkComResposta(D.d1, M.ana, FORM.visao, VISAO, 3, { respondidoPor: jovemProfile });
 linkComResposta(D.d1, M.ana, FORM.metas, METAS, 4, { respondidoPor: jovemProfile });
 linkComResposta(D.d1, M.ana, FORM.pdm, PDM, 4, { respondidoPor: jovemProfile });
-linkComResposta(D.d1, M.ana, FORM.anamnese, {
-  quem_mora: "Moro com a minha mãe e meu irmão mais novo.",
-  territorio: "Vila Esperança, zona leste.",
-  estuda: "sim", trabalha: "nao",
-  onde_estuda_trabalha: "Escola Estadual Dom Paulo — 3º ano.",
-  rotina: "Aula de manhã, tarde estudo e ajudo meu irmão.",
-  rede_apoio: ["Família", "Professores", "ONG Futuro Agora"],
-  gosta: "Desenhar e jogar vôlei.",
-  te_descreveriam: "Quieta no começo, falante depois que pega confiança.",
-  expectativas: "Passar em Medicina e ser a primeira médica da família.",
-  pref_genero_mentor: "Indiferente",
-}, 0);
 // parciais em outras duplas — todas as rodas abaixo são leituras iniciais
 // (enc. 1 do guia), marcadas com contexto.momento = 'inicial'
 const INICIAL = { origem: "instrumentos", momento: "inicial" };
@@ -977,13 +964,11 @@ await post("pessoa_notas", [
 try {
   await post("encerramentos", [
     { id: uid(0x1300), dupla_id: D.d9, tipo: "concluida",
-      checklist: { feedback_final: true, feedback_mutuo: true, revisao_pdm: true, avaliacao_360_enviada: true, autoavaliacao: true },
-      autoavaliacao_mentor: "Cresci como ouvinte. O Enzo me ensinou que consistência pequena vence plano grande.",
-      disponivel_proximo_ciclo: true,
+      checklist: { feedback_final: true, feedback_mutuo: true, revisao_pdm: true, avaliacao_360_enviada: true },
       resumo_jornada: "6 encontros realizados, 3 metas fechadas, trilha de finanças concluída com a Sofia.",
       decidido_por: P.coord, created_at: iso(new Date("2026-10-10T20:10:00-03:00")) },
     { id: uid(0x1301), dupla_id: D.d12, tipo: "encerrada",
-      checklist: { feedback_final: false, feedback_mutuo: false, revisao_pdm: false, avaliacao_360_enviada: true, autoavaliacao: false },
+      checklist: { feedback_final: false, feedback_mutuo: false, revisao_pdm: false, avaliacao_360_enviada: true },
       resumo_jornada: "3 encontros realizados. A família da Manuela se mudou pra Santos — encerramento antecipado sem conflito.",
       decidido_por: P.coord, created_at: iso(new Date("2026-09-30T20:10:00-03:00")) },
   ]);

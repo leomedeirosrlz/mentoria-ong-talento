@@ -488,7 +488,7 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     });
     await expect(trancado.getByRole("link")).toHaveCount(0);
     await expect(trancado.getByRole("button")).toHaveCount(0);
-    // o rodapé "Anamnese… → Formulários" é coord-only
+    // o rodapé "Intakes… → Formulários" é coord-only
     await expect(
       instrumentos.getByRole("link", { name: "Formulários" })
     ).toHaveCount(0);

@@ -7,10 +7,11 @@
  * ativo; como /formularios é coord-only, os dados só saem pro papel
  * "coordenacao".
  *
- * Além dos forms da coordenação, o dataset carrega os 3 instrumentos
- * oficiais do guia (sistema: anamnese / avaliacao_360 / autoavaliacao_mentor
- * — campos verbatim da 0042), com links e respostas que alimentam a ficha
- * da pessoa (anamnese) e o checklist de encerramento (360º).
+ * Além dos forms da coordenação, o dataset carrega os instrumentos oficiais
+ * ainda vivos (avaliação 360º, trilha de especialista, intake e desfecho —
+ * campos verbatim das migrations), com links e respostas que alimentam o
+ * checklist de encerramento (360º) e o painel da jornada. A Anamnese Social
+ * e a Autoavaliação do mentor saíram do programa na REALIZA-236.
  *
  * Os links apontam pras personas e mentorados reais do dataset (getDemoData)
  * — nomes e WhatsApp resolvem pelo id, então a tela de links exibe os mesmos
@@ -58,12 +59,9 @@ export const DEMO_TOKENS = {
   genericoInscricao: "demo-tok-inscric-generico",
   genericoInscricaoVivo: "demo-tok-inscric-vivo-000",
   // instrumentos oficiais (0042)
-  anaAnamneseOficial: "demo-tok-anamnese-ana-ofic",
-  eduardoAnamneseOficial: "demo-tok-anamnese-edu-ofic",
   luizaAvaliacao360: "demo-tok-360-luiza-oficial1",
   isabelaAvaliacao360: "demo-tok-360-isabela-oficia",
   ricardoAvaliacao360: "demo-tok-360-ricardo-ofici",
-  luizaAutoavaliacao: "demo-tok-autoav-luiza-ofici",
   // instrumentos da jornada (0080) — dupla Ricardo×Ana
   anaVisao: "demo-tok-visao-ana-00000001",
   anaMetas: "demo-tok-metas-ana-00000001",
@@ -207,41 +205,6 @@ export function getDemoFormularios(): DemoFormularios {
   // ---------- 4-6. instrumentos oficiais (0042 — campos verbatim da
   // migration; created_by null porque nasceram por SQL versionado) ----------
 
-  const fAnamneseOficial: Formulario = {
-    id: uid(0x4004),
-    titulo: "Anamnese Social",
-    descricao:
-      "Ficha de conhecimento do(a) jovem, respondida antes do início da mentoria: quem você é, como é sua vida e o que espera do programa. Ajuda a coordenação no pareamento e orienta o trabalho do(a) mentor(a).",
-    sistema: "anamnese",
-    campos: [
-      { id: "quem_mora", tipo: "texto_longo", label: "Quem mora com você? Como é a convivência em casa?", obrigatorio: true },
-      { id: "territorio", tipo: "texto", label: "Em que bairro ou comunidade você mora?", obrigatorio: true },
-      { id: "estuda", tipo: "sim_nao", label: "Você está estudando atualmente?", obrigatorio: true },
-      { id: "trabalha", tipo: "sim_nao", label: "Você está trabalhando atualmente?", obrigatorio: true },
-      { id: "onde_estuda_trabalha", tipo: "texto", label: "Onde você estuda ou trabalha? (escola, curso, emprego)", obrigatorio: false },
-      { id: "rotina", tipo: "texto_longo", label: "Como é um dia comum na sua semana?", obrigatorio: false },
-      {
-        id: "rede_apoio", tipo: "multi_select", label: "Quem são as pessoas que te apoiam hoje?",
-        obrigatorio: true,
-        opcoes: ["Família", "Amigos", "Professores", "Pessoas da ONG ou projeto social", "Líderes religiosos ou comunitários", "Outros"],
-      },
-      { id: "gosta", tipo: "texto_longo", label: "O que você mais gosta de fazer? (hobbies, esportes, programas)", obrigatorio: false },
-      { id: "te_descreveriam", tipo: "texto_longo", label: "Se seus amigos ou familiares fossem te descrever, o que diriam?", obrigatorio: false },
-      { id: "expectativas", tipo: "texto_longo", label: "O que você espera da mentoria? O que quer conquistar com ela?", obrigatorio: true },
-      {
-        id: "pref_genero_mentor", tipo: "select", label: "Você tem preferência sobre o gênero da pessoa que vai te mentorar?",
-        obrigatorio: true,
-        opcoes: ["Sem preferência", "Mulher", "Homem"],
-      },
-      { id: "algo_mais", tipo: "texto_longo", label: "Tem algo mais que a gente deveria saber sobre você?", obrigatorio: false },
-    ],
-    ativo: true,
-    versao: 1,
-    created_by: null,
-    created_at: haDias(240, "09:00"),
-    updated_at: haDias(240, "09:00"),
-  };
-
   const fAvaliacao360: Formulario = {
     id: uid(0x4005),
     titulo: "Avaliação 360º",
@@ -259,26 +222,6 @@ export function getDemoFormularios(): DemoFormularios {
       { id: "melhorar", tipo: "texto_longo", label: "O que o programa poderia melhorar?", obrigatorio: false },
       { id: "disponivel_proximo_ciclo", tipo: "sim_nao", label: "Se você é o(a) mentor(a): segue disponível pro próximo ciclo?", obrigatorio: false },
       { id: "capacidade_proximo_ciclo", tipo: "texto", label: "Se você é o(a) mentor(a): quantos jovens consegue acompanhar no próximo ciclo?", obrigatorio: false },
-    ],
-    ativo: true,
-    versao: 1,
-    created_by: null,
-    created_at: haDias(240, "09:00"),
-    updated_at: haDias(240, "09:00"),
-  };
-
-  const fAutoavaliacao: Formulario = {
-    id: uid(0x4006),
-    titulo: "Autoavaliação do mentor",
-    descricao:
-      "A reflexão de fim de ciclo do guia (cap. 14), respondida pelo(a) mentor(a) no encerramento da jornada.",
-    sistema: "autoavaliacao_mentor",
-    campos: [
-      { id: "funcionou", tipo: "texto_longo", label: "O que eu fiz nesta mentoria que funcionou bem e quero repetir?", obrigatorio: true },
-      { id: "falei_mais", tipo: "texto_longo", label: "Em que momentos eu falei mais do que escutei?", obrigatorio: true },
-      { id: "competencias", tipo: "texto_longo", label: "Que competência do checklist evoluiu ao longo do ciclo? Qual ainda preciso desenvolver?", obrigatorio: true },
-      { id: "aprendi", tipo: "texto_longo", label: "O que aprendi com este(a) jovem?", obrigatorio: true },
-      { id: "faria_diferente", tipo: "texto_longo", label: "O que eu faria diferente em um próximo ciclo?", obrigatorio: true },
     ],
     ativo: true,
     versao: 1,
@@ -586,22 +529,6 @@ export function getDemoFormularios(): DemoFormularios {
       contexto: {}, usado_em: null, expira_em: null,
       created_by: marina, created_at: haDias(75),
     },
-    // anamnese oficial (0042): a Ana respondeu ao entrar (a notificação
-    // formulario_respondido da Marina aponta pra este form); o Eduardo tem
-    // link vigente pendente — a ficha dele mostra "reenviar/copiar" em vez
-    // de "enviar"
-    {
-      id: uid(0x4210), formulario_id: fAnamneseOficial.id, token: DEMO_TOKENS.anaAnamneseOficial,
-      dest_profile_id: null, dest_mentorado_id: ment("Ana"),
-      dupla_id: duplaDe("Ricardo", "Ana"), contexto: { origem: "ficha" },
-      usado_em: haDias(33, "19:12"), expira_em: null, created_by: marina, created_at: haDias(36),
-    },
-    {
-      id: uid(0x4211), formulario_id: fAnamneseOficial.id, token: DEMO_TOKENS.eduardoAnamneseOficial,
-      dest_profile_id: null, dest_mentorado_id: ment("Eduardo"),
-      dupla_id: duplaDe("João Pedro", "Eduardo"), contexto: { origem: "ficha" },
-      usado_em: null, expira_em: null, created_by: marina, created_at: haDias(6),
-    },
     // 360º oficial: respondida pela Luiza no encerramento da dupla do ciclo
     // anterior (carimba checklist.avaliacao_360_enviada no encerramento
     // demo); o link da Isabela expirou sem resposta — a UI mostra o estado
@@ -616,14 +543,6 @@ export function getDemoFormularios(): DemoFormularios {
       dest_profile_id: null, dest_mentorado_id: ment("Isabela"),
       dupla_id: duplaDe("Luiza", "Isabela"), contexto: { origem: "ficha" },
       usado_em: null, expira_em: haDias(208), created_by: marina, created_at: haDias(238),
-    },
-    // autoavaliação oficial: a Luiza respondeu — é o que preencheu
-    // encerramentos.autoavaliacao_mentor da dupla d-fim
-    {
-      id: uid(0x4214), formulario_id: fAutoavaliacao.id, token: DEMO_TOKENS.luizaAutoavaliacao,
-      dest_profile_id: porNome("Luiza"), dest_mentorado_id: null,
-      dupla_id: duplaDe("Luiza", "Isabela"), contexto: { origem: "ficha" },
-      usado_em: haDias(235, "21:40"), expira_em: null, created_by: marina, created_at: haDias(238),
     },
     // 360º do encerramento em andamento (d-ok): o Ricardo respondeu — é o
     // que carimba checklist.avaliacao_360_enviada na fixture parcial
@@ -786,25 +705,6 @@ export function getDemoFormularios(): DemoFormularios {
       },
       respondido_em: haDias(70, "14:05"),
     },
-    // anamnese oficial da Ana — as chaves são os ids estáveis do instrumento
-    {
-      id: uid(0x4405), link_id: uid(0x4210),
-      respostas: {
-        quem_mora: "Moro com a minha mãe e meu irmão mais novo. A casa é pequena, mas a gente se ajuda — minha mãe trabalha o dia todo e eu cuido do meu irmão depois da escola.",
-        territorio: "Vila Esperança, perto da quadra da ONG.",
-        estuda: "sim",
-        trabalha: "nao",
-        onde_estuda_trabalha: "Escola Estadual Dom Paulo — 2º ano do ensino médio.",
-        rotina: "Aula de manhã, almoço em casa, tarde ajudando meu irmão e fazendo lição. À noite vejo série com a minha mãe.",
-        rede_apoio: ["Família", "Professores", "Pessoas da ONG ou projeto social"],
-        gosta: "Desenhar e jogar vôlei na quadra.",
-        te_descreveriam: "Que sou quieta no começo, mas que quando pego confiança não paro de falar.",
-        expectativas: "Quero me preparar pro ENEM e entender qual carreira combina comigo.",
-        pref_genero_mentor: "Mulher",
-        algo_mais: "Fico nervosa de falar em público.",
-      },
-      respondido_em: haDias(33, "19:12"),
-    },
     // 360º da Luiza — fim de jornada da dupla encerrada
     {
       id: uid(0x4406), link_id: uid(0x4212),
@@ -822,21 +722,8 @@ export function getDemoFormularios(): DemoFormularios {
       },
       respondido_em: haDias(233, "20:10"),
     },
-    // autoavaliação da Luiza — as 5 perguntas do cap. 14; é o texto que o
-    // encerramento consolidou em autoavaliacao_mentor
-    {
-      id: uid(0x4407), link_id: uid(0x4214),
-      respostas: {
-        funcionou: "As metas pequenas da Isabela — cada semana com uma vitória visível manteve o ritmo.",
-        falei_mais: "Nos primeiros encontros eu falei demais; quando passei a perguntar antes de sugerir, ela se abriu.",
-        competencias: "Evoluiu a escuta ativa. A desenvolver: pedir feedback do jovem com mais frequência.",
-        aprendi: "Com a Isa aprendi que persistência silenciosa vence talento com pressa.",
-        faria_diferente: "Começaria o PDM já no primeiro encontro e revisaria a Roda da Vida a cada mês, não só no meio do ciclo.",
-      },
-      respondido_em: haDias(235, "21:40"),
-    },
     // 360º do Ricardo — encerramento em andamento da d-ok (checklist
-    // parcial: a autoavaliação e a decisão ainda não chegaram)
+    // parcial: a decisão da coordenação ainda não chegou)
     {
       id: uid(0x4408), link_id: uid(0x4216),
       respostas: {
@@ -1077,9 +964,7 @@ export function getDemoFormularios(): DemoFormularios {
       fAvaliacao,
       fAnamnese,
       fInscricao,
-      fAnamneseOficial,
       fAvaliacao360,
-      fAutoavaliacao,
       fVisao,
       fMetas,
       fPdm,
@@ -1096,36 +981,6 @@ export function getDemoFormularios(): DemoFormularios {
 // ---------- derivações dos instrumentos oficiais (0042) ----------
 // Mesma lógica das queries reais, sobre o dataset: as policies das 3 tabelas
 // são coord-only, então os callers conferem o papel antes de chamar.
-
-/** Estado da Anamnese Social de um mentorado — idem getAnamneseMentorado:
- *  última resposta ou link vigente pendente (o atalho da ficha reusa). */
-export function demoAnamneseMentorado(
-  role: AppRole,
-  mentoradoId: string
-): { formularioId: string; respondida_em: string | null; linkPendente: boolean } | null {
-  if (role !== "coordenacao") return null; // RLS coord-only → null na real
-  const { formularios, links, respostas } = getDemoFormularios();
-  const form = formularios.find((f) => f.sistema === "anamnese");
-  if (!form) return null;
-  const agora = Date.now();
-  let respondida_em: string | null = null;
-  let linkPendente = false;
-  for (const l of links
-    .filter(
-      (x) => x.formulario_id === form.id && x.dest_mentorado_id === mentoradoId
-    )
-    .sort((a, b) => b.created_at.localeCompare(a.created_at))) {
-    if (l.usado_em) {
-      respondida_em =
-        respondida_em ??
-        respostas.find((r) => r.link_id === l.id)?.respondido_em ??
-        l.usado_em;
-    } else if (!l.expira_em || new Date(l.expira_em).getTime() > agora) {
-      linkPendente = true;
-    }
-  }
-  return { formularioId: form.id, respondida_em, linkPendente };
-}
 
 /** Data da resposta 360º mais recente da dupla — idem
  *  getAvaliacao360DaDupla (join resposta ← link ← form oficial). */

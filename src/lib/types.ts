@@ -851,28 +851,26 @@ export type Supervisao = {
 
 // ---------- fechamento do ciclo (0037) ----------
 
-/** As 5 chaves do rito de fechamento (guia DPP) — vocabulário fechado,
- *  espelha o CHECK encerramento_checklist_ok. */
+/** As 4 chaves do rito de fechamento (guia DPP) — vocabulário fechado,
+ *  espelha o CHECK encerramento_checklist_ok. A autoavaliação do mentor saiu
+ *  do rito na REALIZA-236 (a leitura do ciclo é a 360º). */
 export type EncerramentoChecklist = {
   feedback_final?: boolean;
   feedback_mutuo?: boolean;
   revisao_pdm?: boolean;
   avaliacao_360_enviada?: boolean;
-  autoavaliacao?: boolean;
 };
 
-/** Fechamento de uma dupla DPP — a row pode nascer antes da decisão, só com
- *  a autoavaliação do mentor (tipo/decidido_por null = fechamento pendente). */
+/** Fechamento de uma dupla DPP — a row nasce pendente quando o último
+ *  encontro conclui a jornada (0102) e vira decisão quando a coordenação
+ *  registra o rito. */
 export type Encerramento = {
   id: string;
   dupla_id: string;
   /** 'concluida' = jornada completa · 'encerrada' = fechamento antecipado ·
-   *  null = só a autoavaliação do mentor chegou, decisão pendente. */
+   *  null = rito aberto (último encontro já concluiu, decisão pendente). */
   tipo: "concluida" | "encerrada" | null;
   checklist: EncerramentoChecklist;
-  autoavaliacao_mentor: string | null;
-  /** Disponibilidade do mentor pro próximo ciclo — registrada na autoavaliação. */
-  disponivel_proximo_ciclo: boolean | null;
   /** Snapshot gerado dos dados da jornada no momento do fechamento. */
   resumo_jornada: string | null;
   decidido_por: string | null;

@@ -95,7 +95,7 @@ export function EnviarFormularioDialog({
   // do mentor pela seção Instrumentos da ficha (a action recusa também).
   // avaliacao_especialista também sai: a emissão é automática no fechamento
   // da trilha (0104) — um link manual confundiria o dedup da RPC.
-  // 360º/anamnese/autoavaliação seguem selecionáveis — a coord emite mesmo.
+  // 360º e os demais oficiais de bordo seguem selecionáveis — a coord emite.
   const selecionaveis = useMemo(
     () =>
       formularios.filter(
