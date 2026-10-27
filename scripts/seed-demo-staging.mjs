@@ -792,6 +792,52 @@ links.push({
 await post("formulario_links", links);
 await post("formulario_respostas", resps);
 
+// PDM vivo (0109) da dupla 1 — a árvore que a Ana vê em /jovem/pdm. Conta a
+// mesma história das respostas de Visão/Metas/PDM acima: a revisão (enc. ~5)
+// reordenou as metas, uma submeta já foi batida e a meta 4 saiu do plano.
+// Cascateia com a dupla, então o limpar() não precisa de entrada própria.
+const PDM_D1 = uid(0x46ff);
+const pdmItem = (n, o) => ({
+  id: uid(0x4700 + n), pdm_id: PDM_D1, parent_id: o.parent ? uid(0x4700 + o.parent) : null,
+  titulo: o.titulo, porque: o.porque ?? null, indicador: o.indicador ?? null,
+  area_vida: o.area ?? null, prazo_alvo: o.prazo ?? null, status: o.status ?? "ativa",
+  atingida_em: o.atingida ?? null, ordem: o.ordem, origem: o.origem ?? "pdm",
+  origem_campo: o.campo ?? null, created_by: P.andre,
+});
+await post("pdm", [{
+  id: PDM_D1, dupla_id: D.d1,
+  visao: "Em 5 anos, estarei cursando Medicina numa universidade pública e serei a primeira médica da família.",
+  visao_em: encontroISO(3, "20:20"),
+}]);
+const pdmRaizes = [
+  pdmItem(1, { ordem: 1, campo: "meta_1", titulo: "Subir a média de biologia e química pra 8,0",
+    porque: "São as matérias de maior peso no vestibular de Medicina.",
+    indicador: "Média 8,0 ou mais nas duas no boletim do 4º bimestre",
+    area: "Escola / universidade", prazo: diaBrt(75) }),
+  pdmItem(2, { ordem: 2, campo: "meta_2", titulo: "Fazer o simulado completo do ENEM sem zerar nenhuma área",
+    porque: "É a porta de entrada pra faculdade. Sem isso o resto não acontece.",
+    indicador: "Simulado completo com nota mínima 600 em cada área",
+    area: "Escola / universidade", prazo: diaBrt(110) }),
+  pdmItem(3, { ordem: 3, campo: "meta_3", titulo: "Conseguir uma bolsa de cursinho pré-vestibular",
+    porque: "O cursinho pago não cabe no orçamento de casa.",
+    indicador: "Matrícula confirmada com bolsa de pelo menos 70%",
+    area: "Finanças", prazo: diaBrt(60) }),
+  pdmItem(4, { ordem: 4, origem: "metas", campo: "meta_4", titulo: "Ler um livro por mês fora da escola",
+    porque: "Quero melhorar a redação.", status: "descartada" }),
+];
+await post("pdm_itens", pdmRaizes);
+await post("pdm_itens", [
+  pdmItem(11, { parent: 1, ordem: 1, campo: "sub_1_1", titulo: "1h de exercícios de biologia toda terça e quinta",
+    status: "atingida", atingida: iso(new Date(Date.now() - 2 * DIA)) }),
+  pdmItem(12, { parent: 1, ordem: 2, campo: "sub_1_2", titulo: "Levar as dúvidas de química pro encontro com o Otávio" }),
+  pdmItem(13, { parent: 1, ordem: 3, campo: "sub_1_3", titulo: "Refazer a prova do 3º bimestre em casa" }),
+  pdmItem(21, { parent: 2, ordem: 1, campo: "sub_2_1", titulo: "Montar o cronograma de estudos da semana",
+    status: "atingida", atingida: iso(new Date(Date.now() - 5 * DIA)) }),
+  pdmItem(22, { parent: 2, ordem: 2, campo: "sub_2_2", titulo: "Fazer um simulado por mês no sábado de manhã", prazo: diaBrt(9) }),
+  pdmItem(31, { parent: 3, ordem: 1, campo: "sub_3_1", titulo: "Pesquisar 3 cursinhos populares perto de casa" }),
+  pdmItem(32, { parent: 3, ordem: 2, campo: "sub_3_2", titulo: "Treinar a entrevista da bolsa com o Otávio no encontro 7" }),
+]);
+
 console.log("avisos, mural, supervisões, presenças, interações, notificações…");
 await post("comunicados", [
   { id: uid(0x900), titulo: "Prazo dos instrumentos", corpo: "Lembrando que a Roda da Vida deve ser aplicada até o 5º encontro. Quem ainda não emitiu o link, aproveita a semana.", audiencia: "dpp", prioridade: "importante", created_by: P.coord, created_at: iso(new Date("2026-10-10T09:00:00-03:00")) },
