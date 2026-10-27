@@ -1029,6 +1029,24 @@ export async function setPessoaRole(profileId: string, role: string | null) {
     }
   }
 
+  // o trigger role→papeis só ACRESCENTA e troca o primário: sem esta
+  // limpeza, coordenação → auxiliar deixava `coordenacao` de pé como papel
+  // secundário e a pessoa seguia com telas e poderes de coordenação (o app
+  // lê o CONJUNTO de papéis, não só o primário)
+  const papeisQueFicam = hibrido
+    ? (["mentor_dpp", "mentor_especialista"] as const)
+    : novoRole
+      ? ([novoRole] as const)
+      : ([] as const);
+  if (papeisQueFicam.length) {
+    const { error: erroLimpeza } = await supabase
+      .from("profile_papeis")
+      .delete()
+      .eq("profile_id", profileId)
+      .not("papel", "in", `(${papeisQueFicam.join(",")})`);
+    if (erroLimpeza) return { error: erroAmigavel(erroLimpeza) };
+  }
+
   // mentor_profiles acompanha o CONJUNTO de papéis efetivos, não só o
   // primário (0085): rebaixar o primário pra não-mentor mantém um papel
   // mentor_* secundário em profile_papeis (o trigger só move a marca de
