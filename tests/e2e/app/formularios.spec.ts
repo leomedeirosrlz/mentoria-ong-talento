@@ -77,10 +77,10 @@ test.describe("guarda — Enviar formulário não oferece instrumentos da jornad
       ).toHaveCount(0);
     }
 
-    // e os oficiais de coordenação seguem emissíveis — o 360º é seleção
-    // válida pra dupla no ambiente de teste
+    // e os oficiais de coordenação seguem emissíveis — a avaliação final
+    // é seleção válida pra dupla no ambiente de teste
     await expect(
-      page.getByRole("option", { name: /Avaliação 360º/ }).first()
+      page.getByRole("option", { name: /Avaliação final/ }).first()
     ).toBeVisible();
   });
 });

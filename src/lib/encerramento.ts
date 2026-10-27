@@ -39,7 +39,7 @@ export const CHECKLIST_ENCERRAMENTO: {
   },
   {
     key: "avaliacao_360_enviada",
-    label: "Avaliação 360º enviada ao mentor e ao mentorado",
+    label: "Avaliação final enviada ao mentor e ao mentorado",
   },
 ];
 

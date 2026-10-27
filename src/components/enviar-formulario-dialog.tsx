@@ -46,7 +46,7 @@ export type FormularioOpcao = {
   id: string;
   titulo: string;
   /** instrumento oficial do programa (0042) — ganha selo no select e casa
-   *  com a sugestão pelo rótulo ("360" acha o sistema avaliacao_360) */
+   *  com a sugestão pelo rótulo ("final" acha as avaliações finais) */
   sistema?: FormularioSistema | null;
 };
 export type PessoaDestino = {
@@ -106,8 +106,8 @@ export function EnviarFormularioDialog({
   const ordenados = useMemo(() => {
     if (!sugestao) return selecionaveis;
     const n = normaliza(sugestao);
-    // casa pelo título OU pelo selo do instrumento oficial ("360" acha a
-    // avaliacao_360 mesmo que o título não traga o número)
+    // casa pelo título OU pelo selo do instrumento oficial ("final" acha
+    // as avaliações finais mesmo que o título mude)
     const casam = (f: FormularioOpcao) =>
       normaliza(f.titulo).includes(n) ||
       (f.sistema ? normaliza(SISTEMA_LABEL[f.sistema]).includes(n) : false);

@@ -246,9 +246,9 @@ export const ESTACOES: Record<
     tagSnippet: "O que você marcou",
   },
   avaliacao_360: {
-    titulo: "Avaliação 360º",
+    titulo: "Avaliação final",
     descricao:
-      "O fechamento do ciclo: como você se vê e como te veem. A coordenação emite no fim da jornada.",
+      "O fechamento do ciclo: o jovem e o mentor respondem, cada um pelo seu link. A coordenação emite no fim da jornada.",
     encIni: 16,
     encFim: 16,
     chipLabel: "Enc. 16",
@@ -379,8 +379,9 @@ function textoSnippet(
     }
     case "avaliacao_360": {
       // sem campos no payload (a RPC 0096 não os manda): os ids citáveis
-      // do instrumento oficial primeiro, depois qualquer texto com corpo
-      for (const id of ["o_que_leva", "melhorar"]) {
+      // da avaliação final do mentorado primeiro, depois qualquer texto
+      // com corpo
+      for (const id of ["depoimento_texto", "melhorias_programa", "melhorar_opcoes"]) {
         const v = textoDe(id);
         if (v) return v;
       }

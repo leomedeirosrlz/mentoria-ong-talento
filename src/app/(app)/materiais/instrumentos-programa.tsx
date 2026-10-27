@@ -120,12 +120,12 @@ const CARDS: CardSpec[] = [
   },
   {
     chave: "avaliacao_360",
-    titulo: "Avaliação 360º e autoavaliação",
+    titulo: "Avaliação final da mentoria",
     descricao:
-      "O fechamento do ciclo: como o jovem se vê e como te veem. Marca o checklist de encerramento.",
+      "O fechamento do ciclo em dois instrumentos, um por lado: o jovem responde a avaliação final e o mentor também. A resposta marca o checklist de encerramento.",
     chips: ["Enc. 16"],
     estacao: "avaliacao_360",
-    sistemaForm: "avaliacao_360",
+    sistemaForm: "avaliacao_final_mentorado",
   },
 ];
 

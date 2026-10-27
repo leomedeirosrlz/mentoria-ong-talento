@@ -50,6 +50,14 @@ export const INSTRUMENTO_TOM: Record<
     tinta: "var(--inst-avaliacao-t)",
   },
   avaliacao_360: { cor: "var(--inst-360)", tinta: "var(--inst-360-t)" },
+  avaliacao_final_mentor: {
+    cor: "var(--inst-360)",
+    tinta: "var(--inst-360-t)",
+  },
+  avaliacao_final_mentorado: {
+    cor: "var(--inst-360)",
+    tinta: "var(--inst-360-t)",
+  },
   avaliacao_especialista: {
     cor: "var(--inst-avaliacao-especialista)",
     tinta: "var(--inst-avaliacao-especialista-t)",
@@ -154,6 +162,21 @@ const GLIFO: Record<InstrumentoChave, ReactNode> = {
       <path d="M20 12a8 8 0 1 1-2.3-5.6" />
       <path d="M20 4v4.2h-4.2" />
       <circle cx="12" cy="12" r="2.4" />
+    </>
+  ),
+  // bandeira quadriculada — o fim da jornada (0130, lado do mentor)
+  avaliacao_final_mentor: (
+    <>
+      <path d="M5.5 20.5V4" />
+      <path d="M5.5 4.5h12l-2.6 3.5 2.6 3.5h-12z" />
+    </>
+  ),
+  // alvo com a flecha cravada — o que o jovem alcançou (0130, lado do mentorado)
+  avaliacao_final_mentorado: (
+    <>
+      <circle cx="11" cy="13" r="7" />
+      <circle cx="11" cy="13" r="3.4" />
+      <path d="m13.4 10.6 6.1-6.1M20.5 3.5v4.2h-4.2" />
     </>
   ),
   // estrela emoldurada — avaliação da trilha de especialista

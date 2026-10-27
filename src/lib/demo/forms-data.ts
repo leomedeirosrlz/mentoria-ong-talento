@@ -205,23 +205,120 @@ export function getDemoFormularios(): DemoFormularios {
   // ---------- 4-6. instrumentos oficiais (0042 — campos verbatim da
   // migration; created_by null porque nasceram por SQL versionado) ----------
 
-  const fAvaliacao360: Formulario = {
+  // avaliação final do mentorado (REALIZA-230, 0130) — é ela que ocupa a
+  // estação do encontro 16 (o slot `avaliacao_360` da jornada/painel)
+  const fAvaliacaoFinalMentorado: Formulario = {
     id: uid(0x4005),
-    titulo: "Avaliação 360º",
+    titulo: "Avaliação final da mentoria · mentorado",
     descricao:
-      "A avaliação formal de encerramento do ciclo, respondida por mentor(a) e mentorado(a): o vínculo construído, a evolução do(a) jovem, os resultados do PDM e da Roda da Vida e a experiência com o programa.",
-    sistema: "avaliacao_360",
+      "O fechamento da jornada pelo lado do jovem: expectativas, processo, o mentor, o impacto percebido e o depoimento. A coordenação envia o link no encerramento da dupla.",
+    sistema: "avaliacao_final_mentorado",
     campos: [
-      { id: "vinculo", tipo: "escala_1_5", label: "Como você avalia o vínculo construído entre vocês ao longo da jornada?", obrigatorio: true },
-      { id: "evolucao_jovem", tipo: "escala_1_5", label: "Quanto o(a) jovem evoluiu nos objetivos pessoais e profissionais durante o ciclo?", obrigatorio: true },
-      { id: "pdm_roda", tipo: "escala_1_5", label: "Que diferença o PDM e a Roda da Vida fizeram no desenvolvimento?", obrigatorio: true },
-      { id: "regularidade", tipo: "sim_nao", label: "Os encontros aconteceram com a regularidade combinada?", obrigatorio: true },
-      { id: "experiencia_programa", tipo: "escala_1_5", label: "Como foi a sua experiência com o Programa de Mentoria Social?", obrigatorio: true },
-      { id: "apoio_coordenacao", tipo: "escala_1_5", label: "Como você avalia o apoio da coordenação durante a jornada?", obrigatorio: false },
-      { id: "o_que_leva", tipo: "texto_longo", label: "O que você leva dessa jornada? (aprendizados, conquistas, marcas)", obrigatorio: true },
-      { id: "melhorar", tipo: "texto_longo", label: "O que o programa poderia melhorar?", obrigatorio: false },
-      { id: "disponivel_proximo_ciclo", tipo: "sim_nao", label: "Se você é o(a) mentor(a): segue disponível pro próximo ciclo?", obrigatorio: false },
-      { id: "capacidade_proximo_ciclo", tipo: "texto", label: "Se você é o(a) mentor(a): quantos jovens consegue acompanhar no próximo ciclo?", obrigatorio: false },
+      { id: "sec_expectativas", tipo: "secao", label: "Atingimento das expectativas", obrigatorio: false },
+      { id: "expectativa_atendida", tipo: "escala_1_5", label: "Em uma escala de 1 a 5, o quanto a mentoria atendeu às suas expectativas?", obrigatorio: true },
+      {
+        id: "expectativas", tipo: "multi_select", label: "O que você esperava alcançar na mentoria?", obrigatorio: true,
+        opcoes: ["Desenvolvimento profissional", "Melhorar habilidades técnicas", "Aumentar networking", "Obter insights sobre o mercado"],
+        permite_outro: true,
+      },
+      { id: "sec_processo", tipo: "secao", label: "Avaliação do processo de mentoria", obrigatorio: false },
+      {
+        id: "estrutura_programa", tipo: "select", label: "Como você avalia a estrutura do programa de mentoria?", obrigatorio: true,
+        opcoes: ["Excelente", "Boa", "Regular", "Ruim", "Péssima"],
+      },
+      {
+        id: "aspectos_uteis", tipo: "multi_select", label: "Quais aspectos da mentoria você considerou mais úteis?", obrigatorio: true,
+        opcoes: ["Sessões individuais com o mentor", "Materiais de apoio fornecidos", "Exercícios práticos", "Feedback recebido", "Troca de experiências com outros mentorados"],
+      },
+      {
+        id: "melhorar_opcoes", tipo: "multi_select", label: "O que poderia ser melhorado na mentoria?", obrigatorio: true,
+        opcoes: ["Frequência dos encontros", "Maior clareza nos objetivos da mentoria", "Melhor comunicação com o mentor", "Inclusão de conteúdos mais práticos"],
+        permite_outro: true,
+      },
+      { id: "sec_mentor", tipo: "secao", label: "Avaliação do mentor", obrigatorio: false },
+      {
+        id: "avaliacao_mentor", tipo: "select", label: "Como você avalia a comunicação e o suporte do seu mentor?", obrigatorio: true,
+        opcoes: ["Excelente", "Boa", "Regular", "Ruim", "Péssima"],
+      },
+      {
+        id: "mentor_ajudou", tipo: "select", label: "O mentor ajudou a esclarecer suas dúvidas e a desenvolver suas habilidades?", obrigatorio: true,
+        opcoes: ["Sim", "Parcialmente", "Não"],
+      },
+      {
+        id: "recomendaria_mentor", tipo: "select", label: "Você recomendaria este mentor para outros mentorados?", obrigatorio: true,
+        opcoes: ["Sim", "Não"],
+      },
+      { id: "sec_impacto", tipo: "secao", label: "Impacto e mudanças realizadas", obrigatorio: false },
+      { id: "mudancas_realizadas", tipo: "sim_nao", label: "Você realizou mudanças na sua vida profissional ou pessoal por causa da mentoria?", obrigatorio: true },
+      {
+        id: "quais_mudancas", tipo: "multi_select", label: "Se sim, quais mudanças você realizou?", obrigatorio: true,
+        opcoes: ["Mudei minha forma de buscar emprego ou oportunidades", "Aprimorei minhas habilidades profissionais", "Consegui um novo emprego ou promoção", "Ampliei meu networking"],
+        permite_outro: true,
+        visible_if: { campo: "mudancas_realizadas", em: ["sim"] },
+      },
+      {
+        id: "mais_preparado", tipo: "select", label: "Você se sente mais preparado para enfrentar desafios depois da mentoria?", obrigatorio: true,
+        opcoes: ["Sim", "Parcialmente", "Não"],
+      },
+      { id: "sec_criticas", tipo: "secao", label: "Críticas e sugestões", obrigatorio: false },
+      {
+        id: "melhorias_programa", tipo: "multi_select", label: "Quais pontos podem ser melhorados no programa de mentoria?", obrigatorio: true,
+        opcoes: ["Melhor estruturação dos encontros", "Maior diversidade de mentores", "Mais materiais complementares", "Melhor acompanhamento do progresso"],
+        permite_outro: true,
+      },
+      { id: "sec_depoimento", tipo: "secao", label: "Depoimento final", obrigatorio: false },
+      { id: "depoimento_texto", tipo: "texto_longo", label: "Você gostaria de deixar um depoimento sobre sua experiência?", obrigatorio: true },
+      {
+        id: "depoimento", tipo: "select", label: "Podemos divulgar seu depoimento em nossos materiais de comunicação?", obrigatorio: true,
+        opcoes: ["Sim, com meu nome", "Sim, mas de forma anônima", "Não"],
+      },
+    ],
+    ativo: true,
+    versao: 1,
+    created_by: null,
+    created_at: haDias(240, "09:00"),
+    updated_at: haDias(240, "09:00"),
+  };
+
+  // avaliação final do mentor (o outro lado da 0130) — mora na prateleira
+  // "Instrumentos do sistema"; a resposta dele aparece na ficha da dupla
+  const fAvaliacaoFinalMentor: Formulario = {
+    id: uid(0x400e),
+    titulo: "Avaliação final da mentoria · mentor",
+    descricao:
+      "O fechamento da jornada pelo lado de quem mentora: estrutura e processo, dificuldades, suporte do Realiza.vc, continuidade e depoimento.",
+    sistema: "avaliacao_final_mentor",
+    campos: [
+      { id: "sec_processo", tipo: "secao", label: "Avaliação do processo de mentoria", obrigatorio: false },
+      {
+        id: "estrutura_programa", tipo: "select", label: "Como você avalia a estrutura do programa de mentoria?", obrigatorio: true,
+        opcoes: ["Excelente", "Boa", "Regular", "Ruim", "Péssima"],
+      },
+      { id: "melhorar_processo", tipo: "texto_longo", label: "Você acha que tem algo que poderia ser melhorado no processo de mentoria?", obrigatorio: true },
+      { id: "dificuldade_material", tipo: "texto_longo", label: "Seu mentorado teve dificuldades ligadas a questões materiais para participar da mentoria (acesso a computadores, internet, local com privacidade)? Se sim, especifique.", obrigatorio: true },
+      { id: "dificuldade_agenda", tipo: "texto_longo", label: "Você teve dificuldades de agendar horários ou realizar os encontros com seu mentorado? Se sim, descreva os principais motivos.", obrigatorio: true },
+      { id: "dificuldade_metodologia", tipo: "texto_longo", label: "Você sentiu dificuldade em realizar alguma parte específica da metodologia com seu mentorado? Se sim, conte a respeito.", obrigatorio: true },
+      { id: "instrumentos_problematicos", tipo: "texto_longo", label: "Algum dos instrumentos ou atividades da metodologia se mostrou problemático, ou foi difícil fazer o mentorado chegar a uma resposta a contento? Se sim, conte mais.", obrigatorio: true },
+      { id: "melhorias_metodologia", tipo: "texto_longo", label: "Tem algum outro aspecto da metodologia que não funcionou bem ou que pode ser aprimorado?", obrigatorio: true },
+      { id: "sec_suporte", tipo: "secao", label: "Suporte do Realiza.vc", obrigatorio: false },
+      {
+        id: "avaliacao_suporte", tipo: "select", label: "Como você avalia o suporte recebido do Realiza.vc ao longo do ciclo?", obrigatorio: true,
+        opcoes: ["Excelente", "Boa", "Regular", "Ruim", "Péssima"],
+      },
+      { id: "sugestao_suporte", tipo: "texto_longo", label: "Tem algum suporte ou atividade que você considera importante o Realiza disponibilizar ou aprimorar?", obrigatorio: true },
+      { id: "sec_mentoria", tipo: "secao", label: "A mentoria", obrigatorio: false },
+      { id: "dificuldades_mentoria", tipo: "texto_longo", label: "Quais foram as principais dificuldades e desafios enfrentados na mentoria?", obrigatorio: true },
+      { id: "consideracoes", tipo: "texto_longo", label: "Espaço livre para considerações e sugestões sobre a metodologia, o programa, o instituto — o que desejar.", obrigatorio: false },
+      { id: "sec_continuidade", tipo: "secao", label: "Próximo ciclo", obrigatorio: false },
+      { id: "continua_proximo_ciclo", tipo: "sim_nao", label: "Você quer continuar como mentor ou mentora no próximo ciclo?", obrigatorio: true },
+      { id: "sec_espaco_mentor", tipo: "secao", label: "Espaço do mentor", obrigatorio: false },
+      { id: "comentarios_mentorado", tipo: "texto_longo", label: "Compartilhe seus comentários sobre o mentorado.", obrigatorio: false },
+      { id: "experiencia_processo", tipo: "texto_longo", label: "Compartilhe sua experiência com o processo, críticas e sugestões.", obrigatorio: false },
+      { id: "sec_depoimento", tipo: "secao", label: "Depoimento", obrigatorio: false },
+      {
+        id: "depoimento", tipo: "select", label: "Podemos divulgar seu depoimento em nossos materiais de comunicação?", obrigatorio: true,
+        opcoes: ["Sim, com meu nome", "Sim, mas de forma anônima", "Não"],
+      },
     ],
     ativo: true,
     versao: 1,
@@ -576,25 +673,26 @@ export function getDemoFormularios(): DemoFormularios {
       contexto: {}, usado_em: null, expira_em: null,
       created_by: marina, created_at: haDias(75),
     },
-    // 360º oficial: respondida pela Luiza no encerramento da dupla do ciclo
-    // anterior (carimba checklist.avaliacao_360_enviada no encerramento
-    // demo); o link da Isabela expirou sem resposta — a UI mostra o estado
+    // avaliação final (0130): a Luiza (mentora) respondeu no encerramento da
+    // dupla do ciclo anterior; o link da Isabela (mentorada) expirou sem
+    // resposta — a UI mostra o estado
     {
-      id: uid(0x4212), formulario_id: fAvaliacao360.id, token: DEMO_TOKENS.luizaAvaliacao360,
+      id: uid(0x4212), formulario_id: fAvaliacaoFinalMentor.id, token: DEMO_TOKENS.luizaAvaliacao360,
       dest_profile_id: porNome("Luiza"), dest_mentorado_id: null,
       dupla_id: duplaDe("Luiza", "Isabela"), contexto: { origem: "ficha" },
       usado_em: haDias(233, "20:10"), expira_em: null, created_by: marina, created_at: haDias(238),
     },
     {
-      id: uid(0x4213), formulario_id: fAvaliacao360.id, token: DEMO_TOKENS.isabelaAvaliacao360,
+      id: uid(0x4213), formulario_id: fAvaliacaoFinalMentorado.id, token: DEMO_TOKENS.isabelaAvaliacao360,
       dest_profile_id: null, dest_mentorado_id: ment("Isabela"),
       dupla_id: duplaDe("Luiza", "Isabela"), contexto: { origem: "ficha" },
       usado_em: null, expira_em: haDias(208), created_by: marina, created_at: haDias(238),
     },
-    // 360º do encerramento em andamento (d-ok): o Ricardo respondeu — é o
-    // que carimba checklist.avaliacao_360_enviada na fixture parcial
+    // avaliação final do encerramento em andamento (d-ok): o Ricardo
+    // respondeu — é o que carimba checklist.avaliacao_360_enviada na
+    // fixture parcial
     {
-      id: uid(0x4216), formulario_id: fAvaliacao360.id, token: DEMO_TOKENS.ricardoAvaliacao360,
+      id: uid(0x4216), formulario_id: fAvaliacaoFinalMentor.id, token: DEMO_TOKENS.ricardoAvaliacao360,
       dest_profile_id: porNome("Ricardo"), dest_mentorado_id: null,
       dupla_id: duplaDe("Ricardo", "Ana"), contexto: { origem: "ficha" },
       usado_em: haDias(3, "21:05"), expira_em: null, created_by: marina, created_at: haDias(6),
@@ -759,38 +857,48 @@ export function getDemoFormularios(): DemoFormularios {
       },
       respondido_em: haDias(70, "14:05"),
     },
-    // 360º da Luiza — fim de jornada da dupla encerrada
+    // avaliação final da Luiza — fim de jornada da dupla encerrada
     {
       id: uid(0x4406), link_id: uid(0x4212),
       respostas: {
-        vinculo: 5,
-        evolucao_jovem: 4,
-        pdm_roda: 4,
-        regularidade: "sim",
-        experiencia_programa: 5,
-        apoio_coordenacao: 5,
-        o_que_leva: "A Isa me ensinou que constância vale mais que intensidade. Levo a amizade, as metas pequenas que viraram hábito e a certeza de que mentoria muda os dois lados.",
-        melhorar: "Um encontro de troca entre mentores no meio do ciclo ajudaria a não me sentir sozinha nas dúvidas.",
-        disponivel_proximo_ciclo: "sim",
-        capacidade_proximo_ciclo: "1 jovem",
+        estrutura_programa: "Excelente",
+        melhorar_processo: "Um encontro de troca entre mentores no meio do ciclo ajudaria a não me sentir sozinha nas dúvidas.",
+        dificuldade_material: "Não. A Isa tinha internet e um canto quieto pra estudar.",
+        dificuldade_agenda: "Não. Terça à noite funcionou o ciclo inteiro.",
+        dificuldade_metodologia: "A Roda da Vida no início foi difícil de explicar sem parecer teste de revista — depois engatou.",
+        instrumentos_problematicos: "O PDM ficou longo demais pra uma sessão só; a gente terminou em duas.",
+        melhorias_metodologia: "Sugerir um recorte do PDM em duas sessões para quem está no primeiro ciclo.",
+        avaliacao_suporte: "Ótima",
+        sugestao_suporte: "Um plantão mensal de dúvidas com a coordenação, mesmo que de 30 minutos.",
+        dificuldades_mentoria: "O começo foi travado: ela não acreditava que daria conta da escola. Levei três encontros pra virar a chave.",
+        consideracoes: "A mentoria mudou a minha forma de escutar antes de sugerir.",
+        continua_proximo_ciclo: "sim",
+        comentarios_mentorado: "A Isa é constante e curiosa. Quando confia, entrega muito.",
+        experiencia_processo: "Processo sólido, material bom, e o registro semanal me ajudou a não perder o fio.",
+        depoimento: "Sim, com meu nome",
       },
       respondido_em: haDias(233, "20:10"),
     },
-    // 360º do Ricardo — encerramento em andamento da d-ok (checklist
-    // parcial: a decisão da coordenação ainda não chegou)
+    // avaliação final do Ricardo — encerramento em andamento da d-ok
+    // (checklist parcial: a decisão da coordenação ainda não chegou)
     {
       id: uid(0x4408), link_id: uid(0x4216),
       respostas: {
-        vinculo: 4,
-        evolucao_jovem: 4,
-        pdm_roda: 3,
-        regularidade: "sim",
-        experiencia_programa: 5,
-        apoio_coordenacao: 5,
-        o_que_leva: "A Ana chegou travada com matemática e hoje monta o próprio cronograma. Levo a disciplina de metas pequenas — funciona com cliente também.",
-        melhorar: "O registro semanal podia lembrar de responder as perguntas do encontro anterior — às vezes eu esqueço um combinado.",
-        disponivel_proximo_ciclo: "sim",
-        capacidade_proximo_ciclo: "1 jovem",
+        estrutura_programa: "Boa",
+        melhorar_processo: "O registro semanal podia lembrar de responder as perguntas do encontro anterior — às vezes eu esqueço um combinado.",
+        dificuldade_material: "Não. Ela usa o computador da escola pra estudar.",
+        dificuldade_agenda: "Duas remarcações por causa do horário dela na escola, mas nada que atrapalhasse.",
+        dificuldade_metodologia: "Não. O guia deixou claro o que fazer em cada encontro.",
+        instrumentos_problematicos: "As metas SMART demoraram a fazer sentido pra ela; só na terceira tentativa saiu algo concreto.",
+        melhorias_metodologia: "Um exemplo pronto de meta SMART no material ajudaria a explicar mais rápido.",
+        avaliacao_suporte: "Boa",
+        sugestao_suporte: "Um resumo do ciclo em uma página pra eu me situar antes de cada encontro.",
+        dificuldades_mentoria: "A Ana chegou travada com matemática e hoje monta o próprio cronograma. Levo a disciplina de metas pequenas — funciona com cliente também.",
+        consideracoes: "",
+        continua_proximo_ciclo: "sim",
+        comentarios_mentorado: "Ela é autônoma e organizada, e agora pede ajuda sem esperar a sessão.",
+        experiencia_processo: "Aprendi a não resolver pela pessoa. Isso mudou meu jeito de liderar também.",
+        depoimento: "Sim, mas de forma anônima",
       },
       respondido_em: haDias(3, "21:05"),
     },
@@ -1066,7 +1174,8 @@ export function getDemoFormularios(): DemoFormularios {
       fAvaliacao,
       fAnamnese,
       fInscricao,
-      fAvaliacao360,
+      fAvaliacaoFinalMentorado,
+      fAvaliacaoFinalMentor,
       fVisao,
       fMetas,
       fPdm,
@@ -1085,7 +1194,7 @@ export function getDemoFormularios(): DemoFormularios {
 // Mesma lógica das queries reais, sobre o dataset: as policies das 3 tabelas
 // são coord-only, então os callers conferem o papel antes de chamar.
 
-/** Data da resposta 360º mais recente da dupla — idem
+/** Data da resposta da avaliação final mais recente da dupla — idem
  *  getAvaliacao360DaDupla (join resposta ← link ← form oficial). */
 export function demoAvaliacao360DaDupla(
   role: AppRole,
@@ -1093,11 +1202,21 @@ export function demoAvaliacao360DaDupla(
 ): string | null {
   if (role !== "coordenacao") return null;
   const { formularios, links, respostas } = getDemoFormularios();
-  const form = formularios.find((f) => f.sistema === "avaliacao_360");
-  if (!form) return null;
+  // depois da 0130 são dois instrumentos (um por lado): vale a resposta
+  // mais recente de qualquer um
+  const forms = new Set(
+    formularios
+      .filter(
+        (f) =>
+          f.sistema === "avaliacao_final_mentorado" ||
+          f.sistema === "avaliacao_final_mentor"
+      )
+      .map((f) => f.id)
+  );
+  if (!forms.size) return null;
   const linkIds = new Set(
     links
-      .filter((l) => l.formulario_id === form.id && l.dupla_id === duplaId)
+      .filter((l) => forms.has(l.formulario_id) && l.dupla_id === duplaId)
       .map((l) => l.id)
   );
   const maisRecente = respostas
@@ -1233,8 +1352,10 @@ export function demoJovemJornada(role: AppRole): JovemJornadaDados | null {
       instrumentos: e.instrumentos,
     }));
 
+  // a estação do encontro 16 é a entrega do jovem (chave `avaliacao_360` do
+  // payload, como na RPC 0096)
   const form360 = getDemoFormularios().formularios.find(
-    (f) => f.sistema === "avaliacao_360"
+    (f) => f.sistema === "avaliacao_final_mentorado"
   );
   const { links, respostas } = getDemoFormularios();
   const agora = Date.now();
@@ -1290,13 +1411,17 @@ export function demoPainelInstrumentosJornada(
   const eu = data.personas[role];
   const { formularios, links } = getDemoFormularios();
   const agora = Date.now();
+  // espelha a RPC: a avaliação final do mentorado alimenta o slot
+  // `avaliacao_360` do painel (o lado do mentor não entra na jornada)
   const sistemasPainel = new Set([
     "visao",
     "metas",
     "pdm",
     "roda_vida",
-    "avaliacao_360",
+    "avaliacao_final_mentorado",
   ]);
+  const chavePainel = (s: string) =>
+    s === "avaliacao_final_mentorado" ? "avaliacao_360" : s;
   const formPorId = new Map(formularios.map((f) => [f.id, f]));
 
   return data.duplas
@@ -1316,7 +1441,7 @@ export function demoPainelInstrumentosJornada(
         if (!f?.sistema || !sistemasPainel.has(f.sistema)) continue;
         const proMentorado = l.dest_mentorado_id === d.mentorado?.id;
         if (!proMentorado && l.dest_profile_id !== d.mentor?.id) continue;
-        const s = f.sistema as keyof PainelJornadaLinha["entregas"];
+        const s = chavePainel(f.sistema) as keyof PainelJornadaLinha["entregas"];
         (entregas[s] ??= []).push({
           status: l.usado_em
             ? "respondido"

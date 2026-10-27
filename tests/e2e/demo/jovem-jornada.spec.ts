@@ -130,7 +130,7 @@ test.describe("demo — Minha jornada do mentorado", () => {
     );
     for (const titulo of [
       "Roda da Vida · aplicação formal",
-      "Avaliação 360º",
+      "Avaliação final",
     ]) {
       const card = trilha.locator("article", { hasText: titulo });
       await expect(card).toBeVisible();
@@ -385,7 +385,7 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     for (const titulo of [
       "Roda da Vida · leitura inicial",
       "Avaliação por terceiros",
-      "Avaliação 360º e autoavaliação",
+      "Avaliação final da mentoria",
     ]) {
       await expect(
         instrumentos.getByRole("heading", { name: titulo })
@@ -413,7 +413,7 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     // card trancado é leitura pura pra TODO staff — o pill de liberação
     // não é gesto: zero link, zero botão dentro dele
     const cardTrancado = instrumentos.locator("article", {
-      hasText: "Avaliação 360º",
+      hasText: "Avaliação final",
     });
     await expect(cardTrancado.getByText("ainda não abriu")).toBeVisible();
     await expect(cardTrancado.getByRole("link")).toHaveCount(0);
@@ -484,7 +484,7 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     ).toHaveCount(0);
     // card trancado: zero gesto dentro (pill informativo, não link/botão)
     const trancado = instrumentos.locator("article", {
-      hasText: "Avaliação 360º",
+      hasText: "Avaliação final",
     });
     await expect(trancado.getByRole("link")).toHaveCount(0);
     await expect(trancado.getByRole("button")).toHaveCount(0);

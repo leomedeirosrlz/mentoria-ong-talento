@@ -212,9 +212,9 @@ export const ENCONTRO_GUIA: Record<number, GuiaEncontro> = {
   },
   16: {
     cobre:
-      "Encerramento formal e celebração; revisão final do PDM e da Roda; preenchimento da Avaliação 360º e da autoavaliação do mentor.",
+      "Encerramento formal e celebração; revisão final do PDM e da Roda; preenchimento da avaliação final da mentoria (mentor e mentorado).",
     conduzir:
-      "Celebrem o percurso e encerrem formalmente a mentoria: revisitem o PDM e a Roda da Vida destacando os avanços alcançados e as perspectivas para o futuro, e conversem sobre as necessidades futuras do jovem e a continuidade do autodesenvolvimento. É aqui que se preenche a Avaliação 360º — o único formulário de avaliação do programa. Encerre em clima de reconhecimento e gratidão: agradeça a confiança, verbalize as qualidades que você percebeu e pergunte “pelo que você é grato(a) nesta jornada?”.",
+      "Celebrem o percurso e encerrem formalmente a mentoria: revisitem o PDM e a Roda da Vida destacando os avanços alcançados e as perspectivas para o futuro, e conversem sobre as necessidades futuras do jovem e a continuidade do autodesenvolvimento. É aqui que mentor e mentorado preenchem, cada um pelo seu link, a avaliação final da mentoria. Encerre em clima de reconhecimento e gratidão: agradeça a confiança, verbalize as qualidades que você percebeu e pergunte “pelo que você é grato(a) nesta jornada?”.",
   },
 };
 
@@ -226,8 +226,8 @@ export const ENCONTRO_GUIA: Record<number, GuiaEncontro> = {
  *  "Modelo SMART" NÃO mapeia pra `metas`: é a técnica de qualidade dentro
  *  das metas — quem diz que metas está em jogo num encontro é a janela
  *  (enc. 2–3), e mapeá-lo espalharia `metas` pelos enc. 12–14 onde o
- *  SMART reaparece pra metas da Roda. Avaliação 360º / autoavaliação do
- *  mentor são formulários de sistema mas não instrumentos da dupla. */
+ *  SMART reaparece pra metas da Roda. As avaliações finais (mentor e
+ *  mentorado) são formulários de sistema mas não instrumentos da dupla. */
 const NOME_INSTRUMENTO: Record<string, InstrumentoSistema> = {
   pdm: "pdm",
   "plano de desenvolvimento do mentorado": "pdm",

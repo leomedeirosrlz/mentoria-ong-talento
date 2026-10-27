@@ -82,6 +82,8 @@ export type FormularioCampo = {
  *  espelhando o CHECK da coluna. null = form criado pela coordenação. */
 export type FormularioSistema =
   | "avaliacao_360"
+  | "avaliacao_final_mentor"
+  | "avaliacao_final_mentorado"
   | "avaliacao_especialista"
   | "visao"
   | "metas"
@@ -92,7 +94,9 @@ export type FormularioSistema =
   | "desfecho";
 
 export const SISTEMA_LABEL: Record<FormularioSistema, string> = {
-  avaliacao_360: "360º",
+  avaliacao_360: "Avaliação 360º (encerrada)",
+  avaliacao_final_mentor: "Avaliação final (mentor)",
+  avaliacao_final_mentorado: "Avaliação final (mentorado)",
   avaliacao_especialista: "Avaliação da trilha",
   visao: "Visão",
   metas: "Metas",
@@ -124,7 +128,7 @@ export const SISTEMAS_REGUA: readonly FormularioSistema[] = [
   "metas",
   "pdm",
   "roda_vida",
-  "avaliacao_360",
+  "avaliacao_final_mentorado",
 ];
 
 /** Sistemas "de bordo" — oficiais que NÃO são a régua DPP: seguem
@@ -135,14 +139,16 @@ export const SISTEMAS_REGUA: readonly FormularioSistema[] = [
  *  defensivo — nunca fica órfão).
  *
  *  Anamnese Social e Autoavaliação saíram do programa (REALIZA-236): a
- *  leitura do ciclo é da 360º, que já pergunta disponibilidade pro próximo
- *  ciclo. As linhas ficaram no banco como histórico morto? Não — foram
- *  apagadas (0128); o vocabulário do CHECK segue com elas porque enum de
- *  texto não se encolhe sem recriar a constraint. */
+ *  leitura do ciclo é da avaliação final (REALIZA-230), entregue em dois
+ *  instrumentos — um por lado da dupla. A do mentorado é a estação do
+ *  encontro 16 na régua; a do mentor mora aqui. As linhas da anamnese e da
+ *  autoavaliação foram apagadas na 0128; o vocabulário do CHECK segue com
+ *  elas porque enum de texto não se encolhe sem recriar a constraint. */
 export const SISTEMAS_BORDO: readonly FormularioSistema[] = [
   "intake_mentor",
   "intake_mentorado",
   "avaliacao_especialista",
+  "avaliacao_final_mentor",
   "desfecho",
 ];
 
