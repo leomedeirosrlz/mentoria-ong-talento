@@ -21,7 +21,6 @@ import {
   WhatsappLogo,
 } from "@phosphor-icons/react";
 import {
-  enviarDesfechoLote,
   enviarInstrumentoLote,
   type LoteInstrumentoLinha,
 } from "@/lib/actions-email";
@@ -547,38 +546,7 @@ export function EnviarInstrumentoLote({
   );
 }
 
-/** Lote do "Depois da mentoria · 6 meses" (REALIZA-216) — a fila são as
- *  duplas concluídas há ≥180 dias; o disparo chama a action do desfecho
- *  com a copy do questionário (não é exercício da jornada). */
-export function EnviarDesfechoLote({
-  linhas,
-  envioLiberado,
-  contador,
-}: {
-  linhas: DuplaLote[];
-  envioLiberado: boolean;
-  contador?: number;
-}) {
-  return (
-    <EnviarLinkLote
-      instrumento="Depois da mentoria"
-      estacaoTitulo="Depois da mentoria · 6 meses"
-      descricao="O questionário sai por e-mail pro jovem. Quem não tem e-mail cadastrado recebe pelo mentor."
-      linhas={linhas}
-      envioLiberado={envioLiberado}
-      contador={contador}
-      disparar={(duplaIds) => enviarDesfechoLote({ duplaIds })}
-      previewEmail={{
-        titulo: "Depois da mentoria: como você está?",
-        corpo: (
-          <>
-            “Oi, Ana! Faz um tempo que a sua mentoria terminou e a gente
-            quer saber: <strong>como você está?</strong> Estudando,
-            trabalhando, empreendendo? São 2 perguntinhas rápidas.” + o
-            link pessoal.
-          </>
-        ),
-      }}
-    />
-  );
-}
+/** Lote do "Depois da mentoria · 6 meses" (REALIZA-216) saiu do programa na
+ *  0134 — o formulário morreu e a fila 6m ficou sem instrumento. A action
+ *  enviarDesfechoLote e a RPC emitir_desfecho_6m_lote seguem no backend como
+ *  vocabulário dorminte (o botão da coordenação não chama mais). */

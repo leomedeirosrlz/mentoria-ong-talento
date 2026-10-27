@@ -92,10 +92,11 @@ function RodaResultado({
 
   return (
     <div className="space-y-4">
-      {/* ≥lg: a roda veste a coroa de nomes de área (variante A —
-          REALIZA-143) e empilha com a lista; abaixo disso fica a
-          moldura compacta de sempre lado a lado com as notas */}
-      <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-center lg:grid-cols-1">
+      {/* roda e lista empilham sempre: o lado a lado da faixa sm–lg
+          espremia os nomes das áreas e deixava vazio sob o desenho dentro
+          do dialog estreito (REALIZA-253). ≥lg a roda veste a coroa de
+          nomes de área (variante A — REALIZA-143) */}
+      <div className="grid gap-4">
         <div className="text-center">
           <RodaSvg
             roda={roda}

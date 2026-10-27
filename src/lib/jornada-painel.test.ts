@@ -169,5 +169,9 @@ describe("liberaCopia", () => {
     expect(liberaCopia("avaliacao_360", semDatas)).toBe(
       "libera no encontro 16"
     );
+    // coordenação lê o mesmo dado como indicador — sem o verbo da trava
+    expect(liberaCopia("roda_formal", grupos, "abre")).toBe(
+      "abre no encontro 12 · T1 06/09 · T2 24/03"
+    );
   });
 });

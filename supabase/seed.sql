@@ -59,20 +59,38 @@ select cron.id, v.tipo, v.numero::smallint, v.data::date, v.titulo, v.fase,
 ) v(tipo, numero, data, titulo, fase, instrumentos, data_fim, status, observacao, ordem);
 
 -- ===== materiais =====
-insert into public.materiais (titulo, descricao, tipo, url, audiencia, encontro_num, ordem) values
-  ('Guia do Mentor DPP', 'Metodologia completa: jornada, 16 encontros, instrumentos e templates.', 'guia', null, 'dpp', null, 1),
-  ('Guia do Mentor Especialista', 'Metodologia da mentoria com especialista: 5 encontros e cinco funções.', 'guia', null, 'especialista', null, 2),
-  ('Perguntas Eficazes', 'Instrumento de referência do guia: exemplos de perguntas abertas e de foco para conduzir cada encontro.', 'conteudo', null, 'dpp', null, 9),
-  ('Mensagem de preparação do mentorado', 'Modelo para enviar antes do 1º encontro: história de vida, Roda da Vida e contatos para avaliação.', 'template', null, 'dpp', 1, 10),
-  ('Instrumento: Construindo a sua Visão', 'Tarefa individual entre o 1º e o 2º encontro; origina a Declaração de Visão.', 'template', null, 'dpp', 1, 11),
-  ('Mensagem às pessoas indicadas', 'Modelo de contato para a avaliação por terceiros (duas perguntas).', 'template', null, 'dpp', 1, 12),
-  ('Consolidação da avaliação por terceiros', 'Quadro para agrupar pontos fortes e de melhoria sem identificar quem respondeu.', 'template', null, 'dpp', 2, 13),
-  ('Plano de Desenvolvimento do Mentorado (PDM)', 'Documento central da dupla: visão, metas SMART, indicadores e mapa de submetas.', 'template', null, 'dpp', 2, 14),
-  ('Mensagem de encaminhamento entre encontros', 'Modelo curto para manter o vínculo e deixar a próxima tarefa clara.', 'template', null, 'dpp', null, 15),
-  ('Roda da Vida: roteiro de aplicação', 'Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.', 'template', null, 'dpp', 12, 16),
-  ('Checklist de competências do mentor', 'Autoavaliação antes do ciclo e novamente no 16º encontro.', 'template', null, 'todos', null, 17),
-  ('Plataforma de mentoria', 'Onde os encontros oficiais são agendados e avaliados.', 'link', 'https://mentoria.realiza.vc', 'todos', null, 20),
-  ('Formação EaD gratuita', 'Trilha opcional com certificado para mentores.', 'link', 'https://ead.realiza.vc', 'todos', null, 21);
+insert into public.materiais (titulo, descricao, tipo, url, audiencia, encontro_num, ordem, path) values
+  ('Guia do Mentor DPP', 'Metodologia completa: jornada, 16 encontros, instrumentos e templates.', 'guia', null, 'dpp', null, 1, 'materiais/5dc4d7d1-e69d-410c-b0b0-f8a80dcc906b-Guia-do-Mentor-de-Desenvolvimento-Pessoal-e-Profissional---Realiza.vc-Equipe-Executiva-1-.pdf'),
+  ('Guia do Mentor Especialista', 'Metodologia da mentoria com especialista: 5 encontros e cinco funções.', 'guia', null, 'especialista', null, 2, 'materiais/7a83fe5a-5128-47c3-9c4c-c2eeb5ae0288-Guia-do-Mentor-Especialista---Realiza.vc-Equipe-Executiva-1-.pdf'),
+  ('Roteiro Semana 1 — Boas-vindas e histórias de vida', null, 'conteudo', null, 'dpp', 1, 3, 'materiais/7d586a09-3842-4efe-84df-671d414cd19c-roteiro-semana-1.pdf'),
+  ('Roteiro Semana 2 — Avaliação por terceiros e visão de futuro', null, 'conteudo', null, 'dpp', 2, 4, 'materiais/79ce91dc-1a9a-4651-936b-0855efbcf2d8-roteiro-semana-2.pdf'),
+  ('Roteiro Semana 3 — Metas e checagem SMART', null, 'conteudo', null, 'dpp', 3, 5, 'materiais/c85f59d3-d1a7-413e-b8d0-62f8e367a260-roteiro-semana-3.pdf'),
+  ('Roteiro Semana 4 — Submetas e compromisso', null, 'conteudo', null, 'dpp', 4, 6, 'materiais/898a0774-c7b8-44cb-ad6c-3d9f65ad3a5f-roteiro-semana-4.pdf'),
+  ('Roteiro Semana 5 — Primeiros resultados', null, 'conteudo', null, 'dpp', 5, 7, 'materiais/e6beb712-5d18-4774-9e11-df334aeb341b-roteiro-semana-5.pdf'),
+  ('Roteiro Semana 6 — Superando barreiras', null, 'conteudo', null, 'dpp', 6, 8, 'materiais/e268ac53-2325-45a7-8d6c-e0886e8e6684-roteiro-semana-6.pdf'),
+  ('Roteiro Semana 7 — Ajustes no plano', null, 'conteudo', null, 'dpp', 7, 9, 'materiais/03d08a31-144c-45f4-bafc-8716c22a3b7d-roteiro-semana-7.pdf'),
+  ('Roteiro Semana 8 — Monitoramento e responsabilidade', null, 'conteudo', null, 'dpp', 8, 10, 'materiais/6589d364-02ed-4247-93ad-3cd9da8c8b32-roteiro-semana-8.pdf'),
+  ('Roteiro Semana 9 — Revisão de meio de percurso', null, 'conteudo', null, 'dpp', 9, 11, 'materiais/fb0710c1-f1ac-4dfb-8a74-56c54ff2fddf-roteiro-semana-9.pdf'),
+  ('Roteiro Semana 10 — O mentor como espelho', null, 'conteudo', null, 'dpp', 10, 12, 'materiais/7f8253ee-c430-4980-81eb-2357aad207d5-roteiro-semana-10.pdf'),
+  ('Roteiro Semana 11 — Rede de apoio e novos espaços', 'Roteiro do 11º encontro: mapear a rede de apoio, abrir portas e apresentar a Roda da Vida.', 'conteudo', null, 'dpp', 11, 13, 'materiais/d6402303-7a25-432e-b3b4-046908c444de-roteiro-semana-11.pdf'),
+  ('Roteiro Semana 12 — Leitura da Roda da Vida', 'Roteiro do 12º encontro: ler a Roda quadrante por quadrante e abrir as metas das 16 áreas.', 'conteudo', null, 'dpp', 12, 14, 'materiais/e82d1ecb-4650-4728-b4c9-448479b3af20-roteiro-semana-12.pdf'),
+  ('Roteiro Semana 13 — Metas das áreas prioritárias', 'Roteiro do 13º encontro: revisar as metas da Roda e eleger as áreas prioritárias a detalhar.', 'conteudo', null, 'dpp', 13, 15, 'materiais/56cce3c4-7325-4895-9296-442157dae6ae-roteiro-semana-13.pdf'),
+  ('Roteiro Semana 14 — Desdobramento e plano de continuidade', 'Roteiro do 14º encontro: validar o mapa de submetas e montar o plano de continuidade.', 'conteudo', null, 'dpp', 14, 16, 'materiais/1a6bcf72-ebb3-40b5-902d-ad2d5e6fefa4-roteiro-semana-14.pdf'),
+  ('Roteiro Semana 15 — Reflexão e reconhecimento', 'Roteiro do 15º encontro: olhar a jornada, reconhecer conquistas e trocar feedback mútuo.', 'conteudo', null, 'dpp', 15, 17, 'materiais/9d23a061-e0bc-4e2e-b835-f875b0654acf-roteiro-semana-15.pdf'),
+  ('Roteiro Semana 16 — Encerramento e celebração', 'Roteiro do 16º encontro: celebrar o percurso, revisar PDM e Roda e responder a avaliação geral.', 'conteudo', null, 'dpp', 16, 18, 'materiais/f22fe899-7bcb-49c8-80cb-949295ded4e1-roteiro-semana-16.pdf'),
+  ('Mensagem de preparação do mentorado', 'Modelo para enviar antes do 1º encontro: história de vida, Roda da Vida e contatos para avaliação.', 'template', null, 'dpp', 1, 19, 'doc:mensagem-preparacao'),
+  ('Mensagem às pessoas indicadas', 'Modelo de contato para a avaliação por terceiros (duas perguntas).', 'template', null, 'dpp', 1, 20, 'doc:mensagem-indicadas'),
+  ('Mensagem de encaminhamento entre encontros', 'Modelo curto para manter o vínculo e deixar a próxima tarefa clara.', 'template', null, 'dpp', null, 21, 'doc:mensagem-encaminhamento'),
+  ('Roda da Vida: roteiro de aplicação', 'Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.', 'template', null, 'dpp', 12, 22, 'materiais/f34e462a-9e3f-4ab8-b68d-8d59abcff2c2-Roda-da-Vida---Realiza.vc.pdf'),
+  ('Feedback Construtivo', 'Instrumento do guia: o modelo de fala e os cuidados para feedback sobre comportamento negativo.', 'conteudo', null, 'todos', null, 23, 'doc:feedback-construtivo'),
+  ('Instrumento: Definindo Metas', 'Metas SMART do mentorado — instrumento de preenchimento entre encontros.', 'template', null, 'dpp', null, 24, 'materiais/4bcba588-fff0-4a14-b9a9-b5d8598cfc21-definindo-metas.pdf'),
+  ('Perguntas Eficazes', 'Documento complementar do guia: o que são, o que evitar e o banco de perguntas por momento da conversa.', 'conteudo', null, 'dpp', null, 25, 'materiais/1a8277af-eb2b-4196-98e7-9fade2899a34-perguntas-eficazes.pdf'),
+  ('Cronograma do programa — Turma 1', null, 'conteudo', null, 'dpp', null, 26, 'materiais/84c8a989-48f0-4497-8b28-58754a2ca02e-cronograma-turma-1.pdf'),
+  ('Cronograma do programa — Turma 2', null, 'conteudo', null, 'dpp', null, 27, 'materiais/6eabec09-3d3f-42ba-9407-8077e9373b6c-cronograma-turma-2.pdf'),
+  ('Plataforma de mentoria', 'Onde os encontros oficiais são agendados e avaliados.', 'link', 'https://mentoria.realiza.vc', 'todos', null, 28, null),
+  ('Formação EaD gratuita', 'Trilha opcional com certificado para mentores.', 'link', 'https://ead.realiza.vc', 'todos', null, 29, null),
+  ('Checklist de competências do mentor', 'As 10 competências do guia para marcar antes do ciclo e no 16º encontro.', 'template', null, 'dpp', null, 30, 'doc:checklist-competencias')
+on conflict do nothing;
 
 -- sem dados de pessoas/duplas: cadastro real acontece pela plataforma
 -- (pessoas -> magic link; duplas pela coordenação)

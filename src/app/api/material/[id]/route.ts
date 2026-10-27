@@ -30,7 +30,7 @@ export async function GET(
       demo === "coordenacao" ||
       (m?.audiencia === "dpp" && demo === "mentor_dpp") ||
       (m?.audiencia === "especialista" && demo === "mentor_especialista");
-    if (!m?.path || !autorizado) {
+    if (!m?.path || m.path.startsWith("doc:") || !autorizado) {
       return apiErro("Material não encontrado.", { status: 404 });
     }
     const pdf = demoPdf(m.titulo, m.descricao ?? undefined);

@@ -1,11 +1,7 @@
 import Link from "next/link";
 import { Check, Clock, Eye, LockSimple, Warning } from "@phosphor-icons/react/dist/ssr";
-import {
-  EnviarDesfechoLote,
-  EnviarInstrumentoLote,
-  type DuplaLote,
-} from "@/components/enviar-instrumento-lote";
-import { LembreteButton } from "@/components/lembrete-button";
+import { EnviarInstrumentoLote } from "@/components/enviar-instrumento-lote";
+import { DuplaWaAcao } from "@/components/dupla-wa-acao";
 import {
   InstrumentoEmblema,
   type InstrumentoChave,
@@ -32,9 +28,10 @@ import type { CicloEvento } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 // Aba "Instrumentos" de /materiais: a régua oficial da jornada DPP — os 7
-// instrumentos da régua + a avaliação por terceiros (0103), que não é
-// formulário `sistema` mas é instrumento do programa (o "quem disse o quê"
-// nunca aparece: o consolidado anonimizado mora na ficha). Pra staff cada
+// instrumentos da régua. A avaliação por terceiros ficou fora da plataforma
+// (decisão do Leo, out/2026: dinâmica pré-encontro 1 com dados confidenciais)
+// — o consolidado segue chegando por fora e morando na ficha da dupla.
+// Pra staff cada
 // card resume a coorte em 3 estados (responderam · aguardando · atrasados)
 // e a lista abaixo é a única fila de ação: jovem com instrumento fora do
 // prazo do guia, lembrado direto (o link já está na jornada dele, emitido
@@ -58,13 +55,6 @@ type CardSpec = {
 };
 
 const CARDS: CardSpec[] = [
-  {
-    chave: "avaliacao_terceiros",
-    titulo: "Avaliação por terceiros",
-    descricao:
-      "Amigos e família respondem 2 perguntas; o programa consolida sem mostrar quem disse o quê. O mentor convida as pessoas.",
-    chips: ["Antes do enc. 1", "Devolutiva enc. 2"],
-  },
   {
     chave: "roda_inicial",
     titulo: ESTACOES.roda_inicial.titulo,
@@ -119,25 +109,39 @@ const CARDS: CardSpec[] = [
     sistemaForm: "roda_vida",
   },
   {
-    chave: "avaliacao_360",
-    titulo: "Avaliação Geral - 360º",
+    chave: "avaliacao_final_mentorado",
+    titulo: "Avaliação Geral - 360º · mentorado(a)",
     descricao:
-      "O fechamento do ciclo em dois instrumentos, um por lado: o jovem responde a avaliação final e o mentor também. A resposta marca o checklist de encerramento.",
+      "O jovem fecha o ciclo contando como foi a mentoria. A resposta marca o checklist de encerramento da dupla.",
     chips: ["Enc. 16"],
     estacao: "avaliacao_360",
     sistemaForm: "avaliacao_final_mentorado",
   },
+  {
+    chave: "avaliacao_final_mentor",
+    titulo: "Avaliação Geral - 360º · mentor(a)",
+    descricao:
+      "O mentor avalia o programa e a própria experiência, e registra a disponibilidade pro próximo ciclo. Também marca o checklist de encerramento.",
+    chips: ["Enc. 16"],
+    estacao: "avaliacao_360",
+    sistemaForm: "avaliacao_final_mentor",
+  },
 ];
 
-/** Estado do card: "ainda não abriu" enquanto nenhuma turma alcançou o
- *  encontro de abertura (o card fica esmaecido e a ação vira a data de
- *  liberação por turma); "liberado" quando ao menos uma turma já chegou.
- *  A avaliação do encontro é recorrente: a tag diz o formato, não o estado. */
+/** Estado do card na régua: "ainda não abriu" enquanto nenhuma turma
+ *  alcançou o encontro de abertura e a janela SEGURA o papel (o card fica
+ *  esmaecido e a ação vira a data de liberação por turma); "janela não
+ *  aberta" quando a janela ainda não chegou mas o card abre — o caso da
+ *  coordenação (REALIZA-257); "liberado" quando ao menos uma turma já
+ *  chegou. A avaliação do encontro é recorrente: a tag diz o formato, não
+ *  o estado. */
 function TagEstado({
   trancado,
+  foraDaJanela = false,
   recorrente = false,
 }: {
   trancado: boolean;
+  foraDaJanela?: boolean;
   recorrente?: boolean;
 }) {
   if (trancado) {
@@ -148,6 +152,16 @@ function TagEstado({
       >
         <LockSimple data-icon="inline-start" size={11} aria-hidden />
         ainda não abriu
+      </Badge>
+    );
+  }
+  if (foraDaJanela) {
+    return (
+      <Badge
+        variant="outline"
+        className="text-xs font-medium text-muted-foreground"
+      >
+        janela não aberta
       </Badge>
     );
   }
@@ -269,17 +283,19 @@ function LinhaAtrasado({
           Ver ficha
         </Link>
         {info?.status === "ativa" ? (
-          <LembreteButton
+          <DuplaWaAcao
             duplaId={linha.dupla_id}
-            destino="mentorado"
-            rotulo={`Lembrar ${primeiro}`}
+            destNome={linha.jovem_nome}
             telefone={info.jovemWhatsapp}
-            titulo="Sua jornada tem atividade esperando"
-            corpo={`Oi ${primeiro}, tudo bem? Aqui é ${eu}, da equipe do Realiza.vc. ${
+            mensagem={`Oi ${primeiro}, tudo bem? Aqui é ${eu}, da equipe do Realiza.vc. ${
               nomes.length === 1 ? "Uma atividade" : "Algumas atividades"
             } da sua jornada ${nomes.length === 1 ? "está" : "estão"} esperando por você: ${lista}. É só abrir Minha jornada no app.`}
-            href="/jovem/materiais"
-            bloqueadoAte={lembreteBloqueadoAte(nudge)}
+            nudge={{
+              destino: "mentorado",
+              titulo: "Sua jornada tem atividade esperando",
+              href: "/jovem/materiais",
+              bloqueadoAte: lembreteBloqueadoAte(nudge),
+            }}
           />
         ) : (
           <Badge variant="secondary">dupla pausada</Badge>
@@ -296,7 +312,6 @@ export function InstrumentosPrograma({
   duplasInfo,
   formIds,
   envioLiberado,
-  desfechoElegiveis = [],
   fichasMentor = [],
   nudges = {},
   meuNome = "",
@@ -320,9 +335,6 @@ export function InstrumentosPrograma({
    *  "Ver respostas"; vazio pra não-coord (RLS do form é coord-only). */
   formIds: Map<FormularioSistema, string>;
   envioLiberado: boolean;
-  /** a fila do "Depois da mentoria · 6 meses" — concluídas há ≥180 dias
-   *  sem link 6m (desfecho_elegiveis_6m, 0124); só preenchida pra coord. */
-  desfechoElegiveis?: DuplaLote[];
   /** mentor: as duplas DPP vivas dele — o rodapé linka cada ficha. */
   fichasMentor?: { id: string; jovemNome: string }[];
   /** último nudge por dupla — o cap de 48h do Lembrar. */
@@ -349,13 +361,18 @@ export function InstrumentosPrograma({
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {CARDS.map((card) => {
           const estacao = card.estacao;
-          // trancado = TODA a coorte abaixo do encIni (sem linhas — mentor —
-          // nunca tranca: o card é catálogo, não espelho de janela)
-          const trancado =
+          // janelaFechada = TODA a coorte abaixo do encIni (sem linhas —
+          // mentor — nunca fecha: o card é catálogo, não espelho de janela)
+          const janelaFechada =
             temEscopo &&
             estacao != null &&
             estacao !== "avaliacao_encontro" &&
             resolvidas.every((r) => r.estados[estacao] === "trancada");
+          // REALIZA-257: a janela do guia segura o mentor e o supervisor,
+          // não a coordenação — ela consulta e emite fora da janela, e pra
+          // ela a janela vira indicador. "trancado" é o estado que bloqueia
+          // de fato, então nunca vale pra coord.
+          const trancado = janelaFechada && !ehCoord;
           const sistemaLote = estacao ? SISTEMA_DA_ESTACAO[estacao] : null;
           const elegiveis =
             ehCoord && sistemaLote && temEscopo && estacao != null
@@ -367,7 +384,9 @@ export function InstrumentosPrograma({
           // REALIZA-233: o card inteiro abre as respostas — stretched link
           // cobre o article e a linha de ações sobe com relative pra seguir
           // clicável. Só onde há página de respostas (coord + form ativo).
-          const verRespostas = ehCoord && formId && !trancado;
+          // REALIZA-257: a trava de janela segura o mentor/jovem, não a
+          // coordenação — o card dela abre sempre.
+          const verRespostas = ehCoord && !!formId;
 
           return (
             <article
@@ -411,6 +430,7 @@ export function InstrumentosPrograma({
                     {temEscopo && estacao && (
                       <TagEstado
                         trancado={trancado}
+                        foraDaJanela={janelaFechada && ehCoord}
                         recorrente={estacao === "avaliacao_encontro"}
                       />
                     )}
@@ -420,7 +440,7 @@ export function InstrumentosPrograma({
               <p className="text-xs leading-relaxed text-muted-foreground">
                 {card.descricao}
               </p>
-              {temEscopo && estacao && !trancado && (
+              {temEscopo && estacao && !janelaFechada && (
                 <LinhaEstados resolvidas={resolvidas} chave={estacao} />
               )}
 
@@ -431,12 +451,21 @@ export function InstrumentosPrograma({
               ehCoord ||
               (papel === "mentor" && fichasMentor.length > 0) ? (
                 <div className="relative mt-auto flex flex-wrap items-center gap-2 pt-1">
-                  {trancado && estacao ? (
+                  {trancado && estacao && (
                     <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
                       <LockSimple size={12} aria-hidden />
                       {liberaCopia(estacao, grupos)}
                     </span>
-                  ) : ehCoord ? (
+                  )}
+                  {/* coordenação fora da janela: o mesmo dado de abertura,
+                      sem cadeado — é indicador, o card abre (REALIZA-257) */}
+                  {ehCoord && janelaFechada && estacao && (
+                    <span className="inline-flex items-center gap-1.5 rounded-md bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
+                      <Clock size={12} aria-hidden />
+                      {liberaCopia(estacao, grupos, "abre")}
+                    </span>
+                  )}
+                  {ehCoord ? (
                     sistemaLote ? (
                       elegiveis.length > 0 ? (
                         <EnviarInstrumentoLote
@@ -447,14 +476,17 @@ export function InstrumentosPrograma({
                           contador={elegiveis.length}
                         />
                       ) : (
-                        <span className="text-xs text-muted-foreground">
-                          {temEscopo
-                            ? "Nada a enviar agora: as duplas já receberam ou já responderam."
-                            : "Sem duplas no escopo ainda."}
-                        </span>
+                        // fora da janela não há o que emitir: o índice diz
+                        // quando ela abre, não que as duplas já responderam
+                        !janelaFechada && (
+                          <span className="text-xs text-muted-foreground">
+                            {temEscopo
+                              ? "Nada a enviar agora: as duplas já receberam ou já responderam."
+                              : "Sem duplas no escopo ainda."}
+                          </span>
+                        )
                       )
-                    ) : estacao === "avaliacao_encontro" ||
-                      card.chave === "avaliacao_terceiros" ? (
+                    ) : estacao === "avaliacao_encontro" ? (
                       <Link
                         href="/duplas"
                         className={buttonVariants({
@@ -505,60 +537,6 @@ export function InstrumentosPrograma({
             </article>
           );
         })}
-        {/* desfecho (0124): o card do 6 meses é coord-only — a régua é o
-            tempo de conclusão, não a janela do guia, e a emissão é gesto
-            humano em lote (nunca automático) */}
-        {ehCoord && (
-          <article
-            className={cn(
-              "relative flex flex-col gap-2.5 rounded-xl bg-card p-3.5 shadow-[var(--shadow-border)]",
-              formIds.get("desfecho") &&
-                "transition-shadow hover:shadow-[var(--shadow-border-hover)]"
-            )}
-          >
-            {formIds.get("desfecho") && (
-              <Link
-                href={`/formularios/${formIds.get("desfecho")}`}
-                aria-label="Ver respostas — Depois da mentoria · 6 meses"
-                className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              />
-            )}
-            <div className="flex items-start gap-2.5">
-              <InstrumentoEmblema instrumento="desfecho" />
-              <div className="min-w-0">
-                <h3 className="text-sm font-semibold leading-snug">
-                  Depois da mentoria · 6 meses
-                </h3>
-                <p className="mt-1 flex flex-wrap items-center gap-1.5">
-                  <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground sm:text-[11px]">
-                    6 meses depois
-                  </span>
-                  <Badge variant="outline" className="text-xs font-medium">
-                    sob demanda
-                  </Badge>
-                </p>
-              </div>
-            </div>
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              O jovem conta como está depois da jornada: estudando,
-              trabalhando ou empreendendo. Vai pra quem concluiu há pelo
-              menos 6 meses e ainda não respondeu.
-            </p>
-            <div className="relative mt-auto flex flex-wrap items-center gap-2 pt-1">
-              {desfechoElegiveis.length > 0 ? (
-                <EnviarDesfechoLote
-                  linhas={desfechoElegiveis}
-                  envioLiberado={envioLiberado}
-                  contador={desfechoElegiveis.length}
-                />
-              ) : (
-                <span className="text-xs text-muted-foreground">
-                  Nenhuma dupla chegou aos 6 meses sem resposta.
-                </span>
-              )}
-            </div>
-          </article>
-        )}
       </div>
       {atrasados.length > 0 && (
         <section
@@ -606,10 +584,11 @@ export function InstrumentosPrograma({
           ))}
         </p>
       )}
-      {/* coord-only: intakes, avaliação da trilha e desfecho moram em /formularios */}
+      {/* coord-only: os instrumentos que sobraram em /formularios são os
+          intakes de matching — os fechamentos da jornada moram aqui */}
       {ehCoord && (
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Intakes, avaliação da trilha e desfecho ficam em{" "}
+          As inscrições de matching ficam em{" "}
           <Link
             href="/formularios"
             className="font-medium underline underline-offset-2 hover:text-foreground"

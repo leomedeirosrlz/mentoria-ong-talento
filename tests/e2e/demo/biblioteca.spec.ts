@@ -1,10 +1,12 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
 // REALIZA-250 — a biblioteca deixa de ser uma lista única e vira seções
-// derivadas do `tipo` do material. O dataset demo tem guia, template e
-// link — "Conteúdos e roteiros" fica vazia e NÃO renderiza (seção sem
-// resultado some, mesma regra de silêncio da 240). "Encontro N" segue
-// meta da linha, nunca seção. Read-only — seguro em qualquer ambiente.
+// derivadas do `tipo` do material. Depois da 0135/0138 o dataset demo
+// espelha o catálogo de prod: 30 linhas, todas acionáveis — 16 roteiros e
+// Perguntas Eficazes caem em "Conteúdos e roteiros", os templates do cap. 14
+// são documentos nativos (path "doc:<slug>" → /materiais/documento/<slug>,
+// sem passar pela rota de arquivo). "Encontro N" segue meta da linha, nunca
+// seção. Read-only — seguro em qualquer ambiente.
 
 test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
   test("coordenação: seções nomeadas, vazia some e busca filtra dentro", async ({
@@ -20,29 +22,68 @@ test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
     // heading da seção) — o leitor de tela anuncia a categoria ao navegar
     // entre grupos; o nome carrega a contagem ("Guias 2")
     const guias = bib.getByRole("region", { name: /Guias/ });
+    const conteudos = bib.getByRole("region", {
+      name: /Conteúdos e roteiros/,
+    });
     const modelos = bib.getByRole("region", {
       name: /Modelos e instrumentos/,
     });
     const links = bib.getByRole("region", { name: /Links/ });
     await expect(guias).toBeVisible();
+    await expect(conteudos).toBeVisible();
     await expect(modelos).toBeVisible();
     await expect(links).toBeVisible();
-    // o demo não tem material do tipo "conteudo" — a seção não existe
-    await expect(
-      bib.getByRole("region", { name: /Conteúdos e roteiros/ })
-    ).toHaveCount(0);
     // encontro é metadado da linha, não seção
     await expect(
       bib.getByRole("region", { name: /Encontro \d+/ })
     ).toHaveCount(0);
 
-    // cada item cai em exatamente uma categoria: a soma das seções é o
-    // total do acervo do papel
-    const n =
-      (await guias.getByRole("listitem").count()) +
-      (await modelos.getByRole("listitem").count()) +
-      (await links.getByRole("listitem").count());
-    expect(n).toBeGreaterThanOrEqual(11);
+    // o catálogo espelha prod: 2 guias, 20 conteúdos (16 roteiros +
+    // Perguntas Eficazes + Feedback Construtivo + 2 cronogramas),
+    // 6 modelos (Roda da Vida, Definindo Metas, os 3 modelos de mensagem e o
+    // checklist de competências; o checklist de autoavaliação saiu —
+    // REALIZA-236), 2 links
+    await expect(guias.getByRole("listitem")).toHaveCount(2);
+    await expect(conteudos.getByRole("listitem")).toHaveCount(20);
+    await expect(modelos.getByRole("listitem")).toHaveCount(6);
+    await expect(links.getByRole("listitem")).toHaveCount(2);
+    await expect(
+      conteudos.getByRole("link", { name: /Roteiro Semana 16/ })
+    ).toBeVisible();
+    await expect(
+      conteudos.getByRole("link", { name: /Perguntas Eficazes/ })
+    ).toBeVisible();
+
+    // os templates do cap. 14 são documentos nativos — o link abre a
+    // página do app, nunca a rota de arquivo (/api/material) nem "em breve"
+    const doc = modelos.getByRole("link", {
+      name: /Checklist de competências do mentor/,
+    });
+    await expect(doc).toHaveAttribute(
+      "href",
+      "/materiais/documento/checklist-competencias"
+    );
+    await expect(
+      modelos.getByRole("link", {
+        name: /Mensagem de preparação do mentorado/,
+      })
+    ).toHaveAttribute("href", "/materiais/documento/mensagem-preparacao");
+
+    // o documento renderiza de verdade — hero do guia + corpo copiável +
+    // voltar pra biblioteca; slug desconhecido cai em 404
+    await doc.click();
+    await expect(page).toHaveURL("/materiais/documento/checklist-competencias");
+    await expect(
+      page.getByRole("heading", { name: "Checklist de competências do mentor", level: 1 })
+    ).toBeVisible();
+    await expect(page.getByText(/Competência/)).toBeVisible();
+    await page
+      .getByRole("link", { name: "Biblioteca de materiais" })
+      .click();
+    await expect(page).toHaveURL(/\/materiais\?aba=biblioteca/);
+    await page.goto("/materiais/documento/nao-existe");
+    await expect(page.getByText(/não encontrada|not found/i).first()).toBeVisible();
+    await page.goto("/materiais?aba=biblioteca");
 
     // ordem dentro da seção: encontro crescente primeiro (Encontro 1
     // antes do 2 e do 12) — o resto do critério é ordem→título
@@ -60,6 +101,9 @@ test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
       .fill("Guia do Mentor");
     await expect(guias).toBeVisible();
     await expect(guias.getByRole("listitem")).toHaveCount(2);
+    await expect(
+      bib.getByRole("region", { name: /Conteúdos e roteiros/ })
+    ).toHaveCount(0);
     await expect(
       bib.getByRole("region", { name: /Modelos e instrumentos/ })
     ).toHaveCount(0);
@@ -86,6 +130,9 @@ test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
     await expect(resumo).toBeVisible();
     const guias = resumo.getByRole("region", { name: /Guias/ });
     await expect(guias).toBeVisible();
+    await expect(
+      resumo.getByRole("region", { name: /Conteúdos e roteiros/ })
+    ).toBeVisible();
     await expect(
       resumo.getByRole("region", { name: /Modelos e instrumentos/ })
     ).toBeVisible();

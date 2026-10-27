@@ -120,41 +120,35 @@ test.describe("coordenação — instrumentos da jornada em /materiais", () => {
     await page.waitForURL(/\/formularios\/[^/]+/);
     await page.goBack();
 
-    // "ainda não abriu" é agregado: só quando TODA dupla do escopo está
-    // abaixo do encIni — e a régua é a posição da dupla (último realizado
-    // + 1), não o calendário da turma. A fixture mantém o realizado nº16
-    // na …0030 (a avaliação pendente do jovem), o que já abre a roda
-    // formal pra ela — então o estado honesto aqui é "liberado" + gesto
-    // de coord. Se o escopo um dia ficar inteiro abaixo do enc. 12, o
-    // card tranca e vira leitura pura — o assert cobre os dois lados.
+    // REALIZA-257: a janela do guia é indicador pra coordenação, não trava —
+    // e a régua é a posição da dupla (último realizado + 1), não o calendário
+    // da turma. Card fora da janela mostra quando ela abre e continua
+    // consultável (o cadeado "ainda não abriu" não existe pro coord).
     const rodaFormal = instrumentos.locator("article", {
       hasText: "Roda da Vida · aplicação formal",
     });
     await expect(rodaFormal).toBeVisible();
     if (
       await rodaFormal
-        .getByText("ainda não abriu")
+        .getByText("janela não aberta")
         .first()
         .isVisible()
         .catch(() => false)
     ) {
-      // pill de liberação é leitura — zero link, zero botão
-      await expect(rodaFormal.getByRole("link")).toHaveCount(0);
-      await expect(rodaFormal.getByRole("button")).toHaveCount(0);
+      // indicador de janela + respostas abertas; emitir em lote não tem
+      // elegível fora da janela (trancada nunca é lote)
+      await expect(rodaFormal.getByText(/abre no encontro 12/)).toBeVisible();
+      await expect(
+        rodaFormal.getByRole("link", { name: /^Ver respostas/ })
+      ).toBeVisible();
+      await expect(
+        rodaFormal.getByRole("button", { name: /Enviar em lote/ })
+      ).toHaveCount(0);
     } else {
       await expect(rodaFormal.getByText("liberado").first()).toBeVisible();
     }
-    // o invariante vale em qualquer fixture: todo card "ainda não abriu"
-    // da régua é leitura pura — pill "libera no encontro N" e nenhum gesto
-    for (const card of await instrumentos
-      .locator("article", { hasText: "ainda não abriu" })
-      .all()) {
-      await expect(
-        card.getByText(/libera no encontro \d+/)
-      ).toBeVisible();
-      await expect(card.getByRole("link")).toHaveCount(0);
-      await expect(card.getByRole("button")).toHaveCount(0);
-    }
+    // invariante do papel: na régua da coord nenhum card carrega o cadeado
+    await expect(instrumentos.getByText("ainda não abriu")).toHaveCount(0);
 
     // rodapé coord-only apontando os forms de bordo
     await expect(

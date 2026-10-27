@@ -77,10 +77,15 @@ test.describe("guarda — Enviar formulário não oferece instrumentos da jornad
       ).toHaveCount(0);
     }
 
-    // e os oficiais de coordenação seguem emissíveis — a avaliação final
-    // é seleção válida pra dupla no ambiente de teste
-    await expect(
-      page.getByRole("option", { name: /Avaliação final/ }).first()
-    ).toBeVisible();
+    // e os oficiais de coordenação seguem emissíveis — as duas 360º de
+    // encerramento são seleção válida pra dupla no ambiente de teste
+    for (const titulo of [
+      "Avaliação Geral de Mentores - 360º",
+      "Avaliação Geral de Mentorados - 360º",
+    ]) {
+      await expect(
+        page.getByRole("option", { name: new RegExp(titulo) })
+      ).toBeVisible();
+    }
   });
 });
