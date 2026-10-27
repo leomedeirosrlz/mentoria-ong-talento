@@ -13,6 +13,7 @@
 // A exibição deriva de `turma`/`nome` via @/lib/turma — o valor cru segue
 // sendo a chave de igualdade (duplas.turma, filtros, snapshots).
 
+import type { CSSProperties } from "react";
 import Link from "next/link";
 import { Clock } from "@phosphor-icons/react/dist/ssr";
 import { hashSeed, rand } from "@/lib/banner";
@@ -35,12 +36,20 @@ import { cn } from "@/lib/utils";
 type Tinta = {
   /** cor da marca — relevo, sigla fantasma, emblema, ícone e faixa-base */
   tt: string;
-  /** versão escura pra texto/detalhe sobre o soft */
+  /** versão escura pra texto/detalhe sobre o soft (e glifo sobre o tt) */
   ink: string;
   /** fundo tintado (bloco funcional, chip da sigla) */
   soft: string;
   /** borda do tint */
   border: string;
+  /** os três de superfície no tema escuro (REALIZA-234): soft/ink/border
+   *  claros estouram no card escuro — a superfície escurece fundo e a
+   *  tinta de texto clareia, mantendo o matiz. `tt`/`ink` não mudam: a
+   *  tinta cheia já lê bem nos dois regimes e o glifo sobre ela segue
+   *  escuro. */
+  softDark: string;
+  inkDark: string;
+  borderDark: string;
 };
 
 const TINTA_1: Tinta = {
@@ -48,12 +57,18 @@ const TINTA_1: Tinta = {
   ink: "hsl(78 60% 17%)",
   soft: "hsl(78 56% 93%)",
   border: "hsl(78 45% 78%)",
+  softDark: "hsl(78 30% 13%)",
+  inkDark: "hsl(78 65% 76%)",
+  borderDark: "hsl(78 28% 27%)",
 };
 const TINTA_2: Tinta = {
   tt: "var(--role-mentorado)",
   ink: "hsl(43 85% 20%)",
   soft: "hsl(48 90% 93%)",
   border: "hsl(46 75% 74%)",
+  softDark: "hsl(44 36% 14%)",
+  inkDark: "hsl(46 80% 74%)",
+  borderDark: "hsl(45 32% 27%)",
 };
 /** T3+ / fora do padrão — matizes já tokenizados no app, fora do par T1/T2
  *  (azul do eixo info, violeta e teal da série chart). */
@@ -63,20 +78,43 @@ const TINTAS_EXTRA: Tinta[] = [
     ink: "hsl(207 82% 26%)",
     soft: "hsl(207 82% 94%)",
     border: "hsl(207 62% 80%)",
+    softDark: "hsl(207 55% 15%)",
+    inkDark: "hsl(207 80% 76%)",
+    borderDark: "hsl(207 45% 30%)",
   },
   {
     tt: "hsl(262 45% 48%)",
     ink: "hsl(262 45% 27%)",
     soft: "hsl(262 60% 94%)",
     border: "hsl(262 40% 82%)",
+    softDark: "hsl(262 32% 17%)",
+    inkDark: "hsl(262 65% 82%)",
+    borderDark: "hsl(262 30% 32%)",
   },
   {
     tt: "hsl(174 62% 32%)",
     ink: "hsl(174 62% 18%)",
     soft: "hsl(174 55% 92%)",
     border: "hsl(174 40% 78%)",
+    softDark: "hsl(174 42% 13%)",
+    inkDark: "hsl(174 55% 70%)",
+    borderDark: "hsl(174 32% 25%)",
   },
 ];
+
+/** As vars de superfície da tinta nos dois regimes — aplica no elemento
+ *  que pinta fundo/borda/texto tintado e o `dark:` troca pra versão
+ *  escura (`bg-[var(--t-soft)]` + `dark:bg-[var(--t-soft-d)]`). */
+function varsTinta(t: Tinta): CSSProperties {
+  return {
+    "--t-soft": t.soft,
+    "--t-soft-d": t.softDark,
+    "--t-ink": t.ink,
+    "--t-ink-d": t.inkDark,
+    "--t-bd": t.border,
+    "--t-bd-d": t.borderDark,
+  } as CSSProperties;
+}
 
 /** Tinta da turma — determinística pelo label: T1 lima / T2 âmbar fixos;
  *  T3+ numeração segue alternando a paleta extra; fora do padrão distribui
@@ -180,13 +218,11 @@ export function SiglaTurma({
       aria-hidden
       className={cn(
         "rounded-md border px-1.5 py-0.5 align-[2px] text-xs font-extrabold",
+        "border-[var(--t-bd)] bg-[var(--t-soft)] text-[var(--t-ink)]",
+        "dark:border-[var(--t-bd-d)] dark:bg-[var(--t-soft-d)] dark:text-[var(--t-ink-d)]",
         className
       )}
-      style={{
-        color: tinta.ink,
-        background: tinta.soft,
-        borderColor: tinta.border,
-      }}
+      style={varsTinta(tinta)}
     >
       {sigla}
     </span>
@@ -450,8 +486,8 @@ export function TurmaCard({
             encerrado já fechou a régua) */}
         {c.status === "ativo" && vig?.numero != null && (
           <div
-            className="flex items-start gap-2.5 rounded-[10px] border p-2.5"
-            style={{ background: tinta.soft, borderColor: tinta.border }}
+            className="flex items-start gap-2.5 rounded-[10px] border p-2.5 border-[var(--t-bd)] bg-[var(--t-soft)] dark:border-[var(--t-bd-d)] dark:bg-[var(--t-soft-d)]"
+            style={varsTinta(tinta)}
           >
             <span
               aria-hidden
@@ -481,8 +517,7 @@ export function TurmaCard({
             </div>
             <div className="shrink-0 text-right">
               <b
-                className="text-base font-bold tabular-nums"
-                style={{ color: tinta.ink }}
+                className="text-base font-bold tabular-nums text-[var(--t-ink)] dark:text-[var(--t-ink-d)]"
               >
                 {vig.numero}
                 <span className="text-[11px] font-semibold text-muted-foreground">
@@ -494,17 +529,12 @@ export function TurmaCard({
               </small>
               <span
                 aria-hidden
-                className="mt-1 block h-[5px] w-[74px] overflow-hidden rounded-full border"
-                style={{
-                  borderColor: tinta.border,
-                  background: "hsl(0 0% 100% / 0.9)",
-                }}
+                className="mt-1 block h-[5px] w-[74px] overflow-hidden rounded-full border border-[var(--t-bd)] bg-card dark:border-[var(--t-bd-d)]"
               >
                 <i
-                  className="block h-full rounded-full"
+                  className="block h-full rounded-full bg-[var(--t-ink)] dark:bg-[var(--t-ink-d)]"
                   style={{
                     width: `${total > 0 ? Math.min((vig.numero / total) * 100, 100) : 0}%`,
-                    background: tinta.ink,
                   }}
                 />
               </span>
