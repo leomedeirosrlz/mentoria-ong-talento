@@ -192,58 +192,77 @@ O §07 diz "início do sexto mês" (PDF 28); o roteiro diz "5º mês" (PDF 39) e
 5º mês, então ele segue o roteiro e não o §07. Nenhuma ação; só não usar essa divergência como
 argumento de desalinhamento.
 
+### 5.8 Respostas (out/2026) — decisão fechada com o Thiago
+
+As seis perguntas de §5.1 a §5.6 foram decididas. Nenhuma delas muda o guia: o que muda é o que a
+plataforma promete, e três delas são só confirmação do que já estava implementado.
+
+| # | Decisão | O que muda no código/dado |
+| --- | --- | --- |
+| 5.1 | **A Anamnese Social é feita por fora da plataforma.** | Nada a construir. O intake continua sendo o único canal de matching e a referência da anamnese segue no campo de notas do mentorado (`mentorados.notas`, ficha em `/pessoas/[id]`). O form de anamnese que ainda existia no dataset de `/demo` saiu (`src/lib/demo/forms-data.ts`), e o teste de lista do `/formularios` passou de 3 para 2 forms. |
+| 5.2 | **A Autoavaliação do mentor sai de vez.** | Já executado pela 0128 + 0132 (form, colunas, RPC e CHECK). Faltava o rastro visível: o material "Autoavaliação do mentor" (ordem 18, sem arquivo) foi apagado de produção, do `seed.sql` e do dataset demo — ele apontava para instrumento inexistente. |
+| 5.3 | **O PDM mora dentro da plataforma.** | Confirma o PDM nativo (revisão, progresso, relatório). O onboarding continua dizendo que o PDM é da plataforma; o guia é que está desatualizado. |
+| 5.4 | **A Roda da Vida fica como roteiro, não como instrumento de 16 metas.** | Confirma o form `roda_vida` atual (notas + reflexão) e a aplicação em três momentos nos enc. 12–14. Nada a criar. |
+| 5.5 | **O especialista não escreve no PDM do DPP.** | Confirma o bloqueio de RLS. O especialista registra no `registros`/`devolutiva_pdm` da trilha e o mentor DPP transporta para o PDM — é o que a 0027/0037 já fazem. |
+| 5.6 | **O fechamento do especialista é um form próprio, personalizado** — não o 360 do par. | Confirma `avaliacao_especialista` como instrumento separado. O erro de citação no comentário da `0104` (§13) segue como P0.3 abaixo. |
+
 ---
 
 ## 6. Próximos passos priorizados
 
 ### P0 · Desbloquear o que já está quebrado (não depende do Leo)
 
-1. **Decidir e executar o destino da 360.** Se o par da 230 não entra agora, reativar
-   `avaliacao_360` (`ativo=true`) para a estação do enc. 16 voltar a emitir. Sem isso, o item 4 do
-   checklist de encerramento é inalcançável. Arquivos: `formularios` (prod), `0099:75`,
-   `src/app/(app)/materiais/instrumentos-programa.tsx` (card 360), `src/lib/encerramento.ts:42`.
-2. **Terminar a remoção da autoavaliação ou revertê-la por inteiro.** A direção depende de §5.2, mas
-   a inconsistência atual não pode ficar: a limpeza é a mesma nos dois cenários. `supabase/seed.sql:56`;
-   `ciclo_eventos` enc. 16 dos dois cronogramas (prod); `src/lib/como-conduzir.ts` (enc. 16, `cobre`).
-3. **Corrigir a citação do form do especialista:** `0104_avaliacao_especialista.sql:1,45,116`
+1. ✅ **Destino da 360 resolvido pela 230:** o enc. 16 emite o par
+   `avaliacao_final_mentor` / `avaliacao_final_mentorado`; `avaliacao_360` ficou arquivado
+   (`ativo=false`) como histórico, e a chave `avaliacao_360` do painel/régua continua lendo o
+   instrumento novo (0130/0131).
+2. ✅ **Remoção da autoavaliação terminada:** 0128 (expand) + 0132 (contract: colunas e RPC) e o
+   material "Autoavaliação do mentor" apagado de produção, do `seed.sql` e do dataset demo —
+   apontava para instrumento inexistente. `ciclo_eventos` do enc. 16 já lista "Avaliação final".
+3. ⏳ **Corrigir a citação do form do especialista:** `0104_avaliacao_especialista.sql:1,45,116`
    (§13 → §12, PDF 41) e a `descricao` já publicada em produção.
-4. **Alinhar os títulos 3 a 7 do cronograma ao guia** (`ciclo_eventos` × 2 + `seed.sql:43`):
+4. ⏳ **Alinhar os títulos 3 a 7 do cronograma ao guia** (`ciclo_eventos` × 2 + `seed.sql:43`):
    "Metas e checagem SMART", "Submetas e compromisso", "Primeiros resultados", "Superando
    barreiras", "Ajustes no plano".
-5. **Renomear o card** para "Avaliação 360º" (`instrumentos-programa.tsx:123`).
-6. **Abrir a Roda inicial antes do enc. 1** (`src/lib/jornada.ts:198`).
-7. **Dado em produção:** resolver o empate de `ordem = 17` na biblioteca.
-8. **Antes de qualquer coisa nova: rodar um ciclo real.** 117 links, 0 respostas. Escolher 1 ou 2
+5. ⚰️ **Obsoleto:** o card não vira "Avaliação 360º" — a 230 renomeou a interface para
+   "Avaliação final" (estação, régua, guia, cronograma, checklist).
+6. ✅ **Roda inicial:** aceito como está — ela vai na "Mensagem de preparação do mentorado"
+   (enc. 1), o canal pré-encontro; a estação do enc. 1 espelha a entrega.
+7. ✅ **Empate de `ordem` resolvido:** biblioteca reordenada 1 a 25 sem empate; os roteiros
+   ocupam o bloco contíguo 3–12.
+8. ⏳ **Antes de qualquer coisa nova: rodar um ciclo real.** 117 links, 0 respostas. Escolher 1 ou 2
    duplas, sentar com o mentor, ver onde o link trava (e-mail, login, celular, tamanho do
    formulário). Nenhum ajuste de conteúdo desta auditoria se paga antes disso.
 
 ### P1 · Conteúdo que já está especificado (esforço médio, impacto visível)
 
-9. **Biblioteca:** subir `Perguntas Eficazes` (PDF 21), `Feedback Construtivo` (22–24),
+9. ⏳ **Biblioteca:** subir `Perguntas Eficazes` (PDF 21), `Feedback Construtivo` (22–24),
    `Ferramentas de comunicação` (44–46) e `Modelo SMART` (28). Resolve M1 a M4 e limpa o E4.
-10. **Subir os 7 templates sem arquivo** (PDF 55–59), com prioridade para o Checklist de competências
+10. ⏳ **Subir os 7 templates sem arquivo** (PDF 55–59), com prioridade para o Checklist de competências
     (citado na preparação e no enc. 1) e a Mensagem de encaminhamento (enc. 4 e 7).
-11. **Roteiros Semana 7 a 16** (depende dos PDFs do Leo, I2).
-12. **Form `metas`:** acrescentar as 3 checagens de revisão e o campo "qual é a mais importante"
+11. ✅ **Roteiros Semana 5 a 10** estão em produção (7 a 10 subiram em out/2026, com arquivo e
+    `encontro_num`). ⏳ 11 a 16 não têm fonte: não existem PDFs além do 10 em `~/Downloads` —
+    dependem dos documentos do Leo (I2).
+12. ⏳ **Form `metas`:** acrescentar as 3 checagens de revisão e o campo "qual é a mais importante"
     (em vez de fixar por posição). Arquivo: `formularios.campos` do oficial `metas` (nova
     migration, precedente 0118).
-13. **Form `pdm`:** trocar o `texto_longo` de submetas por slots por nível, com IS e prazo,
+13. ⏳ **Form `pdm`:** trocar o `texto_longo` de submetas por slots por nível, com IS e prazo,
     reaproveitando o contrato `sub_N_i` que o nativo já consome (0118/0109).
-14. **`intake_mentorado`:** incluir formação acadêmica / curso atual (PDF 31).
-15. **Dataset demo:** atualizar de 13 para 22 materiais (`src/lib/demo/data.ts:3121`).
+14. ⏳ **`intake_mentorado`:** incluir formação acadêmica / curso atual (PDF 31).
+15. ⏳ **Dataset demo:** hoje tem 12 materiais contra 25 em produção (13 menos os dois que saíram
+    do programa); falta espelhar a biblioteca real (`src/lib/demo/data.ts:3121`).
 
-### P2 · Depende de decisão de produto (§5)
+### P2 · Decisão de produto — fechadas em §5.8
 
-16. **Pacote da avaliação final (D5 + 230):** par mentor/mentorado, e o destino de
-    `avaliacao_especialista` e de `avaliacao_360` como histórico. Ver `avaliacao-final-230.md`.
-17. **PDM e especialista:** abrir caminho de escrita escopada ou registrar a decisão de não abrir
-    (§5.5).
-18. **Meta por área da Roda:** decidir instrumento × roteiro (§5.4) e, se instrumento, projetar
+16. ✅ **Pacote da avaliação final (D5 + 230):** par mentor/mentorado em produção; o especialista
+    tem form próprio (5.6); `avaliacao_360` fica como histórico. Ver `avaliacao-final-230.md`.
+17. ✅ **PDM e especialista:** decisão é **não abrir** escrita — o especialista registra na trilha
+    e o DPP transporta (§5.5).
+18. ✅ **Meta por área da Roda:** decisão é **roteiro, não instrumento** (§5.4) — nada a projetar
     em `pdm_itens.area_vida`.
-19. **Anamnese Social:** decidir entre reintroduzir coord-only, absorver no intake ou assumir que
-    é processo externo (§5.1).
-20. **Autoavaliação do mentor:** recriar ou remover de vez, incluindo a fatia "contract" da 0128
-    (colunas e RPC) (§5.2).
+19. ✅ **Anamnese Social:** processo **externo** à plataforma (§5.1); o intake segue como único
+    canal e a referência mora no campo de notas do mentorado.
+20. ✅ **Autoavaliação do mentor:** removida de vez (§5.2), contrato incluído.
 
 ### O que **não** fazer
 
