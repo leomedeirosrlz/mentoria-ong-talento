@@ -46,6 +46,7 @@ import {
   type ResolucaoPar,
 } from "@/lib/importar-duplas";
 import { notificar } from "./notificar";
+import { bloqueioTrocaPapel } from "./papel-vinculo";
 import { ROLES_POR_AUDIENCIA } from "@/lib/email";
 import {
   dispararComunicadoEmail,
@@ -954,19 +955,31 @@ export async function setPessoaRole(profileId: string, role: string | null) {
     return { ok: true };
   }
 
-  // trocar papel de quem está em dupla ativa/pausada deixa a dupla apontando
-  // pra quem não é mais mentor/supervisor — e como as policies de escrita
-  // amarram mentor_id (não o papel), a pessoa manteria escrita indevida
+  // trocar papel de quem sustenta uma dupla ativa/pausada só bloqueia quando
+  // o papel NOVO deixa a dupla sem quem a conduza — as policies de escrita
+  // amarram mentor_id/supervisor_id, não o papel. Auxiliar → auxiliar e
+  // coordenação → auxiliar de quem já acompanha as mesmas duplas passam
+  // (era o falso bloqueio na troca da Adriana).
   const { data: vinculos } = await supabase
     .from("duplas")
-    .select("id")
+    .select("mentor_id, supervisor_id")
     .or(`mentor_id.eq.${profileId},supervisor_id.eq.${profileId}`)
-    .in("status", ["ativa", "pausada"])
-    .limit(1);
-  if (vinculos?.length) {
+    .in("status", ["ativa", "pausada"]);
+  const bloqueio = bloqueioTrocaPapel(
+    profileId,
+    role as AppRole | "mentor_hibrido" | null,
+    vinculos ?? []
+  );
+  if (bloqueio === "mentor") {
     return {
       error:
-        "A pessoa está em uma dupla ativa ou pausada. Pause, encerre ou reatribua a dupla antes de mudar o papel.",
+        "A pessoa é mentor(a) de uma dupla ativa ou pausada. Reatribua a dupla antes de mudar o papel.",
+    };
+  }
+  if (bloqueio === "auxiliar") {
+    return {
+      error:
+        "A pessoa acompanha uma dupla ativa ou pausada como auxiliar executivo. Reatribua ou pause a dupla antes de mudar o papel.",
     };
   }
   // o mesmo check pelo lado do jovem (D1): se o profile é o login de um
