@@ -8,10 +8,11 @@
  * "coordenacao".
  *
  * Além dos forms da coordenação, o dataset carrega os instrumentos oficiais
- * ainda vivos (avaliação 360º, trilha de especialista, intake e desfecho —
- * campos verbatim das migrations), com links e respostas que alimentam o
- * checklist de encerramento (360º) e o painel da jornada. A Anamnese Social
- * e a Autoavaliação do mentor saíram do programa na REALIZA-236.
+ * ainda vivos (intake e o par de avaliação geral 360º — campos verbatim das
+ * migrations), com links e respostas que alimentam o checklist de
+ * encerramento e o painel da jornada. A Anamnese Social e a Autoavaliação
+ * do mentor saíram na REALIZA-236; o 360º antigo, a avaliação da trilha-esp
+ * e o "Depois da mentoria" saíram na 0134.
  *
  * Os links apontam pras personas e mentorados reais do dataset (getDemoData)
  * — nomes e WhatsApp resolvem pelo id, então a tela de links exibe os mesmos
@@ -75,9 +76,6 @@ export const DEMO_TOKENS = {
   matheusRoda: "demo-tok-roda-matheus-00001",
   pedroVisao: "demo-tok-visao-pedro-0000001",
   dandaraVisao: "demo-tok-visao-dandara-00001",
-  // avaliação geral da trilha de especialista (0104) — emitida no
-  // fechamento; Helena responde pelo link (especialista logada)
-  helenaAvaliacaoEsp: "demo-tok-avalesp-helena-0001",
 } as const;
 
 /** Metadados de upload do intake no dataset (mesma forma de
@@ -172,7 +170,7 @@ export function getDemoFormularios(): DemoFormularios {
   // estação do encontro 16 (o slot `avaliacao_360` da jornada/painel)
   const fAvaliacaoFinalMentorado: Formulario = {
     id: uid(0x4005),
-    titulo: "Avaliação final da mentoria · mentorado",
+    titulo: "Avaliação Geral de Mentorados - 360º",
     descricao:
       "O fechamento da jornada pelo lado do jovem: expectativas, processo, o mentor, o impacto percebido e o depoimento. A coordenação envia o link no encerramento da dupla.",
     sistema: "avaliacao_final_mentorado",
@@ -247,7 +245,7 @@ export function getDemoFormularios(): DemoFormularios {
   // "Instrumentos do sistema"; a resposta dele aparece na ficha da dupla
   const fAvaliacaoFinalMentor: Formulario = {
     id: uid(0x400e),
-    titulo: "Avaliação final da mentoria · mentor",
+    titulo: "Avaliação Geral de Mentores - 360º",
     descricao:
       "O fechamento da jornada pelo lado de quem mentora: estrutura e processo, dificuldades, suporte do Realiza.vc, continuidade e depoimento.",
     sistema: "avaliacao_final_mentor",
@@ -416,34 +414,6 @@ export function getDemoFormularios(): DemoFormularios {
       { id: "q_realizacao", tipo: "escala_1_10", label: "Realização e felicidade", obrigatorio: true },
       { id: "q_espiritualidade", tipo: "escala_1_10", label: "Espiritualidade", obrigatorio: true },
       { id: "reflexao", tipo: "texto_longo", label: "Olhando pra sua roda: quais áreas você mais gostaria de melhorar? Por quê?", obrigatorio: true },
-    ],
-    ativo: true,
-    versao: 1,
-    created_by: null,
-    created_at: haDias(240, "09:00"),
-    updated_at: haDias(240, "09:00"),
-  };
-
-  // ---------- 11. avaliação geral da trilha de especialista (0104 —
-  // campos verbatim da migration; emitida sozinha no fechamento da
-  // trilha, respondida pelo especialista logado) ----------
-
-  const fAvaliacaoEsp: Formulario = {
-    id: uid(0x400b),
-    titulo: "Avaliação geral da trilha de especialista",
-    descricao:
-      "A avaliação final do guia do especialista (§13), respondida ao concluir o acompanhamento de um(a) jovem: como foi a trilha e percepções sobre o programa e o trabalho da coordenação.",
-    sistema: "avaliacao_especialista",
-    campos: [
-      { id: "s1", tipo: "secao", label: "A trilha", obrigatorio: false },
-      { id: "experiencia", tipo: "escala_1_5", label: "No geral, como você avalia a experiência desta mentoria especialista?", obrigatorio: true },
-      { id: "atendeu_demanda", tipo: "escala_1_5", label: "O quanto a trilha respondeu à demanda do(a) jovem?", obrigatorio: true },
-      { id: "resultados", tipo: "texto_longo", label: "Quais resultados ou avanços você percebeu no(a) jovem?", obrigatorio: true },
-      { id: "melhorar_trilha", tipo: "texto_longo", label: "O que poderia ter sido melhor na condução da trilha?", obrigatorio: false },
-      { id: "s2", tipo: "secao", label: "O programa e a coordenação", obrigatorio: false },
-      { id: "apoio_coordenacao", tipo: "escala_1_5", label: "Como você avalia o suporte da coordenação durante a trilha?", obrigatorio: true },
-      { id: "percepcoes", tipo: "texto_longo", label: "Percepções sobre o programa e o trabalho da coordenação — o que vale registrar?", obrigatorio: false },
-      { id: "participaria_outra", tipo: "sim_nao", label: "Você participaria de outra trilha como especialista?", obrigatorio: false },
     ],
     ativo: true,
     versao: 1,
@@ -732,14 +702,6 @@ export function getDemoFormularios(): DemoFormularios {
       dupla_id: duplaDe("André", "Pedro"), contexto: { origem: "instrumentos" },
       // venceu sem resposta — o painel mostra "expirado", a ficha "Reenviar"
       usado_em: null, expira_em: haDias(16), created_by: porNome("André"), created_at: haDias(30),
-    },
-    // avaliação geral da trilha de especialista (0104) — a trilha da
-    // Helena com a Bia concluiu há 5 dias; o link espera a resposta dela
-    {
-      id: uid(0x4229), formulario_id: fAvaliacaoEsp.id, token: DEMO_TOKENS.helenaAvaliacaoEsp,
-      dest_profile_id: porNome("Helena"), dest_mentorado_id: null,
-      dupla_id: duplaDe("Helena", "Ana"), contexto: { origem: "auto", trilha: "especialista" },
-      usado_em: null, expira_em: null, created_by: porNome("Helena"), created_at: haDias(5),
     },
     // link de inscrição do intake (0115): UM endereço público, N
     // respostas anônimas — usado_em fica null pra sempre, a contagem sai
@@ -1111,7 +1073,6 @@ export function getDemoFormularios(): DemoFormularios {
       fMetas,
       fPdm,
       fRodaVida,
-      fAvaliacaoEsp,
       fIntakeMentor,
       fIntakeMentorado,
     ],

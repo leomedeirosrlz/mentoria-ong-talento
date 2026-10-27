@@ -46,12 +46,11 @@ test.describe("demo — /formularios separa customs de instrumentos", () => {
       hasText: "Instrumentos do sistema",
     });
     await expect(sec).toBeVisible();
-    await expect(sec.getByRole("listitem")).toHaveCount(4);
+    await expect(sec.getByRole("listitem")).toHaveCount(3);
     for (const titulo of [
-      /Avaliação geral da trilha de especialista/,
       /Inscrição de mentores · Matching de Mentores/,
       /Inscrição de mentorados · Matching de Mentorados/,
-      /Avaliação final da mentoria · mentor/,
+      /Avaliação Geral de Mentores - 360º/,
     ]) {
       await expect(sec.getByRole("link", { name: titulo })).toBeVisible();
     }

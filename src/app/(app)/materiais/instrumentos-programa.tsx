@@ -120,7 +120,7 @@ const CARDS: CardSpec[] = [
   },
   {
     chave: "avaliacao_360",
-    titulo: "Avaliação final da mentoria",
+    titulo: "Avaliação Geral - 360º",
     descricao:
       "O fechamento do ciclo em dois instrumentos, um por lado: o jovem responde a avaliação final e o mentor também. A resposta marca o checklist de encerramento.",
     chips: ["Enc. 16"],

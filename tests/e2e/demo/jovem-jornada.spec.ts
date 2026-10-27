@@ -376,7 +376,7 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     for (const titulo of [
       "Roda da Vida · leitura inicial",
       "Avaliação por terceiros",
-      "Avaliação final da mentoria",
+      "Avaliação Geral - 360º",
     ]) {
       await expect(
         instrumentos.getByRole("heading", { name: titulo })

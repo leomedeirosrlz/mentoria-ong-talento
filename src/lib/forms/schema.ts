@@ -94,9 +94,9 @@ export type FormularioSistema =
   | "desfecho";
 
 export const SISTEMA_LABEL: Record<FormularioSistema, string> = {
-  avaliacao_360: "Avaliação 360º (encerrada)",
-  avaliacao_final_mentor: "Avaliação final (mentor)",
-  avaliacao_final_mentorado: "Avaliação final (mentorado)",
+  avaliacao_360: "Avaliação 360º (aposentada)",
+  avaliacao_final_mentor: "Avaliação geral 360º (mentor)",
+  avaliacao_final_mentorado: "Avaliação geral 360º (mentorado)",
   avaliacao_especialista: "Avaliação da trilha",
   visao: "Visão",
   metas: "Metas",
@@ -139,12 +139,12 @@ export const SISTEMAS_REGUA: readonly FormularioSistema[] = [
  *  defensivo — nunca fica órfão).
  *
  *  Anamnese Social e Autoavaliação saíram do programa (REALIZA-236): a
- *  leitura do ciclo é da avaliação final (REALIZA-230), entregue em dois
- *  instrumentos — um por lado da dupla. A do mentorado é a estação do
- *  encontro 16 na régua; a do mentor mora aqui. As linhas e o vocabulário
- *  das duas saíram do CHECK na 0128 (a constraint foi recriada sem elas);
- *  a avaliação final antiga, `avaliacao_360`, segue no vocabulário como
- *  instrumento arquivado — a estação 16 ainda usa essa chave de slot. */
+ *  leitura do ciclo é da avaliação geral 360º (REALIZA-230), entregue em
+ *  dois instrumentos — um por lado da dupla. A do mentorado é a estação
+ *  do encontro 16 na régua; a do mentor mora aqui. Na 0134 o catálogo
+ *  encolheu de novo (Leo): 360 antigo, avaliação de trilha-esp e
+ *  "Depois da mentoria" saíram — as linhas morreram, os valores seguem
+ *  no CHECK como vocabulário dorminte. */
 export const SISTEMAS_BORDO: readonly FormularioSistema[] = [
   "intake_mentor",
   "intake_mentorado",
