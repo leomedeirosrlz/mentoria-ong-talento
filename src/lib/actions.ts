@@ -1165,6 +1165,46 @@ export async function setEscopoAuxiliar(
 
 // ---------- gestao ----------
 
+/** Dados civis do termo (0046) — CPF, RG e endereço, coluna coord-only.
+ *  Merge parcial: só os campos que o form mandou entram; o resto do jsonb
+ *  fica como estava. CPF com DV conferido, CEP só dígitos. */
+function camposCivis(
+  formData: FormData,
+  atual: DadosCivis | null
+): { dados_civis: DadosCivis } | { error: string } | Record<string, never> {
+  const chaves = [
+    "civ_cpf", "civ_rg", "civ_cep", "civ_logradouro", "civ_numero",
+    "civ_complemento", "civ_bairro", "civ_cidade", "civ_uf",
+  ];
+  if (!chaves.some((k) => formData.has(k))) return {};
+
+  const texto = (k: string, anterior: string | null | undefined) =>
+    formData.has(k) ? String(formData.get(k) ?? "").trim() || null : (anterior ?? null);
+
+  const cpfRaw = String(formData.get("civ_cpf") ?? "").replace(/\D/g, "");
+  if (cpfRaw && !cpfValido(cpfRaw)) {
+    return { error: "Confira o CPF (dígito verificador)." };
+  }
+  const e = atual?.endereco;
+  return {
+    dados_civis: {
+      nome_civil: atual?.nome_civil ?? null,
+      data_nascimento: atual?.data_nascimento ?? null,
+      cpf: cpfRaw || null,
+      rg: texto("civ_rg", atual?.rg),
+      endereco: {
+        logradouro: texto("civ_logradouro", e?.logradouro) ?? "",
+        numero: texto("civ_numero", e?.numero) ?? "",
+        complemento: texto("civ_complemento", e?.complemento),
+        bairro: texto("civ_bairro", e?.bairro) ?? "",
+        cidade: texto("civ_cidade", e?.cidade) ?? "",
+        uf: (texto("civ_uf", e?.uf) ?? "").toUpperCase().slice(0, 2),
+        cep: (texto("civ_cep", e?.cep) ?? "").replace(/\D/g, "").slice(0, 8),
+      },
+    },
+  };
+}
+
 export async function updatePessoa(profileId: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -1197,9 +1237,11 @@ export async function updatePessoa(profileId: string, formData: FormData) {
     return { error: "Informe uma capacidade de pelo menos 1." };
   }
 
-  // e-mail = identidade do link de acesso; só muda enquanto a pessoa nunca entrou
+  // e-mail = identidade do link de acesso; a coordenação corrige o de
+  // qualquer um por aqui — inclusive de quem já entrou (auth.users + trigger
+  // 0060). A pessoa troca o próprio em /perfil (trocarEmail).
   const { data: atual } = await supabase
-    .from("profiles").select("user_id, role, consent_lgpd_em, profile_papeis(papel)").eq("id", profileId).single();
+    .from("profiles").select("user_id, role, email, dados_civis, consent_lgpd_em, profile_papeis(papel)").eq("id", profileId).single();
   // campos de apresentação (0030) — a coordenação edita os mesmos que a
   // pessoa edita em /perfil; o form manda `areas_perfil` porque `areas` já é
   // o campo do mentor_profile
@@ -1214,14 +1256,49 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   if ("error" in ficha) return { error: ficha.error };
   const mentorCampos = camposMentor(formData);
   if ("error" in mentorCampos) return { error: mentorCampos.error };
+  // dados civis do termo (0046) — CPF/RG/endereço, coord-only
+  const civis = camposCivis(formData, (atual?.dados_civis ?? null) as DadosCivis | null);
+  if ("error" in civis) return { error: civis.error };
   const patch: Record<string, unknown> = {
     nome,
     whatsapp: whatsapp || null,
     ...apresentacao,
     ...ficha,
+    ...civis,
     ...consentPatch(formData, atual?.consent_lgpd_em),
   };
-  if (email && !atual?.user_id) patch.email = email;
+  // quem já tem login troca o e-mail no auth.users (o trigger 0060 espelha
+  // em profiles.email); quem nunca entrou grava direto na row
+  let emailMudou = false;
+  if (email && email !== (atual?.email ?? "").toLowerCase()) {
+    if (!atual?.user_id) {
+      patch.email = email;
+    } else {
+      const { data: livre, error: erroRpc } = await supabase.rpc(
+        "email_disponivel",
+        { p_email: email }
+      );
+      if (erroRpc) {
+        return { error: "Não foi possível verificar o e-mail. Tente de novo." };
+      }
+      if (!livre) {
+        return { error: "Esse e-mail já está em outro cadastro do programa." };
+      }
+      const { createAdminClient } = await import("./supabase/admin");
+      const { error: erroAuth } = await createAdminClient().auth.admin.updateUserById(
+        atual.user_id,
+        { email, email_confirm: true }
+      );
+      if (erroAuth) {
+        return {
+          error: /already|registered|exists|duplicate/i.test(erroAuth.message)
+            ? "Esse e-mail já está em outro cadastro do programa."
+            : "Não foi possível trocar o e-mail. Tente de novo.",
+        };
+      }
+      emailMudou = true;
+    }
+  }
 
   const { data, error } = await supabase
     .from("profiles").update(patch).eq("id", profileId).select("id");
@@ -1231,7 +1308,9 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   }
 
   // foto nova: sobe na pasta do dono, troca o path e remove o arquivo antigo
-  let aviso: string | undefined;
+  let aviso: string | undefined = emailMudou
+    ? "E-mail de acesso trocado: a pessoa entra com o endereço novo e a senha que já tem."
+    : undefined;
   const foto = await subirFoto(supabase, profileId, formData);
   if (foto.path) {
     const { data: atualAv } = await supabase
