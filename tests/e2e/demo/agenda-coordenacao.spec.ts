@@ -112,6 +112,52 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     ).toBeVisible();
   });
 
+  test("um alternador só — tablist único, painel controlado e teclado", async ({
+    page,
+  }) => {
+    // REALIZA-246: a página tem UMA tablist (antes conviviam a da visão e a
+    // dos modos, com o mesmo aria-label)
+    const abas = page.getByRole("tablist", { name: "Modos da agenda" });
+    await expect(abas).toHaveCount(1);
+    await expect(abas.getByRole("tab")).toHaveCount(2);
+
+    const monitoramento = abas.getByRole("tab", { name: "Monitoramento" });
+    const calendario = abas.getByRole("tab", { name: "Calendário" });
+    // roving tabindex: só a aba ativa é parada de Tab
+    await expect(monitoramento).toHaveAttribute("tabindex", "0");
+    await expect(calendario).toHaveAttribute("tabindex", "-1");
+    // aria-controls aponta pro painel que a página renderiza
+    await expect(monitoramento).toHaveAttribute("aria-controls", "painel-agenda");
+    await expect(page.locator("#painel-agenda")).toHaveAttribute(
+      "role",
+      "tabpanel"
+    );
+
+    // seta direita ativa a próxima (o link navega — é o mesmo controle)
+    await monitoramento.focus();
+    await page.keyboard.press("ArrowRight");
+    await expect(page).toHaveURL(/aba=calendario/, { timeout: 15_000 });
+    await expect(
+      page.getByRole("tab", { name: "Calendário" })
+    ).toHaveAttribute("aria-selected", "true");
+
+    // seta esquerda volta
+    await page.getByRole("tab", { name: "Calendário" }).focus();
+    await page.keyboard.press("ArrowLeft");
+    await expect(page).toHaveURL(/\/agenda$/, { timeout: 15_000 });
+    await expect(
+      page.getByRole("tab", { name: "Monitoramento" })
+    ).toHaveAttribute("aria-selected", "true");
+
+    // End vai pra última, Home volta pra primeira
+    await page.getByRole("tab", { name: "Monitoramento" }).focus();
+    await page.keyboard.press("End");
+    await expect(page).toHaveURL(/aba=calendario/, { timeout: 15_000 });
+    await page.getByRole("tab", { name: "Calendário" }).focus();
+    await page.keyboard.press("Home");
+    await expect(page).toHaveURL(/\/agenda$/, { timeout: 15_000 });
+  });
+
   test("números da semana — cobertura honesta por turma, semáforo e recorte", async ({
     page,
   }) => {
@@ -360,21 +406,25 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     ).toBeVisible();
 
     // o nudge de ~20h atrás dispara o cap D5: a meta da linha diz
-    // "lembrete enviado dd/mm, aguardando a dupla" e o botão vem
-    // desabilitado
+    // "lembrete enviado dd/mm, aguardando a dupla" e, dentro do preview,
+    // o Lembrar-app vem "Lembrada dd/mm" desabilitado com a razão no title
     await expect(
       risco.getByText(/lembrete enviado \d{2}\/\d{2}/)
     ).toBeVisible();
     await expect(risco.getByText(/aguardando a dupla/)).toBeVisible();
-    const bloqueada = risco.getByRole("button", {
-      name: /^Lembrada \d{2}\/\d{2}$/,
-    });
+    await risco
+      .getByRole("button", { name: /ver a mensagem antes de enviar/ })
+      .click();
+    const bloqueada = page
+      .getByRole("dialog")
+      .getByRole("button", { name: /^Lembrada \d{2}\/\d{2}$/ });
     await expect(bloqueada).toBeVisible();
     await expect(bloqueada).toBeDisabled();
     await expect(bloqueada).toHaveAttribute(
       "title",
       /^1 lembrete a cada 48h por dupla\. Destrava \d{2}\/\d{2}$/
     );
+    await page.keyboard.press("Escape");
 
     // d-pend — entra e sai da fila com o relógio do enc. 4: registro vira
     // pendente só 24h depois do encontro (quarta de dia ela some; quarta à
@@ -438,11 +488,17 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     await expect(
       sofia.getByText(/sessão pendente|sessão agendada já passou/)
     ).toBeVisible();
+    // o botão da linha abre o preview — o lembrete sai do "Lembrar pelo
+    // app" lá dentro (o WhatsApp é o outro botão do mesmo dialog)
     const lembrarSofia = sofia.getByRole("button", {
-      name: /^Lembrar( registro)?$/,
+      name: /^Lembrar( registro)? .*ver a mensagem/,
     });
     await expect(lembrarSofia).toBeEnabled();
     await lembrarSofia.click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Lembrar pelo app" })
+      .click();
     await expect(
       page.getByText("Modo demo: nada é enviado de verdade.")
     ).toBeVisible();
@@ -454,7 +510,7 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       await expect(
         fila
           .locator("li", { hasText: nomes })
-          .getByRole("button", { name: /^Lembrar( .*)?$/ })
+          .getByRole("button", { name: /^Lembrar( .*)?ver a mensagem/ })
       ).toBeEnabled();
 
     // d-rito (Ricardo × Gustavo) — a concluída com o rito de encerramento
@@ -638,6 +694,14 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     ).toHaveAttribute("aria-selected", "true");
     await expect(
       page.getByRole("navigation", { name: "Encontros da jornada" })
+    ).toBeVisible();
+    // REALIZA-247: a faixa "Semana do programa" é leitura de monitoramento e
+    // não existe no calendário — quem monitora está na outra aba
+    await expect(
+      page.locator('section[aria-label="Semana do programa"]')
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Agenda do programa", level: 1 })
     ).toBeVisible();
     await expect(
       page.getByRole("heading", { name: /Semana do \d+º encontro/ })

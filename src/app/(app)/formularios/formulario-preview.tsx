@@ -46,16 +46,22 @@ export function FormularioPreview({
             respondem, mas o envio fica desligado nesta prévia.
           </DialogDescription>
         </DialogHeader>
-        <FormularioPublico
-          token="preview"
-          titulo={titulo}
-          descricao={descricao}
-          campos={campos}
-          // nome de exemplo pra saudação "Olá, …" aparecer como no link real
-          destinatario="Ana"
-          sistema={sistema}
-          preview
-        />
+        {/* @container + min-w-0: o conteúdo do instrumento se mede pelo
+            espaço do dialog, não pela viewport (o popup é grid — sem o
+            min-w-0 o item adota o min-content do texto e estoura a 390px).
+            O form público é o mesmo do /f, que também é container. */}
+        <div className="@container min-w-0">
+          <FormularioPublico
+            token="preview"
+            titulo={titulo}
+            descricao={descricao}
+            campos={campos}
+            // nome de exemplo pra saudação "Olá, …" aparecer como no link real
+            destinatario="Ana"
+            sistema={sistema}
+            preview
+          />
+        </div>
       </DialogContent>
     </Dialog>
   );

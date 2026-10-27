@@ -27,6 +27,9 @@ function SheetClose({ ...props }: DialogPrimitive.Close.Props) {
 const LADO = {
   left: "inset-y-0 left-0 h-dvh w-[min(20rem,85vw)] border-r data-open:slide-in-from-left data-closed:slide-out-to-left",
   right: "inset-y-0 right-0 h-dvh w-[min(20rem,85vw)] border-l data-open:slide-in-from-right data-closed:slide-out-to-right",
+  // painel de rodapé (assistente no mobile): altura alvo do design, arredonda
+  // só em cima e desliza da borda inferior — cobre nav+FAB pelo z-50
+  bottom: "inset-x-0 bottom-0 h-[min(70dvh,640px)] rounded-t-2xl border-t data-open:slide-in-from-bottom data-closed:slide-out-to-bottom",
 } as const
 
 function SheetContent({

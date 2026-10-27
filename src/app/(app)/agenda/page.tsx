@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import { cn } from "@/lib/utils";
 import { temPapel } from "@/lib/types";
 import {
   getCicloEventos,
@@ -35,9 +33,14 @@ import {
 } from "@/lib/ciclo";
 import { deriveAgendaMinha } from "@/lib/agenda-minha";
 import { duplaSupervisionada } from "@/lib/auxiliar-escopo";
-import { AgendaAuxiliar } from "@/components/agenda-auxiliar";
+import { abasDaAgenda, PAINEL_AGENDA, idDaAba } from "@/lib/agenda-abas";
+import { AbasAgenda } from "@/components/agenda-abas";
+import { AgendaAuxiliar, CabecalhoAuxiliar } from "@/components/agenda-auxiliar";
 import { AgendaCalendario } from "@/components/agenda-calendario";
-import { AgendaCoordenacao } from "@/components/agenda-coordenacao";
+import {
+  AgendaCoordenacao,
+  CabecalhoCoordenacao,
+} from "@/components/agenda-coordenacao";
 import { AgendaEspecialista } from "@/components/agenda-especialista";
 import { AgendaEspHorarios } from "@/components/agenda-especialista-horarios";
 import { AgendaMinha } from "@/components/agenda-minha";
@@ -96,6 +99,7 @@ export default async function AgendaPage({
   // vale pra todo mundo menos o especialista puro — o híbrido vê as duas
   // em abas (?visao=), aterrissando na do papel primário
   const souEsp = temPapel(me, "mentor_especialista");
+  const souMentor = temPapel(me, "mentor_dpp");
   // a visão esp é "minha agenda" — filtra pelas duplas do próprio mentor
   // antes de derivar as abas: pra staff+esp o escopo RLS traz duplas de
   // outros mentores junto
@@ -139,6 +143,42 @@ export default async function AgendaPage({
       </p>
     ) : null;
 
+  // WP3 — os modos do mentor DPP vivem nesta tablist única: Minha agenda
+  // (cronológica, default — "o que eu tenho hoje" primeiro), Por mentorado
+  // (card por jovem com a trilha do especialista em modo "acompanha, não
+  // participa") e Calendário (o AgendaCalendario atual, preservado inteiro).
+  // Coord/sup ficam no calendário — os modos novos são do mentor. Param
+  // inválido cai em "minha" — default da v6, não do papel.
+  // ?dia= sem ?aba= explícita mira o calendário — o deep-link é dele;
+  // ?jw= também (é o seletor temporal das visões do calendário — implica
+  // aba=calendario pra quem tem a superfície)
+  const aba =
+    abaParam === "por-mentorado" || abaParam === "calendario"
+      ? abaParam
+      : diaInicial != null || janelaInicial != null
+        ? "calendario"
+        : "minha";
+  // a barra é a mesma nas três visões e muda só a superfície disponível:
+  // o ramo do especialista pede a lista com a aba dele, o resto entra com
+  // a visão esp só quando ela existe de verdade (duasVisoes)
+  const abasEsp = abasDaAgenda({
+    papel: me?.role ?? null,
+    mentor: souMentor,
+    especialista: true,
+  });
+  const abas = abasDaAgenda({
+    papel: me?.role ?? null,
+    mentor: souMentor,
+    especialista: duasVisoes,
+  });
+  // subtítulo do lado DPP do mentor — o MESMO nos três modos (trocar de aba
+  // não reescreve o header; ele descreve a agenda, não a aba)
+  const subtituloDpp = (
+    <p className="mt-1 text-sm text-muted-foreground">
+      Os encontros do ciclo e os que você marcou com sua dupla.
+    </p>
+  );
+
   if (visaoEsp) {
     // grade e exceções alimentam o "Quando você atende" (só leitura — a
     // edição mora no perfil); espEventos dá título/foco dos passos da trilha
@@ -147,66 +187,51 @@ export default async function AgendaPage({
       getMinhasExcecoes(),
       duplasEsp.length > 0 ? getEspecialistaEventos() : Promise.resolve([]),
     ]);
+    const barraEsp = <AbasAgenda abas={abasEsp} ativa="especialista" />;
     // especialista puro sem trilha: cabeçalho + estado vazio curto + a
     // disponibilidade em leitura (o híbrido sem trilha nem chega aqui —
     // caiu na visão DPP acima)
-    const conteudoEsp =
-      duplasEsp.length === 0 ? (
-        <div className="space-y-6">
-          <header>
-            <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Mentoria especializada · até 5 sessões de 1h em até 3 meses
-            </p>
-          </header>
-          <div className="rounded-xl bg-card px-5 py-6 text-center shadow-[var(--shadow-border)]">
-            <p className="text-sm text-muted-foreground">
-              Você ainda não tem trilhas. Quando um pedido for aceito, as
-              sessões aparecem aqui.
-            </p>
-          </div>
-          <AgendaEspHorarios grade={grade} excecoes={excecoes} />
-        </div>
-      ) : (
-        <AgendaEspecialista
-          duplas={duplasEsp}
-          espEventos={espEventos}
-          grade={grade}
-          excecoes={excecoes}
-          hojeIso={hoje}
-          agoraMs={agora.getTime()}
-        />
-      );
-    return duasVisoes ? (
+    return (
       <div className="space-y-6">
         {avisoVisao}
-        <AbasAgenda ativa="especialista" />
-        {conteudoEsp}
-      </div>
-    ) : (
-      <div className="space-y-6">
-        {avisoVisao}
-        {conteudoEsp}
+        {duplasEsp.length === 0 ? (
+          <>
+            <header>
+              <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Mentoria especializada · até 5 sessões de 1h em até 3 meses
+              </p>
+            </header>
+            {barraEsp}
+            <div
+              id={PAINEL_AGENDA}
+              role="tabpanel"
+              className="animate-enter space-y-6"
+            >
+              <div className="rounded-xl bg-card px-5 py-6 text-center shadow-[var(--shadow-border)]">
+                <p className="text-sm text-muted-foreground">
+                  Você ainda não tem trilhas. Quando um pedido for aceito, as
+                  sessões aparecem aqui.
+                </p>
+              </div>
+              <AgendaEspHorarios grade={grade} excecoes={excecoes} />
+            </div>
+          </>
+        ) : (
+          <AgendaEspecialista
+            duplas={duplasEsp}
+            espEventos={espEventos}
+            grade={grade}
+            excecoes={excecoes}
+            hojeIso={hoje}
+            agoraMs={agora.getTime()}
+            abas={barraEsp}
+          />
+        )}
       </div>
     );
   }
 
-  // WP3 — os modos do mentor DPP vivem numa tablist dentro da visão DPP:
-  // Minha agenda (cronológica, default — "o que eu tenho hoje" primeiro),
-  // Por mentorado (card por jovem com a trilha do especialista em modo
-  // "acompanha, não participa") e Calendário (o AgendaCalendario atual,
-  // preservado inteiro). Coord/sup ficam no calendário — os modos novos são
-  // do mentor. Param inválido cai em "minha" — default da v6, não do papel.
-  // ?dia= sem ?aba= explícita mira o calendário — o deep-link é dele;
-  // ?jw= também (é o seletor temporal das visões do calendário — implica
-  // aba=calendario pra quem tem a superfície)
-  const souMentor = temPapel(me, "mentor_dpp");
-  const aba =
-    abaParam === "por-mentorado" || abaParam === "calendario"
-      ? abaParam
-      : diaInicial != null || janelaInicial != null
-        ? "calendario"
-        : "minha";
   // "Minhas duplas" = as que eu mentoro — pra staff+mentor o escopo RLS traz
   // supervisionadas/coorte inteira junto, e AgendaMinha/PorMentorado assume
   // que a entrada já é do mentor (o ramo esp já filtrava por mentor.id)
@@ -260,54 +285,58 @@ export default async function AgendaPage({
         {avisoVisao}
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
+          {subtituloDpp}
         </header>
-        {duasVisoes && <AbasAgenda ativa="dpp" />}
-        {/* staff+mentor também é híbrido aqui: sem o ?visao=dpp as tabs
-            "minha/por mentorado" derrubam de volta na superfície de equipe
-            (mesma régua das chamadas lá de baixo) */}
-        <AbasAgendaMentor
-          ativa={aba}
-          hibrido={duasVisoes || (papelStaff ?? false)}
-        />
-        {aba === "minha" ? (
-          <AgendaMinha
-            duplas={duplasDpp}
-            trilhas={trilhas}
-            eventos={eventos}
-            cronogramas={cronogramas}
-            supervisoes={supervisoes}
-            meuId={me!.id}
-            hoje={hoje}
-            agora={agora.getTime()}
-            // staff+mentor híbrido: os cards da faixa linkam pro dia no
-            // calendário — precisam carregar a visão certa (regra do
-            // hibrido do PorMentorado)
-            hibrido={duasVisoes || (papelStaff ?? false)}
-          />
-        ) : (
-          <AgendaPorMentorado
-            duplas={duplasDpp}
-            trilhas={trilhas}
-            solicitacoes={solicitacoes}
-            especialistas={especialistas.map((e) => ({
-              id: e.id,
-              nome: e.nome,
-            }))}
-            eventos={eventos}
-            cronogramas={cronogramas}
-            supervisoes={supervisoes}
-            nudges={nudges}
-            encerramentosPendentes={encerramentosPendentes}
-            itensSemana={itensSemana}
-            // staff+mentor também: o deep-link do dia no strip precisa do
-            // ?visao=dpp (mesma régua do AbasAgendaMentor no ramo calendário)
-            hibrido={duasVisoes || (papelStaff ?? false)}
-            meuId={me!.id}
-            meuNome={me!.nome.split(" ")[0]}
-            hoje={hoje}
-            agora={agora.getTime()}
-          />
-        )}
+        {/* uma barra só pra página inteira: o híbrido staff+mentor entra com
+            ?visao=dpp&aba= e o "Calendário" volta pro calendário de equipe */}
+        <AbasAgenda abas={abas} ativa={aba} />
+        <div
+          key={aba}
+          id={PAINEL_AGENDA}
+          role="tabpanel"
+          aria-labelledby={idDaAba(aba)}
+          className="animate-enter"
+        >
+          {aba === "minha" ? (
+            <AgendaMinha
+              duplas={duplasDpp}
+              trilhas={trilhas}
+              eventos={eventos}
+              cronogramas={cronogramas}
+              supervisoes={supervisoes}
+              meuId={me!.id}
+              hoje={hoje}
+              agora={agora.getTime()}
+              // staff+mentor híbrido: os cards da faixa linkam pro dia no
+              // calendário — precisam carregar a visão certa (regra do
+              // hibrido do PorMentorado)
+              hibrido={duasVisoes || (papelStaff ?? false)}
+            />
+          ) : (
+            <AgendaPorMentorado
+              duplas={duplasDpp}
+              trilhas={trilhas}
+              solicitacoes={solicitacoes}
+              especialistas={especialistas.map((e) => ({
+                id: e.id,
+                nome: e.nome,
+              }))}
+              eventos={eventos}
+              cronogramas={cronogramas}
+              supervisoes={supervisoes}
+              nudges={nudges}
+              encerramentosPendentes={encerramentosPendentes}
+              itensSemana={itensSemana}
+              // staff+mentor também: o deep-link do dia no strip precisa do
+              // ?visao=dpp (mesma régua da barra no ramo calendário)
+              hibrido={duasVisoes || (papelStaff ?? false)}
+              meuId={me!.id}
+              meuNome={me!.nome.split(" ")[0]}
+              hoje={hoje}
+              agora={agora.getTime()}
+            />
+          )}
+        </div>
       </div>
     );
   }
@@ -320,6 +349,9 @@ export default async function AgendaPage({
   // supervisor+mentor tem o calendário DPP dele atrás de ?aba=calendario e
   // dos deep-links ?dia=/?jw= — sem o guard, o ramo da auxiliar captura a
   // aba e a janela que não são dela
+  const supervisionadas = me
+    ? duplas.filter((d) => duplaSupervisionada(d, me.id))
+    : duplas;
   if (
     me?.role === "supervisor" &&
     !(
@@ -329,9 +361,8 @@ export default async function AgendaPage({
       souMentor
     )
   ) {
-    // escopo da RLS (0125): supervisionadas + turma dele chegam em `duplas`
-    // — a peneira só tira o lado mentor (duplaSupervisionada)
-    const supervisionadas = duplas.filter((d) => duplaSupervisionada(d, me.id));
+    // "Consolidada" é uma das abas da barra (a ativa). O default é "Por turma".
+    const consolidada = abaParam === "consolidada";
     const [alvos, supervisoesAux, nudgesAux] = await Promise.all([
       getSupervisaoAlvos(),
       getSupervisoesDaPessoa(me.id),
@@ -340,7 +371,6 @@ export default async function AgendaPage({
     return (
       <div className="space-y-6">
         {avisoVisao}
-        {duasVisoes && <AbasAgenda ativa="dpp" />}
         <AgendaAuxiliar
           duplas={supervisionadas}
           eventos={eventos}
@@ -355,7 +385,13 @@ export default async function AgendaPage({
           // faixa linkam `?aba=calendario&dia=` (o guard acima escapa esse
           // param do ramo auxiliar); pro supervisor puro o link seria engolido
           comLinkDia={souMentor}
-          consolidada={abaParam === "consolidada"}
+          consolidada={consolidada}
+          abas={
+            <AbasAgenda
+              abas={abas}
+              ativa={consolidada ? "consolidada" : "turma"}
+            />
+          }
         />
       </div>
     );
@@ -382,8 +418,6 @@ export default async function AgendaPage({
     return (
       <div className="space-y-6">
         {avisoVisao}
-        {duasVisoes && <AbasAgenda ativa="dpp" />}
-        <AbasAgendaCoord ativa="monitoramento" />
         <AgendaCoordenacao
           duplas={duplas}
           eventos={eventos}
@@ -394,6 +428,7 @@ export default async function AgendaPage({
           meuNome={me.nome.split(" ")[0]}
           hoje={hoje}
           agora={agora.getTime()}
+          abas={<AbasAgenda abas={abas} ativa="monitoramento" />}
         />
       </div>
     );
@@ -430,183 +465,64 @@ export default async function AgendaPage({
   for (const p of presencasLista)
     (presencasPorEvento[p.ciclo_evento_id] ??= {})[p.profile_id] = p.presente;
 
-  return (
-    <div className="space-y-6">
+  // o calendário é superfície de mais de um papel: o header acompanha a
+  // superfície de onde a pessoa veio, pra trocar de aba não reescrever o h1
+  const cabecalhoCalendario =
+    !papelStaff || visao === "dpp" ? (
       <header>
         <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {/* contexto estático por papel — a semana vigente vive no rail e no
-              título do board, que acompanham o cronograma selecionado */}
-          {me?.role === "coordenacao"
-            ? "O calendário oficial do ciclo e o que cada dupla marcou."
-            : "Os encontros do ciclo e os que você marcou com sua dupla."}
-        </p>
+        {subtituloDpp}
       </header>
+    ) : me?.role === "coordenacao" ? (
+      <CabecalhoCoordenacao hoje={hoje} />
+    ) : (
+      <CabecalhoAuxiliar duplas={supervisionadas} hoje={hoje} />
+    );
 
-      {duasVisoes && <AbasAgenda ativa="dpp" />}
-      {souMentor && (
-        <AbasAgendaMentor
-          ativa="calendario"
-          // staff+mentor também precisa do ?visao=dpp nas tabs — sem ele os
-          // links "minha/por mentorado" caem de volta na superfície staff
-          hibrido={duasVisoes || (papelStaff ?? false)}
-        />
-      )}
-      {me?.role === "coordenacao" && <AbasAgendaCoord ativa="calendario" />}
-
-      {eventos.length === 0 ? (
-        <div className="rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
-          <p className="text-sm text-muted-foreground">
-            A agenda ainda não foi publicada pela coordenação.
-          </p>
-        </div>
-      ) : (
-        <AgendaCalendario
-          eventos={eventos}
-          cronogramas={cronogramas}
-          espEventos={espEventos}
-          materiais={materiaisVisiveis}
-          hoje={hoje}
-          semanaId={semana?.id ?? null}
-          diaInicial={diaInicial}
-          janelaInicial={janelaInicial}
-          duplas={duplas}
-          role={me?.role ?? null}
-          papeis={me?.papeis ?? null}
-          mentores={mentoresChamada}
-          presencas={presencasPorEvento}
-          // Overlay "quem pode nesse dia" — só o mentor DPP puro
-          // (REALIZA-24): coord/sup veem TODAS as duplas (uma tinta por
-          // dupla seria ambígua) e pro staff+mentor a grade dele seria
-          // vazamento de coorte na superfície de equipe — a visão mentor
-          // dele fica atrás do ?visao=dpp
-          mentorDisponibilidade={
-            temPapel(me, "mentor_dpp") && !papelStaff
-              ? (meuMentorProfile?.disponibilidade ?? null)
-              : undefined
-          }
-        />
-      )}
-    </div>
-  );
-}
-
-/** Abas da agenda do híbrido (WP6b) — quem é DPP + especialista alterna
- *  entre o calendário oficial do ciclo e a agenda própria de especialista.
- *  Deep-link por ?visao= — notificações de trilha esp podem pousar direto. */
-function AbasAgenda({ ativa }: { ativa: "dpp" | "especialista" }) {
   return (
-    <nav
-      aria-label="Visão da agenda"
-      className="scroll-fina flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1"
-    >
-      {(
-        [
-          // o param explícito é obrigatório — sem ele o default recai na
-          // visão do papel primário e a aba DPP fica inalcançável pro
-          // híbrido com primário especialista
-          ["dpp", "Ciclo DPP", "/agenda?visao=dpp"],
-          ["especialista", "Especialista", "/agenda?visao=especialista"],
-        ] as const
-      ).map(([v, label, href]) => (
-        <Link
-          key={v}
-          href={href}
-          aria-current={ativa === v ? "page" : undefined}
-          className={cn(
-            "inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium transition-colors sm:min-h-8",
-            ativa === v
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          {label}
-        </Link>
-      ))}
-    </nav>
-  );
-}
-
-/** Abas da agenda da coordenação (WP5) — "Monitoramento" é a aterrissagem;
- *  o calendário oficial fica a uma aba de distância (?aba=calendario e os
- *  deep-links ?dia= abrem nele). */
-function AbasAgendaCoord({
-  ativa,
-}: {
-  ativa: "monitoramento" | "calendario";
-}) {
-  return (
-    <div
-      role="tablist"
-      aria-label="Modos da agenda"
-      className="scroll-fina flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1"
-    >
-      {(
-        [
-          ["monitoramento", "Monitoramento", "/agenda"],
-          ["calendario", "Calendário", "/agenda?aba=calendario"],
-        ] as const
-      ).map(([v, label, href]) => (
-        <Link
-          key={v}
-          role="tab"
-          aria-selected={ativa === v}
-          href={href}
-          className={cn(
-            "inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium transition-colors sm:min-h-8",
-            ativa === v
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          {label}
-        </Link>
-      ))}
-    </div>
-  );
-}
-
-/** Modos da agenda do mentor DPP (WP3) — segundo nível, dentro da visão DPP.
- *  Link + role=tablist/tab: deep-link por ?aba= (notificação pode pousar na
- *  aba certa) sem roubar o nome acessível "Visão da agenda" do nav do
- *  híbrido (WP6b). No híbrido os links carregam ?visao=dpp — sem ele a
- *  aba DPP volta a ficar inalcançável pra quem tem primário especialista. */
-function AbasAgendaMentor({
-  ativa,
-  hibrido,
-}: {
-  ativa: "minha" | "por-mentorado" | "calendario";
-  hibrido: boolean;
-}) {
-  const base = hibrido ? "/agenda?visao=dpp&aba=" : "/agenda?aba=";
-  return (
-    <div
-      role="tablist"
-      aria-label="Modos da agenda"
-      className="scroll-fina flex w-fit max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1"
-    >
-      {(
-        [
-          ["minha", "Minha agenda"],
-          ["por-mentorado", "Por mentorado"],
-          ["calendario", "Calendário"],
-        ] as const
-      ).map(([v, label]) => (
-        <Link
-          key={v}
-          role="tab"
-          aria-selected={ativa === v}
-          href={`${base}${v}`}
-          className={cn(
-            "inline-flex min-h-11 shrink-0 items-center rounded-md px-3 text-sm font-medium transition-colors sm:min-h-8",
-            ativa === v
-              ? "bg-card text-foreground shadow-sm"
-              : "text-muted-foreground hover:text-foreground"
-          )}
-        >
-          {label}
-        </Link>
-      ))}
+    <div className="space-y-6">
+      {cabecalhoCalendario}
+      <AbasAgenda abas={abas} ativa="calendario" />
+      <div
+        id={PAINEL_AGENDA}
+        role="tabpanel"
+        aria-labelledby={idDaAba("calendario")}
+        className="animate-enter"
+      >
+        {eventos.length === 0 ? (
+          <div className="rounded-xl bg-card px-5 py-10 text-center shadow-[var(--shadow-border)]">
+            <p className="text-sm text-muted-foreground">
+              A agenda ainda não foi publicada pela coordenação.
+            </p>
+          </div>
+        ) : (
+          <AgendaCalendario
+            eventos={eventos}
+            cronogramas={cronogramas}
+            espEventos={espEventos}
+            materiais={materiaisVisiveis}
+            hoje={hoje}
+            semanaId={semana?.id ?? null}
+            diaInicial={diaInicial}
+            janelaInicial={janelaInicial}
+            duplas={duplas}
+            role={me?.role ?? null}
+            papeis={me?.papeis ?? null}
+            mentores={mentoresChamada}
+            presencas={presencasPorEvento}
+            // Overlay "quem pode nesse dia" — só o mentor DPP puro
+            // (REALIZA-24): coord/sup veem TODAS as duplas (uma tinta por
+            // dupla seria ambígua) e pro staff+mentor a grade dele seria
+            // vazamento de coorte na superfície de equipe — a visão mentor
+            // dele fica atrás do ?visao=dpp
+            mentorDisponibilidade={
+              temPapel(me, "mentor_dpp") && !papelStaff
+                ? (meuMentorProfile?.disponibilidade ?? null)
+                : undefined
+            }
+          />
+        )}
+      </div>
     </div>
   );
 }

@@ -82,13 +82,14 @@ insert into public.materiais (titulo, descricao, tipo, url, audiencia, encontro_
   ('Mensagem às pessoas indicadas', 'Modelo de contato para a avaliação por terceiros (duas perguntas).', 'template', null, 'dpp', 1, 20, 'doc:mensagem-indicadas'),
   ('Mensagem de encaminhamento entre encontros', 'Modelo curto para manter o vínculo e deixar a próxima tarefa clara.', 'template', null, 'dpp', null, 21, 'doc:mensagem-encaminhamento'),
   ('Roda da Vida: roteiro de aplicação', 'Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.', 'template', null, 'dpp', 12, 22, 'materiais/f34e462a-9e3f-4ab8-b68d-8d59abcff2c2-Roda-da-Vida---Realiza.vc.pdf'),
-  ('Checklist de competências do mentor', 'Autoavaliação antes do ciclo e novamente no 16º encontro.', 'template', null, 'todos', null, 23, 'doc:checklist-competencias'),
+  ('Feedback Construtivo', 'Instrumento do guia: o modelo de fala e os cuidados para feedback sobre comportamento negativo.', 'conteudo', null, 'todos', null, 23, 'doc:feedback-construtivo'),
   ('Instrumento: Definindo Metas', 'Metas SMART do mentorado — instrumento de preenchimento entre encontros.', 'template', null, 'dpp', null, 24, 'materiais/4bcba588-fff0-4a14-b9a9-b5d8598cfc21-definindo-metas.pdf'),
   ('Perguntas Eficazes', 'Documento complementar do guia: o que são, o que evitar e o banco de perguntas por momento da conversa.', 'conteudo', null, 'dpp', null, 25, 'materiais/1a8277af-eb2b-4196-98e7-9fade2899a34-perguntas-eficazes.pdf'),
   ('Cronograma do programa — Turma 1', null, 'conteudo', null, 'dpp', null, 26, 'materiais/84c8a989-48f0-4497-8b28-58754a2ca02e-cronograma-turma-1.pdf'),
   ('Cronograma do programa — Turma 2', null, 'conteudo', null, 'dpp', null, 27, 'materiais/6eabec09-3d3f-42ba-9407-8077e9373b6c-cronograma-turma-2.pdf'),
   ('Plataforma de mentoria', 'Onde os encontros oficiais são agendados e avaliados.', 'link', 'https://mentoria.realiza.vc', 'todos', null, 28, null),
-  ('Formação EaD gratuita', 'Trilha opcional com certificado para mentores.', 'link', 'https://ead.realiza.vc', 'todos', null, 29, null)
+  ('Formação EaD gratuita', 'Trilha opcional com certificado para mentores.', 'link', 'https://ead.realiza.vc', 'todos', null, 29, null),
+  ('Checklist de competências do mentor', 'As 10 competências do guia para marcar antes do ciclo e no 16º encontro.', 'template', null, 'dpp', null, 30, 'doc:checklist-competencias')
 on conflict do nothing;
 
 -- sem dados de pessoas/duplas: cadastro real acontece pela plataforma

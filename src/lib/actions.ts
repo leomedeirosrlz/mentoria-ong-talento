@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { AVATAR_MAX_BYTES, avisoImagemGrande } from "@/lib/avatar";
 import {
   COR_RACAS,
   DOCUMENTO_PESSOA_TIPOS,
@@ -87,7 +88,9 @@ async function me() {
 }
 
 const FOTO_TIPOS = ["image/png", "image/jpeg", "image/webp"];
-const FOTO_MAX = 2 * 1024 * 1024;
+// mesmo teto do browser (AVATAR_MAX_BYTES) — o server não pode recusar o que
+// o perfil aceitou
+const FOTO_MAX = AVATAR_MAX_BYTES;
 
 type Supa = Awaited<ReturnType<typeof createClient>>;
 
@@ -105,7 +108,7 @@ async function subirFoto(
     return { aviso: "A foto não entrou. Use PNG, JPG ou WebP." };
   }
   if (foto.size > FOTO_MAX) {
-    return { aviso: "A foto não entrou. Use uma imagem de até 2 MB." };
+    return { aviso: `A foto não entrou. ${avisoImagemGrande(foto.size)}` };
   }
   const ext = foto.name.split(".").pop()?.toLowerCase() ?? "png";
   const path = `${pasta}/${crypto.randomUUID()}.${ext}`;
@@ -858,7 +861,99 @@ export async function setPessoaRole(profileId: string, role: string | null) {
         "O papel de mentorado vem do vínculo com o cadastro do jovem — não é concedido por aqui.",
     };
   }
-  const novoRole = role && (ROLES as readonly string[]).includes(role) ? role : null;
+  // 'mentor_hibrido' é o valor composto do RoleSelect (REALIZA-262): DPP +
+  // especialista juntos. Em papel ele é {mentor_dpp + secundário
+  // mentor_especialista} — o primário continua sendo quem já era.
+  const hibrido = role === "mentor_hibrido";
+  const novoRole = hibrido
+    ? "mentor_dpp"
+    : role && (ROLES as readonly string[]).includes(role) ? role : null;
+  // papéis atuais: os dois caminhos de híbrido abaixo só tocam papéis
+  // SECUNDÁRIOS de mentor — a guarda de vínculo (mais abaixo) protege troca
+  // de primário; aqui nada que sustente uma dupla em curso é removido
+  const { data: ppAtuais } = await supabase
+    .from("profile_papeis")
+    .select("papel, primario")
+    .eq("profile_id", profileId);
+  const ehPapelMentor = (p: string | null) =>
+    p === "mentor_dpp" || p === "mentor_especialista";
+  const mentorSet = new Set(
+    (ppAtuais ?? []).map((r) => r.papel).filter(ehPapelMentor)
+  );
+  const primarioAtual =
+    (ppAtuais ?? []).find((r) => r.primario)?.papel ?? null;
+
+  // conceder o lado que falta: primário já é mentor_* → só entra o
+  // secundário. O mentor em dupla DPP ativa pode virar híbrido sem passar
+  // pelo "mova a dupla antes" — nada deixa de existir pra ele
+  if (hibrido && primarioAtual && ehPapelMentor(primarioAtual)) {
+    const falta =
+      primarioAtual === "mentor_dpp" ? "mentor_especialista" : "mentor_dpp";
+    if (!mentorSet.has(falta)) {
+      const { error } = await supabase
+        .from("profile_papeis")
+        .upsert(
+          { profile_id: profileId, papel: falta },
+          { ignoreDuplicates: true }
+        );
+      if (error) return { error: erroAmigavel(error) };
+    }
+    revalidatePath("/pessoas");
+    revalidatePath(`/pessoas/${profileId}`);
+    return { ok: true };
+  }
+
+  // voltar pra um lado só: tira o outro papel mentor. A trilha que sai não
+  // pode ter dupla em curso — a guarda é por trilha, não a guarda ampla de
+  // vínculo (que bloquearia tirar a especialista de quem segue em dupla DPP)
+  if (
+    (role === "mentor_dpp" || role === "mentor_especialista") &&
+    primarioAtual &&
+    ehPapelMentor(primarioAtual) &&
+    mentorSet.size > 1
+  ) {
+    const outro =
+      role === "mentor_dpp" ? "mentor_especialista" : "mentor_dpp";
+    const trilhaOutro = outro === "mentor_dpp" ? "dpp" : "especialista";
+    const { data: emCurso } = await supabase
+      .from("duplas")
+      .select("id")
+      .eq("mentor_id", profileId)
+      .eq("trilha", trilhaOutro)
+      .in("status", ["ativa", "pausada"])
+      .limit(1);
+    if (emCurso?.length) {
+      return {
+        error: `A pessoa segue em dupla ${trilhaOutro === "dpp" ? "DPP" : "de especialista"} ativa ou pausada. Encerre ou reatribua antes de tirar esse lado do papel.`,
+      };
+    }
+    if (primarioAtual !== role) {
+      // promove o lado escolhido — o trigger rebaixa o outro e o delete
+      // abaixo já o encontra não-primário
+      const { error: upErr } = await supabase
+        .from("profiles")
+        .update({ role })
+        .eq("id", profileId)
+        .select("id");
+      if (upErr) return { error: erroAmigavel(upErr) };
+    }
+    const { error: delErr } = await supabase
+      .from("profile_papeis")
+      .delete()
+      .eq("profile_id", profileId)
+      .eq("papel", outro);
+    if (delErr) return { error: erroAmigavel(delErr) };
+    // tipo do mentor_profiles acompanha o primário (mesma regra do fim)
+    const { error: mpErr } = await supabase.from("mentor_profiles").upsert({
+      profile_id: profileId,
+      tipo: role === "mentor_especialista" ? "especialista" : "dpp",
+    });
+    if (mpErr) return { error: erroAmigavel(mpErr) };
+    revalidatePath("/pessoas");
+    revalidatePath(`/pessoas/${profileId}`);
+    return { ok: true };
+  }
+
   // trocar papel de quem está em dupla ativa/pausada deixa a dupla apontando
   // pra quem não é mais mentor/supervisor — e como as policies de escrita
   // amarram mentor_id (não o papel), a pessoa manteria escrita indevida
@@ -906,6 +1001,19 @@ export async function setPessoaRole(profileId: string, role: string | null) {
   // RLS esconde a linha → 0 rows sem erro; não pode fingir que salvou
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  }
+
+  // híbrido a partir de primário não-mentor (coord/auxiliar → DPP+esp): o
+  // update acima projetou o mentor_dpp primário; entra o lado especialista
+  // como secundário. O insert no dpp cobre o canto de profile_papeis vazio
+  // desatualizado — ignoreDuplicates torna os dois no-ops quando já existem
+  if (hibrido) {
+    for (const papel of ["mentor_dpp", "mentor_especialista"] as const) {
+      const { error } = await supabase
+        .from("profile_papeis")
+        .upsert({ profile_id: profileId, papel }, { ignoreDuplicates: true });
+      if (error) return { error: erroAmigavel(error) };
+    }
   }
 
   // mentor_profiles acompanha o CONJUNTO de papéis efetivos, não só o

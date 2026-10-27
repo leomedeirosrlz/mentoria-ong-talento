@@ -66,6 +66,8 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
     // as abas do auxiliar: "Por turma" é o default, "Consolidada" vive em
     // ?aba=consolidada — links com role=tab, como no resto da agenda
     const abas = page.getByRole("tablist", { name: "Modos da agenda" });
+    // uma barra só na página (REALIZA-246)
+    await expect(abas).toHaveCount(1);
     await expect(
       abas.getByRole("tab", { name: "Por turma" })
     ).toHaveAttribute("aria-selected", "true");
@@ -273,8 +275,13 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
       await expect(
         aAgendar.getByText(/Caio com Carlos Menezes · Turma 1/)
       ).toBeVisible();
+      // o botão abre o preview — o lembrete sai do "Lembrar pelo app"
       await aAgendar
-        .getByRole("button", { name: "Lembrar", exact: true })
+        .getByRole("button", { name: /^Lembrar .*ver a mensagem/ })
+        .click();
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Lembrar pelo app" })
         .click();
       await expect(
         page.getByText("Modo demo: nada é enviado de verdade.")

@@ -1,34 +1,44 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
-// REALIZA-179 — /assistente em modo demo (sdd §8): transcript enlatado,
-// chips com respostas fixas e NENHUM fetch ao provider — honesto, sem
-// fingir LLM.
+// REALIZA-243 — a bolha em modo demo (sdd §8): transcript enlatado, chips
+// com respostas fixas e NENHUM fetch à API — honesto, sem fingir LLM.
 
-test("demo: chips respondem enlatado sem chamar a API", async ({ page }) => {
+test("demo: bolha abre e chips respondem enlatado sem chamar a API", async ({
+  page,
+}) => {
   let chamadasApi = 0;
   await page.route("**/api/ia/chat", (route) => {
     chamadasApi++;
     return route.abort();
   });
   await entrarNaDemo(page, "coordenacao");
-  await page.goto("/assistente");
+  // entrarNaDemo só planta os cookies no /demo (wizard, sem shell) — a
+  // bolha mora no AppShell, então precisa de uma tela do app
+  await page.goto("/");
 
-  await expect(
-    page.getByRole("heading", { name: "Assistente" })
-  ).toBeVisible();
-  await expect(
-    page.getByText(/responde com exemplos fixos/)
-  ).toBeVisible();
+  // seletor estável entre os rótulos Abrir/Fechar (o nome muda no clique)
+  const fab = page.locator('[aria-controls="painel-assistente"]');
+  // bolha desligada por padrão (IA_BOLHA != 1) enquanto a rodada de UI não
+  // fecha — o CI liga a flag pra exercitar a feature
+  if ((await fab.count()) === 0) {
+    test.skip(true, "bolha desligada (IA_BOLHA != 1)");
+  }
+  await expect(fab).toBeVisible();
+  await fab.click();
 
-  await page.getByRole("button", { name: "Resumo da semana" }).click();
-  await expect(page.getByText(/resumo sai de exemplo/)).toBeVisible();
+  const painel = page.locator("#painel-assistente");
+  await expect(painel).toBeVisible();
+  await expect(painel.getByText(/responde com exemplos fixos/)).toBeVisible();
+
+  await painel.getByRole("button", { name: "Resumo da semana" }).click();
+  await expect(painel.getByText(/resumo sai de exemplo/)).toBeVisible();
   expect(chamadasApi).toBe(0);
 
   // input livre → a resposta fixa de demonstração
-  await page
+  await painel
     .getByRole("textbox", { name: "Mensagem pro assistente" })
     .fill("e os relatórios?");
-  await page.getByRole("button", { name: "Enviar mensagem" }).click();
-  await expect(page.getByText(/respostas de exemplo/)).toBeVisible();
+  await painel.getByRole("button", { name: "Enviar mensagem" }).click();
+  await expect(painel.getByText(/respostas de exemplo/)).toBeVisible();
   expect(chamadasApi).toBe(0);
 });

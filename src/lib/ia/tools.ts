@@ -31,6 +31,7 @@ import {
   getInstrumentosDaDuplaIa,
   getJovemDuplaIa,
   getRegistrosDaDuplaIa,
+  matchGuiaIa,
   papeisDoUsuario,
 } from "./queries";
 
@@ -93,6 +94,16 @@ const agendaArgs = z
       .boolean()
       .optional()
       .describe("inclui os encontros dos últimos 3 dias (padrão true)"),
+  })
+  .strict();
+
+const guiaArgs = z
+  .object({
+    pergunta: z
+      .string()
+      .min(3)
+      .max(300)
+      .describe("a pergunta em linguagem natural, como o usuário fez"),
   })
   .strict();
 
@@ -368,6 +379,26 @@ export const IA_TOOLS = {
           status: e.status,
           data_hora: e.data_hora,
           realizado_em: e.realizado_em,
+        })),
+      };
+    },
+  },
+
+  guia_consulta: {
+    nome: "guia_consulta",
+    descricao:
+      "Busca nos guias oficiais do programa (Guia do Mentor DPP, Guia do Mentor Especialista, cronograma do ciclo, instrumentos e decisões operacionais da plataforma): metodologia, encontros, instrumentos, papéis, regras de reposição, formação, LGPD/termo. Use pra qualquer pergunta sobre 'como funciona', 'o que o guia diz', metodologia ou regras do programa — NÃO pra dados das duplas do usuário (essas saem das outras tools). Devolve trechos citáveis com guia, seção e página; quando não achar nada, diga que não está nos guias e sugira a coordenação.",
+    schema: guiaArgs,
+    roles: TODOS_PAPEIS,
+    run: async ({ pergunta }: z.infer<typeof guiaArgs>, ctx) => {
+      const fontes = await matchGuiaIa(ctx.supabase, pergunta, 4);
+      // score sai fora — número de ranking não ajuda o modelo a citar
+      return {
+        fontes: fontes.map((f) => ({
+          guia: f.guia,
+          secao: f.secao,
+          pagina: f.pagina,
+          trecho: f.trecho,
         })),
       };
     },

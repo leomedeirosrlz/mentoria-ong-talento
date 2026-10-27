@@ -1123,10 +1123,14 @@ export function diaMesEvento(iso: string | null): string | null {
 /** A linha "libera no encontro N · T1 dd/mm · T2 dd/mm" — a data de
  *  abertura por turma (o encIni da estação no cronograma de cada uma),
  *  omitindo turma sem data oficial. Sem turmas com data, volta pro número
- *  do encontro sozinho. */
+ *  do encontro sozinho.
+ *  `verbo`: "libera" é o cadeado da janela (quem ela segura); "abre" é o
+ *  indicador da coordenação, que consulta/emite fora da janela
+ *  (REALIZA-257) — mesmo dado, sem ler como bloqueio. */
 export function liberaCopia(
   chave: EstacaoChave,
-  grupos: GrupoTurma[]
+  grupos: GrupoTurma[],
+  verbo: "libera" | "abre" = "libera"
 ): string {
   const porTurma = grupos
     .map((g) => {
@@ -1134,6 +1138,6 @@ export function liberaCopia(
       return dm ? `${g.sigla} ${dm}` : null;
     })
     .filter((s): s is string => s != null);
-  const base = `libera no encontro ${ESTACOES[chave].encIni}`;
+  const base = `${verbo} no encontro ${ESTACOES[chave].encIni}`;
   return porTurma.length ? `${base} · ${porTurma.join(" · ")}` : base;
 }

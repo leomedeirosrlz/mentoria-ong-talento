@@ -9,6 +9,7 @@ import { MaterialDocumento } from "@/components/material-documento";
 export function generateStaticParams() {
   return [
     { slug: "checklist-competencias" },
+    { slug: "feedback-construtivo" },
     { slug: "mensagem-preparacao" },
     { slug: "mensagem-indicadas" },
     { slug: "mensagem-encaminhamento" },

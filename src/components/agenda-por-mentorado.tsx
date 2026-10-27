@@ -66,7 +66,7 @@ import { cn } from "@/lib/utils";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { AgendaSuaSemana } from "@/components/agenda-sua-semana";
-import { LembreteButton } from "@/components/lembrete-button";
+import { DuplaWaAcao } from "@/components/dupla-wa-acao";
 import { dowCurto, Tag } from "@/components/agenda-partes";
 import { Estrelas } from "@/components/estrelas";
 import { SemaforoBadge } from "@/components/semaforo";
@@ -577,13 +577,11 @@ function CardMentorado({
           <ArrowRight size={14} />
         </Link>
         {dupla.status === "ativa" && (
-          <LembreteButton
+          <DuplaWaAcao
             duplaId={dupla.id}
-            destino="mentorado"
-            rotulo={`Lembrar ${primeiroNome}`}
+            destNome={primeiroNome}
             telefone={dupla.mentorado.whatsapp ?? null}
-            titulo="Lembrete do seu mentor"
-            corpo={
+            mensagem={
               msgsContato(
                 {
                   eu: meuNome,
@@ -596,8 +594,12 @@ function CardMentorado({
                 }
               ).mentorado ?? ""
             }
-            href="/jovem/agenda"
-            bloqueadoAte={lembreteBloqueadoAte(nudge, agora)}
+            nudge={{
+              destino: "mentorado",
+              titulo: "Lembrete do seu mentor",
+              href: "/jovem/agenda",
+              bloqueadoAte: lembreteBloqueadoAte(nudge, agora),
+            }}
           />
         )}
       </div>

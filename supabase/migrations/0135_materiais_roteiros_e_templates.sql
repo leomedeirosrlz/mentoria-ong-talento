@@ -38,7 +38,11 @@ values
   ('Perguntas Eficazes',
    'Documento complementar do guia: o que são, o que evitar e o banco de perguntas por momento da conversa.',
    'conteudo', 'dpp', null, 25,
-   'materiais/1a8277af-eb2b-4196-98e7-9fade2899a34-perguntas-eficazes.pdf');
+   'materiais/1a8277af-eb2b-4196-98e7-9fade2899a34-perguntas-eficazes.pdf')
+-- idempotente: bancos que já receberam o catálogo por seed (staging de e2e)
+-- pulam a duplicata em vez de abortar o push inteiro (o unique de path é
+-- índice, não constraint — sem alvo no on conflict)
+on conflict do nothing;
 
 -- templates do cap. 14 → documentos nativos (o app renderiza em
 -- /materiais/documento/<slug>; o storage não serve HTML renderizável)

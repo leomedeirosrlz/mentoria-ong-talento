@@ -51,7 +51,7 @@ test.describe("demo — Minha jornada do mentorado", () => {
     ).toBeVisible();
 
     // a estante — os 5 instrumentos da janela como cards-produto, todos
-    // com a tag "Feito" + a data; a devolutiva de terceiros mora entre eles
+    // com a tag "Feito" + a data
     const trilha = page.locator(
       'section[aria-labelledby="meus-instrumentos-titulo"]'
     );
@@ -61,7 +61,6 @@ test.describe("demo — Minha jornada do mentorado", () => {
       "Definindo minhas metas",
       "PDM · Plano de Desenvolvimento",
       "Avaliação do encontro",
-      "Avaliação por terceiros",
     ]) {
       await expect(
         trilha.getByRole("heading", { name: titulo })
@@ -170,26 +169,27 @@ test.describe("demo — Minha jornada do mentorado", () => {
     ).toBeVisible();
     // o acervo do mentorado é só audiencia='todos' (a policy do 0065):
     // os Guias dos mentores não aparecem — os links prontos viram grid e o
-    // checklist abre como documento nativo no grupo "Modelos" (era o
-    // material "em breve" do dataset antes dos doc: da 0135)
+    // doc "Feedback Construtivo" abre nativo no grupo "Conteúdos" (o
+    // checklist de autoavaliação saiu do catálogo — REALIZA-236)
     await expect(acervo.getByText("Links")).toBeVisible();
-    await expect(acervo.getByText("Modelos")).toBeVisible();
+    await expect(acervo.getByText("Conteúdos")).toBeVisible();
+    await expect(acervo.getByText("Modelos")).toHaveCount(0);
     const docJovem = acervo.getByRole("link", {
-      name: /Checklist de competências do mentor/,
+      name: /Feedback Construtivo/,
     });
     await expect(docJovem).toHaveAttribute(
       "href",
-      "/jovem/materiais/documento/checklist-competencias"
+      "/jovem/materiais/documento/feedback-construtivo"
     );
     // a rota nativa do jovem renderiza o documento de verdade e volta pro
     // acervo — não pode vazar pra /materiais (layout app redireciona o papel)
     await docJovem.click();
     await expect(page).toHaveURL(
-      "/jovem/materiais/documento/checklist-competencias"
+      "/jovem/materiais/documento/feedback-construtivo"
     );
     await expect(
       page.getByRole("heading", {
-        name: "Checklist de competências do mentor",
+        name: "Feedback Construtivo",
         level: 1,
       })
     ).toBeVisible();
@@ -385,15 +385,20 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     // o lembrete não é mais pro mentor: nenhum "Lembrar <mentor>"
     await expect(fila.getByRole("button", { name: /Lembrar (Carlos|João|Ricardo)/ })).toHaveCount(0);
     if (await lembrar.first().isVisible().catch(() => false)) {
+      // o botão abre o preview — o lembrete sai do "Lembrar pelo app"
       await lembrar.first().click();
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Lembrar pelo app" })
+        .click();
       await expect(
         page.getByText("Modo demo: nada é enviado de verdade.")
       ).toBeVisible();
     }
 
     // a régua oficial separada da biblioteca (v5c), agora na própria aba:
-    // os 8 instrumentos do programa em cards — a devolutiva de terceiros
-    // entre eles, nunca material solto de acervo
+    // os instrumentos do programa em cards — nunca material solto de
+    // acervo
     await page.goto("/materiais?aba=instrumentos");
     const instrumentos = page.locator(
       'section[aria-labelledby="instrumentos-titulo"]'
@@ -401,7 +406,6 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     await expect(instrumentos).toBeVisible();
     for (const titulo of [
       "Roda da Vida · leitura inicial",
-      "Avaliação por terceiros",
       "Avaliação Geral - 360º · mentorado(a)",
       "Avaliação Geral - 360º · mentor(a)",
     ]) {
@@ -428,14 +432,27 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     await expect(page).toHaveURL(/\/formularios\/[^/]+/);
     await page.goBack();
 
-    // card trancado é leitura pura pra TODO staff — o pill de liberação
-    // não é gesto: zero link, zero botão dentro dele
-    const cardTrancado = instrumentos.locator("article", {
+    // REALIZA-257: a janela do guia é indicador pra coordenação, não trava —
+    // o card do 360º (enc. 16) está fora da janela na demo e mesmo assim
+    // abre as respostas; o indicador diz quando a janela abre, sem cadeado
+    const cardForaDaJanela = instrumentos.locator("article", {
       hasText: "Avaliação Geral - 360º · mentorado(a)",
     });
-    await expect(cardTrancado.getByText("ainda não abriu")).toBeVisible();
-    await expect(cardTrancado.getByRole("link")).toHaveCount(0);
-    await expect(cardTrancado.getByRole("button")).toHaveCount(0);
+    await expect(
+      cardForaDaJanela.getByText("janela não aberta")
+    ).toBeVisible();
+    await expect(
+      cardForaDaJanela.getByText(/abre no encontro 16/)
+    ).toBeVisible();
+    // o cadeado é do papel que a janela segura — não da coord
+    await expect(cardForaDaJanela.getByText("ainda não abriu")).toHaveCount(0);
+    await expect(
+      cardForaDaJanela.getByRole("link", { name: /^Ver respostas/ })
+    ).toHaveAttribute("href", /^\/formularios\//);
+    // e nada de cópia de lote que minta ("já receberam ou já responderam")
+    await expect(
+      cardForaDaJanela.getByText(/Nada a enviar agora/)
+    ).toHaveCount(0);
 
     // rodapé coord-only: os forms de bordo apontam pra /formularios
     await expect(
@@ -497,10 +514,14 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     await expect(
       instrumentos.getByRole("link", { name: "Ver respostas" })
     ).toHaveCount(0);
-    // card trancado: zero gesto dentro (pill informativo, não link/botão)
+    // card fora da janela: a janela é o estado dele (cadeado + data) e ele
+    // segue leitura pura — a trava de janela vale pro supervisor, só a
+    // coordenação consulta/emite fora dela (REALIZA-257)
     const trancado = instrumentos.locator("article", {
-      hasText: "Avaliação final",
+      hasText: "Avaliação Geral - 360º · mentorado(a)",
     });
+    await expect(trancado.getByText("ainda não abriu")).toBeVisible();
+    await expect(trancado.getByText(/libera no encontro 16/)).toBeVisible();
     await expect(trancado.getByRole("link")).toHaveCount(0);
     await expect(trancado.getByRole("button")).toHaveCount(0);
     // o rodapé "Intakes… → Formulários" é coord-only

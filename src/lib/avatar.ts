@@ -1,7 +1,25 @@
 import { createHash } from "node:crypto";
 
 export const AVATAR_ACCEPT = ".png,.jpg,.jpeg,.webp";
-export const AVATAR_MAX_BYTES = 2 * 1024 * 1024;
+/** Teto do upload de foto — o server espelha em FOTO_MAX (actions.ts). */
+export const AVATAR_MAX_BYTES = 10 * 1024 * 1024;
+
+/** "12,4 MB" / "10 MB" — tamanho legível, vírgula decimal. As duas casas
+ *  só aparecem quando importam: um arquivo logo acima do teto não pode ser
+ *  anunciado com o mesmo texto do limite. */
+export function tamanhoMb(bytes: number): string {
+  const texto = (bytes / (1024 * 1024))
+    .toFixed(2)
+    .replace(/\.?0+$/, "")
+    .replace(".", ",");
+  return `${texto} MB`;
+}
+
+/** Erro de upload com o tamanho real do arquivo e o teto — "use uma de até
+ *  X MB" não dizia quanto a imagem da pessoa tinha. */
+export function avisoImagemGrande(bytes: number): string {
+  return `Essa imagem tem ${tamanhoMb(bytes)}. O limite é ${tamanhoMb(AVATAR_MAX_BYTES)}.`;
+}
 
 /** URL pública do bucket `avatares` — path novo a cada upload, sem cache-bust.
  *  Paths "demo/*" são os retratos locais do modo demo (public/demo/*). */

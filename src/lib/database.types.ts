@@ -2349,6 +2349,36 @@ export type Database = {
           },
         ]
       }
+      ia_chunks: {
+        Row: {
+          created_at: string
+          guia: string
+          id: string
+          pagina: number | null
+          secao: string | null
+          texto: string
+          tsv: unknown
+        }
+        Insert: {
+          created_at?: string
+          guia: string
+          id?: string
+          pagina?: number | null
+          secao?: string | null
+          texto: string
+          tsv?: unknown
+        }
+        Update: {
+          created_at?: string
+          guia?: string
+          id?: string
+          pagina?: number | null
+          secao?: string | null
+          texto?: string
+          tsv?: unknown
+        }
+        Relationships: []
+      }
       ia_eventos: {
         Row: {
           args: Json
@@ -5571,6 +5601,16 @@ export type Database = {
         Args: { p_encontro: string }
         Returns: Json
       }
+      match_ia_chunks: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          guia: string
+          pagina: number
+          score: number
+          secao: string
+          trecho: string
+        }[]
+      }
       meus_dados_civis: { Args: never; Returns: Json }
       meus_dados_pessoais: { Args: never; Returns: Json }
       my_mentorado_id: { Args: never; Returns: string }
@@ -5972,3 +6012,4 @@ export const Constants = {
     },
   },
 } as const
+

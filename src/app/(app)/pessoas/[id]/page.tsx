@@ -52,7 +52,7 @@ import {
   GENERO_LABELS,
   idade,
   linkSeguro,
-  papelLabel,
+  papelLabelComposto,
   podeSupervisionar,
   PREF_GENERO_LABELS,
   SITUACAO_MENTORADO_LABEL,
@@ -542,7 +542,7 @@ export default async function PessoaPerfilPage({
             ) : (
               <>
                 <Badge variant="outline" className="font-normal">
-                  {papelLabel("role" in p ? p.role : null)}
+                  {"role" in p ? papelLabelComposto(p) : "Sem papel definido"}
                 </Badge>
                 {/* estado operacional do cadastro é coisa de staff — colega
                     não precisa saber se a conta está ativa */}

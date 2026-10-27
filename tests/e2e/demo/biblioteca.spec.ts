@@ -1,11 +1,11 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
 // REALIZA-250 — a biblioteca deixa de ser uma lista única e vira seções
-// derivadas do `tipo` do material. Depois da 0135 o dataset demo espelha o
-// catálogo de prod: 29 linhas, todas acionáveis — 16 roteiros e Perguntas
-// Eficazes caem em "Conteúdos e roteiros", os 4 templates do cap. 14 são
-// documentos nativos (path "doc:<slug>" → /materiais/documento/<slug>, sem
-// passar pela rota de arquivo). "Encontro N" segue meta da linha, nunca
+// derivadas do `tipo` do material. Depois da 0135/0138 o dataset demo
+// espelha o catálogo de prod: 30 linhas, todas acionáveis — 16 roteiros e
+// Perguntas Eficazes caem em "Conteúdos e roteiros", os templates do cap. 14
+// são documentos nativos (path "doc:<slug>" → /materiais/documento/<slug>,
+// sem passar pela rota de arquivo). "Encontro N" segue meta da linha, nunca
 // seção. Read-only — seguro em qualquer ambiente.
 
 test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
@@ -38,10 +38,13 @@ test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
       bib.getByRole("region", { name: /Encontro \d+/ })
     ).toHaveCount(0);
 
-    // o catálogo espelha prod: 2 guias, 19 conteúdos (16 roteiros +
-    // Perguntas Eficazes + 2 cronogramas), 6 modelos, 2 links
+    // o catálogo espelha prod: 2 guias, 20 conteúdos (16 roteiros +
+    // Perguntas Eficazes + Feedback Construtivo + 2 cronogramas),
+    // 6 modelos (Roda da Vida, Definindo Metas, os 3 modelos de mensagem e o
+    // checklist de competências; o checklist de autoavaliação saiu —
+    // REALIZA-236), 2 links
     await expect(guias.getByRole("listitem")).toHaveCount(2);
-    await expect(conteudos.getByRole("listitem")).toHaveCount(19);
+    await expect(conteudos.getByRole("listitem")).toHaveCount(20);
     await expect(modelos.getByRole("listitem")).toHaveCount(6);
     await expect(links.getByRole("listitem")).toHaveCount(2);
     await expect(
@@ -51,7 +54,7 @@ test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
       conteudos.getByRole("link", { name: /Perguntas Eficazes/ })
     ).toBeVisible();
 
-    // os 4 templates do cap. 14 são documentos nativos — o link abre a
+    // os templates do cap. 14 são documentos nativos — o link abre a
     // página do app, nunca a rota de arquivo (/api/material) nem "em breve"
     const doc = modelos.getByRole("link", {
       name: /Checklist de competências do mentor/,

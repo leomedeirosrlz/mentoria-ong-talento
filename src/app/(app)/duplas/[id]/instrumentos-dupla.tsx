@@ -136,9 +136,10 @@ function LinhaInstrumento({
   }
 
   return (
-    <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:gap-3 lg:flex-col lg:items-stretch">
-      {/* emblema + texto na mesma coluna-flex: no mobile o par fica acima
-          das ações; em sm+ ocupa a esquerda — o símbolo do instrumento
+    <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
+      {/* emblema + texto na coluna, ações embaixo na largura toda — a faixa
+          sm–lg como linha deixava os botões roubando metade do texto e um
+          vazio sob eles (REALIZA-253). O símbolo do instrumento
           (formularios.md item 2) é o mesmo da régua e da prateleira */}
       <div className="flex min-w-0 flex-1 items-start gap-3">
         {sistema && ehInstrumentoChave(sistema) ? (
