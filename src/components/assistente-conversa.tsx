@@ -19,6 +19,7 @@ import {
   Square,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
+import { montarEnvioChat } from "@/lib/ia/mensagens";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -295,7 +296,9 @@ export function AssistenteConversa({
       const res = await fetch("/api/ia/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: base }),
+        // campos de UI (estado/tools/em) e o tail acima de 20 mensagens
+        // derrubam o parse com "Pedido inválido" — montarEnvioChat saneia
+        body: JSON.stringify({ messages: montarEnvioChat(base) }),
         signal: ctrl.signal,
       });
       const tipo = res.headers.get("content-type") ?? "";
