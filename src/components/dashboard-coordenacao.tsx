@@ -1,4 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import Link from "next/link";
 import { ArrowCounterClockwise, ArrowRight, CaretDown } from "@phosphor-icons/react/dist/ssr";
 import {
@@ -218,14 +220,16 @@ export function DashboardCoordenacao({
       <div className="animate-enter rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5">
         {/* com turma em foco os atalhos pousam na /duplas já com ela —
             a URL carrega o contexto (?turma=<label> é recorte lá) */}
-        <SaudePrograma
-          saude={situacao}
-          linkBase={
-            turmaFoco
-              ? `/duplas?turma=${encodeURIComponent(turmaFoco)}`
-              : "/duplas"
-          }
-        />
+        <Suspense fallback={<Skeleton className="h-16 w-full" />}>
+          <SaudePrograma
+            saude={situacao}
+            linkBase={
+              turmaFoco
+                ? `/duplas?turma=${encodeURIComponent(turmaFoco)}`
+                : "/duplas"
+            }
+          />
+        </Suspense>
       </div>
 
       <div

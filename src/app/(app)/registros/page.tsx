@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { ClipboardText } from "@phosphor-icons/react/dist/ssr";
@@ -117,6 +119,26 @@ function aconteceuEmDe(r: RegistroResumo): string {
   );
 }
 
+async function PanoramaDoCiclo({
+  filtros,
+  hoje,
+  saude,
+}: {
+  filtros: FiltrosRegistro;
+  hoje: string;
+  saude: ReturnType<typeof saudeDoRecorte>;
+}) {
+  const panorama = await getRegistrosPanorama(filtros);
+  return <RegistrosPainel panorama={panorama} hoje={hoje} saude={saude} />;
+}
+
+async function MetricasRegistroSection({ souCoord }: { souCoord: boolean }) {
+  if (!souCoord) return null;
+  const metricas = await getMetricasRegistro();
+  if (!metricas) return null;
+  return <MetricasRegistroCard metricas={metricas} />;
+}
+
 export default async function RegistrosPage({
   searchParams,
 }: {
@@ -156,19 +178,15 @@ export default async function RegistrosPage({
     duplas,
     alertas,
     espEventos,
-    panorama,
     cronogramas,
     todasDuplas,
-    metricas,
   ] = await Promise.all([
     getRegistros(filtros),
     getDuplasOpcoes(),
     getAlertasRegistros(),
     getEspecialistaEventos(),
-    getRegistrosPanorama(filtros),
     getCronogramas(),
     getDuplas(),
-    getMetricasRegistro(),
   ]);
   // situação das duplas: o mesmo resumo de /duplas, /agenda e da home, no
   // recorte de turma do painel (a URL é a fonte do recorte)
@@ -543,13 +561,19 @@ export default async function RegistrosPage({
             </div>
           </div>
         </div>
-        <RegistrosPainel panorama={panorama} hoje={hoje} saude={saude} />
+        <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+          <PanoramaDoCiclo filtros={filtros} hoje={hoje} saude={saude} />
+        </Suspense>
       </section>
 
       {/* telemetria do form (REALIZA-217): tempo e abandono do
           preenchimento, só pra coordenação — a query já devolve null pra
           supervisor, o gate aqui deixa isso explícito */}
-      {souCoord && metricas && <MetricasRegistroCard metricas={metricas} />}
+      {souCoord && (
+        <Suspense fallback={<Skeleton className="h-16 w-full" />}>
+          <MetricasRegistroSection souCoord={souCoord} />
+        </Suspense>
+      )}
 
       {/* cabeçalho da lista: contador operacional à esquerda (clicar num
           número aplica o filtro correspondente), controle de agrupamento

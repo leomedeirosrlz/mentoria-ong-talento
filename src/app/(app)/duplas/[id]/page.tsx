@@ -4,6 +4,8 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   BookOpen,
   CalendarBlank,
@@ -1026,28 +1028,30 @@ export default async function DuplaPage({
         </section>
       )}
 
-      {fechamentoEmFoco && (
-        <>
-          {ehEsp && <TrilhaFechamento dupla={dupla} avaliacao={avaliacaoEsp} />}
-          {!ehEsp && (
-            <EncerramentoDupla
-              dupla={dupla}
-              encerramento={encerramento}
-              souMentor={souMentor}
-              souCoord={souCoord}
-              formularios={formulariosAtivos}
-              avaliacao360Em={avaliacao360Em}
-              realizadosCount={realizadosCount}
-            />
-          )}
-          {mostrarResumo && (
-            <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
-          )}
-          {souCoord && desfechoEntregas.length > 0 && (
-            <DesfechoDuplaCard entregas={desfechoEntregas} />
-          )}
-        </>
-      )}
+      <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+        {fechamentoEmFoco && (
+          <>
+            {ehEsp && <TrilhaFechamento dupla={dupla} avaliacao={avaliacaoEsp} />}
+            {!ehEsp && (
+              <EncerramentoDupla
+                dupla={dupla}
+                encerramento={encerramento}
+                souMentor={souMentor}
+                souCoord={souCoord}
+                formularios={formulariosAtivos}
+                avaliacao360Em={avaliacao360Em}
+                realizadosCount={realizadosCount}
+              />
+            )}
+            {mostrarResumo && (
+              <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+            )}
+            {souCoord && desfechoEntregas.length > 0 && (
+              <DesfechoDuplaCard entregas={desfechoEntregas} />
+            )}
+          </>
+        )}
+      </Suspense>
     </>
   );
 
@@ -1140,23 +1144,25 @@ export default async function DuplaPage({
 
       {/* fechamento e resumo que não estão na Agora (dupla ainda no meio do
           ciclo): ficam aqui, no fim da lista, sem sumir */}
-      {!fechamentoEmFoco && !ehEsp && (
-        <EncerramentoDupla
-          dupla={dupla}
-          encerramento={encerramento}
-          souMentor={souMentor}
-          souCoord={souCoord}
-          formularios={formulariosAtivos}
-          avaliacao360Em={avaliacao360Em}
-          realizadosCount={realizadosCount}
-        />
-      )}
-      {!fechamentoEmFoco && mostrarResumo && (
-        <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
-      )}
-      {souCoord && desfechoEntregas.length > 0 && (
-        <DesfechoDuplaCard entregas={desfechoEntregas} />
-      )}
+      <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+        {!fechamentoEmFoco && !ehEsp && (
+          <EncerramentoDupla
+            dupla={dupla}
+            encerramento={encerramento}
+            souMentor={souMentor}
+            souCoord={souCoord}
+            formularios={formulariosAtivos}
+            avaliacao360Em={avaliacao360Em}
+            realizadosCount={realizadosCount}
+          />
+        )}
+        {!fechamentoEmFoco && mostrarResumo && (
+          <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+        )}
+        {souCoord && desfechoEntregas.length > 0 && (
+          <DesfechoDuplaCard entregas={desfechoEntregas} />
+        )}
+      </Suspense>
     </>
   );
 
@@ -1176,29 +1182,31 @@ export default async function DuplaPage({
           }
         />
       )}
-      {!ehEsp && pdm && (
-        <PdmDupla
-          duplaId={dupla.id}
-          doc={pdm}
-          mentoradoNome={dupla.mentorado.nome}
-          podeEditar={
-            souMentor &&
-            (dupla.status === "ativa" || dupla.status === "pausada")
-          }
-        />
-      )}
-      {!ehEsp && terceiros && (
-        <TerceirosDupla
-          duplaId={dupla.id}
-          contatos={terceiros.contatos}
-          consolidacao={terceiros.consolidacao}
-          mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
-          podeGerenciar={souCoord || souMentor}
-          jornadaViva={
-            dupla.status === "ativa" || dupla.status === "pausada"
-          }
-        />
-      )}
+      <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+        {!ehEsp && pdm && (
+          <PdmDupla
+            duplaId={dupla.id}
+            doc={pdm}
+            mentoradoNome={dupla.mentorado.nome}
+            podeEditar={
+              souMentor &&
+              (dupla.status === "ativa" || dupla.status === "pausada")
+            }
+          />
+        )}
+        {!ehEsp && terceiros && (
+          <TerceirosDupla
+            duplaId={dupla.id}
+            contatos={terceiros.contatos}
+            consolidacao={terceiros.consolidacao}
+            mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+            podeGerenciar={souCoord || souMentor}
+            jornadaViva={
+              dupla.status === "ativa" || dupla.status === "pausada"
+            }
+          />
+        )}
+      </Suspense>
       {vozVisivel &&
         (ehEsp ? (
           <VozDoJovemEspecialista itens={espAvaliacoes} />
@@ -1598,7 +1606,9 @@ export default async function DuplaPage({
 
       <AbaPorHash />
 
-      <FichaAbas ativa={aba}>{conteudo}</FichaAbas>
+      <FichaAbas ativa={aba}>
+        <Suspense fallback={<Skeleton className="h-40 w-full" />}>{conteudo}</Suspense>
+      </FichaAbas>
     </div>
   );
 }

@@ -1,4 +1,6 @@
 import { cookies } from "next/headers";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   getCicloEventos,
   getComunicados,
@@ -134,22 +136,24 @@ export default async function HomePage({
           }
         />
         {ehEsp && (
-          <DemandasEspecialista
-            solicitacoes={solicitacoes}
-            propostas={propostas}
-            slots={meusSlots}
-            meuId={me.id}
-            minhasAreas={me.areas ?? undefined}
-            mentoradosProprios={duplas
-              .filter(
-                (d) =>
-                  d.trilha !== "especialista" &&
-                  d.mentor?.id === me.id &&
-                  (d.status === "ativa" || d.status === "pausada")
-              )
-              .map((d) => d.mentorado?.id)
-              .filter((id): id is string => id != null)}
-          />
+          <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+            <DemandasEspecialista
+              solicitacoes={solicitacoes}
+              propostas={propostas}
+              slots={meusSlots}
+              meuId={me.id}
+              minhasAreas={me.areas ?? undefined}
+              mentoradosProprios={duplas
+                .filter(
+                  (d) =>
+                    d.trilha !== "especialista" &&
+                    d.mentor?.id === me.id &&
+                    (d.status === "ativa" || d.status === "pausada")
+                )
+                .map((d) => d.mentorado?.id)
+                .filter((id): id is string => id != null)}
+            />
+          </Suspense>
         )}
       </div>
     );
@@ -236,22 +240,24 @@ export default async function HomePage({
           }
         />
         {ehEspSup && (
-          <DemandasEspecialista
-            solicitacoes={solicitacoesEsp}
-            propostas={propostasSup}
-            slots={slotsSup}
-            meuId={me.id}
-            minhasAreas={me.areas ?? undefined}
-            mentoradosProprios={duplas
-              .filter(
-                (d) =>
-                  d.trilha !== "especialista" &&
-                  d.mentor?.id === me.id &&
-                  (d.status === "ativa" || d.status === "pausada")
-              )
-              .map((d) => d.mentorado?.id)
-              .filter((id): id is string => id != null)}
-          />
+          <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+            <DemandasEspecialista
+              solicitacoes={solicitacoesEsp}
+              propostas={propostasSup}
+              slots={slotsSup}
+              meuId={me.id}
+              minhasAreas={me.areas ?? undefined}
+              mentoradosProprios={duplas
+                .filter(
+                  (d) =>
+                    d.trilha !== "especialista" &&
+                    d.mentor?.id === me.id &&
+                    (d.status === "ativa" || d.status === "pausada")
+                )
+                .map((d) => d.mentorado?.id)
+                .filter((id): id is string => id != null)}
+            />
+          </Suspense>
         )}
       </div>
     );
@@ -314,21 +320,23 @@ export default async function HomePage({
         papel={me?.role ?? ""}
       />
       {temPapel(me, "mentor_especialista") && (
-        <DemandasEspecialista
-          solicitacoes={solicitacoes}
-          propostas={propostas}
-          slots={meusSlots}
-          meuId={me!.id}
-          minhasAreas={me?.areas ?? undefined}
-          mentoradosProprios={duplas
-            .filter(
-              (d) =>
-                d.trilha !== "especialista" &&
-                (d.status === "ativa" || d.status === "pausada")
-            )
-            .map((d) => d.mentorado?.id)
-            .filter((id): id is string => id != null)}
-        />
+        <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+          <DemandasEspecialista
+            solicitacoes={solicitacoes}
+            propostas={propostas}
+            slots={meusSlots}
+            meuId={me!.id}
+            minhasAreas={me?.areas ?? undefined}
+            mentoradosProprios={duplas
+              .filter(
+                (d) =>
+                  d.trilha !== "especialista" &&
+                  (d.status === "ativa" || d.status === "pausada")
+              )
+              .map((d) => d.mentorado?.id)
+              .filter((id): id is string => id != null)}
+          />
+        </Suspense>
       )}
       <AvisosSection avisos={avisos} souCoord={false} />
     </div>
