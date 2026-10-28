@@ -179,7 +179,7 @@ export function NovoMaterialDialog({
             acompanha a trilha.
           </DialogDescription>
         </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
+        <form onSubmit={submit} className="min-w-0 space-y-4 overflow-hidden">
           <div className="space-y-2">
             <Label htmlFor="titulo">Título</Label>
             <Input id="titulo" name="titulo" required />

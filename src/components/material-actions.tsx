@@ -336,7 +336,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
             </DialogDescription>
           </DialogHeader>
           <form
-            className="space-y-4"
+            className="min-w-0 space-y-4 overflow-hidden"
             onSubmit={(e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
