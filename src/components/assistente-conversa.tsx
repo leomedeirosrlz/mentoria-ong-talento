@@ -31,10 +31,17 @@ type Msg = {
   content: string;
   estado?: "stream" | "erro";
   tools?: string[];
+  em?: number;
 };
 
-const BOAS_VINDAS =
-  "Oi! Sou o assistente do Realiza. Posso ajudar com a sua operação ou com o que dizem os guias do programa.";
+const primeiroNome = (nome?: string) => nome?.trim().split(/\s+/)[0];
+
+const hhmm = (em?: number) =>
+  em ? new Date(em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
+
+// fora do componente: Date.now é impuro pro linter do compiler — a hora
+// só é lida em handler de evento, nunca durante render
+const agora = () => Date.now();
 
 const DEMO_FALLBACK =
   "Na demonstração o assistente tem respostas de exemplo — no ambiente real ele responde com seus dados e guias oficiais.";
@@ -190,16 +197,17 @@ export function AssistenteConversa({
   demo,
   configurado,
   autoFocus,
+  nome,
 }: {
   papeis: AppRole[];
   demo: boolean;
   configurado: boolean;
   /** a bolha já foca o textarea ao abrir — autoFocus cobre o caso direto */
   autoFocus?: boolean;
+  /** primeiro nome pro empty state ("Oi, X!") — sem ele, genérico */
+  nome?: string;
 }) {
-  const [msgs, setMsgs] = useState<Msg[]>([
-    { role: "assistant", content: BOAS_VINDAS },
-  ]);
+  const [msgs, setMsgs] = useState<Msg[]>([]);
   const [texto, setTexto] = useState("");
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -212,7 +220,6 @@ export function AssistenteConversa({
   // SSE manda deltas pequenos demais pra re-render por delta
   const tokensRef = useRef("");
   const flushRef = useRef(0);
-  const primeiraMsg = !msgs.some((m) => m.role === "user");
   const chips = sugestoes(papeis);
 
   const rolarFim = (forca = false) => {
@@ -274,6 +281,7 @@ export function AssistenteConversa({
             content ||
             (estado === "interrompido" ? "Resposta interrompida." : FALHA),
           tools: extra?.tools?.length ? extra.tools : undefined,
+          em: agora(),
         },
       ];
     });
@@ -292,13 +300,14 @@ export function AssistenteConversa({
   async function rodar(base: Msg[]) {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
+    // body strict na rota: campos de UI (estado, tools) ou >20 mensagens
+    // derrubam o parse com "Pedido inválido" — montarEnvioChat saneia
+    const envio = montarEnvioChat(base);
     try {
       const res = await fetch("/api/ia/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        // campos de UI (estado/tools/em) e o tail acima de 20 mensagens
-        // derrubam o parse com "Pedido inválido" — montarEnvioChat saneia
-        body: JSON.stringify({ messages: montarEnvioChat(base) }),
+        body: JSON.stringify({ messages: envio }),
         signal: ctrl.signal,
       });
       const tipo = res.headers.get("content-type") ?? "";
@@ -358,7 +367,10 @@ export function AssistenteConversa({
   async function enviar(conteudo: string) {
     const limpo = conteudo.trim();
     if (!limpo || pending) return;
-    const novas: Msg[] = [...msgs, { role: "user", content: limpo }];
+    const novas: Msg[] = [
+      ...msgs,
+      { role: "user", content: limpo, em: agora() },
+    ];
     setMsgs([...novas, { role: "assistant", content: "", estado: "stream" }]);
     setTexto("");
     setPending(true);
@@ -372,7 +384,11 @@ export function AssistenteConversa({
       setMsgs((ms) =>
         ms.map((m, i) =>
           i === ms.length - 1
-            ? { role: "assistant" as const, content: respostaDemo(limpo) }
+            ? {
+                role: "assistant" as const,
+                content: respostaDemo(limpo),
+                em: agora(),
+              }
             : m
         )
       );
@@ -414,112 +430,188 @@ export function AssistenteConversa({
         </p>
       )}
 
-      {/* transcript — role=log + aria-live pra resposta nova; a rolagem só
-          segue o fim quando o usuário já está perto dele */}
-      <div
-        ref={logRef}
-        onScroll={() => {
-          const el = logRef.current;
-          if (el)
-            pertoDoFim.current =
-              el.scrollHeight - el.scrollTop - el.clientHeight < 96;
-        }}
-        role="log"
-        aria-live="polite"
-        aria-label="Conversa com o assistente"
-        className="min-h-0 flex-1 space-y-3 overflow-y-auto px-4 py-4"
-      >
-        {msgs.map((m, i) => (
-          <div
-            key={i}
-            className={cn(
-              "group flex",
-              m.role === "user" ? "justify-end" : "justify-start"
-            )}
-          >
-            <div className="max-w-[85%]">
-              <div
-                className={cn(
-                  "rounded-2xl px-4 py-2.5 text-sm",
-                  m.role === "user"
-                    ? "rounded-br-md bg-[var(--brand-lime)] text-[var(--brand-ink)] whitespace-pre-wrap"
-                    : "rounded-bl-md bg-muted/60 text-foreground shadow-[var(--shadow-border)]",
-                  m.estado === "erro" && "border border-[var(--warn)]/40"
-                )}
+      {/* empty state (REALIZA-289): avatar + saudação + sugestões — some
+          na primeira mensagem e não volta */}
+      {msgs.length === 0 && (
+        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 py-8 text-center">
+          <span className="grid size-12 place-items-center rounded-2xl bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)]">
+            <Sparkle size={22} weight="fill" aria-hidden />
+          </span>
+          <div>
+            <p className="text-base font-semibold">
+              {primeiroNome(nome) ? `Oi, ${primeiroNome(nome)}!` : "Oi!"}
+            </p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Posso ajudar com a sua operação ou com o que dizem os guias do
+              programa.
+            </p>
+          </div>
+          <div className="mt-1 flex max-w-72 flex-wrap justify-center gap-2">
+            {chips.map((s) => (
+              <button
+                key={s}
+                type="button"
+                disabled={pending || (!configurado && !demo)}
+                onClick={() => enviar(s)}
+                className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-[var(--shadow-border)] transition-colors hover:border-foreground/25 hover:text-foreground disabled:opacity-50"
               >
-                {m.role === "assistant" ? (
-                  <MdLite texto={m.content || "…"} />
-                ) : (
-                  m.content
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* transcript — role=log + aria-live pra resposta nova; a rolagem só
+          segue o fim quando o usuário já está perto dele. scroll-fina =
+          scrollbar thin muted (REALIZA-282); fade no topo emoldura o topo
+          do log quando rolado */}
+      <div className="relative min-h-0 flex-1">
+        <div
+          ref={logRef}
+          onScroll={() => {
+            const el = logRef.current;
+            if (el)
+              pertoDoFim.current =
+                el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+          }}
+          role="log"
+          aria-live="polite"
+          aria-label="Conversa com o assistente"
+          className="scroll-fina h-full space-y-3 overflow-y-auto px-4 py-4"
+        >
+          {msgs.map((m, i) => (
+            <div
+              key={i}
+              className={cn(
+                "group flex items-end gap-2",
+                m.role === "user" ? "justify-end" : "justify-start"
+              )}
+            >
+              {m.role === "assistant" && (
+                <span
+                  aria-hidden
+                  className="mb-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)]/15 text-[var(--brand-lime-deep)]"
+                >
+                  <Sparkle size={12} weight="fill" />
+                </span>
+              )}
+              <div className="max-w-[85%]">
+                <div
+                  className={cn(
+                    "rounded-2xl px-4 py-2.5 text-sm",
+                    m.role === "user"
+                      ? "rounded-br-md bg-[var(--brand-lime)] text-[var(--brand-ink)] whitespace-pre-wrap"
+                      : "rounded-bl-md bg-muted/60 text-foreground shadow-[var(--shadow-border)]",
+                    m.estado === "erro" && "border border-[var(--warn)]/40"
+                  )}
+                >
+                  {m.role === "assistant" ? (
+                    <>
+                      <MdLite texto={m.content || "…"} />
+                      {/* cursor do stream (REALIZA-280): bloco piscante no
+                          fim enquanto o token ainda está chegando */}
+                      {m.estado === "stream" && (
+                        <span
+                          aria-hidden
+                          className="ml-0.5 inline-block h-[1em] w-0.5 translate-y-0.5 animate-pulse rounded-full bg-foreground/70"
+                        />
+                      )}
+                    </>
+                  ) : (
+                    m.content
+                  )}
+                </div>
+                {/* meta: hora + copy/retry + fontes — discreto, sempre no
+                    ar (touch não tem hover) */}
+                {(m.em || (m.role === "assistant" && (m.content || m.estado === "erro"))) && (
+                  <div
+                    className={cn(
+                      "mt-1 flex items-center gap-2",
+                      m.role === "user" ? "justify-end pr-1" : "pl-1"
+                    )}
+                  >
+                    {m.em && (
+                      <span className="text-[10px] text-muted-foreground/70">
+                        {hhmm(m.em)}
+                      </span>
+                    )}
+                    {m.role === "assistant" && m.content && !m.estado && (
+                      <button
+                        type="button"
+                        onClick={() => copiar(i, m.content)}
+                        aria-label="Copiar resposta"
+                        className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        {copiado === i ? <Check size={12} /> : <Copy size={12} />}
+                        {copiado === i ? "Copiado" : "Copiar"}
+                      </button>
+                    )}
+                    {m.tools?.length ? (
+                      <span className="text-[11px] text-muted-foreground/70">
+                        fontes: {m.tools.join(", ")}
+                      </span>
+                    ) : null}
+                    {m.estado === "erro" && (
+                      <button
+                        type="button"
+                        onClick={tentarDeNovo}
+                        className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
+                      >
+                        <ArrowClockwise size={12} />
+                        Tentar de novo
+                      </button>
+                    )}
+                  </div>
                 )}
               </div>
-              {/* ferramentas usadas + copy/retry — discretos, sempre no ar
-                  (touch não tem hover) */}
-              {m.role === "assistant" && m.content && !m.estado && (
-                <div className="mt-1 flex items-center gap-2 pl-1">
-                  <button
-                    type="button"
-                    onClick={() => copiar(i, m.content)}
-                    aria-label="Copiar resposta"
-                    className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    {copiado === i ? <Check size={12} /> : <Copy size={12} />}
-                    {copiado === i ? "Copiado" : "Copiar"}
-                  </button>
-                  {m.tools?.length ? (
-                    <span className="text-[11px] text-muted-foreground/70">
-                      fontes: {m.tools.join(", ")}
-                    </span>
-                  ) : null}
-                </div>
-              )}
-              {m.estado === "erro" && (
-                <div className="mt-1 pl-1">
-                  <button
-                    type="button"
-                    onClick={tentarDeNovo}
-                    className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-                  >
-                    <ArrowClockwise size={12} />
-                    Tentar de novo
-                  </button>
-                </div>
-              )}
             </div>
-          </div>
-        ))}
+          ))}
 
-        {/* bolha de espera: dots até o 1º token; linha de status durante
-            as rodadas de tool */}
-        {pending && (
-          <div className="flex justify-start">
-            <div className="rounded-2xl rounded-bl-md bg-muted/60 px-4 py-3 shadow-[var(--shadow-border)]">
-              {status ? (
-                <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                  <span className="size-1.5 animate-pulse rounded-full bg-[var(--brand-lime-deep)]" />
-                  {status}
-                </p>
-              ) : (
-                <div
-                  aria-label="O assistente está escrevendo"
-                  className="flex items-center gap-1.5"
-                >
-                  {[0, 1, 2].map((d) => (
-                    <span
-                      key={d}
-                      className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60"
-                      style={{ animationDelay: `${d * 180}ms` }}
-                    />
-                  ))}
-                </div>
-              )}
+          {/* bolha de espera: dots até o 1º token; linha de status durante
+              as rodadas de tool */}
+          {pending && (
+            <div className="flex items-end justify-start gap-2">
+              <span
+                aria-hidden
+                className="mb-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)]/15 text-[var(--brand-lime-deep)]"
+              >
+                <Sparkle size={12} weight="fill" />
+              </span>
+              <div className="rounded-2xl rounded-bl-md bg-muted/60 px-4 py-3 shadow-[var(--shadow-border)]">
+                {status ? (
+                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <span className="size-1.5 animate-pulse rounded-full bg-[var(--brand-lime-deep)]" />
+                    {status}
+                  </p>
+                ) : (
+                  <div
+                    aria-label="O assistente está escrevendo"
+                    className="flex items-center gap-1.5"
+                  >
+                    {[0, 1, 2].map((d) => (
+                      <span
+                        key={d}
+                        className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60"
+                        style={{ animationDelay: `${d * 180}ms` }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
+        {/* fade do topo — aparece só quando o log rolou (o gradiente sai
+            do bg do painel, não de uma cor fixa) */}
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-popover to-transparent"
+        />
       </div>
 
-      {/* chips só antes da primeira pergunta — depois disso viram ruído */}
-      <div className="space-y-2 px-4 pb-4 pt-1">
+      {/* composer — os chips moram no empty state agora */}
+      <div className="space-y-2 border-t border-border/60 px-4 pb-4 pt-3">
         {!configurado && !demo ? (
           <Card className="px-4 py-3 text-sm text-muted-foreground">
             O assistente está indisponível no momento — tente de novo em
@@ -527,23 +619,6 @@ export function AssistenteConversa({
           </Card>
         ) : (
           <>
-            {primeiraMsg && (
-              <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
-                {chips.map((s) => (
-                  <Button
-                    key={s}
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    disabled={pending}
-                    onClick={() => enviar(s)}
-                    className="shrink-0 rounded-full text-xs font-normal text-muted-foreground"
-                  >
-                    {s}
-                  </Button>
-                ))}
-              </div>
-            )}
             <form
               onSubmit={(e) => {
                 e.preventDefault();
@@ -555,6 +630,7 @@ export function AssistenteConversa({
                 ref={inputRef}
                 value={texto}
                 autoFocus={autoFocus}
+                maxLength={4000}
                 onChange={(e) => setTexto(e.target.value)}
                 onKeyDown={(e) => {
                   if (e.key === "Enter" && !e.shiftKey) {
@@ -588,11 +664,18 @@ export function AssistenteConversa({
                 </Button>
               )}
             </form>
-            <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-              <Sparkle aria-hidden />
-              Respostas geradas por IA podem errar — confirme informações
-              críticas.
-            </p>
+            <div className="flex items-center justify-between gap-2">
+              <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
+                <Sparkle aria-hidden />
+                Respostas geradas por IA podem errar — confirme informações
+                críticas.
+              </p>
+              {texto.length > 3600 && (
+                <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                  {texto.length}/4000
+                </span>
+              )}
+            </div>
           </>
         )}
       </div>

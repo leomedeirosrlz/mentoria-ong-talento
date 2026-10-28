@@ -48,7 +48,13 @@ function Cabecalho({ onFechar }: { onFechar: () => void }) {
         <Sparkle size={15} weight="fill" aria-hidden />
       </span>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold">Assistente</p>
+        <p className="flex items-center gap-1.5 text-sm font-semibold">
+          Assistente
+          <span
+            aria-hidden
+            className="size-1.5 rounded-full bg-[var(--ok-text)]"
+          />
+        </p>
         <p className="text-[11px] text-muted-foreground">
           Operação e guias do programa
         </p>
@@ -70,10 +76,12 @@ export function AssistenteBolha({
   papeis,
   demo,
   configurado,
+  nome,
 }: {
   papeis: AppRole[];
   demo: boolean;
   configurado: boolean;
+  nome?: string;
 }) {
   // SSR/hidratação renderiza o braço desktop (server snapshot true) — o
   // painel só existe aberto, então a escolha errada nunca aparece na tela
@@ -107,7 +115,7 @@ export function AssistenteBolha({
   };
 
   const conversa = (
-    <AssistenteConversa papeis={papeis} demo={demo} configurado={configurado} autoFocus />
+    <AssistenteConversa papeis={papeis} demo={demo} configurado={configurado} autoFocus nome={nome} />
   );
 
   const icons = (
