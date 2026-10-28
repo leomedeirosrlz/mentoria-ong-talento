@@ -170,7 +170,7 @@ export function DuplaWaAcao({
               O mesmo texto pros dois canais — escolhe onde sai.
             </DialogDescription>
           </DialogHeader>
-          <p className="whitespace-pre-wrap rounded-lg bg-muted px-3 py-2.5 text-sm leading-relaxed">
+          <p className="whitespace-pre-wrap break-words rounded-lg bg-muted px-3 py-2.5 text-sm leading-relaxed">
             {mensagem}
           </p>
           <DialogFooter>

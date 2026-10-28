@@ -753,7 +753,7 @@ export function DialogoSenha({ email }: { email: string }) {
             <DialogFooter showCloseButton />
           </>
         ) : (
-          <form onSubmit={salvar} className="space-y-4">
+          <form onSubmit={salvar} className="min-w-0 space-y-4">
             {temSenha ? (
               <div className="space-y-2">
                 <Label htmlFor="senha-atual">Senha atual</Label>
