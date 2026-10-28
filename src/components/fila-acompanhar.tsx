@@ -61,7 +61,7 @@ type FiltroFila = "todas" | "urgentes" | "sem_data" | "registro_pendente";
 const FILTROS: { id: FiltroFila; rotulo: string }[] = [
   { id: "todas", rotulo: "Todas" },
   { id: "urgentes", rotulo: "Urgentes" },
-  { id: "sem_data", rotulo: "Sem data" },
+  { id: "sem_data", rotulo: "Sem agendamento" },
   { id: "registro_pendente", rotulo: "Registro pendente" },
 ];
 

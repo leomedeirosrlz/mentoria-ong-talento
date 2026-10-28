@@ -367,3 +367,19 @@ Pedido do Thiago (perdido numa sessão anterior, resgatado em 24/out):
 - [ ] **Centralizar o logo na tela de login** — lockup de marca
   centralizado; revisar junto o débito já documentado do h1 `text-lg`
   fora da escala (tela de marca é exceção aceita, mas o alinhamento não).
+
+## Rebranding & ajustes de UX (out/2026)
+
+- [ ] **Rebranding da marca** — hoje o app se chama "realiza.vc" em todo
+  lugar (e-mails transacionais, magic link, assunto de notificações,
+  título da aba, favicon). Tornar explícito que é a plataforma de
+  mentoria: "Realiza.vc — Plataforma de Mentoria" (ou similar) na copy
+  de e-mails, notificações e superfícies de marca. Manter "realiza.vc"
+  como domínio mas reforçar a identidade de mentoria.
+- [ ] **Mentores especialistas fora de "aguardando par"** — o status
+  "aguardando par" é do fluxo DPP (mentor-mentorado). Mentores
+  especialistas não fazem parte desse fluxo e não devem aparecer em
+  "aguardando par". Filtrar por trilha/papel nas queries e na UI.
+- [ ] **Filtros da aba Pessoas reorganizados** — os pills de filtro devem
+  ficar abaixo, logo antes da lista de pessoas. Transformar "aguardando
+  par" em um dropdown e movê-lo para cima dos filtros/pesquisa.

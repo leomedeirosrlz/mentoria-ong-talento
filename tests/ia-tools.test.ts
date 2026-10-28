@@ -27,6 +27,9 @@ const UUID = "11111111-2222-4333-8444-555555555555";
 type Opts = {
   papel?: string | null;
   tabelas?: Record<string, unknown[]>;
+  // count exato por tabela — o índice de duplas pede { count: "exact" } pra
+  // sinalizar truncamento; null = sem cabeçalho (o que a query tolera)
+  contagens?: Record<string, number>;
   rpcData?: Record<string, unknown>;
   rpcErro?: Record<string, { message: string }>;
 };
@@ -34,6 +37,7 @@ type Opts = {
 function supaFake({
   papel = "coordenacao",
   tabelas = {},
+  contagens = {},
   rpcData = {},
   rpcErro = {},
 }: Opts = {}) {
@@ -59,7 +63,12 @@ function supaFake({
       then: (
         res: (v: unknown) => unknown,
         rej?: (e: unknown) => unknown
-      ) => Promise.resolve({ data: rows(), error: null }).then(res, rej),
+      ) =>
+        Promise.resolve({
+          data: rows(),
+          error: null,
+          count: contagens[tabela] ?? null,
+        }).then(res, rej),
     };
     return b;
   };
@@ -530,9 +539,11 @@ describe("executarTool — tools", () => {
     const r = await executarTool("duplas_do_usuario", {}, supabase, "chat");
     const dados = dadosDe(r) as {
       total: number;
+      truncado: boolean;
       duplas: Record<string, unknown>[];
     };
     expect(dados.total).toBe(1);
+    expect(dados.truncado).toBe(false);
     expect(dados.duplas[0]).toMatchObject({
       dupla_id: "d-1",
       mentor: "Ana",
@@ -541,6 +552,35 @@ describe("executarTool — tools", () => {
     });
     expect(dados.duplas[0]).not.toHaveProperty("whatsapp");
     expect(dados.duplas[0]).not.toHaveProperty("demanda_interna");
+  });
+
+  it("duplas_do_usuario sinaliza lista parcial quando o escopo passa do limite", async () => {
+    // o índice corta em 60 — o count exato da query denuncia o corte e o
+    // modelo recebe truncado:true em vez de responder com dados parciais
+    const { supabase } = supaFake({
+      tabelas: {
+        duplas: [
+          {
+            id: "d-1",
+            trilha: "dpp",
+            status: "ativa",
+            turma: "T1",
+            mentor: { nome: "Ana" },
+            mentorado: { nome: "Luisa" },
+          },
+        ],
+      },
+      contagens: { duplas: 73 },
+    });
+    const r = await executarTool("duplas_do_usuario", {}, supabase, "chat");
+    const dados = dadosDe(r) as {
+      total: number;
+      truncado: boolean;
+      duplas: Record<string, unknown>[];
+    };
+    expect(dados.total).toBe(73);
+    expect(dados.truncado).toBe(true);
+    expect(dados.duplas).toHaveLength(1);
   });
 
   it("agenda_do_periodo devolve encontros da janela com a dupla", async () => {

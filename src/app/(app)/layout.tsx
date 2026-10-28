@@ -150,6 +150,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             papeis={papeisIa}
             demo={demo != null}
             configurado={providerConfigurado()}
+            nome={me.nome}
           />
         ) : undefined
       }

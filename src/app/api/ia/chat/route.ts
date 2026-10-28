@@ -35,13 +35,21 @@ import { getMe } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
-// loop de tools (≤6 rodadas × timeout do provider) + streaming pode passar
-// do default da plataforma — mesmo patamar dos jobs (vercel lê o export)
+// loop de tools (≤6 rodadas) + streaming pode passar do default da
+// plataforma — mesmo patamar dos jobs (vercel lê o export). O stream se
+// limita a ORCAMENTO_STREAM_MS pra sobrar tempo de emitir o evento de
+// erro antes de a função morrer aos 60s
 export const maxDuration = 60;
 
 // teto de iterações do loop de tools — o modelo que chama tools pra sempre
 // para aqui e responde com o que já tem (acceptance: 7 calls → para em 6)
 const MAX_ITERACOES = 4;
+
+// orçamento total do stream (REALIZA-304): a plataforma encerra a função
+// aos 60s sem avisar — se o teto por rodada fosse o único limite, uma
+// rodada lenta morria no meio e nenhum evento de erro chegava ao cliente.
+// 50s a partir da abertura do stream deixa ~10s pros gates pré-stream
+const ORCAMENTO_STREAM_MS = 50_000;
 
 const MSG_FALHA =
   "Não consegui concluir essa consulta agora — tente perguntar de outra forma.";
@@ -117,6 +125,9 @@ export async function POST(req: Request) {
   // sessão estável por usuário — o provider Go exige pra rotear/cachear;
   // profile_id é pseudônimo e não revela nada além do que a sessão já diz
   const sessao = me.id;
+  // teto por rodada — o orçamento do stream (ORCAMENTO_STREAM_MS) capa
+  // esse valor a cada iteração, então na prática o que manda é o que
+  // ainda falta pro prazo
   const timeoutRound = Number(process.env.IA_TIMEOUT_MS ?? 20_000) * 4;
 
   const stream = new ReadableStream({
@@ -142,11 +153,16 @@ export async function POST(req: Request) {
       const toolsUsadas: string[] = [];
       let concluido = false;
       let guiaChamado = false;
+      const prazo = Date.now() + ORCAMENTO_STREAM_MS;
 
       for (let i = 0; i < MAX_ITERACOES && !req.signal.aborted && !fechado; i++) {
+        // sem orçamento, sai do loop — o erro padrão depois do for avisa
+        // o cliente em vez de a plataforma cortar a função no silêncio
+        const restante = prazo - Date.now();
+        if (restante <= 0) break;
         const signal = AbortSignal.any([
           req.signal,
-          AbortSignal.timeout(timeoutRound),
+          AbortSignal.timeout(Math.min(timeoutRound, restante)),
         ]);
         let emitido = 0; // tokens da rodada que já saíram pro cliente
         const r = await chamarModeloStream(historico, sessao, {
@@ -169,7 +185,10 @@ export async function POST(req: Request) {
           break; // usuário fechou/stop — sai do loop sem erro
         } else if (r.fallback) {
           // provider recusou SSE ou o stream morreu no meio: a rodada
-          // refaz em JSON; só o trecho ainda não enviado sai como token
+          // refaz em JSON; só o trecho ainda não enviado sai como token.
+          // o abort do prazo também cai aqui — sem orçamento não refaz,
+          // a chamada JSON tem relógio próprio e passaria dos 60s
+          if (Date.now() >= prazo) break;
           const alt = await chamarModelo(historico, sessao);
           if (!alt.ok) {
             send({ type: "error", e: alt.erro });

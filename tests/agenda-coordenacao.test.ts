@@ -682,7 +682,7 @@ describe("dimensoesDoItem + sinteseMonitoramento", () => {
       rotulo: "Apoio pedido",
       detalhe: "pedido do mentor",
     });
-    expect(d.cronograma).toEqual({ tom: "muted", rotulo: "sem data" });
+    expect(d.cronograma).toEqual({ tom: "muted", rotulo: "sem agendamento" });
     expect(d.operacional).toBeNull();
   });
 
@@ -737,7 +737,7 @@ describe("dimensoesDoItem + sinteseMonitoramento", () => {
     const [sd] = paraAcompanhar([dSoSemData], EVENTOS, {}, AGORA_SEG);
     expect(dimensoesDoItem(sd).cronograma).toEqual({
       tom: "muted",
-      rotulo: "sem data",
+      rotulo: "sem agendamento",
     });
   });
 

@@ -124,7 +124,7 @@ export function agruparRegistros<T extends RegistroAgrupavel>(
       const seg = semanaDe(r.created_at);
       chave = seg;
       rotulo =
-        seg === SEM_DATA ? "Sem data" : `Semana de ${formatDiaMes(seg)}`;
+        seg === SEM_DATA ? "Sem agendamento" : `Semana de ${formatDiaMes(seg)}`;
     }
     let b = blocos.get(chave);
     if (!b) {

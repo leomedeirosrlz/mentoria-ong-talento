@@ -332,16 +332,19 @@ export const IA_TOOLS = {
   duplas_do_usuario: {
     nome: "duplas_do_usuario",
     descricao:
-      "Índice das duplas que o usuário enxerga: o mentor vê as dele, o supervisor as supervisionadas, a coordenação todas. Devolve o dupla_id + nomes, trilha, status e turma de cada uma — chame antes de ficha_dupla/registros_da_dupla quando a pergunta vier sem id ('minha dupla', 'com quem eu trabalho').",
+      "Índice das duplas que o usuário enxerga: o mentor vê as dele, o supervisor as supervisionadas, a coordenação todas. Devolve o dupla_id + nomes, trilha, status e turma de cada uma — chame antes de ficha_dupla/registros_da_dupla quando a pergunta vier sem id ('minha dupla', 'com quem eu trabalho'). `total` é o universo no escopo; quando `truncado` vier true a lista é parcial (máx 60) — avise que há mais duplas além das listadas.",
     schema: semArgs,
     // mentorado fica fora: ele não tem grant na tabela duplas (a ficha dele
     // vem da view jovem_duplas em ficha_dupla) — e o índice não serve pra
     // quem só enxerga uma dupla
     roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
     run: async (_args: z.infer<typeof semArgs>, ctx) => {
-      const duplas = await getDuplasResumoIa(ctx.supabase);
+      const { duplas, total } = await getDuplasResumoIa(ctx.supabase);
       return {
-        total: duplas.length,
+        total,
+        // o índice corta em 60 — truncado:true diz ao modelo que a lista é
+        // parcial e que "quantas duplas" é o total, não duplas.length
+        truncado: total > duplas.length,
         duplas: duplas.map((d) => ({
           dupla_id: d.id,
           mentor: d.mentor?.nome ?? null,

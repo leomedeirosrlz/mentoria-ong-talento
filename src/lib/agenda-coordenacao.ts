@@ -552,7 +552,7 @@ export function dimensoesDoItem(item: ItemParaAcompanhar): DimensoesItem {
       : motivos.includes("limbo")
         ? { tom: "warn", rotulo: "agendamento vencido" }
         : motivos.includes("sem_data")
-          ? { tom: "muted", rotulo: "sem data" }
+          ? { tom: "muted", rotulo: "sem agendamento" }
           : temSinal("estagnacao")
             ? { tom: "warn", rotulo: "estagnada" }
             : null;

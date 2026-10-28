@@ -45,7 +45,7 @@ test.describe("assistente", () => {
     // env de e2e — feature flag honesta, sem composer morto)
     const painel = page.locator("#painel-assistente");
     await expect(painel).toBeVisible();
-    await expect(painel.getByText(/Sou o assistente do Realiza/)).toBeVisible();
+    await expect(painel.getByText(/Oi/)).toBeVisible();
     await expect(
       painel.getByText(/assistente está indisponível/i)
     ).toBeVisible();

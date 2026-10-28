@@ -369,7 +369,7 @@ function CardMentorado({
                   ? "pausada"
                   : dupla.status === "concluida"
                     ? "concluída"
-                    : "encerrada"}
+                    : "desistente"}
               </Badge>
             )}
             {mentoradoFora && (
@@ -1115,7 +1115,7 @@ function TrilhasAnteriores({ trilhas }: { trilhas: TrilhaJovem[] }) {
                 {t.iniciada_em && ` · iniciada ${formatDate(t.iniciada_em)}`}
                 {t.encerrada_em &&
                   ` · ${
-                    t.status === "concluida" ? "concluída" : "encerrada"
+                    t.status === "concluida" ? "concluída" : "desistente"
                   } ${formatDate(t.encerrada_em)}`}
                 {t.motivo_encerramento && ` · ${t.motivo_encerramento}`}
               </p>
