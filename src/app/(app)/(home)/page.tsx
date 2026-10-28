@@ -61,13 +61,13 @@ export default async function HomePage({
   const agora = new Date().toISOString();
 
   if (me?.role === "coordenacao") {
-    const [duplas, pessoas, solicitacoes, encerramentos] = await Promise.all([
+    const [duplas, pessoas, solicitacoes, encerramentos, interacoes] = await Promise.all([
       getDuplas(),
       getContagemPessoas(),
       getSolicitacoesVisiveis(),
       getEncerramentosPendentes(),
+      getDuplas().then((d) => getUltimasInteracoes(d.map((x) => x.id), "nudge")),
     ]);
-    const interacoes = await getUltimasInteracoes(duplas.map((d) => d.id), "nudge");
     // contexto de turma (REALIZA-73): ?turma= vence o cookie, que vence o
     // "todas". O painel recebe já recortado — SaudePrograma, "Precisa de
     // você hoje" e os resumos da semana falam só da turma em foco.
@@ -159,23 +159,28 @@ export default async function HomePage({
     // idem coord: sup+esp também recebe o ping do mural — a home dele tem
     // que deixar agir. Os fetches sobem no mesmo batch: só dependem de `me`
     const ehEspSup = temPapel(me, "mentor_especialista");
-    const [duplas, supervisoes, supervisaoAlvos, solicitacoesEsp, slotsSup, interacoes] =
+    const solicitacoesEspPromise = ehEspSup
+      ? getSolicitacoesVisiveis()
+      : Promise.resolve([]);
+    const [duplas, supervisoes, supervisaoAlvos, solicitacoesEsp, slotsSup, interacoes, propostasSup] =
       await Promise.all([
         getMinhasDuplas(),
         getSupervisoesRecentes(),
         getSupervisaoAlvos(),
-        ehEspSup ? getSolicitacoesVisiveis() : Promise.resolve([]),
+        solicitacoesEspPromise,
         ehEspSup ? getSlotsLivres(me.id) : Promise.resolve([]),
         getMinhasDuplas().then((d) =>
           getUltimasInteracoes(d.map((x) => x.id), "nudge")
         ),
+        solicitacoesEspPromise.then((sols) => {
+          const emNeg = sols.filter((s) =>
+            ["aberta", "contra_proposta"].includes(s.status_efetivo ?? s.status)
+          );
+          return emNeg.length
+            ? getPropostasMap(emNeg.map((s) => s.id))
+            : {};
+        }),
       ]);
-    const emNegSup = solicitacoesEsp.filter((s) =>
-      ["aberta", "contra_proposta"].includes(s.status_efetivo ?? s.status)
-    );
-    const propostasSup = emNegSup.length
-      ? await getPropostasMap(emNegSup.map((s) => s.id))
-      : {};
     // contexto de turma do auxiliar: o seletor lista só as turmas que o
     // escopo dele já enxerga (as turmas das duplas que a RLS entregou) —
     // o seletor nunca nomeia turma alheia (sdr.md). Mono-turma → nada

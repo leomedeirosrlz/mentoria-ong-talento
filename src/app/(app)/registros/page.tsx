@@ -188,12 +188,30 @@ export default async function RegistrosPage({
   // ?r= de um registro fora da página carregada: sobe as páginas (cumulativas)
   // até achá-lo, para o link de um registro antigo abrir o registro certo
   let itens = itensIniciais;
-  for (
-    let p = filtros.pagina + 1;
-    rId && p <= 50 && itens.length < total && !itens.some((x) => x.id === rId);
-    p++
+  if (
+    rId &&
+    itens.length < total &&
+    !itens.some((x) => x.id === rId)
   ) {
-    itens = (await getRegistros({ ...filtros, pagina: p })).itens;
+    const maxPage = Math.min(50, Math.ceil(total / REGISTROS_PAGINA));
+    const startPage = filtros.pagina + 1;
+    if (startPage <= maxPage) {
+      const pages = Array.from(
+        { length: maxPage - startPage + 1 },
+        (_, i) => startPage + i
+      );
+      const results = await Promise.all(
+        pages.map((p) => getRegistros({ ...filtros, pagina: p }))
+      );
+      let chosen = results[results.length - 1];
+      for (const res of results) {
+        if (res.itens.some((x) => x.id === rId)) {
+          chosen = res;
+          break;
+        }
+      }
+      itens = chosen.itens;
+    }
   }
 
   // trilha especialista (0074): encontro.numero é a TENTATIVA — o passo do

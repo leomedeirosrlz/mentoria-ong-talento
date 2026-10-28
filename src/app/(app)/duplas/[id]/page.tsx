@@ -279,10 +279,7 @@ export default async function DuplaPage({
   // aponta a sucessora. As queries voltam null quando a outra ponta está
   // fora do escopo do papel (RLS — quem saiu não enxerga a ficha nova) e a
   // linha discreta simplesmente não renderiza
-  const [origem, sucessora] = await Promise.all([
-    dupla.remanejada_de ? getDuplaVinculo(dupla.remanejada_de) : null,
-    dupla.status === "encerrada" ? getDuplaSucessora(dupla.id) : null,
-  ]);
+  const ehEsp = dupla.trilha === "especialista";
   const nomeVinculo = (v: DuplaVinculo) =>
     `${v.mentor?.nome ?? "—"} e ${v.mentorado?.nome ?? "—"}`;
   // quem supervisiona registra a sessão daqui mesmo — alvo único, sem
@@ -292,30 +289,37 @@ export default async function DuplaPage({
   const podeRegistrarSupervisao = alvosSupervisao.some(
     (a) => a.dupla_id === dupla.id
   );
-  const ehEsp = dupla.trilha === "especialista";
-  // forms ativos pra "Enviar formulário" da ficha e pro link de avaliação
-  // 360º do encerramento — escopo coord (a query já devolve [] pros demais)
-  const formulariosAtivos = souCoord
-    ? (await getFormularios()).filter((f) => f.ativo)
-    : [];
-  // data da resposta 360º oficial (0042) — escopo coord: a proveniência do
-  // check é detalhe operacional, e a policy de respostas já é coord-only
-  const avaliacao360Em = souCoord ? await getAvaliacao360DaDupla(id) : null;
-  // resposta individual do "Depois da mentoria" (0124) — escopo coord
-  // idem: a policy de links/respostas já barra os demais papéis
-  const desfechoEntregas = souCoord ? await getDesfechoDaDupla(id) : [];
-  // passos do guia da trilha — ciclo_eventos (DPP, com datas) ou os 5 passos
-  // do especialista (sem data: a dupla combina dentro dos 3 meses)
-  const espEventos = ehEsp ? await getEspecialistaEventos() : [];
-  // avaliação geral pós-fechamento (0104): a RPC entrega o token só pro
-  // especialista da trilha e o estado pra coord — a ficha é o caminho de
-  // volta quando a notificação se perde
-  const avaliacaoEsp =
-    ehEsp && dupla.encerrada_em ? await getAvaliacaoEspDaDupla(id) : null;
-  // fluxo entre mentores do guia: a demanda de especialista nasce na dupla
-  // DPP. O chip conta o estado a quem olha a ficha; o botão some enquanto uma
-  // solicitação está aberta (re-pedir é pra quando a anterior se resolveu)
-  const solicitacoes = !ehEsp ? await getSolicitacoesDaDupla(id) : [];
+  const [
+    origem,
+    sucessora,
+    formulariosAtivos,
+    avaliacao360Em,
+    desfechoEntregas,
+    espEventos,
+    avaliacaoEsp,
+    solicitacoes,
+    avaliacaoLinks,
+    mediaJovem,
+    espAvaliacoes,
+    devolutivasFeed,
+    pdmResumo,
+  ] = await Promise.all([
+    dupla.remanejada_de ? getDuplaVinculo(dupla.remanejada_de) : null,
+    dupla.status === "encerrada" ? getDuplaSucessora(dupla.id) : null,
+    souCoord
+      ? getFormularios().then((fs) => fs.filter((f) => f.ativo))
+      : [],
+    souCoord ? getAvaliacao360DaDupla(id) : null,
+    souCoord ? getDesfechoDaDupla(id) : [],
+    ehEsp ? getEspecialistaEventos() : [],
+    ehEsp && dupla.encerrada_em ? getAvaliacaoEspDaDupla(id) : null,
+    !ehEsp ? getSolicitacoesDaDupla(id) : [],
+    souCoord ? getAvaliacaoLinks(id) : [],
+    souMentor && !ehEsp ? getAvaliacaoMediaDpp(id) : null,
+    souMentor && ehEsp ? getEspecialistaAvaliacoes(id) : [],
+    ehEsp && (souMentor || souCoord) ? getDevolutivasDupla(id) : [],
+    !ehEsp ? getPdmResumo(id) : null,
+  ]);
   const solicitacao = solicitacoes[0] ?? null;
   // o pedido que ocupa a vaga agora (0074 — "em aberto" inclui triagem e
   // negociação; o status_efetivo já desconta o slot vencido, então um
@@ -340,20 +344,6 @@ export default async function DuplaPage({
     solEmAberto ? getPropostas(solEmAberto.id) : Promise.resolve([]),
     espDaMesa ? getSlotsLivres(espDaMesa) : Promise.resolve([]),
   ]);
-  // avaliação estrela do jovem (0071): links tokenizados são coord-only
-  // (policy), a média agregada só faz sentido pro mentor DPP e as estrelas
-  // da trilha especialista vêm da view definer — cada leitura no seu papel
-  const [avaliacaoLinks, mediaJovem, espAvaliacoes, devolutivasFeed] =
-    await Promise.all([
-      souCoord ? getAvaliacaoLinks(id) : Promise.resolve([]),
-      souMentor && !ehEsp ? getAvaliacaoMediaDpp(id) : Promise.resolve(null),
-      souMentor && ehEsp ? getEspecialistaAvaliacoes(id) : Promise.resolve([]),
-      // WP6: feed datado da trilha esp — a policy lê pro autor (o
-      // especialista) e pra coord; supervisor/mentor DPP não veem a coluna
-      ehEsp && (souMentor || souCoord)
-        ? getDevolutivasDupla(id)
-        : Promise.resolve([]),
-    ]);
   const linkAvalPorEncontro = new Map(
     avaliacaoLinks.map((l) => [l.encontro_id, l])
   );
@@ -513,8 +503,6 @@ export default async function DuplaPage({
     !dupla.encerrada_em;
   // resumo da jornada — gerado dos dados; o "fim" é o carimbo do fechamento
   // (decisão DPP ou encerrada_em da trilha especialista)
-  // recorte do PDM pro resumo — mesma RPC já cacheada, deriva sem +1 RTT
-  const pdmResumo = !ehEsp ? await getPdmResumo(id) : null;
   const resumoJornada = dadosResumoJornada(
     dupla,
     passos,
