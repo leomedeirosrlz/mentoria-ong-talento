@@ -67,7 +67,7 @@ export function AudienciasPicker({
           </button>
         ))}
       </div>
-      <input type="hidden" name={name} id={id} value={sel.join(",")} readOnly />
+      <input type="hidden" name={name} id={id} value={sel.join(",")} hidden readOnly />
       <p className="text-xs text-muted-foreground">
         Pode combinar papéis. “Todos” inclui o mentorando.
       </p>
