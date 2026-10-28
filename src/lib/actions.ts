@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, revalidateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AVATAR_MAX_BYTES, avisoImagemGrande } from "@/lib/avatar";
@@ -2442,6 +2442,7 @@ export async function deleteMaterial(id: string) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
   revalidatePath("/materiais");
+  revalidateTag("materiais", "max");
   return { ok: true };
 }
 
@@ -3831,6 +3832,7 @@ export async function marcarAconteceuJovem(encontroId: string) {
   revalidatePath("/agenda");
   revalidatePath("/duplas");
   revalidatePath("/materiais");
+  revalidateTag("materiais", "max");
   if (enc?.dupla_id) revalidatePath(`/duplas/${enc.dupla_id}`);
   return { ok: true };
 }
@@ -3992,6 +3994,7 @@ export async function salvarMaterial(formData: FormData) {
         : undefined,
   });
   revalidatePath("/materiais");
+  revalidateTag("materiais", "max");
   // id volta pro client poder desfazer a row se o upload do arquivo falhar
   return { ok: true, id: novo.id as string, emailFalhas: email.falhas };
 }
@@ -4052,6 +4055,7 @@ export async function editarMaterial(id: string, formData: FormData) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
   revalidatePath("/materiais");
+  revalidateTag("materiais", "max");
   return { ok: true };
 }
 
@@ -4071,6 +4075,7 @@ export async function anexarArquivoMaterial(id: string, path: string) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
   revalidatePath("/materiais");
+  revalidateTag("materiais", "max");
   return { ok: true };
 }
 
@@ -4087,6 +4092,7 @@ export async function removerArquivoMaterial(id: string) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
   revalidatePath("/materiais");
+  revalidateTag("materiais", "max");
   return { ok: true };
 }
 
