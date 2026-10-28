@@ -12,6 +12,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowClockwise,
+  ArrowRight,
   Check,
   Copy,
   PaperPlaneRight,
@@ -19,7 +20,8 @@ import {
   Square,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
-import { montarEnvioChat } from "@/lib/ia/mensagens";
+import { extrairAcoes, montarEnvioChat, msgAmigavel } from "@/lib/ia/mensagens";
+import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -32,6 +34,7 @@ type Msg = {
   estado?: "stream" | "erro";
   tools?: string[];
   em?: number;
+  acoes?: { rotulo: string; href: string }[];
 };
 
 const primeiroNome = (nome?: string) => nome?.trim().split(/\s+/)[0];
@@ -146,7 +149,10 @@ function MdLite({ texto }: { texto: string }) {
   const blocos: React.ReactNode[] = [];
   let lista: string[] | null = null;
   let listaOrd = false;
-  const flush = (key: number) => {
+  let emCodigo = false;
+  let codigo: string[] = [];
+  let key = 0;
+  const flush = () => {
     if (!lista?.length) return;
     const items = lista.map((l, i) => (
       <li key={i}>
@@ -155,38 +161,90 @@ function MdLite({ texto }: { texto: string }) {
     ));
     blocos.push(
       listaOrd ? (
-        <ol key={key} className="list-decimal space-y-1 pl-5">
+        <ol key={key++} className="list-decimal space-y-1 pl-5">
           {items}
         </ol>
       ) : (
-        <ul key={key} className="list-disc space-y-1 pl-5 marker:text-muted-foreground">
+        <ul key={key++} className="list-disc space-y-1 pl-5 marker:text-muted-foreground">
           {items}
         </ul>
       )
     );
     lista = null;
   };
-  linhas.forEach((linha, i) => {
+  linhas.forEach((linha) => {
+    // fenced code: tudo entre ``` vira bloco monoespaçado, sem inline
+    if (emCodigo) {
+      if (/^\s*```/.test(linha)) {
+        blocos.push(
+          <pre
+            key={key++}
+            className="overflow-x-auto rounded-lg bg-muted px-3 py-2 text-[0.85em] font-mono"
+          >
+            <code>{codigo.join("\n")}</code>
+          </pre>
+        );
+        emCodigo = false;
+        codigo = [];
+      } else codigo.push(linha);
+      return;
+    }
+    if (/^\s*```/.test(linha)) {
+      flush();
+      emCodigo = true;
+      return;
+    }
     const bullet = /^\s*[-*•]\s+(.+)$/.exec(linha);
     const num = /^\s*\d+[.)]\s+(.+)$/.exec(linha);
     if (bullet || num) {
       if (!lista || listaOrd !== Boolean(num)) {
-        flush(i * 2);
+        flush();
         lista = [];
         listaOrd = Boolean(num);
       }
       lista.push((bullet ?? num)![1]);
       return;
     }
-    flush(i * 2);
+    flush();
     if (!linha.trim()) return;
+    const h = /^#{1,3}\s+(.+)$/.exec(linha);
+    if (h) {
+      blocos.push(
+        <p key={key++} className="font-semibold">
+          <Inline texto={h[1]} />
+        </p>
+      );
+      return;
+    }
+    const quote = /^>\s?(.*)$/.exec(linha);
+    if (quote) {
+      blocos.push(
+        <blockquote
+          key={key++}
+          className="border-l-2 border-border pl-3 text-muted-foreground"
+        >
+          <Inline texto={quote[1]} />
+        </blockquote>
+      );
+      return;
+    }
     blocos.push(
-      <p key={i * 2 + 1}>
+      <p key={key++}>
         <Inline texto={linha} />
       </p>
     );
   });
-  flush(linhas.length * 2);
+  flush();
+  // fence aberto no fim do stream: mostra o que chegou
+  if (emCodigo && codigo.length)
+    blocos.push(
+      <pre
+        key={key++}
+        className="overflow-x-auto rounded-lg bg-muted px-3 py-2 text-[0.85em] font-mono"
+      >
+        <code>{codigo.join("\n")}</code>
+      </pre>
+    );
   return <div className="space-y-2">{blocos}</div>;
 }
 
@@ -281,6 +339,7 @@ export function AssistenteConversa({
             content ||
             (estado === "interrompido" ? "Resposta interrompida." : FALHA),
           tools: extra?.tools?.length ? extra.tools : undefined,
+          acoes: estado === "ok" ? extrairAcoes(content) : undefined,
           em: agora(),
         },
       ];
@@ -296,13 +355,15 @@ export function AssistenteConversa({
   }
 
   /** POST + leitura do SSE até done/erro/fechamento — único caminho de
-   *  resposta real (envio normal e retry compartilham). */
-  async function rodar(base: Msg[]) {
+   *  resposta real (envio normal e retry compartilham). Falha de rede ou
+   *  provider fora tenta uma vez de novo sozinho (REALIZA-284). */
+  async function rodar(base: Msg[], tentativas = 0) {
     const ctrl = new AbortController();
     abortRef.current = ctrl;
     // body strict na rota: campos de UI (estado, tools) ou >20 mensagens
     // derrubam o parse com "Pedido inválido" — montarEnvioChat saneia
     const envio = montarEnvioChat(base);
+    let statusHttp = 0;
     try {
       const res = await fetch("/api/ia/chat", {
         method: "POST",
@@ -310,6 +371,7 @@ export function AssistenteConversa({
         body: JSON.stringify({ messages: envio }),
         signal: ctrl.signal,
       });
+      statusHttp = res.status;
       const tipo = res.headers.get("content-type") ?? "";
       // gates pré-stream respondem JSON (401/429/503) ou redirect (307→
       // página de login em HTML) — qualquer um deles vira erro legível
@@ -317,6 +379,9 @@ export function AssistenteConversa({
         const data = (await res.json().catch(() => null)) as {
           error?: string;
         } | null;
+        // redirect silencioso pro login = sessão caída, não falha do provider
+        if (res.redirected && res.ok)
+          throw new Error("Sua sessão expirou — entre de novo pelo login.");
         throw new Error(data?.error ?? FALHA);
       }
 
@@ -358,9 +423,18 @@ export function AssistenteConversa({
         finalizar("interrompido");
         return;
       }
-      const msg = e instanceof Error && e.message ? e.message : FALHA;
-      finalizar("erro", { erro: msg });
-      toast.error(msg);
+      // rede ou provider fora: uma retentativa automática (a bolha de
+      // espera mostra "Reconectando…") — validação/auth não repetem
+      if (tentativas === 0 && (e instanceof TypeError || statusHttp === 503)) {
+        setStatus("Reconectando…");
+        await new Promise((r) => setTimeout(r, 1200));
+        if (ctrl.signal.aborted) {
+          finalizar("interrompido");
+          return;
+        }
+        return rodar(base, tentativas + 1);
+      }
+      finalizar("erro", { erro: msgAmigavel(e, statusHttp, FALHA) });
     }
   }
 
@@ -522,6 +596,21 @@ export function AssistenteConversa({
                     m.content
                   )}
                 </div>
+                {/* ações extraídas dos links internos da resposta */}
+                {m.acoes?.length ? (
+                  <div className="mt-1.5 flex flex-wrap gap-1.5">
+                    {m.acoes.map((a) => (
+                      <Link
+                        key={a.href}
+                        href={a.href}
+                        className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-[var(--shadow-border)] transition-colors hover:border-foreground/25 hover:text-foreground"
+                      >
+                        {a.rotulo}
+                        <ArrowRight size={11} aria-hidden />
+                      </Link>
+                    ))}
+                  </div>
+                ) : null}
                 {/* meta: hora + copy/retry + fontes — discreto, sempre no
                     ar (touch não tem hover) */}
                 {(m.em || (m.role === "assistant" && (m.content || m.estado === "erro"))) && (
