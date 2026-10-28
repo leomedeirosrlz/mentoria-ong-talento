@@ -2475,6 +2475,11 @@ function build(): DemoData {
     demanda: null,
     solicitacao_id: null,
     mentor: luiza,
+    desfecho: "concluida",
+    desfecho_motivo: null,
+    desfecho_obs: null,
+    desfecho_em: ymd(FIM_CICLO_ANTERIOR),
+    desfecho_por: null,
     mentorado: isabela,
     supervisor: paulo,
     encontros: encD5,
@@ -2521,6 +2526,11 @@ function build(): DemoData {
     demanda: null,
     solicitacao_id: null,
     mentor: ricardo,
+    desfecho: "concluida",
+    desfecho_motivo: null,
+    desfecho_obs: null,
+    desfecho_em: ymd(FIM_DUPLA_RITO),
+    desfecho_por: null,
     mentorado: gustavo,
     supervisor: beatriz, // o Paulo supervisiona a d-fim; a Beatriz cobre esta
     encontros: encRito,
@@ -2737,6 +2747,12 @@ function build(): DemoData {
     encerrada_em: ymd(addDias(HOJE, -5)),
     motivo_encerramento:
       "Trilha concluída — os 5 encontros aconteceram e a meta da solicitação foi batida.",
+    desfecho: "concluida",
+    desfecho_motivo: null,
+    desfecho_obs:
+      "Trilha concluída — os 5 encontros aconteceram e a meta da solicitação foi batida.",
+    desfecho_em: ymd(addDias(HOJE, -5)),
+    desfecho_por: null,
     devolutiva_pdm:
       "A Bia apresentou o projeto dela pra uma plateia de 20 pessoas na última sessão — saiu do texto decorado e respondeu as três perguntas finais de improviso, sem notas. Pro PDM: vale colocar ela pra apresentar os próprios resultados nos encontros da dupla — exposição curta e frequente consolidou mais do que treino longo.",
   };

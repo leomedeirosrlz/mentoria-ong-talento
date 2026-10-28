@@ -1282,6 +1282,11 @@ export type Database = {
           created_at: string
           cronograma_id: string | null
           demanda: string | null
+          desfecho: string | null
+          desfecho_em: string | null
+          desfecho_motivo: string | null
+          desfecho_obs: string | null
+          desfecho_por: string | null
           devolutiva_pdm: string | null
           encerrada_em: string | null
           id: string
@@ -1301,6 +1306,11 @@ export type Database = {
           created_at?: string
           cronograma_id?: string | null
           demanda?: string | null
+          desfecho?: string | null
+          desfecho_em?: string | null
+          desfecho_motivo?: string | null
+          desfecho_obs?: string | null
+          desfecho_por?: string | null
           devolutiva_pdm?: string | null
           encerrada_em?: string | null
           id?: string
@@ -1320,6 +1330,11 @@ export type Database = {
           created_at?: string
           cronograma_id?: string | null
           demanda?: string | null
+          desfecho?: string | null
+          desfecho_em?: string | null
+          desfecho_motivo?: string | null
+          desfecho_obs?: string | null
+          desfecho_por?: string | null
           devolutiva_pdm?: string | null
           encerrada_em?: string | null
           id?: string

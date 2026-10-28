@@ -101,5 +101,23 @@ update public.materiais set audiencias = case audiencia
   else array['todos'] end
 where audiencia <> 'todos' and audiencias = array['todos'];
 
+-- 0140: desfecho auditável — colunas desfecho/desfecho_motivo/desfecho_obs/
+-- desfecho_em/desfecho_por já existem (migration). Backfill coerente com o
+-- status legado, pra que o histórico antigo não suma. Duplas ainda em curso
+-- (ativa/pausada) ficam com desfecho null. `dupla_eventos` é criada pela
+-- migration e permanece vazia no seed (append-only em runtime).
+update public.duplas
+   set desfecho = 'concluida',
+       desfecho_em = coalesce(concluida_em, encerrada_em, now()),
+       desfecho_obs = motivo_encerramento
+ where status = 'concluida' and desfecho is null;
+
+update public.duplas
+   set desfecho = 'outro',
+       desfecho_motivo = coalesce(motivo_encerramento, 'legado'),
+       desfecho_em = coalesce(encerrada_em, now()),
+       desfecho_obs = motivo_encerramento
+ where status = 'encerrada' and desfecho is null;
+
 -- sem dados de pessoas/duplas: cadastro real acontece pela plataforma
 -- (pessoas -> magic link; duplas pela coordenação)

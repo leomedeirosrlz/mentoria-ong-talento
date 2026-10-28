@@ -29,6 +29,7 @@ import {
 } from "@/lib/ciclo";
 import { prazoTrilhaEspecialista } from "@/lib/encerramento";
 import { saudeDoRecorte, type RecorteFatia } from "@/lib/agenda-coordenacao";
+import { ehConcluida, ehDesistente } from "@/lib/dupla-desfecho";
 import { gravarTurmaFocoClient } from "@/lib/turma-contexto";
 import { turmaDaDupla, turmaLonga } from "@/lib/turma";
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
@@ -445,11 +446,13 @@ const CATS: { id: FiltroCat; nome: string; dot: string | null }[] = [
   { id: "andamento", nome: "Em andamento", dot: null },
   { id: "pausada", nome: "Pausadas", dot: null },
   { id: "concluida", nome: "Concluídas", dot: null },
+  { id: "desistente", nome: "Desistentes", dot: null },
   { id: "apoio", nome: "Apoio", dot: null },
 ];
 
 /** Cada chip é uma parte da mesma régua do resumo: "Em andamento" são as
- *  ativas (risco e atenção incluídas), "Concluídas" juntam encerradas. */
+ *  ativas (risco e atenção incluídas); "Concluídas" são as que fecharam com
+ *  êxito; "Desistentes" são as encerradas/interrompidas. */
 function chipBate(f: FiltroCat, d: Dupla, s: Saude): boolean {
   switch (f) {
     case "todas":
@@ -463,7 +466,9 @@ function chipBate(f: FiltroCat, d: Dupla, s: Saude): boolean {
     case "pausada":
       return d.status === "pausada";
     case "concluida":
-      return d.status === "concluida" || d.status === "encerrada";
+      return d.status === "concluida" || ehConcluida({ desfecho: d.desfecho });
+    case "desistente":
+      return d.status === "encerrada" || ehDesistente({ desfecho: d.desfecho, status: d.status });
     case "apoio":
       return s.apoio.aberto;
   }

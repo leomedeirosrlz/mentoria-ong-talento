@@ -20,6 +20,8 @@ import {
   podeSupervisionar,
 } from "@/lib/ciclo";
 import { capitalizar, cpfValido, erroAmigavel, nomeProprio } from "@/lib/utils";
+import { desfechoValido } from "@/lib/dupla-desfecho";
+import type { DuplaDesfecho } from "@/lib/dupla-desfecho";
 import { snapshotDuplaHoje } from "@/lib/jobs";
 import { temPapel } from "@/lib/types";
 import type { AppRole, ComunicadoPrioridade, CorRaca, Cronograma, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, SituacaoMentorado, Trilha } from "@/lib/types";
@@ -1823,7 +1825,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   // então só valida quando o novo status volta a contar. A própria dupla sai da
   // conta (.neq) pra edição simples não brigar com ela mesma
   const { data: atualDupla } = await supabase
-    .from("duplas").select("mentor_id, mentorado_id, supervisor_id, status, trilha, cronograma_id").eq("id", duplaId).single();
+    .from("duplas").select("mentor_id, mentorado_id, supervisor_id, status, trilha, cronograma_id, desfecho, desfecho_motivo, desfecho_obs").eq("id", duplaId).single();
   if (atualDupla && trilhaNova !== atualDupla.trilha) {
     const { count } = await supabase
       .from("encontros")
@@ -1915,6 +1917,44 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       }
     }
   }
+  // desfecho auditável (0140): validar quando a dupla fecha (ou quando o
+  // desfecho muda mesmo com status igual). Reabrir limpa os carimbos.
+  const statusMudouDupla = !!atualDupla && status !== atualDupla.status;
+  const desfechoVeio = formData.has("desfecho");
+  const desfechoRaw = desfechoVeio
+    ? String(formData.get("desfecho") ?? "").trim()
+    : "";
+  const desfechoAtual = (atualDupla?.desfecho ?? null) as string | null;
+  const desfechoNovo = desfechoVeio && desfechoRaw !== (desfechoAtual ?? "");
+  const encerrando =
+    statusMudouDupla && (status === "encerrada" || status === "concluida");
+  const desfechoMudouMesmoStatus =
+    !statusMudouDupla &&
+    (status === "encerrada" || status === "concluida") &&
+    desfechoNovo;
+  const reabrindo =
+    statusMudouDupla &&
+    (status === "ativa" || status === "pausada") &&
+    (atualDupla?.status === "encerrada" || atualDupla?.status === "concluida");
+  if (encerrando || desfechoMudouMesmoStatus) {
+    const motivoEfetivo = formData.has("desfecho_motivo")
+      ? String(formData.get("desfecho_motivo") ?? "").trim() || null
+      : desfechoMudouMesmoStatus
+        ? ((atualDupla as { desfecho_motivo?: string | null } | null)?.desfecho_motivo ?? null)
+        : null;
+    const obsEfetiva = formData.has("desfecho_obs")
+      ? String(formData.get("desfecho_obs") ?? "").trim() || null
+      : desfechoMudouMesmoStatus
+        ? ((atualDupla as { desfecho_obs?: string | null } | null)?.desfecho_obs ?? null)
+        : null;
+    const erroDesfecho = desfechoValido({
+      desfecho: (desfechoRaw || null) as DuplaDesfecho | null,
+      motivo: motivoEfetivo,
+      obs: obsEfetiva,
+    });
+    if (erroDesfecho) return { error: erroDesfecho };
+  }
+
   // iniciada_em em branco preserva a data atual — zerar mudaria a base do semáforo
   const patch: Record<string, unknown> = {
     mentor_id,
@@ -1934,6 +1974,28 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       ? { encerrada_em: null, motivo_encerramento: null, devolutiva_pdm: null }
       : {}),
   };
+  // desfecho auditável (0140): grava quando fecha/muda; limpa quando reabre.
+  if (encerrando || desfechoMudouMesmoStatus) {
+    patch.desfecho = desfechoRaw ? (desfechoRaw as DuplaDesfecho) : null;
+    patch.desfecho_motivo = formData.has("desfecho_motivo")
+      ? String(formData.get("desfecho_motivo") ?? "").trim() || null
+      : desfechoMudouMesmoStatus
+        ? (atualDupla?.desfecho_motivo ?? null)
+        : null;
+    patch.desfecho_obs = formData.has("desfecho_obs")
+      ? String(formData.get("desfecho_obs") ?? "").trim() || null
+      : desfechoMudouMesmoStatus
+        ? (atualDupla?.desfecho_obs ?? null)
+        : null;
+    patch.desfecho_em = new Date().toISOString();
+    patch.desfecho_por = eu.id;
+  } else if (reabrindo) {
+    patch.desfecho = null;
+    patch.desfecho_motivo = null;
+    patch.desfecho_obs = null;
+    patch.desfecho_em = null;
+    patch.desfecho_por = null;
+  }
   // cronograma: troca explícita do dialog move a dupla E o label da turma;
   // "Sem vínculo" desvincula (histórica/encerrada ficam sem calendário);
   // migração DPP→especialista solta o vínculo (a trilha não tem calendário);
@@ -1971,6 +2033,39 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   if (error) return { error: erroAmigavel(error) };
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  }
+  // desfecho auditável (0140): append-only em dupla_eventos. Só escreve
+  // quando houve mudança de status ou de desfecho — caso contrário, nada.
+  const desfechoChanged = encerrando || desfechoMudouMesmoStatus || reabrindo;
+  const tipoEvento =
+    statusMudouDupla || desfechoMudouMesmoStatus
+      ? desfechoChanged
+        ? "desfecho"
+        : "status"
+      : null;
+  if (tipoEvento) {
+    const evDesfecho = Object.prototype.hasOwnProperty.call(patch, "desfecho")
+      ? (patch.desfecho ?? null)
+      : (desfechoAtual ?? null);
+    const evMotivo = Object.prototype.hasOwnProperty.call(patch, "desfecho_motivo")
+      ? (patch.desfecho_motivo ?? null)
+      : (atualDupla?.desfecho_motivo ?? null);
+    const evObs = Object.prototype.hasOwnProperty.call(patch, "desfecho_obs")
+      ? (patch.desfecho_obs ?? null)
+      : (atualDupla?.desfecho_obs ?? null);
+    const { error: evErr } = await supabase
+      .from("dupla_eventos" as never)
+      .insert({
+        dupla_id: duplaId,
+        tipo: tipoEvento,
+        de: atualDupla?.status ?? null,
+        para: status,
+        desfecho: evDesfecho,
+        motivo: evMotivo,
+        observacao: evObs,
+        por: eu.id,
+      });
+    if (evErr) return { error: erroAmigavel(evErr) };
   }
   // troca de mentor/supervisor notifica os DOIS lados — quem entra precisa
   // saber que assumiu, e quem sai não pode ver a dupla sumir sem explicação.

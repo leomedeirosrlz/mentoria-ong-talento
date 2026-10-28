@@ -501,6 +501,18 @@ export type Dupla = {
   encerrada_em?: string | null;
   /** Por que a trilha fechou (obrigatório junto com encerrada_em). */
   motivo_encerramento?: string | null;
+  /** Desfecho estruturado da dupla (0140): concluida | desistencia_jovem |
+   *  desistencia_mentor | remanejada | outro. null = ainda em curso. */
+  desfecho?: DuplaDesfecho | null;
+  /** Motivo estruturado ligado ao desfecho (obrigatório quando não é
+   *  'concluida'). */
+  desfecho_motivo?: string | null;
+  /** Observação livre da coordenação (obrigatória quando 'outro'). */
+  desfecho_obs?: string | null;
+  /** Quando o desfecho foi registrado. */
+  desfecho_em?: string | null;
+  /** Quem registrou. */
+  desfecho_por?: string | null;
   /** O que a trilha devolve pro PDM — chega ao mentor DPP via solicitacoes_mural. */
   devolutiva_pdm?: string | null;
   mentor: Profile;
@@ -1010,6 +1022,7 @@ export type DocumentoPessoa = {
 // em database.types.ts: todas nullable porque a view não declara NOT NULL.
 
 import type { Database } from "./database.types";
+import type { DuplaDesfecho } from "./dupla-desfecho";
 
 /** Ficha do próprio jovem (view `jovem_perfil`) — mentorados.* do registro
  *  dele: programa (objetivos/escolaridade/ong) e contato do cadastro. Pessoa
