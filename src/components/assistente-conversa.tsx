@@ -6,8 +6,9 @@
 // tokens chegam por rAF-batched setState (um render por frame, não por
 // delta), status das tool rounds vira linha "consultando dados…", stop
 // aborta o fetch no meio e retry reenvia a última pergunta. Transcript
-// só em useState: refresh limpa de propósito (LGPD — a conversa não
-// persiste; o que fica é a ação em ia_eventos).
+// só na ABA: sessionStorage mantém a conversa entre abrir/fechar do
+// painel, mas morre com a aba (LGPD — nada vai pro servidor; o que fica
+// é a ação em ia_eventos).
 
 import { useEffect, useRef, useState } from "react";
 import {
@@ -45,6 +46,9 @@ const hhmm = (em?: number) =>
 // fora do componente: Date.now é impuro pro linter do compiler — a hora
 // só é lida em handler de evento, nunca durante render
 const agora = () => Date.now();
+
+// conversa da aba — chave distinta da do painel ("assistente:aberto")
+const STORAGE_MSGS = "assistente:msgs";
 
 const DEMO_FALLBACK =
   "Na demonstração o assistente tem respostas de exemplo — no ambiente real ele responde com seus dados e guias oficiais.";
@@ -256,6 +260,7 @@ export function AssistenteConversa({
   configurado,
   autoFocus,
   nome,
+  registrarNova,
 }: {
   papeis: AppRole[];
   demo: boolean;
@@ -264,8 +269,11 @@ export function AssistenteConversa({
   autoFocus?: boolean;
   /** primeiro nome pro empty state ("Oi, X!") — sem ele, genérico */
   nome?: string;
+  /** a bolha expõe "Nova conversa" no header — registra a ação aqui */
+  registrarNova?: (fn: () => void) => void;
 }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [restaurada, setRestaurada] = useState(false);
   const [texto, setTexto] = useState("");
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -285,6 +293,53 @@ export function AssistenteConversa({
     if (el && (forca || pertoDoFim.current)) el.scrollTop = el.scrollHeight;
   };
   useEffect(() => rolarFim(), [msgs, pending, status]);
+
+  // restaura a conversa da aba (Pop/Sheet desmontam o painel ao fechar —
+  // sem isso cada abertura recomeçava do zero). rAF: setState fora do
+  // corpo do effect (regra react-hooks), mesmo padrão da bolha
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      try {
+        const salvo = sessionStorage.getItem(STORAGE_MSGS);
+        if (salvo) {
+          const parsed = JSON.parse(salvo) as Msg[];
+          if (Array.isArray(parsed) && parsed.length)
+            setMsgs(parsed.filter((m) => m.role && m.content).slice(-20));
+        }
+      } catch {
+        // storage indisponível (modo privado): conversa só na memória
+      }
+      setRestaurada(true);
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  // persiste o histórico utilizável — sem bolha de stream intermediária
+  // nem campo de UI que o payload strict rejeitaria (montarEnvioChat já
+  // garante o segundo; o primeiro poluiria o estado restaurado)
+  useEffect(() => {
+    if (!restaurada) return;
+    try {
+      const limpas = msgs
+        .filter((m) => m.content && m.estado !== "stream")
+        .slice(-20);
+      if (limpas.length)
+        sessionStorage.setItem(STORAGE_MSGS, JSON.stringify(limpas));
+      else sessionStorage.removeItem(STORAGE_MSGS);
+    } catch {}
+  }, [msgs, restaurada]);
+
+  /** limpa histórico + storage — o header oferece "Nova conversa" */
+  function novaConversa() {
+    abortRef.current?.abort();
+    setMsgs([]);
+    setTexto("");
+    try {
+      sessionStorage.removeItem(STORAGE_MSGS);
+    } catch {}
+    inputRef.current?.focus();
+  }
+  useEffect(() => registrarNova?.(novaConversa), [registrarNova]);
 
   function flushTokens() {
     flushRef.current = 0;
