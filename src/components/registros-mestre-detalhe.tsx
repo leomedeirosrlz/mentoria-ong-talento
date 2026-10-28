@@ -65,6 +65,8 @@ export function RegistrosMestreDetalhe({
   hrefBase,
   chaveLista,
   souCoord,
+  souMentor = false,
+  perspectiva = "mentor",
   agrupadoPorDupla,
   rodape,
 }: {
@@ -76,6 +78,8 @@ export function RegistrosMestreDetalhe({
   /** muda com filtro, busca, ordem ou agrupamento: re-key anima a troca */
   chaveLista: string;
   souCoord: boolean;
+  souMentor?: boolean;
+  perspectiva?: "mentor" | "jovem" | "ambos";
   /** agrupado por dupla: os nomes já estão no cabeçalho, então a linha mostra o tema */
   agrupadoPorDupla: boolean;
   /** "Mostrar mais" da página, dentro da rolagem da lista */
@@ -213,7 +217,7 @@ export function RegistrosMestreDetalhe({
           <DialogDescription className="sr-only">
             Registro completo do encontro selecionado na lista.
           </DialogDescription>
-          <RegistroDetalhe entrada={sel} souCoord={souCoord} />
+          <RegistroDetalhe entrada={sel} souCoord={souCoord} souMentor={souMentor} perspectiva={perspectiva} />
         </DialogContent>
       </Dialog>
     </div>
