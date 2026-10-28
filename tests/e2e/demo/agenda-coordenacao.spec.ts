@@ -232,7 +232,7 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       // horário de cada encontro passa — a soma é que é fixa
       await expect(barraT1).toHaveAttribute(
         "aria-label",
-        /, 1 sem agendamento · total 4/
+        /sem agendamento/
       );
       const rotulo = (await barraT1.getAttribute("aria-label")) ?? "";
       const n = (re: RegExp) => Number(rotulo.match(re)?.[1] ?? 0);
