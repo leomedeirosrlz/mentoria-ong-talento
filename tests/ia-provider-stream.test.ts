@@ -184,3 +184,142 @@ describe("chamarModeloStream", () => {
     expect(res).toMatchObject({ ok: false, abortado: true });
   });
 });
+
+describe("chamarModeloStream — retry (REALIZA-307)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    vi.spyOn(console, "error").mockImplementation(() => {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it("5xx antes do stream abrir retenta e conclui na 2ª tentativa", async () => {
+    let n = 0;
+    const spy = vi.fn(() =>
+      Promise.resolve(
+        n++ === 0
+          ? new Response("pau", { status: 503 })
+          : sseResposta([sse({ choices: [{ delta: { content: "oi" } }] })])
+      )
+    );
+    vi.stubGlobal("fetch", spy);
+
+    const res = await chamar();
+    expect(res).toMatchObject({ ok: true, content: "oi" });
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it("429 honra Retry-After pequeno na retentativa", async () => {
+    // Retry-After: 0 → delay ~0, mantém o teste rápido
+    let n = 0;
+    const spy = vi.fn(() =>
+      Promise.resolve(
+        n++ === 0
+          ? new Response("quota", { status: 429, headers: { "Retry-After": "0" } })
+          : sseResposta([sse({ choices: [{ delta: { content: "ok" } }] })])
+      )
+    );
+    vi.stubGlobal("fetch", spy);
+
+    const res = await chamar();
+    expect(res).toMatchObject({ ok: true, content: "ok" });
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it("erro de rede antes do 1º byte útil retenta", async () => {
+    let n = 0;
+    const spy = vi.fn(() =>
+      n++ === 0
+        ? Promise.reject(new TypeError("fetch failed"))
+        : Promise.resolve(
+            sseResposta([sse({ choices: [{ delta: { content: "voltou" } }] })])
+          )
+    );
+    vi.stubGlobal("fetch", spy);
+
+    const res = await chamar();
+    expect(res).toMatchObject({ ok: true, content: "voltou" });
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it("4xx não retenta — fallback direto", async () => {
+    const spy = vi
+      .fn()
+      .mockResolvedValue(new Response("no", { status: 402 }));
+    vi.stubGlobal("fetch", spy);
+
+    const res = await chamar();
+    expect(res).toMatchObject({ ok: false, fallback: true });
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("quebra depois de token emitido NÃO retenta — vira fallback", async () => {
+    const enc = new TextEncoder();
+    // pull no 1º read entrega o evento do token; no 2º quebra — c.error
+    // no start() descartaria o chunk enfileirado antes do read acontecer
+    let primeiroRead = true;
+    const streamQuebrando = new ReadableStream<Uint8Array>({
+      pull(c) {
+        if (primeiroRead) {
+          primeiroRead = false;
+          c.enqueue(
+            enc.encode(
+              `data: ${JSON.stringify({ choices: [{ delta: { content: "parcial" } }] })}\n\n`
+            )
+          );
+        } else {
+          c.error(new TypeError("reset"));
+        }
+      },
+    });
+    const spy = vi.fn().mockResolvedValue(
+      new Response(streamQuebrando, {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" },
+      })
+    );
+    vi.stubGlobal("fetch", spy);
+
+    const tokens: string[] = [];
+    const res = await chamar({ tokens });
+    expect(tokens).toEqual(["parcial"]);
+    expect(res).toMatchObject({ ok: false, fallback: true });
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("signal da rota abortado (timeout) não retenta", async () => {
+    const ctrl = new AbortController();
+    ctrl.abort();
+    const spy = vi
+      .fn()
+      .mockRejectedValue(new DOMException("abort", "AbortError"));
+    vi.stubGlobal("fetch", spy);
+
+    const res = await chamar({
+      signal: ctrl.signal,
+      clienteAbortou: () => false,
+    });
+    expect(res).toMatchObject({ ok: false, fallback: true });
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+
+  it("abort no meio do backoff corta a espera (sem 2ª chamada)", async () => {
+    const ctrl = new AbortController();
+    const spy = vi
+      .fn()
+      .mockResolvedValue(new Response("pau", { status: 503 }));
+    vi.stubGlobal("fetch", spy);
+
+    const p = chamar({ signal: ctrl.signal, clienteAbortou: () => false });
+    setTimeout(() => ctrl.abort(), 50);
+    const res = await p;
+    // abort veio do timeout da rota, não do cliente → fallback, não "abortado"
+    expect(res).toMatchObject({ ok: false, fallback: true });
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+});

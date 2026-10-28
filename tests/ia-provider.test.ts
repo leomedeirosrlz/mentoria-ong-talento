@@ -113,3 +113,85 @@ describe("chamarModelo", () => {
     consoleSpy.mockRestore();
   });
 });
+
+describe("chamarModelo — retry (REALIZA-307)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("5xx retenta uma vez e devolve ok se a 2ª tentativa passa", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    let chamadas = 0;
+    const spy = stubFetch(() =>
+      chamadas++ === 0
+        ? new Response("pau", { status: 503 })
+        : respostaOpenAi({ role: "assistant", content: "foi" })
+    );
+    const r = await chamarModelo([{ role: "user", content: "oi" }]);
+    expect(r).toEqual({
+      ok: true,
+      mensagem: { role: "assistant", content: "foi" },
+    });
+    expect(spy).toHaveBeenCalledTimes(2);
+    consoleSpy.mockRestore();
+  });
+
+  it("429 honra Retry-After pequeno; sem ele/4xx não muda o contrato", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    // Retry-After: 0 → delay ~0, mantém o teste rápido
+    let n = 0;
+    const spy = stubFetch(() =>
+      n++ === 0
+        ? new Response("quota", { status: 429, headers: { "Retry-After": "0" } })
+        : respostaOpenAi({ role: "assistant", content: "ok" })
+    );
+    const r = await chamarModelo([{ role: "user", content: "oi" }]);
+    expect(r.ok).toBe(true);
+    expect(spy).toHaveBeenCalledTimes(2);
+
+    // 4xx definitivo — uma chamada só, erro amigável na hora
+    const spy4xx = stubFetch(() => new Response("no", { status: 402 }));
+    const r2 = await chamarModelo([{ role: "user", content: "oi" }]);
+    expect(r2).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
+    expect(spy4xx).toHaveBeenCalledTimes(1);
+    consoleSpy.mockRestore();
+  });
+
+  it("rede caída e timeout interno retentam; esgotada a 2ª vira erro", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    // TypeError (fetch failed) sempre → 2 chamadas e desiste
+    const spy = stubFetch(
+      () => Promise.reject(new TypeError("fetch failed")) as never
+    );
+    const r = await chamarModelo([{ role: "user", content: "oi" }]);
+    expect(r).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
+    expect(spy).toHaveBeenCalledTimes(2);
+
+    // TimeoutError do AbortSignal interno → transitório, retenta
+    let n = 0;
+    stubFetch(() =>
+      n++ === 0
+        ? (Promise.reject(new DOMException("estourou", "TimeoutError")) as never)
+        : respostaOpenAi({ role: "assistant", content: "ok" })
+    );
+    const r2 = await chamarModelo([{ role: "user", content: "oi" }]);
+    expect(r2.ok).toBe(true);
+    consoleSpy.mockRestore();
+  });
+
+  it("erro não-transitório não retenta", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const spy = stubFetch(
+      () => Promise.reject(new Error("socket")) as never
+    );
+    const r = await chamarModelo([{ role: "user", content: "oi" }]);
+    expect(r).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
+    expect(spy).toHaveBeenCalledTimes(1);
+    consoleSpy.mockRestore();
+  });
+});
