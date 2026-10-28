@@ -59,7 +59,7 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
     // relógio; o denominador (5) e o apoio do Caio (pedido do jovem) não
     await expect(saude.getByRole("img")).toHaveAttribute(
       "aria-label",
-      /5 em andamento: \d+ em risco, \d+ em atenção, \d+ em dia\. 2 pausadas ou concluídas\. 1 com apoio aberto\./
+      /5 em andamento: \d+ em risco, \d+ em atenção, \d+ em dia\. 0 pausadas, 2 concluídas, \d+ desistentes\. 1 com apoio aberto\./
     );
     await expect(saude.getByText(/com apoio aberto/)).toBeVisible();
 
