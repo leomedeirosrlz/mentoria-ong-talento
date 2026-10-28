@@ -6,8 +6,11 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 /** true = estourou o teto (o chamador responde 429). Falha na contagem
- *  loga e deixa passar — o limite protege custo, não é fronteira de
- *  segurança (essa é a RLS + allowlist das tools). */
+ *  loga e BLOQUEIA (fail-closed): em serverless não existe estado local
+ *  confiável pra provar baixa atividade, e liberar com o DB degradado
+ *  abre custo de LLM sem teto justo quando a infra já está ruim.
+ *  Custo ilimitado pesa mais que UX degradada temporária — o 429 é
+ *  recuperável com retry do cliente (o componente já trata). */
 export async function checarLimiteIa(
   supabase: SupabaseClient,
   profileId: string,
@@ -20,7 +23,7 @@ export async function checarLimiteIa(
     .gte("created_at", new Date(Date.now() - 60_000).toISOString());
   if (error) {
     console.error("checarLimiteIa:", error);
-    return false;
+    return true;
   }
   return (count ?? 0) >= limite;
 }
