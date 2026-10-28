@@ -11,6 +11,7 @@ import {
   type RespostaValor,
 } from "@/lib/forms/schema";
 import { normaliza } from "@/lib/utils";
+import { turmaDaDupla } from "@/lib/turma";
 import {
   AVALIACAO_LABEL,
   COR_RACA_LABELS,
@@ -103,7 +104,14 @@ export async function GET(request: NextRequest) {
     }
     const cronDemo = new Map(d.cronogramas.map((c) => [c.id, c.nome]));
     return csvResponse(
-      csvCiclo(filtraCsvCiclo(d.duplas, request.nextUrl.searchParams), cronDemo),
+      csvCiclo(
+        filtraCsvCiclo(
+          d.duplas,
+          request.nextUrl.searchParams,
+          d.cronogramas
+        ),
+        cronDemo
+      ),
       nomeCsvCiclo()
     );
   }
@@ -166,26 +174,32 @@ export async function GET(request: NextRequest) {
   }
   const { data: crons } = await supabase
     .from("cronogramas")
-    .select("id, nome");
+    .select("id, nome, turma");
   const cronogramas = new Map(
     (crons ?? []).map((c) => [c.id, c.nome] as const)
   );
   const duplas = filtraCsvCiclo(
     (data as unknown as Dupla[]) ?? [],
-    request.nextUrl.searchParams
+    request.nextUrl.searchParams,
+    crons ?? []
   );
 
   return csvResponse(csvCiclo(duplas, cronogramas), nomeCsvCiclo());
 }
 
 /** ?turma= e ?cronograma= recortam a prestação de contas — com turmas em
- *  paralelo, o relatório misto pode servir de recibo por turma. */
-function filtraCsvCiclo(duplas: Dupla[], p: URLSearchParams): Dupla[] {
+ *  paralelo, o relatório misto pode servir de recibo por turma. O label
+ *  casa pelo rótulo vivo (`turmaDaDupla`), não pelo selo da dupla. */
+function filtraCsvCiclo(
+  duplas: Dupla[],
+  p: URLSearchParams,
+  crons: { id: string; nome: string; turma: string }[]
+): Dupla[] {
   const turma = p.get("turma")?.trim();
   const cronograma = p.get("cronograma")?.trim();
   return duplas.filter(
     (d) =>
-      (!turma || d.turma === turma) &&
+      (!turma || turmaDaDupla(d, crons) === turma) &&
       (!cronograma || d.cronograma_id === cronograma)
   );
 }

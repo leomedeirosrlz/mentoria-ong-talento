@@ -1,4 +1,5 @@
 import type {
+  AppRole,
   CelulaDisponibilidade,
   ChamadoCategoria,
   ChamadoStatus,
@@ -20,6 +21,7 @@ import type {
   SituacaoMentorado,
   Trilha,
 } from "./types";
+import { temPapel } from "./types";
 import { turmaLonga } from "./turma";
 
 export type Semaforo = "ok" | "atencao" | "risco";
@@ -2088,6 +2090,18 @@ export function papelLabel(role: string | null | undefined) {
     case "mentorado": return "Mentorado";
     default: return "Sem papel definido";
   }
+}
+
+/** Papel COMPOSTO (REALIZA-262): quem acumula mentor_dpp + mentor_especialista
+ *  é o híbrido — "Mentor DPP + especialista". Nos demais casos é o rótulo
+ *  do primário. Pra badges/selects que mostram a pessoa como ela é. */
+export function papelLabelComposto(
+  p: { role: AppRole | null; papeis?: AppRole[] | null } | null | undefined
+) {
+  if (temPapel(p, "mentor_dpp") && temPapel(p, "mentor_especialista")) {
+    return "Mentor DPP + especialista";
+  }
+  return papelLabel(p?.role);
 }
 
 /** Versão curta do papel — cabe nos ~80-140px da pill do header mobile e da

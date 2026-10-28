@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { audienciasDe, veMaterial } from "@/lib/materiais";
 import Link from "next/link";
 import {
   getCicloEventos,
@@ -8,7 +9,6 @@ import {
   getPainelInstrumentosJornada,
 } from "@/lib/queries";
 import { getFormularios } from "@/lib/forms/queries";
-import { getDesfechoElegiveis6m } from "@/lib/queries-desfecho";
 import type { FormularioSistema } from "@/lib/forms/schema";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import {
@@ -57,14 +57,7 @@ export default async function MateriaisPage({
   // vê e faz o que a RLS (has_papel) e a RPC de lote já autorizam
   const ehCoord = temPapel(me, "coordenacao");
 
-  const visiveis = materiais.filter((m) => {
-    if (m.audiencia === "todos") return true;
-    if (ehCoord) return true;
-    if (m.audiencia === "dpp") return temPapel(me, "mentor_dpp");
-    if (m.audiencia === "especialista")
-      return temPapel(me, "mentor_especialista");
-    return false;
-  });
+  const visiveis = materiais.filter((m) => veMaterial(audienciasDe(m), me));
 
   // encontro_num do material é por programa (o guia do 5º vale pras duas
   // turmas) — o teto do hub é o maior nº que existe, não a soma das linhas
@@ -141,21 +134,14 @@ export default async function MateriaisPage({
       ? ("supervisor" as const)
       : ("mentor" as const);
   const formIds = new Map<FormularioSistema, string>();
-  let desfechoElegiveis: Awaited<
-    ReturnType<typeof getDesfechoElegiveis6m>
-  > = [];
   if (ehCoord) {
-    const [forms, eleg6m] = await Promise.all([
-      getFormularios().catch((e) => {
-        console.error("materiais/getFormularios:", e);
-        return [];
-      }),
-      getDesfechoElegiveis6m(),
-    ]);
+    const forms = await getFormularios().catch((e) => {
+      console.error("materiais/getFormularios:", e);
+      return [];
+    });
     for (const f of forms) {
       if (f.sistema && !formIds.has(f.sistema)) formIds.set(f.sistema, f.id);
     }
-    desfechoElegiveis = eleg6m;
   }
   const fichasMentor = ehMentorDpp
     ? duplasPainel
@@ -283,7 +269,6 @@ export default async function MateriaisPage({
             duplasInfo={duplasInfo}
             formIds={formIds}
             envioLiberado={EMAIL_ENVIO_LIBERADO}
-            desfechoElegiveis={desfechoElegiveis}
             fichasMentor={fichasMentor}
             nudges={nudges}
             meuNome={me?.nome_social || me?.nome || ""}
@@ -330,8 +315,9 @@ export default async function MateriaisPage({
             }
           />
         ) : (
-          /* staff: a biblioteca inteira numa lista só (REALIZA-210) —
-             editar/anexar/excluir no ⋯ de cada linha pra coord */
+          /* staff: a biblioteca inteira agrupada por categoria
+             (REALIZA-250) — editar/anexar/excluir no ⋯ de cada linha
+             pra coord */
           <BibliotecaLista
             materiais={visiveis}
             ehCoord={ehCoord}

@@ -184,9 +184,11 @@ export async function criarCronograma(input: {
   return { ok: true, id: cron.id as string };
 }
 
-/** Edita os dados do cronograma (rótulo, turma, status). A turma das duplas
- *  já vinculadas NÃO muda — `duplas.turma` é label gravada no pareamento;
- *  renomear aqui só desloca o selo do cronograma. */
+/** Edita os dados do cronograma (rótulo, turma, status). Renomear a
+ *  turma PROPAGA o selo das duplas vinculadas — o trigger
+ *  `cronograma_turma_propaga` (0127) regrava `duplas.turma` pelo
+ *  cronograma_id e, quando o label antigo fica órfão, os snapshots
+ *  por label (inscrições, links de relatório, escopo de auxiliar). */
 export async function atualizarCronograma(
   id: string,
   input: { nome?: string; turma?: string; status?: string }

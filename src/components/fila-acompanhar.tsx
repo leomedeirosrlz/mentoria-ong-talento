@@ -11,7 +11,7 @@ import { formatDiaMes, LEMBRETE_INTERVALO_MS } from "@/lib/ciclo";
 import { turmaLonga } from "@/lib/turma";
 import { normaliza } from "@/lib/utils";
 import type { LembreteDestino } from "@/lib/actions-lembrete";
-import { LembreteButton } from "@/components/lembrete-button";
+import { DuplaWaAcao } from "@/components/dupla-wa-acao";
 import {
   DuplaLinha,
   type PessoaLinha,
@@ -127,6 +127,9 @@ export function FilaAcompanhar({ linhas }: { linhas: LinhaFila[] }) {
       >
         {FILTROS.map((f) => {
           const n = itens.filter(MATCH_FILTRO[f.id]).length;
+          // chip com 0 resultado não filtra nada — esconde (o ativo fica
+          // pra não prender a pessoa num filtro sem saída)
+          if (f.id !== "todas" && n === 0 && filtro !== f.id) return null;
           return (
             <button
               key={f.id}
@@ -258,19 +261,32 @@ function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
             {linha.rotulo}
           </Link>
         ) : (
-          <LembreteButton
+          <DuplaWaAcao
             duplaId={item.duplaId}
-            destino={linha.destino}
-            rotulo={linha.rotulo}
-            telefone={telefone}
-            titulo={lembrete.titulo}
-            corpo={lembrete.corpo}
-            href={
+            destNome={
               linha.destino === "mentorado"
-                ? "/jovem/agenda"
-                : `/duplas/${item.duplaId}`
+                ? linha.mentorado.nome
+                : (linha.mentor?.nome ?? "mentor")
             }
-            bloqueadoAte={item.bloqueadoAte}
+            telefone={telefone}
+            mensagem={lembrete.corpo}
+            nudge={{
+              destino: linha.destino,
+              titulo: lembrete.titulo,
+              href:
+                linha.destino === "mentorado"
+                  ? "/jovem/agenda"
+                  : `/duplas/${item.duplaId}`,
+              bloqueadoAte: item.bloqueadoAte,
+              // o rótulo já vem resolvido do server (agenda-coordenacao):
+              // "Chamar" no pedido de apoio do jovem, "Lembrar registro"
+              // quando o caso dominante é a pendência de registro, "Lembrar"
+              // no resto — "Concluir rito" nunca chega aqui (é link)
+              rotulo:
+                linha.rotulo === "Chamar" || linha.rotulo === "Lembrar registro"
+                  ? linha.rotulo
+                  : undefined,
+            }}
           />
         )
       }

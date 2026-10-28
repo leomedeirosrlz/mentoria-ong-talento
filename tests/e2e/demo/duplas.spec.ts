@@ -128,13 +128,11 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
 
     for (let i = 0; i < n; i++) {
       const linha = linhas.nth(i);
-      // WhatsApp sempre visível (decisão travada): o split do desktop é
-      // [Lembrar|Chamar] + ▾ "Opções da mensagem" — um por linha. O
-      // trigger combinado do mobile também existe no DOM (escondido por
-      // md:) e o rótulo dele termina em ": opções da mensagem": só o
-      // match EXATO separa o ▾ do quadrado verde.
+      // WhatsApp sempre visível (decisão travada, REALIZA-255): UM botão
+      // por linha — abre o preview do texto com Lembrar-app + wa.me dentro
+      // (o split [ação|▾] e o menu saíram; a escolha do canal é do dialog)
       await expect(
-        linha.getByRole("button", { name: "Opções da mensagem", exact: true })
+        linha.getByRole("button", { name: /ver a mensagem antes de enviar/ })
       ).toHaveCount(1);
       // exatamente um "Ver ficha" por linha — nunca duplicado
       await expect(
@@ -146,27 +144,56 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
       ).toHaveCount(1);
     }
 
-    // a primária do split muda com o estado: "Lembrar" nas ativas com
-    // pendência, "Chamar" (wa.me direto, sem cap) nas fora da régua — e
-    // onde o demo já nudgeou <48h, "Lembrada dd/mm" desabilitado. O
-    // dataset cobre os três estados.
+    // o botão muda com o estado: "Lembrar" nas ativas com pendência,
+    // "Chamar" (contato livre, sem cap) nas fora da régua. O "Lembrada
+    // dd/mm" do cap de 48h mora no dialog da dupla bloqueada (abaixo).
     await expect(
       page.locator(LINHAS_COORD).getByText(/^Lembrar/).first()
     ).toBeVisible();
     await expect(
       page.locator(LINHAS_COORD).getByText(/^Chamar/).first()
     ).toBeVisible();
-    await expect(
-      page.locator(LINHAS_COORD).getByText(/^Lembrada/).first()
-    ).toBeVisible();
 
-    // o "Chamar" é contato direto wa.me via /api/nudge — o flag
-    // `t=contato` é o que mantém o clique fora do cap de 48h (o cap é
-    // dos nudges); sem ele registrar contato bloquearia o Lembrar
-    const chamar = page
+    // o "Chamar" abre o preview — o wa.me com `t=contato` (fora do cap de
+    // 48h) está no "Abrir WhatsApp" lá dentro. O rótulo cobre DOIS estados
+    // (ele diz a intenção, não a presença de pendência): contato livre de
+    // dupla em dia, sem nudge → sem lembrete in-app; e a resposta ao pedido
+    // de apoio do jovem, que TEM nudge (destino mentorado) e mostra o
+    // Lembrar in-app no preview. Aqui interessa o contato livre.
+    const linhaChamar = page
       .locator(LINHAS_COORD)
-      .getByRole("link", { name: /Chamar .+ no WhatsApp/ });
-    await expect(chamar.first()).toHaveAttribute("href", /t=contato/);
+      .filter({ has: page.getByRole("button", { name: /Chamar .+ ver a mensagem/ }) })
+      .filter({ hasText: "Sem pendências" })
+      .first();
+    await linhaChamar
+      .getByRole("button", { name: /Chamar .+ ver a mensagem/ })
+      .click();
+    const dlgChamar = page.getByRole("dialog");
+    await expect(
+      dlgChamar.getByRole("link", { name: "Abrir WhatsApp" })
+    ).toHaveAttribute("href", /t=contato/);
+    // sem pendência apontável não há lembrete in-app no preview
+    await expect(
+      dlgChamar.getByRole("button", { name: /Lembrar pelo app/ })
+    ).toHaveCount(0);
+    await page.keyboard.press("Escape");
+
+    // o cap de 48h: a dupla em risco (Fernanda × Dandara) recebeu nudge
+    // ~20h atrás — o botão dela abre o preview com "Lembrada dd/mm"
+    // desabilitado em vez do "Lembrar pelo app". O filtro ancora no mentor
+    // porque "Dandara" também aparece como mentorada em outra dupla do
+    // dataset (a da Helena)
+    const linhaBloqueada = page
+      .locator(LINHAS_COORD)
+      .filter({ hasText: "Fernanda" });
+    await linhaBloqueada
+      .getByRole("button", { name: /ver a mensagem antes de enviar/ })
+      .click();
+    const dlgBloq = page.getByRole("dialog");
+    await expect(
+      dlgBloq.getByRole("button", { name: /Lembrada \d{2}\/\d{2}/ })
+    ).toBeDisabled();
+    await page.keyboard.press("Escape");
 
     // fora da régua nunca vira nudge: pausada e concluída só têm "Chamar"
     // — nem "Lembrar" nem "Lembrada" — e a pill repete o rótulo do status
@@ -175,7 +202,7 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     await expect(pausada).toHaveCount(1);
     await expect(pausada.getByText(/^Lembra/)).toHaveCount(0);
     await expect(
-      pausada.getByRole("link", { name: /Chamar .+ no WhatsApp/ })
+      pausada.getByRole("button", { name: /Chamar .+ ver a mensagem/ })
     ).toHaveCount(1);
     // exact: a pill de situação é exatamente "Pausada" e o motivo diz a
     // jornada congelada — não há "Em dia" escondido na linha
@@ -236,29 +263,77 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
         await expect(
           minis
             .nth(i)
-            .getByRole("button", { name: "Opções da mensagem", exact: true })
+            .getByRole("button", { name: /ver a mensagem antes de enviar/ })
         ).toHaveCount(1);
       }
     }
 
-    // "Ver texto da mensagem" abre o dialog com o corpo que sai nas três
-    // saídas (wa.me, cópia, notificação) — a linha inteira compartilha o
-    // mesmo texto
+    // o botão da linha abre o preview com o texto que sai nas duas saídas
+    // (wa.me e notificação) + a ação de copiar — a linha inteira
+    // compartilha o mesmo texto
     await linhas
       .first()
-      .getByRole("button", { name: "Opções da mensagem", exact: true })
-      .click();
-    await page
-      .getByRole("menuitem", { name: "Ver texto da mensagem" })
+      .getByRole("button", { name: /ver a mensagem antes de enviar/ })
       .click();
     const dlg = page.getByRole("dialog");
-    await expect(
-      dlg.getByRole("heading", { name: "Texto da mensagem" })
-    ).toBeVisible();
     const corpo = dlg.locator("p.whitespace-pre-wrap");
     await expect(corpo).toBeVisible();
     expect((await corpo.textContent())?.trim().length).toBeGreaterThan(0);
+    await expect(
+      dlg.getByRole("button", { name: "Copiar texto" })
+    ).toBeVisible();
     await page.keyboard.press("Escape");
+  });
+
+  // REALIZA-240/241 — o card inteiro é um link esticado (uma âncora por
+  // linha, nome da dupla no rótulo) e a régua de silêncio dos filtros:
+  // chip com 0 resultado não renderiza e supervisão/mentor moram no
+  // painel "Filtros", não na barra.
+  test("coordenação: card inteiro abre a ficha; critério vazio some e secundários vão pro painel", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/duplas");
+
+    // 240 — nenhum chip de situação com contador zero: o dataset cobre
+    // todas as fatias, então se a régua falhar um "… 0" aparece
+    const chips = page.getByRole("group", { name: "Filtrar por situação" });
+    await expect(chips.getByRole("button", { name: / 0$/ })).toHaveCount(0);
+
+    // 241 — uma âncora por linha com o nome da dupla; clicar no corpo do
+    // card (fora dos controles) abre a ficha via o link esticado
+    const linha = page.locator(LINHAS_COORD).first();
+    const ficha = linha.getByRole("link", {
+      name: /Ver ficha da dupla de /,
+    });
+    await expect(ficha).toHaveCount(1);
+    const href = await ficha.getAttribute("href");
+    expect(href).toMatch(/^\/duplas\//);
+    await linha.click({ position: { x: 120, y: 40 } });
+    await page.waitForURL(new RegExp(href!.replace(/\//g, "\\/") + "$"));
+    await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+    await page.goBack();
+    await page.waitForURL(/\/duplas$/);
+
+    // 240 — supervisão e mentor saíram da barra: o gatilho "Filtros" abre
+    // o dialog com os dois critérios e aplica de uma vez (o contador do
+    // gatilho reflete os ativos)
+    await page.getByRole("button", { name: "Filtros" }).click();
+    const dlg = page.getByRole("dialog");
+    await expect(dlg.getByText("Supervisão")).toBeVisible();
+    await expect(dlg.getByText("Mentor", { exact: true })).toBeVisible();
+    await dlg
+      .getByRole("combobox", { name: "Filtrar por supervisão" })
+      .click();
+    await page.getByRole("option", { name: "Paulo Serra" }).click();
+    await dlg.getByRole("button", { name: /Aplicar/ }).click();
+    await expect(
+      page.getByRole("button", { name: "Filtros, 1 ativo" })
+    ).toBeVisible();
+    // o filtro morde de verdade: só duplas do Paulo na lista
+    await expect(
+      page.locator(LINHAS_COORD).getByText("Beatriz Lins")
+    ).toHaveCount(0);
   });
 
   test("coordenação mobile: cards p-3/gap-2, ações no topo, toques ≥44px", async ({
@@ -292,52 +367,50 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
       ).toHaveCount(1);
 
       // as ações moram na célula order-2 (topo à direita, ao lado das
-      // pílulas): quadrado verde combinado (ação + opções num trigger só)
-      // 44px + ficha 44px
+      // pílulas): um botão verde por card que abre o preview da mensagem,
+      // 44px; o "Ver ficha" visual dela é decorativo — a âncora real é o
+      // link esticado que cobre o card inteiro (REALIZA-241)
       const celulaAcoes = card.locator(":scope > div > div.order-2");
       const wa = celulaAcoes.getByRole("button", {
-        name: /: opções da mensagem$/,
+        name: /: ver a mensagem antes de enviar$/,
       });
       await expect(wa).toHaveCount(1);
       const waBox = await wa.boundingBox();
       expect(waBox?.width).toBeGreaterThanOrEqual(44);
       expect(waBox?.height).toBeGreaterThanOrEqual(44);
-      const ficha = celulaAcoes.getByRole("link", { name: /Ver ficha/ });
+      await expect(
+        celulaAcoes.getByRole("link", { name: /Ver ficha/ })
+      ).toHaveCount(0);
+      const ficha = card.getByRole("link", { name: /Ver ficha/ });
       await expect(ficha).toHaveCount(1);
       const fichaBox = await ficha.boundingBox();
       expect(fichaBox?.height).toBeGreaterThanOrEqual(44);
-
-      // a faixa-footer morta não volta: fora da célula de ações não há
-      // link de ficha solto no card
-      await expect(
-        card
-          .locator(":scope > div > div:not(.order-2)")
-          .getByRole("link", { name: /Ver ficha/ })
-      ).toHaveCount(0);
     }
 
-    // o quadrado verde abre o menu com a ação como 1º item — "Abrir
-    // wa.me", "Copiar mensagem" e "Ver texto" são o contrato do menu
+    // o botão verde abre o preview da mensagem — "Abrir WhatsApp" (âncora
+    // pro wa.me) e "Copiar texto" são o contrato do dialog
     const wa = cards
       .first()
       .locator(":scope > div > div.order-2")
-      .getByRole("button", { name: /: opções da mensagem$/ });
+      .getByRole("button", { name: /: ver a mensagem antes de enviar$/ });
     await wa.click();
-    const menu = page.getByRole("menu");
-    await expect(menu).toBeVisible();
-    // o 1º card é o do Caio (apoio do mentorado — "Chamar", não Lembrar):
-    // a ação mora dentro do menu do quadrado
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    // o 1º card é o do Caio (pedido de apoio do jovem — "Chamar" o
+    // mentorado, nunca cobrar o mentor). Apoio aberto é pendência
+    // apontável: o preview traz os dois canais, o lembrete in-app e o
+    // wa.me com o mesmo texto
     await expect(
-      menu.getByRole("menuitem", { name: /^Chamar Caio/ })
+      dialog.getByRole("heading", { name: /Chamar Caio|Mensagem pra Caio/ })
     ).toBeVisible();
     await expect(
-      menu.getByRole("menuitem", { name: /Abrir wa\.me/ })
+      dialog.getByRole("link", { name: "Abrir WhatsApp" })
     ).toBeVisible();
     await expect(
-      menu.getByRole("menuitem", { name: "Copiar mensagem" })
+      dialog.getByRole("button", { name: "Copiar texto" })
     ).toBeVisible();
     await expect(
-      menu.getByRole("menuitem", { name: "Ver texto da mensagem" })
+      dialog.getByRole("button", { name: "Lembrar pelo app" })
     ).toBeVisible();
   });
 
@@ -382,10 +455,10 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
       if (!box) throw new Error("linha sem bounding box");
       expect(box.height).toBeGreaterThanOrEqual(44);
       expect(box.height).toBeLessThanOrEqual(150);
-      // WhatsApp por linha supervisionada + um único "Ver ficha" (o ▾
-      // pede exact: o trigger combinado do mobile tem o mesmo sufixo)
+      // WhatsApp por linha supervisionada + um único "Ver ficha" — uma
+      // entrada por card: o botão abre o preview da mensagem
       await expect(
-        linha.getByRole("button", { name: "Opções da mensagem", exact: true })
+        linha.getByRole("button", { name: /ver a mensagem antes de enviar/ })
       ).toHaveCount(1);
       await expect(
         linha.getByRole("link", { name: /Ver ficha/ })
@@ -410,12 +483,11 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
 
     // pedido de apoio do JOVEM: a linha do Caio troca a ponta inteira —
     // "Chamar" o mentorado (pode ser sobre o próprio mentor), nunca um
-    // "Lembrar" cobrando o mentor. O $ ancora na primária — o trigger do
-    // menu mobile carrega ": opções da mensagem" no mesmo rótulo
+    // "Lembrar" cobrando o mentor
     const linhaCaio = page.locator(LINHAS_SUP).filter({ hasText: "Caio" });
     await expect(
       linhaCaio.getByRole("button", {
-        name: /^Chamar Caio: notificação \+ WhatsApp$/,
+        name: /^Chamar Caio: ver a mensagem antes de enviar$/,
       })
     ).toBeVisible();
 
@@ -427,17 +499,18 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
       .filter({ hasText: "Helena" });
     await expect(linhaHelena.getByText(/^Lembra/)).toHaveCount(0);
     await expect(
-      linhaHelena.locator('[title="Sem WhatsApp cadastrado"]')
+      linhaHelena.locator('[title*="sem WhatsApp cadastrado"]')
     ).toHaveCount(1);
-    // o ▾ explica o motivo no item desabilitado
+    // o preview abre mesmo sem número — o WhatsApp fica desabilitado no
+    // rodapé do dialog com o motivo no próprio rótulo
     await linhaHelena
-      .getByRole("button", { name: "Opções da mensagem", exact: true })
+      .getByRole("button", { name: /ver a mensagem antes de enviar/ })
       .click();
     await expect(
       page
-        .getByRole("menuitem", { name: /sem WhatsApp cadastrado/ })
-        .first()
-    ).toBeVisible();
+        .getByRole("dialog")
+        .getByRole("button", { name: "Sem WhatsApp cadastrado" })
+    ).toBeDisabled();
     await page.keyboard.press("Escape");
 
     // a supervisão recolhe no ⋮ "Mais ações da dupla de <nome>" — abre e

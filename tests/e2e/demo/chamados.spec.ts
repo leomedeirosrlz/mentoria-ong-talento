@@ -37,6 +37,16 @@ test.describe("demo — chamados (WP1)", () => {
       page.getByText("Em atendimento · Marina").first()
     ).toBeVisible();
 
+    // REALIZA-240 — regra de silêncio: nenhum chip da fila com contador
+    // zero; categoria e estado são secundários e moram no painel "Filtros"
+    const fila = page.getByRole("group", { name: "Filtrar por fila" });
+    await expect(fila.getByRole("button", { name: / 0$/ })).toHaveCount(0);
+    await page.getByRole("button", { name: "Filtros" }).click();
+    const dlgFiltro = page.getByRole("dialog");
+    await expect(dlgFiltro.getByText("Categoria")).toBeVisible();
+    await expect(dlgFiltro.getByText("Estado")).toBeVisible();
+    await page.keyboard.press("Escape");
+
     // detalhe do chamado do jovem: origem avaliação + evento de sistema +
     // comentário interno da Marina (só a equipe lê)
     await page.goto(`/chamados?c=${CH_JOVEM}`);

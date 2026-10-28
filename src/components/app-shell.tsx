@@ -151,6 +151,7 @@ export function AppShell({
   notificacoes,
   chamadosSemDono = 0,
   demo,
+  assistente,
   children,
 }: {
   me: Profile;
@@ -162,6 +163,9 @@ export function AppShell({
   /** pill compacta da DemoBar dockada no header mobile (substitui o span de
    *  papel — sempre visível e sem cobrir conteúdo) */
   demo?: React.ReactNode;
+  /** a bolha do assistente (AssistenteBolha) — montada no layout com o gate
+   *  de papel resolvido; ausente pra quem não tem acesso */
+  assistente?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -424,6 +428,10 @@ export function AppShell({
           </Sheet>
         </div>
       </nav>
+
+      {/* bolha do assistente: depois da bottom-nav pra ganhar o empate de
+          z-40 na ordem do DOM; fica sob qualquer sheet/dialog (z-50) */}
+      {assistente}
     </div>
     </DemoSlotProvider>
     </NotificacoesProvider>

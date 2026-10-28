@@ -394,8 +394,33 @@ describe("normalizaLinha — resgate por linha com diff auditável", () => {
     expect(dEmail.revisar).toBe(false); // resgate determinístico, sem flag
   });
 
-  it("o ilegível descarta o campo + marca revisar — a linha não morre", () => {
+  it("nome social resposta de outra pergunta é descartado com flag (REALIZA-224)", () => {
     const { linha, diffs } = normalizaLinha(
+      linhaDe({ nome_social: "Ele/Dele" })
+    );
+    expect(linha.nome_social).toBe("");
+    const d = diffs.find((x) => x.campo === "nome_social")!;
+    expect(d.de).toBe("Ele/Dele");
+    expect(d.para).toBe("");
+    expect(d.revisar).toBe(true);
+    expect(d.aviso).toMatch(/pronome/);
+
+    // mesmo pool de sujeira do form real; a ficha também não grava
+    for (const sujo of ["Não tenho.", "Nome Artistico: Andressa"]) {
+      const n = normalizaLinha(linhaDe({ nome_social: sujo }));
+      expect(n.linha.nome_social).toBe("");
+      expect(n.diffs.find((x) => x.campo === "nome_social")!.revisar).toBe(true);
+      const f = fichaLinha(n.linha, "mentorado");
+      expect((f as Record<string, unknown>).nome_social).toBeNull();
+    }
+
+    // nome de verdade não gera diff nem flag
+    const limpo = normalizaLinha(linhaDe({ nome_social: "Duda" }));
+    expect(limpo.linha.nome_social).toBe("Duda");
+    expect(limpo.diffs.some((x) => x.campo === "nome_social")).toBe(false);
+  });
+
+  it("o ilegível descarta o campo + marca revisar — a linha não morre", () => {    const { linha, diffs } = normalizaLinha(
       linhaDe({
         email: "não é email",
         linkedin: "Marcos Silva",

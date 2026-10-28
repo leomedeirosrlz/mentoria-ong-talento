@@ -1,5 +1,5 @@
 import Link from "next/link";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   CalendarPlus,
   ClockCounterClockwise,
@@ -27,6 +27,7 @@ import {
   type PassoGuia,
 } from "@/lib/ciclo";
 import { prazoTrilhaEspecialista, type PrazoTrilha } from "@/lib/encerramento";
+import { PAINEL_AGENDA } from "@/lib/agenda-abas";
 import type {
   Dupla,
   Encontro,
@@ -132,6 +133,7 @@ export function AgendaEspecialista({
   excecoes,
   hojeIso,
   agoraMs,
+  abas,
 }: {
   /** Só as trilhas de especialista do mentor (a página já filtra). */
   duplas: Dupla[];
@@ -142,6 +144,8 @@ export function AgendaEspecialista({
   hojeIso: string;
   /** epoch ms do `agora` da página — mesmo snapshot do request. */
   agoraMs: number;
+  /** Barra de modos da página (AbasAgenda) — uma por página, no header. */
+  abas?: ReactNode;
 }) {
   const agora = new Date(agoraMs);
   const passos = passosDaTrilha("especialista", [], espEventos);
@@ -236,62 +240,67 @@ export function AgendaEspecialista({
         </p>
       </header>
 
-      {pendencias.length > 0 && (
-        <section aria-label="Precisa de você">
-          <h2 className="text-base font-semibold">Precisa de você</h2>
-          <div className="mt-2.5 space-y-2">
-            {pendencias.map((p, i) => (
-              <LinhaPendencia
-                key={p.id}
-                p={p}
-                indice={i}
-                destaque={i === 0}
-              />
+      {abas}
+
+      <div id={PAINEL_AGENDA} role="tabpanel" className="space-y-6">
+
+        {pendencias.length > 0 && (
+          <section aria-label="Precisa de você">
+            <h2 className="text-base font-semibold">Precisa de você</h2>
+            <div className="mt-2.5 space-y-2">
+              {pendencias.map((p, i) => (
+                <LinhaPendencia
+                  key={p.id}
+                  p={p}
+                  indice={i}
+                  destaque={i === 0}
+                />
+              ))}
+            </div>
+          </section>
+        )}
+
+        <section aria-label="Próximas sessões">
+          <h2 className="text-base font-semibold">Próximas sessões</h2>
+          {grupos.length === 0 ? (
+            <p className="mt-2.5 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground sm:px-5">
+              Nenhuma sessão marcada.
+            </p>
+          ) : (
+            <div className="mt-2.5 space-y-4">
+              {grupos.map((g) => (
+                <div key={g.dia}>
+                  <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    {g.rotulo}
+                  </h3>
+                  <ul className="space-y-2">
+                    {g.itens.map((s, i) => (
+                      <LinhaSessao
+                        key={s.e.id}
+                        s={s}
+                        passos={passos}
+                        hojeIso={hojeIso}
+                        indice={i}
+                      />
+                    ))}
+                  </ul>
+                </div>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <section aria-label="Suas trilhas">
+          <h2 className="text-base font-semibold">Suas trilhas</h2>
+          <div className="mt-2.5 grid grid-cols-1 gap-3 lg:grid-cols-2">
+            {recortes.map((r, i) => (
+              <CardTrilha key={r.dupla.id} r={r} indice={i} />
             ))}
           </div>
         </section>
-      )}
 
-      <section aria-label="Próximas sessões">
-        <h2 className="text-base font-semibold">Próximas sessões</h2>
-        {grupos.length === 0 ? (
-          <p className="mt-2.5 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground sm:px-5">
-            Nenhuma sessão marcada.
-          </p>
-        ) : (
-          <div className="mt-2.5 space-y-4">
-            {grupos.map((g) => (
-              <div key={g.dia}>
-                <h3 className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  {g.rotulo}
-                </h3>
-                <ul className="space-y-2">
-                  {g.itens.map((s, i) => (
-                    <LinhaSessao
-                      key={s.e.id}
-                      s={s}
-                      passos={passos}
-                      hojeIso={hojeIso}
-                      indice={i}
-                    />
-                  ))}
-                </ul>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-
-      <section aria-label="Suas trilhas">
-        <h2 className="text-base font-semibold">Suas trilhas</h2>
-        <div className="mt-2.5 grid grid-cols-1 gap-3 lg:grid-cols-2">
-          {recortes.map((r, i) => (
-            <CardTrilha key={r.dupla.id} r={r} indice={i} />
-          ))}
-        </div>
-      </section>
-
-      <AgendaEspHorarios grade={grade} excecoes={excecoes} />
+        <AgendaEspHorarios grade={grade} excecoes={excecoes} />
+      </div>
     </div>
   );
 }

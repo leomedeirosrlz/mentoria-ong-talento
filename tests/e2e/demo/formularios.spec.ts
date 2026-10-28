@@ -2,12 +2,13 @@ import type { Page } from "@playwright/test";
 import { entrarNaDemo, expect, test } from "../helpers";
 
 // REALIZA-199 — /formularios virou a casa dos forms CUSTOM da coordenação:
-// os 5 instrumentos da régua DPP (Visão, Metas, PDM, Roda da Vida, 360º)
-// saíram daqui e moram na seção "Instrumentos do programa" de /materiais
-// (REALIZA-194 — os cards de lá fazem deep-link pras respostas daqui).
-// Os oficiais "de bordo" (anamnese, inscrições, autoavaliação, avaliação
-// da trilha) ficam na prateleira read-only "Instrumentos do sistema" no
-// fim da página. Spec demo: sem writes — o builder roda inteiro em estado
+// os instrumentos da régua DPP (Visão, Metas, PDM, Roda da Vida e os dois
+// 360º de encerramento — mentorado e mentor) saíram daqui e moram na seção
+// "Instrumentos do programa" de /materiais (REALIZA-194 — os cards de lá
+// fazem deep-link pras respostas daqui). Dos "de bordo" só os intakes de
+// matching restaram na prateleira read-only "Instrumentos do sistema" (a
+// trilha de especialista avalia por sessão e o desfecho saiu do catálogo
+// na 0134). Spec demo: sem writes — o builder roda inteiro em estado
 // local (o save falharia por DEMO_MSG, mas não é o que se testa).
 
 const URL_VISAO = "/formularios/de000000-0000-4000-8000-000000016391";
@@ -19,10 +20,10 @@ test.describe("demo — /formularios separa customs de instrumentos", () => {
     await entrarNaDemo(page, "coordenacao");
     await page.goto("/formularios");
 
-    // os 3 forms da coordenação seguem na lista
+    // os 2 forms da coordenação seguem na lista (a Anamnese Social é feita
+    // por fora da plataforma — decisão de out/2026)
     for (const titulo of [
       /Avaliação do encontro/,
-      /Anamnese social · família e contexto/,
       /Inscrição · ciclo 2026\/2027/,
     ]) {
       await expect(
@@ -30,28 +31,31 @@ test.describe("demo — /formularios separa customs de instrumentos", () => {
       ).toBeVisible();
     }
 
-    // a régua DPP saiu da página inteira — nem na lista, nem na seção
+    // a régua DPP saiu da página inteira — nem na lista, nem na seção (a
+    // Avaliação Geral 360º do mentor virou instrumento da jornada também,
+    // mora em /materiais junto da do mentorado)
     for (const titulo of [
       /Construindo a sua Visão/,
       /Definindo Minhas Metas/,
       /Plano de Desenvolvimento do Mentorado/,
       /Roda da Vida/,
       /Avaliação 360º/,
+      /Avaliação Geral de Mentores - 360º/,
     ]) {
       await expect(page.getByRole("link", { name: titulo })).toHaveCount(0);
     }
 
-    // os 4 oficiais de bordo moram na prateleira read-only
+    // os oficiais de bordo moram na prateleira read-only — só os dois
+    // intakes restaram (a anamnese e a autoavaliação saíram na REALIZA-236,
+    // especialista/desfecho na 0134, o 360º do mentor virou régua)
     const sec = page.locator("section", {
       hasText: "Instrumentos do sistema",
     });
     await expect(sec).toBeVisible();
-    await expect(sec.getByRole("listitem")).toHaveCount(4);
+    await expect(sec.getByRole("listitem")).toHaveCount(2);
     for (const titulo of [
-      /Anamnese Social/,
-      /Autoavaliação do mentor/,
-      /Avaliação geral da trilha de especialista/,
       /Inscrição de mentores · Matching de Mentores/,
+      /Inscrição de mentorados · Matching de Mentorados/,
     ]) {
       await expect(sec.getByRole("link", { name: titulo })).toBeVisible();
     }

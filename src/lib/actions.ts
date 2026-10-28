@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { AVATAR_MAX_BYTES, avisoImagemGrande } from "@/lib/avatar";
 import {
   COR_RACAS,
   DOCUMENTO_PESSOA_TIPOS,
@@ -19,6 +20,8 @@ import {
   podeSupervisionar,
 } from "@/lib/ciclo";
 import { capitalizar, cpfValido, erroAmigavel, nomeProprio } from "@/lib/utils";
+import { desfechoValido } from "@/lib/dupla-desfecho";
+import type { DuplaDesfecho } from "@/lib/dupla-desfecho";
 import { snapshotDuplaHoje } from "@/lib/jobs";
 import { temPapel } from "@/lib/types";
 import type { AppRole, ComunicadoPrioridade, CorRaca, Cronograma, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, SituacaoMentorado, Trilha } from "@/lib/types";
@@ -45,6 +48,8 @@ import {
   type ResolucaoPar,
 } from "@/lib/importar-duplas";
 import { notificar } from "./notificar";
+import { bloqueioTrocaPapel } from "./papel-vinculo";
+import { AUDIENCIAS, audienciaLegada } from "./materiais";
 import { ROLES_POR_AUDIENCIA } from "@/lib/email";
 import {
   dispararComunicadoEmail,
@@ -87,7 +92,9 @@ async function me() {
 }
 
 const FOTO_TIPOS = ["image/png", "image/jpeg", "image/webp"];
-const FOTO_MAX = 2 * 1024 * 1024;
+// mesmo teto do browser (AVATAR_MAX_BYTES) — o server não pode recusar o que
+// o perfil aceitou
+const FOTO_MAX = AVATAR_MAX_BYTES;
 
 type Supa = Awaited<ReturnType<typeof createClient>>;
 
@@ -105,7 +112,7 @@ async function subirFoto(
     return { aviso: "A foto não entrou. Use PNG, JPG ou WebP." };
   }
   if (foto.size > FOTO_MAX) {
-    return { aviso: "A foto não entrou. Use uma imagem de até 2 MB." };
+    return { aviso: `A foto não entrou. ${avisoImagemGrande(foto.size)}` };
   }
   const ext = foto.name.split(".").pop()?.toLowerCase() ?? "png";
   const path = `${pasta}/${crypto.randomUUID()}.${ext}`;
@@ -858,20 +865,124 @@ export async function setPessoaRole(profileId: string, role: string | null) {
         "O papel de mentorado vem do vínculo com o cadastro do jovem — não é concedido por aqui.",
     };
   }
-  const novoRole = role && (ROLES as readonly string[]).includes(role) ? role : null;
-  // trocar papel de quem está em dupla ativa/pausada deixa a dupla apontando
-  // pra quem não é mais mentor/supervisor — e como as policies de escrita
-  // amarram mentor_id (não o papel), a pessoa manteria escrita indevida
+  // 'mentor_hibrido' é o valor composto do RoleSelect (REALIZA-262): DPP +
+  // especialista juntos. Em papel ele é {mentor_dpp + secundário
+  // mentor_especialista} — o primário continua sendo quem já era.
+  const hibrido = role === "mentor_hibrido";
+  const novoRole = hibrido
+    ? "mentor_dpp"
+    : role && (ROLES as readonly string[]).includes(role) ? role : null;
+  // papéis atuais: os dois caminhos de híbrido abaixo só tocam papéis
+  // SECUNDÁRIOS de mentor — a guarda de vínculo (mais abaixo) protege troca
+  // de primário; aqui nada que sustente uma dupla em curso é removido
+  const { data: ppAtuais } = await supabase
+    .from("profile_papeis")
+    .select("papel, primario")
+    .eq("profile_id", profileId);
+  const ehPapelMentor = (p: string | null) =>
+    p === "mentor_dpp" || p === "mentor_especialista";
+  const mentorSet = new Set(
+    (ppAtuais ?? []).map((r) => r.papel).filter(ehPapelMentor)
+  );
+  const primarioAtual =
+    (ppAtuais ?? []).find((r) => r.primario)?.papel ?? null;
+
+  // conceder o lado que falta: primário já é mentor_* → só entra o
+  // secundário. O mentor em dupla DPP ativa pode virar híbrido sem passar
+  // pelo "mova a dupla antes" — nada deixa de existir pra ele
+  if (hibrido && primarioAtual && ehPapelMentor(primarioAtual)) {
+    const falta =
+      primarioAtual === "mentor_dpp" ? "mentor_especialista" : "mentor_dpp";
+    if (!mentorSet.has(falta)) {
+      const { error } = await supabase
+        .from("profile_papeis")
+        .upsert(
+          { profile_id: profileId, papel: falta },
+          { ignoreDuplicates: true }
+        );
+      if (error) return { error: erroAmigavel(error) };
+    }
+    revalidatePath("/pessoas");
+    revalidatePath(`/pessoas/${profileId}`);
+    return { ok: true };
+  }
+
+  // voltar pra um lado só: tira o outro papel mentor. A trilha que sai não
+  // pode ter dupla em curso — a guarda é por trilha, não a guarda ampla de
+  // vínculo (que bloquearia tirar a especialista de quem segue em dupla DPP)
+  if (
+    (role === "mentor_dpp" || role === "mentor_especialista") &&
+    primarioAtual &&
+    ehPapelMentor(primarioAtual) &&
+    mentorSet.size > 1
+  ) {
+    const outro =
+      role === "mentor_dpp" ? "mentor_especialista" : "mentor_dpp";
+    const trilhaOutro = outro === "mentor_dpp" ? "dpp" : "especialista";
+    const { data: emCurso } = await supabase
+      .from("duplas")
+      .select("id")
+      .eq("mentor_id", profileId)
+      .eq("trilha", trilhaOutro)
+      .in("status", ["ativa", "pausada"])
+      .limit(1);
+    if (emCurso?.length) {
+      return {
+        error: `A pessoa segue em dupla ${trilhaOutro === "dpp" ? "DPP" : "de especialista"} ativa ou pausada. Encerre ou reatribua antes de tirar esse lado do papel.`,
+      };
+    }
+    if (primarioAtual !== role) {
+      // promove o lado escolhido — o trigger rebaixa o outro e o delete
+      // abaixo já o encontra não-primário
+      const { error: upErr } = await supabase
+        .from("profiles")
+        .update({ role })
+        .eq("id", profileId)
+        .select("id");
+      if (upErr) return { error: erroAmigavel(upErr) };
+    }
+    const { error: delErr } = await supabase
+      .from("profile_papeis")
+      .delete()
+      .eq("profile_id", profileId)
+      .eq("papel", outro);
+    if (delErr) return { error: erroAmigavel(delErr) };
+    // tipo do mentor_profiles acompanha o primário (mesma regra do fim)
+    const { error: mpErr } = await supabase.from("mentor_profiles").upsert({
+      profile_id: profileId,
+      tipo: role === "mentor_especialista" ? "especialista" : "dpp",
+    });
+    if (mpErr) return { error: erroAmigavel(mpErr) };
+    revalidatePath("/pessoas");
+    revalidatePath(`/pessoas/${profileId}`);
+    return { ok: true };
+  }
+
+  // trocar papel de quem sustenta uma dupla ativa/pausada só bloqueia quando
+  // o papel NOVO deixa a dupla sem quem a conduza — as policies de escrita
+  // amarram mentor_id/supervisor_id, não o papel. Auxiliar → auxiliar e
+  // coordenação → auxiliar de quem já acompanha as mesmas duplas passam
+  // (era o falso bloqueio na troca da Adriana).
   const { data: vinculos } = await supabase
     .from("duplas")
-    .select("id")
+    .select("mentor_id, supervisor_id")
     .or(`mentor_id.eq.${profileId},supervisor_id.eq.${profileId}`)
-    .in("status", ["ativa", "pausada"])
-    .limit(1);
-  if (vinculos?.length) {
+    .in("status", ["ativa", "pausada"]);
+  const bloqueio = bloqueioTrocaPapel(
+    profileId,
+    role as AppRole | "mentor_hibrido" | null,
+    vinculos ?? []
+  );
+  if (bloqueio === "mentor") {
     return {
       error:
-        "A pessoa está em uma dupla ativa ou pausada. Pause, encerre ou reatribua a dupla antes de mudar o papel.",
+        "A pessoa é mentor(a) de uma dupla ativa ou pausada. Reatribua a dupla antes de mudar o papel.",
+    };
+  }
+  if (bloqueio === "auxiliar") {
+    return {
+      error:
+        "A pessoa acompanha uma dupla ativa ou pausada como auxiliar executivo. Reatribua ou pause a dupla antes de mudar o papel.",
     };
   }
   // o mesmo check pelo lado do jovem (D1): se o profile é o login de um
@@ -906,6 +1017,37 @@ export async function setPessoaRole(profileId: string, role: string | null) {
   // RLS esconde a linha → 0 rows sem erro; não pode fingir que salvou
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  }
+
+  // híbrido a partir de primário não-mentor (coord/auxiliar → DPP+esp): o
+  // update acima projetou o mentor_dpp primário; entra o lado especialista
+  // como secundário. O insert no dpp cobre o canto de profile_papeis vazio
+  // desatualizado — ignoreDuplicates torna os dois no-ops quando já existem
+  if (hibrido) {
+    for (const papel of ["mentor_dpp", "mentor_especialista"] as const) {
+      const { error } = await supabase
+        .from("profile_papeis")
+        .upsert({ profile_id: profileId, papel }, { ignoreDuplicates: true });
+      if (error) return { error: erroAmigavel(error) };
+    }
+  }
+
+  // o trigger role→papeis só ACRESCENTA e troca o primário: sem esta
+  // limpeza, coordenação → auxiliar deixava `coordenacao` de pé como papel
+  // secundário e a pessoa seguia com telas e poderes de coordenação (o app
+  // lê o CONJUNTO de papéis, não só o primário)
+  const papeisQueFicam = hibrido
+    ? (["mentor_dpp", "mentor_especialista"] as const)
+    : novoRole
+      ? ([novoRole] as const)
+      : ([] as const);
+  if (papeisQueFicam.length) {
+    const { error: erroLimpeza } = await supabase
+      .from("profile_papeis")
+      .delete()
+      .eq("profile_id", profileId)
+      .not("papel", "in", `(${papeisQueFicam.join(",")})`);
+    if (erroLimpeza) return { error: erroAmigavel(erroLimpeza) };
   }
 
   // mentor_profiles acompanha o CONJUNTO de papéis efetivos, não só o
@@ -1026,6 +1168,46 @@ export async function setEscopoAuxiliar(
 
 // ---------- gestao ----------
 
+/** Dados civis do termo (0046) — CPF, RG e endereço, coluna coord-only.
+ *  Merge parcial: só os campos que o form mandou entram; o resto do jsonb
+ *  fica como estava. CPF com DV conferido, CEP só dígitos. */
+function camposCivis(
+  formData: FormData,
+  atual: DadosCivis | null
+): { dados_civis: DadosCivis } | { error: string } | Record<string, never> {
+  const chaves = [
+    "civ_cpf", "civ_rg", "civ_cep", "civ_logradouro", "civ_numero",
+    "civ_complemento", "civ_bairro", "civ_cidade", "civ_uf",
+  ];
+  if (!chaves.some((k) => formData.has(k))) return {};
+
+  const texto = (k: string, anterior: string | null | undefined) =>
+    formData.has(k) ? String(formData.get(k) ?? "").trim() || null : (anterior ?? null);
+
+  const cpfRaw = String(formData.get("civ_cpf") ?? "").replace(/\D/g, "");
+  if (cpfRaw && !cpfValido(cpfRaw)) {
+    return { error: "Confira o CPF (dígito verificador)." };
+  }
+  const e = atual?.endereco;
+  return {
+    dados_civis: {
+      nome_civil: atual?.nome_civil ?? null,
+      data_nascimento: atual?.data_nascimento ?? null,
+      cpf: cpfRaw || null,
+      rg: texto("civ_rg", atual?.rg),
+      endereco: {
+        logradouro: texto("civ_logradouro", e?.logradouro) ?? "",
+        numero: texto("civ_numero", e?.numero) ?? "",
+        complemento: texto("civ_complemento", e?.complemento),
+        bairro: texto("civ_bairro", e?.bairro) ?? "",
+        cidade: texto("civ_cidade", e?.cidade) ?? "",
+        uf: (texto("civ_uf", e?.uf) ?? "").toUpperCase().slice(0, 2),
+        cep: (texto("civ_cep", e?.cep) ?? "").replace(/\D/g, "").slice(0, 8),
+      },
+    },
+  };
+}
+
 export async function updatePessoa(profileId: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -1058,28 +1240,68 @@ export async function updatePessoa(profileId: string, formData: FormData) {
     return { error: "Informe uma capacidade de pelo menos 1." };
   }
 
-  // e-mail = identidade do link de acesso; só muda enquanto a pessoa nunca entrou
+  // e-mail = identidade do link de acesso; a coordenação corrige o de
+  // qualquer um por aqui — inclusive de quem já entrou (auth.users + trigger
+  // 0060). A pessoa troca o próprio em /perfil (trocarEmail).
   const { data: atual } = await supabase
-    .from("profiles").select("user_id, role, consent_lgpd_em, profile_papeis(papel)").eq("id", profileId).single();
+    .from("profiles").select("user_id, role, email, dados_civis, consent_lgpd_em, profile_papeis(papel)").eq("id", profileId).single();
   // campos de apresentação (0030) — a coordenação edita os mesmos que a
   // pessoa edita em /perfil; o form manda `areas_perfil` porque `areas` já é
   // o campo do mentor_profile
   const apresentacao = camposApresentacao(formData, { areasKey: "areas_perfil" });
   if ("error" in apresentacao) return { error: apresentacao.error };
   // ficha pessoal/matching (0034) — a escrita é table-level: coord edita de
-  // qualquer um; os sensíveis que ela lê via view ela também grava aqui
-  const ficha = camposFicha(formData, { de: "pessoa" });
+  // qualquer um; os sensíveis que ela lê via view ela também grava aqui.
+  // Patch parcial de propósito: campo que o form não renderiza (a preferência
+  // de par de quem não é mentor, REALIZA-231) não pode virar null no save —
+  // o dado já gravado sobrevive a uma edição feita por outro recorte de papel.
+  const ficha = camposFicha(formData, { de: "pessoa", parcial: true });
   if ("error" in ficha) return { error: ficha.error };
   const mentorCampos = camposMentor(formData);
   if ("error" in mentorCampos) return { error: mentorCampos.error };
+  // dados civis do termo (0046) — CPF/RG/endereço, coord-only
+  const civis = camposCivis(formData, (atual?.dados_civis ?? null) as DadosCivis | null);
+  if ("error" in civis) return { error: civis.error };
   const patch: Record<string, unknown> = {
     nome,
     whatsapp: whatsapp || null,
     ...apresentacao,
     ...ficha,
+    ...civis,
     ...consentPatch(formData, atual?.consent_lgpd_em),
   };
-  if (email && !atual?.user_id) patch.email = email;
+  // quem já tem login troca o e-mail no auth.users (o trigger 0060 espelha
+  // em profiles.email); quem nunca entrou grava direto na row
+  let emailMudou = false;
+  if (email && email !== (atual?.email ?? "").toLowerCase()) {
+    if (!atual?.user_id) {
+      patch.email = email;
+    } else {
+      const { data: livre, error: erroRpc } = await supabase.rpc(
+        "email_disponivel",
+        { p_email: email }
+      );
+      if (erroRpc) {
+        return { error: "Não foi possível verificar o e-mail. Tente de novo." };
+      }
+      if (!livre) {
+        return { error: "Esse e-mail já está em outro cadastro do programa." };
+      }
+      const { createAdminClient } = await import("./supabase/admin");
+      const { error: erroAuth } = await createAdminClient().auth.admin.updateUserById(
+        atual.user_id,
+        { email, email_confirm: true }
+      );
+      if (erroAuth) {
+        return {
+          error: /already|registered|exists|duplicate/i.test(erroAuth.message)
+            ? "Esse e-mail já está em outro cadastro do programa."
+            : "Não foi possível trocar o e-mail. Tente de novo.",
+        };
+      }
+      emailMudou = true;
+    }
+  }
 
   const { data, error } = await supabase
     .from("profiles").update(patch).eq("id", profileId).select("id");
@@ -1089,7 +1311,9 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   }
 
   // foto nova: sobe na pasta do dono, troca o path e remove o arquivo antigo
-  let aviso: string | undefined;
+  let aviso: string | undefined = emailMudou
+    ? "E-mail de acesso trocado: a pessoa entra com o endereço novo e a senha que já tem."
+    : undefined;
   const foto = await subirFoto(supabase, profileId, formData);
   if (foto.path) {
     const { data: atualAv } = await supabase
@@ -1601,7 +1825,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   // então só valida quando o novo status volta a contar. A própria dupla sai da
   // conta (.neq) pra edição simples não brigar com ela mesma
   const { data: atualDupla } = await supabase
-    .from("duplas").select("mentor_id, mentorado_id, supervisor_id, status, trilha, cronograma_id").eq("id", duplaId).single();
+    .from("duplas").select("mentor_id, mentorado_id, supervisor_id, status, trilha, cronograma_id, desfecho, desfecho_motivo, desfecho_obs").eq("id", duplaId).single();
   if (atualDupla && trilhaNova !== atualDupla.trilha) {
     const { count } = await supabase
       .from("encontros")
@@ -1693,6 +1917,44 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       }
     }
   }
+  // desfecho auditável (0140): validar quando a dupla fecha (ou quando o
+  // desfecho muda mesmo com status igual). Reabrir limpa os carimbos.
+  const statusMudouDupla = !!atualDupla && status !== atualDupla.status;
+  const desfechoVeio = formData.has("desfecho");
+  const desfechoRaw = desfechoVeio
+    ? String(formData.get("desfecho") ?? "").trim()
+    : "";
+  const desfechoAtual = (atualDupla?.desfecho ?? null) as string | null;
+  const desfechoNovo = desfechoVeio && desfechoRaw !== (desfechoAtual ?? "");
+  const encerrando =
+    statusMudouDupla && (status === "encerrada" || status === "concluida");
+  const desfechoMudouMesmoStatus =
+    !statusMudouDupla &&
+    (status === "encerrada" || status === "concluida") &&
+    desfechoNovo;
+  const reabrindo =
+    statusMudouDupla &&
+    (status === "ativa" || status === "pausada") &&
+    (atualDupla?.status === "encerrada" || atualDupla?.status === "concluida");
+  if (encerrando || desfechoMudouMesmoStatus) {
+    const motivoEfetivo = formData.has("desfecho_motivo")
+      ? String(formData.get("desfecho_motivo") ?? "").trim() || null
+      : desfechoMudouMesmoStatus
+        ? ((atualDupla as { desfecho_motivo?: string | null } | null)?.desfecho_motivo ?? null)
+        : null;
+    const obsEfetiva = formData.has("desfecho_obs")
+      ? String(formData.get("desfecho_obs") ?? "").trim() || null
+      : desfechoMudouMesmoStatus
+        ? ((atualDupla as { desfecho_obs?: string | null } | null)?.desfecho_obs ?? null)
+        : null;
+    const erroDesfecho = desfechoValido({
+      desfecho: (desfechoRaw || null) as DuplaDesfecho | null,
+      motivo: motivoEfetivo,
+      obs: obsEfetiva,
+    });
+    if (erroDesfecho) return { error: erroDesfecho };
+  }
+
   // iniciada_em em branco preserva a data atual — zerar mudaria a base do semáforo
   const patch: Record<string, unknown> = {
     mentor_id,
@@ -1712,6 +1974,28 @@ export async function updateDupla(duplaId: string, formData: FormData) {
       ? { encerrada_em: null, motivo_encerramento: null, devolutiva_pdm: null }
       : {}),
   };
+  // desfecho auditável (0140): grava quando fecha/muda; limpa quando reabre.
+  if (encerrando || desfechoMudouMesmoStatus) {
+    patch.desfecho = desfechoRaw ? (desfechoRaw as DuplaDesfecho) : null;
+    patch.desfecho_motivo = formData.has("desfecho_motivo")
+      ? String(formData.get("desfecho_motivo") ?? "").trim() || null
+      : desfechoMudouMesmoStatus
+        ? (atualDupla?.desfecho_motivo ?? null)
+        : null;
+    patch.desfecho_obs = formData.has("desfecho_obs")
+      ? String(formData.get("desfecho_obs") ?? "").trim() || null
+      : desfechoMudouMesmoStatus
+        ? (atualDupla?.desfecho_obs ?? null)
+        : null;
+    patch.desfecho_em = new Date().toISOString();
+    patch.desfecho_por = eu.id;
+  } else if (reabrindo) {
+    patch.desfecho = null;
+    patch.desfecho_motivo = null;
+    patch.desfecho_obs = null;
+    patch.desfecho_em = null;
+    patch.desfecho_por = null;
+  }
   // cronograma: troca explícita do dialog move a dupla E o label da turma;
   // "Sem vínculo" desvincula (histórica/encerrada ficam sem calendário);
   // migração DPP→especialista solta o vínculo (a trilha não tem calendário);
@@ -1749,6 +2033,39 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   if (error) return { error: erroAmigavel(error) };
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
+  }
+  // desfecho auditável (0140): append-only em dupla_eventos. Só escreve
+  // quando houve mudança de status ou de desfecho — caso contrário, nada.
+  const desfechoChanged = encerrando || desfechoMudouMesmoStatus || reabrindo;
+  const tipoEvento =
+    statusMudouDupla || desfechoMudouMesmoStatus
+      ? desfechoChanged
+        ? "desfecho"
+        : "status"
+      : null;
+  if (tipoEvento) {
+    const evDesfecho = Object.prototype.hasOwnProperty.call(patch, "desfecho")
+      ? (patch.desfecho ?? null)
+      : (desfechoAtual ?? null);
+    const evMotivo = Object.prototype.hasOwnProperty.call(patch, "desfecho_motivo")
+      ? (patch.desfecho_motivo ?? null)
+      : (atualDupla?.desfecho_motivo ?? null);
+    const evObs = Object.prototype.hasOwnProperty.call(patch, "desfecho_obs")
+      ? (patch.desfecho_obs ?? null)
+      : (atualDupla?.desfecho_obs ?? null);
+    const { error: evErr } = await supabase
+      .from("dupla_eventos" as never)
+      .insert({
+        dupla_id: duplaId,
+        tipo: tipoEvento,
+        de: atualDupla?.status ?? null,
+        para: status,
+        desfecho: evDesfecho,
+        motivo: evMotivo,
+        observacao: evObs,
+        por: eu.id,
+      });
+    if (evErr) return { error: erroAmigavel(evErr) };
   }
   // troca de mentor/supervisor notifica os DOIS lados — quem entra precisa
   // saber que assumiu, e quem sai não pode ver a dupla sumir sem explicação.
@@ -3575,7 +3892,22 @@ export async function conflitoEncontro(
 // ---------- materiais ----------
 
 const TIPOS_MATERIAL = ["guia", "template", "conteudo", "link"] as const;
-const AUDIENCIAS_MATERIAL = ["todos", "dpp", "especialista", "coordenacao"] as const;
+const AUDIENCIAS_MATERIAL = AUDIENCIAS;
+
+/** Material fala por papel; o disparo de e-mail tem vocabulário próprio
+ *  (todos | dpp | especialista | equipe | coordenacao). Auxiliar executivo e
+ *  mentorando ainda não têm lista de e-mail própria — não entram no disparo
+ *  automático (o material continua visível pra eles no app). */
+function audienciasEmail(audiencias: readonly string[]): string[] {
+  const out = new Set<string>();
+  for (const a of audiencias) {
+    if (a === "todos") out.add("todos");
+    else if (a === "mentor_dpp") out.add("dpp");
+    else if (a === "mentor_especialista") out.add("especialista");
+    else if (a === "coordenacao") out.add("coordenacao");
+  }
+  return [...out];
+}
 
 /** Path do arquivo oficial — gerado no client como `materiais/{uuid}-{nome-saneado}`. */
 const MATERIAL_PATH_RE = /^materiais\/[0-9a-f-]{36}-[a-zA-Z0-9._-]+$/;
@@ -3587,9 +3919,15 @@ export async function salvarMaterial(formData: FormData) {
   const titulo = String(formData.get("titulo") ?? "").trim();
   if (!titulo) return { error: "Título é obrigatório." };
   const tipo = String(formData.get("tipo") || "link");
-  const audiencia = String(formData.get("audiencia") || "todos");
-  if (!(TIPOS_MATERIAL as readonly string[]).includes(tipo) ||
-      !(AUDIENCIAS_MATERIAL as readonly string[]).includes(audiencia)) {
+  const audiencias = String(formData.get("audiencias") || "todos")
+    .split(",")
+    .map((a) => a.trim())
+    .filter(Boolean);
+  if (
+    !(TIPOS_MATERIAL as readonly string[]).includes(tipo) ||
+    !audiencias.length ||
+    audiencias.some((a) => !(AUDIENCIAS_MATERIAL as readonly string[]).includes(a))
+  ) {
     return { error: "Revise os campos: um dos valores não é válido." };
   }
   const url = String(formData.get("url") ?? "").trim() || null;
@@ -3609,10 +3947,14 @@ export async function salvarMaterial(formData: FormData) {
   // numera dentro dos 5 passos dela, o resto dentro do ciclo DPP. O teto é
   // o maior nº entre TODOS os cronogramas (material não é por turma — a 0061
   // deixa o número solto até uma decisão de escopo própria)
-  const maxNumMat =
-    audiencia === "especialista"
-      ? maxEncontros("especialista")
-      : (maxEv?.numero ?? 16);
+  // material só da trilha de especialista numera dentro dos 5 passos dela
+  const soEspecialista =
+    audiencias.includes("mentor_especialista") &&
+    !audiencias.includes("mentor_dpp") &&
+    !audiencias.includes("todos");
+  const maxNumMat = soEspecialista
+    ? maxEncontros("especialista")
+    : (maxEv?.numero ?? 16);
   if (
     encontroRaw &&
     (!Number.isInteger(encontroNum) || encontroNum! < 1 || encontroNum! > maxNumMat)
@@ -3629,7 +3971,8 @@ export async function salvarMaterial(formData: FormData) {
     tipo,
     url,
     path,
-    audiencia,
+    audiencia: audienciaLegada(audiencias),
+    audiencias,
     encontro_num: encontroNum,
     ordem: (maxOrd?.ordem ?? 0) + 1,
   }).select("id").single();
@@ -3641,10 +3984,12 @@ export async function salvarMaterial(formData: FormData) {
   const email = await dispararMaterialEmail({
     supabase,
     material: { id: novo.id as string, titulo, descricao, tipo, url, path },
-    audiencias: [audiencia],
+    audiencias: audienciasEmail(audiencias),
     autorId: eu.id,
     excluirRoles:
-      audiencia === "todos" && encontroNum != null ? ["mentorado"] : undefined,
+      audiencias.includes("todos") && encontroNum != null
+        ? ["mentorado"]
+        : undefined,
   });
   revalidatePath("/materiais");
   // id volta pro client poder desfazer a row se o upload do arquivo falhar
@@ -3658,9 +4003,15 @@ export async function editarMaterial(id: string, formData: FormData) {
   const titulo = String(formData.get("titulo") ?? "").trim();
   if (!titulo) return { error: "Título é obrigatório." };
   const tipo = String(formData.get("tipo") || "link");
-  const audiencia = String(formData.get("audiencia") || "todos");
-  if (!(TIPOS_MATERIAL as readonly string[]).includes(tipo) ||
-      !(AUDIENCIAS_MATERIAL as readonly string[]).includes(audiencia)) {
+  const audiencias = String(formData.get("audiencias") || "todos")
+    .split(",")
+    .map((a) => a.trim())
+    .filter(Boolean);
+  if (
+    !(TIPOS_MATERIAL as readonly string[]).includes(tipo) ||
+    !audiencias.length ||
+    audiencias.some((a) => !(AUDIENCIAS_MATERIAL as readonly string[]).includes(a))
+  ) {
     return { error: "Revise os campos: um dos valores não é válido." };
   }
   const url = String(formData.get("url") ?? "").trim() || null;
@@ -3670,10 +4021,13 @@ export async function editarMaterial(id: string, formData: FormData) {
   const { data: maxEv } = await supabase
     .from("ciclo_eventos").select("numero")
     .eq("tipo", "encontro").order("numero", { ascending: false }).limit(1).maybeSingle();
-  const maxNumMat =
-    audiencia === "especialista"
-      ? maxEncontros("especialista")
-      : (maxEv?.numero ?? 16);
+  const soEspecialista =
+    audiencias.includes("mentor_especialista") &&
+    !audiencias.includes("mentor_dpp") &&
+    !audiencias.includes("todos");
+  const maxNumMat = soEspecialista
+    ? maxEncontros("especialista")
+    : (maxEv?.numero ?? 16);
   if (
     encontroRaw &&
     (!Number.isInteger(encontroNum) || encontroNum! < 1 || encontroNum! > maxNumMat)
@@ -3687,7 +4041,8 @@ export async function editarMaterial(id: string, formData: FormData) {
       descricao: String(formData.get("descricao") ?? "").trim() || null,
       tipo,
       url,
-      audiencia,
+      audiencia: audienciaLegada(audiencias),
+      audiencias,
       encontro_num: encontroNum,
     })
     .eq("id", id)

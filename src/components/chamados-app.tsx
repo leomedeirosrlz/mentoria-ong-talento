@@ -9,6 +9,7 @@ import {
   useTransition,
   type ChangeEvent,
   type ComponentType,
+  type CSSProperties,
   type KeyboardEvent,
 } from "react";
 import { useRouter } from "next/navigation";
@@ -93,6 +94,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { FiltrosButton } from "@/components/ui/filtros-button";
 import { Avatar } from "@/components/avatar";
 import { NovoChamadoDialog } from "@/components/novo-chamado-dialog";
 import {
@@ -127,6 +129,9 @@ const STATUS_TOM: Record<ChamadoStatus, string> = {
     "border-[var(--warn)]/50 bg-[var(--warn)]/10 text-[var(--warn-text)]",
   resolvido: "border-[var(--ok)]/50 bg-[var(--ok)]/10 text-[var(--ok-text)]",
 };
+
+const OVERLINE =
+  "text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]";
 
 const primeiroNome = (n: string) => n.split(" ")[0];
 
@@ -256,6 +261,36 @@ export function ChamadosApp({
   >("todos");
   const [fCategoria, setFCategoria] = useState<string>("todas");
   const [fStatus, setFStatus] = useState<string>("todos");
+  // categoria/estado são secundários — moram no painel "Filtros (n)",
+  // não na barra (o modal aplica de uma vez, como em /registros)
+  const [painelAberto, setPainelAberto] = useState(false);
+  const [draftCat, setDraftCat] = useState("todas");
+  const [draftStatus, setDraftStatus] = useState("todos");
+
+  // critério só oferece valores que existem na fila — categoria/estado
+  // sem nenhum chamado não filtra nada; select com <2 opções úteis nem
+  // renderiza (um filtro ativo mantém o controle pra não prender ninguém)
+  const categoriasPresentes = useMemo(
+    () =>
+      Object.keys(CHAMADO_CATEGORIA_LABEL).filter((k) =>
+        itens.some((c) => c.categoria === k)
+      ),
+    [itens]
+  );
+  const estadosPresentes = useMemo(
+    () =>
+      Object.keys(CHAMADO_STATUS_LABEL).filter((k) =>
+        itens.some((c) => c.status === k)
+      ),
+    [itens]
+  );
+  const catShow = categoriasPresentes.length >= 2 || fCategoria !== "todas";
+  const statusShow = estadosPresentes.length >= 2 || fStatus !== "todos";
+  const temSecundarios = catShow || statusShow;
+  const ativosSec =
+    (fCategoria !== "todas" ? 1 : 0) + (fStatus !== "todos" ? 1 : 0);
+  const draftAtivos =
+    (draftCat !== "todas" ? 1 : 0) + (draftStatus !== "todos" ? 1 : 0);
 
   const filtrados = useMemo(() => {
     let l = itens;
@@ -346,6 +381,29 @@ export function ChamadosApp({
                 )}
               </span>
             </div>
+            {/* "Busca + Filtros (n)" — a linha compacta; categoria/estado
+                são secundários e moram no painel (Dialog, padrão
+                /registros). Chips de fila ficam inline por serem a
+                navegação principal, e chip com 0 resultado não renderiza */}
+            <div className="flex items-center gap-2">
+              <Input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar nº, assunto ou autor…"
+                aria-label="Buscar chamado"
+                className="h-11 min-w-0 flex-1 text-sm md:h-9 md:max-w-64"
+              />
+              {temSecundarios && (
+                <FiltrosButton
+                  ativos={ativosSec}
+                  onClick={() => {
+                    setDraftCat(fCategoria);
+                    setDraftStatus(fStatus);
+                    setPainelAberto(true);
+                  }}
+                />
+              )}
+            </div>
             <div
               role="group"
               aria-label="Filtrar por fila"
@@ -359,78 +417,130 @@ export function ChamadosApp({
                   ["meus", "Meus"],
                   ["resolvidos", "Resolvidos"],
                 ] as const
-              ).map(([v, l]) => (
-                <button
-                  key={v}
-                  onClick={() => setFFila(v)}
-                  aria-pressed={fFila === v}
-                  className={cn(
-                    "min-h-11 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8",
-                    fFila === v
-                      ? "border-transparent bg-foreground text-background"
-                      : "border-border bg-card text-muted-foreground hover:bg-muted"
-                  )}
-                >
-                  {l}{" "}
-                  <span
+              ).map(([v, l]) => {
+                const n = contFila[v];
+                // chip com 0 resultado não filtra nada — esconde (o ativo
+                // fica pra não prender a pessoa num filtro sem saída)
+                if (v !== "todos" && n === 0 && fFila !== v) return null;
+                return (
+                  <button
+                    key={v}
+                    onClick={() => setFFila(v)}
+                    aria-pressed={fFila === v}
                     className={cn(
-                      "text-[10px] font-semibold tabular-nums",
-                      fFila === v ? "opacity-70" : "text-muted-foreground"
+                      "min-h-11 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8",
+                      fFila === v
+                        ? "border-transparent bg-foreground text-background"
+                        : "border-border bg-card text-muted-foreground hover:bg-muted"
                     )}
                   >
-                    {contFila[v]}
-                  </span>
-                </button>
-              ))}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Select
-                value={fCategoria}
-                onValueChange={(v) => setFCategoria(v ?? "todas")}
-              >
-                <SelectTrigger
-                  className="h-11 w-auto min-w-32 max-w-48 text-xs md:h-8"
-                  aria-label="Filtrar por categoria"
-                >
-                  <SelectValue placeholder="Categoria" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todas">Todas as categorias</SelectItem>
-                  {Object.entries(CHAMADO_CATEGORIA_LABEL).map(([v, l]) => (
-                    <SelectItem key={v} value={v}>
-                      {l}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select
-                value={fStatus}
-                onValueChange={(v) => setFStatus(v ?? "todos")}
-              >
-                <SelectTrigger
-                  className="h-11 w-auto min-w-32 max-w-48 text-xs md:h-8"
-                  aria-label="Filtrar por estado"
-                >
-                  <SelectValue placeholder="Estado" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="todos">Todos os estados</SelectItem>
-                  {Object.entries(CHAMADO_STATUS_LABEL).map(([v, l]) => (
-                    <SelectItem key={v} value={v}>
-                      {l}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Input
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                placeholder="Buscar nº, assunto ou autor…"
-                aria-label="Buscar chamado"
-                className="h-11 w-full text-sm md:h-8 md:max-w-52"
-              />
+                    {l}{" "}
+                    <span
+                      className={cn(
+                        "text-[10px] font-semibold tabular-nums",
+                        fFila === v ? "opacity-70" : "text-muted-foreground"
+                      )}
+                    >
+                      {n}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
+        )}
+        {staff && (
+          <Dialog open={painelAberto} onOpenChange={setPainelAberto}>
+            <DialogContent size="md">
+              <DialogHeader>
+                <DialogTitle>Filtros</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                {catShow && (
+                  <fieldset>
+                    <legend className={OVERLINE}>Categoria</legend>
+                    <div className="mt-1.5">
+                      <Select
+                        value={draftCat}
+                        onValueChange={(v) => setDraftCat(v ?? "todas")}
+                      >
+                        <SelectTrigger aria-label="Filtrar por categoria">
+                          <SelectValue placeholder="Categoria" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todas">
+                            Todas as categorias
+                          </SelectItem>
+                          {categoriasPresentes.map((v) => (
+                            <SelectItem key={v} value={v}>
+                              {
+                                CHAMADO_CATEGORIA_LABEL[
+                                  v as keyof typeof CHAMADO_CATEGORIA_LABEL
+                                ]
+                              }
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </fieldset>
+                )}
+                {statusShow && (
+                  <fieldset>
+                    <legend className={OVERLINE}>Estado</legend>
+                    <div className="mt-1.5">
+                      <Select
+                        value={draftStatus}
+                        onValueChange={(v) => setDraftStatus(v ?? "todos")}
+                      >
+                        <SelectTrigger aria-label="Filtrar por estado">
+                          <SelectValue placeholder="Estado" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="todos">
+                            Todos os estados
+                          </SelectItem>
+                          {estadosPresentes.map((v) => (
+                            <SelectItem key={v} value={v}>
+                              {
+                                CHAMADO_STATUS_LABEL[
+                                  v as keyof typeof CHAMADO_STATUS_LABEL
+                                ]
+                              }
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </fieldset>
+                )}
+              </div>
+              <DialogFooter sticky>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="sm:me-auto"
+                  disabled={draftAtivos === 0}
+                  onClick={() => {
+                    setDraftCat("todas");
+                    setDraftStatus("todos");
+                  }}
+                >
+                  Limpar
+                </Button>
+                <Button
+                  type="button"
+                  onClick={() => {
+                    setFCategoria(draftCat);
+                    setFStatus(draftStatus);
+                    setPainelAberto(false);
+                  }}
+                >
+                  Aplicar{draftAtivos > 0 ? ` (${draftAtivos})` : ""}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
         )}
         {!staff && (
           <div className="mb-3 flex items-center justify-between gap-3">
@@ -465,7 +575,12 @@ export function ChamadosApp({
             />
           </div>
         )}
-        <ul className="space-y-2">
+        {/* a troca de filtro/busca re-monta a lista — o animate-enter
+            re-roda por linha em vez de um repaint seco (convenção) */}
+        <ul
+          key={`${fFila}|${fCategoria}|${fStatus}|${busca}`}
+          className="space-y-2"
+        >
           {filtrados.length === 0 && (
             <li className="rounded-xl border border-dashed border-border px-5 py-8 text-center text-sm text-muted-foreground">
               {staff
@@ -473,8 +588,12 @@ export function ChamadosApp({
                 : "Você ainda não abriu nenhum pedido. Se precisar, é só tocar em “Novo pedido”."}
             </li>
           )}
-          {filtrados.map((c) => (
-            <li key={c.id} className="min-w-0">
+          {filtrados.map((c, i) => (
+            <li
+              key={c.id}
+              className="animate-enter min-w-0"
+              style={{ "--i": Math.min(i, 10) } as CSSProperties}
+            >
               <button
                 onClick={() => abrir(c.id)}
                 aria-current={sel === c.id ? "true" : undefined}

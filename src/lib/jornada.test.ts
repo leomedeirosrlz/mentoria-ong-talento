@@ -502,7 +502,9 @@ describe("estacoesJornada — trancada", () => {
           entrega360({
             status: "respondido",
             respondido_em: "2026-04-10T20:00:00-03:00",
-            respostas: { o_que_leva: "Levo a amizade e a disciplina das metas." },
+            respostas: {
+              depoimento_texto: "Levo a amizade e a disciplina das metas.",
+            },
           }),
         ],
       })

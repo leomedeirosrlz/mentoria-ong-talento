@@ -171,15 +171,18 @@ export function RodaVida({
         </div>
 
         {/* duas molduras do mesmo desenho: a compacta (números 1–16)
-            serve mobile e telas médias; a rotulada (coroa de nomes,
-            REALIZA-143) assume no desktop — display:none a tira da
-            árvore de a11y e dos eventos quando não está visível */}
+            serve containers estreitos (celular, dialog de prévia); a
+            rotulada (coroa de nomes, REALIZA-143) assume quando o espaço
+            é de desktop. Breakpoints de CONTAINER — o form público abre
+            tanto em /f quanto no dialog de preview (REALIZA-248).
+            display:none tira da árvore de a11y e dos eventos quando não
+            está visível */}
         <RodaSvg
           roda={roda}
           ativo={ativo}
           onMudanca={escolher}
           onFim={fimGesto}
-          className="mt-3 md:max-w-[360px] lg:hidden"
+          className="mt-3 max-w-[300px] @[24rem]:max-w-[360px] @[34rem]:hidden"
         />
         <RodaSvg
           roda={roda}
@@ -187,7 +190,7 @@ export function RodaVida({
           onMudanca={escolher}
           onFim={fimGesto}
           rotuloEixos
-          className="mt-3 hidden lg:block lg:max-w-[500px]"
+          className="mt-3 hidden @[34rem]:block @[34rem]:max-w-[500px]"
         />
         {/* anúncio do gesto pro leitor de tela — o svg é aria-hidden, a
             nota sai por aqui ao soltar o dedo */}

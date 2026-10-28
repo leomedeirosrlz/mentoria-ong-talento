@@ -94,7 +94,10 @@ export function IntakeRespostas({
       </div>
       <ol className="space-y-2">
         {respostas.map((r) => {
-          const promovida = !!r.promovido_profile_id;
+          // cada via carimba a própria coluna (profile × mentorado, 0129)
+          const criadoId =
+            r.promovido_profile_id ?? r.promovido_mentorado_id ?? null;
+          const promovida = !!criadoId;
           const contato = contatoCandidato(r);
           const disp = resumoDisponibilidade(r.respostas.disponibilidade);
           return (
@@ -187,7 +190,7 @@ export function IntakeRespostas({
                   <div className="flex flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2.5 sm:px-5">
                     {promovida ? (
                       <Link
-                        href={`/pessoas/${r.promovido_profile_id}`}
+                        href={`/pessoas/${criadoId}`}
                         className="text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
                       >
                         Abrir o cadastro criado

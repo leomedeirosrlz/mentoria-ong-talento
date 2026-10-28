@@ -67,9 +67,9 @@ function ehIntake(sistema: FormularioSistema | null | undefined): boolean {
 
 /** Formulário público /f/<token> — despacha pelo sistema do form: os 4
  *  instrumentos de jornada (0080) têm experiência sob medida
- *  (src/components/instrumentos); todo o resto — incluindo anamnese, 360º
- *  e autoavaliação — segue no renderer genérico. O contrato de submissão
- *  é o mesmo nas duas vias. */
+ *  (src/components/instrumentos); todo o resto — 360º, avaliação da
+ *  trilha, intakes e forms da coordenação — segue no renderer genérico. O
+ *  contrato de submissão é o mesmo nas duas vias. */
 export function FormularioPublico(props: {
   token: string;
   titulo: string;

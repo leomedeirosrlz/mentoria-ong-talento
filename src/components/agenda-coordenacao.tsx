@@ -1,4 +1,6 @@
 import Link from "next/link";
+import type { ReactNode } from "react";
+import { PAINEL_AGENDA } from "@/lib/agenda-abas";
 import {
   itensDaSemanaPrograma,
   numerosDaSemana,
@@ -47,6 +49,7 @@ export function AgendaCoordenacao({
   meuNome,
   hoje,
   agora: agoraMs,
+  abas,
 }: {
   /** Todas as duplas do ciclo (RLS da coordenação). */
   duplas: Dupla[];
@@ -65,9 +68,10 @@ export function AgendaCoordenacao({
   /** epoch ms do mesmo "agora" da page — semáforo/limbo/cap ancoram no
    *  snapshot do request, não num segundo `new Date()` do RSC. */
   agora: number;
+  /** Barra de modos da página (AbasAgenda) — uma por página, no header. */
+  abas?: ReactNode;
 }) {
   const agora = new Date(agoraMs);
-  const { seg, dom } = semanaBounds(agora);
   const resumos = resumosPorCronograma(duplas, cronogramas, eventos, agora);
   const acompanhar = paraAcompanhar(
     duplas,
@@ -94,7 +98,6 @@ export function AgendaCoordenacao({
     agoraMs
   );
   const duplasPorId = new Map(duplas.map((d) => [d.id, d]));
-  const rotuloHoje = rotuloDiaAgenda(hoje);
   const sintese =
     acompanhar.length > 0
       ? sinteseMonitoramento(acompanhar, resumos, duplas, eventos, agora)
@@ -167,119 +170,136 @@ export function AgendaCoordenacao({
 
   return (
     <div className="space-y-6">
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">
-            Agenda do programa
-          </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Semana {semanaIso(hoje)} · {Number(seg.slice(8, 10))} a{" "}
-            {Number(dom.slice(8, 10))} de {mesLongo(dom)} · hoje,{" "}
-            {rotuloHoje.charAt(0).toLowerCase() + rotuloHoje.slice(1)}
+      {/* header compartilhado com a aba Calendário: trocar de aba não
+          reescreve o h1 nem o contexto da semana */}
+      <CabecalhoCoordenacao hoje={hoje} />
+
+      {abas}
+
+      <div id={PAINEL_AGENDA} role="tabpanel" className="space-y-6">
+        {/* faixa de síntese — leitura de 2s do estado da fila antes dos cards.
+            Só existe com fila viva (o empty state lá embaixo já cobre o "tudo
+            em dia"); o único número com peso é o de críticas */}
+        {sintese && (
+          <p
+            role="note"
+            aria-label="Síntese do monitoramento"
+            className="text-xs leading-relaxed text-muted-foreground"
+          >
+            <b className="font-semibold text-foreground">
+              {sintese.total} para acompanhar
+            </b>
+            {sintese.criticas > 0 && (
+              <>
+                {" · "}
+                <b className="font-semibold text-foreground">
+                  {sintese.criticas}{" "}
+                  {sintese.criticas === 1 ? "urgente" : "urgentes"}
+                </b>
+              </>
+            )}
+            {/* "sem agendamento" aqui = denominador das linhas-resumo
+                (semAgendamento), não o motivo sem_data da fila — o rótulo
+                casa com o "N sem agendamento" delas pra não parecer o mesmo
+                número do chip do filtro */}
+            {sintese.semData > 0 && ` · ${sintese.semData} sem agendamento`}
+            {sintese.registrosPendentes > 0 &&
+              ` · ${sintese.registrosPendentes} ${
+                sintese.registrosPendentes === 1
+                  ? "registro pendente"
+                  : "registros pendentes"
+              }`}
+            {sintese.lembretesEm48h > 0 &&
+              ` · ${sintese.lembretesEm48h} ${
+                sintese.lembretesEm48h === 1 ? "lembrete" : "lembretes"
+              } em 48h`}
+            {/* pedidos de apoio contam TODAS as duplas vivas — o sinal mais
+                urgente da tela, e a fila dele é /chamados (uma dupla "em
+                dia" com pedido aberto não aparece em "para acompanhar") */}
+            {sintese.apoioAberto > 0 && (
+              <>
+                {" · "}
+                <Link
+                  href="/chamados"
+                  className="-my-1 py-1 font-medium text-foreground underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-primary"
+                >
+                  {sintese.apoioAberto}{" "}
+                  {sintese.apoioAberto === 1
+                    ? "pedido de apoio"
+                    : "pedidos de apoio"}
+                </Link>
+              </>
+            )}
           </p>
-        </div>
-      </header>
+        )}
 
-      {/* faixa de síntese — leitura de 2s do estado da fila antes dos cards.
-          Só existe com fila viva (o empty state lá embaixo já cobre o "tudo
-          em dia"); o único número com peso é o de críticas */}
-      {sintese && (
-        <p
-          role="note"
-          aria-label="Síntese do monitoramento"
-          className="text-xs leading-relaxed text-muted-foreground"
-        >
-          <b className="font-semibold text-foreground">
-            {sintese.total} para acompanhar
-          </b>
-          {sintese.criticas > 0 && (
-            <>
-              {" · "}
-              <b className="font-semibold text-foreground">
-                {sintese.criticas}{" "}
-                {sintese.criticas === 1 ? "urgente" : "urgentes"}
-              </b>
-            </>
-          )}
-          {/* "sem agendamento" aqui = denominador das linhas-resumo
-              (semAgendamento), não o motivo sem_data da fila — o rótulo
-              casa com o "N sem agendamento" delas pra não parecer o mesmo
-              número do chip do filtro */}
-          {sintese.semData > 0 && ` · ${sintese.semData} sem agendamento`}
-          {sintese.registrosPendentes > 0 &&
-            ` · ${sintese.registrosPendentes} ${
-              sintese.registrosPendentes === 1
-                ? "registro pendente"
-                : "registros pendentes"
-            }`}
-          {sintese.lembretesEm48h > 0 &&
-            ` · ${sintese.lembretesEm48h} ${
-              sintese.lembretesEm48h === 1 ? "lembrete" : "lembretes"
-            } em 48h`}
-          {/* pedidos de apoio contam TODAS as duplas vivas — o sinal mais
-              urgente da tela, e a fila dele é /chamados (uma dupla "em
-              dia" com pedido aberto não aparece em "para acompanhar") */}
-          {sintese.apoioAberto > 0 && (
-            <>
-              {" · "}
-              <Link
-                href="/chamados"
-                className="-my-1 py-1 font-medium text-foreground underline decoration-muted-foreground/40 underline-offset-2 transition-colors hover:text-primary"
-              >
-                {sintese.apoioAberto}{" "}
-                {sintese.apoioAberto === 1
-                  ? "pedido de apoio"
-                  : "pedidos de apoio"}
-              </Link>
-            </>
-          )}
-        </p>
-      )}
+        {/* ---- Semana do programa (v8b): os oficiais do seg–dom em cards
+            de scroll lateral — tema, instrumentos e "o que cobre" atrás de
+            <details>; "Abrir chamada" só no dia da formação (gate no card) ---- */}
+        <SemanaDoPrograma
+          itens={programa}
+          hoje={hoje}
+          modo="coord"
+          // "Abrir chamada" é dela — o painel de presença só existe no
+          // calendário da coordenação (ehCoord)
+          podeChamada
+          titulo="Semana do programa"
+          ariaLabel="Semana do programa"
+        />
 
-      {/* ---- Semana do programa (v8b): os oficiais do seg–dom em cards
-          de scroll lateral — tema, instrumentos e "o que cobre" atrás de
-          <details>; "Abrir chamada" só no dia da formação (gate no card) ---- */}
-      <SemanaDoPrograma
-        itens={programa}
-        hoje={hoje}
-        modo="coord"
-        // "Abrir chamada" é dela — o painel de presença só existe no
-        // calendário da coordenação (ehCoord)
-        podeChamada
-        titulo="Semana do programa"
-        ariaLabel="Semana do programa"
-      />
+        {/* ---- Números da semana (v8b): cobertura honesta por encontro +
+            situação das duplas (a mesma de /duplas) + pulso com a ★ do jovem.
+            O toggle T1/T2/Todas é estado próprio da seção ---- */}
+        <NumerosSemanaSecao opcoes={numeros.opcoes} agregados={numeros.agregados} />
 
-      {/* ---- Números da semana (v8b): cobertura honesta por encontro +
-          situação das duplas (a mesma de /duplas) + pulso com a ★ do jovem.
-          O toggle T1/T2/Todas é estado próprio da seção ---- */}
-      <NumerosSemanaSecao opcoes={numeros.opcoes} agregados={numeros.agregados} />
-
-      {/* ---- Painel da semana: a fila operacional — a pergunta dos 5s,
-          quem pede ação. Chips filtram de verdade (FilaAcompanhar). ---- */}
-      <section aria-label="Painel da semana">
-        <h2 className="text-base font-semibold">Painel da semana</h2>
-        <div
-          className="mt-4"
-          role="group"
-          aria-label="Duplas para acompanhar"
-          title="Sem agendamento ou atrasadas. Lembrar envia um aviso à dupla (notificação + WhatsApp se houver). A coordenação não marca o encontro por ela."
-        >
-          <h3 className="text-sm font-semibold">
-            Para acompanhar{" "}
-            <span className="font-normal text-muted-foreground">
-              · {acompanhar.length}
-            </span>
-          </h3>
-          {acompanhar.length === 0 ? (
-            <p className="mt-3 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
-              Tudo em dia. Nenhuma dupla pede atenção.
-            </p>
-          ) : (
-            <FilaAcompanhar linhas={linhas} />
-          )}
-        </div>
-      </section>
+        {/* ---- Painel da semana: a fila operacional — a pergunta dos 5s,
+            quem pede ação. Chips filtram de verdade (FilaAcompanhar). ---- */}
+        <section aria-label="Painel da semana">
+          <h2 className="text-base font-semibold">Painel da semana</h2>
+          <div
+            className="mt-4"
+            role="group"
+            aria-label="Duplas para acompanhar"
+            title="Sem agendamento ou atrasadas. Lembrar envia um aviso à dupla (notificação + WhatsApp se houver). A coordenação não marca o encontro por ela."
+          >
+            <h3 className="text-sm font-semibold">
+              Para acompanhar{" "}
+              <span className="font-normal text-muted-foreground">
+                · {acompanhar.length}
+              </span>
+            </h3>
+            {acompanhar.length === 0 ? (
+              <p className="mt-3 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+                Tudo em dia. Nenhuma dupla pede atenção.
+              </p>
+            ) : (
+              <FilaAcompanhar linhas={linhas} />
+            )}
+          </div>
+        </section>
+      </div>
     </div>
+  );
+}
+
+/** Header do monitoramento — o mesmo na aba Calendário da coordenação (a
+ *  página monta esse calendário com a superfície de equipe). Fora do
+ *  componente pra que as duas abas leiam um h1 só. */
+export function CabecalhoCoordenacao({ hoje }: { hoje: string }) {
+  const { seg, dom } = semanaBounds(new Date(`${hoje}T12:00:00Z`));
+  const rotuloHoje = rotuloDiaAgenda(hoje);
+  return (
+    <header className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Agenda do programa
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Semana {semanaIso(hoje)} · {Number(seg.slice(8, 10))} a{" "}
+          {Number(dom.slice(8, 10))} de {mesLongo(dom)} · hoje,{" "}
+          {rotuloHoje.charAt(0).toLowerCase() + rotuloHoje.slice(1)}
+        </p>
+      </div>
+    </header>
   );
 }

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { audienciasDe } from "@/lib/materiais";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
@@ -489,11 +490,12 @@ export default async function DuplaPage({
   // a audiência segue a trilha: material DPP nunca cai na trilha especialista
   // (pra coordenação, que enxerga tudo, o número coincidiria errado)
   const audienciasDaTrilha = ehEsp
-    ? new Set(["todos", "especialista", "coordenacao"])
-    : new Set(["todos", "dpp", "coordenacao"]);
+    ? new Set(["todos", "mentor_especialista", "coordenacao"])
+    : new Set(["todos", "mentor_dpp", "coordenacao"]);
   const materiaisPorNumero = new Map<number, Material[]>();
   for (const m of materiais) {
-    if (m.encontro_num == null || !audienciasDaTrilha.has(m.audiencia)) continue;
+    if (m.encontro_num == null) continue;
+    if (!audienciasDe(m).some((a) => audienciasDaTrilha.has(a))) continue;
     const arr = materiaisPorNumero.get(m.encontro_num) ?? [];
     arr.push(m);
     materiaisPorNumero.set(m.encontro_num, arr);

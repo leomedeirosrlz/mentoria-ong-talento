@@ -18,6 +18,9 @@ const ROLE_LABEL: Record<string, string> = {
   sem_papel: "Sem papel",
   mentor_dpp: "Mentor DPP",
   mentor_especialista: "Mentor especialista",
+  // composto (REALIZA-262): existe desde antes nos dados (profile_papeis) —
+  // o select materializa o híbrido que a área de pessoas não sabia nomear
+  mentor_hibrido: "Mentor DPP + especialista",
   supervisor: "Auxiliar executivo",
   coordenacao: "Coordenação",
   // só pro trigger fechado quando a row já é mentorado (login do jovem,
@@ -26,7 +29,13 @@ const ROLE_LABEL: Record<string, string> = {
   mentorado: "Mentorado",
 };
 
-export function RoleSelect({ profileId, role, nome }: { profileId: string; role: string | null; nome?: string }) {
+export function RoleSelect({ profileId, role, papeis, nome }: { profileId: string; role: string | null; papeis?: string[] | null; nome?: string }) {
+  // o valor mostrado é composto: primário + secundários de mentor juntos —
+  // sem isso o híbrido aparecia só como "Mentor DPP" e o dropdown não
+  // admitia o estado que o banco já guardava
+  const hibrido =
+    !!papeis?.includes("mentor_dpp") && !!papeis?.includes("mentor_especialista");
+  const valor = hibrido ? "mentor_hibrido" : (role ?? "sem_papel");
   const [pending, start] = useTransition();
   // coordenação abre tudo — escolher esse papel no select pede confirmação
   // em vez de aplicar direto; o value controlado segue mostrando o papel
@@ -57,7 +66,7 @@ export function RoleSelect({ profileId, role, nome }: { profileId: string; role:
   return (
     <>
       <Select
-        value={role ?? "sem_papel"}
+        value={valor}
         disabled={pending}
         // sem items o trigger fechado mostra o enum cru ("mentor_especialista")
         items={ROLE_LABEL}
@@ -75,6 +84,7 @@ export function RoleSelect({ profileId, role, nome }: { profileId: string; role:
           <SelectItem value="sem_papel">Sem papel</SelectItem>
           <SelectItem value="mentor_dpp">Mentor DPP</SelectItem>
           <SelectItem value="mentor_especialista">Mentor especialista</SelectItem>
+          <SelectItem value="mentor_hibrido">Mentor DPP + especialista</SelectItem>
           <SelectItem value="supervisor">Auxiliar executivo</SelectItem>
           <SelectItem value="coordenacao">Coordenação</SelectItem>
         </SelectContent>

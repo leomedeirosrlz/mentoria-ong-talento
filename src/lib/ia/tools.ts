@@ -21,14 +21,17 @@ import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
 import { temPapel } from "@/lib/types";
 import type { AppRole, Dupla, Mentorado, Profile } from "@/lib/types";
 import {
+  getAgendaPeriodoIa,
   getCapacidadeInsumos,
   getCicloEventosIa,
   getDuplaIa,
+  getDuplasResumoIa,
   getDuplasVivasIa,
   getFilaInsumos,
   getInstrumentosDaDuplaIa,
   getJovemDuplaIa,
   getRegistrosDaDuplaIa,
+  matchGuiaIa,
   papeisDoUsuario,
 } from "./queries";
 
@@ -75,6 +78,32 @@ const registrosArgs = z
       .max(50)
       .optional()
       .describe("máximo de registros, mais recentes primeiro (padrão 20)"),
+  })
+  .strict();
+
+const agendaArgs = z
+  .object({
+    dias: z
+      .number()
+      .int()
+      .min(1)
+      .max(60)
+      .optional()
+      .describe("janela em dias a partir de hoje (padrão 14)"),
+    incluir_recentes: z
+      .boolean()
+      .optional()
+      .describe("inclui os encontros dos últimos 3 dias (padrão true)"),
+  })
+  .strict();
+
+const guiaArgs = z
+  .object({
+    pergunta: z
+      .string()
+      .min(3)
+      .max(300)
+      .describe("a pergunta em linguagem natural, como o usuário fez"),
   })
   .strict();
 
@@ -297,6 +326,81 @@ export const IA_TOOLS = {
         })
         .sort((a, b) => comparaNome(a.nome, b.nome));
       return { mentores, total: mentores.length };
+    },
+  },
+
+  duplas_do_usuario: {
+    nome: "duplas_do_usuario",
+    descricao:
+      "Índice das duplas que o usuário enxerga: o mentor vê as dele, o supervisor as supervisionadas, a coordenação todas. Devolve o dupla_id + nomes, trilha, status e turma de cada uma — chame antes de ficha_dupla/registros_da_dupla quando a pergunta vier sem id ('minha dupla', 'com quem eu trabalho').",
+    schema: semArgs,
+    // mentorado fica fora: ele não tem grant na tabela duplas (a ficha dele
+    // vem da view jovem_duplas em ficha_dupla) — e o índice não serve pra
+    // quem só enxerga uma dupla
+    roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
+    run: async (_args: z.infer<typeof semArgs>, ctx) => {
+      const duplas = await getDuplasResumoIa(ctx.supabase);
+      return {
+        total: duplas.length,
+        duplas: duplas.map((d) => ({
+          dupla_id: d.id,
+          mentor: d.mentor?.nome ?? null,
+          mentorado: d.mentorado?.nome ?? null,
+          trilha: d.trilha,
+          status: d.status,
+          turma: d.turma,
+        })),
+      };
+    },
+  },
+
+  agenda_do_periodo: {
+    nome: "agenda_do_periodo",
+    descricao:
+      "Encontros das duplas numa janela de dias (padrão: próximos 14, com os últimos 3 incluídos): número do encontro, a dupla, o status e a data/hora. Use pra 'o que tem essa semana?', 'próximos encontros', 'agenda da dupla'.",
+    schema: agendaArgs,
+    roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
+    run: async ({ dias, incluir_recentes }: z.infer<typeof agendaArgs>, ctx) => {
+      const agora = Date.now();
+      const desde = new Date(
+        agora - (incluir_recentes === false ? 0 : 3) * 86_400_000
+      ).toISOString();
+      const ate = new Date(agora + (dias ?? 14) * 86_400_000).toISOString();
+      const encontros = await getAgendaPeriodoIa(ctx.supabase, desde, ate);
+      return {
+        desde,
+        ate,
+        total: encontros.length,
+        encontros: encontros.map((e) => ({
+          dupla_id: e.dupla.id,
+          mentor: e.dupla.mentor?.nome ?? null,
+          mentorado: e.dupla.mentorado?.nome ?? null,
+          numero: e.numero,
+          status: e.status,
+          data_hora: e.data_hora,
+          realizado_em: e.realizado_em,
+        })),
+      };
+    },
+  },
+
+  guia_consulta: {
+    nome: "guia_consulta",
+    descricao:
+      "Busca nos guias oficiais do programa (Guia do Mentor DPP, Guia do Mentor Especialista, cronograma do ciclo, instrumentos e decisões operacionais da plataforma): metodologia, encontros, instrumentos, papéis, regras de reposição, formação, LGPD/termo. Use pra qualquer pergunta sobre 'como funciona', 'o que o guia diz', metodologia ou regras do programa — NÃO pra dados das duplas do usuário (essas saem das outras tools). Devolve trechos citáveis com guia, seção e página; quando não achar nada, diga que não está nos guias e sugira a coordenação. Chame **no máximo uma vez** por pergunta — depois responda com os trechos recebidos (cite guia e seção).",
+    schema: guiaArgs,
+    roles: TODOS_PAPEIS,
+    run: async ({ pergunta }: z.infer<typeof guiaArgs>, ctx) => {
+      const fontes = await matchGuiaIa(ctx.supabase, pergunta, 4);
+      // score sai fora — número de ranking não ajuda o modelo a citar
+      return {
+        fontes: fontes.map((f) => ({
+          guia: f.guia,
+          secao: f.secao,
+          pagina: f.pagina,
+          trecho: f.trecho,
+        })),
+      };
     },
   },
 

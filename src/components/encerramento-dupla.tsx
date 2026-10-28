@@ -1,7 +1,6 @@
-import { Check, CheckCircle, FlagCheckered, LockSimple, Minus, PaperPlaneTilt } from "@phosphor-icons/react/dist/ssr";
+import { Check, FlagCheckered, LockSimple, Minus, PaperPlaneTilt } from "@phosphor-icons/react/dist/ssr";
 import { CHECKLIST_ENCERRAMENTO } from "@/lib/encerramento";
 import { formatDateTime, formatDiaMes } from "@/lib/ciclo";
-import { AutoavaliacaoMentorForm } from "@/components/autoavaliacao-mentor-form";
 import { EncerrarDuplaDialog } from "@/components/encerrar-dupla-dialog";
 import { EnviarFormularioDialog, type FormularioOpcao } from "@/components/enviar-formulario-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -11,9 +10,9 @@ import { cn } from "@/lib/utils";
 
 /** Seção "Encerramento" da ficha da dupla DPP — o rito de fechamento do guia.
  *  - Coordenação: checklist + decisão (concluir a jornada ou encerrar antes).
- *  - Mentor: a autoavaliação é a parte dele — form até a decisão, leitura depois.
+ *  - Mentor: acompanha o que já chegou e vê o registro depois da decisão.
  *  - Supervisor: acompanha o que já foi registrado.
- *  A row pode nascer só com a autoavaliação (tipo null = decisão pendente). */
+ *  A row nasce pendente no último encontro (0102); tipo null = rito aberto. */
 export function EncerramentoDupla({
   dupla,
   encerramento,
@@ -39,8 +38,8 @@ export function EncerramentoDupla({
   const decidido = !!encerramento?.tipo;
   const aberta = dupla.status === "ativa" || dupla.status === "pausada";
   // fechamento automático (0102): o último encontro conclui a dupla e a row
-  // nasce pendente — o rito continua aberto aqui (autoavaliação do mentor,
-  // 360 tardio, checklist da coordenação) até a decisão
+  // nasce pendente — o rito continua aberto aqui (360 tardio, checklist da
+  // coordenação) até a decisão
   const ritoPendente = !aberta && encerramento != null && !decidido;
   const operavel = aberta || ritoPendente;
   // o rito é do fim da jornada — abre quando ela amadureceu (mesma janela
@@ -98,8 +97,8 @@ export function EncerramentoDupla({
             />
             <p>
               Encerramento do ciclo: abre na reta final da jornada (a
-              partir do encontro 12). A autoavaliação do mentor e o
-              checklist aparecem aqui quando chegar a hora.
+              partir do encontro 12). O checklist do rito aparece aqui quando
+              chegar a hora.
             </p>
           </div>
           {/* encerramento antecipado é fluxo real — dupla que não vingou
@@ -110,14 +109,10 @@ export function EncerramentoDupla({
         </>
       ) : (
       <>
-      {/* checklist do rito — antes da decisão mostra o que já chegou
-          (a autoavaliação é a única peça que não é clique da coordenação) */}
+      {/* checklist do rito — antes da decisão mostra o que já chegou */}
       <ul className="space-y-1">
         {CHECKLIST_ENCERRAMENTO.map((item) => {
-          const feito =
-            item.key === "autoavaliacao"
-              ? !!encerramento?.autoavaliacao_mentor
-              : !!encerramento?.checklist?.[item.key];
+          const feito = !!encerramento?.checklist?.[item.key];
           return (
             <li
               key={item.key}
@@ -188,32 +183,6 @@ export function EncerramentoDupla({
 
       {decidido ? (
         <>
-          {encerramento!.autoavaliacao_mentor && (
-            <blockquote className="rounded-lg border-l-2 border-[var(--brand-lime)] bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-              <p className="mb-1 font-medium text-foreground">
-                Autoavaliação de {dupla.mentor.nome.split(" ")[0]}
-              </p>
-              <p className="whitespace-pre-line break-words">
-                {encerramento!.autoavaliacao_mentor}
-              </p>
-              {encerramento!.disponivel_proximo_ciclo != null && (
-                <p className="mt-1.5 flex items-center gap-1.5">
-                  <CheckCircle
-                    size={13}
-                    aria-hidden
-                    className={
-                      encerramento!.disponivel_proximo_ciclo
-                        ? "text-[var(--ok-text)]"
-                        : "text-muted-foreground"
-                    }
-                  />
-                  {encerramento!.disponivel_proximo_ciclo
-                    ? "Disponível pro próximo ciclo"
-                    : "Não segue no próximo ciclo"}
-                </p>
-              )}
-            </blockquote>
-          )}
           <p className="text-xs text-muted-foreground">
             Registrado por {encerramento!.decidido?.nome ?? "a coordenação"} ·{" "}
             {formatDateTime(encerramento!.created_at)}
@@ -221,50 +190,14 @@ export function EncerramentoDupla({
         </>
       ) : (
         <>
-          {/* a parte do mentor no rito — ele preenche aqui, antes da decisão */}
-          {souMentor && operavel && (
-            <AutoavaliacaoMentorForm
+          {souCoord && operavel && (
+            <EncerrarDuplaDialog
               duplaId={dupla.id}
-              inicial={
-                encerramento?.autoavaliacao_mentor
-                  ? {
-                      texto: encerramento.autoavaliacao_mentor,
-                      disponivel: encerramento.disponivel_proximo_ciclo ?? true,
-                    }
-                  : null
-              }
+              encerramento={encerramento}
+              somenteConclusao={dupla.status === "concluida"}
             />
           )}
-          {souCoord && operavel && (
-            <>
-              {encerramento?.autoavaliacao_mentor ? (
-                <blockquote className="rounded-lg border-l-2 border-[var(--brand-lime)] bg-muted/30 px-3 py-2 text-xs text-muted-foreground">
-                  <p className="mb-1 font-medium text-foreground">
-                    Autoavaliação de {dupla.mentor.nome.split(" ")[0]}
-                  </p>
-                  <p className="whitespace-pre-line break-words line-clamp-4">
-                    {encerramento.autoavaliacao_mentor}
-                  </p>
-                  <p className="mt-1">
-                    {encerramento.disponivel_proximo_ciclo
-                      ? "Disponível pro próximo ciclo."
-                      : "Não segue no próximo ciclo."}
-                  </p>
-                </blockquote>
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  A autoavaliação do mentor ainda não chegou. Ele preenche
-                  aqui na ficha.
-                </p>
-              )}
-              <EncerrarDuplaDialog
-                duplaId={dupla.id}
-                encerramento={encerramento}
-                somenteConclusao={dupla.status === "concluida"}
-              />
-            </>
-          )}
-          {!souMentor && !souCoord && (
+          {!souCoord && (
             <p className="text-xs text-muted-foreground">
               A coordenação registra o fechamento no fim da jornada. O que já
               chegou aparece marcado acima.

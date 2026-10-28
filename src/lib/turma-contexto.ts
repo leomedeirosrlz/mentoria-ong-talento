@@ -31,8 +31,9 @@ export type TurmaFocoOrigem =
   | "padrao";
 
 export type TurmaFoco = {
-  /** Label cru de `cronogramas.turma` em foco — a mesma chave de igualdade
-   *  de `duplas.turma`. Null = "todas". */
+  /** Label cru de `cronogramas.turma` em foco. Null = "todas". A
+   *  comparação com as duplas é por `turmaDaDupla` (rótulo vivo), nunca
+   *  pelo selo `duplas.turma` — ele congela no pareamento. */
   turma: string | null;
   /** O recorte: cronogramas da turma em foco (todos quando null). Uma
    *  turma com dois cronogramas devolve os dois. */

@@ -26,15 +26,18 @@ import {
   toDateStr,
 } from "@/lib/ciclo";
 import { MetricasRegistroCard } from "@/components/metricas-registro";
+import { RegistrosAgrupar } from "@/components/registros-agrupar";
 import { RegistrosFiltros, type OrdemRegistros } from "@/components/registros-filtros";
 import { RegistrosPainel } from "@/components/registros-painel";
 import { RegistrosMestreDetalhe, type SecaoLista } from "@/components/registros-mestre-detalhe";
 import type { EntradaRegistro } from "@/components/registros-detalhe";
 import {
   agruparRegistros,
+  GRUPOS_REGISTROS,
   grupoRegistrosDe,
   PERIODO_REGISTROS_OPCOES,
   periodoRegistrosDe,
+  type GrupoRegistros,
 } from "@/lib/registros";
 import { saudeDoRecorte } from "@/lib/agenda-coordenacao";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
@@ -42,6 +45,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { ImportarRegistrosDialog } from "@/components/importar-registros-dialog";
 import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
+import { temPapel } from "@/lib/types";
 import type { AvaliacaoJovem, Dificuldade, Encontro } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Registros" };
@@ -121,6 +125,7 @@ export default async function RegistrosPage({
   const me = await getMe();
   if (me?.role !== "coordenacao" && me?.role !== "supervisor") redirect("/");
   const souCoord = me.role === "coordenacao";
+  const souMentor = temPapel(me, "mentor_dpp") || temPapel(me, "mentor_especialista");
 
   const eventos = await getCicloEventos();
   // teto do filtro por nº = o maior número entre os cronogramas — contar
@@ -128,6 +133,9 @@ export default async function RegistrosPage({
   const maxEncontro = maxNumeroEncontro(eventos);
   const params = await searchParams;
   const filtros = parseFiltros(params, maxEncontro);
+  const perspRaw = primeiro(params.persp);
+  const perspectiva: "mentor" | "jovem" | "ambos" =
+    perspRaw === "jovem" || perspRaw === "ambos" ? perspRaw : "mentor";
   // triagem por scoreAlerta dentro da fatia carregada — a paginação é
   // cumulativa, então "prioridade" cobre tudo que já foi buscado
   const ordemParam = primeiro(params.ordem);
@@ -165,6 +173,17 @@ export default async function RegistrosPage({
   // situação das duplas: o mesmo resumo de /duplas, /agenda e da home, no
   // recorte de turma do painel (a URL é a fonte do recorte)
   const saude = saudeDoRecorte(todasDuplas, eventos, new Date(), filtros.turma ?? null);
+  // pílula de encontro sem registro no escopo não filtra nada — o modal
+  // só oferece os nºs que existem de fato (regra de silêncio da 240)
+  const encontrosComRegistro = [
+    ...new Set(
+      todasDuplas.flatMap((d) =>
+        (d.encontros ?? [])
+          .filter((e) => e.registro != null && e.numero != null)
+          .map((e) => e.numero!)
+      )
+    ),
+  ].sort((a, b) => a - b);
 
   // ?r= de um registro fora da página carregada: sobe as páginas (cumulativas)
   // até achá-lo, para o link de um registro antigo abrir o registro certo
@@ -272,6 +291,7 @@ export default async function RegistrosPage({
     if (ordem !== "recentes") p.set("ordem", ordem);
     if (grupo !== "dupla") p.set("grupo", grupo);
     if (filtros.pagina > 1) p.set("pagina", String(filtros.pagina));
+    if (perspectiva !== "mentor") p.set("persp", perspectiva);
     for (const [k, v] of Object.entries(patch)) {
       if (v === null) p.delete(k);
       else p.set(k, v);
@@ -334,6 +354,15 @@ export default async function RegistrosPage({
     Math.ceil(itens.length / REGISTROS_PAGINA)
   );
   const hrefBase = hrefCom({ r: null });
+  // eixo de agrupamento: controle de visualização no cabeçalho da lista —
+  // os hrefs preservam TODOS os params (inclusive ?pagina= cumulativa,
+  // porque reorganizam os mesmos itens, não filtram)
+  const hrefsGrupo = Object.fromEntries(
+    GRUPOS_REGISTROS.map((g) => [
+      g,
+      hrefCom({ grupo: g === "dupla" ? null : g }),
+    ])
+  ) as Record<GrupoRegistros, string>;
   // filtro, busca, ordem ou agrupamento trocados remontam a lista (animam);
   // trocar só a seleção ou carregar mais não remonta
   const chaveLista = JSON.stringify([{ ...filtros, pagina: 0 }, ordem, grupo]);
@@ -382,7 +411,29 @@ export default async function RegistrosPage({
             ? "O que os mentores reportaram em cada encontro · todas as duplas"
             : "O que os mentores reportaram em cada encontro · suas duplas"
         }
-        actions={souCoord ? <ImportarRegistrosDialog /> : undefined}
+        actions={
+          <div className="flex items-center gap-2">
+            {souCoord && <ImportarRegistrosDialog />}
+            <div className="inline-flex items-center rounded-full border border-border bg-card p-0.5 text-xs">
+              {(["mentor", "jovem", "ambos"] as const).map((v) => (
+                <Link
+                  key={v}
+                  href={hrefCom({ persp: v === "mentor" ? null : v })}
+                  scroll={false}
+                  aria-current={perspectiva === v ? "page" : undefined}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 transition-colors",
+                    perspectiva === v
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {v === "mentor" ? "Mentor" : v === "jovem" ? "Jovem" : "Ambos"}
+                </Link>
+              ))}
+            </div>
+          </div>
+        }
       />
 
       <RegistrosFiltros
@@ -390,6 +441,7 @@ export default async function RegistrosPage({
         duplas={duplas}
         turmas={turmasPainel}
         maxEncontro={maxEncontro}
+        encontrosComRegistro={encontrosComRegistro}
         ordem={ordem}
         grupo={grupo}
       />
@@ -481,10 +533,12 @@ export default async function RegistrosPage({
           supervisor, o gate aqui deixa isso explícito */}
       {souCoord && metricas && <MetricasRegistroCard metricas={metricas} />}
 
-      {/* resumo operacional: o que pede ação vem logo antes da lista; clicar
-          num número aplica o filtro correspondente */}
+      {/* cabeçalho da lista: contador operacional à esquerda (clicar num
+          número aplica o filtro correspondente), controle de agrupamento
+          à direita — agrupar é visão, não filtro, então sai da barra */}
       {(total > 0 || alertas.apoio > 0 || alertas.tardios > 0) && (
-        <p className="text-sm text-muted-foreground" aria-live="polite">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5">
+          <p className="text-sm text-muted-foreground" aria-live="polite">
           {temFiltro ? (
             <Link
               href={hrefLimpo}
@@ -543,6 +597,8 @@ export default async function RegistrosPage({
             </>
           )}
         </p>
+        <RegistrosAgrupar grupo={grupo} hrefs={hrefsGrupo} />
+      </div>
       )}
 
       {ordenados.length === 0 ? (
@@ -587,6 +643,8 @@ export default async function RegistrosPage({
               hrefBase={hrefBase}
               chaveLista={chaveLista}
               souCoord={souCoord}
+              souMentor={souMentor}
+              perspectiva={perspectiva}
               agrupadoPorDupla={grupo === "dupla"}
               rodape={linkMais}
             />

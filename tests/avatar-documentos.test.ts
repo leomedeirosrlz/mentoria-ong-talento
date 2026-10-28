@@ -1,5 +1,11 @@
 import { describe, expect, it } from "vitest";
-import { gravatarUrl, iniciais } from "@/lib/avatar";
+import {
+  AVATAR_MAX_BYTES,
+  avisoImagemGrande,
+  gravatarUrl,
+  iniciais,
+  tamanhoMb,
+} from "@/lib/avatar";
 import {
   dadosAutorizacaoDe,
   dadosCivisDe,
@@ -16,6 +22,28 @@ describe("iniciais", () => {
     expect(iniciais("Ana Maria de Souza")).toBe("AS");
     expect(iniciais("   ")).toBe("?");
     expect(iniciais("")).toBe("?");
+  });
+});
+
+// REALIZA-245 — o teto do avatar é 10 MB e o erro diz o tamanho real do
+// arquivo (o toast antigo só repetia o limite, sem dizer quanto a imagem
+// da pessoa tinha)
+describe("tamanho do avatar", () => {
+  it("teto de 10 MB", () => {
+    expect(AVATAR_MAX_BYTES).toBe(10 * 1024 * 1024);
+  });
+
+  it("tamanho legível com vírgula decimal", () => {
+    expect(tamanhoMb(12.4 * 1024 * 1024)).toBe("12,4 MB");
+    expect(tamanhoMb(AVATAR_MAX_BYTES)).toBe("10 MB");
+    expect(tamanhoMb(10.02 * 1024 * 1024)).toBe("10,02 MB");
+    expect(tamanhoMb(0.5 * 1024 * 1024)).toBe("0,5 MB");
+  });
+
+  it("aviso traz o tamanho da imagem e o limite", () => {
+    expect(avisoImagemGrande(12.4 * 1024 * 1024)).toBe(
+      "Essa imagem tem 12,4 MB. O limite é 10 MB."
+    );
   });
 });
 

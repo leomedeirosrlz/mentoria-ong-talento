@@ -469,7 +469,7 @@ function buildCicloEventos(cronogramaT1: string, cronogramaT2: string): CicloEve
     ev(cronogramaId, "recesso", null, addDias(dia(14), 1), "Recesso de fim de ano", null, [], addDias(dia(14), 18),
       { observacao: "Sem encontros — retomada na 1ª semana de janeiro" }),
     ev(cronogramaId, "encontro", 15, dia(15), "Reflexão e reconhecimento", F6, ["PDM", "Roda da Vida"]),
-    ev(cronogramaId, "encontro", 16, dia(16), "Encerramento e celebração", F6, ["Avaliação 360º", "Autoavaliação do mentor"]),
+    ev(cronogramaId, "encontro", 16, dia(16), "Encerramento e celebração", F6, ["Avaliação final"]),
     // seção 3 — encerramento: evento compartilhável pelas turmas, mas cada
     // cronograma guarda a própria row (cronograma_id é NOT NULL): 15/01 no
     // real, +3d após o 16º encontro de cada uma
@@ -2475,6 +2475,11 @@ function build(): DemoData {
     demanda: null,
     solicitacao_id: null,
     mentor: luiza,
+    desfecho: "concluida",
+    desfecho_motivo: null,
+    desfecho_obs: null,
+    desfecho_em: ymd(FIM_CICLO_ANTERIOR),
+    desfecho_por: null,
     mentorado: isabela,
     supervisor: paulo,
     encontros: encD5,
@@ -2521,6 +2526,11 @@ function build(): DemoData {
     demanda: null,
     solicitacao_id: null,
     mentor: ricardo,
+    desfecho: "concluida",
+    desfecho_motivo: null,
+    desfecho_obs: null,
+    desfecho_em: ymd(FIM_DUPLA_RITO),
+    desfecho_por: null,
     mentorado: gustavo,
     supervisor: beatriz, // o Paulo supervisiona a d-fim; a Beatriz cobre esta
     encontros: encRito,
@@ -2737,6 +2747,12 @@ function build(): DemoData {
     encerrada_em: ymd(addDias(HOJE, -5)),
     motivo_encerramento:
       "Trilha concluída — os 5 encontros aconteceram e a meta da solicitação foi batida.",
+    desfecho: "concluida",
+    desfecho_motivo: null,
+    desfecho_obs:
+      "Trilha concluída — os 5 encontros aconteceram e a meta da solicitação foi batida.",
+    desfecho_em: ymd(addDias(HOJE, -5)),
+    desfecho_por: null,
     devolutiva_pdm:
       "A Bia apresentou o projeto dela pra uma plateia de 20 pessoas na última sessão — saiu do texto decorado e respondeu as três perguntas finais de improviso, sem notas. Pro PDM: vale colocar ela pra apresentar os próprios resultados nos encontros da dupla — exposição curta e frequente consolidou mais do que treino longo.",
   };
@@ -3118,26 +3134,38 @@ function build(): DemoData {
     { numero: 5, titulo: "Encerramento, reflexão e celebração", foco: "Reflexão sobre aprendizados; desafios futuros; feedback do jovem; registro final no PDM" },
   ];
 
-  // os 13 materiais do seed.sql verbatim — com uma diferença proposital:
-  // dois materiais de encontro têm path (servidos como PDF placeholder pela
-  // rota demo), senão a trilha de cobertura do /materiais (REALIZA-173) não
-  // teria nenhuma célula "com material" pra exibir. Os demais continuam sem
-  // destino e renderizam "em breve" — estado legítimo (materiais chegam ao
-  // longo do ciclo)
+  // o catálogo de prod depois da 0135 (e da 0138) — 30 linhas, todas
+  // acionáveis: roteiros das 16 semanas (o guia cobre a jornada inteira), os
+  // templates do cap. 14 como documentos nativos (path "doc:<slug>" → página
+  // do app), Perguntas Eficazes (o documento que o guia cita) e os links
+  // públicos. Arquivos resolvem pro PDF placeholder da rota demo; doc: abre o
+  // doc real.
   const materiais: Material[] = [
     { id: uid(0x2001), titulo: "Guia do Mentor DPP", descricao: "Metodologia completa: jornada, 16 encontros, instrumentos e templates.", tipo: "guia", url: null, path: "materiais/guia-dpp.pdf", audiencia: "dpp", encontro_num: null, ordem: 1 },
     { id: uid(0x2002), titulo: "Guia do Mentor Especialista", descricao: "Metodologia da mentoria com especialista: 5 encontros e cinco funções.", tipo: "guia", url: null, path: "materiais/guia-especialista.pdf", audiencia: "especialista", encontro_num: null, ordem: 2 },
-    { id: uid(0x2003), titulo: "Mensagem de preparação do mentorado", descricao: "Modelo para enviar antes do 1º encontro: história de vida, Roda da Vida e contatos para avaliação.", tipo: "template", url: null, path: "materiais/preparacao-mentorado.pdf", audiencia: "dpp", encontro_num: 1, ordem: 10 },
-    { id: uid(0x2004), titulo: "Instrumento: Construindo a sua Visão", descricao: "Tarefa individual entre o 1º e o 2º encontro; origina a Declaração de Visão.", tipo: "template", url: null, path: null, audiencia: "dpp", encontro_num: 1, ordem: 11 },
-    { id: uid(0x2005), titulo: "Mensagem às pessoas indicadas", descricao: "Modelo de contato para a avaliação por terceiros (duas perguntas).", tipo: "template", url: null, path: null, audiencia: "dpp", encontro_num: 1, ordem: 12 },
-    { id: uid(0x2006), titulo: "Consolidação da avaliação por terceiros", descricao: "Quadro para agrupar pontos fortes e de melhoria sem identificar quem respondeu.", tipo: "template", url: null, path: "materiais/consolidacao-avaliacao.pdf", audiencia: "dpp", encontro_num: 2, ordem: 13 },
-    { id: uid(0x2007), titulo: "Plano de Desenvolvimento do Mentorado (PDM)", descricao: "Documento central da dupla: visão, metas SMART, indicadores e mapa de submetas.", tipo: "template", url: null, path: null, audiencia: "dpp", encontro_num: 2, ordem: 14 },
-    { id: uid(0x2008), titulo: "Mensagem de encaminhamento entre encontros", descricao: "Modelo curto para manter o vínculo e deixar a próxima tarefa clara.", tipo: "template", url: null, path: null, audiencia: "dpp", encontro_num: null, ordem: 15 },
-    { id: uid(0x2009), titulo: "Roda da Vida: roteiro de aplicação", descricao: "Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.", tipo: "template", url: null, path: null, audiencia: "dpp", encontro_num: 12, ordem: 16 },
-    { id: uid(0x2010), titulo: "Checklist de competências do mentor", descricao: "Autoavaliação antes do ciclo e novamente no 16º encontro.", tipo: "template", url: null, path: null, audiencia: "todos", encontro_num: null, ordem: 17 },
-    { id: uid(0x2011), titulo: "Autoavaliação do mentor", descricao: "Cinco perguntas de reflexão para o encerramento do ciclo.", tipo: "template", url: null, path: null, audiencia: "todos", encontro_num: 16, ordem: 18 },
-    { id: uid(0x2012), titulo: "Plataforma de mentoria", descricao: "Onde os encontros oficiais são agendados e avaliados.", tipo: "link", url: "https://mentoria.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 20 },
-    { id: uid(0x2013), titulo: "Formação EaD gratuita", descricao: "Trilha opcional com certificado para mentores.", tipo: "link", url: "https://ead.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 21 },
+    ...Array.from({ length: 16 }, (_, i) => i + 1).map((n, i) => ({
+      id: uid(0x2010 + i),
+      titulo: `Roteiro Semana ${n} — ${["Boas-vindas e histórias de vida","Avaliação por terceiros e visão de futuro","Metas e checagem SMART","Submetas e compromisso","Primeiros resultados","Superando barreiras","Ajustes no plano","Monitoramento e responsabilidade","Revisão de meio de percurso","O mentor como espelho","Rede de apoio e novos espaços","Leitura da Roda da Vida","Metas das áreas prioritárias","Desdobramento e plano de continuidade","Reflexão e reconhecimento","Encerramento e celebração"][i]}`,
+      descricao: n <= 10 ? null : `Roteiro do ${n}º encontro: ${["mapear a rede de apoio, abrir portas e apresentar a Roda da Vida","ler a Roda quadrante por quadrante e abrir as metas das 16 áreas","revisar as metas da Roda e eleger as áreas prioritárias a detalhar","validar o mapa de submetas e montar o plano de continuidade","olhar a jornada, reconhecer conquistas e trocar feedback mútuo","celebrar o percurso, revisar PDM e Roda e responder a avaliação geral"][i - 10]}.`,
+      tipo: "conteudo" as const,
+      url: null,
+      path: `materiais/roteiro-semana-${n}.pdf`,
+      audiencia: "dpp" as const,
+      encontro_num: n,
+      ordem: n + 2,
+    })),
+    { id: uid(0x2030), titulo: "Mensagem de preparação do mentorado", descricao: "Modelo para enviar antes do 1º encontro: história de vida, Roda da Vida e contatos para avaliação.", tipo: "template", url: null, path: "doc:mensagem-preparacao", audiencia: "dpp", encontro_num: 1, ordem: 19 },
+    { id: uid(0x2031), titulo: "Mensagem às pessoas indicadas", descricao: "Modelo de contato para a avaliação por terceiros (duas perguntas).", tipo: "template", url: null, path: "doc:mensagem-indicadas", audiencia: "dpp", encontro_num: 1, ordem: 20 },
+    { id: uid(0x2032), titulo: "Mensagem de encaminhamento entre encontros", descricao: "Modelo curto para manter o vínculo e deixar a próxima tarefa clara.", tipo: "template", url: null, path: "doc:mensagem-encaminhamento", audiencia: "dpp", encontro_num: null, ordem: 21 },
+    { id: uid(0x2033), titulo: "Roda da Vida: roteiro de aplicação", descricao: "Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.", tipo: "template", url: null, path: "materiais/roda-da-vida.pdf", audiencia: "dpp", encontro_num: 12, ordem: 22 },
+    { id: uid(0x2034), titulo: "Feedback Construtivo", descricao: "Instrumento do guia: o modelo de fala e os cuidados para feedback sobre comportamento negativo.", tipo: "conteudo", url: null, path: "doc:feedback-construtivo", audiencia: "todos", encontro_num: null, ordem: 23 },
+    { id: uid(0x2035), titulo: "Instrumento: Definindo Metas", descricao: "Metas SMART do mentorado — instrumento de preenchimento entre encontros.", tipo: "template", url: null, path: "materiais/definindo-metas.pdf", audiencia: "dpp", encontro_num: null, ordem: 24 },
+    { id: uid(0x2036), titulo: "Perguntas Eficazes", descricao: "Documento complementar do guia: o que são, o que evitar e o banco de perguntas por momento da conversa.", tipo: "conteudo", url: null, path: "materiais/perguntas-eficazes.pdf", audiencia: "dpp", encontro_num: null, ordem: 25 },
+    { id: uid(0x2037), titulo: "Cronograma do programa — Turma 1", descricao: null, tipo: "conteudo", url: null, path: "materiais/cronograma-turma-1.pdf", audiencia: "dpp", encontro_num: null, ordem: 26 },
+    { id: uid(0x2038), titulo: "Cronograma do programa — Turma 2", descricao: null, tipo: "conteudo", url: null, path: "materiais/cronograma-turma-2.pdf", audiencia: "dpp", encontro_num: null, ordem: 27 },
+    { id: uid(0x2039), titulo: "Plataforma de mentoria", descricao: "Onde os encontros oficiais são agendados e avaliados.", tipo: "link", url: "https://mentoria.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 28 },
+    { id: uid(0x203a), titulo: "Formação EaD gratuita", descricao: "Trilha opcional com certificado para mentores.", tipo: "link", url: "https://ead.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 29 },
+    { id: uid(0x203b), titulo: "Checklist de competências do mentor", descricao: "As 10 competências do guia para marcar antes do ciclo e no 16º encontro.", tipo: "template", url: null, path: "doc:checklist-competencias", audiencia: "dpp", encontro_num: null, ordem: 30 },
   ];
 
   // ---------- notificações por papel ----------
@@ -3174,19 +3202,6 @@ function build(): DemoData {
         href: `/duplas/${uid(D.esp2)}`,
         lida_em: haDias(19, "08:00"),
         created_at: haDias(20, "18:05"),
-      },
-      // formulario_respondido (0042) — a RPC de submit avisa a coordenação;
-      // aqui é a resposta da anamnese oficial da Ana (ver forms-data.ts)
-      {
-        id: uid(0x3004),
-        tipo: "formulario_respondido",
-        titulo: "Resposta de formulário",
-        corpo: 'Ana Beatriz Silva respondeu "Anamnese Social"',
-        // uid(0x4004) = Anamnese Social oficial (forms-data) — id decimal,
-        // não o hex cru
-        href: `/formularios/${uid(0x4004)}`,
-        lida_em: haDias(31, "09:00"),
-        created_at: haDias(33, "19:12"),
       },
       {
         // canal de segurança do jovem → CHA-000142 (urgência, sem login:

@@ -81,9 +81,9 @@ export type FormularioCampo = {
 /** Instrumento oficial do programa (0042, 0080) — vocabulário fechado
  *  espelhando o CHECK da coluna. null = form criado pela coordenação. */
 export type FormularioSistema =
-  | "anamnese"
   | "avaliacao_360"
-  | "autoavaliacao_mentor"
+  | "avaliacao_final_mentor"
+  | "avaliacao_final_mentorado"
   | "avaliacao_especialista"
   | "visao"
   | "metas"
@@ -94,9 +94,9 @@ export type FormularioSistema =
   | "desfecho";
 
 export const SISTEMA_LABEL: Record<FormularioSistema, string> = {
-  anamnese: "Anamnese",
-  avaliacao_360: "360º",
-  autoavaliacao_mentor: "Autoavaliação",
+  avaliacao_360: "Avaliação 360º (aposentada)",
+  avaliacao_final_mentor: "Avaliação geral 360º (mentor)",
+  avaliacao_final_mentorado: "Avaliação geral 360º (mentorado)",
   avaliacao_especialista: "Avaliação da trilha",
   visao: "Visão",
   metas: "Metas",
@@ -119,29 +119,42 @@ export const INSTRUMENTOS_SISTEMA = [
 
 export type InstrumentoSistema = (typeof INSTRUMENTOS_SISTEMA)[number];
 
-/** Sistemas da régua de instrumentos do programa (REALIZA-199): os 5 cujos
+/** Sistemas da régua de instrumentos do programa (REALIZA-199): os cujos
  *  cards moram na seção "Instrumentos do programa" de /materiais (194) —
  *  saíram da listagem de /formularios. As respostas/links seguem no
- *  /formularios/<id> de cada um (o card da régua faz deep-link). */
+ *  /formularios/<id> de cada um (o card da régua faz deep-link). Os dois
+ *  360º de encerramento dividem a estação do encontro 16 — o do mentor
+ *  veio de bordo na rodada de materiais (a avaliação é instrumento da
+ *  jornada, não papel de coordenação). */
 export const SISTEMAS_REGUA: readonly FormularioSistema[] = [
   "visao",
   "metas",
   "pdm",
   "roda_vida",
-  "avaliacao_360",
+  "avaliacao_final_mentorado",
+  "avaliacao_final_mentor",
 ];
 
 /** Sistemas "de bordo" — oficiais que NÃO são a régua DPP: seguem
  *  acessíveis de /formularios na seção "Instrumentos do sistema"
  *  (read-only — catálogo imutável, sem builder). A ordem de exibição é a
- *  do ciclo de vida: inscrição → anamnese → fechamentos da jornada. Um
- *  sistema novo que não estiver aqui nem na régua aparece no fim da seção
- *  (complemento defensivo — nunca fica órfão). */
+ *  do ciclo de vida: inscrição → fechamentos da jornada. Um sistema novo
+ *  que não estiver aqui nem na régua aparece no fim da seção (complemento
+ *  defensivo — nunca fica órfão).
+ *
+ *  Anamnese Social e Autoavaliação saíram do programa (REALIZA-236): a
+ *  leitura do ciclo é da avaliação geral 360º (REALIZA-230), entregue em
+ *  dois instrumentos — um por lado da dupla, os dois na estação do
+ *  encontro 16 da régua em /materiais (o do mentor saiu daqui na
+ *  rodada de materiais — a avaliação é instrumento do encontro, não
+ *  papel de bordo). Na 0134 o catálogo encolheu de novo (Leo): 360
+ *  antigo, avaliação de trilha-esp e "Depois da mentoria" saíram — as
+ *  linhas morreram, os valores seguem no CHECK como vocabulário
+ *  dorminte. A avaliação por sessão cobre a trilha de especialista —
+ *  ela não tem form de encerramento. */
 export const SISTEMAS_BORDO: readonly FormularioSistema[] = [
   "intake_mentor",
   "intake_mentorado",
-  "anamnese",
-  "autoavaliacao_mentor",
   "avaliacao_especialista",
   "desfecho",
 ];
@@ -211,6 +224,8 @@ export type FormularioResposta = {
   respondido_em: string;
   /** carimbo da promoção (0115): a resposta de intake virou cadastro */
   promovido_profile_id?: string | null;
+  /** carimbo da via de mentorado (0129) — FK pra mentorados */
+  promovido_mentorado_id?: string | null;
 };
 
 /** upload resolvido por form_anexo_put + storage — path é o nome do

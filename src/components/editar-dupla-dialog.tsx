@@ -19,6 +19,11 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 import { TRILHA_LABEL, foraDoPrograma, podeSupervisionar, rotuloCronograma } from "@/lib/ciclo";
+import {
+  DESFECHOS,
+  DESFECHO_LABEL,
+  DESFECHO_MOTIVOS,
+} from "@/lib/dupla-desfecho";
 import type { AppRole, Cronograma, SituacaoMentorado } from "@/lib/types";
 
 type Opt = { id: string; nome: string; role?: string | null; papeis?: AppRole[] };
@@ -67,6 +72,10 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
   const [tentativa, setTentativa] = useState(0);
   // status escolhido agora — a nota de efeito (FR-3) reage à escolha, não ao valor salvo
   const [statusSel, setStatusSel] = useState<DuplaStatus>(dupla.status);
+  // desfecho da dupla quando ela fecha (encerrada/concluída) — domínio em
+  // src/lib/dupla-desfecho.ts. Prefill a partir da dupla atual.
+  const [desfechoSel, setDesfechoSel] = useState<string>(dupla.desfecho ?? "");
+  const [motivoSel, setMotivoSel] = useState<string>(dupla.desfecho_motivo ?? "");
   // mentor escolhido agora — supervisor/demanda reagem à trilha que ele impõe
   const [mentorSel, setMentorSel] = useState<string>(dupla.mentor.id);
   // trilha escolhida (WP6b): só vale quando o mentor tem os dois papéis —
@@ -340,6 +349,8 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
           if (o) {
             setStatusSel(dupla.status);
             setMentorSel(dupla.mentor.id);
+            setDesfechoSel(dupla.desfecho ?? "");
+            setMotivoSel(dupla.desfecho_motivo ?? "");
             setFalha(false);
           }
         }}
@@ -642,6 +653,99 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
                 )}
               </div>
             </div>
+            {(statusSel === "encerrada" || statusSel === "concluida") && (
+              <div className="space-y-4 rounded-lg border border-border/60 p-3">
+                <div className="space-y-2">
+                  <Label id="edit-desfecho-label">Desfecho</Label>
+                  <Select
+                    name="desfecho"
+                    required
+                    value={desfechoSel || undefined}
+                    items={Object.fromEntries(
+                      DESFECHOS.map((d) => [d, DESFECHO_LABEL[d]])
+                    )}
+                    onValueChange={(v) => {
+                      const val = (v ?? "") as string;
+                      setDesfechoSel(val);
+                      setMotivoSel("");
+                    }}
+                  >
+                    <SelectTrigger
+                      id="edit-desfecho-select"
+                      aria-labelledby="edit-desfecho-label edit-desfecho-select"
+                    >
+                      <SelectValue placeholder="Selecione o desfecho" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {DESFECHOS.map((d) => (
+                        <SelectItem key={d} value={d}>
+                          {DESFECHO_LABEL[d]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {desfechoSel &&
+                  (DESFECHO_MOTIVOS[desfechoSel as keyof typeof DESFECHO_MOTIVOS] ?? [])
+                    .length > 0 && (
+                    <div className="space-y-2">
+                      <Label id="edit-desfecho-motivo-label">Motivo</Label>
+                      <Select
+                        key={desfechoSel}
+                        name="desfecho_motivo"
+                        required
+                        value={motivoSel || undefined}
+                        items={Object.fromEntries(
+                          (
+                            DESFECHO_MOTIVOS[
+                              desfechoSel as keyof typeof DESFECHO_MOTIVOS
+                            ] ?? []
+                          ).map((m) => [m, m])
+                        )}
+                        onValueChange={(v) => setMotivoSel(v ?? "")}
+                      >
+                        <SelectTrigger
+                          id="edit-desfecho-motivo-select"
+                          aria-labelledby="edit-desfecho-motivo-label edit-desfecho-motivo-select"
+                        >
+                          <SelectValue placeholder="Selecione o motivo" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {(
+                            DESFECHO_MOTIVOS[
+                              desfechoSel as keyof typeof DESFECHO_MOTIVOS
+                            ] ?? []
+                          ).map((m) => (
+                            <SelectItem key={m} value={m}>
+                              {m}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                <div className="space-y-2">
+                  <Label htmlFor="edit-desfecho-obs">Observação</Label>
+                  <Textarea
+                    id="edit-desfecho-obs"
+                    name="desfecho_obs"
+                    rows={3}
+                    required={desfechoSel === "outro"}
+                    defaultValue={dupla.desfecho_obs ?? ""}
+                    placeholder={
+                      desfechoSel === "outro"
+                        ? "Descreva o motivo"
+                        : "Observações (opcional)"
+                    }
+                  />
+                  {desfechoSel === "outro" && (
+                    <p className="text-xs text-muted-foreground">
+                      Obrigatório quando o desfecho é “Outro motivo”.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
             {ehEsp && (
               <div className="space-y-2">
                 <Label htmlFor="edit-demanda">Contexto</Label>

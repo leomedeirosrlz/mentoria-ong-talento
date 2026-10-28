@@ -92,7 +92,7 @@ export const ENCONTROS_DPP_OFICIAL: ConteudoEncontro[] = [
   { titulo: "Reflexão e reconhecimento", fase: FASES_DPP[5],
     instrumentos: ["PDM", "Roda da Vida"], observacao: null },
   { titulo: "Encerramento e celebração", fase: FASES_DPP[5],
-    instrumentos: ["Avaliação 360º", "Autoavaliação do mentor"], observacao: null },
+    instrumentos: ["Avaliação final"], observacao: null },
 ];
 
 // ---------- datas ----------

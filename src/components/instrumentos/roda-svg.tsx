@@ -22,8 +22,9 @@ import { cn } from "@/lib/utils";
 // quadrante no aro) e a rotulada (`rotuloEixos`, viewBox expandido — a
 // coroa com o nome das áreas substitui os números; variante A decidida
 // em docs/planos/issues/_decisoes.md, REALIZA-143). O chamador monta a
-// responsividade com CSS: um render `lg:hidden` (compacta) + um
-// `hidden lg:block` (rotulada) — só o visível entra na árvore de a11y.
+// responsividade com CSS: um render `hidden` por container estreito
+// (compacta) + um `hidden @[34rem]:block` (rotulada) — só o visível entra
+// na árvore de a11y.
 
 const ANEIS = [2, 4, 6, 8, 10];
 
@@ -53,7 +54,7 @@ export function RodaSvg({
   /** fim do gesto (pointerup/cancel) — o caller decide avançar de eixo */
   onFim?: () => void;
   /** desktop: os nomes das áreas coroam a roda no lugar dos números —
-   *  viewBox maior; usar num render separado `hidden lg:block` */
+   *  viewBox maior; usar num render separado `hidden @[34rem]:block` */
   rotuloEixos?: boolean;
   className?: string;
 }) {
@@ -125,7 +126,10 @@ export function RodaSvg({
       onPointerUp={interativo ? () => onFim?.() : undefined}
       onPointerCancel={interativo ? () => onFim?.() : undefined}
       className={cn(
-        "mx-auto w-full max-w-[300px] shrink-0 select-none sm:max-w-[320px]",
+        // o teto padrão é o do celular; cada chamador passa o seu por
+        // container — variante de viewport (`sm:`/`lg:`) brigaria com o
+        // max-w que o dialog de prévia precisa (REALIZA-248)
+        "mx-auto w-full max-w-[300px] shrink-0 select-none",
         interativo && "cursor-crosshair touch-none",
         className
       )}

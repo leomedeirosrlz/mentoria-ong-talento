@@ -27,20 +27,19 @@ function duplaResumo(over: Partial<DuplaParaResumo> = {}): DuplaParaResumo {
 }
 
 describe("CHECKLIST_ENCERRAMENTO", () => {
-  it("5 passos do guia; autoavaliação é derivada (não se marca à mão)", () => {
+  it("os 4 passos do guia — todos atestados pela coordenação", () => {
     expect(CHECKLIST_ENCERRAMENTO.map((c) => c.key)).toEqual([
       "feedback_final",
       "feedback_mutuo",
       "revisao_pdm",
       "avaliacao_360_enviada",
-      "autoavaliacao",
     ]);
+    // a autoavaliação do mentor saiu do rito (REALIZA-236) — nada derivado
     expect(
-      CHECKLIST_ENCERRAMENTO.find((c) => c.key === "autoavaliacao")?.derivado
-    ).toBe(true);
-    expect(
-      CHECKLIST_ENCERRAMENTO.filter((c) => !c.derivado).map((c) => c.key)
-    ).toHaveLength(4);
+      CHECKLIST_ENCERRAMENTO.some(
+        (c) => (c.key as string) === "autoavaliacao"
+      )
+    ).toBe(false);
   });
 });
 

@@ -15,7 +15,12 @@ import { emailValido, normEmail } from "@/lib/importar";
 import { DEMO_MSG, demoAtivoClient } from "@/lib/demo/shared";
 import { setAvatarPath, updateMeuPerfil } from "@/lib/actions";
 import { avisarSenhaAlterada, trocarEmail } from "@/lib/actions-conta";
-import { avatarPublicUrl, AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
+import {
+  avatarPublicUrl,
+  AVATAR_ACCEPT,
+  AVATAR_MAX_BYTES,
+  avisoImagemGrande,
+} from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { PessoaBanner } from "@/components/pessoa-banner";
 import { SignOutButton } from "@/components/signout-button";
@@ -553,7 +558,10 @@ function DialogoMentoria({ mentorProfile }: { mentorProfile: MentorProfile }) {
 }
 
 /** Uma linha de credencial na seção Conta — rótulo + descrição à esquerda,
- *  ação à direita; o padrão de settings que o <details> improvisava antes. */
+ *  ação à direita; o padrão de settings que o <details> improvisava antes.
+ *  Empilha pelo espaço do próprio card (@container), não pela viewport: no
+ *  rail de 340px do /perfil o toggle de tema comia a descrição inteira
+ *  (REALIZA-248). */
 export function ContaLinha({
   titulo,
   descricao,
@@ -568,17 +576,17 @@ export function ContaLinha({
   return (
     <div
       className={cn(
-        "flex flex-wrap items-center justify-between gap-3 px-6 py-5",
+        "@container flex flex-col gap-3 px-6 py-5 @[26rem]:flex-row @[26rem]:flex-wrap @[26rem]:items-center @[26rem]:justify-between",
         borda && "border-t border-border/60"
       )}
     >
       <div className="min-w-0 flex-1">
         <p className="text-sm font-medium">{titulo}</p>
-        <p className="mt-0.5 text-xs text-muted-foreground [overflow-wrap:anywhere]">
+        <p className="mt-0.5 text-xs text-pretty text-muted-foreground [overflow-wrap:anywhere]">
           {descricao}
         </p>
       </div>
-      {acao}
+      <div className="self-start @[26rem]:self-auto">{acao}</div>
     </div>
   );
 }
@@ -745,7 +753,7 @@ export function DialogoSenha({ email }: { email: string }) {
             <DialogFooter showCloseButton />
           </>
         ) : (
-          <form onSubmit={salvar} className="space-y-4">
+          <form onSubmit={salvar} className="min-w-0 space-y-4">
             {temSenha ? (
               <div className="space-y-2">
                 <Label htmlFor="senha-atual">Senha atual</Label>
@@ -985,6 +993,14 @@ export function PerfilForm({
   // meus_dados_pessoais (0048) por cima do getMe. Conta simples: vazio/null
   // = pendente; e-mail não entra (credencial, sempre presente).
   const tem = (v: string | null | undefined) => Boolean(v?.trim());
+  // pareamento só existe pra quem vai ser pareado: mentor tem par (ficha ou
+  // papel, híbrido incluso) — coordenação e supervisão não têm, então a
+  // preferência de gênero do par some do cadastro delas (REALIZA-231). O
+  // dado já gravado não é apagado: o save de /perfil é parcial.
+  const ehMentor =
+    Boolean(mentorProfile) ||
+    temPapel(me, "mentor_dpp") ||
+    temPapel(me, "mentor_especialista");
   const anosNasc = idade(me.data_nascimento);
   // `valor` é a leitura do campo no <dl> do preview; `node` é o input que o
   // Dialog da seção renderiza — a mesma ordem nos dois lugares
@@ -1095,7 +1111,7 @@ export function PerfilForm({
       },
       node: <CampoConsentimento carimbadoEm={me.consent_lgpd_em} />,
     },
-  ];
+  ].filter((c) => ehMentor || c.key !== "pref_genero_par");
   const cadPendentes = camposCadastro.filter((c) => !c.ok);
   // o termo de voluntariado entra na conta de pendências da gaveta mesmo
   // não sendo campo — cadastro completo = dados + assinatura
@@ -1148,7 +1164,7 @@ export function PerfilForm({
 
   async function trocarFoto(file: File) {
     if (file.size > AVATAR_MAX_BYTES) {
-      toast.error("Imagem grande demais: use uma de até 2 MB.");
+      toast.error(avisoImagemGrande(file.size));
       return;
     }
     setUploading(true);
@@ -1294,7 +1310,7 @@ export function PerfilForm({
             </Badge>
           )}
           <p className="mt-3 text-xs text-muted-foreground">
-            PNG, JPG ou WebP até 2 MB. Sem foto, usamos a do seu e-mail.
+            Sem foto, usamos a do seu e-mail.
           </p>
         </div>
       </header>

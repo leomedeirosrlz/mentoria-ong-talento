@@ -92,19 +92,22 @@ function RodaResultado({
 
   return (
     <div className="space-y-4">
-      {/* ≥lg: a roda veste a coroa de nomes de área (variante A —
-          REALIZA-143) e empilha com a lista; abaixo disso fica a
-          moldura compacta de sempre lado a lado com as notas */}
-      <div className="grid gap-4 sm:grid-cols-[auto_1fr] sm:items-center lg:grid-cols-1">
+      {/* roda e lista empilham sempre: o lado a lado da faixa sm–lg
+          espremia os nomes das áreas e deixava vazio sob o desenho dentro
+          do dialog estreito (REALIZA-253). Em container largo a roda veste
+          a coroa de nomes de área (variante A — REALIZA-143). Breakpoints
+          de container: o mesmo desenho abre na ficha da dupla e no dialog
+          de respostas (REALIZA-248) */}
+      <div className="grid gap-4">
         <div className="text-center">
           <RodaSvg
             roda={roda}
-            className="max-w-[280px] sm:max-w-[300px] lg:hidden"
+            className="max-w-[280px] @[24rem]:max-w-[300px] @[34rem]:hidden"
           />
           <RodaSvg
             roda={roda}
             rotuloEixos
-            className="hidden lg:block lg:max-w-[460px]"
+            className="hidden @[34rem]:block @[34rem]:max-w-[460px]"
           />
           <p className="mt-1 text-sm text-muted-foreground">
             {roda.media != null && (
@@ -122,7 +125,7 @@ function RodaResultado({
         </div>
         {/* nota por área agrupada por quadrante — a barra repete a leitura
             do polígono pra quem precisa do número exato */}
-        <div className="space-y-3 lg:grid lg:grid-cols-2 lg:gap-x-6 lg:gap-y-4 lg:space-y-0 lg:self-start">
+        <div className="space-y-3 @[30rem]:grid @[30rem]:grid-cols-2 @[30rem]:gap-x-6 @[30rem]:gap-y-4 @[30rem]:space-y-0 @[30rem]:self-start">
           {roda.quadrantes.map((q) => (
             <div key={q.nome || "geral"}>
               {q.nome && (
@@ -397,17 +400,27 @@ export function InstrumentoResultado({
   campos: FormularioCampo[];
   respostas: Record<string, RespostaValor>;
 }) {
-  switch (sistema) {
-    case "roda_vida":
-      return <RodaResultado campos={campos} respostas={respostas} />;
-    case "metas":
-    case "pdm":
-      return (
-        <MetasResultado campos={campos} respostas={respostas} sistema={sistema} />
-      );
-    case "visao":
-      return <VisaoResultado campos={campos} respostas={respostas} />;
-    default:
-      return null;
-  }
+  const conteudo = (() => {
+    switch (sistema) {
+      case "roda_vida":
+        return <RodaResultado campos={campos} respostas={respostas} />;
+      case "metas":
+      case "pdm":
+        return (
+          <MetasResultado
+            campos={campos}
+            respostas={respostas}
+            sistema={sistema}
+          />
+        );
+      case "visao":
+        return <VisaoResultado campos={campos} respostas={respostas} />;
+      default:
+        return null;
+    }
+  })();
+  if (!conteudo) return null;
+  // @container: os breakpoints do desenho medem o espaço real (ficha da
+  // dupla, dialog de respostas), não a viewport (REALIZA-248)
+  return <div className="@container">{conteudo}</div>;
 }

@@ -125,13 +125,23 @@ export function DuplaLinha({
       <div
         style={{ "--i": Math.min(i, 10) } as CSSProperties}
         className={cn(
-          "animate-enter flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card p-3",
+          "relative animate-enter flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-border bg-card p-3 transition-colors hover:bg-muted/50",
           // container largo: a grade densa; estreito: a mesma linha empilhada do celular
-          "@4xl:grid @4xl:gap-x-3 @4xl:gap-y-0 @4xl:rounded-none @4xl:border-0 @4xl:bg-transparent @4xl:px-5 @4xl:py-3 @4xl:transition-colors @4xl:hover:bg-muted/50",
+          "@4xl:grid @4xl:gap-x-3 @4xl:gap-y-0 @4xl:rounded-none @4xl:border-0 @4xl:bg-transparent @4xl:px-5 @4xl:py-3",
           GRID_DUPLA_LG,
           className
         )}
       >
+        {/* card inteiro abre a ficha (stretched link, REALIZA-241): cobre a
+            linha em z-10 — inclusive os discos do avatar, que são relative
+            por estilo. Só os controles de verdade (ação, ⋯) e a pill de
+            apoio com title sobem pra z-20; o "Ver ficha" visual é decorativo
+            — 1 tab por card */}
+        <Link
+          href={fichaHref}
+          aria-label={`Ver ficha da dupla de ${fichaNome}`}
+          className="absolute inset-0 z-10 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring @4xl:rounded-none"
+        />
         {/* situação e apoio — pill de estado e pill de apoio, sempre separadas */}
         <div className="order-1 flex flex-wrap items-center gap-1.5 @4xl:order-none @4xl:flex-col @4xl:items-start @4xl:gap-1.5">
           <span
@@ -148,7 +158,7 @@ export function DuplaLinha({
           {apoio && (
             <span
               title={apoio.detalhe}
-              className="inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-[var(--info-border)] bg-[var(--info-bg)] px-2 py-1 text-[11px] font-semibold leading-none text-[var(--info-text)]"
+              className="relative z-20 inline-flex items-center gap-1 whitespace-nowrap rounded-full border border-[var(--info-border)] bg-[var(--info-bg)] px-2 py-1 text-[11px] font-semibold leading-none text-[var(--info-text)]"
             >
               <Lifebuoy size={12} aria-hidden />
               Apoio pedido
@@ -235,23 +245,24 @@ export function DuplaLinha({
           {nota}
         </div>
 
-        {/* ação contextual, ⋯ e Ver ficha. No celular ficam no topo à direita */}
+        {/* ação contextual, ⋯ e o Ver ficha decorativo. No celular ficam no
+            topo à direita. Os controles reais sobem com `relative` pra ficar
+            acima do link esticado; o "Ver ficha" é um span aria-hidden sem
+            posição — o clique passa pro link do card (pointer-events-none) */}
         <div className="order-2 ml-auto flex items-center gap-1.5 @4xl:order-none @4xl:ml-0 @4xl:flex-col @4xl:items-end @4xl:gap-1">
-          {acao}
+          {acao != null && <span className="relative z-20">{acao}</span>}
           <span className="flex items-center gap-1 @4xl:justify-end">
-            {menu}
-            <Link
-              href={fichaHref}
-              aria-label={`Ver ficha da dupla de ${fichaNome}`}
-              title="Ver ficha"
+            {menu != null && <span className="relative z-20">{menu}</span>}
+            <span
+              aria-hidden
               className={cn(
                 buttonVariants({ variant: "ghost", size: "sm" }),
-                "w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
+                "pointer-events-none w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
               )}
             >
               <span className="hidden whitespace-nowrap md:inline">Ver ficha</span>
-              <CaretRight weight="bold" aria-hidden />
-            </Link>
+              <CaretRight weight="bold" />
+            </span>
           </span>
         </div>
       </div>

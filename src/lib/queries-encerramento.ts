@@ -10,7 +10,7 @@ import type { Encerramento } from "./types";
 
 /** O encerramento da dupla (0 ou 1 — unique(dupla_id)). Legível por
  *  coordenação + mentor/supervisor da dupla (policy encerramentos_select);
- *  a row pode existir antes da decisão, só com a autoavaliação do mentor.
+ *  a row pode existir antes da decisão (0102 cria no último encontro).
  *  Falha degrada pra null (a seção some da ficha) — com log, como as demais
  *  leituras complementares. */
 export const getEncerramentoDaDupla = cache(
@@ -22,9 +22,8 @@ export const getEncerramentoDaDupla = cache(
     const { data, error } = await supabase
       .from("encerramentos")
       .select(
-        `id, dupla_id, tipo, checklist, autoavaliacao_mentor,
-         disponivel_proximo_ciclo, resumo_jornada, decidido_por, created_at,
-         decidido:profiles!encerramentos_decidido_por_fkey(nome)`
+        `id, dupla_id, tipo, checklist, resumo_jornada, decidido_por,
+         created_at, decidido:profiles!encerramentos_decidido_por_fkey(nome)`
       )
       .eq("dupla_id", duplaId)
       .maybeSingle();
@@ -43,63 +42,64 @@ export const getEncerramentoDaDupla = cache(
   }
 );
 
-/** Mapa dupla_id → peças do rito em aberto: rows de `encerramentos` sem
- *  decisão (tipo/decidido_por null — o rito segue aberto). Alimenta a
- *  agenda da coordenação (o motivo "encerramento" do paraAcompanhar) e o
- *  espelho do mentor (a pendência "falta sua autoavaliação" no card do
- *  mentorado). O filtro por status da dupla NÃO vai na query: quem
- *  consome já tem a lista de duplas e decide o recorte (só 'concluida'
- *  cobra o rito; a row pendente de dupla ativa é peça chegando cedo, não
- *  pendência). RLS (encerramentos_select) faz o escopo: coord todas,
- *  mentor/supervisor só os da própria dupla. Falha degrada pra {} com
- *  log — mesma disciplina das leituras complementares. */
+/** ids das duplas com o rito de encerramento em aberto: rows de
+ *  `encerramentos` sem decisão (tipo/decidido_por null). Alimenta a agenda
+ *  da coordenação (o motivo "encerramento" do paraAcompanhar) e o espelho do
+ *  mentor (o card do mentorado cobra o fechamento na ficha). O filtro por
+ *  status da dupla NÃO vai na query: quem consome já tem a lista de duplas e
+ *  decide o recorte (só 'concluida' cobra o rito; a row pendente de dupla
+ *  ativa é peça chegando cedo, não pendência). RLS (encerramentos_select) faz
+ *  o escopo: coord todas, mentor/supervisor só os da própria dupla. Falha
+ *  degrada pra [] com log — mesma disciplina das leituras complementares. */
 export const getEncerramentosPendentes = cache(
-  async (): Promise<Record<string, { autoavaliacao: boolean }>> => {
+  async (): Promise<string[]> => {
     const demo = await demoRole();
     if (demo) return demoEncerramentosPendentes(demo);
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("encerramentos")
-      .select("dupla_id, autoavaliacao_mentor")
+      .select("dupla_id")
       .is("tipo", null);
     if (error) {
       console.error("getEncerramentosPendentes:", error);
-      return {};
+      return [];
     }
-    const out: Record<string, { autoavaliacao: boolean }> = {};
-    for (const r of data ?? [])
-      out[r.dupla_id] = { autoavaliacao: r.autoavaliacao_mentor != null };
-    return out;
+    return (data ?? []).map((r) => r.dupla_id);
   }
 );
 
-/** Data da resposta 360º mais recente da dupla — derivação por join
- *  (resposta ← link ← form oficial), sem coluna nova em encerramentos: o
- *  checklist é vocabulário fechado e a resposta já sabe a que dupla/link
- *  pertence. null = nenhuma resposta oficial (marcação manual antiga) ou
- *  papel sem acesso aos forms — a UI só omite o "via formulário em dd/mm". */
+/** Data da resposta da avaliação final mais recente da dupla — derivação
+ *  por join (resposta ← link ← form oficial), sem coluna nova em
+ *  encerramentos: o checklist é vocabulário fechado e a resposta já sabe a
+ *  que dupla/link pertence. Depois da REALIZA-230 são dois instrumentos
+ *  (um por lado), então vale a resposta mais recente de qualquer um: o
+ *  item do checklist é "enviada ao mentor e ao mentorado". null = nenhuma
+ *  resposta oficial (marcação manual antiga) ou papel sem acesso aos
+ *  forms — a UI só omite o "via formulário em dd/mm". */
 export const getAvaliacao360DaDupla = cache(
   async (duplaId: string): Promise<string | null> => {
     const demo = await demoRole();
-    // demo: a resposta 360º da Luiza (dupla d-fim) — o "via formulário em
-    // dd/mm" do checklist aparece na ficha como na real
+    // demo: a resposta da avaliação final da dupla d-fim — o "via
+    // formulário em dd/mm" do checklist aparece na ficha como na real
     if (demo) return demoAvaliacao360DaDupla(demo, duplaId);
     const supabase = await createClient();
-    const { data: form, error } = await supabase
+    const { data: forms, error } = await supabase
       .from("formularios")
       .select("id")
-      .eq("sistema", "avaliacao_360")
-      .maybeSingle();
+      .in("sistema", ["avaliacao_final_mentorado", "avaliacao_final_mentor"]);
     if (error) {
-      console.error("getAvaliacao360DaDupla (form):", error);
+      console.error("getAvaliacao360DaDupla (forms):", error);
       return null;
     }
-    if (!form) return null;
+    if (!forms?.length) return null;
     const { data, error: e2 } = await supabase
       .from("formulario_respostas")
       .select("respondido_em, link:formulario_links!inner(id)")
       .eq("link.dupla_id", duplaId)
-      .eq("link.formulario_id", form.id)
+      .in(
+        "link.formulario_id",
+        forms.map((f) => f.id)
+      )
       .order("respondido_em", { ascending: false })
       .limit(1)
       .maybeSingle();

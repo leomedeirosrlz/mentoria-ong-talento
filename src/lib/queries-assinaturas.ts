@@ -32,11 +32,18 @@ const normAssinatura = (a: Assinatura): Assinatura => ({
 });
 
 /** A assinatura do termo de adesão do usuário logado (a mais recente de
- *  qualquer status — a página decide o que mostrar). null = nunca iniciou. */
+ *  qualquer status — a página decide o que mostrar). null = nunca iniciou.
+ *
+ *  "Minha" é literal: a policy deixa a coordenação ler TODAS as assinaturas,
+ *  então o filtro por `profile_id` é obrigatório — sem ele a página pegava a
+ *  linha mais recente da tabela (o termo assinado do Thiago aparecia pra
+ *  qualquer coordenação, inclusive no link do PDF). */
 export const getMinhaAssinaturaTermo = cache(async (): Promise<Assinatura | null> => {
   const demo = await demoRole();
   if (demo) return demoMinhaAssinaturaTermo(demo);
   const supabase = await createClient();
+  const { data: eu } = await supabase.rpc("my_profile_id");
+  if (!eu) return null;
   const { data, error } = await supabase
     .from("assinaturas")
     .select(
@@ -46,6 +53,7 @@ export const getMinhaAssinaturaTermo = cache(async (): Promise<Assinatura | null
       )
     )
     .eq("template.slug", "termo-voluntario")
+    .eq("profile_id", eu as string)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();

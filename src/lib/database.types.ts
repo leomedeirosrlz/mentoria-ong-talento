@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -1210,6 +1190,88 @@ export type Database = {
           },
         ]
       }
+      dupla_eventos: {
+        Row: {
+          de: string | null
+          desfecho: Database["public"]["Enums"]["dupla_desfecho"] | null
+          dupla_id: string
+          em: string
+          id: string
+          motivo: string | null
+          observacao: string | null
+          para: string | null
+          por: string | null
+          tipo: string
+        }
+        Insert: {
+          de?: string | null
+          desfecho?: Database["public"]["Enums"]["dupla_desfecho"] | null
+          dupla_id: string
+          em?: string
+          id?: string
+          motivo?: string | null
+          observacao?: string | null
+          para?: string | null
+          por?: string | null
+          tipo: string
+        }
+        Update: {
+          de?: string | null
+          desfecho?: Database["public"]["Enums"]["dupla_desfecho"] | null
+          dupla_id?: string
+          em?: string
+          id?: string
+          motivo?: string | null
+          observacao?: string | null
+          para?: string | null
+          por?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dupla_eventos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_eventos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dupla_saude_snapshots: {
         Row: {
           apoio_jovem: boolean
@@ -1282,6 +1344,11 @@ export type Database = {
           created_at: string
           cronograma_id: string | null
           demanda: string | null
+          desfecho: Database["public"]["Enums"]["dupla_desfecho"] | null
+          desfecho_em: string | null
+          desfecho_motivo: string | null
+          desfecho_obs: string | null
+          desfecho_por: string | null
           devolutiva_pdm: string | null
           encerrada_em: string | null
           id: string
@@ -1301,6 +1368,11 @@ export type Database = {
           created_at?: string
           cronograma_id?: string | null
           demanda?: string | null
+          desfecho?: Database["public"]["Enums"]["dupla_desfecho"] | null
+          desfecho_em?: string | null
+          desfecho_motivo?: string | null
+          desfecho_obs?: string | null
+          desfecho_por?: string | null
           devolutiva_pdm?: string | null
           encerrada_em?: string | null
           id?: string
@@ -1320,6 +1392,11 @@ export type Database = {
           created_at?: string
           cronograma_id?: string | null
           demanda?: string | null
+          desfecho?: Database["public"]["Enums"]["dupla_desfecho"] | null
+          desfecho_em?: string | null
+          desfecho_motivo?: string | null
+          desfecho_obs?: string | null
+          desfecho_por?: string | null
           devolutiva_pdm?: string | null
           encerrada_em?: string | null
           id?: string
@@ -1340,6 +1417,34 @@ export type Database = {
             columns: ["cronograma_id"]
             isOneToOne: false
             referencedRelation: "cronogramas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_desfecho_por_fkey"
+            columns: ["desfecho_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_desfecho_por_fkey"
+            columns: ["desfecho_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_desfecho_por_fkey"
+            columns: ["desfecho_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_desfecho_por_fkey"
+            columns: ["desfecho_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
             referencedColumns: ["id"]
           },
           {
@@ -1588,33 +1693,27 @@ export type Database = {
       }
       encerramentos: {
         Row: {
-          autoavaliacao_mentor: string | null
           checklist: Json
           created_at: string
           decidido_por: string | null
-          disponivel_proximo_ciclo: boolean | null
           dupla_id: string
           id: string
           resumo_jornada: string | null
           tipo: string | null
         }
         Insert: {
-          autoavaliacao_mentor?: string | null
           checklist?: Json
           created_at?: string
           decidido_por?: string | null
-          disponivel_proximo_ciclo?: boolean | null
           dupla_id: string
           id?: string
           resumo_jornada?: string | null
           tipo?: string | null
         }
         Update: {
-          autoavaliacao_mentor?: string | null
           checklist?: Json
           created_at?: string
           decidido_por?: string | null
-          disponivel_proximo_ciclo?: boolean | null
           dupla_id?: string
           id?: string
           resumo_jornada?: string | null
@@ -2193,6 +2292,7 @@ export type Database = {
         Row: {
           id: string
           link_id: string
+          promovido_mentorado_id: string | null
           promovido_profile_id: string | null
           respondido_em: string
           respostas: Json
@@ -2200,6 +2300,7 @@ export type Database = {
         Insert: {
           id?: string
           link_id: string
+          promovido_mentorado_id?: string | null
           promovido_profile_id?: string | null
           respondido_em?: string
           respostas: Json
@@ -2207,6 +2308,7 @@ export type Database = {
         Update: {
           id?: string
           link_id?: string
+          promovido_mentorado_id?: string | null
           promovido_profile_id?: string | null
           respondido_em?: string
           respostas?: Json
@@ -2217,6 +2319,41 @@ export type Database = {
             columns: ["link_id"]
             isOneToOne: false
             referencedRelation: "formulario_links"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_respostas_promovido_mentorado_id_fkey"
+            columns: ["promovido_mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_perfil"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_respostas_promovido_mentorado_id_fkey"
+            columns: ["promovido_mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_respostas_promovido_mentorado_id_fkey"
+            columns: ["promovido_mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_curriculo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_respostas_promovido_mentorado_id_fkey"
+            columns: ["promovido_mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_respostas_promovido_mentorado_id_fkey"
+            columns: ["promovido_mentorado_id"]
+            isOneToOne: false
+            referencedRelation: "mentorados_turma"
             referencedColumns: ["id"]
           },
           {
@@ -2316,6 +2453,36 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      ia_chunks: {
+        Row: {
+          created_at: string
+          guia: string
+          id: string
+          pagina: number | null
+          secao: string | null
+          texto: string
+          tsv: unknown
+        }
+        Insert: {
+          created_at?: string
+          guia: string
+          id?: string
+          pagina?: number | null
+          secao?: string | null
+          texto: string
+          tsv?: unknown
+        }
+        Update: {
+          created_at?: string
+          guia?: string
+          id?: string
+          pagina?: number | null
+          secao?: string | null
+          texto?: string
+          tsv?: unknown
+        }
+        Relationships: []
       }
       ia_eventos: {
         Row: {
@@ -2482,6 +2649,7 @@ export type Database = {
       materiais: {
         Row: {
           audiencia: string
+          audiencias: string[]
           created_at: string
           descricao: string | null
           encontro_num: number | null
@@ -2494,6 +2662,7 @@ export type Database = {
         }
         Insert: {
           audiencia?: string
+          audiencias?: string[]
           created_at?: string
           descricao?: string | null
           encontro_num?: number | null
@@ -2506,6 +2675,7 @@ export type Database = {
         }
         Update: {
           audiencia?: string
+          audiencias?: string[]
           created_at?: string
           descricao?: string | null
           encontro_num?: number | null
@@ -5539,6 +5709,16 @@ export type Database = {
         Args: { p_encontro: string }
         Returns: Json
       }
+      match_ia_chunks: {
+        Args: { p_limit?: number; p_query: string }
+        Returns: {
+          guia: string
+          pagina: number
+          score: number
+          secao: string
+          trecho: string
+        }[]
+      }
       meus_dados_civis: { Args: never; Returns: Json }
       meus_dados_pessoais: { Args: never; Returns: Json }
       my_mentorado_id: { Args: never; Returns: string }
@@ -5710,10 +5890,6 @@ export type Database = {
       }
       revogar_assinatura: { Args: { p_id: string }; Returns: undefined }
       revogar_relatorio_link: { Args: { p_id: string }; Returns: Json }
-      salvar_autoavaliacao: {
-        Args: { p_disponivel: boolean; p_dupla: string; p_texto: string }
-        Returns: undefined
-      }
       salvar_consolidado_terceiros: {
         Args: {
           p_consolidado: string
@@ -5787,6 +5963,12 @@ export type Database = {
         | "mentor_dpp"
         | "mentor_especialista"
         | "mentorado"
+      dupla_desfecho:
+        | "concluida"
+        | "desistencia_jovem"
+        | "desistencia_mentor"
+        | "remanejada"
+        | "outro"
       dupla_status: "ativa" | "pausada" | "encerrada" | "concluida"
       encaminhamento_status: "pendente" | "feito" | "atrasado"
       encontro_status:
@@ -5920,9 +6102,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_role: [
@@ -5931,6 +6110,13 @@ export const Constants = {
         "mentor_dpp",
         "mentor_especialista",
         "mentorado",
+      ],
+      dupla_desfecho: [
+        "concluida",
+        "desistencia_jovem",
+        "desistencia_mentor",
+        "remanejada",
+        "outro",
       ],
       dupla_status: ["ativa", "pausada", "encerrada", "concluida"],
       encaminhamento_status: ["pendente", "feito", "atrasado"],
@@ -5944,4 +6130,3 @@ export const Constants = {
     },
   },
 } as const
-

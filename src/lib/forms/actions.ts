@@ -259,7 +259,7 @@ export async function gerarLinksFormulario(input: {
   // os 4 instrumentos de jornada têm via própria (RPC emitir_link_instrumento
   // pela seção Instrumentos da ficha — o mentor entrega no tempo do guia e o
   // link já nasce com o contexto certo). O caminho genérico geraria um link
-  // de fora da trilha. 360º/anamnese/autoavaliação seguem por aqui mesmo.
+  // de fora da trilha. 360º segue por aqui mesmo.
   // A avaliação da trilha de especialista (0104) é emitida sozinha pelo
   // encerramento — um link manual pra mesma (form, dest, dupla) seria
   // absorvido pelo dedup da RPC e a notificação não sairia.
@@ -710,7 +710,7 @@ export async function promoverRespostaIntake(respostaId: string) {
   const { data: r, error: rErr } = await supabase
     .from("formulario_respostas")
     .select(
-      `id, respostas, promovido_profile_id,
+      `id, respostas, promovido_profile_id, promovido_mentorado_id,
        link:formulario_links!inner(origem, multi_uso,
          formulario:formularios!inner(sistema))`
     )
@@ -724,7 +724,7 @@ export async function promoverRespostaIntake(respostaId: string) {
     : link?.formulario;
   if (link?.origem !== "intake" || link?.multi_uso !== true)
     return { error: "Só respostas do link de inscrição viram cadastro por aqui." };
-  if (r.promovido_profile_id)
+  if (r.promovido_profile_id || r.promovido_mentorado_id)
     return { error: "Essa resposta já foi promovida a cadastro." };
 
   const { prefillDoIntake } = await import("./intake");
@@ -736,8 +736,8 @@ export async function promoverRespostaIntake(respostaId: string) {
       error:
         "A resposta não tem nome e e-mail preenchidos — cadastre pela ficha manual.",
     };
-  // o sistema do form confirma a via de promoção (hoje só mentores; a 69
-  // adiciona a via de mentorado com o mesmo shape)
+  // o sistema do form confirma a via de promoção — as duas vias de intake
+  // (mentores e mentorados) usam o mesmo shape de resposta e prefill
   if (form?.sistema !== "intake_mentor" && form?.sistema !== "intake_mentorado")
     return { error: "Esse formulário não é um intake oficial." };
   return { ok: true, prefill, sistema: form.sistema as string };
@@ -747,9 +747,9 @@ export async function promoverRespostaIntake(respostaId: string) {
  *  revisa o prefill (promoverRespostaIntake) e confirma, a pessoa é criada
  *  de verdade por aqui — profile mentor_dpp + mentor_profiles, ou
  *  mentorado na via da 69. Tudo é re-derivado no servidor: o client só
- *  manda o id da resposta, nunca os dados. O carimbo promovido_profile_id
- *  é guard único (.is null) — duas confirmações simultâneas não criam
- *  duas pessoas: a segunda desfaz o insert e avisa. */
+ *  manda o id da resposta, nunca os dados. O carimbo `promovido_*` é guard
+ *  único (.is null) — duas confirmações simultâneas não criam duas pessoas:
+ *  a segunda desfaz o insert e avisa. */
 export async function finalizarPromocaoIntake(respostaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, error } = await meCoord();
@@ -759,7 +759,7 @@ export async function finalizarPromocaoIntake(respostaId: string) {
   const { data: r, error: rErr } = await supabase
     .from("formulario_respostas")
     .select(
-      `id, respostas, promovido_profile_id,
+      `id, respostas, promovido_profile_id, promovido_mentorado_id,
        link:formulario_links!inner(origem, multi_uso, formulario_id,
          formulario:formularios!inner(sistema, campos))`
     )
@@ -773,7 +773,7 @@ export async function finalizarPromocaoIntake(respostaId: string) {
     : link?.formulario;
   if (link?.origem !== "intake" || link?.multi_uso !== true)
     return { error: "Só respostas do link de inscrição viram cadastro por aqui." };
-  if (r.promovido_profile_id)
+  if (r.promovido_profile_id || r.promovido_mentorado_id)
     return { error: "Essa resposta já foi promovida a cadastro." };
   const sistema = form?.sistema;
   const formularioId = link?.formulario_id as string | undefined;
@@ -791,6 +791,12 @@ export async function finalizarPromocaoIntake(respostaId: string) {
 
   const { createAdminClient } = await import("@/lib/supabase/admin");
   const admin = createAdminClient();
+  // a origem diz de qual campanha a pessoa veio — o texto fixo do prefill
+  // fala de mentores; a via de mentorado tem nome próprio (REALIZA-229)
+  const origem =
+    sistema === "intake_mentorado"
+      ? "Inscrição pública (Matching de Mentorados)"
+      : prefill.origem;
   const ficha = {
     nome_social: prefill.nome_social || null,
     data_nascimento: prefill.data_nascimento || null,
@@ -798,9 +804,8 @@ export async function finalizarPromocaoIntake(respostaId: string) {
     cor_raca: (prefill.cor_raca || null) as CorRaca | null,
     cidade: prefill.cidade || null,
     uf: prefill.uf || null,
-    motivacao: prefill.motivacao || null,
     pref_genero_par: (prefill.pref_genero_par || null) as PrefGeneroPar | null,
-    origem: prefill.origem,
+    origem,
   };
 
   let pessoaId: string | null = null;
@@ -815,6 +820,7 @@ export async function finalizarPromocaoIntake(respostaId: string) {
         role: "mentor_dpp",
         cargo: prefill.cargo || null,
         empresa: prefill.empresa || null,
+        motivacao: prefill.motivacao || null,
         ...ficha,
       })
       .select("id")
@@ -893,12 +899,19 @@ export async function finalizarPromocaoIntake(respostaId: string) {
   }
 
   // carimbo único: ganha quem chegar primeiro; o perdedor desfaz a pessoa
-  // recém-criada pra não deixar cadastro órfão da resposta
+  // recém-criada pra não deixar cadastro órfão da resposta. Cada via tem a
+  // própria coluna (profile × mentorado) porque a FK aponta pra tabelas
+  // diferentes — gravar id de mentorado em promovido_profile_id violava a
+  // FK e derrubava a promoção (REALIZA-229).
+  const carimbo =
+    sistema === "intake_mentorado"
+      ? "promovido_mentorado_id"
+      : "promovido_profile_id";
   const { data: marcada, error: markErr } = await admin
     .from("formulario_respostas")
-    .update({ promovido_profile_id: pessoaId })
+    .update({ [carimbo]: pessoaId })
     .eq("id", respostaId)
-    .is("promovido_profile_id", null)
+    .is(carimbo, null)
     .select("id");
   if (markErr) {
     await supabase.from(pessoaTabela).delete().eq("id", pessoaId);

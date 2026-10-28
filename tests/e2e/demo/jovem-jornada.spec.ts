@@ -51,7 +51,7 @@ test.describe("demo — Minha jornada do mentorado", () => {
     ).toBeVisible();
 
     // a estante — os 5 instrumentos da janela como cards-produto, todos
-    // com a tag "Feito" + a data; a devolutiva de terceiros mora entre eles
+    // com a tag "Feito" + a data
     const trilha = page.locator(
       'section[aria-labelledby="meus-instrumentos-titulo"]'
     );
@@ -61,7 +61,6 @@ test.describe("demo — Minha jornada do mentorado", () => {
       "Definindo minhas metas",
       "PDM · Plano de Desenvolvimento",
       "Avaliação do encontro",
-      "Avaliação por terceiros",
     ]) {
       await expect(
         trilha.getByRole("heading", { name: titulo })
@@ -130,7 +129,7 @@ test.describe("demo — Minha jornada do mentorado", () => {
     );
     for (const titulo of [
       "Roda da Vida · aplicação formal",
-      "Avaliação 360º",
+      "Avaliação final",
     ]) {
       const card = trilha.locator("article", { hasText: titulo });
       await expect(card).toBeVisible();
@@ -169,31 +168,48 @@ test.describe("demo — Minha jornada do mentorado", () => {
       acervo.getByText(/Para ler e consultar quando quiser/)
     ).toBeVisible();
     // o acervo do mentorado é só audiencia='todos' (a policy do 0065):
-    // os Guias dos mentores não aparecem — os links prontos viram grid e
-    // o checklist sem destino fecha no grupo apagado "A caminho" com o
-    // estado legítimo "em breve" no badge (REALIZA-162)
+    // os Guias dos mentores não aparecem — os links prontos viram grid e o
+    // doc "Feedback Construtivo" abre nativo no grupo "Conteúdos" (o
+    // checklist de autoavaliação saiu do catálogo — REALIZA-236)
     await expect(acervo.getByText("Links")).toBeVisible();
-    await expect(acervo.getByText("A caminho")).toBeVisible();
-    await expect(acervo.getByText("Guias")).toHaveCount(0);
-    await expect(acervo.getByText("em breve").first()).toBeVisible();
-
-    // acervo progressivo (REALIZA-160): a Ana está no enc. 5 — o material
-    // marcado pro enc. 16 sai da vitrine e recolhe no <details> apagado
-    const trancados = acervo.locator("details", {
-      hasText: "Mais adiante na jornada",
+    await expect(acervo.getByText("Conteúdos")).toBeVisible();
+    await expect(acervo.getByText("Modelos")).toHaveCount(0);
+    const docJovem = acervo.getByRole("link", {
+      name: /Feedback Construtivo/,
     });
-    await expect(trancados).toBeVisible();
+    await expect(docJovem).toHaveAttribute(
+      "href",
+      "/jovem/materiais/documento/feedback-construtivo"
+    );
+    // a rota nativa do jovem renderiza o documento de verdade e volta pro
+    // acervo — não pode vazar pra /materiais (layout app redireciona o papel)
+    await docJovem.click();
+    await expect(page).toHaveURL(
+      "/jovem/materiais/documento/feedback-construtivo"
+    );
     await expect(
-      trancados.getByText("Autoavaliação do mentor (enc. 16)")
+      page.getByRole("heading", {
+        name: "Feedback Construtivo",
+        level: 1,
+      })
     ).toBeVisible();
-    // recolhido por padrão — o item não é clicável nem aparece na grid
+    await page
+      .getByRole("link", { name: "Acervo de materiais" })
+      .click();
+    await expect(page).toHaveURL(/\/jovem\/materiais#acervo/);
+    await expect(acervo.getByText("Guias")).toHaveCount(0);
+    // catálogo todo acionável: sem linha apagada nem badge "em breve"
+    await expect(acervo.getByText("A caminho")).toHaveCount(0);
+    await expect(acervo.getByText("em breve")).toHaveCount(0);
+
+    // REALIZA-236/237: a "Autoavaliação do mentor" saiu do programa — sem
+    // material de encontro futuro na audiência do mentorado, o recap "Mais
+    // adiante na jornada" não renderiza (a régua segue coberta em
+    // tests/ciclo-jornada.test.ts)
+    await expect(acervo.getByText(/Autoavaliação do mentor/)).toHaveCount(0);
     await expect(
-      acervo.getByRole("link", { name: /Autoavaliação do mentor/ })
+      acervo.getByText("Mais adiante na jornada")
     ).toHaveCount(0);
-    await trancados.locator("summary").click();
-    await expect(
-      trancados.getByText(/Libera no encontro 16/)
-    ).toBeVisible();
   });
 
   // REALIZA-162/194 — a ordem física da página (hero → sub-nav → estante
@@ -288,12 +304,13 @@ test.describe("demo — Minha jornada do mentorado", () => {
     if (!m1 || !m2) throw new Error("card do acervo sem bounding box");
     expect(m1.y).toBeLessThan(m2.y);
 
-    // "em breve" nunca entra na vitrine: mora no grupo apagado "A caminho"
+    // "em breve" nunca entra na vitrine — e o catálogo atual não tem
+    // material sem destino: nada apagado nem no grupo "A caminho"
     await expect(
       acervo.locator("div.grid").getByText("em breve")
     ).toHaveCount(0);
-    await expect(acervo.getByText("A caminho")).toBeVisible();
-    await expect(acervo.getByText("em breve").first()).toBeVisible();
+    await expect(acervo.getByText("A caminho")).toHaveCount(0);
+    await expect(acervo.getByText("em breve")).toHaveCount(0);
   });
 
   test("prefers-reduced-motion: a entrada não bloqueia a leitura", async ({
@@ -368,15 +385,20 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     // o lembrete não é mais pro mentor: nenhum "Lembrar <mentor>"
     await expect(fila.getByRole("button", { name: /Lembrar (Carlos|João|Ricardo)/ })).toHaveCount(0);
     if (await lembrar.first().isVisible().catch(() => false)) {
+      // o botão abre o preview — o lembrete sai do "Lembrar pelo app"
       await lembrar.first().click();
+      await page
+        .getByRole("dialog")
+        .getByRole("button", { name: "Lembrar pelo app" })
+        .click();
       await expect(
         page.getByText("Modo demo: nada é enviado de verdade.")
       ).toBeVisible();
     }
 
     // a régua oficial separada da biblioteca (v5c), agora na própria aba:
-    // os 8 instrumentos do programa em cards — a devolutiva de terceiros
-    // entre eles, nunca material solto de acervo
+    // os instrumentos do programa em cards — nunca material solto de
+    // acervo
     await page.goto("/materiais?aba=instrumentos");
     const instrumentos = page.locator(
       'section[aria-labelledby="instrumentos-titulo"]'
@@ -384,8 +406,8 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     await expect(instrumentos).toBeVisible();
     for (const titulo of [
       "Roda da Vida · leitura inicial",
-      "Avaliação por terceiros",
-      "Avaliação 360º e autoavaliação",
+      "Avaliação Geral - 360º · mentorado(a)",
+      "Avaliação Geral - 360º · mentor(a)",
     ]) {
       await expect(
         instrumentos.getByRole("heading", { name: titulo })
@@ -410,31 +432,41 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     await expect(page).toHaveURL(/\/formularios\/[^/]+/);
     await page.goBack();
 
-    // card trancado é leitura pura pra TODO staff — o pill de liberação
-    // não é gesto: zero link, zero botão dentro dele
-    const cardTrancado = instrumentos.locator("article", {
-      hasText: "Avaliação 360º",
+    // REALIZA-257: a janela do guia é indicador pra coordenação, não trava —
+    // o card do 360º (enc. 16) está fora da janela na demo e mesmo assim
+    // abre as respostas; o indicador diz quando a janela abre, sem cadeado
+    const cardForaDaJanela = instrumentos.locator("article", {
+      hasText: "Avaliação Geral - 360º · mentorado(a)",
     });
-    await expect(cardTrancado.getByText("ainda não abriu")).toBeVisible();
-    await expect(cardTrancado.getByRole("link")).toHaveCount(0);
-    await expect(cardTrancado.getByRole("button")).toHaveCount(0);
+    await expect(
+      cardForaDaJanela.getByText("janela não aberta")
+    ).toBeVisible();
+    await expect(
+      cardForaDaJanela.getByText(/abre no encontro 16/)
+    ).toBeVisible();
+    // o cadeado é do papel que a janela segura — não da coord
+    await expect(cardForaDaJanela.getByText("ainda não abriu")).toHaveCount(0);
+    await expect(
+      cardForaDaJanela.getByRole("link", { name: /^Ver respostas/ })
+    ).toHaveAttribute("href", /^\/formularios\//);
+    // e nada de cópia de lote que minta ("já receberam ou já responderam")
+    await expect(
+      cardForaDaJanela.getByText(/Nada a enviar agora/)
+    ).toHaveCount(0);
 
     // rodapé coord-only: os forms de bordo apontam pra /formularios
     await expect(
       instrumentos.getByRole("link", { name: "Formulários" })
     ).toBeVisible();
 
-    // a biblioteca mora na aba própria — grupos + badge "sem conteúdo"
-    // (rótulo staff; pro jovem o mesmo estado diz "em breve"). Com o hub
-    // por encontro (REALIZA-173) parte desses badges mora em <details>
-    // fechados — o primeiro match no DOM pode estar oculto; o filtro
-    // garante um visível (os transversais seguem abertos)
-    // REALIZA-210: a biblioteca é uma lista só, com busca — sem grupos
-    // por encontro/tipo; "sem conteúdo" é o rótulo staff do "em breve"
+    // a biblioteca mora na aba própria — REALIZA-210: lista única com
+    // busca, depois 250 agrupada por categoria; "sem conteúdo" é o rótulo
+    // staff do "em breve" e hoje não aparece: o catálogo é todo acionável
+    // (arquivo, link externo ou documento nativo doc:)
     await page.goto("/materiais?aba=biblioteca");
     const bib = page.locator('section[aria-labelledby="biblioteca-titulo"]');
     await expect(bib.getByRole("heading", { name: /Todos os materiais/ })).toBeVisible();
-    await expect(bib.getByText("sem conteúdo").first()).toBeVisible();
+    await expect(bib.getByText("sem conteúdo")).toHaveCount(0);
     await expect(page.locator("details")).toHaveCount(0);
     await bib.getByRole("searchbox", { name: "Buscar material" }).fill("guia do mentor");
     await expect(bib.getByText("Guia do Mentor DPP")).toBeVisible();
@@ -482,13 +514,17 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     await expect(
       instrumentos.getByRole("link", { name: "Ver respostas" })
     ).toHaveCount(0);
-    // card trancado: zero gesto dentro (pill informativo, não link/botão)
+    // card fora da janela: a janela é o estado dele (cadeado + data) e ele
+    // segue leitura pura — a trava de janela vale pro supervisor, só a
+    // coordenação consulta/emite fora dela (REALIZA-257)
     const trancado = instrumentos.locator("article", {
-      hasText: "Avaliação 360º",
+      hasText: "Avaliação Geral - 360º · mentorado(a)",
     });
+    await expect(trancado.getByText("ainda não abriu")).toBeVisible();
+    await expect(trancado.getByText(/libera no encontro 16/)).toBeVisible();
     await expect(trancado.getByRole("link")).toHaveCount(0);
     await expect(trancado.getByRole("button")).toHaveCount(0);
-    // o rodapé "Anamnese… → Formulários" é coord-only
+    // o rodapé "Intakes… → Formulários" é coord-only
     await expect(
       instrumentos.getByRole("link", { name: "Formulários" })
     ).toHaveCount(0);

@@ -8,9 +8,8 @@ import { cn } from "@/lib/utils";
 // por instrumento, usados onde o instrumento aparece — seção
 // "Instrumentos do programa", ficha da dupla, painel jornada, /formularios.
 // Os 8 glifos da régua DPP são os símbolos do sprite do mockup v5c
-// (traço 1.7, viewBox 24); os sistemas fora da régua (anamnese,
-// autoavaliação, avaliação da trilha, intakes) receberam glifo próprio na
-// mesma gramática. A cor mora em tokens --inst-* (globals.css) — o ícone
+// (traço 1.7, viewBox 24); os sistemas fora da régua (avaliação da trilha,
+// intakes, desfecho) receberam glifo próprio na mesma gramática. A cor mora em tokens --inst-* (globals.css) — o ícone
 // tinge a si mesmo, o card aplica --ic/--ict via instrumentoVars().
 //
 // Server-safe de propósito (nada de hooks): serve nas páginas RSC e nos
@@ -51,10 +50,13 @@ export const INSTRUMENTO_TOM: Record<
     tinta: "var(--inst-avaliacao-t)",
   },
   avaliacao_360: { cor: "var(--inst-360)", tinta: "var(--inst-360-t)" },
-  anamnese: { cor: "var(--inst-anamnese)", tinta: "var(--inst-anamnese-t)" },
-  autoavaliacao_mentor: {
-    cor: "var(--inst-autoavaliacao)",
-    tinta: "var(--inst-autoavaliacao-t)",
+  avaliacao_final_mentor: {
+    cor: "var(--inst-360)",
+    tinta: "var(--inst-360-t)",
+  },
+  avaliacao_final_mentorado: {
+    cor: "var(--inst-360)",
+    tinta: "var(--inst-360-t)",
   },
   avaliacao_especialista: {
     cor: "var(--inst-avaliacao-especialista)",
@@ -162,20 +164,19 @@ const GLIFO: Record<InstrumentoChave, ReactNode> = {
       <circle cx="12" cy="12" r="2.4" />
     </>
   ),
-  // prancheta da entrevista social — fora do mock, mesma gramática
-  anamnese: (
+  // bandeira quadriculada — o fim da jornada (0130, lado do mentor)
+  avaliacao_final_mentor: (
     <>
-      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-      <rect x="8" y="2" width="8" height="4" rx="1" />
-      <path d="M8.5 11.5h7M8.5 15.5h5" />
+      <path d="M5.5 20.5V4" />
+      <path d="M5.5 4.5h12l-2.6 3.5 2.6 3.5h-12z" />
     </>
   ),
-  // a pessoa + o check do "como eu me avalio" (encerramento, lado mentor)
-  autoavaliacao_mentor: (
+  // alvo com a flecha cravada — o que o jovem alcançou (0130, lado do mentorado)
+  avaliacao_final_mentorado: (
     <>
-      <circle cx="10" cy="8.5" r="3.4" />
-      <path d="M4.5 19.8c.6-3.4 2.9-5.2 5.5-5.2 1.3 0 2.5.4 3.4 1" />
-      <path d="m15.3 18.2 1.5 1.5 3-3" />
+      <circle cx="11" cy="13" r="7" />
+      <circle cx="11" cy="13" r="3.4" />
+      <path d="m13.4 10.6 6.1-6.1M20.5 3.5v4.2h-4.2" />
     </>
   ),
   // estrela emoldurada — avaliação da trilha de especialista

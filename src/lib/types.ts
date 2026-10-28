@@ -501,6 +501,18 @@ export type Dupla = {
   encerrada_em?: string | null;
   /** Por que a trilha fechou (obrigatório junto com encerrada_em). */
   motivo_encerramento?: string | null;
+  /** Desfecho estruturado da dupla (0140): concluida | desistencia_jovem |
+   *  desistencia_mentor | remanejada | outro. null = ainda em curso. */
+  desfecho?: DuplaDesfecho | null;
+  /** Motivo estruturado ligado ao desfecho (obrigatório quando não é
+   *  'concluida'). */
+  desfecho_motivo?: string | null;
+  /** Observação livre da coordenação (obrigatória quando 'outro'). */
+  desfecho_obs?: string | null;
+  /** Quando o desfecho foi registrado. */
+  desfecho_em?: string | null;
+  /** Quem registrou. */
+  desfecho_por?: string | null;
   /** O que a trilha devolve pro PDM — chega ao mentor DPP via solicitacoes_mural. */
   devolutiva_pdm?: string | null;
   mentor: Profile;
@@ -528,7 +540,11 @@ export type Material = {
   url: string | null;
   /** Arquivo oficial no bucket `materiais` — quando presente, é o destino (a url não é usada). */
   path: string | null;
+  /** Audiência legada de valor único — normalizada por `audienciasDe`
+   *  (`src/lib/materiais.ts`). A coluna `audiencias` é a verdade. */
   audiencia: "todos" | "dpp" | "especialista" | "coordenacao";
+  /** Público por papel (0139) — cumulativo; `todos` inclui o jovem. */
+  audiencias?: string[] | null;
   encontro_num: number | null;
   ordem: number;
 };
@@ -851,28 +867,26 @@ export type Supervisao = {
 
 // ---------- fechamento do ciclo (0037) ----------
 
-/** As 5 chaves do rito de fechamento (guia DPP) — vocabulário fechado,
- *  espelha o CHECK encerramento_checklist_ok. */
+/** As 4 chaves do rito de fechamento (guia DPP) — vocabulário fechado,
+ *  espelha o CHECK encerramento_checklist_ok. A autoavaliação do mentor saiu
+ *  do rito na REALIZA-236 (a leitura do ciclo é a 360º). */
 export type EncerramentoChecklist = {
   feedback_final?: boolean;
   feedback_mutuo?: boolean;
   revisao_pdm?: boolean;
   avaliacao_360_enviada?: boolean;
-  autoavaliacao?: boolean;
 };
 
-/** Fechamento de uma dupla DPP — a row pode nascer antes da decisão, só com
- *  a autoavaliação do mentor (tipo/decidido_por null = fechamento pendente). */
+/** Fechamento de uma dupla DPP — a row nasce pendente quando o último
+ *  encontro conclui a jornada (0102) e vira decisão quando a coordenação
+ *  registra o rito. */
 export type Encerramento = {
   id: string;
   dupla_id: string;
   /** 'concluida' = jornada completa · 'encerrada' = fechamento antecipado ·
-   *  null = só a autoavaliação do mentor chegou, decisão pendente. */
+   *  null = rito aberto (último encontro já concluiu, decisão pendente). */
   tipo: "concluida" | "encerrada" | null;
   checklist: EncerramentoChecklist;
-  autoavaliacao_mentor: string | null;
-  /** Disponibilidade do mentor pro próximo ciclo — registrada na autoavaliação. */
-  disponivel_proximo_ciclo: boolean | null;
   /** Snapshot gerado dos dados da jornada no momento do fechamento. */
   resumo_jornada: string | null;
   decidido_por: string | null;
@@ -1008,6 +1022,7 @@ export type DocumentoPessoa = {
 // em database.types.ts: todas nullable porque a view não declara NOT NULL.
 
 import type { Database } from "./database.types";
+import type { DuplaDesfecho } from "./dupla-desfecho";
 
 /** Ficha do próprio jovem (view `jovem_perfil`) — mentorados.* do registro
  *  dele: programa (objetivos/escolaridade/ong) e contato do cadastro. Pessoa

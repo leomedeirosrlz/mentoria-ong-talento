@@ -384,96 +384,98 @@ export function EncontroRow({
       {/* registro salvo = histórico: linha-resumo (apoio, avaliação, tema) +
           disclosure pro corpo completo. Só o encontro atual e os pendentes
           nascem abertos; o deep link #registrar-{id} continua abrindo o bloco */}
-      {reg && encontro && (
-        <RegistroDetails
-          encontroId={encontro.id}
-          aberto={registroAberto}
-          className="border-t border-border/60 bg-muted/50 shadow-[var(--shadow-inset)]"
-          summary={
-            <>
-              <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-foreground">
-                Registro
-              </span>
-              {reg.precisa_apoio && (
-                <HandHeart
-                  size={13}
-                  aria-label="Apoio solicitado"
-                  className="shrink-0 text-[var(--danger)]"
-                />
-              )}
-              {reg.avaliacao && <AvaliacaoBadge avaliacao={reg.avaliacao} />}
-              {regPreview && (
-                <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                  {regPreview}
-                </span>
-              )}
-              <CaretDown
-                size={13}
-                aria-hidden
-                className="ml-auto shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180"
-              />
-            </>
-          }
-        >
-          <div className="space-y-2 px-4 pb-3.5 pt-1 text-sm">
-            <RegistroView
-              reg={reg}
-              tardio={tardio}
-              anexos={
-                <AnexosRegistro
-                  registroId={reg.id}
+      {(reg && encontro) || (feito && (encontro?.avaliacao_jovem || (!souMentor && estrelaJovem == null))) ? (
+        <div className="grid gap-3 lg:grid-cols-2">
+          {reg && encontro && (
+            <div className="space-y-2">
+              <RegistroDetails
+                encontroId={encontro.id}
+                aberto={registroAberto}
+                className="border-t border-border/60 bg-muted/50 shadow-[var(--shadow-inset)]"
+                summary={
+                  <>
+                    <span className="flex shrink-0 items-center gap-1.5 text-xs font-semibold text-foreground">
+                      Registro
+                    </span>
+                    {reg.precisa_apoio && (
+                      <HandHeart
+                        size={13}
+                        aria-label="Apoio solicitado"
+                        className="shrink-0 text-[var(--danger)]"
+                      />
+                    )}
+                    {reg.avaliacao && <AvaliacaoBadge avaliacao={reg.avaliacao} />}
+                    {regPreview && (
+                      <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                        {regPreview}
+                      </span>
+                    )}
+                    <CaretDown
+                      size={13}
+                      aria-hidden
+                      className="ml-auto shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180"
+                    />
+                  </>
+                }
+              >
+                <div className="space-y-2 px-4 pb-3.5 pt-1 text-sm">
+                  <RegistroView
+                    reg={reg}
+                    tardio={tardio}
+                    anexos={
+                      <AnexosRegistro
+                        registroId={reg.id}
+                        duplaId={duplaId}
+                        autorId={autorId}
+                        podeAnexar={podeAnexar}
+                        podeRemover={podeRemoverAnexos}
+                        anexos={anexos}
+                      />
+                    }
+                  />
+                  {podeEditar && (
+                    <div className="pt-1">
+                      <EditarRegistro
+                        encontroId={encontro.id}
+                        duplaId={duplaId}
+                        evento={passo}
+                        registro={reg}
+                      />
+                    </div>
+                  )}
+                </div>
+              </RegistroDetails>
+            </div>
+          )}
+          {feito && (
+            <div className="space-y-2">
+              {encontro?.avaliacao_jovem ? (
+                <AvaliacaoJovemCard
+                  avaliacao={encontro.avaliacao_jovem}
                   duplaId={duplaId}
-                  autorId={autorId}
-                  podeAnexar={podeAnexar}
-                  podeRemover={podeRemoverAnexos}
-                  anexos={anexos}
+                  souCoord={souCoord}
+                  liberadaProMentor={souMentor}
                 />
-              }
-            />
-            {podeEditar && (
-              <div className="pt-1">
-                <EditarRegistro
-                  encontroId={encontro.id}
+              ) : !souMentor && estrelaJovem == null ? (
+                <AvaliacaoPendenteLinha
+                  link={linkAvaliacao}
+                  urlBase={urlBase}
+                  jovemNome={jovemNome}
+                  jovemWhatsapp={jovemWhatsapp}
+                  numero={passo.numero}
+                  souCoord={souCoord}
                   duplaId={duplaId}
-                  evento={passo}
-                  registro={reg}
+                  jornadaViva={jornadaViva}
                 />
-              </div>
-            )}
-          </div>
-        </RegistroDetails>
-      )}
-
-      {/* avaliação estrela do jovem (0071) — canal paralelo ao registro do
-          mentor: coord/sup leem a linha que a RLS entregou, o mentor DPP só
-          a que o jovem liberou ("meu mentor pode ler esta"), e na trilha
-          especialista só sobra a estrela da view definer */}
-      {feito && encontro?.avaliacao_jovem && (
-        <AvaliacaoJovemCard
-          avaliacao={encontro.avaliacao_jovem}
-          duplaId={duplaId}
-          souCoord={souCoord}
-          liberadaProMentor={souMentor}
-        />
-      )}
-      {/* pendência do jovem — fato operacional pra coord/sup (o mentor não
-          vê: saber que "a do encontro 4 não chegou" o convida a cobrar, e
-          a pressão corrói o anonimato que a média protege) */}
-      {feito &&
-        !encontro?.avaliacao_jovem &&
-        !souMentor &&
-        estrelaJovem == null && (
-          <AvaliacaoPendenteLinha
-            link={linkAvaliacao}
-            urlBase={urlBase}
-            jovemNome={jovemNome}
-            jovemWhatsapp={jovemWhatsapp}
-            numero={passo.numero}
-            souCoord={souCoord}
-            duplaId={duplaId}
-            jornadaViva={jornadaViva}
-          />
-        )}
+              ) : (
+                <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+                  Sem avaliação do jovem para este encontro.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      ) : null}
       {/* especialista: só a estrela — a view definer é o recorte inteiro */}
       {feito && estrelaJovem != null && (
         <div className="border-t border-border/60 px-4 py-2.5">

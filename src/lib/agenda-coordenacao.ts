@@ -20,6 +20,7 @@ import {
 import { primeiroNomeDaDupla } from "./agenda-minha";
 import { guiaDoEncontro } from "./como-conduzir";
 import { turmaCurta, turmaLonga } from "./turma";
+import { ehConcluida, ehDesistente } from "./dupla-desfecho";
 import type {
   CicloEvento,
   Cronograma,
@@ -1035,8 +1036,9 @@ function coberturaDoVigente(
  *  - `risco` + `atencao` + `emDia` PARTICIONAM `emAndamento` pelo semáforo.
  *  - `apoio` é SOBREPOSIÇÃO: conta pedido de apoio aberto (ativa ou pausada)
  *    à parte e nunca tira a dupla da sua situação.
- *  - `pausadas` e `concluidas` (concluída + encerrada) ficam fora da régua.
- *  - `total` = emAndamento + pausadas + concluidas: o denominador da barra. */
+ *  - `pausadas`, `concluidas` (concluída com êxito) e `desistentes`
+ *    (encerrada / desistência / remanejada / outro) ficam fora da régua.
+ *  - `total` = emAndamento + pausadas + concluidas + desistentes: o denominador da barra. */
 export type SaudeRecorte = {
   emAndamento: number;
   risco: number;
@@ -1045,6 +1047,7 @@ export type SaudeRecorte = {
   apoio: number;
   pausadas: number;
   concluidas: number;
+  desistentes: number;
   total: number;
 };
 
@@ -1062,6 +1065,7 @@ export function saudeDoRecorte(
     apoio: 0,
     pausadas: 0,
     concluidas: 0,
+    desistentes: 0,
     total: 0,
   };
   for (const d of duplas) {
@@ -1075,11 +1079,13 @@ export function saudeDoRecorte(
       else s.emDia++;
     } else if (d.status === "pausada") {
       s.pausadas++;
-    } else if (d.status === "concluida" || d.status === "encerrada") {
+    } else if (ehConcluida({ desfecho: d.desfecho }) || d.status === "concluida") {
       s.concluidas++;
+    } else if (ehDesistente({ desfecho: d.desfecho, status: d.status }) || d.status === "encerrada") {
+      s.desistentes++;
     }
   }
-  s.total = s.emAndamento + s.pausadas + s.concluidas;
+  s.total = s.emAndamento + s.pausadas + s.concluidas + s.desistentes;
   return s;
 }
 
@@ -1092,6 +1098,7 @@ export type RecorteFatia =
   | "andamento"
   | "pausada"
   | "concluida"
+  | "desistente"
   | "apoio";
 
 export const RECORTES_FATIA: readonly RecorteFatia[] = [
@@ -1100,6 +1107,7 @@ export const RECORTES_FATIA: readonly RecorteFatia[] = [
   "andamento",
   "pausada",
   "concluida",
+  "desistente",
   "apoio",
 ];
 

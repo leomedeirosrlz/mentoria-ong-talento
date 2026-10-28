@@ -26,12 +26,10 @@ describe("templates de e-mail", () => {
     expect(html).toContain(">Urgente<"); // faixa de prioridade
     expect(html).toContain("&lt;até&gt;"); // corpo escapado
     expect(html).not.toContain("<até>");
-    // casca nova: logo wordmark pesado no topo, rodapé ink com chip do emblema
-    expect(html).toContain("Archivo Black");
-    expect(html).toContain("REALIZA");
-    expect(html).toContain("#ffd531"); // ponto âmbar do logo
-    expect(html).toContain('bgcolor="#323232"'); // rodapé ink
-    expect(html).toContain("height:6px");
+    // casca nova: header ink com logo branco (bucket público) + linha lime
+    expect(html).toContain("email-assets/logo-realiza-branco.png");
+    expect(html).toContain('bgcolor="#323232"'); // header/rodapé ink
+    expect(html).toContain("height:3px");
     expect(html).toContain("— Equipe Realiza.vc");
   });
 

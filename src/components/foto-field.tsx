@@ -2,7 +2,11 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Camera } from "@phosphor-icons/react";
-import { AVATAR_ACCEPT, AVATAR_MAX_BYTES } from "@/lib/avatar";
+import {
+  AVATAR_ACCEPT,
+  AVATAR_MAX_BYTES,
+  avisoImagemGrande,
+} from "@/lib/avatar";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
@@ -64,7 +68,7 @@ export function FotoField({
               return;
             }
             if (f.size > AVATAR_MAX_BYTES) {
-              toast.error("Imagem grande demais. Use uma de até 2 MB.");
+              toast.error(avisoImagemGrande(f.size));
               e.target.value = "";
               return;
             }
@@ -82,7 +86,7 @@ export function FotoField({
           >
             {preview ? "Trocar foto" : "Escolher foto"}
           </Button>
-          <p className="text-xs text-muted-foreground">PNG, JPG ou WebP até 2 MB.</p>
+          <p className="text-xs text-muted-foreground">PNG, JPG ou WebP.</p>
         </div>
       </div>
     </div>

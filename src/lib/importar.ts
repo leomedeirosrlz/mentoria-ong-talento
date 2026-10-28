@@ -8,6 +8,7 @@ import {
   normalizaEmail,
   normalizaEscolaridade,
   normalizaGenero,
+  normalizaNomeSocial,
   normalizaPapel,
   normalizaPrefGenero,
   normalizaTelefone,
@@ -734,6 +735,14 @@ export function fichaLinha(
     if (erro) return { error: erro };
   }
 
+  // REALIZA-224 — guarda final: mesmo vindo por caminho que não passou pelo
+  // normalizaLinha (script de import antigo, chamada direta), resposta de
+  // outra pergunta em nome social não é gravada.
+  if (typeof out.nome_social === "string") {
+    const ns = normalizaNomeSocial(out.nome_social);
+    if (ns.valor === null) out.nome_social = null;
+  }
+
   const nasc = normData(String(l.data_nascimento ?? ""));
   if (String(l.data_nascimento ?? "").trim() && !nasc)
     return { error: "data de nascimento inválida (use dd/mm/aaaa)" };
@@ -898,6 +907,11 @@ export function normalizaLinha(l: LinhaImportada): {
   };
 
   aplica("nome", "nome", normalizaTexto(l.nome));
+  // nome social é opcional e responde pergunta errada com frequência
+  // (REALIZA-224) — pronome, negativa ou rótulo viram null + flag, nunca
+  // nome de gente na jornada
+  aplica("nome_social", "nome social", normalizaNomeSocial(l.nome_social));
+
   aplica("email", "e-mail", normalizaEmail(l.email));
   aplica("whatsapp", "WhatsApp", normalizaTelefone(l.whatsapp));
   aplica("linkedin", "LinkedIn", normalizaUrl(l.linkedin), {

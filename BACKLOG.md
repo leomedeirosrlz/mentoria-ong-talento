@@ -182,9 +182,33 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
 - [x] ~~Materiais de verdade~~ — `0010`: `materiais.path` + bucket privado `materiais` (policies de storage espelham a audiência — coord lê tudo, trilha só a própria, supervisor só "todos"); upload no `NovoMaterialDialog` (toggle arquivo/link, 20MB, PDF/imagem) e "Anexar arquivo" no `MaterialActions`; `/api/material/[id]` → signed URL 300s; card de encontro na página da dupla abre o arquivo.
 - [x] ~~**Avaliação geral final do especialista**~~ (guia-esp §13) — `0104`: form oficial `sistema='avaliacao_especialista'` (trilha + programa/coordenação), emitido **dentro** da RPC `encerrar_trilha_especialista` com dedup por (form, dest, dupla) + notificação `avaliacao_pendente` → `/f/<token>` logado. Bypass fechado em review: `Editar dupla` não oferece "encerrada/concluída" pra trilha esp e `updateDupla` recusa server-side (sem o rito não há link/motivo/devolutiva); `avaliacao_esp_da_dupla` (definer) devolve token só pro especialista e estado pra coord — CTA/status no `TrilhaFechamento`; emissão manual bloqueada (picker + action). Validador REST 20/20.
 - [ ] **PDM nativo na plataforma** — **decisão fechada (REALIZA-181)**: o PDM deixa de ser só `duplas.pdm_url` (link Drive) e vira modelo de dados próprio — `pdm_metas` (meta SMART: descrição, área da vida, indicador de sucesso, prazo, status) + `pdm_submetas` com progresso. Co-edição mentor+mentorado, coord lê, superfícies na ficha da dupla / portal do jovem / resumo de jornada. `pdm_url` fica como legado opcional.
-- [ ] **Roteiros semanais 7–16**: os cartões-roteiro dos encontros 1–6 já estão em prod como `materiais` (`tipo=conteudo`, `audiencia=dpp`, `encontro_num` 1–6 — grupo "Encontro N", acervo progressivo). Semanas 7–16 ainda não existem em PDF — subir conforme a equipe produzir (mesmo padrão: `conteudo`/`dpp`/`encontro_num=N`, ordem 3+N).
+- [x] ~~**Roteiros semanais 5–10**~~ — os cartões-roteiro dos encontros 1–10 estão em prod como `materiais` (`tipo=conteudo`, `audiencia=dpp`, `encontro_num` 1–10, bloco contíguo de `ordem` 3–12, grupo "Encontro N", acervo progressivo). 7–10 subiram em out/2026. **11–16 seguem sem fonte**: não existem PDFs além da semana 10 — subir conforme a equipe produzir (mesmo padrão).
 - [ ] **Termos da equipe executiva** (coordenação/supervisores): todo mundo que entra na plataforma deveria assinar, mas hoje só mentores (`termo-voluntario`) e mentorados (`termo-mentorando`/`autorizacao-responsavel`) têm documento. Quando o jurídico definir o modelo da equipe, vira mais um slug em `documento_templates` + renderer em `src/lib/documentos/` — a infra de assinatura/evidência/link já é genérica.
 - [ ] **Contra-assinatura do presidente**: subir o PNG em qualquer ficha → seção Assinaturas → engrenagem (ou `documentos/sistema/contra-assinatura.png` no storage). Os PDFs do termo já saem assinados pelo instituto quando a imagem existe.
+
+## REALIZA-238 — auditoria dos guias vs catálogo (out/2026)
+
+> Relatório completo: `docs/planos/feedback-leo-2026-10/auditoria-238.md` (22 itens, tabela de decisão + lacunas + ambiguidades). Resumo: **14 manter, 6 ajustar, 1 criar, 1 escalar**. O catálogo cobre a espinha da metodologia; o que falta é conteúdo de apoio.
+
+- [ ] **Materiais das ferramentas de condução** (M1–M4) — Perguntas Eficazes (existe só no `seed.sql`, não em prod), Feedback Construtivo, Escuta Ativa/CNV/quebra-gelo/check-in, Modelo SMART. Hoje o cronograma cita as cinco como "instrumento" e nenhuma tem material. Ou viram material, ou saem da coluna `instrumentos` e passam a competência.
+- [ ] **Templates sem arquivo** (M7) — seis linhas de `materiais` com `path`/`url` nulos (Mensagem de preparação, Mensagem às pessoas indicadas, Consolidação da avaliação por terceiros, PDM, Mensagem de encaminhamento, Checklist de competências). Renderizam "em breve". A "Autoavaliação do mentor" saiu do catálogo em out/2026.
+- [ ] **Consolidação da avaliação por terceiros** (M6) — o template PDF 56 não existe como instrumento; a coordenação lê contato por contato na ficha.
+- [ ] **`formularios` — checagens de revisão das metas** (F2) — o template oficial fecha com três perguntas de auto-revisão ("ajudam a chegar onde quero / são importantes / consigo explicar"); o form `metas` só tem prioridade implícita em `meta_1`.
+- [ ] **`formularios` — submetas por nível com IS e prazo** (F3) — o form `pdm` guarda um `texto_longo` por meta; o `pdm_itens` nativo já suporta árvore (`parent_id`) + indicador, mas nada o alimenta além de uma linha de texto.
+- [ ] **`formularios` — meta SMART por área da Roda** (F4) — `pdm_itens.area_vida` existe e nunca é populado.
+- [ ] **`intake_mentorado` — formação acadêmica** (F7) — o guia (PDF 31) cita "formação acadêmica ou curso atual" como dado do matching; o form da 0129 não pergunta. `mentorados.escolaridade` é select de 6 opções (não texto livre) — a decisão é qual dos dois o intake captura. (Disponibilidade do jovem **é** coletada no onboarding — `profiles.disponibilidade`, jsonb por dia — e o matching **já cruza** as duas no `AfinidadePar` (alerta "Sem sobreposição de dia e período"); o problema é que o jovem só preenche o onboarding **depois** da dupla ser formada, então o aviso não dispara do lado dele. Ver REALIZA-278.)
+- [x] ~~**Janela da Roda inicial** (S1)~~ — aceito: a Roda da Vida vai na "Mensagem de preparação do mentorado" (enc. 1), que é o canal pré-encontro; a estação do enc. 1 espelha isso.
+- [x] ~~**Especialista não registra meta no PDM** (S2)~~ — **decisão out/2026: não abre.** O especialista registra na trilha (`registros`/`devolutiva_pdm`) e o mentor DPP transporta para o PDM; `pdm_pode_editar` segue recusando `trilha='especialista'`.
+- [ ] **Títulos 3 a 7 do cronograma divergem do guia** (S6) — paráfrases ("Declaração de Visão e metas SMART" no lugar de "Metas e checagem SMART"), e o mentor lê os dois lado a lado. Depende do Leo.
+- [ ] **Dataset demo com 12 materiais** (E6) — prod tem 25; quem testa a demo vê uma biblioteca que não existe.
+- [x] ~~**Duas linhas com `ordem = 17` em produção**~~ (E7) — biblioteca reordenada 1 a 25 sem empate em out/2026.
+- [x] ~~**Anamnese Social e Autoavaliação do mentor**~~ — decidido em out/2026: a anamnese é **processo externo** (o intake é o único canal; a referência mora no campo de notas do mentorado) e a autoavaliação **saiu de vez** (0128+0132 + material apagado de prod, seed e demo).
+- [ ] **PDM do especialista e divergência "PDM fora da plataforma"** (E1/S2) — **decisão out/2026: o PDM mora dentro da plataforma.** Falta a copy: dizer isso ao mentor no onboarding (senão ele mantém duas cópias).
+
+## Intake e documentos (out/2026)
+
+- [x] ~~**Currículos dos mentorados como link do Drive**~~ — os 33 mentorados agora têm `curriculo_url` preenchido com o link do form de matching (ficha em `/pessoas/[id]`, confidencial coord/auxiliar). Nada foi re-uploadado: o arquivo continua no Drive e a ficha oferece o link. Os 17 currículos que já estavam no bucket privado `documentos` (import de 24/set) seguem lá como arquivo morto opcional — remover só com pedido explícito.
+- [x] ~~**Anexos do intake**~~ — os 178 arquivos dos três forms (matching mentores/mentorados + cadastro BP) já estão importados desde 24/set: 45 pessoas, 138 arquivos → 115 rows em `documentos_pessoa` (RG/CNH, comprovante de residência, comprovante bancário, CPF e currículo dos mentores e da equipe) + 23 avatares. `scripts/importar-intake.ts` é idempotente e roda de novo sem duplicar.
 
 ## Produção
 
@@ -343,3 +367,19 @@ Pedido do Thiago (perdido numa sessão anterior, resgatado em 24/out):
 - [ ] **Centralizar o logo na tela de login** — lockup de marca
   centralizado; revisar junto o débito já documentado do h1 `text-lg`
   fora da escala (tela de marca é exceção aceita, mas o alinhamento não).
+
+## Rebranding & ajustes de UX (out/2026)
+
+- [ ] **Rebranding da marca** — hoje o app se chama "realiza.vc" em todo
+  lugar (e-mails transacionais, magic link, assunto de notificações,
+  título da aba, favicon). Tornar explícito que é a plataforma de
+  mentoria: "Realiza.vc — Plataforma de Mentoria" (ou similar) na copy
+  de e-mails, notificações e superfícies de marca. Manter "realiza.vc"
+  como domínio mas reforçar a identidade de mentoria.
+- [ ] **Mentores especialistas fora de "aguardando par"** — o status
+  "aguardando par" é do fluxo DPP (mentor-mentorado). Mentores
+  especialistas não fazem parte desse fluxo e não devem aparecer em
+  "aguardando par". Filtrar por trilha/papel nas queries e na UI.
+- [ ] **Filtros da aba Pessoas reorganizados** — os pills de filtro devem
+  ficar abaixo, logo antes da lista de pessoas. Transformar "aguardando
+  par" em um dropdown e movê-lo para cima dos filtros/pesquisa.

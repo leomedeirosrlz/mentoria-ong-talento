@@ -4,7 +4,6 @@ import { demoRole } from "../demo/mode";
 import { getDemoData } from "../demo/data";
 import { demoFormularioPorToken } from "../demo/queries";
 import {
-  demoAnamneseMentorado,
   demoInstrumentosDaDupla,
   getDemoFormularios,
 } from "../demo/forms-data";
@@ -178,7 +177,7 @@ export const getFormulario = cache(
       .from("formulario_links")
       .select(
         `*,
-        resposta:formulario_respostas(id, link_id, respostas, respondido_em, promovido_profile_id),
+        resposta:formulario_respostas(id, link_id, respostas, respondido_em, promovido_profile_id, promovido_mentorado_id),
         dest_profile:profiles!formulario_links_dest_profile_id_fkey(id, nome, role, avatar_path),
         dest_mentorado:mentorados!formulario_links_dest_mentorado_id_fkey(id, nome, whatsapp, avatar_path),
         dupla:duplas!formulario_links_dupla_id_fkey(
@@ -286,67 +285,6 @@ export const getFormulario = cache(
       links: resolvidos,
       anexos,
     };
-  }
-);
-
-/** Estado da Anamnese Social de um mentorado — instrumento oficial
- *  (sistema='anamnese', 0042). Alimenta o atalho "Enviar anamnese" na ficha
- *  da pessoa: form ausente → null (a migração ainda não rodou); já
- *  respondida → data; link vigente pendente → linkPendente (a ação reusa). */
-export type AnamneseMentorado = {
-  formularioId: string;
-  respondida_em: string | null;
-  linkPendente: boolean;
-};
-
-export const getAnamneseMentorado = cache(
-  async (mentoradoId: string): Promise<AnamneseMentorado | null> => {
-    const demo = await demoRole();
-    // demo: a fixture modela os oficiais — Ana respondida, Eduardo com
-    // link pendente (as policies das tabelas são coord-only, idem a real)
-    if (demo) return demoAnamneseMentorado(demo, mentoradoId);
-    const supabase = await createClient();
-    const { data: form, error } = await supabase
-      .from("formularios")
-      .select("id")
-      .eq("sistema", "anamnese")
-      .maybeSingle();
-    // falha (ex.: coluna sistema ainda não migrada) degrada pra null — a
-    // ficha segue igual, sem o bloco da anamnese
-    if (error) {
-      console.error("getAnamneseMentorado:", error);
-      return null;
-    }
-    if (!form) return null;
-
-    const { data: links, error: e2 } = await supabase
-      .from("formulario_links")
-      .select("id, usado_em, expira_em, resposta:formulario_respostas(respondido_em)")
-      .eq("formulario_id", form.id)
-      .eq("dest_mentorado_id", mentoradoId)
-      .order("created_at", { ascending: false });
-    if (e2) {
-      console.error("getAnamneseMentorado (links):", e2);
-      return null;
-    }
-
-    type LinkRaw = {
-      id: string;
-      usado_em: string | null;
-      expira_em: string | null;
-      resposta: { respondido_em: string } | { respondido_em: string }[] | null;
-    };
-    const agora = Date.now();
-    let respondida_em: string | null = null;
-    let linkPendente = false;
-    for (const l of (links ?? []) as LinkRaw[]) {
-      if (l.usado_em) {
-        respondida_em = respondida_em ?? norm(l.resposta)?.respondido_em ?? l.usado_em;
-      } else if (!l.expira_em || new Date(l.expira_em).getTime() > agora) {
-        linkPendente = true;
-      }
-    }
-    return { formularioId: form.id, respondida_em, linkPendente };
   }
 );
 

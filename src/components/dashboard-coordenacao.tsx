@@ -30,7 +30,7 @@ import {
   type ProgressoDupla,
   type TomSituacao,
 } from "@/components/dupla-linha";
-import { LembreteButton } from "@/components/lembrete-button";
+import { DuplaWaAcao } from "@/components/dupla-wa-acao";
 import { SaudePrograma } from "@/components/saude-programa";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { SolicitacoesCoordCard } from "@/components/solicitacoes-coord-card";
@@ -608,14 +608,17 @@ function montarPrecisa({
       // limbo > atraso > sem data, e o cap de 48h vem do server. O wrapper
       // leva o alvo a 44px no celular sem mexer no botão compartilhado
       <div className="[&_button]:min-h-11 md:[&_button]:min-h-8">
-        <LembreteButton
+        <DuplaWaAcao
           duplaId={d.id}
-          destino="mentor"
-          rotulo={item.rotuloLembrete}
+          destNome={d.mentor?.nome ?? "mentor"}
           telefone={d.mentor?.whatsapp ?? null}
-          {...lembreteDoItem(d, item, eventos, meuNome, hoje)}
-          href={`/duplas/${d.id}`}
-          bloqueadoAte={item.bloqueadoAte}
+          mensagem={lembreteDoItem(d, item, eventos, meuNome, hoje).corpo}
+          nudge={{
+            destino: "mentor",
+            titulo: lembreteDoItem(d, item, eventos, meuNome, hoje).titulo,
+            href: `/duplas/${d.id}`,
+            bloqueadoAte: item.bloqueadoAte,
+          }}
         />
       </div>
     ) : null;

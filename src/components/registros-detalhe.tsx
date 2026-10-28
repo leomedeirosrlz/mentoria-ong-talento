@@ -5,6 +5,7 @@ import { Badge } from "@/components/ui/badge";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { RegistroView } from "@/components/registro-view";
+import { AvaliacaoJovemCard } from "@/components/avaliacao-jovem";
 import { ResolverApoioButton } from "@/components/resolver-apoio-button";
 import { diasAtrasoRegistro, formatDate, registroTardio } from "@/lib/ciclo";
 import type { RegistroResumo } from "@/lib/queries";
@@ -23,9 +24,13 @@ export type EntradaRegistro = {
 export function RegistroDetalhe({
   entrada,
   souCoord,
+  souMentor = false,
+  perspectiva = "mentor",
 }: {
   entrada: EntradaRegistro;
   souCoord: boolean;
+  souMentor?: boolean;
+  perspectiva?: "mentor" | "jovem" | "ambos";
 }) {
   const { r, tituloEncontro, passoEsp } = entrada;
   const enc = r.encontro;
@@ -113,9 +118,52 @@ export function RegistroDetalhe({
         </div>
       )}
 
-      <div className="mt-4 space-y-2 border-t pt-4 text-sm">
-        <RegistroView reg={r} tardio={tardio} ocultarMeta />
-      </div>
+      {perspectiva === "ambos" ? (
+        <div className="mt-4 grid gap-3 border-t pt-4 lg:grid-cols-2">
+          <div className="space-y-2 text-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Mentor
+            </p>
+            <RegistroView reg={r} tardio={tardio} ocultarMeta />
+          </div>
+          <div className="space-y-2 text-sm">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Jovem
+            </p>
+            {enc?.avaliacao_jovem ? (
+              <AvaliacaoJovemCard
+                avaliacao={enc.avaliacao_jovem}
+                duplaId={dupla!.id}
+                souCoord={souCoord}
+                liberadaProMentor={souMentor}
+              />
+            ) : (
+              <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+                Sem avaliação do jovem para este encontro.
+              </div>
+            )}
+          </div>
+        </div>
+      ) : perspectiva === "jovem" ? (
+        <div className="mt-4 space-y-2 border-t pt-4 text-sm">
+          {enc?.avaliacao_jovem ? (
+            <AvaliacaoJovemCard
+              avaliacao={enc.avaliacao_jovem}
+              duplaId={dupla!.id}
+              souCoord={souCoord}
+              liberadaProMentor={souMentor}
+            />
+          ) : (
+            <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
+              Sem avaliação do jovem para este encontro.
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="mt-4 space-y-2 border-t pt-4 text-sm">
+          <RegistroView reg={r} tardio={tardio} ocultarMeta />
+        </div>
+      )}
 
       {(href || (souCoord && r.precisa_apoio && dupla)) && (
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-2 border-t pt-4">

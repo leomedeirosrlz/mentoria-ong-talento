@@ -168,20 +168,43 @@ export function PessoaActions({
                 name="email"
                 type="email"
                 defaultValue={pessoa.email}
-                disabled={!!pessoa.user_id}
               />
             </div>
           </div>
           {pessoa.user_id && (
             <p className="text-xs text-muted-foreground -mt-2">
-              O e-mail é a identidade do link de acesso e não pode mais ser alterado após o primeiro acesso.
+              Trocar o e-mail muda o endereço de acesso da pessoa; a senha que
+              ela já tem continua valendo.
             </p>
           )}
+        </>
+      ),
+    },
+    {
+      // dados pessoais e documento ficam fora do passo de contato — a
+      // coordenação abre o cadastro pelo que usa no dia a dia (nome, zap,
+      // e-mail) e só desce pro resto quando precisa
+      titulo: "Dados pessoais e documento",
+      conteudo: (
+        <>
           <div className="grid gap-4 sm:grid-cols-2">
             <CampoNascimento id="e_nasc" defaultValue={pessoa.data_nascimento ?? ""} />
             <CampoGenero defaultValue={pessoa.genero ?? ""} />
           </div>
           <CampoCorRaca defaultValue={pessoa.cor_raca ?? ""} />
+          <p className="text-xs text-muted-foreground">
+            CPF, RG e endereço vão como estão no documento para o termo de
+            adesão. Só a coordenação vê estes campos.
+          </p>
+          {/* CPF/RG/endereço do termo (dados_civis, coord-only) — mesmos
+              campos da assinatura, com prefixo pra não colidir com os do
+              perfil (cidade/uf do matching são outros) */}
+          <DadosCivisFields
+            defaults={pessoa.dados_civis}
+            prefix="civ_"
+            opcional
+            compacto
+          />
         </>
       ),
     },
@@ -222,7 +245,7 @@ export function PessoaActions({
       ),
     },
     {
-      titulo: "Motivação e pareamento",
+      titulo: ehMentor ? "Motivação e pareamento" : "Motivação",
       conteudo: (
         <>
           <div className="space-y-2">
@@ -233,7 +256,12 @@ export function PessoaActions({
               placeholder="O que traz a pessoa ao programa"
             />
           </div>
-          <CampoPrefGenero defaultValue={pessoa.pref_genero_par ?? ""} />
+          {/* quem não é mentor não tem par — a preferência some da ficha
+              (REALIZA-231); o save de updatePessoa é parcial, então o valor
+              já gravado sobrevive a uma edição sem esse campo */}
+          {ehMentor && (
+            <CampoPrefGenero defaultValue={pessoa.pref_genero_par ?? ""} />
+          )}
         </>
       ),
     },
@@ -299,7 +327,7 @@ export function PessoaActions({
       ? [{
           titulo: "Ficha de mentor",
           conteudo: (
-            <div className="space-y-4 rounded-lg bg-muted/40 p-3.5">
+            <div className="space-y-4 rounded-lg bg-muted p-3.5">
               <div className="grid gap-4 sm:grid-cols-2">
                 {hibrido ? (
                   // duas pools independentes (WP6b): uma por trilha servida

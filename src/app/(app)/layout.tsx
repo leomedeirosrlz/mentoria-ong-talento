@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { AssistenteBolha } from "@/components/assistente-bolha";
 import { DemoBar } from "@/components/demo-bar";
 import { OnboardingFlow } from "@/components/onboarding-flow";
 import { TelaConta } from "@/components/telas-conta";
@@ -7,6 +8,7 @@ import { demoRole } from "@/lib/demo/mode";
 import { getMe, getMeuMentorProfile, getMeusDadosPessoais, getNotificacoes } from "@/lib/queries";
 import { getChamadosSemDono } from "@/lib/queries-chamados";
 import { getMeusDadosCivis, getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
+import { providerConfigurado } from "@/lib/ia/provider";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import type { AppRole } from "@/lib/types";
 import { redirect } from "next/navigation";
@@ -119,6 +121,21 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       ? getChamadosSemDono()
       : Promise.resolve(0),
   ]);
+  // bolha do assistente (REALIZA-243): o mesmo gate do item de nav que ela
+  // substituiu — staff e mentores, nunca o jovem (shell próprio) nem papeis
+  // fora da lista. papeis efetivos: primário + secundários (0085), igual ao
+  // que a página antiga passava
+  const papeisIa =
+    me.papeis && me.papeis.length ? me.papeis : me.role ? [me.role] : [];
+  // a bolha está DESLIGADA por padrão enquanto o assistente fecha a rodada
+  // de UI (gravação da demo, out/2026). IA_BOLHA=1 liga no ambiente — o e2e
+  // do app liga explicitamente; sem a flag não há entrada nenhuma pra staff
+  const acessoIa =
+    process.env.IA_BOLHA === "1" &&
+    ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"].some(
+      (r) => papeisIa.includes(r as AppRole)
+    );
+
   return (
     <AppShell
       me={me}
@@ -127,6 +144,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       notificacoes={notificacoes}
       chamadosSemDono={chamadosSemDono}
       demo={demoDock}
+      assistente={
+        acessoIa ? (
+          <AssistenteBolha
+            papeis={papeisIa}
+            demo={demo != null}
+            configurado={providerConfigurado()}
+          />
+        ) : undefined
+      }
     >
       {children}
       {demoFloat}

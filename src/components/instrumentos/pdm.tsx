@@ -54,44 +54,47 @@ export function Pdm({
   }));
 
   return (
-    <div className="xl:grid xl:grid-cols-[180px_1fr] xl:items-start xl:gap-5">
-      {/* sumário lateral — só telas extra-largas: até xl o documento fica
-          em fluxo único (o preview do form cabe inteiro assim) */}
-      <nav
-        aria-label="Capítulos do PDM"
-        className="sticky top-16 hidden self-start space-y-1 xl:block"
-      >
-        <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          Seu PDM
-        </p>
-        {capitulos.map((c) => (
-          <a
-            key={c.id}
-            href={`#${c.id}`}
-            className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-          >
-            <span
-              aria-hidden
-              className={cn(
-                "grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-bold tabular-nums",
-                c.completo
-                  ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
-                  : "bg-muted text-muted-foreground"
-              )}
+    <div className="@container">
+      <div className="@[34rem]:grid @[34rem]:grid-cols-[180px_1fr] @[34rem]:items-start @[34rem]:gap-5">
+        {/* sumário lateral — só quando o container é largo: abaixo disso o
+            documento fica em fluxo único (é assim que o preview do form
+            cabe inteiro no dialog). Container, não viewport (REALIZA-248) */}
+        <nav
+          aria-label="Capítulos do PDM"
+          className="sticky top-16 hidden self-start space-y-1 @[34rem]:block"
+        >
+          <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            Seu PDM
+          </p>
+          {capitulos.map((c) => (
+            <a
+              key={c.id}
+              href={`#${c.id}`}
+              className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
             >
-              {c.completo ? <Check size={11} weight="bold" /> : c.numero}
-            </span>
-            <span className="min-w-0 flex-1 truncate">
-              {c.bloco.secao?.label ?? `Capítulo ${c.numero}`}
-            </span>
-          </a>
-        ))}
-      </nav>
+              <span
+                aria-hidden
+                className={cn(
+                  "grid size-5 shrink-0 place-items-center rounded-full text-[10px] font-bold tabular-nums",
+                  c.completo
+                    ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
+                    : "bg-muted text-muted-foreground"
+                )}
+              >
+                {c.completo ? <Check size={11} weight="bold" /> : c.numero}
+              </span>
+              <span className="min-w-0 flex-1 truncate">
+                {c.bloco.secao?.label ?? `Capítulo ${c.numero}`}
+              </span>
+            </a>
+          ))}
+        </nav>
 
-      <div className="min-w-0 space-y-4">
-        {capitulos.map((c) => (
-          <CapituloDoc key={c.id} capitulo={c} api={api} grupos={grupos} />
-        ))}
+        <div className="min-w-0 space-y-4">
+          {capitulos.map((c) => (
+            <CapituloDoc key={c.id} capitulo={c} api={api} grupos={grupos} />
+          ))}
+        </div>
       </div>
     </div>
   );
@@ -281,7 +284,7 @@ function FichasPdm({
                 />
                 <ErroCampo campo={g.meta} msg={api.erros[g.meta.id]} />
               </div>
-              <div className="grid gap-3 md:grid-cols-[1fr_180px]">
+              <div className="grid gap-3 @[30rem]:grid-cols-[1fr_180px]">
                 {g.is && (
                   <div className="space-y-1.5" data-campo={g.is.id}>
                     <label

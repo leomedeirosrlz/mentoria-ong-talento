@@ -39,7 +39,6 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { cn, maskCep, maskCpf } from "@/lib/utils";
 import { getDocumentosPessoa, getMe, getPessoaPerfil } from "@/lib/queries";
-import { getAnamneseMentorado } from "@/lib/forms/queries";
 import { getSupervisoesDaPessoa } from "@/lib/queries-supervisao";
 import { getResumoFormacao } from "@/lib/queries-presenca";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
@@ -53,7 +52,7 @@ import {
   GENERO_LABELS,
   idade,
   linkSeguro,
-  papelLabel,
+  papelLabelComposto,
   podeSupervisionar,
   PREF_GENERO_LABELS,
   SITUACAO_MENTORADO_LABEL,
@@ -61,7 +60,6 @@ import {
 } from "@/lib/ciclo";
 import { temPapel } from "@/lib/types";
 import type { DadosCivis } from "@/lib/types";
-import { AnamneseMentoradoChip } from "@/components/anamnese-mentorado";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { CurriculoMentorado } from "@/components/curriculo-mentorado";
 import { DocumentosPessoa } from "@/components/documentos-pessoa";
@@ -342,10 +340,6 @@ export default async function PessoaPerfilPage({
     mp && podeVerFormacao ? await getResumoFormacao(p.id) : null;
   const dispTxt = disponibilidadeTexto(mp?.disponibilidade);
   const dispMentoradoTxt = disponibilidadeTexto(ment?.disponibilidade);
-  // anamnese oficial do mentorado (0042) — escopo coord; null quando a
-  // migração ainda não rodou, então a página segue igual antes dela
-  const anamnese =
-    ehMentorado && souCoord ? await getAnamneseMentorado(p.id) : null;
   // documentos do intake (0054) — coord-only; pra outro papel a query
   // nem dispara
   const documentos = souCoord
@@ -548,7 +542,7 @@ export default async function PessoaPerfilPage({
             ) : (
               <>
                 <Badge variant="outline" className="font-normal">
-                  {papelLabel("role" in p ? p.role : null)}
+                  {"role" in p ? papelLabelComposto(p) : "Sem papel definido"}
                 </Badge>
                 {/* estado operacional do cadastro é coisa de staff — colega
                     não precisa saber se a conta está ativa */}
@@ -884,12 +878,19 @@ export default async function PessoaPerfilPage({
                                 sempre={souCoord}
                                 className="sm:col-span-2"
                               />
-                              <Linha
-                                icone={<Users size={15} />}
-                                rotulo="Pref. de par"
-                                valor={p.pref_genero_par ? PREF_GENERO_LABELS[p.pref_genero_par] : null}
-                                sempre={souCoord}
-                              />
+                              {/* preferência de par só existe pra quem é
+                                  pareado: mentorado e mentor (REALIZA-231) */}
+                              {(ment ||
+                                (prof &&
+                                  (temPapel(prof, "mentor_dpp") ||
+                                    temPapel(prof, "mentor_especialista")))) && (
+                                <Linha
+                                  icone={<Users size={15} />}
+                                  rotulo="Pref. de par"
+                                  valor={p.pref_genero_par ? PREF_GENERO_LABELS[p.pref_genero_par] : null}
+                                  sempre={souCoord}
+                                />
+                              )}
                               {/* consent_lgpd_em só existe em profiles — mentorado é
                                   coberto pela autorização do responsável. Trilha de
                                   compliance, não perfil: fora da visão de colega */}
@@ -1094,7 +1095,7 @@ export default async function PessoaPerfilPage({
             />
           )}
 
-          {/* documentos + termos + anamnese — coord-only ponta a ponta. A
+          {/* documentos + termos — coord-only ponta a ponta. A
               gaveta nasce fechada: o cabeçalho com a contagem já diz o que
               tem dentro e a ficha fica leve; id próprio porque o stat
               "Termo" pendente aponta pra cá */}
@@ -1132,16 +1133,6 @@ export default async function PessoaPerfilPage({
                         whatsapp={p.whatsapp}
                       />
                     </div>
-                    {/* Anamnese Social (0042) — o form oficial respondido
-                        pelo(a) jovem sem login; coord envia/reenvia daqui */}
-                    {anamnese && (
-                      <AnamneseMentoradoChip
-                        mentoradoId={p.id}
-                        nome={p.nome}
-                        whatsapp={p.whatsapp}
-                        anamnese={anamnese}
-                      />
-                    )}
                   </div>
                 </Collapsible.Panel>
               </Collapsible.Root>

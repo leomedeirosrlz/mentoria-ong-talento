@@ -79,9 +79,15 @@ function LinhaMaterial({
   destaque?: boolean;
 }) {
   const Icone = TIPO_ICONE[m.tipo];
-  // arquivo oficial ganha da url externa; sem os dois, "em breve"
+  // arquivo oficial ganha da url externa; "doc:<slug>" é documento nativo
+  // (página do app); sem os três, "em breve"
   const urlOk = linkSeguro(m.url);
-  const href = m.path ? `/api/material/${m.id}` : urlOk;
+  const ehDoc = m.path?.startsWith("doc:") ?? false;
+  const href = ehDoc
+    ? `/materiais/documento/${m.path!.slice(4)}`
+    : m.path
+      ? `/api/material/${m.id}`
+      : urlOk;
   const conteudo = (
     <>
       <span
@@ -101,7 +107,13 @@ function LinhaMaterial({
         )}
         <span className="sr-only">
           {TIPO_LABEL[m.tipo]}
-          {m.path ? " · arquivo" : urlOk && m.tipo !== "link" ? " · link externo" : ""}
+          {m.path
+            ? m.path.startsWith("doc:")
+              ? " · documento"
+              : " · arquivo"
+            : urlOk && m.tipo !== "link"
+              ? " · link externo"
+              : ""}
         </span>
       </span>
     </>
@@ -122,8 +134,7 @@ function LinhaMaterial({
   return (
     <a
       href={href}
-      target="_blank"
-      rel="noopener noreferrer"
+      {...(ehDoc ? {} : { target: "_blank", rel: "noopener noreferrer" })}
       className={cn(
         cls,
         "transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
@@ -134,12 +145,15 @@ function LinhaMaterial({
     >
       {conteudo}
       {/* um ícone só no trilho direito — "Abrir em nova aba", o mesmo do
-          ⋯ do MaterialMenu; o que difere arquivo de link é o ícone do tipo */}
-      <ArrowSquareOut
-        size={17}
-        aria-hidden
-        className="shrink-0 text-muted-foreground"
-      />
+          ⋯ do MaterialMenu; documento nativo navega na mesma aba e não
+          leva o ícone de saída */}
+      {!ehDoc && (
+        <ArrowSquareOut
+          size={17}
+          aria-hidden
+          className="shrink-0 text-muted-foreground"
+        />
+      )}
     </a>
   );
 }
@@ -251,8 +265,8 @@ export function MateriaisMentorBiblioteca({
   /** transversais pro mentor DPP; pro especialista, tudo que ele vê. */
   referenciais: Material[];
 }) {
-  // um card por turma com o encontro da semana; abaixo, o acervo inteiro
-  // numa lista só (REALIZA-210) — sem próximos/adiante/anteriores
+  // um card por turma com o encontro da semana; abaixo, o acervo agrupado
+  // por categoria (REALIZA-250) — sem próximos/adiante/anteriores
   const todos = new Map<string, Material>();
   for (const lista of porEncontro.values())
     for (const m of lista) todos.set(m.id, m);

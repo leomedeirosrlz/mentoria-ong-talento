@@ -36,8 +36,12 @@ test("agenda do híbrido sem trilha: sem aba Especialista, horários no perfil",
 
   // REALIZA-207: a aba Especialista só existe com trilha pra mostrar. O
   // Ricardo é especialista sem trilha ativa → a agenda é só a do ciclo DPP
+  // (REALIZA-246: a visão entrou na mesma tablist dos modos — a barra
+  // simplesmente não tem a aba)
   await expect(
-    page.getByRole("navigation", { name: "Visão da agenda" })
+    page
+      .getByRole("tablist", { name: "Modos da agenda" })
+      .getByRole("tab", { name: "Especialista" })
   ).toHaveCount(0);
   await expect(page.getByRole("heading", { name: "Minha agenda" })).toBeVisible();
 

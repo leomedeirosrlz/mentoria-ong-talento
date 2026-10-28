@@ -8,8 +8,8 @@
  * Erros dos mocks corrigidos aqui (plano §432): Roda inicial abre no
  * enc. 1 (não no 2); PDM é documento vivo construído nos enc. 1–4 com
  * revisão no 9; Roda formal nos enc. 12–14; 360º é terminal (enc. 16 /
- * encerramento). Anamnese e avaliação por terceiros ficam FORA da
- * jornada por decisão (C8/C10). "Avaliação do encontro" é recorrente —
+ * encerramento). Avaliação por terceiros fica FORA da jornada por decisão
+ * (C8/C10). "Avaliação do encontro" é recorrente —
  * "em dia · X de Y", nunca "fecha".
  */
 
@@ -246,9 +246,9 @@ export const ESTACOES: Record<
     tagSnippet: "O que você marcou",
   },
   avaliacao_360: {
-    titulo: "Avaliação 360º",
+    titulo: "Avaliação final",
     descricao:
-      "O fechamento do ciclo: como você se vê e como te veem. A coordenação emite no fim da jornada.",
+      "O fechamento do ciclo: o jovem e o mentor respondem, cada um pelo seu link. A coordenação emite no fim da jornada.",
     encIni: 16,
     encFim: 16,
     chipLabel: "Enc. 16",
@@ -379,8 +379,9 @@ function textoSnippet(
     }
     case "avaliacao_360": {
       // sem campos no payload (a RPC 0096 não os manda): os ids citáveis
-      // do instrumento oficial primeiro, depois qualquer texto com corpo
-      for (const id of ["o_que_leva", "melhorar"]) {
+      // da avaliação final do mentorado primeiro, depois qualquer texto
+      // com corpo
+      for (const id of ["depoimento_texto", "melhorias_programa", "melhorar_opcoes"]) {
         const v = textoDe(id);
         if (v) return v;
       }
@@ -1122,10 +1123,14 @@ export function diaMesEvento(iso: string | null): string | null {
 /** A linha "libera no encontro N · T1 dd/mm · T2 dd/mm" — a data de
  *  abertura por turma (o encIni da estação no cronograma de cada uma),
  *  omitindo turma sem data oficial. Sem turmas com data, volta pro número
- *  do encontro sozinho. */
+ *  do encontro sozinho.
+ *  `verbo`: "libera" é o cadeado da janela (quem ela segura); "abre" é o
+ *  indicador da coordenação, que consulta/emite fora da janela
+ *  (REALIZA-257) — mesmo dado, sem ler como bloqueio. */
 export function liberaCopia(
   chave: EstacaoChave,
-  grupos: GrupoTurma[]
+  grupos: GrupoTurma[],
+  verbo: "libera" | "abre" = "libera"
 ): string {
   const porTurma = grupos
     .map((g) => {
@@ -1133,6 +1138,6 @@ export function liberaCopia(
       return dm ? `${g.sigla} ${dm}` : null;
     })
     .filter((s): s is string => s != null);
-  const base = `libera no encontro ${ESTACOES[chave].encIni}`;
+  const base = `${verbo} no encontro ${ESTACOES[chave].encIni}`;
   return porTurma.length ? `${base} · ${porTurma.join(" · ")}` : base;
 }

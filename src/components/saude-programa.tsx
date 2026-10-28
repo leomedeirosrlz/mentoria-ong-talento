@@ -47,9 +47,9 @@ const REGRAS: { termo: string; texto: string }[] = [
       "Pedido de apoio do mentor ou do jovem. Não muda a situação da dupla: ela aparece na situação dela e também no apoio.",
   },
   {
-    termo: "Pausadas e concluídas",
+    termo: "Pausadas, concluídas e desistentes",
     texto:
-      "Pausadas têm a jornada congelada, sem cobrança. Concluídas são as jornadas fechadas ou encerradas pelo rito.",
+      "Pausadas têm a jornada congelada, sem cobrança. Concluídas são as jornadas fechadas com êxito. Desistentes são as encerradas ou interrompidas no meio.",
   },
 ];
 
@@ -79,8 +79,17 @@ export function SaudePrograma({
   onRecorte?: (id: RecorteFatia) => void;
 }) {
   const Titulo = nivel;
-  const { emAndamento, risco, atencao, emDia, apoio, pausadas, concluidas, total } =
-    saude;
+  const {
+    emAndamento,
+    risco,
+    atencao,
+    emDia,
+    apoio,
+    pausadas,
+    concluidas,
+    desistentes,
+    total,
+  } = saude;
   const foraDaRegua = pausadas + concluidas;
 
   const segmentos = [
@@ -114,6 +123,12 @@ export function SaudePrograma({
             <Atalho id="pausada" linkBase={linkBase} onRecorte={onRecorte}>
               <span className="tabular-nums">
                 {pausadas} {pausadas === 1 ? "pausada" : "pausadas"}
+              </span>
+            </Atalho>
+            {" · "}
+            <Atalho id="desistente" linkBase={linkBase} onRecorte={onRecorte}>
+              <span className="tabular-nums">
+                {desistentes} {desistentes === 1 ? "desistente" : "desistentes"}
               </span>
             </Atalho>
           </p>

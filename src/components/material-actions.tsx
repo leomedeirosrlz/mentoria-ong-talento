@@ -23,6 +23,8 @@ import { linkSeguro, TRILHA_LEN } from "@/lib/ciclo";
 import { createClient } from "@/lib/supabase/client";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { AudienciasPicker } from "@/components/audiencias-picker";
+import { audienciasDe, type Audiencia } from "@/lib/materiais";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { EnviarEmailDialog } from "@/components/enviar-email-dialog";
@@ -65,16 +67,13 @@ const TIPO_LABEL = {
   conteudo: "Conteúdo",
   link: "Link",
 } as const;
-const AUDIENCIA_LABEL = {
-  todos: "Todos",
-  dpp: "Mentores DPP",
-  especialista: "Mentores especialistas",
-  coordenacao: "Coordenação",
-} as const;
 
-/** Destino do material — o mesmo das linhas/cards: o arquivo oficial ganha
- *  da url externa; sem os dois não há link pra abrir/copiar. */
-function hrefMaterial(m: Material): string | null {
+/** Destino do material — o mesmo das linhas/cards: "doc:<slug>" é o
+ *  documento nativo (a base muda por casa: /materiais no staff, /jovem no
+ *  mentorado); arquivo oficial ganha da url externa; sem os três não há
+ *  link pra abrir/copiar. */
+function hrefMaterial(m: Material, docBase = "/materiais/documento"): string | null {
+  if (m.path?.startsWith("doc:")) return `${docBase}/${m.path.slice(4)}`;
   return m.path ? `/api/material/${m.id}` : linkSeguro(m.url);
 }
 
@@ -83,8 +82,8 @@ function hrefMaterial(m: Material): string | null {
  *  não é da audiência cai no 404 honesto); url externa copia como está.
  *  Mesma régua de erro do CopiarLinkAvaliacao: sem clipboard API (contexto
  *  não-seguro/permissão negada) ou falha → toast de erro, não silêncio. */
-async function copiarLinkMaterial(m: Material) {
-  const href = hrefMaterial(m);
+async function copiarLinkMaterial(m: Material, docBase?: string) {
+  const href = hrefMaterial(m, docBase);
   if (!href) return;
   const texto = m.path ? `${window.location.origin}${href}` : href;
   if (!navigator.clipboard?.writeText) {
@@ -123,8 +122,16 @@ function TriggerAcoes({ titulo, pending }: { titulo: string; pending?: boolean }
  *  o jovem nos cards do acervo: a linha/card inteiro já é o "Abrir"; aqui
  *  ficam os gestos secundários. Sem destino ("em breve") não renderiza —
  *  não há link pra abrir nem copiar. */
-export function MaterialMenu({ material }: { material: Material }) {
-  const href = hrefMaterial(material);
+export function MaterialMenu({
+  material,
+  docBase,
+}: {
+  material: Material;
+  /** casa do documento nativo — "/jovem/materiais/documento" pro acervo do
+   *  jovem (a rota do staff expulsa o papel dele); default é a do app. */
+  docBase?: string;
+}) {
+  const href = hrefMaterial(material, docBase);
   if (!href) return null;
   return (
     <DropdownMenu>
@@ -136,7 +143,7 @@ export function MaterialMenu({ material }: { material: Material }) {
           <ArrowSquareOut size={16} data-icon="inline-start" aria-hidden />
           Abrir em nova aba
         </DropdownMenuItem>
-        <DropdownMenuItem onClick={() => copiarLinkMaterial(material)}>
+        <DropdownMenuItem onClick={() => copiarLinkMaterial(material, docBase)}>
           <LinkSimple size={16} data-icon="inline-start" aria-hidden />
           Copiar link
         </DropdownMenuItem>
@@ -153,9 +160,16 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
   // padrão dos encaminhamentos: o ConfirmDeleteButton sem trigger próprio)
   const [excluindo, setExcluindo] = useState(false);
   // audiência controlada — o teto de "encontro" segue a trilha dela
-  const [audiencia, setAudiencia] = useState(material.audiencia);
-  const maxEncontroSel =
-    audiencia === "especialista" ? TRILHA_LEN.especialista : (maxEncontro ?? 99);
+  const [audiencias, setAudiencias] = useState<Audiencia[]>(
+    audienciasDe(material)
+  );
+  const soEspecialista =
+    audiencias.includes("mentor_especialista") &&
+    !audiencias.includes("mentor_dpp") &&
+    !audiencias.includes("todos");
+  const maxEncontroSel = soEspecialista
+    ? TRILHA_LEN.especialista
+    : (maxEncontro ?? 99);
   const router = useRouter();
   const fileRef = useRef<HTMLInputElement>(null);
   const href = hrefMaterial(material);
@@ -309,7 +323,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
           setEditOpen(o);
           // Select de audiência é defaultValue — sem o reset o estado fica
           // à frente do que ele exibe quando o dialog reabre
-          if (!o) setAudiencia(material.audiencia);
+          if (!o) setAudiencias(audienciasDe(material));
         }}
       >
         {/* mesmo teto do dialog de criação — os dois grids de 2 colunas
@@ -322,7 +336,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
             </DialogDescription>
           </DialogHeader>
           <form
-            className="space-y-4"
+            className="min-w-0 space-y-4 overflow-hidden"
             onSubmit={(e) => {
               e.preventDefault();
               const fd = new FormData(e.currentTarget);
@@ -361,21 +375,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
                   </SelectContent>
                 </Select>
               </div>
-              <div className="space-y-2">
-                <Label id="mat-aud-label">Quem recebe</Label>
-                <Select
-                  name="audiencia"
-                  defaultValue={material.audiencia}
-                  onValueChange={(v) => setAudiencia((v ?? material.audiencia) as Material["audiencia"])}
-                >
-                  <SelectTrigger aria-labelledby="mat-aud-label"><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {Object.entries(AUDIENCIA_LABEL).map(([v, l]) => (
-                      <SelectItem key={v} value={v}>{l}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+              <AudienciasPicker value={audiencias} onChange={setAudiencias} />
             </div>
             <div className="grid gap-4 sm:grid-cols-2">
               <div className="space-y-2">
@@ -386,7 +386,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
                   min={1} max={maxEncontroSel}
                   defaultValue={material.encontro_num ?? ""}
                 />
-                {audiencia === "todos" && (
+                {audiencias.includes("todos") && (
                   <p className="text-xs text-muted-foreground">
                     Pro jovem, libera quando a dupla chegar no encontro.
                   </p>
