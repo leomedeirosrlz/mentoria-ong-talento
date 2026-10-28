@@ -80,7 +80,7 @@ function DialogContent({
       <DialogPrimitive.Popup
         data-slot="dialog-content"
         className={cn(
-          "fixed top-1/2 left-1/2 z-50 grid w-full min-w-0 max-w-[calc(100%-2rem)] max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-x-clip overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground shadow-[var(--shadow-modal)] duration-150 ease-[cubic-bezier(0.2,0,0,1)] outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-open:slide-in-from-bottom-2 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:slide-out-to-bottom-2",
+          "fixed top-1/2 left-1/2 z-50 grid w-full min-w-0 max-w-[calc(100%-2rem)] max-h-[calc(100dvh-2rem)] -translate-x-1/2 -translate-y-1/2 gap-4 overflow-x-clip overflow-y-auto rounded-xl bg-popover p-4 text-sm text-popover-foreground shadow-[var(--shadow-modal)] duration-150 ease-[cubic-bezier(0.2,0,0,1)] outline-none data-open:animate-in data-open:fade-in-0 data-open:zoom-in-95 data-open:slide-in-from-bottom-2 data-closed:animate-out data-closed:fade-out-0 data-closed:zoom-out-95 data-closed:slide-out-to-bottom-2 [&>*]:min-w-0",
           DIALOG_SIZES[size],
           className
         )}
@@ -113,7 +113,7 @@ function DialogHeader({ className, ...props }: React.ComponentProps<"div">) {
     <div
       data-slot="dialog-header"
       // pr-8: o X absoluto do popup não pode ficar por cima de título longo
-      className={cn("flex flex-col gap-2 pr-8", className)}
+      className={cn("flex min-w-0 flex-col gap-2 pr-8", className)}
       {...props}
     />
   )
