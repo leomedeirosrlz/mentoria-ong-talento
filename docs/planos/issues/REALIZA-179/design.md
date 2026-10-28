@@ -2,11 +2,18 @@
 
 `.devin/skills/ux-review/SKILL.md`. Componentes reais: `page-header`,
 `button`, `card`, `badge`, `dialog`, `textarea`, `input`, `skeleton`,
-`sonner`, `filter-chip`, `tooltip`, `password-input`. **Não existe
-Sheet/Drawer** em `src/components/ui` — o assistente é página própria
-(melhor no mobile, sem inventar primitiva).
+`sonner`, `filter-chip`, `tooltip`, `password-input`.
 
-## 1. `/assistente` — página do chat (todos os papéis)
+**Entregue diferente (REALIZA-243):** o assistente não virou página —
+virou **bolha** (`AssistenteBolha`, FAB fixo no AppShell; `Popover`
+não-modal no desktop, `Sheet` de rodapé no mobile — `ui/sheet` passou a
+existir pra ela). O painel interno é o `AssistenteConversa` nos dois.
+Gate: env `IA_BOLHA=1` + papéis staff/mentores (jovem fora — shell
+próprio). `/assistente` virou `redirect("/")` pra links antigos. O
+desenho abaixo segue valendo pro conteúdo do painel; os deltas estão
+anotados.
+
+## 1. assistente — painel da bolha (era: página `/assistente`)
 
 ### Layout
 
@@ -45,26 +52,29 @@ PageHeader "Assistente"  sub: "Pergunte sobre a operação ou os guias do progra
   contrato de `executarTool` + system prompt; sem estado de erro separado.
 - **Erro de transporte** (5xx/429): toast `sonner` + bolha do assistente
   com a mensagem amigável.
-- **Card de confirmação**: `Card` inline no transcript com o `resumo`
-  pt-BR + botões "Confirmar" (primary) / "Cancelar" (ghost). Após
-  confirmar, o card vira read-only "Confirmado ✓" e a resposta chega em
-  nova bolha. Cancelar → "Ação cancelada — nada foi alterado."
-- **Citações**: quando o resultado da tool `guia_consulta` tem `fontes`,
-  a bolha renderiza badges abaixo do texto: `Guia do Mentor · p.12`.
-  (Sem link — guia é corpus interno; a referência textual basta.)
-- **Demo**: transcript inicial com 1 troca enlatada; chips funcionam com
-  respostas fixas; input livre → resposta fixa "Na demonstração o
-  assistente tem respostas de exemplo — no ambiente real ele responde com
-  seus dados." Banner discreto no topo dizendo isso.
+- **Card de confirmação** — *pendente (REALIZA-290–297)*, depende das
+  tools de escrita: `Card` inline no transcript com o `resumo` pt-BR +
+  botões "Confirmar" (primary) / "Cancelar" (ghost). Após confirmar, o
+  card vira read-only "Confirmado ✓" e a resposta chega em nova bolha.
+  Cancelar → "Ação cancelada — nada foi alterado."
+- **Citações** — entregue mais simples: o modelo cita guia/seção na
+  própria prosa ("segundo o Guia do Mentor, cap. 10…") e a meta da bolha
+  lista as tools usadas ("fontes: guia_consulta"); links internos na
+  resposta viram chips de ação (REALIZA-286). Os badges "Guia · p.N"
+  separados ficam como melhoria possível.
+- **Demo** — entregue: aviso "Na demonstração, o assistente responde com
+  exemplos fixos." + respostas enlatadas por regex sobre o dataset (sem
+  fetch ao provider/API — `DEMO_RESPOSTAS`).
 
-### Nav
+### Nav — superseded
 
-Item "Assistente" (`ChatCircle`/`Sparkle`) no `app-shell.tsx` — `roles:
-null` (todos) ou staff-only na primeira entrega (decisão de produto no
-plan; default todos os papéis). Bottom-nav mobile entra no grupo
-secundário.
+Sem item na nav: o acesso é o FAB (`Sparkle`) fixo no AppShell —
+`assistente-bolha.tsx`. Gate real = `IA_BOLHA=1` + papéis
+coordenacao/supervisor/mentor_dpp/mentor_especialista (o jovem não vê;
+decisão mais restrita que o "todos os papéis" previsto). Estado aberto
+persiste em `sessionStorage` (a aba lembra).
 
-## 2. `/perfil` — "Conectar IA externa" (coord-only)
+## 2. `/perfil` — "Conectar IA externa" (coord-only) — **PENDENTE (REALIZA-290–297)**
 
 Seção nova no perfil (abaixo das existentes):
 
@@ -105,18 +115,23 @@ Card "Conectar IA externa"
 ## 4. A11y / consistência
 
 - Transcript: `role="log"` `aria-live="polite"` na lista; foco volta ao
-  composer após envio.
+  composer após envio. *(entregue — a rolagem só segue o fim quando o
+  usuário já está perto dele)*
 - Bolhas com contraste AA; max-width ~75ch; scroll automático pro fim na
   nova mensagem.
-- Card de confirmação com `aria-label` claro ("Confirmação de ação").
-- Mobile: página full-width, composer fixo no rodapé acima da bottom-nav
-  (`sticky bottom`), chips scroll horizontal.
-- Tudo server-render exceto `assistente-chat.tsx` (client isolado).
+- Card de confirmação com `aria-label` claro ("Confirmação de ação") —
+  pendente (290–297).
+- Mobile *(entregue diferente)*: não é página full-width — é `Sheet` de
+  rodapé (backdrop + focus trap, cobre a bottom-nav via z-50); composer
+  no rodapé do painel, chips no empty state.
+- Client isolado *(entregue)*: `assistente-conversa.tsx` +
+  `assistente-bolha.tsx` são os únicos `"use client"` do fluxo; o layout
+  resolve o gate server-side e passa `papeis`/`demo`/`configurado`/`nome`.
 
 ## 5. O que NÃO entra (escopo visual)
 
-- Nenhum drawer/modal de chat global — página própria (Sheet não existe
-  na lib).
+- ~~Página `/assistente` dedicada~~ → superseded: a 243 preferiu a bolha
+  FAB (Popover/Sheet) sobre a página — `ui/sheet` nasceu pra ela.
 - Sem histórico de conversas, sem sidebar de threads (transcript não
   persiste).
 - Sem voz/anexo no chat — texto só.

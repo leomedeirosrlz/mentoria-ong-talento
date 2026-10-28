@@ -2,18 +2,21 @@
 
 Maior superfície de risco do cluster: primeira integração LLM, primeiro
 endpoint Bearer, primeira tabela de tokens, primeira escrita por agente.
+**(REALIZA-310):** a integração LLM já está no ar — read-only. Endpoint
+Bearer, tabela de tokens e escrita por agente seguem **pendentes
+(REALIZA-290–297)** — as análises deles ficam como spec da fase.
 
 ## 1. Superfícies novas
 
-| Superfície | Acesso | Auth |
-|---|---|---|
-| `POST /api/ia/chat` | qualquer logado | cookie (middleware protege `/api/*` por default) |
-| `/assistente` | qualquer logado | idem |
-| `POST/GET /api/mcp` | coord | `Bearer` JWT-Supabase **ou** PAT `rlz_`; rota na lista pública do middleware [NOVO] |
-| `ia_chunks` + `match_ia_chunks` | qualquer logado | `grant select authenticated` + RPC definer |
-| `ia_tokens` | dono (select/delete) + RPC coord-only | policies novas |
-| tools de escrita | por `papeis` + RLS | mesma sessão/token |
-| Provider LLM | server-only | `IA_API_KEY` |
+| Superfície | Acesso | Auth | Status |
+|---|---|---|---|
+| `POST /api/ia/chat` | qualquer logado | cookie (middleware protege `/api/*` por default) | entregue — SSE `status/token/done/error`; gates JSON pré-stream |
+| bolha do assistente (FAB) | staff + mentores | idem + gate `IA_BOLHA=1` | entregue — `AssistenteBolha`; `/assistente` virou redirect |
+| `POST/GET /api/mcp` | coord | `Bearer` JWT-Supabase **ou** PAT `rlz_`; rota na lista pública do middleware [NOVO] | pendente — REALIZA-290–297 |
+| `ia_chunks` + `match_ia_chunks` | qualquer logado | `grant select authenticated` + RPC definer | entregue — migration 0136 |
+| `ia_tokens` | dono (select/delete) + RPC coord-only | policies novas | pendente — REALIZA-290–297 |
+| tools de escrita | por `roles` + RLS | mesma sessão/token | pendente — REALIZA-290–297 |
+| Provider LLM (opencode Go) | server-only | `IA_API_KEY` | entregue |
 
 ## 2. Análise de ameaças
 
@@ -25,8 +28,11 @@ endpoint Bearer, primeira tabela de tokens, primeira escrita por agente.
   livre (`queries.ts` allowlists — invariante testado em
   `ia-tools.test.ts`; **manter essa allowlist intocada ao adicionar
   tools novas**).
-- **Gate de lançamento**: DPA + retenção zero contratual — `BLOCKER`
-  formal. Sem confirmação → `IA_API_KEY` ausente → feature morta.
+- **Provider em uso**: opencode Go (plano de assinatura) — o modelo
+  default `mimo-v2.6-flash` declara retenção 0 dias e não treina com os
+  dados. A confirmação formal do DPA segue como pendência do jurídico;
+  sem `IA_API_KEY` a feature fica morta (`providerConfigurado` → 503 +
+  bolha oculta).
 - Prompt-injection via tool results: resultados são JSON de dados
   estruturados (sem instruções); system prompt proíbe obedecer texto vindo
   de `tool`/`user` que peça pra ignorar regras — defesa fraca por natureza,
@@ -37,7 +43,9 @@ endpoint Bearer, primeira tabela de tokens, primeira escrita por agente.
   não entram em breadcrumbs — adicionar `request.body` scrub na rota
   `/api/ia/chat` se o Sentry capturar bodies (verificar `sentry.*.config`).
 
-### 2.2 Endpoint MCP Bearer
+### 2.2 Endpoint MCP Bearer — pendente (REALIZA-290–297)
+
+Análise mantida como spec da fase — a rota ainda não existe.
 
 - `/api/mcp` entra na lista pública do middleware → **toda a auth é da
   rota** — qualquer request sem Bearer válido recebe 401 JSON (não
@@ -65,7 +73,10 @@ endpoint Bearer, primeira tabela de tokens, primeira escrita por agente.
 - `match_ia_chunks` recebe texto livre — `plainto_tsquery` sanitiza (sem
   injection em tsquery raw); RPC definer não retorna nada além dos chunks.
 
-### 2.4 Tools de escrita
+### 2.4 Tools de escrita — pendente (REALIZA-290–297)
+
+O assistente entregue é read-only — nenhuma tool de escrita existe ainda.
+Análise mantida como spec da fase.
 
 - Defesa em camadas: (a) `papeis` no registry; (b) **RLS/policy do
   banco** — a tool escreve com o client do usuário, então um mentor
@@ -86,16 +97,25 @@ endpoint Bearer, primeira tabela de tokens, primeira escrita por agente.
   (LGPD: dados sensíveis ficam fora).
 - `IA_ESCRITAS_OK`/`IA_MCP_ESCRITAS` gates de rollout por superfície.
 
-### 2.5 Rate limit / abuso
+### 2.5 Rate limit / abuso — parcialmente entregue
 
-- `checarLimiteIa`: 20 calls/min (chat) / 30 calls/min (MCP) por
-  `profile_id`, contando `ia_eventos` — DB-accurate (não depende de
-  memória de instância serverless). Custo: 1 count query por mensagem.
-- Loop de tools limitado a 6 iterações/request — modelo não pode ficar
-  chamando tool em ciclo (cost cap por request).
-- Input cap: `messages` ≤20, `content` ≤4000 chars (zod na rota).
+- `checarLimiteIa` **entregue**: 20 msg/60s (chat) por `profile_id`,
+  contando `ia_eventos` — DB-accurate (não depende de memória de
+  instância serverless). Cada envio grava um evento `tool='mensagem'`,
+  então o limite mede mensagens, não só tool calls. Falha na contagem
+  loga e deixa passar — o limite protege custo, não é fronteira de
+  segurança (essa é a RLS + allowlist). MCP 30/min quando entrar
+  (290–297) — a função já recebe o teto por arg.
+- Loop de tools limitado a **6 iterações**/request (MAX_ITERACOES=6) +
+  guards anti-loop entregues: `guia_consulta` máx 1× por resposta e
+  nudge "responda com o que tem" a partir da 2ª rodada. Orçamento total
+  por request com headroom sob `maxDuration=60` — cada rodada recebe o
+  restante do deadline.
+- Input cap entregue: `messages` ≤20, `content` ≤4000 chars, roles só
+  `user|assistant` (zod strict na rota — campos extras derrubam o parse).
 - Custo do provider: `duracao_ms` nos eventos + contagem →
-  observabilidade pronta; sem auto-retry.
+  observabilidade pronta; sem auto-retry **no servidor** (o client da
+  bolha faz uma retentativa única em 503/rede — REALIZA-284).
 
 ### 2.6 Transcript / retenção
 
@@ -116,22 +136,33 @@ endpoint Bearer, primeira tabela de tokens, primeira escrita por agente.
 
 ## 3. Checklist de lançamento
 
-- [ ] DPA + zero-retention do provider confirmado (Thiago) → set envs.
-- [ ] OAuth server do Supabase: habilitado? documenta flow; senão PAT.
-- [ ] `mcp-handler` versão pinned; `pnpm audit` limpo.
-- [ ] `/api/mcp` na lista pública do middleware + teste 401 sem bearer.
-- [ ] `ia_tokens`: grants (select/delete próprio via policy; insert só
-  via RPC `emitir_ia_token` definer; **revoke all** primeiro — padrão 0032).
-- [ ] Scrub Sentry cobre `/api/ia/*` e `/api/mcp` (headers já negados;
-  conferir body).
+Entregue: provider configurado e operando (retenção 0 declarada no modelo
+default), rate limit no ar, assistente read-only. Os itens de
+MCP/escrita migram pro checklist da fase **REALIZA-290–297**:
+
+- [ ] DPA formal do provider (jurídico) — modelo em uso declara retenção
+  0 e não treina; formalização do contrato segue aberta.
+- [ ] *(290–297)* OAuth server do Supabase: habilitado? documenta flow;
+  senão PAT.
+- [ ] *(290–297)* `mcp-handler` versão pinned; `pnpm audit` limpo.
+- [ ] *(290–297)* `/api/mcp` na lista pública do middleware + teste 401
+  sem bearer.
+- [ ] *(290–297)* `ia_tokens`: grants (select/delete próprio via policy;
+  insert só via RPC `emitir_ia_token` definer; **revoke all** primeiro —
+  padrão 0032).
+- [ ] Scrub Sentry cobre `/api/ia/*` (e `/api/mcp` quando existir)
+  (headers já negados; conferir body).
 - [ ] Rate limit testado por papel.
-- [ ] `ia_eventos` mostra par proposta/confirmação de cada write.
+- [ ] *(290–297)* `ia_eventos` mostra par proposta/confirmação de cada
+  write.
 
 ## 4. Checklist LGPD
 
 - [x] Mínimo necessário nas queries (allowlist já existente — manter).
 - [x] Sem transcript persistido.
-- [x] Token = hash no DB, revogável, auditável.
-- [x] Escrita só com confirmação + regra de domínio + RLS.
-- [x] Corpus RAG = material institucional (sem pessoas).
-- [ ] Registro no mapa de operadores quando o provider for ligado.
+- [ ] *(pendente — 290–297)* Token = hash no DB, revogável, auditável.
+- [ ] *(pendente — 290–297)* Escrita só com confirmação + regra de
+  domínio + RLS.
+- [x] Corpus RAG = material institucional (sem pessoas — gate anti-PII na
+  ingestão).
+- [ ] Registro no mapa de operadores (provider já em uso — formalizar).
