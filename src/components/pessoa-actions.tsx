@@ -327,7 +327,7 @@ export function PessoaActions({
       ? [{
           titulo: "Ficha de mentor",
           conteudo: (
-            <div className="space-y-4 rounded-lg bg-muted/40 p-3.5">
+            <div className="space-y-4 rounded-lg bg-muted p-3.5">
               <div className="grid gap-4 sm:grid-cols-2">
                 {hibrido ? (
                   // duas pools independentes (WP6b): uma por trilha servida
