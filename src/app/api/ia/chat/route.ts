@@ -43,7 +43,7 @@ export const maxDuration = 60;
 
 // teto de iterações do loop de tools — o modelo que chama tools pra sempre
 // para aqui e responde com o que já tem (acceptance: 7 calls → para em 6)
-const MAX_ITERACOES = 6;
+const MAX_ITERACOES = 4;
 
 // orçamento total do stream (REALIZA-304): a plataforma encerra a função
 // aos 60s sem avisar — se o teto por rodada fosse o único limite, uma
