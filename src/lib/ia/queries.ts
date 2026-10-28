@@ -187,25 +187,32 @@ export const getRegistrosDaDuplaIa = cache(
 
 // ---------- fila "aguardando par" + capacidade (coord-only) ----------
 
-/** form_bruto id→payload das views *_pessoal — só a coluna do carimbo do
- *  intake (a fila ordena por "desde"; dados_civis/motivação etc. não entram
- *  no select, ao contrário do merge completo de getPessoalMap). Fora da
- *  coordenação a view devolve zero linhas — degrada pra mapa vazio, como
- *  getPessoalMap. */
-async function getFormBrutoMap(
+/** id → carimbo do intake das views *_pessoal — a fila ordena por "desde"
+ *  e a ÚNICA chave que esperaDesde/carimboFormBruto lê no form_bruto é
+ *  "Carimbo de data/hora". O payload cru ainda atravessa o fetch (o
+ *  PostgREST não consegue fatiar chave JSON com espaço/'/' no select —
+ *  tirar de vez exigiria coluna computada/RPC no banco), mas morre na
+ *  borda: o mapa guarda só {"Carimbo de data/hora": v} — documentos,
+ *  contato, nascimento e o resto do intake nunca chegam aos objetos que a
+ *  tool e as funções puras tocam (ao contrário do merge completo de
+ *  getPessoalMap, que é tela da coordenação). Fora da coordenação a view
+ *  devolve zero linhas — degrada pra mapa vazio, como getPessoalMap. */
+async function getCarimboMap(
   supabase: SupabaseClient,
   view: "profiles_pessoal" | "mentorados_pessoal"
 ): Promise<Map<string, Record<string, unknown> | null>> {
   const { data, error } = await supabase.from(view).select("id, form_bruto");
   if (error) {
-    console.error(`getFormBrutoMap(${view}):`, error);
+    console.error(`getCarimboMap(${view}):`, error);
     return new Map();
   }
   return new Map(
     (data ?? []).map(
       (r: { id: string; form_bruto: Record<string, unknown> | null }) => [
         r.id,
-        r.form_bruto,
+        r.form_bruto == null
+          ? null
+          : { "Carimbo de data/hora": r.form_bruto["Carimbo de data/hora"] },
       ]
     )
   );
@@ -215,7 +222,9 @@ async function getFormBrutoMap(
  *  mantém a opcionalidade do tipo cheio: `as Profile[]`/`as Mentorado[]`
  *  continuam casts legítimos na fronteira das funções puras (o superset
  *  viria do select; o que falta é só o que o banco não mandou — whatsapp,
- *  email — e a fila não toca). */
+ *  email — e a fila não toca). `form_bruto` aqui já vem reduzido pelo
+ *  getCarimboMap: é o objeto {"Carimbo de data/hora": v} | null, não o
+ *  intake inteiro — esperaDesde só lê essa chave. */
 export type PessoaFilaIa = Pick<
   Profile,
   | "id"
@@ -255,7 +264,7 @@ export const getFilaInsumos = cache(
     historico: Set<string>;
     contagemPorMentor: Record<string, number>;
   }> => {
-    const [pessoas, mentorados, brutoP, brutoM, duplas, mps] =
+    const [pessoas, mentorados, carimboP, carimboM, duplas, mps] =
       await Promise.all([
         supabase
           .from("profiles")
@@ -265,8 +274,8 @@ export const getFilaInsumos = cache(
         supabase
           .from("mentorados")
           .select("id, nome, ong_origem, origem, situacao, created_at"),
-        getFormBrutoMap(supabase, "profiles_pessoal"),
-        getFormBrutoMap(supabase, "mentorados_pessoal"),
+        getCarimboMap(supabase, "profiles_pessoal"),
+        getCarimboMap(supabase, "mentorados_pessoal"),
         supabase.from("duplas").select("mentor_id, mentorado_id, status, trilha"),
         supabase
           .from("mentor_profiles")
@@ -306,12 +315,12 @@ export const getFilaInsumos = cache(
         return {
           ...rest,
           papeis: (profile_papeis ?? []).map((r) => r.papel),
-          form_bruto: brutoP.get(p.id) ?? null,
+          form_bruto: carimboP.get(p.id) ?? null,
         };
       }),
       mentorados: ((mentorados.data ?? []) as MentoradoFilaIa[]).map((m) => ({
         ...m,
-        form_bruto: brutoM.get(m.id) ?? null,
+        form_bruto: carimboM.get(m.id) ?? null,
       })),
       mentorProfiles,
       ocupados,
@@ -436,30 +445,46 @@ export const getJovemDuplaIa = cache(
 
 // ---------- índice de duplas + agenda do período ----------
 
+/** A linha do índice de duplas — projeção mínima pra descobrir dupla_id
+ *  e dar contexto na resposta (nomes, trilha, status, turma). */
+export type DuplaResumoIa = {
+  id: string;
+  trilha: Trilha;
+  status: DuplaStatus;
+  turma: string;
+  mentor: { nome: string } | null;
+  mentorado: { nome: string } | null;
+};
+
 /** Índice enxuto das duplas vivas no escopo do papel — é como o modelo
  *  descobre `dupla_id` antes das tools por-id ("minha dupla" → a dele).
- *  Sem encontros/registros: o detalhe vem de ficha_dupla/registros_da_dupla. */
+ *  Sem encontros/registros: o detalhe vem de ficha_dupla/registros_da_dupla.
+ *  Corta em 60 pra caber no contexto e devolve junto o total REAL do
+ *  escopo (count exato na mesma query — o PostgREST conta sob a RLS sem
+ *  round-trip extra) — total > duplas.length avisa a tool que a lista
+ *  veio parcial, senão o modelo responderia como se tivesse visto o
+ *  universo inteiro. */
 export const getDuplasResumoIa = cache(
-  async (supabase: SupabaseClient) => {
-    const { data, error } = await supabase
+  async (
+    supabase: SupabaseClient
+  ): Promise<{ duplas: DuplaResumoIa[]; total: number }> => {
+    const { data, error, count } = await supabase
       .from("duplas")
       .select(
         `id, trilha, status, turma,
          mentor:profiles!duplas_mentor_id_fkey(nome),
-         mentorado:mentorados(nome)`
+         mentorado:mentorados(nome)`,
+        { count: "exact" }
       )
       .in("status", ["ativa", "pausada"])
       .order("turma")
       .limit(60);
     if (error) throw error;
-    return (data ?? []) as unknown as {
-      id: string;
-      trilha: Trilha;
-      status: DuplaStatus;
-      turma: string;
-      mentor: { nome: string } | null;
-      mentorado: { nome: string } | null;
-    }[];
+    const duplas = (data ?? []) as unknown as DuplaResumoIa[];
+    // count vem null se o PostgREST não devolver o cabeçalho — o total
+    // honesto degrada pro tamanho da página (nunca promete corte que não
+    // houve; no pior caso omite a sinalização, como antes)
+    return { duplas, total: count ?? duplas.length };
   }
 );
 
