@@ -115,7 +115,7 @@ export function NumerosSemanaSecao({
                         rotulo: "não aconteceu",
                         cls: "bg-muted-foreground/25",
                       },
-                      { valor: c.semAgendamento, rotulo: "sem data" },
+                      { valor: c.semAgendamento, rotulo: "sem agendamento" },
                     ]}
                   />
                 )}

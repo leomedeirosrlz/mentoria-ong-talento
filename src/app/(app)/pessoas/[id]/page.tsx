@@ -90,7 +90,7 @@ const STATUS_DUPLA: Record<string, string> = {
   ativa: "ativa",
   pausada: "pausada",
   concluida: "concluída",
-  encerrada: "encerrada",
+  encerrada: "desistente",
 };
 
 /** Campo da ficha — ícone de escaneio + rótulo uppercase pequeno sobre o

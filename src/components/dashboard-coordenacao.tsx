@@ -605,7 +605,7 @@ function montarPrecisa({
       </Link>
     ) : item ? (
       // a mesma régua de lembrete da fila: o caso decisório é registro >
-      // limbo > atraso > sem data, e o cap de 48h vem do server. O wrapper
+      // limbo > atraso > sem agendamento, e o cap de 48h vem do server. O wrapper
       // leva o alvo a 44px no celular sem mexer no botão compartilhado
       <div className="[&_button]:min-h-11 md:[&_button]:min-h-8">
         <DuplaWaAcao
@@ -684,7 +684,8 @@ function lembreteDoItem(
 type ItemFila = ReturnType<typeof paraAcompanhar>[number];
 
 function situacaoDaDupla(d: Dupla, saude: DuplaSaude): { rotulo: string; tom: TomSituacao } {
-  if (d.status === "concluida" || d.status === "encerrada") return { rotulo: "Concluída", tom: "pausa" };
+  if (d.status === "concluida") return { rotulo: "Concluída", tom: "pausa" };
+  if (d.status === "encerrada") return { rotulo: "Desistente", tom: "pausa" };
   if (d.status === "pausada") return { rotulo: "Pausada", tom: "pausa" };
   if (saude.semaforo === "risco") return { rotulo: "Em risco", tom: "risco" };
   if (saude.semaforo === "atencao") return { rotulo: "Atenção", tom: "atencao" };

@@ -254,11 +254,13 @@ function LinhaDupla({
   const legenda =
     d.status === "pausada"
       ? "em pausa"
-      : d.status === "concluida" || d.status === "encerrada"
-        ? "jornada fechada"
-        : ehEsp
-          ? "sessões"
-          : `esperado ${saude.esperado}`;
+      : d.status === "concluida"
+        ? "concluída"
+        : d.status === "encerrada"
+          ? "desistente"
+          : ehEsp
+            ? "sessões"
+            : `esperado ${saude.esperado}`;
 
   return (
     <DuplaLinha

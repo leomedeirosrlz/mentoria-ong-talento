@@ -135,7 +135,7 @@ describe("agruparRegistros · semana", () => {
     const grupos = agruparRegistros(itens, "semana");
     expect(grupos.map((g) => g.rotulo)).toEqual([
       "Semana de 13/10/2025",
-      "Sem data",
+      "Sem agendamento",
     ]);
   });
 });

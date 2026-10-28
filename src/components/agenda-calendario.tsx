@@ -465,7 +465,7 @@ function ResumoEncontrosDupla({
           rotulo: "não aconteceram",
           cls: "bg-muted-foreground/50",
         },
-        { valor: semData, rotulo: "sem data" },
+        { valor: semData, rotulo: "sem agendamento" },
       ]}
     />
   );
@@ -522,7 +522,7 @@ function LegendaEncontrosDupla({
       {semData > 0 && (
         <span className={item}>
           <span aria-hidden className="viz-hatch size-2 rounded-full" />
-          {semData} sem data
+          {semData} sem agendamento
         </span>
       )}
     </span>
@@ -3023,7 +3023,7 @@ export function AgendaCalendario({
                       rotulo: "não aconteceram",
                       cls: "bg-muted-foreground/25",
                     },
-                    { valor: acumCiclo.semData, rotulo: "sem data" },
+                    { valor: acumCiclo.semData, rotulo: "sem agendamento" },
                   ]}
                 />
               )}

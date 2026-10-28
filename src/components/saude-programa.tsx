@@ -47,9 +47,19 @@ const REGRAS: { termo: string; texto: string }[] = [
       "Pedido de apoio do mentor ou do jovem. Não muda a situação da dupla: ela aparece na situação dela e também no apoio.",
   },
   {
-    termo: "Pausadas, concluídas e desistentes",
+    termo: "Pausada",
     texto:
-      "Pausadas têm a jornada congelada, sem cobrança. Concluídas são as jornadas fechadas com êxito. Desistentes são as encerradas ou interrompidas no meio.",
+      "Jornada congelada, sem cobrança. A dupla pode voltar quando quiser.",
+  },
+  {
+    termo: "Concluída",
+    texto:
+      "Registraram todos os encontros e concluíram a jornada do programa.",
+  },
+  {
+    termo: "Desistente",
+    texto:
+      "Finalizaram a jornada por impeditivos ou motivos de força maior.",
   },
 ];
 
@@ -90,14 +100,14 @@ export function SaudePrograma({
     desistentes,
     total,
   } = saude;
-  const foraDaRegua = pausadas + concluidas;
-
   const segmentos = [
     { valor: risco, rotulo: "em risco", cls: "bg-[var(--danger)]" },
     { valor: atencao, rotulo: "em atenção", cls: "bg-[var(--warn)]" },
     // dupla em dia é neutra: o segmento é cinza de dado, sem cor de status
     { valor: emDia, rotulo: "em dia", cls: "bg-muted-foreground" },
-    { valor: foraDaRegua, rotulo: "pausadas ou concluídas", cls: "bg-[var(--pausa)]" },
+    { valor: pausadas, rotulo: "pausadas", cls: "bg-[var(--pausa)]" },
+    { valor: concluidas, rotulo: "concluídas", cls: "bg-[var(--ok)]" },
+    { valor: desistentes, rotulo: "desistentes", cls: "bg-[var(--danger)]" },
   ];
 
   return (
@@ -158,7 +168,7 @@ export function SaudePrograma({
             denominador={total}
             animate
             segmentos={segmentos}
-            ariaLabel={`${emAndamento} em andamento: ${risco} em risco, ${atencao} em atenção, ${emDia} em dia. ${foraDaRegua} pausadas ou concluídas. ${apoio} com apoio aberto.`}
+            ariaLabel={`${emAndamento} em andamento: ${risco} em risco, ${atencao} em atenção, ${emDia} em dia. ${pausadas} pausadas, ${concluidas} concluídas, ${desistentes} desistentes. ${apoio} com apoio aberto.`}
           />
           <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
             <Item
@@ -181,10 +191,22 @@ export function SaudePrograma({
             />
             <Item n={emDia} rotulo="em dia" dot="bg-muted-foreground" texto="text-foreground" />
             <Item
-              n={foraDaRegua}
-              rotulo="pausadas ou concluídas"
+              n={pausadas}
+              rotulo="pausadas"
               dot="bg-[var(--pausa)]"
               texto="text-[var(--pausa-text)]"
+            />
+            <Item
+              n={concluidas}
+              rotulo="concluídas"
+              dot="bg-[var(--ok)]"
+              texto="text-[var(--ok-text)]"
+            />
+            <Item
+              n={desistentes}
+              rotulo="desistentes"
+              dot="bg-[var(--danger)]"
+              texto="text-[var(--danger-text)]"
             />
           </ul>
         </>
