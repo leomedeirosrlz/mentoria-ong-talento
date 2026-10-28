@@ -507,7 +507,7 @@ export function AssistenteConversa({
       {/* empty state (REALIZA-289): avatar + saudação + sugestões — some
           na primeira mensagem e não volta */}
       {msgs.length === 0 && (
-        <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 px-6 py-8 text-center">
+        <div className="flex min-h-0 flex-1 animate-in flex-col items-center justify-center gap-3 px-6 py-8 text-center fade-in-0 duration-300">
           <span className="grid size-12 place-items-center rounded-2xl bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)]">
             <Sparkle size={22} weight="fill" aria-hidden />
           </span>
@@ -558,7 +558,7 @@ export function AssistenteConversa({
             <div
               key={i}
               className={cn(
-                "group flex items-end gap-2",
+                "group flex animate-in items-end gap-2 fade-in-0 slide-in-from-bottom-1 duration-200",
                 m.role === "user" ? "justify-end" : "justify-start"
               )}
             >
@@ -660,7 +660,7 @@ export function AssistenteConversa({
           {/* bolha de espera: dots até o 1º token; linha de status durante
               as rodadas de tool */}
           {pending && (
-            <div className="flex items-end justify-start gap-2">
+            <div className="flex animate-in items-end justify-start gap-2 fade-in-0 duration-200">
               <span
                 aria-hidden
                 className="mb-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)]/15 text-[var(--brand-lime-deep)]"
