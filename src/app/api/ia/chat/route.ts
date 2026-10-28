@@ -30,6 +30,7 @@ import {
 import type { MsgChat } from "@/lib/ia/provider";
 import { systemPromptIa } from "@/lib/ia/prompts";
 import { checarLimiteIa } from "@/lib/ia/rate-limit";
+import type { FonteIa } from "@/lib/ia/fontes";
 import { executarTool } from "@/lib/ia/tools";
 import { getMe } from "@/lib/queries";
 import { createClient } from "@/lib/supabase/server";
@@ -151,6 +152,9 @@ export async function POST(req: Request) {
       }
 
       const toolsUsadas: string[] = [];
+      // fontes que a guia_consulta trouxe — sobem no done pra UI renderizar
+      // a fileira "Fontes" (dedupe por guia+secao)
+      const fontes = new Map<string, FonteIa>();
       let concluido = false;
       let guiaChamado = false;
       const prazo = Date.now() + ORCAMENTO_STREAM_MS;
@@ -208,7 +212,11 @@ export async function POST(req: Request) {
           (c) => c.type === "function"
         );
         if (!calls.length) {
-          send({ type: "done", tools: toolsUsadas });
+          send({
+            type: "done",
+            tools: toolsUsadas,
+            fontes: fontes.size ? [...fontes.values()] : undefined,
+          });
           concluido = true;
           break;
         }
@@ -234,7 +242,12 @@ export async function POST(req: Request) {
               // erro pro modelo reformular, mesmo caminho de arg inválido
             }
             res = await executarTool(tc.function.name, args, supabase, "chat");
-            if (tc.function.name === "guia_consulta") guiaChamado = true;
+            if (tc.function.name === "guia_consulta") {
+              guiaChamado = true;
+              const fs = (res as { fontes?: FonteIa[] })?.fontes;
+              for (const f of fs ?? [])
+                fontes.set(`${f.guia}|${f.secao ?? ""}`, f);
+            }
           }
           toolsUsadas.push(tc.function.name);
           historico.push({

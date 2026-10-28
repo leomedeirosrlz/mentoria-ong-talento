@@ -14,6 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   ArrowClockwise,
   ArrowRight,
+  BookOpen,
   Check,
   Copy,
   PaperPlaneRight,
@@ -22,6 +23,7 @@ import {
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { extrairAcoes, montarEnvioChat, msgAmigavel } from "@/lib/ia/mensagens";
+import { metaFonte, type FonteIa } from "@/lib/ia/fontes";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -36,6 +38,7 @@ type Msg = {
   tools?: string[];
   em?: number;
   acoes?: { rotulo: string; href: string }[];
+  fontes?: FonteIa[];
 };
 
 const primeiroNome = (nome?: string) => nome?.trim().split(/\s+/)[0];
@@ -365,7 +368,7 @@ export function AssistenteConversa({
    *  bolha (ok vira ausência de estado; erro ganha retry). */
   function finalizar(
     estado: "ok" | "erro" | "interrompido",
-    extra?: { tools?: string[]; erro?: string }
+    extra?: { tools?: string[]; erro?: string; fontes?: FonteIa[] }
   ) {
     if (flushRef.current) {
       cancelAnimationFrame(flushRef.current);
@@ -395,6 +398,7 @@ export function AssistenteConversa({
             (estado === "interrompido" ? "Resposta interrompida." : FALHA),
           tools: extra?.tools?.length ? extra.tools : undefined,
           acoes: estado === "ok" ? extrairAcoes(content) : undefined,
+          fontes: extra?.fontes?.length ? extra.fontes : undefined,
           em: agora(),
         },
       ];
@@ -444,6 +448,7 @@ export function AssistenteConversa({
       const dec = new TextDecoder();
       let buf = "";
       let tools: string[] | undefined;
+      let fontes: FonteIa[] | undefined;
       let falha: string | null = null;
       while (true) {
         const { done, value } = await reader.read();
@@ -464,15 +469,18 @@ export function AssistenteConversa({
             if (!ev) continue;
             if (ev.type === "token") enfileirarToken((ev as { c: string }).c);
             else if (ev.type === "status") setStatus((ev as { t: string }).t);
-            else if (ev.type === "done")
-              tools = (ev as { tools?: string[] }).tools;
+            else if (ev.type === "done") {
+              const d = ev as { tools?: string[]; fontes?: FonteIa[] };
+              tools = d.tools;
+              fontes = d.fontes;
+            }
             else if (ev.type === "error") falha = (ev as { e: string }).e;
           }
         }
       }
       if (falha) finalizar("erro", { erro: falha });
       // stream fechou sem done (rede caiu no fim): finaliza com o que tem
-      else finalizar("ok", { tools });
+      else finalizar("ok", { tools, fontes });
     } catch (e) {
       if (ctrl.signal.aborted) {
         finalizar("interrompido");
@@ -666,7 +674,49 @@ export function AssistenteConversa({
                     ))}
                   </div>
                 ) : null}
-                {/* meta: hora + copy/retry + fontes — discreto, sempre no
+                {/* fontes consultadas pela guia_consulta — link pro
+                    documento oficial (REALIZA-283+) */}
+                {m.fontes?.length ? (
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70">
+                      <BookOpen size={11} aria-hidden /> Fontes
+                    </span>
+                    {m.fontes.map((f) => {
+                      const meta = metaFonte(f.guia);
+                      // seção pode chegar a 200 chars no chunk — corta pra
+                      // não estourar o chip (o inteiro vai no title)
+                      const secaoCurta =
+                        f.secao && f.secao.length > 60
+                          ? `${f.secao.slice(0, 60).trimEnd()}…`
+                          : f.secao;
+                      const rotulo = secaoCurta
+                        ? `${meta.rotulo} · ${secaoCurta}`
+                        : meta.rotulo;
+                      const title = f.secao
+                        ? `${meta.rotulo} — ${f.secao}`
+                        : meta.rotulo;
+                      return meta.href ? (
+                        <Link
+                          key={`${f.guia}|${f.secao ?? ""}`}
+                          href={meta.href}
+                          title={title}
+                          className="inline-flex max-w-full items-center gap-1 truncate rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-[var(--shadow-border)] transition-colors hover:border-foreground/25 hover:text-foreground"
+                        >
+                          {rotulo}
+                        </Link>
+                      ) : (
+                        <span
+                          key={`${f.guia}|${f.secao ?? ""}`}
+                          title={title}
+                          className="inline-flex max-w-full items-center truncate rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground"
+                        >
+                          {rotulo}
+                        </span>
+                      );
+                    })}
+                  </div>
+                ) : null}
+                {/* meta: hora + copy/retry — discreto, sempre no
                     ar (touch não tem hover) */}
                 {(m.em || (m.role === "assistant" && (m.content || m.estado === "erro"))) && (
                   <div
