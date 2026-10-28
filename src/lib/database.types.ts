@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.17"
   }
   public: {
     Tables: {
@@ -1210,6 +1190,88 @@ export type Database = {
           },
         ]
       }
+      dupla_eventos: {
+        Row: {
+          de: string | null
+          desfecho: Database["public"]["Enums"]["dupla_desfecho"] | null
+          dupla_id: string
+          em: string
+          id: string
+          motivo: string | null
+          observacao: string | null
+          para: string | null
+          por: string | null
+          tipo: string
+        }
+        Insert: {
+          de?: string | null
+          desfecho?: Database["public"]["Enums"]["dupla_desfecho"] | null
+          dupla_id: string
+          em?: string
+          id?: string
+          motivo?: string | null
+          observacao?: string | null
+          para?: string | null
+          por?: string | null
+          tipo: string
+        }
+        Update: {
+          de?: string | null
+          desfecho?: Database["public"]["Enums"]["dupla_desfecho"] | null
+          dupla_id?: string
+          em?: string
+          id?: string
+          motivo?: string | null
+          observacao?: string | null
+          para?: string | null
+          por?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dupla_eventos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_eventos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dupla_saude_snapshots: {
         Row: {
           apoio_jovem: boolean
@@ -1282,7 +1344,7 @@ export type Database = {
           created_at: string
           cronograma_id: string | null
           demanda: string | null
-          desfecho: string | null
+          desfecho: Database["public"]["Enums"]["dupla_desfecho"] | null
           desfecho_em: string | null
           desfecho_motivo: string | null
           desfecho_obs: string | null
@@ -1306,7 +1368,7 @@ export type Database = {
           created_at?: string
           cronograma_id?: string | null
           demanda?: string | null
-          desfecho?: string | null
+          desfecho?: Database["public"]["Enums"]["dupla_desfecho"] | null
           desfecho_em?: string | null
           desfecho_motivo?: string | null
           desfecho_obs?: string | null
@@ -1330,7 +1392,7 @@ export type Database = {
           created_at?: string
           cronograma_id?: string | null
           demanda?: string | null
-          desfecho?: string | null
+          desfecho?: Database["public"]["Enums"]["dupla_desfecho"] | null
           desfecho_em?: string | null
           desfecho_motivo?: string | null
           desfecho_obs?: string | null
@@ -1355,6 +1417,34 @@ export type Database = {
             columns: ["cronograma_id"]
             isOneToOne: false
             referencedRelation: "cronogramas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_desfecho_por_fkey"
+            columns: ["desfecho_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_desfecho_por_fkey"
+            columns: ["desfecho_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_desfecho_por_fkey"
+            columns: ["desfecho_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_desfecho_por_fkey"
+            columns: ["desfecho_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
             referencedColumns: ["id"]
           },
           {
@@ -5873,6 +5963,12 @@ export type Database = {
         | "mentor_dpp"
         | "mentor_especialista"
         | "mentorado"
+      dupla_desfecho:
+        | "concluida"
+        | "desistencia_jovem"
+        | "desistencia_mentor"
+        | "remanejada"
+        | "outro"
       dupla_status: "ativa" | "pausada" | "encerrada" | "concluida"
       encaminhamento_status: "pendente" | "feito" | "atrasado"
       encontro_status:
@@ -6006,9 +6102,6 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_role: [
@@ -6017,6 +6110,13 @@ export const Constants = {
         "mentor_dpp",
         "mentor_especialista",
         "mentorado",
+      ],
+      dupla_desfecho: [
+        "concluida",
+        "desistencia_jovem",
+        "desistencia_mentor",
+        "remanejada",
+        "outro",
       ],
       dupla_status: ["ativa", "pausada", "encerrada", "concluida"],
       encaminhamento_status: ["pendente", "feito", "atrasado"],
@@ -6030,4 +6130,3 @@ export const Constants = {
     },
   },
 } as const
-
