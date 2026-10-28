@@ -46,7 +46,7 @@ import {
   type RegistrosPanorama,
 } from "./registros";
 import { temPapel } from "./types";
-import type { AppRole, AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, DocumentoTemplate, Dupla, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
+import type { AppRole, AvaliacaoEncontro, AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, DocumentoTemplate, Dupla, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
 
 /** mentor_profiles — re-export do tipo canônico (types.ts): os callers da
  *  página de pessoas/board importam daqui historicamente. */
@@ -845,6 +845,7 @@ export type RegistroResumo = Registro & {
     data_hora: string | null;
     realizado_em: string | null;
     status: EncontroStatus;
+    avaliacao_jovem?: AvaliacaoEncontro | null;
     dupla: {
       id: string;
       status: DuplaStatus;

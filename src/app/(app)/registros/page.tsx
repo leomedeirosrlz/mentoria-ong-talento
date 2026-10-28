@@ -45,6 +45,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { ImportarRegistrosDialog } from "@/components/importar-registros-dialog";
 import { PageHeader } from "@/components/page-header";
 import { cn } from "@/lib/utils";
+import { temPapel } from "@/lib/types";
 import type { AvaliacaoJovem, Dificuldade, Encontro } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Registros" };
@@ -124,6 +125,7 @@ export default async function RegistrosPage({
   const me = await getMe();
   if (me?.role !== "coordenacao" && me?.role !== "supervisor") redirect("/");
   const souCoord = me.role === "coordenacao";
+  const souMentor = temPapel(me, "mentor_dpp") || temPapel(me, "mentor_especialista");
 
   const eventos = await getCicloEventos();
   // teto do filtro por nº = o maior número entre os cronogramas — contar
@@ -131,6 +133,9 @@ export default async function RegistrosPage({
   const maxEncontro = maxNumeroEncontro(eventos);
   const params = await searchParams;
   const filtros = parseFiltros(params, maxEncontro);
+  const perspRaw = primeiro(params.persp);
+  const perspectiva: "mentor" | "jovem" | "ambos" =
+    perspRaw === "jovem" || perspRaw === "ambos" ? perspRaw : "mentor";
   // triagem por scoreAlerta dentro da fatia carregada — a paginação é
   // cumulativa, então "prioridade" cobre tudo que já foi buscado
   const ordemParam = primeiro(params.ordem);
@@ -286,6 +291,7 @@ export default async function RegistrosPage({
     if (ordem !== "recentes") p.set("ordem", ordem);
     if (grupo !== "dupla") p.set("grupo", grupo);
     if (filtros.pagina > 1) p.set("pagina", String(filtros.pagina));
+    if (perspectiva !== "mentor") p.set("persp", perspectiva);
     for (const [k, v] of Object.entries(patch)) {
       if (v === null) p.delete(k);
       else p.set(k, v);
@@ -405,7 +411,29 @@ export default async function RegistrosPage({
             ? "O que os mentores reportaram em cada encontro · todas as duplas"
             : "O que os mentores reportaram em cada encontro · suas duplas"
         }
-        actions={souCoord ? <ImportarRegistrosDialog /> : undefined}
+        actions={
+          <div className="flex items-center gap-2">
+            {souCoord && <ImportarRegistrosDialog />}
+            <div className="inline-flex items-center rounded-full border border-border bg-card p-0.5 text-xs">
+              {(["mentor", "jovem", "ambos"] as const).map((v) => (
+                <Link
+                  key={v}
+                  href={hrefCom({ persp: v === "mentor" ? null : v })}
+                  scroll={false}
+                  aria-current={perspectiva === v ? "page" : undefined}
+                  className={cn(
+                    "rounded-full px-2.5 py-1 transition-colors",
+                    perspectiva === v
+                      ? "bg-foreground text-background"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {v === "mentor" ? "Mentor" : v === "jovem" ? "Jovem" : "Ambos"}
+                </Link>
+              ))}
+            </div>
+          </div>
+        }
       />
 
       <RegistrosFiltros
@@ -615,6 +643,8 @@ export default async function RegistrosPage({
               hrefBase={hrefBase}
               chaveLista={chaveLista}
               souCoord={souCoord}
+              souMentor={souMentor}
+              perspectiva={perspectiva}
               agrupadoPorDupla={grupo === "dupla"}
               rodape={linkMais}
             />
