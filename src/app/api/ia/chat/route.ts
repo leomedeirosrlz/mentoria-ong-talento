@@ -41,7 +41,7 @@ export const maxDuration = 60;
 
 // teto de iterações do loop de tools — o modelo que chama tools pra sempre
 // para aqui e responde com o que já tem (acceptance: 7 calls → para em 6)
-const MAX_ITERACOES = 6;
+const MAX_ITERACOES = 4;
 
 const MSG_FALHA =
   "Não consegui concluir essa consulta agora — tente perguntar de outra forma.";
@@ -141,6 +141,7 @@ export async function POST(req: Request) {
 
       const toolsUsadas: string[] = [];
       let concluido = false;
+      let guiaChamado = false;
 
       for (let i = 0; i < MAX_ITERACOES && !req.signal.aborted && !fechado; i++) {
         const signal = AbortSignal.any([
@@ -195,25 +196,42 @@ export async function POST(req: Request) {
 
         send({ type: "status", t: "consultando dados…" });
         for (const tc of calls) {
-          let args: unknown = {};
-          try {
-            args = JSON.parse(tc.function.arguments || "{}");
-          } catch {
-            // JSON quebrado vira {} — a validação zod da tool devolve o
-            // erro pro modelo reformular, mesmo caminho de arg inválido
+          // guia_consulta: no máximo uma chamada por resposta — se o modelo
+          // tentar de novo, devolve "já busquei" em vez de reconsultar, pra
+          // forçar a resposta com os trechos que já tem (mimo-v2.6-flash
+          // tinha o hábito de re-buscar até estourar iterações)
+          let res: unknown;
+          if (tc.function.name === "guia_consulta" && guiaChamado) {
+            res = {
+              fontes: [],
+              nota: "busca já realizada nesta resposta — responda com os trechos anteriores",
+            };
+          } else {
+            let args: unknown = {};
+            try {
+              args = JSON.parse(tc.function.arguments || "{}");
+            } catch {
+              // JSON quebrado vira {} — a validação zod da tool devolve o
+              // erro pro modelo reformular, mesmo caminho de arg inválido
+            }
+            res = await executarTool(tc.function.name, args, supabase, "chat");
+            if (tc.function.name === "guia_consulta") guiaChamado = true;
           }
-          const res = await executarTool(
-            tc.function.name,
-            args,
-            supabase,
-            "chat"
-          );
           toolsUsadas.push(tc.function.name);
           historico.push({
             role: "tool",
             tool_call_id: tc.id,
             name: tc.function.name,
             content: JSON.stringify(res),
+          });
+        }
+        // nudge: a partir da 2ª rodada, força o modelo a responder com o
+        // que já tem em vez de seguir chamando ferramentas
+        if (i >= 1 && !concluido) {
+          historico.push({
+            role: "user",
+            content:
+              "Responda agora com base no que você já encontrou. Não chame mais ferramentas.",
           });
         }
       }
