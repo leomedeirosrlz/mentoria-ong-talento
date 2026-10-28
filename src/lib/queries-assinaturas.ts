@@ -115,21 +115,23 @@ export const getAssinaturasResumo = cache(
 );
 
 /** Histórico de assinaturas de uma pessoa — seção da ficha (coord-only). */
-export async function getAssinaturasPessoa(
-  tipo: "profile" | "mentorado",
-  id: string
-): Promise<Assinatura[]> {
-  const demo = await demoRole();
-  if (demo) return demoAssinaturasPessoa(demo, tipo, id);
-  const supabase = await createClient();
-  const col = tipo === "profile" ? "profile_id" : "mentorado_id";
-  const { data, error } = await supabase
-    .from("assinaturas")
-    .select(COLS)
-    .eq(col, id)
-    .order("created_at", { ascending: false });
-  if (error) throw error;
-  return ((data ?? []) as unknown as Assinatura[]).map(normAssinatura);
-}
+export const getAssinaturasPessoa = cache(
+  async (
+    tipo: "profile" | "mentorado",
+    id: string
+  ): Promise<Assinatura[]> => {
+    const demo = await demoRole();
+    if (demo) return demoAssinaturasPessoa(demo, tipo, id);
+    const supabase = await createClient();
+    const col = tipo === "profile" ? "profile_id" : "mentorado_id";
+    const { data, error } = await supabase
+      .from("assinaturas")
+      .select(COLS)
+      .eq(col, id)
+      .order("created_at", { ascending: false });
+    if (error) throw error;
+    return ((data ?? []) as unknown as Assinatura[]).map(normAssinatura);
+  }
+);
 
 export type { DocumentoTemplate };

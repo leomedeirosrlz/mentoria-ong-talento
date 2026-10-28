@@ -182,11 +182,12 @@ export const getPropostas = cache(
 
 /** solicitacao_id → thread, numa query só — o mural da home e a ficha
  *  carregam as negociações abertas sem N+1. */
-export async function getPropostasMap(
-  solicitacaoIds: string[]
-): Promise<Record<string, SolicitacaoProposta[]>> {
-  if (!solicitacaoIds.length) return {};
-  const demo = await demoRole();
+export const getPropostasMap = cache(
+  async (
+    solicitacaoIds: string[]
+  ): Promise<Record<string, SolicitacaoProposta[]>> => {
+    if (!solicitacaoIds.length) return {};
+    const demo = await demoRole();
   if (demo) {
     return Object.fromEntries(
       solicitacaoIds.map((id) => [id, demoPropostas(demo, id)])
@@ -208,7 +209,8 @@ export async function getPropostasMap(
     (mapa[p.solicitacao_id] ??= []).push(p);
   }
   return mapa;
-}
+  }
+);
 
 /** Especialistas ativos (id + nome + áreas de atuação, 0030) — pro select
  *  "direcionar a um especialista específico" do dialog de solicitação.
