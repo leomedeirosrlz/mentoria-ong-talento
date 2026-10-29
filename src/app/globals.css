@@ -463,6 +463,18 @@
   );
 }
 
+/* desistente nas barras de saúde (saude-programa): "fechou sem êxito" —
+   o mesmo cinza de concluída mas em listra, sem cor de status. O vão usa
+   --muted pra se fundir ao trilho da barra (bg-muted); no dot da legenda
+   lê como traços esparsos. Distinto do .viz-hatch ("sem dado", claro). */
+.viz-hatch-desistente {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--muted-foreground) 0 2.5px,
+    var(--muted) 2.5px 5.5px
+  );
+}
+
 /* varredura do sheen no Skeleton — com background-size 200% o ciclo fecha sem salto */
 @keyframes shimmer {
   from {
