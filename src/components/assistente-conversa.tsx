@@ -24,6 +24,15 @@ import {
 import { toast } from "sonner";
 import { extrairAcoes, montarEnvioChat, msgAmigavel } from "@/lib/ia/mensagens";
 import { metaFonte, type FonteIa } from "@/lib/ia/fontes";
+import {
+  ehTabelaMd,
+  extrairFontesTexto,
+  extrairStats,
+  parseTabelaMd,
+  type Stat,
+  type StatTom,
+  type TabelaMd,
+} from "@/lib/ia/render";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -179,7 +188,9 @@ function MdLite({ texto }: { texto: string }) {
     );
     lista = null;
   };
-  linhas.forEach((linha) => {
+  let pularAte = -1;
+  linhas.forEach((linha, idx) => {
+    if (idx <= pularAte) return;
     // fenced code: tudo entre ``` vira bloco monoespaçado, sem inline
     if (emCodigo) {
       if (/^\s*```/.test(linha)) {
@@ -200,6 +211,17 @@ function MdLite({ texto }: { texto: string }) {
       flush();
       emCodigo = true;
       return;
+    }
+    // pipe-table GFM (REALIZA-281): linha com pipes externos tenta virar
+    // tabela de verdade — não validou, segue como texto comum
+    if (ehTabelaMd(linha)) {
+      const t = parseTabelaMd(linhas.slice(idx));
+      if (t) {
+        flush();
+        pularAte = idx + 1 + t.linhas.length;
+        blocos.push(<Tabela key={key++} t={t} />);
+        return;
+      }
     }
     const bullet = /^\s*[-*•]\s+(.+)$/.exec(linha);
     const num = /^\s*\d+[.)]\s+(.+)$/.exec(linha);
@@ -253,6 +275,85 @@ function MdLite({ texto }: { texto: string }) {
       </pre>
     );
   return <div className="space-y-2">{blocos}</div>;
+}
+
+/** Tabela pipe → <table> de verdade (REALIZA-281): células passam pelo
+ *  inline pra manter negrito/código/link; rolagem horizontal no estreito. */
+function Tabela({ t }: { t: TabelaMd }) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-left text-[0.9em]">
+        <thead>
+          <tr className="border-b border-border bg-muted/50">
+            {t.cab.map((c, i) => (
+              <th key={i} className="px-2.5 py-1.5 font-semibold">
+                <Inline texto={c} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border/60">
+          {t.linhas.map((l, i) => (
+            <tr key={i}>
+              {l.map((c, j) => (
+                <td key={j} className="px-2.5 py-1.5 align-top">
+                  <Inline texto={c} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Cartões do bloco ```stats (REALIZA-281): fileira compacta de
+ *  indicadores com o tom semântico do dado — mesmo mapa do semáforo. */
+const TOM_STAT: Record<StatTom, string> = {
+  danger: "text-[var(--danger-text)]",
+  warn: "text-[var(--warn-text)]",
+  ok: "text-[var(--ok-text)]",
+  info: "text-[var(--info-text)]",
+  neutro: "text-foreground",
+};
+
+function StatCards({ stats }: { stats: Stat[] }) {
+  return (
+    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+      {stats.slice(0, 4).map((s, i) => (
+        <div
+          key={i}
+          className="rounded-lg border border-border bg-card px-2.5 py-2 shadow-[var(--shadow-border)]"
+        >
+          <p className={cn("text-base font-semibold leading-tight", TOM_STAT[s.tom])}>
+            {s.valor}
+          </p>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+            {s.rotulo}
+          </p>
+          {s.detalhe ? (
+            <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground/70">
+              {s.detalhe}
+            </p>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Resposta do assistente: extrai o bloco ```stats (vira cartões) e
+ *  renderiza o resto no MdLite. Bloco inválido/parcial fica no texto e
+ *  renderiza como código — conteúdo nunca some. */
+function BolhaMd({ texto }: { texto: string }) {
+  const { stats, textoSemBloco } = extrairStats(texto);
+  return (
+    <>
+      {stats.length ? <StatCards stats={stats} /> : null}
+      {textoSemBloco ? <MdLite texto={textoSemBloco} /> : null}
+    </>
+  );
 }
 
 // ---------- conversa ----------
@@ -645,7 +746,7 @@ export function AssistenteConversa({
                 >
                   {m.role === "assistant" ? (
                     <>
-                      <MdLite texto={m.content || "…"} />
+                      <BolhaMd texto={m.content || "…"} />
                       {/* cursor do stream (REALIZA-280): bloco piscante no
                           fim enquanto o token ainda está chegando */}
                       {m.estado === "stream" && (
@@ -674,14 +775,30 @@ export function AssistenteConversa({
                     ))}
                   </div>
                 ) : null}
-                {/* fontes consultadas pela guia_consulta — link pro
-                    documento oficial (REALIZA-283+) */}
-                {m.fontes?.length ? (
-                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                    <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70">
-                      <BookOpen size={11} aria-hidden /> Fontes
-                    </span>
-                    {m.fontes.map((f) => {
+                {/* fontes: as estruturadas do done (guia_consulta) + as
+                    citadas inline no markdown (/materiais/*), dedup por
+                    slug — REALIZA-281/302 */}
+                {(() => {
+                  const inline = m.estado
+                    ? []
+                    : extrairFontesTexto(m.content).filter(
+                        (ft) => !m.fontes?.some((f) => f.guia === ft.slug)
+                      );
+                  return m.fontes?.length || inline.length ? (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70">
+                        <BookOpen size={11} aria-hidden /> Fontes
+                      </span>
+                      {inline.map((ft) => (
+                        <Link
+                          key={`i|${ft.slug}`}
+                          href={ft.href}
+                          className="inline-flex max-w-full items-center gap-1 truncate rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-[var(--shadow-border)] transition-colors hover:border-foreground/25 hover:text-foreground"
+                        >
+                          {ft.rotulo}
+                        </Link>
+                      ))}
+                      {m.fontes?.map((f) => {
                       const meta = metaFonte(f.guia);
                       // seção pode chegar a 200 chars no chunk — corta pra
                       // não estourar o chip (o inteiro vai no title)
@@ -714,8 +831,9 @@ export function AssistenteConversa({
                         </span>
                       );
                     })}
-                  </div>
-                ) : null}
+                    </div>
+                  ) : null;
+                })()}
                 {/* meta: hora + copy/retry — discreto, sempre no
                     ar (touch não tem hover) */}
                 {(m.em || (m.role === "assistant" && (m.content || m.estado === "erro"))) && (

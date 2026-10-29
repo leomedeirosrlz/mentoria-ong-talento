@@ -70,6 +70,14 @@ describe("extrairAcoes", () => {
     );
     expect(acoes).toHaveLength(3);
   });
+
+  it("/materiais/ não vira ação — é citação de guia (fileira Fontes)", () => {
+    const acoes = extrairAcoes(
+      "Veja o [Guia do mentor](/materiais/documento/guia-mentor-dpp) " +
+        "e abra [a ficha](/duplas/1)."
+    );
+    expect(acoes).toEqual([{ rotulo: "a ficha", href: "/duplas/1" }]);
+  });
 });
 
 // REALIZA-284: erro tipado vira frase amigável; mensagem do servidor

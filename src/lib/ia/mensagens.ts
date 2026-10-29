@@ -27,6 +27,9 @@ export function extrairAcoes(texto: string): { rotulo: string; href: string }[] 
   const vistos = new Set<string>();
   for (const m of texto.matchAll(LINK_INTERNO)) {
     const href = m[2];
+    // /materiais/ é citação de guia — vai pra fileira "Fontes" (render.ts),
+    // não pra chip de ação, senão o mesmo link renderiza duas vezes
+    if (href.startsWith("/materiais/")) continue;
     if (vistos.has(href) || acoes.length >= 3) continue;
     vistos.add(href);
     acoes.push({ rotulo: m[1], href });
