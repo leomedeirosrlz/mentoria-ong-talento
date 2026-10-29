@@ -608,11 +608,6 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
         name: "Roda de casos — formação continuada de mentores",
       })
     ).toBeVisible();
-    await expect(
-      sec.getByRole("link", {
-        name: "Supervisão · Paulo Serra × Ricardo Tavares",
-      })
-    ).toBeVisible();
     // a pill de turma marca o card do encontro E o da formação da mesma
     // turma — a faixa tem os dois, então a asserção ancora no primeiro
     await expect(

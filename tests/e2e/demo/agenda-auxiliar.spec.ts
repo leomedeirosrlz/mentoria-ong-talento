@@ -179,9 +179,6 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
         () => menuAcoes.isVisible()
       );
       await expect(
-        menuAcoes.getByRole("menuitem", { name: "Registrar supervisão" })
-      ).toBeVisible();
-      await expect(
         menuAcoes.getByRole("menuitem", { name: "Ver ficha" })
       ).toHaveAttribute("href", `/duplas/${DUPLA_PEND}`);
       await page.keyboard.press("Escape");
@@ -191,9 +188,6 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
         type: "dataset",
         description: "Caio em-dia hoje — sem sinal, sem Lembrar e sem ⋯",
       });
-      await expect(
-        cardCaio.getByRole("button", { name: "Registrar supervisão" })
-      ).toBeEnabled();
       await expect(
         cardCaio.getByRole("link", { name: "Ver ficha ›" })
       ).toHaveAttribute("href", `/duplas/${DUPLA_PEND}`);
@@ -292,27 +286,6 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
         description: "Caio sem item 'a agendar' hoje (enc. vigente já tem row)",
       });
     }
-
-    // a supervisão do domingo entra como item próprio — pill "Você" e o
-    // dialog de supervisão no contexto da dupla (d-ok)
-    const sup = page
-      .locator("article")
-      .filter({ hasText: "Supervisão · Paulo Serra × Ricardo Tavares" });
-    await expect(
-      sup.getByRole("heading", {
-        name: "Supervisão · Paulo Serra × Ricardo Tavares",
-      })
-    ).toBeVisible();
-    await expect(sup.getByText("Você", { exact: true })).toBeVisible();
-    await sup
-      .getByRole("button", { name: "Registrar supervisão" })
-      .click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await expect(
-      dialog.getByRole("heading", { name: "Registrar supervisão" })
-    ).toBeVisible();
-    await page.keyboard.press("Escape");
 
     // sessões da trilha supervisionada (Sofia × Bia) — convidado: a tag
     // âmbar marca e o item não tem nenhuma ação pro supervisor. A âncora

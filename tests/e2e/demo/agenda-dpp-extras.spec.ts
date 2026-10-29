@@ -71,28 +71,21 @@ test.describe("agenda demo do mentor DPP — Sua semana / Do programa / Lembrar 
     await expect(celulas.first()).toContainText("seg");
     await expect(celulas.last()).toContainText("dom");
 
-    // a célula de domingo recebe a supervisão (dada pelo Paulo) e a roda de
-    // casos — labels vivem em texto mesmo quando escondidos no mobile
+    // a célula de domingo recebe a roda de casos — labels vivem em texto
+    // mesmo quando escondidos no mobile
     const domingo = celulas.last();
-    await expect(domingo).toContainText("supervisão");
     await expect(domingo).toContainText("formação");
-    // os dois são compromissos próprios → contador lime "2"
+    // um compromisso próprio → contador lime "1"
     await expect(
       domingo.locator('em[class*="bg-[var(--brand-lime)]"]')
-    ).toHaveText("2");
+    ).toHaveText("1");
   });
 
-  test("do programa — supervisão recebida e formação da turma", async ({
+  test("do programa — formação da turma", async ({
     page,
   }) => {
     const prog = page.locator('section[aria-label="Do programa"]');
     await expect(prog).toBeVisible();
-
-    // a supervisão recebida — "Supervisão com Paulo Serra" + a dupla dela
-    await expect(prog.getByText("Supervisão com Paulo Serra")).toBeVisible();
-    await expect(
-      prog.getByText(/sobre a dupla com Ana Beatriz Silva/)
-    ).toBeVisible();
 
     // a formação futura do cronograma do Ricardo (roda de casos no domingo)
     // o rótulo de categoria repete a cada formação listada — basta uma

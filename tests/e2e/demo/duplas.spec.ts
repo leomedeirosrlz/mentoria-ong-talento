@@ -320,22 +320,12 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     // 240 — supervisão e mentor saíram da barra: o gatilho "Filtros" abre
     // o dialog com os dois critérios e aplica de uma vez (o contador do
     // gatilho reflete os ativos)
+    // filtro de supervisão removido (feature de supervisão extinta) —
+    // testa apenas o filtro por mentor
     await page.getByRole("button", { name: "Filtros" }).click();
     const dlg = page.getByRole("dialog");
-    await expect(dlg.getByText("Supervisão")).toBeVisible();
     await expect(dlg.getByText("Mentor", { exact: true })).toBeVisible();
-    await dlg
-      .getByRole("combobox", { name: "Filtrar por supervisão" })
-      .click();
-    await page.getByRole("option", { name: "Paulo Serra" }).click();
     await dlg.getByRole("button", { name: /Aplicar/ }).click();
-    await expect(
-      page.getByRole("button", { name: "Filtros, 1 ativo" })
-    ).toBeVisible();
-    // o filtro morde de verdade: só duplas do Paulo na lista
-    await expect(
-      page.locator(LINHAS_COORD).getByText("Beatriz Lins")
-    ).toHaveCount(0);
   });
 
   test("coordenação mobile: cards p-3/gap-2, ações no topo, toques ≥44px", async ({
@@ -515,27 +505,7 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     ).toBeDisabled();
     await page.keyboard.press("Escape");
 
-    // a supervisão recolhe no ⋮ "Mais ações da dupla de <nome>" — abre e
-    // aponta o dialog de supervisão no alvo certo
-    const maisAcoes = page
-      .locator(LINHAS_SUP)
-      .getByRole("button", { name: /Mais ações da dupla/ })
-      .first();
-    await expect(maisAcoes).toBeVisible();
-    await maisAcoes.click();
-    const menu = page.getByRole("menu");
-    await expect(
-      menu.getByRole("menuitem", { name: "Registrar supervisão" })
-    ).toBeVisible();
-    await menu
-      .getByRole("menuitem", { name: "Registrar supervisão" })
-      .click();
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
-    await expect(
-      dialog.getByRole("heading", { name: "Registrar supervisão" })
-    ).toBeVisible();
-    await page.keyboard.press("Escape");
+    // (supervisão removida — sem ⋮ de ações secundárias nesta view)
   });
 
   test("coordenação: ?recorte= pousa com a fatia ativa — chip + lista", async ({
