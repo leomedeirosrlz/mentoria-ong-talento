@@ -4,8 +4,8 @@ import { type CSSProperties, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  CaretRight,
   Clock,
+  DotsThree,
   DownloadSimple,
   Funnel,
   Lifebuoy,
@@ -118,7 +118,7 @@ const STATUS_LABEL: Record<string, { label: string; tom: TomPill }> = {
   ok: { label: "Em dia", tom: "ok" },
   pausada: { label: "Pausada", tom: "pausa" },
   concluida: { label: "Concluída", tom: "pausa" },
-  encerrada: { label: "Encerrada", tom: "pausa" },
+  encerrada: { label: "Desistente", tom: "pausa" },
 };
 
 /** O pill de estado da linha: status da dupla fora da régua, senão o
@@ -394,8 +394,8 @@ function LinhaMini({
             "pointer-events-none w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
           )}
         >
-          <span className="hidden whitespace-nowrap md:inline">Ver ficha</span>
-          <CaretRight weight="bold" />
+          <span className="hidden whitespace-nowrap md:inline">Ações</span>
+          <DotsThree weight="bold" />
         </span>
       </span>
     </div>

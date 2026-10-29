@@ -284,9 +284,11 @@ test.describe("WP6 — especialista do lado do jovem", () => {
     await expect(
       page.getByText(/Sugestão dispensada/i)
     ).toBeVisible({ timeout: 15_000 });
+    // o router.refresh() do card no preview pode demorar — a sol já
+    // saiu do filtro (só 'sugerida' renderiza)
     await expect(
       page.getByText(/sugeriu um especialista pra você/i)
-    ).toHaveCount(0);
+    ).toHaveCount(0, { timeout: 15_000 });
 
     const sol = await solDoJovem();
     expect(sol!.status).toBe("cancelada");

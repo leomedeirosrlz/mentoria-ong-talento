@@ -6,13 +6,15 @@
 // tokens chegam por rAF-batched setState (um render por frame, não por
 // delta), status das tool rounds vira linha "consultando dados…", stop
 // aborta o fetch no meio e retry reenvia a última pergunta. Transcript
-// só em useState: refresh limpa de propósito (LGPD — a conversa não
-// persiste; o que fica é a ação em ia_eventos).
+// só na ABA: sessionStorage mantém a conversa entre abrir/fechar do
+// painel, mas morre com a aba (LGPD — nada vai pro servidor; o que fica
+// é a ação em ia_eventos).
 
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowClockwise,
   ArrowRight,
+  BookOpen,
   Check,
   Copy,
   PaperPlaneRight,
@@ -21,6 +23,16 @@ import {
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { extrairAcoes, montarEnvioChat, msgAmigavel } from "@/lib/ia/mensagens";
+import { metaFonte, type FonteIa } from "@/lib/ia/fontes";
+import {
+  ehTabelaMd,
+  extrairFontesTexto,
+  extrairStats,
+  parseTabelaMd,
+  type Stat,
+  type StatTom,
+  type TabelaMd,
+} from "@/lib/ia/render";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -35,6 +47,7 @@ type Msg = {
   tools?: string[];
   em?: number;
   acoes?: { rotulo: string; href: string }[];
+  fontes?: FonteIa[];
 };
 
 const primeiroNome = (nome?: string) => nome?.trim().split(/\s+/)[0];
@@ -45,6 +58,9 @@ const hhmm = (em?: number) =>
 // fora do componente: Date.now é impuro pro linter do compiler — a hora
 // só é lida em handler de evento, nunca durante render
 const agora = () => Date.now();
+
+// conversa da aba — chave distinta da do painel ("assistente:aberto")
+const STORAGE_MSGS = "assistente:msgs";
 
 const DEMO_FALLBACK =
   "Na demonstração o assistente tem respostas de exemplo — no ambiente real ele responde com seus dados e guias oficiais.";
@@ -172,7 +188,9 @@ function MdLite({ texto }: { texto: string }) {
     );
     lista = null;
   };
-  linhas.forEach((linha) => {
+  let pularAte = -1;
+  linhas.forEach((linha, idx) => {
+    if (idx <= pularAte) return;
     // fenced code: tudo entre ``` vira bloco monoespaçado, sem inline
     if (emCodigo) {
       if (/^\s*```/.test(linha)) {
@@ -193,6 +211,17 @@ function MdLite({ texto }: { texto: string }) {
       flush();
       emCodigo = true;
       return;
+    }
+    // pipe-table GFM (REALIZA-281): linha com pipes externos tenta virar
+    // tabela de verdade — não validou, segue como texto comum
+    if (ehTabelaMd(linha)) {
+      const t = parseTabelaMd(linhas.slice(idx));
+      if (t) {
+        flush();
+        pularAte = idx + 1 + t.linhas.length;
+        blocos.push(<Tabela key={key++} t={t} />);
+        return;
+      }
     }
     const bullet = /^\s*[-*•]\s+(.+)$/.exec(linha);
     const num = /^\s*\d+[.)]\s+(.+)$/.exec(linha);
@@ -248,6 +277,85 @@ function MdLite({ texto }: { texto: string }) {
   return <div className="space-y-2">{blocos}</div>;
 }
 
+/** Tabela pipe → <table> de verdade (REALIZA-281): células passam pelo
+ *  inline pra manter negrito/código/link; rolagem horizontal no estreito. */
+function Tabela({ t }: { t: TabelaMd }) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-left text-[0.9em]">
+        <thead>
+          <tr className="border-b border-border bg-muted/50">
+            {t.cab.map((c, i) => (
+              <th key={i} className="px-2.5 py-1.5 font-semibold">
+                <Inline texto={c} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border/60">
+          {t.linhas.map((l, i) => (
+            <tr key={i}>
+              {l.map((c, j) => (
+                <td key={j} className="px-2.5 py-1.5 align-top">
+                  <Inline texto={c} />
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/** Cartões do bloco ```stats (REALIZA-281): fileira compacta de
+ *  indicadores com o tom semântico do dado — mesmo mapa do semáforo. */
+const TOM_STAT: Record<StatTom, string> = {
+  danger: "text-[var(--danger-text)]",
+  warn: "text-[var(--warn-text)]",
+  ok: "text-[var(--ok-text)]",
+  info: "text-[var(--info-text)]",
+  neutro: "text-foreground",
+};
+
+function StatCards({ stats }: { stats: Stat[] }) {
+  return (
+    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+      {stats.slice(0, 4).map((s, i) => (
+        <div
+          key={i}
+          className="rounded-lg border border-border bg-card px-2.5 py-2 shadow-[var(--shadow-border)]"
+        >
+          <p className={cn("text-base font-semibold leading-tight", TOM_STAT[s.tom])}>
+            {s.valor}
+          </p>
+          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+            {s.rotulo}
+          </p>
+          {s.detalhe ? (
+            <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground/70">
+              {s.detalhe}
+            </p>
+          ) : null}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/** Resposta do assistente: extrai o bloco ```stats (vira cartões) e
+ *  renderiza o resto no MdLite. Bloco inválido/parcial fica no texto e
+ *  renderiza como código — conteúdo nunca some. */
+function BolhaMd({ texto }: { texto: string }) {
+  const { stats, textoSemBloco } = extrairStats(texto);
+  return (
+    <>
+      {stats.length ? <StatCards stats={stats} /> : null}
+      {textoSemBloco ? <MdLite texto={textoSemBloco} /> : null}
+    </>
+  );
+}
+
 // ---------- conversa ----------
 
 export function AssistenteConversa({
@@ -256,6 +364,7 @@ export function AssistenteConversa({
   configurado,
   autoFocus,
   nome,
+  registrarNova,
 }: {
   papeis: AppRole[];
   demo: boolean;
@@ -264,8 +373,11 @@ export function AssistenteConversa({
   autoFocus?: boolean;
   /** primeiro nome pro empty state ("Oi, X!") — sem ele, genérico */
   nome?: string;
+  /** a bolha expõe "Nova conversa" no header — registra a ação aqui */
+  registrarNova?: (fn: () => void) => void;
 }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  const [restaurada, setRestaurada] = useState(false);
   const [texto, setTexto] = useState("");
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
@@ -285,6 +397,53 @@ export function AssistenteConversa({
     if (el && (forca || pertoDoFim.current)) el.scrollTop = el.scrollHeight;
   };
   useEffect(() => rolarFim(), [msgs, pending, status]);
+
+  // restaura a conversa da aba (Pop/Sheet desmontam o painel ao fechar —
+  // sem isso cada abertura recomeçava do zero). rAF: setState fora do
+  // corpo do effect (regra react-hooks), mesmo padrão da bolha
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      try {
+        const salvo = sessionStorage.getItem(STORAGE_MSGS);
+        if (salvo) {
+          const parsed = JSON.parse(salvo) as Msg[];
+          if (Array.isArray(parsed) && parsed.length)
+            setMsgs(parsed.filter((m) => m.role && m.content).slice(-20));
+        }
+      } catch {
+        // storage indisponível (modo privado): conversa só na memória
+      }
+      setRestaurada(true);
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  // persiste o histórico utilizável — sem bolha de stream intermediária
+  // nem campo de UI que o payload strict rejeitaria (montarEnvioChat já
+  // garante o segundo; o primeiro poluiria o estado restaurado)
+  useEffect(() => {
+    if (!restaurada) return;
+    try {
+      const limpas = msgs
+        .filter((m) => m.content && m.estado !== "stream")
+        .slice(-20);
+      if (limpas.length)
+        sessionStorage.setItem(STORAGE_MSGS, JSON.stringify(limpas));
+      else sessionStorage.removeItem(STORAGE_MSGS);
+    } catch {}
+  }, [msgs, restaurada]);
+
+  /** limpa histórico + storage — o header oferece "Nova conversa" */
+  function novaConversa() {
+    abortRef.current?.abort();
+    setMsgs([]);
+    setTexto("");
+    try {
+      sessionStorage.removeItem(STORAGE_MSGS);
+    } catch {}
+    inputRef.current?.focus();
+  }
+  useEffect(() => registrarNova?.(novaConversa), [registrarNova]);
 
   function flushTokens() {
     flushRef.current = 0;
@@ -310,7 +469,7 @@ export function AssistenteConversa({
    *  bolha (ok vira ausência de estado; erro ganha retry). */
   function finalizar(
     estado: "ok" | "erro" | "interrompido",
-    extra?: { tools?: string[]; erro?: string }
+    extra?: { tools?: string[]; erro?: string; fontes?: FonteIa[] }
   ) {
     if (flushRef.current) {
       cancelAnimationFrame(flushRef.current);
@@ -340,6 +499,7 @@ export function AssistenteConversa({
             (estado === "interrompido" ? "Resposta interrompida." : FALHA),
           tools: extra?.tools?.length ? extra.tools : undefined,
           acoes: estado === "ok" ? extrairAcoes(content) : undefined,
+          fontes: extra?.fontes?.length ? extra.fontes : undefined,
           em: agora(),
         },
       ];
@@ -389,6 +549,7 @@ export function AssistenteConversa({
       const dec = new TextDecoder();
       let buf = "";
       let tools: string[] | undefined;
+      let fontes: FonteIa[] | undefined;
       let falha: string | null = null;
       while (true) {
         const { done, value } = await reader.read();
@@ -409,15 +570,18 @@ export function AssistenteConversa({
             if (!ev) continue;
             if (ev.type === "token") enfileirarToken((ev as { c: string }).c);
             else if (ev.type === "status") setStatus((ev as { t: string }).t);
-            else if (ev.type === "done")
-              tools = (ev as { tools?: string[] }).tools;
+            else if (ev.type === "done") {
+              const d = ev as { tools?: string[]; fontes?: FonteIa[] };
+              tools = d.tools;
+              fontes = d.fontes;
+            }
             else if (ev.type === "error") falha = (ev as { e: string }).e;
           }
         }
       }
       if (falha) finalizar("erro", { erro: falha });
       // stream fechou sem done (rede caiu no fim): finaliza com o que tem
-      else finalizar("ok", { tools });
+      else finalizar("ok", { tools, fontes });
     } catch (e) {
       if (ctrl.signal.aborted) {
         finalizar("interrompido");
@@ -582,7 +746,7 @@ export function AssistenteConversa({
                 >
                   {m.role === "assistant" ? (
                     <>
-                      <MdLite texto={m.content || "…"} />
+                      <BolhaMd texto={m.content || "…"} />
                       {/* cursor do stream (REALIZA-280): bloco piscante no
                           fim enquanto o token ainda está chegando */}
                       {m.estado === "stream" && (
@@ -611,7 +775,66 @@ export function AssistenteConversa({
                     ))}
                   </div>
                 ) : null}
-                {/* meta: hora + copy/retry + fontes — discreto, sempre no
+                {/* fontes: as estruturadas do done (guia_consulta) + as
+                    citadas inline no markdown (/materiais/*), dedup por
+                    slug — REALIZA-281/302 */}
+                {(() => {
+                  const inline = m.estado
+                    ? []
+                    : extrairFontesTexto(m.content).filter(
+                        (ft) => !m.fontes?.some((f) => f.guia === ft.slug)
+                      );
+                  return m.fontes?.length || inline.length ? (
+                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70">
+                        <BookOpen size={11} aria-hidden /> Fontes
+                      </span>
+                      {inline.map((ft) => (
+                        <Link
+                          key={`i|${ft.slug}`}
+                          href={ft.href}
+                          className="inline-flex max-w-full items-center gap-1 truncate rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-[var(--shadow-border)] transition-colors hover:border-foreground/25 hover:text-foreground"
+                        >
+                          {ft.rotulo}
+                        </Link>
+                      ))}
+                      {m.fontes?.map((f) => {
+                      const meta = metaFonte(f.guia);
+                      // seção pode chegar a 200 chars no chunk — corta pra
+                      // não estourar o chip (o inteiro vai no title)
+                      const secaoCurta =
+                        f.secao && f.secao.length > 60
+                          ? `${f.secao.slice(0, 60).trimEnd()}…`
+                          : f.secao;
+                      const rotulo = secaoCurta
+                        ? `${meta.rotulo} · ${secaoCurta}`
+                        : meta.rotulo;
+                      const title = f.secao
+                        ? `${meta.rotulo} — ${f.secao}`
+                        : meta.rotulo;
+                      return meta.href ? (
+                        <Link
+                          key={`${f.guia}|${f.secao ?? ""}`}
+                          href={meta.href}
+                          title={title}
+                          className="inline-flex max-w-full items-center gap-1 truncate rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-[var(--shadow-border)] transition-colors hover:border-foreground/25 hover:text-foreground"
+                        >
+                          {rotulo}
+                        </Link>
+                      ) : (
+                        <span
+                          key={`${f.guia}|${f.secao ?? ""}`}
+                          title={title}
+                          className="inline-flex max-w-full items-center truncate rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground"
+                        >
+                          {rotulo}
+                        </span>
+                      );
+                    })}
+                    </div>
+                  ) : null;
+                })()}
+                {/* meta: hora + copy/retry — discreto, sempre no
                     ar (touch não tem hover) */}
                 {(m.em || (m.role === "assistant" && (m.content || m.estado === "erro"))) && (
                   <div

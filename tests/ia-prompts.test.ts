@@ -105,9 +105,9 @@ describe("guardrails", () => {
     expect(prompt).toContain("não está nos guias");
   });
 
-  it("fixa o tom: pt-BR, sem emoji, markdown leve e sem tabelas", () => {
+  it("fixa o tom: pt-BR, sem emoji, markdown leve e sem títulos", () => {
     expect(prompt).toContain("pt-BR");
     expect(prompt).toContain("sem emoji");
-    expect(prompt).toContain("tabelas");
+    expect(prompt).toContain("títulos");
   });
 });

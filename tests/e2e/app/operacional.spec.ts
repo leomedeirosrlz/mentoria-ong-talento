@@ -286,8 +286,12 @@ test.describe("coordenação — fluxos operacionais", () => {
       .getByRole("button", { name: "Pré-visualizar" })
       .click();
 
-    // a prévia server-side resolveu os dois lados contra o diretório
-    await expect(dialog.getByText(/1 dupla pronta/)).toBeVisible();
+    // a prévia server-side resolveu os dois lados contra o diretório —
+    // no preview a action pode passar dos 5s padrão (mesma tolerância das
+    // asserts de staging abaixo)
+    await expect(dialog.getByText(/1 dupla pronta/)).toBeVisible({
+      timeout: 15_000,
+    });
     await expect(
       dialog.getByText("Pronta", { exact: true })
     ).toBeVisible();
@@ -479,10 +483,25 @@ test.describe("coordenação — fluxos operacionais", () => {
       .getByRole("button", { name: "Livres para dupla" })
       .click();
 
+    // expande o matching (colapsado por default)
+    const matchingTrigger = page.getByText(/Matching/i).first();
+    if (await matchingTrigger.isVisible()) {
+      await matchingTrigger.click();
+      await page.waitForTimeout(1000);
+    } else {
+      // fallback: tenta clicar no Collapsible trigger
+      const trigger = page.locator('[aria-expanded="false"]').first();
+      if (await trigger.isVisible()) {
+        await trigger.click();
+        await page.waitForTimeout(1000);
+      }
+    }
+
     // board: todo mentor ativo com o X/Y — o reserva (1/1 implícita) já
-    // nasce cheio marcado; o import (0/1) tem vaga
+    // nasce cheio marcado; o import (0/1) tem vaga. O painel novo é o
+    // MatchingPanel colapsável ("Matching · N mentores livres · M jovens").
     const painel = page.locator("section", {
-      has: page.getByRole("heading", { name: "Parear", exact: true }),
+      has: page.getByText(/^Matching ·/),
     });
     await expect(painel).toBeVisible();
     await painel.locator("#parear-mentor").click();

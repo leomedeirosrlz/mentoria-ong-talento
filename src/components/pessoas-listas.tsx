@@ -457,6 +457,14 @@ export function PessoasListas({
 
   return (
     <>
+      {souCoord && semDupla && !verFora && (
+        <MatchingPanel
+          mentores={mentoresAtivos}
+          mentorados={mentoradosLivres}
+          mentorProfiles={mentorProfiles}
+          ocupacao={contagemPorMentor}
+        />
+      )}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative w-full sm:max-w-sm">
           <MagnifyingGlass
@@ -552,7 +560,7 @@ export function PessoasListas({
           onValueChange={(v) => setFiltroPapel(String(v))}
           items={FILTRO_PAPEL_LABEL}
         >
-          <SelectTrigger size="sm" aria-label="Filtrar por papel" className="w-auto max-w-44">
+          <SelectTrigger size="sm" aria-label="Filtrar por papel" className="h-9 w-auto max-w-44 rounded-md border-border bg-background px-3 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false}>
@@ -566,7 +574,7 @@ export function PessoasListas({
           onValueChange={(v) => setFiltroStatus(String(v))}
           items={FILTRO_STATUS_LABEL}
         >
-          <SelectTrigger size="sm" aria-label="Filtrar por status" className="w-auto max-w-40">
+          <SelectTrigger size="sm" aria-label="Filtrar por status" className="h-9 w-auto max-w-40 rounded-md border-border bg-background px-3 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false}>
@@ -580,7 +588,7 @@ export function PessoasListas({
           onValueChange={(v) => setFiltroTrilha(String(v))}
           items={FILTRO_TRILHA_LABEL}
         >
-          <SelectTrigger size="sm" aria-label="Filtrar por trilha" className="w-auto max-w-40">
+          <SelectTrigger size="sm" aria-label="Filtrar por trilha" className="h-9 w-auto max-w-40 rounded-md border-border bg-background px-3 text-sm">
             <SelectValue />
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false}>
@@ -589,10 +597,26 @@ export function PessoasListas({
             ))}
           </SelectContent>
         </Select>
+        <span className="text-xs text-muted-foreground tabular-nums">
+          {pessoasExibidas.length + mentoradosExibidos.length} de{" "}
+          {pessoas.length + mentorados.length} pessoas
+        </span>
         {filtrando && (
-          <span className="text-xs text-muted-foreground tabular-nums">
-            {pessoasExibidas.length + mentoradosExibidos.length} resultados
-          </span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-9 px-3 text-xs"
+            onClick={() => {
+              setBusca("");
+              setFiltroPapel("todos");
+              setFiltroStatus("ativos");
+              setFiltroTrilha("todas");
+              setSemDupla(false);
+              setVerFora(false);
+            }}
+          >
+            Limpar filtros
+          </Button>
         )}
       </div>
 
@@ -609,18 +633,6 @@ export function PessoasListas({
           semHistorico={temQualquerDupla}
           euNome={euNome}
           onParear={semDupla ? undefined : () => setSemDupla(true)}
-        />
-      )}
-
-      {/* board de pareamento — comparação de afinidade mentorado × mentor
-          só faz sentido com o filtro de livres ligado (visão da coordenação);
-          vendo "Fora do programa" ele é ruído no meio do arquivo */}
-      {souCoord && semDupla && !verFora && (
-        <MatchingPanel
-          mentores={mentoresAtivos}
-          mentorados={mentoradosLivres}
-          mentorProfiles={mentorProfiles}
-          ocupacao={contagemPorMentor}
         />
       )}
 
