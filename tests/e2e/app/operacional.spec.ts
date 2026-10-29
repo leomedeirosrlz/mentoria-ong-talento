@@ -480,10 +480,17 @@ test.describe("coordenação — fluxos operacionais", () => {
       .click();
 
     // expande o matching (colapsado por default)
-    const matchingTrigger = page.getByText(/Matching ·/i).first();
+    const matchingTrigger = page.getByText(/Matching/i).first();
     if (await matchingTrigger.isVisible()) {
       await matchingTrigger.click();
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(1000);
+    } else {
+      // fallback: tenta clicar no Collapsible trigger
+      const trigger = page.locator('[aria-expanded="false"]').first();
+      if (await trigger.isVisible()) {
+        await trigger.click();
+        await page.waitForTimeout(1000);
+      }
     }
 
     // board: todo mentor ativo com o X/Y — o reserva (1/1 implícita) já
