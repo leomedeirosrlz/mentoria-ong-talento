@@ -4,11 +4,12 @@ import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
 import type { ReactNode } from "react";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   BookOpen,
   CalendarBlank,
   CaretDown,
-  ChatsCircle,
   ClockCounterClockwise,
   HandHeart,
   VideoCamera,
@@ -45,10 +46,6 @@ import {
   getAvaliacaoMediaDpp,
   getEspecialistaAvaliacoes,
 } from "@/lib/queries-avaliacao";
-import {
-  getSupervisaoAlvos,
-  getSupervisoesDaDupla,
-} from "@/lib/queries-supervisao";
 import { getFormularios, getInstrumentosDaDupla } from "@/lib/forms/queries";
 import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
 import { getPdmDaDupla, getPdmResumo } from "@/lib/queries-pdm";
@@ -111,8 +108,6 @@ import { InstrumentosDupla } from "./instrumentos-dupla";
 import { TerceirosDupla } from "./terceiros-dupla";
 import { DuplaMaisMenu } from "./mais-menu";
 import { DevolutivaEspecialista } from "@/components/devolutiva-especialista";
-import { SupervisaoDialog } from "@/components/supervisao-dialog";
-import { SupervisoesSection } from "@/components/supervisoes-section";
 import { MarcoNotifier } from "@/components/marco-notifier";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -235,7 +230,7 @@ export default async function DuplaPage({
   const { id } = await params;
   const { aba: abaParam } = await searchParams;
   const aba = parseAba(abaParam);
-  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, supervisoes, instrumentos, terceiros, pdm, alvosSupervisao] =
+  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, instrumentos, terceiros, pdm] =
     await Promise.all([
       getDupla(id),
       getCicloEventos(),
@@ -250,10 +245,6 @@ export default async function DuplaPage({
       // fechamento do ciclo — a row pode existir só com a autoavaliação do
       // mentor (decisão da coordenação pendente)
       getEncerramentoDaDupla(id),
-      // sessões de supervisão da dupla + as gerais do mentor dela (0041)
-      getDupla(id).then((d) =>
-        d ? getSupervisoesDaDupla(d.id, d.mentor.id) : []
-      ),
       // instrumentos oficiais da jornada (0080) — RPC escopada: coord,
       // mentor e supervisor da dupla (e o próprio jovem, na área dele)
       getInstrumentosDaDupla(id),
@@ -266,10 +257,6 @@ export default async function DuplaPage({
       getDupla(id).then((d) =>
         d?.trilha === "dpp" ? getPdmDaDupla(id) : null
       ),
-      // alvos de supervisão (0125): diretas + turma dele — o botão "Registrar
-      // supervisão" da ficha usa a mesma lista que alimenta o dialog e a
-      // action; pra não-supervisor a query nem roda (getMe cacheado + [] )
-      getSupervisaoAlvos(),
     ]);
   if (!dupla || !me) notFound();
 
@@ -279,43 +266,40 @@ export default async function DuplaPage({
   // aponta a sucessora. As queries voltam null quando a outra ponta está
   // fora do escopo do papel (RLS — quem saiu não enxerga a ficha nova) e a
   // linha discreta simplesmente não renderiza
-  const [origem, sucessora] = await Promise.all([
-    dupla.remanejada_de ? getDuplaVinculo(dupla.remanejada_de) : null,
-    dupla.status === "encerrada" ? getDuplaSucessora(dupla.id) : null,
-  ]);
+  const ehEsp = dupla.trilha === "especialista";
   const nomeVinculo = (v: DuplaVinculo) =>
     `${v.mentor?.nome ?? "—"} e ${v.mentorado?.nome ?? "—"}`;
-  // quem supervisiona registra a sessão daqui mesmo — alvo único, sem
-  // query extra (o dialog ganha mentor+dupla já resolvidos). A lista de
-  // alvos já é o escopo 0125 (supervisionada direta ou turma dele, só
-  // ativas/pausadas) — estar nela é a permissão inteira
-  const podeRegistrarSupervisao = alvosSupervisao.some(
-    (a) => a.dupla_id === dupla.id
-  );
-  const ehEsp = dupla.trilha === "especialista";
-  // forms ativos pra "Enviar formulário" da ficha e pro link de avaliação
-  // 360º do encerramento — escopo coord (a query já devolve [] pros demais)
-  const formulariosAtivos = souCoord
-    ? (await getFormularios()).filter((f) => f.ativo)
-    : [];
-  // data da resposta 360º oficial (0042) — escopo coord: a proveniência do
-  // check é detalhe operacional, e a policy de respostas já é coord-only
-  const avaliacao360Em = souCoord ? await getAvaliacao360DaDupla(id) : null;
-  // resposta individual do "Depois da mentoria" (0124) — escopo coord
-  // idem: a policy de links/respostas já barra os demais papéis
-  const desfechoEntregas = souCoord ? await getDesfechoDaDupla(id) : [];
-  // passos do guia da trilha — ciclo_eventos (DPP, com datas) ou os 5 passos
-  // do especialista (sem data: a dupla combina dentro dos 3 meses)
-  const espEventos = ehEsp ? await getEspecialistaEventos() : [];
-  // avaliação geral pós-fechamento (0104): a RPC entrega o token só pro
-  // especialista da trilha e o estado pra coord — a ficha é o caminho de
-  // volta quando a notificação se perde
-  const avaliacaoEsp =
-    ehEsp && dupla.encerrada_em ? await getAvaliacaoEspDaDupla(id) : null;
-  // fluxo entre mentores do guia: a demanda de especialista nasce na dupla
-  // DPP. O chip conta o estado a quem olha a ficha; o botão some enquanto uma
-  // solicitação está aberta (re-pedir é pra quando a anterior se resolveu)
-  const solicitacoes = !ehEsp ? await getSolicitacoesDaDupla(id) : [];
+  const [
+    origem,
+    sucessora,
+    formulariosAtivos,
+    avaliacao360Em,
+    desfechoEntregas,
+    espEventos,
+    avaliacaoEsp,
+    solicitacoes,
+    avaliacaoLinks,
+    mediaJovem,
+    espAvaliacoes,
+    devolutivasFeed,
+    pdmResumo,
+  ] = await Promise.all([
+    dupla.remanejada_de ? getDuplaVinculo(dupla.remanejada_de) : null,
+    dupla.status === "encerrada" ? getDuplaSucessora(dupla.id) : null,
+    souCoord
+      ? getFormularios().then((fs) => fs.filter((f) => f.ativo))
+      : [],
+    souCoord ? getAvaliacao360DaDupla(id) : null,
+    souCoord ? getDesfechoDaDupla(id) : [],
+    ehEsp ? getEspecialistaEventos() : [],
+    ehEsp && dupla.encerrada_em ? getAvaliacaoEspDaDupla(id) : null,
+    !ehEsp ? getSolicitacoesDaDupla(id) : [],
+    souCoord ? getAvaliacaoLinks(id) : [],
+    souMentor && !ehEsp ? getAvaliacaoMediaDpp(id) : null,
+    souMentor && ehEsp ? getEspecialistaAvaliacoes(id) : [],
+    ehEsp && (souMentor || souCoord) ? getDevolutivasDupla(id) : [],
+    !ehEsp ? getPdmResumo(id) : null,
+  ]);
   const solicitacao = solicitacoes[0] ?? null;
   // o pedido que ocupa a vaga agora (0074 — "em aberto" inclui triagem e
   // negociação; o status_efetivo já desconta o slot vencido, então um
@@ -340,20 +324,6 @@ export default async function DuplaPage({
     solEmAberto ? getPropostas(solEmAberto.id) : Promise.resolve([]),
     espDaMesa ? getSlotsLivres(espDaMesa) : Promise.resolve([]),
   ]);
-  // avaliação estrela do jovem (0071): links tokenizados são coord-only
-  // (policy), a média agregada só faz sentido pro mentor DPP e as estrelas
-  // da trilha especialista vêm da view definer — cada leitura no seu papel
-  const [avaliacaoLinks, mediaJovem, espAvaliacoes, devolutivasFeed] =
-    await Promise.all([
-      souCoord ? getAvaliacaoLinks(id) : Promise.resolve([]),
-      souMentor && !ehEsp ? getAvaliacaoMediaDpp(id) : Promise.resolve(null),
-      souMentor && ehEsp ? getEspecialistaAvaliacoes(id) : Promise.resolve([]),
-      // WP6: feed datado da trilha esp — a policy lê pro autor (o
-      // especialista) e pra coord; supervisor/mentor DPP não veem a coluna
-      ehEsp && (souMentor || souCoord)
-        ? getDevolutivasDupla(id)
-        : Promise.resolve([]),
-    ]);
   const linkAvalPorEncontro = new Map(
     avaliacaoLinks.map((l) => [l.encontro_id, l])
   );
@@ -513,8 +483,6 @@ export default async function DuplaPage({
     !dupla.encerrada_em;
   // resumo da jornada — gerado dos dados; o "fim" é o carimbo do fechamento
   // (decisão DPP ou encerrada_em da trilha especialista)
-  // recorte do PDM pro resumo — mesma RPC já cacheada, deriva sem +1 RTT
-  const pdmResumo = !ehEsp ? await getPdmResumo(id) : null;
   const resumoJornada = dadosResumoJornada(
     dupla,
     passos,
@@ -1038,28 +1006,30 @@ export default async function DuplaPage({
         </section>
       )}
 
-      {fechamentoEmFoco && (
-        <>
-          {ehEsp && <TrilhaFechamento dupla={dupla} avaliacao={avaliacaoEsp} />}
-          {!ehEsp && (
-            <EncerramentoDupla
-              dupla={dupla}
-              encerramento={encerramento}
-              souMentor={souMentor}
-              souCoord={souCoord}
-              formularios={formulariosAtivos}
-              avaliacao360Em={avaliacao360Em}
-              realizadosCount={realizadosCount}
-            />
-          )}
-          {mostrarResumo && (
-            <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
-          )}
-          {souCoord && desfechoEntregas.length > 0 && (
-            <DesfechoDuplaCard entregas={desfechoEntregas} />
-          )}
-        </>
-      )}
+      <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+        {fechamentoEmFoco && (
+          <>
+            {ehEsp && <TrilhaFechamento dupla={dupla} avaliacao={avaliacaoEsp} />}
+            {!ehEsp && (
+              <EncerramentoDupla
+                dupla={dupla}
+                encerramento={encerramento}
+                souMentor={souMentor}
+                souCoord={souCoord}
+                formularios={formulariosAtivos}
+                avaliacao360Em={avaliacao360Em}
+                realizadosCount={realizadosCount}
+              />
+            )}
+            {mostrarResumo && (
+              <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+            )}
+            {souCoord && desfechoEntregas.length > 0 && (
+              <DesfechoDuplaCard entregas={desfechoEntregas} />
+            )}
+          </>
+        )}
+      </Suspense>
     </>
   );
 
@@ -1152,23 +1122,25 @@ export default async function DuplaPage({
 
       {/* fechamento e resumo que não estão na Agora (dupla ainda no meio do
           ciclo): ficam aqui, no fim da lista, sem sumir */}
-      {!fechamentoEmFoco && !ehEsp && (
-        <EncerramentoDupla
-          dupla={dupla}
-          encerramento={encerramento}
-          souMentor={souMentor}
-          souCoord={souCoord}
-          formularios={formulariosAtivos}
-          avaliacao360Em={avaliacao360Em}
-          realizadosCount={realizadosCount}
-        />
-      )}
-      {!fechamentoEmFoco && mostrarResumo && (
-        <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
-      )}
-      {souCoord && desfechoEntregas.length > 0 && (
-        <DesfechoDuplaCard entregas={desfechoEntregas} />
-      )}
+      <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+        {!fechamentoEmFoco && !ehEsp && (
+          <EncerramentoDupla
+            dupla={dupla}
+            encerramento={encerramento}
+            souMentor={souMentor}
+            souCoord={souCoord}
+            formularios={formulariosAtivos}
+            avaliacao360Em={avaliacao360Em}
+            realizadosCount={realizadosCount}
+          />
+        )}
+        {!fechamentoEmFoco && mostrarResumo && (
+          <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+        )}
+        {souCoord && desfechoEntregas.length > 0 && (
+          <DesfechoDuplaCard entregas={desfechoEntregas} />
+        )}
+      </Suspense>
     </>
   );
 
@@ -1188,29 +1160,31 @@ export default async function DuplaPage({
           }
         />
       )}
-      {!ehEsp && pdm && (
-        <PdmDupla
-          duplaId={dupla.id}
-          doc={pdm}
-          mentoradoNome={dupla.mentorado.nome}
-          podeEditar={
-            souMentor &&
-            (dupla.status === "ativa" || dupla.status === "pausada")
-          }
-        />
-      )}
-      {!ehEsp && terceiros && (
-        <TerceirosDupla
-          duplaId={dupla.id}
-          contatos={terceiros.contatos}
-          consolidacao={terceiros.consolidacao}
-          mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
-          podeGerenciar={souCoord || souMentor}
-          jornadaViva={
-            dupla.status === "ativa" || dupla.status === "pausada"
-          }
-        />
-      )}
+      <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+        {!ehEsp && pdm && (
+          <PdmDupla
+            duplaId={dupla.id}
+            doc={pdm}
+            mentoradoNome={dupla.mentorado.nome}
+            podeEditar={
+              souMentor &&
+              (dupla.status === "ativa" || dupla.status === "pausada")
+            }
+          />
+        )}
+        {!ehEsp && terceiros && (
+          <TerceirosDupla
+            duplaId={dupla.id}
+            contatos={terceiros.contatos}
+            consolidacao={terceiros.consolidacao}
+            mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+            podeGerenciar={souCoord || souMentor}
+            jornadaViva={
+              dupla.status === "ativa" || dupla.status === "pausada"
+            }
+          />
+        )}
+      </Suspense>
       {vozVisivel &&
         (ehEsp ? (
           <VozDoJovemEspecialista itens={espAvaliacoes} />
@@ -1361,38 +1335,6 @@ export default async function DuplaPage({
         </section>
       )}
 
-      {(supervisoes.length > 0 || podeRegistrarSupervisao) && (
-        <SupervisoesSection
-          itens={supervisoes}
-          visao="mentor"
-          duplaAtualId={dupla.id}
-          podeExcluir={souCoord}
-          acao={
-            podeRegistrarSupervisao ? (
-              <SupervisaoDialog
-                alvos={[
-                  {
-                    dupla_id: dupla.id,
-                    mentor_id: dupla.mentor.id,
-                    mentor_nome: dupla.mentor.nome,
-                    mentorado_nome: dupla.mentorado.nome,
-                  },
-                ]}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="-my-1 text-muted-foreground"
-                  >
-                    <ChatsCircle size={14} />
-                    Registrar supervisão
-                  </Button>
-                }
-              />
-            ) : undefined
-          }
-        />
-      )}
 
       {!ehEsp && <DevolutivaEspecialista solicitacoes={solicitacoes} />}
     </>
@@ -1610,7 +1552,9 @@ export default async function DuplaPage({
 
       <AbaPorHash />
 
-      <FichaAbas ativa={aba}>{conteudo}</FichaAbas>
+      <FichaAbas ativa={aba}>
+        <Suspense fallback={<Skeleton className="h-40 w-full" />}>{conteudo}</Suspense>
+      </FichaAbas>
     </div>
   );
 }

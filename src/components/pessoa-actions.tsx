@@ -438,6 +438,17 @@ export function PessoaActions({
             nome={pessoa.nome}
             whatsapp={pessoa.whatsapp}
           />
+          {pessoa.role !== "mentorado" && (
+            <label className="flex items-center gap-2 text-sm cursor-pointer">
+              <input
+                type="checkbox"
+                name="voluntario"
+                defaultChecked={pessoa.voluntario !== false}
+                className="accent-primary"
+              />
+              Sou voluntário(a)
+            </label>
+          )}
           <CampoConsentimento carimbadoEm={pessoa.consent_lgpd_em} />
         </>
       ),

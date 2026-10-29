@@ -47,6 +47,7 @@ import {
 const PAPEL_LABEL: Record<string, string> = {
   mentor_dpp: "Mentor DPP",
   mentor_especialista: "Mentor especialista",
+  mentor_hibrido: "Mentor DPP + especialista",
   supervisor: "Auxiliar executivo",
   coordenacao: "Coordenação",
 };
@@ -122,8 +123,8 @@ export function NovaPessoaDialog() {
   const [interesses, setInteresses] = useState<string[]>([]);
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(null);
   const { submit, pending } = useSubmit(createPessoa, (n) => `Cadastro de ${n} salvo.`, () => setOpen(false));
-  const ehMentor = role === "mentor_dpp" || role === "mentor_especialista";
-
+  const ehMentor = role === "mentor_dpp" || role === "mentor_especialista" || role === "mentor_hibrido";
+  const hibrido = role === "mentor_hibrido";
   // um passo por SecaoFicha — a parede de campos virava um scroll só; a
   // "Ficha de mentor" entra/sai com o papel escolhido no passo 1
   const passos: PassoFicha[] = [
@@ -235,14 +236,27 @@ export function NovaPessoaDialog() {
           conteudo: (
             <>
               <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="n_cap">
-                    {role === "mentor_especialista"
-                      ? "Capacidade (trilhas de especialista)"
-                      : "Capacidade (duplas DPP)"}
-                  </Label>
-                  <Input id="n_cap" name="capacidade" type="number" min={1} max={10} defaultValue={1} required />
-                </div>
+                {hibrido ? (
+                  <>
+                    <div className="space-y-2">
+                      <Label htmlFor="n_cap">Capacidade (duplas DPP)</Label>
+                      <Input id="n_cap" name="capacidade" type="number" min={1} max={10} defaultValue={1} required />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="n_cap_esp">Capacidade (trilhas de especialista)</Label>
+                      <Input id="n_cap_esp" name="capacidade_esp" type="number" min={1} max={10} defaultValue={1} required />
+                    </div>
+                  </>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="n_cap">
+                      {role === "mentor_especialista"
+                        ? "Capacidade (trilhas de especialista)"
+                        : "Capacidade (duplas DPP)"}
+                    </Label>
+                    <Input id="n_cap" name="capacidade" type="number" min={1} max={10} defaultValue={1} required />
+                  </div>
+                )}
               </div>
               <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
               <div className="space-y-2">
@@ -273,6 +287,10 @@ export function NovaPessoaDialog() {
       conteudo: (
         <>
           <FotoField id="foto" />
+          <label className="flex items-center gap-2 text-sm cursor-pointer">
+            <input type="checkbox" name="voluntario" className="accent-primary" />
+            Sou voluntário(a)
+          </label>
           <CampoConsentimento />
           <p className="text-xs text-muted-foreground">
             A pessoa entra com o e-mail por link de acesso; o papel define o que ela vê e pode ser alterado depois na lista.

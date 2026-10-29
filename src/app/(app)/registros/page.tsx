@@ -1,4 +1,6 @@
 import Link from "next/link";
+import { Suspense } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import { ClipboardText } from "@phosphor-icons/react/dist/ssr";
@@ -117,6 +119,26 @@ function aconteceuEmDe(r: RegistroResumo): string {
   );
 }
 
+async function PanoramaDoCiclo({
+  filtros,
+  hoje,
+  saude,
+}: {
+  filtros: FiltrosRegistro;
+  hoje: string;
+  saude: ReturnType<typeof saudeDoRecorte>;
+}) {
+  const panorama = await getRegistrosPanorama(filtros);
+  return <RegistrosPainel panorama={panorama} hoje={hoje} saude={saude} />;
+}
+
+async function MetricasRegistroSection({ souCoord }: { souCoord: boolean }) {
+  if (!souCoord) return null;
+  const metricas = await getMetricasRegistro();
+  if (!metricas) return null;
+  return <MetricasRegistroCard metricas={metricas} />;
+}
+
 export default async function RegistrosPage({
   searchParams,
 }: {
@@ -156,19 +178,15 @@ export default async function RegistrosPage({
     duplas,
     alertas,
     espEventos,
-    panorama,
     cronogramas,
     todasDuplas,
-    metricas,
   ] = await Promise.all([
     getRegistros(filtros),
     getDuplasOpcoes(),
     getAlertasRegistros(),
     getEspecialistaEventos(),
-    getRegistrosPanorama(filtros),
     getCronogramas(),
     getDuplas(),
-    getMetricasRegistro(),
   ]);
   // situação das duplas: o mesmo resumo de /duplas, /agenda e da home, no
   // recorte de turma do painel (a URL é a fonte do recorte)
@@ -188,12 +206,30 @@ export default async function RegistrosPage({
   // ?r= de um registro fora da página carregada: sobe as páginas (cumulativas)
   // até achá-lo, para o link de um registro antigo abrir o registro certo
   let itens = itensIniciais;
-  for (
-    let p = filtros.pagina + 1;
-    rId && p <= 50 && itens.length < total && !itens.some((x) => x.id === rId);
-    p++
+  if (
+    rId &&
+    itens.length < total &&
+    !itens.some((x) => x.id === rId)
   ) {
-    itens = (await getRegistros({ ...filtros, pagina: p })).itens;
+    const maxPage = Math.min(50, Math.ceil(total / REGISTROS_PAGINA));
+    const startPage = filtros.pagina + 1;
+    if (startPage <= maxPage) {
+      const pages = Array.from(
+        { length: maxPage - startPage + 1 },
+        (_, i) => startPage + i
+      );
+      const results = await Promise.all(
+        pages.map((p) => getRegistros({ ...filtros, pagina: p }))
+      );
+      let chosen = results[results.length - 1];
+      for (const res of results) {
+        if (res.itens.some((x) => x.id === rId)) {
+          chosen = res;
+          break;
+        }
+      }
+      itens = chosen.itens;
+    }
   }
 
   // trilha especialista (0074): encontro.numero é a TENTATIVA — o passo do
@@ -525,13 +561,19 @@ export default async function RegistrosPage({
             </div>
           </div>
         </div>
-        <RegistrosPainel panorama={panorama} hoje={hoje} saude={saude} />
+        <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+          <PanoramaDoCiclo filtros={filtros} hoje={hoje} saude={saude} />
+        </Suspense>
       </section>
 
       {/* telemetria do form (REALIZA-217): tempo e abandono do
           preenchimento, só pra coordenação — a query já devolve null pra
           supervisor, o gate aqui deixa isso explícito */}
-      {souCoord && metricas && <MetricasRegistroCard metricas={metricas} />}
+      {souCoord && (
+        <Suspense fallback={<Skeleton className="h-16 w-full" />}>
+          <MetricasRegistroSection souCoord={souCoord} />
+        </Suspense>
+      )}
 
       {/* cabeçalho da lista: contador operacional à esquerda (clicar num
           número aplica o filtro correspondente), controle de agrupamento

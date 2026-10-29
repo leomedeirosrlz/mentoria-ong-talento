@@ -360,7 +360,7 @@ export const DUPLA_SELECT = `
   mentor:profiles!duplas_mentor_id_fkey(${PROFILE_COLS_PUBLICAS}),
   mentorado:mentorados(${MENTORADO_COLS_PAR}),
   supervisor:profiles!duplas_supervisor_id_fkey(${PROFILE_COLS_PUBLICAS}),
-  encontros(*, registro:registros(*, autor:profiles!registros_created_by_fkey(nome)),
+  encontros(*, registro:registros(id, encontro_id, tema, atividades, avaliacao, dificuldade, dificuldade_detalhe, precisa_apoio, proximo_passo, proximo_passo_detalhe, reflexoes, observacoes, ferramenta, created_at, updated_at, created_by, autor:profiles!registros_created_by_fkey(nome)),
     avaliacao_jovem:avaliacoes_encontro(*)),
   encaminhamentos(*),
   notas:encontro_notas(*)
@@ -531,11 +531,12 @@ export const getDuplasResumoTodas = cache(async (): Promise<DuplaResumo[]> => {
 /** Encontros mínimos de um conjunto de duplas — o passo do guia da trilha
  *  especialista é o rank entre realizados (0074), então derivá-lo exige o
  *  histórico todo da dupla, não só o encontro linkado ao registro. */
-export async function getEncontrosPorDuplas(
-  duplaIds: string[]
-): Promise<Pick<Encontro, "id" | "dupla_id" | "numero" | "status">[]> {
-  if (!duplaIds.length) return [];
-  const demo = await demoRole();
+export const getEncontrosPorDuplas = cache(
+  async (
+    duplaIds: string[]
+  ): Promise<Pick<Encontro, "id" | "dupla_id" | "numero" | "status">[]> => {
+    if (!duplaIds.length) return [];
+    const demo = await demoRole();
   if (demo) return demoEncontrosPorDuplas(demo, duplaIds);
   const supabase = await createClient();
   const { data, error } = await supabase
@@ -550,7 +551,8 @@ export async function getEncontrosPorDuplas(
     Encontro,
     "id" | "dupla_id" | "numero" | "status"
   >[];
-}
+  }
+);
 
 /** Só a contagem (head: true, sem rows) — alimenta o checklist de setup da home. */
 export const getContagemPessoas = cache(async (): Promise<number> => {
@@ -900,10 +902,11 @@ const REGISTRO_RESUMO_SELECT = `
   )`;
 
 /** Registros visíveis pelo papel (RLS: coord = todos, supervisor = suas duplas). */
-export async function getRegistros(
-  f: FiltrosRegistro
-): Promise<{ itens: RegistroResumo[]; total: number }> {
-  const demo = await demoRole();
+export const getRegistros = cache(
+  async (
+    f: FiltrosRegistro
+  ): Promise<{ itens: RegistroResumo[]; total: number }> => {
+    const demo = await demoRole();
   if (demo) return demoRegistros(demo, f);
   const supabase = await createClient();
   // recorte de turma = "registros de encontros das duplas daquele
@@ -987,7 +990,8 @@ export async function getRegistros(
     return { itens, total: itens.length };
   }
   return { itens, total: count ?? 0 };
-}
+  }
+);
 
 /** Limite do recorte "últimas N semanas" em ISO — corta por quando o
  *  encontro aconteceu (mesma régua da timeline e das colunas do painel). */
@@ -1023,13 +1027,14 @@ export const getRegistrosPanorama = cache(
 );
 
 /** Contadores de triagem do topo — globais ao papel, não seguem os filtros. */
-export async function getAlertasRegistros(): Promise<{
-  apoio: number;
-  baixa: number;
-  comDificuldade: number;
-  tardios: number;
-}> {
-  const demo = await demoRole();
+export const getAlertasRegistros = cache(
+  async (): Promise<{
+    apoio: number;
+    baixa: number;
+    comDificuldade: number;
+    tardios: number;
+  }> => {
+    const demo = await demoRole();
   if (demo) return demoAlertasRegistros(demo);
   const supabase = await createClient();
   const head = { count: "exact" as const, head: true };
@@ -1056,7 +1061,8 @@ export async function getAlertasRegistros(): Promise<{
     comDificuldade: dif.count ?? 0,
     tardios,
   };
-}
+  }
+);
 
 /** Telemetria de preenchimento do form de registro (REALIZA-217, fase 1):
  *  agrega as tentativas dos últimos 30 dias — total, % concluídas,

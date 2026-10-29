@@ -538,7 +538,7 @@ export type AgendaMinhaProps = {
   trilhas: Record<string, TrilhaJovem[]>;
   eventos: CicloEvento[];
   cronogramas: Cronograma[];
-  supervisoes: Supervisao[];
+  supervisoes?: Supervisao[];
   /** profile_id do mentor — separa supervisão recebida da conduzida. */
   meuId: string;
   /** "YYYY-MM-DD" — a page resolve no server; aqui o valor ancora os buckets. */
@@ -556,7 +556,7 @@ export function AgendaMinha({
   trilhas,
   eventos,
   cronogramas,
-  supervisoes,
+  supervisoes = [],
   meuId,
   hoje,
   agora,

@@ -30,6 +30,25 @@ export default async function AssinarPage() {
     getMeusDadosCivis(),
   ]);
 
+  // quem não é voluntário(a) não assina o termo de adesão ao trabalho
+  // voluntário — só LGPD (já no cadastro) + termo do mentorado, se for o caso
+  if (me.voluntario === false) {
+    return (
+      <div className="mx-auto max-w-2xl">
+        <Card className="animate-enter">
+          <CardContent className="py-10 text-center">
+            <h1 className="text-lg font-semibold">Termo de adesão não se aplica</h1>
+            <p className="mx-auto mt-1 max-w-sm text-sm leading-relaxed text-muted-foreground">
+              Seu cadastro não está marcado como voluntário(a), então não há termo
+              de adesão ao trabalho voluntário a assinar. O consentimento LGPD já
+              foi registrado no seu cadastro.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   if (a?.status === "assinado") {
     return (
       <div className="mx-auto max-w-2xl">

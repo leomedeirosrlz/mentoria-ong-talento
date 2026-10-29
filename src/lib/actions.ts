@@ -534,7 +534,9 @@ export async function createPessoa(formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  const role = String(formData.get("role") ?? "");
+  const roleRaw = String(formData.get("role") ?? "");
+  const hibrido = roleRaw === "mentor_hibrido";
+  const role = hibrido ? "mentor_dpp" : roleRaw;
   const nome = String(formData.get("nome") ?? "").trim();
   const email = String(formData.get("email") ?? "").trim().toLowerCase();
   const whatsappRaw = String(formData.get("whatsapp") ?? "");
@@ -542,7 +544,7 @@ export async function createPessoa(formData: FormData) {
   if (!nome || !email) return { error: "Nome e e-mail são obrigatórios." };
   if (!emailValido(email)) return { error: "Confira o e-mail." };
   if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp: use DDD e o número completo." };
-  if (!(ROLES as readonly string[]).includes(role)) return { error: "Escolha um papel válido." };
+  if (roleRaw !== "mentor_hibrido" && !(ROLES as readonly string[]).includes(roleRaw)) return { error: "Escolha um papel válido." };
   const ficha = camposFicha(formData, { de: "pessoa" });
   if ("error" in ficha) return { error: ficha.error };
   const mentorCampos = camposMentor(formData);
@@ -555,6 +557,7 @@ export async function createPessoa(formData: FormData) {
       email,
       whatsapp: whatsapp || null,
       role,
+      voluntario: formData.get("voluntario") === "on",
       ...ficha,
       ...consentPatch(formData, null),
     })
@@ -573,22 +576,39 @@ export async function createPessoa(formData: FormData) {
     aviso = foto.aviso;
   }
 
-  if (role === "mentor_dpp" || role === "mentor_especialista") {
+  if (role === "mentor_dpp" || role === "mentor_especialista" || hibrido) {
     const capacidade = Number(formData.get("capacidade") || 1);
     if (!Number.isInteger(capacidade) || capacidade < 1) {
       return { error: "Informe uma capacidade de pelo menos 1." };
     }
+    const capacidadeEsp = hibrido
+      ? Number(formData.get("capacidade_esp") || 1)
+      : capacidade;
+    if (hibrido && (!Number.isInteger(capacidadeEsp) || capacidadeEsp < 1)) {
+      return { error: "Informe uma capacidade de pelo menos 1." };
+    }
     // a pool é a da trilha do papel (0073) — a coluna da outra fica no
     // default 1, inerte porque ninguém lê capacidade fora da própria trilha
+    const ehEsp = role === "mentor_especialista";
     const { error: mpErr } = await supabase.from("mentor_profiles").insert({
       profile_id: profile.id,
-      tipo: role === "mentor_dpp" ? "dpp" : "especialista",
-      ...(role === "mentor_especialista"
+      tipo: ehEsp ? "especialista" : "dpp",
+      ...(ehEsp
         ? { capacidade_especialista: capacidade }
         : { capacidade }),
+      ...(hibrido ? { capacidade_especialista: capacidadeEsp } : {}),
       ...mentorCampos,
     });
     if (mpErr) return { error: erroAmigavel(mpErr) };
+    // híbrido: entra o papel secundário mentor_especialista em profile_papeis
+    if (hibrido) {
+      for (const papel of ["mentor_dpp", "mentor_especialista"] as const) {
+        const { error: ppErr } = await supabase
+          .from("profile_papeis")
+          .upsert({ profile_id: profile.id, papel }, { ignoreDuplicates: true });
+        if (ppErr) return { error: erroAmigavel(ppErr) };
+      }
+    }
   }
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${profile.id}`);
@@ -1270,6 +1290,9 @@ export async function updatePessoa(profileId: string, formData: FormData) {
     ...civis,
     ...consentPatch(formData, atual?.consent_lgpd_em),
   };
+  if (formData.has("voluntario")) {
+    patch.voluntario = formData.get("voluntario") === "on";
+  }
   // quem já tem login troca o e-mail no auth.users (o trigger 0060 espelha
   // em profiles.email); quem nunca entrou grava direto na row
   let emailMudou = false;

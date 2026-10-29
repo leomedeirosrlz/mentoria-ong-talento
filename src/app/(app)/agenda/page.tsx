@@ -11,11 +11,6 @@ import {
   getMeuMentorProfile,
 } from "@/lib/queries";
 import { getMentoresChamada, getPresencas } from "@/lib/queries-presenca";
-import {
-  getSupervisaoAlvos,
-  getSupervisoesDaPessoa,
-  getSupervisoesRecentes,
-} from "@/lib/queries-supervisao";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import { getEncerramentosPendentes } from "@/lib/queries-encerramento";
 import {
@@ -243,12 +238,9 @@ export default async function AgendaPage({
   // staff+mentor: ?visao=dpp é o escape explícito pra superfície de mentor
   if (souMentor && aba !== "calendario" && (!papelStaff || visao === "dpp")) {
     const idsDpp = duplasDpp.map((d) => d.id);
-    const [trilhas, supervisoes, solicitacoes, especialistas, nudges, encerramentosPendentes] =
+    const [trilhas, solicitacoes, especialistas, nudges, encerramentosPendentes] =
       await Promise.all([
         getTrilhasDosJovens(idsDpp),
-        // as duas abas leem supervisões: "minha" pra linha cronológica,
-        // "por-mentorado" pra seção "Do programa" + o strip da semana
-        getSupervisoesDaPessoa(me!.id),
         aba === "por-mentorado"
           ? Promise.all(idsDpp.map((id) => getSolicitacoesDaDupla(id))).then(
               (lista) => Object.fromEntries(idsDpp.map((id, i) => [id, lista[i]]))
@@ -275,7 +267,7 @@ export default async function AgendaPage({
             trilhas,
             eventos,
             cronogramas,
-            supervisoes,
+            supervisoes: [],
             meuId: me!.id,
             hoje,
             agora: agora.getTime(),
@@ -304,7 +296,6 @@ export default async function AgendaPage({
               trilhas={trilhas}
               eventos={eventos}
               cronogramas={cronogramas}
-              supervisoes={supervisoes}
               meuId={me!.id}
               hoje={hoje}
               agora={agora.getTime()}
@@ -324,7 +315,6 @@ export default async function AgendaPage({
               }))}
               eventos={eventos}
               cronogramas={cronogramas}
-              supervisoes={supervisoes}
               nudges={nudges}
               encerramentosPendentes={encerramentosPendentes}
               itensSemana={itensSemana}
@@ -364,9 +354,7 @@ export default async function AgendaPage({
   ) {
     // "Consolidada" é uma das abas da barra (a ativa). O default é "Por turma".
     const consolidada = abaParam === "consolidada";
-    const [alvos, supervisoesAux, nudgesAux] = await Promise.all([
-      getSupervisaoAlvos(),
-      getSupervisoesDaPessoa(me.id),
+    const [nudgesAux] = await Promise.all([
       getUltimasInteracoes(supervisionadas.map((d) => d.id), "nudge"),
     ]);
     return (
@@ -376,8 +364,6 @@ export default async function AgendaPage({
           duplas={supervisionadas}
           eventos={eventos}
           cronogramas={cronogramas}
-          supervisoes={supervisoesAux}
-          alvos={alvos}
           nudges={nudgesAux}
           meuNome={me.nome.split(" ")[0]}
           hoje={hoje}
@@ -407,11 +393,9 @@ export default async function AgendaPage({
     diaInicial == null &&
     janelaInicial == null
   ) {
-    const [nudgesCoord, supervisoesCoord, encerramentosPendentes] =
+    const [nudgesCoord, encerramentosPendentes] =
       await Promise.all([
         getUltimasInteracoes(duplas.map((d) => d.id), "nudge"),
-        // a lib recorta a semana — trago margem (30) pra cobrir ciclos grandes
-        getSupervisoesRecentes(30),
         // rito de encerramento aberto — a pendência que vira linha "concluir
         // na ficha" quando a dupla já concluiu (REALIZA-172)
         getEncerramentosPendentes(),
@@ -424,7 +408,6 @@ export default async function AgendaPage({
           eventos={eventos}
           cronogramas={cronogramas}
           nudges={nudgesCoord}
-          supervisoes={supervisoesCoord}
           encerramentosPendentes={new Set(encerramentosPendentes)}
           meuNome={me.nome.split(" ")[0]}
           hoje={hoje}

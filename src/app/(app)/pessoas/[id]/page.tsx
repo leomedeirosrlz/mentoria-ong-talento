@@ -39,7 +39,6 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { cn, maskCep, maskCpf } from "@/lib/utils";
 import { getDocumentosPessoa, getMe, getPessoaPerfil } from "@/lib/queries";
-import { getSupervisoesDaPessoa } from "@/lib/queries-supervisao";
 import { getResumoFormacao } from "@/lib/queries-presenca";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import {
@@ -53,7 +52,6 @@ import {
   idade,
   linkSeguro,
   papelLabelComposto,
-  podeSupervisionar,
   PREF_GENERO_LABELS,
   SITUACAO_MENTORADO_LABEL,
   waLink,
@@ -73,7 +71,6 @@ import { MentoradoActions } from "@/components/mentorado-actions";
 import { PessoaActions } from "@/components/pessoa-actions";
 import { PessoaBanner } from "@/components/pessoa-banner";
 import { PessoaMural, type MuralNota } from "@/components/pessoa-mural";
-import { SupervisoesSection } from "@/components/supervisoes-section";
 import { VoltarLink } from "@/components/voltar-link";
 
 export async function generateMetadata({
@@ -234,18 +231,6 @@ export default async function PessoaPerfilPage({
   const ehStaff = me.role === "coordenacao" || me.role === "supervisor";
   if (perfil.tipo === "profile" && perfil.pessoa.id === me.id) redirect("/perfil");
   // mentorado fora de vínculo: o RLS já barrou quem não alcança (query voltou null)
-
-  // sessões de supervisão (0041): conduzidas (ficha de quem supervisiona —
-  // supervisor ou coordenação, que pode ser supervisor_id de dupla) ou
-  // recebidas (ficha de mentor). A RLS escopa o que cada papel lê — mentorado
-  // não tem sessão, a query nem roda pra ele
-  const papelPessoa = perfil.tipo === "profile" ? perfil.pessoa.role : null;
-  const supervisoes =
-    podeSupervisionar(papelPessoa) ||
-    papelPessoa === "mentor_dpp" ||
-    papelPessoa === "mentor_especialista"
-      ? await getSupervisoesDaPessoa(id)
-      : [];
 
   const p = perfil.pessoa;
   const souCoord = me.role === "coordenacao";
@@ -1008,15 +993,7 @@ export default async function PessoaPerfilPage({
             </section>
           )}
 
-          {/* supervisão (0041) — na ficha do supervisor, as sessões que ele
-              conduziu; na do mentor, as que recebeu. Vazia = seção some */}
-          {supervisoes.length > 0 && (
-            <SupervisoesSection
-              itens={supervisoes}
-              visao={podeSupervisionar(papelPessoa) ? "supervisor" : "mentor"}
-              podeExcluir={souCoord}
-            />
-          )}
+          {/* supervisão removida (REALIZA-313) */}
         </div>
 
         {/* rail direito — referência operacional: vínculos, documentos

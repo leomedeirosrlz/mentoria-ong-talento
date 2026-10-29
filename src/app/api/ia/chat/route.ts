@@ -37,7 +37,7 @@ import { createClient } from "@/lib/supabase/server";
 export const dynamic = "force-dynamic";
 // loop de tools (≤6 rodadas) + streaming pode passar do default da
 // plataforma — mesmo patamar dos jobs (vercel lê o export). O stream se
-// limita a ORCAMENTO_STREAM_MS pra sobrar tempo de emitir o evento de
+// limita a STREAM_BUDGET_MS pra sobrar tempo de emitir o evento de
 // erro antes de a função morrer aos 60s
 export const maxDuration = 60;
 
@@ -50,6 +50,12 @@ const MAX_ITERACOES = 4;
 // rodada lenta morria no meio e nenhum evento de erro chegava ao cliente.
 // 50s a partir da abertura do stream deixa ~10s pros gates pré-stream
 const ORCAMENTO_STREAM_MS = 50_000;
+
+// orçamento total do stream (REALIZA-304): a plataforma encerra a função
+// aos 60s sem avisar — se o teto por rodada fosse o único limite, uma
+// rodada lenta morria no meio e nenhum evento de erro chegava ao cliente.
+// 50s a partir da abertura do stream deixa ~10s pros gates pré-stream
+const STREAM_BUDGET_MS = 50_000;
 
 const MSG_FALHA =
   "Não consegui concluir essa consulta agora — tente perguntar de outra forma.";
@@ -125,7 +131,7 @@ export async function POST(req: Request) {
   // sessão estável por usuário — o provider Go exige pra rotear/cachear;
   // profile_id é pseudônimo e não revela nada além do que a sessão já diz
   const sessao = me.id;
-  // teto por rodada — o orçamento do stream (ORCAMENTO_STREAM_MS) capa
+  // teto por rodada — o orçamento do stream (STREAM_BUDGET_MS) capa
   // esse valor a cada iteração, então na prática o que manda é o que
   // ainda falta pro prazo
   const timeoutRound = Number(process.env.IA_TIMEOUT_MS ?? 20_000) * 4;
@@ -153,7 +159,7 @@ export async function POST(req: Request) {
       const toolsUsadas: string[] = [];
       let concluido = false;
       let guiaChamado = false;
-      const prazo = Date.now() + ORCAMENTO_STREAM_MS;
+      const prazo = Date.now() + STREAM_BUDGET_MS;
 
       for (let i = 0; i < MAX_ITERACOES && !req.signal.aborted && !fechado; i++) {
         // sem orçamento, sai do loop — o erro padrão depois do for avisa

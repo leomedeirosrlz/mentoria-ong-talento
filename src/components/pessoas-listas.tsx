@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import { Collapsible } from "@base-ui/react/collapsible";
 import {
@@ -39,6 +39,7 @@ import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { MatchingPanel } from "@/components/matching-panel";
 import { NovaPessoaDialog, NovoMentoradoDialog } from "@/components/pessoas-dialogs";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Button } from "@/components/ui/button";
 import { filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
@@ -68,6 +69,30 @@ type OrdemPessoas = "nome" | "pendencias";
 const ORDEM_PESSOAS_LABEL: Record<OrdemPessoas, string> = {
   nome: "Nome A–Z",
   pendencias: "Pendências primeiro",
+};
+
+const FILTRO_PAPEL_LABEL: Record<string, string> = {
+  todos: "Todos os papéis",
+  mentor_dpp: "Mentor DPP",
+  mentor_especialista: "Mentor Especialista",
+  mentor_hibrido: "Mentor Híbrido",
+  supervisor: "Supervisor",
+  coordenacao: "Coordenação",
+  auxiliar: "Auxiliar",
+  jovem: "Jovem",
+};
+
+const FILTRO_STATUS_LABEL: Record<string, string> = {
+  ativos: "Ativos",
+  desistentes: "Desistentes",
+  concluidos: "Concluídos",
+  todos: "Todos os status",
+};
+
+const FILTRO_TRILHA_LABEL: Record<string, string> = {
+  todas: "Todas as trilhas",
+  dpp: "Trilha DPP",
+  especialista: "Trilha Especialista",
 };
 
 /** Conta pendências do cadastro — mesmas regras dos badges e da região
@@ -168,8 +193,25 @@ export function PessoasListas({
    *  chegam vazios da página e nem são consultados nesse modo. */
   souCoord: boolean;
 }) {
-  const [busca, setBusca] = useState("");
+  const [busca, setBusca] = useState(() => {
+    if (typeof window === "undefined") return "";
+    return new URLSearchParams(window.location.search).get("busca") ?? "";
+  });
+  const [buscaDebounced, setBuscaDebounced] = useState(busca);
   const [semDupla, setSemDupla] = useState(false);
+  // filtros client-side (REALIZA-318) — combináveis (AND) em memória
+  const [filtroPapel, setFiltroPapel] = useState(() => {
+    if (typeof window === "undefined") return "todos";
+    return new URLSearchParams(window.location.search).get("papel") ?? "todos";
+  });
+  const [filtroStatus, setFiltroStatus] = useState(() => {
+    if (typeof window === "undefined") return "ativos";
+    return new URLSearchParams(window.location.search).get("status") ?? "ativos";
+  });
+  const [filtroTrilha, setFiltroTrilha] = useState(() => {
+    if (typeof window === "undefined") return "todas";
+    return new URLSearchParams(window.location.search).get("trilha") ?? "todas";
+  });
   // "Fora do programa" inverte o recorte: a lista principal passa a mostrar
   // SÓ quem saiu (0077); desligado, eles moram na seção colapsável do fim
   const [verFora, setVerFora] = useState(false);
@@ -179,7 +221,29 @@ export function PessoasListas({
   const emDupla = useMemo(() => new Set(comDupla), [comDupla]);
   const temQualquerDupla = useMemo(() => new Set(comQualquerDupla), [comQualquerDupla]);
 
-  const q = normaliza(busca.trim());
+  // debounce da busca por nome (300ms) — REALIZA-318
+  useEffect(() => {
+    const t = setTimeout(() => setBuscaDebounced(busca), 300);
+    return () => clearTimeout(t);
+  }, [busca]);
+
+  // persistência dos filtros na URL (deep-link) — REALIZA-318
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams(window.location.search);
+    if (busca) sp.set("busca", busca);
+    else sp.delete("busca");
+    if (filtroPapel !== "todos") sp.set("papel", filtroPapel);
+    else sp.delete("papel");
+    if (filtroStatus !== "ativos") sp.set("status", filtroStatus);
+    else sp.delete("status");
+    if (filtroTrilha !== "todas") sp.set("trilha", filtroTrilha);
+    else sp.delete("trilha");
+    const qs = sp.toString();
+    window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
+  }, [busca, filtroPapel, filtroStatus, filtroTrilha]);
+
+  const q = normaliza(buscaDebounced.trim());
   // diretório de colegas: sem papel ainda não é colega — pré-cadastro que
   // só a coordenação precisa enxergar; cadastro inativo (saiu da equipe)
   // idem — pro diretório ele não é mais colega. A base filtrada também é o
@@ -187,37 +251,89 @@ export function PessoasListas({
   const basePessoas = souCoord
     ? pessoas
     : pessoas.filter((p) => p.role != null && p.ativo);
+  // helpers de filtro client-side (REALIZA-318) — combináveis (AND)
+  const papelMatchPessoa = (p: Profile) => {
+    switch (filtroPapel) {
+      case "todos": return true;
+      case "mentor_dpp": return temPapel(p, "mentor_dpp");
+      case "mentor_especialista": return temPapel(p, "mentor_especialista");
+      case "mentor_hibrido":
+        return temPapel(p, "mentor_dpp") && temPapel(p, "mentor_especialista");
+      case "supervisor":
+      case "auxiliar": return p.role === "supervisor";
+      case "coordenacao": return p.role === "coordenacao";
+      case "jovem": return false;
+      default: return true;
+    }
+  };
+  const trilhaMatchPessoa = (p: Profile) => {
+    if (filtroTrilha === "todas") return true;
+    if (!ehMentor(p)) return false;
+    if (filtroTrilha === "dpp") return temPapel(p, "mentor_dpp");
+    if (filtroTrilha === "especialista") return temPapel(p, "mentor_especialista");
+    return true;
+  };
+  const statusMatchPessoa = (p: Profile) => {
+    if (filtroStatus === "ativos") return p.ativo;
+    if (filtroStatus === "todos") return true;
+    return false;
+  };
+  const papelMatchMentorado = () => {
+    return (
+      filtroPapel === "todos" ||
+      filtroPapel === "jovem" ||
+      filtroPapel === "mentorado"
+    );
+  };
+  const trilhaMatchMentorado = () => true;
+  const statusMatchMentorado = (m: Mentorado) => {
+    if (filtroStatus === "ativos") return !foraDoPrograma(m);
+    if (filtroStatus === "desistentes") return m.situacao === "desistente";
+    if (filtroStatus === "concluidos") return m.situacao === "concluido";
+    if (filtroStatus === "todos") return true;
+    return true;
+  };
+
   // pra não-coord o e-mail não chega (view profiles_contato só devolve o
   // escopo do papel) — a busca é por nome (+ nome social, que é público)
-  let pessoasFiltradas = q
-    ? basePessoas.filter(
-        (p) =>
-          normaliza(p.nome).includes(q) ||
-          normaliza(p.nome_social ?? "").includes(q) ||
-          (souCoord && normaliza(p.email).includes(q))
-      )
-    : basePessoas;
+  const pessoasBaseFiltradas = basePessoas.filter((p) => {
+    if (!papelMatchPessoa(p)) return false;
+    if (!trilhaMatchPessoa(p)) return false;
+    if (!statusMatchPessoa(p)) return false;
+    if (!q) return true;
+    return (
+      normaliza(p.nome).includes(q) ||
+      normaliza(p.nome_social ?? "").includes(q) ||
+      (souCoord && normaliza(p.email).includes(q))
+    );
+  });
+  let pessoasFiltradas = pessoasBaseFiltradas;
   // pra coordenação, cadastro desativado sai do grupo principal e vive na
   // seção "Inativos" no fim — visível, mas sem diluir a leitura de quem segue
   const inativas = useMemo(
     () => (souCoord ? pessoas.filter((p) => !p.ativo) : []),
     [souCoord, pessoas]
   );
-  const inativasFiltradas = souCoord
-    ? pessoasFiltradas.filter((p) => !p.ativo)
+  const mostrarInativas =
+    souCoord && (filtroStatus === "ativos" || filtroStatus === "todos");
+  const inativasFiltradas = mostrarInativas
+    ? pessoasBaseFiltradas.filter((p) => !p.ativo)
     : [];
   if (souCoord) {
     pessoasFiltradas = pessoasFiltradas.filter((p) => p.ativo);
   }
-  let mentoradosFiltrados = q
-    ? mentorados.filter(
-        (m) =>
-          normaliza(m.nome).includes(q) ||
-          normaliza(m.nome_social ?? "").includes(q) ||
-          normaliza(m.email ?? "").includes(q) ||
-          normaliza(m.ong_origem).includes(q)
-      )
-    : mentorados;
+  let mentoradosFiltrados = mentorados.filter((m) => {
+    if (!papelMatchMentorado()) return false;
+    if (!trilhaMatchMentorado()) return false;
+    if (!statusMatchMentorado(m)) return false;
+    if (!q) return true;
+    return (
+      normaliza(m.nome).includes(q) ||
+      normaliza(m.nome_social ?? "").includes(q) ||
+      normaliza(m.email ?? "").includes(q) ||
+      normaliza(m.ong_origem).includes(q)
+    );
+  });
   // saída do programa (0077): desistente/concluído sai do grupo principal e
   // vai pra "Fora do programa" no fim — o chip inverte e filtra só eles.
   // A seção respeita a busca (foraFiltrados já é pós-q) pra achar o nome
@@ -226,9 +342,11 @@ export function PessoasListas({
     () => mentorados.reduce((n, m) => n + (foraDoPrograma(m) ? 1 : 0), 0),
     [mentorados]
   );
-  mentoradosFiltrados = verFora
-    ? foraFiltrados
-    : mentoradosFiltrados.filter((m) => !foraDoPrograma(m));
+  if (filtroStatus === "ativos") {
+    mentoradosFiltrados = verFora
+      ? foraFiltrados
+      : mentoradosFiltrados.filter((m) => !foraDoPrograma(m));
+  }
 
   // fila "Aguardando par" (REALIZA-101): mentorados que NUNCA tiveram dupla
   // + mentores ativos com vaga livre — derivação pura em @/lib/fila
@@ -284,7 +402,12 @@ export function PessoasListas({
     pessoasFiltradas = pessoasFiltradas.filter(temVaga);
     mentoradosFiltrados = mentoradosFiltrados.filter((m) => !emDupla.has(m.id));
   }
-  const filtrando = Boolean(q) || semDupla;
+  const filtrando =
+    Boolean(q) ||
+    semDupla ||
+    filtroPapel !== "todos" ||
+    filtroStatus !== "ativos" ||
+    filtroTrilha !== "todas";
 
   // quem saiu se ordena pela saída mais recente — arquivo cronológico, não
   // fila de trabalho (pendência não se aplica a quem já partiu)
@@ -423,6 +546,56 @@ export function PessoasListas({
         )}
       </div>
 
+      <div className="flex flex-wrap items-center gap-2">
+        <Select
+          value={filtroPapel}
+          onValueChange={(v) => setFiltroPapel(String(v))}
+          items={FILTRO_PAPEL_LABEL}
+        >
+          <SelectTrigger size="sm" aria-label="Filtrar por papel" className="w-auto max-w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent alignItemWithTrigger={false}>
+            {Object.entries(FILTRO_PAPEL_LABEL).map(([v, l]) => (
+              <SelectItem key={v} value={v}>{l}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={filtroStatus}
+          onValueChange={(v) => setFiltroStatus(String(v))}
+          items={FILTRO_STATUS_LABEL}
+        >
+          <SelectTrigger size="sm" aria-label="Filtrar por status" className="w-auto max-w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent alignItemWithTrigger={false}>
+            {Object.entries(FILTRO_STATUS_LABEL).map(([v, l]) => (
+              <SelectItem key={v} value={v}>{l}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select
+          value={filtroTrilha}
+          onValueChange={(v) => setFiltroTrilha(String(v))}
+          items={FILTRO_TRILHA_LABEL}
+        >
+          <SelectTrigger size="sm" aria-label="Filtrar por trilha" className="w-auto max-w-40">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent alignItemWithTrigger={false}>
+            {Object.entries(FILTRO_TRILHA_LABEL).map(([v, l]) => (
+              <SelectItem key={v} value={v}>{l}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {filtrando && (
+          <span className="text-xs text-muted-foreground tabular-nums">
+            {pessoasExibidas.length + mentoradosExibidos.length} resultados
+          </span>
+        )}
+      </div>
+
       {/* fila de espera — sempre visível pra coordenação: é o contexto
           (tempo de espera, origem, contato) que alimenta a decisão do
           board; escondê-la atrás do chip era o que deixava inscrito novo
@@ -444,7 +617,7 @@ export function PessoasListas({
           vendo "Fora do programa" ele é ruído no meio do arquivo */}
       {souCoord && semDupla && !verFora && (
         <MatchingPanel
-          mentores={mentoresAtivos.filter((p) => temPapel(p, "mentor_dpp"))}
+          mentores={mentoresAtivos}
           mentorados={mentoradosLivres}
           mentorProfiles={mentorProfiles}
           ocupacao={contagemPorMentor}
@@ -989,6 +1162,52 @@ function PessoaRow({
             termo pendente
           </Badge>
         )}
+        {/* capacidade X/Y do mentor (REALIZA-317) — badge ao lado do nome,
+            cor por vaga livre (verde) vs. cheio (vermelho/cinza) */}
+        {souCoord && ehMentor(p) && (
+          <>
+            {temPapel(p, "mentor_dpp") && (
+              <Tooltip>
+                <TooltipTrigger>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs shrink-0 tabular-nums",
+                      usadas.dpp < capDpp
+                        ? "border-[var(--ok)]/50 bg-[var(--ok-bg)] text-[var(--ok-text)]"
+                        : "border-[var(--danger)]/50 bg-[var(--danger-bg)] text-[var(--danger-text)]"
+                    )}
+                  >
+                    {usadas.dpp}/{capDpp}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  DPP · capacidade máxima: {capDpp} duplas
+                </TooltipContent>
+              </Tooltip>
+            )}
+            {temPapel(p, "mentor_especialista") && (
+              <Tooltip>
+                <TooltipTrigger>
+                  <Badge
+                    variant="outline"
+                    className={cn(
+                      "text-xs shrink-0 tabular-nums",
+                      usadas.especialista < capEsp
+                        ? "border-[var(--ok)]/50 bg-[var(--ok-bg)] text-[var(--ok-text)]"
+                        : "border-[var(--danger)]/50 bg-[var(--danger-bg)] text-[var(--danger-text)]"
+                    )}
+                  >
+                    {usadas.especialista}/{capEsp}
+                  </Badge>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Especialista · capacidade máxima: {capEsp} duplas
+                </TooltipContent>
+              </Tooltip>
+            )}
+          </>
+        )}
         {/* vagas e pendências do mentor saíram da linha — ficam em "Detalhes".
             Sem badge "especialista": o seletor de papel na mesma linha já diz
             "mentor especialista" (mp.tipo é derivado de role) */}
@@ -1241,6 +1460,9 @@ function MentoradoRow({
         )}
         {souCoord && !fora && emDupla && (
           <Badge variant="outline" className="text-xs shrink-0">em dupla</Badge>
+        )}
+        {souCoord && !fora && !emDupla && (
+          <Badge variant="outline" className="text-xs shrink-0 text-muted-foreground">sem dupla</Badge>
         )}
         {souCoord && !fora && !docOk && (
           <Badge

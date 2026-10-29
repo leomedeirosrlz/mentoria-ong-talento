@@ -107,6 +107,10 @@ export type Profile = {
   linkedin: string | null;
   areas: string[] | null;
   voluntariado: string | null;
+  /** Se a pessoa atua como voluntária. Quando false, o termo de adesão ao
+   *  trabalho voluntário não se aplica. Default true em dados existentes;
+   *  novos cadastros começam desmarcado. */
+  voluntario?: boolean | null;
   /** Marca do onboarding por papel (0031) — null = ainda não viu o wizard;
    *  o gate no layout do app lê este campo. */
   onboarded_em: string | null;
@@ -590,7 +594,6 @@ export type Notificacao = {
     | "especialista_aceitou"
     | "solicitacao_cancelada"
     | "trilha_encerrada"
-    | "supervisao_registrada"
     | "formulario_respondido"
     | "avaliacao_pendente"
     | "apoio_jovem"

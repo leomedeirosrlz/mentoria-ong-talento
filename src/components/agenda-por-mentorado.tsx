@@ -85,7 +85,7 @@ export type AgendaPorMentoradoProps = {
   cronogramas: Cronograma[];
   /** Sessões do mentor — conduzidas + recebidas; "Do programa" filtra as
    *  recebidas (mentor_id === meuId) e o strip usa todas. */
-  supervisoes: Supervisao[];
+  supervisoes?: Supervisao[];
   /** Último contato por dupla — o "Lembrar o jovem" só conta tipo nudge. */
   nudges: Record<string, Interacao>;
   /** ids das duplas com rito de encerramento aberto
@@ -131,7 +131,7 @@ export function AgendaPorMentorado({
   especialistas,
   eventos,
   cronogramas,
-  supervisoes,
+  supervisoes = [],
   nudges,
   encerramentosPendentes,
   itensSemana,
