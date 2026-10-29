@@ -1,6 +1,0 @@
-/home/thiago/nb/realiza.vc/docs/mockups/duplas/v2-desktop.png
-/home/thiago/nb/realiza.vc/docs/mockups/duplas/v2-mobile.png
-/home/thiago/nb/realiza.vc/docs/mockups/duplas/v3-desktop.png
-/home/thiago/nb/realiza.vc/docs/mockups/duplas/v3-mobile.png
-/home/thiago/nb/realiza.vc/docs/mockups/duplas/v4-desktop.png
-/home/thiago/nb/realiza.vc/docs/mockups/duplas/v4-mobile.png

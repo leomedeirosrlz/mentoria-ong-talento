@@ -1,6 +1,0 @@
-/home/thiago/nb/realiza.vc/docs/mockups/materiais/v5c-desktop.png
-/home/thiago/nb/realiza.vc/docs/mockups/materiais/v5c-mobile-jovem-cards.png
-/home/thiago/nb/realiza.vc/docs/mockups/materiais/v5c-mobile.png
-/home/thiago/nb/realiza.vc/docs/mockups/registros/v1-desktop.png
-/home/thiago/nb/realiza.vc/docs/mockups/registros/v1-mobile.png
-/home/thiago/nb/realiza.vc/docs/mockups/registros/v2-desktop.png

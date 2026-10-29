@@ -1,6 +1,0 @@
-/home/thiago/nb/realiza.vc/public/demo/avatars/joaoPedro.svg
-/home/thiago/nb/realiza.vc/public/demo/avatars/kaua.svg
-/home/thiago/nb/realiza.vc/public/demo/avatars/laura.svg
-/home/thiago/nb/realiza.vc/public/demo/avatars/luiza.svg
-/home/thiago/nb/realiza.vc/public/demo/avatars/marcos.svg
-/home/thiago/nb/realiza.vc/public/demo/avatars/marina.svg
