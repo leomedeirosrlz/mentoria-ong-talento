@@ -1,2 +1,0 @@
-/home/thiago/nb/realiza.vc/src/app/apple-icon.png
-/home/thiago/nb/realiza.vc/src/app/icon.png

@@ -1,6 +1,0 @@
-/home/thiago/nb/realiza.vc/docs/mockups/chamados/v5-desktop-topo.png
-/home/thiago/nb/realiza.vc/docs/mockups/chamados/v5-desktop.png
-/home/thiago/nb/realiza.vc/docs/mockups/chamados/v5-mobile-topo.png
-/home/thiago/nb/realiza.vc/docs/mockups/chamados/v5-mobile.png
-/home/thiago/nb/realiza.vc/docs/mockups/duplas/v1-desktop.png
-/home/thiago/nb/realiza.vc/docs/mockups/duplas/v1-mobile.png

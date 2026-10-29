@@ -1,6 +1,0 @@
-/home/thiago/nb/realiza.vc/docs/mockups/relatorios/v1-mobile.png
-/home/thiago/nb/realiza.vc/docs/mockups/turmas/v1a-desktop.png
-/home/thiago/nb/realiza.vc/docs/mockups/turmas/v1a-mobile.png
-/home/thiago/nb/realiza.vc/docs/mockups/turmas/v1b-desktop.png
-/home/thiago/nb/realiza.vc/docs/mockups/turmas/v1b-mobile.png
-/home/thiago/nb/realiza.vc/public/logo-realiza.png

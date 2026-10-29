@@ -1,6 +1,0 @@
-/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-mobile.png
-/home/thiago/nb/realiza.vc/docs/mockups/agenda/v6-desktop.png
-/home/thiago/nb/realiza.vc/docs/mockups/agenda/v6-mobile.png
-/home/thiago/nb/realiza.vc/docs/mockups/agenda/v7-desktop.png
-/home/thiago/nb/realiza.vc/docs/mockups/agenda/v7-mobile.png
-/home/thiago/nb/realiza.vc/docs/mockups/agenda/v8-desktop.png

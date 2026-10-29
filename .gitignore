@@ -32,3 +32,10 @@ openwa/
 # Sentry Config File
 .env.sentry-build-plugin
 .devin-ctx/
+
+# artefatos de tooling/agentes — nunca entram na história
+agent/
+.impeccable/
+graphify-out/
+HANDOFF.md
+skills-lock.json

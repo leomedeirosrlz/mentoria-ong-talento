@@ -1,6 +1,0 @@
-/home/thiago/nb/realiza.vc/public/demo/avatars/ricardo.svg
-/home/thiago/nb/realiza.vc/public/demo/avatars/sofia.svg
-/home/thiago/nb/realiza.vc/public/email/vamos-juntos.png
-/home/thiago/nb/realiza.vc/public/icons/icon-192.png
-/home/thiago/nb/realiza.vc/public/icons/icon-512.png
-/home/thiago/nb/realiza.vc/public/icons/icon-maskable-512.png
