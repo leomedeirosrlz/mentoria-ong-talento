@@ -1,7 +1,9 @@
 ---
 fonte: guia-mentor-dpp
 titulo: Guia do Mentor de Desenvolvimento Pessoal e Profissional
+material: guia-mentor-dpp
 tipo: guia
+natureza: consolidado
 audiencia: [mentor_dpp, coordenacao, supervisor]
 versao: guia físico vigente
 origem: docs/fontes/guia-dpp-docx.txt (consolidado; novo-programa-dpp.txt é rascunho anterior)

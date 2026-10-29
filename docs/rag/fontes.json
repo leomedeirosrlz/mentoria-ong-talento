@@ -1,0 +1,151 @@
+{
+  "gerado_em": "2026-10-29T00:21:52.805Z",
+  "docs": 16,
+  "chunks": 232,
+  "fontes": [
+    {
+      "guia": "autorizacao-responsavel",
+      "titulo": "Autorização do Responsável Legal (modelo)",
+      "material": "autorizacao-responsavel",
+      "natureza": "transcrito",
+      "arquivo": "autorizacao-responsavel.md",
+      "secoes": 4,
+      "chunks": 4
+    },
+    {
+      "guia": "checklist-competencias",
+      "titulo": "Checklist de competências do mentor",
+      "material": "checklist-competencias",
+      "natureza": "transcrito",
+      "arquivo": "checklist-competencias.md",
+      "secoes": 2,
+      "chunks": 2
+    },
+    {
+      "guia": "ciclo-cronograma",
+      "titulo": "Cronograma do Programa de Mentoria — Turma 1, Ciclo 2026/2027",
+      "material": "ciclo-cronograma",
+      "natureza": "transcrito",
+      "arquivo": "ciclo-2026-2027.md",
+      "secoes": 5,
+      "chunks": 9
+    },
+    {
+      "guia": "ciclo-turma2-cronograma",
+      "titulo": "Cronograma do Programa de Mentoria — Turma 2, Ciclo 2026/2027",
+      "material": "ciclo-turma2-cronograma",
+      "natureza": "transcrito",
+      "arquivo": "ciclo-turma2-2026-2027.md",
+      "secoes": 6,
+      "chunks": 11
+    },
+    {
+      "guia": "feedback-construtivo",
+      "titulo": "Feedback Construtivo",
+      "material": "feedback-construtivo",
+      "natureza": "transcrito",
+      "arquivo": "feedback-construtivo.md",
+      "secoes": 5,
+      "chunks": 5
+    },
+    {
+      "guia": "guia-mentor-dpp",
+      "titulo": "Guia do Mentor de Desenvolvimento Pessoal e Profissional",
+      "material": "guia-mentor-dpp",
+      "natureza": "consolidado",
+      "arquivo": "guia-mentor-dpp.md",
+      "secoes": 16,
+      "chunks": 100
+    },
+    {
+      "guia": "guia-mentor-especialista",
+      "titulo": "Guia do Mentor Especialista",
+      "material": "guia-mentor-especialista",
+      "natureza": "consolidado",
+      "arquivo": "guia-mentor-especialista.md",
+      "secoes": 15,
+      "chunks": 46
+    },
+    {
+      "guia": "instrumento-definindo-minhas-metas",
+      "titulo": "Instrumento — Definindo Minhas Metas",
+      "material": "instrumento-definindo-minhas-metas",
+      "natureza": "transcrito",
+      "arquivo": "instrumento-definindo-minhas-metas.md",
+      "secoes": 4,
+      "chunks": 4
+    },
+    {
+      "guia": "mensagem-encaminhamento",
+      "titulo": "Mensagem de encaminhamento entre encontros",
+      "material": "mensagem-encaminhamento",
+      "natureza": "transcrito",
+      "arquivo": "mensagem-encaminhamento.md",
+      "secoes": 2,
+      "chunks": 2
+    },
+    {
+      "guia": "mensagem-indicadas",
+      "titulo": "Mensagem às pessoas indicadas",
+      "material": "mensagem-indicadas",
+      "natureza": "transcrito",
+      "arquivo": "mensagem-indicadas.md",
+      "secoes": 2,
+      "chunks": 3
+    },
+    {
+      "guia": "mensagem-preparacao",
+      "titulo": "Mensagem de preparação do(a) mentorado(a)",
+      "material": "mensagem-preparacao",
+      "natureza": "transcrito",
+      "arquivo": "mensagem-preparacao.md",
+      "secoes": 2,
+      "chunks": 3
+    },
+    {
+      "guia": "perguntas-eficazes",
+      "titulo": "Perguntas Eficazes",
+      "material": "perguntas-eficazes",
+      "natureza": "sintese-operacional",
+      "arquivo": "perguntas-eficazes.md",
+      "secoes": 3,
+      "chunks": 6
+    },
+    {
+      "guia": "plataforma-e-operacao",
+      "titulo": "Plataforma e operação — decisões vigentes",
+      "material": "plataforma-e-operacao",
+      "natureza": "sintese-operacional",
+      "arquivo": "plataforma-e-operacao.md",
+      "secoes": 5,
+      "chunks": 12
+    },
+    {
+      "guia": "roteiros-encontros-11-16",
+      "titulo": "Roteiros dos encontros 11 a 16 (Semanas 11 a 16)",
+      "material": "roteiros-encontros-11-16",
+      "natureza": "sintese-operacional",
+      "arquivo": "roteiros-encontros-11-16.md",
+      "secoes": 7,
+      "chunks": 10
+    },
+    {
+      "guia": "termo-adesao-voluntario",
+      "titulo": "Termo de Adesão ao Trabalho Voluntário (modelo)",
+      "material": "termo-adesao-voluntario",
+      "natureza": "transcrito",
+      "arquivo": "termo-adesao-voluntario.md",
+      "secoes": 7,
+      "chunks": 7
+    },
+    {
+      "guia": "termo-mentorando",
+      "titulo": "Termo de Adesão e Participação no Programa de Mentoria Social (modelo)",
+      "material": "termo-mentorando",
+      "natureza": "transcrito",
+      "arquivo": "termo-mentorando.md",
+      "secoes": 8,
+      "chunks": 8
+    }
+  ]
+}

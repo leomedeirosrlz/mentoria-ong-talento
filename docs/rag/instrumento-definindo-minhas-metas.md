@@ -1,7 +1,9 @@
 ---
 fonte: instrumento-definindo-minhas-metas
 titulo: Instrumento — Definindo Minhas Metas
+material: instrumento-definindo-minhas-metas
 tipo: instrumento
+natureza: transcrito
 audiencia: [mentor_dpp, mentorado, coordenacao, supervisor]
 versao: vigente (material na aba Instrumentos de /materiais)
 origem: docs/fontes/definindo-minhas-metas.txt (OCR do template, limpo)

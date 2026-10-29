@@ -1,7 +1,9 @@
 ---
 fonte: termo-adesao-voluntario
 titulo: Termo de Adesão ao Trabalho Voluntário (modelo)
+material: termo-adesao-voluntario
 tipo: termo
+natureza: transcrito
 audiencia: [coordenacao]
 versao: modelo vigente
 origem: docs/fontes/termo-adesao-voluntario.txt — SANITIZADO: o arquivo-fonte é um
