@@ -9,7 +9,7 @@
 // inicio_em/fim_em/encontros_esperados do cronograma são derivados dos
 // eventos (mesma conta do backfill da 0061) — recalculados a cada mutação.
 
-import { revalidatePath, revalidateTag } from "next/cache";
+import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
@@ -59,8 +59,6 @@ function revalidaCronograma(cronogramaId?: string) {
   revalidatePath("/duplas");
   revalidatePath("/duplas/[id]", "page");
   revalidatePath("/registros");
-  revalidateTag("cronogramas", "max");
-  revalidateTag("ciclo-eventos", "max");
 }
 
 const UUID_RE =

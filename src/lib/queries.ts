@@ -1,5 +1,4 @@
 import { cache } from "react";
-import { unstable_cache } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { comparaNome, registroTardio } from "./ciclo";
 import { demoLidas, demoOnboarded, demoRole } from "./demo/mode";
@@ -327,55 +326,33 @@ export const getMe = cache(async (): Promise<Profile | null> => {
     : null;
 });
 
-const getCicloEventosCached = unstable_cache(
-  async (_role: string): Promise<CicloEvento[]> => {
-    void _role;
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("ciclo_eventos")
-      .select("*")
-      // a ordem canônica é `ordem` (0062) — data nullable jogaria etapas
-      // concluídas pro fim da lista; quem precisa de data refiltra por tipo
-      .order("ordem", { ascending: true });
-    if (error) throw error;
-    return data ?? [];
-  },
-  ["ciclo-eventos"],
-  { tags: ["ciclo-eventos"], revalidate: 3600 }
-);
-
 export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
   const demo = await demoRole();
   if (demo) return demoCicloEventos();
-  const me = await getMe();
-  const role = (me?.role as string) ?? "anon";
-  return getCicloEventosCached(role);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("ciclo_eventos")
+    .select("*")
+    // a ordem canônica é `ordem` (0062) — data nullable jogaria etapas
+    // concluídas pro fim da lista; quem precisa de data refiltra por tipo
+    .order("ordem", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
 });
 
 /** Todos os cronogramas (0061) — leitura livre pra qualquer papel, como os
  *  eventos: o seletor de turma/calendário é a régua que escopa o recorte. */
-const getCronogramasCached = unstable_cache(
-  async (_role: string): Promise<Cronograma[]> => {
-    void _role;
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("cronogramas")
-      .select("*")
-      .order("turma")
-      .order("nome");
-    if (error) throw error;
-    return data ?? [];
-  },
-  ["cronogramas"],
-  { tags: ["cronogramas"], revalidate: 3600 }
-);
-
 export const getCronogramas = cache(async (): Promise<Cronograma[]> => {
   const demo = await demoRole();
   if (demo) return demoCronogramas();
-  const me = await getMe();
-  const role = (me?.role as string) ?? "anon";
-  return getCronogramasCached(role);
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("cronogramas")
+    .select("*")
+    .order("turma")
+    .order("nome");
+  if (error) throw error;
+  return data ?? [];
 });
 
 export const DUPLA_SELECT = `
@@ -730,34 +707,16 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   return null;
 });
 
-const getMateriaisCached = unstable_cache(
-  async (role: string): Promise<Material[]> => {
-    void role;
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("materiais")
-      .select("*")
-      .order("ordem", { ascending: true });
-    if (error) throw error;
-    return data ?? [];
-  },
-  ["materiais"],
-  { tags: ["materiais"], revalidate: 3600 }
-);
-
 export const getMateriais = cache(async (): Promise<Material[]> => {
   const demo = await demoRole();
   if (demo) return demoMateriais(demo);
-  const me = await getMe();
-  // RLS de materiais depende de papéis EFETIVOS (has_papel), não só do
-  // papel primário: um mentor com papel secundário 'supervisor' vê material
-  // endereçado a supervisor. A chave do cache precisa refletir isso, senão
-  // usuários do mesmo papel primário mas papéis efetivos diferentes
-  // compartilham (e vazam) o resultado cacheado do primeiro.
-  const roleKey = me
-    ? [me.role, ...(me.papeis ?? [])].filter(Boolean).sort().join(",")
-    : "anon";
-  return getMateriaisCached(roleKey || "anon");
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("materiais")
+    .select("*")
+    .order("ordem", { ascending: true });
+  if (error) throw error;
+  return data ?? [];
 });
 
 /** mentor_profiles é table-level legível por autenticado (0001) — a lista
@@ -1163,9 +1122,10 @@ export const getDuplasOpcoes = cache(async (): Promise<DuplaOpcao[]> => {
 // ---------- trilha de especialista (0027) ----------
 
 /** Os 5 encontros do guia do especialista — título + foco, na ordem. */
-const getEspecialistaEventosCached = unstable_cache(
-  async (_role: string): Promise<EspecialistaEvento[]> => {
-    void _role;
+export const getEspecialistaEventos = cache(
+  async (): Promise<EspecialistaEvento[]> => {
+    const demo = await demoRole();
+    if (demo) return demoEspecialistaEventos();
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("especialista_eventos")
@@ -1173,18 +1133,6 @@ const getEspecialistaEventosCached = unstable_cache(
       .order("numero");
     if (error) throw error;
     return data ?? [];
-  },
-  ["especialista-eventos"],
-  { tags: ["especialista-eventos"], revalidate: 86400 }
-);
-
-export const getEspecialistaEventos = cache(
-  async (): Promise<EspecialistaEvento[]> => {
-    const demo = await demoRole();
-    if (demo) return demoEspecialistaEventos();
-    const me = await getMe();
-    const role = (me?.role as string) ?? "anon";
-    return getEspecialistaEventosCached(role);
   }
 );
 

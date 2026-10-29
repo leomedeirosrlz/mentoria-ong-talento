@@ -10,7 +10,6 @@ import {
   BookOpen,
   CalendarBlank,
   CaretDown,
-  ChatsCircle,
   ClockCounterClockwise,
   HandHeart,
   VideoCamera,
@@ -47,10 +46,6 @@ import {
   getAvaliacaoMediaDpp,
   getEspecialistaAvaliacoes,
 } from "@/lib/queries-avaliacao";
-import {
-  getSupervisaoAlvos,
-  getSupervisoesDaDupla,
-} from "@/lib/queries-supervisao";
 import { getFormularios, getInstrumentosDaDupla } from "@/lib/forms/queries";
 import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
 import { getPdmDaDupla, getPdmResumo } from "@/lib/queries-pdm";
@@ -113,8 +108,6 @@ import { InstrumentosDupla } from "./instrumentos-dupla";
 import { TerceirosDupla } from "./terceiros-dupla";
 import { DuplaMaisMenu } from "./mais-menu";
 import { DevolutivaEspecialista } from "@/components/devolutiva-especialista";
-import { SupervisaoDialog } from "@/components/supervisao-dialog";
-import { SupervisoesSection } from "@/components/supervisoes-section";
 import { MarcoNotifier } from "@/components/marco-notifier";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -237,7 +230,7 @@ export default async function DuplaPage({
   const { id } = await params;
   const { aba: abaParam } = await searchParams;
   const aba = parseAba(abaParam);
-  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, supervisoes, instrumentos, terceiros, pdm, alvosSupervisao] =
+  const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, instrumentos, terceiros, pdm] =
     await Promise.all([
       getDupla(id),
       getCicloEventos(),
@@ -252,10 +245,6 @@ export default async function DuplaPage({
       // fechamento do ciclo — a row pode existir só com a autoavaliação do
       // mentor (decisão da coordenação pendente)
       getEncerramentoDaDupla(id),
-      // sessões de supervisão da dupla + as gerais do mentor dela (0041)
-      getDupla(id).then((d) =>
-        d ? getSupervisoesDaDupla(d.id, d.mentor.id) : []
-      ),
       // instrumentos oficiais da jornada (0080) — RPC escopada: coord,
       // mentor e supervisor da dupla (e o próprio jovem, na área dele)
       getInstrumentosDaDupla(id),
@@ -268,10 +257,6 @@ export default async function DuplaPage({
       getDupla(id).then((d) =>
         d?.trilha === "dpp" ? getPdmDaDupla(id) : null
       ),
-      // alvos de supervisão (0125): diretas + turma dele — o botão "Registrar
-      // supervisão" da ficha usa a mesma lista que alimenta o dialog e a
-      // action; pra não-supervisor a query nem roda (getMe cacheado + [] )
-      getSupervisaoAlvos(),
     ]);
   if (!dupla || !me) notFound();
 
@@ -284,13 +269,6 @@ export default async function DuplaPage({
   const ehEsp = dupla.trilha === "especialista";
   const nomeVinculo = (v: DuplaVinculo) =>
     `${v.mentor?.nome ?? "—"} e ${v.mentorado?.nome ?? "—"}`;
-  // quem supervisiona registra a sessão daqui mesmo — alvo único, sem
-  // query extra (o dialog ganha mentor+dupla já resolvidos). A lista de
-  // alvos já é o escopo 0125 (supervisionada direta ou turma dele, só
-  // ativas/pausadas) — estar nela é a permissão inteira
-  const podeRegistrarSupervisao = alvosSupervisao.some(
-    (a) => a.dupla_id === dupla.id
-  );
   const [
     origem,
     sucessora,
@@ -1357,38 +1335,6 @@ export default async function DuplaPage({
         </section>
       )}
 
-      {(supervisoes.length > 0 || podeRegistrarSupervisao) && (
-        <SupervisoesSection
-          itens={supervisoes}
-          visao="mentor"
-          duplaAtualId={dupla.id}
-          podeExcluir={souCoord}
-          acao={
-            podeRegistrarSupervisao ? (
-              <SupervisaoDialog
-                alvos={[
-                  {
-                    dupla_id: dupla.id,
-                    mentor_id: dupla.mentor.id,
-                    mentor_nome: dupla.mentor.nome,
-                    mentorado_nome: dupla.mentorado.nome,
-                  },
-                ]}
-                trigger={
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="-my-1 text-muted-foreground"
-                  >
-                    <ChatsCircle size={14} />
-                    Registrar supervisão
-                  </Button>
-                }
-              />
-            ) : undefined
-          }
-        />
-      )}
 
       {!ehEsp && <DevolutivaEspecialista solicitacoes={solicitacoes} />}
     </>

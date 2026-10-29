@@ -17,7 +17,6 @@ import {
   getSlotsLivres,
   getSolicitacoesVisiveis,
 } from "@/lib/queries-especialista";
-import { getSupervisaoAlvos, getSupervisoesRecentes } from "@/lib/queries-supervisao";
 import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { getEncerramentosPendentes } from "@/lib/queries-encerramento";
 import { getChamados } from "@/lib/queries-chamados";
@@ -166,11 +165,9 @@ export default async function HomePage({
     const solicitacoesEspPromise = ehEspSup
       ? getSolicitacoesVisiveis()
       : Promise.resolve([]);
-    const [duplas, supervisoes, supervisaoAlvos, solicitacoesEsp, slotsSup, interacoes, propostasSup] =
+    const [duplas, solicitacoesEsp, slotsSup, interacoes, propostasSup] =
       await Promise.all([
         getMinhasDuplas(),
-        getSupervisoesRecentes(),
-        getSupervisaoAlvos(),
         solicitacoesEspPromise,
         ehEspSup ? getSlotsLivres(me.id) : Promise.resolve([]),
         getMinhasDuplas().then((d) =>
@@ -217,8 +214,6 @@ export default async function HomePage({
           interacoes={interacoes}
           supervisor
           avisos={avisos}
-          supervisaoItens={supervisoes}
-          supervisaoAlvos={supervisaoAlvos}
           meuNome={me?.nome.split(" ")[0]}
           termo={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
           turmaFoco={focoSup.turma}
