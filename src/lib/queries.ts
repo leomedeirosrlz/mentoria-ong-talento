@@ -383,7 +383,7 @@ export const DUPLA_SELECT = `
   mentor:profiles!duplas_mentor_id_fkey(${PROFILE_COLS_PUBLICAS}),
   mentorado:mentorados(${MENTORADO_COLS_PAR}),
   supervisor:profiles!duplas_supervisor_id_fkey(${PROFILE_COLS_PUBLICAS}),
-  encontros(*, registro:registros(id, encontro_id, tema, atividades, avaliacao, dificuldade, dificuldade_detalhe, precisa_apoio, proximo_passo, proximo_passo_detalhe, reflexoes, observacoes, ferramenta, created_at, updated_at, autor:profiles!registros_created_by_fkey(nome)),
+  encontros(*, registro:registros(id, encontro_id, tema, atividades, avaliacao, dificuldade, dificuldade_detalhe, precisa_apoio, proximo_passo, proximo_passo_detalhe, reflexoes, observacoes, ferramenta, created_at, updated_at, created_by, autor:profiles!registros_created_by_fkey(nome)),
     avaliacao_jovem:avaliacoes_encontro(*)),
   encaminhamentos(*),
   notas:encontro_notas(*)
@@ -749,8 +749,15 @@ export const getMateriais = cache(async (): Promise<Material[]> => {
   const demo = await demoRole();
   if (demo) return demoMateriais(demo);
   const me = await getMe();
-  const role = (me?.role as string) ?? "anon";
-  return getMateriaisCached(role);
+  // RLS de materiais depende de papéis EFETIVOS (has_papel), não só do
+  // papel primário: um mentor com papel secundário 'supervisor' vê material
+  // endereçado a supervisor. A chave do cache precisa refletir isso, senão
+  // usuários do mesmo papel primário mas papéis efetivos diferentes
+  // compartilham (e vazam) o resultado cacheado do primeiro.
+  const roleKey = me
+    ? [me.role, ...(me.papeis ?? [])].filter(Boolean).sort().join(",")
+    : "anon";
+  return getMateriaisCached(roleKey || "anon");
 });
 
 /** mentor_profiles é table-level legível por autenticado (0001) — a lista

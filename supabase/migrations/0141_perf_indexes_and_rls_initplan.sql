@@ -66,16 +66,16 @@ drop policy if exists profiles_self_update on public.profiles;
 create policy profiles_self_update on public.profiles
   for update to public
   using (user_id = (select auth.uid()))
-  with check (user_id = (select auth.uid()) and role = my_role());
+  with check (user_id = (select auth.uid()) and role = public.my_role());
 
 drop policy if exists profiles_select on public.profiles;
 create policy profiles_select on public.profiles
   for select to authenticated
   using (
     user_id = (select auth.uid())
-    or my_role() = 'coordenacao'::app_role
+    or public.my_role() = 'coordenacao'::app_role
     or (
-      my_role() = any (array['supervisor'::app_role, 'mentor_dpp'::app_role, 'mentor_especialista'::app_role])
+      public.my_role() = any (array['supervisor'::app_role, 'mentor_dpp'::app_role, 'mentor_especialista'::app_role])
       and (role <> 'mentorado'::app_role or jovem_relacionado(id))
     )
   );
@@ -84,10 +84,10 @@ drop policy if exists sol_update on public.solicitacoes_especialista;
 create policy sol_update on public.solicitacoes_especialista
   for update to public
   using (
-    my_role() = 'coordenacao'::app_role
+    public.my_role() = 'coordenacao'::app_role
     or (select current_setting('realiza.sol_transicao'::text, true)) = 'on'::text
   )
   with check (
-    my_role() = 'coordenacao'::app_role
+    public.my_role() = 'coordenacao'::app_role
     or (select current_setting('realiza.sol_transicao'::text, true)) = 'on'::text
   );
