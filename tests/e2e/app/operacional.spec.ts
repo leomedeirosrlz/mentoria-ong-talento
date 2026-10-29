@@ -479,6 +479,12 @@ test.describe("coordenação — fluxos operacionais", () => {
       .getByRole("button", { name: "Livres para dupla" })
       .click();
 
+    // expande o matching (colapsado por default)
+    const matchingHeader = page.getByText(/Matching/i).first();
+    if (await matchingHeader.isVisible()) {
+      await matchingHeader.click();
+    }
+
     // board: todo mentor ativo com o X/Y — o reserva (1/1 implícita) já
     // nasce cheio marcado; o import (0/1) tem vaga
     const painel = page.locator("section", {
