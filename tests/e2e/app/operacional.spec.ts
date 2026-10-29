@@ -480,10 +480,10 @@ test.describe("coordenação — fluxos operacionais", () => {
       .click();
 
     // expande o matching (colapsado por default)
-    const matchingTrigger = page.getByRole("button", { name: /Matching/i });
+    const matchingTrigger = page.getByText(/Matching ·/i).first();
     if (await matchingTrigger.isVisible()) {
       await matchingTrigger.click();
-      await page.waitForTimeout(300);
+      await page.waitForTimeout(500);
     }
 
     // board: todo mentor ativo com o X/Y — o reserva (1/1 implícita) já
