@@ -1,7 +1,9 @@
 ---
 fonte: guia-mentor-especialista
 titulo: Guia do Mentor Especialista
+material: guia-mentor-especialista
 tipo: guia
+natureza: consolidado
 audiencia: [mentor_especialista, coordenacao, supervisor]
 versao: guia físico vigente
 origem: docs/fontes/guia-especialista-docx.txt (consolidado; novo-programa-especialista.txt é rascunho anterior)

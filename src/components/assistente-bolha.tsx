@@ -9,8 +9,8 @@
 // useEffect pós-hidratação pra não divergir do SSR. Guard global de
 // prefers-reduced-motion já zera as animações — nada por componente.
 
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { Sparkle, X } from "@phosphor-icons/react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Plus, Sparkle, X } from "@phosphor-icons/react";
 import { AssistenteConversa } from "@/components/assistente-conversa";
 import {
   Popover,
@@ -41,7 +41,13 @@ function subscribeDesktop(cb: () => void) {
   return () => mq.removeEventListener("change", cb);
 }
 
-function Cabecalho({ onFechar }: { onFechar: () => void }) {
+function Cabecalho({
+  onFechar,
+  onNovaConversa,
+}: {
+  onFechar: () => void;
+  onNovaConversa?: () => void;
+}) {
   return (
     <div className="flex shrink-0 items-center gap-2.5 border-b border-border px-4 py-3">
       <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
@@ -59,6 +65,18 @@ function Cabecalho({ onFechar }: { onFechar: () => void }) {
           Operação e guias do programa
         </p>
       </div>
+      {onNovaConversa && (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Nova conversa"
+          title="Nova conversa"
+          onClick={onNovaConversa}
+          className="shrink-0 text-muted-foreground"
+        >
+          <Plus aria-hidden />
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="icon"
@@ -114,9 +132,22 @@ export function AssistenteBolha({
     } catch {}
   };
 
+  // "Nova conversa" mora na conversa (dona do estado) — a ação é
+  // registrada aqui pro botão do header alcançar
+  const novaConversaRef = useRef<(() => void) | null>(null);
   const conversa = (
-    <AssistenteConversa papeis={papeis} demo={demo} configurado={configurado} autoFocus nome={nome} />
+    <AssistenteConversa
+      papeis={papeis}
+      demo={demo}
+      configurado={configurado}
+      autoFocus
+      nome={nome}
+      registrarNova={(fn) => {
+        novaConversaRef.current = fn;
+      }}
+    />
   );
+  const novaConversa = () => novaConversaRef.current?.();
 
   const icons = (
     <span className="relative grid size-6 place-items-center">
@@ -161,7 +192,7 @@ export function AssistenteBolha({
           sideOffset={12}
           className={PAINEL_CLS}
         >
-          <Cabecalho onFechar={() => mudar(false)} />
+          <Cabecalho onFechar={() => mudar(false)} onNovaConversa={novaConversa} />
           <PopoverTitle className="sr-only">Assistente</PopoverTitle>
           {conversa}
         </PopoverContent>
@@ -190,7 +221,7 @@ export function AssistenteBolha({
           className="gap-0 overflow-hidden bg-popover text-popover-foreground"
         >
           <SheetTitle className="sr-only">Assistente</SheetTitle>
-          <Cabecalho onFechar={() => mudar(false)} />
+          <Cabecalho onFechar={() => mudar(false)} onNovaConversa={novaConversa} />
           {conversa}
         </SheetContent>
       </Sheet>

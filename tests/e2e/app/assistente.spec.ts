@@ -41,17 +41,22 @@ test.describe("assistente", () => {
     await fab.click();
     await expect(fab).toHaveAttribute("aria-expanded", "true");
 
-    // painel: header + saudação + card de indisponível (provider fora do
-    // env de e2e — feature flag honesta, sem composer morto)
+    // painel: header + saudação. O composer depende do provider: o e2e
+    // local roda sem IA_API_* (card "indisponível" honesto); o preview da
+    // Vercel tem as envs e mostra o composer de verdade.
     const painel = page.locator("#painel-assistente");
     await expect(painel).toBeVisible();
     await expect(painel.getByText(/Oi/)).toBeVisible();
-    await expect(
-      painel.getByText(/assistente está indisponível/i)
-    ).toBeVisible();
-    await expect(
-      page.getByRole("textbox", { name: "Mensagem pro assistente" })
-    ).not.toBeVisible();
+    const composer = page.getByRole("textbox", {
+      name: "Mensagem pro assistente",
+    });
+    if (await composer.count()) {
+      await expect(composer).toBeVisible();
+    } else {
+      await expect(
+        painel.getByText(/assistente está indisponível/i)
+      ).toBeVisible();
+    }
 
     await page.keyboard.press("Escape");
     await expect(painel).not.toBeVisible();
@@ -76,13 +81,22 @@ test.describe("assistente", () => {
     expect([307, 401]).toContain(res.status());
   });
 
-  test("POST /api/ia/chat logado sem provider devolve 503 amigável", async ({
+  test("POST /api/ia/chat logado responde honesto sobre o provider", async ({
     page,
   }) => {
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
     const res = await page.request.post("/api/ia/chat", {
       data: { messages: [{ role: "user", content: "oi" }] },
+      // o request só resolve com o stream fechado — geração real pode
+      // passar dos 30s padrão do APIRequestContext
+      timeout: 90_000,
     });
+    // sem IA_API_* (e2e local): 503 JSON amigável. Com provider real
+    // (preview Vercel): 200 abrindo o stream SSE.
+    if (res.status() === 200) {
+      expect(res.headers()["content-type"]).toMatch(/text\/event-stream/i);
+      return;
+    }
     expect(res.status()).toBe(503);
     const body = await res.json();
     expect(body.error).toMatch(/indisponível/i);

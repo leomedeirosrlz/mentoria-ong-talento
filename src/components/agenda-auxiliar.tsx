@@ -302,7 +302,7 @@ const ROTULO_STATUS: Record<Dupla["status"], string> = {
   ativa: "",
   pausada: "Pausada",
   concluida: "Concluída",
-  encerrada: "Encerrada",
+  encerrada: "Desistente",
 };
 
 /** O sinal mais grave que um lembrete endereça — o primeiro da fila do
