@@ -43,24 +43,44 @@ export function MatchingPanel({
 }) {
   const [mentorId, setMentorId] = useState<string | null>(null);
   const [mentoradoId, setMentoradoId] = useState<string | null>(null);
+  const [trilhaFiltro, setTrilhaFiltro] = useState<"dpp" | "especialista" | "todos">("dpp");
   const mentor = mentores.find((m) => m.id === mentorId) ?? null;
   const mentorado = mentorados.find((m) => m.id === mentoradoId) ?? null;
   const mp = mentor ? mentorProfiles[mentor.id] : undefined;
+
+  // filtro de trilha no board (REALIZA-316): DPP / Especialista / Todos
+  const mentoresFiltrados = mentores.filter((m) => {
+    if (trilhaFiltro === "dpp") return temPapel(m, "mentor_dpp");
+    if (trilhaFiltro === "especialista") return temPapel(m, "mentor_especialista");
+    return true;
+  });
+
+  // pool efetivo de um mentor conforme o filtro selecionado
+  const poolDe = (m: Profile): "dpp" | "especialista" => {
+    if (trilhaFiltro === "dpp") return "dpp";
+    if (trilhaFiltro === "especialista") return "especialista";
+    return m.role === "mentor_especialista" ? "especialista" : "dpp";
+  };
 
   // board de pareamento é DPP (WP6b): especialista pareja pelo mural. A
   // ocupação vem chaveada `${id}:${trilha}` — aqui sempre a pool DPP, e o
   // híbrido comparece só se tiver o papel DPP.
   const tetoDe = (id: string) => {
     const p = mentores.find((m) => m.id === id);
-    return p ? tetoMentor(p, mentorProfiles[id], "dpp") : 1;
+    if (!p) return 1;
+    return tetoMentor(p, mentorProfiles[id], poolDe(p));
   };
-  const usadasDe = (id: string) => ocupacao[`${id}:dpp`] ?? 0;
+  const usadasDe = (id: string) => {
+    const p = mentores.find((m) => m.id === id);
+    if (!p) return 0;
+    return ocupacao[`${id}:${poolDe(p)}`] ?? 0;
+  };
   const mentorLotado =
     mentor != null && usadasDe(mentor.id) >= tetoDe(mentor.id);
-  const comVaga = mentores.filter((m) => usadasDe(m.id) < tetoDe(m.id));
+  const comVaga = mentoresFiltrados.filter((m) => usadasDe(m.id) < tetoDe(m.id));
   // livres primeiro (mais vagas na frente), cheios afundam; nome desempata —
   // mesma régua dos selects dos dialogs
-  const mentoresOrd = [...mentores].sort(
+  const mentoresOrd = [...mentoresFiltrados].sort(
     (a, b) =>
       tetoDe(b.id) - usadasDe(b.id) - (tetoDe(a.id) - usadasDe(a.id)) ||
       a.nome.localeCompare(b.nome, "pt-BR")
@@ -69,9 +89,12 @@ export function MatchingPanel({
     const hibrido =
       temPapel(m, "mentor_dpp") && temPapel(m, "mentor_especialista");
     const cheio = usadasDe(m.id) >= tetoDe(m.id);
+    const pool = poolDe(m) === "dpp" ? "DPP" : "Especialista";
     return `${m.nome} · ${usadasDe(m.id)}/${tetoDe(m.id)}${
-      hibrido ? " · DPP e especialista" : ""
-    }${cheio ? " · sem vaga" : ""}`;
+      trilhaFiltro === "todos" ? ` · ${pool}` : ""
+    }${hibrido && trilhaFiltro === "todos" ? " · híbrido" : ""}${
+      cheio ? " · sem vaga" : ""
+    }`;
   };
 
   return (
@@ -82,16 +105,39 @@ export function MatchingPanel({
         </h2>
         <NovaDuplaDialog />
       </div>
-      {mentorados.length === 0 || mentores.length === 0 ? (
+      {mentorados.length === 0 || mentoresFiltrados.length === 0 ? (
         <p className="text-sm text-muted-foreground">
           {mentorados.length === 0 && mentores.length === 0
             ? "Ninguém livre pra parear agora."
             : mentorados.length === 0
               ? "Sem mentorado livre. Todos já estão em dupla."
-              : "Nenhum mentor ativo cadastrado."}
+              : "Nenhum mentor ativo cadastrado pra esta trilha."}
         </p>
       ) : (
         <>
+          <div className="flex flex-wrap items-center gap-2">
+            <Label id="parear-trilha-label">Trilha</Label>
+            <Select
+              value={trilhaFiltro}
+              onValueChange={(v) =>
+                setTrilhaFiltro((v ? String(v) : "dpp") as "dpp" | "especialista" | "todos")
+              }
+              items={{
+                dpp: "DPP",
+                especialista: "Especialista",
+                todos: "Todos",
+              }}
+            >
+              <SelectTrigger id="parear-trilha" aria-labelledby="parear-trilha-label" className="w-auto">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="dpp">DPP</SelectItem>
+                <SelectItem value="especialista">Especialista</SelectItem>
+                <SelectItem value="todos">Todos</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label id="parear-mentorado-label">Mentorado</Label>
@@ -167,7 +213,7 @@ export function MatchingPanel({
                 nome={mentor.nome}
                 atual={tetoDe(mentor.id)}
                 emUso={usadasDe(mentor.id)}
-                trilha="dpp"
+                trilha={mentor ? poolDe(mentor) : "dpp"}
                 trigger={
                   <Button
                     type="button"
@@ -192,10 +238,7 @@ export function MatchingPanel({
                 pref_genero_par: mentor.pref_genero_par ?? null,
                 motivacao: mentor.motivacao ?? null,
                 disponibilidade: mp?.disponibilidade ?? null,
-                trilha:
-                  mentor.role === "mentor_especialista"
-                    ? "especialista"
-                    : "dpp",
+                trilha: mentor ? poolDe(mentor) : "dpp",
                 areas: mp?.areas ?? null,
               }}
               mentorado={{

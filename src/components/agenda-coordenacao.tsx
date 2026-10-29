@@ -44,7 +44,7 @@ export function AgendaCoordenacao({
   eventos,
   cronogramas,
   nudges,
-  supervisoes,
+  supervisoes = [],
   encerramentosPendentes,
   meuNome,
   hoje,
@@ -58,7 +58,7 @@ export function AgendaCoordenacao({
   /** getUltimasInteracoes — a lib filtra a tipo 'nudge' pro cap de 48h. */
   nudges: Record<string, Interacao>;
   /** Supervisões recentes — a lib recorta a semana corrente. */
-  supervisoes: Supervisao[];
+  supervisoes?: Supervisao[];
   /** dupla_ids com rito de encerramento aberto (getEncerramentosPendentes)
    *  — a dupla concluída vira linha "concluir na ficha" na fila. */
   encerramentosPendentes: ReadonlySet<string>;

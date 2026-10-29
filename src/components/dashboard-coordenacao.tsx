@@ -21,9 +21,8 @@ import { painelTrilhasCoord, type AlertaPedido } from "@/lib/trilhas-coord";
 import { lembreteDaDupla } from "@/components/agenda-partes";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
 import { cn } from "@/lib/utils";
-import type { CicloEvento, Comunicado, Cronograma, Dupla, SolicitacaoEspecialista, Supervisao } from "@/lib/types";
+import type { CicloEvento, Comunicado, Cronograma, Dupla, SolicitacaoEspecialista } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
-import type { SupervisaoAlvo } from "@/lib/queries-supervisao";
 import { AvisosSection } from "@/components/avisos-section";
 import { CopiarResumoButton } from "@/components/copiar-resumo-button";
 import {
@@ -36,8 +35,6 @@ import { DuplaWaAcao } from "@/components/dupla-wa-acao";
 import { SaudePrograma } from "@/components/saude-programa";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { SolicitacoesCoordCard } from "@/components/solicitacoes-coord-card";
-import { SupervisaoDialog } from "@/components/supervisao-dialog";
-import { SupervisoesSection } from "@/components/supervisoes-section";
 import { TrilhasCoordPanel } from "@/components/trilhas-coord-panel";
 import { BarraSegmentada } from "@/components/viz";
 import { buttonVariants } from "@/components/ui/button";
@@ -92,8 +89,6 @@ export function DashboardCoordenacao({
   avisos = [],
   solicitacoes = [],
   turmas = [],
-  supervisaoItens = [],
-  supervisaoAlvos = [],
   encerramentos = new Set<string>(),
   meuNome,
   termo,
@@ -121,9 +116,6 @@ export function DashboardCoordenacao({
   solicitacoes?: SolicitacaoEspecialista[];
   /** labels de turma pra triagem dos pedidos do jovem sem dupla DPP. */
   turmas?: string[];
-  /** sessões de supervisão recentes + mentores elegíveis — só a home do supervisor. */
-  supervisaoItens?: Supervisao[];
-  supervisaoAlvos?: SupervisaoAlvo[];
   /** dupla_ids com rito de encerramento aberto (concluídas sem decisão). */
   encerramentos?: ReadonlySet<string>;
   /** faixa do termo de adesão pendente — entra depois do primeiro bloco de trabalho. */
@@ -429,23 +421,7 @@ export function DashboardCoordenacao({
             </Recolhido>
           )}
 
-          {/* ritual supervisor ↔ mentor do guia (0041): registrar a conversa e
-              reler as últimas. Sem dupla supervisionada nem sessão no histórico,
-              o bloco some */}
-          {supervisor && (supervisaoItens.length > 0 || supervisaoAlvos.length > 0) && (
-            <Recolhido id="supervisoes" titulo="Supervisões" contagem={supervisaoItens.length}>
-              <SupervisoesSection
-                itens={supervisaoItens}
-                visao="supervisor"
-                descricao="As conversas de supervisão com seus mentores: o ritual de acompanhamento do guia."
-                acao={
-                  supervisaoAlvos.length > 0 ? (
-                    <SupervisaoDialog alvos={supervisaoAlvos} />
-                  ) : undefined
-                }
-              />
-            </Recolhido>
-          )}
+          {/* supervisão removida (REALIZA-313) */}
         </aside>
       </div>
     </div>

@@ -223,7 +223,6 @@ const ICONE: Record<Notificacao["tipo"], typeof Bell> = {
   especialista_aceitou: UserCheck,
   solicitacao_cancelada: XCircle,
   trilha_encerrada: FlagCheckered,
-  supervisao_registrada: ChatsCircle,
   formulario_respondido: ClipboardText,
   // 0071 — a estrela é o prompt do encontro pro jovem; o apoio dele é o
   // canal de segurança (mesmo ícone do pedido do mentor, origem diferente)

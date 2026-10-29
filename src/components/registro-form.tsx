@@ -813,7 +813,7 @@ export function RegistroForm({
               name="reflexoes"
               rows={3}
               defaultValue={registro?.reflexoes ?? ""}
-              placeholder="O que o mentorado trouxe de mais significativo, nas palavras dele(a) quando possível."
+              placeholder="Suas observações sobre o encontro, combinados e próximos passos."
             />
           </div>
 
