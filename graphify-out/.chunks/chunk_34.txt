@@ -1,0 +1,6 @@
+/home/thiago/nb/realiza.vc/docs/banner.svg
+/home/thiago/nb/realiza.vc/docs/demo.svg
+/home/thiago/nb/realiza.vc/docs/der-atual.png
+/home/thiago/nb/realiza.vc/docs/der-atual.svg
+/home/thiago/nb/realiza.vc/docs/der-planejado.png
+/home/thiago/nb/realiza.vc/docs/der-planejado.svg

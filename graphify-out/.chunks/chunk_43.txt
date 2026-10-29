@@ -1,0 +1,6 @@
+/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v1-desktop.png
+/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v1-mobile.png
+/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v2-desktop.png
+/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v2-mobile.png
+/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v3-desktop.png
+/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v3-mobile.png

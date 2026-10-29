@@ -1,0 +1,552 @@
+{
+  "nodes": [
+    {
+      "id": "docs_mockups_jovem_especialistas_v4_desktop_mockup",
+      "label": "Mockup v4 — tela 'Especialistas' do mentorado (mobile + desktop lado a lado)",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v4-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v4_desktop_tela_especialistas",
+      "label": "Tela 'Especialistas' (v4): header realiza.vc, trilha ativa, pedir nova trilha, grade de especialistas e card 'Precisa de outra coisa? Fale com a coordenação'",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v4-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v4_desktop_card_trilha_sessoes",
+      "label": "Card 'Sua trilha de especialista' com Sessões 1–5 e estados visíveis (concluída, agendada, 'Entrar na chamada', bloqueada) — v4",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v4-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v4_desktop_grid_especialistas",
+      "label": "Grade 'Quem pode virar sua trilha' (v4): cards de especialistas (Luisa Campos, Ricardo Almeida, Beatriz Fontoura, Tomás Ribeiro) com área, disponibilidade por dia da semana e botão 'Pedir trilha com X'",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v4-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v4_desktop_nav_sidebar",
+      "label": "Nav desktop v4: sidebar Início/Agenda/Pessoas/Materiais/Perfil com item ativo âmbar, vs. bottom nav no mockup de celular",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v4-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v4_mobile_mockup",
+      "label": "Mockup v4 — 'Especialistas' em frame de celular (persona Ana Souza, mentorada T1), mesma tela renderizada só no viewport mobile",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v4-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v4_mobile_bottom_nav",
+      "label": "Bottom nav mobile (v4): Início · Agenda · Materiais · Perfil, com Início ativo em âmbar",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v4-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v5_desktop_mockup",
+      "label": "Mockup v5 — tela renomeada para 'Sua trilha' ('Acompanhamento com especialista — do pedido até a última sessão'), versões mobile e desktop na mesma prancheta",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v5-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v5_desktop_timeline_ciclo_vida",
+      "label": "Timeline do ciclo de vida do pedido (v5): 'Você pediu a trilha' → 'Pedido no mural dos especialistas' → 'Luisa aceitou a trilha', com datas",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v5-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v5_desktop_sessoes_estados",
+      "label": "'Suas sessões' (v5): Sessões 1–5 com pill de estado, 'Registro' de mentor, 'Entrar na chamada'/'Remarcar', 'Agendar sessão 4' e Sessão 5 trancada ('Abre pra agendar depois da sessão 4')",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v5-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v5_desktop_quem_pode_ajudar",
+      "label": "'Quem pode ajudar' (v5): 4 especialistas da trilha com chips 'Na sua trilha' e 'Sugeri no pedido' (Luisa Prado, Ricardo Almeida, Beatriz Fontoura, Tomás Ribeiro)",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v5-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v5_desktop_separacao_conceitos",
+      "label": "Separação de conceitos (v5): card 'Precisa de outra trilha?' com 'Pedir outra trilha' separado de 'Não é sobre a trilha? Fale com a coordenação'",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v5-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v5_mobile_mockup",
+      "label": "Mockup v5 — 'Sua trilha' em dois frames de celular lado a lado (persona mobile, versão compacta)",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v5-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v6_desktop_mockup",
+      "label": "Mockup v6 (final) — prancheta jovem-especialistas com seletores 'Ver como' (Mentorado/Mentor especialista/Coordenação/Mentor DPP), 'Tela' (Início/Especialistas) e 'Estado' (Ana·trilha ativa / Caio·pedido no mural / Sem trilha nem pedido)",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v6_desktop_home_oi_ana",
+      "label": "Home 'Oi, Ana' (v6): 'Terça, 7 de outubro · T1 · encontro 8 de 16', card 'Encontro 8 · T1 — hoje, 19h' (Google Meet, Confirmado, 'Entrar no Meet'/'Reagendar') e lista 'Esta semana' (Encontro 8, Roda de conversa, Sessão 3·Luisa Prado com badge Especialista, 'Avaliar o encontro 7' pendente)",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v6_desktop_card_cta_trilha",
+      "label": "Card-CTA vivo 'Especialistas' na home (v6): 'Trilha em andamento · sessão 3 de 5 — Carreira e portfólio com Luisa Prado · Sex 10/out 16h–16h50 · confirmada. A sessão 4 ainda precisa de horário.' + botão 'Abrir minha trilha' — única entrada (Especialistas não é item de nav)",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v6_desktop_matriz_papeis",
+      "label": "Matriz papel × o que vê × o que pode fazer (v6): Mentorado / Mentor especialista / Coordenação / Mentor DPP contra ações (pedir trilha, aceitar demanda do mural, propor horário, remarcar, registrar, avaliar, editar grade, painel de trilhas, encerramento antecipado, chamado de apoio)",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v6_desktop_rastreabilidade",
+      "label": "Bloco 'Rastreabilidade' (v6): documenta base v4 (trilha explícita 1–5), da v5 (ciclo de vida com datas, pills de estado, sessão 5 trancada), da v3 (card-CTA vivo na home + negociação de horário dentro da sessão) e o novo na v6 (três conceitos separados, estado vazio com formulário curto, visões Coordenação/DPP)",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v6_desktop_decisoes_aberto",
+      "label": "'Decisões em aberto' (v6): 8 itens ABERTO — inconsistência do dataset (proposta fora da grade da Luisa), limite de 5 dias do alerta da coordenação, nudge da coordenação, o que o mentor DPP vê do registro, janela de preferência por especialista, teto de trilhas simultâneas, datas ilustrativas de Ana/Pedro, prazo de 3 meses a partir do aceite ou da sessão 1",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_jovem_especialistas_v6_mobile_mockup",
+      "label": "Mockup v6 (final) renderizado em viewport mobile: mesma home 'Oi, Ana' + 'Notas da prancheta' (matriz de papéis, rastreabilidade, decisões em aberto) empilhadas",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "docs_mockups_jovem_especialistas_v4_desktop_mockup",
+      "target": "docs_mockups_jovem_especialistas_v4_desktop_tela_especialistas",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v4_desktop_tela_especialistas",
+      "target": "docs_mockups_jovem_especialistas_v4_desktop_card_trilha_sessoes",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v4_desktop_tela_especialistas",
+      "target": "docs_mockups_jovem_especialistas_v4_desktop_grid_especialistas",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v4_desktop_mockup",
+      "target": "docs_mockups_jovem_especialistas_v4_desktop_nav_sidebar",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v4_mobile_mockup",
+      "target": "docs_mockups_jovem_especialistas_v4_mobile_bottom_nav",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v4-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v4_mobile_mockup",
+      "target": "docs_mockups_jovem_especialistas_v4_desktop_tela_especialistas",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v4-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v4_mobile_bottom_nav",
+      "target": "docs_mockups_jovem_especialistas_v4_desktop_nav_sidebar",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v4-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v5_desktop_mockup",
+      "target": "docs_mockups_jovem_especialistas_v5_desktop_timeline_ciclo_vida",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v5_desktop_mockup",
+      "target": "docs_mockups_jovem_especialistas_v5_desktop_sessoes_estados",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v5_desktop_mockup",
+      "target": "docs_mockups_jovem_especialistas_v5_desktop_quem_pode_ajudar",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v5_desktop_mockup",
+      "target": "docs_mockups_jovem_especialistas_v5_desktop_separacao_conceitos",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v5_mobile_mockup",
+      "target": "docs_mockups_jovem_especialistas_v5_desktop_mockup",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v5-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v5_desktop_sessoes_estados",
+      "target": "docs_mockups_jovem_especialistas_v4_desktop_card_trilha_sessoes",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v5_desktop_quem_pode_ajudar",
+      "target": "docs_mockups_jovem_especialistas_v4_desktop_grid_especialistas",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v5_desktop_mockup",
+      "target": "docs_mockups_jovem_especialistas_v4_desktop_tela_especialistas",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v6_desktop_mockup",
+      "target": "docs_mockups_jovem_especialistas_v6_desktop_home_oi_ana",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v6_desktop_home_oi_ana",
+      "target": "docs_mockups_jovem_especialistas_v6_desktop_card_cta_trilha",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v6_desktop_mockup",
+      "target": "docs_mockups_jovem_especialistas_v6_desktop_matriz_papeis",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v6_desktop_mockup",
+      "target": "docs_mockups_jovem_especialistas_v6_desktop_rastreabilidade",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v6_desktop_mockup",
+      "target": "docs_mockups_jovem_especialistas_v6_desktop_decisoes_aberto",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v6_desktop_rastreabilidade",
+      "target": "docs_mockups_jovem_especialistas_v4_desktop_mockup",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v6_desktop_rastreabilidade",
+      "target": "docs_mockups_jovem_especialistas_v5_desktop_mockup",
+      "relation": "references",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v6_desktop_card_cta_trilha",
+      "target": "docs_mockups_jovem_especialistas_v5_desktop_mockup",
+      "relation": "references",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v6_desktop_decisoes_aberto",
+      "target": "docs_mockups_jovem_especialistas_v6_desktop_matriz_papeis",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v6_desktop_matriz_papeis",
+      "target": "docs_mockups_jovem_especialistas_v5_desktop_separacao_conceitos",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v6_mobile_mockup",
+      "target": "docs_mockups_jovem_especialistas_v6_desktop_mockup",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v6_mobile_mockup",
+      "target": "docs_mockups_jovem_especialistas_v6_desktop_home_oi_ana",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_jovem_especialistas_v6_desktop_home_oi_ana",
+      "target": "docs_mockups_jovem_especialistas_v5_desktop_separacao_conceitos",
+      "relation": "semantically_similar_to",
+      "confidence": "AMBIGUOUS",
+      "confidence_score": 0.3,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "he_trilha_cinco_sessoes",
+      "label": "Trilha de especialista em 5 sessões com estados — conceito persistente que atravessa v4, v5 e v6",
+      "nodes": [
+        "docs_mockups_jovem_especialistas_v4_desktop_card_trilha_sessoes",
+        "docs_mockups_jovem_especialistas_v5_desktop_sessoes_estados",
+        "docs_mockups_jovem_especialistas_v6_desktop_card_cta_trilha"
+      ],
+      "relation": "form",
+      "confidence": "INFERRED",
+      "confidence_score": 0.9,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png"
+    },
+    {
+      "id": "he_tres_conceitos_tres_lugares",
+      "label": "Doutrina 'pedir trilha ≠ agendar sessão ≠ pedir apoio à coordenação — três conceitos, três lugares' (enunciada no cabeçalho da v6 e operada pela matriz e pelas decisões em aberto)",
+      "nodes": [
+        "docs_mockups_jovem_especialistas_v5_desktop_separacao_conceitos",
+        "docs_mockups_jovem_especialistas_v6_desktop_matriz_papeis",
+        "docs_mockups_jovem_especialistas_v6_desktop_decisoes_aberto"
+      ],
+      "relation": "participate_in",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png"
+    },
+    {
+      "id": "he_serie_jovem_especialistas",
+      "label": "Série iterativa de mockups 'jovem-especialistas' v4→v5→v6 (final), cada um em par desktop+mobile, para a feature de trilhas com mentores especialistas do realiza.vc",
+      "nodes": [
+        "docs_mockups_jovem_especialistas_v4_desktop_mockup",
+        "docs_mockups_jovem_especialistas_v4_mobile_mockup",
+        "docs_mockups_jovem_especialistas_v5_desktop_mockup",
+        "docs_mockups_jovem_especialistas_v5_mobile_mockup",
+        "docs_mockups_jovem_especialistas_v6_desktop_mockup",
+        "docs_mockups_jovem_especialistas_v6_mobile_mockup"
+      ],
+      "relation": "form",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/jovem-especialistas/v6-desktop.png"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

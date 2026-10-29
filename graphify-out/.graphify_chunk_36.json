@@ -1,0 +1,931 @@
+{
+  "nodes": [
+    {
+      "id": "docs_mockups_agenda_v2_mobile_mockup",
+      "label": "Mockup Agenda v2 (mobile): 'Agenda — Outubro de 2025 · duas turmas, cronogramas desencontrados (T1 terças, T2 quartas)'. Uma seção por mentorado (cartões Ana Souza T1 'atenção' e Caio Ramos T2 'em dia'), cada um com mini-calendário do mês + lista do que vem; modo alternativo 'Tudo junto'.",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v2_mobile_secao_mentorado",
+      "label": "Decisão 'uma seção por mentorado': cada dupla vira cartão próprio com cabeçalho (avatar, nome, turma, 'Encontro 8 de 16 · terças às 19h'), trilha com especialista embutida, mini-calendário e lista; no mobile as seções viram acordeões.",
+      "file_type": "rationale",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v2_mobile_mini_calendario",
+      "label": "Mini-calendário do mês como referência, não grade: pontinhos marcam dias com encontro (verde), especialista (âmbar), evento oficial (contorno) e prazo (vermelho); pontinho vazado = a confirmar; horário e detalhe ficam na lista abaixo.",
+      "file_type": "concept",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v2_mobile_tudo_junto",
+      "label": "Modo 'Tudo junto': seletor no topo alterna para cronologia única agrupada por dia com chips de dono em cada item — 'Ana · T1', 'Caio · T2', 'Você' — inclusive formação do próprio mentor.",
+      "file_type": "concept",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v2_mobile_previsto_confirmar",
+      "label": "Decisão 'previsto não é agendado': o que o calendário oficial prevê mas a dupla não confirmou entra esmaecido, com tile tracejado e nota 'previsto, a confirmar' — a dupla agenda, a agenda não assume.",
+      "file_type": "rationale",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v2_mobile_semaforo_dupla",
+      "label": "Semáforo no cabeçalho da dupla: badge 'atenção'/'em dia' por cartão; o motivo (avaliação do encontro 7 vencida sem resposta) aparece como primeiro item da lista daquela dupla.",
+      "file_type": "concept",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v3_desktop_mockup",
+      "label": "Mockup Agenda v3 (desktop): 'Agenda — Semana 41 · 6 a 12 de outubro de 2025'. Fila única de cards agrupados por dia (Hoje / Amanhã / Próximos) com chips de escopo 'Agenda de: Ana | Caio | Tudo' e rail lateral de resumo. Nav: Início, Agenda, Minhas duplas, Materiais.",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v3_desktop_fila_dia",
+      "label": "Decisão 'o dia é a unidade': agenda como fila única — Hoje, Amanhã e Próximos com sub-cabeçalhos por dia — só entram dias com compromisso; pendências (registro do encontro 4, avaliação até 23h59) aparecem na mesma fila como linhas finas, não em painel separado.",
+      "file_type": "rationale",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v3_desktop_chips_escopo",
+      "label": "Chips de escopo 'Agenda de: Ana / Caio / Tudo' filtram a fila por dupla; nota explica que 'Tudo' inclui o que os mentorados têm marcado, sempre sinalizado.",
+      "file_type": "concept",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v3_desktop_nao_participa",
+      "label": "Decisão ''não é seu' tem estado visual próprio': o que o mentor acompanha mas não participa (roda de conversa com famílias, sessão da Ana com especialista) vira card âmbar tracejado com etiqueta 'agenda da Ana — você não participa' e sem botão de entrar.",
+      "file_type": "rationale",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v3_desktop_rail_semana",
+      "label": "Rail lateral resume, não repete: card 'Esta semana' totaliza (2 encontros DPP, 1 supervisão, 1 sessão de especialista, 1 formação, 1 prazo) e card 'Suas duplas' mostra semáforos (Ana em dia, Caio atenção) com link 'Abrir ficha das duplas'.",
+      "file_type": "concept",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v3_desktop_previstos_agendar",
+      "label": "Decisão 'previstos ficam tracejados': encontros da semana seguinte entram como linhas finas 'a agendar' — o calendário oficial propõe o dia, a dupla confirma formato e local.",
+      "file_type": "rationale",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v3_mobile_mockup",
+      "label": "Mockup Agenda v3 (mobile): mesma fila única por dia (Hoje / Amanhã / Próximos) e chips 'Agenda de: Ana | Caio | Tudo' em coluna única estreita, sem rail lateral.",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v3_mobile_fila_dia",
+      "label": "Fila única por dia adaptada ao mobile: mesmos grupos Hoje/Amanhã/Próximos, cards de compromisso em largura total com CTAs empilhados ('Entrar no Meet', 'Guia do encontro', 'Lembrar o Caio').",
+      "file_type": "rationale",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v3_mobile_bottom_nav",
+      "label": "Bottom nav fixa no mobile: Início, Agenda, Duplas, Materiais, Perfil — a navegação superior vira barra inferior abaixo de 1040px.",
+      "file_type": "concept",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v4_desktop_mockup",
+      "label": "Mockup Agenda v4 (desktop): duas personas lado a lado — André Lima (mentor DPP, turmas desencontradas T1/T2) com 'Minha agenda' + 'Acompanhando seus jovens', e Luísa Prado (mentora especialista, 2 trilhas ativas) com grade de disponibilidade + 'Trilhas em andamento'.",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v4_desktop_duas_superficies",
+      "label": "Decisão 'duas superfícies, uma página': 'Minha agenda' só carrega compromissos do André (encontros DPP e formação); 'Acompanhando seus jovens' é superfície âmbar separada que junta trilhas e pendências das duplas — o que ele vê e o que é dele ficam fisicamente separados.",
+      "file_type": "rationale",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v4_desktop_turmas_desencontradas",
+      "label": "Decisão 'turmas desencontradas, explicadas': legenda sob 'Minha agenda' diz que a T2 começou 3 semanas depois — por isso Ana está no encontro 8 e Caio no 5; cada turma numera os próprios encontros.",
+      "file_type": "rationale",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v4_desktop_trilha_jornada",
+      "label": "Trilha é jornada, não evento: card de cada jovem mostra stepper de 5 sessões, último registro com avaliação ★4/5 do jovem e próxima sessão marcada — sempre com etiqueta 'agenda da Ana'; trilha do Caio mostra funil de solicitação (solicitada → no mural → aceita → em andamento).",
+      "file_type": "concept",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v4_desktop_grade_disponibilidade",
+      "label": "Grade de disponibilidade da especialista: grade semanal SEG–DOM × 9h–17h com legenda (janela oferecida, sessão marcada, proposta do jovem, fora da grade) e CTA 'Editar grade' — é o instrumento de trabalho da Luísa, de onde nascem as sessões.",
+      "file_type": "concept",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v4_desktop_proposta_fora_grade",
+      "label": "Decisão 'proposta fora da grade chega mesmo assim': card âmbar 'O jovem propôs: hoje, 15h — fora da grade' com CTAs 'Propor outro horário' e 'Confirmar hoje, 15h' — a especialista confirma como exceção ou sugere alternativa; prazo de ~3 meses conta da 1ª sessão.",
+      "file_type": "rationale",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v4_desktop_previsto_nao_vira",
+      "label": "Decisão 'previsto não vira compromisso': semana seguinte aparece em linhas finas tracejadas 'a agendar' — o calendário oficial propõe, quem confirma é a dupla.",
+      "file_type": "rationale",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v4_mobile_mockup",
+      "label": "Mockup Agenda v4 (mobile): as duas personas empilhadas em um único scroll — primeiro a agenda do André (Minha agenda + Acompanhando seus jovens), depois a da Luísa (Sua disponibilidade + Trilhas em andamento) — com bottom nav.",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v4_mobile_superficies_empilhadas",
+      "label": "Duas superfícies empilhadas no mobile: 'Minha agenda' (encontros DPP, formação, previstos 'a agendar') seguida da superfície âmbar 'Acompanhando seus jovens' (trilhas + pendências por dupla) em coluna única.",
+      "file_type": "rationale",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v4_mobile_grade_compacta",
+      "label": "Grade de disponibilidade e trilhas da especialista em layout compacto mobile: semana em grade estreita, cards de trilha (Ana 3/5, Pedro 1/5) com proposta 'fora da grade' e CTAs empilhados.",
+      "file_type": "concept",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-mobile.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v5_desktop_mockup",
+      "label": "Mockup Agenda v5 rodada 2 (desktop): 'A agenda é das relações — o tempo entra como contexto'. Duas personas, mesma lógica — página organizada por quem você acompanha ou conduz, não pelo calendário; faixa 'Sua semana' no topo em ambos os painéis (André mentor DPP × Luísa especialista).",
+      "file_type": "image",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v5_desktop_bloco_pessoa",
+      "label": "Decisão 'por pessoa, não por dia': bloco por dupla/trilha carrega turma e posição no ciclo ('encontro 8 de 16 · T1' × 'encontro 5 de 16 · T2', com nota de que a T2 começou 3 semanas depois); cada bloco junta próximo encontro, agenda do jovem e pendências.",
+      "file_type": "rationale",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v5_desktop_sua_semana",
+      "label": "Faixa 'Sua semana' (seg 6 – dom 12): células por dia com marcadores por tipo (seu compromisso / você acompanha / prazo; sessão marcada / proposta a confirmar / horário livre) e legenda de hoje — amarra os dias sem virar a estrutura da página.",
+      "file_type": "concept",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v5_desktop_voce_acompanha",
+      "label": "Decisão ''você acompanha' é um modo visual próprio': sessões de especialista e eventos do jovem ficam dentro do bloco da pessoa, em faixa âmbar 'DA AGENDA DA ANA · você acompanha — não participa' com etiqueta de olho e sem botão de entrar — chegam progresso, último registro, avaliação ★4 e sessão sem data.",
+      "file_type": "rationale",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v5_desktop_pendencias_dupla",
+      "label": "Subseção 'Pendências da dupla' dentro do bloco da pessoa: avaliação do encontro 7 ('fecha sex às 23h59' → Responder), registro do encontro 4 pendente (→ Preencher), local a confirmar (→ Lembrar), sessão 4 sem horário ('você é avisado quando marcar').",
+      "file_type": "concept",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v5_desktop_grade_instrumento",
+      "label": "Grade de disponibilidade como instrumento de trabalho da especialista: estados livre/marcada/proposta com rótulo e legenda ('livre — visível pro jovem'), chips '5 horários livres · 1 sessão marcada · 1 proposta pendente', '+ novo' e 'Editar grade'; domingo fora da grade; prazo da trilha no cabeçalho ('até 9 dez' / 'até 12 jan').",
+      "file_type": "concept",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    },
+    {
+      "id": "docs_mockups_agenda_v5_desktop_do_programa",
+      "label": "Bloco 'Do programa · não é de uma dupla específica': compromissos do mentor fora das duplas — supervisão com Paula Nunes (hoje 12h30, Meet → Entrar) e formação 'Escuta ativa e os limites do mentor' (sáb 11, presencial → Confirmar presença).",
+      "file_type": "concept",
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "source_url": null,
+      "captured_at": null,
+      "author": null,
+      "contributor": null
+    }
+  ],
+  "edges": [
+    {
+      "source": "docs_mockups_agenda_v2_mobile_mockup",
+      "target": "docs_mockups_agenda_v2_mobile_secao_mentorado",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v2_mobile_mockup",
+      "target": "docs_mockups_agenda_v2_mobile_mini_calendario",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v2_mobile_mockup",
+      "target": "docs_mockups_agenda_v2_mobile_tudo_junto",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v2_mobile_mockup",
+      "target": "docs_mockups_agenda_v2_mobile_previsto_confirmar",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v2_mobile_mockup",
+      "target": "docs_mockups_agenda_v2_mobile_semaforo_dupla",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v2_mobile_semaforo_dupla",
+      "target": "docs_mockups_agenda_v2_mobile_secao_mentorado",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v2_mobile_mini_calendario",
+      "target": "docs_mockups_agenda_v2_mobile_secao_mentorado",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v3_desktop_mockup",
+      "target": "docs_mockups_agenda_v3_desktop_fila_dia",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v3_desktop_mockup",
+      "target": "docs_mockups_agenda_v3_desktop_chips_escopo",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v3_desktop_mockup",
+      "target": "docs_mockups_agenda_v3_desktop_nao_participa",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v3_desktop_mockup",
+      "target": "docs_mockups_agenda_v3_desktop_rail_semana",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v3_desktop_mockup",
+      "target": "docs_mockups_agenda_v3_desktop_previstos_agendar",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v3_desktop_nao_participa",
+      "target": "docs_mockups_agenda_v3_desktop_chips_escopo",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v3_mobile_mockup",
+      "target": "docs_mockups_agenda_v3_mobile_fila_dia",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v3_mobile_mockup",
+      "target": "docs_mockups_agenda_v3_mobile_bottom_nav",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_desktop_mockup",
+      "target": "docs_mockups_agenda_v4_desktop_duas_superficies",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_desktop_mockup",
+      "target": "docs_mockups_agenda_v4_desktop_turmas_desencontradas",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_desktop_mockup",
+      "target": "docs_mockups_agenda_v4_desktop_trilha_jornada",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_desktop_mockup",
+      "target": "docs_mockups_agenda_v4_desktop_grade_disponibilidade",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_desktop_mockup",
+      "target": "docs_mockups_agenda_v4_desktop_proposta_fora_grade",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_desktop_mockup",
+      "target": "docs_mockups_agenda_v4_desktop_previsto_nao_vira",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_desktop_trilha_jornada",
+      "target": "docs_mockups_agenda_v4_desktop_duas_superficies",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_desktop_proposta_fora_grade",
+      "target": "docs_mockups_agenda_v4_desktop_grade_disponibilidade",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_mobile_mockup",
+      "target": "docs_mockups_agenda_v4_mobile_superficies_empilhadas",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_mobile_mockup",
+      "target": "docs_mockups_agenda_v4_mobile_grade_compacta",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_mockup",
+      "target": "docs_mockups_agenda_v5_desktop_bloco_pessoa",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_mockup",
+      "target": "docs_mockups_agenda_v5_desktop_sua_semana",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_mockup",
+      "target": "docs_mockups_agenda_v5_desktop_voce_acompanha",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_mockup",
+      "target": "docs_mockups_agenda_v5_desktop_pendencias_dupla",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_mockup",
+      "target": "docs_mockups_agenda_v5_desktop_grade_instrumento",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_mockup",
+      "target": "docs_mockups_agenda_v5_desktop_do_programa",
+      "relation": "implements",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_voce_acompanha",
+      "target": "docs_mockups_agenda_v5_desktop_bloco_pessoa",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_pendencias_dupla",
+      "target": "docs_mockups_agenda_v5_desktop_bloco_pessoa",
+      "relation": "conceptually_related_to",
+      "confidence": "EXTRACTED",
+      "confidence_score": 1.0,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v3_mobile_mockup",
+      "target": "docs_mockups_agenda_v3_desktop_mockup",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v3_mobile_fila_dia",
+      "target": "docs_mockups_agenda_v3_desktop_fila_dia",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_mobile_mockup",
+      "target": "docs_mockups_agenda_v4_desktop_mockup",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_mobile_superficies_empilhadas",
+      "target": "docs_mockups_agenda_v4_desktop_duas_superficies",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_mobile_grade_compacta",
+      "target": "docs_mockups_agenda_v4_desktop_grade_disponibilidade",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-mobile.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v3_desktop_mockup",
+      "target": "docs_mockups_agenda_v2_mobile_mockup",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_desktop_mockup",
+      "target": "docs_mockups_agenda_v3_desktop_mockup",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_mockup",
+      "target": "docs_mockups_agenda_v4_desktop_mockup",
+      "relation": "conceptually_related_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v3_desktop_previstos_agendar",
+      "target": "docs_mockups_agenda_v2_mobile_previsto_confirmar",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_desktop_previsto_nao_vira",
+      "target": "docs_mockups_agenda_v3_desktop_previstos_agendar",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_grade_instrumento",
+      "target": "docs_mockups_agenda_v4_desktop_grade_disponibilidade",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.95,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_voce_acompanha",
+      "target": "docs_mockups_agenda_v3_desktop_nao_participa",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v4_desktop_duas_superficies",
+      "target": "docs_mockups_agenda_v3_desktop_nao_participa",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v4-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_bloco_pessoa",
+      "target": "docs_mockups_agenda_v2_mobile_secao_mentorado",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v3_desktop_chips_escopo",
+      "target": "docs_mockups_agenda_v2_mobile_tudo_junto",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_sua_semana",
+      "target": "docs_mockups_agenda_v3_desktop_rail_semana",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_sua_semana",
+      "target": "docs_mockups_agenda_v2_mobile_mini_calendario",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v3_desktop_rail_semana",
+      "target": "docs_mockups_agenda_v2_mobile_semaforo_dupla",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.75,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v3-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_pendencias_dupla",
+      "target": "docs_mockups_agenda_v3_desktop_fila_dia",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.65,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    },
+    {
+      "source": "docs_mockups_agenda_v5_desktop_bloco_pessoa",
+      "target": "docs_mockups_agenda_v4_desktop_turmas_desencontradas",
+      "relation": "semantically_similar_to",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png",
+      "source_location": null,
+      "weight": 1.0
+    }
+  ],
+  "hyperedges": [
+    {
+      "id": "agenda_previsto_nao_agendado",
+      "label": "Padrão recorrente entre iterações: 'previsto não é agendado' — itens futuros do calendário oficial entram tracejados como 'a agendar' até a dupla confirmar (v2 'previsto, a confirmar' → v3/v4 linhas 'a agendar').",
+      "nodes": [
+        "docs_mockups_agenda_v2_mobile_previsto_confirmar",
+        "docs_mockups_agenda_v3_desktop_previstos_agendar",
+        "docs_mockups_agenda_v4_desktop_previsto_nao_vira"
+      ],
+      "relation": "form",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-mobile.png"
+    },
+    {
+      "id": "agenda_voce_acompanha_modo",
+      "label": "Padrão recorrente: modo visual 'você acompanha — não participa' em âmbar sem CTA de entrar (v3 card tracejado → v4 superfície 'Acompanhando seus jovens' → v5 faixa 'da agenda da Ana' dentro do bloco da pessoa).",
+      "nodes": [
+        "docs_mockups_agenda_v3_desktop_nao_participa",
+        "docs_mockups_agenda_v4_desktop_duas_superficies",
+        "docs_mockups_agenda_v5_desktop_voce_acompanha"
+      ],
+      "relation": "form",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png"
+    },
+    {
+      "id": "agenda_grade_disponibilidade_especialista",
+      "label": "Grade de disponibilidade como instrumento da mentora especialista, presente nas três versões em que a persona Luísa aparece (v4 desktop, v4 mobile compacta, v5 com estados e legenda).",
+      "nodes": [
+        "docs_mockups_agenda_v4_desktop_grade_disponibilidade",
+        "docs_mockups_agenda_v4_mobile_grade_compacta",
+        "docs_mockups_agenda_v5_desktop_grade_instrumento"
+      ],
+      "relation": "form",
+      "confidence": "INFERRED",
+      "confidence_score": 0.85,
+      "source_file": "/home/thiago/nb/realiza.vc/docs/mockups/agenda/v5-desktop.png"
+    }
+  ],
+  "input_tokens": 0,
+  "output_tokens": 0
+}

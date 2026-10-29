@@ -1,0 +1,6 @@
+/home/thiago/nb/realiza.vc/docs/mockups/materiais/v1-desktop.png
+/home/thiago/nb/realiza.vc/docs/mockups/materiais/v1-mobile.png
+/home/thiago/nb/realiza.vc/docs/mockups/materiais/v2-desktop.png
+/home/thiago/nb/realiza.vc/docs/mockups/materiais/v2-mobile.png
+/home/thiago/nb/realiza.vc/docs/mockups/materiais/v3-desktop.png
+/home/thiago/nb/realiza.vc/docs/mockups/materiais/v3-mobile.png

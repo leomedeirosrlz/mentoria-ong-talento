@@ -1,0 +1,6 @@
+/home/thiago/nb/realiza.vc/docs/diagrama-atual.svg
+/home/thiago/nb/realiza.vc/docs/diagrama-planejado.svg
+/home/thiago/nb/realiza.vc/docs/dominio.svg
+/home/thiago/nb/realiza.vc/docs/mockups/agenda/v1-desktop.png
+/home/thiago/nb/realiza.vc/docs/mockups/agenda/v1-mobile.png
+/home/thiago/nb/realiza.vc/docs/mockups/agenda/v2-desktop.png

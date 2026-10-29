@@ -585,7 +585,7 @@ export function MentorHome({
                       <DuplaNomes mentor="Você" mentorado={dupla.mentorado.nome} />
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {dupla.status === "concluida" ? "Concluída" : "Encerrada"} ·{" "}
+                      {dupla.status === "concluida" ? "Concluída" : "Desistente"} ·{" "}
                       <span className="tabular-nums">
                         {saude.feitos}/{totalDupla}
                       </span>{" "}

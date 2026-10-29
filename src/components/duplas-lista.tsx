@@ -118,7 +118,7 @@ const STATUS_LABEL: Record<string, { label: string; tom: TomPill }> = {
   ok: { label: "Em dia", tom: "ok" },
   pausada: { label: "Pausada", tom: "pausa" },
   concluida: { label: "Concluída", tom: "pausa" },
-  encerrada: { label: "Encerrada", tom: "pausa" },
+  encerrada: { label: "Desistente", tom: "pausa" },
 };
 
 /** O pill de estado da linha: status da dupla fora da régua, senão o
