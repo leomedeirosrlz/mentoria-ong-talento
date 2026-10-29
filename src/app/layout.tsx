@@ -3,7 +3,6 @@ import { cookies } from "next/headers";
 import { Mitr, JetBrains_Mono } from "next/font/google";
 import { MotionConfig } from "motion/react";
 import { Toaster } from "@/components/ui/sonner";
-import { QueryProvider } from "@/components/query-provider";
 import { TemaSync } from "@/components/tema-sync";
 import { demoRole } from "@/lib/demo/mode";
 import { TEMA_COOKIE, TEMA_SCRIPT, temaValido } from "@/lib/tema";
@@ -91,9 +90,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         <TemaSync />
         {/* reducedMotion="user": o guard CSS de prefers-reduced-motion não cobre
             animação JS — aqui transform/layout viram instantâneos (fades ficam) */}
-        <MotionConfig reducedMotion="user">
-         <QueryProvider>{children}</QueryProvider>
-       </MotionConfig>
+        <MotionConfig reducedMotion="user">{children}</MotionConfig>
         {/* mobileOffset acima da bottom nav (~57px) e do footer do wizard
             (~68px); em demo no desktop o offset descola da pill float */}
         <Toaster

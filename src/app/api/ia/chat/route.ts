@@ -52,12 +52,6 @@ const MAX_ITERACOES = 6;
 // 50s a partir da abertura do stream deixa ~10s pros gates pré-stream
 const STREAM_BUDGET_MS = 50_000;
 
-// orçamento total do stream (REALIZA-304): a plataforma encerra a função
-// aos 60s sem avisar — se o teto por rodada fosse o único limite, uma
-// rodada lenta morria no meio e nenhum evento de erro chegava ao cliente.
-// 50s a partir da abertura do stream deixa ~10s pros gates pré-stream
-const STREAM_BUDGET_MS = 50_000;
-
 const MSG_FALHA =
   "Não consegui concluir essa consulta agora — tente perguntar de outra forma.";
 
