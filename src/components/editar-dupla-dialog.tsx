@@ -41,7 +41,7 @@ const STATUS_DUPLA: Record<string, string> = {
   ativa: "Ativa",
   pausada: "Pausada",
   concluida: "Concluída",
-  encerrada: "Encerrada",
+  encerrada: "Desistente",
 };
 
 export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {

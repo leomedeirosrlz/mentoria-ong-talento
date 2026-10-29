@@ -9,7 +9,6 @@ import {
   getMe,
   getMinhasDuplas,
 } from "@/lib/queries";
-import { getSupervisaoAlvos } from "@/lib/queries-supervisao";
 import { duplaSupervisionada } from "@/lib/auxiliar-escopo";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import { RECORTES_FATIA, type RecorteFatia } from "@/lib/agenda-coordenacao";
@@ -57,7 +56,7 @@ export default async function DuplasPage({
   // sem baixar o ciclo inteiro pra filtrar em JS). Os extras são por visão:
   // alvos do dialog de supervisão (auxiliar) e os 5 passos da trilha
   // (especialista) — os demais não pagam essa leitura
-  const [lista, eventos, alvos, espEventos, h, sp, cronogramas, cookieStore] = await Promise.all([
+  const [lista, eventos, espEventos, h, sp, cronogramas, cookieStore] = await Promise.all([
     me.role === "coordenacao"
       ? getDuplas()
       : me.role === "supervisor"
@@ -69,7 +68,6 @@ export default async function DuplasPage({
           )
         : getMinhasDuplas(),
     getCicloEventos(),
-    visao === "supervisor" ? getSupervisaoAlvos() : Promise.resolve([]),
     visao === "especialista" || visao === "hibrido"
       ? getEspecialistaEventos()
       : Promise.resolve([]),
@@ -171,7 +169,6 @@ export default async function DuplasPage({
         agora={new Date().toISOString()}
         visao={visao}
         meuNome={me.nome.split(" ")[0]}
-        supervisaoAlvos={alvos}
         especialistaEventos={espEventos}
         nudges={nudges}
         origem={origem}

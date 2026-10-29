@@ -1,0 +1,17 @@
+/home/thiago/nb/realiza.vc/docs/planos/issues/_recon/issues-status.md
+/home/thiago/nb/realiza.vc/docs/planos/issues/_recon/ops-mapa.md
+/home/thiago/nb/realiza.vc/docs/planos/issues/_recon/schema-mapa.md
+/home/thiago/nb/realiza.vc/docs/planos/issues/_recon/telas-mapa.md
+/home/thiago/nb/realiza.vc/docs/planos/issues/_reviews/dba.md
+/home/thiago/nb/realiza.vc/docs/planos/issues/_reviews/produto-coord.md
+/home/thiago/nb/realiza.vc/docs/planos/issues/_reviews/qa.md
+/home/thiago/nb/realiza.vc/docs/planos/issues/_reviews/seguranca.md
+/home/thiago/nb/realiza.vc/docs/planos/issues/_reviews/tech-lead.md
+/home/thiago/nb/realiza.vc/docs/planos/issues/_reviews/ux.md
+/home/thiago/nb/realiza.vc/docs/planos/mobile/_brief-auditoria.md
+/home/thiago/nb/realiza.vc/docs/planos/mobile/agenda-ops.md
+/home/thiago/nb/realiza.vc/docs/planos/mobile/coord-core.md
+/home/thiago/nb/realiza.vc/docs/planos/mobile/jovem-mentor-esp.md
+/home/thiago/nb/realiza.vc/docs/planos/mobile/publicas-auth.md
+/home/thiago/nb/realiza.vc/supabase/templates/magic-link.html
+/home/thiago/nb/realiza.vc/supabase/templates/recovery.html

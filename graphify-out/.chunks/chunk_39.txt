@@ -1,0 +1,6 @@
+/home/thiago/nb/realiza.vc/docs/mockups/chamados/v2-desktop.png
+/home/thiago/nb/realiza.vc/docs/mockups/chamados/v2-mobile.png
+/home/thiago/nb/realiza.vc/docs/mockups/chamados/v3-desktop.png
+/home/thiago/nb/realiza.vc/docs/mockups/chamados/v3-mobile.png
+/home/thiago/nb/realiza.vc/docs/mockups/chamados/v4-desktop.png
+/home/thiago/nb/realiza.vc/docs/mockups/chamados/v4-mobile.png

@@ -1,0 +1,6 @@
+/home/thiago/nb/realiza.vc/docs/mockups/registros/v2-mobile.png
+/home/thiago/nb/realiza.vc/docs/mockups/relatorios/v1-desktop-clean.png
+/home/thiago/nb/realiza.vc/docs/mockups/relatorios/v1-desktop-dialog.png
+/home/thiago/nb/realiza.vc/docs/mockups/relatorios/v1-desktop.png
+/home/thiago/nb/realiza.vc/docs/mockups/relatorios/v1-mobile-clean.png
+/home/thiago/nb/realiza.vc/docs/mockups/relatorios/v1-mobile-dialog.png

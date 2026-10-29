@@ -3270,17 +3270,6 @@ function build(): DemoData {
         lida_em: haDias(13, "07:00"),
         created_at: haDias(14, "09:35"),
       },
-      // supervisao_registrada (0041) — o mentor lê data e resumo da sessão
-      // que o supervisor registrou sobre ele (transparência)
-      {
-        id: uid(0x3022),
-        tipo: "supervisao_registrada",
-        titulo: "Sessão de supervisão registrada",
-        corpo: `Paulo Serra registrou a supervisão de ${ymd(addDias(HOJE, -13)).split("-").reverse().join("/")} sobre a dupla com Ana Beatriz Silva. O resumo está na ficha da dupla.`,
-        href: `/duplas/${uid(D.ok)}`,
-        lida_em: haDias(12, "08:00"),
-        created_at: haDias(13, "18:40"),
-      },
       {
         // a Marina respondeu o chamado de agenda do Ricardo (CHA-000143)
         id: uid(0x3023),

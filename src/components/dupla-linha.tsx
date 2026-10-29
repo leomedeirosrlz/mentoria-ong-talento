@@ -1,6 +1,6 @@
 import type { CSSProperties, ReactNode } from "react";
 import Link from "next/link";
-import { CaretRight, Lifebuoy } from "@phosphor-icons/react/dist/ssr";
+import { DotsThree, Lifebuoy } from "@phosphor-icons/react/dist/ssr";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { buttonVariants } from "@/components/ui/button";
@@ -260,8 +260,8 @@ export function DuplaLinha({
                 "pointer-events-none w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
               )}
             >
-              <span className="hidden whitespace-nowrap md:inline">Ver ficha</span>
-              <CaretRight weight="bold" />
+              <span className="hidden whitespace-nowrap md:inline">Ações</span>
+              <DotsThree weight="bold" />
             </span>
           </span>
         </div>

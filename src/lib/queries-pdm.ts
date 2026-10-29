@@ -32,8 +32,10 @@ export const getPdmDaDupla = cache(
 /** O recorte pro resumo da jornada/encerramento — deriva do mesmo
  *  documento, sem RPC extra: totais + a lista de metas atingidas. Null
  *  quando não há PDM ou nenhuma meta (o bloco não renderiza). */
-export async function getPdmResumo(duplaId: string): Promise<PdmResumo | null> {
-  const demo = await demoRole();
-  if (demo) return demoPdmResumo(demo, duplaId);
-  return resumoPdm(await getPdmDaDupla(duplaId));
-}
+export const getPdmResumo = cache(
+  async (duplaId: string): Promise<PdmResumo | null> => {
+    const demo = await demoRole();
+    if (demo) return demoPdmResumo(demo, duplaId);
+    return resumoPdm(await getPdmDaDupla(duplaId));
+  }
+);

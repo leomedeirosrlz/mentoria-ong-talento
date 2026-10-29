@@ -4,10 +4,8 @@ import { type CSSProperties, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
-  CaretRight,
-  ChatsCircle,
   Clock,
-  DotsThreeVertical,
+  DotsThree,
   DownloadSimple,
   Funnel,
   Lifebuoy,
@@ -35,7 +33,6 @@ import { turmaDaDupla, turmaLonga } from "@/lib/turma";
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
 import { acaoWhatsAppDupla, encontroPendente } from "@/lib/acao-lembrete";
 import type { Interacao } from "@/lib/interacoes";
-import type { SupervisaoAlvo } from "@/lib/queries-supervisao";
 import type {
   CicloEvento,
   Cronograma,
@@ -51,7 +48,6 @@ import { AvaliacaoBadge } from "@/components/semaforo";
 import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
 import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
 import { DuplaWaAcao } from "@/components/dupla-wa-acao";
-import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
@@ -61,12 +57,6 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FiltrosButton } from "@/components/ui/filtros-button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import { filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 import {
@@ -128,7 +118,7 @@ const STATUS_LABEL: Record<string, { label: string; tom: TomPill }> = {
   ok: { label: "Em dia", tom: "ok" },
   pausada: { label: "Pausada", tom: "pausa" },
   concluida: { label: "Concluída", tom: "pausa" },
-  encerrada: { label: "Encerrada", tom: "pausa" },
+  encerrada: { label: "Desistente", tom: "pausa" },
 };
 
 /** O pill de estado da linha: status da dupla fora da régua, senão o
@@ -404,8 +394,8 @@ function LinhaMini({
             "pointer-events-none w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
           )}
         >
-          <span className="hidden whitespace-nowrap md:inline">Ver ficha</span>
-          <CaretRight weight="bold" />
+          <span className="hidden whitespace-nowrap md:inline">Ações</span>
+          <DotsThree weight="bold" />
         </span>
       </span>
     </div>
@@ -652,7 +642,6 @@ export function DuplasLista({
   agora,
   visao,
   meuNome,
-  supervisaoAlvos = [],
   especialistaEventos = [],
   nudges = {},
   origem,
@@ -671,8 +660,6 @@ export function DuplasLista({
   visao: VisaoDuplas;
   /** primeiro nome de quem opera — assina o texto do lembrete */
   meuNome?: string;
-  /** visão do auxiliar: os alvos do dialog de supervisão (já escopados a ele). */
-  supervisaoAlvos?: SupervisaoAlvo[];
   /** os 5 passos do guia — visão da especialista (e só ela os consome). */
   especialistaEventos?: EspecialistaEvento[];
   /** último contato por dupla — a coordenação lê o cap de 48h do Lembrar */
@@ -726,7 +713,6 @@ export function DuplasLista({
         hoje={hoje}
         hojeStr={hojeStr}
         saudePorId={saudePorId}
-        alvos={supervisaoAlvos}
         meuNome={meuNome}
         nudges={nudges}
         origem={origem}
@@ -1370,7 +1356,6 @@ function VisaoSupervisor({
   hoje,
   hojeStr,
   saudePorId,
-  alvos,
   meuNome,
   nudges,
   origem,
@@ -1383,7 +1368,6 @@ function VisaoSupervisor({
   hoje: Date;
   hojeStr: string;
   saudePorId: Map<string, Saude>;
-  alvos: SupervisaoAlvo[];
   /** primeiro nome de quem opera — assina o texto do Lembrar/Chamar */
   meuNome?: string;
   /** último nudge por dupla — o mesmo cap de 48h da coordenação; a RPC
@@ -1568,17 +1552,6 @@ function VisaoSupervisor({
                     <div className="space-y-3 @4xl:space-y-0 @4xl:divide-y @4xl:divide-border/60 @max-4xl:pt-3">
                       {duplas.map((d) => {
                         const s = saudePorId.get(d.id)!;
-                        const alvo = alvos.find((a) => a.dupla_id === d.id);
-                        // supervisão registrável em ativa ou pausada; com o
-                        // WhatsApp sempre visível a secundária vai pro ⋮ —
-                        // mesmo padrão do card de atenção da agenda (186)
-                        const menu =
-                          (d.status === "ativa" || d.status === "pausada") && alvo ? (
-                            <AcoesSupervisor
-                              alvo={alvo}
-                              nomeDupla={d.mentorado.nome}
-                            />
-                          ) : undefined;
                         return (
                           <LinhaDupla
                             key={d.id}
@@ -1602,7 +1575,6 @@ function VisaoSupervisor({
                                 })}
                               />
                             }
-                            menu={menu}
                             i={i++}
                           />
                         );
@@ -1615,39 +1587,6 @@ function VisaoSupervisor({
           </div>
         </section>
       )}
-    </>
-  );
-}
-
-/** ⋮ da linha supervisionada — "Registrar supervisão" abre o dialog
- *  controlado fora do popup (o Select interno recomeça do alvo a cada
- *  abertura — mesmo contrato do ⋯ do card de atenção da agenda). */
-function AcoesSupervisor({
-  alvo,
-  nomeDupla,
-}: {
-  alvo: SupervisaoAlvo;
-  nomeDupla: string;
-}) {
-  const [open, setOpen] = useState(false);
-  return (
-    <>
-      <DropdownMenu>
-        <DropdownMenuTrigger
-          aria-label={`Mais ações da dupla de ${nomeDupla.split(" ")[0]}`}
-          title="Mais ações"
-          className="grid size-11 shrink-0 place-items-center rounded-xl border border-border bg-card text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:size-7 md:rounded-lg lg:size-8"
-        >
-          <DotsThreeVertical size={18} weight="bold" aria-hidden />
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem onClick={() => setOpen(true)}>
-            <ChatsCircle size={16} data-icon="inline-start" aria-hidden />
-            Registrar supervisão
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-      <SupervisaoDialog alvos={[alvo]} open={open} onOpenChange={setOpen} />
     </>
   );
 }

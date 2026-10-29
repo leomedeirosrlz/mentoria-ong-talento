@@ -30,23 +30,19 @@ import {
   rotuloDiaAgenda,
 } from "@/lib/agenda-minha";
 import type { Interacao } from "@/lib/interacoes";
-import type { SupervisaoAlvo } from "@/lib/queries-supervisao";
 import type {
   CicloEvento,
   Cronograma,
   Dupla,
-  Supervisao,
 } from "@/lib/types";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/avatar";
 import { AuxCardAcoes } from "@/components/aux-card-acoes";
 import { DuplaWaAcao } from "@/components/dupla-wa-acao";
-import { SupervisaoDialog } from "@/components/supervisao-dialog";
 import { SemanaDoPrograma } from "@/components/semana-do-programa";
 import { PAINEL_AGENDA } from "@/lib/agenda-abas";
 import { SaudePrograma } from "@/components/saude-programa";
-import { Button } from "@/components/ui/button";
 import {
   lembreteDaDupla,
   mesLongo,
@@ -73,8 +69,6 @@ export function AgendaAuxiliar({
   duplas,
   eventos,
   cronogramas,
-  supervisoes,
-  alvos,
   nudges,
   meuNome,
   hoje,
@@ -87,10 +81,6 @@ export function AgendaAuxiliar({
   duplas: Dupla[];
   eventos: CicloEvento[];
   cronogramas: Cronograma[];
-  /** getSupervisoesDaPessoa(me.id) — conduzidas por mim sobre mentores. */
-  supervisoes: Supervisao[];
-  /** Alvos do dialog de supervisão (escopo do RLS). */
-  alvos: SupervisaoAlvo[];
   /** getUltimasInteracoes — pro cap de 48h do Lembrar. */
   nudges: Record<string, Interacao>;
   /** Primeiro nome — assina a mensagem do lembrete. */
@@ -111,7 +101,7 @@ export function AgendaAuxiliar({
 }) {
   const agora = new Date(agoraMs);
   const grupos = duplasPorTurma(duplas, cronogramas, eventos, agora);
-  const itens = itensConsolidados(duplas, supervisoes, eventos, agora);
+  const itens = itensConsolidados(duplas, [], eventos, agora);
   const saudePorId = new Map(
     duplas.map((d) => [d.id, saudadeDaDupla(d, eventos, agora)])
   );
@@ -163,7 +153,7 @@ export function AgendaAuxiliar({
             // supervisionadas — a faixa da aux nunca mostra turma alheia
             eventos.filter((e) => cronosDelas.has(e.cronograma_id)),
             cronogramas.filter((c) => cronosDelas.has(c.id)),
-            supervisoes,
+            [],
             agora,
             // meta "N duplas" conta as supervisionadas daquele cronograma
             duplas
@@ -215,9 +205,6 @@ export function AgendaAuxiliar({
                         dupla={d}
                         saude={saudePorId.get(d.id)!}
                         contexto={contextoDuplaAux(d, eventos, agora)}
-                        alvo={
-                          alvos.find((a) => a.dupla_id === d.id) ?? null
-                        }
                         nudge={
                           nudges[d.id]?.tipo === "nudge" ? nudges[d.id] : null
                         }
@@ -255,7 +242,6 @@ export function AgendaAuxiliar({
         ) : (
           <ConsolidadaAux
             itens={itens}
-            alvos={alvos}
             duplasPorId={duplasPorId}
             nudges={nudges}
             eventos={eventos}
@@ -316,7 +302,7 @@ const ROTULO_STATUS: Record<Dupla["status"], string> = {
   ativa: "",
   pausada: "Pausada",
   concluida: "Concluída",
-  encerrada: "Encerrada",
+  encerrada: "Desistente",
 };
 
 /** O sinal mais grave que um lembrete endereça — o primeiro da fila do
@@ -337,7 +323,6 @@ function CardDuplaAux({
   dupla: d,
   saude,
   contexto,
-  alvo,
   nudge,
   eventos,
   meuNome,
@@ -346,7 +331,6 @@ function CardDuplaAux({
   dupla: Dupla;
   saude: DuplaSaude;
   contexto: { texto: string; problema: boolean };
-  alvo: SupervisaoAlvo | null;
   nudge: Interacao | null;
   eventos: CicloEvento[];
   meuNome: string;
@@ -415,10 +399,7 @@ function CardDuplaAux({
           />
         )}
         <AuxCardAcoes
-          alvos={alvo ? [alvo] : undefined}
           href={`/duplas/${d.id}`}
-          nome={nome}
-          menu={!!lembrete}
         />
       </div>
     </article>
@@ -445,7 +426,6 @@ const ROTULO_TIPO: Record<ItemConsolidado["tipo"], string> = {
 
 function ConsolidadaAux({
   itens,
-  alvos,
   duplasPorId,
   nudges,
   eventos,
@@ -454,7 +434,6 @@ function ConsolidadaAux({
   agora,
 }: {
   itens: ItemConsolidado[];
-  alvos: SupervisaoAlvo[];
   duplasPorId: Map<string, Dupla>;
   nudges: Record<string, Interacao>;
   eventos: CicloEvento[];
@@ -495,7 +474,6 @@ function ConsolidadaAux({
                 <LinhaConsolidada
                   key={item.id}
                   item={item}
-                  alvos={alvos}
                   dupla={
                     item.duplaId != null
                       ? duplasPorId.get(item.duplaId)
@@ -522,7 +500,6 @@ function ConsolidadaAux({
 
 function LinhaConsolidada({
   item,
-  alvos,
   dupla,
   nudge,
   eventos,
@@ -530,7 +507,6 @@ function LinhaConsolidada({
   agora,
 }: {
   item: ItemConsolidado;
-  alvos: SupervisaoAlvo[];
   dupla: Dupla | undefined;
   nudge: Interacao | null;
   eventos: CicloEvento[];
@@ -538,11 +514,6 @@ function LinhaConsolidada({
   agora: Date;
 }) {
   const Icone = ICONE_TIPO[item.tipo];
-  // o dialog nasce com a dupla do item quando existe — o select abre já no
-  // contexto certo; sessão "geral" fica a escolha explícita de sempre
-  const alvosItem = item.duplaId
-    ? alvos.filter((a) => a.dupla_id === item.duplaId)
-    : alvos;
   const lembrete =
     item.tipo === "a_agendar" && dupla
       ? lembreteDaDupla(dupla, "sem_data", eventos, meuNome, agora)
@@ -593,17 +564,6 @@ function LinhaConsolidada({
               </p>
             ) : (
               <div className="mt-2 flex flex-wrap items-center gap-2">
-                {item.tipo === "supervisao" && alvosItem.length > 0 && (
-                  <SupervisaoDialog
-                    alvos={alvosItem}
-                    trigger={
-                      <Button variant="outline" size="sm">
-                        <ChatsCircle size={14} aria-hidden />
-                        Registrar supervisão
-                      </Button>
-                    }
-                  />
-                )}
                 {item.tipo === "encontro" && item.href && (
                   <Link
                     href={item.href}

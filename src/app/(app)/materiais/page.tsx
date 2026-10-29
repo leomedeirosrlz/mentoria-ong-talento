@@ -47,10 +47,18 @@ export default async function MateriaisPage({
   searchParams: Promise<{ aba?: string }>;
 }) {
   const { aba: abaParam } = await searchParams;
-  const [materiais, me, eventos] = await Promise.all([
+  const [materiais, me, eventos, formulariosRaw] = await Promise.all([
     getMateriais(),
     getMe(),
     getCicloEventos(),
+    getMe().then((m) =>
+      temPapel(m, "coordenacao")
+        ? getFormularios().catch((e) => {
+            console.error("materiais/getFormularios:", e);
+            return [];
+          })
+        : Promise.resolve([])
+    ),
   ]);
 
   // coordenação por papel (não só o primário): o híbrido supervisor+coord
@@ -92,19 +100,27 @@ export default async function MateriaisPage({
   const vePainel =
     me != null && (temPapel(me, "coordenacao") || temPapel(me, "supervisor"));
   const ehMentorDpp = me != null && temPapel(me, "mentor_dpp");
-  const [painel, duplasPainel] =
+  const painelPromise =
+    vePainel || ehMentorDpp
+      ? vePainel
+        ? getPainelInstrumentosJornada()
+        : Promise.resolve([])
+      : Promise.resolve([]);
+  const [painel, duplasPainel, nudges] =
     vePainel || ehMentorDpp
       ? await Promise.all([
-          vePainel ? getPainelInstrumentosJornada() : Promise.resolve([]),
+          painelPromise,
           getDuplas(),
+          painelPromise.then((p) =>
+            p.length
+              ? getUltimasInteracoes(
+                  p.map((l) => l.dupla_id),
+                  "nudge"
+                )
+              : {}
+          ),
         ])
-      : [[], []];
-  const nudges = painel.length
-    ? await getUltimasInteracoes(
-        painel.map((l) => l.dupla_id),
-        "nudge"
-      )
-    : {};
+      : [[], [], {}];
   const duplasInfo = new Map(
     duplasPainel.map((d) => [
       d.id,
@@ -135,10 +151,7 @@ export default async function MateriaisPage({
       : ("mentor" as const);
   const formIds = new Map<FormularioSistema, string>();
   if (ehCoord) {
-    const forms = await getFormularios().catch((e) => {
-      console.error("materiais/getFormularios:", e);
-      return [];
-    });
+    const forms = formulariosRaw;
     for (const f of forms) {
       if (f.sistema && !formIds.has(f.sistema)) formIds.set(f.sistema, f.id);
     }

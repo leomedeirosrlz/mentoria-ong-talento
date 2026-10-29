@@ -226,7 +226,7 @@ function alvosDe(
 
 const STATUS_LABEL: Record<string, string> = {
   ativa: "Ativa",
-  encerrada: "Encerrada",
+  encerrada: "Desistente",
   pausada: "Pausada",
   concluida: "Concluída",
 };

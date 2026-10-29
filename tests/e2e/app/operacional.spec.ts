@@ -479,6 +479,13 @@ test.describe("coordenação — fluxos operacionais", () => {
       .getByRole("button", { name: "Livres para dupla" })
       .click();
 
+    // expande o matching (colapsado por default)
+    const matchingTrigger = page.getByRole("button", { name: /Matching/i });
+    if (await matchingTrigger.isVisible()) {
+      await matchingTrigger.click();
+      await page.waitForTimeout(300);
+    }
+
     // board: todo mentor ativo com o X/Y — o reserva (1/1 implícita) já
     // nasce cheio marcado; o import (0/1) tem vaga
     const painel = page.locator("section", {
