@@ -161,7 +161,10 @@ export function AssistenteBolha({
       papeis={papeis}
       demo={demo}
       configurado={configurado}
-      autoFocus
+      // autoFocus só no desktop — no mobile focar na abertura abre o
+      // teclado durante a animação da sheet (flicker + metade da tela
+      // tomada); lá o foco vem do toque do usuário
+      autoFocus={desktop}
       nome={nome}
       registrarNova={(fn) => {
         novaConversaRef.current = fn;
@@ -182,14 +185,22 @@ export function AssistenteBolha({
     if (desktop || !aberto) return;
     const vv = window.visualViewport;
     if (!vv) return;
+    let raf = 0;
     const medir = () => {
-      const diff = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-      setKb(Math.round(diff));
+      // o iOS reporta valores intermediários durante a animação do
+      // teclado — coalescer pra um setState por frame evita rajada de
+      // re-layout na sheet
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const diff = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        setKb(Math.round(diff));
+      });
     };
     medir();
     vv.addEventListener("resize", medir);
     vv.addEventListener("scroll", medir);
     return () => {
+      cancelAnimationFrame(raf);
       vv.removeEventListener("resize", medir);
       vv.removeEventListener("scroll", medir);
     };

@@ -853,9 +853,11 @@ export function AssistenteConversa({
       )}
 
       {/* empty state (REALIZA-289): avatar + saudação + sugestões — some
-          na primeira mensagem e não volta */}
-      {msgs.length === 0 && (
-        <div className="flex min-h-0 flex-1 animate-in flex-col items-center justify-center gap-3 px-6 py-8 text-center fade-in-0 duration-300">
+          na primeira mensagem e não volta. Mutuamente exclusivo com o
+          transcript: os dois com flex-1 dividiam a altura e o conteúdo
+          centralizado transbordava pra cima do header no mobile. */}
+      {msgs.length === 0 ? (
+        <div className="scroll-fina flex min-h-0 flex-1 animate-in flex-col items-center justify-center gap-3 overflow-y-auto px-6 py-8 text-center fade-in-0 duration-300">
           <span className="grid size-12 place-items-center rounded-2xl bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)]">
             <Sparkle size={22} weight="fill" aria-hidden />
           </span>
@@ -882,12 +884,11 @@ export function AssistenteConversa({
             ))}
           </div>
         </div>
-      )}
-
-      {/* transcript — role=log + aria-live pra resposta nova; a rolagem só
+      ) : (
+      /* transcript — role=log + aria-live pra resposta nova; a rolagem só
           segue o fim quando o usuário já está perto dele. scroll-fina =
           scrollbar thin muted (REALIZA-282); fade no topo emoldura o topo
-          do log quando rolado */}
+          do log quando rolado */
       <div className="relative min-h-0 flex-1">
         <div
           ref={logRef}
@@ -1144,6 +1145,7 @@ export function AssistenteConversa({
           </Button>
         )}
       </div>
+      )}
 
       {/* composer — os chips moram no empty state agora. pb com safe-area:
           no Sheet mobile o composer não cola na home indicator */}
