@@ -17,7 +17,14 @@ import {
   useSyncExternalStore,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { ClockCounterClockwise, Plus, Sparkle, X } from "@phosphor-icons/react";
+import {
+  ClockCounterClockwise,
+  Gear,
+  Plus,
+  Sparkle,
+  X,
+} from "@phosphor-icons/react";
+import { AssistenteConfig } from "@/components/assistente-config";
 import { AssistenteConversa } from "@/components/assistente-conversa";
 import {
   Popover,
@@ -52,10 +59,12 @@ function Cabecalho({
   onFechar,
   onNovaConversa,
   onHistorico,
+  onConfig,
 }: {
   onFechar: () => void;
   onNovaConversa?: () => void;
   onHistorico?: () => void;
+  onConfig?: () => void;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-2.5 border-b border-border px-4 py-3">
@@ -96,6 +105,18 @@ function Cabecalho({
           className="shrink-0 text-muted-foreground"
         >
           <Plus aria-hidden />
+        </Button>
+      )}
+      {onConfig && (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label="Ajustes do assistente"
+          title="Ajustes do assistente"
+          onClick={onConfig}
+          className="shrink-0 text-muted-foreground"
+        >
+          <Gear aria-hidden />
         </Button>
       )}
       <Button
@@ -198,6 +219,20 @@ export function AssistenteBolha({
   );
   const novaConversa = () => novaConversaRef.current?.();
   const alternarHistorico = () => historicoRef.current?.();
+
+  // aba de ajustes (REALIZA-328): view-stack aqui na bolha — a conversa
+  // continua montada por baixo (estado do chat preservado), o painel de
+  // config cobre. Só coordenação fora da demo (a RLS fecha a escrita de
+  // qualquer jeito — o botão é só cortesia de não mostrar o que nega)
+  const [viewConfig, setViewConfig] = useState(false);
+  const onConfig = papeis.includes("coordenacao") && !demo
+    ? () => setViewConfig(true)
+    : undefined;
+  const corpo = viewConfig ? (
+    <AssistenteConfig onVoltar={() => setViewConfig(false)} />
+  ) : (
+    conversa
+  );
 
   // arrastar p/ baixo fecha — a alça no topo da sheet rastreia o dedo 1:1
   // via transform (compositor, 60fps); >88px confirma, senão snap de volta.
@@ -312,9 +347,10 @@ export function AssistenteBolha({
             onFechar={() => mudar(false)}
             onNovaConversa={novaConversa}
             onHistorico={alternarHistorico}
+            onConfig={onConfig}
           />
           <PopoverTitle className="sr-only">Assistente</PopoverTitle>
-          {conversa}
+          {corpo}
         </PopoverContent>
       </Popover>
     );
@@ -368,8 +404,9 @@ export function AssistenteBolha({
             onFechar={() => mudar(false)}
             onNovaConversa={novaConversa}
             onHistorico={alternarHistorico}
+            onConfig={onConfig}
           />
-          {conversa}
+          {corpo}
         </SheetContent>
       </Sheet>
     </>

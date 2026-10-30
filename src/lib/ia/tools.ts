@@ -23,6 +23,7 @@ import type { AppRole, Dupla, Mentorado, Profile } from "@/lib/types";
 import {
   getAgendaPeriodoIa,
   getCapacidadeInsumos,
+  getChamadosIa,
   getCicloEventosIa,
   getDuplaIa,
   getDuplasResumoIa,
@@ -30,6 +31,7 @@ import {
   getFilaInsumos,
   getInstrumentosDaDuplaIa,
   getJovemDuplaIa,
+  getPessoasBuscaIa,
   getRegistrosDaDuplaIa,
   matchGuiaIa,
   papeisDoUsuario,
@@ -395,7 +397,10 @@ export const IA_TOOLS = {
     roles: TODOS_PAPEIS,
     run: async ({ pergunta }: z.infer<typeof guiaArgs>, ctx) => {
       const [fontes, catalogo] = await Promise.all([
-        matchGuiaIa(ctx.supabase, pergunta, 4),
+        // pede 10 e fica com 4 SEÇÕES únicas — sem o dedup, 3 slots iam
+        // pro mesmo capítulo ("12 · Avaliação" repetia 3×) e o roteiro
+        // diverso ficava de fora do contexto do modelo
+        matchGuiaIa(ctx.supabase, pergunta, 10),
         // catálogo completo sempre junto — "que guias você tem" se responde
         // mesmo quando a busca não retorna trecho pro termo perguntado
         ctx.supabase.from("ia_chunks").select("guia"),
@@ -403,15 +408,77 @@ export const IA_TOOLS = {
       const guias = [
         ...new Set((catalogo.data ?? []).map((r) => r.guia as string)),
       ].sort();
+      const vistas = new Set<string>();
+      const unicas = fontes.filter((f) => {
+        const chave = `${f.guia}|${f.secao ?? ""}`;
+        if (vistas.has(chave)) return false;
+        vistas.add(chave);
+        return true;
+      });
       // score sai fora — número de ranking não ajuda o modelo a citar
       return {
-        fontes: fontes.map((f) => ({
+        fontes: unicas.slice(0, 4).map((f) => ({
           guia: f.guia,
           secao: f.secao,
           pagina: f.pagina,
           trecho: f.trecho,
         })),
         guias,
+      };
+    },
+  },
+
+  chamados_resumo: {
+    nome: "chamados_resumo",
+    descricao:
+      "Chamados de apoio abertos ou em atendimento (REALIZA-325): número, categoria, assunto, status e a dupla ligada — a RLS decide o escopo (staff vê a fila inteira, mentor os próprios). Use pra 'quantos chamados abertos?', 'pedidos de apoio pendentes', 'o que a equipe tá atendendo'. O conteúdo das mensagens não sai pela tool — detalhe fica na tela de Chamados.",
+    schema: semArgs,
+    roles: TODOS_PAPEIS,
+    run: async (_args: z.infer<typeof semArgs>, ctx) => {
+      const itens = await getChamadosIa(ctx.supabase);
+      const porStatus = { aberto: 0, em_atendimento: 0 };
+      for (const c of itens) {
+        if (c.status === "aberto") porStatus.aberto++;
+        else if (c.status === "em_atendimento") porStatus.em_atendimento++;
+      }
+      return {
+        total: itens.length,
+        ...porStatus,
+        chamados: itens.map((c) => ({
+          numero: c.numero,
+          categoria: c.categoria,
+          assunto: c.assunto,
+          status: c.status,
+          dupla_id: c.dupla_id,
+          criado_em: c.created_at,
+        })),
+      };
+    },
+  },
+
+  pessoas_busca: {
+    nome: "pessoas_busca",
+    descricao:
+      "Busca pessoas do programa por nome (staff): devolve profile_id, nome, nome social e papel — use pra achar a pessoa antes de perguntar pela ficha dela, ou pra responder 'quem é X'. Contatos e dados sensíveis não saem pela tool.",
+    schema: z
+      .object({
+        nome: z
+          .string()
+          .min(2)
+          .max(80)
+          .describe("nome (ou trecho do nome) da pessoa"),
+      })
+      .strict(),
+    roles: ["coordenacao", "supervisor"],
+    run: async ({ nome }: { nome: string }, ctx) => {
+      const pessoas = await getPessoasBuscaIa(ctx.supabase, nome);
+      return {
+        total: pessoas.length,
+        pessoas: pessoas.map((p) => ({
+          profile_id: p.id,
+          nome: p.nome_social || p.nome,
+          papel: p.role,
+        })),
       };
     },
   },
@@ -502,7 +569,11 @@ export async function executarTool(
   nome: string,
   args: unknown,
   supabase: SupabaseClient,
-  canal: CanalIa
+  canal: CanalIa,
+  /** papéis pré-resolvidos — o MCP autentica por PAT (não há JWT pra
+   *  my_papeis), então a rota passa os papéis que a autorização devolveu.
+   *  Ausente → resolve do JWT como sempre. */
+  papeisForcados?: AppRole[]
 ): Promise<ResultadoTool> {
   const inicio = Date.now();
   let ok = false;
@@ -527,7 +598,7 @@ export async function executarTool(
     // — o híbrido chama a tool do papel que ele tem, mesmo fora do primário.
     // ctx.papel é o papel que liberou (ordem do roles da tool — staff antes
     // de mentorado), pra run ramificar certo (ex.: ficha do jovem)
-    const papeis = await papeisDoUsuario(supabase);
+    const papeis = papeisForcados ?? (await papeisDoUsuario(supabase));
     const papel = (tool.roles as readonly Papel[]).find((r) =>
       papeis.includes(r)
     );

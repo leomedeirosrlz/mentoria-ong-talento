@@ -572,3 +572,61 @@ export async function matchGuiaIa(
   if (error) throw error;
   return (data ?? []) as unknown as FonteGuia[];
 }
+
+// ---------- chamados + pessoas (REALIZA-325) ----------
+
+/** Chamados no escopo que a RLS já dá: staff vê a fila inteira (view
+ *  chamados_fila), autor vê os próprios. Pro resumo da tool basta o
+ *  essencial — conteúdo da conversa do chamado fica fora (mesma regra de
+ *  minimização dos registros). */
+export type ChamadoIa = {
+  id: string;
+  numero: string;
+  categoria: string;
+  assunto: string;
+  status: string;
+  dupla_id: string | null;
+  created_at: string;
+};
+
+export async function getChamadosIa(
+  supabase: SupabaseClient,
+  limite = 15
+): Promise<ChamadoIa[]> {
+  const { data, error } = await supabase
+    .from("chamados")
+    .select("id, numero, categoria, assunto, status, dupla_id, created_at")
+    .neq("status", "resolvido")
+    .order("created_at", { ascending: false })
+    .limit(limite);
+  if (error) throw error;
+  return (data ?? []) as unknown as ChamadoIa[];
+}
+
+/** Busca de pessoas por nome (staff): perfil mínimo pra identificar e
+ *  pra alimentar outras tools com ids — contato e campos sensíveis não
+ *  saem pela tool. A RLS de profiles decide o que volta. */
+export async function getPessoasBuscaIa(
+  supabase: SupabaseClient,
+  nome: string,
+  limite = 8
+): Promise<
+  { id: string; nome: string; nome_social: string | null; role: string | null }[]
+> {
+  const termo = nome.trim().replace(/[%_]/g, "");
+  if (termo.length < 2) return [];
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, nome, nome_social, role")
+    .or(`nome.ilike.%${termo}%,nome_social.ilike.%${termo}%`)
+    .eq("ativo", true)
+    .order("nome")
+    .limit(limite);
+  if (error) throw error;
+  return (data ?? []) as {
+    id: string;
+    nome: string;
+    nome_social: string | null;
+    role: string | null;
+  }[];
+}

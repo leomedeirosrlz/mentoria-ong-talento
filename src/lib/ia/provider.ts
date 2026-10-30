@@ -22,6 +22,7 @@
 // duplicaria texto.
 
 import { z } from "zod";
+import type { EsforcoIa } from "./config";
 import { IA_TOOLS } from "./tools";
 
 /** Mensagem no formato chat.completions — `tool_calls`/`tool_call_id` são
@@ -116,16 +117,44 @@ function esperar(ms: number, signal?: AbortSignal): Promise<boolean> {
   });
 }
 
+// ---------- esforço (REALIZA-328) ----------
+
+const EFFORT = { baixo: "low", medio: "medium", alto: "high" } as const;
+
+/** Corpo compartilhado das duas chamadas: tier de modelo vem do roteador
+ *  (ia_config), não do env direto — slug ausente cai no IA_MODEL de
+ *  sempre. reasoning_effort só entra quando configurado; provider que
+ *  desconhece o campo devolve 400 e a chamada refaz sem ele (uma vez,
+ *  flag `mandarEsforco` no caller). */
+function montarBody(
+  messages: MsgChat[],
+  modelo: string | undefined,
+  esforco: EsforcoIa | undefined,
+  stream: boolean
+) {
+  return JSON.stringify({
+    model: modelo || process.env.IA_MODEL,
+    messages,
+    tools: toolsPayload(),
+    tool_choice: "auto",
+    ...(esforco ? { reasoning_effort: EFFORT[esforco] } : {}),
+    ...(stream ? { stream: true } : {}),
+  });
+}
+
 /** Uma rodada com o modelo. `sessao` é o id estável da conversa (o Go o
  *  exige pra rotear; outros providers ignoram o header extra). Nunca
  *  lança — erro de rede/timeout/HTTP vira `{ ok: false, erro }` amigável.
  *  REALIZA-307: falha transitória retenta uma vez — aqui o timeout é o
  *  AbortSignal.timeout interno (não vem da rota), então TimeoutError
- *  também vale retry. */
+ *  também vale retry. REALIZA-328: modelo/esforço por chamada —
+ *  400 com reasoning_effort refaz a rodada sem o campo. */
 export async function chamarModelo(
   messages: MsgChat[],
-  sessao?: string
+  sessao?: string,
+  opts?: { modelo?: string; esforco?: EsforcoIa }
 ): Promise<{ ok: true; mensagem: MsgChat } | { ok: false; erro: string }> {
+  let mandarEsforco = Boolean(opts?.esforco);
   for (let tentativa = 1; tentativa <= 2; tentativa++) {
     try {
       const res = await fetch(`${process.env.IA_API_BASE}/chat/completions`, {
@@ -136,15 +165,22 @@ export async function chamarModelo(
           "User-Agent": "realiza-app/1.0",
           ...(sessao ? { "x-opencode-session": sessao } : {}),
         },
-        body: JSON.stringify({
-          model: process.env.IA_MODEL,
+        body: montarBody(
           messages,
-          tools: toolsPayload(),
-          tool_choice: "auto",
-        }),
+          opts?.modelo,
+          mandarEsforco ? opts?.esforco : undefined,
+          false
+        ),
         signal: AbortSignal.timeout(Number(process.env.IA_TIMEOUT_MS ?? 20_000)),
       });
       if (!res.ok) {
+        // provider que não conhece reasoning_effort: tira o campo e refaz
+        // — a rodada não morre por um parâmetro opcional
+        if (res.status === 400 && mandarEsforco) {
+          mandarEsforco = false;
+          tentativa--;
+          continue;
+        }
         const corpo = await res.text().catch(() => "");
         console.error(`chamarModelo: HTTP ${res.status}`, corpo.slice(0, 300));
         if (tentativa === 1 && statusRetentavel(res.status)) {
@@ -210,11 +246,15 @@ export async function chamarModeloStream(
      *  combinado também dispara por timeout, e timeout não é cancelamento
      *  do usuário: vira fallback (a rodada tenta de novo em JSON) */
     clienteAbortou: () => boolean;
+    /** tier/esforço resolvidos pela rota (ia_config + roteador) */
+    modelo?: string;
+    esforco?: EsforcoIa;
   }
 ): Promise<ResultadoStream> {
   // retry só vale com a saída ainda limpa — depois de token emitido,
   // recomeçar re-imprime texto na tela do usuário
   let saiuAlgo = false;
+  let mandarEsforco = Boolean(opts.esforco);
   for (let tentativa = 1; tentativa <= 2; tentativa++) {
     try {
       const res = await fetch(`${process.env.IA_API_BASE}/chat/completions`, {
@@ -226,17 +266,23 @@ export async function chamarModeloStream(
           "User-Agent": "realiza-app/1.0",
           ...(sessao ? { "x-opencode-session": sessao } : {}),
         },
-        body: JSON.stringify({
-          model: process.env.IA_MODEL,
+        body: montarBody(
           messages,
-          tools: toolsPayload(),
-          tool_choice: "auto",
-          stream: true,
-        }),
+          opts.modelo,
+          mandarEsforco ? opts.esforco : undefined,
+          true
+        ),
         signal: opts.signal,
       });
       const tipo = res.headers.get("content-type") ?? "";
       if (!res.ok || !res.body || !tipo.includes("text/event-stream")) {
+        // 400 por reasoning_effort desconhecido: tira e refaz — o campo é
+        // opcional e não pode derrubar a rodada
+        if (res.status === 400 && mandarEsforco) {
+          mandarEsforco = false;
+          tentativa--;
+          continue;
+        }
         const corpo = await res.text().catch(() => "");
         console.error(
           `chamarModeloStream: HTTP ${res.status} tipo=${tipo}`,
