@@ -9,12 +9,15 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
+  ArrowDown,
   ArrowLeft,
+  ArrowUp,
   Check,
   CircleNotch,
   Copy,
   Key,
   Trash,
+  X,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import {
@@ -33,6 +36,9 @@ type Esforco = "baixo" | "medio" | "alto";
 
 type Config = {
   modelos: Partial<Record<Tier, string>>;
+  /** cadeia ordenada por tier — [0] é a 1ª tentativa após o primário;
+   *  grava dentro da mesma chave `modelos` (modelos.fallbacks) */
+  fallbacks: Record<Tier, string[]>;
   /** esforço por tier — no banco a chave `esforco` aceita objeto por
    *  tier ou string legada (mesmo nível pros três); a UI sempre grava
    *  o mapa completo */
@@ -121,6 +127,11 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
       ]);
       if (!vivo) return;
       const modelos: Config["modelos"] = {};
+      const fallbacks: Config["fallbacks"] = {
+        rapido: [],
+        balanceado: [],
+        forte: [],
+      };
       const esforco: Config["esforco"] = {
         rapido: "medio",
         balanceado: "medio",
@@ -132,6 +143,16 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
           const m = row.valor as Record<string, unknown>;
           for (const t of TIERS)
             if (typeof m[t.chave] === "string") modelos[t.chave] = m[t.chave] as string;
+          // cadeia por-tier (objeto) ou legado (array solto = pros 3)
+          const f = m.fallbacks;
+          const strs = (v: unknown) =>
+            Array.isArray(v) ? v.filter((s): s is string => typeof s === "string") : [];
+          if (Array.isArray(f)) {
+            for (const t of TIERS) fallbacks[t.chave] = strs(f);
+          } else if (f && typeof f === "object") {
+            const o = f as Record<string, unknown>;
+            for (const t of TIERS) fallbacks[t.chave] = strs(o[t.chave]);
+          }
         }
         if (row.chave === "esforco") {
           if (typeof row.valor === "string") {
@@ -147,7 +168,7 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
         if (row.chave === "roteamento" && typeof row.valor === "boolean")
           roteamento = row.valor;
       }
-      setCfg({ modelos, esforco, roteamento });
+      setCfg({ modelos, fallbacks, esforco, roteamento });
       setCatalogo(
         Array.isArray(res?.modelos) ? (res.modelos as string[]) : []
       );
@@ -232,11 +253,31 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
     [supabase, flash]
   );
 
+  // a chave `modelos` no banco carrega primários + cadeias juntos —
+  // gravar sempre o objeto inteiro evita perder metade num upsert
+  const gravarModelos = (campo: string, modelos: Config["modelos"], fallbacks: Config["fallbacks"]) =>
+    gravar(campo, "modelos", { ...modelos, fallbacks });
+
   const mudarModelo = (tier: Tier, slug: string) => {
     if (!cfg) return;
     const modelos = { ...cfg.modelos, [tier]: slug };
-    setCfg({ ...cfg, modelos });
-    void gravar(`modelo:${tier}`, "modelos", modelos);
+    // o primário novo não pode continuar na própria cadeia
+    const fallbacks = {
+      ...cfg.fallbacks,
+      [tier]: cfg.fallbacks[tier].filter((s) => s !== slug),
+    };
+    setCfg({ ...cfg, modelos, fallbacks });
+    void gravarModelos(`modelo:${tier}`, modelos, fallbacks);
+  };
+
+  const mudarFallbacks = (tier: Tier, lista: string[]) => {
+    if (!cfg) return;
+    const limpa = [...new Set(lista)].filter(
+      (s) => s && s !== cfg.modelos[tier]
+    );
+    const fallbacks = { ...cfg.fallbacks, [tier]: limpa };
+    setCfg({ ...cfg, fallbacks });
+    void gravarModelos(`fallback:${tier}`, cfg.modelos, fallbacks);
   };
   const mudarEsforco = (tier: Tier, e: Esforco) => {
     if (!cfg) return;
@@ -340,6 +381,98 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
                           {e.rotulo}
                         </Button>
                       ))}
+                    </div>
+                    {/* cadeia de fallback: se o primário falha (cota,
+                        janela de 5h, slug removido), tenta em ordem */}
+                    <div className="space-y-1">
+                      {cfg.fallbacks[t.chave].length > 0 && (
+                        <ol className="space-y-0.5" aria-label={`Fallbacks do tier ${t.rotulo}`}>
+                          {cfg.fallbacks[t.chave].map((slug, idx) => (
+                            <li
+                              key={slug}
+                              className="flex items-center gap-1.5 rounded-md bg-muted/60 py-0.5 pl-2 pr-1 text-[11px]"
+                            >
+                              <span className="w-3.5 shrink-0 text-muted-foreground">
+                                {idx + 1}.
+                              </span>
+                              <span className="min-w-0 flex-1 truncate font-mono">
+                                {slug}
+                              </span>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={idx === 0}
+                                aria-label={`Subir ${slug}`}
+                                onClick={() => {
+                                  const l = [...cfg.fallbacks[t.chave]];
+                                  [l[idx - 1], l[idx]] = [l[idx], l[idx - 1]];
+                                  mudarFallbacks(t.chave, l);
+                                }}
+                                className="h-5 w-5 rounded p-0"
+                              >
+                                <ArrowUp size={11} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={idx === cfg.fallbacks[t.chave].length - 1}
+                                aria-label={`Descer ${slug}`}
+                                onClick={() => {
+                                  const l = [...cfg.fallbacks[t.chave]];
+                                  [l[idx], l[idx + 1]] = [l[idx + 1], l[idx]];
+                                  mudarFallbacks(t.chave, l);
+                                }}
+                                className="h-5 w-5 rounded p-0"
+                              >
+                                <ArrowDown size={11} />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                aria-label={`Remover ${slug}`}
+                                onClick={() =>
+                                  mudarFallbacks(
+                                    t.chave,
+                                    cfg.fallbacks[t.chave].filter((s) => s !== slug)
+                                  )
+                                }
+                                className="h-5 w-5 rounded p-0 text-muted-foreground hover:text-destructive"
+                              >
+                                <X size={11} />
+                              </Button>
+                            </li>
+                          ))}
+                        </ol>
+                      )}
+                      <Select
+                        value=""
+                        onValueChange={(v) =>
+                          mudarFallbacks(t.chave, [
+                            ...cfg.fallbacks[t.chave],
+                            v as string,
+                          ])
+                        }
+                      >
+                        <SelectTrigger
+                          aria-label={`Adicionar fallback ${t.rotulo}`}
+                          className="h-7 border-dashed text-[11px] text-muted-foreground"
+                        >
+                          <SelectValue placeholder="+ fallback" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {catalogo
+                            .filter(
+                              (s) =>
+                                s !== cfg.modelos[t.chave] &&
+                                !cfg.fallbacks[t.chave].includes(s)
+                            )
+                            .map((slug) => (
+                              <SelectItem key={slug} value={slug}>
+                                {slug}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
                     </div>
                     <p className="text-[11px] text-muted-foreground">{t.dica}</p>
                   </div>

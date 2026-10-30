@@ -29,7 +29,12 @@ import {
 } from "@/lib/ia/provider";
 import type { MsgChat } from "@/lib/ia/provider";
 import { systemPromptIa } from "@/lib/ia/prompts";
-import { esforcoDoTier, getIaConfig, modeloDoTier } from "@/lib/ia/config";
+import {
+  esforcoDoTier,
+  fallbacksDoTier,
+  getIaConfig,
+  modeloDoTier,
+} from "@/lib/ia/config";
 import { rotearTier } from "@/lib/ia/roteador";
 import { checarLimiteIa } from "@/lib/ia/rate-limit";
 import type { FonteIa } from "@/lib/ia/fontes";
@@ -144,6 +149,7 @@ export async function POST(req: Request) {
   const chamada = {
     modelo: modeloDoTier(iaCfg, tier),
     esforco: esforcoDoTier(iaCfg, tier),
+    fallbacks: fallbacksDoTier(iaCfg, tier),
   };
 
   // sessão estável por usuário — o provider Go exige pra rotear/cachear;

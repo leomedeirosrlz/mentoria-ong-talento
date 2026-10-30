@@ -13,13 +13,14 @@
 // delta.tool_calls chega fatiado por `index` e o arguments é string
 // concatenada, então re-montar é obrigação desta camada, não da rota.
 // chamarModelo (JSON) segue como caminho de fallback.
-// Retry (REALIZA-307): falha transitória (5xx, 429, rede, timeout)
-// ganha UMA segunda tentativa com backoff curto — sem ela um soluço
-// do provider derrubava a rodada inteira ou forçava um fallback JSON
-// redundante no stream. 4xx nunca retenta (é erro nosso, não do
-// provider) e abort do cliente/rota idem — no stream o retry só existe
-// antes do primeiro byte útil: depois de token na tela, recomeçar
-// duplicaria texto.
+// Cadeia de modelos (REALIZA-328/329): cada chamada leva o primário +
+// fallbacks ordenados por tier (ia_config). Falha transitória (5xx,
+// 429, 402, rede, timeout), 404 ou 400 "model unavailable" avança pro
+// próximo slug — slugs e cotas do Zen mudam rápido e a cadeia absorve
+// sem deploy. Retry no MESMO slug não existe: repetiria o mesmo ponto
+// de falha; a exceção é o 400 de reasoning_effort, retry grátis sem o
+// campo no mesmo modelo. No stream, avançar só vale antes do primeiro
+// byte útil: depois de token na tela, recomeçar duplicaria texto.
 
 import { z } from "zod";
 import type { EsforcoIa } from "./config";
@@ -75,9 +76,37 @@ function toolsPayload() {
 const RETRY_BACKOFF_MS = 750;
 
 /** Status que merece segunda tentativa: 5xx (instância do provider
- *  caindo) e 429 (rate limit que libera em seguida). 4xx é erro nosso
- *  — auth, payload — retentar só queima cota. */
-const statusRetentavel = (status: number) => status === 429 || status >= 500;
+ *  caindo), 429 (rate limit que libera em seguida) e 402 (cota/janela
+ *  estourada — o Zen cobra por janelas de 5h). */
+const statusRetentavel = (status: number) =>
+  status === 429 || status === 402 || status >= 500;
+
+/** Falha que avança a cadeia de fallback: além do transitório, 404 e
+ *  400 com cara de indisponibilidade do modelo — slugs mudam rápido
+ *  no Zen ("Model is unavailable" chega como 400) e a cadeia existe
+ *  exatamente pra isso. 400 genérico (payload nosso) para a rodada. */
+function avancaCadeia(status: number, corpo: string): boolean {
+  if (statusRetentavel(status) || status === 404) return true;
+  if (status !== 400) return false;
+  return /unavailable|model|quota|limit/i.test(corpo);
+}
+
+/** [primário, ...fallbacks] dedup'd; cadeia vazia cai no IA_MODEL do
+ *  ambiente (undefined → montarBody resolve). Cada modelo tenta uma
+ *  vez — retry no MESMO slug só repetiria o mesmo ponto de falha. */
+function cadeiaDeModelos(
+  primario: string | undefined,
+  fallbacks?: string[]
+): (string | undefined)[] {
+  const unicos = [
+    ...new Set(
+      [primario, ...(fallbacks ?? [])].filter(
+        (s): s is string => Boolean(s && s.trim())
+      )
+    ),
+  ];
+  return unicos.length ? unicos : [undefined];
+}
 
 /** Throw transitório do fetch: TypeError = a rede caiu antes de vir
  *  resposta; TimeoutError/AbortError = um signal de timeout estourou.
@@ -152,59 +181,71 @@ function montarBody(
 export async function chamarModelo(
   messages: MsgChat[],
   sessao?: string,
-  opts?: { modelo?: string; esforco?: EsforcoIa }
+  opts?: { modelo?: string; esforco?: EsforcoIa; fallbacks?: string[] }
 ): Promise<{ ok: true; mensagem: MsgChat } | { ok: false; erro: string }> {
-  let mandarEsforco = Boolean(opts?.esforco);
-  for (let tentativa = 1; tentativa <= 2; tentativa++) {
-    try {
-      const res = await fetch(`${process.env.IA_API_BASE}/chat/completions`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${process.env.IA_API_KEY}`,
-          "Content-Type": "application/json",
-          "User-Agent": "realiza-app/1.0",
-          ...(sessao ? { "x-opencode-session": sessao } : {}),
-        },
-        body: montarBody(
-          messages,
-          opts?.modelo,
-          mandarEsforco ? opts?.esforco : undefined,
-          false
-        ),
-        signal: AbortSignal.timeout(Number(process.env.IA_TIMEOUT_MS ?? 20_000)),
-      });
-      if (!res.ok) {
-        // provider que não conhece reasoning_effort: tira o campo e refaz
-        // — a rodada não morre por um parâmetro opcional
-        if (res.status === 400 && mandarEsforco) {
-          mandarEsforco = false;
-          tentativa--;
-          continue;
+  const cadeia = cadeiaDeModelos(opts?.modelo, opts?.fallbacks);
+  let esperaMs = 0; // Retry-After de um 429 carrega pro próximo modelo
+  for (let i = 0; i < cadeia.length; i++) {
+    const ultimo = i === cadeia.length - 1;
+    if (esperaMs) {
+      await esperar(esperaMs);
+      esperaMs = 0;
+    }
+    // flag por modelo: o próximo da cadeia merece sua própria chance
+    // com reasoning_effort (um que recusa não fala pelos outros)
+    let mandarEsforco = Boolean(opts?.esforco);
+    for (;;) {
+      try {
+        const res = await fetch(`${process.env.IA_API_BASE}/chat/completions`, {
+          method: "POST",
+          headers: {
+            Authorization: `Bearer ${process.env.IA_API_KEY}`,
+            "Content-Type": "application/json",
+            "User-Agent": "realiza-app/1.0",
+            ...(sessao ? { "x-opencode-session": sessao } : {}),
+          },
+          body: montarBody(
+            messages,
+            cadeia[i],
+            mandarEsforco ? opts?.esforco : undefined,
+            false
+          ),
+          signal: AbortSignal.timeout(Number(process.env.IA_TIMEOUT_MS ?? 20_000)),
+        });
+        if (!res.ok) {
+          // provider que não conhece reasoning_effort: tira o campo e
+          // refaz no MESMO modelo — retry grátis, não consome a cadeia
+          if (res.status === 400 && mandarEsforco) {
+            mandarEsforco = false;
+            continue;
+          }
+          const corpo = await res.text().catch(() => "");
+          console.error(
+            `chamarModelo: ${cadeia[i] ?? "env"} HTTP ${res.status}`,
+            corpo.slice(0, 300)
+          );
+          if (!ultimo && avancaCadeia(res.status, corpo)) {
+            esperaMs = delayDoRetry(res);
+            break;
+          }
+          return { ok: false, erro: IA_MSG_INDISPONIVEL };
         }
-        const corpo = await res.text().catch(() => "");
-        console.error(`chamarModelo: HTTP ${res.status}`, corpo.slice(0, 300));
-        if (tentativa === 1 && statusRetentavel(res.status)) {
-          await esperar(delayDoRetry(res));
-          continue;
+        const msg = (await res.json())?.choices?.[0]?.message as
+          | MsgChat
+          | undefined;
+        if (!msg || (msg.content == null && !msg.tool_calls?.length)) {
+          console.error("chamarModelo: resposta sem mensagem utilizável");
+          return { ok: false, erro: IA_MSG_INDISPONIVEL };
+        }
+        return { ok: true, mensagem: msg };
+      } catch (e) {
+        console.error(`chamarModelo: ${cadeia[i] ?? "env"}`, e);
+        if (!ultimo && erroTransitorio(e)) {
+          esperaMs = RETRY_BACKOFF_MS;
+          break;
         }
         return { ok: false, erro: IA_MSG_INDISPONIVEL };
       }
-      const msg = (await res.json())?.choices?.[0]?.message as
-        | MsgChat
-        | undefined;
-      if (!msg || (msg.content == null && !msg.tool_calls?.length)) {
-        console.error("chamarModelo: resposta sem mensagem utilizável");
-        return { ok: false, erro: IA_MSG_INDISPONIVEL };
-      }
-      return { ok: true, mensagem: msg };
-    } catch (e) {
-      console.error("chamarModelo:", e);
-      // só o transitório retenta — erro de parse/lógica cai direto
-      if (tentativa === 1 && erroTransitorio(e)) {
-        await esperar(RETRY_BACKOFF_MS);
-        continue;
-      }
-      return { ok: false, erro: IA_MSG_INDISPONIVEL };
     }
   }
   return { ok: false, erro: IA_MSG_INDISPONIVEL };
@@ -249,13 +290,27 @@ export async function chamarModeloStream(
     /** tier/esforço resolvidos pela rota (ia_config + roteador) */
     modelo?: string;
     esforco?: EsforcoIa;
+    /** cadeia ordenada de fallback por tier — cada slug tenta uma vez,
+     *  sempre ANTES do primeiro byte útil sair na tela */
+    fallbacks?: string[];
   }
 ): Promise<ResultadoStream> {
   // retry só vale com a saída ainda limpa — depois de token emitido,
-  // recomeçar re-imprime texto na tela do usuário
+  // recomeçar (mesmo em outro modelo) re-imprime texto na tela
   let saiuAlgo = false;
-  let mandarEsforco = Boolean(opts.esforco);
-  for (let tentativa = 1; tentativa <= 2; tentativa++) {
+  const cadeia = cadeiaDeModelos(opts.modelo, opts.fallbacks);
+  let esperaMs = 0;
+  for (let i = 0; i < cadeia.length; i++) {
+    const ultimo = i === cadeia.length - 1;
+    if (esperaMs) {
+      if (!(await esperar(esperaMs, opts.signal)))
+        return opts.clienteAbortou()
+          ? { ok: false, erro: "interrompido", abortado: true }
+          : { ok: false, erro: IA_MSG_INDISPONIVEL, fallback: true };
+      esperaMs = 0;
+    }
+    let mandarEsforco = Boolean(opts.esforco);
+    for (;;) {
     try {
       const res = await fetch(`${process.env.IA_API_BASE}/chat/completions`, {
         method: "POST",
@@ -268,7 +323,7 @@ export async function chamarModeloStream(
         },
         body: montarBody(
           messages,
-          opts.modelo,
+          cadeia[i],
           mandarEsforco ? opts.esforco : undefined,
           true
         ),
@@ -276,26 +331,23 @@ export async function chamarModeloStream(
       });
       const tipo = res.headers.get("content-type") ?? "";
       if (!res.ok || !res.body || !tipo.includes("text/event-stream")) {
-        // 400 por reasoning_effort desconhecido: tira e refaz — o campo é
-        // opcional e não pode derrubar a rodada
+        // 400 por reasoning_effort desconhecido: tira e refaz no mesmo
+        // modelo — o campo é opcional e não pode derrubar a rodada
         if (res.status === 400 && mandarEsforco) {
           mandarEsforco = false;
-          tentativa--;
           continue;
         }
         const corpo = await res.text().catch(() => "");
         console.error(
-          `chamarModeloStream: HTTP ${res.status} tipo=${tipo}`,
+          `chamarModeloStream: ${cadeia[i] ?? "env"} HTTP ${res.status} tipo=${tipo}`,
           corpo.slice(0, 300)
         );
-        // o provider recusou ANTES do stream abrir: 5xx/429 retenta — a
-        // espera é cancelável e o abort no meio dela sai pelo mesmo
+        // o provider recusou ANTES do stream abrir: avança a cadeia —
+        // a espera é cancelável e o abort no meio dela sai pelo mesmo
         // mapeamento do catch (cliente → "interrompido", rota → fallback)
-        if (tentativa === 1 && statusRetentavel(res.status)) {
-          if (await esperar(delayDoRetry(res), opts.signal)) continue;
-          return opts.clienteAbortou()
-            ? { ok: false, erro: "interrompido", abortado: true }
-            : { ok: false, erro: IA_MSG_INDISPONIVEL, fallback: true };
+        if (!ultimo && avancaCadeia(res.status, corpo)) {
+          esperaMs = delayDoRetry(res);
+          break;
         }
         return { ok: false, erro: IA_MSG_INDISPONIVEL, fallback: true };
       }
@@ -380,25 +432,23 @@ export async function chamarModeloStream(
       if (opts.clienteAbortou()) {
         return { ok: false, erro: "interrompido", abortado: true };
       }
-      console.error("chamarModeloStream:", e);
-      // não retenta quando: o signal da rota abortou sem ser o cliente
-      // (timeout combinado — o orçamento acabou), já é a 2ª tentativa,
-      // byte útil já saiu na tela (repetir duplicaria texto) ou o erro
-      // não é transitório — tudo cai no fallback, que a rota refaz em
-      // JSON re-enviando só o que ainda não virou token
+      console.error(`chamarModeloStream: ${cadeia[i] ?? "env"}`, e);
+      // não avança quando: o signal da rota abortou sem ser o cliente
+      // (timeout combinado — o orçamento acabou), é o último modelo da
+      // cadeia, byte útil já saiu na tela (repetir duplicaria texto) ou
+      // o erro não é transitório — tudo cai no fallback, que a rota
+      // refaz em JSON re-enviando só o que ainda não virou token
       if (
         opts.signal.aborted ||
-        tentativa === 2 ||
+        ultimo ||
         saiuAlgo ||
         !erroTransitorio(e)
       ) {
         return { ok: false, erro: IA_MSG_INDISPONIVEL, fallback: true };
       }
-      // rede/timeout antes do 1º byte útil: espera (cancelável) e repete
-      if (await esperar(RETRY_BACKOFF_MS, opts.signal)) continue;
-      return opts.clienteAbortou()
-        ? { ok: false, erro: "interrompido", abortado: true }
-        : { ok: false, erro: IA_MSG_INDISPONIVEL, fallback: true };
+      esperaMs = RETRY_BACKOFF_MS;
+      break;
+    }
     }
   }
   return { ok: false, erro: IA_MSG_INDISPONIVEL, fallback: true };
