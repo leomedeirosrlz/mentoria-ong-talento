@@ -566,6 +566,21 @@
   animation: ia-cursor 1.06s steps(1) infinite;
 }
 
+/* assistente — fade por fatia de ~6 chars no texto streamado: cada span
+   novo (o stream só acrescenta no fim) entra com um fade de opacidade
+   curto; só opacity anima = custo de compositor, zero reflow, e nenhum
+   throttle de TPS — a rede dita o ritmo, o fade só amortece a aparição.
+   Reduced-motion: o guard global zera e o texto aparece inteiro (o
+   comportamento ideal nesse caso). */
+@keyframes ia-tok {
+  from {
+    opacity: 0;
+  }
+}
+.ia-tok {
+  animation: ia-tok 0.32s ease-out both;
+}
+
 /* assistente — linha de status das tool rounds: varredura de luz sobre o
    texto (o vocabulário "processando" dos produtos de IA). Reusa o
    keyframe shimmer; guard de reduced-motion congela no ponto inicial do

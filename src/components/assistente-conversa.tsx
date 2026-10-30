@@ -173,19 +173,39 @@ function sugestoes(papeis: AppRole[]): string[] {
 
 const INLINE = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/g;
 
-function Inline({ texto }: { texto: string }) {
+/** Texto fatiado em ~6 chars com fade por fatia (stream): o conteúdo
+ *  só cresce no fim, então spans anteriores não re-animam e as novas
+ *  entram suave — a velocidade de exibição continua a da rede (sem
+ *  throttle de TPS), só a aparição é amortecida. */
+function Tokens({ texto }: { texto: string }) {
+  return (
+    <>
+      {Array.from({ length: Math.ceil(texto.length / 6) }, (_, i) => (
+        <span key={i} className="ia-tok">
+          {texto.slice(i * 6, i * 6 + 6)}
+        </span>
+      ))}
+    </>
+  );
+}
+
+function Inline({ texto, animar }: { texto: string; animar?: boolean }) {
   return (
     <>
       {texto.split(INLINE).map((parte, i) => {
         if (parte.startsWith("**") && parte.endsWith("**"))
-          return <strong key={i}>{parte.slice(2, -2)}</strong>;
+          return (
+            <strong key={i}>
+              {animar ? <Tokens texto={parte.slice(2, -2)} /> : parte.slice(2, -2)}
+            </strong>
+          );
         if (parte.startsWith("`") && parte.endsWith("`"))
           return (
             <code
               key={i}
               className="rounded bg-muted px-1 py-0.5 text-[0.85em] font-mono"
             >
-              {parte.slice(1, -1)}
+              {animar ? <Tokens texto={parte.slice(1, -1)} /> : parte.slice(1, -1)}
             </code>
           );
         const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(parte);
@@ -201,17 +221,25 @@ function Inline({ texto }: { texto: string }) {
                 rel="noopener noreferrer"
                 className="underline underline-offset-2 decoration-muted-foreground/50 hover:decoration-foreground"
               >
-                {rotulo}
+                {animar ? <Tokens texto={rotulo} /> : rotulo}
               </a>
             );
         }
-        return parte;
+        return animar ? <Tokens key={i} texto={parte} /> : parte;
       })}
     </>
   );
 }
 
-function MdLite({ texto, graficos }: { texto: string; graficos?: Grafico[] }) {
+function MdLite({
+  texto,
+  graficos,
+  animar,
+}: {
+  texto: string;
+  graficos?: Grafico[];
+  animar?: boolean;
+}) {
   const linhas = texto.split("\n");
   const blocos: React.ReactNode[] = [];
   let lista: string[] | null = null;
@@ -225,7 +253,7 @@ function MdLite({ texto, graficos }: { texto: string; graficos?: Grafico[] }) {
     if (!lista?.length) return;
     const items = lista.map((l, i) => (
       <li key={i}>
-        <Inline texto={l} />
+        <Inline texto={l} animar={animar} />
       </li>
     ));
     blocos.push(
@@ -305,7 +333,7 @@ function MdLite({ texto, graficos }: { texto: string; graficos?: Grafico[] }) {
     if (h) {
       blocos.push(
         <p key={key++} className="font-semibold">
-          <Inline texto={h[1]} />
+          <Inline texto={h[1]} animar={animar} />
         </p>
       );
       return;
@@ -317,14 +345,14 @@ function MdLite({ texto, graficos }: { texto: string; graficos?: Grafico[] }) {
           key={key++}
           className="border-l-2 border-border pl-3 text-muted-foreground"
         >
-          <Inline texto={quote[1]} />
+          <Inline texto={quote[1]} animar={animar} />
         </blockquote>
       );
       return;
     }
     blocos.push(
       <p key={key++}>
-        <Inline texto={linha} />
+        <Inline texto={linha} animar={animar} />
       </p>
     );
   });
@@ -415,13 +443,13 @@ function StatCards({ stats }: { stats: Stat[] }) {
  *  marca que o MdLite troca pelo gráfico na posição original (genUI v2).
  *  Stats inválido fica no texto como código; grafico inválido some —
  *  o usuário nunca lê JSON cru. */
-function BolhaMd({ texto }: { texto: string }) {
+function BolhaMd({ texto, animar }: { texto: string; animar?: boolean }) {
   const { stats, textoSemBloco } = extrairStats(texto);
   const { graficos, textoSemBloco: limpo } = extrairGraficos(textoSemBloco);
   return (
     <>
       {stats.length ? <StatCards stats={stats} /> : null}
-      {limpo ? <MdLite texto={limpo} graficos={graficos} /> : null}
+      {limpo ? <MdLite texto={limpo} graficos={graficos} animar={animar} /> : null}
     </>
   );
 }
@@ -1023,7 +1051,7 @@ export function AssistenteConversa({
                       )
                     ) : (
                       <>
-                        <BolhaMd texto={m.content || "…"} />
+                        <BolhaMd texto={m.content || "…"} animar={m.estado === "stream"} />
                         {/* status de tool round mid-stream mora DENTRO da
                             bolha (entre o texto e o caret) — uma bolha só,
                             nunca a dupla de antes */}

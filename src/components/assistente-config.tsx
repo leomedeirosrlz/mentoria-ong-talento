@@ -111,6 +111,11 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
   const [tokenNovo, setTokenNovo] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
   const [gerando, setGerando] = useState(false);
+  /** saude por slug: probe de 1 token via /api/ia/modelos — undefined =
+   *  não provado (fora do cap de 8), medindo = probe em voo */
+  const [saude, setSaude] = useState<
+    Record<string, { ok: boolean; ms: number; status: number } | "medindo">
+  >({});
   const salvoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -173,6 +178,28 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
         Array.isArray(res?.modelos) ? (res.modelos as string[]) : []
       );
       setTokens((tks ?? []) as TokenMcp[]);
+
+      // reconhecimento automático: probe de todos os slugs configurados
+      // (primários + cadeias) — catálogo não garante que o slug responde
+      const slugs = [
+        ...new Set(
+          TIERS.flatMap((t) => [modelos[t.chave], ...fallbacks[t.chave]])
+        ),
+      ].filter((s): s is string => Boolean(s));
+      if (slugs.length) {
+        setSaude(Object.fromEntries(slugs.map((s) => [s, "medindo" as const])));
+        fetch("/api/ia/modelos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ slugs }),
+        })
+          .then((r) => (r.ok ? r.json() : null))
+          .then((j) => {
+            if (vivo && j?.saude && typeof j.saude === "object")
+              setSaude(j.saude);
+          })
+          .catch(() => {});
+      }
     })();
     return () => {
       vivo = false;
@@ -300,6 +327,35 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
       <Check size={14} aria-hidden className="text-[var(--ok-text)]" />
     ) : null;
 
+  /** dot de saúde do slug (probe 1-token): verde <2,5s, âmbar ≥2,5s,
+   *  vermelho falhou, neutro pulsante enquanto mede / não provado */
+  const pontoSaude = (slug: string | undefined) => {
+    if (!slug) return null;
+    const s = saude[slug];
+    const [cor, rotulo, pulsa] =
+      s === "medindo"
+        ? ["bg-muted-foreground/40", "verificando…", true]
+        : s === undefined
+          ? ["bg-muted-foreground/30", "não verificado", false]
+          : !s.ok
+            ? ["bg-[var(--danger-text)]", `falhou (HTTP ${s.status || "rede"})`, false]
+            : s.ms < 2500
+              ? ["bg-[var(--ok-text)]", `ok · ${(s.ms / 1000).toFixed(1)}s`, false]
+              : ["bg-[var(--warn-text)]", `lento · ${(s.ms / 1000).toFixed(1)}s`, false];
+    return (
+      <span
+        role="img"
+        aria-label={`${slug}: ${rotulo}`}
+        title={`${slug}: ${rotulo}`}
+        className={cn(
+          "inline-block h-2 w-2 shrink-0 rounded-full",
+          cor,
+          pulsa && "animate-pulse"
+        )}
+      />
+    );
+  };
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       <div className="flex items-center gap-1 border-b border-border px-2 py-2">
@@ -337,10 +393,14 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
                 return (
                   <div key={t.chave} className="space-y-1.5">
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-sm font-medium">{t.rotulo}</span>
+                      <span className="flex items-center gap-1.5 text-sm font-medium">
+                        {t.rotulo}
+                        {pontoSaude(cfg.modelos[t.chave])}
+                      </span>
                       <span className="flex items-center gap-1.5">
                         {marcaDeSalvo(`modelo:${t.chave}`)}
                         {marcaDeSalvo(`esforco:${t.chave}`)}
+                        {marcaDeSalvo(`fallback:${t.chave}`)}
                       </span>
                     </div>
                     <Select
@@ -395,8 +455,9 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
                               <span className="w-3.5 shrink-0 text-muted-foreground">
                                 {idx + 1}.
                               </span>
-                              <span className="min-w-0 flex-1 truncate font-mono">
-                                {slug}
+                              <span className="flex min-w-0 flex-1 items-center gap-1.5">
+                                {pontoSaude(slug)}
+                                <span className="truncate font-mono">{slug}</span>
                               </span>
                               <Button
                                 variant="ghost"
