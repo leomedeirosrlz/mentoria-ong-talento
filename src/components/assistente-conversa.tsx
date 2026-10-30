@@ -29,12 +29,16 @@ import { metaFonte, type FonteIa } from "@/lib/ia/fontes";
 import {
   ehTabelaMd,
   extrairFontesTexto,
+  extrairGraficos,
   extrairStats,
+  MARCA_GRAFICO,
   parseTabelaMd,
+  type Grafico,
   type Stat,
   type StatTom,
   type TabelaMd,
 } from "@/lib/ia/render";
+import { CodeBlock, GraficoBloco } from "@/components/assistente-genui";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -207,13 +211,15 @@ function Inline({ texto }: { texto: string }) {
   );
 }
 
-function MdLite({ texto }: { texto: string }) {
+function MdLite({ texto, graficos }: { texto: string; graficos?: Grafico[] }) {
   const linhas = texto.split("\n");
   const blocos: React.ReactNode[] = [];
   let lista: string[] | null = null;
   let listaOrd = false;
   let emCodigo = false;
   let codigo: string[] = [];
+  // tag do fence corrente (```sql) — vira o rótulo do header do CodeBlock
+  let langCodigo: string | undefined;
   let key = 0;
   const flush = () => {
     if (!lista?.length) return;
@@ -238,25 +244,37 @@ function MdLite({ texto }: { texto: string }) {
   let pularAte = -1;
   linhas.forEach((linha, idx) => {
     if (idx <= pularAte) return;
-    // fenced code: tudo entre ``` vira bloco monoespaçado, sem inline
+    // fenced code: tudo entre ``` vira CodeBlock (genUI v2 — header com
+    // a linguagem e copiar), sem inline
     if (emCodigo) {
       if (/^\s*```/.test(linha)) {
         blocos.push(
-          <pre
+          <CodeBlock
             key={key++}
-            className="overflow-x-auto rounded-lg bg-muted px-3 py-2 text-[0.85em] font-mono"
-          >
-            <code>{codigo.join("\n")}</code>
-          </pre>
+            codigo={codigo.join("\n")}
+            linguagem={langCodigo}
+          />
         );
         emCodigo = false;
         codigo = [];
+        langCodigo = undefined;
       } else codigo.push(linha);
       return;
     }
-    if (/^\s*```/.test(linha)) {
+    const abreFence = /^\s*```(\S*)/.exec(linha);
+    if (abreFence) {
       flush();
       emCodigo = true;
+      langCodigo = abreFence[1] || undefined;
+      return;
+    }
+    // marca de um ```grafico válido (extrairGraficos já rodou): a linha
+    // sentinela vira o gráfico na posição em que o modelo o escreveu
+    const marca = MARCA_GRAFICO.exec(linha);
+    if (marca) {
+      flush();
+      const g = graficos?.[Number(marca[1])];
+      if (g) blocos.push(<GraficoBloco key={key++} g={g} />);
       return;
     }
     // pipe-table GFM (REALIZA-281): linha com pipes externos tenta virar
@@ -311,15 +329,16 @@ function MdLite({ texto }: { texto: string }) {
     );
   });
   flush();
-  // fence aberto no fim do stream: mostra o que chegou
+  // fence aberto no fim do stream: mostra o que chegou — copiar fica
+  // desabilitado até o fence fechar (o bloco ainda está incompleto)
   if (emCodigo && codigo.length)
     blocos.push(
-      <pre
+      <CodeBlock
         key={key++}
-        className="overflow-x-auto rounded-lg bg-muted px-3 py-2 text-[0.85em] font-mono"
-      >
-        <code>{codigo.join("\n")}</code>
-      </pre>
+        codigo={codigo.join("\n")}
+        linguagem={langCodigo}
+        pronto={false}
+      />
     );
   return <div className="space-y-2">{blocos}</div>;
 }
@@ -328,12 +347,12 @@ function MdLite({ texto }: { texto: string }) {
  *  inline pra manter negrito/código/link; rolagem horizontal no estreito. */
 function Tabela({ t }: { t: TabelaMd }) {
   return (
-    <div className="overflow-x-auto rounded-lg border border-border">
+    <div className="overflow-x-auto rounded-lg border border-border/70 bg-card">
       <table className="w-full text-left text-[0.9em]">
         <thead>
           <tr className="border-b border-border bg-muted/50">
             {t.cab.map((c, i) => (
-              <th key={i} className="px-2.5 py-1.5 font-semibold">
+              <th key={i} className="px-3 py-2 font-semibold">
                 <Inline texto={c} />
               </th>
             ))}
@@ -341,9 +360,9 @@ function Tabela({ t }: { t: TabelaMd }) {
         </thead>
         <tbody className="divide-y divide-border/60">
           {t.linhas.map((l, i) => (
-            <tr key={i}>
+            <tr key={i} className="transition-colors hover:bg-muted/40">
               {l.map((c, j) => (
-                <td key={j} className="px-2.5 py-1.5 align-top">
+                <td key={j} className="px-3 py-2 align-top">
                   <Inline texto={c} />
                 </td>
               ))}
@@ -371,7 +390,8 @@ function StatCards({ stats }: { stats: Stat[] }) {
       {stats.slice(0, 4).map((s, i) => (
         <div
           key={i}
-          className="rounded-lg border border-border bg-card px-2.5 py-2 shadow-[var(--shadow-border)]"
+          className="animate-enter rounded-lg border border-border bg-card px-2.5 py-2 shadow-[var(--shadow-border)]"
+          style={{ "--i": i } as React.CSSProperties}
         >
           <p className={cn("text-base font-semibold leading-tight", TOM_STAT[s.tom])}>
             {s.valor}
@@ -390,15 +410,18 @@ function StatCards({ stats }: { stats: Stat[] }) {
   );
 }
 
-/** Resposta do assistente: extrai o bloco ```stats (vira cartões) e
- *  renderiza o resto no MdLite. Bloco inválido/parcial fica no texto e
- *  renderiza como código — conteúdo nunca some. */
+/** Resposta do assistente: extrai os blocos ricos antes do MdLite —
+ *  ```stats vira a fileira de cartões no topo; ```grafico vira linha-
+ *  marca que o MdLite troca pelo gráfico na posição original (genUI v2).
+ *  Stats inválido fica no texto como código; grafico inválido some —
+ *  o usuário nunca lê JSON cru. */
 function BolhaMd({ texto }: { texto: string }) {
   const { stats, textoSemBloco } = extrairStats(texto);
+  const { graficos, textoSemBloco: limpo } = extrairGraficos(textoSemBloco);
   return (
     <>
       {stats.length ? <StatCards stats={stats} /> : null}
-      {textoSemBloco ? <MdLite texto={textoSemBloco} /> : null}
+      {limpo ? <MdLite texto={limpo} graficos={graficos} /> : null}
     </>
   );
 }
@@ -600,6 +623,22 @@ export function AssistenteConversa({
       flushRef.current = requestAnimationFrame(flushTokens);
   }
 
+  /** reset do stream: a rota refez a rodada em JSON (fallback pós-falha
+   *  de stream) — a geração nova não tem prefixo comum, então a bolha
+   *  zera e reimprime em vez de emendar textos diferentes */
+  function resetarStream() {
+    if (flushRef.current) {
+      cancelAnimationFrame(flushRef.current);
+      flushRef.current = 0;
+    }
+    tokensRef.current = "";
+    setMsgs((ms) =>
+      ms.map((m, i) =>
+        i === ms.length - 1 && m.estado === "stream" ? { ...m, content: "" } : m
+      )
+    );
+  }
+
   /** Fecha a rodada: flush dos tokens pendentes + marca o estado final da
    *  bolha (ok vira ausência de estado; erro ganha retry). */
   function finalizar(
@@ -704,6 +743,7 @@ export function AssistenteConversa({
             }
             if (!ev) continue;
             if (ev.type === "token") enfileirarToken((ev as { c: string }).c);
+            else if (ev.type === "reset") resetarStream();
             else if (ev.type === "status") setStatus((ev as { t: string }).t);
             else if (ev.type === "done") {
               const d = ev as { tools?: string[]; fontes?: FonteIa[] };

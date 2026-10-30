@@ -586,6 +586,96 @@
   animation: shimmer 1.7s linear infinite;
 }
 
+/* === assistente — genUI v2 (blocos ```grafico) ===
+   Entradas dos gráficos inline. Só transform/opacity e stroke-dash*
+   (paint) animam; todos os keyframes são "from" + fill both, então o
+   estado final é sempre o estilo natural do elemento — o guard global de
+   prefers-reduced-motion zera a animação e o gráfico já nasce pronto. */
+
+/* barra vertical nasce da própria baseline — transform-box: fill-box
+   ancora o transform-origin na caixa do rect, não no canto do viewBox */
+@keyframes ia-barra {
+  from {
+    transform: scaleY(0);
+  }
+}
+.ia-barra {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: ia-barra 420ms var(--ease-snappy) both;
+  animation-delay: calc(var(--i, 0) * 55ms + 90ms);
+}
+
+/* barra horizontal — reuse do fill-grow (scaleX da esquerda); o fill-box
+   ancora a origem no próprio elemento (div ou rect de svg) */
+.ia-barra-h {
+  transform-box: fill-box;
+  transform-origin: left;
+  animation: fill-grow 420ms var(--ease-snappy) both;
+  animation-delay: calc(var(--i, 0) * 55ms + 90ms);
+}
+
+/* traço da linha desenhado da esquerda pra direita — --traco é a length
+   da polyline calculada no componente; o dasharray fica inline no
+   elemento e o keyframe zera só o offset */
+@keyframes ia-traco {
+  from {
+    stroke-dashoffset: var(--traco, 400);
+  }
+}
+.ia-traco {
+  animation: ia-traco 620ms var(--ease-snappy) both;
+}
+
+/* fatia da rosca varre do zero: o elemento traz a dasharray real
+   (`<seg> <circ>`) e o keyframe zera só o 1º valor — o vão de 1000 é
+   grande demais pra aparecer em qualquer raio. --ini acumula o atraso
+   das fatias anteriores (varredura sequencial). */
+@keyframes ia-arco {
+  from {
+    stroke-dasharray: 0 1000;
+  }
+}
+.ia-arco {
+  animation: ia-arco 480ms var(--ease-snappy) both;
+  animation-delay: var(--ini, 0ms);
+}
+
+/* pop dos pontos/legendas depois do traço — scale pequeno, sem overshoot */
+@keyframes ia-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+.ia-pop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ia-pop 240ms var(--ease-snappy) both;
+  animation-delay: var(--ini, 0ms);
+}
+
+/* fade atrasado — área sob o traço, rótulos de valor sobre as barras */
+@keyframes ia-aparece {
+  from {
+    opacity: 0;
+  }
+}
+.ia-aparece {
+  animation: ia-aparece 320ms ease-out both;
+  animation-delay: var(--ini, 0ms);
+}
+
+/* highlight por fatia: as irmãs esmaecem enquanto uma está em hover
+   (o dado completo vai no <title> do grupo — sem tooltip próprio).
+   Só opacity: o guard zera a transição e o estado segue correto. */
+.ia-graf .ia-fatia {
+  transition: opacity 160ms var(--ease-snappy);
+}
+.ia-graf:has(.ia-fatia:hover) .ia-fatia:not(:hover) {
+  opacity: 0.38;
+}
+
 /* feedback de mutação — a célula que acabou de gravar pisca o --ok a ~20%
    e apaga em ~600ms. Uma vez só; o guard de reduced-motion zera. */
 @keyframes flash-ok {

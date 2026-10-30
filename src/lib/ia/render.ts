@@ -44,6 +44,26 @@
  *    separada dos chips de ação. Fontes são subconjunto dos links
  *    internos: quem monta as ações decide se filtra os /materiais/ pra
  *    não renderizar o mesmo link duas vezes.
+ *
+ *  Convenção 4 — bloco de gráfico ` ```grafico ` (genUI v2):
+ *      ```grafico
+ *      {"tipo":"barras","titulo":"Encontros por semana",
+ *       "dados":[{"rotulo":"S1","valor":12,"tom":"ok"}]}
+ *      ```
+ *    O fence é reconhecido pela tag `grafico` (mesma regra do stats). O
+ *    conteúdo é UM objeto JSON: `tipo` ∈ barras|barras-h|linha|area|
+ *    rosca|progresso, `titulo` opcional (≤60), `dados` = 1–10 itens
+ *    {rotulo ≤40, valor ≥0, tom opcional ∈ danger|warn|ok|info|pausa,
+ *    detalhe opcional ≤80} e `total` opcional (o M do "N de M" do
+ *    progresso). Chaves a mais são ignoradas.
+ *    - Bloco VÁLIDO vira uma linha-marca `\u0000grafico:<i>\u0000` no
+ *      texto devolvido — o gráfico fica na POSIÇÃO em que o modelo o
+ *      escreveu, não numa faixa separada como os stats. O MdLite troca a
+ *      marca pelo componente (`MARCA_GRAFICO` reconhece a linha).
+ *    - Bloco inválido ou fence sem fechar SAI do texto sem deixar marca:
+ *      diferente do stats (que fica visível pra iterar o prompt), spec
+ *      de gráfico cru é JSON de visualização — mostrar é ruído, não
+ *      informação. O usuário nunca vê o JSON quebrado.
  */
 
 import { z } from "zod";
@@ -132,6 +152,107 @@ export function extrairStats(texto: string): {
     i++;
   }
   return { stats, textoSemBloco: saida.join("\n").trim() };
+}
+
+// ---------- convenção 4: bloco ```grafico ----------
+
+const graficoTomSchema = z.enum(["danger", "warn", "ok", "info", "pausa"]);
+export type GraficoTom = z.infer<typeof graficoTomSchema>;
+
+// limites de UI: o gráfico é inline na bolha — rótulo curto, detalhe de
+// uma linha, até 10 fatias (o prompt recomenda ≤8). valor é número real
+// ≥0 (a escala do eixo resolve a proporção; inteiro não é exigido).
+const graficoDadoSchema = z.object({
+  rotulo: z.string().trim().min(1).max(40),
+  valor: z.number().finite().min(0),
+  tom: graficoTomSchema.optional(),
+  detalhe: z.string().trim().min(1).max(80).optional(),
+});
+export type GraficoDado = z.infer<typeof graficoDadoSchema>;
+
+const graficoSchema = z.object({
+  tipo: z.enum(["barras", "barras-h", "linha", "area", "rosca", "progresso"]),
+  titulo: z.string().trim().min(1).max(60).optional(),
+  dados: z.array(graficoDadoSchema).min(1).max(10),
+  total: z.number().finite().positive().optional(),
+});
+export type Grafico = z.infer<typeof graficoSchema>;
+export type GraficoTipo = Grafico["tipo"];
+
+// a linha do fence é só ```grafico — qualquer coisa a mais é fence comum
+const ABRE_GRAFICO = /^\s*```\s*grafico\s*$/i;
+
+// linha-marca que substitui o bloco válido no texto devolvido: \u0000 não
+// aparece em texto do modelo, então a marca nunca colide com conteúdo.
+// O MdLite reconhece a linha inteira e renderiza graficos[i] no lugar.
+export const MARCA_GRAFICO = /^\u0000grafico:(\d+)\u0000$/;
+const marca = (i: number) => `\u0000grafico:${i}\u0000`;
+
+/** Extrai os blocos ```grafico do texto. O válido deixa uma linha-marca
+ *  na posição original (o componente resolve pela lista `graficos`); o
+ *  inválido/parcial sai de fininho — spec cru não é informação pro
+ *  usuário. Mesmo scanner do extrairStats: qualquer linha ``` fecha um
+ *  fence, então a leitura nunca diverge do MdLite. */
+export function extrairGraficos(texto: string): {
+  graficos: Grafico[];
+  textoSemBloco: string;
+} {
+  const linhas = texto.split("\n");
+  const saida: string[] = [];
+  const graficos: Grafico[] = [];
+  let emFence = false; // fence comum (qualquer tag ≠ grafico) passa direto
+  let i = 0;
+  while (i < linhas.length) {
+    const linha = linhas[i];
+    if (emFence) {
+      saida.push(linha);
+      if (FENCE.test(linha)) emFence = false;
+      i++;
+      continue;
+    }
+    if (ABRE_GRAFICO.test(linha)) {
+      // sem fence de fechamento o spec ainda está chegando (stream) —
+      // tudo depois da tag é conteúdo do fence: some por ora e o gráfico
+      // entra de uma vez quando o fence fecha
+      let fecha = -1;
+      for (let j = i + 1; j < linhas.length; j++) {
+        if (FENCE.test(linhas[j])) {
+          fecha = j;
+          break;
+        }
+      }
+      let g: Grafico | null = null;
+      if (fecha !== -1) {
+        try {
+          const parsed = graficoSchema.safeParse(
+            JSON.parse(linhas.slice(i + 1, fecha).join("\n"))
+          );
+          if (parsed.success) g = parsed.data;
+        } catch {
+          // JSON quebrado: g segue null → o bloco some sem marca
+        }
+      }
+      // colapsa o vazio pendurado antes do bloco
+      while (saida.length && saida[saida.length - 1].trim() === "") saida.pop();
+      if (g) {
+        if (saida.length) saida.push("");
+        saida.push(marca(graficos.length));
+        graficos.push(g);
+      }
+      if (fecha === -1) break;
+      // pula o vazio depois do fence — uma linha em branco separa a marca
+      // (ou o texto) do que vem a seguir, nada pendurado nas pontas
+      let j = fecha + 1;
+      while (j < linhas.length && linhas[j].trim() === "") j++;
+      if (saida.length && j < linhas.length) saida.push("");
+      i = j;
+      continue;
+    }
+    if (FENCE.test(linha)) emFence = true;
+    saida.push(linha);
+    i++;
+  }
+  return { graficos, textoSemBloco: saida.join("\n").trim() };
 }
 
 // ---------- convenção 2: tabela pipe ----------

@@ -2,13 +2,17 @@ import { describe, expect, it } from "vitest";
 import {
   ehTabelaMd,
   extrairFontesTexto,
+  extrairGraficos,
   extrairStats,
+  MARCA_GRAFICO,
   parseTabelaMd,
 } from "@/lib/ia/render";
 
 // REALIZA-281/302 — convenções de UI generativa do markdown do assistente.
 // A regra de ouro: conteúdo nunca some — o que não valida fica no texto e
 // renderiza como markdown comum (code block, parágrafo com pipes).
+// Exceção do ```grafico (genUI v2): spec de gráfico é JSON de
+// visualização, não conteúdo — inválido sai do texto sem deixar marca.
 
 describe("extrairStats", () => {
   it("extrai bloco válido e remove o fence do texto", () => {
@@ -255,5 +259,145 @@ describe("extrairFontesTexto", () => {
         href: "/materiais/documento/guia/?aba=jornada#topo",
       },
     ]);
+  });
+});
+
+// ---------- bloco ```grafico (genUI v2) ----------
+
+const G_VALIDO =
+  '{"tipo":"barras","titulo":"Encontros","dados":[' +
+  '{"rotulo":"S1","valor":12,"tom":"ok"},' +
+  '{"rotulo":"S2","valor":9}]}';
+
+describe("extrairGraficos", () => {
+  it("extrai bloco válido e deixa a marca na posição original", () => {
+    const texto =
+      `Olha o ritmo:\n\n\`\`\`grafico\n${G_VALIDO}\n\`\`\`\n\nContinua caindo.`;
+    const { graficos, textoSemBloco } = extrairGraficos(texto);
+    expect(graficos).toEqual([
+      {
+        tipo: "barras",
+        titulo: "Encontros",
+        dados: [
+          { rotulo: "S1", valor: 12, tom: "ok" },
+          { rotulo: "S2", valor: 9 },
+        ],
+      },
+    ]);
+    // a linha-marca ocupa o lugar do bloco — o texto em volta fica intacto
+    expect(textoSemBloco).toBe(
+      "Olha o ritmo:\n\n\u0000grafico:0\u0000\n\nContinua caindo."
+    );
+    // e a marca é a linha que o MdLite reconhece
+    expect(
+      textoSemBloco.split("\n").some((l) => MARCA_GRAFICO.test(l))
+    ).toBe(true);
+  });
+
+  it("marca graficos[i] na ordem dos blocos — dois blocos, duas marcas", () => {
+    const texto =
+      `\`\`\`grafico\n${G_VALIDO}\n\`\`\`\n\nmeio\n\n` +
+      '```grafico\n{"tipo":"rosca","dados":[{"rotulo":"a","valor":3}]}\n```';
+    const { graficos, textoSemBloco } = extrairGraficos(texto);
+    expect(graficos.map((g) => g.tipo)).toEqual(["barras", "rosca"]);
+    expect(textoSemBloco).toBe(
+      "\u0000grafico:0\u0000\n\nmeio\n\n\u0000grafico:1\u0000"
+    );
+  });
+
+  it("campos opcionais: total do progresso e detalhe do item passam", () => {
+    const { graficos } = extrairGraficos(
+      '```grafico\n{"tipo":"progresso","titulo":"Jornada","total":16,' +
+        '"dados":[{"rotulo":"realizados","valor":12,"detalhe":"faltam 4"}]}\n```'
+    );
+    expect(graficos).toEqual([
+      {
+        tipo: "progresso",
+        titulo: "Jornada",
+        total: 16,
+        dados: [{ rotulo: "realizados", valor: 12, detalhe: "faltam 4" }],
+      },
+    ]);
+  });
+
+  it("chaves a mais no JSON são ignoradas; sem título/tom vira default", () => {
+    const { graficos } = extrairGraficos(
+      '```grafico\n{"tipo":"linha","cor":"azul","dados":[' +
+        '{"rotulo":"a","valor":1,"extra":true}]}\n```'
+    );
+    expect(graficos).toEqual([
+      { tipo: "linha", dados: [{ rotulo: "a", valor: 1 }] },
+    ]);
+  });
+
+  it("JSON quebrado: o bloco SOME do texto e nenhum gráfico sai", () => {
+    const texto =
+      'antes\n\n```grafico\n{"tipo":"barras", quebrado\n```\n\ndepois';
+    const { graficos, textoSemBloco } = extrairGraficos(texto);
+    expect(graficos).toEqual([]);
+    // diferente do stats: spec cru não fica visível — some por completo
+    expect(textoSemBloco).toBe("antes\n\ndepois");
+  });
+
+  it("schema fora do contrato: tipo inválido, sem dados, 11 itens, valor negativo", () => {
+    const casos = [
+      '{"tipo":"pizza","dados":[{"rotulo":"a","valor":1}]}',
+      '{"tipo":"barras","dados":[]}',
+      `{"tipo":"barras","dados":[${Array.from(
+        { length: 11 },
+        (_, i) => `{"rotulo":"r${i}","valor":${i}}`
+      ).join(",")}]}`,
+      '{"tipo":"barras","dados":[{"rotulo":"a","valor":-3}]}',
+      '{"tipo":"barras","dados":[{"rotulo":"a","valor":"12"}]}',
+      '{"tipo":"barras","dados":[{"rotulo":"a","valor":1,"tom":"vermelho"}]}',
+      '["não é objeto"]',
+    ];
+    for (const json of casos) {
+      const texto = `antes\n\n\`\`\`grafico\n${json}\n\`\`\`\n\ndepois`;
+      const { graficos, textoSemBloco } = extrairGraficos(texto);
+      expect(graficos).toEqual([]);
+      expect(textoSemBloco).toBe("antes\n\ndepois");
+    }
+  });
+
+  it("misto: bloco válido deixa marca, bloco inválido some", () => {
+    const texto =
+      `\`\`\`grafico\n${G_VALIDO}\n\`\`\`\n\n` +
+      "meio\n\n" +
+      '```grafico\n{"tipo":}\n```';
+    const { graficos, textoSemBloco } = extrairGraficos(texto);
+    expect(graficos).toHaveLength(1);
+    expect(textoSemBloco).toBe("\u0000grafico:0\u0000\n\nmeio");
+  });
+
+  it("fence grafico sem fechar some com o rabo (stream parcial)", () => {
+    const texto = `texto\n\n\`\`\`grafico\n${G_VALIDO.slice(0, 20)}`;
+    const { graficos, textoSemBloco } = extrairGraficos(texto);
+    expect(graficos).toEqual([]);
+    expect(textoSemBloco).toBe("texto");
+  });
+
+  it("```grafico dentro de um fence comum não vira gráfico", () => {
+    const texto = `\`\`\`\n\`\`\`grafico\n${G_VALIDO}\n\`\`\``;
+    const { graficos, textoSemBloco } = extrairGraficos(texto);
+    expect(graficos).toEqual([]);
+    expect(textoSemBloco).toBe(texto);
+  });
+
+  it("tag grafico aceita caixa alta e espaços em volta", () => {
+    const { graficos, textoSemBloco } = extrairGraficos(
+      `resumo:\n\n  \`\`\`GRAFICO  \n${G_VALIDO}\n\`\`\`\n`
+    );
+    expect(graficos).toHaveLength(1);
+    expect(textoSemBloco).toBe("resumo:\n\n\u0000grafico:0\u0000");
+  });
+
+  it("fence sem a tag grafico não é tocado", () => {
+    const texto =
+      `\`\`\`json\n${G_VALIDO}\n\`\`\`\n\n` +
+      `\`\`\`\n${G_VALIDO}\n\`\`\``;
+    const { graficos, textoSemBloco } = extrairGraficos(texto);
+    expect(graficos).toEqual([]);
+    expect(textoSemBloco).toBe(texto);
   });
 });
