@@ -108,7 +108,9 @@ export default async function PessoasPage() {
   if (souCoord) {
     for (const p of pessoas) {
       faltantesPorPessoa[p.id] = {
-        "termo-voluntario": faltantesDocumento("termo-voluntario", p),
+        // não-voluntário não tem termo a assinar — sem faltantes, sem pendência
+        "termo-voluntario":
+          p.voluntario === false ? [] : faltantesDocumento("termo-voluntario", p),
       };
     }
     for (const m of mentorados) {
@@ -144,7 +146,8 @@ export default async function PessoasPage() {
                   histórico, e reemitir manual continua possível) */}
               <EnviarTermosDialog
                 pessoas={pessoas
-                  .filter((p) => p.ativo)
+                  // não-voluntário não entra no pool de emissão do termo
+                  .filter((p) => p.ativo && p.voluntario !== false)
                   .map((p) => ({
                     id: p.id,
                     nome: p.nome,

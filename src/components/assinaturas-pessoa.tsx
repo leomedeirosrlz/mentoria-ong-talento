@@ -312,6 +312,7 @@ export function AssinaturasPessoa({
   id,
   nome,
   whatsapp,
+  voluntario,
 }: {
   tipo: "profile" | "mentorado";
   id: string;
@@ -320,6 +321,9 @@ export function AssinaturasPessoa({
   /** contato pra onde vai o link (jovem/responsável) — sem ele o botão
    *  WhatsApp não aparece e resta o "Copiar link" */
   whatsapp?: string | null;
+  /** flag "sou voluntário" do cadastro: false tira o termo do pool de
+   *  emissão — a ficha só mostra assinaturas já emitidas, se houver */
+  voluntario?: boolean | null;
 }) {
   const [itens, setItens] = useState<Assinatura[] | null>(null);
   const [falhou, setFalhou] = useState(false);
@@ -437,7 +441,9 @@ export function AssinaturasPessoa({
       .map((a) => a.template?.slug)
   );
   const emissiveis = TEMPLATES_POR_TIPO[tipo].filter(
-    (t) => !pendentesPorSlug.has(t.slug)
+    (t) =>
+      !pendentesPorSlug.has(t.slug) &&
+      !(tipo === "profile" && t.slug === "termo-voluntario" && voluntario === false)
   );
 
   return (

@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import type {
   AppRole,
+  CorRaca,
   Cronograma,
   Disponibilidade,
   Escolaridade,
@@ -54,6 +55,7 @@ type MentoradoOpt = {
  *  select volta vazio e a afinidade omite os campos. */
 type Pessoal = {
   genero: Genero | null;
+  cor_raca?: CorRaca | null;
   pref_genero_par: PrefGeneroPar | null;
   motivacao: string | null;
   data_nascimento?: string | null;
@@ -68,7 +70,19 @@ const NENHUM = "__nenhum";
 const papeisDe = (m: Opt | null | undefined): AppRole[] =>
   m?.papeis?.length ? m.papeis : m?.role ? [m.role as AppRole] : [];
 
-export function NovaDuplaDialog() {
+export function NovaDuplaDialog({
+  mentorIdInicial,
+  mentoradoIdInicial,
+  trigger,
+}: {
+  /** Pré-seleção vinda do modo "Parear" do card Aguardando par — aplicada
+   *  toda vez que o dialog abre (o fetch dos selects é async, então a
+   *  aplicação espera as opções chegarem via effect). */
+  mentorIdInicial?: string | null;
+  mentoradoIdInicial?: string | null;
+  /** Trigger customizado (default: botão "Nova dupla"). */
+  trigger?: React.ReactElement;
+}) {
   const [open, setOpen] = useState(false);
   const [mentores, setMentores] = useState<Opt[]>([]);
   const [mentorados, setMentorados] = useState<MentoradoOpt[]>([]);
@@ -209,6 +223,16 @@ export function NovaDuplaDialog() {
         setCronogramas((cronsRes.data ?? []) as Cronograma[]);
         carregou.current = true;
         setPronto(true);
+        // pré-seleção do "Parear": aplica depois das opções chegarem —
+        // antes disso os selects ainda não têm os itens pra exibir
+        if (mentoradoIdInicial) {
+          setMentoradoSel((cur) =>
+            cur ?? mentoradoIdInicial
+          );
+        }
+        if (mentorIdInicial) {
+          setMentorSel((cur) => cur ?? mentorIdInicial);
+        }
       } catch {
         if (cancelado) return;
         if (carregou.current) {
@@ -226,19 +250,22 @@ export function NovaDuplaDialog() {
     // só perde os campos de afinidade)
     supabase
       .from("profiles_pessoal")
-      .select("id, genero, pref_genero_par, motivacao")
+      .select("id, genero, cor_raca, pref_genero_par, motivacao")
       .then(({ data }) =>
         setPessoalMentor(new Map((data ?? []).map((r) => [r.id, r as Pessoal])))
       );
     supabase
       .from("mentorados_pessoal")
-      .select("id, genero, pref_genero_par, motivacao, data_nascimento")
+      .select("id, genero, cor_raca, pref_genero_par, motivacao, data_nascimento")
       .then(({ data }) =>
         setPessoalMentorado(new Map((data ?? []).map((r) => [r.id, r as Pessoal])))
       );
     return () => {
       cancelado = true;
     };
+    // as iniciais só se aplicam na abertura — refetch posterior não pode
+    // pisar numa escolha já feita (o ?? cur preserva a seleção)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, tentativa]);
 
   const mentorSelObj = mentores.find((m) => m.id === mentorSel) ?? null;
@@ -374,7 +401,15 @@ export function NovaDuplaDialog() {
         }
       }}
     >
-      <DialogTrigger render={<Button size="sm" className="max-sm:w-full"><Plus size={16} /> Nova dupla</Button>} />
+      <DialogTrigger
+        render={
+          trigger ?? (
+            <Button size="sm" className="max-sm:w-full">
+              <Plus size={16} /> Nova dupla
+            </Button>
+          )
+        }
+      />
       <DialogContent size="xl">
         <DialogHeader>
           <DialogTitle>Formar dupla</DialogTitle>
@@ -429,6 +464,7 @@ export function NovaDuplaDialog() {
             <Select
               name="mentor_id"
               required
+              value={mentorSel ?? undefined}
               items={Object.fromEntries(mentoresOrd.map((m) => {
                 const rotulo = `${m.nome} · ${vagasLabel(m)}`;
                 return [m.id, rotulo];
@@ -559,6 +595,7 @@ export function NovaDuplaDialog() {
             <Select
               name="mentorado_id"
               required
+              value={mentoradoSel ?? undefined}
               items={Object.fromEntries(mentoradosOrd.map((m) => [
                 m.id,
                 rotuloOcupado(m.id) ? `${m.nome} (${rotuloOcupado(m.id)})` : m.nome,
@@ -594,6 +631,8 @@ export function NovaDuplaDialog() {
                 cidade: mentorSelObj.cidade,
                 uf: mentorSelObj.uf,
                 genero: pessoalMentor.get(mentorSelObj.id)?.genero ?? null,
+                cor_raca:
+                  pessoalMentor.get(mentorSelObj.id)?.cor_raca ?? null,
                 pref_genero_par:
                   pessoalMentor.get(mentorSelObj.id)?.pref_genero_par ?? null,
                 motivacao: pessoalMentor.get(mentorSelObj.id)?.motivacao ?? null,
@@ -608,6 +647,8 @@ export function NovaDuplaDialog() {
                 cidade: mentoradoSelObj.cidade,
                 uf: mentoradoSelObj.uf,
                 genero: pessoalMentorado.get(mentoradoSelObj.id)?.genero ?? null,
+                cor_raca:
+                  pessoalMentorado.get(mentoradoSelObj.id)?.cor_raca ?? null,
                 pref_genero_par:
                   pessoalMentorado.get(mentoradoSelObj.id)?.pref_genero_par ??
                   null,

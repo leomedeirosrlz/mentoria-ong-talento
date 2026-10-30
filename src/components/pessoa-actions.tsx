@@ -427,16 +427,21 @@ export function PessoaActions({
             id="e_foto"
             defaultUrl={pessoa.avatar_path ? avatarPublicUrl(pessoa.avatar_path) : null}
           />
-          <DocumentoPessoa
-            tipo="profile"
-            id={pessoa.id}
-            documentoPath={pessoa.documento_path}
-          />
+          {/* o termo legado só existe pra voluntário — não-voluntário não
+              tem documento oficial a anexar (o flag vem logo abaixo) */}
+          {pessoa.voluntario !== false && (
+            <DocumentoPessoa
+              tipo="profile"
+              id={pessoa.id}
+              documentoPath={pessoa.documento_path}
+            />
+          )}
           <AssinaturasPessoa
             tipo="profile"
             id={pessoa.id}
             nome={pessoa.nome}
             whatsapp={pessoa.whatsapp}
+            voluntario={pessoa.voluntario}
           />
           {pessoa.role !== "mentorado" && (
             <label className="flex items-center gap-2 text-sm cursor-pointer">

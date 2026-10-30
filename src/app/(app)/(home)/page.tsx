@@ -60,6 +60,10 @@ export default async function HomePage({
   const cookieTurma = cookieStore.get(TURMA_FOCO_COOKIE)?.value;
   // um único instante pra página inteira — semáforo e "semana do encontro" consistentes
   const agora = new Date().toISOString();
+  // o banner do termo só existe pra quem é voluntário — o flag do cadastro
+  // decide; não-voluntário nunca vê a cobrança
+  const termoPendente =
+    assinatura?.status !== "assinado" && me?.voluntario !== false;
 
   if (me?.role === "coordenacao") {
     const [duplas, pessoas, solicitacoes, encerramentos, interacoes] = await Promise.all([
@@ -111,7 +115,7 @@ export default async function HomePage({
           encerramentos={new Set(encerramentos)}
           turmas={[...new Set(cronogramas.map((c) => c.turma))]}
           meuNome={me?.nome.split(" ")[0]}
-          termo={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
+          termo={termoPendente ? <TermoBanner /> : null}
           turmaFoco={foco.turma}
           seletorContexto={
             // o sync do cookie mora dentro do seletor mesmo quando ele se
@@ -215,7 +219,7 @@ export default async function HomePage({
           supervisor
           avisos={avisos}
           meuNome={me?.nome.split(" ")[0]}
-          termo={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
+          termo={termoPendente ? <TermoBanner /> : null}
           turmaFoco={focoSup.turma}
           seletorContexto={
             <TurmaContextoSelect
@@ -307,7 +311,7 @@ export default async function HomePage({
         espEventos={espEventos}
         cronogramas={cronogramas}
         me={me!}
-        termo={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
+        termo={termoPendente ? <TermoBanner /> : null}
       />
       <MeusChamadosCard
         chamados={meusChamados.itens}

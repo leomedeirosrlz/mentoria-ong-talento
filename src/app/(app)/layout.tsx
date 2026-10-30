@@ -90,12 +90,15 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // prefill: a importação da coordenação já pode ter trazido a ficha —
     // sensíveis via RPC self-scoped (0048), ficha de mentor via grant próprio.
     // civis + assinatura do termo alimentam o passo opcional de assinatura:
-    // "assinado" tira o passo do wizard, pendência mostra o termo pra ler/assinar
+    // "assinado" tira o passo do wizard, pendência mostra o termo pra
+    // ler/assinar. Não-voluntário não tem termo — nem busca
     const [pessoal, mentorProfile, civis, assinaturaTermo] = await Promise.all([
       getMeusDadosPessoais(),
       getMeuMentorProfile(),
       getMeusDadosCivis(),
-      getMinhaAssinaturaTermo(),
+      me.voluntario === false
+        ? Promise.resolve(null)
+        : getMinhaAssinaturaTermo(),
     ]);
     // o dock vai dentro do header do wizard (prop demo) — clicável em todos
     // os passos pra trocar de papel / rever a apresentação / sair da demo

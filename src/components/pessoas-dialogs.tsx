@@ -288,7 +288,14 @@ export function NovaPessoaDialog() {
         <>
           <FotoField id="foto" />
           <label className="flex items-center gap-2 text-sm cursor-pointer">
-            <input type="checkbox" name="voluntario" className="accent-primary" />
+            {/* voluntário é o caso comum (mentores/equipe) — não-voluntário
+                é a exceção que a coord desmarca; desmarcado pula o termo */}
+            <input
+              type="checkbox"
+              name="voluntario"
+              defaultChecked
+              className="accent-primary"
+            />
             Sou voluntário(a)
           </label>
           <CampoConsentimento />

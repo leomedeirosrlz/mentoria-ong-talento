@@ -265,7 +265,7 @@ export const IA_TOOLS = {
   aguardando_par: {
     nome: "aguardando_par",
     descricao:
-      "A fila de espera por pareamento, derivada ao vivo como na página de Pessoas: mentorados inscritos que nunca tiveram dupla (com origem e desde quando esperam) e mentores ativos com vaga livre (trilha e vagas). Use pra 'quem tá esperando par?', 'quantos jovens na fila?'.",
+      "A fila de espera por pareamento, derivada ao vivo como na página de Pessoas: mentorados inscritos que nunca tiveram dupla (com origem e desde quando esperam) e mentores DPP ativos com vaga livre. Especialistas não entram — parejam por demanda, não aguardam par. Use pra 'quem tá esperando par?', 'quantos jovens na fila?'.",
     schema: semArgs,
     roles: ["coordenacao"],
     run: async (_args: z.infer<typeof semArgs>, ctx) => {
@@ -289,7 +289,6 @@ export const IA_TOOLS = {
       ).map((m) => ({
         id: m.id,
         nome: m.nome,
-        trilha: m.trilha,
         vagas: m.vagas,
         origem: m.origem,
         esperando_desde: m.desde,

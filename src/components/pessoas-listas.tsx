@@ -8,7 +8,6 @@ import {
   CaretDown,
   FileText,
   GraduationCap,
-  LinkBreak,
   MagnifyingGlass,
   SignOut,
   Student,
@@ -36,7 +35,6 @@ import { RoleSelect } from "@/components/role-select";
 import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
 import { FilaEspera } from "@/components/fila-espera";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
-import { MatchingPanel } from "@/components/matching-panel";
 import { NovaPessoaDialog, NovoMentoradoDialog } from "@/components/pessoas-dialogs";
 import { Badge } from "@/components/ui/badge";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -105,9 +103,15 @@ function pendenciasPessoa(
   docs: DocsPessoa | undefined
 ): number {
   const d = docs ?? DOCS_VAZIO;
-  const termoOk = ehMentor(p)
-    ? Boolean(mp?.termo_ok)
-    : d.assinado["termo-voluntario"] !== undefined || Boolean(p.documento_path);
+  // não-voluntário não deve o termo (flag "sou voluntário" do cadastro) —
+  // a pendência só existe pra quem tem o documento a assinar
+  const termoOk =
+    p.voluntario === false
+      ? true
+      : ehMentor(p)
+        ? Boolean(mp?.termo_ok)
+        : d.assinado["termo-voluntario"] !== undefined ||
+          Boolean(p.documento_path);
   let n = 0;
   if (!termoOk) n++;
   if (ehMentor(p) && !mp?.formacao_ok) n++;
@@ -198,7 +202,6 @@ export function PessoasListas({
     return new URLSearchParams(window.location.search).get("busca") ?? "";
   });
   const [buscaDebounced, setBuscaDebounced] = useState(busca);
-  const [semDupla, setSemDupla] = useState(false);
   // filtros client-side (REALIZA-318) — combináveis (AND) em memória
   const [filtroPapel, setFiltroPapel] = useState(() => {
     if (typeof window === "undefined") return "todos";
@@ -368,43 +371,28 @@ export function PessoasListas({
     [pessoas]
   );
 
-  // matching board (REALIZA-116): "livre" pra mentor é ter VAGA, não estar
-  // zerado — com capacidade 2 a dupla 1/2 ainda aceita par. O painel recebe
-  // todos os ativos (cheios afundam marcados) e a ocupação pra desenhar o X/Y.
-  // WP6b: a contagem é por trilha — o híbrido é livre se QUALQUER pool dele
-  // tiver vaga (a outra pool não consome a vaga desta).
-  const usoDe = (p: Profile, trilha: "dpp" | "especialista") =>
-    contagemPorMentor[`${p.id}:${trilha}`] ?? 0;
+  // modo Parear do card "Aguardando par": "livre" pra mentor é ter VAGA
+  // DPP, não estar zerado — com capacidade 2 a dupla 1/2 ainda aceita par.
+  // O pool recebe todos os DPP ativos (cheios afundam marcados) e a
+  // ocupação pra desenhar o X/Y. Especialista não entra: pareja por
+  // demanda no mural, não é reserva obrigatória.
   const vagasDe = (p: Profile) => {
-    let livres = 0;
-    if (temPapel(p, "mentor_dpp")) {
-      livres = Math.max(
-        livres,
-        tetoMentor(p, mentorProfiles[p.id], "dpp") - usoDe(p, "dpp")
-      );
-    }
-    if (temPapel(p, "mentor_especialista")) {
-      livres = Math.max(
-        livres,
-        tetoMentor(p, mentorProfiles[p.id], "especialista") - usoDe(p, "especialista")
-      );
-    }
-    return livres;
+    if (!temPapel(p, "mentor_dpp")) return 0;
+    return Math.max(
+      0,
+      tetoMentor(p, mentorProfiles[p.id], "dpp") -
+        (contagemPorMentor[`${p.id}:dpp`] ?? 0)
+    );
   };
   const temVaga = (p: Profile) => ehMentor(p) && p.ativo && vagasDe(p) > 0;
-  const mentoresAtivos = pessoas.filter((p) => ehMentor(p) && p.ativo);
-  const mentoresComVaga = mentoresAtivos.filter(temVaga);
+  const mentoresDpp = pessoas.filter(
+    (p) => temPapel(p, "mentor_dpp") && p.ativo
+  );
   const mentoradosLivres = mentorados.filter(
     (m) => !emDupla.has(m.id) && !foraDoPrograma(m)
   );
-  const livres = mentoresComVaga.length + mentoradosLivres.length;
-  if (semDupla) {
-    pessoasFiltradas = pessoasFiltradas.filter(temVaga);
-    mentoradosFiltrados = mentoradosFiltrados.filter((m) => !emDupla.has(m.id));
-  }
   const filtrando =
     Boolean(q) ||
-    semDupla ||
     filtroPapel !== "todos" ||
     filtroStatus !== "ativos" ||
     filtroTrilha !== "todas";
@@ -457,14 +445,6 @@ export function PessoasListas({
 
   return (
     <>
-      {souCoord && semDupla && !verFora && (
-        <MatchingPanel
-          mentores={mentoresAtivos}
-          mentorados={mentoradosLivres}
-          mentorProfiles={mentorProfiles}
-          ocupacao={contagemPorMentor}
-        />
-      )}
       <div className="flex flex-wrap items-center gap-3">
         <div className="relative w-full sm:max-w-sm">
           <MagnifyingGlass
@@ -485,26 +465,6 @@ export function PessoasListas({
         </div>
         {souCoord && (
           <>
-            {/* chip com 0 resultado não filtra nada — esconde (o ativo
-                fica pra não prender a pessoa num filtro sem saída) */}
-            {(livres > 0 || semDupla) && (
-              <button
-                type="button"
-                aria-pressed={semDupla}
-                onClick={() => setSemDupla((v) => !v)}
-                className={filterChipCls(semDupla)}
-              >
-                Livres para dupla
-                <span
-                  className={cn(
-                    "font-mono text-[11px] tabular-nums",
-                    semDupla ? "text-background/70" : "text-muted-foreground/70"
-                  )}
-                >
-                  {livres}
-                </span>
-              </button>
-            )}
             {/* quem saiu do programa (0077): inverte a seção Mentorados pra
                 mostrar só eles — a seção colapsável no fim continua sendo
                 o arquivo de sempre visível */}
@@ -611,7 +571,6 @@ export function PessoasListas({
               setFiltroPapel("todos");
               setFiltroStatus("ativos");
               setFiltroTrilha("todas");
-              setSemDupla(false);
               setVerFora(false);
             }}
           >
@@ -620,10 +579,9 @@ export function PessoasListas({
         )}
       </div>
 
-      {/* fila de espera — sempre visível pra coordenação: é o contexto
-          (tempo de espera, origem, contato) que alimenta a decisão do
-          board; escondê-la atrás do chip era o que deixava inscrito novo
-          invisível */}
+      {/* fila + pareamento no mesmo card (fev/2026): a fila é o contexto
+          da decisão e o modo Parear transforma as próprias colunas no
+          seletor — clicou no jovem, clicou no mentor, afinidade na hora */}
       {souCoord && (
         <FilaEspera
           mentorados={filaMds}
@@ -632,7 +590,10 @@ export function PessoasListas({
           pessoasPorId={pessoaPorId}
           semHistorico={temQualquerDupla}
           euNome={euNome}
-          onParear={semDupla ? undefined : () => setSemDupla(true)}
+          mentoradosLivres={mentoradosLivres}
+          mentoresDpp={mentoresDpp}
+          mentorProfiles={mentorProfiles}
+          ocupacao={contagemPorMentor}
         />
       )}
 
@@ -643,7 +604,7 @@ export function PessoasListas({
         {/* re-key por busca/filtro/ordem — a troca re-roda o animate-enter
             das linhas em vez de um repaint seco (convenção) */}
         <div
-          key={`${q}|${semDupla ? 1 : 0}|${ordem}`}
+          key={`${q}|${ordem}`}
           className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden"
         >
           {basePessoas.length === 0 && (
@@ -687,15 +648,21 @@ export function PessoasListas({
               ) : (
                 <>
                   <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-                    <LinkBreak aria-hidden size={18} />
+                    <MagnifyingGlass aria-hidden size={18} />
                   </span>
-                  <p className="text-sm font-medium">Ninguém livre no momento</p>
-                  <p className="text-sm text-muted-foreground">Todos os mentores já estão em dupla.</p>
+                  <p className="text-sm font-medium">Nenhum resultado</p>
+                  <p className="text-sm text-muted-foreground">Os filtros ativos não retornaram ninguém.</p>
                   <Button
                     variant="ghost" size="sm" className="mt-2"
-                    onClick={() => setSemDupla(false)}
+                    onClick={() => {
+                      setBusca("");
+                      setFiltroPapel("todos");
+                      setFiltroStatus("ativos");
+                      setFiltroTrilha("todas");
+                      setVerFora(false);
+                    }}
                   >
-                    Ver todos
+                    Limpar filtros
                   </Button>
                 </>
               )}
@@ -732,7 +699,7 @@ export function PessoasListas({
         {/* a troca de filtro (busca, livres, fora, ordem) re-monta a lista —
             o animate-enter re-roda por linha (convenção) */}
         <div
-          key={`${q}|${semDupla ? 1 : 0}|${verFora ? 1 : 0}|${ordem}`}
+          key={`${q}|${verFora ? 1 : 0}|${ordem}`}
           className="rounded-xl bg-card shadow-[var(--shadow-border)] divide-y divide-border/60 overflow-hidden"
         >
           {mentorados.length === 0 &&
@@ -791,15 +758,21 @@ export function PessoasListas({
               ) : (
                 <>
                   <span className="grid size-11 place-items-center rounded-full bg-muted text-muted-foreground">
-                    <LinkBreak aria-hidden size={18} />
+                    <MagnifyingGlass aria-hidden size={18} />
                   </span>
-                  <p className="text-sm font-medium">Nenhum mentorado livre no momento</p>
-                  <p className="text-sm text-muted-foreground">Todos os mentorados já estão em dupla.</p>
+                  <p className="text-sm font-medium">Nenhum resultado</p>
+                  <p className="text-sm text-muted-foreground">Os filtros ativos não retornaram ninguém.</p>
                   <Button
                     variant="ghost" size="sm" className="mt-2"
-                    onClick={() => setSemDupla(false)}
+                    onClick={() => {
+                      setBusca("");
+                      setFiltroPapel("todos");
+                      setFiltroStatus("ativos");
+                      setFiltroTrilha("todas");
+                      setVerFora(false);
+                    }}
                   >
-                    Ver todos
+                    Limpar filtros
                   </Button>
                 </>
               )}
@@ -1068,17 +1041,23 @@ function PessoaRow({
   const usoPrimario =
     trilhaPrimaria === "especialista" ? usadas.especialista : usadas.dpp;
   const detalhesId = `detalhes-${p.id}`;
-  // inativo não tem pendência operacional a cobrar — a seção dele é arquivo
+  // inativo não tem pendência operacional a cobrar — a seção dele é arquivo;
+  // não-voluntário não deve termo (o flag do cadastro decide), só formação
   const temPendencia =
-    p.ativo && ehMentor(p) && (!mp?.termo_ok || !mp?.formacao_ok);
+    p.ativo &&
+    ehMentor(p) &&
+    ((p.voluntario !== false && !mp?.termo_ok) || !mp?.formacao_ok);
   const docs = docsProp ?? DOCS_VAZIO;
   const assinadoTermo = docs.assinado["termo-voluntario"];
   // o termo de voluntariado vale pra equipe inteira — mentor via termo_ok
   // (que também cobre o upload em papel), demais papéis pela assinatura
-  // ou pelo documento_path direto
-  const termoOk = ehMentor(p)
-    ? Boolean(mp?.termo_ok)
-    : assinadoTermo !== undefined || Boolean(p.documento_path);
+  // ou pelo documento_path direto; quem não é voluntário não tem o que cobrar
+  const termoOk =
+    p.voluntario === false
+      ? true
+      : ehMentor(p)
+        ? Boolean(mp?.termo_ok)
+        : assinadoTermo !== undefined || Boolean(p.documento_path);
   // diretório: subtítulo de contexto profissional (cargo · empresa, senão
   // cidade · UF) + chips do que a pessoa oferece/curte — áreas pra mentor,
   // interesses pro resto; tudo coluna pública do grant (0026/0034)
@@ -1327,21 +1306,24 @@ function PessoaRow({
               })()}
             </ItemDetalhe>
           )}
-          {mp?.termo_ok ? (
-            <ItemDetalhe icone={FileText}>
-              {assinadoTermo !== undefined ? (
-                <LinkAssinatura id={assinadoTermo.id}>
-                  {`Termo de adesão assinado${assinadoTermo.em ? ` em ${fmtDia(assinadoTermo.em)}` : ""}`}
-                </LinkAssinatura>
-              ) : (
-                "Termo de adesão no arquivo"
-              )}
-            </ItemDetalhe>
-          ) : (
-            <ItemDetalhe icone={FileText} warn>
-              Termo de adesão pendente de assinatura
-            </ItemDetalhe>
-          )}
+          {/* termo só aparece pra quem é voluntário — não-voluntário não
+              tem o documento a assinar, mostrar "pendente" seria ruído */}
+          {p.voluntario !== false &&
+            (mp?.termo_ok ? (
+              <ItemDetalhe icone={FileText}>
+                {assinadoTermo !== undefined ? (
+                  <LinkAssinatura id={assinadoTermo.id}>
+                    {`Termo de adesão assinado${assinadoTermo.em ? ` em ${fmtDia(assinadoTermo.em)}` : ""}`}
+                  </LinkAssinatura>
+                ) : (
+                  "Termo de adesão no arquivo"
+                )}
+              </ItemDetalhe>
+            ) : (
+              <ItemDetalhe icone={FileText} warn>
+                Termo de adesão pendente de assinatura
+              </ItemDetalhe>
+            ))}
           {!mp?.formacao_ok && (
             <ItemDetalhe icone={GraduationCap} warn>
               Formação inicial pendente

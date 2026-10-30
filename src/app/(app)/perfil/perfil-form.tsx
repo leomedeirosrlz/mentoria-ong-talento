@@ -1114,8 +1114,10 @@ export function PerfilForm({
   ].filter((c) => ehMentor || c.key !== "pref_genero_par");
   const cadPendentes = camposCadastro.filter((c) => !c.ok);
   // o termo de voluntariado entra na conta de pendências da gaveta mesmo
-  // não sendo campo — cadastro completo = dados + assinatura
-  const termoOk = assinaturaTermo?.status === "assinado";
+  // não sendo campo — cadastro completo = dados + assinatura. Quem não é
+  // voluntário (flag do cadastro) não tem o que assinar: conta como ok.
+  const termoOk =
+    me.voluntario === false || assinaturaTermo?.status === "assinado";
   const pendentesTotal = cadPendentes.length + (termoOk ? 0 : 1);
 
   // ficha de mentor: disponibilidade sem nenhuma célula conta como pendente
@@ -1479,7 +1481,9 @@ export function PerfilForm({
                 </div>
               </dl>
               {/* o termo não é campo do form — a assinatura mora em /assinar;
-                  a gaveta só anuncia o estado e manda pra lá */}
+                  a gaveta só anuncia o estado e manda pra lá. Não-voluntário
+                  nem vê a linha: não há documento dele pra assinar */}
+              {me.voluntario !== false && (
               <div className="mt-5 flex items-center gap-3 rounded-lg border border-border px-3.5 py-3">
                 <Signature
                   size={18}
@@ -1528,6 +1532,7 @@ export function PerfilForm({
                   </Link>
                 )}
               </div>
+              )}
             </div>
           </details>
 

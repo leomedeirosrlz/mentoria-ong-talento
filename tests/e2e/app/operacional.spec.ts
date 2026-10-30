@@ -471,65 +471,95 @@ test.describe("coordenação — fluxos operacionais", () => {
     await expect(linhaColega.getByText(/1\/2/)).toBeVisible();
   });
 
-  // REALIZA-116 — o X/Y percorre o board e o NovaDuplaDialog: mentor cheio
-  // fica selecionável marcado "sem vaga" (a afinidade dele ainda compara)
-  // mas o submit bloqueia até a capacidade subir ou outro mentor entrar
-  test("matching: X/Y no board e nova dupla bloqueada até aumentar a capacidade", async ({
+  // REALIZA-116 + rodada fev/2026 — o matching virou um estado do card
+  // "Aguardando par" (modo Parear): as próprias colunas são o seletor,
+  // mentor cheio fica clicável marcado "sem vaga" (a afinidade dele ainda
+  // compara) e o "Formar dupla" abre o dialog já com os dois escolhidos.
+  // Especialista não entra — pareja por demanda, não por reserva.
+  test("parear: linhas clicáveis, só DPP e submit bloqueado até aumentar a capacidade", async ({
     page,
   }) => {
     test.slow(); // write de capacidade em staging no meio do fluxo
     await page.goto("/pessoas");
-    await page
-      .getByRole("button", { name: "Livres para dupla" })
-      .click();
 
-    // expande o matching (colapsado por default)
-    const matchingTrigger = page.getByText(/Matching/i).first();
-    if (await matchingTrigger.isVisible()) {
-      await matchingTrigger.click();
-      await page.waitForTimeout(1000);
-    } else {
-      // fallback: tenta clicar no Collapsible trigger
-      const trigger = page.locator('[aria-expanded="false"]').first();
-      if (await trigger.isVisible()) {
-        await trigger.click();
-        await page.waitForTimeout(1000);
-      }
+    const card = page.locator(
+      'section[aria-labelledby="fila-espera-titulo"]'
+    );
+    await expect(card.getByText(/Aguardando par · \d+/)).toBeVisible();
+    // o card lembra o estado no localStorage — contexto novo abre por
+    // default, mas a guarda cobre um run que herde preferência fechada
+    const gatilho = card.getByRole("button", {
+      name: /Aguardando par ·/,
+    });
+    if ((await gatilho.getAttribute("aria-expanded")) === "false") {
+      await gatilho.click();
     }
 
-    // board: todo mentor ativo com o X/Y — o reserva (1/1 implícita) já
-    // nasce cheio marcado; o import (0/1) tem vaga. O painel novo é o
-    // MatchingPanel colapsável ("Matching · N mentores livres · M jovens").
-    const painel = page.locator("section", {
-      has: page.getByText(/^Matching ·/),
+    // modo Parear: as duas colunas viram radiogroups — mentorado livre de
+    // um lado, TODO mentor DPP ativo do outro (cheio afunda marcado)
+    await card.getByRole("button", { name: "Parear", exact: true }).click();
+    const colMentorados = card.getByRole("radiogroup", {
+      name: "Mentorados livres",
     });
-    await expect(painel).toBeVisible();
-    await painel.locator("#parear-mentor").click();
-    await expect(
-      page.getByRole("option", { name: /Mentor E2E Reserva · 1\/1 · sem vaga/ })
-    ).toBeVisible();
-    await expect(
-      page.getByRole("option", { name: /Mentor E2E Import · 0\/1/ })
-    ).toBeVisible();
-    // o colega carrega a pausada na contagem — 1/1 sem vaga também
-    await expect(
-      page.getByRole("option", { name: /Mentor E2E Colega · 1\/1 · sem vaga/ })
-    ).toBeVisible();
-    await page.keyboard.press("Escape");
+    const colMentores = card.getByRole("radiogroup", {
+      name: "Mentores DPP",
+    });
+    await expect(colMentorados).toBeVisible();
+    await expect(colMentores).toBeVisible();
 
-    // NovaDuplaDialog: mentor cheio selecionável + marcado, mas o submit
-    // segura até a capacidade subir — e o "aumentar capacidade →" resolve
-    await painel.getByRole("button", { name: "Nova dupla" }).click();
+    // X/Y por linha: reserva e colega (cap 1 com dupla viva) chegam cheios;
+    // o import (sem dupla) mostra a vaga livre. Especialista não aparece:
+    // "Esp E2E"/"Esp Dois E2E" ficam de fora do pool — demanda, não reserva
+    const linhaReserva = colMentores.getByRole("radio", {
+      name: /Mentor E2E Reserva/,
+    });
+    await expect(linhaReserva.getByText(/1\/1 · sem vaga/)).toBeVisible();
+    await expect(
+      colMentores.getByRole("radio", { name: /Mentor E2E Import/ }).getByText(/0\/1 · 1 vaga/)
+    ).toBeVisible();
+    await expect(
+      colMentores
+        .getByRole("radio", { name: /Mentor E2E Colega/ })
+        .getByText(/1\/1 · sem vaga/)
+    ).toBeVisible();
+    // o híbrido entra uma única vez, pelo papel DPP
+    await expect(
+      colMentores.getByRole("radio", { name: /Mentor E2E Híbrido/ })
+    ).toHaveCount(1);
+    await expect(
+      colMentores.getByRole("radio", { name: /Esp E2E|Esp Dois E2E/ })
+    ).toHaveCount(0);
+
+    // seleção por clique — o radio marca, o card de afinidade monta embaixo
+    await colMentorados
+      .getByRole("radio", { name: /Mentorada E2E Livre/ })
+      .click();
+    await linhaReserva.click();
+    await expect(linhaReserva).toHaveAttribute("aria-checked", "true");
+    await expect(card.getByText("Afinidade do par")).toBeVisible();
+    // mentor cheio selecionado: o aviso explica o caminho (aumentar a
+    // capacidade) em vez de esconder a opção
+    await expect(card.getByText(/está sem vaga/)).toBeVisible();
+
+    // "Formar dupla" abre o dialog de sempre com os dois lados já
+    // escolhidos — o select mostra o nome, não o placeholder
+    await card
+      .getByRole("button", { name: "Formar dupla", exact: true })
+      .click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
-    await dialog.locator("#mentor").click();
-    await page
-      .getByRole("option", { name: /Mentor E2E Reserva · 1\/1 · sem vaga/ })
-      .click();
+    await expect(dialog.locator("#mentor")).toContainText(
+      "Mentor E2E Reserva",
+      { timeout: 15_000 }
+    );
+    await expect(dialog.locator("#mentorado")).toContainText(
+      "Mentorada E2E Livre"
+    );
+
+    // mentor lotado no dialog: submit bloqueado até a capacidade subir
     const submit = dialog.getByRole("button", { name: "Formar dupla" });
     await expect(submit).toBeDisabled();
     await expect(dialog.getByText(/está sem vaga/)).toBeVisible();
-
     await dialog
       .getByRole("button", { name: /aumentar capacidade/ })
       .click();

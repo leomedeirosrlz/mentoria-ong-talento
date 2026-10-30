@@ -3,13 +3,14 @@
 import { Check, Warning } from "@phosphor-icons/react";
 import {
   celulasComuns,
-  disponibilidadeNoDia,
   disponibilidadeTexto,
+  COR_RACA_LABELS,
   ESCOLARIDADE_LABELS,
   GENERO_LABELS,
   idade,
 } from "@/lib/ciclo";
 import type {
+  CorRaca,
   Disponibilidade,
   Escolaridade,
   Genero,
@@ -18,8 +19,9 @@ import type {
 } from "@/lib/types";
 import { cn, normaliza } from "@/lib/utils";
 
-// Board de afinidade da coordenação (/pessoas, filtro "Livres para dupla") e
-// painel embutido no NovaDuplaDialog. Os campos sensíveis (gênero, preferência
+// Board de afinidade da coordenação (modo "Parear" do card Aguardando par
+// em /pessoas) e painel embutido no NovaDuplaDialog. Os campos sensíveis
+// (gênero, cor/raça, preferência
 // de par, motivação) chegam já mergeados pelas views *_pessoal — só a
 // coordenação recebe valor; fora dela vêm null e o painel simplesmente omite.
 
@@ -29,6 +31,7 @@ export type LadoAfinidade = {
   cidade?: string | null;
   uf?: string | null;
   genero: Genero | null;
+  cor_raca?: CorRaca | null;
   pref_genero_par: PrefGeneroPar | null;
   motivacao: string | null;
 };
@@ -88,6 +91,13 @@ function alertaGenero(
 const local = (l: LadoAfinidade) =>
   [l.cidade, l.uf].filter(Boolean).join("/");
 
+/** Cor/raça como declarado — "prefiro não dizer" não é informação de
+ *  matching, então a linha omite em vez de exibir a opção como dado. */
+const raca = (l: LadoAfinidade) =>
+  l.cor_raca && l.cor_raca !== "prefiro_nao_dizer"
+    ? COR_RACA_LABELS[l.cor_raca]
+    : null;
+
 function ChipInteresse({ texto, destaque }: { texto: string; destaque: boolean }) {
   return (
     <span
@@ -146,7 +156,6 @@ export function AfinidadePar({
     mentorado.disponibilidade ?? null
   );
   const temSobreposicao = agendaComum.length > 0;
-  const cobreTer = disponibilidadeNoDia(mentor.disponibilidade, "ter");
   const temInteresses = intMentor.length + intMentorado.length > 0;
   const temMotivacao =
     mentorado.motivacao || mentorado.objetivos || mentor.motivacao;
@@ -157,8 +166,8 @@ export function AfinidadePar({
         Afinidade do par
       </p>
 
-      {/* meta: cidade/UF, idade e escolaridade — o contexto de proximidade
-          que pesa na escolha manual */}
+      {/* meta: cidade/UF, idade, escolaridade e cor/raça — o contexto de
+          proximidade que pesa na escolha manual */}
       <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-muted-foreground">
         <span>
           {primeiroNome(mentorado.nome)}
@@ -167,10 +176,12 @@ export function AfinidadePar({
           {mentorado.escolaridade
             ? ` · ${ESCOLARIDADE_LABELS[mentorado.escolaridade]}`
             : ""}
+          {raca(mentorado) ? ` · ${raca(mentorado)}` : ""}
         </span>
         <span>
           {primeiroNome(mentor.nome)}
           {local(mentor) ? ` · ${local(mentor)}` : ""}
+          {raca(mentor) ? ` · ${raca(mentor)}` : ""}
           {mentor.areas?.length ? ` · atua em ${mentor.areas.join(", ")}` : ""}
         </span>
       </div>
@@ -242,19 +253,12 @@ export function AfinidadePar({
             Agenda do mentor não informada. Confirme antes de formar.
           </p>
         )}
-        {mentor.trilha === "dpp" && agendaTxt ? (
-          cobreTer ? (
-            <p className="flex items-center gap-1.5 text-[var(--ok-text)]">
-              <Check size={12} weight="bold" aria-hidden />
-              Cobre as terças dos encontros oficiais.
-            </p>
-          ) : (
-            <p className="flex items-start gap-1.5 text-[var(--warn-text)]">
-              <Warning size={12} aria-hidden className="mt-0.5 shrink-0" />
-              Grade sem terça. Os encontros do DPP são às terças.
-            </p>
-          )
-        ) : null}
+        {mentor.trilha === "dpp" && (
+          <p className="text-muted-foreground">
+            O cronograma usa terças como referência, mas a dupla agenda no
+            dia que combinar.
+          </p>
+        )}
         {mentor.trilha === "especialista" && (
           <p className="text-muted-foreground">
             Datas combinadas pela dupla, sem dia fixo.

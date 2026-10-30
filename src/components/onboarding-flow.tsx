@@ -152,11 +152,14 @@ export function OnboardingFlow({
   const router = useRouter();
   const ehMentor =
     temPapel(me, "mentor_dpp") || temPapel(me, "mentor_especialista");
-  // passo do termo existe só enquanto a assinatura estiver pendente — e é
-  // CONGELADO no mount: assinar no próprio wizard dispara router.refresh() e
-  // a prop voltaria "assinado", encolhendo `total` com o usuário já sentado
-  // no último passo
-  const [temTermo] = useState(() => assinaturaTermo?.status !== "assinado");
+  // o passo do termo existe só pra quem é voluntário de fato — o flag
+  // "sou voluntário" do cadastro (coord) decide; quem não é pula direto.
+  // É CONGELADO no mount: assinar no próprio wizard dispara router.refresh()
+  // e a prop voltaria "assinado", encolhendo `total` com o usuário já
+  // sentado no último passo
+  const [temTermo] = useState(
+    () => assinaturaTermo?.status !== "assinado" && me.voluntario !== false
+  );
   // coord/supervisor: boas-vindas + recursos + ficha pessoal em 3 sub-passos
   // + fechamento (6); mentores: + foto, apresentação, pareamento e
   // disponibilidade (12); termo pendente adiciona 1 passo pra todo papel
