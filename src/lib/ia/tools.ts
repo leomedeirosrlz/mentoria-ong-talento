@@ -390,11 +390,19 @@ export const IA_TOOLS = {
   guia_consulta: {
     nome: "guia_consulta",
     descricao:
-      "Busca nos guias oficiais do programa (Guia do Mentor DPP, Guia do Mentor Especialista, cronograma do ciclo, instrumentos e decisões operacionais da plataforma): metodologia, encontros, instrumentos, papéis, regras de reposição, formação, LGPD/termo. Use pra qualquer pergunta sobre 'como funciona', 'o que o guia diz', metodologia ou regras do programa — NÃO pra dados das duplas do usuário (essas saem das outras tools). Devolve trechos citáveis com guia, seção e página; quando não achar nada, diga que não está nos guias e sugira a coordenação. Chame **no máximo uma vez** por pergunta — depois responda com os trechos recebidos (cite guia e seção).",
+      "Busca nos guias oficiais do programa (Guia do Mentor DPP, Guia do Mentor Especialista, cronograma do ciclo, instrumentos e decisões operacionais da plataforma): metodologia, encontros, instrumentos, papéis, regras de reposição, formação, LGPD/termo. Use pra qualquer pergunta sobre 'como funciona', 'o que o guia diz', metodologia ou regras do programa — NÃO pra dados das duplas do usuário (essas saem das outras tools). Devolve trechos citáveis com guia, seção e página + `guias` (o catálogo completo de documentos disponíveis — use pra responder quando perguntarem quais guias/fontes existem); quando não achar trecho pro termo, diga que não está nos guias e sugira a coordenação. Chame **no máximo uma vez** por pergunta — depois responda com os trechos recebidos (cite guia e seção).",
     schema: guiaArgs,
     roles: TODOS_PAPEIS,
     run: async ({ pergunta }: z.infer<typeof guiaArgs>, ctx) => {
-      const fontes = await matchGuiaIa(ctx.supabase, pergunta, 4);
+      const [fontes, catalogo] = await Promise.all([
+        matchGuiaIa(ctx.supabase, pergunta, 4),
+        // catálogo completo sempre junto — "que guias você tem" se responde
+        // mesmo quando a busca não retorna trecho pro termo perguntado
+        ctx.supabase.from("ia_chunks").select("guia"),
+      ]);
+      const guias = [
+        ...new Set((catalogo.data ?? []).map((r) => r.guia as string)),
+      ].sort();
       // score sai fora — número de ranking não ajuda o modelo a citar
       return {
         fontes: fontes.map((f) => ({
@@ -403,6 +411,7 @@ export const IA_TOOLS = {
           pagina: f.pagina,
           trecho: f.trecho,
         })),
+        guias,
       };
     },
   },
