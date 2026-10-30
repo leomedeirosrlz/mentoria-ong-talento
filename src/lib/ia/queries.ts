@@ -563,11 +563,16 @@ export type FonteGuia = {
 export async function matchGuiaIa(
   supabase: SupabaseClient,
   pergunta: string,
-  limite = 4
+  limite = 4,
+  /** vetor da pergunta (0150): null = só o braço FTS — a RPC decide a
+   *  fusão RRF quando o vetor chega */
+  embedding?: number[] | null
 ): Promise<FonteGuia[]> {
   const { data, error } = await supabase.rpc("match_ia_chunks", {
     p_query: pergunta,
     p_limit: limite,
+    // PostgREST espera o literal vetorial "[a,b,c]", não um array JSON
+    ...(embedding ? { p_embedding: `[${embedding.join(",")}]` } : {}),
   });
   if (error) throw error;
   return (data ?? []) as unknown as FonteGuia[];

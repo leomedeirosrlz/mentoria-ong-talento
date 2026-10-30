@@ -17,9 +17,9 @@ import { POST } from "@/app/api/ia/chat/route";
 import type { MsgChat } from "@/lib/ia/provider";
 
 const m = vi.hoisted(() => ({
-  getUser: vi.fn(),
+  getClaims: vi.fn(),
   rpc: vi.fn(),
-  getMe: vi.fn(),
+  from: vi.fn(),
   checarLimiteIa: vi.fn(),
   providerConfigurado: vi.fn(),
   chamarModelo: vi.fn(),
@@ -29,11 +29,11 @@ const m = vi.hoisted(() => ({
 
 vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(async () => ({
-    auth: { getUser: m.getUser },
+    auth: { getClaims: m.getClaims },
     rpc: m.rpc,
+    from: m.from,
   })),
 }));
-vi.mock("@/lib/queries", () => ({ getMe: m.getMe }));
 vi.mock("@/lib/ia/rate-limit", () => ({ checarLimiteIa: m.checarLimiteIa }));
 vi.mock("@/lib/ia/provider", () => ({
   providerConfigurado: m.providerConfigurado,
@@ -42,20 +42,39 @@ vi.mock("@/lib/ia/provider", () => ({
 }));
 vi.mock("@/lib/ia/tools", () => ({ executarTool: m.executarTool }));
 
+/** Builder de query fake: a rota lê `profiles` com select→eq→maybeSingle
+ *  e `ia_config` (via getIaConfig real) com select direto awaited — o
+ *  mesmo objeto serve os dois padrões. */
+function queryFake(dado: unknown) {
+  const q = {
+    select: () => q,
+    eq: () => q,
+    maybeSingle: async () => ({ data: dado, error: null }),
+    then: (res: (v: unknown) => unknown) =>
+      Promise.resolve({ data: [], error: null }).then(res),
+  };
+  return q;
+}
+
+const PROFILE = { id: "prof-1", role: "coordenacao" };
+
 /** O caminho feliz antes do body: sessão, provider, profile e limite ok. */
 function autenticado() {
-  m.getUser.mockResolvedValue({
-    data: { user: { id: "auth-1" } },
+  m.getClaims.mockResolvedValue({
+    data: { claims: { sub: "auth-1" } },
     error: null,
   });
   m.providerConfigurado.mockReturnValue(true);
-  m.getMe.mockResolvedValue({
-    id: "prof-1",
-    role: "coordenacao",
-    papeis: ["coordenacao"],
-  });
+  m.from.mockImplementation((tabela: string) =>
+    queryFake(tabela === "profiles" ? PROFILE : [])
+  );
   m.checarLimiteIa.mockResolvedValue(false);
-  m.rpc.mockResolvedValue({ data: null, error: null });
+  m.rpc.mockImplementation((fn: string) =>
+    Promise.resolve({
+      data: fn === "my_papeis" ? ["coordenacao"] : null,
+      error: null,
+    })
+  );
 }
 
 const req = (
@@ -92,7 +111,7 @@ describe("gates — JSON antes do stream abrir", () => {
   beforeEach(() => vi.resetAllMocks());
 
   it("sem sessão devolve 401 antes de olhar o provider", async () => {
-    m.getUser.mockResolvedValue({ data: { user: null }, error: null });
+    m.getClaims.mockResolvedValue({ data: { claims: null }, error: null });
     const res = await POST(req());
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({
@@ -109,12 +128,14 @@ describe("gates — JSON antes do stream abrir", () => {
     await expect(res.json()).resolves.toEqual({
       error: expect.stringContaining("indisponível"),
     });
-    expect(m.getMe).not.toHaveBeenCalled();
+    expect(m.from).not.toHaveBeenCalled();
   });
 
   it("sessão válida sem profile devolve 401 (cadastro não encontrado)", async () => {
     autenticado();
-    m.getMe.mockResolvedValue(null);
+    m.from.mockImplementation((tabela: string) =>
+      queryFake(tabela === "profiles" ? null : [])
+    );
     const res = await POST(req());
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({
@@ -130,7 +151,12 @@ describe("gates — JSON antes do stream abrir", () => {
     expect(res.status).toBe(429);
     // o recorte é o profile, não a sessão auth
     expect(m.checarLimiteIa).toHaveBeenCalledWith(expect.anything(), "prof-1");
-    expect(m.rpc).not.toHaveBeenCalled();
+    // my_papeis roda antes do limite (Promise.all da identidade) — o que
+    // não pode ter acontecido é registrar a mensagem
+    expect(m.rpc).not.toHaveBeenCalledWith(
+      "registrar_ia_evento",
+      expect.anything()
+    );
     expect(m.chamarModeloStream).not.toHaveBeenCalled();
   });
 
@@ -151,7 +177,10 @@ describe("gates — JSON antes do stream abrir", () => {
     await expect(res.json()).resolves.toEqual({
       error: expect.stringContaining("inválido"),
     });
-    expect(m.rpc).not.toHaveBeenCalled();
+    expect(m.rpc).not.toHaveBeenCalledWith(
+      "registrar_ia_evento",
+      expect.anything()
+    );
   });
 
   it("body malformado devolve 400 em todas as formas", async () => {
@@ -176,7 +205,10 @@ describe("gates — JSON antes do stream abrir", () => {
       expect(res.status).toBe(400);
       await res.json();
     }
-    expect(m.rpc).not.toHaveBeenCalled();
+    expect(m.rpc).not.toHaveBeenCalledWith(
+      "registrar_ia_evento",
+      expect.anything()
+    );
     expect(m.chamarModeloStream).not.toHaveBeenCalled();
   });
 });

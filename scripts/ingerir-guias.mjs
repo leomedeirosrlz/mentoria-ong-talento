@@ -138,6 +138,37 @@ const CAMPOS_INSERT = ["guia", "secao", "pagina", "texto"];
 const paraInsert = (chunk) =>
   Object.fromEntries(CAMPOS_INSERT.map((c) => [c, chunk[c]]));
 
+// ---------- embeddings (braço vetorial da 0150) ----------
+// OpenAI text-embedding-3-small com dimensions=512 (Matryoshka) — casa
+// com a coluna vector(512). Sem IA_EMBED_API_KEY as linhas entram com
+// embedding NULL: o braço vetorial simplesmente não ranqueia esses
+// chunks e a RPC segue no FTS puro (mesmo contrato do query-time).
+const EMBED_KEY = process.env.IA_EMBED_API_KEY;
+const EMBED_MODEL = process.env.IA_EMBED_MODEL ?? "text-embedding-3-small";
+const EMBED_DIM = Number(process.env.IA_EMBED_DIM ?? 512);
+const EMBED_LOTE = 64; // ~64×1k tok < limite de 300k tok/request da API
+
+async function embedLote(textos) {
+  const res = await fetch("https://api.openai.com/v1/embeddings", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${EMBED_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: EMBED_MODEL,
+      input: textos,
+      dimensions: EMBED_DIM,
+    }),
+  });
+  if (!res.ok)
+    throw new Error(
+      `embeddings HTTP ${res.status}: ${(await res.text()).slice(0, 200)}`
+    );
+  const { data } = await res.json();
+  return data.sort((a, b) => a.index - b.index).map((d) => d.embedding);
+}
+
 // ---------- main ----------
 
 const arquivos = readdirSync(DIR).filter(
@@ -235,9 +266,28 @@ for (const d of docs) {
     console.error(`✗ ${d.fonte}: delete falhou — ${delErr.message}`);
     process.exit(1);
   }
+  const linhas = d.chunks.map(paraInsert);
+  if (EMBED_KEY) {
+    // lotes de 64 dentro do próprio doc — falha aqui aborta antes do
+    // insert, então nunca fica corpus parcialmente embedado do doc
+    try {
+      for (let i = 0; i < linhas.length; i += EMBED_LOTE) {
+        const embs = await embedLote(
+          linhas.slice(i, i + EMBED_LOTE).map((l) => l.texto)
+        );
+        embs.forEach((e, j) => {
+          linhas[i + j].embedding = `[${e.join(",")}]`;
+          linhas[i + j].embedding_modelo = EMBED_MODEL;
+        });
+      }
+    } catch (e) {
+      console.error(`✗ ${d.fonte}: embeddings falharam — ${e.message}`);
+      process.exit(1);
+    }
+  }
   const { error: insErr } = await supabase
     .from("ia_chunks")
-    .insert(d.chunks.map(paraInsert));
+    .insert(linhas);
   if (insErr) {
     console.error(`✗ ${d.fonte}: insert falhou — ${insErr.message}`);
     process.exit(1);

@@ -39,6 +39,8 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   agenda_do_periodo: {},
   guia_consulta: { pergunta: "como funciona o encontro?" },
   instrumentos_da_dupla: { dupla_id: UUID },
+  chamados_resumo: {},
+  pessoas_busca: { nome: "Maria" },
 };
 
 describe("allowlist — forma do registry", () => {

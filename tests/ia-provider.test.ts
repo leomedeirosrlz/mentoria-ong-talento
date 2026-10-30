@@ -114,13 +114,18 @@ describe("chamarModelo", () => {
   });
 });
 
-describe("chamarModelo — retry (REALIZA-307)", () => {
+describe("chamarModelo — cadeia de fallback (REALIZA-307)", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
   });
 
-  it("5xx retenta uma vez e devolve ok se a 2ª tentativa passa", async () => {
+  const OPTS = { modelo: "primario", fallbacks: ["fb-1", "fb-2"] };
+
+  const modeloDaChamada = (spy: ReturnType<typeof stubFetch>, i: number) =>
+    JSON.parse(String(spy.mock.calls[i]?.[1]?.body)).model;
+
+  it("5xx no primário avança pro próximo slug da cadeia", async () => {
     for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     let chamadas = 0;
@@ -129,16 +134,32 @@ describe("chamarModelo — retry (REALIZA-307)", () => {
         ? new Response("pau", { status: 503 })
         : respostaOpenAi({ role: "assistant", content: "foi" })
     );
-    const r = await chamarModelo([{ role: "user", content: "oi" }]);
+    const r = await chamarModelo(
+      [{ role: "user", content: "oi" }],
+      undefined,
+      OPTS
+    );
     expect(r).toEqual({
       ok: true,
       mensagem: { role: "assistant", content: "foi" },
     });
     expect(spy).toHaveBeenCalledTimes(2);
+    expect(modeloDaChamada(spy, 0)).toBe("primario");
+    expect(modeloDaChamada(spy, 1)).toBe("fb-1");
     consoleSpy.mockRestore();
   });
 
-  it("429 honra Retry-After pequeno; sem ele/4xx não muda o contrato", async () => {
+  it("cadeia de slug único não retenta — sem fallback, 5xx falha direto", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const spy = stubFetch(() => new Response("pau", { status: 503 }));
+    const r = await chamarModelo([{ role: "user", content: "oi" }]);
+    expect(r).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
+    expect(spy).toHaveBeenCalledTimes(1);
+    consoleSpy.mockRestore();
+  });
+
+  it("429 honra Retry-After pequeno antes de pular de modelo", async () => {
     for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     // Retry-After: 0 → delay ~0, mantém o teste rápido
@@ -148,48 +169,133 @@ describe("chamarModelo — retry (REALIZA-307)", () => {
         ? new Response("quota", { status: 429, headers: { "Retry-After": "0" } })
         : respostaOpenAi({ role: "assistant", content: "ok" })
     );
-    const r = await chamarModelo([{ role: "user", content: "oi" }]);
+    const r = await chamarModelo(
+      [{ role: "user", content: "oi" }],
+      undefined,
+      OPTS
+    );
     expect(r.ok).toBe(true);
     expect(spy).toHaveBeenCalledTimes(2);
-
-    // 4xx definitivo — uma chamada só, erro amigável na hora
-    const spy4xx = stubFetch(() => new Response("no", { status: 402 }));
-    const r2 = await chamarModelo([{ role: "user", content: "oi" }]);
-    expect(r2).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
-    expect(spy4xx).toHaveBeenCalledTimes(1);
+    expect(modeloDaChamada(spy, 1)).toBe("fb-1");
     consoleSpy.mockRestore();
   });
 
-  it("rede caída e timeout interno retentam; esgotada a 2ª vira erro", async () => {
+  it("rede caída e timeout avançam; cadeia esgotada vira erro", async () => {
     for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-    // TypeError (fetch failed) sempre → 2 chamadas e desiste
+    // TypeError (fetch failed) sempre → percorre a cadeia inteira e desiste
     const spy = stubFetch(
       () => Promise.reject(new TypeError("fetch failed")) as never
     );
-    const r = await chamarModelo([{ role: "user", content: "oi" }]);
+    const r = await chamarModelo(
+      [{ role: "user", content: "oi" }],
+      undefined,
+      OPTS
+    );
     expect(r).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
-    expect(spy).toHaveBeenCalledTimes(2);
+    expect(spy).toHaveBeenCalledTimes(3); // primario + fb-1 + fb-2
 
-    // TimeoutError do AbortSignal interno → transitório, retenta
+    // TimeoutError do AbortSignal interno → transitório, próximo slug resolve
     let n = 0;
     stubFetch(() =>
       n++ === 0
         ? (Promise.reject(new DOMException("estourou", "TimeoutError")) as never)
         : respostaOpenAi({ role: "assistant", content: "ok" })
     );
-    const r2 = await chamarModelo([{ role: "user", content: "oi" }]);
+    const r2 = await chamarModelo(
+      [{ role: "user", content: "oi" }],
+      undefined,
+      OPTS
+    );
     expect(r2.ok).toBe(true);
     consoleSpy.mockRestore();
   });
 
-  it("erro não-transitório não retenta", async () => {
+  it("400 'model unavailable' e 404 de slug morto avançam a cadeia", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    // Zen devolve slug morto como 400 — o corpo diz que é do modelo
+    let n = 0;
+    const spy = stubFetch(() =>
+      n++ === 0
+        ? new Response('{"error":{"message":"Model is unavailable"}}', {
+            status: 400,
+          })
+        : respostaOpenAi({ role: "assistant", content: "ok" })
+    );
+    const r = await chamarModelo(
+      [{ role: "user", content: "oi" }],
+      undefined,
+      OPTS
+    );
+    expect(r.ok).toBe(true);
+    expect(modeloDaChamada(spy, 1)).toBe("fb-1");
+
+    // 404 idem — slug removido do catálogo
+    let m = 0;
+    const spy404 = stubFetch(() =>
+      m++ === 0
+        ? new Response("not found", { status: 404 })
+        : respostaOpenAi({ role: "assistant", content: "ok" })
+    );
+    const r2 = await chamarModelo(
+      [{ role: "user", content: "oi" }],
+      undefined,
+      OPTS
+    );
+    expect(r2.ok).toBe(true);
+    expect(spy404).toHaveBeenCalledTimes(2);
+    consoleSpy.mockRestore();
+  });
+
+  it("400 genérico (payload nosso) para a rodada sem avançar", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const spy = stubFetch(
+      () => new Response("invalid messages", { status: 400 })
+    );
+    const r = await chamarModelo(
+      [{ role: "user", content: "oi" }],
+      undefined,
+      OPTS
+    );
+    expect(r).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
+    expect(spy).toHaveBeenCalledTimes(1);
+    consoleSpy.mockRestore();
+  });
+
+  it("400 por reasoning_effort refaz no MESMO slug sem consumir a cadeia", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const spy = stubFetch((init) => {
+      const body = JSON.parse(String(init.body));
+      return body.reasoning_effort
+        ? new Response("unknown field", { status: 400 })
+        : respostaOpenAi({ role: "assistant", content: "ok sem esforço" });
+    });
+    const r = await chamarModelo([{ role: "user", content: "oi" }], undefined, {
+      ...OPTS,
+      esforco: "alto",
+    });
+    expect(r.ok).toBe(true);
+    // duas chamadas, ambas no primário — o retry de esforço é grátis
+    expect(spy).toHaveBeenCalledTimes(2);
+    expect(modeloDaChamada(spy, 0)).toBe("primario");
+    expect(modeloDaChamada(spy, 1)).toBe("primario");
+    consoleSpy.mockRestore();
+  });
+
+  it("erro não-transitório não avança nem retenta", async () => {
     for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const spy = stubFetch(
       () => Promise.reject(new Error("socket")) as never
     );
-    const r = await chamarModelo([{ role: "user", content: "oi" }]);
+    const r = await chamarModelo(
+      [{ role: "user", content: "oi" }],
+      undefined,
+      OPTS
+    );
     expect(r).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
     expect(spy).toHaveBeenCalledTimes(1);
     consoleSpy.mockRestore();

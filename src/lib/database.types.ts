@@ -2477,6 +2477,8 @@ export type Database = {
       ia_chunks: {
         Row: {
           created_at: string
+          embedding: string | null
+          embedding_modelo: string | null
           guia: string
           id: string
           pagina: number | null
@@ -2486,6 +2488,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          embedding?: string | null
+          embedding_modelo?: string | null
           guia: string
           id?: string
           pagina?: number | null
@@ -2495,6 +2499,8 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          embedding?: string | null
+          embedding_modelo?: string | null
           guia?: string
           id?: string
           pagina?: number | null
@@ -3455,7 +3461,6 @@ export type Database = {
           uf: string | null
           user_id: string | null
           voluntariado: string | null
-          voluntario: boolean
           whatsapp: string | null
         }
         Insert: {
@@ -3488,7 +3493,6 @@ export type Database = {
           uf?: string | null
           user_id?: string | null
           voluntariado?: string | null
-          voluntario?: boolean
           whatsapp?: string | null
         }
         Update: {
@@ -3521,7 +3525,6 @@ export type Database = {
           uf?: string | null
           user_id?: string | null
           voluntariado?: string | null
-          voluntario?: boolean
           whatsapp?: string | null
         }
         Relationships: []
@@ -5733,7 +5736,7 @@ export type Database = {
         Returns: Json
       }
       match_ia_chunks: {
-        Args: { p_limit?: number; p_query: string }
+        Args: { p_limit?: number; p_query: string; p_embedding?: string | null }
         Returns: {
           guia: string
           pagina: number

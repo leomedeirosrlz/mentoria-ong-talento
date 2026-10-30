@@ -36,6 +36,7 @@ import {
   matchGuiaIa,
   papeisDoUsuario,
 } from "./queries";
+import { embedQuery } from "./embed";
 
 /** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário. */
 export type CanalIa = "chat" | "mcp";
@@ -396,11 +397,22 @@ export const IA_TOOLS = {
     schema: guiaArgs,
     roles: TODOS_PAPEIS,
     run: async ({ pergunta }: z.infer<typeof guiaArgs>, ctx) => {
+      // flag coord "busca" ("fts" desliga o braço vetorial sem deploy;
+      // ausente/outro valor = híbrida quando a chave de embed existe).
+      // Lê ANTES de embedar: com fts não vai pergunta nenhuma pra OpenAI
+      // (minimização — o embed é a única saída de dados pra lá).
+      const cfgBusca = await ctx.supabase
+        .from("ia_config")
+        .select("valor")
+        .eq("chave", "busca")
+        .maybeSingle();
+      const vetor =
+        cfgBusca.data?.valor === "fts" ? null : await embedQuery(pergunta);
       const [fontes, catalogo] = await Promise.all([
         // pede 10 e fica com 4 SEÇÕES únicas — sem o dedup, 3 slots iam
         // pro mesmo capítulo ("12 · Avaliação" repetia 3×) e o roteiro
         // diverso ficava de fora do contexto do modelo
-        matchGuiaIa(ctx.supabase, pergunta, 10),
+        matchGuiaIa(ctx.supabase, pergunta, 10, vetor),
         // catálogo completo sempre junto — "que guias você tem" se responde
         // mesmo quando a busca não retorna trecho pro termo perguntado
         ctx.supabase.from("ia_chunks").select("guia"),

@@ -111,16 +111,18 @@ const dadosDe = (r: Awaited<ReturnType<typeof executarTool>>) => {
 };
 
 describe("registry", () => {
-  it("declara as 9 tools com descrição pt-BR e papéis", () => {
+  it("declara as 11 tools com descrição pt-BR e papéis", () => {
     expect(IA_TOOL_NOMES.sort()).toEqual(
       [
         "agenda_do_periodo",
         "aguardando_par",
         "capacidade_mentores",
+        "chamados_resumo",
         "duplas_do_usuario",
         "ficha_dupla",
         "guia_consulta",
         "instrumentos_da_dupla",
+        "pessoas_busca",
         "registros_da_dupla",
         "resumo_semana",
       ].sort()
@@ -735,6 +737,7 @@ describe("executarTool — auditoria", () => {
           trecho: "Apresente os resultados consolidados…",
         },
       ],
+      guias: [],
     });
   });
 
