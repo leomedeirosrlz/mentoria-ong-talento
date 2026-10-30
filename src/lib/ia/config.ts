@@ -8,20 +8,25 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type EsforcoIa = "baixo" | "medio" | "alto";
+export type TierIa = "rapido" | "balanceado" | "forte";
 
 export type IaConfig = {
-  modelos: { rapido?: string; balanceado?: string; forte?: string; fallbacks?: string[] };
-  esforco: EsforcoIa;
+  modelos: Partial<Record<TierIa, string>> & { fallbacks?: string[] };
+  /** esforço por tier (controle granular): chave ausente cai em "medio";
+   *  a chave `esforco` no banco aceita objeto por-tier ou string legada
+   *  (mesmo nível pros três — formato do seed da 0148) */
+  esforco: Record<TierIa, EsforcoIa>;
   roteamento: boolean;
 };
 
 const PADRAO: IaConfig = {
   modelos: {},
-  esforco: "medio",
+  esforco: { rapido: "medio", balanceado: "medio", forte: "medio" },
   roteamento: true,
 };
 
 const ESFORCOS = new Set<EsforcoIa>(["baixo", "medio", "alto"]);
+const TIERS: readonly TierIa[] = ["rapido", "balanceado", "forte"];
 
 export async function getIaConfig(supabase: SupabaseClient): Promise<IaConfig> {
   const { data, error } = await supabase
@@ -29,7 +34,7 @@ export async function getIaConfig(supabase: SupabaseClient): Promise<IaConfig> {
     .select("chave, valor");
   if (error || !data) return PADRAO;
 
-  const cfg: IaConfig = { ...PADRAO, modelos: {} };
+  const cfg: IaConfig = { ...PADRAO, modelos: {}, esforco: { ...PADRAO.esforco } };
   for (const row of data as { chave: string; valor: unknown }[]) {
     if (row.chave === "modelos" && row.valor && typeof row.valor === "object") {
       const m = row.valor as Record<string, unknown>;
@@ -41,9 +46,19 @@ export async function getIaConfig(supabase: SupabaseClient): Promise<IaConfig> {
           ? m.fallbacks.filter((f): f is string => typeof f === "string")
           : [],
       };
-    } else if (row.chave === "esforco" && typeof row.valor === "string") {
-      const v = row.valor as EsforcoIa;
-      if (ESFORCOS.has(v)) cfg.esforco = v;
+    } else if (row.chave === "esforco") {
+      if (typeof row.valor === "string") {
+        // formato legado ("medio" pra todos) — ainda aceito, a UI
+        // converte pra objeto no primeiro toque por tier
+        const v = row.valor as EsforcoIa;
+        if (ESFORCOS.has(v)) for (const t of TIERS) cfg.esforco[t] = v;
+      } else if (row.valor && typeof row.valor === "object") {
+        const e = row.valor as Record<string, unknown>;
+        for (const t of TIERS) {
+          const v = e[t] as EsforcoIa;
+          if (ESFORCOS.has(v)) cfg.esforco[t] = v;
+        }
+      }
     } else if (row.chave === "roteamento" && typeof row.valor === "boolean") {
       cfg.roteamento = row.valor;
     }
@@ -53,10 +68,12 @@ export async function getIaConfig(supabase: SupabaseClient): Promise<IaConfig> {
 
 /** Tier → slug concreto: config vazia cai no IA_MODEL do ambiente —
  *  o env continua sendo o piso que garante o assistente de pé. */
-export function modeloDoTier(
-  cfg: IaConfig,
-  tier: "rapido" | "balanceado" | "forte"
-): string {
+export function modeloDoTier(cfg: IaConfig, tier: TierIa): string {
   const slug = cfg.modelos[tier];
   return slug && slug.trim() ? slug : (process.env.IA_MODEL ?? "");
+}
+
+/** Tier → nível de esforço: granular por tier, default "medio". */
+export function esforcoDoTier(cfg: IaConfig, tier: TierIa): EsforcoIa {
+  return cfg.esforco[tier] ?? "medio";
 }

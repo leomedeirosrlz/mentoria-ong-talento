@@ -33,7 +33,10 @@ type Esforco = "baixo" | "medio" | "alto";
 
 type Config = {
   modelos: Partial<Record<Tier, string>>;
-  esforco: Esforco;
+  /** esforço por tier — no banco a chave `esforco` aceita objeto por
+   *  tier ou string legada (mesmo nível pros três); a UI sempre grava
+   *  o mapa completo */
+  esforco: Record<Tier, Esforco>;
   roteamento: boolean;
 };
 
@@ -118,7 +121,11 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
       ]);
       if (!vivo) return;
       const modelos: Config["modelos"] = {};
-      let esforco: Esforco = "medio";
+      const esforco: Config["esforco"] = {
+        rapido: "medio",
+        balanceado: "medio",
+        forte: "medio",
+      };
       let roteamento = true;
       for (const row of data ?? []) {
         if (row.chave === "modelos" && row.valor && typeof row.valor === "object") {
@@ -126,8 +133,17 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
           for (const t of TIERS)
             if (typeof m[t.chave] === "string") modelos[t.chave] = m[t.chave] as string;
         }
-        if (row.chave === "esforco" && ESFORCOS.some((e) => e.chave === row.valor))
-          esforco = row.valor as Esforco;
+        if (row.chave === "esforco") {
+          if (typeof row.valor === "string") {
+            if (ESFORCOS.some((e) => e.chave === row.valor))
+              for (const t of TIERS) esforco[t.chave] = row.valor as Esforco;
+          } else if (row.valor && typeof row.valor === "object") {
+            const e = row.valor as Record<string, unknown>;
+            for (const t of TIERS)
+              if (ESFORCOS.some((x) => x.chave === e[t.chave]))
+                esforco[t.chave] = e[t.chave] as Esforco;
+          }
+        }
         if (row.chave === "roteamento" && typeof row.valor === "boolean")
           roteamento = row.valor;
       }
@@ -222,10 +238,11 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
     setCfg({ ...cfg, modelos });
     void gravar(`modelo:${tier}`, "modelos", modelos);
   };
-  const mudarEsforco = (e: Esforco) => {
+  const mudarEsforco = (tier: Tier, e: Esforco) => {
     if (!cfg) return;
-    setCfg({ ...cfg, esforco: e });
-    void gravar("esforco", "esforco", e);
+    const esforco = { ...cfg.esforco, [tier]: e };
+    setCfg({ ...cfg, esforco });
+    void gravar(`esforco:${tier}`, "esforco", esforco);
   };
   const mudarRoteamento = (v: boolean) => {
     if (!cfg) return;
@@ -277,10 +294,13 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
                   ),
                 ];
                 return (
-                  <div key={t.chave} className="space-y-1">
+                  <div key={t.chave} className="space-y-1.5">
                     <div className="flex items-center justify-between gap-2">
                       <span className="text-sm font-medium">{t.rotulo}</span>
-                      {marcaDeSalvo(`modelo:${t.chave}`)}
+                      <span className="flex items-center gap-1.5">
+                        {marcaDeSalvo(`modelo:${t.chave}`)}
+                        {marcaDeSalvo(`esforco:${t.chave}`)}
+                      </span>
                     </div>
                     <Select
                       value={cfg.modelos[t.chave] ?? ""}
@@ -297,40 +317,34 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
                         ))}
                       </SelectContent>
                     </Select>
+                    {/* esforço granular por tier — o par certo é
+                        rápido+baixo, forte+alto */}
+                    <div
+                      className="grid grid-cols-3 gap-1 rounded-md bg-muted p-0.5"
+                      role="group"
+                      aria-label={`Esforço do tier ${t.rotulo}`}
+                    >
+                      {ESFORCOS.map((e) => (
+                        <Button
+                          key={e.chave}
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => mudarEsforco(t.chave, e.chave)}
+                          className={cn(
+                            "h-6 rounded px-1.5 text-[11px] transition-colors duration-150",
+                            cfg.esforco[t.chave] === e.chave
+                              ? "bg-popover font-medium shadow-sm hover:bg-popover"
+                              : "text-muted-foreground hover:text-foreground hover:bg-transparent"
+                          )}
+                        >
+                          {e.rotulo}
+                        </Button>
+                      ))}
+                    </div>
                     <p className="text-[11px] text-muted-foreground">{t.dica}</p>
                   </div>
                 );
               })}
-            </section>
-
-            <section className="space-y-2">
-              <div className="flex items-center justify-between">
-                <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  Nível de esforço
-                </h3>
-                {marcaDeSalvo("esforco")}
-              </div>
-              <div className="grid grid-cols-3 gap-1 rounded-lg bg-muted p-1">
-                {ESFORCOS.map((e) => (
-                  <Button
-                    key={e.chave}
-                    variant="ghost"
-                    onClick={() => mudarEsforco(e.chave)}
-                    className={cn(
-                      "h-auto rounded-md px-2 py-1.5 text-sm transition-colors duration-150",
-                      cfg.esforco === e.chave
-                        ? "bg-popover font-medium shadow-sm hover:bg-popover"
-                        : "text-muted-foreground hover:text-foreground hover:bg-transparent"
-                    )}
-                  >
-                    {e.rotulo}
-                  </Button>
-                ))}
-              </div>
-              <p className="text-[11px] text-muted-foreground">
-                Quanto o modelo raciocina antes de responder — baixo é mais
-                rápido, alto pensa mais. Aplicado a todos os tiers.
-              </p>
             </section>
 
             <section className="space-y-1.5">

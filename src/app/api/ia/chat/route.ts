@@ -29,7 +29,7 @@ import {
 } from "@/lib/ia/provider";
 import type { MsgChat } from "@/lib/ia/provider";
 import { systemPromptIa } from "@/lib/ia/prompts";
-import { getIaConfig, modeloDoTier } from "@/lib/ia/config";
+import { esforcoDoTier, getIaConfig, modeloDoTier } from "@/lib/ia/config";
 import { rotearTier } from "@/lib/ia/roteador";
 import { checarLimiteIa } from "@/lib/ia/rate-limit";
 import type { FonteIa } from "@/lib/ia/fontes";
@@ -143,7 +143,7 @@ export async function POST(req: Request) {
   const tier = iaCfg.roteamento ? rotearTier(ultimaPergunta) : "balanceado";
   const chamada = {
     modelo: modeloDoTier(iaCfg, tier),
-    esforco: iaCfg.esforco,
+    esforco: esforcoDoTier(iaCfg, tier),
   };
 
   // sessão estável por usuário — o provider Go exige pra rotear/cachear;
