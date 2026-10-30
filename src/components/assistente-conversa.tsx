@@ -54,6 +54,12 @@ type Msg = {
 
 const primeiroNome = (nome?: string) => nome?.trim().split(/\s+/)[0];
 
+// focar o composer só em viewport de desktop — no mobile focar sobe o
+// teclado sem o usuário pedir (o toque no campo já faz isso)
+const focarComposer = (el: HTMLTextAreaElement | null) => {
+  if (el && matchMedia("(min-width: 768px)").matches) el.focus();
+};
+
 const hhmm = (em?: number) =>
   em ? new Date(em).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "";
 
@@ -407,6 +413,7 @@ export function AssistenteConversa({
   nome,
   registrarNova,
   registrarHistorico,
+  onNavegarInterno,
 }: {
   papeis: AppRole[];
   demo: boolean;
@@ -419,6 +426,8 @@ export function AssistenteConversa({
   registrarNova?: (fn: () => void) => void;
   /** idem pro botão de histórico — alterna transcript ↔ lista de conversas */
   registrarHistorico?: (fn: () => void) => void;
+  /** link interno clicado (ação/fonte/inline) — a bolha fecha pra navegar */
+  onNavegarInterno?: () => void;
 }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [restaurada, setRestaurada] = useState(false);
@@ -523,7 +532,7 @@ export function AssistenteConversa({
     setMsgs([]);
     setTexto("");
     setVisao("chat");
-    inputRef.current?.focus();
+    focarComposer(inputRef.current);
   }
   useEffect(() => registrarNova?.(novaConversa), [registrarNova]);
   /** botão do header: transcript ↔ histórico — a lista recarrega do
@@ -633,7 +642,7 @@ export function AssistenteConversa({
     setPending(false);
     setStatus(null);
     abortRef.current = null;
-    inputRef.current?.focus();
+    focarComposer(inputRef.current);
   }
 
   function parar() {
@@ -759,7 +768,7 @@ export function AssistenteConversa({
         )
       );
       setPending(false);
-      inputRef.current?.focus();
+      focarComposer(inputRef.current);
       return;
     }
 
@@ -889,7 +898,15 @@ export function AssistenteConversa({
           segue o fim quando o usuário já está perto dele. scroll-fina =
           scrollbar thin muted (REALIZA-282); fade no topo emoldura o topo
           do log quando rolado */
-      <div className="relative min-h-0 flex-1">
+      <div
+        className="relative min-h-0 flex-1"
+        onClick={(e) => {
+          // link interno (ação, fonte ou inline do markdown) → a bolha
+          // fecha pra navegação aparecer; externo abre aba e o painel fica
+          const a = (e.target as HTMLElement).closest("a[href]");
+          if (a?.getAttribute("href")?.startsWith("/")) onNavegarInterno?.();
+        }}
+      >
         <div
           ref={logRef}
           onScroll={() => {
@@ -967,6 +984,12 @@ export function AssistenteConversa({
                     ) : (
                       <>
                         <BolhaMd texto={m.content || "…"} />
+                        {/* status de tool round mid-stream mora DENTRO da
+                            bolha (entre o texto e o caret) — uma bolha só,
+                            nunca a dupla de antes */}
+                        {m.estado === "stream" && status && (
+                          <p className="ia-shimmer mt-1.5 text-xs">{status}</p>
+                        )}
                         {/* cursor do stream (REALIZA-280): blink de caret seco
                             (~530ms/fase) no fim enquanto o token chega */}
                         {m.estado === "stream" && (
@@ -1101,24 +1124,9 @@ export function AssistenteConversa({
             </div>
           ))}
 
-          {/* status de tool round DURANTE o stream: a bolha da resposta já
-              tem conteúdo+cursor — a linha de status vem embaixo (pré-token
-              o status mora dentro da bolha, sem duplicar) */}
-          {pending && status && msgs[msgs.length - 1]?.content ? (
-            <div className="flex animate-in items-end justify-start gap-2 fade-in-0 duration-200">
-              <span
-                aria-hidden
-                className="mb-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)]/15 text-[var(--brand-lime-deep)]"
-              >
-                <Sparkle size={12} weight="fill" />
-              </span>
-              <div className="rounded-2xl rounded-bl-md bg-muted/60 px-4 py-2.5 shadow-[var(--shadow-border)]">
-                <p className="ia-shimmer flex items-center gap-2 text-xs">
-                  {status}
-                </p>
-              </div>
-            </div>
-          ) : null}
+          {/* sem bolha de espera separada: pré-token o indicador vive
+              dentro da bolha da resposta; mid-stream o status também —
+              nunca duas bolhas empilhadas */}
         </div>
         {/* fade do topo — aparece só quando o log rolou (o gradiente sai
             do bg do painel, não de uma cor fixa) */}

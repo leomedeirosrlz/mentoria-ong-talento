@@ -10,6 +10,7 @@
 // prefers-reduced-motion já zera as animações — nada por componente.
 
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
@@ -145,7 +146,9 @@ export function AssistenteBolha({
     return () => cancelAnimationFrame(id);
   }, []);
 
-  const mudar = (v: boolean) => {
+  // offset do teclado iOS — declarado antes de mudar (que o zera ao fechar)
+  const [kb, setKb] = useState(0);
+  const mudar = useCallback((v: boolean) => {
     setAberto(v);
     // fecha com offset zerado — sem isso uma reabertura herda o último kb
     // por um frame (flash de bottom: N antes da primeira medição)
@@ -153,7 +156,22 @@ export function AssistenteBolha({
     try {
       sessionStorage.setItem("assistente:aberto", v ? "1" : "0");
     } catch {}
-  };
+  }, []);
+
+  // voltar do sistema (gesto/botão Android) fecha a sheet: empurra um
+  // state na abertura e escuta popstate. Fechando por X/backdrop/arrasto,
+  // o cleanup desfaz o state empurrado (history.back sem listener é
+  // silencioso). Só no mobile — desktop fecha por Esc/outside do Popover.
+  useEffect(() => {
+    if (desktop || !aberto) return;
+    history.pushState({ assistenteSheet: true }, "");
+    const aoVoltar = () => mudar(false);
+    window.addEventListener("popstate", aoVoltar);
+    return () => {
+      window.removeEventListener("popstate", aoVoltar);
+      if (history.state?.assistenteSheet) history.back();
+    };
+  }, [desktop, aberto, mudar]);
 
   // "Nova conversa" e "Histórico" moram na conversa (dona do estado) — as
   // ações são registradas aqui pros botões do header alcançarem
@@ -175,6 +193,7 @@ export function AssistenteBolha({
       registrarHistorico={(fn) => {
         historicoRef.current = fn;
       }}
+      onNavegarInterno={() => mudar(false)}
     />
   );
   const novaConversa = () => novaConversaRef.current?.();
@@ -217,7 +236,6 @@ export function AssistenteBolha({
   // teclado do celular (iOS Safari): a viewport visual encolhe mas a layout
   // não — visualViewport mede a diferença e a sheet sobe junto. Android já
   // cobre via interactive-widget=resizes-content no meta (kb≈0 lá).
-  const [kb, setKb] = useState(0);
   useEffect(() => {
     if (desktop || !aberto) return;
     const vv = window.visualViewport;
