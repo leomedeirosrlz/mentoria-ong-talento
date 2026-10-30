@@ -521,6 +521,71 @@
   animation: confirm-draw 420ms var(--ease-snappy) 260ms forwards;
 }
 
+/* assistente — bolha "escrevendo": onda calma de translateY+opacity, stagger
+   160ms entre pontos via animationDelay inline. Só transform/opacity animam
+   (60fps). Sob reduced-motion o guard troca pra ia-digitando-fade (só
+   opacidade) — a espera continua viva sem deslocamento. */
+@keyframes ia-digitando {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+@keyframes ia-digitando-fade {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.ia-digitando {
+  animation: ia-digitando 1.3s ease-in-out infinite;
+}
+
+/* assistente — cursor do stream: blink de caret de verdade (liga/desliga
+   seco a ~530ms por fase), mais nítido que o fade senoidal do animate-pulse */
+@keyframes ia-cursor {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+.ia-cursor {
+  animation: ia-cursor 1.06s steps(1) infinite;
+}
+
+/* assistente — linha de status das tool rounds: varredura de luz sobre o
+   texto (o vocabulário "processando" dos produtos de IA). Reusa o
+   keyframe shimmer; guard de reduced-motion congela no ponto inicial do
+   gradiente, que é o muted-foreground — texto segue legível. */
+.ia-shimmer {
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--muted-foreground) 0%,
+    var(--muted-foreground) 40%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 60%,
+    var(--muted-foreground) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: shimmer 1.7s linear infinite;
+}
+
 /* feedback de mutação — a célula que acabou de gravar pisca o --ok a ~20%
    e apaga em ~600ms. Uma vez só; o guard de reduced-motion zera. */
 @keyframes flash-ok {
@@ -570,6 +635,22 @@
        Mantém o giro (1s linear) mesmo com reduce. */
     .animate-spin {
       animation-duration: 1s !important;
+      animation-iteration-count: infinite !important;
+    }
+    /* exceções funcionais do assistente — WCAG 2.3.3 isenta opacity/cor:
+       caret e shimmer não deslocam nada; os pontos de "escrevendo" trocam
+       o bounce por onda de opacidade (a espera continua comunicada). */
+    .ia-cursor {
+      animation-duration: 1.06s !important;
+      animation-iteration-count: infinite !important;
+    }
+    .ia-shimmer {
+      animation-duration: 1.7s !important;
+      animation-iteration-count: infinite !important;
+    }
+    .ia-digitando {
+      animation-name: ia-digitando-fade !important;
+      animation-duration: 1.6s !important;
       animation-iteration-count: infinite !important;
     }
   }

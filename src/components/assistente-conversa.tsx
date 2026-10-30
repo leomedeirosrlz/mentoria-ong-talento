@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from "react";
 import {
   ArrowClockwise,
+  ArrowDown,
   ArrowRight,
   BookOpen,
   Check,
@@ -20,6 +21,7 @@ import {
   PaperPlaneRight,
   Sparkle,
   Square,
+  Trash,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { extrairAcoes, montarEnvioChat, msgAmigavel } from "@/lib/ia/mensagens";
@@ -59,8 +61,47 @@ const hhmm = (em?: number) =>
 // só é lida em handler de evento, nunca durante render
 const agora = () => Date.now();
 
-// conversa da aba — chave distinta da do painel ("assistente:aberto")
-const STORAGE_MSGS = "assistente:msgs";
+// conversas ficam no aparelho (localStorage, client-side — LGPD igual ao
+// sessionStorage anterior, mas sobrevivem ao fechamento). A mais recente
+// reabre como conversa ativa; a lista completa vira a visão "histórico".
+const STORAGE_MSGS = "assistente:msgs"; // legado — migrado pro histórico
+const STORAGE_CONVERSAS = "assistente:conversas";
+const MAX_CONVERSAS = 12;
+const MAX_MSGS = 20;
+
+type Conversa = { id: string; titulo: string; em: number; msgs: Msg[] };
+
+function lerConversas(): Conversa[] {
+  try {
+    const raw = localStorage.getItem(STORAGE_CONVERSAS);
+    const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    return Array.isArray(parsed)
+      ? (parsed.filter(
+          (c): c is Conversa =>
+            !!c && typeof c === "object" && "id" in c && Array.isArray((c as Conversa).msgs)
+        ) as Conversa[])
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+function gravarConversas(lista: Conversa[]) {
+  try {
+    if (lista.length) localStorage.setItem(STORAGE_CONVERSAS, JSON.stringify(lista));
+    else localStorage.removeItem(STORAGE_CONVERSAS);
+  } catch {
+    // storage indisponível (modo privado): histórico só na memória
+  }
+}
+
+// título = primeira pergunta do usuário, uma linha, truncada — mesmo
+// padrão do ChatGPT; msgs sem pergunta (só resposta demo?) ficam genéricas
+const tituloDa = (ms: Msg[]) => {
+  const primeira = ms.find((m) => m.role === "user")?.content ?? "Conversa";
+  const linha = primeira.replace(/\s+/g, " ").trim();
+  return linha.length > 52 ? `${linha.slice(0, 52).trimEnd()}…` : linha;
+};
 
 const DEMO_FALLBACK =
   "Na demonstração o assistente tem respostas de exemplo — no ambiente real ele responde com seus dados e guias oficiais.";
@@ -365,6 +406,7 @@ export function AssistenteConversa({
   autoFocus,
   nome,
   registrarNova,
+  registrarHistorico,
 }: {
   papeis: AppRole[];
   demo: boolean;
@@ -375,13 +417,20 @@ export function AssistenteConversa({
   nome?: string;
   /** a bolha expõe "Nova conversa" no header — registra a ação aqui */
   registrarNova?: (fn: () => void) => void;
+  /** idem pro botão de histórico — alterna transcript ↔ lista de conversas */
+  registrarHistorico?: (fn: () => void) => void;
 }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
   const [restaurada, setRestaurada] = useState(false);
+  const [conversas, setConversas] = useState<Conversa[]>([]);
+  const [visao, setVisao] = useState<"chat" | "historico">("chat");
   const [texto, setTexto] = useState("");
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [copiado, setCopiado] = useState<number | null>(null);
+  // espelho renderizável do pertoDoFim ref — a pill "ir ao fim" precisa de
+  // estado porque evento de scroll não dispara render por si só
+  const [longeDoFim, setLongeDoFim] = useState(false);
   const logRef = useRef<HTMLDivElement>(null);
   const pertoDoFim = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -390,6 +439,9 @@ export function AssistenteConversa({
   // SSE manda deltas pequenos demais pra re-render por delta
   const tokensRef = useRef("");
   const flushRef = useRef(0);
+  // id da conversa ativa no histórico — criado no 1º envio, zerado em
+  // "Nova conversa"; estado (não ref) porque a lista o lê durante render
+  const [conversaId, setConversaId] = useState<string | null>(null);
   const chips = sugestoes(papeis);
 
   const rolarFim = (forca = false) => {
@@ -398,52 +450,126 @@ export function AssistenteConversa({
   };
   useEffect(() => rolarFim(), [msgs, pending, status]);
 
-  // restaura a conversa da aba (Pop/Sheet desmontam o painel ao fechar —
-  // sem isso cada abertura recomeçava do zero). rAF: setState fora do
-  // corpo do effect (regra react-hooks), mesmo padrão da bolha
+  // restaura o histórico do aparelho (Pop/Sheet desmontam o painel ao
+  // fechar e o storage sobrevive à aba — continuidade entre sessões).
+  // Migra o sessionStorage antigo como a conversa ativa. rAF: setState
+  // fora do corpo do effect (regra react-hooks), mesmo padrão da bolha
   useEffect(() => {
     const id = requestAnimationFrame(() => {
+      const lista = lerConversas();
       try {
         const salvo = sessionStorage.getItem(STORAGE_MSGS);
-        if (salvo) {
-          const parsed = JSON.parse(salvo) as Msg[];
-          if (Array.isArray(parsed) && parsed.length)
-            setMsgs(parsed.filter((m) => m.role && m.content).slice(-20));
+        sessionStorage.removeItem(STORAGE_MSGS);
+        const antigas = salvo ? (JSON.parse(salvo) as Msg[]) : [];
+        if (Array.isArray(antigas) && antigas.length) {
+          const limpas = antigas.filter((m) => m.role && m.content).slice(-MAX_MSGS);
+          const ativa: Conversa = {
+            id: crypto.randomUUID(),
+            titulo: tituloDa(limpas),
+            em: limpas[limpas.length - 1]?.em ?? agora(),
+            msgs: limpas,
+          };
+          const prox = [ativa, ...lista].slice(0, MAX_CONVERSAS);
+          gravarConversas(prox);
+          setMsgs(limpas);
+          setConversaId(ativa.id);
+          setRestaurada(true);
+          return;
         }
       } catch {
-        // storage indisponível (modo privado): conversa só na memória
+        // storage indisponível ou legado corrompido: segue com o histórico
+      }
+      if (lista.length) {
+        setMsgs(lista[0].msgs);
+        setConversaId(lista[0].id);
       }
       setRestaurada(true);
     });
     return () => cancelAnimationFrame(id);
   }, []);
 
-  // persiste o histórico utilizável — sem bolha de stream intermediária
-  // nem campo de UI que o payload strict rejeitaria (montarEnvioChat já
-  // garante o segundo; o primeiro poluiria o estado restaurado)
+  // persiste a conversa ativa no histórico — sem bolha de stream
+  // intermediária nem campo de UI que o payload strict rejeitaria
+  // (montarEnvioChat já garante o segundo; o primeiro poluiria o estado
+  // restaurado). Upsert por id, mais recente primeiro, cap de 12. Escreve
+  // só no storage: a lista visível carrega ao abrir a visão histórico.
   useEffect(() => {
-    if (!restaurada) return;
-    try {
-      const limpas = msgs
-        .filter((m) => m.content && m.estado !== "stream")
-        .slice(-20);
-      if (limpas.length)
-        sessionStorage.setItem(STORAGE_MSGS, JSON.stringify(limpas));
-      else sessionStorage.removeItem(STORAGE_MSGS);
-    } catch {}
-  }, [msgs, restaurada]);
+    if (!restaurada || !conversaId) return;
+    const limpas = msgs
+      .filter((m) => m.content && m.estado !== "stream")
+      .slice(-MAX_MSGS);
+    if (!limpas.length) return;
+    const id = conversaId;
+    const lista = lerConversas();
+    gravarConversas(
+      [
+        {
+          id,
+          titulo:
+            lista.find((c) => c.id === id)?.titulo ?? tituloDa(limpas),
+          em: limpas[limpas.length - 1].em ?? agora(),
+          msgs: limpas,
+        },
+        ...lista.filter((c) => c.id !== id),
+      ].slice(0, MAX_CONVERSAS)
+    );
+  }, [msgs, restaurada, conversaId]);
 
-  /** limpa histórico + storage — o header oferece "Nova conversa" */
+  /** limpa a conversa ativa (a anterior já está gravada no histórico) —
+   *  o header oferece "Nova conversa" */
   function novaConversa() {
     abortRef.current?.abort();
+    setConversaId(null);
     setMsgs([]);
     setTexto("");
-    try {
-      sessionStorage.removeItem(STORAGE_MSGS);
-    } catch {}
+    setVisao("chat");
     inputRef.current?.focus();
   }
   useEffect(() => registrarNova?.(novaConversa), [registrarNova]);
+  /** botão do header: transcript ↔ histórico — a lista recarrega do
+   *  storage a cada abertura (a persistência mora no effect de msgs) */
+  function alternarHistorico() {
+    setConversas(lerConversas());
+    setVisao((v) => (v === "chat" ? "historico" : "chat"));
+  }
+  useEffect(
+    () => registrarHistorico?.(alternarHistorico),
+    [registrarHistorico]
+  );
+
+  /** troca pra uma conversa do histórico — aborta um stream em andamento
+   *  (os tokens já gravados ficam na conversa de origem) */
+  function abrirConversa(c: Conversa) {
+    abortRef.current?.abort();
+    if (flushRef.current) {
+      cancelAnimationFrame(flushRef.current);
+      flushRef.current = 0;
+    }
+    tokensRef.current = "";
+    setConversaId(c.id);
+    setMsgs(c.msgs);
+    setPending(false);
+    setStatus(null);
+    setVisao("chat");
+    pertoDoFim.current = true;
+  }
+
+  /** remove uma conversa do histórico — se for a ativa, limpa a tela */
+  function apagarConversa(id: string) {
+    setConversas((prev) => {
+      const prox = prev.filter((c) => c.id !== id);
+      gravarConversas(prox);
+      return prox;
+    });
+    if (conversaId === id) {
+      abortRef.current?.abort();
+      setConversaId(null);
+      setMsgs([]);
+      setPending(false);
+      setStatus(null);
+      setVisao("chat");
+    }
+  }
 
   function flushTokens() {
     flushRef.current = 0;
@@ -605,6 +731,8 @@ export function AssistenteConversa({
   async function enviar(conteudo: string) {
     const limpo = conteudo.trim();
     if (!limpo || pending) return;
+    if (!conversaId) setConversaId(crypto.randomUUID());
+    setVisao("chat");
     const novas: Msg[] = [
       ...msgs,
       { role: "user", content: limpo, em: agora() },
@@ -662,6 +790,62 @@ export function AssistenteConversa({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      {visao === "historico" ? (
+        /* histórico do aparelho (REALIZA-xxx): lista de conversas salvas —
+           tocar abre de volta na transcript; lixeira apaga só a dela */
+        <div className="relative min-h-0 flex-1">
+          <div className="scroll-fina h-full overflow-y-auto px-4 py-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Conversas neste aparelho
+            </p>
+            {conversas.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                Nenhuma conversa salva ainda. Elas ficam só neste aparelho.
+              </p>
+            ) : (
+              <ul className="mt-2 space-y-1.5">
+                {conversas.map((c) => (
+                  <li key={c.id} className="flex items-stretch gap-1.5">
+                    <Button
+                      variant="ghost"
+                      onClick={() => abrirConversa(c)}
+                      className={cn(
+                        "h-auto min-w-0 flex-1 flex-col items-stretch gap-0.5 rounded-xl border px-3 py-2.5 text-left shadow-[var(--shadow-border)]",
+                        c.id === conversaId
+                          ? "border-foreground/25 bg-card"
+                          : "border-border bg-card hover:border-foreground/25"
+                      )}
+                    >
+                      <span className="block truncate text-sm font-medium">
+                        {c.titulo}
+                      </span>
+                      <span className="block text-[11px] font-normal text-muted-foreground">
+                        {new Date(c.em).toLocaleDateString("pt-BR", {
+                          day: "numeric",
+                          month: "short",
+                        })}{" "}
+                        · {c.msgs.length}{" "}
+                        {c.msgs.length === 1 ? "mensagem" : "mensagens"}
+                      </span>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => apagarConversa(c.id)}
+                      aria-label={`Apagar conversa "${c.titulo}"`}
+                      title="Apagar conversa"
+                      className="h-auto w-9 shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
+                    >
+                      <Trash size={15} aria-hidden />
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        </div>
+      ) : (
+      <>
       {demo && (
         <p className="mx-4 mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
           Na demonstração, o assistente responde com exemplos fixos.
@@ -709,21 +893,26 @@ export function AssistenteConversa({
           ref={logRef}
           onScroll={() => {
             const el = logRef.current;
-            if (el)
+            if (el) {
               pertoDoFim.current =
                 el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+              setLongeDoFim(!pertoDoFim.current);
+            }
           }}
           role="log"
           aria-live="polite"
           aria-label="Conversa com o assistente"
-          className="scroll-fina h-full space-y-3 overflow-y-auto px-4 py-4"
+          className="scroll-fina h-full space-y-3 overflow-y-auto overscroll-contain px-4 py-4"
         >
           {msgs.map((m, i) => (
             <div
               key={i}
               className={cn(
-                "group flex animate-in items-end gap-2 fade-in-0 slide-in-from-bottom-1 duration-200",
-                m.role === "user" ? "justify-end" : "justify-start"
+                "group flex animate-in items-end gap-2 fade-in-0 slide-in-from-bottom-2 duration-200",
+                m.role === "user" ? "justify-end" : "justify-start",
+                // a bolha do assistente entra 80ms depois da pergunta —
+                // lê como resposta chegando, não como montagem simultânea
+                m.estado === "stream" && "[animation-delay:80ms]"
               )}
             >
               {m.role === "assistant" && (
@@ -745,17 +934,48 @@ export function AssistenteConversa({
                   )}
                 >
                   {m.role === "assistant" ? (
-                    <>
-                      <BolhaMd texto={m.content || "…"} />
-                      {/* cursor do stream (REALIZA-280): bloco piscante no
-                          fim enquanto o token ainda está chegando */}
-                      {m.estado === "stream" && (
-                        <span
-                          aria-hidden
-                          className="ml-0.5 inline-block h-[1em] w-0.5 translate-y-0.5 animate-pulse rounded-full bg-foreground/70"
-                        />
-                      )}
-                    </>
+                    m.estado === "stream" && !m.content ? (
+                      /* pré-token: UM indicador dentro da própria bolha —
+                         shimmer de status se uma tool está rodando, senão
+                         a onda de 3 pontos. Nada de bolha de espera dupla. */
+                      status ? (
+                        <p className="ia-shimmer flex items-center gap-2 text-xs">
+                          <Sparkle
+                            size={12}
+                            weight="fill"
+                            className="text-[var(--brand-lime-deep)]"
+                            aria-hidden
+                          />
+                          {status}
+                        </p>
+                      ) : (
+                        <div
+                          aria-label="O assistente está escrevendo"
+                          role="status"
+                          className="flex items-center gap-1.5 py-0.5"
+                        >
+                          {[0, 1, 2].map((d) => (
+                            <span
+                              key={d}
+                              className="ia-digitando size-1.5 rounded-full bg-muted-foreground/70"
+                              style={{ animationDelay: `${d * 160}ms` }}
+                            />
+                          ))}
+                        </div>
+                      )
+                    ) : (
+                      <>
+                        <BolhaMd texto={m.content || "…"} />
+                        {/* cursor do stream (REALIZA-280): blink de caret seco
+                            (~530ms/fase) no fim enquanto o token chega */}
+                        {m.estado === "stream" && (
+                          <span
+                            aria-hidden
+                            className="ia-cursor ml-0.5 inline-block h-[1em] w-[3px] translate-y-0.5 rounded-full bg-foreground/70"
+                          />
+                        )}
+                      </>
+                    )
                   ) : (
                     m.content
                   )}
@@ -880,9 +1100,10 @@ export function AssistenteConversa({
             </div>
           ))}
 
-          {/* bolha de espera: dots até o 1º token; linha de status durante
-              as rodadas de tool */}
-          {pending && (
+          {/* status de tool round DURANTE o stream: a bolha da resposta já
+              tem conteúdo+cursor — a linha de status vem embaixo (pré-token
+              o status mora dentro da bolha, sem duplicar) */}
+          {pending && status && msgs[msgs.length - 1]?.content ? (
             <div className="flex animate-in items-end justify-start gap-2 fade-in-0 duration-200">
               <span
                 aria-hidden
@@ -890,29 +1111,13 @@ export function AssistenteConversa({
               >
                 <Sparkle size={12} weight="fill" />
               </span>
-              <div className="rounded-2xl rounded-bl-md bg-muted/60 px-4 py-3 shadow-[var(--shadow-border)]">
-                {status ? (
-                  <p className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span className="size-1.5 animate-pulse rounded-full bg-[var(--brand-lime-deep)]" />
-                    {status}
-                  </p>
-                ) : (
-                  <div
-                    aria-label="O assistente está escrevendo"
-                    className="flex items-center gap-1.5"
-                  >
-                    {[0, 1, 2].map((d) => (
-                      <span
-                        key={d}
-                        className="size-1.5 animate-pulse rounded-full bg-muted-foreground/60"
-                        style={{ animationDelay: `${d * 180}ms` }}
-                      />
-                    ))}
-                  </div>
-                )}
+              <div className="rounded-2xl rounded-bl-md bg-muted/60 px-4 py-2.5 shadow-[var(--shadow-border)]">
+                <p className="ia-shimmer flex items-center gap-2 text-xs">
+                  {status}
+                </p>
               </div>
             </div>
-          )}
+          ) : null}
         </div>
         {/* fade do topo — aparece só quando o log rolou (o gradiente sai
             do bg do painel, não de uma cor fixa) */}
@@ -920,10 +1125,29 @@ export function AssistenteConversa({
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-popover to-transparent"
         />
+        {/* "ir ao fim": o scroll para de seguir quando o usuário sobe —
+            a pill devolve pro fundo com um toque (msg nova não rouba a
+            posição de quem está lendo) */}
+        {longeDoFim && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              pertoDoFim.current = true;
+              setLongeDoFim(false);
+              rolarFim(true);
+            }}
+            className="absolute bottom-2 left-1/2 h-auto -translate-x-1/2 animate-in gap-1.5 rounded-full bg-card px-3 py-1.5 text-[11px] font-medium text-muted-foreground shadow-[var(--shadow-overlay)] duration-200 fade-in-0 zoom-in-95 hover:text-foreground"
+          >
+            <ArrowDown size={12} aria-hidden />
+            Ver recentes
+          </Button>
+        )}
       </div>
 
-      {/* composer — os chips moram no empty state agora */}
-      <div className="space-y-2 border-t border-border/60 px-4 pb-4 pt-3">
+      {/* composer — os chips moram no empty state agora. pb com safe-area:
+          no Sheet mobile o composer não cola na home indicator */}
+      <div className="space-y-2 border-t border-border/60 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
         {!configurado && !demo ? (
           <Card className="px-4 py-3 text-sm text-muted-foreground">
             O assistente está indisponível no momento — tente de novo em
@@ -991,6 +1215,8 @@ export function AssistenteConversa({
           </>
         )}
       </div>
+      </>
+      )}
     </div>
   );
 }
