@@ -28,6 +28,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 
@@ -100,6 +101,17 @@ const dataCurta = (iso: string) =>
     year: "2-digit",
   });
 
+type SaudeMap = Record<
+  string,
+  { ok: boolean; ms: number; status: number } | "medindo"
+>;
+
+/** Cache de probe por conjunto de slugs (3min, nível módulo — sobrevive
+ *  a abrir/fechar a aba): reabrir a tela não refaz 8 chamadas ao
+ *  provider; um slug trocado refaz só o conjunto novo. */
+let probeCache: { chave: string; ate: number; saude: SaudeMap } | null = null;
+const PROBE_CACHE_MS = 3 * 60_000;
+
 export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
   const supabase = createClient();
   const [cfg, setCfg] = useState<Config | null>(null);
@@ -120,16 +132,11 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
 
   useEffect(() => {
     let vivo = true;
+
+    // 1) ia_config é o único fetch que destrava a tela — resolve sozinho
+    //    e renderiza já; catálogo e tokens chegam em paralelo depois
     void (async () => {
-      const [{ data }, res, { data: tks }] = await Promise.all([
-        supabase.from("ia_config").select("chave, valor"),
-        fetch("/api/ia/modelos").then((r) => (r.ok ? r.json() : null)).catch(() => null),
-        supabase
-          .from("ia_mcp_tokens")
-          .select("id, rotulo, created_at, ultimo_uso_em")
-          .is("revogado_em", null)
-          .order("created_at", { ascending: false }),
-      ]);
+      const { data } = await supabase.from("ia_config").select("chave, valor");
       if (!vivo) return;
       const modelos: Config["modelos"] = {};
       const fallbacks: Config["fallbacks"] = {
@@ -174,19 +181,18 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
           roteamento = row.valor;
       }
       setCfg({ modelos, fallbacks, esforco, roteamento });
-      setCatalogo(
-        Array.isArray(res?.modelos) ? (res.modelos as string[]) : []
-      );
-      setTokens((tks ?? []) as TokenMcp[]);
 
-      // reconhecimento automático: probe de todos os slugs configurados
-      // (primários + cadeias) — catálogo não garante que o slug responde
+      // reconhecimento automático: probe dos slugs configurados — com
+      // cache de 3min: reabrir a aba não refaz chamadas ao provider
       const slugs = [
         ...new Set(
           TIERS.flatMap((t) => [modelos[t.chave], ...fallbacks[t.chave]])
         ),
       ].filter((s): s is string => Boolean(s));
-      if (slugs.length) {
+      const chaveProbe = slugs.join("|");
+      if (probeCache?.chave === chaveProbe && probeCache.ate > Date.now()) {
+        setSaude(probeCache.saude);
+      } else if (slugs.length) {
         setSaude(Object.fromEntries(slugs.map((s) => [s, "medindo" as const])));
         fetch("/api/ia/modelos", {
           method: "POST",
@@ -195,12 +201,39 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
         })
           .then((r) => (r.ok ? r.json() : null))
           .then((j) => {
-            if (vivo && j?.saude && typeof j.saude === "object")
-              setSaude(j.saude);
+            if (j?.saude && typeof j.saude === "object") {
+              probeCache = {
+                chave: chaveProbe,
+                ate: Date.now() + PROBE_CACHE_MS,
+                saude: j.saude,
+              };
+              if (vivo) setSaude(j.saude);
+            }
           })
           .catch(() => {});
       }
     })();
+
+    // 2) catálogo alimenta os selects — chega quando chega, os selects
+    //    já mostram o valor salvo antes disso
+    fetch("/api/ia/modelos")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((res) => {
+        if (vivo)
+          setCatalogo(Array.isArray(res?.modelos) ? (res.modelos as string[]) : []);
+      })
+      .catch(() => {});
+
+    // 3) tokens MCP — seção própria, skeleton enquanto não resolve
+    void supabase
+      .from("ia_mcp_tokens")
+      .select("id, rotulo, created_at, ultimo_uso_em")
+      .is("revogado_em", null)
+      .order("created_at", { ascending: false })
+      .then(({ data: tks }) => {
+        if (vivo) setTokens((tks ?? []) as TokenMcp[]);
+      });
+
     return () => {
       vivo = false;
     };
@@ -367,8 +400,28 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
         {erro && <p className="text-sm text-[var(--danger-text)]">{erro}</p>}
         {!cfg ? (
-          <div className="grid place-items-center py-10">
-            <CircleNotch size={20} aria-hidden className="animate-spin text-muted-foreground" />
+          /* skeleton no formato do painel — label+select+segmento por
+             tier; o usuário lê a estrutura antes do conteúdo chegar */
+          <div className="space-y-5" aria-busy="true" aria-label="Carregando ajustes">
+            <div className="space-y-2">
+              <Skeleton className="h-3 w-24" />
+              <Skeleton className="h-3.5 w-56" />
+            </div>
+            {[0, 1, 2].map((i) => (
+              <div key={i} className="space-y-1.5">
+                <Skeleton className="h-4 w-20" />
+                <Skeleton className="h-9 w-full rounded-md" />
+                <Skeleton className="h-7 w-full rounded-md" />
+                <Skeleton className="h-3 w-44" />
+              </div>
+            ))}
+            <div className="flex items-center justify-between gap-3">
+              <div className="space-y-1.5">
+                <Skeleton className="h-4 w-36" />
+                <Skeleton className="h-3 w-52" />
+              </div>
+              <Skeleton className="h-5 w-9 rounded-full" />
+            </div>
           </div>
         ) : (
           <>
@@ -602,7 +655,10 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
               )}
 
               {tokens === null ? (
-                <CircleNotch size={16} aria-hidden className="animate-spin text-muted-foreground" />
+                <div className="space-y-1.5" aria-busy="true" aria-label="Carregando tokens">
+                  <Skeleton className="h-9 w-full rounded-lg" />
+                  <Skeleton className="h-9 w-full rounded-lg" />
+                </div>
               ) : (
                 <ul className="space-y-1.5">
                   {tokens.map((t) => (
