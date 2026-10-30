@@ -41,7 +41,7 @@ import { cn } from "@/lib/utils";
 
 type Papel = "coordenacao" | "supervisor" | "mentor";
 
-type CardSpec = {
+export type CardSpec = {
   chave: InstrumentoChave;
   titulo: string;
   descricao: string;
@@ -54,7 +54,10 @@ type CardSpec = {
   sistemaForm?: FormularioSistema;
 };
 
-const CARDS: CardSpec[] = [
+/** Os 8 cards da régua — a mesma lista ancora a página por instrumento
+ *  /materiais/instrumentos/[chave] (REALIZA-331): o seletor do topo usa
+ *  esta ordem e a chave vira o segmento da rota. */
+export const CARDS: CardSpec[] = [
   {
     chave: "roda_inicial",
     titulo: ESTACOES.roda_inicial.titulo,
@@ -277,7 +280,7 @@ function LinhaAtrasado({
       </div>
       <div className="flex items-center gap-2">
         <Link
-          href={`/duplas/${linha.dupla_id}#instrumentos`}
+          href={`/duplas/${linha.dupla_id}?aba=instrumentos#instrumentos`}
           className={buttonVariants({ variant: "ghost", size: "sm" })}
         >
           Ver ficha
@@ -310,7 +313,6 @@ export function InstrumentosPrograma({
   linhas,
   eventos,
   duplasInfo,
-  formIds,
   envioLiberado,
   fichasMentor = [],
   nudges = {},
@@ -331,9 +333,6 @@ export function InstrumentosPrograma({
       mentorTemEmail: boolean;
     }
   >;
-  /** sistema → id do formulário oficial (getFormularios) — monta o
-   *  "Ver respostas"; vazio pra não-coord (RLS do form é coord-only). */
-  formIds: Map<FormularioSistema, string>;
   envioLiberado: boolean;
   /** mentor: as duplas DPP vivas dele — o rodapé linka cada ficha. */
   fichasMentor?: { id: string; jovemNome: string }[];
@@ -378,32 +377,21 @@ export function InstrumentosPrograma({
             ehCoord && sistemaLote && temEscopo && estacao != null
               ? elegiveisLote(resolvidas, estacao, duplasInfo)
               : [];
-          const formId = card.sistemaForm
-            ? formIds.get(card.sistemaForm)
-            : undefined;
-          // REALIZA-233: o card inteiro abre as respostas — stretched link
-          // cobre o article e a linha de ações sobe com relative pra seguir
-          // clicável. Só onde há página de respostas (coord + form ativo).
-          // REALIZA-257: a trava de janela segura o mentor/jovem, não a
-          // coordenação — o card dela abre sempre.
-          const verRespostas = ehCoord && !!formId;
-
+          // REALIZA-331: o card inteiro abre a página do instrumento —
+          // /materiais/instrumentos/<chave> mostra as duplas do escopo do
+          // papel com as respostas por linha (uma rota só pra coord, sup e
+          // mentor; o /formularios/<id> segue pros forms de bordo). Stretched
+          // link cobre o article; as ações sobem com relative.
           return (
             <article
               key={card.chave}
-              className={cn(
-                "relative flex flex-col gap-2.5 rounded-xl bg-card p-3.5 shadow-[var(--shadow-border)]",
-                verRespostas &&
-                  "transition-shadow hover:shadow-[var(--shadow-border-hover)]"
-              )}
+              className="relative flex flex-col gap-2.5 rounded-xl bg-card p-3.5 shadow-[var(--shadow-border)] transition-shadow hover:shadow-[var(--shadow-border-hover)]"
             >
-              {verRespostas && (
-                <Link
-                  href={`/formularios/${formId}`}
-                  aria-label={`Ver respostas — ${card.titulo}`}
-                  className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                />
-              )}
+              <Link
+                href={`/materiais/instrumentos/${card.chave}`}
+                aria-label={`Abrir ${card.titulo}`}
+                className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              />
               <div className="flex items-start gap-2.5">
                 <InstrumentoEmblema
                   instrumento={card.chave}
@@ -511,7 +499,7 @@ export function InstrumentosPrograma({
                       ficha rotulado pelo nome do jovem */}
                   {papel === "mentor" && fichasMentor.length === 1 && (
                     <Link
-                      href={`/duplas/${fichasMentor[0]!.id}#instrumentos`}
+                      href={`/duplas/${fichasMentor[0]!.id}?aba=instrumentos#instrumentos`}
                       className={buttonVariants({
                         variant: "outline",
                         size: "sm",
@@ -526,7 +514,7 @@ export function InstrumentosPrograma({
                     fichasMentor.map((f) => (
                       <Link
                         key={f.id}
-                        href={`/duplas/${f.id}#instrumentos`}
+                        href={`/duplas/${f.id}?aba=instrumentos#instrumentos`}
                         className="text-xs font-medium underline underline-offset-2 hover:text-foreground"
                       >
                         {f.jovemNome}
@@ -575,7 +563,7 @@ export function InstrumentosPrograma({
             <span key={f.id}>
               {i > 0 && " · "}
               <Link
-                href={`/duplas/${f.id}#instrumentos`}
+                href={`/duplas/${f.id}?aba=instrumentos#instrumentos`}
                 className="font-medium underline underline-offset-2 hover:text-foreground"
               >
                 {f.jovemNome}

@@ -8,8 +8,6 @@ import {
   getMe,
   getPainelInstrumentosJornada,
 } from "@/lib/queries";
-import { getFormularios } from "@/lib/forms/queries";
-import type { FormularioSistema } from "@/lib/forms/schema";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import {
   eventoDaSemana,
@@ -47,18 +45,10 @@ export default async function MateriaisPage({
   searchParams: Promise<{ aba?: string }>;
 }) {
   const { aba: abaParam } = await searchParams;
-  const [materiais, me, eventos, formulariosRaw] = await Promise.all([
+  const [materiais, me, eventos] = await Promise.all([
     getMateriais(),
     getMe(),
     getCicloEventos(),
-    getMe().then((m) =>
-      temPapel(m, "coordenacao")
-        ? getFormularios().catch((e) => {
-            console.error("materiais/getFormularios:", e);
-            return [];
-          })
-        : Promise.resolve([])
-    ),
   ]);
 
   // coordenação por papel (não só o primário): o híbrido supervisor+coord
@@ -149,13 +139,6 @@ export default async function MateriaisPage({
     : vePainel
       ? ("supervisor" as const)
       : ("mentor" as const);
-  const formIds = new Map<FormularioSistema, string>();
-  if (ehCoord) {
-    const forms = formulariosRaw;
-    for (const f of forms) {
-      if (f.sistema && !formIds.has(f.sistema)) formIds.set(f.sistema, f.id);
-    }
-  }
   const fichasMentor = ehMentorDpp
     ? duplasPainel
         .filter(
@@ -280,7 +263,6 @@ export default async function MateriaisPage({
             linhas={painel}
             eventos={eventos}
             duplasInfo={duplasInfo}
-            formIds={formIds}
             envioLiberado={EMAIL_ENVIO_LIBERADO}
             fichasMentor={fichasMentor}
             nudges={nudges}

@@ -110,14 +110,26 @@ test.describe("coordenação — instrumentos da jornada em /materiais", () => {
     ).toBeVisible();
     await expect(instrumentos.getByText("a cada encontro")).toBeVisible();
 
-    // "Ver respostas" navega pro formulário oficial — coord-only
-    const verRespostas = instrumentos
-      .getByRole("link", { name: "Ver respostas" })
+    // REALIZA-331: o card inteiro abre a página do instrumento — as
+    // respostas por dupla moram lá dentro (/materiais/instrumentos/<chave>)
+    const abrir = instrumentos
+      .getByRole("link", { name: /^Abrir / })
       .first();
-    await expect(verRespostas).toBeVisible();
-    await expect(verRespostas).toHaveAttribute("href", /^\/formularios\//);
-    await verRespostas.click();
-    await page.waitForURL(/\/formularios\/[^/]+/);
+    await expect(abrir).toBeVisible();
+    await expect(abrir).toHaveAttribute(
+      "href",
+      /^\/materiais\/instrumentos\//
+    );
+    await abrir.click();
+    await page.waitForURL(/\/materiais\/instrumentos\/[^/]+/);
+    // a página por instrumento: seletor no topo (troca sem sair da
+    // leitura) + uma linha por dupla do escopo
+    await expect(
+      page.getByRole("navigation", { name: "Trocar de instrumento" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Ficha" }).first()
+    ).toBeVisible();
     await page.goBack();
 
     // REALIZA-257: a janela do guia é indicador pra coordenação, não trava —
@@ -135,11 +147,11 @@ test.describe("coordenação — instrumentos da jornada em /materiais", () => {
         .isVisible()
         .catch(() => false)
     ) {
-      // indicador de janela + respostas abertas; emitir em lote não tem
-      // elegível fora da janela (trancada nunca é lote)
+      // indicador de janela + card navegável (a página mostra as duplas
+      // "ainda não abriu"); emitir em lote não tem elegível fora da janela
       await expect(rodaFormal.getByText(/abre no encontro 12/)).toBeVisible();
       await expect(
-        rodaFormal.getByRole("link", { name: /^Ver respostas/ })
+        rodaFormal.getByRole("link", { name: /^Abrir / })
       ).toBeVisible();
       await expect(
         rodaFormal.getByRole("button", { name: /Enviar em lote/ })
@@ -205,18 +217,23 @@ test.describe("coordenação — instrumentos da jornada em /materiais", () => {
     await expect(
       instrumentos.getByRole("link", { name: "Ver respostas" })
     ).toHaveCount(0);
-    // trancado sem link/botão também pra ele — card de estação fechada não
-    // tem ação nenhuma (a data de liberação é um pill, não um botão)
+    // trancado continua sem ação: o único link do card é o de navegação
+    // pra página do instrumento (leitura pura por lá — linhas "ainda não
+    // abriu", nenhum gesto); a data de liberação é um pill, não um botão
     const rodaFormal = instrumentos.locator("article", {
       hasText: "Roda da Vida · aplicação formal",
     });
-    await expect(rodaFormal.getByRole("link")).toHaveCount(0);
     await expect(rodaFormal.getByRole("button")).toHaveCount(0);
-    // e o invariante geral: qualquer card "ainda não abriu" é leitura pura
+    // e o invariante geral: card "ainda não abriu" tem só o link "Abrir"
     for (const card of await instrumentos
       .locator("article", { hasText: "ainda não abriu" })
       .all()) {
-      await expect(card.getByRole("link")).toHaveCount(0);
+      const links = card.getByRole("link");
+      await expect(links).toHaveCount(1);
+      await expect(links.first()).toHaveAttribute(
+        "href",
+        /^\/materiais\/instrumentos\//
+      );
       await expect(card.getByRole("button")).toHaveCount(0);
     }
     // rodapé de formulários é coord-only
@@ -262,7 +279,7 @@ test.describe("coordenação — instrumentos da jornada em /materiais", () => {
     await expect(naFicha).toBeVisible();
     await expect(naFicha).toHaveAttribute(
       "href",
-      `/duplas/${DUPLA_ID}#instrumentos`
+      `/duplas/${DUPLA_ID}?aba=instrumentos#instrumentos`
     );
     await expect(
       instrumentos.getByText(/Estado e envio por dupla na ficha:/)

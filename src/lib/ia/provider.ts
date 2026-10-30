@@ -23,6 +23,7 @@
 // byte útil: depois de token na tela, recomeçar duplicaria texto.
 
 import { z } from "zod";
+import type { AppRole } from "@/lib/types";
 import type { EsforcoIa } from "./config";
 import { IA_TOOLS } from "./tools";
 
@@ -53,20 +54,29 @@ export function providerConfigurado(): boolean {
   );
 }
 
-// zod 4 tem toJSONSchema nativo — o registry vira function-calling sem dep
-let toolsCache: unknown[] | null = null;
-function toolsPayload() {
-  if (!toolsCache) {
-    toolsCache = Object.values(IA_TOOLS).map((t) => ({
-      type: "function",
-      function: {
-        name: t.nome,
-        description: t.descricao,
-        parameters: z.toJSONSchema(t.schema),
-      },
-    }));
+// zod 4 tem toJSONSchema nativo — o registry vira function-calling sem dep.
+// O payload é filtrado por papel (REALIZA-333): anunciar tool que o papel
+// não pode rodar só ensinava o modelo a chamar e papagaia a descrição da
+// negação na resposta — mentor lia "fila de pareamento, ocupação dos
+// mentores" de tools coord-only. Cache por conjunto de papéis.
+const toolsCache = new Map<string, unknown[]>();
+function toolsPayload(papeis: AppRole[] | undefined) {
+  const chave = papeis ? [...papeis].sort().join("|") : "*";
+  let cached = toolsCache.get(chave);
+  if (!cached) {
+    cached = Object.values(IA_TOOLS)
+      .filter((t) => !papeis || t.roles.some((r) => papeis.includes(r)))
+      .map((t) => ({
+        type: "function",
+        function: {
+          name: t.nome,
+          description: t.descricao,
+          parameters: z.toJSONSchema(t.schema),
+        },
+      }));
+    toolsCache.set(chave, cached);
   }
-  return toolsCache;
+  return cached;
 }
 
 // ---------- retry (REALIZA-307) ----------
@@ -159,12 +169,13 @@ function montarBody(
   messages: MsgChat[],
   modelo: string | undefined,
   esforco: EsforcoIa | undefined,
-  stream: boolean
+  stream: boolean,
+  papeis: AppRole[] | undefined
 ) {
   return JSON.stringify({
     model: modelo || process.env.IA_MODEL,
     messages,
-    tools: toolsPayload(),
+    tools: toolsPayload(papeis),
     tool_choice: "auto",
     ...(esforco ? { reasoning_effort: EFFORT[esforco] } : {}),
     ...(stream ? { stream: true } : {}),
@@ -181,7 +192,12 @@ function montarBody(
 export async function chamarModelo(
   messages: MsgChat[],
   sessao?: string,
-  opts?: { modelo?: string; esforco?: EsforcoIa; fallbacks?: string[] }
+  opts?: {
+    modelo?: string;
+    esforco?: EsforcoIa;
+    fallbacks?: string[];
+    papeis?: AppRole[];
+  }
 ): Promise<{ ok: true; mensagem: MsgChat } | { ok: false; erro: string }> {
   const cadeia = cadeiaDeModelos(opts?.modelo, opts?.fallbacks);
   let esperaMs = 0; // Retry-After de um 429 carrega pro próximo modelo
@@ -208,7 +224,8 @@ export async function chamarModelo(
             messages,
             cadeia[i],
             mandarEsforco ? opts?.esforco : undefined,
-            false
+            false,
+            opts?.papeis
           ),
           signal: AbortSignal.timeout(Number(process.env.IA_TIMEOUT_MS ?? 20_000)),
         });
@@ -293,6 +310,9 @@ export async function chamarModeloStream(
     /** cadeia ordenada de fallback por tier — cada slug tenta uma vez,
      *  sempre ANTES do primeiro byte útil sair na tela */
     fallbacks?: string[];
+    /** papéis do usuário — o payload de tools já sai filtrado por eles
+     *  (REALIZA-333); ausente = todas (MCP/tests que não têm papel) */
+    papeis?: AppRole[];
   }
 ): Promise<ResultadoStream> {
   // retry só vale com a saída ainda limpa — depois de token emitido,
@@ -325,7 +345,8 @@ export async function chamarModeloStream(
           messages,
           cadeia[i],
           mandarEsforco ? opts.esforco : undefined,
-          true
+          true,
+          opts.papeis
         ),
         signal: opts.signal,
       });

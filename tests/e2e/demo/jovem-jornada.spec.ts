@@ -418,18 +418,28 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     await expect(
       instrumentos.getByRole("button", { name: /Enviar em lote/ }).first()
     ).toBeVisible();
-    // ...e lê as respostas no formulário oficial — o link navega pra
-    // /formularios/<id> (coord-only; supervisor nem vê)
-    const verRespostas = instrumentos
-      .getByRole("link", { name: "Ver respostas" })
+    // ...e lê as respostas na página do instrumento — REALIZA-331: o
+    // card inteiro abre /materiais/instrumentos/<chave> com as duplas do
+    // escopo e a resposta por linha (o /formularios/<id> fica pros forms
+    // de bordo)
+    const abrir = instrumentos
+      .getByRole("link", { name: /^Abrir / })
       .first();
-    await expect(verRespostas).toBeVisible();
-    await expect(verRespostas).toHaveAttribute(
+    await expect(abrir).toBeVisible();
+    await expect(abrir).toHaveAttribute(
       "href",
-      /^\/formularios\//
+      /^\/materiais\/instrumentos\//
     );
-    await verRespostas.click();
-    await expect(page).toHaveURL(/\/formularios\/[^/]+/);
+    await abrir.click();
+    await expect(page).toHaveURL(/\/materiais\/instrumentos\/[^/]+/);
+    // seletor no topo troca de instrumento sem sair da leitura + uma
+    // linha por dupla do escopo (o mentor lê as próprias aqui também)
+    await expect(
+      page.getByRole("navigation", { name: "Trocar de instrumento" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Ficha" }).first()
+    ).toBeVisible();
     await page.goBack();
 
     // REALIZA-257: a janela do guia é indicador pra coordenação, não trava —
@@ -447,8 +457,8 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     // o cadeado é do papel que a janela segura — não da coord
     await expect(cardForaDaJanela.getByText("ainda não abriu")).toHaveCount(0);
     await expect(
-      cardForaDaJanela.getByRole("link", { name: /^Ver respostas/ })
-    ).toHaveAttribute("href", /^\/formularios\//);
+      cardForaDaJanela.getByRole("link", { name: /^Abrir / })
+    ).toHaveAttribute("href", /^\/materiais\/instrumentos\//);
     // e nada de cópia de lote que minta ("já receberam ou já responderam")
     await expect(
       cardForaDaJanela.getByText(/Nada a enviar agora/)
@@ -515,14 +525,20 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
       instrumentos.getByRole("link", { name: "Ver respostas" })
     ).toHaveCount(0);
     // card fora da janela: a janela é o estado dele (cadeado + data) e ele
-    // segue leitura pura — a trava de janela vale pro supervisor, só a
-    // coordenação consulta/emite fora dela (REALIZA-257)
+    // segue sem ação — a trava de janela vale pro supervisor, só a
+    // coordenação consulta/emite fora dela (REALIZA-257). O único link é
+    // o de navegação pra página do instrumento (leitura pura por lá).
     const trancado = instrumentos.locator("article", {
       hasText: "Avaliação Geral - 360º · mentorado(a)",
     });
     await expect(trancado.getByText("ainda não abriu")).toBeVisible();
     await expect(trancado.getByText(/libera no encontro 16/)).toBeVisible();
-    await expect(trancado.getByRole("link")).toHaveCount(0);
+    const linksTrancado = trancado.getByRole("link");
+    await expect(linksTrancado).toHaveCount(1);
+    await expect(linksTrancado.first()).toHaveAttribute(
+      "href",
+      /^\/materiais\/instrumentos\//
+    );
     await expect(trancado.getByRole("button")).toHaveCount(0);
     // o rodapé "Intakes… → Formulários" é coord-only
     await expect(

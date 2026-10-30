@@ -150,6 +150,10 @@ export async function POST(req: Request) {
     modelo: modeloDoTier(iaCfg, tier),
     esforco: esforcoDoTier(iaCfg, tier),
     fallbacks: fallbacksDoTier(iaCfg, tier),
+    // REALIZA-333: o payload de tools sai filtrado por papel — não anunciar
+    // pro modelo o que ele não pode rodar (ele papagaiava a descrição das
+    // tools coord-only ao explicar a negação)
+    papeis,
   };
 
   // sessão estável por usuário — o provider Go exige pra rotear/cachear;
@@ -326,7 +330,10 @@ export async function POST(req: Request) {
               }
             }
           }
-          toolsUsadas.push(tc.function.name);
+          // tool negada por papel não vira "fonte" da resposta — a meta
+          // listava o nome cru da função que falhou (REALIZA-333)
+          const env = res as { ok?: boolean } | null;
+          if (!env || env.ok !== false) toolsUsadas.push(tc.function.name);
           historico.push({
             role: "tool",
             tool_call_id: tc.id,

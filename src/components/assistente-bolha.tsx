@@ -205,8 +205,10 @@ export function AssistenteBolha({
       configurado={configurado}
       // autoFocus só no desktop — no mobile focar na abertura abre o
       // teclado durante a animação da sheet (flicker + metade da tela
-      // tomada); lá o foco vem do toque do usuário
+      // tomada); lá o foco vem do toque do usuário. Com keepMounted o
+      // mount é no load, então a conversa foca quando `aberto` liga
       autoFocus={desktop}
+      aberto={desktop && aberto}
       nome={nome}
       registrarNova={(fn) => {
         novaConversaRef.current = fn;
@@ -221,17 +223,23 @@ export function AssistenteBolha({
   const alternarHistorico = () => historicoRef.current?.();
 
   // aba de ajustes (REALIZA-328): view-stack aqui na bolha — a conversa
-  // continua montada por baixo (estado do chat preservado), o painel de
-  // config cobre. Só coordenação fora da demo (a RLS fecha a escrita de
-  // qualquer jeito — o botão é só cortesia de não mostrar o que nega)
+  // continua montada por baixo (estado do chat e do stream preservados:
+  // um swap de elemento desmontava e órfanava a resposta — REALIZA-332),
+  // o painel de config cobre. contents deixa a bolha filha direta do flex;
+  // hidden esconde sem desmontar. Só coordenação fora da demo (a RLS fecha
+  // a escrita de qualquer jeito — o botão é só cortesia de não mostrar o
+  // que nega)
   const [viewConfig, setViewConfig] = useState(false);
   const onConfig = papeis.includes("coordenacao") && !demo
     ? () => setViewConfig(true)
     : undefined;
-  const corpo = viewConfig ? (
-    <AssistenteConfig onVoltar={() => setViewConfig(false)} />
-  ) : (
-    conversa
+  const corpo = (
+    <>
+      <div className={viewConfig ? "hidden" : "contents"}>{conversa}</div>
+      {viewConfig && (
+        <AssistenteConfig onVoltar={() => setViewConfig(false)} />
+      )}
+    </>
   );
 
   // arrastar p/ baixo fecha — a alça no topo da sheet rastreia o dedo 1:1
@@ -341,6 +349,10 @@ export function AssistenteBolha({
           side="top"
           align="end"
           sideOffset={12}
+          // keepMounted: fechar esconde mas não desmonta — o stream segue
+          // rodando e a resposta não se perde (REALIZA-332). O Base UI
+          // aplica inert no fechado (sem foco/interação/árvore a11y)
+          keepMounted
           className={PAINEL_CLS}
         >
           <Cabecalho
@@ -375,6 +387,8 @@ export function AssistenteBolha({
           id="painel-assistente"
           side="bottom"
           showCloseButton={false}
+          // idem PopoverContent acima — fechar não órfana o stream
+          keepMounted
           style={{
             // teclado iOS: a sheet sobe inteira acima dele e encolhe pra
             // não estourar o topo — bottom (offset) não briga com o

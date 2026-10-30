@@ -40,3 +40,23 @@ const META_FONTE: Record<string, { rotulo: string; href: string }> = {
 export function metaFonte(guia: string): { rotulo: string; href?: string } {
   return META_FONTE[guia] ?? { rotulo: guia };
 }
+
+// Nome interno da tool → rótulo que o usuário entende (a meta "fontes:"
+// sob a resposta não pode vazar vocabulário técnico — REALIZA-333)
+const ROTULO_TOOL: Record<string, string> = {
+  resumo_semana: "resumo da semana",
+  ficha_dupla: "ficha da dupla",
+  registros_da_dupla: "registros da dupla",
+  aguardando_par: "fila de pareamento",
+  capacidade_mentores: "ocupação de mentores",
+  duplas_do_usuario: "suas duplas",
+  agenda_do_periodo: "agenda do período",
+  guia_consulta: "guias do programa",
+  chamados_resumo: "chamados",
+  pessoas_busca: "pessoas",
+  instrumentos_da_dupla: "instrumentos da dupla",
+};
+
+export function rotuloTool(nome: string): string {
+  return ROTULO_TOOL[nome] ?? nome;
+}

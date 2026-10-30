@@ -69,15 +69,7 @@ function quandoCurto(data: string): string {
  *  descrição curta, ação à direita (abrir arquivo/link em nova aba). Sem
  *  selo de público nem ⋯ — a linha inteira é o gesto; "em breve" é o
  *  estado legítimo de quem ainda não tem destino e não vira link. */
-function LinhaMaterial({
-  m,
-  destaque = false,
-}: {
-  m: Material;
-  /** dentro do card amarelo da semana — superfície e hover usam o par do
-   *  tema (foreground em tom baixo), não o neutro de card. */
-  destaque?: boolean;
-}) {
+function LinhaMaterial({ m }: { m: Material }) {
   const Icone = TIPO_ICONE[m.tipo];
   // arquivo oficial ganha da url externa; "doc:<slug>" é documento nativo
   // (página do app); sem os três, "em breve"
@@ -90,12 +82,7 @@ function LinhaMaterial({
       : urlOk;
   const conteudo = (
     <>
-      <span
-        className={cn(
-          "grid size-9 shrink-0 place-items-center rounded-lg text-muted-foreground",
-          destaque ? "bg-foreground/5" : "bg-muted/70"
-        )}
-      >
+      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
         <Icone size={17} aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
@@ -137,10 +124,7 @@ function LinhaMaterial({
       {...(ehDoc ? {} : { target: "_blank", rel: "noopener noreferrer" })}
       className={cn(
         cls,
-        "transition-colors focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-        destaque
-          ? "hover:bg-foreground/5 active:bg-foreground/10"
-          : "hover:bg-muted/50 active:bg-muted"
+        "transition-colors hover:bg-muted/50 active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       )}
     >
       {conteudo}
@@ -158,9 +142,16 @@ function LinhaMaterial({
   );
 }
 
-/** "Encontro desta semana" — card de destaque com numero+tema do vigente
- *  da turma, o "Como conduzir" do guia em prévia de 3 linhas ("Ler tudo"
- *  abre o texto todo) e os materiais do encontro como linhas clicáveis. */
+/** "Encontro desta semana" — card neutro com acento de jornada na borda
+ *  (o amarelo é próximo passo, não banho de fundo: REALIZA-335), o "Como
+ *  conduzir" do guia e os materiais do encontro como linhas clicáveis.
+ *  O texto longo vai em <details>: a prévia de 3 linhas mora no summary
+ *  (única parte visível fechado) e o texto INTEIRO no corpo — antes o
+ *  corpo era vazio e o texto morava todo no summary, então o "dropdown"
+ *  não tinha nada dentro. Texto curto sai como parágrafo, sem um toggle
+ *  que abriria pro mesmo trecho. */
+const CONDUZIR_LIMITE = 240;
+
 function CardSemana({
   turma,
   itens,
@@ -172,78 +163,91 @@ function CardSemana({
 }) {
   const encontro = turma.encontros.find((e) => e.numero === turma.vigente);
   if (!encontro) return null;
-  const guia = guiaDoEncontro(encontro.numero);
+  const conduzir = guiaDoEncontro(encontro.numero)?.conduzir;
   const id = `semana-${turma.rotulo ? turma.rotulo.replace(/\s+/g, "-") : "ciclo"}`;
   return (
     <section
       aria-labelledby={id}
-      className="animate-enter overflow-hidden rounded-xl border border-[var(--destaque-borda)] bg-[var(--destaque-suave)] text-foreground"
+      className="animate-enter overflow-hidden rounded-xl border border-border border-l-[3px] border-l-[var(--destaque)] bg-card text-foreground"
       style={{ "--i": Math.min(indice, 10) } as CSSProperties}
     >
       <div className="px-4 pb-3.5 pt-4 sm:px-5">
         <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5">
           <p
             id={id}
-            className="text-[11px] font-semibold uppercase tracking-[0.08em]"
+            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
           >
             Encontro desta semana
           </p>
           {turma.rotulo && (
-            <Badge
-              variant="outline"
-              className="border-[var(--destaque-borda)] font-semibold"
-            >
+            <Badge variant="outline" className="font-semibold">
               {turma.rotulo}
             </Badge>
           )}
           {encontro.data && (
-            <span className="ml-auto text-xs">{quandoCurto(encontro.data)}</span>
+            <span className="ml-auto text-xs text-muted-foreground">
+              {quandoCurto(encontro.data)}
+            </span>
           )}
         </div>
         <h2 className="mt-1 text-base font-semibold">
           Encontro {encontro.numero}
           {encontro.titulo && ` · ${encontro.titulo}`}
         </h2>
-        {guia && (
-          <details className="group/cc mt-2">
-            <summary className="cursor-pointer list-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-              {/* a prévia truncada fica dentro do summary mas fora do nome
-                  acessível (aria-hidden): o botão se chama "Ler tudo", não
-                  o texto cortado; o corpo repete o trecho inteiro ao abrir */}
-              <span
-                aria-hidden
-                className="line-clamp-3 text-sm leading-relaxed group-open/cc:hidden"
-              >
-                <strong className="font-semibold">Como conduzir:</strong>{" "}
-                {guia.conduzir}
-              </span>
-              <span className="mt-1.5 inline-flex min-h-11 items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground group-open/cc:hidden sm:min-h-8">
-                Ler tudo
-                <CaretDown size={12} aria-hidden />
-              </span>
-              {/* aberto: o texto inteiro vem primeiro e o controle fecha
-                  embaixo dele, no lugar onde o leitor terminou */}
-              <span className="hidden text-sm leading-relaxed group-open/cc:block">
-                <strong className="font-semibold">Como conduzir:</strong>{" "}
-                {guia.conduzir}
-              </span>
-              <span className="mt-1.5 hidden min-h-11 items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground group-open/cc:inline-flex sm:min-h-8">
-                Mostrar menos
-                <CaretDown size={12} aria-hidden className="rotate-180" />
-              </span>
-            </summary>
-          </details>
-        )}
+        {conduzir &&
+          (conduzir.length > CONDUZIR_LIMITE ? (
+            <details className="group/cc mt-1.5">
+              <summary className="cursor-pointer list-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                {/* prévia truncada — a única parte do details visível
+                    fechado; aria-hidden pra não virar nome acessível */}
+                <span
+                  aria-hidden
+                  className="line-clamp-3 text-sm leading-relaxed text-muted-foreground group-open/cc:hidden"
+                >
+                  <strong className="font-semibold text-foreground">
+                    Como conduzir:
+                  </strong>{" "}
+                  {conduzir}
+                </span>
+                <span className="mt-1 inline-flex min-h-8 items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
+                  <span className="group-open/cc:hidden">Ler tudo</span>
+                  <span className="hidden group-open/cc:inline">
+                    Mostrar menos
+                  </span>
+                  <CaretDown
+                    size={12}
+                    aria-hidden
+                    className="transition-transform group-open/cc:rotate-180"
+                  />
+                </span>
+              </summary>
+              {/* corpo real do dropdown — fechado o browser nem renderiza;
+                  o texto completo mora aqui, não no summary */}
+              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                <strong className="font-semibold text-foreground">
+                  Como conduzir:
+                </strong>{" "}
+                {conduzir}
+              </p>
+            </details>
+          ) : (
+            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+              <strong className="font-semibold text-foreground">
+                Como conduzir:
+              </strong>{" "}
+              {conduzir}
+            </p>
+          ))}
       </div>
-      <div className="border-t border-[var(--destaque-borda)]">
+      <div className="border-t border-border/60">
         {itens.length > 0 ? (
-          <div className="divide-y divide-[var(--destaque-borda)]">
+          <div className="divide-y divide-border/60">
             {itens.map((m) => (
-              <LinhaMaterial key={m.id} m={m} destaque />
+              <LinhaMaterial key={m.id} m={m} />
             ))}
           </div>
         ) : (
-          <p className="px-4 py-3 text-sm sm:px-5">
+          <p className="px-4 py-3 text-sm text-muted-foreground sm:px-5">
             Nada publicado pra esse encontro por enquanto.
           </p>
         )}

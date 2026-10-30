@@ -302,13 +302,32 @@ function statusEntrega(
  *  dupla é a leitura inicial e as seguintes a formal — a data do enc. 12
  *  não serve de régua (dupla emparelhada tarde tem a inicial dela depois
  *  do enc. 12; aplicação atrasada idem; re-envio cria link novo). */
-function momentoRoda(
-  e: Pick<EntregaJornada, "contexto">,
+export function momentoRoda(
+  e: { contexto?: Record<string, unknown> | null },
   primeiraSemMarca: boolean
 ): "inicial" | "formal" {
   const m = e.contexto?.["momento"];
   if (m === "inicial" || m === "formal") return m;
   return primeiraSemMarca ? "inicial" : "formal";
+}
+
+/** Filtra as entregas de roda_vida de um momento (leitura inicial ×
+ *  aplicação formal) — mesma régua de estacoesJornada/painel: marca
+ *  `momento` explícita no contexto primeiro; sem marca, a PRIMEIRA
+ *  entrega sem marca é a inicial. Usada pela página por instrumento e
+ *  pela action de detalhe (REALIZA-331). */
+export function entregasDoMomento<
+  T extends { contexto?: Record<string, unknown> | null; created_at?: string },
+>(entregas: T[], momento: "inicial" | "formal"): T[] {
+  const ord = [...entregas].sort((a, b) =>
+    (a.created_at ?? "").localeCompare(b.created_at ?? "")
+  );
+  const idxSemMarca = ord.findIndex(
+    (e) =>
+      e.contexto?.["momento"] !== "inicial" &&
+      e.contexto?.["momento"] !== "formal"
+  );
+  return ord.filter((e, i) => momentoRoda(e, i === idxSemMarca) === momento);
 }
 
 /** Conta os itens de um campo submetas_N: enumerações "1. … 2. …" (mesmo

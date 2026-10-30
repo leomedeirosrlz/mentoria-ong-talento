@@ -25,7 +25,7 @@ import {
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { extrairAcoes, montarEnvioChat, msgAmigavel } from "@/lib/ia/mensagens";
-import { metaFonte, type FonteIa } from "@/lib/ia/fontes";
+import { metaFonte, rotuloTool, type FonteIa } from "@/lib/ia/fontes";
 import {
   ehTabelaMd,
   extrairFontesTexto,
@@ -212,12 +212,25 @@ function Inline({ texto, animar }: { texto: string; animar?: boolean }) {
         if (link) {
           const [, rotulo, href] = link;
           // link seguro: http(s) ou interno — javascript:/data: viram texto
-          if (/^(https?:|\/)/.test(href))
+          // interno vai por next/link: navegação SPA mantém o fetch do
+          // stream vivo; <a> puro dava full nav e matava a resposta
+          // (REALIZA-332)
+          if (href.startsWith("/"))
+            return (
+              <Link
+                key={i}
+                href={href}
+                className="underline underline-offset-2 decoration-muted-foreground/50 hover:decoration-foreground"
+              >
+                {animar ? <Tokens texto={rotulo} /> : rotulo}
+              </Link>
+            );
+          if (/^https?:/.test(href))
             return (
               <a
                 key={i}
                 href={href}
-                target={href.startsWith("/") ? undefined : "_blank"}
+                target="_blank"
                 rel="noopener noreferrer"
                 className="underline underline-offset-2 decoration-muted-foreground/50 hover:decoration-foreground"
               >
@@ -368,7 +381,9 @@ function MdLite({
         pronto={false}
       />
     );
-  return <div className="space-y-2">{blocos}</div>;
+  // overflow-wrap: links longos e código sem quebra não vazam da bolha
+  // estreita do painel (~240px no desktop) — REALIZA-334
+  return <div className="space-y-2 [overflow-wrap:anywhere]">{blocos}</div>;
 }
 
 /** Tabela pipe → <table> de verdade (REALIZA-281): células passam pelo
@@ -413,22 +428,26 @@ const TOM_STAT: Record<StatTom, string> = {
 };
 
 function StatCards({ stats }: { stats: Stat[] }) {
+  // auto-fit + piso de 7rem: o painel tem ~240px úteis — grid-cols fixo
+  // por viewport (sm:grid-cols-4) esmagava o card no desktop e o texto
+  // vazava da borda (REALIZA-334); min-w-0 + break-words contêm rótulos
+  // longos tipo "chamados em atendimento"
   return (
-    <div className="grid grid-cols-2 gap-1.5 sm:grid-cols-4">
+    <div className="grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-1.5">
       {stats.slice(0, 4).map((s, i) => (
         <div
           key={i}
-          className="animate-enter rounded-lg border border-border bg-card px-2.5 py-2 shadow-[var(--shadow-border)]"
+          className="animate-enter min-w-0 rounded-lg border border-border bg-card px-2.5 py-2 shadow-[var(--shadow-border)]"
           style={{ "--i": i } as React.CSSProperties}
         >
-          <p className={cn("text-base font-semibold leading-tight", TOM_STAT[s.tom])}>
+          <p className={cn("break-words text-base font-semibold leading-tight", TOM_STAT[s.tom])}>
             {s.valor}
           </p>
-          <p className="mt-0.5 text-[11px] leading-snug text-muted-foreground">
+          <p className="mt-0.5 break-words text-[11px] leading-snug text-muted-foreground">
             {s.rotulo}
           </p>
           {s.detalhe ? (
-            <p className="mt-0.5 text-[10px] leading-snug text-muted-foreground/70">
+            <p className="mt-0.5 break-words text-[10px] leading-snug text-muted-foreground/70">
               {s.detalhe}
             </p>
           ) : null}
@@ -461,6 +480,7 @@ export function AssistenteConversa({
   demo,
   configurado,
   autoFocus,
+  aberto,
   nome,
   registrarNova,
   registrarHistorico,
@@ -471,6 +491,9 @@ export function AssistenteConversa({
   configurado: boolean;
   /** a bolha já foca o textarea ao abrir — autoFocus cobre o caso direto */
   autoFocus?: boolean;
+  /** painel visível — com keepMounted a conversa monta fechada, então o
+   *  foco do composer vem da abertura, não do autoFocus (REALIZA-332) */
+  aberto?: boolean;
   /** primeiro nome pro empty state ("Oi, X!") — sem ele, genérico */
   nome?: string;
   /** a bolha expõe "Nova conversa" no header — registra a ação aqui */
@@ -481,6 +504,9 @@ export function AssistenteConversa({
   onNavegarInterno?: () => void;
 }) {
   const [msgs, setMsgs] = useState<Msg[]>([]);
+  // id da conversa ativa no histórico — criado no 1º envio, zerado em
+  // "Nova conversa"; estado (não ref) porque a lista o lê durante render
+  const [conversaId, setConversaId] = useState<string | null>(null);
   const [restaurada, setRestaurada] = useState(false);
   const [conversas, setConversas] = useState<Conversa[]>([]);
   const [visao, setVisao] = useState<"chat" | "historico">("chat");
@@ -495,14 +521,66 @@ export function AssistenteConversa({
   const pertoDoFim = useRef(true);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const abortRef = useRef<AbortController | null>(null);
+  // espelhos pro cleanup de desmonte — setState não roda em cleanup e o
+  // effect de persistência não dispara de novo, então a escrita do
+  // parcial é manual via refs (REALIZA-332)
+  const msgsRef = useRef<Msg[]>(msgs);
+  const conversaIdRef = useRef(conversaId);
+  useEffect(() => {
+    msgsRef.current = msgs;
+    conversaIdRef.current = conversaId;
+  }, [msgs, conversaId]);
   // tokens acumulam num ref e descem pro estado uma vez por frame —
   // SSE manda deltas pequenos demais pra re-render por delta
   const tokensRef = useRef("");
   const flushRef = useRef(0);
-  // id da conversa ativa no histórico — criado no 1º envio, zerado em
-  // "Nova conversa"; estado (não ref) porque a lista o lê durante render
-  const [conversaId, setConversaId] = useState<string | null>(null);
   const chips = sugestoes(papeis);
+
+  // REALIZA-332: um desmonte de verdade não deve órfanar o stream —
+  // aborta o fetch (o req.signal do servidor para de gerar na hora) e
+  // grava o parcial direto no storage: setMsgs aqui é no-op e o effect de
+  // persistência não dispara de novo, então a escrita final é manual.
+  // Cobre os desmontes que o keepMounted não cobre: troca de braço
+  // Popover↔Sheet (768px) e saída do grupo (app).
+  useEffect(() => {
+    return () => {
+      abortRef.current?.abort();
+      if (flushRef.current) {
+        cancelAnimationFrame(flushRef.current);
+        flushRef.current = 0;
+      }
+      const atuais = msgsRef.current;
+      const ultima = atuais[atuais.length - 1];
+      if (!ultima || ultima.role !== "assistant" || ultima.estado !== "stream")
+        return;
+      const content = ultima.content + tokensRef.current;
+      const finais = [
+        ...atuais.slice(0, -1),
+        {
+          role: "assistant" as const,
+          content: content || "Resposta interrompida.",
+          em: agora(),
+        },
+      ]
+        .filter((m) => m.content)
+        .slice(-MAX_MSGS);
+      const id = conversaIdRef.current;
+      if (!id || !finais.length) return;
+      const lista = lerConversas();
+      gravarConversas(
+        [
+          {
+            id,
+            titulo:
+              lista.find((c) => c.id === id)?.titulo ?? tituloDa(finais),
+            em: finais[finais.length - 1].em ?? agora(),
+            msgs: finais,
+          },
+          ...lista.filter((c) => c.id !== id),
+        ].slice(0, MAX_CONVERSAS)
+      );
+    };
+  }, []);
 
   const rolarFim = (forca = false) => {
     const el = logRef.current;
@@ -510,8 +588,14 @@ export function AssistenteConversa({
   };
   useEffect(() => rolarFim(), [msgs, pending, status]);
 
-  // restaura o histórico do aparelho (Pop/Sheet desmontam o painel ao
-  // fechar e o storage sobrevive à aba — continuidade entre sessões).
+  // foco na abertura — com keepMounted a conversa monta fechada e o
+  // autoFocus do textarea não dispara; o effect cobre false→true
+  useEffect(() => {
+    if (aberto) focarComposer(inputRef.current);
+  }, [aberto]);
+
+  // restaura o histórico do aparelho (o storage sobrevive ao painel e à
+  // aba — continuidade entre sessões e entre desmontes de braço/config).
   // Migra o sessionStorage antigo como a conversa ativa. rAF: setState
   // fora do corpo do effect (regra react-hooks), mesmo padrão da bolha
   useEffect(() => {
@@ -1014,7 +1098,7 @@ export function AssistenteConversa({
                   className={cn(
                     "rounded-2xl px-4 py-2.5 text-sm",
                     m.role === "user"
-                      ? "rounded-br-md bg-[var(--brand-lime)] text-[var(--brand-ink)] whitespace-pre-wrap"
+                      ? "rounded-br-md bg-[var(--brand-lime)] text-[var(--brand-ink)] whitespace-pre-wrap break-words"
                       : "rounded-bl-md bg-muted/60 text-foreground shadow-[var(--shadow-border)]",
                     m.estado === "erro" && "border border-[var(--warn)]/40"
                   )}
@@ -1173,7 +1257,7 @@ export function AssistenteConversa({
                     )}
                     {m.tools?.length ? (
                       <span className="text-[11px] text-muted-foreground/70">
-                        fontes: {m.tools.join(", ")}
+                        fontes: {m.tools.map(rotuloTool).join(", ")}
                       </span>
                     ) : null}
                     {m.estado === "erro" && (

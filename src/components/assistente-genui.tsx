@@ -306,7 +306,7 @@ function BarrasH({ g }: { g: Grafico }) {
             d.detalhe ? ` — ${d.detalhe}` : ""
           }`}
         >
-          <span className="w-20 shrink-0 truncate text-[11px] text-muted-foreground sm:w-24">
+          <span className="w-20 shrink-0 truncate text-[11px] text-muted-foreground">
             {d.rotulo}
           </span>
           <span className="h-[18px] min-w-0 flex-1 overflow-hidden rounded-[5px] bg-muted/80">
@@ -661,7 +661,7 @@ function Progresso({ g }: { g: Grafico }) {
         const pct = Math.min(100, Math.max(0, (d.valor / denom) * 100));
         return (
           <div key={i} className="flex items-center gap-2" title={d.detalhe}>
-            <span className="w-20 shrink-0 truncate text-[11px] text-muted-foreground sm:w-24">
+            <span className="w-20 shrink-0 truncate text-[11px] text-muted-foreground">
               {d.rotulo}
             </span>
             <span className="h-2 min-w-0 flex-1 overflow-hidden rounded-full bg-muted/80">

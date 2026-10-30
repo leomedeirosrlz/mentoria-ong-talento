@@ -2168,7 +2168,11 @@ export function AgendaCalendario({
             semanas na "semana" e nos "horarios"; o "ciclo" é a visão geral
             e não navega */}
         {visaoEfetiva !== "ciclo" && (
-          <div className="flex items-center gap-1 border-b px-2 py-1.5 sm:px-3">
+          /* hierarquia (REALIZA-337): grid 3 colunas — setas à esquerda,
+             rótulo do período centrado (é o protagonista da faixa), "Hoje"
+             à direita. Antes tudo se acumulava à esquerda com peso igual */
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-1 border-b px-2 py-1.5 sm:px-3">
+            <div className="flex items-center gap-0.5">
             <Button
               type="button"
               variant="ghost"
@@ -2227,32 +2231,11 @@ export function AgendaCalendario({
             >
               <CaretRight aria-hidden />
             </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={
-                navegaPorDia
-                  ? selecionado === hoje || !hojeNoAlcance
-                  : navegaPorSemana
-                    ? semanaIso === segHojeClamped
-                    : mes === mesHoje || !hojeNoAlcance
-              }
-              onClick={() =>
-                navegaPorDia
-                  ? irParaDia(hoje)
-                  : navegaPorSemana
-                    ? irParaSemana(segHoje)
-                    : irParaMes(mesHoje)
-              }
-              className="ms-0.5 text-muted-foreground"
-            >
-              Hoje
-            </Button>
+            </div>
             <p
               id="agenda-mes-rotulo"
               aria-live="polite"
-              className="min-w-0 flex-1 truncate px-2.5 text-lg font-semibold tracking-tight"
+              className="min-w-0 truncate px-2 text-center text-lg font-semibold tracking-tight"
             >
               {navegaPorDia ? (
                 <>
@@ -2286,6 +2269,30 @@ export function AgendaCalendario({
                 </>
               )}
             </p>
+            <div className="flex items-center justify-end">
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                disabled={
+                  navegaPorDia
+                    ? selecionado === hoje || !hojeNoAlcance
+                    : navegaPorSemana
+                      ? semanaIso === segHojeClamped
+                      : mes === mesHoje || !hojeNoAlcance
+                }
+                onClick={() =>
+                  navegaPorDia
+                    ? irParaDia(hoje)
+                    : navegaPorSemana
+                      ? irParaSemana(segHoje)
+                      : irParaMes(mesHoje)
+                }
+                className="text-muted-foreground"
+              >
+                Hoje
+              </Button>
+            </div>
           </div>
         )}
 
@@ -3182,7 +3189,11 @@ export function AgendaCalendario({
       <section
         ref={refDetalhe}
         aria-label="Detalhe do dia selecionado"
-        className="scroll-mt-20 scroll-fina rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5 lg:sticky lg:top-4 lg:col-start-2 lg:row-start-1 lg:max-h-[calc(100dvh-2rem)] lg:overflow-y-auto"
+        /* sem sticky/max-h: num grid o containing block do sticky é a
+           grid-area, então o painel "mergulhava" sob o card de eventos e
+           ainda cortava com scroll próprio (REALIZA-336). Sem travas, a
+           coluna cresce junto com o conteúdo */
+        className="scroll-mt-20 rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5 lg:col-start-2 lg:row-start-1"
       >
         {/* live region enxuta (PV-4): anuncia só data + relativo — a seção
             remonta a cada dia e aria-live nela despejava o painel inteiro */}
