@@ -856,7 +856,7 @@ export function AssistenteConversa({
           na primeira mensagem e não volta. Mutuamente exclusivo com o
           transcript: os dois com flex-1 dividiam a altura e o conteúdo
           centralizado transbordava pra cima do header no mobile. */}
-      {msgs.length === 0 ? (
+      {restaurada && msgs.length === 0 ? (
         <div className="scroll-fina flex min-h-0 flex-1 animate-in flex-col items-center justify-center gap-3 overflow-y-auto px-6 py-8 text-center fade-in-0 duration-300">
           <span className="grid size-12 place-items-center rounded-2xl bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)]">
             <Sparkle size={22} weight="fill" aria-hidden />

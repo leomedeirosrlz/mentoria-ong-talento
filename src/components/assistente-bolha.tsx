@@ -147,6 +147,9 @@ export function AssistenteBolha({
 
   const mudar = (v: boolean) => {
     setAberto(v);
+    // fecha com offset zerado — sem isso uma reabertura herda o último kb
+    // por um frame (flash de bottom: N antes da primeira medição)
+    if (!v) setKb(0);
     try {
       sessionStorage.setItem("assistente:aberto", v ? "1" : "0");
     } catch {}
@@ -177,38 +180,10 @@ export function AssistenteBolha({
   const novaConversa = () => novaConversaRef.current?.();
   const alternarHistorico = () => historicoRef.current?.();
 
-  // teclado do celular (iOS Safari): a viewport visual encolhe mas a layout
-  // não — visualViewport mede a diferença e a sheet sobe junto. Android já
-  // cobre via interactive-widget=resizes-content no meta (kb≈0 lá).
-  const [kb, setKb] = useState(0);
-  useEffect(() => {
-    if (desktop || !aberto) return;
-    const vv = window.visualViewport;
-    if (!vv) return;
-    let raf = 0;
-    const medir = () => {
-      // o iOS reporta valores intermediários durante a animação do
-      // teclado — coalescer pra um setState por frame evita rajada de
-      // re-layout na sheet
-      cancelAnimationFrame(raf);
-      raf = requestAnimationFrame(() => {
-        const diff = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
-        setKb(Math.round(diff));
-      });
-    };
-    medir();
-    vv.addEventListener("resize", medir);
-    vv.addEventListener("scroll", medir);
-    return () => {
-      cancelAnimationFrame(raf);
-      vv.removeEventListener("resize", medir);
-      vv.removeEventListener("scroll", medir);
-    };
-  }, [desktop, aberto]);
-
   // arrastar p/ baixo fecha — a alça no topo da sheet rastreia o dedo 1:1
   // via transform (compositor, 60fps); >88px confirma, senão snap de volta.
-  // Só toque/stylus: mouse usa X/Esc/backdrop como sempre.
+  // Só toque/stylus: mouse usa X/Esc/backdrop como sempre. Os refs ficam
+  // antes do effect do teclado (o lint proíbe mutar ref lido em effect).
   const popupRef = useRef<HTMLDivElement | null>(null);
   const arrastoRef = useRef<{ y0: number; dy: number } | null>(null);
   const iniciarArrasto = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -238,6 +213,39 @@ export function AssistenteBolha({
       }, 200);
     }
   };
+
+  // teclado do celular (iOS Safari): a viewport visual encolhe mas a layout
+  // não — visualViewport mede a diferença e a sheet sobe junto. Android já
+  // cobre via interactive-widget=resizes-content no meta (kb≈0 lá).
+  const [kb, setKb] = useState(0);
+  useEffect(() => {
+    if (desktop || !aberto) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    let raf = 0;
+    const medir = () => {
+      // o iOS reporta valores intermediários durante a animação do
+      // teclado — coalescer pra um setState por frame evita rajada de
+      // re-layout na sheet
+      cancelAnimationFrame(raf);
+      raf = requestAnimationFrame(() => {
+        const diff = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+        // teclado de verdade só quando o composer está focado e a diferença
+        // passa de 100px — movimentos de URL bar / scroll-lock (~60px) são
+        // ruído que pulava a sheet no fim da animação
+        const focoDentro = !!popupRef.current?.contains(document.activeElement);
+        setKb(diff > 100 && focoDentro ? Math.round(diff) : 0);
+      });
+    };
+    medir();
+    vv.addEventListener("resize", medir);
+    vv.addEventListener("scroll", medir);
+    return () => {
+      cancelAnimationFrame(raf);
+      vv.removeEventListener("resize", medir);
+      vv.removeEventListener("scroll", medir);
+    };
+  }, [desktop, aberto]);
 
   const icons = (
     <span className="relative grid size-6 place-items-center">
@@ -318,9 +326,12 @@ export function AssistenteBolha({
             // não estourar o topo — bottom (offset) não briga com o
             // transform do arrasto
             bottom: kb || undefined,
-            maxHeight: kb ? `calc(100dvh - ${kb}px)` : undefined,
+            maxHeight: kb ? `calc(100svh - ${kb}px)` : undefined,
           }}
-          className="h-[min(88dvh,760px)] gap-0 overflow-hidden bg-popover text-popover-foreground duration-300"
+          // svh (não dvh): altura estável — dvh re-resolve quando a URL bar
+          // do iOS se move com o scroll-lock do dialog, e a sheet pulava
+          // no fim da animação de abrir/fechar
+          className="h-[min(88svh,760px)] gap-0 overflow-hidden bg-popover text-popover-foreground duration-300"
         >
           <SheetTitle className="sr-only">Assistente</SheetTitle>
           {/* alça de arrasto: affordance de sheet nativa + gesto p/ fechar
