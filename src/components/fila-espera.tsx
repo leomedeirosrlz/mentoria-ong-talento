@@ -1,13 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { Fragment, useEffect, useState } from "react";
+import { Fragment, useEffect, useState, useSyncExternalStore } from "react";
 import type { CSSProperties } from "react";
 import { Collapsible } from "@base-ui/react/collapsible";
 import {
   ArrowsLeftRight,
   CaretDown,
   Check,
+  Sparkle,
   Student,
   UsersThree,
   Warning,
@@ -26,6 +27,7 @@ import { avatarPublicUrl } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { WhatsAppRapido } from "@/components/whatsapp-rapido";
 import { MentoradoActions } from "@/components/mentorado-actions";
 import { PessoaActions } from "@/components/pessoa-actions";
@@ -40,6 +42,10 @@ import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
  *  distribuição; revisar depois do backfill de prod. */
 const SUG_POR_VEZ = 5;
 const SUG_SIM_MIN = 0.58;
+// preferência "card aberto" da coord no localStorage + subscribe vazio do
+// useSyncExternalStore — a store não emite eventos, a leitura é por render
+const LS_AGUARDANDO_PAR = "aguardando-par-open";
+const assinaNada = () => () => {};
 
 /** Card "Aguardando par" — fila de espera + pareamento num lugar só
  *  (REALIZA-101 + rodada fev/2026). Dois estados no mesmo card:
@@ -89,23 +95,34 @@ export function FilaEspera({
   const total = mentorados.length + mentores.length;
   // congelado na hidratação — o "há N dias" não pode divergir do SSR
   const [agoraMs] = useState(() => Date.now());
-  // o card nasce aberto (inscrito novo precisa aparecer) e lembra a
-  // preferência — mesmo padrão do antigo painel de matching
-  const [open, setOpen] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
+  // o card nasce colapsado — a fila completa é contexto, não ação. A
+  // preferência da coord persiste no localStorage e é lida via
+  // useSyncExternalStore (o caminho sem hydration mismatch: o snapshot
+  // do servidor é sempre "fechado", o do cliente lê a preferência de
+  // verdade na hidratação). Depois do primeiro toque, `tocado` manda.
+  const preferido = useSyncExternalStore(
+    assinaNada,
+    () => {
+      try {
+        return window.localStorage.getItem(LS_AGUARDANDO_PAR) === "1";
+      } catch {
+        return false;
+      }
+    },
+    () => false
+  );
+  const [tocado, setTocado] = useState<boolean | null>(null);
+  const open = tocado ?? preferido;
+  // a escrita mora no handler da interação — nunca em efeito, assim o
+  // frame fechado inicial não apaga a preferência guardada
+  const mudaOpen = (v: boolean) => {
+    setTocado(v);
     try {
-      return window.localStorage.getItem("aguardando-par-open") !== "0";
-    } catch {
-      return true;
-    }
-  });
-  useEffect(() => {
-    try {
-      window.localStorage.setItem("aguardando-par-open", open ? "1" : "0");
+      window.localStorage.setItem(LS_AGUARDANDO_PAR, v ? "1" : "0");
     } catch {
       // ignore
     }
-  }, [open]);
+  };
 
   const [modo, setModo] = useState<"fila" | "parear">("fila");
   const [selMentorado, setSelMentorado] = useState<string | null>(null);
@@ -208,6 +225,10 @@ export function FilaEspera({
     selMentorEf && rankMentorados?.para === selMentorEf
       ? rankMentorados.rank
       : null;
+  // seleção feita mas o rank ainda não chegou → coluna oposta mostra
+  // esqueleto no lugar onde as sugestões vão pousar
+  const carregandoMentores = selMentoradoEf != null && rankMentoresEf === null;
+  const carregandoMentorados = selMentorEf != null && rankMentoradosEf === null;
   const temasParEf =
     selMentorEf &&
     selMentoradoEf &&
@@ -263,7 +284,7 @@ export function FilaEspera({
     mentorSelObj != null && usadasDe(mentorSelObj.id) >= tetoDe(mentorSelObj.id);
 
   return (
-    <Collapsible.Root open={open} onOpenChange={setOpen}>
+    <Collapsible.Root open={open} onOpenChange={mudaOpen}>
       <section
         aria-labelledby="fila-espera-titulo"
         className="rounded-xl bg-card shadow-[var(--shadow-border)] overflow-hidden"
@@ -277,7 +298,8 @@ export function FilaEspera({
               id="fila-espera-titulo"
               className="text-base font-semibold tabular-nums"
             >
-              Aguardando par · {total}
+              Aguardando par{" "}
+              <span className="whitespace-nowrap">· {total}</span>
             </span>
             <CaretDown
               aria-hidden
@@ -366,95 +388,121 @@ export function FilaEspera({
                   <ParearColuna
                     rotulo="Mentorados livres"
                     vazio="Nenhum mentorado livre pra parear."
+                    carregando={carregandoMentorados}
                   >
-                    {mentoradosRanqueados.map((m, i) => (
-                      <Fragment key={m.id}>
-                        {i === corteSugMentorados &&
-                          sugeridosMentorados.size > corteSugMentorados && (
-                            <li className="px-1 py-1">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() =>
-                                  setSugMentorados((v) => v + SUG_POR_VEZ)
-                                }
-                                className="h-auto w-full py-1.5 text-xs text-muted-foreground"
-                              >
-                                Ver mais sugestões (
-                                {sugeridosMentorados.size - corteSugMentorados})
-                              </Button>
-                            </li>
-                          )}
-                        <ParearLinha
-                          indice={i}
-                          selecionado={selMentoradoEf === m.id}
-                          onSelecionar={() =>
-                            setSelMentorado(selMentoradoEf === m.id ? null : m.id)
-                          }
-                          nome={m.nome}
-                          avatarPath={m.avatar_path}
-                          papel="mentorado"
-                          selo={
-                            i < corteSugMentorados ? "sugerido" : undefined
-                          }
-                          meta={
-                            [
-                              semHistorico.has(m.id) ? "remanejo" : null,
-                              m.ong_origem ?? m.origem,
-                            ]
-                              .filter(Boolean)
-                              .join(" · ") || null
-                          }
-                        />
-                      </Fragment>
-                    ))}
+                    {carregandoMentorados
+                      ? [0, 1, 2, 3].map((i) => <LinhaSkeleton key={i} />)
+                      : mentoradosRanqueados.map((m, i) => (
+                          <Fragment key={m.id}>
+                            {i === 0 && sugeridosMentorados.size > 0 && (
+                              <li className="flex items-center gap-1.5 px-2 pb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                                <Sparkle size={11} aria-hidden />
+                                {sugeridosMentorados.size}{" "}
+                                {sugeridosMentorados.size === 1
+                                  ? "sugerido"
+                                  : "sugeridos"}{" "}
+                                pela afinidade
+                              </li>
+                            )}
+                            {i === corteSugMentorados &&
+                              sugeridosMentorados.size > corteSugMentorados && (
+                                <li className="px-1 py-1">
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      setSugMentorados((v) => v + SUG_POR_VEZ)
+                                    }
+                                    className="h-auto w-full py-1.5 text-xs text-muted-foreground"
+                                  >
+                                    Ver mais sugestões (
+                                    {sugeridosMentorados.size - corteSugMentorados})
+                                  </Button>
+                                </li>
+                              )}
+                            <ParearLinha
+                              indice={i}
+                              selecionado={selMentoradoEf === m.id}
+                              onSelecionar={() =>
+                                setSelMentorado(selMentoradoEf === m.id ? null : m.id)
+                              }
+                              nome={m.nome}
+                              avatarPath={m.avatar_path}
+                              papel="mentorado"
+                              selo={
+                                i < corteSugMentorados ? "sugerido" : undefined
+                              }
+                              meta={
+                                [
+                                  semHistorico.has(m.id) ? "remanejo" : null,
+                                  m.ong_origem ?? m.origem,
+                                ]
+                                  .filter(Boolean)
+                                  .join(" · ") || null
+                              }
+                            />
+                          </Fragment>
+                        ))}
                   </ParearColuna>
                   <ParearColuna
                     rotulo="Mentores DPP"
                     vazio="Nenhum mentor DPP ativo."
+                    carregando={carregandoMentores}
                   >
-                    {mentoresRanqueados.map((m, i) => {
-                      const livres = tetoDe(m.id) - usadasDe(m.id);
-                      return (
-                        <Fragment key={m.id}>
-                          {i === corteSugMentores &&
-                            sugeridosMentores.size > corteSugMentores && (
-                              <li className="px-1 py-1">
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() =>
-                                    setSugMentores((v) => v + SUG_POR_VEZ)
-                                  }
-                                  className="h-auto w-full py-1.5 text-xs text-muted-foreground"
-                                >
-                                  Ver mais sugestões (
-                                  {sugeridosMentores.size - corteSugMentores})
-                                </Button>
-                              </li>
-                            )}
-                          <ParearLinha
-                            indice={i}
-                            selecionado={selMentorEf === m.id}
-                            onSelecionar={() =>
-                              setSelMentor(selMentorEf === m.id ? null : m.id)
-                            }
-                            nome={m.nome}
-                            avatarPath={m.avatar_path}
-                            selo={
-                              i < corteSugMentores ? "sugerido" : undefined
-                            }
-                            meta={`${usadasDe(m.id)}/${tetoDe(m.id)}${
-                              livres <= 0
-                                ? " · sem vaga"
-                                : ` · ${livres} ${livres === 1 ? "vaga" : "vagas"}`
-                            }`}
-                          />
-                        </Fragment>
-                      );
-                    })}
+                    {carregandoMentores
+                      ? [0, 1, 2, 3].map((i) => <LinhaSkeleton key={i} />)
+                      : mentoresRanqueados.map((m, i) => {
+                          const livres = tetoDe(m.id) - usadasDe(m.id);
+                          return (
+                            <Fragment key={m.id}>
+                              {i === 0 && sugeridosMentores.size > 0 && (
+                                <li className="flex items-center gap-1.5 px-2 pb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                                  <Sparkle size={11} aria-hidden />
+                                  {sugeridosMentores.size}{" "}
+                                  {sugeridosMentores.size === 1
+                                    ? "sugerido"
+                                    : "sugeridos"}{" "}
+                                  pela afinidade
+                                </li>
+                              )}
+                              {i === corteSugMentores &&
+                                sugeridosMentores.size > corteSugMentores && (
+                                  <li className="px-1 py-1">
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() =>
+                                        setSugMentores((v) => v + SUG_POR_VEZ)
+                                      }
+                                      className="h-auto w-full py-1.5 text-xs text-muted-foreground"
+                                    >
+                                      Ver mais sugestões (
+                                      {sugeridosMentores.size - corteSugMentores})
+                                    </Button>
+                                  </li>
+                                )}
+                              <ParearLinha
+                                indice={i}
+                                selecionado={selMentorEf === m.id}
+                                onSelecionar={() =>
+                                  setSelMentor(selMentorEf === m.id ? null : m.id)
+                                }
+                                nome={m.nome}
+                                avatarPath={m.avatar_path}
+                                selo={
+                                  i < corteSugMentores ? "sugerido" : undefined
+                                }
+                                meta={`${usadasDe(m.id)}/${tetoDe(m.id)}${
+                                  livres <= 0
+                                    ? " · sem vaga"
+                                    : ` · ${livres} ${livres === 1 ? "vaga" : "vagas"}`
+                                }`}
+                              />
+                            </Fragment>
+                          );
+                        })}
                   </ParearColuna>
                 </div>
 
@@ -749,32 +797,51 @@ function FilaLinha({
   );
 }
 
-/** Coluna do modo Parear — radiogroup: cada linha é um radio, um por lado. */
+/** Coluna do modo Parear — radiogroup: cada linha é um radio, um por lado.
+ *  `carregando` marca a lista como ocupada enquanto o rank semântico
+ *  recalcula — esqueleto no lugar onde as sugestões vão pousar. */
 function ParearColuna({
   rotulo,
   vazio,
+  carregando,
   children,
 }: {
   rotulo: string;
   vazio: string;
+  carregando?: boolean;
   children: React.ReactNode;
 }) {
   const itens = Array.isArray(children) ? children.length : children ? 1 : 0;
   return (
     <div className="min-w-0 space-y-1">
       <p className="text-xs font-medium text-muted-foreground">{rotulo}</p>
-      {itens === 0 ? (
+      {itens === 0 && !carregando ? (
         <p className="px-1 py-3 text-sm text-muted-foreground">{vazio}</p>
       ) : (
         <ul
           role="radiogroup"
           aria-label={rotulo}
-          className="max-h-80 divide-y divide-border/60 overflow-y-auto"
+          aria-busy={carregando || undefined}
+          className="scroll-fina max-h-80 divide-y divide-border/60 overflow-y-auto pr-1"
         >
           {children}
         </ul>
       )}
     </div>
+  );
+}
+
+/** Esqueleto de linha do Parear — forma do LinhaConteudo (avatar + 2 linhas)
+ *  enquanto o rank semântico calcula a coluna oposta. */
+function LinhaSkeleton() {
+  return (
+    <li aria-hidden className="flex items-center gap-2.5 px-2 py-2.5">
+      <Skeleton className="size-[30px] shrink-0 rounded-full" />
+      <div className="min-w-0 flex-1 space-y-1.5">
+        <Skeleton className="h-3.5 w-2/3" />
+        <Skeleton className="h-2.5 w-1/3" />
+      </div>
+    </li>
   );
 }
 
@@ -816,7 +883,9 @@ function ParearLinha({
           "h-auto w-full justify-start whitespace-normal rounded-lg px-2 py-2 text-left md:h-auto",
           selecionado
             ? "bg-[var(--brand-lime)]/15 ring-1 ring-[var(--brand-lime)]/60 hover:bg-[var(--brand-lime)]/20"
-            : null
+            : selo
+              ? "bg-[var(--brand-lime)]/[0.05] hover:bg-[var(--brand-lime)]/10"
+              : null
         )}
       >
         <LinhaConteudo
