@@ -15,8 +15,8 @@ import {
   CronogramaAcoes,
   CronogramaDuplas,
   CronogramaEventos,
-  StatusBadge,
 } from "@/components/cronograma-editor";
+import { StatusBadge } from "@/components/cronograma-status-badge";
 
 export async function generateMetadata({
   params,

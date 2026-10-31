@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createClient } from "./supabase/server";
 import { demoRole } from "./demo/mode";
+import { getMe } from "./queries";
 import { getDemoData } from "./demo/data";
 import {
   demoChamadosFila,
@@ -33,13 +34,8 @@ export const getChamados = cache(
       return { papel: demo, itens: demoChamadosFila(demo) };
     }
     const supabase = await createClient();
-    const { data: claims } = await supabase.auth.getClaims();
-    if (!claims?.claims?.sub) return { papel: null, itens: [] };
-    const { data: me } = await supabase
-      .from("profiles")
-      .select("id, role")
-      .eq("user_id", claims.claims.sub)
-      .single();
+    // getMe é React.cache — o layout já resolveu o mesmo profile no request
+    const me = await getMe();
     if (!me) return { papel: null, itens: [] };
     const staff = me.role === "coordenacao" || me.role === "supervisor";
 
@@ -267,14 +263,7 @@ export const getChamadoDetalhe = cache(
       };
     }
     const supabase = await createClient();
-    const { data: claims } = await supabase.auth.getClaims();
-    if (!claims?.claims?.sub)
-      return { chamado: null, timeline: [], equipe: [], papel: null, meuId: null };
-    const { data: me } = await supabase
-      .from("profiles")
-      .select("id, role")
-      .eq("user_id", claims.claims.sub)
-      .single();
+    const me = await getMe();
     if (!me)
       return { chamado: null, timeline: [], equipe: [], papel: null, meuId: null };
     const staff = me.role === "coordenacao" || me.role === "supervisor";

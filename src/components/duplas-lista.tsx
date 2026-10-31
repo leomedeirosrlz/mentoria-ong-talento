@@ -3,6 +3,7 @@
 import { type CSSProperties, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
   Clock,
   DotsThree,
@@ -45,8 +46,6 @@ import { DuplaNomes } from "@/components/dupla-nomes";
 import { DuplaLinha, GRID_DUPLA_LG, type TomSituacao } from "@/components/dupla-linha";
 import { SaudePrograma } from "@/components/saude-programa";
 import { AvaliacaoBadge } from "@/components/semaforo";
-import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
-import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
 import { DuplaWaAcao } from "@/components/dupla-wa-acao";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -69,6 +68,14 @@ import {
 
 const OVERLINE =
   "text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]";
+
+// dialogs da coordenação — atrás de clique, viram chunk sob demanda
+const NovaDuplaDialog = dynamic(() =>
+  import("@/components/nova-dupla-dialog").then((m) => m.NovaDuplaDialog)
+);
+const ImportarCsvDialog = dynamic(() =>
+  import("@/components/importar-csv-dialog").then((m) => m.ImportarCsvDialog)
+);
 
 type Saude = ReturnType<typeof saudadeDaDupla>;
 

@@ -42,7 +42,7 @@ import { WhatsAppRapido, type DestinoWA } from "@/components/whatsapp-rapido";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
-import { RegistroForm } from "@/components/registro-form";
+import { RegistroFormLazy } from "@/components/registro-form-lazy";
 import { EncontroDetalheDialog } from "@/components/encontro-detalhe-dialog";
 import { RevelarApos } from "@/components/revelar-apos";
 import { fade, T } from "@/components/motion";
@@ -3878,7 +3878,7 @@ function EncontroDuplaRow({
                 e próximo passo.
               </DialogDescription>
             </DialogHeader>
-            <RegistroForm
+            <RegistroFormLazy
               embutido
               encontroId={encontro.id}
               duplaId={dupla.id}

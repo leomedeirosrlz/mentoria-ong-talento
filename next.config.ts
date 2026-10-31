@@ -35,9 +35,32 @@ const CSP = [
   "frame-ancestors 'none'",
 ].join("; ");
 
+// supabase local de dev/e2e (não-*.supabase.co) também hospeda avatares —
+// mesma régua do connect-src do CSP: a origem explícita da env entra na
+// whitelist. Em prod a URL é *.supabase.co e o pattern https cobre.
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const remotePatterns: NonNullable<NextConfig["images"]>["remotePatterns"] = [
+  // avatares: bucket público do supabase + fallback gravatar — os mesmos
+  // hosts do img-src do CSP (upload até 10MB virava src crua do <img>)
+  { protocol: "https", hostname: "*.supabase.co" },
+  { protocol: "https", hostname: "*.gravatar.com" },
+  ...(supabaseUrl && !supabaseUrl.endsWith(".supabase.co")
+    ? [
+        {
+          protocol: new URL(supabaseUrl).protocol.replace(":", "") as
+            | "http"
+            | "https",
+          hostname: new URL(supabaseUrl).hostname,
+          port: new URL(supabaseUrl).port,
+        },
+      ]
+    : []),
+];
+
 const nextConfig: NextConfig = {
   // sem "X-Powered-By: Next.js" — banner de stack não ajuda ninguém
   poweredByHeader: false,
+  images: { remotePatterns },
   // router cache do cliente: tela dinâmica revisitada em até 30s renderiza
   // do payload guardado em vez de refazer todas as queries no banco. As
   // actions já invalidam com revalidatePath — escrita continua fresca.

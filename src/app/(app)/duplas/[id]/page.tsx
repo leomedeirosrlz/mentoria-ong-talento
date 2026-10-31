@@ -95,7 +95,6 @@ import { ArquivosDupla } from "@/components/arquivos-dupla";
 import { PedirApoioDialog } from "@/components/pedir-apoio-dialog";
 import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
 import { SolicitacaoStatusChip } from "@/components/solicitacao-status-chip";
-import { SolicitacaoNegociacao } from "@/components/solicitacao-negociacao";
 import { DevolutivaComposer } from "@/components/devolutivas-card";
 import { TrilhaJornada } from "@/components/trilha-jornada";
 import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
@@ -103,9 +102,12 @@ import { TrilhaFechamento } from "@/components/trilha-fechamento";
 import { EncerramentoDupla } from "@/components/encerramento-dupla";
 import { ResumoJornadaSection } from "@/components/resumo-jornada";
 import { DesfechoDuplaCard } from "@/components/desfecho-dupla";
-import { PdmDupla } from "@/components/pdm-dupla";
-import { InstrumentosDupla } from "./instrumentos-dupla";
-import { TerceirosDupla } from "./terceiros-dupla";
+import {
+  SolicitacaoNegociacao,
+  InstrumentosDupla,
+  PdmDupla,
+  TerceirosDupla,
+} from "./ficha-paineis-lazy";
 import { DuplaMaisMenu } from "./mais-menu";
 import { DevolutivaEspecialista } from "@/components/devolutiva-especialista";
 import { MarcoNotifier } from "@/components/marco-notifier";
@@ -320,10 +322,6 @@ export default async function DuplaPage({
   // mesa — o contra da equipe também sai da grade dele (regra da RPC)
   const espDaMesa =
     solEmAberto?.especialista_id ?? solEmAberto?.especialista_desejado_id;
-  const [propostasAberta, slotsEsp] = await Promise.all([
-    solEmAberto ? getPropostas(solEmAberto.id) : Promise.resolve([]),
-    espDaMesa ? getSlotsLivres(espDaMesa) : Promise.resolve([]),
-  ]);
   const linkAvalPorEncontro = new Map(
     avaliacaoLinks.map((l) => [l.encontro_id, l])
   );
@@ -348,8 +346,6 @@ export default async function DuplaPage({
     dupla.status === "ativa" &&
     souMentor &&
     !sugestaoPendente;
-  const especialistas =
-    podeSolicitar || podeSugerir ? await getEspecialistas() : [];
   // calendário oficial DA DUPLA (0061): só os eventos do cronograma dela.
   // Especialista e dupla histórica sem vínculo caem em [] — especialista
   // usa os 5 passos próprios; histórica vive do que está gravado (fallback
@@ -358,15 +354,33 @@ export default async function DuplaPage({
   const passos = passosDaTrilha(dupla.trilha, eventosDaDupla, espEventos);
   const agora = new Date();
   const saude = saudadeDaDupla(dupla, eventos);
-  // sugestão de remanejo (REALIZA-115): risco já é o gatilho — nada de
-  // carência em "atencao". E só com a dupla viva: remanejar encerrada é
-  // contraditório (o RPC também barra)
-  const sugestaoRemanejo =
-    souCoord &&
-    (saude.semaforo === "risco" || saude.apoio.aberto) &&
-    (dupla.status === "ativa" || dupla.status === "pausada")
-      ? await montarSugestaoRemanejo(dupla)
-      : null;
+  // cauda tardia da ficha — cada leitura depende só de flags já derivadas
+  // (uma por ramo, como antes: quem não precisa não paga). A sugestão de
+  // remanejo (REALIZA-115) abre com risco ou apoio em dupla viva — nada de
+  // carência em "atencao", e encerrada é contraditório (o RPC também
+  // barra). Nudge/origem são do Lembrar de coord/sup — o mentor nunca paga
+  const [propostasAberta, slotsEsp, especialistas, sugestaoRemanejo, ultimoNudge, origemLinks] =
+    await Promise.all([
+      solEmAberto ? getPropostas(solEmAberto.id) : Promise.resolve([]),
+      espDaMesa ? getSlotsLivres(espDaMesa) : Promise.resolve([]),
+      podeSolicitar || podeSugerir ? getEspecialistas() : Promise.resolve([]),
+      souCoord &&
+      (saude.semaforo === "risco" || saude.apoio.aberto) &&
+      (dupla.status === "ativa" || dupla.status === "pausada")
+        ? montarSugestaoRemanejo(dupla)
+        : Promise.resolve(null),
+      !souMentor
+        ? getUltimasInteracoes([dupla.id], "nudge").then(
+            (u) => u[dupla.id] ?? null
+          )
+        : Promise.resolve(null),
+      !souMentor
+        ? headers().then(
+            (h) =>
+              `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`
+          )
+        : Promise.resolve(undefined),
+    ]);
   const total = passos.length;
   const { proximoNumero, encontroAlvo, sugeridoProximo, faltantes } =
     alvoAgendamento(dupla, eventos);
@@ -434,16 +448,8 @@ export default async function DuplaPage({
 
   // ação primária da coordenação e da supervisão: "Lembrar" ou "Chamar",
   // com a mesma regra da lista de duplas (cap de 48h, mensagem do caso).
-  // Mentor não chama a si mesmo — o bloco só existe pra quem olha de fora
-  const ultimoNudge = !souMentor
-    ? ((await getUltimasInteracoes([dupla.id], "nudge"))[dupla.id] ?? null)
-    : null;
-  const origemLinks = !souMentor
-    ? await (async () => {
-        const h = await headers();
-        return `${h.get("x-forwarded-proto") ?? "https"}://${h.get("host")}`;
-      })()
-    : undefined;
+  // Mentor não chama a si mesmo — o bloco só existe pra quem olha de fora.
+  // ultimoNudge/origemLinks já vieram na leva tardia acima
   const acaoWA = !souMentor
     ? acaoWhatsAppDupla({
         dupla,

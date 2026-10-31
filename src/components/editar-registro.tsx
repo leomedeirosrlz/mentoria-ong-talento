@@ -5,7 +5,7 @@ import { PencilSimple } from "@phosphor-icons/react";
 import type { PassoGuia } from "@/lib/ciclo";
 import type { Registro } from "@/lib/types";
 import { Button } from "@/components/ui/button";
-import { RegistroForm } from "@/components/registro-form";
+import { RegistroFormLazy } from "@/components/registro-form-lazy";
 
 export function EditarRegistro({
   encontroId,
@@ -23,7 +23,7 @@ export function EditarRegistro({
   if (aberto) {
     return (
       <div className="space-y-2">
-        <RegistroForm
+        <RegistroFormLazy
           encontroId={encontroId}
           duplaId={duplaId}
           evento={evento}

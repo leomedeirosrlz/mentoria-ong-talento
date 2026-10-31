@@ -1169,6 +1169,96 @@ export const getDuplasOpcoes = cache(async (): Promise<DuplaOpcao[]> => {
     );
 });
 
+/** Recorte enxuto da dupla pra painéis — vínculo + nome do jovem + os
+ *  contatos que o Lembrar e a prévia de e-mail usam. O contato do mentor
+ *  sai da view profiles_contato (mesma régua do DUPLA_SELECT); o do jovem
+ *  é grant de coluna público (MENTORADO_COLS_PAR). Sem a árvore de
+ *  encontros — quem precisa dela chama getDuplas. */
+export type DuplaInfo = {
+  id: string;
+  status: DuplaStatus;
+  trilha: Trilha;
+  cronograma_id: string | null;
+  turma: string;
+  mentor: { id: string; email: string; whatsapp: string | null };
+  mentorado: {
+    id: string;
+    nome: string;
+    nome_social: string | null;
+    email: string | null;
+    whatsapp: string | null;
+  };
+};
+
+const DUPLA_INFO_SELECT = `
+  id, status, trilha, cronograma_id, turma,
+  mentor:profiles!duplas_mentor_id_fkey(id),
+  mentorado:mentorados(id, nome, nome_social, whatsapp, email)
+`;
+
+export const getDuplasInfo = cache(async (): Promise<DuplaInfo[]> => {
+  const demo = await demoRole();
+  if (demo) {
+    return demoDuplas(demo).map((d) => ({
+      id: d.id,
+      status: d.status,
+      trilha: d.trilha,
+      cronograma_id: d.cronograma_id,
+      turma: d.turma,
+      mentor: {
+        id: d.mentor.id,
+        email: d.mentor.email ?? "",
+        whatsapp: d.mentor.whatsapp ?? null,
+      },
+      mentorado: {
+        id: d.mentorado.id,
+        nome: d.mentorado.nome,
+        nome_social: d.mentorado.nome_social ?? null,
+        email: d.mentorado.email ?? null,
+        whatsapp: d.mentorado.whatsapp ?? null,
+      },
+    }));
+  }
+  const supabase = await createClient();
+  const [{ data, error }, contatos] = await Promise.all([
+    supabase
+      .from("duplas")
+      .select(DUPLA_INFO_SELECT)
+      .order("created_at", { ascending: true }),
+    getContatos(),
+  ]);
+  if (error) throw error;
+  const norm = <T,>(v: T | T[] | null): T | null =>
+    Array.isArray(v) ? (v[0] ?? null) : v;
+  type Row = Omit<DuplaInfo, "mentor" | "mentorado"> & {
+    mentor: { id: string } | { id: string }[] | null;
+    mentorado: DuplaInfo["mentorado"] | DuplaInfo["mentorado"][] | null;
+  };
+  return ((data ?? []) as unknown as Row[]).map((d) => {
+    const mentor = norm(d.mentor);
+    const contato = mentor ? contatos.get(mentor.id) : undefined;
+    return {
+      id: d.id,
+      status: d.status,
+      trilha: d.trilha,
+      cronograma_id: d.cronograma_id,
+      turma: d.turma,
+      mentor: {
+        id: mentor?.id ?? "",
+        email: contato?.email ?? "",
+        whatsapp: contato?.whatsapp ?? null,
+      },
+      mentorado: norm(d.mentorado) ?? {
+        id: "",
+        nome: "",
+        nome_social: null,
+        email: null,
+        whatsapp: null,
+      },
+    };
+  });
+});
+
 // ---------- trilha de especialista (0027) ----------
 
 /** Os 5 encontros do guia do especialista — título + foco, na ordem. */

@@ -7,7 +7,7 @@ import { demoRole } from "@/lib/demo/mode";
 import { getMe, getNotificacoes } from "@/lib/queries";
 import { getJovemPerfil } from "@/lib/queries-jovem";
 import type { AppRole } from "@/lib/types";
-import { OnboardingJovem } from "./onboarding-jovem";
+import { OnboardingJovemLazy } from "./onboarding-jovem-lazy";
 
 /** Gate do lado do jovem (REALIZA-108): os mesmos três becos do shell de
  *  staff (sem cadastro / desativado / sem papel) + a régua de papel — só
@@ -87,7 +87,7 @@ export default async function JovemLayout({
     const perfil = await getJovemPerfil();
     return (
       <>
-        <OnboardingJovem me={me} perfil={perfil} demo={demoDock} />
+        <OnboardingJovemLazy me={me} perfil={perfil} demo={demoDock} />
         {demoFloat}
       </>
     );

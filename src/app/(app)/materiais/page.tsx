@@ -3,7 +3,7 @@ import { audienciasDe, veMaterial } from "@/lib/materiais";
 import Link from "next/link";
 import {
   getCicloEventos,
-  getDuplas,
+  getDuplasInfo,
   getMateriais,
   getMe,
   getPainelInstrumentosJornada,
@@ -100,7 +100,9 @@ export default async function MateriaisPage({
     vePainel || ehMentorDpp
       ? await Promise.all([
           painelPromise,
-          getDuplas(),
+          // recorte enxuto: a página só lê vínculo/nome/contato — a árvore
+          // de encontros do getDuplas não desce pra coorte inteira aqui
+          getDuplasInfo(),
           painelPromise.then((p) =>
             p.length
               ? getUltimasInteracoes(

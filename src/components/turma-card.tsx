@@ -28,7 +28,7 @@ import {
 import { turmaAno, turmaCurta, turmaLonga, turmaNumero } from "@/lib/turma";
 import type { VinculoCronograma } from "@/lib/queries-cronogramas";
 import type { CicloEvento, Cronograma, EncontroStatus } from "@/lib/types";
-import { StatusBadge } from "@/components/cronograma-editor";
+import { StatusBadge } from "@/components/cronograma-status-badge";
 import { cn } from "@/lib/utils";
 
 // ---------- tinta por turma ----------

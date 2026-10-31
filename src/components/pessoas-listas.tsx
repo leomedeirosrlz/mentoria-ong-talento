@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
+import dynamic from "next/dynamic";
 import { Collapsible } from "@base-ui/react/collapsible";
 import {
   Briefcase,
@@ -37,7 +38,6 @@ import { PessoaActions } from "@/components/pessoa-actions";
 import { MentoradoActions } from "@/components/mentorado-actions";
 import { RoleSelect } from "@/components/role-select";
 import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
-import { FilaEspera } from "@/components/fila-espera";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { NovaPessoaDialog, NovoMentoradoDialog } from "@/components/pessoas-dialogs";
 import { Badge } from "@/components/ui/badge";
@@ -54,6 +54,12 @@ import {
 
 const ehMentor = (p: Profile) =>
   temPapel(p, "mentor_dpp") || temPapel(p, "mentor_especialista");
+
+// o card da fila só existe pra coordenação — quase 1k linhas fora do
+// chunk de quem visita /pessoas como mentor/supervisor (SSR mantido)
+const FilaEspera = dynamic(() =>
+  import("@/components/fila-espera").then((m) => m.FilaEspera)
+);
 
 /** Status de assinatura de uma pessoa, montado na page a partir do resumo:
  *  `assinado` = slug → ISO da assinatura; `pendente` = slugs com link vivo. */

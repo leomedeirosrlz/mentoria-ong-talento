@@ -36,7 +36,7 @@ import {
   type FormularioCampo,
   type RespostaValor,
 } from "@/lib/forms/schema";
-import type { InstrumentoEntrega } from "@/lib/forms/queries";
+import type { InstrumentoDupla, InstrumentoEntrega } from "@/lib/forms/queries";
 import { turmaCurta } from "@/lib/turma";
 import {
   InstrumentoEmblema,
@@ -316,11 +316,44 @@ export default async function InstrumentoPage({
   const estacao = card.estacao;
   const sistema = estacao ? SISTEMA_DA_ESTACAO[estacao] : undefined;
 
-  const [eventos, duplas, painel] = await Promise.all([
-    getCicloEventos(),
-    getDuplas(),
-    vePainel ? getPainelInstrumentosJornada() : Promise.resolve([]),
-  ]);
+  // tudo sobe numa leva só: o filtro "duplas DPP vivas do mentor" repete a
+  // expressão das linhas pra destravar a RPC por dupla (definer — uma por
+  // dupla, em paralelo, sem esperar o resto); o detalhe do 360º encadeia
+  // getFormularios→getFormulario (React.cache deduplica o getDuplas)
+  const duplasPromise = getDuplas();
+  const [eventos, duplas, painel, instrumentosMentorPares, formDetalhe] =
+    await Promise.all([
+      getCicloEventos(),
+      duplasPromise,
+      vePainel ? getPainelInstrumentosJornada() : Promise.resolve([]),
+      ehMentorDpp && ehForm
+        ? duplasPromise.then((ds) =>
+            Promise.all(
+              ds
+                .filter(
+                  (d) =>
+                    d.trilha !== "especialista" &&
+                    (d.status === "ativa" || d.status === "pausada")
+                )
+                .map(
+                  async (d) =>
+                    [d.id, await getInstrumentosDaDupla(d.id)] as const
+                )
+            )
+          )
+        : Promise.resolve([] as (readonly [string, InstrumentoDupla[]])[]),
+      // 360º: o detalhe mora no form oficial — coord-only (o RLS das
+      // tabelas de forms não deixa os outros papéis lerem resposta de
+      // terceiros)
+      ehCoord && eh360 && card.sistemaForm
+        ? getFormularios()
+            .then((fs) => {
+              const f = fs.find((x) => x.sistema === card.sistemaForm);
+              return f ? getFormulario(f.id) : null;
+            })
+            .catch(() => null)
+        : Promise.resolve(null),
+    ]);
   const resolvidas = resolveLinhasPainel(painel, eventos);
   const duplaPorId = new Map(duplas.map((d) => [d.id, d]));
 
@@ -334,27 +367,7 @@ export default async function InstrumentoPage({
           (d.status === "ativa" || d.status === "pausada")
       )
     : [];
-  const instrumentosMentor = new Map(
-    ehMentorDpp && ehForm && duplasMentor.length
-      ? await Promise.all(
-          duplasMentor.map(
-            async (d) => [d.id, await getInstrumentosDaDupla(d.id)] as const
-          )
-        )
-      : []
-  );
-
-  // 360º: o detalhe mora no form oficial — coord-only (o RLS das tabelas
-  // de forms não deixa os outros papéis lerem resposta de terceiros)
-  const formDetalhe =
-    ehCoord && eh360 && card.sistemaForm
-      ? await getFormularios()
-          .then((fs) => {
-            const f = fs.find((x) => x.sistema === card.sistemaForm);
-            return f ? getFormulario(f.id) : null;
-          })
-          .catch(() => null)
-      : null;
+  const instrumentosMentor = new Map(instrumentosMentorPares);
   const respostaPorDupla = new Map<
     string,
     { respostas: Record<string, RespostaValor>; respondidoEm: string | null }

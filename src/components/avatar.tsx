@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useState } from "react";
 import { iniciais } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
@@ -54,11 +55,14 @@ export function Avatar({
       aria-hidden="true"
     >
       {idx < fontes.length ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
+        // width/height = o tamanho do box (18–96px): srcset 1x/2x serve
+        // webp pequeno em vez do upload original de até 10MB
+        <Image
           ref={refImg}
           src={fontes[idx]}
           alt=""
+          width={size}
+          height={size}
           className="h-full w-full object-cover"
           onError={() => setIdx((i) => i + 1)}
         />

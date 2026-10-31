@@ -32,7 +32,7 @@ import {
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { NaoAconteceuButton, DesfazerNaoAconteceuButton } from "@/components/nao-aconteceu-button";
-import { RegistroForm } from "@/components/registro-form";
+import { RegistroFormLazy } from "@/components/registro-form-lazy";
 import {
   RegistroDetails,
   RegistroInline,
@@ -495,7 +495,7 @@ export function EncontroRow({
               registroPendente ? "bg-[var(--warn)]/5" : "bg-muted/50"
             )}
           >
-            <RegistroForm
+            <RegistroFormLazy
               encontroId={encontro.id}
               duplaId={duplaId}
               evento={passo}

@@ -4,6 +4,13 @@ import {
   type SupabaseClient,
 } from "@supabase/supabase-js";
 import { demoRoleClient } from "@/lib/demo/shared";
+// O stub + dataset demo (~4,7k linhas) entram em todo chunk que importa
+// este módulo — ou seja, quase toda a árvore client. Tornar o desvio
+// lazy exigiria createClient() async e 22 arquivos de callers síncronos
+// encadeando .from() na hora. Recomendado quando houver janela: mover o
+// desvio pra uma fronteira explícita (ex.: provider do /demo com seu
+// próprio entry "supabase-client-demo") e deixar este módulo livre de
+// demo/*.
 import { createDemoClient } from "@/lib/demo/client-stub";
 
 // Secure só em produção: dev roda em http — localhost aceita Secure por

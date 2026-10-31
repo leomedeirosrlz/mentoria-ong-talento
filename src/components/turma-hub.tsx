@@ -20,7 +20,7 @@ import { saudeDoRecorte } from "@/lib/agenda-coordenacao";
 import { turmaAno, turmaDaDupla, turmaLonga } from "@/lib/turma";
 import type { CicloEvento, Cronograma, Dupla } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { StatusBadge } from "@/components/cronograma-editor";
+import { StatusBadge } from "@/components/cronograma-status-badge";
 import { SiglaTurma } from "@/components/turma-card";
 
 /** A faixa "Mostrando: Turma N · ver todas" — role=status anuncia o

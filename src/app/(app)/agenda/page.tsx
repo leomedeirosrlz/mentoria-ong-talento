@@ -17,7 +17,7 @@ import {
   getEspecialistas,
   getMinhaGrade,
   getMinhasExcecoes,
-  getSolicitacoesDaDupla,
+  getSolicitacoesDasDuplas,
   getTrilhasDosJovens,
 } from "@/lib/queries-especialista";
 import type { SolicitacaoEspecialista } from "@/lib/types";
@@ -32,7 +32,7 @@ import { duplaSupervisionada } from "@/lib/auxiliar-escopo";
 import { abasDaAgenda, PAINEL_AGENDA, idDaAba } from "@/lib/agenda-abas";
 import { AbasAgenda } from "@/components/agenda-abas";
 import { AgendaAuxiliar, CabecalhoAuxiliar } from "@/components/agenda-auxiliar";
-import { AgendaCalendario } from "@/components/agenda-calendario";
+import { AgendaCalendarioLazy } from "@/components/agenda-calendario-lazy";
 import {
   AgendaCoordenacao,
   CabecalhoCoordenacao,
@@ -242,9 +242,7 @@ export default async function AgendaPage({
       await Promise.all([
         getTrilhasDosJovens(idsDpp),
         aba === "por-mentorado"
-          ? Promise.all(idsDpp.map((id) => getSolicitacoesDaDupla(id))).then(
-              (lista) => Object.fromEntries(idsDpp.map((id, i) => [id, lista[i]]))
-            )
+          ? getSolicitacoesDasDuplas(idsDpp)
           : Promise.resolve({} as Record<string, SolicitacaoEspecialista[]>),
         aba === "por-mentorado" ? getEspecialistas() : Promise.resolve([]),
         // cap de 48h do "Lembrar o jovem" — só o Por mentorado renderiza
@@ -476,7 +474,7 @@ export default async function AgendaPage({
             </p>
           </div>
         ) : (
-          <AgendaCalendario
+          <AgendaCalendarioLazy
             eventos={eventos}
             cronogramas={cronogramas}
             espEventos={espEventos}

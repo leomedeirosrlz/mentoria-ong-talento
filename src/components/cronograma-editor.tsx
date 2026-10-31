@@ -39,6 +39,7 @@ import {
 import { formatDiaSemanaMes } from "@/lib/ciclo";
 import type { VinculoCronograma } from "@/lib/queries-cronogramas";
 import type { CicloEvento, Cronograma, DuplaStatus } from "@/lib/types";
+import { CRONOGRAMA_STATUS_LABEL } from "@/components/cronograma-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -69,29 +70,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-
-const STATUS_LABEL: Record<Cronograma["status"], string> = {
-  rascunho: "Rascunho",
-  ativo: "Ativo",
-  encerrado: "Encerrado",
-};
-
-const STATUS_BADGE: Record<Cronograma["status"], string> = {
-  rascunho: "border-dashed",
-  ativo: "",
-  encerrado: "",
-};
-
-export function StatusBadge({ status }: { status: Cronograma["status"] }) {
-  return (
-    <Badge
-      variant={status === "ativo" ? "secondary" : "outline"}
-      className={STATUS_BADGE[status]}
-    >
-      {STATUS_LABEL[status]}
-    </Badge>
-  );
-}
 
 function rascunhoDe(e: CicloEvento): EventoRascunho {
   return {
@@ -326,14 +304,14 @@ export function CronogramaAcoes({
               <Label id="cg-status-label">Status</Label>
               <Select
                 value={statusSel}
-                items={STATUS_LABEL}
+                items={CRONOGRAMA_STATUS_LABEL}
                 onValueChange={(v) => setStatusSel(v as Cronograma["status"])}
               >
                 <SelectTrigger aria-labelledby="cg-status-label">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(STATUS_LABEL).map(([v, l]) => (
+                  {Object.entries(CRONOGRAMA_STATUS_LABEL).map(([v, l]) => (
                     <SelectItem key={v} value={v}>
                       {l}
                     </SelectItem>
