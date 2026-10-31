@@ -1,12 +1,14 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import type { ComponentProps } from "react";
 import { useRouter } from "next/navigation";
 import {
   DownloadSimple,
   DotsThree,
   FileArrowUp,
   Plus,
+  Signature,
   UserPlus,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -14,6 +16,7 @@ import { createMentorado, createPessoa } from "@/lib/actions";
 import { DadosCivisFields } from "@/components/assinatura-form";
 import { FotoField } from "@/components/foto-field";
 import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
+import { EnviarTermosDialog } from "@/components/enviar-termos-dialog";
 import {
   CampoConsentimento,
   CampoDisponibilidade,
@@ -82,11 +85,19 @@ function useSubmit(
   return { submit, pending };
 }
 
-/** "Mais ações" do header de /pessoas — importação e backups ficam recolhidos
- *  pra criação (Nova pessoa / Novo mentorado) ser a primária visível. Os
- *  exports são <a> de verdade dentro do menu (href real, download direto). */
-export function PessoasMaisAcoes() {
+/** "Mais ações" do header de /pessoas — importação, disparo de termos e
+ *  backups ficam recolhidos pra criação (Nova pessoa / Novo mentorado) ser
+ *  a primária visível. Os exports são <a> de verdade dentro do menu (href
+ *  real, download direto). */
+export function PessoasMaisAcoes({
+  termos,
+}: {
+  /** props do EnviarTermosDialog — mora aqui porque a emissão em lote cedeu
+   *  lugar ao cadastro (onboarding cobre a assinatura no dia a dia) */
+  termos: Omit<ComponentProps<typeof EnviarTermosDialog>, "open" | "onOpenChange">;
+}) {
   const [importarOpen, setImportarOpen] = useState(false);
+  const [termosOpen, setTermosOpen] = useState(false);
   return (
     <>
       <DropdownMenu>
@@ -101,6 +112,9 @@ export function PessoasMaisAcoes() {
           <DropdownMenuItem onClick={() => setImportarOpen(true)}>
             <FileArrowUp /> Importar CSV
           </DropdownMenuItem>
+          <DropdownMenuItem onClick={() => setTermosOpen(true)}>
+            <Signature /> Enviar termos
+          </DropdownMenuItem>
           <DropdownMenuItem render={<a href="/api/export?tipo=pessoas" />}>
             <DownloadSimple /> Exportar CSV
           </DropdownMenuItem>
@@ -113,6 +127,11 @@ export function PessoasMaisAcoes() {
         </DropdownMenuContent>
       </DropdownMenu>
       <ImportarCsvDialog open={importarOpen} onOpenChange={setImportarOpen} />
+      <EnviarTermosDialog
+        {...termos}
+        open={termosOpen}
+        onOpenChange={setTermosOpen}
+      />
     </>
   );
 }

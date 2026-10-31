@@ -18,7 +18,6 @@ import {
   NovoMentoradoDialog,
   PessoasMaisAcoes,
 } from "@/components/pessoas-dialogs";
-import { EnviarTermosDialog } from "@/components/enviar-termos-dialog";
 import { PessoasListas } from "@/components/pessoas-listas";
 import { PageHeader } from "@/components/page-header";
 
@@ -143,29 +142,32 @@ export default async function PessoasPage() {
               <NovaPessoaDialog />
               {/* inativa não entra no pool de emissão — link pra quem saiu
                   do programa não faz sentido (a ficha dela segue com o
-                  histórico, e reemitir manual continua possível) */}
-              <EnviarTermosDialog
-                pessoas={pessoas
-                  // não-voluntário não entra no pool de emissão do termo
-                  .filter((p) => p.ativo && p.voluntario !== false)
-                  .map((p) => ({
-                    id: p.id,
-                    nome: p.nome,
-                    email: p.email || null,
-                    whatsapp: p.whatsapp,
-                  }))}
-                mentorados={mentorados
-                  .filter((m) => !foraDoPrograma(m))
-                  .map((m) => ({
-                    id: m.id,
-                    nome: m.nome,
-                    email: m.email || null,
-                    whatsapp: m.whatsapp,
-                  }))}
-                docs={docsPorPessoa}
-                faltantes={faltantesPorPessoa}
+                  histórico, e reemitir manual continua possível). O disparo
+                  em lote mora no "Mais ações": quem entra novo já assina
+                  no onboarding, o lote virou caminho ocasional */}
+              <PessoasMaisAcoes
+                termos={{
+                  pessoas: pessoas
+                    // não-voluntário não entra no pool de emissão do termo
+                    .filter((p) => p.ativo && p.voluntario !== false)
+                    .map((p) => ({
+                      id: p.id,
+                      nome: p.nome,
+                      email: p.email || null,
+                      whatsapp: p.whatsapp,
+                    })),
+                  mentorados: mentorados
+                    .filter((m) => !foraDoPrograma(m))
+                    .map((m) => ({
+                      id: m.id,
+                      nome: m.nome,
+                      email: m.email || null,
+                      whatsapp: m.whatsapp,
+                    })),
+                  docs: docsPorPessoa,
+                  faltantes: faltantesPorPessoa,
+                }}
               />
-              <PessoasMaisAcoes />
             </>
           ) : undefined
         }
