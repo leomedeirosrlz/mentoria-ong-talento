@@ -27,7 +27,7 @@ import {
 } from "@phosphor-icons/react";
 import { concluirOnboarding, salvarOnboarding } from "@/lib/actions";
 import { recomecarDemo } from "@/lib/demo/actions";
-import { assinarTermo } from "@/lib/actions-assinaturas";
+import { assinarTermo, declararVoluntario } from "@/lib/actions-assinaturas";
 import { AREAS_SUGESTOES } from "@/lib/ciclo";
 import {
   avatarPublicUrl,
@@ -235,9 +235,38 @@ export function OnboardingFlow({
   // assinatura já existe (assinado) — o passo some do wizard inteiro
   const passoTermo = temTermo ? total - 2 : -1;
   const ehPassoTermo = step === passoTermo;
+  // auto-declaração no passo do termo: a coord classifica no cadastro, mas
+  // quem foi marcado por engano se corrige aqui — desmarcar grava
+  // voluntario=false e a pendência do termo some (fechamento, banner, /perfil)
+  const [souVoluntario, setSouVoluntario] = useState(true);
+  const [volEscrito, setVolEscrito] = useState(true);
 
   function avancar() {
     setStep((s) => Math.min(s + 1, total - 1));
+  }
+
+  /** Avança gravando a declaração quando ela diverge do que já foi pro
+   *  banco — desmarcar e voltar/remarcar cobre os dois sentidos. Na demo
+   *  não há escrita: a caixa é só visual, como o resto do passo. */
+  function avancarDoTermo() {
+    if (souVoluntario === volEscrito) {
+      avancar();
+      return;
+    }
+    if (demo) {
+      setVolEscrito(souVoluntario);
+      avancar();
+      return;
+    }
+    start(async () => {
+      const res = await declararVoluntario(souVoluntario);
+      if ("error" in res) {
+        toast.error(res.error);
+        return;
+      }
+      setVolEscrito(souVoluntario);
+      avancar();
+    });
   }
 
   function salvarPasso(e: React.FormEvent<HTMLFormElement>) {
@@ -263,6 +292,15 @@ export function OnboardingFlow({
   function concluir() {
     start(async () => {
       try {
+        // quem desmarcou "sou voluntário" e pulou o resto ainda precisa da
+        // flag gravada — senão a pendência do termo volta na home
+        if (!demo && souVoluntario !== volEscrito) {
+          const decl = await declararVoluntario(souVoluntario);
+          if ("error" in decl) {
+            toast.error(decl.error);
+            return;
+          }
+        }
         const res = await concluirOnboarding();
         if ("error" in res) {
           toast.error(res.error);
@@ -522,7 +560,7 @@ export function OnboardingFlow({
   // o default do switch é o índice final, mas o boas-vindas (step 0) cai
   // nele também — sem o gate a nag aparecia antes da jornada começar
   const corpoFechamento =
-    ultimo && temTermo && !termoOk ? (
+    ultimo && temTermo && !termoOk && souVoluntario ? (
       <p className="rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed text-muted-foreground">
         Falta só o termo de adesão ao voluntariado: assine quando puder pelo
         banner da sua home ou em{" "}
@@ -544,10 +582,35 @@ export function OnboardingFlow({
     // o termo tem form próprio (AssinaturaForm) — intercepta antes do switch
     // porque o índice colide com o case 5 (linkedin) pra coord/supervisor
     if (ehPassoTermo) {
+      // mesma caixa do cadastro da coord: quem não é voluntário de fato se
+      // corrige aqui em vez de carregar a pendência pra sempre
+      const caixaVoluntario = (
+        <label className="flex items-center gap-2 text-sm cursor-pointer">
+          <input
+            type="checkbox"
+            checked={souVoluntario}
+            onChange={(e) => setSouVoluntario(e.target.checked)}
+            className="accent-primary"
+          />
+          Sou voluntário(a)
+        </label>
+      );
+      if (!souVoluntario) {
+        return (
+          <div className="space-y-4">
+            {caixaVoluntario}
+            <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+              Sem trabalho voluntário o termo não se aplica: sua ficha segue
+              sem ele e a coordenação fica sabendo.
+            </p>
+          </div>
+        );
+      }
       // demo: só leitura — botão de assinar que sempre falha é má UX
       if (demo) {
         return (
           <div className="space-y-4">
+            {caixaVoluntario}
             <TermoVoluntarioDoc civis={civis} />
             <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
               Na demonstração a assinatura não é gravada. No cadastro real é
@@ -558,6 +621,7 @@ export function OnboardingFlow({
       }
       return (
         <div className="space-y-4">
+          {caixaVoluntario}
           <TermoVoluntarioDoc
             civis={civis}
             continuar={{
@@ -799,11 +863,11 @@ export function OnboardingFlow({
               {/* no termo o ghost é "Assinar depois": avança sem gravar —
                   a pendência segue como ausência de assinatura. Na demo o
                   Continuar primário já cobre o pulo, sem ghost duplicado */}
-              {(passoComCampos || !demo) && (
+              {(passoComCampos || !demo) && !(ehPassoTermo && !souVoluntario) && (
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={avancar}
+                  onClick={avancarDoTermo}
                   disabled={pending}
                 >
                   {ehPassoTermo ? "Assinar depois" : "Agora não"}
@@ -830,7 +894,7 @@ export function OnboardingFlow({
               No passo do termo o primário some: o submit mora dentro do
               AssinaturaForm e um "Continuar" ao lado de "Assinar depois"
               seria ambíguo; na demo (só leitura) ele volta */}
-          {(!ehPassoTermo || demo) && (
+          {(!ehPassoTermo || demo || !souVoluntario) && (
             <Button
               type="button"
               onClick={() => {
@@ -840,6 +904,8 @@ export function OnboardingFlow({
                   )?.requestSubmit();
                 } else if (ultimo) {
                   concluir();
+                } else if (ehPassoTermo) {
+                  avancarDoTermo();
                 } else {
                   avancar();
                 }
@@ -848,7 +914,7 @@ export function OnboardingFlow({
               className="h-11 flex-1 font-semibold"
             >
               {pending
-                ? ultimo || ehPassoTermo
+                ? ultimo || (ehPassoTermo && souVoluntario)
                   ? "Entrando…"
                   : "Salvando…"
                 : ultimo
