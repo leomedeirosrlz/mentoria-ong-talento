@@ -140,7 +140,6 @@ export function CampoPrefGenero(props: Omit<Parameters<typeof SelectOpcional>[0]
       name="pref_genero_par"
       label="Preferência de gênero do par"
       opcoes={PREF_GENERO_LABELS}
-      vazioLabel="Sem preferência informada"
     />
   );
 }
