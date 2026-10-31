@@ -324,7 +324,7 @@ export function FilaEspera({
                   aria-pressed={modo === m}
                   onClick={() => setModo(m)}
                   className={cn(
-                    "h-auto rounded-md px-2.5 py-1 text-xs md:h-auto",
+                    "h-auto rounded-md px-3 py-1.5 text-sm md:h-auto",
                     modo === m
                       ? "bg-foreground text-background hover:bg-foreground hover:text-background"
                       : "text-muted-foreground"
@@ -395,8 +395,8 @@ export function FilaEspera({
                       : mentoradosRanqueados.map((m, i) => (
                           <Fragment key={m.id}>
                             {i === 0 && sugeridosMentorados.size > 0 && (
-                              <li className="flex items-center gap-1.5 px-2 pb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                                <Sparkle size={11} aria-hidden />
+                              <li className="flex items-center gap-1.5 px-2 pb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                                <Sparkle size={12} aria-hidden />
                                 {sugeridosMentorados.size}{" "}
                                 {sugeridosMentorados.size === 1
                                   ? "sugerido"
@@ -414,7 +414,7 @@ export function FilaEspera({
                                     onClick={() =>
                                       setSugMentorados((v) => v + SUG_POR_VEZ)
                                     }
-                                    className="h-auto w-full py-1.5 text-xs text-muted-foreground"
+                                    className="h-auto w-full py-1.5 text-sm text-muted-foreground"
                                   >
                                     Ver mais sugestões (
                                     {sugeridosMentorados.size - corteSugMentorados})
@@ -457,8 +457,8 @@ export function FilaEspera({
                           return (
                             <Fragment key={m.id}>
                               {i === 0 && sugeridosMentores.size > 0 && (
-                                <li className="flex items-center gap-1.5 px-2 pb-1 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                                  <Sparkle size={11} aria-hidden />
+                                <li className="flex items-center gap-1.5 px-2 pb-1 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                                  <Sparkle size={12} aria-hidden />
                                   {sugeridosMentores.size}{" "}
                                   {sugeridosMentores.size === 1
                                     ? "sugerido"
@@ -476,7 +476,7 @@ export function FilaEspera({
                                       onClick={() =>
                                         setSugMentores((v) => v + SUG_POR_VEZ)
                                       }
-                                      className="h-auto w-full py-1.5 text-xs text-muted-foreground"
+                                      className="h-auto w-full py-1.5 text-sm text-muted-foreground"
                                     >
                                       Ver mais sugestões (
                                       {sugeridosMentores.size - corteSugMentores})
@@ -507,8 +507,8 @@ export function FilaEspera({
                 </div>
 
                 {mentorSelObj && mentorLotado && (
-                  <p className="flex flex-wrap items-center gap-x-1.5 text-xs text-[var(--warn-text)]">
-                    <Warning size={13} aria-hidden className="shrink-0" />
+                  <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-[var(--warn-text)]">
+                    <Warning size={14} aria-hidden className="shrink-0" />
                     {mentorSelObj.nome.split(" ")[0]} está sem vaga (
                     {usadasDe(mentorSelObj.id)}/{tetoDe(mentorSelObj.id)} duplas
                     em andamento). Se a afinidade fechar,{" "}
@@ -565,7 +565,7 @@ export function FilaEspera({
                     }}
                   />
                 ) : (
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-sm text-muted-foreground">
                     Toque num jovem e num mentor pra comparar interesses,
                     cor/raça, preferências e agenda antes de formar a dupla.
                   </p>
@@ -618,7 +618,7 @@ function FilaColuna({
   // min-w-0: a coluna cede largura ao grid em vez de herdar o nowrap da linha
   return (
     <div className="min-w-0 space-y-1">
-      <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground tabular-nums">
+      <p className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground tabular-nums">
         {lado === "mentorado" ? (
           <Student aria-hidden size={14} />
         ) : (
@@ -684,7 +684,7 @@ function LinhaConteudo({
           title={meta || undefined}
         >
           {destaqueMeta && (
-            <span className="font-medium text-foreground/70">
+            <span className="font-medium text-foreground">
               {destaqueMeta}
               {meta ? " · " : ""}
             </span>
@@ -814,7 +814,7 @@ function ParearColuna({
   const itens = Array.isArray(children) ? children.length : children ? 1 : 0;
   return (
     <div className="min-w-0 space-y-1">
-      <p className="text-xs font-medium text-muted-foreground">{rotulo}</p>
+      <p className="text-sm font-medium text-muted-foreground">{rotulo}</p>
       {itens === 0 && !carregando ? (
         <p className="px-1 py-3 text-sm text-muted-foreground">{vazio}</p>
       ) : (
@@ -880,7 +880,7 @@ function ParearLinha({
         aria-checked={selecionado}
         onClick={onSelecionar}
         className={cn(
-          "h-auto w-full justify-start whitespace-normal rounded-lg px-2 py-2 text-left md:h-auto",
+          "group h-auto w-full justify-start whitespace-normal rounded-lg px-2 py-2 text-left md:h-auto",
           selecionado
             ? "bg-[var(--brand-lime)]/15 ring-1 ring-[var(--brand-lime)]/60 hover:bg-[var(--brand-lime)]/20"
             : selo
@@ -895,7 +895,7 @@ function ParearLinha({
           meta={meta}
         />
         {selo && (
-          <span className="ml-auto shrink-0 rounded-full border border-[var(--brand-lime)]/60 bg-[var(--brand-lime)]/15 px-2 py-0.5 text-[10px] font-medium leading-4 text-foreground">
+          <span className="ml-auto shrink-0 rounded-full border border-[var(--brand-lime)]/60 bg-[var(--brand-lime)]/15 px-2 py-0.5 text-[11px] font-medium leading-4 text-foreground">
             {selo}
           </span>
         )}

@@ -115,7 +115,7 @@ function ChipInteresse({ texto, destaque }: { texto: string; destaque: boolean }
   return (
     <span
       className={cn(
-        "rounded-full border px-2 py-0.5 text-[11px] leading-5",
+        "rounded-full border px-2 py-0.5 text-xs leading-5",
         destaque
           ? "border-[var(--brand-lime)]/60 bg-[var(--brand-lime)]/15 text-foreground"
           : "border-border text-muted-foreground"
@@ -141,14 +141,14 @@ function GradeAgendaComum({
       {DIAS_SEMANA.map((dia) => (
         <p
           key={dia}
-          className="text-center text-[9px] font-medium uppercase tracking-wide text-muted-foreground/80"
+          className="text-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80"
         >
           {DIAS_SEMANA_CURTOS[dia]}
         </p>
       ))}
       {PERIODOS.map((per) => (
         <div key={per} className="contents">
-          <p className="self-center text-[9px] font-medium uppercase tracking-wide text-muted-foreground/80">
+          <p className="self-center text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">
             {PERIODOS_LABELS[per].slice(0, 1)}
           </p>
           {DIAS_SEMANA.map((dia) => {
@@ -238,7 +238,7 @@ export function AfinidadePar({
 
   return (
     <div className="space-y-3 rounded-lg border border-border bg-muted/30 px-3.5 py-3">
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <p className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
         Afinidade do par
       </p>
 
@@ -246,14 +246,14 @@ export function AfinidadePar({
         <p
           key={a.texto}
           className={cn(
-            "flex items-start gap-1.5 rounded-md px-2.5 py-1.5 text-xs",
+            "flex items-start gap-1.5 rounded-md px-2.5 py-1.5 text-sm",
             a.nivel === "alerta"
               ? "bg-[var(--warn)]/10 text-[var(--warn-text)]"
               : "text-muted-foreground"
           )}
         >
           {a.nivel === "alerta" && (
-            <Warning size={13} aria-hidden className="mt-0.5 shrink-0" />
+            <Warning size={14} aria-hidden className="mt-0.5 shrink-0" />
           )}
           {a.texto}
         </p>
@@ -261,7 +261,7 @@ export function AfinidadePar({
 
       {temAgenda && (
         <div className="space-y-1.5">
-          <p className="text-[11px] font-medium text-muted-foreground">
+          <p className="text-xs font-medium text-muted-foreground">
             Agenda em comum
             {temSobreposicao
               ? ` · ${agendaComum.length} ${
@@ -272,19 +272,19 @@ export function AfinidadePar({
           <GradeAgendaComum comum={comumSet} />
           {agendaTxt && agendaJovemTxt ? (
             temSobreposicao ? (
-              <p className="flex items-center gap-1.5 text-xs text-[var(--ok-text)]">
-                <Check size={12} weight="bold" aria-hidden />
+              <p className="flex items-center gap-1.5 text-sm text-[var(--ok-text)]">
+                <Check size={14} weight="bold" aria-hidden />
                 Coincidem em {disponibilidadeTexto({ celulas: agendaComum })}.
               </p>
             ) : (
-              <p className="flex items-start gap-1.5 text-xs text-[var(--warn-text)]">
-                <Warning size={12} aria-hidden className="mt-0.5 shrink-0" />
+              <p className="flex items-start gap-1.5 text-sm text-[var(--warn-text)]">
+                <Warning size={14} aria-hidden className="mt-0.5 shrink-0" />
                 Sem janela em comum de dia e período — confirme a agenda dos
                 dois antes de formar.
               </p>
             )
           ) : (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               {!agendaTxt
                 ? "Agenda do mentor não informada. Confirme antes de formar."
                 : "Agenda do jovem não informada — a grade dele pode ser preenchida na ficha."}
@@ -295,7 +295,7 @@ export function AfinidadePar({
 
       {temasComuns.length > 0 && (
         <div className="space-y-1.5">
-          <p className="text-[11px] font-medium text-muted-foreground">
+          <p className="text-xs font-medium text-muted-foreground">
             Temas em comum · {temasComuns.length}
           </p>
           <div className="flex flex-wrap gap-1">
@@ -308,7 +308,7 @@ export function AfinidadePar({
 
       {temInteresses && (
         <div className="space-y-1.5">
-          <p className="text-[11px] font-medium text-muted-foreground">
+          <p className="text-xs font-medium text-muted-foreground">
             Interesses em comum{comuns.size ? ` · ${comuns.size}` : ""}
           </p>
           {comuns.size > 0 ? (
@@ -320,7 +320,7 @@ export function AfinidadePar({
                 ))}
             </div>
           ) : (
-            <p className="text-xs text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Nenhum em comum — as listas completas ficam nos detalhes.
             </p>
           )}
@@ -335,7 +335,7 @@ export function AfinidadePar({
       >
         <Collapsible.Trigger
           aria-expanded={detalhesAbertos}
-          className="flex w-full items-center gap-1 rounded-md py-0.5 text-xs font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+          className="flex w-full items-center gap-1 rounded-md py-0.5 text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
           Ver detalhes
           <CaretDown
@@ -370,8 +370,8 @@ export function AfinidadePar({
               </span>
             </div>
 
-            <div className="space-y-1 text-xs">
-              <p className="text-[11px] font-medium text-muted-foreground">
+            <div className="space-y-1 text-sm">
+              <p className="text-xs font-medium text-muted-foreground">
                 Agenda completa
               </p>
               <p className="text-muted-foreground">
@@ -390,7 +390,7 @@ export function AfinidadePar({
 
             {temInteresses && (
               <div className="space-y-1">
-                <p className="text-[11px] font-medium text-muted-foreground">
+                <p className="text-xs font-medium text-muted-foreground">
                   Interesses de cada um
                 </p>
                 {(
@@ -401,7 +401,7 @@ export function AfinidadePar({
                 ).map((lado) => (
                   <div
                     key={lado.nome}
-                    className="flex flex-wrap items-center gap-1 text-xs"
+                    className="flex flex-wrap items-center gap-1 text-sm"
                   >
                     <span className="w-20 shrink-0 truncate text-muted-foreground">
                       {primeiroNome(lado.nome)}
@@ -425,10 +425,10 @@ export function AfinidadePar({
             )}
 
             {temMotivacao && (
-              <dl className="space-y-1.5 text-xs">
+              <dl className="space-y-1.5 text-sm">
                 {mentorado.motivacao && (
                   <div>
-                    <dt className="font-medium text-muted-foreground">
+                    <dt className="text-xs font-medium text-muted-foreground">
                       Motivação · {primeiroNome(mentorado.nome)}
                     </dt>
                     <dd
@@ -441,7 +441,7 @@ export function AfinidadePar({
                 )}
                 {mentorado.objetivos && (
                   <div>
-                    <dt className="font-medium text-muted-foreground">Objetivos</dt>
+                    <dt className="text-xs font-medium text-muted-foreground">Objetivos</dt>
                     <dd
                       className="mt-0.5 line-clamp-4 text-muted-foreground"
                       title={mentorado.objetivos}
@@ -452,7 +452,7 @@ export function AfinidadePar({
                 )}
                 {mentor.motivacao && (
                   <div>
-                    <dt className="font-medium text-muted-foreground">
+                    <dt className="text-xs font-medium text-muted-foreground">
                       Motivação · {primeiroNome(mentor.nome)}
                     </dt>
                     <dd
