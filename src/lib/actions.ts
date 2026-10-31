@@ -48,6 +48,12 @@ import {
   type ResolucaoPar,
 } from "@/lib/importar-duplas";
 import { notificar } from "./notificar";
+import {
+  depoisDe,
+  removerMatchingPerfil,
+  sincronizarMatchingPerfilMentorado,
+  sincronizarMatchingPerfilPessoa,
+} from "./ia/matching";
 import { bloqueioTrocaPapel } from "./papel-vinculo";
 import { AUDIENCIAS, audienciaLegada } from "./materiais";
 import { ROLES_POR_AUDIENCIA } from "@/lib/email";
@@ -610,6 +616,9 @@ export async function createPessoa(formData: FormData) {
       }
     }
   }
+  // perfil-matching (REALIZA-338) — pós-resposta: IA não pode segurar o
+  // cadastro; a sync decide sozinha se o papel pede vetor
+  depoisDe(() => sincronizarMatchingPerfilPessoa(profile.id));
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${profile.id}`);
   return { ok: true, aviso };
@@ -648,6 +657,7 @@ export async function createMentorado(formData: FormData) {
   } else {
     aviso = foto.aviso;
   }
+  depoisDe(() => sincronizarMatchingPerfilMentorado(mentorado.id));
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${mentorado.id}`);
   return { ok: true, aviso };
@@ -922,6 +932,7 @@ export async function setPessoaRole(profileId: string, role: string | null) {
         );
       if (error) return { error: erroAmigavel(error) };
     }
+    depoisDe(() => sincronizarMatchingPerfilPessoa(profileId));
     revalidatePath("/pessoas");
     revalidatePath(`/pessoas/${profileId}`);
     return { ok: true };
@@ -973,6 +984,7 @@ export async function setPessoaRole(profileId: string, role: string | null) {
       tipo: role === "mentor_especialista" ? "especialista" : "dpp",
     });
     if (mpErr) return { error: erroAmigavel(mpErr) };
+    depoisDe(() => sincronizarMatchingPerfilPessoa(profileId));
     revalidatePath("/pessoas");
     revalidatePath(`/pessoas/${profileId}`);
     return { ok: true };
@@ -1098,6 +1110,7 @@ export async function setPessoaRole(profileId: string, role: string | null) {
       .from("mentor_profiles").delete().eq("profile_id", profileId);
     if (mpErr) return { error: erroAmigavel(mpErr) };
   }
+  depoisDe(() => sincronizarMatchingPerfilPessoa(profileId));
   revalidatePath("/pessoas");
   return { ok: true };
 }
@@ -1388,6 +1401,7 @@ export async function updatePessoa(profileId: string, formData: FormData) {
     });
     if (mpErr) return { error: erroAmigavel(mpErr) };
   }
+  depoisDe(() => sincronizarMatchingPerfilPessoa(profileId));
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${profileId}`);
   return { ok: true, aviso };
@@ -1479,6 +1493,7 @@ export async function setPessoaAtivo(profileId: string, ativo: boolean, forcar =
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
+  depoisDe(() => sincronizarMatchingPerfilPessoa(profileId));
   revalidatePath("/pessoas");
   revalidatePath("/");
   return { ok: true };
@@ -1521,6 +1536,7 @@ export async function deletePessoa(profileId: string) {
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
+  depoisDe(() => removerMatchingPerfil("mentor", profileId));
   revalidatePath("/pessoas");
   return { ok: true };
 }
@@ -1568,6 +1584,7 @@ export async function updateMentorado(id: string, formData: FormData) {
   } else {
     aviso = foto.aviso;
   }
+  depoisDe(() => sincronizarMatchingPerfilMentorado(id));
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${id}`);
   return { ok: true, aviso };
@@ -1610,6 +1627,7 @@ export async function deleteMentorado(id: string) {
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
+  depoisDe(() => removerMatchingPerfil("mentorado", id));
   revalidatePath("/pessoas");
   return { ok: true };
 }
@@ -1672,6 +1690,7 @@ export async function marcarSaidaMentorado(
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
+  depoisDe(() => sincronizarMatchingPerfilMentorado(id));
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${id}`);
   revalidatePath("/duplas");
@@ -2571,6 +2590,18 @@ export async function importPessoas(rows: LinhaImportada[]) {
     }
   }
 
+  // perfil-matching em lote (REALIZA-338) — sequencial de propósito: a
+  // importação pode trazer centenas e a API de embedding agradece o ritmo
+  const idsMentores = (inseridas ?? [])
+    .filter((p) => p.role === "mentor_dpp" || p.role === "mentor_especialista")
+    .map((p) => p.id);
+  if (idsMentores.length) {
+    depoisDe(async () => {
+      for (const id of idsMentores) {
+        await sincronizarMatchingPerfilPessoa(id);
+      }
+    });
+  }
   revalidatePath("/pessoas");
   return { ok: true, criados: inseridas?.length ?? 0, puladas };
 }
@@ -2622,8 +2653,19 @@ export async function importMentorados(rows: LinhaImportada[]) {
   }
   if (!validas.length) return { ok: true, criados: 0, puladas };
 
-  const { error } = await supabase.from("mentorados").insert(validas);
+  const { data: inseridos, error } = await supabase
+    .from("mentorados").insert(validas).select("id");
   if (error) return { error: erroAmigavel(error) };
+  // perfil-matching em lote — idem importPessoas: sequencial pra não
+  // estourar a API externa num arquivo de centenas de linhas
+  const idsNovos = (inseridos ?? []).map((m) => m.id);
+  if (idsNovos.length) {
+    depoisDe(async () => {
+      for (const id of idsNovos) {
+        await sincronizarMatchingPerfilMentorado(id);
+      }
+    });
+  }
   revalidatePath("/pessoas");
   return { ok: true, criados: validas.length, puladas };
 }
@@ -4389,6 +4431,7 @@ export async function updateMeuPerfil(formData: FormData) {
       .eq("profile_id", eu.id);
     if (mpErr) return { error: erroAmigavel(mpErr) };
   }
+  depoisDe(() => sincronizarMatchingPerfilPessoa(eu.id));
   revalidatePath("/", "layout");
   return { ok: true };
 }
@@ -4481,6 +4524,10 @@ export async function salvarOnboarding(formData: FormData) {
     aviso = foto.aviso;
   }
 
+  // o wizard é onde a ficha de matching fica completa (interesses,
+  // motivação, experiência, disponibilidade) — o recompute pós-resposta
+  // cobre cada passo sem custar nada quando o doc não muda (hash)
+  depoisDe(() => sincronizarMatchingPerfilPessoa(eu.id));
   // wizard é full-screen — revalidar a home basta, nada de refresh em massa
   revalidatePath("/");
   return { ok: true, aviso };

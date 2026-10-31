@@ -119,6 +119,8 @@ function ChipInteresse({ texto, destaque }: { texto: string; destaque: boolean }
 export function AfinidadePar({
   mentor,
   mentorado,
+  temasMentor,
+  temasMentorado,
 }: {
   mentor: LadoAfinidade & {
     disponibilidade: Disponibilidade | null;
@@ -131,10 +133,20 @@ export function AfinidadePar({
     data_nascimento?: string | null;
     disponibilidade?: Disponibilidade | null;
   };
+  /** Tags canônicas extraídas do doc-matching (REALIZA-338) — a camada
+   *  explicável do vetor: a interseção vira "temas em comum". Sem a
+   *  prop a seção simplesmente não aparece. */
+  temasMentor?: string[];
+  temasMentorado?: string[];
 }) {
   const intMentor = mentor.interesses ?? [];
   const intMentorado = mentorado.interesses ?? [];
   const comuns = emComum(intMentorado, intMentor);
+  // temas canônicos (matching_perfis) — comparação já é no vocab fechado,
+  // então o cruzamento é por igualdade literal, sem normalizar de novo
+  const temasA = new Set(temasMentorado ?? []);
+  const temasB = new Set(temasMentor ?? []);
+  const temasComuns = [...temasA].filter((t) => temasB.has(t));
   const anos = idade(mentorado.data_nascimento);
   const alertas = [
     alertaGenero(mentorado, mentor, "mentorado"),
@@ -202,6 +214,19 @@ export function AfinidadePar({
           {a.texto}
         </p>
       ))}
+
+      {temasComuns.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-[11px] font-medium text-muted-foreground">
+            Temas em comum · {temasComuns.length}
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {temasComuns.map((t) => (
+              <ChipInteresse key={t} texto={t} destaque />
+            ))}
+          </div>
+        </div>
+      )}
 
       {temInteresses && (
         <div className="space-y-1.5">

@@ -2672,6 +2672,36 @@ export type Database = {
         }
         Relationships: []
       }
+      matching_perfis: {
+        Row: {
+          doc: string
+          doc_hash: string
+          dono_id: string
+          dono_tipo: string
+          embedding: string | null
+          gerado_em: string
+          temas: string[]
+        }
+        Insert: {
+          doc?: string
+          doc_hash: string
+          dono_id: string
+          dono_tipo: string
+          embedding?: string | null
+          gerado_em?: string
+          temas?: string[]
+        }
+        Update: {
+          doc?: string
+          doc_hash?: string
+          dono_id?: string
+          dono_tipo?: string
+          embedding?: string | null
+          gerado_em?: string
+          temas?: string[]
+        }
+        Relationships: []
+      }
       materiais: {
         Row: {
           audiencia: string
@@ -5747,6 +5777,10 @@ export type Database = {
           secao: string
           trecho: string
         }[]
+      }
+      matching_ranquear: {
+        Args: { p_id: string; p_outro_tipo: string; p_tipo: string }
+        Returns: { dono_id: string; similaridade: number }[]
       }
       meus_dados_civis: { Args: never; Returns: Json }
       meus_dados_pessoais: { Args: never; Returns: Json }
