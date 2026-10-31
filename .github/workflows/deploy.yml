@@ -1,0 +1,108 @@
+name: deploy
+
+# Deploy self-hosted por tag: commit com [deploy] → imagem → GHCR → SSH
+# no host → compose up → deployment_status sintético → e2e-preview roda
+# a suite INALTERADA contra o staging (regra: nada sobe sem preview
+# verde). Push comum não faz nada — o `if` aborta o run.
+#
+# Vars/secrets necessários no repo:
+#   secrets.DEPLOY_SSH_KEY  — chave privada ed25519 do user de deploy
+#   secrets.DEPLOY_HOST     — IP ou MagicDNS da máquina alvo
+#   secrets.DEPLOY_USER     — usuário ssh com docker
+#   secrets.STAGING_HOST    — se staging for em outra máquina (notebook)
+#   vars.SITE_URL_STAGING   — https://staging.realiza.vc
+#   vars.SITE_URL_PROD      — https://realiza.vc
+#   vars.NEXT_PUBLIC_SUPABASE_URL / _ANON_KEY — projeto alvo
+#   secrets.GHCR_PAT        — PAT read:packages p/ o host puxar a imagem
+# O host precisa: docker + compose plugin, checkout do repo (ou só
+# docker-compose.yml + docker/ + .env), e logar uma vez:
+#   echo $GHCR_PAT | docker login ghcr.io -u USER --password-stdin
+
+on:
+  push:
+    branches: [staging, main]
+
+permissions:
+  contents: read
+  packages: write
+  deployments: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    if: contains(github.event.head_commit.message, '[deploy]')
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: login GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      # staging e prod são imagens distintas por construção: as
+      # NEXT_PUBLIC_* são embutidas no bundle do browser em build time
+      - name: args por ambiente
+        env:
+          REF: ${{ github.ref_name }}
+        run: |
+          if [ "$REF" = "main" ]; then
+            echo "SITE_URL=${{ vars.SITE_URL_PROD }}" >> "$GITHUB_ENV"
+            echo "TARGET=${{ secrets.DEPLOY_HOST }}" >> "$GITHUB_ENV"
+          else
+            echo "SITE_URL=${{ vars.SITE_URL_STAGING }}" >> "$GITHUB_ENV"
+            echo "TARGET=${{ secrets.STAGING_HOST || secrets.DEPLOY_HOST }}" >> "$GITHUB_ENV"
+          fi
+
+      - name: build + push imagem
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: ghcr.io/${{ github.repository }}:${{ github.ref_name }}-${{ github.sha }}
+          build-args: |
+            NEXT_PUBLIC_SUPABASE_URL=${{ vars.NEXT_PUBLIC_SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY }}
+            NEXT_PUBLIC_SITE_URL=${{ env.SITE_URL }}
+            NEXT_PUBLIC_APP_ENV=${{ github.ref_name }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: deploy no host via SSH
+        uses: appleboy/ssh-action@v1
+        env:
+          IMAGE: ghcr.io/${{ github.repository }}:${{ github.ref_name }}-${{ github.sha }}
+        with:
+          host: ${{ env.TARGET }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          envs: IMAGE
+          script: |
+            set -e
+            cd ~/realiza
+            echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+            export IMAGE
+            docker compose --env-file .env pull
+            docker compose --env-file .env up -d
+            docker image prune -f
+
+      # só em staging: o deployment_status=success sintético dispara o
+      # e2e-preview contra staging.realiza.vc — suite inteira no artefato
+      # deployado, igual fazia com Vercel. Em main não dispara (a suite
+      # tem writes — não aponta pra prod)
+      - name: deployment_status=success → e2e-preview
+        if: github.ref_name == 'staging'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SHA: ${{ github.sha }}
+        run: |
+          DEP=$(gh api repos/${{ github.repository }}/deployments \
+            -f ref="$SHA" -f environment="Preview" \
+            -f description="selfhost staging" --jq .id)
+          gh api "repos/${{ github.repository }}/deployments/$DEP/statuses" \
+            -f state=success -f environment=Preview \
+            -f target_url="${{ vars.SITE_URL_STAGING }}" \
+            -f description="container up — e2e pode rodar"

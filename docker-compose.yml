@@ -13,7 +13,8 @@ services:
         NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY}
         NEXT_PUBLIC_SITE_URL: ${NEXT_PUBLIC_SITE_URL}
         NEXT_PUBLIC_APP_ENV: ${APP_ENV:-production}
-    image: realiza-app
+    # GHCR no deploy (IMAGE=ghcr.io/...:tag) ou build local sem IMAGE
+    image: ${IMAGE:-realiza-app}
     env_file: .env
     environment:
       APP_ENV: ${APP_ENV:-production}
