@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -20,6 +21,7 @@ import {
   MapTrifold,
   Megaphone,
   NotePencil,
+  ShieldCheck,
   TrafficSignal,
   UserPlus,
   UsersThree,
@@ -27,8 +29,8 @@ import {
 } from "@phosphor-icons/react";
 import { concluirOnboarding, salvarOnboarding } from "@/lib/actions";
 import { recomecarDemo } from "@/lib/demo/actions";
-import { assinarTermo, declararVoluntario } from "@/lib/actions-assinaturas";
-import { AREAS_SUGESTOES } from "@/lib/ciclo";
+import { assinarTermo } from "@/lib/actions-assinaturas";
+import { AREAS_SUGESTOES, GENERO_LABELS } from "@/lib/ciclo";
 import {
   avatarPublicUrl,
   AVATAR_ACCEPT,
@@ -36,6 +38,7 @@ import {
   avisoImagemGrande,
 } from "@/lib/avatar";
 import { AssinaturaForm } from "@/components/assinatura-form";
+import { CaixaSelecao } from "@/components/ui/caixa-selecao";
 import { TagInput } from "@/components/tag-input";
 import { TermoVoluntarioDoc } from "@/components/termo-doc";
 import {
@@ -62,39 +65,40 @@ import type {
   Profile,
 } from "@/lib/types";
 import { Logo } from "@/components/logo";
+import { cn } from "cn";
 
 /** Um form por passo — o botão do footer fixo submete via atributo `form`. */
 const FORM_ID = "onboarding-passo";
 
-type Recurso = { icon: Icon; texto: string };
+type Recurso = { icon: Icon; texto: string; img?: string; alt?: string };
 
 /** "O que você pode fazer aqui" — os 4-5 pontos que mudam a rotina de cada papel. */
 const RECURSOS: Record<AppRole, Recurso[]> = {
   coordenacao: [
-    { icon: TrafficSignal, texto: "O andamento das duplas em tempo real: quem precisa de atenção aparece destacado." },
-    { icon: HandHeart, texto: "Pedidos de apoio e de mentoria especializada chegam pra você." },
-    { icon: UsersThree, texto: "Formar duplas e gerenciar os cadastros da equipe e dos mentorados." },
+    { icon: TrafficSignal, texto: "O andamento das duplas em tempo real: quem precisa de atenção aparece destacado.", img: "/onboarding/coordenacao-home.jpg", alt: "Visão geral da coordenação: turmas, situação das duplas e pendências" },
+    { icon: HandHeart, texto: "Pedidos de apoio e de mentoria especializada chegam pra você.", img: "/onboarding/coordenacao-dupla.jpg", alt: "Ficha de uma dupla com pedido de apoio" },
+    { icon: UsersThree, texto: "Formar duplas e gerenciar os cadastros da equipe e dos mentorados.", img: "/onboarding/coordenacao-duplas.jpg", alt: "Lista de duplas com estado e filtros" },
     { icon: Megaphone, texto: "Comunicados pra equipe e pra cada grupo de mentores." },
     { icon: ChartLineUp, texto: "Exportar relatórios do programa." },
   ],
   supervisor: [
-    { icon: UsersThree, texto: "As duplas sob sua supervisão num lugar só." },
-    { icon: NotePencil, texto: "Notas de acompanhamento na ficha de cada dupla." },
-    { icon: TrafficSignal, texto: "O andamento de cada dupla: quem vai bem e quem precisa de atenção." },
+    { icon: UsersThree, texto: "As duplas sob sua supervisão num lugar só.", img: "/onboarding/supervisor-duplas.jpg", alt: "Lista de duplas supervisionadas" },
+    { icon: NotePencil, texto: "Notas de acompanhamento na ficha de cada dupla.", img: "/onboarding/supervisor-dupla.jpg", alt: "Ficha de uma dupla com notas e encontros" },
+    { icon: TrafficSignal, texto: "O andamento de cada dupla: quem vai bem e quem precisa de atenção.", img: "/onboarding/supervisor-home.jpg", alt: "Visão geral do supervisor com andamento das duplas" },
     { icon: FolderOpen, texto: "Os materiais oficiais do programa." },
   ],
   mentor_dpp: [
-    { icon: CalendarCheck, texto: "Agendar e registrar os encontros com a sua dupla." },
-    { icon: MapTrifold, texto: "A jornada dos 16 encontros do guia, passo a passo." },
+    { icon: CalendarCheck, texto: "Agendar e registrar os encontros com a sua dupla.", img: "/onboarding/mentor_dpp-dupla.jpg", alt: "Ficha da dupla com encontros e registros" },
+    { icon: MapTrifold, texto: "A jornada dos 16 encontros do guia, passo a passo.", img: "/onboarding/mentor_dpp-home.jpg", alt: "Visão geral do mentor com a jornada dos encontros" },
     { icon: HandHeart, texto: "Pedir apoio à coordenação quando precisar." },
     { icon: UserPlus, texto: "Solicitar um mentor especialista pro seu mentorado." },
-    { icon: FolderOpen, texto: "Os materiais oficiais do programa." },
+    { icon: FolderOpen, texto: "Os materiais oficiais do programa.", img: "/onboarding/mentor_dpp-materiais.jpg", alt: "Biblioteca de materiais do programa" },
   ],
   mentor_especialista: [
-    { icon: ClipboardText, texto: "Uma lista de pedidos que combinam com o seu perfil." },
+    { icon: ClipboardText, texto: "Uma lista de pedidos que combinam com o seu perfil.", img: "/onboarding/mentor_especialista-home.jpg", alt: "Mural de pedidos de mentoria especializada" },
     { icon: Handshake, texto: "Aceitar um pedido e conduzir até 5 encontros." },
     { icon: NotePencil, texto: "Registrar cada encontro realizado." },
-    { icon: FolderOpen, texto: "Os materiais oficiais do programa." },
+    { icon: FolderOpen, texto: "Os materiais oficiais do programa.", img: "/onboarding/mentor_especialista-materiais.jpg", alt: "Biblioteca de materiais do programa" },
   ],
   // o jovem não passa por este wizard (o dele é o OnboardingJovem do
   // /jovem, REALIZA-114) — a entrada existe porque o Record pede todos os
@@ -106,16 +110,48 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
   ],
 };
 
-// índices dos passos por papel — o "Sobre você" virou 3 sub-passos
-// (identidade, profissional, interesses/motivação/consentimento) porque 11
-// campos num balão só era a parede que a galera pulava; mentores seguem
+// índices dos passos por papel — as declarações (voluntário + LGPD) abrem o
+// fluxo pra garantir o consent antes de qualquer dado pedido; o "Sobre você"
+// virou 3 sub-passos (identidade, profissional, interesses/motivação) porque
+// 11 campos num balão só era a parede que a galera pulava; mentores seguem
 // pros passos de ficha/perfil (0034 + 0030) antes do fechamento. O termo de
 // voluntariado (0033) entra penúltimo — sempre `total - 2` quando a
-// assinatura ainda está pendente, pra qualquer papel
-const PASSO_SOBRE = (ehMentor: boolean) => (ehMentor ? 6 : 2);
+// assinatura ainda está pendente e a pessoa se declarou voluntária, pra
+// qualquer papel
+const PASSO_DECLARACOES = 1;
+const PASSO_SOBRE = (ehMentor: boolean) => (ehMentor ? 7 : 3);
 const SUBPASSOS_SOBRE = 3;
-const PASSO_PAREAMENTO = 9;
-const PASSO_DISPONIBILIDADE = 10;
+const PASSO_PAREAMENTO = 10;
+const PASSO_DISPONIBILIDADE = 11;
+
+/** Moldura de "janela de navegador" pros prints de tela reais — os três
+ *  pontinhos vendem "isso é o produto de verdade" sem custar copy. */
+function MolduraTela({
+  children,
+  className,
+}: {
+  children: React.ReactNode;
+  className?: string;
+}) {
+  return (
+    <div
+      className={cn(
+        "overflow-hidden rounded-2xl border border-border bg-card shadow-sm",
+        className
+      )}
+    >
+      <div
+        aria-hidden
+        className="flex items-center gap-1.5 border-b border-border/60 bg-muted/60 px-3 py-2"
+      >
+        <span className="size-2 rounded-full bg-border" />
+        <span className="size-2 rounded-full bg-border" />
+        <span className="size-2 rounded-full bg-border" />
+      </div>
+      {children}
+    </div>
+  );
+}
 
 /** Wizard de primeiro acesso — balão de pergunta por passo, salvando um pedaço
  *  do perfil por vez (salvarOnboarding com patch parcial: só o que o passo
@@ -152,18 +188,16 @@ export function OnboardingFlow({
   const router = useRouter();
   const ehMentor =
     temPapel(me, "mentor_dpp") || temPapel(me, "mentor_especialista");
-  // o passo do termo existe só pra quem é voluntário de fato — o flag
-  // "sou voluntário" do cadastro (coord) decide; quem não é pula direto.
-  // É CONGELADO no mount: assinar no próprio wizard dispara router.refresh()
-  // e a prop voltaria "assinado", encolhendo `total` com o usuário já
-  // sentado no último passo
-  const [temTermo] = useState(
-    () => assinaturaTermo?.status !== "assinado" && me.voluntario !== false
-  );
-  // coord/supervisor: boas-vindas + recursos + ficha pessoal em 3 sub-passos
-  // + fechamento (6); mentores: + foto, apresentação, pareamento e
-  // disponibilidade (12); termo pendente adiciona 1 passo pra todo papel
-  const total = (ehMentor ? 12 : 6) + (temTermo ? 1 : 0);
+  // a declaração do passo 1 (não a prop) decide se o termo existe no fim:
+  // desmarcar "Sou voluntário(a)" ali encolhe o wizard na hora e o termo
+  // nunca renderiza — o freeze que existia era contra o router.refresh()
+  // pós-assinatura mexendo na prop, e estado local não sofre com refresh
+  const [souVoluntario, setSouVoluntario] = useState(me.voluntario !== false);
+  const temTermo = assinaturaTermo?.status !== "assinado" && souVoluntario;
+  // coord/supervisor: boas-vindas + declarações + recursos + ficha pessoal
+  // em 3 sub-passos + fechamento (7); mentores: + foto, apresentação,
+  // pareamento e disponibilidade (13); termo pendente adiciona 1 passo
+  const total = (ehMentor ? 13 : 7) + (temTermo ? 1 : 0);
   const [step, setStep] = useState(0);
   const [termoOk, setTermoOk] = useState(false);
   const [pending, start] = useTransition();
@@ -194,6 +228,14 @@ export function OnboardingFlow({
   const [interesses, setInteresses] = useState<string[]>(me.interesses ?? []);
   const [motivacao, setMotivacao] = useState(pessoal?.motivacao ?? "");
   const [consent, setConsent] = useState(false);
+  // recurso cujos dados ilustram a tela no passo "o que você pode fazer" —
+  // hover/foco no item troca o print (desktop); mobile mostra a home do papel
+  const [recursoAtivo, setRecursoAtivo] = useState(() =>
+    Math.max(0, RECURSOS[me.role ?? "mentor_dpp"].findIndex((r) => r.img))
+  );
+  // sub-passos do "Sobre você" colapsam quando a importação da coordenação já
+  // preencheu — "Corrigir" expande o form de volta pra editar
+  const [editarSobre, setEditarSobre] = useState<Record<number, boolean>>({});
 
   // ficha de mentor (0034) — pareamento + grade semanal, já preenchidos se
   // a coordenação importou (mentor_profiles é legível pelo dono)
@@ -229,42 +271,35 @@ export function OnboardingFlow({
   const ultimoComCampos = ehMentor
     ? PASSO_DISPONIBILIDADE
     : passoSobre + SUBPASSOS_SOBRE - 1;
-  const passoComCampos = step >= 2 && step <= ultimoComCampos;
+  const passoComCampos = step >= 3 && step <= ultimoComCampos;
   // o termo é penúltimo (antes do "Tudo certo") e fica FORA do <form>
   // compartilhado: o AssinaturaForm tem form e submit próprios. -1 quando a
   // assinatura já existe (assinado) — o passo some do wizard inteiro
   const passoTermo = temTermo ? total - 2 : -1;
   const ehPassoTermo = step === passoTermo;
-  // auto-declaração no passo do termo: a coord classifica no cadastro, mas
-  // quem foi marcado por engano se corrige aqui — desmarcar grava
-  // voluntario=false e a pendência do termo some (fechamento, banner, /perfil)
-  const [souVoluntario, setSouVoluntario] = useState(true);
-  const [volEscrito, setVolEscrito] = useState(true);
 
   function avancar() {
     setStep((s) => Math.min(s + 1, total - 1));
   }
 
-  /** Avança gravando a declaração quando ela diverge do que já foi pro
-   *  banco — desmarcar e voltar/remarcar cobre os dois sentidos. Na demo
-   *  não há escrita: a caixa é só visual, como o resto do passo. */
-  function avancarDoTermo() {
-    if (souVoluntario === volEscrito) {
-      avancar();
+  /** Passo "Declarações": o LGPD é o único gate do wizard (sem consent não
+   *  dá pra tratar os dados que os próximos passos pedem); a flag de
+   *  voluntário decide se o termo aparece no fim. Tudo salva num post só. */
+  function avancarDasDeclaracoes() {
+    if (!consent && !me.consent_lgpd_em) {
+      toast.error("Precisamos do seu consentimento pra continuar.");
       return;
     }
-    if (demo) {
-      setVolEscrito(souVoluntario);
-      avancar();
-      return;
-    }
+    const fd = new FormData();
+    fd.set("decl_voluntario", "1");
+    if (souVoluntario) fd.set("voluntario", "on");
+    if (consent) fd.set("consent_lgpd", "on");
     start(async () => {
-      const res = await declararVoluntario(souVoluntario);
+      const res = await salvarOnboarding(fd);
       if ("error" in res) {
         toast.error(res.error);
         return;
       }
-      setVolEscrito(souVoluntario);
       avancar();
     });
   }
@@ -292,15 +327,6 @@ export function OnboardingFlow({
   function concluir() {
     start(async () => {
       try {
-        // quem desmarcou "sou voluntário" e pulou o resto ainda precisa da
-        // flag gravada — senão a pendência do termo volta na home
-        if (!demo && souVoluntario !== volEscrito) {
-          const decl = await declararVoluntario(souVoluntario);
-          if ("error" in decl) {
-            toast.error(decl.error);
-            return;
-          }
-        }
         const res = await concluirOnboarding();
         if ("error" in res) {
           toast.error(res.error);
@@ -432,24 +458,65 @@ export function OnboardingFlow({
           placeholder="Sua motivação pra participar da mentoria"
         />
       </div>
-      {/* consent_lgpd → consentPatch grava o carimbo; unchecked não manda
-          a chave e não apaga um carimbo já existente */}
-      <label className="flex items-start gap-2 text-sm cursor-pointer">
-        <input
-          type="checkbox"
-          name="consent_lgpd"
-          checked={consent}
-          onChange={(e) => setConsent(e.target.checked)}
-          className="mt-0.5 size-4 shrink-0 accent-primary"
-        />
-        <span>
-          Autorizo o uso dos meus dados do cadastro no programa (LGPD).
-        </span>
-      </label>
     </div>
   );
 
   const PASSOS_SOBRE = [passoSobreIdentidade, passoSobreProfissional, passoSobreMotivacao];
+
+  // sub-passos burocráticos já preenchidos pela importação da coordenação
+  // viram resumo compacto com "Corrigir" — "o que te move" fica sempre
+  // aberto porque interesses/motivação são o dado que alimenta o matching
+  const sobrePreenchido = [
+    !!(nascimento && genero && cidade && uf),
+    !!(cargo && empresa),
+    false,
+  ];
+  const resumoItensSobre: [string, string][][] = [
+    [
+      ["Nome social", nomeSocial],
+      [
+        "Nascimento",
+        nascimento
+          ? new Date(nascimento + "T00:00:00").toLocaleDateString("pt-BR")
+          : "",
+      ],
+      ["Gênero", GENERO_LABELS[genero as keyof typeof GENERO_LABELS] ?? genero],
+      ["Cidade", [cidade, uf].filter(Boolean).join("/")],
+    ],
+    [
+      ["Cargo", cargo],
+      ["Empresa", empresa],
+      ["Como chegou", origem],
+    ],
+    [],
+  ];
+  const resumoSobre = (sub: number) => (
+    <div className="rounded-2xl border border-border bg-card px-4 py-3.5">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-medium">Já temos esses dados do cadastro</p>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={() => setEditarSobre((s) => ({ ...s, [sub]: true }))}
+        >
+          Corrigir
+        </Button>
+      </div>
+      <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2.5">
+        {resumoItensSobre[sub]
+          .filter(([, v]) => v)
+          .map(([rotulo, valor]) => (
+            <div key={rotulo} className="min-w-0">
+              <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                {rotulo}
+              </dt>
+              <dd className="truncate text-sm">{valor}</dd>
+            </div>
+          ))}
+      </dl>
+    </div>
+  );
 
   /** Passo "Pareamento" (mentor, 0034) — o que ajuda a coordenação a escolher
    *  a dupla: preferência de gênero do par + a bagagem que entra na ficha. */
@@ -503,15 +570,17 @@ export function OnboardingFlow({
       case 0:
         return `Bem-vindo(a) ao Realiza.vc, ${primeiroNome}!`;
       case 1:
-        return "O que você pode fazer aqui";
+        return "Antes de tudo: duas confirmações";
       case 2:
-        return "Uma foto ajuda as pessoas a te reconhecer";
+        return "O que você pode fazer aqui";
       case 3:
-        return "Conte sua trajetória em poucas linhas";
+        return "Uma foto ajuda as pessoas a te reconhecer";
       case 4:
-        return "No que você pode ajudar?";
+        return "Conte sua trajetória em poucas linhas";
       case 5:
-        // case 5 é passo de mentor — pra coord/supervisor o índice 5 é o
+        return "No que você pode ajudar?";
+      case 6:
+        // case 6 é passo de mentor — pra coord/supervisor o índice 6 é o
         // fechamento ("Tudo certo"), não os campos de LinkedIn
         return ehMentor ? "Pra fechar: LinkedIn e voluntariado" : `Tudo certo, ${primeiroNome}!`;
       default:
@@ -525,7 +594,7 @@ export function OnboardingFlow({
     if (step === passoSobre + 1)
       return "Cargo, empresa e como você chegou: contexto rápido pra equipe te conhecer.";
     if (step === passoSobre + 2)
-      return "Interesses e motivação alimentam o matching e ficam só com a coordenação. O consentimento fecha a ficha.";
+      return "Interesses e motivação alimentam o matching e ficam só com a coordenação.";
     if (ehMentor && step === PASSO_PAREAMENTO)
       return "A coordenação usa isso pra escolher a dupla: tudo opcional, dá pra completar depois no Perfil.";
     if (ehMentor && step === PASSO_DISPONIBILIDADE)
@@ -538,14 +607,16 @@ export function OnboardingFlow({
       case 0:
         return "A plataforma do Programa de Mentoria Social: a jornada da sua dupla, os registros e os materiais oficiais num lugar só.";
       case 1:
-        return "O essencial da sua rotina no programa cabe nesta tela.";
+        return "Rapidinho: diz se você atua como voluntário(a) e autoriza o uso dos dados do cadastro.";
       case 2:
-        return "Aparece no seu perfil e nas duplas.";
+        return "O essencial da sua rotina no programa cabe nesta tela. Passe o cursor ou toque nos itens pra espiar as telas de verdade.";
       case 3:
-        return "O que você faz, o que estudou, o que te trouxe ao programa. Aparece no seu perfil pra equipe e pros mentorados.";
+        return "Aparece no seu perfil e nas duplas.";
       case 4:
-        return "Toque pra selecionar ou digite uma nova. Dá pra mudar depois no seu perfil.";
+        return "O que você faz, o que estudou, o que te trouxe ao programa. Aparece no seu perfil pra equipe e pros mentorados.";
       case 5:
+        return "Toque pra selecionar ou digite uma nova. Dá pra mudar depois no seu perfil.";
+      case 6:
         return ehMentor
           ? "Os dois são opcionais e ajudam a equipe e os mentorados a te conhecerem melhor."
           : "Seu perfil já está visível pra equipe. Dá pra completar ou mudar tudo depois em Perfil.";
@@ -560,7 +631,7 @@ export function OnboardingFlow({
   // o default do switch é o índice final, mas o boas-vindas (step 0) cai
   // nele também — sem o gate a nag aparecia antes da jornada começar
   const corpoFechamento =
-    ultimo && temTermo && !termoOk && souVoluntario ? (
+    ultimo && temTermo && !termoOk ? (
       <p className="rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed text-muted-foreground">
         Falta só o termo de adesão ao voluntariado: assine quando puder pelo
         banner da sua home ou em{" "}
@@ -575,42 +646,21 @@ export function OnboardingFlow({
     ) : null;
 
   const corpo = (() => {
-    if (step >= passoSobre && step < passoSobre + SUBPASSOS_SOBRE)
-      return PASSOS_SOBRE[step - passoSobre];
+    if (step >= passoSobre && step < passoSobre + SUBPASSOS_SOBRE) {
+      const sub = step - passoSobre;
+      return sobrePreenchido[sub] && !editarSobre[sub]
+        ? resumoSobre(sub)
+        : PASSOS_SOBRE[sub];
+    }
     if (ehMentor && step === PASSO_PAREAMENTO) return passoPareamento;
     if (ehMentor && step === PASSO_DISPONIBILIDADE) return passoDisponibilidade;
     // o termo tem form próprio (AssinaturaForm) — intercepta antes do switch
-    // porque o índice colide com o case 5 (linkedin) pra coord/supervisor
+    // porque o índice colide com o case 6 (linkedin) pra coord/supervisor
     if (ehPassoTermo) {
-      // mesma caixa do cadastro da coord: quem não é voluntário de fato se
-      // corrige aqui em vez de carregar a pendência pra sempre
-      const caixaVoluntario = (
-        <label className="flex items-center gap-2 text-sm cursor-pointer">
-          <input
-            type="checkbox"
-            checked={souVoluntario}
-            onChange={(e) => setSouVoluntario(e.target.checked)}
-            className="accent-primary"
-          />
-          Sou voluntário(a)
-        </label>
-      );
-      if (!souVoluntario) {
-        return (
-          <div className="space-y-4">
-            {caixaVoluntario}
-            <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
-              Sem trabalho voluntário o termo não se aplica: sua ficha segue
-              sem ele e a coordenação fica sabendo.
-            </p>
-          </div>
-        );
-      }
       // demo: só leitura — botão de assinar que sempre falha é má UX
       if (demo) {
         return (
           <div className="space-y-4">
-            {caixaVoluntario}
             <TermoVoluntarioDoc civis={civis} />
             <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
               Na demonstração a assinatura não é gravada. No cadastro real é
@@ -621,7 +671,6 @@ export function OnboardingFlow({
       }
       return (
         <div className="space-y-4">
-          {caixaVoluntario}
           <TermoVoluntarioDoc
             civis={civis}
             continuar={{
@@ -650,23 +699,115 @@ export function OnboardingFlow({
       );
     }
     switch (step) {
-      case 1:
+      case PASSO_DECLARACOES: {
+        const lgpdCarimbado = me.consent_lgpd_em;
         return (
-          <ul className="space-y-2">
-            {RECURSOS[me.role ?? "mentor_dpp"].map((r) => (
-              <li
-                key={r.texto}
-                className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3"
-              >
-                <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
-                  <r.icon size={18} weight="fill" aria-hidden />
-                </span>
-                <span className="text-sm leading-snug">{r.texto}</span>
-              </li>
-            ))}
-          </ul>
+          <div className="space-y-3">
+            <CaixaSelecao
+              icon={HandHeart}
+              titulo="Sou voluntário(a)"
+              descricao="O programa é trabalho voluntário: quem se declara assina o termo de adesão no final do cadastro."
+              checked={souVoluntario}
+              onCheckedChange={(v) => setSouVoluntario(v)}
+            />
+            {lgpdCarimbado ? (
+              <CaixaSelecao
+                icon={ShieldCheck}
+                titulo="Uso dos meus dados (LGPD)"
+                descricao={`Consentimento registrado em ${new Date(lgpdCarimbado).toLocaleDateString("pt-BR")}.`}
+                checked
+                disabled
+              />
+            ) : (
+              <CaixaSelecao
+                icon={ShieldCheck}
+                titulo="Autorizo o uso dos meus dados"
+                descricao="Cadastro e ficha ficam visíveis pra coordenação e pra sua dupla — é o que o programa precisa pra funcionar."
+                checked={consent}
+                onCheckedChange={(v) => setConsent(v)}
+              />
+            )}
+            {/* voluntário com termo já assinado: o passo do termo não existe
+                no fim — a nota confirma o estado em vez de anunciar pendência */}
+            {souVoluntario && assinaturaTermo?.status === "assinado" && (
+              <p className="px-1 text-xs leading-relaxed text-muted-foreground">
+                Termo de adesão ao voluntariado: assinado. Ele fica na sua
+                home se você quiser reler.
+              </p>
+            )}
+          </div>
         );
-      case 2:
+      }
+      case 2: {
+        const recursos = RECURSOS[me.role ?? "mentor_dpp"];
+        const comImg = recursos.filter((r) => r.img);
+        return (
+          <div className="space-y-4">
+            {/* hero estreito: a home do papel é o print de capa — o swap por
+                hover/foco só existe no desktop, onde a lista fica ao lado */}
+            {comImg.length > 0 && (
+              <MolduraTela className="sm:hidden">
+                <div className="relative aspect-[4/3]">
+                  <Image
+                    src={`/onboarding/${me.role ?? "mentor_dpp"}-home-m.jpg`}
+                    alt={comImg[0]?.alt ?? ""}
+                    fill
+                    sizes="(max-width: 640px) 100vw, 0px"
+                    className="object-cover object-top"
+                  />
+                </div>
+              </MolduraTela>
+            )}
+            <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,52%)] sm:items-start sm:gap-5">
+              <ul className="space-y-2">
+                {recursos.map((r, i) => (
+                  <li
+                    key={r.texto}
+                    tabIndex={r.img ? 0 : undefined}
+                    onMouseEnter={() => r.img && setRecursoAtivo(i)}
+                    onFocus={() => r.img && setRecursoAtivo(i)}
+                    className={cn(
+                      "flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 outline-none transition-colors",
+                      r.img &&
+                        "cursor-default hover:border-foreground/30 focus-visible:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring/40",
+                      i === recursoAtivo && r.img && "border-primary/50"
+                    )}
+                  >
+                    <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
+                      <r.icon size={18} weight="fill" aria-hidden />
+                    </span>
+                    <span className="text-sm leading-snug">{r.texto}</span>
+                  </li>
+                ))}
+              </ul>
+              {/* painel com crossfade: cada recurso com print troca a tela —
+                  os itens sem print mantêm o último exibido */}
+              {comImg.length > 0 && (
+                <MolduraTela className="mt-4 hidden sm:mt-0 sm:block">
+                  <div className="relative aspect-[8/5]">
+                    {comImg.map((r) => (
+                      <Image
+                        key={r.img}
+                        src={r.img!}
+                        alt={recursos.indexOf(r) === recursoAtivo ? (r.alt ?? "") : ""}
+                        fill
+                        sizes="(min-width: 640px) 480px, 0px"
+                        className={cn(
+                          "object-cover object-top transition-opacity duration-300",
+                          recursos.indexOf(r) === recursoAtivo
+                            ? "opacity-100"
+                            : "opacity-0"
+                        )}
+                      />
+                    ))}
+                  </div>
+                </MolduraTela>
+              )}
+            </div>
+          </div>
+        );
+      }
+      case 3:
         return (
           <div className="flex flex-col items-center gap-3 py-1">
             <span className="grid size-24 place-items-center overflow-hidden rounded-full bg-muted text-muted-foreground ring-1 ring-border">
@@ -699,7 +840,7 @@ export function OnboardingFlow({
             </Button>
           </div>
         );
-      case 3:
+      case 4:
         return (
           <div className="space-y-2">
             <div className="flex items-baseline justify-between gap-2">
@@ -719,7 +860,7 @@ export function OnboardingFlow({
             />
           </div>
         );
-      case 4:
+      case 5:
         return (
           <div className="space-y-2">
             {/* rótulo de grupo, não de controle — o input livre do TagInput
@@ -734,8 +875,8 @@ export function OnboardingFlow({
             />
           </div>
         );
-      case 5:
-        // passo de mentor — pra coord/supervisor o índice 5 já é o
+      case 6:
+        // passo de mentor — pra coord/supervisor o índice 6 já é o
         // fechamento; cair aqui renderizaria campos fora do <form>
         if (!ehMentor) return corpoFechamento;
         return (
@@ -863,11 +1004,11 @@ export function OnboardingFlow({
               {/* no termo o ghost é "Assinar depois": avança sem gravar —
                   a pendência segue como ausência de assinatura. Na demo o
                   Continuar primário já cobre o pulo, sem ghost duplicado */}
-              {(passoComCampos || !demo) && !(ehPassoTermo && !souVoluntario) && (
+              {(passoComCampos || !demo) && (
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={avancarDoTermo}
+                  onClick={avancar}
                   disabled={pending}
                 >
                   {ehPassoTermo ? "Assinar depois" : "Agora não"}
@@ -894,7 +1035,7 @@ export function OnboardingFlow({
               No passo do termo o primário some: o submit mora dentro do
               AssinaturaForm e um "Continuar" ao lado de "Assinar depois"
               seria ambíguo; na demo (só leitura) ele volta */}
-          {(!ehPassoTermo || demo || !souVoluntario) && (
+          {(!ehPassoTermo || demo) && (
             <Button
               type="button"
               onClick={() => {
@@ -904,8 +1045,8 @@ export function OnboardingFlow({
                   )?.requestSubmit();
                 } else if (ultimo) {
                   concluir();
-                } else if (ehPassoTermo) {
-                  avancarDoTermo();
+                } else if (step === PASSO_DECLARACOES) {
+                  avancarDasDeclaracoes();
                 } else {
                   avancar();
                 }
@@ -914,7 +1055,7 @@ export function OnboardingFlow({
               className="h-11 flex-1 font-semibold"
             >
               {pending
-                ? ultimo || (ehPassoTermo && souVoluntario)
+                ? ultimo || ehPassoTermo
                   ? "Entrando…"
                   : "Salvando…"
                 : ultimo

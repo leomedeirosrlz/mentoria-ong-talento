@@ -15,7 +15,7 @@ import { enviarEmailsIndividuais, SITE_URL } from "./email";
 import { emailDocumentoAssinatura } from "./email-templates";
 import { ipCliente } from "./ip";
 import { DEMO_MSG } from "./demo/shared";
-import { capitalizar, cpfValido, erroAmigavel, nomeProprio } from "./utils";
+import { capitalizar, cpfValido, nomeProprio } from "./utils";
 import type { DadosCivis, Endereco, ResponsavelCivis } from "./types";
 
 // Actions do fluxo de assinatura eletrônica (0033). Toda escrita vai por RPC
@@ -674,24 +674,6 @@ export async function assinarTermo(formData: FormData) {
   if (error) return { error: "Não foi possível registrar a assinatura. Tente de novo." };
   revalidatePath("/", "layout");
   return { ok: true, id: data };
-}
-
-/** Auto-declaração no onboarding: a coordenação classifica `voluntario` no
- *  cadastro, mas quem foi marcado por engano não tinha saída — a pendência
- *  do termo ficava pedindo assinatura pra sempre. No passo do termo a
- *  pessoa pode desmarcar "Sou voluntário(a)" e a flag volta ao correto
- *  (coluna fora do guard_profiles_self_columns — self-update direto). */
-export async function declararVoluntario(voluntario: boolean) {
-  if (await demoAtivo()) return { error: DEMO_MSG };
-  const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  const { error } = await supabase
-    .from("profiles")
-    .update({ voluntario })
-    .eq("id", eu.id);
-  if (error) return { error: erroAmigavel(error) };
-  revalidatePath("/", "layout");
-  return { ok: true };
 }
 
 // ---------- signatário por token (autorização do responsável) ----------

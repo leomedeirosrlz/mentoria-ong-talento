@@ -4482,11 +4482,17 @@ export async function salvarOnboarding(formData: FormData) {
   if ("error" in apresentacao) return { error: apresentacao.error };
   const ficha = camposFicha(formData, { de: "pessoa", parcial: true });
   if ("error" in ficha) return { error: ficha.error };
-  const patch = {
+  const patch: Record<string, unknown> = {
     ...apresentacao,
     ...ficha,
     ...consentPatch(formData, eu.consent_lgpd_em),
   };
+  // passo "Declarações" do wizard (0142): checkbox desmarcado não posta —
+  // a sentinela decl_voluntario marca que o passo existiu, senão uma
+  // desmarcação nunca chegaria ao banco
+  if (formData.has("decl_voluntario")) {
+    patch.voluntario = formData.get("voluntario") === "on";
+  }
   if (Object.keys(patch).length > 0) {
     const { error } = await supabase
       .from("profiles").update(patch).eq("id", eu.id);
