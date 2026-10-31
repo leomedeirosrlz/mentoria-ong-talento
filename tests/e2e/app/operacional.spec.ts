@@ -138,7 +138,7 @@ test.describe("coordenação — fluxos operacionais", () => {
     await restaurarFixtures();
   });
 
-  test("pessoas: fila 'Aguardando par' lista o mentorado sem par", async ({
+  test("pessoas: fila 'Aguardando par' abre fechada e lista o mentorado sem par", async ({
     page,
   }) => {
     await page.goto("/pessoas");
@@ -146,7 +146,10 @@ test.describe("coordenação — fluxos operacionais", () => {
     const fila = page.locator(
       'section[aria-labelledby="fila-espera-titulo"]'
     );
-    await expect(fila.getByText(/Aguardando par · \d+/)).toBeVisible();
+    // a tela abre com o card fechado — a coord expande se precisar
+    const gatilho = fila.getByRole("button", { name: /Aguardando par ·/ });
+    await expect(gatilho).toHaveAttribute("aria-expanded", "false");
+    await gatilho.click();
     // a mentorada fixture nunca teve dupla — espera na coluna de mentorados
     await expect(
       fila.getByRole("link", { name: "Abrir perfil de Mentorada E2E Livre" })
@@ -486,8 +489,7 @@ test.describe("coordenação — fluxos operacionais", () => {
       'section[aria-labelledby="fila-espera-titulo"]'
     );
     await expect(card.getByText(/Aguardando par · \d+/)).toBeVisible();
-    // o card lembra o estado no localStorage — contexto novo abre por
-    // default, mas a guarda cobre um run que herde preferência fechada
+    // o card abre fechado por padrão — expande antes de entrar no Parear
     const gatilho = card.getByRole("button", {
       name: /Aguardando par ·/,
     });
@@ -534,8 +536,20 @@ test.describe("coordenação — fluxos operacionais", () => {
     await colMentorados
       .getByRole("radio", { name: /Mentorada E2E Livre/ })
       .click();
+    // a lista fixa de mentores NUNCA vira esqueleto quando o outro lado é
+    // clicado — enquanto o rank recalcula só o bloco de sugestões mostra
+    // a linha "buscando"; as linhas (e a seleção) ficam no lugar
+    await expect(linhaReserva).toBeVisible();
+    await expect(
+      colMentores.getByRole("radio", { name: /Mentor E2E Import/ })
+    ).toBeVisible();
     await linhaReserva.click();
     await expect(linhaReserva).toHaveAttribute("aria-checked", "true");
+    // idem pro lado oposto: a mentorada escolhida continua marcada e
+    // visível com o rank dos mentorados recalculando
+    await expect(
+      colMentorados.getByRole("radio", { name: /Mentorada E2E Livre/ })
+    ).toHaveAttribute("aria-checked", "true");
     await expect(card.getByText("Afinidade do par")).toBeVisible();
     // mentor cheio selecionado: o aviso explica o caminho (aumentar a
     // capacidade) em vez de esconder a opção
