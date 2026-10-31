@@ -25,12 +25,14 @@ import {
 import { msgAguardandoPar } from "@/lib/whatsapp-msgs";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
+import { idade } from "@/lib/ciclo";
 import { Avatar } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { WhatsAppRapido } from "@/components/whatsapp-rapido";
 import { MentoradoActions } from "@/components/mentorado-actions";
 import { PessoaActions } from "@/components/pessoa-actions";
+import type { DocsPessoa } from "@/components/pessoas-listas";
 import { AfinidadePar } from "@/components/matching-afinidade";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
@@ -72,6 +74,7 @@ export function FilaEspera({
   mentoresDpp,
   mentorProfiles,
   ocupacao,
+  assinaturas,
 }: {
   mentorados: FilaItem[];
   mentores: FilaItem[];
@@ -91,6 +94,10 @@ export function FilaEspera({
   mentorProfiles: Record<string, MentorProfile>;
   /** Ocupação por `${mentorId}:${trilha}` — aqui só a chave :dpp interessa. */
   ocupacao: Record<string, number>;
+  /** Resumo de assinaturas por id de pessoa — alimenta a restrição de
+   *  documento do jovem no card de afinidade (status real: emitida,
+   *  enviada, assinada). Mesmo mapa dos badges da lista. */
+  assinaturas?: Record<string, DocsPessoa>;
 }) {
   const total = mentorados.length + mentores.length;
   // congelado na hidratação — o "há N dias" não pode divergir do SSR
@@ -282,6 +289,39 @@ export function FilaEspera({
   const mpSel = mentorSelObj ? mentorProfiles[mentorSelObj.id] : undefined;
   const mentorLotado =
     mentorSelObj != null && usadasDe(mentorSelObj.id) >= tetoDe(mentorSelObj.id);
+
+  // status real do documento do jovem — mesma regra dos badges da lista:
+  // menor → autorização (documento_path também vale), maior → termo.
+  // "assinado" resolve a restrição; "enviado"/"nao_emitido" viram aviso.
+  const docsJovem = mentoradoSelObj
+    ? assinaturas?.[mentoradoSelObj.id]
+    : undefined;
+  const docJovem = mentoradoSelObj
+    ? (() => {
+        const anos = idade(mentoradoSelObj.data_nascimento);
+        const menor = anos != null && anos < 18;
+        const slug: "autorizacao-responsavel" | "termo-mentorando" = menor
+          ? "autorizacao-responsavel"
+          : "termo-mentorando";
+        const assinado =
+          (menor && Boolean(mentoradoSelObj.documento_path)) ||
+          Boolean(docsJovem?.assinado[slug]);
+        return {
+          slug,
+          status: assinado
+            ? ("assinado" as const)
+            : docsJovem?.pendente.includes(slug)
+              ? ("enviado" as const)
+              : ("nao_emitido" as const),
+        };
+      })()
+    : undefined;
+
+  // o par veio de uma sugestão semântica — seja o mentor sugerido pro
+  // jovem marcado, seja o jovem sugerido pro mentor
+  const sugeridoSemantico =
+    (selMentorEf != null && sugeridosMentores.has(selMentorEf)) ||
+    (selMentoradoEf != null && sugeridosMentorados.has(selMentoradoEf));
 
   return (
     <Collapsible.Root open={open} onOpenChange={mudaOpen}>
@@ -536,7 +576,10 @@ export function FilaEspera({
                   <AfinidadePar
                     temasMentor={temasParEf?.mentor}
                     temasMentorado={temasParEf?.mentorado}
+                    docJovem={docJovem}
+                    sugeridoSemantico={sugeridoSemantico}
                     mentor={{
+                      id: mentorSelObj.id,
                       nome: mentorSelObj.nome,
                       interesses: mentorSelObj.interesses,
                       cidade: mentorSelObj.cidade,
@@ -550,6 +593,7 @@ export function FilaEspera({
                       areas: mpSel?.areas ?? null,
                     }}
                     mentorado={{
+                      id: mentoradoSelObj.id,
                       nome: mentoradoSelObj.nome,
                       interesses: mentoradoSelObj.interesses,
                       cidade: mentoradoSelObj.cidade,

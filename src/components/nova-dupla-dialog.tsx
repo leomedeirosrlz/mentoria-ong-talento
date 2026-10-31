@@ -626,6 +626,7 @@ export function NovaDuplaDialog({
           {mentorSelObj && mentoradoSelObj && (
             <AfinidadePar
               mentor={{
+                id: mentorSelObj.id,
                 nome: mentorSelObj.nome,
                 interesses: mentorSelObj.interesses,
                 cidade: mentorSelObj.cidade,
@@ -642,6 +643,7 @@ export function NovaDuplaDialog({
                 areas: fichaMentor.get(mentorSelObj.id)?.areas ?? null,
               }}
               mentorado={{
+                id: mentoradoSelObj.id,
                 nome: mentoradoSelObj.nome,
                 interesses: mentoradoSelObj.interesses,
                 cidade: mentoradoSelObj.cidade,

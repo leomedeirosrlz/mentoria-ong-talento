@@ -594,6 +594,7 @@ export function PessoasListas({
           mentoresDpp={mentoresDpp}
           mentorProfiles={mentorProfiles}
           ocupacao={contagemPorMentor}
+          assinaturas={assinaturas}
         />
       )}
 
