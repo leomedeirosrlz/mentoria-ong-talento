@@ -972,8 +972,16 @@ export function OnboardingFlow({
         </div>
       </header>
 
-      {/* coluna central — pb/pt compensam header e footer fixos */}
-      <main className="mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col justify-center px-4 pb-32 pt-20 sm:px-6">
+      {/* coluna central — pb/pt compensam header e footer fixos. O passo de
+          recursos com telas reais respira em desktop (balão apertado deixava
+          o print ilegível); os demais passos ficam na coluna estreita de
+          conversa */}
+      <main
+        className={cn(
+          "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col justify-center px-4 pb-32 pt-20 transition-[max-width] duration-500 sm:px-6",
+          step === 2 && "sm:max-w-4xl"
+        )}
+      >
         <Logo size="sm" className="mb-6 self-start" />
         <div key={step} className="animate-rise">
           <div className="rounded-3xl rounded-bl-md border border-border bg-card px-5 py-4">
@@ -1000,7 +1008,7 @@ export function OnboardingFlow({
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
           {(passoComCampos || ehPassoTermo) && (
-            <div className="flex shrink-0 flex-col items-start">
+            <div className="flex shrink-0 flex-wrap items-center gap-x-1">
               {/* no termo o ghost é "Assinar depois": avança sem gravar —
                   a pendência segue como ausência de assinatura. Na demo o
                   Continuar primário já cobre o pulo, sem ghost duplicado */}
