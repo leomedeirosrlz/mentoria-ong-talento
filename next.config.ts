@@ -38,6 +38,12 @@ const CSP = [
 const nextConfig: NextConfig = {
   // sem "X-Powered-By: Next.js" — banner de stack não ajuda ninguém
   poweredByHeader: false,
+  // router cache do cliente: tela dinâmica revisitada em até 30s renderiza
+  // do payload guardado em vez de refazer todas as queries no banco. As
+  // actions já invalidam com revalidatePath — escrita continua fresca.
+  experimental: {
+    staleTimes: { dynamic: 30 },
+  },
   // build autocontido pro deploy em Docker fora da Vercel: gera
   // .next/standalone (server.js + node_modules traçado) — a imagem final
   // carrega standalone + static + public apenas

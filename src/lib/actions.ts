@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AVATAR_MAX_BYTES, avisoImagemGrande } from "@/lib/avatar";
@@ -85,6 +85,13 @@ const comPapeis = <T extends { role: AppRole | null }>(
     ],
   };
 };
+
+/** materiais fica em cache compartilhado (queries.ts) — a tag expira a
+ *  entrada pra todo mundo, não só pra quem escreveu. */
+function revalidaMateriais() {
+  updateTag("materiais");
+  revalidatePath("/materiais");
+}
 
 async function me() {
   const supabase = await createClient();
@@ -2483,7 +2490,7 @@ export async function deleteMaterial(id: string) {
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
-  revalidatePath("/materiais");
+  revalidaMateriais();
   return { ok: true };
 }
 
@@ -3895,7 +3902,7 @@ export async function marcarAconteceuJovem(encontroId: string) {
   revalidatePath("/");
   revalidatePath("/agenda");
   revalidatePath("/duplas");
-  revalidatePath("/materiais");
+  revalidaMateriais();
   if (enc?.dupla_id) revalidatePath(`/duplas/${enc.dupla_id}`);
   return { ok: true };
 }
@@ -4056,7 +4063,7 @@ export async function salvarMaterial(formData: FormData) {
         ? ["mentorado"]
         : undefined,
   });
-  revalidatePath("/materiais");
+  revalidaMateriais();
   // id volta pro client poder desfazer a row se o upload do arquivo falhar
   return { ok: true, id: novo.id as string, emailFalhas: email.falhas };
 }
@@ -4116,7 +4123,7 @@ export async function editarMaterial(id: string, formData: FormData) {
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
-  revalidatePath("/materiais");
+  revalidaMateriais();
   return { ok: true };
 }
 
@@ -4135,7 +4142,7 @@ export async function anexarArquivoMaterial(id: string, path: string) {
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
-  revalidatePath("/materiais");
+  revalidaMateriais();
   return { ok: true };
 }
 
@@ -4151,7 +4158,7 @@ export async function removerArquivoMaterial(id: string) {
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
-  revalidatePath("/materiais");
+  revalidaMateriais();
   return { ok: true };
 }
 

@@ -9,7 +9,7 @@
 // inicio_em/fim_em/encontros_esperados do cronograma são derivados dos
 // eventos (mesma conta do backfill da 0061) — recalculados a cada mutação.
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
@@ -52,6 +52,10 @@ async function meCoord(): Promise<Gate> {
  *  (semáforo/trilha medem contra o calendário da dupla) e /registros (o título
  *  do encontro por nº vem do evento). */
 function revalidaCronograma(cronogramaId?: string) {
+  // caches compartilhados de queries.ts (ciclo_eventos + cronogramas) —
+  // expire imediato pra quem escreveu já ler o valor novo nesta ação
+  updateTag("ciclo-eventos");
+  updateTag("cronogramas");
   revalidatePath("/turmas");
   if (cronogramaId) revalidatePath(`/turmas/${cronogramaId}`);
   revalidatePath("/agenda");

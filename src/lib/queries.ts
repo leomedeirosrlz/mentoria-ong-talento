@@ -1,5 +1,8 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { comparaNome, registroTardio } from "./ciclo";
 import { demoLidas, demoOnboarded, demoRole } from "./demo/mode";
 import {
@@ -326,33 +329,59 @@ export const getMe = cache(async (): Promise<Profile | null> => {
     : null;
 });
 
-export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
-  const demo = await demoRole();
-  if (demo) return demoCicloEventos();
-  const supabase = await createClient();
-  const { data, error } = await supabase
+// Leituras de referência do programa (ciclo_eventos, cronogramas,
+// materiais): mesmo resultado pra qualquer papel. Com service key elas vão
+// por cache compartilhado entre requests/usuários (unstable_cache — o
+// createClient de sessão é proibido lá dentro por ler cookies; quem escreve
+// invalida via updateTag e o revalidate é só rede de segurança). Sem a key
+// (dev solto sem .env.staging) caem no caminho de sessão — mesmo SQL.
+async function buscaCicloEventos(db: SupabaseClient) {
+  const { data, error } = await db
     .from("ciclo_eventos")
     .select("*")
     // a ordem canônica é `ordem` (0062) — data nullable jogaria etapas
     // concluídas pro fim da lista; quem precisa de data refiltra por tipo
     .order("ordem", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as CicloEvento[];
+}
+
+const cicloEventosDb = unstable_cache(
+  () => buscaCicloEventos(createServiceClient()),
+  ["ciclo-eventos"],
+  { tags: ["ciclo-eventos"], revalidate: 3600 }
+);
+
+export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
+  const demo = await demoRole();
+  if (demo) return demoCicloEventos();
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) return cicloEventosDb();
+  return buscaCicloEventos(await createClient());
 });
 
 /** Todos os cronogramas (0061) — leitura livre pra qualquer papel, como os
  *  eventos: o seletor de turma/calendário é a régua que escopa o recorte. */
-export const getCronogramas = cache(async (): Promise<Cronograma[]> => {
-  const demo = await demoRole();
-  if (demo) return demoCronogramas();
-  const supabase = await createClient();
-  const { data, error } = await supabase
+async function buscaCronogramas(db: SupabaseClient) {
+  const { data, error } = await db
     .from("cronogramas")
     .select("*")
     .order("turma")
     .order("nome");
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as Cronograma[];
+}
+
+const cronogramasDb = unstable_cache(
+  () => buscaCronogramas(createServiceClient()),
+  ["cronogramas"],
+  { tags: ["cronogramas"], revalidate: 3600 }
+);
+
+export const getCronogramas = cache(async (): Promise<Cronograma[]> => {
+  const demo = await demoRole();
+  if (demo) return demoCronogramas();
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) return cronogramasDb();
+  return buscaCronogramas(await createClient());
 });
 
 export const DUPLA_SELECT = `
@@ -707,16 +736,26 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   return null;
 });
 
-export const getMateriais = cache(async (): Promise<Material[]> => {
-  const demo = await demoRole();
-  if (demo) return demoMateriais(demo);
-  const supabase = await createClient();
-  const { data, error } = await supabase
+async function buscaMateriais(db: SupabaseClient) {
+  const { data, error } = await db
     .from("materiais")
     .select("*")
     .order("ordem", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as Material[];
+}
+
+const materiaisDb = unstable_cache(
+  () => buscaMateriais(createServiceClient()),
+  ["materiais"],
+  { tags: ["materiais"], revalidate: 3600 }
+);
+
+export const getMateriais = cache(async (): Promise<Material[]> => {
+  const demo = await demoRole();
+  if (demo) return demoMateriais(demo);
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) return materiaisDb();
+  return buscaMateriais(await createClient());
 });
 
 /** mentor_profiles é table-level legível por autenticado (0001) — a lista
