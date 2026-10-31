@@ -177,6 +177,8 @@ async function extrairTemas(doc) {
         Authorization: `Bearer ${IA_KEY}`,
         "Content-Type": "application/json",
         "User-Agent": "realiza-vetorizar/1.0",
+        // Go exige a sessão mesmo em batch — id fixo agrupa o backfill
+        "x-opencode-session": "vetorizar-pessoas-backfill",
       },
       body: JSON.stringify({
         model: IA_MODEL,

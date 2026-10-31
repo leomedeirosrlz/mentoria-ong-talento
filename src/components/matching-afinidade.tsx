@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { CaretDown, Check, Warning } from "@phosphor-icons/react";
+import { CaretDown, Warning } from "@phosphor-icons/react";
 import { Collapsible } from "@base-ui/react/collapsible";
 import {
   celulasComuns,
@@ -120,6 +120,39 @@ function prefAtendida(quem: LadoAfinidade, outro: LadoAfinidade): boolean {
   );
 }
 
+/** Campo "Pref. de par" de um lado — texto + dot: atendida verde,
+ *  conflito vermelho, indiferente/não informado neutro. */
+function campoPref(
+  quem: LadoAfinidade,
+  outro: LadoAfinidade,
+  papel: "mentor" | "mentorado"
+): { estado: EstadoCampo; texto: string } {
+  const pref = quem.pref_genero_par;
+  if (!pref) return { estado: "neutro", texto: "Não informou" };
+  if (pref === "indiferente") return { estado: "neutro", texto: "Sem preferência" };
+  const rotulo =
+    papel === "mentorado"
+      ? pref === "feminino"
+        ? "mentora"
+        : "mentor"
+      : pref === "feminino"
+        ? "mentorada"
+        : "mentorado";
+  const g = outro.genero;
+  if (!g || g === "prefiro_nao_dizer") {
+    return {
+      estado: "neutro",
+      texto: `Quer ${rotulo} — ${primeiroNome(outro.nome)} não informou`,
+    };
+  }
+  return g === pref
+    ? { estado: "ok", texto: `Quer ${rotulo} — atendido` }
+    : {
+        estado: "diverge",
+        texto: `Quer ${rotulo} — ${primeiroNome(outro.nome)} é ${GENERO_LABELS[g].toLocaleLowerCase("pt-BR")}`,
+      };
+}
+
 const local = (l: LadoAfinidade) =>
   [l.cidade, l.uf].filter(Boolean).join("/");
 
@@ -223,27 +256,59 @@ const NA = (
   <span className="italic text-muted-foreground/80">Não informado</span>
 );
 
-/** Coluna de um participante dentro de "Ver detalhes" — mesmas famílias de
- *  campos alinhadas nas duas colunas pra comparação sem esforço. Campos
- *  vazios aparecem como "Não informado" (ausência de informação ≠
- *  ausência de interesse). */
-function ColParticipante({
+/** Estado de um campo comparável entre os dois lados — o dot por linha
+ *  responde a pergunta "esse campo aproxima ou afasta?" sem leitura:
+ *  verde combina, vermelho diverge, cinza neutro (faltou informação ou o
+ *  campo não é comparável). */
+type EstadoCampo = "ok" | "diverge" | "neutro";
+const ESTADO_TXT: Record<EstadoCampo, string> = {
+  ok: "combina",
+  diverge: "diverge",
+  neutro: "não comparável",
+};
+
+function CampoPar({
+  estado,
+  label,
+  children,
+}: {
+  estado: EstadoCampo;
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div>
+      <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+        <span
+          aria-hidden
+          className={cn(
+            "size-2 shrink-0 rounded-full",
+            estado === "ok" && "bg-[var(--ok)]",
+            estado === "diverge" && "bg-[var(--danger)]",
+            estado === "neutro" && "bg-muted-foreground/30"
+          )}
+        />
+        <span className="sr-only">{ESTADO_TXT[estado]}: </span>
+        {label}
+      </p>
+      <div className="mt-0.5 pl-3.5 text-sm">{children}</div>
+    </div>
+  );
+}
+
+/** Card de um lado do par — fica embaixo da coluna de seleção do papel:
+ *  meta no topo e os campos comparáveis empilhados, cada um com o dot
+ *  que diz como ele cruza com o outro lado. */
+function CardLado({
   rotulo,
   lado,
   meta,
-  interesses,
-  comuns,
-  agendaTxt,
-  campos,
+  children,
 }: {
   rotulo: string;
   lado: LadoAfinidade;
-  /** fragmentos da linha de meta (idade, cidade, escolaridade…) */
   meta: (string | null)[];
-  interesses: string[];
-  comuns: ReadonlySet<string>;
-  agendaTxt: string | null;
-  campos: { rotulo: string; valor: string | null | undefined }[];
+  children: React.ReactNode;
 }) {
   return (
     <div className="space-y-2.5 rounded-md border border-border/60 bg-card/60 p-3">
@@ -256,35 +321,27 @@ function ColParticipante({
           {meta.filter(Boolean).join(" · ") || "Sem dados de contato"}
         </p>
       </div>
-      <div>
-        <p className="text-xs font-medium text-muted-foreground">Interesses</p>
-        <div className="mt-1 flex flex-wrap gap-1">
-          {interesses.length
-            ? interesses.map((i) => (
-                <ChipInteresse
-                  key={i}
-                  texto={i}
-                  destaque={comuns.has(normaliza(i))}
-                />
-              ))
-            : NA}
-        </div>
-      </div>
-      <div>
-        <p className="text-xs font-medium text-muted-foreground">Agenda</p>
-        <p className="mt-0.5 text-sm text-muted-foreground">
-          {agendaTxt ?? NA}
-        </p>
-      </div>
-      {campos.map((c) => (
-        <div key={c.rotulo}>
-          <p className="text-xs font-medium text-muted-foreground">
-            {c.rotulo}
-          </p>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {c.valor ?? NA}
-          </p>
-        </div>
+      {children}
+    </div>
+  );
+}
+
+function ChipsLista({
+  itens,
+  comuns,
+}: {
+  itens: string[];
+  comuns?: ReadonlySet<string>;
+}) {
+  if (!itens.length) return NA;
+  return (
+    <div className="flex flex-wrap gap-1">
+      {itens.map((i) => (
+        <ChipInteresse
+          key={i}
+          texto={i}
+          destaque={comuns?.has(normaliza(i)) ?? false}
+        />
       ))}
     </div>
   );
@@ -419,6 +476,55 @@ export function AfinidadePar({
   const generoOk =
     prefAtendida(mentorado, mentor) || prefAtendida(mentor, mentorado);
 
+  // ————— Estado por campo — o dot que diz onde os lados combinam,
+  // divergem ou não se comparam. Mesma regra dos grupos acima:
+  // vermelho só quando os dois informaram e os valores batem de frente.
+  const estadoAgenda: EstadoCampo = !ambosTemAgenda
+    ? "neutro"
+    : temSobreposicao
+      ? "ok"
+      : "diverge";
+  const ambosTemInteresses = intMentor.length > 0 && intMentorado.length > 0;
+  const estadoInteresses: EstadoCampo = !ambosTemInteresses
+    ? "neutro"
+    : comuns.size > 0
+      ? "ok"
+      : "diverge";
+  const temasM = temasMentor ?? [];
+  const temasJ = temasMentorado ?? [];
+  const ambosTemTemas = temasM.length > 0 && temasJ.length > 0;
+  const estadoTemas: EstadoCampo = !ambosTemTemas
+    ? "neutro"
+    : temasComuns.length > 0
+      ? "ok"
+      : "diverge";
+  const setTemasComuns = new Set(temasComuns);
+  const prefJovem = campoPref(mentorado, mentor, "mentorado");
+  const prefMentor = campoPref(mentor, mentorado, "mentor");
+  const docCampo: { estado: EstadoCampo; texto: string } | null = ehMenor
+    ? docJovem?.status === "assinado"
+      ? { estado: "ok", texto: "Autorização assinada" }
+      : {
+          estado: "diverge",
+          texto:
+            docJovem?.status === "enviado"
+              ? "Autorização enviada — aguardando assinatura"
+              : docJovem
+                ? "Autorização ainda não emitida"
+                : "Autorização precisa estar assinada",
+        }
+    : docJovem?.slug === "termo-mentorando"
+      ? docJovem.status === "assinado"
+        ? { estado: "ok", texto: "Termo assinado" }
+        : {
+            estado: "diverge",
+            texto:
+              docJovem.status === "enviado"
+                ? "Termo enviado — aguardando assinatura"
+                : "Termo ainda não emitido",
+          }
+      : null;
+
   // ————— Explicação da sugestão — cada linha sai de um dado real; sem
   // evidência nenhuma a seção diz isso em vez de inventar afinidade
   const motivos: string[] = [];
@@ -452,7 +558,9 @@ export function AfinidadePar({
     motivos.push("Há uma pendência pra resolver antes de formar.");
   }
 
-  const [detalhesAbertos, setDetalhesAbertos] = useState(false);
+  // detalhes nascem expandidos — o inventário completo é o que sustenta
+  // a decisão; fechar é escolha da coord, não o caminho padrão
+  const [detalhesAbertos, setDetalhesAbertos] = useState(true);
 
   return (
     <div className="space-y-4 rounded-lg border border-border bg-muted/30 px-3.5 py-3.5">
@@ -495,90 +603,106 @@ export function AfinidadePar({
         </ul>
       )}
 
-      {/* compatibilidade — evidências que cruzam */}
-      <div className="grid gap-4 sm:grid-cols-[minmax(0,17rem)_minmax(0,1fr)]">
+      {/* os dois lados, cada um embaixo da coluna de seleção do papel —
+          o dot diz onde os dados combinam, divergem ou não se comparam */}
+      <div className="grid gap-3 sm:grid-cols-2">
+        <CardLado
+          rotulo="Mentorado"
+          lado={mentorado}
+          meta={[
+            anos != null ? `${anos} anos` : null,
+            mentorado.genero && mentorado.genero !== "prefiro_nao_dizer"
+              ? GENERO_LABELS[mentorado.genero]
+              : null,
+            local(mentorado) || null,
+            mentorado.escolaridade
+              ? ESCOLARIDADE_LABELS[mentorado.escolaridade]
+              : null,
+            raca(mentorado),
+          ]}
+        >
+          <CampoPar estado={estadoAgenda} label="Agenda">
+            <span className="text-muted-foreground">
+              {agendaJovemTxt ?? NA}
+            </span>
+          </CampoPar>
+          <CampoPar estado={estadoInteresses} label="Interesses">
+            <ChipsLista itens={intMentorado} comuns={comuns} />
+          </CampoPar>
+          {ambosTemTemas && (
+            <CampoPar estado={estadoTemas} label="Temas">
+              <ChipsLista itens={temasJ} comuns={setTemasComuns} />
+            </CampoPar>
+          )}
+          <CampoPar estado={prefJovem.estado} label="Pref. de par">
+            <span className="text-muted-foreground">{prefJovem.texto}</span>
+          </CampoPar>
+          {docCampo && (
+            <CampoPar estado={docCampo.estado} label="Documento">
+              <span className="text-muted-foreground">{docCampo.texto}</span>
+            </CampoPar>
+          )}
+        </CardLado>
+
+        <CardLado
+          rotulo="Mentor"
+          lado={mentor}
+          meta={[
+            mentor.genero && mentor.genero !== "prefiro_nao_dizer"
+              ? GENERO_LABELS[mentor.genero]
+              : null,
+            local(mentor) || null,
+            raca(mentor),
+          ]}
+        >
+          <CampoPar estado={estadoAgenda} label="Agenda">
+            <span className="text-muted-foreground">
+              {agendaTxt ?? NA}
+            </span>
+          </CampoPar>
+          <CampoPar estado={estadoInteresses} label="Interesses">
+            <ChipsLista itens={intMentor} comuns={comuns} />
+          </CampoPar>
+          {ambosTemTemas && (
+            <CampoPar estado={estadoTemas} label="Temas">
+              <ChipsLista itens={temasM} comuns={setTemasComuns} />
+            </CampoPar>
+          )}
+          <CampoPar estado={prefMentor.estado} label="Pref. de par">
+            <span className="text-muted-foreground">{prefMentor.texto}</span>
+          </CampoPar>
+          <CampoPar estado="neutro" label="Áreas">
+            <span className="text-muted-foreground">
+              {mentor.areas?.length ? mentor.areas.join(", ") : NA}
+            </span>
+          </CampoPar>
+        </CardLado>
+      </div>
+
+      {/* evidência compartilhada — onde as duas agendas se sobrepõem */}
+      {temAgenda && (
         <div className="space-y-1.5">
           <p className="text-xs font-medium text-muted-foreground">
             Disponibilidade em comum
           </p>
-          {temAgenda ? (
-            <>
-              <p className="text-sm">
-                {temSobreposicao ? (
-                  <>
-                    <b className="font-semibold tabular-nums">
-                      {agendaComum.length}{" "}
-                      {agendaComum.length === 1 ? "janela" : "janelas"}
-                    </b>{" "}
-                    <span className="text-muted-foreground">
-                      · {disponibilidadeTexto({ celulas: agendaComum })}
-                    </span>
-                  </>
-                ) : (
-                  <b className="font-semibold">Sem coincidência</b>
-                )}
-              </p>
-              <GradeAgendaComum mentor={setMentor} jovem={setJovem} />
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground">
-              Nenhuma agenda informada — os detalhes mostram como preencher.
-            </p>
-          )}
-        </div>
-
-        <div className="space-y-3">
-          {temasComuns.length > 0 && (
-            <div className="space-y-1.5">
-              <p className="text-xs font-medium text-muted-foreground">
-                Temas em comum{" "}
-                <b className="font-semibold text-foreground tabular-nums">
-                  {temasComuns.length}
-                </b>
-              </p>
-              <div className="flex flex-wrap gap-1">
-                {temasComuns.map((t) => (
-                  <ChipInteresse key={t} texto={t} destaque />
-                ))}
-              </div>
-            </div>
-          )}
-
-          <div className="space-y-1.5">
-            <p className="text-xs font-medium text-muted-foreground">
-              Interesses em comum{" "}
-              <b className="font-semibold text-foreground tabular-nums">
-                {comuns.size}
-              </b>
-            </p>
-            {comuns.size > 0 ? (
-              <div className="flex flex-wrap gap-1">
-                {intMentorado
-                  .filter((i) => comuns.has(normaliza(i)))
-                  .map((i) => (
-                    <ChipInteresse key={i} texto={i} destaque />
-                  ))}
-              </div>
-            ) : intMentor.length && intMentorado.length ? (
-              <p className="text-sm text-muted-foreground">
-                Interesses distintos — repertórios diferentes pra trocar.
-              </p>
+          <p className="text-sm">
+            {temSobreposicao ? (
+              <>
+                <b className="font-semibold tabular-nums">
+                  {agendaComum.length}{" "}
+                  {agendaComum.length === 1 ? "janela" : "janelas"}
+                </b>{" "}
+                <span className="text-muted-foreground">
+                  · {disponibilidadeTexto({ celulas: agendaComum })}
+                </span>
+              </>
             ) : (
-              <p className="text-sm text-muted-foreground">
-                Interesses não informados — as listas completas ficam nos
-                detalhes.
-              </p>
+              <b className="font-semibold">Sem coincidência</b>
             )}
-          </div>
-
-          {generoOk && (
-            <p className="flex items-center gap-1.5 text-sm text-[var(--ok-text)]">
-              <Check size={14} weight="bold" aria-hidden />
-              Preferência de gênero atendida.
-            </p>
-          )}
+          </p>
+          <GradeAgendaComum mentor={setMentor} jovem={setJovem} />
         </div>
-      </div>
+      )}
 
       {/* por que este par — explicação gerada dos critérios reais */}
       {motivos.length > 0 && (
@@ -596,8 +720,7 @@ export function AfinidadePar({
         </div>
       )}
 
-      {/* o que não cruza é detalhe: duas colunas comparáveis, um
-          participante por lado, campos alinhados */}
+      {/* inventário completo — nasce aberto; fechar é escolha, não default */}
       <Collapsible.Root
         open={detalhesAbertos}
         onOpenChange={setDetalhesAbertos}
@@ -621,47 +744,25 @@ export function AfinidadePar({
           className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-200 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden"
         >
           <div className="mt-2 grid gap-3 border-t border-border/60 pt-3 sm:grid-cols-2">
-            <ColParticipante
-              rotulo="Mentorado"
-              lado={mentorado}
-              meta={[
-                anos != null ? `${anos} anos` : null,
-                mentorado.genero &&
-                mentorado.genero !== "prefiro_nao_dizer"
-                  ? GENERO_LABELS[mentorado.genero]
-                  : null,
-                local(mentorado) || null,
-                mentorado.escolaridade
-                  ? ESCOLARIDADE_LABELS[mentorado.escolaridade]
-                  : null,
-                raca(mentorado),
-              ]}
-              interesses={intMentorado}
-              comuns={comuns}
-              agendaTxt={agendaJovemTxt}
-              campos={[
-                { rotulo: "Objetivos", valor: mentorado.objetivos },
-                { rotulo: "Motivação", valor: mentorado.motivacao },
-              ]}
-            />
-            <ColParticipante
-              rotulo="Mentor"
-              lado={mentor}
-              meta={[
-                mentor.genero && mentor.genero !== "prefiro_nao_dizer"
-                  ? GENERO_LABELS[mentor.genero]
-                  : null,
-                local(mentor) || null,
-                raca(mentor),
-                mentor.areas?.length
-                  ? `atua em ${mentor.areas.join(", ")}`
-                  : null,
-              ]}
-              interesses={intMentor}
-              comuns={comuns}
-              agendaTxt={agendaTxt}
-              campos={[{ rotulo: "Motivação", valor: mentor.motivacao }]}
-            />
+            <div className="space-y-2.5">
+              <CampoPar estado="neutro" label="Objetivos do mentorado">
+                <span className="text-muted-foreground">
+                  {mentorado.objetivos ?? NA}
+                </span>
+              </CampoPar>
+              <CampoPar estado="neutro" label="Motivação do mentorado">
+                <span className="text-muted-foreground">
+                  {mentorado.motivacao ?? NA}
+                </span>
+              </CampoPar>
+            </div>
+            <div className="space-y-2.5">
+              <CampoPar estado="neutro" label="Motivação do mentor">
+                <span className="text-muted-foreground">
+                  {mentor.motivacao ?? NA}
+                </span>
+              </CampoPar>
+            </div>
           </div>
           {mentor.trilha === "dpp" && (
             <p className="mt-3 text-sm text-muted-foreground">
