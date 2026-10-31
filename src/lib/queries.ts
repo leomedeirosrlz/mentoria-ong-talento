@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { comparaNome, registroTardio } from "./ciclo";
+import { audienciasDe, veMaterial } from "./materiais";
 import { demoLidas, demoOnboarded, demoRole } from "./demo/mode";
 import {
   demoAlertasRegistros,
@@ -751,11 +752,21 @@ const materiaisDb = unstable_cache(
   { tags: ["materiais"], revalidate: 3600 }
 );
 
+// audiencias passou a filtrar por papel na RLS (0139) — com o cache de
+// service role a lista crua vem completa pra qualquer papel, então o
+// veMaterial roda AQUI e vale pra todos os callers de uma vez (antes as
+// páginas do jovem não re-filtravam: metadado de material restrito vazava
+// como card morto). Páginas que ainda re-filtram veMaterial: idempotente.
 export const getMateriais = cache(async (): Promise<Material[]> => {
   const demo = await demoRole();
   if (demo) return demoMateriais(demo);
-  if (process.env.SUPABASE_SERVICE_ROLE_KEY) return materiaisDb();
-  return buscaMateriais(await createClient());
+  const [todos, me] = await Promise.all([
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+      ? materiaisDb()
+      : buscaMateriais(await createClient()),
+    getMe(),
+  ]);
+  return todos.filter((m) => veMaterial(audienciasDe(m), me));
 });
 
 /** mentor_profiles é table-level legível por autenticado (0001) — a lista
@@ -1161,17 +1172,30 @@ export const getDuplasOpcoes = cache(async (): Promise<DuplaOpcao[]> => {
 // ---------- trilha de especialista (0027) ----------
 
 /** Os 5 encontros do guia do especialista — título + foco, na ordem. */
+// especialista_eventos é catálogo de programa (0065:37, 4 papéis adultos)
+// — mesmo cache compartilhado das outras referências. Não tem escrita no
+// app hoje; quem criar um writer precisa chamar updateTag da tag abaixo.
+async function buscaEspecialistaEventos(db: SupabaseClient) {
+  const { data, error } = await db
+    .from("especialista_eventos")
+    .select("numero, titulo, foco")
+    .order("numero");
+  if (error) throw error;
+  return (data ?? []) as EspecialistaEvento[];
+}
+
+const especialistaEventosDb = unstable_cache(
+  () => buscaEspecialistaEventos(createServiceClient()),
+  ["especialista-eventos"],
+  { tags: ["especialista-eventos"], revalidate: 3600 }
+);
+
 export const getEspecialistaEventos = cache(
   async (): Promise<EspecialistaEvento[]> => {
     const demo = await demoRole();
     if (demo) return demoEspecialistaEventos();
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("especialista_eventos")
-      .select("numero, titulo, foco")
-      .order("numero");
-    if (error) throw error;
-    return data ?? [];
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) return especialistaEventosDb();
+    return buscaEspecialistaEventos(await createClient());
   }
 );
 
@@ -1271,6 +1295,28 @@ export const getRelatorioLinks = cache(
 /** Templates de documento ativos — alimenta o seletor do recorte
  *  'assinaturas' do NovoLinkDialog. Leitura authenticated (0033); quem não
  *  é coordenador nem chama (a página já barra). */
+// documento_templates é a única tabela de get* com using(true) real
+// (0033:68) — global até pra anon. Sem escrita no app; writer futuro
+// precisa chamar updateTag("documento-templates").
+async function buscaDocumentoTemplates(db: SupabaseClient) {
+  const { data, error } = await db
+    .from("documento_templates")
+    .select("slug, titulo")
+    .eq("ativo", true)
+    .order("titulo");
+  if (error) {
+    console.error("getDocumentoTemplates:", error);
+    return [];
+  }
+  return (data ?? []) as Pick<DocumentoTemplate, "slug" | "titulo">[];
+}
+
+const documentoTemplatesDb = unstable_cache(
+  () => buscaDocumentoTemplates(createServiceClient()),
+  ["documento-templates"],
+  { tags: ["documento-templates"], revalidate: 3600 }
+);
+
 export const getDocumentoTemplates = cache(
   async (): Promise<Pick<DocumentoTemplate, "slug" | "titulo">[]> => {
     if (await demoRole()) {
@@ -1278,17 +1324,8 @@ export const getDocumentoTemplates = cache(
         .filter((t) => t.ativo)
         .map((t) => ({ slug: t.slug, titulo: t.titulo }));
     }
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("documento_templates")
-      .select("slug, titulo")
-      .eq("ativo", true)
-      .order("titulo");
-    if (error) {
-      console.error("getDocumentoTemplates:", error);
-      return [];
-    }
-    return data ?? [];
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) return documentoTemplatesDb();
+    return buscaDocumentoTemplates(await createClient());
   }
 );
 

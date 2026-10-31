@@ -1,5 +1,6 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
+import { getCicloEventos, getCronogramas } from "./queries";
 import { demoRole } from "./demo/mode";
 import {
   demoPessoas,
@@ -82,32 +83,27 @@ export const getResumoFormacao = cache(
     const demo = await demoRole();
     if (demo) return demoResumoFormacao(demo, profileId);
     const supabase = await createClient();
-    const [evsRes, cronsRes, duplasRes] = await Promise.all([
-      supabase
-        .from("ciclo_eventos")
-        .select("id, data, cronograma_id")
-        .eq("tipo", "formacao")
-        .order("data", { ascending: true }),
-      supabase.from("cronogramas").select("id, turma, inicio_em"),
+    // ciclo_eventos/cronogramas vêm dos getters com unstable_cache — os 2
+    // selects diretos repetiam o que o cache compartilhado já resolve
+    const [evs, crons, duplasRes] = await Promise.all([
+      getCicloEventos().then((l) =>
+        l
+          .filter((e) => e.tipo === "formacao" && e.data != null)
+          .sort((a, b) => (a.data ?? "").localeCompare(b.data ?? ""))
+      ),
+      getCronogramas(),
       supabase
         .from("duplas")
         .select("cronograma_id")
         .eq("mentor_id", profileId)
         .not("cronograma_id", "is", null),
     ]);
-    if (evsRes.error) {
-      console.error("getResumoFormacao:", evsRes.error);
-      return { presentes: 0, total: 0 };
-    }
-    const evs = evsRes.data ?? [];
-    const turmaPorCron = new Map(
-      (cronsRes.data ?? []).map((c) => [c.id, c.turma])
-    );
+    const turmaPorCron = new Map(crons.map((c) => [c.id, c.turma]));
     // turma do mentor: a do cronograma mais recente dentre as suas duplas
     const cronsDoMentor = new Set(
       (duplasRes.data ?? []).map((d) => d.cronograma_id as string)
     );
-    const maisRecente = (cronsRes.data ?? [])
+    const maisRecente = crons
       .filter((c) => cronsDoMentor.has(c.id))
       .sort((a, b) => (b.inicio_em ?? "").localeCompare(a.inicio_em ?? ""))[0];
     const vigente =

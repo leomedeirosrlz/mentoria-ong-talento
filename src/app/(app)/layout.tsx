@@ -14,8 +14,21 @@ import type { AppRole } from "@/lib/types";
 import { redirect } from "next/navigation";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const me = await getMe();
-  const demo = await demoRole();
+  // notificações são self-scoped na RLS — disparam junto com getMe em vez de
+  // esperar a cadeia de gates. O catch solto marca a promise como handled
+  // pros retornos antecipados que a abandonam (o await real ainda propaga).
+  const mePromise = getMe();
+  const demoPromise = demoRole();
+  const notificacoesPromise = getNotificacoes();
+  notificacoesPromise.catch(() => {});
+  const chamadosPromise = mePromise.then((m) =>
+    m && (m.role === "coordenacao" || m.role === "supervisor")
+      ? getChamadosSemDono()
+      : 0
+  );
+  chamadosPromise.catch(() => {});
+  const me = await mePromise;
+  const demo = await demoPromise;
   // autenticado sem profile vinculado: redirect("/login") voltaria pra cá pelo
   // middleware e viraria loop — tela bloqueada com saída, como os casos abaixo
   if (!me) {
@@ -118,11 +131,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const [notificacoes, chamadosSemDono] = await Promise.all([
-    getNotificacoes(),
-    // badge da fila só faz sentido pra quem atende (coordenação/auxiliar)
-    me.role === "coordenacao" || me.role === "supervisor"
-      ? getChamadosSemDono()
-      : Promise.resolve(0),
+    notificacoesPromise,
+    chamadosPromise,
   ]);
   // bolha do assistente (REALIZA-243): o mesmo gate do item de nav que ela
   // substituiu — staff e mentores, nunca o jovem (shell próprio) nem papeis
