@@ -518,9 +518,11 @@ export function OnboardingFlow({
 
   // fechamento: quem pulou o termo sai do wizard com o lembrete de onde ele
   // fica — pendência permanece (ausência de row), resolvida pelo banner da
-  // home, pela linha do /perfil ou direto em /assinar
+  // home, pela linha do /perfil ou direto em /assinar. Só no último passo:
+  // o default do switch é o índice final, mas o boas-vindas (step 0) cai
+  // nele também — sem o gate a nag aparecia antes da jornada começar
   const corpoFechamento =
-    temTermo && !termoOk ? (
+    ultimo && temTermo && !termoOk ? (
       <p className="rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed text-muted-foreground">
         Falta só o termo de adesão ao voluntariado: assine quando puder pelo
         banner da sua home ou em{" "}

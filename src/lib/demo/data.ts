@@ -876,6 +876,7 @@ function build(): DemoData {
     motivacao: "Coordena o programa desde o primeiro ciclo — acredita em mentoria como alavanca de mobilidade.",
     pref_genero_par: "indiferente",
     cargo: "Coordenadora de programas", empresa: "Instituto Realiza",
+    voluntario: true,
     origem: "Equipe fundadora", consent_lgpd_em: haDias(400),
     // sync-back da assinatura (0046): quem assinou tem a ficha preenchida
     dados_civis: {
@@ -897,6 +898,7 @@ function build(): DemoData {
     motivacao: "Psicólogo há 20 anos; entrou pra dar suporte técnico às duplas.",
     pref_genero_par: "indiferente",
     cargo: "Psicólogo", empresa: "Consultório próprio",
+    voluntario: true,
     origem: "Indicação da coordenação", consent_lgpd_em: haDias(400),
   };
   const ricardo: Profile = {
@@ -912,6 +914,7 @@ function build(): DemoData {
     motivacao: "Tive um mentor no começo da carreira que mudou minha trajetória — quero fazer o mesmo por alguém.",
     pref_genero_par: "indiferente",
     cargo: "Product manager", empresa: "Fintech",
+    voluntario: true,
     origem: "Post no LinkedIn", consent_lgpd_em: haDias(45),
     // cadastro trouxe os civis — o /assinar dele chega preenchido e a demo
     // mostra o prefill sem precisar digitar nada além do aceite
@@ -939,6 +942,7 @@ function build(): DemoData {
     motivacao: "Sou professora — sei destravar exatas pra quem trava na base.",
     pref_genero_par: "indiferente",
     cargo: "Professora de matemática", empresa: "Colégio particular",
+    voluntario: true,
     origem: "Voluntária desde o ciclo anterior", consent_lgpd_em: haDias(50),
   };
 
@@ -959,6 +963,7 @@ function build(): DemoData {
     motivacao: "12 anos em programas de jovens — supervisão é onde mais contribuo.",
     pref_genero_par: "indiferente",
     cargo: "Psicóloga organizacional", empresa: "Consultoria própria",
+    voluntario: true,
     origem: "Rede da coordenação", consent_lgpd_em: haDias(90),
   };
   const carlos: Profile = {
@@ -978,6 +983,7 @@ function build(): DemoData {
     motivacao: "Mentor desde 2024 — comecei como monitor em cursinho comunitário.",
     pref_genero_par: "indiferente",
     cargo: "Líder técnico", empresa: "Fintech",
+    voluntario: true,
     origem: "Indicação de outro mentor", consent_lgpd_em: haDias(60),
   };
   const fernanda: Profile = {
@@ -997,6 +1003,7 @@ function build(): DemoData {
     motivacao: "Trabalho com reforço escolar na rede pública — a mentoria é o próximo passo natural.",
     pref_genero_par: "feminino",
     cargo: "Pedagoga", empresa: "Prefeitura de Guarulhos",
+    voluntario: true,
     origem: "ONG parceira", consent_lgpd_em: haDias(60),
   };
   const joaoPedro: Profile = {
@@ -1016,6 +1023,7 @@ function build(): DemoData {
     motivacao: "Fui mentorado na faculdade; agora quero retribuir.",
     pref_genero_par: "indiferente",
     cargo: "Analista de dados", empresa: "Banco",
+    voluntario: true,
     origem: "Post no LinkedIn", consent_lgpd_em: haDias(45),
   };
   const luiza: Profile = {
@@ -1035,6 +1043,7 @@ function build(): DemoData {
     motivacao: "Segundo ciclo como mentora — a troca com o jovem me ensina tanto quanto ensino.",
     pref_genero_par: "feminino",
     cargo: "Designer de produto", empresa: "Freelancer",
+    voluntario: true,
     origem: "Voltou do ciclo anterior", consent_lgpd_em: haDias(200),
   };
   const andre: Profile = {
@@ -1054,6 +1063,7 @@ function build(): DemoData {
     motivacao: "Abri duas empresas do zero; quero ajudar um jovem a enxergar que também pode.",
     pref_genero_par: "indiferente",
     cargo: "Empreendedor", empresa: "Negócio próprio",
+    voluntario: true,
     origem: "Evento da ONG Horizonte", consent_lgpd_em: haDias(30),
   };
   const helena: Profile = {
@@ -1073,6 +1083,7 @@ function build(): DemoData {
     motivacao: "Destravo gente pra entrevista e apresentação — é o que faço todo dia.",
     pref_genero_par: "feminino",
     cargo: "Head de comunicação", empresa: "Varejo",
+    voluntario: true,
     origem: "Indicação de uma mentora especialista", consent_lgpd_em: haDias(50),
   };
   const marcos: Profile = {
@@ -1092,6 +1103,7 @@ function build(): DemoData {
     motivacao: "Dou aula técnica aos sábados — a trilha curta encaixa na minha rotina.",
     pref_genero_par: "indiferente",
     cargo: "Engenheiro de dados", empresa: "Consultoria",
+    voluntario: true,
     origem: "Post no LinkedIn", consent_lgpd_em: haDias(25),
   };
   // especialista com a agenda publicada mas a capacidade zerada neste ciclo
@@ -1115,6 +1127,7 @@ function build(): DemoData {
     motivacao: "Jovem que aprende a fechar o mês no azul muda a vida da casa inteira.",
     pref_genero_par: "indiferente",
     cargo: "Contadora", empresa: "Escritório próprio",
+    voluntario: true,
     origem: "Formação de voluntários", consent_lgpd_em: haDias(35),
   };
   // cadastro recebido, ainda não entrou: user_id null + ativo — a badge da
@@ -1132,6 +1145,7 @@ function build(): DemoData {
     cidade: "São Paulo", uf: "SP", interesses: [],
     motivacao: null, pref_genero_par: null,
     cargo: null, empresa: null,
+    voluntario: true,
     origem: "Formulário de inscrição", consent_lgpd_em: null,
   };
   const patricia: Profile = {
@@ -1151,6 +1165,7 @@ function build(): DemoData {
     motivacao: "Foi mentora em ciclos anteriores.",
     pref_genero_par: "indiferente",
     cargo: "Gerente de RH", empresa: "Indústria",
+    voluntario: true,
     origem: "Ciclos anteriores", consent_lgpd_em: haDias(300),
   };
 
