@@ -45,11 +45,25 @@ jobs:
         id: check
         env:
           B: ${{ secrets.VERCEL_AUTOMATION_BYPASS }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
+          skip=""
           if [ -z "$B" ]; then
             echo "::notice::VERCEL_AUTOMATION_BYPASS ausente — e2e de preview pulado."
-            echo "skip=1" >> "$GITHUB_OUTPUT"
+            skip=1
           fi
+          # todo push em branch vira deployment Preview na Vercel (o Ignored
+          # Build Step só segura prod) e cada deployment_status=success dispara
+          # este workflow — a suite inteira contra a URL viva queimava ~1GB+ de
+          # Fast Transfer por run (out/2026: 63GB/mês, pico de 9GB/dia). Como o
+          # gate do dia a dia é o e2e-app (mesma cobertura, in-runner, zero
+          # Vercel), a suite contra preview só vale no deploy autorizado.
+          msg=$(gh api "repos/${{ github.repository }}/commits/${{ github.event.deployment.sha }}" --jq .commit.message 2>/dev/null || true)
+          if ! grep -q '\[deploy\]' <<<"$msg"; then
+            echo "::notice::commit do deploy sem tag [deploy] — e2e de preview pulado (quota de CDN)."
+            skip=1
+          fi
+          [ -n "$skip" ] && echo "skip=1" >> "$GITHUB_OUTPUT"
       - if: steps.check.outputs.skip != '1'
         uses: actions/checkout@v4
       # probe antes da suíte: um commit só de testes/docs faz a Vercel
