@@ -8,8 +8,12 @@ import { scrubSentryEvent, scrubSentrySpan } from "@/lib/sentry-scrub";
 Sentry.init({
   dsn: "https://f281267762c5b87ff76232766db6ff08@o4512297444048896.ingest.us.sentry.io/4512297493200896",
 
-  // NEXT_PUBLIC_VERCEL_ENV é injetada pela Vercel no bundle do browser
-  environment: process.env.NEXT_PUBLIC_VERCEL_ENV ?? process.env.NODE_ENV,
+  // NEXT_PUBLIC_APP_ENV (self-host) ou NEXT_PUBLIC_VERCEL_ENV (Vercel) é
+  // injetada no bundle do browser
+  environment:
+    process.env.NEXT_PUBLIC_APP_ENV ??
+    process.env.NEXT_PUBLIC_VERCEL_ENV ??
+    process.env.NODE_ENV,
 
   // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
   tracesSampleRate: process.env.NODE_ENV === "development" ? 1 : 0.1,

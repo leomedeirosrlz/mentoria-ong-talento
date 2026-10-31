@@ -38,6 +38,10 @@ const CSP = [
 const nextConfig: NextConfig = {
   // sem "X-Powered-By: Next.js" — banner de stack não ajuda ninguém
   poweredByHeader: false,
+  // build autocontido pro deploy em Docker fora da Vercel: gera
+  // .next/standalone (server.js + node_modules traçado) — a imagem final
+  // carrega standalone + static + public apenas
+  output: "standalone",
   // acesso ao dev server a partir de outros dispositivos (celular via LAN
   // ou Tailscale): sem a origem aqui o Next bloqueia os endpoints de dev —
   // o HMR falha, a hydration nunca roda e a página renderiza morta (SSR

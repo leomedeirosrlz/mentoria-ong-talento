@@ -30,7 +30,7 @@ let saltEmFaltaAvisado = false;
 function saltAcesso(): string | null {
   const env = process.env.RESUMO_ACESSO_SALT;
   if (env) return env;
-  if (process.env.VERCEL_ENV === "production") {
+  if ((process.env.APP_ENV ?? process.env.VERCEL_ENV) === "production") {
     console.error(
       "[resumo_acessos] RESUMO_ACESSO_SALT não configurada em produção — ip_hash da auditoria vai nulo"
     );
