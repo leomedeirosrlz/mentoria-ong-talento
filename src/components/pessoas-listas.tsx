@@ -36,7 +36,6 @@ import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { PessoaActions } from "@/components/pessoa-actions";
 import { MentoradoActions } from "@/components/mentorado-actions";
-import { RoleSelect } from "@/components/role-select";
 import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { NovaPessoaDialog, NovoMentoradoDialog } from "@/components/pessoas-dialogs";
@@ -1010,6 +1009,16 @@ function PessoaRow({
       ? p.email
       : subtitulo || p.email;
   const semVagaDpp = temPapel(p, "mentor_dpp") && usadas.dpp >= capDpp;
+  // anel do avatar por papel: híbrido conta como mentor (lima), equipe =
+  // cinza neutro, sem papel fica sem anel — mesmo mapa do Badge de papel
+  const papelAvatar =
+    temPapel(p, "mentor_dpp") || temPapel(p, "mentor_especialista")
+      ? ("mentor" as const)
+      : p.role === "mentorado"
+        ? ("mentorado" as const)
+        : p.role
+          ? ("equipe" as const)
+          : undefined;
   return (
     // Root do disclosure da linha — o trigger mora no cluster de ações e o
     // painel vem depois da linha principal; uncontrolled, sem estado local.
@@ -1031,6 +1040,7 @@ function PessoaRow({
           <Avatar
             nome={p.nome}
             src={p.avatar_path ? avatarPublicUrl(p.avatar_path) : null}
+            papel={papelAvatar}
             size={40}
           />
           <span className="min-w-0">
@@ -1111,14 +1121,11 @@ function PessoaRow({
         {/* capacidade X/Y e e-mail saíram da linha — ocupação vai no meta,
             contato e pendências em "Detalhes" (rodada out/2026) */}
         {souCoord && <DetalhesTrigger temPendencia={temPendencia} />}
-        {/* a 390px o cluster cai pra linha própria — w-full deixa o select de
-            papel ocupar a linha toda (alvo generoso) com o ⋮ na direita;
-            sm+ volta a ser o cluster compacto colado à direita */}
+        {/* a troca de papel mora no ⋮ ("Alterar papel" — ação rara, não é
+            do dia a dia): a linha fica só com o ⋮ no cluster e o espaço do
+            select vira respiro pro meta */}
         {souCoord && (
-          <div className="flex w-full items-center justify-between gap-2 sm:ml-auto sm:w-auto">
-            <div className="w-full sm:w-40">
-              <RoleSelect profileId={p.id} role={p.role} papeis={p.papeis} nome={p.nome} />
-            </div>
+          <div className="flex w-full items-center justify-end gap-2 sm:ml-auto sm:w-auto">
             <PessoaActions
               pessoa={p}
               // mesma guarda do server: qualquer dupla (até encerrada) bloqueia excluir
@@ -1399,9 +1406,6 @@ function MentoradoRow({
           />
           <span className="min-w-0">
             <span className="flex items-center gap-1.5 text-sm font-medium">
-              {!m.avatar_path && (
-                <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-[var(--role-mentorado)]" />
-              )}
               <span
                 className={cn(
                   "truncate underline-offset-4 transition-colors group-hover:underline",

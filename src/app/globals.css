@@ -137,6 +137,9 @@
      nunca como cor de texto. Spec §1 */
   --role-mentor: var(--brand-lime);
   --role-mentorado: var(--destaque);
+  /* equipe (coordenação/auxiliar) = neutro — o muted-foreground já é
+     theme-aware (38% claro / 66% escuro) e lee como cinza nos dois temas */
+  --role-equipe: var(--muted-foreground);
   /* identidade por instrumento oficial do programa (spec v5c de
      /materiais): par cor-de-traço + tinta-do-emblema — os cards aplicam
      --ic/--ict via instrumentoVars() e o InstrumentoIcone/Emblema lê daqui;

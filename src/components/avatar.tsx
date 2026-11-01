@@ -5,10 +5,27 @@ import { useCallback, useState } from "react";
 import { iniciais } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 
+/** Papel grosso pra identidade visual — o anel 2px marca a cor com ou sem
+ *  foto; o disco de iniciais segue a mesma cor como fallback. */
+export type PapelVisual = "mentor" | "mentorado" | "equipe";
+
+const ANEL: Record<PapelVisual, string> = {
+  mentor: "ring-2 ring-[var(--role-mentor)]",
+  mentorado: "ring-2 ring-[var(--role-mentorado)]",
+  equipe: "ring-2 ring-[var(--role-equipe)]",
+};
+
+const DISCO: Record<PapelVisual, string> = {
+  mentor: "bg-[var(--brand-lime)] text-[var(--brand-ink)]",
+  mentorado:
+    "bg-[color-mix(in_oklch,var(--role-mentorado)_72%,white)] text-[var(--brand-ink)]",
+  equipe: "bg-muted text-muted-foreground",
+};
+
 /** Foto de perfil com cadeia de fallback: upload → Gravatar → iniciais.
  *  Cada src que falha (rede ou 404 do Gravatar) desce um degrau.
- *  papel="mentorado" usa disco amarelo + iniciais tinta como fallback — se
- *  houver `src` (foto cadastrada pela coordenação), a foto aparece normal. */
+ *  `papel` dá anel + disco na cor do papel (anel sobrevive à foto); sem
+ *  papel, o fallback é o disco lime de sempre e nenhum anel. */
 export function Avatar({
   nome,
   src,
@@ -20,7 +37,7 @@ export function Avatar({
   nome: string;
   src?: string | null;
   fallbackSrc?: string | null;
-  papel?: "mentorado";
+  papel?: PapelVisual;
   size?: number;
   className?: string;
 }) {
@@ -46,9 +63,7 @@ export function Avatar({
     <span
       className={cn(
         "grid shrink-0 place-items-center overflow-hidden rounded-full font-semibold",
-        papel === "mentorado"
-          ? "bg-[color-mix(in_oklch,var(--role-mentorado)_72%,white)] text-[var(--brand-ink)]"
-          : "bg-[var(--brand-lime)] text-[var(--brand-ink)]",
+        papel ? cn(ANEL[papel], DISCO[papel]) : "bg-[var(--brand-lime)] text-[var(--brand-ink)]",
         className
       )}
       style={{ width: size, height: size, fontSize: size * 0.38 }}

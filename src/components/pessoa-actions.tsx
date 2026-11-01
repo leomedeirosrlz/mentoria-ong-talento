@@ -7,11 +7,13 @@ import {
   PencilSimple,
   Prohibit,
   Trash,
+  UserSwitch,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { deletePessoa, setPessoaAtivo, updatePessoa } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
 import { EscopoAuxiliarDialog } from "@/components/escopo-auxiliar-dialog";
+import { RoleSelect } from "@/components/role-select";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { FotoField } from "@/components/foto-field";
 import { TagInput } from "@/components/tag-input";
@@ -69,6 +71,7 @@ export function PessoaActions({
   podeExcluir: boolean;
 }) {
   const [editOpen, setEditOpen] = useState(false);
+  const [papelOpen, setPapelOpen] = useState(false);
   const [delOpen, setDelOpen] = useState(false);
   // escopo do auxiliar (REALIZA-32) — "só as duplas dele" × "toda a turma"
   const [escopoOpen, setEscopoOpen] = useState(false);
@@ -477,6 +480,13 @@ export function PessoaActions({
             <PencilSimple size={16} data-icon="inline-start" aria-hidden />{" "}
             Editar
           </DropdownMenuItem>
+          {/* papel era um select inline na linha — ação rara (não é do dia
+              a dia): vive no menu e abre o dialog com o select dentro,
+              mantendo as confirmações de coordenação e escopo auxiliar */}
+          <DropdownMenuItem onClick={() => setPapelOpen(true)}>
+            <UserSwitch size={16} data-icon="inline-start" aria-hidden />{" "}
+            Alterar papel
+          </DropdownMenuItem>
           {ehAuxiliar && (
             <DropdownMenuItem onClick={() => setEscopoOpen(true)}>
               <PencilSimple size={16} data-icon="inline-start" aria-hidden />{" "}
@@ -558,6 +568,23 @@ export function PessoaActions({
             pending={pending}
             submitLabel="Salvar"
             onSubmit={submit}
+          />
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={papelOpen} onOpenChange={setPapelOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Alterar papel de {primeiroNome}</DialogTitle>
+            <DialogDescription>
+              O papel define o acesso da pessoa e aplica na hora.
+            </DialogDescription>
+          </DialogHeader>
+          <RoleSelect
+            profileId={pessoa.id}
+            role={pessoa.role}
+            papeis={pessoa.papeis}
+            nome={pessoa.nome}
           />
         </DialogContent>
       </Dialog>

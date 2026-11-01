@@ -25,7 +25,7 @@ import { msgAguardandoPar } from "@/lib/whatsapp-msgs";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
 import { idade } from "@/lib/ciclo";
-import { Avatar } from "@/components/avatar";
+import { Avatar, type PapelVisual } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { WhatsAppRapido } from "@/components/whatsapp-rapido";
 import { MentoradoActions } from "@/components/mentorado-actions";
@@ -400,7 +400,7 @@ export function FilaEspera({
               )
             ) : (
               <div className="space-y-3">
-                <div className="grid grid-cols-[minmax(0,1fr)] gap-4 sm:grid-cols-2">
+                <div className="grid grid-cols-[minmax(0,1fr)] items-start gap-4 sm:grid-cols-2">
                   <ParearColuna
                     rotulo="Mentorados livres"
                     vazio="Nenhum mentorado livre pra parear."
@@ -483,6 +483,7 @@ export function FilaEspera({
                             }
                             nome={m.nome}
                             avatarPath={m.avatar_path}
+                            papel="mentor"
                             selo="sugerido"
                             meta={metaMentor(m.id)}
                           />
@@ -500,6 +501,7 @@ export function FilaEspera({
                         }
                         nome={m.nome}
                         avatarPath={m.avatar_path}
+                        papel="mentor"
                         selo={
                           sugeridosMentores.has(m.id) ? "sugerido" : undefined
                         }
@@ -668,7 +670,7 @@ function LinhaConteudo({
 }: {
   nome: string;
   avatarPath: string | null | undefined;
-  papel?: "mentorado";
+  papel?: PapelVisual;
   meta: string | null;
   /** prefixo do meta em destaque (o "há N dias" da espera) */
   destaqueMeta?: string | null;
@@ -751,7 +753,13 @@ function FilaLinha({
         <LinhaConteudo
           nome={p.nome}
           avatarPath={p.avatar_path}
-          papel={lado === "mentorado" ? "mentorado" : undefined}
+          papel={
+            lado === "mentorado"
+              ? "mentorado"
+              : lado === "mentor"
+                ? "mentor"
+                : undefined
+          }
           meta={meta}
           destaqueMeta={espera}
         />
@@ -831,12 +839,14 @@ function BlocoSugestoes({
     );
   if (total === 0) return null;
   return (
-    <div className="pb-1.5">
+    <div className="shrink-0 pb-1.5">
       <p className="flex items-center gap-1.5 px-2 pb-0.5 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground">
         <Sparkle size={12} aria-hidden />
         {total} {total === 1 ? "sugerido" : "sugeridos"} pela afinidade
       </p>
-      <ul className="divide-y divide-border/60">{children}</ul>
+      {/* o bloco tem teto próprio — muitas sugestões rolam internamente em
+          vez de comer o orçamento de altura da lista fixa */}
+      <ul className="scroll-fina max-h-36 divide-y divide-border/60 overflow-y-auto pr-1">{children}</ul>
       {restantes > 0 && (
         <Button
           type="button"
@@ -852,9 +862,11 @@ function BlocoSugestoes({
   );
 }
 
-/** Coluna do modo Parear — radiogroup em dois planos: o bloco de
- *  sugestões no topo (rank semântico, fora do scroll) e a lista fixa
- *  completa embaixo, que nunca sai do lugar. */
+/** Coluna do modo Parear — radiogroup em dois planos dentro de UM teto de
+ *  altura só: sugestões pinadas no topo (rank semântico, scroll próprio) e
+ *  a lista fixa completa embaixo rolando no que sobrar. As duas colunas
+ *  dividem o mesmo orçamento — antes as sugestões somavam em cima do
+ *  max-h da lista e a coluna sem sugestão esticava com espaço vazio. */
 function ParearColuna({
   rotulo,
   vazio,
@@ -876,12 +888,13 @@ function ParearColuna({
         role="radiogroup"
         aria-label={rotulo}
         aria-busy={carregandoSugestoes || undefined}
+        className="flex max-h-[28rem] flex-col"
       >
         {sugestoes}
         {itens === 0 ? (
           <p className="px-1 py-3 text-sm text-muted-foreground">{vazio}</p>
         ) : (
-          <ul className="scroll-fina max-h-80 divide-y divide-border/60 overflow-y-auto pr-1">
+          <ul className="scroll-fina min-h-0 flex-1 divide-y divide-border/60 overflow-y-auto pr-1">
             {children}
           </ul>
         )}
@@ -906,7 +919,7 @@ function ParearLinha({
 }: {
   nome: string;
   avatarPath: string | null | undefined;
-  papel?: "mentorado";
+  papel?: PapelVisual;
   meta: string | null;
   selo?: string;
   selecionado: boolean;
