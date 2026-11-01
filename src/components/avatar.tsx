@@ -9,14 +9,20 @@ import { cn } from "@/lib/utils";
  *  foto; o disco de iniciais segue a mesma cor como fallback. */
 export type PapelVisual = "mentor" | "mentorado" | "equipe";
 
+// offset na cor do card: gap entre foto e anel — o anel lê mesmo quando a
+// borda da foto é da mesma família da cor do papel
+const ANEL_BASE = "ring-2 ring-offset-2 ring-offset-[var(--card)]";
 const ANEL: Record<PapelVisual, string> = {
-  mentor: "ring-2 ring-[var(--role-mentor)]",
-  mentorado: "ring-2 ring-[var(--role-mentorado)]",
-  equipe: "ring-2 ring-[var(--role-equipe)]",
+  mentor: `${ANEL_BASE} ring-[var(--role-mentor)]`,
+  mentorado: `${ANEL_BASE} ring-[var(--role-mentorado)]`,
+  equipe: `${ANEL_BASE} ring-[var(--role-equipe)]`,
 };
 
 const DISCO: Record<PapelVisual, string> = {
-  mentor: "bg-[var(--brand-lime)] text-[var(--brand-ink)]",
+  // disco claro + anel saturado — mesmo contraste do mentorado: anel
+  // saturado sobre disco saturado sumia (lime em lime)
+  mentor:
+    "bg-[color-mix(in_oklch,var(--role-mentor)_72%,white)] text-[var(--brand-ink)]",
   mentorado:
     "bg-[color-mix(in_oklch,var(--role-mentorado)_72%,white)] text-[var(--brand-ink)]",
   equipe: "bg-muted text-muted-foreground",
