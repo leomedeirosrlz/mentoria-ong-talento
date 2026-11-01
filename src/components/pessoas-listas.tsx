@@ -590,7 +590,10 @@ export function PessoasListas({
                 animate-enter das linhas (convenção) */}
             <div
               key={`${q}|${cat}|${ordem}|${verFora ? 1 : 0}|${verFila ? 1 : 0}|${g}`}
-              className="grid gap-2 sm:grid-cols-2"
+              // items-start: o Detalhes aberto cresce só o próprio card —
+              // sem ele a linha do grid assume a altura do maior item e o
+              // card vizinho estica vazio junto
+              className="grid items-start gap-2 sm:grid-cols-2"
             >
               {gp.map((p, i) => (
                 <PessoaRow
@@ -744,7 +747,7 @@ export function PessoasListas({
             className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden"
           >
             {/* levemente apagado — arquivo, não fila de trabalho */}
-            <div className="grid gap-2 opacity-80 sm:grid-cols-2">
+            <div className="grid items-start gap-2 opacity-80 sm:grid-cols-2">
               {foraExibidos.map((m, i) => (
                 <MentoradoRow
                   key={m.id}
@@ -788,7 +791,7 @@ export function PessoasListas({
             keepMounted
             className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden"
           >
-            <div className="grid gap-2 opacity-80 sm:grid-cols-2">
+            <div className="grid items-start gap-2 opacity-80 sm:grid-cols-2">
               {inativasExibidas.map((p, i) => (
                 <PessoaRow
                   key={p.id}
