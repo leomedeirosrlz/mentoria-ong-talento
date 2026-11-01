@@ -330,12 +330,17 @@ export const getMe = cache(async (): Promise<Profile | null> => {
     : null;
 });
 
-// Leituras de referência do programa (ciclo_eventos, cronogramas,
-// materiais): mesmo resultado pra qualquer papel. Com service key elas vão
-// por cache compartilhado entre requests/usuários (unstable_cache — o
-// createClient de sessão é proibido lá dentro por ler cookies; quem escreve
-// invalida via updateTag e o revalidate é só rede de segurança). Sem a key
-// (dev solto sem .env.staging) caem no caminho de sessão — mesmo SQL.
+// Leituras de referência do programa com cache compartilhado entre
+// requests/usuários (unstable_cache — o createClient de sessão é proibido
+// lá dentro por ler cookies; quem escreve invalida via updateTag e o
+// revalidate é só rede de segurança). Sem service key caem no caminho de
+// sessão — mesmo SQL.
+// INVARIANTE: as policies SELECT de ciclo_eventos, cronogramas e
+// especialista_eventos (0065) restringem a papéis adultos — mentorado
+// recebia [] sob sessão e pelo service-role passa a ver o catálogo. Não
+// chamar estes getters em contexto de jovem (auditoria 2026-11: nenhum
+// caller em (jovem)/, /f/, /t/ e afins). documento_templates é
+// using(true) real; materiais é re-filtrado por veMaterial no getter.
 async function buscaCicloEventos(db: SupabaseClient) {
   const { data, error } = await db
     .from("ciclo_eventos")
@@ -360,8 +365,8 @@ export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
   return buscaCicloEventos(await createClient());
 });
 
-/** Todos os cronogramas (0061) — leitura livre pra qualquer papel, como os
- *  eventos: o seletor de turma/calendário é a régua que escopa o recorte. */
+/** Todos os cronogramas (0061) — papéis adultos leem o catálogo inteiro; o
+ *  seletor de turma/calendário é a régua que escopa o recorte. */
 async function buscaCronogramas(db: SupabaseClient) {
   const { data, error } = await db
     .from("cronogramas")

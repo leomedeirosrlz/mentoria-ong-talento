@@ -7,7 +7,7 @@ import {
   demoPresencas,
   demoResumoFormacao,
 } from "./demo/queries";
-import type { AppRole, Presenca, Profile } from "./types";
+import type { AppRole, CicloEvento, Cronograma, Presenca, Profile } from "./types";
 
 // a collation do banco ordena acentos depois de Z — a ordenação final é
 // sempre pt-BR no app (mesma convenção de queries.ts)
@@ -84,20 +84,30 @@ export const getResumoFormacao = cache(
     if (demo) return demoResumoFormacao(demo, profileId);
     const supabase = await createClient();
     // ciclo_eventos/cronogramas vêm dos getters com unstable_cache — os 2
-    // selects diretos repetiam o que o cache compartilhado já resolve
-    const [evs, crons, duplasRes] = await Promise.all([
-      getCicloEventos().then((l) =>
-        l
-          .filter((e) => e.tipo === "formacao" && e.data != null)
-          .sort((a, b) => (a.data ?? "").localeCompare(b.data ?? ""))
-      ),
-      getCronogramas(),
-      supabase
-        .from("duplas")
-        .select("cronograma_id")
-        .eq("mentor_id", profileId)
-        .not("cronograma_id", "is", null),
-    ]);
+    // selects diretos repetiam o que o cache compartilhado já resolve. O
+    // catch mantém o degrade do select antigo (erro -> {0,0}, sem derrubar
+    // a ficha da pessoa)
+    let evs: CicloEvento[];
+    let crons: Cronograma[];
+    let duplasRes: { data: { cronograma_id: string | null }[] | null };
+    try {
+      [evs, crons, duplasRes] = await Promise.all([
+        getCicloEventos().then((l) =>
+          l
+            .filter((e) => e.tipo === "formacao" && e.data != null)
+            .sort((a, b) => (a.data ?? "").localeCompare(b.data ?? ""))
+        ),
+        getCronogramas(),
+        supabase
+          .from("duplas")
+          .select("cronograma_id")
+          .eq("mentor_id", profileId)
+          .not("cronograma_id", "is", null),
+      ]);
+    } catch (err) {
+      console.error("getResumoFormacao:", err);
+      return { presentes: 0, total: 0 };
+    }
     const turmaPorCron = new Map(crons.map((c) => [c.id, c.turma]));
     // turma do mentor: a do cronograma mais recente dentre as suas duplas
     const cronsDoMentor = new Set(

@@ -29,8 +29,8 @@ export function Logo({
       <Image
         src="/logo-realiza.png"
         alt="Realiza.vc"
-        width={1920}
-        height={262}
+        width={960}
+        height={131}
         // above the fold no shell e nas telas públicas — o PNG cru de
         // 1920px virava download cheio; o otimizador serve o tamanho justo
         preload

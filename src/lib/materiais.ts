@@ -49,7 +49,9 @@ export function audienciasDe(m: {
 
 /** O material aparece pra esta pessoa? Coordenação vê tudo (a policy também
  *  libera); os demais veem `todos` ou o próprio papel (primário ou
- *  secundário — híbrido incluso). */
+ *  secundário — híbrido incluso). Paridade com a policy 0139: ela usa
+ *  my_role() (papel primário) e aqui temPapel() inclui secundários — a
+ *  divergência só existiria com um híbrido adulto+mentorado, que não há. */
 export function veMaterial(
   audiencias: readonly string[],
   pessoa: { role: AppRole | null; papeis?: AppRole[] | null } | null | undefined
