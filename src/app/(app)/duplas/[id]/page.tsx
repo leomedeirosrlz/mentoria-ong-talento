@@ -9,6 +9,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import {
   BookOpen,
   CalendarBlank,
+  CalendarPlus,
   CaretDown,
   ClockCounterClockwise,
   HandHeart,
@@ -653,6 +654,28 @@ export default async function DuplaPage({
             </a>
           )
           : null;
+
+  // agendar nunca se esconde no "⋯": quando a pendência de registro já é a
+  // primária, ele fica ao lado em outline — ação de primeira classe em todo
+  // estado em que vale (REALIZA-97). O encontro pode ser o mesmo da
+  // pendência (agendado vencido): aí o dialog abre em modo remarcação
+  const agendarMentor =
+    souMentor && pendenteRegistro && precisaAgendar ? (
+      <AgendarEncontroDialog
+        duplaId={dupla.id}
+        numero={proximoNumero}
+        atual={encontroAlvo}
+        sugerido={sugeridoProximo}
+        piso={dupla.iniciada_em ?? undefined}
+        jovemNome={primeiroNomeMentorado}
+        trigger={
+          <Button variant="outline" size="sm">
+            <CalendarPlus aria-hidden />
+            Agendar {proximoNumero}º encontro
+          </Button>
+        }
+      />
+    ) : null;
 
   // o encontro atual da jornada — a aba Agora mostra o que fazer nele
   const noAtual = numeroAtual != null
@@ -1469,6 +1492,7 @@ export default async function DuplaPage({
 
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {souMentor && primarioMentor}
+          {souMentor && agendarMentor}
           {!souMentor && acaoWA && <DuplaWaAcao {...acaoWA} />}
 
           {/* secundárias em outline: o pedido de apoio do mentor; a
@@ -1504,20 +1528,11 @@ export default async function DuplaPage({
 
           {/* overflow de segunda ordem — cada prop-grupo presente vira um
               item; os dialogs moram dentro do componente, fora do popup
-              (REALIZA-157). Some sozinho quando nenhuma ação se aplica */}
+              (REALIZA-157). Some sozinho quando nenhuma ação se aplica.
+              "Agendar" não mora aqui: é ação de primeira classe do mentor
+              (REALIZA-97) — fica na primária ou na outline ao lado */}
           <DuplaMaisMenu
             duplaId={dupla.id}
-            agendar={
-              pendenteRegistro && precisaAgendar
-                ? {
-                    numero: proximoNumero,
-                    atual: encontroAlvo,
-                    sugerido: sugeridoProximo,
-                    piso: dupla.iniciada_em ?? undefined,
-                    jovemNome: primeiroNomeMentorado,
-                  }
-                : null
-            }
             formulario={
               souCoord &&
               (dupla.status === "ativa" || dupla.status === "pausada")

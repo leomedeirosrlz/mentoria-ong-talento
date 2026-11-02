@@ -14,6 +14,7 @@ import {
 import { formatDiaHora, MOTIVOS_REAGENDAMENTO } from "@/lib/ciclo";
 import type { Encontro } from "@/lib/types";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
@@ -250,7 +251,20 @@ export function AgendarEncontroDialog({
       )}
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>{nome}</DialogTitle>
+          <DialogTitle className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            {nome}
+            {/* data passada = fluxo retroativo (REALIZA-97): o título sinaliza
+                o modo antes do submit "Registrar encontro" — mesma gramática
+                da tag "registro pendente" das linhas de encontro */}
+            {ehRetroativo && (
+              <Badge
+                variant="outline"
+                className="border-[var(--warn)] text-[var(--warn-text)]"
+              >
+                entra como realizado
+              </Badge>
+            )}
+          </DialogTitle>
           <DialogDescription>
             Marque a data e o horário. Se a data mudou, conte o motivo da
             remarcação.

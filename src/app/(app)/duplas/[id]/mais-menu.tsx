@@ -15,15 +15,13 @@
 import { useState } from "react";
 import {
   ArrowsLeftRight,
-  CalendarPlus,
   DotsThree,
   FlagCheckered,
   PaperPlaneTilt,
   Sparkle,
   UserPlus,
 } from "@phosphor-icons/react";
-import type { Dupla, Encontro } from "@/lib/types";
-import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
+import type { Dupla } from "@/lib/types";
 import {
   EnviarFormularioDialog,
   type FormularioOpcao,
@@ -41,7 +39,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 
-type DialogId = "agendar" | "form" | "solicitar" | "sugerir" | "encerrar" | "remanejar";
+type DialogId = "form" | "solicitar" | "sugerir" | "encerrar" | "remanejar";
 
 // ícones do Mais: tamanho e cor explícitos — é o que alinha o texto do item
 // com o da linha (REALIZA-157); sem o size-4 o svg herdava o tamanho do texto
@@ -55,7 +53,6 @@ type EspecialistaOpcao = {
 
 export function DuplaMaisMenu({
   duplaId,
-  agendar,
   formulario,
   solicitar,
   sugerir,
@@ -63,15 +60,6 @@ export function DuplaMaisMenu({
   remanejar,
 }: {
   duplaId: string;
-  /** "Agendar encontro" — mentor em dupla DPP ativa com pendência de
-   *  registro. As props do dialog vêm prontas da página. */
-  agendar?: {
-    numero: number;
-    atual: Encontro | null;
-    sugerido?: string;
-    piso?: string;
-    jovemNome?: string;
-  } | null;
   /** "Enviar formulário" — coordenação em dupla viva. */
   formulario?: {
     formularios: FormularioOpcao[];
@@ -95,7 +83,6 @@ export function DuplaMaisMenu({
   const [aberto, setAberto] = useState<DialogId | null>(null);
 
   const temItem =
-    !!agendar ||
     !!formulario ||
     !!solicitar ||
     !!sugerir ||
@@ -117,15 +104,6 @@ export function DuplaMaisMenu({
         {/* w-56: o popup é mais largo que o trigger — a âncora ficaria
             apertada pros labels de ação (o default é w-(--anchor-width)) */}
         <DropdownMenuContent align="end" className="w-56">
-          {agendar && (
-            <DropdownMenuItem
-              aria-haspopup="dialog"
-              onClick={() => setAberto("agendar")}
-            >
-              <CalendarPlus aria-hidden className={ICONE} />
-              Agendar encontro
-            </DropdownMenuItem>
-          )}
           {formulario && (
             <DropdownMenuItem
               aria-haspopup="dialog"
@@ -185,19 +163,6 @@ export function DuplaMaisMenu({
 
       {/* os dialogs ficam no nível do botão, controlados — fechar o menu
           não os desmonta e o foco volta pro "Mais" ao sair */}
-      {agendar && (
-        <AgendarEncontroDialog
-          duplaId={duplaId}
-          numero={agendar.numero}
-          atual={agendar.atual}
-          sugerido={agendar.sugerido}
-          piso={agendar.piso}
-          jovemNome={agendar.jovemNome}
-          trigger={null}
-          open={aberto === "agendar"}
-          onOpenChange={(o) => setAberto(o ? "agendar" : null)}
-        />
-      )}
       {formulario && (
         <EnviarFormularioDialog
           formularios={formulario.formularios}

@@ -168,11 +168,18 @@ export default async function AgendaPage({
     especialista: duasVisoes,
   });
   // subtítulo do lado DPP do mentor — o MESMO nos três modos (trocar de aba
-  // não reescreve o header; ele descreve a agenda, não a aba)
+  // não reescreve o header; ele descreve a agenda, não a aba). A segunda
+  // linha (REALIZA-97) fixa a leitura do calendário oficial: data do ciclo
+  // é sugestão, a dupla combina a real — regra de reposição na mesma semana
   const subtituloDpp = (
-    <p className="mt-1 text-sm text-muted-foreground">
-      Os encontros do ciclo e os que você marcou com sua dupla.
-    </p>
+    <>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Os encontros do ciclo e os que você marcou com sua dupla.
+      </p>
+      <p className="mt-1 text-xs text-muted-foreground">
+        As datas oficiais são sugestões. A dupla combina o dia e o horário.
+      </p>
+    </>
   );
 
   if (visaoEsp) {
