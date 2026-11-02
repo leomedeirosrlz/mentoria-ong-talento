@@ -1,12 +1,32 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { CaretDown } from "@phosphor-icons/react";
 import { buttonVariants } from "@/components/ui/button";
 import { T } from "@/components/motion";
 import { cn } from "@/lib/utils";
+
+/** Assina as três formas de o hash mudar: hashchange nativo, popstate e o
+ *  `realiza:hash` que quem navega por pushState dispara. */
+function assinarHash(cb: () => void) {
+  window.addEventListener("hashchange", cb);
+  window.addEventListener("popstate", cb);
+  window.addEventListener("realiza:hash", cb);
+  return () => {
+    window.removeEventListener("hashchange", cb);
+    window.removeEventListener("popstate", cb);
+    window.removeEventListener("realiza:hash", cb);
+  };
+}
 
 /** Form de registro por card, um aberto por vez. O hash `#registrar-{id}` é a
  *  fonte de verdade do "qual está aberto": o CTA da linha É a âncora (mesmo
@@ -30,23 +50,16 @@ export function RegistroInline({
   // null = segue o hash · true/false = escolha local até o hash mudar de novo
   // (fecha este e abre outro card, ou deep-link chegando de fora)
   const [forcado, setForcado] = useState<boolean | null>(null);
-  const [hashBate, setHashBate] = useState(false);
-
-  useEffect(() => {
-    const sync = () => {
-      setHashBate(window.location.hash === alvo);
-      setForcado(null);
-    };
-    sync();
-    window.addEventListener("hashchange", sync);
-    window.addEventListener("popstate", sync);
-    window.addEventListener("realiza:hash", sync);
-    return () => {
-      window.removeEventListener("hashchange", sync);
-      window.removeEventListener("popstate", sync);
-      window.removeEventListener("realiza:hash", sync);
-    };
-  }, [alvo]);
+  // o hash é store externo: lido por useSyncExternalStore, e não por um
+  // efeito de montagem. O efeito re-roda quando o React reexibe uma árvore
+  // escondida por Suspense, e zerar ali fechava o card recém-aberto
+  const hashBate = useSyncExternalStore(
+    assinarHash,
+    () => window.location.hash === alvo,
+    () => false
+  );
+  // só um hash novo de fato devolve o controle ao hash
+  useEffect(() => assinarHash(() => setForcado(null)), []);
 
   const aberto = forcado ?? hashBate;
   // abriu pelo hash (deep link ou navegação de fora), não por clique local
@@ -206,23 +219,16 @@ export function RegistroDetails({
   const alvo = `#registrar-${encontroId}`;
   // null = segue hash/default · true/false = escolha local até o hash mudar
   const [forcado, setForcado] = useState<boolean | null>(null);
-  const [hashBate, setHashBate] = useState(false);
-
-  useEffect(() => {
-    const sync = () => {
-      setHashBate(window.location.hash === alvo);
-      setForcado(null);
-    };
-    sync();
-    window.addEventListener("hashchange", sync);
-    window.addEventListener("popstate", sync);
-    window.addEventListener("realiza:hash", sync);
-    return () => {
-      window.removeEventListener("hashchange", sync);
-      window.removeEventListener("popstate", sync);
-      window.removeEventListener("realiza:hash", sync);
-    };
-  }, [alvo]);
+  // o hash é store externo: lido por useSyncExternalStore, e não por um
+  // efeito de montagem. O efeito re-roda quando o React reexibe uma árvore
+  // escondida por Suspense, e zerar ali fechava o card recém-aberto
+  const hashBate = useSyncExternalStore(
+    assinarHash,
+    () => window.location.hash === alvo,
+    () => false
+  );
+  // só um hash novo de fato devolve o controle ao hash
+  useEffect(() => assinarHash(() => setForcado(null)), []);
 
   return (
     <Collapsible.Root
