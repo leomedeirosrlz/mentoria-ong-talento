@@ -365,10 +365,10 @@ function avisosDaDupla(d: Dupla, hoje: string, agoraMs: number): AvisoAgenda[] {
       escopo,
       duplaId: d.id,
       encontro: null,
-      titulo: `Intenções em aberto · ${nome1} · ${turmaLonga(d.turma)}`,
+      titulo: `Afazeres em aberto · ${nome1} · ${turmaLonga(d.turma)}`,
       detalhe: `${intPendentes.length} ${intPendentes.length === 1 ? "item" : "itens"} · o mais antigo é do ${maisAntigo}º encontro.`,
       href: `/duplas/${d.id}#intencoes-${maisAntigo}`,
-      cta: "Ver intenções",
+      cta: "Ver afazeres",
       remarcar: false,
     });
   }

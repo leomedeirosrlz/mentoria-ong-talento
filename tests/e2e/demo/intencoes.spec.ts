@@ -27,7 +27,7 @@ test.describe("demo — intenções do encontro (REALIZA-21)", () => {
     // a âncora #intencoes-5 existe no card do 5º encontro; 2 pendentes na
     // soma do trigger (1 do 5º + 1 carry-over do 3º)
     const bloco = page.locator("#intencoes-5");
-    const trigger = bloco.getByRole("button", { name: /Intenções/ });
+    const trigger = bloco.getByRole("button", { name: /Afazeres/ });
     await expect(trigger).toContainText("2 pendentes");
     await trigger.click();
 
@@ -50,7 +50,7 @@ test.describe("demo — intenções do encontro (REALIZA-21)", () => {
     // criar: Enter no input adiciona o item na hora (estado local da demo)
     const novo = "E2E — perguntar do ENEM";
     await bloco
-      .getByRole("textbox", { name: "Nova intenção do 5º encontro" })
+      .getByRole("textbox", { name: "Novo afazer do 5º encontro" })
       .fill(novo);
     await page.keyboard.press("Enter");
     await expect(bloco.getByText(novo)).toBeVisible();
@@ -73,7 +73,7 @@ test.describe("demo — intenções do encontro (REALIZA-21)", () => {
     // remover: só no item em questão — o botão × é o icon-button do li
     await bloco
       .locator("li", { hasText: novo })
-      .getByRole("button", { name: "Remover intenção" })
+      .getByRole("button", { name: "Remover afazer" })
       .click();
     await expect(bloco.getByText(novo)).toHaveCount(0);
 
@@ -89,13 +89,13 @@ test.describe("demo — intenções do encontro (REALIZA-21)", () => {
 
     // uma linha só por dupla — contagem + nº mais antigo, sem texto de item
     await expect(
-      page.getByText(/Intenções em aberto · Ana/).first()
+      page.getByText(/Afazeres em aberto · Ana/).first()
     ).toBeVisible();
     await expect(
       page.getByText(/2 itens · o mais antigo é do 3º encontro\./)
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: "Ver intenções" })
+      page.getByRole("link", { name: "Ver afazeres" })
     ).toHaveAttribute("href", `/duplas/${DUPLA_OK}#intencoes-3`);
   });
 
@@ -112,10 +112,10 @@ test.describe("demo — intenções do encontro (REALIZA-21)", () => {
     await expect(bloco.getByText(CARRY)).toBeVisible();
     await expect(bloco.getByRole("checkbox")).toHaveCount(0);
     await expect(
-      bloco.getByRole("textbox", { name: /Nova intenção/ })
+      bloco.getByRole("textbox", { name: /Novo afazer/ })
     ).toHaveCount(0);
     await expect(
-      bloco.getByRole("button", { name: "Remover intenção" })
+      bloco.getByRole("button", { name: "Remover afazer" })
     ).toHaveCount(0);
   });
 });

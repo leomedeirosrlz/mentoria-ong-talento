@@ -417,10 +417,10 @@ describe("intenções em aberto (REALIZA-21)", () => {
     expect(a.avisos).toHaveLength(1);
     const av = a.avisos[0];
     expect(av.id).toBe("int-d1");
-    expect(av.titulo).toBe("Intenções em aberto · Ana · 2026/2027");
+    expect(av.titulo).toBe("Afazeres em aberto · Ana · 2026/2027");
     expect(av.detalhe).toBe("3 itens · o mais antigo é do 3º encontro.");
     expect(av.href).toBe("/duplas/d1#intencoes-3");
-    expect(av.cta).toBe("Ver intenções");
+    expect(av.cta).toBe("Ver afazeres");
     expect(av.remarcar).toBe(false);
     // o texto dos itens é plano privado do mentor — não sai da ficha
     expect(av.detalhe).not.toContain("ENEM");

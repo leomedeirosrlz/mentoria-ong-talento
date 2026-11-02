@@ -228,7 +228,7 @@ export function IntencoesEncontro({
         type="button"
         variant="ghost"
         size="icon"
-        aria-label="Remover intenção"
+        aria-label="Remover afazer"
         disabled={pending && pendingId === t.id}
         onClick={() => remover(t, carryOver)}
         className="mt-1.5 size-8 shrink-0 text-muted-foreground opacity-60 transition-opacity hover:opacity-100 focus-visible:opacity-100"
@@ -259,7 +259,7 @@ export function IntencoesEncontro({
       <div id={`intencoes-${numero}`} className="scroll-mt-20">
         <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
-          Intenções
+          Afazeres
         </p>
         {lista.length > 0 && (
           <ul>{lista.map((t) => itemLeitura(t, false))}</ul>
@@ -280,7 +280,7 @@ export function IntencoesEncontro({
     <div id={`intencoes-${numero}`} className="scroll-mt-20">
       <Collapsible.Root>
         <Collapsible.Trigger className="group grid min-h-11 w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 rounded-md py-1.5 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9">
-          <span className="font-medium text-foreground/80">Intenções</span>
+          <span className="font-medium text-foreground/80">Afazeres</span>
           {sufixo && (
             <span className="min-w-0 truncate text-muted-foreground">
               · {sufixo}
@@ -329,8 +329,8 @@ export function IntencoesEncontro({
                 onChange={(e) => setNovo(e.target.value)}
                 onBlur={() => novo.trim() && adicionar()}
                 maxLength={280}
-                placeholder="Adicionar intenção…"
-                aria-label={`Nova intenção do ${numero}º encontro`}
+                placeholder="Adicionar afazer…"
+                aria-label={`Novo afazer do ${numero}º encontro`}
                 disabled={pending}
                 className="h-9 border-0 bg-muted/40 px-3 shadow-none focus-visible:ring-1"
               />

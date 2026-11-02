@@ -204,7 +204,7 @@ export function EncontroDetalheDialog({
           {intencoes.length > 0 && (
             <div className="rounded-lg bg-muted/40 px-3.5 py-2.5">
               <p className="text-xs font-medium text-muted-foreground">
-                Intenções do mentor
+                Afazeres do mentor
               </p>
               <ul className="mt-1 space-y-1">
                 {intencoes.map((i) => (

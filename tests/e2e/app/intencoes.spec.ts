@@ -38,13 +38,13 @@ async function montarCardDoPasso(page: Page, numero: number) {
   return bloco;
 }
 
-/** Trigger "Intenções · …" do bloco + painel aberto (o Collapsible nasce
+/** Trigger "Afazeres · …" do bloco + painel aberto (o Collapsible nasce
  *  fechado; reabrir cobre o estado pós-reload). */
 async function abrirIntencoes(bloco: Locator) {
-  const trigger = bloco.getByRole("button", { name: /Intenções/ });
+  const trigger = bloco.getByRole("button", { name: /Afazeres/ });
   await trigger.click();
   await expect(
-    bloco.getByRole("textbox", { name: /Nova intenção/ })
+    bloco.getByRole("textbox", { name: /Novo afazer/ })
   ).toBeVisible();
   return trigger;
 }
@@ -85,7 +85,7 @@ test.describe("mentor DPP — intenções do encontro (REALIZA-21)", () => {
     ).toBeVisible();
 
     await bloco
-      .getByRole("textbox", { name: `Nova intenção do ${NUMERO}º encontro` })
+      .getByRole("textbox", { name: `Novo afazer do ${NUMERO}º encontro` })
       .fill(TEXTO);
     await page.keyboard.press("Enter");
 

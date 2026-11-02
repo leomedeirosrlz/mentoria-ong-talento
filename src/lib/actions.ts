@@ -3541,7 +3541,7 @@ export async function criarIntencao(duplaId: string, numero: number, texto: stri
   // a intenção é plano do mentor — nem a coord escreve por ele (a policy
   // aceitaria; o contrato fica aqui, mesmo desenho da nota)
   if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
-    return { error: "As intenções do encontro são do mentor da dupla." };
+    return { error: "Os afazeres do encontro são do mentor da dupla." };
   }
 
   const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", duplaId).single();
@@ -3566,8 +3566,8 @@ export async function criarIntencao(duplaId: string, numero: number, texto: stri
   }
 
   const limpo = texto.trim();
-  if (!limpo) return { error: "Escreva a intenção antes de adicionar." };
-  if (limpo.length > 280) return { error: "Intenção muito longa (máx. 280 caracteres)." };
+  if (!limpo) return { error: "Escreva o afazer antes de adicionar." };
+  if (limpo.length > 280) return { error: "Afazer muito longo (máx. 280 caracteres)." };
 
   const { error } = await supabase
     .from("encontro_intencoes")
@@ -3587,7 +3587,7 @@ export async function marcarIntencao(id: string, feito: boolean) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
-    return { error: "As intenções do encontro são do mentor da dupla." };
+    return { error: "Os afazeres do encontro são do mentor da dupla." };
   }
 
   // a dupla vem junto no embed: o gate é o status DELA (encerrada/pausada
@@ -3598,7 +3598,7 @@ export async function marcarIntencao(id: string, feito: boolean) {
     .select("id, dupla_id, duplas(status)")
     .eq("id", id)
     .maybeSingle();
-  if (!row) return { error: "Intenção não encontrada." };
+  if (!row) return { error: "Afazer não encontrado." };
   const dupla = Array.isArray(row.duplas) ? row.duplas[0] : row.duplas;
   if (dupla && dupla.status !== "ativa") return { error: "Essa dupla não está ativa." };
 
@@ -3608,7 +3608,7 @@ export async function marcarIntencao(id: string, feito: boolean) {
     .eq("id", id)
     .select("id");
   if (error) return { error: erroAmigavel(error) };
-  if (!data?.length) return { error: "Intenção não encontrada." };
+  if (!data?.length) return { error: "Afazer não encontrado." };
 
   revalidatePath("/agenda");
   revalidatePath(`/duplas/${row.dupla_id}`);
@@ -3622,7 +3622,7 @@ export async function removerIntencao(id: string) {
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
   if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
-    return { error: "As intenções do encontro são do mentor da dupla." };
+    return { error: "Os afazeres do encontro são do mentor da dupla." };
   }
 
   const { data: row } = await supabase
@@ -3630,7 +3630,7 @@ export async function removerIntencao(id: string) {
     .select("id, dupla_id, duplas(status)")
     .eq("id", id)
     .maybeSingle();
-  if (!row) return { error: "Intenção não encontrada." };
+  if (!row) return { error: "Afazer não encontrado." };
   const dupla = Array.isArray(row.duplas) ? row.duplas[0] : row.duplas;
   if (dupla && dupla.status !== "ativa") return { error: "Essa dupla não está ativa." };
 
@@ -3640,7 +3640,7 @@ export async function removerIntencao(id: string) {
     .eq("id", id)
     .select("id");
   if (error) return { error: erroAmigavel(error) };
-  if (!data?.length) return { error: "Intenção não encontrada." };
+  if (!data?.length) return { error: "Afazer não encontrado." };
 
   revalidatePath("/agenda");
   revalidatePath(`/duplas/${row.dupla_id}`);

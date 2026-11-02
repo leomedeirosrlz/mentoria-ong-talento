@@ -376,8 +376,8 @@ export function EncontroRow({
         )}
       </div>
 
-      {/* preparo do mentor — nota livre + checklist de intenções, nesta
-          ordem: a nota responde "como quero conduzir", as intenções "o que
+      {/* preparo do mentor — nota livre + checklist de afazeres, nesta
+          ordem: a nota responde "como quero conduzir", os afazeres "o que
           não posso esquecer". Pra quem não edita (coord/sup, dupla inativa)
           o que existe vira leitura */}
       {(podeEditar || nota || intencoes.length > 0 || intencoesPendentes.length > 0) && (
