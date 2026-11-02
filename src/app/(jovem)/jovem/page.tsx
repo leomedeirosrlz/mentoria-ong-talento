@@ -828,7 +828,7 @@ export default async function JovemHome() {
           <div className="mb-2.5 flex items-center justify-between gap-3">
             <h2 id="materiais-titulo" className="flex items-center gap-2 font-semibold">
               <FolderOpen size={18} className="text-muted-foreground" aria-hidden />
-              Materiais do programa
+              Materiais de apoio
             </h2>
             <Link
               href="/jovem/materiais"

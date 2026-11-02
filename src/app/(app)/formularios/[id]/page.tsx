@@ -272,7 +272,7 @@ export default async function FormularioPage({
                   >
                     Instrumentos do programa
                   </Link>{" "}
-                  em Materiais.
+                  em Materiais de apoio.
                 </>
               )}
             </p>

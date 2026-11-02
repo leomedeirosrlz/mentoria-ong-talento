@@ -44,7 +44,7 @@ const RECURSOS: Recurso[] = [
   {
     icon: CalendarCheck,
     texto:
-      "Sua agenda de encontros, os combinados entre vocês e os materiais do programa num lugar só.",
+      "Sua agenda de encontros, os combinados entre vocês e os materiais de apoio do programa num lugar só.",
   },
   {
     icon: HandHeart,

@@ -86,20 +86,20 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
     { icon: UsersThree, texto: "As duplas sob sua supervisão num lugar só.", img: "/onboarding/supervisor-duplas.jpg", alt: "Lista de duplas supervisionadas" },
     { icon: NotePencil, texto: "Notas de acompanhamento na ficha de cada dupla.", img: "/onboarding/supervisor-dupla.jpg", alt: "Ficha de uma dupla com notas e encontros" },
     { icon: TrafficSignal, texto: "O andamento de cada dupla: quem vai bem e quem precisa de atenção.", img: "/onboarding/supervisor-home.jpg", alt: "Visão geral do supervisor com andamento das duplas" },
-    { icon: FolderOpen, texto: "Os materiais oficiais do programa." },
+    { icon: FolderOpen, texto: "Os materiais de apoio do programa." },
   ],
   mentor_dpp: [
     { icon: CalendarCheck, texto: "Agendar e registrar os encontros com a sua dupla.", img: "/onboarding/mentor_dpp-dupla.jpg", alt: "Ficha da dupla com encontros e registros" },
     { icon: MapTrifold, texto: "A jornada dos 16 encontros do guia, passo a passo.", img: "/onboarding/mentor_dpp-home.jpg", alt: "Visão geral do mentor com a jornada dos encontros" },
     { icon: HandHeart, texto: "Pedir apoio à coordenação quando precisar." },
     { icon: UserPlus, texto: "Solicitar um mentor especialista pro seu mentorado." },
-    { icon: FolderOpen, texto: "Os materiais oficiais do programa.", img: "/onboarding/mentor_dpp-materiais.jpg", alt: "Biblioteca de materiais do programa" },
+    { icon: FolderOpen, texto: "Os materiais de apoio do programa.", img: "/onboarding/mentor_dpp-materiais.jpg", alt: "Biblioteca de materiais de apoio do programa" },
   ],
   mentor_especialista: [
     { icon: ClipboardText, texto: "Uma lista de pedidos que combinam com o seu perfil.", img: "/onboarding/mentor_especialista-home.jpg", alt: "Mural de pedidos de mentoria especializada" },
     { icon: Handshake, texto: "Aceitar um pedido e conduzir até 5 encontros." },
     { icon: NotePencil, texto: "Registrar cada encontro realizado." },
-    { icon: FolderOpen, texto: "Os materiais oficiais do programa.", img: "/onboarding/mentor_especialista-materiais.jpg", alt: "Biblioteca de materiais do programa" },
+    { icon: FolderOpen, texto: "Os materiais de apoio do programa.", img: "/onboarding/mentor_especialista-materiais.jpg", alt: "Biblioteca de materiais de apoio do programa" },
   ],
   // o jovem não passa por este wizard (o dele é o OnboardingJovem do
   // /jovem, REALIZA-114) — a entrada existe porque o Record pede todos os
@@ -107,7 +107,7 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
   mentorado: [
     { icon: CalendarCheck, texto: "Sua agenda de encontros com o mentor." },
     { icon: ListChecks, texto: "Os combinados que ficaram pra você." },
-    { icon: FolderOpen, texto: "Os materiais oficiais do programa." },
+    { icon: FolderOpen, texto: "Os materiais de apoio do programa." },
   ],
 };
 
@@ -607,7 +607,7 @@ export function OnboardingFlow({
         : "O documento que formaliza o voluntariado de toda a equipe no programa, com a mesma validade de uma assinatura em papel. Leia e, se quiser, já assine; dá pra deixar pra depois também.";
     switch (step) {
       case 0:
-        return "A plataforma do Programa de Mentoria Social: a jornada da sua dupla, os registros e os materiais oficiais num lugar só.";
+        return "A plataforma do Programa de Mentoria Social: a jornada da sua dupla, os registros e os materiais de apoio num lugar só.";
       case 1:
         return "Rapidinho: diz se você atua como voluntário(a) e autoriza o uso dos dados do cadastro.";
       case 2:
