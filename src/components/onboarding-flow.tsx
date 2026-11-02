@@ -17,6 +17,7 @@ import {
   FolderOpen,
   HandHeart,
   Handshake,
+  ImageSquare,
   ListChecks,
   MapTrifold,
   Megaphone,
@@ -228,8 +229,9 @@ export function OnboardingFlow({
   const [interesses, setInteresses] = useState<string[]>(me.interesses ?? []);
   const [motivacao, setMotivacao] = useState(pessoal?.motivacao ?? "");
   const [consent, setConsent] = useState(false);
-  // recurso cujos dados ilustram a tela no passo "o que você pode fazer" —
-  // hover/foco no item troca o print (desktop); mobile mostra a home do papel
+  // recurso cuja tela ilustra o passo "o que você pode fazer" — hover, foco
+  // ou toque no item trocam o print (o último gesto vale); mobile mostra a
+  // home do papel deslizando numa moldura de celular
   const [recursoAtivo, setRecursoAtivo] = useState(() =>
     Math.max(0, RECURSOS[me.role ?? "mentor_dpp"].findIndex((r) => r.img))
   );
@@ -741,44 +743,71 @@ export function OnboardingFlow({
       case 2: {
         const recursos = RECURSOS[me.role ?? "mentor_dpp"];
         const comImg = recursos.filter((r) => r.img);
+        // o print mobile é sempre a home do papel — o alt vem do item "home",
+        // que nem sempre é o primeiro com imagem (mentor abre com a dupla)
+        const altHome =
+          comImg.find((r) => r.img?.includes("-home."))?.alt ?? "";
         return (
           <div className="space-y-4">
-            {/* hero estreito: a home do papel é o print de capa — o swap por
-                hover/foco só existe no desktop, onde a lista fica ao lado */}
+            {/* moldura de celular: a captura mobile é a página inteira, muito
+                mais alta que a janela — o print desliza devagar sob ela
+                (.animate-percorre-tela; reduced-motion estaciona no topo).
+                O swap por item só existe no desktop, onde a lista fica ao lado */}
             {comImg.length > 0 && (
-              <MolduraTela className="sm:hidden">
-                <div className="relative aspect-[4/3]">
+              <MolduraTela className="mx-auto w-full max-w-[300px] sm:hidden">
+                <div className="relative aspect-[3/4]">
                   <Image
                     src={`/onboarding/${me.role ?? "mentor_dpp"}-home-m.jpg`}
-                    alt={comImg[0]?.alt ?? ""}
+                    alt={altHome}
                     fill
-                    sizes="(max-width: 640px) 100vw, 0px"
-                    className="object-cover object-top"
+                    sizes="300px"
+                    className="animate-percorre-tela object-cover object-top"
                   />
                 </div>
               </MolduraTela>
             )}
-            <div className="sm:grid sm:grid-cols-[minmax(0,1fr)_minmax(0,52%)] sm:items-start sm:gap-5">
+            <div className="sm:grid sm:grid-cols-[minmax(0,5fr)_minmax(0,8fr)] sm:items-start sm:gap-5">
               <ul className="space-y-2">
-                {recursos.map((r, i) => (
-                  <li
-                    key={r.texto}
-                    tabIndex={r.img ? 0 : undefined}
-                    onMouseEnter={() => r.img && setRecursoAtivo(i)}
-                    onFocus={() => r.img && setRecursoAtivo(i)}
-                    className={cn(
-                      "flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3 outline-none transition-colors",
-                      r.img &&
-                        "cursor-default hover:border-foreground/30 focus-visible:border-primary/60 focus-visible:ring-2 focus-visible:ring-ring/40",
-                      i === recursoAtivo && r.img && "border-primary/50"
-                    )}
-                  >
-                    <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
-                      <r.icon size={18} weight="fill" aria-hidden />
-                    </span>
-                    <span className="text-sm leading-snug">{r.texto}</span>
-                  </li>
-                ))}
+                {recursos.map((r, i) => {
+                  const ativo = !!r.img && i === recursoAtivo;
+                  return (
+                    <li
+                      key={r.texto}
+                      tabIndex={r.img ? 0 : undefined}
+                      onMouseEnter={() => r.img && setRecursoAtivo(i)}
+                      onFocus={() => r.img && setRecursoAtivo(i)}
+                      onClick={() => r.img && setRecursoAtivo(i)}
+                      className={cn(
+                        "flex items-center gap-3 rounded-2xl border px-4 py-3 outline-none transition-colors",
+                        r.img &&
+                          "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring/40",
+                        ativo
+                          ? "border-[var(--brand-lime)] bg-[var(--brand-lime)]/10"
+                          : cn(
+                              "border-border bg-card",
+                              r.img && "hover:border-foreground/40"
+                            )
+                      )}
+                    >
+                      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
+                        <r.icon size={18} weight="fill" aria-hidden />
+                      </span>
+                      <span className="text-sm leading-snug">{r.texto}</span>
+                      {/* o printinho marca quais itens têm tela pra espiar —
+                          no ativo ele ganha tinta, reforçando a ligação */}
+                      {r.img && (
+                        <ImageSquare
+                          size={16}
+                          aria-hidden
+                          className={cn(
+                            "ml-auto shrink-0 transition-colors",
+                            ativo ? "text-foreground" : "text-muted-foreground/70"
+                          )}
+                        />
+                      )}
+                    </li>
+                  );
+                })}
               </ul>
               {/* painel com crossfade: cada recurso com print troca a tela —
                   os itens sem print mantêm o último exibido */}
@@ -791,7 +820,7 @@ export function OnboardingFlow({
                         src={r.img!}
                         alt={recursos.indexOf(r) === recursoAtivo ? (r.alt ?? "") : ""}
                         fill
-                        sizes="(min-width: 640px) 480px, 0px"
+                        sizes="(min-width: 1200px) 680px, (min-width: 640px) 57vw, 0px"
                         className={cn(
                           "object-cover object-top transition-opacity duration-300",
                           recursos.indexOf(r) === recursoAtivo
@@ -979,7 +1008,7 @@ export function OnboardingFlow({
       <main
         className={cn(
           "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col justify-center px-4 pb-32 pt-20 transition-[max-width] duration-500 sm:px-6",
-          step === 2 && "sm:max-w-4xl"
+          step === 2 && "sm:max-w-6xl"
         )}
       >
         <Logo size="sm" className="mb-6 self-start" />
