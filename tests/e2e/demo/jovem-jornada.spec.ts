@@ -478,7 +478,7 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     await expect(bib.getByRole("heading", { name: /Todos os materiais/ })).toBeVisible();
     await expect(bib.getByText("sem conteúdo")).toHaveCount(0);
     await expect(page.locator("details")).toHaveCount(0);
-    await bib.getByRole("searchbox", { name: "Buscar material" }).fill("guia do mentor");
+    await bib.getByRole("searchbox", { name: "Buscar material de apoio" }).fill("guia do mentor");
     await expect(bib.getByText("Guia do Mentor DPP")).toBeVisible();
     await expect(bib.getByText("Plataforma de mentoria")).toHaveCount(0);
   });

@@ -2181,7 +2181,7 @@ export function AgendaCalendario({
               {materiaisDoEncontro.length > 0 && (
                 <div className="pt-1.5">
                   <h3 className="text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Materiais do encontro
+                    Material de apoio do encontro
                   </h3>
                   <ul className="mt-0.5">
                     {materiaisDoEncontro.map((m) => (

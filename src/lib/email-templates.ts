@@ -211,14 +211,14 @@ export function emailMaterial({
   </tr>
 </table>`;
   return emailLayout({
-    titulo: `Novo material: ${titulo}`,
-    conteudoHtml: `<p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:${INK};">Um novo material entrou na biblioteca:</p>${card}`,
+    titulo: `Novo material de apoio: ${titulo}`,
+    conteudoHtml: `<p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:${INK};">Um novo material de apoio entrou na plataforma:</p>${card}`,
     ctaLabel: "Abrir material",
     ctaHref,
-    tagline: "Biblioteca de materiais",
-    preheader: `Novo material: ${titulo}${descricao ? ` — ${descricao.slice(0, 80)}` : ""}`,
+    tagline: "Materiais de apoio",
+    preheader: `Novo material de apoio: ${titulo}${descricao ? `. ${descricao.slice(0, 80)}` : ""}`,
     rodapeExtra:
-      "O material fica disponível na aba Materiais da plataforma — este e-mail é só o aviso de que ele chegou.",
+      "O material fica disponível em Materiais de apoio, na plataforma. Este e-mail é só o aviso de que ele chegou.",
   });
 }
 

@@ -43,7 +43,7 @@ const TIPO_LABEL = {
  *  o material aparece em exatamente uma categoria, sem sobrar fora. */
 const CATEGORIAS: { tipo: Material["tipo"]; rotulo: string }[] = [
   { tipo: "guia", rotulo: "Guias" },
-  { tipo: "template", rotulo: "Modelos e instrumentos" },
+  { tipo: "template", rotulo: "Modelos" },
   { tipo: "conteudo", rotulo: "Conteúdos e roteiros" },
   { tipo: "link", rotulo: "Links" },
 ];
@@ -170,7 +170,7 @@ export function BibliotecaLista({
   ehCoord = false,
   maxEncontro = 16,
   vigente = null,
-  titulo = "Todos os materiais",
+  titulo = "Todos os materiais de apoio",
 }: {
   materiais: Material[];
   ehCoord?: boolean;
@@ -200,7 +200,7 @@ export function BibliotecaLista({
         </h2>
         {materiais.length > 6 && (
           <label className="relative w-full sm:w-72">
-            <span className="sr-only">Buscar material</span>
+            <span className="sr-only">Buscar material de apoio</span>
             <MagnifyingGlass
               size={15}
               aria-hidden
@@ -210,7 +210,7 @@ export function BibliotecaLista({
               type="search"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar material"
+              placeholder="Buscar material de apoio"
               className="pl-8"
             />
           </label>
