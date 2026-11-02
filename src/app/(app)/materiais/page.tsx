@@ -37,7 +37,7 @@ import {
   type TurmaMateriais,
 } from "@/components/materiais-mentor-biblioteca";
 
-export const metadata: Metadata = { title: "Materiais" };
+export const metadata: Metadata = { title: "Materiais de apoio" };
 
 export default async function MateriaisPage({
   searchParams,
@@ -245,10 +245,10 @@ export default async function MateriaisPage({
       {/* biblioteca vazia: o CTA mora dentro do card de estado vazio, não
           aqui — por isso o actions some junto com o catálogo */}
       <PageHeader
-        title="Materiais"
+        title="Materiais de apoio"
         meta={
           ehCoord
-            ? "Instrumentos da jornada e o acervo do programa"
+            ? "Instrumentos da jornada e o material de apoio do programa"
             : "Guias e instrumentos do programa. A coordenação publica conforme a jornada avança"
         }
         actions={

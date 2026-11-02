@@ -62,7 +62,7 @@ test.describe("demo — /formularios separa customs de instrumentos", () => {
 
     // a ponte pra casa nova dos instrumentos da jornada
     await expect(
-      sec.getByRole("link", { name: "Materiais" })
+      sec.getByRole("link", { name: "Materiais de apoio" })
     ).toHaveAttribute("href", "/materiais");
   });
 

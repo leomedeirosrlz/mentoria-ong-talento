@@ -848,6 +848,7 @@ export default async function DuplaPage({
         podeRemoverAnexos={souCoord || (souMentor && (dupla.status === "ativa" || ritoPendente))}
         anexos={(enc?.registro && anexosPorRegistro[enc.registro.id]) || []}
         materiais={materiaisPorNumero.get(passo.numero) ?? []}
+        combinados={dupla.encaminhamentos ?? []}
         combinadosPendentes={combinadosPendentes}
         nota={dupla.notas?.find((n) => n.numero === passo.numero)?.texto ?? null}
         intencoes={(dupla.intencoes ?? []).filter(
@@ -1428,7 +1429,7 @@ export default async function DuplaPage({
           {[
             turmaLonga(dupla.turma),
             `Encontro ${jornada.proximoNumero ?? jornada.feitos} de ${total}`,
-            dupla.supervisor && `sup. ${dupla.supervisor.nome}`,
+            dupla.supervisor && `auxiliar executivo ${dupla.supervisor.nome}`,
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -1512,7 +1513,8 @@ export default async function DuplaPage({
           {!souMentor && acaoWA && <DuplaWaAcao {...acaoWA} />}
 
           {/* secundárias em outline: o pedido de apoio do mentor; a
-              coordenação edita a dupla. O resto mora no Mais */}
+              coordenação edita a dupla. As de segunda ordem vêm do
+              DuplaMaisMenu: em linha no desktop, no Mais só no celular */}
           {souMentor && (dupla.status === "ativa" || dupla.status === "pausada") && (
             <PedirApoioDialog
               duplaId={dupla.id}

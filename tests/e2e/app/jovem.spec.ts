@@ -109,7 +109,7 @@ test.describe("mentorado — shell /jovem", () => {
 
   test.afterAll(async () => {
     // a home do mentor olha a MESMA dupla: um agendado fixture pendurado
-    // trocaria o CTA "Agendar encontro" por "Agendar próximo" e quebraria o
+    // trocaria o CTA "Agendar encontro" por "Agendar próximo encontro" e quebraria o
     // spec dele — os encontros da dupla voltam a zero (o seed recria o d1)
     // Filhos da 0071 primeiro: se o d1 passou por 'realizado' o trigger
     // mintou avaliacao_links (e o spec pode ter avaliado) — apagar o pai

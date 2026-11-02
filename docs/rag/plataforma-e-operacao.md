@@ -17,6 +17,7 @@ Decisões operacionais e de produto que ainda **não estão refletidas nos guias
 ## Plataforma
 
 - Todo o programa roda na plataforma de mentoria (**mentoria.realiza.vc**, criada em parceria com a Top2You): matching, agenda dos encontros, fichas das duplas, registros, instrumentos e materiais.
+- **Nomenclatura da interface**: *Material de apoio* é o acervo do programa (roteiros, modelos, guias e links), no item "Materiais de apoio" do menu (/materiais). *Instrumentos* são as ferramentas metodológicas (PDM, Roda da Vida, Perguntas Eficazes, Feedback Construtivo); os da jornada são formulários respondidos na ficha da dupla. Use sempre esses dois nomes ao orientar.
 - Acesso é por **magic link** enviado ao e-mail cadastrado pela coordenação — não existe cadastro aberto. A aba que pede o link recebe a sessão por um handoff seguro (funciona mesmo quando o link é aberto em outro navegador).
 - **Não confundir:** mentoria.realiza.vc (a mentoria) × ead.realiza.vc (cursos EaD opcionais e gratuitos).
 

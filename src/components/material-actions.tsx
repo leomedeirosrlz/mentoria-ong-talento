@@ -262,7 +262,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuItem onClick={() => setEditOpen(true)}>
             <PencilSimple size={16} data-icon="inline-start" aria-hidden />
-            Editar material
+            Editar material de apoio
           </DropdownMenuItem>
           <DropdownMenuItem
             disabled={pending}
@@ -330,7 +330,7 @@ export function MaterialActions({ material, maxEncontro }: { material: Material;
             (tipo×audiência, encontro×url) respiram melhor que no md */}
         <DialogContent size="lg">
           <DialogHeader>
-            <DialogTitle>Editar material</DialogTitle>
+            <DialogTitle>Editar material de apoio</DialogTitle>
             <DialogDescription>
               Título, descrição, tipo e o encontro a que o material pertence.
             </DialogDescription>

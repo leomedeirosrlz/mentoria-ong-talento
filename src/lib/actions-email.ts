@@ -236,7 +236,7 @@ export async function dispararMaterialEmail({
   return dispararParaRoles({
     tipo: "material",
     refId: material.id,
-    assunto: `Novo material: ${material.titulo}`,
+    assunto: `Novo material de apoio: ${material.titulo}`,
     html,
     audiencias,
     autorId,

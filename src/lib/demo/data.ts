@@ -45,6 +45,7 @@ import type {
   Encaminhamento,
   Encontro,
   EncontroIntencao,
+  EncontroRemarcacao,
   EspecialistaEvento,
   ExcecaoEspecialista,
   GradeJanela,
@@ -156,7 +157,7 @@ const uid = (n: number): string =>
 // especialista_grade: 52xx ·
 // especialista_excecoes: 54xx · chamados: 58xx · chamado_atualizacoes: 60xx ·
 // chamado_comentarios: 62xx · chamado_anexos: 64xx · devolutivas: 66xx ·
-// turma_inscricoes: 68xx.
+// turma_inscricoes: 68xx · encontro_remarcacoes: 70xx.
 // user_id fake: f0xx.
 // especialista_eventos e profile_papeis não tem id.
 const P = {
@@ -750,6 +751,7 @@ function build(): DemoData {
   let seqEncam = 0;
   let seqNota = 0;
   let seqInt = 0;
+  let seqRem = 0;
 
   type EncOpts = {
     /** Dia em que aconteceu de fato — default = dia agendado. */
@@ -879,6 +881,28 @@ function build(): DemoData {
     created_by: autor.id,
     created_at: criadoEm,
     updated_at: criadoEm,
+  });
+
+  /** Uma remarcação do encontro (REALIZA-341) — no real só o trigger
+   *  escreve: cada mudança de data_hora carimba de quando pra quando + o
+   *  motivo declarado. O agendamento inicial não entra. */
+  const remarcacao = (
+    enc: Encontro,
+    dataAnterior: string,
+    dataNova: string,
+    motivo: string,
+    criadoEm: string,
+    autor: Profile
+  ): EncontroRemarcacao => ({
+    id: uid(0x7000 + ++seqRem),
+    encontro_id: enc.id,
+    dupla_id: enc.dupla_id,
+    numero: enc.numero,
+    data_anterior: dataAnterior,
+    data_nova: dataNova,
+    motivo,
+    created_by: autor.id,
+    created_at: criadoEm,
   });
 
   // ---------- pessoas ----------
@@ -2221,6 +2245,18 @@ function build(): DemoData {
     ),
     agendado(uid(D.ok), 5, diaEncontro(5), { link: MEET }),
     agendado(uid(D.ok), 6, diaEncontro(6), { link: MEET }),
+  ];
+
+  // REALIZA-341: o 5º encontro andou duas vezes e voltou pra terça oficial —
+  // a Ana moveu pro sábado por causa de uma prova e a dupla desfez quando a
+  // prova foi adiada. O vaivém é o que a coordenação e o calendário do
+  // mentor leem; o motivo que fica na row é o da ÚLTIMA remarcação.
+  encD1[4].motivo_reagendamento = "A prova da escola foi adiada, dá pra manter a terça";
+  encD1[4].remarcacoes = [
+    remarcacao(encD1[4], em(diaEncontro(5), "19:00"), em(addDias(diaEncontro(5), 4), "10:00"),
+      "Conflito de agenda", haDias(4, "21:15"), anaLogin),
+    remarcacao(encD1[4], em(addDias(diaEncontro(5), 4), "10:00"), em(diaEncontro(5), "19:00"),
+      "A prova da escola foi adiada, dá pra manter a terça", haDias(1, "18:40"), ricardo),
   ];
 
   const regD1E1 = encD1[0].registro!;

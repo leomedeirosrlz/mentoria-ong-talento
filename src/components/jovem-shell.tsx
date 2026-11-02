@@ -9,6 +9,7 @@ import {
   House,
   List,
   Path,
+  Question,
   Sparkle,
   UserCircle,
   Users,
@@ -30,7 +31,7 @@ import type { Notificacao, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 /** Lado do jovem (REALIZA-108) — shell próprio, não o AppShell filtrado:
- *  seis destinos fixos e nada de navegação de staff. O acento da nav é o
+ *  sete destinos fixos e nada de navegação de staff. O acento da nav é o
  *  amarelo --role-mentorado (o verde fica pros adultos) — a mesma cor do
  *  avatar-iniciais do jovem no resto do app. */
 const NAV = [
@@ -41,6 +42,8 @@ const NAV = [
   // trilha de progresso, não pasta: jornada é avanço, o acervo é /materiais
   { href: "/jovem/materiais", label: "Jornada", icon: Path },
   { href: "/jovem/perfil", label: "Perfil", icon: UserCircle },
+  // REALIZA-345: a Ajuda do jovem — fora do MOBILE_PRIMEIRO, mora no Menu
+  { href: "/jovem/ajuda", label: "Ajuda", icon: Question },
 ] as const;
 
 /** Bottom nav: 4 destinos fixos + Menu (REALIZA-221). Primárias = o que
@@ -137,7 +140,7 @@ export function JovemShell({
           </div>
         </header>
 
-        {/* sidebar desktop — mesma linguagem do AppShell, cinco destinos */}
+        {/* sidebar desktop — mesma linguagem do AppShell, sete destinos */}
         <aside className="hidden md:flex w-56 shrink-0 bg-sidebar text-sidebar-foreground border-r border-sidebar-border flex-col fixed inset-y-0">
           <div className="px-5 pt-6 pb-8">
             <Link href="/jovem" className="inline-block" aria-label="Início">

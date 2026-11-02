@@ -99,6 +99,7 @@ export function RegistroForm({
   trilha = null,
   registro = null,
   combinadosPendentes,
+  combinadosDoRegistro,
   onSaved,
   embutido = false,
   origem,
@@ -113,6 +114,9 @@ export function RegistroForm({
   registro?: Registro | null;
   /** Encaminhamentos da dupla ainda não feitos (status !== "feito"), por prazo. */
   combinadosPendentes?: Encaminhamento[];
+  /** Combinados gravados por ESTE registro (só edição) — hidratam a etapa 3
+   *  com o id do banco, que volta no submit pro salvarRegistro casar por id. */
+  combinadosDoRegistro?: Encaminhamento[];
   /** Chamado após toda gravação bem-sucedida — ex.: fechar o host. */
   onSaved?: () => void;
   /** Dentro de outra superfície (modal): sem moldura nem título próprios —
@@ -123,7 +127,17 @@ export function RegistroForm({
    *  form infere do `registro` (edição) — nunca afeta comportamento. */
   origem?: "novo" | "retroativo";
 }) {
-  const [encaminhamentos, setEncaminhamentos] = useState<Enc[]>([]);
+  // edição nasce com os combinados já gravados pelo registro — o id de
+  // banco viaja na linha e volta no submit (o Adicionar usa uuid local,
+  // que não casa nada no servidor e cai no insert)
+  const [encaminhamentos, setEncaminhamentos] = useState<Enc[]>(() =>
+    (combinadosDoRegistro ?? []).map((c) => ({
+      id: c.id,
+      descricao: c.descricao,
+      responsavel: c.responsavel,
+      prazo: c.prazo ?? "",
+    }))
+  );
   const [concluirIds, setConcluirIds] = useState<Set<string>>(new Set());
   const [dificuldade, setDificuldade] = useState(registro?.dificuldade ?? "nenhuma");
   const [proximoPasso, setProximoPasso] = useState(registro?.proximo_passo ?? "continuar");
@@ -506,9 +520,14 @@ export function RegistroForm({
       .forEach((t) =>
         fd.append(
           "encaminhamento",
-          JSON.stringify({ descricao: t.descricao, responsavel: t.responsavel, prazo: t.prazo })
+          JSON.stringify({ id: t.id, descricao: t.descricao, responsavel: t.responsavel, prazo: t.prazo })
         )
       );
+    // edição: a lista acima é a COMPLETA (hidratada do registro) — só com
+    // essa marca o servidor apaga o que sumiu. Form de registro novo nunca
+    // manda: se outra aba já gravou o registro, o salvar vira edição no
+    // servidor e não pode derrubar combinados que este form nem carregou
+    if (registro) fd.append("combinados_completos", "1");
     // só manda ids que ainda aparecem como pendentes (a lista pode ter mudado)
     const pendentes = new Set((combinadosPendentes ?? []).map((c) => c.id));
     [...concluirIds]

@@ -466,6 +466,27 @@ export type Encontro = {
    *  dupla. O RLS decide quem a vê: coord/sup sempre, mentor DPP só quando o
    *  jovem autorizou, especialista nunca por aqui (a view dele é estrelas). */
   avaliacao_jovem?: AvaliacaoEncontro | null;
+  /** Trilha de remarcações deste encontro (0153) — embed to-many no select
+   *  da dupla. Cada mudança de data_hora vira uma linha; o agendamento
+   *  inicial não entra. */
+  remarcacoes?: EncontroRemarcacao[];
+};
+
+/** Linha de `encontro_remarcacoes` (REALIZA-341, migration 0153) — uma
+ *  remarcação do encontro: de quando pra quando a data andou + o motivo
+ *  declarado na hora. Só o trigger escreve; o app lê pelo embed do
+ *  encontro (que traz o subset id, datas, motivo e created_at — os demais
+ *  campos ficam undefined fora de selects que os peçam). */
+export type EncontroRemarcacao = {
+  id: string;
+  encontro_id: string;
+  dupla_id: string;
+  numero: number;
+  data_anterior: string;
+  data_nova: string;
+  motivo: string | null;
+  created_by: string | null;
+  created_at: string;
 };
 
 /** Anotação/plano de aula do mentor — chave (dupla_id, numero), não FK de

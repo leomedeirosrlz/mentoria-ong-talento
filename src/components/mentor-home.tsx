@@ -201,7 +201,7 @@ export function MentorHome({
           (encontroAlvo?.data_hora && new Date(encontroAlvo.data_hora) > hoje
             ? encontroAlvo
             : null);
-        // "Agendar próximo" no estado quieto: primeiro número livre depois
+        // "Agendar próximo encontro" no estado quieto: primeiro número livre depois
         // do agendado — livre = sem row realizada/agendada/remarcada
         // (nao_aconteceu e cancelado voltam a ser agendáveis; o dialog
         // recebe a row em `atual` e edita em vez de criar duplicata)
@@ -258,6 +258,14 @@ export function MentorHome({
                   <CardTitle className="text-lg font-semibold mt-1">
                     <DuplaNomes mentor="Você" mentorado={dupla.mentorado.nome} onDark />
                   </CardTitle>
+                  {/* o auxiliar executivo que acompanha a dupla — meta discreto
+                      sob o lockup; white/70 mantém o nome legível no ink (o
+                      white/50 do overline mede ~4.4:1 pra dado lido) */}
+                  {dupla.supervisor && (
+                    <p className="mt-0.5 text-xs text-white/70 sm:text-[11px]">
+                      Auxiliar executivo: {dupla.supervisor.nome}
+                    </p>
+                  )}
                   {/* prazo de 3 meses da trilha — o diferenciador entre duplas
                       especialistas concorrentes; a retintada adapta o badge
                       outline ao banner ink (o componente é superfície clara) */}
@@ -413,7 +421,7 @@ export function MentorHome({
                             trigger={
                               <Button variant="outline" size="sm">
                                 <CalendarPlus size={16} />
-                                Agendar próximo
+                                Agendar próximo encontro
                               </Button>
                             }
                           />

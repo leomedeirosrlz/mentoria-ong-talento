@@ -13,6 +13,7 @@ import {
   Lifebuoy,
   List,
   ListChecks,
+  Question,
   Table,
   UserCircle,
   UsersThree,
@@ -34,8 +35,9 @@ import {
 import type { Notificacao, Profile } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-/** Seção de trabalho da sidebar. Visão geral fica sem grupo (null). */
-type Grupo = "Acompanhar" | "Programa" | "Dados";
+/** Seção de trabalho da sidebar. Visão geral fica sem grupo (null); Ajuda
+ *  fecha a lista num grupo próprio — apoio, não trabalho. */
+type Grupo = "Acompanhar" | "Programa" | "Dados" | "Ajuda";
 
 // a ordem do array é a ordem de exibição dentro de cada grupo
 const NAV = [
@@ -45,18 +47,21 @@ const NAV = [
   // 0084: a fila de chamados é casa nova da coordenação/auxiliar — badge =
   // chamados sem dono (quem assumir primeiro trata)
   { href: "/chamados", label: "Chamados", curto: "Chamados", icon: Lifebuoy, roles: ["coordenacao", "supervisor"], grupo: "Acompanhar" },
-  { href: "/materiais", label: "Materiais", curto: "Materiais", icon: FolderOpen, roles: null, grupo: "Programa" },
+  { href: "/materiais", label: "Materiais de apoio", curto: "Materiais", icon: FolderOpen, roles: null, grupo: "Programa" },
   { href: "/formularios", label: "Formulários", curto: "Forms", icon: ListChecks, roles: ["coordenacao"], grupo: "Programa" },
   { href: "/turmas", label: "Turmas", curto: "Turmas", icon: ChalkboardTeacher, roles: ["coordenacao"], grupo: "Programa" },
   { href: "/registros", label: "Registros", curto: "Registros", icon: ClipboardText, roles: ["coordenacao", "supervisor"], grupo: "Dados" },
   { href: "/relatorios", label: "Relatórios", curto: "Relatórios", icon: Table, roles: ["coordenacao"], grupo: "Dados" },
   { href: "/pessoas", label: "Pessoas", curto: "Pessoas", icon: UsersThree, roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"], grupo: "Dados" },
+  // REALIZA-345: a Ajuda vale pra todos os papéis de staff e fica fora da
+  // barra do celular (o MOBILE_PRIMEIRO não a inclui — mora no menu lateral)
+  { href: "/ajuda", label: "Ajuda", curto: "Ajuda", icon: Question, roles: null, grupo: "Ajuda" },
 ] as const;
 
 type Item = (typeof NAV)[number];
 type Secao<T> = { titulo: Grupo | null; itens: T[] };
 
-const GRUPOS: readonly (Grupo | null)[] = [null, "Acompanhar", "Programa", "Dados"];
+const GRUPOS: readonly (Grupo | null)[] = [null, "Acompanhar", "Programa", "Dados", "Ajuda"];
 
 /** Agrupa por trabalho, na ordem fixa dos grupos (a ordem dos itens vem da NAV). */
 function porGrupo<T extends { grupo: Grupo | null }>(itens: readonly T[]): Secao<T>[] {
@@ -66,8 +71,8 @@ function porGrupo<T extends { grupo: Grupo | null }>(itens: readonly T[]): Secao
   })).filter((s) => s.itens.length > 0);
 }
 
-// até 7 itens a lista é simples (supervisor = 7, mentor = 5); acima disso,
-// só a coordenação, e ela agrupa por trabalho
+// até 7 itens a lista é simples (mentor = 6); acima disso ela agrupa por
+// trabalho — coordenação e, desde a Ajuda, o auxiliar (8)
 const LIMITE_LISTA_SIMPLES = 7;
 
 /** A lista de navegação agrupada — a mesma na sidebar do desktop e no
