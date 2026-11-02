@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { cookies } from "next/headers";
 import { audienciasDe, veMaterial } from "@/lib/materiais";
 import { temPapel } from "@/lib/types";
 import {
@@ -29,6 +30,12 @@ import {
 } from "@/lib/ciclo";
 import { deriveAgendaMinha } from "@/lib/agenda-minha";
 import { duplaSupervisionada } from "@/lib/auxiliar-escopo";
+import {
+  resolveTurmaFoco,
+  TURMA_FOCO_COOKIE,
+  turmasDisponiveis,
+} from "@/lib/turma-contexto";
+import { turmaDaDupla } from "@/lib/turma";
 import { abasDaAgenda, PAINEL_AGENDA, idDaAba } from "@/lib/agenda-abas";
 import { AbasAgenda } from "@/components/agenda-abas";
 import { AgendaAuxiliar, CabecalhoAuxiliar } from "@/components/agenda-auxiliar";
@@ -41,6 +48,11 @@ import { AgendaEspecialista } from "@/components/agenda-especialista";
 import { AgendaEspHorarios } from "@/components/agenda-especialista-horarios";
 import { AgendaMinha } from "@/components/agenda-minha";
 import { AgendaPorMentorado } from "@/components/agenda-por-mentorado";
+import {
+  TurmaContextoSelect,
+  TurmaFocoSync,
+} from "@/components/turma-contexto-select";
+import { FaixaTurmaFoco } from "@/components/turma-hub";
 
 export const metadata: Metadata = { title: "Agenda" };
 
@@ -52,6 +64,7 @@ export default async function AgendaPage({
     visao?: string;
     aba?: string;
     jw?: string;
+    turma?: string | string[];
   }>;
 }) {
   // ?dia=YYYY-MM-DD abre a agenda já no dia (deep-link da ficha/notificações);
@@ -59,7 +72,15 @@ export default async function AgendaPage({
   // ?aba=minha|por-mentorado|calendario abre o modo dentro da visão DPP (WP3)
   // ?jw=semana|mes|ciclo — a janela temporal de coord/sup (REALIZA-195);
   // é param próprio, nunca recicla o ?visao= de papel
-  const { dia, visao: visaoParam, aba: abaParam, jw } = await searchParams;
+  // ?turma=<label> — contexto de turma das superfícies de equipe
+  // (REALIZA-73): param > cookie turma_foco > "todas"
+  const {
+    dia,
+    visao: visaoParam,
+    aba: abaParam,
+    jw,
+    turma: turmaParam,
+  } = await searchParams;
   const diaInicial = dia && /^\d{4}-\d{2}-\d{2}$/.test(dia) ? dia : null;
   const janelaInicial =
     jw === "semana" || jw === "mes" || jw === "ciclo" ? jw : null;
@@ -71,19 +92,83 @@ export default async function AgendaPage({
   // getDuplas vem no escopo do RLS: mentor→a própria, supervisor→supervisionadas, coord→todas.
   // O que só um ramo usa (materiais, grade do mentor, chamada, catálogo esp)
   // é buscado depois do roteamento — a aba não paga pela query da outra.
-  const [eventos, me, duplas, cronogramas] = await Promise.all([
+  const [eventos, me, duplas, cronogramas, cookieStore] = await Promise.all([
     getCicloEventos(),
     getMe(),
     getDuplas(),
     getCronogramas(),
+    cookies(),
   ]);
   const agora = new Date();
   const hoje = toDateStr(agora);
+
+  // ---- contexto de turma (REALIZA-73) — só as superfícies de equipe
+  // (monitoramento da coordenação, agenda do auxiliar e o calendário
+  // oficial delas) se recortam; as de mentor/especialista são da pessoa
+  // e não leem contexto. Escopo do auxiliar = as turmas das supervisionadas
+  // (mesma régua da home e da /duplas — nunca nomeia turma alheia). ----
+  const supervisionadas = me
+    ? duplas.filter((d) => duplaSupervisionada(d, me.id))
+    : duplas;
+  const escopoTurmas =
+    me?.role === "supervisor"
+      ? [
+          ...new Set(
+            supervisionadas
+              .map((d) => turmaDaDupla(d, cronogramas))
+              .filter((t): t is string => !!t)
+          ),
+        ]
+      : undefined;
+  const papelContexto =
+    me?.role === "coordenacao" || me?.role === "supervisor";
+  const foco = papelContexto
+    ? resolveTurmaFoco(
+        turmaParam,
+        cookieStore.get(TURMA_FOCO_COOKIE)?.value,
+        cronogramas,
+        { papel: me!.role, escopoTurmas }
+      )
+    : null;
+  // os conjuntos já recortados: o calendário oficial do contexto são os
+  // cronogramas da turma (1 turma com 2 cronogramas mantém os dois — o
+  // seletor interno do calendário desambigua); as duplas casam pelo
+  // rótulo vivo (turmaDaDupla), nunca pelo selo congelado
+  const cronogramasCtx = foco?.cronogramas ?? cronogramas;
+  const idsCronCtx = new Set(cronogramasCtx.map((c) => c.id));
+  const eventosCtx = foco?.turma
+    ? eventos.filter((e) => idsCronCtx.has(e.cronograma_id))
+    : eventos;
+  const duplasCtx = foco?.turma
+    ? duplas.filter((d) => turmaDaDupla(d, cronogramas) === foco.turma)
+    : duplas;
+  const supervisionadasCtx = foco?.turma
+    ? supervisionadas.filter(
+        (d) => turmaDaDupla(d, cronogramas) === foco.turma
+      )
+    : supervisionadas;
+  // seletor + faixa do contexto — o seletor se esconde com <2 opções mas
+  // o sync do cookie roda dentro dele de qualquer jeito (a /duplas usa
+  // os chips dela como controle; aqui o controle é o seletor do header)
+  const turmasNavegaveis = papelContexto
+    ? turmasDisponiveis(cronogramas, { papel: me!.role, escopoTurmas })
+    : [];
+  const seletorTurma = foco ? (
+    <TurmaContextoSelect
+      turmas={turmasNavegaveis}
+      foco={{ turma: foco.turma, origem: foco.origem }}
+    />
+  ) : null;
+  const faixaTurma = (
+    <FaixaTurmaFoco foco={foco?.turma ?? null} hrefTodas="/agenda?turma=todas" />
+  );
+
   // "semana do encontro" é do cronograma vigente (o default da tela) — na
   // união dos calendários, semana de T1 e T2 se embaralhariam. Ela alimenta
   // só a inicialização/deep-link do calendário: dentro dele o "atual" é
-  // recomputado do cronograma selecionado
-  const vigente = cronogramaVigente(cronogramas, agora);
+  // recomputado do cronograma selecionado. Com turma em foco o vigente é
+  // o DELA (a semana destacada é da turma que a pessoa está trabalhando)
+  const vigente = cronogramaVigente(cronogramasCtx, agora);
   const eventosVigente = vigente
     ? eventosDoCronograma(eventos, vigente.id)
     : eventos;
@@ -190,6 +275,11 @@ export default async function AgendaPage({
     return (
       <div className="space-y-6">
         {avisoVisao}
+        {/* a visão é da pessoa, não do contexto — mas um ?turma= pousado
+            aqui ainda precisa gravar o cookie (sync headless, sem UI) */}
+        {foco && (
+          <TurmaFocoSync foco={{ turma: foco.turma, origem: foco.origem }} />
+        )}
         {duplasEsp.length === 0 ? (
           <>
             <header>
@@ -274,6 +364,11 @@ export default async function AgendaPage({
     return (
       <div className="space-y-6">
         {avisoVisao}
+        {/* idem visão esp: superfície do mentor não se recorta, mas o
+            ?turma= pousado aqui persiste no cookie mesmo assim */}
+        {foco && (
+          <TurmaFocoSync foco={{ turma: foco.turma, origem: foco.origem }} />
+        )}
         <header>
           <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
           {subtituloDpp}
@@ -338,9 +433,6 @@ export default async function AgendaPage({
   // supervisor+mentor tem o calendário DPP dele atrás de ?aba=calendario e
   // dos deep-links ?dia=/?jw= — sem o guard, o ramo da auxiliar captura a
   // aba e a janela que não são dela
-  const supervisionadas = me
-    ? duplas.filter((d) => duplaSupervisionada(d, me.id))
-    : duplas;
   if (
     me?.role === "supervisor" &&
     !(
@@ -353,15 +445,17 @@ export default async function AgendaPage({
     // "Consolidada" é uma das abas da barra (a ativa). O default é "Por turma".
     const consolidada = abaParam === "consolidada";
     const [nudgesAux] = await Promise.all([
-      getUltimasInteracoes(supervisionadas.map((d) => d.id), "nudge"),
+      getUltimasInteracoes(supervisionadasCtx.map((d) => d.id), "nudge"),
     ]);
     return (
       <div className="space-y-6">
         {avisoVisao}
         <AgendaAuxiliar
-          duplas={supervisionadas}
-          eventos={eventos}
-          cronogramas={cronogramas}
+          // o contexto recorta no server, como na /duplas dele — o grupo
+          // "Por turma" da turma em foco fica sozinho e a faixa dá a saída
+          duplas={supervisionadasCtx}
+          eventos={eventosCtx}
+          cronogramas={cronogramasCtx}
           nudges={nudgesAux}
           meuNome={me.nome.split(" ")[0]}
           hoje={hoje}
@@ -371,6 +465,8 @@ export default async function AgendaPage({
           // param do ramo auxiliar); pro supervisor puro o link seria engolido
           comLinkDia={souMentor}
           consolidada={consolidada}
+          seletorContexto={seletorTurma}
+          contextoTurma={faixaTurma}
           abas={
             <AbasAgenda
               abas={abas}
@@ -393,7 +489,8 @@ export default async function AgendaPage({
   ) {
     const [nudgesCoord, encerramentosPendentes] =
       await Promise.all([
-        getUltimasInteracoes(duplas.map((d) => d.id), "nudge"),
+        // o cap de 48h do Lembrar só precisa das duplas do recorte
+        getUltimasInteracoes(duplasCtx.map((d) => d.id), "nudge"),
         // rito de encerramento aberto — a pendência que vira linha "concluir
         // na ficha" quando a dupla já concluiu (REALIZA-172)
         getEncerramentosPendentes(),
@@ -402,14 +499,18 @@ export default async function AgendaPage({
       <div className="space-y-6">
         {avisoVisao}
         <AgendaCoordenacao
-          duplas={duplas}
-          eventos={eventos}
-          cronogramas={cronogramas}
+          // fila, semana e números derivam do recorte: com turma em foco
+          // os cards-resumo e o "para acompanhar" falam só dela
+          duplas={duplasCtx}
+          eventos={eventosCtx}
+          cronogramas={cronogramasCtx}
           nudges={nudgesCoord}
           encerramentosPendentes={new Set(encerramentosPendentes)}
           meuNome={me.nome.split(" ")[0]}
           hoje={hoje}
           agora={agora.getTime()}
+          seletorContexto={seletorTurma}
+          contextoTurma={faixaTurma}
           abas={<AbasAgenda abas={abas} ativa="monitoramento" />}
         />
       </div>
@@ -432,13 +533,27 @@ export default async function AgendaPage({
   );
   // chamada dos encontros de formação — só a coordenação marca; pros demais
   // papéis nem busca (a UI nem renderiza o painel fora da coordenação)
-  const idsFormacao = eventos
+  const idsFormacao = eventosCtx
     .filter((e) => e.tipo === "formacao")
     .map((e) => e.id);
   const [mentoresChamada, presencasLista] =
     me?.role === "coordenacao"
       ? await Promise.all([getMentoresChamada(), getPresencas(idsFormacao)])
       : [[], []];
+  // a chamada é da turma em foco (navegacao-turmas.md): mentor dela = quem
+  // tem dupla nos cronogramas do contexto; quem ainda não tem dupla em
+  // turma nenhuma segue na lista de qualquer foco (não dá pra dizer de
+  // qual turma ele é até o membership real da REALIZA-47)
+  const mentoresCtx = foco?.turma
+    ? mentoresChamada.filter(
+        (m) =>
+          !duplas.some((d) => d.mentor?.id === m.id) ||
+          duplas.some(
+            (d) =>
+              d.mentor?.id === m.id && idsCronCtx.has(d.cronograma_id ?? "")
+          )
+      )
+    : mentoresChamada;
   const presencasPorEvento: Record<string, Record<string, boolean>> = {};
   for (const p of presencasLista)
     (presencasPorEvento[p.ciclo_evento_id] ??= {})[p.profile_id] = p.presente;
@@ -447,19 +562,30 @@ export default async function AgendaPage({
   // superfície de onde a pessoa veio, pra trocar de aba não reescrever o h1
   const cabecalhoCalendario =
     !papelStaff || visao === "dpp" ? (
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
-        {subtituloDpp}
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
+          {subtituloDpp}
+        </div>
+        {/* staff+mentor com ?visao=dpp: a superfície abaixo segue sendo a
+            de equipe (o calendário decide por papel, não por ?visao=) —
+            o seletor de contexto vale pra ela também */}
+        {seletorTurma}
       </header>
     ) : me?.role === "coordenacao" ? (
-      <CabecalhoCoordenacao hoje={hoje} />
+      <CabecalhoCoordenacao hoje={hoje} seletor={seletorTurma} />
     ) : (
-      <CabecalhoAuxiliar duplas={supervisionadas} hoje={hoje} />
+      <CabecalhoAuxiliar
+        duplas={supervisionadasCtx}
+        hoje={hoje}
+        seletor={seletorTurma}
+      />
     );
 
   return (
     <div className="space-y-6">
       {cabecalhoCalendario}
+      {foco?.turma && faixaTurma}
       <AbasAgenda abas={abas} ativa="calendario" />
       <div
         id={PAINEL_AGENDA}
@@ -475,18 +601,21 @@ export default async function AgendaPage({
           </div>
         ) : (
           <AgendaCalendarioLazy
-            eventos={eventos}
-            cronogramas={cronogramas}
+            // a camada oficial é a do contexto: com turma em foco o
+            // seletor interno só oferece os cronogramas dela e os dots/
+            // coberturas contam as duplas dela (design REALIZA-73)
+            eventos={eventosCtx}
+            cronogramas={cronogramasCtx}
             espEventos={espEventos}
             materiais={materiaisVisiveis}
             hoje={hoje}
             semanaId={semana?.id ?? null}
             diaInicial={diaInicial}
             janelaInicial={janelaInicial}
-            duplas={duplas}
+            duplas={duplasCtx}
             role={me?.role ?? null}
             papeis={me?.papeis ?? null}
-            mentores={mentoresChamada}
+            mentores={mentoresCtx}
             presencas={presencasPorEvento}
             // Overlay "quem pode nesse dia" — só o mentor DPP puro
             // (REALIZA-24): coord/sup veem TODAS as duplas (uma tinta por

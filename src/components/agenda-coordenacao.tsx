@@ -50,10 +50,13 @@ export function AgendaCoordenacao({
   hoje,
   agora: agoraMs,
   abas,
+  seletorContexto,
+  contextoTurma,
 }: {
-  /** Todas as duplas do ciclo (RLS da coordenação). */
+  /** Duplas do recorte da página (RLS da coordenação × turma em foco). */
   duplas: Dupla[];
   eventos: CicloEvento[];
+  /** Cronogramas do recorte — com turma em foco a página manda só os dela. */
   cronogramas: Cronograma[];
   /** getUltimasInteracoes — a lib filtra a tipo 'nudge' pro cap de 48h. */
   nudges: Record<string, Interacao>;
@@ -70,6 +73,11 @@ export function AgendaCoordenacao({
   agora: number;
   /** Barra de modos da página (AbasAgenda) — uma por página, no header. */
   abas?: ReactNode;
+  /** Seletor de contexto de turma (REALIZA-73) — encosta à direita do h1,
+   *  como na home. */
+  seletorContexto?: ReactNode;
+  /** Faixa "Mostrando: Turma N · ver todas" — sob o header quando há foco. */
+  contextoTurma?: ReactNode;
 }) {
   const agora = new Date(agoraMs);
   const resumos = resumosPorCronograma(duplas, cronogramas, eventos, agora);
@@ -172,7 +180,9 @@ export function AgendaCoordenacao({
     <div className="space-y-6">
       {/* header compartilhado com a aba Calendário: trocar de aba não
           reescreve o h1 nem o contexto da semana */}
-      <CabecalhoCoordenacao hoje={hoje} />
+      <CabecalhoCoordenacao hoje={hoje} seletor={seletorContexto} />
+
+      {contextoTurma}
 
       {abas}
 
@@ -285,7 +295,15 @@ export function AgendaCoordenacao({
 /** Header do monitoramento — o mesmo na aba Calendário da coordenação (a
  *  página monta esse calendário com a superfície de equipe). Fora do
  *  componente pra que as duas abas leiam um h1 só. */
-export function CabecalhoCoordenacao({ hoje }: { hoje: string }) {
+export function CabecalhoCoordenacao({
+  hoje,
+  seletor,
+}: {
+  hoje: string;
+  /** Seletor de contexto de turma — encosta à direita do header quando a
+   *  página manda (multi-turma, REALIZA-73). */
+  seletor?: ReactNode;
+}) {
   const { seg, dom } = semanaBounds(new Date(`${hoje}T12:00:00Z`));
   const rotuloHoje = rotuloDiaAgenda(hoje);
   return (
@@ -300,6 +318,7 @@ export function CabecalhoCoordenacao({ hoje }: { hoje: string }) {
           {rotuloHoje.charAt(0).toLowerCase() + rotuloHoje.slice(1)}
         </p>
       </div>
+      {seletor}
     </header>
   );
 }

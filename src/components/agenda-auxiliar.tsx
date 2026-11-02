@@ -76,8 +76,11 @@ export function AgendaAuxiliar({
   comLinkDia,
   consolidada,
   abas,
+  seletorContexto,
+  contextoTurma,
 }: {
-  /** Só as duplas que eu supervisiono (a página filtra). */
+  /** Só as duplas que eu supervisiono (a página filtra), no recorte da
+   *  turma em foco quando houver. */
   duplas: Dupla[];
   eventos: CicloEvento[];
   cronogramas: Cronograma[];
@@ -98,6 +101,11 @@ export function AgendaAuxiliar({
   consolidada: boolean;
   /** Barra de modos da página (AbasAgenda) — uma por página, no header. */
   abas?: ReactNode;
+  /** Seletor de contexto de turma (REALIZA-73) — à direita do h1, com as
+   *  turmas do escopo dele (mesma régua da home). */
+  seletorContexto?: ReactNode;
+  /** Faixa "Mostrando: Turma N · ver todas" — sob o header quando há foco. */
+  contextoTurma?: ReactNode;
 }) {
   const agora = new Date(agoraMs);
   const grupos = duplasPorTurma(duplas, cronogramas, eventos, agora);
@@ -138,7 +146,9 @@ export function AgendaAuxiliar({
     <div className="space-y-6">
       {/* header + barra compartilhados com a aba Calendário do supervisor+mentor:
           trocar de aba não reescreve o h1 nem o recorte das turmas */}
-      <CabecalhoAuxiliar duplas={duplas} hoje={hoje} />
+      <CabecalhoAuxiliar duplas={duplas} hoje={hoje} seletor={seletorContexto} />
+
+      {contextoTurma}
 
       {abas}
 
@@ -261,10 +271,14 @@ export function AgendaAuxiliar({
 export function CabecalhoAuxiliar({
   duplas,
   hoje,
+  seletor,
 }: {
   /** Duplas supervisionadas (a página já filtra pelo escopo). */
   duplas: Dupla[];
   hoje: string;
+  /** Seletor de contexto de turma — encosta à direita do header quando a
+   *  página manda (multi-turma no escopo dele, REALIZA-73). */
+  seletor?: ReactNode;
 }) {
   const correndo = duplas.filter(
     (d) => d.status === "ativa" || d.status === "pausada"
@@ -276,15 +290,18 @@ export function CabecalhoAuxiliar({
   ];
   const { seg, dom } = semanaBounds(new Date(`${hoje}T12:00:00Z`));
   return (
-    <header>
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Agenda das minhas duplas
-      </h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {turmasTxt.join(" e ")}
-        {correndo.length > 0 &&
-          `${turmasTxt.length > 0 ? " · " : ""}semana ${semanaIso(hoje)}, ${Number(seg.slice(8, 10))} a ${Number(dom.slice(8, 10))} de ${mesLongo(dom)}`}
-      </p>
+    <header className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Agenda das minhas duplas
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {turmasTxt.join(" e ")}
+          {correndo.length > 0 &&
+            `${turmasTxt.length > 0 ? " · " : ""}semana ${semanaIso(hoje)}, ${Number(seg.slice(8, 10))} a ${Number(dom.slice(8, 10))} de ${mesLongo(dom)}`}
+        </p>
+      </div>
+      {seletor}
     </header>
   );
 }
