@@ -641,11 +641,15 @@ function IndicadorSemanaMes({
               agoraMs
             )
           : null;
+        // neutro = gramática do rail: lime passada, lime com anel na semana
+        // corrente, cinza por vir
         const cor = estado
           ? INDICADOR_SEMANA[estado]
           : fim < hoje
             ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
-            : "bg-muted text-muted-foreground";
+            : semanaComecou
+              ? "bg-[var(--brand-lime)] text-[var(--brand-ink)] ring-2 ring-[var(--brand-lime)]/40 ring-offset-1 ring-offset-card"
+              : "bg-muted text-muted-foreground";
         return (
           <button
             key={e.id}
