@@ -163,6 +163,12 @@ function linhas(tabela: string, papel: AppRole | null): Linha[] {
       return d.duplas.flatMap(
         (x) => (x.intencoes ?? []) as unknown as Linha[]
       );
+    case "encontro_remarcacoes":
+      return d.duplas.flatMap((x) =>
+        (x.encontros ?? []).flatMap(
+          (e) => (e.remarcacoes ?? []) as unknown as Linha[]
+        )
+      );
     case "registro_anexos":
       return d.anexos as unknown as Linha[];
     case "materiais":

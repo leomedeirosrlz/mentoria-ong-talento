@@ -396,7 +396,8 @@ export const DUPLA_SELECT = `
   mentorado:mentorados(${MENTORADO_COLS_PAR}),
   supervisor:profiles!duplas_supervisor_id_fkey(${PROFILE_COLS_PUBLICAS}),
   encontros(*, registro:registros(id, encontro_id, tema, atividades, avaliacao, dificuldade, dificuldade_detalhe, precisa_apoio, proximo_passo, proximo_passo_detalhe, reflexoes, observacoes, ferramenta, created_at, updated_at, created_by, autor:profiles!registros_created_by_fkey(nome)),
-    avaliacao_jovem:avaliacoes_encontro(*)),
+    avaliacao_jovem:avaliacoes_encontro(*),
+    remarcacoes:encontro_remarcacoes(id, data_anterior, data_nova, motivo, created_at)),
   encaminhamentos(*),
   notas:encontro_notas(*),
   intencoes:encontro_intencoes(*)
