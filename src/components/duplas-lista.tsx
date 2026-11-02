@@ -242,8 +242,8 @@ function LinhaDupla({
     d.turma ? turmaLonga(d.turma) : null,
     mostrarSupervisor
       ? d.supervisor
-        ? `sup. ${d.supervisor.nome}`
-        : "sem supervisor"
+        ? `auxiliar executivo ${d.supervisor.nome}`
+        : "sem auxiliar executivo"
       : null,
   ]
     .filter(Boolean)
