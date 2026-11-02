@@ -1863,6 +1863,92 @@ export type Database = {
           },
         ]
       }
+      encontro_remarcacoes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_anterior: string
+          data_nova: string
+          dupla_id: string
+          encontro_id: string
+          id: string
+          motivo: string | null
+          numero: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_anterior: string
+          data_nova: string
+          dupla_id: string
+          encontro_id: string
+          id?: string
+          motivo?: string | null
+          numero: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_anterior?: string
+          data_nova?: string
+          dupla_id?: string
+          encontro_id?: string
+          id?: string
+          motivo?: string | null
+          numero?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encontro_remarcacoes_encontro_id_fkey"
+            columns: ["encontro_id"]
+            isOneToOne: false
+            referencedRelation: "encontros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       encontro_notas: {
         Row: {
           created_at: string

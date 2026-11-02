@@ -82,20 +82,42 @@ export function DuplaMaisMenu({
 }) {
   const [aberto, setAberto] = useState<DialogId | null>(null);
 
-  const temItem =
-    !!formulario ||
-    !!solicitar ||
-    !!sugerir ||
-    !!encerrar ||
-    !!remanejar;
-  if (!temItem) return null;
+  // uma lista só alimenta as duas apresentações: em linha a partir do sm
+  // (o cabeçalho tem espaço e a ação fica à vista, sem caçar no Mais) e o
+  // menu no celular, onde a linha de botões quebraria em três andares
+  const itens = [
+    formulario && { id: "form", Icone: PaperPlaneTilt, rotulo: "Enviar formulário" },
+    solicitar && { id: "solicitar", Icone: UserPlus, rotulo: "Solicitar mentor especialista" },
+    sugerir && { id: "sugerir", Icone: Sparkle, rotulo: "Sugerir especialista pro jovem" },
+    remanejar && { id: "remanejar", Icone: ArrowsLeftRight, rotulo: "Remanejar dupla" },
+    encerrar && { id: "encerrar", Icone: FlagCheckered, rotulo: "Encerrar trilha" },
+  ].filter(Boolean) as { id: DialogId; Icone: typeof UserPlus; rotulo: string }[];
+  if (itens.length === 0) return null;
 
   return (
     <>
+      {itens.map(({ id, Icone, rotulo }) => (
+        <Button
+          key={id}
+          variant="outline"
+          size="sm"
+          className="hidden sm:inline-flex"
+          aria-haspopup="dialog"
+          onClick={() => setAberto(id)}
+        >
+          <Icone aria-hidden />
+          {rotulo}
+        </Button>
+      ))}
       <DropdownMenu>
         <DropdownMenuTrigger
           render={
-            <Button variant="outline" size="sm" aria-label="Mais ações da dupla">
+            <Button
+              variant="outline"
+              size="sm"
+              className="sm:hidden"
+              aria-label="Mais ações da dupla"
+            >
               <DotsThree weight="bold" aria-hidden className="size-4" />
               Mais
             </Button>
@@ -104,51 +126,16 @@ export function DuplaMaisMenu({
         {/* w-56: o popup é mais largo que o trigger — a âncora ficaria
             apertada pros labels de ação (o default é w-(--anchor-width)) */}
         <DropdownMenuContent align="end" className="w-56">
-          {formulario && (
+          {itens.map(({ id, Icone, rotulo }) => (
             <DropdownMenuItem
+              key={id}
               aria-haspopup="dialog"
-              onClick={() => setAberto("form")}
+              onClick={() => setAberto(id)}
             >
-              <PaperPlaneTilt aria-hidden className={ICONE} />
-              Enviar formulário
+              <Icone aria-hidden className={ICONE} />
+              {rotulo}
             </DropdownMenuItem>
-          )}
-          {solicitar && (
-            <DropdownMenuItem
-              aria-haspopup="dialog"
-              onClick={() => setAberto("solicitar")}
-            >
-              <UserPlus aria-hidden className={ICONE} />
-              Solicitar mentor especialista
-            </DropdownMenuItem>
-          )}
-          {sugerir && (
-            <DropdownMenuItem
-              aria-haspopup="dialog"
-              onClick={() => setAberto("sugerir")}
-            >
-              <Sparkle aria-hidden className={ICONE} />
-              Sugerir especialista pro jovem
-            </DropdownMenuItem>
-          )}
-          {remanejar && (
-            <DropdownMenuItem
-              aria-haspopup="dialog"
-              onClick={() => setAberto("remanejar")}
-            >
-              <ArrowsLeftRight aria-hidden className={ICONE} />
-              Remanejar dupla
-            </DropdownMenuItem>
-          )}
-          {encerrar && (
-            <DropdownMenuItem
-              aria-haspopup="dialog"
-              onClick={() => setAberto("encerrar")}
-            >
-              <FlagCheckered aria-hidden className={ICONE} />
-              Encerrar trilha
-            </DropdownMenuItem>
-          )}
+          ))}
         </DropdownMenuContent>
       </DropdownMenu>
 

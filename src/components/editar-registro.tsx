@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { PencilSimple } from "@phosphor-icons/react";
 import type { PassoGuia } from "@/lib/ciclo";
-import type { Registro } from "@/lib/types";
+import type { Encaminhamento, Registro } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { RegistroFormLazy } from "@/components/registro-form-lazy";
 
@@ -12,11 +12,15 @@ export function EditarRegistro({
   duplaId,
   evento,
   registro,
+  combinados = [],
 }: {
   encontroId: string;
   duplaId: string;
   evento: PassoGuia | null;
   registro: Registro;
+  /** Combinados gravados por este registro — hidratam a etapa 3 do form de
+   *  edição (o id do banco é o que o salvarRegistro casa por id). */
+  combinados?: Encaminhamento[];
 }) {
   const [aberto, setAberto] = useState(false);
 
@@ -28,6 +32,7 @@ export function EditarRegistro({
           duplaId={duplaId}
           evento={evento}
           registro={registro}
+          combinadosDoRegistro={combinados}
           onSaved={() => setAberto(false)}
         />
         <Button type="button" variant="ghost" size="sm" onClick={() => setAberto(false)}>
