@@ -177,7 +177,7 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
       page.getByRole("button", { name: "Agendar encontro", exact: true })
     ).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: "Agendar próximo", exact: true })
+      page.getByRole("button", { name: "Agendar próximo encontro", exact: true })
     ).toHaveCount(0);
     await expect(
       page.getByText(/Sessão nova nasce de um pedido aceito/).first()

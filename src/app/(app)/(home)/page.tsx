@@ -300,7 +300,7 @@ export default async function HomePage({
     .filter((d) => d.status === "ativa" || d.status === "pausada")
     .map((d) => ({
       id: d.id,
-      label: `${d.mentorado?.nome?.split(" ")[0] ?? "Mentorado(a)"} · ${d.trilha === "especialista" ? "Especialista" : "DPP"}`,
+      label: `${d.mentorado?.nome ?? "Mentorado(a)"} · ${d.trilha === "especialista" ? "Especialista" : "DPP"}`,
     }));
   return (
     <div className="space-y-8">
