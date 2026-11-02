@@ -340,7 +340,7 @@ export function ChamadoDetalhe({
         {/* pedido original — a mensagem que abriu o chamado não aparecia */}
         {!chamado.restrito && chamado.mensagem && (
           <div className="mt-3.5 rounded-lg border border-border bg-muted/30 px-3.5 py-3">
-            <h3 className="text-xs sm:text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+            <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
               {staff
                 ? `Pedido original · ${chamado.autor_nome ?? "autor"}`
                 : "Você escreveu"}
@@ -652,7 +652,7 @@ export function ChamadoDetalhe({
 function FatoChamado({ rotulo, valor }: { rotulo: string; valor: string }) {
   return (
     <div className="min-w-0">
-      <dt className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+      <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
         {rotulo}
       </dt>
       <dd className="mt-0.5 truncate text-xs font-medium text-foreground">
@@ -1203,7 +1203,7 @@ function ChamadoComposer({
             >
               <li
                 role="presentation"
-                className="px-3 pb-1 pt-1.5 text-xs sm:text-[10px] font-semibold uppercase tracking-wider text-muted-foreground"
+                className="px-3 pb-1 pt-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]"
               >
                 Marcar alguém. Continue digitando pra filtrar
               </li>
@@ -1308,7 +1308,7 @@ function ChamadoComposer({
                 <UserPlus size={15} aria-hidden />+ pessoas
               </PopoverTrigger>
               <PopoverContent side="top" align="start" className="w-72 max-w-[calc(100vw-2rem)] p-1.5">
-                <p className="px-2.5 pb-1 pt-2 text-xs sm:text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <p className="px-2.5 pb-1 pt-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
                   Marcar alguém da equipe
                 </p>
                 <ul>
