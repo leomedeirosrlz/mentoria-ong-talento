@@ -848,6 +848,7 @@ export default async function DuplaPage({
         podeRemoverAnexos={souCoord || (souMentor && (dupla.status === "ativa" || ritoPendente))}
         anexos={(enc?.registro && anexosPorRegistro[enc.registro.id]) || []}
         materiais={materiaisPorNumero.get(passo.numero) ?? []}
+        combinados={dupla.encaminhamentos ?? []}
         combinadosPendentes={combinadosPendentes}
         nota={dupla.notas?.find((n) => n.numero === passo.numero)?.texto ?? null}
         intencoes={(dupla.intencoes ?? []).filter(

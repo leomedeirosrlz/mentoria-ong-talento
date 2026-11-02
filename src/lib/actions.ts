@@ -22,6 +22,8 @@ import {
 import { capitalizar, cpfValido, erroAmigavel, nomeProprio } from "@/lib/utils";
 import { desfechoValido } from "@/lib/dupla-desfecho";
 import type { DuplaDesfecho } from "@/lib/dupla-desfecho";
+import { reconciliaCombinados } from "@/lib/combinados";
+import type { CombinadoEnviado } from "@/lib/combinados";
 import { snapshotDuplaHoje } from "@/lib/jobs";
 import { temPapel } from "@/lib/types";
 import type { AppRole, ComunicadoPrioridade, CorRaca, Cronograma, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, SituacaoMentorado, Trilha } from "@/lib/types";
@@ -3399,8 +3401,10 @@ export async function salvarRegistro(formData: FormData) {
         .from("registros").insert({ ...payload, encontro_id, created_by: eu.id }).select("id").single();
   if (error) return { error: erroAmigavel(error) };
 
-  // encaminhamentos vêm como JSON por linha (descrição pode ter qualquer caractere)
-  const enc = formData
+  // encaminhamentos vêm como JSON por linha (descrição pode ter qualquer
+  // caractere); o `id` só existe na edição — id de banco casa update/delete,
+  // o uuid local das linhas novas não casa nada e cai no insert
+  const enc: CombinadoEnviado[] = formData
     .getAll("encaminhamento")
     .map(String)
     .flatMap((line) => {
@@ -3409,30 +3413,55 @@ export async function salvarRegistro(formData: FormData) {
         const descricao = String(t.descricao ?? "").trim();
         if (!descricao) return [];
         return [{
+          id: typeof t.id === "string" && t.id ? t.id : null,
           descricao,
-          responsavel: t.responsavel === "mentor" ? "mentor" : "mentorado",
+          responsavel: t.responsavel === "mentor" ? ("mentor" as const) : ("mentorado" as const),
           prazo: t.prazo || null,
         }];
       } catch {
         return [];
       }
     });
-  if (enc.length) {
-    // re-submit (aba duplicada) não duplica o que já existe nesse registro
-    const { data: existentes } = await supabase
+  // edição reconcilia por id: o form devolve a lista completa — o que voltou
+  // com id é update (só o que mudou), o id que existia e não voltou é delete
+  // e o resto é insert. Registro novo não tem existentes e pula a consulta;
+  // o dedupe de insert contra o estado final segue valendo pro re-submit de
+  // aba duplicada (o que já existe não duplica nem some)
+  const { data: existentes } = regExistente
+    ? await supabase
+        .from("encaminhamentos")
+        .select("id, descricao, responsavel, prazo")
+        .eq("registro_id", registro.id)
+        .eq("dupla_id", dupla_id)
+    : { data: null };
+  const plano = reconciliaCombinados(existentes ?? [], enc);
+  for (const u of plano.atualizar) {
+    // status nunca entra — feito/pendente é preservado; dupla+registro no
+    // where impedem cruzar pra combinado de outra dupla ou outro registro
+    const { error: upErr } = await supabase
       .from("encaminhamentos")
-      .select("descricao, responsavel, prazo")
+      .update({ descricao: u.descricao, responsavel: u.responsavel, prazo: u.prazo })
+      .eq("id", u.id)
+      .eq("dupla_id", dupla_id)
       .eq("registro_id", registro.id);
-    const jaTem = new Set(
-      (existentes ?? []).map((e) => `${e.descricao}|${e.responsavel}|${e.prazo ?? ""}`)
-    );
-    const rows = enc
-      .filter((t) => !jaTem.has(`${t.descricao}|${t.responsavel}|${t.prazo ?? ""}`))
-      .map((t) => ({ dupla_id, registro_id: registro.id, ...t }));
-    if (rows.length) {
-      const { error: encErr } = await supabase.from("encaminhamentos").insert(rows);
-      if (encErr) return { error: erroAmigavel(encErr) };
-    }
+    if (upErr) return { error: erroAmigavel(upErr) };
+  }
+  // delete só com a lista completa da edição (combinados_completos) — o
+  // form novo sobre registro que já existe (aba desatualizada) só insere
+  if (formData.get("combinados_completos") === "1" && plano.remover.length) {
+    const { error: delErr } = await supabase
+      .from("encaminhamentos")
+      .delete()
+      .in("id", plano.remover)
+      .eq("dupla_id", dupla_id)
+      .eq("registro_id", registro.id);
+    if (delErr) return { error: erroAmigavel(delErr) };
+  }
+  if (plano.inserir.length) {
+    const { error: encErr } = await supabase
+      .from("encaminhamentos")
+      .insert(plano.inserir.map((t) => ({ dupla_id, registro_id: registro.id, ...t })));
+    if (encErr) return { error: erroAmigavel(encErr) };
   }
 
   // combinados de encontros anteriores marcados como feitos neste registro —

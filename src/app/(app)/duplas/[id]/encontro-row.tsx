@@ -68,6 +68,7 @@ export function EncontroRow({
   podeRemoverAnexos,
   anexos,
   materiais,
+  combinados,
   combinadosPendentes,
   nota,
   intencoes,
@@ -104,6 +105,9 @@ export function EncontroRow({
   podeRemoverAnexos: boolean;
   anexos: RegistroAnexo[];
   materiais: Material[];
+  /** Todos os combinados da dupla — a linha filtra por registro_id pro
+   *  registro exibido e pro form de edição. */
+  combinados: Encaminhamento[];
   combinadosPendentes: Encaminhamento[];
   /** Anotação/plano do mentor pra esse nº do ciclo — null = sem nota. */
   nota: string | null;
@@ -143,6 +147,11 @@ export function EncontroRow({
     (encontro?.status === "agendado" || encontro?.status === "remarcado") &&
     !!encontro.data_hora;
   const reg = encontro?.registro;
+  // combinados gravados por ESTE registro — alimentam a view do card e o
+  // form de edição (que devolve os ids de banco pro salvarRegistro casar)
+  const combinadosDoRegistro = reg
+    ? combinados.filter((c) => c.registro_id === reg.id)
+    : [];
   // realizado sem registro — a dupla deve o follow-up; marca a linha em warn
   // suave. Em dupla pausada/encerrada ninguém pode registrar: a badge e a
   // lavagem viram ruído de algo sem saída e são suprimidas
@@ -441,6 +450,7 @@ export function EncontroRow({
                   <RegistroView
                     reg={reg}
                     tardio={tardio}
+                    combinados={combinadosDoRegistro}
                     anexos={
                       <AnexosRegistro
                         registroId={reg.id}
@@ -459,6 +469,7 @@ export function EncontroRow({
                         duplaId={duplaId}
                         evento={passo}
                         registro={reg}
+                        combinados={combinadosDoRegistro}
                       />
                     </div>
                   )}
