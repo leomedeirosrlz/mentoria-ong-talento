@@ -309,8 +309,9 @@ describe("stream SSE", () => {
       expect.anything(),
       "chat"
     );
+    // o status chega com o rótulo por tool (STATUS_TOOL em lib/ia/ui.ts)
     expect(texto).toContain(
-      'data: {"type":"status","t":"consultando dados…"}'
+      'data: {"type":"status","t":"Lendo o resumo da semana…"}'
     );
     expect(texto).toContain('data: {"type":"done","tools":["resumo_semana"]}');
 
