@@ -63,7 +63,7 @@ jobs:
             echo "::notice::commit do deploy sem tag [deploy] — e2e de preview pulado (quota de CDN)."
             skip=1
           fi
-          [ -n "$skip" ] && echo "skip=1" >> "$GITHUB_OUTPUT"
+          if [ -n "$skip" ]; then echo "skip=1" >> "$GITHUB_OUTPUT"; fi
       - if: steps.check.outputs.skip != '1'
         uses: actions/checkout@v4
       # probe antes da suíte: um commit só de testes/docs faz a Vercel
