@@ -398,7 +398,8 @@ export const DUPLA_SELECT = `
   encontros(*, registro:registros(id, encontro_id, tema, atividades, avaliacao, dificuldade, dificuldade_detalhe, precisa_apoio, proximo_passo, proximo_passo_detalhe, reflexoes, observacoes, ferramenta, created_at, updated_at, created_by, autor:profiles!registros_created_by_fkey(nome)),
     avaliacao_jovem:avaliacoes_encontro(*)),
   encaminhamentos(*),
-  notas:encontro_notas(*)
+  notas:encontro_notas(*),
+  intencoes:encontro_intencoes(*)
 `;
 // avaliacao_jovem (0071): embed to-one (encontro_id é unique lá). O RLS da
 // tabela faz o recorte por papel SOZINHO — coord/sup recebem todas as

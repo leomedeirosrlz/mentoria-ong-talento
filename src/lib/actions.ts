@@ -3528,6 +3528,125 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
   return { ok: true };
 }
 
+// ---------- intenções do encontro (checklist do mentor, REALIZA-21) ----------
+
+/** Cria um item do checklist no nº do guia (REALIZA-21). A chave é
+ *  (dupla_id, numero) — a intenção pode existir antes do encontro agendado
+ *  e não se move com remarcação/"não aconteceu". Guardas idênticas à nota:
+ *  papel mentor, dupla ativa, nº dentro do teto do cronograma DELA. */
+export async function criarIntencao(duplaId: string, numero: number, texto: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  // a intenção é plano do mentor — nem a coord escreve por ele (a policy
+  // aceitaria; o contrato fica aqui, mesmo desenho da nota)
+  if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
+    return { error: "As intenções do encontro são do mentor da dupla." };
+  }
+
+  const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", duplaId).single();
+  if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
+  if (d && d.trilha !== "especialista" && !d.cronograma_id) {
+    return { error: "Essa dupla está sem cronograma. A coordenação vincula um na edição da dupla." };
+  }
+
+  // teto de nº por trilha — a intenção segue o passo do guia (16 DPP / 5
+  // especialista); no DPP o teto é do cronograma dela, não do calendário global
+  const maxNum = d?.trilha === "especialista"
+    ? maxEncontros("especialista")
+    : (
+        await supabase
+          .from("ciclo_eventos").select("numero")
+          .eq("tipo", "encontro")
+          .eq("cronograma_id", d!.cronograma_id!)
+          .order("numero", { ascending: false }).limit(1).maybeSingle()
+      ).data?.numero ?? 16;
+  if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
+    return { error: "Escolha um encontro da lista." };
+  }
+
+  const limpo = texto.trim();
+  if (!limpo) return { error: "Escreva a intenção antes de adicionar." };
+  if (limpo.length > 280) return { error: "Intenção muito longa (máx. 280 caracteres)." };
+
+  const { error } = await supabase
+    .from("encontro_intencoes")
+    .insert({ dupla_id: duplaId, numero, texto: limpo, created_by: eu.id });
+  if (error) return { error: erroAmigavel(error) };
+
+  revalidatePath("/agenda");
+  revalidatePath(`/duplas/${duplaId}`);
+  return { ok: true };
+}
+
+/** Marca/desmarca um item. O update vai por id e a RLS escopa à dupla do
+ *  mentor — item de outra dupla devolve 0 rows e vira "não encontrada".
+ *  `feito_em` é carimbo do trigger, não do caller. */
+export async function marcarIntencao(id: string, feito: boolean) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
+    return { error: "As intenções do encontro são do mentor da dupla." };
+  }
+
+  // a dupla vem junto no embed: o gate é o status DELA (encerrada/pausada
+  // congela o checklist), não o status do encontro — "enviar vídeo depois"
+  // é justamente o caso de marcar após o realizado
+  const { data: row } = await supabase
+    .from("encontro_intencoes")
+    .select("id, dupla_id, duplas(status)")
+    .eq("id", id)
+    .maybeSingle();
+  if (!row) return { error: "Intenção não encontrada." };
+  const dupla = Array.isArray(row.duplas) ? row.duplas[0] : row.duplas;
+  if (dupla && dupla.status !== "ativa") return { error: "Essa dupla não está ativa." };
+
+  const { data, error } = await supabase
+    .from("encontro_intencoes")
+    .update({ feito })
+    .eq("id", id)
+    .select("id");
+  if (error) return { error: erroAmigavel(error) };
+  if (!data?.length) return { error: "Intenção não encontrada." };
+
+  revalidatePath("/agenda");
+  revalidatePath(`/duplas/${row.dupla_id}`);
+  return { ok: true };
+}
+
+/** Remove um item — o gesto é apagar o que foi digitado errado, não
+ *  arquivar: item cumprido fica na lista como feito. */
+export async function removerIntencao(id: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
+    return { error: "As intenções do encontro são do mentor da dupla." };
+  }
+
+  const { data: row } = await supabase
+    .from("encontro_intencoes")
+    .select("id, dupla_id, duplas(status)")
+    .eq("id", id)
+    .maybeSingle();
+  if (!row) return { error: "Intenção não encontrada." };
+  const dupla = Array.isArray(row.duplas) ? row.duplas[0] : row.duplas;
+  if (dupla && dupla.status !== "ativa") return { error: "Essa dupla não está ativa." };
+
+  const { data, error } = await supabase
+    .from("encontro_intencoes")
+    .delete()
+    .eq("id", id)
+    .select("id");
+  if (error) return { error: erroAmigavel(error) };
+  if (!data?.length) return { error: "Intenção não encontrada." };
+
+  revalidatePath("/agenda");
+  revalidatePath(`/duplas/${row.dupla_id}`);
+  return { ok: true };
+}
+
 // ---------- mural de notas do perfil (/pessoas/[id]) ----------
 
 /** Publica nota individual no mural da pessoa. O RLS faz o escopo pesado:

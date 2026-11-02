@@ -15,6 +15,7 @@ import type {
   Dupla,
   Encaminhamento,
   Encontro,
+  EncontroIntencao,
   MentoradoPar,
   Profile,
   Supervisao,
@@ -90,6 +91,21 @@ function mkEncaminhamento(over: Partial<Encaminhamento>): Encaminhamento {
     prazo: null,
     status: "pendente",
     created_at: "2026-10-01T00:00:00Z",
+    ...over,
+  };
+}
+
+function mkIntencao(over: Partial<EncontroIntencao>): EncontroIntencao {
+  return {
+    id: `int-${Math.random().toString(36).slice(2, 8)}`,
+    dupla_id: "d1",
+    numero: 5,
+    texto: "Enviar o vídeo depois do encontro",
+    feito: false,
+    feito_em: null,
+    created_by: "pm",
+    created_at: "2026-10-01T00:00:00Z",
+    updated_at: "2026-10-01T00:00:00Z",
     ...over,
   };
 }
@@ -384,6 +400,58 @@ describe("pendências — warnrows do topo do Hoje", () => {
     expect(a.avisos).toHaveLength(1);
     expect(a.avisos[0].titulo).toBe("Combinado vencido · Ana · 2026/2027");
     expect(a.avisos[0].href).toBe("/duplas/d1#combinados");
+  });
+});
+
+describe("intenções em aberto (REALIZA-21)", () => {
+  it("uma linha só por dupla: contagem + nº mais antigo, sem texto de item", () => {
+    const d = mkDupla({
+      intencoes: [
+        mkIntencao({ numero: 7, texto: "Perguntar do ENEM" }),
+        mkIntencao({ numero: 3, texto: "Levar o guia de rotina" }),
+        mkIntencao({ numero: 5, texto: "Enviar vídeo depois" }),
+        mkIntencao({ numero: 2, feito: true, feito_em: "2026-10-02T10:00:00Z" }),
+      ],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
+    expect(a.avisos).toHaveLength(1);
+    const av = a.avisos[0];
+    expect(av.id).toBe("int-d1");
+    expect(av.titulo).toBe("Intenções em aberto · Ana · 2026/2027");
+    expect(av.detalhe).toBe("3 itens · o mais antigo é do 3º encontro.");
+    expect(av.href).toBe("/duplas/d1#intencoes-3");
+    expect(av.cta).toBe("Ver intenções");
+    expect(av.remarcar).toBe(false);
+    // o texto dos itens é plano privado do mentor — não sai da ficha
+    expect(av.detalhe).not.toContain("ENEM");
+    expect(av.detalhe).not.toContain("vídeo");
+  });
+
+  it("um único pendente lê 'item' no singular e ancora no próprio nº", () => {
+    const d = mkDupla({ intencoes: [mkIntencao({ numero: 6 })] });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
+    expect(a.avisos[0].detalhe).toBe("1 item · o mais antigo é do 6º encontro.");
+    expect(a.avisos[0].href).toBe("/duplas/d1#intencoes-6");
+  });
+
+  it("tudo feito some — item riscado não é pendência", () => {
+    const d = mkDupla({
+      intencoes: [
+        mkIntencao({ numero: 3, feito: true, feito_em: "2026-10-02T10:00:00Z" }),
+        mkIntencao({ numero: 5, feito: true, feito_em: "2026-10-04T10:00:00Z" }),
+      ],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
+    expect(a.avisos).toHaveLength(0);
+  });
+
+  it("dupla pausada não cobra — o checklist congela com a dupla", () => {
+    const d = mkDupla({
+      status: "pausada",
+      intencoes: [mkIntencao({ numero: 3 })],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
+    expect(a.avisos).toHaveLength(0);
   });
 });
 

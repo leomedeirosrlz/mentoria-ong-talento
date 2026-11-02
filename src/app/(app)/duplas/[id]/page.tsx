@@ -548,8 +548,15 @@ export default async function DuplaPage({
       (enc.status === "agendado" &&
         enc.data_hora != null &&
         new Date(enc.data_hora) < new Date()));
-  const futurosComPendencia = encontrosFuturos.filter((ev) =>
-    temPendencia(dupla.encontros.find((e) => e.numero === ev.numero))
+  const futurosComPendencia = encontrosFuturos.filter(
+    (ev) =>
+      temPendencia(dupla.encontros.find((e) => e.numero === ev.numero)) ||
+      // passo com intenção pendente também não dorme no collapsible: a âncora
+      // `#intencoes-{nº}` do aviso da agenda precisa existir montada (mesma
+      // regra do #registrar-{id} logo acima)
+      (dupla.intencoes ?? []).some(
+        (i) => i.numero === ev.numero && !i.feito
+      )
   );
   const encontrosVisiveis = passosLista.filter(
     (ev) => numeroSemana == null || ev.numero <= numeroSemana
@@ -820,6 +827,15 @@ export default async function DuplaPage({
         materiais={materiaisPorNumero.get(passo.numero) ?? []}
         combinadosPendentes={combinadosPendentes}
         nota={dupla.notas?.find((n) => n.numero === passo.numero)?.texto ?? null}
+        intencoes={(dupla.intencoes ?? []).filter(
+          (i) => i.numero === passo.numero
+        )}
+        // carry-over: pendente de nº anterior reaparece aqui taggeado —
+        // a intenção é do passo do guia, não do encontro físico (0074:
+        // no especialista o nº gravado é o passo, igual à nota)
+        intencoesPendentes={(dupla.intencoes ?? []).filter(
+          (i) => i.numero < passo.numero && !i.feito
+        )}
         registroAberto={passo.numero === numeroAtual}
         apoioDestinos={apoioDestinos}
         linkAvaliacao={
