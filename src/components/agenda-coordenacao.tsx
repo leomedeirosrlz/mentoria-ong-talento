@@ -29,16 +29,17 @@ function pessoaDaFila(p: { id: string; nome: string; avatar_path?: string | null
   return { id: p.id, nome: p.nome, avatar_path: p.avatar_path ?? null };
 }
 
-/** Visão "Monitoramento" da coordenação (REALIZA-195 · mock v8b): faixa
- *  de síntese no topo (a leitura de 2s da fila), a faixa "Semana do
- *  programa" (os oficiais do seg–dom em cards de scroll lateral), os
+/** Visão "Monitoramento" da coordenação (REALIZA-195 · mock v8b, ordem
+ *  do aceite REALIZA-176): faixa de síntese no topo (a leitura de 2s da
+ *  fila), a fila operacional "Para acompanhar" em 1º — a resposta dos
+ *  5s, com chips que filtram de verdade —, a faixa "Semana do
+ *  programa" (os oficiais do seg–dom em cards de scroll lateral) e os
  *  "Números da semana" (cobertura honesta por turma + semáforo com o
- *  eixo azul do apoio + pulso de registro com a ★ do jovem) e, por
- *  último, o "Painel da semana" — a fila operacional "Para acompanhar"
- *  com chips que filtram de verdade. A coordenação NÃO agenda por
- *  ninguém: a única ação sobre dupla aqui é o nudge. Toda a derivação
- *  mora em lib/agenda-coordenacao (pura); a página é quem busca os
- *  dados — este componente só compõe e renderiza. */
+ *  eixo azul do apoio + pulso de registro com a ★ do jovem). A
+ *  coordenação NÃO agenda por ninguém: a única ação sobre dupla aqui é
+ *  o nudge. Toda a derivação mora em lib/agenda-coordenacao (pura); a
+ *  página é quem busca os dados — este componente só compõe e
+ *  renderiza. */
 export function AgendaCoordenacao({
   duplas,
   eventos,
@@ -177,8 +178,8 @@ export function AgendaCoordenacao({
       {abas}
 
       <div id={PAINEL_AGENDA} role="tabpanel" className="space-y-6">
-        {/* faixa de síntese — leitura de 2s do estado da fila antes dos cards.
-            Só existe com fila viva (o empty state lá embaixo já cobre o "tudo
+        {/* faixa de síntese — leitura de 2s do estado da fila, acima dela.
+            Só existe com fila viva (o empty state da seção já cobre o "tudo
             em dia"); o único número com peso é o de críticas */}
         {sintese && (
           <p
@@ -233,6 +234,29 @@ export function AgendaCoordenacao({
           </p>
         )}
 
+        {/* ---- Para acompanhar (REALIZA-176): a fila operacional é a 1ª
+            seção — a pergunta dos 5s, quem pede ação. Chips filtram de
+            verdade (FilaAcompanhar); Lembrar é o único gesto sobre dupla
+            aqui — quem agenda é a dupla. ---- */}
+        <section
+          aria-label="Para acompanhar"
+          title="Sem agendamento ou atrasadas. Lembrar envia um aviso à dupla (notificação + WhatsApp se houver). A coordenação não marca o encontro por ela."
+        >
+          <h2 className="text-base font-semibold">
+            Para acompanhar{" "}
+            <span className="font-normal text-muted-foreground">
+              · {acompanhar.length}
+            </span>
+          </h2>
+          {acompanhar.length === 0 ? (
+            <p className="mt-3 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+              Tudo em dia. Nenhuma dupla pede atenção.
+            </p>
+          ) : (
+            <FilaAcompanhar linhas={linhas} />
+          )}
+        </section>
+
         {/* ---- Semana do programa (v8b): os oficiais do seg–dom em cards
             de scroll lateral — tema, instrumentos e "o que cobre" atrás de
             <details>; "Abrir chamada" só no dia da formação (gate no card) ---- */}
@@ -251,32 +275,6 @@ export function AgendaCoordenacao({
             situação das duplas (a mesma de /duplas) + pulso com a ★ do jovem.
             O toggle T1/T2/Todas é estado próprio da seção ---- */}
         <NumerosSemanaSecao opcoes={numeros.opcoes} agregados={numeros.agregados} />
-
-        {/* ---- Painel da semana: a fila operacional — a pergunta dos 5s,
-            quem pede ação. Chips filtram de verdade (FilaAcompanhar). ---- */}
-        <section aria-label="Painel da semana">
-          <h2 className="text-base font-semibold">Painel da semana</h2>
-          <div
-            className="mt-4"
-            role="group"
-            aria-label="Duplas para acompanhar"
-            title="Sem agendamento ou atrasadas. Lembrar envia um aviso à dupla (notificação + WhatsApp se houver). A coordenação não marca o encontro por ela."
-          >
-            <h3 className="text-sm font-semibold">
-              Para acompanhar{" "}
-              <span className="font-normal text-muted-foreground">
-                · {acompanhar.length}
-              </span>
-            </h3>
-            {acompanhar.length === 0 ? (
-              <p className="mt-3 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
-                Tudo em dia. Nenhuma dupla pede atenção.
-              </p>
-            ) : (
-              <FilaAcompanhar linhas={linhas} />
-            )}
-          </div>
-        </section>
       </div>
     </div>
   );
