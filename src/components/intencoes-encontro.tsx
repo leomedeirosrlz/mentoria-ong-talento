@@ -16,6 +16,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
+/** Estado "aberto" FORA do componente (REALIZA-21 fix): criar o 1º
+ *  pendente tira o card do agrupador "Próximos N encontros" e o React
+ *  remonta o bloco — useState interno morreria junto e o painel fechava
+ *  logo após criar (bug visto no e2e). O mapa por (dupla,nº) devolve a
+ *  escolha do usuário na remontagem; reload de página recomeça fechado. */
+const abertoPorBloco = new Map<string, boolean>();
+
 /** Checklist de intenções do mentor por encontro (REALIZA-21) — itens
  *  acionáveis que vivem sob a nota livre: a nota responde "como quero
  *  conduzir", as intenções respondem "o que não posso esquecer". Chave
@@ -42,6 +49,10 @@ export function IntencoesEncontro({
   const [pending, start] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [novo, setNovo] = useState("");
+  const chaveBloco = `${duplaId}:${numero}`;
+  const [aberto, setAberto] = useState(
+    () => abertoPorBloco.get(chaveBloco) ?? false
+  );
   const router = useRouter();
   // demo: criar/marcar/remover funcionam em estado local — nenhuma action
   // dispara (seria toast DEMO_MSG por gesto) e nada sobra pro próximo visitante
@@ -278,7 +289,13 @@ export function IntencoesEncontro({
 
   return (
     <div id={`intencoes-${numero}`} className="scroll-mt-20">
-      <Collapsible.Root>
+      <Collapsible.Root
+        open={aberto}
+        onOpenChange={(o) => {
+          setAberto(o);
+          abertoPorBloco.set(chaveBloco, o);
+        }}
+      >
         <Collapsible.Trigger className="group grid min-h-11 w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 rounded-md py-1.5 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9">
           <span className="font-medium text-foreground/80">Afazeres</span>
           {sufixo && (
