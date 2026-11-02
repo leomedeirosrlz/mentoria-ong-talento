@@ -9,6 +9,7 @@ import type {
   AvaliacaoLink,
   Encaminhamento,
   Encontro,
+  EncontroIntencao,
   Material,
   RegistroAnexo,
 } from "@/lib/types";
@@ -24,6 +25,7 @@ import { WhatsAppRapido } from "@/components/whatsapp-rapido";
 import { AvaliacaoBadge } from "@/components/semaforo";
 import { CopiarChamada } from "@/components/copiar-chamada";
 import { NotaEncontro } from "@/components/nota-encontro";
+import { IntencoesEncontro } from "@/components/intencoes-encontro";
 import {
   AvaliacaoJovemCard,
   AvaliacaoPendenteLinha,
@@ -68,6 +70,8 @@ export function EncontroRow({
   materiais,
   combinadosPendentes,
   nota,
+  intencoes,
+  intencoesPendentes,
   registroAberto,
   apoioDestinos,
   linkAvaliacao,
@@ -103,6 +107,10 @@ export function EncontroRow({
   combinadosPendentes: Encaminhamento[];
   /** Anotação/plano do mentor pra esse nº do ciclo — null = sem nota. */
   nota: string | null;
+  /** Checklist do mentor neste nº do guia (REALIZA-21) — itens próprios. */
+  intencoes: EncontroIntencao[];
+  /** Pendentes de nºs anteriores — carry-over taggeado "do Nº encontro". */
+  intencoesPendentes: EncontroIntencao[];
   /** Encontro atual ou pendente de registro — nasce com o registro expandido;
    *  os demais viram linha-resumo sob disclosure (o deep link `#registrar-{id}` abre). */
   registroAberto: boolean;
@@ -368,14 +376,25 @@ export function EncontroRow({
         )}
       </div>
 
-      {/* anotações/plano do encontro — o mentor prepara aqui; pra quem não
-          edita (coord/sup, dupla inativa) a nota existente vira leitura */}
-      {(podeEditar || nota) && (
-        <div className="border-t border-border/60 px-4 py-3">
-          <NotaEncontro
+      {/* preparo do mentor — nota livre + checklist de afazeres, nesta
+          ordem: a nota responde "como quero conduzir", os afazeres "o que
+          não posso esquecer". Pra quem não edita (coord/sup, dupla inativa)
+          o que existe vira leitura */}
+      {(podeEditar || nota || intencoes.length > 0 || intencoesPendentes.length > 0) && (
+        <div className="space-y-1.5 border-t border-border/60 px-4 py-3">
+          {(podeEditar || nota) && (
+            <NotaEncontro
+              duplaId={duplaId}
+              numero={passo.numero}
+              nota={nota}
+              somenteLeitura={!podeEditar}
+            />
+          )}
+          <IntencoesEncontro
             duplaId={duplaId}
             numero={passo.numero}
-            nota={nota}
+            itens={intencoes}
+            pendentesAnteriores={intencoesPendentes}
             somenteLeitura={!podeEditar}
           />
         </div>

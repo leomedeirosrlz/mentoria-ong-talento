@@ -1784,6 +1784,85 @@ export type Database = {
           },
         ]
       }
+      encontro_intencoes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          dupla_id: string
+          feito: boolean
+          feito_em: string | null
+          id: string
+          numero: number
+          texto: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          dupla_id: string
+          feito?: boolean
+          feito_em?: string | null
+          id?: string
+          numero: number
+          texto: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          dupla_id?: string
+          feito?: boolean
+          feito_em?: string | null
+          id?: string
+          numero?: number
+          texto?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encontro_intencoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_intencoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_intencoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_intencoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_intencoes_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_intencoes_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       encontro_notas: {
         Row: {
           created_at: string
