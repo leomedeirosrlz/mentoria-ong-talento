@@ -89,7 +89,7 @@ test.describe("demo — intenções do encontro (REALIZA-21)", () => {
 
     // uma linha só por dupla — contagem + nº mais antigo, sem texto de item
     await expect(
-      page.getByText(/Afazeres em aberto · Ana/).first()
+      page.getByText(/Afazeres em aberto · Bia/).first()
     ).toBeVisible();
     await expect(
       page.getByText(/2 itens · o mais antigo é do 3º encontro\./)
