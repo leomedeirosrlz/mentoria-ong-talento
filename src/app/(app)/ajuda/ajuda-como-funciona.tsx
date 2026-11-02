@@ -1,17 +1,19 @@
 import type {
-  ItemComoFunciona,
+  ItemMenuPapel,
   SecaoComoFunciona,
 } from "@/lib/ajuda/conteudo";
 
-/** A aba "Como funciona": as seções do papel efetivo + o mapa do menu do
- *  papel primário. Cada seção é um card com uma lista termo→texto — o dt
- *  ancora a leitura (nome da fase, do papel, do destino). */
+/** A aba "Como funciona": as seções do papel efetivo + o mapa do menu
+ *  mergeado dos papéis efetivos. Cada seção é um card com uma lista
+ *  termo→texto — o dt ancora a leitura (nome da fase, do papel, do
+ *  destino) e um dd pode trazer mais de uma linha quando o destino vale
+ *  pra mais de um papel (o híbrido lê os dois mundos). */
 export function AjudaComoFunciona({
   secoes,
   menu,
 }: {
   secoes: SecaoComoFunciona[];
-  menu: ItemComoFunciona[];
+  menu: ItemMenuPapel[];
 }) {
   return (
     <div className="space-y-5">
@@ -59,7 +61,11 @@ export function AjudaComoFunciona({
                 className="grid gap-0.5 py-2.5 sm:grid-cols-[11rem_1fr] sm:gap-4"
               >
                 <dt className="text-sm font-medium">{item.rotulo}</dt>
-                <dd className="text-sm text-muted-foreground">{item.texto}</dd>
+                <dd className="space-y-1 text-sm text-muted-foreground">
+                  {item.textos.map((texto) => (
+                    <p key={texto}>{texto}</p>
+                  ))}
+                </dd>
               </div>
             ))}
           </dl>

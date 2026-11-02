@@ -1,8 +1,13 @@
 "use client";
 
+import Link from "next/link";
 import type { CSSProperties } from "react";
 import { useMemo, useState } from "react";
-import { CaretDown, MagnifyingGlass } from "@phosphor-icons/react";
+import {
+  ArrowRight,
+  CaretDown,
+  MagnifyingGlass,
+} from "@phosphor-icons/react";
 import { Input } from "@/components/ui/input";
 import { buscarPerguntas } from "@/lib/ajuda/filtrar";
 import { TEMAS_AJUDA, type PerguntaAjuda } from "@/lib/ajuda/conteudo";
@@ -80,9 +85,30 @@ export function AjudaPerguntas({ perguntas }: { perguntas: PerguntaAjuda[] }) {
                           />
                           {p.pergunta}
                         </summary>
-                        <p className="px-3 pb-3 pl-9 text-sm leading-relaxed text-muted-foreground">
-                          {p.resposta}
-                        </p>
+                        <div className="px-3 pb-3 pl-9">
+                          <p className="text-sm leading-relaxed text-muted-foreground">
+                            {p.resposta}
+                          </p>
+                          {p.links && p.links.length > 0 && (
+                            <ul className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5">
+                              {p.links.map((l) => (
+                                <li key={`${l.rotulo}-${l.href}`}>
+                                  <Link
+                                    href={l.href}
+                                    className="group inline-flex items-center gap-1 rounded-sm text-sm font-medium underline-offset-2 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                                  >
+                                    {l.rotulo}
+                                    <ArrowRight
+                                      aria-hidden
+                                      size={12}
+                                      className="text-muted-foreground transition-transform group-hover:translate-x-0.5"
+                                    />
+                                  </Link>
+                                </li>
+                              ))}
+                            </ul>
+                          )}
+                        </div>
                       </details>
                     </li>
                   ))}

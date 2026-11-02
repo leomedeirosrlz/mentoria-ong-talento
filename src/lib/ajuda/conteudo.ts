@@ -31,11 +31,25 @@ export const TEMAS_AJUDA: { id: TemaAjuda; rotulo: string }[] = [
   { id: "conta", rotulo: "Conta e privacidade" },
 ];
 
+/** Atalho direto ao fim da resposta — só quando a resposta manda a pessoa
+ *  pra uma tela. `papeis` restringe quando o mesmo destino tem rota
+ *  diferente por papel (a Agenda do mentor é /agenda, a do jovem
+ *  /jovem/agenda); sem ele o link vale pra todo mundo que vê a pergunta. */
+export type LinkAjuda = {
+  rotulo: string;
+  href: string;
+  papeis?: readonly AppRole[];
+};
+
 export type PerguntaAjuda = {
   id: string;
   tema: TemaAjuda;
   pergunta: string;
   resposta: string;
+  /** Peso dentro do tema: menor = dúvida mais comum, sobe na lista. Quem
+   *  não declara fica no neutro (50) e a ordem do array desempata. */
+  prioridade?: number;
+  links?: LinkAjuda[];
   /** Papéis pra quem o item vale — basta um papel efetivo bater. */
   papeis: readonly AppRole[];
 };
@@ -48,6 +62,11 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Quem marca os encontros?",
     resposta:
       "A própria dupla: o mentor agenda pela Agenda ou pela ficha da dupla e o jovem marca pela agenda dele. A coordenação acompanha tudo e lembra quando algo atrasa, mas não agenda no lugar de vocês.",
+    prioridade: 10,
+    links: [
+      { rotulo: "Agenda", href: "/agenda" },
+      { rotulo: "Duplas", href: "/duplas" },
+    ],
     papeis: TRILHA_DPP,
   },
   {
@@ -56,6 +75,8 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Quem marca os encontros?",
     resposta:
       "Você e seu mentor combinam juntos. Na sua Agenda, toque em Agendar encontro e escolha o dia. A equipe acompanha vocês e lembra quando algo atrasa.",
+    prioridade: 10,
+    links: [{ rotulo: "Agenda", href: "/jovem/agenda" }],
     papeis: ["mentorado"],
   },
   {
@@ -64,6 +85,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Quantos encontros tem a mentoria?",
     resposta:
       "São 16 encontros, um por semana e quase sempre às terças, de cerca de uma hora. O ciclo inteiro dura uns quatro meses, com uma pausa de fim de ano no meio.",
+    prioridade: 15,
     papeis: [...TRILHA_DPP, "mentorado"],
   },
   {
@@ -72,6 +94,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Quantas sessões tem a trilha de especialista?",
     resposta:
       "Até 5 sessões de uma hora, dentro de 3 meses e em paralelo à mentoria principal do jovem.",
+    prioridade: 15,
     papeis: ["mentor_especialista"],
   },
   {
@@ -80,6 +103,11 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Preciso remarcar um encontro. Como faço?",
     resposta:
       "Abra o encontro na sua Agenda e toque em Remarcar pra escolher o novo dia. O combinado do programa é repor na mesma semana, então marquem a nova data logo. Cada mudança fica registrada com o motivo.",
+    prioridade: 30,
+    links: [
+      { rotulo: "Agenda", href: "/agenda", papeis: ["mentor_dpp"] },
+      { rotulo: "Agenda", href: "/jovem/agenda", papeis: ["mentorado"] },
+    ],
     papeis: ["mentor_dpp", "mentorado"],
   },
   {
@@ -96,6 +124,10 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "O encontro aconteceu, mas ninguém tinha marcado antes. E agora?",
     resposta:
       "Sem problema: o mentor registra como encontro já realizado. Na ficha da dupla ou na Agenda ele marca a data que já passou e a plataforma já pede o registro na sequência.",
+    links: [
+      { rotulo: "Agenda", href: "/agenda", papeis: ["mentor_dpp"] },
+      { rotulo: "Duplas", href: "/duplas", papeis: ["mentor_dpp"] },
+    ],
     papeis: TRILHA_DPP,
   },
   {
@@ -104,6 +136,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "E quando o encontro não acontece?",
     resposta:
       "A dupla avisa na agenda e o encontro fica como não aconteceu, com reposição na mesma semana. Falta sem reposição entra no radar da coordenação como atraso.",
+    links: [{ rotulo: "Agenda", href: "/agenda", papeis: ["mentor_dpp"] }],
     papeis: TRILHA_DPP,
   },
   {
@@ -112,6 +145,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "E quando o encontro não acontece?",
     resposta:
       "Na sua Agenda você marca que o encontro não aconteceu e combinam outro dia na mesma semana. Avisar seu mentor antes ajuda os dois lados.",
+    links: [{ rotulo: "Agenda", href: "/jovem/agenda" }],
     papeis: ["mentorado"],
   },
   {
@@ -120,6 +154,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Como o jovem ganha um mentor especialista?",
     resposta:
       "Pela ficha da dupla, nos botões do topo (no celular, no menu Mais): Solicitar mentor especialista manda o pedido pra equipe e Sugerir especialista pro jovem deixa a escolha com ele. A coordenação conecta o profissional da área e as sessões acontecem em paralelo à mentoria.",
+    links: [{ rotulo: "Duplas", href: "/duplas" }],
     papeis: TRILHA_DPP,
   },
   {
@@ -128,6 +163,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "O que são os especialistas?",
     resposta:
       "São mentores de um tema específico, tipo uma profissão ou uma prova. Em Especialistas você vê quem pode te ajudar e pede uma sessão; depois combina os horários pela sua Agenda.",
+    links: [{ rotulo: "Especialistas", href: "/jovem/especialistas" }],
     papeis: ["mentorado"],
   },
   {
@@ -136,6 +172,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Como nasce uma sessão com o jovem?",
     resposta:
       "Do pedido aceito: a demanda chega pra você com os horários possíveis e, aceitando, a sessão entra na sua agenda.",
+    links: [{ rotulo: "Agenda", href: "/agenda" }],
     papeis: ["mentor_especialista"],
   },
   {
@@ -144,6 +181,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "O encontro é online ou presencial?",
     resposta:
       "Como a dupla combinar: os dois jeitos valem. O link da videochamada fica salvo junto do agendamento pra estar à mão na hora.",
+    prioridade: 20,
     papeis: TODOS,
   },
 
@@ -154,6 +192,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "O que é o registro do encontro?",
     resposta:
       "O resumo que o mentor escreve depois de cada encontro: o que foi trabalhado, como foi, se apareceu alguma dificuldade e qual o próximo passo combinado. É ele que mantém a equipe por dentro da jornada.",
+    prioridade: 15,
     papeis: TRILHA_DPP,
   },
   {
@@ -162,6 +201,11 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Onde eu faço o registro?",
     resposta:
       "Na ficha da dupla, pelo botão Registrar encontro, ou na sua Agenda, na linha do encontro. Enquanto o resumo não existe, o encontro aparece como pendente de registro.",
+    prioridade: 20,
+    links: [
+      { rotulo: "Agenda", href: "/agenda" },
+      { rotulo: "Duplas", href: "/duplas" },
+    ],
     papeis: ["mentor_dpp"],
   },
   {
@@ -186,6 +230,11 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "O que eu faço depois de cada encontro?",
     resposta:
       "Avalie como foi com as estrelinhas na sua Agenda. Você escolhe se o seu mentor pode ler cada avaliação; sem a sua marca, ele só vê a média. Também vale conferir os seus combinados na página inicial.",
+    prioridade: 25,
+    links: [
+      { rotulo: "Agenda", href: "/jovem/agenda" },
+      { rotulo: "Início", href: "/jovem" },
+    ],
     papeis: ["mentorado"],
   },
 
@@ -196,6 +245,8 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "O que são os combinados?",
     resposta:
       "As tarefas que a dupla combina pro intervalo entre um encontro e outro: o que cada um faz até a próxima vez, com prazo e responsável. Ficam na ficha da dupla, na aba Agora, e na página inicial do jovem.",
+    prioridade: 20,
+    links: [{ rotulo: "Duplas", href: "/duplas" }],
     papeis: TRILHA_DPP,
   },
   {
@@ -204,6 +255,8 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "O que são os combinados?",
     resposta:
       "As tarefas que você e seu mentor combinam pra você fazer até o próximo encontro. Ficam na sua página inicial, em Meus combinados.",
+    prioridade: 20,
+    links: [{ rotulo: "Início", href: "/jovem" }],
     papeis: ["mentorado"],
   },
   {
@@ -212,6 +265,8 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Como marco um combinado como feito?",
     resposta:
       "Na ficha da dupla, aba Agora, é só marcar a caixinha do item. O jovem marca os dele na página inicial dele.",
+    prioridade: 30,
+    links: [{ rotulo: "Duplas", href: "/duplas" }],
     papeis: ["mentor_dpp"],
   },
   {
@@ -220,6 +275,8 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Como marco um combinado como feito?",
     resposta:
       "Na sua página inicial, em Meus combinados, toque na caixinha da tarefa. Seu mentor acompanha o andamento pelo lado dele.",
+    prioridade: 30,
+    links: [{ rotulo: "Início", href: "/jovem" }],
     papeis: ["mentorado"],
   },
   {
@@ -228,6 +285,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Qual a diferença entre combinados e afazeres?",
     resposta:
       "Combinados são da dupla: o que você e o jovem combinam fazer até o próximo encontro, e ele vê. Afazeres são só seus: lembretes de preparo de cada encontro, no card dele na aba Encontros da ficha, abaixo das anotações. O jovem não vê os afazeres, e o que ficou pendente aparece de novo no encontro seguinte.",
+    links: [{ rotulo: "Duplas", href: "/duplas" }],
     papeis: ["mentor_dpp"],
   },
   {
@@ -236,6 +294,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "O que são os afazeres do mentor?",
     resposta:
       "A lista de preparo que o mentor monta pra cada encontro, separada dos combinados da dupla. A equipe lê na ficha da dupla, sem editar, e o jovem não vê.",
+    links: [{ rotulo: "Duplas", href: "/duplas" }],
     papeis: EQUIPE,
   },
 
@@ -246,6 +305,11 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Preciso de ajuda com a dupla. O que faço?",
     resposta:
       "Use o botão Pedir apoio na ficha da dupla. O pedido chega na fila da equipe na hora e você acompanha a resposta em Meus chamados, na sua página inicial.",
+    prioridade: 20,
+    links: [
+      { rotulo: "Duplas", href: "/duplas" },
+      { rotulo: "Meus chamados", href: "/chamados" },
+    ],
     papeis: ["mentor_dpp", "mentor_especialista"],
   },
   {
@@ -254,6 +318,11 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Preciso de ajuda. Com quem eu falo?",
     resposta:
       "Toque em Precisa de ajuda? Fale com a equipe, na sua página inicial, ou chame a coordenação no WhatsApp que fica ao lado. Você acompanha a resposta no seu Perfil, em Meus pedidos de ajuda.",
+    prioridade: 20,
+    links: [
+      { rotulo: "Início", href: "/jovem" },
+      { rotulo: "Perfil", href: "/jovem/perfil" },
+    ],
     papeis: ["mentorado"],
   },
   {
@@ -262,6 +331,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Como funciona a fila de Chamados?",
     resposta:
       "É a caixa de entrada dos pedidos de apoio e de ajuda. Quem assumir primeiro trata e a resposta combinada sai em 1 dia útil. O que está sem dono aparece com o contador no menu.",
+    links: [{ rotulo: "Chamados", href: "/chamados" }],
     papeis: EQUIPE,
   },
   {
@@ -270,6 +340,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "O que acontece depois que eu peço apoio?",
     resposta:
       "A equipe é avisada na hora e o pedido entra na fila: quem assumir primeiro trata, com resposta combinada em 1 dia útil. Você acompanha o andamento em Meus chamados, na sua página inicial.",
+    links: [{ rotulo: "Meus chamados", href: "/chamados" }],
     papeis: ["mentor_dpp", "mentor_especialista"],
   },
   {
@@ -278,6 +349,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "O que significam as cores de situação das duplas?",
     resposta:
       "É a leitura de saúde do acompanhamento: amarelo pede atenção (um atraso, registro pendente ou combinado vencido) e vermelho pede ação (pedido de apoio, avaliação baixa com dificuldade ou dois atrasos). A contagem é a mesma em todas as telas.",
+    prioridade: 30,
     papeis: STAFF,
   },
 
@@ -288,6 +360,11 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Onde estão os guias e materiais de apoio?",
     resposta:
       "Em Materiais de apoio, no menu: a aba Instrumentos mostra a régua da jornada por encontro e a aba Biblioteca tem os guias completos, técnicas e modelos pra consultar quando quiser.",
+    prioridade: 20,
+    links: [
+      { rotulo: "Instrumentos", href: "/materiais?aba=instrumentos" },
+      { rotulo: "Biblioteca", href: "/materiais?aba=biblioteca" },
+    ],
     papeis: TRILHA_DPP,
   },
   {
@@ -296,6 +373,8 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Onde estão os materiais de apoio?",
     resposta:
       "Em Materiais de apoio, no menu, fica a biblioteca do programa: guias, técnicas e modelos pra consultar quando quiser.",
+    prioridade: 20,
+    links: [{ rotulo: "Materiais de apoio", href: "/materiais" }],
     papeis: ["mentor_especialista"],
   },
   {
@@ -304,6 +383,8 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Onde estão meus materiais de apoio?",
     resposta:
       "Na sua Jornada, em Acervo. É lá que ficam os conteúdos pra ler e consultar quando quiser.",
+    prioridade: 20,
+    links: [{ rotulo: "Jornada", href: "/jovem/materiais" }],
     papeis: ["mentorado"],
   },
   {
@@ -312,6 +393,11 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Onde ficam o PDM e a Roda da Vida?",
     resposta:
       "São instrumentos da plataforma, preenchidos junto com o jovem: ficam na ficha da dupla, na aba Instrumentos, e a régua de Materiais acompanha o andamento.",
+    prioridade: 30,
+    links: [
+      { rotulo: "Duplas", href: "/duplas" },
+      { rotulo: "Instrumentos", href: "/materiais?aba=instrumentos" },
+    ],
     papeis: TRILHA_DPP,
   },
   {
@@ -320,6 +406,8 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Onde ficam meus instrumentos?",
     resposta:
       "Na sua Jornada, em Meus instrumentos. Cada um abre na hora certa: o seu plano de desenvolvimento no começo da mentoria e a Roda da Vida perto do fim.",
+    prioridade: 30,
+    links: [{ rotulo: "Jornada", href: "/jovem/materiais" }],
     papeis: ["mentorado"],
   },
   {
@@ -336,6 +424,9 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Onde fica a avaliação final da mentoria?",
     resposta:
       "No fim da jornada a plataforma abre a Avaliação Geral 360º, uma pra cada lado da dupla. O jovem responde na jornada dele, no último encontro; o mentor responde pelo link que a equipe envia. A régua de Instrumentos mostra quem já respondeu.",
+    links: [
+      { rotulo: "Instrumentos", href: "/materiais?aba=instrumentos" },
+    ],
     papeis: TRILHA_DPP,
   },
   {
@@ -344,6 +435,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Onde eu respondo a avaliação final?",
     resposta:
       "No último encontro abre a Avaliação Geral 360º na sua Jornada. É a sua chance de contar como foi a mentoria pra você.",
+    links: [{ rotulo: "Jornada", href: "/jovem/materiais" }],
     papeis: ["mentorado"],
   },
 
@@ -354,6 +446,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Como entro na plataforma?",
     resposta:
       "Pelo e-mail que a coordenação cadastrou: na tela de entrada você pede um link de acesso e ele chega no seu e-mail. Abra o link e a entrada acontece na tela que pediu, mesmo se o e-mail for aberto em outro navegador ou no celular.",
+    prioridade: 10,
     papeis: TODOS,
   },
   {
@@ -362,6 +455,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "O link de acesso expirou ou não funcionou",
     resposta:
       "Os links valem uma entrada só e têm validade curta. Peça um novo na tela de entrada e o antigo para de valer.",
+    prioridade: 30,
     papeis: TODOS,
   },
   {
@@ -370,6 +464,11 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Preciso de senha?",
     resposta:
       "Não: a entrada do dia a dia é sempre pelo link de e-mail. No primeiro acesso a plataforma oferece criar uma senha, mas dá pra pular.",
+    prioridade: 20,
+    links: [
+      { rotulo: "Perfil", href: "/perfil", papeis: STAFF },
+      { rotulo: "Perfil", href: "/jovem/perfil", papeis: ["mentorado"] },
+    ],
     papeis: TODOS,
   },
   {
@@ -394,6 +493,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     pergunta: "Quem vê as minhas informações?",
     resposta:
       "Você vê só as suas coisas: seus encontros, suas respostas e seu acervo. Seus dados pessoais ficam com a coordenação e o seu contato só vai pros colegas se você permitir no seu Perfil.",
+    links: [{ rotulo: "Perfil", href: "/jovem/perfil" }],
     papeis: ["mentorado"],
   },
   {
@@ -425,6 +525,12 @@ export type SecaoComoFunciona = {
   /** Papéis pra quem a seção vale — basta um papel efetivo bater. */
   papeis: readonly AppRole[];
 };
+
+/** Item do "Onde fica cada coisa" depois do merge por papéis efetivos
+ *  (menuDoPapel): o mesmo destino pode carregar a descrição de mais de um
+ *  papel — o híbrido lê o que aquele lugar é em cada mundo dele, um texto
+ *  por linha, na ordem em que os papéis vieram. */
+export type ItemMenuPapel = { rotulo: string; textos: string[] };
 
 export const COMO_FUNCIONA: SecaoComoFunciona[] = [
   {
@@ -616,9 +722,10 @@ export const COMO_FUNCIONA: SecaoComoFunciona[] = [
   },
 ];
 
-/** Mapa do menu por papel primário — a seção "Onde fica cada coisa" da aba
- *  Como funciona. Diferente das seções acima, aqui vale o papel primário:
- *  é ele que monta a navegação (o híbrido lê o mapa do papel de entrada). */
+/** Mapa do menu por papel — matéria-prima da seção "Onde fica cada coisa"
+ *  da aba Como funciona. menuDoPapel mergeia os mapas dos papéis efetivos
+ *  na ordem recebida (o primário primeiro), dedup pelo rótulo do destino:
+ *  o híbrido não fica preso ao mapa do papel de entrada. */
 export const MENU_DO_PAPEL: { papel: AppRole; itens: ItemComoFunciona[] }[] = [
   {
     papel: "coordenacao",

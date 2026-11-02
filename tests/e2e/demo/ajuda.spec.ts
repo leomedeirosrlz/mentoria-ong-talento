@@ -18,6 +18,22 @@ test.describe("demo — ajuda", () => {
       page.getByRole("tab", { name: "Perguntas frequentes" })
     ).toHaveAttribute("aria-selected", "true");
 
+    // as dúvidas mais comuns abrem o tema: "Quem marca os encontros?" é a
+    // primeira pergunta da lista, antes de "Quantos encontros..."
+    await expect(
+      page.locator("summary").first()
+    ).toContainText("Quem marca os encontros?");
+
+    // link direto na resposta aponta pra tela de verdade — e a rota
+    // escopada por papel manda o mentor pra /agenda (não /jovem/agenda)
+    const remarcar = page.locator("details", {
+      hasText: "Preciso remarcar um encontro",
+    });
+    await remarcar.locator("summary").click();
+    await expect(
+      remarcar.getByRole("link", { name: "Agenda" })
+    ).toHaveAttribute("href", "/agenda");
+
     // busca client-side: "registro" acha a pergunta do registro e esconde
     // o que não combina
     await page.getByRole("searchbox").fill("registro");
@@ -50,6 +66,16 @@ test.describe("demo — ajuda", () => {
     ).toBeVisible();
     // pergunta do jovem visível…
     await expect(page.getByText("O que são os especialistas?")).toBeVisible();
+
+    // o link da resposta aponta pra rota dele, não pra de staff
+    const materiais = page.locator("details", {
+      hasText: "Onde estão meus materiais de apoio?",
+    });
+    await materiais.locator("summary").click();
+    await expect(
+      materiais.getByRole("link", { name: "Jornada" })
+    ).toHaveAttribute("href", "/jovem/materiais");
+
     // …e a pergunta exclusiva de staff fica de fora do FAQ dele — nem a
     // busca a ressuscita
     await expect(

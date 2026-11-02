@@ -41,7 +41,7 @@ export default async function AjudaPage({
         ) : (
           <AjudaComoFunciona
             secoes={secoesPara(papeis, COMO_FUNCIONA)}
-            menu={menuDoPapel(me.role)}
+            menu={menuDoPapel(papeis)}
           />
         )}
       </AjudaAbas>
