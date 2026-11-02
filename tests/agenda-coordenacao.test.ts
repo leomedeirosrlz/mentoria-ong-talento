@@ -3,6 +3,7 @@ import {
   dimensoesDoItem,
   itensDaSemanaPrograma,
   itensSemanaProgramaMentor,
+  numerosDaSemana,
   paraAcompanhar,
   resumosPorCronograma,
   sinteseMonitoramento,
@@ -1251,5 +1252,53 @@ describe("itensSemanaProgramaMentor", () => {
     );
     expect(itens.map((i) => i.titulo)).toEqual(["Retiro · Turma 1"]);
     expect(itens[0].diaKey).toBe("2026-10-03");
+  });
+});
+
+// ============================================================
+describe("numerosDaSemana — opções do toggle por recorte", () => {
+  it("2+ cronogramas ativos: 'Todas as turmas' + uma opção por cronograma", () => {
+    const { opcoes, agregados } = numerosDaSemana(
+      [dA, dE],
+      [],
+      [C1, C2],
+      EVENTOS,
+      AGORA,
+      AGORA.getTime()
+    );
+    expect(opcoes.map((o) => o.id)).toEqual(["todas", "c1", "c2"]);
+    expect(opcoes[0].rotulo).toBe("Todas as turmas");
+    // o agregado "todas" sempre existe — é o fallback da seção
+    expect(agregados.todas.saude.emAndamento).toBe(2);
+  });
+
+  it("1 cronograma ativo no recorte: sem toggle — 'Todas' ≡ a turma única", () => {
+    // REALIZA-73: com turma em foco a página passa só os cronogramas
+    // dela; um toggle "Todas as turmas" ali mentiria o rótulo
+    const { opcoes, agregados } = numerosDaSemana(
+      [dA, dB, dC],
+      [],
+      [C1],
+      EVENTOS,
+      AGORA,
+      AGORA.getTime()
+    );
+    expect(opcoes).toEqual([]);
+    // a seção cai no agregado "todas" (= o recorte inteiro), que segue
+    // populado mesmo sem opções
+    expect(agregados.todas.coberturas).toHaveLength(1);
+    expect(agregados.todas.coberturas[0].turma).toBe("T1");
+  });
+
+  it("cronograma ativo sem eventos não vira opção", () => {
+    const { opcoes } = numerosDaSemana(
+      [dA],
+      [],
+      [C1, C5], // C5: ativo mas sem ciclo_eventos — fora das opções
+      EVENTOS,
+      AGORA,
+      AGORA.getTime()
+    );
+    expect(opcoes).toEqual([]); // só C1 tem eventos → 1 opção efetiva → sem toggle
   });
 });

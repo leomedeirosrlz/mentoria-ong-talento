@@ -1224,10 +1224,16 @@ export function numerosDaSemana(
     };
   }
   return {
-    opcoes: [
-      { id: "todas", rotulo: "Todas as turmas" },
-      ...ativos.map((c) => ({ id: c.id, rotulo: turmaLonga(c.turma) })),
-    ],
+    // com um cronograma só no recorte o toggle seria redundância ("Todas"
+    // ≡ a turma única — e mentiria o rótulo quando o recorte já é uma
+    // turma em foco, REALIZA-73): a seção cai no agregado "todas" direto
+    opcoes:
+      ativos.length > 1
+        ? [
+            { id: "todas", rotulo: "Todas as turmas" },
+            ...ativos.map((c) => ({ id: c.id, rotulo: turmaLonga(c.turma) })),
+          ]
+        : [],
     agregados,
   };
 }
