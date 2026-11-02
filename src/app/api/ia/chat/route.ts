@@ -8,7 +8,8 @@
 // auth/provider/rate-limit/body continuam NextResponse.json (o e2e lê esse
 // contrato). Abrido o stream, tudo vira evento data: {type} — o cliente lê
 // com getReader + TextDecoder:
-//   {"type":"status","t":"consultando dados…"}  → rodada de tool
+//   {"type":"status","t":"Abrindo a agenda…"}   → tool rodando (rótulo por tool)
+//   {"type":"ui","b":UiBloco}                   → card direto da tool (lib/ia/ui.ts)
 //   {"type":"token","c":"…"}                    → delta de resposta ao vivo
 //   {"type":"done","tools":[…],"interrompido"?} → fim normal ou abort
 //   {"type":"error","e":"…"}                    → falha pós-stream
@@ -38,7 +39,8 @@ import {
 import { rotearTier } from "@/lib/ia/roteador";
 import { checarLimiteIa } from "@/lib/ia/rate-limit";
 import type { FonteIa } from "@/lib/ia/fontes";
-import { executarTool } from "@/lib/ia/tools";
+import { executarTool, type ResultadoTool } from "@/lib/ia/tools";
+import { STATUS_TOOL, uiDaTool, uiDosInstrumentos } from "@/lib/ia/ui";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -69,7 +71,16 @@ const MsgBody = z
   .strict();
 
 const Body = z
-  .object({ messages: z.array(MsgBody).min(1).max(20) })
+  .object({
+    messages: z.array(MsgBody).min(1).max(20),
+    // rota em que a pessoa está (só o path) — o prompt usa pra entender
+    // "esta dupla"/"esta semana"; query e hash ficam no cliente
+    pagina: z
+      .string()
+      .max(200)
+      .regex(/^\/[\w\-/]*$/)
+      .optional(),
+  })
   .strict();
 
 export async function POST(req: Request) {
@@ -134,7 +145,7 @@ export async function POST(req: Request) {
         ? [profile.role]
         : [];
   const historico: MsgChat[] = [
-    { role: "system", content: systemPromptIa(papeis) },
+    { role: "system", content: systemPromptIa(papeis, body.data.pagina) },
     ...body.data.messages.map((m) => ({ ...m, content: m.content })),
   ];
 
@@ -276,13 +287,18 @@ export async function POST(req: Request) {
           break;
         }
 
-        send({ type: "status", t: "consultando dados…" });
         for (const tc of calls) {
           // orçamento segue valendo entre tools — uma query lenta do
           // Supabase não pode matar a função aos 60s sem evento de erro
           if (req.signal.aborted || fechado) break;
           const restanteTc = prazo - Date.now();
           if (restanteTc <= 0) break;
+          // status por tool: a pessoa lê o que está acontecendo ("Abrindo
+          // a agenda…") em vez de um "consultando" genérico
+          send({
+            type: "status",
+            t: STATUS_TOOL[tc.function.name] ?? "Consultando dados…",
+          });
           // guia_consulta: no máximo uma chamada por resposta — se o modelo
           // tentar de novo, devolve "já busquei" em vez de reconsultar, pra
           // forçar a resposta com os trechos que já tem (mimo-v2.6-flash
@@ -316,6 +332,19 @@ export async function POST(req: Request) {
               throw e;
             });
             if (res === null) break;
+            // genUI direto: o card sai já — antes da próxima rodada do
+            // modelo, que ainda vai pensar e escrever por cima dele
+            const resTool = res as ResultadoTool;
+            if (resTool.ok) {
+              const bloco =
+                tc.function.name === "instrumentos_da_dupla"
+                  ? uiDosInstrumentos(
+                      String((args as { dupla_id?: unknown } | null)?.dupla_id ?? ""),
+                      resTool.dados
+                    )
+                  : uiDaTool(tc.function.name, resTool.dados);
+              if (bloco) send({ type: "ui", b: bloco });
+            }
             if (tc.function.name === "guia_consulta") {
               // envelope ResultadoTool — os dados moram em .dados; só
               // marca guiaChamado quando a busca rodou (falha permite

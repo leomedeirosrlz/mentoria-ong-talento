@@ -18,8 +18,15 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { comparaNome, saudadeDaDupla } from "@/lib/ciclo";
 import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
+import { saudeDoRecorte } from "@/lib/agenda-coordenacao";
 import { temPapel } from "@/lib/types";
-import type { AppRole, Dupla, Mentorado, Profile } from "@/lib/types";
+import type {
+  AppRole,
+  CicloEvento,
+  Dupla,
+  Mentorado,
+  Profile,
+} from "@/lib/types";
 import {
   getAgendaPeriodoIa,
   getCapacidadeInsumos,
@@ -35,6 +42,7 @@ import {
   getRegistrosDaDuplaIa,
   matchGuiaIa,
   papeisDoUsuario,
+  type DuplaIa,
 } from "./queries";
 import { embedQuery } from "./embed";
 
@@ -112,6 +120,99 @@ const guiaArgs = z
 
 const semaforoOrd = { risco: 0, atencao: 1, ok: 2 } as const;
 
+/** Saída do resumo_semana a partir das duplas vivas — pura, pra a demo
+ *  (/demo, dataset em memória) responder pelo MESMO caminho da tool. */
+export function projetarResumo(duplas: DuplaIa[], eventos: CicloEvento[]) {
+  const itens = duplas.map((d) => {
+    // a projeção de IA_SAUDE_SELECT é exatamente o que saudadeDaDupla
+    // lê — o contrato é a constante compartilhada, não a linha solta
+    const s = saudadeDaDupla(d as unknown as Dupla, eventos);
+    return {
+      dupla_id: d.id,
+      mentor: d.mentor?.nome ?? null,
+      mentorado: d.mentorado?.nome ?? null,
+      trilha: d.trilha,
+      status: d.status,
+      semaforo: s.semaforo,
+      motivo: s.motivo,
+      // todos os critérios acesos — o semáforo resume, a lista explica
+      motivos: s.motivos,
+      sinais: s.sinais,
+      // apoio é eixo separado: chamado aberto, não falha da jornada
+      apoio: s.apoio,
+      esperado: s.esperado,
+      feitos: s.feitos,
+      registro_pendente: s.registroPendente,
+      proximo_encontro: s.proximo
+        ? { numero: s.proximo.numero, data_hora: s.proximo.data_hora }
+        : null,
+    };
+  });
+  // apoio aberto primeiro (trabalho a fazer), depois risco → atenção →
+  // ok — o radar da equipe ordena pelo que pede ação
+  itens.sort(
+    (a, b) =>
+      Number(b.apoio.aberto) - Number(a.apoio.aberto) ||
+      semaforoOrd[a.semaforo] - semaforoOrd[b.semaforo] ||
+      comparaNome(a.mentor ?? "", b.mentor ?? "")
+  );
+  // contagem pela regra única das telas (saudeDoRecorte) — o card do
+  // chat e o texto do modelo leem o mesmo número da home e de /duplas
+  const saude = saudeDoRecorte(duplas as unknown as Dupla[], eventos, new Date());
+  return {
+    gerado_em: new Date().toISOString(),
+    total: itens.length,
+    saude: {
+      em_andamento: saude.emAndamento,
+      risco: saude.risco,
+      atencao: saude.atencao,
+      em_dia: saude.emDia,
+      apoio: saude.apoio,
+      pausadas: saude.pausadas,
+    },
+    duplas: itens,
+  };
+}
+
+/** Saída do ficha_dupla (visão da equipe) — pura, idem projetarResumo. */
+export function projetarFicha(d: DuplaIa, eventos: CicloEvento[]) {
+  const s = saudadeDaDupla(d as unknown as Dupla, eventos);
+  return {
+    dupla_id: d.id,
+    trilha: d.trilha,
+    status: d.status,
+    turma: d.turma,
+    iniciada_em: d.iniciada_em,
+    demanda: d.demanda,
+    mentor: d.mentor?.nome ?? null,
+    mentorado: d.mentorado?.nome ?? null,
+    supervisor: d.supervisor?.nome ?? null,
+    semaforo: s.semaforo,
+    motivo: s.motivo,
+    motivos: s.motivos,
+    sinais: s.sinais,
+    apoio: s.apoio,
+    esperado: s.esperado,
+    feitos: s.feitos,
+    registro_pendente: s.registroPendente,
+    proximo_encontro: s.proximo
+      ? { numero: s.proximo.numero, data_hora: s.proximo.data_hora }
+      : null,
+    encaminhamentos_pendentes: d.encaminhamentos.filter(
+      (t) => t.status === "pendente"
+    ).length,
+    encontros: d.encontros
+      .map((e) => ({
+        numero: e.numero,
+        status: e.status,
+        data_hora: e.data_hora,
+        realizado_em: e.realizado_em,
+        tem_registro: e.registro != null,
+      }))
+      .sort((a, b) => a.numero - b.numero),
+  };
+}
+
 export const IA_TOOLS = {
   resumo_semana: {
     nome: "resumo_semana",
@@ -124,44 +225,7 @@ export const IA_TOOLS = {
         getDuplasVivasIa(ctx.supabase),
         getCicloEventosIa(ctx.supabase),
       ]);
-      const itens = duplas.map((d) => {
-        // a projeção de IA_SAUDE_SELECT é exatamente o que saudadeDaDupla
-        // lê — o contrato é a constante compartilhada, não a linha solta
-        const s = saudadeDaDupla(d as unknown as Dupla, eventos);
-        return {
-          dupla_id: d.id,
-          mentor: d.mentor?.nome ?? null,
-          mentorado: d.mentorado?.nome ?? null,
-          trilha: d.trilha,
-          status: d.status,
-          semaforo: s.semaforo,
-          motivo: s.motivo,
-          // todos os critérios acesos — o semáforo resume, a lista explica
-          motivos: s.motivos,
-          sinais: s.sinais,
-          // apoio é eixo separado: chamado aberto, não falha da jornada
-          apoio: s.apoio,
-          esperado: s.esperado,
-          feitos: s.feitos,
-          registro_pendente: s.registroPendente,
-          proximo_encontro: s.proximo
-            ? { numero: s.proximo.numero, data_hora: s.proximo.data_hora }
-            : null,
-        };
-      });
-      // apoio aberto primeiro (trabalho a fazer), depois risco → atenção →
-      // ok — o radar da equipe ordena pelo que pede ação
-      itens.sort(
-        (a, b) =>
-          Number(b.apoio.aberto) - Number(a.apoio.aberto) ||
-          semaforoOrd[a.semaforo] - semaforoOrd[b.semaforo] ||
-          comparaNome(a.mentor ?? "", b.mentor ?? "")
-      );
-      return {
-        gerado_em: new Date().toISOString(),
-        total: itens.length,
-        duplas: itens,
-      };
+      return projetarResumo(duplas, eventos);
     },
   },
 
@@ -193,42 +257,7 @@ export const IA_TOOLS = {
         getDuplaIa(ctx.supabase, dupla_id),
         getCicloEventosIa(ctx.supabase),
       ]);
-      if (!d) return null;
-      const s = saudadeDaDupla(d as unknown as Dupla, eventos);
-      return {
-        dupla_id: d.id,
-        trilha: d.trilha,
-        status: d.status,
-        turma: d.turma,
-        iniciada_em: d.iniciada_em,
-        demanda: d.demanda,
-        mentor: d.mentor?.nome ?? null,
-        mentorado: d.mentorado?.nome ?? null,
-        supervisor: d.supervisor?.nome ?? null,
-        semaforo: s.semaforo,
-        motivo: s.motivo,
-        motivos: s.motivos,
-        sinais: s.sinais,
-        apoio: s.apoio,
-        esperado: s.esperado,
-        feitos: s.feitos,
-        registro_pendente: s.registroPendente,
-        proximo_encontro: s.proximo
-          ? { numero: s.proximo.numero, data_hora: s.proximo.data_hora }
-          : null,
-        encaminhamentos_pendentes: d.encaminhamentos.filter(
-          (t) => t.status === "pendente"
-        ).length,
-        encontros: d.encontros
-          .map((e) => ({
-            numero: e.numero,
-            status: e.status,
-            data_hora: e.data_hora,
-            realizado_em: e.realizado_em,
-            tem_registro: e.registro != null,
-          }))
-          .sort((a, b) => a.numero - b.numero),
-      };
+      return d ? projetarFicha(d, eventos) : null;
     },
   },
 

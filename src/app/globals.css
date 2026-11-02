@@ -591,6 +591,21 @@
 .ia-cursor {
   animation: ia-cursor 1.06s steps(1) infinite;
 }
+/* caret no fim do texto que está chegando — ::after no último parágrafo
+   (ou no último item da última lista), nunca numa linha própria. Quando o
+   último bloco é card/skeleton não há caret: o skeleton já diz "chegando" */
+.ia-stream > :is(p, blockquote):last-child::after,
+.ia-stream > :is(ul, ol):last-child > li:last-child::after {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--foreground) 70%, transparent);
+  animation: ia-cursor 1.06s steps(1) infinite;
+}
 
 /* assistente — fade por fatia de ~6 chars no texto streamado: cada span
    novo (o stream só acrescenta no fim) entra com um fade de opacidade
@@ -771,7 +786,9 @@
     /* exceções funcionais do assistente — WCAG 2.3.3 isenta opacity/cor:
        caret e shimmer não deslocam nada; os pontos de "escrevendo" trocam
        o bounce por onda de opacidade (a espera continua comunicada). */
-    .ia-cursor {
+    .ia-cursor,
+    .ia-stream > :is(p, blockquote):last-child::after,
+    .ia-stream > :is(ul, ol):last-child > li:last-child::after {
       animation-duration: 1.06s !important;
       animation-iteration-count: infinite !important;
     }
