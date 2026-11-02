@@ -120,6 +120,7 @@ import type {
   Disponibilidade,
   Dupla,
   Encontro,
+  EncontroRemarcacao,
   EncontroStatus,
   EspecialistaEvento,
   Material,
@@ -307,6 +308,14 @@ const INDICADOR_SEMANA: Record<EstadoSemana, string> = {
   agendado: DISCO_ESTADO.agendado,
   registrado: DISCO_ESTADO.registrado,
 };
+
+/** Disco "fantasma" da data antiga de um encontro remarcado (REALIZA-341):
+ *  cinza tracejado, pro mentor rastrear o que mudou e a coord/aux lerem a
+ *  assiduidade sem abrir a ficha. */
+const DISCO_REMARCADO =
+  "border border-dashed border-muted-foreground/70 text-muted-foreground";
+
+type ItemRemarcacao = { encontro: Encontro; dupla: Dupla; rem: EncontroRemarcacao };
 
 const ROTULO_ESTADO_SEMANA: Record<EstadoSemana, string> = {
   pendente: "pendente",
@@ -701,6 +710,20 @@ function ChaveDotsDupla({
           {ROTULO_ESTADO_ENCONTRO[estado]}
         </span>
       ))}
+      {disco && (
+        <span className={item}>
+          <span
+            aria-hidden
+            className={cn(
+              "grid size-4 place-items-center rounded-full text-[10px] font-semibold leading-none tabular-nums",
+              DISCO_REMARCADO
+            )}
+          >
+            1
+          </span>
+          remarcado
+        </span>
+      )}
     </span>
   );
 }
@@ -897,6 +920,30 @@ export function AgendaCalendario({
           (instanteDoEncontro(a.encontro)?.getTime() ?? Number.POSITIVE_INFINITY) -
           (instanteDoEncontro(b.encontro)?.getTime() ?? Number.POSITIVE_INFINITY)
       );
+    return mapa;
+  }, [duplas]);
+
+  // data antiga de cada remarcação (REALIZA-341) — o disco cinza fica no dia
+  // que a dupla tinha combinado; o encontro em si segue no dia novo
+  const remarcacoesPorDia = useMemo(() => {
+    const mapa = new Map<string, ItemRemarcacao[]>();
+    for (const dupla of duplas) {
+      if (dupla.status !== "ativa") continue;
+      for (const encontro of dupla.encontros) {
+        const diaAtual = diaDoEncontro(encontro);
+        // um fantasma por dia e encontro (o mais recente vence), e nenhum no
+        // dia em que ele acontece: ir e voltar pra mesma data não é rastro
+        const porIso = new Map<string, EncontroRemarcacao>();
+        for (const rem of encontro.remarcacoes ?? []) {
+          const iso = toDateStr(new Date(rem.data_anterior));
+          if (iso === diaAtual) continue;
+          const atual = porIso.get(iso);
+          if (!atual || rem.created_at > atual.created_at) porIso.set(iso, rem);
+        }
+        for (const [iso, rem] of porIso)
+          mapa.set(iso, [...(mapa.get(iso) ?? []), { encontro, dupla, rem }]);
+      }
+    }
     return mapa;
   }, [duplas]);
 
@@ -1764,6 +1811,7 @@ export function AgendaCalendario({
       ? duplasSemEncontroDoNumero(duplas, oficialDoDia)
       : [];
   const bucketsDoDia = bucketsDoEncontro(itensDupla, agoraMs);
+  const remarcacoesDoSel = remarcacoesPorDia.get(selecionado) ?? [];
 
   // eventos do painel: os do dia + (mentor) os encontros oficiais da semana +
   // o oficial de cada encontro da dupla listado acima, achado pelo nº no
@@ -1935,6 +1983,42 @@ export function AgendaCalendario({
               </ul>
             </div>
           )}
+        </div>
+      )}
+      {/* datas antigas de encontros remarcados (REALIZA-341): o rastro de
+          quando a dupla tinha combinado e pra quando foi */}
+      {remarcacoesDoSel.length > 0 && (
+        <div className="mt-3 px-1">
+          <h3 className="text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            Remarcado deste dia
+          </h3>
+          <ul className="mt-1.5 space-y-1.5">
+            {remarcacoesDoSel.map(({ rem, encontro, dupla }) => (
+              <li key={rem.id} className="flex items-start gap-2 text-sm">
+                <span
+                  aria-hidden
+                  className={cn(
+                    "mt-0.5 grid size-4 shrink-0 place-items-center rounded-full text-[10px] font-semibold leading-none tabular-nums",
+                    DISCO_REMARCADO
+                  )}
+                >
+                  {encontro.numero}
+                </span>
+                <span className="min-w-0">
+                  <span className="block">
+                    {encontro.numero}º encontro
+                    {ehMentorUi
+                      ? ` com ${dupla.mentorado.nome}`
+                      : ` de ${dupla.mentor.nome} e ${dupla.mentorado.nome}`}
+                  </span>
+                  <span className="block text-xs text-muted-foreground">
+                    Remarcado para {formatDateTime(rem.data_nova)}
+                    {rem.motivo ? `. Motivo: ${rem.motivo}` : ""}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
         </div>
       )}
       {eventosPainel.length === 0 ? (
@@ -2674,6 +2758,7 @@ export function AgendaCalendario({
                     return <div role="gridcell" key={`vazio-${s}-${c}`} aria-hidden />;
                   const { iso, dia, eventos: doDia } = cel;
                   const duplasDoDia = duplasPorDia.get(iso) ?? [];
+                  const remarcadosDoDia = remarcacoesPorDia.get(iso) ?? [];
                   const temRecesso = doDia.some((e) => e.tipo === "recesso");
                   const inicioRecesso = doDia.some(
                     (e) => e.tipo === "recesso" && e.data === iso
@@ -2711,6 +2796,11 @@ export function AgendaCalendario({
                       : fmtCompleta.format(parseDia(iso))) +
                     (duplasDoDia.length > 0
                       ? `, ${resumoEncontrosDupla(duplasDoDia, agoraMs)}`
+                      : "") +
+                    (remarcadosDoDia.length > 0
+                      ? `, ${remarcadosDoDia
+                          .map((r) => `${r.encontro.numero}º encontro remarcado deste dia`)
+                          .join(", ")}`
                       : "") +
                     dispoA11y;
 
@@ -2841,6 +2931,23 @@ export function AgendaCalendario({
                                 {encontro.numero}
                               </span>
                             ))
+                              .concat(
+                                // fantasmas só no que sobra dos 2 slots — a
+                                // célula de 375px não comporta mais
+                                remarcadosDoDia
+                                  .slice(0, Math.max(0, 2 - duplasDoDia.length))
+                                  .map(({ rem, encontro }) => (
+                                    <span
+                                      key={rem.id}
+                                      className={cn(
+                                        "grid size-4 shrink-0 place-items-center rounded-full text-[10px] font-semibold leading-none tabular-nums",
+                                        DISCO_REMARCADO
+                                      )}
+                                    >
+                                      {encontro.numero}
+                                    </span>
+                                  ))
+                              )
                           ) : (
                             <span
                               className={cn(
@@ -3902,6 +4009,8 @@ function EncontroDuplaRow({
   // mentor e evidências do dia sem sair da agenda
   const [detalheAberto, setDetalheAberto] = useState(false);
   const { encontro, dupla } = item;
+  // vaivém do encontro (REALIZA-341) — lido por coord/aux como assiduidade
+  const remarcacoes = encontro.remarcacoes?.length ?? 0;
   const iso = isoDoEncontro(encontro);
   // numero-match do mentor pode trazer encontro de outro dia — aí a data aparece completa
   const mesmoDia = diaDoEncontro(encontro) === selecionado;
@@ -4063,6 +4172,8 @@ function EncontroDuplaRow({
                 ) : (
                   <span className="text-[var(--warn-text)]">, registro pendente</span>
                 ))}
+              {remarcacoes > 0 &&
+                `, remarcado ${remarcacoes} ${remarcacoes === 1 ? "vez" : "vezes"}`}
             </span>
           </span>
           <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
@@ -4100,6 +4211,8 @@ function EncontroDuplaRow({
                   ) : (
                     <span className="text-[var(--warn-text)]">, registro pendente</span>
                   ))}
+                {remarcacoes > 0 &&
+                  `, remarcado ${remarcacoes} ${remarcacoes === 1 ? "vez" : "vezes"}`}
               </span>
             </span>
             <span className="inline-flex shrink-0 items-center gap-0.5 text-xs font-medium text-muted-foreground transition-colors group-hover:text-foreground">
