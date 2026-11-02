@@ -42,6 +42,7 @@ import { T } from "@/components/motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { AppRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -250,8 +251,13 @@ export function AssistenteConversa({
   onEstado?: (e: EstadoConversa) => void;
   /** resposta terminou bem — a bolha avisa no FAB se o painel está fechado */
   onRespostaPronta?: () => void;
-  /** mascote no tamanho pedido — a bolha é dona do componente e do estado */
-  Avatar: (p: { tamanho: number; estado: EstadoConversa | "aberto" }) => React.ReactNode;
+  /** mascote no tamanho pedido — a bolha é dona do componente e do estado
+   *  ("aberto" saúda no empty state; "pronto" comemora a resposta que
+   *  acabou de fechar) */
+  Avatar: (p: {
+    tamanho: number;
+    estado: EstadoConversa | "aberto" | "pronto";
+  }) => React.ReactNode;
 }) {
   const pagina = usePathname();
   const [msgs, setMsgs] = useState<Msg[]>([]);
@@ -303,6 +309,15 @@ export function AssistenteConversa({
       ? "erro"
       : "parado";
   useEffect(() => onEstado?.(estado), [estado, onEstado]);
+
+  // a resposta que acabou de fechar comemora uma vez — o mascote ao lado
+  // dela pula ("pronto"), depois volta pro repouso. Evento, não estado
+  const [celebra, setCelebra] = useState(false);
+  useEffect(() => {
+    if (!celebra) return;
+    const t = setTimeout(() => setCelebra(false), 1600);
+    return () => clearTimeout(t);
+  }, [celebra]);
 
   // REALIZA-332: um desmonte de verdade não deve órfanar o stream —
   // aborta o fetch (o req.signal do servidor para de gerar na hora) e
@@ -580,7 +595,10 @@ export function AssistenteConversa({
     setPending(false);
     setStatus(null);
     abortRef.current = null;
-    if (estado === "ok") onRespostaPronta?.();
+    if (estado === "ok") {
+      onRespostaPronta?.();
+      setCelebra(true);
+    }
     focarComposer(inputRef.current);
   }
 
@@ -805,11 +823,11 @@ export function AssistenteConversa({
                   aria-hidden
                   className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                 />
-                <input
+                <Input
                   value={busca}
                   onChange={(e) => setBusca(e.target.value)}
                   placeholder="Buscar conversa"
-                  className="h-9 w-full rounded-lg border border-input bg-transparent pl-8 pr-3 text-base outline-none transition-[border-color,box-shadow] placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50 md:text-sm"
+                  className="h-9 pl-8 md:h-8"
                 />
               </label>
             )}
@@ -988,6 +1006,17 @@ export function AssistenteConversa({
               streaming,
             };
             const ultimaDaConversa = i === msgs.length - 1;
+            // mascote da mensagem: durante o stream ele encena a rodada
+            // (consultando → escrevendo); fechada, a última comemora uma
+            // vez e a de erro guarda a careta — as demais ficam em repouso
+            const estadoAvatar: EstadoConversa | "aberto" | "pronto" =
+              streaming
+                ? estado
+                : ultimaDaConversa && celebra
+                  ? "pronto"
+                  : m.estado === "erro"
+                    ? "erro"
+                    : "parado";
             // indicador pré-token: status da tool (shimmer) ou a onda de
             // pontos — dentro da própria resposta, nunca bolha de espera dupla
             const esperando = streaming && !analise.textoSemBloco && !analise.stats.length;
@@ -1060,7 +1089,7 @@ export function AssistenteConversa({
                      card, gráfico e tabela precisam de largura */
                   <div className="space-y-2.5 text-sm">
                     <div className="flex items-center gap-2">
-                      <Avatar tamanho={22} estado={streaming ? estado : "parado"} />
+                      <Avatar tamanho={22} estado={estadoAvatar} />
                       <span className="text-xs font-semibold">Rea</span>
                     </div>
                     <div
@@ -1076,7 +1105,7 @@ export function AssistenteConversa({
                 ) : (
                   <div className="flex items-end gap-2">
                     <span className="mb-0.5 shrink-0">
-                      <Avatar tamanho={24} estado={streaming ? estado : "parado"} />
+                      <Avatar tamanho={24} estado={estadoAvatar} />
                     </span>
                     <div
                       className={cn(
