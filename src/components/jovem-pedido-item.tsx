@@ -8,6 +8,7 @@ import { tempoRelativo } from "@/lib/ciclo";
 import { efetivoDe, resumoPedidoJovem } from "@/lib/jovem-especialista";
 import type {
   Disponibilidade,
+  JovemContato,
   SolicitacaoEspecialista,
   SolicitacaoProposta,
 } from "@/lib/types";
@@ -26,14 +27,16 @@ export function PedidoJovemMesa({
   propostas,
   slots,
   meuId,
-  waCoord,
+  equipe,
+  nomeJovem,
   disponibilidade,
 }: {
   s: SolicitacaoEspecialista;
   propostas: SolicitacaoProposta[];
   slots: string[];
   meuId: string;
-  waCoord: string | null;
+  equipe: JovemContato[];
+  nomeJovem: string;
   /** Grade do próprio jovem — pinta "encaixa com você" nos slots da
    *  contra-proposta; null/undefined = mesa sem o destaque. */
   disponibilidade?: Disponibilidade | null;
@@ -74,7 +77,8 @@ export function PedidoJovemMesa({
       slots={slots}
       meuId={meuId}
       papel="mentorado"
-      waCoord={waCoord}
+      equipe={equipe}
+      nomeJovem={nomeJovem}
       disponibilidade={disponibilidade}
       onAceito={() => router.refresh()}
     />
@@ -88,7 +92,8 @@ export function PedidoJovemItem({
   propostas,
   slots,
   meuId,
-  waCoord,
+  equipe,
+  nomeJovem,
   alvo,
   disponibilidade,
 }: {
@@ -96,7 +101,8 @@ export function PedidoJovemItem({
   propostas: SolicitacaoProposta[];
   slots: string[];
   meuId: string;
-  waCoord: string | null;
+  equipe: JovemContato[];
+  nomeJovem: string;
   /** O especialista da mesa (engajado ?? direcionado) — nome/foto vindos do
    *  catálogo jovem_especialistas; null = pedido em broadcast. */
   alvo: { nome: string; avatar_path: string | null } | null;
@@ -147,7 +153,8 @@ export function PedidoJovemItem({
           propostas={propostas}
           slots={slots}
           meuId={meuId}
-          waCoord={waCoord}
+          equipe={equipe}
+          nomeJovem={nomeJovem}
           disponibilidade={disponibilidade}
         />
       </div>

@@ -42,7 +42,6 @@ import {
   passoEsp,
   toDateStr,
   waLink,
-  waLinkEquipe,
 } from "@/lib/ciclo";
 import { agrupaContatosPorPessoa } from "@/lib/jovem-contatos";
 import {
@@ -371,11 +370,6 @@ export default async function JovemHome() {
     );
   };
 
-  const waCoord = waLinkEquipe(
-    coordenacao[0]?.whatsapp,
-    `Olá! Sou ${nomeTela}, mentorado(a) do programa, e preciso falar com a equipe.`
-  );
-
   // lembrete permanente do "Preencher depois" (REALIZA-114): sem grade o
   // cruzamento da agenda não tem com o que cruzar — a faixa fica até a
   // pessoa preencher no Perfil (quem "pulou" no wizard cai no mesmo estado)
@@ -486,7 +480,7 @@ export default async function JovemHome() {
 
       {/* canal de segurança sempre à mão, sem competir com o encontro: uma
           linha discreta logo abaixo do que fazer agora */}
-      <PedirAjudaLinha waCoord={waCoord} />
+      <PedirAjudaLinha equipe={coordenacao} nomeJovem={primeiroNome} />
 
       {(temDpp || feitosEsp > 0) && (
         <section

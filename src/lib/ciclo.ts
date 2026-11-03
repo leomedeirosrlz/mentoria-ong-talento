@@ -2152,17 +2152,6 @@ export function waLink(phone: string | null | undefined, mensagem: string): stri
   return `https://wa.me/${digits}?text=${encodeURIComponent(mensagem)}`;
 }
 
-/** Canal do mentorado com a equipe: o grupo do programa (WHATSAPP_GRUPO_URL,
- *  link de convite chat.whatsapp.com) quando configurado; sem grupo, cai no
- *  wa.me do primeiro coordenador ativo. Server-only — lido nas páginas, não
- *  em client components. */
-export function waLinkEquipe(
-  phone: string | null | undefined,
-  mensagem: string,
-): string | null {
-  return process.env.WHATSAPP_GRUPO_URL || waLink(phone, mensagem);
-}
-
 /** WhatsApp cru (`5511987654003`) → exibição `(11) 98765-4003`. Só mascara
  *  BR ("55" + 10/11 dígitos) — número estrangeiro volta cru, máscara errada
  *  é pior que nenhuma. Round-trip garantido: normWhatsapp re-normaliza. */

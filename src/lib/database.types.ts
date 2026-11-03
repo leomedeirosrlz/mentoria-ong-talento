@@ -3656,7 +3656,7 @@ export type Database = {
           uf: string | null
           user_id: string | null
           voluntariado: string | null
-          voluntario: boolean
+          voluntario: boolean | null
           whatsapp: string | null
         }
         Insert: {
@@ -3689,7 +3689,7 @@ export type Database = {
           uf?: string | null
           user_id?: string | null
           voluntariado?: string | null
-          voluntario?: boolean
+          voluntario?: boolean | null
           whatsapp?: string | null
         }
         Update: {
@@ -3722,7 +3722,7 @@ export type Database = {
           uf?: string | null
           user_id?: string | null
           voluntariado?: string | null
-          voluntario?: boolean
+          voluntario?: boolean | null
           whatsapp?: string | null
         }
         Relationships: []

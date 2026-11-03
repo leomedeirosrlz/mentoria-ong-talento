@@ -29,9 +29,11 @@ import {
 import type {
   AppRole,
   Disponibilidade,
+  JovemContato,
   SolicitacaoEspecialista,
   SolicitacaoProposta,
 } from "@/lib/types";
+import { EquipeWaDialog } from "@/components/jovem-equipe-wa";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -365,7 +367,8 @@ export function SolicitacaoNegociacao({
   slots,
   meuId,
   papel,
-  waCoord,
+  equipe,
+  nomeJovem,
   disponibilidade,
   mentoradosProprios,
   onAceito,
@@ -380,10 +383,13 @@ export function SolicitacaoNegociacao({
   /** profile.id do visitante — define a vez ("sua proposta" não se responde). */
   meuId: string;
   papel: AppRole | null;
-  /** Link wa.me da coordenação — o fallback do jovem nos estados sem saída
-   *  (expirou, idas e vindas demais): o especialista NÃO é contato dele
-   *  antes do aceite (jovem_contatos), então "falar com alguém" = a equipe. */
-  waCoord?: string | null;
+  /** Contatos da coordenação (jovem_contatos) — o fallback do jovem nos
+   *  estados sem saída (expirou, idas e vindas demais): o especialista NÃO
+   *  é contato dele antes do aceite, então "falar com alguém" = a equipe. */
+  equipe?: JovemContato[];
+  /** Primeiro nome do mentorado — assina a mensagem pré-preenchida do
+   *  WhatsApp da equipe. */
+  nomeJovem?: string;
   /** Grade de disponibilidade de quem escolhe o horário — na mesa do jovem
    *  é a dele (jovem_perfil.disponibilidade); pinta "encaixa com você" nos
    *  slots da grade de dias da contra-proposta. Null/ausente = sem destaque. */
@@ -474,21 +480,22 @@ export function SolicitacaoNegociacao({
                 }
               />
             )}
-            {papel === "mentorado" && waCoord && (
-              <a
-                href={waCoord}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={cn(
-                  buttonVariants({ variant: "outline", size: "sm" }),
-                  "text-muted-foreground"
-                )}
-              >
-                <WhatsappLogo size={15} aria-hidden />
-                Falar com a coordenação
-                <span className="sr-only"> (abre em nova aba)</span>
-              </a>
-            )}
+            {papel === "mentorado" && equipe?.length ? (
+              <EquipeWaDialog
+                equipe={equipe}
+                nomeJovem={nomeJovem ?? ""}
+                trigger={
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="text-muted-foreground"
+                  >
+                    <WhatsappLogo size={15} aria-hidden />
+                    Falar com a coordenação
+                  </Button>
+                }
+              />
+            ) : null}
           </div>
         </div>
       );
@@ -783,21 +790,22 @@ export function SolicitacaoNegociacao({
                   ? "Já foram muitas idas e vindas. Se o horário não fechar, fala com a coordenação."
                   : "Limite de propostas na mesa. Combinem o horário por outro canal."}
               </p>
-              {papel === "mentorado" && waCoord && (
-                <a
-                  href={waCoord}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className={cn(
-                    buttonVariants({ variant: "outline", size: "sm" }),
-                    "text-muted-foreground"
-                  )}
-                >
-                  <WhatsappLogo size={15} aria-hidden />
-                  Falar com a coordenação
-                  <span className="sr-only"> (abre em nova aba)</span>
-                </a>
-              )}
+              {papel === "mentorado" && equipe?.length ? (
+                <EquipeWaDialog
+                  equipe={equipe}
+                  nomeJovem={nomeJovem ?? ""}
+                  trigger={
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-muted-foreground"
+                    >
+                      <WhatsappLogo size={15} aria-hidden />
+                      Falar com a coordenação
+                    </Button>
+                  }
+                />
+              ) : null}
             </div>
           ) : !autorPodeAceitar && efetivo === "contra_proposta" ? (
             <p className="text-xs text-muted-foreground">

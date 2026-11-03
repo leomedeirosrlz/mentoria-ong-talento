@@ -1,5 +1,8 @@
 import { CaretRight, HandHeart, WhatsappLogo } from "@phosphor-icons/react/dist/ssr";
+import { EquipeWaDialog } from "@/components/jovem-equipe-wa";
 import { NovoChamadoDialog } from "@/components/novo-chamado-dialog";
+import { Button } from "@/components/ui/button";
+import type { JovemContato } from "@/lib/types";
 
 /** "Preciso de ajuda" do jovem — 0084: o canal de segurança abre um chamado
  *  (opções na linguagem dele, "É urgente" sempre à mão) em vez de uma
@@ -15,9 +18,16 @@ export function PedirAjudaDialog({
 }
 
 /** Linha discreta de ajuda da home: sempre visível, sem disputar com o
- *  encontro. O texto inteiro abre o mesmo chamado; o WhatsApp da coordenação
- *  segue ao lado, pra quem prefere falar direto. */
-export function PedirAjudaLinha({ waCoord }: { waCoord: string | null }) {
+ *  encontro. O texto inteiro abre o mesmo chamado; o WhatsApp ao lado abre
+ *  a equipe (cada membro da coordenação com o próprio número). */
+export function PedirAjudaLinha({
+  equipe,
+  nomeJovem,
+}: {
+  equipe: JovemContato[];
+  nomeJovem: string;
+}) {
+  const comWa = equipe.some((c) => c.whatsapp?.trim());
   return (
     <div className="flex items-center justify-between gap-2">
       <PedirAjudaDialog
@@ -36,17 +46,20 @@ export function PedirAjudaLinha({ waCoord }: { waCoord: string | null }) {
           </button>
         }
       />
-      {waCoord && (
-        <a
-          href={waCoord}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="inline-flex min-h-11 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
-        >
-          <WhatsappLogo size={16} aria-hidden />
-          WhatsApp
-          <span className="sr-only"> da coordenação (abre em nova aba)</span>
-        </a>
+      {comWa && (
+        <EquipeWaDialog
+          equipe={equipe}
+          nomeJovem={nomeJovem}
+          trigger={
+            <Button
+              variant="ghost"
+              className="min-h-11 shrink-0 gap-1.5 px-2 text-sm text-muted-foreground hover:text-foreground"
+            >
+              <WhatsappLogo size={16} aria-hidden />
+              WhatsApp
+            </Button>
+          }
+        />
       )}
     </div>
   );

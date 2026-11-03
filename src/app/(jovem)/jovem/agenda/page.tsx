@@ -37,7 +37,6 @@ import {
   maxEncontros,
   passoEsp,
   waLink,
-  waLinkEquipe,
 } from "@/lib/ciclo";
 import {
   efetivoDe,
@@ -168,10 +167,8 @@ export default async function JovemAgenda() {
   const semDuplaDpp = !duplas.some(
     (d) => d.trilha !== "especialista" && d.status === "ativa"
   );
-  const waCoord = waLinkEquipe(
-    contatos.find((c) => c.papel === "coordenacao")?.whatsapp,
-    `Olá! Sou ${me?.nome_social || me?.nome || ""}, mentorado(a) do programa, e preciso falar com a equipe.`
-  );
+  const equipeCoord = contatos.filter((c) => c.papel === "coordenacao");
+  const nomeTela = (me?.nome_social || me?.nome || "").split(" ")[0];
   // a grade do jovem marca nos chips/slots do especialista os horários que
   // encaixam nela ("encaixa com você" — mesma régua da mesa de negociação)
   const dispJovem =
@@ -331,7 +328,8 @@ export default async function JovemAgenda() {
                           propostas={pedidosEsp.propostas[pedido.id] ?? []}
                           slots={slots}
                           meuId={me?.id ?? ""}
-                          waCoord={waCoord}
+                          equipe={equipeCoord}
+                          nomeJovem={nomeTela}
                           disponibilidade={dispJovem}
                         />
                       </div>
