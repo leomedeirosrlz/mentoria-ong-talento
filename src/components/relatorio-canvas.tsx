@@ -172,15 +172,36 @@ export function RelatorioCanvas({
     } catch {}
   }, [ordenadas, selecionadas, paraTsv]);
 
-  // Ctrl+C com seleção ativa copia como TSV (mesmo gesto do Excel)
+  // Ctrl+C com seleção de LINHAS ativa copia como TSV (mesmo gesto do
+  // Excel) — mas só quando não há seleção de texto nativa no canvas: se a
+  // pessoa arrastou o mouse sobre o texto de uma célula (a seleção começa
+  // ou termina dentro da grade), o Ctrl+C é do texto e o browser copia
+  // normal. Idem com foco em campo editável: dentro do input da edição
+  // inline a cópia é sempre do conteúdo do campo, nunca da grade.
   useEffect(() => {
     const el = wrapRef.current;
     if (!el || selecionadas === null) return;
     const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === "c" && selecionadas.size > 0) {
-        e.preventDefault();
-        void copiar();
+      if (!(e.ctrlKey || e.metaKey) || e.key.toLowerCase() !== "c") return;
+      if (selecionadas.size === 0) return;
+      const alvo = e.target;
+      if (
+        alvo instanceof HTMLElement &&
+        (alvo.isContentEditable || alvo.closest("input, textarea") !== null)
+      ) {
+        return;
       }
+      const sel = window.getSelection();
+      if (
+        sel &&
+        !sel.isCollapsed &&
+        sel.toString() !== "" &&
+        (el.contains(sel.anchorNode) || el.contains(sel.focusNode))
+      ) {
+        return;
+      }
+      e.preventDefault();
+      void copiar();
     };
     el.addEventListener("keydown", onKey);
     return () => el.removeEventListener("keydown", onKey);
@@ -497,6 +518,15 @@ export function RelatorioCanvas({
                               // linha (borbulha pro tr); clique simples abre
                               // a edição sem mexer na seleção
                               if (e.shiftKey) return;
+                              // o mouseup que fecha um arrasto de seleção de
+                              // texto dentro da célula também dispara click —
+                              // abrir o editor aqui trocaria a célula por
+                              // inputs e destruiria a seleção antes do Ctrl+C.
+                              // Seleção ativa → não é clique de editar; deixa
+                              // borbulhar pro tr (vira clique de linha, como
+                              // numa célula não-editável)
+                              const sel = window.getSelection();
+                              if (sel && !sel.isCollapsed) return;
                               e.stopPropagation();
                               abrirEdicao(l, c.id);
                             }
