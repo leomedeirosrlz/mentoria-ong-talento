@@ -65,6 +65,9 @@ type OpcoesOlhar = {
   alvo: Ponto | null;
   /** varredura de leitura esquerda→direita em torno do alvo (~1,2s) */
   varrer?: boolean;
+  /** olhar de quem pensa: para no alvo, cruza devagar pro lado oposto,
+      segura e volta (~5s) — ninguém pensa olhando pro mesmo ponto */
+  pensar?: boolean;
   reduzido: boolean;
 };
 
@@ -83,7 +86,7 @@ type OpcoesOlhar = {
  *    deslocamento pela tela. */
 export function useOlhar(
   ref: RefObject<Element | null>,
-  { seguir, alvo, varrer = false, reduzido }: OpcoesOlhar,
+  { seguir, alvo, varrer = false, pensar = false, reduzido }: OpcoesOlhar,
 ): { x: MotionValue<number>; y: MotionValue<number> } {
   const brutoX = useMotionValue(0);
   const brutoY = useMotionValue(0);
@@ -125,8 +128,17 @@ export function useOlhar(
       });
       return () => ctrl.stop();
     }
+    if (pensar) {
+      const ctrl = animate(brutoX, [ax, ax, -ax * 0.6, -ax * 0.6, ax], {
+        duration: 5,
+        times: [0, 0.38, 0.5, 0.88, 1],
+        ease: "easeInOut",
+        repeat: Infinity,
+      });
+      return () => ctrl.stop();
+    }
     brutoX.set(ax);
-  }, [temAlvo, ax, ay, varrer, reduzido, brutoX, brutoY, x, y]);
+  }, [temAlvo, ax, ay, varrer, pensar, reduzido, brutoX, brutoY, x, y]);
 
   // vida própria: seguir o ponteiro + olhadas ociosas
   useEffect(() => {
@@ -181,7 +193,7 @@ export function useOlhar(
     };
 
     const espiar = () => {
-      const ocioso = performance.now() - ultimoMovimento > 3000;
+      const ocioso = performance.now() - ultimoMovimento > 1600;
       if (document.hidden || !ocioso) {
         agendar();
         return;
@@ -204,7 +216,7 @@ export function useOlhar(
 
     function agendar() {
       clearTimeout(timer);
-      timer = setTimeout(espiar, 4000 + Math.random() * 5000);
+      timer = setTimeout(espiar, 2800 + Math.random() * 3600);
     }
 
     const aoMudarVisibilidade = () => {
@@ -242,7 +254,7 @@ export function useOlhar(
 
 /** Piscar: devolve a abertura do olho (1 aberto → ~0 fechado) pra virar
  *  scaleY. Intervalo aleatório de 3–6s, ~18% de piscada dupla; `lento`
- *  (sonolento/consultando) troca por piscadas pesadas e mais espaçadas.
+ *  (consultando) troca por piscadas pesadas e mais espaçadas.
  *
  *  Reduced motion: piscar DESLIGADO. É um loop autônomo e decorativo — não
  *  responde a nada que o usuário fez. Trocar por um corte instantâneo seria
@@ -253,12 +265,29 @@ export function usePiscar({
   ativo,
   reduzido,
   lento = false,
+  gatilho,
 }: {
   ativo: boolean;
   reduzido: boolean;
   lento?: boolean;
+  /** muda → uma piscada curta. Gente pisca ao trocar de foco/expressão;
+      é o que faz a troca de pose parecer pensamento, não troca de quadro */
+  gatilho?: string;
 }): MotionValue<number> {
   const abertura = useMotionValue(1);
+  const gatilhoAntes = useRef(gatilho);
+
+  useEffect(() => {
+    if (gatilhoAntes.current === gatilho) return;
+    gatilhoAntes.current = gatilho;
+    if (!ativo || reduzido || document.hidden) return;
+    const ctrl = animate(abertura, [abertura.get(), 0.06, 1], {
+      duration: 0.18,
+      times: [0, 0.4, 1],
+      ease: "easeInOut",
+    });
+    return () => ctrl.stop();
+  }, [gatilho, ativo, reduzido, abertura]);
 
   useEffect(() => {
     if (!ativo || reduzido) {
@@ -308,6 +337,46 @@ export function usePiscar({
       abertura.set(1);
     };
   }, [ativo, reduzido, lento, abertura]);
+
+  return abertura;
+}
+
+/** Boca falando: abre e fecha em sílabas de duração e amplitude
+ *  irregulares, com pausas de respiro de vez em quando — um loop fixo lê
+ *  como metrônomo (ou robô). Devolve o scaleY da boca. Reduced motion:
+ *  boca entreaberta parada (a pose ainda diz "falando"). */
+export function useTagarelar(ativo: boolean, reduzido: boolean): MotionValue<number> {
+  const abertura = useMotionValue(0.7);
+
+  useEffect(() => {
+    if (!ativo || reduzido) {
+      abertura.set(0.7);
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let ctrl: AnimationPlaybackControls | undefined;
+    let aberta = false;
+
+    const passo = () => {
+      if (document.hidden) {
+        timer = setTimeout(passo, 500);
+        return;
+      }
+      // fechando a sílaba, às vezes respira: boca quase fechada um tempo
+      const pausa = aberta && Math.random() < 0.12;
+      aberta = !aberta;
+      const alvo = aberta ? 0.75 + Math.random() * 0.45 : 0.35 + Math.random() * 0.15;
+      const ms = pausa ? 260 + Math.random() * 280 : 80 + Math.random() * 90;
+      ctrl = animate(abertura, alvo, { duration: Math.min(ms, 120) / 1000, ease: "easeOut" });
+      timer = setTimeout(passo, ms);
+    };
+    passo();
+
+    return () => {
+      clearTimeout(timer);
+      ctrl?.stop();
+    };
+  }, [ativo, reduzido, abertura]);
 
   return abertura;
 }

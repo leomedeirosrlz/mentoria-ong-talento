@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { motion, useTransform, type MotionValue, type Transition } from "motion/react";
 import type { ReaEstado, ReaProps } from "./tipos";
 import {
@@ -15,37 +15,62 @@ import {
   useOlhar,
   usePiscar,
   useReduzido,
+  useTagarelar,
   type Ponto,
 } from "./use-olhar";
 
-/** Conceito B — "Blob". Um mochi lima sentado no canto da tela: base larga,
- *  topo macio, sombra de contato. Respira devagar (sempre, bem pouco) e
+/** Conceito B — "Blob". Um disco lima cheio de vida no canto da tela:
+ *  respira devagar (sempre, bem pouco) e
  *  comunica com o corpo inteiro: espicha quando você chega perto, se encolhe
  *  antes de pular, amassa ao aterrissar, murcha e inclina no erro. Olhos
- *  ovais + uma boquinha que muda de forma (sorriso, "o", aberta, reta, onda). */
+ *  ovais + uma boquinha que muda de forma (sorriso, "o", aberta, reta, onda,
+ *  triste). */
 
-const LIMA = "var(--brand-lime)";
 const TINTA = "var(--brand-ink)";
+const LIMA = "var(--brand-lime)";
 
-/** base mais larga e achatada que o topo — lê como "sentado", não como bola */
-const CORPO =
-  "M50 10C75 10 92 30 93 56C94 80 80 90 50 90C20 90 6 80 7 56C8 30 25 10 50 10Z";
+/** silhueta de disco: círculo limpo ocupando o viewBox todo (mesmo r=50
+ *  do conceito Disco). A expressão segue do Blob, só o recorte mudou */
+const CORPO = "M50 0A50 50 0 1 1 50 100A50 50 0 1 1 50 0Z";
 
-type Boca = "sorriso" | "o" | "aberta" | "reta" | "onda";
+/** teste: esconde a boquinha no `parado` pra comparar só com olhos —
+ *  false = some no parado; true = normal */
+const BOCA_NO_PARADO = true;
+
+type Boca = "sorriso" | "o" | "aberta" | "reta" | "onda" | "triste" | "falando";
 
 type Pose = {
   alvo: Ponto | null;
   sx: number;
   sy: number;
   palpebra: number;
-  forma: "oval" | "arco";
+  forma: "oval" | "arco" | "aperto" | "fenda";
   boca: Boca;
-  /** escala e deslocamento do "o" (bico pensativo vai pro lado) */
+  /** escala e deslocamento do "o"/sorriso (bico pensativo vai pro lado) */
   bocaEscala: number;
   bocaX: number;
-  sobrancelha: boolean;
+  /** sobrancelha por lado: "aflita" (canto interno pra cima — erro,
+      cético) e "brava" (canto interno pra baixo — emburrada, cético) */
+  sobrancelhaEsq: boolean;
+  sobrancelhaDir: boolean;
+  bravaEsq: boolean;
+  bravaDir: boolean;
+  /** curvatura do topo só do olho direito — o "hmm" de quem está
+      pensando é a pálpebra descendo, não o olho inteiro diminuindo */
+  topoDir: number;
+  /** intensidade das bochechas rosadas (0–0.8) — fofura de mascote */
+  bochecha: number;
   /** segundo reflexo nos olhos — o brilho de "deu certo" */
   brilhoExtra: boolean;
+  /** curvatura do topo do olho — 1 = redondo; <1 e a linha do topo desce
+      em curva (pálpebra molenga, não tampa reta) */
+  olhoTopo: number;
+  /** curvatura da parte de baixo — <1 e a base curva pra dentro do olho */
+  olhoBaixo: number;
+  /** inclinação do olho em graus, espelhada por lado — positivo derruba
+      o canto EXTERNO (sono, dengoso); negativo derruba o interno e vira
+      a fenda de bravo, não de sono */
+  olhoTilt: number;
   corpo: { sx: number; sy: number; rotate: number };
 };
 
@@ -58,42 +83,177 @@ const BASE: Pose = {
   boca: "sorriso",
   bocaEscala: 1,
   bocaX: 0,
-  sobrancelha: false,
+  sobrancelhaEsq: false,
+  sobrancelhaDir: false,
+  bravaEsq: false,
+  bravaDir: false,
+  topoDir: 1,
+  bochecha: 0,
   brilhoExtra: false,
+  olhoTopo: 1,
+  olhoBaixo: 1,
+  olhoTilt: 0,
   corpo: { sx: 1, sy: 1, rotate: 0 },
 };
+
+/** Humor de bichinho — camada interna, por cima do `estado` externo. Não é
+ *  botão: a criatura reage a ser encarada e cutucada. Só vale enquanto ela
+ *  está de boa (parada/atenta); qualquer estado de trabalho sobrescreve. */
+type Humor = "neutro" | "timida" | "cochilo" | "irritado" | "tonto";
+
+function useBichinho(ativo: boolean) {
+  const [humor, setHumor] = useState<Humor>("neutro");
+  const toques = useRef<number[]>([]);
+  const esfregadas = useRef<number[]>([]);
+  const tTimida = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const tCochilo = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const tHumor = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  // reset por "estado derivado da render anterior" (mesmo padrão do
+  // useMomento): saiu do modo de boa → humor zera; refs/timers limpa no
+  // effect abaixo (ref no render é proibido)
+  const [ativoAntes, setAtivoAntes] = useState(ativo);
+  if (ativoAntes !== ativo) {
+    setAtivoAntes(ativo);
+    if (!ativo) {
+      setHumor("neutro");
+    }
+  }
+
+  useEffect(() => {
+    if (ativo) return;
+    toques.current = [];
+    esfregadas.current = [];
+    clearTimeout(tTimida.current);
+    clearTimeout(tCochilo.current);
+    clearTimeout(tHumor.current);
+  }, [ativo]);
+
+  useEffect(
+    () => () => {
+      clearTimeout(tTimida.current);
+      clearTimeout(tCochilo.current);
+      clearTimeout(tHumor.current);
+    },
+    [],
+  );
+
+  const entrar = () => {
+    if (!ativo || humor === "tonto" || humor === "irritado") return;
+    // carinho = vai-e-volta rápido: cada entrada conta uma esfregada; ~4
+    // em seguida e ela fica toda tímida de olho fechado — e cada esfregada
+    // a mais renova a corujice (parou o carinho, ela abre o olho sozinha)
+    const agora = performance.now();
+    esfregadas.current = esfregadas.current.filter((t) => agora - t < 1600);
+    esfregadas.current.push(agora);
+    if (esfregadas.current.length >= 4 || humor === "timida") {
+      esfregadas.current = [];
+      setHumor("timida");
+      clearTimeout(tHumor.current);
+      tHumor.current = setTimeout(() => setHumor("neutro"), 1600);
+    }
+    // dois jeitos de carinho: as esfregadas lá em cima, ou a mão parada
+    // em cima ~2,4s — e se o afago continuar muito, ela cochila
+    clearTimeout(tTimida.current);
+    tTimida.current = setTimeout(() => setHumor("timida"), 2000);
+    clearTimeout(tCochilo.current);
+    tCochilo.current = setTimeout(() => setHumor("cochilo"), 5000);
+  };
+
+  const sair = () => {
+    clearTimeout(tTimida.current);
+    clearTimeout(tCochilo.current);
+    if (humor === "timida") {
+      // a cauda do carinho: fica envergonhada mais um instante antes de
+      // abrir o olho de novo
+      clearTimeout(tHumor.current);
+      tHumor.current = setTimeout(() => setHumor("neutro"), 800);
+    } else if (humor === "cochilo") {
+      setHumor("neutro");
+    }
+  };
+
+  const tocar = () => {
+    if (!ativo || humor === "tonto") return;
+    // toque interrompe carinho: se o timer da mão parada disparasse no
+    // meio da reação, timida/cochilo sobrescreveriam emburrada/tonto
+    clearTimeout(tTimida.current);
+    clearTimeout(tCochilo.current);
+    const agora = performance.now();
+    toques.current = toques.current.filter((t) => agora - t < 1600);
+    toques.current.push(agora);
+    const n = toques.current.length;
+    if (n < 3) return;
+    clearTimeout(tHumor.current);
+    if (n >= 5) {
+      // atordoado: a contagem zera e tocar não faz nada até ele se
+      // recompor (early return lá em cima) — curto, é um susto, não um show
+      toques.current = [];
+      setHumor("tonto");
+      tHumor.current = setTimeout(() => setHumor("neutro"), 1700);
+    } else {
+      // emburrada não zera a contagem: insistir leva direto pro tonto
+      setHumor("irritado");
+      tHumor.current = setTimeout(() => setHumor("neutro"), 1900);
+    }
+  };
+
+  return { humor: ativo ? humor : "neutro", entrar, sair, tocar };
+}
 
 function poseDe(estado: ReaEstado, momento: boolean, detalhe: boolean): Pose {
   switch (estado) {
     case "atento":
-      // espicha pra cima, olhos arregalam, boca vira um "o" curioso
-      return { ...BASE, sx: 1.08, sy: 1.12, palpebra: -0.5, boca: "o", corpo: { sx: 0.97, sy: 1.04, rotate: 0 } };
+      // espicha pra cima, olhos abrem e o sorriso alarga — "oi, posso
+      // ajudar?". Um "o" de susto a cada hover lia como sobressalto
+      return { ...BASE, sx: 1.06, sy: 1.1, palpebra: -0.5, bocaEscala: 1.25, corpo: { sx: 0.97, sy: 1.04, rotate: 0 } };
     case "aberto":
       return momento
         ? { ...BASE, alvo: { x: 0, y: -0.2 }, forma: "arco", boca: "aberta" }
-        : { ...BASE, alvo: { x: -0.75, y: 0.6 } };
+        // acenou, acomodou: solta o olhar pra acompanhar quem está com ela
+        : BASE;
     case "consultando":
-      return { ...BASE, alvo: { x: 0.6, y: -0.8 }, palpebra: 0.05, boca: "o", bocaEscala: 0.72, bocaX: 2.6 };
+      // 🤨: o arco do olho esquerdo SOBE extra (côncavo, olho arregala —
+      // sobrancelha levantada) e a pálpebra do direito desce (convexo)
+      return {
+        ...BASE,
+        alvo: { x: 0.6, y: -0.8 },
+        palpebra: 0.05,
+        boca: "o",
+        bocaEscala: 0.72,
+        bocaX: 2.6,
+        olhoTopo: 1.25,
+        topoDir: 0.6,
+      };
     case "escrevendo":
       return { ...BASE, alvo: { x: 0, y: 0.3 }, sy: 0.86, boca: "reta" };
+    case "falando":
+      // tagarelando: olhar em quem ouve, boca trabalhando — e a base do
+      // olho curva pra dentro, aquela expressão de "tô contando coisa"
+      return { ...BASE, alvo: { x: 0, y: 0.15 }, boca: "falando", olhoBaixo: 0.65, olhoTopo: 0.95 };
     case "pronto":
       return momento
         ? { ...BASE, alvo: { x: 0, y: -0.15 }, sx: 1.14, sy: 1.14, boca: "aberta", brilhoExtra: true }
         : BASE;
     case "erro":
+      // "ops" curto (boquinha em o) e assenta num chateado contido —
+      // empatia, não drama
       return {
         ...BASE,
         alvo: { x: -0.1, y: 0.3 },
-        sx: 0.84,
-        sy: 0.84,
-        boca: "onda",
-        sobrancelha: detalhe,
+        sx: 0.88,
+        sy: 0.88,
+        boca: momento ? "o" : "triste",
+        bocaEscala: momento ? 0.8 : 1,
+        sobrancelhaEsq: detalhe,
+        sobrancelhaDir: detalhe,
+        bochecha: 0,
         corpo: { sx: 1.015, sy: 0.97, rotate: -5 },
       };
     case "sonolento":
-      return detalhe
-        ? { ...BASE, alvo: { x: 0, y: 0.4 }, palpebra: 0.52, boca: "o", bocaEscala: 0.6 }
-        : { ...BASE, alvo: { x: 0, y: 0.4 }, sy: 0.42 };
+      // olho fechado é uma linha curva de pontas redondas (a ︶ de sono),
+      // pendendo nos cantos externos — a fenda preenchida lia como brava
+      return { ...BASE, alvo: { x: 0, y: 0.4 }, forma: "fenda", boca: "o", bocaEscala: 0.6, olhoTilt: 6 };
     default:
       return BASE;
   }
@@ -102,11 +262,13 @@ function poseDe(estado: ReaEstado, momento: boolean, detalhe: boolean): Pose {
 type Alvo = Record<string, number | number[]>;
 
 /** Coreografia do corpo e da sombra por estado. Sob reduced motion fica só a
- *  pose estática (inclinação/encolhida do erro, espichada do hover). */
+ *  pose estática (inclinação/encolhida do erro, espichada do hover). O humor
+ *  do bichinho manda no corpo quando existe — é reação, não trabalho. */
 function movimentoDoCorpo({
   efetivo,
   momento,
   festa,
+  humor,
   reduzido,
   pose,
   transicao,
@@ -115,17 +277,16 @@ function movimentoDoCorpo({
   efetivo: ReaEstado;
   momento: boolean;
   festa: boolean;
+  humor: Humor;
   reduzido: boolean;
   pose: Pose;
   transicao: Transition;
   tamanho: number;
-}): { corpo: Alvo; corpoT: Transition; sombra: Alvo; sombraT: Transition } {
+}): { corpo: Alvo; corpoT: Transition } {
   const c = pose.corpo;
   const estatico = {
     corpo: { y: 0, scaleX: c.sx, scaleY: c.sy, rotate: c.rotate },
     corpoT: transicao,
-    sombra: { scaleX: 1, opacity: 1 },
-    sombraT: transicao,
   };
   if (reduzido) return estatico;
 
@@ -138,6 +299,41 @@ function movimentoDoCorpo({
       corpoT: { default: transicao, scaleX: loop, scaleY: loop },
     };
   };
+
+  // humores de bichinho — nada de deslocamento: o corpo fica plantado e a
+  // reação vem da pose. Tonto é a exceção: balança girando no lugar
+  // (pivô na base) porque tontura é literalmente perder o equilíbrio.
+  if (humor === "tonto") {
+    const t: Transition = { duration: 0.9, times: [0, 0.25, 0.55, 0.8, 1], ease: "easeInOut" };
+    return {
+      corpo: { y: 0, scaleX: [1, 1.02, 1, 1.01, 1], scaleY: [1, 0.97, 1, 0.99, 1], rotate: [0, -6, 5, -3, c.rotate] },
+      corpoT: t,
+    };
+  }
+  if (humor === "timida") {
+    // ronroninho de carinho: squish macio e devagar, olhos fechados
+    const loop = { duration: 2.4, repeat: Infinity, ease: "easeInOut" } as const;
+    return {
+      corpo: { y: 0, scaleX: [1.02, 1.035, 1.02], scaleY: [0.95, 0.975, 0.95], rotate: 0 },
+      corpoT: { default: transicao, scaleX: loop, scaleY: loop },
+    };
+  }
+  if (humor === "irritado") {
+    // "hmpf": encolhe num bufo contido e vira o rosto — uma vez, ~0,4s
+    const t: Transition = { duration: 0.42, times: [0, 0.4, 1], ease: EASE };
+    return {
+      corpo: { y: 0, scaleX: [1, 1.06, c.sx], scaleY: [1, 0.9, c.sy], rotate: [0, c.rotate - 2, c.rotate] },
+      corpoT: t,
+    };
+  }
+  if (humor === "cochilo") {
+    // respiro pesado e fundo — quase dormiu debaixo do seu cursor
+    return {
+      ...estatico,
+      corpo: { y: 0, scaleX: [1, 1 - 0.03 * 0.55, 1], scaleY: [0.96, 0.96 + 0.03, 0.96], rotate: -2 },
+      corpoT: { default: transicao, scaleX: { duration: 5.2, repeat: Infinity, ease: "easeInOut" }, scaleY: { duration: 5.2, repeat: Infinity, ease: "easeInOut" } },
+    };
+  }
 
   if (festa) {
     const pulo = px2u(5, tamanho);
@@ -155,9 +351,6 @@ function movimentoDoCorpo({
         rotate: 0,
       },
       corpoT: t,
-      // a sombra encolhe e clareia enquanto ele está no ar
-      sombra: { scaleX: [1, 1.06, 0.7, 1.08, 1], opacity: [1, 1, 0.45, 1, 1] },
-      sombraT: t,
     };
   }
   if (efetivo === "aberto" && momento) {
@@ -168,21 +361,48 @@ function movimentoDoCorpo({
       corpoT: { duration: 0.55, times: [0, 0.35, 0.7, 1], ease: EASE },
     };
   }
+  if (efetivo === "erro" && momento) {
+    // o "ops": um recuo rápido (encolhe) e um balanço curto da cabeça
+    // antes de assentar inclinado
+    const r = c.rotate;
+    return {
+      corpo: {
+        y: 0,
+        scaleX: [1, 1.05, c.sx, c.sx, c.sx],
+        scaleY: [1, 0.9, c.sy, c.sy, c.sy],
+        rotate: [0, 0, r - 3, r + 2, r],
+      },
+      corpoT: { duration: 0.6, times: [0, 0.18, 0.45, 0.75, 1], ease: "easeInOut" },
+    };
+  }
   if (efetivo === "consultando") {
     const flutua = Math.min(px2u(2, tamanho), 2.5);
     const loop = { duration: 2.6, repeat: Infinity, ease: "easeInOut" } as const;
     return {
       corpo: { y: [0, -flutua, 0], scaleX: 1, scaleY: 1, rotate: 0 },
       corpoT: { default: transicao, y: loop },
-      // flutua: a sombra acompanha, encolhendo no alto
-      sombra: { scaleX: [1, 0.92, 1], opacity: [1, 0.75, 1] },
-      sombraT: loop,
     };
   }
-  if (efetivo === "sonolento") return respira(0.024, 5.6);
+  if (efetivo === "sonolento") {
+    // respiro pesado e perceptível — e a cabeça pende devagar junto,
+    // como quem vai cochilando sentado
+    const loop = { duration: 5.2, repeat: Infinity, ease: "easeInOut" } as const;
+    return {
+      ...estatico,
+      corpo: { y: 0, scaleX: [1, 0.98, 1], scaleY: [1, 1.035, 1], rotate: [0, -3, -3, 0] },
+      corpoT: {
+        default: transicao,
+        scaleX: loop,
+        scaleY: loop,
+        rotate: { duration: 5.2, repeat: Infinity, ease: "easeInOut", times: [0, 0.4, 0.7, 1] },
+      },
+    };
+  }
+  // falando: respiro mais curto e vivo, o corpo acompanha a fala
+  if (efetivo === "falando") return respira(0.018, 2.4);
   if (efetivo === "parado" || efetivo === "aberto" || efetivo === "escrevendo") {
-    // respiração de repouso: 1,4% de escala, abaixo do limiar de "mexendo"
-    return respira(0.014, 4.2);
+    // respiração de repouso: ~2% de escala — perceptível sem virar "mexendo"
+    return respira(0.022, 3.8);
   }
   return estatico;
 }
@@ -193,51 +413,75 @@ export function ReaBlob({ estado, tamanho, seguirCursor = true, className }: Rea
   const reduzido = useReduzido();
   const momento = useMomento(estado);
   const detalhe = tamanho >= 28; // boca, pálpebra, sobrancelha, sombra
-  const brilho = tamanho >= 40;
 
   const efetivo: ReaEstado = estado === "pronto" && !momento ? "parado" : estado;
   const festa = estado === "pronto" && momento;
-  const pose = poseDe(efetivo, momento, detalhe);
+
+  // bichinho: humor interno por cima do estado — só quando está de boa.
+  // "aberto" entra depois da saudação (momento) — a mascote do empty state
+  // vira pet assim que para de acenar
+  const { humor, entrar, sair, tocar } = useBichinho(
+    efetivo === "parado" || efetivo === "atento" || (efetivo === "aberto" && !momento),
+  );
+
+  // tonto = olhos apertados > < e boquinha ondulada; emburrada = vira o
+  // rosto de lado, sobrancelha franzida e bico — sem mudar de cor (vermelho
+  // é a cor de risco da interface) e sem efeito por cima
+  const pose: Pose =
+    humor === "tonto"
+      ? { ...BASE, alvo: { x: 0, y: 0 }, forma: "aperto" as const, boca: "onda", corpo: { sx: 1, sy: 0.97, rotate: -3 } }
+      : humor === "irritado"
+        ? { ...BASE, alvo: { x: -0.8, y: 0.1 }, palpebra: 0.22, boca: "o", bocaEscala: 0.55, bocaX: -1.5, bravaEsq: detalhe, bravaDir: detalhe, olhoTilt: -3, corpo: { sx: 1.04, sy: 0.95, rotate: -3 } }
+        : humor === "timida"
+          ? { ...BASE, forma: "arco" as const, boca: "sorriso", bochecha: 0.8, corpo: { sx: 1.03, sy: 0.95, rotate: 0 } }
+          : humor === "cochilo"
+            ? { ...BASE, alvo: { x: 0, y: 0.35 }, forma: "fenda" as const, boca: "o", bocaEscala: 0.6, olhoTilt: 6, corpo: { sx: 1, sy: 0.96, rotate: -2 } }
+            : poseDe(efetivo, momento, detalhe);
 
   const olhar = useOlhar(ref, {
     seguir: seguirCursor,
     alvo: pose.alvo,
     varrer: efetivo === "escrevendo",
+    pensar: efetivo === "consultando",
     reduzido,
   });
   const abertura = usePiscar({
-    ativo: pose.forma === "oval",
+    // sono suspende a piscada: o olho já é uma fenda, não tem o que fechar
+    ativo: pose.forma === "oval" && efetivo !== "sonolento" && humor !== "cochilo",
     reduzido,
-    lento: efetivo === "sonolento" || efetivo === "consultando",
+    lento: efetivo === "consultando",
+    gatilho: `${efetivo}:${humor}`,
   });
+  const tagarela = useTagarelar(detalhe && pose.boca === "falando", reduzido);
   const inclina = useAlvoMola(efetivo === "atento" ? 1 : 0, reduzido);
 
+  const olhoDims = detalhe ? { rx: 9, ry: 11, cy: 47, dx: 17 } : { rx: 11, ry: 13.5, cy: 49, dx: 18 };
+  // o olho inteiro viaja no rosto (raio) e o reflexo faz um contra-movimento
+  // (hx) — o clássico de mascote; a boca anda ~metade: o rosto "vira" em 3D
   const raio = detalhe ? { x: 8, y: 6 } : { x: 5.5, y: 4.5 };
   const ox = useTransform(olhar.x, (v) => v * raio.x);
   const oy = useTransform(olhar.y, (v) => v * raio.y);
-  // a boca anda ~metade do que os olhos andam: o rosto "vira" em 3D
   const bx = useTransform(olhar.x, (v) => v * raio.x * 0.55);
   const by = useTransform(olhar.y, (v) => v * raio.y * 0.45);
   // no hover o corpo inteiro tomba pro lado do cursor, pivotando na base
   const tomba = useTransform([olhar.x, inclina], ([g, k]: number[]) => g * k * 6);
   const hx = useTransform(olhar.x, (v) => v * -1.2);
 
-  const transicao: Transition = reduzido ? REDUZIDA : efetivo === "atento" ? MOLA_RAPIDA : MOLA;
+  const transicao: Transition = reduzido ? REDUZIDA : efetivo === "atento" || humor !== "neutro" ? MOLA_RAPIDA : MOLA;
 
-  const { corpo, corpoT, sombra, sombraT } = movimentoDoCorpo({
+  const { corpo, corpoT } = movimentoDoCorpo({
     efetivo,
     momento,
     festa,
+    humor,
     reduzido,
     pose,
     transicao,
     tamanho,
   });
 
-  const olhoDims = detalhe ? { rx: 5.4, ry: 6.6, cy: 47, dx: 16 } : { rx: 7, ry: 8.6, cy: 49, dx: 17 };
-
   return (
-    <svg
+    <motion.svg
       ref={ref}
       viewBox="0 0 100 100"
       width={tamanho}
@@ -246,6 +490,17 @@ export function ReaBlob({ estado, tamanho, seguirCursor = true, className }: Rea
       aria-hidden
       focusable="false"
       className={className}
+      // fill-box + %: a referência é a própria caixa do svg — o squash
+      // ancora na base em QUALQUER tamanho (view-box no svg raiz media em
+      // px do viewport e arrastava a criatura no clique)
+      style={{ transformBox: "fill-box", transformOrigin: "50% 100%" }}
+      // bichinho: ser encarado cansa, ser cutucado irrita — nos contextos em
+      // que o svg recebe ponteiro (vitrine, header, avatar, FAB)
+      onPointerEnter={entrar}
+      onPointerLeave={sair}
+      onPointerDown={tocar}
+      // achatamento no toque fica — é a criatura sendo apertada, não botão
+      whileTap={reduzido ? undefined : { scaleX: 1.14, scaleY: 0.8 }}
     >
       <defs>
         <clipPath id={clipId}>
@@ -253,48 +508,51 @@ export function ReaBlob({ estado, tamanho, seguirCursor = true, className }: Rea
         </clipPath>
       </defs>
 
-      {detalhe && (
-        <motion.g
-          initial={false}
-          animate={sombra}
-          transition={sombraT}
-          style={{ transformBox: "view-box", transformOrigin: "50px 93px" }}
-        >
-          <ellipse cx={50} cy={93.5} rx={28} ry={3} fill="hsl(0 0% 0% / 0.14)" />
-        </motion.g>
-      )}
-
-      <motion.g style={{ rotate: tomba, transformBox: "view-box", transformOrigin: "50px 90px" }}>
+      <motion.g style={{ rotate: tomba, transformBox: "view-box", transformOrigin: "50px 100px" }}>
         <motion.g
           initial={false}
           animate={corpo}
           transition={corpoT}
-          style={{ transformBox: "view-box", transformOrigin: "50px 90px" }}
+          style={{ transformBox: "view-box", transformOrigin: "50px 100px" }}
         >
-          <path d={CORPO} fill={LIMA} />
-          <g clipPath={`url(#${clipId})`}>
-            {([-1, 1] as const).map((lado) => (
-              <Olho
-                key={lado}
-                lado={lado}
-                cx={50 + lado * olhoDims.dx}
-                cy={olhoDims.cy}
-                rx={olhoDims.rx}
-                ry={olhoDims.ry}
-                pose={pose}
-                ox={ox}
-                oy={oy}
-                hx={hx}
-                abertura={abertura}
-                transicao={transicao}
-                detalhe={detalhe}
-                brilho={brilho}
-              />
-            ))}
-            {detalhe && (
+          <g fill={LIMA}>
+            <path d={CORPO} />
+            <g clipPath={`url(#${clipId})`}>
+              {([-1, 1] as const).map((lado) => (
+                <Olho
+                  key={lado}
+                  lado={lado}
+                  cx={50 + lado * olhoDims.dx}
+                  cy={olhoDims.cy}
+                  rx={olhoDims.rx}
+                  ry={olhoDims.ry}
+                  pose={pose}
+                  ox={ox}
+                  oy={oy}
+                  hx={hx}
+                  abertura={abertura}
+                  transicao={transicao}
+                  detalhe={detalhe}
+                />
+              ))}
+              {/* bochechas rosadas sob os cantos externos dos olhos */}
+              {([-1, 1] as const).map((lado) => (
+                <motion.ellipse
+                  key={`bochecha-${lado}`}
+                  cx={50 + lado * (olhoDims.dx + 7.5)}
+                  cy={olhoDims.cy + olhoDims.ry + 4.5}
+                  rx={detalhe ? 4.4 : 5.2}
+                  ry={detalhe ? 2.4 : 2.8}
+                  fill="hsl(4 72% 62%)"
+                  initial={false}
+                  animate={{ opacity: pose.bochecha }}
+                  transition={{ opacity: { duration: 0.3, ease: EASE }, default: transicao }}
+                />
+              ))}
+            {detalhe && (efetivo !== "parado" || BOCA_NO_PARADO) && (
               <motion.g style={{ x: bx, y: by }}>
                 <g transform="translate(50 61)">
-                  <BocaForma ativa={pose.boca === "sorriso"} transicao={transicao}>
+                  <BocaForma ativa={pose.boca === "sorriso"} transicao={transicao} escala={pose.bocaEscala}>
                     <path d="M-4.2 -1.2Q0 2.8 4.2 -1.2" fill="none" stroke={TINTA} strokeWidth={2.6} strokeLinecap="round" />
                   </BocaForma>
                   <BocaForma
@@ -307,6 +565,18 @@ export function ReaBlob({ estado, tamanho, seguirCursor = true, className }: Rea
                   </BocaForma>
                   <BocaForma ativa={pose.boca === "aberta"} transicao={transicao}>
                     <path d="M-5.6 -1.6Q0 -2.4 5.6 -1.6Q5.2 5.6 0 5.8Q-5.2 5.6 -5.6 -1.6Z" fill={TINTA} />
+                  </BocaForma>
+                  <BocaForma ativa={pose.boca === "falando"} transicao={transicao}>
+                    {/* tagarela: a boquinha abre e fecha em sílabas —
+                        amplitude irregular pra não parecer metrônomo */}
+                    <motion.ellipse
+                      cx={0}
+                      cy={0.6}
+                      rx={2.9}
+                      ry={2.7}
+                      style={{ scaleY: tagarela, transformBox: "fill-box", transformOrigin: "center" }}
+                      fill={TINTA}
+                    />
                   </BocaForma>
                   <BocaForma ativa={pose.boca === "reta"} transicao={transicao}>
                     <path d="M-3 0.4H3" fill="none" stroke={TINTA} strokeWidth={2.6} strokeLinecap="round" />
@@ -321,13 +591,55 @@ export function ReaBlob({ estado, tamanho, seguirCursor = true, className }: Rea
                       strokeLinejoin="round"
                     />
                   </BocaForma>
+                  <BocaForma ativa={pose.boca === "triste"} transicao={transicao}>
+                    <path d="M-3.8 1.6Q0 -1.4 3.8 1.6" fill="none" stroke={TINTA} strokeWidth={2.6} strokeLinecap="round" />
+                  </BocaForma>
                 </g>
               </motion.g>
             )}
           </g>
+          </g>
+
+          {/* "zZ" do sono: dois zetas subindo alternados acima da
+              cabeça — maior e menor, em contra-tempo. Serve o cochilo
+              (afago longo) e o estado sonolento */}
+          {detalhe && (humor === "cochilo" || efetivo === "sonolento") && (
+            <>
+              <motion.g
+                initial={{ opacity: 0, x: 0, y: 0 }}
+                animate={{ opacity: [0, 0.85, 0.85, 0], y: [0, -10, -22, -22], x: [0, 3, 6, 6] }}
+                transition={{ duration: 2.8, repeat: Infinity, ease: "easeOut" }}
+              >
+                <path
+                  d="M0 0L9 0L0 9L9 9"
+                  transform="translate(78 -2)"
+                  fill="none"
+                  stroke="var(--foreground)"
+                  strokeWidth={2.6}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </motion.g>
+              <motion.g
+                initial={{ opacity: 0, x: 0, y: 0 }}
+                animate={{ opacity: [0, 0.7, 0.7, 0], y: [0, -8, -17, -17], x: [0, 2, 4, 4] }}
+                transition={{ duration: 2.8, repeat: Infinity, ease: "easeOut", delay: 1.4 }}
+              >
+                <path
+                  d="M0 0L6 0L0 6L6 6"
+                  transform="translate(90 -6)"
+                  fill="none"
+                  stroke="var(--foreground)"
+                  strokeWidth={2.1}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </motion.g>
+            </>
+          )}
         </motion.g>
       </motion.g>
-    </svg>
+    </motion.svg>
   );
 }
 
@@ -355,6 +667,15 @@ function BocaForma({
   );
 }
 
+/** o olho não é uma elipse fixa: duas cúbicas (topo/base) deixam cada
+ *  expressão morfar o formato — base entrando na tagarelice, topo caindo
+ *  em curva no sono. Cúbica, não quadrática: a
+ *  tangente nas laterais é vertical, então as pontas ficam redondas
+ *  (a versão com Q saía em cúspide e lia como losango). A estrutura do
+ *  path é sempre a mesma pra transição interpolar os números */
+const olhoPath = (rx: number, ry: number, topo: number, baixo: number) =>
+  `M ${-rx} 0C${-rx} ${-ry * 1.333 * topo} ${rx} ${-ry * 1.333 * topo} ${rx} 0C${rx} ${ry * 1.333 * baixo} ${-rx} ${ry * 1.333 * baixo} ${-rx} 0Z`;
+
 function Olho({
   lado,
   cx,
@@ -368,7 +689,6 @@ function Olho({
   abertura,
   transicao,
   detalhe,
-  brilho,
 }: {
   lado: -1 | 1;
   cx: number;
@@ -382,36 +702,65 @@ function Olho({
   abertura: MotionValue<number>;
   transicao: Transition;
   detalhe: boolean;
-  brilho: boolean;
 }) {
   const oval = pose.forma === "oval";
   const arco = pose.forma === "arco";
+  const aperto = pose.forma === "aperto";
+  const fenda = pose.forma === "fenda";
   const h = ry * 2;
+  // assimetria por lado: cético (🤨) tem sobrancelhas em direções
+  // opostas e a pálpebra de cima descendo só num olho
+  const topo = lado === 1 ? pose.topoDir : pose.olhoTopo;
+  const sobrancelha = lado === -1 ? pose.sobrancelhaEsq : pose.sobrancelhaDir;
+  const brava = lado === -1 ? pose.bravaEsq : pose.bravaDir;
 
   return (
     <motion.g style={{ x: ox, y: oy }}>
       <g transform={`translate(${cx} ${cy})`}>
+        {/* inclinação da expressão: o canto interno pende no sono e na
+            raiva — fill-box ancora o giro no próprio olho */}
+        <motion.g
+          initial={false}
+          animate={{ rotate: lado * pose.olhoTilt }}
+          transition={transicao}
+          style={{ transformBox: "fill-box", transformOrigin: "center" }}
+        >
         <motion.g
           initial={false}
           animate={{ scaleX: oval ? pose.sx : 0.8, scaleY: oval ? pose.sy : 0.25, opacity: oval ? 1 : 0 }}
           transition={{ default: transicao, opacity: FADE }}
         >
           <motion.g style={{ scaleY: abertura, transformOrigin: "50% 60%" }}>
-            <ellipse cx={0} cy={0} rx={rx} ry={ry} fill={TINTA} />
-            {brilho && (
-              <motion.g style={{ x: hx }}>
-                <circle cx={rx * 0.34} cy={-ry * 0.4} r={rx * 0.36} fill="#fff" />
-                <motion.circle
-                  cx={-rx * 0.3}
-                  cy={ry * 0.32}
-                  r={rx * 0.2}
-                  fill="#fff"
-                  initial={false}
-                  animate={{ opacity: pose.brilhoExtra ? 0.9 : 0 }}
-                  transition={FADE}
-                />
-              </motion.g>
-            )}
+            <motion.path
+              initial={false}
+              animate={{ d: olhoPath(rx, ry, topo, pose.olhoBaixo) }}
+              transition={transicao}
+              fill={TINTA}
+            />
+            {/* brilho em TODOS os tamanhos — o olho fica vivo até no mini.
+                pálpebra baixa: o brilho encolhe e desce pra continuar
+                dentro da tinta (pálpebra muito baixa → some) */}
+            <motion.g
+              style={{ x: hx, transformBox: "fill-box", transformOrigin: "center" }}
+              initial={false}
+              animate={{
+                opacity: pose.forma === "oval" && topo >= 0.35 ? 1 : 0,
+                y: topo < 0.75 ? ry * 0.15 : 0,
+                scale: topo < 0.75 ? 0.82 : 1,
+              }}
+              transition={{ opacity: FADE, default: transicao }}
+            >
+              <circle cx={rx * 0.34} cy={-ry * 0.4} r={rx * 0.36} fill="#fff" />
+              <motion.circle
+                cx={-rx * 0.3}
+                cy={ry * 0.32}
+                r={rx * 0.2}
+                fill="#fff"
+                initial={false}
+                animate={{ opacity: pose.brilhoExtra ? 0.9 : 0 }}
+                transition={FADE}
+              />
+            </motion.g>
           </motion.g>
         </motion.g>
 
@@ -422,39 +771,92 @@ function Olho({
             transition={transicao}
             style={{ transformOrigin: "50% 100%" }}
           >
-            <rect x={-rx * 2} y={-ry - 16} width={rx * 4} height={16} fill={LIMA} />
+            {/* a pálpebra herda o fill do grupo do corpo */}
+            <rect x={-rx * 2} y={-ry - 16} width={rx * 4} height={16} />
           </motion.g>
         )}
 
-        {/* sobrancelha aflita: canto interno pra cima (só no erro) */}
-        {detalhe && (
-          <motion.g
-            initial={false}
-            animate={{ opacity: pose.sobrancelha ? 1 : 0, y: pose.sobrancelha ? 0 : 2 }}
-            transition={{ default: transicao, opacity: FADE }}
-          >
-            <path
-              d={`M${lado * 5} ${-ry - 3}L${-lado * 4.2} ${-ry - 6.4}`}
-              fill="none"
-              stroke={TINTA}
-              strokeWidth={2.4}
-              strokeLinecap="round"
-            />
-          </motion.g>
-        )}
-
+      {/* sobrancelha aflita: canto interno pra cima (só no erro) */}
+      {detalhe && (
         <motion.g
           initial={false}
-          animate={{ opacity: arco ? 1 : 0, y: arco ? 0 : 3, scale: arco ? 1 : 0.8 }}
+          animate={{ opacity: sobrancelha ? 1 : 0, y: sobrancelha ? 0 : 2 }}
           transition={{ default: transicao, opacity: FADE }}
         >
           <path
-            d={`M${-rx * 1.2} ${ry * 0.15}Q0 ${-ry * 0.95} ${rx * 1.2} ${ry * 0.15}`}
+            d={`M${lado * 5} ${-ry - 3}L${-lado * 4.2} ${-ry - 6.4}`}
             fill="none"
             stroke={TINTA}
-            strokeWidth={detalhe ? 4.4 : 6}
+            strokeWidth={2.4}
             strokeLinecap="round"
           />
+        </motion.g>
+      )}
+
+      {/* sobrancelha brava: canto interno pra baixo (irritado de bichinho) */}
+      {detalhe && (
+        <motion.g
+          initial={false}
+          animate={{ opacity: brava ? 1 : 0, y: brava ? 0 : -2 }}
+          transition={{ default: transicao, opacity: FADE }}
+        >
+          <path
+            d={`M${lado * 5} ${-ry - 6.8}L${-lado * 4.2} ${-ry - 3}`}
+            fill="none"
+            stroke={TINTA}
+            strokeWidth={2.4}
+            strokeLinecap="round"
+          />
+        </motion.g>
+      )}
+
+      {/* felicidade: olho vira um arco ^ */}
+      <motion.g
+        initial={false}
+        animate={{ opacity: arco ? 1 : 0, y: arco ? 0 : 3, scale: arco ? 1 : 0.8 }}
+        transition={{ default: transicao, opacity: FADE }}
+      >
+        <path
+          d={`M${-rx * 1.2} ${ry * 0.15}Q0 ${-ry * 0.95} ${rx * 1.2} ${ry * 0.15}`}
+          fill="none"
+          stroke={TINTA}
+          strokeWidth={detalhe ? 4.4 : 6}
+          strokeLinecap="round"
+        />
+      </motion.g>
+
+      {/* tonto: olhos apertados > < apontando pro nariz — o "ai" de quem
+          levou um susto, lê em qualquer tamanho e não gira sem parar */}
+      <motion.g
+        initial={false}
+        animate={{ opacity: aperto ? 1 : 0, scaleX: aperto ? 1 : 0.6 }}
+        transition={{ default: transicao, opacity: FADE }}
+      >
+        <path
+          d={`M${lado * rx * 0.75} ${-ry * 0.5}L${-lado * rx * 0.55} 0L${lado * rx * 0.75} ${ry * 0.5}`}
+          fill="none"
+          stroke={TINTA}
+          strokeWidth={detalhe ? 4 : 5.5}
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+      </motion.g>
+
+      {/* sono: olho fechado = uma curva de pontas arredondadas que pende
+          suavemente pro meio — preenchido lia como raiva, linha lê sono */}
+      <motion.g
+        initial={false}
+        animate={{ opacity: fenda ? 1 : 0, y: fenda ? 0 : 3 }}
+        transition={{ default: transicao, opacity: FADE }}
+      >
+        <path
+          d={`M${-rx * 0.8} ${ry * 0.1}Q0 ${ry * 0.85} ${rx * 0.8} ${ry * 0.1}`}
+          fill="none"
+          stroke={TINTA}
+          strokeWidth={detalhe ? 4.4 : 5.8}
+          strokeLinecap="round"
+        />
+      </motion.g>
         </motion.g>
       </g>
     </motion.g>

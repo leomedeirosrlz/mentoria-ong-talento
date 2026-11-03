@@ -63,12 +63,12 @@ export function apiGetApp(page: Page, url: string) {
   });
 }
 
-/** Wizard de primeiro acesso: "Pular tudo e começar" só renderiza em passos
+/** Wizard de primeiro acesso: "Concluir agora" só renderiza em passos
  *  com formulário (step>=2) — o(s) primeiro(s) são só "Continuar".
  *  Clique pré-hidratação é no-op silencioso (RSC demora a ligar handlers em
  *  dev/preview frio), então cada clique confirma o avanço no progressbar. */
 export async function pularOnboarding(page: Page) {
-  const pular = page.getByRole("button", { name: /Pular tudo e começar/ });
+  const pular = page.getByRole("button", { name: /Concluir agora/ });
   const progress = page.getByRole("progressbar");
   for (let i = 0; i < 12; i++) {
     if (await pular.isVisible().catch(() => false)) break;

@@ -196,11 +196,12 @@ function camposApresentacao(
   }
 
   if (!parcial || formData.has("linkedin")) {
-    const linkedin = String(formData.get("linkedin") ?? "").trim() || null;
-    // case-sensitive de propósito — o CHECK profiles_linkedin_http (0030) é `~`
-    if (linkedin && !/^https?:\/\//.test(linkedin)) {
-      return { error: "Confira o link do LinkedIn: precisa começar com http:// ou https://." };
-    }
+    const linkedinRaw = String(formData.get("linkedin") ?? "").trim();
+    // aceita como a pessoa digita: sem protocolo vira https://; o CHECK
+    // profiles_linkedin_http (0030) exige o esquema em minúsculas
+    const linkedin = linkedinRaw
+      ? `https://${linkedinRaw.replace(/^https?:\/\//i, "")}`
+      : null;
     out.linkedin = linkedin;
   }
 

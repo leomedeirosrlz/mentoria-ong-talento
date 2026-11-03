@@ -2,12 +2,13 @@ import { entrarNaDemo, expect, test } from "../helpers";
 
 // WP7 (REALIZA-140) — "Minha jornada" em /jovem/materiais, espelhada no
 // modo demo (specs demo não escrevem em backend nenhum). REALIZA-194
-// (v5c): a trilha virou a estante "Meus instrumentos" — um card-produto
-// por instrumento da régua + a devolutiva de terceiros; trancados ficam
-// visíveis dessaturados com a data de liberação (não há mais <details>
-// "Daqui pra frente" nem bloco "A fazer agora" — a ação é o próprio
-// card). Snippets de resposta saíram dos cards por desenho: a resposta
-// mora no "Rever resposta", não na estante.
+// (v5c→v6a): a trilha é a estante "Meus instrumentos" — um card-produto
+// por instrumento da régua (capa desenhada, uma linha de estado, UM gesto
+// por card) + a devolutiva de terceiros; trancados seguem visíveis com a
+// data de liberação em texto, sem cadeado. A avaliação de encontro não é
+// card: pendente vira banner no topo da seção, em dia vira o acesso
+// quieto ao histórico ("Suas avaliações"). Snippets de resposta saíram
+// dos cards por desenho: a resposta mora no "Rever resposta".
 //
 // A fixture da persona mentorado (Ana × Ricardo, dupla d-ok na T1) tem a
 // jornada da janela aberta INTEIRA feita: roda inicial, visão, metas e PDM
@@ -50,8 +51,8 @@ test.describe("demo — Minha jornada do mentorado", () => {
       )
     ).toBeVisible();
 
-    // a estante — os 5 instrumentos da janela como cards-produto, todos
-    // com a tag "Feito" + a data
+    // a estante — os 4 instrumentos de entrega única da janela como
+    // cards-produto, todos com a tag "Feito · <data>" na linha de estado
     const trilha = page.locator(
       'section[aria-labelledby="meus-instrumentos-titulo"]'
     );
@@ -60,30 +61,36 @@ test.describe("demo — Minha jornada do mentorado", () => {
       "Construindo a sua Visão",
       "Definindo minhas metas",
       "PDM · Plano de Desenvolvimento",
-      "Avaliação do encontro",
     ]) {
       await expect(
         trilha.getByRole("heading", { name: titulo })
       ).toBeVisible();
     }
-    // o chip da janela do guia mora em cada card — a régua 1–7 segue na
-    // ordem do guia, sem numeração "Estação N" (v5c tirou o termo)
-    await expect(trilha.getByText("Enc. 1–4").first()).toBeVisible();
-    await expect(trilha.getByText("Feito", { exact: true })).toHaveCount(5);
-    await expect(trilha.getByText(/Respondido em /).first()).toBeVisible();
+    await expect(trilha.getByText(/^Feito · /)).toHaveCount(4);
 
-    // snippets de resposta saíram da estante por desenho (v5c): o texto
+    // snippets de resposta saíram da estante por desenho: o texto
     // da visão NÃO aparece no card — a resposta vive no "Rever resposta"
     await expect(trilha.getByText("Você escreveu")).toHaveCount(0);
     await expect(
       trilha.getByText(/Em até 3 anos, serei uma profissional formada/)
     ).toHaveCount(0);
-    // a recorrente nunca "fecha": em dia conta X de Y, com "Ver resposta"
-    // (exact — os cards feitos respondem como "Rever resposta — <título>")
-    await expect(trilha.getByText("em dia · 4 de 4")).toBeVisible();
+    // a recorrente saiu da estante (v6a): sem pendência ela não é card
+    // nem banner — vira o acesso quieto ao histórico na linha do título,
+    // e cada registro abre o dialog de leitura de sempre
     await expect(
-      trilha.getByRole("button", { name: "Ver resposta", exact: true })
+      trilha.getByRole("heading", { name: "Avaliação do encontro" })
+    ).toHaveCount(0);
+    await trilha
+      .getByRole("button", { name: /Suas avaliações/ })
+      .click();
+    const hist = page.getByRole("dialog");
+    await expect(
+      hist.getByRole("heading", { name: "Suas avaliações dos encontros" })
     ).toBeVisible();
+    await expect(
+      hist.getByRole("button", { name: "Ver resposta", exact: true })
+    ).toHaveCount(4);
+    await page.keyboard.press("Escape");
 
     // a bandeira terminal fecha a estante com a data do enc. 16 da turma
     await expect(trilha.getByText("Celebração da jornada")).toBeVisible();
@@ -96,13 +103,12 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/materiais");
 
-    // qualquer instrumento feito com resposta+campos ganha o botão — na
-    // estante v5c ele mora direto no card feito, sem recibo fechado
+    // qualquer instrumento feito com resposta+campos é o gatilho — na
+    // estante o card feito inteiro é o gesto único (render prop com
+    // role=button), sem recibo fechado nem botão separado
     const trilha = page.locator(
       'section[aria-labelledby="meus-instrumentos-titulo"]'
     );
-    // o card feito inteiro é o gatilho do Rever (v5c — render prop com
-    // role=button): clicar no card da roda inicial abre o dialog
     await trilha
       .getByRole("button", { name: /Roda da Vida · leitura inicial/ })
       .click();
@@ -122,8 +128,9 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/materiais");
 
-    // v5c — os dois instrumentos futuros da Ana são cards trancados na
-    // própria estante: nome + janela + data de liberação, nunca card mudo
+    // v6a — os dois instrumentos futuros da Ana são cards trancados na
+    // própria estante: nome + sub + a liberação em texto, sem cadeado
+    // nem tag "fechado" — a data é a resposta
     const trilha = page.locator(
       'section[aria-labelledby="meus-instrumentos-titulo"]'
     );
@@ -133,7 +140,7 @@ test.describe("demo — Minha jornada do mentorado", () => {
     ]) {
       const card = trilha.locator("article", { hasText: titulo });
       await expect(card).toBeVisible();
-      await expect(card.getByText("Ainda não liberado")).toBeVisible();
+      await expect(card.getByText(/libera no encontro/)).toBeVisible();
     }
     await expect(trilha.getByText(/libera no encontro \d+/)).toHaveCount(2);
 

@@ -917,20 +917,24 @@ export function AssistenteConversa({
           exclusivo com o transcript: os dois com flex-1 dividiam a altura
           e o conteúdo centralizado transbordava pra cima do header */}
       {restaurada && msgs.length === 0 ? (
-        <div className="scroll-fina flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-y-auto px-6 py-8 text-center">
-          <div className="animate-enter">
-            <Avatar tamanho={64} estado={aberto ? "aberto" : "parado"} />
+        <div className="scroll-fina flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-8">
+          {/* a Rea senta no canto superior esquerdo — mascote de verdade,
+              não ícone decorativo centralizado */}
+          <div className="animate-enter flex items-start gap-4">
+            <div className="shrink-0">
+              <Avatar tamanho={96} estado={aberto ? "aberto" : "parado"} />
+            </div>
+            <div className="min-w-0 pt-4 text-left">
+              <p className="text-base font-semibold text-balance">
+                {primeiroNome(nome) ? `Oi, ${primeiroNome(nome)}! Eu sou a Rea.` : "Oi! Eu sou a Rea."}
+              </p>
+              <p className="mt-1 text-sm text-pretty text-muted-foreground">
+                Posso ajudar com a sua operação ou com o que dizem os guias do
+                programa.
+              </p>
+            </div>
           </div>
-          <div className="animate-enter" style={{ "--i": 1 } as CSSProperties}>
-            <p className="text-base font-semibold text-balance">
-              {primeiroNome(nome) ? `Oi, ${primeiroNome(nome)}! Eu sou a Rea.` : "Oi! Eu sou a Rea."}
-            </p>
-            <p className="mt-1 text-sm text-pretty text-muted-foreground">
-              Posso ajudar com a sua operação ou com o que dizem os guias do
-              programa.
-            </p>
-          </div>
-          <div className="mt-1 flex max-w-80 flex-wrap justify-center gap-2">
+          <div className="mt-5 flex max-w-80 flex-wrap gap-2">
             {chips.map((s, i) => (
               <button
                 key={s}

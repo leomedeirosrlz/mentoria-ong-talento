@@ -32,7 +32,6 @@ import {
   estrelasTexto,
 } from "@/lib/ciclo";
 import {
-  respostaFormatada,
   type FormularioCampo,
   type RespostaValor,
 } from "@/lib/forms/schema";
@@ -43,6 +42,8 @@ import {
   instrumentoVars,
 } from "@/components/instrumento-icone";
 import { InstrumentoResultado } from "@/components/instrumento-resultado";
+import { FadeX } from "@/components/fade-x";
+import { RespostaLista } from "@/components/resposta-lista";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -247,8 +248,8 @@ function DetalheAvaliacoes({ dupla }: { dupla: Dupla }) {
   );
 }
 
-/** Respostas do form 360º por dupla — leitura coord-only: o dl genérico
- *  de respostas-section (pergunta → resposta formatada). */
+/** Respostas do form 360º por dupla — leitura coord-only: a lista
+ *  pergunta → resposta compartilhada (mesma do acordeão de /formularios). */
 function Detalhe360({
   campos,
   respostas,
@@ -256,30 +257,12 @@ function Detalhe360({
   campos: FormularioCampo[];
   respostas: Record<string, RespostaValor>;
 }) {
-  const ordem = new Map(campos.map((c, i) => [c.id, i]));
-  const campoPorId = new Map(campos.map((c) => [c.id, c]));
   return (
-    <dl className="mt-2 space-y-3 border-t border-border/60 pt-3">
-      {Object.entries(respostas)
-        .sort(
-          ([a], [b]) =>
-            (ordem.get(a) ?? Number.MAX_SAFE_INTEGER) -
-            (ordem.get(b) ?? Number.MAX_SAFE_INTEGER)
-        )
-        .map(([campoId, valor]) => {
-          const campo = campoPorId.get(campoId);
-          return (
-            <div key={campoId}>
-              <dt className="text-xs font-medium text-muted-foreground">
-                {campo?.label ?? "pergunta removida do formulário"}
-              </dt>
-              <dd className="mt-0.5 text-sm leading-relaxed whitespace-pre-wrap">
-                {respostaFormatada(campo, valor)}
-              </dd>
-            </div>
-          );
-        })}
-    </dl>
+    <RespostaLista
+      campos={campos}
+      respostas={respostas}
+      className="mt-2 border-t border-border/60 pt-3"
+    />
   );
 }
 
@@ -489,8 +472,12 @@ export default async function InstrumentoPage({
 
       {/* o seletor é a troca sem fricção do pedido: manter a leitura por
           instrumento e saltar entre eles sem voltar pra régua */}
-      <nav aria-label="Trocar de instrumento" className="-mx-1 overflow-x-auto">
-        <ul className="scroll-fina flex items-center gap-1 px-1 pb-1">
+      <FadeX
+        tag="nav"
+        aria-label="Trocar de instrumento"
+        className="-mx-1 overflow-x-auto overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      >
+        <ul className="flex items-center gap-1 px-1 pb-1">
           {CARDS.map((c) => (
             <li key={c.chave} className="shrink-0">
               <Link
@@ -509,7 +496,7 @@ export default async function InstrumentoPage({
             </li>
           ))}
         </ul>
-      </nav>
+      </FadeX>
 
       <section
         aria-label={`Duplas — ${card.titulo}`}

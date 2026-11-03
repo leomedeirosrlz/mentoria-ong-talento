@@ -382,9 +382,9 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     tema: "materiais",
     pergunta: "Onde estão meus materiais de apoio?",
     resposta:
-      "Na sua Jornada, em Acervo. É lá que ficam os conteúdos pra ler e consultar quando quiser.",
+      "Em Materiais, em Acervo. É lá que ficam os conteúdos pra ler e consultar quando quiser.",
     prioridade: 20,
-    links: [{ rotulo: "Jornada", href: "/jovem/materiais" }],
+    links: [{ rotulo: "Materiais", href: "/jovem/materiais" }],
     papeis: ["mentorado"],
   },
   {
@@ -405,9 +405,9 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     tema: "materiais",
     pergunta: "Onde ficam meus instrumentos?",
     resposta:
-      "Na sua Jornada, em Meus instrumentos. Cada um abre na hora certa: o seu plano de desenvolvimento no começo da mentoria e a Roda da Vida perto do fim.",
+      "Em Materiais, em Meus instrumentos. Cada um abre na hora certa: o seu plano de desenvolvimento no começo da mentoria e a Roda da Vida perto do fim.",
     prioridade: 30,
-    links: [{ rotulo: "Jornada", href: "/jovem/materiais" }],
+    links: [{ rotulo: "Materiais", href: "/jovem/materiais" }],
     papeis: ["mentorado"],
   },
   {
@@ -434,8 +434,8 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     tema: "materiais",
     pergunta: "Onde eu respondo a avaliação final?",
     resposta:
-      "No último encontro abre a Avaliação Geral 360º na sua Jornada. É a sua chance de contar como foi a mentoria pra você.",
-    links: [{ rotulo: "Jornada", href: "/jovem/materiais" }],
+      "No último encontro abre a Avaliação Geral 360º em Materiais. É a sua chance de contar como foi a mentoria pra você.",
+    links: [{ rotulo: "Materiais", href: "/jovem/materiais" }],
     papeis: ["mentorado"],
   },
 
@@ -899,7 +899,7 @@ export const MENU_DO_PAPEL: { papel: AppRole; itens: ItemComoFunciona[] }[] = [
         texto: "Seu mentor, a coordenação e seus contatos.",
       },
       {
-        rotulo: "Jornada",
+        rotulo: "Materiais",
         texto: "Seus instrumentos e o acervo de materiais de apoio.",
       },
       {

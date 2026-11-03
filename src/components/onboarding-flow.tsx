@@ -6,30 +6,49 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import {
+  AddressBook,
   ArrowLeft,
   ArrowRight,
+  Briefcase,
+  Buildings,
+  Cake,
   CalendarCheck,
   Camera,
   ChartLineUp,
   Check,
   CircleNotch,
   ClipboardText,
+  Flag,
   FolderOpen,
+  GenderIntersex,
+  GraduationCap,
   HandHeart,
   Handshake,
+  Heart,
   ImageSquare,
+  LinkedinLogo,
   ListChecks,
+  MapPin,
   MapTrifold,
+  Medal,
   Megaphone,
   NotePencil,
+  PencilLine,
+  SealCheck,
   ShieldCheck,
+  Signpost,
+  Tag,
+  ThumbsUp,
   TrafficSignal,
+  User,
   UserPlus,
+  Users,
   UsersThree,
   type Icon,
 } from "@phosphor-icons/react";
 import { concluirOnboarding, salvarOnboarding } from "@/lib/actions";
 import { recomecarDemo } from "@/lib/demo/actions";
+import { assinarTermoDemo } from "@/lib/demo/shared";
 import { assinarTermo } from "@/lib/actions-assinaturas";
 import { AREAS_SUGESTOES, GENERO_LABELS } from "@/lib/ciclo";
 import {
@@ -66,37 +85,48 @@ import type {
   Profile,
 } from "@/lib/types";
 import { Logo } from "@/components/logo";
+import { ReaBlob } from "@/components/rea/rea-blob";
 import { cn } from "cn";
 
 /** Um form por passo — o botão do footer fixo submete via atributo `form`. */
 const FORM_ID = "onboarding-passo";
 
-type Recurso = { icon: Icon; texto: string; img?: string; alt?: string };
+type Recurso = {
+  icon: Icon;
+  texto: string;
+  img?: string;
+  /** variante mobile do print (captura em celular) — usada na moldura
+   *  retrato do passo 2; sem ela o print desktop vai cortado */
+  imgM?: string;
+  alt?: string;
+};
 
 /** "O que você pode fazer aqui" — os 4-5 pontos que mudam a rotina de cada papel. */
 const RECURSOS: Record<AppRole, Recurso[]> = {
   coordenacao: [
-    { icon: TrafficSignal, texto: "O andamento das duplas em tempo real: quem precisa de atenção aparece destacado.", img: "/onboarding/coordenacao-home.jpg", alt: "Visão geral da coordenação: turmas, situação das duplas e pendências" },
+    { icon: TrafficSignal, texto: "O andamento das duplas em tempo real: quem precisa de atenção aparece destacado.", img: "/onboarding/coordenacao-home.jpg", imgM: "/onboarding/coordenacao-home-m.jpg", alt: "Visão geral da coordenação: turmas, situação das duplas e pendências" },
     { icon: HandHeart, texto: "Pedidos de apoio e de mentoria especializada chegam pra você.", img: "/onboarding/coordenacao-dupla.jpg", alt: "Ficha de uma dupla com pedido de apoio" },
-    { icon: UsersThree, texto: "Formar duplas e gerenciar os cadastros da equipe e dos mentorados.", img: "/onboarding/coordenacao-duplas.jpg", alt: "Lista de duplas com estado e filtros" },
+    { icon: UsersThree, texto: "Formar duplas e acompanhar cada jornada.", img: "/onboarding/coordenacao-duplas.jpg", alt: "Lista de duplas com estado e filtros" },
+    { icon: AddressBook, texto: "Gerenciar os cadastros da equipe e dos mentorados.", img: "/onboarding/coordenacao-pessoas.jpg", alt: "Lista de pessoas com papéis, vínculos e cadastros" },
     { icon: Megaphone, texto: "Comunicados pra equipe e pra cada grupo de mentores." },
     { icon: ChartLineUp, texto: "Exportar relatórios do programa." },
   ],
   supervisor: [
     { icon: UsersThree, texto: "As duplas sob sua supervisão num lugar só.", img: "/onboarding/supervisor-duplas.jpg", alt: "Lista de duplas supervisionadas" },
     { icon: NotePencil, texto: "Notas de acompanhamento na ficha de cada dupla.", img: "/onboarding/supervisor-dupla.jpg", alt: "Ficha de uma dupla com notas e encontros" },
-    { icon: TrafficSignal, texto: "O andamento de cada dupla: quem vai bem e quem precisa de atenção.", img: "/onboarding/supervisor-home.jpg", alt: "Visão geral do supervisor com andamento das duplas" },
+    { icon: TrafficSignal, texto: "O andamento de cada dupla: quem vai bem e quem precisa de atenção.", img: "/onboarding/supervisor-home.jpg", imgM: "/onboarding/supervisor-home-m.jpg", alt: "Visão geral do supervisor com andamento das duplas" },
     { icon: FolderOpen, texto: "Os materiais de apoio do programa." },
   ],
   mentor_dpp: [
     { icon: CalendarCheck, texto: "Agendar e registrar os encontros com a sua dupla.", img: "/onboarding/mentor_dpp-dupla.jpg", alt: "Ficha da dupla com encontros e registros" },
-    { icon: MapTrifold, texto: "A jornada dos 16 encontros do guia, passo a passo.", img: "/onboarding/mentor_dpp-home.jpg", alt: "Visão geral do mentor com a jornada dos encontros" },
+    { icon: Users, texto: "As suas duplas num lugar só, com o próximo passo de cada uma.", img: "/onboarding/mentor_dpp-duplas.jpg", alt: "Lista das suas duplas com o próximo passo de cada uma" },
+    { icon: MapTrifold, texto: "A jornada dos 16 encontros do guia, passo a passo.", img: "/onboarding/mentor_dpp-home.jpg", imgM: "/onboarding/mentor_dpp-home-m.jpg", alt: "Visão geral do mentor com a jornada dos encontros" },
     { icon: HandHeart, texto: "Pedir apoio à coordenação quando precisar." },
     { icon: UserPlus, texto: "Solicitar um mentor especialista pro seu mentorado." },
     { icon: FolderOpen, texto: "Os materiais de apoio do programa.", img: "/onboarding/mentor_dpp-materiais.jpg", alt: "Biblioteca de materiais de apoio do programa" },
   ],
   mentor_especialista: [
-    { icon: ClipboardText, texto: "Uma lista de pedidos que combinam com o seu perfil.", img: "/onboarding/mentor_especialista-home.jpg", alt: "Mural de pedidos de mentoria especializada" },
+    { icon: ClipboardText, texto: "Uma lista de pedidos que combinam com o seu perfil.", img: "/onboarding/mentor_especialista-home.jpg", imgM: "/onboarding/mentor_especialista-home-m.jpg", alt: "Mural de pedidos de mentoria especializada" },
     { icon: Handshake, texto: "Aceitar um pedido e conduzir até 5 encontros." },
     { icon: NotePencil, texto: "Registrar cada encontro realizado." },
     { icon: FolderOpen, texto: "Os materiais de apoio do programa.", img: "/onboarding/mentor_especialista-materiais.jpg", alt: "Biblioteca de materiais de apoio do programa" },
@@ -137,7 +167,7 @@ function MolduraTela({
   return (
     <div
       className={cn(
-        "overflow-hidden rounded-2xl border border-border bg-card shadow-sm",
+        "overflow-hidden rounded-2xl border border-border bg-card shadow-border",
         className
       )}
     >
@@ -151,6 +181,25 @@ function MolduraTela({
       </div>
       {children}
     </div>
+  );
+}
+
+/** Label com micro-ícone do assunto — no primeiro acesso o ícone ancora o
+ *  campo antes da leitura (os forms densos do app seguem com label puro). */
+function Rotulo({
+  htmlFor,
+  icon: Icone,
+  children,
+}: {
+  htmlFor?: string;
+  icon: Icon;
+  children: React.ReactNode;
+}) {
+  return (
+    <Label htmlFor={htmlFor} className="flex items-center gap-1.5">
+      <Icone size={15} className="text-muted-foreground" aria-hidden />
+      {children}
+    </Label>
   );
 }
 
@@ -230,8 +279,8 @@ export function OnboardingFlow({
   const [motivacao, setMotivacao] = useState(pessoal?.motivacao ?? "");
   const [consent, setConsent] = useState(false);
   // recurso cuja tela ilustra o passo "o que você pode fazer" — hover, foco
-  // ou toque no item trocam o print (o último gesto vale); mobile mostra a
-  // home do papel deslizando numa moldura de celular
+  // ou toque no item trocam o print (o último gesto vale); no mobile o
+  // painel fica acima da lista pra resposta do toque aparecer na hora
   const [recursoAtivo, setRecursoAtivo] = useState(() =>
     Math.max(0, RECURSOS[me.role ?? "mentor_dpp"].findIndex((r) => r.img))
   );
@@ -266,8 +315,8 @@ export function OnboardingFlow({
 
   const primeiroNome = me.nome.trim().split(/\s+/)[0] || me.nome;
   const ultimo = step === total - 1;
-  // passos de ficha/perfil são opcionais — ganham o ghost "Agora não" e a
-  // saída "Pular tudo e começar"; faixa contínua do primeiro passo de ficha
+  // passos de ficha/perfil são opcionais — ganham o ghost "Pular etapa" e a
+  // saída "Pular tudo"; faixa contínua do primeiro passo de ficha
   // até a disponibilidade (mentor) ou o fim dos sub-passos (coord/superv.)
   const passoSobre = PASSO_SOBRE(ehMentor);
   const ultimoComCampos = ehMentor
@@ -284,12 +333,36 @@ export function OnboardingFlow({
     setStep((s) => Math.min(s + 1, total - 1));
   }
 
+  /** "Pular etapa" com campo preenchido: o que a pessoa digitou é dela —
+   *  se o passo tem dado, submete (salva e avança); vazio, só avança. */
+  function pularEtapa() {
+    const form = document.getElementById(FORM_ID) as HTMLFormElement | null;
+    if (!form) return avancar();
+    const fd = new FormData(form);
+    // a foto mora fora do FormData (state) e só conta no passo dela —
+    // contar sempre reenviaria o arquivo a cada pulo seguinte
+    const temDado =
+      (!!foto && step === 3) ||
+      [...fd.entries()].some(([, v]) => {
+        if (typeof v !== "string") return false;
+        const val = v.trim();
+        return (
+          val !== "" &&
+          val !== SENTINEL_VAZIO &&
+          val !== "[]" &&
+          val !== '{"celulas":[]}'
+        );
+      });
+    if (temDado) form.requestSubmit();
+    else avancar();
+  }
+
   /** Passo "Declarações": o LGPD é o único gate do wizard (sem consent não
    *  dá pra tratar os dados que os próximos passos pedem); a flag de
    *  voluntário decide se o termo aparece no fim. Tudo salva num post só. */
   function avancarDasDeclaracoes() {
     if (!consent && !me.consent_lgpd_em) {
-      toast.error("Precisamos do seu consentimento pra continuar.");
+      toast.error("Marque a caixa \"Autorizo o uso dos meus dados\" pra continuar.");
       return;
     }
     const fd = new FormData();
@@ -370,7 +443,7 @@ export function OnboardingFlow({
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="ob-social">Nome social</Label>
+          <Rotulo htmlFor="ob-social" icon={User}>Nome social</Rotulo>
           <Input
             id="ob-social"
             name="nome_social"
@@ -381,29 +454,35 @@ export function OnboardingFlow({
             placeholder="Como você prefere ser chamado(a)"
           />
         </div>
-        <CampoNascimento id="ob-nasc" value={nascimento} onChange={setNascimento} />
+        <CampoNascimento id="ob-nasc" value={nascimento} onChange={setNascimento} icon={Cake} />
       </div>
       <div className="grid gap-4 sm:grid-cols-2">
         <CampoGenero
           value={genero}
           onChange={(v) => setGenero(v === SENTINEL_VAZIO ? "" : v)}
+          icon={GenderIntersex}
         />
-        <div className="space-y-2">
-          <Label htmlFor="ob-cidade">Cidade</Label>
-          <Input
-            id="ob-cidade"
-            name="cidade"
-            maxLength={100}
-            autoCapitalize="words"
-            value={cidade}
-            onChange={(e) => setCidade(e.target.value)}
+        {/* cidade + UF na mesma linha: um conceito só (onde) e o select de
+            2 letras não precisa de uma linha inteira */}
+        <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-3">
+          <div className="space-y-2">
+            <Rotulo htmlFor="ob-cidade" icon={MapPin}>Cidade</Rotulo>
+            <Input
+              id="ob-cidade"
+              name="cidade"
+              maxLength={100}
+              autoCapitalize="words"
+              value={cidade}
+              onChange={(e) => setCidade(e.target.value)}
+            />
+          </div>
+          <CampoUf
+            value={uf}
+            onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
+            icon={Flag}
           />
         </div>
       </div>
-      <CampoUf
-        value={uf}
-        onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
-      />
     </div>
   );
 
@@ -411,7 +490,7 @@ export function OnboardingFlow({
     <div className="space-y-4">
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="space-y-2">
-          <Label htmlFor="ob-cargo">Cargo</Label>
+          <Rotulo htmlFor="ob-cargo" icon={Briefcase}>Cargo</Rotulo>
           <Input
             id="ob-cargo"
             name="cargo"
@@ -421,7 +500,7 @@ export function OnboardingFlow({
           />
         </div>
         <div className="space-y-2">
-          <Label htmlFor="ob-empresa">Empresa</Label>
+          <Rotulo htmlFor="ob-empresa" icon={Buildings}>Empresa</Rotulo>
           <Input
             id="ob-empresa"
             name="empresa"
@@ -432,7 +511,7 @@ export function OnboardingFlow({
         </div>
       </div>
       <div className="space-y-2">
-        <Label htmlFor="ob-origem">Como você chegou ao programa</Label>
+        <Rotulo htmlFor="ob-origem" icon={Signpost}>Como você chegou ao programa</Rotulo>
         <Input
           id="ob-origem"
           name="origem"
@@ -447,9 +526,9 @@ export function OnboardingFlow({
 
   const passoSobreMotivacao = (
     <div className="space-y-4">
-      <CampoInteresses value={interesses} onChange={setInteresses} />
+      <CampoInteresses value={interesses} onChange={setInteresses} icon={ThumbsUp} />
       <div className="space-y-2">
-        <Label htmlFor="ob-motivacao">O que te traz ao programa</Label>
+        <Rotulo htmlFor="ob-motivacao" icon={Heart}>O que te traz ao programa</Rotulo>
         <Textarea
           id="ob-motivacao"
           name="motivacao"
@@ -495,14 +574,17 @@ export function OnboardingFlow({
   const resumoSobre = (sub: number) => (
     <div className="rounded-2xl border border-border bg-card px-4 py-3.5">
       <div className="flex items-center justify-between gap-3">
-        <p className="text-sm font-medium">Já temos esses dados do cadastro</p>
+        <p className="flex items-center gap-1.5 text-sm font-medium">
+          <ClipboardText size={15} className="text-muted-foreground" aria-hidden />
+          Já temos esses dados do cadastro
+        </p>
         <Button
           type="button"
           variant="ghost"
           size="sm"
           onClick={() => setEditarSobre((s) => ({ ...s, [sub]: true }))}
         >
-          Corrigir
+          Editar
         </Button>
       </div>
       <dl className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-2.5">
@@ -513,7 +595,7 @@ export function OnboardingFlow({
               <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 {rotulo}
               </dt>
-              <dd className="truncate text-sm">{valor}</dd>
+              <dd className="truncate text-sm" title={valor}>{valor}</dd>
             </div>
           ))}
       </dl>
@@ -527,9 +609,10 @@ export function OnboardingFlow({
       <CampoPrefGenero
         value={prefGenero}
         onChange={(v) => setPrefGenero(v === SENTINEL_VAZIO ? "" : v)}
+        icon={Users}
       />
       <div className="space-y-2">
-        <Label htmlFor="ob-exp">Experiência prévia como mentor</Label>
+        <Rotulo htmlFor="ob-exp" icon={Medal}>Experiência prévia como mentor</Rotulo>
         <Textarea
           id="ob-exp"
           name="experiencia_previa"
@@ -541,7 +624,7 @@ export function OnboardingFlow({
         />
       </div>
       <div className="space-y-2">
-        <Label htmlFor="ob-form">Formação e certificações</Label>
+        <Rotulo htmlFor="ob-form" icon={GraduationCap}>Formação e certificações</Rotulo>
         <Textarea
           id="ob-form"
           name="formacao_externa"
@@ -584,7 +667,7 @@ export function OnboardingFlow({
       case 6:
         // case 6 é passo de mentor — pra coord/supervisor o índice 6 é o
         // fechamento ("Tudo certo"), não os campos de LinkedIn
-        return ehMentor ? "Pra fechar: LinkedIn e voluntariado" : `Tudo certo, ${primeiroNome}!`;
+        return ehMentor ? "LinkedIn e experiência com voluntariado" : `Tudo certo, ${primeiroNome}!`;
       default:
         return `Tudo certo, ${primeiroNome}!`;
     }
@@ -596,31 +679,37 @@ export function OnboardingFlow({
     if (step === passoSobre + 1)
       return "Cargo, empresa e como você chegou: contexto rápido pra equipe te conhecer.";
     if (step === passoSobre + 2)
-      return "Interesses e motivação alimentam o matching e ficam só com a coordenação.";
+      return ehMentor
+        ? "Interesses e motivação ajudam a formar a sua dupla; a motivação fica só com a coordenação."
+        : "Interesses e motivação ajudam a equipe a te conhecer; a motivação fica só com a coordenação.";
     if (ehMentor && step === PASSO_PAREAMENTO)
       return "A coordenação usa isso pra escolher a dupla: tudo opcional, dá pra completar depois no Perfil.";
     if (ehMentor && step === PASSO_DISPONIBILIDADE)
       return "Toque nos dias e períodos em que você costuma ter agenda livre. A coordenação cruza com a do mentorado.";
     if (ehPassoTermo)
       return demo
-        ? "O documento que formaliza o voluntariado de toda a equipe no programa. Na demonstração ele é só leitura."
+        ? "O documento que formaliza o voluntariado de toda a equipe no programa. Leia e, se quiser, já assine: na demonstração a assinatura é simulada, nada sai do seu navegador."
         : "O documento que formaliza o voluntariado de toda a equipe no programa, com a mesma validade de uma assinatura em papel. Leia e, se quiser, já assine; dá pra deixar pra depois também.";
     switch (step) {
       case 0:
-        return "A plataforma do Programa de Mentoria Social: a jornada da sua dupla, os registros e os materiais de apoio num lugar só.";
+        return ehMentor
+          ? "A plataforma do Programa de Mentoria Social: a jornada da sua dupla, os registros e os materiais de apoio num lugar só."
+          : "A plataforma do Programa de Mentoria Social: o andamento das duplas, os registros e os materiais de apoio num lugar só.";
       case 1:
-        return "Rapidinho: diz se você atua como voluntário(a) e autoriza o uso dos dados do cadastro.";
+        return "Rapidinho: diz se você é voluntário(a). A segunda confirmação, obrigatória, autoriza o uso dos dados do cadastro.";
       case 2:
-        return "O essencial da sua rotina no programa cabe nesta tela. Passe o cursor ou toque nos itens pra espiar as telas de verdade.";
+        return "O essencial da sua rotina no programa cabe nesta lista. Os itens com o ícone de imagem têm print da tela real pra espiar.";
       case 3:
-        return "Aparece no seu perfil e nas duplas.";
+        return "Aparece no seu perfil e nas duplas. Dá pra colocar depois.";
       case 4:
-        return "O que você faz, o que estudou, o que te trouxe ao programa. Aparece no seu perfil pra equipe e pros mentorados.";
+        return temPapel(me, "mentor_especialista")
+          ? "Aparece no seu perfil pra equipe e pros mentorados do catálogo."
+          : "Aparece no seu perfil pra equipe.";
       case 5:
         return "Toque pra selecionar ou digite uma nova. Dá pra mudar depois no seu perfil.";
       case 6:
         return ehMentor
-          ? "Os dois são opcionais e ajudam a equipe e os mentorados a te conhecerem melhor."
+          ? "Os dois são opcionais e ajudam a equipe a te conhecer melhor."
           : "Seu perfil já está visível pra equipe. Dá pra completar ou mudar tudo depois em Perfil.";
       default:
         return "Seu perfil já está visível pra equipe. Dá pra completar ou mudar tudo depois em Perfil.";
@@ -636,10 +725,10 @@ export function OnboardingFlow({
     ultimo && temTermo && !termoOk ? (
       <p className="rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed text-muted-foreground">
         Falta só o termo de adesão ao voluntariado: assine quando puder pelo
-        banner da sua home ou em{" "}
+        banner da sua home ou pela página{" "}
         <Link
           href="/assinar"
-          className="font-medium text-primary underline-offset-4 hover:underline"
+          className="font-medium text-foreground underline underline-offset-4"
         >
           Assinar
         </Link>
@@ -659,15 +748,37 @@ export function OnboardingFlow({
     // o termo tem form próprio (AssinaturaForm) — intercepta antes do switch
     // porque o índice colide com o case 6 (linkedin) pra coord/supervisor
     if (ehPassoTermo) {
-      // demo: só leitura — botão de assinar que sempre falha é má UX
+      // demo: o fluxo real inteiro — documento, dados civis da persona e o
+      // form — só a gravação é simulada (cookie demo_termo; os espelhos
+      // leem como "assinado" e a via em PDF sai com o que foi digitado)
       if (demo) {
         return (
           <div className="space-y-4">
-            <TermoVoluntarioDoc civis={civis} />
-            <p className="rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm leading-relaxed text-muted-foreground">
-              Na demonstração a assinatura não é gravada. No cadastro real é
-              aqui que você confere os dados civis e assina.
-            </p>
+            <TermoVoluntarioDoc
+              civis={civis}
+              continuar={{
+                href: "#ob-termo-dados",
+                rotulo: "Continuar para seus dados ↓",
+              }}
+            />
+            <div id="ob-termo-dados" className="scroll-mt-24 space-y-2">
+              <h2 className="text-base font-semibold">Seus dados para assinar</h2>
+              <p className="text-sm leading-relaxed text-muted-foreground">
+                {civis
+                  ? "Já temos seus dados do cadastro: confira, corrija se preciso e assine."
+                  : "Pra assinar precisamos dos seus dados civis: preencha como no documento de identidade. Eles entram no termo exatamente como digitados."}{" "}
+                Na demonstração a assinatura é simulada: nada sai do seu navegador.
+              </p>
+            </div>
+            <AssinaturaForm
+              modo="termo"
+              acao={(fd) => assinarTermoDemo(me.role ?? "mentor_dpp", fd)}
+              dados={civis}
+              onSucesso={() => {
+                setTermoOk(true);
+                avancar();
+              }}
+            />
           </div>
         );
       }
@@ -685,13 +796,33 @@ export function OnboardingFlow({
             <p className="text-sm leading-relaxed text-muted-foreground">
               {civis
                 ? "Já temos seus dados do cadastro: confira, corrija se preciso e assine."
-                : "Pra assinar precisamos dos seus dados civis: preencha como no documento de identidade. Eles entram no termo exatamente como digitados."}
+                : "Pra assinar precisamos dos seus dados civis: preencha como no documento de identidade. Eles entram no termo exatamente como digitados."}{" "}
+              Eles ficam restritos à coordenação e ao termo, não aparecem no seu perfil.
             </p>
           </div>
           <AssinaturaForm
             modo="termo"
             acao={assinarTermo}
-            dados={civis}
+            dados={
+              civis ?? {
+                // prefill com o que o wizard já coletou — os dados civis são
+                // um silo à parte (RPC 0046), mas nascimento/cidade/UF valem
+                // nos dois mundos
+                nome_civil: null,
+                rg: null,
+                cpf: null,
+                data_nascimento: nascimento || null,
+                endereco: {
+                  logradouro: null,
+                  numero: null,
+                  complemento: null,
+                  bairro: null,
+                  cidade: cidade || null,
+                  uf: uf || null,
+                  cep: null,
+                },
+              }
+            }
             onSucesso={() => {
               setTermoOk(true);
               avancar();
@@ -708,7 +839,7 @@ export function OnboardingFlow({
             <CaixaSelecao
               icon={HandHeart}
               titulo="Sou voluntário(a)"
-              descricao="O programa é trabalho voluntário: quem se declara assina o termo de adesão no final do cadastro."
+              descricao="Quem atua como voluntário(a) assina um termo de adesão. Marcando aqui, ele aparece no final do cadastro."
               checked={souVoluntario}
               onCheckedChange={(v) => setSouVoluntario(v)}
             />
@@ -724,7 +855,11 @@ export function OnboardingFlow({
               <CaixaSelecao
                 icon={ShieldCheck}
                 titulo="Autorizo o uso dos meus dados"
-                descricao="Cadastro e ficha ficam visíveis pra coordenação e pra sua dupla — é o que o programa precisa pra funcionar."
+                descricao={
+                  ehMentor
+                    ? "Seus dados servem pra formar duplas e acompanhar o programa: a coordenação lê tudo, a sua dupla vê o essencial. É a única confirmação obrigatória do cadastro."
+                    : "Seus dados servem pra organizar e acompanhar o programa: a coordenação lê tudo, a equipe vê o essencial. É a única confirmação obrigatória do cadastro."
+                }
                 checked={consent}
                 onCheckedChange={(v) => setConsent(v)}
               />
@@ -732,9 +867,12 @@ export function OnboardingFlow({
             {/* voluntário com termo já assinado: o passo do termo não existe
                 no fim — a nota confirma o estado em vez de anunciar pendência */}
             {souVoluntario && assinaturaTermo?.status === "assinado" && (
-              <p className="px-1 text-xs leading-relaxed text-muted-foreground">
-                Termo de adesão ao voluntariado: assinado. Ele fica na sua
-                home se você quiser reler.
+              <p className="flex items-start gap-1.5 px-1 text-xs leading-relaxed text-muted-foreground">
+                <SealCheck size={14} className="mt-0.5 shrink-0 text-[var(--ok-text)]" aria-hidden />
+                <span>
+                  Termo de adesão ao voluntariado: assinado. Pra reler ou
+                  baixar o PDF, é só ir em Perfil.
+                </span>
               </p>
             )}
           </div>
@@ -743,53 +881,33 @@ export function OnboardingFlow({
       case 2: {
         const recursos = RECURSOS[me.role ?? "mentor_dpp"];
         const comImg = recursos.filter((r) => r.img);
-        // o print mobile é sempre a home do papel — o alt vem do item "home",
-        // que nem sempre é o primeiro com imagem (mentor abre com a dupla)
-        const altHome =
-          comImg.find((r) => r.img?.includes("-home."))?.alt ?? "";
         return (
           <div className="space-y-4">
-            {/* moldura de celular: a captura mobile é a página inteira, muito
-                mais alta que a janela — o print desliza devagar sob ela
-                (.animate-percorre-tela; reduced-motion estaciona no topo).
-                O swap por item só existe no desktop, onde a lista fica ao lado */}
-            {comImg.length > 0 && (
-              <MolduraTela className="mx-auto w-full max-w-[300px] sm:hidden">
-                <div className="relative aspect-[3/4]">
-                  <Image
-                    src={`/onboarding/${me.role ?? "mentor_dpp"}-home-m.jpg`}
-                    alt={altHome}
-                    fill
-                    sizes="300px"
-                    className="animate-percorre-tela object-cover object-top"
-                  />
-                </div>
-              </MolduraTela>
-            )}
-            <div className="sm:grid sm:grid-cols-[minmax(0,5fr)_minmax(0,8fr)] sm:items-start sm:gap-5">
+            <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,5fr)_minmax(0,8fr)] sm:items-start sm:gap-5">
               <ul className="space-y-2">
                 {recursos.map((r, i) => {
                   const ativo = !!r.img && i === recursoAtivo;
-                  return (
-                    <li
-                      key={r.texto}
-                      tabIndex={r.img ? 0 : undefined}
-                      onMouseEnter={() => r.img && setRecursoAtivo(i)}
-                      onFocus={() => r.img && setRecursoAtivo(i)}
-                      onClick={() => r.img && setRecursoAtivo(i)}
-                      className={cn(
-                        "flex items-center gap-3 rounded-2xl border px-4 py-3 outline-none transition-colors",
-                        r.img &&
-                          "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring/40",
-                        ativo
-                          ? "border-[var(--brand-lime)] bg-[var(--brand-lime)]/10"
-                          : cn(
-                              "border-border bg-card",
-                              r.img && "hover:border-foreground/40"
-                            )
-                      )}
-                    >
-                      <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
+                  const cartao = cn(
+                    "flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left outline-none transition-colors",
+                    ativo
+                      ? "border-[var(--brand-lime)] bg-[var(--brand-lime)]/10"
+                      : cn(
+                          "border-border bg-card",
+                          r.img && "hover:border-foreground/40"
+                        )
+                  );
+                  const conteudo = (
+                    <>
+                      {/* o disco lime é sinal de estado (mesma regra do
+                          CaixaSelecao): neutro no repouso, aceso no ativo */}
+                      <span
+                        className={cn(
+                          "grid size-10 shrink-0 place-items-center rounded-full transition-colors",
+                          ativo
+                            ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
+                            : "bg-muted text-muted-foreground"
+                        )}
+                      >
                         <r.icon size={18} weight="fill" aria-hidden />
                       </span>
                       <span className="text-sm leading-snug">{r.texto}</span>
@@ -805,32 +923,76 @@ export function OnboardingFlow({
                           )}
                         />
                       )}
+                    </>
+                  );
+                  return (
+                    <li key={r.texto}>
+                      {r.img ? (
+                        <button
+                          type="button"
+                          onMouseEnter={() => setRecursoAtivo(i)}
+                          onFocus={() => setRecursoAtivo(i)}
+                          onClick={() => setRecursoAtivo(i)}
+                          aria-current={ativo || undefined}
+                          className={cn(
+                            cartao,
+                            "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring/60"
+                          )}
+                        >
+                          {conteudo}
+                        </button>
+                      ) : (
+                        <div className={cartao}>{conteudo}</div>
+                      )}
                     </li>
                   );
                 })}
               </ul>
               {/* painel com crossfade: cada recurso com print troca a tela —
-                  os itens sem print mantêm o último exibido */}
+                  os itens sem print mantêm o último exibido. No mobile a
+                  moldura é retrato (order-first, acima da lista) e prefere a
+                  captura mobile do recurso; no desktop a paisagem clássica */}
               {comImg.length > 0 && (
-                <MolduraTela className="mt-4 hidden sm:mt-0 sm:block">
-                  <div className="relative aspect-[8/5]">
-                    {comImg.map((r) => (
-                      <Image
-                        key={r.img}
-                        src={r.img!}
-                        alt={recursos.indexOf(r) === recursoAtivo ? (r.alt ?? "") : ""}
-                        fill
-                        sizes="(min-width: 1200px) 680px, (min-width: 640px) 57vw, 0px"
-                        className={cn(
-                          "object-cover object-top transition-opacity duration-300",
-                          recursos.indexOf(r) === recursoAtivo
-                            ? "opacity-100"
-                            : "opacity-0"
-                        )}
-                      />
-                    ))}
-                  </div>
-                </MolduraTela>
+                <>
+                  <MolduraTela className="order-first sm:hidden">
+                    <div className="relative aspect-[4/5]" aria-live="polite">
+                      {comImg.map((r) => (
+                        <Image
+                          key={`m-${r.img}`}
+                          src={r.imgM ?? r.img!}
+                          alt={recursos.indexOf(r) === recursoAtivo ? (r.alt ?? "") : ""}
+                          fill
+                          sizes="92vw"
+                          className={cn(
+                            "object-cover object-top transition-opacity duration-300",
+                            recursos.indexOf(r) === recursoAtivo
+                              ? "opacity-100"
+                              : "opacity-0"
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </MolduraTela>
+                  <MolduraTela className="hidden sm:block">
+                    <div className="relative aspect-[8/5]" aria-live="polite">
+                      {comImg.map((r) => (
+                        <Image
+                          key={r.img}
+                          src={r.img!}
+                          alt={recursos.indexOf(r) === recursoAtivo ? (r.alt ?? "") : ""}
+                          fill
+                          sizes="(min-width: 1200px) 680px, 57vw"
+                          className={cn(
+                            "object-cover object-top transition-opacity duration-300",
+                            recursos.indexOf(r) === recursoAtivo
+                              ? "opacity-100"
+                              : "opacity-0"
+                          )}
+                        />
+                      ))}
+                    </div>
+                  </MolduraTela>
+                </>
               )}
             </div>
           </div>
@@ -873,7 +1035,7 @@ export function OnboardingFlow({
         return (
           <div className="space-y-2">
             <div className="flex items-baseline justify-between gap-2">
-              <Label htmlFor="ob-bio">Biografia</Label>
+              <Rotulo htmlFor="ob-bio" icon={PencilLine}>Biografia</Rotulo>
               <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
                 {bio.length}/1.000
               </span>
@@ -894,7 +1056,10 @@ export function OnboardingFlow({
           <div className="space-y-2">
             {/* rótulo de grupo, não de controle — o input livre do TagInput
                 tem aria-label próprio, então <p> em vez de <Label> órfão */}
-            <p className="text-sm font-medium">Áreas de atuação</p>
+            <p className="flex items-center gap-1.5 text-sm font-medium">
+              <Tag size={15} className="text-muted-foreground" aria-hidden />
+              Áreas de atuação
+            </p>
             <TagInput
               name="areas"
               sugestoes={AREAS_SUGESTOES}
@@ -911,7 +1076,7 @@ export function OnboardingFlow({
         return (
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="ob-linkedin">LinkedIn</Label>
+              <Rotulo htmlFor="ob-linkedin" icon={LinkedinLogo}>LinkedIn</Rotulo>
               <Input
                 id="ob-linkedin"
                 name="linkedin"
@@ -925,7 +1090,7 @@ export function OnboardingFlow({
             </div>
             <div className="space-y-2">
               <div className="flex items-baseline justify-between gap-2">
-                <Label htmlFor="ob-voluntariado">Experiência com voluntariado</Label>
+                <Rotulo htmlFor="ob-voluntariado" icon={HandHeart}>Experiência com voluntariado</Rotulo>
                 <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
                   {voluntariado.length}/300
                 </span>
@@ -994,7 +1159,7 @@ export function OnboardingFlow({
               style={{ width: `${((step + 1) / total) * 100}%` }}
             />
           </div>
-          <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
+          <span aria-hidden className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
             {step + 1}/{total}
           </span>
           {demo}
@@ -1013,15 +1178,26 @@ export function OnboardingFlow({
       >
         <Logo size="sm" className="mb-6 self-start" />
         <div key={step} className="animate-rise">
-          <div className="rounded-3xl rounded-bl-md border border-border bg-card px-5 py-4">
-            <h1
-              ref={tituloRef}
-              tabIndex={-1}
-              className="text-xl font-semibold leading-snug outline-none"
-            >
-              {titulo}
-            </h1>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{hint}</p>
+          <div className="flex items-end gap-3">
+            {/* a Rea abre e fecha a jornada — a cauda do balão aponta pra
+                ela; nos passos do meio ela sai pra não disputar o form */}
+            {(step === 0 || ultimo) && (
+              <ReaBlob
+                estado={ultimo ? "pronto" : "atento"}
+                tamanho={64}
+                className="mb-1 shrink-0"
+              />
+            )}
+            <div className="min-w-0 flex-1 rounded-3xl rounded-bl-md border border-border bg-card px-5 py-4 sm:max-w-xl">
+              <h1
+                ref={tituloRef}
+                tabIndex={-1}
+                className="text-xl font-semibold leading-snug outline-none"
+              >
+                {titulo}
+              </h1>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{hint}</p>
+            </div>
           </div>
           {passoComCampos ? (
             <form id={FORM_ID} onSubmit={salvarPasso} className="mt-5">
@@ -1033,36 +1209,42 @@ export function OnboardingFlow({
         </div>
       </main>
 
-      {/* footer fixo: "Agora não" nos passos opcionais + primário */}
+      {/* footer fixo: "Pular etapa" nos passos opcionais + primário */}
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
           {(passoComCampos || ehPassoTermo) && (
-            <div className="flex shrink-0 flex-wrap items-center gap-x-1">
+            <div className="flex shrink-0 flex-wrap items-center gap-x-3">
               {/* no termo o ghost é "Assinar depois": avança sem gravar —
-                  a pendência segue como ausência de assinatura. Na demo o
-                  Continuar primário já cobre o pulo, sem ghost duplicado */}
-              {(passoComCampos || !demo) && (
+                  a pendência segue como ausência de assinatura. Nos demais
+                  passos da demo sem form o primário cobre o pulo; no termo
+                  demo ele aparece porque o primário some (paridade com o
+                  fluxo real: quem decide é o botão dentro do form) */}
+              {(passoComCampos || ehPassoTermo || !demo) && (
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={avancar}
+                  onClick={pularEtapa}
                   disabled={pending}
                 >
-                  {ehPassoTermo ? "Assinar depois" : "Agora não"}
+                  {ehPassoTermo ? "Assinar depois" : "Pular etapa"}
                 </Button>
               )}
               {/* saída honesta pros passos opcionais acumulados: conclui o
                   onboarding direto (mesmo concluirOnboarding do último
-                  passo) — a ficha pode ser completada depois no Perfil */}
-              <Button
-                type="button"
-                variant="link"
-                size="sm"
-                onClick={concluir}
-                disabled={pending}
-              >
-                Pular tudo e começar
-              </Button>
+                  passo) — a ficha pode ser completada depois no Perfil. No
+                  termo some: "Assinar depois" já é a saída desse passo */}
+              {!ehPassoTermo && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={concluir}
+                  disabled={pending}
+                  className="text-muted-foreground"
+                >
+                  Concluir agora
+                </Button>
+              )}
             </div>
           )}
           {/* sempre type=button + requestSubmit explícito: um botão que vira
@@ -1071,8 +1253,9 @@ export function OnboardingFlow({
               "Continuar" avançava 2 passos (pulava a foto).
               No passo do termo o primário some: o submit mora dentro do
               AssinaturaForm e um "Continuar" ao lado de "Assinar depois"
-              seria ambíguo; na demo (só leitura) ele volta */}
-          {(!ehPassoTermo || demo) && (
+              seria ambíguo — na demo vale o mesmo, o form simulado é que
+              conduz */}
+          {!ehPassoTermo && (
             <Button
               type="button"
               onClick={() => {

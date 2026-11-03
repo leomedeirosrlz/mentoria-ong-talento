@@ -1,4 +1,5 @@
 import { getDemoData, type DemoData } from "./data";
+import type { TermoSimulado } from "./shared";
 import { audienciasDe, veMaterial } from "../materiais";
 import { comparaNome, registroTardio, semanaBounds } from "../ciclo";
 import { slotsLivresEspecialista } from "./agenda";
@@ -953,23 +954,34 @@ export function demoJovemEncaminhamentos(role: AppRole): JovemEncaminhamento[] {
 /** jovem_assinaturas (0070): id/template + slug/título por join + estado do
  *  link — sem dados_snapshot, IP, user agent nem hash (evidência fica de
  *  fora da view). Ordenação da query real: created_at desc. */
-export function demoJovemAssinaturas(role: AppRole): JovemAssinatura[] {
+export function demoJovemAssinaturas(
+  role: AppRole,
+  // a assinatura simulada do wizard vira "assinado" aqui também — o card
+  // Documentos da home e o passo de termo do onboarding refletem a sessão
+  simulado: TermoSimulado | null = null
+): JovemAssinatura[] {
   const data = getDemoData();
   const m = mentoradoDaPersona(data, role);
   if (!m) return [];
   return data.assinaturas
     .filter((a) => a.mentorado_id === m.id)
-    .map((a) => ({
-      id: a.id,
-      template_id: a.template_id,
-      slug: a.template?.slug ?? null,
-      titulo: a.template?.titulo ?? null,
-      status: a.status,
-      token: a.token,
-      token_expira_em: a.token_expira_em,
-      assinado_em: a.assinado_em,
-      created_at: a.created_at,
-    }))
+    .map((a) => {
+      const assinada =
+        simulado &&
+        a.template?.slug === "termo-mentorando" &&
+        a.status === "pendente";
+      return {
+        id: a.id,
+        template_id: a.template_id,
+        slug: a.template?.slug ?? null,
+        titulo: a.template?.titulo ?? null,
+        status: assinada ? "assinado" : a.status,
+        token: a.token,
+        token_expira_em: a.token_expira_em,
+        assinado_em: assinada ? simulado.em : a.assinado_em,
+        created_at: a.created_at,
+      };
+    })
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
@@ -1575,18 +1587,93 @@ export function demoAnexosPorRegistros(
 
 // ---------- documentos & assinaturas (0033) ----------
 
+/** A assinatura simulada (cookie demo_termo) aplicada sobre a row real da
+ *  persona: pendência dela vira "assinado" com o snapshot que ela digitou
+ *  no wizard — banner, /assinar, perfil e a via em PDF refletem a sessão. */
+function comTermoSimulado(
+  a: Assinatura | null,
+  simulado: TermoSimulado | null
+): Assinatura | null {
+  if (!a || !simulado || a.status !== "pendente") return a;
+  const data = getDemoData();
+  const slug = a.template?.slug;
+  // voluntário: a row é do profile da persona; mentorando: a row é do
+  // mentorado da persona (o jovem assina pelo próprio token)
+  if (slug === "termo-voluntario") {
+    const persona = data.personas[simulado.papel];
+    if (!persona || a.profile_id !== persona.id) return a;
+  } else if (slug === "termo-mentorando") {
+    if (a.mentorado_id !== mentoradoDaPersona(data, simulado.papel)?.id) {
+      return a;
+    }
+  } else {
+    return a;
+  }
+  return {
+    ...a,
+    status: "assinado",
+    dados_snapshot: simulado.civis,
+    assinatura_texto: simulado.nome,
+    assinado_em: simulado.em,
+  };
+}
+
+/** Id estável da linha sintética: persona sem row de termo ganha a linha
+ *  que a RPC assinar_termo criaria — a via em PDF resolve por ele. */
+const TERMO_SIMULADO_ID = "de000000-0000-4000-8000-0000000032ff";
+
+function linhaTermoSimulada(simulado: TermoSimulado): Assinatura | null {
+  const data = getDemoData();
+  const persona = data.personas[simulado.papel];
+  const tpl = data.documentoTemplates.find(
+    (t) => t.slug === "termo-voluntario"
+  );
+  if (!persona || !tpl) return null;
+  return {
+    id: TERMO_SIMULADO_ID,
+    template_id: tpl.id,
+    profile_id: persona.id,
+    mentorado_id: null,
+    status: "assinado",
+    dados_snapshot: simulado.civis,
+    token: "",
+    token_expira_em: null,
+    assinatura_texto: simulado.nome,
+    assinado_em: simulado.em,
+    ip: null,
+    user_agent: null,
+    hash_documento: null,
+    created_by: persona.id,
+    created_at: simulado.em,
+    template: {
+      slug: tpl.slug,
+      titulo: tpl.titulo,
+      versao: tpl.versao,
+      signatario: tpl.signatario,
+    },
+  };
+}
+
 /** A assinatura de termo mais recente da persona — o banner do home e a
- *  página /assinar decidem a partir dela. Ricardo não tem → pendente. */
-export function demoMinhaAssinaturaTermo(role: AppRole): Assinatura | null {
+ *  página /assinar decidem a partir dela. Ricardo não tem → pendente; com
+ *  `simulado` (assinatura feita no wizard demo) ela vira concluída. */
+export function demoMinhaAssinaturaTermo(
+  role: AppRole,
+  simulado: TermoSimulado | null = null
+): Assinatura | null {
   const data = getDemoData();
   const eu = data.personas[role];
-  return (
+  const row =
     [...data.assinaturas]
       .filter(
         (a) => a.profile_id === eu.id && a.template?.slug === "termo-voluntario"
       )
-      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null
-  );
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))[0] ?? null;
+  const aplicada = comTermoSimulado(row, simulado);
+  if (aplicada) return aplicada;
+  // persona sem linha nenhuma: a simulada é a linha que o banco criaria
+  if (simulado?.papel === role) return linhaTermoSimulada(simulado);
+  return null;
 }
 
 /** Espelha meus_dados_civis() (0046): civis da persona + nome/nascimento da
@@ -1610,22 +1697,37 @@ export function demoMeusDadosCivis(role: AppRole): DadosCivis | null {
 }
 
 /** Uma assinatura por id — escopo da policy: dono ou coordenação. */
-export function demoAssinatura(role: AppRole, id: string): Assinatura | null {
+export function demoAssinatura(
+  role: AppRole,
+  id: string,
+  simulado: TermoSimulado | null = null
+): Assinatura | null {
   const data = getDemoData();
+  const eu = data.personas[role];
+  if (id === TERMO_SIMULADO_ID) {
+    const sintetica = simulado ? linhaTermoSimulada(simulado) : null;
+    return sintetica &&
+      (sintetica.profile_id === eu.id || role === "coordenacao")
+      ? sintetica
+      : null;
+  }
   const a = data.assinaturas.find((x) => x.id === id) ?? null;
   if (!a) return null;
-  const eu = data.personas[role];
-  if (a.profile_id === eu.id || role === "coordenacao") return a;
-  return null;
+  if (a.profile_id !== eu.id && role !== "coordenacao") return null;
+  return comTermoSimulado(a, simulado);
 }
 
 /** Resumo por pessoa pra aba /pessoas — mesmo escopo da policy (coord vê
  *  tudo; signatário só as próprias linhas). */
-export function demoAssinaturasResumo(role: AppRole): AssinaturaResumo[] {
+export function demoAssinaturasResumo(
+  role: AppRole,
+  simulado: TermoSimulado | null = null
+): AssinaturaResumo[] {
   const data = getDemoData();
   const eu = data.personas[role];
-  return data.assinaturas
+  const lista = data.assinaturas
     .filter((a) => role === "coordenacao" || a.profile_id === eu.id)
+    .map((a) => comTermoSimulado(a, simulado)!)
     .map((a) => ({
       id: a.id,
       profile_id: a.profile_id,
@@ -1635,6 +1737,29 @@ export function demoAssinaturasResumo(role: AppRole): AssinaturaResumo[] {
       token_expira_em: a.token_expira_em,
       slug: a.template?.slug ?? "",
     }));
+  const sintetica = simulado ? linhaTermoSimulada(simulado) : null;
+  // a linha sintética entra só quando a persona não tinha row de termo —
+  // com row real a virada já aconteceu em comTermoSimulado
+  if (
+    sintetica &&
+    (role === "coordenacao" || sintetica.profile_id === eu.id) &&
+    !data.assinaturas.some(
+      (a) =>
+        a.profile_id === sintetica.profile_id &&
+        a.template?.slug === "termo-voluntario"
+    )
+  ) {
+    lista.push({
+      id: sintetica.id,
+      profile_id: sintetica.profile_id,
+      mentorado_id: null,
+      status: "assinado",
+      assinado_em: sintetica.assinado_em,
+      token_expira_em: null,
+      slug: "termo-voluntario",
+    });
+  }
+  return lista;
 }
 
 /** Histórico de assinaturas da ficha — dado coord-only: pros demais papéis
@@ -1642,13 +1767,27 @@ export function demoAssinaturasResumo(role: AppRole): AssinaturaResumo[] {
 export function demoAssinaturasPessoa(
   role: AppRole,
   tipo: "profile" | "mentorado",
-  id: string
+  id: string,
+  simulado: TermoSimulado | null = null
 ): Assinatura[] {
   if (role !== "coordenacao") return [];
+  const data = getDemoData();
   const col = tipo === "profile" ? "profile_id" : "mentorado_id";
-  return [...getDemoData().assinaturas]
+  const lista = [...data.assinaturas]
     .filter((a) => a[col] === id)
-    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+    .map((a) => comTermoSimulado(a, simulado)!);
+  const sintetica = simulado ? linhaTermoSimulada(simulado) : null;
+  if (
+    sintetica &&
+    tipo === "profile" &&
+    sintetica.profile_id === id &&
+    !data.assinaturas.some(
+      (a) => a.profile_id === id && a.template?.slug === "termo-voluntario"
+    )
+  ) {
+    lista.push(sintetica);
+  }
+  return lista.sort((a, b) => b.created_at.localeCompare(a.created_at));
 }
 
 /** Público da demo: o que assinatura_por_token devolveria — usado pela

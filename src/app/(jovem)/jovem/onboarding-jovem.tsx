@@ -16,20 +16,22 @@ import {
   type Icon,
 } from "@phosphor-icons/react";
 import { concluirOnboarding } from "@/lib/actions";
+import { assinarComToken } from "@/lib/actions-assinaturas";
 import {
   salvarDisponibilidadeJovem,
   setContatoCompartilhado,
 } from "@/lib/actions-jovem";
 import { recomecarDemo } from "@/lib/demo/actions";
+import { assinarTermoDemo } from "@/lib/demo/shared";
+import { AssinaturaForm } from "@/components/assinatura-form";
 import { CampoDisponibilidade } from "@/components/campos-pessoais";
 import { SignOutButton } from "@/components/signout-button";
+import { TermoMentorandoDoc } from "@/components/termo-doc";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { formatWhatsApp } from "@/lib/ciclo";
-import type { Disponibilidade, JovemPerfil, Profile } from "@/lib/types";
+import type { DadosCivis, Disponibilidade, JovemPerfil, Profile } from "@/lib/types";
 import { Logo } from "@/components/logo";
-
-const TOTAL = 3;
 
 type Recurso = { icon: Icon; texto: string };
 
@@ -53,23 +55,32 @@ const RECURSOS: Recurso[] = [
   },
 ];
 
-/** Wizard de primeiro acesso do mentorado (REALIZA-114) — três passos:
- *  boas-vindas, a grade de disponibilidade (o insumo que o cruzamento da
- *  agenda precisa — sem ela o mentor vê "nenhum horário em comum" em tudo)
- *  e a confirmação de contato com o opt-in colega↔colega. O gate mora no
- *  layout: onboarded_em null renderiza isto no lugar do shell; "Preencher
- *  depois" é permitido mas a pendência vira lembrete permanente na home
- *  até a grade existir. Mesma gramática visual do OnboardingFlow de staff
- *  (header fixo + progressbar, balão por passo, footer fixo). */
+/** Wizard de primeiro acesso do mentorado (REALIZA-114): boas-vindas, a
+ *  grade de disponibilidade (o insumo que o cruzamento da agenda precisa
+ *  — sem ela o mentor vê "nenhum horário em comum" em tudo), o termo de
+ *  participação quando há um pendente (mesmo desenho do passo de termo do
+ *  OnboardingFlow: documento, dados civis, AssinaturaForm, "Assinar
+ *  depois") e a confirmação de contato com o opt-in colega↔colega. O gate
+ *  mora no layout: onboarded_em null renderiza isto no lugar do shell;
+ *  "Preencher depois" é permitido mas a pendência vira lembrete
+ *  permanente na home até a grade existir. Mesma gramática visual do
+ *  OnboardingFlow de staff (header fixo + progressbar, balão por passo,
+ *  footer fixo). */
 export function OnboardingJovem({
   me,
   perfil,
+  termo,
   demo,
 }: {
   me: Profile;
   /** ficha mentorados do próprio jovem (view jovem_perfil) — preenche a
-   *  grade e o contato; null = ficha ainda não vinculada pela coordenação */
+   *  grade, o contato e os dados civis do termo; null = ficha ainda não
+   *  vinculada pela coordenação */
   perfil: JovemPerfil | null;
+  /** token do termo-mentorando pendente (o jovem assina pelo próprio
+   *  token, como em /assinar/[token]) — null = sem pendência: o passo
+   *  não existe e o wizard fica em 3 */
+  termo?: { token: string } | null;
   /** pill da DemoBar dockada no header (demo ativa) — presença também é a
    *  flag "não grava nada": o wizard demo flui igual, sem writes */
   demo?: React.ReactNode;
@@ -78,6 +89,15 @@ export function OnboardingJovem({
   const [step, setStep] = useState(0);
   const [pending, start] = useTransition();
   const tituloRef = useRef<HTMLHeadingElement>(null);
+  const [termoOk, setTermoOk] = useState(false);
+
+  const temTermo = !!termo;
+  const total = temTermo ? 4 : 3;
+  // penúltimo, como no wizard de staff — o passo seguinte (contato) é o
+  // fechamento
+  const passoTermo = temTermo ? total - 2 : -1;
+  const ehPassoTermo = step === passoTermo;
+  const civis = (perfil?.dados_civis as DadosCivis | null) ?? null;
 
   const [grade, setGrade] = useState<Disponibilidade | null>(
     (perfil?.disponibilidade as Disponibilidade | null) ?? null
@@ -93,17 +113,17 @@ export function OnboardingJovem({
 
   const primeiroNome =
     (me.nome_social || me.nome).trim().split(/\s+/)[0] || me.nome;
-  const ultimo = step === TOTAL - 1;
+  const ultimo = step === total - 1;
   const temWhatsapp = perfil?.whatsapp != null;
 
   function avancar() {
-    setStep((s) => Math.min(s + 1, TOTAL - 1));
+    setStep((s) => Math.min(s + 1, total - 1));
   }
 
   /** Continuar do passo da grade — grava o que estiver marcado (a RPC
    *  normaliza vazio pra null) e avança. Na demo e sem ficha não há onde
    *  gravar: o gesto só avança — o "Preencher depois" é o mesmo gesto sem
-   *  salvar, igual ao "Agora não" do wizard de staff. */
+   *  salvar, igual ao "Pular etapa" do wizard de staff. */
   function salvarGrade() {
     if (demo || !perfil) {
       avancar();
@@ -150,6 +170,7 @@ export function OnboardingJovem({
   }
 
   const titulo = (() => {
+    if (ehPassoTermo) return "Seu termo de participação";
     switch (step) {
       case 0:
         return `Bem-vindo(a) ao Realiza, ${primeiroNome}!`;
@@ -161,6 +182,9 @@ export function OnboardingJovem({
   })();
 
   const hint = (() => {
+    if (ehPassoTermo) {
+      return "É o documento que formaliza a sua participação no programa: leia, confira seus dados e assine pra começar.";
+    }
     switch (step) {
       case 0:
         return "O Programa de Mentoria Social te conecta com um mentor pra caminhar junto: encontros, planos e o que você quiser construir. Três passos rápidos e você entra.";
@@ -171,7 +195,58 @@ export function OnboardingJovem({
     }
   })();
 
+  // fechamento: quem pulou o termo sai do wizard com o lembrete de onde
+  // ele fica — a pendência permanece e o card Documentos da home resolve.
+  // Mesmo desenho do corpoFechamento do OnboardingFlow
+  const corpoFechamento =
+    ultimo && temTermo && !termoOk ? (
+      <p className="rounded-2xl border border-border bg-card px-4 py-3 text-sm leading-relaxed text-muted-foreground">
+        Falta só o termo de participação: assine quando puder pelo card
+        Documentos, na sua home.
+      </p>
+    ) : null;
+
   const corpo = (() => {
+    // o termo tem form próprio (AssinaturaForm) — intercepta antes do
+    // switch; na demo a gravação é simulada (cookie demo_termo) e os
+    // espelhos leem como "assinado", como no wizard de staff
+    if (ehPassoTermo && termo) {
+      return (
+        <div className="space-y-4">
+          <TermoMentorandoDoc
+            civis={civis}
+            continuar={{
+              href: "#ob-termo-dados",
+              rotulo: "Continuar para seus dados ↓",
+            }}
+          />
+          <div id="ob-termo-dados" className="scroll-mt-24 space-y-2">
+            <h2 className="text-base font-semibold">Seus dados para assinar</h2>
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              {civis
+                ? "Já temos seus dados do cadastro: confira, corrija se preciso e assine."
+                : "Pra assinar precisamos dos seus dados civis: preencha como no documento de identidade. Eles entram no termo exatamente como digitados."}{" "}
+              {demo
+                ? "Na demonstração a assinatura é simulada: nada sai do seu navegador."
+                : "Eles ficam restritos à coordenação e ao termo."}
+            </p>
+          </div>
+          <AssinaturaForm
+            modo="termo"
+            acao={
+              demo
+                ? (fd) => assinarTermoDemo("mentorado", fd)
+                : assinarComToken.bind(null, termo.token)
+            }
+            dados={civis}
+            onSucesso={() => {
+              setTermoOk(true);
+              avancar();
+            }}
+          />
+        </div>
+      );
+    }
     switch (step) {
       case 0:
         return (
@@ -212,6 +287,7 @@ export function OnboardingJovem({
       default:
         return (
           <div className="space-y-4">
+            {corpoFechamento}
             <dl className="space-y-2">
               <div className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3">
                 <span className="grid size-10 shrink-0 place-items-center rounded-full bg-[var(--role-mentorado)] text-[var(--destaque-foreground)]">
@@ -312,17 +388,17 @@ export function OnboardingJovem({
             role="progressbar"
             aria-valuenow={step + 1}
             aria-valuemin={1}
-            aria-valuemax={TOTAL}
-            aria-label={`Passo ${step + 1} de ${TOTAL}`}
+            aria-valuemax={total}
+            aria-label={`Passo ${step + 1} de ${total}`}
             className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
           >
             <div
               className="h-full rounded-full bg-[var(--role-mentorado)] transition-all duration-500"
-              style={{ width: `${((step + 1) / TOTAL) * 100}%` }}
+              style={{ width: `${((step + 1) / total) * 100}%` }}
             />
           </div>
           <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
-            {step + 1}/{TOTAL}
+            {step + 1}/{total}
           </span>
           {demo}
         </div>
@@ -348,9 +424,12 @@ export function OnboardingJovem({
         </div>
       </main>
 
-      {/* footer fixo: "Preencher depois" no passo da grade + primário.
-          requestSubmit não se usa aqui — o passo não tem <form>, o gesto
-          chama a action direto (sem submit implícito de Enter em input) */}
+      {/* footer fixo: "Preencher depois" no passo da grade, "Assinar
+          depois" no do termo + primário. requestSubmit não se usa aqui —
+          o passo não tem <form>, o gesto chama a action direto; no termo
+          o submit mora dentro do AssinaturaForm e o primário some (um
+          "Continuar" ao lado de "Assinar depois" seria ambíguo — paridade
+          com o OnboardingFlow) */}
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
           {step === 1 && perfil && (
@@ -363,6 +442,17 @@ export function OnboardingJovem({
               Preencher depois
             </Button>
           )}
+          {ehPassoTermo && (
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={avancar}
+              disabled={pending}
+            >
+              Assinar depois
+            </Button>
+          )}
+          {!ehPassoTermo && (
           <Button
             type="button"
             onClick={() => {
@@ -387,6 +477,7 @@ export function OnboardingJovem({
                 <ArrowRight aria-hidden />
               ))}
           </Button>
+          )}
         </div>
       </footer>
     </div>

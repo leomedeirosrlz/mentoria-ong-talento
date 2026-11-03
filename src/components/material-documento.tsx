@@ -103,7 +103,10 @@ export function MaterialDocumento({
               return (
                 <div
                   key={i}
-                  className="overflow-x-auto rounded-xl bg-card shadow-[var(--shadow-border)]"
+                  role="region"
+                  aria-label="Tabela do documento. Role horizontalmente"
+                  tabIndex={0}
+                  className="scroll-fina overflow-x-auto rounded-xl bg-card shadow-[var(--shadow-border)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <table className="w-full text-sm">
                     <thead>

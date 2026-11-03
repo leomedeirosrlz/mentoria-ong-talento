@@ -79,6 +79,10 @@ const nextConfig: NextConfig = {
     "192.168.15.6",
     "100.113.24.100",
     "thixmachine2.tailf3e87b.ts.net",
+    // nb-linux (WSL do notebook atual)
+    "192.168.15.4",
+    "100.116.25.126",
+    "nb-linux.tailf3e87b.ts.net",
   ],
   async headers() {
     return [

@@ -16,7 +16,7 @@ import { assinarComToken, assinaturaPorToken } from "@/lib/actions-assinaturas";
 import { demoRole } from "@/lib/demo/mode";
 import { AssinaturaForm } from "@/components/assinatura-form";
 import { SiteFooter } from "@/components/site-footer";
-import { TermoVoluntarioDoc } from "@/components/termo-doc";
+import { TermoMentorandoDoc, TermoVoluntarioDoc } from "@/components/termo-doc";
 import { buttonVariants } from "@/components/ui/button";
 import { formatDateTime } from "@/lib/ciclo";
 import { sharedOg } from "@/lib/og";
@@ -25,13 +25,9 @@ import {
   AUTORIZACAO_TITULO,
   civisPreview,
   CLAUSULAS_AUTORIZACAO,
-  CLAUSULAS_MENTORANDO,
   dataPorExtenso,
   FECHO_AUTORIZACAO,
-  FECHO_MENTORANDO,
-  MENTORANDO_TITULO,
   preambuloAutorizacao,
-  preambuloMentorando,
 } from "@/lib/documentos/texto";
 import type { DadosAutorizacao, DadosCivis, ResponsavelCivis } from "@/lib/types";
 import { Logo } from "@/components/logo";
@@ -342,34 +338,29 @@ export default async function AssinarTokenPage({
               }}
             />
           </div>
-        ) : (
+        ) : ehAutorizacao ? (
           <section
             id="termo"
             className="mt-8 scroll-mt-4 rounded-xl bg-card p-6 shadow-[var(--shadow-border)] sm:p-8"
           >
             <h2 className="text-center text-sm font-semibold uppercase tracking-[0.06em]">
-              {ehAutorizacao ? AUTORIZACAO_TITULO : MENTORANDO_TITULO}
+              {AUTORIZACAO_TITULO}
             </h2>
             <div className="mt-5 space-y-3 text-sm leading-relaxed">
-              {(ehAutorizacao
-                ? preambuloAutorizacao(dadosPreview)
-                : preambuloMentorando(civisPreview(civis))
-              ).map((p, i) => (
+              {preambuloAutorizacao(dadosPreview).map((p, i) => (
                 <p key={i}>{p}</p>
               ))}
-              {(ehAutorizacao ? CLAUSULAS_AUTORIZACAO : CLAUSULAS_MENTORANDO).map(
-                ([titulo, paragrafos]) => (
-                  <div key={titulo} className="pt-1">
-                    <h3 className="font-semibold">{titulo}</h3>
-                    {paragrafos.map((p) => (
-                      <p key={p} className="mt-1.5">
-                        {p}
-                      </p>
-                    ))}
-                  </div>
-                )
-              )}
-              <p>{ehAutorizacao ? FECHO_AUTORIZACAO : FECHO_MENTORANDO}</p>
+              {CLAUSULAS_AUTORIZACAO.map(([titulo, paragrafos]) => (
+                <div key={titulo} className="pt-1">
+                  <h3 className="font-semibold">{titulo}</h3>
+                  {paragrafos.map((p) => (
+                    <p key={p} className="mt-1.5">
+                      {p}
+                    </p>
+                  ))}
+                </div>
+              ))}
+              <p>{FECHO_AUTORIZACAO}</p>
               <p>{dataPorExtenso(new Date())}</p>
             </div>
             <p className="mt-6 border-t border-border pt-5 text-center">
@@ -381,6 +372,17 @@ export default async function AssinarTokenPage({
               </a>
             </p>
           </section>
+        ) : (
+          <div className="mt-8">
+            <TermoMentorandoDoc
+              civis={civis}
+              id="termo"
+              continuar={{
+                href: "#dados",
+                rotulo: "Continuar para seus dados ↓",
+              }}
+            />
+          </div>
         )}
 
         <section

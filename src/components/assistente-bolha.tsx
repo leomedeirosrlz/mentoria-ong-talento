@@ -27,9 +27,9 @@ import {
 } from "@phosphor-icons/react";
 import { AssistenteConfig } from "@/components/assistente-config";
 import { AssistenteConversa } from "@/components/assistente-conversa";
-// conceito escolhido: Balão — os três protótipos dividem o contrato
+// conceito escolhido: Blob — os três protótipos dividem o contrato
 // ReaProps (rea/tipos.ts), então trocar de conceito é trocar o import
-import { ReaBalao } from "@/components/rea/rea-balao";
+import { ReaBlob } from "@/components/rea/rea-blob";
 import type { ReaEstado } from "@/components/rea/tipos";
 import { useMomento } from "@/components/rea/use-olhar";
 import {
@@ -50,7 +50,7 @@ const FAB_POS =
   "fixed z-40 right-[max(1rem,env(safe-area-inset-right))] bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6";
 
 const FAB_CLS =
-  "grid size-12 md:size-14 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)] outline-none transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:scale-105 hover:shadow-[var(--shadow-modal)] active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-offset-2";
+  "group/fab grid size-12 md:size-14 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)] outline-none transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:scale-105 hover:shadow-[var(--shadow-modal)] active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-offset-2";
 
 // tamanho vem de --painel-w/--painel-h (inline, redimensionável); o min()
 // segura viewport estreita e o --available-height do positioner segura
@@ -66,9 +66,13 @@ const PAINEL_CLS =
 const TAM_PADRAO = { w: 384, h: 640 };
 
 // mascote da conversa — a bolha é dona do componente; o estado chega por
-// render-prop porque a conversa é quem conhece a rodada (stream/erro)
+// render-prop porque a conversa é quem conhece a rodada (stream/erro).
+// "escrevendo" (stream saindo) o rosto mostra como "falando": a boca
+// tagarela enquanto ela despeja a resposta
+const falando = (e: ReaEstado): ReaEstado =>
+  e === "escrevendo" ? "falando" : e;
 const AvatarRea = (p: { tamanho: number; estado: ReaEstado }) => (
-  <ReaBalao tamanho={p.tamanho} estado={p.estado} />
+  <ReaBlob tamanho={p.tamanho} estado={falando(p.estado)} />
 );
 const TAM_EXPANDIDO = { w: 640, h: 820 };
 const TAM_MIN = { w: 352, h: 440 };
@@ -76,8 +80,9 @@ const TAM_MAX = { w: 960, h: 1000 };
 const STORAGE_TAM = "assistente:tamanho";
 const ehExpandido = (t: { w: number }) => t.w >= 560;
 // ociosa demais com o painel fechado, a Rea cochila ("sonolento") —
-// qualquer gesto acorda. A janela é generosa: soninho é charme, não timer
-const SONO_MS = 45_000;
+// qualquer gesto acorda. Soninho é charme, mas o wait não pode virar
+// queda de atenção: ~20s parada já bastam pra ela começar a pesar
+const SONO_MS = 20_000;
 
 const limitar = (t: { w: number; h: number }) => ({
   w: Math.round(Math.min(TAM_MAX.w, Math.max(TAM_MIN.w, t.w))),
@@ -223,7 +228,7 @@ function Cabecalho({
   return (
     <div className="flex shrink-0 items-center gap-2.5 border-b border-border px-4 py-3">
       <span className="grid size-8 shrink-0 place-items-center">
-        <ReaBalao tamanho={34} estado={estado} />
+        <ReaBlob tamanho={34} estado={estado} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 text-sm font-semibold">
@@ -577,7 +582,7 @@ export function AssistenteBolha({
   // olho no cursor (e a rodada sobe pro rosto do FAB também:
   // consultando/escrevendo/erro); fechada, o pulo de "pronto" com o
   // ponto de aviso, o hover/foco de "atento" e o cochilo do "sonolento"
-  // se revezam. O X de fechar mora no cabeçalho do painel
+  // se revezam. Aberto, o FAB troca a mascote por um X de fechar
   const estadoFab: ReaEstado = aberto
     ? estadoRea === "parado"
       ? "atento"
@@ -589,8 +594,26 @@ export function AssistenteBolha({
         : sonolento
           ? "sonolento"
           : estadoRea;
+  // painel aberto: a Rea do FAB vira um X — fecha a bolha no mesmo lugar
+  // onde ela abriu e evita três mascotes simultâneas na tela (o X do
+  // cabeçalho continua pra quem já está com a mão dentro do painel). O
+  // press amassa só o conteúdo — a bolha de fundo segue o scale-95 do FAB
   const icons = (
-    <ReaBalao tamanho={44} estado={estadoFab} className="pointer-events-none" />
+    <span className="pointer-events-none grid place-items-center transition-transform duration-150 group-active/fab:scale-x-110 group-active/fab:scale-y-[.8] [transform-origin:50%_100%]">
+      {aberto ? (
+        <X
+          size={24}
+          weight="bold"
+          className="animate-in zoom-in-50 spin-in-45 duration-200"
+        />
+      ) : (
+        <ReaBlob
+          tamanho={44}
+          estado={falando(estadoFab)}
+          className="animate-in zoom-in-50 spin-in-[-45deg] duration-200"
+        />
+      )}
+    </span>
   );
 
   // a Rea do header saúda na abertura (o momento "aberto" do mascote) e
@@ -664,7 +687,7 @@ export function AssistenteBolha({
             onConfig={onConfig}
             expandido={ehExpandido(tamanho)}
             onExpandir={alternarExpandido}
-            estado={estadoCab}
+            estado={falando(estadoCab)}
           />
           <PopoverTitle className="sr-only">Assistente</PopoverTitle>
           {corpo}
@@ -729,7 +752,7 @@ export function AssistenteBolha({
             onNovaConversa={novaConversa}
             onHistorico={alternarHistorico}
             onConfig={onConfig}
-            estado={estadoCab}
+            estado={falando(estadoCab)}
           />
           {corpo}
         </SheetContent>

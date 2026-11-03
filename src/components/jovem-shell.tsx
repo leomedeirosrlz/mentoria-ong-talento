@@ -39,8 +39,8 @@ const NAV = [
   { href: "/jovem/agenda", label: "Agenda", icon: CalendarDots },
   { href: "/jovem/especialistas", label: "Especialistas", icon: Sparkle },
   { href: "/jovem/pessoas", label: "Pessoas", icon: Users },
-  // trilha de progresso, não pasta: jornada é avanço, o acervo é /materiais
-  { href: "/jovem/materiais", label: "Jornada", icon: Path },
+  // o rótulo segue o destino (/materiais, como no staff); "jornada" fica pro progresso dentro da página
+  { href: "/jovem/materiais", label: "Materiais", icon: Path },
   { href: "/jovem/perfil", label: "Perfil", icon: UserCircle },
   // REALIZA-345: a Ajuda do jovem — fora do MOBILE_PRIMEIRO, mora no Menu
   { href: "/jovem/ajuda", label: "Ajuda", icon: Question },

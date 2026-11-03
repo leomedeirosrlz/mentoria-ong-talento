@@ -8,6 +8,7 @@ export type ReaEstado =
   | "aberto" // painel acabou de abrir
   | "consultando" // ferramenta rodando
   | "escrevendo" // resposta em streaming
+  | "falando" // falando de verdade: boca tagarela (streaming com voz)
   | "pronto" // resposta terminou com o painel fechado (pula uma vez)
   | "erro"
   | "sonolento"; // ocioso há muito tempo

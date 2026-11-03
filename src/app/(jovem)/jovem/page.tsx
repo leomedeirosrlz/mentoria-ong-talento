@@ -42,6 +42,7 @@ import {
   passoEsp,
   toDateStr,
   waLink,
+  waLinkEquipe,
 } from "@/lib/ciclo";
 import { agrupaContatosPorPessoa } from "@/lib/jovem-contatos";
 import {
@@ -370,7 +371,7 @@ export default async function JovemHome() {
     );
   };
 
-  const waCoord = waLink(
+  const waCoord = waLinkEquipe(
     coordenacao[0]?.whatsapp,
     `Olá! Sou ${nomeTela}, mentorado(a) do programa, e preciso falar com a equipe.`
   );

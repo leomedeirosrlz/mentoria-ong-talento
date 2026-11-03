@@ -107,12 +107,15 @@ export function ReaDisco({ estado, tamanho, seguirCursor = true, className }: Re
     seguir: seguirCursor,
     alvo: pose.alvo,
     varrer: efetivo === "escrevendo",
+    pensar: efetivo === "consultando",
     reduzido,
   });
   const abertura = usePiscar({
-    ativo: pose.forma === "pilula",
+    // sono suspende a piscada: a pálpebra já desceu, não tem o que fechar
+    ativo: pose.forma === "pilula" && efetivo !== "sonolento",
     reduzido,
-    lento: efetivo === "sonolento" || efetivo === "consultando",
+    lento: efetivo === "consultando",
+    gatilho: efetivo,
   });
   const inclina = useAlvoMola(efetivo === "atento" ? 1 : 0, reduzido);
 
@@ -154,7 +157,7 @@ export function ReaDisco({ estado, tamanho, seguirCursor = true, className }: Re
     ? { y: { duration: 2.6, repeat: Infinity, ease: "easeInOut" }, rotate: transicao }
     : transicao;
 
-  const dims = detalhe ? { w: 11, h: 17, cy: 45 } : { w: 14, h: 21, cy: 46 };
+  const dims = detalhe ? { w: 14, h: 21, cy: 45 } : { w: 17, h: 25, cy: 46 };
 
   return (
     <svg
@@ -192,7 +195,7 @@ export function ReaDisco({ estado, tamanho, seguirCursor = true, className }: Re
                 <Olho
                   key={lado}
                   lado={lado}
-                  cx={50 + lado * 17}
+                  cx={50 + lado * 18}
                   cy={dims.cy}
                   w={dims.w}
                   h={dims.h}

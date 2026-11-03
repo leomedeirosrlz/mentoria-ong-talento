@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Sparkle } from "@phosphor-icons/react/dist/ssr";
 import { getMe } from "@/lib/queries";
-import { waLink } from "@/lib/ciclo";
+import { waLinkEquipe } from "@/lib/ciclo";
 import {
   getDevolutivas,
   getJovemContatos,
@@ -63,7 +63,7 @@ export default async function JovemEspecialistasPage() {
     (c) => (c.dupla_id == null || c.dupla_id === duplaAtual?.id) && c.papel === "coordenacao"
   );
   const nomeTela = me.nome_social || me.nome;
-  const waCoord = waLink(
+  const waCoord = waLinkEquipe(
     coordenacao[0]?.whatsapp,
     `Olá! Sou ${nomeTela}, mentorado(a) do programa, e preciso falar com a equipe.`
   );

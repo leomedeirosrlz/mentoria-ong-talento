@@ -41,6 +41,7 @@ import type {
   EspecialistaEvento,
 } from "@/lib/types";
 import { cn, normaliza } from "@/lib/utils";
+import { useFadeX } from "@/lib/use-fade-x";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { DuplaLinha, GRID_DUPLA_LG, type TomSituacao } from "@/components/dupla-linha";
@@ -846,6 +847,7 @@ function VisaoCoordenacao({
   const [painelAberto, setPainelAberto] = useState(false);
   const [draftSup, setDraftSup] = useState("todas");
   const [draftMentor, setDraftMentor] = useState("todos");
+  const { ref: chipsRef, maskStyle: chipsMask } = useFadeX<HTMLDivElement>();
 
   // link da home pousa aqui sem remontar a rota — realinha o chip quando
   // o contexto resolvido muda. Ajuste durante o render (padrão react.dev),
@@ -1072,7 +1074,9 @@ function VisaoCoordenacao({
           "Como calculamos" do resumo. Clicar de novo desfaz o filtro. */}
       {lista.length > 0 && (
         <div
-          className="mt-5 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap"
+          ref={chipsRef}
+          style={chipsMask}
+          className="-mx-4 mt-5 flex gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:px-0"
           role="group"
           aria-label="Filtrar por situação"
         >
@@ -1383,6 +1387,7 @@ function VisaoSupervisor({
 }) {
   const [busca, setBusca] = useState("");
   const [filtro, setFiltro] = useState<FiltroCat>(recorteInicial ?? "todas");
+  const { ref: chipsRef, maskStyle: chipsMask } = useFadeX<HTMLDivElement>();
 
   const pesoFila = (d: Dupla) => {
     const s = saudePorId.get(d.id)!;
@@ -1466,7 +1471,9 @@ function VisaoSupervisor({
           no chip ativo) devolve a lista inteira e esconde a linha */}
       {filtro !== "todas" && (
         <div
-          className="mt-5 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap"
+          ref={chipsRef}
+          style={chipsMask}
+          className="-mx-4 mt-5 flex gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:px-0"
           role="group"
           aria-label="Filtrar por situação"
         >

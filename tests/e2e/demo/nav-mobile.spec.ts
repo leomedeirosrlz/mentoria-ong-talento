@@ -45,11 +45,11 @@ test.describe("navegação do celular", () => {
     await expect(menu).toBeHidden();
   });
 
-  test("jovem: Especialistas e Jornada na barra", async ({ page }) => {
+  test("jovem: Especialistas e Materiais na barra", async ({ page }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem");
     const barra = page.getByRole("navigation", { name: "Navegação principal" }).last();
-    for (const nome of ["Início", "Especialistas", "Jornada", "Agenda"]) {
+    for (const nome of ["Início", "Especialistas", "Materiais", "Agenda"]) {
       await expect(barra.getByRole("link", { name: nome, exact: true })).toBeVisible();
     }
     await barra.getByRole("button", { name: /^Menu/ }).click();

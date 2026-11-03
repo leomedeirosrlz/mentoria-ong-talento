@@ -37,6 +37,7 @@ import {
   maxEncontros,
   passoEsp,
   waLink,
+  waLinkEquipe,
 } from "@/lib/ciclo";
 import {
   efetivoDe,
@@ -167,7 +168,7 @@ export default async function JovemAgenda() {
   const semDuplaDpp = !duplas.some(
     (d) => d.trilha !== "especialista" && d.status === "ativa"
   );
-  const waCoord = waLink(
+  const waCoord = waLinkEquipe(
     contatos.find((c) => c.papel === "coordenacao")?.whatsapp,
     `Olá! Sou ${me?.nome_social || me?.nome || ""}, mentorado(a) do programa, e preciso falar com a equipe.`
   );

@@ -159,7 +159,12 @@ function Tabela({ t }: { t: TabelaMd }) {
       t.alinhamento[j] !== "esq" ? t.alinhamento[j] : t.numerica[j] ? "dir" : "esq"
     ];
   return (
-    <div className="scroll-fina animate-enter overflow-x-auto rounded-lg border border-border/70 bg-card">
+    <div
+      role="region"
+      aria-label="Tabela. Role horizontalmente"
+      tabIndex={0}
+      className="scroll-fina animate-enter overflow-x-auto rounded-lg border border-border/70 bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
       <table className="w-full text-[0.9em]">
         <thead>
           <tr className="border-b border-border bg-muted/50">

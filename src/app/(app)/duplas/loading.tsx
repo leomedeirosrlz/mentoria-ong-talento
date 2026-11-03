@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { FadeX } from "@/components/fade-x";
 import { GRID_DUPLA_LG } from "@/components/dupla-linha";
 
 // Espelho da lista de duplas da coordenação (o caso comum): título + busca
@@ -36,12 +37,13 @@ export default function Loading() {
         </div>
       </div>
 
-      {/* chips por situação — rolam na horizontal no celular */}
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      {/* chips por situação — rolam na horizontal no celular (espelho da
+          linha real: bleed, barra oculta e fade de borda via FadeX) */}
+      <FadeX className="-mx-4 flex gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0">
         {[0, 1, 2, 3, 4, 5, 6].map((i) => (
           <Skeleton key={i} className="h-11 w-28 shrink-0 rounded-full sm:h-8" />
         ))}
-      </div>
+      </FadeX>
 
       {/* lista densa — cabeçalho de colunas só em @4xl (container) + linhas */}
       <section className="@container">

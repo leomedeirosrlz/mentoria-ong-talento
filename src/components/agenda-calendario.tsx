@@ -103,6 +103,7 @@ import {
   type PassoGuia,
 } from "@/lib/ciclo";
 import { limboAberto } from "@/lib/agenda-minha";
+import { useFadeX } from "@/lib/use-fade-x";
 import {
   estadoDaSemana,
   estadoDoEncontro,
@@ -1227,6 +1228,7 @@ export function AgendaCalendario({
   // rail do ciclo: nó "você está aqui" entra na viewport ao montar (o rail
   // rola horizontal no mobile — sem o scroll o nó atual sairia da tela)
   const refRailAtual = useRef<HTMLButtonElement | null>(null);
+  const { ref: railRef, maskStyle: railMask } = useFadeX<HTMLDivElement>();
   useEffect(() => {
     const el = refRailAtual.current;
     if (!el) return;
@@ -2602,7 +2604,11 @@ export function AgendaCalendario({
             aria-label="Encontros da jornada"
             className="border-b px-3 pb-1.5 pt-2 sm:px-4"
           >
-            <div className="scroll-fina flex items-center overflow-x-auto pb-1">
+            <div
+              ref={railRef}
+              style={railMask}
+              className="flex items-center overflow-x-auto overscroll-x-contain pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+            >
               {encontrosRail.map((e, i) => {
                 const passou = e.data < hoje;
                 const atual = e.id === eventoSemanaSel?.id;

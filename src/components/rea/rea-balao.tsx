@@ -257,7 +257,7 @@ export function ReaBalao({ estado, tamanho, seguirCursor = true, className }: Re
     tamanho,
   });
 
-  const olho = detalhe ? { r: 5.6, dx: 14, cy: 44 } : { r: 7.2, dx: 15, cy: 45 };
+  const olho = detalhe ? { r: 7, dx: 15, cy: 44 } : { r: 8.8, dx: 16, cy: 45 };
   const ponto = detalhe ? { r: 5, dx: 18, cy: 49 } : { r: 6.2, dx: 19, cy: 49 };
   const flutuaRosto = !reduzido && efetivo === "consultando";
 

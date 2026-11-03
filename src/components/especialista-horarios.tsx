@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useState, useTransition, type KeyboardEvent } from "react";
+import { useState, useTransition, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CircleNotch, Plus, X } from "@phosphor-icons/react";
@@ -13,6 +13,7 @@ import {
 import { DIAS_SEMANA, DIAS_SEMANA_LABELS, toDateStr } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
 import { diaPlural, faixa, resumoExcecao } from "@/lib/horarios-especialista";
+import { useFadeX } from "@/lib/use-fade-x";
 import type { ExcecaoEspecialista, GradeJanela } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { FaixaHorario } from "@/components/roda-horario";
@@ -44,7 +45,7 @@ function FaixaDatas({
   onChange: (iso: string) => void;
   disabled?: boolean;
 }) {
-  const ref = useRef<HTMLDivElement>(null);
+  const { ref, el, maskStyle } = useFadeX<HTMLDivElement>();
   const base = new Date(`${inicio}T12:00:00`);
   const dias = Array.from({ length: DIAS_FAIXA_DATAS }, (_, i) => {
     const d = new Date(base);
@@ -68,9 +69,9 @@ function FaixaDatas({
     e.preventDefault();
     const alvo = Math.min(dias.length - 1, Math.max(0, (iSel < 0 ? 0 : iSel) + passo));
     onChange(dias[alvo]!.iso);
-    const el = ref.current?.querySelectorAll<HTMLButtonElement>("[role=radio]")[alvo];
-    el?.focus();
-    el?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const btn = el?.querySelectorAll<HTMLButtonElement>("[role=radio]")[alvo];
+    btn?.focus();
+    btn?.scrollIntoView({ block: "nearest", inline: "nearest" });
   }
 
   return (
@@ -79,7 +80,8 @@ function FaixaDatas({
       role="radiogroup"
       aria-label="Data"
       onKeyDown={aoTeclar}
-      className="scroll-fina -mx-1 flex snap-x snap-proximity gap-1.5 overflow-x-auto px-1 pb-1.5"
+      style={maskStyle}
+      className="-mx-1 flex snap-x snap-proximity gap-1.5 overflow-x-auto overscroll-x-contain scroll-px-1 px-1 pb-1.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {dias.map((d, i) => {
         const sel = d.iso === valor;

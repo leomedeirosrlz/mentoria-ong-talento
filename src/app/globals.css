@@ -442,29 +442,6 @@
   animation: rise 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-/* janela de celular do onboarding: a captura mobile é a página inteira (muito
-   mais alta que a moldura), então o print desliza devagar sob ela — desce,
-   pausa no fim e volta ao topo. O ciclo termina onde começou, então o guard
-   global de prefers-reduced-motion estaciona a imagem no topo sem regra
-   duplicada. object-position anima o recorte do object-cover sem reflow. */
-@keyframes percorre-tela {
-  0%,
-  8% {
-    object-position: 50% 0%;
-  }
-  44%,
-  56% {
-    object-position: 50% 100%;
-  }
-  92%,
-  100% {
-    object-position: 50% 0%;
-  }
-}
-.animate-percorre-tela {
-  animation: percorre-tela 30s ease-in-out infinite;
-}
-
 /* hatch de "tempo bloqueado" (recesso) nas células da agenda — padrão semântico
    que carrega estado, não textura decorativa. background-image (não background)
    para sobrepor o bg-color que a célula já tiver. Nome único de domínio em

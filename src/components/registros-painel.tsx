@@ -32,6 +32,7 @@ import {
   toDateStr,
 } from "@/lib/ciclo";
 import type { SaudeRecorte } from "@/lib/agenda-coordenacao";
+import { useFadeX } from "@/lib/use-fade-x";
 import { cn } from "@/lib/utils";
 import type {
   PanoramaCelula,
@@ -130,11 +131,14 @@ function SegLocal<T extends string>({
   valor: T;
   onChange: (v: T) => void;
 }) {
+  const { ref, maskStyle } = useFadeX<HTMLDivElement>();
   return (
     <div
       role="group"
       aria-label={rotulo}
-      className="scroll-fina inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full border border-border bg-background p-0.5"
+      ref={ref}
+      style={maskStyle}
+      className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto overscroll-x-contain rounded-full border border-border bg-background p-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {opcoes.map((o) => (
         <button
@@ -673,7 +677,12 @@ export function RegistrosPainel({
               <summary className="inline-flex min-h-11 cursor-pointer items-center font-semibold text-foreground underline-offset-4 hover:underline sm:min-h-8">
                 ver dados em tabela
               </summary>
-              <div className="scroll-fina mt-2 overflow-x-auto">
+              <div
+                role="region"
+                aria-label="Cobertura por encontro em tabela. Role horizontalmente"
+                tabIndex={0}
+                className="scroll-fina mt-2 overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
                 <table className="w-full text-left tabular-nums">
                   <thead>
                     <tr className="text-muted-foreground">

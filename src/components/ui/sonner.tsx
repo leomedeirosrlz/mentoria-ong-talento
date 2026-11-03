@@ -62,7 +62,7 @@ const Toaster = ({ ...props }: ToasterProps) => {
           "--success-text": "var(--ok-text)",
           "--error-bg": "color-mix(in oklab, var(--danger) 8%, var(--popover))",
           "--error-border": "color-mix(in oklab, var(--danger) 30%, var(--border))",
-          "--error-text": "var(--danger)",
+          "--error-text": "var(--danger-text)",
           "--warning-bg": "color-mix(in oklab, var(--warn) 15%, var(--popover))",
           "--warning-border": "color-mix(in oklab, var(--warn) 40%, var(--border))",
           "--warning-text": "var(--warn-text)",

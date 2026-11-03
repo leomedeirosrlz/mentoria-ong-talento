@@ -96,7 +96,7 @@ export function AvaliacaoJovemCard({
       )}
 
       {temDetalhe && (
-        <dl className="mt-2 space-y-1.5 text-sm">
+        <dl className="mt-2 space-y-2.5 text-sm">
           {avaliacao.sentimento && (
             <Linha rotulo="Sentiu-se">
               {SENTIMENTO_AVALIACAO_LABEL[avaliacao.sentimento] ??
@@ -149,9 +149,11 @@ function Linha({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex gap-3">
-      <dt className="w-20 shrink-0 text-xs text-muted-foreground">{rotulo}</dt>
-      <dd className="min-w-0 flex-1">{children}</dd>
+    <div>
+      <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+        {rotulo}
+      </dt>
+      <dd className="mt-0.5">{children}</dd>
     </div>
   );
 }

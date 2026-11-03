@@ -28,7 +28,7 @@ function CaixaSelecao({
       <CheckboxPrimitive.Root
         data-slot="caixa-selecao"
         className={cn(
-          "group flex w-full cursor-pointer items-center gap-3.5 rounded-2xl border border-border bg-card p-4 text-left transition-colors outline-none select-none hover:border-foreground/25 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-default disabled:opacity-70 data-checked:border-primary/60 data-checked:bg-primary/[0.05]",
+          "group flex w-full cursor-pointer items-center gap-3.5 rounded-2xl border border-border bg-card p-4 text-left transition-colors outline-none select-none hover:border-foreground/25 focus-visible:ring-3 focus-visible:ring-ring/50 disabled:cursor-default data-checked:border-primary/60 data-checked:bg-primary/[0.05]",
           className
         )}
         {...props}
@@ -45,7 +45,7 @@ function CaixaSelecao({
       <span className="grid size-5 shrink-0 place-items-center rounded-md border border-border bg-background transition-colors group-data-checked:border-primary group-data-checked:bg-primary">
         <CheckboxPrimitive.Indicator
           keepMounted
-          className="grid place-items-center text-white transition-transform duration-150 ease-snappy data-unchecked:scale-50 data-unchecked:opacity-0"
+          className="grid place-items-center text-[var(--brand-ink)] transition-transform duration-150 ease-snappy data-unchecked:scale-50 data-unchecked:opacity-0"
         >
           <Check size={13} weight="bold" aria-hidden />
         </CheckboxPrimitive.Indicator>
