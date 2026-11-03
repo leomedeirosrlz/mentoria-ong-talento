@@ -34,7 +34,9 @@
  *    tabela termina na primeira linha não-pipe. `\|` dentro da célula é
  *    pipe literal. `ehTabelaMd` só diz se UMA linha tem cara de linha
  *    pipe (o MdLite usa pra achar o bloco); quem decide se é tabela de
- *    verdade é parseTabelaMd.
+ *    verdade é parseTabelaMd. Por coluna saem `alinhamento` (do `:` do
+ *    separador; sem `:` = esq) e `numerica` (todo valor do corpo é
+ *    número, %, fração ou moeda — a UI alinha à direita e usa tabular-nums).
  *
  *  Convenção 3 — fonte de guia inline:
  *    o modelo cita documento com link comum [rótulo](/materiais/documento/<slug>).
@@ -56,14 +58,20 @@
  *    {rotulo ≤40, valor ≥0, tom opcional ∈ danger|warn|ok|info|pausa,
  *    detalhe opcional ≤80} e `total` opcional (o M do "N de M" do
  *    progresso). Chaves a mais são ignoradas.
- *    - Bloco VÁLIDO vira uma linha-marca `\u0000grafico:<i>\u0000` no
- *      texto devolvido — o gráfico fica na POSIÇÃO em que o modelo o
- *      escreveu, não numa faixa separada como os stats. O MdLite troca a
- *      marca pelo componente (`MARCA_GRAFICO` reconhece a linha).
+ *    - Bloco VÁLIDO vira uma linha-marca no texto devolvido — o gráfico
+ *      fica na POSIÇÃO em que o modelo o escreveu, não numa faixa
+ *      separada como os stats. extrairGraficos usa `\u0000grafico:<i>\u0000`
+ *      (MARCA_GRAFICO); extrairBlocos põe o gráfico na fila comum de
+ *      blocos e usa MARCA_BLOCO.
  *    - Bloco inválido ou fence sem fechar SAI do texto sem deixar marca:
  *      diferente do stats (que fica visível pra iterar o prompt), spec
  *      de gráfico cru é JSON de visualização — mostrar é ruído, não
  *      informação. O usuário nunca vê o JSON quebrado.
+ *
+ *  Convenção 5 — blocos interativos (genUI v3): ver a seção no meio do
+ *    arquivo. extrairBlocos é o scanner único de todas as tags de fence
+ *    (stats, grafico e os interativos) numa passada; segurarParcial
+ *    esconde o rabo ainda incompleto durante o stream.
  */
 
 import { z } from "zod";
@@ -85,74 +93,8 @@ export type Stat = z.infer<typeof statSchema>;
 
 const statsSchema = z.array(statSchema).min(1).max(4);
 
-// a linha do fence é só ```stats — qualquer coisa a mais é fence comum
-const ABRE_STATS = /^\s*```\s*stats\s*$/i;
 // fechar fence: mesma regra do MdLite — qualquer linha abrindo com ```
 const FENCE = /^\s*```/;
-
-export function extrairStats(texto: string): {
-  stats: Stat[];
-  textoSemBloco: string;
-} {
-  const linhas = texto.split("\n");
-  const saida: string[] = [];
-  const stats: Stat[] = [];
-  let emFence = false; // fence comum (qualquer tag ≠ stats) passa direto
-  let i = 0;
-  while (i < linhas.length) {
-    const linha = linhas[i];
-    if (emFence) {
-      saida.push(linha);
-      if (FENCE.test(linha)) emFence = false;
-      i++;
-      continue;
-    }
-    if (ABRE_STATS.test(linha)) {
-      // sem fence de fechamento o bloco ainda está chegando (stream) —
-      // fica como código, igual o MdLite mostra o parcial
-      let fecha = -1;
-      for (let j = i + 1; j < linhas.length; j++) {
-        if (FENCE.test(linhas[j])) {
-          fecha = j;
-          break;
-        }
-      }
-      let valido = false;
-      if (fecha !== -1) {
-        try {
-          const parsed = statsSchema.safeParse(
-            JSON.parse(linhas.slice(i + 1, fecha).join("\n"))
-          );
-          if (parsed.success) {
-            stats.push(...parsed.data);
-            valido = true;
-          }
-        } catch {
-          // JSON quebrado: cai no caminho inválido e fica como código
-        }
-      }
-      if (!valido) {
-        // inválido NÃO é removido — vira code block comum e o conteúdo
-        // não desaparece da resposta
-        const fim = fecha === -1 ? linhas.length : fecha + 1;
-        for (; i < fim; i++) saida.push(linhas[i]);
-        continue;
-      }
-      // bloco removido: colapsa o vazio em volta — no máximo uma linha em
-      // branco separando o antes do depois, nada pendurado nas pontas
-      let j = fecha + 1;
-      while (j < linhas.length && linhas[j].trim() === "") j++;
-      while (saida.length && saida[saida.length - 1].trim() === "") saida.pop();
-      if (saida.length && j < linhas.length) saida.push("");
-      i = j;
-      continue;
-    }
-    if (FENCE.test(linha)) emFence = true;
-    saida.push(linha);
-    i++;
-  }
-  return { stats, textoSemBloco: saida.join("\n").trim() };
-}
 
 // ---------- convenção 4: bloco ```grafico ----------
 
@@ -179,28 +121,222 @@ const graficoSchema = z.object({
 export type Grafico = z.infer<typeof graficoSchema>;
 export type GraficoTipo = Grafico["tipo"];
 
-// a linha do fence é só ```grafico — qualquer coisa a mais é fence comum
-const ABRE_GRAFICO = /^\s*```\s*grafico\s*$/i;
-
 // linha-marca que substitui o bloco válido no texto devolvido: \u0000 não
 // aparece em texto do modelo, então a marca nunca colide com conteúdo.
 // O MdLite reconhece a linha inteira e renderiza graficos[i] no lugar.
 export const MARCA_GRAFICO = /^\u0000grafico:(\d+)\u0000$/;
-const marca = (i: number) => `\u0000grafico:${i}\u0000`;
 
-/** Extrai os blocos ```grafico do texto. O válido deixa uma linha-marca
- *  na posição original (o componente resolve pela lista `graficos`); o
- *  inválido/parcial sai de fininho — spec cru não é informação pro
- *  usuário. Mesmo scanner do extrairStats: qualquer linha ``` fecha um
- *  fence, então a leitura nunca diverge do MdLite. */
-export function extrairGraficos(texto: string): {
-  graficos: Grafico[];
+// ---------- convenção 5: blocos interativos (genUI v3) ----------
+//
+// Fences que o modelo escreve, um objeto/array JSON por bloco, mesma regra
+// de fence do stats/grafico (linha só com ```<tag>, qualquer ``` fecha):
+//
+//   ```sugestoes   ["Pergunta curta", …]               1–3, cada ≤60
+//                  → chips de continuação no FIM da resposta (tocar envia)
+//   ```escolha     {"pergunta","opcoes":[{"rotulo","valor"?}]}  2–5 opções
+//                  → botões inline; tocar envia `valor ?? rotulo`
+//   ```rascunho    {"canal","para"?,"assunto"?,"texto"}
+//                  → mensagem pronta editável + Copiar / Abrir no WhatsApp
+//   ```passos      {"titulo"?,"itens":[{"texto","detalhe"?}]}  2–8
+//                  → roteiro com checkboxes locais
+//   ```destaque    {"tom","titulo"?,"texto","fonte"?:{"rotulo","href"}}
+//                  → callout de dica/atenção; href só /materiais/*
+//
+// Válido → linha-marca inline (MARCA_BLOCO) na posição em que o modelo
+// escreveu (sugestoes sai do texto e vai pro fim). Inválido → some, exceto
+// rascunho, que fica como code block (o texto da mensagem é informação).
+// Com `streaming`, fence aberto vira MARCA_PENDENTE do kind — a UI
+// desenha um skeleton do mesmo tamanho do resultado, sem JSON cru.
+
+const sugestoesSchema = z.array(z.string().trim().min(2).max(60)).min(1).max(3);
+
+const escolhaSchema = z.object({
+  pergunta: z.string().trim().min(2).max(120),
+  opcoes: z
+    .array(
+      z.object({
+        rotulo: z.string().trim().min(1).max(40),
+        valor: z.string().trim().min(1).max(120).optional(),
+      })
+    )
+    .min(2)
+    .max(5),
+});
+export type BlocoEscolha = z.infer<typeof escolhaSchema>;
+
+const rascunhoSchema = z.object({
+  canal: z.enum(["whatsapp", "email", "texto"]).default("texto"),
+  para: z.string().trim().min(1).max(60).optional(),
+  assunto: z.string().trim().min(1).max(80).optional(),
+  texto: z.string().trim().min(1).max(1200),
+});
+export type BlocoRascunho = z.infer<typeof rascunhoSchema>;
+
+const passosSchema = z.object({
+  titulo: z.string().trim().min(1).max(60).optional(),
+  itens: z
+    .array(
+      z.object({
+        texto: z.string().trim().min(1).max(160),
+        detalhe: z.string().trim().min(1).max(200).optional(),
+      })
+    )
+    .min(2)
+    .max(8),
+});
+export type BlocoPassos = z.infer<typeof passosSchema>;
+
+const destaqueSchema = z.object({
+  tom: z.enum(["dica", "atencao", "info"]).default("info"),
+  titulo: z.string().trim().min(1).max(60).optional(),
+  texto: z.string().trim().min(1).max(300),
+  fonte: z
+    .object({
+      rotulo: z.string().trim().min(1).max(60),
+      href: z.string().startsWith("/materiais"),
+    })
+    .optional(),
+});
+export type BlocoDestaque = z.infer<typeof destaqueSchema>;
+
+export const BLOCO_SCHEMAS = {
+  sugestoes: sugestoesSchema,
+  escolha: escolhaSchema,
+  rascunho: rascunhoSchema,
+  passos: passosSchema,
+  destaque: destaqueSchema,
+} as const;
+
+/** Bloco inline renderizável (o gráfico entra na mesma fila de marcas). */
+export type BlocoMd =
+  | { kind: "grafico"; g: Grafico }
+  | { kind: "escolha"; b: BlocoEscolha }
+  | { kind: "rascunho"; b: BlocoRascunho }
+  | { kind: "passos"; b: BlocoPassos }
+  | { kind: "destaque"; b: BlocoDestaque };
+
+/** Tags de fence que a UI conhece — o skeleton de MARCA_PENDENTE usa. */
+export type BlocoKind = "stats" | "sugestoes" | BlocoMd["kind"];
+
+export const MARCA_BLOCO = /^\u0000bloco:(\d+)\u0000$/;
+export const MARCA_PENDENTE = /^\u0000pendente:([a-z]+)\u0000$/;
+
+const TAGS_BLOCO: readonly BlocoKind[] = [
+  "stats",
+  "grafico",
+  "sugestoes",
+  "escolha",
+  "rascunho",
+  "passos",
+  "destaque",
+];
+const TODAS_AS_TAGS: ReadonlySet<BlocoKind> = new Set(TAGS_BLOCO);
+
+// inválido/sem fechar que FICA como code block: stats (deslize visível pra
+// iterar o prompt) e rascunho (o texto da mensagem é informação). O resto
+// é JSON de interface — mostrar cru é ruído.
+const FICA_COMO_CODIGO: ReadonlySet<BlocoKind> = new Set(["stats", "rascunho"]);
+
+// a linha do fence é só ```<tag> — qualquer coisa a mais é fence comum
+const ABRE_BLOCO = /^\s*```\s*([a-z]+)\s*$/i;
+
+function tagDaLinha(
+  linha: string,
+  aceitas: ReadonlySet<BlocoKind>
+): BlocoKind | null {
+  const m = ABRE_BLOCO.exec(linha);
+  if (!m) return null;
+  const tag = m[1].toLowerCase();
+  return (aceitas as ReadonlySet<string>).has(tag) ? (tag as BlocoKind) : null;
+}
+
+type Validado =
+  | { tipo: "stats"; stats: Stat[] }
+  | { tipo: "sugestoes"; sugestoes: string[] }
+  | { tipo: "bloco"; bloco: BlocoMd };
+
+function validarBloco(tag: BlocoKind, json: string): Validado | null {
+  let dado: unknown;
+  try {
+    dado = JSON.parse(json);
+  } catch {
+    return null; // JSON quebrado: quem chama decide se some ou fica como código
+  }
+  switch (tag) {
+    case "stats": {
+      const p = statsSchema.safeParse(dado);
+      return p.success ? { tipo: "stats", stats: p.data } : null;
+    }
+    case "sugestoes": {
+      const p = sugestoesSchema.safeParse(dado);
+      return p.success ? { tipo: "sugestoes", sugestoes: p.data } : null;
+    }
+    case "grafico": {
+      const p = graficoSchema.safeParse(dado);
+      return p.success
+        ? { tipo: "bloco", bloco: { kind: "grafico", g: p.data } }
+        : null;
+    }
+    case "escolha": {
+      const p = escolhaSchema.safeParse(dado);
+      return p.success
+        ? { tipo: "bloco", bloco: { kind: "escolha", b: p.data } }
+        : null;
+    }
+    case "rascunho": {
+      const p = rascunhoSchema.safeParse(dado);
+      return p.success
+        ? { tipo: "bloco", bloco: { kind: "rascunho", b: p.data } }
+        : null;
+    }
+    case "passos": {
+      const p = passosSchema.safeParse(dado);
+      return p.success
+        ? { tipo: "bloco", bloco: { kind: "passos", b: p.data } }
+        : null;
+    }
+    case "destaque": {
+      const p = destaqueSchema.safeParse(dado);
+      return p.success
+        ? { tipo: "bloco", bloco: { kind: "destaque", b: p.data } }
+        : null;
+    }
+  }
+}
+
+// chave de dedup das sugestões: caixa e espaço repetido não contam
+const chaveSugestao = (s: string) =>
+  s.toLocaleLowerCase("pt-BR").replace(/\s+/g, " ");
+
+const MAX_SUGESTOES = 3;
+
+type Escaneado = {
+  stats: Stat[];
+  blocos: BlocoMd[];
+  sugestoes: string[];
   textoSemBloco: string;
-} {
+};
+
+/** Scanner único das tags de fence. `aceitas` limita quais tags contam
+ *  (as outras passam como fence comum, conteúdo intacto) — é o que deixa
+ *  extrairStats/extrairGraficos seguirem com o comportamento de antes. */
+function escanear(
+  texto: string,
+  aceitas: ReadonlySet<BlocoKind>,
+  streaming: boolean,
+  marca: (i: number) => string
+): Escaneado {
   const linhas = texto.split("\n");
   const saida: string[] = [];
-  const graficos: Grafico[] = [];
-  let emFence = false; // fence comum (qualquer tag ≠ grafico) passa direto
+  const stats: Stat[] = [];
+  const blocos: BlocoMd[] = [];
+  const sugestoes: string[] = [];
+  const vistas = new Set<string>();
+  // colapsa o vazio pendurado antes do que sai/entra no lugar do bloco
+  const soltarVazio = () => {
+    while (saida.length && saida[saida.length - 1].trim() === "") saida.pop();
+  };
+  let emFence = false; // fence comum (tag fora de `aceitas`) passa direto
   let i = 0;
   while (i < linhas.length) {
     const linha = linhas[i];
@@ -210,10 +346,8 @@ export function extrairGraficos(texto: string): {
       i++;
       continue;
     }
-    if (ABRE_GRAFICO.test(linha)) {
-      // sem fence de fechamento o spec ainda está chegando (stream) —
-      // tudo depois da tag é conteúdo do fence: some por ora e o gráfico
-      // entra de uma vez quando o fence fecha
+    const tag = tagDaLinha(linha, aceitas);
+    if (tag) {
       let fecha = -1;
       for (let j = i + 1; j < linhas.length; j++) {
         if (FENCE.test(linhas[j])) {
@@ -221,25 +355,43 @@ export function extrairGraficos(texto: string): {
           break;
         }
       }
-      let g: Grafico | null = null;
-      if (fecha !== -1) {
-        try {
-          const parsed = graficoSchema.safeParse(
-            JSON.parse(linhas.slice(i + 1, fecha).join("\n"))
-          );
-          if (parsed.success) g = parsed.data;
-        } catch {
-          // JSON quebrado: g segue null → o bloco some sem marca
+      if (fecha === -1) {
+        // sem fechamento o fence engole até o fim do texto
+        if (streaming) {
+          // ainda chegando: uma marca de pendente no lugar (a UI desenha o
+          // skeleton do kind) — nada de JSON cru piscando na bolha
+          soltarVazio();
+          if (saida.length) saida.push("");
+          saida.push(`\u0000pendente:${tag}\u0000`);
+        } else if (FICA_COMO_CODIGO.has(tag)) {
+          saida.push(...linhas.slice(i));
+        } else {
+          soltarVazio();
+        }
+        break;
+      }
+      const v = validarBloco(tag, linhas.slice(i + 1, fecha).join("\n"));
+      if (!v && FICA_COMO_CODIGO.has(tag)) {
+        // inválido NÃO é removido — vira code block comum
+        saida.push(...linhas.slice(i, fecha + 1));
+        i = fecha + 1;
+        continue;
+      }
+      soltarVazio();
+      if (v?.tipo === "bloco") {
+        if (saida.length) saida.push("");
+        saida.push(marca(blocos.length));
+        blocos.push(v.bloco);
+      } else if (v?.tipo === "stats") {
+        stats.push(...v.stats);
+      } else if (v?.tipo === "sugestoes") {
+        for (const s of v.sugestoes) {
+          const k = chaveSugestao(s);
+          if (sugestoes.length >= MAX_SUGESTOES || vistas.has(k)) continue;
+          vistas.add(k);
+          sugestoes.push(s);
         }
       }
-      // colapsa o vazio pendurado antes do bloco
-      while (saida.length && saida[saida.length - 1].trim() === "") saida.pop();
-      if (g) {
-        if (saida.length) saida.push("");
-        saida.push(marca(graficos.length));
-        graficos.push(g);
-      }
-      if (fecha === -1) break;
       // pula o vazio depois do fence — uma linha em branco separa a marca
       // (ou o texto) do que vem a seguir, nada pendurado nas pontas
       let j = fecha + 1;
@@ -252,15 +404,169 @@ export function extrairGraficos(texto: string): {
     saida.push(linha);
     i++;
   }
-  return { graficos, textoSemBloco: saida.join("\n").trim() };
+  return { stats, blocos, sugestoes, textoSemBloco: saida.join("\n").trim() };
+}
+
+const marcaBloco = (i: number) => `\u0000bloco:${i}\u0000`;
+const marcaGrafico = (i: number) => `\u0000grafico:${i}\u0000`;
+
+/** Extrai todos os blocos de fence numa passada: stats vão pro topo
+ *  (sem marca), sugestoes vão pro fim (sem marca, dedup, até 3) e os
+ *  inline (grafico, escolha, rascunho, passos, destaque) deixam
+ *  MARCA_BLOCO na posição original — o índice da marca aponta pra
+ *  `blocos`. Com `streaming`, fence conhecido ainda aberto vira
+ *  MARCA_PENDENTE da tag no lugar do resto do texto. */
+export function extrairBlocos(
+  texto: string,
+  opts?: { streaming?: boolean }
+): {
+  stats: Stat[];
+  blocos: BlocoMd[];
+  sugestoes: string[];
+  textoSemBloco: string;
+} {
+  return escanear(texto, TODAS_AS_TAGS, opts?.streaming ?? false, marcaBloco);
+}
+
+const SO_STATS: ReadonlySet<BlocoKind> = new Set(["stats"]);
+const SO_GRAFICO: ReadonlySet<BlocoKind> = new Set(["grafico"]);
+
+/** Só os ```stats (as outras tags passam como fence comum). Inválido ou
+ *  sem fechar fica no texto como código. */
+export function extrairStats(texto: string): {
+  stats: Stat[];
+  textoSemBloco: string;
+} {
+  const { stats, textoSemBloco } = escanear(texto, SO_STATS, false, marcaBloco);
+  return { stats, textoSemBloco };
+}
+
+/** Só os ```grafico: o válido deixa MARCA_GRAFICO na posição original (o
+ *  componente resolve pela lista `graficos`); o inválido/parcial sai de
+ *  fininho — spec cru não é informação pro usuário. */
+export function extrairGraficos(texto: string): {
+  graficos: Grafico[];
+  textoSemBloco: string;
+} {
+  const { blocos, textoSemBloco } = escanear(
+    texto,
+    SO_GRAFICO,
+    false,
+    marcaGrafico
+  );
+  const graficos = blocos.flatMap((b) => (b.kind === "grafico" ? [b.g] : []));
+  return { graficos, textoSemBloco };
+}
+
+// ---------- stream: segurar o rabo incompleto ----------
+
+// separador sendo digitado: só pipe, hífen, dois-pontos e espaço
+const SEP_PARCIAL = /^\|[\s:|-]*$/;
+// 1 ou 2 crases sozinhas na linha: começo de um ``` que ainda não chegou
+const CRASE_PARCIAL = /^\s*`{1,2}\s*$/;
+
+/** Durante o stream, tira do FIM do texto o pedaço que ainda não dá pra
+ *  renderizar direito: cabeçalho de tabela sem separador completo (senão
+ *  pisca como parágrafo de pipes e vira tabela um token depois), linha de
+ *  corpo ainda sem o pipe final, e abertura de fence sendo digitada
+ *  ("```gra"). Conservador: só mexe na última linha/bloco, nunca em
+ *  tabela completa, texto comum ou conteúdo de fence aberto. Só faz
+ *  sentido com o stream em andamento — no texto final não chame. */
+export function segurarParcial(texto: string): string {
+  const linhas = texto.split("\n");
+  // dentro[i]: a linha i está dentro de um fence aberto antes dela (é
+  // conteúdo ou fechamento) — mesma regra de toggle do MdLite
+  const dentro: boolean[] = [];
+  let emFence = false;
+  for (const l of linhas) {
+    dentro.push(emFence);
+    if (FENCE.test(l)) emFence = !emFence;
+  }
+  const corta = (n: number) => linhas.slice(0, n).join("\n").trimEnd();
+  const n = linhas.length;
+  const ultima = linhas[n - 1];
+
+  // abertura de fence ainda chegando (sem quebra de linha depois). A tag
+  // conhecida inteira fica: o extrairBlocos já troca por pendente.
+  if (!dentro[n - 1]) {
+    if (FENCE.test(ultima) && !tagDaLinha(ultima, TODAS_AS_TAGS))
+      return corta(n - 1);
+    if (CRASE_PARCIAL.test(ultima)) return corta(n - 1);
+  }
+
+  // última posição vazia = a linha anterior chegou inteira (com "\n")
+  let fim = n;
+  if (ultima.trim() === "") fim--;
+  const novaLinha = fim < n;
+  // corrida final de linhas pipe fora de fence
+  let k = fim;
+  while (k > 0 && !dentro[k - 1] && linhas[k - 1].trim().startsWith("|")) k--;
+  if (k === fim) return texto;
+
+  const bloco = linhas.slice(k, fim);
+  // só o cabeçalho: o separador ainda não chegou
+  if (bloco.length === 1) return corta(k);
+  const tabela = parseTabelaMd(bloco);
+  if (tabela) {
+    // tabela de verdade fica; só a linha de corpo ainda sem pipe final
+    // espera (senão sai da tabela e pisca como texto embaixo dela)
+    const ult = bloco[bloco.length - 1];
+    if (bloco.length > 2 && !novaLinha && !ehTabelaMd(ult)) return corta(fim - 1);
+    return texto;
+  }
+  // separador sendo digitado (ainda sem a última célula ou o pipe final)
+  if (bloco.length === 2 && !novaLinha && SEP_PARCIAL.test(bloco[1].trim()))
+    return corta(k);
+  return texto;
 }
 
 // ---------- convenção 2: tabela pipe ----------
 
-export type TabelaMd = { cab: string[]; linhas: string[][] };
+export type AlinhamentoColuna = "esq" | "dir" | "centro";
+
+export type TabelaMd = {
+  cab: string[];
+  linhas: string[][];
+  alinhamento: AlinhamentoColuna[];
+  numerica: boolean[];
+};
 
 // separador GFM: -, :-, -:, :-: (alinhamento) — quantos hífens for
 const CEL_SEPARADOR = /^:?-+:?$/;
+
+function alinhamentoDe(sep: string): AlinhamentoColuna {
+  const esq = sep.startsWith(":");
+  const dir = sep.endsWith(":");
+  if (esq && dir) return "centro";
+  return dir ? "dir" : "esq";
+}
+
+// número em pt-BR ou en: sinal, moeda (R$, US$, $, €), milhar/decimal com
+// . ou , (ou espaço fino), % no fim; ou fração "3/16"
+const CEL_NUMERO =
+  /^[+\-−]?(?:(?:R\$|US\$|\$|€)\s?)?[+\-−]?\d+(?:[.,\u00a0\u202f]\d+)*\s?%?$/;
+const CEL_FRACAO = /^\d+(?:[.,]\d+)?\s?\/\s?\d+(?:[.,]\d+)?$/;
+// travessão/hífen sozinho é "sem dado" na coluna numérica — não desqualifica
+const CEL_VAZIA = /^[-–—]?$/;
+
+function celulaNumerica(c: string): boolean {
+  // o modelo às vezes destaca o número (**12**, `12`) — a ênfase não conta
+  const t = c.replace(/^(\*\*|__|\*|_|`)(.*)\1$/, "$2").trim();
+  return CEL_NUMERO.test(t) || CEL_FRACAO.test(t);
+}
+
+function colunasNumericas(cab: string[], corpo: string[][]): boolean[] {
+  return cab.map((_, col) => {
+    let algum = false;
+    for (const l of corpo) {
+      const c = l[col].trim();
+      if (CEL_VAZIA.test(c)) continue;
+      if (!celulaNumerica(c)) return false;
+      algum = true;
+    }
+    return algum;
+  });
+}
 
 /** Uma linha tem cara de linha pipe-table: pipes externos e pelo menos
  *  uma célula (a própria linha separadora também passa — quem decide se o
@@ -302,7 +608,12 @@ export function parseTabelaMd(linhas: string[]): TabelaMd | null {
     while (cel.length < cab.length) cel.push("");
     corpo.push(cel);
   }
-  return { cab, linhas: corpo };
+  return {
+    cab,
+    linhas: corpo,
+    alinhamento: sep.map(alinhamentoDe),
+    numerica: colunasNumericas(cab, corpo),
+  };
 }
 
 // ---------- convenção 3: fonte de guia inline ----------

@@ -18,14 +18,20 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import {
+  ArrowsIn,
+  ArrowsOut,
   ClockCounterClockwise,
   Gear,
   Plus,
-  Sparkle,
   X,
 } from "@phosphor-icons/react";
 import { AssistenteConfig } from "@/components/assistente-config";
 import { AssistenteConversa } from "@/components/assistente-conversa";
+// conceito escolhido: Balão — os três protótipos dividem o contrato
+// ReaProps (rea/tipos.ts), então trocar de conceito é trocar o import
+import { ReaBalao } from "@/components/rea/rea-balao";
+import type { ReaEstado } from "@/components/rea/tipos";
+import { useMomento } from "@/components/rea/use-olhar";
 import {
   Popover,
   PopoverContent,
@@ -46,8 +52,148 @@ const FAB_POS =
 const FAB_CLS =
   "grid size-12 md:size-14 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)] outline-none transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:scale-105 hover:shadow-[var(--shadow-modal)] active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-offset-2";
 
+// tamanho vem de --painel-w/--painel-h (inline, redimensionável); o min()
+// segura viewport estreita e o --available-height do positioner segura
+// o topo. A transição de tamanho só liga no toggle Expandir — no arrasto
+// o data-redimensionando desliga pra seguir o ponteiro 1:1. O zoom-90 (no
+// lugar do -95 padrão) dá mais viagem à entrada: o painel "nasce" da bolha
+// — a origem é o canto ancorado no FAB (transform-origin do positioner)
 const PAINEL_CLS =
-  "flex h-[min(70dvh,640px)] w-[min(24rem,calc(100vw-2rem))] max-h-(--available-height) flex-col overflow-hidden rounded-2xl p-0 duration-200";
+  "relative flex h-[min(var(--painel-h),calc(100dvh-7rem))] w-[min(var(--painel-w),calc(100vw-2rem))] max-h-(--available-height) flex-col overflow-hidden rounded-2xl p-0 duration-200 transition-[width,height] ease-[cubic-bezier(0.2,0,0,1)] data-[redimensionando]:transition-none data-open:zoom-in-90 data-closed:zoom-out-90";
+
+// px — padrão = o painel de sempre; expandido = leitura confortável de
+// gráfico e tabela; os limites seguram o mínimo legível e o máximo útil
+const TAM_PADRAO = { w: 384, h: 640 };
+
+// mascote da conversa — a bolha é dona do componente; o estado chega por
+// render-prop porque a conversa é quem conhece a rodada (stream/erro)
+const AvatarRea = (p: { tamanho: number; estado: ReaEstado }) => (
+  <ReaBalao tamanho={p.tamanho} estado={p.estado} />
+);
+const TAM_EXPANDIDO = { w: 640, h: 820 };
+const TAM_MIN = { w: 352, h: 440 };
+const TAM_MAX = { w: 960, h: 1000 };
+const STORAGE_TAM = "assistente:tamanho";
+const ehExpandido = (t: { w: number }) => t.w >= 560;
+// ociosa demais com o painel fechado, a Rea cochila ("sonolento") —
+// qualquer gesto acorda. A janela é generosa: soninho é charme, não timer
+const SONO_MS = 45_000;
+
+const limitar = (t: { w: number; h: number }) => ({
+  w: Math.round(Math.min(TAM_MAX.w, Math.max(TAM_MIN.w, t.w))),
+  h: Math.round(Math.min(TAM_MAX.h, Math.max(TAM_MIN.h, t.h))),
+});
+
+/** Alças de redimensionar do painel ancorado embaixo à direita: ele cresce
+ *  pra cima e pra esquerda, então as alças moram na borda esquerda, no topo
+ *  e no canto superior esquerdo. O arrasto escreve as CSS vars direto no
+ *  elemento (sem render por frame); soltar grava o tamanho e o estado. */
+function AlcasRedimensionar({
+  painelRef,
+  tamanho,
+  onSoltar,
+}: {
+  painelRef: React.RefObject<HTMLDivElement | null>;
+  tamanho: { w: number; h: number };
+  onSoltar: (t: { w: number; h: number }) => void;
+}) {
+  const arrasto = useRef<{
+    x0: number;
+    y0: number;
+    w0: number;
+    h0: number;
+    eixo: "x" | "y" | "xy";
+    atual: { w: number; h: number };
+  } | null>(null);
+
+  const iniciar = (
+    eixo: "x" | "y" | "xy",
+    e: ReactPointerEvent<HTMLDivElement>
+  ) => {
+    const el = painelRef.current;
+    if (!el || e.button !== 0) return;
+    e.preventDefault();
+    const r = el.getBoundingClientRect();
+    arrasto.current = {
+      x0: e.clientX,
+      y0: e.clientY,
+      w0: r.width,
+      h0: r.height,
+      eixo,
+      atual: { w: r.width, h: r.height },
+    };
+    el.dataset.redimensionando = "";
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const mover = (e: ReactPointerEvent<HTMLDivElement>) => {
+    const a = arrasto.current;
+    const el = painelRef.current;
+    if (!a || !el) return;
+    const t = limitar({
+      w: a.eixo === "y" ? a.w0 : a.w0 + (a.x0 - e.clientX),
+      h: a.eixo === "x" ? a.h0 : a.h0 + (a.y0 - e.clientY),
+    });
+    a.atual = t;
+    el.style.setProperty("--painel-w", `${t.w}px`);
+    el.style.setProperty("--painel-h", `${t.h}px`);
+  };
+  const soltar = () => {
+    const a = arrasto.current;
+    arrasto.current = null;
+    const el = painelRef.current;
+    if (!a || !el) return;
+    delete el.dataset.redimensionando;
+    onSoltar(a.atual);
+  };
+  // props explícitas nas alças (o lint de refs não enxerga o spread de
+  // um factory e acusa leitura de ref no render — nos handlers o .current
+  // só é lido no gesto) — duplo clique volta ao tamanho padrão, saída
+  // rápida de um arrasto ruim
+  const propsArrasto = {
+    onPointerMove: mover,
+    onPointerUp: soltar,
+    onPointerCancel: soltar,
+    onDoubleClick: () => onSoltar(TAM_PADRAO),
+  };
+  return (
+    <>
+      <div
+        aria-hidden
+        onPointerDown={(e) => iniciar("x", e)}
+        {...propsArrasto}
+        className="absolute inset-y-4 left-0 z-10 w-1.5 cursor-ew-resize"
+      />
+      <div
+        aria-hidden
+        onPointerDown={(e) => iniciar("y", e)}
+        {...propsArrasto}
+        className="absolute inset-x-4 top-0 z-10 h-1.5 cursor-ns-resize"
+      />
+      {/* canto: a única alça visível (affordance), as bordas são invisíveis */}
+      <div
+        aria-hidden
+        onPointerDown={(e) => iniciar("xy", e)}
+        {...propsArrasto}
+        title={`Arraste pra redimensionar (${tamanho.w} × ${tamanho.h})`}
+        className="group/alca absolute left-0 top-0 z-20 grid size-5 cursor-nwse-resize place-items-center"
+      >
+        <svg
+          viewBox="0 0 10 10"
+          className="size-2.5 text-muted-foreground/40 transition-colors group-hover/alca:text-muted-foreground"
+        >
+          <path
+            d="M1 7 L7 1 M1 10 L10 1"
+            stroke="currentColor"
+            strokeWidth="1.2"
+            strokeLinecap="round"
+            fill="none"
+            transform="translate(0 -0.5)"
+          />
+        </svg>
+      </div>
+    </>
+  );
+}
 
 function subscribeDesktop(cb: () => void) {
   const mq = matchMedia("(min-width: 768px)");
@@ -60,16 +206,24 @@ function Cabecalho({
   onNovaConversa,
   onHistorico,
   onConfig,
+  expandido,
+  onExpandir,
+  estado,
 }: {
   onFechar: () => void;
   onNovaConversa?: () => void;
   onHistorico?: () => void;
   onConfig?: () => void;
+  /** só desktop — o painel mobile já é a sheet quase cheia */
+  expandido?: boolean;
+  onExpandir?: () => void;
+  /** a Rea mora no header: saúda na abertura e acompanha a rodada */
+  estado: ReaEstado;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-2.5 border-b border-border px-4 py-3">
-      <span className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
-        <Sparkle size={15} weight="fill" aria-hidden />
+      <span className="grid size-8 shrink-0 place-items-center">
+        <ReaBalao tamanho={34} estado={estado} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 text-sm font-semibold">
@@ -119,6 +273,19 @@ function Cabecalho({
           <Gear aria-hidden />
         </Button>
       )}
+      {onExpandir && (
+        <Button
+          variant="ghost"
+          size="icon"
+          aria-label={expandido ? "Reduzir painel" : "Expandir painel"}
+          aria-pressed={expandido}
+          title={expandido ? "Reduzir painel" : "Expandir painel"}
+          onClick={onExpandir}
+          className="shrink-0 text-muted-foreground"
+        >
+          {expandido ? <ArrowsIn aria-hidden /> : <ArrowsOut aria-hidden />}
+        </Button>
+      )}
       <Button
         variant="ghost"
         size="icon"
@@ -153,12 +320,84 @@ export function AssistenteBolha({
   const [aberto, setAberto] = useState(false);
   const [pronto, setPronto] = useState(false);
 
+  // mascote Rea: a conversa reporta a rodada (onEstado) e o fim de
+  // resposta (onRespostaPronta) — com o painel fechado isso vira o pulo
+  // de "pronto" + o ponto de aviso no FAB; hover/foco no FAB acende
+  // "atento" e o cochilo vira "sonolento" depois de SONO_MS quieta
+  const [estadoRea, setEstadoRea] = useState<ReaEstado>("parado");
+  const [respostaPronta, setRespostaPronta] = useState(false);
+  const [aviso, setAviso] = useState(false);
+  const [atento, setAtento] = useState(false);
+  const [sonolento, setSonolento] = useState(false);
+
+  // a Rea só dorme quieta: painel fechado, sem rodada, sem aviso e sem o
+  // dedo/foco em cima. Mudou qualquer condição → acorda; a flag limpa na
+  // própria render (padrão "estado derivado da anterior") sem setState
+  // em effect
+  const ociosa =
+    !aberto && !atento && !respostaPronta && estadoRea === "parado";
+  const [eraOciosa, setEraOciosa] = useState(ociosa);
+  if (eraOciosa !== ociosa) {
+    setEraOciosa(ociosa);
+    if (sonolento) setSonolento(false);
+  }
+
+  // a vigia do cochilo: intervalo barato por aba, só enquanto ociosa —
+  // pointermove renova o relógio sem render (só flag local), acordar de
+  // verdade custa um setState
+  useEffect(() => {
+    if (!ociosa) return;
+    let ultimo = Date.now();
+    let dormindo = false;
+    const acordar = () => {
+      ultimo = Date.now();
+      if (dormindo) {
+        dormindo = false;
+        setSonolento(false);
+      }
+    };
+    const id = setInterval(() => {
+      if (dormindo || document.hidden) return;
+      if (Date.now() - ultimo > SONO_MS) {
+        dormindo = true;
+        setSonolento(true);
+      }
+    }, 4000);
+    window.addEventListener("pointermove", acordar, { passive: true });
+    window.addEventListener("pointerdown", acordar, { passive: true });
+    window.addEventListener("keydown", acordar);
+    return () => {
+      clearInterval(id);
+      window.removeEventListener("pointermove", acordar);
+      window.removeEventListener("pointerdown", acordar);
+      window.removeEventListener("keydown", acordar);
+    };
+  }, [ociosa]);
+
+  // tamanho do painel desktop — preferência do aparelho (localStorage)
+  const [tamanho, setTamanho] = useState(TAM_PADRAO);
+  const painelRef = useRef<HTMLDivElement | null>(null);
+  const gravarTamanho = useCallback((t: { w: number; h: number }) => {
+    // o arrasto já escreveu as mesmas vars inline que o estado vai
+    // renderizar — o React não precisa reescrever e nada pisca
+    const v = limitar(t);
+    setTamanho(v);
+    try {
+      localStorage.setItem(STORAGE_TAM, JSON.stringify(v));
+    } catch {}
+  }, []);
+  const alternarExpandido = () =>
+    gravarTamanho(ehExpandido(tamanho) ? TAM_PADRAO : TAM_EXPANDIDO);
+
   // restaura a sessão após hidratar — fora do render pra não divergir do
   // SSR; o rAF tira o setState do corpo do effect (regra react-hooks)
   useEffect(() => {
     const id = requestAnimationFrame(() => {
       try {
         if (sessionStorage.getItem("assistente:aberto") === "1") setAberto(true);
+        const t = JSON.parse(localStorage.getItem(STORAGE_TAM) ?? "null");
+        if (t && typeof t.w === "number" && typeof t.h === "number")
+          setTamanho(limitar(t));
       } catch {
         // storage indisponível (modo privado): painel simplesmente abre fechado
       }
@@ -171,6 +410,11 @@ export function AssistenteBolha({
   const [kb, setKb] = useState(0);
   const mudar = useCallback((v: boolean) => {
     setAberto(v);
+    // abrir consome os avisos — a resposta já está visível no painel
+    if (v) {
+      setRespostaPronta(false);
+      setAviso(false);
+    }
     // fecha com offset zerado — sem isso uma reabertura herda o último kb
     // por um frame (flash de bottom: N antes da primeira medição)
     if (!v) setKb(0);
@@ -178,6 +422,13 @@ export function AssistenteBolha({
       sessionStorage.setItem("assistente:aberto", v ? "1" : "0");
     } catch {}
   }, []);
+
+  // o pulo de "pronto" é um evento — volta sozinho pro estado da rodada
+  useEffect(() => {
+    if (!respostaPronta) return;
+    const t = setTimeout(() => setRespostaPronta(false), 2400);
+    return () => clearTimeout(t);
+  }, [respostaPronta]);
 
   // voltar do sistema (gesto/botão Android) fecha a sheet: empurra um
   // state na abertura e escuta popstate. Fechando por X/backdrop/arrasto,
@@ -205,10 +456,13 @@ export function AssistenteBolha({
       configurado={configurado}
       // autoFocus só no desktop — no mobile focar na abertura abre o
       // teclado durante a animação da sheet (flicker + metade da tela
-      // tomada); lá o foco vem do toque do usuário. Com keepMounted o
-      // mount é no load, então a conversa foca quando `aberto` liga
+      // tomada); lá o foco vem do toque do usuário e o gate de viewport
+      // do focarComposer segura o teclado. Com keepMounted o mount é no
+      // load, então a conversa reage quando `aberto` liga — `aberto` real
+      // nos dois braços: no mobile a mascote também ganha o sorriso de
+      // boas-vindas do estado "aberto"
       autoFocus={desktop}
-      aberto={desktop && aberto}
+      aberto={aberto}
       nome={nome}
       registrarNova={(fn) => {
         novaConversaRef.current = fn;
@@ -217,6 +471,17 @@ export function AssistenteBolha({
         historicoRef.current = fn;
       }}
       onNavegarInterno={() => mudar(false)}
+      onEstado={setEstadoRea}
+      onRespostaPronta={() => {
+        // só avisa no FAB quando o painel está fora de vista — aberto,
+        // a resposta já se anuncia sozinha (e a mascote da mensagem
+        // comemora lá dentro)
+        if (!aberto) {
+          setRespostaPronta(true);
+          setAviso(true);
+        }
+      }}
+      Avatar={AvatarRea}
     />
   );
   const novaConversa = () => novaConversaRef.current?.();
@@ -308,41 +573,66 @@ export function AssistenteBolha({
     };
   }, [desktop, aberto]);
 
+  // o FAB é a Rea em si. Com o painel aberto ela atende — alerta e de
+  // olho no cursor (e a rodada sobe pro rosto do FAB também:
+  // consultando/escrevendo/erro); fechada, o pulo de "pronto" com o
+  // ponto de aviso, o hover/foco de "atento" e o cochilo do "sonolento"
+  // se revezam. O X de fechar mora no cabeçalho do painel
+  const estadoFab: ReaEstado = aberto
+    ? estadoRea === "parado"
+      ? "atento"
+      : estadoRea
+    : respostaPronta
+      ? "pronto"
+      : atento
+        ? "atento"
+        : sonolento
+          ? "sonolento"
+          : estadoRea;
   const icons = (
-    <span className="relative grid size-6 place-items-center">
-      <Sparkle
-        size={22}
-        weight="fill"
-        aria-hidden
-        className={cn(
-          "absolute transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]",
-          aberto ? "scale-50 rotate-90 opacity-0" : "scale-100 rotate-0 opacity-100"
-        )}
-      />
-      <X
-        size={20}
-        weight="bold"
-        aria-hidden
-        className={cn(
-          "transition-all duration-200 ease-[cubic-bezier(0.2,0,0,1)]",
-          aberto ? "scale-100 rotate-0 opacity-100" : "-rotate-90 scale-50 opacity-0"
-        )}
-      />
+    <ReaBalao tamanho={44} estado={estadoFab} className="pointer-events-none" />
+  );
+
+  // a Rea do header saúda na abertura (o momento "aberto" do mascote) e
+  // depois acompanha a rodada — a mesma persona do FAB, agora no painel
+  const recemAberto = useMomento(aberto ? "aberto" : "parado");
+  const estadoCab: ReaEstado = recemAberto ? "aberto" : estadoRea;
+
+  // ponto de resposta pronta no canto do FAB: halo ping-once na chegada,
+  // depois o sólido espera a abertura (amarelo da marca = próximo passo)
+  const pontoAviso = aviso && (
+    <span
+      aria-hidden
+      className="pointer-events-none absolute -right-0.5 -top-0.5"
+    >
+      <span className="absolute inset-0 block size-3 animate-[ping-once_0.6s_ease-out_120ms_both] rounded-full bg-[var(--destaque)]" />
+      <span className="block size-3 animate-in zoom-in-50 rounded-full bg-[var(--destaque)] shadow-[0_0_0_2px_var(--background)] duration-150" />
     </span>
   );
+  const rotuloFab = aberto
+    ? "Fechar assistente"
+    : aviso
+      ? "Abrir assistente, a Rea respondeu"
+      : "Abrir assistente";
 
   if (desktop) {
     return (
       <Popover open={aberto} onOpenChange={mudar}>
         <div className={cn(FAB_POS, pronto && "animate-in fade-in-0 zoom-in-75 duration-300")}>
           <PopoverTrigger
-            aria-label={aberto ? "Fechar assistente" : "Abrir assistente"}
+            aria-label={rotuloFab}
             aria-expanded={aberto}
             aria-controls="painel-assistente"
+            onPointerEnter={() => setAtento(true)}
+            onPointerLeave={() => setAtento(false)}
+            // foco de teclado merece a mesma atenção do hover
+            onFocus={() => setAtento(true)}
+            onBlur={() => setAtento(false)}
             className={FAB_CLS}
           >
             {icons}
           </PopoverTrigger>
+          {pontoAviso}
         </div>
         <PopoverContent
           id="painel-assistente"
@@ -353,13 +643,28 @@ export function AssistenteBolha({
           // rodando e a resposta não se perde (REALIZA-332). O Base UI
           // aplica inert no fechado (sem foco/interação/árvore a11y)
           keepMounted
+          ref={painelRef}
           className={PAINEL_CLS}
+          style={
+            {
+              "--painel-w": `${tamanho.w}px`,
+              "--painel-h": `${tamanho.h}px`,
+            } as React.CSSProperties
+          }
         >
+          <AlcasRedimensionar
+            painelRef={painelRef}
+            tamanho={tamanho}
+            onSoltar={gravarTamanho}
+          />
           <Cabecalho
             onFechar={() => mudar(false)}
             onNovaConversa={novaConversa}
             onHistorico={alternarHistorico}
             onConfig={onConfig}
+            expandido={ehExpandido(tamanho)}
+            onExpandir={alternarExpandido}
+            estado={estadoCab}
           />
           <PopoverTitle className="sr-only">Assistente</PopoverTitle>
           {corpo}
@@ -372,14 +677,19 @@ export function AssistenteBolha({
     <>
       <div className={cn(FAB_POS, pronto && "animate-in fade-in-0 zoom-in-75 duration-300")}>
         <Button
-          aria-label={aberto ? "Fechar assistente" : "Abrir assistente"}
+          aria-label={rotuloFab}
           aria-expanded={aberto}
           aria-controls="painel-assistente"
+          onPointerEnter={() => setAtento(true)}
+          onPointerLeave={() => setAtento(false)}
+          onFocus={() => setAtento(true)}
+          onBlur={() => setAtento(false)}
           onClick={() => mudar(true)}
           className={FAB_CLS}
         >
           {icons}
         </Button>
+        {pontoAviso}
       </div>
       <Sheet open={aberto} onOpenChange={mudar}>
         <SheetContent
@@ -419,6 +729,7 @@ export function AssistenteBolha({
             onNovaConversa={novaConversa}
             onHistorico={alternarHistorico}
             onConfig={onConfig}
+            estado={estadoCab}
           />
           {corpo}
         </SheetContent>

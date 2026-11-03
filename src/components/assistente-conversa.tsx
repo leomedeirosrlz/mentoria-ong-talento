@@ -10,7 +10,9 @@
 // painel, mas morre com a aba (LGPD — nada vai pro servidor; o que fica
 // é a ação em ia_eventos).
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type CSSProperties } from "react";
+import { usePathname } from "next/navigation";
+import { AnimatePresence, motion } from "motion/react";
 import {
   ArrowClockwise,
   ArrowDown,
@@ -18,30 +20,29 @@ import {
   BookOpen,
   Check,
   Copy,
+  MagnifyingGlass,
   PaperPlaneRight,
-  Sparkle,
   Square,
   Trash,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { extrairAcoes, montarEnvioChat, msgAmigavel } from "@/lib/ia/mensagens";
 import { metaFonte, rotuloTool, type FonteIa } from "@/lib/ia/fontes";
+import { extrairFontesTexto } from "@/lib/ia/render";
+import { juntarUi, type UiBloco } from "@/lib/ia/ui";
+import { responderDemoIa } from "@/lib/demo/ia";
 import {
-  ehTabelaMd,
-  extrairFontesTexto,
-  extrairGraficos,
-  extrairStats,
-  MARCA_GRAFICO,
-  parseTabelaMd,
-  type Grafico,
-  type Stat,
-  type StatTom,
-  type TabelaMd,
-} from "@/lib/ia/render";
-import { CodeBlock, GraficoBloco } from "@/components/assistente-genui";
+  analisarResposta,
+  ehRica,
+  RespostaMd,
+} from "@/components/assistente-md";
+import { Sugestoes } from "@/components/assistente-blocos";
+import { UiCard } from "@/components/assistente-cards";
+import { T } from "@/components/motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { AppRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -54,7 +55,14 @@ type Msg = {
   em?: number;
   acoes?: { rotulo: string; href: string }[];
   fontes?: FonteIa[];
+  /** cards da genUI direta (evento `ui` da rota) — acima do texto */
+  ui?: UiBloco[];
+  /** ms entre o envio e a resposta pronta — "Consultou … em 3 s" */
+  dur?: number;
 };
+
+/** Estado que a bolha traduz em expressão do mascote. */
+export type EstadoConversa = "parado" | "consultando" | "escrevendo" | "erro";
 
 const primeiroNome = (nome?: string) => nome?.trim().split(/\s+/)[0];
 
@@ -113,11 +121,38 @@ const tituloDa = (ms: Msg[]) => {
   return linha.length > 52 ? `${linha.slice(0, 52).trimEnd()}…` : linha;
 };
 
+const normalizar = (t: string) =>
+  t.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+
+/** Hoje / Ontem / Últimos 7 dias / Antes — a lista já vem do mais recente
+ *  pro mais antigo, então cada grupo herda a ordem. Hoje e ontem mostram
+ *  a hora; os mais antigos, a data. */
+function agruparConversas(lista: Conversa[]) {
+  const d0 = new Date();
+  d0.setHours(0, 0, 0, 0);
+  const hoje = d0.getTime();
+  const dia = 86_400_000;
+  const faixas = [
+    { rotulo: "Hoje", hora: true, desde: hoje },
+    { rotulo: "Ontem", hora: true, desde: hoje - dia },
+    { rotulo: "Últimos 7 dias", hora: false, desde: hoje - 7 * dia },
+    { rotulo: "Antes", hora: false, desde: -Infinity },
+  ];
+  return faixas
+    .map((f, i) => ({
+      ...f,
+      itens: lista.filter(
+        (c) => c.em >= f.desde && (i === 0 || c.em < faixas[i - 1].desde)
+      ),
+    }))
+    .filter((g) => g.itens.length);
+}
+
 const DEMO_FALLBACK =
-  "Na demonstração o assistente tem respostas de exemplo — no ambiente real ele responde com seus dados e guias oficiais.";
+  "Na demonstração a Rea tem respostas de exemplo. No ambiente real ela responde com os seus dados e os guias oficiais.";
 
 const FALHA =
-  "Não consegui responder agora — tente de novo em instantes.";
+  "Não consegui responder agora. Tente de novo em instantes.";
 
 // o dataset demo é evergreen — as respostas enlatadas falam dele sem
 // precisar de números fixos (sdd §8: honesto, sem fingir LLM)
@@ -144,9 +179,22 @@ function respostaDemo(texto: string): string {
   return DEMO_RESPOSTAS.find(([re]) => re.test(texto))?.[1] ?? DEMO_FALLBACK;
 }
 
-/** Sugestões por papel — caminhos que as tools respondem de fato
- *  (dados via registry; guias via guia_consulta). */
-function sugestoes(papeis: AppRole[]): string[] {
+/** Sugestões por papel e pela página aberta — caminhos que as tools
+ *  respondem de fato (dados via registry; guias via guia_consulta). A
+ *  página entra primeiro: na ficha da dupla a pergunta mais provável é
+ *  sobre ela (o prompt recebe a rota e resolve "esta dupla"). */
+function sugestoes(papeis: AppRole[], pagina: string): string[] {
+  const staff = papeis.some((p) => p === "coordenacao" || p === "supervisor");
+  if (/^\/duplas\/[0-9a-f-]{36}/.test(pagina))
+    return papeis.includes("mentorado")
+      ? ["Quando é o próximo encontro?", "O que é o PDM?"]
+      : ["Resuma esta dupla", "O que falta registrar?", "Escreva um lembrete pra dupla"];
+  if (pagina.startsWith("/agenda") && !papeis.includes("mentorado"))
+    return ["Encontros desta semana", "Alguém sem encontro marcado?", "Escreva um lembrete pra dupla"];
+  if (pagina.startsWith("/duplas") && staff)
+    return ["Quem está em risco?", "Quem pediu apoio?", "Resumo da semana"];
+  if (pagina.startsWith("/materiais"))
+    return ["O que diz o guia sobre a Roda da Vida?", "Como dar um feedback construtivo?", "O que é o PDM?"];
   if (papeis.includes("coordenacao"))
     return [
       "Resumo da semana",
@@ -167,312 +215,6 @@ function sugestoes(papeis: AppRole[]): string[] {
   ];
 }
 
-// ---------- markdown-lite ----------
-// bold, listas, links e código — sem parser pesado: blocos por linha,
-// inline por regex. O modelo só emite esse subconjunto (system prompt).
-
-const INLINE = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/g;
-
-/** Texto fatiado em ~6 chars com fade por fatia (stream): o conteúdo
- *  só cresce no fim, então spans anteriores não re-animam e as novas
- *  entram suave — a velocidade de exibição continua a da rede (sem
- *  throttle de TPS), só a aparição é amortecida. */
-function Tokens({ texto }: { texto: string }) {
-  return (
-    <>
-      {Array.from({ length: Math.ceil(texto.length / 6) }, (_, i) => (
-        <span key={i} className="ia-tok">
-          {texto.slice(i * 6, i * 6 + 6)}
-        </span>
-      ))}
-    </>
-  );
-}
-
-function Inline({ texto, animar }: { texto: string; animar?: boolean }) {
-  return (
-    <>
-      {texto.split(INLINE).map((parte, i) => {
-        if (parte.startsWith("**") && parte.endsWith("**"))
-          return (
-            <strong key={i}>
-              {animar ? <Tokens texto={parte.slice(2, -2)} /> : parte.slice(2, -2)}
-            </strong>
-          );
-        if (parte.startsWith("`") && parte.endsWith("`"))
-          return (
-            <code
-              key={i}
-              className="rounded bg-muted px-1 py-0.5 text-[0.85em] font-mono"
-            >
-              {animar ? <Tokens texto={parte.slice(1, -1)} /> : parte.slice(1, -1)}
-            </code>
-          );
-        const link = /^\[([^\]]+)\]\(([^)\s]+)\)$/.exec(parte);
-        if (link) {
-          const [, rotulo, href] = link;
-          // link seguro: http(s) ou interno — javascript:/data: viram texto
-          // interno vai por next/link: navegação SPA mantém o fetch do
-          // stream vivo; <a> puro dava full nav e matava a resposta
-          // (REALIZA-332)
-          if (href.startsWith("/"))
-            return (
-              <Link
-                key={i}
-                href={href}
-                className="underline underline-offset-2 decoration-muted-foreground/50 hover:decoration-foreground"
-              >
-                {animar ? <Tokens texto={rotulo} /> : rotulo}
-              </Link>
-            );
-          if (/^https?:/.test(href))
-            return (
-              <a
-                key={i}
-                href={href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-2 decoration-muted-foreground/50 hover:decoration-foreground"
-              >
-                {animar ? <Tokens texto={rotulo} /> : rotulo}
-              </a>
-            );
-        }
-        return animar ? <Tokens key={i} texto={parte} /> : parte;
-      })}
-    </>
-  );
-}
-
-function MdLite({
-  texto,
-  graficos,
-  animar,
-}: {
-  texto: string;
-  graficos?: Grafico[];
-  animar?: boolean;
-}) {
-  const linhas = texto.split("\n");
-  const blocos: React.ReactNode[] = [];
-  let lista: string[] | null = null;
-  let listaOrd = false;
-  let emCodigo = false;
-  let codigo: string[] = [];
-  // tag do fence corrente (```sql) — vira o rótulo do header do CodeBlock
-  let langCodigo: string | undefined;
-  let key = 0;
-  const flush = () => {
-    if (!lista?.length) return;
-    const items = lista.map((l, i) => (
-      <li key={i}>
-        <Inline texto={l} animar={animar} />
-      </li>
-    ));
-    blocos.push(
-      listaOrd ? (
-        <ol key={key++} className="list-decimal space-y-1 pl-5">
-          {items}
-        </ol>
-      ) : (
-        <ul key={key++} className="list-disc space-y-1 pl-5 marker:text-muted-foreground">
-          {items}
-        </ul>
-      )
-    );
-    lista = null;
-  };
-  let pularAte = -1;
-  linhas.forEach((linha, idx) => {
-    if (idx <= pularAte) return;
-    // fenced code: tudo entre ``` vira CodeBlock (genUI v2 — header com
-    // a linguagem e copiar), sem inline
-    if (emCodigo) {
-      if (/^\s*```/.test(linha)) {
-        blocos.push(
-          <CodeBlock
-            key={key++}
-            codigo={codigo.join("\n")}
-            linguagem={langCodigo}
-          />
-        );
-        emCodigo = false;
-        codigo = [];
-        langCodigo = undefined;
-      } else codigo.push(linha);
-      return;
-    }
-    const abreFence = /^\s*```(\S*)/.exec(linha);
-    if (abreFence) {
-      flush();
-      emCodigo = true;
-      langCodigo = abreFence[1] || undefined;
-      return;
-    }
-    // marca de um ```grafico válido (extrairGraficos já rodou): a linha
-    // sentinela vira o gráfico na posição em que o modelo o escreveu
-    const marca = MARCA_GRAFICO.exec(linha);
-    if (marca) {
-      flush();
-      const g = graficos?.[Number(marca[1])];
-      if (g) blocos.push(<GraficoBloco key={key++} g={g} />);
-      return;
-    }
-    // pipe-table GFM (REALIZA-281): linha com pipes externos tenta virar
-    // tabela de verdade — não validou, segue como texto comum
-    if (ehTabelaMd(linha)) {
-      const t = parseTabelaMd(linhas.slice(idx));
-      if (t) {
-        flush();
-        pularAte = idx + 1 + t.linhas.length;
-        blocos.push(<Tabela key={key++} t={t} />);
-        return;
-      }
-    }
-    const bullet = /^\s*[-*•]\s+(.+)$/.exec(linha);
-    const num = /^\s*\d+[.)]\s+(.+)$/.exec(linha);
-    if (bullet || num) {
-      if (!lista || listaOrd !== Boolean(num)) {
-        flush();
-        lista = [];
-        listaOrd = Boolean(num);
-      }
-      lista.push((bullet ?? num)![1]);
-      return;
-    }
-    flush();
-    if (!linha.trim()) return;
-    const h = /^#{1,3}\s+(.+)$/.exec(linha);
-    if (h) {
-      blocos.push(
-        <p key={key++} className="font-semibold">
-          <Inline texto={h[1]} animar={animar} />
-        </p>
-      );
-      return;
-    }
-    const quote = /^>\s?(.*)$/.exec(linha);
-    if (quote) {
-      blocos.push(
-        <blockquote
-          key={key++}
-          className="border-l-2 border-border pl-3 text-muted-foreground"
-        >
-          <Inline texto={quote[1]} animar={animar} />
-        </blockquote>
-      );
-      return;
-    }
-    blocos.push(
-      <p key={key++}>
-        <Inline texto={linha} animar={animar} />
-      </p>
-    );
-  });
-  flush();
-  // fence aberto no fim do stream: mostra o que chegou — copiar fica
-  // desabilitado até o fence fechar (o bloco ainda está incompleto)
-  if (emCodigo && codigo.length)
-    blocos.push(
-      <CodeBlock
-        key={key++}
-        codigo={codigo.join("\n")}
-        linguagem={langCodigo}
-        pronto={false}
-      />
-    );
-  // overflow-wrap: links longos e código sem quebra não vazam da bolha
-  // estreita do painel (~240px no desktop) — REALIZA-334
-  return <div className="space-y-2 [overflow-wrap:anywhere]">{blocos}</div>;
-}
-
-/** Tabela pipe → <table> de verdade (REALIZA-281): células passam pelo
- *  inline pra manter negrito/código/link; rolagem horizontal no estreito. */
-function Tabela({ t }: { t: TabelaMd }) {
-  return (
-    <div className="overflow-x-auto rounded-lg border border-border/70 bg-card">
-      <table className="w-full text-left text-[0.9em]">
-        <thead>
-          <tr className="border-b border-border bg-muted/50">
-            {t.cab.map((c, i) => (
-              <th key={i} className="px-3 py-2 font-semibold">
-                <Inline texto={c} />
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border/60">
-          {t.linhas.map((l, i) => (
-            <tr key={i} className="transition-colors hover:bg-muted/40">
-              {l.map((c, j) => (
-                <td key={j} className="px-3 py-2 align-top">
-                  <Inline texto={c} />
-                </td>
-              ))}
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
-
-/** Cartões do bloco ```stats (REALIZA-281): fileira compacta de
- *  indicadores com o tom semântico do dado — mesmo mapa do semáforo. */
-const TOM_STAT: Record<StatTom, string> = {
-  danger: "text-[var(--danger-text)]",
-  warn: "text-[var(--warn-text)]",
-  ok: "text-[var(--ok-text)]",
-  info: "text-[var(--info-text)]",
-  neutro: "text-foreground",
-};
-
-function StatCards({ stats }: { stats: Stat[] }) {
-  // auto-fit + piso de 7rem: o painel tem ~240px úteis — grid-cols fixo
-  // por viewport (sm:grid-cols-4) esmagava o card no desktop e o texto
-  // vazava da borda (REALIZA-334); min-w-0 + break-words contêm rótulos
-  // longos tipo "chamados em atendimento"
-  return (
-    <div className="grid grid-cols-[repeat(auto-fit,minmax(7rem,1fr))] gap-1.5">
-      {stats.slice(0, 4).map((s, i) => (
-        <div
-          key={i}
-          className="animate-enter min-w-0 rounded-lg border border-border bg-card px-2.5 py-2 shadow-[var(--shadow-border)]"
-          style={{ "--i": i } as React.CSSProperties}
-        >
-          <p className={cn("break-words text-base font-semibold leading-tight", TOM_STAT[s.tom])}>
-            {s.valor}
-          </p>
-          <p className="mt-0.5 break-words text-[11px] leading-snug text-muted-foreground">
-            {s.rotulo}
-          </p>
-          {s.detalhe ? (
-            <p className="mt-0.5 break-words text-[10px] leading-snug text-muted-foreground/70">
-              {s.detalhe}
-            </p>
-          ) : null}
-        </div>
-      ))}
-    </div>
-  );
-}
-
-/** Resposta do assistente: extrai os blocos ricos antes do MdLite —
- *  ```stats vira a fileira de cartões no topo; ```grafico vira linha-
- *  marca que o MdLite troca pelo gráfico na posição original (genUI v2).
- *  Stats inválido fica no texto como código; grafico inválido some —
- *  o usuário nunca lê JSON cru. */
-function BolhaMd({ texto, animar }: { texto: string; animar?: boolean }) {
-  const { stats, textoSemBloco } = extrairStats(texto);
-  const { graficos, textoSemBloco: limpo } = extrairGraficos(textoSemBloco);
-  return (
-    <>
-      {stats.length ? <StatCards stats={stats} /> : null}
-      {limpo ? <MdLite texto={limpo} graficos={graficos} animar={animar} /> : null}
-    </>
-  );
-}
-
 // ---------- conversa ----------
 
 export function AssistenteConversa({
@@ -485,6 +227,9 @@ export function AssistenteConversa({
   registrarNova,
   registrarHistorico,
   onNavegarInterno,
+  onEstado,
+  onRespostaPronta,
+  Avatar,
 }: {
   papeis: AppRole[];
   demo: boolean;
@@ -502,7 +247,19 @@ export function AssistenteConversa({
   registrarHistorico?: (fn: () => void) => void;
   /** link interno clicado (ação/fonte/inline) — a bolha fecha pra navegar */
   onNavegarInterno?: () => void;
+  /** a bolha anima o mascote pelo estado da rodada */
+  onEstado?: (e: EstadoConversa) => void;
+  /** resposta terminou bem — a bolha avisa no FAB se o painel está fechado */
+  onRespostaPronta?: () => void;
+  /** mascote no tamanho pedido — a bolha é dona do componente e do estado
+   *  ("aberto" saúda no empty state; "pronto" comemora a resposta que
+   *  acabou de fechar) */
+  Avatar: (p: {
+    tamanho: number;
+    estado: EstadoConversa | "aberto" | "pronto";
+  }) => React.ReactNode;
 }) {
+  const pagina = usePathname();
   const [msgs, setMsgs] = useState<Msg[]>([]);
   // id da conversa ativa no histórico — criado no 1º envio, zerado em
   // "Nova conversa"; estado (não ref) porque a lista o lê durante render
@@ -534,7 +291,33 @@ export function AssistenteConversa({
   // SSE manda deltas pequenos demais pra re-render por delta
   const tokensRef = useRef("");
   const flushRef = useRef(0);
-  const chips = sugestoes(papeis);
+  const chips = sugestoes(papeis, pagina);
+  const [busca, setBusca] = useState("");
+  // links dos cards apontam pras telas do jovem quando ele é só mentorado
+  const soJovem = papeis.length > 0 && papeis.every((p) => p === "mentorado");
+  // início da rodada (handler de evento) — vira o "em N s" da meta
+  const inicioRef = useRef(0);
+
+  // estado da rodada pra fora (mascote): status de tool = consultando,
+  // token chegando = escrevendo, bolha de erro = erro
+  const ultimaMsg = msgs[msgs.length - 1];
+  const estado: EstadoConversa = pending
+    ? status || !ultimaMsg?.content
+      ? "consultando"
+      : "escrevendo"
+    : ultimaMsg?.estado === "erro"
+      ? "erro"
+      : "parado";
+  useEffect(() => onEstado?.(estado), [estado, onEstado]);
+
+  // a resposta que acabou de fechar comemora uma vez — o mascote ao lado
+  // dela pula ("pronto"), depois volta pro repouso. Evento, não estado
+  const [celebra, setCelebra] = useState(false);
+  useEffect(() => {
+    if (!celebra) return;
+    const t = setTimeout(() => setCelebra(false), 1600);
+    return () => clearTimeout(t);
+  }, [celebra]);
 
   // REALIZA-332: um desmonte de verdade não deve órfanar o stream —
   // aborta o fetch (o req.signal do servidor para de gerar na hora) e
@@ -559,6 +342,7 @@ export function AssistenteConversa({
         {
           role: "assistant" as const,
           content: content || "Resposta interrompida.",
+          ui: ultima.ui,
           em: agora(),
         },
       ]
@@ -720,10 +504,25 @@ export function AssistenteConversa({
     const pend = tokensRef.current;
     if (!pend) return;
     tokensRef.current = "";
+    // texto voltou a chegar: a tool acabou — o status sai e o mascote
+    // passa de "consultando" pra "escrevendo"
+    setStatus(null);
     setMsgs((ms) =>
       ms.map((m, i) =>
         i === ms.length - 1 && m.estado === "stream"
           ? { ...m, content: m.content + pend }
+          : m
+      )
+    );
+  }
+
+  /** card da genUI direta chegou: entra já na bolha que está sendo
+   *  escrita (antes do texto da rodada seguinte) */
+  function receberUi(b: UiBloco) {
+    setMsgs((ms) =>
+      ms.map((m, i) =>
+        i === ms.length - 1 && m.estado === "stream"
+          ? { ...m, ui: juntarUi(m.ui ?? [], b) }
           : m
       )
     );
@@ -774,6 +573,7 @@ export function AssistenteConversa({
             role: "assistant",
             content: content || extra?.erro || FALHA,
             estado: "erro",
+            ui: ultima.ui,
           },
         ];
       return [
@@ -786,13 +586,19 @@ export function AssistenteConversa({
           tools: extra?.tools?.length ? extra.tools : undefined,
           acoes: estado === "ok" ? extrairAcoes(content) : undefined,
           fontes: extra?.fontes?.length ? extra.fontes : undefined,
+          ui: ultima.ui,
           em: agora(),
+          dur: inicioRef.current ? agora() - inicioRef.current : undefined,
         },
       ];
     });
     setPending(false);
     setStatus(null);
     abortRef.current = null;
+    if (estado === "ok") {
+      onRespostaPronta?.();
+      setCelebra(true);
+    }
     focarComposer(inputRef.current);
   }
 
@@ -814,7 +620,12 @@ export function AssistenteConversa({
       const res = await fetch("/api/ia/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: envio }),
+        // a rota aceita só o path (regex no Body) — rota de demo/teste
+        // fora do padrão simplesmente não manda
+        body: JSON.stringify({
+          messages: envio,
+          ...(/^\/[\w\-/]*$/.test(pagina) ? { pagina } : {}),
+        }),
         signal: ctrl.signal,
       });
       statusHttp = res.status;
@@ -827,7 +638,7 @@ export function AssistenteConversa({
         } | null;
         // redirect silencioso pro login = sessão caída, não falha do provider
         if (res.redirected && res.ok)
-          throw new Error("Sua sessão expirou — entre de novo pelo login.");
+          throw new Error("Sua sessão expirou. Entre de novo pelo login.");
         throw new Error(data?.error ?? FALHA);
       }
 
@@ -857,6 +668,7 @@ export function AssistenteConversa({
             if (ev.type === "token") enfileirarToken((ev as { c: string }).c);
             else if (ev.type === "reset") resetarStream();
             else if (ev.type === "status") setStatus((ev as { t: string }).t);
+            else if (ev.type === "ui") receberUi((ev as { b: UiBloco }).b);
             else if (ev.type === "done") {
               const d = ev as { tools?: string[]; fontes?: FonteIa[] };
               tools = d.tools;
@@ -902,29 +714,42 @@ export function AssistenteConversa({
     setTexto("");
     setPending(true);
     setStatus(null);
+    inicioRef.current = agora();
     pertoDoFim.current = true;
     requestAnimationFrame(() => rolarFim(true));
 
-    if (demo) {
-      // demo não chama provider nem API — resposta enlatada honesta
-      await new Promise((r) => setTimeout(r, 500));
-      setMsgs((ms) =>
-        ms.map((m, i) =>
-          i === ms.length - 1
-            ? {
-                role: "assistant" as const,
-                content: respostaDemo(limpo),
-                em: agora(),
-              }
-            : m
-        )
-      );
-      setPending(false);
-      focarComposer(inputRef.current);
-      return;
-    }
+    if (demo) await rodarDemo(limpo);
+    else await rodar(novas);
+  }
 
-    await rodar(novas);
+  /** Demo: sem provider nem API, mas com o mesmo ritmo da rota real —
+   *  status da "tool", card chegando antes do texto e texto em stream
+   *  (o server action monta os cards pelo dataset de exemplo; intenção
+   *  que ele não cobre cai na resposta enlatada honesta). */
+  async function rodarDemo(pergunta: string) {
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    const espera = (ms: number) => new Promise((r) => setTimeout(r, ms));
+    try {
+      const r = await responderDemoIa(pergunta).catch(() => null);
+      if (r?.ui.length) {
+        setStatus("Consultando os dados de exemplo…");
+        await espera(450);
+        if (ctrl.signal.aborted) return finalizar("interrompido");
+        r.ui.forEach(receberUi);
+        await espera(250);
+      }
+      const content = r?.content ?? respostaDemo(pergunta);
+      // fatias de ~4 palavras a cada 28ms — o mesmo fade por fatia do stream
+      for (const pedaco of content.match(/(\S+\s*){1,4}|\s+/g) ?? []) {
+        if (ctrl.signal.aborted) return finalizar("interrompido");
+        enfileirarToken(pedaco);
+        await espera(28);
+      }
+      finalizar("ok");
+    } catch {
+      finalizar("erro");
+    }
   }
 
   function tentarDeNovo() {
@@ -936,6 +761,7 @@ export function AssistenteConversa({
     setMsgs([...base, { role: "assistant", content: "", estado: "stream" }]);
     setPending(true);
     setStatus(null);
+    inicioRef.current = agora();
     void rodar(base);
   }
 
@@ -949,96 +775,170 @@ export function AssistenteConversa({
     }
   }
 
+  /** remove do histórico com "Desfazer" no toast — apagar por engano numa
+   *  lista de toque é fácil, e a conversa só existe neste aparelho */
+  function apagarComDesfazer(c: Conversa) {
+    const antes = conversas;
+    apagarConversa(c.id);
+    toast("Conversa apagada.", {
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          gravarConversas(antes);
+          setConversas(antes);
+        },
+      },
+    });
+  }
+
+  const grupos = agruparConversas(
+    busca.trim()
+      ? conversas.filter((c) =>
+          normalizar(c.titulo).includes(normalizar(busca.trim()))
+        )
+      : conversas
+  );
+
   return (
     <div className="flex min-h-0 flex-1 flex-col">
+      <AnimatePresence mode="popLayout" initial={false}>
       {visao === "historico" ? (
-        /* histórico do aparelho (REALIZA-xxx): lista de conversas salvas —
-           tocar abre de volta na transcript; lixeira apaga só a dela */
-        <div className="relative min-h-0 flex-1">
+        /* histórico do aparelho: lista de conversas salvas agrupada por
+           data — tocar abre de volta na transcript; lixeira apaga só a
+           dela (com desfazer). Entra pela direita, a conversa pela
+           esquerda: continuidade espacial de "camada por cima" */
+        <motion.div
+          key="historico"
+          initial={{ opacity: 0, x: 16 }}
+          animate={{ opacity: 1, x: 0 }}
+          exit={{ opacity: 0, x: 16 }}
+          transition={T.panel}
+          className="relative min-h-0 flex-1"
+        >
           <div className="scroll-fina h-full overflow-y-auto px-4 py-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              Conversas neste aparelho
-            </p>
+            {conversas.length > 4 && (
+              <label className="relative mb-3 block">
+                <span className="sr-only">Buscar conversa</span>
+                <MagnifyingGlass
+                  aria-hidden
+                  className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                />
+                <Input
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  placeholder="Buscar conversa"
+                  className="h-9 pl-8 md:h-8"
+                />
+              </label>
+            )}
             {conversas.length === 0 ? (
               <p className="py-10 text-center text-sm text-muted-foreground">
                 Nenhuma conversa salva ainda. Elas ficam só neste aparelho.
               </p>
+            ) : grupos.length === 0 ? (
+              <p className="py-10 text-center text-sm text-muted-foreground">
+                Nenhuma conversa com esse termo.
+              </p>
             ) : (
-              <ul className="mt-2 space-y-1.5">
-                {conversas.map((c) => (
-                  <li key={c.id} className="flex items-stretch gap-1.5">
-                    <Button
-                      variant="ghost"
-                      onClick={() => abrirConversa(c)}
-                      className={cn(
-                        "h-auto min-w-0 flex-1 flex-col items-stretch gap-0.5 rounded-xl border px-3 py-2.5 text-left shadow-[var(--shadow-border)]",
-                        c.id === conversaId
-                          ? "border-foreground/25 bg-card"
-                          : "border-border bg-card hover:border-foreground/25"
-                      )}
-                    >
-                      <span className="block truncate text-sm font-medium">
-                        {c.titulo}
-                      </span>
-                      <span className="block text-[11px] font-normal text-muted-foreground">
-                        {new Date(c.em).toLocaleDateString("pt-BR", {
-                          day: "numeric",
-                          month: "short",
-                        })}{" "}
-                        · {c.msgs.length}{" "}
-                        {c.msgs.length === 1 ? "mensagem" : "mensagens"}
-                      </span>
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => apagarConversa(c.id)}
-                      aria-label={`Apagar conversa "${c.titulo}"`}
-                      title="Apagar conversa"
-                      className="h-auto w-9 shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
-                    >
-                      <Trash size={15} aria-hidden />
-                    </Button>
-                  </li>
+              <div className="space-y-4">
+                {grupos.map((g) => (
+                  <section key={g.rotulo} aria-label={g.rotulo}>
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      {g.rotulo}
+                    </p>
+                    <ul className="mt-1.5 space-y-1.5">
+                      {g.itens.map((c, i) => (
+                        <li
+                          key={c.id}
+                          className="animate-enter flex items-stretch gap-1.5"
+                          style={{ "--i": Math.min(i, 8) } as CSSProperties}
+                        >
+                          <Button
+                            variant="ghost"
+                            onClick={() => abrirConversa(c)}
+                            aria-current={c.id === conversaId || undefined}
+                            className={cn(
+                              "h-auto min-w-0 flex-1 flex-col items-stretch gap-0.5 rounded-xl border px-3 py-2.5 text-left shadow-[var(--shadow-border)]",
+                              c.id === conversaId
+                                ? "border-foreground/25 bg-card"
+                                : "border-border bg-card hover:border-foreground/25"
+                            )}
+                          >
+                            <span className="block truncate text-sm font-medium" title={c.titulo}>
+                              {c.titulo}
+                            </span>
+                            <span className="block text-xs font-normal text-muted-foreground">
+                              {g.hora
+                                ? hhmm(c.em)
+                                : new Date(c.em).toLocaleDateString("pt-BR", {
+                                    day: "numeric",
+                                    month: "short",
+                                  })}{" "}
+                              · {c.msgs.length}{" "}
+                              {c.msgs.length === 1 ? "mensagem" : "mensagens"}
+                            </span>
+                          </Button>
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => apagarComDesfazer(c)}
+                            aria-label={`Apagar conversa "${c.titulo}"`}
+                            title="Apagar conversa"
+                            className="h-auto w-9 shrink-0 rounded-xl text-muted-foreground hover:text-foreground"
+                          >
+                            <Trash size={15} aria-hidden />
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  </section>
                 ))}
-              </ul>
+              </div>
             )}
           </div>
-        </div>
+        </motion.div>
       ) : (
-      <>
+      <motion.div
+        key="chat"
+        initial={{ opacity: 0, x: -16 }}
+        animate={{ opacity: 1, x: 0 }}
+        exit={{ opacity: 0, x: -16 }}
+        transition={T.panel}
+        className="flex min-h-0 flex-1 flex-col"
+      >
       {demo && (
         <p className="mx-4 mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-          Na demonstração, o assistente responde com exemplos fixos.
+          Na demonstração, a Rea responde com dados de exemplo.
         </p>
       )}
 
-      {/* empty state (REALIZA-289): avatar + saudação + sugestões — some
-          na primeira mensagem e não volta. Mutuamente exclusivo com o
-          transcript: os dois com flex-1 dividiam a altura e o conteúdo
-          centralizado transbordava pra cima do header no mobile. */}
+      {/* empty state (REALIZA-289): mascote + saudação + sugestões da
+          página — some na primeira mensagem e não volta. Mutuamente
+          exclusivo com o transcript: os dois com flex-1 dividiam a altura
+          e o conteúdo centralizado transbordava pra cima do header */}
       {restaurada && msgs.length === 0 ? (
-        <div className="scroll-fina flex min-h-0 flex-1 animate-in flex-col items-center justify-center gap-3 overflow-y-auto px-6 py-8 text-center fade-in-0 duration-300">
-          <span className="grid size-12 place-items-center rounded-2xl bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)]">
-            <Sparkle size={22} weight="fill" aria-hidden />
-          </span>
-          <div>
-            <p className="text-base font-semibold">
-              {primeiroNome(nome) ? `Oi, ${primeiroNome(nome)}!` : "Oi!"}
+        <div className="scroll-fina flex min-h-0 flex-1 flex-col items-center justify-center gap-3 overflow-y-auto px-6 py-8 text-center">
+          <div className="animate-enter">
+            <Avatar tamanho={64} estado={aberto ? "aberto" : "parado"} />
+          </div>
+          <div className="animate-enter" style={{ "--i": 1 } as CSSProperties}>
+            <p className="text-base font-semibold text-balance">
+              {primeiroNome(nome) ? `Oi, ${primeiroNome(nome)}! Eu sou a Rea.` : "Oi! Eu sou a Rea."}
             </p>
-            <p className="mt-1 text-sm text-muted-foreground">
+            <p className="mt-1 text-sm text-pretty text-muted-foreground">
               Posso ajudar com a sua operação ou com o que dizem os guias do
               programa.
             </p>
           </div>
-          <div className="mt-1 flex max-w-72 flex-wrap justify-center gap-2">
-            {chips.map((s) => (
+          <div className="mt-1 flex max-w-80 flex-wrap justify-center gap-2">
+            {chips.map((s, i) => (
               <button
                 key={s}
                 type="button"
                 disabled={pending || (!configurado && !demo)}
                 onClick={() => enviar(s)}
-                className="rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-[var(--shadow-border)] transition-colors hover:border-foreground/25 hover:text-foreground disabled:opacity-50"
+                style={{ "--i": i + 2 } as CSSProperties}
+                className="animate-enter min-h-9 rounded-full border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground shadow-[var(--shadow-border)] transition-[color,border-color,transform] duration-150 ease-snappy hover:border-foreground/25 hover:text-foreground active:scale-[0.97] disabled:opacity-50"
               >
                 {s}
               </button>
@@ -1071,217 +971,282 @@ export function AssistenteConversa({
           }}
           role="log"
           aria-live="polite"
-          aria-label="Conversa com o assistente"
-          className="scroll-fina h-full space-y-3 overflow-y-auto overscroll-contain px-4 py-4"
+          aria-label="Conversa com a Rea"
+          className="scroll-fina @container h-full space-y-5 overflow-y-auto overscroll-contain px-4 py-4"
         >
-          {msgs.map((m, i) => (
-            <div
-              key={i}
-              className={cn(
-                "group flex animate-in items-end gap-2 fade-in-0 slide-in-from-bottom-2 duration-200",
-                m.role === "user" ? "justify-end" : "justify-start",
-                // a bolha do assistente entra 80ms depois da pergunta —
-                // lê como resposta chegando, não como montagem simultânea
-                m.estado === "stream" && "[animation-delay:80ms]"
-              )}
-            >
-              {m.role === "assistant" && (
-                <span
-                  aria-hidden
-                  className="mb-0.5 grid size-6 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)]/15 text-[var(--brand-lime-deep)]"
-                >
-                  <Sparkle size={12} weight="fill" />
-                </span>
-              )}
-              <div className="max-w-[85%]">
+          {msgs.map((m, i) => {
+            if (m.role === "user")
+              return (
                 <div
-                  className={cn(
-                    "rounded-2xl px-4 py-2.5 text-sm",
-                    m.role === "user"
-                      ? "rounded-br-md bg-[var(--brand-lime)] text-[var(--brand-ink)] whitespace-pre-wrap break-words"
-                      : "rounded-bl-md bg-muted/60 text-foreground shadow-[var(--shadow-border)]",
-                    m.estado === "erro" && "border border-[var(--warn)]/40"
-                  )}
+                  key={i}
+                  className="flex animate-in justify-end fade-in-0 slide-in-from-bottom-2 duration-200"
                 >
-                  {m.role === "assistant" ? (
-                    m.estado === "stream" && !m.content ? (
-                      /* pré-token: UM indicador dentro da própria bolha —
-                         shimmer de status se uma tool está rodando, senão
-                         a onda de 3 pontos. Nada de bolha de espera dupla. */
-                      status ? (
-                        <p className="ia-shimmer flex items-center gap-2 text-xs">
-                          <Sparkle
-                            size={12}
-                            weight="fill"
-                            className="text-[var(--brand-lime-deep)]"
-                            aria-hidden
-                          />
-                          {status}
-                        </p>
-                      ) : (
-                        <div
-                          aria-label="O assistente está escrevendo"
-                          role="status"
-                          className="flex items-center gap-1.5 py-0.5"
-                        >
-                          {[0, 1, 2].map((d) => (
-                            <span
-                              key={d}
-                              className="ia-digitando size-1.5 rounded-full bg-muted-foreground/70"
-                              style={{ animationDelay: `${d * 160}ms` }}
-                            />
-                          ))}
-                        </div>
-                      )
-                    ) : (
-                      <>
-                        <BolhaMd texto={m.content || "…"} animar={m.estado === "stream"} />
-                        {/* status de tool round mid-stream mora DENTRO da
-                            bolha (entre o texto e o caret) — uma bolha só,
-                            nunca a dupla de antes */}
-                        {m.estado === "stream" && status && (
-                          <p className="ia-shimmer mt-1.5 text-xs">{status}</p>
-                        )}
-                        {/* cursor do stream (REALIZA-280): blink de caret seco
-                            (~530ms/fase) no fim enquanto o token chega */}
-                        {m.estado === "stream" && (
-                          <span
-                            aria-hidden
-                            className="ia-cursor ml-0.5 inline-block h-[1em] w-[3px] translate-y-0.5 rounded-full bg-foreground/70"
-                          />
-                        )}
-                      </>
-                    )
-                  ) : (
-                    m.content
-                  )}
+                  <div className="max-w-[85%]">
+                    <div className="whitespace-pre-wrap break-words rounded-2xl rounded-br-md bg-[var(--brand-lime)] px-4 py-2.5 text-sm text-[var(--brand-ink)]">
+                      {m.content}
+                    </div>
+                    {m.em ? (
+                      <p className="mt-1 pr-1 text-right text-xs text-muted-foreground sm:text-[11px]">
+                        {hhmm(m.em)}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
-                {/* ações extraídas dos links internos da resposta */}
-                {m.acoes?.length ? (
-                  <div className="mt-1.5 flex flex-wrap gap-1.5">
-                    {m.acoes.map((a) => (
-                      <Link
-                        key={a.href}
-                        href={a.href}
-                        className="inline-flex items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-[var(--shadow-border)] transition-colors hover:border-foreground/25 hover:text-foreground"
-                      >
-                        {a.rotulo}
-                        <ArrowRight size={11} aria-hidden />
-                      </Link>
+              );
+
+            const streaming = m.estado === "stream";
+            const analise = analisarResposta(m.content, streaming);
+            const ui = m.ui ?? [];
+            const rica = ehRica(analise, ui.length > 0);
+            const proxima = msgs[i + 1];
+            const ctx = {
+              onEnviar: enviar,
+              respondida: i < msgs.length - 1,
+              resposta: proxima?.role === "user" ? proxima.content : undefined,
+              streaming,
+            };
+            const ultimaDaConversa = i === msgs.length - 1;
+            // mascote da mensagem: durante o stream ele encena a rodada
+            // (consultando → escrevendo); fechada, a última comemora uma
+            // vez e a de erro guarda a careta — as demais ficam em repouso
+            const estadoAvatar: EstadoConversa | "aberto" | "pronto" =
+              streaming
+                ? estado
+                : ultimaDaConversa && celebra
+                  ? "pronto"
+                  : m.estado === "erro"
+                    ? "erro"
+                    : "parado";
+            // indicador pré-token: status da tool (shimmer) ou a onda de
+            // pontos — dentro da própria resposta, nunca bolha de espera dupla
+            const esperando = streaming && !analise.textoSemBloco && !analise.stats.length;
+            const indicador = esperando ? (
+              status ? (
+                <p className="ia-shimmer text-xs" role="status">
+                  {status}
+                </p>
+              ) : (
+                <div
+                  aria-label="A Rea está escrevendo"
+                  role="status"
+                  className="flex items-center gap-1.5 py-1"
+                >
+                  {[0, 1, 2].map((d) => (
+                    <span
+                      key={d}
+                      className="ia-digitando size-1.5 rounded-full bg-muted-foreground/70"
+                      style={{ animationDelay: `${d * 160}ms` }}
+                    />
+                  ))}
+                </div>
+              )
+            ) : null;
+            const corpo = (
+              <>
+                {ui.length ? (
+                  <div className="space-y-2.5">
+                    {ui.map((b) => (
+                      <UiCard key={b.kind} bloco={b} jovem={soJovem} />
                     ))}
                   </div>
                 ) : null}
-                {/* fontes: as estruturadas do done (guia_consulta) + as
-                    citadas inline no markdown (/materiais/*), dedup por
-                    slug — REALIZA-281/302 */}
-                {(() => {
-                  const inline = m.estado
-                    ? []
-                    : extrairFontesTexto(m.content).filter(
-                        (ft) => !m.fontes?.some((f) => f.guia === ft.slug)
-                      );
-                  return m.fontes?.length || inline.length ? (
-                    <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                      <span className="inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.08em] text-muted-foreground/70">
+                {esperando ? (
+                  indicador
+                ) : (
+                  <RespostaMd analise={analise} ctx={ctx} />
+                )}
+                {/* status de tool round no meio do stream (texto já
+                    chegou e o modelo foi consultar de novo) */}
+                {streaming && status && !esperando && (
+                  <p className="ia-shimmer text-xs" role="status">
+                    {status}
+                  </p>
+                )}
+              </>
+            );
+            // fontes: as estruturadas do done (guia_consulta) + as citadas
+            // inline no markdown (/materiais/*), dedup por slug. Com o card
+            // de trechos dos guias na resposta, as do done já estão nele
+            const temCardFontes = ui.some((b) => b.kind === "fontes");
+            const fontesDone = temCardFontes ? [] : (m.fontes ?? []);
+            const inline = m.estado
+              ? []
+              : extrairFontesTexto(m.content).filter(
+                  (ft) => !m.fontes?.some((f) => f.guia === ft.slug)
+                );
+            return (
+              <div
+                key={i}
+                className={cn(
+                  "group animate-in fade-in-0 slide-in-from-bottom-2 duration-200",
+                  // a resposta entra 80ms depois da pergunta — lê como
+                  // resposta chegando, não como montagem simultânea
+                  streaming && "[animation-delay:80ms]"
+                )}
+              >
+                {rica ? (
+                  /* resposta rica: prosa na largura do painel, sem balão —
+                     card, gráfico e tabela precisam de largura */
+                  <div className="space-y-2.5 text-sm">
+                    <div className="flex items-center gap-2">
+                      <Avatar tamanho={22} estado={estadoAvatar} />
+                      <span className="text-xs font-semibold">Rea</span>
+                    </div>
+                    <div
+                      className={cn(
+                        "space-y-2.5",
+                        m.estado === "erro" &&
+                          "rounded-xl border border-[var(--warn-border)] px-3 py-2.5"
+                      )}
+                    >
+                      {corpo}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex items-end gap-2">
+                    <span className="mb-0.5 shrink-0">
+                      <Avatar tamanho={24} estado={estadoAvatar} />
+                    </span>
+                    <div
+                      className={cn(
+                        "max-w-[85%] space-y-2 rounded-2xl rounded-bl-md bg-muted/60 px-4 py-2.5 text-sm text-foreground shadow-[var(--shadow-border)]",
+                        m.estado === "erro" && "border border-[var(--warn-border)]"
+                      )}
+                    >
+                      {corpo}
+                    </div>
+                  </div>
+                )}
+
+                <div className={cn("space-y-1.5", rica ? "mt-2" : "mt-1.5 pl-8")}>
+                  {/* ações extraídas dos links internos da resposta */}
+                  {m.acoes?.length ? (
+                    <div className="flex flex-wrap gap-1.5">
+                      {m.acoes.map((a, j) => (
+                        <Link
+                          key={a.href}
+                          href={a.href}
+                          style={{ "--i": j } as CSSProperties}
+                          className="animate-enter inline-flex min-h-8 items-center gap-1 rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-[var(--shadow-border)] transition-[color,border-color,transform] duration-150 ease-snappy hover:border-foreground/25 hover:text-foreground active:scale-[0.97] sm:text-[11px]"
+                        >
+                          {a.rotulo}
+                          <ArrowRight size={11} aria-hidden />
+                        </Link>
+                      ))}
+                    </div>
+                  ) : null}
+                  {fontesDone.length || inline.length ? (
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                         <BookOpen size={11} aria-hidden /> Fontes
                       </span>
-                      {inline.map((ft) => (
+                      {inline.map((ft, j) => (
                         <Link
                           key={`i|${ft.slug}`}
                           href={ft.href}
-                          className="inline-flex max-w-full items-center gap-1 truncate rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-[var(--shadow-border)] transition-colors hover:border-foreground/25 hover:text-foreground"
+                          style={{ "--i": j } as CSSProperties}
+                          className="animate-enter inline-flex min-h-8 max-w-full items-center gap-1 truncate rounded-full border border-border bg-card px-2.5 py-1 text-xs font-medium text-muted-foreground shadow-[var(--shadow-border)] transition-colors hover:border-foreground/25 hover:text-foreground sm:text-[11px]"
                         >
                           {ft.rotulo}
                         </Link>
                       ))}
-                      {m.fontes?.map((f) => {
-                      const meta = metaFonte(f.guia);
-                      // seção pode chegar a 200 chars no chunk — corta pra
-                      // não estourar o chip (o inteiro vai no title)
-                      const secaoCurta =
-                        f.secao && f.secao.length > 60
-                          ? `${f.secao.slice(0, 60).trimEnd()}…`
-                          : f.secao;
-                      const rotulo = secaoCurta
-                        ? `${meta.rotulo} · ${secaoCurta}`
-                        : meta.rotulo;
-                      const title = f.secao
-                        ? `${meta.rotulo} — ${f.secao}`
-                        : meta.rotulo;
-                      return meta.href ? (
-                        <Link
-                          key={`${f.guia}|${f.secao ?? ""}`}
-                          href={meta.href}
-                          title={title}
-                          className="inline-flex max-w-full items-center gap-1 truncate rounded-full border border-border bg-card px-2.5 py-1 text-[11px] font-medium text-muted-foreground shadow-[var(--shadow-border)] transition-colors hover:border-foreground/25 hover:text-foreground"
-                        >
-                          {rotulo}
-                        </Link>
-                      ) : (
-                        <span
-                          key={`${f.guia}|${f.secao ?? ""}`}
-                          title={title}
-                          className="inline-flex max-w-full items-center truncate rounded-full border border-border/60 px-2.5 py-1 text-[11px] text-muted-foreground"
-                        >
-                          {rotulo}
-                        </span>
-                      );
-                    })}
+                      {fontesDone.map((f, j) => {
+                        const meta = metaFonte(f.guia);
+                        // seção pode chegar a 200 chars no chunk — corta pra
+                        // não estourar o chip (o inteiro vai no title)
+                        const secaoCurta =
+                          f.secao && f.secao.length > 60
+                            ? `${f.secao.slice(0, 60).trimEnd()}…`
+                            : f.secao;
+                        const rotulo = secaoCurta
+                          ? `${meta.rotulo} · ${secaoCurta}`
+                          : meta.rotulo;
+                        const title = f.secao ? `${meta.rotulo}, ${f.secao}` : meta.rotulo;
+                        const cls =
+                          "animate-enter inline-flex min-h-8 max-w-full items-center truncate rounded-full border px-2.5 py-1 text-xs sm:text-[11px]";
+                        return meta.href ? (
+                          <Link
+                            key={`${f.guia}|${f.secao ?? ""}`}
+                            href={meta.href}
+                            title={title}
+                            style={{ "--i": inline.length + j } as CSSProperties}
+                            className={cn(
+                              cls,
+                              "border-border bg-card font-medium text-muted-foreground shadow-[var(--shadow-border)] transition-colors hover:border-foreground/25 hover:text-foreground"
+                            )}
+                          >
+                            {rotulo}
+                          </Link>
+                        ) : (
+                          <span
+                            key={`${f.guia}|${f.secao ?? ""}`}
+                            title={title}
+                            style={{ "--i": inline.length + j } as CSSProperties}
+                            className={cn(cls, "border-border/60 text-muted-foreground")}
+                          >
+                            {rotulo}
+                          </span>
+                        );
+                      })}
                     </div>
-                  ) : null;
-                })()}
-                {/* meta: hora + copy/retry — discreto, sempre no
-                    ar (touch não tem hover) */}
-                {(m.em || (m.role === "assistant" && (m.content || m.estado === "erro"))) && (
-                  <div
-                    className={cn(
-                      "mt-1 flex items-center gap-2",
-                      m.role === "user" ? "justify-end pr-1" : "pl-1"
-                    )}
-                  >
-                    {m.em && (
-                      <span className="text-[10px] text-muted-foreground/70">
-                        {hhmm(m.em)}
-                      </span>
-                    )}
-                    {m.role === "assistant" && m.content && !m.estado && (
-                      <button
-                        type="button"
-                        onClick={() => copiar(i, m.content)}
-                        aria-label="Copiar resposta"
-                        className="inline-flex items-center gap-1 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        {copiado === i ? <Check size={12} /> : <Copy size={12} />}
-                        {copiado === i ? "Copiado" : "Copiar"}
-                      </button>
-                    )}
-                    {m.tools?.length ? (
-                      <span className="text-[11px] text-muted-foreground/70">
-                        fontes: {m.tools.map(rotuloTool).join(", ")}
-                      </span>
-                    ) : null}
-                    {m.estado === "erro" && (
-                      <button
-                        type="button"
-                        onClick={tentarDeNovo}
-                        className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground transition-colors hover:text-foreground"
-                      >
-                        <ArrowClockwise size={12} />
-                        Tentar de novo
-                      </button>
-                    )}
-                  </div>
-                )}
+                  ) : null}
+                  {/* continuação sugerida (```sugestoes) — só na última
+                      resposta: nas antigas a conversa já seguiu */}
+                  {ultimaDaConversa && !streaming && analise.sugestoes.length ? (
+                    <Sugestoes
+                      itens={analise.sugestoes}
+                      onEnviar={enviar}
+                      desabilitado={pending}
+                    />
+                  ) : null}
+                  {/* meta: hora + o que consultou + copy/retry — discreto,
+                      sempre no ar (touch não tem hover) */}
+                  {!streaming && (m.content || m.estado === "erro") && (
+                    <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pl-0.5">
+                      {m.em && (
+                        <span className="text-xs text-muted-foreground sm:text-[11px]">
+                          {hhmm(m.em)}
+                        </span>
+                      )}
+                      {m.tools?.length ? (
+                        <span className="text-xs text-muted-foreground sm:text-[11px]">
+                          Consultou {m.tools.map(rotuloTool).filter((t, k, a) => a.indexOf(t) === k).join(", ")}
+                          {m.dur ? ` em ${Math.max(1, Math.round(m.dur / 1000))} s` : ""}
+                        </span>
+                      ) : null}
+                      {m.content && !m.estado && (
+                        <button
+                          type="button"
+                          onClick={() => copiar(i, m.content)}
+                          aria-label="Copiar resposta"
+                          className="inline-flex min-h-8 items-center gap-1 text-xs text-muted-foreground transition-colors hover:text-foreground sm:text-[11px]"
+                        >
+                          {copiado === i ? (
+                            <Check size={12} className="animate-in zoom-in-50 text-[var(--ok-text)] duration-150" />
+                          ) : (
+                            <Copy size={12} />
+                          )}
+                          {copiado === i ? "Copiado" : "Copiar"}
+                        </button>
+                      )}
+                      {m.estado === "erro" && (
+                        <button
+                          type="button"
+                          onClick={tentarDeNovo}
+                          className="inline-flex min-h-8 items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground sm:text-[11px]"
+                        >
+                          <ArrowClockwise size={12} />
+                          Tentar de novo
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-
-          {/* sem bolha de espera separada: pré-token o indicador vive
-              dentro da bolha da resposta; mid-stream o status também —
-              nunca duas bolhas empilhadas */}
+            );
+          })}
         </div>
-        {/* fade do topo — aparece só quando o log rolou (o gradiente sai
-            do bg do painel, não de uma cor fixa) */}
+        {/* fade do topo — emoldura o log rolado (sai do bg do painel) */}
         <div
           aria-hidden
           className="pointer-events-none absolute inset-x-0 top-0 h-6 bg-gradient-to-b from-popover to-transparent"
@@ -1289,31 +1254,40 @@ export function AssistenteConversa({
         {/* "ir ao fim": o scroll para de seguir quando o usuário sobe —
             a pill devolve pro fundo com um toque (msg nova não rouba a
             posição de quem está lendo) */}
-        {longeDoFim && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => {
-              pertoDoFim.current = true;
-              setLongeDoFim(false);
-              rolarFim(true);
-            }}
-            className="absolute bottom-2 left-1/2 h-auto -translate-x-1/2 animate-in gap-1.5 rounded-full bg-card px-3 py-1.5 text-[11px] font-medium text-muted-foreground shadow-[var(--shadow-overlay)] duration-200 fade-in-0 zoom-in-95 hover:text-foreground"
-          >
-            <ArrowDown size={12} aria-hidden />
-            Ver recentes
-          </Button>
-        )}
+        <AnimatePresence>
+          {longeDoFim && (
+            <motion.div
+              initial={{ opacity: 0, y: 6, scale: 0.96 }}
+              animate={{ opacity: 1, y: 0, scale: 1 }}
+              exit={{ opacity: 0, y: 6, scale: 0.96, transition: T.micro }}
+              transition={T.enter}
+              className="absolute bottom-2 left-1/2 -translate-x-1/2"
+            >
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  pertoDoFim.current = true;
+                  setLongeDoFim(false);
+                  rolarFim(true);
+                }}
+                className="h-auto gap-1.5 rounded-full bg-card px-3 py-1.5 text-[11px] font-medium text-muted-foreground shadow-[var(--shadow-overlay)] hover:text-foreground"
+              >
+                <ArrowDown size={12} aria-hidden />
+                Ver recentes
+              </Button>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
       )}
 
-      {/* composer — os chips moram no empty state agora. pb com safe-area:
-          no Sheet mobile o composer não cola na home indicator */}
+      {/* composer — pb com safe-area: no Sheet mobile o composer não cola
+          na home indicator */}
       <div className="space-y-2 border-t border-border/60 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
         {!configurado && !demo ? (
           <Card className="px-4 py-3 text-sm text-muted-foreground">
-            O assistente está indisponível no momento — tente de novo em
-            instantes.
+            A Rea está indisponível no momento. Tente de novo em instantes.
           </Card>
         ) : (
           <>
@@ -1336,40 +1310,42 @@ export function AssistenteConversa({
                     enviar(texto);
                   }
                 }}
-                placeholder="Pergunte sobre a operação…"
-                aria-label="Mensagem pro assistente"
+                placeholder="Pergunte à Rea…"
+                aria-label="Mensagem pra Rea"
                 rows={1}
                 className="max-h-32 min-h-11 flex-1 resize-none"
               />
-              {pending ? (
-                <Button
-                  type="button"
-                  size="icon"
-                  variant="outline"
-                  onClick={parar}
-                  aria-label="Parar resposta"
-                >
-                  <Square weight="fill" />
-                </Button>
-              ) : (
-                <Button
-                  type="submit"
-                  size="icon"
-                  disabled={!texto.trim()}
-                  aria-label="Enviar mensagem"
-                >
-                  <PaperPlaneRight />
-                </Button>
-              )}
+              {/* enviar ↔ parar: o mesmo lugar troca de papel com crossfade
+                  + giro curto do ícone (continuidade, não dois botões) */}
+              <Button
+                type={pending ? "button" : "submit"}
+                size="icon"
+                variant={pending ? "outline" : "default"}
+                onClick={pending ? parar : undefined}
+                disabled={!pending && !texto.trim()}
+                aria-label={pending ? "Parar resposta" : "Enviar mensagem"}
+                className="relative overflow-hidden"
+              >
+                <AnimatePresence mode="popLayout" initial={false}>
+                  <motion.span
+                    key={pending ? "parar" : "enviar"}
+                    initial={{ opacity: 0, scale: 0.6, rotate: pending ? -45 : 45 }}
+                    animate={{ opacity: 1, scale: 1, rotate: 0 }}
+                    exit={{ opacity: 0, scale: 0.6, transition: T.micro }}
+                    transition={T.enter}
+                    className="grid place-items-center"
+                  >
+                    {pending ? <Square weight="fill" /> : <PaperPlaneRight />}
+                  </motion.span>
+                </AnimatePresence>
+              </Button>
             </form>
             <div className="flex items-center justify-between gap-2">
-              <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground">
-                <Sparkle aria-hidden />
-                Respostas geradas por IA podem errar — confirme informações
-                críticas.
+              <p className="text-xs text-muted-foreground sm:text-[11px]">
+                A Rea é uma IA e pode errar. Confirme informações críticas.
               </p>
               {texto.length > 3600 && (
-                <span className="shrink-0 text-[10px] tabular-nums text-muted-foreground">
+                <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">
                   {texto.length}/4000
                 </span>
               )}
@@ -1377,8 +1353,9 @@ export function AssistenteConversa({
           </>
         )}
       </div>
-      </>
+      </motion.div>
       )}
+      </AnimatePresence>
     </div>
   );
 }
