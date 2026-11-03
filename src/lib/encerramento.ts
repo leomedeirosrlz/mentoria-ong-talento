@@ -43,6 +43,17 @@ export const CHECKLIST_ENCERRAMENTO: {
   },
 ];
 
+/** 'pendente' não é decisão (0156): a row do rito nasce com `tipo =
+ *  'pendente'` e o check do banco a mantém acoplada a `decidido_por is
+ *  null` — decisão é só 'concluida'/'encerrada'. Antes da 0156 a sentinela
+ *  era `tipo null`, então truthiness do tipo NÃO testa "já decidido":
+ *  quem precisa disso passa por aqui. */
+export function encerramentoDecidido(
+  e: { tipo: string | null } | null | undefined
+): boolean {
+  return e != null && e.tipo != null && e.tipo !== "pendente";
+}
+
 // ---------- resumo da jornada (relatório final do guia) ----------
 
 const PESO_AVALIACAO: Record<AvaliacaoJovem, number> = {

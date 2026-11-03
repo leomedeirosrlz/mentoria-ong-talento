@@ -1719,7 +1719,7 @@ export type Database = {
           dupla_id: string
           id: string
           resumo_jornada: string | null
-          tipo: string | null
+          tipo: string
         }
         Insert: {
           checklist?: Json
@@ -1728,7 +1728,7 @@ export type Database = {
           dupla_id: string
           id?: string
           resumo_jornada?: string | null
-          tipo?: string | null
+          tipo: string
         }
         Update: {
           checklist?: Json
@@ -1737,7 +1737,7 @@ export type Database = {
           dupla_id?: string
           id?: string
           resumo_jornada?: string | null
-          tipo?: string | null
+          tipo?: string
         }
         Relationships: [
           {

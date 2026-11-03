@@ -2589,7 +2589,7 @@ function build(): DemoData {
   // Ricardo: entrou na metade do ciclo e a jornada esticou com remarcações,
   // então o último encontro caiu semanas atrás — a dupla virou 'concluida'
   // e o Gustavo já consta fora do programa, mas o rito de encerramento
-  // segue aberto (tipo null no encerramento-data). É o caso que a agenda
+  // segue aberto (tipo 'pendente' no encerramento-data). É o caso que a agenda
   // da coordenação cobra (REALIZA-172): a pendência vira linha "concluir
   // na ficha" no monitoramento e "falta sua autoavaliação" no card do
   // mentor — a d-fim NÃO serve aqui porque o rito dela já foi decidido.

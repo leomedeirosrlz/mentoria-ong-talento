@@ -116,7 +116,7 @@ export function DashboardCoordenacao({
   solicitacoes?: SolicitacaoEspecialista[];
   /** labels de turma pra triagem dos pedidos do jovem sem dupla DPP. */
   turmas?: string[];
-  /** dupla_ids com rito de encerramento aberto (concluídas sem decisão). */
+  /** dupla_ids com rito de encerramento aberto (concluídas com tipo 'pendente'). */
   encerramentos?: ReadonlySet<string>;
   /** faixa do termo de adesão pendente — entra depois do primeiro bloco de trabalho. */
   termo?: ReactNode;

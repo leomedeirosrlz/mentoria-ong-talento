@@ -378,7 +378,7 @@ export function paraAcompanhar(
   eventos: CicloEvento[],
   nudges: Record<string, Interacao>,
   hoje: Date = new Date(),
-  /** dupla_ids com `encerramentos` sem decisão (tipo null) — a pendência
+  /** dupla_ids com `encerramentos` sem decisão (tipo 'pendente') — a pendência
    *  que vira o motivo "encerramento" quando a dupla já concluiu a jornada.
    *  Vem de getEncerramentosPendentes (RLS já faz o escopo do papel). */
   encerramentosPendentes: ReadonlySet<string> = new Set()

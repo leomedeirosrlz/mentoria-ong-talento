@@ -43,7 +43,7 @@ export const getEncerramentoDaDupla = cache(
 );
 
 /** ids das duplas com o rito de encerramento em aberto: rows de
- *  `encerramentos` sem decisão (tipo/decidido_por null). Alimenta a agenda
+ *  `encerramentos` sem decisão (tipo 'pendente', decidido_por null). Alimenta a agenda
  *  da coordenação (o motivo "encerramento" do paraAcompanhar) e o espelho do
  *  mentor (o card do mentorado cobra o fechamento na ficha). O filtro por
  *  status da dupla NÃO vai na query: quem consome já tem a lista de duplas e
@@ -59,7 +59,7 @@ export const getEncerramentosPendentes = cache(
     const { data, error } = await supabase
       .from("encerramentos")
       .select("dupla_id")
-      .is("tipo", null);
+      .eq("tipo", "pendente");
     if (error) {
       console.error("getEncerramentosPendentes:", error);
       return [];
