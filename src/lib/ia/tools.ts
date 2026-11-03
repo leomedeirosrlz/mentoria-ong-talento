@@ -584,7 +584,11 @@ export async function executarTool(
   /** papéis pré-resolvidos — o MCP autentica por PAT (não há JWT pra
    *  my_papeis), então a rota passa os papéis que a autorização devolveu.
    *  Ausente → resolve do JWT como sempre. */
-  papeisForcados?: AppRole[]
+  papeisForcados?: AppRole[],
+  /** profile_id explícito pra auditoria — idem: no MCP não existe JWT, o
+   *  my_profile_id() da RPC sairia NULL e o evento não gravaria. O caller
+   *  passa o dono da PAT; no chat fica ausente e a RPC usa o JWT. */
+  autorProfileId?: string
 ): Promise<ResultadoTool> {
   const inicio = Date.now();
   let ok = false;
@@ -637,6 +641,7 @@ export async function executarTool(
       p_ok: ok,
       p_erro: erro,
       p_duracao_ms: Date.now() - inicio,
+      p_profile_id: autorProfileId ?? null,
     });
     if (erroAudit) console.error("registrar_ia_evento:", erroAudit);
   } catch (e) {

@@ -5,11 +5,12 @@
 // cookie) e o envelope (JSON-RPC no lugar de SSE).
 //
 // Auth: `Authorization: Bearer rlz_mcp_…` — a RPC ia_mcp_autorizar
-// resolve sha256 → profile + papéis. Fase 1 é coord-only (gate abaixo);
-// expandir papel = incluir no check + revisar o allowlist de tools.
-// Execução: client service-role + papéis forçados — como só coord entra
-// na fase 1, o escopo que a RLS daria à coord é o mesmo que o service
-// vê (coordenacao enxerga tudo por desenho). Quando outros papéis
+// resolve sha256 → profile + papéis. Fase 1 é staff: coord + supervisor
+// (gate abaixo — Thiago confirmou supervisor dentro); expandir papel =
+// incluir no check + revisar o allowlist de tools.
+// Execução: client service-role + papéis forçados — como só staff entra
+// na fase 1, o escopo que a RLS daria é o mesmo que o service vê
+// (coord/supervisor enxergam tudo por desenho). Quando outros papéis
 // entrarem, o client vira JWT-impersonado — registrar nesse comentário.
 //
 // A rota fica FORA da auth do proxy: o middleware só protege páginas;
@@ -19,6 +20,7 @@ import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { executarTool, IA_TOOL_CATALOGO } from "@/lib/ia/tools";
+import { checarLimiteIa } from "@/lib/ia/rate-limit";
 import type { AppRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -131,7 +133,23 @@ export async function POST(req: Request) {
       if (typeof nome !== "string") {
         return rpcErro(id, -32602, "params.name ausente.");
       }
-      const r = await executarTool(nome, args, supabase, "mcp", papeis);
+      // mesmo limite do chat (20/min por pessoa) — a PAT é da pessoa, o
+      // dono responde pelo uso dela
+      if (await checarLimiteIa(supabase, autorizado.profile_id)) {
+        return rpcErro(
+          id,
+          -32000,
+          "Limite de consultas por minuto atingido — aguarde um instante e tente de novo."
+        );
+      }
+      const r = await executarTool(
+        nome,
+        args,
+        supabase,
+        "mcp",
+        papeis,
+        autorizado.profile_id
+      );
       if (!r.ok) {
         return rpcResult(id, {
           content: [{ type: "text", text: r.erro }],
