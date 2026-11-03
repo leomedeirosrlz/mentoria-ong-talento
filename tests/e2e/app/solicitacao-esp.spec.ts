@@ -225,7 +225,11 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     await relogar(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.dupla}`);
     await expect(page.getByText("Horário expirado")).toBeVisible();
-    await expect(page.getByText("Mentor especialista")).toHaveCount(0);
+    // exact: o botão "Solicitar mentor especialista" do cabeçalho fica
+    // sempre montado — a assert é sobre o rail de negociação, não o CTA
+    await expect(
+      page.getByText("Mentor especialista", { exact: true })
+    ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: /^Aceitar / })
     ).toHaveCount(0);
@@ -241,14 +245,10 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     // ---- lado staff: o pedido nasce pela UI da ficha (a superfície real)
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.dupla}`);
-    const item = page.getByRole("menuitem", {
+    // desktop: as ações da ficha são botões inline — o "Mais" é sm:hidden
+    const item = page.getByRole("button", {
       name: "Solicitar mentor especialista",
     });
-    await agirComConfirma(
-      () =>
-        page.getByRole("button", { name: "Mais ações da dupla" }).click(),
-      () => item.isVisible()
-    );
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
       () => item.click(),

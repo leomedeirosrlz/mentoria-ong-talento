@@ -552,12 +552,11 @@ export default async function DuplaPage({
   const futurosComPendencia = encontrosFuturos.filter(
     (ev) =>
       temPendencia(dupla.encontros.find((e) => e.numero === ev.numero)) ||
-      // passo com intenção pendente também não dorme no collapsible: a âncora
+      // passo com intenção também não dorme no collapsible: a âncora
       // `#intencoes-{nº}` do aviso da agenda precisa existir montada (mesma
-      // regra do #registrar-{id} logo acima)
-      (dupla.intencoes ?? []).some(
-        (i) => i.numero === ev.numero && !i.feito
-      )
+      // regra do #registrar-{id} logo acima) — e vale pra item já feito:
+      // marcar o último pendente não pode afundar o card sob o mentor
+      (dupla.intencoes ?? []).some((i) => i.numero === ev.numero)
   );
   const encontrosVisiveis = passosLista.filter(
     (ev) => numeroSemana == null || ev.numero <= numeroSemana

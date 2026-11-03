@@ -336,6 +336,10 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     await page.goto("/duplas");
 
     const cards = page.locator(LINHAS_COORD);
+    // o goto resolve no load do shell (loading.tsx) — a lista chega no
+    // stream RSC logo depois; sem esse wait o count abaixo corria contra
+    // o streaming e lia 0 sob carga de workers
+    await expect(cards.first()).toBeVisible();
     const n = await cards.count();
     expect(n).toBeGreaterThan(3);
 
