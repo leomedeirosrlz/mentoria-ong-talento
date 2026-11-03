@@ -36,7 +36,7 @@ test("demo: bolha abre e chips respondem enlatado sem chamar a API", async ({
 
   // input livre → a resposta fixa de demonstração
   await painel
-    .getByRole("textbox", { name: "Mensagem pra Rea" })
+    .getByRole("textbox", { name: "Mensagem pra Liza" })
     .fill("e os relatórios?");
   await painel.getByRole("button", { name: "Enviar mensagem" }).click();
   await expect(painel.getByText(/respostas de exemplo/)).toBeVisible();

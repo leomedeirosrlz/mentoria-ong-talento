@@ -9,9 +9,9 @@ import {
   type AnimationPlaybackControls,
   type MotionValue,
 } from "motion/react";
-import type { ReaEstado } from "./tipos";
+import type { LizaEstado } from "./tipos";
 
-/** Vocabulário de motion compartilhado pelos três conceitos da Rea.
+/** Vocabulário de motion compartilhado pelos três conceitos da Liza.
  *  Regras da casa: só transform/opacity, molas com bounce ≤ 0,3, reações
  *  entre 150 e 400ms, ease = --ease-snappy. */
 
@@ -71,7 +71,7 @@ type OpcoesOlhar = {
   reduzido: boolean;
 };
 
-/** Olhar da Rea: devolve x/y normalizados em [-1, 1] já suavizados por mola.
+/** Olhar da Liza: devolve x/y normalizados em [-1, 1] já suavizados por mola.
  *  Cada conceito multiplica pelo próprio raio (em unidades do viewBox — como o
  *  SVG escala com `tamanho`, o raio fica proporcional ao tamanho de graça).
  *
@@ -385,7 +385,7 @@ export function useTagarelar(ativo: boolean, reduzido: boolean): MotionValue<num
  *  `aberto` sorri (^ ^) e depois se acomoda olhando pro composer; `pronto`
  *  comemora uma vez e depois se comporta como `parado`; `erro` balança a
  *  cabeça uma vez e assenta murcho. */
-const DURACAO_MOMENTO: Partial<Record<ReaEstado, number>> = {
+const DURACAO_MOMENTO: Partial<Record<LizaEstado, number>> = {
   aberto: 1200,
   pronto: 1500,
   erro: 620,
@@ -394,7 +394,7 @@ const DURACAO_MOMENTO: Partial<Record<ReaEstado, number>> = {
 /** true enquanto o estado atual está no seu momento de entrada. Reinicia a
  *  cada nova entrada no estado (padrão "estado derivado da render anterior"
  *  do React — sem setState síncrono em effect). */
-export function useMomento(estado: ReaEstado): boolean {
+export function useMomento(estado: LizaEstado): boolean {
   const [anterior, setAnterior] = useState(estado);
   const [ativo, setAtivo] = useState(estado in DURACAO_MOMENTO);
   if (anterior !== estado) {

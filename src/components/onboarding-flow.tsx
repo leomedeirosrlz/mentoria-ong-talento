@@ -85,7 +85,7 @@ import type {
   Profile,
 } from "@/lib/types";
 import { Logo } from "@/components/logo";
-import { ReaBlob } from "@/components/rea/rea-blob";
+import { LizaBlob } from "@/components/liza/liza-blob";
 import { cn } from "cn";
 
 /** Um form por passo — o botão do footer fixo submete via atributo `form`. */
@@ -1179,10 +1179,10 @@ export function OnboardingFlow({
         <Logo size="sm" className="mb-6 self-start" />
         <div key={step} className="animate-rise">
           <div className="flex items-end gap-3">
-            {/* a Rea abre e fecha a jornada — a cauda do balão aponta pra
+            {/* a Liza abre e fecha a jornada — a cauda do balão aponta pra
                 ela; nos passos do meio ela sai pra não disputar o form */}
             {(step === 0 || ultimo) && (
-              <ReaBlob
+              <LizaBlob
                 estado={ultimo ? "pronto" : "atento"}
                 tamanho={64}
                 className="mb-1 shrink-0"

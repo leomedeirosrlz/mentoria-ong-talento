@@ -1,16 +1,16 @@
 "use client";
 
 import { useEffect, useState, type ComponentType } from "react";
-import { ReaBalao } from "@/components/rea/rea-balao";
-import { ReaBlob } from "@/components/rea/rea-blob";
-import { ReaDisco } from "@/components/rea/rea-disco";
-import type { ReaEstado, ReaProps } from "@/components/rea/tipos";
+import { LizaBalao } from "@/components/liza/liza-balao";
+import { LizaBlob } from "@/components/liza/liza-blob";
+import { LizaDisco } from "@/components/liza/liza-disco";
+import type { LizaEstado, LizaProps } from "@/components/liza/tipos";
 
-/** Vitrine temporária dos três conceitos da Rea — escolha de conceito para a
+/** Vitrine temporária dos três conceitos da Liza — escolha de conceito para a
  *  bolha do assistente. Remover depois da decisão (troca = trocar o import em
  *  assistente-bolha.tsx). */
 
-const ESTADOS: { id: ReaEstado; label: string; dica: string }[] = [
+const ESTADOS: { id: LizaEstado; label: string; dica: string }[] = [
   { id: "parado", label: "Parado", dica: "ocioso: pisca e segue o cursor" },
   { id: "atento", label: "Atento", dica: "hover/foco no FAB" },
   { id: "aberto", label: "Aberto", dica: "painel acabou de abrir" },
@@ -22,14 +22,14 @@ const ESTADOS: { id: ReaEstado; label: string; dica: string }[] = [
   { id: "sonolento", label: "Sonolento", dica: "ocioso há muito tempo" },
 ];
 
-const CONCEITOS: { nome: string; Comp: ComponentType<ReaProps> }[] = [
-  { nome: "Disco", Comp: ReaDisco },
-  { nome: "Blob", Comp: ReaBlob },
-  { nome: "Balão", Comp: ReaBalao },
+const CONCEITOS: { nome: string; Comp: ComponentType<LizaProps> }[] = [
+  { nome: "Disco", Comp: LizaDisco },
+  { nome: "Blob", Comp: LizaBlob },
+  { nome: "Balão", Comp: LizaBalao },
 ];
 
-export default function ReaVitrine() {
-  const [estado, setEstado] = useState<ReaEstado>("parado");
+export default function LizaVitrine() {
+  const [estado, setEstado] = useState<LizaEstado>("parado");
   const [auto, setAuto] = useState(false);
 
   useEffect(() => {
@@ -50,7 +50,7 @@ export default function ReaVitrine() {
         <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Vitrine temporária
         </p>
-        <h1 className="text-2xl font-semibold tracking-tight">Rea: 3 conceitos</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Liza: 3 conceitos</h1>
         <p className="text-sm text-muted-foreground">
           Mesma máquina de estados, três rostos. Escolha um estado abaixo e
           compare; os olhos seguem o cursor no estado parado.
@@ -126,7 +126,7 @@ export default function ReaVitrine() {
       </p>
       <p className="text-xs text-muted-foreground">
         Trocar o conceito no produto = trocar o import em
-        assistente-bolha.tsx. Hoje está ReaBlob.
+        assistente-bolha.tsx. Hoje está LizaBlob.
       </p>
     </main>
   );

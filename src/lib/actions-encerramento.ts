@@ -9,7 +9,6 @@ import { passosDaTrilha } from "./ciclo";
 import {
   CHECKLIST_ENCERRAMENTO,
   dadosResumoJornada,
-  encerramentoDecidido,
   textoResumoJornada,
 } from "./encerramento";
 import { getPdmResumo } from "./queries-pdm";
@@ -108,7 +107,7 @@ export async function registrarEncerramento(
     .select("id, tipo, checklist")
     .eq("dupla_id", duplaId)
     .maybeSingle();
-  if (encerramentoDecidido(existente)) {
+  if (existente?.tipo) {
     return { error: "O encerramento dessa dupla já foi registrado." };
   }
 

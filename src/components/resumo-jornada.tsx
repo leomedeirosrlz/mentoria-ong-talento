@@ -1,9 +1,5 @@
 import { AVALIACAO_LABEL, formatDate, TRILHA_LABEL } from "@/lib/ciclo";
-import {
-  encerramentoDecidido,
-  mediaAvaliacaoLabel,
-  type ResumoJornada,
-} from "@/lib/encerramento";
+import { mediaAvaliacaoLabel, type ResumoJornada } from "@/lib/encerramento";
 import { ImprimirButton } from "@/components/imprimir-button";
 import type { Encerramento } from "@/lib/types";
 
@@ -137,7 +133,7 @@ export function ResumoJornadaSection({
       )}
 
       <p className="mt-3 text-xs text-muted-foreground">
-        {encerramento != null && encerramentoDecidido(encerramento)
+        {encerramento?.tipo
           ? `Encerramento registrado por ${encerramento.decidido?.nome ?? "a coordenação"} em ${formatDate(encerramento.created_at)}. Este resumo foi gerado dos dados da jornada.`
           : "Gerado dos dados da jornada. Serve de base pro relatório final do ciclo."}
       </p>

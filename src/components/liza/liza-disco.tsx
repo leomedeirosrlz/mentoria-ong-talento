@@ -2,7 +2,7 @@
 
 import { useId, useRef } from "react";
 import { motion, useTransform, type MotionValue, type Transition } from "motion/react";
-import type { ReaEstado, ReaProps } from "./tipos";
+import type { LizaEstado, LizaProps } from "./tipos";
 import {
   EASE,
   FADE,
@@ -57,7 +57,7 @@ const BASE: Pose = {
   cabeca: 0,
 };
 
-function poseDe(estado: ReaEstado, momento: boolean, detalhe: boolean): Pose {
+function poseDe(estado: LizaEstado, momento: boolean, detalhe: boolean): Pose {
   switch (estado) {
     case "atento":
       // olhos se abrem um pouco: a pálpebra recolhe junto pra não morder a pílula
@@ -90,16 +90,16 @@ function poseDe(estado: ReaEstado, momento: boolean, detalhe: boolean): Pose {
 
 const REPOUSO = { y: 0, scaleX: 1, scaleY: 1 };
 
-export function ReaDisco({ estado, tamanho, seguirCursor = true, className }: ReaProps) {
+export function LizaDisco({ estado, tamanho, seguirCursor = true, className }: LizaProps) {
   const ref = useRef<SVGSVGElement>(null);
-  const clipId = `rea-disco-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const clipId = `liza-disco-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const reduzido = useReduzido();
   const momento = useMomento(estado);
   const detalhe = tamanho >= 28; // pálpebras
   const brilho = tamanho >= 40; // ponto de luz no olho
 
   // depois do pulo o `pronto` se comporta como `parado`
-  const efetivo: ReaEstado = estado === "pronto" && !momento ? "parado" : estado;
+  const efetivo: LizaEstado = estado === "pronto" && !momento ? "parado" : estado;
   const festa = estado === "pronto" && momento;
   const pose = poseDe(efetivo, momento, detalhe);
 

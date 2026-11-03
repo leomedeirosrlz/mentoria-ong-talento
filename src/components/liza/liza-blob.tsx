@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { motion, useTransform, type MotionValue, type Transition } from "motion/react";
-import type { ReaEstado, ReaProps } from "./tipos";
+import type { LizaEstado, LizaProps } from "./tipos";
 import {
   EASE,
   FADE,
@@ -201,7 +201,7 @@ function useBichinho(ativo: boolean) {
   return { humor: ativo ? humor : "neutro", entrar, sair, tocar };
 }
 
-function poseDe(estado: ReaEstado, momento: boolean, detalhe: boolean): Pose {
+function poseDe(estado: LizaEstado, momento: boolean, detalhe: boolean): Pose {
   switch (estado) {
     case "atento":
       // espicha pra cima, olhos abrem e o sorriso alarga — "oi, posso
@@ -274,7 +274,7 @@ function movimentoDoCorpo({
   transicao,
   tamanho,
 }: {
-  efetivo: ReaEstado;
+  efetivo: LizaEstado;
   momento: boolean;
   festa: boolean;
   humor: Humor;
@@ -407,14 +407,14 @@ function movimentoDoCorpo({
   return estatico;
 }
 
-export function ReaBlob({ estado, tamanho, seguirCursor = true, className }: ReaProps) {
+export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: LizaProps) {
   const ref = useRef<SVGSVGElement>(null);
-  const clipId = `rea-blob-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const clipId = `liza-blob-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const reduzido = useReduzido();
   const momento = useMomento(estado);
   const detalhe = tamanho >= 28; // boca, pálpebra, sobrancelha, sombra
 
-  const efetivo: ReaEstado = estado === "pronto" && !momento ? "parado" : estado;
+  const efetivo: LizaEstado = estado === "pronto" && !momento ? "parado" : estado;
   const festa = estado === "pronto" && momento;
 
   // bichinho: humor interno por cima do estado — só quando está de boa.

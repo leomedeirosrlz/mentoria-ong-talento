@@ -2,7 +2,7 @@
 
 import { useId, useRef } from "react";
 import { motion, useTransform, type MotionValue, type Transition } from "motion/react";
-import type { ReaEstado, ReaProps } from "./tipos";
+import type { LizaEstado, LizaProps } from "./tipos";
 import {
   EASE,
   FADE,
@@ -19,7 +19,7 @@ import {
 } from "./use-olhar";
 
 /** Conceito C — "Balão". O ponto lima vira um balão de fala: a silhueta já diz
- *  "converse comigo" antes de qualquer ícone. A cauda é o gesto da Rea — balança
+ *  "converse comigo" antes de qualquer ícone. A cauda é o gesto da Liza — balança
  *  de leve pro lado do cursor, aponta pro composer quando o painel abre, abana
  *  na comemoração e murcha no erro/sono. E quando ela escreve, os dois olhos
  *  descem pra linha e viram os três pontinhos de "digitando" (o terceiro nasce
@@ -68,7 +68,7 @@ const BASE: Pose = {
   corpo: { sx: 1, sy: 1, rotate: 0 },
 };
 
-function poseDe(estado: ReaEstado, momento: boolean, detalhe: boolean): Pose {
+function poseDe(estado: LizaEstado, momento: boolean, detalhe: boolean): Pose {
   switch (estado) {
     case "atento":
       return { ...BASE, s: 1.12, palpebra: -0.5, corpo: { sx: 1.03, sy: 1.03, rotate: 0 } };
@@ -121,7 +121,7 @@ function movimento({
   transicao,
   tamanho,
 }: {
-  efetivo: ReaEstado;
+  efetivo: LizaEstado;
   momento: boolean;
   festa: boolean;
   reduzido: boolean;
@@ -204,15 +204,15 @@ function movimento({
   return estatico;
 }
 
-export function ReaBalao({ estado, tamanho, seguirCursor = true, className }: ReaProps) {
+export function LizaBalao({ estado, tamanho, seguirCursor = true, className }: LizaProps) {
   const ref = useRef<SVGSVGElement>(null);
-  const clipId = `rea-balao-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
+  const clipId = `liza-balao-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const reduzido = useReduzido();
   const momento = useMomento(estado);
   const detalhe = tamanho >= 28;
   const brilho = tamanho >= 40;
 
-  const efetivo: ReaEstado = estado === "pronto" && !momento ? "parado" : estado;
+  const efetivo: LizaEstado = estado === "pronto" && !momento ? "parado" : estado;
   const festa = estado === "pronto" && momento;
   const pose = poseDe(efetivo, momento, detalhe);
   const digitando = pose.forma === "digitando";

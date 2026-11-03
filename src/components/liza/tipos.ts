@@ -1,8 +1,8 @@
-/** Contrato único dos conceitos de mascote da Rea (assistente). Os três
+/** Contrato único dos conceitos de mascote da Liza (assistente). Os três
  *  protótipos (Disco, Blob, Balão) aceitam exatamente estas props, então a
  *  troca de conceito no FAB/painel é só trocar o import. */
 
-export type ReaEstado =
+export type LizaEstado =
   | "parado" // ocioso: pisca, segue o cursor (desktop) ou dá olhadas (toque)
   | "atento" // hover/foco no FAB
   | "aberto" // painel acabou de abrir
@@ -13,8 +13,8 @@ export type ReaEstado =
   | "erro"
   | "sonolento"; // ocioso há muito tempo
 
-export type ReaProps = {
-  estado: ReaEstado;
+export type LizaProps = {
+  estado: LizaEstado;
   /** lado do quadrado em px (o SVG escala pelo viewBox) */
   tamanho: number;
   /** olhos acompanham o ponteiro (mouse/caneta). Padrão: true */

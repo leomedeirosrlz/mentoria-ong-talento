@@ -183,9 +183,9 @@ describe("juntarUi", () => {
 });
 
 describe("prompt v3", () => {
-  it("apresenta a Rea e manda não repetir o card", () => {
+  it("apresenta a Liza e manda não repetir o card", () => {
     const p = systemPromptIa(["coordenacao"]);
-    expect(p).toContain("Rea");
+    expect(p).toContain("Liza");
     expect(p).toContain("Não repita a lista");
     for (const tag of ["sugestoes", "escolha", "rascunho", "passos", "destaque"])
       expect(p).toContain(`\`\`\`${tag}`);

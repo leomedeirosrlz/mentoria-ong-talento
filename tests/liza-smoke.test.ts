@@ -1,17 +1,17 @@
-// smoke dos conceitos da Rea — o contrato de rea/tipos.ts diz que os três
+// smoke dos conceitos da Liza — o contrato de liza/tipos.ts diz que os três
 // protótipos aceitam as mesmas props (trocar de conceito = trocar o
-// import). Aqui se prova que os três renderizam todo ReaEstado sem
+// import). Aqui se prova que os três renderizam todo LizaEstado sem
 // explodir e como svg neutro pra a11y (aria-hidden — o significado vai no
 // botão/label de quem hospeda).
 import { describe, expect, it } from "vitest";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { ReaBalao } from "../src/components/rea/rea-balao";
-import { ReaBlob } from "../src/components/rea/rea-blob";
-import { ReaDisco } from "../src/components/rea/rea-disco";
-import type { ReaEstado } from "../src/components/rea/tipos";
+import { LizaBalao } from "../src/components/liza/liza-balao";
+import { LizaBlob } from "../src/components/liza/liza-blob";
+import { LizaDisco } from "../src/components/liza/liza-disco";
+import type { LizaEstado } from "../src/components/liza/tipos";
 
-const ESTADOS: ReaEstado[] = [
+const ESTADOS: LizaEstado[] = [
   "parado",
   "atento",
   "aberto",
@@ -22,11 +22,11 @@ const ESTADOS: ReaEstado[] = [
   "sonolento",
 ];
 
-const CONCEITOS = { ReaBalao, ReaBlob, ReaDisco } as const;
+const CONCEITOS = { LizaBalao, LizaBlob, LizaDisco } as const;
 
-describe("rea — contrato dos conceitos", () => {
+describe("liza — contrato dos conceitos", () => {
   for (const [nome, Comp] of Object.entries(CONCEITOS)) {
-    it(`${nome}: todo ReaEstado renderiza um svg escondido da a11y`, () => {
+    it(`${nome}: todo LizaEstado renderiza um svg escondido da a11y`, () => {
       for (const estado of ESTADOS) {
         const html = renderToStaticMarkup(
           createElement(Comp, { estado, tamanho: 44 })

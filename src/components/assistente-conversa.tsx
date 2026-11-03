@@ -149,7 +149,7 @@ function agruparConversas(lista: Conversa[]) {
 }
 
 const DEMO_FALLBACK =
-  "Na demonstração a Rea tem respostas de exemplo. No ambiente real ela responde com os seus dados e os guias oficiais.";
+  "Na demonstração a Liza tem respostas de exemplo. No ambiente real ela responde com os seus dados e os guias oficiais.";
 
 const FALHA =
   "Não consegui responder agora. Tente de novo em instantes.";
@@ -908,7 +908,7 @@ export function AssistenteConversa({
       >
       {demo && (
         <p className="mx-4 mt-3 rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
-          Na demonstração, a Rea responde com dados de exemplo.
+          Na demonstração, a Liza responde com dados de exemplo.
         </p>
       )}
 
@@ -918,7 +918,7 @@ export function AssistenteConversa({
           e o conteúdo centralizado transbordava pra cima do header */}
       {restaurada && msgs.length === 0 ? (
         <div className="scroll-fina flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-8">
-          {/* a Rea senta no canto superior esquerdo — mascote de verdade,
+          {/* a Liza senta no canto superior esquerdo — mascote de verdade,
               não ícone decorativo centralizado */}
           <div className="animate-enter flex items-start gap-4">
             <div className="shrink-0">
@@ -926,7 +926,7 @@ export function AssistenteConversa({
             </div>
             <div className="min-w-0 pt-4 text-left">
               <p className="text-base font-semibold text-balance">
-                {primeiroNome(nome) ? `Oi, ${primeiroNome(nome)}! Eu sou a Rea.` : "Oi! Eu sou a Rea."}
+                {primeiroNome(nome) ? `Oi, ${primeiroNome(nome)}! Eu sou a Liza.` : "Oi! Eu sou a Liza."}
               </p>
               <p className="mt-1 text-sm text-pretty text-muted-foreground">
                 Posso ajudar com a sua operação ou com o que dizem os guias do
@@ -975,7 +975,7 @@ export function AssistenteConversa({
           }}
           role="log"
           aria-live="polite"
-          aria-label="Conversa com a Rea"
+          aria-label="Conversa com a Liza"
           className="scroll-fina @container h-full space-y-5 overflow-y-auto overscroll-contain px-4 py-4"
         >
           {msgs.map((m, i) => {
@@ -1031,7 +1031,7 @@ export function AssistenteConversa({
                 </p>
               ) : (
                 <div
-                  aria-label="A Rea está escrevendo"
+                  aria-label="A Liza está escrevendo"
                   role="status"
                   className="flex items-center gap-1.5 py-1"
                 >
@@ -1094,7 +1094,7 @@ export function AssistenteConversa({
                   <div className="space-y-2.5 text-sm">
                     <div className="flex items-center gap-2">
                       <Avatar tamanho={22} estado={estadoAvatar} />
-                      <span className="text-xs font-semibold">Rea</span>
+                      <span className="text-xs font-semibold">Liza</span>
                     </div>
                     <div
                       className={cn(
@@ -1291,7 +1291,7 @@ export function AssistenteConversa({
       <div className="space-y-2 border-t border-border/60 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
         {!configurado && !demo ? (
           <Card className="px-4 py-3 text-sm text-muted-foreground">
-            A Rea está indisponível no momento. Tente de novo em instantes.
+            A Liza está indisponível no momento. Tente de novo em instantes.
           </Card>
         ) : (
           <>
@@ -1314,8 +1314,8 @@ export function AssistenteConversa({
                     enviar(texto);
                   }
                 }}
-                placeholder="Pergunte à Rea…"
-                aria-label="Mensagem pra Rea"
+                placeholder="Pergunte à Liza…"
+                aria-label="Mensagem pra Liza"
                 rows={1}
                 className="max-h-32 min-h-11 flex-1 resize-none"
               />
@@ -1346,7 +1346,7 @@ export function AssistenteConversa({
             </form>
             <div className="flex items-center justify-between gap-2">
               <p className="text-xs text-muted-foreground sm:text-[11px]">
-                A Rea é uma IA e pode errar. Confirme informações críticas.
+                A Liza é uma IA e pode errar. Confirme informações críticas.
               </p>
               {texto.length > 3600 && (
                 <span className="shrink-0 text-[11px] tabular-nums text-muted-foreground">

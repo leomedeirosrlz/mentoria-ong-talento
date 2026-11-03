@@ -63,7 +63,7 @@ const ENCERRAMENTOS: Record<string, Encerramento> = {
   [D_OK]: {
     id: uid(0x4801),
     dupla_id: D_OK,
-    tipo: "pendente",
+    tipo: null, // decisão pendente
     checklist: {
       revisao_pdm: true,
       avaliacao_360_enviada: true,
@@ -76,7 +76,7 @@ const ENCERRAMENTOS: Record<string, Encerramento> = {
   [D_RITO]: {
     id: uid(0x4802),
     dupla_id: D_RITO,
-    tipo: "pendente", // decisão pendente — a linha "concluir na ficha" da agenda
+    tipo: null, // decisão pendente — a linha "concluir na ficha" da agenda
     checklist: {
       avaliacao_360_enviada: true,
     },
@@ -95,12 +95,12 @@ export function demoEncerramentoDaDupla(
   return ENCERRAMENTOS[duplaId] ?? null;
 }
 
-/** Espelho do `.eq("tipo", "pendente")` real: ids das rows sem decisão no
- *  escopo do papel. A d-ok entra aqui mas a dupla segue ativa — quem consome
- *  filtra o status, como na query. */
+/** Espelho do `.is("tipo", null)` real: ids das rows sem decisão no escopo
+ *  do papel. A d-ok entra aqui mas a dupla segue ativa — quem consome filtra
+ *  o status, como na query. */
 export function demoEncerramentosPendentes(role: AppRole): string[] {
   return Object.values(ENCERRAMENTOS)
-    .filter((enc) => enc.tipo === "pendente" && noEscopo(role, enc.dupla_id))
+    .filter((enc) => enc.tipo == null && noEscopo(role, enc.dupla_id))
     .map((enc) => enc.dupla_id);
 }
 

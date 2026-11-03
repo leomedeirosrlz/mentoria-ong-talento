@@ -28,10 +28,10 @@ import {
 import { AssistenteConfig } from "@/components/assistente-config";
 import { AssistenteConversa } from "@/components/assistente-conversa";
 // conceito escolhido: Blob — os três protótipos dividem o contrato
-// ReaProps (rea/tipos.ts), então trocar de conceito é trocar o import
-import { ReaBlob } from "@/components/rea/rea-blob";
-import type { ReaEstado } from "@/components/rea/tipos";
-import { useMomento } from "@/components/rea/use-olhar";
+// LizaProps (liza/tipos.ts), então trocar de conceito é trocar o import
+import { LizaBlob } from "@/components/liza/liza-blob";
+import type { LizaEstado } from "@/components/liza/tipos";
+import { useMomento } from "@/components/liza/use-olhar";
 import {
   Popover,
   PopoverContent,
@@ -69,17 +69,17 @@ const TAM_PADRAO = { w: 384, h: 640 };
 // render-prop porque a conversa é quem conhece a rodada (stream/erro).
 // "escrevendo" (stream saindo) o rosto mostra como "falando": a boca
 // tagarela enquanto ela despeja a resposta
-const falando = (e: ReaEstado): ReaEstado =>
+const falando = (e: LizaEstado): LizaEstado =>
   e === "escrevendo" ? "falando" : e;
-const AvatarRea = (p: { tamanho: number; estado: ReaEstado }) => (
-  <ReaBlob tamanho={p.tamanho} estado={falando(p.estado)} />
+const AvatarLiza = (p: { tamanho: number; estado: LizaEstado }) => (
+  <LizaBlob tamanho={p.tamanho} estado={falando(p.estado)} />
 );
 const TAM_EXPANDIDO = { w: 640, h: 820 };
 const TAM_MIN = { w: 352, h: 440 };
 const TAM_MAX = { w: 960, h: 1000 };
 const STORAGE_TAM = "assistente:tamanho";
 const ehExpandido = (t: { w: number }) => t.w >= 560;
-// ociosa demais com o painel fechado, a Rea cochila ("sonolento") —
+// ociosa demais com o painel fechado, a Liza cochila ("sonolento") —
 // qualquer gesto acorda. Soninho é charme, mas o wait não pode virar
 // queda de atenção: ~20s parada já bastam pra ela começar a pesar
 const SONO_MS = 20_000;
@@ -222,13 +222,13 @@ function Cabecalho({
   /** só desktop — o painel mobile já é a sheet quase cheia */
   expandido?: boolean;
   onExpandir?: () => void;
-  /** a Rea mora no header: saúda na abertura e acompanha a rodada */
-  estado: ReaEstado;
+  /** a Liza mora no header: saúda na abertura e acompanha a rodada */
+  estado: LizaEstado;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-2.5 border-b border-border px-4 py-3">
       <span className="grid size-8 shrink-0 place-items-center">
-        <ReaBlob tamanho={34} estado={estado} />
+        <LizaBlob tamanho={34} estado={estado} />
       </span>
       <div className="min-w-0 flex-1">
         <p className="flex items-center gap-1.5 text-sm font-semibold">
@@ -325,22 +325,22 @@ export function AssistenteBolha({
   const [aberto, setAberto] = useState(false);
   const [pronto, setPronto] = useState(false);
 
-  // mascote Rea: a conversa reporta a rodada (onEstado) e o fim de
+  // mascote Liza: a conversa reporta a rodada (onEstado) e o fim de
   // resposta (onRespostaPronta) — com o painel fechado isso vira o pulo
   // de "pronto" + o ponto de aviso no FAB; hover/foco no FAB acende
   // "atento" e o cochilo vira "sonolento" depois de SONO_MS quieta
-  const [estadoRea, setEstadoRea] = useState<ReaEstado>("parado");
+  const [estadoLiza, setEstadoLiza] = useState<LizaEstado>("parado");
   const [respostaPronta, setRespostaPronta] = useState(false);
   const [aviso, setAviso] = useState(false);
   const [atento, setAtento] = useState(false);
   const [sonolento, setSonolento] = useState(false);
 
-  // a Rea só dorme quieta: painel fechado, sem rodada, sem aviso e sem o
+  // a Liza só dorme quieta: painel fechado, sem rodada, sem aviso e sem o
   // dedo/foco em cima. Mudou qualquer condição → acorda; a flag limpa na
   // própria render (padrão "estado derivado da anterior") sem setState
   // em effect
   const ociosa =
-    !aberto && !atento && !respostaPronta && estadoRea === "parado";
+    !aberto && !atento && !respostaPronta && estadoLiza === "parado";
   const [eraOciosa, setEraOciosa] = useState(ociosa);
   if (eraOciosa !== ociosa) {
     setEraOciosa(ociosa);
@@ -476,7 +476,7 @@ export function AssistenteBolha({
         historicoRef.current = fn;
       }}
       onNavegarInterno={() => mudar(false)}
-      onEstado={setEstadoRea}
+      onEstado={setEstadoLiza}
       onRespostaPronta={() => {
         // só avisa no FAB quando o painel está fora de vista — aberto,
         // a resposta já se anuncia sozinha (e a mascote da mensagem
@@ -486,7 +486,7 @@ export function AssistenteBolha({
           setAviso(true);
         }
       }}
-      Avatar={AvatarRea}
+      Avatar={AvatarLiza}
     />
   );
   const novaConversa = () => novaConversaRef.current?.();
@@ -578,23 +578,23 @@ export function AssistenteBolha({
     };
   }, [desktop, aberto]);
 
-  // o FAB é a Rea em si. Com o painel aberto ela atende — alerta e de
+  // o FAB é a Liza em si. Com o painel aberto ela atende — alerta e de
   // olho no cursor (e a rodada sobe pro rosto do FAB também:
   // consultando/escrevendo/erro); fechada, o pulo de "pronto" com o
   // ponto de aviso, o hover/foco de "atento" e o cochilo do "sonolento"
   // se revezam. Aberto, o FAB troca a mascote por um X de fechar
-  const estadoFab: ReaEstado = aberto
-    ? estadoRea === "parado"
+  const estadoFab: LizaEstado = aberto
+    ? estadoLiza === "parado"
       ? "atento"
-      : estadoRea
+      : estadoLiza
     : respostaPronta
       ? "pronto"
       : atento
         ? "atento"
         : sonolento
           ? "sonolento"
-          : estadoRea;
-  // painel aberto: a Rea do FAB vira um X — fecha a bolha no mesmo lugar
+          : estadoLiza;
+  // painel aberto: a Liza do FAB vira um X — fecha a bolha no mesmo lugar
   // onde ela abriu e evita três mascotes simultâneas na tela (o X do
   // cabeçalho continua pra quem já está com a mão dentro do painel). O
   // press amassa só o conteúdo — a bolha de fundo segue o scale-95 do FAB
@@ -607,7 +607,7 @@ export function AssistenteBolha({
           className="animate-in zoom-in-50 spin-in-45 duration-200"
         />
       ) : (
-        <ReaBlob
+        <LizaBlob
           tamanho={44}
           estado={falando(estadoFab)}
           className="animate-in zoom-in-50 spin-in-[-45deg] duration-200"
@@ -616,10 +616,10 @@ export function AssistenteBolha({
     </span>
   );
 
-  // a Rea do header saúda na abertura (o momento "aberto" do mascote) e
+  // a Liza do header saúda na abertura (o momento "aberto" do mascote) e
   // depois acompanha a rodada — a mesma persona do FAB, agora no painel
   const recemAberto = useMomento(aberto ? "aberto" : "parado");
-  const estadoCab: ReaEstado = recemAberto ? "aberto" : estadoRea;
+  const estadoCab: LizaEstado = recemAberto ? "aberto" : estadoLiza;
 
   // ponto de resposta pronta no canto do FAB: halo ping-once na chegada,
   // depois o sólido espera a abertura (amarelo da marca = próximo passo)
@@ -635,7 +635,7 @@ export function AssistenteBolha({
   const rotuloFab = aberto
     ? "Fechar assistente"
     : aviso
-      ? "Abrir assistente, a Rea respondeu"
+      ? "Abrir assistente, a Liza respondeu"
       : "Abrir assistente";
 
   if (desktop) {
