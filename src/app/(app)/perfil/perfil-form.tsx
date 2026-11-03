@@ -764,6 +764,18 @@ export function DialogoSenha({ email }: { email: string }) {
                   value={senhaAtual}
                   onChange={(e) => setSenhaAtual(e.target.value)}
                 />
+                {/* quem não lembra a atual não preenche o campo — o caminho
+                    do recovery fica aqui, não no rodapé onde ninguém olha */}
+                <Button
+                  type="button"
+                  variant="link"
+                  size="sm"
+                  className="h-auto px-0 underline"
+                  onClick={() => void esqueci()}
+                  disabled={salvando}
+                >
+                  Esqueci minha senha: enviar link por e-mail
+                </Button>
               </div>
             ) : (
               <p className="text-xs leading-relaxed text-muted-foreground">
@@ -794,17 +806,6 @@ export function DialogoSenha({ email }: { email: string }) {
               />
             </div>
             <DialogFooter>
-              {temSenha && (
-                <Button
-                  type="button"
-                  variant="link"
-                  className="sm:me-auto"
-                  onClick={() => void esqueci()}
-                  disabled={salvando}
-                >
-                  Esqueci minha senha: enviar link por e-mail
-                </Button>
-              )}
               <Button
                 type="button"
                 variant="outline"

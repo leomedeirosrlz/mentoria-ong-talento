@@ -46,6 +46,8 @@ export function LoginForm() {
   const [senha, setSenha] = useState("");
   const [modo, setModo] = useState<"link" | "senha">("link");
   const [enviado, setEnviado] = useState(false);
+  const [resetEnviado, setResetEnviado] = useState(false);
+  const [resetEnviando, setResetEnviando] = useState(false);
   const [cooldown, setCooldown] = useState(0);
   const [erro, setErro] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -338,6 +340,34 @@ export function LoginForm() {
     }
   }
 
+  // recovery implícito (mesmo client do magic link, sem pkce): o link pousa
+  // em /auth/definir-senha, que detecta #type=recovery e pede só a senha
+  // nova. Caminho de quem deslogou e esqueceu — dentro do app o mesmo reset
+  // mora no dialog de senha do perfil
+  async function esqueciSenha() {
+    const alvo = email.trim();
+    if (!alvo) {
+      setErro("Digite seu e-mail pra receber o link de redefinição.");
+      return;
+    }
+    setErro(null);
+    setResetEnviando(true);
+    try {
+      const { error } = await otp.auth.resetPasswordForEmail(alvo, {
+        redirectTo: `${window.location.origin}/auth/definir-senha`,
+      });
+      if (error) {
+        setErro("Não foi possível enviar o link de redefinição. Tente de novo.");
+        return;
+      }
+      setResetEnviado(true);
+    } catch {
+      setErro("Sem conexão. Tente de novo.");
+    } finally {
+      setResetEnviando(false);
+    }
+  }
+
   const mmss = `${Math.floor(cooldown / 60)}:${String(cooldown % 60).padStart(2, "0")}`;
   // link expirado/usado chega como ?erro=link-invalido (de /auth/confirm ou
   // do normalizador de #error=) — merece tela própria, não o form com um aviso
@@ -603,20 +633,44 @@ export function LoginForm() {
                     : modo === "link" ? "Receber link de acesso" : "Entrar"}
                 </Button>
 
-                {modo === "senha" && (
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="w-full"
-                    onClick={() => {
-                      setModo("link");
-                      setErro(null);
-                    }}
-                  >
-                    Esqueceu a senha? Entre pelo link de e-mail
-                  </Button>
-                )}
+                {modo === "senha" &&
+                  (resetEnviado ? (
+                    <p
+                      role="status"
+                      className="rounded-lg border border-border px-3 py-2.5 text-center text-xs leading-relaxed text-muted-foreground"
+                    >
+                      Link de redefinição enviado pra{" "}
+                      <span className="font-medium text-foreground">{email}</span>.
+                      Abra o e-mail pra criar a nova senha.
+                    </p>
+                  ) : (
+                    <div className="space-y-1">
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="w-full"
+                        onClick={() => {
+                          setModo("link");
+                          setErro(null);
+                        }}
+                      >
+                        Esqueceu a senha? Entre pelo link de e-mail
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="w-full text-muted-foreground"
+                        onClick={() => void esqueciSenha()}
+                        disabled={resetEnviando}
+                      >
+                        {resetEnviando
+                          ? "Enviando…"
+                          : "ou receba um link pra redefinir a senha"}
+                      </Button>
+                    </div>
+                  ))}
               </form>
             </motion.div>
           )}
