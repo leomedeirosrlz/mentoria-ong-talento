@@ -614,7 +614,7 @@ export type Comunicado = {
 export type Notificacao = {
   id: string;
   /** Os 4 originais (0018) + os 4 do fluxo de especialista (0028) +
-   *  trilha_encerrada (0037) + supervisao_registrada (0041) +
+   *  trilha_encerrada (0037) +
    *  formulario_respondido (0042, inserido pela RPC de submit) +
    *  avaliacao_pendente/apoio_jovem (0071, trigger + RPC de avaliação) +
    *  os 3 de agenda bilateral (0072, trigger encontros_agenda_notify) —
@@ -881,28 +881,6 @@ export type ExcecaoEspecialista = {
   hora_inicio: string;
   hora_fim: string;
   tipo: "bloqueio" | "extra";
-};
-
-// ---------- supervisão (0041) ----------
-
-/** Sessão de supervisão (supervisor ↔ mentor) — o ritual de acompanhamento
- *  do guia. dupla_id null = sessão geral, não atada a uma dupla. O mentor
- *  lê data e resumo das sessões sobre ele (decisão de transparência —
- *  ver 0041); a coordenação lê tudo e modera (só ela apaga). */
-export type Supervisao = {
-  id: string;
-  supervisor_id: string;
-  mentor_id: string;
-  dupla_id: string | null;
-  /** "YYYY-MM-DD" — dia em que a sessão aconteceu (não o do registro). */
-  data: string;
-  resumo: string;
-  created_by: string | null;
-  created_at: string;
-  // embeds quando selecionados:
-  supervisor?: { id: string; nome: string } | null;
-  mentor?: { id: string; nome: string } | null;
-  dupla?: { id: string; mentorado: { nome: string } | null } | null;
 };
 
 // ---------- fechamento do ciclo (0037) ----------

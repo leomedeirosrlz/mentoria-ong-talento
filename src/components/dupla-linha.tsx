@@ -84,8 +84,6 @@ export type DuplaLinhaProps = {
   nota?: ReactNode;
   /** a UMA ação contextual: Lembrar, Chamar, Registrar, Concluir rito */
   acao?: ReactNode;
-  /** ⋯ — o resto das ações, só quando existe */
-  menu?: ReactNode;
   fichaHref: string;
   /** primeiro nome do mentorado, pro aria-label do "Ver ficha" */
   fichaNome: string;
@@ -104,7 +102,6 @@ export function DuplaLinha({
   progresso,
   nota,
   acao,
-  menu,
   fichaHref,
   fichaNome,
   i = 0,
@@ -252,7 +249,6 @@ export function DuplaLinha({
         <div className="order-2 ml-auto flex items-center gap-1.5 @4xl:order-none @4xl:ml-0 @4xl:flex-col @4xl:items-end @4xl:gap-1">
           {acao != null && <span className="relative z-20">{acao}</span>}
           <span className="flex items-center gap-1 @4xl:justify-end">
-            {menu != null && <span className="relative z-20">{menu}</span>}
             <span
               aria-hidden
               className={cn(

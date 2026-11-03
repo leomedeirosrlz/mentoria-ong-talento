@@ -23,8 +23,6 @@ function rotuloStrip(i: AgendaItem): string {
       return `enc. ${i.numero}`;
     case "sessao_esp":
       return "sessão esp";
-    case "supervisao":
-      return "supervisão";
     case "programa":
       return i.rotulo.startsWith("Formação") ? "formação" : "evento";
     case "a_agendar":

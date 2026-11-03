@@ -2206,22 +2206,17 @@ export async function deleteDupla(duplaId: string) {
     return { error: "Só a coordenação exclui duplas." };
   }
   // FKs NO ACTION bloqueiam o delete (a cascata cobre encontros→registros→
-  // anexos, mas supervisões, encerramento, solicitações — via dupla_id e
+  // anexos, mas encerramento, solicitações — via dupla_id e
   // dupla_dpp_id —, links de formulário e a sucessora do remanejamento são
   // histórico que não se apaga). O check vem antes de qualquer remoção:
   // falhar aqui preserva tudo; falhar depois dos anexos deixaria objetos
   // apagados com a row viva.
   const [
-    { count: nSup },
     { count: nEncerr },
     { count: nSol },
     { count: nLinks },
     { count: nSuc },
   ] = await Promise.all([
-    supabase
-      .from("supervisoes")
-      .select("id", { count: "exact", head: true })
-      .eq("dupla_id", duplaId),
     supabase
       .from("encerramentos")
       .select("id", { count: "exact", head: true })
@@ -2240,9 +2235,6 @@ export async function deleteDupla(duplaId: string) {
       .eq("remanejada_de", duplaId),
   ]);
   const historico = [
-    nSup
-      ? `${nSup} ${nSup === 1 ? "sessão de supervisão" : "sessões de supervisão"}`
-      : null,
     nEncerr ? "o registro de encerramento" : null,
     nSol
       ? `${nSol} ${nSol === 1 ? "solicitação" : "solicitações"} de especialista`

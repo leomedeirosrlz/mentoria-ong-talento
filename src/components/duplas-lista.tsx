@@ -213,7 +213,6 @@ function LinhaDupla({
   eventos,
   mostrarSupervisor,
   wa,
-  menu,
   i,
 }: {
   d: Dupla;
@@ -223,8 +222,6 @@ function LinhaDupla({
   /** ação WhatsApp sempre visível — "Lembrar" onde há pendência apontável
    *  em dupla ativa, "Chamar" nas demais (o DuplaWaAcao resolve o resto). */
   wa: React.ReactNode;
-  /** ⋮ das ações secundárias do papel — ex.: "Registrar supervisão". */
-  menu?: React.ReactNode;
   i: number;
 }) {
   const estado = estadoDaDupla(d, saude);
@@ -300,7 +297,6 @@ function LinhaDupla({
         )
       }
       acao={wa}
-      menu={menu}
       fichaHref={`/duplas/${d.id}`}
       fichaNome={d.mentorado.nome.split(" ")[0]}
     />
@@ -1527,7 +1523,7 @@ function VisaoSupervisor({
           <div className="@4xl:overflow-hidden @4xl:rounded-xl @4xl:bg-card @4xl:shadow-[var(--shadow-border)]">
             <CabecalhoColunas />
             {/* re-key só no recorte (nunca na busca) — remontar a cada
-                  tecla recolhia os grupos e matava o dialog de supervisão
+                  tecla recolhia os grupos e matava um dialog
                   aberto; a troca de chip re-roda o animate-enter das linhas */}
             <div key={filtro}>
               {gruposOrdenados.map(([turma, duplas], gi) => {

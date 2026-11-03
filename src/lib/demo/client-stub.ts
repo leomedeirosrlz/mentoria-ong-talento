@@ -204,10 +204,6 @@ function linhas(tabela: string, papel: AppRole | null): Linha[] {
       return d.assinaturas as unknown as Linha[];
     case "presencas":
       return d.presencas as unknown as Linha[];
-    case "supervisoes":
-      // supervisor/mentor/dupla já vêm embutidos nas linhas da fixture —
-      // o resolveEmbed devolve `jaTem` ou resolve pela coluna _id
-      return d.supervisoes as unknown as Linha[];
     case "formularios":
       return getDemoFormularios().formularios as unknown as Linha[];
     case "formulario_links":

@@ -14,7 +14,7 @@ import { cn } from "@/lib/utils";
 // Peças compartilhadas das visões de equipe da agenda (WP5) —
 // tag/pill no idioma do mock v6, helpers de data de São Paulo e o
 // texto do lembrete (D5) por caso. Server-safe de propósito: quem
-// precisa de interação (LembreteButton, SupervisaoDialog) já é
+// precisa de interação (LembreteButton) já é
 // boundary próprio.
 // ============================================================
 

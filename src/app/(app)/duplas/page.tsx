@@ -54,7 +54,7 @@ export default async function DuplasPage({
 
   // coord vê tudo; supervisor/mentor já vêm escopados da query (uma leitura,
   // sem baixar o ciclo inteiro pra filtrar em JS). Os extras são por visão:
-  // alvos do dialog de supervisão (auxiliar) e os 5 passos da trilha
+  // os 5 passos da trilha
   // (especialista) — os demais não pagam essa leitura
   const listaPromise =
     me.role === "coordenacao"

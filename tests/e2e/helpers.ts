@@ -296,7 +296,7 @@ export async function convergirDuplaAtiva(duplaId: string): Promise<void> {
 
 /** DELETE de duplas com TODOS os filhos NO ACTION, não só encontros —
  *  solicitações (thread de propostas + aresta duplas.solicitacao_id),
- *  formulario_links (0099), encerramentos (0037/0102), supervisoes, os
+ *  formulario_links (0099), encerramentos (0037/0102), os
  *  avaliacao_* da dupla toda, chamados diretos e a linhagem remanejada_de.
  *  Cascade (pdm, snapshots, lembretes, devolutivas, interacoes, notas,
  *  encaminhamentos, mural) cuida do resto. Specs antigos que só limpavam
@@ -332,7 +332,6 @@ export async function limparDuplas(ids: string[]): Promise<void> {
   await limparViaServiceRole("avaliacao_links", `dupla_id=in.(${csv})`);
   await limparViaServiceRole("formulario_links", `dupla_id=in.(${csv})`);
   await limparViaServiceRole("encerramentos", `dupla_id=in.(${csv})`);
-  await limparViaServiceRole("supervisoes", `dupla_id=in.(${csv})`);
   await limparViaServiceRole("chamados", `dupla_id=in.(${csv})`);
   await limparViaServiceRole("duplas", `id=in.(${csv})`);
 }

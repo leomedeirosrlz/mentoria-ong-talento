@@ -130,10 +130,6 @@ function pendenciaDeRegistro(d: Dupla, agoraMs: number): Encontro | null {
   );
 }
 
-function trunca(s: string, n = 90): string {
-  return s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s;
-}
-
 /** Um passo da régua oficial (os círculos 1..N do mock). */
 export type ReguaPasso = {
   numero: number;
@@ -622,7 +618,7 @@ export function sinteseMonitoramento(
 
 // ---------- "Semana no programa" ----------
 
-export type TipoItemPrograma = "encontro" | "formacao" | "evento" | "supervisao";
+export type TipoItemPrograma = "encontro" | "formacao" | "evento";
 
 /** Card da faixa "Semana do programa" (v8b) — a mesma estrutura serve
  *  coordenação/auxiliar (semana operacional) e mentor ("Minha agenda",
@@ -635,7 +631,7 @@ export type ItemPrograma = {
   titulo: string;
   /** "N duplas — cada uma marca a sua" / "10h–12h · Sede". */
   detalhe: string | null;
-  /** Accent do card v8b — encontro/formacao/evento/supervisao. */
+  /** Accent do card v8b — encontro/formacao/evento. */
   tipoItem: TipoItemPrograma;
   /** id do evento formacao pra ligar "Abrir chamada"; null nos demais. */
   eventoId: string | null;
@@ -655,7 +651,7 @@ export type ItemPrograma = {
   convidado: boolean;
   /** Dupla dona do card — só o card encontro×dupla do mentor a tem; é a
    *  identidade do dedup contra a Minha agenda (`duplaId:numero`). Null
-   *  nos demais itens (evento único, supervisão, meta da coorte). */
+   *  nos demais itens (evento único, meta da coorte). */
   duplaId: string | null;
 };
 
@@ -680,18 +676,12 @@ function temaDoEvento(ev: CicloEvento): ItemPrograma["tema"] {
 }
 
 /** Lista cronológica da semana corrente: todos os `ciclo_eventos` datados
- *  da semana (todos os cronogramas, encontros + formações + especiais) +
- *  supervisões registradas na semana. Chamada só aparece quando o evento
+ *  da semana (todos os cronogramas, encontros + formações + especiais).
+ *  Chamada só aparece quando o evento
  *  é hoje (o componente decide com `diaKey === hoje`). */
 export function itensDaSemanaPrograma(
   eventos: CicloEvento[],
   cronogramas: Cronograma[],
-  supervisoes: {
-    id: string;
-    data: string;
-    supervisor?: { nome: string } | null;
-    mentor?: { nome: string } | null;
-  }[],
   hoje: Date = new Date(),
   /** coorte do recorte — alimenta o meta "N duplas" dos encontros
    *  oficiais (coord: todas; auxiliar: as supervisionadas dela). */
@@ -768,29 +758,6 @@ export function itensDaSemanaPrograma(
     }
   }
 
-  for (const s of supervisoes) {
-    if (s.data < seg || s.data > dom) continue;
-    // o tipo do parâmetro é o subconjunto que a page lê; `resumo` existe na
-    // Supervisao real e entra (truncado) quando presente
-    const resumo = (s as { resumo?: string | null }).resumo;
-    itens.push({
-      id: `sup-${s.id}`,
-      diaKey: s.data,
-      titulo: `Supervisão · ${s.supervisor?.nome ?? "Auxiliar"} × ${s.mentor?.nome ?? "mentor"}`,
-      detalhe: resumo ? trunca(resumo) : null,
-      tipoItem: "supervisao",
-      eventoId: null,
-      numero: null,
-      turma: null,
-      tema: null,
-      guia: null,
-      nota: null,
-      aviso: null,
-      convidado: false,
-      duplaId: null,
-    });
-  }
-
   return itens.sort(
     (a, b) =>
       a.diaKey.localeCompare(b.diaKey) ||
@@ -801,8 +768,8 @@ export function itensDaSemanaPrograma(
 /** "Minha agenda" do mentor (faixa v8b): os mesmos cards da semana, mas
  *  recortados na agenda DELE — um card por encontro oficial vigente ×
  *  dupla ativa dele (duas duplas na mesma turma geram dois cards, porque
- *  cada uma marca a sua), as formações/eventos oficiais dos cronogramas
- *  dele e as supervisões sobre ele. A roda/encerramento entra como
+ *  cada uma marca a sua) e as formações/eventos oficiais dos cronogramas
+ *  dele. A roda/encerramento entra como
  *  convidado ("você não participa") — o mock explicita o caso.
  *
  *  `cobertos` (chaves `duplaId:numero`, de `encontrosCobertos`) suprime o
@@ -815,13 +782,6 @@ export function itensSemanaProgramaMentor(
   duplas: Dupla[],
   eventos: CicloEvento[],
   cronogramas: Cronograma[],
-  supervisoes: {
-    id: string;
-    data: string;
-    supervisor?: { nome: string } | null;
-    mentor?: { id?: string; nome: string } | null;
-  }[],
-  meuId: string,
   hoje: Date = new Date(),
   agoraMs: number = hoje.getTime(),
   cobertos?: ReadonlySet<string>
@@ -928,29 +888,6 @@ export function itensSemanaProgramaMentor(
         });
       }
     }
-  }
-
-  // supervisões sobre o mentor na semana — ele as vê (transparência 0041)
-  for (const s of supervisoes) {
-    if (s.data < seg || s.data > dom) continue;
-    if (s.mentor?.id && s.mentor.id !== meuId) continue;
-    const resumo = (s as { resumo?: string | null }).resumo;
-    itens.push({
-      id: `sup-${s.id}`,
-      diaKey: s.data,
-      titulo: `Supervisão com ${s.supervisor?.nome ?? "equipe"}`,
-      detalhe: resumo ? trunca(resumo) : null,
-      tipoItem: "supervisao",
-      eventoId: null,
-      numero: null,
-      turma: null,
-      tema: null,
-      guia: null,
-      nota: null,
-      aviso: null,
-      convidado: false,
-      duplaId: null,
-    });
   }
 
   return itens.sort(

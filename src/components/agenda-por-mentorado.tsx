@@ -50,7 +50,6 @@ import type {
   Encontro,
   SolicitacaoEspecialista,
   SolicitacaoEspecialistaStatus,
-  Supervisao,
   TrilhaJovem,
   TrilhaJovemRegistro,
   TrilhaJovemSessao,
@@ -83,9 +82,6 @@ export type AgendaPorMentoradoProps = {
   especialistas: { id: string; nome: string }[];
   eventos: CicloEvento[];
   cronogramas: Cronograma[];
-  /** Sessões do mentor — conduzidas + recebidas; "Do programa" filtra as
-   *  recebidas (mentor_id === meuId) e o strip usa todas. */
-  supervisoes?: Supervisao[];
   /** Último contato por dupla — o "Lembrar o jovem" só conta tipo nudge. */
   nudges: Record<string, Interacao>;
   /** ids das duplas com rito de encerramento aberto
@@ -96,7 +92,6 @@ export type AgendaPorMentoradoProps = {
   /** staff+mentor e DPP+esp chegam via ?visao=dpp — o strip repassa ao
    *  deep-link do dia (mesma regra do AbasAgendaMentor). */
   hibrido?: boolean;
-  meuId: string;
   /** Primeiro nome do mentor — assina o check-in do Lembrar. */
   meuNome: string;
   hoje: string;
@@ -131,12 +126,10 @@ export function AgendaPorMentorado({
   especialistas,
   eventos,
   cronogramas,
-  supervisoes = [],
   nudges,
   encerramentosPendentes,
   itensSemana,
   hibrido = false,
-  meuId,
   meuNome,
   hoje,
   agora: agoraMs,
@@ -215,10 +208,8 @@ export function AgendaPorMentorado({
         ))}
       </div>
       <DoPrograma
-        supervisoes={supervisoes}
         eventos={eventos}
         duplas={duplas}
-        meuId={meuId}
         hoje={hoje}
       />
     </div>
@@ -1334,30 +1325,23 @@ function SemTrilhaBlock({
 
 // ---------- "Do programa" ----------
 
-/** O que a equipe faz COM o mentor — supervisões recebidas ("por Paula
- *  Nunes") e as formações do calendário oficial das turmas dele. Vai no
+/** O que a equipe faz COM o mentor — as formações do calendário oficial
+ *  das turmas dele. Vai no
  *  fim: é contexto, não ação do dia. Sem itens a seção some (estado vazio
  *  aqui é só ausência, não defeito). */
 function DoPrograma({
-  supervisoes,
   eventos,
   duplas,
-  meuId,
   hoje,
 }: {
-  supervisoes: Supervisao[];
   eventos: CicloEvento[];
   duplas: Dupla[];
-  meuId: string;
   hoje: string;
 }) {
-  const recebidas = supervisoes
-    .filter((s) => s.mentor_id === meuId)
-    .slice(0, 3);
   const cronosDasDuplas = new Set(
     duplas.map((d) => d.cronograma_id).filter(Boolean)
   );
-  const formacoes = eventos
+  const itens = eventos
     .filter(
       (e) =>
         e.tipo === "formacao" &&
@@ -1367,26 +1351,13 @@ function DoPrograma({
         cronosDasDuplas.has(e.cronograma_id)
     )
     .sort((a, b) => a.data!.localeCompare(b.data!))
-    .slice(0, 3);
-
-  const itens = [
-    ...recebidas.map((s) => ({
-      key: `sup-${s.id}`,
-      data: s.data,
-      titulo: `Supervisão com ${s.supervisor?.nome ?? "auxiliar executivo"}`,
-      detalhe: s.dupla?.mentorado?.nome
-        ? `sobre a dupla com ${s.dupla.mentorado.nome}`
-        : "sessão geral",
-    })),
-    ...formacoes.map((e) => ({
+    .slice(0, 3)
+    .map((e) => ({
       key: `for-${e.id}`,
       data: e.data!,
       titulo: "Formação de mentores",
       detalhe: [e.titulo, e.observacao].filter(Boolean).join(" · "),
-    })),
-    // cronológico desc — supervisão (já aconteceu) e formação (vai acontecer)
-    // na mesma linha do tempo; concatenar deixava a mais recente embaixo
-  ].sort((a, b) => b.data.localeCompare(a.data));
+    }));
   if (itens.length === 0) return null;
 
   return (

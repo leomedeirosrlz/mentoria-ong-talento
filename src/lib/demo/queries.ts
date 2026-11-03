@@ -42,7 +42,6 @@ import type {
   SolicitacaoEspecialista,
   SolicitacaoEspecialistaStatus,
   SolicitacaoProposta,
-  Supervisao,
   TrilhaJovem,
   TrilhaJovemDevolutiva,
   TrilhaJovemRegistro,
@@ -1827,68 +1826,6 @@ export function demoResumoFormacao(
       presencaVisivel(data, role, p)
   ).length;
   return { presentes, total: ids.length };
-}
-
-// ---------- sessões de supervisão (0041) ----------
-
-/** Escopo da policy supervisoes_select: coordenação tudo; o supervisor
- *  autor; o mentor sobre quem é a sessão; e o supervisor das sessões
- *  vinculadas a duplas que ele supervisiona. */
-function demoSupervisoesEscopo(role: AppRole): Supervisao[] {
-  const data = getDemoData();
-  if (role === "coordenacao") return data.supervisoes;
-  const eu = data.personas[role];
-  const supervisionadas = new Set(
-    data.duplas.filter((d) => d.supervisor?.id === eu.id).map((d) => d.id)
-  );
-  return data.supervisoes.filter(
-    (s) =>
-      s.supervisor_id === eu.id ||
-      s.mentor_id === eu.id ||
-      (s.dupla_id != null && supervisionadas.has(s.dupla_id))
-  );
-}
-
-/** Últimas sessões no escopo do papel — ordenação da real (data desc,
- *  created_at desc) + limit. */
-export function demoSupervisoesRecentes(
-  role: AppRole,
-  limite = 6
-): Supervisao[] {
-  return [...demoSupervisoesEscopo(role)]
-    .sort(
-      (a, b) =>
-        b.data.localeCompare(a.data) || b.created_at.localeCompare(a.created_at)
-    )
-    .slice(0, limite);
-}
-
-/** Sessões da dupla + as "gerais" do mentor dela — idem
- *  getSupervisoesDaDupla (or dupla_id.eq.X,and(mentor_id.eq.Y,dupla_id.is.null)). */
-export function demoSupervisoesDaDupla(
-  role: AppRole,
-  duplaId: string,
-  mentorId: string
-): Supervisao[] {
-  return demoSupervisoesEscopo(role)
-    .filter(
-      (s) =>
-        s.dupla_id === duplaId ||
-        (s.mentor_id === mentorId && s.dupla_id == null)
-    )
-    .sort((a, b) => b.data.localeCompare(a.data));
-}
-
-/** Sessões da pessoa — conduzidas (supervisor) ou recebidas (mentor),
- *  cap de 30 como a real. */
-export function demoSupervisoesDaPessoa(
-  role: AppRole,
-  profileId: string
-): Supervisao[] {
-  return demoSupervisoesEscopo(role)
-    .filter((s) => s.supervisor_id === profileId || s.mentor_id === profileId)
-    .sort((a, b) => b.data.localeCompare(a.data))
-    .slice(0, 30);
 }
 
 /** Documentos do intake da pessoa — coord-only como a real (a página da

@@ -17,7 +17,7 @@ import {
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import type { Interacao } from "@/lib/interacoes";
-import type { CicloEvento, Cronograma, Dupla, Supervisao } from "@/lib/types";
+import type { CicloEvento, Cronograma, Dupla } from "@/lib/types";
 import { FilaAcompanhar, type LinhaFila } from "@/components/fila-acompanhar";
 import { NumerosSemanaSecao } from "@/components/numeros-semana";
 import { SemanaDoPrograma } from "@/components/semana-do-programa";
@@ -45,7 +45,6 @@ export function AgendaCoordenacao({
   eventos,
   cronogramas,
   nudges,
-  supervisoes = [],
   encerramentosPendentes,
   meuNome,
   hoje,
@@ -61,8 +60,6 @@ export function AgendaCoordenacao({
   cronogramas: Cronograma[];
   /** getUltimasInteracoes — a lib filtra a tipo 'nudge' pro cap de 48h. */
   nudges: Record<string, Interacao>;
-  /** Supervisões recentes — a lib recorta a semana corrente. */
-  supervisoes?: Supervisao[];
   /** dupla_ids com rito de encerramento aberto (getEncerramentosPendentes)
    *  — a dupla concluída vira linha "concluir na ficha" na fila. */
   encerramentosPendentes: ReadonlySet<string>;
@@ -92,7 +89,6 @@ export function AgendaCoordenacao({
   const programa = itensDaSemanaPrograma(
     eventos,
     cronogramas,
-    supervisoes,
     agora,
     // meta "N duplas — cada uma marca a sua": a coorte inteira que o
     // RLS da coordenação enxerga

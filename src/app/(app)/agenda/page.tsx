@@ -362,8 +362,6 @@ export default async function AgendaPage({
             trilhas,
             eventos,
             cronogramas,
-            supervisoes: [],
-            meuId: me!.id,
             hoje,
             agora: agora.getTime(),
           }).secoes.flatMap((s) => s.grupos.flatMap((g) => g.itens))
@@ -396,7 +394,6 @@ export default async function AgendaPage({
               trilhas={trilhas}
               eventos={eventos}
               cronogramas={cronogramas}
-              meuId={me!.id}
               hoje={hoje}
               agora={agora.getTime()}
               // staff+mentor híbrido: os cards da faixa linkam pro dia no
@@ -421,7 +418,6 @@ export default async function AgendaPage({
               // staff+mentor também: o deep-link do dia no strip precisa do
               // ?visao=dpp (mesma régua da barra no ramo calendário)
               hibrido={duasVisoes || (papelStaff ?? false)}
-              meuId={me!.id}
               meuNome={me!.nome.split(" ")[0]}
               hoje={hoje}
               agora={agora.getTime()}
@@ -434,7 +430,7 @@ export default async function AgendaPage({
 
   // ---- ramo supervisor (WP5) — agenda própria do auxiliar executivo:
   // "Por turma" (as supervisionadas no calendário delas) | "Consolidada"
-  // (a agenda única da pessoa). Ele monitora e registra supervisão —
+  // (a agenda única da pessoa). Ele monitora —
   // nunca agenda por dupla — então o calendário do ciclo não é superfície
   // dele; `?dia=` cai na mesma vista (sem painel de dia)
   // supervisor+mentor tem o calendário DPP dele atrás de ?aba=calendario e

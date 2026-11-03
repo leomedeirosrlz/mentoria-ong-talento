@@ -61,7 +61,6 @@ import type {
   RegistroAnexo,
   SolicitacaoEspecialista,
   SolicitacaoProposta,
-  Supervisao,
   TurmaInscricao,
 } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
@@ -129,7 +128,6 @@ export type DemoData = {
   documentoTemplates: DocumentoTemplate[];
   assinaturas: Assinatura[];
   presencas: Presenca[];
-  supervisoes: Supervisao[];
   documentosPessoa: DocumentoPessoa[];
   avaliacoes: AvaliacaoEncontro[];
   avaliacaoLinks: AvaliacaoLink[];
@@ -151,7 +149,7 @@ const uid = (n: number): string =>
 // anexos: 16xx · ciclo_eventos: 18xx · materiais: 20xx · comunicados: 22xx ·
 // solicitacoes: 24xx · pessoa_notas: 26xx · interacoes: 28xx ·
 // notificacoes: 30xx · assinaturas: 32xx · doc_templates: 33xx · tokens de
-// assinatura: 34xx · presencas: 36xx · supervisoes: 38xx ·
+// assinatura: 34xx · presencas: 36xx ·
 // avaliacao_links: 42xx · avaliacoes_encontro: 44xx ·
 // documentos_pessoa: 46xx · encontro_intencoes: 48xx · cronogramas: 50xx ·
 // especialista_grade: 52xx ·
@@ -3639,60 +3637,6 @@ function build(): DemoData {
       )
   );
 
-  // ---------- sessões de supervisão (0041) ----------
-
-  // Ritual supervisor ↔ mentor do guia. As linhas já carregam os embeds do
-  // select da query real (supervisor/mentor/dupla>mentorado) — o stub e as
-  // queries demo consomem direto, sem resolver FK.
-  const supervisoes: Supervisao[] = [
-    {
-      id: uid(0x3801),
-      supervisor_id: paulo.id,
-      mentor_id: ricardo.id,
-      dupla_id: duplaOk.id,
-      // WP5 — domingo da semana corrente (seg–dom): dentro da janela da
-      // "Consolidada" do auxiliar e da "Semana no programa" da coordenação,
-      // e ≥ hoje pra entrar na agenda do mentor como sessão recebida ("Do
-      // programa" filtra data >= hoje — qualquer dia do run cobre)
-      data: ymd(addDias(HOJE, (7 - HOJE.getUTCDay()) % 7)),
-      resumo:
-        "Supervisão da semana com o Ricardo — a dupla engatou rápido: a Bia já fechou o PDM e entrou na execução das submetas. Ponto pra domingo: ela tende a abraçar metas demais — vale segurar uma submeta por vez e revisar o ritmo no registro semanal. Combinado de ele trazer as dúvidas de condução.",
-      created_by: paulo.id,
-      created_at: haDias(6, "18:40"),
-      supervisor: { id: paulo.id, nome: paulo.nome },
-      mentor: { id: ricardo.id, nome: ricardo.nome },
-      dupla: { id: duplaOk.id, mentorado: { nome: ana.nome } },
-    },
-    {
-      id: uid(0x3802),
-      supervisor_id: paulo.id,
-      mentor_id: sofia.id,
-      dupla_id: null, // sessão geral — não atada a uma dupla
-      data: ymd(addDias(HOJE, -5)),
-      resumo:
-        "Conversa geral sobre a trilha de especialista com a Bia: o diagnóstico de frações e funções saiu no 2º encontro e a Sofia já roda listas progressivas. Reforçamos o cuidado de registrar no PDM o que continua depois dos 5 encontros, pra mentoria DPP retomar o fio sem perder o ganho.",
-      created_by: paulo.id,
-      created_at: haDias(5, "19:10"),
-      supervisor: { id: paulo.id, nome: paulo.nome },
-      mentor: { id: sofia.id, nome: sofia.nome },
-      dupla: null,
-    },
-    {
-      id: uid(0x3803),
-      supervisor_id: beatriz.id,
-      mentor_id: fernanda.id,
-      dupla_id: duplaRisco.id,
-      data: ymd(addDias(HOJE, -2)),
-      resumo:
-        "Sessão sobre a queda de participação da Dandara: a Fernanda contou que a jovem voltou a trabalhar nos fins de semana e responde pouco no WhatsApp. Combinamos repactuar o horário com a família antes de escalar — o pedido de apoio do 2º encontro já foi encaminhado pra coordenação.",
-      created_by: beatriz.id,
-      created_at: haDias(2, "20:15"),
-      supervisor: { id: beatriz.id, nome: beatriz.nome },
-      mentor: { id: fernanda.id, nome: fernanda.nome },
-      dupla: { id: duplaRisco.id, mentorado: { nome: dandara.nome } },
-    },
-  ];
-
   // ---------- avaliação do encontro FEITA PELO JOVEM (0071) ----------
   // Três canais distintos dos registros do mentor — a RLS real é replicada
   // nas queries demo: coord/sup leem tudo, o jovem as próprias, o mentor
@@ -3977,7 +3921,6 @@ function build(): DemoData {
     documentoTemplates,
     assinaturas,
     presencas,
-    supervisoes,
     documentosPessoa,
     avaliacoes,
     avaliacaoLinks,

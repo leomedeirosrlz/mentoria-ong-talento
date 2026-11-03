@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   CalendarPlus,
-  ChatsCircle,
   Eye,
   Flag,
   Sparkle,
@@ -62,7 +61,7 @@ const fmtHoraMin = new Intl.DateTimeFormat("pt-BR", {
  *  nenhuma superfície aqui marca encontro de dupla. Duas abas (por
  *  `?aba=` como o resto da agenda): "Por turma" agrupa as supervisionadas
  *  pelo calendário delas e "Consolidada" vira a agenda única da pessoa —
- *  encontros das duplas, as supervisões dela, eventos oficiais e sessões
+ *  encontros das duplas, eventos oficiais e sessões
  *  esp em modo convidado ("só acompanhamento"). Derivações todas em
  *  lib/agenda-auxiliar (pura). */
 export function AgendaAuxiliar({
@@ -109,7 +108,7 @@ export function AgendaAuxiliar({
 }) {
   const agora = new Date(agoraMs);
   const grupos = duplasPorTurma(duplas, cronogramas, eventos, agora);
-  const itens = itensConsolidados(duplas, [], eventos, agora);
+  const itens = itensConsolidados(duplas, eventos, agora);
   const saudePorId = new Map(
     duplas.map((d) => [d.id, saudadeDaDupla(d, eventos, agora)])
   );
@@ -118,8 +117,8 @@ export function AgendaAuxiliar({
   const cronosDelas = new Set(
     duplas.flatMap((d) => (d.cronograma_id ? [d.cronograma_id] : []))
   );
-  // a lista só exibe ativa/pausada (mesmo filtro da lib) — encerradas entram
-  // na supervisão histórica mas não na agenda
+  // a lista só exibe ativa/pausada (mesmo filtro da lib) — encerradas ficam
+  // fora da agenda
   const correndo = duplas.filter(
     (d) => d.status === "ativa" || d.status === "pausada"
   );
@@ -155,7 +154,7 @@ export function AgendaAuxiliar({
       <div id={PAINEL_AGENDA} role="tabpanel" className="space-y-6">
         {/* a mesma faixa "Semana do programa" da coordenação (v8b), com o
             denominador do escopo do auxiliar: os oficiais dos cronogramas
-            das supervisionadas + as supervisões dela. "o que cobre" porque
+            das supervisionadas. "o que cobre" porque
             quem lê monitora — o card não agenda nada. */}
         <SemanaDoPrograma
           itens={itensDaSemanaPrograma(
@@ -163,7 +162,6 @@ export function AgendaAuxiliar({
             // supervisionadas — a faixa da aux nunca mostra turma alheia
             eventos.filter((e) => cronosDelas.has(e.cronograma_id)),
             cronogramas.filter((c) => cronosDelas.has(c.id)),
-            [],
             agora,
             // meta "N duplas" conta as supervisionadas daquele cronograma
             duplas
@@ -425,8 +423,7 @@ function CardDuplaAux({
 
 // ---------- aba Consolidada ----------
 
-const ICONE_TIPO: Record<ItemConsolidado["tipo"], typeof ChatsCircle> = {
-  supervisao: ChatsCircle,
+const ICONE_TIPO: Record<ItemConsolidado["tipo"], typeof Users> = {
   encontro: Users,
   sessao_esp: Sparkle,
   oficial: Flag,
@@ -434,7 +431,6 @@ const ICONE_TIPO: Record<ItemConsolidado["tipo"], typeof ChatsCircle> = {
 };
 
 const ROTULO_TIPO: Record<ItemConsolidado["tipo"], string> = {
-  supervisao: "Supervisão",
   encontro: "Encontro",
   sessao_esp: "Trilha de especialista",
   oficial: "Evento oficial",
@@ -548,8 +544,8 @@ function LinhaConsolidada({
         <div className="flex gap-3">
           <div className="w-12 shrink-0 pt-0.5 text-right">
             <span className="block text-sm font-semibold tabular-nums">
-              {/* inicio é ISO instante (encontro) ou "YYYY-MM-DD" (supervisão,
-                  oficial, a_agendar — sem hora honesta pra mostrar) */}
+              {/* inicio é ISO instante (encontro) ou "YYYY-MM-DD" (oficial,
+                  a_agendar — sem hora honesta pra mostrar) */}
               {item.inicio.includes("T")
                 ? fmtHoraMin
                     .format(new Date(item.inicio))

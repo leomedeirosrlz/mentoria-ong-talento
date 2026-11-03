@@ -20,21 +20,18 @@ const ACENTO: Record<TipoItemPrograma, string> = {
   encontro: "border-t-[var(--brand-lime)]",
   formacao: "border-t-[var(--warn)]",
   evento: "border-t-[var(--info)]",
-  supervisao: "border-t-[var(--pausa)]",
 };
 
 const ROTULO_TIPO: Record<TipoItemPrograma, string> = {
   encontro: "Encontro",
   formacao: "Formação",
   evento: "Evento",
-  supervisao: "Supervisão",
 };
 
 const TOM_TIPO: Record<TipoItemPrograma, "ok" | "warn" | "info" | "muted"> = {
   encontro: "ok",
   formacao: "warn",
   evento: "info",
-  supervisao: "muted",
 };
 
 /** Fade lateral do scroller via máscara inline — a utilidade não existe
