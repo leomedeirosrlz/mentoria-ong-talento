@@ -15,6 +15,7 @@ import {
   type ItemConsolidado,
 } from "@/lib/agenda-auxiliar";
 import { itensDaSemanaPrograma, saudeDoRecorte } from "@/lib/agenda-coordenacao";
+import { msgsContato } from "@/lib/whatsapp-msgs";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
 import {
   lembreteBloqueadoAte,
@@ -405,6 +406,25 @@ function CardDuplaAux({
             destNome={d.mentor?.nome ?? "mentor"}
             telefone={d.mentor?.whatsapp ?? null}
             mensagem={lembrete.corpo}
+            destinatarios={{
+              // a pendência é do mentor; o jovem recebe o check-in neutro
+              padrao: "mentor",
+              mentor: {
+                nome: d.mentor?.nome ?? "mentor",
+                telefone: d.mentor?.whatsapp ?? null,
+                mensagem: lembrete.corpo,
+              },
+              mentorado: {
+                nome,
+                telefone: d.mentorado?.whatsapp ?? null,
+                mensagem:
+                  msgsContato({
+                    eu: meuNome,
+                    mentorNome: (d.mentor?.nome ?? "").split(" ")[0],
+                    mentoradoNome: nome,
+                  }).mentorado ?? "",
+              },
+            }}
             nudge={{
               destino: "mentor",
               titulo: lembrete.titulo,
@@ -585,12 +605,38 @@ function LinhaConsolidada({
                     Ver ficha ›
                   </Link>
                 )}
-                {lembrete && item.duplaId && (
+                {lembrete && item.duplaId && dupla && (
                   <DuplaWaAcao
                     duplaId={item.duplaId}
-                    destNome={dupla?.mentor?.nome ?? "mentor"}
-                    telefone={dupla?.mentor?.whatsapp ?? null}
+                    destNome={dupla.mentor?.nome ?? "mentor"}
+                    telefone={dupla.mentor?.whatsapp ?? null}
                     mensagem={lembrete.corpo}
+                    destinatarios={{
+                      // a pendência é do mentor; o jovem recebe o check-in
+                      // neutro, nunca a cobrança operacional
+                      padrao: "mentor",
+                      mentor: {
+                        nome: dupla.mentor?.nome ?? "mentor",
+                        telefone: dupla.mentor?.whatsapp ?? null,
+                        mensagem: lembrete.corpo,
+                      },
+                      mentorado: {
+                        nome:
+                          dupla.mentorado?.nome_social ||
+                          dupla.mentorado?.nome ||
+                          "Jovem",
+                        telefone: dupla.mentorado?.whatsapp ?? null,
+                        mensagem:
+                          msgsContato({
+                            eu: meuNome,
+                            mentorNome: (dupla.mentor?.nome ?? "").split(" ")[0],
+                            mentoradoNome:
+                              dupla.mentorado?.nome_social ||
+                              dupla.mentorado?.nome ||
+                              "Jovem",
+                          }).mentorado ?? "",
+                      },
+                    }}
                     nudge={{
                       destino: "mentor",
                       titulo: lembrete.titulo,

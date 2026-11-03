@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useId, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ChatsCircle,
@@ -37,6 +37,25 @@ export type NudgeWA = {
   rotulo?: "Lembrar" | "Lembrar registro" | "Chamar";
 };
 
+/** Uma ponta da dupla no seletor do preview: nome pro título, telefone pro
+ *  wa.me e o texto já na língua dela — o mentorado nunca recebe a cobrança
+ *  operacional que é do mentor (check-in neutro ou a resposta de apoio). */
+export type DestinatarioWA = {
+  nome: string;
+  telefone: string | null | undefined;
+  mensagem: string;
+};
+
+/** As duas pontas com mensagem própria + quem a ação mira por padrão (a
+ *  mesma regra de sempre: mentor nas pendências operacionais, jovem quando
+ *  o pedido de apoio é dele). Presente, o preview vira um seletor "Quem
+ *  recebe"; ausente, o comportamento é o de um destinatário só. */
+export type DestinatariosWA = {
+  padrao: "mentor" | "mentorado";
+  mentor: DestinatarioWA;
+  mentorado: DestinatarioWA;
+};
+
 /** Ação WhatsApp da linha de dupla (REALIZA-255): UMA entrada por card —
  *  o botão abre o texto da mensagem antes de qualquer envio. No preview
  *  moram os dois caminhos distintos, sem botão duplicado:
@@ -53,9 +72,11 @@ export function DuplaWaAcao({
   telefone,
   mensagem,
   nudge,
+  destinatarios,
 }: {
   duplaId: string;
-  /** Primeiro nome de quem recebe — compõe os aria-labels. */
+  /** Primeiro nome de quem recebe — compõe os aria-labels. Com
+   *  `destinatarios` é o nome da ponta `padrao` (o alvo da regra). */
   destNome: string;
   telefone: string | null | undefined;
   /** Texto pronto — preview, cópia, wa.me e (no Lembrar) a notificação. */
@@ -63,15 +84,41 @@ export function DuplaWaAcao({
   /** Presente = há pendência apontável (libera o Lembrar in-app); ausente =
    *  contato livre — só WhatsApp/copiar. */
   nudge?: NudgeWA;
+  /** As duas pontas com texto próprio — o preview vira seletor de quem
+   *  recebe. O Lembrar in-app continua fixo no `nudge.destino`: escolhida
+   *  a outra ponta, o dialog vira contato direto (só WhatsApp/copiar). */
+  destinatarios?: DestinatariosWA;
 }) {
   const [pending, start] = useTransition();
   const [aberto, setAberto] = useState(false);
+  const [quem, setQuem] = useState<"mentor" | "mentorado">(
+    destinatarios?.padrao ?? "mentor"
+  );
+  const uid = useId();
   const router = useRouter();
   // "agora" congelado na montagem — mesmo contrato do LembreteButton
   const [agoraMs] = useState(() => Date.now());
 
-  const nomeCurto = destNome.split(" ")[0];
-  const wa = waLink(telefone, mensagem);
+  // cada abertura volta na ponta da regra (a escolha da sessão anterior do
+  // preview não vaza — mesmo padrão de reset dos dialogs da casa)
+  const [abertoAntes, setAbertoAntes] = useState(aberto);
+  if (aberto !== abertoAntes) {
+    setAbertoAntes(aberto);
+    if (aberto && destinatarios) setQuem(destinatarios.padrao);
+  }
+
+  const dest: DestinatarioWA = destinatarios?.[quem] ?? {
+    nome: destNome,
+    telefone,
+    mensagem,
+  };
+  const nomeCurto = dest.nome.split(" ")[0];
+  // "Lembrar pelo app" manda a notificação pra quem a pendência aponta
+  // (nudge.destino) — escolhida a outra ponta, o dialog vira contato
+  // direto e o botão some: rotular "Lembrar" pro WhatsApp seria mentira
+  const mostraLembrar =
+    nudge != null && (destinatarios == null || quem === nudge.destino);
+  const wa = waLink(dest.telefone, dest.mensagem);
   // "Abrir WhatsApp" loga `contato` — tipo fora do cap de 48h (o cap é dos
   // nudges); sem telefone cai pra null e o item exibe o motivo
   const waContato = wa
@@ -96,7 +143,7 @@ export function DuplaWaAcao({
       try {
         const res = await enviarLembrete(duplaId, nudge.destino, {
           titulo: nudge.titulo,
-          corpo: mensagem,
+          corpo: dest.mensagem,
           href: nudge.href,
         });
         if ("error" in res) {
@@ -124,7 +171,7 @@ export function DuplaWaAcao({
       return;
     }
     try {
-      await navigator.clipboard.writeText(mensagem);
+      await navigator.clipboard.writeText(dest.mensagem);
       toast.success("Mensagem copiada.");
     } catch {
       toast.error("Não consegui copiar a mensagem.");
@@ -143,11 +190,11 @@ export function DuplaWaAcao({
         variant="outline"
         size="icon"
         onClick={() => setAberto(true)}
-        aria-label={`${rotulo} ${nomeCurto}: ver a mensagem antes de enviar`}
+        aria-label={`${rotulo} ${destNome.split(" ")[0]}: ver a mensagem antes de enviar`}
         title={
           waContato
-            ? `${rotulo} ${nomeCurto}`
-            : `${rotulo} ${nomeCurto} (sem WhatsApp cadastrado)`
+            ? `${rotulo} ${destNome.split(" ")[0]}`
+            : `${rotulo} ${destNome.split(" ")[0]} (sem WhatsApp cadastrado)`
         }
         className={cn(
           "md:w-auto md:px-3",
@@ -164,21 +211,61 @@ export function DuplaWaAcao({
         <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>
-              {nudge ? `${rotulo} ${nomeCurto}` : `Mensagem pra ${nomeCurto}`}
+              {mostraLembrar
+                ? `${rotulo} ${nomeCurto}`
+                : `Mensagem pra ${nomeCurto}`}
             </DialogTitle>
             <DialogDescription>
-              O mesmo texto pros dois canais — escolhe onde sai.
+              {destinatarios
+                ? "Escolhe quem recebe e por onde a mensagem sai."
+                : "O mesmo texto pros dois canais: escolhe onde sai."}
             </DialogDescription>
           </DialogHeader>
+          {destinatarios && (
+            <fieldset>
+              <legend className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                Quem recebe
+              </legend>
+              <div className="grid grid-cols-2 gap-1.5">
+                {(["mentorado", "mentor"] as const).map((papel) => {
+                  const p = destinatarios[papel];
+                  return (
+                    <label
+                      key={papel}
+                      title={p.nome}
+                      className="flex cursor-pointer items-center gap-2 rounded-lg border border-border px-2.5 py-2 transition-colors has-checked:border-primary/60 has-checked:bg-primary/5"
+                    >
+                      <input
+                        type="radio"
+                        name={`${uid}-dest`}
+                        checked={quem === papel}
+                        onChange={() => setQuem(papel)}
+                        className="accent-primary"
+                      />
+                      <span className="min-w-0 leading-tight">
+                        <span className="block truncate text-sm font-medium">
+                          {p.nome.split(" ")[0]}
+                        </span>
+                        <span className="block text-[11px] text-muted-foreground">
+                          {papel === "mentorado" ? "mentorado(a)" : "mentor(a)"}
+                          {p.telefone ? "" : " · sem WhatsApp"}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </fieldset>
+          )}
           <p className="whitespace-pre-wrap break-words rounded-lg bg-muted px-3 py-2.5 text-sm leading-relaxed">
-            {mensagem}
+            {dest.mensagem}
           </p>
           <DialogFooter>
             <Button variant="ghost" onClick={copiar}>
               <Copy aria-hidden />
               Copiar texto
             </Button>
-            {nudge &&
+            {mostraLembrar &&
               (bloqueado ? (
                 <Button
                   variant="outline"
@@ -193,7 +280,7 @@ export function DuplaWaAcao({
                   variant="outline"
                   onClick={lembrar}
                   disabled={pending}
-                  title="Só a notificação dentro do app — não abre WhatsApp"
+                  title="Só a notificação dentro do app, não abre WhatsApp"
                 >
                   {pending ? (
                     <CircleNotch className="animate-spin" aria-hidden />

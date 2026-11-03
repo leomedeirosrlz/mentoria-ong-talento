@@ -108,8 +108,9 @@ export function AgendaCoordenacao({
       ? sinteseMonitoramento(acompanhar, resumos, duplas, eventos, agora)
       : null;
   // as linhas saem daqui já prontas pra boundary client da fila: destino,
-  // rótulo, texto do lembrete e telefone resolvem no server — Dupla/
-  // CicloEvento não cruzam pra lá
+  // rótulo, texto do lembrete e telefone resolvem no server — a Dupla
+  // cruza inteira (o ⋯ real e o "Quem recebe" precisam dela); CicloEvento
+  // fica do lado de cá
   const linhas: LinhaFila[] = acompanhar.flatMap((item) => {
     const dupla = duplasPorId.get(item.duplaId);
     if (!dupla) return [];
@@ -132,8 +133,28 @@ export function AgendaCoordenacao({
     // encerramento pendente: a pendência é da coordenação — a fila desenha
     // o CTA "Concluir rito" (link pra ficha) no lugar do LembreteButton
     const acaoFicha = item.motivos.includes("encerramento");
+    // as duas pontas do preview "Quem recebe": o mentor leva o lembrete
+    // operacional do caso (sempre há motivo operacional na fila — apoio
+    // não põe a dupla nela sozinho); o jovem recebe a resposta do pedido
+    // de apoio dele ou o check-in neutro — nunca a cobrança do mentor
+    const lembreteMentor = acaoFicha
+      ? null
+      : lembreteDaDupla(dupla, caso, eventos, meuNome, agora);
+    const nomeJovem =
+      dupla.mentorado?.nome_social || dupla.mentorado?.nome || "Jovem";
+    const msgMentorado = apoioDoJovem
+      ? (msgsContato("apoio_jovem", {
+          mentoradoNome: nomeJovem,
+          autorNome: meuNome,
+        }).mentorado ?? "")
+      : (msgsContato({
+          eu: meuNome,
+          mentorNome: (dupla.mentor?.nome ?? "").split(" ")[0],
+          mentoradoNome: nomeJovem,
+        }).mentorado ?? "");
     return [{
       item,
+      dupla,
       destino: apoioDoJovem ? "mentorado" : "mentor",
       rotulo: apoioDoJovem ? "Chamar" : item.rotuloLembrete,
       lembrete: acaoFicha
@@ -141,16 +162,24 @@ export function AgendaCoordenacao({
         : apoioDoJovem
           ? {
               titulo: "A equipe quer te ouvir",
-              corpo:
-                msgsContato("apoio_jovem", {
-                  mentoradoNome:
-                    dupla?.mentorado?.nome_social || dupla?.mentorado?.nome,
-                  autorNome: meuNome,
-                }).mentorado ?? "",
+              corpo: msgMentorado,
             }
-          : dupla
-            ? lembreteDaDupla(dupla, caso, eventos, meuNome, agora)
-            : { titulo: "Lembrete da equipe", corpo: "" },
+          : (lembreteMentor ?? { titulo: "Lembrete da equipe", corpo: "" }),
+      destinatarios: acaoFicha
+        ? undefined
+        : {
+            padrao: apoioDoJovem ? ("mentorado" as const) : ("mentor" as const),
+            mentor: {
+              nome: dupla.mentor?.nome ?? "mentor",
+              telefone: dupla.mentor?.whatsapp ?? null,
+              mensagem: lembreteMentor?.corpo ?? "",
+            },
+            mentorado: {
+              nome: nomeJovem,
+              telefone: dupla.mentorado?.whatsapp ?? null,
+              mensagem: msgMentorado,
+            },
+          },
       telefone: apoioDoJovem
         ? (dupla?.mentorado?.whatsapp ?? null)
         : (dupla?.mentor?.whatsapp ?? null),

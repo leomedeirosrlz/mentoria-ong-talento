@@ -69,6 +69,7 @@ export function EnviarFormularioDialog({
   trigger,
   open: openProp,
   onOpenChange: onOpenChangeProp,
+  carregando,
 }: {
   formularios: FormularioOpcao[];
   duplaId: string;
@@ -84,6 +85,9 @@ export function EnviarFormularioDialog({
    *  abre o dialog fora do popup (REALIZA-157). */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** O catálogo ainda está carregando (o ⋯ da linha busca os ativos na 1ª
+   *  abertura): o vazio vira um spinner, não o "Nenhum formulário ativo". */
+  carregando?: boolean;
 }) {
   const [openInt, setOpenInt] = useState(false);
   const open = openProp ?? openInt;
@@ -122,7 +126,10 @@ export function EnviarFormularioDialog({
   // WhatsApp com URL relativa e o absoluto entra na re-render seguinte
   const origem = useOrigem();
 
-  const formSel = selecionaveis.find((f) => f.id === formId) ?? null;
+  // o catálogo pode chegar depois da abertura (o ⋯ da linha busca na 1ª
+  // vez): sem escolha explícita, o 1º ordenado vale como seleção
+  const formIdEf = formId || ordenados[0]?.id || "";
+  const formSel = selecionaveis.find((f) => f.id === formIdEf) ?? null;
   const nDestinos = Number(para.mentor) + Number(para.mentorado);
 
   const itensProntos = useMemo<LinkProntoItem[]>(
@@ -169,12 +176,12 @@ export function EnviarFormularioDialog({
 
   function gerar() {
     const destinos = (["mentor", "mentorado"] as const).filter((k) => para[k]);
-    if (!formId || !destinos.length) return;
+    if (!formIdEf || !destinos.length) return;
     start(async () => {
       let r;
       try {
         r = await gerarLinksParaDupla({
-          formularioId: formId,
+          formularioId: formIdEf,
           duplaId,
           destinos: [...destinos],
           diasValidade: validade === "0" ? null : Number(validade),
@@ -231,6 +238,17 @@ export function EnviarFormularioDialog({
               />
             </motion.div>
           ) : selecionaveis.length === 0 ? (
+            carregando ? (
+              <motion.p
+                key="carregando"
+                {...fade}
+                transition={T.enter}
+                className="flex items-center gap-2 text-sm text-muted-foreground"
+              >
+                <CircleNotch className="animate-spin" aria-hidden />
+                Carregando os formulários ativos...
+              </motion.p>
+            ) : (
             <motion.p
               key="vazio"
               {...fade}
@@ -246,6 +264,7 @@ export function EnviarFormularioDialog({
               </Link>{" "}
               e volte pra enviar daqui.
             </motion.p>
+            )
           ) : (
             <motion.div
               key="form"
@@ -256,7 +275,7 @@ export function EnviarFormularioDialog({
               <div className="space-y-1.5">
                 <Label id={formLabelId}>Formulário</Label>
                 <Select
-                  value={formId}
+                  value={formIdEf}
                   onValueChange={(v) => setFormId(v ?? "")}
                   items={Object.fromEntries(
                     ordenados.map((f) => [f.id, f.titulo])
@@ -324,7 +343,7 @@ export function EnviarFormularioDialog({
                 <Button
                   type="button"
                   onClick={gerar}
-                  disabled={pending || !formId || nDestinos === 0}
+                  disabled={pending || !formIdEf || nDestinos === 0}
                 >
                   {pending && (
                     <CircleNotch className="animate-spin" aria-hidden />

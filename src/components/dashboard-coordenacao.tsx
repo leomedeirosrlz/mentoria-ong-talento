@@ -18,6 +18,7 @@ import {
 } from "@/lib/ciclo";
 import { paraAcompanhar, saudeDoRecorte } from "@/lib/agenda-coordenacao";
 import { painelTrilhasCoord, type AlertaPedido } from "@/lib/trilhas-coord";
+import { msgsContato } from "@/lib/whatsapp-msgs";
 import { lembreteDaDupla } from "@/components/agenda-partes";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ import {
   type TomSituacao,
 } from "@/components/dupla-linha";
 import { DuplaWaAcao } from "@/components/dupla-wa-acao";
+import { DuplaLinhaMenu } from "@/components/dupla-linha-menu";
 import { SaudePrograma } from "@/components/saude-programa";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { SolicitacoesCoordCard } from "@/components/solicitacoes-coord-card";
@@ -61,6 +63,9 @@ type LinhaDupla = {
   motivo: string | null;
   progresso: ProgressoDupla;
   acao: ReactNode;
+  /** o ⋯ real — o caller decide o conteúdo por papel (as ações de
+   *  coordenação não entram no menu do supervisor) */
+  menu: ReactNode;
 };
 
 /** A fila "Precisa de você hoje": dupla (linha canônica) ou pedido de
@@ -171,6 +176,22 @@ export function DashboardCoordenacao({
     encerramentos,
     alertas: alertas?.alertas ?? [],
     meuNome,
+    // o ⋯ leva as ações de coordenação só pra coordenação — pro supervisor
+    // fica o "Ver ficha" (a tela é compartilhada)
+    menuDa: (d) => (
+      <DuplaLinhaMenu
+        dupla={d}
+        fichaHref={`/duplas/${d.id}`}
+        formulario={!supervisor}
+        remanejar={!supervisor}
+        encerrar={
+          !supervisor &&
+          d.trilha === "especialista" &&
+          !d.encerrada_em &&
+          (d.status === "ativa" || d.status === "pausada")
+        }
+      />
+    ),
   });
 
   const emRisco = duplas
@@ -539,6 +560,7 @@ function montarPrecisa({
   encerramentos,
   alertas,
   meuNome,
+  menuDa,
 }: {
   duplas: Dupla[];
   eventos: CicloEvento[];
@@ -547,6 +569,8 @@ function montarPrecisa({
   encerramentos: ReadonlySet<string>;
   alertas: AlertaPedido[];
   meuNome?: string;
+  /** o ⋯ da linha — montado pelo caller, que conhece o papel */
+  menuDa: (d: Dupla) => ReactNode;
 }): Excecao[] {
   const acompanhar = paraAcompanhar(duplas, eventos, interacoes, hoje, encerramentos);
   const itemPorDupla = new Map(acompanhar.map((it) => [it.duplaId, it]));
@@ -575,6 +599,9 @@ function montarPrecisa({
           : `esperado ${saude.esperado}`,
     };
 
+    const lembrete = item ? lembreteDoItem(d, item, eventos, meuNome, hoje) : null;
+    const nomeJovem = d.mentorado.nome_social || d.mentorado.nome;
+
     const acao: ReactNode = pedeApoio ? (
       <Link href="/chamados" className={BOTAO_ACAO}>
         Abrir apoio
@@ -583,7 +610,7 @@ function montarPrecisa({
       <Link href={`/duplas/${d.id}`} className={BOTAO_ACAO}>
         Concluir rito
       </Link>
-    ) : item ? (
+    ) : item && lembrete ? (
       // a mesma régua de lembrete da fila: o caso decisório é registro >
       // limbo > atraso > sem agendamento, e o cap de 48h vem do server. O wrapper
       // leva o alvo a 44px no celular sem mexer no botão compartilhado
@@ -592,10 +619,30 @@ function montarPrecisa({
           duplaId={d.id}
           destNome={d.mentor?.nome ?? "mentor"}
           telefone={d.mentor?.whatsapp ?? null}
-          mensagem={lembreteDoItem(d, item, eventos, meuNome, hoje).corpo}
+          mensagem={lembrete.corpo}
+          destinatarios={{
+            // a pendência é do mentor; o jovem recebe o check-in neutro —
+            // nunca a cobrança operacional
+            padrao: "mentor",
+            mentor: {
+              nome: d.mentor?.nome ?? "mentor",
+              telefone: d.mentor?.whatsapp ?? null,
+              mensagem: lembrete.corpo,
+            },
+            mentorado: {
+              nome: nomeJovem,
+              telefone: d.mentorado?.whatsapp ?? null,
+              mensagem:
+                msgsContato({
+                  eu: meuNome,
+                  mentorNome: primeiroNome(d.mentor?.nome ?? "mentor"),
+                  mentoradoNome: nomeJovem,
+                }).mentorado ?? "",
+            },
+          }}
           nudge={{
             destino: "mentor",
-            titulo: lembreteDoItem(d, item, eventos, meuNome, hoje).titulo,
+            titulo: lembrete.titulo,
             href: `/duplas/${d.id}`,
             bloqueadoAte: item.bloqueadoAte,
           }}
@@ -627,6 +674,7 @@ function montarPrecisa({
         motivo: item ? item.contextoPartes.join(" · ") : saude.motivo,
         progresso,
         acao,
+        menu: menuDa(d),
       },
     });
   }
