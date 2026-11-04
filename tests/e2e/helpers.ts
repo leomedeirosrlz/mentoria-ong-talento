@@ -1,4 +1,4 @@
-import { test as base, expect, type Page } from "@playwright/test";
+import { test as base, expect, type Locator, type Page } from "@playwright/test";
 
 // --- test fixture: bypass do Vercel escopado à origem sob teste ---
 // extraHTTPHeaders mandaria o token em TODA request — inclusive chamadas
@@ -484,4 +484,22 @@ export async function restComoUsuario(
     },
     ...(init.body !== undefined ? { body: JSON.stringify(init.body) } : {}),
   });
+}
+
+/** Confirma o AgendarEncontroDialog do mentor. Quando o horário cai fora da
+ *  grade de disponibilidade de alguém, o primeiro clique só mostra o aviso
+ *  ("Quer agendar mesmo assim?") e o botão vira "… mesmo assim" — o segundo
+ *  clique grava. Fixtures sem grade não disparam o aviso; com grade, o
+ *  horário do spec pode cair fora dela, então o helper cobre os dois. */
+export async function confirmarNoDialogAgendar(
+  dialog: Locator,
+  rotulo: "Confirmar agendamento" | "Confirmar remarcação"
+) {
+  await dialog.getByRole("button", { name: rotulo }).click();
+  const mesmoAssim = dialog.getByRole("button", { name: /mesmo assim$/ });
+  const avisou = await mesmoAssim
+    .waitFor({ state: "visible", timeout: 2_000 })
+    .then(() => true)
+    .catch(() => false);
+  if (avisou) await mesmoAssim.click();
 }

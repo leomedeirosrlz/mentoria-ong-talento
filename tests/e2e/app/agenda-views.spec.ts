@@ -10,6 +10,7 @@ import {
   loginComSenha,
   relogar,
   test,
+  confirmarNoDialogAgendar,
 } from "../helpers";
 
 // REALIZA-25 — as visões novas da agenda do mentor: "Semana" (grade compacta
@@ -351,9 +352,7 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
     const valor = await campo.inputValue();
     await page.screenshot({ path: "/tmp/realiza25-dialog-slot.png" });
 
-    await dialog
-      .getByRole("button", { name: "Confirmar agendamento" })
-      .click();
+    await confirmarNoDialogAgendar(dialog, "Confirmar agendamento");
     await expect(
       page.getByText(/Agendamento confirmado: 1º encontro\./)
     ).toBeVisible();

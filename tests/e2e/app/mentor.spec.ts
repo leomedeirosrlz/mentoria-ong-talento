@@ -10,6 +10,7 @@ import {
   loginComSenha,
   relogar,
   test,
+  confirmarNoDialogAgendar,
 } from "../helpers";
 
 // Backend real (staging ou supabase local do CI): a fixture vem de
@@ -147,9 +148,7 @@ test.describe("mentor DPP — fluxos reais", () => {
     const ymd = `${futuro.getFullYear()}-${String(futuro.getMonth() + 1).padStart(2, "0")}-${String(futuro.getDate()).padStart(2, "0")}`;
     await dialog.locator("#data_hora").fill(`${ymd}T19:00`);
 
-    await dialog
-      .getByRole("button", { name: "Confirmar agendamento" })
-      .click();
+    await confirmarNoDialogAgendar(dialog, "Confirmar agendamento");
 
     // toast de sucesso e o dialog fecha — o refresh traz o card novo.
     // O card da home fala "Nº encontro agendado" — o toast novo é
@@ -308,9 +307,7 @@ test.describe("mentor DPP — fluxos reais", () => {
       ).toHaveCount(0);
       await dialog.locator("#motivo-select").click();
       await page.getByRole("option", { name: "Conflito de agenda" }).click();
-      await dialog
-        .getByRole("button", { name: "Confirmar remarcação" })
-        .click();
+      await confirmarNoDialogAgendar(dialog, "Confirmar remarcação");
 
       await expect(
         page.getByText("Remarcação confirmada: 4º encontro.")
