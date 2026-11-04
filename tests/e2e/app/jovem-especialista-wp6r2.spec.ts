@@ -29,14 +29,13 @@ import type { Page } from "@playwright/test";
 //      caso do RLS: o jovem não lê profiles alheios, então a projeção
 //      costura o nome via jovem_contatos. Sem o stitch cai "Seu mentor
 //      sugeriu…" — a Ana tem que ler "Otávio Martins sugeriu…";
-//   3) card-CTA da home no estado "triagem" — pedido aguardando_coord do
-//      jovem sem DPP ganha o badge "com a coordenação".
+//   (o caso 3, card-CTA de triagem, saiu na 0158: sem triagem da
+//   coordenação, o pedido do jovem sem DPP vai direto ao mural)
 //
 // Fixture de* é compartilhada e read-only aqui: nada clica em
 // confirmar/dispensar — a sugestão …1004 tem que continuar 'sugerida'.
 
 const JOVEM_EMAIL = process.env.E2E_JOVEM_EMAIL ?? "jovem-e2e@realiza.test";
-const JOVEM2_EMAIL = process.env.E2E_JOVEM2_EMAIL ?? "jovem2-e2e@realiza.test";
 const SENHA = process.env.E2E_MENTOR_PASSWORD ?? "";
 const DEMO_SENHA = process.env.DEMO_PASSWORD ?? "realiza123";
 const ANA_EMAIL = "jovem@realiza.test";
@@ -123,7 +122,7 @@ async function convergirWp6R2() {
   await convergirDuplaAtiva(IDS.duplaDpp);
 }
 
-test.describe("WP6-R2 — encaixa, autor da sugestão e CTA de triagem", () => {
+test.describe("WP6-R2 — encaixa e autor da sugestão", () => {
   test.describe.configure({ mode: "serial" });
   test.beforeEach(convergirWp6R2);
   test.afterAll(convergirWp6R2);
@@ -245,37 +244,5 @@ test.describe("WP6-R2 — encaixa, autor da sugestão e CTA de triagem", () => {
     ).toBeVisible();
     await expect(sugestoes.getByText(/Pensando em:/)).toBeVisible();
     await expect(sugestoes.getByText(/Luísa/)).toBeVisible();
-  });
-
-  test("home do jovem sem DPP: pedido em triagem ganha 'com a coordenação'", async ({
-    page,
-  }) => {
-    await inserirViaServiceRole("solicitacoes_especialista", {
-      mentorado_id: IDS.mentoradoSemDpp,
-      demanda:
-        "E2E-146: primeiro pedido sem dupla — a coordenação precisa olhar antes",
-      motivo: null,
-      origem: "jovem",
-      status: "aguardando_coord",
-      turma: "T1 · E2E",
-      created_by: IDS.jovem2Profile,
-    });
-
-    await loginComSenha(page, JOVEM2_EMAIL, SENHA);
-    // home: a seção de especialistas só abre com ação — pedido em triagem
-    // não gera card; a linha honesta "com a coordenação" mora na mesa de
-    // pedidos da página
-    await page.goto("/jovem");
-    await expect(cardHome(page)).toHaveCount(0);
-    await page.goto("/jovem/especialistas");
-    const item = secaoPedidos(page).locator("li").first();
-    await expect(
-      item.getByText("A coordenação tá olhando seu pedido antes de liberar.")
-    ).toBeVisible();
-    await expect(
-      item.getByText(
-        "A coordenação libera o pedido pra ele chegar aos especialistas."
-      )
-    ).toBeVisible();
   });
 });

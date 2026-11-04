@@ -2284,6 +2284,7 @@ export function demoChamadosFila(role: AppRole): ChamadoFilaItem[] {
           : "mentorado",
         atribuido_nome: restrito ? null : nome(c.atribuido_a),
         contexto,
+        mentorado_nome: restrito ? null : mNome,
       } as ChamadoFilaItem;
     })
     .sort((a, b) => {

@@ -328,6 +328,13 @@ export function ChamadoDetalhe({
                       : "Ainda sem responsável"
                   }
                 />
+                {/* pro jovem o mentorado da dupla é ele mesmo — omitir */}
+                {chamado.mentorado_nome && papel !== "mentorado" && (
+                  <FatoChamado
+                    rotulo="Mentorado"
+                    valor={chamado.mentorado_nome}
+                  />
+                )}
                 <FatoChamado
                   rotulo="Aberto em"
                   valor={formatDiaMes(chamado.created_at)}

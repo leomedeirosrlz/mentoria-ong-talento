@@ -724,6 +724,9 @@ export type ChamadoFilaItem = ChamadoFila & {
   autor_papel: string | null;
   atribuido_nome: string | null;
   contexto: string | null; // "Encontro 4 · Ana" — origem+dupla resumidos
+  /** Nome do mentorado da dupla vinculada (chamados.dupla_id) — null sem
+   *  dupla, quando restrito, ou quando a RLS não entrega a dupla. */
+  mentorado_nome: string | null;
 };
 
 export type ChamadoAtualizacao = {
