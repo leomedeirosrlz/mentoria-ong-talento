@@ -117,7 +117,6 @@ export function PedirEspecialistaDialog({
   especialistas,
   trilhasAtivas,
   slotsPorEsp,
-  semDuplaDpp,
   preEspId,
   preSlot,
   trigger,
@@ -133,9 +132,6 @@ export function PedirEspecialistaDialog({
   /** Slots livres já trazidos pelo server (a agenda passa o do próprio
    *  especialista); o resto o dialog busca on-demand na escolha. */
   slotsPorEsp?: Record<string, string[]>;
-  /** Jovem sem dupla DPP ativa — o pedido entra na triagem da coordenação
-   *  antes do mural (status aguardando_coord). Só muda o texto do aviso. */
-  semDuplaDpp?: boolean;
   /** Prefill — a agenda abre já apontando pro especialista/slot clicado. */
   preEspId?: string | null;
   preSlot?: string | null;
@@ -221,17 +217,11 @@ export function PedirEspecialistaDialog({
           toast.error(res.error);
           return;
         }
-        if (res?.status === "aguardando_coord") {
-          toast.success(
-            "Pedido registrado! A coordenação dá uma olhada e libera pros especialistas."
-          );
-        } else {
-          toast.success(
-            esp
-              ? `Pedido enviado pra ${primeiro(esp.nome_social || esp.nome)}!`
-              : "Pedido enviado pro mural dos especialistas!"
-          );
-        }
+        toast.success(
+          esp
+            ? `Pedido enviado pra ${primeiro(esp.nome_social || esp.nome)}!`
+            : "Pedido enviado pro mural dos especialistas!"
+        );
         setOpen(false);
         onEnviado?.();
         router.refresh();
@@ -440,13 +430,6 @@ export function PedirEspecialistaDialog({
                 </>
               )}
             </div>
-          )}
-
-          {modo && semDuplaDpp && (
-            <p className="text-xs leading-relaxed text-muted-foreground">
-              Como você ainda não tá numa dupla do programa, a coordenação dá
-              uma olhada no pedido antes dele chegar aos especialistas.
-            </p>
           )}
 
           {/* sticky: a lista de especialistas rola até 40dvh — o envio fica

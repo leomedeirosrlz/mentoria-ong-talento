@@ -65,6 +65,7 @@ import {
   eventosDoCronograma,
   formatDate,
   formatDateTime,
+  rotuloSlot,
   foraDoPrograma,
   jornadaDaDupla,
   linkSeguro,
@@ -683,6 +684,26 @@ export default async function DuplaPage({
       />
     ) : null;
 
+  // o próximo já marcado: o lugar do "Agendar" vira "Remarcar" com a data —
+  // as duas duplas do mentor mostram o mesmo botão, cada uma no seu estado
+  // (feedback da mentora: "a Larissa tem mais botões que a Ana")
+  const remarcarMentor =
+    souMentor && podeAgendar && proximoJaAgendado && encontroAlvo?.data_hora ? (
+      <AgendarEncontroDialog
+        duplaId={dupla.id}
+        numero={proximoNumero}
+        atual={encontroAlvo}
+        piso={dupla.iniciada_em ?? undefined}
+        jovemNome={primeiroNomeMentorado}
+        trigger={
+          <Button variant="outline" size="sm">
+            <CalendarBlank aria-hidden />
+            Remarcar {proximoNumero}º · {rotuloSlot(encontroAlvo.data_hora)}
+          </Button>
+        }
+      />
+    ) : null;
+
   // o encontro atual da jornada — a aba Agora mostra o que fazer nele
   const noAtual = numeroAtual != null
     ? (jornada.nos.find((n) => n.numero === numeroAtual) ?? null)
@@ -735,37 +756,31 @@ export default async function DuplaPage({
   }
   if (!ehEsp && solEmAberto) {
     pedidos.push(
-      (solEmAberto.status_efetivo ?? solEmAberto.status) === "aguardando_coord" ? (
-        <p key="espera" className="rounded-lg bg-muted/50 px-3.5 py-3 text-sm text-muted-foreground">
-          Pedido de especialista em triagem na coordenação.
-        </p>
-      ) : (
-        // o pedido em andamento é assunto da ficha: quem abriu (ou a coord)
-        // responde a proposta daqui; a thread mostra a mesa
-        <div key="negociacao" className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
-          <p className="mb-2 text-xs font-semibold text-foreground">Mentor especialista</p>
-          {/* papel-no-contexto (WP6b): o componente só habilita o lado
-              especialista quando o visitante é o alvo/desejado ou o
-              pedido é broadcast — informar o papel efetivo é seguro e
-              destrava o híbrido DPP-primário */}
-          <SolicitacaoNegociacao
-            s={solEmAberto}
-            propostas={propostasAberta}
-            slots={slotsEsp}
-            meuId={me.id}
-            papel={
-              temPapel(me, "mentor_especialista")
-                ? "mentor_especialista"
-                : me.role
-            }
-            mentoradosProprios={
-              souMentor && dupla.trilha !== "especialista"
-                ? [dupla.mentorado.id]
-                : undefined
-            }
-          />
-        </div>
-      )
+      // o pedido em andamento é assunto da ficha: quem abriu (ou a coord)
+      // responde a proposta daqui; a thread mostra a mesa
+      <div key="negociacao" className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
+        <p className="mb-2 text-xs font-semibold text-foreground">Mentor especialista</p>
+        {/* papel-no-contexto (WP6b): o componente só habilita o lado
+            especialista quando o visitante é o alvo/desejado ou o
+            pedido é broadcast — informar o papel efetivo é seguro e
+            destrava o híbrido DPP-primário */}
+        <SolicitacaoNegociacao
+          s={solEmAberto}
+          propostas={propostasAberta}
+          slots={slotsEsp}
+          meuId={me.id}
+          papel={
+            temPapel(me, "mentor_especialista")
+              ? "mentor_especialista"
+              : me.role
+          }
+          mentoradosProprios={
+            souMentor && dupla.trilha !== "especialista"
+              ? [dupla.mentorado.id]
+              : undefined
+          }
+        />
+      </div>
     );
   }
   if (!ehEsp && sugestaoPendente) {
@@ -1512,6 +1527,7 @@ export default async function DuplaPage({
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {souMentor && primarioMentor}
           {souMentor && agendarMentor}
+          {remarcarMentor}
           {!souMentor && acaoWA && <DuplaWaAcao {...acaoWA} />}
 
           {/* secundárias em outline: o pedido de apoio do mentor; a
@@ -1572,6 +1588,19 @@ export default async function DuplaPage({
                 : null
             }
             solicitar={podeSolicitar ? { especialistas } : null}
+            solicitarEstado={
+              !ehEsp &&
+              dupla.status === "ativa" &&
+              (souMentor || souCoord) &&
+              solEmAberto
+                ? "Pedido de especialista em andamento"
+                : null
+            }
+            sugerirEstado={
+              !ehEsp && dupla.status === "ativa" && souMentor && sugestaoPendente
+                ? `Sugestão enviada, aguardando ${primeiroNomeMentorado}`
+                : null
+            }
             sugerir={
               podeSugerir
                 ? {

@@ -1996,8 +1996,8 @@ function build(): DemoData {
       desejado: { nome: helena.nome },
     },
     {
-      // pedido do Wendel SEM dupla DPP: entra na fila de triagem da
-      // coordenação — liberar exige definir a turma (reconhecer_solicitacao)
+      // pedido do Wendel SEM dupla DPP: vai direto ao mural como qualquer
+      // outro (0158: sem triagem da coordenação)
       id: uid(S.triagem),
       mentorado_id: wendel.id,
       dupla_dpp_id: null,
@@ -2010,10 +2010,10 @@ function build(): DemoData {
       especialista_desejado_id: null,
       especialista_id: null,
       dupla_id: null,
-      status: "aguardando_coord",
+      status: "aberta",
       created_by: wendelLogin.id,
       // 6 dias parado: o limiar do alerta do painel da coordenação é 5 —
-      // o Wendel aparece nos "Pedidos parados" como o caso de triagem
+      // o Wendel aparece nos "Pedidos parados" como pedido sem aceite
       created_at: haDias(6, "09:15"),
       respondida_em: null,
       mentorado: { nome: wendel.nome },

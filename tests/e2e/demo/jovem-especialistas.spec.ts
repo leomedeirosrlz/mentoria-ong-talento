@@ -13,7 +13,7 @@ import { entrarNaDemo, expect, test } from "../helpers";
 // A persona mentor_especialista (Sofia) cobre o mural: busca acento-
 // insensível, chips de filtro, "Direcionada a você". A persona coordenacao
 // cobre o painel somente-leitura de trilhas + "Pedidos parados" (o pedido
-// do Wendel está parado na triagem há 6 dias — acima do limiar de 5).
+// do Wendel está parado no mural há 6 dias — acima do limiar de 5).
 
 const secaoPedidos = (page: import("@playwright/test").Page) =>
   page.locator("section#pedidos");
@@ -347,17 +347,16 @@ test.describe("especialista — mural com busca e filtros", () => {
     await expect(
       dirigido.getByText("Solicitado por Carlos Menezes")
     ).toBeVisible();
-    // o pedido aberto da própria Bia traz o selo "pedido do jovem"
-    const daBia = lista.locator("> li", { hasText: "pedido do jovem" });
+    // o pedido aberto da própria Bia traz o selo "pedido do jovem" (o do
+    // Wendel, sem dupla DPP, também está no mural desde a 0158)
+    const daBia = lista.locator("> li", { hasText: "Solicitado por Bia" });
     await expect(daBia).toHaveCount(1);
-    await expect(
-      daBia.getByText("Solicitado por Bia")
-    ).toBeVisible();
+    await expect(daBia.getByText("pedido do jovem")).toBeVisible();
   });
 });
 
 test.describe("coordenação — painel de trilhas e pedidos parados", () => {
-  test("home da coord: trilhas somente-leitura + alerta de triagem parada", async ({
+  test("home da coord: trilhas somente-leitura + alerta de pedido parado", async ({
     page,
   }) => {
     await entrarNaDemo(page, "coordenacao");
@@ -374,7 +373,7 @@ test.describe("coordenação — painel de trilhas e pedidos parados", () => {
       .click();
     await expect(page.getByText("Somente leitura").first()).toBeVisible();
 
-    // alerta operacional — o pedido do Wendel espera triagem há 6 dias
+    // alerta operacional — o pedido do Wendel espera aceite há 6 dias
     // (limiar configurado: 5) e tem que aparecer em "Pedidos parados"
     const parados = page.locator('section[aria-label="Pedidos parados"]');
     await expect(parados).toBeVisible();

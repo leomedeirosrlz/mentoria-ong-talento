@@ -202,9 +202,8 @@ describe("nomeEspDoPedido — a costura que a RLS não faz", () => {
 
 describe("resumoPedidoJovem — a linha de estado na voz dele", () => {
   it("cada status diz onde a bola está", () => {
-    expect(resumoPedidoJovem("aguardando_coord", null)).toContain(
-      "coordenação"
-    );
+    // sem triagem desde a 0158: o legado lê como o mural
+    expect(resumoPedidoJovem("aguardando_coord", null)).toContain("mural");
     expect(resumoPedidoJovem("aberta", "Lena")).toContain("Lena");
     expect(resumoPedidoJovem("aberta", null)).toContain("mural");
     expect(resumoPedidoJovem("contra_proposta", "Lena")).toContain("Lena");
@@ -363,13 +362,13 @@ describe("stepperCicloDeVida — o ol.life do mock v6", () => {
     expect(passos[4].data).toBeNull();
   });
 
-  it("aguardando_coord relê o nó do mural como 'Em triagem'", () => {
+  it("aguardando_coord legado lê o nó do mural como 'No mural' (0158)", () => {
     const passos = stepperCicloDeVida({
       solicitacao: sol({ status: "aguardando_coord" }),
       dupla: null,
       hoje: HOJE,
     });
-    expect(passos[1]).toMatchObject({ rotulo: "Em triagem", estado: "atual" });
+    expect(passos[1]).toMatchObject({ rotulo: "No mural", estado: "atual" });
   });
 
   it("sugerida: 'Sugestão do mentor' é o nó vivo e o mural fica futuro", () => {
