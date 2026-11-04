@@ -1,5 +1,10 @@
-name: deploy
+name: deploy (legado)
 
+# LEGADO (nov/2026): o staging e a produção são servidos pela Vercel
+# (staging.realiza.vc = branch staging, deploy pelo [deploy] no Ignored
+# Build Step). Este pipeline self-hosted fica só como referência e roda
+# apenas à mão (workflow_dispatch) — não dispara mais em push.
+#
 # Deploy self-hosted por tag: commit com [deploy] → imagem → GHCR → SSH
 # no host → compose up → deployment_status sintético → e2e-preview roda
 # a suite INALTERADA contra o staging (regra: nada sobe sem preview
@@ -20,8 +25,7 @@ name: deploy
 #   echo $GHCR_PAT | docker login ghcr.io -u USER --password-stdin
 
 on:
-  push:
-    branches: [staging, main]
+  workflow_dispatch:
 
 permissions:
   contents: read
