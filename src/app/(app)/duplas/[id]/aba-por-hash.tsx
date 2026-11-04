@@ -18,7 +18,8 @@ export function AbaPorHash() {
     const aba =
       url.hash.startsWith("#registrar-") ||
       url.hash.startsWith("#combinados-") ||
-      url.hash.startsWith("#intencoes")
+      url.hash.startsWith("#intencoes") ||
+      url.hash.startsWith("#encontro-")
         ? "encontros"
         : url.hash === "#instrumentos"
           ? "instrumentos"
@@ -26,7 +27,10 @@ export function AbaPorHash() {
     if (!aba) return;
     url.searchParams.set("aba", aba);
     router.replace(`${url.pathname}${url.search}${url.hash}`, {
-      scroll: aba === "instrumentos",
+      // todo hash mapeado é âncora de leitura: o router rola pro alvo e,
+      // no caso #registrar-, o RegistroInline ainda abre o form por cima
+      // (scroll extra pro mesmo lugar, sem custo)
+      scroll: true,
     });
   }, [router]);
 

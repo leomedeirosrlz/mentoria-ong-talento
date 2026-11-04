@@ -22,6 +22,7 @@ import {
   type PainelJornadaLinha,
 } from "@/lib/jornada";
 import { lembreteBloqueadoAte } from "@/lib/ciclo";
+import { autoria } from "@/lib/whatsapp-msgs";
 import type { Interacao } from "@/lib/interacoes";
 import { turmaCurta } from "@/lib/turma";
 import type { CicloEvento } from "@/lib/types";
@@ -290,7 +291,7 @@ function LinhaAtrasado({
             duplaId={linha.dupla_id}
             destNome={linha.jovem_nome}
             telefone={info.jovemWhatsapp}
-            mensagem={`Oi ${primeiro}, tudo bem? Aqui é ${eu}, da equipe do Realiza.vc. ${
+            mensagem={`Oi ${primeiro}, tudo bem? ${autoria(eu || undefined)}. ${
               nomes.length === 1 ? "Uma atividade" : "Algumas atividades"
             } da sua jornada ${nomes.length === 1 ? "está" : "estão"} esperando por você: ${lista}. É só abrir Minha jornada no app.`}
             nudge={{

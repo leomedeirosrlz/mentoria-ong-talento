@@ -618,6 +618,7 @@ export default async function AgendaPage({
             duplas={duplasCtx}
             role={me?.role ?? null}
             papeis={me?.papeis ?? null}
+            autorNome={me?.nome ?? undefined}
             mentores={mentoresCtx}
             presencas={presencasPorEvento}
             // Overlay "quem pode nesse dia" — só o mentor DPP puro

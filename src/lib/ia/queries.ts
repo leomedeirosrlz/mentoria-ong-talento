@@ -546,8 +546,11 @@ export async function getInstrumentosDaDuplaIa(
 
 // ---------- RAG dos guias (match_ia_chunks, 0136) ----------
 
-/** Um trecho citável dos guias oficiais — guia/secao/pagina são a referência
- *  que o modelo cita na resposta ("Guia do Mentor DPP, cap. 10"). */
+/** Um trecho citável dos guias oficiais. A referência que o modelo cita é
+ *  guia/secao ("Guia do Mentor DPP, cap. 10") — `pagina` é só o id
+ *  sintético do chunk dentro do documento (ingerir-guias.mjs: si×100+ci),
+ *  não a página do PDF: fica aqui pra identidade/dedup e NÃO sai pro
+ *  modelo nem pro card de fontes. */
 export type FonteGuia = {
   guia: string;
   secao: string | null;

@@ -428,7 +428,7 @@ function CardDuplaAux({
             nudge={{
               destino: "mentor",
               titulo: lembrete.titulo,
-              href: `/duplas/${d.id}`,
+              href: lembrete.href ?? `/duplas/${d.id}`,
               bloqueadoAte: lembreteBloqueadoAte(nudge, agora),
             }}
           />
@@ -640,7 +640,10 @@ function LinhaConsolidada({
                     nudge={{
                       destino: "mentor",
                       titulo: lembrete.titulo,
-                      href: item.href ?? `/duplas/${item.duplaId}`,
+                      href:
+                        item.href ??
+                        lembrete.href ??
+                        `/duplas/${item.duplaId}`,
                       bloqueadoAte: lembreteBloqueadoAte(nudge, agora),
                     }}
                   />

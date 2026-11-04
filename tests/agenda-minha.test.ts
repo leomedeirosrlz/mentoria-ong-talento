@@ -371,7 +371,7 @@ describe("pendências — warnrows do topo do Hoje", () => {
     expect(item!.acoes).toContain("entrar");
   });
 
-  it("combinado pendente com prazo vencido vira aviso pro #combinados", () => {
+  it("combinado pendente com prazo vencido vira aviso pro item na ficha", () => {
     const d = mkDupla({
       encaminhamentos: [
         mkEncaminhamento({ id: "c-venc", prazo: "2026-10-05" }),
@@ -382,7 +382,7 @@ describe("pendências — warnrows do topo do Hoje", () => {
     const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
     expect(a.avisos).toHaveLength(1);
     expect(a.avisos[0].titulo).toBe("Combinado vencido · Ana · 2026/2027");
-    expect(a.avisos[0].href).toBe("/duplas/d1#combinados");
+    expect(a.avisos[0].href).toBe("/duplas/d1#combinado-c-venc");
   });
 });
 

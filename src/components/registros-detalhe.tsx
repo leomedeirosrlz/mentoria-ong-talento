@@ -38,7 +38,10 @@ export function RegistroDetalhe({
   const aconteceuEm = enc?.realizado_em ?? enc?.data_hora ?? null;
   const tardio = registroTardio(r, enc);
   const diasAtraso = tardio ? diasAtrasoRegistro(r, enc) : 0;
-  const href = dupla && enc ? `/duplas/${dupla.id}#registrar-${enc.id}` : null;
+  const href =
+    dupla && enc
+      ? `/duplas/${dupla.id}?aba=encontros#registrar-${enc.id}`
+      : null;
   const numero =
     passoEsp != null
       ? `${passoEsp}º passo`

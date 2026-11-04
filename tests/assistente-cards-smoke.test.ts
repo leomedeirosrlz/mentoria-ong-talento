@@ -123,7 +123,7 @@ const BLOCOS: UiBloco[] = [
   {
     kind: "fontes",
     fontes: [
-      { guia: "instrumento-definindo-minhas-metas", secao: "Metas SMART", pagina: 3, trecho: "Cada meta tem prazo." },
+      { guia: "instrumento-definindo-minhas-metas", secao: "Metas SMART", trecho: "Cada meta tem prazo." },
     ],
   },
 ];
@@ -212,7 +212,10 @@ describe("UiCard: conteúdo", () => {
     expect(inst).toContain("Não enviado");
     const fontes = html(de("fontes"));
     expect(fontes).toContain("Instrumento: Definindo Minhas Metas");
-    expect(fontes).toContain("pág. 3");
+    expect(fontes).toContain("Metas SMART");
+    // a referência citável é guia + seção: "pág." do banco era o id do
+    // chunk e lia como página inexistente no documento
+    expect(fontes).not.toContain("pág.");
     expect(fontes).toContain('aria-expanded="false"');
   });
 });

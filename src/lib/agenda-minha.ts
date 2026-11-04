@@ -345,7 +345,7 @@ function avisosDaDupla(d: Dupla, hoje: string, agoraMs: number): AvisoAgenda[] {
       detalhe: `${enc.descricao}. O prazo era ${formatDiaMes(enc.prazo)}${
         enc.responsavel === "mentor" ? "" : " (combinado do mentorado)"
       }.`,
-      href: `/duplas/${d.id}#combinados`,
+      href: `/duplas/${d.id}#combinado-${enc.id}`,
       cta: "Ver combinado",
       remarcar: false,
     });

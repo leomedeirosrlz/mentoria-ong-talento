@@ -44,6 +44,7 @@ import {
   papeisDoUsuario,
   type DuplaIa,
 } from "./queries";
+import { limparTrecho } from "./fontes";
 import { embedQuery } from "./embed";
 
 /** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário. */
@@ -421,7 +422,7 @@ export const IA_TOOLS = {
   guia_consulta: {
     nome: "guia_consulta",
     descricao:
-      "Busca nos guias oficiais do programa (Guia do Mentor DPP, Guia do Mentor Especialista, cronograma do ciclo, instrumentos e decisões operacionais da plataforma): metodologia, encontros, instrumentos, papéis, regras de reposição, formação, LGPD/termo. Use pra qualquer pergunta sobre 'como funciona', 'o que o guia diz', metodologia ou regras do programa — NÃO pra dados das duplas do usuário (essas saem das outras tools). Devolve trechos citáveis com guia, seção e página + `guias` (o catálogo completo de documentos disponíveis — use pra responder quando perguntarem quais guias/fontes existem); quando não achar trecho pro termo, diga que não está nos guias e sugira a coordenação. Chame **no máximo uma vez** por pergunta — depois responda com os trechos recebidos (cite guia e seção).",
+      "Busca nos guias oficiais do programa (Guia do Mentor DPP, Guia do Mentor Especialista, cronograma do ciclo, instrumentos e decisões operacionais da plataforma): metodologia, encontros, instrumentos, papéis, regras de reposição, formação, LGPD/termo. Use pra qualquer pergunta sobre 'como funciona', 'o que o guia diz', metodologia ou regras do programa — NÃO pra dados das duplas do usuário (essas saem das outras tools). Devolve trechos citáveis com guia e seção (sem número de página: a referência é sempre 'documento, seção') + `guias` (o catálogo completo de documentos disponíveis — use pra responder quando perguntarem quais guias/fontes existem); quando não achar trecho pro termo, diga que não está nos guias e sugira a coordenação. Chame **no máximo uma vez** por pergunta — depois responda com os trechos recebidos (cite guia e seção).",
     schema: guiaArgs,
     roles: TODOS_PAPEIS,
     run: async ({ pergunta }: z.infer<typeof guiaArgs>, ctx) => {
@@ -455,13 +456,15 @@ export const IA_TOOLS = {
         vistas.add(chave);
         return true;
       });
-      // score sai fora — número de ranking não ajuda o modelo a citar
+      // score sai fora — número de ranking não ajuda o modelo a citar;
+      // pagina também (é o id sintético do chunk, não página do documento
+      // — citá-la lia como "pág. 200" num guia sem essa paginação); e o
+      // trecho sai limpo, sem <b> do headline nem markdown cru do chunk
       return {
         fontes: unicas.slice(0, 4).map((f) => ({
           guia: f.guia,
           secao: f.secao,
-          pagina: f.pagina,
-          trecho: f.trecho,
+          trecho: limparTrecho(f.trecho, 600),
         })),
         guias,
       };

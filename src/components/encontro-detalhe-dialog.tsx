@@ -311,7 +311,7 @@ export function EncontroDetalheDialog({
 
           <div className="border-t pt-3">
             <Link
-              href={`/duplas/${dupla.id}#registrar-${encontro.id}`}
+              href={`/duplas/${dupla.id}?aba=encontros#encontro-${encontro.id}`}
               className="inline-flex min-h-11 items-center gap-1 text-xs font-medium underline underline-offset-2 hover:text-muted-foreground sm:min-h-0"
             >
               Abrir na ficha da dupla

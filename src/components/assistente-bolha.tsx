@@ -607,8 +607,10 @@ export function AssistenteBolha({
           className="animate-in zoom-in-50 spin-in-45 duration-200"
         />
       ) : (
+        // mobile enche o botão (a bolha é da mesma lima do FAB — só a
+        // cara cresce); desktop fica com o respiro de 44 dentro de 56
         <LizaBlob
-          tamanho={44}
+          tamanho={desktop ? 44 : 48}
           estado={falando(estadoFab)}
           className="animate-in zoom-in-50 spin-in-[-45deg] duration-200"
         />

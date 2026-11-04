@@ -786,6 +786,7 @@ export function AgendaCalendario({
   presencas = {},
   mentorDisponibilidade,
   papeis = null,
+  autorNome,
 }: {
   eventos: CicloEvento[];
   /** Cronogramas do programa (0061) — cada um é um calendário oficial por
@@ -825,6 +826,9 @@ export function AgendaCalendario({
   /** Papéis efetivos (WP6b) — o híbrido esp-primário também é mentor nas
    *  duplas DPP dele; sem a prop cai no role primário (comportamento antigo) */
   papeis?: AppRole[] | null;
+  /** Nome de quem vê a agenda — assina os textos de WhatsApp dos nudges
+   *  (sem ele, a assinatura cai no genérico "a equipe"). */
+  autorNome?: string;
 }) {
   const ehMentor = temPapel({ role, papeis }, "mentor_dpp") ||
     temPapel({ role, papeis }, "mentor_especialista");
@@ -1866,6 +1870,7 @@ export function AgendaCalendario({
       onAlternarRegistro={(abrir) =>
         setRegistroAberto(abrir ? item.encontro.id : null)
       }
+      autorNome={autorNome}
       onRegistroSalvo={() => {
         setRegistroAberto(null);
         router.refresh();
@@ -2155,6 +2160,7 @@ export function AgendaCalendario({
                     key={d.id}
                     dupla={d}
                     numero={oficialDoDia!.numero!}
+                    autorNome={autorNome}
                   />
                 ))}
               </ul>
@@ -3368,6 +3374,7 @@ export function AgendaCalendario({
                           key={d.id}
                           dupla={d}
                           numero={oficialSemana.numero!}
+                          autorNome={autorNome}
                         />
                       ))}
                     </ul>
@@ -3967,6 +3974,7 @@ function EncontroDuplaRow({
   aberto,
   onAlternarRegistro,
   onRegistroSalvo,
+  autorNome,
 }: {
   item: ItemDupla;
   selecionado: string;
@@ -3983,6 +3991,8 @@ function EncontroDuplaRow({
   aberto: boolean;
   onAlternarRegistro: (abrir: boolean) => void;
   onRegistroSalvo: () => void;
+  /** Nome de quem opera — assina os textos de WhatsApp do nudge. */
+  autorNome?: string;
 }) {
   // coord/sup: a linha abre o "Detalhes do encontro" — registro, plano do
   // mentor e evidências do dia sem sair da agenda
@@ -4006,6 +4016,7 @@ function EncontroDuplaRow({
     const msgs = msgsContato(limbo ? "limbo" : "registro_pendente", {
       mentorNome: dupla.mentor.nome,
       mentoradoNome: dupla.mentorado.nome,
+      autorNome,
       extra: `${encontro.numero}º`,
     });
     return [
@@ -4022,7 +4033,7 @@ function EncontroDuplaRow({
         t: "contato",
       },
     ];
-  }, [registroPendente, limbo, dupla, encontro.numero]);
+  }, [registroPendente, limbo, dupla, encontro.numero, autorNome]);
   // mentor com registro pendente cai direto no card do encontro na página da
   // dupla — lá a âncora abre o RegistroInline; aqui o caminho curto é o CTA.
   // (só usado no ramo ehMentor — coord/sup abrem o detalhe em modal)
@@ -4441,10 +4452,20 @@ function BucketEncontros({
  *  "WhatsApp" abre a conversa dos dois lados (mentor agenda; o mentorado é
  *  canal quando a dupla some). Sem cor de alarme: não marcar ainda é estado
  *  normal, não falha. */
-function LinhaSemEncontro({ dupla, numero }: { dupla: Dupla; numero: number }) {
+function LinhaSemEncontro({
+  dupla,
+  numero,
+  autorNome,
+}: {
+  dupla: Dupla;
+  numero: number;
+  /** Nome de quem opera — assina o texto de WhatsApp do nudge. */
+  autorNome?: string;
+}) {
   const msgs = msgsContato("sem_encontro", {
     mentorNome: dupla.mentor.nome,
     mentoradoNome: dupla.mentorado.nome,
+    autorNome,
     extra: `${numero}º`,
   });
   const destinos: DestinoWA[] = [

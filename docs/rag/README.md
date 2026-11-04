@@ -110,4 +110,11 @@ o slug de material nem o título oficial. O script já carrega
 insert fica no schema atual. Para a citação virar link direto a partir do
 banco, falta migration: colunas `material`/`titulo` em `ia_chunks` (ou
 tabela `ia_fontes` com o mapa `guia → metadados`) + retorno do campo em
-`match_ia_chunks`. Até lá, o mapa canônico é `fontes.json`/front-matter.
+`match_ia_chunks`. Até lá, o mapa canônico é `fontes.json`/front-matter —
+duplicado à mão em `src/lib/ia/fontes.ts` (`META_FONTE`, com o destino de
+cada guia na interface).
+
+**`pagina` é o id sintético do chunk** (`seção×100+ordem`), não a página
+do documento — o app filtra antes de mostrar/citar ("pág. 200" lia como
+página inexistente). Se algum dia o schema ganhar página real do PDF, aí
+sim ela volta ao circuito de citação.

@@ -1,4 +1,5 @@
 import { lembreteBloqueadoAte, type DuplaSaude } from "@/lib/ciclo";
+import { limboFechado } from "@/lib/agenda-minha";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import type { Dupla, Encontro } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
@@ -9,17 +10,16 @@ import type { DestinatariosWA, NudgeWA } from "@/components/dupla-wa-acao";
 // 48h. Devolve as props do DuplaWaAcao; o componente só apresenta.
 
 /** Pendência de registro mais antiga: realizado sem registro, ou agendado
- *  cuja data já passou. É o destino do "Registrar encontro N". */
+ *  (incl. o "remarcado" legado) cujo horário previsto já terminou — a
+ *  mesma régua `limboFechado` da agenda: enquanto a chamada rola o
+ *  encontro ainda não é cobrança. É o destino do "Registrar encontro N". */
 export function encontroPendente(d: Dupla, hoje: Date): Encontro | undefined {
   return [...d.encontros]
     .sort((a, b) => a.numero - b.numero)
     .find(
       (e) =>
         !e.registro &&
-        (e.status === "realizado" ||
-          (e.status === "agendado" &&
-            e.data_hora != null &&
-            new Date(e.data_hora) < hoje))
+        (e.status === "realizado" || limboFechado(e, hoje.getTime()))
     );
 }
 
@@ -41,7 +41,7 @@ function casoLembrete(
       ? `${origem}/duplas/${d.id}#registrar-${pendente.id}`
       : null;
   const tipo = s.sinais[0]?.tipo;
-  if (pendente?.status === "agendado")
+  if (pendente && pendente.status !== "realizado")
     return `O ${pendente.numero}º encontro estava agendado e já passou. Rolou?${
       link
         ? ` Se rolou, o registro é por aqui: ${link}`
@@ -105,6 +105,9 @@ export function acaoWhatsAppDupla({
     dupla.status === "ativa" && (saude.sinais.length > 0 || saude.pediuApoio)
       ? casoLembrete(dupla, saude, hoje, origem)
       : undefined;
+  // a notificação do Lembrar pousa no mesmo lugar que o link do texto aponta:
+  // o form do encontro pendente quando a cobrança é de registro/limbo
+  const pendente = encontroPendente(dupla, hoje);
   const livres = msgsContato(
     {
       eu: meuNome,
@@ -127,7 +130,11 @@ export function acaoWhatsAppDupla({
     ? {
         destino: apoioJovem ? "mentorado" : "mentor",
         titulo: apoioJovem ? "A equipe quer te ouvir" : tituloNudge,
-        href: apoioJovem ? "/jovem/agenda" : `/duplas/${dupla.id}`,
+        href: apoioJovem
+          ? "/jovem/agenda"
+          : pendente
+            ? `/duplas/${dupla.id}#registrar-${pendente.id}`
+            : `/duplas/${dupla.id}`,
         // responder um pedido do jovem é "Chamar", nunca cobrança
         rotulo: apoioJovem ? "Chamar" : undefined,
         bloqueadoAte: lembreteBloqueadoAte(ultimoNudge, hoje),

@@ -37,4 +37,22 @@ describe("liza — contrato dos conceitos", () => {
       }
     });
   }
+
+  it("LizaBlob: o olho cresce na proporção do rosto abaixo de 64px", () => {
+    // o FAB do celular (48px) e o header (34px) interpolam o rx cheio (9)
+    // rumo ao mini (11) — era o "olho minúsculo" do flutuante
+    const fab = renderToStaticMarkup(
+      createElement(LizaBlob, { estado: "parado", tamanho: 48 })
+    );
+    const grande = renderToStaticMarkup(
+      createElement(LizaBlob, { estado: "parado", tamanho: 100 })
+    );
+    // o olho é path (olhoPath), não ellipse — o rx abre o `d` ("M -rx 0C…")
+    const rxOlho = (html: string) =>
+      Math.max(
+        ...[...html.matchAll(/M -([\d.]+) 0C/g)].map((m) => Number(m[1]))
+      );
+    expect(rxOlho(fab)).toBeGreaterThan(9.5);
+    expect(rxOlho(grande)).toBe(9);
+  });
 });

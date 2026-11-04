@@ -455,7 +455,19 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
   const tagarela = useTagarelar(detalhe && pose.boca === "falando", reduzido);
   const inclina = useAlvoMola(efetivo === "atento" ? 1 : 0, reduzido);
 
-  const olhoDims = detalhe ? { rx: 9, ry: 11, cy: 47, dx: 17 } : { rx: 11, ry: 13.5, cy: 49, dx: 18 };
+  // os olhos crescem na proporção do rosto conforme a mascote encolhe —
+  // abaixo de 64px eles interpolam até as medidas do mini (as do <28),
+  // senão o FAB do celular (44) e o header (34) liam como pontinhos.
+  // k: 0 aos 28px (medidas do mini) → 1 aos 64px+ (medidas cheias)
+  const kOlho = Math.min(1, Math.max(0, (tamanho - 28) / 36));
+  const olhoDims = detalhe
+    ? {
+        rx: 11 - 2 * kOlho,
+        ry: 13.5 - 2.5 * kOlho,
+        cy: 49 - 2 * kOlho,
+        dx: 18 - kOlho,
+      }
+    : { rx: 11, ry: 13.5, cy: 49, dx: 18 };
   // o olho inteiro viaja no rosto (raio) e o reflexo faz um contra-movimento
   // (hx) — o clássico de mascote; a boca anda ~metade: o rosto "vira" em 3D
   const raio = detalhe ? { x: 8, y: 6 } : { x: 5.5, y: 4.5 };

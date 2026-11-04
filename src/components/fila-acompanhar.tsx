@@ -51,8 +51,9 @@ export type LinhaFila = {
   /** Rótulo do botão — "Lembrar", "Lembrar registro" ou "Chamar". */
   rotulo: string;
   /** Título/corpo do nudge — calculado no server (lembreteDaDupla /
-   *  msgsContato pro caso apoio_jovem). */
-  lembrete: { titulo: string; corpo: string };
+   *  msgsContato pro caso apoio_jovem). `href` é o alvo exato quando o
+   *  caso aponta um lugar (o encontro pendente), senão cai na ficha. */
+  lembrete: { titulo: string; corpo: string; href?: string };
   /** WhatsApp do destinatário — null = o nudge sai só como notificação
    *  in-app. */
   telefone: string | null;
@@ -288,7 +289,7 @@ function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
               href:
                 linha.destino === "mentorado"
                   ? "/jovem/agenda"
-                  : `/duplas/${item.duplaId}`,
+                  : (lembrete.href ?? `/duplas/${item.duplaId}`),
               bloqueadoAte: item.bloqueadoAte,
               // o rótulo já vem resolvido do server (agenda-coordenacao):
               // "Chamar" no pedido de apoio do jovem, "Lembrar registro"
