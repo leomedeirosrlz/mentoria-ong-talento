@@ -11,6 +11,7 @@ import type {
   Disponibilidade,
   DocumentoPessoa,
   Dupla,
+  DuplaStatus,
   Encontro,
   Escolaridade,
   EspecialistaEvento,
@@ -2315,3 +2316,46 @@ export const CHAMADO_ORIGEM_LABEL: Record<string, string> = {
   registro: "Registro de encontro",
   avaliacao_jovem: "Avaliação do jovem",
 };
+
+/** Select "Dupla relacionada" do NovoChamadoDialog — só as duplas em que
+ *  a pessoa é mentora, ativas ou pausadas. A home e a /chamados montam a
+ *  lista pela mesma régua (getMinhasDuplas → este filtro); lista vazia
+ *  esconde o campo. */
+export function duplasOpcoesChamado(
+  duplas: readonly {
+    id: string;
+    status: DuplaStatus;
+    trilha: Trilha;
+    mentor?: { id: string } | null;
+    mentorado?: { nome: string | null } | null;
+  }[],
+  meuId: string
+): { id: string; label: string }[] {
+  return duplas
+    .filter(
+      (d) =>
+        (d.status === "ativa" || d.status === "pausada") &&
+        d.mentor?.id === meuId
+    )
+    .map((d) => ({
+      id: d.id,
+      label: `${d.mentorado?.nome ?? "Mentorado(a)"} · ${
+        d.trilha === "especialista" ? "Especialista" : "DPP"
+      }`,
+    }));
+}
+
+/** Junta `mentorado_nome` aos chamados — o mapa vem duma leitura em lote
+ *  (dupla_id → mentorado.nome), nunca N+1. Chamado sem dupla (ou cuja
+ *  dupla a RLS não entrega) fica null e a interface omite o dado. */
+export function anexarMentorado<T extends { dupla_id: string | null }>(
+  itens: readonly T[],
+  mentoradoPorDupla: ReadonlyMap<string, string | null>
+): (T & { mentorado_nome: string | null })[] {
+  return itens.map((c) => ({
+    ...c,
+    mentorado_nome: c.dupla_id
+      ? (mentoradoPorDupla.get(c.dupla_id) ?? null)
+      : null,
+  }));
+}
