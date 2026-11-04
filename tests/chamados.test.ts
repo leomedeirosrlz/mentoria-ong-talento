@@ -7,8 +7,10 @@ import {
 } from "@/lib/demo/queries";
 import { getDemoData } from "@/lib/demo/data";
 import {
+  anexarMentorado,
   CHAMADO_CATEGORIA_LABEL,
   CHAMADO_STATUS_LABEL,
+  duplasOpcoesChamado,
 } from "@/lib/ciclo";
 import type { ChamadoCategoria, ChamadoStatus } from "@/lib/types";
 
@@ -96,6 +98,97 @@ describe("demoChamadosFila — escopo por papel", () => {
     expect(item("coordenacao", NUM.agenda)!.contexto).toBe(
       "Dupla de Ana Beatriz Silva"
     );
+  });
+});
+
+describe("mentorado_nome — mentorado da dupla vinculada", () => {
+  it("mentor vê o nome do mentorado do próprio chamado", () => {
+    // CHA-000143 e CHA-000118 são do Ricardo, dupla da Ana Beatriz
+    expect(item("mentor_dpp", NUM.agenda)!.mentorado_nome).toBe(
+      "Ana Beatriz Silva"
+    );
+    expect(item("mentor_dpp", NUM.metodoAntiga)!.mentorado_nome).toBe(
+      "Ana Beatriz Silva"
+    );
+  });
+
+  it("staff também recebe o campo (a exibição usa o contexto)", () => {
+    // CHA-000141 nasceu do registro da dupla da Dandara
+    expect(item("coordenacao", NUM.registro)!.mentorado_nome).toBe(
+      "Dandara Souza"
+    );
+  });
+
+  it("chamado sem dupla fica null e restrito não vaza o nome", () => {
+    expect(item("coordenacao", NUM.jovem)!.mentorado_nome).not.toBeNull();
+    expect(item("supervisor", NUM.plataforma)!.mentorado_nome).toBeNull();
+  });
+});
+
+describe("anexarMentorado — leitura em lote do autor", () => {
+  it("preenche pelo dupla_id; sem dupla ou sem nome fica null", () => {
+    const itens = anexarMentorado(
+      [
+        { id: "c1", dupla_id: "d1" },
+        { id: "c2", dupla_id: "d2" },
+        { id: "c3", dupla_id: null },
+      ],
+      new Map([
+        ["d1", "Ana Beatriz Silva"],
+        ["d2", null],
+      ])
+    );
+    expect(itens[0].mentorado_nome).toBe("Ana Beatriz Silva");
+    // dupla vinculada que a RLS não entregou → null, sem inventar
+    expect(itens[1].mentorado_nome).toBeNull();
+    // chamado de assunto geral (sem dupla) → null
+    expect(itens[2].mentorado_nome).toBeNull();
+  });
+});
+
+describe("duplasOpcoesChamado — select de dupla do NovoChamadoDialog", () => {
+  const DUPLAS = [
+    {
+      id: "d1",
+      status: "ativa",
+      trilha: "dpp",
+      mentor: { id: "m1" },
+      mentorado: { nome: "Ana" },
+    },
+    {
+      id: "d2",
+      status: "pausada",
+      trilha: "especialista",
+      mentor: { id: "m1" },
+      mentorado: { nome: "Caio" },
+    },
+    {
+      id: "d3",
+      status: "encerrada",
+      trilha: "dpp",
+      mentor: { id: "m1" },
+      mentorado: { nome: "Bia" },
+    },
+    {
+      id: "d4",
+      status: "ativa",
+      trilha: "dpp",
+      mentor: { id: "m2" },
+      mentorado: { nome: "Dan" },
+    },
+  ] as const;
+
+  it("só duplas da pessoa como mentora, ativas ou pausadas", () => {
+    expect(duplasOpcoesChamado(DUPLAS, "m1")).toEqual([
+      { id: "d1", label: "Ana · DPP" },
+      { id: "d2", label: "Caio · Especialista" },
+    ]);
+    // d3 encerrada e d4 de outra pessoa ficam de fora
+  });
+
+  it("quem não é mentor recebe lista vazia (o campo some)", () => {
+    expect(duplasOpcoesChamado(DUPLAS, "m3")).toEqual([]);
+    expect(duplasOpcoesChamado([], "m1")).toEqual([]);
   });
 });
 

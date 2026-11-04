@@ -34,8 +34,8 @@ import type { Page } from "@playwright/test";
 //      vê o pedido com o nome do jovem;
 //   5) negociação no rail do jovem — a contra-proposta do especialista é
 //      aceita pelo jovem e a sessão nasce na dupla criada na hora;
-//   6) jovem sem DPP: demanda obrigatória + pedido cai 'aguardando_coord'
-//      (triagem da coordenação) em vez do mural;
+//   6) jovem sem DPP: demanda obrigatória + pedido nasce 'aberta' no mural
+//      (0158: sem triagem da coordenação), com aviso ao pool;
 //   7) cancelamento — o autor cancela, o registro fica 'cancelada' e o
 //      especialista procurado é avisado.
 //
@@ -678,7 +678,7 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     await expect(secao.getByText("Sessão com Esp")).toHaveCount(0);
   });
 
-  test("jovem sem DPP: demanda obrigatória e pedido cai na triagem", async ({
+  test("jovem sem DPP: demanda obrigatória e pedido vai direto ao mural (0158)", async ({
     page,
   }) => {
     await loginComSenha(page, JOVEM2_EMAIL, SENHA);
@@ -701,14 +701,14 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
           .getAttribute("aria-pressed")) === "true"
     );
 
-    // sem trilha E sem DPP: a demanda rica é exigida (mínimo 10) e o aviso
-    // de triagem aparece — quem libera o pedido é a coordenação
+    // sem trilha E sem DPP: a demanda rica é exigida (mínimo 10); não há
+    // mais aviso de triagem — ninguém aprova no meio (0158)
     await expect(
       dialog.getByText("Por que você quer esse apoio?")
     ).toBeVisible();
     await expect(
       dialog.getByText(/coordenação dá uma olhada no pedido/)
-    ).toBeVisible();
+    ).toHaveCount(0);
     const enviar = dialog.getByRole("button", { name: "Enviar pedido" });
     await dialog.locator("#pedido-texto").fill("curto");
     await expect(enviar).toBeDisabled();
@@ -725,7 +725,7 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     );
     await expect(dialog).toBeHidden();
 
-    // sem dupla DPP o pedido NÃO vai pro mural — entra na fila da coord
+    // mesmo sem dupla DPP o pedido nasce no mural
     const [sol] = await buscarViaServiceRole<
       {
         status: string;
@@ -739,28 +739,28 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
       "solicitacoes_especialista",
       `select=status,origem,dupla_dpp_id,especialista_desejado_id,demanda,created_by&mentorado_id=eq.${IDS.mentoradoSemDpp}&limit=1`
     );
-    expect(sol.status).toBe("aguardando_coord");
+    expect(sol.status).toBe("aberta");
     expect(sol.origem).toBe("jovem");
     expect(sol.dupla_dpp_id).toBeNull();
     expect(sol.demanda).toBe(DEMANDA_SEM_DPP);
     expect(sol.created_by).toBe(IDS.jovem2Profile);
 
-    // a página conta o estado na voz dele — e quem tira da fila é a coord
+    // a página conta o estado na voz dele: no mural, sem coordenação
     await expect(
-      secao.getByText("A coordenação tá olhando seu pedido antes de liberar.")
-    ).toBeVisible();
-    await expect(
-      secao.getByText(
-        "A coordenação libera o pedido pra ele chegar aos especialistas."
-      )
+      secao.getByText("Seu pedido tá no mural dos especialistas.")
     ).toBeVisible();
 
-    // radar da coordenação: o sino de triagem tocou de verdade
-    const notifs = await buscarViaServiceRole(
+    // broadcast avisa o pool de especialistas e segue no radar da coord
+    const notifsPool = await buscarViaServiceRole(
       "notificacoes",
-      `select=id&profile_id=eq.${IDS.coordProfile}&tipo=eq.solicitacao_triagem`
+      `select=id&profile_id=eq.${IDS.espProfile}&tipo=eq.demanda_especialista`
     );
-    expect(notifs.length).toBeGreaterThanOrEqual(1);
+    expect(notifsPool.length).toBeGreaterThanOrEqual(1);
+    const notifsCoord = await buscarViaServiceRole(
+      "notificacoes",
+      `select=id&profile_id=eq.${IDS.coordProfile}&tipo=eq.solicitacao_registrada`
+    );
+    expect(notifsCoord.length).toBeGreaterThanOrEqual(1);
   });
 
   test("jovem cancela o próprio pedido — o alvo é avisado", async ({

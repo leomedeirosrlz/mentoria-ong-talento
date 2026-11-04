@@ -63,6 +63,7 @@ export function ChamadosApp({
   meuId,
   meuNome,
   itens,
+  duplas,
   selecionadoInicial,
   detalheInicial,
 }: {
@@ -70,6 +71,9 @@ export function ChamadosApp({
   meuId: string;
   meuNome: string;
   itens: ChamadoFilaItem[];
+  /** Opções do select "Dupla relacionada" do NovoChamadoDialog — só as
+   *  duplas em que a pessoa é mentora; vazio esconde o campo. */
+  duplas: { id: string; label: string }[];
   selecionadoInicial: string | null;
   detalheInicial: {
     chamado: ChamadoFilaItem;
@@ -377,6 +381,7 @@ export function ChamadosApp({
             />
             <NovoChamadoDialog
               papel={papel}
+              duplas={duplas}
               trigger={
                 <Button size="sm">
                   <Plus size={15} aria-hidden />
@@ -390,6 +395,7 @@ export function ChamadosApp({
           <div className="mb-3 flex justify-end">
             <NovoChamadoDialog
               papel={papel}
+              duplas={duplas}
               trigger={
                 <Button variant="outline" size="sm">
                   <Plus size={15} aria-hidden />
@@ -452,7 +458,14 @@ export function ChamadosApp({
                         ]
                           .filter(Boolean)
                           .join(" · ")
-                      : `Atualizado ${relTempo(c.updated_at)}`}
+                      : [
+                          c.mentorado_nome
+                            ? `Mentorado: ${c.mentorado_nome}`
+                            : null,
+                          `Atualizado ${relTempo(c.updated_at)}`,
+                        ]
+                          .filter(Boolean)
+                          .join(" · ")}
                 </p>
                 <div className="mt-1.5">
                   <ChamadoStatusBadge

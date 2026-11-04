@@ -164,9 +164,6 @@ export default async function JovemAgenda() {
         d.mentor_id != null
     )
     .map((d) => d.mentor_id!);
-  const semDuplaDpp = !duplas.some(
-    (d) => d.trilha !== "especialista" && d.status === "ativa"
-  );
   const equipeCoord = contatos.filter((c) => c.papel === "coordenacao");
   const nomeTela = (me?.nome_social || me?.nome || "").split(" ")[0];
   // a grade do jovem marca nos chips/slots do especialista os horários que
@@ -344,7 +341,6 @@ export default async function JovemAgenda() {
                           especialistas={pedidosEsp.catalogo}
                           trilhasAtivas={trilhasAtivasEsp}
                           slotsPorEsp={{ [d.mentor_id!]: slots }}
-                          semDuplaDpp={semDuplaDpp}
                           preEspId={d.mentor_id}
                           trigger={
                             <Button variant="outline" size="sm">
@@ -361,7 +357,6 @@ export default async function JovemAgenda() {
                         especialistas={pedidosEsp.catalogo}
                         trilhasAtivas={trilhasAtivasEsp}
                         slotsPorEsp={{ [d.mentor_id!]: slots }}
-                        semDuplaDpp={semDuplaDpp}
                         disponibilidade={dispJovem}
                       />
                     )}

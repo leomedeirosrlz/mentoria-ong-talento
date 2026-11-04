@@ -56,6 +56,8 @@ export function DuplaMaisMenu({
   formulario,
   solicitar,
   sugerir,
+  solicitarEstado,
+  sugerirEstado,
   encerrar,
   remanejar,
 }: {
@@ -75,6 +77,12 @@ export function DuplaMaisMenu({
     nomeJovem: string;
     especialistas: EspecialistaOpcao[];
   } | null;
+  /** Quando "Solicitar" não vale agora (já há pedido em andamento), o
+   *  lugar do botão diz por quê — desabilitado, no mesmo ponto: as duas
+   *  duplas do mentor mostram os mesmos botões (feedback da mentora). */
+  solicitarEstado?: string | null;
+  /** Idem pro "Sugerir" com a sugestão já enviada esperando o jovem. */
+  sugerirEstado?: string | null;
   /** "Encerrar trilha" — fechamento da trilha especialista aberta. */
   encerrar?: boolean;
   /** "Remanejar" — troca um lado da dupla viva (coordenação). */
@@ -87,22 +95,36 @@ export function DuplaMaisMenu({
   // menu no celular, onde a linha de botões quebraria em três andares
   const itens = [
     formulario && { id: "form", Icone: PaperPlaneTilt, rotulo: "Enviar formulário" },
-    solicitar && { id: "solicitar", Icone: UserPlus, rotulo: "Solicitar mentor especialista" },
-    sugerir && { id: "sugerir", Icone: Sparkle, rotulo: "Sugerir especialista pro jovem" },
+    solicitar
+      ? { id: "solicitar", Icone: UserPlus, rotulo: "Solicitar mentor especialista" }
+      : solicitarEstado
+        ? { id: "solicitar", Icone: UserPlus, rotulo: solicitarEstado, desabilitado: true }
+        : null,
+    sugerir
+      ? { id: "sugerir", Icone: Sparkle, rotulo: "Sugerir especialista pro jovem" }
+      : sugerirEstado
+        ? { id: "sugerir", Icone: Sparkle, rotulo: sugerirEstado, desabilitado: true }
+        : null,
     remanejar && { id: "remanejar", Icone: ArrowsLeftRight, rotulo: "Remanejar dupla" },
     encerrar && { id: "encerrar", Icone: FlagCheckered, rotulo: "Encerrar trilha" },
-  ].filter(Boolean) as { id: DialogId; Icone: typeof UserPlus; rotulo: string }[];
+  ].filter(Boolean) as {
+    id: DialogId;
+    Icone: typeof UserPlus;
+    rotulo: string;
+    desabilitado?: boolean;
+  }[];
   if (itens.length === 0) return null;
 
   return (
     <>
-      {itens.map(({ id, Icone, rotulo }) => (
+      {itens.map(({ id, Icone, rotulo, desabilitado }) => (
         <Button
           key={id}
           variant="outline"
           size="sm"
           className="hidden sm:inline-flex"
-          aria-haspopup="dialog"
+          aria-haspopup={desabilitado ? undefined : "dialog"}
+          disabled={desabilitado}
           onClick={() => setAberto(id)}
         >
           <Icone aria-hidden />
@@ -126,10 +148,11 @@ export function DuplaMaisMenu({
         {/* w-56: o popup é mais largo que o trigger — a âncora ficaria
             apertada pros labels de ação (o default é w-(--anchor-width)) */}
         <DropdownMenuContent align="end" className="w-56">
-          {itens.map(({ id, Icone, rotulo }) => (
+          {itens.map(({ id, Icone, rotulo, desabilitado }) => (
             <DropdownMenuItem
               key={id}
-              aria-haspopup="dialog"
+              aria-haspopup={desabilitado ? undefined : "dialog"}
+              disabled={desabilitado}
               onClick={() => setAberto(id)}
             >
               <Icone aria-hidden className={ICONE} />

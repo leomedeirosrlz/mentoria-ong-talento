@@ -351,6 +351,12 @@ export type Encaminhamento = {
   responsavel: "mentor" | "mentorado";
   prazo: string | null;
   status: EncaminhamentoStatus;
+  /** nº do passo do guia a que o combinado pertence (0157) — o do encontro
+   *  do registro, ou o do card onde o mentor anotou no preparo. Null só em
+   *  combinado antigo sem registro: fica na aba Combinados da ficha. */
+  numero: number | null;
+  feito_em: string | null;
+  created_by: string | null;
   created_at: string;
 };
 
@@ -504,18 +510,6 @@ export type EncontroNota = {
 /** Intenção do mentor pro encontro N (REALIZA-21) — chave (dupla_id, numero)
  *  como a nota: precede o agendamento e segue o nº do guia na remarcação.
  *  Pendente = feito=false; feito_em é carimbo de trigger, nunca do caller. */
-export type EncontroIntencao = {
-  id: string;
-  dupla_id: string;
-  numero: number;
-  texto: string;
-  feito: boolean;
-  feito_em: string | null;
-  created_by: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
 export type Dupla = {
   id: string;
   /** Label da turma (ex-coluna `ciclo`, renomeada na 0061) — derivada do
@@ -561,7 +555,6 @@ export type Dupla = {
   encontros: Encontro[];
   encaminhamentos: Encaminhamento[];
   notas?: EncontroNota[];
-  intencoes?: EncontroIntencao[];
 };
 
 /** Versão enxuta de Dupla — só os ids de vínculo, sem a árvore de encontros. */
@@ -731,6 +724,9 @@ export type ChamadoFilaItem = ChamadoFila & {
   autor_papel: string | null;
   atribuido_nome: string | null;
   contexto: string | null; // "Encontro 4 · Ana" — origem+dupla resumidos
+  /** Nome do mentorado da dupla vinculada (chamados.dupla_id) — null sem
+   *  dupla, quando restrito, ou quando a RLS não entrega a dupla. */
+  mentorado_nome: string | null;
 };
 
 export type ChamadoAtualizacao = {

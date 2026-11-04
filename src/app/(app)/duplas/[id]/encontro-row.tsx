@@ -9,7 +9,6 @@ import type {
   AvaliacaoLink,
   Encaminhamento,
   Encontro,
-  EncontroIntencao,
   Material,
   RegistroAnexo,
 } from "@/lib/types";
@@ -27,7 +26,7 @@ import { WhatsAppRapido } from "@/components/whatsapp-rapido";
 import { AvaliacaoBadge } from "@/components/semaforo";
 import { CopiarChamada } from "@/components/copiar-chamada";
 import { NotaEncontro } from "@/components/nota-encontro";
-import { IntencoesEncontro } from "@/components/intencoes-encontro";
+import { CombinadosEncontro } from "@/components/combinados-encontro";
 import {
   AvaliacaoJovemCard,
   AvaliacaoPendenteLinha,
@@ -74,8 +73,8 @@ export function EncontroRow({
   combinados,
   combinadosPendentes,
   nota,
-  intencoes,
-  intencoesPendentes,
+  combinadosDoNumero,
+  combinadosAnteriores,
   registroAberto,
   apoioDestinos,
   linkAvaliacao,
@@ -115,10 +114,11 @@ export function EncontroRow({
   combinadosPendentes: Encaminhamento[];
   /** Anotação/plano do mentor pra esse nº do ciclo — null = sem nota. */
   nota: string | null;
-  /** Checklist do mentor neste nº do guia (REALIZA-21) — itens próprios. */
-  intencoes: EncontroIntencao[];
+  /** Combinados deste nº do guia (0157: registro + preparo, os dois
+   *  responsáveis). */
+  combinadosDoNumero: Encaminhamento[];
   /** Pendentes de nºs anteriores — carry-over taggeado "do Nº encontro". */
-  intencoesPendentes: EncontroIntencao[];
+  combinadosAnteriores: Encaminhamento[];
   /** Encontro atual ou pendente de registro — nasce com o registro expandido;
    *  os demais viram linha-resumo sob disclosure (o deep link `#registrar-{id}` abre). */
   registroAberto: boolean;
@@ -498,7 +498,6 @@ export function EncontroRow({
                   <RegistroView
                     reg={reg}
                     tardio={tardio}
-                    combinados={combinadosDoRegistro}
                     anexos={
                       <AnexosRegistro
                         registroId={reg.id}
@@ -555,26 +554,30 @@ export function EncontroRow({
           )}
         </div>
       ) : null}
-      {/* preparo do mentor — vem DEPOIS do registro: quem volta a um
-          encontro procura primeiro o que foi registrado (REALIZA-343). Nota
-          livre + checklist de afazeres, nesta ordem: a nota responde "como quero conduzir", os afazeres "o que
-          não posso esquecer". Pra quem não edita (coord/sup, dupla inativa)
-          o que existe vira leitura */}
-      {(podeEditar || nota || intencoes.length > 0 || intencoesPendentes.length > 0) && (
-        <div className="space-y-1.5 border-t border-border/60 px-4 py-3">
-          {(podeEditar || nota) && (
-            <NotaEncontro
-              duplaId={duplaId}
-              numero={passo.numero}
-              nota={nota}
-              somenteLeitura={!podeEditar}
-            />
-          )}
-          <IntencoesEncontro
+      {/* combinados logo abaixo do registro (0157): uma lista só, a do
+          registro e a do preparo, marcável aqui mesmo — quem acabou de ler
+          o registro não precisa ir à aba Combinados pra dar baixa */}
+      <div className="border-t border-border/60 px-4 py-3 empty:hidden">
+        <CombinadosEncontro
+          duplaId={duplaId}
+          numero={passo.numero}
+          itens={combinadosDoNumero}
+          pendentesAnteriores={combinadosAnteriores}
+          jovemNome={jovemNome.split(" ")[0] || "Mentorado"}
+          podeEditar={podeEditar}
+          podeMarcar={podeMarcar}
+        />
+      </div>
+      {/* anotação do mentor — DEPOIS do registro e dos combinados: quem
+          volta a um encontro procura primeiro o que foi registrado
+          (REALIZA-343). Pra quem não edita (coord/sup, dupla inativa) a
+          nota existente vira leitura */}
+      {(podeEditar || nota) && (
+        <div className="border-t border-border/60 px-4 py-3">
+          <NotaEncontro
             duplaId={duplaId}
             numero={passo.numero}
-            itens={intencoes}
-            pendentesAnteriores={intencoesPendentes}
+            nota={nota}
             somenteLeitura={!podeEditar}
           />
         </div>

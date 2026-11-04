@@ -3,12 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import {
-  DotsThreeVertical,
-  ListChecks,
-  PencilSimple,
-  Trash,
-} from "@phosphor-icons/react";
+import { ListChecks } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
   editarEncaminhamento,
@@ -17,19 +12,11 @@ import {
 } from "@/lib/actions";
 import { formatDate } from "@/lib/ciclo";
 import type { Encaminhamento } from "@/lib/types";
-import { Button, buttonVariants } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import {
-  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
-import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+  CombinadoMenu,
+  EditarCombinadoDialog,
+  ExcluirCombinadoConfirm,
+} from "@/components/combinado-acoes";
 import { T } from "@/components/motion";
 import { cn } from "@/lib/utils";
 
@@ -59,7 +46,6 @@ export function EncaminhamentosList({
   const [feitosAgora, setFeitosAgora] = useState<ReadonlySet<string>>(new Set());
   // um dialog compartilhado pros dois fluxos — o item alvo fica em estado
   const [editando, setEditando] = useState<Encaminhamento | null>(null);
-  const [descLen, setDescLen] = useState(0);
   const [excluindo, setExcluindo] = useState<Encaminhamento | null>(null);
   const router = useRouter();
 
@@ -120,27 +106,12 @@ export function EncaminhamentosList({
           );
 
           const menu = podeEditar && (
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                aria-label={`Ações do combinado "${t.descricao}"`}
-                className={cn(
-                  buttonVariants({ variant: "ghost", size: "icon" }),
-                  "mt-0.5 size-11 shrink-0 sm:size-8"
-                )}
-              >
-                <DotsThreeVertical size={18} weight="bold" aria-hidden />
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem onClick={() => { setEditando(t); setDescLen(t.descricao.length); }}>
-                  <PencilSimple size={16} data-icon="inline-start" aria-hidden />{" "}
-                  Editar
-                </DropdownMenuItem>
-                <DropdownMenuItem variant="destructive" onClick={() => setExcluindo(t)}>
-                  <Trash size={16} data-icon="inline-start" aria-hidden />{" "}
-                  Excluir
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <CombinadoMenu
+              descricao={t.descricao}
+              onEditar={() => setEditando(t)}
+              onExcluir={() => setExcluindo(t)}
+              className="mt-0.5 size-11 shrink-0 sm:size-8"
+            />
           );
 
           return (
@@ -241,89 +212,21 @@ export function EncaminhamentosList({
         })}
       </ul>
 
-      {/* edição — um dialog por lista; os defaults vêm do item alvo */}
-      <Dialog open={editando !== null} onOpenChange={(o) => !o && setEditando(null)}>
-        <DialogContent size="lg">
-          <DialogHeader>
-            <DialogTitle>Editar combinado</DialogTitle>
-            <DialogDescription>
-              O que ficou combinado, quem faz e até quando.
-            </DialogDescription>
-          </DialogHeader>
-          {editando && (
-            <form
-              key={editando.id}
-              className="space-y-4"
-              onSubmit={(e) => {
-                e.preventDefault();
-                const fd = new FormData(e.currentTarget);
-                start(async () => {
-                  try {
-                    const res = await editarEncaminhamento(editando.id, duplaId, fd);
-                    if (res?.error) toast.error(res.error);
-                    else {
-                      toast.success("Combinado atualizado.");
-                      setEditando(null);
-                      router.refresh();
-                    }
-                  } catch {
-                    toast.error("Sem conexão. Tente de novo.");
-                  }
-                });
-              }}
-            >
-              <div className="space-y-2">
-                <div className="flex items-baseline justify-between gap-2">
-                  <Label htmlFor="enc-descricao">O que ficou combinado</Label>
-                  <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
-                    {descLen}/500
-                  </span>
-                </div>
-                <Input
-                  id="enc-descricao"
-                  name="descricao"
-                  required
-                  maxLength={500}
-                  defaultValue={editando.descricao}
-                  onChange={(e) => setDescLen(e.target.value.length)}
-                />
-              </div>
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div className="space-y-2">
-                  <Label id="enc-resp-label">Quem faz</Label>
-                  <Select name="responsavel" defaultValue={editando.responsavel}>
-                    <SelectTrigger aria-labelledby="enc-resp-label"><SelectValue /></SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="mentorado">Mentorado</SelectItem>
-                      <SelectItem value="mentor">Mentor</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="enc-prazo">Prazo</Label>
-                  <Input id="enc-prazo" name="prazo" type="date" defaultValue={editando.prazo ?? ""} />
-                </div>
-              </div>
-              <DialogFooter>
-                <Button type="submit" disabled={pending}>
-                  {pending ? "Salvando…" : "Salvar"}
-                </Button>
-              </DialogFooter>
-            </form>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      <ConfirmDeleteButton
-        open={excluindo !== null}
-        onOpenChange={(o) => !o && setExcluindo(null)}
-        titulo="Excluir combinado?"
-        descricao={
-          excluindo
-            ? `"${excluindo.descricao}" sai da lista da dupla.`
-            : ""
+      {/* edição e exclusão — um dialog por lista; os defaults vêm do item
+          alvo (componentes compartilhados com o card do encontro) */}
+      <EditarCombinadoDialog
+        editando={editando}
+        onOpenChange={(o) => !o && setEditando(null)}
+        onSalvar={(fd) =>
+          editando
+            ? editarEncaminhamento(editando.id, duplaId, fd)
+            : Promise.resolve({})
         }
-        sucesso="Combinado excluído."
+      />
+
+      <ExcluirCombinadoConfirm
+        excluindo={excluindo}
+        onOpenChange={(o) => !o && setExcluindo(null)}
         onConfirm={() => excluindo ? excluirEncaminhamento(excluindo.id, duplaId) : Promise.resolve({})}
       />
     </>

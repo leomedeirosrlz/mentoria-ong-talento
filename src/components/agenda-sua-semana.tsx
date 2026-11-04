@@ -82,19 +82,36 @@ export function AgendaSuaSemana({
           const aAgendar = d.itens.filter(
             (i) => !i.convidado && i.tipo === "a_agendar"
           ).length;
-          const proprios = d.itens.filter(
+          const itensProprios = d.itens.filter(
             (i) => !i.convidado && i.tipo !== "a_agendar"
-          ).length;
+          );
+          const proprios = itensProprios.length;
           const convidados = d.itens.length - proprios - aAgendar;
+          // a bolinha nomeia o encontro (a mentora lia "1" esperando o 7º):
+          // dia com só encontros seus mostra os nºs separados por "·"
+          // enquanto couber ("7·8"); item próprio de outro tipo volta a
+          // mostrar a contagem
+          const numerosProprios = itensProprios
+            .filter((i) => i.tipo === "encontro" && i.numero != null)
+            .map((i) => i.numero!);
+          const soEncontros =
+            proprios > 0 && numerosProprios.length === proprios;
+          const badgeProprios =
+            soEncontros && numerosProprios.join("·").length <= 5
+              ? numerosProprios.join("·")
+              : String(proprios);
           const labels =
             [...new Set(d.itens.map(rotuloStrip))].slice(0, 3).join(" · ") ||
             "livre";
           // resumo falado: mesma gramática da legenda ("é seu" / "só
-          // acompanha")
+          // acompanha") — com só encontros ele nomeia os nºs que a bolinha
+          // mostra
           const resumo =
             [
               proprios > 0
-                ? `${proprios} ${proprios === 1 ? "seu" : "seus"}`
+                ? soEncontros
+                  ? `${proprios === 1 ? "encontro" : "encontros"} ${numerosProprios.join(" e ")}`
+                  : `${proprios} ${proprios === 1 ? "seu" : "seus"}`
                 : null,
               convidados > 0 ? `${convidados} só acompanhando` : null,
               aAgendar > 0 ? `${aAgendar} a agendar` : null,
@@ -123,9 +140,9 @@ export function AgendaSuaSemana({
                 <span className="mt-0.5 max-w-full truncate text-[10px] leading-tight text-muted-foreground md:text-[11px]">
                   {labels}
                 </span>
-                {proprios > 1 && (
+                {proprios > 0 && (
                   <span className="mt-1 grid min-w-[22px] place-items-center rounded-full bg-[var(--brand-lime)] px-1 py-0.5 text-[11px] font-bold tabular-nums text-[var(--brand-ink)]">
-                    {proprios}
+                    {badgeProprios}
                   </span>
                 )}
                 {convidados > 1 && (

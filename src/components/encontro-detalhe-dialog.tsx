@@ -72,14 +72,14 @@ export function EncontroDetalheDialog({
   const [agora] = useState(() => Date.now());
   const nota =
     dupla.notas?.find((n) => n.numero === encontro.numero)?.texto ?? null;
-  // checklist do mentor neste nº (REALIZA-21) — leitura pra coord/sup, sem
-  // checkbox: quem lê não opera o plano dele
-  const intencoes = (dupla.intencoes ?? [])
-    .filter((i) => i.numero === encontro.numero)
+  // combinados deste nº (0157): os do registro e os que o mentor anotou no
+  // preparo (o antigo afazer) — uma lista só, como no card da ficha
+  const combinados = (dupla.encaminhamentos ?? [])
+    .filter(
+      (e) =>
+        e.numero === encontro.numero || (reg != null && e.registro_id === reg.id)
+    )
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
-  const combinados = reg
-    ? (dupla.encaminhamentos ?? []).filter((e) => e.registro_id === reg.id)
-    : [];
   const tardio = reg != null && registroTardio(reg, encontro);
 
   // anexos não vêm no payload da agenda — busca sob demanda ao abrir;
@@ -198,40 +198,6 @@ export function EncontroDetalheDialog({
                 Plano do mentor
               </p>
               <p className="mt-0.5 whitespace-pre-wrap break-words">{nota}</p>
-            </div>
-          )}
-
-          {intencoes.length > 0 && (
-            <div className="rounded-lg bg-muted/40 px-3.5 py-2.5">
-              <p className="text-xs font-medium text-muted-foreground">
-                Afazeres do mentor
-              </p>
-              <ul className="mt-1 space-y-1">
-                {intencoes.map((i) => (
-                  <li key={i.id} className="flex items-start gap-2">
-                    {i.feito ? (
-                      <CheckCircle
-                        size={15}
-                        className="mt-0.5 shrink-0 text-[var(--ok)]"
-                      />
-                    ) : (
-                      <Circle
-                        size={15}
-                        className="mt-0.5 shrink-0 text-muted-foreground/60"
-                      />
-                    )}
-                    <span
-                      className={
-                        i.feito
-                          ? "text-muted-foreground line-through"
-                          : undefined
-                      }
-                    >
-                      {i.texto}
-                    </span>
-                  </li>
-                ))}
-              </ul>
             </div>
           )}
 

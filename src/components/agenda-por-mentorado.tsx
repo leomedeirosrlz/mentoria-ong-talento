@@ -1173,15 +1173,9 @@ function PedidoEspecialistaBlock({
           "current",
           `sugestão sua aguardando ${primeiroNome} confirmar · ainda não virou pedido`,
         ],
-        ["open", "a coordenação libera pro mural"],
-        ["open", "um especialista aceita e a trilha começa"],
-        ["open", "5 sessões em ~3 meses"],
-      ];
-      break;
-    case "aguardando_coord":
-      passos = [
-        ["done", `pedido registrado em ${formatDate(s.created_at)}`],
-        ["current", "com a coordenação · ainda não foi pro mural"],
+        // confirmada, a sugestão vira pedido no mural na hora: ninguém
+        // aprova no meio (0086 + 0158)
+        ["open", `${primeiroNome} confirma e o pedido vai pro mural`],
         ["open", "um especialista aceita e a trilha começa"],
         ["open", "5 sessões em ~3 meses"],
       ];

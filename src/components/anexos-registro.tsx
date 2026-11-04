@@ -14,7 +14,18 @@ const LIMITE_BYTES = 10 * 1024 * 1024;
 const BUCKET = "registro-anexos";
 // allowlist explícita — image/* admitiria SVG (conteúdo ativo) e HEIC (não renderiza)
 const TIPOS_ACEITOS = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
-const ACCEPT = TIPOS_ACEITOS.join(",");
+export const ACCEPT_ANEXO = TIPOS_ACEITOS.join(",");
+const ACCEPT = ACCEPT_ANEXO;
+
+/** Mensagem de recusa do arquivo, ou null quando ele pode subir — a mesma
+ *  régua no uploader do card e no passo 3 do registro novo. */
+export function recusaDoAnexo(file: File): string | null {
+  if (!TIPOS_ACEITOS.includes(file.type))
+    return "Formato não aceito: use PDF, PNG, JPG ou WebP.";
+  if (file.size > LIMITE_BYTES)
+    return "O arquivo passa de 10 MB. Envie uma versão menor.";
+  return null;
+}
 
 /** Nome do arquivo entra no path do storage — fica em ASCII seguro. */
 function saneiaNome(nome: string): string {
@@ -24,6 +35,51 @@ function saneiaNome(nome: string): string {
     .replace(/[^a-zA-Z0-9._-]+/g, "-")
     .replace(/^-+|-+$/g, "");
   return limpo || "anexo";
+}
+
+/** Sobe um arquivo de evidência pro registro — row de metadados, depois o
+ *  objeto no storage. Nunca lança: devolve a row gravada ou a mensagem de
+ *  erro pronta pro toast. */
+export async function enviarAnexo(
+  registroId: string,
+  autorId: string,
+  file: File
+): Promise<{ row: RegistroAnexo } | { error: string }> {
+  try {
+    const supabase = createClient();
+    const path = `${registroId}/${crypto.randomUUID()}-${saneiaNome(file.name)}`;
+
+    // 1) a row de metadados vem ANTES do arquivo — a policy de INSERT do
+    //    storage só aceita objeto cujo path já exista em registro_anexos
+    const { data: row, error: rowError } = await supabase
+      .from("registro_anexos")
+      .insert({
+        registro_id: registroId,
+        path,
+        nome: file.name,
+        tamanho: file.size,
+        mime: file.type,
+        created_by: autorId,
+      })
+      .select("id, registro_id, path, nome, tamanho, mime, created_by, created_at")
+      .single();
+    if (rowError || !row) {
+      return { error: "Não foi possível registrar o anexo. Tente de novo." };
+    }
+
+    // 2) o arquivo em si
+    const { error: upError } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, file);
+    if (upError) {
+      // sem o arquivo a row não vale (e seguraria o path pra sempre)
+      await supabase.from("registro_anexos").delete().eq("id", row.id);
+      return { error: "Falha ao enviar o arquivo. Tente de novo." };
+    }
+    return { row: row as RegistroAnexo };
+  } catch {
+    return { error: "Sem conexão. Tente de novo." };
+  }
 }
 
 export function AnexosRegistro({
@@ -68,56 +124,21 @@ export function AnexosRegistro({
     e.target.value = "";
     if (!file) return;
 
-    if (!TIPOS_ACEITOS.includes(file.type)) {
-      toast.error("Formato não aceito: use PDF, PNG, JPG ou WebP.");
-      return;
-    }
-    if (file.size > LIMITE_BYTES) {
-      toast.error("O arquivo passa de 10 MB. Envie uma versão menor.");
+    const recusa = recusaDoAnexo(file);
+    if (recusa) {
+      toast.error(recusa);
       return;
     }
 
     start(async () => {
-      try {
-        const supabase = createClient();
-        const path = `${registroId}/${crypto.randomUUID()}-${saneiaNome(file.name)}`;
-
-        // 1) a row de metadados vem ANTES do arquivo — a policy de INSERT do
-        //    storage só aceita objeto cujo path já exista em registro_anexos
-        const { data: row, error: rowError } = await supabase
-          .from("registro_anexos")
-          .insert({
-            registro_id: registroId,
-            path,
-            nome: file.name,
-            tamanho: file.size,
-            mime: file.type,
-            created_by: autorId,
-          })
-          .select("id, registro_id, path, nome, tamanho, mime, created_by, created_at")
-          .single();
-        if (rowError || !row) {
-          toast.error("Não foi possível registrar o anexo. Tente de novo.");
-          return;
-        }
-
-        // 2) o arquivo em si
-        const { error: upError } = await supabase.storage
-          .from(BUCKET)
-          .upload(path, file);
-        if (upError) {
-          // sem o arquivo a row não vale (e seguraria o path pra sempre)
-          await supabase.from("registro_anexos").delete().eq("id", row.id);
-          toast.error("Falha ao enviar o arquivo. Tente de novo.");
-          return;
-        }
-
-        toast.success("Evidência anexada.");
-        setExtras((prev) => [...prev, row as RegistroAnexo]);
-        router.refresh();
-      } catch {
-        toast.error("Sem conexão. Tente de novo.");
+      const res = await enviarAnexo(registroId, autorId, file);
+      if ("error" in res) {
+        toast.error(res.error);
+        return;
       }
+      toast.success("Evidência anexada.");
+      setExtras((prev) => [...prev, res.row]);
+      router.refresh();
     });
   }
 

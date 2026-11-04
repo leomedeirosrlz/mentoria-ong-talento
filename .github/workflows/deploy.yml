@@ -53,25 +53,18 @@ jobs:
           REF: ${{ github.ref_name }}
         run: |
           if [ "$REF" = "main" ]; then
-            SUPA_URL="${{ vars.NEXT_PUBLIC_SUPABASE_URL_PROD }}"
-            SUPA_ANON="${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY_PROD }}"
-            SUFIXO=PROD
             echo "SITE_URL=${{ vars.SITE_URL_PROD }}" >> "$GITHUB_ENV"
             echo "TARGET=${{ secrets.DEPLOY_HOST }}" >> "$GITHUB_ENV"
+            echo "SUPA_URL=${{ vars.NEXT_PUBLIC_SUPABASE_URL_PROD }}" >> "$GITHUB_ENV"
+            echo "SUPA_ANON=${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY_PROD }}" >> "$GITHUB_ENV"
           else
-            SUPA_URL="${{ vars.NEXT_PUBLIC_SUPABASE_URL_STAGING }}"
-            SUPA_ANON="${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY_STAGING }}"
-            SUFIXO=STAGING
             echo "SITE_URL=${{ vars.SITE_URL_STAGING }}" >> "$GITHUB_ENV"
             echo "TARGET=${{ secrets.STAGING_HOST || secrets.DEPLOY_HOST }}" >> "$GITHUB_ENV"
+            echo "SUPA_URL=${{ vars.NEXT_PUBLIC_SUPABASE_URL_STAGING }}" >> "$GITHUB_ENV"
+            echo "SUPA_ANON=${{ vars.NEXT_PUBLIC_SUPABASE_ANON_KEY_STAGING }}" >> "$GITHUB_ENV"
           fi
           # sem fallback silencioso: imagem com var vazia subiria quebrada
-          if [ -z "$SUPA_URL" ] || [ -z "$SUPA_ANON" ]; then
-            echo "::error::vars NEXT_PUBLIC_SUPABASE_*_$SUFIXO ausentes"
-            exit 1
-          fi
-          echo "SUPA_URL=$SUPA_URL" >> "$GITHUB_ENV"
-          echo "SUPA_ANON=$SUPA_ANON" >> "$GITHUB_ENV"
+          [ -n "$SUPA_URL" ] && [ -n "$SUPA_ANON" ] || { echo "::error::vars NEXT_PUBLIC_SUPABASE_*_${REF/main/PROD} ausentes"; exit 1; }
 
       - name: build + push imagem
         uses: docker/build-push-action@v6

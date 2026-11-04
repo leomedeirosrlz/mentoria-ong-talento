@@ -1659,9 +1659,12 @@ export type Database = {
       encaminhamentos: {
         Row: {
           created_at: string
+          created_by: string | null
           descricao: string
           dupla_id: string
+          feito_em: string | null
           id: string
+          numero: number | null
           prazo: string | null
           registro_id: string | null
           responsavel: string
@@ -1669,9 +1672,12 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           descricao: string
           dupla_id: string
+          feito_em?: string | null
           id?: string
+          numero?: number | null
           prazo?: string | null
           registro_id?: string | null
           responsavel?: string
@@ -1679,15 +1685,46 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           descricao?: string
           dupla_id?: string
+          feito_em?: string | null
           id?: string
+          numero?: number | null
           prazo?: string | null
           registro_id?: string | null
           responsavel?: string
           status?: Database["public"]["Enums"]["encaminhamento_status"]
         }
         Relationships: [
+          {
+            foreignKeyName: "encaminhamentos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encaminhamentos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encaminhamentos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encaminhamentos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "encaminhamentos_dupla_id_fkey"
             columns: ["dupla_id"]
@@ -1779,85 +1816,6 @@ export type Database = {
             foreignKeyName: "encerramentos_dupla_id_fkey"
             columns: ["dupla_id"]
             isOneToOne: true
-            referencedRelation: "jovem_duplas"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      encontro_intencoes: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          dupla_id: string
-          feito: boolean
-          feito_em: string | null
-          id: string
-          numero: number
-          texto: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          dupla_id: string
-          feito?: boolean
-          feito_em?: string | null
-          id?: string
-          numero: number
-          texto: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          dupla_id?: string
-          feito?: boolean
-          feito_em?: string | null
-          id?: string
-          numero?: number
-          texto?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "encontro_intencoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "jovem_especialistas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_intencoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_intencoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_contato"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_intencoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_pessoal"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_intencoes_dupla_id_fkey"
-            columns: ["dupla_id"]
-            isOneToOne: false
-            referencedRelation: "duplas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "encontro_intencoes_dupla_id_fkey"
-            columns: ["dupla_id"]
-            isOneToOne: false
             referencedRelation: "jovem_duplas"
             referencedColumns: ["id"]
           },

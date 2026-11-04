@@ -93,7 +93,6 @@ export function DashboardCoordenacao({
   supervisor = false,
   avisos = [],
   solicitacoes = [],
-  turmas = [],
   encerramentos = new Set<string>(),
   meuNome,
   termo,
@@ -119,8 +118,6 @@ export function DashboardCoordenacao({
   avisos?: Comunicado[];
   /** pedidos de especialista visíveis ao papel — só a coordenação monitora. */
   solicitacoes?: SolicitacaoEspecialista[];
-  /** labels de turma pra triagem dos pedidos do jovem sem dupla DPP. */
-  turmas?: string[];
   /** dupla_ids com rito de encerramento aberto (concluídas sem decisão). */
   encerramentos?: ReadonlySet<string>;
   /** faixa do termo de adesão pendente — entra depois do primeiro bloco de trabalho. */
@@ -433,7 +430,7 @@ export function DashboardCoordenacao({
               Recolhidos com contador; o pedido parado aponta pra cá */}
           {!supervisor && (
             <Recolhido id="pedidos-especialista" titulo="Pedidos de especialista" contagem={pedidosAbertos}>
-              <SolicitacoesCoordCard solicitacoes={solicitacoes} turmas={turmas} />
+              <SolicitacoesCoordCard solicitacoes={solicitacoes} />
             </Recolhido>
           )}
           {!supervisor && (
@@ -505,11 +502,7 @@ function ItemFila({ e, i }: { e: Excecao; i: number }) {
 
 function PedidoParadoLinha({ alerta, i }: { alerta: AlertaPedido; i: number }) {
   const onde =
-    alerta.onde === "triagem"
-      ? "em triagem"
-      : alerta.onde === "expirada"
-        ? "com horário expirado"
-        : "no mural";
+    alerta.onde === "expirada" ? "com horário expirado" : "no mural";
   return (
     <div
       style={{ "--i": Math.min(i, 10) } as CSSProperties}
