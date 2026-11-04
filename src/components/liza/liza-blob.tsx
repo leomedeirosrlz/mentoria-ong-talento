@@ -23,8 +23,10 @@ import {
  *  respira devagar (sempre, bem pouco) e
  *  comunica com o corpo inteiro: espicha quando você chega perto, se encolhe
  *  antes de pular, amassa ao aterrissar, murcha e inclina no erro. Olhos
- *  ovais + uma boquinha que muda de forma (sorriso, "o", aberta, reta, onda,
- *  triste). */
+ *  ovais grandes com cílios discretos no canto externo e pálpebras que
+ *  carregam a expressão (atenção, concentração, empatia, desconfiança); a
+ *  boquinha muda de forma (sorriso, "o", aberta, reta, onda, triste), mas é
+ *  coadjuvante — os olhos falam primeiro. */
 
 const TINTA = "var(--brand-ink)";
 const LIMA = "var(--brand-lime)";
@@ -81,7 +83,8 @@ const BASE: Pose = {
   palpebra: -0.35,
   forma: "oval",
   boca: "sorriso",
-  bocaEscala: 1,
+  // neutro: curvinha pequena — quem expressa são os olhos
+  bocaEscala: 0.85,
   bocaX: 0,
   sobrancelhaEsq: false,
   sobrancelhaDir: false,
@@ -204,9 +207,10 @@ function useBichinho(ativo: boolean) {
 function poseDe(estado: LizaEstado, momento: boolean, detalhe: boolean): Pose {
   switch (estado) {
     case "atento":
-      // espicha pra cima, olhos abrem e o sorriso alarga — "oi, posso
-      // ajudar?". Um "o" de susto a cada hover lia como sobressalto
-      return { ...BASE, sx: 1.06, sy: 1.1, palpebra: -0.5, bocaEscala: 1.25, corpo: { sx: 0.97, sy: 1.04, rotate: 0 } };
+      // escuta: espicha pra cima e os olhos abrem bem — a pálpebra recolhe
+      // e o topo arredonda; a boca fica discreta (olho atento é o "oi,
+      // posso ajudar?"). Um "o" de susto a cada hover lia como sobressalto
+      return { ...BASE, sx: 1.06, sy: 1.1, palpebra: -0.6, olhoTopo: 1.06, bocaEscala: 1, corpo: { sx: 0.97, sy: 1.04, rotate: 0 } };
     case "aberto":
       return momento
         ? { ...BASE, alvo: { x: 0, y: -0.2 }, forma: "arco", boca: "aberta" }
@@ -224,9 +228,13 @@ function poseDe(estado: LizaEstado, momento: boolean, detalhe: boolean): Pose {
         bocaX: 2.6,
         olhoTopo: 1.25,
         topoDir: 0.6,
+        // a base do olho sobe um tico: o "apertar" de quem está pensando
+        olhoBaixo: 0.85,
       };
     case "escrevendo":
-      return { ...BASE, alvo: { x: 0, y: 0.3 }, sy: 0.86, boca: "reta" };
+      // concentração: pálpebra a meio caminho e a base subindo — olhar de
+      // quem lê com atenção, não de sono
+      return { ...BASE, alvo: { x: 0, y: 0.3 }, sy: 0.86, palpebra: 0.12, olhoBaixo: 0.8, boca: "reta" };
     case "falando":
       // tagarelando: olhar em quem ouve, boca trabalhando — e a base do
       // olho curva pra dentro, aquela expressão de "tô contando coisa"
@@ -247,6 +255,11 @@ function poseDe(estado: LizaEstado, momento: boolean, detalhe: boolean): Pose {
         bocaEscala: momento ? 0.8 : 1,
         sobrancelhaEsq: detalhe,
         sobrancelhaDir: detalhe,
+        // empatia: os cantos externos caem e a pálpebra baixa um pouco —
+        // o "poxa" está no olho, a boca só confirma
+        palpebra: 0.1,
+        olhoTilt: 5,
+        olhoTopo: 0.9,
         bochecha: 0,
         corpo: { sx: 1.015, sy: 0.97, rotate: -5 },
       };
@@ -431,7 +444,7 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
     humor === "tonto"
       ? { ...BASE, alvo: { x: 0, y: 0 }, forma: "aperto" as const, boca: "onda", corpo: { sx: 1, sy: 0.97, rotate: -3 } }
       : humor === "irritado"
-        ? { ...BASE, alvo: { x: -0.8, y: 0.1 }, palpebra: 0.22, boca: "o", bocaEscala: 0.55, bocaX: -1.5, bravaEsq: detalhe, bravaDir: detalhe, olhoTilt: -3, corpo: { sx: 1.04, sy: 0.95, rotate: -3 } }
+        ? { ...BASE, alvo: { x: -0.8, y: 0.1 }, palpebra: 0.22, olhoBaixo: 0.75, boca: "o", bocaEscala: 0.55, bocaX: -1.5, bravaEsq: detalhe, bravaDir: detalhe, olhoTilt: -3, corpo: { sx: 1.04, sy: 0.95, rotate: -3 } }
         : humor === "timida"
           ? { ...BASE, forma: "arco" as const, boca: "sorriso", bochecha: 0.8, corpo: { sx: 1.03, sy: 0.95, rotate: 0 } }
           : humor === "cochilo"
@@ -460,14 +473,20 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
   // senão o FAB do celular (44) e o header (34) liam como pontinhos.
   // k: 0 aos 28px (medidas do mini) → 1 aos 64px+ (medidas cheias)
   const kOlho = Math.min(1, Math.max(0, (tamanho - 28) / 36));
+  // olhos ~17% maiores que a primeira versão (feedback de design: a
+  // expressão era genérica) — o oval e o afastamento seguem, e no mini
+  // continuam legíveis sem encostar um no outro
   const olhoDims = detalhe
     ? {
-        rx: 11 - 2 * kOlho,
-        ry: 13.5 - 2.5 * kOlho,
-        cy: 49 - 2 * kOlho,
-        dx: 18 - kOlho,
+        rx: 12.8 - 2.3 * kOlho,
+        ry: 15.8 - 2.9 * kOlho,
+        cy: 48.5 - 2 * kOlho,
+        dx: 19 - 1.5 * kOlho,
       }
-    : { rx: 11, ry: 13.5, cy: 49, dx: 18 };
+    : { rx: 12.8, ry: 15.8, cy: 48.5, dx: 19 };
+  // cílios só onde eles leem como detalhe e não como borrão (FAB 44/48,
+  // onboarding 64, conversa 96); no header (34) e no avatar (22/24) somem
+  const cilios = tamanho >= 40;
   // o olho inteiro viaja no rosto (raio) e o reflexo faz um contra-movimento
   // (hx) — o clássico de mascote; a boca anda ~metade: o rosto "vira" em 3D
   const raio = detalhe ? { x: 8, y: 6 } : { x: 5.5, y: 4.5 };
@@ -545,6 +564,7 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
                   abertura={abertura}
                   transicao={transicao}
                   detalhe={detalhe}
+                  cilios={cilios}
                 />
               ))}
               {/* bochechas rosadas sob os cantos externos dos olhos */}
@@ -563,7 +583,7 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
               ))}
             {detalhe && (efetivo !== "parado" || BOCA_NO_PARADO) && (
               <motion.g style={{ x: bx, y: by }}>
-                <g transform="translate(50 61)">
+                <g transform="translate(50 62)">
                   <BocaForma ativa={pose.boca === "sorriso"} transicao={transicao} escala={pose.bocaEscala}>
                     <path d="M-4.2 -1.2Q0 2.8 4.2 -1.2" fill="none" stroke={TINTA} strokeWidth={2.6} strokeLinecap="round" />
                   </BocaForma>
@@ -701,6 +721,7 @@ function Olho({
   abertura,
   transicao,
   detalhe,
+  cilios,
 }: {
   lado: -1 | 1;
   cx: number;
@@ -714,6 +735,7 @@ function Olho({
   abertura: MotionValue<number>;
   transicao: Transition;
   detalhe: boolean;
+  cilios: boolean;
 }) {
   const oval = pose.forma === "oval";
   const arco = pose.forma === "arco";
@@ -725,6 +747,25 @@ function Olho({
   const topo = lado === 1 ? pose.topoDir : pose.olhoTopo;
   const sobrancelha = lado === -1 ? pose.sobrancelhaEsq : pose.sobrancelhaDir;
   const brava = lado === -1 ? pose.bravaEsq : pose.bravaDir;
+
+  // cílios: dois traços curtos no canto externo superior, na raiz do
+  // contorno do olho (pontos da cúbica do topo em t≈0,85 e t≈0,75). Quando a
+  // pálpebra desce além da raiz, eles montam na borda dela — é a pálpebra
+  // que carrega os cílios. Seguem a escala do oval à mão (o grupo de escala
+  // do olho ancora no centro do próprio desenho, não no deles)
+  const palp = detalhe ? pose.palpebra : -1;
+  const borda = (fator: number) => -fator * ry + 2 * ry * palp;
+  const r1x = lado * 0.88 * rx * pose.sx;
+  const r1y = Math.max(-0.51 * ry * topo * pose.sy, borda(0.86));
+  const r2x = lado * 0.69 * rx * pose.sx;
+  const r2y = Math.max(-0.75 * ry * topo * pose.sy, borda(0.85));
+  const cilio1 = `M${r1x} ${r1y}q${lado * 1.5} ${-1.5} ${lado * 3.8} ${-1.3}`;
+  const cilio2 = `M${r2x} ${r2y}q${lado * 1.1} ${-1.8} ${lado * 2.8} ${-2.4}`;
+  // na piscada eles somem junto (o olho achata em ~120ms; um traço
+  // flutuando sem olho embaixo leria como sujeira)
+  const ciliosVisiveis = useTransform(abertura, (v) =>
+    Math.min(1, Math.max(0, (v - 0.35) / 0.5)),
+  );
 
   return (
     <motion.g style={{ x: ox, y: oy }}>
@@ -783,10 +824,43 @@ function Olho({
             transition={transicao}
             style={{ transformOrigin: "50% 100%" }}
           >
-            {/* a pálpebra herda o fill do grupo do corpo */}
-            <rect x={-rx * 2} y={-ry - 16} width={rx * 4} height={16} />
+            {/* a pálpebra herda o fill do grupo do corpo; a borda é curva
+                (desce no meio), não um corte reto — ao baixar ela abraça o
+                olho como pálpebra de verdade */}
+            <path
+              d={`M${-rx * 2} ${-ry - 16}H${rx * 2}V${-ry}Q0 ${-ry * 0.65} ${-rx * 2} ${-ry}Z`}
+            />
           </motion.g>
         )}
+
+      {cilios && (
+        <motion.g
+          initial={false}
+          animate={{ opacity: oval ? 1 : 0 }}
+          transition={{ opacity: FADE }}
+        >
+          <motion.g style={{ opacity: ciliosVisiveis }}>
+            <motion.path
+              initial={false}
+              animate={{ d: cilio1 }}
+              transition={transicao}
+              fill="none"
+              stroke={TINTA}
+              strokeWidth={1.9}
+              strokeLinecap="round"
+            />
+            <motion.path
+              initial={false}
+              animate={{ d: cilio2 }}
+              transition={transicao}
+              fill="none"
+              stroke={TINTA}
+              strokeWidth={1.7}
+              strokeLinecap="round"
+            />
+          </motion.g>
+        </motion.g>
+      )}
 
       {/* sobrancelha aflita: canto interno pra cima (só no erro) */}
       {detalhe && (
