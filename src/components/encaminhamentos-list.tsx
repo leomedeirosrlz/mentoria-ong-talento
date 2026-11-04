@@ -149,9 +149,12 @@ export function EncaminhamentosList({
             // desliga via MotionConfig global
             <motion.li
               key={t.id}
+              // #combinado-<id>: os CTAs de "combinado vencido" (home, agenda)
+              // pousam no item exato — lá o checkbox marca na hora
+              id={`combinado-${t.id}`}
               layout
               transition={T.panel}
-              className="flex items-start gap-1"
+              className="flex scroll-mt-20 items-start gap-1"
             >
               {podeEditar || podeMarcar ? (
                 // checkbox nativo + label: teclado, estado e o clique no texto

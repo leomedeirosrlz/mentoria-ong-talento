@@ -708,15 +708,15 @@ describe("executarTool — auditoria", () => {
     consoleSpy.mockRestore();
   });
 
-  it("guia_consulta devolve trechos citáveis sem o score", async () => {
+  it("guia_consulta devolve trechos citáveis limpos, sem score nem pagina", async () => {
     const { supabase } = supaFake({
       rpcData: {
         match_ia_chunks: [
           {
             guia: "guia-mentor-dpp",
             secao: "2º encontro",
-            pagina: 12,
-            trecho: "Apresente os resultados consolidados…",
+            pagina: 12, // id sintético do chunk — nunca chega ao modelo
+            trecho: "Apresente os <b>resultados</b> consolidados…",
             score: 0.42,
           },
         ],
@@ -733,7 +733,6 @@ describe("executarTool — auditoria", () => {
         {
           guia: "guia-mentor-dpp",
           secao: "2º encontro",
-          pagina: 12,
           trecho: "Apresente os resultados consolidados…",
         },
       ],

@@ -7,7 +7,7 @@ import {
 import type { MotivoAcompanhar } from "@/lib/agenda-coordenacao";
 import type { CicloEvento, Dupla } from "@/lib/types";
 import { partesTurma } from "@/lib/ciclo";
-import { msgsContato } from "@/lib/whatsapp-msgs";
+import { autoria, msgsContato } from "@/lib/whatsapp-msgs";
 import { cn } from "@/lib/utils";
 
 // ============================================================
@@ -100,14 +100,19 @@ export function semanaIso(iso: string): number {
 /** Título + corpo do lembrete pro caso da dupla — o MESMO texto alimenta a
  *  notificação in-app e o wa.me (o aviso é um só, por dois canais). Destino
  *  sempre "mentor": a operação da mentoria é dever dele; a fala pro jovem
- *  (check-in gentil) é o fluxo próprio do mentor DPP no Por mentorado. */
+ *  (check-in gentil) é o fluxo próprio do mentor DPP no Por mentorado.
+ *  `href` é o alvo da notificação quando o caso aponta um lugar exato —
+ *  a pendência de registro/limbo cai na linha do encontro, não na ficha
+ *  genérica; demais casos ficam na ficha (o chamador faz o fallback). */
 export function lembreteDaDupla(
   d: Dupla,
   caso: MotivoAcompanhar | null,
   eventos: CicloEvento[],
   autorNome: string | undefined,
   agora = new Date()
-): { titulo: string; corpo: string } {
+): { titulo: string; corpo: string; href?: string } {
+  const hrefRegistro = (id: string) => `/duplas/${d.id}#registrar-${id}`;
+  const agoraMs = agora.getTime();
   const mentorNome = (d.mentor?.nome ?? "").split(" ")[0];
   const mentoradoNome = (
     d.mentorado?.nome_social ||
@@ -122,38 +127,56 @@ export function lembreteDaDupla(
   // O nº oficial do cronograma DPP seria informação falsa aqui.
   if (d.trilha === "especialista") {
     if (caso === "registro_pendente") {
+      const pendReg = [...d.encontros]
+        .sort((a, b) => a.numero - b.numero)
+        .find(
+          (e) =>
+            !e.registro &&
+            (e.status === "realizado" || emLimbo(e, agoraMs))
+        );
       return {
         titulo: "Lembrete: registro pendente",
-        corpo: `Oi ${mentorNome}, tudo bem? A sessão de ${mentoradoNome} já aconteceu, mas ainda falta o registro. Completa quando puder, leva poucos minutos.`,
+        corpo: `Oi ${mentorNome}, tudo bem? ${autoria(autorNome)}. A sessão de ${mentoradoNome} já aconteceu, mas ainda falta o registro. Completa quando puder, leva poucos minutos.`,
+        href: pendReg ? hrefRegistro(pendReg.id) : undefined,
       };
     }
     const pendEsp = [...d.encontros]
       .sort((a, b) => a.numero - b.numero)
-      .find((e) => !e.registro && emLimbo(e, agora.getTime()));
+      .find((e) => !e.registro && emLimbo(e, agoraMs));
     return {
       titulo: pendEsp
         ? "Lembrete: sessão por confirmar"
         : "Lembrete: marcar a sessão",
       corpo: pendEsp
-        ? `Oi ${mentorNome}, tudo bem? A sessão de ${mentoradoNome} estava agendada e já passou. Rolou? Se rolou, dá pra registrar como foi; se não, vale remarcar.`
-        : `Oi ${mentorNome}! Passando pra lembrar de marcar a próxima sessão de ${mentoradoNome} na trilha de especialista. Qualquer coisa me chama :)`,
+        ? `Oi ${mentorNome}, tudo bem? ${autoria(autorNome)}. A sessão de ${mentoradoNome} estava agendada e já passou. Rolou? Se rolou, dá pra registrar como foi; se não, vale remarcar.`
+        : `Oi ${mentorNome}! ${autoria(autorNome)}. Passando pra lembrar de marcar a próxima sessão de ${mentoradoNome} na trilha de especialista. Qualquer coisa me chama :)`,
+      href: pendEsp ? hrefRegistro(pendEsp.id) : undefined,
     };
   }
   const vigente = eventoDaSemana(
     eventosDoCronograma(eventos, d.cronograma_id),
     agora
   );
-  const numLimbo = [...d.encontros]
+  const limboEnc = [...d.encontros]
     .sort((a, b) => a.numero - b.numero)
-    .find((e) => emLimbo(e, agora.getTime()))?.numero;
+    .find((e) => emLimbo(e, agoraMs));
+  const numLimbo = limboEnc?.numero;
   const extraVigente =
     vigente?.numero != null ? `${vigente.numero}º` : undefined;
   const info = { mentorNome, mentoradoNome, autorNome };
 
   if (caso === "registro_pendente") {
+    const pendReg = [...d.encontros]
+      .sort((a, b) => a.numero - b.numero)
+      .find(
+        (e) =>
+          !e.registro &&
+          (e.status === "realizado" || emLimbo(e, agoraMs))
+      );
     return {
       titulo: "Lembrete: registro pendente",
       corpo: msgsContato("registro_pendente", info).mentor ?? "",
+      href: pendReg ? hrefRegistro(pendReg.id) : undefined,
     };
   }
   if (caso === "limbo") {
@@ -164,6 +187,7 @@ export function lembreteDaDupla(
           ...info,
           extra: numLimbo != null ? `${numLimbo}º` : extraVigente,
         }).mentor ?? "",
+      href: limboEnc ? hrefRegistro(limboEnc.id) : undefined,
     };
   }
   if (caso === "atraso") {
@@ -171,7 +195,7 @@ export function lembreteDaDupla(
       titulo: "Lembrete: encontros em atraso",
       corpo:
         msgsContato(
-          { mentorNome, mentoradoNome },
+          { eu: autorNome, mentorNome, mentoradoNome },
           {
             casoMentor:
               "Os encontros estão atrasados. Posso ajudar a replanejar?",

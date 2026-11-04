@@ -176,8 +176,9 @@ export function AgendaPorMentorado({
   return (
     <div className="space-y-6">
       {/* o strip da semana só aparece quando tem o que condensar — sem
-          itens derivados ele seria 7 "livre" sem utilidade */}
-      {itensSemana.length > 0 && (
+          item com data na semana ele seria 7 "livre" sem utilidade
+          ("a agendar" não tem dia, não justifica o strip sozinho) */}
+      {itensSemana.some((it) => it.dia != null) && (
         <AgendaSuaSemana itens={itensSemana} hoje={hoje} hibrido={hibrido} />
       )}
       {/* >1 dupla: cards em 2 colunas em xl (mesma régua da home do
@@ -492,12 +493,22 @@ function CardMentorado({
                         : "encontro realizado sem registro: atividades, avaliação e próximo passo"}
                     </p>
                   </div>
-                  <Link
-                    href={`/duplas/${dupla.id}#registrar-${e.id}`}
-                    className={buttonVariants({ variant: "outline", size: "sm" })}
-                  >
-                    Preencher
-                  </Link>
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href={`/duplas/${dupla.id}#registrar-${e.id}`}
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                    >
+                      Registrar
+                    </Link>
+                    {noLimbo && (
+                      <Link
+                        href={`/duplas/${dupla.id}?aba=encontros#encontro-${e.id}`}
+                        className={buttonVariants({ variant: "ghost", size: "sm" })}
+                      >
+                        Remarcar
+                      </Link>
+                    )}
+                  </div>
                 </li>
               );
             })}
@@ -518,7 +529,7 @@ function CardMentorado({
                   </p>
                 </div>
                 <Link
-                  href={`/duplas/${dupla.id}#combinados`}
+                  href={`/duplas/${dupla.id}#combinado-${t.id}`}
                   className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
                   Ver na ficha
@@ -576,12 +587,13 @@ function CardMentorado({
               msgsContato(
                 {
                   eu: meuNome,
+                  remetente: "mentor",
                   mentorNome: meuNome,
                   mentoradoNome: primeiroNome,
                 },
                 {
                   casoMentorado:
-                    "Passando pra ver como você está e se precisa de algo por aqui. Os encontros seguem abertos pra vocês marcarem quando couber.",
+                    "Passando pra ver como você está e se precisa de algo por aqui. Os encontros seguem abertos pra gente marcar quando couber.",
                 }
               ).mentorado ?? ""
             }
@@ -631,25 +643,30 @@ function ProximoEncontro({
     titulo = "Dupla encerrada";
     detalhe = `${feitos} de ${total} encontros realizados`;
   } else if (limbo) {
-    // limbo é honesto: a plataforma não sabe se rolou — a pergunta é da
-    // dupla, a correção acontece na ficha (remarcar/registrar). O CTA é a
-    // pill outline sm dos outros cartões de pendência — um link inline de
-    // texto tinha ~20px de alvo no toque.
-    titulo = `Estava agendado ${formatDiaHora(limbo.data_hora)}`;
+    // limbo é honesto: a plataforma não sabe se rolou — então pergunta, e
+    // cada resposta tem a sua saída: aconteceu → registra (o deep link já
+    // abre o form); não aconteceu → a linha do encontro na ficha tem o
+    // Remarcar (e o "não aconteceu") à mão
+    titulo = `O ${limbo.numero}º encontro estava agendado ${formatDiaHora(limbo.data_hora)}. Aconteceu?`;
     detalhe = (
       <>
         <span className="block">
-          não aconteceu? Se rolou, o registro também é na ficha
+          se rolou, registre como foi; se não, remarque na ficha
         </span>
-        <Link
-          href={`/duplas/${dupla.id}`}
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            "mt-2"
-          )}
-        >
-          Remarcar na ficha
-        </Link>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Link
+            href={`/duplas/${dupla.id}?aba=encontros#registrar-${limbo.id}`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            Registrar como foi
+          </Link>
+          <Link
+            href={`/duplas/${dupla.id}?aba=encontros#encontro-${limbo.id}`}
+            className={buttonVariants({ variant: "ghost", size: "sm" })}
+          >
+            Remarcar na ficha
+          </Link>
+        </div>
       </>
     );
   } else if (proximo?.data_hora) {
@@ -707,7 +724,7 @@ function ProximoEncontro({
         </p>
         <p className="mt-0.5 text-sm font-medium">{titulo}</p>
         {detalhe && (
-          <p className="text-xs text-muted-foreground">{detalhe}</p>
+          <div className="text-xs text-muted-foreground">{detalhe}</div>
         )}
       </div>
     </div>
@@ -891,7 +908,9 @@ function SessaoRow({
     detalhe = (
       <>
         {quando ? `${formatDate(quando)} · ` : ""}
-        {rep.registro ? "registro entregue" : "registro pendente"}
+        {rep.registro
+          ? "registro entregue"
+          : "registro do especialista pendente · sem ação sua"}
         {rep.estrelas != null && (
           <>
             {" · "}

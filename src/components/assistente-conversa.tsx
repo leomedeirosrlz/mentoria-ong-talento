@@ -1155,15 +1155,17 @@ export function AssistenteConversa({
                         </Link>
                       ))}
                       {fontesDone.map((f, j) => {
-                        const meta = metaFonte(f.guia);
+                        const meta = metaFonte(f.guia, soJovem);
                         // seção pode chegar a 200 chars no chunk — corta pra
-                        // não estourar o chip (o inteiro vai no title)
+                        // não estourar o chip (o inteiro vai no title);
+                        // o travessão do título vira dois-pontos (copy)
                         const secaoCurta =
                           f.secao && f.secao.length > 60
                             ? `${f.secao.slice(0, 60).trimEnd()}…`
                             : f.secao;
-                        const rotulo = secaoCurta
-                          ? `${meta.rotulo} · ${secaoCurta}`
+                        const secaoTxt = secaoCurta?.replace(/\s+—\s+/g, ": ");
+                        const rotulo = secaoTxt
+                          ? `${meta.rotulo} · ${secaoTxt}`
                           : meta.rotulo;
                         const title = f.secao ? `${meta.rotulo}, ${f.secao}` : meta.rotulo;
                         const cls =

@@ -215,7 +215,9 @@ function linhaDoProximo(
     case "agendado":
       return `Agendado para ${formatDateTime(enc?.data_hora)}.`;
     case "nao_aconteceu":
-      return "Não aconteceu. Remarque quando puder.";
+      // status marcado por alguém (mentor, jovem ou coord) — se rolou de
+      // verdade, o Desfazer da linha volta o encontro pro agendado
+      return "Não aconteceu. Remarque quando puder, ou desfaça se rolou.";
     default:
       return passo.data
         ? `Sugerido pelo guia: ${formatDate(passo.data)}.`
@@ -540,13 +542,14 @@ export default async function DuplaPage({
   const encontrosFuturos = passosLista.filter(
     (ev) => numeroSemana != null && ev.numero > numeroSemana
   );
-  // pendência de registro (realizado sem registro ou agendado já vencido) —
-  // nunca entra no collapsible: o deep link #registrar-{id} precisa sempre existir
+  // pendência de registro (realizado sem registro ou agendado/remarcado já
+  // vencido — mesma régua do `limboAberto` da agenda) — nunca entra no
+  // collapsible: o deep link #registrar-{id} precisa sempre existir
   const temPendencia = (enc: Encontro | undefined) =>
     !!enc &&
     !enc.registro &&
     (enc.status === "realizado" ||
-      (enc.status === "agendado" &&
+      ((enc.status === "agendado" || enc.status === "remarcado") &&
         enc.data_hora != null &&
         new Date(enc.data_hora) < new Date()));
   const futurosComPendencia = encontrosFuturos.filter(
@@ -842,6 +845,7 @@ export default async function DuplaPage({
         }
         souCoord={souCoord}
         autorId={me.id}
+        autorNome={me.nome}
         // evidência é do mentor — coord só remove (moderação), sup só lê
         podeAnexar={souMentor && (dupla.status === "ativa" || ritoPendente)}
         podeRemoverAnexos={souCoord || (souMentor && (dupla.status === "ativa" || ritoPendente))}
@@ -1125,7 +1129,7 @@ export default async function DuplaPage({
               Próximos {encontrosColapsados.length} encontros
               <CaretDown size={14} aria-hidden className="transition-transform group-data-[panel-open]:rotate-180" />
             </Collapsible.Trigger>
-            <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
+            <Collapsible.Panel hiddenUntilFound className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
               <div className="space-y-3">{encontrosColapsados.map(renderEncontro)}</div>
             </Collapsible.Panel>
           </Collapsible.Root>
@@ -1203,6 +1207,7 @@ export default async function DuplaPage({
           jornadaViva={
             dupla.status === "ativa" || dupla.status === "pausada"
           }
+          remetenteMentorNome={souMentor ? me.nome : undefined}
         />
       )}
       <Suspense fallback={<Skeleton className="h-24 w-full" />}>
@@ -1224,6 +1229,7 @@ export default async function DuplaPage({
             consolidacao={terceiros.consolidacao}
             mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
             podeGerenciar={souCoord || souMentor}
+            remetenteNome={souMentor ? me.nome : undefined}
             jornadaViva={
               dupla.status === "ativa" || dupla.status === "pausada"
             }

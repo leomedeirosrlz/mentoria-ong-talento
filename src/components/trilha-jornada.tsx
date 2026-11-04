@@ -98,7 +98,9 @@ function textoProximo(no: NoJornada | undefined): string | null {
   if (no.estado === "agendado")
     return `Próximo: ${no.numero}º · agendado ${formatDateTime(no.encontro?.data_hora)}`;
   if (no.estado === "nao_aconteceu")
-    return `Próximo: ${no.numero}º · não aconteceu, remarcar`;
+    // o "não aconteceu" é sempre marcação de alguém (mentor, jovem ou
+    // coord) — se foi engano, o caminho de volta é o Desfazer na linha
+    return `Próximo: ${no.numero}º · não aconteceu · remarcar ou desfazer`;
   return no.evento.data
     ? `Próximo: ${no.numero}º · sugerido ${formatDate(no.evento.data)}`
     : `Próximo: ${no.numero}º · data a combinar`;

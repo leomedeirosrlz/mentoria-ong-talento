@@ -78,8 +78,12 @@ export function LoginForm() {
   // expirado não é âncora da app e não pode vazar pro destino
   const destinoFinal = useCallback(() => {
     const next = params.get("next");
-    // só a âncora da app é repassada — #error=/#access_token= do GoTrue não
-    const hash = location.hash.startsWith("#registrar-") ? location.hash : "";
+    // só âncoras da app são repassadas — #error=/#access_token= do GoTrue não
+    const hash = /^#(registrar-|encontro-|intencoes|combinado|combinados|instrumentos|assinaturas|avisos)/.test(
+      location.hash
+    )
+      ? location.hash
+      : "";
     return (pathInterno(next) ?? "/") + hash;
   }, [params]);
 

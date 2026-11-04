@@ -86,6 +86,7 @@ export function EncontroRow({
   jovemNome,
   jovemWhatsapp,
   jornadaViva,
+  autorNome,
 }: {
   /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
   passo: PassoGuia;
@@ -141,6 +142,8 @@ export function EncontroRow({
   /** Dupla viva (ativa|pausada) — destrava as ações de link da pendência
    *  de avaliação; fechada deixa só o aviso como fato. */
   jornadaViva: boolean;
+  /** Nome de quem vê — assina o convite de avaliação pro jovem. */
+  autorNome?: string;
 }) {
   const feito = encontro?.status === "realizado";
   const naoAconteceu = encontro?.status === "nao_aconteceu";
@@ -275,8 +278,12 @@ export function EncontroRow({
       )}
     >
       <div
+        // #encontro-<id>: âncora de leitura (só rola — usada pelos CTAs
+        // "Remarcar na ficha"); #registrar-<id> no card abre o form além
+        // de rolar, por isso são dois ids em elementos distintos
+        id={encontro ? `encontro-${encontro.id}` : undefined}
         className={cn(
-          "flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5",
+          "flex scroll-mt-20 flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5",
           registroPendente && "bg-[var(--warn)]/5"
         )}
       >
@@ -537,6 +544,7 @@ export function EncontroRow({
                   souCoord={souCoord}
                   duplaId={duplaId}
                   jornadaViva={jornadaViva}
+                  autorNome={autorNome}
                 />
               ) : (
                 <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">

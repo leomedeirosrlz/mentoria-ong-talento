@@ -643,7 +643,7 @@ function montarPrecisa({
           nudge={{
             destino: "mentor",
             titulo: lembrete.titulo,
-            href: `/duplas/${d.id}`,
+            href: lembrete.href ?? `/duplas/${d.id}`,
             bloqueadoAte: item.bloqueadoAte,
           }}
         />
@@ -698,7 +698,7 @@ function lembreteDoItem(
   eventos: CicloEvento[],
   meuNome: string | undefined,
   hoje: Date
-): { titulo: string; corpo: string } {
+): { titulo: string; corpo: string; href?: string } {
   const caso = item.motivos.includes("registro_pendente")
     ? "registro_pendente"
     : item.motivos.includes("limbo")

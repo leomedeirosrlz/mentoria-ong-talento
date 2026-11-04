@@ -100,9 +100,19 @@ function msgConviteWhatsApp(
   convidadoNome: string,
   jovemNome: string,
   token: string,
-  origem: string
+  origem: string,
+  /** nome do mentor quando é ele quem envia — um convite sem remetente
+   *  vindo do número dele lê anônimo; omitido = texto de equipe */
+  remetenteNome?: string
 ): string {
-  return `Olá, ${nomeExib(convidadoNome)}! ${nomeExib(jovemNome)} indicou você pra contar como vê essa pessoa. É a avaliação por terceiros do Programa de Mentoria Realiza.vc. São só 2 perguntas rápidas e sua resposta é confidencial: ${urlPublica(token, origem, "/t")}`;
+  const c = nomeExib(convidadoNome);
+  const j = nomeExib(jovemNome);
+  const url = urlPublica(token, origem, "/t");
+  if (remetenteNome) {
+    const m = nomeExib(remetenteNome) || "o mentor";
+    return `Olá, ${c}! Aqui é ${m}, mentor de ${j}. Foi ${j} quem indicou você pra contar como vê essa pessoa. São só 2 perguntas rápidas e sua resposta é confidencial: ${url}`;
+  }
+  return `Olá, ${c}! Aqui é a equipe do Realiza.vc. ${j} indicou você pra contar como vê essa pessoa. É a avaliação por terceiros do Programa de Mentoria Realiza.vc. São só 2 perguntas rápidas e sua resposta é confidencial: ${url}`;
 }
 
 /** Expiração é lazy no banco (só vira 'expirado' quando o link é tocado) —
@@ -120,12 +130,14 @@ function LinhaContato({
   jovemNome,
   podeGerenciar,
   jornadaViva,
+  remetenteNome,
 }: {
   contato: TerceiroContato;
   duplaId: string;
   jovemNome: string;
   podeGerenciar: boolean;
   jornadaViva: boolean;
+  remetenteNome?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -244,7 +256,8 @@ function LinhaContato({
                       contato.nome,
                       jovemNome,
                       contato.token,
-                      origem
+                      origem,
+                      remetenteNome
                     )
                   );
                   return wa ? (
@@ -659,6 +672,7 @@ export function TerceirosDupla({
   mentoradoNome,
   podeGerenciar,
   jornadaViva,
+  remetenteNome,
   className,
 }: {
   duplaId: string;
@@ -670,6 +684,9 @@ export function TerceirosDupla({
   podeGerenciar: boolean;
   /** ativa|pausada — dupla fechada vira só leitura */
   jornadaViva: boolean;
+  /** nome do mentor quando é ele quem opera — assina o convite do
+   *  WhatsApp como pessoa (sem ele o texto sai em voz de equipe) */
+  remetenteNome?: string;
   className?: string;
 }) {
   const [dialogAberto, setDialogAberto] = useState(false);
@@ -713,6 +730,7 @@ export function TerceirosDupla({
               jovemNome={mentoradoNome}
               podeGerenciar={podeGerenciar}
               jornadaViva={jornadaViva}
+              remetenteNome={remetenteNome}
             />
           ))}
         </ul>

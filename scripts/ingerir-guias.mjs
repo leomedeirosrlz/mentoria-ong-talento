@@ -198,7 +198,10 @@ for (const f of arquivos) {
     fatiar(s.texto).map((texto, ci) => ({
       guia: doc.fonte,
       secao: s.secao.slice(0, 200),
-      pagina: si * 100 + ci, // estável por seção+ordem dentro da seção
+      // id sintético do chunk (seção×100+ordem) — NÃO é a página do
+      // documento e não deve ser citado como tal (o app filtra; ver
+      // limparTrecho/metaFonte em src/lib/ia/fontes.ts)
+      pagina: si * 100 + ci,
       texto: texto.slice(0, 4000),
       // metadados do doc propagados ao chunk — fora do insert enquanto o
       // schema não tiver coluna (ver CAMPOS_INSERT e o gap no README)

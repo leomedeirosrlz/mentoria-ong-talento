@@ -375,6 +375,11 @@ export type LoteInstrumentoLinha = {
   token: string | null;
   waFone: string | null;
   waNome: string | null;
+  /** waFone é do MENTOR porque o jovem não tem WhatsApp — a mensagem vira
+   *  pedido de repasse, não convite ao destinatário do número */
+  waRepasse?: boolean;
+  /** nome do jovem pra copy de repasse ("o link é da Ana") */
+  waJovemNome?: string | null;
 };
 
 const MOTIVO_LOTE: Record<string, string> = {
@@ -501,6 +506,8 @@ export async function enviarInstrumentoLote(input: {
         token: r.token ?? null,
         waFone,
         waNome,
+        waRepasse: waJovem == null && waMentor != null,
+        waJovemNome: primeiroNome(r.jovem?.nome) || null,
       });
       continue;
     }
@@ -557,11 +564,14 @@ export async function enviarInstrumentoLote(input: {
       (x) => x.dupla_id === linha.duplaId
     );
     linha.token = rpc?.token ?? null;
-    linha.waFone =
-      rpc?.jovem?.whatsapp?.trim() || rpc?.mentor?.whatsapp?.trim() || null;
-    linha.waNome = rpc?.jovem?.whatsapp?.trim()
-      ? primeiroNome(rpc.jovem?.nome)
+    const waJovem = rpc?.jovem?.whatsapp?.trim() || null;
+    const waMentor = rpc?.mentor?.whatsapp?.trim() || null;
+    linha.waFone = waJovem ?? waMentor;
+    linha.waNome = waJovem
+      ? primeiroNome(rpc?.jovem?.nome)
       : primeiroNome(rpc?.mentor?.nome);
+    linha.waRepasse = waJovem == null && waMentor != null;
+    linha.waJovemNome = primeiroNome(rpc?.jovem?.nome) || null;
   };
 
   // kill-switch/config: nada foi tentado — marca envio_desligado e devolve
@@ -732,6 +742,8 @@ export async function enviarDesfechoLote(input: {
         token: r.token ?? null,
         waFone,
         waNome,
+        waRepasse: waJovem == null && waMentor != null,
+        waJovemNome: primeiroNome(r.jovem?.nome) || null,
       });
       continue;
     }
@@ -785,11 +797,14 @@ export async function enviarDesfechoLote(input: {
       (x) => x.dupla_id === linha.duplaId
     );
     linha.token = rpc?.token ?? null;
-    linha.waFone =
-      rpc?.jovem?.whatsapp?.trim() || rpc?.mentor?.whatsapp?.trim() || null;
-    linha.waNome = rpc?.jovem?.whatsapp?.trim()
-      ? primeiroNome(rpc.jovem?.nome)
+    const waJovem = rpc?.jovem?.whatsapp?.trim() || null;
+    const waMentor = rpc?.mentor?.whatsapp?.trim() || null;
+    linha.waFone = waJovem ?? waMentor;
+    linha.waNome = waJovem
+      ? primeiroNome(rpc?.jovem?.nome)
       : primeiroNome(rpc?.mentor?.nome);
+    linha.waRepasse = waJovem == null && waMentor != null;
+    linha.waJovemNome = primeiroNome(rpc?.jovem?.nome) || null;
   };
 
   // kill-switch/config: nada foi tentado — marca envio_desligado e devolve

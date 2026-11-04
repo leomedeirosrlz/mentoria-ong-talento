@@ -340,7 +340,7 @@ export function UiCard({ bloco, jovem }: { bloco: UiBloco; jovem?: boolean }) {
     case "instrumentos":
       return <CardInstrumentos b={bloco} r={r} />;
     case "fontes":
-      return <CardFontes b={bloco} />;
+      return <CardFontes b={bloco} jovem={ehJovem} />;
   }
 }
 
@@ -1118,7 +1118,7 @@ export function CardInstrumentos({ b, r = rotas(false) }: { b: UiInstrumentos; r
 
 // ---------- fontes ----------
 
-export function CardFontes({ b }: { b: UiFontes }) {
+export function CardFontes({ b, jovem }: { b: UiFontes; jovem?: boolean }) {
   return (
     <Cartao
       titulo="Trechos dos guias"
@@ -1126,20 +1126,35 @@ export function CardFontes({ b }: { b: UiFontes }) {
     >
       <ul className="space-y-1.5">
         {b.fontes.map((f, i) => (
-          <FonteItem key={`${f.guia}-${f.secao}-${f.pagina}-${i}`} f={f} i={i + 1} />
+          <FonteItem
+            key={`${f.guia}-${f.secao}-${i}`}
+            f={f}
+            i={i + 1}
+            jovem={jovem}
+          />
         ))}
       </ul>
     </Cartao>
   );
 }
 
-function FonteItem({ f, i }: { f: UiFontes["fontes"][number]; i: number }) {
+function FonteItem({
+  f,
+  i,
+  jovem,
+}: {
+  f: UiFontes["fontes"][number];
+  i: number;
+  jovem?: boolean;
+}) {
   const [aberto, setAberto] = useState(false);
   const id = useId();
-  const meta = metaFonte(f.guia);
+  const meta = metaFonte(f.guia, jovem);
   // rótulos do catálogo podem trazer travessão; na tela vira dois-pontos
   const rotulo = meta.rotulo.replace(/\s+—\s+/g, ": ");
-  const onde = [f.secao, f.pagina != null && `pág. ${f.pagina}`].filter(Boolean).join(" · ");
+  // a referência citável é guia + seção — o "pagina" do banco era o id
+  // sintético do chunk e lia como página que não existe no documento
+  const onde = (f.secao ?? "").replace(/\s+—\s+/g, ": ");
   return (
     <li style={passo(i)} className="animate-enter rounded-lg border border-border/70">
       {/* ghost do kit com a forma de linha: altura livre, texto quebra */}
@@ -1189,7 +1204,7 @@ function FonteItem({ f, i }: { f: UiFontes["fontes"][number]; i: number }) {
                     FOCO
                   )}
                 >
-                  {meta.href.startsWith("/agenda") ? "Abrir agenda" : "Abrir em Materiais"}
+                  {meta.href.endsWith("/agenda") ? "Abrir agenda" : "Abrir em Materiais"}
                   <CaretRight size={11} weight="bold" aria-hidden />
                 </Link>
               )}

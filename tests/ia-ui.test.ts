@@ -140,13 +140,22 @@ describe("demais tools", () => {
     expect(b.chamados[0].numero).toBe("C-2");
   });
 
-  it("guia corta o trecho e mantém a referência", () => {
+  it("guia limpa o trecho, corta na frase e nunca leva a pagina sintética", () => {
     const b = uiDaTool("guia_consulta", {
-      fontes: [{ guia: "guia-mentor-dpp", secao: "10", pagina: 42, trecho: "x".repeat(500) }],
+      fontes: [
+        {
+          guia: "guia-mentor-dpp",
+          secao: "10",
+          pagina: 42, // id do chunk — não pode vazar pro card
+          trecho: `<b>Preserve</b> a **dupla** | segue ${"x".repeat(400)}`,
+        },
+      ],
     });
     if (b?.kind !== "fontes") throw new Error("sem card");
     expect(b.fontes[0].trecho.length).toBeLessThanOrEqual(320);
-    expect(b.fontes[0].pagina).toBe(42);
+    expect(b.fontes[0].trecho).toContain("Preserve a dupla · segue");
+    expect(b.fontes[0].trecho).not.toMatch(/<b>|\*\*|\|/);
+    expect("pagina" in b.fontes[0]).toBe(false);
   });
 
   it("lookup intermediário e tool sem card não viram card", () => {

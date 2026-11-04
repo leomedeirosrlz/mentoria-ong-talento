@@ -26,6 +26,7 @@ import type {
   ProximoPasso,
   Trilha,
 } from "@/lib/types";
+import { limparTrecho } from "./fontes";
 
 // ---------- shapes dos blocos ----------
 
@@ -165,11 +166,12 @@ export type UiInstrumentos = {
 
 export type UiFontes = {
   kind: "fontes";
-  /** até 4 trechos citáveis — o card expande o trecho ao tocar no chip */
+  /** até 4 trechos citáveis — o card expande o trecho ao tocar no chip.
+   *  Referência citável é guia + seção: o `pagina` do banco é o id
+   *  sintético do chunk, não a página do documento — não sai pro card. */
   fontes: {
     guia: string;
     secao: string | null;
-    pagina: number | null;
     trecho: string;
   }[];
 };
@@ -406,8 +408,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
         fontes: fs.slice(0, 4).map((f) => ({
           guia: String(f.guia),
           secao: str(f.secao),
-          pagina: typeof f.pagina === "number" ? f.pagina : null,
-          trecho: corta(str(f.trecho), 320) ?? "",
+          trecho: limparTrecho(str(f.trecho), 320),
         })),
       };
     }
