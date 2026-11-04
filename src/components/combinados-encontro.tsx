@@ -6,12 +6,13 @@ import { Collapsible } from "@base-ui/react/collapsible";
 import { CaretDown, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
-  criarIntencao,
-  marcarIntencao,
-  removerIntencao,
+  criarCombinadoEncontro,
+  excluirEncaminhamento,
+  toggleEncaminhamento,
 } from "@/lib/actions";
+import { formatDiaMes } from "@/lib/ciclo";
 import { demoAtivoClient } from "@/lib/demo/shared";
-import type { EncontroIntencao } from "@/lib/types";
+import type { Encaminhamento } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -20,38 +21,52 @@ import { cn } from "@/lib/utils";
  *  pendente tira o card do agrupador "Próximos N encontros" e o React
  *  remonta o bloco — useState interno morreria junto e o painel fechava
  *  logo após criar (bug visto no e2e). O mapa por (dupla,nº) devolve a
- *  escolha do usuário na remontagem; reload de página recomeça fechado. */
+ *  escolha do usuário na remontagem; reload de página recomeça pelo padrão. */
 const abertoPorBloco = new Map<string, boolean>();
 
-/** Checklist de intenções do mentor por encontro (REALIZA-21) — itens
- *  acionáveis que vivem sob a nota livre: a nota responde "como quero
- *  conduzir", as intenções respondem "o que não posso esquecer". Chave
- *  (dupla_id, numero) como a nota: precede o agendamento e segue o nº do
- *  guia. Pendentes de nº anteriores reaparecem aqui taggeados "do Nº
- *  encontro" — a origem evita ler pendência antiga como item novo. */
-export function IntencoesEncontro({
+type Responsavel = "mentor" | "mentorado";
+
+/** Combinados do encontro (0157: os afazeres viraram combinados) — uma
+ *  lista só por nº do guia, logo abaixo do registro: o que a dupla combinou
+ *  no registro e o que o mentor anotou no preparo, cada um com o
+ *  responsável. O do mentorado ele vê na área dele; o do mentor fica entre
+ *  o mentor e a equipe. Pendentes de nºs anteriores reaparecem aqui
+ *  taggeados "do Nº encontro" — a origem evita ler pendência antiga como
+ *  item novo. Marcar feito aqui ou na aba Combinados dá no mesmo. */
+export function CombinadosEncontro({
   duplaId,
   numero,
   itens,
   pendentesAnteriores = [],
-  somenteLeitura,
+  jovemNome,
+  podeEditar,
+  podeMarcar,
 }: {
   duplaId: string;
-  /** nº do passo do guia — a âncora da checklist (não o encontro físico). */
+  /** nº do passo do guia — a âncora da lista (não o encontro físico). */
   numero: number;
-  /** Itens deste nº (feitos e pendentes). */
-  itens: EncontroIntencao[];
+  /** Combinados deste nº (feitos e pendentes). */
+  itens: Encaminhamento[];
   /** Pendentes de nºs anteriores — carry-over marcável aqui mesmo. */
-  pendentesAnteriores?: EncontroIntencao[];
-  /** coord/sup, dupla inativa: lista pra ler, sem inputs; null quando vazia. */
-  somenteLeitura?: boolean;
+  pendentesAnteriores?: Encaminhamento[];
+  /** Primeiro nome do mentorado — rótulo do responsável. */
+  jovemNome: string;
+  /** Mentor da dupla viva: adiciona e remove. */
+  podeEditar: boolean;
+  /** Mentor ou coordenação em dupla ativa: marca feito. */
+  podeMarcar: boolean;
 }) {
   const [pending, start] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [novo, setNovo] = useState("");
+  const [responsavel, setResponsavel] = useState<Responsavel>("mentor");
   const chaveBloco = `${duplaId}:${numero}`;
+  // abre sozinho quando há o que ver — fechado escondia o que a dupla
+  // combinou atrás de um rótulo que ninguém abria
   const [aberto, setAberto] = useState(
-    () => abertoPorBloco.get(chaveBloco) ?? false
+    () =>
+      abertoPorBloco.get(chaveBloco) ??
+      itens.length + pendentesAnteriores.length > 0
   );
   const router = useRouter();
   // demo: criar/marcar/remover funcionam em estado local — nenhuma action
@@ -59,33 +74,39 @@ export function IntencoesEncontro({
   const [demo] = useState(demoAtivoClient);
   const [itensLoc, setItensLoc] = useState(itens);
   const [antLoc, setAntLoc] = useState(pendentesAnteriores);
+  const feito = (c: Encaminhamento) => c.status === "feito";
   const lista = (demo ? itensLoc : itens)
     .slice()
     .sort((a, b) =>
-      a.feito !== b.feito
-        ? a.feito
+      feito(a) !== feito(b)
+        ? feito(a)
           ? 1
           : -1
         : a.created_at.localeCompare(b.created_at)
     );
   const anteriores = (demo ? antLoc : pendentesAnteriores)
     .slice()
-    .sort((a, b) => a.numero - b.numero || a.created_at.localeCompare(b.created_at));
+    .sort(
+      (a, b) =>
+        (a.numero ?? 0) - (b.numero ?? 0) ||
+        a.created_at.localeCompare(b.created_at)
+    );
 
-  function toggle(t: EncontroIntencao, carryOver: boolean) {
+  function toggle(c: Encaminhamento, carryOver: boolean) {
+    const alvo = !feito(c);
     if (demo) {
-      // item feito sai do "De antes" (o recorte é !feito); item próprio fica
-      // na lista, riscado — mesmo resultado do refresh contra o banco
-      if (carryOver && !t.feito) {
-        setAntLoc((l) => l.filter((x) => x.id !== t.id));
+      // item feito sai do "De antes" (o recorte é pendente); item próprio
+      // fica na lista, riscado — mesmo resultado do refresh contra o banco
+      if (carryOver && alvo) {
+        setAntLoc((l) => l.filter((x) => x.id !== c.id));
       } else {
         (carryOver ? setAntLoc : setItensLoc)((l) =>
           l.map((x) =>
-            x.id === t.id
+            x.id === c.id
               ? {
                   ...x,
-                  feito: !t.feito,
-                  feito_em: !t.feito ? new Date().toISOString() : null,
+                  status: alvo ? "feito" : "pendente",
+                  feito_em: alvo ? new Date().toISOString() : null,
                 }
               : x
           )
@@ -93,10 +114,10 @@ export function IntencoesEncontro({
       }
       return;
     }
-    setPendingId(t.id);
+    setPendingId(c.id);
     start(async () => {
       try {
-        const res = await marcarIntencao(t.id, !t.feito);
+        const res = await toggleEncaminhamento(c.id, alvo, duplaId);
         if (res?.error) toast.error(res.error);
         else router.refresh();
       } catch {
@@ -107,17 +128,17 @@ export function IntencoesEncontro({
     });
   }
 
-  function remover(t: EncontroIntencao, carryOver: boolean) {
+  function remover(c: Encaminhamento, carryOver: boolean) {
     if (demo) {
       (carryOver ? setAntLoc : setItensLoc)((l) =>
-        l.filter((x) => x.id !== t.id)
+        l.filter((x) => x.id !== c.id)
       );
       return;
     }
-    setPendingId(t.id);
+    setPendingId(c.id);
     start(async () => {
       try {
-        const res = await removerIntencao(t.id);
+        const res = await excluirEncaminhamento(c.id, duplaId);
         if (res?.error) toast.error(res.error);
         else router.refresh();
       } catch {
@@ -139,20 +160,22 @@ export function IntencoesEncontro({
         {
           id: crypto.randomUUID(),
           dupla_id: duplaId,
+          registro_id: null,
           numero,
-          texto: limpo,
-          feito: false,
+          descricao: limpo,
+          responsavel,
+          prazo: null,
+          status: "pendente",
           feito_em: null,
           created_by: null,
           created_at: agora,
-          updated_at: agora,
         },
       ]);
       return;
     }
     start(async () => {
       try {
-        const res = await criarIntencao(duplaId, numero, limpo);
+        const res = await criarCombinadoEncontro(duplaId, numero, limpo, responsavel);
         if (res?.error) {
           toast.error(res.error);
           setNovo(limpo); // devolve o texto — a digitação não se perde
@@ -166,63 +189,71 @@ export function IntencoesEncontro({
     });
   }
 
-  const pendentes = lista.filter((i) => !i.feito).length + anteriores.length;
+  const pendentes = lista.filter((c) => !feito(c)).length + anteriores.length;
   const total = lista.length + anteriores.length;
+  // coord/sup sem nada pra ver: a seção nem aparece
+  if (!podeEditar && total === 0) return null;
   const sufixo =
     pendentes > 0
       ? `${pendentes} ${pendentes === 1 ? "pendente" : "pendentes"}`
       : total > 0
         ? "tudo feito"
         : null;
+  const rotuloResp = (r: Responsavel) =>
+    r === "mentor" ? (podeEditar ? "Você" : "Mentor") : jovemNome;
 
-  const texto = (t: EncontroIntencao, carryOver: boolean) => (
+  const texto = (c: Encaminhamento, carryOver: boolean) => (
     <span className="block min-w-0 flex-1">
-      {/* o riscado é binário como nos combinados — text-decoration não
+      {/* o riscado é binário como na aba Combinados — text-decoration não
           anima e um line-through sempre ativo entregaria "texto suprimido"
           pra leitor de tela */}
       <span
         className={cn(
           "block break-words text-sm transition-colors",
-          t.feito && "text-muted-foreground line-through"
+          feito(c) && "text-muted-foreground line-through"
         )}
       >
-        {carryOver && (
+        {carryOver && c.numero != null && (
           <span className="text-muted-foreground">
-            do {t.numero}º encontro ·{" "}
+            do {c.numero}º encontro ·{" "}
           </span>
         )}
-        {t.texto}
+        {c.descricao}
+      </span>
+      <span className="mt-0.5 block text-xs text-muted-foreground">
+        {rotuloResp(c.responsavel)}
+        {c.prazo ? ` · até ${formatDiaMes(c.prazo)}` : ""}
       </span>
     </span>
   );
 
   // checkbox nativo + label — teclado e clique no texto de graça; o quadrado
-  // estilizado é só a representação (mesmo padrão das listas de combinados)
-  const itemEditavel = (t: EncontroIntencao, carryOver: boolean) => (
-    <li key={t.id} className="flex items-start gap-1">
+  // estilizado é só a representação (mesmo padrão da aba Combinados)
+  const itemMarcavel = (c: Encaminhamento, carryOver: boolean) => (
+    <li key={c.id} className="flex items-start gap-1">
       <label
         className={cn(
           "group flex min-w-0 flex-1 cursor-pointer items-start gap-3 py-2 transition-colors",
-          pending && pendingId === t.id && "opacity-60"
+          pending && pendingId === c.id && "opacity-60"
         )}
       >
         <input
           type="checkbox"
           className="peer sr-only"
-          checked={t.feito}
-          disabled={pending && pendingId === t.id}
-          onChange={() => toggle(t, carryOver)}
+          checked={feito(c)}
+          disabled={pending && pendingId === c.id}
+          onChange={() => toggle(c, carryOver)}
         />
         <span
           aria-hidden="true"
           className={cn(
             "mt-0.5 grid size-4.5 shrink-0 place-items-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card",
-            t.feito
+            feito(c)
               ? "border-[var(--ok)] bg-[var(--ok)] text-[var(--status-foreground)]"
               : "border-muted-foreground/40 group-hover:border-foreground"
           )}
         >
-          {t.feito && (
+          {feito(c) && (
             <svg
               viewBox="0 0 10 8"
               className="size-2.5 fill-none stroke-current stroke-2"
@@ -231,64 +262,44 @@ export function IntencoesEncontro({
             </svg>
           )}
         </span>
-        {texto(t, carryOver)}
+        {texto(c, carryOver)}
       </label>
       {/* × sempre visível em opacity-60 — "só no hover" não existe no touch;
           sobe pra 100 no hover/focus do grupo */}
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon"
-        aria-label="Remover afazer"
-        disabled={pending && pendingId === t.id}
-        onClick={() => remover(t, carryOver)}
-        className="mt-1.5 size-8 shrink-0 text-muted-foreground opacity-60 transition-opacity hover:opacity-100 focus-visible:opacity-100"
-      >
-        <X size={14} aria-hidden />
-      </Button>
+      {podeEditar && (
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon"
+          aria-label="Remover combinado"
+          disabled={pending && pendingId === c.id}
+          onClick={() => remover(c, carryOver)}
+          className="mt-1.5 size-8 shrink-0 text-muted-foreground opacity-60 transition-opacity hover:opacity-100 focus-visible:opacity-100"
+        >
+          <X size={14} aria-hidden />
+        </Button>
+      )}
     </li>
   );
 
   // leitura: anel fino é gramática de status, não de controle — um quadrado
-  // pareceria checkbox desabilitado (mesma leitura da lista de combinados)
-  const itemLeitura = (t: EncontroIntencao, carryOver: boolean) => (
-    <li key={t.id} className="flex items-start gap-3 py-1.5">
+  // pareceria checkbox desabilitado (mesma leitura da aba Combinados)
+  const itemLeitura = (c: Encaminhamento, carryOver: boolean) => (
+    <li key={c.id} className="flex items-start gap-3 py-1.5">
       <span
         aria-hidden="true"
         className={cn(
           "mt-1.5 size-2.5 shrink-0 rounded-full border-2",
-          t.feito ? "border-[var(--ok)]" : "border-muted-foreground/50"
+          feito(c) ? "border-[var(--ok)]" : "border-muted-foreground/50"
         )}
       />
-      {texto(t, carryOver)}
+      {texto(c, carryOver)}
     </li>
   );
-
-  if (somenteLeitura) {
-    if (total === 0) return null;
-    return (
-      <div id={`intencoes-${numero}`} className="scroll-mt-20">
-        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
-          Afazeres
-        </p>
-        {lista.length > 0 && (
-          <ul>{lista.map((t) => itemLeitura(t, false))}</ul>
-        )}
-        {anteriores.length > 0 && (
-          <>
-            <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-              De antes
-            </p>
-            <ul>{anteriores.map((t) => itemLeitura(t, true))}</ul>
-          </>
-        )}
-      </div>
-    );
-  }
+  const item = podeMarcar ? itemMarcavel : itemLeitura;
 
   return (
-    <div id={`intencoes-${numero}`} className="scroll-mt-20">
+    <div id={`combinados-${numero}`} className="scroll-mt-20">
       <Collapsible.Root
         open={aberto}
         onOpenChange={(o) => {
@@ -297,7 +308,7 @@ export function IntencoesEncontro({
         }}
       >
         <Collapsible.Trigger className="group grid min-h-11 w-full cursor-pointer grid-cols-[auto_minmax(0,1fr)_auto] items-center gap-1.5 rounded-md py-1.5 text-left text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9">
-          <span className="font-medium text-foreground/80">Afazeres</span>
+          <span className="font-medium text-foreground/80">Combinados</span>
           {sufixo && (
             <span className="min-w-0 truncate text-muted-foreground">
               · {sufixo}
@@ -315,13 +326,13 @@ export function IntencoesEncontro({
           <div className="pb-1 pl-0.5">
             {total === 0 && (
               <p className="py-1 text-sm text-muted-foreground">
-                Coisas que precisam acontecer neste encontro, ex.: enviar
+                O que você ou {jovemNome} precisam fazer, ex.: enviar o
                 material depois.
               </p>
             )}
             {lista.length > 0 && (
               <ul className="divide-y divide-border/60">
-                {lista.map((t) => itemEditavel(t, false))}
+                {lista.map((c) => item(c, false))}
               </ul>
             )}
             {anteriores.length > 0 && (
@@ -330,38 +341,63 @@ export function IntencoesEncontro({
                   De antes
                 </p>
                 <ul className="divide-y divide-border/60">
-                  {anteriores.map((t) => itemEditavel(t, true))}
+                  {anteriores.map((c) => item(c, true))}
                 </ul>
               </div>
             )}
-            <form
-              className="mt-1 flex items-center gap-2"
-              onSubmit={(e) => {
-                e.preventDefault();
-                adicionar();
-              }}
-            >
-              <Input
-                value={novo}
-                onChange={(e) => setNovo(e.target.value)}
-                onBlur={() => novo.trim() && adicionar()}
-                maxLength={280}
-                placeholder="Adicionar afazer…"
-                aria-label={`Novo afazer do ${numero}º encontro`}
-                disabled={pending}
-                className="h-9 border-0 bg-muted/40 px-3 shadow-none focus-visible:ring-1"
-              />
-              {/* contador do maxLength — some quando o campo está vazio pra
-                  não pesar a linha (a régua 1-280 é do CHECK da tabela) */}
-              {novo.length > 0 && (
-                <span
-                  aria-hidden
-                  className="shrink-0 text-xs tabular-nums text-muted-foreground"
+            {podeEditar && (
+              <form
+                className="mt-1 flex flex-wrap items-center gap-2 sm:flex-nowrap"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  adicionar();
+                }}
+              >
+                <Input
+                  value={novo}
+                  onChange={(e) => setNovo(e.target.value)}
+                  maxLength={500}
+                  placeholder="Adicionar combinado…"
+                  aria-label={`Novo combinado do ${numero}º encontro`}
+                  disabled={pending}
+                  className="h-9 min-w-0 flex-1 basis-48 border-0 bg-muted/40 px-3 shadow-none focus-visible:ring-1"
+                />
+                {/* quem faz — dois botões e não um select: a escolha é
+                    binária e fica visível sem abrir nada */}
+                <div
+                  role="group"
+                  aria-label="Quem faz"
+                  className="flex shrink-0 rounded-md bg-muted/40 p-0.5"
                 >
-                  {novo.length}/280
-                </span>
-              )}
-            </form>
+                  {(["mentor", "mentorado"] as const).map((r) => (
+                    <Button
+                      key={r}
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      aria-pressed={responsavel === r}
+                      onClick={() => setResponsavel(r)}
+                      className={cn(
+                        "h-8 max-w-[10rem] truncate px-2.5 text-xs",
+                        responsavel === r
+                          ? "bg-card text-foreground shadow-sm hover:bg-card"
+                          : "text-muted-foreground"
+                      )}
+                    >
+                      {rotuloResp(r)}
+                    </Button>
+                  ))}
+                </div>
+                <Button
+                  type="submit"
+                  size="sm"
+                  variant="outline"
+                  disabled={pending || novo.trim().length < 2}
+                >
+                  Adicionar
+                </Button>
+              </form>
+            )}
           </div>
         </Collapsible.Panel>
       </Collapsible.Root>
