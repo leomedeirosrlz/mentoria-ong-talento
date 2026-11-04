@@ -50,14 +50,18 @@ test.describe("demo — combinados do encontro (0157)", () => {
     await expect(doRegistro).toContainText("do 4º encontro");
     await expect(doRegistro).toContainText(/Ana · até \d{2}\/\d{2}\/\d{4}/);
 
-    // criar com o mentorado como responsável: o item nasce com o nome dele
+    // criar com o mentorado como responsável e prazo: o item nasce com o
+    // nome dele e a data
     const novo = "E2E · trazer o boletim";
     await bloco
       .getByRole("textbox", { name: "Novo combinado do 5º encontro" })
       .fill(novo);
     await bloco.getByRole("button", { name: "Ana", exact: true }).click();
+    await bloco.getByLabel("Prazo").fill("2030-12-31");
     await bloco.getByRole("button", { name: "Adicionar" }).click();
-    await expect(bloco.locator("label", { hasText: novo })).toContainText("Ana");
+    const liNovo = bloco.locator("li", { hasText: novo });
+    await expect(liNovo).toContainText("Ana");
+    await expect(liNovo).toContainText(/até 31\/12\/2030/);
     await expect(trigger).toContainText("4 pendentes");
 
     // marcar: o clique honesto é no label (o checkbox é sr-only)
@@ -73,12 +77,30 @@ test.describe("demo — combinados do encontro (0157)", () => {
     await expect(bloco.getByText(CARRY)).toHaveCount(0);
     await expect(trigger).toContainText("2 pendentes");
 
-    // remover: só no item em questão — o botão × é o icon-button do li
-    await bloco
-      .locator("li", { hasText: novo })
-      .getByRole("button", { name: "Remover combinado" })
+    // editar pelo menu ⋯ do item — mesmo dialog da aba Agora; na demo a
+    // mutação cai no estado local
+    const novoEditado = "E2E · trazer o boletim e a ficha de matrícula";
+    await liNovo
+      .getByRole("button", { name: /Ações do combinado/ })
       .click();
-    await expect(bloco.getByText(novo)).toHaveCount(0);
+    await page.getByRole("menuitem", { name: "Editar" }).click();
+    const dialog = page.getByRole("dialog");
+    await dialog.getByLabel("O que ficou combinado").fill(novoEditado);
+    await dialog.getByRole("button", { name: "Salvar" }).click();
+    const liEditado = bloco.locator("li", { hasText: novoEditado });
+    await expect(liEditado).toBeVisible();
+    await expect(page.getByText("Combinado atualizado.")).toBeVisible();
+
+    // excluir pelo mesmo menu — a confirmação é o dialog compartilhado
+    await liEditado
+      .getByRole("button", { name: /Ações do combinado/ })
+      .click();
+    await page.getByRole("menuitem", { name: "Excluir" }).click();
+    await page
+      .getByRole("dialog")
+      .getByRole("button", { name: "Excluir" })
+      .click();
+    await expect(bloco.getByText(novoEditado)).toHaveCount(0);
 
     // nenhum gesto disparou action — o toast DEMO_MSG nunca aparece
     await expect(page.getByText(DEMO_MSG)).toHaveCount(0);
@@ -90,13 +112,13 @@ test.describe("demo — combinados do encontro (0157)", () => {
     await entrarNaDemo(page, "mentor_dpp");
     await page.goto("/agenda");
 
-    // uma linha só por dupla — contagem + nº mais antigo, sem texto de
-    // item; o aviso usa o nome social (Bia)
+    // uma linha só por dupla — contagem por lado + nº mais antigo, sem
+    // texto de item; o aviso usa o nome social (Bia)
     await expect(
-      page.getByText(/Combinados seus em aberto · Bia/).first()
+      page.getByText(/Combinados em aberto · Bia/).first()
     ).toBeVisible();
     await expect(
-      page.getByText(/2 itens · o mais antigo é do 3º encontro\./)
+      page.getByText(/3 itens \(2 seus, 1 de Bia\) · o mais antigo é do 3º encontro\./)
     ).toBeVisible();
     await expect(
       page.getByRole("link", { name: "Ver combinados" }).first()
@@ -121,7 +143,7 @@ test.describe("demo — combinados do encontro (0157)", () => {
       bloco.getByRole("textbox", { name: /Novo combinado/ })
     ).toHaveCount(0);
     await expect(
-      bloco.getByRole("button", { name: "Remover combinado" })
+      bloco.getByRole("button", { name: /Ações do combinado/ })
     ).toHaveCount(0);
   });
 });

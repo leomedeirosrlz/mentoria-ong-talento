@@ -1,18 +1,24 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Collapsible } from "@base-ui/react/collapsible";
-import { CaretDown, X } from "@phosphor-icons/react";
+import { CaretDown } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
   criarCombinadoEncontro,
+  editarEncaminhamento,
   excluirEncaminhamento,
   toggleEncaminhamento,
 } from "@/lib/actions";
 import { formatDiaMes } from "@/lib/ciclo";
 import { demoAtivoClient } from "@/lib/demo/shared";
 import type { Encaminhamento } from "@/lib/types";
+import {
+  CombinadoMenu,
+  EditarCombinadoDialog,
+  ExcluirCombinadoConfirm,
+} from "@/components/combinado-acoes";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
@@ -59,7 +65,18 @@ export function CombinadosEncontro({
   const [pending, start] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
   const [novo, setNovo] = useState("");
+  const [prazo, setPrazo] = useState("");
   const [responsavel, setResponsavel] = useState<Responsavel>("mentor");
+  // edição/exclusão via menu ⋯ — o item alvo carrega de qual lista ele é
+  // (própria ou "De antes") pro modo demo mexer no estado certo
+  const [editando, setEditando] = useState<{
+    c: Encaminhamento;
+    carryOver: boolean;
+  } | null>(null);
+  const [excluindo, setExcluindo] = useState<{
+    c: Encaminhamento;
+    carryOver: boolean;
+  } | null>(null);
   const chaveBloco = `${duplaId}:${numero}`;
   // abre sozinho quando há o que ver — fechado escondia o que a dupla
   // combinou atrás de um rótulo que ninguém abria
@@ -69,6 +86,39 @@ export function CombinadosEncontro({
       itens.length + pendentesAnteriores.length > 0
   );
   const router = useRouter();
+
+  // deep link #combinados-<nº> (aviso "Combinados em aberto" da Minha
+  // agenda): a aba Encontros já está montada quando este card existe —
+  // falta abrir o painel se estiver fechado e rolar até a âncora. O mount
+  // cobre a chegada de fora (o AbaPorHash trocou pra ?aba=encontros com
+  // scroll desligado); hashchange/popstate/realiza:hash cobrem o clique
+  // com a página já aberta — mesmo padrão do #registrar-<id>
+  useEffect(() => {
+    const alvo = `#combinados-${numero}`;
+    const conferir = () => {
+      if (window.location.hash !== alvo) return;
+      setAberto(true);
+      abertoPorBloco.set(chaveBloco, true);
+      const el = document.getElementById(`combinados-${numero}`);
+      if (!el) return;
+      const reduzir = window.matchMedia(
+        "(prefers-reduced-motion: reduce)"
+      ).matches;
+      el.scrollIntoView({
+        block: "start",
+        behavior: reduzir ? "auto" : "smooth",
+      });
+    };
+    conferir();
+    window.addEventListener("hashchange", conferir);
+    window.addEventListener("popstate", conferir);
+    window.addEventListener("realiza:hash", conferir);
+    return () => {
+      window.removeEventListener("hashchange", conferir);
+      window.removeEventListener("popstate", conferir);
+      window.removeEventListener("realiza:hash", conferir);
+    };
+  }, [chaveBloco, numero]);
   // demo: criar/marcar/remover funcionam em estado local — nenhuma action
   // dispara (seria toast DEMO_MSG por gesto) e nada sobra pro próximo visitante
   const [demo] = useState(demoAtivoClient);
@@ -128,31 +178,48 @@ export function CombinadosEncontro({
     });
   }
 
-  function remover(c: Encaminhamento, carryOver: boolean) {
+  // exclusão passa pelo dialog de confirmação — na demo remove do estado
+  // local (mesmo resultado do refresh contra o banco)
+  function excluir() {
+    if (!excluindo) return Promise.resolve({});
+    const { c, carryOver } = excluindo;
     if (demo) {
       (carryOver ? setAntLoc : setItensLoc)((l) =>
         l.filter((x) => x.id !== c.id)
       );
-      return;
+      return Promise.resolve({ ok: true });
     }
-    setPendingId(c.id);
-    start(async () => {
-      try {
-        const res = await excluirEncaminhamento(c.id, duplaId);
-        if (res?.error) toast.error(res.error);
-        else router.refresh();
-      } catch {
-        toast.error("Sem conexão. Tente de novo.");
-      } finally {
-        setPendingId(null);
-      }
-    });
+    return excluirEncaminhamento(c.id, duplaId);
+  }
+
+  // edição passa pelo EditarCombinadoDialog — na demo aplica o patch no
+  // estado local; fora dela vai na mesma action da aba Agora
+  function salvarEdicao(fd: FormData) {
+    if (!editando) return Promise.resolve({});
+    const { c, carryOver } = editando;
+    if (demo) {
+      const descricao = String(fd.get("descricao") ?? "").trim();
+      const resp: Responsavel =
+        fd.get("responsavel") === "mentor" ? "mentor" : "mentorado";
+      const prazoEd = String(fd.get("prazo") ?? "").trim() || null;
+      (carryOver ? setAntLoc : setItensLoc)((l) =>
+        l.map((x) =>
+          x.id === c.id
+            ? { ...x, descricao, responsavel: resp, prazo: prazoEd }
+            : x
+        )
+      );
+      return Promise.resolve({ ok: true });
+    }
+    return editarEncaminhamento(c.id, duplaId, fd);
   }
 
   function adicionar() {
     const limpo = novo.trim();
     if (!limpo || pending) return;
+    const prazoLimpo = prazo;
     setNovo("");
+    setPrazo("");
     if (demo) {
       const agora = new Date().toISOString();
       setItensLoc((l) => [
@@ -164,7 +231,7 @@ export function CombinadosEncontro({
           numero,
           descricao: limpo,
           responsavel,
-          prazo: null,
+          prazo: prazoLimpo || null,
           status: "pendente",
           feito_em: null,
           created_by: null,
@@ -175,16 +242,19 @@ export function CombinadosEncontro({
     }
     start(async () => {
       try {
-        const res = await criarCombinadoEncontro(duplaId, numero, limpo, responsavel);
+        const res = await criarCombinadoEncontro(duplaId, numero, limpo, responsavel, prazoLimpo || null);
         if (res?.error) {
           toast.error(res.error);
-          setNovo(limpo); // devolve o texto — a digitação não se perde
+          // devolve o que estava preenchido — a digitação não se perde
+          setNovo(limpo);
+          setPrazo(prazoLimpo);
         } else {
           router.refresh();
         }
       } catch {
         toast.error("Sem conexão. Tente de novo.");
         setNovo(limpo);
+        setPrazo(prazoLimpo);
       }
     });
   }
@@ -264,20 +334,13 @@ export function CombinadosEncontro({
         </span>
         {texto(c, carryOver)}
       </label>
-      {/* × sempre visível em opacity-60 — "só no hover" não existe no touch;
-          sobe pra 100 no hover/focus do grupo */}
       {podeEditar && (
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon"
-          aria-label="Remover combinado"
-          disabled={pending && pendingId === c.id}
-          onClick={() => remover(c, carryOver)}
-          className="mt-1.5 size-8 shrink-0 text-muted-foreground opacity-60 transition-opacity hover:opacity-100 focus-visible:opacity-100"
-        >
-          <X size={14} aria-hidden />
-        </Button>
+        <CombinadoMenu
+          descricao={c.descricao}
+          onEditar={() => setEditando({ c, carryOver })}
+          onExcluir={() => setExcluindo({ c, carryOver })}
+          className="mt-0.5 size-11 shrink-0 sm:size-8"
+        />
       )}
     </li>
   );
@@ -388,6 +451,16 @@ export function CombinadosEncontro({
                     </Button>
                   ))}
                 </div>
+                {/* prazo opcional — mesmo campo do dialog de edição; vazio
+                    grava null */}
+                <Input
+                  type="date"
+                  value={prazo}
+                  onChange={(e) => setPrazo(e.target.value)}
+                  aria-label="Prazo"
+                  disabled={pending}
+                  className="h-9 w-40 shrink-0 border-0 bg-muted/40 px-3 shadow-none focus-visible:ring-1"
+                />
                 <Button
                   type="submit"
                   size="sm"
@@ -401,6 +474,18 @@ export function CombinadosEncontro({
           </div>
         </Collapsible.Panel>
       </Collapsible.Root>
+      {/* edição e exclusão — um dialog por bloco, compartilhado com a aba
+          Agora; na demo a mutação é o estado local acima */}
+      <EditarCombinadoDialog
+        editando={editando?.c ?? null}
+        onOpenChange={(o) => !o && setEditando(null)}
+        onSalvar={salvarEdicao}
+      />
+      <ExcluirCombinadoConfirm
+        excluindo={excluindo?.c ?? null}
+        onOpenChange={(o) => !o && setExcluindo(null)}
+        onConfirm={excluir}
+      />
     </div>
   );
 }

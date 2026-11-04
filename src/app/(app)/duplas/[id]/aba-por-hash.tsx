@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 /** Deep link sem `?aba=` (home do mentor, e-mails, WhatsApp): o servidor
  *  não enxerga o fragmento, então a ficha abre na aba Agora e este
  *  componente troca pra aba onde o alvo está montado —
- *  `#registrar-<encontro>` e `#combinados-<nº>` (aviso "Combinados seus em
+ *  `#registrar-<encontro>` e `#combinados-<nº>` (aviso "Combinados em
  *  aberto" da agenda; `#intencoes-<nº>` é o link antigo) → Encontros; `#instrumentos` → Instrumentos (o hash acompanha
  *  a navegação e o browser rola pra seção quando ela monta). */
 export function AbaPorHash() {
