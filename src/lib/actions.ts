@@ -3568,7 +3568,8 @@ export async function criarCombinadoEncontro(
   duplaId: string,
   numero: number,
   descricao: string,
-  responsavel: "mentor" | "mentorado"
+  responsavel: "mentor" | "mentorado",
+  prazo?: string | null
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -3605,10 +3606,14 @@ export async function criarCombinadoEncontro(
   const limpo = descricao.trim();
   if (limpo.length < 2) return { error: "Escreva o combinado antes de adicionar." };
   if (limpo.length > 500) return { error: "Combinado muito longo (máx. 500 caracteres)." };
+  const prazoLimpo = prazo?.trim() ?? "";
+  if (prazoLimpo && !/^\d{4}-\d{2}-\d{2}$/.test(prazoLimpo)) {
+    return { error: "Confira a data do prazo." };
+  }
 
   const { error } = await supabase
     .from("encaminhamentos")
-    .insert({ dupla_id: duplaId, numero, descricao: limpo, responsavel, created_by: eu.id });
+    .insert({ dupla_id: duplaId, numero, descricao: limpo, responsavel, prazo: prazoLimpo || null, created_by: eu.id });
   if (error) return { error: erroAmigavel(error) };
 
   revalidatePath("/agenda");

@@ -87,7 +87,7 @@ test.describe("demo — combinados do registro (REALIZA-339)", () => {
 
     // adicionar/remover seguem editáveis — a remoção do item hidratado é o
     // que vira DELETE no servidor. Escopo no form: a seção Combinados do
-    // card tem "Adicionar" e "Remover combinado" próprios
+    // card tem "Adicionar" próprio
     const form = card4.locator("form", { hasText: "Passo 3 de 3" });
     await form.getByRole("button", { name: "Adicionar" }).click();
     await expect(linha).toHaveCount(2);

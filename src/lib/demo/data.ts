@@ -2306,7 +2306,7 @@ function build(): DemoData {
     ],
   };
   // combinados do preparo (0157): o pendente do 3º encontro reaparece no
-  // "De antes" dos cards seguintes e alimenta o aviso "Combinados seus em
+  // "De antes" dos cards seguintes e alimenta o aviso "Combinados em
   // aberto" da agenda do Ricardo
   duplaOk.encaminhamentos.push(
       combinadoDoPreparo(uid(D.ok), 3,

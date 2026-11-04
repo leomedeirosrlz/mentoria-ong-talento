@@ -387,21 +387,23 @@ describe("pendências — warnrows do topo do Hoje", () => {
 });
 
 describe("combinados do mentor em aberto (0157)", () => {
-  it("uma linha só por dupla: contagem + nº mais antigo, sem texto de item", () => {
+  it("uma linha só por dupla: contagem por lado + nº mais antigo, sem texto de item", () => {
     const d = mkDupla({
       encaminhamentos: [
         mkDoPreparo({ numero: 7, descricao: "Perguntar do ENEM" }),
         mkDoPreparo({ numero: 3, descricao: "Levar o guia de rotina" }),
-        mkDoPreparo({ numero: 5, descricao: "Enviar vídeo depois" }),
+        mkDoPreparo({ numero: 5, descricao: "Enviar vídeo depois", responsavel: "mentorado" }),
         mkDoPreparo({ numero: 2, status: "feito", feito_em: "2026-10-02T10:00:00Z" }),
+        // sem nº não ancora nem conta — combinado antigo sem registro
+        mkEncaminhamento({ descricao: "Combinado de antes dos números" }),
       ],
     });
     const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
     expect(a.avisos).toHaveLength(1);
     const av = a.avisos[0];
     expect(av.id).toBe("int-d1");
-    expect(av.titulo).toBe("Combinados seus em aberto · Ana · 2026/2027");
-    expect(av.detalhe).toBe("3 itens · o mais antigo é do 3º encontro.");
+    expect(av.titulo).toBe("Combinados em aberto · Ana · 2026/2027");
+    expect(av.detalhe).toBe("3 itens (2 seus, 1 de Ana) · o mais antigo é do 3º encontro.");
     expect(av.href).toBe("/duplas/d1#combinados-3");
     expect(av.cta).toBe("Ver combinados");
     expect(av.remarcar).toBe(false);
@@ -410,18 +412,58 @@ describe("combinados do mentor em aberto (0157)", () => {
     expect(av.detalhe).not.toContain("vídeo");
   });
 
+  it("só do mentor lê 'itens seus', sem nomear o jovem", () => {
+    const d = mkDupla({
+      encaminhamentos: [
+        mkDoPreparo({ numero: 6 }),
+        mkDoPreparo({ numero: 4 }),
+      ],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
+    expect(a.avisos[0].detalhe).toBe("2 itens seus · o mais antigo é do 4º encontro.");
+    expect(a.avisos[0].href).toBe("/duplas/d1#combinados-4");
+  });
+
   it("um único pendente lê 'item' no singular e ancora no próprio nº", () => {
     const d = mkDupla({ encaminhamentos: [mkDoPreparo({ numero: 6 })] });
     const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
-    expect(a.avisos[0].detalhe).toBe("1 item · o mais antigo é do 6º encontro.");
+    expect(a.avisos[0].detalhe).toBe("1 item seu · o mais antigo é do 6º encontro.");
     expect(a.avisos[0].href).toBe("/duplas/d1#combinados-6");
+  });
+
+  it("só do mentorado lê 'itens de <nome>' — o mentor acompanha sem ver o texto", () => {
+    const d = mkDupla({
+      encaminhamentos: [
+        mkDoPreparo({ numero: 5, responsavel: "mentorado", descricao: "Revisar as submetas" }),
+        mkDoPreparo({ numero: 2, responsavel: "mentorado", descricao: "Falar com a coordenação" }),
+      ],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
+    expect(a.avisos[0].detalhe).toBe("2 itens de Ana · o mais antigo é do 2º encontro.");
+    expect(a.avisos[0].detalhe).not.toContain("submetas");
+    expect(a.avisos[0].href).toBe("/duplas/d1#combinados-2");
+  });
+
+  it("vencido não entra na conta — já tem aviso próprio (Combinado vencido)", () => {
+    const d = mkDupla({
+      encaminhamentos: [
+        // vencido do mentorado: sai no aviso de cima, não duplica aqui
+        mkDoPreparo({ numero: 3, prazo: "2026-10-05", responsavel: "mentorado" }),
+        mkDoPreparo({ numero: 5 }),
+      ],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d] });
+    expect(a.avisos).toHaveLength(2);
+    expect(a.avisos[0].titulo).toBe("Combinado vencido · Ana · 2026/2027");
+    expect(a.avisos[1].titulo).toBe("Combinados em aberto · Ana · 2026/2027");
+    expect(a.avisos[1].detalhe).toBe("1 item seu · o mais antigo é do 5º encontro.");
   });
 
   it("tudo feito some — item riscado não é pendência", () => {
     const d = mkDupla({
       encaminhamentos: [
         mkDoPreparo({ numero: 3, status: "feito", feito_em: "2026-10-02T10:00:00Z" }),
-        mkDoPreparo({ numero: 5, status: "feito", feito_em: "2026-10-04T10:00:00Z" }),
+        mkDoPreparo({ numero: 5, responsavel: "mentorado", status: "feito", feito_em: "2026-10-04T10:00:00Z" }),
       ],
     });
     const a = deriveAgendaMinha({ ...BASE, duplas: [d] });

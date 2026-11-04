@@ -351,26 +351,36 @@ function avisosDaDupla(d: Dupla, hoje: string, agoraMs: number): AvisoAgenda[] {
     });
   }
 
-  // combinados do mentor em aberto (o antigo afazer, 0157): uma linha
-  // resumida, não um aviso por item — a contagem e o nº mais antigo bastam
-  // pra decidir abrir a ficha. O vencido já saiu acima com aviso próprio; o
-  // texto dos itens não sai da ficha (LGPD: pode citar o jovem)
-  const meusPendentes = (d.encaminhamentos ?? []).filter(
+  // combinados em aberto, dos dois lados (o antigo afazer, 0157 — o mentor
+  // acompanha também os do jovem): uma linha resumida, não um aviso por
+  // item — a contagem por lado e o nº mais antigo bastam pra decidir abrir
+  // a ficha. O vencido já saiu acima com aviso próprio; o texto dos itens
+  // não sai da ficha (LGPD: pode citar o jovem)
+  const emAberto = (d.encaminhamentos ?? []).filter(
     (enc) =>
-      enc.responsavel === "mentor" &&
       enc.numero != null &&
       enc.status !== "feito" &&
       !(enc.prazo != null && enc.prazo < hoje)
   );
-  if (meusPendentes.length > 0) {
-    const maisAntigo = Math.min(...meusPendentes.map((enc) => enc.numero!));
+  if (emAberto.length > 0) {
+    const maisAntigo = Math.min(...emAberto.map((enc) => enc.numero!));
+    const total = emAberto.length;
+    const seus = emAberto.filter((enc) => enc.responsavel === "mentor").length;
+    const doJovem = total - seus;
+    // "de {nome}" sem artigo — neutro de gênero como "agenda de {nome}"
+    const contagem =
+      seus > 0 && doJovem > 0
+        ? `${total} ${total === 1 ? "item" : "itens"} (${seus} ${seus === 1 ? "seu" : "seus"}, ${doJovem} de ${nome1})`
+        : seus > 0
+          ? `${total} ${total === 1 ? "item seu" : "itens seus"}`
+          : `${total} ${total === 1 ? `item de ${nome1}` : `itens de ${nome1}`}`;
     avisos.push({
       id: `int-${d.id}`,
       escopo,
       duplaId: d.id,
       encontro: null,
-      titulo: `Combinados seus em aberto · ${nome1} · ${turmaLonga(d.turma)}`,
-      detalhe: `${meusPendentes.length} ${meusPendentes.length === 1 ? "item" : "itens"} · o mais antigo é do ${maisAntigo}º encontro.`,
+      titulo: `Combinados em aberto · ${nome1} · ${turmaLonga(d.turma)}`,
+      detalhe: `${contagem} · o mais antigo é do ${maisAntigo}º encontro.`,
       href: `/duplas/${d.id}#combinados-${maisAntigo}`,
       cta: "Ver combinados",
       remarcar: false,
