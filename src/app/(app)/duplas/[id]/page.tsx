@@ -552,11 +552,11 @@ export default async function DuplaPage({
   const futurosComPendencia = encontrosFuturos.filter(
     (ev) =>
       temPendencia(dupla.encontros.find((e) => e.numero === ev.numero)) ||
-      // passo com intenção também não dorme no collapsible: a âncora
-      // `#intencoes-{nº}` do aviso da agenda precisa existir montada (mesma
+      // passo com combinado também não dorme no collapsible: a âncora
+      // `#combinados-{nº}` do aviso da agenda precisa existir montada (mesma
       // regra do #registrar-{id} logo acima) — e vale pra item já feito:
       // marcar o último pendente não pode afundar o card sob o mentor
-      (dupla.intencoes ?? []).some((i) => i.numero === ev.numero)
+      (dupla.encaminhamentos ?? []).some((c) => c.numero === ev.numero)
   );
   const encontrosVisiveis = passosLista.filter(
     (ev) => numeroSemana == null || ev.numero <= numeroSemana
@@ -850,14 +850,17 @@ export default async function DuplaPage({
         combinados={dupla.encaminhamentos ?? []}
         combinadosPendentes={combinadosPendentes}
         nota={dupla.notas?.find((n) => n.numero === passo.numero)?.texto ?? null}
-        intencoes={(dupla.intencoes ?? []).filter(
-          (i) => i.numero === passo.numero
+        combinadosDoNumero={(dupla.encaminhamentos ?? []).filter(
+          (c) => c.numero === passo.numero
         )}
         // carry-over: pendente de nº anterior reaparece aqui taggeado —
-        // a intenção é do passo do guia, não do encontro físico (0074:
+        // o combinado é do passo do guia, não do encontro físico (0074:
         // no especialista o nº gravado é o passo, igual à nota)
-        intencoesPendentes={(dupla.intencoes ?? []).filter(
-          (i) => i.numero < passo.numero && !i.feito
+        combinadosAnteriores={(dupla.encaminhamentos ?? []).filter(
+          (c) =>
+            c.numero != null &&
+            c.numero < passo.numero &&
+            c.status !== "feito"
         )}
         registroAberto={passo.numero === numeroAtual}
         apoioDestinos={apoioDestinos}

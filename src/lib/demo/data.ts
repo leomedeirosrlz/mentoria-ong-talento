@@ -44,7 +44,6 @@ import type {
   Dupla,
   Encaminhamento,
   Encontro,
-  EncontroIntencao,
   EncontroRemarcacao,
   EspecialistaEvento,
   ExcecaoEspecialista,
@@ -151,7 +150,7 @@ const uid = (n: number): string =>
 // notificacoes: 30xx · assinaturas: 32xx · doc_templates: 33xx · tokens de
 // assinatura: 34xx · presencas: 36xx ·
 // avaliacao_links: 42xx · avaliacoes_encontro: 44xx ·
-// documentos_pessoa: 46xx · encontro_intencoes: 48xx · cronogramas: 50xx ·
+// documentos_pessoa: 46xx · combinados do preparo: 48xx · cronogramas: 50xx ·
 // especialista_grade: 52xx ·
 // especialista_excecoes: 54xx · chamados: 58xx · chamado_atualizacoes: 60xx ·
 // chamado_comentarios: 62xx · chamado_anexos: 64xx · devolutivas: 66xx ·
@@ -852,6 +851,11 @@ function build(): DemoData {
     responsavel,
     prazo: prazo ? ymd(prazo) : null,
     status,
+    // nº do encontro do registro — preenchido no fim, quando as duplas
+    // existem (mesma derivação da 0157 sobre os combinados antigos)
+    numero: null,
+    feito_em: null,
+    created_by: null,
     // a coluna é NOT NULL (default now()) — a view jovem_encaminhamentos a
     // expõe e a ordenação dos combinados a usa como desempate. Na vida real
     // o combinado nasce junto do registro do encontro; aqui o fixture
@@ -859,26 +863,29 @@ function build(): DemoData {
     created_at: prazo ? em(addDias(prazo, -7), "20:30") : haDias(14, "20:30"),
   });
 
-  /** Item do checklist de intenções do mentor (REALIZA-21) — feito_em é
+  /** Combinado anotado pelo mentor no card do encontro, no preparo (o
+   *  antigo afazer, 0157) — responsável mentor, sem registro. feito_em é
    *  carimbo da transição no banco, então o item feito do fixture já nasce
    *  com ele (aproximo pelo criadoEm, a ordem de leitura é o que importa). */
-  const intencao = (
+  const combinadoDoPreparo = (
     dupla: string,
     numero: number,
-    texto: string,
+    descricao: string,
     feito: boolean,
     criadoEm: string,
     autor: Profile
-  ): EncontroIntencao => ({
+  ): Encaminhamento => ({
     id: uid(0x4800 + ++seqInt),
     dupla_id: dupla,
+    registro_id: null,
     numero,
-    texto,
-    feito,
+    descricao,
+    responsavel: "mentor",
+    prazo: null,
+    status: feito ? "feito" : "pendente",
     feito_em: feito ? criadoEm : null,
     created_by: autor.id,
     created_at: criadoEm,
-    updated_at: criadoEm,
   });
 
   /** Uma remarcação do encontro (REALIZA-341) — no real só o trigger
@@ -2297,21 +2304,21 @@ function build(): DemoData {
         updated_at: haDias(1, "08:30"),
       },
     ],
-    // checklist do encontro (REALIZA-21): o pendente do 3º encontro
-    // reaparece no "De antes" dos cards seguintes e alimenta o aviso
-    // "Intenções em aberto" da agenda do Ricardo
-    intencoes: [
-      intencao(uid(D.ok), 3,
+  };
+  // combinados do preparo (0157): o pendente do 3º encontro reaparece no
+  // "De antes" dos cards seguintes e alimenta o aviso "Combinados seus em
+  // aberto" da agenda do Ricardo
+  duplaOk.encaminhamentos.push(
+      combinadoDoPreparo(uid(D.ok), 3,
         "Pedir o contato do professor de matemática pra alinhar a recuperação",
         false, haDias(21, "08:45"), ricardo),
-      intencao(uid(D.ok), 5,
+      combinadoDoPreparo(uid(D.ok), 5,
         "Revisar as submetas do PDM juntos antes de propor metas novas",
         false, haDias(1, "08:35"), ricardo),
-      intencao(uid(D.ok), 5,
+      combinadoDoPreparo(uid(D.ok), 5,
         "Enviar o vídeo da Roda da Vida comentado depois do encontro",
         true, haDias(1, "08:40"), ricardo),
-    ],
-  };
+  );
 
   // d-pend · Carlos × Caio — encontro 4 realizado sem registro (a pendência
   // que o semáforo cobra) + um registro tardio no histórico + o 5º oficial
@@ -2967,6 +2974,15 @@ function build(): DemoData {
   };
 
   const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaRito, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b, duplaT2c];
+  // combinado do registro herda o nº do encontro (backfill da 0157)
+  for (const d of duplas) {
+    const numeroPorRegistro = new Map(
+      d.encontros.flatMap((e) => (e.registro ? [[e.registro.id, e.numero] as const] : []))
+    );
+    for (const c of d.encaminhamentos)
+      if (c.numero == null && c.registro_id)
+        c.numero = numeroPorRegistro.get(c.registro_id) ?? null;
+  }
 
   // ---------- devolutivas (WP6) ----------
   // Feed datado por trilha — a última entrega continua sendo o que marca a
