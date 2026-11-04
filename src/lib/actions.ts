@@ -4102,6 +4102,68 @@ export async function conflitoEncontro(
   };
 }
 
+/** Primeiro nome de uso — nome social quando existe, senão o primeiro token
+ *  do civil (mesma régua de primeiroNomeDaDupla, sem depender do embed). */
+const primeiroNomeDe = (n: string | null | undefined) =>
+  (n ?? "").trim().split(/\s+/)[0] || null;
+
+/** Grades semanais dos dois lados da dupla — insumo do aviso de horário do
+ *  AgendarEncontroDialog: "quem não marcou essa célula" antes de confirmar.
+ *  Leitura best-effort como conflitoEncontro — qualquer falha devolve tudo
+ *  null e o dialog segue sem aviso, nunca bloqueia o agendamento. A trilha
+ *  especialista também volta vazia: lá o horário nasce do combinado
+ *  bilateral da sessão, não da grade semanal do DPP. */
+export async function disponibilidadesDaDupla(duplaId: string): Promise<{
+  mentor: Disponibilidade | null;
+  jovem: Disponibilidade | null;
+  jovemNome: string | null;
+}> {
+  const vazio = {
+    mentor: null as Disponibilidade | null,
+    jovem: null as Disponibilidade | null,
+    jovemNome: null as string | null,
+  };
+  if (await demoAtivo()) {
+    const d = getDemoData();
+    const dupla = d.duplas.find((x) => x.id === duplaId);
+    if (!dupla || dupla.trilha === "especialista") return vazio;
+    return {
+      mentor:
+        d.mentorProfiles.find((m) => m.profile_id === dupla.mentor.id)
+          ?.disponibilidade ?? null,
+      jovem: dupla.mentorado.disponibilidade ?? null,
+      jovemNome: primeiroNomeDe(
+        dupla.mentorado.nome_social ?? dupla.mentorado.nome
+      ),
+    };
+  }
+  const { supabase, me: eu } = await me();
+  if (!eu) return vazio;
+  const { data: dupla } = await supabase
+    .from("duplas")
+    .select("mentor_id, mentorado_id, trilha")
+    .eq("id", duplaId)
+    .maybeSingle();
+  if (!dupla || dupla.trilha === "especialista") return vazio;
+  const [{ data: mp }, { data: jovem }] = await Promise.all([
+    supabase
+      .from("mentor_profiles")
+      .select("disponibilidade")
+      .eq("profile_id", dupla.mentor_id)
+      .maybeSingle(),
+    supabase
+      .from("mentorados")
+      .select("disponibilidade, nome, nome_social")
+      .eq("id", dupla.mentorado_id)
+      .maybeSingle(),
+  ]);
+  return {
+    mentor: (mp?.disponibilidade ?? null) as Disponibilidade | null,
+    jovem: (jovem?.disponibilidade ?? null) as Disponibilidade | null,
+    jovemNome: primeiroNomeDe(jovem?.nome_social ?? jovem?.nome),
+  };
+}
+
 // ---------- materiais ----------
 
 const TIPOS_MATERIAL = ["guia", "template", "conteudo", "link"] as const;
