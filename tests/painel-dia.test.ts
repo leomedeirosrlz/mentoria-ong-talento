@@ -171,3 +171,18 @@ describe("demais casos da regra", () => {
     expect(numeros(p.semana[0].linhas)).toEqual([8]);
   });
 });
+
+describe("encontro com data na semana fora do nº oficial", () => {
+  it("dupla adiantada: o encontro marcado na semana entra como linha", () => {
+    // oficial da semana é o 8º; a dupla já marcou o 9º pra quinta
+    const d = ana([
+      ...Array.from({ length: 8 }, (_, i) =>
+        ({ ...encRealizado(i + 1, "2025-08-05"), registro: { id: `r${i}` } as never })
+      ),
+      encAgendado(9, QUINTA),
+    ]);
+    const p = painel([d], SABADO);
+    expect(numeros(p.semana[0].linhas)).toEqual([9]);
+    expect(tipos(p.semana[0].linhas)).toEqual(["encontro"]);
+  });
+});

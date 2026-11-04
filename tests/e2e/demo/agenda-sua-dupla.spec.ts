@@ -39,9 +39,9 @@ test.describe("demo — quadro de duplas no painel do dia", () => {
     await expect(grupos.nth(0)).toContainText("Ana Beatriz Silva");
     await expect(grupos.nth(1)).toContainText("Matheus Gonçalves");
     // a linha da Ana traz o 5º oficial da semana marcado na terça; a do
-    // Matheus o 1º da Turma 2 (realizado antes do prazo oficial) — a linha
-    // é do encontro dela mesmo com a Turma 1 exibida na tela
+    // Matheus, o encontro dele marcado nesta semana (a Turma 2 anda à
+    // frente do oficial dela) — mesmo com a Turma 1 exibida na tela
     await expect(grupos.nth(0)).toContainText(/\dº encontro · agendado/);
-    await expect(grupos.nth(1)).toContainText(/\dº encontro · realizado/);
+    await expect(grupos.nth(1)).toContainText(/\dº encontro · agendado/);
   });
 });

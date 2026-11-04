@@ -83,7 +83,10 @@ test.describe("demo — combinados do registro (REALIZA-339)", () => {
     await expect(
       card4.getByRole("combobox", { name: "Responsável" })
     ).toContainText("Mentorado");
-    await expect(card4.getByLabel("Prazo")).toHaveValue(/\d{4}-\d{2}-\d{2}/);
+    // escopo no form: a seção Combinados do card tem o próprio campo Prazo
+    await expect(
+      card4.locator("form", { hasText: "Passo 3 de 3" }).getByLabel("Prazo")
+    ).toHaveValue(/\d{4}-\d{2}-\d{2}/);
 
     // adicionar/remover seguem editáveis — a remoção do item hidratado é o
     // que vira DELETE no servidor. Escopo no form: a seção Combinados do

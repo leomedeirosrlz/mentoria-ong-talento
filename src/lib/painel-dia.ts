@@ -2,6 +2,7 @@ import {
   alvoAgendamento,
   encontrosDaSemana,
   eventosDoCronograma,
+  semanaBounds,
   toDateStr,
   type ItemEncontroDupla,
 } from "@/lib/ciclo";
@@ -66,6 +67,7 @@ export function painelDuplasDoDia({
 }): PainelDia {
   // âncora no meio-dia pra o dia da semana não depender do fuso da máquina
   const diaSel = new Date(`${selecionado}T12:00:00`);
+  const { seg, dom } = semanaBounds(diaSel);
   const hojeBase = new Date(`${hoje}T12:00:00`);
 
   const noDia: ItemEncontroDupla[] = [];
@@ -96,15 +98,9 @@ export function painelDuplasDoDia({
         // realizado e registrado é história: nada a fazer na semana, e a
         // linha só disputaria atenção com o que pede gesto
         if (encontro.status === "realizado" && encontro.registro) continue;
-        if (numeros.has(encontro.numero)) {
-          // o nº oficial da semana marcado em outro dia — não-aconteceu
-          // vira "remarcar" (reagendar), os demais seguem na row de status
-          linhas.push(
-            encontro.status === "nao_aconteceu"
-              ? { tipo: "remarcar", encontro }
-              : { tipo: "encontro", encontro }
-          );
-        } else if (
+        const dia = diaDoEncontro(encontro);
+        const naSemana = dia != null && dia >= seg && dia <= dom;
+        if (
           encontro.numero < primeiroOficial &&
           (encontro.status === "agendado" || encontro.status === "remarcado")
         ) {
@@ -112,6 +108,16 @@ export function painelDuplasDoDia({
           // quinta quando o dia é sábado da semana do 8º) — remarcar com o
           // nº no rótulo, nunca um "Remarcar" solto sob a linha de outro
           linhas.push({ tipo: "remarcar", encontro });
+        } else if (numeros.has(encontro.numero) || naSemana) {
+          // o nº oficial da semana marcado em outro dia, ou qualquer
+          // encontro da dupla com data nesta semana (dupla adiantada ou
+          // atrasada em relação ao calendário oficial). Não-aconteceu vira
+          // "remarcar" (reagendar); os demais seguem na row de status
+          linhas.push(
+            encontro.status === "nao_aconteceu"
+              ? { tipo: "remarcar", encontro }
+              : { tipo: "encontro", encontro }
+          );
         }
       }
       for (const o of oficiais)
