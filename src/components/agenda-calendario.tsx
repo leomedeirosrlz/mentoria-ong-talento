@@ -2378,7 +2378,7 @@ export function AgendaCalendario({
                   <span className="min-w-0 flex-1">
                     {e.titulo}
                     {e.observacao && (
-                      <span className="block truncate text-xs text-muted-foreground">
+                      <span className="block break-words text-xs text-muted-foreground">
                         {e.observacao}
                       </span>
                     )}
@@ -3500,11 +3500,11 @@ export function AgendaCalendario({
                           {e.data ? diaCompacto(e.data) : "Concluída"}
                         </span>
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium">
+                          <span className="block break-words text-sm font-medium">
                             {nomeEvento}
                           </span>
                           {(e.fase || e.data_fim) && (
-                            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                            <span className="mt-0.5 block break-words text-xs text-muted-foreground">
                               {[
                                 e.fase,
                                 e.data_fim && `até ${diaCompacto(e.data_fim)}`,
@@ -3741,7 +3741,7 @@ export function AgendaCalendario({
                       {e.tipo === "encontro" ? "Sugerido" : diaCompacto(e.data)}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">
+                      <span className="block break-words text-sm font-medium">
                         {numeroNoRotulo ? (
                           <span className="sr-only">{e.numero}º encontro · </span>
                         ) : (
@@ -3750,7 +3750,7 @@ export function AgendaCalendario({
                         {e.titulo}
                       </span>
                       {linhaSec && (
-                        <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                        <span className="mt-0.5 block break-words text-xs text-muted-foreground">
                           {linhaSec}
                         </span>
                       )}
@@ -3789,11 +3789,11 @@ export function AgendaCalendario({
                       {diaCompacto(iso)}
                     </span>
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm font-medium">
+                      <span className="block break-words text-sm font-medium">
                         {encontro.numero}º encontro
                         {tema ? ` · ${tema}` : ""}
                       </span>
-                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                      <span className="mt-0.5 block break-words text-xs text-muted-foreground">
                         {multiDuplaLista ? dupla.mentorado.nome : "Seu encontro"} ·{" "}
                         {ROTULO_ESTADO_ENCONTRO[estado]}
                       </span>
@@ -4116,10 +4116,10 @@ function DuplaSemEncontroLinha({
         className="size-2 shrink-0 rounded-full border border-dashed border-muted-foreground"
       />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">
+        <span className="block break-words text-sm font-medium">
           {dupla.mentorado.nome}
         </span>
-        <span className="block truncate text-xs text-muted-foreground">
+        <span className="block break-words text-xs text-muted-foreground">
           {previsto != null
             ? `${previsto}º encontro · a agendar`
             : "sem encontro previsto"}
@@ -4318,10 +4318,10 @@ function EncontroDuplaRow({
           />
           <span className="min-w-0 flex-1">
             {/* o mentor já sabe que é ele — a linha nomeia o outro lado */}
-            <span className="block truncate text-sm font-medium">
+            <span className="block break-words text-sm font-medium">
               {dupla.mentorado.nome}
             </span>
-            <span className="block truncate text-xs text-muted-foreground">
+            <span className="block break-words text-xs text-muted-foreground">
               {encontro.numero}º encontro · {STATUS_ENCONTRO_LABEL[encontro.status].toLowerCase()}
               {iso
                 ? `, ${mesmoDia ? `às ${fmtHora.format(new Date(iso))}` : formatDateTime(iso)}`
@@ -4357,10 +4357,10 @@ function EncontroDuplaRow({
               className={cn("size-2 shrink-0 rounded-full", corDotEncontro(encontro, agora))}
             />
             <span className="min-w-0 flex-1">
-              <span className="block truncate text-sm font-medium">
+              <span className="block break-words text-sm font-medium">
                 <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
               </span>
-              <span className="block truncate text-xs text-muted-foreground">
+              <span className="block break-words text-xs text-muted-foreground">
                 {encontro.numero}º encontro · {STATUS_ENCONTRO_LABEL[encontro.status].toLowerCase()}
                 {iso
                   ? `, ${mesmoDia ? `às ${fmtHora.format(new Date(iso))}` : formatDateTime(iso)}`
@@ -4481,7 +4481,7 @@ function MaterialDoEncontro({ m }: { m: Material }) {
     <>
       <Icone size={16} className="shrink-0 text-muted-foreground" aria-hidden />
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-sm font-medium">{m.titulo}</span>
+        <span className="block break-words text-sm font-medium">{m.titulo}</span>
         {m.descricao && (
           <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">
             {m.descricao}
@@ -4648,7 +4648,7 @@ function LinhaSemEncontro({ dupla, numero }: { dupla: Dupla; numero: number }) {
     <li className="flex items-center gap-1 rounded-lg py-1 pr-1 pl-3 transition-colors hover:bg-muted/50 sm:pl-4">
       <Link
         href={`/duplas/${dupla.id}`}
-        className="flex min-h-11 min-w-0 flex-1 items-center truncate rounded-sm text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="flex min-h-11 min-w-0 flex-1 items-center rounded-sm text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <DuplaNomes
           mentor={dupla.mentor.nome}
@@ -4861,7 +4861,7 @@ function MarcadorDiaSemana({
   return (
     <span
       title={e.titulo}
-      className="flex min-w-0 items-center gap-1 text-[10px] leading-5 text-muted-foreground"
+      className="flex min-w-0 items-start gap-1 text-[10px] leading-4 py-0.5 text-muted-foreground"
     >
       {e.tipo === "encontro" ? (
         <span
@@ -4901,7 +4901,17 @@ function MarcadorDiaSemana({
           className="shrink-0"
         />
       )}
-      <span className="truncate">{rotulo}</span>
+      {/* quebra por palavra, sem corte: no celular não tem hover pro
+          title. A palavra "encontro" some na coluna estreita — o disco já
+          diz o nº */}
+      <span
+        className={cn(
+          "min-w-0 hyphens-auto",
+          e.tipo === "encontro" && e.numero != null && "hidden sm:inline"
+        )}
+      >
+        {rotulo}
+      </span>
     </span>
   );
 }
@@ -4934,19 +4944,28 @@ function BlocoEncontro({
       className={cn(
         // o bloco flutua sobre a superfície clicável da coluna — o clique nele
         // é navegação pra ficha, nunca dispara o agendamento
-        "pointer-events-auto flex min-w-0 items-center gap-1 rounded-md bg-card px-1.5 py-1 text-[11px] leading-tight shadow-[var(--shadow-border)] transition-shadow hover:shadow-[var(--shadow-border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+        "pointer-events-auto flex min-w-0 items-start gap-1 rounded-md bg-card px-1.5 py-1 text-[11px] leading-tight shadow-[var(--shadow-border)] transition-shadow hover:shadow-[var(--shadow-border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
         className
       )}
       style={style}
     >
       <span
         aria-hidden
-        className={cn("size-1.5 shrink-0 rounded-full", corDotEncontro(encontro, agora))}
+        className={cn("mt-[0.3em] size-1.5 shrink-0 rounded-full", corDotEncontro(encontro, agora))}
       />
-      <span className="min-w-0 truncate font-medium">
+      {/* quebra em vez de cortar: no celular não tem hover pro title
+          (feedback da mentora) — o nome do mentorado desce pra 2ª linha */}
+      <span className="min-w-0 hyphens-auto font-medium">
         {instante && `${horaCurta(instante)} · `}
-        {encontro.numero}º encontro
-        {multiDupla && ` · ${primeiroNomeMentorado(dupla.mentorado)}`}
+        {encontro.numero}º
+        {/* "encontro" só com espaço: na coluna do celular quebraria no
+            meio da palavra */}
+        <span className="hidden sm:inline"> encontro</span>
+        {multiDupla && (
+          <span className="block font-normal text-muted-foreground">
+            {primeiroNomeMentorado(dupla.mentorado)}
+          </span>
+        )}
         <span className="sr-only">
           , {STATUS_ENCONTRO_LABEL[encontro.status].toLowerCase()}
         </span>

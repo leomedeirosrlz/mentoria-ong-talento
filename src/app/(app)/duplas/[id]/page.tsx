@@ -65,6 +65,7 @@ import {
   eventosDoCronograma,
   formatDate,
   formatDateTime,
+  rotuloSlot,
   foraDoPrograma,
   jornadaDaDupla,
   linkSeguro,
@@ -678,6 +679,26 @@ export default async function DuplaPage({
           <Button variant="outline" size="sm">
             <CalendarPlus aria-hidden />
             Agendar {proximoNumero}º encontro
+          </Button>
+        }
+      />
+    ) : null;
+
+  // o próximo já marcado: o lugar do "Agendar" vira "Remarcar" com a data —
+  // as duas duplas do mentor mostram o mesmo botão, cada uma no seu estado
+  // (feedback da mentora: "a Larissa tem mais botões que a Ana")
+  const remarcarMentor =
+    souMentor && podeAgendar && proximoJaAgendado && encontroAlvo?.data_hora ? (
+      <AgendarEncontroDialog
+        duplaId={dupla.id}
+        numero={proximoNumero}
+        atual={encontroAlvo}
+        piso={dupla.iniciada_em ?? undefined}
+        jovemNome={primeiroNomeMentorado}
+        trigger={
+          <Button variant="outline" size="sm">
+            <CalendarBlank aria-hidden />
+            Remarcar {proximoNumero}º · {rotuloSlot(encontroAlvo.data_hora)}
           </Button>
         }
       />
@@ -1512,6 +1533,7 @@ export default async function DuplaPage({
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {souMentor && primarioMentor}
           {souMentor && agendarMentor}
+          {remarcarMentor}
           {!souMentor && acaoWA && <DuplaWaAcao {...acaoWA} />}
 
           {/* secundárias em outline: o pedido de apoio do mentor; a
@@ -1572,6 +1594,19 @@ export default async function DuplaPage({
                 : null
             }
             solicitar={podeSolicitar ? { especialistas } : null}
+            solicitarEstado={
+              !ehEsp &&
+              dupla.status === "ativa" &&
+              (souMentor || souCoord) &&
+              solEmAberto
+                ? "Pedido de especialista em andamento"
+                : null
+            }
+            sugerirEstado={
+              !ehEsp && dupla.status === "ativa" && souMentor && sugestaoPendente
+                ? `Sugestão enviada, aguardando ${primeiroNomeMentorado}`
+                : null
+            }
             sugerir={
               podeSugerir
                 ? {
