@@ -756,6 +756,79 @@ export function cruzamentoDisponibilidadeHora(
   return "nenhum";
 }
 
+/** Quem NÃO cobre o horário escolhido — o insumo do aviso do dialog de
+ *  agendar: o mentor vê antes de confirmar se a grade dele ou a do jovem
+ *  não marca aquela célula. */
+export type AvisoDisponibilidade = {
+  mentorLivre: boolean;
+  jovemLivre: boolean;
+};
+
+/** As grades dos dois lados cobrem o dia/hora LOCAIS de `quando` (o
+ *  datetime-local do dialog é naïve, já no fuso de quem agenda)? Um lado
+ *  sem grade — null/undefined ou zero células — conta como livre: não
+ *  sabemos, não alertamos. Os dois livres → null, sem aviso. */
+export function avisoDisponibilidade(
+  mentor: Disponibilidade | null | undefined,
+  jovem: Disponibilidade | null | undefined,
+  quando: Date
+): AvisoDisponibilidade | null {
+  // getDay() 0=dom — DIAS_SEMANA é seg=0, mesma realinhação de diaSemanaDe
+  const dow = DIAS_SEMANA[(quando.getDay() + 6) % 7];
+  const hora = quando.getHours();
+  const mentorLivre =
+    disponibilidadeVazia(mentor) || disponibilidadeNaHora(mentor, dow, hora);
+  const jovemLivre =
+    disponibilidadeVazia(jovem) || disponibilidadeNaHora(jovem, dow, hora);
+  return mentorLivre && jovemLivre ? null : { mentorLivre, jovemLivre };
+}
+
+/** Preposição que acompanha cada período — a manhã não leva crase no uso do
+ *  programa ("de manhã", mas "à tarde", "à noite"). */
+const PERIODO_COM_PREPOSICAO: Record<Periodo, string> = {
+  manha: "de manhã",
+  tarde: "à tarde",
+  noite: "à noite",
+};
+
+/** "na quarta à tarde" / "no sábado de manhã" — dia por extenso minúsculo + período de `quando`.
+ *  Hora fora das três faixas da grade (JANELA_PERIODO) vira "nesse horário":
+ *  nenhuma célula cobre, então nomear um período seria mentira. */
+function ondeNaGrade(quando: Date): string {
+  const dow = DIAS_SEMANA[(quando.getDay() + 6) % 7];
+  const hora = quando.getHours();
+  const periodo = PERIODOS.find((p) => {
+    const [ini, fim] = JANELA_PERIODO[p];
+    return hora >= ini && hora < fim;
+  });
+  const dia = DIAS_SEMANA_LABELS[dow].toLocaleLowerCase("pt-BR");
+  // sábado e domingo são masculinos: "no sábado", não "na sábado"
+  const artigo = dow === "sab" || dow === "dom" ? "no" : "na";
+  return `${artigo} ${dia} ${periodo ? PERIODO_COM_PREPOSICAO[periodo] : "nesse horário"}`;
+}
+
+/** A frase do aviso, lida pelo mentor — "Você não marcou…", "Ana não
+ *  marcou…", "Nem você nem Ana marcaram…". `jovemNome` é o primeiro nome de
+ *  uso; sem ele, o papel genérico ("o mentorado"). Aviso nulo ou os dois
+ *  livres → "" (o caller só chama com aviso real). */
+export function textoAvisoDisponibilidade(
+  aviso: AvisoDisponibilidade | null,
+  jovemNome: string | undefined,
+  quando: Date
+): string {
+  if (!aviso || (aviso.mentorLivre && aviso.jovemLivre)) return "";
+  const onde = ondeNaGrade(quando);
+  const jovem = jovemNome?.trim() || "o mentorado";
+  if (!aviso.mentorLivre && !aviso.jovemLivre) {
+    return `Nem você nem ${jovem} marcaram disponibilidade ${onde}.`;
+  }
+  if (!aviso.mentorLivre) {
+    return `Você não marcou disponibilidade ${onde}.`;
+  }
+  const nome = jovem.charAt(0).toUpperCase() + jovem.slice(1);
+  return `${nome} não marcou disponibilidade ${onde}.`;
+}
+
 /** Idade em anos a partir de "YYYY-MM-DD" — âncora no meio-dia pra não voltar
  *  um dia no fuso; null quando a data é inválida. */
 export function idade(iso: string | null | undefined): number | null {

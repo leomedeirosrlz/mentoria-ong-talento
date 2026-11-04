@@ -351,21 +351,28 @@ function avisosDaDupla(d: Dupla, hoje: string, agoraMs: number): AvisoAgenda[] {
     });
   }
 
-  // intenções em aberto (REALIZA-21): uma linha resumida, não um aviso por
-  // item — a contagem e o nº mais antigo bastam pra decidir abrir a ficha.
-  // O texto dos itens não sai da ficha (LGPD: é plano privado do mentor)
-  const intPendentes = (d.intencoes ?? []).filter((i) => !i.feito);
-  if (intPendentes.length > 0) {
-    const maisAntigo = Math.min(...intPendentes.map((i) => i.numero));
+  // combinados do mentor em aberto (o antigo afazer, 0157): uma linha
+  // resumida, não um aviso por item — a contagem e o nº mais antigo bastam
+  // pra decidir abrir a ficha. O vencido já saiu acima com aviso próprio; o
+  // texto dos itens não sai da ficha (LGPD: pode citar o jovem)
+  const meusPendentes = (d.encaminhamentos ?? []).filter(
+    (enc) =>
+      enc.responsavel === "mentor" &&
+      enc.numero != null &&
+      enc.status !== "feito" &&
+      !(enc.prazo != null && enc.prazo < hoje)
+  );
+  if (meusPendentes.length > 0) {
+    const maisAntigo = Math.min(...meusPendentes.map((enc) => enc.numero!));
     avisos.push({
       id: `int-${d.id}`,
       escopo,
       duplaId: d.id,
       encontro: null,
-      titulo: `Afazeres em aberto · ${nome1} · ${turmaLonga(d.turma)}`,
-      detalhe: `${intPendentes.length} ${intPendentes.length === 1 ? "item" : "itens"} · o mais antigo é do ${maisAntigo}º encontro.`,
-      href: `/duplas/${d.id}#intencoes-${maisAntigo}`,
-      cta: "Ver afazeres",
+      titulo: `Combinados seus em aberto · ${nome1} · ${turmaLonga(d.turma)}`,
+      detalhe: `${meusPendentes.length} ${meusPendentes.length === 1 ? "item" : "itens"} · o mais antigo é do ${maisAntigo}º encontro.`,
+      href: `/duplas/${d.id}#combinados-${maisAntigo}`,
+      cta: "Ver combinados",
       remarcar: false,
     });
   }

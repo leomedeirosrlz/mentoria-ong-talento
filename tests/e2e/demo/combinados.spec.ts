@@ -1,9 +1,9 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
-// REALIZA-339 — combinados do registro: o corpo expandido do registro na
-// ficha lista os itens (antes: só o detalhe da agenda lia) e o "Editar
-// registro" reidrata a etapa 3 com eles (antes: nascia vazia e salvar
-// duplicava). Fixture d-ok (Ricardo × Ana, uid 0x0601): 4º encontro tem 1
+// REALIZA-339 — combinados do registro: aparecem no card do encontro, na
+// seção Combinados logo abaixo do registro (0157: a lista única), e o
+// "Editar registro" reidrata a etapa 3 com eles (antes: nascia vazia e
+// salvar duplicava). Fixture d-ok (Ricardo × Ana, uid 0x0601): 4º encontro tem 1
 // pendente ("Revisar as duas primeiras submetas…"), 1º e 3º têm um feito
 // cada. A demo não escreve — o salvar devolve DEMO_MSG; o teste cobre
 // leitura + hidratação, não persistência.
@@ -17,7 +17,7 @@ const PENDENTE = "Revisar as duas primeiras submetas";
 const FEITO = "Listar 3 pessoas pra avaliação por terceiros";
 
 test.describe("demo — combinados do registro (REALIZA-339)", () => {
-  test("registro expandido lista os combinados do encontro", async ({
+  test("o card lista os combinados do registro do encontro", async ({
     page,
   }) => {
     await entrarNaDemo(page, "mentor_dpp");
@@ -27,17 +27,11 @@ test.describe("demo — combinados do registro (REALIZA-339)", () => {
     const card4 = page
       .locator('[id^="registrar-"]')
       .filter({ hasText: "Fechamento da construção do PDM" });
-    await card4
-      .getByRole("button", { name: /Fechamento da construção do PDM/ })
-      .click();
-
-    await expect(
-      card4.getByText("Combinados", { exact: true })
-    ).toBeVisible();
-    const item = card4.locator("li", { hasText: PENDENTE });
+    const bloco4 = card4.locator("#combinados-4");
+    const item = bloco4.locator("li", { hasText: PENDENTE });
     await expect(item).toBeVisible();
-    await expect(item).toContainText("Mentorado");
-    await expect(item).toContainText(/até \d{2} de \w{3}\. de \d{4}/);
+    await expect(item).toContainText("Ana");
+    await expect(item).toContainText(/até \d{2}\/\d{2}\/\d{4}/);
     // pendente não vem riscado
     await expect(item.getByText(PENDENTE)).not.toHaveClass(/line-through/);
 
@@ -45,9 +39,6 @@ test.describe("demo — combinados do registro (REALIZA-339)", () => {
     const card1 = page
       .locator('[id^="registrar-"]')
       .filter({ hasText: "Boas-vindas e histórias de vida" });
-    await card1
-      .getByRole("button", { name: /Boas-vindas e histórias de vida/ })
-      .click();
     await expect(
       card1.getByText(FEITO)
     ).toBeVisible();
@@ -95,10 +86,12 @@ test.describe("demo — combinados do registro (REALIZA-339)", () => {
     await expect(card4.getByLabel("Prazo")).toHaveValue(/\d{4}-\d{2}-\d{2}/);
 
     // adicionar/remover seguem editáveis — a remoção do item hidratado é o
-    // que vira DELETE no servidor
-    await card4.getByRole("button", { name: "Adicionar" }).click();
+    // que vira DELETE no servidor. Escopo no form: a seção Combinados do
+    // card tem "Adicionar" e "Remover combinado" próprios
+    const form = card4.locator("form", { hasText: "Passo 3 de 3" });
+    await form.getByRole("button", { name: "Adicionar" }).click();
     await expect(linha).toHaveCount(2);
-    await card4
+    await form
       .getByRole("button", { name: "Remover combinado" })
       .last()
       .click();

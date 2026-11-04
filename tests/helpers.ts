@@ -228,6 +228,9 @@ export function mkEncaminhamento(over: Partial<Encaminhamento> = {}): Encaminham
     responsavel: "mentor",
     prazo: null,
     status: "pendente",
+    numero: null,
+    feito_em: null,
+    created_by: null,
     created_at: "2025-01-01T00:00:00Z",
     ...over,
   };

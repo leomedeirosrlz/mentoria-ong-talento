@@ -25,7 +25,7 @@ export type TemaAjuda =
 export const TEMAS_AJUDA: { id: TemaAjuda; rotulo: string }[] = [
   { id: "encontros", rotulo: "Encontros e agenda" },
   { id: "registro", rotulo: "Registro do encontro" },
-  { id: "combinados", rotulo: "Combinados e afazeres" },
+  { id: "combinados", rotulo: "Combinados" },
   { id: "apoio", rotulo: "Chamados e apoio" },
   { id: "materiais", rotulo: "Materiais de apoio e instrumentos" },
   { id: "conta", rotulo: "Conta e privacidade" },
@@ -238,13 +238,13 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     papeis: ["mentorado"],
   },
 
-  // ---------- Combinados e afazeres ----------
+  // ---------- Combinados ----------
   {
     id: "combinados-o-que-sao",
     tema: "combinados",
     pergunta: "O que são os combinados?",
     resposta:
-      "As tarefas que a dupla combina pro intervalo entre um encontro e outro: o que cada um faz até a próxima vez, com prazo e responsável. Ficam na ficha da dupla, na aba Agora, e na página inicial do jovem.",
+      "O que você ou o jovem precisam fazer, cada item com o responsável e, se quiser, um prazo. Você anota no registro do encontro ou direto no card dele, na aba Encontros da ficha, logo abaixo do registro; dá pra anotar antes do encontro também, como preparo. O jovem vê na página inicial dele os combinados em que ele é o responsável.",
     prioridade: 20,
     links: [{ rotulo: "Duplas", href: "/duplas" }],
     papeis: TRILHA_DPP,
@@ -264,7 +264,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     tema: "combinados",
     pergunta: "Como marco um combinado como feito?",
     resposta:
-      "Na ficha da dupla, aba Agora, é só marcar a caixinha do item. O jovem marca os dele na página inicial dele.",
+      "Marque a caixinha do item no card do encontro, na aba Encontros da ficha, ou na aba Agora. Dá no mesmo: o que você marca num lugar aparece marcado no outro. O jovem marca os dele na página inicial dele.",
     prioridade: 30,
     links: [{ rotulo: "Duplas", href: "/duplas" }],
     papeis: ["mentor_dpp"],
@@ -282,18 +282,18 @@ export const PERGUNTAS: PerguntaAjuda[] = [
   {
     id: "afazeres-o-que-sao",
     tema: "combinados",
-    pergunta: "Qual a diferença entre combinados e afazeres?",
+    pergunta: "O que aconteceu com os afazeres?",
     resposta:
-      "Combinados são da dupla: o que você e o jovem combinam fazer até o próximo encontro, e ele vê. Afazeres são só seus: lembretes de preparo de cada encontro, no card dele na aba Encontros da ficha, abaixo das anotações. O jovem não vê os afazeres, e o que ficou pendente aparece de novo no encontro seguinte.",
+      "Viraram combinados. Os afazeres eram a sua lista de preparo de cada encontro; agora tudo fica numa lista só, no card do encontro, e cada item diz quem faz: você ou o jovem. Os seus o jovem não vê. O que ficou pendente aparece de novo no encontro seguinte, em De antes.",
     links: [{ rotulo: "Duplas", href: "/duplas" }],
-    papeis: ["mentor_dpp"],
+    papeis: ["mentor_dpp", "mentor_especialista"],
   },
   {
     id: "afazeres-equipe",
     tema: "combinados",
-    pergunta: "O que são os afazeres do mentor?",
+    pergunta: "Onde ficaram os afazeres do mentor?",
     resposta:
-      "A lista de preparo que o mentor monta pra cada encontro, separada dos combinados da dupla. A equipe lê na ficha da dupla, sem editar, e o jovem não vê.",
+      "Viraram combinados com o mentor como responsável, na mesma lista dos combinados da dupla, no card de cada encontro. A equipe lê na ficha da dupla e pode marcar como feito; o jovem só vê os combinados em que ele é o responsável.",
     links: [{ rotulo: "Duplas", href: "/duplas" }],
     papeis: EQUIPE,
   },

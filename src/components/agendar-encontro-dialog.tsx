@@ -8,10 +8,17 @@ import {
   agendarEncontro,
   conflitoEncontro,
   desmarcarEncontro,
+  disponibilidadesDaDupla,
   registrarEncontroRetroativo,
   type ConflitoEncontro,
 } from "@/lib/actions";
-import { formatDiaHora, MOTIVOS_REAGENDAMENTO } from "@/lib/ciclo";
+import {
+  avisoDisponibilidade,
+  formatDiaHora,
+  MOTIVOS_REAGENDAMENTO,
+  textoAvisoDisponibilidade,
+  type AvisoDisponibilidade,
+} from "@/lib/ciclo";
 import type { Encontro } from "@/lib/types";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Badge } from "@/components/ui/badge";
@@ -96,6 +103,17 @@ export function AgendarEncontroDialog({
     lista: ConflitoEncontro[];
   } | null>(null);
   const timerConflito = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // grades dos dois lados (uma leitura por abertura) + o aviso que já foi
+  // mostrado, guardado com a data consultada: confirmar vale só pra ELA —
+  // trocar a data exige novo aviso, como o debounce do conflito
+  const [grades, setGrades] = useState<Awaited<
+    ReturnType<typeof disponibilidadesDaDupla>
+  > | null>(null);
+  const [avisoDisp, setAvisoDisp] = useState<{
+    para: string;
+    quando: Date;
+    aviso: AvisoDisponibilidade;
+  } | null>(null);
   // id do card recém-criado — scroll quando o refresh terminar (o card não
   // existia no DOM velho, então o hash sozinho não rola)
   const scrollTarget = useRef<string | null>(null);
@@ -139,6 +157,10 @@ export function AgendarEncontroDialog({
       setMotivo("");
       setDataMudou(false);
       setValorData(defaultValue);
+      setAvisoDisp(null);
+      // as grades da abertura anterior não valem — a leitura nova chega no
+      // efeito de open; sem reset ela podia confirmar um aviso com grade velha
+      setGrades(null);
     }
   }
   // modo retroativo só existe pra encontro novo (sem row editável)
@@ -178,12 +200,56 @@ export function AgendarEncontroDialog({
   }, [valorData, duplaId, open]);
   const conflitos = conflito?.para === valorData && open ? conflito.lista : [];
 
+  // grades de disponibilidade: uma leitura por abertura, sem bloquear o
+  // dialog — falha (ou trilha especialista, que a action devolve vazia) vira
+  // null e o submit segue sem o aviso
+  useEffect(() => {
+    if (!open) return;
+    let vivo = true;
+    disponibilidadesDaDupla(duplaId)
+      .then((res) => {
+        if (vivo) setGrades(res);
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [open, duplaId]);
+  // o aviso só vale pra data que o gerou — vale também como "já confirmou":
+  // o submit que chega com o aviso visível é o "mesmo assim" do usuário
+  const avisoDispVisivel =
+    avisoDisp != null && avisoDisp.para === valorData ? avisoDisp : null;
+  // primeiro nome pro texto do aviso — a prop ganha, senão o que a action
+  // leu junto das grades
+  const nomeJovemAviso = jovemNome ?? grades?.jovemNome ?? undefined;
+
   function submit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const fd = new FormData(e.currentTarget);
     fd.set("dupla_id", duplaId);
     fd.set("numero", String(numero));
     const local = String(fd.get("data_hora") ?? "");
+    // aviso de disponibilidade : só data FUTURA — o retroativo registra
+    // o que já aconteceu, alertar grade depois do fato seria ruído. Aviso é
+    // por data: o mesmo valor re-submetido é a confirmação "mesmo assim"
+    const quando = local ? new Date(local) : null;
+    if (
+      grades &&
+      quando &&
+      !isNaN(quando.getTime()) &&
+      quando.getTime() > Date.now() &&
+      avisoDisp?.para !== local
+    ) {
+      const aviso = avisoDisponibilidade(
+        grades.mentor,
+        grades.jovem,
+        quando
+      );
+      if (aviso) {
+        setAvisoDisp({ para: local, quando, aviso });
+        return;
+      }
+    }
     // datetime-local é naïve — vai cru; o server resolve o instante
     // (sem offset = horário de São Paulo; ISO com fuso também é aceito)
     start(async () => {
@@ -283,6 +349,8 @@ export function AgendarEncontroDialog({
               onChange={(e) => {
                 setValorData(e.target.value);
                 setDataMudou(valorAtual != null && e.target.value !== valorAtual);
+                // data nova pede confirmação nova — o aviso da anterior cai
+                setAvisoDisp(null);
               }}
             />
             {!atual && (
@@ -300,6 +368,19 @@ export function AgendarEncontroDialog({
                 marcada pra {formatDiaHora(conflitos[0].data_hora)}
                 {conflitos.length > 1 && ` (e mais ${conflitos.length - 1})`}.
                 Confirme antes de seguir.
+              </p>
+            )}
+            {/* aviso de disponibilidade  — mesmo visual do conflito:
+                texto âmbar com Warning, confirmação no próprio dialog */}
+            {avisoDispVisivel && (
+              <p className="flex items-start gap-1.5 text-xs leading-relaxed text-[var(--warn-text)]">
+                <Warning size={13} aria-hidden className="mt-0.5 shrink-0" />
+                {textoAvisoDisponibilidade(
+                  avisoDispVisivel.aviso,
+                  nomeJovemAviso,
+                  avisoDispVisivel.quando
+                )}{" "}
+                Quer {atual ? "remarcar" : "agendar"} mesmo assim?
               </p>
             )}
           </div>
@@ -382,8 +463,19 @@ export function AgendarEncontroDialog({
             >
               Cancelar
             </Button>
+            {/* "outro horário" só esconde o aviso — a data fica no campo pra
+                o usuário trocar; o submit dele pede nova confirmação */}
+            {avisoDispVisivel && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setAvisoDisp(null)}
+              >
+                Escolher outro horário
+              </Button>
+            )}
             <Button type="submit" disabled={pending}>
-              {pending ? "Salvando…" : ehRetroativo ? "Registrar encontro" : atual ? "Confirmar remarcação" : "Confirmar agendamento"}
+              {pending ? "Salvando…" : avisoDispVisivel ? (atual ? "Remarcar mesmo assim" : "Agendar mesmo assim") : ehRetroativo ? "Registrar encontro" : atual ? "Confirmar remarcação" : "Confirmar agendamento"}
             </Button>
           </DialogFooter>
         </form>
