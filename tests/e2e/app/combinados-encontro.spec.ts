@@ -26,16 +26,17 @@ const FILTRO = `dupla_id=eq.${DUPLA_ID}&numero=eq.${NUMERO}&registro_id=is.null`
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
 
 /** Card do passo N pode dormir no collapsible "Próximos N encontros" —
- *  lá dentro o painel desmonta e a âncora some do DOM; um clique no
- *  trigger monta. No-op quando o card já está fora. */
+ *  o painel fechado mantém o card no DOM, só oculto (hidden-until-found),
+ *  então a âncora EXISTE mas não é clicável: o que decide abrir é a
+ *  visibilidade, não a contagem. No-op quando o card já está à vista. */
 async function montarCardDoPasso(page: Page, numero: number) {
   const bloco = page.locator(`#combinados-${numero}`);
-  if (await bloco.count()) return bloco;
+  if (await bloco.isVisible()) return bloco;
   await page
     .getByText(/^Próximos \d+ encontros$/)
     .click()
     .catch(() => {});
-  await expect(bloco).toHaveCount(1, { timeout: 15_000 });
+  await expect(bloco).toBeVisible({ timeout: 15_000 });
   return bloco;
 }
 
