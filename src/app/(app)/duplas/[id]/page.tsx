@@ -735,37 +735,31 @@ export default async function DuplaPage({
   }
   if (!ehEsp && solEmAberto) {
     pedidos.push(
-      (solEmAberto.status_efetivo ?? solEmAberto.status) === "aguardando_coord" ? (
-        <p key="espera" className="rounded-lg bg-muted/50 px-3.5 py-3 text-sm text-muted-foreground">
-          Pedido de especialista em triagem na coordenação.
-        </p>
-      ) : (
-        // o pedido em andamento é assunto da ficha: quem abriu (ou a coord)
-        // responde a proposta daqui; a thread mostra a mesa
-        <div key="negociacao" className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
-          <p className="mb-2 text-xs font-semibold text-foreground">Mentor especialista</p>
-          {/* papel-no-contexto (WP6b): o componente só habilita o lado
-              especialista quando o visitante é o alvo/desejado ou o
-              pedido é broadcast — informar o papel efetivo é seguro e
-              destrava o híbrido DPP-primário */}
-          <SolicitacaoNegociacao
-            s={solEmAberto}
-            propostas={propostasAberta}
-            slots={slotsEsp}
-            meuId={me.id}
-            papel={
-              temPapel(me, "mentor_especialista")
-                ? "mentor_especialista"
-                : me.role
-            }
-            mentoradosProprios={
-              souMentor && dupla.trilha !== "especialista"
-                ? [dupla.mentorado.id]
-                : undefined
-            }
-          />
-        </div>
-      )
+      // o pedido em andamento é assunto da ficha: quem abriu (ou a coord)
+      // responde a proposta daqui; a thread mostra a mesa
+      <div key="negociacao" className="rounded-xl bg-card p-4 text-sm shadow-[var(--shadow-border)]">
+        <p className="mb-2 text-xs font-semibold text-foreground">Mentor especialista</p>
+        {/* papel-no-contexto (WP6b): o componente só habilita o lado
+            especialista quando o visitante é o alvo/desejado ou o
+            pedido é broadcast — informar o papel efetivo é seguro e
+            destrava o híbrido DPP-primário */}
+        <SolicitacaoNegociacao
+          s={solEmAberto}
+          propostas={propostasAberta}
+          slots={slotsEsp}
+          meuId={me.id}
+          papel={
+            temPapel(me, "mentor_especialista")
+              ? "mentor_especialista"
+              : me.role
+          }
+          mentoradosProprios={
+            souMentor && dupla.trilha !== "especialista"
+              ? [dupla.mentorado.id]
+              : undefined
+          }
+        />
+      </div>
     );
   }
   if (!ehEsp && sugestaoPendente) {

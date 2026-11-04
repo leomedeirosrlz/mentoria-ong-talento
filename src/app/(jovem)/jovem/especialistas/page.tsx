@@ -109,9 +109,6 @@ export default async function JovemEspecialistasPage() {
       (d) => (d.status === "ativa" || d.status === "pausada") && d.mentor_id != null
     )
     .map((d) => d.mentor_id!);
-  const semDuplaDpp = !duplas.some(
-    (d) => d.trilha !== "especialista" && d.status === "ativa"
-  );
 
   // a mesa: pedidos abertos + recusadas (aceita vira trilha; cancelada some)
   const visiveis = solicitacoes
@@ -273,7 +270,6 @@ export default async function JovemEspecialistasPage() {
           catalogo={catalogo}
           trilhasAtivas={trilhasAtivas}
           slotsPorEsp={slotsPorEsp}
-          semDuplaDpp={semDuplaDpp}
           lotado={lotado}
           pedidosAbertos={abertos}
         />

@@ -113,7 +113,6 @@ export default async function HomePage({
           avisos={avisos}
           solicitacoes={solicitacoes}
           encerramentos={new Set(encerramentos)}
-          turmas={[...new Set(cronogramas.map((c) => c.turma))]}
           meuNome={me?.nome.split(" ")[0]}
           termo={termoPendente ? <TermoBanner /> : null}
           turmaFoco={foco.turma}

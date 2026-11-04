@@ -2,8 +2,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Megaphone, XCircle } from "@phosphor-icons/react";
-import { cancelarSolicitacao } from "@/lib/actions-especialista";
+import { Megaphone } from "@phosphor-icons/react";
 import { tempoRelativo } from "@/lib/ciclo";
 import { efetivoDe, resumoPedidoJovem } from "@/lib/jovem-especialista";
 import type {
@@ -14,14 +13,11 @@ import type {
 } from "@/lib/types";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
-import { Button } from "@/components/ui/button";
-import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { SolicitacaoNegociacao } from "@/components/solicitacao-negociacao";
 
 /** A mesa do pedido do jovem — rail de negociação (aceitar a proposta do
- *  especialista, contra-propor, cancelar) ou, em `aguardando_coord`, a linha
- *  honesta + o cancelamento (a triagem é da coord, não uma negociação). O
- *  item da home usa dentro da linha; a agenda usa direto no card da trilha. */
+ *  especialista, contra-propor, cancelar). O item da home usa dentro da
+ *  linha; a agenda usa direto no card da trilha. */
 export function PedidoJovemMesa({
   s,
   propostas,
@@ -42,34 +38,6 @@ export function PedidoJovemMesa({
   disponibilidade?: Disponibilidade | null;
 }) {
   const router = useRouter();
-  if (efetivoDe(s) === "aguardando_coord") {
-    return (
-      <div className="space-y-1.5">
-        <p className="text-sm text-muted-foreground">
-          A coordenação libera o pedido pra ele chegar aos especialistas.
-        </p>
-        {s.created_by === meuId && (
-          <ConfirmDeleteButton
-            titulo="Cancelar pedido?"
-            descricao="O pedido sai da fila da coordenação."
-            acao="Cancelar pedido"
-            sucesso="Pedido cancelado."
-            onConfirm={() => cancelarSolicitacao(s.id)}
-            trigger={
-              <Button
-                size="sm"
-                variant="ghost"
-                className="text-muted-foreground"
-              >
-                <XCircle size={15} />
-                Cancelar pedido
-              </Button>
-            }
-          />
-        )}
-      </div>
-    );
-  }
   return (
     <SolicitacaoNegociacao
       s={s}

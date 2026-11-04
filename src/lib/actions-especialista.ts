@@ -366,31 +366,6 @@ export async function aceitarProposta(solicitacaoId: string) {
   return { ok: true, duplaId };
 }
 
-/** Triagem da coordenação (0074, 0101): pedido do jovem sem dupla DPP
- *  entra 'aguardando_coord' — reconhecer libera pro mural. Com o pool
- *  global a turma é opcional: definida agora ou resolvida na efetivação
- *  (s.turma → DPP → cronograma vigente). */
-export async function reconhecerSolicitacao(
-  solicitacaoId: string,
-  turma?: string | null
-) {
-  if (await demoAtivo()) return { error: DEMO_MSG };
-  const { supabase, me: eu } = await me();
-  if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  if (eu.role !== "coordenacao") {
-    return { error: "Só a coordenação faz a triagem." };
-  }
-  if (!solicitacaoId) return { error: "Solicitação não informada." };
-
-  const { error } = await supabase.rpc("reconhecer_solicitacao", {
-    p_id: solicitacaoId,
-    p_turma: turma?.trim() || null,
-  });
-  if (error) return { error: erroAmigavel(error) };
-  revalidarMural();
-  return { ok: true };
-}
-
 // ---------- agenda real do especialista (0073) ----------
 // Grade semanal + exceções datadas. RLS restringe a escrita ao dono da
 // agenda (mentor_especialista) e à coordenação — os checks de papel aqui

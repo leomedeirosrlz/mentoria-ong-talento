@@ -129,11 +129,9 @@ export function TrilhasCoordPanel({
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {a.diasParado} {a.diasParado === 1 ? "dia" : "dias"}{" "}
-                      {a.onde === "triagem"
-                        ? "em triagem"
-                        : a.onde === "expirada"
-                          ? "com horário expirado"
-                          : "no mural"}{" "}
+                      {a.onde === "expirada"
+                        ? "com horário expirado"
+                        : "no mural"}{" "}
                       (limite: {limiteDias}) · Preferência:{" "}
                       {a.preferenciaNome ?? "qualquer especialista"}
                     </p>
