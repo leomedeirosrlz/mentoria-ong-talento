@@ -183,7 +183,7 @@ function respostaDemo(texto: string): string {
  *  respondem de fato (dados via registry; guias via guia_consulta). A
  *  página entra primeiro: na ficha da dupla a pergunta mais provável é
  *  sobre ela (o prompt recebe a rota e resolve "esta dupla"). */
-function sugestoes(papeis: AppRole[], pagina: string): string[] {
+export function sugestoes(papeis: AppRole[], pagina: string): string[] {
   const staff = papeis.some((p) => p === "coordenacao" || p === "supervisor");
   if (/^\/duplas\/[0-9a-f-]{36}/.test(pagina))
     return papeis.includes("mentorado")
@@ -226,6 +226,7 @@ export function AssistenteConversa({
   nome,
   registrarNova,
   registrarHistorico,
+  registrarEnviar,
   onNavegarInterno,
   onEstado,
   onRespostaPronta,
@@ -245,6 +246,9 @@ export function AssistenteConversa({
   registrarNova?: (fn: () => void) => void;
   /** idem pro botão de histórico — alterna transcript ↔ lista de conversas */
   registrarHistorico?: (fn: () => void) => void;
+  /** idem pra enviar uma pergunta de fora: o chip do balão de fala da
+   *  Liza (painel fechado) abre e já pergunta */
+  registrarEnviar?: (fn: (pergunta: string) => void) => void;
   /** link interno clicado (ação/fonte/inline) — a bolha fecha pra navegar */
   onNavegarInterno?: () => void;
   /** a bolha anima o mascote pelo estado da rodada */
@@ -463,6 +467,16 @@ export function AssistenteConversa({
   useEffect(
     () => registrarHistorico?.(alternarHistorico),
     [registrarHistorico]
+  );
+  // enviar fecha sobre msgs/pending do render — a bolha chama a versão
+  // mais nova pelo ref (registrada uma vez, lida só no clique)
+  const enviarRef = useRef<(t: string) => void>(() => {});
+  useEffect(() => {
+    enviarRef.current = (t) => void enviar(t);
+  });
+  useEffect(
+    () => registrarEnviar?.((t) => enviarRef.current(t)),
+    [registrarEnviar]
   );
 
   /** troca pra uma conversa do histórico — aborta um stream em andamento
