@@ -95,7 +95,7 @@ Depois do 9º encontro, os dois lados registram a sessão na plataforma e o(a) m
 - O(a) mentor(a) registra a sessão na ficha da dupla: o que foi trabalhado, a avaliação do encontro, as dificuldades identificadas e o próximo passo combinado.
 - O(a) jovem responde a própria avaliação rápida na plataforma: nota, sentimento, se sente que avançou e a opção de pedir apoio.
 - Atualizar o PDM com a revisão de meio de percurso e registrar as atividades e reflexões do encontro.
-- Enviar a mensagem de encaminhamento entre encontros (modelo no documento `mensagem-encaminhamento`).
+- Enviar a mensagem de encaminhamento entre encontros (modelo no documento Mensagem de encaminhamento).
 - Preparar experiências para compartilhar no 10º encontro e confirmar o horário.
 
 ## 9º encontro · Nota ao mentor

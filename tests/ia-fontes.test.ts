@@ -34,6 +34,9 @@ describe("limparTrecho", () => {
       "7. Roda da Vida: roteiro"
     );
     expect(limparTrecho("- item solto", 600)).toBe("item solto");
+    expect(limparTrecho("> Assunto: Sobre o nosso encontro", 600)).toBe(
+      "Assunto: Sobre o nosso encontro"
+    );
   });
 
   it("travessão do documento vira vírgula (regra de copy)", () => {

@@ -31,7 +31,7 @@ Para o nosso primeiro encontro, preciso de três coisas:
 
 1. Os nomes e contatos de pelo menos **três amigos e três familiares** (e três colegas de trabalho, se você estiver trabalhando). Vou enviar a cada uma um link para responder duas perguntas rápidas sobre você. Avise essas pessoas de que o link vai chegar.
 2. Um **resumo da sua história de vida**, pessoal e profissional. Sugiro listar em ordem cronológica os fatos que foram importantes para você, formando uma linha do tempo. Não precisa me enviar: guarde para conversarmos no encontro.
-3. Responda a sua **Roda da Vida** na plataforma antes do nosso primeiro encontro, com uma reflexão sobre as áreas que você mais gostaria de melhorar.
+3. A sua **Roda da Vida** respondida na plataforma, com uma reflexão sobre as áreas que você mais gostaria de melhorar.
 
 Faça as tarefas em um lugar tranquilo, que permita refletir com calma. Tudo o que você compartilhar comigo é confidencial e fica entre nós, como será em todo o processo.
 

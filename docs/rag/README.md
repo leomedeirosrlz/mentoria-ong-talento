@@ -109,6 +109,40 @@ mantêm o banco idempotente. Decisão nova de plataforma/operação → edita
 `plataforma-e-operacao.md` (ou cria um `.md` novo com o front-matter
 completo — `fonte`, `titulo`, `material` e `natureza` são obrigatórios).
 Metadados novos → `pnpm ingerir:guias --manifest` regera `fontes.json`.
+Doc removido ou renomeado → o `--apply` apaga do banco os chunks do slug
+que saiu do corpus. Slug novo → entrada em `META_FONTE`
+(`src/lib/ia/fontes.ts`), senão a citação sai como texto cru.
+
+## Recorte e escrita para a busca
+
+O recorte é `scripts/lib/rag-chunks.mjs` (testes em
+`tests/rag-chunks.test.ts`):
+
+- cada `###` vira seção própria, `secao = "<##> › <###>"`; a intro curta
+  de um `##` (até 300 chars) vai como contexto na frente de cada `###`;
+  o h1 sozinho não vira chunk;
+- o texto do chunk não repete o título (ele está em `secao`, peso A no
+  FTS, e entra no embedding como `secao + texto`);
+- parágrafo grande é fatiado por frase, nunca no meio da palavra; o
+  overlap é a última frase completa do chunk anterior.
+
+Na escrita: cada `##`/`###` tem de fazer sentido sozinho (diga o
+encontro ou o instrumento no título) e não cite slug no texto (escreva
+"no documento Mensagem de encaminhamento", não `` `mensagem-encaminhamento` ``):
+o modelo repete o que lê.
+
+## Avaliação da busca
+
+`avaliacao-busca.json` tem perguntas reais com a seção que deve aparecer
+entre os 4 trechos que o modelo recebe. Rode antes e depois de mexer no
+corpus ou na busca (só lê; o alvo vem do ambiente, nunca do `.env.local`):
+
+```
+SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/avaliar-busca-guias.mjs --vetor
+```
+
+Referência em 05/11/2026 (staging, corpus de 04/11): híbrida 27/27 no
+top-4 (18 em 1º); só FTS 22/27. Corpus anterior: 4/27.
 
 ## Gap de schema (TODO de migration)
 

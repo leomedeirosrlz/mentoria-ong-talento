@@ -96,7 +96,7 @@ Depois do 8º encontro, os dois lados registram a sessão na plataforma e o(a) m
 - O(a) jovem responde a própria avaliação rápida na plataforma: nota, sentimento, se sente que avançou e a opção de pedir apoio.
 - Atualizar o PDM com o que foi concluído e registrar as atividades e reflexões do encontro.
 - Lembrar o(a) jovem de preparar o balanço para o 9º encontro.
-- Enviar a mensagem de encaminhamento entre encontros (modelo no documento `mensagem-encaminhamento`) e confirmar o horário do 9º encontro.
+- Enviar a mensagem de encaminhamento entre encontros (modelo no documento Mensagem de encaminhamento) e confirmar o horário do 9º encontro.
 
 ## 8º encontro · Nota ao mentor
 

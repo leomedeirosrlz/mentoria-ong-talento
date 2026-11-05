@@ -82,7 +82,7 @@ Depois do 13º encontro, os dois lados registram a sessão na plataforma e o(a) 
 - O(a) mentor(a) registra a sessão na ficha da dupla: o que foi trabalhado, a avaliação do encontro, as dificuldades identificadas e o próximo passo combinado.
 - O(a) jovem responde a própria avaliação rápida na plataforma: nota, sentimento, se sente que avançou e a opção de pedir apoio.
 - Registrar as áreas prioritárias eleitas.
-- Enviar a mensagem de encaminhamento entre encontros (modelo no documento `mensagem-encaminhamento`).
+- Enviar a mensagem de encaminhamento entre encontros (modelo no documento Mensagem de encaminhamento).
 - Confirmar o horário do 14º encontro.
 
 ## 13º encontro · Nota ao mentor

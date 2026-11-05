@@ -18,7 +18,7 @@ origem: consolidado de Roda-da-Vida---Realiza.vc.txt (material do instrumento),
 
 ## Roda da Vida · O que é
 
-A Roda da Vida é o instrumento de autoavaliação do Programa de Mentoria: um retrato do momento do(a) jovem em 16 áreas da vida, organizadas em quatro quadrantes. Cada área recebe uma nota de satisfação e o desenho das notas forma a roda, que mostra de uma vez onde a energia está bem empregada e o que está ficando para trás.
+A Roda da Vida é o instrumento de autoavaliação do Programa de Mentoria: um retrato do momento do(a) jovem em 16 áreas da vida, organizadas em quatro quadrantes. Cada área recebe uma nota de satisfação de 1 a 10 e o desenho das notas forma a roda, que mostra de uma vez onde a energia está bem empregada e o que está ficando para trás.
 
 A roda do Realiza.vc foi desenhada para o público do programa: além de carreira e estudos, ela olha para relacionamentos, equilíbrio emocional, independência e qualidade de vida, porque o desenvolvimento profissional caminha junto com o equilíbrio pessoal. O instrumento funciona como bússola em dois momentos da jornada: no início, para conhecer o contexto do(a) jovem, e na reta final, para comparar o antes e o depois e transformar áreas prioritárias em metas.
 

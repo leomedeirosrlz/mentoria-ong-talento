@@ -35,7 +35,7 @@ A preparação do 1º encontro começa assim que a dupla é formada: o(a) mentor
 
 ### Preparação do(a) mentor(a)
 
-- Entrar em contato com o(a) jovem e enviar a mensagem de preparação (o modelo está no documento `mensagem-preparacao`).
+- Entrar em contato com o(a) jovem e enviar a mensagem de preparação (o modelo está no documento Mensagem de preparação).
 - Confirmar que o(a) jovem recebeu a mensagem e está preparando os três materiais pedidos.
 - Marcar no Checklist de competências o que quer desenvolver (é uma lista de leitura e marcação, não um formulário; revisitada no fechamento do ciclo).
 - Deixar a ficha da dupla na plataforma pronta para iniciar o PDM.
@@ -99,7 +99,7 @@ Depois do 1º encontro, os dois lados registram a sessão na plataforma e o(a) m
 - O(a) mentor(a) registra a sessão na ficha da dupla: o que foi trabalhado, a avaliação do encontro, as dificuldades identificadas e o próximo passo combinado.
 - O(a) jovem responde a própria avaliação rápida na plataforma: nota, sentimento, se sente que avançou e a opção de pedir apoio.
 - Manter o PDM e a Roda da Vida atualizados na ficha da dupla.
-- O(a) mentor(a) aciona a avaliação por terceiros: as pessoas indicadas respondem pelo link na plataforma, que o(a) mentor(a) gera e envia pela ficha da dupla, e a consolidação acontece sem identificar quem disse o quê. O modelo de mensagem para contato direto está no documento `mensagem-indicadas`.
+- O(a) mentor(a) aciona a avaliação por terceiros: as pessoas indicadas respondem pelo link na plataforma, que o(a) mentor(a) gera e envia pela ficha da dupla, e a consolidação acontece sem identificar quem disse o quê. O modelo de mensagem para contato direto está no documento Mensagem às pessoas indicadas.
 
 ## 1º encontro · Nota ao mentor
 

@@ -95,7 +95,7 @@ Depois do 5º encontro, os dois lados registram a sessão na plataforma e o(a) m
 - O(a) mentor(a) registra a sessão na ficha da dupla: o que foi trabalhado, a avaliação do encontro, as dificuldades identificadas e o próximo passo combinado.
 - O(a) jovem responde a própria avaliação rápida na plataforma: nota, sentimento, se sente que avançou e a opção de pedir apoio.
 - Atualizar o PDM com avanços e ajustes e registrar as atividades e reflexões do encontro.
-- Enviar a mensagem de encaminhamento entre encontros (modelo no documento `mensagem-encaminhamento`).
+- Enviar a mensagem de encaminhamento entre encontros (modelo no documento Mensagem de encaminhamento).
 - Anotar pontos a retomar na próxima conversa e confirmar o horário do 6º encontro.
 
 ## 5º encontro · Nota ao mentor

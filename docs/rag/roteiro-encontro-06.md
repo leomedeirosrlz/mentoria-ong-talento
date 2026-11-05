@@ -95,7 +95,7 @@ Depois do 6º encontro, os dois lados registram a sessão na plataforma e o(a) m
 - O(a) jovem responde a própria avaliação rápida na plataforma: nota, sentimento, se sente que avançou e a opção de pedir apoio.
 - Atualizar o PDM caso alguma submeta tenha sido ajustada e registrar as atividades e reflexões do encontro.
 - Sinalizar à coordenação situações que ultrapassem o papel da mentoria.
-- Enviar a mensagem de encaminhamento entre encontros (modelo no documento `mensagem-encaminhamento`) e confirmar o horário do 7º encontro.
+- Enviar a mensagem de encaminhamento entre encontros (modelo no documento Mensagem de encaminhamento) e confirmar o horário do 7º encontro.
 
 ## 6º encontro · Nota ao mentor
 

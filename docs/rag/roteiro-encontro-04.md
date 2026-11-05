@@ -99,7 +99,7 @@ Depois do 4º encontro, os dois lados registram a sessão na plataforma e o(a) m
 - O(a) jovem responde a própria avaliação rápida na plataforma: nota, sentimento, se sente que avançou e a opção de pedir apoio.
 - Conferir se o PDM está atualizado e se submetas, indicadores e prazos estão registrados.
 - Registrar qual será a primeira submeta executada e quando os primeiros resultados serão avaliados.
-- Enviar a mensagem de encaminhamento entre encontros (modelo no documento `mensagem-encaminhamento`), deixando clara a próxima tarefa e o próximo encontro.
+- Enviar a mensagem de encaminhamento entre encontros (modelo no documento Mensagem de encaminhamento), deixando clara a próxima tarefa e o próximo encontro.
 
 ## 4º encontro · Nota ao mentor
 

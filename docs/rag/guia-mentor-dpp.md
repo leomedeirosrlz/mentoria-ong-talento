@@ -203,7 +203,7 @@ Nenhuma dessas nove funções exige perfeição. Elas exigem presença, consist�
 
 ## Os instrumentos da metodologia
 
-Os instrumentos do(a) mentor(a) DPP são Perguntas Eficazes, Feedback Construtivo, o PDM (Plano de Desenvolvimento do Mentorado, que reúne visão, metas e submetas) e a Roda da Vida. Cada um tem documento próprio no corpus: `perguntas-eficazes`, `feedback-construtivo`, `instrumento-pdm`, `instrumento-construindo-visao`, `instrumento-definindo-minhas-metas` e `instrumento-roda-da-vida`. As seções a seguir apresentam o que cada instrumento é; o passo a passo de uso está nos documentos citados.
+Os instrumentos do(a) mentor(a) DPP são Perguntas Eficazes, Feedback Construtivo, o PDM (Plano de Desenvolvimento do Mentorado, que reúne visão, metas e submetas) e a Roda da Vida. Cada um tem documento próprio no corpus: Perguntas Eficazes, Feedback Construtivo, PDM, Construindo a sua Visão, Definindo Minhas Metas e Roda da Vida. As seções a seguir apresentam o que cada instrumento é; o passo a passo de uso está nos documentos citados.
 
 ## Perguntas Eficazes
 
@@ -213,7 +213,7 @@ Perguntas eficazes são instigantes e estimulam a reflexão: direcionam a atenç
 - Em vez de "Por que você não resolveu esse problema?", pergunte "O que te impediu de resolver esse problema?": perguntas iniciadas por "por que" podem soar acusatórias e gerar defensividade.
 - Em vez de "Você não acha que deveria estudar mais?", pergunte "O que você precisaria para avançar nos estudos?": perguntas fechadas e sugestivas encerram a reflexão em vez de abri-la.
 
-As categorias completas de perguntas e mais exemplos estão no documento `perguntas-eficazes` (metodologia de origem: Erlich Mentoring).
+As categorias completas de perguntas e mais exemplos estão no documento Perguntas Eficazes (metodologia de origem: Erlich Mentoring).
 
 ## Feedback Construtivo
 
@@ -221,7 +221,7 @@ O Feedback Construtivo melhora a autoconsciência, contribui para o aumento da a
 
 O modelo sugerido é: "Olha, quando acontece determinada situação, eu me sinto (descreva como você se sente), porque (explique o motivo). Eu gostaria que você considerasse (apresente uma sugestão ou alternativa)." Em seguida, pergunte: "O que você pensa sobre o que acabei de dizer?"
 
-O passo a passo completo, com os cuidados ao falar de comportamento negativo e como fechar o feedback com uma ação, está no documento `feedback-construtivo`.
+O passo a passo completo, com os cuidados ao falar de comportamento negativo e como fechar o feedback com uma ação, está no documento Feedback Construtivo.
 
 ## PDM: o plano da mentoria
 
@@ -232,15 +232,15 @@ O PDM tem duas partes:
 - **Visão e metas:** a Declaração de Visão no topo e, para cada meta, a frase iniciada por verbo de ação, o indicador de sucesso (IS) e o prazo (P).
 - **Mapa de submetas:** para cada meta, a pergunta "o que eu preciso fazer para conseguir isso?" gera as submetas do nível A; cada desdobramento seguinte abre os níveis B, C e assim por diante, até chegar a algo realizável de imediato. Todas as submetas levam indicador de sucesso e prazo.
 
-Um PDM que não muda ao longo do ciclo provavelmente não está sendo usado. A linha do tempo de construção encontro a encontro e o passo a passo do preenchimento estão no documento `instrumento-pdm`.
+Um PDM que não muda ao longo do ciclo provavelmente não está sendo usado. A linha do tempo de construção encontro a encontro e o passo a passo do preenchimento estão no documento PDM.
 
 ## Visão, metas e o modelo SMART
 
-O PDM começa pela visão de futuro: o(a) jovem é convidado(a) a um exercício de imaginação (como se vê nos próximos anos, que vida deseja construir) e escreve a Declaração de Visão, uma frase iniciada por verbo no futuro ("Serei", "Alcançarei", "Conquistarei") e com prazo. O instrumento Construindo a sua Visão fica na ficha da dupla: combinado ao final do 1º encontro e trazido pronto para o 2º. As perguntas do exercício estão no documento `instrumento-construindo-visao`.
+O PDM começa pela visão de futuro: o(a) jovem é convidado(a) a um exercício de imaginação (como se vê nos próximos anos, que vida deseja construir) e escreve a Declaração de Visão, uma frase iniciada por verbo no futuro ("Serei", "Alcançarei", "Conquistarei") e com prazo. O instrumento Construindo a sua Visão fica na ficha da dupla: combinado ao final do 1º encontro e trazido pronto para o 2º. As perguntas do exercício estão no documento Construindo a sua Visão.
 
 Da visão nascem as metas: o que o(a) jovem precisa criar, aprender, melhorar ou eliminar para que a visão se torne realidade. Cada meta começa com um verbo de ação, tem indicador de sucesso (o dado, fato ou comportamento que mostra que a meta foi alcançada) e prazo estimado, e passa pela checagem SMART: específica, mensurável, atingível, relevante e temporal. Exemplo: META "Concluir o curso técnico em administração", IS "certificado emitido", P "até dezembro".
 
-Perguntas que ajudam a construir metas: "O que você precisa fazer para alcançar a sua visão?", "Que competências você já tem e quais precisa adquirir ou melhorar?", "Que recursos você já possui e quais precisa obter?". Se a dificuldade persistir, retome os pontos que ele(a) citou nas conversas anteriores e pergunte qual considera mais importante agora. O instrumento Definindo Minhas Metas, com o passo a passo, está no documento `instrumento-definindo-minhas-metas`.
+Perguntas que ajudam a construir metas: "O que você precisa fazer para alcançar a sua visão?", "Que competências você já tem e quais precisa adquirir ou melhorar?", "Que recursos você já possui e quais precisa obter?". Se a dificuldade persistir, retome os pontos que ele(a) citou nas conversas anteriores e pergunte qual considera mais importante agora. O instrumento Definindo Minhas Metas, com o passo a passo, está no documento Definindo Minhas Metas.
 
 ## Roda da Vida
 
@@ -255,7 +255,7 @@ A Roda da Vida tem duas aplicações, as duas na plataforma. Na leitura inicial,
 
 O olhar do(a) mentor(a) sobre a pontuação: observe se as notas correspondem ao que ele(a) realmente vive, porque valorização excessiva ou subestimação merecem conversa. Uma boa abertura: "Que motivos você teria para agradecer o que tem em cada um desses quadrantes?". E estimule o(a) jovem a participar de projetos sociais do entorno (esporte, lazer, música, cultura): estar inserido(a) em um grupo qualificado amplia a rede de apoio e favorece várias áreas da roda ao mesmo tempo.
 
-O instrumento, com a condução detalhada e as perguntas de reflexão por área, está no documento `instrumento-roda-da-vida`.
+O instrumento, com a condução detalhada e as perguntas de reflexão por área, está no documento Roda da Vida.
 
 ## Matching: como formamos as duplas
 
@@ -276,7 +276,7 @@ As seis fases do percurso:
 - **Encontros 12 a 14 · Roda da Vida:** leitura das 16 áreas quadrante por quadrante, metas SMART para as áreas prioritárias e desdobramento em submetas. Instrumentos: Roda da Vida e modelo SMART.
 - **Encontros 15 e 16 · Encerrar e celebrar:** revisão do percurso, reflexão sobre conquistas e aprendizados, Avaliação Geral - 360º e encerramento simbólico. Instrumentos: Roda da Vida e Avaliação Geral - 360º.
 
-Encontro que não acontece no dia previsto é reposto na mesma semana, regra combinada com as duplas já no 1º encontro. As datas oficiais de cada turma estão nos documentos `ciclo-cronograma` e `ciclo-turma2-cronograma`.
+Encontro que não acontece no dia previsto é reposto na mesma semana, regra combinada com as duplas já no 1º encontro. As datas oficiais de cada turma estão nos documentos Cronograma do ciclo, Turma 1 e Cronograma do ciclo, Turma 2.
 
 ## Os 16 encontros
 
@@ -287,13 +287,13 @@ Os 16 encontros seguem sempre a mesma estrutura básica:
 - **Encaminhamentos:** combine o que ele(a) prepara e quais ações realiza até o próximo encontro.
 - **Checkout:** pergunte o que achou do encontro e as sugestões e por que a conversa valeu a pena, e deixe a próxima data e horário agendados.
 
-Os encontros estão sob a sua responsabilidade, com sensibilidade e flexibilidade para respeitar o momento e o ritmo do(a) jovem. Como acontecem com intervalo de tempo, vale enviar uma mensagem no meio do caminho verificando como ele(a) está e confirmando a próxima sessão (modelo no documento `mensagem-encaminhamento`).
+Os encontros estão sob a sua responsabilidade, com sensibilidade e flexibilidade para respeitar o momento e o ritmo do(a) jovem. Como acontecem com intervalo de tempo, vale enviar uma mensagem no meio do caminho verificando como ele(a) está e confirmando a próxima sessão (modelo no documento Mensagem de encaminhamento).
 
 ### Preparação antes do 1º encontro
 
-Antes do primeiro encontro, marque no Checklist de competências do mentor o que você já faz bem e o que quer desenvolver (é uma lista de leitura e marcação, revisitada no fechamento; documento `checklist-competencias`). Depois envie ao(à) jovem a mensagem de preparação (documento `mensagem-preparacao`), que pede o resumo da história de vida, a Roda da Vida respondida na plataforma e os contatos das pessoas que farão a avaliação inicial. Na sequência, contate as pessoas indicadas (modelo no documento `mensagem-indicadas`): cada uma responde pelo link na plataforma.
+Antes do primeiro encontro, marque no Checklist de competências do mentor o que você já faz bem e o que quer desenvolver (é uma lista de leitura e marcação, revisitada no fechamento; documento Checklist de competências do mentor). Depois envie ao(à) jovem a mensagem de preparação (documento Mensagem de preparação), que pede o resumo da história de vida, a Roda da Vida respondida na plataforma e os contatos das pessoas que farão a avaliação inicial. Na sequência, contate as pessoas indicadas (modelo no documento Mensagem às pessoas indicadas): cada uma responde pelo link na plataforma.
 
-Cada encontro tem um roteiro próprio com o que cada lado leva, os momentos, as perguntas e a tarefa. Os resumos a seguir apresentam o objetivo de cada encontro; o passo a passo completo está nos documentos `roteiro-encontro-01` a `roteiro-encontro-16`.
+Cada encontro tem um roteiro próprio com o que cada lado leva, os momentos, as perguntas e a tarefa. Os resumos a seguir apresentam o objetivo de cada encontro; o passo a passo completo está no roteiro de cada encontro, do 1º ao 16º.
 
 ## Encontros 1 a 4 · Criar vínculo e construir o PDM
 
@@ -301,19 +301,19 @@ A primeira fase constrói a base da relação e do plano: vínculo, confiança, 
 
 ### 1º encontro · Boas-vindas, histórias de vida e abertura do PDM
 
-O primeiro encontro cria o ambiente de confiança que sustenta toda a jornada: apresentações, histórias de vida (a sua contada com honestidade, inclusive os tropeços) e acordos de convivência (respeito, confidencialidade e compromisso). A dupla conversa sobre a Roda da Vida que o(a) jovem respondeu na plataforma, uma leitura inicial para conhecer o contexto, e abre o PDM com três blocos: interesses, eventos significativos e autoavaliação. Tarefa: realizar o instrumento Construindo a sua Visão e trazer a Declaração de Visão pronta. Passo a passo: `roteiro-encontro-01`.
+O primeiro encontro cria o ambiente de confiança que sustenta toda a jornada: apresentações, histórias de vida (a sua contada com honestidade, inclusive os tropeços) e acordos de convivência (respeito, confidencialidade e compromisso). A dupla conversa sobre a Roda da Vida que o(a) jovem respondeu na plataforma, uma leitura inicial para conhecer o contexto, e abre o PDM com três blocos: interesses, eventos significativos e autoavaliação. Tarefa: realizar o instrumento Construindo a sua Visão e trazer a Declaração de Visão pronta. Passo a passo: Roteiro do 1º encontro.
 
 ### 2º encontro · Avaliação por terceiros e visão de futuro
 
-Apresente o consolidado da avaliação feita pelas pessoas indicadas, sempre sem identificar quem respondeu, e peça que ele(a) compare as percepções com a autoavaliação. Depois ajude a refinar a Declaração de Visão até que fique clara, inspiradora e com prazo, e oriente a criação de metas com perguntas de foco sobre competências e recursos. Tarefa: definir as metas sozinho(a), cada frase começando por um verbo de ação. Passo a passo: `roteiro-encontro-02`.
+Apresente o consolidado da avaliação feita pelas pessoas indicadas, sempre sem identificar quem respondeu, e peça que ele(a) compare as percepções com a autoavaliação. Depois ajude a refinar a Declaração de Visão até que fique clara, inspiradora e com prazo, e oriente a criação de metas com perguntas de foco sobre competências e recursos. Tarefa: definir as metas sozinho(a), cada frase começando por um verbo de ação. Passo a passo: Roteiro do 2º encontro.
 
 ### 3º encontro · Metas e checagem SMART
 
-O(a) jovem apresenta as metas que criou; se tiver dificuldade, retome os pontos que ele(a) citou nas conversas anteriores. Verifiquem juntos cada meta pelo modelo SMART, acrescentem indicador de sucesso e prazo e registrem a Declaração de Visão e as metas no PDM. Ao final, ensine o desdobramento em submetas. Tarefa: desdobrar as metas em submetas, com indicador de sucesso e prazo para cada uma. Passo a passo: `roteiro-encontro-03`.
+O(a) jovem apresenta as metas que criou; se tiver dificuldade, retome os pontos que ele(a) citou nas conversas anteriores. Verifiquem juntos cada meta pelo modelo SMART, acrescentem indicador de sucesso e prazo e registrem a Declaração de Visão e as metas no PDM. Ao final, ensine o desdobramento em submetas. Tarefa: desdobrar as metas em submetas, com indicador de sucesso e prazo para cada uma. Passo a passo: Roteiro do 3º encontro.
 
 ### 4º encontro · Submetas e compromisso
 
-Verifiquem se o plano fecha de forma lógica (se as submetas realmente levam às metas e se os prazos são realistas) e passem ao compromisso: por qual submeta ele(a) vai começar e quando vocês vão avaliar os primeiros resultados. Este encontro fecha a construção do PDM; daqui em diante os encontros giram em torno da execução. Tarefa: iniciar a execução das primeiras submetas combinadas. Passo a passo: `roteiro-encontro-04`.
+Verifiquem se o plano fecha de forma lógica (se as submetas realmente levam às metas e se os prazos são realistas) e passem ao compromisso: por qual submeta ele(a) vai começar e quando vocês vão avaliar os primeiros resultados. Este encontro fecha a construção do PDM; daqui em diante os encontros giram em torno da execução. Tarefa: iniciar a execução das primeiras submetas combinadas. Passo a passo: Roteiro do 4º encontro.
 
 ## Encontros 5 a 7 · Colocar o plano em prática
 
@@ -321,15 +321,15 @@ Com o PDM construído, a dupla entra na execução: acompanhar resultados, super
 
 ### 5º encontro · Primeiros resultados
 
-Início do acompanhamento formal das ações planejadas. Conduza com escuta ativa, incentivando o(a) jovem a compartilhar avanços, dificuldades e aprendizados das primeiras submetas, e use Perguntas Eficazes e Feedback Construtivo para ajudá-lo(a) a identificar o que está funcionando e o que precisa ser ajustado. Passo a passo: `roteiro-encontro-05`.
+Início do acompanhamento formal das ações planejadas. Conduza com escuta ativa, incentivando o(a) jovem a compartilhar avanços, dificuldades e aprendizados das primeiras submetas, e use Perguntas Eficazes e Feedback Construtivo para ajudá-lo(a) a identificar o que está funcionando e o que precisa ser ajustado. Passo a passo: Roteiro do 5º encontro.
 
 ### 6º encontro · Superando barreiras
 
-Apoie o(a) jovem na superação dos obstáculos da execução: inseguranças, autocríticas e desânimo são comuns nesta etapa e pedem sensibilidade e empatia. Quando um obstáculo se repete, vale rever se a submeta está grande demais ou se falta um passo intermediário; situações que extrapolam a mentoria devem ser sinalizadas à coordenação. Passo a passo: `roteiro-encontro-06`.
+Apoie o(a) jovem na superação dos obstáculos da execução: inseguranças, autocríticas e desânimo são comuns nesta etapa e pedem sensibilidade e empatia. Quando um obstáculo se repete, vale rever se a submeta está grande demais ou se falta um passo intermediário; situações que extrapolam a mentoria devem ser sinalizadas à coordenação. Passo a passo: Roteiro do 6º encontro.
 
 ### 7º encontro · Ajustes no plano
 
-Revisem o andamento das submetas e ajustem o que for preciso: prazos, indicadores ou o próprio desdobramento. Um PDM que não muda ao longo do ciclo provavelmente não está sendo usado. A partir do próximo encontro, o(a) jovem passa a trazer a pauta da conversa. Passo a passo: `roteiro-encontro-07`.
+Revisem o andamento das submetas e ajustem o que for preciso: prazos, indicadores ou o próprio desdobramento. Um PDM que não muda ao longo do ciclo provavelmente não está sendo usado. A partir do próximo encontro, o(a) jovem passa a trazer a pauta da conversa. Passo a passo: Roteiro do 7º encontro.
 
 ## Encontros 8 e 9 · Consolidar a autonomia
 
@@ -337,11 +337,11 @@ A condução da mentoria migra aos poucos para o(a) jovem, com uma revisão form
 
 ### 8º encontro · Monitoramento e responsabilidade
 
-Retome o mapa de metas e submetas e converse sobre o que foi concluído, valorizando o que avançou e tratando o que não avançou sem julgamento: o foco é entender o que atrapalhou. É o(a) jovem quem passa a trazer a pauta e a propor os próximos passos; a tarefa é preparar o balanço da jornada até aqui. Passo a passo: `roteiro-encontro-08`.
+Retome o mapa de metas e submetas e converse sobre o que foi concluído, valorizando o que avançou e tratando o que não avançou sem julgamento: o foco é entender o que atrapalhou. É o(a) jovem quem passa a trazer a pauta e a propor os próximos passos; a tarefa é preparar o balanço da jornada até aqui. Passo a passo: Roteiro do 8º encontro.
 
 ### 9º encontro · Revisão de meio de percurso
 
-Metade da jornada é um bom momento para olhar para trás: metas atingidas, submetas em andamento e aprendizados, comparados com a visão de futuro construída no início. É a revisão formal do PDM: valorize as conquistas e apoie a reformulação de estratégias para o plano continuar realista e motivador. A tarefa é trazer perguntas sobre a trajetória do(a) mentor(a) para o próximo encontro. Passo a passo: `roteiro-encontro-09`.
+Metade da jornada é um bom momento para olhar para trás: metas atingidas, submetas em andamento e aprendizados, comparados com a visão de futuro construída no início. É a revisão formal do PDM: valorize as conquistas e apoie a reformulação de estratégias para o plano continuar realista e motivador. A tarefa é trazer perguntas sobre a trajetória do(a) mentor(a) para o próximo encontro. Passo a passo: Roteiro do 9º encontro.
 
 ## Encontros 10 e 11 · Aprofundar o vínculo e o aprendizado
 
@@ -349,11 +349,11 @@ Depois da revisão de meio de percurso, a dupla aprofunda a relação e o olhar 
 
 ### 10º encontro · O mentor como espelho
 
-Encontro de caráter relacional e simbólico: compartilhe experiências de vida, aprendizados e momentos de superação que possam inspirar o(a) jovem, no exercício do papel modelar, que ensina pelo exemplo, pela coerência e pela transparência. A troca fortalece o vínculo e mostra que o desenvolvimento humano é contínuo e mútuo. Passo a passo: `roteiro-encontro-10`.
+Encontro de caráter relacional e simbólico: compartilhe experiências de vida, aprendizados e momentos de superação que possam inspirar o(a) jovem, no exercício do papel modelar, que ensina pelo exemplo, pela coerência e pela transparência. A troca fortalece o vínculo e mostra que o desenvolvimento humano é contínuo e mútuo. Passo a passo: Roteiro do 10º encontro.
 
 ### 11º encontro · Rede de apoio e novos espaços
 
-Converse sobre a rede de apoio do(a) jovem (em quem ele(a) pode contar e que portas ainda não foram exploradas) e faça pontes sempre que possível: pessoas, eventos, comunidades e projetos sociais do entorno. Ao final, apresente a Roda da Vida: o(a) jovem refaz a Roda na plataforma e a leitura acontece no próximo encontro. Passo a passo: `roteiro-encontro-11`.
+Converse sobre a rede de apoio do(a) jovem (em quem ele(a) pode contar e que portas ainda não foram exploradas) e faça pontes sempre que possível: pessoas, eventos, comunidades e projetos sociais do entorno. Ao final, apresente a Roda da Vida: o(a) jovem refaz a Roda na plataforma e a leitura acontece no próximo encontro. Passo a passo: Roteiro do 11º encontro.
 
 ## Encontros 12 a 14 · Roda da Vida
 
@@ -361,15 +361,15 @@ A aplicação formal da Roda da Vida ocupa estes três encontros, depois de a fe
 
 ### 12º encontro · Leitura da Roda da Vida
 
-Discutam quadrante por quadrante os motivos que levaram a cada nota, comparando com a leitura inicial do 1º encontro e ajudando o(a) jovem a perceber áreas subestimadas ou superestimadas. Uma boa condução: "Que motivos você teria para agradecer o que tem em cada um desses quadrantes?". Ao final, combinem pelo menos uma meta SMART para cada uma das 16 áreas. Passo a passo: `roteiro-encontro-12`.
+Discutam quadrante por quadrante os motivos que levaram a cada nota, comparando com a leitura inicial do 1º encontro e ajudando o(a) jovem a perceber áreas subestimadas ou superestimadas. Uma boa condução: "Que motivos você teria para agradecer o que tem em cada um desses quadrantes?". Ao final, combinem pelo menos uma meta SMART para cada uma das 16 áreas. Passo a passo: Roteiro do 12º encontro.
 
 ### 13º encontro · Metas das áreas prioritárias
 
-Revisem as metas que ele(a) elaborou para cada área, checando prazos e indicadores de sucesso, e elejam juntos um subconjunto de metas a detalhar, contemplando as prioridades do(a) jovem e as áreas de menor pontuação. As novas metas reforçam que o desenvolvimento profissional está ligado ao equilíbrio pessoal. Tarefa: desdobrar as metas eleitas em submetas, no mesmo modelo do PDM. Passo a passo: `roteiro-encontro-13`.
+Revisem as metas que ele(a) elaborou para cada área, checando prazos e indicadores de sucesso, e elejam juntos um subconjunto de metas a detalhar, contemplando as prioridades do(a) jovem e as áreas de menor pontuação. As novas metas reforçam que o desenvolvimento profissional está ligado ao equilíbrio pessoal. Tarefa: desdobrar as metas eleitas em submetas, no mesmo modelo do PDM. Passo a passo: Roteiro do 13º encontro.
 
 ### 14º encontro · Desdobramento e plano de continuidade
 
-Valide o mapa de metas e submetas, ajustando prazos e indicadores, e organizem tudo em um plano de continuidade que o(a) jovem poderá seguir depois do fim da mentoria. É um momento de síntese: revisitem os aprendizados do PDM e conectem todo o processo vivido até aqui. Passo a passo: `roteiro-encontro-14`.
+Valide o mapa de metas e submetas, ajustando prazos e indicadores, e organizem tudo em um plano de continuidade que o(a) jovem poderá seguir depois do fim da mentoria. É um momento de síntese: revisitem os aprendizados do PDM e conectem todo o processo vivido até aqui. Passo a passo: Roteiro do 14º encontro.
 
 ## Encontros 15 e 16 · Encerrar e celebrar
 
@@ -377,15 +377,15 @@ A última fase olha para a jornada inteira e fecha o ciclo com reconhecimento, a
 
 ### 15º encontro · Reflexão e reconhecimento
 
-Mentor(a) e mentorado(a) refletem sobre toda a jornada: o(a) jovem é incentivado(a) a reconhecer conquistas, aprendizagens e mudanças pessoais, e você oferece um feedback final sobre a evolução percebida, reforçando o protagonismo dele(a). É também o momento da troca de feedback mútuo e de combinar o tom do encontro de encerramento. Passo a passo: `roteiro-encontro-15`.
+Mentor(a) e mentorado(a) refletem sobre toda a jornada: o(a) jovem é incentivado(a) a reconhecer conquistas, aprendizagens e mudanças pessoais, e você oferece um feedback final sobre a evolução percebida, reforçando o protagonismo dele(a). É também o momento da troca de feedback mútuo e de combinar o tom do encontro de encerramento. Passo a passo: Roteiro do 15º encontro.
 
 ### 16º encontro · Encerramento e celebração
 
-O último encontro celebra o percurso e encerra formalmente a mentoria: revisitem o PDM e a Roda da Vida, conversem sobre as necessidades futuras e reforce a continuidade do autodesenvolvimento. No encontro, cada participante responde a sua Avaliação Geral - 360º na plataforma, e a dupla combina como fica o contato depois do ciclo (não há regra escrita sobre presentes nem sobre contato: a coordenação orienta). Uma sugestão de fechamento: agradeça a confiança, verbalize as qualidades que percebeu e pergunte "Pelo que você é grato(a) nesta jornada?". Passo a passo: `roteiro-encontro-16`. *(Atualização: o PDF publicado ainda lista a autoavaliação do(a) mentor(a) entre os materiais do 16º encontro; vale a Avaliação Geral - 360º de cada participante.)*
+O último encontro celebra o percurso e encerra formalmente a mentoria: revisitem o PDM e a Roda da Vida, conversem sobre as necessidades futuras e reforce a continuidade do autodesenvolvimento. No encontro, cada participante responde a sua Avaliação Geral - 360º na plataforma, e a dupla combina como fica o contato depois do ciclo (não há regra escrita sobre presentes nem sobre contato: a coordenação orienta). Uma sugestão de fechamento: agradeça a confiança, verbalize as qualidades que percebeu e pergunte "Pelo que você é grato(a) nesta jornada?". Passo a passo: Roteiro do 16º encontro. *(Atualização: o PDF publicado ainda lista a autoavaliação do(a) mentor(a) entre os materiais do 16º encontro; vale a Avaliação Geral - 360º de cada participante.)*
 
 ## Ferramentas de comunicação
 
-Boa parte do resultado de uma mentoria não está no conteúdo transmitido, mas na qualidade da conversa. O capítulo de comunicação do guia reúne quatro práticas, detalhadas no documento `escuta-ativa-e-comunicacao`:
+Boa parte do resultado de uma mentoria não está no conteúdo transmitido, mas na qualidade da conversa. O capítulo de comunicação do guia reúne quatro práticas, detalhadas no documento Escuta ativa e comunicação:
 
 - **Escuta ativa:** a base de todas as funções, com a atenção inteiramente disponível, sem julgar nem interromper, validando o entendimento.
 - **Comunicação Não Violenta (CNV):** os quatro pilares observação, sentimento, necessidade e pedido, criados por Marshall Rosenberg para falar o que importa sem culpar, envergonhar, coagir ou ameaçar.
@@ -394,7 +394,7 @@ Boa parte do resultado de uma mentoria não está no conteúdo transmitido, mas 
 
 ### Privacidade, limites e quando acionar apoio
 
-Registre apenas o necessário para o acompanhamento da mentoria, não compartilhe informações pessoais com terceiros e não divulgue histórias, imagens ou dados sensíveis sem autorização expressa. Mantenha a confidencialidade de tudo o que for tratado nas sessões. Se identificar situações que extrapolam o seu papel (questões de saúde mental, violência ou violação de direitos), acione imediatamente o supervisor de relacionamento ou a coordenação: você não precisa, e não deve, lidar com isso sozinho(a). Os limites e compromissos de conduta do(a) mentor(a) estão no documento `codigo-etica-conduta`.
+Registre apenas o necessário para o acompanhamento da mentoria, não compartilhe informações pessoais com terceiros e não divulgue histórias, imagens ou dados sensíveis sem autorização expressa. Mantenha a confidencialidade de tudo o que for tratado nas sessões. Se identificar situações que extrapolam o seu papel (questões de saúde mental, violência ou violação de direitos), acione imediatamente o supervisor de relacionamento ou a coordenação: você não precisa, e não deve, lidar com isso sozinho(a). Os limites e compromissos de conduta do(a) mentor(a) estão no documento Código de ética e conduta.
 
 ## Depois de cada encontro: registro e avaliação rápida
 
@@ -425,7 +425,7 @@ Cada pessoa responde a duas perguntas:
 1. "O que você considera pontos fortes de [nome do(a) jovem], na vida pessoal e profissional? Por favor, explique."
 2. "Em quais aspectos ele(a) precisaria melhorar para obter mais resultados na vida e no trabalho? Por favor, explique."
 
-O(a) mentor(a) lê as respostas, consolida agrupando o que se repete (pontos fortes de um lado, pontos de melhoria do outro) e publica a síntese sem identificar quem disse o quê, retirando palavras e expressões que possam indicar a autoria. A devolutiva acontece no 2º encontro, comparada com a autoavaliação do(a) jovem. O modelo de mensagem para contato direto está no documento `mensagem-indicadas`.
+O(a) mentor(a) lê as respostas, consolida agrupando o que se repete (pontos fortes de um lado, pontos de melhoria do outro) e publica a síntese sem identificar quem disse o quê, retirando palavras e expressões que possam indicar a autoria. A devolutiva acontece no 2º encontro, comparada com a autoavaliação do(a) jovem. O modelo de mensagem para contato direto está no documento Mensagem às pessoas indicadas.
 
 ## Avaliação Geral - 360º
 
@@ -484,15 +484,15 @@ Referências acessíveis para indicar: os conteúdos de educação financeira do
 
 Os modelos e instrumentos citados ao longo deste guia têm documentos próprios no corpus, com os textos completos e o passo a passo:
 
-- **Checklist de competências do mentor:** lista de leitura e marcação para o início do ciclo, revisitada no fechamento; documento `checklist-competencias`.
-- **Mensagem de preparação do(a) mentorado(a):** enviada assim que a dupla é formada; documento `mensagem-preparacao`.
-- **Mensagem às pessoas indicadas:** modelo de contato para a avaliação por terceiros; documento `mensagem-indicadas`.
-- **Mensagem de encaminhamento entre encontros:** o lembrete que mantém o vínculo vivo entre uma sessão e outra; documento `mensagem-encaminhamento`.
-- **Construindo a sua Visão:** o exercício de imaginação que gera a Declaração de Visão; documento `instrumento-construindo-visao`.
-- **Definindo Minhas Metas:** as metas escritas pelo(a) jovem, checadas pelo modelo SMART; documento `instrumento-definindo-minhas-metas`.
-- **PDM (Plano de Desenvolvimento do Mentorado):** visão, metas com indicador e prazo, e o mapa de submetas; documento `instrumento-pdm`.
-- **Roda da Vida:** as 16 áreas, a escala de 1 a 10 e a condução das duas aplicações; documento `instrumento-roda-da-vida`.
-- **Código de ética e conduta:** os limites e os compromissos do(a) mentor(a); documento `codigo-etica-conduta`.
+- **Checklist de competências do mentor:** lista de leitura e marcação para o início do ciclo, revisitada no fechamento; documento Checklist de competências do mentor.
+- **Mensagem de preparação do(a) mentorado(a):** enviada assim que a dupla é formada; documento Mensagem de preparação.
+- **Mensagem às pessoas indicadas:** modelo de contato para a avaliação por terceiros; documento Mensagem às pessoas indicadas.
+- **Mensagem de encaminhamento entre encontros:** o lembrete que mantém o vínculo vivo entre uma sessão e outra; documento Mensagem de encaminhamento.
+- **Construindo a sua Visão:** o exercício de imaginação que gera a Declaração de Visão; documento Construindo a sua Visão.
+- **Definindo Minhas Metas:** as metas escritas pelo(a) jovem, checadas pelo modelo SMART; documento Definindo Minhas Metas.
+- **PDM (Plano de Desenvolvimento do Mentorado):** visão, metas com indicador e prazo, e o mapa de submetas; documento PDM.
+- **Roda da Vida:** as 16 áreas, a escala de 1 a 10 e a condução das duas aplicações; documento Roda da Vida.
+- **Código de ética e conduta:** os limites e os compromissos do(a) mentor(a); documento Código de ética e conduta.
 
 ## Considerações finais
 

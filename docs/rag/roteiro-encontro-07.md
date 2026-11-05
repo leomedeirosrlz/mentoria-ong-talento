@@ -93,7 +93,7 @@ Depois do 7º encontro, os dois lados registram a sessão na plataforma e o(a) m
 - O(a) jovem responde a própria avaliação rápida na plataforma: nota, sentimento, se sente que avançou e a opção de pedir apoio.
 - Conferir se o PDM está atualizado com os ajustes e registrar as atividades e reflexões do encontro.
 - Lembrar o(a) jovem de preparar a pauta do 8º encontro.
-- Enviar a mensagem de encaminhamento entre encontros (modelo no documento `mensagem-encaminhamento`) e confirmar o horário do 8º encontro.
+- Enviar a mensagem de encaminhamento entre encontros (modelo no documento Mensagem de encaminhamento) e confirmar o horário do 8º encontro.
 
 ## 7º encontro · Nota ao mentor
 
