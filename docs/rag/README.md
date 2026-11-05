@@ -45,19 +45,24 @@ origem: <de onde o texto saiu + o que fazer quando divergir>
 
 | arquivo | guia | material (slug de citação) | natureza |
 |---|---|---|---|
-| `guia-mentor-dpp.md` | `guia-mentor-dpp` | `guia-mentor-dpp` (PDF) | consolidado |
-| `guia-mentor-especialista.md` | `guia-mentor-especialista` | `guia-mentor-especialista` (PDF) | consolidado |
-| `ciclo-2026-2027.md` | `ciclo-cronograma` | `ciclo-cronograma` (PDF "Cronograma do programa — Turma 1") | transcrito |
-| `ciclo-turma2-2026-2027.md` | `ciclo-turma2-cronograma` | `ciclo-turma2-cronograma` (PDF "Cronograma do programa — Turma 2") | transcrito |
+| `guia-mentor-dpp.md` | `guia-mentor-dpp` | `guia-mentor-dpp` | consolidado |
+| `guia-mentor-especialista.md` | `guia-mentor-especialista` | `guia-mentor-especialista` | consolidado |
 | `plataforma-e-operacao.md` | `plataforma-e-operacao` | `plataforma-e-operacao` | sintese-operacional |
-| `roteiros-encontros-11-16.md` | `roteiros-encontros-11-16` | `roteiros-encontros-11-16` (6 PDFs) | sintese-operacional |
-| `perguntas-eficazes.md` | `perguntas-eficazes` | `perguntas-eficazes` (PDF) | sintese-operacional |
-| `feedback-construtivo.md` | `feedback-construtivo` | `feedback-construtivo` (doc nativo) | transcrito |
-| `checklist-competencias.md` | `checklist-competencias` | `checklist-competencias` (doc nativo) | transcrito |
-| `mensagem-preparacao.md` | `mensagem-preparacao` | `mensagem-preparacao` (doc nativo) | transcrito |
-| `mensagem-indicadas.md` | `mensagem-indicadas` | `mensagem-indicadas` (doc nativo) | transcrito |
-| `mensagem-encaminhamento.md` | `mensagem-encaminhamento` | `mensagem-encaminhamento` (doc nativo) | transcrito |
-| `instrumento-definindo-minhas-metas.md` | `instrumento-definindo-minhas-metas` | `instrumento-definindo-minhas-metas` (PDF) | transcrito |
+| `ciclo-2026-2027.md` | `ciclo-cronograma` | `ciclo-cronograma` | consolidado |
+| `ciclo-turma2-2026-2027.md` | `ciclo-turma2-cronograma` | `ciclo-turma2-cronograma` | consolidado |
+| `roteiro-encontro-01.md` … `roteiro-encontro-16.md` | `roteiro-encontro-NN` | `roteiro-encontro-NN` (PDF "Roteiro Semana N") | consolidado |
+| `instrumento-roda-da-vida.md` | `instrumento-roda-da-vida` | `instrumento-roda-da-vida` | consolidado |
+| `instrumento-pdm.md` | `instrumento-pdm` | `instrumento-pdm` | consolidado |
+| `instrumento-construindo-visao.md` | `instrumento-construindo-visao` | `instrumento-construindo-visao` | consolidado |
+| `instrumento-definindo-minhas-metas.md` | `instrumento-definindo-minhas-metas` | `instrumento-definindo-minhas-metas` | consolidado |
+| `perguntas-eficazes.md` | `perguntas-eficazes` | `perguntas-eficazes` | consolidado |
+| `escuta-ativa-e-comunicacao.md` | `escuta-ativa-e-comunicacao` | `escuta-ativa-e-comunicacao` | consolidado |
+| `feedback-construtivo.md` | `feedback-construtivo` | `feedback-construtivo` | consolidado |
+| `checklist-competencias.md` | `checklist-competencias` | `checklist-competencias` | consolidado |
+| `codigo-etica-conduta.md` | `codigo-etica-conduta` | `codigo-etica-conduta` | consolidado |
+| `mensagem-preparacao.md` | `mensagem-preparacao` | `mensagem-preparacao` | consolidado |
+| `mensagem-indicadas.md` | `mensagem-indicadas` | `mensagem-indicadas` | consolidado |
+| `mensagem-encaminhamento.md` | `mensagem-encaminhamento` | `mensagem-encaminhamento` | consolidado |
 | `termo-adesao-voluntario.md` | `termo-adesao-voluntario` | `termo-adesao-voluntario` | transcrito |
 | `termo-mentorando.md` | `termo-mentorando` | `termo-mentorando` | transcrito |
 | `autorizacao-responsavel.md` | `autorizacao-responsavel` | `autorizacao-responsavel` | transcrito |
@@ -74,12 +79,15 @@ origem: <de onde o texto saiu + o que fazer quando divergir>
   avaliação por terceiros nativa, instrumentos digitais, regras
   operacionais). Cada turma tem seu calendário — encontro duplo na quinta
   e sem a folga de 15 dias só existem na Turma 2.
-- `roteiros-encontros-11-16.md` e `perguntas-eficazes.md` são sínteses
-  operacionais: os PDFs existem no acervo mas não estão transcritos —
-  o roteiro 11–16 é extração do cap. 10 do guia (migration 0135) e o
-  "Perguntas Eficazes" é consolidado do que os guias trazem sobre o
-  instrumento. Quando os PDFs forem transcritos em `docs/fontes/`, estes
-  docs passam a `transcrito`.
+- **Consolidação de 04/11/2026** (revisão em `.auditoria-rag/`, fora do git):
+  todos os docs não jurídicos foram reescritos como texto consolidado e
+  sanitizado a partir dos PDFs publicados, dos docs do Drive e do código.
+  Eles **prevalecem sobre o PDF publicado** quando divergirem. Regras fixas:
+  sem travessão, âncora por encontro (nunca por mês), só o que é vigente,
+  Roda da Vida com duas aplicações na plataforma e escala 1 a 10, terceiros
+  (Erlich e afins) só como origem citada.
+- Os `roteiro-encontro-NN.md` são a fonte por encontro; o cap. "Os 16
+  encontros" do guia DPP é só um resumo que remete a eles.
 - `feedback-construtivo.md`, `checklist-competencias.md` e os três
   `mensagem-*.md` reproduzem os **documentos nativos** do app
   (`src/lib/materiais-documentos.ts`, texto do cap. 14 do guia) — é o que

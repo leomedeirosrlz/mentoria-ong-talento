@@ -6,7 +6,10 @@ tipo: guia
 natureza: consolidado
 audiencia: [mentor_especialista, coordenacao, supervisor]
 versao: guia físico vigente
-origem: docs/fontes/guia-especialista-docx.txt (consolidado; novo-programa-especialista.txt é rascunho anterior)
+origem: guia-especialista-2026-07.md (DOCX do Drive, versão mais recente) e
+  Guia-do-Mentor-Especialista---Realiza.vc-Equipe-Executiva-1-.txt (PDF
+  publicado). Texto consolidado e sanitizado em 04/11/2026; prevalece sobre
+  o PDF publicado quando divergirem.
 ---
 
 # Guia do Mentor Especialista
@@ -17,11 +20,11 @@ Metodologia da Mentoria Social · Instituto Realiza.vc · Mirella Ghachache Aven
 
 Seja bem-vindo(a) ao Programa de Mentoria Social do Instituto Realiza.vc. A mentoria é um espaço que ensina, na prática, que diferentes tipos de conhecimento e experiência constroem uma relação transformadora para as duas pessoas envolvidas. A sua bagagem de vida tem o poder de inspirar, trazer referências e estimular o jovem a pensar em como colocar em prática o seu projeto de vida.
 
-Esteja aberto(a) e disposto(a) a criar vínculo, ouvir com atenção, pensar junto, emprestar o seu olhar e dar suporte. Esse estímulo caminha lado a lado com o respeito à identidade do(a) jovem — não há espaço para a projeção de desejos e expectativas individuais. A jornada de aprendizagem é mútua.
+Esteja aberto(a) e disposto(a) a criar vínculo, ouvir com atenção, pensar junto, emprestar o seu olhar e dar suporte. Esse estímulo caminha lado a lado com o respeito à identidade do(a) jovem: não há espaço para a projeção de desejos e expectativas individuais. A jornada de aprendizagem é mútua.
 
-Este guia traz a metodologia, sugestões de condução dos encontros e as ferramentas que utilizamos. Registre sempre as atividades e reflexões de cada encontro: são a base do relatório final que você entregará ao(à) mentorado(a) e à coordenação. Esta mentoria acontece entre você e um(a) jovem, mas o Instituto Realiza.vc está aqui para dar todo o suporte necessário.
+Este guia traz a metodologia, sugestões de condução dos encontros e as ferramentas que utilizamos. Registre sempre as atividades e reflexões de cada encontro na plataforma: são elas que alimentam o acompanhamento da coordenação ao longo da trilha. Esta mentoria acontece entre você e um(a) jovem, mas o Instituto Realiza.vc está aqui para dar todo o suporte necessário.
 
-> "Se quer ir rápido, vá sozinho. Se quer ir longe, vá em grupo." — Provérbio africano
+*"Se quer ir rápido, vá sozinho. Se quer ir longe, vá em grupo." (Provérbio africano)*
 
 ### Como usar este material
 
@@ -36,24 +39,24 @@ O Instituto Realiza.vc promove a autonomia e o desenvolvimento humano e social d
 
 Valores: protagonismo juvenil · diversidade e inclusão · rede de apoio · transparência e ética · impacto mensurável.
 
-### O Programa de Mentoria Social — duas modalidades complementares
+### O Programa de Mentoria Social: duas modalidades complementares
 
 | Modalidade | Foco | Duração | Encontros |
 |---|---|---|---|
-| Mentoria de Desenvolvimento Pessoal e Profissional | Desenvolvimento amplo do(a) jovem: autoconhecimento, projeto de vida, metas pessoais e profissionais | Até 6 meses | 16 encontros |
+| Mentoria de Desenvolvimento Pessoal e Profissional | Desenvolvimento amplo do(a) jovem: autoconhecimento, projeto de vida, metas pessoais e profissionais | Um ciclo | 16 encontros |
 | Mentoria com Especialista | Resolução de demandas específicas de uma área do conhecimento ou nicho de carreira | Até 3 meses | Até 5 encontros |
 
 As duas modalidades conversam: é o Mentor DPP, ou o próprio jovem, quem identifica a necessidade de uma mentoria especializada e aciona o(a) especialista pela plataforma.
 
 ### Apoio institucional
 
-O programa conta com o apoio da Erlich Mentoring Brasil-Europa na formação dos mentores e na consolidação da metodologia. Todo o programa é realizado através da plataforma criada em parceria com a Top2You.
+O programa conta com o apoio da Erlich Mentoring Brasil-Europa na formação dos mentores e na consolidação da metodologia. Todo o programa acontece na plataforma de mentoria do Instituto Realiza.vc (mentoria.realiza.vc).
 
 ## 03 · Introdução
 
 ### Qual é o papel do Mentor Especialista?
 
-O(a) mentor(a) especialista é o(a) profissional acionado(a) para responder a uma **demanda concreta** do(a) jovem em uma área específica do conhecimento ou em um nicho de carreira. Enquanto o Mentor DPP acompanha a jornada ampla ao longo de seis meses, você entra para resolver uma questão delimitada, com profundidade técnica e olhar humano.
+O(a) mentor(a) especialista é o(a) profissional acionado(a) para responder a uma **demanda concreta** do(a) jovem em uma área específica do conhecimento ou em um nicho de carreira. Enquanto o Mentor DPP acompanha a jornada ampla ao longo do ciclo, com 16 encontros, você entra para resolver uma questão delimitada, com profundidade técnica e olhar humano.
 
 | Parâmetro | Mentoria com Especialista |
 |---|---|
@@ -84,15 +87,16 @@ Dedicação estimada de aproximadamente **8 horas ao longo de até três meses**
 | Até 5 encontros individuais de mentoria | 5h | Virtual ou presencial |
 | **Total** | **8h** | |
 
-Reserve tempo de preparação antes de cada encontro: revise a demanda registrada pelo Mentor DPP, retome os seus registros anteriores e organize as referências que pretende indicar. Com apenas cinco encontros, cada minuto preparado vale duas vezes.
+Reserve tempo de preparação antes de cada encontro: revise a demanda registrada pelo Mentor DPP, retome os seus registros anteriores e organize as referências que pretende indicar. Com até cinco encontros, cada minuto preparado vale duas vezes.
 
 ### Formação EaD opcional e gratuita
 
-Trilha EaD extra, gratuita e opcional em **ead.realiza.vc** — curso de Mentor Especialista no seu ritmo, com certificado. Quem já tem certificação Erlich Mentoring realiza apenas o curso complementar. A participação é voluntária e não substitui os encontros de formação.
+Trilha EaD extra, gratuita e opcional em **ead.realiza.vc**: curso de Mentor Especialista no seu ritmo, com certificado. Quem já tem certificação Erlich Mentoring realiza apenas o curso complementar. A participação é voluntária e não substitui os encontros de formação.
 
 ### Perfil dos(as) mentorados(as)
 
-O perfil dos jovens é levantado pela **Anamnese Social**, instrumento do Instituto aplicado antes do início da mentoria. Jovens em vulnerabilidade social podem trazer **ansiedade e urgência** na resolução dos problemas — nesses momentos, sinalize que a mentoria desenvolve técnicas e habilidades cujos resultados se constroem no tempo, sem minimizar a necessidade real trazida.
+O perfil dos jovens é levantado no intake do mentorado, respondido na plataforma antes do início da mentoria. Jovens em vulnerabilidade social podem trazer **ansiedade e urgência** na resolução dos problemas: nesses momentos, sinalize que a mentoria desenvolve técnicas e habilidades cujos resultados se constroem no tempo, sem minimizar a necessidade real trazida.
+
 
 Para aprofundar: documentário "Nunca me sonharam" (2017), Atlas das Juventudes, materiais do Instituto Ayrton Senna.
 
@@ -116,7 +120,7 @@ Para aprofundar: documentário "Nunca me sonharam" (2017), Atlas das Juventudes,
 - Estar disposto(a) a criar vínculo;
 - Comprometer-se a participar da mentoria até o final.
 
-**Sobre idade e maturidade:** referência de mentores a partir de 25 anos e supervisores a partir de 35 — não são regras rígidas; o critério determinante é a bagagem de vida e profissional.
+**Sobre idade e maturidade:** referência de mentores a partir de 25 anos e supervisores a partir de 35. Não são regras rígidas; o critério determinante é a bagagem de vida e profissional.
 
 ### Quem faz o programa acontecer
 
@@ -143,18 +147,18 @@ Inscrição online → análise de pré-requisitos e seleção → encontro inic
 
 ### A jornada do(a) jovem mentorado(a)
 
-Inscrição online → análise e seleção → trilha preparatória → Anamnese Social → encontro de abertura com a coordenação → mentoria DPP → sessões com especialista, se aplicável → encerramento ou renovação.
+Inscrição online → análise e seleção → trilha preparatória → intake na plataforma → encontro de abertura com a coordenação → mentoria DPP → sessões com especialista, se aplicável → encerramento ou renovação.
 
 ### A plataforma de mentoria
 
-Todas as mentorias acontecem na plataforma (**mentoria.realiza.vc**), criada em parceria com a Top2You.
+Todas as mentorias acontecem na plataforma (**mentoria.realiza.vc**).
 
 - **Acesso:** entre com o seu e-mail cadastrado previamente pela coordenação.
 - **Agendamento:** todos os encontros são agendados pelo sistema. Nenhum encontro acontece fora dela.
-- **Avaliação:** ao final de cada encontro, mentor(a) e mentorado(a) preenchem uma avaliação da sessão na plataforma.
-- **Especialistas:** organizados por área — design, eventos, finanças, inteligência emocional, planejamento de carreira, tecnologia, entre outras.
+- **Pós-encontro:** ao final de cada encontro, você registra a sessão na ficha da dupla e o(a) jovem responde a própria avaliação rápida na plataforma.
+- **Especialistas:** organizados por área, como design, eventos, finanças, inteligência emocional, planejamento de carreira e tecnologia.
 
-**Onde ficam o PDM e a Roda da Vida:** documentos de trabalho da dupla, guardados pelo(a) mentorado(a) e/ou mentor(a). *(Atualização: os instrumentos oficiais passaram a ser registrados na plataforma — ver "Plataforma e operação".)*
+**Onde ficam o PDM e a Roda da Vida:** são instrumentos oficiais respondidos na ficha da dupla (aba Instrumentos). *(Atualização: o guia publicado ainda diz que ficam com a dupla; vale a ficha da dupla na plataforma.)*
 
 **Não confunda:** mentoria.realiza.vc é a plataforma da mentoria; ead.realiza.vc é a plataforma de cursos EaD.
 
@@ -168,23 +172,23 @@ Todas as mentorias acontecem na plataforma (**mentoria.realiza.vc**), criada em 
 | 4. Escuta e aconselhamento | Compreender com profundidade e ajudar o(a) jovem a encontrar as próprias respostas |
 | 5. Papel de modelo | Ser referência pela conduta, pela coerência e pelo exemplo |
 
-**1. Orientação** — Ensine o que for normativo na sua área: como as coisas funcionam, quais são os padrões, o que se espera de um profissional. Forneça dicas que facilitem as tarefas, indique fontes de pesquisa (livros, sites, cursos, pessoas), proponha tarefas desafiadoras e ofereça feedback construtivo. Conecte-o(a) com outras pessoas quando necessário. Não tenha receio de admitir quando não souber algo; diga que vai pesquisar.
+**1. Orientação.** Ensine o que for normativo na sua área: como as coisas funcionam, quais são os padrões, o que se espera de um profissional. Forneça dicas que facilitem as tarefas, indique fontes de pesquisa (livros, sites, cursos, pessoas), proponha tarefas desafiadoras e ofereça feedback construtivo. Conecte-o(a) com outras pessoas quando necessário. Não tenha receio de admitir quando não souber algo; diga que vai pesquisar.
 
-**2. Proteção** — Ofereça sugestões para evitar erros comprometedores ou o descumprimento de tarefas importantes. Ajude a reconhecer comportamentos inadequados no ambiente de trabalho e oriente sobre como se portar diante de diferentes pessoas, explicando os motivos. Cuidado para não exagerar: proteger é preparar para o risco, não impedir a experiência.
+**2. Proteção.** Ofereça sugestões para evitar erros comprometedores ou o descumprimento de tarefas importantes. Ajude a reconhecer comportamentos inadequados no ambiente de trabalho e oriente sobre como se portar diante de diferentes pessoas, explicando os motivos. Cuidado para não exagerar: proteger é preparar para o risco, não impedir a experiência.
 
-**3. Aceitação** — Declare a intenção de formar uma aliança em benefício do(a) jovem. Postura não julgadora, atitude igualitária e não hierárquica, compromisso com a confidencialidade, abertura para receber feedback.
+**3. Aceitação.** Declare a intenção de formar uma aliança em benefício do(a) jovem. Postura não julgadora, atitude igualitária e não hierárquica, compromisso com a confidencialidade, abertura para receber feedback.
 
 *Construindo a confiança:* compartilhe o conhecimento relevante, cumpra os compromissos (imprevistos: peça desculpas, corrija, remarque com antecedência), comente erros que você já cometeu e como resolveu, evite criticar outras pessoas diretamente.
 
-**4. Escuta e aconselhamento** — A escuta ativa e empática permite aconselhar com sensibilidade, respeitando ritmo, desejos e limites. Elimine distrações, identifique significados implícitos, não julgue nem antecipe conclusões, evite interromper. O objetivo é o(a) jovem encontrar as soluções por conta própria — respostas prontas são o último recurso. Estimule autoconhecimento e autonomia por perguntas eficazes.
+**4. Escuta e aconselhamento.** A escuta ativa e empática permite aconselhar com sensibilidade, respeitando ritmo, desejos e limites. Elimine distrações, identifique significados implícitos, não julgue nem antecipe conclusões, evite interromper. O objetivo é o(a) jovem encontrar as soluções por conta própria: respostas prontas são o último recurso. Estimule autoconhecimento e autonomia por perguntas eficazes.
 
 | Modo de aconselhamento | Quando usar |
 |---|---|
-| A. Provocação reflexiva | Sempre que possível — perguntas que desafiam o(a) jovem a encontrar as respostas |
-| B. Compartilhamento de experiências | Quando falta repertório — conte um caso e pergunte "Que soluções você imagina a partir deste exemplo?" |
+| A. Provocação reflexiva | Sempre que possível: perguntas que desafiam o(a) jovem a encontrar as respostas |
+| B. Compartilhamento de experiências | Quando falta repertório: conte um caso e pergunte "Que soluções você imagina a partir deste exemplo?" |
 | C. Sugestão ou direcionamento | Último recurso, em situações de risco não compreendidas |
 
-**5. Papel de modelo** — Referência pela conduta, coerência e exemplo. Declare a sua confiança na capacidade de crescimento do(a) jovem, elogie os progressos e comente o que você mesmo(a) está aprendendo. Mentoria é uma via de mão dupla.
+**5. Papel de modelo.** Referência pela conduta, coerência e exemplo. Declare a sua confiança na capacidade de crescimento do(a) jovem, elogie os progressos e comente o que você mesmo(a) está aprendendo. Mentoria é uma via de mão dupla.
 
 ## 07 · Instrumentos da metodologia
 
@@ -204,19 +208,19 @@ Mais exemplos no documento "Perguntas Eficazes", no material complementar (aba B
 
 ### Feedback construtivo
 
-Melhora autoconsciência, autoconfiança, aprendizagem, motivação e desempenho. Mesmo ao apontar aspectos negativos, deve ser construtivo — pode surgir espontaneamente, com responsabilidade e respeito.
+Melhora autoconsciência, autoconfiança, aprendizagem, motivação e desempenho. Mesmo ao apontar aspectos negativos, deve ser construtivo e pode surgir espontaneamente, com responsabilidade e respeito.
 
 **Modelo sugerido:** "Olha, quando acontece determinada situação, eu me sinto *(como você se sente)*, porque *(o motivo)*. Eu gostaria que você considerasse *(sugestão ou alternativa)*." Em seguida: "O que você pensa sobre o que acabei de dizer?"
 
-**Relembrando:** atitude não julgadora, confiança e respeito · relatos baseados no que você viu ou sabe · não rotule a pessoa · foque no comportamento/fato/resultado ("Percebi que o trabalho ainda não foi concluído", não "Você não conseguiu concluir") · cuidado com absolutos (tudo, nada, sempre, nunca) · pergunte o que ele(a) entendeu · atenção à reação emocional ("Como você está se sentindo?").
+**Relembrando:** atitude não julgadora, confiança e respeito · relatos baseados no que você viu ou sabe · não rotule a pessoa · foque no comportamento, no fato ou no resultado ("Percebi que o trabalho ainda não foi concluído", não "Você não conseguiu concluir") · cuidado com absolutos (tudo, nada, sempre, nunca) · pergunte o que ele(a) entendeu · atenção à reação emocional ("Como você está se sentindo?").
 
 Todo feedback deve resultar em uma ação: "Como a nossa conversa contribuiu para o que você precisa alcançar?", "O que você vai fazer agora?".
 
 ### Plano de Desenvolvimento do Mentorado (PDM)
 
-O PDM é construído com o Mentor DPP ao longo do programa de seis meses. Como especialista, é essencial compreendê-lo: ele é o **ponto de partida das suas conversas** e o lugar onde as metas que vocês definirem serão registradas.
+O PDM é construído com o Mentor DPP ao longo do ciclo, com 16 encontros. Como especialista, é essencial compreendê-lo: ele é o **ponto de partida das suas conversas** e o lugar onde as metas que vocês definirem serão registradas.
 
-O PDM parte de uma **visão de futuro** — o que o(a) jovem deseja alcançar — desdobrada em metas, e cada meta em submetas, pela pergunta repetida em camadas: "O que você acha que precisa fazer para atingir essa meta?". O resultado é um mapa de ações realizáveis de imediato, encadeadas até a visão.
+O PDM parte de uma **visão de futuro**, o que o(a) jovem deseja alcançar, desdobrada em metas, e cada meta em submetas, pela pergunta repetida em camadas: "O que você acha que precisa fazer para atingir essa meta?". O resultado é um mapa de ações realizáveis de imediato, encadeadas até a visão.
 
 **Como construir uma boa meta:** cada meta tem prazo e indicador de sucesso, verificada pelo modelo SMART. Corresponde ao que o(a) jovem precisa criar, aprender, melhorar ou eliminar. Perguntas de apoio: o que você precisa fazer para alcançar a sua visão? · Que competências você já tem? · Quais precisa adquirir? · Que recursos já possui? Quais precisa obter? As frases das metas começam por verbo de ação.
 
@@ -234,7 +238,7 @@ O contato parte do Mentor DPP (ou do próprio jovem), que identifica uma demanda
 | 2. Solicitação pela plataforma | A demanda é registrada e o(a) especialista adequado(a) é acionado(a) |
 | 3. Aceite e agendamento | Você avalia a demanda, confirma disponibilidade e agenda o 1º encontro, de 1 hora |
 | 4. Realização dos encontros | Até cinco encontros individuais, ao longo de até três meses |
-| 5. Registro e encerramento | Metas e aprendizados registrados no PDM e avaliação final na plataforma |
+| 5. Registro e encerramento | Metas e aprendizados registrados no PDM; cada encontro leva o seu registro na ficha da dupla |
 
 O processo pode ser concluído **antes do quinto encontro**, se os objetivos já foram atingidos. Independentemente do número de sessões, o último encontro deve sempre incluir reflexão sobre resultados, levantamento de necessidades futuras e celebração.
 
@@ -254,6 +258,8 @@ Encontros de mentoria com 1 hora; formação com 1h30 por encontro. A trilha EaD
 
 ### Visão geral dos cinco encontros
 
+A trilha é sob demanda, com **no máximo 5 encontros**: a quantidade necessária é estimada no 1º encontro e acompanhada pela plataforma.
+
 | Encontro | Ações e foco |
 |---|---|
 | 1º | Criação de vínculo. Escuta das demandas e desafios. Identificação inicial do tema, considerando o PDM construído com o Mentor DPP |
@@ -262,7 +268,7 @@ Encontros de mentoria com 1 hora; formação com 1h30 por encontro. A trilha EaD
 | 4º | Discussão do plano de metas e submetas. Alinhamento das estratégias |
 | 5º | Fechamento da mentoria. Reflexão sobre aprendizados. Identificação de desafios futuros. Feedback do(a) jovem e registro final no PDM |
 
-## 10 · Os 5 encontros
+## 10 · Os encontros da trilha
 
 Estrutura básica de todos os encontros:
 
@@ -270,18 +276,18 @@ Estrutura básica de todos os encontros:
 |---|---|
 | Check-in | Acolha o(a) jovem: como está, como foram os dias. Retome a atividade anterior (quando não for o 1º). Verifique o material. Apresente os objetivos |
 | Desenvolvimento | Trabalhe o tema da mentoria com escuta ativa, perguntas eficazes e feedback construtivo |
-| Encaminhamentos | Defina em conjunto atividades, leituras ou ações até o próximo encontro — essencial para a continuidade e a autonomia |
-| Checkout | Peça o feedback do(a) jovem. Compartilhe a sua avaliação. Registre a data do próximo encontro. Encerre em tom motivador |
+| Encaminhamentos | Defina em conjunto atividades, leituras ou ações até o próximo encontro, essenciais para a continuidade e a autonomia |
+| Checkout | Peça o feedback do(a) jovem. Combine a data do próximo encontro. Encerre em tom motivador. Depois do encontro, registre a sessão na ficha da dupla; o(a) jovem responde a avaliação rápida na plataforma |
 
-**1º ENCONTRO — Acolhimento, vínculo e identificação da demanda.** Acolhimento e estabelecimento de vínculo: conheçam-se e criem as bases de confiança. A escuta ativa e empática norteia a conversa para compreender demandas, desafios e expectativas. Compartilhe brevemente a sua trajetória e convide o(a) jovem a relatar a dele(a) — a partir da troca, identifiquem o tema central da mentoria e os resultados esperados. Esclareça o caráter confidencial das conversas e o potencial de contribuição que você oferece. Avalie se há necessidades fora da sua área e oriente sobre apoio complementar. Estime a quantidade de encontros necessários e verifique metas específicas já existentes — quando preciso ajustá-las, oriente o(a) jovem, eventualmente em parceria com o Mentor DPP. Encerre com o agendamento das próximas sessões e, se houver tempo, orientações iniciais e indicação de conteúdos de apoio. Finalize reforçando o reconhecimento pelo empenho do(a) jovem.
+**1º ENCONTRO: Acolhimento, vínculo e identificação da demanda.** Acolhimento e estabelecimento de vínculo: conheçam-se e criem as bases de confiança. A escuta ativa e empática norteia a conversa para compreender demandas, desafios e expectativas. Compartilhe brevemente a sua trajetória e convide o(a) jovem a relatar a dele(a): a partir da troca, identifiquem o tema central da mentoria e os resultados esperados. Esclareça o caráter confidencial das conversas e o potencial de contribuição que você oferece. Avalie se há necessidades fora da sua área e oriente sobre apoio complementar. Estime quantos encontros a demanda precisa, dentro do máximo de cinco, e verifique metas específicas já existentes; quando preciso ajustá-las, oriente o(a) jovem, eventualmente em parceria com o Mentor DPP. Encerre com o agendamento das próximas sessões e, se houver tempo, orientações iniciais e indicação de conteúdos de apoio. Finalize reforçando o reconhecimento pelo empenho do(a) jovem.
 
-**2º ENCONTRO — Orientação, proteção e aconselhamento.** Você assume um papel mais ativo, exercendo orientação, proteção e aconselhamento. O vínculo se fortalece e a escuta segue essencial. Esclareça dúvidas sobre os conteúdos de referência indicados, avalie as metas e submetas apresentadas e proponha ajustes. O objetivo é consolidar a direção do processo. Encerre com palavras de reconhecimento e incentivo.
+**2º ENCONTRO: Orientação, proteção e aconselhamento.** Você assume um papel mais ativo, exercendo orientação, proteção e aconselhamento. O vínculo se fortalece e a escuta segue essencial. Esclareça dúvidas sobre os conteúdos de referência indicados, avalie as metas e submetas apresentadas e proponha ajustes. O objetivo é consolidar a direção do processo. Encerre com palavras de reconhecimento e incentivo.
 
-**3º ENCONTRO — Definição e alinhamento das metas.** Definição e alinhamento dos objetivos e metas. O(a) jovem pode chegar com metas estabelecidas, que serão analisadas e, se necessário, reformuladas. Você também pode propor novas metas, trabalhadas depois com o Mentor DPP. Use o modelo SMART e registre tudo no PDM. É também o momento das primeiras aplicações práticas.
+**3º ENCONTRO: Definição e alinhamento das metas.** Definição e alinhamento dos objetivos e metas. O(a) jovem pode chegar com metas estabelecidas, que serão analisadas e, se necessário, reformuladas. Você também pode propor novas metas, trabalhadas depois com o Mentor DPP. Use o modelo SMART e registre tudo no PDM. É também o momento das primeiras aplicações práticas.
 
-**4º ENCONTRO — Acompanhamento do plano de metas.** Encontro estratégico e de acompanhamento. Analisem o plano de metas e submetas, identificando avanços e ajustando estratégias. O foco é fortalecer o compromisso com o plano de ação. Ofereça feedback construtivo sobre o que já foi executado e ajude a antecipar os obstáculos previsíveis.
+**4º ENCONTRO: Acompanhamento do plano de metas.** Encontro estratégico e de acompanhamento. Analisem o plano de metas e submetas, identificando avanços e ajustando estratégias. O foco é fortalecer o compromisso com o plano de ação. Ofereça feedback construtivo sobre o que já foi executado e ajude a antecipar os obstáculos previsíveis.
 
-**5º ENCONTRO — Encerramento, reflexão e celebração.** Encerramento formal: reflexão, reconhecimento e celebração dos aprendizados. Conversem sobre resultados, identifiquem desafios futuros e troquem feedbacks sobre a experiência. Reconheça o esforço e o crescimento do(a) jovem e encerre de forma positiva e inspiradora. Registre no PDM as metas alcançadas, os encaminhamentos em aberto e as recomendações para a continuidade com o Mentor DPP.
+**5º ENCONTRO: Encerramento, reflexão e celebração.** Encerramento formal: reflexão, reconhecimento e celebração dos aprendizados. Conversem sobre resultados, identifiquem desafios futuros e troquem feedbacks sobre a experiência. Reconheça o esforço e o crescimento do(a) jovem e encerre de forma positiva e inspiradora. Registre no PDM as metas alcançadas, os encaminhamentos em aberto e as recomendações para a continuidade com o Mentor DPP.
 
 **Uma sugestão para o fechamento:** agradeça ao(à) jovem por confiar em você. Verbalize as qualidades que percebeu nele(a). Depois, pergunte: "E você? Pelo que você é grato(a) nesta jornada?".
 
@@ -294,7 +300,7 @@ Boa parte do resultado de uma mentoria está na qualidade da conversa.
 - Elimine distrações: silencie notificações, feche abas, dedique-se integralmente.
 - Ouça atentamente e identifique significados implícitos no que é dito e no que não é dito.
 - Controle o impulso de julgar, antecipar conclusões ou completar frases.
-- Evite interromper — silêncios costumam preceder as respostas mais importantes.
+- Evite interromper: silêncios costumam preceder as respostas mais importantes.
 - Valide o entendimento: "Deixa eu ver se entendi: você me disse que… é isso mesmo?".
 - Registre o que for relevante para retomar nos próximos encontros.
 
@@ -324,16 +330,16 @@ Para aprofundar: Quando você era mais jovem, quais atividades te deixavam muito
 | Check-in | Como o(a) jovem está, como foram os dias · conexão e material · retomada do combinado · objetivos do encontro |
 | Desenvolvimento | Ferramenta ou tema previsto, com escuta ativa e perguntas eficazes |
 | Encaminhamentos | O que ele(a) prepara, lê ou realiza até o próximo encontro |
-| Checkout | Feedback do(a) jovem · a sua avaliação · próxima data agendada · encerramento motivador |
+| Checkout | Feedback do(a) jovem · próxima data agendada · encerramento motivador |
 
 ### Dicas importantes
 
 - Valide o entendimento com perguntas simples.
-- Compartilhar os próprios desafios cria identificação — as pontes nascem nas vulnerabilidades.
+- Compartilhar os próprios desafios cria identificação: as pontes nascem nas vulnerabilidades.
 - Prepare-se: releia o guia, busque referências, estruture a jornada.
 - Cumpra o combinado; para remarcar, avise com antecedência e peça desculpas.
 - Mantenha a confidencialidade de tudo o que for tratado.
-- Situações que extrapolam o seu papel — saúde mental, violência, violação de direitos — devem ser acionadas imediatamente com o Supervisor de Relacionamento ou a coordenação.
+- Situações que extrapolam o seu papel, como saúde mental, violência ou violação de direitos, devem ser acionadas imediatamente com o Supervisor de Relacionamento ou a coordenação.
 
 ### Privacidade e proteção de dados
 
@@ -343,13 +349,14 @@ Registre apenas o necessário, não compartilhe informações pessoais com terce
 
 ### Como a mentoria é avaliada
 
-A trilha do especialista não tem formulário final — a avaliação é a da sessão, registrada na plataforma ao final de cada encontro por mentor(a) e mentorado(a). A Avaliação Geral 360º existe só na trilha DPP.
+O pós-encontro da trilha especialista é o mesmo da trilha DPP: ao final de cada encontro, você registra a sessão na ficha da dupla (tema, instrumento, avaliação, dificuldades e próximo passo) e o(a) jovem responde a própria avaliação rápida na plataforma, com nota, sentimento, avanço e opção de pedir apoio. A trilha do especialista não tem formulário final: a avaliação é a da sessão. O par Avaliação Geral - 360º existe só na trilha DPP.
 
-Se surgir dificuldade na relação com o(a) jovem, não espere a avaliação final: acione a coordenação ou o Supervisor de Relacionamento a qualquer momento.
+
+Se surgir dificuldade na relação com o(a) jovem, não espere o fim da trilha: acione a coordenação ou o Supervisor de Relacionamento a qualquer momento.
 
 ### Supervisor de Relacionamento
 
-Mentor experiente com vivência em trabalhos com jovens, acionável pelo(a) mentor(a) ou pelo(a) jovem a qualquer momento — sessões conjuntas ou individuais.
+Mentor experiente com vivência em trabalhos com jovens, acionável pelo(a) mentor(a) ou pelo(a) jovem a qualquer momento, em sessões conjuntas ou individuais.
 
 ### Grupos de troca
 
@@ -357,7 +364,7 @@ Discussões periódicas entre mentores e um grupo específico para os jovens.
 
 ### Fale com a coordenação
 
-**mentoria@realiza.vc** — disponível para qualquer dúvida.
+**mentoria@realiza.vc**, disponível para qualquer dúvida.
 
 ## 13 · Conteúdo complementar
 
@@ -365,11 +372,11 @@ Não obrigatório, mas útil nas conversas sobre trabalho, estudo e vida finance
 
 ### Currículo e vídeo currículo
 
-Pesquise a empresa antes · seja objetivo(a) (1–2 min de vídeo, máx. duas páginas) · destaque formação, cursos, voluntariado e experiências informais · cuide do ambiente de gravação (luz de frente, fundo neutro, áudio limpo) · pratique antes.
+Pesquise a empresa antes · seja objetivo(a) (1 a 2 min de vídeo, máx. duas páginas) · destaque formação, cursos, voluntariado e experiências informais · cuide do ambiente de gravação (luz de frente, fundo neutro, áudio limpo) · pratique antes.
 
 ### Processos seletivos e entrevistas virtuais
 
-Teste internet/câmera/microfone · prepare uma apresentação de dois minutos · leve perguntas para o(a) recrutador(a) · combine o que fazer se a conexão cair · agradeça após a entrevista e registre aprendizados.
+Teste internet, câmera e microfone · prepare uma apresentação de dois minutos · leve perguntas para o(a) recrutador(a) · combine o que fazer se a conexão cair · agradeça após a entrevista e registre aprendizados.
 
 ### Plataformas gratuitas de busca de vagas
 
@@ -383,7 +390,7 @@ Teste internet/câmera/microfone · prepare uma apresentação de dois minutos �
 
 ### Educação financeira
 
-Comece pelo diagnóstico (entradas, saídas, destinos) antes de investimentos: registre gastos por 30 dias · separe fixos, variáveis e dívidas (negocie dívidas primeiro) · reserva inicial pequena — o hábito importa mais que o valor · desconfie de ganho rápido e crédito fácil. Referências: Cidadania Financeira (Banco Central), Nath Finanças, trilhas do Sebrae.
+Comece pelo diagnóstico (entradas, saídas, destinos) antes de investimentos: registre gastos por 30 dias · separe fixos, variáveis e dívidas (negocie dívidas primeiro) · reserve uma reserva inicial pequena, o hábito importa mais que o valor · desconfie de ganho rápido e crédito fácil. Referências: Cidadania Financeira (Banco Central), Nath Finanças, trilhas do Sebrae.
 
 ### Sugestão de registros do(a) mentor(a)
 
@@ -391,6 +398,6 @@ Após cada encontro, anote: data e duração · tema e ferramenta · principais 
 
 ## 14 · Considerações finais
 
-A modalidade Mentoria com Especialistas foi concebida para promover vínculos transformadores entre jovens e profissionais voluntários. O papel do(a) especialista é exercido a partir de cinco funções fundamentais — orientação, proteção, aceitação, escuta e aconselhamento e papel de modelo — em até cinco encontros objetivos, mas com profundidade humana.
+A modalidade Mentoria com Especialistas foi concebida para promover vínculos transformadores entre jovens e profissionais voluntários. O papel do(a) especialista é exercido a partir de cinco funções fundamentais (orientação, proteção, aceitação, escuta e aconselhamento e papel de modelo) em até cinco encontros objetivos, mas com profundidade humana.
 
 Cinco encontros parecem pouco. Mas uma hora de conversa com quem já percorreu o caminho pode encurtar anos de tentativa e erro. Obrigado por oferecer o seu tempo e a sua experiência.
