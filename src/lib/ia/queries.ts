@@ -28,6 +28,7 @@ import type {
   Trilha,
 } from "@/lib/types";
 import type { InstrumentoDupla } from "@/lib/forms/queries";
+import { perguntaFts } from "@/lib/ia/busca-guias";
 
 /** Papéis efetivos do dono do client — a mesma my_papeis() que o getMe usa
  *  (0085): a leitura sai de uma fonte só (o banco), nunca de claim
@@ -559,6 +560,30 @@ export type FonteGuia = {
   score: number;
 };
 
+/** Texto inteiro dos chunks vencedores. O `trecho` da RPC é a janela de
+ *  ~40 palavras do ts_headline (ou 220 chars no hit vetorial) e cortava
+ *  a frase nas duas pontas: o modelo respondia com meio fato (P1). A
+ *  leitura é direta — ia_chunks é select pra authenticated (0136). */
+export async function textosChunksIa(
+  supabase: SupabaseClient,
+  chaves: { guia: string; pagina: number | null }[]
+): Promise<Map<string, string>> {
+  const guias = [...new Set(chaves.map((c) => c.guia))];
+  const paginas = [
+    ...new Set(chaves.flatMap((c) => (c.pagina == null ? [] : [c.pagina]))),
+  ];
+  if (!guias.length || !paginas.length) return new Map();
+  const { data, error } = await supabase
+    .from("ia_chunks")
+    .select("guia, pagina, texto")
+    .in("guia", guias)
+    .in("pagina", paginas);
+  if (error) throw error;
+  return new Map(
+    (data ?? []).map((r) => [`${r.guia}|${r.pagina}`, r.texto as string])
+  );
+}
+
 /** Busca FTS portuguese no corpus dos guias (docs/rag/*.md ingeridos em
  *  ia_chunks). A RPC é definer e o conteúdo é institucional (sem PII), mas
  *  o client autenticado do caller segue sendo o transporte — mesmo padrão
@@ -572,7 +597,7 @@ export async function matchGuiaIa(
   embedding?: number[] | null
 ): Promise<FonteGuia[]> {
   const { data, error } = await supabase.rpc("match_ia_chunks", {
-    p_query: pergunta,
+    p_query: perguntaFts(pergunta),
     p_limit: limite,
     // PostgREST espera o literal vetorial "[a,b,c]", não um array JSON
     ...(embedding ? { p_embedding: `[${embedding.join(",")}]` } : {}),

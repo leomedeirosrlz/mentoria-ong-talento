@@ -3,24 +3,24 @@ fonte: checklist-competencias
 titulo: Checklist de competências do mentor
 material: checklist-competencias
 tipo: instrumento
-natureza: transcrito
+natureza: consolidado
 audiencia: [mentor_dpp, coordenacao, supervisor]
 versao: vigente (documento nativo em /materiais/documento/checklist-competencias)
-origem: src/lib/materiais-documentos.ts — as 10 competências do Guia do
-  Mentor DPP (cap. 14, item 1), renderizadas como documento nativo no app.
-  Material do catálogo (seed ordem 30). Não é instrumento respondido: é
-  material de leitura e marcação — a autoavaliação formal saiu do programa.
+origem: as 10 competências do Guia do Mentor DPP (cap. 14, item 1),
+  renderizadas como documento nativo no app (src/lib/materiais-documentos.ts).
+  Texto consolidado e sanitizado em 04/11/2026; prevalece sobre o
+  documento publicado quando divergirem.
 ---
 
 # Checklist de competências do mentor
 
-Dez competências de escuta e condução para você marcar o que já faz bem e o que precisa desenvolver, antes de iniciar o ciclo e de novo no 16º encontro.
+## Uma lista de leitura e marcação
 
-Preencha antes de iniciar o ciclo e novamente ao final, no 16º encontro.
+O Checklist de competências é uma lista de leitura e marcação, não um formulário do programa: o(a) mentor(a) marca no início do ciclo o que já faz bem e o que quer desenvolver, e revisita a lista no fechamento.
 
-> **Nota:** marque como prioritário aquilo que você quer desenvolver e exercite esses pontos no dia a dia, com amigos, família e no trabalho, antes de aplicá-los na mentoria.
+Marque como prioritário aquilo que você quer desenvolver e exercite esses pontos no dia a dia, com amigos, família e no trabalho, antes de aplicá-los na mentoria.
 
-## As 10 competências
+## As 10 competências do mentor
 
 | Competência | Já faço bem | Preciso desenvolver |
 |---|---|---|

@@ -41,9 +41,11 @@ import {
   getPessoasBuscaIa,
   getRegistrosDaDuplaIa,
   matchGuiaIa,
+  textosChunksIa,
   papeisDoUsuario,
   type DuplaIa,
 } from "./queries";
+import { topSecoes } from "./busca-guias";
 import { limparTrecho } from "./fontes";
 import { embedQuery } from "./embed";
 
@@ -422,7 +424,7 @@ export const IA_TOOLS = {
   guia_consulta: {
     nome: "guia_consulta",
     descricao:
-      "Busca nos guias oficiais do programa (Guia do Mentor DPP, Guia do Mentor Especialista, cronograma do ciclo, instrumentos e decisões operacionais da plataforma): metodologia, encontros, instrumentos, papéis, regras de reposição, formação, LGPD/termo. Use pra qualquer pergunta sobre 'como funciona', 'o que o guia diz', metodologia ou regras do programa — NÃO pra dados das duplas do usuário (essas saem das outras tools). Devolve trechos citáveis com guia e seção (sem número de página: a referência é sempre 'documento, seção') + `guias` (o catálogo completo de documentos disponíveis — use pra responder quando perguntarem quais guias/fontes existem); quando não achar trecho pro termo, diga que não está nos guias e sugira a coordenação. Chame **no máximo uma vez** por pergunta — depois responda com os trechos recebidos (cite guia e seção).",
+      "Busca nos guias oficiais do programa (Guia do Mentor DPP, Guia do Mentor Especialista, roteiros dos 16 encontros, instrumentos, cronograma do ciclo, código de ética e decisões operacionais da plataforma): metodologia, encontros, instrumentos, papéis, regras de reposição, formação, LGPD/termo. Use pra qualquer pergunta sobre 'como funciona', 'o que o guia diz', metodologia ou regras do programa — NÃO pra dados das duplas do usuário (essas saem das outras tools). Devolve trechos citáveis com guia e seção (sem número de página: a referência é sempre 'documento, seção') + `guias` (o catálogo completo de documentos disponíveis — use pra responder quando perguntarem quais guias/fontes existem); quando não achar trecho pro termo, diga que não está nos guias e sugira a coordenação. Chame **no máximo uma vez** por pergunta — depois responda com os trechos recebidos (cite guia e seção).",
     schema: guiaArgs,
     roles: TODOS_PAPEIS,
     run: async ({ pergunta }: z.infer<typeof guiaArgs>, ctx) => {
@@ -438,9 +440,7 @@ export const IA_TOOLS = {
       const vetor =
         cfgBusca.data?.valor === "fts" ? null : await embedQuery(pergunta);
       const [fontes, catalogo] = await Promise.all([
-        // pede 10 e fica com 4 SEÇÕES únicas — sem o dedup, 3 slots iam
-        // pro mesmo capítulo ("12 · Avaliação" repetia 3×) e o roteiro
-        // diverso ficava de fora do contexto do modelo
+        // pede 10 e fica com 4 seções únicas (topSecoes, busca-guias.ts)
         matchGuiaIa(ctx.supabase, pergunta, 10, vetor),
         // catálogo completo sempre junto — "que guias você tem" se responde
         // mesmo quando a busca não retorna trecho pro termo perguntado
@@ -449,22 +449,24 @@ export const IA_TOOLS = {
       const guias = [
         ...new Set((catalogo.data ?? []).map((r) => r.guia as string)),
       ].sort();
-      const vistas = new Set<string>();
-      const unicas = fontes.filter((f) => {
-        const chave = `${f.guia}|${f.secao ?? ""}`;
-        if (vistas.has(chave)) return false;
-        vistas.add(chave);
-        return true;
-      });
+      // o modelo lê o chunk inteiro (~900 chars), não a janela de 40
+      // palavras do headline — falha na leitura cai no trecho da RPC
+      const top = topSecoes(fontes, 4);
+      const textos = await textosChunksIa(ctx.supabase, top).catch(
+        () => new Map<string, string>()
+      );
       // score sai fora — número de ranking não ajuda o modelo a citar;
       // pagina também (é o id sintético do chunk, não página do documento
       // — citá-la lia como "pág. 200" num guia sem essa paginação); e o
       // trecho sai limpo, sem <b> do headline nem markdown cru do chunk
       return {
-        fontes: unicas.slice(0, 4).map((f) => ({
+        fontes: top.map((f) => ({
           guia: f.guia,
           secao: f.secao,
-          trecho: limparTrecho(f.trecho, 600),
+          trecho: limparTrecho(
+            textos.get(`${f.guia}|${f.pagina}`) ?? f.trecho,
+            1100
+          ),
         })),
         guias,
       };

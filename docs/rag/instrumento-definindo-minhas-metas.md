@@ -1,52 +1,58 @@
 ---
 fonte: instrumento-definindo-minhas-metas
-titulo: Instrumento — Definindo Minhas Metas
+titulo: Definindo Minhas Metas
 material: instrumento-definindo-minhas-metas
 tipo: instrumento
-natureza: transcrito
-audiencia: [mentor_dpp, mentorado, coordenacao, supervisor]
-versao: vigente (material na aba Instrumentos de /materiais)
-origem: docs/fontes/definindo-minhas-metas.txt (OCR do template, limpo)
+natureza: consolidado
+audiencia: [dpp]
+versao: vigente
+origem: consolidado de definindo-metas.md (PDF do instrumento),
+  supabase/migrations/0080_instrumentos_dupla.sql (form metas),
+  roteiro-semana-3.md e roteiro-semana-4.md (critérios SMART e verificação do
+  desdobramento). Texto consolidado e sanitizado em 04/11/2026; prevalece
+  sobre o PDF publicado quando divergirem.
 ---
 
 # Definindo Minhas Metas
 
-Instrumento de preenchimento pelo(a) mentorado(a) entre o 2º e o 3º encontro da mentoria DPP. Responde à pergunta: **"Do que eu preciso alcançar para chegar à minha visão de futuro?"**
+## Definindo Minhas Metas · O que é
 
-No encontro anterior, o(a) jovem construiu a sua Declaração de Visão — uma frase que representa o que deseja ser, alcançar ou conquistar no futuro. O próximo passo é pensar em quais conquistas precisam acontecer para tornar essa visão realidade.
+Definindo Minhas Metas é o instrumento em que o(a) jovem transforma a Declaração de Visão em metas escritas: de 3 a 5 metas, cada uma começando por um verbo de ação e acompanhada do porquê. Ele responde à pergunta "quais conquistas preciso alcançar para tornar essa visão realidade?". Metas são resultados que a pessoa deseja alcançar: precisam estar ligadas à visão de futuro e representar algo importante para ela.
 
-> Metas são resultados que a pessoa deseja alcançar. Devem estar ligadas à visão de futuro e representar algo importante para ela.
+Quem define as metas é o(a) jovem; o(a) mentor(a) ajuda a desenvolvê-las.
 
-## Minha visão de futuro
+## Definindo Minhas Metas · O que o instrumento pede
 
-- **Minha Declaração de Visão:** *(espaço para a frase construída no encontro anterior)*
-- **O que preciso criar, aprender, melhorar ou eliminar?** Relembre a sua visão e as conversas até aqui. Pense: para me aproximar da minha visão, o que eu preciso…
-  - CRIAR
-  - APRENDER
-  - MELHORAR
-  - ELIMINAR
+O formulário retoma a visão antes de pedir as metas. O(a) jovem copia ou reescreve a própria Declaração de Visão e pensa no que precisa para se aproximar dela em quatro frentes: o que precisa criar, o que precisa aprender, o que precisa melhorar e o que precisa eliminar.
 
-## Minhas metas (preencha de 3 a 5)
+Depois escreve de 3 a 5 metas (as três primeiras obrigatórias), cada uma com a frase iniciada por verbo de ação e o campo "por que essa meta é importante para mim?". A dica do instrumento sugere verbos de ação: Desenvolver, Concluir, Aprender, Melhorar, Conseguir, Criar, Organizar.
 
-Dica: comece cada meta com um verbo de ação — Desenvolver, Concluir, Aprender, Melhorar, Conseguir, Criar, Organizar.
+Antes de enviar, uma revisão rápida em três perguntas: minhas metas realmente me ajudam a chegar onde quero? elas são importantes para mim? consigo explicar claramente o que quero alcançar? E a escolha final: qual dessas metas é a mais importante neste momento. O(a) jovem não precisa deixar as metas perfeitas: no encontro seguinte a dupla revisa cada uma com o modelo SMART.
 
-| Nº | Minha meta | Por que essa meta é importante para mim? |
-|---|---|---|
-| 1 | | |
-| 2 | | |
-| 3 | | |
-| 4 (opcional) | | |
-| 5 (opcional) | | |
+## Definindo Minhas Metas · Quando na jornada
 
-## Antes do nosso próximo encontro
+O instrumento é respondido na plataforma entre o 2º e o 3º encontro. No 2º encontro, a dupla prepara o terreno com as perguntas de foco: competências que o(a) jovem já tem e que precisa adquirir, recursos que possui e que precisa obter e o que precisa criar, aprender, melhorar ou eliminar.
 
-Revise as suas metas e marque:
+No 3º encontro ("Metas & Checagem SMART"), o(a) jovem apresenta as metas que criou e explica o que pretende alcançar, por que cada meta importa e como ela se relaciona com a visão. Se ele(a) travou na definição, o(a) mentor(a) retoma os pontos que ele(a) mesmo citou nas conversas sobre o que precisava criar, aprender, melhorar ou eliminar. A meta eleita como a mais importante é a candidata natural a abrir o PDM.
 
-- Elas realmente me ajudam a chegar onde quero? ( ) Sim ( ) Ainda preciso pensar melhor
-- Elas são importantes para mim? ( ) Sim ( ) Ainda preciso refletir
-- Consigo explicar claramente o que quero alcançar? ( ) Sim ( ) Ainda preciso reformular
-- **Qual dessas metas é mais importante para mim neste momento?**
+## Definindo Minhas Metas · A checagem SMART no 3º encontro
 
-Você não precisa deixar as metas perfeitas agora. O objetivo desta atividade é colocar no papel aquilo que você considera importante alcançar. No próximo encontro, você e o(a) seu(sua) mentor(a) revisam cada meta juntos e verificam se ela está clara, mensurável, alcançável, relevante e com prazo definido, usando o modelo SMART.
+No 3º encontro, a dupla analisa cada meta pelo modelo SMART:
 
-> Você define as suas metas. O(a) mentor(a) ajuda você a desenvolvê-las.
+- **S, específica:** está claro exatamente o que ele(a) quer alcançar?
+- **M, mensurável:** existe forma de perceber ou medir se conseguiu?
+- **A, atingível:** é possível considerando a realidade e os recursos disponíveis?
+- **R, relevante:** contribui de fato para a visão de futuro?
+- **T, temporal:** existe um prazo definido para alcançá-la?
+
+O modelo serve para verificar a qualidade do que foi proposto e fazer os ajustes necessários, não apenas para carimbar a sigla na meta. Para cada meta aprovada, a dupla define o indicador de sucesso (a pergunta que ajuda é "como vamos saber que você conseguiu atingir essa meta?") e o prazo. Visão e metas entram no PDM já com IS e P.
+
+Exemplo de meta bem formada: META "Concluir o curso técnico em administração", IS "certificado emitido", P "até dezembro".
+
+Do 3º ao 4º encontro, a tarefa é desdobrar cada meta em submetas ("o que eu preciso fazer para conseguir isso?"), também com indicador e prazo; no 4º encontro ("Submetas & Compromisso") a dupla verifica se o desdobramento fecha de forma lógica.
+
+## Definindo Minhas Metas · Onde fica na plataforma
+
+Definindo Minhas Metas é instrumento oficial na ficha da dupla (aba Instrumentos): o(a) mentor(a) emite o link e o(a) jovem responde na plataforma. As metas ficam registradas na ficha e alimentam o PDM; o card do instrumento (enc. 2 a 3) aparece na aba Instrumentos de /materiais e o andamento segue na jornada do(a) jovem.
+
+*(Atualização: o PDF do template circula como folha de preenchimento; vale a resposta na plataforma, na ficha da dupla.)*

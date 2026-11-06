@@ -211,7 +211,7 @@ describe("UiCard: conteúdo", () => {
     expect(inst).toContain("Aguardando resposta");
     expect(inst).toContain("Não enviado");
     const fontes = html(de("fontes"));
-    expect(fontes).toContain("Instrumento: Definindo Minhas Metas");
+    expect(fontes).toContain("Definindo Minhas Metas");
     expect(fontes).toContain("Metas SMART");
     // a referência citável é guia + seção: "pág." do banco era o id do
     // chunk e lia como página inexistente no documento

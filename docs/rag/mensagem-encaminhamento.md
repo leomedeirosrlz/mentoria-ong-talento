@@ -3,12 +3,14 @@ fonte: mensagem-encaminhamento
 titulo: Mensagem de encaminhamento entre encontros
 material: mensagem-encaminhamento
 tipo: template
-natureza: transcrito
+natureza: consolidado
 audiencia: [mentor_dpp, coordenacao, supervisor]
 versao: vigente (documento nativo em /materiais/documento/mensagem-encaminhamento)
-origem: src/lib/materiais-documentos.ts — template do Guia do Mentor DPP
+origem: src/lib/materiais-documentos.ts, template do Guia do Mentor DPP
   (cap. 14, item 6 "Mensagem de encaminhamento entre encontros"), renderizado
-  como documento nativo no app. Material do catálogo (seed ordem 21).
+  como documento nativo no app. Material do catálogo (seed ordem 21). Texto
+  consolidado e sanitizado em 04/11/2026; prevalece sobre o documento
+  nativo quando divergirem.
 ---
 
 # Mensagem de encaminhamento entre encontros
