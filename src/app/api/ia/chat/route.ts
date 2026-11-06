@@ -116,6 +116,7 @@ export async function POST(req: Request) {
       .from("profiles")
       .select("id, role")
       .eq("user_id", sub)
+      .eq("ativo", true)
       .maybeSingle(),
     supabase.rpc("my_papeis"),
     // config viva (ia_config): modelos por tier + esforço + roteamento —
@@ -347,6 +348,7 @@ export async function POST(req: Request) {
             }
             // race contra o prazo — a tool continua em bg mas a resposta
             // emite o erro dentro do orçamento em vez de morrer calada
+            let timerPrazo: ReturnType<typeof setTimeout> | undefined;
             res = await Promise.race([
               executarTool(
                 tc.function.name,
@@ -359,16 +361,18 @@ export async function POST(req: Request) {
                 undefined,
                 requestId
               ),
-              new Promise<never>((_, rej) =>
-                setTimeout(() => rej(new Error("prazo")), restanteTc)
-              ),
-            ]).catch((e) => {
-              if (e instanceof Error && e.message === "prazo") {
-                sendErro(MSG_FALHA);
-                return null;
-              }
-              throw e;
-            });
+              new Promise<never>((_, rej) => {
+                timerPrazo = setTimeout(() => rej(new Error("prazo")), restanteTc);
+              }),
+            ])
+              .catch((e) => {
+                if (e instanceof Error && e.message === "prazo") {
+                  sendErro(MSG_FALHA);
+                  return null;
+                }
+                throw e;
+              })
+              .finally(() => clearTimeout(timerPrazo));
             if (res === null) break;
             // genUI direto: o card sai já — antes da próxima rodada do
             // modelo, que ainda vai pensar e escrever por cima dele

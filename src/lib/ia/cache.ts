@@ -15,6 +15,9 @@ export class CacheTtl<V> {
   // chamadas simultâneas da mesma chave dividem a mesma promessa: um
   // burst de perguntas iguais (chip de sugestão) vira uma leitura só
   private emVoo = new Map<string, Promise<V>>();
+  // `limpar` sobe a geração: carga que estava em voo antes dele não
+  // escreve no cache depois (valor velho voltaria pós-limpeza)
+  private geracao = 0;
 
   constructor(
     private ttlMs: number,
@@ -55,17 +58,22 @@ export class CacheTtl<V> {
     if (hit !== undefined) return hit;
     const voo = this.emVoo.get(chave);
     if (voo) return voo;
-    const p = carregar()
+    const geracao = this.geracao;
+    const p: Promise<V> = carregar()
       .then((v) => {
-        if (guardar(v)) this.set(chave, v);
+        if (geracao === this.geracao && guardar(v)) this.set(chave, v);
         return v;
       })
-      .finally(() => this.emVoo.delete(chave));
+      .finally(() => {
+        // após um `limpar` outra carga da mesma chave pode estar em voo
+        if (this.emVoo.get(chave) === p) this.emVoo.delete(chave);
+      });
     this.emVoo.set(chave, p);
     return p;
   }
 
   limpar(): void {
+    this.geracao++;
     this.mapa.clear();
     this.emVoo.clear();
   }

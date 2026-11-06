@@ -444,7 +444,9 @@ export const IA_TOOLS = {
     run: async ({ pergunta }: z.infer<typeof guiaArgs>, ctx) => {
       // flag coord "busca" ("fts" desliga o braço vetorial sem deploy):
       // vem da config viva já cacheada (config.ts) — lida ANTES de embedar,
-      // com fts nenhuma pergunta vai pra OpenAI (minimização)
+      // com fts nenhuma pergunta vai pra OpenAI (minimização). Trocar pra
+      // "fts" vale em até 30s por instância (TTL da config), não na hora:
+      // atraso aceito em troca de não ler ia_config a cada busca
       const { busca } = await getIaConfig(ctx.supabase);
       const [fontes, guias] = await Promise.all([
         buscarNosGuias(ctx.supabase, pergunta, busca),

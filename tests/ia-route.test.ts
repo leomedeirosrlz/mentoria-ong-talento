@@ -15,6 +15,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/ia/chat/route";
 import type { MsgChat } from "@/lib/ia/provider";
+import { limparCacheIaConfig } from "@/lib/ia/config";
+import { limparCacheGuias } from "@/lib/ia/guias";
 
 const m = vi.hoisted(() => ({
   getClaims: vi.fn(),
@@ -41,6 +43,13 @@ vi.mock("@/lib/ia/provider", () => ({
   chamarModeloStream: m.chamarModeloStream,
 }));
 vi.mock("@/lib/ia/tools", () => ({ executarTool: m.executarTool }));
+
+// config e guias têm cache por módulo: sem limpar, um teste herdava o
+// que o anterior leu
+beforeEach(() => {
+  limparCacheIaConfig();
+  limparCacheGuias();
+});
 
 /** Builder de query fake: a rota lê `profiles` com select→eq→maybeSingle
  *  e `ia_config` (via getIaConfig real) com select direto awaited — o
@@ -156,6 +165,36 @@ describe("gates — JSON antes do stream abrir", () => {
       queryFake(tabela === "profiles" ? null : [])
     );
     const res = await POST(req());
+    expect(res.status).toBe(401);
+    await expect(res.json()).resolves.toEqual({
+      error: expect.stringContaining("Cadastro"),
+    });
+    expect(m.consumirLimiteIa).not.toHaveBeenCalled();
+  });
+
+  it("profile inativo não passa: a leitura filtra ativo antes do limite", async () => {
+    autenticado();
+    const eq = vi.fn();
+    // banco fake: o profile existe mas está inativo — só some com o filtro
+    m.from.mockImplementation((tabela: string) => {
+      if (tabela !== "profiles") return queryFake([]);
+      const filtros: [string, unknown][] = [];
+      const q = {
+        select: () => q,
+        eq: (col: string, v: unknown) => {
+          eq(col, v);
+          filtros.push([col, v]);
+          return q;
+        },
+        maybeSingle: async () => ({
+          data: filtros.some(([c, v]) => c === "ativo" && v === true) ? null : PROFILE,
+          error: null,
+        }),
+      };
+      return q;
+    });
+    const res = await POST(req());
+    expect(eq).toHaveBeenCalledWith("ativo", true);
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({
       error: expect.stringContaining("Cadastro"),
@@ -341,7 +380,7 @@ describe("stream SSE", () => {
       {},
       expect.anything(),
       "chat",
-      expect.any(Array), // papéis já resolvidos pela rota — a tool não refaz my_papeis
+      ["coordenacao"], // papéis já resolvidos pela rota (my_papeis) — a tool não refaz
       undefined, // autorProfileId — idem
       "req-teste"
     );
@@ -363,6 +402,38 @@ describe("stream SSE", () => {
       ok: true,
       dados: { total: 0, duplas: [] },
     });
+  });
+
+  it("my_papeis vazio cai no papel do profile", async () => {
+    m.from.mockImplementation((tabela: string) =>
+      queryFake(tabela === "profiles" ? { id: "prof-1", role: "mentor" } : [])
+    );
+    m.rpc.mockImplementation(() => Promise.resolve({ data: [], error: null }));
+    m.executarTool.mockResolvedValue({ ok: true, dados: {} });
+    m.chamarModeloStream
+      .mockResolvedValueOnce({
+        ok: true,
+        content: "",
+        toolCalls: [
+          {
+            id: "call_1",
+            type: "function",
+            function: { name: "resumo_semana", arguments: "{}" },
+          },
+        ],
+      })
+      .mockResolvedValueOnce({ ok: true, content: "ok", toolCalls: [] });
+
+    await lerStream(await POST(req()));
+    expect(m.executarTool).toHaveBeenCalledWith(
+      "resumo_semana",
+      {},
+      expect.anything(),
+      "chat",
+      ["mentor"],
+      undefined,
+      "req-teste"
+    );
   });
 
   it("provider sem SSE refaz a rodada em JSON (fallback) e emite o resto", async () => {

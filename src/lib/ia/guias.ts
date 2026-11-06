@@ -64,9 +64,12 @@ export function buscarNosGuias(
     degradado = modo === "hibrida" && vetor === null;
     // pede 10 e fica com 4 seções únicas (topSecoes, busca-guias.ts)
     const top = topSecoes(await matchGuiaIa(supabase, pergunta, 10, vetor), 4);
-    const textos = await textosChunksIa(supabase, top).catch(
-      () => new Map<string, string>()
-    );
+    // sem o texto inteiro o trecho cai no headline da RPC: serve agora,
+    // mas não fica 10 min guardado
+    const textos = await textosChunksIa(supabase, top).catch(() => {
+      degradado = true;
+      return new Map<string, string>();
+    });
     // score e pagina saem fora — ranking não ajuda a citar e pagina é o id
     // sintético do chunk (lia como "pág. 200"); trecho limpo, sem <b> do
     // headline nem markdown cru

@@ -4,7 +4,7 @@
 // O supabase fake é chainable no mínimo que as queries usam — as linhas
 // voltam prontas (a RLS real não roda aqui; o que se testa é a tool).
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   executarTool,
@@ -13,12 +13,21 @@ import {
   IA_TOOL_NOMES,
 } from "@/lib/ia/tools";
 import { IA_REGISTRO_SELECT, IA_SAUDE_SELECT } from "@/lib/ia/queries";
+import { limparCacheIaConfig } from "@/lib/ia/config";
+import { limparCacheGuias } from "@/lib/ia/guias";
 import {
   CICLO_16,
   encRealizado,
   mkDupla,
   mkEncaminhamento,
 } from "./helpers";
+
+// config e guias têm cache por módulo: sem limpar, um teste herdava o
+// que o anterior leu
+beforeEach(() => {
+  limparCacheIaConfig();
+  limparCacheGuias();
+});
 
 // uuid v4 + variante 8 — z.uuid() do zod 4 exige o formato RFC (versão no
 // 3º grupo, variante no 4º), igual aos gen_random_uuid() do banco

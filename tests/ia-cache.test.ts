@@ -14,7 +14,17 @@ import { getIaConfig, limparCacheIaConfig } from "@/lib/ia/config";
 const embed = vi.mocked(embedQuery);
 
 /** supabase falso: rpc(match_ia_chunks) + from(ia_chunks|ia_config) */
-function clienteFalso(opts: { configRows?: { chave: string; valor: unknown }[] } = {}) {
+function clienteFalso(
+  opts: {
+    configRows?: { chave: string; valor: unknown }[];
+    // erro na 1ª leitura de cada uma; as seguintes respondem normal
+    erroTextos?: boolean;
+    erroCatalogo?: boolean;
+    erroConfig?: boolean;
+  } = {}
+) {
+  const erro = { data: null, error: { message: "falhou" } };
+  let { erroTextos, erroCatalogo, erroConfig } = opts;
   const rpc = vi.fn(async () => ({
     data: [
       { guia: "instrumento-roda-da-vida", secao: "O que é", pagina: 1, trecho: "headline" },
@@ -24,15 +34,39 @@ function clienteFalso(opts: { configRows?: { chave: string; valor: unknown }[] }
   }));
   const from = vi.fn((tabela: string) => {
     if (tabela === "ia_config")
-      return { select: async () => ({ data: opts.configRows ?? [], error: null }) };
+      return {
+        select: async () => {
+          if (erroConfig) {
+            erroConfig = false;
+            return erro;
+          }
+          return { data: opts.configRows ?? [], error: null };
+        },
+      };
     // ia_chunks: catálogo (select("guia") awaited direto) ou textos (.in().in())
     const textos = { data: [{ guia: "instrumento-roda-da-vida", pagina: 1, texto: "Texto inteiro do chunk." }], error: null };
     const catalogo = { data: [{ guia: "b" }, { guia: "a" }, { guia: "a" }], error: null };
     return {
-      select: (cols: string) =>
-        cols === "guia"
-          ? Promise.resolve(catalogo)
-          : { in: () => ({ in: async () => textos }) },
+      select: (cols: string) => {
+        if (cols === "guia") {
+          if (erroCatalogo) {
+            erroCatalogo = false;
+            return Promise.resolve(erro);
+          }
+          return Promise.resolve(catalogo);
+        }
+        return {
+          in: () => ({
+            in: async () => {
+              if (erroTextos) {
+                erroTextos = false;
+                return erro;
+              }
+              return textos;
+            },
+          }),
+        };
+      },
     };
   });
   return { rpc, from } as unknown as Parameters<typeof buscarNosGuias>[0] & {
@@ -87,6 +121,26 @@ describe("CacheTtl", () => {
     await c.obter("n", carregar);
     expect(carregar).toHaveBeenCalledTimes(2);
   });
+
+  it("limpar durante uma carga em voo: o valor velho não volta pro cache", async () => {
+    const c = new CacheTtl<number>(60_000, 10);
+    let soltarVelha!: (v: number) => void;
+    const velha = c.obter("k", () => new Promise<number>((r) => (soltarVelha = r)));
+    c.limpar();
+    let soltarNova!: (v: number) => void;
+    const nova = c.obter("k", () => new Promise<number>((r) => (soltarNova = r)));
+    soltarVelha(1);
+    await velha;
+    expect(c.get("k")).toBeUndefined();
+    // o finally da carga velha não apagou a nova: quem chega agora divide ela
+    const carregar = vi.fn(async () => 3);
+    const junto = c.obter("k", carregar);
+    soltarNova(2);
+    expect(await nova).toBe(2);
+    expect(await junto).toBe(2);
+    expect(carregar).not.toHaveBeenCalled();
+    expect(c.get("k")).toBe(2);
+  });
 });
 
 describe("chavePergunta", () => {
@@ -130,6 +184,26 @@ describe("buscarNosGuias", () => {
     expect(embed).toHaveBeenCalledTimes(2);
     expect(sb.rpc).toHaveBeenCalledTimes(2);
   });
+
+  it("falha na leitura dos chunks serve o headline e não guarda", async () => {
+    const sb = clienteFalso({ erroTextos: true });
+    const a = await buscarNosGuias(sb, "remarcar encontro", "fts");
+    expect(a[0].trecho).toBe("headline");
+    const b = await buscarNosGuias(sb, "remarcar encontro", "fts");
+    expect(b[0].trecho).toBe("Texto inteiro do chunk.");
+    expect(sb.rpc).toHaveBeenCalledTimes(2);
+    await buscarNosGuias(sb, "remarcar encontro", "fts");
+    expect(sb.rpc).toHaveBeenCalledTimes(2);
+  });
+
+  it("fts e hibrida não dividem a chave do cache", async () => {
+    embed.mockResolvedValue([0.1]);
+    const sb = clienteFalso();
+    await buscarNosGuias(sb, "escuta ativa", "fts");
+    await buscarNosGuias(sb, "escuta ativa", "hibrida");
+    expect(sb.rpc).toHaveBeenCalledTimes(2);
+    expect(embed).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe("catalogoGuias", () => {
@@ -138,6 +212,15 @@ describe("catalogoGuias", () => {
     expect(await catalogoGuias(sb)).toEqual(["a", "b"]);
     await catalogoGuias(sb);
     expect(sb.from).toHaveBeenCalledTimes(1);
+  });
+
+  it("erro devolve lista vazia sem guardar", async () => {
+    const erro = vi.spyOn(console, "error").mockImplementation(() => {});
+    const sb = clienteFalso({ erroCatalogo: true });
+    expect(await catalogoGuias(sb)).toEqual([]);
+    expect(await catalogoGuias(sb)).toEqual(["a", "b"]);
+    expect(sb.from).toHaveBeenCalledTimes(2);
+    erro.mockRestore();
   });
 });
 
@@ -148,5 +231,24 @@ describe("getIaConfig com cache", () => {
     await getIaConfig(sb);
     expect(a.busca).toBe("fts");
     expect(sb.from).toHaveBeenCalledTimes(1);
+  });
+
+  it("erro de leitura cai no padrão e não fica guardado", async () => {
+    const sb = clienteFalso({ erroConfig: true, configRows: [{ chave: "busca", valor: "fts" }] });
+    expect((await getIaConfig(sb)).busca).toBe("hibrida");
+    expect((await getIaConfig(sb)).busca).toBe("fts");
+    expect(sb.from).toHaveBeenCalledTimes(2);
+  });
+
+  it("relê a tabela depois dos 30s de TTL", async () => {
+    vi.useFakeTimers();
+    const sb = clienteFalso();
+    await getIaConfig(sb);
+    vi.advanceTimersByTime(29_999);
+    await getIaConfig(sb);
+    expect(sb.from).toHaveBeenCalledTimes(1);
+    vi.advanceTimersByTime(2);
+    await getIaConfig(sb);
+    expect(sb.from).toHaveBeenCalledTimes(2);
   });
 });

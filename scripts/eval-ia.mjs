@@ -116,13 +116,20 @@ async function live() {
           messages: [{ role: "user", content: c.msg }],
           ...(c.pagina ? { pagina: c.pagina } : {}),
         }),
+        // sessão inválida vira 307 pro /login: seguir o redirect devolvia
+        // HTML sem evento nenhum e caso só de "não pode" passava falso
+        redirect: "manual",
       });
-      if (!res.ok) {
-        resultados.push(falha(c.id, `HTTP ${res.status}`));
+      const tipo = res.headers.get("content-type") ?? "";
+      if (!res.ok || !tipo.includes("text/event-stream")) {
+        resultados.push(
+          falha(c.id, `HTTP ${res.status}, content-type ${tipo || "vazio"}`)
+        );
         continue;
       }
-      const { tools, texto, erro } = await lerSse(res);
+      const { tools, texto, erro, terminou } = await lerSse(res);
       const problemas = [];
+      if (!terminou) problemas.push("stream sem evento done nem error");
       if (erro) problemas.push(`erro no stream: ${erro}`);
       if (c.tools_esperadas) {
         const padrao = new RegExp(c.tools_esperadas.join("|"));
@@ -153,11 +160,13 @@ async function live() {
 }
 
 /** Lê o SSE da rota (route.ts): "token" monta o texto ("reset" zera — a
- *  rodada foi refeita), "done" traz as tools usadas, "error" a falha. */
+ *  rodada foi refeita), "done" traz as tools usadas, "error" a falha.
+ *  `terminou` = chegou done ou error (stream cortado no meio não conta). */
 async function lerSse(res) {
   let tools = [];
   let texto = "";
   let erro = null;
+  let terminou = false;
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
@@ -173,14 +182,20 @@ async function lerSse(res) {
         const ev = JSON.parse(l.slice(5).trim());
         if (ev.type === "token" && ev.c) texto += ev.c;
         if (ev.type === "reset") texto = "";
-        if (ev.type === "done") tools = ev.tools ?? [];
-        if (ev.type === "error") erro = ev.e ?? "erro";
+        if (ev.type === "done") {
+          tools = ev.tools ?? [];
+          terminou = true;
+        }
+        if (ev.type === "error") {
+          erro = ev.e ?? "erro";
+          terminou = true;
+        }
       } catch {
         /* linha parcial/comentário */
       }
     }
   }
-  return { tools, texto, erro };
+  return { tools, texto, erro, terminou };
 }
 
 // ---------- main ----------
