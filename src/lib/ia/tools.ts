@@ -46,16 +46,13 @@ import {
   getMinhaDuplaIa,
   getPessoasBuscaIa,
   getRegistrosDaDuplaIa,
-  matchGuiaIa,
-  textosChunksIa,
   papeisDoUsuario,
   type DuplaIa,
 } from "./queries";
-import { topSecoes } from "./busca-guias";
-import { limparTrecho } from "./fontes";
 import { PERGUNTAS } from "@/lib/ajuda/conteudo";
 import { normaliza } from "@/lib/utils";
-import { embedQuery } from "./embed";
+import { getIaConfig } from "./config";
+import { buscarNosGuias, catalogoGuias } from "./guias";
 
 /** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário. */
 export type CanalIa = "chat" | "mcp";
@@ -445,48 +442,17 @@ export const IA_TOOLS = {
     schema: guiaArgs,
     roles: TODOS_PAPEIS,
     run: async ({ pergunta }: z.infer<typeof guiaArgs>, ctx) => {
-      // flag coord "busca" ("fts" desliga o braço vetorial sem deploy;
-      // ausente/outro valor = híbrida quando a chave de embed existe).
-      // Lê ANTES de embedar: com fts não vai pergunta nenhuma pra OpenAI
-      // (minimização — o embed é a única saída de dados pra lá).
-      const cfgBusca = await ctx.supabase
-        .from("ia_config")
-        .select("valor")
-        .eq("chave", "busca")
-        .maybeSingle();
-      const vetor =
-        cfgBusca.data?.valor === "fts" ? null : await embedQuery(pergunta);
-      const [fontes, catalogo] = await Promise.all([
-        // pede 10 e fica com 4 seções únicas (topSecoes, busca-guias.ts)
-        matchGuiaIa(ctx.supabase, pergunta, 10, vetor),
+      // flag coord "busca" ("fts" desliga o braço vetorial sem deploy):
+      // vem da config viva já cacheada (config.ts) — lida ANTES de embedar,
+      // com fts nenhuma pergunta vai pra OpenAI (minimização)
+      const { busca } = await getIaConfig(ctx.supabase);
+      const [fontes, guias] = await Promise.all([
+        buscarNosGuias(ctx.supabase, pergunta, busca),
         // catálogo completo sempre junto — "que guias você tem" se responde
         // mesmo quando a busca não retorna trecho pro termo perguntado
-        ctx.supabase.from("ia_chunks").select("guia"),
+        catalogoGuias(ctx.supabase),
       ]);
-      const guias = [
-        ...new Set((catalogo.data ?? []).map((r) => r.guia as string)),
-      ].sort();
-      // o modelo lê o chunk inteiro (~900 chars), não a janela de 40
-      // palavras do headline — falha na leitura cai no trecho da RPC
-      const top = topSecoes(fontes, 4);
-      const textos = await textosChunksIa(ctx.supabase, top).catch(
-        () => new Map<string, string>()
-      );
-      // score sai fora — número de ranking não ajuda o modelo a citar;
-      // pagina também (é o id sintético do chunk, não página do documento
-      // — citá-la lia como "pág. 200" num guia sem essa paginação); e o
-      // trecho sai limpo, sem <b> do headline nem markdown cru do chunk
-      return {
-        fontes: top.map((f) => ({
-          guia: f.guia,
-          secao: f.secao,
-          trecho: limparTrecho(
-            textos.get(`${f.guia}|${f.pagina}`) ?? f.trecho,
-            1100
-          ),
-        })),
-        guias,
-      };
+      return { fontes, guias };
     },
   },
 

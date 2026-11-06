@@ -9,10 +9,17 @@
 // prompt por papel — delega pra `vitest run tests/evals/contrato.test.ts`,
 // que compartilha o mesmo casos.json.
 //
-// LIVE é opt-in e faz HTTP de verdade contra /api/ia/chat:
-//   EVAL_BASE_URL  — ex.: http://localhost:3000 ou a URL do preview
-//   EVAL_COOKIE    — header Cookie da sessão (copiado do DevTools logado;
-//                    o endpoint exige sessão, PAT não serve pro chat)
+// LIVE é opt-in e faz HTTP de verdade contra /api/ia/chat (o endpoint
+// exige sessão do app; PAT não serve pro chat):
+//   EVAL_BASE_URL          — ex.: http://localhost:3000 ou a URL do preview
+//   EVAL_EMAIL/EVAL_SENHA  — conta de teste do ambiente (ex.: jovem@ ou
+//                            coord@realiza.test no staging); o script entra
+//                            por senha e monta o cookie sozinho
+//   EVAL_SUPABASE_URL/EVAL_SUPABASE_ANON_KEY — Supabase do MESMO ambiente
+//                            do EVAL_BASE_URL (sem fallback pro .env.local,
+//                            que aponta pra produção)
+//   EVAL_COOKIE            — alternativa manual: header Cookie copiado do
+//                            DevTools de uma sessão logada
 // A saída lista caso a caso: PASS/FAIL, tools vistas no stream e o trecho
 // da resposta. Falha sai com exit 1. Live não roda em CI — a credencial é
 // de quem dispara.
@@ -46,12 +53,46 @@ async function roteador() {
 
 // ---------- live: POST /api/ia/chat, SSE → tools + texto ----------
 
+/** Entra por senha e devolve o header Cookie no formato do app: o
+ *  createServerClient do @supabase/ssr escreve os mesmos cookies
+ *  (nome sb-<ref>-auth-token, chunks, base64-) que o middleware lê. O
+ *  token só vive neste processo. */
+async function cookieDeSessao() {
+  const { EVAL_EMAIL: email, EVAL_SENHA: senha } = process.env;
+  const url = process.env.EVAL_SUPABASE_URL;
+  const anon = process.env.EVAL_SUPABASE_ANON_KEY;
+  if (!email || !senha) return null;
+  if (!url || !anon) {
+    console.error(
+      "EVAL_EMAIL/EVAL_SENHA precisam de EVAL_SUPABASE_URL e EVAL_SUPABASE_ANON_KEY do mesmo ambiente"
+    );
+    process.exit(2);
+  }
+  const { createServerClient } = await import("@supabase/ssr");
+  const jar = new Map();
+  const sb = createServerClient(url, anon, {
+    cookies: {
+      getAll: () => [...jar].map(([name, value]) => ({ name, value })),
+      setAll: (lista) =>
+        lista.forEach(({ name, value }) =>
+          value ? jar.set(name, value) : jar.delete(name)
+        ),
+    },
+  });
+  const { error } = await sb.auth.signInWithPassword({ email, password: senha });
+  if (error) {
+    console.error(`login do eval falhou: ${error.message}`);
+    process.exit(2);
+  }
+  return [...jar].map(([n, v]) => `${n}=${v}`).join("; ");
+}
+
 async function live() {
   const base = process.env.EVAL_BASE_URL;
-  const cookie = process.env.EVAL_COOKIE;
+  const cookie = (await cookieDeSessao()) ?? process.env.EVAL_COOKIE;
   if (!base || !cookie) {
     console.error(
-      "live precisa de EVAL_BASE_URL e EVAL_COOKIE (cookie da sessão logada)"
+      "live precisa de EVAL_BASE_URL e de EVAL_EMAIL+EVAL_SENHA (ou EVAL_COOKIE)"
     );
     process.exit(2);
   }
@@ -61,14 +102,19 @@ async function live() {
       const res = await fetch(`${base}/api/ia/chat`, {
         method: "POST",
         headers: { "content-type": "application/json", cookie },
-        body: JSON.stringify({ mensagem: c.msg, conversaId: `eval-${c.id}` }),
+        // mesmo contrato do componente: histórico + rota atual
+        body: JSON.stringify({
+          messages: [{ role: "user", content: c.msg }],
+          ...(c.pagina ? { pagina: c.pagina } : {}),
+        }),
       });
       if (!res.ok) {
         resultados.push(falha(c.id, `HTTP ${res.status}`));
         continue;
       }
-      const { tools, texto } = await lerSse(res);
+      const { tools, texto, erro } = await lerSse(res);
       const problemas = [];
+      if (erro) problemas.push(`erro no stream: ${erro}`);
       if (c.tools_esperadas) {
         const padrao = new RegExp(c.tools_esperadas.join("|"));
         if (!tools.some((t) => padrao.test(t)))
@@ -97,10 +143,12 @@ async function live() {
   return resultados;
 }
 
-/** Lê o SSE da rota: {type:"tool"} guarda o nome, os deltas montam o texto. */
+/** Lê o SSE da rota (route.ts): "token" monta o texto ("reset" zera — a
+ *  rodada foi refeita), "done" traz as tools usadas, "error" a falha. */
 async function lerSse(res) {
-  const tools = [];
+  let tools = [];
   let texto = "";
+  let erro = null;
   const reader = res.body.getReader();
   const dec = new TextDecoder();
   let buf = "";
@@ -114,15 +162,16 @@ async function lerSse(res) {
       if (!l.startsWith("data:")) continue;
       try {
         const ev = JSON.parse(l.slice(5).trim());
-        if (ev.type === "tool" && ev.nome) tools.push(ev.nome);
-        if (ev.type === "delta" && ev.t) texto += ev.t;
-        if (ev.type === "text" && ev.t) texto += ev.t;
+        if (ev.type === "token" && ev.c) texto += ev.c;
+        if (ev.type === "reset") texto = "";
+        if (ev.type === "done") tools = ev.tools ?? [];
+        if (ev.type === "error") erro = ev.e ?? "erro";
       } catch {
         /* linha parcial/comentário */
       }
     }
   }
-  return { tools, texto };
+  return { tools, texto, erro };
 }
 
 // ---------- main ----------

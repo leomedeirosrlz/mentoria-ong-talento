@@ -411,6 +411,16 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     papeis: ["mentorado"],
   },
   {
+    // texto do instrumento-pdm (docs/rag), na voz do jovem
+    id: "materiais-pdm-jovem",
+    tema: "materiais",
+    pergunta: "O que é o PDM?",
+    resposta:
+      "É o seu Plano de Desenvolvimento: o seu projeto de vida por escrito, feito junto com o seu mentor. No topo vai a sua visão de futuro; embaixo, as suas metas, cada uma com prazo e um jeito de medir se deu certo, quebradas em passos pequenos. Ele nasce nos quatro primeiros encontros e muda com você ao longo do ciclo.",
+    links: [{ rotulo: "Meu PDM", href: "/jovem/pdm" }],
+    papeis: ["mentorado"],
+  },
+  {
     id: "materiais-em-breve",
     tema: "materiais",
     pergunta: "Por que tem material marcado como em breve?",

@@ -353,7 +353,9 @@ export async function POST(req: Request) {
                 args,
                 supabase,
                 "chat",
-                undefined,
+                // papéis já resolvidos no começo da request: sem eles a
+                // tool refazia o my_papeis a cada chamada
+                papeis,
                 undefined,
                 requestId
               ),

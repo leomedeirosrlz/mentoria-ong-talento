@@ -341,7 +341,7 @@ describe("stream SSE", () => {
       {},
       expect.anything(),
       "chat",
-      undefined, // papeisForcados — só MCP resolve papel fora do JWT
+      expect.any(Array), // papéis já resolvidos pela rota — a tool não refaz my_papeis
       undefined, // autorProfileId — idem
       "req-teste"
     );
