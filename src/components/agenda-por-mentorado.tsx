@@ -264,7 +264,18 @@ function CardMentorado({
   );
   const alvo = alvoAgendamento(dupla, eventos, agora);
   const total = jornada.total || TRILHA_LEN.dpp;
-  const feitos = jornada.feitos;
+  // sem passos contáveis na jornada (cronograma sem encontros, ou todos
+  // antes do iniciada_em): a conta honesta são os realizados registrados,
+  // capados no total pra barra/ARIA não mentirem com encontros extras
+  const feitos = Math.min(
+    jornada.total > 0
+      ? jornada.feitos
+      : dupla.encontros.filter((e) => e.status === "realizado").length,
+    total
+  );
+  // jornada fechada mesmo sem `completa`: sem passos, `completa` é sempre
+  // false — feitos == total fecha a leitura ("16 de 16", não "passo N")
+  const jornadaFechada = jornada.completa || feitos >= total;
   const pct = total > 0 ? Math.round((feitos / total) * 100) : 0;
 
   // agendado/remarcado futuro — saude.proximo só cobre 'agendado'; o
@@ -385,7 +396,7 @@ function CardMentorado({
       <div>
         <div className="flex items-baseline justify-between gap-2 text-sm">
           <p className="font-medium">
-            {jornada.completa
+            {jornadaFechada
               ? `${total} de ${total} encontros`
               : `Encontro ${alvo.proximoNumero} de ${total}`}
             <span className="text-muted-foreground">
@@ -415,7 +426,7 @@ function CardMentorado({
         proximo={proximo}
         limbo={limbo}
         alvo={alvo}
-        jornadaCompleta={jornada.completa}
+        jornadaCompleta={jornadaFechada}
         feitos={feitos}
         total={total}
         hoje={hoje}
