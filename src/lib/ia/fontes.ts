@@ -24,6 +24,7 @@ export function limparTrecho(bruto: string | null | undefined, max: number): str
   let t = bruto
     .replace(/<\/?[^>]+>/g, "") // <b> do ts_headline (e qualquer tag)
     .replace(/^#{1,6}\s+/gm, "") // títulos markdown
+    .replace(/^\s*>\s?/gm, "") // blockquote dos templates
     .replace(/\*\*|__/g, "") // negrito/itálico
     .replace(/^\s*[-•*]\s+/gm, "") // marcador de lista no início de linha
     .replace(/\|/g, " · ") // tabela pipe vira lista separada
@@ -55,12 +56,22 @@ export function limparTrecho(bruto: string | null | undefined, max: number): str
 }
 
 // um rótulo + destino por guia do corpus (docs/rag/fontes.json). Guias,
-// roteiros e termos são PDFs do catálogo → biblioteca; os 5 documentos
-// nativos têm página própria em /materiais/documento/<slug>; o cronograma
-// é a própria agenda. Sem entrada aqui, a fonte sai como texto sem link.
+// roteiros e termos são PDFs do catálogo → biblioteca; os instrumentos
+// vivem na aba Instrumentos; os 5 documentos nativos têm página própria em
+// /materiais/documento/<slug>; o cronograma é a própria agenda. Sem
+// `href` (conteúdo só do corpus, sem material no catálogo) a fonte sai
+// com o rótulo e sem link; sem entrada aqui, sai o slug como texto.
 const BIB = "/materiais?aba=biblioteca";
+const INSTR = "/materiais?aba=instrumentos";
 const DOC = "/materiais/documento";
-const META_FONTE: Record<string, { rotulo: string; href: string }> = {
+// um roteiro por encontro (roteiro-encontro-01 … 16)
+const ROTEIROS = Object.fromEntries(
+  Array.from({ length: 16 }, (_, i) => [
+    `roteiro-encontro-${String(i + 1).padStart(2, "0")}`,
+    { rotulo: `Roteiro do ${i + 1}º encontro`, href: BIB },
+  ])
+);
+const META_FONTE: Record<string, { rotulo: string; href?: string }> = {
   "guia-mentor-dpp": { rotulo: "Guia do Mentor DPP", href: BIB },
   "guia-mentor-especialista": {
     rotulo: "Guia do Mentor Especialista",
@@ -71,15 +82,23 @@ const META_FONTE: Record<string, { rotulo: string; href: string }> = {
     rotulo: "Cronograma do ciclo, Turma 2",
     href: "/agenda",
   },
-  "roteiros-encontros-11-16": {
-    rotulo: "Roteiros dos encontros 11 a 16",
-    href: BIB,
-  },
+  ...ROTEIROS,
   "plataforma-e-operacao": { rotulo: "Plataforma e operação", href: BIB },
   "perguntas-eficazes": { rotulo: "Perguntas Eficazes", href: BIB },
+  "escuta-ativa-e-comunicacao": { rotulo: "Escuta ativa e comunicação" },
+  "codigo-etica-conduta": { rotulo: "Código de ética e conduta" },
+  "instrumento-roda-da-vida": { rotulo: "Roda da Vida", href: INSTR },
+  "instrumento-pdm": {
+    rotulo: "PDM (Plano de Desenvolvimento do Mentorado)",
+    href: INSTR,
+  },
+  "instrumento-construindo-visao": {
+    rotulo: "Construindo a sua Visão",
+    href: INSTR,
+  },
   "instrumento-definindo-minhas-metas": {
-    rotulo: "Instrumento — Definindo Minhas Metas",
-    href: "/materiais?aba=instrumentos",
+    rotulo: "Definindo Minhas Metas",
+    href: INSTR,
   },
   "checklist-competencias": {
     rotulo: "Checklist de competências do mentor",
@@ -121,7 +140,7 @@ export function metaFonte(
 ): { rotulo: string; href?: string } {
   const meta = META_FONTE[guia];
   if (!meta) return { rotulo: guia };
-  if (!jovem) return meta;
+  if (!jovem || !meta.href) return meta;
   // destino que já é do jovem (Ajuda do Realiza) não passa pelo remap
   if (meta.href.startsWith("/jovem")) return meta;
   if (meta.href.startsWith(DOC)) return { ...meta, href: `/jovem${meta.href}` };

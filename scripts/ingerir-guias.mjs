@@ -28,6 +28,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fatiar, parseDoc } from "./lib/rag-chunks.mjs";
 
 const APPLY = process.argv.includes("--apply");
 const MANIFEST = process.argv.includes("--manifest");
@@ -52,81 +53,6 @@ const PII_MARCADORES = [
   /espirito\s+santo/i,
   /ALCIDES\s+CANDIDO/i,
 ];
-
-const NATUREZAS = new Set(["transcrito", "consolidado", "sintese-operacional"]);
-
-// ---------- frontmatter + seções ----------
-
-function parseDoc(nome, raw) {
-  const fm = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/.exec(raw);
-  if (!fm) throw new Error(`${nome}: sem frontmatter`);
-  const meta = Object.fromEntries(
-    fm[1].split("\n")
-      .map((l) => /^([a-z_]+):\s*(.*)$/.exec(l.trim()))
-      .filter(Boolean)
-      .map(([, k, v]) => [k, v.replace(/\s+/g, " ").trim()])
-  );
-  for (const req of ["fonte", "titulo", "material", "natureza"]) {
-    if (!meta[req]) throw new Error(`${nome}: frontmatter sem '${req}'`);
-  }
-  if (!NATUREZAS.has(meta.natureza)) {
-    throw new Error(
-      `${nome}: natureza '${meta.natureza}' inválida — use uma de ${[...NATUREZAS].join(", ")}`
-    );
-  }
-  if (meta.fonte.length > 80) {
-    throw new Error(`${nome}: fonte > 80 chars (limite da coluna guia)`);
-  }
-
-  const body = fm[2];
-  const partes = body.split(/^## /m).map((s) => s.trim()).filter(Boolean);
-  const secoes = partes.map((p) => {
-    const nl = p.indexOf("\n");
-    const cab = nl === -1 ? p : p.slice(0, nl).trim();
-    const resto = nl === -1 ? "" : p.slice(nl + 1).trim();
-    const secao = cab.replace(/^# /, "").trim(); // primeira parte pode ser o h1 do doc
-    return { secao, texto: resto ? `${cab}\n\n${resto}` : cab };
-  });
-  return {
-    fonte: meta.fonte,
-    titulo: meta.titulo,
-    material: meta.material,
-    natureza: meta.natureza,
-    secoes,
-  };
-}
-
-// ---------- chunking ----------
-
-const ALVO = 800;
-const MAX = 900;
-const OVERLAP = 120;
-
-function fatiar(texto) {
-  if (texto.length <= MAX) return [texto];
-  const paras = texto.split(/\n{2,}/).filter((p) => p.trim());
-  const chunks = [];
-  let buf = "";
-  const flush = () => {
-    if (!buf.trim()) return;
-    chunks.push(buf.trim());
-    buf = buf.length > OVERLAP ? buf.slice(-OVERLAP).replace(/^.*?[.!?]\s/, "… ") : buf;
-  };
-  for (const p of paras) {
-    if (p.length > MAX) {
-      // parágrafo gigante (tabela, lista longa): fatia por janela
-      flush();
-      for (let i = 0; i < p.length; i += ALVO - OVERLAP)
-        chunks.push("… " + p.slice(i, i + ALVO).trim());
-      buf = "";
-      continue;
-    }
-    if (buf.length + p.length + 2 > MAX) flush();
-    buf = buf ? `${buf}\n\n${p}` : p;
-  }
-  flush();
-  return chunks.length ? chunks : [texto.slice(0, MAX)];
-}
 
 // ---------- persistência ----------
 
@@ -275,8 +201,12 @@ for (const d of docs) {
     // insert, então nunca fica corpus parcialmente embedado do doc
     try {
       for (let i = 0; i < linhas.length; i += EMBED_LOTE) {
+        // seção + texto: o texto do chunk não repete o título (rag-chunks),
+        // e sem ele o vetor perdia o contexto ("12º encontro", "Roda da Vida")
         const embs = await embedLote(
-          linhas.slice(i, i + EMBED_LOTE).map((l) => l.texto)
+          linhas
+            .slice(i, i + EMBED_LOTE)
+            .map((l) => `${l.secao}\n\n${l.texto}`)
         );
         embs.forEach((e, j) => {
           linhas[i + j].embedding = `[${e.join(",")}]`;
@@ -296,6 +226,27 @@ for (const d of docs) {
     process.exit(1);
   }
   console.log(`✓ ${d.fonte}: ${d.chunks.length} chunks`);
+}
+
+// guia que saiu do corpus (doc removido ou renomeado) fica órfão no banco:
+// o delete acima é por guia presente. Ex.: roteiros-encontros-11-16 virou
+// um roteiro-encontro-NN por encontro em 04/11/2026.
+const { data: noBanco, error: lsErr } = await supabase.from("ia_chunks").select("guia");
+if (lsErr) {
+  console.error(`✗ listar guias do banco falhou — ${lsErr.message}`);
+  process.exit(1);
+}
+const vigentes = new Set(docs.map((d) => d.fonte));
+const orfaos = [...new Set((noBanco ?? []).map((r) => r.guia))].filter(
+  (g) => !vigentes.has(g)
+);
+for (const g of orfaos) {
+  const { error } = await supabase.from("ia_chunks").delete().eq("guia", g);
+  if (error) {
+    console.error(`✗ ${g}: remoção do órfão falhou — ${error.message}`);
+    process.exit(1);
+  }
+  console.log(`− ${g}: saiu do corpus, chunks removidos`);
 }
 
 console.log(`\n== ingestão ok: ${total} chunks em ${docs.length} documentos.`);
