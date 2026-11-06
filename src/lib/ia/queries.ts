@@ -780,7 +780,9 @@ export async function getJovemCombinadosIa(
 ): Promise<{ pendentes: JovemCombinadoIa[]; feitos: JovemCombinadoIa[] }> {
   const { data, error } = await supabase
     .from("jovem_encaminhamentos")
-    .select("id, texto, status, prazo, created_at")
+    // a view expõe `descricao` (0070); o alias mantém o contrato `texto` da
+    // tool e do card
+    .select("id, texto:descricao, status, prazo, created_at")
     .order("status")
     .order("prazo", { ascending: true, nullsFirst: false });
   if (error) throw error;

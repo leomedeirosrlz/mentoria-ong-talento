@@ -20,6 +20,8 @@
 //                            que aponta pra produção)
 //   EVAL_COOKIE            — alternativa manual: header Cookie copiado do
 //                            DevTools de uma sessão logada
+//   EVAL_PAPEL             — "mentorado" ou "staff": roda só os casos desse
+//                            papel (+ os "qualquer"); sem ela, roda todos
 // A saída lista caso a caso: PASS/FAIL, tools vistas no stream e o trecho
 // da resposta. Falha sai com exit 1. Live não roda em CI — a credencial é
 // de quem dispara.
@@ -97,7 +99,14 @@ async function live() {
     process.exit(2);
   }
   const resultados = [];
-  for (const c of casos.live) {
+  // caso de outro papel daria FAIL falso (tool que a conta nem pode usar)
+  const papel = process.env.EVAL_PAPEL;
+  const doPapel = casos.live.filter(
+    (c) => !papel || c.papel_esperado === "qualquer" || c.papel_esperado === papel
+  );
+  if (papel && doPapel.length < casos.live.length)
+    console.log(`(${casos.live.length - doPapel.length} caso(s) de outro papel pulados)`);
+  for (const c of doPapel) {
     try {
       const res = await fetch(`${base}/api/ia/chat`, {
         method: "POST",
