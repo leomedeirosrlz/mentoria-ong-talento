@@ -1,5 +1,5 @@
 /** Derivação pura da aba "Minha agenda" do mentor DPP (WP3 — mock v6):
- *  transforma duplas + trilhas de especialista dos jovens + supervisões +
+ *  transforma duplas + trilhas de especialista dos jovens +
  *  calendário oficial na lista cronológica Hoje/Amanhã/Próximos, nos avisos
  *  de pendência no topo do dia e no rail (resumo da semana + semáforo das
  *  duplas). Sem JSX e sem efeitos — a tela só desenha. `hoje` e `agora`
@@ -27,14 +27,13 @@ import type {
   Dupla,
   Encontro,
   EncontroStatus,
-  Supervisao,
   TrilhaJovem,
 } from "./types";
 import { turmaLonga } from "./turma";
 
 // ---------- escopo ----------
 
-/** Identidade de um chip de escopo: "eu" (supervisão/formação do mentor) ou
+/** Identidade de um chip de escopo: "eu" (formação do mentor) ou
  *  `dupla:{id}` (encontros, sessões do jovem e eventos oficiais da turma).
  *  "tudo" existe só como filtro selecionado — nenhum item nasce nele. */
 export type EscopoId = "eu" | `dupla:${string}`;
@@ -47,7 +46,6 @@ export type ChipEscopo = { id: EscopoAgenda; rotulo: string };
 export type AgendaItemTipo =
   | "encontro"    // linha real da dupla (agendado/remarcado/realizado/não aconteceu)
   | "sessao_esp"  // sessão da trilha de especialista do jovem — convidado
-  | "supervisao"  // sessão de supervisão registrada sobre/com o mentor
   | "programa"    // evento oficial do cronograma (formação, encerramento…)
   | "a_agendar";  // passo oficial ainda sem row — a dupla agenda
 
@@ -147,7 +145,6 @@ export type ResumoSemana = {
   encontrosDetalhe: string | null;
   sessoesEsp: number;
   sessoesEspDetalhe: string | null;
-  supervisoes: number;
   programas: number;
   /** Avisos abertos — mesma conta dos warnrows, pra não discordar da lista. */
   pendencias: number;
@@ -348,8 +345,44 @@ function avisosDaDupla(d: Dupla, hoje: string, agoraMs: number): AvisoAgenda[] {
       detalhe: `${enc.descricao}. O prazo era ${formatDiaMes(enc.prazo)}${
         enc.responsavel === "mentor" ? "" : " (combinado do mentorado)"
       }.`,
-      href: `/duplas/${d.id}#combinados`,
+      href: `/duplas/${d.id}#combinado-${enc.id}`,
       cta: "Ver combinado",
+      remarcar: false,
+    });
+  }
+
+  // combinados em aberto, dos dois lados (o antigo afazer, 0157 — o mentor
+  // acompanha também os do jovem): uma linha resumida, não um aviso por
+  // item — a contagem por lado e o nº mais antigo bastam pra decidir abrir
+  // a ficha. O vencido já saiu acima com aviso próprio; o texto dos itens
+  // não sai da ficha (LGPD: pode citar o jovem)
+  const emAberto = (d.encaminhamentos ?? []).filter(
+    (enc) =>
+      enc.numero != null &&
+      enc.status !== "feito" &&
+      !(enc.prazo != null && enc.prazo < hoje)
+  );
+  if (emAberto.length > 0) {
+    const maisAntigo = Math.min(...emAberto.map((enc) => enc.numero!));
+    const total = emAberto.length;
+    const seus = emAberto.filter((enc) => enc.responsavel === "mentor").length;
+    const doJovem = total - seus;
+    // "de {nome}" sem artigo — neutro de gênero como "agenda de {nome}"
+    const contagem =
+      seus > 0 && doJovem > 0
+        ? `${total} ${total === 1 ? "item" : "itens"} (${seus} ${seus === 1 ? "seu" : "seus"}, ${doJovem} de ${nome1})`
+        : seus > 0
+          ? `${total} ${total === 1 ? "item seu" : "itens seus"}`
+          : `${total} ${total === 1 ? `item de ${nome1}` : `itens de ${nome1}`}`;
+    avisos.push({
+      id: `int-${d.id}`,
+      escopo,
+      duplaId: d.id,
+      encontro: null,
+      titulo: `Combinados em aberto · ${nome1} · ${turmaLonga(d.turma)}`,
+      detalhe: `${contagem} · o mais antigo é do ${maisAntigo}º encontro.`,
+      href: `/duplas/${d.id}#combinados-${maisAntigo}`,
+      cta: "Ver combinados",
       remarcar: false,
     });
   }
@@ -597,51 +630,6 @@ function itensDaDupla(
   return itens;
 }
 
-/** Sessão de supervisão sobre o mentor — escopo "eu". `data` é dia de
- *  calendário (não há hora no registro), então o item ordena sem horário.
- *  Recebida × conduzida compara por id (nomes homônimos existem); um embed
- *  de mentor quebrado não faz a sessão do outro parecer sua. */
-function itensSupervisao(supervisoes: Supervisao[], meuId: string, hoje: string): AgendaItem[] {
-  return supervisoes
-    .filter((s) => s.data >= hoje)
-    .map((s) => {
-      const recebida = s.mentor_id === meuId;
-      const meta: string[] = [
-        recebida
-          ? `por ${s.supervisor?.nome ?? "auxiliar executivo"}`
-          : `com ${s.mentor?.nome ?? "mentor"}: conduzida por você`,
-        s.dupla?.mentorado?.nome
-          ? `sobre a dupla com ${s.dupla.mentorado.nome}`
-          : "sessão geral",
-      ];
-      return {
-        id: `sup-${s.id}`,
-        escopo: "eu" as const,
-        tipo: "supervisao" as const,
-        dia: s.data,
-        ts: null,
-        hora: null,
-        fim: null,
-        rotulo: "Supervisão",
-        titulo: recebida
-          ? `Supervisão com ${s.supervisor?.nome ?? "auxiliar executivo"}`
-          : `Supervisão de ${s.mentor?.nome ?? "mentor"}`,
-        estado: null,
-        meta,
-        tom: null,
-        convidado: false,
-        notaConvidado: null,
-        duplaId: s.dupla_id,
-        encontro: null,
-        numero: null,
-        sugeridoDia: null,
-        eventoId: null,
-        link: null,
-        acoes: [] as AgendaAcaoTipo[],
-      } satisfies AgendaItem;
-    });
-}
-
 /** Eventos oficiais fora do eixo encontro-a-encontro: formação é do mentor
  *  ("eu"); encerramento/roda entra na agenda de cada jovem do cronograma —
  *  a turma é deles, o mentor acompanha por ali. */
@@ -717,7 +705,7 @@ function itensPrograma(
 // ---------- bucketing ----------
 
 /** Ordem estável dentro do dia: com horário primeiro (por hora), depois os
- *  sem hora (supervisão/evento do programa são por dia), "a agendar" por
+ *  sem hora (evento do programa é por dia), "a agendar" por
  *  último — é intenção, não compromisso marcado. */
 function cmpItens(a: AgendaItem, b: AgendaItem): number {
   const rank = (i: AgendaItem) =>
@@ -784,14 +772,13 @@ function resumoDaSemana(
   trilhas: Record<string, TrilhaJovem[]>,
   eventos: CicloEvento[],
   cronogramas: Cronograma[],
-  supervisoes: Supervisao[],
   avisos: AvisoAgenda[],
   hoje: string
 ): ResumoSemana {
   const { seg, dom } = semanaBounds(parseDia(hoje));
   // "esta semana" conta o que a semana TEM — encontro/formação de segunda já
   // realizado continua sendo compromisso da semana, mesmo com hoje = quarta.
-  // Por isso a conta sai das FONTES (encontros/sessões/eventos/supervisões)
+  // Por isso a conta sai das FONTES (encontros/sessões/eventos)
   // e não da lista de itens, que é só-pra-frente.
   const naSemana = (dia: string | null) => dia != null && dia >= seg && dia <= dom;
   const cronogramasDasDuplas = new Set(
@@ -849,7 +836,6 @@ function resumoDaSemana(
           return `${diaSemanaCurto(dia)} ${fmtHora.format(new Date(s.data_hora!))} (${nome1})`;
         })
         .join(", ") || null,
-    supervisoes: supervisoes.filter((s) => naSemana(s.data)).length,
     // eventos oficiais da semana nos cronogramas das próprias duplas —
     // formacao + evento_encerramento são os tipos que a agenda lista; a
     // conta é de eventos (um encerramento cobrindo 2 duplas conta 1)
@@ -890,8 +876,6 @@ export function deriveAgendaMinha({
   trilhas,
   eventos,
   cronogramas,
-  supervisoes,
-  meuId,
   hoje,
   agora,
 }: {
@@ -899,9 +883,6 @@ export function deriveAgendaMinha({
   trilhas: Record<string, TrilhaJovem[]>;
   eventos: CicloEvento[];
   cronogramas: Cronograma[];
-  supervisoes: Supervisao[];
-  /** profile_id do mentor — separa supervisão recebida da conduzida. */
-  meuId: string;
   /** "YYYY-MM-DD" — dia de referência; o componente passa o hoje do server. */
   hoje: string;
   /** epoch ms do instante atual — decide limbo e "Entrar"; default Date.now(). */
@@ -916,7 +897,6 @@ export function deriveAgendaMinha({
     ...duplas.flatMap((d) =>
       itensDaDupla(d, trilhas[d.id] ?? [], eventos, hoje, hojeData, agoraMs)
     ),
-    ...itensSupervisao(supervisoes, meuId, hoje),
     ...programaItens,
   ];
 
@@ -925,7 +905,7 @@ export function deriveAgendaMinha({
     avisos,
     secoes: secoesDaAgenda(itens, hoje),
     semana: resumoDaSemana(
-      duplas, trilhas, eventos, cronogramas, supervisoes, avisos, hoje
+      duplas, trilhas, eventos, cronogramas, avisos, hoje
     ),
     // rail na mesma régua do Por mentorado: risco → atenção → ok
     duplasRail: duplas
@@ -950,7 +930,7 @@ export function itemNoEscopo(item: { escopo: EscopoId }, escopo: EscopoAgenda): 
  *  (`itensSemanaProgramaMentor`) usa o conjunto pra não repetir o card
  *  do mesmo encontro: o gesto mora na lista, então a cópia da faixa é
  *  que sai — dedup no sentido inverso do `repeteFaixa`, que esvazia a
- *  lista do que a faixa já mostra (programa/supervisão sem ação).
+ *  lista do que a faixa já mostra (programa sem ação).
  *  `numero`, não `encontro.id`: o "a agendar" sem row e o aviso de
  *  registro identificam o mesmo compromisso oficial. */
 export function encontrosCobertos(agenda: AgendaMinhaDerivada): Set<string> {
@@ -988,14 +968,14 @@ export function filtraAgenda(
     return true;
   };
   // em "tudo" a faixa "Minha agenda" já mostra a semana do programa —
-  // evento oficial e supervisão desta semana, sem ação, seriam o mesmo
+  // evento oficial desta semana, sem ação, seria o mesmo
   // card duas vezes. A lista fica com o que pede gesto e com o resto do
   // calendário (encontros sempre ficam: carregam hora e ações da dupla —
   // o dedup deles é na faixa, via `encontrosCobertos`)
   const { seg, dom } = agenda.semana;
   const repeteFaixa = (i: AgendaItem) =>
     escopo === "tudo" &&
-    (i.tipo === "programa" || i.tipo === "supervisao") &&
+    i.tipo === "programa" &&
     i.acoes.length === 0 &&
     i.dia != null &&
     i.dia >= seg &&

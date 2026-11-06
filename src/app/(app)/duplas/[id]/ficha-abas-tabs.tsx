@@ -4,6 +4,7 @@ import type { KeyboardEvent, ReactNode } from "react";
 import { useRef } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { useFadeX } from "@/lib/use-fade-x";
 import { ABAS, ROTULO_ABA, type AbaFicha } from "./ficha-abas";
 
 /** Abas da ficha: links com ?aba= (cada aba entra no histórico, o voltar
@@ -19,6 +20,7 @@ export function FichaAbas({
   children: ReactNode;
 }) {
   const refs = useRef<Record<string, HTMLAnchorElement | null>>({});
+  const { ref, maskStyle } = useFadeX<HTMLDivElement>();
 
   function onKeyDown(e: KeyboardEvent<HTMLAnchorElement>, i: number) {
     let proximo: number | null = null;
@@ -39,7 +41,9 @@ export function FichaAbas({
       <div
         role="tablist"
         aria-label="Seções da dupla"
-        className="scroll-fina flex w-full max-w-full items-center gap-1 overflow-x-auto rounded-lg bg-muted p-1"
+        ref={ref}
+        style={maskStyle}
+        className="flex w-full max-w-full items-center gap-1 overflow-x-auto overscroll-x-contain rounded-lg bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {ABAS.map((v, i) => {
           const selecionada = v === ativa;

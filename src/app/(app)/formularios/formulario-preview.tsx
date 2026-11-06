@@ -1,8 +1,8 @@
 "use client";
 
+import dynamic from "next/dynamic";
 import { Eye } from "@phosphor-icons/react";
 import type { FormularioCampo, FormularioSistema } from "@/lib/forms/schema";
-import { FormularioPublico } from "@/app/f/[token]/formulario-publico";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -12,6 +12,13 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+
+// o form público inteiro só é útil quando o dialog abre — chunk sob demanda
+const FormularioPublico = dynamic(() =>
+  import("@/app/f/[token]/formulario-publico").then(
+    (m) => m.FormularioPublico
+  )
+);
 
 /** Pré-visualização do form público na ficha — o coord manda links pra
  *  dezenas de pessoas sem nunca ter visto a página. Renderiza o próprio

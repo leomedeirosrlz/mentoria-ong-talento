@@ -4,7 +4,15 @@ import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { gerarLinksFormulario, type DestinoLink } from "./forms/actions";
-import { INSTRUMENTOS_SISTEMA, type FormularioSistema } from "./forms/schema";
+import { getInstrumentosDaDupla } from "./forms/queries";
+import {
+  INSTRUMENTOS_SISTEMA,
+  type FormularioCampo,
+  type FormularioSistema,
+  type InstrumentoSistema,
+  type RespostaValor,
+} from "./forms/schema";
+import { entregasDoMomento, SISTEMA_DA_ESTACAO, type EstacaoChave } from "./jornada";
 import { erroAmigavel } from "./utils";
 
 // "Enviar formulário" a partir da ficha da dupla — a action do motor
@@ -174,6 +182,54 @@ export async function gerarLinksParaDupla(input: {
     criados: r.criados ?? 0,
     reutilizados: r.reutilizados ?? 0,
     links: prontos,
+  };
+}
+
+/** Resposta estruturada de um instrumento da jornada numa dupla — leitura
+ *  da página /materiais/instrumentos/[chave] (REALIZA-331): a linha da
+ *  dupla abre, a action roda, o InstrumentoResultado aparece. O escopo é
+ *  o da RPC instrumentos_da_dupla (coord, mentor da dupla, supervisor
+ *  direto, mentorado) — fora dele a RPC devolve [] e aqui vira ok:false.
+ *  Roda inicial × formal separam pelo `momento` (mesma régua da jornada):
+ *  marca explícita do contexto, senão a primeira sem marca é a inicial. */
+type DetalheInstrumento =
+  | {
+      ok: true;
+      sistema: InstrumentoSistema;
+      campos: FormularioCampo[];
+      respostas: Record<string, RespostaValor>;
+      respondidoEm: string | null;
+    }
+  | { ok: false };
+
+export async function detalheInstrumentoDaDupla(
+  duplaId: string,
+  chave: string
+): Promise<DetalheInstrumento> {
+  if (!UUID_RE.test(duplaId)) return { ok: false };
+  const sistema = SISTEMA_DA_ESTACAO[chave as EstacaoChave];
+  if (!sistema) return { ok: false };
+
+  const itens = await getInstrumentosDaDupla(duplaId);
+  const inst = itens.find((i) => i.sistema === sistema);
+  if (!inst) return { ok: false };
+
+  let entregas = inst.entregas.filter((e) => e.destino === "mentorado");
+  if (sistema === "roda_vida") {
+    const alvo = chave === "roda_inicial" ? "inicial" : "formal";
+    entregas = entregasDoMomento(entregas, alvo);
+  }
+
+  const respondida = entregas
+    .filter((e) => e.status === "respondido" && e.respostas != null)
+    .sort((a, b) => (b.respondido_em ?? "").localeCompare(a.respondido_em ?? ""))[0];
+  if (!respondida?.respostas) return { ok: false };
+  return {
+    ok: true,
+    sistema,
+    campos: inst.campos,
+    respostas: respondida.respostas,
+    respondidoEm: respondida.respondido_em,
   };
 }
 

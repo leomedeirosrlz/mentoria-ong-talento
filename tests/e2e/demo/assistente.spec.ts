@@ -28,15 +28,15 @@ test("demo: bolha abre e chips respondem enlatado sem chamar a API", async ({
 
   const painel = page.locator("#painel-assistente");
   await expect(painel).toBeVisible();
-  await expect(painel.getByText(/responde com exemplos fixos/)).toBeVisible();
+  await expect(painel.getByText(/responde com dados de exemplo/)).toBeVisible();
 
   await painel.getByRole("button", { name: "Resumo da semana" }).click();
-  await expect(painel.getByText(/resumo sai de exemplo/)).toBeVisible();
+  await expect(painel.getByText(/números são de exemplo/)).toBeVisible();
   expect(chamadasApi).toBe(0);
 
   // input livre → a resposta fixa de demonstração
   await painel
-    .getByRole("textbox", { name: "Mensagem pro assistente" })
+    .getByRole("textbox", { name: "Mensagem pra Liza" })
     .fill("e os relatórios?");
   await painel.getByRole("button", { name: "Enviar mensagem" }).click();
   await expect(painel.getByText(/respostas de exemplo/)).toBeVisible();

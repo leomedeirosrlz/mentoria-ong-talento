@@ -7,7 +7,6 @@ import {
   User,
 } from "@phosphor-icons/react/dist/ssr";
 import {
-  respostaFormatada,
   type FormularioCampo,
   type FormularioResposta,
   type RespostaValor,
@@ -16,6 +15,7 @@ import type { FormularioAnexo, LinkResolvido } from "@/lib/forms/queries";
 import { formatDateTime } from "@/lib/ciclo";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
+import { RespostaLista } from "@/components/resposta-lista";
 import { PromoverIntakeButton } from "./promover-intake";
 
 // Fila de candidatos do link de inscrição (REALIZA-70): no form oficial de
@@ -63,8 +63,6 @@ export function IntakeRespostas({
   // path → anexo: o valor gravado na resposta é {path,…} e o download é
   // por id — o mapa resolve sem query extra (anexos já veio na página)
   const anexoPorPath = new Map(anexos.map((a) => [a.path, a]));
-  const campoPorId = new Map(campos.map((c) => [c.id, c]));
-  const ordemCampos = new Map(campos.map((c, i) => [c.id, i]));
 
   const respostas = links
     .flatMap((l) => l.respostas)
@@ -136,57 +134,31 @@ export function IntakeRespostas({
                   />
                 </Collapsible.Trigger>
                 <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
-                  <dl className="space-y-3 border-t border-border px-4 py-3 sm:px-5">
-                    {Object.entries(r.respostas)
-                      .sort(
-                        ([a], [b]) =>
-                          (ordemCampos.get(a) ?? Number.MAX_SAFE_INTEGER) -
-                          (ordemCampos.get(b) ?? Number.MAX_SAFE_INTEGER)
-                      )
-                      .map(([campoId, valor]) => {
-                        const campo = campoPorId.get(campoId);
-                        if (campo?.tipo === "arquivo") {
-                          const a = anexoPorPath.get(
-                            (valor as { path?: string })?.path ?? ""
-                          );
-                          return (
-                            <div key={campoId}>
-                              <dt className="text-xs font-medium text-muted-foreground">
-                                {campo.label}
-                              </dt>
-                              <dd className="mt-0.5 text-sm">
-                                {a ? (
-                                  <Link
-                                    href={`/api/form-anexo/${a.id}`}
-                                    target="_blank"
-                                    className="inline-flex items-center gap-1.5 font-medium underline underline-offset-4"
-                                  >
-                                    <FileText aria-hidden size={14} />
-                                    {a.nome}
-                                  </Link>
-                                ) : (
-                                  respostaFormatada(campo, valor)
-                                )}
-                              </dd>
-                            </div>
-                          );
-                        }
-                        return (
-                          <div key={campoId}>
-                            <dt className="text-xs font-medium text-muted-foreground">
-                              {campo?.label ?? (
-                                <span className="italic">
-                                  pergunta removida do formulário
-                                </span>
-                              )}
-                            </dt>
-                            <dd className="mt-0.5 text-sm leading-relaxed whitespace-pre-wrap">
-                              {respostaFormatada(campo, valor)}
-                            </dd>
-                          </div>
+                  <div className="border-t border-border px-4 py-3 sm:px-5">
+                    <RespostaLista
+                      campos={campos}
+                      respostas={r.respostas}
+                      renderValor={(campo, valor) => {
+                        // arquivo vira link de download — o valor cru é
+                        // {path,…} e a rota baixa por id, não por path
+                        if (campo?.tipo !== "arquivo") return null;
+                        const a = anexoPorPath.get(
+                          (valor as { path?: string } | undefined)?.path ?? ""
                         );
-                      })}
-                  </dl>
+                        if (!a) return null;
+                        return (
+                          <Link
+                            href={`/api/form-anexo/${a.id}`}
+                            target="_blank"
+                            className="inline-flex items-center gap-1.5 font-medium underline underline-offset-4"
+                          >
+                            <FileText aria-hidden size={14} />
+                            {a.nome}
+                          </Link>
+                        );
+                      }}
+                    />
+                  </div>
                   <div className="flex flex-wrap items-center gap-2 border-t border-border/60 px-4 py-2.5 sm:px-5">
                     {promovida ? (
                       <Link

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
-import { CaretLeft, CaretRight, Check } from "@phosphor-icons/react";
+import { CaretLeft, CaretRight, Check, type Icon } from "@phosphor-icons/react";
 import { cn } from "cn";
 import {
   celulasDe,
@@ -53,6 +53,7 @@ export function SelectOpcional({
   onChange,
   defaultValue,
   vazioLabel = "Não informado",
+  icon: Icone,
 }: {
   id?: string;
   name: string;
@@ -62,6 +63,9 @@ export function SelectOpcional({
   onChange?: (v: string) => void;
   defaultValue?: string | null;
   vazioLabel?: string;
+  /** micro-ícone junto do label — o onboarding usa pra sinalizar o assunto
+   *  do campo; os forms densos (perfil, cadastro) seguem sem */
+  icon?: Icon;
 }) {
   const autoId = useId();
   const labelId = `${autoId}-label`;
@@ -69,7 +73,10 @@ export function SelectOpcional({
   const items = { [SENTINEL_VAZIO]: vazioLabel, ...opcoes };
   return (
     <div className="space-y-2">
-      <Label id={labelId}>{label}</Label>
+      <Label id={labelId} className={cn(Icone && "inline-flex items-center gap-1.5")}>
+        {Icone && <Icone size={15} className="text-muted-foreground" aria-hidden />}
+        {label}
+      </Label>
       <Select
         name={name}
         items={items}
@@ -101,15 +108,20 @@ export function CampoNascimento({
   value,
   onChange,
   defaultValue,
+  icon: Icone,
 }: {
   id?: string;
   value?: string;
   onChange?: (v: string) => void;
   defaultValue?: string | null;
+  icon?: Icon;
 }) {
   return (
     <div className="space-y-2">
-      <Label htmlFor={id}>Data de nascimento</Label>
+      <Label htmlFor={id} className={cn(Icone && "inline-flex items-center gap-1.5")}>
+        {Icone && <Icone size={15} className="text-muted-foreground" aria-hidden />}
+        Data de nascimento
+      </Label>
       <Input
         id={id}
         name="data_nascimento"
@@ -140,7 +152,6 @@ export function CampoPrefGenero(props: Omit<Parameters<typeof SelectOpcional>[0]
       name="pref_genero_par"
       label="Preferência de gênero do par"
       opcoes={PREF_GENERO_LABELS}
-      vazioLabel="Sem preferência informada"
     />
   );
 }
@@ -155,8 +166,10 @@ export function CampoUf(props: Omit<Parameters<typeof SelectOpcional>[0], "name"
       {...props}
       name="uf"
       label="UF"
+      // "Não informado" trunca no select estreito e lê como resposta
+      // negativa — aqui o vazio é só "ainda não escolheu"
+      vazioLabel="Selecione"
       opcoes={Object.fromEntries(UFS.map((u) => [u, u]))}
-      vazioLabel="—"
     />
   );
 }
@@ -166,15 +179,20 @@ export function CampoUf(props: Omit<Parameters<typeof SelectOpcional>[0], "name"
 export function CampoInteresses({
   value,
   onChange,
+  icon: Icone,
 }: {
   value: string[];
   onChange: (v: string[]) => void;
+  icon?: Icon;
 }) {
   return (
     <div className="space-y-2">
       {/* o TagInput já tem aria-label próprio — Label solta criaria label
           órfão na árvore de acessibilidade */}
-      <p className="text-sm font-medium">Interesses</p>
+      <p className={cn("text-sm font-medium", Icone && "flex items-center gap-1.5")}>
+        {Icone && <Icone size={15} className="text-muted-foreground" aria-hidden />}
+        Interesses
+      </p>
       <TagInput
         name="interesses"
         sugestoes={INTERESSES_SUGESTOES}
@@ -421,7 +439,7 @@ export function CampoDisponibilidade({
                     className={cn(
                       "grid h-11 w-full place-items-center rounded-md border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:h-10",
                       ativo
-                        ? "border-primary/40 bg-primary/15 text-primary"
+                        ? "border-primary bg-primary/25 text-foreground"
                         : "border-border bg-card text-muted-foreground hover:bg-muted"
                     )}
                   >

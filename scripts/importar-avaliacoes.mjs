@@ -158,6 +158,7 @@ const ALIAS_MENTOR = {
 };
 const ALIAS_MENTORADO = {
   "leila gomes des souza": "leila gomes de souza",
+  "andressa venancio": "andressa silva oliveira",
 };
 
 // ---------- campos do form ----------
@@ -355,6 +356,27 @@ for (let i = 0; i < data.length; i++) {
   l.duplaId = dupla.id;
   const mdo = (mentorados ?? []).find((m) => m.id === dupla.mentorado_id);
 
+  // ----- payload montado cedo: linhas em 'revisar' por nº extrapolado
+  // também precisam dele quando o --resolve as anexa a um encontro -----
+  const partesComentario = [];
+  const ajudouTxt = (r[idx.ajudou] ?? "").trim();
+  const obsTxt = (r[idx.obs] ?? "").trim();
+  if (ajudouTxt && !AFIRMACAO_CURTA.has(norm(ajudouTxt).trim())) partesComentario.push(ajudouTxt);
+  if (obsTxt) partesComentario.push(obsTxt);
+  l.avaliacao = {
+    dupla_id: dupla.id,
+    encontro_id: null, // preenchido após casar/criar o encontro
+    estrelas: nota,
+    sentimento: null,
+    avancei: mapAvancei(ajudouTxt),
+    temas: null,
+    comentario: partesComentario.join("\n\n") || null,
+    pedir_apoio: false,
+    avaliacao_visivel_mentor: false,
+    respondido_por_profile_id: mdo?.profile_id ?? null,
+    created_at: ts,
+  };
+
   // ----- encontro: (dupla, numero) → data confiável → criar → revisar -----
   const encsDupla = encPorDupla.get(dupla.id) ?? [];
   const porNumero = encsDupla.find((e) => e.numero === numero);
@@ -427,26 +449,7 @@ for (let i = 0; i < data.length; i++) {
   }
   vistos.set(alvoId, n);
 
-  // ----- payload -----
-  const partesComentario = [];
-  const ajudouTxt = (r[idx.ajudou] ?? "").trim();
-  const obsTxt = (r[idx.obs] ?? "").trim();
-  if (ajudouTxt && !AFIRMACAO_CURTA.has(norm(ajudouTxt).trim())) partesComentario.push(ajudouTxt);
-  if (obsTxt) partesComentario.push(obsTxt);
-
-  l.avaliacao = {
-    dupla_id: dupla.id,
-    encontro_id: l.encontroId, // preenchido após criar encontro quando novo
-    estrelas: nota,
-    sentimento: null,
-    avancei: mapAvancei(ajudouTxt),
-    temas: null,
-    comentario: partesComentario.join("\n\n") || null,
-    pedir_apoio: false,
-    avaliacao_visivel_mentor: false,
-    respondido_por_profile_id: mdo?.profile_id ?? null,
-    created_at: ts,
-  };
+  l.avaliacao.encontro_id = l.encontroId; // preenchido após criar encontro quando novo
   l.status = "ok";
   aImportar.push(l);
 }

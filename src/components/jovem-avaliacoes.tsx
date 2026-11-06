@@ -132,7 +132,9 @@ export function VerAvaliacaoButton({
         {label}
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogContent size="md">
+        {/* xl: leitura da resposta (resumo + comentário em largura cheia);
+            o md fica pro FORM de avaliar, coluna única com menos ar */}
+        <DialogContent size="xl">
           <DialogHeader>
             <DialogTitle>
               {avaliacao.encontro?.numero
@@ -299,21 +301,6 @@ export function JovemAvaliacoes({
   );
 }
 
-function Linha({
-  rotulo,
-  children,
-}: {
-  rotulo: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div className="flex gap-3 text-sm">
-      <dt className="w-28 shrink-0 text-muted-foreground">{rotulo}</dt>
-      <dd className="min-w-0 flex-1">{children}</dd>
-    </div>
-  );
-}
-
 function DetalheAvaliacao({ a }: { a: AvaliacaoFeita }) {
   const [visivel, setVisivel] = useState(a.avaliacao_visivel_mentor);
   const [pending, start] = useTransition();
@@ -338,52 +325,60 @@ function DetalheAvaliacao({ a }: { a: AvaliacaoFeita }) {
     });
   }
 
+  // resumo de uma linha: nota + as metas curtas no mesmo fôlego; o
+  // comentário e os temas ganham bloco próprio abaixo
+  const metas = [
+    a.sentimento
+      ? (SENTIMENTO_AVALIACAO_LABEL[a.sentimento] ?? a.sentimento)
+      : null,
+    a.avancei ? (AVANCEI_AVALIACAO_LABEL[a.avancei] ?? a.avancei) : null,
+    `Enviada em ${formatDateTime(a.created_at)}`,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return (
     <div className="space-y-4">
-      <dl className="space-y-2.5">
-        <Linha rotulo="Nota">
-          <span className="inline-flex items-center gap-2">
-            <Estrelas n={a.estrelas} size={16} />
-            <span className="text-xs text-muted-foreground">
-              {a.estrelas} de 5
-            </span>
-          </span>
-        </Linha>
-        {a.sentimento && (
-          <Linha rotulo="Você se sentiu">
-            {SENTIMENTO_AVALIACAO_LABEL[a.sentimento] ?? a.sentimento}
-          </Linha>
-        )}
-        {a.avancei && (
-          <Linha rotulo="Avançou?">
-            {AVANCEI_AVALIACAO_LABEL[a.avancei] ?? a.avancei}
-          </Linha>
-        )}
-        {a.temas?.length ? (
-          <Linha rotulo="Conversaram sobre">
-            <span className="flex flex-wrap gap-1">
-              {a.temas.map((t) => (
-                <Badge key={t} variant="outline">
-                  {TEMA_AVALIACAO_LABEL[t] ?? t}
-                </Badge>
-              ))}
-            </span>
-          </Linha>
-        ) : null}
-        {a.comentario && (
-          <Linha rotulo="Seu comentário">
-            <span className="whitespace-pre-wrap">{a.comentario}</span>
-          </Linha>
-        )}
-        {a.pedir_apoio && (
-          <Linha rotulo="Ajuda">
-            <span className="inline-flex items-center gap-1.5 text-[var(--warn-text)]">
-              <HandHeart size={15} aria-hidden />
-              Você pediu ajuda nesta. A equipe já foi avisada.
-            </span>
-          </Linha>
-        )}
-      </dl>
+      <p className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <Estrelas n={a.estrelas} size={18} />
+        <span className="text-sm font-semibold tabular-nums">
+          {a.estrelas} de 5
+        </span>
+        <span className="text-sm text-muted-foreground">{metas}</span>
+      </p>
+
+      {a.temas?.length ? (
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            Conversaram sobre
+          </p>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {a.temas.map((t) => (
+              <Badge key={t} variant="outline">
+                {TEMA_AVALIACAO_LABEL[t] ?? t}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {a.comentario && (
+        <div>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            Seu comentário
+          </p>
+          <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap">
+            {a.comentario}
+          </p>
+        </div>
+      )}
+
+      {a.pedir_apoio && (
+        <p className="inline-flex items-center gap-1.5 text-sm font-medium text-[var(--warn-text)]">
+          <HandHeart size={15} aria-hidden />
+          Você pediu ajuda nesta. A equipe já foi avisada.
+        </p>
+      )}
 
       {/* quem lê, honesto por trilha (K6): na especialista a estrela SEMPRE
           aparece pro mentor DPP (decisão 0092) — o resto da resposta fica
@@ -396,29 +391,31 @@ function DetalheAvaliacao({ a }: { a: AvaliacaoFeita }) {
         </p>
       )}
       {a.trilha === "dpp" && (
-        <label
-          className={cn(
-            "flex items-start gap-3 rounded-lg border border-border px-3.5 py-3 text-sm",
-            pending && "opacity-60"
-          )}
-        >
-          <Switch
-            checked={visivel}
-            onCheckedChange={toggle}
-            disabled={pending}
-            aria-label="Meu mentor pode ler esta avaliação"
-            className="mt-0.5"
-          />
-          <span>
-            <span className="font-medium">
-              Meu mentor pode ler esta avaliação
-            </span>{" "}
-            <span className="text-muted-foreground">
-              : normalmente ele só vê a média de vocês. Com a chave ligada,
-              ele lê esta resposta inteira.
+        <div className="border-t border-border/60 pt-3">
+          <label
+            className={cn(
+              "flex items-start gap-3 text-sm",
+              pending && "opacity-60"
+            )}
+          >
+            <Switch
+              checked={visivel}
+              onCheckedChange={toggle}
+              disabled={pending}
+              aria-label="Meu mentor pode ler esta avaliação"
+              className="mt-0.5"
+            />
+            <span>
+              <span className="font-medium">
+                Meu mentor pode ler esta avaliação
+              </span>{" "}
+              <span className="text-muted-foreground">
+                : normalmente ele só vê a média de vocês. Com a chave
+                ligada, ele lê esta resposta inteira.
+              </span>
             </span>
-          </span>
-        </label>
+          </label>
+        </div>
       )}
     </div>
   );

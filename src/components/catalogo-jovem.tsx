@@ -28,7 +28,6 @@ export function CatalogoJovem({
   catalogo,
   trilhasAtivas,
   slotsPorEsp,
-  semDuplaDpp,
   lotado,
   pedidosAbertos,
 }: {
@@ -36,7 +35,6 @@ export function CatalogoJovem({
   /** profile_ids dos especialistas com trilha ativa/pausada do jovem. */
   trilhasAtivas: string[];
   slotsPorEsp: Record<string, string[]>;
-  semDuplaDpp: boolean;
   /** Teto da RPC batido (3 pedidos em aberto) — CTA some da página toda. */
   lotado: boolean;
   /** Pedidos em aberto do jovem — insumo do varianteDoCard. */
@@ -113,7 +111,6 @@ export function CatalogoJovem({
         especialistas={catalogo}
         trilhasAtivas={trilhasAtivas}
         slotsPorEsp={slotsPorEsp}
-        semDuplaDpp={semDuplaDpp}
         open={dialogAberto}
         onOpenChange={setDialogAberto}
         preEspId={preEspId}

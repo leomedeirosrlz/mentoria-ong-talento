@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Star } from "@phosphor-icons/react";
-import type { NumerosSemana } from "@/lib/agenda-coordenacao";
+import type { CoberturaVigente, NumerosSemana } from "@/lib/agenda-coordenacao";
 import { BarraSegmentada } from "@/components/viz";
 import { SaudePrograma } from "@/components/saude-programa";
 import { PillTurma } from "@/components/agenda-partes";
@@ -12,12 +12,33 @@ import { filterChipCls } from "@/components/ui/filter-chip";
 // ============================================================
 // "Números da semana" (REALIZA-195 · mock v8b) — os três eixos
 // honestos do monitoramento: cobertura do encontro vigente por
-// turma (uma barra por cronograma, denominador literal), situação
-// das duplas (a mesma leitura de /duplas) e pulso
-// de registro (entregue × aguardando + ★ dos jovens + lembretes
-// no cap). O toggle T1/T2/Todas é ESTADO PRÓPRIO da seção — não
-// recicla `cronogramaSel` nem `?visao=` (contrato REALIZA-195).
+// turma (uma linha por cronograma, barra lime única — aceite
+// REALIZA-176), situação das duplas (a mesma leitura de /duplas)
+// e pulso de registro (entregue × aguardando + ★ dos jovens +
+// lembretes no cap). O toggle T1/T2/Todas é ESTADO PRÓPRIO da
+// seção — não recicla `cronogramaSel` nem `?visao=` (contrato
+// REALIZA-195).
 // ============================================================
+
+/** A barra única lime desenha só o "com registro" — o resto é o trilho
+ *  muted, sem fatia nomeada ("sem data" é buraco honesto do trilho, não
+ *  cor própria). O aria-label segue lendo o denominador completo no
+ *  mesmo formato da BarraSegmentada: a cobertura continua literal pra
+ *  leitor de tela (e pros specs que a verificam). */
+function rotuloCobertura(c: CoberturaVigente): string {
+  const fatias: [number, string][] = [
+    [c.comRegistro, "com registro"],
+    [c.aguardandoRegistro, "aguardando registro"],
+    [c.agendadas, "agendadas"],
+    [c.naoAconteceram, "não aconteceu"],
+    [c.semAgendamento, "sem agendamento"],
+  ];
+  const descricao = fatias
+    .filter(([v]) => v > 0)
+    .map(([v, r]) => `${v} ${r}`)
+    .join(", ");
+  return `${descricao || "nenhum"} · total ${c.total}`;
+}
 
 export function NumerosSemanaSecao({
   opcoes,
@@ -36,7 +57,11 @@ export function NumerosSemanaSecao({
           <div
             role="group"
             aria-label="Recortar os números por turma"
-            className="flex items-center gap-2"
+            // w-full no mobile: a fileira pula pra linha própria e os
+            // chips quebram dentro dela — o grupo sem wrap (562px com 4+
+            // turmas) estourava o flex-wrap do pai e alargava a página
+            // inteira, levando o FAB fixo pra fora da tela
+            className="flex flex-wrap items-center gap-2 w-full sm:w-auto"
           >
             {opcoes.map((o) => (
               <button
@@ -54,9 +79,9 @@ export function NumerosSemanaSecao({
       </div>
 
       <div className="mt-3 grid gap-3 lg:grid-cols-3">
-        {/* (a) cobertura do encontro vigente — uma barra por cronograma,
-            fatias literais sobre o denominador da turma; "sem data" é
-            segmento neutro visível, nunca omissão */}
+        {/* (a) cobertura do encontro vigente — uma linha por cronograma:
+            pill da turma, link pro dia oficial, "N de M com registro" e a
+            barra única lime (REALIZA-176) — "sem data" é trilho, não fatia */}
         <div className="rounded-xl border bg-card p-4">
           <h3 className="text-base font-semibold">
             Cobertura do encontro da semana
@@ -89,35 +114,18 @@ export function NumerosSemanaSecao({
                   </p>
                 )}
                 {c.total > 0 && (
-                  <BarraSegmentada
-                    className="mt-2"
-                    altura="md"
-                    denominador={c.total}
-                    legenda
-                    segmentos={[
-                      {
-                        valor: c.comRegistro,
-                        rotulo: "com registro",
-                        cls: "bg-[var(--ok)]",
-                      },
-                      {
-                        valor: c.aguardandoRegistro,
-                        rotulo: "aguardando registro",
-                        cls: "bg-[var(--warn)]",
-                      },
-                      {
-                        valor: c.agendadas,
-                        rotulo: "agendadas",
-                        cls: "bg-muted-foreground/40",
-                      },
-                      {
-                        valor: c.naoAconteceram,
-                        rotulo: "não aconteceu",
-                        cls: "bg-muted-foreground/25",
-                      },
-                      { valor: c.semAgendamento, rotulo: "sem agendamento" },
-                    ]}
-                  />
+                  <div
+                    role="img"
+                    aria-label={rotuloCobertura(c)}
+                    className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
+                  >
+                    <div
+                      className="h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-500 ease-snappy"
+                      style={{
+                        width: `${(c.comRegistro / c.total) * 100}%`,
+                      }}
+                    />
+                  </div>
                 )}
               </li>
             ))}

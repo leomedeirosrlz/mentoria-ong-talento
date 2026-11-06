@@ -11,7 +11,12 @@ import { formatDiaMes, LEMBRETE_INTERVALO_MS } from "@/lib/ciclo";
 import { turmaLonga } from "@/lib/turma";
 import { normaliza } from "@/lib/utils";
 import type { LembreteDestino } from "@/lib/actions-lembrete";
-import { DuplaWaAcao } from "@/components/dupla-wa-acao";
+import type { Dupla } from "@/lib/types";
+import {
+  DuplaWaAcao,
+  type DestinatariosWA,
+} from "@/components/dupla-wa-acao";
+import { DuplaLinhaMenu } from "@/components/dupla-linha-menu";
 import {
   DuplaLinha,
   type PessoaLinha,
@@ -27,21 +32,28 @@ import { Input } from "@/components/ui/input";
 // busca por nome e o agrupamento urgentes × demais. Cada linha é a
 // mesma linha canônica de /duplas (DuplaLinha): situação pela régua da
 // dupla, apoio em pill à parte, motivo em uma linha e UMA ação. Recebe
-// as linhas já enriquecidas do server: Dupla e CicloEvento não cruzam a
-// boundary.
+// as linhas já enriquecidas do server — a Dupla cruza inteira pra alimentar
+// o ⋯ real e o seletor de destinatário; CicloEvento fica do lado de lá.
 // ============================================================
 
 /** Uma linha da fila pronta pra render. */
 export type LinhaFila = {
   item: ItemParaAcompanhar;
+  /** A dupla inteira — alimenta o ⋯ real da linha (remanejar/encerrar leem
+   *  status e trilha dela). */
+  dupla: Dupla;
   /** Quem recebe o nudge — "mentorado" quando o pedido de apoio partiu do
    *  jovem (a resposta certa é chamar ele, nunca o mentor). */
   destino: LembreteDestino;
+  /** As duas pontas do preview do WhatsApp — calculadas no server junto do
+   *  lembrete. Ausente na linha "ficha" (sem ação WhatsApp). */
+  destinatarios?: DestinatariosWA;
   /** Rótulo do botão — "Lembrar", "Lembrar registro" ou "Chamar". */
   rotulo: string;
   /** Título/corpo do nudge — calculado no server (lembreteDaDupla /
-   *  msgsContato pro caso apoio_jovem). */
-  lembrete: { titulo: string; corpo: string };
+   *  msgsContato pro caso apoio_jovem). `href` é o alvo exato quando o
+   *  caso aponta um lugar (o encontro pendente), senão cai na ficha. */
+  lembrete: { titulo: string; corpo: string; href?: string };
   /** WhatsApp do destinatário — null = o nudge sai só como notificação
    *  in-app. */
   telefone: string | null;
@@ -225,7 +237,7 @@ function ListaFila({ linhas, chave }: { linhas: LinhaComDimensoes[]; chave: stri
 }
 
 function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
-  const { item, lembrete, telefone } = linha;
+  const { item, lembrete, telefone, dupla } = linha;
   // cap D5 em curso = "aguardando a dupla": o lembrete saiu há <48h e a
   // próxima ação é dela. `bloqueadoAte` não-null ⟺ bloqueada no render do
   // server — sem re-derivar relógio aqui.
@@ -270,13 +282,14 @@ function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
             }
             telefone={telefone}
             mensagem={lembrete.corpo}
+            destinatarios={linha.destinatarios}
             nudge={{
               destino: linha.destino,
               titulo: lembrete.titulo,
               href:
                 linha.destino === "mentorado"
                   ? "/jovem/agenda"
-                  : `/duplas/${item.duplaId}`,
+                  : (lembrete.href ?? `/duplas/${item.duplaId}`),
               bloqueadoAte: item.bloqueadoAte,
               // o rótulo já vem resolvido do server (agenda-coordenacao):
               // "Chamar" no pedido de apoio do jovem, "Lembrar registro"
@@ -289,6 +302,19 @@ function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
             }}
           />
         )
+      }
+      menu={
+        <DuplaLinhaMenu
+          dupla={dupla}
+          fichaHref={`/duplas/${item.duplaId}`}
+          formulario
+          remanejar
+          encerrar={
+            dupla.trilha === "especialista" &&
+            !dupla.encerrada_em &&
+            (dupla.status === "ativa" || dupla.status === "pausada")
+          }
+        />
       }
       fichaHref={`/duplas/${item.duplaId}`}
       fichaNome={linha.mentorado.nome.split(" ")[0]}

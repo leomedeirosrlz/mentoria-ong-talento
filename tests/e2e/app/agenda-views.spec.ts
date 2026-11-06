@@ -10,6 +10,7 @@ import {
   loginComSenha,
   relogar,
   test,
+  confirmarNoDialogAgendar,
 } from "../helpers";
 
 // REALIZA-25 — as visões novas da agenda do mentor: "Semana" (grade compacta
@@ -287,14 +288,25 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
     await expect(grade.locator('span[data-tinta="ambos"]')).toHaveCount(8);
     await expect(grade.locator('span[data-tinta="mentor"]')).toHaveCount(4);
 
-    // evento oficial da semana (sempre há um no ciclo vigente) vira marcador
-    // fino na faixa de topo — nunca um bloco na grade
+    // evento oficial vira marcador fino na faixa de topo — nunca um bloco
+    // na grade. A semana corrente pode cair numa folga do ciclo (a janela
+    // 8º→9º tem 15 dias; o recesso de fim de ano idem) — se não houver
+    // marcador, avança até achar uma semana com encontro oficial.
+    let semanas = 0;
+    while (
+      (await grade.getByText("encontro", { exact: true }).count()) === 0 &&
+      semanas < 4
+    ) {
+      await page.getByRole("button", { name: "Próxima semana" }).click();
+      await page.waitForTimeout(300);
+      semanas++;
+    }
     await expect(
       grade.getByText("encontro", { exact: true }).first()
     ).toBeVisible();
 
     // cada coluna é a superfície de agendamento — o aria-label diz o dia
-    const dias = diasDaSemana();
+    const dias = diasDaSemana(semanas);
     await expect(colunaHorarios(page, dias[3])).toBeVisible();
     await page.screenshot({
       path: "/tmp/realiza25-horarios-mentor.png",
@@ -340,9 +352,7 @@ test.describe("agenda do mentor — visões Semana e Horários (REALIZA-25)", ()
     const valor = await campo.inputValue();
     await page.screenshot({ path: "/tmp/realiza25-dialog-slot.png" });
 
-    await dialog
-      .getByRole("button", { name: "Confirmar agendamento" })
-      .click();
+    await confirmarNoDialogAgendar(dialog, "Confirmar agendamento");
     await expect(
       page.getByText(/Agendamento confirmado: 1º encontro\./)
     ).toBeVisible();

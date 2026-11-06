@@ -83,6 +83,7 @@ function LinhaInstrumento({
   mentoradoWhatsapp,
   podeEnviar,
   jornadaViva,
+  remetenteMentorNome,
 }: {
   /** null quando o instrumento ainda não foi semeado no banco — a linha
    *  existe pra jornada completa aparecer, mas sem ação */
@@ -95,6 +96,9 @@ function LinhaInstrumento({
    *  qualquer papel (Copiar/WhatsApp/Gerar): o link que o jovem já tem
    *  segue respondível, mas ninguém emite nem reenvia. */
   jornadaViva: boolean;
+  /** Quando quem vê é o mentor: a msg do link sai na voz dele ("seu
+   *  mentor"), não "a equipe" — o texto vai do número dele. */
+  remetenteMentorNome?: string;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -241,7 +245,8 @@ function LinhaInstrumento({
                 titulo,
                 mentoradoNome,
                 tokenVivo,
-                origem
+                origem,
+                remetenteMentorNome
               )}
               duplaId={duplaId}
               label="Enviar no WhatsApp"
@@ -281,6 +286,7 @@ export function InstrumentosDupla({
   mentoradoWhatsapp,
   podeEnviar,
   jornadaViva,
+  remetenteMentorNome,
   className,
 }: {
   duplaId: string;
@@ -292,6 +298,8 @@ export function InstrumentosDupla({
   podeEnviar: boolean;
   /** ativa|pausada — dupla fechada vira só leitura de resultados */
   jornadaViva: boolean;
+  /** Voz do link de WhatsApp: nome quando quem envia é o mentor da dupla. */
+  remetenteMentorNome?: string;
   className?: string;
 }) {
   if (!itens.length) return null;
@@ -319,6 +327,7 @@ export function InstrumentosDupla({
             mentoradoWhatsapp={mentoradoWhatsapp}
             podeEnviar={podeEnviar}
             jornadaViva={jornadaViva}
+            remetenteMentorNome={remetenteMentorNome}
           />
         ))}
       </ul>

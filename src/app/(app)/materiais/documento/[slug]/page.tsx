@@ -27,7 +27,7 @@ export default async function DocumentoPage({
   return (
     <MaterialDocumento
       slug={slug}
-      voltar={{ href: "/materiais?aba=biblioteca", rotulo: "Biblioteca de materiais" }}
+      voltar={{ href: "/materiais?aba=biblioteca", rotulo: "Materiais de apoio" }}
     />
   );
 }

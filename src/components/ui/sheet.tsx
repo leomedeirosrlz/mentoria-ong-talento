@@ -37,13 +37,14 @@ function SheetContent({
   children,
   side = "left",
   showCloseButton = true,
+  keepMounted,
   ...props
 }: DialogPrimitive.Popup.Props & {
   side?: keyof typeof LADO
   showCloseButton?: boolean
-}) {
+} & Pick<DialogPrimitive.Portal.Props, "keepMounted">) {
   return (
-    <DialogPrimitive.Portal>
+    <DialogPrimitive.Portal keepMounted={keepMounted}>
       <DialogPrimitive.Backdrop
         data-slot="sheet-overlay"
         className="fixed inset-0 isolate z-50 bg-[var(--overlay-forte)] duration-200 ease-[cubic-bezier(0.2,0,0,1)] supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"

@@ -77,6 +77,10 @@ export async function updateSession(request: NextRequest) {
     // autenticação é o bearer CRON_SECRET dentro da rota, que responde
     // 401 JSON — nunca redirect.
     p.startsWith("/api/jobs/") ||
+    // /api/mcp — clientes MCP (PAT Bearer, sem cookie) tomavam o mesmo 307
+    // das crons. A autenticação é o Bearer rlz_mcp_* dentro da rota
+    // (ia_mcp_autorizar), que responde 401 JSON — nunca redirect.
+    p === "/api/mcp" ||
     p === "/privacidade";
 
   if (!user && !isPublic) {

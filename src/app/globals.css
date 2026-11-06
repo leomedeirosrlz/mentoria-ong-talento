@@ -137,6 +137,9 @@
      nunca como cor de texto. Spec §1 */
   --role-mentor: var(--brand-lime);
   --role-mentorado: var(--destaque);
+  /* equipe (coordenação/auxiliar) = neutro — o muted-foreground já é
+     theme-aware (38% claro / 66% escuro) e lee como cinza nos dois temas */
+  --role-equipe: var(--muted-foreground);
   /* identidade por instrumento oficial do programa (spec v5c de
      /materiais): par cor-de-traço + tinta-do-emblema — os cards aplicam
      --ic/--ict via instrumentoVars() e o InstrumentoIcone/Emblema lê daqui;
@@ -463,6 +466,18 @@
   );
 }
 
+/* desistente nas barras de saúde (saude-programa): "fechou sem êxito" —
+   o mesmo cinza de concluída mas em listra, sem cor de status. O vão usa
+   --muted pra se fundir ao trilho da barra (bg-muted); no dot da legenda
+   lê como traços esparsos. Distinto do .viz-hatch ("sem dado", claro). */
+.viz-hatch-desistente {
+  background-image: repeating-linear-gradient(
+    135deg,
+    var(--muted-foreground) 0 2.5px,
+    var(--muted) 2.5px 5.5px
+  );
+}
+
 /* varredura do sheen no Skeleton — com background-size 200% o ciclo fecha sem salto */
 @keyframes shimmer {
   from {
@@ -507,6 +522,191 @@
   stroke-dasharray: 40;
   stroke-dashoffset: 40;
   animation: confirm-draw 420ms var(--ease-snappy) 260ms forwards;
+}
+
+/* assistente — bolha "escrevendo": onda calma de translateY+opacity, stagger
+   160ms entre pontos via animationDelay inline. Só transform/opacity animam
+   (60fps). Sob reduced-motion o guard troca pra ia-digitando-fade (só
+   opacidade) — a espera continua viva sem deslocamento. */
+@keyframes ia-digitando {
+  0%,
+  60%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.45;
+  }
+  30% {
+    transform: translateY(-4px);
+    opacity: 1;
+  }
+}
+@keyframes ia-digitando-fade {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.ia-digitando {
+  animation: ia-digitando 1.3s ease-in-out infinite;
+}
+
+/* assistente — cursor do stream: blink de caret de verdade (liga/desliga
+   seco a ~530ms por fase), mais nítido que o fade senoidal do animate-pulse */
+@keyframes ia-cursor {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+.ia-cursor {
+  animation: ia-cursor 1.06s steps(1) infinite;
+}
+/* caret no fim do texto que está chegando — ::after no último parágrafo
+   (ou no último item da última lista), nunca numa linha própria. Quando o
+   último bloco é card/skeleton não há caret: o skeleton já diz "chegando" */
+.ia-stream > :is(p, blockquote):last-child::after,
+.ia-stream > :is(ul, ol):last-child > li:last-child::after {
+  content: "";
+  display: inline-block;
+  width: 3px;
+  height: 1em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--foreground) 70%, transparent);
+  animation: ia-cursor 1.06s steps(1) infinite;
+}
+
+/* assistente — fade por fatia de ~6 chars no texto streamado: cada span
+   novo (o stream só acrescenta no fim) entra com um fade de opacidade
+   curto; só opacity anima = custo de compositor, zero reflow, e nenhum
+   throttle de TPS — a rede dita o ritmo, o fade só amortece a aparição.
+   Reduced-motion: o guard global zera e o texto aparece inteiro (o
+   comportamento ideal nesse caso). */
+@keyframes ia-tok {
+  from {
+    opacity: 0;
+  }
+}
+.ia-tok {
+  animation: ia-tok 0.32s ease-out both;
+}
+
+/* assistente — linha de status das tool rounds: varredura de luz sobre o
+   texto (o vocabulário "processando" dos produtos de IA). Reusa o
+   keyframe shimmer; guard de reduced-motion congela no ponto inicial do
+   gradiente, que é o muted-foreground — texto segue legível. */
+.ia-shimmer {
+  color: transparent;
+  background-image: linear-gradient(
+    90deg,
+    var(--muted-foreground) 0%,
+    var(--muted-foreground) 40%,
+    var(--foreground) 50%,
+    var(--muted-foreground) 60%,
+    var(--muted-foreground) 100%
+  );
+  background-size: 200% 100%;
+  background-clip: text;
+  -webkit-background-clip: text;
+  animation: shimmer 1.7s linear infinite;
+}
+
+/* === assistente — genUI v2 (blocos ```grafico) ===
+   Entradas dos gráficos inline. Só transform/opacity e stroke-dash*
+   (paint) animam; todos os keyframes são "from" + fill both, então o
+   estado final é sempre o estilo natural do elemento — o guard global de
+   prefers-reduced-motion zera a animação e o gráfico já nasce pronto. */
+
+/* barra vertical nasce da própria baseline — transform-box: fill-box
+   ancora o transform-origin na caixa do rect, não no canto do viewBox */
+@keyframes ia-barra {
+  from {
+    transform: scaleY(0);
+  }
+}
+.ia-barra {
+  transform-box: fill-box;
+  transform-origin: bottom;
+  animation: ia-barra 420ms var(--ease-snappy) both;
+  animation-delay: calc(var(--i, 0) * 55ms + 90ms);
+}
+
+/* barra horizontal — reuse do fill-grow (scaleX da esquerda); o fill-box
+   ancora a origem no próprio elemento (div ou rect de svg) */
+.ia-barra-h {
+  transform-box: fill-box;
+  transform-origin: left;
+  animation: fill-grow 420ms var(--ease-snappy) both;
+  animation-delay: calc(var(--i, 0) * 55ms + 90ms);
+}
+
+/* traço da linha desenhado da esquerda pra direita — --traco é a length
+   da polyline calculada no componente; o dasharray fica inline no
+   elemento e o keyframe zera só o offset */
+@keyframes ia-traco {
+  from {
+    stroke-dashoffset: var(--traco, 400);
+  }
+}
+.ia-traco {
+  animation: ia-traco 620ms var(--ease-snappy) both;
+}
+
+/* fatia da rosca varre do zero: o elemento traz a dasharray real
+   (`<seg> <circ>`) e o keyframe zera só o 1º valor — o vão de 1000 é
+   grande demais pra aparecer em qualquer raio. --ini acumula o atraso
+   das fatias anteriores (varredura sequencial). */
+@keyframes ia-arco {
+  from {
+    stroke-dasharray: 0 1000;
+  }
+}
+.ia-arco {
+  animation: ia-arco 480ms var(--ease-snappy) both;
+  animation-delay: var(--ini, 0ms);
+}
+
+/* pop dos pontos/legendas depois do traço — scale pequeno, sem overshoot */
+@keyframes ia-pop {
+  from {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+}
+.ia-pop {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: ia-pop 240ms var(--ease-snappy) both;
+  animation-delay: var(--ini, 0ms);
+}
+
+/* fade atrasado — área sob o traço, rótulos de valor sobre as barras */
+@keyframes ia-aparece {
+  from {
+    opacity: 0;
+  }
+}
+.ia-aparece {
+  animation: ia-aparece 320ms ease-out both;
+  animation-delay: var(--ini, 0ms);
+}
+
+/* highlight por fatia: as irmãs esmaecem enquanto uma está em hover
+   (o dado completo vai no <title> do grupo — sem tooltip próprio).
+   Só opacity: o guard zera a transição e o estado segue correto. */
+.ia-graf .ia-fatia {
+  transition: opacity 160ms var(--ease-snappy);
+}
+.ia-graf:has(.ia-fatia:hover) .ia-fatia:not(:hover) {
+  opacity: 0.38;
 }
 
 /* feedback de mutação — a célula que acabou de gravar pisca o --ok a ~20%
@@ -558,6 +758,24 @@
        Mantém o giro (1s linear) mesmo com reduce. */
     .animate-spin {
       animation-duration: 1s !important;
+      animation-iteration-count: infinite !important;
+    }
+    /* exceções funcionais do assistente — WCAG 2.3.3 isenta opacity/cor:
+       caret e shimmer não deslocam nada; os pontos de "escrevendo" trocam
+       o bounce por onda de opacidade (a espera continua comunicada). */
+    .ia-cursor,
+    .ia-stream > :is(p, blockquote):last-child::after,
+    .ia-stream > :is(ul, ol):last-child > li:last-child::after {
+      animation-duration: 1.06s !important;
+      animation-iteration-count: infinite !important;
+    }
+    .ia-shimmer {
+      animation-duration: 1.7s !important;
+      animation-iteration-count: infinite !important;
+    }
+    .ia-digitando {
+      animation-name: ia-digitando-fade !important;
+      animation-duration: 1.6s !important;
       animation-iteration-count: infinite !important;
     }
   }

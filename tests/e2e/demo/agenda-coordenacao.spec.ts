@@ -1,18 +1,18 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
-// WP5 → REALIZA-161 → REALIZA-176 → REALIZA-195 (v8b) — a agenda da
-// coordenação no modo "Monitoramento": faixa de síntese no topo (a leitura
-// de 2s), 1º "Semana do programa" (os oficiais do seg–dom em cards de
-// scroll lateral — tema, instrumentos e "o que cobre" atrás de <details>),
-// 2º "Números da semana" (cobertura honesta por turma — denominador
-// literal com "sem data" visível — "Situação das duplas" (o SaudePrograma
-// de /duplas: apoio em pill à parte, regras no popover "Como calculamos")
-// e o pulso de registro com a ★ do jovem; o recorte T1/T2/Todas é estado
-// próprio da seção), e por último o "Painel da semana" — a fila "Para
-// acompanhar" na linha canônica DuplaLinha (pill de situação + pill de
-// apoio + motivo em texto — o vermelho mora no risco, não num badge —,
-// chips com contador que filtram de verdade, agrupamento Urgentes × Demais
-// e o Lembrar universal com o cap D5 de 48h). A coordenação NÃO agenda por
+// WP5 → REALIZA-161 → REALIZA-195 (v8b) → REALIZA-176 (aceite) — a agenda
+// da coordenação no modo "Monitoramento": faixa de síntese no topo (a
+// leitura de 2s), 1º "Para acompanhar" — a fila operacional na linha
+// canônica DuplaLinha (pill de situação + pill de apoio + motivo em texto
+// — o vermelho mora no risco, não num badge —, chips com contador que
+// filtram de verdade, agrupamento Urgentes × Demais e o Lembrar universal
+// com o cap D5 de 48h), 2º "Semana do programa" (os oficiais do seg–dom em
+// cards de scroll lateral — tema, instrumentos e "o que cobre" atrás de
+// <details>) e 3º "Números da semana" (cobertura honesta por turma —
+// barra lime única com "sem data" no trilho —, "Situação das duplas" (o
+// SaudePrograma de /duplas: apoio em pill à parte, regras no popover
+// "Como calculamos") e o pulso de registro com a ★ do jovem; o recorte
+// T1/T2/Todas é estado próprio da seção). A coordenação NÃO agenda por
 // ninguém: a única ação sobre dupla aqui é o nudge.
 //
 // Dataset demo (src/lib/demo/data.ts):
@@ -91,25 +91,23 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       "/agenda?aba=calendario"
     );
 
-    // as seções do modo na ordem do v8b (REALIZA-195): orientação do
-    // programa ANTES do detalhe operacional — 1º "Semana do programa",
-    // 2º "Números da semana", por último o "Painel da semana" que abriga a
-    // fila "Duplas para acompanhar" (role=group, a resposta dos 5s)
+    // as seções do modo na ordem do aceite (REALIZA-176): a fila
+    // operacional é a 1ª — "Para acompanhar" (a resposta dos 5s), depois
+    // os blocos de monitoramento "Semana do programa" e "Números da
+    // semana". O primeiro h2 da página é o da fila
     await expect(page.locator("section[aria-label]").first()).toHaveAttribute(
       "aria-label",
-      "Semana do programa"
+      "Para acompanhar"
     );
     for (const label of [
+      "Para acompanhar",
       "Semana do programa",
       "Números da semana",
-      "Painel da semana",
     ])
       await expect(
         page.locator(`section[aria-label="${label}"]`)
       ).toBeVisible();
-    await expect(
-      page.locator('[role="group"][aria-label="Duplas para acompanhar"]')
-    ).toBeVisible();
+    await expect(page.locator("h2").first()).toContainText("Para acompanhar");
   });
 
   test("um alternador só — tablist único, painel controlado e teclado", async ({
@@ -179,8 +177,9 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     ).toBeVisible();
 
     // (a) cobertura — uma linha por cronograma ativo: pill da turma, link
-    // pro dia oficial, "N de M com registro" e a barra honesta (role=img,
-    // denominador literal — "sem data" é fatia nomeada, nunca omissão)
+    // pro dia oficial, "N de M com registro" e a barra única lime
+    // (role=img — o desenho é um fill só, mas o aria-label segue lendo o
+    // denominador literal com "sem data" nomeado, nunca omissão)
     const linhaT1 = sec.locator("li", { hasText: "Turma 1" }).first();
     const linhaT2 = sec.locator("li", { hasText: "Turma 2" }).first();
     await expect(linhaT1).toBeVisible();
@@ -212,8 +211,8 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
 
     // T2 idem: enc. 1 pode estar futuro (só o registro antecipado do
     // Matheus) ou já realizado (2 com registro, 1 aguardando). O "N de 3"
-    // é o mesmo N que a barra segmentada declara — lê o aria-label dela
-    // em vez de chumbar o número da semana.
+    // é o mesmo N que a barra única declara — lê o aria-label dela em
+    // vez de chumbar o número da semana.
     const barraT2Label =
       (await linhaT2.getByRole("img").getAttribute("aria-label")) ?? "";
     const mT2 = barraT2Label.match(/(\d) com registro.*· total (\d)/);
@@ -221,7 +220,8 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       `${mT2?.[1] ?? "?"} de ${mT2?.[2] ?? "?"} com registro`
     );
 
-    // a barra segmentada lê o MESMO denominador do "N de M" ao lado:
+    // a barra única lê o MESMO denominador do "N de M" ao lado (o fill
+    // lime é só o "com registro"; o aria-label nomeia as demais fatias):
     // seg–ter<19h "3 agendadas, 1 sem data" (Caio sem row); depois das 19h
     // os agendados caem em limbo ("aguardando registro"); qua–dom o
     // vigente é o enc. 4: 1 com registro, 1 aguardando (Caio), 1 não
@@ -291,8 +291,8 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // lembretes nas últimas 48h (o do Dandara foi há ~20h — é ele que
     // trava o botão dela; a métrica conta enviados na janela, não "presos")
     await expect(sec.getByText(/registros entregues/)).toBeVisible();
-    // o contador do pulso — "N aguardando" (a barra de cobertura também
-    // tem "aguardando registro" na legenda; o dígito desambigua)
+    // o contador do pulso — "N aguardando" (o aria-label da barra de
+    // cobertura também diz "aguardando registro"; o dígito desambigua)
     await expect(sec.getByText(/\d+ aguardando$/)).toBeVisible();
     await expect(
       sec.getByText(/média das avaliações dos jovens/)
@@ -321,13 +321,11 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
   test("para acompanhar — síntese, dimensões por linha, filtros e cap 48h", async ({
     page,
   }) => {
-    // a fila mora dentro do "Painel da semana" como role=group nomeado
-    // (REALIZA-195): o heading leva a contagem viva "Para acompanhar · N";
-    // a frase de escopo saiu da tela pro title do grupo (o polimento tirou
-    // os parágrafos explicativos — o domínio segue acessível ali)
-    const fila = page.locator(
-      '[role="group"][aria-label="Duplas para acompanhar"]'
-    );
+    // a fila é a 1ª seção da página (REALIZA-176): o h2 leva a contagem
+    // viva "Para acompanhar · N"; a frase de escopo saiu da tela pro
+    // title da seção (o polimento tirou os parágrafos explicativos — o
+    // domínio segue acessível ali)
+    const fila = page.locator('section[aria-label="Para acompanhar"]');
     await expect(
       fila.getByRole("heading", { name: /^Para acompanhar/ })
     ).toBeVisible();

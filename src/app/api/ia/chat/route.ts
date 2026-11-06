@@ -8,7 +8,8 @@
 // auth/provider/rate-limit/body continuam NextResponse.json (o e2e lê esse
 // contrato). Abrido o stream, tudo vira evento data: {type} — o cliente lê
 // com getReader + TextDecoder:
-//   {"type":"status","t":"consultando dados…"}  → rodada de tool
+//   {"type":"status","t":"Abrindo a agenda…"}   → tool rodando (rótulo por tool)
+//   {"type":"ui","b":UiBloco}                   → card direto da tool (lib/ia/ui.ts)
 //   {"type":"token","c":"…"}                    → delta de resposta ao vivo
 //   {"type":"done","tools":[…],"interrompido"?} → fim normal ou abort
 //   {"type":"error","e":"…"}                    → falha pós-stream
@@ -29,10 +30,17 @@ import {
 } from "@/lib/ia/provider";
 import type { MsgChat } from "@/lib/ia/provider";
 import { systemPromptIa } from "@/lib/ia/prompts";
+import {
+  esforcoDoTier,
+  fallbacksDoTier,
+  getIaConfig,
+  modeloDoTier,
+} from "@/lib/ia/config";
+import { rotearTier } from "@/lib/ia/roteador";
 import { checarLimiteIa } from "@/lib/ia/rate-limit";
 import type { FonteIa } from "@/lib/ia/fontes";
-import { executarTool } from "@/lib/ia/tools";
-import { getMe } from "@/lib/queries";
+import { executarTool, type ResultadoTool } from "@/lib/ia/tools";
+import { STATUS_TOOL, uiDaTool, uiDosInstrumentos } from "@/lib/ia/ui";
 import { createClient } from "@/lib/supabase/server";
 
 export const dynamic = "force-dynamic";
@@ -63,15 +71,25 @@ const MsgBody = z
   .strict();
 
 const Body = z
-  .object({ messages: z.array(MsgBody).min(1).max(20) })
+  .object({
+    messages: z.array(MsgBody).min(1).max(20),
+    // rota em que a pessoa está (só o path) — o prompt usa pra entender
+    // "esta dupla"/"esta semana"; query e hash ficam no cliente
+    pagina: z
+      .string()
+      .max(200)
+      .regex(/^\/[\w\-/]*$/)
+      .optional(),
+  })
   .strict();
 
 export async function POST(req: Request) {
   const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-  if (!user) {
+  // getClaims valida o JWT local — getUser era uma RTT remota redundante
+  // (o middleware já revalidou a sessão pra chegar até aqui)
+  const { data: claims } = await supabase.auth.getClaims();
+  const sub = claims?.claims?.sub;
+  if (!sub) {
     return NextResponse.json(
       { error: "Sessão expirada — entre de novo." },
       { status: 401 }
@@ -83,21 +101,28 @@ export async function POST(req: Request) {
       { status: 503 }
     );
   }
-  const me = await getMe();
-  if (!me) {
+  // identidade slim: id+papel efetivo bastam — getMe() puxava contatos e
+  // respeitava o cookie demo_role (persona fake derrubava o rate limit e
+  // mentia o papel no prompt). Aqui identidade = JWT, sempre.
+  const [{ data: profile }, { data: papeisRpc }, iaCfg] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id, role")
+      .eq("user_id", sub)
+      .maybeSingle(),
+    supabase.rpc("my_papeis"),
+    // config viva (ia_config): modelos por tier + esforço + roteamento —
+    // lida junto com a identidade, não custa RTT extra no caminho crítico
+    getIaConfig(supabase),
+  ]);
+  if (!profile) {
     return NextResponse.json(
       { error: "Cadastro não encontrado." },
       { status: 401 }
     );
   }
 
-  if (await checarLimiteIa(supabase, me.id)) {
-    return NextResponse.json(
-      { error: "Muitas mensagens seguidas — aguarde um instante." },
-      { status: 429 }
-    );
-  }
-
+  // body antes do rate limit: request malformado não custa query
   const body = Body.safeParse(await req.json().catch(() => null));
   if (!body.success) {
     return NextResponse.json(
@@ -106,26 +131,45 @@ export async function POST(req: Request) {
     );
   }
 
-  // a mensagem recebida é um evento (não o conteúdo dela — só o fato) —
-  // é o que faz o rate limit medir mensagens, não só tool calls
-  await supabase.rpc("registrar_ia_evento", {
-    p_canal: "chat",
-    p_tool: "mensagem",
-    p_args: { n_mensagens: body.data.messages.length },
-    p_ok: true,
-    p_duracao_ms: 0,
-  });
+  if (await checarLimiteIa(supabase, profile.id)) {
+    return NextResponse.json(
+      { error: "Muitas mensagens seguidas — aguarde um instante." },
+      { status: 429 }
+    );
+  }
 
   const papeis =
-    me.papeis && me.papeis.length ? me.papeis : me.role ? [me.role] : [];
+    papeisRpc && papeisRpc.length
+      ? papeisRpc
+      : profile.role
+        ? [profile.role]
+        : [];
   const historico: MsgChat[] = [
-    { role: "system", content: systemPromptIa(papeis) },
+    { role: "system", content: systemPromptIa(papeis, body.data.pagina) },
     ...body.data.messages.map((m) => ({ ...m, content: m.content })),
   ];
 
+  // tier da pergunta (REALIZA-329): roteador determinístico — saudação
+  // vai pro raso, pedido analítico pro forte, resto no balanceado;
+  // desligado na config = sempre balanceado. Slug ausente cai no
+  // IA_MODEL do ambiente, então config vazia não quebra nada
+  const ultimaPergunta =
+    [...body.data.messages].reverse().find((m) => m.role === "user")
+      ?.content ?? "";
+  const tier = iaCfg.roteamento ? rotearTier(ultimaPergunta) : "balanceado";
+  const chamada = {
+    modelo: modeloDoTier(iaCfg, tier),
+    esforco: esforcoDoTier(iaCfg, tier),
+    fallbacks: fallbacksDoTier(iaCfg, tier),
+    // REALIZA-333: o payload de tools sai filtrado por papel — não anunciar
+    // pro modelo o que ele não pode rodar (ele papagaiava a descrição das
+    // tools coord-only ao explicar a negação)
+    papeis,
+  };
+
   // sessão estável por usuário — o provider Go exige pra rotear/cachear;
   // profile_id é pseudônimo e não revela nada além do que a sessão já diz
-  const sessao = me.id;
+  const sessao = profile.id;
   // teto por rodada — o orçamento do stream (STREAM_BUDGET_MS) capa
   // esse valor a cada iteração, então na prática o que manda é o que
   // ainda falta pro prazo
@@ -151,11 +195,31 @@ export async function POST(req: Request) {
         return;
       }
 
+      // a mensagem recebida é um evento (não o conteúdo dela — só o fato).
+      // Fora do caminho crítico: dispara em paralelo com o stream em vez
+      // de awaited antes dele (rpc() solto é lazy — precisa do .then)
+      void supabase
+        .rpc("registrar_ia_evento", {
+          p_canal: "chat",
+          p_tool: "mensagem",
+          p_args: { n_mensagens: body.data.messages.length },
+          p_ok: true,
+          p_duracao_ms: 0,
+        })
+        .then(({ error }) => {
+          if (error) console.error("registrar_ia_evento:", error);
+        });
+
       const toolsUsadas: string[] = [];
       // fontes que a guia_consulta trouxe — sobem no done pra UI renderizar
       // a fileira "Fontes" (dedupe por guia+secao)
       const fontes = new Map<string, FonteIa>();
       let concluido = false;
+      let erroEmitido = false;
+      const sendErro = (e: string) => {
+        send({ type: "error", e });
+        erroEmitido = true;
+      };
       let guiaChamado = false;
       const prazo = Date.now() + STREAM_BUDGET_MS;
 
@@ -176,6 +240,7 @@ export async function POST(req: Request) {
             send({ type: "token", c: t });
           },
           clienteAbortou: () => req.signal.aborted,
+          ...chamada,
         });
 
         let msg: MsgChat;
@@ -189,21 +254,22 @@ export async function POST(req: Request) {
           break; // usuário fechou/stop — sai do loop sem erro
         } else if (r.fallback) {
           // provider recusou SSE ou o stream morreu no meio: a rodada
-          // refaz em JSON; só o trecho ainda não enviado sai como token.
-          // o abort do prazo também cai aqui — sem orçamento não refaz,
-          // a chamada JSON tem relógio próprio e passaria dos 60s
+          // refaz em JSON — mas é uma GERAÇÃO NOVA, sem prefixo comum com
+          // o que já saiu. Se algo já foi emitido, `reset` manda a bolha
+          // recomeçar (emendar o rabo de outra resposta corrompia o texto)
           if (Date.now() >= prazo) break;
-          const alt = await chamarModelo(historico, sessao);
+          const alt = await chamarModelo(historico, sessao, chamada);
           if (!alt.ok) {
-            send({ type: "error", e: alt.erro });
+            sendErro(alt.erro);
             break;
           }
           msg = alt.mensagem;
-          if (msg.content && msg.content.length > emitido) {
-            send({ type: "token", c: msg.content.slice(emitido) });
+          if (msg.content) {
+            if (emitido > 0) send({ type: "reset" });
+            send({ type: "token", c: msg.content });
           }
         } else {
-          send({ type: "error", e: r.erro });
+          sendErro(r.erro);
           break;
         }
 
@@ -221,8 +287,18 @@ export async function POST(req: Request) {
           break;
         }
 
-        send({ type: "status", t: "consultando dados…" });
         for (const tc of calls) {
+          // orçamento segue valendo entre tools — uma query lenta do
+          // Supabase não pode matar a função aos 60s sem evento de erro
+          if (req.signal.aborted || fechado) break;
+          const restanteTc = prazo - Date.now();
+          if (restanteTc <= 0) break;
+          // status por tool: a pessoa lê o que está acontecendo ("Abrindo
+          // a agenda…") em vez de um "consultando" genérico
+          send({
+            type: "status",
+            t: STATUS_TOOL[tc.function.name] ?? "Consultando dados…",
+          });
           // guia_consulta: no máximo uma chamada por resposta — se o modelo
           // tentar de novo, devolve "já busquei" em vez de reconsultar, pra
           // forçar a resposta com os trechos que já tem (mimo-v2.6-flash
@@ -241,15 +317,52 @@ export async function POST(req: Request) {
               // JSON quebrado vira {} — a validação zod da tool devolve o
               // erro pro modelo reformular, mesmo caminho de arg inválido
             }
-            res = await executarTool(tc.function.name, args, supabase, "chat");
+            // race contra o prazo — a tool continua em bg mas a resposta
+            // emite o erro dentro do orçamento em vez de morrer calada
+            res = await Promise.race([
+              executarTool(tc.function.name, args, supabase, "chat"),
+              new Promise<never>((_, rej) =>
+                setTimeout(() => rej(new Error("prazo")), restanteTc)
+              ),
+            ]).catch((e) => {
+              if (e instanceof Error && e.message === "prazo") {
+                sendErro(MSG_FALHA);
+                return null;
+              }
+              throw e;
+            });
+            if (res === null) break;
+            // genUI direto: o card sai já — antes da próxima rodada do
+            // modelo, que ainda vai pensar e escrever por cima dele
+            const resTool = res as ResultadoTool;
+            if (resTool.ok) {
+              const bloco =
+                tc.function.name === "instrumentos_da_dupla"
+                  ? uiDosInstrumentos(
+                      String((args as { dupla_id?: unknown } | null)?.dupla_id ?? ""),
+                      resTool.dados
+                    )
+                  : uiDaTool(tc.function.name, resTool.dados);
+              if (bloco) send({ type: "ui", b: bloco });
+            }
             if (tc.function.name === "guia_consulta") {
-              guiaChamado = true;
-              const fs = (res as { fontes?: FonteIa[] })?.fontes;
-              for (const f of fs ?? [])
-                fontes.set(`${f.guia}|${f.secao ?? ""}`, f);
+              // envelope ResultadoTool — os dados moram em .dados; só
+              // marca guiaChamado quando a busca rodou (falha permite
+              // re-tentativa com args corrigidos em vez de travar a tool)
+              const r = res as
+                | { ok: true; dados: { fontes?: FonteIa[] } }
+                | { ok: false; erro: string };
+              if (r.ok) {
+                guiaChamado = true;
+                for (const f of r.dados.fontes ?? [])
+                  fontes.set(`${f.guia}|${f.secao ?? ""}`, f);
+              }
             }
           }
-          toolsUsadas.push(tc.function.name);
+          // tool negada por papel não vira "fonte" da resposta — a meta
+          // listava o nome cru da função que falhou (REALIZA-333)
+          const env = res as { ok?: boolean } | null;
+          if (!env || env.ok !== false) toolsUsadas.push(tc.function.name);
           historico.push({
             role: "tool",
             tool_call_id: tc.id,
@@ -257,6 +370,8 @@ export async function POST(req: Request) {
             content: JSON.stringify(res),
           });
         }
+        if (erroEmitido || req.signal.aborted || fechado) break;
+        if (Date.now() >= prazo) break;
         // nudge: a partir da 2ª rodada, força o modelo a responder com o
         // que já tem em vez de seguir chamando ferramentas
         if (i >= 1 && !concluido) {
@@ -268,7 +383,7 @@ export async function POST(req: Request) {
         }
       }
 
-      if (!concluido && !req.signal.aborted && !fechado) {
+      if (!concluido && !erroEmitido && !req.signal.aborted && !fechado) {
         send({ type: "error", e: MSG_FALHA });
       }
       try {

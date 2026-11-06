@@ -77,7 +77,7 @@ test.describe("agenda demo do mentor DPP — Sua semana / Do programa / Lembrar 
     await expect(domingo).toContainText("formação");
     // um compromisso próprio → contador lime "1"
     await expect(
-      domingo.locator('em[class*="bg-[var(--brand-lime)]"]')
+      domingo.locator('[class*="bg-[var(--brand-lime)]"]')
     ).toHaveText("1");
   });
 

@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
-import { demoRole } from "./demo/mode";
+import { demoRole, demoTermoSimulado } from "./demo/mode";
+import { getMe } from "./queries";
 import {
   demoAssinatura,
   demoAssinaturasPessoa,
@@ -40,10 +41,12 @@ const normAssinatura = (a: Assinatura): Assinatura => ({
  *  qualquer coordenação, inclusive no link do PDF). */
 export const getMinhaAssinaturaTermo = cache(async (): Promise<Assinatura | null> => {
   const demo = await demoRole();
-  if (demo) return demoMinhaAssinaturaTermo(demo);
+  if (demo) return demoMinhaAssinaturaTermo(demo, await demoTermoSimulado());
+  // getMe é React.cache — em qualquer página do (app) o profile já veio
+  // pro shell; reusar poupa a RPC my_profile_id que resolvia o mesmo id
+  const me = await getMe();
+  if (!me) return null;
   const supabase = await createClient();
-  const { data: eu } = await supabase.rpc("my_profile_id");
-  if (!eu) return null;
   const { data, error } = await supabase
     .from("assinaturas")
     .select(
@@ -53,7 +56,7 @@ export const getMinhaAssinaturaTermo = cache(async (): Promise<Assinatura | null
       )
     )
     .eq("template.slug", "termo-voluntario")
-    .eq("profile_id", eu as string)
+    .eq("profile_id", me.id)
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -64,7 +67,7 @@ export const getMinhaAssinaturaTermo = cache(async (): Promise<Assinatura | null
 /** Uma assinatura por id — pra autorização de download do PDF e pro detalhe. */
 export const getAssinatura = cache(async (id: string): Promise<Assinatura | null> => {
   const demo = await demoRole();
-  if (demo) return demoAssinatura(demo, id);
+  if (demo) return demoAssinatura(demo, id, await demoTermoSimulado());
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("assinaturas")
@@ -92,7 +95,7 @@ export const getMeusDadosCivis = cache(async (): Promise<DadosCivis | null> => {
 export const getAssinaturasResumo = cache(
   async (): Promise<AssinaturaResumo[]> => {
     const demo = await demoRole();
-    if (demo) return demoAssinaturasResumo(demo);
+    if (demo) return demoAssinaturasResumo(demo, await demoTermoSimulado());
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("assinaturas")
@@ -121,7 +124,7 @@ export const getAssinaturasPessoa = cache(
     id: string
   ): Promise<Assinatura[]> => {
     const demo = await demoRole();
-    if (demo) return demoAssinaturasPessoa(demo, tipo, id);
+    if (demo) return demoAssinaturasPessoa(demo, tipo, id, await demoTermoSimulado());
     const supabase = await createClient();
     const col = tipo === "profile" ? "profile_id" : "mentorado_id";
     const { data, error } = await supabase

@@ -3,6 +3,7 @@ import {
   dimensoesDoItem,
   itensDaSemanaPrograma,
   itensSemanaProgramaMentor,
+  numerosDaSemana,
   paraAcompanhar,
   resumosPorCronograma,
   sinteseMonitoramento,
@@ -653,6 +654,9 @@ describe("dimensoesDoItem + sinteseMonitoramento", () => {
         responsavel: "mentor",
         prazo: "2026-10-01",
         status: "pendente",
+        numero: null,
+        feito_em: null,
+        created_by: null,
         created_at: "2026-09-25T00:00:00Z",
       } satisfies Encaminhamento,
     ],
@@ -858,28 +862,11 @@ describe("itensDaSemanaPrograma", () => {
     }),
     mkEvento(null, null, "etapa_preparacao", "c1"), // sem data → fora
   ];
-  const supervisoes: {
-    id: string;
-    data: string;
-    supervisor?: { nome: string } | null;
-    mentor?: { nome: string } | null;
-    resumo?: string;
-  }[] = [
-    {
-      id: "s1",
-      data: "2026-10-07",
-      supervisor: { nome: "Paula Nunes" },
-      mentor: { nome: "André Lima" },
-      resumo: "Sessão longa: ".padEnd(120, "x"),
-    },
-    { id: "s2", data: "2026-10-12", supervisor: { nome: "Paula Nunes" }, mentor: { nome: "Bruno Paz" } }, // fora da semana
-  ];
 
-  it("encontro oficial, formação, evento e supervisão — tipoItem e turma certos", () => {
+  it("encontro oficial, formação e evento — tipoItem e turma certos", () => {
     const itens = itensDaSemanaPrograma(
       programacao,
       [C1, C2],
-      supervisoes,
       AGORA
     );
     const porTitulo = Object.fromEntries(itens.map((i) => [i.titulo, i]));
@@ -905,7 +892,6 @@ describe("itensDaSemanaPrograma", () => {
     const itens = itensDaSemanaPrograma(
       programacao,
       [C1, C2],
-      [],
       AGORA,
       // c1: dA/dB/dC ativas (dD pausada não conta); c2: só dE
       [dA, dB, dC, dD, dE]
@@ -918,7 +904,7 @@ describe("itensDaSemanaPrograma", () => {
       "1 dupla, cada uma marca o seu"
     );
     // sem a coorte, o meta some — a observação (se houver) segue valendo
-    const semCoorte = itensDaSemanaPrograma(programacao, [C1, C2], [], AGORA);
+    const semCoorte = itensDaSemanaPrograma(programacao, [C1, C2], AGORA);
     expect(
       Object.fromEntries(semCoorte.map((i) => [i.titulo, i]))["Encontro 8 · Turma 1"]
         .detalhe
@@ -941,38 +927,16 @@ describe("itensDaSemanaPrograma", () => {
         }),
       ],
       [C1],
-      [],
       AGORA
     );
     expect(itens.map((i) => i.titulo)).toEqual(["Retiro de outubro"]);
     expect(itens[0].diaKey).toBe("2026-10-03");
   });
 
-  it("supervisão da semana entra com nomes e resumo truncado", () => {
-    const itens = itensDaSemanaPrograma(
-      programacao,
-      [C1, C2],
-      supervisoes,
-      AGORA
-    );
-    const sup = itens.find((i) => i.id === "sup-s1")!;
-    expect(sup).toMatchObject({
-      tipoItem: "supervisao",
-      diaKey: "2026-10-07",
-      titulo: "Supervisão · Paula Nunes × André Lima",
-      eventoId: null,
-    });
-    expect(sup.detalhe!.endsWith("…")).toBe(true);
-    expect(sup.detalhe!.length).toBeLessThanOrEqual(95);
-    // a de 12/10 é semana que vem — fora
-    expect(itens.find((i) => i.id === "sup-s2")).toBeUndefined();
-  });
-
   it("ordena por dia e título; sem-data e fora da semana ficam de fora", () => {
     const itens = itensDaSemanaPrograma(
       programacao,
       [C1, C2, C4], // C4 conhecido como rascunho → o evento dele não entra
-      supervisoes,
       AGORA
     );
     const chaves = itens.map((i) => `${i.diaKey}|${i.titulo}`);
@@ -983,9 +947,9 @@ describe("itensDaSemanaPrograma", () => {
     }));
     // 05–11/10 exatos: nem 13/10 (próxima) nem 30/09 (anterior) entram
     expect(itens.every((i) => i.diaKey >= "2026-10-05" && i.diaKey <= "2026-10-11")).toBe(true);
-    // enc8 T1 + enc5 T2 + supervisão + encerramento + formação + recesso;
+    // enc8 T1 + enc5 T2 + encerramento + formação + recesso;
     // o encontro de c4 (rascunho) e o etapa sem data ficam fora
-    expect(itens).toHaveLength(6);
+    expect(itens).toHaveLength(5);
     expect(itens.some((i) => i.titulo === "Encontro 1 · T4")).toBe(false);
   });
 
@@ -996,7 +960,7 @@ describe("itensDaSemanaPrograma", () => {
       mkEvento(4, "2026-10-04", "encontro", "c1"), // dom — dentro
       mkEvento(5, "2026-10-05", "encontro", "c1"), // seg seguinte — fora
     ];
-    const itens = itensDaSemanaPrograma(evs, [C1], [], quartaDeSetembro);
+    const itens = itensDaSemanaPrograma(evs, [C1], quartaDeSetembro);
     expect(itens.map((i) => i.titulo)).toEqual([
       "Encontro 3 · Turma 1",
       "Encontro 4 · Turma 1",
@@ -1065,8 +1029,6 @@ describe("itensSemanaProgramaMentor", () => {
       [dSemLocal, dComLink],
       EV_M,
       [C1],
-      [],
-      "p-qualquer",
       AGORA,
       AGORA.getTime()
     );
@@ -1079,8 +1041,6 @@ describe("itensSemanaProgramaMentor", () => {
       [dSemLocal, dComLink],
       EV_M,
       [C1],
-      [],
-      "p-qualquer",
       AGORA,
       AGORA.getTime()
     );
@@ -1098,8 +1058,6 @@ describe("itensSemanaProgramaMentor", () => {
       [dRegistro],
       EV_M,
       [C1],
-      [],
-      "p-qualquer",
       AGORA,
       AGORA.getTime()
     );
@@ -1111,8 +1069,6 @@ describe("itensSemanaProgramaMentor", () => {
       [dLimbo],
       EV_M,
       [C1],
-      [],
-      "p-qualquer",
       AGORA,
       AGORA.getTime()
     );
@@ -1124,8 +1080,6 @@ describe("itensSemanaProgramaMentor", () => {
       [mkDupla({ id: "dSA" })],
       EV_M,
       [C1],
-      [],
-      "p-qualquer",
       AGORA,
       AGORA.getTime()
     );
@@ -1143,8 +1097,6 @@ describe("itensSemanaProgramaMentor", () => {
         }),
       ],
       [C1],
-      [],
-      "p-qualquer",
       AGORA,
       AGORA.getTime()
     );
@@ -1159,8 +1111,6 @@ describe("itensSemanaProgramaMentor", () => {
       [dSemLocal, dComLink],
       EV_M,
       [C1],
-      [],
-      "p-qualquer",
       AGORA,
       AGORA.getTime(),
       new Set(["dSL:8"])
@@ -1173,8 +1123,6 @@ describe("itensSemanaProgramaMentor", () => {
       [mkDupla({ id: "dSA" })],
       EV_M,
       [C1],
-      [],
-      "p-qualquer",
       AGORA,
       AGORA.getTime(),
       new Set(["dSA:8"])
@@ -1192,8 +1140,6 @@ describe("itensSemanaProgramaMentor", () => {
         }),
       ],
       [C1],
-      [],
-      "p-qualquer",
       AGORA,
       AGORA.getTime(),
       new Set(["dSA:8"])
@@ -1220,8 +1166,6 @@ describe("itensSemanaProgramaMentor", () => {
       [mkDupla({ id: "dSA" })],
       evs,
       [C1],
-      [],
-      "p-qualquer",
       AGORA,
       AGORA.getTime()
     );
@@ -1244,12 +1188,58 @@ describe("itensSemanaProgramaMentor", () => {
         }),
       ],
       [C1],
-      [],
-      "p-qualquer",
       AGORA,
       AGORA.getTime()
     );
     expect(itens.map((i) => i.titulo)).toEqual(["Retiro · Turma 1"]);
     expect(itens[0].diaKey).toBe("2026-10-03");
+  });
+});
+
+// ============================================================
+describe("numerosDaSemana — opções do toggle por recorte", () => {
+  it("2+ cronogramas ativos: 'Todas as turmas' + uma opção por cronograma", () => {
+    const { opcoes, agregados } = numerosDaSemana(
+      [dA, dE],
+      [],
+      [C1, C2],
+      EVENTOS,
+      AGORA,
+      AGORA.getTime()
+    );
+    expect(opcoes.map((o) => o.id)).toEqual(["todas", "c1", "c2"]);
+    expect(opcoes[0].rotulo).toBe("Todas as turmas");
+    // o agregado "todas" sempre existe — é o fallback da seção
+    expect(agregados.todas.saude.emAndamento).toBe(2);
+  });
+
+  it("1 cronograma ativo no recorte: sem toggle — 'Todas' ≡ a turma única", () => {
+    // REALIZA-73: com turma em foco a página passa só os cronogramas
+    // dela; um toggle "Todas as turmas" ali mentiria o rótulo
+    const { opcoes, agregados } = numerosDaSemana(
+      [dA, dB, dC],
+      [],
+      [C1],
+      EVENTOS,
+      AGORA,
+      AGORA.getTime()
+    );
+    expect(opcoes).toEqual([]);
+    // a seção cai no agregado "todas" (= o recorte inteiro), que segue
+    // populado mesmo sem opções
+    expect(agregados.todas.coberturas).toHaveLength(1);
+    expect(agregados.todas.coberturas[0].turma).toBe("T1");
+  });
+
+  it("cronograma ativo sem eventos não vira opção", () => {
+    const { opcoes } = numerosDaSemana(
+      [dA],
+      [],
+      [C1, C5], // C5: ativo mas sem ciclo_eventos — fora das opções
+      EVENTOS,
+      AGORA,
+      AGORA.getTime()
+    );
+    expect(opcoes).toEqual([]); // só C1 tem eventos → 1 opção efetiva → sem toggle
   });
 });

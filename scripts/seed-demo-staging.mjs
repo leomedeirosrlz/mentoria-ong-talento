@@ -131,7 +131,6 @@ async function limpar() {
   const porFk = [
     ["notificacoes", "profile_id"], ["notificacoes", "created_by"],
     ["presencas", "profile_id"], ["presencas", "marcado_por"],
-    ["supervisoes", "supervisor_id"], ["supervisoes", "mentor_id"], ["supervisoes", "dupla_id"], ["supervisoes", "created_by"],
     ["interacoes", "dupla_id"], ["interacoes", "autor_id"],
     ["encaminhamentos", "dupla_id"],
     ["avaliacoes_encontro", "dupla_id"], ["avaliacoes_encontro", "encontro_id"], ["avaliacoes_encontro", "respondido_por_profile_id"],
@@ -873,14 +872,6 @@ await post("devolutivas", [
     created_at: iso(new Date(Date.now() - 3 * DIA)) },
 ]);
 
-await post("supervisoes", [
-  { id: uid(0xb00), supervisor_id: P.sup1, mentor_id: P.andre, dupla_id: D.d1, data: "2026-09-25", resumo: "Otávio trouxe a dificuldade de a Ana não falar da família. Trabalhamos escuta ativa e perguntas abertas — saiu com plano.", created_by: P.sup1, created_at: iso(new Date("2026-09-25T20:00:00-03:00")) },
-  { id: uid(0xb01), supervisor_id: P.sup1, mentor_id: P.fernando, dupla_id: D.d3, data: "2026-10-09", resumo: "Conversa sobre o pedido de apoio da Maria Fernanda. Orientei o Sérgio a escutar sem resolver — ele segue com acompanhamento próximo.", created_by: P.sup1, created_at: iso(new Date("2026-10-09T20:00:00-03:00")) },
-  { id: uid(0xb02), supervisor_id: P.sup2, mentor_id: P.tiago, dupla_id: D.d7, data: "2026-10-07", resumo: "Tiago está com a agenda apertada — combinado horário fixo de sábado de manhã e compromisso de resposta em 24h.", created_by: P.sup2, created_at: iso(new Date("2026-10-07T20:00:00-03:00")) },
-  // T2 demo — supervisão corrente da dupla nova (data relativa ao run)
-  { id: uid(0xb10), supervisor_id: P.sup2, mentor_id: P.monica, dupla_id: D.dT2a, data: diaBrt(), resumo: "Primeira supervisão da Mônica com a turma nova — a T2 engatou: o Davi chegou com a meta do curso técnico meio formada. Combinado: ela segura o ritmo semanal e eu reviso os registros dela a cada quinzena.", created_by: P.sup2, created_at: iso(new Date()) },
-]);
-
 // presenças nos dois encontros de formação (03 e 04/set) — os ids variam
 // por ambiente (staging vs `supabase start`), resolve por data+tipo
 const [evF1] = await rest("ciclo_eventos?select=id&tipo=eq.formacao&data=eq.2026-09-03&order=data.asc&limit=1");
@@ -919,7 +910,6 @@ await post("notificacoes", [
   { id: uid(0xf00), profile_id: P.coord, tipo: "apoio_jovem", titulo: "Pedido de apoio — Maria Fernanda", corpo: "A avaliação do encontro 6 marcou \"Preciso de ajuda\".", href: `/duplas/${D.d3}`, created_by: P.coord2, created_at: iso(new Date("2026-10-14T08:00:00-03:00")) },
   { id: uid(0xf01), profile_id: P.coord, tipo: "solicitacao_triagem", titulo: "Nova solicitação aguardando triagem", corpo: "Igor Batista pediu orientação vocacional (sem dupla DPP).", href: "/especialistas", created_at: iso(new Date("2026-10-12T10:05:00-03:00")) },
   { id: uid(0xf02), profile_id: P.sup1, tipo: "comunicado", titulo: "Dupla em risco — Tiago × Lucas", corpo: "2 encontros atrasados no ciclo.", href: `/duplas/${D.d7}`, created_at: iso(new Date("2026-10-14T07:00:00-03:00")) },
-  { id: uid(0xf03), profile_id: P.andre, tipo: "supervisao_registrada", titulo: "Sessão de supervisão registrada", corpo: "Paula registrou a supervisão de 25/set — confira o resumo na sua página.", href: "/perfil", lida_em: iso(new Date("2026-09-26T08:00:00-03:00")), created_at: iso(new Date("2026-09-25T20:05:00-03:00")) },
   // WP6 — sol_notificar da sugerir_especialista_mentor / postar_devolutiva:
   // a Ana recebe a sugestão do Otávio (mesmo carimbo da row 'sugerida') e a
   // Larissa é avisada da devolutiva mais recente da trilha dela

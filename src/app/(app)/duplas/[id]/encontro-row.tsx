@@ -13,10 +13,12 @@ import type {
   RegistroAnexo,
 } from "@/lib/types";
 import {
+  DIFICULDADE_LABEL,
   formatDate,
   formatDateTime,
   linkSeguro,
   registroTardio,
+  semanaBounds,
   type PassoGuia,
 } from "@/lib/ciclo";
 import type { DestinoWA } from "@/components/whatsapp-rapido";
@@ -24,6 +26,7 @@ import { WhatsAppRapido } from "@/components/whatsapp-rapido";
 import { AvaliacaoBadge } from "@/components/semaforo";
 import { CopiarChamada } from "@/components/copiar-chamada";
 import { NotaEncontro } from "@/components/nota-encontro";
+import { CombinadosEncontro } from "@/components/combinados-encontro";
 import {
   AvaliacaoJovemCard,
   AvaliacaoPendenteLinha,
@@ -32,7 +35,7 @@ import {
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { NaoAconteceuButton, DesfazerNaoAconteceuButton } from "@/components/nao-aconteceu-button";
-import { RegistroForm } from "@/components/registro-form";
+import { RegistroFormLazy } from "@/components/registro-form-lazy";
 import {
   RegistroDetails,
   RegistroInline,
@@ -46,6 +49,7 @@ import { RegistroView } from "@/components/registro-view";
 import { AnexosRegistro } from "@/components/anexos-registro";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Popover, PopoverContent, PopoverTitle, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 
 /** Linha de um encontro na aba Encontros: disco numerado, datas, ações da
@@ -66,8 +70,11 @@ export function EncontroRow({
   podeRemoverAnexos,
   anexos,
   materiais,
+  combinados,
   combinadosPendentes,
   nota,
+  combinadosDoNumero,
+  combinadosAnteriores,
   registroAberto,
   apoioDestinos,
   linkAvaliacao,
@@ -78,6 +85,7 @@ export function EncontroRow({
   jovemNome,
   jovemWhatsapp,
   jornadaViva,
+  autorNome,
 }: {
   /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
   passo: PassoGuia;
@@ -100,9 +108,17 @@ export function EncontroRow({
   podeRemoverAnexos: boolean;
   anexos: RegistroAnexo[];
   materiais: Material[];
+  /** Todos os combinados da dupla — a linha filtra por registro_id pro
+   *  registro exibido e pro form de edição. */
+  combinados: Encaminhamento[];
   combinadosPendentes: Encaminhamento[];
   /** Anotação/plano do mentor pra esse nº do ciclo — null = sem nota. */
   nota: string | null;
+  /** Combinados deste nº do guia (0157: registro + preparo, os dois
+   *  responsáveis). */
+  combinadosDoNumero: Encaminhamento[];
+  /** Pendentes de nºs anteriores — carry-over taggeado "do Nº encontro". */
+  combinadosAnteriores: Encaminhamento[];
   /** Encontro atual ou pendente de registro — nasce com o registro expandido;
    *  os demais viram linha-resumo sob disclosure (o deep link `#registrar-{id}` abre). */
   registroAberto: boolean;
@@ -126,6 +142,8 @@ export function EncontroRow({
   /** Dupla viva (ativa|pausada) — destrava as ações de link da pendência
    *  de avaliação; fechada deixa só o aviso como fato. */
   jornadaViva: boolean;
+  /** Nome de quem vê — assina o convite de avaliação pro jovem. */
+  autorNome?: string;
 }) {
   const feito = encontro?.status === "realizado";
   const naoAconteceu = encontro?.status === "nao_aconteceu";
@@ -135,6 +153,11 @@ export function EncontroRow({
     (encontro?.status === "agendado" || encontro?.status === "remarcado") &&
     !!encontro.data_hora;
   const reg = encontro?.registro;
+  // combinados gravados por ESTE registro — alimentam a view do card e o
+  // form de edição (que devolve os ids de banco pro salvarRegistro casar)
+  const combinadosDoRegistro = reg
+    ? combinados.filter((c) => c.registro_id === reg.id)
+    : [];
   // realizado sem registro — a dupla deve o follow-up; marca a linha em warn
   // suave. Em dupla pausada/encerrada ninguém pode registrar: a badge e a
   // lavagem viram ruído de algo sem saída e são suprimidas
@@ -144,6 +167,7 @@ export function EncontroRow({
     feito && encontro?.realizado_em != null && encontro.realizado_em !== encontro.data_hora;
   // material do encontro: com destino (arquivo oficial ou url) vira chip; sem, só o título muted
   const material = materiais.find((m) => m.path || m.url) ?? materiais[0] ?? null;
+  const materiaisComDestino = materiais.filter((m) => m.path || linkSeguro(m.url));
   const materialHref = material?.path
     ? `/api/material/${material.id}`
     : linkSeguro(material?.url);
@@ -180,12 +204,20 @@ export function EncontroRow({
     (encontro?.status === "agendado" && podeMarcar && !!encontro.data_hora) ||
     (naoAconteceu && podeMarcar) ||
     !!reg?.precisa_apoio;
-  // linha 1 (data + situação): a 1ª cláusula é a data do guia, nua — o
-  // "sugerido" mora uma vez no rótulo da seção, não em cada linha. Depois de
-  // realizado sem divergência a data oficial é ruído e a linha abre direto
-  // no "realizado {data}" (§4). Join com " · " evita separador órfão
+  // linha 1 (data + situação): a 1ª cláusula é a semana que o guia sugere,
+  // rotulada — sem o rótulo a data solta não dizia de onde vinha, e a
+  // sugestão é de semana, não de terça (REALIZA-343). Depois de realizado
+  // sem divergência ela é ruído e a linha abre direto no "realizado {data}"
+  // (§4). Join com " · " evita separador órfão
+  // "02/11": o ano já é o do ciclo e alongava a linha (formatDiaMes traz ano)
+  const diaMesCurto = (iso: string) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+  const semanaSugerida = passo.data
+    ? semanaBounds(new Date(`${passo.data}T12:00:00`))
+    : null;
   const linha1 = [
-    !(feito && !diverge) && passo.data && formatDate(passo.data),
+    !(feito && !diverge) &&
+      semanaSugerida &&
+      `semana sugerida ${diaMesCurto(semanaSugerida.seg)} a ${diaMesCurto(semanaSugerida.dom)}`,
     encontro?.data_hora &&
       `${feito && !diverge ? "realizado" : "agendado"} ${formatDateTime(encontro.data_hora)}`,
     naoAconteceu && "não aconteceu",
@@ -218,6 +250,21 @@ export function EncontroRow({
       reg.reflexoes
     : null;
 
+  // segunda linha do resumo do registro: sinais que antes só apareciam no
+  // corpo expandido
+  const resumoRegistro = reg
+    ? [
+        reg.dificuldade &&
+          reg.dificuldade !== "nenhuma" &&
+          `dificuldade: ${DIFICULDADE_LABEL[reg.dificuldade].toLowerCase()}`,
+        tardio && "registro tardio",
+        combinadosDoRegistro.length > 0 &&
+          `${combinadosDoRegistro.length} ${combinadosDoRegistro.length === 1 ? "combinado" : "combinados"}`,
+      ]
+        .filter(Boolean)
+        .join(" · ")
+    : "";
+
   const card = (
     <div
       id={encontro ? `registrar-${encontro.id}` : undefined}
@@ -231,8 +278,12 @@ export function EncontroRow({
       )}
     >
       <div
+        // #encontro-<id>: âncora de leitura (só rola — usada pelos CTAs
+        // "Remarcar na ficha"); #registrar-<id> no card abre o form além
+        // de rolar, por isso são dois ids em elementos distintos
+        id={encontro ? `encontro-${encontro.id}` : undefined}
         className={cn(
-          "flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5",
+          "flex scroll-mt-20 flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3.5",
           registroPendente && "bg-[var(--warn)]/5"
         )}
       >
@@ -294,7 +345,9 @@ export function EncontroRow({
                     linkAtual={encontro.link}
                   />
                 )}
-                {materialHref && (
+                {/* um material abre direto; mais de um vira lista — o "+N"
+                    antes prometia vários e abria só o primeiro */}
+                {materialHref && materiaisComDestino.length <= 1 && (
                   <a
                     href={materialHref}
                     target="_blank"
@@ -302,8 +355,38 @@ export function EncontroRow({
                     className={buttonVariants({ variant: "outline", size: "sm" })}
                   >
                     <BookOpen />
-                    Material{materiais.length > 1 ? ` +${materiais.length - 1}` : ""}
+                    Material de apoio
                   </a>
+                )}
+                {materiaisComDestino.length > 1 && (
+                  <Popover>
+                    <PopoverTrigger
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                    >
+                      <BookOpen />
+                      Material de apoio ({materiaisComDestino.length})
+                    </PopoverTrigger>
+                    <PopoverContent align="start" className="w-[min(20rem,calc(100vw-2rem))] p-2">
+                      <PopoverTitle className="px-2 pb-1 pt-1 text-sm font-semibold">
+                        Material de apoio
+                      </PopoverTitle>
+                      <ul>
+                        {materiaisComDestino.map((m) => (
+                          <li key={m.id}>
+                            <a
+                              href={m.path ? `/api/material/${m.id}` : linkSeguro(m.url)!}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex min-h-11 items-center gap-2 rounded-md px-2 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9"
+                            >
+                              <BookOpen aria-hidden size={15} className="shrink-0 text-muted-foreground" />
+                              <span className="min-w-0">{m.titulo}</span>
+                            </a>
+                          </li>
+                        ))}
+                      </ul>
+                    </PopoverContent>
+                  </Popover>
                 )}
               </div>
             )}
@@ -368,19 +451,6 @@ export function EncontroRow({
         )}
       </div>
 
-      {/* anotações/plano do encontro — o mentor prepara aqui; pra quem não
-          edita (coord/sup, dupla inativa) a nota existente vira leitura */}
-      {(podeEditar || nota) && (
-        <div className="border-t border-border/60 px-4 py-3">
-          <NotaEncontro
-            duplaId={duplaId}
-            numero={passo.numero}
-            nota={nota}
-            somenteLeitura={!podeEditar}
-          />
-        </div>
-      )}
-
       {/* registro salvo = histórico: linha-resumo (apoio, avaliação, tema) +
           disclosure pro corpo completo. Só o encontro atual e os pendentes
           nascem abertos; o deep link #registrar-{id} continua abrindo o bloco */}
@@ -405,11 +475,17 @@ export function EncontroRow({
                       />
                     )}
                     {reg.avaliacao && <AvaliacaoBadge avaliacao={reg.avaliacao} />}
-                    {regPreview && (
-                      <span className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
-                        {regPreview}
-                      </span>
-                    )}
+                    {/* o resumo fechado carrega o que chama atenção sem
+                        expandir: o texto em até 2 linhas + dificuldade,
+                        tardio e combinados (REALIZA-343) */}
+                    <span className="min-w-0 flex-1 text-xs text-muted-foreground">
+                      {regPreview && (
+                        <span className="line-clamp-2 text-foreground">{regPreview}</span>
+                      )}
+                      {resumoRegistro && (
+                        <span className="mt-0.5 block truncate">{resumoRegistro}</span>
+                      )}
+                    </span>
                     <CaretDown
                       size={13}
                       aria-hidden
@@ -440,6 +516,7 @@ export function EncontroRow({
                         duplaId={duplaId}
                         evento={passo}
                         registro={reg}
+                        combinados={combinadosDoRegistro}
                       />
                     </div>
                   )}
@@ -466,6 +543,7 @@ export function EncontroRow({
                   souCoord={souCoord}
                   duplaId={duplaId}
                   jornadaViva={jornadaViva}
+                  autorNome={autorNome}
                 />
               ) : (
                 <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
@@ -476,6 +554,35 @@ export function EncontroRow({
           )}
         </div>
       ) : null}
+      {/* combinados logo abaixo do registro (0157): uma lista só, a do
+          registro e a do preparo, marcável aqui mesmo — quem acabou de ler
+          o registro não precisa ir à aba Combinados pra dar baixa */}
+      <div className="border-t border-border/60 px-4 py-3 empty:hidden">
+        <CombinadosEncontro
+          duplaId={duplaId}
+          numero={passo.numero}
+          itens={combinadosDoNumero}
+          pendentesAnteriores={combinadosAnteriores}
+          jovemNome={jovemNome.split(" ")[0] || "Mentorado"}
+          podeEditar={podeEditar}
+          podeMarcar={podeMarcar}
+        />
+      </div>
+      {/* anotação do mentor — DEPOIS do registro e dos combinados: quem
+          volta a um encontro procura primeiro o que foi registrado
+          (REALIZA-343). Pra quem não edita (coord/sup, dupla inativa) a
+          nota existente vira leitura */}
+      {(podeEditar || nota) && (
+        <div className="border-t border-border/60 px-4 py-3">
+          <NotaEncontro
+            duplaId={duplaId}
+            numero={passo.numero}
+            nota={nota}
+            somenteLeitura={!podeEditar}
+          />
+        </div>
+      )}
+
       {/* especialista: só a estrela — a view definer é o recorte inteiro */}
       {feito && estrelaJovem != null && (
         <div className="border-t border-border/60 px-4 py-2.5">
@@ -495,7 +602,7 @@ export function EncontroRow({
               registroPendente ? "bg-[var(--warn)]/5" : "bg-muted/50"
             )}
           >
-            <RegistroForm
+            <RegistroFormLazy
               encontroId={encontro.id}
               duplaId={duplaId}
               evento={passo}

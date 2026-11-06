@@ -59,9 +59,14 @@ export function msgAguardandoPar(
  *  direto pro registro embutido na mensagem. Preferir o catálogo por
  *  contexto quando o caso cabe num ContextoWA. */
 export type CtxWhatsApp = {
-  /** Primeiro nome de quem envia (coord/supervisor). Assina a mensagem pro
-   *  mentorado; sem ele, a assinatura é "a equipe". */
+  /** Primeiro nome de quem envia. Assina a mensagem; sem ele, a assinatura
+   *  cai no genérico da ponta. */
   eu?: string;
+  /** Quem envia. Staff (default) assina "da equipe" — número desconhecido
+   *  precisa se apresentar; o mentor DPP assina como ele mesmo ("seu
+   *  mentor") — o jovem conhece a pessoa, e "da equipe" vindo do número
+   *  do mentor lia como a coordenação falando por ele. */
+  remetente?: "equipe" | "mentor";
   /** Primeiro nome do mentor. */
   mentorNome: string;
   /** Primeiro nome do mentorado. */
@@ -77,7 +82,10 @@ const comMd = (i: InfoWA): string => (pn(i.mentoradoNome) ? ` com ${pn(i.mentora
 const comM = (i: InfoWA): string => (pn(i.mentorNome) ? ` com ${pn(i.mentorNome)}` : "");
 const oExtra = (i: InfoWA): string => (i.extra ? `${i.extra} ` : "");
 
-const autoria = (autorNome: string | undefined): string =>
+/** Assinatura de staff — texto WA de número desconhecido precisa dizer quem
+ *  fala. Exportada pras mensagens montadas fora do catálogo (trilha esp,
+ *  avaliação do jovem) seguirem a mesma forma. */
+export const autoria = (autorNome: string | undefined): string =>
   pn(autorNome)
     ? `Aqui é ${pn(autorNome)}, da equipe do Realiza.vc`
     : "Aqui é a equipe do Realiza.vc";
@@ -165,15 +173,28 @@ export function msgsContato(
   }
   // texto livre — o chamador traz o fecho contextual de cada ponta (ex.: o
   // "É direto por aqui: {link}" do card de registro pendente)
-  const quem = ctx.eu ? `${pn(ctx.eu)}, da equipe` : "a equipe";
   const livre = info as { casoMentor?: string; casoMentorado?: string };
+  const assinaturaEquipe = `Aqui é ${
+    ctx.eu ? `${pn(ctx.eu)}, da equipe` : "a equipe"
+  } do Realiza.vc`;
+  // a ponta do mentorado muda de voz com o remetente: staff = equipe, mentor
+  // = a própria pessoa. A do mentor é sempre staff — não existe fluxo de
+  // mentor mandando mensagem de equipe pra si mesmo.
+  const assinaturaJovem =
+    ctx.remetente === "mentor"
+      ? pn(ctx.eu)
+        ? `Aqui é ${pn(ctx.eu)}, seu mentor`
+        : "Aqui é seu mentor"
+      : assinaturaEquipe;
   return {
-    mentor: `Oi ${pn(ctx.mentorNome)}, tudo bem? Passando pra acompanhar a mentoria com ${pn(ctx.mentoradoNome)}. ${
+    mentor: `Oi ${pn(ctx.mentorNome)}, tudo bem? ${assinaturaEquipe}. Passando pra acompanhar a mentoria com ${pn(ctx.mentoradoNome)}. ${
       livre.casoMentor ?? "Como estão as coisas?"
     }`,
-    mentorado: `Oi ${pn(ctx.mentoradoNome)}, tudo bem? Aqui é ${quem} do Realiza.vc. ${
+    mentorado: `Oi ${pn(ctx.mentoradoNome)}, tudo bem? ${assinaturaJovem}. ${
       livre.casoMentorado ??
-      `Passando pra saber como está indo a mentoria com ${pn(ctx.mentorNome)} e se precisa de algo.`
+      (ctx.remetente === "mentor"
+        ? "Passando pra ver como você está e se precisa de algo por aqui."
+        : `Passando pra saber como está indo a mentoria com ${pn(ctx.mentorNome)} e se precisa de algo.`)
     }`,
   };
 }

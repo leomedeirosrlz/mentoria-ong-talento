@@ -20,6 +20,7 @@ import {
 import { cn } from "@/lib/utils";
 import { AudienciasPicker } from "@/components/audiencias-picker";
 import type { Audiencia } from "@/lib/materiais";
+import { novoUuid } from "@/lib/uuid";
 
 // labels registradas nos Selects — sem elas o trigger fechado mostra o valor
 // cru do enum ("dpp", "coordenacao")
@@ -56,7 +57,7 @@ function saneiaNome(nome: string): string {
 export function NovoMaterialDialog({
   maxEncontro,
   defaultEncontro,
-  triggerLabel = "Novo material",
+  triggerLabel = "Novo material de apoio",
   triggerVariant = "default",
 }: {
   maxEncontro: number;
@@ -113,7 +114,7 @@ export function NovoMaterialDialog({
       }
       // path antes do submit: a row de materiais precisa nascer com ele — a
       // policy de INSERT do storage só aceita objeto com path = name na row
-      fd.set("path", `materiais/${crypto.randomUUID()}-${saneiaNome(file.name)}`);
+      fd.set("path", `materiais/${novoUuid()}-${saneiaNome(file.name)}`);
     }
 
     start(async () => {
@@ -136,7 +137,7 @@ export function NovoMaterialDialog({
             return;
           }
         }
-        toast.success(titulo ? `"${titulo}" adicionado aos materiais.` : "Material adicionado.");
+        toast.success(titulo ? `"${titulo}" adicionado aos materiais de apoio.` : "Material de apoio adicionado.");
         setOpen(false);
         // fecha programático não passa pelo onOpenChange — reseta aqui também
         setDestino("arquivo");
@@ -173,9 +174,9 @@ export function NovoMaterialDialog({
           os selects lado a lado ficavam apertados */}
       <DialogContent size="lg">
         <DialogHeader>
-          <DialogTitle>Adicionar material</DialogTitle>
+          <DialogTitle>Adicionar material de apoio</DialogTitle>
           <DialogDescription>
-            O material entra na biblioteca e fica disponível pra quem
+            O material de apoio entra na biblioteca e fica disponível pra quem
             acompanha a trilha.
           </DialogDescription>
         </DialogHeader>

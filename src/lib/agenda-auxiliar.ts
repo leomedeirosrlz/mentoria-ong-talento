@@ -25,7 +25,6 @@ import type {
   DiaSemana,
   Dupla,
   Encontro,
-  Supervisao,
 } from "./types";
 
 // ============================================================
@@ -145,10 +144,6 @@ function juntaNums(nums: number[]): string {
   return `${nums.slice(0, -1).join(", ")} e ${nums[nums.length - 1]}`;
 }
 
-function trunca(s: string, n = 90): string {
-  return s.length > n ? `${s.slice(0, n - 1).trimEnd()}…` : s;
-}
-
 /** Grupo "Por turma" — as supervisionadas agrupadas por cronograma. */
 export type TurmaGrupo = {
   cronogramaId: string | null;
@@ -231,26 +226,25 @@ export type ItemConsolidado = {
   /** "YYYY-MM-DD" — agrupa nos subtítulos de dia. */
   diaKey: string;
   inicio: string;
-  tipo: "supervisao" | "encontro" | "sessao_esp" | "oficial" | "a_agendar";
+  tipo: "encontro" | "sessao_esp" | "oficial" | "a_agendar";
   /** "Ana Souza com André Lima" / "Formação de mentores". */
   titulo: string;
   detalhe: string | null;
   /** guest âmbar ("só acompanhamento") — sem ação pro auxiliar. */
   convidado: boolean;
   duplaId: string | null;
-  /** "Você" pra supervisão própria; "T1"/"T2" pra encontro; "" senão. */
+  /** "T1"/"T2"/"Esp" pra encontro; "" senão. */
   pill: string;
   /** href do "Ver ficha" / destino principal. */
   href: string | null;
 };
 
 /** Consolidada: encontros das supervisionadas (semana + próxima) +
- *  supervisões que o auxiliar registrou na semana + eventos oficiais
+ *  eventos oficiais
  *  (convidado) + sessões esp das duplas visíveis (convidado) + encontros
  *  futuros do cronograma ainda sem data ("a_agendar", tracejado). */
 export function itensConsolidados(
   duplas: Dupla[],
-  supervisoes: Supervisao[],
   eventos: CicloEvento[],
   hoje: Date = new Date()
 ): ItemConsolidado[] {
@@ -303,22 +297,6 @@ export function itensConsolidados(
         href: `/duplas/${d.id}`,
       });
     }
-  }
-
-  for (const s of supervisoes) {
-    if (!naSemana(s.data)) continue;
-    itens.push({
-      id: `sup-${s.id}`,
-      diaKey: s.data,
-      inicio: s.data,
-      tipo: "supervisao",
-      titulo: `Supervisão · ${s.supervisor?.nome ?? "Auxiliar"} × ${s.mentor?.nome ?? "mentor"}`,
-      detalhe: s.resumo ? trunca(s.resumo) : null,
-      convidado: false,
-      duplaId: s.dupla_id,
-      pill: "Você",
-      href: s.dupla_id ? `/duplas/${s.dupla_id}` : null,
-    });
   }
 
   // eventos oficiais fora do eixo encontro-a-encontro — o auxiliar é

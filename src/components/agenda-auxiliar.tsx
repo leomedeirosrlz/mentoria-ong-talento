@@ -2,7 +2,6 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import {
   CalendarPlus,
-  ChatsCircle,
   Eye,
   Flag,
   Sparkle,
@@ -16,6 +15,7 @@ import {
   type ItemConsolidado,
 } from "@/lib/agenda-auxiliar";
 import { itensDaSemanaPrograma, saudeDoRecorte } from "@/lib/agenda-coordenacao";
+import { msgsContato } from "@/lib/whatsapp-msgs";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
 import {
   lembreteBloqueadoAte,
@@ -62,7 +62,7 @@ const fmtHoraMin = new Intl.DateTimeFormat("pt-BR", {
  *  nenhuma superfície aqui marca encontro de dupla. Duas abas (por
  *  `?aba=` como o resto da agenda): "Por turma" agrupa as supervisionadas
  *  pelo calendário delas e "Consolidada" vira a agenda única da pessoa —
- *  encontros das duplas, as supervisões dela, eventos oficiais e sessões
+ *  encontros das duplas, eventos oficiais e sessões
  *  esp em modo convidado ("só acompanhamento"). Derivações todas em
  *  lib/agenda-auxiliar (pura). */
 export function AgendaAuxiliar({
@@ -76,8 +76,11 @@ export function AgendaAuxiliar({
   comLinkDia,
   consolidada,
   abas,
+  seletorContexto,
+  contextoTurma,
 }: {
-  /** Só as duplas que eu supervisiono (a página filtra). */
+  /** Só as duplas que eu supervisiono (a página filtra), no recorte da
+   *  turma em foco quando houver. */
   duplas: Dupla[];
   eventos: CicloEvento[];
   cronogramas: Cronograma[];
@@ -98,10 +101,15 @@ export function AgendaAuxiliar({
   consolidada: boolean;
   /** Barra de modos da página (AbasAgenda) — uma por página, no header. */
   abas?: ReactNode;
+  /** Seletor de contexto de turma (REALIZA-73) — à direita do h1, com as
+   *  turmas do escopo dele (mesma régua da home). */
+  seletorContexto?: ReactNode;
+  /** Faixa "Mostrando: Turma N · ver todas" — sob o header quando há foco. */
+  contextoTurma?: ReactNode;
 }) {
   const agora = new Date(agoraMs);
   const grupos = duplasPorTurma(duplas, cronogramas, eventos, agora);
-  const itens = itensConsolidados(duplas, [], eventos, agora);
+  const itens = itensConsolidados(duplas, eventos, agora);
   const saudePorId = new Map(
     duplas.map((d) => [d.id, saudadeDaDupla(d, eventos, agora)])
   );
@@ -110,8 +118,8 @@ export function AgendaAuxiliar({
   const cronosDelas = new Set(
     duplas.flatMap((d) => (d.cronograma_id ? [d.cronograma_id] : []))
   );
-  // a lista só exibe ativa/pausada (mesmo filtro da lib) — encerradas entram
-  // na supervisão histórica mas não na agenda
+  // a lista só exibe ativa/pausada (mesmo filtro da lib) — encerradas ficam
+  // fora da agenda
   const correndo = duplas.filter(
     (d) => d.status === "ativa" || d.status === "pausada"
   );
@@ -138,14 +146,16 @@ export function AgendaAuxiliar({
     <div className="space-y-6">
       {/* header + barra compartilhados com a aba Calendário do supervisor+mentor:
           trocar de aba não reescreve o h1 nem o recorte das turmas */}
-      <CabecalhoAuxiliar duplas={duplas} hoje={hoje} />
+      <CabecalhoAuxiliar duplas={duplas} hoje={hoje} seletor={seletorContexto} />
+
+      {contextoTurma}
 
       {abas}
 
       <div id={PAINEL_AGENDA} role="tabpanel" className="space-y-6">
         {/* a mesma faixa "Semana do programa" da coordenação (v8b), com o
             denominador do escopo do auxiliar: os oficiais dos cronogramas
-            das supervisionadas + as supervisões dela. "o que cobre" porque
+            das supervisionadas. "o que cobre" porque
             quem lê monitora — o card não agenda nada. */}
         <SemanaDoPrograma
           itens={itensDaSemanaPrograma(
@@ -153,7 +163,6 @@ export function AgendaAuxiliar({
             // supervisionadas — a faixa da aux nunca mostra turma alheia
             eventos.filter((e) => cronosDelas.has(e.cronograma_id)),
             cronogramas.filter((c) => cronosDelas.has(c.id)),
-            [],
             agora,
             // meta "N duplas" conta as supervisionadas daquele cronograma
             duplas
@@ -261,10 +270,14 @@ export function AgendaAuxiliar({
 export function CabecalhoAuxiliar({
   duplas,
   hoje,
+  seletor,
 }: {
   /** Duplas supervisionadas (a página já filtra pelo escopo). */
   duplas: Dupla[];
   hoje: string;
+  /** Seletor de contexto de turma — encosta à direita do header quando a
+   *  página manda (multi-turma no escopo dele, REALIZA-73). */
+  seletor?: ReactNode;
 }) {
   const correndo = duplas.filter(
     (d) => d.status === "ativa" || d.status === "pausada"
@@ -276,15 +289,18 @@ export function CabecalhoAuxiliar({
   ];
   const { seg, dom } = semanaBounds(new Date(`${hoje}T12:00:00Z`));
   return (
-    <header>
-      <h1 className="text-2xl font-semibold tracking-tight">
-        Agenda das minhas duplas
-      </h1>
-      <p className="mt-1 text-sm text-muted-foreground">
-        {turmasTxt.join(" e ")}
-        {correndo.length > 0 &&
-          `${turmasTxt.length > 0 ? " · " : ""}semana ${semanaIso(hoje)}, ${Number(seg.slice(8, 10))} a ${Number(dom.slice(8, 10))} de ${mesLongo(dom)}`}
-      </p>
+    <header className="flex flex-wrap items-end justify-between gap-3">
+      <div>
+        <h1 className="text-2xl font-semibold tracking-tight">
+          Agenda das minhas duplas
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {turmasTxt.join(" e ")}
+          {correndo.length > 0 &&
+            `${turmasTxt.length > 0 ? " · " : ""}semana ${semanaIso(hoje)}, ${Number(seg.slice(8, 10))} a ${Number(dom.slice(8, 10))} de ${mesLongo(dom)}`}
+        </p>
+      </div>
+      {seletor}
     </header>
   );
 }
@@ -390,10 +406,29 @@ function CardDuplaAux({
             destNome={d.mentor?.nome ?? "mentor"}
             telefone={d.mentor?.whatsapp ?? null}
             mensagem={lembrete.corpo}
+            destinatarios={{
+              // a pendência é do mentor; o jovem recebe o check-in neutro
+              padrao: "mentor",
+              mentor: {
+                nome: d.mentor?.nome ?? "mentor",
+                telefone: d.mentor?.whatsapp ?? null,
+                mensagem: lembrete.corpo,
+              },
+              mentorado: {
+                nome,
+                telefone: d.mentorado?.whatsapp ?? null,
+                mensagem:
+                  msgsContato({
+                    eu: meuNome,
+                    mentorNome: (d.mentor?.nome ?? "").split(" ")[0],
+                    mentoradoNome: nome,
+                  }).mentorado ?? "",
+              },
+            }}
             nudge={{
               destino: "mentor",
               titulo: lembrete.titulo,
-              href: `/duplas/${d.id}`,
+              href: lembrete.href ?? `/duplas/${d.id}`,
               bloqueadoAte: lembreteBloqueadoAte(nudge, agora),
             }}
           />
@@ -408,8 +443,7 @@ function CardDuplaAux({
 
 // ---------- aba Consolidada ----------
 
-const ICONE_TIPO: Record<ItemConsolidado["tipo"], typeof ChatsCircle> = {
-  supervisao: ChatsCircle,
+const ICONE_TIPO: Record<ItemConsolidado["tipo"], typeof Users> = {
   encontro: Users,
   sessao_esp: Sparkle,
   oficial: Flag,
@@ -417,7 +451,6 @@ const ICONE_TIPO: Record<ItemConsolidado["tipo"], typeof ChatsCircle> = {
 };
 
 const ROTULO_TIPO: Record<ItemConsolidado["tipo"], string> = {
-  supervisao: "Supervisão",
   encontro: "Encontro",
   sessao_esp: "Trilha de especialista",
   oficial: "Evento oficial",
@@ -531,8 +564,8 @@ function LinhaConsolidada({
         <div className="flex gap-3">
           <div className="w-12 shrink-0 pt-0.5 text-right">
             <span className="block text-sm font-semibold tabular-nums">
-              {/* inicio é ISO instante (encontro) ou "YYYY-MM-DD" (supervisão,
-                  oficial, a_agendar — sem hora honesta pra mostrar) */}
+              {/* inicio é ISO instante (encontro) ou "YYYY-MM-DD" (oficial,
+                  a_agendar — sem hora honesta pra mostrar) */}
               {item.inicio.includes("T")
                 ? fmtHoraMin
                     .format(new Date(item.inicio))
@@ -572,16 +605,45 @@ function LinhaConsolidada({
                     Ver ficha ›
                   </Link>
                 )}
-                {lembrete && item.duplaId && (
+                {lembrete && item.duplaId && dupla && (
                   <DuplaWaAcao
                     duplaId={item.duplaId}
-                    destNome={dupla?.mentor?.nome ?? "mentor"}
-                    telefone={dupla?.mentor?.whatsapp ?? null}
+                    destNome={dupla.mentor?.nome ?? "mentor"}
+                    telefone={dupla.mentor?.whatsapp ?? null}
                     mensagem={lembrete.corpo}
+                    destinatarios={{
+                      // a pendência é do mentor; o jovem recebe o check-in
+                      // neutro, nunca a cobrança operacional
+                      padrao: "mentor",
+                      mentor: {
+                        nome: dupla.mentor?.nome ?? "mentor",
+                        telefone: dupla.mentor?.whatsapp ?? null,
+                        mensagem: lembrete.corpo,
+                      },
+                      mentorado: {
+                        nome:
+                          dupla.mentorado?.nome_social ||
+                          dupla.mentorado?.nome ||
+                          "Jovem",
+                        telefone: dupla.mentorado?.whatsapp ?? null,
+                        mensagem:
+                          msgsContato({
+                            eu: meuNome,
+                            mentorNome: (dupla.mentor?.nome ?? "").split(" ")[0],
+                            mentoradoNome:
+                              dupla.mentorado?.nome_social ||
+                              dupla.mentorado?.nome ||
+                              "Jovem",
+                          }).mentorado ?? "",
+                      },
+                    }}
                     nudge={{
                       destino: "mentor",
                       titulo: lembrete.titulo,
-                      href: item.href ?? `/duplas/${item.duplaId}`,
+                      href:
+                        item.href ??
+                        lembrete.href ??
+                        `/duplas/${item.duplaId}`,
                       bloqueadoAte: lembreteBloqueadoAte(nudge, agora),
                     }}
                   />

@@ -32,15 +32,9 @@ test.describe("guarda — Enviar formulário não oferece instrumentos da jornad
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
     await page.goto(`/duplas/${DUPLA_ID}`);
 
-    // o Enviar formulário mora no "Mais" do header da ficha — menuitem
-    // comum que abre o dialog controlado (mesmo padrão do Solicitar
-    // especialista; REALIZA-157 tirou o Dialog.Trigger de dentro do popup)
-    const item = page.getByRole("menuitem", { name: "Enviar formulário" });
-    await agirComConfirma(
-      () =>
-        page.getByRole("button", { name: "Mais ações da dupla" }).click(),
-      () => item.isVisible()
-    );
+    // o Enviar formulário é botão em linha no header da ficha no desktop
+    // (REALIZA-343; no celular segue no "Mais") e abre o dialog controlado
+    const item = page.getByRole("button", { name: "Enviar formulário", exact: true });
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
       () => item.click(),

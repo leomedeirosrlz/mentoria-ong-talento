@@ -41,7 +41,7 @@ describe("templates de e-mail", () => {
       ctaHref: "https://realizavc.vercel.app/materiais",
     });
     dump("email-material", html);
-    expect(html).toContain("Biblioteca de materiais");
+    expect(html).toContain("Materiais de apoio");
     expect(html).toContain("Abrir material");
   });
 

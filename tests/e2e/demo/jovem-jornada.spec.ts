@@ -2,12 +2,13 @@ import { entrarNaDemo, expect, test } from "../helpers";
 
 // WP7 (REALIZA-140) — "Minha jornada" em /jovem/materiais, espelhada no
 // modo demo (specs demo não escrevem em backend nenhum). REALIZA-194
-// (v5c): a trilha virou a estante "Meus instrumentos" — um card-produto
-// por instrumento da régua + a devolutiva de terceiros; trancados ficam
-// visíveis dessaturados com a data de liberação (não há mais <details>
-// "Daqui pra frente" nem bloco "A fazer agora" — a ação é o próprio
-// card). Snippets de resposta saíram dos cards por desenho: a resposta
-// mora no "Rever resposta", não na estante.
+// (v5c→v6a): a trilha é a estante "Meus instrumentos" — um card-produto
+// por instrumento da régua (capa desenhada, uma linha de estado, UM gesto
+// por card) + a devolutiva de terceiros; trancados seguem visíveis com a
+// data de liberação em texto, sem cadeado. A avaliação de encontro não é
+// card: pendente vira banner no topo da seção, em dia vira o acesso
+// quieto ao histórico ("Suas avaliações"). Snippets de resposta saíram
+// dos cards por desenho: a resposta mora no "Rever resposta".
 //
 // A fixture da persona mentorado (Ana × Ricardo, dupla d-ok na T1) tem a
 // jornada da janela aberta INTEIRA feita: roda inicial, visão, metas e PDM
@@ -50,8 +51,8 @@ test.describe("demo — Minha jornada do mentorado", () => {
       )
     ).toBeVisible();
 
-    // a estante — os 5 instrumentos da janela como cards-produto, todos
-    // com a tag "Feito" + a data
+    // a estante — os 4 instrumentos de entrega única da janela como
+    // cards-produto, todos com a tag "Feito · <data>" na linha de estado
     const trilha = page.locator(
       'section[aria-labelledby="meus-instrumentos-titulo"]'
     );
@@ -60,30 +61,36 @@ test.describe("demo — Minha jornada do mentorado", () => {
       "Construindo a sua Visão",
       "Definindo minhas metas",
       "PDM · Plano de Desenvolvimento",
-      "Avaliação do encontro",
     ]) {
       await expect(
         trilha.getByRole("heading", { name: titulo })
       ).toBeVisible();
     }
-    // o chip da janela do guia mora em cada card — a régua 1–7 segue na
-    // ordem do guia, sem numeração "Estação N" (v5c tirou o termo)
-    await expect(trilha.getByText("Enc. 1–4").first()).toBeVisible();
-    await expect(trilha.getByText("Feito", { exact: true })).toHaveCount(5);
-    await expect(trilha.getByText(/Respondido em /).first()).toBeVisible();
+    await expect(trilha.getByText(/^Feito · /)).toHaveCount(4);
 
-    // snippets de resposta saíram da estante por desenho (v5c): o texto
+    // snippets de resposta saíram da estante por desenho: o texto
     // da visão NÃO aparece no card — a resposta vive no "Rever resposta"
     await expect(trilha.getByText("Você escreveu")).toHaveCount(0);
     await expect(
       trilha.getByText(/Em até 3 anos, serei uma profissional formada/)
     ).toHaveCount(0);
-    // a recorrente nunca "fecha": em dia conta X de Y, com "Ver resposta"
-    // (exact — os cards feitos respondem como "Rever resposta — <título>")
-    await expect(trilha.getByText("em dia · 4 de 4")).toBeVisible();
+    // a recorrente saiu da estante (v6a): sem pendência ela não é card
+    // nem banner — vira o acesso quieto ao histórico na linha do título,
+    // e cada registro abre o dialog de leitura de sempre
     await expect(
-      trilha.getByRole("button", { name: "Ver resposta", exact: true })
+      trilha.getByRole("heading", { name: "Avaliação do encontro" })
+    ).toHaveCount(0);
+    await trilha
+      .getByRole("button", { name: /Suas avaliações/ })
+      .click();
+    const hist = page.getByRole("dialog");
+    await expect(
+      hist.getByRole("heading", { name: "Suas avaliações dos encontros" })
     ).toBeVisible();
+    await expect(
+      hist.getByRole("button", { name: "Ver resposta", exact: true })
+    ).toHaveCount(4);
+    await page.keyboard.press("Escape");
 
     // a bandeira terminal fecha a estante com a data do enc. 16 da turma
     await expect(trilha.getByText("Celebração da jornada")).toBeVisible();
@@ -96,13 +103,12 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/materiais");
 
-    // qualquer instrumento feito com resposta+campos ganha o botão — na
-    // estante v5c ele mora direto no card feito, sem recibo fechado
+    // qualquer instrumento feito com resposta+campos é o gatilho — na
+    // estante o card feito inteiro é o gesto único (render prop com
+    // role=button), sem recibo fechado nem botão separado
     const trilha = page.locator(
       'section[aria-labelledby="meus-instrumentos-titulo"]'
     );
-    // o card feito inteiro é o gatilho do Rever (v5c — render prop com
-    // role=button): clicar no card da roda inicial abre o dialog
     await trilha
       .getByRole("button", { name: /Roda da Vida · leitura inicial/ })
       .click();
@@ -122,8 +128,9 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/materiais");
 
-    // v5c — os dois instrumentos futuros da Ana são cards trancados na
-    // própria estante: nome + janela + data de liberação, nunca card mudo
+    // v6a — os dois instrumentos futuros da Ana são cards trancados na
+    // própria estante: nome + sub + a liberação em texto, sem cadeado
+    // nem tag "fechado" — a data é a resposta
     const trilha = page.locator(
       'section[aria-labelledby="meus-instrumentos-titulo"]'
     );
@@ -133,7 +140,7 @@ test.describe("demo — Minha jornada do mentorado", () => {
     ]) {
       const card = trilha.locator("article", { hasText: titulo });
       await expect(card).toBeVisible();
-      await expect(card.getByText("Ainda não liberado")).toBeVisible();
+      await expect(card.getByText(/libera no encontro/)).toBeVisible();
     }
     await expect(trilha.getByText(/libera no encontro \d+/)).toHaveCount(2);
 
@@ -418,18 +425,28 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     await expect(
       instrumentos.getByRole("button", { name: /Enviar em lote/ }).first()
     ).toBeVisible();
-    // ...e lê as respostas no formulário oficial — o link navega pra
-    // /formularios/<id> (coord-only; supervisor nem vê)
-    const verRespostas = instrumentos
-      .getByRole("link", { name: "Ver respostas" })
+    // ...e lê as respostas na página do instrumento — REALIZA-331: o
+    // card inteiro abre /materiais/instrumentos/<chave> com as duplas do
+    // escopo e a resposta por linha (o /formularios/<id> fica pros forms
+    // de bordo)
+    const abrir = instrumentos
+      .getByRole("link", { name: /^Abrir / })
       .first();
-    await expect(verRespostas).toBeVisible();
-    await expect(verRespostas).toHaveAttribute(
+    await expect(abrir).toBeVisible();
+    await expect(abrir).toHaveAttribute(
       "href",
-      /^\/formularios\//
+      /^\/materiais\/instrumentos\//
     );
-    await verRespostas.click();
-    await expect(page).toHaveURL(/\/formularios\/[^/]+/);
+    await abrir.click();
+    await expect(page).toHaveURL(/\/materiais\/instrumentos\/[^/]+/);
+    // seletor no topo troca de instrumento sem sair da leitura + uma
+    // linha por dupla do escopo (o mentor lê as próprias aqui também)
+    await expect(
+      page.getByRole("navigation", { name: "Trocar de instrumento" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: "Ficha" }).first()
+    ).toBeVisible();
     await page.goBack();
 
     // REALIZA-257: a janela do guia é indicador pra coordenação, não trava —
@@ -447,8 +464,8 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     // o cadeado é do papel que a janela segura — não da coord
     await expect(cardForaDaJanela.getByText("ainda não abriu")).toHaveCount(0);
     await expect(
-      cardForaDaJanela.getByRole("link", { name: /^Ver respostas/ })
-    ).toHaveAttribute("href", /^\/formularios\//);
+      cardForaDaJanela.getByRole("link", { name: /^Abrir / })
+    ).toHaveAttribute("href", /^\/materiais\/instrumentos\//);
     // e nada de cópia de lote que minta ("já receberam ou já responderam")
     await expect(
       cardForaDaJanela.getByText(/Nada a enviar agora/)
@@ -468,7 +485,7 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     await expect(bib.getByRole("heading", { name: /Todos os materiais/ })).toBeVisible();
     await expect(bib.getByText("sem conteúdo")).toHaveCount(0);
     await expect(page.locator("details")).toHaveCount(0);
-    await bib.getByRole("searchbox", { name: "Buscar material" }).fill("guia do mentor");
+    await bib.getByRole("searchbox", { name: "Buscar material de apoio" }).fill("guia do mentor");
     await expect(bib.getByText("Guia do Mentor DPP")).toBeVisible();
     await expect(bib.getByText("Plataforma de mentoria")).toHaveCount(0);
   });
@@ -515,14 +532,20 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
       instrumentos.getByRole("link", { name: "Ver respostas" })
     ).toHaveCount(0);
     // card fora da janela: a janela é o estado dele (cadeado + data) e ele
-    // segue leitura pura — a trava de janela vale pro supervisor, só a
-    // coordenação consulta/emite fora dela (REALIZA-257)
+    // segue sem ação — a trava de janela vale pro supervisor, só a
+    // coordenação consulta/emite fora dela (REALIZA-257). O único link é
+    // o de navegação pra página do instrumento (leitura pura por lá).
     const trancado = instrumentos.locator("article", {
       hasText: "Avaliação Geral - 360º · mentorado(a)",
     });
     await expect(trancado.getByText("ainda não abriu")).toBeVisible();
     await expect(trancado.getByText(/libera no encontro 16/)).toBeVisible();
-    await expect(trancado.getByRole("link")).toHaveCount(0);
+    const linksTrancado = trancado.getByRole("link");
+    await expect(linksTrancado).toHaveCount(1);
+    await expect(linksTrancado.first()).toHaveAttribute(
+      "href",
+      /^\/materiais\/instrumentos\//
+    );
     await expect(trancado.getByRole("button")).toHaveCount(0);
     // o rodapé "Intakes… → Formulários" é coord-only
     await expect(

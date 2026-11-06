@@ -370,11 +370,6 @@ export default async function JovemHome() {
     );
   };
 
-  const waCoord = waLink(
-    coordenacao[0]?.whatsapp,
-    `Olá! Sou ${nomeTela}, mentorado(a) do programa, e preciso falar com a equipe.`
-  );
-
   // lembrete permanente do "Preencher depois" (REALIZA-114): sem grade o
   // cruzamento da agenda não tem com o que cruzar — a faixa fica até a
   // pessoa preencher no Perfil (quem "pulou" no wizard cai no mesmo estado)
@@ -485,7 +480,7 @@ export default async function JovemHome() {
 
       {/* canal de segurança sempre à mão, sem competir com o encontro: uma
           linha discreta logo abaixo do que fazer agora */}
-      <PedirAjudaLinha waCoord={waCoord} />
+      <PedirAjudaLinha equipe={coordenacao} nomeJovem={primeiroNome} />
 
       {(temDpp || feitosEsp > 0) && (
         <section
@@ -828,7 +823,7 @@ export default async function JovemHome() {
           <div className="mb-2.5 flex items-center justify-between gap-3">
             <h2 id="materiais-titulo" className="flex items-center gap-2 font-semibold">
               <FolderOpen size={18} className="text-muted-foreground" aria-hidden />
-              Materiais do programa
+              Materiais de apoio
             </h2>
             <Link
               href="/jovem/materiais"

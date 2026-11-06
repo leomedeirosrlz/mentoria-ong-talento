@@ -1,6 +1,10 @@
 import { cache } from "react";
+import { unstable_cache } from "next/cache";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import { createServiceClient } from "@/lib/supabase/service";
 import { comparaNome, registroTardio } from "./ciclo";
+import { audienciasDe, veMaterial } from "./materiais";
 import { demoLidas, demoOnboarded, demoRole } from "./demo/mode";
 import {
   demoAlertasRegistros,
@@ -326,33 +330,64 @@ export const getMe = cache(async (): Promise<Profile | null> => {
     : null;
 });
 
-export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
-  const demo = await demoRole();
-  if (demo) return demoCicloEventos();
-  const supabase = await createClient();
-  const { data, error } = await supabase
+// Leituras de referência do programa com cache compartilhado entre
+// requests/usuários (unstable_cache — o createClient de sessão é proibido
+// lá dentro por ler cookies; quem escreve invalida via updateTag e o
+// revalidate é só rede de segurança). Sem service key caem no caminho de
+// sessão — mesmo SQL.
+// INVARIANTE: as policies SELECT de ciclo_eventos, cronogramas e
+// especialista_eventos (0065) restringem a papéis adultos — mentorado
+// recebia [] sob sessão e pelo service-role passa a ver o catálogo. Não
+// chamar estes getters em contexto de jovem (auditoria 2026-11: nenhum
+// caller em (jovem)/, /f/, /t/ e afins). documento_templates é
+// using(true) real; materiais é re-filtrado por veMaterial no getter.
+async function buscaCicloEventos(db: SupabaseClient) {
+  const { data, error } = await db
     .from("ciclo_eventos")
     .select("*")
     // a ordem canônica é `ordem` (0062) — data nullable jogaria etapas
     // concluídas pro fim da lista; quem precisa de data refiltra por tipo
     .order("ordem", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as CicloEvento[];
+}
+
+const cicloEventosDb = unstable_cache(
+  () => buscaCicloEventos(createServiceClient()),
+  ["ciclo-eventos"],
+  { tags: ["ciclo-eventos"], revalidate: 3600 }
+);
+
+export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
+  const demo = await demoRole();
+  if (demo) return demoCicloEventos();
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) return cicloEventosDb();
+  return buscaCicloEventos(await createClient());
 });
 
-/** Todos os cronogramas (0061) — leitura livre pra qualquer papel, como os
- *  eventos: o seletor de turma/calendário é a régua que escopa o recorte. */
-export const getCronogramas = cache(async (): Promise<Cronograma[]> => {
-  const demo = await demoRole();
-  if (demo) return demoCronogramas();
-  const supabase = await createClient();
-  const { data, error } = await supabase
+/** Todos os cronogramas (0061) — papéis adultos leem o catálogo inteiro; o
+ *  seletor de turma/calendário é a régua que escopa o recorte. */
+async function buscaCronogramas(db: SupabaseClient) {
+  const { data, error } = await db
     .from("cronogramas")
     .select("*")
     .order("turma")
     .order("nome");
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as Cronograma[];
+}
+
+const cronogramasDb = unstable_cache(
+  () => buscaCronogramas(createServiceClient()),
+  ["cronogramas"],
+  { tags: ["cronogramas"], revalidate: 3600 }
+);
+
+export const getCronogramas = cache(async (): Promise<Cronograma[]> => {
+  const demo = await demoRole();
+  if (demo) return demoCronogramas();
+  if (process.env.SUPABASE_SERVICE_ROLE_KEY) return cronogramasDb();
+  return buscaCronogramas(await createClient());
 });
 
 export const DUPLA_SELECT = `
@@ -361,7 +396,8 @@ export const DUPLA_SELECT = `
   mentorado:mentorados(${MENTORADO_COLS_PAR}),
   supervisor:profiles!duplas_supervisor_id_fkey(${PROFILE_COLS_PUBLICAS}),
   encontros(*, registro:registros(id, encontro_id, tema, atividades, avaliacao, dificuldade, dificuldade_detalhe, precisa_apoio, proximo_passo, proximo_passo_detalhe, reflexoes, observacoes, ferramenta, created_at, updated_at, created_by, autor:profiles!registros_created_by_fkey(nome)),
-    avaliacao_jovem:avaliacoes_encontro(*)),
+    avaliacao_jovem:avaliacoes_encontro(*),
+    remarcacoes:encontro_remarcacoes(id, data_anterior, data_nova, motivo, created_at)),
   encaminhamentos(*),
   notas:encontro_notas(*)
 `;
@@ -707,16 +743,36 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   return null;
 });
 
-export const getMateriais = cache(async (): Promise<Material[]> => {
-  const demo = await demoRole();
-  if (demo) return demoMateriais(demo);
-  const supabase = await createClient();
-  const { data, error } = await supabase
+async function buscaMateriais(db: SupabaseClient) {
+  const { data, error } = await db
     .from("materiais")
     .select("*")
     .order("ordem", { ascending: true });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []) as Material[];
+}
+
+const materiaisDb = unstable_cache(
+  () => buscaMateriais(createServiceClient()),
+  ["materiais"],
+  { tags: ["materiais"], revalidate: 3600 }
+);
+
+// audiencias passou a filtrar por papel na RLS (0139) — com o cache de
+// service role a lista crua vem completa pra qualquer papel, então o
+// veMaterial roda AQUI e vale pra todos os callers de uma vez (antes as
+// páginas do jovem não re-filtravam: metadado de material restrito vazava
+// como card morto). Páginas que ainda re-filtram veMaterial: idempotente.
+export const getMateriais = cache(async (): Promise<Material[]> => {
+  const demo = await demoRole();
+  if (demo) return demoMateriais(demo);
+  const [todos, me] = await Promise.all([
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+      ? materiaisDb()
+      : buscaMateriais(await createClient()),
+    getMe(),
+  ]);
+  return todos.filter((m) => veMaterial(audienciasDe(m), me));
 });
 
 /** mentor_profiles é table-level legível por autenticado (0001) — a lista
@@ -1119,20 +1175,123 @@ export const getDuplasOpcoes = cache(async (): Promise<DuplaOpcao[]> => {
     );
 });
 
+/** Recorte enxuto da dupla pra painéis — vínculo + nome do jovem + os
+ *  contatos que o Lembrar e a prévia de e-mail usam. O contato do mentor
+ *  sai da view profiles_contato (mesma régua do DUPLA_SELECT); o do jovem
+ *  é grant de coluna público (MENTORADO_COLS_PAR). Sem a árvore de
+ *  encontros — quem precisa dela chama getDuplas. */
+export type DuplaInfo = {
+  id: string;
+  status: DuplaStatus;
+  trilha: Trilha;
+  cronograma_id: string | null;
+  turma: string;
+  mentor: { id: string; email: string; whatsapp: string | null };
+  mentorado: {
+    id: string;
+    nome: string;
+    nome_social: string | null;
+    email: string | null;
+    whatsapp: string | null;
+  };
+};
+
+const DUPLA_INFO_SELECT = `
+  id, status, trilha, cronograma_id, turma,
+  mentor:profiles!duplas_mentor_id_fkey(id),
+  mentorado:mentorados(id, nome, nome_social, whatsapp, email)
+`;
+
+export const getDuplasInfo = cache(async (): Promise<DuplaInfo[]> => {
+  const demo = await demoRole();
+  if (demo) {
+    return demoDuplas(demo).map((d) => ({
+      id: d.id,
+      status: d.status,
+      trilha: d.trilha,
+      cronograma_id: d.cronograma_id,
+      turma: d.turma,
+      mentor: {
+        id: d.mentor.id,
+        email: d.mentor.email ?? "",
+        whatsapp: d.mentor.whatsapp ?? null,
+      },
+      mentorado: {
+        id: d.mentorado.id,
+        nome: d.mentorado.nome,
+        nome_social: d.mentorado.nome_social ?? null,
+        email: d.mentorado.email ?? null,
+        whatsapp: d.mentorado.whatsapp ?? null,
+      },
+    }));
+  }
+  const supabase = await createClient();
+  const [{ data, error }, contatos] = await Promise.all([
+    supabase
+      .from("duplas")
+      .select(DUPLA_INFO_SELECT)
+      .order("created_at", { ascending: true }),
+    getContatos(),
+  ]);
+  if (error) throw error;
+  const norm = <T,>(v: T | T[] | null): T | null =>
+    Array.isArray(v) ? (v[0] ?? null) : v;
+  type Row = Omit<DuplaInfo, "mentor" | "mentorado"> & {
+    mentor: { id: string } | { id: string }[] | null;
+    mentorado: DuplaInfo["mentorado"] | DuplaInfo["mentorado"][] | null;
+  };
+  return ((data ?? []) as unknown as Row[]).map((d) => {
+    const mentor = norm(d.mentor);
+    const contato = mentor ? contatos.get(mentor.id) : undefined;
+    return {
+      id: d.id,
+      status: d.status,
+      trilha: d.trilha,
+      cronograma_id: d.cronograma_id,
+      turma: d.turma,
+      mentor: {
+        id: mentor?.id ?? "",
+        email: contato?.email ?? "",
+        whatsapp: contato?.whatsapp ?? null,
+      },
+      mentorado: norm(d.mentorado) ?? {
+        id: "",
+        nome: "",
+        nome_social: null,
+        email: null,
+        whatsapp: null,
+      },
+    };
+  });
+});
+
 // ---------- trilha de especialista (0027) ----------
 
 /** Os 5 encontros do guia do especialista — título + foco, na ordem. */
+// especialista_eventos é catálogo de programa (0065:37, 4 papéis adultos)
+// — mesmo cache compartilhado das outras referências. Não tem escrita no
+// app hoje; quem criar um writer precisa chamar updateTag da tag abaixo.
+async function buscaEspecialistaEventos(db: SupabaseClient) {
+  const { data, error } = await db
+    .from("especialista_eventos")
+    .select("numero, titulo, foco")
+    .order("numero");
+  if (error) throw error;
+  return (data ?? []) as EspecialistaEvento[];
+}
+
+const especialistaEventosDb = unstable_cache(
+  () => buscaEspecialistaEventos(createServiceClient()),
+  ["especialista-eventos"],
+  { tags: ["especialista-eventos"], revalidate: 3600 }
+);
+
 export const getEspecialistaEventos = cache(
   async (): Promise<EspecialistaEvento[]> => {
     const demo = await demoRole();
     if (demo) return demoEspecialistaEventos();
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("especialista_eventos")
-      .select("numero, titulo, foco")
-      .order("numero");
-    if (error) throw error;
-    return data ?? [];
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) return especialistaEventosDb();
+    return buscaEspecialistaEventos(await createClient());
   }
 );
 
@@ -1232,6 +1391,28 @@ export const getRelatorioLinks = cache(
 /** Templates de documento ativos — alimenta o seletor do recorte
  *  'assinaturas' do NovoLinkDialog. Leitura authenticated (0033); quem não
  *  é coordenador nem chama (a página já barra). */
+// documento_templates é a única tabela de get* com using(true) real
+// (0033:68) — global até pra anon. Sem escrita no app; writer futuro
+// precisa chamar updateTag("documento-templates").
+async function buscaDocumentoTemplates(db: SupabaseClient) {
+  const { data, error } = await db
+    .from("documento_templates")
+    .select("slug, titulo")
+    .eq("ativo", true)
+    .order("titulo");
+  if (error) {
+    console.error("getDocumentoTemplates:", error);
+    return [];
+  }
+  return (data ?? []) as Pick<DocumentoTemplate, "slug" | "titulo">[];
+}
+
+const documentoTemplatesDb = unstable_cache(
+  () => buscaDocumentoTemplates(createServiceClient()),
+  ["documento-templates"],
+  { tags: ["documento-templates"], revalidate: 3600 }
+);
+
 export const getDocumentoTemplates = cache(
   async (): Promise<Pick<DocumentoTemplate, "slug" | "titulo">[]> => {
     if (await demoRole()) {
@@ -1239,17 +1420,8 @@ export const getDocumentoTemplates = cache(
         .filter((t) => t.ativo)
         .map((t) => ({ slug: t.slug, titulo: t.titulo }));
     }
-    const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("documento_templates")
-      .select("slug, titulo")
-      .eq("ativo", true)
-      .order("titulo");
-    if (error) {
-      console.error("getDocumentoTemplates:", error);
-      return [];
-    }
-    return data ?? [];
+    if (process.env.SUPABASE_SERVICE_ROLE_KEY) return documentoTemplatesDb();
+    return buscaDocumentoTemplates(await createClient());
   }
 );
 

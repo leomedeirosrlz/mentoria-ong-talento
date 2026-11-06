@@ -1,9 +1,11 @@
 "use client";
 
-import { type CSSProperties, useState } from "react";
+import { type CSSProperties, useEffect, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import dynamic from "next/dynamic";
 import {
+  CaretRight,
   Clock,
   DotsThree,
   DownloadSimple,
@@ -40,13 +42,13 @@ import type {
   EspecialistaEvento,
 } from "@/lib/types";
 import { cn, normaliza } from "@/lib/utils";
+import { useFadeX } from "@/lib/use-fade-x";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { DuplaLinha, GRID_DUPLA_LG, type TomSituacao } from "@/components/dupla-linha";
+import { DuplaLinhaMenu } from "@/components/dupla-linha-menu";
 import { SaudePrograma } from "@/components/saude-programa";
 import { AvaliacaoBadge } from "@/components/semaforo";
-import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
-import { ImportarCsvDialog } from "@/components/importar-csv-dialog";
 import { DuplaWaAcao } from "@/components/dupla-wa-acao";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -69,6 +71,14 @@ import {
 
 const OVERLINE =
   "text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]";
+
+// dialogs da coordenação — atrás de clique, viram chunk sob demanda
+const NovaDuplaDialog = dynamic(() =>
+  import("@/components/nova-dupla-dialog").then((m) => m.NovaDuplaDialog)
+);
+const ImportarCsvDialog = dynamic(() =>
+  import("@/components/importar-csv-dialog").then((m) => m.ImportarCsvDialog)
+);
 
 type Saude = ReturnType<typeof saudadeDaDupla>;
 
@@ -207,6 +217,7 @@ function LinhaDupla({
   mostrarSupervisor,
   wa,
   menu,
+  dimDesistentes,
   i,
 }: {
   d: Dupla;
@@ -216,8 +227,11 @@ function LinhaDupla({
   /** ação WhatsApp sempre visível — "Lembrar" onde há pendência apontável
    *  em dupla ativa, "Chamar" nas demais (o DuplaWaAcao resolve o resto). */
   wa: React.ReactNode;
-  /** ⋮ das ações secundárias do papel — ex.: "Registrar supervisão". */
+  /** o ⋯ real — o caller decide o conteúdo por papel */
   menu?: React.ReactNode;
+  /** na visão "todas" a desistente esmaece — está fora da régua, não é
+   *  prioridade do radar (a ficha continua a um clique) */
+  dimDesistentes?: boolean;
   i: number;
 }) {
   const estado = estadoDaDupla(d, saude);
@@ -235,8 +249,8 @@ function LinhaDupla({
     d.turma ? turmaLonga(d.turma) : null,
     mostrarSupervisor
       ? d.supervisor
-        ? `sup. ${d.supervisor.nome}`
-        : "sem supervisor"
+        ? `auxiliar executivo ${d.supervisor.nome}`
+        : "sem auxiliar executivo"
       : null,
   ]
     .filter(Boolean)
@@ -296,6 +310,7 @@ function LinhaDupla({
       menu={menu}
       fichaHref={`/duplas/${d.id}`}
       fichaNome={d.mentorado.nome.split(" ")[0]}
+      className={dimDesistentes && desistenteDa(d) ? "opacity-60" : undefined}
     />
   );
 }
@@ -309,6 +324,7 @@ function LinhaMini({
   eventos,
   hojeStr,
   wa,
+  menu,
   i,
 }: {
   d: Dupla;
@@ -316,6 +332,8 @@ function LinhaMini({
   eventos: CicloEvento[];
   hojeStr: string;
   wa: React.ReactNode;
+  /** o ⋯ real — colapsada não significa sem ações */
+  menu?: React.ReactNode;
   i: number;
 }) {
   const feitos = d.encontros.filter((e) => e.status === "realizado").length;
@@ -376,7 +394,10 @@ function LinhaMini({
           )}
         </span>
         <span className="whitespace-nowrap text-xs font-semibold text-foreground">
-          {feitos}/{total} · esp. {saude.esperado}
+          {feitos}/{total}
+          {/* sem cronograma não há esperado pra comparar — "esp. 0"
+              mentia a mesma coisa que o tick escondido acima */}
+          {saude.esperado > 0 && ` · esp. ${saude.esperado}`}
         </span>
       </span>
       <span className="hidden truncate text-xs text-muted-foreground @4xl:inline">
@@ -387,16 +408,20 @@ function LinhaMini({
           ações inteira (nomes à esquerda, ações à direita) */}
       <span className="flex items-center gap-1.5 @4xl:contents">
         <span className="relative z-20">{wa}</span>
-        <span
-          aria-hidden
-          className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
-            "pointer-events-none w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
-          )}
-        >
-          <span className="hidden whitespace-nowrap md:inline">Ações</span>
-          <DotsThree weight="bold" />
-        </span>
+        {menu != null ? (
+          <span className="relative z-20">{menu}</span>
+        ) : (
+          <span
+            aria-hidden
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "pointer-events-none w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
+            )}
+          >
+            <span className="hidden whitespace-nowrap md:inline">Ações</span>
+            <DotsThree weight="bold" />
+          </span>
+        )}
       </span>
     </div>
   );
@@ -442,6 +467,16 @@ const CATS: { id: FiltroCat; nome: string; dot: string | null }[] = [
   { id: "apoio", nome: "Apoio", dot: null },
 ];
 
+/** O critério único de desistente — o chip, a contagem do cabeçalho e o
+ *  esmaecer da linha leem a mesma regra: encerrada OU desfecho que não é
+ *  conclusão (concluída com sucesso nunca conta). */
+function desistenteDa(d: Dupla): boolean {
+  return (
+    d.status === "encerrada" ||
+    ehDesistente({ desfecho: d.desfecho, status: d.status })
+  );
+}
+
 /** Cada chip é uma parte da mesma régua do resumo: "Em andamento" são as
  *  ativas (risco e atenção incluídas); "Concluídas" são as que fecharam com
  *  êxito; "Desistentes" são as encerradas/interrompidas. */
@@ -460,7 +495,7 @@ function chipBate(f: FiltroCat, d: Dupla, s: Saude): boolean {
     case "concluida":
       return d.status === "concluida" || ehConcluida({ desfecho: d.desfecho });
     case "desistente":
-      return d.status === "encerrada" || ehDesistente({ desfecho: d.desfecho, status: d.status });
+      return desistenteDa(d);
     case "apoio":
       return s.apoio.aberto;
   }
@@ -512,7 +547,7 @@ function resumoDaLista(
   lista: Dupla[],
   saudePorId: Map<string, Saude>,
   visao: VisaoDuplas
-): { n: string; itens: { texto: string; forte?: boolean }[] } {
+): { n: string; desistentes: number; itens: { texto: string; forte?: boolean }[] } {
   const cont = { risco: 0, atencao: 0, andamento: 0, pausada: 0, apoio: 0 };
   for (const d of lista) {
     const s = saudePorId.get(d.id)!;
@@ -521,10 +556,13 @@ function resumoDaLista(
       cont[s.semaforo === "ok" ? "andamento" : s.semaforo]++;
     else if (d.status === "pausada") cont.pausada++;
   }
+  // desistentes não contam no sujeito — a mancha vai no sufixo discreto
+  const desistentes = lista.filter(desistenteDa).length;
+  const nVivas = lista.length - desistentes;
   const sujeito =
     visao === "especialista"
-      ? `${lista.length} ${lista.length === 1 ? "trilha" : "trilhas"}`
-      : `${lista.length} ${lista.length === 1 ? "dupla" : "duplas"}`;
+      ? `${nVivas} ${nVivas === 1 ? "trilha" : "trilhas"}`
+      : `${nVivas} ${nVivas === 1 ? "dupla" : "duplas"}`;
   const itens = [
     cont.risco > 0 && { texto: `${cont.risco} em risco`, forte: true },
     cont.atencao > 0 && { texto: `${cont.atencao} em atenção`, forte: true },
@@ -532,13 +570,20 @@ function resumoDaLista(
     cont.pausada > 0 && { texto: `${cont.pausada} pausada${cont.pausada > 1 ? "s" : ""}` },
     cont.andamento > 0 && { texto: `${cont.andamento} em dia` },
   ].filter(Boolean) as { texto: string; forte?: boolean }[];
-  return { n: sujeito, itens };
+  return { n: sujeito, desistentes, itens };
 }
 
 function ResumoLinha({ resumo }: { resumo: ReturnType<typeof resumoDaLista> }) {
   return (
     <p className="mt-1 text-sm text-muted-foreground">
       {resumo.n}
+      {resumo.desistentes > 0 && (
+        <span className="text-xs">
+          {" · "}
+          {resumo.desistentes}{" "}
+          {resumo.desistentes === 1 ? "desistente" : "desistentes"}
+        </span>
+      )}
       {resumo.itens.map((it, i) => (
         <span key={i}>
           {" · "}
@@ -833,16 +878,24 @@ function VisaoCoordenacao({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [busca, setBusca] = useState("");
+  const sp = useSearchParams();
+  const spStr = sp.toString();
+  // os recortes locais vivem na URL (a ficha preserva, o Voltar aterrissa
+  // de volta neles e refresh compartilha): `q`/`sup`/`mentor` nascem do
+  // search; `recorte` nasce do inicial validado pela page
+  const [busca, setBusca] = useState(() => sp.get("q") ?? "");
   const [filtro, setFiltro] = useState<FiltroCat>(recorteInicial ?? "todas");
   const [turmaSel, setTurmaSel] = useState<string | null>(turmaInicial);
-  const [supSel, setSupSel] = useState<string>("todas");
-  const [mentorSel, setMentorSel] = useState<string | null>(null);
+  const [supSel, setSupSel] = useState<string>(() => sp.get("sup") ?? "todas");
+  const [mentorSel, setMentorSel] = useState<string | null>(() =>
+    sp.get("mentor")
+  );
   // supervisão/mentor são secundários — moram no painel "Filtros (n)",
   // não na barra (o modal aplica de uma vez, como em /registros)
   const [painelAberto, setPainelAberto] = useState(false);
   const [draftSup, setDraftSup] = useState("todas");
   const [draftMentor, setDraftMentor] = useState("todos");
+  const { ref: chipsRef, maskStyle: chipsMask } = useFadeX<HTMLDivElement>();
 
   // link da home pousa aqui sem remontar a rota — realinha o chip quando
   // o contexto resolvido muda. Ajuste durante o render (padrão react.dev),
@@ -852,6 +905,16 @@ function VisaoCoordenacao({
   if (turmaInicialVisto !== turmaInicial) {
     setTurmaInicialVisto(turmaInicial);
     setTurmaSel(turmaInicial);
+  }
+
+  // idem turma: um ?recorte= resolvido novo (navegação de verdade pra um
+  // atalho, ou o voltar do histórico trazendo a URL de antes) realinha o
+  // chip de situação — a mesma regra de ajuste no render
+  const [recorteInicialVisto, setRecorteInicialVisto] =
+    useState(recorteInicial);
+  if (recorteInicialVisto !== recorteInicial) {
+    setRecorteInicialVisto(recorteInicial);
+    setFiltro(recorteInicial ?? "todas");
   }
 
   // o chip de turma É o controle de contexto da página: turma navegável ou
@@ -906,15 +969,65 @@ function VisaoCoordenacao({
     .map(([id, nome]) => ({ id, nome }))
     .sort((a, b) => comparaNome(a.nome, b.nome));
 
+  // um ?sup=/?mentor= antigo pode apontar pra alguém fora do recorte atual
+  // — a cópia validada é a que filtra e a que o efeito escreve de volta
+  // (o inválido sai da URL sozinho, sem chip preso)
+  const supSelEf =
+    supSel === "todas" ||
+    (supSel === "nenhum"
+      ? temSemSup
+      : supervisores.some((s) => s.id === supSel))
+      ? supSel
+      : "todas";
+  const mentorSelEf =
+    mentorSel && mentores.some((m) => m.id === mentorSel) ? mentorSel : null;
+
+  // URL → estado: o histórico mudou (voltar/avançar com a página montada)
+  // ou o replaceState do efeito abaixo ecoou — aplica no render, o mesmo
+  // padrão do turmaInicialVisto. Re-ler o que o efeito escreveu é no-op
+  const [spStrVisto, setSpStrVisto] = useState(spStr);
+  if (spStrVisto !== spStr) {
+    setSpStrVisto(spStr);
+    const params = new URLSearchParams(spStr);
+    const r = params.get("recorte");
+    setFiltro(CATS.some((c) => c.id === r) ? (r as FiltroCat) : "todas");
+    setBusca(params.get("q") ?? "");
+    setSupSel(params.get("sup") ?? "todas");
+    setMentorSel(params.get("mentor"));
+  }
+
+  // estado → URL: replaceState NATIVO, nunca router.replace — a navegação
+  // da Next refaz o RSC inteiro e seria um fetch por letra digitada. A
+  // API nativa atualiza a barra (e o useSearchParams acima) sem refetch.
+  // `turma` não entra aqui: escolherTurma já grava o dele via router
+  // (turma é contexto de página, não recorte da lista)
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (filtro === "todas") params.delete("recorte");
+    else params.set("recorte", filtro);
+    const qt = busca.trim();
+    if (!qt) params.delete("q");
+    else params.set("q", qt);
+    if (supSelEf === "todas") params.delete("sup");
+    else params.set("sup", supSelEf);
+    if (!mentorSelEf) params.delete("mentor");
+    else params.set("mentor", mentorSelEf);
+    const qs = params.toString();
+    const url = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+    if (url !== `${window.location.pathname}${window.location.search}`) {
+      window.history.replaceState(null, "", url);
+    }
+  }, [filtro, busca, supSelEf, mentorSelEf]);
+
   // critério secundário só existe com ≥2 opções úteis (regra de silêncio
   // dos filtros); se um deles está ativo o controle fica — ninguém fica
   // preso num filtro sem jeito de tirar
   const supShow =
-    supervisores.length + (temSemSup ? 1 : 0) >= 2 || supSel !== "todas";
-  const mentorShow = mentores.length > 1 || mentorSel != null;
+    supervisores.length + (temSemSup ? 1 : 0) >= 2 || supSelEf !== "todas";
+  const mentorShow = mentores.length > 1 || mentorSelEf != null;
   const temSecundarios = supShow || mentorShow;
   const ativosSec =
-    (supSel !== "todas" ? 1 : 0) + (mentorSel != null ? 1 : 0);
+    (supSelEf !== "todas" ? 1 : 0) + (mentorSelEf != null ? 1 : 0);
   const draftAtivos =
     (draftSup !== "todas" ? 1 : 0) + (draftMentor !== "todos" ? 1 : 0);
 
@@ -923,9 +1036,11 @@ function VisaoCoordenacao({
   const recorte = lista.filter(
     (d) =>
       (!turmaSel || turmaDaDupla(d, cronogramas) === turmaSel) &&
-      (supSel === "todas" ||
-        (supSel === "nenhum" ? !d.supervisor : d.supervisor?.id === supSel)) &&
-      (!mentorSel || d.mentor.id === mentorSel)
+      (supSelEf === "todas" ||
+        (supSelEf === "nenhum"
+          ? !d.supervisor
+          : d.supervisor?.id === supSelEf)) &&
+      (!mentorSelEf || d.mentor.id === mentorSelEf)
   );
   const saude = saudeDoRecorte(recorte, eventos, hoje);
 
@@ -955,7 +1070,8 @@ function VisaoCoordenacao({
 
   // na visão "todas" sem recortes a massa saudável colapsa — destaques são
   // quem tem encontro batendo nos próximos 3 dias (v5)
-  const semRecorte = !q && !turmaSel && supSel === "todas" && !mentorSel;
+  const semRecorte =
+    !q && !turmaSel && supSelEf === "todas" && !mentorSelEf;
   const mostrarMassa =
     filtro === "todas" && semRecorte && exibidas.length > 0;
   const LIMITE_MASSA = 5;
@@ -982,6 +1098,24 @@ function VisaoCoordenacao({
   // fronteira entre "em andamento" e "fora da régua": o details da massa
   // entra antes das pausadas/encerradas (a fila continua debaixo dele)
   const idxForaDaRegua = visiveis.findIndex((d) => d.status !== "ativa");
+
+  // o ⋯ real — as ações de coordenação que os dados da linha sustentam
+  // ("Enviar formulário" busca o catálogo na 1ª abertura; solicitar/sugerir
+  // especialista ficam na ficha, que é onde o catálogo de especialistas
+  // já mora)
+  const menuDa = (d: Dupla) => (
+    <DuplaLinhaMenu
+      dupla={d}
+      fichaHref={`/duplas/${d.id}`}
+      formulario
+      remanejar
+      encerrar={
+        d.trilha === "especialista" &&
+        !d.encerrada_em &&
+        (d.status === "ativa" || d.status === "pausada")
+      }
+    />
+  );
 
   // a mesma linha monta a ação WhatsApp uma vez e reusa na linha cheia e
   // na mínima da massa (WhatsApp visível pra TODA dupla — decisão travada)
@@ -1011,6 +1145,8 @@ function VisaoCoordenacao({
         eventos={eventos}
         mostrarSupervisor
         wa={waDa(d, s)}
+        menu={menuDa(d)}
+        dimDesistentes={filtro === "todas"}
         i={i}
       />
     );
@@ -1039,7 +1175,7 @@ function VisaoCoordenacao({
             <Input
               type="search"
               aria-label="Buscar dupla"
-              placeholder="Buscar dupla, mentor ou mentorada…"
+              placeholder="Buscar dupla ou pessoa…"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               className="pl-8"
@@ -1069,7 +1205,9 @@ function VisaoCoordenacao({
           "Como calculamos" do resumo. Clicar de novo desfaz o filtro. */}
       {lista.length > 0 && (
         <div
-          className="mt-5 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap"
+          ref={chipsRef}
+          style={chipsMask}
+          className="-mx-4 mt-5 flex gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:px-0"
           role="group"
           aria-label="Filtrar por situação"
         >
@@ -1148,8 +1286,8 @@ function VisaoCoordenacao({
             <FiltrosButton
               ativos={ativosSec}
               onClick={() => {
-                setDraftSup(supSel);
-                setDraftMentor(mentorSel ?? "todos");
+                setDraftSup(supSelEf);
+                setDraftMentor(mentorSelEf ?? "todos");
                 setPainelAberto(true);
               }}
             />
@@ -1253,13 +1391,32 @@ function VisaoCoordenacao({
         </DialogContent>
       </Dialog>
 
-      {/* barra da lista: contagem viva + legenda dos dots */}
+      {/* barra da lista: contagem viva + legenda dos dots. Desistentes não
+          inflam o número principal — a mancha vai no sufixo discreto (no
+          chip Desistentes a contagem é delas mesmas) */}
       <div className="mb-2 mt-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-[13px] text-muted-foreground">
-          <b className="font-semibold text-foreground">
-            {exibidas.length}{" "}
-            {exibidas.length === 1 ? "dupla" : "duplas"}
-          </b>{" "}
+          {(() => {
+            const nDes = exibidas.filter(desistenteDa).length;
+            const nPrincipais = exibidas.length - nDes;
+            return filtro === "desistente" ? (
+              <b className="font-semibold text-foreground">
+                {nDes} {nDes === 1 ? "desistente" : "desistentes"}
+              </b>
+            ) : (
+              <>
+                <b className="font-semibold text-foreground">
+                  {nPrincipais} {nPrincipais === 1 ? "dupla" : "duplas"}
+                </b>
+                {nDes > 0 && (
+                  <span className="text-xs">
+                    {" "}
+                    · {nDes} {nDes === 1 ? "desistente" : "desistentes"}
+                  </span>
+                )}
+              </>
+            );
+          })()}{" "}
           · ordenadas por prioridade
         </p>
         <p className="text-xs text-muted-foreground">
@@ -1280,8 +1437,8 @@ function VisaoCoordenacao({
           filtroAtivo={
             filtro !== "todas" ||
             !!turmaSel ||
-            supSel !== "todas" ||
-            !!mentorSel
+            supSelEf !== "todas" ||
+            !!mentorSelEf
           }
           onLimparBusca={() => setBusca("")}
           onLimparFiltro={limparRecortes}
@@ -1301,7 +1458,7 @@ function VisaoCoordenacao({
                   AGENTS.md): a re-key remonta as linhas e o animate-enter re-roda
                   com o stagger do --i. A busca entra na key de propósito. */}
               <div
-                key={`${filtro}|${turmaSel ?? ""}|${supSel}|${mentorSel ?? ""}|${q}`}
+                key={`${filtro}|${turmaSel ?? ""}|${supSelEf}|${mentorSelEf ?? ""}|${q}`}
                 className="space-y-3 @4xl:space-y-0 @4xl:divide-y @4xl:divide-border/60"
               >
                 {antes.map((d) => linha(d, i++))}
@@ -1328,6 +1485,7 @@ function VisaoCoordenacao({
                             eventos={eventos}
                             hojeStr={hojeStr}
                             wa={waDa(d, s)}
+                            menu={menuDa(d)}
                             i={i++}
                           />
                         );
@@ -1378,8 +1536,48 @@ function VisaoSupervisor({
    *  padrão; ela aparece só enquanto um recorte estiver ativo */
   recorteInicial?: RecorteFatia | null;
 }) {
-  const [busca, setBusca] = useState("");
+  const sp = useSearchParams();
+  const spStr = sp.toString();
+  // busca e recorte vivem na URL (mesma regra da visão de coordenação — a
+  // ficha preserva e o voltar aterrissa de volta neles)
+  const [busca, setBusca] = useState(() => sp.get("q") ?? "");
   const [filtro, setFiltro] = useState<FiltroCat>(recorteInicial ?? "todas");
+  const { ref: chipsRef, maskStyle: chipsMask } = useFadeX<HTMLDivElement>();
+
+  // um ?recorte= resolvido novo realinha a fatia — ajuste no render, o
+  // mesmo padrão da visão de coordenação
+  const [recorteInicialVisto, setRecorteInicialVisto] =
+    useState(recorteInicial);
+  if (recorteInicialVisto !== recorteInicial) {
+    setRecorteInicialVisto(recorteInicial);
+    setFiltro(recorteInicial ?? "todas");
+  }
+
+  // URL → estado: histórico mudou ou o replaceState do efeito ecoou —
+  // aplica no render, idem VisaoCoordenacao. Aqui só recorte + busca,
+  // não há filtros secundários
+  const [spStrVisto, setSpStrVisto] = useState(spStr);
+  if (spStrVisto !== spStr) {
+    setSpStrVisto(spStr);
+    const params = new URLSearchParams(spStr);
+    const r = params.get("recorte");
+    setFiltro(CATS.some((c) => c.id === r) ? (r as FiltroCat) : "todas");
+    setBusca(params.get("q") ?? "");
+  }
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (filtro === "todas") params.delete("recorte");
+    else params.set("recorte", filtro);
+    const qt = busca.trim();
+    if (!qt) params.delete("q");
+    else params.set("q", qt);
+    const qs = params.toString();
+    const url = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
+    if (url !== `${window.location.pathname}${window.location.search}`) {
+      window.history.replaceState(null, "", url);
+    }
+  }, [filtro, busca]);
 
   const pesoFila = (d: Dupla) => {
     const s = saudePorId.get(d.id)!;
@@ -1463,7 +1661,9 @@ function VisaoSupervisor({
           no chip ativo) devolve a lista inteira e esconde a linha */}
       {filtro !== "todas" && (
         <div
-          className="mt-5 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap"
+          ref={chipsRef}
+          style={chipsMask}
+          className="-mx-4 mt-5 flex gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:px-0"
           role="group"
           aria-label="Filtrar por situação"
         >
@@ -1487,11 +1687,31 @@ function VisaoSupervisor({
         </div>
       )}
 
+      {/* desistentes fora do número principal (mesma régua da
+          coordenação) */}
       <div className="mb-2 mt-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-[13px] text-muted-foreground">
-          <b className="font-semibold text-foreground">
-            {exibidas.length} {exibidas.length === 1 ? "dupla" : "duplas"}
-          </b>{" "}
+          {(() => {
+            const nDes = exibidas.filter(desistenteDa).length;
+            const nPrincipais = exibidas.length - nDes;
+            return filtro === "desistente" ? (
+              <b className="font-semibold text-foreground">
+                {nDes} {nDes === 1 ? "desistente" : "desistentes"}
+              </b>
+            ) : (
+              <>
+                <b className="font-semibold text-foreground">
+                  {nPrincipais} {nPrincipais === 1 ? "dupla" : "duplas"}
+                </b>
+                {nDes > 0 && (
+                  <span className="text-xs">
+                    {" "}
+                    · {nDes} {nDes === 1 ? "desistente" : "desistentes"}
+                  </span>
+                )}
+              </>
+            );
+          })()}{" "}
           · agrupadas por turma
         </p>
         <p className="text-xs text-muted-foreground">
@@ -1520,7 +1740,7 @@ function VisaoSupervisor({
           <div className="@4xl:overflow-hidden @4xl:rounded-xl @4xl:bg-card @4xl:shadow-[var(--shadow-border)]">
             <CabecalhoColunas />
             {/* re-key só no recorte (nunca na busca) — remontar a cada
-                  tecla recolhia os grupos e matava o dialog de supervisão
+                  tecla recolhia os grupos e matava um dialog
                   aberto; a troca de chip re-roda o animate-enter das linhas */}
             <div key={filtro}>
               {gruposOrdenados.map(([turma, duplas], gi) => {
@@ -1559,6 +1779,15 @@ function VisaoSupervisor({
                             saude={s}
                             eventos={eventos}
                             mostrarSupervisor={false}
+                            menu={
+                              // supervisor não tem ação de coordenação —
+                              // o ⋯ leva o "Ver ficha" explícito
+                              <DuplaLinhaMenu
+                                dupla={d}
+                                fichaHref={`/duplas/${d.id}`}
+                              />
+                            }
+                            dimDesistentes={filtro === "todas"}
                             wa={
                               <DuplaWaAcao
                                 {...acaoWhatsAppDupla({
@@ -1678,8 +1907,17 @@ function VisaoMentor({
               <article
                 key={d.id}
                 style={{ "--i": Math.min(idx, 10) } as CSSProperties}
-                className="animate-enter grid grid-cols-1 gap-2 rounded-xl border border-border bg-card p-3 shadow-[var(--shadow-border)]"
+                className="group animate-enter relative grid grid-cols-1 gap-2 rounded-xl border border-border bg-card p-3 shadow-[var(--shadow-border)] transition-colors hover:bg-muted/50"
               >
+                {/* card inteiro abre a ficha (stretched link, mesmo padrão
+                    da DuplaLinha — REALIZA-241): cobre o card em z-10 e
+                    só o "Registrar encontro" sobe pra z-20. Pill e chevron
+                    são decorativos — 1 tab-stop por card */}
+                <Link
+                  href={`/duplas/${d.id}`}
+                  aria-label={`Ver ficha da dupla de ${d.mentorado.nome.split(" ")[0]}`}
+                  className="absolute inset-0 z-10 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
                 <header className="flex flex-wrap items-center justify-between gap-2">
                   <p className="flex min-w-0 flex-wrap items-center gap-1.5 font-semibold">
                     <DuplaAvatares mentor={d.mentor} mentorado={d.mentorado} size={28} />
@@ -1693,8 +1931,8 @@ function VisaoMentor({
                       </span>
                     )}
                   </p>
-                  {/* "Abrir ficha" sempre no header — nada de footer de
-                      ações; a pendência ganha botão no "Próximo passo" */}
+                  {/* sem botão "Abrir ficha" — o card inteiro é o link; o
+                      chevron é a dica visual de que ele abre */}
                   <span className="flex items-center gap-2">
                     {apoioProprio ? (
                       <Pill tom="atencao">
@@ -1707,19 +1945,23 @@ function VisaoMentor({
                         {estado.label}
                       </Pill>
                     )}
-                    <Link
-                      href={`/duplas/${d.id}`}
-                      className={buttonVariants({ size: "sm" })}
-                    >
-                      Abrir ficha
-                    </Link>
+                    <CaretRight
+                      aria-hidden
+                      size={16}
+                      weight="bold"
+                      className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
+                    />
                   </span>
                 </header>
 
                 {/* feito × esperado com o tick do calendário */}
                 <div
                   role="img"
-                  aria-label={`${feitos} encontros feitos de ${s.esperado} esperados até hoje, de ${total}`}
+                  aria-label={
+                    s.esperado > 0
+                      ? `${feitos} encontros feitos de ${s.esperado} esperados até hoje, de ${total}`
+                      : `${feitos} encontros feitos de ${total}`
+                  }
                 >
                   <div className="relative h-2 rounded-full border border-border bg-muted">
                     <div
@@ -1735,17 +1977,28 @@ function VisaoMentor({
                         width: `${total > 0 ? Math.min((feitos / total) * 100, 100) : 0}%`,
                       }}
                     />
-                    <span
-                      aria-hidden
-                      className="absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2 rounded bg-foreground"
-                      style={{
-                        left: `${total > 0 ? Math.min((s.esperado / total) * 100, 100) : 0}%`,
-                      }}
-                    />
+                    {/* sem cronograma não há "esperado" (dupla histórica de
+                        outro ciclo) — tick no 0 e "× 0 esperados" mentiriam
+                        contra os feitos */}
+                    {s.esperado > 0 && (
+                      <span
+                        aria-hidden
+                        className="absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2 rounded bg-foreground"
+                        style={{
+                          left: `${total > 0 ? Math.min((s.esperado / total) * 100, 100) : 0}%`,
+                        }}
+                      />
+                    )}
                   </div>
                   <span className="mt-1.5 block text-xs text-muted-foreground">
-                    <b className="text-foreground">{feitos}</b> feitos ×{" "}
-                    <b className="text-foreground">{s.esperado}</b> esperados
+                    <b className="text-foreground">{feitos}</b> feitos
+                    {s.esperado > 0 && (
+                      <>
+                        {" "}
+                        × <b className="text-foreground">{s.esperado}</b>{" "}
+                        esperados
+                      </>
+                    )}
                   </span>
                 </div>
 
@@ -1770,7 +2023,7 @@ function VisaoMentor({
                     {pendente && (
                       <Link
                         href={`/duplas/${d.id}#registrar-${pendente.id}`}
-                        className={cn(buttonVariants({ size: "sm" }), "mt-2")}
+                        className={cn(buttonVariants({ size: "sm" }), "relative z-20 mt-2")}
                       >
                         Registrar encontro {pendente.numero}
                       </Link>

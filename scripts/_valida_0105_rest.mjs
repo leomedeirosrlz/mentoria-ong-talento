@@ -110,7 +110,7 @@ const cleanup = async () => {
     const ids = succ.map((s) => s.id).join(",");
     for (const t of ["formulario_links", "avaliacao_links", "avaliacoes_encontro",
       "chamados", "chamados_fila", "encaminhamentos", "encerramentos",
-      "encontro_notas", "encontros", "interacoes", "supervisoes",
+      "encontro_notas", "encontros", "interacoes",
       "terceiros_consolidacao", "terceiros_contatos"]) {
       await svc(`${t}?dupla_id=in.(${ids})`, { method: "DELETE" });
     }

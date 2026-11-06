@@ -4,6 +4,7 @@ import type { KeyboardEvent } from "react";
 import { useRef } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { useFadeX } from "@/lib/use-fade-x";
 import {
   PAINEL_AGENDA,
   idDaAba,
@@ -30,6 +31,7 @@ export function AbasAgenda({
   ativa: AbaAgendaId;
 }) {
   const refs = useRef<Record<string, HTMLAnchorElement | null>>({});
+  const { ref, maskStyle } = useFadeX<HTMLDivElement>();
   if (abas.length < 2) return null;
 
   // a aba ativa é a única parada de Tab; se o id não estiver na lista (param
@@ -57,7 +59,9 @@ export function AbasAgenda({
     <div
       role="tablist"
       aria-label="Modos da agenda"
-      className="scroll-fina flex w-fit max-w-full items-center gap-1 overflow-x-auto overscroll-x-contain rounded-lg bg-muted p-1"
+      ref={ref}
+      style={maskStyle}
+      className="flex w-fit max-w-full items-center gap-1 overflow-x-auto overscroll-x-contain rounded-lg bg-muted p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       {abas.map((aba, i) => {
         const selecionada = aba.id === ativa;

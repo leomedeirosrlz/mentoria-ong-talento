@@ -26,7 +26,7 @@ test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
       name: /Conteúdos e roteiros/,
     });
     const modelos = bib.getByRole("region", {
-      name: /Modelos e instrumentos/,
+      name: /^Modelos/,
     });
     const links = bib.getByRole("region", { name: /Links/ });
     await expect(guias).toBeVisible();
@@ -78,7 +78,8 @@ test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
     ).toBeVisible();
     await expect(page.getByText(/Competência/)).toBeVisible();
     await page
-      .getByRole("link", { name: "Biblioteca de materiais" })
+      .locator("#conteudo")
+      .getByRole("link", { name: "Materiais de apoio" })
       .click();
     await expect(page).toHaveURL(/\/materiais\?aba=biblioteca/);
     await page.goto("/materiais/documento/nao-existe");
@@ -97,7 +98,7 @@ test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
 
     // a busca é global e filtra DENTRO das seções — a que zera some
     await page
-      .getByRole("searchbox", { name: "Buscar material" })
+      .getByRole("searchbox", { name: "Buscar material de apoio" })
       .fill("Guia do Mentor");
     await expect(guias).toBeVisible();
     await expect(guias.getByRole("listitem")).toHaveCount(2);
@@ -105,7 +106,7 @@ test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
       bib.getByRole("region", { name: /Conteúdos e roteiros/ })
     ).toHaveCount(0);
     await expect(
-      bib.getByRole("region", { name: /Modelos e instrumentos/ })
+      bib.getByRole("region", { name: /^Modelos/ })
     ).toHaveCount(0);
     await expect(
       bib.getByRole("region", { name: /Links/ })
@@ -113,7 +114,7 @@ test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
 
     // busca sem resultado: nenhuma seção, empty state no lugar
     await page
-      .getByRole("searchbox", { name: "Buscar material" })
+      .getByRole("searchbox", { name: "Buscar material de apoio" })
       .fill("zzz impossível");
     await expect(bib.getByRole("heading", { level: 3 })).toHaveCount(0);
     await expect(page.getByText(/Nenhum material com/)).toBeVisible();
@@ -134,7 +135,7 @@ test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
       resumo.getByRole("region", { name: /Conteúdos e roteiros/ })
     ).toBeVisible();
     await expect(
-      resumo.getByRole("region", { name: /Modelos e instrumentos/ })
+      resumo.getByRole("region", { name: /^Modelos/ })
     ).toBeVisible();
     // o Ricardo é híbrido (DPP + especialista) — a seção Guias mostra os
     // dois guias da audiência dele, e só eles

@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { FadeX } from "@/components/fade-x";
 import { GuiaPopover } from "@/components/guia-popover";
 import type { ItemPrograma, TipoItemPrograma } from "@/lib/agenda-coordenacao";
 import { formatDate } from "@/lib/ciclo";
@@ -9,9 +10,10 @@ import { cn } from "@/lib/utils";
 // Faixa "Semana do programa" (REALIZA-195 · mock v8b) — cards
 // compactos em scroll horizontal em TODAS as larguras (nunca
 // grade achatada): flex overflow-x + scroll-snap + fade nas
-// bordas. Server-safe de propósito: monta no RSC da coordenação/
-// auxiliar e dentro do client da Minha agenda do mentor — quem
-// precisa de estado (filtro etc.) fica fora da faixa.
+// bordas (o FadeX é a ilha client do scrollport — o resto segue
+// server-safe de propósito: monta no RSC da coordenação/auxiliar
+// e dentro do client da Minha agenda do mentor — quem precisa
+// de estado (filtro etc.) fica fora da faixa).
 // ============================================================
 
 /** Acento superior do card por tipo — a cor mora na borda de 3px, o
@@ -20,32 +22,19 @@ const ACENTO: Record<TipoItemPrograma, string> = {
   encontro: "border-t-[var(--brand-lime)]",
   formacao: "border-t-[var(--warn)]",
   evento: "border-t-[var(--info)]",
-  supervisao: "border-t-[var(--pausa)]",
 };
 
 const ROTULO_TIPO: Record<TipoItemPrograma, string> = {
   encontro: "Encontro",
   formacao: "Formação",
   evento: "Evento",
-  supervisao: "Supervisão",
 };
 
 const TOM_TIPO: Record<TipoItemPrograma, "ok" | "warn" | "info" | "muted"> = {
   encontro: "ok",
   formacao: "warn",
   evento: "info",
-  supervisao: "muted",
 };
-
-/** Fade lateral do scroller via máscara inline — a utilidade não existe
- *  em globals (e globals é fora de escopo): mask-image respeita o
- *  conteúdo e funciona sem classe nova. */
-const FADE_LATERAL = {
-  WebkitMaskImage:
-    "linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent)",
-  maskImage:
-    "linear-gradient(to right, transparent, black 20px, black calc(100% - 20px), transparent)",
-} as const;
 
 function CardPrograma({
   item,
@@ -226,12 +215,11 @@ export function SemanaDoPrograma({
           Nada marcado na semana do programa.
         </p>
       ) : (
-        <div
+        <FadeX
           role="region"
           aria-label={`${titulo}. Role horizontalmente`}
           tabIndex={0}
-          className="scroll-fina -mx-4 mt-3 overflow-x-auto px-4 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          style={FADE_LATERAL}
+          className="scroll-fina -mx-4 mt-3 overflow-x-auto overscroll-x-contain scroll-px-4 px-4 pb-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <ul className="flex w-max snap-x snap-proximity items-start gap-3">
             {itens.map((item) => (
@@ -246,7 +234,7 @@ export function SemanaDoPrograma({
               />
             ))}
           </ul>
-        </div>
+        </FadeX>
       )}
     </section>
   );

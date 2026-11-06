@@ -1,6 +1,6 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
+import { revalidatePath, updateTag } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AVATAR_MAX_BYTES, avisoImagemGrande } from "@/lib/avatar";
@@ -22,6 +22,8 @@ import {
 import { capitalizar, cpfValido, erroAmigavel, nomeProprio } from "@/lib/utils";
 import { desfechoValido } from "@/lib/dupla-desfecho";
 import type { DuplaDesfecho } from "@/lib/dupla-desfecho";
+import { reconciliaCombinados } from "@/lib/combinados";
+import type { CombinadoEnviado } from "@/lib/combinados";
 import { snapshotDuplaHoje } from "@/lib/jobs";
 import { temPapel } from "@/lib/types";
 import type { AppRole, ComunicadoPrioridade, CorRaca, Cronograma, DadosCivis, Disponibilidade, DocumentoPessoa, Endereco, Escolaridade, Genero, Notificacao, PrefGeneroPar, ResponsavelCivis, SituacaoMentorado, Trilha } from "@/lib/types";
@@ -48,6 +50,12 @@ import {
   type ResolucaoPar,
 } from "@/lib/importar-duplas";
 import { notificar } from "./notificar";
+import {
+  depoisDe,
+  removerMatchingPerfil,
+  sincronizarMatchingPerfilMentorado,
+  sincronizarMatchingPerfilPessoa,
+} from "./ia/matching";
 import { bloqueioTrocaPapel } from "./papel-vinculo";
 import { AUDIENCIAS, audienciaLegada } from "./materiais";
 import { ROLES_POR_AUDIENCIA } from "@/lib/email";
@@ -79,6 +87,13 @@ const comPapeis = <T extends { role: AppRole | null }>(
     ],
   };
 };
+
+/** materiais fica em cache compartilhado (queries.ts) — a tag expira a
+ *  entrada pra todo mundo, não só pra quem escreveu. */
+function revalidaMateriais() {
+  updateTag("materiais");
+  revalidatePath("/materiais");
+}
 
 async function me() {
   const supabase = await createClient();
@@ -181,11 +196,12 @@ function camposApresentacao(
   }
 
   if (!parcial || formData.has("linkedin")) {
-    const linkedin = String(formData.get("linkedin") ?? "").trim() || null;
-    // case-sensitive de propósito — o CHECK profiles_linkedin_http (0030) é `~`
-    if (linkedin && !/^https?:\/\//.test(linkedin)) {
-      return { error: "Confira o link do LinkedIn: precisa começar com http:// ou https://." };
-    }
+    const linkedinRaw = String(formData.get("linkedin") ?? "").trim();
+    // aceita como a pessoa digita: sem protocolo vira https://; o CHECK
+    // profiles_linkedin_http (0030) exige o esquema em minúsculas
+    const linkedin = linkedinRaw
+      ? `https://${linkedinRaw.replace(/^https?:\/\//i, "")}`
+      : null;
     out.linkedin = linkedin;
   }
 
@@ -610,6 +626,9 @@ export async function createPessoa(formData: FormData) {
       }
     }
   }
+  // perfil-matching (REALIZA-338) — pós-resposta: IA não pode segurar o
+  // cadastro; a sync decide sozinha se o papel pede vetor
+  depoisDe(() => sincronizarMatchingPerfilPessoa(profile.id));
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${profile.id}`);
   return { ok: true, aviso };
@@ -648,6 +667,7 @@ export async function createMentorado(formData: FormData) {
   } else {
     aviso = foto.aviso;
   }
+  depoisDe(() => sincronizarMatchingPerfilMentorado(mentorado.id));
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${mentorado.id}`);
   return { ok: true, aviso };
@@ -922,6 +942,7 @@ export async function setPessoaRole(profileId: string, role: string | null) {
         );
       if (error) return { error: erroAmigavel(error) };
     }
+    depoisDe(() => sincronizarMatchingPerfilPessoa(profileId));
     revalidatePath("/pessoas");
     revalidatePath(`/pessoas/${profileId}`);
     return { ok: true };
@@ -973,6 +994,7 @@ export async function setPessoaRole(profileId: string, role: string | null) {
       tipo: role === "mentor_especialista" ? "especialista" : "dpp",
     });
     if (mpErr) return { error: erroAmigavel(mpErr) };
+    depoisDe(() => sincronizarMatchingPerfilPessoa(profileId));
     revalidatePath("/pessoas");
     revalidatePath(`/pessoas/${profileId}`);
     return { ok: true };
@@ -1098,6 +1120,7 @@ export async function setPessoaRole(profileId: string, role: string | null) {
       .from("mentor_profiles").delete().eq("profile_id", profileId);
     if (mpErr) return { error: erroAmigavel(mpErr) };
   }
+  depoisDe(() => sincronizarMatchingPerfilPessoa(profileId));
   revalidatePath("/pessoas");
   return { ok: true };
 }
@@ -1388,6 +1411,7 @@ export async function updatePessoa(profileId: string, formData: FormData) {
     });
     if (mpErr) return { error: erroAmigavel(mpErr) };
   }
+  depoisDe(() => sincronizarMatchingPerfilPessoa(profileId));
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${profileId}`);
   return { ok: true, aviso };
@@ -1479,6 +1503,7 @@ export async function setPessoaAtivo(profileId: string, ativo: boolean, forcar =
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
+  depoisDe(() => sincronizarMatchingPerfilPessoa(profileId));
   revalidatePath("/pessoas");
   revalidatePath("/");
   return { ok: true };
@@ -1521,6 +1546,7 @@ export async function deletePessoa(profileId: string) {
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
+  depoisDe(() => removerMatchingPerfil("mentor", profileId));
   revalidatePath("/pessoas");
   return { ok: true };
 }
@@ -1568,6 +1594,7 @@ export async function updateMentorado(id: string, formData: FormData) {
   } else {
     aviso = foto.aviso;
   }
+  depoisDe(() => sincronizarMatchingPerfilMentorado(id));
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${id}`);
   return { ok: true, aviso };
@@ -1610,6 +1637,7 @@ export async function deleteMentorado(id: string) {
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
+  depoisDe(() => removerMatchingPerfil("mentorado", id));
   revalidatePath("/pessoas");
   return { ok: true };
 }
@@ -1672,6 +1700,7 @@ export async function marcarSaidaMentorado(
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
+  depoisDe(() => sincronizarMatchingPerfilMentorado(id));
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${id}`);
   revalidatePath("/duplas");
@@ -2178,22 +2207,17 @@ export async function deleteDupla(duplaId: string) {
     return { error: "Só a coordenação exclui duplas." };
   }
   // FKs NO ACTION bloqueiam o delete (a cascata cobre encontros→registros→
-  // anexos, mas supervisões, encerramento, solicitações — via dupla_id e
+  // anexos, mas encerramento, solicitações — via dupla_id e
   // dupla_dpp_id —, links de formulário e a sucessora do remanejamento são
   // histórico que não se apaga). O check vem antes de qualquer remoção:
   // falhar aqui preserva tudo; falhar depois dos anexos deixaria objetos
   // apagados com a row viva.
   const [
-    { count: nSup },
     { count: nEncerr },
     { count: nSol },
     { count: nLinks },
     { count: nSuc },
   ] = await Promise.all([
-    supabase
-      .from("supervisoes")
-      .select("id", { count: "exact", head: true })
-      .eq("dupla_id", duplaId),
     supabase
       .from("encerramentos")
       .select("id", { count: "exact", head: true })
@@ -2212,9 +2236,6 @@ export async function deleteDupla(duplaId: string) {
       .eq("remanejada_de", duplaId),
   ]);
   const historico = [
-    nSup
-      ? `${nSup} ${nSup === 1 ? "sessão de supervisão" : "sessões de supervisão"}`
-      : null,
     nEncerr ? "o registro de encerramento" : null,
     nSol
       ? `${nSol} ${nSol === 1 ? "solicitação" : "solicitações"} de especialista`
@@ -2464,7 +2485,7 @@ export async function deleteMaterial(id: string) {
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
-  revalidatePath("/materiais");
+  revalidaMateriais();
   return { ok: true };
 }
 
@@ -2571,6 +2592,18 @@ export async function importPessoas(rows: LinhaImportada[]) {
     }
   }
 
+  // perfil-matching em lote (REALIZA-338) — sequencial de propósito: a
+  // importação pode trazer centenas e a API de embedding agradece o ritmo
+  const idsMentores = (inseridas ?? [])
+    .filter((p) => p.role === "mentor_dpp" || p.role === "mentor_especialista")
+    .map((p) => p.id);
+  if (idsMentores.length) {
+    depoisDe(async () => {
+      for (const id of idsMentores) {
+        await sincronizarMatchingPerfilPessoa(id);
+      }
+    });
+  }
   revalidatePath("/pessoas");
   return { ok: true, criados: inseridas?.length ?? 0, puladas };
 }
@@ -2622,8 +2655,19 @@ export async function importMentorados(rows: LinhaImportada[]) {
   }
   if (!validas.length) return { ok: true, criados: 0, puladas };
 
-  const { error } = await supabase.from("mentorados").insert(validas);
+  const { data: inseridos, error } = await supabase
+    .from("mentorados").insert(validas).select("id");
   if (error) return { error: erroAmigavel(error) };
+  // perfil-matching em lote — idem importPessoas: sequencial pra não
+  // estourar a API externa num arquivo de centenas de linhas
+  const idsNovos = (inseridos ?? []).map((m) => m.id);
+  if (idsNovos.length) {
+    depoisDe(async () => {
+      for (const id of idsNovos) {
+        await sincronizarMatchingPerfilMentorado(id);
+      }
+    });
+  }
   revalidatePath("/pessoas");
   return { ok: true, criados: validas.length, puladas };
 }
@@ -3350,8 +3394,10 @@ export async function salvarRegistro(formData: FormData) {
         .from("registros").insert({ ...payload, encontro_id, created_by: eu.id }).select("id").single();
   if (error) return { error: erroAmigavel(error) };
 
-  // encaminhamentos vêm como JSON por linha (descrição pode ter qualquer caractere)
-  const enc = formData
+  // encaminhamentos vêm como JSON por linha (descrição pode ter qualquer
+  // caractere); o `id` só existe na edição — id de banco casa update/delete,
+  // o uuid local das linhas novas não casa nada e cai no insert
+  const enc: CombinadoEnviado[] = formData
     .getAll("encaminhamento")
     .map(String)
     .flatMap((line) => {
@@ -3360,30 +3406,61 @@ export async function salvarRegistro(formData: FormData) {
         const descricao = String(t.descricao ?? "").trim();
         if (!descricao) return [];
         return [{
+          id: typeof t.id === "string" && t.id ? t.id : null,
           descricao,
-          responsavel: t.responsavel === "mentor" ? "mentor" : "mentorado",
+          responsavel: t.responsavel === "mentor" ? ("mentor" as const) : ("mentorado" as const),
           prazo: t.prazo || null,
         }];
       } catch {
         return [];
       }
     });
-  if (enc.length) {
-    // re-submit (aba duplicada) não duplica o que já existe nesse registro
-    const { data: existentes } = await supabase
+  // edição reconcilia por id: o form devolve a lista completa — o que voltou
+  // com id é update (só o que mudou), o id que existia e não voltou é delete
+  // e o resto é insert. Registro novo não tem existentes e pula a consulta;
+  // o dedupe de insert contra o estado final segue valendo pro re-submit de
+  // aba duplicada (o que já existe não duplica nem some)
+  const { data: existentes } = regExistente
+    ? await supabase
+        .from("encaminhamentos")
+        .select("id, descricao, responsavel, prazo")
+        .eq("registro_id", registro.id)
+        .eq("dupla_id", dupla_id)
+    : { data: null };
+  const plano = reconciliaCombinados(existentes ?? [], enc);
+  for (const u of plano.atualizar) {
+    // status nunca entra — feito/pendente é preservado; dupla+registro no
+    // where impedem cruzar pra combinado de outra dupla ou outro registro
+    const { error: upErr } = await supabase
       .from("encaminhamentos")
-      .select("descricao, responsavel, prazo")
+      .update({ descricao: u.descricao, responsavel: u.responsavel, prazo: u.prazo })
+      .eq("id", u.id)
+      .eq("dupla_id", dupla_id)
       .eq("registro_id", registro.id);
-    const jaTem = new Set(
-      (existentes ?? []).map((e) => `${e.descricao}|${e.responsavel}|${e.prazo ?? ""}`)
-    );
-    const rows = enc
-      .filter((t) => !jaTem.has(`${t.descricao}|${t.responsavel}|${t.prazo ?? ""}`))
-      .map((t) => ({ dupla_id, registro_id: registro.id, ...t }));
-    if (rows.length) {
-      const { error: encErr } = await supabase.from("encaminhamentos").insert(rows);
-      if (encErr) return { error: erroAmigavel(encErr) };
-    }
+    if (upErr) return { error: erroAmigavel(upErr) };
+  }
+  // delete só com a lista completa da edição (combinados_completos) — o
+  // form novo sobre registro que já existe (aba desatualizada) só insere
+  if (formData.get("combinados_completos") === "1" && plano.remover.length) {
+    const { error: delErr } = await supabase
+      .from("encaminhamentos")
+      .delete()
+      .in("id", plano.remover)
+      .eq("dupla_id", dupla_id)
+      .eq("registro_id", registro.id);
+    if (delErr) return { error: erroAmigavel(delErr) };
+  }
+  if (plano.inserir.length) {
+    const { error: encErr } = await supabase
+      .from("encaminhamentos")
+      .insert(plano.inserir.map((t) => ({
+        dupla_id,
+        registro_id: registro.id,
+        numero: encDb.numero,
+        created_by: eu.id,
+        ...t,
+      })));
+    if (encErr) return { error: erroAmigavel(encErr) };
   }
 
   // combinados de encontros anteriores marcados como feitos neste registro —
@@ -3479,6 +3556,71 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
   return { ok: true };
 }
 
+// ---------- combinados do encontro (afazeres unificados, 0157) ----------
+
+/** Cria um combinado no nº do guia, direto do card do encontro — no preparo
+ *  (antes do registro) ou depois dele. A chave é (dupla_id, numero): existe
+ *  antes do encontro agendado e não se move com remarcação/"não aconteceu".
+ *  Responsável "mentor" é o antigo afazer: o jovem não vê (0070 filtra
+ *  responsavel = 'mentorado'). Guardas da nota: papel mentor, dupla ativa,
+ *  nº dentro do teto do cronograma DELA. */
+export async function criarCombinadoEncontro(
+  duplaId: string,
+  numero: number,
+  descricao: string,
+  responsavel: "mentor" | "mentorado",
+  prazo?: string | null
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  // o combinado é da dupla — a coord só marca feito (toggleEncaminhamento)
+  if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
+    return { error: "O combinado é da dupla. A coordenação só pode marcar como feito." };
+  }
+  if (responsavel !== "mentor" && responsavel !== "mentorado") {
+    return { error: "Escolha quem fica responsável pelo combinado." };
+  }
+
+  const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", duplaId).single();
+  if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
+  if (d && d.trilha !== "especialista" && !d.cronograma_id) {
+    return { error: "Essa dupla está sem cronograma. A coordenação vincula um na edição da dupla." };
+  }
+
+  // teto de nº por trilha — o combinado segue o passo do guia (16 DPP / 5
+  // especialista); no DPP o teto é do cronograma dela, não do calendário global
+  const maxNum = d?.trilha === "especialista"
+    ? maxEncontros("especialista")
+    : (
+        await supabase
+          .from("ciclo_eventos").select("numero")
+          .eq("tipo", "encontro")
+          .eq("cronograma_id", d!.cronograma_id!)
+          .order("numero", { ascending: false }).limit(1).maybeSingle()
+      ).data?.numero ?? 16;
+  if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
+    return { error: "Escolha um encontro da lista." };
+  }
+
+  const limpo = descricao.trim();
+  if (limpo.length < 2) return { error: "Escreva o combinado antes de adicionar." };
+  if (limpo.length > 500) return { error: "Combinado muito longo (máx. 500 caracteres)." };
+  const prazoLimpo = prazo?.trim() ?? "";
+  if (prazoLimpo && !/^\d{4}-\d{2}-\d{2}$/.test(prazoLimpo)) {
+    return { error: "Confira a data do prazo." };
+  }
+
+  const { error } = await supabase
+    .from("encaminhamentos")
+    .insert({ dupla_id: duplaId, numero, descricao: limpo, responsavel, prazo: prazoLimpo || null, created_by: eu.id });
+  if (error) return { error: erroAmigavel(error) };
+
+  revalidatePath("/agenda");
+  revalidatePath(`/duplas/${duplaId}`);
+  return { ok: true };
+}
+
 // ---------- mural de notas do perfil (/pessoas/[id]) ----------
 
 /** Publica nota individual no mural da pessoa. O RLS faz o escopo pesado:
@@ -3553,6 +3695,7 @@ export async function toggleEncaminhamento(id: string, feito: boolean, duplaId: 
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
   revalidatePath("/");
+  revalidatePath("/agenda");
   revalidatePath("/duplas");
   revalidatePath(`/duplas/${duplaId}`);
   return { ok: true };
@@ -3853,7 +3996,7 @@ export async function marcarAconteceuJovem(encontroId: string) {
   revalidatePath("/");
   revalidatePath("/agenda");
   revalidatePath("/duplas");
-  revalidatePath("/materiais");
+  revalidaMateriais();
   if (enc?.dupla_id) revalidatePath(`/duplas/${enc.dupla_id}`);
   return { ok: true };
 }
@@ -3909,6 +4052,68 @@ export async function conflitoEncontro(
   return {
     ok: true,
     conflitos: (Array.isArray(data) ? data : []) as ConflitoEncontro[],
+  };
+}
+
+/** Primeiro nome de uso — nome social quando existe, senão o primeiro token
+ *  do civil (mesma régua de primeiroNomeDaDupla, sem depender do embed). */
+const primeiroNomeDe = (n: string | null | undefined) =>
+  (n ?? "").trim().split(/\s+/)[0] || null;
+
+/** Grades semanais dos dois lados da dupla — insumo do aviso de horário do
+ *  AgendarEncontroDialog: "quem não marcou essa célula" antes de confirmar.
+ *  Leitura best-effort como conflitoEncontro — qualquer falha devolve tudo
+ *  null e o dialog segue sem aviso, nunca bloqueia o agendamento. A trilha
+ *  especialista também volta vazia: lá o horário nasce do combinado
+ *  bilateral da sessão, não da grade semanal do DPP. */
+export async function disponibilidadesDaDupla(duplaId: string): Promise<{
+  mentor: Disponibilidade | null;
+  jovem: Disponibilidade | null;
+  jovemNome: string | null;
+}> {
+  const vazio = {
+    mentor: null as Disponibilidade | null,
+    jovem: null as Disponibilidade | null,
+    jovemNome: null as string | null,
+  };
+  if (await demoAtivo()) {
+    const d = getDemoData();
+    const dupla = d.duplas.find((x) => x.id === duplaId);
+    if (!dupla || dupla.trilha === "especialista") return vazio;
+    return {
+      mentor:
+        d.mentorProfiles.find((m) => m.profile_id === dupla.mentor.id)
+          ?.disponibilidade ?? null,
+      jovem: dupla.mentorado.disponibilidade ?? null,
+      jovemNome: primeiroNomeDe(
+        dupla.mentorado.nome_social ?? dupla.mentorado.nome
+      ),
+    };
+  }
+  const { supabase, me: eu } = await me();
+  if (!eu) return vazio;
+  const { data: dupla } = await supabase
+    .from("duplas")
+    .select("mentor_id, mentorado_id, trilha")
+    .eq("id", duplaId)
+    .maybeSingle();
+  if (!dupla || dupla.trilha === "especialista") return vazio;
+  const [{ data: mp }, { data: jovem }] = await Promise.all([
+    supabase
+      .from("mentor_profiles")
+      .select("disponibilidade")
+      .eq("profile_id", dupla.mentor_id)
+      .maybeSingle(),
+    supabase
+      .from("mentorados")
+      .select("disponibilidade, nome, nome_social")
+      .eq("id", dupla.mentorado_id)
+      .maybeSingle(),
+  ]);
+  return {
+    mentor: (mp?.disponibilidade ?? null) as Disponibilidade | null,
+    jovem: (jovem?.disponibilidade ?? null) as Disponibilidade | null,
+    jovemNome: primeiroNomeDe(jovem?.nome_social ?? jovem?.nome),
   };
 }
 
@@ -4014,7 +4219,7 @@ export async function salvarMaterial(formData: FormData) {
         ? ["mentorado"]
         : undefined,
   });
-  revalidatePath("/materiais");
+  revalidaMateriais();
   // id volta pro client poder desfazer a row se o upload do arquivo falhar
   return { ok: true, id: novo.id as string, emailFalhas: email.falhas };
 }
@@ -4074,7 +4279,7 @@ export async function editarMaterial(id: string, formData: FormData) {
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
-  revalidatePath("/materiais");
+  revalidaMateriais();
   return { ok: true };
 }
 
@@ -4093,7 +4298,7 @@ export async function anexarArquivoMaterial(id: string, path: string) {
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
-  revalidatePath("/materiais");
+  revalidaMateriais();
   return { ok: true };
 }
 
@@ -4109,7 +4314,7 @@ export async function removerArquivoMaterial(id: string) {
   if (!data?.length) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
-  revalidatePath("/materiais");
+  revalidaMateriais();
   return { ok: true };
 }
 
@@ -4389,6 +4594,7 @@ export async function updateMeuPerfil(formData: FormData) {
       .eq("profile_id", eu.id);
     if (mpErr) return { error: erroAmigavel(mpErr) };
   }
+  depoisDe(() => sincronizarMatchingPerfilPessoa(eu.id));
   revalidatePath("/", "layout");
   return { ok: true };
 }
@@ -4439,11 +4645,17 @@ export async function salvarOnboarding(formData: FormData) {
   if ("error" in apresentacao) return { error: apresentacao.error };
   const ficha = camposFicha(formData, { de: "pessoa", parcial: true });
   if ("error" in ficha) return { error: ficha.error };
-  const patch = {
+  const patch: Record<string, unknown> = {
     ...apresentacao,
     ...ficha,
     ...consentPatch(formData, eu.consent_lgpd_em),
   };
+  // passo "Declarações" do wizard (0142): checkbox desmarcado não posta —
+  // a sentinela decl_voluntario marca que o passo existiu, senão uma
+  // desmarcação nunca chegaria ao banco
+  if (formData.has("decl_voluntario")) {
+    patch.voluntario = formData.get("voluntario") === "on";
+  }
   if (Object.keys(patch).length > 0) {
     const { error } = await supabase
       .from("profiles").update(patch).eq("id", eu.id);
@@ -4481,6 +4693,10 @@ export async function salvarOnboarding(formData: FormData) {
     aviso = foto.aviso;
   }
 
+  // o wizard é onde a ficha de matching fica completa (interesses,
+  // motivação, experiência, disponibilidade) — o recompute pós-resposta
+  // cobre cada passo sem custar nada quando o doc não muda (hash)
+  depoisDe(() => sincronizarMatchingPerfilPessoa(eu.id));
   // wizard é full-screen — revalidar a home basta, nada de refresh em massa
   revalidatePath("/");
   return { ok: true, aviso };

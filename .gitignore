@@ -39,3 +39,4 @@ agent/
 graphify-out/
 HANDOFF.md
 skills-lock.json
+.mockshots/

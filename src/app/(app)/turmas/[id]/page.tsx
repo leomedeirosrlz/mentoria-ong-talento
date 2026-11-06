@@ -4,7 +4,7 @@ import { getCicloEventos, getCronogramas, getMe } from "@/lib/queries";
 import { getVinculosCronogramas } from "@/lib/queries-cronogramas";
 import { demoAtivo } from "@/lib/demo/mode";
 import { eventosDoCronograma, formatDiaMes, rotuloCronograma } from "@/lib/ciclo";
-import { turmaAno, turmaLonga } from "@/lib/turma";
+import { turmaLonga } from "@/lib/turma";
 import { VoltarLink } from "@/components/voltar-link";
 import {
   linhaDadosTurma,
@@ -15,8 +15,8 @@ import {
   CronogramaAcoes,
   CronogramaDuplas,
   CronogramaEventos,
-  StatusBadge,
 } from "@/components/cronograma-editor";
+import { StatusBadge } from "@/components/cronograma-status-badge";
 
 export async function generateMetadata({
   params,
@@ -57,15 +57,14 @@ export default async function TurmaPage({
   ).length;
   const encontros = evs.filter((e) => e.tipo === "encontro").length;
   const hoje = new Date();
-  const ano = turmaAno(cronograma.turma);
 
   return (
     <div className="space-y-6">
       <VoltarLink fallback="/turmas" />
 
       {/* perfil da turma — a mesma capa de identidade do card (REALIZA-200):
-          banner ink + nome canônico + metadados; o nome do calendário fica
-          na linha de meta porque a entidade exibida é a turma */}
+          banner ink + nome canônico + metadados; nome do calendário e ciclo
+          já vão na linha mono do banner — a meta fica com datas e totais */}
       <section className="animate-enter overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
         <TurmaBanner
           cronograma={cronograma}
@@ -79,11 +78,9 @@ export default async function TurmaPage({
               <StatusBadge status={cronograma.status} />
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
-              {cronograma.nome}
-              {ano && ` · Ciclo ${ano}`}
               {cronograma.inicio_em
-                ? ` · ${formatDiaMes(cronograma.inicio_em)} → ${formatDiaMes(cronograma.fim_em)}`
-                : " · sem datas definidas"}
+                ? `${formatDiaMes(cronograma.inicio_em)} → ${formatDiaMes(cronograma.fim_em)}`
+                : "sem datas definidas"}
               {` · ${encontros} ${encontros === 1 ? "encontro oficial" : "encontros oficiais"} · `}
               {vinc.length === 0
                 ? "nenhuma dupla"

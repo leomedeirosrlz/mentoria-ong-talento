@@ -7,7 +7,7 @@ import { CHAMADO_CATEGORIA_LABEL } from "@/lib/ciclo";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
-import { ChamadoStatusBadge } from "@/components/chamados-app";
+import { ChamadoStatusBadge } from "@/components/chamados-shared";
 import { NovoChamadoDialog } from "@/components/novo-chamado-dialog";
 import { Button } from "@/components/ui/button";
 import { Plus } from "@phosphor-icons/react";

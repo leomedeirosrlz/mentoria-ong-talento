@@ -21,17 +21,6 @@ export type FilaItem = {
   desde: string | null;
   /** Só mentor: vagas livres agora (capacidade − duplas ativas/pausadas). */
   vagas?: number;
-  /** Só mentor: trilha — especialista pareja pelo mural, não pelo board. */
-  trilha?: "dpp" | "especialista";
-};
-
-/** Trilhas que o mentor serve — papel efetivo (WP6b): o híbrido devolve as
- *  duas, cada uma com a própria pool de vagas. */
-const trilhasDe = (p: Pick<Profile, "role" | "papeis">): Trilha[] => {
-  const t: Trilha[] = [];
-  if (temPapel(p, "mentor_dpp")) t.push("dpp");
-  if (temPapel(p, "mentor_especialista")) t.push("especialista");
-  return t;
 };
 
 /** "Carimbo de data/hora" do Google Forms dentro de form_bruto — o intake
@@ -166,32 +155,31 @@ export function tetoMentor(
  *  linha em mentor_profiles vale capacidade 1, a mesma régua do
  *  createDupla/PessoaRow. Inativa (ativo=false = saiu do programa) não
  *  aparece — a reserva é de quem ficou. Mentor de volta de dupla
- *  encerrada conta normal: reserva não exige histórico zerado. */
+ *  encerrada conta normal: reserva não exige histórico zerado.
+ *
+ *  Só a pool DPP conta (2026-02): especialista não "aguarda par" — é
+ *  capacidade sob demanda acionada pelo mural, não obrigação de parear.
+ *  O híbrido aparece pelo papel DPP, medido só na pool DPP. */
 export function filaMentores(
   pessoas: Profile[],
   mentorProfiles: Record<string, MentorProfile>,
   contagem: Record<string, number>
 ): FilaItem[] {
-  // uma entrada por trilha com vaga — o híbrido (WP6b) aparece nas duas,
-  // `contagem` é chaveada por `${profile_id}:${trilha}`
   const itens: FilaItem[] = [];
   for (const p of pessoas) {
-    if (!p.ativo) continue;
-    for (const trilha of trilhasDe(p)) {
-      const teto = tetoMentor(p, mentorProfiles[p.id], trilha);
-      const usadas = contagem[`${p.id}:${trilha}`] ?? 0;
-      if (teto - usadas <= 0) continue;
-      itens.push({
-        id: p.id,
-        nome: p.nome,
-        avatar_path: p.avatar_path,
-        whatsapp: p.whatsapp,
-        origem: p.origem ?? null,
-        desde: esperaDesde(p),
-        vagas: teto - usadas,
-        trilha,
-      });
-    }
+    if (!p.ativo || !temPapel(p, "mentor_dpp")) continue;
+    const teto = tetoMentor(p, mentorProfiles[p.id], "dpp");
+    const usadas = contagem[`${p.id}:dpp`] ?? 0;
+    if (teto - usadas <= 0) continue;
+    itens.push({
+      id: p.id,
+      nome: p.nome,
+      avatar_path: p.avatar_path,
+      whatsapp: p.whatsapp,
+      origem: p.origem ?? null,
+      desde: esperaDesde(p),
+      vagas: teto - usadas,
+    });
   }
   return itens.sort(porEspera);
 }

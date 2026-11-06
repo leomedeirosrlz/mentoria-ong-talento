@@ -3,13 +3,11 @@ import { audienciasDe, veMaterial } from "@/lib/materiais";
 import Link from "next/link";
 import {
   getCicloEventos,
-  getDuplas,
+  getDuplasInfo,
   getMateriais,
   getMe,
   getPainelInstrumentosJornada,
 } from "@/lib/queries";
-import { getFormularios } from "@/lib/forms/queries";
-import type { FormularioSistema } from "@/lib/forms/schema";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import {
   eventoDaSemana,
@@ -39,7 +37,7 @@ import {
   type TurmaMateriais,
 } from "@/components/materiais-mentor-biblioteca";
 
-export const metadata: Metadata = { title: "Materiais" };
+export const metadata: Metadata = { title: "Materiais de apoio" };
 
 export default async function MateriaisPage({
   searchParams,
@@ -47,18 +45,10 @@ export default async function MateriaisPage({
   searchParams: Promise<{ aba?: string }>;
 }) {
   const { aba: abaParam } = await searchParams;
-  const [materiais, me, eventos, formulariosRaw] = await Promise.all([
+  const [materiais, me, eventos] = await Promise.all([
     getMateriais(),
     getMe(),
     getCicloEventos(),
-    getMe().then((m) =>
-      temPapel(m, "coordenacao")
-        ? getFormularios().catch((e) => {
-            console.error("materiais/getFormularios:", e);
-            return [];
-          })
-        : Promise.resolve([])
-    ),
   ]);
 
   // coordenação por papel (não só o primário): o híbrido supervisor+coord
@@ -110,7 +100,9 @@ export default async function MateriaisPage({
     vePainel || ehMentorDpp
       ? await Promise.all([
           painelPromise,
-          getDuplas(),
+          // recorte enxuto: a página só lê vínculo/nome/contato — a árvore
+          // de encontros do getDuplas não desce pra coorte inteira aqui
+          getDuplasInfo(),
           painelPromise.then((p) =>
             p.length
               ? getUltimasInteracoes(
@@ -149,13 +141,6 @@ export default async function MateriaisPage({
     : vePainel
       ? ("supervisor" as const)
       : ("mentor" as const);
-  const formIds = new Map<FormularioSistema, string>();
-  if (ehCoord) {
-    const forms = formulariosRaw;
-    for (const f of forms) {
-      if (f.sistema && !formIds.has(f.sistema)) formIds.set(f.sistema, f.id);
-    }
-  }
   const fichasMentor = ehMentorDpp
     ? duplasPainel
         .filter(
@@ -260,10 +245,10 @@ export default async function MateriaisPage({
       {/* biblioteca vazia: o CTA mora dentro do card de estado vazio, não
           aqui — por isso o actions some junto com o catálogo */}
       <PageHeader
-        title="Materiais"
+        title="Materiais de apoio"
         meta={
           ehCoord
-            ? "Instrumentos da jornada e o acervo do programa"
+            ? "Instrumentos da jornada e o material de apoio do programa"
             : "Guias e instrumentos do programa. A coordenação publica conforme a jornada avança"
         }
         actions={
@@ -280,7 +265,6 @@ export default async function MateriaisPage({
             linhas={painel}
             eventos={eventos}
             duplasInfo={duplasInfo}
-            formIds={formIds}
             envioLiberado={EMAIL_ENVIO_LIBERADO}
             fichasMentor={fichasMentor}
             nudges={nudges}

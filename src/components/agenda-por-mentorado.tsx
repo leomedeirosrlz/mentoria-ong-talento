@@ -50,7 +50,6 @@ import type {
   Encontro,
   SolicitacaoEspecialista,
   SolicitacaoEspecialistaStatus,
-  Supervisao,
   TrilhaJovem,
   TrilhaJovemRegistro,
   TrilhaJovemSessao,
@@ -83,9 +82,6 @@ export type AgendaPorMentoradoProps = {
   especialistas: { id: string; nome: string }[];
   eventos: CicloEvento[];
   cronogramas: Cronograma[];
-  /** Sessões do mentor — conduzidas + recebidas; "Do programa" filtra as
-   *  recebidas (mentor_id === meuId) e o strip usa todas. */
-  supervisoes?: Supervisao[];
   /** Último contato por dupla — o "Lembrar o jovem" só conta tipo nudge. */
   nudges: Record<string, Interacao>;
   /** ids das duplas com rito de encerramento aberto
@@ -96,7 +92,6 @@ export type AgendaPorMentoradoProps = {
   /** staff+mentor e DPP+esp chegam via ?visao=dpp — o strip repassa ao
    *  deep-link do dia (mesma regra do AbasAgendaMentor). */
   hibrido?: boolean;
-  meuId: string;
   /** Primeiro nome do mentor — assina o check-in do Lembrar. */
   meuNome: string;
   hoje: string;
@@ -131,12 +126,10 @@ export function AgendaPorMentorado({
   especialistas,
   eventos,
   cronogramas,
-  supervisoes = [],
   nudges,
   encerramentosPendentes,
   itensSemana,
   hibrido = false,
-  meuId,
   meuNome,
   hoje,
   agora: agoraMs,
@@ -183,8 +176,9 @@ export function AgendaPorMentorado({
   return (
     <div className="space-y-6">
       {/* o strip da semana só aparece quando tem o que condensar — sem
-          itens derivados ele seria 7 "livre" sem utilidade */}
-      {itensSemana.length > 0 && (
+          item com data na semana ele seria 7 "livre" sem utilidade
+          ("a agendar" não tem dia, não justifica o strip sozinho) */}
+      {itensSemana.some((it) => it.dia != null) && (
         <AgendaSuaSemana itens={itensSemana} hoje={hoje} hibrido={hibrido} />
       )}
       {/* >1 dupla: cards em 2 colunas em xl (mesma régua da home do
@@ -215,10 +209,8 @@ export function AgendaPorMentorado({
         ))}
       </div>
       <DoPrograma
-        supervisoes={supervisoes}
         eventos={eventos}
         duplas={duplas}
-        meuId={meuId}
         hoje={hoje}
       />
     </div>
@@ -272,7 +264,18 @@ function CardMentorado({
   );
   const alvo = alvoAgendamento(dupla, eventos, agora);
   const total = jornada.total || TRILHA_LEN.dpp;
-  const feitos = jornada.feitos;
+  // sem passos contáveis na jornada (cronograma sem encontros, ou todos
+  // antes do iniciada_em): a conta honesta são os realizados registrados,
+  // capados no total pra barra/ARIA não mentirem com encontros extras
+  const feitos = Math.min(
+    jornada.total > 0
+      ? jornada.feitos
+      : dupla.encontros.filter((e) => e.status === "realizado").length,
+    total
+  );
+  // jornada fechada mesmo sem `completa`: sem passos, `completa` é sempre
+  // false — feitos == total fecha a leitura ("16 de 16", não "passo N")
+  const jornadaFechada = jornada.completa || feitos >= total;
   const pct = total > 0 ? Math.round((feitos / total) * 100) : 0;
 
   // agendado/remarcado futuro — saude.proximo só cobre 'agendado'; o
@@ -393,7 +396,7 @@ function CardMentorado({
       <div>
         <div className="flex items-baseline justify-between gap-2 text-sm">
           <p className="font-medium">
-            {jornada.completa
+            {jornadaFechada
               ? `${total} de ${total} encontros`
               : `Encontro ${alvo.proximoNumero} de ${total}`}
             <span className="text-muted-foreground">
@@ -423,7 +426,7 @@ function CardMentorado({
         proximo={proximo}
         limbo={limbo}
         alvo={alvo}
-        jornadaCompleta={jornada.completa}
+        jornadaCompleta={jornadaFechada}
         feitos={feitos}
         total={total}
         hoje={hoje}
@@ -501,12 +504,22 @@ function CardMentorado({
                         : "encontro realizado sem registro: atividades, avaliação e próximo passo"}
                     </p>
                   </div>
-                  <Link
-                    href={`/duplas/${dupla.id}#registrar-${e.id}`}
-                    className={buttonVariants({ variant: "outline", size: "sm" })}
-                  >
-                    Preencher
-                  </Link>
+                  <div className="flex flex-wrap gap-2">
+                    <Link
+                      href={`/duplas/${dupla.id}#registrar-${e.id}`}
+                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                    >
+                      Registrar
+                    </Link>
+                    {noLimbo && (
+                      <Link
+                        href={`/duplas/${dupla.id}?aba=encontros#encontro-${e.id}`}
+                        className={buttonVariants({ variant: "ghost", size: "sm" })}
+                      >
+                        Remarcar
+                      </Link>
+                    )}
+                  </div>
                 </li>
               );
             })}
@@ -527,7 +540,7 @@ function CardMentorado({
                   </p>
                 </div>
                 <Link
-                  href={`/duplas/${dupla.id}#combinados`}
+                  href={`/duplas/${dupla.id}#combinado-${t.id}`}
                   className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
                   Ver na ficha
@@ -585,12 +598,13 @@ function CardMentorado({
               msgsContato(
                 {
                   eu: meuNome,
+                  remetente: "mentor",
                   mentorNome: meuNome,
                   mentoradoNome: primeiroNome,
                 },
                 {
                   casoMentorado:
-                    "Passando pra ver como você está e se precisa de algo por aqui. Os encontros seguem abertos pra vocês marcarem quando couber.",
+                    "Passando pra ver como você está e se precisa de algo por aqui. Os encontros seguem abertos pra gente marcar quando couber.",
                 }
               ).mentorado ?? ""
             }
@@ -640,25 +654,30 @@ function ProximoEncontro({
     titulo = "Dupla encerrada";
     detalhe = `${feitos} de ${total} encontros realizados`;
   } else if (limbo) {
-    // limbo é honesto: a plataforma não sabe se rolou — a pergunta é da
-    // dupla, a correção acontece na ficha (remarcar/registrar). O CTA é a
-    // pill outline sm dos outros cartões de pendência — um link inline de
-    // texto tinha ~20px de alvo no toque.
-    titulo = `Estava agendado ${formatDiaHora(limbo.data_hora)}`;
+    // limbo é honesto: a plataforma não sabe se rolou — então pergunta, e
+    // cada resposta tem a sua saída: aconteceu → registra (o deep link já
+    // abre o form); não aconteceu → a linha do encontro na ficha tem o
+    // Remarcar (e o "não aconteceu") à mão
+    titulo = `O ${limbo.numero}º encontro estava agendado ${formatDiaHora(limbo.data_hora)}. Aconteceu?`;
     detalhe = (
       <>
         <span className="block">
-          não aconteceu? Se rolou, o registro também é na ficha
+          se rolou, registre como foi; se não, remarque na ficha
         </span>
-        <Link
-          href={`/duplas/${dupla.id}`}
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            "mt-2"
-          )}
-        >
-          Remarcar na ficha
-        </Link>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Link
+            href={`/duplas/${dupla.id}?aba=encontros#registrar-${limbo.id}`}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            Registrar como foi
+          </Link>
+          <Link
+            href={`/duplas/${dupla.id}?aba=encontros#encontro-${limbo.id}`}
+            className={buttonVariants({ variant: "ghost", size: "sm" })}
+          >
+            Remarcar na ficha
+          </Link>
+        </div>
       </>
     );
   } else if (proximo?.data_hora) {
@@ -716,7 +735,7 @@ function ProximoEncontro({
         </p>
         <p className="mt-0.5 text-sm font-medium">{titulo}</p>
         {detalhe && (
-          <p className="text-xs text-muted-foreground">{detalhe}</p>
+          <div className="text-xs text-muted-foreground">{detalhe}</div>
         )}
       </div>
     </div>
@@ -900,7 +919,9 @@ function SessaoRow({
     detalhe = (
       <>
         {quando ? `${formatDate(quando)} · ` : ""}
-        {rep.registro ? "registro entregue" : "registro pendente"}
+        {rep.registro
+          ? "registro entregue"
+          : "registro do especialista pendente · sem ação sua"}
         {rep.estrelas != null && (
           <>
             {" · "}
@@ -1163,15 +1184,9 @@ function PedidoEspecialistaBlock({
           "current",
           `sugestão sua aguardando ${primeiroNome} confirmar · ainda não virou pedido`,
         ],
-        ["open", "a coordenação libera pro mural"],
-        ["open", "um especialista aceita e a trilha começa"],
-        ["open", "5 sessões em ~3 meses"],
-      ];
-      break;
-    case "aguardando_coord":
-      passos = [
-        ["done", `pedido registrado em ${formatDate(s.created_at)}`],
-        ["current", "com a coordenação · ainda não foi pro mural"],
+        // confirmada, a sugestão vira pedido no mural na hora: ninguém
+        // aprova no meio (0086 + 0158)
+        ["open", `${primeiroNome} confirma e o pedido vai pro mural`],
         ["open", "um especialista aceita e a trilha começa"],
         ["open", "5 sessões em ~3 meses"],
       ];
@@ -1334,30 +1349,23 @@ function SemTrilhaBlock({
 
 // ---------- "Do programa" ----------
 
-/** O que a equipe faz COM o mentor — supervisões recebidas ("por Paula
- *  Nunes") e as formações do calendário oficial das turmas dele. Vai no
+/** O que a equipe faz COM o mentor — as formações do calendário oficial
+ *  das turmas dele. Vai no
  *  fim: é contexto, não ação do dia. Sem itens a seção some (estado vazio
  *  aqui é só ausência, não defeito). */
 function DoPrograma({
-  supervisoes,
   eventos,
   duplas,
-  meuId,
   hoje,
 }: {
-  supervisoes: Supervisao[];
   eventos: CicloEvento[];
   duplas: Dupla[];
-  meuId: string;
   hoje: string;
 }) {
-  const recebidas = supervisoes
-    .filter((s) => s.mentor_id === meuId)
-    .slice(0, 3);
   const cronosDasDuplas = new Set(
     duplas.map((d) => d.cronograma_id).filter(Boolean)
   );
-  const formacoes = eventos
+  const itens = eventos
     .filter(
       (e) =>
         e.tipo === "formacao" &&
@@ -1367,26 +1375,13 @@ function DoPrograma({
         cronosDasDuplas.has(e.cronograma_id)
     )
     .sort((a, b) => a.data!.localeCompare(b.data!))
-    .slice(0, 3);
-
-  const itens = [
-    ...recebidas.map((s) => ({
-      key: `sup-${s.id}`,
-      data: s.data,
-      titulo: `Supervisão com ${s.supervisor?.nome ?? "auxiliar executivo"}`,
-      detalhe: s.dupla?.mentorado?.nome
-        ? `sobre a dupla com ${s.dupla.mentorado.nome}`
-        : "sessão geral",
-    })),
-    ...formacoes.map((e) => ({
+    .slice(0, 3)
+    .map((e) => ({
       key: `for-${e.id}`,
       data: e.data!,
       titulo: "Formação de mentores",
       detalhe: [e.titulo, e.observacao].filter(Boolean).join(" · "),
-    })),
-    // cronológico desc — supervisão (já aconteceu) e formação (vai acontecer)
-    // na mesma linha do tempo; concatenar deixava a mais recente embaixo
-  ].sort((a, b) => b.data.localeCompare(a.data));
+    }));
   if (itens.length === 0) return null;
 
   return (

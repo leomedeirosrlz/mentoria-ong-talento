@@ -221,7 +221,7 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
   // as condenadas de verdade — as quatro duplas fixture ficam (a do jovem,
   // a dupla2 que só volta a 'ativa', a trilha esp e a dupla pausada do
   // colega, também fixtures). Filhos NO ACTION primeiro: especialista_,
-  // formulario_, supervisoes e encerramentos referenciam duplas sem
+  // formulario_ e encerramentos referenciam duplas sem
   // cascade; encontros carrega registros/notas/interações em cascade, mas
   // as avaliações/links só saíram acima por causa do dupla_id espelhado.
   const condenadas = morremIds.filter(
@@ -256,7 +256,6 @@ console.log(`cronograma: ${cron.id} (${cron.turma})`);
       await del(`solicitacoes_especialista?id=in.(${solIds.join(",")})`);
     }
     await del(`formulario_links?dupla_id=in.(${ids})`);
-    await del(`supervisoes?dupla_id=in.(${ids})`);
     await del(`encerramentos?dupla_id=in.(${ids})`);
     // 0084: chamados apontam pra dupla sem cascade — saem antes do pai
     await del(`chamados?dupla_id=in.(${ids})`);

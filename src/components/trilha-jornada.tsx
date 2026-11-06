@@ -12,6 +12,7 @@ import {
   type NoJornada,
 } from "@/lib/ciclo";
 import type { DuplaStatus } from "@/lib/types";
+import { useFadeX } from "@/lib/use-fade-x";
 import { cn } from "@/lib/utils";
 
 const ICONE_MARCO: Record<MarcoJornada, typeof Flag> = {
@@ -97,7 +98,9 @@ function textoProximo(no: NoJornada | undefined): string | null {
   if (no.estado === "agendado")
     return `Próximo: ${no.numero}º · agendado ${formatDateTime(no.encontro?.data_hora)}`;
   if (no.estado === "nao_aconteceu")
-    return `Próximo: ${no.numero}º · não aconteceu, remarcar`;
+    // o "não aconteceu" é sempre marcação de alguém (mentor, jovem ou
+    // coord) — se foi engano, o caminho de volta é o Desfazer na linha
+    return `Próximo: ${no.numero}º · não aconteceu · remarcar ou desfazer`;
   return no.evento.data
     ? `Próximo: ${no.numero}º · sugerido ${formatDate(no.evento.data)}`
     : `Próximo: ${no.numero}º · data a combinar`;
@@ -119,31 +122,7 @@ export function TrilhaJornada({
   duplaId: string;
 }) {
   const refAtual = useRef<HTMLLIElement | null>(null);
-  const refStrip = useRef<HTMLOListElement | null>(null);
-
-  // fade de 16px nas bordas do scroll horizontal — só quando há overflow de
-  // fato (mobile: os 16 nós não cabem); no sm+ a trilha preenche o card sem
-  // rolar e a máscara sai, senão esmaecia os nós das pontas
-  useEffect(() => {
-    const el = refStrip.current;
-    if (!el) return;
-    const MASCARA =
-      "linear-gradient(to right, transparent, black 16px, black calc(100% - 16px), transparent)";
-    const aplicar = () => {
-      const rola = el.scrollWidth > el.clientWidth + 1;
-      if (rola) {
-        el.style.setProperty("-webkit-mask-image", MASCARA);
-        el.style.setProperty("mask-image", MASCARA);
-      } else {
-        el.style.removeProperty("-webkit-mask-image");
-        el.style.removeProperty("mask-image");
-      }
-    };
-    aplicar();
-    const ro = new ResizeObserver(aplicar);
-    ro.observe(el);
-    return () => ro.disconnect();
-  }, []);
+  const { ref: refStrip, maskStyle } = useFadeX<HTMLOListElement>();
 
   // strip rola horizontal só no mobile (16 alvos de 44px ≈ 800px > 375px) —
   // sem o scroll o passo atual sairia da tela; mesmo padrão do rail da
@@ -208,7 +187,8 @@ export function TrilhaJornada({
           indicador de continuação, não a barra */}
       <ol
         ref={refStrip}
-        className="mt-1 flex items-center overflow-x-auto pt-2.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={maskStyle}
+        className="mt-1 flex items-center overflow-x-auto overscroll-x-contain scroll-px-4 pt-2.5 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {jornada.nos.map((no, i) => {
           const atual = no.numero === jornada.proximoNumero;

@@ -108,7 +108,7 @@ export function InstrumentosSistemaLista({
           href="/materiais"
           className="font-medium underline underline-offset-2 hover:text-foreground"
         >
-          Materiais
+          Materiais de apoio
         </Link>
         .
       </p>

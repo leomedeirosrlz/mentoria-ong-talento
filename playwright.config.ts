@@ -7,6 +7,15 @@ import { defineConfig } from "@playwright/test";
 //   pro vercel.com/sso-api. Em produção/local pode ficar vazio.
 const baseURL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 
+// E2E_VULKAN=1: browser com GPU via ANGLE/Vulkan — dev local com driver
+// Vulkan alivia o CPU em specs densos (calendário, PDFs).
+const vulkanArgs = process.env.E2E_VULKAN
+  ? [
+      "--use-angle=vulkan",
+      "--enable-features=Vulkan,VulkanFromANGLE,DefaultANGLEVulkan",
+    ]
+  : [];
+
 export default defineConfig({
   testDir: "tests/e2e",
   timeout: 30_000,
@@ -26,6 +35,7 @@ export default defineConfig({
     // debugável em CI: trace no retry, screenshot sempre que falhar
     trace: "on-first-retry",
     screenshot: "only-on-failure",
+    launchOptions: { args: vulkanArgs },
   },
   projects: [
     // demo = superfície pública/stubada — roda contra qualquer ambiente,

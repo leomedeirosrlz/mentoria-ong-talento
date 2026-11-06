@@ -111,16 +111,18 @@ const dadosDe = (r: Awaited<ReturnType<typeof executarTool>>) => {
 };
 
 describe("registry", () => {
-  it("declara as 9 tools com descrição pt-BR e papéis", () => {
+  it("declara as 11 tools com descrição pt-BR e papéis", () => {
     expect(IA_TOOL_NOMES.sort()).toEqual(
       [
         "agenda_do_periodo",
         "aguardando_par",
         "capacidade_mentores",
+        "chamados_resumo",
         "duplas_do_usuario",
         "ficha_dupla",
         "guia_consulta",
         "instrumentos_da_dupla",
+        "pessoas_busca",
         "registros_da_dupla",
         "resumo_semana",
       ].sort()
@@ -706,15 +708,15 @@ describe("executarTool — auditoria", () => {
     consoleSpy.mockRestore();
   });
 
-  it("guia_consulta devolve trechos citáveis sem o score", async () => {
+  it("guia_consulta devolve trechos citáveis limpos, sem score nem pagina", async () => {
     const { supabase } = supaFake({
       rpcData: {
         match_ia_chunks: [
           {
             guia: "guia-mentor-dpp",
             secao: "2º encontro",
-            pagina: 12,
-            trecho: "Apresente os resultados consolidados…",
+            pagina: 12, // id sintético do chunk — nunca chega ao modelo
+            trecho: "Apresente os <b>resultados</b> consolidados…",
             score: 0.42,
           },
         ],
@@ -731,10 +733,10 @@ describe("executarTool — auditoria", () => {
         {
           guia: "guia-mentor-dpp",
           secao: "2º encontro",
-          pagina: 12,
           trecho: "Apresente os resultados consolidados…",
         },
       ],
+      guias: [],
     });
   });
 

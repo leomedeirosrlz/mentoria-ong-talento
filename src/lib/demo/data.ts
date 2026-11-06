@@ -44,6 +44,7 @@ import type {
   Dupla,
   Encaminhamento,
   Encontro,
+  EncontroRemarcacao,
   EspecialistaEvento,
   ExcecaoEspecialista,
   GradeJanela,
@@ -59,7 +60,6 @@ import type {
   RegistroAnexo,
   SolicitacaoEspecialista,
   SolicitacaoProposta,
-  Supervisao,
   TurmaInscricao,
 } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
@@ -127,7 +127,6 @@ export type DemoData = {
   documentoTemplates: DocumentoTemplate[];
   assinaturas: Assinatura[];
   presencas: Presenca[];
-  supervisoes: Supervisao[];
   documentosPessoa: DocumentoPessoa[];
   avaliacoes: AvaliacaoEncontro[];
   avaliacaoLinks: AvaliacaoLink[];
@@ -149,12 +148,13 @@ const uid = (n: number): string =>
 // anexos: 16xx · ciclo_eventos: 18xx · materiais: 20xx · comunicados: 22xx ·
 // solicitacoes: 24xx · pessoa_notas: 26xx · interacoes: 28xx ·
 // notificacoes: 30xx · assinaturas: 32xx · doc_templates: 33xx · tokens de
-// assinatura: 34xx · presencas: 36xx · supervisoes: 38xx ·
+// assinatura: 34xx · presencas: 36xx ·
 // avaliacao_links: 42xx · avaliacoes_encontro: 44xx ·
-// documentos_pessoa: 46xx · cronogramas: 50xx · especialista_grade: 52xx ·
+// documentos_pessoa: 46xx · combinados do preparo: 48xx · cronogramas: 50xx ·
+// especialista_grade: 52xx ·
 // especialista_excecoes: 54xx · chamados: 58xx · chamado_atualizacoes: 60xx ·
 // chamado_comentarios: 62xx · chamado_anexos: 64xx · devolutivas: 66xx ·
-// turma_inscricoes: 68xx.
+// turma_inscricoes: 68xx · encontro_remarcacoes: 70xx.
 // user_id fake: f0xx.
 // especialista_eventos e profile_papeis não tem id.
 const P = {
@@ -747,6 +747,8 @@ function build(): DemoData {
   let seqReg = 0;
   let seqEncam = 0;
   let seqNota = 0;
+  let seqInt = 0;
+  let seqRem = 0;
 
   type EncOpts = {
     /** Dia em que aconteceu de fato — default = dia agendado. */
@@ -849,11 +851,63 @@ function build(): DemoData {
     responsavel,
     prazo: prazo ? ymd(prazo) : null,
     status,
+    // nº do encontro do registro — preenchido no fim, quando as duplas
+    // existem (mesma derivação da 0157 sobre os combinados antigos)
+    numero: null,
+    feito_em: null,
+    created_by: null,
     // a coluna é NOT NULL (default now()) — a view jovem_encaminhamentos a
     // expõe e a ordenação dos combinados a usa como desempate. Na vida real
     // o combinado nasce junto do registro do encontro; aqui o fixture
     // aproxima: "cobrado ~1 semana antes do prazo"
     created_at: prazo ? em(addDias(prazo, -7), "20:30") : haDias(14, "20:30"),
+  });
+
+  /** Combinado anotado pelo mentor no card do encontro, no preparo (o
+   *  antigo afazer, 0157) — responsável mentor, sem registro. feito_em é
+   *  carimbo da transição no banco, então o item feito do fixture já nasce
+   *  com ele (aproximo pelo criadoEm, a ordem de leitura é o que importa). */
+  const combinadoDoPreparo = (
+    dupla: string,
+    numero: number,
+    descricao: string,
+    feito: boolean,
+    criadoEm: string,
+    autor: Profile
+  ): Encaminhamento => ({
+    id: uid(0x4800 + ++seqInt),
+    dupla_id: dupla,
+    registro_id: null,
+    numero,
+    descricao,
+    responsavel: "mentor",
+    prazo: null,
+    status: feito ? "feito" : "pendente",
+    feito_em: feito ? criadoEm : null,
+    created_by: autor.id,
+    created_at: criadoEm,
+  });
+
+  /** Uma remarcação do encontro (REALIZA-341) — no real só o trigger
+   *  escreve: cada mudança de data_hora carimba de quando pra quando + o
+   *  motivo declarado. O agendamento inicial não entra. */
+  const remarcacao = (
+    enc: Encontro,
+    dataAnterior: string,
+    dataNova: string,
+    motivo: string,
+    criadoEm: string,
+    autor: Profile
+  ): EncontroRemarcacao => ({
+    id: uid(0x7000 + ++seqRem),
+    encontro_id: enc.id,
+    dupla_id: enc.dupla_id,
+    numero: enc.numero,
+    data_anterior: dataAnterior,
+    data_nova: dataNova,
+    motivo,
+    created_by: autor.id,
+    created_at: criadoEm,
   });
 
   // ---------- pessoas ----------
@@ -876,6 +930,7 @@ function build(): DemoData {
     motivacao: "Coordena o programa desde o primeiro ciclo — acredita em mentoria como alavanca de mobilidade.",
     pref_genero_par: "indiferente",
     cargo: "Coordenadora de programas", empresa: "Instituto Realiza",
+    voluntario: true,
     origem: "Equipe fundadora", consent_lgpd_em: haDias(400),
     // sync-back da assinatura (0046): quem assinou tem a ficha preenchida
     dados_civis: {
@@ -897,6 +952,7 @@ function build(): DemoData {
     motivacao: "Psicólogo há 20 anos; entrou pra dar suporte técnico às duplas.",
     pref_genero_par: "indiferente",
     cargo: "Psicólogo", empresa: "Consultório próprio",
+    voluntario: true,
     origem: "Indicação da coordenação", consent_lgpd_em: haDias(400),
   };
   const ricardo: Profile = {
@@ -912,6 +968,7 @@ function build(): DemoData {
     motivacao: "Tive um mentor no começo da carreira que mudou minha trajetória — quero fazer o mesmo por alguém.",
     pref_genero_par: "indiferente",
     cargo: "Product manager", empresa: "Fintech",
+    voluntario: true,
     origem: "Post no LinkedIn", consent_lgpd_em: haDias(45),
     // cadastro trouxe os civis — o /assinar dele chega preenchido e a demo
     // mostra o prefill sem precisar digitar nada além do aceite
@@ -939,6 +996,7 @@ function build(): DemoData {
     motivacao: "Sou professora — sei destravar exatas pra quem trava na base.",
     pref_genero_par: "indiferente",
     cargo: "Professora de matemática", empresa: "Colégio particular",
+    voluntario: true,
     origem: "Voluntária desde o ciclo anterior", consent_lgpd_em: haDias(50),
   };
 
@@ -959,6 +1017,7 @@ function build(): DemoData {
     motivacao: "12 anos em programas de jovens — supervisão é onde mais contribuo.",
     pref_genero_par: "indiferente",
     cargo: "Psicóloga organizacional", empresa: "Consultoria própria",
+    voluntario: true,
     origem: "Rede da coordenação", consent_lgpd_em: haDias(90),
   };
   const carlos: Profile = {
@@ -978,6 +1037,7 @@ function build(): DemoData {
     motivacao: "Mentor desde 2024 — comecei como monitor em cursinho comunitário.",
     pref_genero_par: "indiferente",
     cargo: "Líder técnico", empresa: "Fintech",
+    voluntario: true,
     origem: "Indicação de outro mentor", consent_lgpd_em: haDias(60),
   };
   const fernanda: Profile = {
@@ -997,6 +1057,7 @@ function build(): DemoData {
     motivacao: "Trabalho com reforço escolar na rede pública — a mentoria é o próximo passo natural.",
     pref_genero_par: "feminino",
     cargo: "Pedagoga", empresa: "Prefeitura de Guarulhos",
+    voluntario: true,
     origem: "ONG parceira", consent_lgpd_em: haDias(60),
   };
   const joaoPedro: Profile = {
@@ -1016,6 +1077,7 @@ function build(): DemoData {
     motivacao: "Fui mentorado na faculdade; agora quero retribuir.",
     pref_genero_par: "indiferente",
     cargo: "Analista de dados", empresa: "Banco",
+    voluntario: true,
     origem: "Post no LinkedIn", consent_lgpd_em: haDias(45),
   };
   const luiza: Profile = {
@@ -1035,6 +1097,7 @@ function build(): DemoData {
     motivacao: "Segundo ciclo como mentora — a troca com o jovem me ensina tanto quanto ensino.",
     pref_genero_par: "feminino",
     cargo: "Designer de produto", empresa: "Freelancer",
+    voluntario: true,
     origem: "Voltou do ciclo anterior", consent_lgpd_em: haDias(200),
   };
   const andre: Profile = {
@@ -1054,6 +1117,7 @@ function build(): DemoData {
     motivacao: "Abri duas empresas do zero; quero ajudar um jovem a enxergar que também pode.",
     pref_genero_par: "indiferente",
     cargo: "Empreendedor", empresa: "Negócio próprio",
+    voluntario: true,
     origem: "Evento da ONG Horizonte", consent_lgpd_em: haDias(30),
   };
   const helena: Profile = {
@@ -1073,6 +1137,7 @@ function build(): DemoData {
     motivacao: "Destravo gente pra entrevista e apresentação — é o que faço todo dia.",
     pref_genero_par: "feminino",
     cargo: "Head de comunicação", empresa: "Varejo",
+    voluntario: true,
     origem: "Indicação de uma mentora especialista", consent_lgpd_em: haDias(50),
   };
   const marcos: Profile = {
@@ -1092,6 +1157,7 @@ function build(): DemoData {
     motivacao: "Dou aula técnica aos sábados — a trilha curta encaixa na minha rotina.",
     pref_genero_par: "indiferente",
     cargo: "Engenheiro de dados", empresa: "Consultoria",
+    voluntario: true,
     origem: "Post no LinkedIn", consent_lgpd_em: haDias(25),
   };
   // especialista com a agenda publicada mas a capacidade zerada neste ciclo
@@ -1115,6 +1181,7 @@ function build(): DemoData {
     motivacao: "Jovem que aprende a fechar o mês no azul muda a vida da casa inteira.",
     pref_genero_par: "indiferente",
     cargo: "Contadora", empresa: "Escritório próprio",
+    voluntario: true,
     origem: "Formação de voluntários", consent_lgpd_em: haDias(35),
   };
   // cadastro recebido, ainda não entrou: user_id null + ativo — a badge da
@@ -1132,6 +1199,7 @@ function build(): DemoData {
     cidade: "São Paulo", uf: "SP", interesses: [],
     motivacao: null, pref_genero_par: null,
     cargo: null, empresa: null,
+    voluntario: true,
     origem: "Formulário de inscrição", consent_lgpd_em: null,
   };
   const patricia: Profile = {
@@ -1151,6 +1219,7 @@ function build(): DemoData {
     motivacao: "Foi mentora em ciclos anteriores.",
     pref_genero_par: "indiferente",
     cargo: "Gerente de RH", empresa: "Indústria",
+    voluntario: true,
     origem: "Ciclos anteriores", consent_lgpd_em: haDias(300),
   };
 
@@ -1927,8 +1996,8 @@ function build(): DemoData {
       desejado: { nome: helena.nome },
     },
     {
-      // pedido do Wendel SEM dupla DPP: entra na fila de triagem da
-      // coordenação — liberar exige definir a turma (reconhecer_solicitacao)
+      // pedido do Wendel SEM dupla DPP: vai direto ao mural como qualquer
+      // outro (0158: sem triagem da coordenação)
       id: uid(S.triagem),
       mentorado_id: wendel.id,
       dupla_dpp_id: null,
@@ -1941,10 +2010,10 @@ function build(): DemoData {
       especialista_desejado_id: null,
       especialista_id: null,
       dupla_id: null,
-      status: "aguardando_coord",
+      status: "aberta",
       created_by: wendelLogin.id,
       // 6 dias parado: o limiar do alerta do painel da coordenação é 5 —
-      // o Wendel aparece nos "Pedidos parados" como o caso de triagem
+      // o Wendel aparece nos "Pedidos parados" como pedido sem aceite
       created_at: haDias(6, "09:15"),
       respondida_em: null,
       mentorado: { nome: wendel.nome },
@@ -2183,6 +2252,18 @@ function build(): DemoData {
     agendado(uid(D.ok), 6, diaEncontro(6), { link: MEET }),
   ];
 
+  // REALIZA-341: o 5º encontro andou duas vezes e voltou pra terça oficial —
+  // a Ana moveu pro sábado por causa de uma prova e a dupla desfez quando a
+  // prova foi adiada. O vaivém é o que a coordenação e o calendário do
+  // mentor leem; o motivo que fica na row é o da ÚLTIMA remarcação.
+  encD1[4].motivo_reagendamento = "A prova da escola foi adiada, dá pra manter a terça";
+  encD1[4].remarcacoes = [
+    remarcacao(encD1[4], em(diaEncontro(5), "19:00"), em(addDias(diaEncontro(5), 4), "10:00"),
+      "Conflito de agenda", haDias(4, "21:15"), anaLogin),
+    remarcacao(encD1[4], em(addDias(diaEncontro(5), 4), "10:00"), em(diaEncontro(5), "19:00"),
+      "A prova da escola foi adiada, dá pra manter a terça", haDias(1, "18:40"), ricardo),
+  ];
+
   const regD1E1 = encD1[0].registro!;
   const regD1E3 = encD1[2].registro!;
   const regD1E4 = encD1[3].registro!;
@@ -2224,6 +2305,20 @@ function build(): DemoData {
       },
     ],
   };
+  // combinados do preparo (0157): o pendente do 3º encontro reaparece no
+  // "De antes" dos cards seguintes e alimenta o aviso "Combinados em
+  // aberto" da agenda do Ricardo
+  duplaOk.encaminhamentos.push(
+      combinadoDoPreparo(uid(D.ok), 3,
+        "Pedir o contato do professor de matemática pra alinhar a recuperação",
+        false, haDias(21, "08:45"), ricardo),
+      combinadoDoPreparo(uid(D.ok), 5,
+        "Revisar as submetas do PDM juntos antes de propor metas novas",
+        false, haDias(1, "08:35"), ricardo),
+      combinadoDoPreparo(uid(D.ok), 5,
+        "Enviar o vídeo da Roda da Vida comentado depois do encontro",
+        true, haDias(1, "08:40"), ricardo),
+  );
 
   // d-pend · Carlos × Caio — encontro 4 realizado sem registro (a pendência
   // que o semáforo cobra) + um registro tardio no histórico + o 5º oficial
@@ -2879,6 +2974,15 @@ function build(): DemoData {
   };
 
   const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaRito, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b, duplaT2c];
+  // combinado do registro herda o nº do encontro (backfill da 0157)
+  for (const d of duplas) {
+    const numeroPorRegistro = new Map(
+      d.encontros.flatMap((e) => (e.registro ? [[e.registro.id, e.numero] as const] : []))
+    );
+    for (const c of d.encaminhamentos)
+      if (c.numero == null && c.registro_id)
+        c.numero = numeroPorRegistro.get(c.registro_id) ?? null;
+  }
 
   // ---------- devolutivas (WP6) ----------
   // Feed datado por trilha — a última entrega continua sendo o que marca a
@@ -3549,60 +3653,6 @@ function build(): DemoData {
       )
   );
 
-  // ---------- sessões de supervisão (0041) ----------
-
-  // Ritual supervisor ↔ mentor do guia. As linhas já carregam os embeds do
-  // select da query real (supervisor/mentor/dupla>mentorado) — o stub e as
-  // queries demo consomem direto, sem resolver FK.
-  const supervisoes: Supervisao[] = [
-    {
-      id: uid(0x3801),
-      supervisor_id: paulo.id,
-      mentor_id: ricardo.id,
-      dupla_id: duplaOk.id,
-      // WP5 — domingo da semana corrente (seg–dom): dentro da janela da
-      // "Consolidada" do auxiliar e da "Semana no programa" da coordenação,
-      // e ≥ hoje pra entrar na agenda do mentor como sessão recebida ("Do
-      // programa" filtra data >= hoje — qualquer dia do run cobre)
-      data: ymd(addDias(HOJE, (7 - HOJE.getUTCDay()) % 7)),
-      resumo:
-        "Supervisão da semana com o Ricardo — a dupla engatou rápido: a Bia já fechou o PDM e entrou na execução das submetas. Ponto pra domingo: ela tende a abraçar metas demais — vale segurar uma submeta por vez e revisar o ritmo no registro semanal. Combinado de ele trazer as dúvidas de condução.",
-      created_by: paulo.id,
-      created_at: haDias(6, "18:40"),
-      supervisor: { id: paulo.id, nome: paulo.nome },
-      mentor: { id: ricardo.id, nome: ricardo.nome },
-      dupla: { id: duplaOk.id, mentorado: { nome: ana.nome } },
-    },
-    {
-      id: uid(0x3802),
-      supervisor_id: paulo.id,
-      mentor_id: sofia.id,
-      dupla_id: null, // sessão geral — não atada a uma dupla
-      data: ymd(addDias(HOJE, -5)),
-      resumo:
-        "Conversa geral sobre a trilha de especialista com a Bia: o diagnóstico de frações e funções saiu no 2º encontro e a Sofia já roda listas progressivas. Reforçamos o cuidado de registrar no PDM o que continua depois dos 5 encontros, pra mentoria DPP retomar o fio sem perder o ganho.",
-      created_by: paulo.id,
-      created_at: haDias(5, "19:10"),
-      supervisor: { id: paulo.id, nome: paulo.nome },
-      mentor: { id: sofia.id, nome: sofia.nome },
-      dupla: null,
-    },
-    {
-      id: uid(0x3803),
-      supervisor_id: beatriz.id,
-      mentor_id: fernanda.id,
-      dupla_id: duplaRisco.id,
-      data: ymd(addDias(HOJE, -2)),
-      resumo:
-        "Sessão sobre a queda de participação da Dandara: a Fernanda contou que a jovem voltou a trabalhar nos fins de semana e responde pouco no WhatsApp. Combinamos repactuar o horário com a família antes de escalar — o pedido de apoio do 2º encontro já foi encaminhado pra coordenação.",
-      created_by: beatriz.id,
-      created_at: haDias(2, "20:15"),
-      supervisor: { id: beatriz.id, nome: beatriz.nome },
-      mentor: { id: fernanda.id, nome: fernanda.nome },
-      dupla: { id: duplaRisco.id, mentorado: { nome: dandara.nome } },
-    },
-  ];
-
   // ---------- avaliação do encontro FEITA PELO JOVEM (0071) ----------
   // Três canais distintos dos registros do mentor — a RLS real é replicada
   // nas queries demo: coord/sup leem tudo, o jovem as próprias, o mentor
@@ -3887,7 +3937,6 @@ function build(): DemoData {
     documentoTemplates,
     assinaturas,
     presencas,
-    supervisoes,
     documentosPessoa,
     avaliacoes,
     avaliacaoLinks,

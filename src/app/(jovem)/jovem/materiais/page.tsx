@@ -2,14 +2,11 @@ import type { Metadata } from "next";
 import type { CSSProperties } from "react";
 import Link from "next/link";
 import {
-  ArrowRight,
   ArrowSquareOut,
   BookOpen,
-  CalendarCheck,
   CaretDown,
   CaretRight,
   CheckCircle,
-  CircleDashed,
   File,
   FileText,
   Flag,
@@ -22,10 +19,10 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import {
   AvaliarPendenteButton,
-  VerAvaliacaoButton,
   type AvaliacaoFeita,
   type AvaliacaoPendente,
 } from "@/components/jovem-avaliacoes";
+import { AvaliacoesHistoricoDialog } from "@/components/jovem-avaliacoes-historico";
 import {
   InstrumentoIcone,
   instrumentoVars,
@@ -33,7 +30,6 @@ import {
 import { JornadaRascunho } from "@/components/jornada-rascunho";
 import { ReverRespostaDialog } from "@/components/jornada-rever";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { formatDate, linkSeguro, TRILHA_LEN } from "@/lib/ciclo";
 import { turmaLonga } from "@/lib/turma";
@@ -271,10 +267,12 @@ export default async function JovemMateriais() {
         trilha: "dpp",
       }
     : null;
-  // getJovemAvaliacoes ordena por created_at desc — [0] é a mais recente
-  const ultimaAvaliacao: AvaliacaoFeita | null = avaliacoesDpp[0]
-    ? { ...avaliacoesDpp[0], trilha: "dpp" }
-    : null;
+  // o histórico da recorrente alimenta o dialog "Suas avaliações" —
+  // pendente ou não, os registros ficam a um toque de distância
+  const feitasDpp: AvaliacaoFeita[] = avaliacoesDpp.map((a) => ({
+    ...a,
+    trilha: "dpp",
+  }));
   const primeiroNome = (me.nome_social || me.nome).split(" ")[0];
 
   const camposPorSistema = new Map<string, FormularioCampo[]>();
@@ -305,13 +303,11 @@ export default async function JovemMateriais() {
   }
 
   /** Props da ação de cada estação — o mesmo recorte por chave que o mapa
-   *  antigo fazia inline (avaliação do encontro usa o fluxo 0071; 360º lê
-   *  os campos pelo token; os 4 instrumentos pelos campos do sistema). */
+   *  antigo fazia inline (360º lê os campos pelo token; os 4 instrumentos
+   *  pelos campos do sistema). A recorrente saiu da estante: ela vive no
+   *  banner de pendência e no histórico, não como produto de entrega
+   *  única. */
   const propsEstacao = (chave: EstacaoChave) => ({
-    pendenteAvaliacao:
-      chave === "avaliacao_encontro" ? pendenteAvaliacao : null,
-    ultimaAvaliacao:
-      chave === "avaliacao_encontro" ? ultimaAvaliacao : null,
     sistema:
       chave === "avaliacao_360"
         ? ("avaliacao_final_mentorado" as FormularioSistema)
@@ -319,9 +315,7 @@ export default async function JovemMateriais() {
     campos:
       chave === "avaliacao_360"
         ? campos360
-        : chave === "avaliacao_encontro"
-          ? []
-          : (camposPorSistema.get(SISTEMA_DA_ESTACAO[chave] ?? "") ?? []),
+        : (camposPorSistema.get(SISTEMA_DA_ESTACAO[chave] ?? "") ?? []),
   });
 
   return (
@@ -420,53 +414,76 @@ export default async function JovemMateriais() {
         </a>
       </nav>
 
-      {/* ---------- "Meus instrumentos" — os cards-produto do v5c ----------
-          Cada instrumento da régua vira um card com capa símbolo + janela +
-          estado honesto; o card inteiro é o gesto (link pro /f/<token>
-          quando há o que continuar — sem botão redundante). Trancados
-          seguem visíveis dessaturados com a data de liberação, nunca
-          card mudo. Sem snippets de resposta — a resposta mora na tela
-          do instrumento e no Rever, não na estante. */}
+      {/* ---------- "Meus instrumentos" — a estante v6a ----------
+          Cada instrumento da régua vira um card com capa desenhada na cor
+          do instrumento + UMA linha de estado; o card inteiro é o gesto
+          (link pro /f/<token> ou dialog de leitura — nunca dois botões
+          por card: a ação secundária mora dentro do destino). Trancados
+          seguem visíveis com a data de liberação em texto — marco futuro
+          não vira cadeado. A avaliação do encontro não é produto de
+          entrega única: pendente vira banner aqui em cima, histórico vive
+          no dialog "Suas avaliações". */}
       <section
         id="jornada"
         aria-labelledby="meus-instrumentos-titulo"
         className="scroll-mt-28 space-y-4 md:scroll-mt-14"
       >
-        <div>
-          <h2 id="meus-instrumentos-titulo" className="text-base font-semibold">
-            Meus instrumentos
-          </h2>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Cada instrumento tem um encontro-alvo no guia. Toque no card
-            pra abrir ou continuar. O que está por vir abre sozinho no
-            encontro certo.
-          </p>
-          {/* escopo honesto do v5c — o que a jovem vê e o que ela não vê,
-              dito antes da estante (privacidade por desenho, explicada) */}
-          <div className="mt-3 rounded-xl border border-border bg-muted/40 px-4 py-3 text-sm">
-            <p>
-              <strong className="font-semibold">Você vê:</strong> os seus
-              instrumentos, as suas respostas e o acervo de apoio.
-            </p>
-            <p className="mt-1 text-muted-foreground">
-              <strong className="font-semibold text-foreground">
-                Você não vê:
-              </strong>{" "}
-              respostas de outros jovens.
+        <div className="flex flex-wrap items-end justify-between gap-x-4 gap-y-2">
+          <div>
+            <h2 id="meus-instrumentos-titulo" className="text-base font-semibold">
+              Meus instrumentos
+            </h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              O que está por vir abre sozinho no encontro certo.
             </p>
           </div>
+          {/* histórico da recorrente — com pendência o acesso mora no
+              banner; sem ela, quieto aqui na linha do título */}
+          {!pendenteAvaliacao && feitasDpp.length > 0 && (
+            <AvaliacoesHistoricoDialog feitas={feitasDpp} />
+          )}
         </div>
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          {/* ordem do guia: as 4 de construção, a recorrente e as duas
-              de fechamento */}
-          {estacoes.map((est) => (
-            <InstrumentoCard
-              key={est.chave}
-              est={est}
-              primeiroNome={primeiroNome}
-              {...propsEstacao(est.chave)}
-            />
-          ))}
+        {/* banner da avaliação pendente — recorrente, não é card da
+            estante; some quando não há nada pra avaliar */}
+        {pendenteAvaliacao && (
+          <div className="animate-enter flex flex-wrap items-center gap-x-3 gap-y-2.5 rounded-xl border border-[var(--inst-avaliacao)]/35 bg-[var(--inst-avaliacao-t)] px-4 py-3">
+            <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[var(--inst-avaliacao)] text-[var(--inst-avaliacao-t)]">
+              <InstrumentoIcone
+                instrumento="avaliacao_encontro"
+                size={22}
+                neutro
+              />
+            </span>
+            <div className="min-w-0 flex-1 basis-44">
+              <p className="text-sm font-semibold">Avaliação do encontro</p>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Falta a nota do encontro {pendenteAvaliacao.numero}: como
+                foi pra você?
+              </p>
+            </div>
+            <span className="flex items-center gap-1.5">
+              {feitasDpp.length > 0 && (
+                <AvaliacoesHistoricoDialog feitas={feitasDpp} />
+              )}
+              <AvaliarPendenteButton
+                pendente={pendenteAvaliacao}
+                primeiroNome={primeiroNome}
+              />
+            </span>
+          </div>
+        )}
+        <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
+          {/* ordem do guia: as 4 de construção e as duas de fechamento —
+              a recorrente mora no banner/histórico, não aqui */}
+          {estacoes
+            .filter((est) => est.chave !== "avaliacao_encontro")
+            .map((est) => (
+              <InstrumentoCard
+                key={est.chave}
+                est={est}
+                {...propsEstacao(est.chave)}
+              />
+            ))}
         </div>
         {/* a bandeira terminal — o encontro 16 da turma dela */}
         <p className="flex items-center gap-2 pt-1 text-xs text-muted-foreground">
@@ -554,12 +571,9 @@ const SUB_ESTACAO: Record<EstacaoChave, string> = {
 };
 
 /** Props compartilhadas dos cards — o que a página resolve por chave
- *  (avaliação do encontro × instrumentos × 360º) e passa pra estante. */
+ *  (360º × instrumentos) e passa pra estante. */
 type EstacaoProps = {
   est: Estacao;
-  pendenteAvaliacao: AvaliacaoPendente | null;
-  ultimaAvaliacao: AvaliacaoFeita | null;
-  primeiroNome: string;
   sistema: FormularioSistema | null;
   campos: FormularioCampo[];
 };
@@ -567,219 +581,135 @@ type EstacaoProps = {
 function TagAFazer() {
   return (
     <Badge variant="outline" className="border-[var(--input)]">
-      <CircleDashed data-icon="inline-start" aria-hidden />
       A fazer
     </Badge>
   );
 }
 
-/** A tag de estado do card — "Feito" verdinho, "A fazer" (com a troca
- *  "Em andamento" do rascunho local quando há token) ou "trancada" nos
- *  que ainda não abriram. Mesmo componente nos dois formatos de card. */
-function EstadoTag({ est }: { est: Estacao }) {
+/** A linha única de estado do card: um rótulo + a informação que falta.
+ *  "Feito · 1 de out." carrega a data na tag (o ✓ mora no selo da capa);
+ *  "A fazer" traz a janela do guia do lado ("Em andamento" troca pelo
+ *  rascunho local quando existe); trancada dispensa tag — a liberação em
+ *  texto é a resposta (marco futuro não vira cadeado). */
+function EstadoLinha({ est }: { est: Estacao }) {
   if (est.estado === "feito") {
     return (
       <Badge className="bg-[var(--ok)]/15 text-[var(--ok-text)]">
-        <CheckCircle data-icon="inline-start" aria-hidden />
-        Feito
+        Feito{est.respondidoEm ? ` · ${diaMesCurto(est.respondidoEm)}` : ""}
       </Badge>
     );
   }
   if (est.estado === "trancada") {
     return (
-      <Badge variant="outline" className="text-muted-foreground">
-        <LockSimple data-icon="inline-start" aria-hidden />
-        Ainda não liberado
-      </Badge>
+      <span className="text-xs text-muted-foreground">
+        {est.detalhe ?? "Mais adiante na jornada"}
+      </span>
     );
   }
-  return est.token ? (
-    // "em andamento" é overlay client-side: o rascunho vive no
-    // localStorage deste aparelho — a tag troca depois do mount
-    <JornadaRascunho token={est.token}>
-      <TagAFazer />
-    </JornadaRascunho>
-  ) : (
-    <TagAFazer />
+  return (
+    <>
+      {est.token ? (
+        // "em andamento" é overlay client-side: o rascunho vive no
+        // localStorage deste aparelho — a tag troca depois do mount
+        <JornadaRascunho token={est.token}>
+          <TagAFazer />
+        </JornadaRascunho>
+      ) : (
+        <TagAFazer />
+      )}
+      <span className="text-xs text-muted-foreground sm:text-[11px]">
+        {est.detalhe ?? est.janela.label}
+      </span>
+    </>
   );
 }
 
-/** A ação dos cards-article (feito, a fazer sem gesto único, avaliação) —
- *  quando o card inteiro já é o link pro /f/<token> nada aqui renderiza:
- *  dois gestos no mesmo card seria redundância, não clareza. */
-function EstacaoAcao({
-  est,
-  pendenteAvaliacao,
-  ultimaAvaliacao,
-  primeiroNome,
-  sistema,
-  campos,
-}: EstacaoProps) {
-  // o PDM virou documento vivo (REALIZA-181): a estação dele sempre
-  // oferece o atalho pro plano — a resposta do instrumento alimenta o doc,
-  // mas é aqui que o jovem co-edita com o mentor
-  const linkPdm =
-    est.chave === "pdm" ? (
-      <Link
-        href="/jovem/pdm"
-        className={buttonVariants({ variant: "outline", size: "sm" })}
-      >
-        Abrir o plano
-        <ArrowRight size={15} data-icon="inline-end" aria-hidden />
-      </Link>
-    ) : null;
-  // a estação recorrente usa o fluxo real de avaliação (0071): pendente →
-  // dialog do form; feita → a última resposta (o toggle "meu mentor lê"
-  // continua lá dentro, onde sempre morou)
-  if (est.chave === "avaliacao_encontro") {
-    if (est.estado === "a_fazer" && pendenteAvaliacao) {
-      return (
-        <AvaliarPendenteButton
-          pendente={pendenteAvaliacao}
-          primeiroNome={primeiroNome}
-        />
-      );
-    }
-    if (est.estado === "feito" && ultimaAvaliacao) {
-      return (
-        <VerAvaliacaoButton
-          avaliacao={ultimaAvaliacao}
-          label="Ver resposta"
-        />
-      );
-    }
-    return null;
-  }
-  // "feito" com resposta na mão vira gatilho no card inteiro
-  // (InstrumentoCard) — aqui só sobra o feito sem resposta, que cai no
-  // `return linkPdm` do fim
-  if (est.estado === "a_fazer" && est.token) {
-    // re-emissão (revisão do PDM): o card continua clicável — mas com a
-    // resposta anterior consultável o gesto único quebraria: aqui o card
-    // vira article com o Rever + o Continuar lado a lado. `campos` vazio
-    // não impede o Rever — a leitura degrada pro recorte cru da resposta
-    return (
-      <>
-        {est.respostas && (
-          <ReverRespostaDialog
-            titulo={est.titulo}
-            respondidoEm={est.respondidoEm}
-            sistema={sistema}
-            campos={campos}
-            respostas={est.respostas as Record<string, RespostaValor>}
-            label="Rever resposta anterior"
-          />
-        )}
-        <Link
-          href={`/f/${est.token}`}
-          className={buttonVariants({ size: "sm" })}
-        >
-          Continuar
-          <ArrowRight size={15} data-icon="inline-end" aria-hidden />
-        </Link>
-        {linkPdm}
-      </>
-    );
-  }
-  // estação do PDM feita mas sem resposta/campos na mão: o atalho segue
-  return linkPdm;
-}
-
-/** O card-produto do instrumento (o `.pcard` do v5c): capa símbolo na cor
- *  do instrumento, título + sub, descrição curta e a linha de estado —
- *  chip da janela do guia + tag + chevron quando o card inteiro é o link.
- *  Trancada é dessaturada e explica a data de liberação; nunca card mudo. */
-function InstrumentoCard(props: EstacaoProps) {
-  const { est, campos, sistema } = props;
+/** O card do instrumento na estante v6a: capa desenhada na cor do
+ *  instrumento (wash de luz + glifo sangrando + marca-app sólida + selo
+ *  de feito), título + sub, descrição de 2 linhas e UMA linha de estado.
+ *  UM gesto por card — nunca dois botões: a_fazer limpo vira link pro
+ *  /f/<token>; feito (ou re-emissão) com resposta abre o dialog Rever —
+ *  e é lá dentro que mora a ação secundária ("Abrir o plano" no PDM,
+ *  "Continuar" na re-emissão). No mobile cada card é uma linha: lombada
+ *  na cor + marca + título + estado + chevron. Trancada mantém a tinta
+ *  em sussurro e a liberação em texto, nunca laje cinza nem cadeado. */
+function InstrumentoCard({ est, sistema, campos }: EstacaoProps) {
   const trancada = est.estado === "trancada";
-  // gesto único: a_fazer + token vira <a> inteiro — a menos que haja uma
-  // resposta anterior pra rever (re-emissão): aí o card é article com os
-  // dois gestos listados, porque <button> dentro de <a> é HTML inválido
   const linkavel =
     est.estado === "a_fazer" && !!est.token && !est.respostas;
-  // "feito" com a resposta na mão: o card INTEIRO é o gatilho do Rever —
-  // a estante clicável do v5c (44px sem depender de botão miúdo). A
-  // recorrente fica de fora: o gesto dela é o "Rever última avaliação"
-  // do fluxo próprio (0071). `campos` vazio não segura: o dialog degrada
-  // pro recorte cru das respostas
+  // "feito" ou a re-emissão (a_fazer com resposta anterior) — o gesto é o
+  // dialog de leitura; a ação secundária entra como rodapé dele
   const reveravel =
-    est.estado === "feito" &&
     !!est.respostas &&
-    est.chave !== "avaliacao_encontro";
-  const acao =
-    linkavel || trancada || reveravel ? null : <EstacaoAcao {...props} />;
+    est.chave !== "avaliacao_encontro" &&
+    (est.estado === "feito" || (est.estado === "a_fazer" && !!est.token));
+  // PDM sem resposta consultável: o plano vivo é o destino que sobra
+  const pdmSolto =
+    est.chave === "pdm" && !linkavel && !reveravel && !trancada;
+  const gesto = linkavel || reveravel || pdmSolto;
 
   const conteudo = (
     <>
-      {/* capa símbolo — tinta do instrumento de fundo, glifo grande no
-          centro; trancada troca a tinta pelo neutro (o glifo já sai
-          neutro) e ganha o cadeado flutuante */}
+      {/* capa: lombada de 56px no mobile, capa desenhada h-24 no desktop */}
       <span
+        aria-hidden
         className={cn(
-          "relative grid h-24 shrink-0 place-items-center",
-          trancada
-            ? "bg-muted text-muted-foreground"
-            : "bg-[var(--ict)] text-[var(--ic)]"
+          "relative flex w-14 shrink-0 items-center justify-center bg-[var(--ict)] sm:block sm:h-24 sm:w-auto",
+          trancada && "opacity-75"
         )}
       >
-        <InstrumentoIcone
-          instrumento={est.chave}
-          size={44}
-          neutro={trancada}
-        />
-        {trancada && (
-          <span className="absolute right-2 top-2 grid size-6 place-items-center rounded-md bg-card/90 text-muted-foreground">
-            <LockSimple size={13} aria-hidden />
+        {/* wash de luz — só a capa desktop (na lombada o sólido basta) */}
+        <span className="absolute inset-0 hidden bg-[radial-gradient(circle_at_30%_15%,rgba(255,255,255,0.12),transparent_62%)] sm:block" />
+        {/* glifo gigante sangrando pelo canto */}
+        <span className="absolute -right-4 -top-4 hidden text-[var(--ic)] opacity-[0.22] sm:block">
+          <InstrumentoIcone instrumento={est.chave} size={104} neutro />
+        </span>
+        {/* a marca-app: chip sólido na cor do instrumento, glifo na tinta */}
+        <span
+          className={cn(
+            "relative grid size-9 place-items-center rounded-[26%] sm:absolute sm:bottom-3 sm:left-3 sm:size-10",
+            trancada
+              ? "text-muted-foreground"
+              : "bg-[var(--ic)] text-[var(--ict)]"
+          )}
+        >
+          <InstrumentoIcone instrumento={est.chave} size={21} neutro />
+        </span>
+        {/* o selo de feito — a capa carimba, a tag carrega a data */}
+        {est.estado === "feito" && (
+          <span className="absolute right-3 top-3 hidden text-[var(--ok)] sm:block">
+            <CheckCircle weight="fill" size={20} />
           </span>
         )}
       </span>
-      <span className="flex flex-1 flex-col gap-1.5 p-3.5">
+      <span className="flex min-w-0 flex-1 flex-col p-3 sm:p-3.5">
         <h3 className="text-sm font-semibold leading-snug tracking-tight">
           {est.titulo}
-          <span className="block text-xs font-normal text-muted-foreground sm:text-[11px]">
+          <span className="mt-0.5 block text-xs font-normal text-muted-foreground sm:text-[11px]">
             {SUB_ESTACAO[est.chave]}
           </span>
         </h3>
-        <p className="line-clamp-3 text-xs leading-relaxed text-muted-foreground">
+        <p className="mt-1 hidden line-clamp-2 text-xs leading-relaxed text-muted-foreground sm:block">
           {est.descricao}
         </p>
-        <span className="mt-auto flex flex-wrap items-center gap-x-2 gap-y-1 pt-2">
-          <span className="rounded-md bg-muted px-1.5 py-0.5 text-[10px] font-semibold text-muted-foreground">
-            {est.janela.label}
-          </span>
-          <EstadoTag est={est} />
-          {(linkavel || reveravel) && (
+        <span className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1 sm:mt-auto sm:pt-2">
+          <EstadoLinha est={est} />
+          {gesto && (
             <CaretRight
               size={16}
-              aria-hidden
               className="ml-auto shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
             />
           )}
         </span>
-        {est.respondidoEm && (
-          <span className="flex items-center gap-1.5 text-xs font-medium text-[var(--ok-text)] sm:text-[11px]">
-            <CalendarCheck size={12} aria-hidden />
-            Respondido em {formatDate(est.respondidoEm)}
-          </span>
-        )}
-        {est.detalhe && (
-          <span className="text-xs leading-snug text-muted-foreground sm:text-[11px]">
-            {est.detalhe}
-          </span>
-        )}
-        {acao && (
-          <span className="mt-1 flex flex-wrap items-center gap-2">
-            {acao}
-          </span>
-        )}
       </span>
     </>
   );
 
   const shell = cn(
-    "group relative flex flex-col overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]",
-    trancada && "border border-dashed border-border bg-card/60 text-muted-foreground"
+    "group relative flex min-w-0 overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)] sm:flex-col",
+    trancada && "border border-dashed border-border/70"
   );
+
   if (linkavel) {
     return (
       <Link
@@ -794,11 +724,29 @@ function InstrumentoCard(props: EstacaoProps) {
       </Link>
     );
   }
+  if (pdmSolto) {
+    return (
+      <Link
+        href="/jovem/pdm"
+        style={instrumentoVars(est.chave)}
+        className={cn(
+          shell,
+          "outline-none transition-shadow hover:ring-2 hover:ring-[var(--ic)]/50 focus-visible:ring-2 focus-visible:ring-ring"
+        )}
+      >
+        {conteudo}
+      </Link>
+    );
+  }
   if (reveravel) {
-    // o card é o gatilho (render prop + nativeButton=false dentro do
-    // ReverRespostaDialog): role=button + tabstop pela base. Nada
-    // interativo pode morar dentro — por isso `acao` é null aqui e o
-    // atalho do PDM vive embaixo do card, não dentro dele
+    // a secundária mora no rodapé do dialog, não no card — é assim que a
+    // estante fica uniforme: todo card é um gesto só pra um destino
+    const acao =
+      est.chave === "pdm" && est.estado === "feito"
+        ? { rotulo: "Abrir o plano", href: "/jovem/pdm" }
+        : est.estado === "a_fazer" && est.token
+          ? { rotulo: "Continuar", href: `/f/${est.token}` }
+          : undefined;
     const card = (
       <article
         style={instrumentoVars(est.chave)}
@@ -811,7 +759,7 @@ function InstrumentoCard(props: EstacaoProps) {
         {conteudo}
       </article>
     );
-    const dialog = (
+    return (
       <ReverRespostaDialog
         titulo={est.titulo}
         respondidoEm={est.respondidoEm}
@@ -819,23 +767,9 @@ function InstrumentoCard(props: EstacaoProps) {
         campos={campos}
         respostas={est.respostas as Record<string, RespostaValor>}
         trigger={card}
+        acao={acao}
       />
     );
-    if (est.chave === "pdm") {
-      return (
-        <div className="flex flex-col gap-2">
-          {dialog}
-          <Link
-            href="/jovem/pdm"
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            Abrir o plano
-            <ArrowRight size={15} data-icon="inline-end" aria-hidden />
-          </Link>
-        </div>
-      );
-    }
-    return dialog;
   }
   return (
     <article style={instrumentoVars(est.chave)} className={shell}>

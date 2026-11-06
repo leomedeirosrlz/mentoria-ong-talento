@@ -39,6 +39,7 @@ import {
 import { formatDiaSemanaMes } from "@/lib/ciclo";
 import type { VinculoCronograma } from "@/lib/queries-cronogramas";
 import type { CicloEvento, Cronograma, DuplaStatus } from "@/lib/types";
+import { CRONOGRAMA_STATUS_LABEL } from "@/components/cronograma-status-badge";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -69,29 +70,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
-
-const STATUS_LABEL: Record<Cronograma["status"], string> = {
-  rascunho: "Rascunho",
-  ativo: "Ativo",
-  encerrado: "Encerrado",
-};
-
-const STATUS_BADGE: Record<Cronograma["status"], string> = {
-  rascunho: "border-dashed",
-  ativo: "",
-  encerrado: "",
-};
-
-export function StatusBadge({ status }: { status: Cronograma["status"] }) {
-  return (
-    <Badge
-      variant={status === "ativo" ? "secondary" : "outline"}
-      className={STATUS_BADGE[status]}
-    >
-      {STATUS_LABEL[status]}
-    </Badge>
-  );
-}
 
 function rascunhoDe(e: CicloEvento): EventoRascunho {
   return {
@@ -326,14 +304,14 @@ export function CronogramaAcoes({
               <Label id="cg-status-label">Status</Label>
               <Select
                 value={statusSel}
-                items={STATUS_LABEL}
+                items={CRONOGRAMA_STATUS_LABEL}
                 onValueChange={(v) => setStatusSel(v as Cronograma["status"])}
               >
                 <SelectTrigger aria-labelledby="cg-status-label">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {Object.entries(STATUS_LABEL).map(([v, l]) => (
+                  {Object.entries(CRONOGRAMA_STATUS_LABEL).map(([v, l]) => (
                     <SelectItem key={v} value={v}>
                       {l}
                     </SelectItem>
@@ -394,9 +372,22 @@ function TrashIcon() {
 // ---------- lista de eventos ----------
 
 /** Seção do PDF pela posição na sequência: tudo antes do 1º encontro é
- *  preparação; `evento_encerramento` é encerramento; o meio é mentoria. */
-function secaoDe(i: number, e: CicloEvento, primeiroEncontro: number): string {
+ *  preparação; `evento_encerramento` é encerramento; o meio é mentoria.
+ *  Sessões anexadas depois do encerramento (rodas de caso e afins) são
+ *  formação continuada — sem isso voltavam a cair em "Mentoria ativa" e a
+ *  seção aparecia duas vezes com a contagem global. Encontro pós-
+ *  encerramento (reposição anexada) segue sendo mentoria: cai no ramo de
+ *  baixo e reabre "Mentoria ativa" com contagem própria — honesto. */
+function secaoDe(
+  i: number,
+  e: CicloEvento,
+  primeiroEncontro: number,
+  encerramento: number
+): string {
   if (e.tipo === "evento_encerramento") return "Encerramento";
+  if (encerramento >= 0 && i > encerramento && e.tipo !== "encontro") {
+    return "Formação continuada";
+  }
   if (primeiroEncontro >= 0 && i >= primeiroEncontro) return "Mentoria ativa";
   return "Preparação";
 }
@@ -562,17 +553,21 @@ export function CronogramaEventos({
   );
 
   const primeiroEncontro = eventos.findIndex((e) => e.tipo === "encontro");
+  const encerramento = eventos.findIndex(
+    (e) => e.tipo === "evento_encerramento"
+  );
 
   // contagem por seção — os headers já separam (Preparação / Mentoria ativa /
-  // Encerramento), só faltava dizer quantos itens cada uma carrega
+  // Encerramento / Formação continuada), só faltava dizer quantos itens cada
+  // uma carrega
   const secaoContagem = useMemo(() => {
     const m = new Map<string, number>();
     eventos.forEach((e, i) => {
-      const s = secaoDe(i, e, primeiroEncontro);
+      const s = secaoDe(i, e, primeiroEncontro, encerramento);
       m.set(s, (m.get(s) ?? 0) + 1);
     });
     return m;
-  }, [eventos, primeiroEncontro]);
+  }, [eventos, primeiroEncontro, encerramento]);
 
   /** Wrapper comum das mutations de evento: toast + refresh; devolve se
    *  deu certo pro caller fechar o dialog. */
@@ -676,8 +671,8 @@ export function CronogramaEventos({
       ) : (
         <ol className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
           {eventos.map((e, i) => {
-            const secao = secaoDe(i, e, primeiroEncontro);
-            const anterior = i > 0 ? secaoDe(i - 1, eventos[i - 1], primeiroEncontro) : null;
+            const secao = secaoDe(i, e, primeiroEncontro, encerramento);
+            const anterior = i > 0 ? secaoDe(i - 1, eventos[i - 1], primeiroEncontro, encerramento) : null;
             return (
               <li key={e.id}>
                 {secao !== anterior && (

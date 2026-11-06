@@ -1,25 +1,25 @@
 import { lembreteBloqueadoAte, type DuplaSaude } from "@/lib/ciclo";
+import { limboFechado } from "@/lib/agenda-minha";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import type { Dupla, Encontro } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
-import type { NudgeWA } from "@/components/dupla-wa-acao";
+import type { DestinatariosWA, NudgeWA } from "@/components/dupla-wa-acao";
 
 // Regra única "Lembrar | Chamar" da linha de dupla: a lista de /duplas, a fila
 // da agenda e a ficha usam a mesma mensagem, o mesmo destino e o mesmo cap de
 // 48h. Devolve as props do DuplaWaAcao; o componente só apresenta.
 
 /** Pendência de registro mais antiga: realizado sem registro, ou agendado
- *  cuja data já passou. É o destino do "Registrar encontro N". */
+ *  (incl. o "remarcado" legado) cujo horário previsto já terminou — a
+ *  mesma régua `limboFechado` da agenda: enquanto a chamada rola o
+ *  encontro ainda não é cobrança. É o destino do "Registrar encontro N". */
 export function encontroPendente(d: Dupla, hoje: Date): Encontro | undefined {
   return [...d.encontros]
     .sort((a, b) => a.numero - b.numero)
     .find(
       (e) =>
         !e.registro &&
-        (e.status === "realizado" ||
-          (e.status === "agendado" &&
-            e.data_hora != null &&
-            new Date(e.data_hora) < hoje))
+        (e.status === "realizado" || limboFechado(e, hoje.getTime()))
     );
 }
 
@@ -41,7 +41,7 @@ function casoLembrete(
       ? `${origem}/duplas/${d.id}#registrar-${pendente.id}`
       : null;
   const tipo = s.sinais[0]?.tipo;
-  if (pendente?.status === "agendado")
+  if (pendente && pendente.status !== "realizado")
     return `O ${pendente.numero}º encontro estava agendado e já passou. Rolou?${
       link
         ? ` Se rolou, o registro é por aqui: ${link}`
@@ -87,6 +87,9 @@ export function acaoWhatsAppDupla({
   telefone: string | null | undefined;
   mensagem: string;
   nudge: NudgeWA | undefined;
+  /** As duas pontas com texto próprio — o preview do DuplaWaAcao vira
+   *  seletor "Quem recebe". A ponta default é a mesma de `mensagem`. */
+  destinatarios: DestinatariosWA;
 } {
   const apoioJovem =
     saude.apoio.aberto &&
@@ -95,28 +98,43 @@ export function acaoWhatsAppDupla({
   // apoio aberto é pendência apontável (trabalho a fazer, não falha da dupla)
   const temPendencia =
     dupla.status === "ativa" && (saude.sinais.length > 0 || saude.apoio.aberto);
-  const mensagem = apoioJovem
+  // pro mentor o caso é o operacional: sinais da régua ou o pedido DELE de
+  // apoio. O apoio que partiu do jovem não vira assunto nem contexto — é o
+  // canal dele, não do mentor (e o fecho "pontos de atenção" mentiria).
+  const casoMentor =
+    dupla.status === "ativa" && (saude.sinais.length > 0 || saude.pediuApoio)
+      ? casoLembrete(dupla, saude, hoje, origem)
+      : undefined;
+  // a notificação do Lembrar pousa no mesmo lugar que o link do texto aponta:
+  // o form do encontro pendente quando a cobrança é de registro/limbo
+  const pendente = encontroPendente(dupla, hoje);
+  const livres = msgsContato(
+    {
+      eu: meuNome,
+      mentorNome: dupla.mentor.nome.split(" ")[0],
+      mentoradoNome: nomeMentorado,
+    },
+    // sem caso: o fecho neutro "Como estão as coisas?" (contato livre)
+    casoMentor ? { casoMentor } : {}
+  );
+  const msgMentor = livres.mentor ?? "";
+  const msgMentorado = apoioJovem
     ? (msgsContato("apoio_jovem", {
         mentoradoNome: nomeMentorado,
         autorNome: meuNome,
       }).mentorado ?? "")
-    : (msgsContato(
-        {
-          eu: meuNome,
-          mentorNome: dupla.mentor.nome.split(" ")[0],
-          mentoradoNome: nomeMentorado,
-        },
-        temPendencia
-          ? { casoMentor: casoLembrete(dupla, saude, hoje, origem) }
-          : // sem caso: o fecho neutro "Como estão as coisas?" (contato livre)
-            {}
-      ).mentor ?? "");
+    : (livres.mentorado ?? "");
+  const mensagem = apoioJovem ? msgMentorado : msgMentor;
 
   const nudge: NudgeWA | undefined = temPendencia
     ? {
         destino: apoioJovem ? "mentorado" : "mentor",
         titulo: apoioJovem ? "A equipe quer te ouvir" : tituloNudge,
-        href: apoioJovem ? "/jovem/agenda" : `/duplas/${dupla.id}`,
+        href: apoioJovem
+          ? "/jovem/agenda"
+          : pendente
+            ? `/duplas/${dupla.id}#registrar-${pendente.id}`
+            : `/duplas/${dupla.id}`,
         // responder um pedido do jovem é "Chamar", nunca cobrança
         rotulo: apoioJovem ? "Chamar" : undefined,
         bloqueadoAte: lembreteBloqueadoAte(ultimoNudge, hoje),
@@ -129,5 +147,18 @@ export function acaoWhatsAppDupla({
     telefone: apoioJovem ? dupla.mentorado.whatsapp : dupla.mentor.whatsapp,
     mensagem,
     nudge,
+    destinatarios: {
+      padrao: apoioJovem ? "mentorado" : "mentor",
+      mentor: {
+        nome: dupla.mentor.nome,
+        telefone: dupla.mentor.whatsapp,
+        mensagem: msgMentor,
+      },
+      mentorado: {
+        nome: nomeMentorado,
+        telefone: dupla.mentorado.whatsapp,
+        mensagem: msgMentorado,
+      },
+    },
   };
 }

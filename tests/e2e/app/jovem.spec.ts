@@ -109,7 +109,7 @@ test.describe("mentorado — shell /jovem", () => {
 
   test.afterAll(async () => {
     // a home do mentor olha a MESMA dupla: um agendado fixture pendurado
-    // trocaria o CTA "Agendar encontro" por "Agendar próximo" e quebraria o
+    // trocaria o CTA "Agendar encontro" por "Agendar próximo encontro" e quebraria o
     // spec dele — os encontros da dupla voltam a zero (o seed recria o d1)
     // Filhos da 0071 primeiro: se o d1 passou por 'realizado' o trigger
     // mintou avaliacao_links (e o spec pode ter avaliado) — apagar o pai
@@ -321,21 +321,18 @@ test.describe("mentorado — shell /jovem", () => {
       page.getByRole("img", { name: /\d+ de 7 entregas feitas/ })
     ).toBeVisible();
 
-    // a estante "Meus instrumentos" (v5c) — os 7 instrumentos sempre na
-    // ordem narrativa do guia.
+    // a estante "Meus instrumentos" (v6a) — os 6 instrumentos de entrega
+    // única sempre na ordem narrativa do guia; a recorrente saiu da
+    // grade: pendente vira banner, em dia vira o acesso ao histórico.
     // Com o realizado no lugar (enc. corrente 16) todos estão visíveis.
     const trilha = page.locator(
       'section[aria-labelledby="meus-instrumentos-titulo"]'
     );
-    // o termo "Estação" saiu da interface (v5c) — a régua se lê pelos
-    // títulos e pelos chips de janela ("Enc. 1", "Enc. 1–4"…)
-    await expect(trilha.getByText("Enc. 1–4").first()).toBeVisible();
     for (const titulo of [
       "Roda da Vida · leitura inicial",
       "Construindo a sua Visão",
       "Definindo minhas metas",
       "PDM · Plano de Desenvolvimento",
-      "Avaliação do encontro",
       "Roda da Vida · aplicação formal",
       "Avaliação final",
     ]) {
@@ -352,12 +349,12 @@ test.describe("mentorado — shell /jovem", () => {
         )
         .first()
     ).toBeVisible();
-    // a recorrente: a fixture deixa o enc. 16 realizado sem a estrela — o
-    // detalhe conta a pendência (ou o "em dia · X de Y" se um spec paralelo
-    // já avaliou — os dois são o estado honesto da estação)
+    // a recorrente: a fixture deixa o enc. 16 realizado sem a estrela — a
+    // pendência vira banner no topo da estante (ou "Suas avaliações" se
+    // um spec paralelo já avaliou — os dois são o estado honesto)
     await expect(
       trilha
-        .getByText(/falta avaliar o encontro \d+|em dia · \d+ de \d+/)
+        .getByText(/Falta a nota do encontro \d+|Suas avaliações/)
         .first()
     ).toBeVisible();
 

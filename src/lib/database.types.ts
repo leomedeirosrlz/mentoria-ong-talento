@@ -1659,9 +1659,12 @@ export type Database = {
       encaminhamentos: {
         Row: {
           created_at: string
+          created_by: string | null
           descricao: string
           dupla_id: string
+          feito_em: string | null
           id: string
+          numero: number | null
           prazo: string | null
           registro_id: string | null
           responsavel: string
@@ -1669,9 +1672,12 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          created_by?: string | null
           descricao: string
           dupla_id: string
+          feito_em?: string | null
           id?: string
+          numero?: number | null
           prazo?: string | null
           registro_id?: string | null
           responsavel?: string
@@ -1679,15 +1685,46 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          created_by?: string | null
           descricao?: string
           dupla_id?: string
+          feito_em?: string | null
           id?: string
+          numero?: number | null
           prazo?: string | null
           registro_id?: string | null
           responsavel?: string
           status?: Database["public"]["Enums"]["encaminhamento_status"]
         }
         Relationships: [
+          {
+            foreignKeyName: "encaminhamentos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encaminhamentos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encaminhamentos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encaminhamentos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "encaminhamentos_dupla_id_fkey"
             columns: ["dupla_id"]
@@ -1719,7 +1756,7 @@ export type Database = {
           dupla_id: string
           id: string
           resumo_jornada: string | null
-          tipo: string | null
+          tipo: string
         }
         Insert: {
           checklist?: Json
@@ -1728,7 +1765,7 @@ export type Database = {
           dupla_id: string
           id?: string
           resumo_jornada?: string | null
-          tipo?: string | null
+          tipo: string
         }
         Update: {
           checklist?: Json
@@ -1737,7 +1774,7 @@ export type Database = {
           dupla_id?: string
           id?: string
           resumo_jornada?: string | null
-          tipo?: string | null
+          tipo?: string
         }
         Relationships: [
           {
@@ -1853,6 +1890,92 @@ export type Database = {
             columns: ["dupla_id"]
             isOneToOne: false
             referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      encontro_remarcacoes: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          data_anterior: string
+          data_nova: string
+          dupla_id: string
+          encontro_id: string
+          id: string
+          motivo: string | null
+          numero: number
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          data_anterior: string
+          data_nova: string
+          dupla_id: string
+          encontro_id: string
+          id?: string
+          motivo?: string | null
+          numero: number
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          data_anterior?: string
+          data_nova?: string
+          dupla_id?: string
+          encontro_id?: string
+          id?: string
+          motivo?: string | null
+          numero?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_remarcacoes_encontro_id_fkey"
+            columns: ["encontro_id"]
+            isOneToOne: false
+            referencedRelation: "encontros"
             referencedColumns: ["id"]
           },
         ]
@@ -2477,6 +2600,8 @@ export type Database = {
       ia_chunks: {
         Row: {
           created_at: string
+          embedding: string | null
+          embedding_modelo: string | null
           guia: string
           id: string
           pagina: number | null
@@ -2486,6 +2611,8 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          embedding?: string | null
+          embedding_modelo?: string | null
           guia: string
           id?: string
           pagina?: number | null
@@ -2495,12 +2622,35 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          embedding?: string | null
+          embedding_modelo?: string | null
           guia?: string
           id?: string
           pagina?: number | null
           secao?: string | null
           texto?: string
           tsv?: unknown
+        }
+        Relationships: []
+      }
+      ia_config: {
+        Row: {
+          atualizado_em: string
+          atualizado_por: string | null
+          chave: string
+          valor: Json
+        }
+        Insert: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          chave: string
+          valor: Json
+        }
+        Update: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          chave?: string
+          valor?: Json
         }
         Relationships: []
       }
@@ -2562,6 +2712,65 @@ export type Database = {
           },
           {
             foreignKeyName: "ia_eventos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ia_mcp_tokens: {
+        Row: {
+          created_at: string
+          id: string
+          profile_id: string
+          revogado_em: string | null
+          rotulo: string
+          token_hash: string
+          ultimo_uso_em: string | null
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          profile_id: string
+          revogado_em?: string | null
+          rotulo: string
+          token_hash: string
+          ultimo_uso_em?: string | null
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          profile_id?: string
+          revogado_em?: string | null
+          rotulo?: string
+          token_hash?: string
+          ultimo_uso_em?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ia_mcp_tokens_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_mcp_tokens_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_mcp_tokens_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_mcp_tokens_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
@@ -2663,6 +2872,36 @@ export type Database = {
           failed?: boolean
           nonce?: string
           refresh_token?: string
+        }
+        Relationships: []
+      }
+      matching_perfis: {
+        Row: {
+          doc: string
+          doc_hash: string
+          dono_id: string
+          dono_tipo: string
+          embedding: string | null
+          gerado_em: string
+          temas: string[]
+        }
+        Insert: {
+          doc?: string
+          doc_hash: string
+          dono_id: string
+          dono_tipo: string
+          embedding?: string | null
+          gerado_em?: string
+          temas?: string[]
+        }
+        Update: {
+          doc?: string
+          doc_hash?: string
+          dono_id?: string
+          dono_tipo?: string
+          embedding?: string | null
+          gerado_em?: string
+          temas?: string[]
         }
         Relationships: []
       }
@@ -4250,138 +4489,6 @@ export type Database = {
           },
         ]
       }
-      supervisoes: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          data: string
-          dupla_id: string | null
-          id: string
-          mentor_id: string
-          resumo: string
-          supervisor_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          data: string
-          dupla_id?: string | null
-          id?: string
-          mentor_id: string
-          resumo: string
-          supervisor_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          data?: string
-          dupla_id?: string | null
-          id?: string
-          mentor_id?: string
-          resumo?: string
-          supervisor_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "supervisoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "jovem_especialistas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_contato"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles_pessoal"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_dupla_id_fkey"
-            columns: ["dupla_id"]
-            isOneToOne: false
-            referencedRelation: "duplas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_dupla_id_fkey"
-            columns: ["dupla_id"]
-            isOneToOne: false
-            referencedRelation: "jovem_duplas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_mentor_id_fkey"
-            columns: ["mentor_id"]
-            isOneToOne: false
-            referencedRelation: "jovem_especialistas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_mentor_id_fkey"
-            columns: ["mentor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_mentor_id_fkey"
-            columns: ["mentor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_contato"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_mentor_id_fkey"
-            columns: ["mentor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_pessoal"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_supervisor_id_fkey"
-            columns: ["supervisor_id"]
-            isOneToOne: false
-            referencedRelation: "jovem_especialistas"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_supervisor_id_fkey"
-            columns: ["supervisor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_supervisor_id_fkey"
-            columns: ["supervisor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_contato"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "supervisoes_supervisor_id_fkey"
-            columns: ["supervisor_id"]
-            isOneToOne: false
-            referencedRelation: "profiles_pessoal"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       terceiros_consolidacao: {
         Row: {
           consolidado: string | null
@@ -5705,6 +5812,15 @@ export type Database = {
             }
             Returns: boolean
           }
+      ia_mcp_autorizar: {
+        Args: { p_token: string }
+        Returns: {
+          papeis: Database["public"]["Enums"]["app_role"][]
+          papel: Database["public"]["Enums"]["app_role"]
+          profile_id: string
+        }[]
+      }
+      ia_norm_query: { Args: { p: string }; Returns: string }
       importar_registros: { Args: { itens: Json }; Returns: Json }
       iniciar_tentativa_registro: {
         Args: {
@@ -5733,13 +5849,20 @@ export type Database = {
         Returns: Json
       }
       match_ia_chunks: {
-        Args: { p_limit?: number; p_query: string }
+        Args: { p_embedding?: string; p_limit?: number; p_query: string }
         Returns: {
           guia: string
           pagina: number
           score: number
           secao: string
           trecho: string
+        }[]
+      }
+      matching_ranquear: {
+        Args: { p_id: string; p_outro_tipo: string; p_tipo: string }
+        Returns: {
+          dono_id: string
+          similaridade: number
         }[]
       }
       meus_dados_civis: { Args: never; Returns: Json }
@@ -5866,6 +5989,7 @@ export type Database = {
           p_duracao_ms?: number
           p_erro?: string
           p_ok: boolean
+          p_profile_id?: string
           p_tool: string
         }
         Returns: string

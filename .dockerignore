@@ -1,0 +1,14 @@
+.git
+node_modules
+.next
+playwright-report
+test-results
+coverage
+.env*
+docker
+pw-*.cjs
+e2e
+scripts
+supabase
+docs
+*.md

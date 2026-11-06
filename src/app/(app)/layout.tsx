@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/app-shell";
-import { AssistenteBolha } from "@/components/assistente-bolha";
+import { AssistenteBolhaLazy } from "@/components/assistente-bolha-lazy";
 import { DemoBar } from "@/components/demo-bar";
-import { OnboardingFlow } from "@/components/onboarding-flow";
+import { OnboardingFlowLazy } from "@/components/onboarding-flow-lazy";
 import { TelaConta } from "@/components/telas-conta";
 import { getDemoData } from "@/lib/demo/data";
 import { demoRole } from "@/lib/demo/mode";
@@ -11,11 +11,25 @@ import { getMeusDadosCivis, getMinhaAssinaturaTermo } from "@/lib/queries-assina
 import { providerConfigurado } from "@/lib/ia/provider";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import type { AppRole } from "@/lib/types";
+import { Children } from "react";
 import { redirect } from "next/navigation";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const me = await getMe();
-  const demo = await demoRole();
+  // notificações são self-scoped na RLS — disparam junto com getMe em vez de
+  // esperar a cadeia de gates. O catch solto marca a promise como handled
+  // pros retornos antecipados que a abandonam (o await real ainda propaga).
+  const mePromise = getMe();
+  const demoPromise = demoRole();
+  const notificacoesPromise = getNotificacoes();
+  notificacoesPromise.catch(() => {});
+  const chamadosPromise = mePromise.then((m) =>
+    m && (m.role === "coordenacao" || m.role === "supervisor")
+      ? getChamadosSemDono()
+      : 0
+  );
+  chamadosPromise.catch(() => {});
+  const me = await mePromise;
+  const demo = await demoPromise;
   // autenticado sem profile vinculado: redirect("/login") voltaria pra cá pelo
   // middleware e viraria loop — tela bloqueada com saída, como os casos abaixo
   if (!me) {
@@ -79,7 +93,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <DemoBar variant="dock" papel={demo} personas={demoPersonas} />
   );
   const demoFloat = demo && demoPersonas && (
-    <div className="hidden md:block">
+    <div key="demo-float" className="hidden md:block">
       <DemoBar variant="float" papel={demo} personas={demoPersonas} />
     </div>
   );
@@ -90,18 +104,22 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     // prefill: a importação da coordenação já pode ter trazido a ficha —
     // sensíveis via RPC self-scoped (0048), ficha de mentor via grant próprio.
     // civis + assinatura do termo alimentam o passo opcional de assinatura:
-    // "assinado" tira o passo do wizard, pendência mostra o termo pra ler/assinar
+    // "assinado" tira o passo do wizard, pendência mostra o termo pra
+    // ler/assinar. Não-voluntário não tem termo — nem busca
     const [pessoal, mentorProfile, civis, assinaturaTermo] = await Promise.all([
       getMeusDadosPessoais(),
       getMeuMentorProfile(),
       getMeusDadosCivis(),
-      getMinhaAssinaturaTermo(),
+      me.voluntario === false
+        ? Promise.resolve(null)
+        : getMinhaAssinaturaTermo(),
     ]);
     // o dock vai dentro do header do wizard (prop demo) — clicável em todos
     // os passos pra trocar de papel / rever a apresentação / sair da demo
     return (
       <>
-        <OnboardingFlow
+        <OnboardingFlowLazy
+          key="onboarding"
           me={me}
           pessoal={pessoal}
           mentorProfile={mentorProfile}
@@ -115,11 +133,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   const [notificacoes, chamadosSemDono] = await Promise.all([
-    getNotificacoes(),
-    // badge da fila só faz sentido pra quem atende (coordenação/auxiliar)
-    me.role === "coordenacao" || me.role === "supervisor"
-      ? getChamadosSemDono()
-      : Promise.resolve(0),
+    notificacoesPromise,
+    chamadosPromise,
   ]);
   // bolha do assistente (REALIZA-243): o mesmo gate do item de nav que ela
   // substituiu — staff e mentores, nunca o jovem (shell próprio) nem papeis
@@ -146,7 +161,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       demo={demoDock}
       assistente={
         acessoIa ? (
-          <AssistenteBolha
+          <AssistenteBolhaLazy
             papeis={papeisIa}
             demo={demo != null}
             configurado={providerConfigurado()}
@@ -155,8 +170,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         ) : undefined
       }
     >
-      {children}
-      {demoFloat}
+      {/* toArray atribui keys — dois filhos soltos disparavam o warning
+          de "each child in a list" no render do AppShell */}
+      {Children.toArray([children, demoFloat])}
     </AppShell>
   );
 }

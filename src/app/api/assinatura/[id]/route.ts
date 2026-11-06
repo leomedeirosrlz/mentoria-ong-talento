@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { demoRole } from "@/lib/demo/mode";
+import { demoRole, demoTermoSimulado } from "@/lib/demo/mode";
 import { demoAssinatura } from "@/lib/demo/queries";
 import { getAssinatura } from "@/lib/queries-assinaturas";
 import { renderDocumentoAssinado } from "@/lib/documentos/pdf";
@@ -54,7 +54,7 @@ export async function GET(
   // snapshot do dataset; contra-assinatura não existe fora do bucket
   const demo = await demoRole();
   if (demo) {
-    const a = demoAssinatura(demo, id);
+    const a = demoAssinatura(demo, id, await demoTermoSimulado());
     if (!a || a.status !== "assinado") {
       return apiErro("Documento não encontrado.", { status: 404 });
     }

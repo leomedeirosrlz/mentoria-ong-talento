@@ -38,6 +38,8 @@ async function chamar(opts?: {
   tokens?: string[];
   signal?: AbortSignal;
   clienteAbortou?: () => boolean;
+  modelo?: string;
+  fallbacks?: string[];
 }) {
   const { chamarModeloStream } = await import("@/lib/ia/provider");
   return chamarModeloStream(
@@ -47,6 +49,8 @@ async function chamar(opts?: {
       onToken: (t: string) => opts?.tokens?.push(t),
       signal: opts?.signal ?? new AbortController().signal,
       clienteAbortou: opts?.clienteAbortou ?? (() => false),
+      modelo: opts?.modelo,
+      fallbacks: opts?.fallbacks,
     }
   );
 }
@@ -198,9 +202,9 @@ describe("chamarModeloStream — retry (REALIZA-307)", () => {
     vi.restoreAllMocks();
   });
 
-  it("5xx antes do stream abrir retenta e conclui na 2ª tentativa", async () => {
+  it("5xx antes do stream abrir avança pro próximo slug da cadeia", async () => {
     let n = 0;
-    const spy = vi.fn(() =>
+    const spy = vi.fn<(url: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(() =>
       Promise.resolve(
         n++ === 0
           ? new Response("pau", { status: 503 })
@@ -209,12 +213,15 @@ describe("chamarModeloStream — retry (REALIZA-307)", () => {
     );
     vi.stubGlobal("fetch", spy);
 
-    const res = await chamar();
+    const res = await chamar({ modelo: "primario", fallbacks: ["fb-1"] });
     expect(res).toMatchObject({ ok: true, content: "oi" });
     expect(spy).toHaveBeenCalledTimes(2);
+    expect(JSON.parse(String(spy.mock.calls[1]?.[1]?.body)).model).toBe(
+      "fb-1"
+    );
   });
 
-  it("429 honra Retry-After pequeno na retentativa", async () => {
+  it("429 honra Retry-After pequeno antes de pular de modelo", async () => {
     // Retry-After: 0 → delay ~0, mantém o teste rápido
     let n = 0;
     const spy = vi.fn(() =>
@@ -226,12 +233,12 @@ describe("chamarModeloStream — retry (REALIZA-307)", () => {
     );
     vi.stubGlobal("fetch", spy);
 
-    const res = await chamar();
+    const res = await chamar({ modelo: "primario", fallbacks: ["fb-1"] });
     expect(res).toMatchObject({ ok: true, content: "ok" });
     expect(spy).toHaveBeenCalledTimes(2);
   });
 
-  it("erro de rede antes do 1º byte útil retenta", async () => {
+  it("erro de rede antes do 1º byte útil avança a cadeia", async () => {
     let n = 0;
     const spy = vi.fn(() =>
       n++ === 0
@@ -242,7 +249,7 @@ describe("chamarModeloStream — retry (REALIZA-307)", () => {
     );
     vi.stubGlobal("fetch", spy);
 
-    const res = await chamar();
+    const res = await chamar({ modelo: "primario", fallbacks: ["fb-1"] });
     expect(res).toMatchObject({ ok: true, content: "voltou" });
     expect(spy).toHaveBeenCalledTimes(2);
   });

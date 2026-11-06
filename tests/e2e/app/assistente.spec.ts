@@ -48,13 +48,13 @@ test.describe("assistente", () => {
     await expect(painel).toBeVisible();
     await expect(painel.getByText(/Oi/)).toBeVisible();
     const composer = page.getByRole("textbox", {
-      name: "Mensagem pro assistente",
+      name: "Mensagem pra Liza",
     });
     if (await composer.count()) {
       await expect(composer).toBeVisible();
     } else {
       await expect(
-        painel.getByText(/assistente está indisponível/i)
+        painel.getByText(/Liza está indisponível/i)
       ).toBeVisible();
     }
 

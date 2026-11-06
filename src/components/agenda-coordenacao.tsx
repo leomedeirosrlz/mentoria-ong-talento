@@ -17,7 +17,7 @@ import {
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import type { Interacao } from "@/lib/interacoes";
-import type { CicloEvento, Cronograma, Dupla, Supervisao } from "@/lib/types";
+import type { CicloEvento, Cronograma, Dupla } from "@/lib/types";
 import { FilaAcompanhar, type LinhaFila } from "@/components/fila-acompanhar";
 import { NumerosSemanaSecao } from "@/components/numeros-semana";
 import { SemanaDoPrograma } from "@/components/semana-do-programa";
@@ -29,36 +29,37 @@ function pessoaDaFila(p: { id: string; nome: string; avatar_path?: string | null
   return { id: p.id, nome: p.nome, avatar_path: p.avatar_path ?? null };
 }
 
-/** Visão "Monitoramento" da coordenação (REALIZA-195 · mock v8b): faixa
- *  de síntese no topo (a leitura de 2s da fila), a faixa "Semana do
- *  programa" (os oficiais do seg–dom em cards de scroll lateral), os
+/** Visão "Monitoramento" da coordenação (REALIZA-195 · mock v8b, ordem
+ *  do aceite REALIZA-176): faixa de síntese no topo (a leitura de 2s da
+ *  fila), a fila operacional "Para acompanhar" em 1º — a resposta dos
+ *  5s, com chips que filtram de verdade —, a faixa "Semana do
+ *  programa" (os oficiais do seg–dom em cards de scroll lateral) e os
  *  "Números da semana" (cobertura honesta por turma + semáforo com o
- *  eixo azul do apoio + pulso de registro com a ★ do jovem) e, por
- *  último, o "Painel da semana" — a fila operacional "Para acompanhar"
- *  com chips que filtram de verdade. A coordenação NÃO agenda por
- *  ninguém: a única ação sobre dupla aqui é o nudge. Toda a derivação
- *  mora em lib/agenda-coordenacao (pura); a página é quem busca os
- *  dados — este componente só compõe e renderiza. */
+ *  eixo azul do apoio + pulso de registro com a ★ do jovem). A
+ *  coordenação NÃO agenda por ninguém: a única ação sobre dupla aqui é
+ *  o nudge. Toda a derivação mora em lib/agenda-coordenacao (pura); a
+ *  página é quem busca os dados — este componente só compõe e
+ *  renderiza. */
 export function AgendaCoordenacao({
   duplas,
   eventos,
   cronogramas,
   nudges,
-  supervisoes = [],
   encerramentosPendentes,
   meuNome,
   hoje,
   agora: agoraMs,
   abas,
+  seletorContexto,
+  contextoTurma,
 }: {
-  /** Todas as duplas do ciclo (RLS da coordenação). */
+  /** Duplas do recorte da página (RLS da coordenação × turma em foco). */
   duplas: Dupla[];
   eventos: CicloEvento[];
+  /** Cronogramas do recorte — com turma em foco a página manda só os dela. */
   cronogramas: Cronograma[];
   /** getUltimasInteracoes — a lib filtra a tipo 'nudge' pro cap de 48h. */
   nudges: Record<string, Interacao>;
-  /** Supervisões recentes — a lib recorta a semana corrente. */
-  supervisoes?: Supervisao[];
   /** dupla_ids com rito de encerramento aberto (getEncerramentosPendentes)
    *  — a dupla concluída vira linha "concluir na ficha" na fila. */
   encerramentosPendentes: ReadonlySet<string>;
@@ -70,6 +71,11 @@ export function AgendaCoordenacao({
   agora: number;
   /** Barra de modos da página (AbasAgenda) — uma por página, no header. */
   abas?: ReactNode;
+  /** Seletor de contexto de turma (REALIZA-73) — encosta à direita do h1,
+   *  como na home. */
+  seletorContexto?: ReactNode;
+  /** Faixa "Mostrando: Turma N · ver todas" — sob o header quando há foco. */
+  contextoTurma?: ReactNode;
 }) {
   const agora = new Date(agoraMs);
   const resumos = resumosPorCronograma(duplas, cronogramas, eventos, agora);
@@ -83,7 +89,6 @@ export function AgendaCoordenacao({
   const programa = itensDaSemanaPrograma(
     eventos,
     cronogramas,
-    supervisoes,
     agora,
     // meta "N duplas — cada uma marca a sua": a coorte inteira que o
     // RLS da coordenação enxerga
@@ -103,8 +108,9 @@ export function AgendaCoordenacao({
       ? sinteseMonitoramento(acompanhar, resumos, duplas, eventos, agora)
       : null;
   // as linhas saem daqui já prontas pra boundary client da fila: destino,
-  // rótulo, texto do lembrete e telefone resolvem no server — Dupla/
-  // CicloEvento não cruzam pra lá
+  // rótulo, texto do lembrete e telefone resolvem no server — a Dupla
+  // cruza inteira (o ⋯ real e o "Quem recebe" precisam dela); CicloEvento
+  // fica do lado de cá
   const linhas: LinhaFila[] = acompanhar.flatMap((item) => {
     const dupla = duplasPorId.get(item.duplaId);
     if (!dupla) return [];
@@ -127,8 +133,28 @@ export function AgendaCoordenacao({
     // encerramento pendente: a pendência é da coordenação — a fila desenha
     // o CTA "Concluir rito" (link pra ficha) no lugar do LembreteButton
     const acaoFicha = item.motivos.includes("encerramento");
+    // as duas pontas do preview "Quem recebe": o mentor leva o lembrete
+    // operacional do caso (sempre há motivo operacional na fila — apoio
+    // não põe a dupla nela sozinho); o jovem recebe a resposta do pedido
+    // de apoio dele ou o check-in neutro — nunca a cobrança do mentor
+    const lembreteMentor = acaoFicha
+      ? null
+      : lembreteDaDupla(dupla, caso, eventos, meuNome, agora);
+    const nomeJovem =
+      dupla.mentorado?.nome_social || dupla.mentorado?.nome || "Jovem";
+    const msgMentorado = apoioDoJovem
+      ? (msgsContato("apoio_jovem", {
+          mentoradoNome: nomeJovem,
+          autorNome: meuNome,
+        }).mentorado ?? "")
+      : (msgsContato({
+          eu: meuNome,
+          mentorNome: (dupla.mentor?.nome ?? "").split(" ")[0],
+          mentoradoNome: nomeJovem,
+        }).mentorado ?? "");
     return [{
       item,
+      dupla,
       destino: apoioDoJovem ? "mentorado" : "mentor",
       rotulo: apoioDoJovem ? "Chamar" : item.rotuloLembrete,
       lembrete: acaoFicha
@@ -136,16 +162,24 @@ export function AgendaCoordenacao({
         : apoioDoJovem
           ? {
               titulo: "A equipe quer te ouvir",
-              corpo:
-                msgsContato("apoio_jovem", {
-                  mentoradoNome:
-                    dupla?.mentorado?.nome_social || dupla?.mentorado?.nome,
-                  autorNome: meuNome,
-                }).mentorado ?? "",
+              corpo: msgMentorado,
             }
-          : dupla
-            ? lembreteDaDupla(dupla, caso, eventos, meuNome, agora)
-            : { titulo: "Lembrete da equipe", corpo: "" },
+          : (lembreteMentor ?? { titulo: "Lembrete da equipe", corpo: "" }),
+      destinatarios: acaoFicha
+        ? undefined
+        : {
+            padrao: apoioDoJovem ? ("mentorado" as const) : ("mentor" as const),
+            mentor: {
+              nome: dupla.mentor?.nome ?? "mentor",
+              telefone: dupla.mentor?.whatsapp ?? null,
+              mensagem: lembreteMentor?.corpo ?? "",
+            },
+            mentorado: {
+              nome: nomeJovem,
+              telefone: dupla.mentorado?.whatsapp ?? null,
+              mensagem: msgMentorado,
+            },
+          },
       telefone: apoioDoJovem
         ? (dupla?.mentorado?.whatsapp ?? null)
         : (dupla?.mentor?.whatsapp ?? null),
@@ -172,13 +206,15 @@ export function AgendaCoordenacao({
     <div className="space-y-6">
       {/* header compartilhado com a aba Calendário: trocar de aba não
           reescreve o h1 nem o contexto da semana */}
-      <CabecalhoCoordenacao hoje={hoje} />
+      <CabecalhoCoordenacao hoje={hoje} seletor={seletorContexto} />
+
+      {contextoTurma}
 
       {abas}
 
       <div id={PAINEL_AGENDA} role="tabpanel" className="space-y-6">
-        {/* faixa de síntese — leitura de 2s do estado da fila antes dos cards.
-            Só existe com fila viva (o empty state lá embaixo já cobre o "tudo
+        {/* faixa de síntese — leitura de 2s do estado da fila, acima dela.
+            Só existe com fila viva (o empty state da seção já cobre o "tudo
             em dia"); o único número com peso é o de críticas */}
         {sintese && (
           <p
@@ -233,6 +269,29 @@ export function AgendaCoordenacao({
           </p>
         )}
 
+        {/* ---- Para acompanhar (REALIZA-176): a fila operacional é a 1ª
+            seção — a pergunta dos 5s, quem pede ação. Chips filtram de
+            verdade (FilaAcompanhar); Lembrar é o único gesto sobre dupla
+            aqui — quem agenda é a dupla. ---- */}
+        <section
+          aria-label="Para acompanhar"
+          title="Sem agendamento ou atrasadas. Lembrar envia um aviso à dupla (notificação + WhatsApp se houver). A coordenação não marca o encontro por ela."
+        >
+          <h2 className="text-base font-semibold">
+            Para acompanhar{" "}
+            <span className="font-normal text-muted-foreground">
+              · {acompanhar.length}
+            </span>
+          </h2>
+          {acompanhar.length === 0 ? (
+            <p className="mt-3 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
+              Tudo em dia. Nenhuma dupla pede atenção.
+            </p>
+          ) : (
+            <FilaAcompanhar linhas={linhas} />
+          )}
+        </section>
+
         {/* ---- Semana do programa (v8b): os oficiais do seg–dom em cards
             de scroll lateral — tema, instrumentos e "o que cobre" atrás de
             <details>; "Abrir chamada" só no dia da formação (gate no card) ---- */}
@@ -251,32 +310,6 @@ export function AgendaCoordenacao({
             situação das duplas (a mesma de /duplas) + pulso com a ★ do jovem.
             O toggle T1/T2/Todas é estado próprio da seção ---- */}
         <NumerosSemanaSecao opcoes={numeros.opcoes} agregados={numeros.agregados} />
-
-        {/* ---- Painel da semana: a fila operacional — a pergunta dos 5s,
-            quem pede ação. Chips filtram de verdade (FilaAcompanhar). ---- */}
-        <section aria-label="Painel da semana">
-          <h2 className="text-base font-semibold">Painel da semana</h2>
-          <div
-            className="mt-4"
-            role="group"
-            aria-label="Duplas para acompanhar"
-            title="Sem agendamento ou atrasadas. Lembrar envia um aviso à dupla (notificação + WhatsApp se houver). A coordenação não marca o encontro por ela."
-          >
-            <h3 className="text-sm font-semibold">
-              Para acompanhar{" "}
-              <span className="font-normal text-muted-foreground">
-                · {acompanhar.length}
-              </span>
-            </h3>
-            {acompanhar.length === 0 ? (
-              <p className="mt-3 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">
-                Tudo em dia. Nenhuma dupla pede atenção.
-              </p>
-            ) : (
-              <FilaAcompanhar linhas={linhas} />
-            )}
-          </div>
-        </section>
       </div>
     </div>
   );
@@ -285,7 +318,15 @@ export function AgendaCoordenacao({
 /** Header do monitoramento — o mesmo na aba Calendário da coordenação (a
  *  página monta esse calendário com a superfície de equipe). Fora do
  *  componente pra que as duas abas leiam um h1 só. */
-export function CabecalhoCoordenacao({ hoje }: { hoje: string }) {
+export function CabecalhoCoordenacao({
+  hoje,
+  seletor,
+}: {
+  hoje: string;
+  /** Seletor de contexto de turma — encosta à direita do header quando a
+   *  página manda (multi-turma, REALIZA-73). */
+  seletor?: ReactNode;
+}) {
   const { seg, dom } = semanaBounds(new Date(`${hoje}T12:00:00Z`));
   const rotuloHoje = rotuloDiaAgenda(hoje);
   return (
@@ -300,6 +341,7 @@ export function CabecalhoCoordenacao({ hoje }: { hoje: string }) {
           {rotuloHoje.charAt(0).toLowerCase() + rotuloHoje.slice(1)}
         </p>
       </div>
+      {seletor}
     </header>
   );
 }

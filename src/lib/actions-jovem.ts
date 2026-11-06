@@ -83,8 +83,8 @@ export async function salvarDisponibilidadeJovem(
 
 /** O jovem pede uma sessão de especialista (pedir_especialista_jovem,
  *  0074): direcionado (com slot opcional da grade real dele) ou broadcast
- *  pro mural. Sem dupla DPP ativa o pedido entra na triagem da coordenação
- *  ('aguardando_coord') — devolvemos o status pra UI contar certo, sem
+ *  pro mural. Todo pedido nasce 'aberta', direto no mural (0158: sem
+ *  triagem da coordenação) — devolvemos o status pra UI contar certo, sem
  *  prometer sessão marcada (ela só nasce no aceite). */
 export async function pedirEspecialistaJovem(input: {
   especialistaId: string | null;
@@ -133,8 +133,8 @@ export async function pedirEspecialistaJovem(input: {
   if (error) return { error: erroAmigavel(error) };
   if (!id) return { error: "Não foi possível enviar o pedido. Tente de novo." };
 
-  // a linha nasce 'aberta' (com dupla DPP) ou 'aguardando_coord' (sem —
-  // a triagem libera); o jovem lê a própria solicitação pelo sol_select
+  // a linha nasce 'aberta' (0158: com ou sem dupla DPP); o jovem lê a
+  // própria solicitação pelo sol_select
   const { data: sol } = await supabase
     .from("solicitacoes_especialista")
     .select("status")

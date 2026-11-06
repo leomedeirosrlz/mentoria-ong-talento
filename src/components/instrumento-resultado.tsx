@@ -8,6 +8,7 @@ import {
 } from "@/lib/forms/schema";
 import { parseSubmetasLinhas } from "@/lib/pdm";
 import { cn } from "@/lib/utils";
+import { RespostaLista } from "./resposta-lista";
 import { RodaSvg } from "./instrumentos/roda-svg";
 
 // Leitura estruturada das respostas dos instrumentos oficiais (0080) —
@@ -271,16 +272,20 @@ function MetasResultado({
               <p className="mt-0.5 text-sm font-medium leading-snug">
                 {m.meta}
               </p>
-              <div className="mt-1 space-y-0.5 text-sm text-muted-foreground">
+              <div className="mt-1 space-y-0.5 text-sm">
                 {m.porque && (
                   <p className="leading-relaxed">
-                    <span className="text-xs font-medium">Por quê: </span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Por quê:{" "}
+                    </span>
                     {m.porque}
                   </p>
                 )}
                 {m.indicador && (
                   <p>
-                    <span className="text-xs font-medium">Indicador: </span>
+                    <span className="text-xs font-medium text-muted-foreground">
+                      Indicador:{" "}
+                    </span>
                     {m.indicador}
                   </p>
                 )}
@@ -327,9 +332,7 @@ function MetasResultado({
                 >
                   {r.ok ? "✓" : "✗"}
                 </span>
-                <span className="min-w-0 flex-1 text-muted-foreground">
-                  {r.label}
-                </span>
+                <span className="min-w-0 flex-1">{r.label}</span>
               </li>
             ))}
           </ul>
@@ -358,30 +361,16 @@ function VisaoResultado({
       "valoriza",
     ] as const
   )
-    .map((id) => {
-      const campo = campos.find((c) => c.id === id);
-      const valor = valorDe(campos, respostas, id);
-      return campo && valor ? { label: campo.label, valor } : null;
-    })
-    .filter((x): x is { label: string; valor: string } => x != null);
+    .map((id) => campos.find((c) => c.id === id))
+    .filter((c): c is FormularioCampo => c != null);
+  const temNarrativa = narrativa.some((c) => respostas[c.id] != null);
 
   return (
     <div className="space-y-4">
       <Declaracao texto={declaracao} />
-      {narrativa.length > 0 && (
+      {temNarrativa && (
         <Bloco titulo="O filme da vida ideal">
-          <dl className="space-y-3">
-            {narrativa.map((n) => (
-              <div key={n.label}>
-                <dt className="text-xs font-medium text-muted-foreground">
-                  {n.label}
-                </dt>
-                <dd className="mt-0.5 text-sm leading-relaxed whitespace-pre-wrap">
-                  {n.valor}
-                </dd>
-              </div>
-            ))}
-          </dl>
+          <RespostaLista campos={narrativa} respostas={respostas} />
         </Bloco>
       )}
     </div>

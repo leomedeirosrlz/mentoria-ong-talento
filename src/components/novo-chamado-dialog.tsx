@@ -285,7 +285,12 @@ export function NovoChamadoDialog({
           {!jovem && duplas && duplas.length > 0 && !duplaId && (
             <div className="space-y-1.5">
               <Label htmlFor="chamado-dupla">Dupla relacionada (opcional)</Label>
-              <Select value={dupla} onValueChange={(v) => setDupla(v ?? "")}>
+              <Select
+                value={dupla}
+                // sem items o trigger fechado mostra o value cru (uuid)
+                items={Object.fromEntries(duplas.map((d) => [d.id, d.label]))}
+                onValueChange={(v) => setDupla(v ?? "")}
+              >
                 <SelectTrigger id="chamado-dupla" className="w-full">
                   <SelectValue placeholder="Sem dupla específica" />
                 </SelectTrigger>

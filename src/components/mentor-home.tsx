@@ -15,11 +15,13 @@ import {
   toDateStr,
   totalDaTrilha,
 } from "@/lib/ciclo";
+import { limboFechado } from "@/lib/agenda-minha";
 import { temPapel } from "@/lib/types";
 import type {
   CicloEvento,
   Cronograma,
   Dupla,
+  Encontro,
   EspecialistaEvento,
   Profile,
 } from "@/lib/types";
@@ -27,6 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
+import { CombinadoCheck } from "@/components/combinado-check";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { TrilhaJornada } from "@/components/trilha-jornada";
@@ -176,19 +179,31 @@ export function MentorHome({
           hoje
         );
         // pendência de registro mais antiga — realizado sem registro ou
-        // agendado cuja data já passou (pode ter rolado: o mentor resolve
-        // registrando, remarcando ou marcando não-aconteceu)
+        // limbo fechado: agendado/remarcado cujo horário previsto (início
+        // + duração) já passou. Enquanto a chamada rola o encontro ainda
+        // não é cobrança — a régua é a mesma `limboFechado` da agenda
         const semRegistro = [...dupla.encontros]
           .sort((a, b) => a.numero - b.numero)
           .find(
             (e) =>
               !e.registro &&
               (e.status === "realizado" ||
-                (e.status === "agendado" &&
-                  e.data_hora != null &&
-                  new Date(e.data_hora) < hoje))
+                limboFechado(e, hoje.getTime()))
           );
-        const pendentes = dupla.encaminhamentos.filter((t) => t.status === "pendente");
+        // chamada no ar: começou mas o fim previsto ainda não passou —
+        // conta como "agendado agora" (Entrar), não como limbo
+        const rolandoAgora = (e: Encontro | null | undefined) =>
+          !!e &&
+          e.data_hora != null &&
+          new Date(e.data_hora) <= hoje &&
+          !limboFechado(e, hoje.getTime());
+        const pendentes = dupla.encaminhamentos
+          .filter((t) => t.status === "pendente")
+          // vencido primeiro, depois o prazo mais próximo — a mesma ordem
+          // da lista na ficha, pra home não esconder urgente no "+N mais"
+          .sort((a, b) =>
+            (a.prazo ?? "9999").localeCompare(b.prazo ?? "9999")
+          );
         const hojeStr = toDateStr(hoje);
 
         // máquina de estados do painel "O que fazer agora" — um primário por
@@ -197,11 +212,12 @@ export function MentorHome({
         // "agendado" futuro; uma row "remarcado" com data futura é o mesmo
         // caso na prática e trata como agendado aqui.
         const agendado =
+          (rolandoAgora(encontroAlvo) ? encontroAlvo : null) ??
           proximoAgendado ??
           (encontroAlvo?.data_hora && new Date(encontroAlvo.data_hora) > hoje
             ? encontroAlvo
             : null);
-        // "Agendar próximo" no estado quieto: primeiro número livre depois
+        // "Agendar próximo encontro" no estado quieto: primeiro número livre depois
         // do agendado — livre = sem row realizada/agendada/remarcada
         // (nao_aconteceu e cancelado voltam a ser agendáveis; o dialog
         // recebe a row em `atual` e edita em vez de criar duplicata)
@@ -258,6 +274,14 @@ export function MentorHome({
                   <CardTitle className="text-lg font-semibold mt-1">
                     <DuplaNomes mentor="Você" mentorado={dupla.mentorado.nome} onDark />
                   </CardTitle>
+                  {/* o auxiliar executivo que acompanha a dupla — meta discreto
+                      sob o lockup; white/70 mantém o nome legível no ink (o
+                      white/50 do overline mede ~4.4:1 pra dado lido) */}
+                  {dupla.supervisor && (
+                    <p className="mt-0.5 text-xs text-white/70 sm:text-[11px]">
+                      Auxiliar executivo: {dupla.supervisor.nome}
+                    </p>
+                  )}
                   {/* prazo de 3 meses da trilha — o diferenciador entre duplas
                       especialistas concorrentes; a retintada adapta o badge
                       outline ao banner ink (o componente é superfície clara) */}
@@ -351,18 +375,20 @@ export function MentorHome({
                   ) : semRegistro ? (
                     <>
                       <p className="font-medium">
-                        {semRegistro.status === "agendado"
+                        {semRegistro.status !== "realizado"
                           ? `O ${semRegistro.numero}º encontro estava agendado e já passou.`
                           : `O ${semRegistro.numero}º encontro aconteceu.`}
                       </p>
                       <p className="text-sm text-muted-foreground mt-0.5">
-                        {semRegistro.status === "agendado"
+                        {semRegistro.status !== "realizado"
                           ? "Se rolou, conte como foi."
                           : "Falta só o registro de como foi."}
                       </p>
                       {/* ação do painel sempre à direita — mesma régua do
-                          "n de N" da Jornada e do "Abrir dupla" no header */}
-                      <div className="mt-3 flex justify-end">
+                          "n de N" da Jornada e do "Abrir dupla" no header.
+                          No limbo a pergunta "rolou?" tem duas saídas —
+                          registrar (se sim) ou remarcar (se não) */}
+                      <div className="mt-3 flex flex-wrap justify-end gap-2">
                         <Link
                           href={`/duplas/${dupla.id}?aba=encontros#registrar-${semRegistro.id}`}
                           className={buttonVariants({ size: "sm" })}
@@ -370,6 +396,15 @@ export function MentorHome({
                           <ClipboardText size={16} />
                           Registrar como foi
                         </Link>
+                        {semRegistro.status !== "realizado" && (
+                          <Link
+                            href={`/duplas/${dupla.id}?aba=encontros#encontro-${semRegistro.id}`}
+                            className={buttonVariants({ variant: "outline", size: "sm" })}
+                          >
+                            <CalendarPlus size={16} />
+                            Remarcar na ficha
+                          </Link>
+                        )}
                       </div>
                     </>
                   ) : cicloCompleto ? (
@@ -413,7 +448,7 @@ export function MentorHome({
                             trigger={
                               <Button variant="outline" size="sm">
                                 <CalendarPlus size={16} />
-                                Agendar próximo
+                                Agendar próximo encontro
                               </Button>
                             }
                           />
@@ -422,7 +457,8 @@ export function MentorHome({
                     </>
                   ) : encontroAlvo ? (
                     // a row existe mas o horário já passou ou não aconteceu —
-                    // nunca "ainda não agendado"
+                    // nunca "ainda não agendado". "não aconteceu" é marcação
+                    // de alguém (até do jovem) — o texto aponta o desfazer
                     <>
                       <p className="font-medium">
                         {encontroAlvo.numero}º encontro{" "}
@@ -434,10 +470,20 @@ export function MentorHome({
                       <p className="text-sm text-muted-foreground mt-0.5">
                         {encontroAlvo.status === "nao_aconteceu" ||
                         encontroAlvo.status === "cancelado"
-                          ? "Remarque quando puder."
+                          ? "Remarque quando puder, ou desfaça na ficha se rolou."
                           : "Se rolou, registre na ficha da dupla; se não, remarque."}
                       </p>
-                      <div className="mt-3 flex justify-end">
+                      <div className="mt-3 flex flex-wrap justify-end gap-2">
+                        {encontroAlvo.status !== "nao_aconteceu" &&
+                          encontroAlvo.status !== "cancelado" && (
+                            <Link
+                              href={`/duplas/${dupla.id}?aba=encontros#registrar-${encontroAlvo.id}`}
+                              className={buttonVariants({ variant: "outline", size: "sm" })}
+                            >
+                              <ClipboardText size={16} />
+                              Registrar como foi
+                            </Link>
+                          )}
                         <AgendarEncontroDialog
                           duplaId={dupla.id}
                           numero={proximoNumero}
@@ -514,31 +560,18 @@ export function MentorHome({
                     <ul className="space-y-1.5">
                       {pendentes.slice(0, 4).map((t) => {
                         // vencido repete a gramática do EncaminhamentosList —
-                        // cor nunca é o único canal (PV-2)
+                        // cor nunca é o único canal (PV-2). O item marca feito
+                        // aqui mesmo — a ficha fica a um toque pelo link
                         const vencido = t.prazo != null && t.prazo < hojeStr;
                         return (
-                          <li key={t.id} className="text-sm flex items-start gap-2">
-                            <span
-                              aria-hidden
-                              className={
-                                "mt-1.5 size-1.5 rounded-full shrink-0 " +
-                                (vencido ? "bg-[var(--danger)]" : "bg-[var(--warn)]")
-                              }
-                            />
-                            <span>
-                              {t.descricao}
-                              {t.prazo && (
-                                <span
-                                  className={
-                                    vencido ? "font-medium text-[var(--danger)]" : "text-muted-foreground"
-                                  }
-                                >
-                                  {" "}· até {formatDate(t.prazo)}
-                                  {vencido ? " (vencido)" : ""}
-                                </span>
-                              )}
-                            </span>
-                          </li>
+                          <CombinadoCheck
+                            key={t.id}
+                            id={t.id}
+                            duplaId={dupla.id}
+                            descricao={t.descricao}
+                            prazoLabel={t.prazo ? `até ${formatDate(t.prazo)}` : null}
+                            vencido={vencido}
+                          />
                         );
                       })}
                       {/* cap em 4 — o sufixo declara o overflow e leva à ficha (PD-2) */}

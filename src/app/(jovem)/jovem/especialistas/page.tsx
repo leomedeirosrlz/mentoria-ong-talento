@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { Sparkle } from "@phosphor-icons/react/dist/ssr";
 import { getMe } from "@/lib/queries";
-import { waLink } from "@/lib/ciclo";
+
 import {
   getDevolutivas,
   getJovemContatos,
@@ -62,11 +62,7 @@ export default async function JovemEspecialistasPage() {
   const coordenacao = contatos.filter(
     (c) => (c.dupla_id == null || c.dupla_id === duplaAtual?.id) && c.papel === "coordenacao"
   );
-  const nomeTela = me.nome_social || me.nome;
-  const waCoord = waLink(
-    coordenacao[0]?.whatsapp,
-    `Olá! Sou ${nomeTela}, mentorado(a) do programa, e preciso falar com a equipe.`
-  );
+  const nomeTela = (me.nome_social || me.nome).split(" ")[0];
 
   // sugestões do mentor DPP esperando a resposta do jovem (WP6) — 'sugerida'
   // não conta nos tetos e não entra na mesa: o card vem primeiro na página
@@ -113,9 +109,6 @@ export default async function JovemEspecialistasPage() {
       (d) => (d.status === "ativa" || d.status === "pausada") && d.mentor_id != null
     )
     .map((d) => d.mentor_id!);
-  const semDuplaDpp = !duplas.some(
-    (d) => d.trilha !== "especialista" && d.status === "ativa"
-  );
 
   // a mesa: pedidos abertos + recusadas (aceita vira trilha; cancelada some)
   const visiveis = solicitacoes
@@ -252,7 +245,8 @@ export default async function JovemEspecialistasPage() {
                       propostas={propostas[s.id] ?? []}
                       slots={alvoId ? (slotsPorEsp[alvoId] ?? []) : []}
                       meuId={me.id}
-                      waCoord={waCoord}
+                      equipe={coordenacao}
+                      nomeJovem={nomeTela}
                       alvo={alvo}
                       disponibilidade={dispJovem}
                     />
@@ -276,7 +270,6 @@ export default async function JovemEspecialistasPage() {
           catalogo={catalogo}
           trilhasAtivas={trilhasAtivas}
           slotsPorEsp={slotsPorEsp}
-          semDuplaDpp={semDuplaDpp}
           lotado={lotado}
           pedidosAbertos={abertos}
         />

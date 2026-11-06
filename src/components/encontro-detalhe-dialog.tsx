@@ -72,9 +72,14 @@ export function EncontroDetalheDialog({
   const [agora] = useState(() => Date.now());
   const nota =
     dupla.notas?.find((n) => n.numero === encontro.numero)?.texto ?? null;
-  const combinados = reg
-    ? (dupla.encaminhamentos ?? []).filter((e) => e.registro_id === reg.id)
-    : [];
+  // combinados deste nº (0157): os do registro e os que o mentor anotou no
+  // preparo (o antigo afazer) — uma lista só, como no card da ficha
+  const combinados = (dupla.encaminhamentos ?? [])
+    .filter(
+      (e) =>
+        e.numero === encontro.numero || (reg != null && e.registro_id === reg.id)
+    )
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
   const tardio = reg != null && registroTardio(reg, encontro);
 
   // anexos não vêm no payload da agenda — busca sob demanda ao abrir;
@@ -306,7 +311,7 @@ export function EncontroDetalheDialog({
 
           <div className="border-t pt-3">
             <Link
-              href={`/duplas/${dupla.id}#registrar-${encontro.id}`}
+              href={`/duplas/${dupla.id}?aba=encontros#encontro-${encontro.id}`}
               className="inline-flex min-h-11 items-center gap-1 text-xs font-medium underline underline-offset-2 hover:text-muted-foreground sm:min-h-0"
             >
               Abrir na ficha da dupla

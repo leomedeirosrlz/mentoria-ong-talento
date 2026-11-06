@@ -123,26 +123,23 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
       abas.getByRole("tab", { name: "Calendário" })
     ).toHaveAttribute("aria-selected", "false");
 
-    // as seções do modo existem mesmo com fila vazia, na ordem do v8b
-    // (REALIZA-195): orientação do programa antes do detalhe operacional
-    // — 1º "Semana do programa", 2º "Números da semana", por último o
-    // "Painel da semana" que abriga a fila "Duplas para acompanhar"
-    // (role=group; o conteúdo depende do staging — a moldura é o contrato)
+    // as seções do modo existem mesmo com fila vazia, na ordem do aceite
+    // (REALIZA-176): a fila operacional "Para acompanhar" é a 1ª, depois
+    // os blocos de monitoramento "Semana do programa" e "Números da
+    // semana" (o conteúdo depende do staging — a moldura é o contrato)
     await expect(page.locator("section[aria-label]").first()).toHaveAttribute(
       "aria-label",
-      "Semana do programa"
+      "Para acompanhar"
     );
     for (const label of [
+      "Para acompanhar",
       "Semana do programa",
       "Números da semana",
-      "Painel da semana",
     ])
       await expect(
         page.locator(`section[aria-label="${label}"]`)
       ).toBeVisible();
-    await expect(
-      page.locator('[role="group"][aria-label="Duplas para acompanhar"]')
-    ).toBeVisible();
+    await expect(page.locator("h2").first()).toContainText("Para acompanhar");
 
     // deep-link pro calendário: os chips da coord são Dia/Semana/Mês/Ciclo
     // (REALIZA-195) — "Horários" e a superfície de agendar são só do mentor
@@ -246,11 +243,9 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
 
       // a dupla sem data cai na fila — as linhas mostram primeiro nome
       // ("Mentorada · Mentor"), que colide entre fixtures; o "Ver ficha ›"
-      // com o href da dupla é o discriminante estável. A fila é um
-      // role=group dentro do "Painel da semana" (REALIZA-195)
-      const fila = page.locator(
-        '[role="group"][aria-label="Duplas para acompanhar"]'
-      );
+      // com o href da dupla é o discriminante estável. A fila é a 1ª
+      // seção da página (REALIZA-176)
+      const fila = page.locator('section[aria-label="Para acompanhar"]');
       const linha = fila.locator("li", {
         has: page.locator(`a[href="/duplas/${IDS.dupla2}"]`),
       });

@@ -11,7 +11,6 @@ import type {
   Encontro,
   MentoradoPar,
   Profile,
-  Supervisao,
 } from "@/lib/types";
 
 // Âncora: quarta 07/10/2026 meio-dia SP — semana seg 05/10 → dom 11/10,
@@ -300,19 +299,6 @@ describe("itensConsolidados", () => {
       realizado("dEsp", 1, "09-30"), // semana passada — fora
     ],
   });
-  const sup: Supervisao = {
-    id: "s1",
-    supervisor_id: "ps",
-    mentor_id: "pm",
-    dupla_id: "dOk",
-    data: "2026-10-07",
-    resumo: "Alinhou o plano do 8º encontro com o mentor.",
-    created_by: null,
-    created_at: "2026-10-07T15:00:00Z",
-    supervisor: { id: "ps", nome: "Paula Nunes" },
-    mentor: { id: "pm", nome: "André Lima" },
-  };
-  const supFora: Supervisao = { ...sup, id: "s2", data: "2026-10-13" }; // semana que vem
   const oficiais = [
     mkEvento(null, "2026-10-09", "evento_encerramento", "c1", {
       titulo: "Festa de encerramento",
@@ -327,7 +313,6 @@ describe("itensConsolidados", () => {
   function consolidada() {
     return itensConsolidados(
       [dOk, dAgendada, dSem, dPaus, dT2, dT3, dOrfa, dEsp],
-      [sup, supFora],
       [...EVENTOS, ...oficiais],
       AGORA
     );
@@ -356,20 +341,6 @@ describe("itensConsolidados", () => {
       convidado: true,
       pill: "Esp",
     });
-  });
-
-  it("supervisão da semana entra com pill 'Você'; a da próxima semana não", () => {
-    const itens = consolidada();
-    const s = itens.find((i) => i.id === "sup-s1")!;
-    expect(s).toMatchObject({
-      tipo: "supervisao",
-      diaKey: "2026-10-07",
-      titulo: "Supervisão · Paula Nunes × André Lima",
-      convidado: false,
-      pill: "Você",
-      href: "/duplas/dOk",
-    });
-    expect(itens.find((i) => i.id === "sup-s2")).toBeUndefined();
   });
 
   it("evento oficial datado na janela é convidado com pill vazia", () => {
@@ -409,7 +380,6 @@ describe("itensConsolidados", () => {
       "2026-10-06:a_agendar",
       "2026-10-06:a_agendar",
       "2026-10-06:encontro",
-      "2026-10-07:supervisao",
       "2026-10-07:encontro",
       "2026-10-08:encontro",
       "2026-10-09:oficial",
@@ -435,16 +405,16 @@ describe("itensConsolidados", () => {
         }),
       ],
     });
-    const itensB = itensConsolidados([dBordas], [], EVENTOS, AGORA);
+    const itensB = itensConsolidados([dBordas], EVENTOS, AGORA);
     // só o realizado do 8 (06/10) — o agendado 12/10 entra (dentro da janela),
     // o 19/10 (além) e o cancelado ficam fora
     expect(itensB.map((i) => i.diaKey)).toEqual(["2026-10-06", "2026-10-12"]);
   });
 
   it("zero duplas / zero eventos sai vazio", () => {
-    expect(itensConsolidados([], [], [], AGORA)).toEqual([]);
+    expect(itensConsolidados([], [], AGORA)).toEqual([]);
     // sem eventos oficiais, ainda assim saem os encontros das duplas
-    const so = itensConsolidados([dOk], [], [], AGORA);
+    const so = itensConsolidados([dOk], [], AGORA);
     expect(so).toHaveLength(1);
     expect(so[0].tipo).toBe("encontro");
   });

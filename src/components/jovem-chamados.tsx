@@ -7,10 +7,8 @@ import {
   CHAMADO_CATEGORIA_LABEL,
   formatDiaMes,
 } from "@/lib/ciclo";
-import {
-  ChamadoDetalhe,
-  ChamadoStatusBadge,
-} from "@/components/chamados-app";
+import { ChamadoDetalhe } from "@/components/chamado-detalhe";
+import { ChamadoStatusBadge } from "@/components/chamados-shared";
 
 /** "Meus pedidos" do jovem dentro do perfil (0084): os chamados dele com a
  *  conversa pública — sem comentário interno, sem nome de quem respondeu,

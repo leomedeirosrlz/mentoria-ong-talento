@@ -4,9 +4,7 @@ import { type CSSProperties, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   ArrowUpRight,
-  Binoculars,
   CalendarPlus,
-  ChatsCircle,
   CheckCircle,
   ClockCounterClockwise,
   Eye,
@@ -42,7 +40,6 @@ import type {
   CicloEvento,
   Cronograma,
   Dupla,
-  Supervisao,
   TrilhaJovem,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -73,13 +70,12 @@ function Tag({ tom, children }: { tom?: string | null; children: React.ReactNode
 const ICONE_TIPO = {
   encontro: Users,
   sessao_esp: Sparkle,
-  supervisao: ChatsCircle,
   programa: Flag,
   a_agendar: CalendarPlus,
 } as const;
 
 /** Ícone do tipo — a coluna de horário o usa quando o item é por dia
- *  (supervisão, programa, "a agendar") e não finge hora que o domínio não
+ *  (programa, "a agendar") e não finge hora que o domínio não
  *  tem. Formação tem ícone próprio; o resto dos "programa" é evento
  *  oficial. */
 function iconeDoItem(
@@ -201,8 +197,8 @@ function LinhaItem({
         )}
       >
         <div className="flex flex-wrap items-start gap-x-3 gap-y-2.5 sm:flex-nowrap sm:gap-x-4">
-          {/* coluna de horário de largura fixa — itens por dia (supervisão,
-              programa, "a agendar") não fingem hora que o domínio não tem:
+          {/* coluna de horário de largura fixa — itens por dia (programa,
+              "a agendar") não fingem hora que o domínio não tem:
               o ícone do tipo ocupa o mesmo trilho, centralizado */}
           <div className="w-18 shrink-0 pt-0.5 text-center">
             {item.hora ? (
@@ -394,7 +390,6 @@ function Rail({ agenda }: { agenda: AgendaMinhaDerivada }) {
   const nadaNaSemana =
     semana.encontros === 0 &&
     semana.sessoesEsp === 0 &&
-    semana.supervisoes === 0 &&
     semana.programas === 0 &&
     semana.pendencias === 0;
   return (
@@ -434,17 +429,6 @@ function Rail({ agenda }: { agenda: AgendaMinhaDerivada }) {
                 </b>
                 {semana.sessoesEspDetalhe ? ` · ${semana.sessoesEspDetalhe}` : ""}{" "}
                 <span className="text-muted-foreground">(você acompanha)</span>
-              </span>
-            </p>
-          )}
-          {semana.supervisoes > 0 && (
-            <p className="flex items-start gap-2">
-              <Binoculars size={15} aria-hidden className="mt-0.5 shrink-0 text-muted-foreground" />
-              <span>
-                <b className="font-medium">
-                  {semana.supervisoes}{" "}
-                  {semana.supervisoes === 1 ? "supervisão" : "supervisões"}
-                </b>
               </span>
             </p>
           )}
@@ -538,9 +522,6 @@ export type AgendaMinhaProps = {
   trilhas: Record<string, TrilhaJovem[]>;
   eventos: CicloEvento[];
   cronogramas: Cronograma[];
-  supervisoes?: Supervisao[];
-  /** profile_id do mentor — separa supervisão recebida da conduzida. */
-  meuId: string;
   /** "YYYY-MM-DD" — a page resolve no server; aqui o valor ancora os buckets. */
   hoje: string;
   /** epoch ms — o mesmo instante que gerou `hoje` no server. Sem ele o memo
@@ -556,8 +537,6 @@ export function AgendaMinha({
   trilhas,
   eventos,
   cronogramas,
-  supervisoes = [],
-  meuId,
   hoje,
   agora,
   hibrido = false,
@@ -570,12 +549,10 @@ export function AgendaMinha({
         trilhas,
         eventos,
         cronogramas,
-        supervisoes,
-        meuId,
         hoje,
         agora,
       }),
-    [duplas, trilhas, eventos, cronogramas, supervisoes, meuId, hoje, agora]
+    [duplas, trilhas, eventos, cronogramas, hoje, agora]
   );
   const { avisos, secoes } = useMemo(
     () => filtraAgenda(agenda, escopo),
@@ -595,13 +572,11 @@ export function AgendaMinha({
         duplas,
         eventos,
         cronogramas,
-        supervisoes,
-        meuId,
         new Date(hoje + "T12:00:00"),
         agora,
         encontrosCobertos(agenda)
       ),
-    [duplas, eventos, cronogramas, supervisoes, meuId, hoje, agora, agenda]
+    [duplas, eventos, cronogramas, hoje, agora, agenda]
   );
   // o CTA preenchido (lima) é um por agenda: o 1º warnrow do "Hoje" leva —
   // sem warnrow, o destaque cai na 1ª ação decisiva da lista (registrar ou
@@ -631,8 +606,8 @@ export function AgendaMinha({
   return (
     <div className="space-y-4">
       {/* faixa "Minha agenda" (v8b): a semana do programa recortada na
-          agenda dele — formações e eventos oficiais, supervisões sobre
-          ele e o encontro oficial ainda fora da lista (o coberto por item
+          agenda dele — formações e eventos oficiais
+          e o encontro oficial ainda fora da lista (o coberto por item
           ou aviso já aparece uma vez lá embaixo). Some quando um chip de
           escopo filtra uma dupla só — a faixa é a leitura da agenda
           inteira, não do recorte */}

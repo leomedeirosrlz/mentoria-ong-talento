@@ -167,6 +167,8 @@ export function EnviarTermosDialog({
   mentorados,
   docs,
   faltantes,
+  open: openProp,
+  onOpenChange,
 }: {
   pessoas: PessoaAlvo[];
   mentorados: PessoaAlvo[];
@@ -174,8 +176,16 @@ export function EnviarTermosDialog({
   docs: Record<string, DocsPessoa>;
   /** id → slug → labels de faltante — calculado no servidor, nunca valores */
   faltantes: Record<string, Record<string, string[]>>;
+  /** Controlado: quem hospeda (menu ⋯) gerencia o open e não recebe trigger. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openInt, setOpenInt] = useState(false);
+  const open = openProp ?? openInt;
+  const setOpen = (o: boolean) => {
+    setOpenInt(o);
+    onOpenChange?.(o);
+  };
   const uid = useId();
   const docLabelId = `${uid}-doc`;
   const origem = useOrigem();
@@ -337,14 +347,17 @@ export function EnviarTermosDialog({
 
   return (
     <Dialog open={open} onOpenChange={aoAbrir}>
-      <DialogTrigger
-        render={
-          <Button variant="outline" size="sm">
-            <Signature aria-hidden />
-            Enviar termos
-          </Button>
-        }
-      />
+      {/* sem trigger no modo controlado — o item do menu ⋯ é quem abre */}
+      {openProp === undefined && (
+        <DialogTrigger
+          render={
+            <Button variant="outline" size="sm">
+              <Signature aria-hidden />
+              Enviar termos
+            </Button>
+          }
+        />
+      )}
       <DialogContent size="2xl">
         <DialogHeader>
           <DialogTitle>Enviar termos pra assinar</DialogTitle>

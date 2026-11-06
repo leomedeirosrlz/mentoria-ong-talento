@@ -351,6 +351,12 @@ export type Encaminhamento = {
   responsavel: "mentor" | "mentorado";
   prazo: string | null;
   status: EncaminhamentoStatus;
+  /** nº do passo do guia a que o combinado pertence (0157) — o do encontro
+   *  do registro, ou o do card onde o mentor anotou no preparo. Null só em
+   *  combinado antigo sem registro: fica na aba Combinados da ficha. */
+  numero: number | null;
+  feito_em: string | null;
+  created_by: string | null;
   created_at: string;
 };
 
@@ -466,6 +472,27 @@ export type Encontro = {
    *  dupla. O RLS decide quem a vê: coord/sup sempre, mentor DPP só quando o
    *  jovem autorizou, especialista nunca por aqui (a view dele é estrelas). */
   avaliacao_jovem?: AvaliacaoEncontro | null;
+  /** Trilha de remarcações deste encontro (0153) — embed to-many no select
+   *  da dupla. Cada mudança de data_hora vira uma linha; o agendamento
+   *  inicial não entra. */
+  remarcacoes?: EncontroRemarcacao[];
+};
+
+/** Linha de `encontro_remarcacoes` (REALIZA-341, migration 0153) — uma
+ *  remarcação do encontro: de quando pra quando a data andou + o motivo
+ *  declarado na hora. Só o trigger escreve; o app lê pelo embed do
+ *  encontro (que traz o subset id, datas, motivo e created_at — os demais
+ *  campos ficam undefined fora de selects que os peçam). */
+export type EncontroRemarcacao = {
+  id: string;
+  encontro_id: string;
+  dupla_id: string;
+  numero: number;
+  data_anterior: string;
+  data_nova: string;
+  motivo: string | null;
+  created_by: string | null;
+  created_at: string;
 };
 
 /** Anotação/plano de aula do mentor — chave (dupla_id, numero), não FK de
@@ -480,6 +507,9 @@ export type EncontroNota = {
   updated_at: string;
 };
 
+/** Intenção do mentor pro encontro N (REALIZA-21) — chave (dupla_id, numero)
+ *  como a nota: precede o agendamento e segue o nº do guia na remarcação.
+ *  Pendente = feito=false; feito_em é carimbo de trigger, nunca do caller. */
 export type Dupla = {
   id: string;
   /** Label da turma (ex-coluna `ciclo`, renomeada na 0061) — derivada do
@@ -577,7 +607,7 @@ export type Comunicado = {
 export type Notificacao = {
   id: string;
   /** Os 4 originais (0018) + os 4 do fluxo de especialista (0028) +
-   *  trilha_encerrada (0037) + supervisao_registrada (0041) +
+   *  trilha_encerrada (0037) +
    *  formulario_respondido (0042, inserido pela RPC de submit) +
    *  avaliacao_pendente/apoio_jovem (0071, trigger + RPC de avaliação) +
    *  os 3 de agenda bilateral (0072, trigger encontros_agenda_notify) —
@@ -694,6 +724,9 @@ export type ChamadoFilaItem = ChamadoFila & {
   autor_papel: string | null;
   atribuido_nome: string | null;
   contexto: string | null; // "Encontro 4 · Ana" — origem+dupla resumidos
+  /** Nome do mentorado da dupla vinculada (chamados.dupla_id) — null sem
+   *  dupla, quando restrito, ou quando a RLS não entrega a dupla. */
+  mentorado_nome: string | null;
 };
 
 export type ChamadoAtualizacao = {
@@ -844,28 +877,6 @@ export type ExcecaoEspecialista = {
   hora_inicio: string;
   hora_fim: string;
   tipo: "bloqueio" | "extra";
-};
-
-// ---------- supervisão (0041) ----------
-
-/** Sessão de supervisão (supervisor ↔ mentor) — o ritual de acompanhamento
- *  do guia. dupla_id null = sessão geral, não atada a uma dupla. O mentor
- *  lê data e resumo das sessões sobre ele (decisão de transparência —
- *  ver 0041); a coordenação lê tudo e modera (só ela apaga). */
-export type Supervisao = {
-  id: string;
-  supervisor_id: string;
-  mentor_id: string;
-  dupla_id: string | null;
-  /** "YYYY-MM-DD" — dia em que a sessão aconteceu (não o do registro). */
-  data: string;
-  resumo: string;
-  created_by: string | null;
-  created_at: string;
-  // embeds quando selecionados:
-  supervisor?: { id: string; nome: string } | null;
-  mentor?: { id: string; nome: string } | null;
-  dupla?: { id: string; mentorado: { nome: string } | null } | null;
 };
 
 // ---------- fechamento do ciclo (0037) ----------

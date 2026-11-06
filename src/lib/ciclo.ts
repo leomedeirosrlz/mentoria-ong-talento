@@ -11,6 +11,7 @@ import type {
   Disponibilidade,
   DocumentoPessoa,
   Dupla,
+  DuplaStatus,
   Encontro,
   Escolaridade,
   EspecialistaEvento,
@@ -754,6 +755,79 @@ export function cruzamentoDisponibilidadeHora(
   if (mentorLivre) return "mentor";
   if (jovemLivre) return "jovem";
   return "nenhum";
+}
+
+/** Quem NÃO cobre o horário escolhido — o insumo do aviso do dialog de
+ *  agendar: o mentor vê antes de confirmar se a grade dele ou a do jovem
+ *  não marca aquela célula. */
+export type AvisoDisponibilidade = {
+  mentorLivre: boolean;
+  jovemLivre: boolean;
+};
+
+/** As grades dos dois lados cobrem o dia/hora LOCAIS de `quando` (o
+ *  datetime-local do dialog é naïve, já no fuso de quem agenda)? Um lado
+ *  sem grade — null/undefined ou zero células — conta como livre: não
+ *  sabemos, não alertamos. Os dois livres → null, sem aviso. */
+export function avisoDisponibilidade(
+  mentor: Disponibilidade | null | undefined,
+  jovem: Disponibilidade | null | undefined,
+  quando: Date
+): AvisoDisponibilidade | null {
+  // getDay() 0=dom — DIAS_SEMANA é seg=0, mesma realinhação de diaSemanaDe
+  const dow = DIAS_SEMANA[(quando.getDay() + 6) % 7];
+  const hora = quando.getHours();
+  const mentorLivre =
+    disponibilidadeVazia(mentor) || disponibilidadeNaHora(mentor, dow, hora);
+  const jovemLivre =
+    disponibilidadeVazia(jovem) || disponibilidadeNaHora(jovem, dow, hora);
+  return mentorLivre && jovemLivre ? null : { mentorLivre, jovemLivre };
+}
+
+/** Preposição que acompanha cada período — a manhã não leva crase no uso do
+ *  programa ("de manhã", mas "à tarde", "à noite"). */
+const PERIODO_COM_PREPOSICAO: Record<Periodo, string> = {
+  manha: "de manhã",
+  tarde: "à tarde",
+  noite: "à noite",
+};
+
+/** "na quarta à tarde" / "no sábado de manhã" — dia por extenso minúsculo + período de `quando`.
+ *  Hora fora das três faixas da grade (JANELA_PERIODO) vira "nesse horário":
+ *  nenhuma célula cobre, então nomear um período seria mentira. */
+function ondeNaGrade(quando: Date): string {
+  const dow = DIAS_SEMANA[(quando.getDay() + 6) % 7];
+  const hora = quando.getHours();
+  const periodo = PERIODOS.find((p) => {
+    const [ini, fim] = JANELA_PERIODO[p];
+    return hora >= ini && hora < fim;
+  });
+  const dia = DIAS_SEMANA_LABELS[dow].toLocaleLowerCase("pt-BR");
+  // sábado e domingo são masculinos: "no sábado", não "na sábado"
+  const artigo = dow === "sab" || dow === "dom" ? "no" : "na";
+  return `${artigo} ${dia} ${periodo ? PERIODO_COM_PREPOSICAO[periodo] : "nesse horário"}`;
+}
+
+/** A frase do aviso, lida pelo mentor — "Você não marcou…", "Ana não
+ *  marcou…", "Nem você nem Ana marcaram…". `jovemNome` é o primeiro nome de
+ *  uso; sem ele, o papel genérico ("o mentorado"). Aviso nulo ou os dois
+ *  livres → "" (o caller só chama com aviso real). */
+export function textoAvisoDisponibilidade(
+  aviso: AvisoDisponibilidade | null,
+  jovemNome: string | undefined,
+  quando: Date
+): string {
+  if (!aviso || (aviso.mentorLivre && aviso.jovemLivre)) return "";
+  const onde = ondeNaGrade(quando);
+  const jovem = jovemNome?.trim() || "o mentorado";
+  if (!aviso.mentorLivre && !aviso.jovemLivre) {
+    return `Nem você nem ${jovem} marcaram disponibilidade ${onde}.`;
+  }
+  if (!aviso.mentorLivre) {
+    return `Você não marcou disponibilidade ${onde}.`;
+  }
+  const nome = jovem.charAt(0).toUpperCase() + jovem.slice(1);
+  return `${nome} não marcou disponibilidade ${onde}.`;
 }
 
 /** Idade em anos a partir de "YYYY-MM-DD" — âncora no meio-dia pra não voltar
@@ -2242,3 +2316,46 @@ export const CHAMADO_ORIGEM_LABEL: Record<string, string> = {
   registro: "Registro de encontro",
   avaliacao_jovem: "Avaliação do jovem",
 };
+
+/** Select "Dupla relacionada" do NovoChamadoDialog — só as duplas em que
+ *  a pessoa é mentora, ativas ou pausadas. A home e a /chamados montam a
+ *  lista pela mesma régua (getMinhasDuplas → este filtro); lista vazia
+ *  esconde o campo. */
+export function duplasOpcoesChamado(
+  duplas: readonly {
+    id: string;
+    status: DuplaStatus;
+    trilha: Trilha;
+    mentor?: { id: string } | null;
+    mentorado?: { nome: string | null } | null;
+  }[],
+  meuId: string
+): { id: string; label: string }[] {
+  return duplas
+    .filter(
+      (d) =>
+        (d.status === "ativa" || d.status === "pausada") &&
+        d.mentor?.id === meuId
+    )
+    .map((d) => ({
+      id: d.id,
+      label: `${d.mentorado?.nome ?? "Mentorado(a)"} · ${
+        d.trilha === "especialista" ? "Especialista" : "DPP"
+      }`,
+    }));
+}
+
+/** Junta `mentorado_nome` aos chamados — o mapa vem duma leitura em lote
+ *  (dupla_id → mentorado.nome), nunca N+1. Chamado sem dupla (ou cuja
+ *  dupla a RLS não entrega) fica null e a interface omite o dado. */
+export function anexarMentorado<T extends { dupla_id: string | null }>(
+  itens: readonly T[],
+  mentoradoPorDupla: ReadonlyMap<string, string | null>
+): (T & { mentorado_nome: string | null })[] {
+  return itens.map((c) => ({
+    ...c,
+    mentorado_nome: c.dupla_id
+      ? (mentoradoPorDupla.get(c.dupla_id) ?? null)
+      : null,
+  }));
+}

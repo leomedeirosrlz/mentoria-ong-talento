@@ -103,11 +103,12 @@ export function SaudePrograma({
   const segmentos = [
     { valor: risco, rotulo: "em risco", cls: "bg-[var(--danger)]" },
     { valor: atencao, rotulo: "em atenção", cls: "bg-[var(--warn)]" },
-    // dupla em dia é neutra: o segmento é cinza de dado, sem cor de status
-    { valor: emDia, rotulo: "em dia", cls: "bg-muted-foreground" },
-    { valor: pausadas, rotulo: "pausadas", cls: "bg-[var(--pausa)]" },
-    { valor: concluidas, rotulo: "concluídas", cls: "bg-[var(--ok)]" },
-    { valor: desistentes, rotulo: "desistentes", cls: "bg-[var(--danger)]" },
+    { valor: emDia, rotulo: "em dia", cls: "bg-[var(--ok)]" },
+    { valor: pausadas, rotulo: "pausadas", cls: "bg-[var(--info)]" },
+    // fechadas saem da régua de status: concluída é cinza sólido,
+    // desistente o mesmo cinza em listra — sem cor de alerta
+    { valor: concluidas, rotulo: "concluídas", cls: "bg-muted-foreground" },
+    { valor: desistentes, rotulo: "desistentes", cls: "viz-hatch-desistente" },
   ];
 
   return (
@@ -189,24 +190,24 @@ export function SaudePrograma({
               linkBase={linkBase}
               onRecorte={onRecorte}
             />
-            <Item n={emDia} rotulo="em dia" dot="bg-muted-foreground" texto="text-foreground" />
+            <Item n={emDia} rotulo="em dia" dot="bg-[var(--ok)]" texto="text-[var(--ok-text)]" />
             <Item
               n={pausadas}
               rotulo="pausadas"
-              dot="bg-[var(--pausa)]"
-              texto="text-[var(--pausa-text)]"
+              dot="bg-[var(--info)]"
+              texto="text-[var(--info-text)]"
             />
             <Item
               n={concluidas}
               rotulo="concluídas"
-              dot="bg-[var(--ok)]"
-              texto="text-[var(--ok-text)]"
+              dot="bg-muted-foreground"
+              texto="text-foreground"
             />
             <Item
               n={desistentes}
               rotulo="desistentes"
-              dot="bg-[var(--danger)]"
-              texto="text-[var(--danger-text)]"
+              dot="viz-hatch-desistente"
+              texto="text-muted-foreground"
             />
           </ul>
         </>

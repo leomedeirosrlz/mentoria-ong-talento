@@ -20,6 +20,7 @@ import {
 import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { getEncerramentosPendentes } from "@/lib/queries-encerramento";
 import { getChamados } from "@/lib/queries-chamados";
+import { duplasOpcoesChamado } from "@/lib/ciclo";
 import { temPapel } from "@/lib/types";
 import {
   resolveTurmaFoco,
@@ -60,6 +61,10 @@ export default async function HomePage({
   const cookieTurma = cookieStore.get(TURMA_FOCO_COOKIE)?.value;
   // um único instante pra página inteira — semáforo e "semana do encontro" consistentes
   const agora = new Date().toISOString();
+  // o banner do termo só existe pra quem é voluntário — o flag do cadastro
+  // decide; não-voluntário nunca vê a cobrança
+  const termoPendente =
+    assinatura?.status !== "assinado" && me?.voluntario !== false;
 
   if (me?.role === "coordenacao") {
     const [duplas, pessoas, solicitacoes, encerramentos, interacoes] = await Promise.all([
@@ -109,9 +114,8 @@ export default async function HomePage({
           avisos={avisos}
           solicitacoes={solicitacoes}
           encerramentos={new Set(encerramentos)}
-          turmas={[...new Set(cronogramas.map((c) => c.turma))]}
           meuNome={me?.nome.split(" ")[0]}
-          termo={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
+          termo={termoPendente ? <TermoBanner /> : null}
           turmaFoco={foco.turma}
           seletorContexto={
             // o sync do cookie mora dentro do seletor mesmo quando ele se
@@ -215,7 +219,7 @@ export default async function HomePage({
           supervisor
           avisos={avisos}
           meuNome={me?.nome.split(" ")[0]}
-          termo={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
+          termo={termoPendente ? <TermoBanner /> : null}
           turmaFoco={focoSup.turma}
           seletorContexto={
             <TurmaContextoSelect
@@ -258,18 +262,24 @@ export default async function HomePage({
     );
   }
 
-  const duplas = await getMinhasDuplas();
-  const [espEventos, solicitacoes] = await Promise.all([
-    // passos da trilha especialista só valem a leitura quando há dupla dela —
-    // mentor DPP puro não paga o round-trip
-    duplas.some((d) => d.trilha === "especialista")
-      ? getEspecialistaEventos()
-      : Promise.resolve([]),
+  // tudo que não depende de outra leitura sobe numa leva só — os chamados
+  // do mentor (0084) e o mural não esperam as duplas; os passos da trilha
+  // especialista encadeiam na promise das duplas (React.cache deduplica) e
+  // só disparam quando há dupla dela — mentor DPP puro não paga o RTT
+  const duplasPromise = getMinhasDuplas();
+  const [duplas, espEventos, solicitacoes, meusChamados] = await Promise.all([
+    duplasPromise,
+    duplasPromise.then((ds) =>
+      ds.some((d) => d.trilha === "especialista")
+        ? getEspecialistaEventos()
+        : []
+    ),
     // o mural de demandas é a home do especialista — pros demais não existe.
     // temPapel: o híbrido DPP-primário também atende demandas (WP6b)
     temPapel(me, "mentor_especialista")
       ? getSolicitacoesVisiveis()
       : Promise.resolve([]),
+    getChamados(),
   ]);
   // a negociação precisa da thread de propostas e da agenda do especialista
   // (o slot sempre sai da grade dele — os picks de aceite/contra vêm daqui)
@@ -278,22 +288,15 @@ export default async function HomePage({
       (s.status_efetivo ?? s.status) === "aberta" ||
       (s.status_efetivo ?? s.status) === "contra_proposta"
   );
-  const [propostas, meusSlots, meusChamados] = await Promise.all([
+  const [propostas, meusSlots] = await Promise.all([
     emNegociacao.length
       ? getPropostasMap(emNegociacao.map((s) => s.id))
       : Promise.resolve({}),
     temPapel(me, "mentor_especialista")
       ? getSlotsLivres(me!.id)
       : Promise.resolve([]),
-    // 0084: os chamados do mentor moram na home dele (coord/sup têm a fila)
-    getChamados(),
   ]);
-  const duplasOpcoes = duplas
-    .filter((d) => d.status === "ativa" || d.status === "pausada")
-    .map((d) => ({
-      id: d.id,
-      label: `${d.mentorado?.nome?.split(" ")[0] ?? "Mentorado(a)"} · ${d.trilha === "especialista" ? "Especialista" : "DPP"}`,
-    }));
+  const duplasOpcoes = duplasOpcoesChamado(duplas, me!.id);
   return (
     <div className="space-y-8">
       {/* contexto próprio → fila de pedidos → avisos: a saudação abre a
@@ -307,7 +310,7 @@ export default async function HomePage({
         espEventos={espEventos}
         cronogramas={cronogramas}
         me={me!}
-        termo={assinatura?.status !== "assinado" ? <TermoBanner /> : null}
+        termo={termoPendente ? <TermoBanner /> : null}
       />
       <MeusChamadosCard
         chamados={meusChamados.itens}

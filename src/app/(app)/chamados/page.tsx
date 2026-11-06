@@ -1,9 +1,11 @@
 import { redirect } from "next/navigation";
-import { getMe } from "@/lib/queries";
+import { getMe, getMinhasDuplas } from "@/lib/queries";
 import {
   getChamados,
   getChamadoDetalhe,
 } from "@/lib/queries-chamados";
+import { duplasOpcoesChamado } from "@/lib/ciclo";
+import { temPapel } from "@/lib/types";
 import { ChamadosApp } from "@/components/chamados-app";
 
 export const metadata = { title: "Chamados" };
@@ -21,7 +23,16 @@ export default async function ChamadosPage({
   if (me.role === "mentorado") redirect("/jovem/perfil"); // o jovem tem a dele no perfil
 
   const staff = me.role === "coordenacao" || me.role === "supervisor";
-  const { itens } = await getChamados();
+  // o select "Dupla relacionada" do NovoChamadoDialog só vale pra quem é
+  // mentor — staff puro não paga o getMinhasDuplas (a RLS devolveria o
+  // escopo inteiro da coordenação, não as duplas dela)
+  const ehMentor =
+    temPapel(me, "mentor_dpp") || temPapel(me, "mentor_especialista");
+  const [{ itens }, minhasDuplas] = await Promise.all([
+    getChamados(),
+    ehMentor ? getMinhasDuplas() : Promise.resolve([]),
+  ]);
+  const duplasOpcoes = duplasOpcoesChamado(minhasDuplas, me.id);
   const selecionado = c && UUID_RE.test(c) ? c : null;
   const detalhe = selecionado ? await getChamadoDetalhe(selecionado) : null;
 
@@ -44,6 +55,7 @@ export default async function ChamadosPage({
         meuId={me.id}
         meuNome={me.nome_social || me.nome || ""}
         itens={itens}
+        duplas={duplasOpcoes}
         selecionadoInicial={selecionado}
         detalheInicial={
           detalhe?.chamado

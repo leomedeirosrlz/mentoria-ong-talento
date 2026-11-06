@@ -1,6 +1,7 @@
 import { cache } from "react";
 import { createClient } from "./supabase/server";
 import { demoRole } from "./demo/mode";
+import { getMe } from "./queries";
 import { getDemoData } from "./demo/data";
 import {
   demoChamadosFila,
@@ -8,7 +9,7 @@ import {
   demoChamadosSemDono,
   demoEquipeChamados,
 } from "./demo/queries";
-import { comparaNome } from "./ciclo";
+import { anexarMentorado, comparaNome } from "./ciclo";
 import type {
   ChamadoAnexo,
   ChamadoFilaItem,
@@ -23,6 +24,14 @@ import type {
 // Os labels CHAMADO_*_LABEL moram em ./ciclo (puro) — este arquivo é
 // server-only e não pode ser importado por client components.
 
+/** `mentorado:mentorados!duplas_mentorado_id_fkey(nome)` — embed to-one,
+ *  mas o PostgREST pode serializar como array dependendo do schema cache. */
+function nomeMentoradoEmbed(v: unknown): string | null {
+  if (!v) return null;
+  const m = Array.isArray(v) ? v[0] : v;
+  return (m as { nome?: string | null } | null)?.nome ?? null;
+}
+
 /** Fila pro papel: staff → todos (auxiliar com plataforma mascarada); autor
  *  → os próprios. Ordem: abertos primeiro, em atendimento depois, resolvidos
  *  por último — dentro de cada grupo, mais recente em cima. */
@@ -33,13 +42,8 @@ export const getChamados = cache(
       return { papel: demo, itens: demoChamadosFila(demo) };
     }
     const supabase = await createClient();
-    const { data: claims } = await supabase.auth.getClaims();
-    if (!claims?.claims?.sub) return { papel: null, itens: [] };
-    const { data: me } = await supabase
-      .from("profiles")
-      .select("id, role")
-      .eq("user_id", claims.claims.sub)
-      .single();
+    // getMe é React.cache — o layout já resolveu o mesmo profile no request
+    const me = await getMe();
     if (!me) return { papel: null, itens: [] };
     const staff = me.role === "coordenacao" || me.role === "supervisor";
 
@@ -76,26 +80,49 @@ export const getChamados = cache(
       console.error("getChamados(autor):", error);
       return { papel: me.role, itens: [] };
     }
-    // o autor vê o nome do responsável ("Responsável: Marina" no mock)
+    // o autor vê o nome do responsável ("Responsável: Marina" no mock) e o
+    // mentorado da dupla vinculada — duas leituras em lote, sem N+1
     const atribIds = [...new Set(
       (data ?? []).map((c) => c.atribuido_a).filter(Boolean) as string[]
     )];
+    const duplaIds = [...new Set(
+      (data ?? []).map((c) => c.dupla_id).filter(Boolean) as string[]
+    )];
     const nomes = new Map<string, string>();
-    if (atribIds.length) {
-      const { data: ps } = await supabase
-        .from("profiles")
-        .select("id, nome, nome_social")
-        .in("id", atribIds);
-      for (const p of ps ?? []) nomes.set(p.id, p.nome_social || p.nome);
+    const mentoradoPorDupla = new Map<string, string | null>();
+    if (atribIds.length || duplaIds.length) {
+      const [psRes, dsRes] = await Promise.all([
+        atribIds.length
+          ? supabase
+              .from("profiles")
+              .select("id, nome, nome_social")
+              .in("id", atribIds)
+          : Promise.resolve({ data: [] }),
+        duplaIds.length
+          ? supabase
+              .from("duplas")
+              .select("id, mentorado:mentorados!duplas_mentorado_id_fkey(nome)")
+              .in("id", duplaIds)
+          : Promise.resolve({ data: [] }),
+      ]);
+      for (const p of psRes.data ?? [])
+        nomes.set(p.id, p.nome_social || p.nome);
+      for (const d of dsRes.data ?? [])
+        mentoradoPorDupla.set(d.id, nomeMentoradoEmbed(d.mentorado));
     }
-    const itens = (data ?? []).map((c) => ({
-      ...c,
-      restrito: false,
-      autor_nome: null,
-      autor_papel: null,
-      atribuido_nome: c.atribuido_a ? (nomes.get(c.atribuido_a) ?? null) : null,
-      contexto: null,
-    })) as ChamadoFilaItem[];
+    const itens = anexarMentorado(
+      (data ?? []).map((c) => ({
+        ...c,
+        restrito: false,
+        autor_nome: null,
+        autor_papel: null,
+        atribuido_nome: c.atribuido_a
+          ? (nomes.get(c.atribuido_a) ?? null)
+          : null,
+        contexto: null,
+      })),
+      mentoradoPorDupla
+    ) as ChamadoFilaItem[];
     return { papel: me.role, itens };
   }
 );
@@ -158,17 +185,9 @@ async function enriqueceItens(
   const duplaMentorado = new Map(
     (duplasRes.data ?? []).map((d) => [
       d.id,
-      (d as unknown as { mentorado?: { nome: string } | { nome: string }[] | null })
-        .mentorado
-        ? Array.isArray(
-            (d as unknown as { mentorado: { nome: string } | { nome: string }[] })
-              .mentorado
-          )
-          ? ((d as unknown as { mentorado: { nome: string }[] }).mentorado[0]
-              ?.nome ?? null)
-          : ((d as unknown as { mentorado: { nome: string } }).mentorado?.nome ??
-            null)
-        : null,
+      nomeMentoradoEmbed(
+        (d as unknown as { mentorado?: unknown }).mentorado
+      ),
     ])
   );
   const registroEncontro = new Map(
@@ -232,6 +251,10 @@ async function enriqueceItens(
         ? (profiles.get(r.atribuido_a)?.nome ?? null)
         : null,
       contexto,
+      mentorado_nome:
+        !restrito && r.dupla_id
+          ? (duplaMentorado.get(r.dupla_id) ?? null)
+          : null,
     };
   });
 }
@@ -267,14 +290,7 @@ export const getChamadoDetalhe = cache(
       };
     }
     const supabase = await createClient();
-    const { data: claims } = await supabase.auth.getClaims();
-    if (!claims?.claims?.sub)
-      return { chamado: null, timeline: [], equipe: [], papel: null, meuId: null };
-    const { data: me } = await supabase
-      .from("profiles")
-      .select("id, role")
-      .eq("user_id", claims.claims.sub)
-      .single();
+    const me = await getMe();
     if (!me)
       return { chamado: null, timeline: [], equipe: [], papel: null, meuId: null };
     const staff = me.role === "coordenacao" || me.role === "supervisor";
@@ -286,14 +302,34 @@ export const getChamadoDetalhe = cache(
     if (!row)
       return { chamado: null, timeline: [], equipe: [], papel: me.role, meuId: me.id };
 
+    // o autor vê o nome do responsável e o mentorado da dupla vinculada
     let atribuidoNome: string | null = null;
-    if (!staff && (row as { atribuido_a?: string | null }).atribuido_a) {
-      const { data: pr } = await supabase
-        .from("profiles")
-        .select("nome, nome_social")
-        .eq("id", (row as { atribuido_a: string }).atribuido_a)
-        .maybeSingle();
-      atribuidoNome = pr ? pr.nome_social || pr.nome : null;
+    let mentoradoNome: string | null = null;
+    if (!staff) {
+      const atribId = (row as { atribuido_a?: string | null }).atribuido_a;
+      const duplaId = (row as { dupla_id?: string | null }).dupla_id;
+      const [prRes, dRes] = await Promise.all([
+        atribId
+          ? supabase
+              .from("profiles")
+              .select("nome, nome_social")
+              .eq("id", atribId)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+        duplaId
+          ? supabase
+              .from("duplas")
+              .select(
+                "id, mentorado:mentorados!duplas_mentorado_id_fkey(nome)"
+              )
+              .eq("id", duplaId)
+              .maybeSingle()
+          : Promise.resolve({ data: null }),
+      ]);
+      atribuidoNome = prRes.data
+        ? prRes.data.nome_social || prRes.data.nome
+        : null;
+      mentoradoNome = nomeMentoradoEmbed(dRes.data?.mentorado);
     }
     const [itens] = staff
       ? await enriqueceItens(
@@ -309,6 +345,7 @@ export const getChamadoDetalhe = cache(
             autor_papel: null,
             atribuido_nome: atribuidoNome,
             contexto: null,
+            mentorado_nome: mentoradoNome,
           } as ChamadoFilaItem,
         ];
 

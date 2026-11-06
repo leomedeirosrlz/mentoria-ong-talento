@@ -18,11 +18,19 @@ import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { comparaNome, saudadeDaDupla } from "@/lib/ciclo";
 import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
+import { saudeDoRecorte } from "@/lib/agenda-coordenacao";
 import { temPapel } from "@/lib/types";
-import type { AppRole, Dupla, Mentorado, Profile } from "@/lib/types";
+import type {
+  AppRole,
+  CicloEvento,
+  Dupla,
+  Mentorado,
+  Profile,
+} from "@/lib/types";
 import {
   getAgendaPeriodoIa,
   getCapacidadeInsumos,
+  getChamadosIa,
   getCicloEventosIa,
   getDuplaIa,
   getDuplasResumoIa,
@@ -30,10 +38,14 @@ import {
   getFilaInsumos,
   getInstrumentosDaDuplaIa,
   getJovemDuplaIa,
+  getPessoasBuscaIa,
   getRegistrosDaDuplaIa,
   matchGuiaIa,
   papeisDoUsuario,
+  type DuplaIa,
 } from "./queries";
+import { limparTrecho } from "./fontes";
+import { embedQuery } from "./embed";
 
 /** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário. */
 export type CanalIa = "chat" | "mcp";
@@ -109,6 +121,99 @@ const guiaArgs = z
 
 const semaforoOrd = { risco: 0, atencao: 1, ok: 2 } as const;
 
+/** Saída do resumo_semana a partir das duplas vivas — pura, pra a demo
+ *  (/demo, dataset em memória) responder pelo MESMO caminho da tool. */
+export function projetarResumo(duplas: DuplaIa[], eventos: CicloEvento[]) {
+  const itens = duplas.map((d) => {
+    // a projeção de IA_SAUDE_SELECT é exatamente o que saudadeDaDupla
+    // lê — o contrato é a constante compartilhada, não a linha solta
+    const s = saudadeDaDupla(d as unknown as Dupla, eventos);
+    return {
+      dupla_id: d.id,
+      mentor: d.mentor?.nome ?? null,
+      mentorado: d.mentorado?.nome ?? null,
+      trilha: d.trilha,
+      status: d.status,
+      semaforo: s.semaforo,
+      motivo: s.motivo,
+      // todos os critérios acesos — o semáforo resume, a lista explica
+      motivos: s.motivos,
+      sinais: s.sinais,
+      // apoio é eixo separado: chamado aberto, não falha da jornada
+      apoio: s.apoio,
+      esperado: s.esperado,
+      feitos: s.feitos,
+      registro_pendente: s.registroPendente,
+      proximo_encontro: s.proximo
+        ? { numero: s.proximo.numero, data_hora: s.proximo.data_hora }
+        : null,
+    };
+  });
+  // apoio aberto primeiro (trabalho a fazer), depois risco → atenção →
+  // ok — o radar da equipe ordena pelo que pede ação
+  itens.sort(
+    (a, b) =>
+      Number(b.apoio.aberto) - Number(a.apoio.aberto) ||
+      semaforoOrd[a.semaforo] - semaforoOrd[b.semaforo] ||
+      comparaNome(a.mentor ?? "", b.mentor ?? "")
+  );
+  // contagem pela regra única das telas (saudeDoRecorte) — o card do
+  // chat e o texto do modelo leem o mesmo número da home e de /duplas
+  const saude = saudeDoRecorte(duplas as unknown as Dupla[], eventos, new Date());
+  return {
+    gerado_em: new Date().toISOString(),
+    total: itens.length,
+    saude: {
+      em_andamento: saude.emAndamento,
+      risco: saude.risco,
+      atencao: saude.atencao,
+      em_dia: saude.emDia,
+      apoio: saude.apoio,
+      pausadas: saude.pausadas,
+    },
+    duplas: itens,
+  };
+}
+
+/** Saída do ficha_dupla (visão da equipe) — pura, idem projetarResumo. */
+export function projetarFicha(d: DuplaIa, eventos: CicloEvento[]) {
+  const s = saudadeDaDupla(d as unknown as Dupla, eventos);
+  return {
+    dupla_id: d.id,
+    trilha: d.trilha,
+    status: d.status,
+    turma: d.turma,
+    iniciada_em: d.iniciada_em,
+    demanda: d.demanda,
+    mentor: d.mentor?.nome ?? null,
+    mentorado: d.mentorado?.nome ?? null,
+    supervisor: d.supervisor?.nome ?? null,
+    semaforo: s.semaforo,
+    motivo: s.motivo,
+    motivos: s.motivos,
+    sinais: s.sinais,
+    apoio: s.apoio,
+    esperado: s.esperado,
+    feitos: s.feitos,
+    registro_pendente: s.registroPendente,
+    proximo_encontro: s.proximo
+      ? { numero: s.proximo.numero, data_hora: s.proximo.data_hora }
+      : null,
+    encaminhamentos_pendentes: d.encaminhamentos.filter(
+      (t) => t.status === "pendente"
+    ).length,
+    encontros: d.encontros
+      .map((e) => ({
+        numero: e.numero,
+        status: e.status,
+        data_hora: e.data_hora,
+        realizado_em: e.realizado_em,
+        tem_registro: e.registro != null,
+      }))
+      .sort((a, b) => a.numero - b.numero),
+  };
+}
+
 export const IA_TOOLS = {
   resumo_semana: {
     nome: "resumo_semana",
@@ -121,44 +226,7 @@ export const IA_TOOLS = {
         getDuplasVivasIa(ctx.supabase),
         getCicloEventosIa(ctx.supabase),
       ]);
-      const itens = duplas.map((d) => {
-        // a projeção de IA_SAUDE_SELECT é exatamente o que saudadeDaDupla
-        // lê — o contrato é a constante compartilhada, não a linha solta
-        const s = saudadeDaDupla(d as unknown as Dupla, eventos);
-        return {
-          dupla_id: d.id,
-          mentor: d.mentor?.nome ?? null,
-          mentorado: d.mentorado?.nome ?? null,
-          trilha: d.trilha,
-          status: d.status,
-          semaforo: s.semaforo,
-          motivo: s.motivo,
-          // todos os critérios acesos — o semáforo resume, a lista explica
-          motivos: s.motivos,
-          sinais: s.sinais,
-          // apoio é eixo separado: chamado aberto, não falha da jornada
-          apoio: s.apoio,
-          esperado: s.esperado,
-          feitos: s.feitos,
-          registro_pendente: s.registroPendente,
-          proximo_encontro: s.proximo
-            ? { numero: s.proximo.numero, data_hora: s.proximo.data_hora }
-            : null,
-        };
-      });
-      // apoio aberto primeiro (trabalho a fazer), depois risco → atenção →
-      // ok — o radar da equipe ordena pelo que pede ação
-      itens.sort(
-        (a, b) =>
-          Number(b.apoio.aberto) - Number(a.apoio.aberto) ||
-          semaforoOrd[a.semaforo] - semaforoOrd[b.semaforo] ||
-          comparaNome(a.mentor ?? "", b.mentor ?? "")
-      );
-      return {
-        gerado_em: new Date().toISOString(),
-        total: itens.length,
-        duplas: itens,
-      };
+      return projetarResumo(duplas, eventos);
     },
   },
 
@@ -190,42 +258,7 @@ export const IA_TOOLS = {
         getDuplaIa(ctx.supabase, dupla_id),
         getCicloEventosIa(ctx.supabase),
       ]);
-      if (!d) return null;
-      const s = saudadeDaDupla(d as unknown as Dupla, eventos);
-      return {
-        dupla_id: d.id,
-        trilha: d.trilha,
-        status: d.status,
-        turma: d.turma,
-        iniciada_em: d.iniciada_em,
-        demanda: d.demanda,
-        mentor: d.mentor?.nome ?? null,
-        mentorado: d.mentorado?.nome ?? null,
-        supervisor: d.supervisor?.nome ?? null,
-        semaforo: s.semaforo,
-        motivo: s.motivo,
-        motivos: s.motivos,
-        sinais: s.sinais,
-        apoio: s.apoio,
-        esperado: s.esperado,
-        feitos: s.feitos,
-        registro_pendente: s.registroPendente,
-        proximo_encontro: s.proximo
-          ? { numero: s.proximo.numero, data_hora: s.proximo.data_hora }
-          : null,
-        encaminhamentos_pendentes: d.encaminhamentos.filter(
-          (t) => t.status === "pendente"
-        ).length,
-        encontros: d.encontros
-          .map((e) => ({
-            numero: e.numero,
-            status: e.status,
-            data_hora: e.data_hora,
-            realizado_em: e.realizado_em,
-            tem_registro: e.registro != null,
-          }))
-          .sort((a, b) => a.numero - b.numero),
-      };
+      return d ? projetarFicha(d, eventos) : null;
     },
   },
 
@@ -262,7 +295,7 @@ export const IA_TOOLS = {
   aguardando_par: {
     nome: "aguardando_par",
     descricao:
-      "A fila de espera por pareamento, derivada ao vivo como na página de Pessoas: mentorados inscritos que nunca tiveram dupla (com origem e desde quando esperam) e mentores ativos com vaga livre (trilha e vagas). Use pra 'quem tá esperando par?', 'quantos jovens na fila?'.",
+      "A fila de espera por pareamento, derivada ao vivo como na página de Pessoas: mentorados inscritos que nunca tiveram dupla (com origem e desde quando esperam) e mentores DPP ativos com vaga livre. Especialistas não entram — parejam por demanda, não aguardam par. Use pra 'quem tá esperando par?', 'quantos jovens na fila?'.",
     schema: semArgs,
     roles: ["coordenacao"],
     run: async (_args: z.infer<typeof semArgs>, ctx) => {
@@ -286,7 +319,6 @@ export const IA_TOOLS = {
       ).map((m) => ({
         id: m.id,
         nome: m.nome,
-        trilha: m.trilha,
         vagas: m.vagas,
         origem: m.origem,
         esperando_desde: m.desde,
@@ -390,18 +422,105 @@ export const IA_TOOLS = {
   guia_consulta: {
     nome: "guia_consulta",
     descricao:
-      "Busca nos guias oficiais do programa (Guia do Mentor DPP, Guia do Mentor Especialista, cronograma do ciclo, instrumentos e decisões operacionais da plataforma): metodologia, encontros, instrumentos, papéis, regras de reposição, formação, LGPD/termo. Use pra qualquer pergunta sobre 'como funciona', 'o que o guia diz', metodologia ou regras do programa — NÃO pra dados das duplas do usuário (essas saem das outras tools). Devolve trechos citáveis com guia, seção e página; quando não achar nada, diga que não está nos guias e sugira a coordenação. Chame **no máximo uma vez** por pergunta — depois responda com os trechos recebidos (cite guia e seção).",
+      "Busca nos guias oficiais do programa (Guia do Mentor DPP, Guia do Mentor Especialista, cronograma do ciclo, instrumentos e decisões operacionais da plataforma): metodologia, encontros, instrumentos, papéis, regras de reposição, formação, LGPD/termo. Use pra qualquer pergunta sobre 'como funciona', 'o que o guia diz', metodologia ou regras do programa — NÃO pra dados das duplas do usuário (essas saem das outras tools). Devolve trechos citáveis com guia e seção (sem número de página: a referência é sempre 'documento, seção') + `guias` (o catálogo completo de documentos disponíveis — use pra responder quando perguntarem quais guias/fontes existem); quando não achar trecho pro termo, diga que não está nos guias e sugira a coordenação. Chame **no máximo uma vez** por pergunta — depois responda com os trechos recebidos (cite guia e seção).",
     schema: guiaArgs,
     roles: TODOS_PAPEIS,
     run: async ({ pergunta }: z.infer<typeof guiaArgs>, ctx) => {
-      const fontes = await matchGuiaIa(ctx.supabase, pergunta, 4);
-      // score sai fora — número de ranking não ajuda o modelo a citar
+      // flag coord "busca" ("fts" desliga o braço vetorial sem deploy;
+      // ausente/outro valor = híbrida quando a chave de embed existe).
+      // Lê ANTES de embedar: com fts não vai pergunta nenhuma pra OpenAI
+      // (minimização — o embed é a única saída de dados pra lá).
+      const cfgBusca = await ctx.supabase
+        .from("ia_config")
+        .select("valor")
+        .eq("chave", "busca")
+        .maybeSingle();
+      const vetor =
+        cfgBusca.data?.valor === "fts" ? null : await embedQuery(pergunta);
+      const [fontes, catalogo] = await Promise.all([
+        // pede 10 e fica com 4 SEÇÕES únicas — sem o dedup, 3 slots iam
+        // pro mesmo capítulo ("12 · Avaliação" repetia 3×) e o roteiro
+        // diverso ficava de fora do contexto do modelo
+        matchGuiaIa(ctx.supabase, pergunta, 10, vetor),
+        // catálogo completo sempre junto — "que guias você tem" se responde
+        // mesmo quando a busca não retorna trecho pro termo perguntado
+        ctx.supabase.from("ia_chunks").select("guia"),
+      ]);
+      const guias = [
+        ...new Set((catalogo.data ?? []).map((r) => r.guia as string)),
+      ].sort();
+      const vistas = new Set<string>();
+      const unicas = fontes.filter((f) => {
+        const chave = `${f.guia}|${f.secao ?? ""}`;
+        if (vistas.has(chave)) return false;
+        vistas.add(chave);
+        return true;
+      });
+      // score sai fora — número de ranking não ajuda o modelo a citar;
+      // pagina também (é o id sintético do chunk, não página do documento
+      // — citá-la lia como "pág. 200" num guia sem essa paginação); e o
+      // trecho sai limpo, sem <b> do headline nem markdown cru do chunk
       return {
-        fontes: fontes.map((f) => ({
+        fontes: unicas.slice(0, 4).map((f) => ({
           guia: f.guia,
           secao: f.secao,
-          pagina: f.pagina,
-          trecho: f.trecho,
+          trecho: limparTrecho(f.trecho, 600),
+        })),
+        guias,
+      };
+    },
+  },
+
+  chamados_resumo: {
+    nome: "chamados_resumo",
+    descricao:
+      "Chamados de apoio abertos ou em atendimento (REALIZA-325): número, categoria, assunto, status e a dupla ligada — a RLS decide o escopo (staff vê a fila inteira, mentor os próprios). Use pra 'quantos chamados abertos?', 'pedidos de apoio pendentes', 'o que a equipe tá atendendo'. O conteúdo das mensagens não sai pela tool — detalhe fica na tela de Chamados.",
+    schema: semArgs,
+    roles: TODOS_PAPEIS,
+    run: async (_args: z.infer<typeof semArgs>, ctx) => {
+      const itens = await getChamadosIa(ctx.supabase);
+      const porStatus = { aberto: 0, em_atendimento: 0 };
+      for (const c of itens) {
+        if (c.status === "aberto") porStatus.aberto++;
+        else if (c.status === "em_atendimento") porStatus.em_atendimento++;
+      }
+      return {
+        total: itens.length,
+        ...porStatus,
+        chamados: itens.map((c) => ({
+          numero: c.numero,
+          categoria: c.categoria,
+          assunto: c.assunto,
+          status: c.status,
+          dupla_id: c.dupla_id,
+          criado_em: c.created_at,
+        })),
+      };
+    },
+  },
+
+  pessoas_busca: {
+    nome: "pessoas_busca",
+    descricao:
+      "Busca pessoas do programa por nome (staff): devolve profile_id, nome, nome social e papel — use pra achar a pessoa antes de perguntar pela ficha dela, ou pra responder 'quem é X'. Contatos e dados sensíveis não saem pela tool.",
+    schema: z
+      .object({
+        nome: z
+          .string()
+          .min(2)
+          .max(80)
+          .describe("nome (ou trecho do nome) da pessoa"),
+      })
+      .strict(),
+    roles: ["coordenacao", "supervisor"],
+    run: async ({ nome }: { nome: string }, ctx) => {
+      const pessoas = await getPessoasBuscaIa(ctx.supabase, nome);
+      return {
+        total: pessoas.length,
+        pessoas: pessoas.map((p) => ({
+          profile_id: p.id,
+          nome: p.nome_social || p.nome,
+          papel: p.role,
         })),
       };
     },
@@ -493,7 +612,15 @@ export async function executarTool(
   nome: string,
   args: unknown,
   supabase: SupabaseClient,
-  canal: CanalIa
+  canal: CanalIa,
+  /** papéis pré-resolvidos — o MCP autentica por PAT (não há JWT pra
+   *  my_papeis), então a rota passa os papéis que a autorização devolveu.
+   *  Ausente → resolve do JWT como sempre. */
+  papeisForcados?: AppRole[],
+  /** profile_id explícito pra auditoria — idem: no MCP não existe JWT, o
+   *  my_profile_id() da RPC sairia NULL e o evento não gravaria. O caller
+   *  passa o dono da PAT; no chat fica ausente e a RPC usa o JWT. */
+  autorProfileId?: string
 ): Promise<ResultadoTool> {
   const inicio = Date.now();
   let ok = false;
@@ -518,7 +645,7 @@ export async function executarTool(
     // — o híbrido chama a tool do papel que ele tem, mesmo fora do primário.
     // ctx.papel é o papel que liberou (ordem do roles da tool — staff antes
     // de mentorado), pra run ramificar certo (ex.: ficha do jovem)
-    const papeis = await papeisDoUsuario(supabase);
+    const papeis = papeisForcados ?? (await papeisDoUsuario(supabase));
     const papel = (tool.roles as readonly Papel[]).find((r) =>
       papeis.includes(r)
     );
@@ -546,6 +673,7 @@ export async function executarTool(
       p_ok: ok,
       p_erro: erro,
       p_duracao_ms: Date.now() - inicio,
+      p_profile_id: autorProfileId ?? null,
     });
     if (erroAudit) console.error("registrar_ia_evento:", erroAudit);
   } catch (e) {

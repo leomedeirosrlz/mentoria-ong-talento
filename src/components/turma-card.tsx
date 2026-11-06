@@ -27,8 +27,13 @@ import {
 } from "@/lib/ciclo";
 import { turmaAno, turmaCurta, turmaLonga, turmaNumero } from "@/lib/turma";
 import type { VinculoCronograma } from "@/lib/queries-cronogramas";
-import type { CicloEvento, Cronograma, EncontroStatus } from "@/lib/types";
-import { StatusBadge } from "@/components/cronograma-editor";
+import type {
+  CicloEvento,
+  Cronograma,
+  DuplaStatus,
+  EncontroStatus,
+} from "@/lib/types";
+import { StatusBadge } from "@/components/cronograma-status-badge";
 import { cn } from "@/lib/utils";
 
 // ---------- tinta por turma ----------
@@ -417,6 +422,20 @@ const AGENDADO_OK: ReadonlySet<EncontroStatus> = new Set([
   "realizado",
 ]);
 
+/** Sub-stat da faixa nomeia a situação, não só o total (mock v1a: "1
+ *  pausada fora da conta", "1 pausada, 1 em risco"). O "em risco" é
+ *  semáforo — o vínculo não o carrega; a quebra possível aqui é o
+ *  status da dupla. Uma situação só fecha com "fora da conta"; duas ou
+ *  mais ficam na enumeração como no T2 do mock. */
+const FORA_ROTULO: Record<
+  Exclude<DuplaStatus, "ativa">,
+  [singular: string, plural: string]
+> = {
+  pausada: ["pausada", "pausadas"],
+  concluida: ["concluída", "concluídas"],
+  encerrada: ["encerrada", "encerradas"],
+};
+
 /** Card da turma em /turmas (v1a) — o Link inteiro abre o cronograma; a
  *  gramática visual é a do PessoaBanner. `eventos`/`vinculos` já chegam
  *  recortados pro cronograma (a página filtra antes). */
@@ -445,7 +464,12 @@ export function TurmaCard({
   const vig: EventoDatado | null = eventoDaSemana(eventos, hoje);
 
   const ativas = vinculos.filter((v) => v.status === "ativa").length;
-  const foraDaConta = vinculos.length - ativas;
+  const foraPartes = (
+    Object.keys(FORA_ROTULO) as (keyof typeof FORA_ROTULO)[]
+  ).flatMap((s) => {
+    const n = vinculos.filter((v) => v.status === s).length;
+    return n > 0 ? [`${n} ${FORA_ROTULO[s][n === 1 ? 0 : 1]}`] : [];
+  });
   // headcount de pessoas (a faixa do mock: duplas | mentores | jovens) —
   // dedup por nome resolve "Renata com 2 duplas" sem custo de query
   const porMentor = new Map<string, number>();
@@ -597,9 +621,10 @@ export function TurmaCard({
           <small className="block text-xs sm:text-[10.5px] text-muted-foreground">
             {vinculos.length === 0
               ? "nenhuma ainda"
-              : foraDaConta > 0
-                ? `${foraDaConta} fora da conta`
-                : "todas no ciclo"}
+              : foraPartes.length === 0
+                ? "todas no ciclo"
+                : foraPartes.join(", ") +
+                  (foraPartes.length === 1 ? " fora da conta" : "")}
           </small>
         </div>
         <div className="border-l border-border px-3.5 py-2.5">

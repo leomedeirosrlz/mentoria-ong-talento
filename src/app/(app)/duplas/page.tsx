@@ -54,9 +54,9 @@ export default async function DuplasPage({
 
   // coord vê tudo; supervisor/mentor já vêm escopados da query (uma leitura,
   // sem baixar o ciclo inteiro pra filtrar em JS). Os extras são por visão:
-  // alvos do dialog de supervisão (auxiliar) e os 5 passos da trilha
+  // os 5 passos da trilha
   // (especialista) — os demais não pagam essa leitura
-  const [lista, eventos, espEventos, h, sp, cronogramas, cookieStore] = await Promise.all([
+  const listaPromise =
     me.role === "coordenacao"
       ? getDuplas()
       : me.role === "supervisor"
@@ -66,29 +66,36 @@ export default async function DuplasPage({
           getMinhasDuplas().then((ds) =>
             ds.filter((d) => duplaSupervisionada(d, me.id))
           )
-        : getMinhasDuplas(),
-    getCicloEventos(),
-    visao === "especialista" || visao === "hibrido"
-      ? getEspecialistaEventos()
-      : Promise.resolve([]),
-    headers(),
-    searchParams,
-    // a tabela de cronogramas é paga por quem honra o contexto de turma:
-    // coordenação (labels navegáveis) e auxiliar (resolve label e
-    // cronograma_id no escopo dele — vem escopada da RLS como tudo mais)
-    visao === "coordenacao" || visao === "supervisor"
-      ? getCronogramas()
-      : Promise.resolve([]),
-    cookies(),
-  ]);
-  // o "Lembrar" lê o cap de 48h (último nudge da dupla) — coordenação e
-  // auxiliar executivo renderizam o botão no próprio escopo (a RPC
-  // `enviar_lembrete` já autoriza o supervisor da dupla); os demais
-  // papéis não pagam a leitura
-  const nudges =
-    visao === "coordenacao" || visao === "supervisor"
-      ? await getUltimasInteracoes(lista.map((d) => d.id), "nudge")
-      : {};
+        : getMinhasDuplas();
+  const [lista, eventos, espEventos, h, sp, cronogramas, cookieStore, nudges] =
+    await Promise.all([
+      listaPromise,
+      getCicloEventos(),
+      visao === "especialista" || visao === "hibrido"
+        ? getEspecialistaEventos()
+        : Promise.resolve([]),
+      headers(),
+      searchParams,
+      // a tabela de cronogramas é paga por quem honra o contexto de turma:
+      // coordenação (labels navegáveis) e auxiliar (resolve label e
+      // cronograma_id no escopo dele — vem escopada da RLS como tudo mais)
+      visao === "coordenacao" || visao === "supervisor"
+        ? getCronogramas()
+        : Promise.resolve([]),
+      cookies(),
+      // o "Lembrar" lê o cap de 48h (último nudge da dupla) — dispara junto
+      // com as demais leituras, encadeado na promise das duplas (React.cache
+      // deduplica); coordenação e auxiliar renderizam o botão no próprio
+      // escopo, os demais papéis não pagam a leitura
+      visao === "coordenacao" || visao === "supervisor"
+        ? listaPromise.then((ds) =>
+            getUltimasInteracoes(
+              ds.map((d) => d.id),
+              "nudge"
+            )
+          )
+        : Promise.resolve({}),
+    ]);
   // proto+host do deploy — o texto do Lembrar embute o link de registro
   // ABSOLUTO (o wa.me/notificação sai do app; path relativo seria texto
   // morto). Mesma técnica do dashboard: x-forwarded-proto + host

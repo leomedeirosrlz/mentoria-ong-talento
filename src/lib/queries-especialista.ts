@@ -80,6 +80,17 @@ function normalize(row: Record<string, unknown>): SolicitacaoEspecialista {
   };
 }
 
+// a devolutiva do encerramento da trilha mora num dataset à parte
+// (0037 — encerramento-data.ts), mergeada aqui como a view faria
+const demoSolicitacoesComFechamento = (
+  demo: Exclude<Awaited<ReturnType<typeof demoRole>>, null>,
+  duplaDppId: string
+): SolicitacaoEspecialista[] =>
+  demoSolicitacoesDaDupla(demo, duplaDppId).map((s) => {
+    const f = demoTrilhaFechamento(s.id);
+    return f ? { ...s, ...f } : s;
+  });
+
 /** Todas as solicitações da dupla DPP, mais recentes primeiro — um jovem pode
  *  passar por várias trilhas de especialista no ciclo, e cada fechamento
  *  devolve uma devolutiva pro PDM. O chip do header usa a primeira; a seção
@@ -88,14 +99,7 @@ export const getSolicitacoesDaDupla = cache(
   async (duplaDppId: string): Promise<SolicitacaoEspecialista[]> => {
     // modo demo: a dupla precisa estar no escopo do papel (sol_select, 0027)
     const demo = await demoRole();
-    if (demo) {
-      // a devolutiva do encerramento da trilha mora num dataset à parte
-      // (0037 — encerramento-data.ts), mergeada aqui como a view faria
-      return demoSolicitacoesDaDupla(demo, duplaDppId).map((s) => {
-        const f = demoTrilhaFechamento(s.id);
-        return f ? { ...s, ...f } : s;
-      });
-    }
+    if (demo) return demoSolicitacoesComFechamento(demo, duplaDppId);
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("solicitacoes_mural")
@@ -108,6 +112,44 @@ export const getSolicitacoesDaDupla = cache(
       return [];
     }
     return (data ?? []).map((r) => normalize(r));
+  }
+);
+
+/** Mesma leitura de getSolicitacoesDaDupla pra um conjunto de duplas — uma
+ *  query `.in()` agrupada em JS no lugar do mapa por dupla (a view já
+ *  escopa por papel; o filtro só estreita). Toda dupla pedida sai como
+ *  chave, mesmo sem solicitação — espelha o fromEntries por índice. */
+export const getSolicitacoesDasDuplas = cache(
+  async (
+    duplaDppIds: string[]
+  ): Promise<Record<string, SolicitacaoEspecialista[]>> => {
+    if (duplaDppIds.length === 0) return {};
+    const demo = await demoRole();
+    if (demo) {
+      return Object.fromEntries(
+        duplaDppIds.map((id) => [
+          id,
+          demoSolicitacoesComFechamento(demo, id),
+        ])
+      );
+    }
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("solicitacoes_mural")
+      .select(SOLICITACAO_SELECT)
+      .in("dupla_dpp_id", duplaDppIds)
+      .order("created_at", { ascending: false });
+    if (error) {
+      console.error("getSolicitacoesDasDuplas:", error);
+      return {};
+    }
+    const mapa: Record<string, SolicitacaoEspecialista[]> = {};
+    for (const id of duplaDppIds) mapa[id] = [];
+    for (const r of data ?? []) {
+      const s = normalize(r);
+      if (s.dupla_dpp_id) (mapa[s.dupla_dpp_id] ??= []).push(s);
+    }
+    return mapa;
   }
 );
 
