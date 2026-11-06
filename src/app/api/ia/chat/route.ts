@@ -28,7 +28,7 @@ import {
   chamarModeloStream,
   providerConfigurado,
 } from "@/lib/ia/provider";
-import type { MsgChat } from "@/lib/ia/provider";
+import type { MsgChat, UsoIa } from "@/lib/ia/provider";
 import { systemPromptIa } from "@/lib/ia/prompts";
 import {
   esforcoDoTier,
@@ -37,7 +37,7 @@ import {
   modeloDoTier,
 } from "@/lib/ia/config";
 import { rotearTier } from "@/lib/ia/roteador";
-import { checarLimiteIa } from "@/lib/ia/rate-limit";
+import { consumirLimiteIa } from "@/lib/ia/rate-limit";
 import type { FonteIa } from "@/lib/ia/fontes";
 import { executarTool, type ResultadoTool } from "@/lib/ia/tools";
 import { STATUS_TOOL, uiDaTool, uiDosInstrumentos } from "@/lib/ia/ui";
@@ -84,6 +84,13 @@ const Body = z
   .strict();
 
 export async function POST(req: Request) {
+  // a rota mora atrás da MESMA flag da bolha (IA_BOLHA, gate dos dois
+  // layouts): sem ela o endpoint nem existe — 404 antes de autenticar ou
+  // gastar limite. O modo demo não passa por aqui (responderDemoIa roda
+  // no cliente), então o gate não muda nada pra ele
+  if (process.env.IA_BOLHA !== "1") {
+    return NextResponse.json({ error: "Não encontrado." }, { status: 404 });
+  }
   const supabase = await createClient();
   // getClaims valida o JWT local — getUser era uma RTT remota redundante
   // (o middleware já revalidou a sessão pra chegar até aqui)
@@ -131,12 +138,20 @@ export async function POST(req: Request) {
     );
   }
 
-  if (await checarLimiteIa(supabase, profile.id)) {
+  // limite atômico (sdd D3): a reserva do slot 'mensagem' já acontece na
+  // RPC sob advisory lock — request negado nem abre stream nem chama
+  // provider. O request_id devolvido correla os eventos desta request
+  // (tools + resumo de telemetria no fim)
+  const limite = await consumirLimiteIa(supabase, {
+    n_mensagens: body.data.messages.length,
+  });
+  if (!limite.permitido) {
     return NextResponse.json(
       { error: "Muitas mensagens seguidas — aguarde um instante." },
       { status: 429 }
     );
   }
+  const requestId = limite.requestId;
 
   const papeis =
     papeisRpc && papeisRpc.length
@@ -195,26 +210,35 @@ export async function POST(req: Request) {
         return;
       }
 
-      // a mensagem recebida é um evento (não o conteúdo dela — só o fato).
-      // Fora do caminho crítico: dispara em paralelo com o stream em vez
-      // de awaited antes dele (rpc() solto é lazy — precisa do .then)
-      void supabase
-        .rpc("registrar_ia_evento", {
-          p_canal: "chat",
-          p_tool: "mensagem",
-          p_args: { n_mensagens: body.data.messages.length },
-          p_ok: true,
-          p_duracao_ms: 0,
-        })
-        .then(({ error }) => {
-          if (error) console.error("registrar_ia_evento:", error);
-        });
-
+      // o evento 'mensagem' já foi gravado pela reserva do limite
+      // (consumir_limite_ia) — regravar aqui duplicaria a contagem
       const toolsUsadas: string[] = [];
       // fontes que a guia_consulta trouxe — sobem no done pra UI renderizar
       // a fileira "Fontes" (dedupe por guia+secao)
       const fontes = new Map<string, FonteIa>();
       let concluido = false;
+      // telemetria da request (sdd D4): tokens/custo somados das rodadas;
+      // modelo = slug que produziu a resposta (último vencedor da cadeia —
+      // quando o fallback aciona, o primário não é o que respondeu)
+      const t0 = Date.now();
+      const uso = {
+        in: 0, out: 0, reasoning: 0, cache: 0,
+        custo: 0, allowance: 0, listCost: 0,
+        billing: undefined as string | undefined,
+      };
+      let modeloUsado: string | undefined;
+      const somarUso = (u?: UsoIa, modelo?: string) => {
+        if (modelo) modeloUsado = modelo;
+        if (!u) return;
+        uso.in += u.prompt_tokens ?? u.opencode?.tokens?.input ?? 0;
+        uso.out += u.completion_tokens ?? u.opencode?.tokens?.output ?? 0;
+        uso.reasoning += u.opencode?.tokens?.reasoning ?? 0;
+        uso.cache += u.opencode?.tokens?.cache_read ?? 0;
+        uso.custo += u.cost ?? 0;
+        uso.allowance += u.opencode?.allowance ?? 0;
+        uso.listCost += u.opencode?.list_cost ?? 0;
+        if (u.opencode?.billing_source) uso.billing = u.opencode.billing_source;
+      };
       let erroEmitido = false;
       const sendErro = (e: string) => {
         send({ type: "error", e });
@@ -222,8 +246,10 @@ export async function POST(req: Request) {
       };
       let guiaChamado = false;
       const prazo = Date.now() + STREAM_BUDGET_MS;
+      let iteracoes = 0;
 
       for (let i = 0; i < MAX_ITERACOES && !req.signal.aborted && !fechado; i++) {
+        iteracoes = i + 1;
         // sem orçamento, sai do loop — o erro padrão depois do for avisa
         // o cliente em vez de a plataforma cortar a função no silêncio
         const restante = prazo - Date.now();
@@ -245,6 +271,7 @@ export async function POST(req: Request) {
 
         let msg: MsgChat;
         if (r.ok) {
+          somarUso(r.usage, r.modelo);
           msg = {
             role: "assistant",
             content: r.content || null,
@@ -263,6 +290,7 @@ export async function POST(req: Request) {
             sendErro(alt.erro);
             break;
           }
+          somarUso(alt.usage, alt.modelo);
           msg = alt.mensagem;
           if (msg.content) {
             if (emitido > 0) send({ type: "reset" });
@@ -320,7 +348,15 @@ export async function POST(req: Request) {
             // race contra o prazo — a tool continua em bg mas a resposta
             // emite o erro dentro do orçamento em vez de morrer calada
             res = await Promise.race([
-              executarTool(tc.function.name, args, supabase, "chat"),
+              executarTool(
+                tc.function.name,
+                args,
+                supabase,
+                "chat",
+                undefined,
+                undefined,
+                requestId
+              ),
               new Promise<never>((_, rej) =>
                 setTimeout(() => rej(new Error("prazo")), restanteTc)
               ),
@@ -385,6 +421,35 @@ export async function POST(req: Request) {
 
       if (!concluido && !erroEmitido && !req.signal.aborted && !fechado) {
         send({ type: "error", e: MSG_FALHA });
+      }
+
+      // evento-resumo da request (sdd D4): um 'resposta' por mensagem com
+      // telemetria agregada — correlaciona com 'mensagem' e as tools pelo
+      // request_id. Awaited antes do close: fire-and-forget morria quando
+      // a função congelava depois do stream e a telemetria se perdia
+      try {
+        const { error: erroResumo } = await supabase.rpc("registrar_ia_evento", {
+          p_canal: "chat",
+          p_tool: "resposta",
+          p_args: { tools: toolsUsadas, list_cost: uso.listCost || undefined },
+          p_ok: concluido,
+          p_erro: erroEmitido ? "erro" : null,
+          p_duracao_ms: Date.now() - t0,
+          p_modelo: modeloUsado ?? null,
+          p_tier: tier,
+          p_tokens_in: uso.in || null,
+          p_tokens_out: uso.out || null,
+          p_tokens_reasoning: uso.reasoning || null,
+          p_cache_read: uso.cache || null,
+          p_custo_usd: uso.custo || null,
+          p_allowance_usd: uso.allowance || null,
+          p_billing_source: uso.billing ?? null,
+          p_request_id: requestId,
+          p_iteracoes: iteracoes,
+        });
+        if (erroResumo) console.error("registrar_ia_evento resposta:", erroResumo);
+      } catch (e) {
+        console.error("registrar_ia_evento resposta:", e);
       }
       try {
         controller.close();

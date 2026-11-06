@@ -65,6 +65,7 @@ export function JovemShell({
   me,
   notificacoes,
   demo,
+  assistente,
   children,
 }: {
   me: Profile;
@@ -72,6 +73,10 @@ export function JovemShell({
   /** pill compacta da DemoBar dockada no header mobile (no lugar do nome —
    *  mesmo trade-off do AppShell, que docka sobre o rótulo de papel) */
   demo?: React.ReactNode;
+  /** bolha da Liza — montada depois da bottom-nav pra ganhar o empate de
+   *  z-40 na ordem do DOM (mesma regra do AppShell; via children ela
+   *  ficava dentro do <main>, antes da nav) */
+  assistente?: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -326,6 +331,8 @@ export function JovemShell({
             </Sheet>
           </div>
         </nav>
+
+        {assistente}
       </div>
     </DemoSlotProvider>
     </NotificacoesProvider>

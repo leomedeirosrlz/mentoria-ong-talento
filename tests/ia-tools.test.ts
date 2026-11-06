@@ -111,17 +111,23 @@ const dadosDe = (r: Awaited<ReturnType<typeof executarTool>>) => {
 };
 
 describe("registry", () => {
-  it("declara as 11 tools com descrição pt-BR e papéis", () => {
+  it("declara as 17 tools com descrição pt-BR e papéis", () => {
     expect(IA_TOOL_NOMES.sort()).toEqual(
       [
         "agenda_do_periodo",
         "aguardando_par",
+        "ajuda_faq",
         "capacidade_mentores",
         "chamados_resumo",
         "duplas_do_usuario",
         "ficha_dupla",
         "guia_consulta",
         "instrumentos_da_dupla",
+        "meu_progresso",
+        "meus_combinados",
+        "meus_pedidos",
+        "minha_agenda",
+        "minha_dupla",
         "pessoas_busca",
         "registros_da_dupla",
         "resumo_semana",
@@ -146,6 +152,17 @@ describe("registry", () => {
     // `duplas` (a ficha dele vem da view) e uma só dupla não pede índice
     expect(IA_TOOLS.duplas_do_usuario.roles).not.toContain("mentorado");
     expect(IA_TOOLS.agenda_do_periodo.roles).not.toContain("mentorado");
+    // tools do jovem são só dele — staff nunca as chama (pacote nov/2026)
+    for (const n of [
+      "minha_dupla",
+      "minha_agenda",
+      "meus_combinados",
+      "meu_progresso",
+      "meus_pedidos",
+      "ajuda_faq",
+    ] as const) {
+      expect(IA_TOOLS[n].roles).toEqual(["mentorado"]);
+    }
   });
 });
 
@@ -235,6 +252,29 @@ describe("executarTool — gate de papel", () => {
     const { supabase, fromCalls } = supaFake({ papel: null });
     const r = await executarTool("resumo_semana", {}, supabase, "mcp");
     expect(r.ok).toBe(false);
+    expect(fromCalls).toHaveLength(0);
+  });
+
+  it("staff não chama tool do jovem — o gate fecha dos dois lados", async () => {
+    for (const papel of ["coordenacao", "supervisor", "mentor_dpp"] as const) {
+      const { supabase, fromCalls } = supaFake({ papel });
+      const r = await executarTool("minha_dupla", {}, supabase, "chat");
+      expect(r.ok).toBe(false);
+      expect(fromCalls).toHaveLength(0);
+    }
+  });
+
+  it("ajuda_faq responde sem tocar no banco (FAQ é estático)", async () => {
+    const { supabase, fromCalls } = supaFake({ papel: "mentorado" });
+    const r = await executarTool(
+      "ajuda_faq",
+      { topico: "quem marca o encontro" },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(true);
+    const d = dadosDe(r) as { respostas: { pergunta: string }[] };
+    expect(d.respostas.length).toBeGreaterThan(0);
     expect(fromCalls).toHaveLength(0);
   });
 });

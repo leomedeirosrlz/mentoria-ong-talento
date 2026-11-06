@@ -14,6 +14,7 @@
 // e latência — inclusive as rejeitadas, porque "o que a IA tentou" também é
 // auditoria.
 
+import { createHash } from "crypto";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { comparaNome, saudadeDaDupla } from "@/lib/ciclo";
@@ -37,7 +38,12 @@ import {
   getDuplasVivasIa,
   getFilaInsumos,
   getInstrumentosDaDuplaIa,
+  getJovemAgendaIa,
+  getJovemCombinadosIa,
   getJovemDuplaIa,
+  getJovemPedidosIa,
+  getJovemProgressoIa,
+  getMinhaDuplaIa,
   getPessoasBuscaIa,
   getRegistrosDaDuplaIa,
   matchGuiaIa,
@@ -45,6 +51,8 @@ import {
   type DuplaIa,
 } from "./queries";
 import { limparTrecho } from "./fontes";
+import { PERGUNTAS } from "@/lib/ajuda/conteudo";
+import { normaliza } from "@/lib/utils";
 import { embedQuery } from "./embed";
 
 /** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário. */
@@ -242,6 +250,11 @@ export const IA_TOOLS = {
       if (ctx.papel === "mentorado") {
         const r = await getJovemDuplaIa(ctx.supabase, dupla_id);
         if (!r) return null;
+        // o jovem é o outro lado da própria dupla — "Você" como no
+        // projetor minha_dupla; sem ele o card voltava a "a definir"
+        const prox = r.encontros.find(
+          (e) => e.status === "agendado" || e.status === "remarcado"
+        );
         return {
           dupla_id: r.dupla.id,
           trilha: r.dupla.trilha,
@@ -249,9 +262,13 @@ export const IA_TOOLS = {
           turma: r.dupla.turma,
           iniciada_em: r.dupla.iniciada_em,
           demanda: r.dupla.demanda,
-          mentor: r.dupla.mentor_nome,
-          supervisor: r.dupla.supervisor_nome,
+          mentor: r.dupla.mentor_nome_social ?? r.dupla.mentor_nome,
+          mentorado: "Você",
+          supervisor: r.dupla.supervisor_nome_social ?? r.dupla.supervisor_nome,
           encontros: r.encontros,
+          proximo_encontro: prox
+            ? { numero: prox.numero, data_hora: prox.data_hora }
+            : null,
         };
       }
       const [d, eventos] = await Promise.all([
@@ -549,6 +566,181 @@ export const IA_TOOLS = {
       }
     },
   },
+
+  // ---------- mentorado (pacote liza nov/2026 — sdd D5) ----------
+  // Só leitura, só o próprio recorte: as queries leem views jovem_* e
+  // tabelas de policy aberta — o mesmo perímetro que o shell /jovem usa.
+  // Nenhuma escreve; nenhuma expõe dado de staff (semáforo, motivo,
+  // registro do mentor ficam fora por desenho).
+
+  minha_dupla: {
+    nome: "minha_dupla",
+    descricao:
+      "A dupla do jovem que está falando: mentor, supervisor, trilha, turma e status — sem precisar de id, a view jovem_duplas já é escopada. Use pra 'quem é meu mentor?', 'minha dupla', 'com quem eu converso' e antes de abrir instrumentos da própria dupla (devolve o dupla_id).",
+    schema: semArgs,
+    roles: ["mentorado"],
+    run: async (_args: z.infer<typeof semArgs>, ctx) => {
+      const d = await getMinhaDuplaIa(ctx.supabase);
+      if (!d) return null;
+      // encontros alimentam os quadrados do card — mesma leitura da
+      // ficha_dupla do jovem (encontros_select já escopa à dupla dele)
+      const ficha = await getJovemDuplaIa(ctx.supabase, d.id);
+      return {
+        dupla_id: d.id,
+        trilha: d.trilha,
+        status: d.status,
+        turma: d.turma,
+        iniciada_em: d.iniciada_em,
+        demanda: d.demanda,
+        mentor: d.mentor_nome_social ?? d.mentor_nome,
+        supervisor: d.supervisor_nome_social ?? d.supervisor_nome,
+        encontros: ficha?.encontros ?? [],
+      };
+    },
+  },
+
+  minha_agenda: {
+    nome: "minha_agenda",
+    descricao:
+      "A agenda de encontros do jovem: os próximos marcados (com data e link da chamada) e os últimos realizados. Use pra 'quando é meu próximo encontro?', 'minha agenda', 'tive encontro essa semana?'.",
+    schema: semArgs,
+    roles: ["mentorado"],
+    run: async (_args: z.infer<typeof semArgs>, ctx) => {
+      const { proximos, passados } = await getJovemAgendaIa(ctx.supabase);
+      if (!proximos.length && !passados.length) return null;
+      // mentor de cada dupla pra linha ler "Ricardo e • Você" — DPP e
+      // trilha de especialista convivem na mesma agenda do jovem
+      const { data: duplas } = await ctx.supabase
+        .from("jovem_duplas")
+        .select("id, mentor_nome, mentor_nome_social");
+      const nomes = new Map(
+        (duplas ?? []).map((d) => [
+          d.id,
+          (d.mentor_nome_social ?? d.mentor_nome) as string | null,
+        ])
+      );
+      return {
+        proximos: proximos.map((e) => ({
+          dupla_id: e.dupla_id,
+          mentor: nomes.get(e.dupla_id) ?? null,
+          numero: e.numero,
+          data_hora: e.data_hora,
+          status: e.status,
+          link: e.link,
+        })),
+        ultimos_realizados: passados.map((e) => ({
+          numero: e.numero,
+          realizado_em: e.realizado_em ?? e.data_hora,
+        })),
+      };
+    },
+  },
+
+  meus_combinados: {
+    nome: "meus_combinados",
+    descricao:
+      "Os combinados do jovem com o mentor (encaminhamentos): o que tá pendente com prazo e o que já foi marcado como feito. Use pra 'o que eu tenho pra fazer?', 'meus combinados', 'tarefas', 'o que falta entregar'.",
+    schema: semArgs,
+    roles: ["mentorado"],
+    run: async (_args: z.infer<typeof semArgs>, ctx) => {
+      const { pendentes, feitos } = await getJovemCombinadosIa(ctx.supabase);
+      if (!pendentes.length && !feitos.length) return null;
+      return {
+        pendentes: pendentes.map((c) => ({
+          texto: c.texto,
+          prazo: c.prazo,
+          criado_em: c.created_at,
+        })),
+        feitos_recentes: feitos.map((c) => ({ texto: c.texto })),
+      };
+    },
+  },
+
+  meu_progresso: {
+    nome: "meu_progresso",
+    descricao:
+      "O progresso do jovem na jornada: quais instrumentos (Visão, Metas, PDM, Roda da Vida, avaliação 360) já foram respondidos e o que ainda tá pendente pra ele. Use pra 'como tá minha jornada?', 'meu progresso', 'o que falta responder', 'tô atrasado?'.",
+    schema: semArgs,
+    roles: ["mentorado"],
+    run: async (_args: z.infer<typeof semArgs>, ctx) => {
+      const j = await getJovemProgressoIa(ctx.supabase);
+      if (!j) return null;
+      const instrumentos = (j.instrumentos ?? []).map((i) => {
+        const minhas = (i.entregas ?? []).filter((e) => e.destino === "mentorado");
+        return {
+          sistema: i.sistema,
+          titulo: i.titulo ?? i.sistema,
+          respondidos: minhas.filter((e) => e.status === "respondido").length,
+          pendentes: minhas.filter((e) => e.status === "pendente").length,
+        };
+      });
+      return {
+        dupla_id: j.dupla_id,
+        instrumentos,
+        total_respondidos: instrumentos.reduce((a, i) => a + i.respondidos, 0),
+        total_pendentes: instrumentos.reduce((a, i) => a + i.pendentes, 0),
+      };
+    },
+  },
+
+  meus_pedidos: {
+    nome: "meus_pedidos",
+    descricao:
+      "Os pedidos de especialista que o jovem (ou a dupla dele) fez: com quem, sobre o quê e em que pé tá cada um. Use pra 'meu pedido de especialista', 'e aquele especialista?', 'pedi ajuda com X, e aí?'.",
+    schema: semArgs,
+    roles: ["mentorado"],
+    run: async (_args: z.infer<typeof semArgs>, ctx) => {
+      const lista = await getJovemPedidosIa(ctx.supabase);
+      if (!lista.length) return null;
+      return {
+        pedidos: lista.map((p) => ({
+          especialista: p.especialista_nome,
+          sobre: p.demanda ?? p.motivo,
+          status: p.status_efetivo ?? p.status,
+          criado_em: p.created_at,
+        })),
+      };
+    },
+  },
+
+  ajuda_faq: {
+    nome: "ajuda_faq",
+    descricao:
+      "Respostas do FAQ oficial em voz de jovem: como o programa funciona, quem faz o quê, prazos e regras. Use pra dúvidas SOBRE O PROGRAMA ('quem marca o encontro?', 'posso trocar de mentor?', 'o que é o PDM?') — não é a tool de dados pessoais (esses saem das outras tools).",
+    schema: z
+      .object({
+        topico: z
+          .string()
+          .min(2)
+          .max(120)
+          .describe("tema ou palavras-chave da dúvida"),
+      })
+      .strict(),
+    roles: ["mentorado"],
+    run: async ({ topico }: { topico: string }) => {
+      const termos = normaliza(topico).split(" ").filter((t) => t.length > 2);
+      const doJovem = PERGUNTAS.filter((p) => p.papeis.includes("mentorado"));
+      const ranqueadas = doJovem
+        .map((p) => {
+          const texto = normaliza(`${p.pergunta} ${p.resposta}`);
+          const score = termos.filter((t) => texto.includes(t)).length;
+          return { p, score };
+        })
+        .filter((x) => x.score > 0)
+        .sort((a, b) => b.score - a.score)
+        .slice(0, 3);
+      if (!ranqueadas.length) return { respostas: [], total_faq: doJovem.length };
+      return {
+        respostas: ranqueadas.map(({ p }) => ({
+          pergunta: p.pergunta,
+          resposta: p.resposta,
+          links: (p.links ?? [])
+            .filter((l) => !l.papeis || l.papeis.includes("mentorado"))
+            .map((l) => ({ rotulo: l.rotulo, href: l.href })),
+        })),
+      };
+    },
+  },
 } satisfies Record<
   string,
   {
@@ -597,6 +789,34 @@ function argsParaLog(v: unknown): Record<string, unknown> {
   }
 }
 
+/** Args com cara de PII (texto livre que pode citar nome/relato de menor)
+ *  não entram verbatim no ledger — a convenção da 0083 é "a ação, não a
+ *  fala". Vira {n, hash12}: dá pra depurar repetição/padrão sem gravar o
+ *  conteúdo. Mapa por tool→campo; hash é sha256 truncado, sem sal — o
+ *  objetivo é dedupe/forense, não sigilo criptográfico. */
+const ARGS_MINIMIZADOS: Record<string, readonly string[]> = {
+  guia_consulta: ["pergunta"],
+  pessoas_busca: ["nome"],
+};
+
+function argsMinimizados(
+  nome: string,
+  args: Record<string, unknown>
+): Record<string, unknown> {
+  const campos = ARGS_MINIMIZADOS[nome];
+  if (!campos) return args;
+  const out = { ...args };
+  for (const c of campos) {
+    const v = out[c];
+    if (typeof v !== "string" || !v) continue;
+    out[c] = {
+      n: v.length,
+      hash12: createHash("sha256").update(v).digest("hex").slice(0, 12),
+    };
+  }
+  return out;
+}
+
 function resumoZod(err: z.ZodError): string {
   return err.issues
     .slice(0, 3)
@@ -620,7 +840,10 @@ export async function executarTool(
   /** profile_id explícito pra auditoria — idem: no MCP não existe JWT, o
    *  my_profile_id() da RPC sairia NULL e o evento não gravaria. O caller
    *  passa o dono da PAT; no chat fica ausente e a RPC usa o JWT. */
-  autorProfileId?: string
+  autorProfileId?: string,
+  /** request_id da reserva do limite — correla os eventos da tool com a
+   *  mensagem que a disparou (sdd D4). Ausente no MCP por enquanto. */
+  requestId?: string
 ): Promise<ResultadoTool> {
   const inicio = Date.now();
   let ok = false;
@@ -669,11 +892,12 @@ export async function executarTool(
     const { error: erroAudit } = await supabase.rpc("registrar_ia_evento", {
       p_canal: canal,
       p_tool: nome,
-      p_args: argsLog,
+      p_args: argsMinimizados(nome, argsLog),
       p_ok: ok,
       p_erro: erro,
       p_duracao_ms: Date.now() - inicio,
       p_profile_id: autorProfileId ?? null,
+      p_request_id: requestId ?? null,
     });
     if (erroAudit) console.error("registrar_ia_evento:", erroAudit);
   } catch (e) {

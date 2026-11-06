@@ -80,6 +80,13 @@ const hhmm = (em?: number) =>
 // só é lida em handler de evento, nunca durante render
 const agora = () => Date.now();
 
+// o dreno só existe pra animar — reduced-motion dispensa e em aba oculta
+// o rAF não roda; nos dois casos a fila despeja direto em vez de travar
+// a bolha esperando um frame que não vem
+const semAnimacao = () =>
+  matchMedia("(prefers-reduced-motion: reduce)").matches ||
+  document.visibilityState === "hidden";
+
 // conversas ficam no aparelho (localStorage, client-side — LGPD igual ao
 // sessionStorage anterior, mas sobrevivem ao fechamento). A mais recente
 // reabre como conversa ativa; a lista completa vira a visão "histórico".
@@ -94,10 +101,18 @@ function lerConversas(): Conversa[] {
   try {
     const raw = localStorage.getItem(STORAGE_CONVERSAS);
     const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    // TTL 30d (sdd D3): conversa com nomes/notas de menores não vive pra
+    // sempre no aparelho — minimização LGPD alinhada à decisão do storage
+    const piso = Date.now() - 30 * 24 * 60 * 60 * 1000;
     return Array.isArray(parsed)
       ? (parsed.filter(
           (c): c is Conversa =>
-            !!c && typeof c === "object" && "id" in c && Array.isArray((c as Conversa).msgs)
+            !!c &&
+            typeof c === "object" &&
+            "id" in c &&
+            Array.isArray((c as Conversa).msgs) &&
+            typeof (c as Conversa).em === "number" &&
+            (c as Conversa).em > piso
         ) as Conversa[])
       : [];
   } catch {
@@ -186,6 +201,16 @@ function respostaDemo(texto: string): string {
  *  sobre ela (o prompt recebe a rota e resolve "esta dupla"). */
 export function sugestoes(papeis: AppRole[], pagina: string): string[] {
   const staff = papeis.some((p) => p === "coordenacao" || p === "supervisor");
+  const soJovem = papeis.length > 0 && papeis.every((p) => p === "mentorado");
+  if (soJovem) {
+    if (pagina.startsWith("/jovem/agenda"))
+      return ["Quando é o próximo encontro?", "Tive encontro essa semana?", "O que é o PDM?"];
+    if (pagina.startsWith("/jovem/especialistas"))
+      return ["E meu pedido de especialista?", "Como funciona o especialista?", "Como tá minha jornada?"];
+    if (pagina.startsWith("/jovem/materiais"))
+      return ["O que é o PDM?", "O que tenho pra fazer?", "Como tá minha jornada?"];
+    return ["O que tenho pra fazer?", "Como tá minha jornada?", "Quem é meu mentor?"];
+  }
   if (/^\/duplas\/[0-9a-f-]{36}/.test(pagina))
     return papeis.includes("mentorado")
       ? ["Quando é o próximo encontro?", "O que é o PDM?"]
@@ -296,6 +321,16 @@ export function AssistenteConversa({
   // SSE manda deltas pequenos demais pra re-render por delta
   const tokensRef = useRef("");
   const flushRef = useRef(0);
+  // marca do último crescimento da fila — o dreno tem ~700ms a partir
+  // dele pra esvaziar, então nem backlog nem o fim da resposta despejam
+  // de uma vez
+  const filaDesdeRef = useRef(0);
+  // fechamento adiado: done/erro chegou com a fila ainda escorrendo —
+  // o dreno termina (curto) e o fechar roda no fim dele
+  const fecharRef = useRef<{
+    estado: "ok" | "erro" | "interrompido";
+    extra?: { tools?: string[]; erro?: string; fontes?: FonteIa[] };
+  } | null>(null);
   const chips = sugestoes(papeis, pagina);
   const [busca, setBusca] = useState("");
   // links dos cards apontam pras telas do jovem quando ele é só mentorado
@@ -489,6 +524,7 @@ export function AssistenteConversa({
       flushRef.current = 0;
     }
     tokensRef.current = "";
+    fecharRef.current = null;
     setConversaId(c.id);
     setMsgs(c.msgs);
     setPending(false);
@@ -506,6 +542,12 @@ export function AssistenteConversa({
     });
     if (conversaId === id) {
       abortRef.current?.abort();
+      if (flushRef.current) {
+        cancelAnimationFrame(flushRef.current);
+        flushRef.current = 0;
+      }
+      tokensRef.current = "";
+      fecharRef.current = null;
       setConversaId(null);
       setMsgs([]);
       setPending(false);
@@ -518,17 +560,34 @@ export function AssistenteConversa({
     flushRef.current = 0;
     const pend = tokensRef.current;
     if (!pend) return;
-    tokensRef.current = "";
-    // texto voltou a chegar: a tool acabou — o status sai e o mascote
-    // passa de "consultando" pra "escrevendo"
-    setStatus(null);
+    // dreno com teto (pacote nov/2026): cada quadro tira o suficiente
+    // pra esvaziar a fila em ~700ms desde o último crescimento dela —
+    // backlog grande acelera (nunca fica pra trás) e o fim da resposta
+    // escorre curto em vez de despejar de uma vez
+    const restantes = Math.max(
+      1,
+      Math.ceil((700 - (agora() - filaDesdeRef.current)) / (1000 / 60))
+    );
+    const fatia = Math.max(2, Math.ceil(pend.length / restantes));
+    tokensRef.current = pend.slice(fatia);
+    const sai = pend.slice(0, fatia);
     setMsgs((ms) =>
       ms.map((m, i) =>
         i === ms.length - 1 && m.estado === "stream"
-          ? { ...m, content: m.content + pend }
+          ? { ...m, content: m.content + sai }
           : m
       )
     );
+    // ainda tem fila → agenda o próximo dreno; sem fila o cursor para
+    if (tokensRef.current) {
+      flushRef.current = requestAnimationFrame(flushTokens);
+    } else if (fecharRef.current) {
+      // a rodada já encerrou no servidor e a fila esvaziou no ritmo —
+      // fecha a bolha agora, não num despejo
+      const f = fecharRef.current;
+      fecharRef.current = null;
+      fechar(f.estado, f.extra);
+    }
   }
 
   /** card da genUI direta chegou: entra já na bolha que está sendo
@@ -545,6 +604,11 @@ export function AssistenteConversa({
 
   function enfileirarToken(t: string) {
     tokensRef.current += t;
+    filaDesdeRef.current = agora();
+    // token novo do servidor depois de um status de tool: a tool acabou —
+    // o status sai aqui, na chegada. Antes o dreno apagava no quadro
+    // seguinte e um status chegando com texto escorrendo ficava invisível
+    setStatus(null);
     if (!flushRef.current)
       flushRef.current = requestAnimationFrame(flushTokens);
   }
@@ -558,6 +622,7 @@ export function AssistenteConversa({
       flushRef.current = 0;
     }
     tokensRef.current = "";
+    fecharRef.current = null;
     setMsgs((ms) =>
       ms.map((m, i) =>
         i === ms.length - 1 && m.estado === "stream" ? { ...m, content: "" } : m
@@ -565,18 +630,40 @@ export function AssistenteConversa({
     );
   }
 
-  /** Fecha a rodada: flush dos tokens pendentes + marca o estado final da
-   *  bolha (ok vira ausência de estado; erro ganha retry). */
+  /** Fecha a rodada: com fila ainda escorrendo e a animação ligada, o
+   *  dreno termina (curto — o teto de ~700ms já corre desde o último
+   *  token) e o fechar roda no fim dele; com reduced-motion ou aba
+   *  oculta não há dreno que valha a espera — despeja direto. */
   function finalizar(
     estado: "ok" | "erro" | "interrompido",
     extra?: { tools?: string[]; erro?: string; fontes?: FonteIa[] }
   ) {
+    const pend = tokensRef.current;
+    // "parar" é parar: interrompido nunca escorre o resto da fila
+    if (pend && estado !== "interrompido" && !semAnimacao()) {
+      fecharRef.current = { estado, extra };
+      if (!flushRef.current)
+        flushRef.current = requestAnimationFrame(flushTokens);
+      return;
+    }
     if (flushRef.current) {
       cancelAnimationFrame(flushRef.current);
       flushRef.current = 0;
     }
-    const pend = tokensRef.current;
     tokensRef.current = "";
+    fecharRef.current = null;
+    fechar(estado, extra, pend);
+  }
+
+  /** O fechamento em si: `pend` é o que sobrou da fila no despejo direto
+   *  (reduced-motion, aba oculta ou fila já vazia) — no caminho animado
+   *  o dreno já imprimiu tudo e `pend` chega "". Marca o estado final da
+   *  bolha: ok vira ausência de estado; erro ganha retry. */
+  function fechar(
+    estado: "ok" | "erro" | "interrompido",
+    extra?: { tools?: string[]; erro?: string; fontes?: FonteIa[] },
+    pend = ""
+  ) {
     setMsgs((ms) => {
       const ultima = ms[ms.length - 1];
       if (!ultima || ultima.role !== "assistant") return ms;
@@ -944,8 +1031,9 @@ export function AssistenteConversa({
                 {primeiroNome(nome) ? `Oi, ${primeiroNome(nome)}! Eu sou a Liza.` : "Oi! Eu sou a Liza."}
               </p>
               <p className="mt-1 text-sm text-pretty text-muted-foreground">
-                Posso ajudar com a sua operação ou com o que dizem os guias do
-                programa.
+                {soJovem
+                  ? "Posso ajudar com a sua mentoria ou com o que dizem os guias do programa."
+                  : "Posso ajudar com a sua operação ou com o que dizem os guias do programa."}
               </p>
             </div>
           </div>
@@ -965,10 +1053,9 @@ export function AssistenteConversa({
           </div>
         </div>
       ) : (
-      /* transcript — role=log + aria-live pra resposta nova; a rolagem só
-          segue o fim quando o usuário já está perto dele. scroll-fina =
-          scrollbar thin muted (REALIZA-282); fade no topo emoldura o topo
-          do log quando rolado */
+      /* transcript — role=log; a rolagem só segue o fim quando o usuário
+          já está perto dele. scroll-fina = scrollbar thin muted
+          (REALIZA-282); fade no topo emoldura o topo do log quando rolado */
       <div
         className="relative min-h-0 flex-1"
         onClick={(e) => {
@@ -989,10 +1076,24 @@ export function AssistenteConversa({
             }
           }}
           role="log"
-          aria-live="polite"
+          aria-live="off"
           aria-label="Conversa com a Liza"
           className="scroll-fina @container h-full space-y-5 overflow-y-auto overscroll-contain px-4 py-4"
         >
+          {/* role=log seria live por definição (ARIA 1.2) — aria-live=off
+              silencia a rajada de tokens; a região sr-only anuncia só as
+              bordas (começou/terminou) e a resposta fica no log */}
+          <div aria-live="polite" className="sr-only">
+            {pending
+              ? "A Liza está respondendo…"
+              : ultimaMsg?.role === "assistant"
+                ? ultimaMsg.estado === "erro"
+                  ? // frase fixa: no erro o content pode ser a resposta
+                    // parcial inteira, longa demais pra um anúncio
+                    "A Liza não conseguiu responder."
+                  : "A Liza respondeu."
+                : ""}
+          </div>
           {msgs.map((m, i) => {
             if (m.role === "user")
               return (

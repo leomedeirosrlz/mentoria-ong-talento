@@ -41,6 +41,13 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   instrumentos_da_dupla: { dupla_id: UUID },
   chamados_resumo: {},
   pessoas_busca: { nome: "Maria" },
+  // mentorado (pacote nov/2026) — semArgs no resto, tópico na FAQ
+  minha_dupla: {},
+  minha_agenda: {},
+  meus_combinados: {},
+  meu_progresso: {},
+  meus_pedidos: {},
+  ajuda_faq: { topico: "encontro" },
 };
 
 describe("allowlist — forma do registry", () => {

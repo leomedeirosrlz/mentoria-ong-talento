@@ -1,5 +1,5 @@
 // Rota /api/ia/chat — o transporte inteiro é mockado na fronteira:
-// createClient (sessão cookie), getMe (profile), checarLimiteIa, o
+// createClient (sessão cookie), getMe (profile), consumirLimiteIa, o
 // provider (stream + fallback JSON) e executarTool. O que se prova aqui é
 // o CONTRATO da rota, não o que cada dependência faz:
 //   · todo gate responde JSON ANTES do stream abrir — depois do primeiro
@@ -12,7 +12,7 @@
 // prompts.ts fica real de propósito — é puro e prova o system prompt no
 // lugar certo do histórico.
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/ia/chat/route";
 import type { MsgChat } from "@/lib/ia/provider";
 
@@ -20,7 +20,7 @@ const m = vi.hoisted(() => ({
   getClaims: vi.fn(),
   rpc: vi.fn(),
   from: vi.fn(),
-  checarLimiteIa: vi.fn(),
+  consumirLimiteIa: vi.fn(),
   providerConfigurado: vi.fn(),
   chamarModelo: vi.fn(),
   chamarModeloStream: vi.fn(),
@@ -34,7 +34,7 @@ vi.mock("@/lib/supabase/server", () => ({
     from: m.from,
   })),
 }));
-vi.mock("@/lib/ia/rate-limit", () => ({ checarLimiteIa: m.checarLimiteIa }));
+vi.mock("@/lib/ia/rate-limit", () => ({ consumirLimiteIa: m.consumirLimiteIa }));
 vi.mock("@/lib/ia/provider", () => ({
   providerConfigurado: m.providerConfigurado,
   chamarModelo: m.chamarModelo,
@@ -68,7 +68,7 @@ function autenticado() {
   m.from.mockImplementation((tabela: string) =>
     queryFake(tabela === "profiles" ? PROFILE : [])
   );
-  m.checarLimiteIa.mockResolvedValue(false);
+  m.consumirLimiteIa.mockResolvedValue({ permitido: true, usados: 1, requestId: "req-teste" });
   m.rpc.mockImplementation((fn: string) =>
     Promise.resolve({
       data: fn === "my_papeis" ? ["coordenacao"] : null,
@@ -108,7 +108,26 @@ const chamadasStream = () =>
   }][];
 
 describe("gates — JSON antes do stream abrir", () => {
-  beforeEach(() => vi.resetAllMocks());
+  // a rota mora atrás da mesma flag da bolha — os casos abaixo assumem
+  // o ambiente com IA_BOLHA=1 (como o e2e liga explicitamente)
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.stubEnv("IA_BOLHA", "1");
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("flag IA_BOLHA desligada devolve 404 antes de autenticar", async () => {
+    vi.stubEnv("IA_BOLHA", "0");
+    const res = await POST(req());
+    expect(res.status).toBe(404);
+    await expect(res.json()).resolves.toEqual({
+      error: expect.stringContaining("encontrado"),
+    });
+    // nem sessão nem limite — o gate corta antes de qualquer custo
+    expect(m.getClaims).not.toHaveBeenCalled();
+    expect(m.consumirLimiteIa).not.toHaveBeenCalled();
+    expect(m.chamarModeloStream).not.toHaveBeenCalled();
+  });
 
   it("sem sessão devolve 401 antes de olhar o provider", async () => {
     m.getClaims.mockResolvedValue({ data: { claims: null }, error: null });
@@ -141,16 +160,19 @@ describe("gates — JSON antes do stream abrir", () => {
     await expect(res.json()).resolves.toEqual({
       error: expect.stringContaining("Cadastro"),
     });
-    expect(m.checarLimiteIa).not.toHaveBeenCalled();
+    expect(m.consumirLimiteIa).not.toHaveBeenCalled();
   });
 
   it("rate limit estourado devolve 429 e não registra a mensagem", async () => {
     autenticado();
-    m.checarLimiteIa.mockResolvedValue(true);
+    m.consumirLimiteIa.mockResolvedValue({ permitido: false, usados: 20 });
     const res = await POST(req());
     expect(res.status).toBe(429);
     // o recorte é o profile, não a sessão auth
-    expect(m.checarLimiteIa).toHaveBeenCalledWith(expect.anything(), "prof-1");
+    expect(m.consumirLimiteIa).toHaveBeenCalledWith(
+      expect.anything(),
+      { n_mensagens: expect.any(Number) }
+    );
     // my_papeis roda antes do limite (Promise.all da identidade) — o que
     // não pode ter acontecido é registrar a mensagem
     expect(m.rpc).not.toHaveBeenCalledWith(
@@ -216,8 +238,10 @@ describe("gates — JSON antes do stream abrir", () => {
 describe("stream SSE", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    vi.stubEnv("IA_BOLHA", "1");
     autenticado();
   });
+  afterEach(() => vi.unstubAllEnvs());
 
   it("abre text/event-stream e o primeiro byte é o comentário ': ok'", async () => {
     m.chamarModeloStream.mockImplementation(
@@ -240,20 +264,28 @@ describe("stream SSE", () => {
     expect(texto).toContain('data: {"type":"done","tools":[]}');
   });
 
-  it("registra a mensagem como evento (é o que alimenta o rate limit)", async () => {
+  it("consome o limite atômico antes do stream (a RPC insere a 'mensagem')", async () => {
     m.chamarModeloStream.mockResolvedValue({
       ok: true,
       content: "oi",
       toolCalls: [],
     });
     await lerStream(await POST(req()));
+    // o evento 'mensagem' agora é a reserva dentro de consumir_limite_ia —
+    // negado nem abre stream; o request_id correla o resto da telemetria
+    expect(m.consumirLimiteIa).toHaveBeenCalledWith(
+      expect.anything(),
+      { n_mensagens: 1 }
+    );
+    // e o resumo 'resposta' sai com o request_id + telemetria da rodada
     expect(m.rpc).toHaveBeenCalledWith(
       "registrar_ia_evento",
       expect.objectContaining({
         p_canal: "chat",
-        p_tool: "mensagem",
-        p_args: { n_mensagens: 1 },
+        p_tool: "resposta",
+        p_request_id: "req-teste",
         p_ok: true,
+        p_iteracoes: 1,
       })
     );
   });
@@ -302,12 +334,16 @@ describe("stream SSE", () => {
 
     const texto = await lerStream(await POST(req()));
 
-    // a tool roda com o client da sessão, no canal chat
+    // a tool roda com o client da sessão, no canal chat, com o
+    // request_id da reserva pra auditoria correlacionada
     expect(m.executarTool).toHaveBeenCalledWith(
       "resumo_semana",
       {},
       expect.anything(),
-      "chat"
+      "chat",
+      undefined, // papeisForcados — só MCP resolve papel fora do JWT
+      undefined, // autorProfileId — idem
+      "req-teste"
     );
     // o status chega com o rótulo por tool (STATUS_TOOL em lib/ia/ui.ts)
     expect(texto).toContain(

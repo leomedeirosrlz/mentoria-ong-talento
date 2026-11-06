@@ -227,6 +227,7 @@ function Cabecalho({
   expandido,
   onExpandir,
   estado,
+  jovem,
 }: {
   onFechar: () => void;
   onNovaConversa?: () => void;
@@ -237,6 +238,8 @@ function Cabecalho({
   onExpandir?: () => void;
   /** a Liza mora no header: saúda na abertura e acompanha a rodada */
   estado: LizaEstado;
+  /** voz do subtítulo: "operação" é vocabulário de equipe, não de jovem */
+  jovem?: boolean;
 }) {
   return (
     <div className="flex shrink-0 items-center gap-2.5 border-b border-border px-4 py-3">
@@ -252,7 +255,7 @@ function Cabecalho({
           />
         </p>
         <p className="text-[11px] text-muted-foreground">
-          Operação e guias do programa
+          {jovem ? "Sua mentoria e os guias" : "Operação e guias do programa"}
         </p>
       </div>
       {onHistorico && (
@@ -369,6 +372,8 @@ export function AssistenteBolha({
     () => true
   );
   const [aberto, setAberto] = useState(false);
+  // voz do jovem: só mentorado troca "operação" por "mentoria" no header
+  const soJovem = papeis.length > 0 && papeis.every((p) => p === "mentorado");
   // aberto "agora", fora do ciclo de render: o chip do balão abre e envia
   // no mesmo gesto, e a resposta (rápida na demo) pode fechar antes do
   // re-render — o callback leria o `aberto` velho e acenderia o aviso
@@ -555,14 +560,22 @@ export function AssistenteBolha({
   // state na abertura e escuta popstate. Fechando por X/backdrop/arrasto,
   // o cleanup desfaz o state empurrado (history.back sem listener é
   // silencioso). Só no mobile — desktop fecha por Esc/outside do Popover.
+  // fechamento por link interno NÃO pode desfazer o state: o router.push
+  // do Next ainda não commitou quando o cleanup roda — um history.back()
+  // aqui estouraria a entrada recém-navegada e o link "só fecharia" a
+  // sheet (bug mobile). O marker fica pra trás na pilha e o voltar do
+  // browser segue funcionando — a página dele é a mesma do sheet fechado.
+  const navInternaRef = useRef(false);
   useEffect(() => {
     if (desktop || !aberto) return;
+    navInternaRef.current = false;
     history.pushState({ assistenteSheet: true }, "");
     const aoVoltar = () => mudar(false);
     window.addEventListener("popstate", aoVoltar);
     return () => {
       window.removeEventListener("popstate", aoVoltar);
-      if (history.state?.assistenteSheet) history.back();
+      if (history.state?.assistenteSheet && !navInternaRef.current)
+        history.back();
     };
   }, [desktop, aberto, mudar]);
 
@@ -595,7 +608,10 @@ export function AssistenteBolha({
       registrarEnviar={(fn) => {
         enviarRef.current = fn;
       }}
-      onNavegarInterno={() => mudar(false)}
+      onNavegarInterno={() => {
+        navInternaRef.current = true;
+        mudar(false);
+      }}
       onEstado={setEstadoLiza}
       onRespostaPronta={() => {
         // só avisa no FAB quando o painel está fora de vista — aberto,
@@ -830,6 +846,7 @@ export function AssistenteBolha({
           />
           <Cabecalho
             onFechar={() => mudar(false)}
+            jovem={soJovem}
             onNovaConversa={novaConversa}
             onHistorico={alternarHistorico}
             onConfig={onConfig}
@@ -898,6 +915,7 @@ export function AssistenteBolha({
           </div>
           <Cabecalho
             onFechar={() => mudar(false)}
+            jovem={soJovem}
             onNovaConversa={novaConversa}
             onHistorico={alternarHistorico}
             onConfig={onConfig}

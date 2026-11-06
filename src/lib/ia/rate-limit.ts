@@ -1,29 +1,43 @@
-// Rate limit da camada de IA (sdd §3): conta os ia_eventos do PRÓPRIO
-// profile nos últimos 60s — o ledger já é a tabela de auditoria, não
-// precisa de estrutura nova. O eq(profile_id) é o que mantém o recorte
-// próprio também pra coordenação (que pela policy lê o rastro de todos).
+// Rate limit da camada de IA (sdd D3, liza-pacote-2026-11): a RPC
+// consumir_limite_ia faz check+insert do evento 'mensagem' sob advisory lock
+// por profile — o TOCTOU do desenho anterior (contava aqui, inseria dentro do
+// stream) deixava um burst paralelo estourar o teto junto; agora N requests
+// simultâneos viram N veredictos sequenciais. O evento 'mensagem' inserido é
+// também a reserva que a contagem mede — request negado não entra no ledger.
+// O request_id devolvido correlaciona os eventos seguintes da mesma request
+// (tools + resumo de telemetria).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 
-/** true = estourou o teto (o chamador responde 429). Falha na contagem
- *  loga e BLOQUEIA (fail-closed): em serverless não existe estado local
- *  confiável pra provar baixa atividade, e liberar com o DB degradado
- *  abre custo de LLM sem teto justo quando a infra já está ruim.
- *  Custo ilimitado pesa mais que UX degradada temporária — o 429 é
- *  recuperável com retry do cliente (o componente já trata). */
-export async function checarLimiteIa(
+export type VeredictoLimite =
+  | { permitido: true; usados: number; requestId: string }
+  | { permitido: false; usados: number };
+
+/** Consome um slot do limite (default 20/60s por profile, compartilhado entre
+ *  chat e MCP). permitido=false → responder 429. Falha na RPC BLOQUEIA
+ *  (fail-closed): em serverless não há estado local pra provar baixa
+ *  atividade, e liberar com o DB degradado abre custo de LLM sem teto — o
+ *  429 é recuperável com retry do cliente (o componente já trata). */
+export async function consumirLimiteIa(
   supabase: SupabaseClient,
-  profileId: string,
+  args: Record<string, unknown>,
+  canal: "chat" | "mcp" = "chat",
   limite = 20
-): Promise<boolean> {
-  const { count, error } = await supabase
-    .from("ia_eventos")
-    .select("id", { count: "exact", head: true })
-    .eq("profile_id", profileId)
-    .gte("created_at", new Date(Date.now() - 60_000).toISOString());
+): Promise<VeredictoLimite> {
+  const { data, error } = await supabase.rpc("consumir_limite_ia", {
+    p_args: args,
+    p_limite: limite,
+    p_canal: canal,
+  });
   if (error) {
-    console.error("checarLimiteIa:", error);
-    return true;
+    console.error("consumirLimiteIa:", error);
+    return { permitido: false, usados: limite };
   }
-  return (count ?? 0) >= limite;
+  const r = (Array.isArray(data) ? data[0] : data) as
+    | { permitido: boolean; usados: number; request_id: string }
+    | undefined;
+  if (!r?.permitido || !r.request_id) {
+    return { permitido: false, usados: r?.usados ?? limite };
+  }
+  return { permitido: true, usados: r.usados, requestId: r.request_id };
 }
