@@ -11,6 +11,7 @@ import { getMeusDadosCivis, getMinhaAssinaturaTermo } from "@/lib/queries-assina
 import { providerConfigurado } from "@/lib/ia/provider";
 import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
 import type { AppRole } from "@/lib/types";
+import { Children } from "react";
 import { redirect } from "next/navigation";
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -92,7 +93,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <DemoBar variant="dock" papel={demo} personas={demoPersonas} />
   );
   const demoFloat = demo && demoPersonas && (
-    <div className="hidden md:block">
+    <div key="demo-float" className="hidden md:block">
       <DemoBar variant="float" papel={demo} personas={demoPersonas} />
     </div>
   );
@@ -118,6 +119,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     return (
       <>
         <OnboardingFlowLazy
+          key="onboarding"
           me={me}
           pessoal={pessoal}
           mentorProfile={mentorProfile}
@@ -168,8 +170,9 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         ) : undefined
       }
     >
-      {children}
-      {demoFloat}
+      {/* toArray atribui keys — dois filhos soltos disparavam o warning
+          de "each child in a list" no render do AppShell */}
+      {Children.toArray([children, demoFloat])}
     </AppShell>
   );
 }

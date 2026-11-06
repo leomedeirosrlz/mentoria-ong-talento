@@ -617,7 +617,7 @@ function EstadoLinha({ est }: { est: Estacao }) {
       ) : (
         <TagAFazer />
       )}
-      <span className="text-[11px] text-muted-foreground">
+      <span className="text-xs text-muted-foreground sm:text-[11px]">
         {est.detalhe ?? est.janela.label}
       </span>
     </>
@@ -685,7 +685,7 @@ function InstrumentoCard({ est, sistema, campos }: EstacaoProps) {
       <span className="flex min-w-0 flex-1 flex-col p-3 sm:p-3.5">
         <h3 className="text-sm font-semibold leading-snug tracking-tight">
           {est.titulo}
-          <span className="mt-0.5 block text-[11px] font-normal text-muted-foreground">
+          <span className="mt-0.5 block text-xs font-normal text-muted-foreground sm:text-[11px]">
             {SUB_ESTACAO[est.chave]}
           </span>
         </h3>
