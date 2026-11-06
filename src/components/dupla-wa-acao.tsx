@@ -12,7 +12,7 @@ import { toast } from "sonner";
 import { enviarLembrete, type LembreteDestino } from "@/lib/actions-lembrete";
 import { formatDiaMes, LEMBRETE_INTERVALO_MS, waLink } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -295,19 +295,15 @@ export function DuplaWaAcao({
                 </Button>
               ))}
             {waContato ? (
-              <Button
-                nativeButton={false}
-                render={
-                  <a
-                    href={waContato}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                  />
-                }
+              <a
+                href={waContato}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonVariants()}
               >
                 <WhatsappLogo weight="fill" aria-hidden />
                 Abrir WhatsApp
-              </Button>
+              </a>
             ) : (
               <Button variant="outline" disabled title="Sem WhatsApp cadastrado">
                 <WhatsappLogo aria-hidden />
