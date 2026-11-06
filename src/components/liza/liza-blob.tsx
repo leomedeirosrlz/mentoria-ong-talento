@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { motion, useTransform, type MotionValue, type Transition } from "motion/react";
+import { cn } from "cn";
 import type { LizaEstado, LizaProps } from "./tipos";
 import {
   EASE,
@@ -484,9 +485,10 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
         dx: 19 - 1.5 * kOlho,
       }
     : { rx: 12.8, ry: 15.8, cy: 48.5, dx: 19 };
-  // cílios só onde eles leem como detalhe e não como borrão (FAB 44/48,
-  // onboarding 64, conversa 96); no header (34) e no avatar (22/24) somem
-  const cilios = tamanho >= 40;
+  // cílios em todas as escalas: acima de 40 o par fino; abaixo, um traço
+  // só mais grosso — o par fino lia como borrão no header (34) e nos
+  // avatares da conversa (22/24)
+  const ciliosMini = tamanho < 40;
   // o olho inteiro viaja no rosto (raio) e o reflexo faz um contra-movimento
   // (hx) — o clássico de mascote; a boca anda ~metade: o rosto "vira" em 3D
   const raio = detalhe ? { x: 8, y: 6 } : { x: 5.5, y: 4.5 };
@@ -520,7 +522,10 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
       overflow="visible"
       aria-hidden
       focusable="false"
-      className={className}
+      // size-auto: dentro de um Button do kit, o `[&_svg]:size-4` que
+      // padroniza ícone espremeria a mascote pra 16px (FAB mobile lia como
+      // olhinhos). auto devolve o tamanho pro atributo `width`/`height`
+      className={cn("size-auto", className)}
       // fill-box + %: a referência é a própria caixa do svg — o squash
       // ancora na base em QUALQUER tamanho (view-box no svg raiz media em
       // px do viewport e arrastava a criatura no clique)
@@ -564,7 +569,7 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
                   abertura={abertura}
                   transicao={transicao}
                   detalhe={detalhe}
-                  cilios={cilios}
+                  ciliosMini={ciliosMini}
                 />
               ))}
               {/* bochechas rosadas sob os cantos externos dos olhos */}
@@ -721,7 +726,7 @@ function Olho({
   abertura,
   transicao,
   detalhe,
-  cilios,
+  ciliosMini,
 }: {
   lado: -1 | 1;
   cx: number;
@@ -735,7 +740,7 @@ function Olho({
   abertura: MotionValue<number>;
   transicao: Transition;
   detalhe: boolean;
-  cilios: boolean;
+  ciliosMini: boolean;
 }) {
   const oval = pose.forma === "oval";
   const arco = pose.forma === "arco";
@@ -833,22 +838,24 @@ function Olho({
           </motion.g>
         )}
 
-      {cilios && (
-        <motion.g
-          initial={false}
-          animate={{ opacity: oval ? 1 : 0 }}
-          transition={{ opacity: FADE }}
-        >
-          <motion.g style={{ opacity: ciliosVisiveis }}>
-            <motion.path
-              initial={false}
-              animate={{ d: cilio1 }}
-              transition={transicao}
-              fill="none"
-              stroke={TINTA}
-              strokeWidth={1.9}
-              strokeLinecap="round"
-            />
+      {/* cílios: o par no detalhe; nas escalas pequenas um traço só mais
+          grosso (o segundo lia como borrão) */}
+      <motion.g
+        initial={false}
+        animate={{ opacity: oval ? 1 : 0 }}
+        transition={{ opacity: FADE }}
+      >
+        <motion.g style={{ opacity: ciliosVisiveis }}>
+          <motion.path
+            initial={false}
+            animate={{ d: cilio1 }}
+            transition={transicao}
+            fill="none"
+            stroke={TINTA}
+            strokeWidth={ciliosMini ? 2.7 : 1.9}
+            strokeLinecap="round"
+          />
+          {!ciliosMini && (
             <motion.path
               initial={false}
               animate={{ d: cilio2 }}
@@ -858,9 +865,9 @@ function Olho({
               strokeWidth={1.7}
               strokeLinecap="round"
             />
-          </motion.g>
+          )}
         </motion.g>
-      )}
+      </motion.g>
 
       {/* sobrancelha aflita: canto interno pra cima (só no erro) */}
       {detalhe && (
