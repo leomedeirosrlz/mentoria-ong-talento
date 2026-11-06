@@ -8,7 +8,7 @@ import { demoAtivo } from "@/lib/demo/mode";
 import { demoIaEventos, DEMO_IA_NOMES } from "@/lib/demo/ia-eventos";
 import { filtrarEventosIa, metricasIa, type IaEventoRow } from "@/lib/ia/metricas";
 import { rotuloTool } from "@/lib/ia/fontes";
-import { getIaEventos } from "@/lib/ia/queries";
+import { getPainelIa } from "@/lib/ia/queries";
 import { PageHeader } from "@/components/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -130,19 +130,12 @@ export default async function IaPage({
     eventos = demoIaEventos(dias);
     nomes = DEMO_IA_NOMES;
   } else {
-    const supabase = await createClient();
-    const res = await getIaEventos(supabase, dias);
+    // me.role já foi checado acima (coordenação) — só então o cache do
+    // painel entra; demo fica no ramo de cima, sem cache
+    const res = await getPainelIa(await createClient(), me.role, dias);
     eventos = res.eventos as IaEventoRow[];
     truncado = res.truncado;
-    const ids = [...new Set(eventos.map((e) => e.profile_id).filter((x): x is string => !!x))];
-    nomes = new Map();
-    if (ids.length) {
-      const { data: ps } = await supabase
-        .from("profiles")
-        .select("id, nome, nome_social")
-        .in("id", ids);
-      for (const p of ps ?? []) nomes.set(p.id, p.nome_social ?? p.nome ?? "Sem nome");
-    }
+    nomes = res.nomes;
   }
 
   // filtros locais (a query já trouxe o período inteiro — canal/modelo são

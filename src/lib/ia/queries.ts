@@ -28,6 +28,7 @@ import type {
   Trilha,
 } from "@/lib/types";
 import type { InstrumentoDupla } from "@/lib/forms/queries";
+import { CacheTtl } from "./cache";
 import { perguntaFts } from "@/lib/ia/busca-guias";
 
 /** Papéis efetivos do dono do client — a mesma my_papeis() que o getMe usa
@@ -699,6 +700,78 @@ export async function getIaEventos(supabase: SupabaseClient, dias: number) {
   // página cheia no último bloco = pode haver mais além do teto
   truncado = eventos.length >= IA_EVENTOS_TETO;
   return { eventos, truncado };
+}
+
+export type PainelIaDados = {
+  eventos: Record<string, unknown>[];
+  truncado: boolean;
+  /** profile_id → nome de exibição, só das pessoas presentes nos eventos */
+  nomes: Map<string, string>;
+};
+
+// Cache do painel /ia: os chips de canal/modelo filtram em memória, então
+// cada clique refazia até 20 páginas de ia_eventos + profiles pro MESMO
+// período. 60s cobre a navegação entre chips sem atrasar muito o dado novo.
+const PAINEL_IA_TTL_MS = 60_000;
+const cachePainelIa = new CacheTtl<PainelIaDados>(PAINEL_IA_TTL_MS, 3);
+
+export function limparCachePainelIa() {
+  cachePainelIa.limpar();
+}
+
+/** Chave do cache do painel, ou null = não cachear. Exceção consciente ao
+ *  "nada recortado pela RLS" de cache.ts: só a coordenação tem chave, e
+ *  pra ela o recorte é o conjunto inteiro (ia_eventos_select, 0083:
+ *  `my_role() = 'coordenacao'` lê tudo; profiles_select, 0141, idem) —
+ *  qualquer pessoa da coordenação veria exatamente as mesmas linhas, então
+ *  dividir a leitura entre elas não vaza nada. Outro papel só vê os
+ *  próprios eventos e nunca entra aqui. O prefixo `coord|` deixa isso
+ *  explícito na chave. Demo não passa por este caminho (page.tsx). */
+export function chavePainelIa(
+  papel: AppRole | null | undefined,
+  dias: number
+): string | null {
+  return papel === "coordenacao" ? `coord|${dias}` : null;
+}
+
+/** Eventos do período + nomes das pessoas que aparecem neles. `papel` é o
+ *  do viewer JÁ verificado pela página; fora da coordenação lê direto. */
+export async function getPainelIa(
+  supabase: SupabaseClient,
+  papel: AppRole | null | undefined,
+  dias: number
+): Promise<PainelIaDados> {
+  // falha em profiles mantém o painel no ar com "Sem nome" (como antes),
+  // mas esse resultado degradado não fica 60s no cache
+  let semNomes = false;
+  const carregar = async (): Promise<PainelIaDados> => {
+    const { eventos, truncado } = await getIaEventos(supabase, dias);
+    const ids = [
+      ...new Set(
+        eventos
+          .map((e) => e.profile_id as string | null)
+          .filter((x): x is string => !!x)
+      ),
+    ];
+    const nomes = new Map<string, string>();
+    if (ids.length) {
+      const { data: ps, error } = await supabase
+        .from("profiles")
+        .select("id, nome, nome_social")
+        .in("id", ids);
+      if (error) {
+        console.error("getPainelIa profiles:", error);
+        semNomes = true;
+      }
+      for (const p of (ps ?? []) as { id: string; nome: string | null; nome_social: string | null }[])
+        nomes.set(p.id, p.nome_social ?? p.nome ?? "Sem nome");
+    }
+    return { eventos, truncado, nomes };
+  };
+  const chave = chavePainelIa(papel, dias);
+  return chave
+    ? cachePainelIa.obter(chave, carregar, () => !semNomes)
+    : carregar();
 }
 
 // ---------- mentorado (sdd D5, pacote liza nov/2026) ----------

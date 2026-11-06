@@ -18,8 +18,9 @@
 //
 // Sem transcript: a rota é stateless e nada de conversa vai pro banco — só
 // ia_eventos registra o que aconteceu (a ação, não a fala): uma linha por
-// mensagem recebida (alimenta o rate limit) + uma por tool call (já dentro
-// de executarTool).
+// mensagem recebida (alimenta o rate limit, gravada na reserva) + uma por
+// tool call + o resumo 'resposta' — esses dois últimos vão juntos numa
+// escrita só no fim do stream (registrar_ia_eventos_lote).
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -37,9 +38,13 @@ import {
   modeloDoTier,
 } from "@/lib/ia/config";
 import { rotearTier } from "@/lib/ia/roteador";
-import { consumirLimiteIa } from "@/lib/ia/rate-limit";
+import { contextoELimiteIa } from "@/lib/ia/rate-limit";
 import type { FonteIa } from "@/lib/ia/fontes";
-import { executarTool, type ResultadoTool } from "@/lib/ia/tools";
+import {
+  executarTool,
+  type EventoIa,
+  type ResultadoTool,
+} from "@/lib/ia/tools";
 import { STATUS_TOOL, uiDaTool, uiDosInstrumentos } from "@/lib/ia/ui";
 import { createClient } from "@/lib/supabase/server";
 
@@ -59,6 +64,9 @@ const MAX_ITERACOES = 6;
 // rodada lenta morria no meio e nenhum evento de erro chegava ao cliente.
 // 50s a partir da abertura do stream deixa ~10s pros gates pré-stream
 const STREAM_BUDGET_MS = 50_000;
+
+// espelha o teto do registrar_ia_eventos_lote (0160)
+const MAX_EVENTOS_LOTE = 50;
 
 const MSG_FALHA =
   "Não consegui concluir essa consulta agora — tente perguntar de outra forma.";
@@ -108,29 +116,7 @@ export async function POST(req: Request) {
       { status: 503 }
     );
   }
-  // identidade slim: id+papel efetivo bastam — getMe() puxava contatos e
-  // respeitava o cookie demo_role (persona fake derrubava o rate limit e
-  // mentia o papel no prompt). Aqui identidade = JWT, sempre.
-  const [{ data: profile }, { data: papeisRpc }, iaCfg] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, role")
-      .eq("user_id", sub)
-      .eq("ativo", true)
-      .maybeSingle(),
-    supabase.rpc("my_papeis"),
-    // config viva (ia_config): modelos por tier + esforço + roteamento —
-    // lida junto com a identidade, não custa RTT extra no caminho crítico
-    getIaConfig(supabase),
-  ]);
-  if (!profile) {
-    return NextResponse.json(
-      { error: "Cadastro não encontrado." },
-      { status: 401 }
-    );
-  }
-
-  // body antes do rate limit: request malformado não custa query
+  // body antes da identidade+limite: request malformado não gasta slot
   const body = Body.safeParse(await req.json().catch(() => null));
   if (!body.success) {
     return NextResponse.json(
@@ -139,27 +125,31 @@ export async function POST(req: Request) {
     );
   }
 
-  // limite atômico (sdd D3): a reserva do slot 'mensagem' já acontece na
-  // RPC sob advisory lock — request negado nem abre stream nem chama
-  // provider. O request_id devolvido correla os eventos desta request
-  // (tools + resumo de telemetria no fim)
-  const limite = await consumirLimiteIa(supabase, {
-    n_mensagens: body.data.messages.length,
-  });
-  if (!limite.permitido) {
+  // identidade + limite numa RPC (ia_contexto_e_limite, 0160): profile
+  // ativo, papel e papéis efetivos + a reserva atômica do slot 'mensagem'
+  // sob advisory lock (sdd D3). Identidade = JWT, sempre: getMe() respeitava
+  // o cookie demo_role (persona fake derrubava o rate limit e mentia o
+  // papel no prompt). O request_id correla os eventos desta request.
+  // A config viva (ia_config) vem em paralelo — sem RTT extra.
+  const [ctx, iaCfg] = await Promise.all([
+    contextoELimiteIa(supabase, { n_mensagens: body.data.messages.length }),
+    getIaConfig(supabase),
+  ]);
+  if (ctx.status === "sem_cadastro") {
+    return NextResponse.json(
+      { error: "Cadastro não encontrado." },
+      { status: 401 }
+    );
+  }
+  if (ctx.status === "negado") {
     return NextResponse.json(
       { error: "Muitas mensagens seguidas — aguarde um instante." },
       { status: 429 }
     );
   }
-  const requestId = limite.requestId;
+  const requestId = ctx.requestId;
 
-  const papeis =
-    papeisRpc && papeisRpc.length
-      ? papeisRpc
-      : profile.role
-        ? [profile.role]
-        : [];
+  const papeis = ctx.papeis.length ? ctx.papeis : ctx.role ? [ctx.role] : [];
   const historico: MsgChat[] = [
     { role: "system", content: systemPromptIa(papeis, body.data.pagina) },
     ...body.data.messages.map((m) => ({ ...m, content: m.content })),
@@ -185,7 +175,7 @@ export async function POST(req: Request) {
 
   // sessão estável por usuário — o provider Go exige pra rotear/cachear;
   // profile_id é pseudônimo e não revela nada além do que a sessão já diz
-  const sessao = profile.id;
+  const sessao = ctx.profileId;
   // teto por rodada — o orçamento do stream (STREAM_BUDGET_MS) capa
   // esse valor a cada iteração, então na prática o que manda é o que
   // ainda falta pro prazo
@@ -212,8 +202,15 @@ export async function POST(req: Request) {
       }
 
       // o evento 'mensagem' já foi gravado pela reserva do limite
-      // (consumir_limite_ia) — regravar aqui duplicaria a contagem
+      // (ia_contexto_e_limite) — regravar aqui duplicaria a contagem
       const toolsUsadas: string[] = [];
+      // auditoria das tools fica em memória e sai no lote do fim
+      const eventos: EventoIa[] = [];
+      // teto do lote na RPC é 50: acima disso o insert inteiro falharia,
+      // então o excedente de tools cai fora e o resumo sempre entra
+      const coletarEvento = (ev: EventoIa) => {
+        if (eventos.length < MAX_EVENTOS_LOTE - 1) eventos.push(ev);
+      };
       // fontes que a guia_consulta trouxe — sobem no done pra UI renderizar
       // a fileira "Fontes" (dedupe por guia+secao)
       const fontes = new Map<string, FonteIa>();
@@ -359,7 +356,8 @@ export async function POST(req: Request) {
                 // tool refazia o my_papeis a cada chamada
                 papeis,
                 undefined,
-                requestId
+                requestId,
+                { coletarEvento }
               ),
               new Promise<never>((_, rej) => {
                 timerPrazo = setTimeout(() => rej(new Error("prazo")), restanteTc);
@@ -431,31 +429,36 @@ export async function POST(req: Request) {
 
       // evento-resumo da request (sdd D4): um 'resposta' por mensagem com
       // telemetria agregada — correlaciona com 'mensagem' e as tools pelo
-      // request_id. Awaited antes do close: fire-and-forget morria quando
-      // a função congelava depois do stream e a telemetria se perdia
+      // request_id. Sai no MESMO lote das tools (uma RPC por mensagem).
+      // Awaited antes do close: fire-and-forget morria quando a função
+      // congelava depois do stream e a telemetria se perdia
+      eventos.push({
+        canal: "chat",
+        tool: "resposta",
+        args: { tools: toolsUsadas, list_cost: uso.listCost || undefined },
+        ok: concluido,
+        erro: erroEmitido ? "erro" : null,
+        duracao_ms: Date.now() - t0,
+        modelo: modeloUsado ?? null,
+        tier,
+        tokens_in: uso.in || null,
+        tokens_out: uso.out || null,
+        tokens_reasoning: uso.reasoning || null,
+        cache_read: uso.cache || null,
+        custo_usd: uso.custo || null,
+        allowance_usd: uso.allowance || null,
+        billing_source: uso.billing ?? null,
+        request_id: requestId,
+        iteracoes,
+      });
       try {
-        const { error: erroResumo } = await supabase.rpc("registrar_ia_evento", {
-          p_canal: "chat",
-          p_tool: "resposta",
-          p_args: { tools: toolsUsadas, list_cost: uso.listCost || undefined },
-          p_ok: concluido,
-          p_erro: erroEmitido ? "erro" : null,
-          p_duracao_ms: Date.now() - t0,
-          p_modelo: modeloUsado ?? null,
-          p_tier: tier,
-          p_tokens_in: uso.in || null,
-          p_tokens_out: uso.out || null,
-          p_tokens_reasoning: uso.reasoning || null,
-          p_cache_read: uso.cache || null,
-          p_custo_usd: uso.custo || null,
-          p_allowance_usd: uso.allowance || null,
-          p_billing_source: uso.billing ?? null,
-          p_request_id: requestId,
-          p_iteracoes: iteracoes,
-        });
-        if (erroResumo) console.error("registrar_ia_evento resposta:", erroResumo);
+        const { error: erroLote } = await supabase.rpc(
+          "registrar_ia_eventos_lote",
+          { p_eventos: eventos }
+        );
+        if (erroLote) console.error("registrar_ia_eventos_lote:", erroLote);
       } catch (e) {
-        console.error("registrar_ia_evento resposta:", e);
+        console.error("registrar_ia_eventos_lote:", e);
       }
       try {
         controller.close();

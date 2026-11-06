@@ -1,5 +1,6 @@
 // Rota /api/ia/chat — o transporte inteiro é mockado na fronteira:
-// createClient (sessão cookie), getMe (profile), consumirLimiteIa, o
+// createClient (sessão cookie), contextoELimiteIa (identidade + limite numa
+// RPC só), o
 // provider (stream + fallback JSON) e executarTool. O que se prova aqui é
 // o CONTRATO da rota, não o que cada dependência faz:
 //   · todo gate responde JSON ANTES do stream abrir — depois do primeiro
@@ -22,7 +23,7 @@ const m = vi.hoisted(() => ({
   getClaims: vi.fn(),
   rpc: vi.fn(),
   from: vi.fn(),
-  consumirLimiteIa: vi.fn(),
+  contextoELimiteIa: vi.fn(),
   providerConfigurado: vi.fn(),
   chamarModelo: vi.fn(),
   chamarModeloStream: vi.fn(),
@@ -36,7 +37,9 @@ vi.mock("@/lib/supabase/server", () => ({
     from: m.from,
   })),
 }));
-vi.mock("@/lib/ia/rate-limit", () => ({ consumirLimiteIa: m.consumirLimiteIa }));
+vi.mock("@/lib/ia/rate-limit", () => ({
+  contextoELimiteIa: m.contextoELimiteIa,
+}));
 vi.mock("@/lib/ia/provider", () => ({
   providerConfigurado: m.providerConfigurado,
   chamarModelo: m.chamarModelo,
@@ -51,40 +54,45 @@ beforeEach(() => {
   limparCacheGuias();
 });
 
-/** Builder de query fake: a rota lê `profiles` com select→eq→maybeSingle
- *  e `ia_config` (via getIaConfig real) com select direto awaited — o
- *  mesmo objeto serve os dois padrões. */
-function queryFake(dado: unknown) {
+/** Builder de query fake: só `ia_config` (via getIaConfig real) ainda lê
+ *  tabela, com select direto awaited. */
+function queryFake() {
   const q = {
     select: () => q,
     eq: () => q,
-    maybeSingle: async () => ({ data: dado, error: null }),
     then: (res: (v: unknown) => unknown) =>
       Promise.resolve({ data: [], error: null }).then(res),
   };
   return q;
 }
 
-const PROFILE = { id: "prof-1", role: "coordenacao" };
+const CTX_OK = {
+  status: "ok",
+  profileId: "prof-1",
+  role: "coordenacao",
+  papeis: ["coordenacao"],
+  usados: 1,
+  requestId: "req-teste",
+};
 
-/** O caminho feliz antes do body: sessão, provider, profile e limite ok. */
+/** O caminho feliz: sessão, provider, identidade e limite ok. */
 function autenticado() {
   m.getClaims.mockResolvedValue({
     data: { claims: { sub: "auth-1" } },
     error: null,
   });
   m.providerConfigurado.mockReturnValue(true);
-  m.from.mockImplementation((tabela: string) =>
-    queryFake(tabela === "profiles" ? PROFILE : [])
-  );
-  m.consumirLimiteIa.mockResolvedValue({ permitido: true, usados: 1, requestId: "req-teste" });
-  m.rpc.mockImplementation((fn: string) =>
-    Promise.resolve({
-      data: fn === "my_papeis" ? ["coordenacao"] : null,
-      error: null,
-    })
-  );
+  m.from.mockImplementation(() => queryFake());
+  m.contextoELimiteIa.mockResolvedValue(CTX_OK);
+  m.rpc.mockResolvedValue({ data: null, error: null });
 }
+
+/** Chamadas do lote de auditoria (uma por mensagem). */
+const chamadasLote = () =>
+  m.rpc.mock.calls.filter(([fn]) => fn === "registrar_ia_eventos_lote") as [
+    string,
+    { p_eventos: Record<string, unknown>[] },
+  ][];
 
 const req = (
   body: unknown = { messages: [{ role: "user", content: "oi" }] }
@@ -134,7 +142,7 @@ describe("gates — JSON antes do stream abrir", () => {
     });
     // nem sessão nem limite — o gate corta antes de qualquer custo
     expect(m.getClaims).not.toHaveBeenCalled();
-    expect(m.consumirLimiteIa).not.toHaveBeenCalled();
+    expect(m.contextoELimiteIa).not.toHaveBeenCalled();
     expect(m.chamarModeloStream).not.toHaveBeenCalled();
   });
 
@@ -148,7 +156,7 @@ describe("gates — JSON antes do stream abrir", () => {
     expect(m.providerConfigurado).not.toHaveBeenCalled();
   });
 
-  it("provider não configurado devolve 503 antes de ler o profile", async () => {
+  it("provider não configurado devolve 503 antes de ler identidade/limite", async () => {
     autenticado();
     m.providerConfigurado.mockReturnValue(false);
     const res = await POST(req());
@@ -156,68 +164,50 @@ describe("gates — JSON antes do stream abrir", () => {
     await expect(res.json()).resolves.toEqual({
       error: expect.stringContaining("indisponível"),
     });
+    expect(m.contextoELimiteIa).not.toHaveBeenCalled();
     expect(m.from).not.toHaveBeenCalled();
   });
 
-  it("sessão válida sem profile devolve 401 (cadastro não encontrado)", async () => {
+  it("sessão válida sem profile ativo devolve 401 (cadastro não encontrado)", async () => {
     autenticado();
-    m.from.mockImplementation((tabela: string) =>
-      queryFake(tabela === "profiles" ? null : [])
-    );
+    // ia_contexto_e_limite devolve profile_id null pra inativo/desconhecido
+    // (my_profile_id filtra ativo) e não reserva slot
+    m.contextoELimiteIa.mockResolvedValue({ status: "sem_cadastro" });
     const res = await POST(req());
     expect(res.status).toBe(401);
     await expect(res.json()).resolves.toEqual({
       error: expect.stringContaining("Cadastro"),
     });
-    expect(m.consumirLimiteIa).not.toHaveBeenCalled();
+    expect(m.chamarModeloStream).not.toHaveBeenCalled();
   });
 
-  it("profile inativo não passa: a leitura filtra ativo antes do limite", async () => {
+  it("identidade e limite saem numa RPC só, depois do body", async () => {
     autenticado();
-    const eq = vi.fn();
-    // banco fake: o profile existe mas está inativo — só some com o filtro
-    m.from.mockImplementation((tabela: string) => {
-      if (tabela !== "profiles") return queryFake([]);
-      const filtros: [string, unknown][] = [];
-      const q = {
-        select: () => q,
-        eq: (col: string, v: unknown) => {
-          eq(col, v);
-          filtros.push([col, v]);
-          return q;
-        },
-        maybeSingle: async () => ({
-          data: filtros.some(([c, v]) => c === "ativo" && v === true) ? null : PROFILE,
-          error: null,
-        }),
-      };
-      return q;
+    m.chamarModeloStream.mockResolvedValue({ ok: true, content: "oi", toolCalls: [] });
+    await lerStream(await POST(req()));
+    expect(m.contextoELimiteIa).toHaveBeenCalledTimes(1);
+    expect(m.contextoELimiteIa).toHaveBeenCalledWith(expect.anything(), {
+      n_mensagens: 1,
     });
-    const res = await POST(req());
-    expect(eq).toHaveBeenCalledWith("ativo", true);
-    expect(res.status).toBe(401);
-    await expect(res.json()).resolves.toEqual({
-      error: expect.stringContaining("Cadastro"),
-    });
-    expect(m.consumirLimiteIa).not.toHaveBeenCalled();
+    // nada de select em profiles nem my_papeis separados
+    expect(m.from).not.toHaveBeenCalledWith("profiles");
+    expect(m.rpc).not.toHaveBeenCalledWith("my_papeis");
+    // por mensagem sem tool: só o lote do fim vai pelo rpc do client
+    expect(m.rpc.mock.calls.map(([fn]) => fn)).toEqual([
+      "registrar_ia_eventos_lote",
+    ]);
   });
 
   it("rate limit estourado devolve 429 e não registra a mensagem", async () => {
     autenticado();
-    m.consumirLimiteIa.mockResolvedValue({ permitido: false, usados: 20 });
+    m.contextoELimiteIa.mockResolvedValue({ status: "negado", usados: 20 });
     const res = await POST(req());
     expect(res.status).toBe(429);
-    // o recorte é o profile, não a sessão auth
-    expect(m.consumirLimiteIa).toHaveBeenCalledWith(
-      expect.anything(),
-      { n_mensagens: expect.any(Number) }
-    );
-    // my_papeis roda antes do limite (Promise.all da identidade) — o que
-    // não pode ter acontecido é registrar a mensagem
-    expect(m.rpc).not.toHaveBeenCalledWith(
-      "registrar_ia_evento",
-      expect.anything()
-    );
+    await expect(res.json()).resolves.toEqual({
+      error: expect.stringContaining("aguarde"),
+    });
+    // negado não grava nada: nem lote, nem evento avulso
+    expect(m.rpc).not.toHaveBeenCalled();
     expect(m.chamarModeloStream).not.toHaveBeenCalled();
   });
 
@@ -238,10 +228,8 @@ describe("gates — JSON antes do stream abrir", () => {
     await expect(res.json()).resolves.toEqual({
       error: expect.stringContaining("inválido"),
     });
-    expect(m.rpc).not.toHaveBeenCalledWith(
-      "registrar_ia_evento",
-      expect.anything()
-    );
+    expect(m.contextoELimiteIa).not.toHaveBeenCalled();
+    expect(m.rpc).not.toHaveBeenCalled();
   });
 
   it("body malformado devolve 400 em todas as formas", async () => {
@@ -271,6 +259,8 @@ describe("gates — JSON antes do stream abrir", () => {
       expect.anything()
     );
     expect(m.chamarModeloStream).not.toHaveBeenCalled();
+    // malformado nunca gasta slot do limite
+    expect(m.contextoELimiteIa).not.toHaveBeenCalled();
   });
 });
 
@@ -303,29 +293,27 @@ describe("stream SSE", () => {
     expect(texto).toContain('data: {"type":"done","tools":[]}');
   });
 
-  it("consome o limite atômico antes do stream (a RPC insere a 'mensagem')", async () => {
+  it("o resumo 'resposta' sai no lote com o request_id da reserva", async () => {
     m.chamarModeloStream.mockResolvedValue({
       ok: true,
       content: "oi",
       toolCalls: [],
     });
     await lerStream(await POST(req()));
-    // o evento 'mensagem' agora é a reserva dentro de consumir_limite_ia —
-    // negado nem abre stream; o request_id correla o resto da telemetria
-    expect(m.consumirLimiteIa).toHaveBeenCalledWith(
-      expect.anything(),
-      { n_mensagens: 1 }
-    );
-    // e o resumo 'resposta' sai com o request_id + telemetria da rodada
-    expect(m.rpc).toHaveBeenCalledWith(
-      "registrar_ia_evento",
+    const lotes = chamadasLote();
+    expect(lotes).toHaveLength(1);
+    expect(lotes[0][1].p_eventos).toEqual([
       expect.objectContaining({
-        p_canal: "chat",
-        p_tool: "resposta",
-        p_request_id: "req-teste",
-        p_ok: true,
-        p_iteracoes: 1,
-      })
+        canal: "chat",
+        tool: "resposta",
+        request_id: "req-teste",
+        ok: true,
+        iteracoes: 1,
+      }),
+    ]);
+    expect(m.rpc).not.toHaveBeenCalledWith(
+      "registrar_ia_evento",
+      expect.anything()
     );
   });
 
@@ -380,9 +368,10 @@ describe("stream SSE", () => {
       {},
       expect.anything(),
       "chat",
-      ["coordenacao"], // papéis já resolvidos pela rota (my_papeis) — a tool não refaz
+      ["coordenacao"], // papéis já resolvidos pela rota — a tool não refaz
       undefined, // autorProfileId — idem
-      "req-teste"
+      "req-teste",
+      { coletarEvento: expect.any(Function) } // auditoria vai no lote do fim
     );
     // o status chega com o rótulo por tool (STATUS_TOOL em lib/ia/ui.ts)
     expect(texto).toContain(
@@ -404,11 +393,12 @@ describe("stream SSE", () => {
     });
   });
 
-  it("my_papeis vazio cai no papel do profile", async () => {
-    m.from.mockImplementation((tabela: string) =>
-      queryFake(tabela === "profiles" ? { id: "prof-1", role: "mentor" } : [])
-    );
-    m.rpc.mockImplementation(() => Promise.resolve({ data: [], error: null }));
+  it("papeis vazio cai no papel do profile", async () => {
+    m.contextoELimiteIa.mockResolvedValue({
+      ...CTX_OK,
+      role: "mentor",
+      papeis: [],
+    });
     m.executarTool.mockResolvedValue({ ok: true, dados: {} });
     m.chamarModeloStream
       .mockResolvedValueOnce({
@@ -432,8 +422,62 @@ describe("stream SSE", () => {
       "chat",
       ["mentor"],
       undefined,
-      "req-teste"
+      "req-teste",
+      { coletarEvento: expect.any(Function) }
     );
+  });
+
+  it("eventos das tools vão junto do resumo numa chamada só do lote", async () => {
+    // executarTool real chama coletarEvento em vez de gravar; o mock imita
+    m.executarTool.mockImplementation(
+      async (
+        nome: string,
+        _a: unknown,
+        _s: unknown,
+        canal: string,
+        _p: unknown,
+        _autor: unknown,
+        requestId: string,
+        opcoes: { coletarEvento: (ev: Record<string, unknown>) => void }
+      ) => {
+        opcoes.coletarEvento({
+          canal,
+          tool: nome,
+          args: {},
+          ok: true,
+          erro: null,
+          duracao_ms: 5,
+          request_id: requestId,
+        });
+        return { ok: true, dados: {} };
+      }
+    );
+    const call = (id: string, name: string) => ({
+      id,
+      type: "function",
+      function: { name, arguments: "{}" },
+    });
+    m.chamarModeloStream
+      .mockResolvedValueOnce({
+        ok: true,
+        content: "",
+        toolCalls: [call("c1", "resumo_semana"), call("c2", "minhas_duplas")],
+      })
+      .mockResolvedValueOnce({ ok: true, content: "pronto", toolCalls: [] });
+
+    await lerStream(await POST(req()));
+
+    // uma RPC de escrita por mensagem: 2 tools + resumo no mesmo lote
+    expect(m.rpc).toHaveBeenCalledTimes(1);
+    const lotes = chamadasLote();
+    expect(lotes).toHaveLength(1);
+    const evs = lotes[0][1].p_eventos;
+    expect(evs.map((e) => e.tool)).toEqual([
+      "resumo_semana",
+      "minhas_duplas",
+      "resposta",
+    ]);
+    expect(evs.every((e) => e.request_id === "req-teste")).toBe(true);
   });
 
   it("provider sem SSE refaz a rodada em JSON (fallback) e emite o resto", async () => {

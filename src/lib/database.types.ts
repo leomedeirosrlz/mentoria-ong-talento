@@ -2633,6 +2633,24 @@ export type Database = {
         }
         Relationships: []
       }
+      ia_chunks_df: {
+        Row: {
+          lexema: string
+          n: number
+          origem: string
+        }
+        Insert: {
+          lexema: string
+          n: number
+          origem: string
+        }
+        Update: {
+          lexema?: string
+          n?: number
+          origem?: string
+        }
+        Relationships: []
+      }
       ia_config: {
         Row: {
           atualizado_em: string
@@ -4988,6 +5006,12 @@ export type Database = {
           },
         ]
       }
+      ia_guias_catalogo: {
+        Row: {
+          guia: string | null
+        }
+        Relationships: []
+      }
       jovem_assinaturas: {
         Row: {
           assinado_em: string | null
@@ -5660,6 +5684,7 @@ export type Database = {
         Args: { p_id: string; p_para: string }
         Returns: undefined
       }
+      atualizar_ia_chunks_df: { Args: never; Returns: number }
       atualizar_tentativa_registro: {
         Args: { p_etapas?: Json; p_id: string }
         Returns: undefined
@@ -5856,6 +5881,17 @@ export type Database = {
             }
             Returns: boolean
           }
+      ia_contexto_e_limite: {
+        Args: { p_args?: Json; p_canal?: string; p_limite?: number }
+        Returns: {
+          papeis: Database["public"]["Enums"]["app_role"][]
+          permitido: boolean
+          profile_id: string
+          request_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          usados: number
+        }[]
+      }
       ia_mcp_autorizar: {
         Args: { p_token: string }
         Returns: {
@@ -6050,6 +6086,7 @@ export type Database = {
         }
         Returns: string
       }
+      registrar_ia_eventos_lote: { Args: { p_eventos: Json }; Returns: number }
       registrar_login_handoff: {
         Args: { p_access: string; p_nonce: string; p_refresh: string }
         Returns: undefined

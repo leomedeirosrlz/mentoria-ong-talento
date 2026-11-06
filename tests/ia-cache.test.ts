@@ -10,10 +10,11 @@ import { CacheTtl, chavePergunta } from "@/lib/ia/cache";
 import { embedQuery } from "@/lib/ia/embed";
 import { buscarNosGuias, catalogoGuias, limparCacheGuias } from "@/lib/ia/guias";
 import { getIaConfig, limparCacheIaConfig } from "@/lib/ia/config";
+import { chavePainelIa, getPainelIa, limparCachePainelIa } from "@/lib/ia/queries";
 
 const embed = vi.mocked(embedQuery);
 
-/** supabase falso: rpc(match_ia_chunks) + from(ia_chunks|ia_config) */
+/** supabase falso: rpc(match_ia_chunks) + from(ia_chunks|ia_guias_catalogo|ia_config) */
 function clienteFalso(
   opts: {
     configRows?: { chave: string; valor: unknown }[];
@@ -43,18 +44,24 @@ function clienteFalso(
           return { data: opts.configRows ?? [], error: null };
         },
       };
-    // ia_chunks: catálogo (select("guia") awaited direto) ou textos (.in().in())
-    const textos = { data: [{ guia: "instrumento-roda-da-vida", pagina: 1, texto: "Texto inteiro do chunk." }], error: null };
-    const catalogo = { data: [{ guia: "b" }, { guia: "a" }, { guia: "a" }], error: null };
-    return {
-      select: (cols: string) => {
-        if (cols === "guia") {
+    // catálogo: a view (0162) já vem deduplicada; o null cobre a coluna
+    // nullable da view
+    if (tabela === "ia_guias_catalogo")
+      return {
+        select: async (cols: string) => {
+          expect(cols).toBe("guia");
           if (erroCatalogo) {
             erroCatalogo = false;
-            return Promise.resolve(erro);
+            return erro;
           }
-          return Promise.resolve(catalogo);
-        }
+          return { data: [{ guia: "b" }, { guia: "a" }, { guia: null }], error: null };
+        },
+      };
+    if (tabela !== "ia_chunks") throw new Error(`tabela inesperada: ${tabela}`);
+    // ia_chunks: só os textos (.in().in()) — o catálogo não varre mais a tabela
+    const textos = { data: [{ guia: "instrumento-roda-da-vida", pagina: 1, texto: "Texto inteiro do chunk." }], error: null };
+    return {
+      select: () => {
         return {
           in: () => ({
             in: async () => {
@@ -78,6 +85,7 @@ function clienteFalso(
 beforeEach(() => {
   limparCacheGuias();
   limparCacheIaConfig();
+  limparCachePainelIa();
   embed.mockReset();
 });
 afterEach(() => vi.useRealTimers());
@@ -207,11 +215,13 @@ describe("buscarNosGuias", () => {
 });
 
 describe("catalogoGuias", () => {
-  it("nomes únicos e ordenados, lidos uma vez", async () => {
+  it("lê a view ia_guias_catalogo uma vez, ordenado e sem null", async () => {
     const sb = clienteFalso();
     expect(await catalogoGuias(sb)).toEqual(["a", "b"]);
     await catalogoGuias(sb);
     expect(sb.from).toHaveBeenCalledTimes(1);
+    expect(sb.from).toHaveBeenCalledWith("ia_guias_catalogo");
+    expect(sb.from).not.toHaveBeenCalledWith("ia_chunks");
   });
 
   it("erro devolve lista vazia sem guardar", async () => {
@@ -250,5 +260,103 @@ describe("getIaConfig com cache", () => {
     vi.advanceTimersByTime(2);
     await getIaConfig(sb);
     expect(sb.from).toHaveBeenCalledTimes(2);
+  });
+});
+
+/** supabase falso do painel /ia: ia_eventos (.select.gte.order.range) e
+ *  profiles (.select.in), contando as leituras de cada tabela */
+function clientePainel(opts: { erroProfiles?: boolean } = {}) {
+  let { erroProfiles } = opts;
+  const eventos = [
+    { profile_id: "p-1", canal: "chat", tool: "mensagem", created_at: "2026-11-05T12:00:00Z" },
+    { profile_id: "p-2", canal: "mcp", tool: "mensagem", created_at: "2026-11-05T11:00:00Z" },
+    { profile_id: "p-1", canal: "chat", tool: "resposta", created_at: "2026-11-05T10:00:00Z" },
+    { profile_id: null, canal: "chat", tool: "mensagem", created_at: "2026-11-05T09:00:00Z" },
+  ];
+  const inIds: string[][] = [];
+  const from = vi.fn((tabela: string) => {
+    if (tabela === "ia_eventos")
+      return {
+        select: () => ({
+          gte: () => ({ order: () => ({ range: async () => ({ data: eventos, error: null }) }) }),
+        }),
+      };
+    if (tabela === "profiles")
+      return {
+        select: () => ({
+          in: async (_col: string, ids: string[]) => {
+            inIds.push(ids);
+            if (erroProfiles) {
+              erroProfiles = false;
+              return { data: null, error: { message: "falhou" } };
+            }
+            return {
+              data: [
+                { id: "p-1", nome: "Ana", nome_social: null },
+                { id: "p-2", nome: "Bruno", nome_social: "Bia" },
+              ],
+              error: null,
+            };
+          },
+        }),
+      };
+    throw new Error(`tabela inesperada: ${tabela}`);
+  });
+  const sb = { from } as unknown as Parameters<typeof getPainelIa>[0] & { from: typeof from };
+  const leituras = (t: string) => from.mock.calls.filter(([x]) => x === t).length;
+  return { sb, leituras, inIds };
+}
+
+describe("painel /ia com cache", () => {
+  it("só a coordenação tem chave, prefixada e por período", () => {
+    expect(chavePainelIa("coordenacao", 30)).toBe("coord|30");
+    expect(chavePainelIa("coordenacao", 7)).not.toBe(chavePainelIa("coordenacao", 30));
+    for (const papel of ["supervisor", "mentor_dpp", "mentorado", null, undefined] as const)
+      expect(chavePainelIa(papel, 30)).toBeNull();
+  });
+
+  it("coordenação: troca de chip no mesmo período não relê o banco", async () => {
+    const { sb, leituras, inIds } = clientePainel();
+    const a = await getPainelIa(sb, "coordenacao", 30);
+    const b = await getPainelIa(sb, "coordenacao", 30);
+    expect(b).toBe(a);
+    expect(leituras("ia_eventos")).toBe(1);
+    expect(leituras("profiles")).toBe(1);
+    // profiles só dos ids presentes nos eventos, sem repetir nem null
+    expect(inIds).toEqual([["p-1", "p-2"]]);
+    expect(a.nomes.get("p-1")).toBe("Ana");
+    expect(a.nomes.get("p-2")).toBe("Bia");
+    expect(a.eventos).toHaveLength(4);
+    expect(a.truncado).toBe(false);
+  });
+
+  it("outro período é outra chave; TTL de 60s relê", async () => {
+    vi.useFakeTimers();
+    const { sb, leituras } = clientePainel();
+    await getPainelIa(sb, "coordenacao", 30);
+    await getPainelIa(sb, "coordenacao", 7);
+    expect(leituras("ia_eventos")).toBe(2);
+    vi.advanceTimersByTime(60_001);
+    await getPainelIa(sb, "coordenacao", 30);
+    expect(leituras("ia_eventos")).toBe(3);
+  });
+
+  it("fora da coordenação nunca lê nem grava o cache", async () => {
+    const { sb, leituras } = clientePainel();
+    await getPainelIa(sb, "supervisor", 30);
+    await getPainelIa(sb, "supervisor", 30);
+    expect(leituras("ia_eventos")).toBe(2);
+    // a leitura do supervisor não semeou a chave da coordenação
+    await getPainelIa(sb, "coordenacao", 30);
+    expect(leituras("ia_eventos")).toBe(3);
+  });
+
+  it("falha em profiles serve sem nomes e não fica guardada", async () => {
+    const erro = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { sb, leituras } = clientePainel({ erroProfiles: true });
+    expect((await getPainelIa(sb, "coordenacao", 30)).nomes.size).toBe(0);
+    expect((await getPainelIa(sb, "coordenacao", 30)).nomes.get("p-1")).toBe("Ana");
+    expect(leituras("ia_eventos")).toBe(2);
+    erro.mockRestore();
   });
 });

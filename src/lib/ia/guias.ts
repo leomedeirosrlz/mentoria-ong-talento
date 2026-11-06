@@ -2,7 +2,7 @@
 // institucional e igual pra todo mundo (ia_chunks não tem recorte por
 // pessoa) e só muda quando o ingest roda — então a mesma pergunta não
 // precisa repetir embedding + RPC + leitura dos chunks a cada vez, e o
-// catálogo não precisa trazer as ~460 linhas de ia_chunks por chamada.
+// catálogo (view ia_guias_catalogo) não precisa ser relido por chamada.
 //
 // Custo por pergunta inédita: 1 embedding + 2 queries. Pergunta repetida
 // (chip de sugestão, dúvida comum) dentro de 10 min: zero.
@@ -88,13 +88,17 @@ export async function catalogoGuias(supabase: SupabaseClient): Promise<string[]>
   return cacheCatalogo.obter(
     "catalogo",
     async () => {
-      const { data, error } = await supabase.from("ia_chunks").select("guia");
+      // a view (0162) já deduplica no banco: uma linha por guia em vez de
+      // todos os chunks, longe do corte de max_rows do PostgREST
+      const { data, error } = await supabase.from("ia_guias_catalogo").select("guia");
       if (error) {
         console.error("catalogoGuias:", error);
         falhou = true;
         return [];
       }
-      return [...new Set((data ?? []).map((r) => r.guia as string))].sort();
+      return [...new Set((data ?? []).map((r) => r.guia as string | null))]
+        .filter((g): g is string => !!g)
+        .sort();
     },
     () => !falhou
   );

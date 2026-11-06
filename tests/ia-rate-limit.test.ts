@@ -12,7 +12,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { consumirLimiteIa } from "@/lib/ia/rate-limit";
+import { consumirLimiteIa, contextoELimiteIa } from "@/lib/ia/rate-limit";
 
 type RespostaRpc = {
   data: unknown;
@@ -113,6 +113,92 @@ describe("consumirLimiteIa", () => {
     });
     expect(spy).toHaveBeenCalledWith(
       "consumirLimiteIa:",
+      expect.objectContaining({ message: "postgrest down" })
+    );
+  });
+});
+
+// contextoELimiteIa — o chat junta identidade (profile ativo, papel, papéis
+// efetivos) e a reserva do limite numa RPC só (ia_contexto_e_limite, 0160).
+// Mesmo fail-closed do consumirLimiteIa, mas erro vira "negado" (429), não
+// "sem_cadastro" (401): banco degradado não deve mandar ninguém pro login.
+describe("contextoELimiteIa", () => {
+  afterEach(() => vi.restoreAllMocks());
+
+  const LINHA = {
+    profile_id: "prof-1",
+    role: "mentor_dpp",
+    papeis: ["mentor_dpp", "mentorado"],
+    permitido: true,
+    usados: 2,
+    request_id: "req-1",
+  };
+
+  it("ok: uma RPC devolve identidade + veredicto + request_id", async () => {
+    const { supabase, chamadas } = supaFake({ data: [LINHA], error: null });
+    const v = await contextoELimiteIa(supabase, { n_mensagens: 1 });
+    expect(v).toEqual({
+      status: "ok",
+      profileId: "prof-1",
+      role: "mentor_dpp",
+      papeis: ["mentor_dpp", "mentorado"],
+      usados: 2,
+      requestId: "req-1",
+    });
+    expect(chamadas).toEqual([
+      {
+        fn: "ia_contexto_e_limite",
+        args: { p_args: { n_mensagens: 1 }, p_limite: 20, p_canal: "chat" },
+      },
+    ]);
+  });
+
+  it("profile inativo/desconhecido (profile_id null) vira sem_cadastro", async () => {
+    const { supabase } = supaFake({
+      data: [{ ...LINHA, profile_id: null, permitido: false, request_id: null }],
+      error: null,
+    });
+    expect(await contextoELimiteIa(supabase, {})).toEqual({
+      status: "sem_cadastro",
+    });
+    const vazio = supaFake({ data: [], error: null });
+    expect(await contextoELimiteIa(vazio.supabase, {})).toEqual({
+      status: "sem_cadastro",
+    });
+  });
+
+  it("limite estourado vira negado com os usados", async () => {
+    const { supabase } = supaFake({
+      data: { ...LINHA, permitido: false, usados: 20, request_id: null },
+      error: null,
+    });
+    expect(await contextoELimiteIa(supabase, {})).toEqual({
+      status: "negado",
+      usados: 20,
+    });
+  });
+
+  it("papeis nulo vira lista vazia (a rota cai no role)", async () => {
+    const { supabase } = supaFake({
+      data: [{ ...LINHA, papeis: null }],
+      error: null,
+    });
+    const v = await contextoELimiteIa(supabase, {});
+    expect(v.status === "ok" && v.papeis).toEqual([]);
+  });
+
+  it("erro da RPC é fail-closed como negado (429), não 401", async () => {
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const { supabase } = supaFake({
+      data: null,
+      error: { message: "postgrest down" },
+    });
+    expect(await contextoELimiteIa(supabase, {})).toEqual({
+      status: "negado",
+      usados: 20,
+    });
+    expect(spy).toHaveBeenCalledWith(
+      "contextoELimiteIa:",
       expect.objectContaining({ message: "postgrest down" })
     );
   });

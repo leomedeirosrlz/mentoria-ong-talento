@@ -794,6 +794,28 @@ function resumoZod(err: z.ZodError): string {
     .join("; ");
 }
 
+/** Evento de ia_eventos no formato do registrar_ia_eventos_lote (0160) —
+ *  o chat junta as tools da mensagem + o resumo 'resposta' numa escrita. */
+export type EventoIa = {
+  canal: CanalIa;
+  tool: string;
+  args: Record<string, unknown>;
+  ok: boolean;
+  erro?: string | null;
+  duracao_ms?: number | null;
+  request_id?: string | null;
+  modelo?: string | null;
+  tier?: string | null;
+  tokens_in?: number | null;
+  tokens_out?: number | null;
+  tokens_reasoning?: number | null;
+  cache_read?: number | null;
+  custo_usd?: number | null;
+  allowance_usd?: number | null;
+  billing_source?: string | null;
+  iteracoes?: number | null;
+};
+
 /** Ponto único de execução das tools — valida args (zod), barra papel fora
  *  da allowlist ANTES de rodar, mede a duração e grava ia_eventos via RPC
  *  (o `await` importa: rpc() solto é lazy e nunca chegaria no PostgREST;
@@ -813,7 +835,11 @@ export async function executarTool(
   autorProfileId?: string,
   /** request_id da reserva do limite — correla os eventos da tool com a
    *  mensagem que a disparou (sdd D4). Ausente no MCP por enquanto. */
-  requestId?: string
+  requestId?: string,
+  /** coletarEvento: o caller guarda o evento de auditoria e grava em lote
+   *  (chat → registrar_ia_eventos_lote no fim do stream). Ausente → grava
+   *  na hora via registrar_ia_evento, como o MCP faz. */
+  opcoes?: { coletarEvento?: (ev: EventoIa) => void }
 ): Promise<ResultadoTool> {
   const inicio = Date.now();
   let ok = false;
@@ -856,6 +882,19 @@ export async function executarTool(
       console.error(`executarTool(${nome}):`, e);
       erro = "Não consegui executar esta consulta agora.";
     }
+  }
+
+  if (opcoes?.coletarEvento) {
+    opcoes.coletarEvento({
+      canal,
+      tool: nome,
+      args: argsMinimizados(nome, argsLog),
+      ok,
+      erro,
+      duracao_ms: Date.now() - inicio,
+      request_id: requestId ?? null,
+    });
+    return ok ? { ok: true, dados } : { ok: false, erro: erro! };
   }
 
   try {
