@@ -49,7 +49,10 @@ export function ehRica(a: Analise, temUi: boolean): boolean {
   );
 }
 
-const INLINE = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/g;
+// itálico em CommonMark simplificado: o conteúdo não começa nem termina
+// com espaço e o * de abertura não cola em caractere de palavra — sem a
+// régua, "2 * 3 = 6 e 4 * 5" virava <em> no meio da conta
+const INLINE = /(\*\*[^\s*](?:[^*\n]*[^\s*])?\*\*|(?<!\w)\*[^\s*](?:[^*\n]*[^\s*])?\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/g;
 
 /** Texto fatiado em ~6 chars com fade por fatia (stream): o conteúdo
  *  só cresce no fim, então spans anteriores não re-animam e as novas
@@ -74,11 +77,26 @@ export function Inline({ texto, animar }: { texto: string; animar?: boolean }) {
   return (
     <>
       {texto.split(INLINE).map((parte, i) => {
-        if (parte.startsWith("**") && parte.endsWith("**"))
+        // split com grupo de captura: índice ímpar = trecho que casou o
+        // INLINE; par = texto solto ("* fora *" não pode virar <em>)
+        const casou = i % 2 === 1;
+        if (casou && parte.startsWith("**") && parte.endsWith("**"))
           return (
             <strong key={i}>
               {animar ? <Tokens texto={parte.slice(2, -2)} /> : parte.slice(2, -2)}
             </strong>
+          );
+        if (
+          casou &&
+          parte.length > 2 &&
+          parte.startsWith("*") &&
+          parte.endsWith("*") &&
+          !parte.startsWith("**")
+        )
+          return (
+            <em key={i}>
+              {animar ? <Tokens texto={parte.slice(1, -1)} /> : parte.slice(1, -1)}
+            </em>
           );
         if (parte.startsWith("`") && parte.endsWith("`"))
           return (
@@ -266,6 +284,22 @@ function MdLite({
   // tag do fence corrente (```sql) — vira o rótulo do header do CodeBlock
   let langCodigo: string | undefined;
   let key = 0;
+  // ```nota é a observação de rodapé — texto menor e apagado, não código
+  // (chatgpt-style footnote; o prompt a usa p/ "não se aplica quando…",
+  // detalhe de cálculo, lembrete fino). Vale no fence fechado e no aberto
+  // (stream ou fim truncado): já renderiza como rodapé, nunca CodeBlock
+  const notaRodape = () => (
+    <div
+      key={key++}
+      className="text-xs leading-relaxed text-muted-foreground opacity-80"
+    >
+      {codigo.map((l, i) => (
+        <p key={i}>
+          <Inline texto={l} animar={animar} />
+        </p>
+      ))}
+    </div>
+  );
   const flush = () => {
     if (!lista?.length) return;
     const items = lista.map((l, i) => (
@@ -293,9 +327,11 @@ function MdLite({
     // e copiar), sem inline
     if (emCodigo) {
       if (/^\s*```/.test(linha)) {
-        saida.push(
-          <CodeBlock key={key++} codigo={codigo.join("\n")} linguagem={langCodigo} />
-        );
+        if (langCodigo === "nota") saida.push(notaRodape());
+        else
+          saida.push(
+            <CodeBlock key={key++} codigo={codigo.join("\n")} linguagem={langCodigo} />
+          );
         emCodigo = false;
         codigo = [];
         langCodigo = undefined;
@@ -349,12 +385,20 @@ function MdLite({
     }
     flush();
     if (!linha.trim()) return;
-    const h = /^#{1,3}\s+(.+)$/.exec(linha);
+    const h = /^(#{1,3})\s+(.+)$/.exec(linha);
     if (h) {
+      // títulos curtos na hierarquia do painel: h2/h3 semânticos —
+      // a bolha vive dentro da página (o h1 já é dela), então nem o
+      // modelo emite h1 e um eventual # cai no mesmo nível do ##
+      const nivel = h[1].length;
+      const Tag = (nivel >= 3 ? "h3" : "h2") as "h2" | "h3";
       saida.push(
-        <p key={key++} className="font-semibold">
-          <Inline texto={h[1]} animar={animar} />
-        </p>
+        <Tag
+          key={key++}
+          className={nivel >= 3 ? "text-sm font-semibold" : "text-base font-semibold"}
+        >
+          <Inline texto={h[2]} animar={animar} />
+        </Tag>
       );
       return;
     }
@@ -374,12 +418,15 @@ function MdLite({
     );
   });
   flush();
-  // fence comum aberto no fim do stream: mostra o que chegou — copiar fica
-  // desabilitado até o fence fechar (o bloco ainda está incompleto)
+  // fence aberto no fim do stream (ou texto truncado sem fechamento):
+  // fence comum mostra o que chegou com copiar desabilitado; ```nota
+  // aberto já renderiza como rodapé — nunca vira bloco de código
   if (emCodigo && codigo.length)
-    saida.push(
-      <CodeBlock key={key++} codigo={codigo.join("\n")} linguagem={langCodigo} pronto={false} />
-    );
+    langCodigo === "nota"
+      ? saida.push(notaRodape())
+      : saida.push(
+          <CodeBlock key={key++} codigo={codigo.join("\n")} linguagem={langCodigo} pronto={false} />
+        );
   // overflow-wrap: links longos e código sem quebra não vazam da coluna
   // estreita do painel (REALIZA-334). ia-stream põe o caret no fim do
   // último parágrafo/item (CSS), não numa linha própria

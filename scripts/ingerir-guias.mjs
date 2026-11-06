@@ -249,4 +249,17 @@ for (const g of orfaos) {
   console.log(`− ${g}: saiu do corpus, chunks removidos`);
 }
 
+// match_ia_chunks lê o df dos lexemas de ia_chunks_df (0161) em vez de
+// recontar o corpus a cada busca: sem o recompute os pesos ficam defasados.
+const { data: linhasDf, error: dfErr } = await supabase.rpc("atualizar_ia_chunks_df");
+if (dfErr) {
+  console.error(
+    `✗ recálculo do df (atualizar_ia_chunks_df) falhou — ${dfErr.message}. ` +
+      "Os chunks já foram gravados; a busca usa pesos antigos até rodar " +
+      "`select public.atualizar_ia_chunks_df();` no SQL editor."
+  );
+  process.exit(1);
+}
+console.log(`✓ df recalculado: ${linhasDf} lexemas`);
+
 console.log(`\n== ingestão ok: ${total} chunks em ${docs.length} documentos.`);

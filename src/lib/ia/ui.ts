@@ -176,6 +176,42 @@ export type UiFontes = {
   }[];
 };
 
+// ---------- mentorado (pacote liza nov/2026) ----------
+
+/** Checklist visual dos combinados — pendente com prazo primeiro,
+ *  feito recente em tom ok por último. */
+export type UiCombinados = {
+  kind: "combinados";
+  pendentes: { texto: string; prazo: string | null }[];
+  feitos: string[];
+};
+
+/** Progresso da jornada do jovem — instrumentos com entregas feitas ×
+ *  pendentes; o card mostra a esteira de "o que falta responder". */
+export type UiJornada = {
+  kind: "jornada";
+  dupla_id: string;
+  instrumentos: {
+    sistema: string;
+    titulo: string;
+    respondidos: number;
+    pendentes: number;
+  }[];
+  total_respondidos: number;
+  total_pendentes: number;
+};
+
+/** Pedido de especialista do jovem — quem, sobre o quê, em que pé. */
+export type UiPedidos = {
+  kind: "pedidos";
+  pedidos: {
+    especialista: string | null;
+    sobre: string | null;
+    status: string;
+    criado_em: string;
+  }[];
+};
+
 export type UiBloco =
   | UiSaude
   | UiDupla
@@ -186,7 +222,10 @@ export type UiBloco =
   | UiPessoas
   | UiChamados
   | UiInstrumentos
-  | UiFontes;
+  | UiFontes
+  | UiCombinados
+  | UiJornada
+  | UiPedidos;
 
 export type UiKind = UiBloco["kind"];
 
@@ -203,6 +242,12 @@ export const STATUS_TOOL: Record<string, string> = {
   chamados_resumo: "Lendo os chamados…",
   pessoas_busca: "Procurando a pessoa…",
   instrumentos_da_dupla: "Abrindo os instrumentos…",
+  minha_dupla: "Olhando sua dupla…",
+  minha_agenda: "Abrindo sua agenda…",
+  meus_combinados: "Vendo seus combinados…",
+  meu_progresso: "Olhando sua jornada…",
+  meus_pedidos: "Vendo seus pedidos…",
+  ajuda_faq: "Buscando na ajuda…",
 };
 
 // ---------- projetores (puros) ----------
@@ -409,6 +454,129 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           guia: String(f.guia),
           secao: str(f.secao),
           trecho: limparTrecho(str(f.trecho), 320),
+        })),
+      };
+    }
+    // ---------- mentorado ----------
+    case "minha_dupla": {
+      if (!str(d.dupla_id)) return null;
+      const encontros = arr(d.encontros).map((e) => ({
+        numero: num(e.numero),
+        status: e.status as EncontroStatus,
+        tem_registro: false,
+      }));
+      const prox =
+        encontros.find(
+          (e) => e.status === "agendado" || e.status === "remarcado"
+        ) ?? null;
+      const dataProx = prox
+        ? (arr(d.encontros).find((e) => num(e.numero) === prox.numero)
+            ?.data_hora as string | null) ?? null
+        : null;
+      return {
+        kind: "dupla",
+        id: String(d.dupla_id),
+        mentor: str(d.mentor),
+        // o outro lado da dupla é quem tá perguntando — "Você", não
+        // "Mentorado a definir" (o jovem não lê o próprio nome aqui)
+        mentorado: "Você",
+        supervisor: str(d.supervisor),
+        trilha: d.trilha as Trilha,
+        status: d.status as DuplaStatus,
+        turma: str(d.turma),
+        feitos: encontros.filter((e) => e.status === "realizado").length,
+        encontros,
+        proximo: prox ? { numero: prox.numero, data_hora: dataProx } : null,
+      };
+    }
+    case "minha_agenda": {
+      const proximos = arr(d.proximos);
+      if (!proximos.length) return null;
+      const datas = proximos
+        .map((e) => str(e.data_hora))
+        .filter((x): x is string => x != null)
+        .sort();
+      return {
+        kind: "agenda",
+        desde: datas[0] ?? "",
+        ate: datas[datas.length - 1] ?? "",
+        total: proximos.length,
+        encontros: proximos.map((e) => ({
+          dupla_id: String(e.dupla_id),
+          // a tool resolve o adulto de cada dupla (DPP e especialista
+          // convivem) — sem ele toda linha virava "a definir"
+          mentor: str(e.mentor),
+          mentorado: "Você",
+          numero: num(e.numero),
+          status: e.status as EncontroStatus,
+          data_hora: str(e.data_hora),
+        })),
+      };
+    }
+    case "meus_combinados": {
+      const pendentes = arr(d.pendentes);
+      const feitos = arr(d.feitos_recentes);
+      if (!pendentes.length && !feitos.length) return null;
+      return {
+        kind: "combinados",
+        pendentes: pendentes.map((c) => ({
+          texto: String(c.texto),
+          prazo: str(c.prazo),
+        })),
+        feitos: feitos.map((c) => String(c.texto)),
+      };
+    }
+    case "meu_progresso": {
+      const itens = arr(d.instrumentos);
+      if (!itens.length) return null;
+      return {
+        kind: "jornada",
+        dupla_id: String(d.dupla_id),
+        instrumentos: itens.map((i) => ({
+          sistema: String(i.sistema),
+          titulo: String(i.titulo ?? i.sistema),
+          respondidos: num(i.respondidos),
+          pendentes: num(i.pendentes),
+        })),
+        total_respondidos: num(d.total_respondidos),
+        total_pendentes: num(d.total_pendentes),
+      };
+    }
+    case "meus_pedidos": {
+      const ps = arr(d.pedidos);
+      if (!ps.length) return null;
+      // a vez dele primeiro (responder proposta/sugestão), depois o que tá
+      // esperando; os encerrados no fim — a ordem alfabética da view
+      // escondia justamente os pedidos que pedem ação do jovem
+      const ORDEM: Record<string, number> = {
+        contra_proposta: 0,
+        sugerida: 1,
+        aguardando_coord: 2,
+        aberta: 2,
+      };
+      const ordenados = [...ps].sort(
+        (a, b) =>
+          (ORDEM[String(a.status)] ?? 3) - (ORDEM[String(b.status)] ?? 3)
+      );
+      return {
+        kind: "pedidos",
+        pedidos: ordenados.slice(0, 5).map((p) => ({
+          especialista: str(p.especialista),
+          sobre: corta(str(p.sobre), 120),
+          status: String(p.status),
+          criado_em: String(p.criado_em),
+        })),
+      };
+    }
+    case "ajuda_faq": {
+      const rs = arr(d.respostas);
+      if (!rs.length) return null;
+      return {
+        kind: "fontes",
+        fontes: rs.slice(0, 3).map((r) => ({
+          guia: "Ajuda do Realiza",
+          secao: str(r.pergunta),
+          trecho: limparTrecho(str(r.resposta), 320),
         })),
       };
     }

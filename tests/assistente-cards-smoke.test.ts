@@ -184,6 +184,20 @@ describe("UiCard: conteúdo", () => {
     expect(out).toContain("Ver minha jornada");
   });
 
+  it("dupla encerrada do jovem lê 'Encerrada', nunca 'Desistente'", () => {
+    // na voz do jovem a encerrada é neutra — "desistente" é vocabulário
+    // interno da equipe, que segue vendo o rótulo de sempre
+    const encerrada = {
+      ...(de("dupla") as Extract<UiBloco, { kind: "dupla" }>),
+      status: "encerrada" as const,
+    };
+    const jovem = { ...encerrada };
+    delete jovem.semaforo;
+    expect(html(jovem)).toContain("Encerrada");
+    expect(html(jovem)).not.toContain("Desistente");
+    expect(html(encerrada)).toContain("Desistente");
+  });
+
   it("agenda agrupa por dia (Hoje) e deixa sem data no fim", () => {
     const out = html(de("agenda"));
     expect(out).toContain("Hoje");

@@ -4,7 +4,7 @@
 // O supabase fake é chainable no mínimo que as queries usam — as linhas
 // voltam prontas (a RLS real não roda aqui; o que se testa é a tool).
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   executarTool,
@@ -13,12 +13,21 @@ import {
   IA_TOOL_NOMES,
 } from "@/lib/ia/tools";
 import { IA_REGISTRO_SELECT, IA_SAUDE_SELECT } from "@/lib/ia/queries";
+import { limparCacheIaConfig } from "@/lib/ia/config";
+import { limparCacheGuias } from "@/lib/ia/guias";
 import {
   CICLO_16,
   encRealizado,
   mkDupla,
   mkEncaminhamento,
 } from "./helpers";
+
+// config e guias têm cache por módulo: sem limpar, um teste herdava o
+// que o anterior leu
+beforeEach(() => {
+  limparCacheIaConfig();
+  limparCacheGuias();
+});
 
 // uuid v4 + variante 8 — z.uuid() do zod 4 exige o formato RFC (versão no
 // 3º grupo, variante no 4º), igual aos gen_random_uuid() do banco
@@ -111,17 +120,23 @@ const dadosDe = (r: Awaited<ReturnType<typeof executarTool>>) => {
 };
 
 describe("registry", () => {
-  it("declara as 11 tools com descrição pt-BR e papéis", () => {
+  it("declara as 17 tools com descrição pt-BR e papéis", () => {
     expect(IA_TOOL_NOMES.sort()).toEqual(
       [
         "agenda_do_periodo",
         "aguardando_par",
+        "ajuda_faq",
         "capacidade_mentores",
         "chamados_resumo",
         "duplas_do_usuario",
         "ficha_dupla",
         "guia_consulta",
         "instrumentos_da_dupla",
+        "meu_progresso",
+        "meus_combinados",
+        "meus_pedidos",
+        "minha_agenda",
+        "minha_dupla",
         "pessoas_busca",
         "registros_da_dupla",
         "resumo_semana",
@@ -146,6 +161,17 @@ describe("registry", () => {
     // `duplas` (a ficha dele vem da view) e uma só dupla não pede índice
     expect(IA_TOOLS.duplas_do_usuario.roles).not.toContain("mentorado");
     expect(IA_TOOLS.agenda_do_periodo.roles).not.toContain("mentorado");
+    // tools do jovem são só dele — staff nunca as chama (pacote nov/2026)
+    for (const n of [
+      "minha_dupla",
+      "minha_agenda",
+      "meus_combinados",
+      "meu_progresso",
+      "meus_pedidos",
+      "ajuda_faq",
+    ] as const) {
+      expect(IA_TOOLS[n].roles).toEqual(["mentorado"]);
+    }
   });
 });
 
@@ -235,6 +261,29 @@ describe("executarTool — gate de papel", () => {
     const { supabase, fromCalls } = supaFake({ papel: null });
     const r = await executarTool("resumo_semana", {}, supabase, "mcp");
     expect(r.ok).toBe(false);
+    expect(fromCalls).toHaveLength(0);
+  });
+
+  it("staff não chama tool do jovem — o gate fecha dos dois lados", async () => {
+    for (const papel of ["coordenacao", "supervisor", "mentor_dpp"] as const) {
+      const { supabase, fromCalls } = supaFake({ papel });
+      const r = await executarTool("minha_dupla", {}, supabase, "chat");
+      expect(r.ok).toBe(false);
+      expect(fromCalls).toHaveLength(0);
+    }
+  });
+
+  it("ajuda_faq responde sem tocar no banco (FAQ é estático)", async () => {
+    const { supabase, fromCalls } = supaFake({ papel: "mentorado" });
+    const r = await executarTool(
+      "ajuda_faq",
+      { topico: "quem marca o encontro" },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(true);
+    const d = dadosDe(r) as { respostas: { pergunta: string }[] };
+    expect(d.respostas.length).toBeGreaterThan(0);
     expect(fromCalls).toHaveLength(0);
   });
 });
@@ -706,6 +755,98 @@ describe("executarTool — auditoria", () => {
     expect(r.ok).toBe(true);
     expect(consoleSpy).toHaveBeenCalled();
     consoleSpy.mockRestore();
+  });
+
+  it("default (sem coletarEvento) segue gravando na hora — caminho do MCP", async () => {
+    const { supabase, auditCalls, auditAwaited } = supaFake({
+      tabelas: { registros: [] },
+    });
+    await executarTool(
+      "registros_da_dupla",
+      { dupla_id: UUID },
+      supabase,
+      "mcp",
+      ["coordenacao"],
+      "prof-autor",
+      "req-1"
+    );
+    expect(auditCalls).toHaveLength(1);
+    expect(auditCalls[0]).toMatchObject({
+      p_canal: "mcp",
+      p_profile_id: "prof-autor",
+      p_request_id: "req-1",
+    });
+    expect(auditAwaited()).toBe(true);
+  });
+
+  it("coletarEvento devolve o evento ao caller em vez de gravar", async () => {
+    const { supabase, auditCalls } = supaFake({
+      tabelas: { registros: [] },
+    });
+    const coletados: Record<string, unknown>[] = [];
+    const r = await executarTool(
+      "registros_da_dupla",
+      { dupla_id: UUID, limite: 3 },
+      supabase,
+      "chat",
+      ["coordenacao"],
+      undefined,
+      "req-2",
+      { coletarEvento: (ev) => coletados.push(ev) }
+    );
+    expect(r.ok).toBe(true);
+    // nenhuma escrita avulsa: o chat manda tudo no lote do fim
+    expect(auditCalls).toHaveLength(0);
+    expect(coletados).toEqual([
+      {
+        canal: "chat",
+        tool: "registros_da_dupla",
+        args: { dupla_id: UUID, limite: 3 },
+        ok: true,
+        erro: null,
+        duracao_ms: expect.any(Number),
+        request_id: "req-2",
+      },
+    ]);
+  });
+
+  it("evento coletado mantém a minimização de args (texto livre vira hash)", async () => {
+    const { supabase } = supaFake({ rpcData: { match_ia_chunks: [] } });
+    const coletados: { args: Record<string, unknown>; ok: boolean }[] = [];
+    await executarTool(
+      "guia_consulta",
+      { pergunta: "como falar com a Ana sobre faltas?" },
+      supabase,
+      "chat",
+      ["coordenacao"],
+      undefined,
+      "req-3",
+      { coletarEvento: (ev) => coletados.push(ev) }
+    );
+    expect(coletados).toHaveLength(1);
+    expect(coletados[0].args.pergunta).toEqual({
+      n: "como falar com a Ana sobre faltas?".length,
+      hash12: expect.stringMatching(/^[0-9a-f]{12}$/),
+    });
+  });
+
+  it("erro de validação também sai no evento coletado", async () => {
+    const { supabase, auditCalls } = supaFake();
+    const coletados: { ok: boolean; erro?: string | null }[] = [];
+    const r = await executarTool(
+      "registros_da_dupla",
+      { dupla_id: "nao-e-uuid" },
+      supabase,
+      "chat",
+      ["coordenacao"],
+      undefined,
+      "req-4",
+      { coletarEvento: (ev) => coletados.push(ev) }
+    );
+    expect(r.ok).toBe(false);
+    expect(auditCalls).toHaveLength(0);
+    expect(coletados[0]).toMatchObject({ ok: false });
+    expect(coletados[0].erro).toContain("Argumentos inválidos");
   });
 
   it("guia_consulta devolve trechos citáveis limpos, sem score nem pagina", async () => {

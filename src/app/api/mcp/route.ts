@@ -20,7 +20,8 @@ import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { executarTool, IA_TOOL_CATALOGO } from "@/lib/ia/tools";
-import { checarLimiteIa } from "@/lib/ia/rate-limit";
+import { consumirLimiteIa } from "@/lib/ia/rate-limit";
+import { clientImpersonado } from "@/lib/ia/impersonar";
 import type { AppRole } from "@/lib/types";
 
 export const dynamic = "force-dynamic";
@@ -51,9 +52,11 @@ function rpcErro(id: unknown, code: number, message: string) {
   });
 }
 
-/** Service client pra execução das tools — o PAT não vira JWT, então as
- *  queries rodam como service; o escopo certo vem do gate de papel (fase
- *  1 = só staff, que já enxerga tudo) + dos papéis forçados no registry. */
+/** Service client SÓ pra autenticar o PAT (ia_mcp_autorizar roda antes de
+ *  sabermos quem é o dono). A execução das tools usa clientImpersonado —
+ *  JWT real do dono, RLS decide o escopo (sdd D1). Service-role bypassaria
+ *  a RLS: um PAT de supervisor leria como coordenador — priv-esc por canal
+ *  externo com credencial de longa duração. */
 function clientServico() {
   return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -77,7 +80,12 @@ export async function POST(req: Request) {
     p_token: token,
   });
   const autorizado = authRows?.[0] as
-    | { profile_id: string; papel: AppRole | null; papeis: AppRole[] }
+    | {
+        profile_id: string;
+        user_id: string | null;
+        papel: AppRole | null;
+        papeis: AppRole[];
+      }
     | undefined;
   if (!autorizado) {
     return NextResponse.json(
@@ -133,9 +141,25 @@ export async function POST(req: Request) {
       if (typeof nome !== "string") {
         return rpcErro(id, -32602, "params.name ausente.");
       }
+      // execução com o JWT real do dono do PAT (sdd D1): RLS escopa as
+      // queries — supervisor vê só o supervisionado, como no chat.
+      // Fail-closed: sem sessão mintada a rota não cai de volta pro
+      // service-role (seria o priv-esc que estamos fechando)
+      if (!autorizado.user_id) {
+        return rpcErro(id, -32000, "Conta sem usuário vinculado.");
+      }
+      const clientExec = await clientImpersonado(autorizado.user_id);
+      if (!clientExec) {
+        return rpcErro(
+          id,
+          -32000,
+          "Não consegui autenticar a execução — tente de novo."
+        );
+      }
       // mesmo limite do chat (20/min por pessoa) — a PAT é da pessoa, o
-      // dono responde pelo uso dela
-      if (await checarLimiteIa(supabase, autorizado.profile_id)) {
+      // dono responde pelo uso dela; a reserva é atômica sob lock
+      const limite = await consumirLimiteIa(clientExec, { tool: nome }, "mcp");
+      if (!limite.permitido) {
         return rpcErro(
           id,
           -32000,
@@ -145,10 +169,11 @@ export async function POST(req: Request) {
       const r = await executarTool(
         nome,
         args,
-        supabase,
+        clientExec,
         "mcp",
         papeis,
-        autorizado.profile_id
+        undefined,
+        limite.requestId
       );
       if (!r.ok) {
         return rpcResult(id, {

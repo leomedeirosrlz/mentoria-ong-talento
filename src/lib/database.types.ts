@@ -2633,6 +2633,24 @@ export type Database = {
         }
         Relationships: []
       }
+      ia_chunks_df: {
+        Row: {
+          lexema: string
+          n: number
+          origem: string
+        }
+        Insert: {
+          lexema: string
+          n: number
+          origem: string
+        }
+        Update: {
+          lexema?: string
+          n?: number
+          origem?: string
+        }
+        Relationships: []
+      }
       ia_config: {
         Row: {
           atualizado_em: string
@@ -2656,36 +2674,69 @@ export type Database = {
       }
       ia_eventos: {
         Row: {
+          allowance_usd: number | null
           args: Json
+          billing_source: string | null
+          cache_read: number | null
           canal: string
           created_at: string
+          custo_usd: number | null
           duracao_ms: number | null
           erro: string | null
           id: string
+          iteracoes: number | null
+          modelo: string | null
           ok: boolean
           profile_id: string
+          request_id: string | null
+          tier: string | null
+          tokens_in: number | null
+          tokens_out: number | null
+          tokens_reasoning: number | null
           tool: string
         }
         Insert: {
+          allowance_usd?: number | null
           args?: Json
+          billing_source?: string | null
+          cache_read?: number | null
           canal: string
           created_at?: string
+          custo_usd?: number | null
           duracao_ms?: number | null
           erro?: string | null
           id?: string
+          iteracoes?: number | null
+          modelo?: string | null
           ok: boolean
           profile_id: string
+          request_id?: string | null
+          tier?: string | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+          tokens_reasoning?: number | null
           tool: string
         }
         Update: {
+          allowance_usd?: number | null
           args?: Json
+          billing_source?: string | null
+          cache_read?: number | null
           canal?: string
           created_at?: string
+          custo_usd?: number | null
           duracao_ms?: number | null
           erro?: string | null
           id?: string
+          iteracoes?: number | null
+          modelo?: string | null
           ok?: boolean
           profile_id?: string
+          request_id?: string | null
+          tier?: string | null
+          tokens_in?: number | null
+          tokens_out?: number | null
+          tokens_reasoning?: number | null
           tool?: string
         }
         Relationships: [
@@ -2722,6 +2773,7 @@ export type Database = {
       ia_mcp_tokens: {
         Row: {
           created_at: string
+          expira_em: string | null
           id: string
           profile_id: string
           revogado_em: string | null
@@ -2731,6 +2783,7 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          expira_em?: string | null
           id?: string
           profile_id: string
           revogado_em?: string | null
@@ -2740,6 +2793,7 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          expira_em?: string | null
           id?: string
           profile_id?: string
           revogado_em?: string | null
@@ -4952,6 +5006,12 @@ export type Database = {
           },
         ]
       }
+      ia_guias_catalogo: {
+        Row: {
+          guia: string | null
+        }
+        Relationships: []
+      }
       jovem_assinaturas: {
         Row: {
           assinado_em: string | null
@@ -5624,6 +5684,7 @@ export type Database = {
         Args: { p_id: string; p_para: string }
         Returns: undefined
       }
+      atualizar_ia_chunks_df: { Args: never; Returns: number }
       atualizar_tentativa_registro: {
         Args: { p_etapas?: Json; p_id: string }
         Returns: undefined
@@ -5680,6 +5741,14 @@ export type Database = {
       conflito_encontro: {
         Args: { p_data_hora: string; p_dupla: string }
         Returns: Json
+      }
+      consumir_limite_ia: {
+        Args: { p_args?: Json; p_canal?: string; p_limite?: number }
+        Returns: {
+          permitido: boolean
+          request_id: string
+          usados: number
+        }[]
       }
       contra_propor_solicitacao: {
         Args: { p_id: string; p_mensagem?: string; p_slot: string }
@@ -5812,12 +5881,24 @@ export type Database = {
             }
             Returns: boolean
           }
+      ia_contexto_e_limite: {
+        Args: { p_args?: Json; p_canal?: string; p_limite?: number }
+        Returns: {
+          papeis: Database["public"]["Enums"]["app_role"][]
+          permitido: boolean
+          profile_id: string
+          request_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          usados: number
+        }[]
+      }
       ia_mcp_autorizar: {
         Args: { p_token: string }
         Returns: {
           papeis: Database["public"]["Enums"]["app_role"][]
           papel: Database["public"]["Enums"]["app_role"]
           profile_id: string
+          user_id: string
         }[]
       }
       ia_norm_query: { Args: { p: string }; Returns: string }
@@ -5984,16 +6065,28 @@ export type Database = {
       }
       registrar_ia_evento: {
         Args: {
+          p_allowance_usd?: number
           p_args: Json
+          p_billing_source?: string
+          p_cache_read?: number
           p_canal: string
+          p_custo_usd?: number
           p_duracao_ms?: number
           p_erro?: string
+          p_iteracoes?: number
+          p_modelo?: string
           p_ok: boolean
           p_profile_id?: string
+          p_request_id?: string
+          p_tier?: string
+          p_tokens_in?: number
+          p_tokens_out?: number
+          p_tokens_reasoning?: number
           p_tool: string
         }
         Returns: string
       }
+      registrar_ia_eventos_lote: { Args: { p_eventos: Json }; Returns: number }
       registrar_login_handoff: {
         Args: { p_access: string; p_nonce: string; p_refresh: string }
         Returns: undefined

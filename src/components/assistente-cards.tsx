@@ -27,7 +27,10 @@ import type {
   UiBloco,
   UiCapacidade,
   UiChamados,
+  UiCombinados,
   UiDupla,
+  UiJornada,
+  UiPedidos,
   UiDuplaMini,
   UiFila,
   UiFontes,
@@ -115,13 +118,17 @@ const plural = (n: number, um: string, varios: string) =>
 const primeiroNome = (n: string | null) => (n ?? "").split(" ")[0] || "dupla";
 
 /** Mesma régua do situacaoDaDupla da home: status fora da jornada manda;
- *  ativa lê a situação. Em dia é neutro, sem cor de status. */
+ *  ativa lê a situação. Em dia é neutro, sem cor de status. Na voz do
+ *  jovem a dupla encerrada lê "Encerrada" (neutro) — "desistente" é o
+ *  vocabulário interno da equipe, nunca sobre ele mesmo. */
 function situacao(
   status: DuplaStatus,
-  semaforo?: Semaforo
+  semaforo?: Semaforo,
+  jovem = false
 ): { rotulo: string; tom: TomSituacao } {
   if (status === "concluida") return { rotulo: "Concluída", tom: "pausa" };
-  if (status === "encerrada") return { rotulo: "Desistente", tom: "pausa" };
+  if (status === "encerrada")
+    return { rotulo: jovem ? "Encerrada" : "Desistente", tom: "pausa" };
   if (status === "pausada") return { rotulo: "Pausada", tom: "pausa" };
   if (semaforo === "risco") return { rotulo: "Em risco", tom: "risco" };
   if (semaforo === "atencao") return { rotulo: "Atenção", tom: "atencao" };
@@ -304,12 +311,14 @@ function rotas(jovem: boolean) {
         encontros: () => "/jovem/agenda",
         instrumentos: () => "/jovem",
         chamados: "/jovem/perfil",
+        agenda: "/jovem/agenda",
       }
     : {
         ficha: (id: string) => `/duplas/${id}`,
         encontros: (id: string) => `/duplas/${id}?aba=encontros`,
         instrumentos: (id: string) => `/duplas/${id}?aba=instrumentos`,
         chamados: "/chamados",
+        agenda: "/agenda",
       };
 }
 type Rotas = ReturnType<typeof rotas>;
@@ -341,6 +350,12 @@ export function UiCard({ bloco, jovem }: { bloco: UiBloco; jovem?: boolean }) {
       return <CardInstrumentos b={bloco} r={r} />;
     case "fontes":
       return <CardFontes b={bloco} jovem={ehJovem} />;
+    case "combinados":
+      return <CardCombinados b={bloco} />;
+    case "jornada":
+      return <CardJornada b={bloco} />;
+    case "pedidos":
+      return <CardPedidos b={bloco} />;
   }
 }
 
@@ -546,16 +561,27 @@ function Quadrado({ estado, tom }: { estado: EstadoQuadrado; tom: TomSituacao })
 
 /** Os quadradinhos da trilha, com legenda em texto: realizado com registro
  *  (cheio), sem registro (anel), agendado (tracejado), não aconteceu
- *  (listra). O traço é o esperado até hoje, como na DuplaLinha. */
-function EncontrosDupla({ b, tom }: { b: UiDupla; tom: TomSituacao }) {
+ *  (listra). O traço é o esperado até hoje, como na DuplaLinha.
+ *  Pro jovem "registro" é conceito interno do mentor — o quadrado cheio
+ *  lê "aconteceu" e os anéis nunca aparecem (a tool nem devolve o dado). */
+function EncontrosDupla({ b, tom, jovem = false }: { b: UiDupla; tom: TomSituacao; jovem?: boolean }) {
   const por = new Map(b.encontros.map((e) => [e.numero, e]));
   const total = Math.max(maxEncontros(b.trilha), ...b.encontros.map((e) => e.numero), 0);
-  const estados = Array.from({ length: total }, (_, k) => estadoEncontro(por.get(k + 1)));
+  const estados = Array.from({ length: total }, (_, k) => {
+    const e = por.get(k + 1);
+    if (jovem && e?.status === "realizado") return "registro" as EstadoQuadrado;
+    return estadoEncontro(e);
+  });
   const n = (s: EstadoQuadrado) => estados.filter((x) => x === s).length;
   const feitos = n("registro") + n("sem_registro");
   const esperado = b.esperado != null && b.status === "ativa" ? Math.min(b.esperado, total) : null;
   const itens: { estado: EstadoQuadrado; texto: string }[] = [
-    { estado: "registro", texto: `${n("registro")} com registro` },
+    {
+      estado: "registro",
+      texto: jovem
+        ? `${n("registro")} ${n("registro") === 1 ? "aconteceu" : "aconteceram"}`
+        : `${n("registro")} com registro`,
+    },
     { estado: "sem_registro", texto: `${n("sem_registro")} sem registro` },
     { estado: "agendado", texto: plural(n("agendado"), "agendado", "agendados") },
     { estado: "nao", texto: `${n("nao")} não ${n("nao") === 1 ? "aconteceu" : "aconteceram"}` },
@@ -618,7 +644,7 @@ export function CardDupla({
   r?: Rotas;
 }) {
   const agora = useAgora();
-  const sit = situacao(b.status, b.semaforo);
+  const sit = situacao(b.status, b.semaforo, jovem);
   const mentor = b.mentor ?? "Mentor a definir";
   const mentorado = b.mentorado ?? "Mentorado a definir";
   const turma = b.turma ? turmaCurta(b.turma) : null;
@@ -633,7 +659,7 @@ export function CardDupla({
       titulo={<DuplaNomes mentor={mentor} mentorado={mentorado} />}
       meta={
         <span className="inline-flex items-center rounded-full border border-border px-2 py-1 text-[11px] font-semibold leading-none text-foreground">
-          {TRILHA_LABEL[b.trilha]}
+          {TRILHA_LABEL[b.trilha ?? "dpp"]}
           {turma && ` · ${turma}`}
         </span>
       }
@@ -647,7 +673,7 @@ export function CardDupla({
       )}
       {b.motivo && <p className="mt-1.5 text-[13px] leading-snug">{b.motivo}</p>}
 
-      <EncontrosDupla b={b} tom={sit.tom} />
+      <EncontrosDupla b={b} tom={sit.tom} jovem={jovem} />
 
       {/* próximo passo da jornada: amarelo de destaque, nunca alerta */}
       {b.proximo && (
@@ -714,7 +740,7 @@ export function CardAgenda({ b, r = rotas(false) }: { b: UiAgenda; r?: Rotas }) 
       titulo="Agenda"
       meta={[periodo, plural(b.total, "encontro", "encontros")].filter(Boolean).join(" · ")}
       rodape={
-        <Rodape href="/agenda">
+        <Rodape href={r.agenda}>
           {b.total > b.encontros.length ? `Ver os ${b.total} na agenda` : "Abrir agenda"}
         </Rodape>
       }
@@ -1213,5 +1239,152 @@ function FonteItem({
         )}
       </AnimatePresence>
     </li>
+  );
+}
+
+// ---------- mentorado (pacote liza nov/2026) ----------
+
+/** Status de solicitação em voz de jovem — sem jargão interno. */
+const PEDIDO_LABEL: Record<string, { rotulo: string; tom: Tom }> = {
+  sugerida: { rotulo: "sugerida", tom: "neutro" },
+  aberta: { rotulo: "esperando especialista", tom: "info" },
+  aguardando_coord: { rotulo: "com a coordenação", tom: "info" },
+  contra_proposta: { rotulo: "novo horário proposto", tom: "atencao" },
+  aceita: { rotulo: "aceita", tom: "ok" },
+  recusada: { rotulo: "não deu certo", tom: "neutro" },
+  cancelada: { rotulo: "cancelada", tom: "neutro" },
+  expirada: { rotulo: "expirada", tom: "neutro" },
+};
+
+/** Checklist dos combinados — pendente em destaque, feito em ok menor. */
+export function CardCombinados({ b }: { b: UiCombinados }) {
+  return (
+    <Cartao titulo="Seus combinados" rodape={<Rodape href="/jovem">Ver na sua página</Rodape>}>
+      {b.pendentes.length ? (
+        <ul className="divide-y divide-border/60">
+          {b.pendentes.map((c, i) => (
+            <li
+              key={`p-${i}`}
+              style={passo(i + 1)}
+              className="animate-enter flex items-start gap-2 py-2 first:pt-0 last:pb-0"
+            >
+              <Clock size={15} weight="bold" aria-hidden className="mt-0.5 shrink-0 text-[var(--warn)]" />
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-medium leading-snug">{c.texto}</p>
+                {valida(c.prazo) && (
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    até {diaSemanaCurto(c.prazo!)}
+                  </p>
+                )}
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <Vazio>Nada pendente, tudo feito</Vazio>
+      )}
+      {b.feitos.length > 0 && (
+        <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">
+          {b.feitos.map((t, i) => (
+            <li
+              key={`f-${i}`}
+              className="flex items-center gap-1.5 text-xs text-muted-foreground"
+            >
+              <CheckCircle size={12} weight="fill" aria-hidden className="shrink-0 text-[var(--ok)]" />
+              <span className="line-through decoration-border">{t}</span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </Cartao>
+  );
+}
+
+/** Esteira da jornada — instrumentos com o que já foi e o que falta;
+ *  barra segmentada resume o caminho. */
+export function CardJornada({ b }: { b: UiJornada }) {
+  const total = b.total_respondidos + b.total_pendentes;
+  return (
+    <Cartao
+      titulo="Sua jornada"
+      meta={`${b.total_respondidos} de ${total} feitos`}
+      rodape={<Rodape href="/jovem">Abrir sua jornada</Rodape>}
+    >
+      {total > 0 && (
+        <div className="mb-2.5">
+          <BarraSegmentada
+            altura="md"
+            animate
+            denominador={total}
+            segmentos={[
+              { valor: b.total_respondidos, rotulo: "feitos", cls: "bg-[var(--ok)]" },
+              { valor: b.total_pendentes, rotulo: "a fazer", cls: "bg-[var(--warn)]" },
+            ]}
+          />
+        </div>
+      )}
+      <ul className="divide-y divide-border/60">
+        {b.instrumentos.map((it, i) => (
+          <li
+            key={it.sistema}
+            style={passo(i + 1)}
+            className="animate-enter flex flex-wrap items-center gap-x-2.5 gap-y-1 py-2 first:pt-0 last:pb-0"
+          >
+            {ehInstrumentoChave(it.sistema) && (
+              <InstrumentoEmblema instrumento={it.sistema} size={28} />
+            )}
+            <p className="min-w-0 flex-1 text-sm font-medium leading-snug">{it.titulo}</p>
+            {it.pendentes > 0 ? (
+              <Pill tom="atencao" icone={<Clock size={12} aria-hidden />}>
+                {it.pendentes > 1 ? `${it.pendentes} pra responder` : "Pra responder"}
+              </Pill>
+            ) : it.respondidos > 0 ? (
+              <Pill tom="ok" icone={<CheckCircle size={12} aria-hidden />}>
+                Feito
+              </Pill>
+            ) : (
+              <span className="text-xs text-muted-foreground">Ainda não chegou</span>
+            )}
+          </li>
+        ))}
+      </ul>
+    </Cartao>
+  );
+}
+
+/** Pedidos de especialista do jovem — quem, sobre o quê, em que pé. */
+export function CardPedidos({ b }: { b: UiPedidos }) {
+  const agora = useAgora();
+  return (
+    <Cartao
+      titulo="Seus pedidos de especialista"
+      rodape={<Rodape href="/jovem/especialistas">Ver seus pedidos</Rodape>}
+    >
+      <ul className="divide-y divide-border/60">
+        {b.pedidos.map((p, i) => {
+          const st = PEDIDO_LABEL[p.status] ?? { rotulo: p.status, tom: "neutro" as Tom };
+          return (
+            <li key={i} style={passo(i + 1)} className="animate-enter py-2 first:pt-0 last:pb-0">
+              <div className="flex flex-wrap items-center gap-1.5">
+                <span className="text-sm font-medium">
+                  {p.especialista ?? "Especialista a definir"}
+                </span>
+                <span className="ml-auto">
+                  <Pill tom={st.tom}>{st.rotulo}</Pill>
+                </span>
+              </div>
+              {p.sobre && (
+                <p className="mt-1 text-sm leading-snug">{p.sobre}</p>
+              )}
+              {valida(p.criado_em) && (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Pedido <time dateTime={p.criado_em}>{tempoRelativo(p.criado_em, agora)}</time>
+                </p>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </Cartao>
   );
 }

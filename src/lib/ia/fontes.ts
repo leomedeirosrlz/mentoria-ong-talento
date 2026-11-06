@@ -126,6 +126,9 @@ const META_FONTE: Record<string, { rotulo: string; href?: string }> = {
   },
   "termo-adesao-voluntario": { rotulo: "Termo de adesão", href: BIB },
   "termo-mentorando": { rotulo: "Termo do mentorando", href: BIB },
+  // ajuda_faq cita a FAQ pelo nome dela (ui.ts), não por slug de guia — o
+  // destino já é a rota do jovem, que metaFonte devolve intacta abaixo
+  "Ajuda do Realiza": { rotulo: "Ajuda do Realiza", href: "/jovem/ajuda" },
 };
 
 /** Rótulo legível + destino real da fonte. `jovem` troca os caminhos do
@@ -138,6 +141,8 @@ export function metaFonte(
   const meta = META_FONTE[guia];
   if (!meta) return { rotulo: guia };
   if (!jovem || !meta.href) return meta;
+  // destino que já é do jovem (Ajuda do Realiza) não passa pelo remap
+  if (meta.href.startsWith("/jovem")) return meta;
   if (meta.href.startsWith(DOC)) return { ...meta, href: `/jovem${meta.href}` };
   if (meta.href === "/agenda") return { ...meta, href: "/jovem/agenda" };
   return { ...meta, href: "/jovem/materiais" };
@@ -157,6 +162,12 @@ const ROTULO_TOOL: Record<string, string> = {
   chamados_resumo: "chamados",
   pessoas_busca: "pessoas",
   instrumentos_da_dupla: "instrumentos da dupla",
+  minha_dupla: "sua dupla",
+  minha_agenda: "sua agenda",
+  meus_combinados: "seus combinados",
+  meu_progresso: "sua jornada",
+  meus_pedidos: "seus pedidos",
+  ajuda_faq: "ajuda do Realiza",
 };
 
 export function rotuloTool(nome: string): string {

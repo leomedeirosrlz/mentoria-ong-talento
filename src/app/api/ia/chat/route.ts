@@ -18,8 +18,9 @@
 //
 // Sem transcript: a rota é stateless e nada de conversa vai pro banco — só
 // ia_eventos registra o que aconteceu (a ação, não a fala): uma linha por
-// mensagem recebida (alimenta o rate limit) + uma por tool call (já dentro
-// de executarTool).
+// mensagem recebida (alimenta o rate limit, gravada na reserva) + uma por
+// tool call + o resumo 'resposta' — esses dois últimos vão juntos numa
+// escrita só no fim do stream (registrar_ia_eventos_lote).
 
 import { NextResponse } from "next/server";
 import { z } from "zod";
@@ -28,7 +29,7 @@ import {
   chamarModeloStream,
   providerConfigurado,
 } from "@/lib/ia/provider";
-import type { MsgChat } from "@/lib/ia/provider";
+import type { MsgChat, UsoIa } from "@/lib/ia/provider";
 import { systemPromptIa } from "@/lib/ia/prompts";
 import {
   esforcoDoTier,
@@ -37,9 +38,13 @@ import {
   modeloDoTier,
 } from "@/lib/ia/config";
 import { rotearTier } from "@/lib/ia/roteador";
-import { checarLimiteIa } from "@/lib/ia/rate-limit";
+import { contextoELimiteIa } from "@/lib/ia/rate-limit";
 import type { FonteIa } from "@/lib/ia/fontes";
-import { executarTool, type ResultadoTool } from "@/lib/ia/tools";
+import {
+  executarTool,
+  type EventoIa,
+  type ResultadoTool,
+} from "@/lib/ia/tools";
 import { STATUS_TOOL, uiDaTool, uiDosInstrumentos } from "@/lib/ia/ui";
 import { createClient } from "@/lib/supabase/server";
 
@@ -59,6 +64,9 @@ const MAX_ITERACOES = 6;
 // rodada lenta morria no meio e nenhum evento de erro chegava ao cliente.
 // 50s a partir da abertura do stream deixa ~10s pros gates pré-stream
 const STREAM_BUDGET_MS = 50_000;
+
+// espelha o teto do registrar_ia_eventos_lote (0160)
+const MAX_EVENTOS_LOTE = 50;
 
 const MSG_FALHA =
   "Não consegui concluir essa consulta agora — tente perguntar de outra forma.";
@@ -84,6 +92,13 @@ const Body = z
   .strict();
 
 export async function POST(req: Request) {
+  // a rota mora atrás da MESMA flag da bolha (IA_BOLHA, gate dos dois
+  // layouts): sem ela o endpoint nem existe — 404 antes de autenticar ou
+  // gastar limite. O modo demo não passa por aqui (responderDemoIa roda
+  // no cliente), então o gate não muda nada pra ele
+  if (process.env.IA_BOLHA !== "1") {
+    return NextResponse.json({ error: "Não encontrado." }, { status: 404 });
+  }
   const supabase = await createClient();
   // getClaims valida o JWT local — getUser era uma RTT remota redundante
   // (o middleware já revalidou a sessão pra chegar até aqui)
@@ -101,28 +116,7 @@ export async function POST(req: Request) {
       { status: 503 }
     );
   }
-  // identidade slim: id+papel efetivo bastam — getMe() puxava contatos e
-  // respeitava o cookie demo_role (persona fake derrubava o rate limit e
-  // mentia o papel no prompt). Aqui identidade = JWT, sempre.
-  const [{ data: profile }, { data: papeisRpc }, iaCfg] = await Promise.all([
-    supabase
-      .from("profiles")
-      .select("id, role")
-      .eq("user_id", sub)
-      .maybeSingle(),
-    supabase.rpc("my_papeis"),
-    // config viva (ia_config): modelos por tier + esforço + roteamento —
-    // lida junto com a identidade, não custa RTT extra no caminho crítico
-    getIaConfig(supabase),
-  ]);
-  if (!profile) {
-    return NextResponse.json(
-      { error: "Cadastro não encontrado." },
-      { status: 401 }
-    );
-  }
-
-  // body antes do rate limit: request malformado não custa query
+  // body antes da identidade+limite: request malformado não gasta slot
   const body = Body.safeParse(await req.json().catch(() => null));
   if (!body.success) {
     return NextResponse.json(
@@ -131,19 +125,31 @@ export async function POST(req: Request) {
     );
   }
 
-  if (await checarLimiteIa(supabase, profile.id)) {
+  // identidade + limite numa RPC (ia_contexto_e_limite, 0160): profile
+  // ativo, papel e papéis efetivos + a reserva atômica do slot 'mensagem'
+  // sob advisory lock (sdd D3). Identidade = JWT, sempre: getMe() respeitava
+  // o cookie demo_role (persona fake derrubava o rate limit e mentia o
+  // papel no prompt). O request_id correla os eventos desta request.
+  // A config viva (ia_config) vem em paralelo — sem RTT extra.
+  const [ctx, iaCfg] = await Promise.all([
+    contextoELimiteIa(supabase, { n_mensagens: body.data.messages.length }),
+    getIaConfig(supabase),
+  ]);
+  if (ctx.status === "sem_cadastro") {
+    return NextResponse.json(
+      { error: "Cadastro não encontrado." },
+      { status: 401 }
+    );
+  }
+  if (ctx.status === "negado") {
     return NextResponse.json(
       { error: "Muitas mensagens seguidas — aguarde um instante." },
       { status: 429 }
     );
   }
+  const requestId = ctx.requestId;
 
-  const papeis =
-    papeisRpc && papeisRpc.length
-      ? papeisRpc
-      : profile.role
-        ? [profile.role]
-        : [];
+  const papeis = ctx.papeis.length ? ctx.papeis : ctx.role ? [ctx.role] : [];
   const historico: MsgChat[] = [
     { role: "system", content: systemPromptIa(papeis, body.data.pagina) },
     ...body.data.messages.map((m) => ({ ...m, content: m.content })),
@@ -169,7 +175,7 @@ export async function POST(req: Request) {
 
   // sessão estável por usuário — o provider Go exige pra rotear/cachear;
   // profile_id é pseudônimo e não revela nada além do que a sessão já diz
-  const sessao = profile.id;
+  const sessao = ctx.profileId;
   // teto por rodada — o orçamento do stream (STREAM_BUDGET_MS) capa
   // esse valor a cada iteração, então na prática o que manda é o que
   // ainda falta pro prazo
@@ -195,26 +201,42 @@ export async function POST(req: Request) {
         return;
       }
 
-      // a mensagem recebida é um evento (não o conteúdo dela — só o fato).
-      // Fora do caminho crítico: dispara em paralelo com o stream em vez
-      // de awaited antes dele (rpc() solto é lazy — precisa do .then)
-      void supabase
-        .rpc("registrar_ia_evento", {
-          p_canal: "chat",
-          p_tool: "mensagem",
-          p_args: { n_mensagens: body.data.messages.length },
-          p_ok: true,
-          p_duracao_ms: 0,
-        })
-        .then(({ error }) => {
-          if (error) console.error("registrar_ia_evento:", error);
-        });
-
+      // o evento 'mensagem' já foi gravado pela reserva do limite
+      // (ia_contexto_e_limite) — regravar aqui duplicaria a contagem
       const toolsUsadas: string[] = [];
+      // auditoria das tools fica em memória e sai no lote do fim
+      const eventos: EventoIa[] = [];
+      // teto do lote na RPC é 50: acima disso o insert inteiro falharia,
+      // então o excedente de tools cai fora e o resumo sempre entra
+      const coletarEvento = (ev: EventoIa) => {
+        if (eventos.length < MAX_EVENTOS_LOTE - 1) eventos.push(ev);
+      };
       // fontes que a guia_consulta trouxe — sobem no done pra UI renderizar
       // a fileira "Fontes" (dedupe por guia+secao)
       const fontes = new Map<string, FonteIa>();
       let concluido = false;
+      // telemetria da request (sdd D4): tokens/custo somados das rodadas;
+      // modelo = slug que produziu a resposta (último vencedor da cadeia —
+      // quando o fallback aciona, o primário não é o que respondeu)
+      const t0 = Date.now();
+      const uso = {
+        in: 0, out: 0, reasoning: 0, cache: 0,
+        custo: 0, allowance: 0, listCost: 0,
+        billing: undefined as string | undefined,
+      };
+      let modeloUsado: string | undefined;
+      const somarUso = (u?: UsoIa, modelo?: string) => {
+        if (modelo) modeloUsado = modelo;
+        if (!u) return;
+        uso.in += u.prompt_tokens ?? u.opencode?.tokens?.input ?? 0;
+        uso.out += u.completion_tokens ?? u.opencode?.tokens?.output ?? 0;
+        uso.reasoning += u.opencode?.tokens?.reasoning ?? 0;
+        uso.cache += u.opencode?.tokens?.cache_read ?? 0;
+        uso.custo += u.cost ?? 0;
+        uso.allowance += u.opencode?.allowance ?? 0;
+        uso.listCost += u.opencode?.list_cost ?? 0;
+        if (u.opencode?.billing_source) uso.billing = u.opencode.billing_source;
+      };
       let erroEmitido = false;
       const sendErro = (e: string) => {
         send({ type: "error", e });
@@ -222,8 +244,10 @@ export async function POST(req: Request) {
       };
       let guiaChamado = false;
       const prazo = Date.now() + STREAM_BUDGET_MS;
+      let iteracoes = 0;
 
       for (let i = 0; i < MAX_ITERACOES && !req.signal.aborted && !fechado; i++) {
+        iteracoes = i + 1;
         // sem orçamento, sai do loop — o erro padrão depois do for avisa
         // o cliente em vez de a plataforma cortar a função no silêncio
         const restante = prazo - Date.now();
@@ -245,6 +269,7 @@ export async function POST(req: Request) {
 
         let msg: MsgChat;
         if (r.ok) {
+          somarUso(r.usage, r.modelo);
           msg = {
             role: "assistant",
             content: r.content || null,
@@ -263,6 +288,7 @@ export async function POST(req: Request) {
             sendErro(alt.erro);
             break;
           }
+          somarUso(alt.usage, alt.modelo);
           msg = alt.mensagem;
           if (msg.content) {
             if (emitido > 0) send({ type: "reset" });
@@ -319,18 +345,32 @@ export async function POST(req: Request) {
             }
             // race contra o prazo — a tool continua em bg mas a resposta
             // emite o erro dentro do orçamento em vez de morrer calada
+            let timerPrazo: ReturnType<typeof setTimeout> | undefined;
             res = await Promise.race([
-              executarTool(tc.function.name, args, supabase, "chat"),
-              new Promise<never>((_, rej) =>
-                setTimeout(() => rej(new Error("prazo")), restanteTc)
+              executarTool(
+                tc.function.name,
+                args,
+                supabase,
+                "chat",
+                // papéis já resolvidos no começo da request: sem eles a
+                // tool refazia o my_papeis a cada chamada
+                papeis,
+                undefined,
+                requestId,
+                { coletarEvento }
               ),
-            ]).catch((e) => {
-              if (e instanceof Error && e.message === "prazo") {
-                sendErro(MSG_FALHA);
-                return null;
-              }
-              throw e;
-            });
+              new Promise<never>((_, rej) => {
+                timerPrazo = setTimeout(() => rej(new Error("prazo")), restanteTc);
+              }),
+            ])
+              .catch((e) => {
+                if (e instanceof Error && e.message === "prazo") {
+                  sendErro(MSG_FALHA);
+                  return null;
+                }
+                throw e;
+              })
+              .finally(() => clearTimeout(timerPrazo));
             if (res === null) break;
             // genUI direto: o card sai já — antes da próxima rodada do
             // modelo, que ainda vai pensar e escrever por cima dele
@@ -385,6 +425,40 @@ export async function POST(req: Request) {
 
       if (!concluido && !erroEmitido && !req.signal.aborted && !fechado) {
         send({ type: "error", e: MSG_FALHA });
+      }
+
+      // evento-resumo da request (sdd D4): um 'resposta' por mensagem com
+      // telemetria agregada — correlaciona com 'mensagem' e as tools pelo
+      // request_id. Sai no MESMO lote das tools (uma RPC por mensagem).
+      // Awaited antes do close: fire-and-forget morria quando a função
+      // congelava depois do stream e a telemetria se perdia
+      eventos.push({
+        canal: "chat",
+        tool: "resposta",
+        args: { tools: toolsUsadas, list_cost: uso.listCost || undefined },
+        ok: concluido,
+        erro: erroEmitido ? "erro" : null,
+        duracao_ms: Date.now() - t0,
+        modelo: modeloUsado ?? null,
+        tier,
+        tokens_in: uso.in || null,
+        tokens_out: uso.out || null,
+        tokens_reasoning: uso.reasoning || null,
+        cache_read: uso.cache || null,
+        custo_usd: uso.custo || null,
+        allowance_usd: uso.allowance || null,
+        billing_source: uso.billing ?? null,
+        request_id: requestId,
+        iteracoes,
+      });
+      try {
+        const { error: erroLote } = await supabase.rpc(
+          "registrar_ia_eventos_lote",
+          { p_eventos: eventos }
+        );
+        if (erroLote) console.error("registrar_ia_eventos_lote:", erroLote);
+      } catch (e) {
+        console.error("registrar_ia_eventos_lote:", e);
       }
       try {
         controller.close();

@@ -1,11 +1,14 @@
 // Resolução da configuração viva do assistente (ia_config, 0148).
-// Lida uma vez por request na rota — uma query de 3 linhas numa tabela
-// de 3 chaves; sem cache de módulo porque a coordenação espera que o
-// ajuste na aba valha na pergunta seguinte, não "depois do deploy".
+// Cache de 30s por instância (cache.ts): a rota e a guia_consulta liam a
+// tabela a cada mensagem e a cada busca. 30s é o atraso máximo pra um
+// ajuste da coordenação valer — "na pergunta seguinte" na prática, sem
+// uma query por mensagem. O editor grava direto pelo client do browser,
+// então não há ponto no servidor pra invalidar antes do TTL.
 // Qualquer chave ausente/malformada cai no default — provider e tiers
 // mudam rápido e um valor quebrado não pode derrubar o assistente.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { CacheTtl } from "./cache";
 
 export type EsforcoIa = "baixo" | "medio" | "alto";
 export type TierIa = "rapido" | "balanceado" | "forte";
@@ -21,22 +24,51 @@ export type IaConfig = {
    *  (mesmo nível pros três — formato do seed da 0148) */
   esforco: Record<TierIa, EsforcoIa>;
   roteamento: boolean;
+  /** chave "busca": "fts" desliga o braço vetorial (nenhuma pergunta vai
+   *  pra API de embedding); qualquer outro valor = híbrida */
+  busca: "fts" | "hibrida";
 };
 
 const PADRAO: IaConfig = {
   modelos: {},
   esforco: { rapido: "medio", balanceado: "medio", forte: "medio" },
   roteamento: true,
+  busca: "hibrida",
 };
+
+const CONFIG_TTL_MS = 30_000;
+const cacheConfig = new CacheTtl<IaConfig>(CONFIG_TTL_MS, 1);
+
+/** Testes e scripts: começa do zero (o cache é por módulo). */
+export function limparCacheIaConfig() {
+  cacheConfig.limpar();
+}
 
 const ESFORCOS = new Set<EsforcoIa>(["baixo", "medio", "alto"]);
 const TIERS: readonly TierIa[] = ["rapido", "balanceado", "forte"];
 
+/** Config viva — global (igual pra todo mundo), por isso cacheável. Erro
+ *  de leitura cai no padrão e NÃO é guardado: a próxima chamada relê. */
 export async function getIaConfig(supabase: SupabaseClient): Promise<IaConfig> {
+  let falhou = false;
+  return cacheConfig.obter(
+    "cfg",
+    async () => {
+      const r = await lerIaConfig(supabase);
+      falhou = r === null;
+      return r ?? PADRAO;
+    },
+    () => !falhou
+  );
+}
+
+async function lerIaConfig(
+  supabase: SupabaseClient
+): Promise<IaConfig | null> {
   const { data, error } = await supabase
     .from("ia_config")
     .select("chave, valor");
-  if (error || !data) return PADRAO;
+  if (error || !data) return null;
 
   const cfg: IaConfig = { ...PADRAO, modelos: {}, esforco: { ...PADRAO.esforco } };
   for (const row of data as { chave: string; valor: unknown }[]) {
@@ -73,6 +105,8 @@ export async function getIaConfig(supabase: SupabaseClient): Promise<IaConfig> {
       }
     } else if (row.chave === "roteamento" && typeof row.valor === "boolean") {
       cfg.roteamento = row.valor;
+    } else if (row.chave === "busca") {
+      cfg.busca = row.valor === "fts" ? "fts" : "hibrida";
     }
   }
   return cfg;
