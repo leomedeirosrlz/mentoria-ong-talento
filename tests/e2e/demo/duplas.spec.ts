@@ -622,17 +622,14 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
 
     const cards = page
       .locator("article")
-      .filter({ has: page.getByRole("link", { name: "Abrir ficha" }) });
+      .filter({ has: page.getByRole("link", { name: /Ver ficha/ }) });
     const n = await cards.count();
     expect(n).toBeGreaterThan(0);
     for (let i = 0; i < n; i++) {
       const card = cards.nth(i);
-      // "Abrir ficha" único e sempre no header — a faixa-footer morreu
-      // de vez na v6a (nem quando há par de ações)
-      await expect(
-        card.locator("header").getByRole("link", { name: "Abrir ficha" })
-      ).toHaveCount(1);
-      await expect(card.getByRole("link", { name: "Abrir ficha" })).toHaveCount(
+      // card inteiro abre a ficha: um stretched link "Ver ficha" por card —
+      // a faixa-footer morreu de vez na v6a (nem quando há par de ações)
+      await expect(card.getByRole("link", { name: /Ver ficha/ })).toHaveCount(
         1
       );
       await expect(card.locator("div.border-dashed")).toHaveCount(0);
