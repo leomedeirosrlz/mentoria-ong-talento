@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { cn, pathInterno } from "@/lib/utils";
+import { novoUuid } from "@/lib/uuid";
 
 // janela do resend do supabase — quando o 429 traz "after N seconds" usa o N real
 const COOLDOWN = 60;
@@ -277,7 +278,7 @@ export function LoginForm() {
     setErro(null);
     try {
       const destino = destinoFinal();
-      const handoff = crypto.randomUUID();
+      const handoff = novoUuid();
       const { error } = await otp.auth.signInWithOtp({
         email: email.trim().toLowerCase(),
         options: {

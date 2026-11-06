@@ -32,6 +32,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
+import { novoUuid } from "@/lib/uuid";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -159,7 +160,7 @@ export function DocumentosPessoa({
     start(async () => {
       try {
         const supabase = createClient();
-        const path = `documentos/${crypto.randomUUID()}-${saneiaNome(file.name)}`;
+        const path = `documentos/${novoUuid()}-${saneiaNome(file.name)}`;
         // 1) a row entra ANTES do upload — a policy de INSERT do storage só
         //    aceita objeto cujo name já é path de documentos_pessoa
         const res = await registrarDocumentoPessoa(tipo, pessoaId, docTipo, path, file.name);

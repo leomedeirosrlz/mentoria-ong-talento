@@ -46,6 +46,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { AppRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { novoUuid } from "@/lib/uuid";
 
 type Msg = {
   role: "user" | "assistant";
@@ -396,7 +397,7 @@ export function AssistenteConversa({
         if (Array.isArray(antigas) && antigas.length) {
           const limpas = antigas.filter((m) => m.role && m.content).slice(-MAX_MSGS);
           const ativa: Conversa = {
-            id: crypto.randomUUID(),
+            id: novoUuid(),
             titulo: tituloDa(limpas),
             em: limpas[limpas.length - 1]?.em ?? agora(),
             msgs: limpas,
@@ -718,7 +719,7 @@ export function AssistenteConversa({
   async function enviar(conteudo: string) {
     const limpo = conteudo.trim();
     if (!limpo || pending) return;
-    if (!conversaId) setConversaId(crypto.randomUUID());
+    if (!conversaId) setConversaId(novoUuid());
     setVisao("chat");
     const novas: Msg[] = [
       ...msgs,

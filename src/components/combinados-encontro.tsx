@@ -22,6 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { novoUuid } from "@/lib/uuid";
 
 /** Estado "aberto" FORA do componente (REALIZA-21 fix): criar o 1º
  *  pendente tira o card do agrupador "Próximos N encontros" e o React
@@ -225,7 +226,7 @@ export function CombinadosEncontro({
       setItensLoc((l) => [
         ...l,
         {
-          id: crypto.randomUUID(),
+          id: novoUuid(),
           dupla_id: duplaId,
           registro_id: null,
           numero,

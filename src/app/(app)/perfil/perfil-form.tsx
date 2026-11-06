@@ -69,6 +69,7 @@ import { cn, maskWhatsApp, sessaoFresca } from "@/lib/utils";
 import { temPapel } from "@/lib/types";
 import type { Assinatura, Disponibilidade, MentorProfile, Profile } from "@/lib/types";
 import Link from "next/link";
+import { novoUuid } from "@/lib/uuid";
 
 /** Chip "pendente" nas linhas do preview — a contagem do summary é a soma
  *  destes badges (completude se lê nos dados, não no modo). */
@@ -1173,7 +1174,7 @@ export function PerfilForm({
     setUploading(true);
     try {
       const ext = file.name.split(".").pop()?.toLowerCase() ?? "png";
-      const path = `${me.id}/${crypto.randomUUID()}.${ext}`;
+      const path = `${me.id}/${novoUuid()}.${ext}`;
       const { error } = await supabase.storage
         .from("avatares")
         .upload(path, file, { contentType: file.type });
