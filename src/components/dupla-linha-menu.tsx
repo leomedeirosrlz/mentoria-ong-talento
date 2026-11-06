@@ -8,7 +8,7 @@
 // do banco na 1ª abertura (a linha não pagava um fetch por card), e
 // remanejar/encerrar leem status e trilha da própria dupla.
 //
-// O trigger replica o ⋯ decorativo que substitui (ghost sm, "Ações" a
+// O trigger replica o ⋯ decorativo que substitui (outline sm, "Ações" a
 // partir do md) e o wrapper no DuplaLinha o põe em z-20, acima do link
 // esticado: o clique abre o menu, nunca navega. Os dialogs ficam fora do
 // popup, controlados por estado — mesmo padrão do "Mais" da ficha
@@ -118,7 +118,7 @@ export function DuplaLinhaMenu({
         <DropdownMenuTrigger
           aria-label="Ações da dupla"
           className={cn(
-            buttonVariants({ variant: "ghost", size: "sm" }),
+            buttonVariants({ variant: "outline", size: "sm" }),
             "w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
           )}
         >

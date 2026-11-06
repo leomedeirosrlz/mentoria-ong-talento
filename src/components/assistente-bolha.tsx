@@ -25,11 +25,16 @@ import {
   Plus,
   X,
 } from "@phosphor-icons/react";
+import { usePathname } from "next/navigation";
 import { AssistenteConfig } from "@/components/assistente-config";
-import { AssistenteConversa } from "@/components/assistente-conversa";
+import {
+  AssistenteConversa,
+  sugestoes,
+} from "@/components/assistente-conversa";
 // conceito escolhido: Blob — os três protótipos dividem o contrato
 // LizaProps (liza/tipos.ts), então trocar de conceito é trocar o import
 import { LizaBlob } from "@/components/liza/liza-blob";
+import { LizaFala, LizaRotulo } from "@/components/liza/liza-fala";
 import type { LizaEstado } from "@/components/liza/tipos";
 import { useMomento } from "@/components/liza/use-olhar";
 import {
@@ -40,6 +45,14 @@ import {
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import {
+  APRESENTACOES_MAX,
+  DURACAO_FALA,
+  FALA_PRONTO,
+  proximaFala,
+  type FalaLiza,
+  type MemoriaFalas,
+} from "@/lib/liza-falas";
 import type { AppRole } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -304,6 +317,39 @@ function Cabecalho({
   );
 }
 
+// memória dos balões de fala (lib/liza-falas.ts): aparelho no localStorage,
+// "já falou nesta aba" no sessionStorage. Storage indisponível (modo
+// privado) → a Liza se apresenta e pronto; nunca quebra o FAB
+const FALAS_LS = "liza:falas";
+const FALAS_SS = "liza:falou";
+// a fala espera a página assentar antes de aparecer (não disputa a
+// atenção com o carregamento nem com o onboarding que abre por cima)
+const FALA_ATRASO_MS = 1800;
+// a boca tagarela só enquanto o balão "sai" — depois ela fica atenta
+const FALA_BOCA_MS = 1400;
+
+type MemoriaAparelho = Omit<MemoriaFalas, "falouNaSessao">;
+
+function lerMemoria(): MemoriaFalas {
+  const vazia = { apresentacoes: 0, abriu: false, dicasDispensadas: 0 };
+  try {
+    const m = { ...vazia, ...JSON.parse(localStorage.getItem(FALAS_LS) ?? "{}") };
+    return { ...m, falouNaSessao: sessionStorage.getItem(FALAS_SS) === "1" };
+  } catch {
+    return { ...vazia, falouNaSessao: false };
+  }
+}
+
+function gravarMemoria(muda: (m: MemoriaAparelho) => MemoriaAparelho) {
+  try {
+    const { apresentacoes, abriu, dicasDispensadas } = lerMemoria();
+    localStorage.setItem(
+      FALAS_LS,
+      JSON.stringify(muda({ apresentacoes, abriu, dicasDispensadas }))
+    );
+  } catch {}
+}
+
 export function AssistenteBolha({
   papeis,
   demo,
@@ -323,6 +369,10 @@ export function AssistenteBolha({
     () => true
   );
   const [aberto, setAberto] = useState(false);
+  // aberto "agora", fora do ciclo de render: o chip do balão abre e envia
+  // no mesmo gesto, e a resposta (rápida na demo) pode fechar antes do
+  // re-render — o callback leria o `aberto` velho e acenderia o aviso
+  const abertoRef = useRef(false);
   const [pronto, setPronto] = useState(false);
 
   // mascote Liza: a conversa reporta a rodada (onEstado) e o fim de
@@ -335,12 +385,20 @@ export function AssistenteBolha({
   const [atento, setAtento] = useState(false);
   const [sonolento, setSonolento] = useState(false);
 
+  // balão de fala com o painel fechado (apresentação, dica da página,
+  // "respondi") — `falandoBoca` é o instante em que o balão sai e a boca
+  // mexe; `pausada` segura o relógio enquanto o ponteiro/foco está nele
+  const pagina = usePathname();
+  const [fala, setFala] = useState<FalaLiza | null>(null);
+  const [falandoBoca, setFalandoBoca] = useState(false);
+  const [pausada, setPausada] = useState(false);
+
   // a Liza só dorme quieta: painel fechado, sem rodada, sem aviso e sem o
   // dedo/foco em cima. Mudou qualquer condição → acorda; a flag limpa na
   // própria render (padrão "estado derivado da anterior") sem setState
   // em effect
   const ociosa =
-    !aberto && !atento && !respostaPronta && estadoLiza === "parado";
+    !aberto && !atento && !respostaPronta && !fala && estadoLiza === "parado";
   const [eraOciosa, setEraOciosa] = useState(ociosa);
   if (eraOciosa !== ociosa) {
     setEraOciosa(ociosa);
@@ -399,7 +457,10 @@ export function AssistenteBolha({
   useEffect(() => {
     const id = requestAnimationFrame(() => {
       try {
-        if (sessionStorage.getItem("assistente:aberto") === "1") setAberto(true);
+        if (sessionStorage.getItem("assistente:aberto") === "1") {
+          abertoRef.current = true;
+          setAberto(true);
+        }
         const t = JSON.parse(localStorage.getItem(STORAGE_TAM) ?? "null");
         if (t && typeof t.w === "number" && typeof t.h === "number")
           setTamanho(limitar(t));
@@ -414,11 +475,15 @@ export function AssistenteBolha({
   // offset do teclado iOS — declarado antes de mudar (que o zera ao fechar)
   const [kb, setKb] = useState(0);
   const mudar = useCallback((v: boolean) => {
+    abertoRef.current = v;
     setAberto(v);
     // abrir consome os avisos — a resposta já está visível no painel
     if (v) {
       setRespostaPronta(false);
       setAviso(false);
+      // abriu uma vez: ela já se apresentou de verdade
+      setFala(null);
+      gravarMemoria((m) => ({ ...m, abriu: true }));
     }
     // fecha com offset zerado — sem isso uma reabertura herda o último kb
     // por um frame (flash de bottom: N antes da primeira medição)
@@ -434,6 +499,57 @@ export function AssistenteBolha({
     const t = setTimeout(() => setRespostaPronta(false), 2400);
     return () => clearTimeout(t);
   }, [respostaPronta]);
+
+  // decide a fala da página depois que ela assenta. Uma por aba: a
+  // apresentação (até abrir a Liza uma vez) ou uma dica de página; troca
+  // de rota re-avalia enquanto a aba ainda não falou
+  useEffect(() => {
+    if (!pronto || aberto) return;
+    const t = setTimeout(() => {
+      const memoria = lerMemoria();
+      const nova = proximaFala({
+        memoria,
+        pagina,
+        papeis,
+        nome,
+        perguntaPadrao: sugestoes(papeis, pagina)[0],
+      });
+      if (!nova) return;
+      try {
+        sessionStorage.setItem(FALAS_SS, "1");
+      } catch {}
+      if (nova.tipo === "apresentacao")
+        gravarMemoria((m) => ({ ...m, apresentacoes: m.apresentacoes + 1 }));
+      setFala((atual) => atual ?? nova);
+      setFalandoBoca(true);
+    }, FALA_ATRASO_MS);
+    return () => clearTimeout(t);
+  }, [pronto, aberto, pagina, papeis, nome]);
+
+  // a boca mexe só na saída do balão (liga junto com a fala, em
+  // mostrarFala; aqui só o relógio que desliga)
+  useEffect(() => {
+    if (!falandoBoca) return;
+    const t = setTimeout(() => setFalandoBoca(false), FALA_BOCA_MS);
+    return () => clearTimeout(t);
+  }, [falandoBoca]);
+
+  // some sozinho (menos o "Respondi"); ponteiro/foco em cima segura
+  useEffect(() => {
+    const ms = fala ? DURACAO_FALA[fala.tipo] : null;
+    if (!ms || pausada) return;
+    const t = setTimeout(() => setFala(null), ms);
+    return () => clearTimeout(t);
+  }, [fala, pausada]);
+
+  const dispensarFala = () => {
+    if (fala?.tipo === "apresentacao")
+      gravarMemoria((m) => ({ ...m, apresentacoes: APRESENTACOES_MAX }));
+    if (fala?.tipo === "dica")
+      gravarMemoria((m) => ({ ...m, dicasDispensadas: m.dicasDispensadas + 1 }));
+    setFala(null);
+    setPausada(false);
+  };
 
   // voltar do sistema (gesto/botão Android) fecha a sheet: empurra um
   // state na abertura e escuta popstate. Fechando por X/backdrop/arrasto,
@@ -454,6 +570,7 @@ export function AssistenteBolha({
   // ações são registradas aqui pros botões do header alcançarem
   const novaConversaRef = useRef<(() => void) | null>(null);
   const historicoRef = useRef<(() => void) | null>(null);
+  const enviarRef = useRef<((pergunta: string) => void) | null>(null);
   const conversa = (
     <AssistenteConversa
       papeis={papeis}
@@ -475,21 +592,34 @@ export function AssistenteBolha({
       registrarHistorico={(fn) => {
         historicoRef.current = fn;
       }}
+      registrarEnviar={(fn) => {
+        enviarRef.current = fn;
+      }}
       onNavegarInterno={() => mudar(false)}
       onEstado={setEstadoLiza}
       onRespostaPronta={() => {
         // só avisa no FAB quando o painel está fora de vista — aberto,
         // a resposta já se anuncia sozinha (e a mascote da mensagem
         // comemora lá dentro)
-        if (!aberto) {
+        if (!abertoRef.current) {
           setRespostaPronta(true);
           setAviso(true);
+          // o balão "Respondi" toma o lugar de qualquer outra fala (é o
+          // único que espera a abertura)
+          setFala(FALA_PRONTO);
+          setFalandoBoca(true);
         }
       }}
       Avatar={AvatarLiza}
     />
   );
   const novaConversa = () => novaConversaRef.current?.();
+  // chip do balão: abre e pergunta (a conversa fica montada fechada —
+  // keepMounted — então o envio já tem pra onde ir)
+  const perguntarDoBalao = (pergunta: string) => {
+    mudar(true);
+    enviarRef.current?.(pergunta);
+  };
   const alternarHistorico = () => historicoRef.current?.();
 
   // aba de ajustes (REALIZA-328): view-stack aqui na bolha — a conversa
@@ -589,7 +719,9 @@ export function AssistenteBolha({
       : estadoLiza
     : respostaPronta
       ? "pronto"
-      : atento
+      : fala && falandoBoca
+        ? "falando"
+        : atento
         ? "atento"
         : sonolento
           ? "sonolento"
@@ -634,6 +766,18 @@ export function AssistenteBolha({
       <span className="block size-3 animate-in zoom-in-50 rounded-full bg-[var(--destaque)] shadow-[0_0_0_2px_var(--background)] duration-150" />
     </span>
   );
+  // balão de fala e rótulo do hover moram no container fixo do FAB
+  const balao = !aberto && fala ? (
+    <LizaFala
+      key={fala.tipo}
+      fala={fala}
+      onPergunta={perguntarDoBalao}
+      onAbrir={() => mudar(true)}
+      onDispensar={dispensarFala}
+      onPausar={setPausada}
+    />
+  ) : null;
+  const rotuloHover = desktop && atento && !aberto && !fala ? <LizaRotulo /> : null;
   const rotuloFab = aberto
     ? "Fechar assistente"
     : aviso
@@ -658,6 +802,8 @@ export function AssistenteBolha({
             {icons}
           </PopoverTrigger>
           {pontoAviso}
+          {balao}
+          {rotuloHover}
         </div>
         <PopoverContent
           id="painel-assistente"
@@ -715,6 +861,7 @@ export function AssistenteBolha({
           {icons}
         </Button>
         {pontoAviso}
+        {balao}
       </div>
       <Sheet open={aberto} onOpenChange={mudar}>
         <SheetContent

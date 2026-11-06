@@ -262,7 +262,7 @@ export function DuplaLinha({
               <span
                 aria-hidden
                 className={cn(
-                  buttonVariants({ variant: "ghost", size: "sm" }),
+                  buttonVariants({ variant: "outline", size: "sm" }),
                   "pointer-events-none w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
                 )}
               >

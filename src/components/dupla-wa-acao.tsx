@@ -260,8 +260,12 @@ export function DuplaWaAcao({
           <p className="whitespace-pre-wrap break-words rounded-lg bg-muted px-3 py-2.5 text-sm leading-relaxed">
             {dest.mensagem}
           </p>
-          <DialogFooter>
-            <Button variant="ghost" onClick={copiar}>
+          {/* wrap: Lembrar + WhatsApp + Copiar não cabem numa linha só
+              no modal md — sem wrap a fila justify-end empurrava o
+              primeiro botão pra fora do popup (overflow-x-clip cortava).
+              mr-auto separa a utilidade (copiar) das ações de envio. */}
+          <DialogFooter className="sm:flex-wrap">
+            <Button variant="ghost" onClick={copiar} className="sm:mr-auto">
               <Copy aria-hidden />
               Copiar texto
             </Button>
@@ -292,6 +296,7 @@ export function DuplaWaAcao({
               ))}
             {waContato ? (
               <Button
+                nativeButton={false}
                 render={
                   <a
                     href={waContato}

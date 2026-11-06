@@ -359,7 +359,9 @@ export function AppShell({
               </Link>
             );
           })}
-          <Sheet open={menuAberto} onOpenChange={setMenuAberto}>
+          {/* key explícita: irmão do array do map — sem ela o Sheet entra
+              na lista implícita sem key e o React reclama no AppShell */}
+          <Sheet key="nav-menu" open={menuAberto} onOpenChange={setMenuAberto}>
             <SheetTrigger
               aria-label={[
                 menuAtivo ? "Menu, seção atual fora da barra" : "Menu",

@@ -5,7 +5,7 @@ import { cn } from "cn"
    sm:min-h-8 no desktop. Dots de status e contagens vivem dentro do chip. */
 export const filterChipCls = (ativo: boolean) =>
   cn(
-    "inline-flex min-h-11 items-center gap-1.5 rounded-full border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8",
+    "inline-flex min-h-11 shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8",
     ativo
       ? "border-foreground bg-foreground text-background"
       : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground"

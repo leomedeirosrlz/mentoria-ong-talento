@@ -9,6 +9,7 @@ import { formatDiaMes, formatTamanho } from "@/lib/ciclo";
 import type { RegistroAnexo } from "@/lib/types";
 import { Button } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
+import { novoUuid } from "@/lib/uuid";
 
 const LIMITE_BYTES = 10 * 1024 * 1024;
 const BUCKET = "registro-anexos";
@@ -47,7 +48,7 @@ export async function enviarAnexo(
 ): Promise<{ row: RegistroAnexo } | { error: string }> {
   try {
     const supabase = createClient();
-    const path = `${registroId}/${crypto.randomUUID()}-${saneiaNome(file.name)}`;
+    const path = `${registroId}/${novoUuid()}-${saneiaNome(file.name)}`;
 
     // 1) a row de metadados vem ANTES do arquivo — a policy de INSERT do
     //    storage só aceita objeto cujo path já exista em registro_anexos

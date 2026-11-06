@@ -40,6 +40,7 @@ import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { novoUuid } from "@/lib/uuid";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -986,7 +987,7 @@ export function RegistroForm({
                 variant="outline"
                 size="sm"
                 ref={addEncRef}
-                onClick={() => setEncaminhamentos([...encaminhamentos, { id: crypto.randomUUID(), descricao: "", responsavel: "mentorado", prazo: "" }])}
+                onClick={() => setEncaminhamentos([...encaminhamentos, { id: novoUuid(), descricao: "", responsavel: "mentorado", prazo: "" }])}
               >
                 <Plus size={14} /> Adicionar
               </Button>

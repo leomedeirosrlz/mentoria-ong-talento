@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import {
+  CaretRight,
   Clock,
   DotsThree,
   DownloadSimple,
@@ -393,7 +394,10 @@ function LinhaMini({
           )}
         </span>
         <span className="whitespace-nowrap text-xs font-semibold text-foreground">
-          {feitos}/{total} · esp. {saude.esperado}
+          {feitos}/{total}
+          {/* sem cronograma não há esperado pra comparar — "esp. 0"
+              mentia a mesma coisa que o tick escondido acima */}
+          {saude.esperado > 0 && ` · esp. ${saude.esperado}`}
         </span>
       </span>
       <span className="hidden truncate text-xs text-muted-foreground @4xl:inline">
@@ -410,7 +414,7 @@ function LinhaMini({
           <span
             aria-hidden
             className={cn(
-              buttonVariants({ variant: "ghost", size: "sm" }),
+              buttonVariants({ variant: "outline", size: "sm" }),
               "pointer-events-none w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5"
             )}
           >
@@ -1171,7 +1175,7 @@ function VisaoCoordenacao({
             <Input
               type="search"
               aria-label="Buscar dupla"
-              placeholder="Buscar dupla, mentor ou mentorada…"
+              placeholder="Buscar dupla ou pessoa…"
               value={busca}
               onChange={(e) => setBusca(e.target.value)}
               className="pl-8"
@@ -1903,8 +1907,17 @@ function VisaoMentor({
               <article
                 key={d.id}
                 style={{ "--i": Math.min(idx, 10) } as CSSProperties}
-                className="animate-enter grid grid-cols-1 gap-2 rounded-xl border border-border bg-card p-3 shadow-[var(--shadow-border)]"
+                className="group animate-enter relative grid grid-cols-1 gap-2 rounded-xl border border-border bg-card p-3 shadow-[var(--shadow-border)] transition-colors hover:bg-muted/50"
               >
+                {/* card inteiro abre a ficha (stretched link, mesmo padrão
+                    da DuplaLinha — REALIZA-241): cobre o card em z-10 e
+                    só o "Registrar encontro" sobe pra z-20. Pill e chevron
+                    são decorativos — 1 tab-stop por card */}
+                <Link
+                  href={`/duplas/${d.id}`}
+                  aria-label={`Ver ficha da dupla de ${d.mentorado.nome.split(" ")[0]}`}
+                  className="absolute inset-0 z-10 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                />
                 <header className="flex flex-wrap items-center justify-between gap-2">
                   <p className="flex min-w-0 flex-wrap items-center gap-1.5 font-semibold">
                     <DuplaAvatares mentor={d.mentor} mentorado={d.mentorado} size={28} />
@@ -1918,8 +1931,8 @@ function VisaoMentor({
                       </span>
                     )}
                   </p>
-                  {/* "Abrir ficha" sempre no header — nada de footer de
-                      ações; a pendência ganha botão no "Próximo passo" */}
+                  {/* sem botão "Abrir ficha" — o card inteiro é o link; o
+                      chevron é a dica visual de que ele abre */}
                   <span className="flex items-center gap-2">
                     {apoioProprio ? (
                       <Pill tom="atencao">
@@ -1932,19 +1945,23 @@ function VisaoMentor({
                         {estado.label}
                       </Pill>
                     )}
-                    <Link
-                      href={`/duplas/${d.id}`}
-                      className={buttonVariants({ size: "sm" })}
-                    >
-                      Abrir ficha
-                    </Link>
+                    <CaretRight
+                      aria-hidden
+                      size={16}
+                      weight="bold"
+                      className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
+                    />
                   </span>
                 </header>
 
                 {/* feito × esperado com o tick do calendário */}
                 <div
                   role="img"
-                  aria-label={`${feitos} encontros feitos de ${s.esperado} esperados até hoje, de ${total}`}
+                  aria-label={
+                    s.esperado > 0
+                      ? `${feitos} encontros feitos de ${s.esperado} esperados até hoje, de ${total}`
+                      : `${feitos} encontros feitos de ${total}`
+                  }
                 >
                   <div className="relative h-2 rounded-full border border-border bg-muted">
                     <div
@@ -1960,17 +1977,28 @@ function VisaoMentor({
                         width: `${total > 0 ? Math.min((feitos / total) * 100, 100) : 0}%`,
                       }}
                     />
-                    <span
-                      aria-hidden
-                      className="absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2 rounded bg-foreground"
-                      style={{
-                        left: `${total > 0 ? Math.min((s.esperado / total) * 100, 100) : 0}%`,
-                      }}
-                    />
+                    {/* sem cronograma não há "esperado" (dupla histórica de
+                        outro ciclo) — tick no 0 e "× 0 esperados" mentiriam
+                        contra os feitos */}
+                    {s.esperado > 0 && (
+                      <span
+                        aria-hidden
+                        className="absolute -top-1 -bottom-1 w-0.5 -translate-x-1/2 rounded bg-foreground"
+                        style={{
+                          left: `${total > 0 ? Math.min((s.esperado / total) * 100, 100) : 0}%`,
+                        }}
+                      />
+                    )}
                   </div>
                   <span className="mt-1.5 block text-xs text-muted-foreground">
-                    <b className="text-foreground">{feitos}</b> feitos ×{" "}
-                    <b className="text-foreground">{s.esperado}</b> esperados
+                    <b className="text-foreground">{feitos}</b> feitos
+                    {s.esperado > 0 && (
+                      <>
+                        {" "}
+                        × <b className="text-foreground">{s.esperado}</b>{" "}
+                        esperados
+                      </>
+                    )}
                   </span>
                 </div>
 
@@ -1995,7 +2023,7 @@ function VisaoMentor({
                     {pendente && (
                       <Link
                         href={`/duplas/${d.id}#registrar-${pendente.id}`}
-                        className={cn(buttonVariants({ size: "sm" }), "mt-2")}
+                        className={cn(buttonVariants({ size: "sm" }), "relative z-20 mt-2")}
                       >
                         Registrar encontro {pendente.numero}
                       </Link>
