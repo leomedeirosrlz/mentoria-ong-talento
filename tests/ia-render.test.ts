@@ -938,6 +938,20 @@ describe("segurarParcial", () => {
     expect(segurarParcial("```\nEm [mat](/x")).toBe("```\nEm [mat](/x");
   });
 
+  it("hr se formando (-, --, __) espera o 3º char; --- pronto libera", () => {
+    expect(segurarParcial("Veja:\n\n-")).toBe("Veja:");
+    expect(segurarParcial("Veja:\n\n--")).toBe("Veja:");
+    expect(segurarParcial("Veja:\n\n__")).toBe("Veja:");
+    // "*" sozinho pode virar *** ou item "* " — também espera
+    expect(segurarParcial("Veja:\n\n*")).toBe("Veja:");
+    expect(segurarParcial("Veja:\n\n- ")).toBe("Veja:");
+    // completo não é mais parcial — segue e o MdLite desenha o <hr>
+    expect(segurarParcial("Veja:\n\n---")).toBe("Veja:\n\n---");
+    expect(segurarParcial("Veja:\n\n***")).toBe("Veja:\n\n***");
+    // dentro de fence continua intocado
+    expect(segurarParcial("```\n-")).toBe("```\n-");
+  });
+
   it("encadeado com extrairBlocos no stream não mostra cru nem pisca", () => {
     const { textoSemBloco } = extrairBlocos(
       segurarParcial("Resumo:\n\n```stats\n[{\"valor\":\"1"),

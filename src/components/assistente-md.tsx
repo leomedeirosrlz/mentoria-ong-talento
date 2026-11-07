@@ -1,8 +1,9 @@
 "use client";
 
 // Markdown-lite da resposta do assistente (saiu da conversa no v3): bold,
-// listas, links, código, tabela pipe e as linhas-marca da genUI — blocos
-// por linha, inline por regex. O modelo só emite esse subconjunto (system
+// listas (com um nível de sub-item), citação agrupada, separador ---,
+// links, código, tabela pipe e as linhas-marca da genUI — blocos por
+// linha, inline por regex. O modelo só emite esse subconjunto (system
 // prompt). A análise (extrairBlocos) roda uma vez por render da bolha em
 // `analisarResposta`; o MdLite só desenha.
 
@@ -11,6 +12,7 @@ import type { CSSProperties, ReactNode } from "react";
 import {
   ehTabelaMd,
   extrairBlocos,
+  HR_LINHA,
   MARCA_BLOCO,
   MARCA_PENDENTE,
   parseTabelaMd,
@@ -292,8 +294,13 @@ function MdLite({
 }) {
   const linhas = texto.split("\n");
   const saida: ReactNode[] = [];
-  let lista: string[] | null = null;
+  // item com `sub` = marcador indentado ≥2 espaços embaixo dele — vira
+  // <ul> filha do <li> (só 1 nível de aninhamento)
+  type ItemLista = { texto: string; sub?: string[] };
+  let lista: ItemLista[] | null = null;
   let listaOrd = false;
+  // linhas ">" seguidas acumulam num blockquote só (um <p> por linha)
+  let citacao: string[] | null = null;
   let emCodigo = false;
   let codigo: string[] = [];
   // tag do fence corrente (```sql) — vira o rótulo do header do CodeBlock
@@ -315,25 +322,54 @@ function MdLite({
       ))}
     </div>
   );
-  const flush = () => {
+  const flushLista = () => {
     if (!lista?.length) return;
-    const items = lista.map((l, i) => (
+    const items = lista.map((item, i) => (
       <li key={i}>
-        <Inline texto={l} animar={animar} />
+        <Inline texto={item.texto} animar={animar} />
+        {item.sub?.length ? (
+          <ul className="mt-1.5 list-disc space-y-1 pl-4 marker:text-muted-foreground">
+            {item.sub.map((s, j) => (
+              <li key={j}>
+                <Inline texto={s} animar={animar} />
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </li>
     ));
     saida.push(
       listaOrd ? (
-        <ol key={key++} className="list-decimal space-y-1 pl-5 marker:text-muted-foreground">
+        <ol key={key++} className="list-decimal space-y-1.5 pl-5 marker:text-muted-foreground">
           {items}
         </ol>
       ) : (
-        <ul key={key++} className="list-disc space-y-1 pl-5 marker:text-muted-foreground">
+        <ul key={key++} className="list-disc space-y-1.5 pl-5 marker:text-muted-foreground">
           {items}
         </ul>
       )
     );
     lista = null;
+  };
+  // fecha o que estiver aberto na posição do texto: a citação agrupada e
+  // a lista nunca coexistem (uma fecha a outra), então a ordem é neutra
+  const flush = () => {
+    if (citacao?.length) {
+      saida.push(
+        <blockquote
+          key={key++}
+          className="space-y-1 border-l-[3px] border-border pl-3 text-muted-foreground"
+        >
+          {citacao.map((l, i) => (
+            <p key={i}>
+              <Inline texto={l} animar={animar} />
+            </p>
+          ))}
+        </blockquote>
+      );
+      citacao = null;
+    }
+    flushLista();
   };
   let pularAte = -1;
   linhas.forEach((linha, idx) => {
@@ -387,42 +423,69 @@ function MdLite({
         return;
       }
     }
-    const bullet = /^\s*[-*•]\s+(.+)$/.exec(linha);
-    const num = /^\s*\d+[.)]\s+(.+)$/.exec(linha);
+    // separador de bloco temático: 3+ do mesmo char colado ("---", "***",
+    // "___"). Vem antes do bullet: "- - -" não casa aqui (o regex exige
+    // os chars colados) e segue como lista; "---" puro já não casaria no
+    // bullet de qualquer forma (ele pede espaço depois do marcador)
+    if (HR_LINHA.test(linha)) {
+      flush();
+      saida.push(<hr key={key++} className="border-border/70" />);
+      return;
+    }
+    const quote = /^>\s?(.*)$/.exec(linha);
+    if (quote) {
+      // ">" seguidas formam UMA citação (não uma barra por linha): só a
+      // lista pendente fecha aqui; a citação em si sai no próximo flush
+      flushLista();
+      (citacao ??= []).push(quote[1]);
+      return;
+    }
+    const bullet = /^(\s*)[-*•]\s+(.+)$/.exec(linha);
+    const num = /^(\s*)\d+[.)]\s+(.+)$/.exec(linha);
     if (bullet || num) {
+      const m = (bullet ?? num)!;
+      // marcador indentado ≥2 espaços = sub-item do anterior (a sublista
+      // é sempre <ul>, numerado ou não); sem lista aberta cai como item
+      // de topo — conteúdo nunca some
+      if (m[1].length >= 2 && lista?.length) {
+        (lista[lista.length - 1].sub ??= []).push(m[2]);
+        return;
+      }
       if (!lista || listaOrd !== Boolean(num)) {
         flush();
         lista = [];
         listaOrd = Boolean(num);
       }
-      lista.push((bullet ?? num)![1]);
+      lista.push({ texto: m[2] });
       return;
     }
     flush();
     if (!linha.trim()) return;
-    const h = /^(#{1,3})\s+(.+)$/.exec(linha);
+    const h = /^(#{1,4})\s+(.+)$/.exec(linha);
     if (h) {
-      // títulos curtos na hierarquia do painel: h2/h3 semânticos —
-      // a bolha vive dentro da página (o h1 já é dela), então nem o
-      // modelo emite h1 e um eventual # cai no mesmo nível do ##
+      // títulos curtos na hierarquia do painel: ## = seção, ### =
+      // subseção, #### = nível miúdo — a bolha vive dentro da página (o
+      // h1 já é dela), então nem o modelo emite h1 e um eventual # cai
+      // no mesmo nível do ##. pt-N abre a seção de verdade e first:pt-0
+      // zera quando o título é o 1º bloco da resposta
       const nivel = h[1].length;
-      const Tag = (nivel >= 3 ? "h3" : "h2") as "h2" | "h3";
+      const Tag = (nivel >= 4 ? "h4" : nivel >= 3 ? "h3" : "h2") as
+        | "h2"
+        | "h3"
+        | "h4";
       saida.push(
         <Tag
           key={key++}
-          className={nivel >= 3 ? "text-sm font-semibold" : "text-base font-semibold"}
+          className={
+            nivel >= 4
+              ? "text-sm font-semibold pt-2 first:pt-0"
+              : nivel >= 3
+                ? "text-base font-semibold tracking-tight pt-3 first:pt-0"
+                : "text-lg font-semibold tracking-tight pt-4 first:pt-0"
+          }
         >
           <Inline texto={h[2]} animar={animar} />
         </Tag>
-      );
-      return;
-    }
-    const quote = /^>\s?(.*)$/.exec(linha);
-    if (quote) {
-      saida.push(
-        <blockquote key={key++} className="border-l-2 border-border pl-3 text-muted-foreground">
-          <Inline texto={quote[1]} animar={animar} />
-        </blockquote>
       );
       return;
     }
@@ -446,7 +509,12 @@ function MdLite({
   // estreita do painel (REALIZA-334). ia-stream põe o caret no fim do
   // último parágrafo/item (CSS), não numa linha própria
   return (
-    <div className={cn("space-y-2.5 [overflow-wrap:anywhere]", animar && "ia-stream")}>
+    <div
+      className={cn(
+        "space-y-3 leading-relaxed [overflow-wrap:anywhere]",
+        animar && "ia-stream"
+      )}
+    >
       {saida}
     </div>
   );

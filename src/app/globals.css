@@ -571,7 +571,7 @@
 /* caret no fim do texto que está chegando — ::after no último parágrafo
    (ou no último item da última lista), nunca numa linha própria. Quando o
    último bloco é card/skeleton não há caret: o skeleton já diz "chegando" */
-.ia-stream > :is(p, blockquote):last-child::after,
+.ia-stream > :is(p, blockquote, h2, h3, h4):last-child::after,
 .ia-stream > :is(ul, ol):last-child > li:last-child::after {
   content: "";
   display: inline-block;
@@ -764,7 +764,7 @@
        caret e shimmer não deslocam nada; os pontos de "escrevendo" trocam
        o bounce por onda de opacidade (a espera continua comunicada). */
     .ia-cursor,
-    .ia-stream > :is(p, blockquote):last-child::after,
+    .ia-stream > :is(p, blockquote, h2, h3, h4):last-child::after,
     .ia-stream > :is(ul, ol):last-child > li:last-child::after {
       animation-duration: 1.06s !important;
       animation-iteration-count: infinite !important;

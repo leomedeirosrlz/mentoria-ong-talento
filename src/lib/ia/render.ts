@@ -464,6 +464,13 @@ export function extrairGraficos(texto: string): {
 const SEP_PARCIAL = /^\|[\s:|-]*$/;
 // 1 ou 2 crases sozinhas na linha: começo de um ``` que ainda não chegou
 const CRASE_PARCIAL = /^\s*`{1,2}\s*$/;
+// linha de separador hr completa: 3+ do mesmo char (-, * ou _) colado —
+// a regra que o MdLite usa pra desenhar o <hr>
+export const HR_LINHA = /^\s*([-*_])\1{2,}\s*$/;
+// separador hr se formando: 1-2 chars de -, * ou _ na última linha —
+// segura até o 3º completar a linha (ou virar outra coisa: "- " abre
+// item de lista, "**a" abre negrito)
+const HR_PARCIAL = /^[-*_]{1,2}\s*$/;
 
 /** Posição inicial do construto inline ainda aberto no fim da linha
  *  (-1 = nada a segurar): link "[" sem "]" ou "](" sem ")", negrito "**"
@@ -537,11 +544,18 @@ export function segurarParcial(texto: string): string {
   // Só revelam quando fecham; se nunca fechar, o texto final mostra cru
   // (segurarParcial só vale no stream, nunca esconde conteúdo do fim)
   if (!novaLinha && !dentro[n - 1]) {
-    const corte = inicioInlineParcial(ultima);
-    if (corte >= 0)
-      return [...linhas.slice(0, n - 1), ultima.slice(0, corte)]
-        .join("\n")
-        .trimEnd();
+    // "-" / "--" / "__" no fim: espera o 3º char do hr ou o texto que
+    // desqualifica (item de lista) — senão pisca como parágrafo solto
+    if (HR_PARCIAL.test(ultima)) return corta(n - 1);
+    // hr já completo passa direto: "***" cairia no filtro de bold parcial
+    // ("**" aberto no fim) e sairia como "*" até a próxima linha
+    if (!HR_LINHA.test(ultima)) {
+      const corte = inicioInlineParcial(ultima);
+      if (corte >= 0)
+        return [...linhas.slice(0, n - 1), ultima.slice(0, corte)]
+          .join("\n")
+          .trimEnd();
+    }
   }
   // corrida final de linhas pipe fora de fence
   let k = fim;
