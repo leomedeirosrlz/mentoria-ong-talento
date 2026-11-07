@@ -15,7 +15,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { cache } from "react";
-import type { DocBloco } from "@/lib/materiais-documentos";
+import type { CalloutTom, DocBloco } from "@/lib/materiais-documentos";
 import { veMaterial } from "@/lib/materiais";
 import type { AppRole } from "@/lib/types";
 import { secaoAnchor } from "./corpus-anchor";
@@ -151,14 +151,144 @@ function blocoTabela(linhas: string[]): DocBloco | null {
   };
 }
 
-function blocoPar(texto: string): DocBloco {
-  // "**Assunto:** X" — o marcador de e-mail dos templates (subj)
+// ---------- the guide's visual vocabulary ----------
+// The corpus carries the PDF block semantics as explicit markdown:
+// `*(…)*` alone (or closing a paragraph) → callout with keyword-derived
+// tone; `*"…" (source)*` → quote; `**N. Título.**` → numbered item;
+// `### Nº encontro` and `**Nº ENCONTRO: T.**` → encounter card with task
+// and route slots. Everything else stays a paragraph with **bold**/*italic*.
+
+const RE_ENCONTRO_TITULO = /^(\d+)º encontro · (.+)$/;
+const RE_ENCONTRO_PAR = /^\*\*(\d+)º\s+encontro\s*:\s*([^*]+?)\.\*\*\s+([\s\S]+)$/i;
+const RE_NUMERO_PAR = /^\*\*(\d+)\.\s*([^*]+?)\.\*\*\s+([\s\S]+)$/;
+const RE_QUOTE_PAR = /^\*"([\s\S]+?)"\s*\(([^()]+)\)\*$/;
+const RE_CALLOUT_PAR = /^\*\(([\s\S]+)\)\*$/;
+const RE_CALLOUT_FINAL = /^([\s\S]+?)\s*\*\(([^*]+)\)\*$/;
+const RE_PASSO_FIM = /\s*Passo a passo:\s*Roteiro do (\d+)º encontro\.?\s*$/;
+const RE_TAREFA_FIM =
+  /(?:\b[Dd]aqui\s+sai\s+)?(?:\b[Aa]\s+)?[Tt]arefa\s*(?::|é)\s+([\s\S]+?)\.\s*$/;
+
+// callout tone from the note's opening word (the corpus always labels it):
+// Atualização/Nota → info; Atenção/Importante/Cuidado → warn; Dica/Sugestão
+// → tip; no keyword → editorial reflection (note, italic gray)
+const TOM_CALLOUT: [RegExp, CalloutTom][] = [
+  [/^(atualiza|nota)\b/i, "info"],
+  [/^(aten|importante|cuidado)\b/i, "warn"],
+  [/^(dica|sugest)\b/i, "tip"],
+];
+
+function tomCallout(inner: string): CalloutTom {
+  const t = inner.trim().toLowerCase();
+  for (const [re, tom] of TOM_CALLOUT) if (re.test(t)) return tom;
+  return "note";
+}
+
+/** Callout html: the leading keyword ("Atualização:", "Dica:"…) becomes a
+ *  bold label for scanning. */
+function htmlCallout(inner: string): string {
+  return inlineMd(inner).replace(/^([^:]{1,30}:)\s/, "<b>$1</b> ");
+}
+
+/** Splits the trailing slots off an encounter body: "Passo a passo:
+ *  Roteiro do Nº encontro." becomes a route link; "Tarefa: X." /
+ *  "a tarefa é X." becomes the task slot. */
+function extrairSlotsEncontro(html: string): {
+  html: string;
+  tarefa?: string;
+  roteiro?: { slug: string; rotulo: string };
+} {
+  let tarefa: string | undefined;
+  let roteiro: { slug: string; rotulo: string } | undefined;
+  const mPasso = RE_PASSO_FIM.exec(html);
+  if (mPasso) {
+    roteiro = {
+      slug: `roteiro-encontro-${mPasso[1].padStart(2, "0")}`,
+      rotulo: `Roteiro do ${mPasso[1]}º encontro`,
+    };
+    html = html.slice(0, mPasso.index);
+  }
+  const mTarefa = RE_TAREFA_FIM.exec(html);
+  if (mTarefa) {
+    tarefa = mTarefa[1].trim();
+    html = html.slice(0, mTarefa.index);
+  }
+  // the task usually comes from a "; a tarefa é …" clause — leftover ";"
+  return { html: html.replace(/[;:]\s*$/, ".").trimEnd(), tarefa, roteiro };
+}
+
+function mkEncontro(
+  numero: string,
+  titulo: string,
+  anchor: string | undefined,
+  corpoHtml: string,
+  resto: DocBloco[]
+): DocBloco {
+  const { html, tarefa, roteiro } = extrairSlotsEncontro(corpoHtml);
+  const corpo: DocBloco[] = html ? [{ kind: "par", html }] : [];
+  corpo.push(...resto);
+  return {
+    kind: "encontro",
+    numero,
+    titulo,
+    ...(anchor ? { anchor } : {}),
+    corpo,
+    ...(tarefa ? { tarefa } : {}),
+    ...(roteiro ? { roteiro } : {}),
+  };
+}
+
+function blocoPar(texto: string): DocBloco[] {
+  // "**Assunto:** X" — the e-mail subject marker of the templates (subj)
   const mSubj = /^\*\*Assunto:\*\*\s+(.+)$/.exec(texto);
-  if (mSubj) return { kind: "subj", texto: mSubj[1].replace(/\*\*/g, "") };
-  // *( ... )* — nota editorial do corpus (atualizações de plataforma)
-  const mNota = /^\*\(([\s\S]+)\)\*$/.exec(texto);
-  if (mNota) return { kind: "nota", html: `<i>${inlineMd(mNota[1])}</i>` };
-  return { kind: "par", html: inlineMd(texto) };
+  if (mSubj) return [{ kind: "subj", texto: mSubj[1].replace(/\*\*/g, "") }];
+  // *"…" (source)* — blockquote
+  const mQuote = RE_QUOTE_PAR.exec(texto);
+  if (mQuote) {
+    return [
+      {
+        kind: "quote",
+        html: inlineMd(`"${mQuote[1]}"`),
+        fonte: mQuote[2].trim(),
+      },
+    ];
+  }
+  // whole *( … )* — the corpus editorial note (platform updates)
+  const mCallout = RE_CALLOUT_PAR.exec(texto);
+  if (mCallout) {
+    return [
+      { kind: "callout", tom: tomCallout(mCallout[1]), html: htmlCallout(mCallout[1]) },
+    ];
+  }
+  // "**Nº ENCONTRO: T.** …" — inline encounter card (specialist track)
+  const mEnc = RE_ENCONTRO_PAR.exec(texto);
+  if (mEnc) {
+    return [mkEncontro(mEnc[1], mEnc[2].trim(), undefined, inlineMd(mEnc[3]), [])];
+  }
+  // "**N. Título.** …" — numbered item (the nine mentor functions)
+  const mNum = RE_NUMERO_PAR.exec(texto);
+  if (mNum) {
+    return [
+      {
+        kind: "numero",
+        numero: mNum[1],
+        titulo: mNum[2].trim(),
+        html: inlineMd(mNum[3]),
+      },
+    ];
+  }
+  // *( … )* closing the paragraph — the note leaves the body as a callout
+  const mFinal = RE_CALLOUT_FINAL.exec(texto);
+  if (mFinal) {
+    return [
+      { kind: "par", html: inlineMd(mFinal[1]) },
+      {
+        kind: "callout",
+        tom: tomCallout(mFinal[2]),
+        html: htmlCallout(mFinal[2]),
+      },
+    ];
+  }
+  return [{ kind: "par", html: inlineMd(texto) }];
 }
 
 const RE_ITEM_LISTA = /^(-|\d+\.)\s/;
@@ -180,7 +310,7 @@ function blocosDeTexto(texto: string): DocBloco[] {
         run.push(linhas[i++].trim());
       const tabela = blocoTabela(run);
       if (tabela) blocos.push(tabela);
-      else blocos.push(...run.map(blocoPar));
+      else blocos.push(...run.flatMap(blocoPar));
       continue;
     }
     const mItem = /^(-|\d+\.)\s+/.exec(l);
@@ -208,7 +338,7 @@ function blocosDeTexto(texto: string): DocBloco[] {
     ) {
       par.push(linhas[i++].trim());
     }
-    blocos.push(blocoPar(par.join(" ")));
+    blocos.push(...blocoPar(par.join(" ")));
   }
   return blocos;
 }
@@ -227,6 +357,22 @@ function tituloLimpo(t: string): string {
   return t.replace(/\*\*/g, "").trim();
 }
 
+/** "### Nº encontro · Título" becomes a single encontro block: the heading
+ *  carries the anchor and the card holds number, title, body and the
+ *  trailing slots (Tarefa / Passo a passo→route link). The section's
+ *  remaining blocks go inside the card body. */
+function blocosEncontro(
+  numero: string,
+  titulo: string,
+  anchor: string,
+  blocos: DocBloco[]
+): DocBloco[] {
+  const [b0, ...resto] = blocos;
+  const corpoHtml = b0?.kind === "par" ? b0.html : "";
+  const fora = b0?.kind === "par" ? resto : blocos;
+  return [mkEncontro(numero, titulo, anchor, corpoHtml, fora)];
+}
+
 function mkSecao(
   secao: string,
   titulo: string,
@@ -234,13 +380,18 @@ function mkSecao(
   nivel: 2 | 3,
   texto: string
 ): CorpusSecao {
+  const limpo = tituloLimpo(titulo);
+  const anchor = secaoAnchor(secao);
+  let blocos = blocosDeTexto(texto);
+  const mEnc = nivel === 3 ? RE_ENCONTRO_TITULO.exec(limpo) : null;
+  if (mEnc) blocos = blocosEncontro(mEnc[1], mEnc[2].trim(), anchor, blocos);
   return {
     secao,
-    titulo: tituloLimpo(titulo),
+    titulo: limpo,
     grupo,
     nivel,
-    anchor: secaoAnchor(secao),
-    blocos: blocosDeTexto(texto),
+    anchor,
+    blocos,
   };
 }
 

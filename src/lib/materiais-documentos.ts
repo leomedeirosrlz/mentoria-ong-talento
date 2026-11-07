@@ -4,13 +4,36 @@
  *  pela convenção `path = "doc:<slug>"` — a biblioteca resolve o href, sem
  *  passar pelo storage. */
 
+/** Tone of a callout — the guide's side box: info (gray-teal, notes and
+ *  platform updates), warn (cream/amber, attention), tip (pale green/lime,
+ *  hints) and note (italic gray, editorial reflection). */
+export type CalloutTom = "info" | "warn" | "tip" | "note";
+
 export type DocBloco =
   | { kind: "par"; html: string }
   // ordenada=false → <ul> (listas "-" do corpus); ausente/true → <ol>
   | { kind: "lista"; itens: string[]; ordenada?: boolean }
   | { kind: "pergunta"; texto: string }
   | { kind: "subj"; texto: string }
-  | { kind: "nota"; html: string }
+  | { kind: "callout"; tom: CalloutTom; html: string }
+  // "**N. Título.**" of the guide — numbered item with highlighted digit
+  | { kind: "numero"; numero: string; titulo: string; html: string }
+  // blockquote: *"text" (attribution)*
+  | { kind: "quote"; html: string; fonte?: string }
+  // the guide's encounter card: "Nº ENCONTRO" eyebrow, title, body and the
+  // trailing slots (assigned task + link to the encounter route)
+  | {
+      kind: "encontro";
+      numero: string;
+      titulo: string;
+      /** anchor of the source section (###-derived cards); absent on inline
+       *  cards ("**Nº ENCONTRO: ...**" inside a paragraph). */
+      anchor?: string;
+      corpo: DocBloco[];
+      /** assigned-task text (already-escaped html), without the "Tarefa:" */
+      tarefa?: string;
+      roteiro?: { slug: string; rotulo: string };
+    }
   // marcacao: colunas > 0 desenham checkbox vazio (fichas de marcação do
   // cap. 14); sem a flag, toda célula renderiza o próprio conteúdo (tabelas
   // de dados do corpus)
@@ -45,7 +68,8 @@ export const MATERIAIS_DOCUMENTOS: Record<string, MaterialDocumento> = {
     blocos: [
       { kind: "par", html: "Marque no início do ciclo o que já faz bem e o que quer desenvolver, e revisite a lista no fechamento." },
       {
-        kind: "nota",
+        kind: "callout",
+        tom: "tip",
         html: "Marque como prioritário aquilo que você quer desenvolver e exercite esses pontos no dia a dia, com amigos, família e no trabalho, antes de aplicá-los na mentoria.",
       },
       {
@@ -82,7 +106,8 @@ export const MATERIAIS_DOCUMENTOS: Record<string, MaterialDocumento> = {
         html: "O Feedback Construtivo melhora a autoconsciência, contribui para o aumento da autoconfiança, estimula a aprendizagem, eleva a motivação e incrementa o desempenho. Mesmo quando for necessário apontar aspectos negativos, o feedback deve ser construtivo. <b>Não precisa ser agendado:</b> pode surgir espontaneamente no decorrer de um encontro, desde que feito com responsabilidade e respeito.",
       },
       {
-        kind: "nota",
+        kind: "callout",
+        tom: "tip",
         html: "<b>Modelo sugerido:</b> “Olha, quando acontece determinada situação, eu me sinto <i>(descreva como você se sente)</i>, porque <i>(explique o motivo)</i>. Eu gostaria que você considerasse <i>(apresente uma sugestão ou alternativa)</i>.” Em seguida, pergunte: “O que você pensa sobre o que acabei de dizer?”",
       },
       {
@@ -117,7 +142,8 @@ export const MATERIAIS_DOCUMENTOS: Record<string, MaterialDocumento> = {
     objetivo: "Envie antes do primeiro encontro, assim que a dupla for formada.",
     blocos: [
       {
-        kind: "nota",
+        kind: "callout",
+        tom: "tip",
         html: "<b>Dica:</b> adapte a linguagem ao seu jeito de escrever e à realidade do(a) jovem. É um ponto de partida, não um formulário obrigatório.",
       },
       { kind: "subj", texto: "Vamos começar a nossa mentoria!" },
@@ -154,7 +180,8 @@ export const MATERIAIS_DOCUMENTOS: Record<string, MaterialDocumento> = {
       "Envie a cada pessoa que o(a) jovem indicou o link dela, gerado na ficha da dupla na plataforma.",
     blocos: [
       {
-        kind: "nota",
+        kind: "callout",
+        tom: "warn",
         html: "<b>Importante:</b> as respostas alimentam a avaliação inicial e ninguém saberá quem disse o quê. Diga isso com clareza, como no modelo.",
       },
       {
