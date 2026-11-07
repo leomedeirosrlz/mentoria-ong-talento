@@ -23,9 +23,10 @@ import {
   type StatusPlano,
   type UsoJanela,
 } from "@/lib/ia/metricas";
-import { getIaConfig, PLANOS_GO, type PlanoIa } from "@/lib/ia/config";
+import { getIaConfig, PLANOS_GO, TETOS_GO_USD, type PlanoIa } from "@/lib/ia/config";
 import { rotuloTool } from "@/lib/ia/fontes";
 import { getConsumoPlanoIa, getPainelIa } from "@/lib/ia/queries";
+import { IaEvals } from "@/components/ia-evals";
 import { PageHeader } from "@/components/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -499,6 +500,7 @@ async function carregarDados(papel: AppRole, dias: number) {
       consumo: demoIaEventos(Math.ceil((agora - desde) / DIA_MS) + 1).filter(
         (e) => e.tool === "resposta"
       ) as ConsumoPlanoRow[],
+      modelosCfg: [] as string[],
     };
   }
   // papel já foi checado pela página (coordenação): só então os caches
@@ -517,7 +519,24 @@ async function carregarDados(papel: AppRole, dias: number) {
     !res.truncado && desde >= agora - dias * DIA_MS
       ? eventos.filter((e) => e.tool === "resposta")
       : ((await getConsumoPlanoIa(supabase, papel, desde)) as ConsumoPlanoRow[]);
-  return { agora, eventos, nomes: res.nomes, truncado: res.truncado, plano: cfg.plano, consumo };
+  return {
+    agora,
+    eventos,
+    nomes: res.nomes,
+    truncado: res.truncado,
+    plano: cfg.plano,
+    consumo,
+    // slugs configurados por tier + os da tabela do plano = sugestões do
+    // seletor de modelos do eval (slug solto continua possível)
+    modelosCfg: [
+      ...new Set([
+        ...Object.values(cfg.modelos).filter(
+          (v): v is string => typeof v === "string"
+        ),
+        ...Object.keys(TETOS_GO_USD),
+      ]),
+    ].sort(),
+  };
 }
 
 export default async function IaPage({
@@ -537,7 +556,7 @@ export default async function IaPage({
     : "todos";
   const modelo = typeof mP === "string" && mP ? mP : null;
 
-  const { agora, eventos, nomes, truncado, plano, consumo } = await carregarDados(
+  const { agora, eventos, nomes, truncado, plano, consumo, modelosCfg } = await carregarDados(
     me.role,
     dias
   );
@@ -890,6 +909,8 @@ export default async function IaPage({
             </ul>
           </Secao>
         </div>
+
+        <IaEvals modelosSugeridos={modelosCfg} />
       </div>
     </div>
   );

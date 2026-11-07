@@ -88,6 +88,15 @@ const Body = z
       .max(200)
       .regex(/^\/[\w\-/]*$/)
       .optional(),
+    // override de modelo — SÓ vale com o header x-ia-eval-key batendo o env
+    // IA_EVAL_KEY (evals do /ia). Sem a chave o campo é ignorado: um usuário
+    // qualquer não escolhe o modelo que queima o plano
+    modelo: z
+      .string()
+      .min(2)
+      .max(80)
+      .regex(/^[\w.\-/:]+$/)
+      .optional(),
   })
   .strict();
 
@@ -163,10 +172,19 @@ export async function POST(req: Request) {
     [...body.data.messages].reverse().find((m) => m.role === "user")
       ?.content ?? "";
   const tier = iaCfg.roteamento ? rotearTier(ultimaPergunta) : "balanceado";
+  // eval (0164): o runner do /ia manda x-ia-eval-key + modelo e mede aquele
+  // slug — a cadeia de fallback sai do caminho senão a métrica mente (o
+  // 'resposta' grava o modelo REAL usado, mas um fallback esconderia a
+  // falha do modelo testado). Sem a chave o campo nem é lido.
+  const evalKey = req.headers.get("x-ia-eval-key");
+  const evalOverride =
+    process.env.IA_EVAL_KEY && evalKey === process.env.IA_EVAL_KEY
+      ? body.data.modelo
+      : undefined;
   const chamada = {
-    modelo: modeloDoTier(iaCfg, tier),
+    modelo: evalOverride ?? modeloDoTier(iaCfg, tier),
     esforco: esforcoDoTier(iaCfg, tier),
-    fallbacks: fallbacksDoTier(iaCfg, tier),
+    fallbacks: evalOverride ? [] : fallbacksDoTier(iaCfg, tier),
     // REALIZA-333: o payload de tools sai filtrado por papel — não anunciar
     // pro modelo o que ele não pode rodar (ele papagaiava a descrição das
     // tools coord-only ao explicar a negação)
@@ -478,6 +496,9 @@ export async function POST(req: Request) {
       "Cache-Control": "no-cache, no-transform",
       // proxies reverso bufferizam SSE por padrão (docs streaming do Next)
       "X-Accel-Buffering": "no",
+      // o eval correla a request com o evento 'resposta' (tokens/custo)
+      // — uuid opaco, já gravado em ia_eventos desta request
+      "x-ia-request-id": requestId,
     },
   });
 }
