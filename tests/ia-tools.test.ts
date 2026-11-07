@@ -141,6 +141,7 @@ describe("registry", () => {
         "duplas_do_usuario",
         "ficha_dupla",
         "guia_consulta",
+        "historico_encontros",
         "instrumentos_da_dupla",
         "jovem_agendar_encontro",
         "jovem_marcar_aconteceu",
@@ -696,6 +697,66 @@ describe("executarTool — tools", () => {
     );
     expect(r.ok).toBe(false);
     expect(fromCalls).toHaveLength(0);
+  });
+
+  it("historico_encontros agrega esperados × realizados por dupla na janela", async () => {
+    const ontem = new Date(Date.now() - 86_400_000).toISOString();
+    const anteontem = new Date(Date.now() - 2 * 86_400_000).toISOString();
+    const amanha = new Date(Date.now() + 86_400_000).toISOString();
+    const dupla = (id: string) => ({
+      id,
+      trilha: "dpp",
+      mentor: { nome: "Ana", nome_social: null },
+      mentorado: { nome: "Luisa", nome_social: "Lu" },
+    });
+    const enc = (status: string, data_hora: string | null, id = "d-1") => ({
+      numero: 1,
+      status,
+      data_hora,
+      realizado_em: null,
+      dupla: dupla(id),
+    });
+    const { supabase } = supaFake({
+      tabelas: {
+        encontros: [
+          enc("realizado", ontem),
+          enc("nao_aconteceu", ontem),
+          enc("agendado", anteontem), // vencido → atrasado
+          enc("remarcado", anteontem), // idem
+          enc("agendado", amanha), // futuro
+          enc("cancelado", ontem), // fora dos esperados
+          enc("realizado", ontem, "d-2"),
+        ],
+      },
+    });
+    const r = await executarTool("historico_encontros", {}, supabase, "chat");
+    const dados = dadosDe(r) as {
+      resumo: Record<string, number>;
+      por_dupla: Record<string, unknown>[];
+    };
+    expect(dados.resumo).toMatchObject({
+      duplas: 2,
+      esperados: 5,
+      realizados: 2,
+      nao_aconteceu: 1,
+      atrasados: 2,
+      futuros: 1,
+      cancelados: 1,
+    });
+    const d1 = dados.por_dupla.find((d) => d.dupla_id === "d-1")!;
+    expect(d1).toMatchObject({
+      esperados: 4,
+      mentor: "Ana",
+      mentorado: "Lu", // nome_social ganha
+      atrasados: 2,
+    });
+  });
+
+  it("historico_encontros é tool de staff — jovem não agrega o programa", async () => {
+    expect(IA_TOOLS.historico_encontros.roles).not.toContain("mentorado");
+    const { supabase } = supaFake({ papel: "mentorado" });
+    const r = await executarTool("historico_encontros", {}, supabase, "chat");
+    expect(r.ok).toBe(false);
   });
 
   it("instrumentos_da_dupla repassa a RPC e propaga o erro de escopo", async () => {

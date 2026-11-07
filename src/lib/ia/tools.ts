@@ -37,6 +37,7 @@ import {
   getDuplasResumoIa,
   getDuplasVivasIa,
   getFilaInsumos,
+  getHistoricoEncontrosIa,
   getInstrumentosDaDuplaIa,
   getJovemAgendaIa,
   getJovemCombinadosIa,
@@ -113,6 +114,22 @@ const agendaArgs = z
       .boolean()
       .optional()
       .describe("inclui os encontros dos últimos 3 dias (padrão true)"),
+  })
+  .strict();
+
+const historicoArgs = z
+  .object({
+    dias: z
+      .number()
+      .int()
+      .min(7)
+      .max(120)
+      .optional()
+      .describe("janela pra trás em dias (padrão 30, máx 120)"),
+    dupla_id: z
+      .uuid()
+      .optional()
+      .describe("restringe a uma dupla (padrão: todas no escopo)"),
   })
   .strict();
 
@@ -471,6 +488,88 @@ export const IA_TOOLS = {
           data_hora: e.data_hora,
           realizado_em: e.realizado_em,
         })),
+      };
+    },
+  },
+
+  historico_encontros: {
+    nome: "historico_encontros",
+    descricao:
+      "Agregado de encontros numa janela PASSADA (padrão últimos 30 dias): esperados × realizados, não acontecidos, atrasados (agendado/remarcado já vencido) e futuros — total do escopo e por dupla, separável por trilha. Use pra 'quantos encontros rolaram nos últimos 30 dias?', 'taxa de realização do ciclo', 'quem está furando encontro', 'como foi a última semana'. NÃO é a agenda futura (essa é agenda_do_periodo).",
+    schema: historicoArgs,
+    roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
+    run: async ({ dias, dupla_id }: z.infer<typeof historicoArgs>, ctx) => {
+      const agora = Date.now();
+      const desde = new Date(agora - (dias ?? 30) * 86_400_000).toISOString();
+      const encontros = await getHistoricoEncontrosIa(
+        ctx.supabase,
+        desde,
+        dupla_id
+      );
+      type Acum = {
+        dupla_id: string;
+        trilha: string;
+        mentor: string | null;
+        mentorado: string | null;
+        esperados: number;
+        realizados: number;
+        nao_aconteceu: number;
+        atrasados: number;
+        futuros: number;
+        cancelados: number;
+      };
+      const porDupla = new Map<string, Acum>();
+      const nome = (p: { nome: string; nome_social: string | null } | null) =>
+        p ? (p.nome_social ?? p.nome) : null;
+      for (const e of encontros) {
+        const id = e.dupla.id;
+        let a = porDupla.get(id);
+        if (!a) {
+          a = {
+            dupla_id: id,
+            trilha: e.dupla.trilha ?? "dpp",
+            mentor: nome(e.dupla.mentor),
+            mentorado: nome(e.dupla.mentorado),
+            esperados: 0,
+            realizados: 0,
+            nao_aconteceu: 0,
+            atrasados: 0,
+            futuros: 0,
+            cancelados: 0,
+          };
+          porDupla.set(id, a);
+        }
+        const passou = e.data_hora !== null && e.data_hora <= new Date(agora).toISOString();
+        if (e.status === "realizado") a.realizados++;
+        else if (e.status === "nao_aconteceu") a.nao_aconteceu++;
+        else if (e.status === "cancelado") a.cancelados++;
+        else if (passou) a.atrasados++;
+        else a.futuros++;
+      }
+      const lista = [...porDupla.values()].map((a) => ({
+        ...a,
+        esperados: a.realizados + a.nao_aconteceu + a.atrasados,
+      }));
+      // mais atraso primeiro — é onde a coordenação precisa agir
+      lista.sort((x, y) => y.atrasados - x.atrasados || y.esperados - x.esperados);
+      const soma = (k: keyof Acum) =>
+        lista.reduce((acc, d) => acc + (d[k] as number), 0);
+      return {
+        desde,
+        dias: dias ?? 30,
+        resumo: {
+          duplas: lista.length,
+          esperados: soma("esperados"),
+          realizados: soma("realizados"),
+          nao_aconteceu: soma("nao_aconteceu"),
+          atrasados: soma("atrasados"),
+          futuros: soma("futuros"),
+          cancelados: soma("cancelados"),
+        },
+        por_dupla: lista.slice(0, 30),
+        ...(encontros.length === 600
+          ? { aviso: "janela cortada em 600 linhas — números parciais" }
+          : {}),
       };
     },
   },

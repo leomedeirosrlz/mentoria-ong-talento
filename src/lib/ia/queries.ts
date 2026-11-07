@@ -536,6 +536,44 @@ export const getAgendaPeriodoIa = cache(
   }
 );
 
+/** Janela passada de encontros pra agregação (esperados × realizados por
+ *  dupla/período) — mesmo escopo RLS + !inner da agenda_do_periodo, mas sem
+ *  teto de data (remarcado pra depois de hoje entra como "futuro" na
+ *  contagem) e com trilha pra separar DPP de especialista. dupla_id
+ *  restringe a uma dupla quando a pergunta é pontual. */
+export const getHistoricoEncontrosIa = cache(
+  async (supabase: SupabaseClient, desdeIso: string, duplaId?: string) => {
+    let q = supabase
+      .from("encontros")
+      .select(
+        `numero, status, data_hora, realizado_em,
+         dupla:duplas!inner(
+           id, trilha,
+           mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+           mentorado:mentorados(nome, nome_social)
+         )`
+      )
+      .gte("data_hora", desdeIso)
+      .order("data_hora", { ascending: true })
+      .limit(600);
+    if (duplaId) q = q.eq("dupla_id", duplaId);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []) as unknown as {
+      numero: number;
+      status: string;
+      data_hora: string | null;
+      realizado_em: string | null;
+      dupla: {
+        id: string;
+        trilha: string | null;
+        mentor: { nome: string; nome_social: string | null } | null;
+        mentorado: { nome: string; nome_social: string | null } | null;
+      };
+    }[];
+  }
+);
+
 // ---------- instrumentos da dupla (RPC homônima, 0080) ----------
 
 /** Respostas dos 4 instrumentos oficiais da dupla — a RPC security definer

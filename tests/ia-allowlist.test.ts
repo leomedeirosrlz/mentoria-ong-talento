@@ -37,6 +37,7 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   capacidade_mentores: {},
   duplas_do_usuario: {},
   agenda_do_periodo: {},
+  historico_encontros: {},
   guia_consulta: { pergunta: "como funciona o encontro?" },
   instrumentos_da_dupla: { dupla_id: UUID },
   chamados_resumo: {},
