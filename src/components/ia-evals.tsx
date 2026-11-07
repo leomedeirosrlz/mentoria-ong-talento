@@ -6,9 +6,15 @@
 // Métricas (latência, tokens, custo) vêm do evento 'resposta' do chat.
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { CaretDown } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
 
 type Caso = { id: string; papel_esperado: string; msg: string };
@@ -187,6 +193,17 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
   const casosEscolhidos = form.casoIds ?? casosFiltrados.map((c) => c.id);
   const totalGrade =
     casosEscolhidos.length * form.modelos.length * form.repeticoes;
+  // grupos pelo prefixo do id ("live-hist-30d" → "live", "hist-*" → "hist")
+  const gruposDeCasos = casosFiltrados.reduce<[string, Caso[]][]>(
+    (grupos, c) => {
+      const grupo = c.id.split("-")[0];
+      const g = grupos.find(([nome]) => nome === grupo);
+      if (g) g[1].push(c);
+      else grupos.push([grupo, [c]]);
+      return grupos;
+    },
+    []
+  );
 
   const criar = async () => {
     setErro(null);
@@ -363,47 +380,94 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
 
         <div className="mt-4 space-y-1.5">
           <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-            Casos ({casosEscolhidos.length} de {casosFiltrados.length})
+            Casos
           </p>
           {casos === null ? (
-            <Skeleton className="h-20 w-full" />
+            <Skeleton className="h-11 w-56" />
+          ) : !casosFiltrados.length ? (
+            <p className="text-sm text-muted-foreground">
+              Nenhum caso live pro papel {form.papel} no corpus
+              (tests/evals/casos.json).
+            </p>
           ) : (
-            <ul className="divide-y divide-border/60 rounded-md border border-border/60">
-              {casosFiltrados.map((c) => {
-                const marcado = casosEscolhidos.includes(c.id);
-                return (
-                  <li key={c.id}>
-                    <label className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-2 hover:bg-muted/50">
-                      <input
-                        type="checkbox"
-                        checked={marcado}
-                        onChange={() => {
-                          const sel = new Set(casosEscolhidos);
-                          if (marcado) sel.delete(c.id);
-                          else sel.add(c.id);
-                          setForm({ ...form, casoIds: [...sel] });
-                        }}
-                        className="size-4 accent-primary"
-                      />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium">
-                          {c.msg}
-                        </span>
-                        <span className="text-[11px] text-muted-foreground">
-                          {c.id} · {c.papel_esperado}
-                        </span>
-                      </span>
-                    </label>
-                  </li>
-                );
-              })}
-              {!casosFiltrados.length && (
-                <li className="px-3 py-2 text-sm text-muted-foreground">
-                  Nenhum caso live pro papel {form.papel} no corpus
-                  (tests/evals/casos.json).
-                </li>
-              )}
-            </ul>
+            <Popover>
+              <PopoverTrigger className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9">
+                {casosEscolhidos.length === casosFiltrados.length
+                  ? `Todos os ${casosFiltrados.length} casos`
+                  : `${casosEscolhidos.length} de ${casosFiltrados.length} casos`}
+                <CaretDown size={14} aria-hidden className="text-muted-foreground" />
+              </PopoverTrigger>
+              <PopoverContent
+                align="start"
+                className="scroll-fina max-h-80 w-[min(26rem,calc(100vw-2rem))] overflow-y-auto p-0"
+              >
+                <div className="sticky top-0 flex items-center justify-between gap-2 border-b border-border/60 bg-popover px-3 py-2">
+                  <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+                    {casosEscolhidos.length} de {casosFiltrados.length}
+                  </span>
+                  <span className="flex gap-1">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() =>
+                        setForm({
+                          ...form,
+                          casoIds: casosFiltrados.map((c) => c.id),
+                        })
+                      }
+                      className="min-h-9 px-2 text-xs sm:min-h-7"
+                    >
+                      Todas
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setForm({ ...form, casoIds: [] })}
+                      className="min-h-9 px-2 text-xs sm:min-h-7"
+                    >
+                      Nenhuma
+                    </Button>
+                  </span>
+                </div>
+                {gruposDeCasos.map(([grupo, itens]) => (
+                  <div key={grupo}>
+                    <p className="px-3 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      {grupo}
+                    </p>
+                    <ul>
+                      {itens.map((c) => {
+                        const marcado = casosEscolhidos.includes(c.id);
+                        return (
+                          <li key={c.id}>
+                            <label className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-1.5 hover:bg-muted/50">
+                              <input
+                                type="checkbox"
+                                checked={marcado}
+                                onChange={() => {
+                                  const sel = new Set(casosEscolhidos);
+                                  if (marcado) sel.delete(c.id);
+                                  else sel.add(c.id);
+                                  setForm({ ...form, casoIds: [...sel] });
+                                }}
+                                className="size-4 shrink-0 accent-primary"
+                              />
+                              <span className="min-w-0 flex-1">
+                                <span className="block truncate text-sm font-medium">
+                                  {c.msg}
+                                </span>
+                                <span className="text-[11px] text-muted-foreground">
+                                  {c.id}
+                                </span>
+                              </span>
+                            </label>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                  </div>
+                ))}
+              </PopoverContent>
+            </Popover>
           )}
         </div>
 
