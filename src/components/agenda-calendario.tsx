@@ -1897,20 +1897,42 @@ export function AgendaCalendario({
           <DuplaSemEncontroLinha dupla={d} previsto={linha.numero} />
           <div className="flex flex-wrap items-center gap-2 pb-1.5 pl-[1.625rem] pr-2">
             {selecionado < hoje ? (
-              <RegistrarRetroativoDialog
-                duplaId={d.id}
-                faltantes={opcoes}
-                numeroInicial={linha.numero}
-                quandoPadrao={selecionado}
-                esp={d.trilha === "especialista"}
-                onCreated={(id, dia) => encontroCriado(d.id, id, dia)}
-                trigger={
-                  <Button variant="outline" size="sm">
-                    <ClockCounterClockwise size={16} />
-                    {`Registrar o ${linha.numero}º encontro`}
-                  </Button>
-                }
-              />
+              <>
+                <RegistrarRetroativoDialog
+                  duplaId={d.id}
+                  faltantes={opcoes}
+                  numeroInicial={linha.numero}
+                  quandoPadrao={selecionado}
+                  esp={d.trilha === "especialista"}
+                  onCreated={(id, dia) => encontroCriado(d.id, id, dia)}
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      <ClockCounterClockwise size={16} />
+                      {`Registrar o ${linha.numero}º encontro`}
+                    </Button>
+                  }
+                />
+                {/* "rolou sem agendar" (Registrar) não é o único desfecho:
+                    a dupla pode não ter encontrado e querer agendar pra
+                    frente. O dialog sugere hoje (não o dia passado) e
+                    qualquer data vale — passada vira retroativo, futura
+                    agenda normal */}
+                <AgendarEncontroDialog
+                  duplaId={d.id}
+                  numero={linha.numero}
+                  atual={null}
+                  sugerido={hoje}
+                  piso={d.iniciada_em ?? undefined}
+                  jovemNome={d.mentorado.nome.split(" ")[0]}
+                  onCreated={(id, dia) => encontroCriado(d.id, id, dia)}
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      <CalendarPlus size={16} />
+                      {`Agendar o ${linha.numero}º encontro`}
+                    </Button>
+                  }
+                />
+              </>
             ) : (
               <AgendarEncontroDialog
                 duplaId={d.id}

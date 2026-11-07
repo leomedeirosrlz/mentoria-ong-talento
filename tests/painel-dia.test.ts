@@ -30,6 +30,15 @@ const ana = (encontros: Dupla["encontros"]) =>
 const larissa = (encontros: Dupla["encontros"]) =>
   mkDupla({ id: "d-lar", encontros });
 
+// base do ciclo cumprida — isola o nº sob teste: sem ela, cada oficial
+// vencido sem row vira linha "agendar" (contrato novo: faltante é backlog
+// agendável em qualquer semana, não só na dele)
+const feitos = (n: number) =>
+  Array.from({ length: n }, (_, i) => ({
+    ...encRealizado(i + 1, "2025-08-05"),
+    registro: { id: `r${i + 1}` } as never,
+  }));
+
 describe("painelDuplasDoDia — Neste dia", () => {
   it("só entra encontro com data no dia, de qualquer dupla, por horário", () => {
     const a = ana([
@@ -48,7 +57,7 @@ describe("F — rótulo da linha e ação falam do mesmo encontro", () => {
   // o bug: num dia da semana do 8º a linha dizia "8º · a agendar" e o botão
   // era "Remarcar" do 7º (o alvoAgendamento apontava ele, não o da linha)
   it("7º agendado + 8º sem row ⇒ remarcar do 7º E agendar do 8º, por nº", () => {
-    const d = ana([encAgendado(7, QUINTA)]); // agendado em outro dia da semana
+    const d = ana([...feitos(6), encAgendado(7, QUINTA)]); // agendado em outro dia da semana
     const p = painel([d], SABADO);
     expect(p.noDia).toEqual([]);
     expect(p.semana).toHaveLength(1);
@@ -60,7 +69,7 @@ describe("F — rótulo da linha e ação falam do mesmo encontro", () => {
   });
 
   it("mesma leitura no dia oficial (o antigo caía noutro ramo)", () => {
-    const d = ana([encAgendado(7, QUINTA)]);
+    const d = ana([...feitos(6), encAgendado(7, QUINTA)]);
     const p = painel([d], TERCA);
     const linhas = p.semana[0].linhas;
     expect(tipos(linhas)).toEqual(["remarcar", "agendar"]);
@@ -71,8 +80,8 @@ describe("F — rótulo da linha e ação falam do mesmo encontro", () => {
 describe("G/H — o que é do dia não se mistura com o que é da semana", () => {
   // reprodução do print: sábado, Ana com o 7º no próprio dia e o 8º marcado
   // na terça; Larissa com o 7º na quinta e o 8º sem agendar
-  const a = ana([encAgendado(7, SABADO), encAgendado(8, TERCA)]);
-  const l = larissa([encAgendado(7, QUINTA)]);
+  const a = ana([...feitos(6), encAgendado(7, SABADO), encAgendado(8, TERCA)]);
+  const l = larissa([...feitos(6), encAgendado(7, QUINTA)]);
 
   it("no sábado: dia mostra só o 7º da Ana; semana separa por dupla e por nº", () => {
     const p = painel([a, l], SABADO);
@@ -112,7 +121,7 @@ describe("G/H — o que é do dia não se mistura com o que é da semana", () =>
 
 describe("demais casos da regra", () => {
   it("oficial realizado em outro dia sem registro entra como linha de encontro", () => {
-    const d = ana([{ ...encRealizado(8, QUINTA), registro: null }]);
+    const d = ana([...feitos(7), { ...encRealizado(8, QUINTA), registro: null }]);
     const p = painel([d], SABADO);
     expect(tipos(p.semana[0].linhas)).toEqual(["encontro"]);
     expect(numeros(p.semana[0].linhas)).toEqual([8]);
@@ -120,6 +129,7 @@ describe("demais casos da regra", () => {
 
   it("oficial realizado e registrado é história: não entra na semana", () => {
     const d = ana([
+      ...feitos(7),
       { ...encRealizado(8, QUINTA), registro: { id: "r8" } as never },
     ]);
     const p = painel([d], SABADO);
@@ -128,6 +138,7 @@ describe("demais casos da regra", () => {
 
   it("oficial marcado como não aconteceu pede remarcar (reagendar)", () => {
     const d = ana([
+      ...feitos(7),
       mkEncontro(8, {
         status: "nao_aconteceu",
         data_hora: "2025-11-25T19:00:00-03:00",
@@ -141,7 +152,7 @@ describe("demais casos da regra", () => {
   it("dupla sem nada no dia nem na semana some do quadro", () => {
     // o oficial da semana cai no próprio dia selecionado e não há pendência
     // anterior — nada sobra pra "Também nesta semana"
-    const d = ana([encAgendado(8, TERCA)]);
+    const d = ana([...feitos(7), encAgendado(8, TERCA)]);
     const p = painel([d], TERCA);
     expect(p.noDia.map((i) => i.encontro.numero)).toEqual([8]);
     expect(p.semana).toEqual([]);
@@ -149,8 +160,6 @@ describe("demais casos da regra", () => {
 
   it("semana sem oficial pra dupla mostra o 'Agendar o Nº' do próximo pendente", () => {
     // semana após o ciclo (16º foi ter 20/01 — seg 26/01 não tem oficial)
-    const feitos = (n: number) =>
-      Array.from({ length: n }, (_, i) => encRealizado(i + 1, "2025-08-05"));
     const cicloCompleto = painel([ana(feitos(16))], "2026-01-27", "2026-01-27");
     expect(cicloCompleto.semana).toEqual([]); // 16/16 feitos — some
     const p = painel([ana(feitos(10))], "2026-01-27", "2026-01-27");
@@ -159,14 +168,14 @@ describe("demais casos da regra", () => {
   });
 
   it("semana sem oficial com encontro alvo agenda... vira remarcar dele", () => {
-    const d = ana([encAgendado(11, "2026-01-30")]);
+    const d = ana([...feitos(10), encAgendado(11, "2026-01-30")]);
     const p = painel([d], "2026-01-27", "2026-01-27");
     expect(tipos(p.semana[0].linhas)).toEqual(["remarcar"]);
     expect(numeros(p.semana[0].linhas)).toEqual([11]);
   });
 
   it("agendado de nº posterior ao oficial não entra na semana", () => {
-    const d = ana([encAgendado(9, "2025-12-02"), encAgendado(8, TERCA)]);
+    const d = ana([...feitos(7), encAgendado(9, "2025-12-02"), encAgendado(8, TERCA)]);
     const p = painel([d], SABADO);
     // o 9º é da semana seguinte — só o 8º (oficial desta) aparece,
     // com o CTA de remarcar que todo encontro aberto da semana tem
@@ -187,5 +196,26 @@ describe("encontro com data na semana fora do nº oficial", () => {
     const p = painel([d], SABADO);
     expect(numeros(p.semana[0].linhas)).toEqual([9]);
     expect(tipos(p.semana[0].linhas)).toEqual(["remarcar"]);
+  });
+});
+
+describe("oficial vencido sem row — backlog agendável (bug de prod)", () => {
+  // caso real: dupla pulou a semana do 8º (nunca criou a row); clicando na
+  // semana do 9º o painel só oferecia "Agendar o 9º" e o 8º sumia — sem
+  // nenhum caminho de agendamento pra frente pelo calendário
+  it("o 8º faltante aparece como 'agendar' na semana do 9º, junto do 9º", () => {
+    const d = ana(feitos(7)); // 1–7 realizados, 8º nunca criado
+    const p = painel([d], "2025-12-02", "2025-12-02"); // terça do 9º oficial
+    expect(p.noDia).toEqual([]);
+    expect(tipos(p.semana[0].linhas)).toEqual(["agendar", "agendar"]);
+    expect(numeros(p.semana[0].linhas)).toEqual([8, 9]);
+  });
+
+  it("na própria semana vencida ele também segue agendável (dia futuro)", () => {
+    // clicando num dia FUTURO da semana do 8º (ainda sem row): agendar
+    const d = ana(feitos(7));
+    const p = painel([d], SABADO, SEXTA); // hoje sexta, clica sábado
+    expect(tipos(p.semana[0].linhas)).toEqual(["agendar"]);
+    expect(numeros(p.semana[0].linhas)).toEqual([8]);
   });
 });
