@@ -22,9 +22,27 @@
 //                            DevTools de uma sessão logada
 //   EVAL_PAPEL             — "mentorado" ou "staff": roda só os casos desse
 //                            papel (+ os "qualquer"); sem ela, roda todos
-// A saída lista caso a caso: PASS/FAIL, tools vistas no stream e o trecho
-// da resposta. Falha sai com exit 1. Live não roda em CI — a credencial é
-// de quem dispara.
+//   EVAL_MODELOS           — lista separada por vírgula de slugs pra forçar
+//                            o modelo de cada request (ex.: "beam-free").
+//                            Cada slug roda o corpus inteiro uma vez.
+//   IA_EVAL_KEY            — o override de modelo só vale com o header
+//                            x-ia-eval-key batendo o env do SERVIDOR; a
+//                            mesma env vai aqui (eval-gate.yml usa
+//                            "eval-ci-key" — chave de porta interna, não
+//                            segredo real)
+//   --gate                 — veredito de gate pro CI (eval-gate.yml): sai
+//                            != 0 quando há itens ERRO (infra quebrada:
+//                            HTTP != SSE, evento error, stream cortado)
+//                            ou quando a pass rate dos casos JULGÁVEIS
+//                            cai abaixo do piso (EVAL_GATE_PISO, default
+//                            0.6 — aceita "60" como porcentagem).
+// A saída lista caso a caso: PASS/FAIL/ERRO, tools vistas no stream e o
+// trecho da resposta. Sem --gate, qualquer não-PASS sai com exit 1.
+// Por que o piso é baixo: os modelos *-free erram mais (tool-choice e
+// rubrica fina) e um piso alto tornaria o gate flakível a cada PR. O
+// gate existe pra pegar regressão CATASTRÓFICA — provider fora, auth
+// quebrado, prompt detonado derrubando a taxa pra ~0 — não a finura,
+// que fica pro run manual do /ia (grade casos×modelos×repetições).
 
 import { readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
@@ -36,9 +54,26 @@ const casos = JSON.parse(
   readFileSync(join(raiz, "tests/evals/casos.json"), "utf8")
 );
 const LIVE = process.argv.includes("--live");
+const GATE = process.argv.includes("--gate");
 
-const ok = (id, det = "") => ({ id, pass: true, det });
-const falha = (id, det = "") => ({ id, pass: false, det });
+const ok = (id, det = "", modelo) => ({ id, pass: true, det, modelo });
+const falha = (id, det = "", modelo) => ({ id, pass: false, det, modelo });
+// erro = infra quebrada (não é nota de rubrica): o gate reprova na hora,
+// porque com a plataforma no chão o veredito dos casos não vale nada
+const erroItem = (id, det = "", modelo) => ({
+  id,
+  pass: false,
+  erro: true,
+  det,
+  modelo,
+});
+
+// burst do eval × limite de 20 msg/60s por profile (ia_contexto_e_limite):
+// o 429 é pacing, não falha de produto — o script espera a janela
+// deslizar e re-tenta em vez de carimbar ERRO de infra à toa
+const TENTATIVAS_429 = 4;
+const ESPERA_429_MS = 12_000;
+const espera = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ---------- contrato: roteador puro aqui, resto no vitest ----------
 
@@ -112,54 +147,84 @@ async function live() {
   );
   if (papel && doPapel.length < casos.live.length)
     console.log(`(${casos.live.length - doPapel.length} caso(s) de outro papel pulados)`);
-  for (const c of doPapel) {
-    try {
-      const res = await fetch(`${base}/api/ia/chat`, {
-        method: "POST",
-        headers: { "content-type": "application/json", cookie },
-        // mesmo contrato do componente: histórico + rota atual
-        body: JSON.stringify({
-          messages: [{ role: "user", content: c.msg }],
-          ...(c.pagina ? { pagina: c.pagina } : {}),
-        }),
-        // sessão inválida vira 307 pro /login: seguir o redirect devolvia
-        // HTML sem evento nenhum e caso só de "não pode" passava falso
-        redirect: "manual",
-      });
-      const tipo = res.headers.get("content-type") ?? "";
-      if (!res.ok || !tipo.includes("text/event-stream")) {
+  // EVAL_MODELOS: cada slug roda o corpus inteiro (override via
+  // x-ia-eval-key + campo modelo — a rota ignora os dois sem a chave
+  // casando o IA_EVAL_KEY do servidor). Vazia = uma passada sem override,
+  // o tier resolve pela config viva como sempre.
+  const corridas = (process.env.EVAL_MODELOS ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  for (const modelo of corridas.length ? corridas : [null]) {
+    for (const c of doPapel) {
+      try {
+        let res;
+        for (let t = 0; t <= TENTATIVAS_429; t++) {
+          res = await fetch(`${base}/api/ia/chat`, {
+            method: "POST",
+            headers: {
+              "content-type": "application/json",
+              cookie,
+              "x-ia-eval-key": process.env.IA_EVAL_KEY ?? "",
+            },
+            // mesmo contrato do componente: histórico + rota atual
+            body: JSON.stringify({
+              messages: [{ role: "user", content: c.msg }],
+              ...(c.pagina ? { pagina: c.pagina } : {}),
+              ...(modelo ? { modelo } : {}),
+            }),
+            // sessão inválida vira 307 pro /login: seguir o redirect devolvia
+            // HTML sem evento nenhum e caso só de "não pode" passava falso
+            redirect: "manual",
+          });
+          if (res.status !== 429) break;
+          if (t < TENTATIVAS_429) await espera(ESPERA_429_MS);
+        }
+        const tipo = res.headers.get("content-type") ?? "";
+        if (!res.ok || !tipo.includes("text/event-stream")) {
+          resultados.push(
+            erroItem(c.id, `HTTP ${res.status}, content-type ${tipo || "vazio"}`, modelo)
+          );
+          continue;
+        }
+        const { tools, texto, erro, terminou } = await lerSse(res);
+        // stream cortado ou evento error (provider fora, orçamento da
+        // rota estourado) = infra, não rubrica
+        if (!terminou || erro) {
+          resultados.push(
+            erroItem(
+              c.id,
+              erro ? `erro no stream: ${erro}` : "stream sem done nem error",
+              modelo
+            )
+          );
+          continue;
+        }
+        const problemas = [];
+        if (c.tools_esperadas) {
+          const padrao = new RegExp(c.tools_esperadas.join("|"));
+          if (!tools.some((t) => padrao.test(t)))
+            problemas.push(`nenhuma tool de ${c.tools_esperadas} (viu: ${tools.join(",") || "—"})`);
+        }
+        if (c.tools_nao_pode) {
+          const padrao = new RegExp(c.tools_nao_pode.join("|"));
+          const vazou = tools.filter((t) => padrao.test(t));
+          if (vazou.length) problemas.push(`tool proibida: ${vazou.join(",")}`);
+        }
+        for (const re of c.resposta_contem ?? [])
+          if (!new RegExp(re, "i").test(texto))
+            problemas.push(`resposta sem /${re}/`);
+        for (const re of c.resposta_nao_contem ?? [])
+          if (new RegExp(re, "i").test(texto))
+            problemas.push(`resposta COM /${re}/`);
         resultados.push(
-          falha(c.id, `HTTP ${res.status}, content-type ${tipo || "vazio"}`)
+          problemas.length
+            ? falha(c.id, problemas.join("; "), modelo)
+            : ok(c.id, `tools: ${tools.join(",") || "—"}`, modelo)
         );
-        continue;
+      } catch (e) {
+        resultados.push(erroItem(c.id, String(e), modelo));
       }
-      const { tools, texto, erro, terminou } = await lerSse(res);
-      const problemas = [];
-      if (!terminou) problemas.push("stream sem evento done nem error");
-      if (erro) problemas.push(`erro no stream: ${erro}`);
-      if (c.tools_esperadas) {
-        const padrao = new RegExp(c.tools_esperadas.join("|"));
-        if (!tools.some((t) => padrao.test(t)))
-          problemas.push(`nenhuma tool de ${c.tools_esperadas} (viu: ${tools.join(",") || "—"})`);
-      }
-      if (c.tools_nao_pode) {
-        const padrao = new RegExp(c.tools_nao_pode.join("|"));
-        const vazou = tools.filter((t) => padrao.test(t));
-        if (vazou.length) problemas.push(`tool proibida: ${vazou.join(",")}`);
-      }
-      for (const re of c.resposta_contem ?? [])
-        if (!new RegExp(re, "i").test(texto))
-          problemas.push(`resposta sem /${re}/`);
-      for (const re of c.resposta_nao_contem ?? [])
-        if (new RegExp(re, "i").test(texto))
-          problemas.push(`resposta COM /${re}/`);
-      resultados.push(
-        problemas.length
-          ? falha(c.id, problemas.join("; "))
-          : ok(c.id, `tools: ${tools.join(",") || "—"}`)
-      );
-    } catch (e) {
-      resultados.push(falha(c.id, String(e)));
     }
   }
   return resultados;
@@ -219,12 +284,43 @@ if (!LIVE) {
 }
 
 let falhas = 0;
+let erros = 0;
 for (const r of resultados) {
-  if (!r.pass) falhas++;
-  console.log(`${r.pass ? "PASS" : "FAIL"} ${r.id}${r.det ? ` — ${r.det}` : ""}`);
+  if (r.erro) erros++;
+  else if (!r.pass) falhas++;
+  const modelo = r.modelo ? ` [${r.modelo}]` : "";
+  console.log(
+    `${r.pass ? "PASS" : r.erro ? "ERRO" : "FAIL"} ${r.id}${modelo}${r.det ? ` — ${r.det}` : ""}`
+  );
 }
+
+if (LIVE) {
+  // ERRO não entra na taxa: não é rubrica, é a plataforma no chão — o
+  // gate já reprova só pela existência dele. A taxa mede o que o modelo
+  // fez quando a infra respondeu.
+  const julgados = resultados.length - erros;
+  const aprovados = julgados - falhas;
+  const pisoRaw = Number(process.env.EVAL_GATE_PISO ?? 0.6);
+  const piso = pisoRaw > 1 ? pisoRaw / 100 : pisoRaw;
+  const taxa = julgados ? aprovados / julgados : 0;
+  // --gate: reprova por erro de infra OU taxa abaixo do piso — um FAIL
+  // isolado de rubrica não derruba o PR (a régua fina é do run manual)
+  const reprovou = erros > 0 || (GATE && taxa < piso);
+  console.log(
+    `\n${aprovados}/${julgados} casos de live ok` +
+      ` · erros de infra: ${erros}` +
+      (GATE
+        ? ` · pass rate ${(taxa * 100).toFixed(0)}% (piso ${(
+            piso * 100
+          ).toFixed(0)}%) — gate ${reprovou ? "REPROVADO" : "ok"}`
+        : "")
+  );
+  // sem --gate mantém a régua antiga: qualquer não-PASS reprova
+  process.exit(reprovou || (!GATE && falhas + erros > 0) ? 1 : 0);
+}
+
 console.log(
-  `\n${resultados.length - falhas}/${resultados.length} casos de ${LIVE ? "live" : "roteador"} ok` +
-    (LIVE ? "" : ` · contrato vitest: ${saiuVitest === 0 ? "ok" : "FALHOU"}`)
+  `\n${resultados.length - falhas}/${resultados.length} casos de roteador ok` +
+    ` · contrato vitest: ${saiuVitest === 0 ? "ok" : "FALHOU"}`
 );
 process.exit(falhas || saiuVitest ? 1 : 0);

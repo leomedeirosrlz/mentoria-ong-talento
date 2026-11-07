@@ -120,7 +120,9 @@ type Rubrica = {
 };
 
 /** Julga a resposta pela rubrica do caso — MESMA lógica do eval-ia.mjs
- *  (regex nas tools vistas no stream e no texto montado). */
+ *  (regex nas tools vistas no stream e no texto montado). Aqui dentro
+ *  terminou/erroStream entram como problema do item; no script --gate a
+ *  mesma falha vira classe "erro" (infra) e reprova fora da pass rate. */
 export function avaliarRubrica(
   rubrica: Rubrica,
   tools: string[],
