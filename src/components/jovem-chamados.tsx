@@ -1,14 +1,14 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { CaretRight, Lifebuoy } from "@phosphor-icons/react";
+import Link from "next/link";
+import type { CSSProperties } from "react";
+import { Lifebuoy } from "@phosphor-icons/react";
 import type { ChamadoFilaItem, ChamadoTimelineItem, Profile } from "@/lib/types";
-import {
-  CHAMADO_CATEGORIA_LABEL,
-  formatDiaMes,
-} from "@/lib/ciclo";
+import { CHAMADO_CATEGORIA_LABEL } from "@/lib/ciclo";
+import { cn } from "@/lib/utils";
 import { ChamadoDetalhe } from "@/components/chamado-detalhe";
-import { ChamadoStatusBadge } from "@/components/chamados-shared";
+import { ChamadoStatusBadge, UrgenciaMarca, relTempo } from "@/components/chamados-shared";
 
 /** "Meus pedidos" do jovem dentro do perfil (0084): os chamados dele com a
  *  conversa pública — sem comentário interno, sem nome de quem respondeu,
@@ -73,35 +73,48 @@ export function JovemChamados({
         </p>
       ) : (
         <ul className="mt-4 space-y-2">
-          {itens.map((c) => (
-            <li key={c.id}>
-              <button
-                onClick={() => router.push(`/jovem/perfil?c=${c.id}`)}
+          {itens.map((c, i) => (
+            <li
+              key={c.id}
+              className="animate-enter min-w-0"
+              style={{ "--i": Math.min(i, 10) } as CSSProperties}
+            >
+              {/* mesma linha de duas linhas da fila: assunto em cima,
+                  contexto+tempo e o status embaixo. O contexto do jovem é
+                  a categoria — o "dupla de" da fila repetiria o nome dele.
+                  O número CHA não aparece: é ruído de protocolo */}
+              <Link
+                href={`/jovem/perfil?c=${c.id}`}
                 aria-current={cSel === c.id ? "true" : undefined}
-                className="flex min-h-11 w-full items-center gap-3 rounded-lg border border-border/60 px-3.5 py-2.5 text-left transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={cn(
+                  "block min-h-11 rounded-xl border px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  cSel === c.id
+                    ? "border-foreground/25 bg-muted/70"
+                    : "border-transparent bg-card shadow-[var(--shadow-border)] hover:bg-muted/40"
+                )}
               >
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {c.numero}
-                    </span>
-                    <ChamadoStatusBadge
-                      status={c.status}
-                      dono={c.atribuido_nome}
-                      visao="autor"
-                      className="text-[10px]"
-                    />
-                    <span className="text-xs text-muted-foreground">
-                      {CHAMADO_CATEGORIA_LABEL[c.categoria]}
-                    </span>
-                  </div>
-                  <p className="mt-0.5 truncate text-sm">{c.assunto}</p>
+                <div className="flex items-start gap-2">
+                  <p className="min-w-0 flex-1 break-words text-sm font-medium leading-snug">
+                    {c.assunto}
+                  </p>
+                  {c.categoria === "urgencia" && (
+                    <UrgenciaMarca className="mt-px" />
+                  )}
                 </div>
-                <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground">
-                  {formatDiaMes(c.created_at)}
-                  <CaretRight size={13} aria-hidden />
-                </span>
-              </button>
+                <div className="mt-1 flex items-center gap-2">
+                  <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                    {[CHAMADO_CATEGORIA_LABEL[c.categoria], relTempo(c.updated_at)]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                  <ChamadoStatusBadge
+                    status={c.status}
+                    dono={c.atribuido_nome}
+                    visao="autor"
+                    className="shrink-0"
+                  />
+                </div>
+              </Link>
             </li>
           ))}
         </ul>

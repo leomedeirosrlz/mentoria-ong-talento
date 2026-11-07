@@ -170,9 +170,12 @@ export function useAnexosPendentes(chamadoId: string, meuId: string) {
 export function ChamadoAnexos({
   onArquivo,
   disabled,
+  compacto,
 }: {
   onArquivo: (file: File) => void;
   disabled?: boolean;
+  /** só o clipe, dentro da caixa do composer */
+  compacto?: boolean;
 }) {
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -194,13 +197,15 @@ export function ChamadoAnexos({
       <Button
         type="button"
         variant="ghost"
-        size="sm"
+        size={compacto ? "icon-sm" : "sm"}
         onClick={() => fileRef.current?.click()}
         disabled={disabled}
+        aria-label={compacto ? "Anexar arquivo" : undefined}
+        title={compacto ? "Anexar arquivo" : undefined}
         className="text-muted-foreground"
       >
         <Paperclip aria-hidden />
-        Anexar arquivo
+        {!compacto && "Anexar arquivo"}
       </Button>
     </>
   );

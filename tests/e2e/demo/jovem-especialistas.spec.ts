@@ -282,7 +282,7 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
       chamado.getByRole("heading", { name: "Pedir ajuda" })
     ).toBeVisible();
     await expect(
-      chamado.getByText("Resumindo, o que aconteceu?")
+      chamado.getByText("O que aconteceu?", { exact: true })
     ).toBeVisible();
     await expect(
       chamado.getByRole("button", { name: "Enviar pedido" })
