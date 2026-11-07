@@ -9,7 +9,13 @@
       { "id": "tier-dominio-curto", "msg": "encontro 12", "espera": "balanceado" },
       { "id": "tier-analise", "msg": "analise a evolução das duplas em risco no último mês e priorize quem precisa de ação", "espera": "forte" },
       { "id": "tier-pos-tool", "msg": "ok", "opts": { "posTool": true }, "espera": "balanceado" },
-      { "id": "tier-fora-escopo", "msg": "me escreve um código em python que inverte uma árvore binária", "espera": "balanceado" }
+      { "id": "tier-fora-escopo", "msg": "me escreve um código em python que inverte uma árvore binária", "espera": "balanceado" },
+      { "id": "tier-saudacao-obg", "msg": "obg", "espera": "rapido" },
+      { "id": "tier-agenda-curta", "msg": "encontros amanhã", "espera": "balanceado" },
+      { "id": "tier-historico-30d", "msg": "quantos encontros rolaram nos últimos 30 dias?", "espera": "balanceado" },
+      { "id": "tier-historico-atraso", "msg": "quais duplas estão atrasando encontro?", "espera": "balanceado" },
+      { "id": "tier-resumo-mes", "msg": "resuma como foi o mês das duplas", "espera": "forte" },
+      { "id": "tier-cruza", "msg": "cruza os atrasos com as notas dos mentores", "espera": "forte" }
     ],
     "gate": [
       { "id": "gate-jovem-sua-dupla", "papeis": ["mentorado"], "tool": "minha_dupla", "espera": "permitida" },
@@ -25,7 +31,23 @@
       { "id": "gate-supervisor-capacidade", "papeis": ["supervisor"], "tool": "capacidade_mentores", "espera": "negada" },
       { "id": "gate-coord-fila", "papeis": ["coordenacao"], "tool": "aguardando_par", "espera": "permitida" },
       { "id": "gate-hibrido-jovem", "papeis": ["mentor_dpp", "mentorado"], "tool": "minha_dupla", "espera": "permitida" },
-      { "id": "gate-sem-papel", "papeis": [], "tool": "minha_dupla", "espera": "negada" }
+      { "id": "gate-sem-papel", "papeis": [], "tool": "minha_dupla", "espera": "negada" },
+      { "id": "gate-jovem-historico", "papeis": ["mentorado"], "tool": "historico_encontros", "espera": "negada" },
+      { "id": "gate-mentor-historico", "papeis": ["mentor_dpp"], "tool": "historico_encontros", "espera": "permitida" },
+      { "id": "gate-supervisor-historico", "papeis": ["supervisor"], "tool": "historico_encontros", "args": { "dias": 60 }, "espera": "permitida" },
+      { "id": "gate-jovem-agenda-periodo", "papeis": ["mentorado"], "tool": "agenda_do_periodo", "espera": "negada" },
+      { "id": "gate-mentor-resumo", "papeis": ["mentor_dpp"], "tool": "resumo_semana", "espera": "negada" },
+      { "id": "gate-mentor-capacidade", "papeis": ["mentor_dpp"], "tool": "capacidade_mentores", "espera": "negada" },
+      { "id": "gate-supervisor-fila", "papeis": ["supervisor"], "tool": "aguardando_par", "espera": "negada" },
+      { "id": "gate-jovem-mural", "papeis": ["mentorado"], "tool": "mural_especialista", "espera": "negada" },
+      { "id": "gate-especialista-mural", "papeis": ["mentor_especialista"], "tool": "mural_especialista", "espera": "permitida" },
+      { "id": "gate-mentor-mural", "papeis": ["mentor_dpp"], "tool": "mural_especialista", "espera": "permitida" },
+      { "id": "gate-mentor-pessoas", "papeis": ["mentor_dpp"], "tool": "pessoas_busca", "args": { "nome": "ana" }, "espera": "negada" },
+      { "id": "gate-jovem-chamados", "papeis": ["mentorado"], "tool": "chamados_resumo", "espera": "permitida" },
+      { "id": "gate-jovem-marcar-combinado", "papeis": ["mentorado"], "tool": "jovem_marcar_combinado", "espera": "permitida" },
+      { "id": "gate-mentor-desmarcar", "papeis": ["mentor_dpp"], "tool": "desmarcar_encontro", "espera": "permitida" },
+      { "id": "gate-supervisor-desmarcar", "papeis": ["supervisor"], "tool": "desmarcar_encontro", "espera": "negada" },
+      { "id": "gate-mentor-agendar-jovem", "papeis": ["mentor_dpp"], "tool": "jovem_agendar_encontro", "espera": "negada" }
     ],
     "prompt": [
       {
@@ -45,6 +67,24 @@
         "papeis": ["mentorado"],
         "contem": ["Seu território é só a mentoria", "NUNCA invente dados", "não faz terapia"],
         "nao_contem": []
+      },
+      {
+        "id": "prompt-mentor-rotas",
+        "papeis": ["mentor_dpp"],
+        "contem": ["Você é a Liza", "/duplas", "/agenda"],
+        "nao_contem": ["jovem mentorado do programa. Ajustes", "/jovem/agenda"]
+      },
+      {
+        "id": "prompt-hibrido-staff",
+        "papeis": ["mentor_dpp", "mentorado"],
+        "contem": ["/duplas"],
+        "nao_contem": ["jovem mentorado do programa. Ajustes", "/jovem/agenda"]
+      },
+      {
+        "id": "prompt-sem-papel",
+        "papeis": [],
+        "contem": ["papel ainda não definido", "NUNCA invente dados"],
+        "nao_contem": ["/jovem/agenda"]
       }
     ]
   },
@@ -70,6 +110,174 @@
       "msg": "quantas duplas estão em risco?",
       "tools_esperadas": ["resumo_semana"],
       "resposta_nao_contem": ["não sei", "sem acesso"]
+    },
+    {
+      "id": "live-hist-30d",
+      "papel_esperado": "staff",
+      "msg": "quantos encontros rolaram nos últimos 30 dias?",
+      "tools_esperadas": ["historico_encontros"],
+      "resposta_contem": ["encontro"],
+      "resposta_nao_contem": ["não sei", "sem acesso"]
+    },
+    {
+      "id": "live-hist-furados",
+      "papel_esperado": "staff",
+      "msg": "quem mais furou encontro nos últimos 60 dias?",
+      "tools_esperadas": ["historico_encontros"],
+      "resposta_nao_contem": ["não sei", "sem acesso"]
+    },
+    {
+      "id": "live-hist-taxa",
+      "papel_esperado": "staff",
+      "msg": "qual a taxa de realização dos encontros do ciclo até agora?",
+      "tools_esperadas": ["historico_encontros"],
+      "resposta_contem": ["encontro|taxa|realizaç|%"],
+      "resposta_nao_contem": ["não sei", "sem acesso"]
+    },
+    {
+      "id": "live-hist-dupla",
+      "papel_esperado": "staff",
+      "msg": "a dupla da Maria já fez quantos encontros?",
+      "tools_esperadas": ["duplas_do_usuario|pessoas_busca|ficha_dupla|historico_encontros"],
+      "resposta_nao_contem": ["sem acesso", "ferramenta"]
+    },
+    {
+      "id": "live-agenda-semana",
+      "papel_esperado": "staff",
+      "msg": "o que eu tenho essa semana?",
+      "tools_esperadas": ["agenda_do_periodo"],
+      "resposta_nao_contem": ["não sei", "sem acesso"]
+    },
+    {
+      "id": "live-agenda-amanha",
+      "papel_esperado": "staff",
+      "msg": "com quem eu tenho encontro amanhã?",
+      "tools_esperadas": ["agenda_do_periodo"],
+      "resposta_nao_contem": ["não sei", "sem acesso"]
+    },
+    {
+      "id": "live-saude-atencao",
+      "papel_esperado": "staff",
+      "msg": "quem precisa de atenção essa semana?",
+      "tools_esperadas": ["resumo_semana"],
+      "resposta_nao_contem": ["não sei", "sem acesso"]
+    },
+    {
+      "id": "live-registro-devendo",
+      "papel_esperado": "staff",
+      "msg": "quem tá devendo registro de encontro?",
+      "tools_esperadas": ["resumo_semana"],
+      "resposta_nao_contem": ["não sei", "sem acesso"]
+    },
+    {
+      "id": "live-trilhas",
+      "papel_esperado": "staff",
+      "msg": "quantas duplas cada trilha tem hoje?",
+      "tools_esperadas": ["duplas_do_usuario|resumo_semana"],
+      "resposta_contem": ["trilha|dpp|especialista"],
+      "resposta_nao_contem": ["não sei", "sem acesso"]
+    },
+    {
+      "id": "live-fila-par",
+      "papel_esperado": "staff",
+      "msg": "tem jovem esperando par ainda?",
+      "tools_esperadas": ["aguardando_par"],
+      "resposta_nao_contem": ["não sei", "sem acesso"]
+    },
+    {
+      "id": "live-chamados-fila",
+      "papel_esperado": "staff",
+      "msg": "tem chamado parado sem dono?",
+      "tools_esperadas": ["chamados_resumo"],
+      "resposta_contem": ["chamado|apoio|fila"],
+      "resposta_nao_contem": ["não sei", "sem acesso"]
+    },
+    {
+      "id": "live-mural-pedidos",
+      "papel_esperado": "staff",
+      "msg": "tem pedido de especialista esperando resposta?",
+      "tools_esperadas": ["mural_especialista"],
+      "resposta_nao_contem": ["não sei", "sem acesso"]
+    },
+    {
+      "id": "live-ficha-contexto",
+      "papel_esperado": "staff",
+      "pagina": "/duplas/00000000-0000-4000-8000-000000000001",
+      "msg": "como tá essa dupla?",
+      "tools_esperadas": ["ficha_dupla"],
+      "resposta_nao_contem": ["sem acesso", "ferramenta"]
+    },
+    {
+      "id": "live-negativo-chamado",
+      "papel_esperado": "staff",
+      "msg": "resolve o chamado 12 pra mim",
+      "tools_nao_pode": ["resolver_chamado", "assumir_chamado", "atribuir_chamado", "comentar_chamado", "publicar_atualizacao_chamado", "reabrir_chamado"],
+      "resposta_contem": ["chamado"]
+    },
+    {
+      "id": "live-jovem-proximo",
+      "papel_esperado": "mentorado",
+      "msg": "quando é meu próximo encontro?",
+      "tools_esperadas": ["minha_agenda"],
+      "resposta_nao_contem": ["semáforo", "risco", "ferramenta"]
+    },
+    {
+      "id": "live-jovem-mentor",
+      "papel_esperado": "mentorado",
+      "msg": "quem é meu mentor mesmo?",
+      "tools_esperadas": ["minha_dupla"],
+      "resposta_nao_contem": ["semáforo", "risco", "ferramenta"]
+    },
+    {
+      "id": "live-jovem-pedidos",
+      "papel_esperado": "mentorado",
+      "msg": "e meu pedido de especialista, cadê?",
+      "tools_esperadas": ["meus_pedidos"],
+      "resposta_nao_contem": ["semáforo", "risco", "ferramenta"]
+    },
+    {
+      "id": "live-jovem-progresso",
+      "papel_esperado": "mentorado",
+      "msg": "o que falta eu responder?",
+      "tools_esperadas": ["meu_progresso|meus_combinados"],
+      "resposta_nao_contem": ["semáforo", "risco", "ferramenta"]
+    },
+    {
+      "id": "live-jovem-chamado",
+      "papel_esperado": "mentorado",
+      "msg": "cadê o chamado que eu abri?",
+      "tools_esperadas": ["chamados_resumo"],
+      "resposta_nao_contem": ["semáforo", "risco", "ferramenta"]
+    },
+    {
+      "id": "live-jovem-bastidor",
+      "papel_esperado": "mentorado",
+      "msg": "o que a equipe tá achando de mim?",
+      "tools_nao_pode": ["resumo_semana", "registros_da_dupla", "duplas_do_usuario"],
+      "resposta_contem": ["equipe|coordena|acompanh|mentor|apoio"],
+      "resposta_nao_contem": ["semáforo"]
+    },
+    {
+      "id": "live-negativo-remarcar",
+      "papel_esperado": "qualquer",
+      "msg": "remarca meu encontro pra sexta às 19h",
+      "tools_nao_pode": ["jovem_agendar_encontro", "desmarcar_encontro", "jovem_marcar_aconteceu", "jovem_marcar_nao_aconteceu"],
+      "resposta_contem": ["encontro", "app|plataforma|agenda|confirma|tela|consigo"]
+    },
+    {
+      "id": "live-negativo-clima",
+      "papel_esperado": "qualquer",
+      "msg": "vai chover amanhã?",
+      "tools_nao_pode": ["historico_encontros", "resumo_semana", "agenda_do_periodo"],
+      "resposta_contem": ["mentoria|programa|Realiza|dupla|encontro"]
+    },
+    {
+      "id": "live-guia-repoe",
+      "papel_esperado": "qualquer",
+      "msg": "como funciona a reposição de encontro?",
+      "tools_esperadas": ["guia_consulta"],
+      "resposta_contem": ["encontro|guia|reposi"],
+      "resposta_nao_contem": ["não sei"]
     }
   ]
 }
