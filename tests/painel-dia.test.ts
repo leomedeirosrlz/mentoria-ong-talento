@@ -79,8 +79,9 @@ describe("G/H — o que é do dia não se mistura com o que é da semana", () =>
     expect(p.noDia.map((i) => i.encontro.numero)).toEqual([7]);
     expect(p.noDia[0].dupla.id).toBe("d-ana");
     expect(p.semana.map((g) => g.dupla.id)).toEqual(["d-ana", "d-lar"]);
-    // Ana: o 8º oficial marcado na terça — linha de encontro, sem ação solta
-    expect(tipos(p.semana[0].linhas)).toEqual(["encontro"]);
+    // Ana: o 8º oficial marcado na terça — agora ganha "Remarcar o 8º"
+    // (antes ficava mudo na row de status; flagado em revisão)
+    expect(tipos(p.semana[0].linhas)).toEqual(["remarcar"]);
     expect(numeros(p.semana[0].linhas)).toEqual([8]);
     // Larissa: remarcar o 7º, agendar o 8º — nada de "a agendar" com Remarcar
     expect(tipos(p.semana[1].linhas)).toEqual(["remarcar", "agendar"]);
@@ -101,8 +102,9 @@ describe("G/H — o que é do dia não se mistura com o que é da semana", () =>
     const p = painel([a, l], SEXTA);
     expect(p.noDia).toEqual([]);
     expect(p.semana).toHaveLength(2);
-    // na sexta o 7º da Ana não é do dia — entra como anterior agendado
-    expect(tipos(p.semana[0].linhas)).toEqual(["remarcar", "encontro"]);
+    // na sexta o 7º da Ana não é do dia — entra como anterior agendado;
+    // o 8º também remarca (encontro aberto da semana sempre tem o CTA)
+    expect(tipos(p.semana[0].linhas)).toEqual(["remarcar", "remarcar"]);
     expect(numeros(p.semana[0].linhas)).toEqual([7, 8]);
     expect(numeros(p.semana[1].linhas)).toEqual([7, 8]);
   });
@@ -166,8 +168,9 @@ describe("demais casos da regra", () => {
   it("agendado de nº posterior ao oficial não entra na semana", () => {
     const d = ana([encAgendado(9, "2025-12-02"), encAgendado(8, TERCA)]);
     const p = painel([d], SABADO);
-    // o 9º é da semana seguinte — só o 8º (oficial desta) aparece
-    expect(tipos(p.semana[0].linhas)).toEqual(["encontro"]);
+    // o 9º é da semana seguinte — só o 8º (oficial desta) aparece,
+    // com o CTA de remarcar que todo encontro aberto da semana tem
+    expect(tipos(p.semana[0].linhas)).toEqual(["remarcar"]);
     expect(numeros(p.semana[0].linhas)).toEqual([8]);
   });
 });
@@ -183,6 +186,6 @@ describe("encontro com data na semana fora do nº oficial", () => {
     ]);
     const p = painel([d], SABADO);
     expect(numeros(p.semana[0].linhas)).toEqual([9]);
-    expect(tipos(p.semana[0].linhas)).toEqual(["encontro"]);
+    expect(tipos(p.semana[0].linhas)).toEqual(["remarcar"]);
   });
 });

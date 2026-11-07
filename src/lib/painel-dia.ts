@@ -111,10 +111,15 @@ export function painelDuplasDoDia({
         } else if (numeros.has(encontro.numero) || naSemana) {
           // o nº oficial da semana marcado em outro dia, ou qualquer
           // encontro da dupla com data nesta semana (dupla adiantada ou
-          // atrasada em relação ao calendário oficial). Não-aconteceu vira
-          // "remarcar" (reagendar); os demais seguem na row de status
+          // atrasada em relação ao calendário oficial). Todo encontro
+          // aberto ganha "Remarcar o Nº" — antes o oficial agendado ficava
+          // mudo na row de status enquanto um nº menor remarcava (regra
+          // invisível flagada em revisão). Em limbo o CTA deduplica no
+          // render via limboAberto; realizado segue na row de status.
           linhas.push(
-            encontro.status === "nao_aconteceu"
+            encontro.status === "agendado" ||
+              encontro.status === "remarcado" ||
+              encontro.status === "nao_aconteceu"
               ? { tipo: "remarcar", encontro }
               : { tipo: "encontro", encontro }
           );
