@@ -23,10 +23,13 @@ import {
   MagnifyingGlass,
   PaperPlaneRight,
   Square,
+  ThumbsDown,
+  ThumbsUp,
   Trash,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { extrairAcoes, montarEnvioChat, msgAmigavel } from "@/lib/ia/mensagens";
+import { deveMostrarFeedback, temLinkMarkdown } from "@/lib/ia/feedback";
 import { metaFonte, rotuloTool, type FonteIa } from "@/lib/ia/fontes";
 import { extrairFontesTexto } from "@/lib/ia/render";
 import { juntarUi, type UiBloco } from "@/lib/ia/ui";
@@ -45,6 +48,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { AppRole } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { novoUuid } from "@/lib/uuid";
 
@@ -60,6 +64,9 @@ type Msg = {
   ui?: UiBloco[];
   /** ms entre o envio e a resposta pronta — "Consultou … em 3 s" */
   dur?: number;
+  /** x-ia-request-id of the response — ties the thumbs vote to the
+   *  round logged in ia_eventos; absent on demo/error/interrupted */
+  reqId?: string;
 };
 
 /** Estado que a bolha traduz em expressão do mascote. */
@@ -290,6 +297,7 @@ export function AssistenteConversa({
   }) => React.ReactNode;
 }) {
   const pagina = usePathname();
+  const supabase = createClient();
   const [msgs, setMsgs] = useState<Msg[]>([]);
   // id da conversa ativa no histórico — criado no 1º envio, zerado em
   // "Nova conversa"; estado (não ref) porque a lista o lê durante render
@@ -301,6 +309,12 @@ export function AssistenteConversa({
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [copiado, setCopiado] = useState<number | null>(null);
+  // thumbs votes keyed by request_id — a Map, not a Set: the direction
+  // fills the voted thumb, not just "already voted"
+  const [votos, setVotos] = useState(() => new Map<string, 1 | -1>());
+  // request_id whose "Valeu pelo retorno!" is still up (~2s, then just
+  // the filled thumb remains)
+  const [agradecimento, setAgradecimento] = useState<string | null>(null);
   // espelho renderizável do pertoDoFim ref — a pill "ir ao fim" precisa de
   // estado porque evento de scroll não dispara render por si só
   const [longeDoFim, setLongeDoFim] = useState(false);
@@ -329,7 +343,12 @@ export function AssistenteConversa({
   // o dreno termina (curto) e o fechar roda no fim dele
   const fecharRef = useRef<{
     estado: "ok" | "erro" | "interrompido";
-    extra?: { tools?: string[]; erro?: string; fontes?: FonteIa[] };
+    extra?: {
+      tools?: string[];
+      erro?: string;
+      fontes?: FonteIa[];
+      reqId?: string;
+    };
   } | null>(null);
   const chips = sugestoes(papeis, pagina);
   const [busca, setBusca] = useState("");
@@ -647,7 +666,12 @@ export function AssistenteConversa({
    *  oculta não há dreno que valha a espera — despeja direto. */
   function finalizar(
     estado: "ok" | "erro" | "interrompido",
-    extra?: { tools?: string[]; erro?: string; fontes?: FonteIa[] }
+    extra?: {
+      tools?: string[];
+      erro?: string;
+      fontes?: FonteIa[];
+      reqId?: string;
+    }
   ) {
     const pend = tokensRef.current;
     // "parar" é parar: interrompido nunca escorre o resto da fila
@@ -672,7 +696,12 @@ export function AssistenteConversa({
    *  bolha: ok vira ausência de estado; erro ganha retry. */
   function fechar(
     estado: "ok" | "erro" | "interrompido",
-    extra?: { tools?: string[]; erro?: string; fontes?: FonteIa[] },
+    extra?: {
+      tools?: string[];
+      erro?: string;
+      fontes?: FonteIa[];
+      reqId?: string;
+    },
     pend = ""
   ) {
     setMsgs((ms) => {
@@ -699,6 +728,7 @@ export function AssistenteConversa({
           tools: extra?.tools?.length ? extra.tools : undefined,
           acoes: estado === "ok" ? extrairAcoes(content) : undefined,
           fontes: extra?.fontes?.length ? extra.fontes : undefined,
+          reqId: extra?.reqId,
           ui: ultima.ui,
           em: agora(),
           dur: inicioRef.current ? agora() - inicioRef.current : undefined,
@@ -742,6 +772,9 @@ export function AssistenteConversa({
         signal: ctrl.signal,
       });
       statusHttp = res.status;
+      // ties this response to the round logged in ia_eventos — becomes
+      // the bubble's reqId at close (feedback gate + vote key)
+      const reqId = res.headers.get("x-ia-request-id") ?? undefined;
       const tipo = res.headers.get("content-type") ?? "";
       // gates pré-stream respondem JSON (401/429/503) ou redirect (307→
       // página de login em HTML) — qualquer um deles vira erro legível
@@ -793,7 +826,7 @@ export function AssistenteConversa({
       }
       if (falha) finalizar("erro", { erro: falha });
       // stream fechou sem done (rede caiu no fim): finaliza com o que tem
-      else finalizar("ok", { tools, fontes });
+      else finalizar("ok", { tools, fontes, reqId });
     } catch (e) {
       if (ctrl.signal.aborted) {
         finalizar("interrompido");
@@ -886,6 +919,40 @@ export function AssistenteConversa({
     } catch {
       toast.error("Não consegui copiar.");
     }
+  }
+
+  /** Thumbs vote — one per answer (keyed by request_id; a retry gets a
+   *  fresh id, so a re-asked question can be rated again). Postgrest
+   *  RPCs are lazy: only .then() actually sends, and a telemetry failure
+   *  must never surface in the chat — rejection handler stays empty. */
+  function avaliar(m: Msg, nota: 1 | -1) {
+    const reqId = m.reqId;
+    if (!reqId || votos.has(reqId)) return;
+    setVotos((prev) => new Map(prev).set(reqId, nota));
+    setAgradecimento(reqId);
+    setTimeout(
+      () => setAgradecimento((atual) => (atual === reqId ? null : atual)),
+      2200
+    );
+    void supabase
+      .rpc("registrar_ia_eventos_lote", {
+        p_eventos: [
+          {
+            canal: "chat",
+            tool: "avaliacao",
+            args: { nota, request_id: reqId },
+            ok: true,
+            duracao_ms: 0,
+            request_id: reqId,
+          },
+        ],
+      })
+      .then(
+        ({ error }) => {
+          if (error) console.error("liza feedback:", error.message);
+        },
+        () => {}
+      );
   }
 
   /** remove do histórico com "Desfazer" no toast — apagar por engano numa
@@ -1215,6 +1282,17 @@ export function AssistenteConversa({
               : extrairFontesTexto(m.content).filter(
                   (ft) => !m.fontes?.some((f) => f.guia === ft.slug)
                 );
+            // thumbs only on a closed (done), complex, sampled answer —
+            // the gate is deterministic by request_id (lib/ia/feedback)
+            const voto = m.reqId ? votos.get(m.reqId) : undefined;
+            const mostrarFeedback =
+              !!m.reqId &&
+              !m.estado &&
+              deveMostrarFeedback(m.reqId, {
+                tools: m.tools?.length,
+                contentLen: m.content.length,
+                hasLink: temLinkMarkdown(m.content),
+              });
             return (
               <div
                 key={i}
@@ -1382,6 +1460,61 @@ export function AssistenteConversa({
                           Tentar de novo
                         </button>
                       )}
+                      {mostrarFeedback && m.reqId ? (
+                        voto === undefined ? (
+                          <span
+                            role="group"
+                            aria-label="Avaliar resposta"
+                            className="ml-auto inline-flex items-center gap-0.5"
+                          >
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => avaliar(m, 1)}
+                              aria-label="Resposta foi útil"
+                              className="size-9 text-muted-foreground hover:text-primary"
+                            >
+                              <ThumbsUp size={16} aria-hidden />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => avaliar(m, -1)}
+                              aria-label="Resposta não foi útil"
+                              className="size-9 text-muted-foreground hover:text-primary"
+                            >
+                              <ThumbsDown size={16} aria-hidden />
+                            </Button>
+                          </span>
+                        ) : (
+                          /* voted: the pair leaves, the filled thumb and
+                             the ~2s "thanks" stay */
+                          <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground sm:text-[11px]">
+                            {agradecimento === m.reqId && (
+                              <span className="animate-in fade-in-0 duration-200">
+                                Valeu pelo retorno!
+                              </span>
+                            )}
+                            {voto === 1 ? (
+                              <ThumbsUp
+                                size={16}
+                                weight="fill"
+                                aria-hidden
+                                className="text-foreground"
+                              />
+                            ) : (
+                              <ThumbsDown
+                                size={16}
+                                weight="fill"
+                                aria-hidden
+                                className="text-foreground"
+                              />
+                            )}
+                          </span>
+                        )
+                      ) : null}
                     </div>
                   )}
                 </div>
