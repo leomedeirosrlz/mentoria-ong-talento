@@ -118,6 +118,11 @@ const REGRAS = [
     texto:
       "Tempo total da pergunta: rodadas do modelo mais as ferramentas, até o fim da resposta. p95 é o limite dos 5% mais lentos.",
   },
+  {
+    termo: "Cache do input",
+    texto:
+      "Fração dos tokens de entrada que o provedor serviu do cache (prefixo repetido entre requisições): tokens relidos custam menos e voltam mais rápido. Sem leitura de cache no período aparece como n/d.",
+  },
 ] as const;
 
 function Chip({
@@ -633,6 +638,10 @@ export default async function IaPage({
   const vazio = uso.requisicoes === 0;
   const chaveRecorte = `${dias}|${canal}|${modelo ?? ""}`;
 
+  // fração do input servida do cache do provedor — sem leitura de cache
+  // no período vira n/d (provedor pode nem reportar cache_read)
+  const cacheEntrada =
+    mt.tokensIn > 0 && mt.cacheRead > 0 ? mt.cacheRead / mt.tokensIn : null;
   const totalTier = mt.porTier.reduce((s, t) => s + t.respostas, 0);
   const totalUsos = mt.topTools.reduce((s, t) => s + t.chamadas, 0);
   const totalPerguntas = mt.porPessoa.reduce((s, p) => s + p.mensagens, 0);
@@ -814,6 +823,11 @@ export default async function IaPage({
             rotulo="Iterações"
             valor={mt.iterMedia == null ? "n/d" : num.format(mt.iterMedia)}
             detalhe="rodadas por resposta"
+          />
+          <Kpi
+            rotulo="Cache do input"
+            valor={cacheEntrada == null ? "n/d" : pct(cacheEntrada)}
+            detalhe={cacheEntrada == null ? undefined : "dos tokens de entrada"}
           />
         </div>
 

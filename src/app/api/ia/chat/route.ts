@@ -22,6 +22,7 @@
 // tool call + o resumo 'resposta' — esses dois últimos vão juntos numa
 // escrita só no fim do stream (registrar_ia_eventos_lote).
 
+import { createHash } from "node:crypto";
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import {
@@ -159,10 +160,14 @@ export async function POST(req: Request) {
   const requestId = ctx.requestId;
 
   const papeis = ctx.papeis.length ? ctx.papeis : ctx.role ? [ctx.role] : [];
+  const system = systemPromptIa(papeis, body.data.pagina);
   const historico: MsgChat[] = [
-    { role: "system", content: systemPromptIa(papeis, body.data.pagina) },
+    { role: "system", content: system },
     ...body.data.messages.map((m) => ({ ...m, content: m.content })),
   ];
+  // hash curto do prompt montado: permite comparar métricas antes/depois
+  // de mexer no prompt sem versionar o texto inteiro nos eventos
+  const promptV = createHash("sha256").update(system).digest("hex").slice(0, 8);
 
   // tier da pergunta (REALIZA-329): roteador determinístico — saudação
   // vai pro raso, pedido analítico pro forte, resto no balanceado;
@@ -377,7 +382,9 @@ export async function POST(req: Request) {
                 papeis,
                 undefined,
                 requestId,
-                { coletarEvento }
+                // dedup por sessão: mesma tool+args na conversa serve o
+                // resultado guardado (90s) em vez de re-rodar a query
+                { coletarEvento, dedupKey: sessao }
               ),
               new Promise<never>((_, rej) => {
                 timerPrazo = setTimeout(() => rej(new Error("prazo")), restanteTc);
@@ -455,7 +462,11 @@ export async function POST(req: Request) {
       eventos.push({
         canal: "chat",
         tool: "resposta",
-        args: { tools: toolsUsadas, list_cost: uso.listCost || undefined },
+        args: {
+          tools: toolsUsadas,
+          list_cost: uso.listCost || undefined,
+          prompt_v: promptV,
+        },
         ok: concluido,
         erro: erroEmitido ? "erro" : null,
         duracao_ms: Date.now() - t0,

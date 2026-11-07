@@ -309,6 +309,11 @@ describe("stream SSE", () => {
         request_id: "req-teste",
         ok: true,
         iteracoes: 1,
+        // hash curto do system prompt montado — compara métricas
+        // antes/depois de mexer no prompt
+        args: expect.objectContaining({
+          prompt_v: expect.stringMatching(/^[0-9a-f]{8}$/),
+        }),
       }),
     ]);
     expect(m.rpc).not.toHaveBeenCalledWith(
@@ -371,7 +376,10 @@ describe("stream SSE", () => {
       ["coordenacao"], // papéis já resolvidos pela rota — a tool não refaz
       undefined, // autorProfileId — idem
       "req-teste",
-      { coletarEvento: expect.any(Function) } // auditoria vai no lote do fim
+      {
+        coletarEvento: expect.any(Function), // auditoria vai no lote do fim
+        dedupKey: "prof-1", // sessão = profile: dedup de leitura na conversa
+      }
     );
     // o status chega com o rótulo por tool (STATUS_TOOL em lib/ia/ui.ts)
     expect(texto).toContain(
@@ -423,7 +431,7 @@ describe("stream SSE", () => {
       ["mentor"],
       undefined,
       "req-teste",
-      { coletarEvento: expect.any(Function) }
+      { coletarEvento: expect.any(Function), dedupKey: "prof-1" }
     );
   });
 

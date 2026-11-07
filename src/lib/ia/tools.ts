@@ -53,6 +53,7 @@ import {
 import { PERGUNTAS } from "@/lib/ajuda/conteudo";
 import { normaliza } from "@/lib/utils";
 import { getIaConfig } from "./config";
+import { CacheTtl } from "./cache";
 import { buscarNosGuias, catalogoGuias } from "./guias";
 
 /** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário. */
@@ -1497,6 +1498,24 @@ export type EventoIa = {
   iteracoes?: number | null;
 };
 
+// ---------- dedup de resultado por sessão (chat) ----------
+
+/** Na mesma conversa o modelo às vezes repete a mesma tool com os mesmos
+ *  args (follow-up) — as tools de leitura são idempotentes e a RLS já
+ *  escopa ao dono da sessão, então o resultado de segundos atrás é o que
+ *  a query devolveria de novo. 90s cobre a vida útil de uma resposta sem
+ *  servir dado velho demais; 200 entradas por instância. Só o chat passa
+ *  dedupKey: o token MCP é multi-uso (uma sessão não existe lá) e tools
+ *  `escreve`/`guia_consulta` ficam fora por contrato (escrita não é
+ *  idempotente; a guia já tem a guarda "uma busca por resposta" na route
+ *  e a re-chamada precisa cair nela, não no cache). */
+const dedupTools = new CacheTtl<unknown>(90_000, 200);
+
+/** Testes: começa do zero (o cache é por módulo). */
+export function limparDedupTools() {
+  dedupTools.limpar();
+}
+
 /** Ponto único de execução das tools — valida args (zod), barra papel fora
  *  da allowlist ANTES de rodar, mede a duração e grava ia_eventos via RPC
  *  (o `await` importa: rpc() solto é lazy e nunca chegaria no PostgREST;
@@ -1519,13 +1538,18 @@ export async function executarTool(
   requestId?: string,
   /** coletarEvento: o caller guarda o evento de auditoria e grava em lote
    *  (chat → registrar_ia_eventos_lote no fim do stream). Ausente → grava
-   *  na hora via registrar_ia_evento, como o MCP faz. */
-  opcoes?: { coletarEvento?: (ev: EventoIa) => void }
+   *  na hora via registrar_ia_evento, como o MCP faz.
+   *  dedupKey: id estável da conversa — repetição de tool de leitura com
+   *  os mesmos args dentro do TTL devolve o resultado guardado em vez de
+   *  re-rodar a query (o evento sai com args.cache:true). */
+  opcoes?: { coletarEvento?: (ev: EventoIa) => void; dedupKey?: string }
 ): Promise<ResultadoTool> {
   const inicio = Date.now();
   let ok = false;
   let erro: string | null = null;
   let dados: unknown = null;
+  // resposta servida do dedup por sessão — vira args.cache no evento
+  let dedupHit = false;
   // log registra os args crus enquanto o parse não valida; depois, os
   // canônicos (defaults aplicados, campos fora do schema descartados)
   let argsLog = argsParaLog(args);
@@ -1632,9 +1656,31 @@ export async function executarTool(
         ok = true;
       }
     } else {
-      // `parsed.data` já passou no schema da própria tool — o `as never`
-      // casa com a união dos params tipados de cada run
-      dados = await tool.run(parsed.data as never, { supabase, papel });
+      // dedup por sessão: a chave usa os args CANÔNICOS (pós-zod) — mesma
+      // serialização da confirmação (canonico), chaves ordenadas em
+      // profundidade. Falha não fica guardada (o erro propaga antes do
+      // set) e `rodou` separa hit de miss: o obter só chama o carregador
+      // quando a entrada não existe nem está em voo — dividir a promessa
+      // de outra chamada idêntica também conta como dedup.
+      const chaveDedup =
+        opcoes?.dedupKey && nome !== "guia_consulta"
+          ? `${opcoes.dedupKey}|${nome}|${createHash("sha256")
+              .update(canonico(parsed.data))
+              .digest("hex")
+              .slice(0, 16)}`
+          : null;
+      if (chaveDedup) {
+        let rodou = false;
+        // `parsed.data` já passou no schema da própria tool — o `as
+        // never` casa com a união dos params tipados de cada run
+        dados = await dedupTools.obter(chaveDedup, async () => {
+          rodou = true;
+          return tool.run(parsed.data as never, { supabase, papel });
+        });
+        dedupHit = !rodou;
+      } else {
+        dados = await tool.run(parsed.data as never, { supabase, papel });
+      }
       ok = true;
     }
   } catch (e) {
@@ -1646,11 +1692,17 @@ export async function executarTool(
     }
   }
 
+  // hit do dedup sai marcado em args.cache — é o que permite contar na
+  // telemetria quantas tool calls foram poupadas por sessão
+  const argsEvento = dedupHit
+    ? { ...argsMinimizados(nome, argsLog), cache: true }
+    : argsMinimizados(nome, argsLog);
+
   if (opcoes?.coletarEvento) {
     opcoes.coletarEvento({
       canal,
       tool: nome,
-      args: argsMinimizados(nome, argsLog),
+      args: argsEvento,
       ok,
       erro,
       duracao_ms: Date.now() - inicio,
@@ -1663,7 +1715,7 @@ export async function executarTool(
     const { error: erroAudit } = await supabase.rpc("registrar_ia_evento", {
       p_canal: canal,
       p_tool: nome,
-      p_args: argsMinimizados(nome, argsLog),
+      p_args: argsEvento,
       p_ok: ok,
       p_erro: erro,
       p_duracao_ms: Date.now() - inicio,
