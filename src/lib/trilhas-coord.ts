@@ -129,12 +129,12 @@ export function painelTrilhasCoord({
         solicitacaoId: s.id,
         // a view achata mentorado_nome → mentorado.nome (o embed de
         // profiles não resolve pra todo leitor)
-        jovemNome: s.mentorado?.nome ?? "Jovem",
+        jovemNome: s.mentorado?.nome_social ?? s.mentorado?.nome ?? "Jovem",
         turma: s.turma,
         demanda: s.demanda ?? s.motivo ?? "",
         diasParado: dias,
         // a preferência é o desejado; sem o embed (RLS), honesto é null
-        preferenciaNome: s.desejado?.nome ?? null,
+        preferenciaNome: s.desejado?.nome_social ?? s.desejado?.nome ?? null,
         onde: e === "expirada" ? "expirada" : "mural",
       };
     })

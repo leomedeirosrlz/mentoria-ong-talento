@@ -114,7 +114,7 @@ export default async function HomePage({
           avisos={avisos}
           solicitacoes={solicitacoes}
           encerramentos={new Set(encerramentos)}
-          meuNome={me?.nome.split(" ")[0]}
+          meuNome={(me?.nome_social ?? me?.nome)?.split(" ")[0]}
           termo={termoPendente ? <TermoBanner /> : null}
           turmaFoco={foco.turma}
           seletorContexto={
@@ -218,7 +218,7 @@ export default async function HomePage({
           interacoes={interacoes}
           supervisor
           avisos={avisos}
-          meuNome={me?.nome.split(" ")[0]}
+          meuNome={(me?.nome_social ?? me?.nome)?.split(" ")[0]}
           termo={termoPendente ? <TermoBanner /> : null}
           turmaFoco={focoSup.turma}
           seletorContexto={

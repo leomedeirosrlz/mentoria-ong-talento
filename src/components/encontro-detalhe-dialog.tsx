@@ -98,7 +98,7 @@ export function EncontroDetalheDialog({
     let vivo = true;
     createClient()
       .from("registro_anexos")
-      .select("*, autor:profiles!registro_anexos_created_by_fkey(nome)")
+      .select("*, autor:profiles!registro_anexos_created_by_fkey(nome, nome_social)")
       .eq("registro_id", reg.id)
       .order("created_at", { ascending: true })
       .then(({ data, error }) => {
@@ -147,8 +147,8 @@ export function EncontroDetalheDialog({
             <span>
               {encontro.numero}º encontro ·{" "}
               <DuplaNomes
-                mentor={dupla.mentor.nome}
-                mentorado={dupla.mentorado.nome}
+                mentor={dupla.mentor.nome_social ?? dupla.mentor.nome}
+                mentorado={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
               />
             </span>
           </DialogTitle>
@@ -234,7 +234,9 @@ export function EncontroDetalheDialog({
                       <span className="block pl-4.5 text-muted-foreground">
                         {[
                           a.tamanho != null ? formatTamanho(a.tamanho) : null,
-                          a.autor?.nome ? `por ${a.autor.nome}` : null,
+                          a.autor?.nome
+                            ? `por ${a.autor.nome_social ?? a.autor.nome}`
+                            : null,
                           formatDiaMes(a.created_at),
                         ]
                           .filter(Boolean)

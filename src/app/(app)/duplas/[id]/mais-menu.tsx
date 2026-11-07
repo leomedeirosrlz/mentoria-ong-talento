@@ -48,6 +48,7 @@ const ICONE = "size-4 shrink-0 text-muted-foreground";
 type EspecialistaOpcao = {
   id: string;
   nome: string;
+  nome_social?: string | null;
   areas: string[] | null;
 };
 

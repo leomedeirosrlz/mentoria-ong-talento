@@ -34,6 +34,7 @@ import type {
 type Opt = {
   id: string;
   nome: string;
+  nome_social?: string | null;
   role?: string | null;
   papeis?: AppRole[];
   interesses?: string[] | null;
@@ -43,6 +44,7 @@ type Opt = {
 type MentoradoOpt = {
   id: string;
   nome: string;
+  nome_social?: string | null;
   interesses?: string[] | null;
   cidade?: string | null;
   uf?: string | null;
@@ -134,13 +136,13 @@ export function NovaDuplaDialog({
         const [perfis, ments, duplasRes, mps, cronsRes] = await Promise.all([
           supabase
             .from("profiles")
-            .select("id, nome, role, interesses, cidade, uf, profile_papeis(papel)")
+            .select("id, nome, nome_social, role, interesses, cidade, uf, profile_papeis(papel)")
             .in("role", ["mentor_dpp", "mentor_especialista", "supervisor", "coordenacao"])
             .eq("ativo", true)
             .order("nome"),
           supabase
             .from("mentorados")
-            .select("id, nome, interesses, objetivos, escolaridade, cidade, uf, disponibilidade, situacao")
+            .select("id, nome, nome_social, interesses, objetivos, escolaridade, cidade, uf, disponibilidade, situacao")
             .order("nome"),
           // sem filtro de status: a ocupação filtra em JS sobre o histórico
           // completo
@@ -372,8 +374,10 @@ export function NovaDuplaDialog({
         if (res?.error) toast.error(res.error);
         else {
           // toast nomeia a dupla — a confirmação tem que ser reconhecível
-          const mentorNome = mentores.find((m) => m.id === fd.get("mentor_id"))?.nome;
-          const mentoradoNome = mentorados.find((m) => m.id === fd.get("mentorado_id"))?.nome;
+          const mSel = mentores.find((m) => m.id === fd.get("mentor_id"));
+          const dSel = mentorados.find((m) => m.id === fd.get("mentorado_id"));
+          const mentorNome = mSel ? (mSel.nome_social ?? mSel.nome) : undefined;
+          const mentoradoNome = dSel ? (dSel.nome_social ?? dSel.nome) : undefined;
           toast.success(
             mentorNome && mentoradoNome
               ? `Dupla formada: ${mentorNome} e ${mentoradoNome}.`
@@ -466,7 +470,7 @@ export function NovaDuplaDialog({
               required
               value={mentorSel ?? undefined}
               items={Object.fromEntries(mentoresOrd.map((m) => {
-                const rotulo = `${m.nome} · ${vagasLabel(m)}`;
+                const rotulo = `${m.nome_social ?? m.nome} · ${vagasLabel(m)}`;
                 return [m.id, rotulo];
               }))}
               onValueChange={(v) => {
@@ -498,7 +502,7 @@ export function NovaDuplaDialog({
                   // comparar a afinidade e abrir "aumentar capacidade";
                   // esconder seria fingir que o mentor certo não existe
                   <SelectItem key={m.id} value={m.id}>
-                    {m.nome} · {vagasLabel(m)}
+                    {m.nome_social ?? m.nome} · {vagasLabel(m)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -509,7 +513,7 @@ export function NovaDuplaDialog({
                 className="rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/5 px-3.5 py-3 text-sm"
               >
                 <p className="font-medium">
-                  {mentorSelObj.nome.split(" ")[0]} está sem vaga
+                  {(mentorSelObj.nome_social ?? mentorSelObj.nome).split(" ")[0]} está sem vaga
                   {ehEsp ? " de especialista" : ""}: já cuida
                   de {usoSel}/{capSel}{" "}
                   {capSel === 1 ? "dupla" : "duplas"}.
@@ -518,7 +522,7 @@ export function NovaDuplaDialog({
                   Se ela é o par certo, dá pra abrir mais uma vaga:{" "}
                   <CapacidadeMentorDialog
                     mentorId={mentorSelObj.id}
-                    nome={mentorSelObj.nome}
+                    nome={mentorSelObj.nome_social ?? mentorSelObj.nome}
                     atual={capSel}
                     emUso={usoSel}
                     // pool da trilha em edição — sem ela o server escreve
@@ -598,7 +602,9 @@ export function NovaDuplaDialog({
               value={mentoradoSel ?? undefined}
               items={Object.fromEntries(mentoradosOrd.map((m) => [
                 m.id,
-                rotuloOcupado(m.id) ? `${m.nome} (${rotuloOcupado(m.id)})` : m.nome,
+                rotuloOcupado(m.id)
+                  ? `${m.nome_social ?? m.nome} (${rotuloOcupado(m.id)})`
+                  : (m.nome_social ?? m.nome),
               ]))}
               onValueChange={(v) => setMentoradoSel(v ? String(v) : null)}
             >
@@ -611,7 +617,9 @@ export function NovaDuplaDialog({
                   const ocupado = ocupadoEm(m.id) != null;
                   return (
                     <SelectItem key={m.id} value={m.id} disabled={ocupado}>
-                      {rotuloOcupado(m.id) ? `${m.nome} (${rotuloOcupado(m.id)})` : m.nome}
+                      {rotuloOcupado(m.id)
+                        ? `${m.nome_social ?? m.nome} (${rotuloOcupado(m.id)})`
+                        : (m.nome_social ?? m.nome)}
                     </SelectItem>
                   );
                 })}
@@ -627,7 +635,7 @@ export function NovaDuplaDialog({
             <AfinidadePar
               mentor={{
                 id: mentorSelObj.id,
-                nome: mentorSelObj.nome,
+                nome: mentorSelObj.nome_social ?? mentorSelObj.nome,
                 interesses: mentorSelObj.interesses,
                 cidade: mentorSelObj.cidade,
                 uf: mentorSelObj.uf,
@@ -644,7 +652,7 @@ export function NovaDuplaDialog({
               }}
               mentorado={{
                 id: mentoradoSelObj.id,
-                nome: mentoradoSelObj.nome,
+                nome: mentoradoSelObj.nome_social ?? mentoradoSelObj.nome,
                 interesses: mentoradoSelObj.interesses,
                 cidade: mentoradoSelObj.cidade,
                 uf: mentoradoSelObj.uf,
@@ -673,13 +681,13 @@ export function NovaDuplaDialog({
               <Select
                 name="supervisor_id"
                 defaultValue={NENHUM}
-                items={{ [NENHUM]: "Nenhum", ...Object.fromEntries(supervisoresOrd.map((m) => [m.id, m.nome])) }}
+                items={{ [NENHUM]: "Nenhum", ...Object.fromEntries(supervisoresOrd.map((m) => [m.id, m.nome_social ?? m.nome])) }}
               >
                 <SelectTrigger id="supervisor" aria-labelledby="supervisor-label supervisor"><SelectValue placeholder="Nenhum" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={NENHUM}>Nenhum</SelectItem>
                   {supervisoresOrd.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.nome}</SelectItem>
+                    <SelectItem key={m.id} value={m.id}>{m.nome_social ?? m.nome}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>

@@ -115,7 +115,7 @@ export function MentorHome({
           da grade (em xl ela esticava na altura do 1º card) */}
       <div className={cn("space-y-4", duplas.length > 1 && "xl:col-span-2")}>
         <header>
-          <h1 className="text-2xl font-semibold tracking-tight">Olá, {me.nome.split(" ")[0]}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Olá, {(me.nome_social ?? me.nome).split(" ")[0]}</h1>
           {eventoSemana && !soEspecialista && (
             <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
               <span aria-hidden className="size-2 shrink-0 rounded-full bg-[var(--brand-lime)]" />
@@ -268,18 +268,23 @@ export function MentorHome({
                       mentorado é o que distingue um card do outro */}
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-white/50 sm:text-[11px]">
                     {duplas.length > 1
-                      ? `Dupla · ${dupla.mentorado.nome}`
+                      ? `Dupla · ${dupla.mentorado.nome_social ?? dupla.mentorado.nome}`
                       : "Sua dupla"}
                   </p>
                   <CardTitle className="text-lg font-semibold mt-1">
-                    <DuplaNomes mentor="Você" mentorado={dupla.mentorado.nome} onDark />
+                    <DuplaNomes
+                      mentor="Você"
+                      mentorado={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+                      onDark
+                    />
                   </CardTitle>
                   {/* o auxiliar executivo que acompanha a dupla — meta discreto
                       sob o lockup; white/70 mantém o nome legível no ink (o
                       white/50 do overline mede ~4.4:1 pra dado lido) */}
                   {dupla.supervisor && (
                     <p className="mt-0.5 text-xs text-white/70 sm:text-[11px]">
-                      Auxiliar executivo: {dupla.supervisor.nome}
+                      Auxiliar executivo:{" "}
+                      {dupla.supervisor.nome_social ?? dupla.supervisor.nome}
                     </p>
                   )}
                   {/* prazo de 3 meses da trilha — o diferenciador entre duplas
@@ -444,7 +449,9 @@ export function MentorHome({
                             atual={encontroSeguinte}
                             sugerido={sugeridoSeguinte}
                             piso={dupla.iniciada_em ?? undefined}
-                            jovemNome={dupla.mentorado.nome.split(" ")[0]}
+                            jovemNome={
+                              (dupla.mentorado.nome_social ?? dupla.mentorado.nome).split(" ")[0]
+                            }
                             trigger={
                               <Button variant="outline" size="sm">
                                 <CalendarPlus size={16} />
@@ -490,7 +497,9 @@ export function MentorHome({
                           atual={encontroAlvo}
                           sugerido={sugeridoProximo}
                           piso={dupla.iniciada_em ?? undefined}
-                          jovemNome={dupla.mentorado.nome.split(" ")[0]}
+                          jovemNome={
+                            (dupla.mentorado.nome_social ?? dupla.mentorado.nome).split(" ")[0]
+                          }
                           trigger={
                             <Button size="sm">
                               <CalendarPlus size={16} />
@@ -523,7 +532,9 @@ export function MentorHome({
                           atual={encontroAlvo}
                           sugerido={sugeridoProximo}
                           piso={dupla.iniciada_em ?? undefined}
-                          jovemNome={dupla.mentorado.nome.split(" ")[0]}
+                          jovemNome={
+                            (dupla.mentorado.nome_social ?? dupla.mentorado.nome).split(" ")[0]
+                          }
                         />
                       </div>
                     </>
@@ -615,7 +626,10 @@ export function MentorHome({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">
-                      <DuplaNomes mentor="Você" mentorado={dupla.mentorado.nome} />
+                      <DuplaNomes
+                        mentor="Você"
+                        mentorado={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+                      />
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
                       {dupla.status === "concluida" ? "Concluída" : "Desistente"} ·{" "}

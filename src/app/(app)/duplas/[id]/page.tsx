@@ -197,7 +197,7 @@ export async function generateMetadata({
   const dupla = await getDupla(id);
   return {
     title: dupla
-      ? `${dupla.mentor.nome} e ${dupla.mentorado.nome} · Realiza.vc`
+      ? `${dupla.mentor.nome_social ?? dupla.mentor.nome} e ${dupla.mentorado.nome_social ?? dupla.mentorado.nome} · Realiza.vc`
       : "Dupla · Realiza.vc",
   };
 }
@@ -274,7 +274,7 @@ export default async function DuplaPage({
   // linha discreta simplesmente não renderiza
   const ehEsp = dupla.trilha === "especialista";
   const nomeVinculo = (v: DuplaVinculo) =>
-    `${v.mentor?.nome ?? "—"} e ${v.mentorado?.nome ?? "—"}`;
+    `${v.mentor?.nome_social ?? v.mentor?.nome ?? "—"} e ${v.mentorado?.nome_social ?? v.mentorado?.nome ?? "—"}`;
   const [
     origem,
     sucessora,
@@ -390,8 +390,12 @@ export default async function DuplaPage({
     alvoAgendamento(dupla, eventos);
   const jornada = jornadaDaDupla(dupla, passos);
 
-  const primeiroNomeMentor = dupla.mentor.nome.split(" ")[0];
-  const primeiroNomeMentorado = dupla.mentorado.nome.split(" ")[0];
+  const primeiroNomeMentor = (
+    dupla.mentor.nome_social ?? dupla.mentor.nome
+  ).split(" ")[0];
+  const primeiroNomeMentorado = (
+    dupla.mentorado.nome_social ?? dupla.mentorado.nome
+  ).split(" ")[0];
 
   // combinados ainda abertos — alimentam o form de registro e a msg de WhatsApp
   const combinadosPendentes = (dupla.encaminhamentos ?? [])
@@ -428,9 +432,9 @@ export default async function DuplaPage({
   // catálogo whatsapp-msgs — check-in neutro do header ("mentoria com X");
   // msgs específicas de anomalia vivem junto de cada bloco que as usa
   const msgsGenerico = msgsContato("generico", {
-    mentorNome: dupla.mentor.nome,
-    mentoradoNome: dupla.mentorado.nome,
-    autorNome: me.nome,
+    mentorNome: dupla.mentor.nome_social ?? dupla.mentor.nome,
+    mentoradoNome: dupla.mentorado.nome_social ?? dupla.mentorado.nome,
+    autorNome: me.nome_social ?? me.nome,
   });
   // nudge do pedido de apoio: só o mentor recebe — o pedido partiu dele e o
   // mentorado não é canal de resposta (vazio pro mentor = nunca renderiza)
@@ -442,9 +446,9 @@ export default async function DuplaPage({
           telefone: dupla.mentor.whatsapp,
           mensagem:
             msgsContato("apoio", {
-              mentorNome: dupla.mentor.nome,
-              mentoradoNome: dupla.mentorado.nome,
-              autorNome: me.nome,
+              mentorNome: dupla.mentor.nome_social ?? dupla.mentor.nome,
+              mentoradoNome: dupla.mentorado.nome_social ?? dupla.mentorado.nome,
+              autorNome: me.nome_social ?? me.nome,
             }).mentor ?? "",
           t: "apoio",
         },
@@ -460,7 +464,7 @@ export default async function DuplaPage({
         saude,
         hoje: agora,
         ultimoNudge,
-        meuNome: me.nome.split(" ")[0],
+        meuNome: (me.nome_social ?? me.nome).split(" ")[0],
         tituloNudge: souCoord ? "Lembrete da coordenação" : "Lembrete da supervisão",
         origem: origemLinks,
       })
@@ -860,7 +864,7 @@ export default async function DuplaPage({
         }
         souCoord={souCoord}
         autorId={me.id}
-        autorNome={me.nome}
+        autorNome={me.nome_social ?? me.nome}
         // evidência é do mentor — coord só remove (moderação), sup só lê
         podeAnexar={souMentor && (dupla.status === "ativa" || ritoPendente)}
         podeRemoverAnexos={souCoord || (souMentor && (dupla.status === "ativa" || ritoPendente))}
@@ -1169,7 +1173,8 @@ export default async function DuplaPage({
                     <p className="whitespace-pre-line break-words">{v.texto}</p>
                   </blockquote>
                   <p className="text-xs text-muted-foreground">
-                    {v.autor?.nome ?? "O especialista"} ·{" "}
+                    {(v.autor?.nome_social ?? v.autor?.nome) ?? "O especialista"}{" "}
+                    ·{" "}
                     {formatDateTime(v.created_at)}
                   </p>
                 </li>
@@ -1219,13 +1224,13 @@ export default async function DuplaPage({
         <InstrumentosDupla
           duplaId={dupla.id}
           itens={instrumentos}
-          mentoradoNome={dupla.mentorado.nome}
+          mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
           mentoradoWhatsapp={dupla.mentorado.whatsapp}
           podeEnviar={souCoord || souMentor}
           jornadaViva={
             dupla.status === "ativa" || dupla.status === "pausada"
           }
-          remetenteMentorNome={souMentor ? me.nome : undefined}
+          remetenteMentorNome={souMentor ? (me.nome_social ?? me.nome) : undefined}
         />
       )}
       <Suspense fallback={<Skeleton className="h-24 w-full" />}>
@@ -1233,7 +1238,7 @@ export default async function DuplaPage({
           <PdmDupla
             duplaId={dupla.id}
             doc={pdm}
-            mentoradoNome={dupla.mentorado.nome}
+            mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
             podeEditar={
               souMentor &&
               (dupla.status === "ativa" || dupla.status === "pausada")
@@ -1247,7 +1252,7 @@ export default async function DuplaPage({
             consolidacao={terceiros.consolidacao}
             mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
             podeGerenciar={souCoord || souMentor}
-            remetenteNome={souMentor ? me.nome : undefined}
+            remetenteNome={souMentor ? (me.nome_social ?? me.nome) : undefined}
             jornadaViva={
               dupla.status === "ativa" || dupla.status === "pausada"
             }
@@ -1290,16 +1295,16 @@ export default async function DuplaPage({
         <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
           <Link
             href={`/pessoas/${dupla.mentor.id}`}
-            aria-label={`Abrir perfil de ${dupla.mentor.nome}`}
+            aria-label={`Abrir perfil de ${dupla.mentor.nome_social ?? dupla.mentor.nome}`}
             className="group -my-1.5 flex min-w-0 items-center gap-2.5 rounded-lg py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             <Avatar
-              nome={dupla.mentor.nome}
+              nome={dupla.mentor.nome_social ?? dupla.mentor.nome}
               src={dupla.mentor.avatar_path ? avatarPublicUrl(dupla.mentor.avatar_path) : null}
               size={32}
             />
             <span className="min-w-0 text-sm font-semibold underline-offset-4 transition-colors group-hover:underline">
-              {dupla.mentor.nome}
+              {dupla.mentor.nome_social ?? dupla.mentor.nome}
               {souMentor && <span className="font-normal text-muted-foreground"> · você</span>}
             </span>
           </Link>
@@ -1326,11 +1331,11 @@ export default async function DuplaPage({
         {/* avatar+nome num link só (padrão da lista de pessoas) */}
         <Link
           href={`/pessoas/${dupla.mentorado.id}`}
-          aria-label={`Abrir perfil de ${dupla.mentorado.nome}`}
+          aria-label={`Abrir perfil de ${dupla.mentorado.nome_social ?? dupla.mentorado.nome}`}
           className="group -my-1.5 flex items-center gap-2.5 rounded-lg py-1.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Avatar
-            nome={dupla.mentorado.nome}
+            nome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
             src={dupla.mentorado.avatar_path ? avatarPublicUrl(dupla.mentorado.avatar_path) : null}
             papel="mentorado"
             size={32}
@@ -1340,7 +1345,7 @@ export default async function DuplaPage({
               <span aria-hidden className="size-1.5 shrink-0 rounded-full bg-[var(--role-mentorado)]" />
             )}
             <span className="underline-offset-4 transition-colors group-hover:underline">
-              {dupla.mentorado.nome}
+              {dupla.mentorado.nome_social ?? dupla.mentorado.nome}
             </span>
           </span>
         </Link>
@@ -1400,7 +1405,7 @@ export default async function DuplaPage({
           <h2 id="pessoa-supervisor" className="text-base font-semibold">
             Auxiliar executivo
           </h2>
-          <p className="mt-2">{dupla.supervisor.nome}</p>
+          <p className="mt-2">{dupla.supervisor.nome_social ?? dupla.supervisor.nome}</p>
         </section>
       )}
 
@@ -1445,14 +1450,18 @@ export default async function DuplaPage({
               linkar
             />
           </span>
-          <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
+          <DuplaNomes
+            mentor={dupla.mentor.nome_social ?? dupla.mentor.nome}
+            mentorado={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+          />
         </h1>
 
         <p className="mt-1.5 text-sm text-muted-foreground">
           {[
             turmaLonga(dupla.turma),
             `Encontro ${jornada.proximoNumero ?? jornada.feitos} de ${total}`,
-            dupla.supervisor && `auxiliar executivo ${dupla.supervisor.nome}`,
+            dupla.supervisor &&
+              `auxiliar executivo ${dupla.supervisor.nome_social ?? dupla.supervisor.nome}`,
           ]
             .filter(Boolean)
             .join(" · ")}
@@ -1582,12 +1591,12 @@ export default async function DuplaPage({
                     formularios: formulariosAtivos,
                     mentor: {
                       id: dupla.mentor.id,
-                      nome: dupla.mentor.nome,
+                      nome: dupla.mentor.nome_social ?? dupla.mentor.nome,
                       whatsapp: dupla.mentor.whatsapp,
                     },
                     mentorado: {
                       id: dupla.mentorado.id,
-                      nome: dupla.mentorado.nome,
+                      nome: dupla.mentorado.nome_social ?? dupla.mentorado.nome,
                       whatsapp: dupla.mentorado.whatsapp,
                     },
                   }
@@ -1611,7 +1620,7 @@ export default async function DuplaPage({
               podeSugerir
                 ? {
                     mentoradoId: dupla.mentorado.id,
-                    nomeJovem: dupla.mentorado.nome,
+                    nomeJovem: dupla.mentorado.nome_social ?? dupla.mentorado.nome,
                     especialistas,
                   }
                 : null

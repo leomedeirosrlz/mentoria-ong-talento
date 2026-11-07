@@ -158,12 +158,12 @@ export function EncerramentoDupla({
                       duplaId={dupla.id}
                       mentor={{
                         id: dupla.mentor.id,
-                        nome: dupla.mentor.nome,
+                        nome: dupla.mentor.nome_social ?? dupla.mentor.nome,
                         whatsapp: dupla.mentor.whatsapp,
                       }}
                       mentorado={{
                         id: dupla.mentorado.id,
-                        nome: dupla.mentorado.nome,
+                        nome: dupla.mentorado.nome_social ?? dupla.mentorado.nome,
                         whatsapp: dupla.mentorado.whatsapp,
                       }}
                       sugestao="360"
@@ -184,7 +184,11 @@ export function EncerramentoDupla({
       {decidido ? (
         <>
           <p className="text-xs text-muted-foreground">
-            Registrado por {encerramento!.decidido?.nome ?? "a coordenação"} ·{" "}
+            Registrado por{" "}
+            {encerramento!.decidido?.nome_social ??
+              encerramento!.decidido?.nome ??
+              "a coordenação"}{" "}
+            ·{" "}
             {formatDateTime(encerramento!.created_at)}
           </p>
         </>

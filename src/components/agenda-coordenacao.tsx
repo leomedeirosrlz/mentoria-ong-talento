@@ -25,8 +25,18 @@ import { lembreteDaDupla, mesLongo, semanaIso } from "@/components/agenda-partes
 
 /** A pessoa como a linha canônica lê — sem o e-mail, que não precisa cruzar
  *  a boundary da fila. */
-function pessoaDaFila(p: { id: string; nome: string; avatar_path?: string | null }) {
-  return { id: p.id, nome: p.nome, avatar_path: p.avatar_path ?? null };
+function pessoaDaFila(p: {
+  id: string;
+  nome: string;
+  nome_social?: string | null;
+  avatar_path?: string | null;
+}) {
+  return {
+    id: p.id,
+    nome: p.nome,
+    nome_social: p.nome_social ?? null,
+    avatar_path: p.avatar_path ?? null,
+  };
 }
 
 /** Visão "Monitoramento" da coordenação (REALIZA-195 · mock v8b, ordem
@@ -149,7 +159,11 @@ export function AgendaCoordenacao({
         }).mentorado ?? "")
       : (msgsContato({
           eu: meuNome,
-          mentorNome: (dupla.mentor?.nome ?? "").split(" ")[0],
+          mentorNome: (
+            dupla.mentor?.nome_social ||
+            dupla.mentor?.nome ||
+            ""
+          ).split(" ")[0],
           mentoradoNome: nomeJovem,
         }).mentorado ?? "");
     return [{
@@ -170,7 +184,7 @@ export function AgendaCoordenacao({
         : {
             padrao: apoioDoJovem ? ("mentorado" as const) : ("mentor" as const),
             mentor: {
-              nome: dupla.mentor?.nome ?? "mentor",
+              nome: dupla.mentor?.nome_social || dupla.mentor?.nome || "mentor",
               telefone: dupla.mentor?.whatsapp ?? null,
               mensagem: lembreteMentor?.corpo ?? "",
             },

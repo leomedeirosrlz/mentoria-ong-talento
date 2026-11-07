@@ -81,7 +81,7 @@ describe("guardrails", () => {
   it("crise, violência e violação de direitos escalam pra humano", () => {
     expect(prompt).toContain("crise");
     // o assistente não resolve — orienta acionar gente do programa
-    expect(prompt).toContain("Supervisor de Relacionamento");
+    expect(prompt).toContain("auxiliar executivo");
     expect(prompt).toContain("coordenação");
     expect(prompt).toContain("mentoria@realiza.vc");
   });

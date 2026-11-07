@@ -30,6 +30,7 @@ export const GRID_DUPLA_LG =
 export type PessoaLinha = {
   id: string;
   nome: string;
+  nome_social?: string | null;
   avatar_path?: string | null;
   email?: string | null;
 };
@@ -174,7 +175,10 @@ export function DuplaLinha({
           <DuplaAvatares mentor={mentor} mentorado={mentorado} size={32} />
           <div className="min-w-0">
             <p className="text-sm font-semibold leading-snug">
-              <DuplaNomes mentor={mentor.nome} mentorado={mentorado.nome} />
+              <DuplaNomes
+                mentor={mentor.nome_social ?? mentor.nome}
+                mentorado={mentorado.nome_social ?? mentorado.nome}
+              />
             </p>
             {meta && <p className="mt-0.5 text-xs text-muted-foreground">{meta}</p>}
           </div>

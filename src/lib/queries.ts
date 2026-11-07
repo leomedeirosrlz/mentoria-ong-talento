@@ -395,7 +395,7 @@ export const DUPLA_SELECT = `
   mentor:profiles!duplas_mentor_id_fkey(${PROFILE_COLS_PUBLICAS}),
   mentorado:mentorados(${MENTORADO_COLS_PAR}),
   supervisor:profiles!duplas_supervisor_id_fkey(${PROFILE_COLS_PUBLICAS}),
-  encontros(*, registro:registros(id, encontro_id, tema, atividades, avaliacao, dificuldade, dificuldade_detalhe, precisa_apoio, proximo_passo, proximo_passo_detalhe, reflexoes, observacoes, ferramenta, created_at, updated_at, created_by, autor:profiles!registros_created_by_fkey(nome)),
+  encontros(*, registro:registros(id, encontro_id, tema, atividades, avaliacao, dificuldade, dificuldade_detalhe, precisa_apoio, proximo_passo, proximo_passo_detalhe, reflexoes, observacoes, ferramenta, created_at, updated_at, created_by, autor:profiles!registros_created_by_fkey(nome, nome_social)),
     avaliacao_jovem:avaliacoes_encontro(*),
     remarcacoes:encontro_remarcacoes(id, data_anterior, data_nova, motivo, created_at)),
   encaminhamentos(*),
@@ -478,22 +478,26 @@ export const getMinhasDuplas = cache(async (): Promise<Dupla[]> => {
  *  discreto da ficha. */
 export type DuplaVinculo = {
   id: string;
-  mentor: { nome: string } | null;
-  mentorado: { nome: string } | null;
+  mentor: { nome: string; nome_social?: string | null } | null;
+  mentorado: { nome: string; nome_social?: string | null } | null;
 };
 
 const DUPLA_VINCULO_SELECT = `
   id,
-  mentor:profiles!duplas_mentor_id_fkey(nome),
-  mentorado:mentorados(nome)
+  mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+  mentorado:mentorados(nome, nome_social)
 `;
 
 const vinculoDe = (d: Dupla | null | undefined): DuplaVinculo | null =>
   d
     ? {
         id: d.id,
-        mentor: d.mentor ? { nome: d.mentor.nome } : null,
-        mentorado: d.mentorado ? { nome: d.mentorado.nome } : null,
+        mentor: d.mentor
+          ? { nome: d.mentor.nome, nome_social: d.mentor.nome_social }
+          : null,
+        mentorado: d.mentorado
+          ? { nome: d.mentorado.nome, nome_social: d.mentorado.nome_social }
+          : null,
       }
     : null;
 
@@ -654,8 +658,8 @@ export type DuplaPerfil = {
   /** Trilha da dupla (WP6b) — a ficha do mentor híbrido conta vagas por
    *  pool (DPP × especialista), sem ela o X/Y misturava as duas. */
   trilha: Trilha;
-  mentor: { id: string; nome: string; avatar_path?: string | null; email?: string | null } | null;
-  mentorado: { id: string; nome: string; avatar_path?: string | null } | null;
+  mentor: { id: string; nome: string; nome_social?: string | null; avatar_path?: string | null; email?: string | null } | null;
+  mentorado: { id: string; nome: string; nome_social?: string | null; avatar_path?: string | null } | null;
 };
 
 export type PessoaPerfil =
@@ -676,8 +680,8 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   // merge com a view quando o papel alcança; o gravatar cai nas iniciais senão
   const DUPLA_PERFIL_SELECT = `
     id, status, iniciada_em, trilha,
-    mentor:profiles!duplas_mentor_id_fkey(id, nome, avatar_path),
-    mentorado:mentorados(id, nome, avatar_path)
+    mentor:profiles!duplas_mentor_id_fkey(id, nome, nome_social, avatar_path),
+    mentorado:mentorados(id, nome, nome_social, avatar_path)
   `;
   // notas são privadas do autor (0017) — só voltam as minhas; embed de autor
   // seria sempre eu mesmo, então não vale o join
@@ -875,7 +879,7 @@ export const getComunicados = cache(async (): Promise<Comunicado[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("comunicados")
-    .select("id, titulo, corpo, audiencia, prioridade, created_by, created_at, autor:profiles!created_by(nome)")
+    .select("id, titulo, corpo, audiencia, prioridade, created_by, created_at, autor:profiles!created_by(nome, nome_social)")
     // prioridade antes de recência: um urgente antigo ainda ganha o top-5
     // de um informativo novo. prioridade_ord é coluna gerada (0055) — o
     // PostgREST ordena por ela mesmo fora do select
@@ -909,8 +913,8 @@ export type RegistroResumo = Registro & {
       status: DuplaStatus;
       trilha: Trilha;
       cronograma_id: string | null;
-      mentor: { id: string; nome: string; email: string | null; avatar_path: string | null } | null;
-      mentorado: { id: string; nome: string; avatar_path: string | null } | null;
+      mentor: { id: string; nome: string; nome_social?: string | null; email: string | null; avatar_path: string | null } | null;
+      mentorado: { id: string; nome: string; nome_social?: string | null; avatar_path: string | null } | null;
     } | null;
   } | null;
   encaminhamentos: { id: string }[];
@@ -945,15 +949,15 @@ const REGISTRO_RESUMO_SELECT = `
   id, tema, ferramenta, reflexoes, observacoes, precisa_apoio,
   atividades, avaliacao, dificuldade, dificuldade_detalhe,
   proximo_passo, proximo_passo_detalhe, created_at, encontro_id,
-  autor:profiles!registros_created_by_fkey(nome),
+  autor:profiles!registros_created_by_fkey(nome, nome_social),
   encaminhamentos(id),
   anexos:registro_anexos(id),
   encontro:encontros!registros_encontro_id_fkey!inner(
     id, numero, data_hora, realizado_em, status,
     dupla:duplas!encontros_dupla_id_fkey(
       id, status, trilha, cronograma_id,
-      mentor:profiles!duplas_mentor_id_fkey(id, nome, avatar_path),
-      mentorado:mentorados!duplas_mentorado_id_fkey(id, nome, avatar_path)
+      mentor:profiles!duplas_mentor_id_fkey(id, nome, nome_social, avatar_path),
+      mentorado:mentorados!duplas_mentorado_id_fkey(id, nome, nome_social, avatar_path)
     )
   )`;
 
@@ -1152,8 +1156,8 @@ export const getMetricasRegistro = cache(
 export type DuplaOpcao = {
   id: string;
   cronograma_id: string | null;
-  mentor: { nome: string } | null;
-  mentorado: { nome: string } | null;
+  mentor: { nome: string; nome_social?: string | null } | null;
+  mentorado: { nome: string; nome_social?: string | null } | null;
 };
 
 export const getDuplasOpcoes = cache(async (): Promise<DuplaOpcao[]> => {
@@ -1163,7 +1167,7 @@ export const getDuplasOpcoes = cache(async (): Promise<DuplaOpcao[]> => {
   const { data, error } = await supabase
     .from("duplas")
     .select(
-      "id, cronograma_id, mentor:profiles!duplas_mentor_id_fkey(nome), mentorado:mentorados!duplas_mentorado_id_fkey(nome)"
+      "id, cronograma_id, mentor:profiles!duplas_mentor_id_fkey(nome, nome_social), mentorado:mentorados!duplas_mentorado_id_fkey(nome, nome_social)"
     )
     .order("created_at", { ascending: true });
   if (error) throw error;
