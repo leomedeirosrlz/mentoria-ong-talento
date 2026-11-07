@@ -89,6 +89,10 @@ function toolsPayload(papeis: AppRole[] | undefined) {
   let cached = toolsCache.get(chave);
   if (!cached) {
     cached = Object.values(IA_TOOLS)
+      // tools de escrita nunca entram no payload do chat: são MCP-only —
+      // anunciar pro modelo interno só ensinaria a chamar o que o canal
+      // bloqueia (mesma lógica do filtro por papel)
+      .filter((t) => !(t as { escreve?: boolean }).escreve)
       .filter((t) => !papeis || t.roles.some((r) => papeis.includes(r)))
       .map((t) => ({
         type: "function",

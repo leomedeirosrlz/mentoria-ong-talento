@@ -5,13 +5,13 @@
 // cookie) e o envelope (JSON-RPC no lugar de SSE).
 //
 // Auth: `Authorization: Bearer rlz_mcp_…` — a RPC ia_mcp_autorizar
-// resolve sha256 → profile + papéis. Fase 1 é staff: coord + supervisor
-// (gate abaixo — Thiago confirmou supervisor dentro); expandir papel =
-// incluir no check + revisar o allowlist de tools.
-// Execução: client service-role + papéis forçados — como só staff entra
-// na fase 1, o escopo que a RLS daria é o mesmo que o service vê
-// (coord/supervisor enxergam tudo por desenho). Quando outros papéis
-// entrarem, o client vira JWT-impersonado — registrar nesse comentário.
+// resolve sha256 → profile + papéis. Todos os papéis conectam (fase
+// escrita): o gate PAPEIS_MCP cobre o programa inteiro e o allowlist
+// fino mora no `roles` de cada tool.
+// Execução: JWT-impersonado do dono do PAT (clientImpersonado) — a RLS
+// decide o escopo exatamente como no chat; service-role só autentica o
+// token. Tools `escreve` passam pelo envelope pendente_confirmacao (0163):
+// a 1ª chamada devolve prévia sem efeito, a 2ª consome e executa.
 //
 // A rota fica FORA da auth do proxy: o middleware só protege páginas;
 // /api/* passa direto e quem barra é o Bearer aqui.
@@ -27,10 +27,17 @@ import type { AppRole } from "@/lib/types";
 export const dynamic = "force-dynamic";
 export const maxDuration = 30;
 
-// papéis que conectam via MCP na fase 1 — o allowlist de tools foi
-// revisado pro escopo staff (coord/supervisor enxergam tudo; quando um
-// papel de mentor entrar, revisar tools antes de abrir)
-const PAPEIS_MCP: readonly AppRole[] = ["coordenacao", "supervisor"];
+// todos os papéis conectam via MCP (fase escrita): a execução roda sob o
+// JWT real do dono — RLS + allowlist `roles` de cada tool + o envelope
+// pendente_confirmacao pra qualquer escrita; este gate passou a ser só
+// "tem papel no programa", não mais staff-only
+const PAPEIS_MCP: readonly AppRole[] = [
+  "coordenacao",
+  "supervisor",
+  "mentor_dpp",
+  "mentor_especialista",
+  "mentorado",
+];
 
 const Rpc = z.object({
   jsonrpc: z.literal("2.0"),

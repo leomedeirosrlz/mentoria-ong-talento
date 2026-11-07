@@ -48,6 +48,39 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   meu_progresso: {},
   meus_pedidos: {},
   ajuda_faq: { topico: "encontro" },
+  mural_especialista: {},
+  // escrita (MCP + confirmação) — args mínimos válidos por schema
+  abrir_chamado: {
+    categoria: "agenda",
+    assunto: "Remarcar encontro",
+    mensagem: "Preciso trocar o horário da próxima semana.",
+  },
+  comentar_chamado: { chamado_id: UUID, texto: "Atualização" },
+  acrescentar_info_chamado: { chamado_id: UUID, texto: "Detalhe extra" },
+  pedir_reabertura_chamado: { chamado_id: UUID },
+  assumir_chamado: { chamado_id: UUID },
+  atribuir_chamado: { chamado_id: UUID, para: UUID },
+  devolver_chamado_fila: { chamado_id: UUID },
+  resolver_chamado: { chamado_id: UUID, resumo: "Resolvido" },
+  reabrir_chamado: { chamado_id: UUID },
+  publicar_atualizacao_chamado: { chamado_id: UUID, texto: "Atualização" },
+  jovem_marcar_combinado: { combinado_id: UUID, feito: true },
+  jovem_agendar_encontro: {
+    dupla_id: UUID,
+    numero: 8,
+    data_hora: "2026-11-10T19:00:00-03:00",
+  },
+  desmarcar_encontro: { encontro_id: UUID },
+  jovem_marcar_aconteceu: { encontro_id: UUID },
+  jovem_marcar_nao_aconteceu: { encontro_id: UUID },
+  jovem_pedir_especialista: {},
+  confirmar_sugestao_especialista: { solicitacao_id: UUID },
+  aceitar_solicitacao: { solicitacao_id: UUID },
+  contra_propor_solicitacao: {
+    solicitacao_id: UUID,
+    slot: "2026-11-15T19:00:00-03:00",
+  },
+  recusar_solicitacao: { solicitacao_id: UUID, justificativa: "Sem agenda" },
 };
 
 describe("allowlist — forma do registry", () => {

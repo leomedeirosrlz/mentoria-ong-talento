@@ -120,25 +120,46 @@ const dadosDe = (r: Awaited<ReturnType<typeof executarTool>>) => {
 };
 
 describe("registry", () => {
-  it("declara as 17 tools com descrição pt-BR e papéis", () => {
+  it("declara as tools com descrição pt-BR e papéis", () => {
     expect(IA_TOOL_NOMES.sort()).toEqual(
       [
+        "abrir_chamado",
+        "acrescentar_info_chamado",
+        "aceitar_solicitacao",
         "agenda_do_periodo",
         "aguardando_par",
         "ajuda_faq",
+        "assumir_chamado",
+        "atribuir_chamado",
         "capacidade_mentores",
         "chamados_resumo",
+        "comentar_chamado",
+        "confirmar_sugestao_especialista",
+        "contra_propor_solicitacao",
+        "desmarcar_encontro",
+        "devolver_chamado_fila",
         "duplas_do_usuario",
         "ficha_dupla",
         "guia_consulta",
         "instrumentos_da_dupla",
+        "jovem_agendar_encontro",
+        "jovem_marcar_aconteceu",
+        "jovem_marcar_combinado",
+        "jovem_marcar_nao_aconteceu",
+        "jovem_pedir_especialista",
         "meu_progresso",
         "meus_combinados",
         "meus_pedidos",
         "minha_agenda",
         "minha_dupla",
+        "mural_especialista",
+        "pedir_reabertura_chamado",
         "pessoas_busca",
+        "publicar_atualizacao_chamado",
+        "reabrir_chamado",
+        "recusar_solicitacao",
         "registros_da_dupla",
+        "resolver_chamado",
         "resumo_semana",
       ].sort()
     );
@@ -893,5 +914,151 @@ describe("executarTool — auditoria", () => {
       "chat"
     );
     expect(r.ok).toBe(true);
+  });
+});
+
+describe("tools de escrita — canal e confirmação (0163)", () => {
+  const CID = "99999999-8888-4777-8666-555555555555";
+
+  it("tool de escrita não roda no chat — a Liza interna segue leitura", async () => {
+    const { supabase } = supaFake({ papel: "coordenacao" });
+    const r = await executarTool(
+      "resolver_chamado",
+      { chamado_id: UUID, resumo: "x" },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erro).toContain("não está disponível neste canal");
+  });
+
+  it("1ª chamada MCP devolve pendente_confirmacao SEM tocar a RPC de domínio", async () => {
+    const rpcCalls: string[] = [];
+    const { supabase } = supaFake({
+      papel: "coordenacao",
+      rpcData: { ia_confirmacao_criar: CID },
+    });
+    // espia as RPCs chamadas
+    const orig = supabase.rpc.bind(supabase);
+    vi.spyOn(supabase, "rpc").mockImplementation(((n: string, a?: unknown) => {
+      rpcCalls.push(n);
+      return orig(n, a as Record<string, unknown>);
+    }) as never);
+
+    const r = await executarTool(
+      "resolver_chamado",
+      { chamado_id: UUID, resumo: "combinamos novo horário" },
+      supabase,
+      "mcp"
+    );
+    expect(r.ok).toBe(true);
+    const d = dadosDe(r).pendente_confirmacao as Record<string, unknown>;
+    expect(d.confirmacao_id).toBe(CID);
+    expect(d.tool).toBe("resolver_chamado");
+    expect(String(d.resumo)).toContain(UUID);
+    // gravou a prévia; NUNCA chamou a RPC que muta
+    expect(rpcCalls).toContain("ia_confirmacao_criar");
+    expect(rpcCalls).not.toContain("resolver_chamado");
+  });
+
+  it("2ª chamada consome a confirmação e executa a RPC de domínio", async () => {
+    const rpcCalls: string[] = [];
+    const { supabase } = supaFake({
+      papel: "coordenacao",
+      rpcData: { ia_confirmacao_consumir: "Resolver o chamado", resolver_chamado: null },
+    });
+    const orig = supabase.rpc.bind(supabase);
+    vi.spyOn(supabase, "rpc").mockImplementation(((n: string, a?: unknown) => {
+      rpcCalls.push(n);
+      return orig(n, a as Record<string, unknown>);
+    }) as never);
+
+    const r = await executarTool(
+      "resolver_chamado",
+      { chamado_id: UUID, resumo: "combinamos novo horário", confirmacao_id: CID },
+      supabase,
+      "mcp"
+    );
+    expect(r.ok).toBe(true);
+    expect(rpcCalls).toContain("ia_confirmacao_consumir");
+    expect(rpcCalls).toContain("resolver_chamado");
+  });
+
+  it("confirmacao inválida/expirada/divergente (consumir=null) não executa", async () => {
+    const rpcCalls: string[] = [];
+    const { supabase } = supaFake({ papel: "coordenacao" });
+    const orig = supabase.rpc.bind(supabase);
+    vi.spyOn(supabase, "rpc").mockImplementation(((n: string, a?: unknown) => {
+      rpcCalls.push(n);
+      return orig(n, a as Record<string, unknown>);
+    }) as never);
+
+    const r = await executarTool(
+      "resolver_chamado",
+      { chamado_id: UUID, resumo: "x", confirmacao_id: CID },
+      supabase,
+      "mcp"
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erro).toContain("Confirmação inválida");
+    expect(rpcCalls).not.toContain("resolver_chamado");
+  });
+
+  it("gate de papel corre antes da prévia — jovem não resolve chamado", async () => {
+    const rpcCalls: string[] = [];
+    const { supabase } = supaFake({ papel: "mentorado" });
+    const orig = supabase.rpc.bind(supabase);
+    vi.spyOn(supabase, "rpc").mockImplementation(((n: string, a?: unknown) => {
+      rpcCalls.push(n);
+      return orig(n, a as Record<string, unknown>);
+    }) as never);
+
+    const r = await executarTool(
+      "resolver_chamado",
+      { chamado_id: UUID, resumo: "x" },
+      supabase,
+      "mcp"
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erro).toContain("não está disponível pro seu papel");
+    expect(rpcCalls).not.toContain("ia_confirmacao_criar");
+  });
+
+  it("tool do jovem passa pelo mesmo envelope (marcar combinado)", async () => {
+    const { supabase } = supaFake({
+      papel: "mentorado",
+      rpcData: { ia_confirmacao_criar: CID },
+    });
+    const r = await executarTool(
+      "jovem_marcar_combinado",
+      { combinado_id: UUID, feito: true },
+      supabase,
+      "mcp"
+    );
+    expect(r.ok).toBe(true);
+    const d = dadosDe(r).pendente_confirmacao as Record<string, unknown>;
+    expect(d.tool).toBe("jovem_marcar_combinado");
+  });
+
+  it("especialista aceita pedido: envelope → consumo → aceitar_solicitacao", async () => {
+    const rpcCalls: string[] = [];
+    const { supabase } = supaFake({
+      papel: "mentor_especialista",
+      rpcData: { ia_confirmacao_consumir: "Aceitar", aceitar_solicitacao: UUID },
+    });
+    const orig = supabase.rpc.bind(supabase);
+    vi.spyOn(supabase, "rpc").mockImplementation(((n: string, a?: unknown) => {
+      rpcCalls.push(n);
+      return orig(n, a as Record<string, unknown>);
+    }) as never);
+
+    const r = await executarTool(
+      "aceitar_solicitacao",
+      { solicitacao_id: UUID, confirmacao_id: CID },
+      supabase,
+      "mcp"
+    );
+    expect(r.ok).toBe(true);
+    expect(rpcCalls).toContain("aceitar_solicitacao");
   });
 });

@@ -128,6 +128,45 @@ const guiaArgs = z
 
 const semaforoOrd = { risco: 0, atencao: 1, ok: 2 } as const;
 
+// ---------- tools de escrita ----------
+
+/** Sufixo de descrição das tools `escreve` — ensina o client o protocolo de
+ *  2 passos (prévia → confirmação). Fica na descrição porque é o texto que
+ *  o modelo lê pra usar a tool. */
+const ESCRITA_DOC =
+  " AÇÃO EM 2 PASSOS: a primeira chamada devolve {pendente_confirmacao} com a prévia e o confirmacao_id — nada é alterado ainda. Mostre a prévia à pessoa; só depois do 'sim' chame de novo com os MESMOS argumentos mais o campo confirmacao_id. A confirmação expira em 10 minutos e vale uma única vez.";
+
+/** Traduz o retorno das RPCs de escrita (definer): `raise exception` vira
+ *  erro PostgREST com a mensagem em pt-BR; várias devolvem {error:"…"} em
+ *  jsonb. Ambos viram ErroTool — mensagem segura pra devolver ao usuário. */
+async function rpcEscreve(
+  ctx: ContextoIa,
+  fn: string,
+  params: Record<string, unknown>
+): Promise<unknown> {
+  const { data, error } = await ctx.supabase.rpc(fn, params);
+  if (error) throw new ErroTool(error.message || "A ação não foi aceita.");
+  const d = data as { error?: string } | null;
+  if (d && typeof d === "object" && typeof d.error === "string")
+    throw new ErroTool(d.error);
+  return data ?? { ok: true };
+}
+
+/** JSON estável pra casar args na confirmação — chaves ordenadas em
+ *  profundidade, porque a RPC faz digest do texto do jsonb. */
+function canonico(v: unknown): string {
+  return JSON.stringify(v, (_k, x) =>
+    x && typeof x === "object" && !Array.isArray(x)
+      ? Object.keys(x)
+          .sort()
+          .reduce((o: Record<string, unknown>, k) => {
+            o[k] = (x as Record<string, unknown>)[k];
+            return o;
+          }, {})
+      : x
+  );
+}
+
 /** Saída do resumo_semana a partir das duplas vivas — pura, pra a demo
  *  (/demo, dataset em memória) responder pelo MESMO caminho da tool. */
 export function projetarResumo(duplas: DuplaIa[], eventos: CicloEvento[]) {
@@ -137,8 +176,8 @@ export function projetarResumo(duplas: DuplaIa[], eventos: CicloEvento[]) {
     const s = saudadeDaDupla(d as unknown as Dupla, eventos);
     return {
       dupla_id: d.id,
-      mentor: d.mentor?.nome ?? null,
-      mentorado: d.mentorado?.nome ?? null,
+      mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
+      mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
       trilha: d.trilha,
       status: d.status,
       semaforo: s.semaforo,
@@ -192,9 +231,9 @@ export function projetarFicha(d: DuplaIa, eventos: CicloEvento[]) {
     turma: d.turma,
     iniciada_em: d.iniciada_em,
     demanda: d.demanda,
-    mentor: d.mentor?.nome ?? null,
-    mentorado: d.mentorado?.nome ?? null,
-    supervisor: d.supervisor?.nome ?? null,
+    mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
+    mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
+    supervisor: d.supervisor?.nome_social ?? d.supervisor?.nome ?? null,
     semaforo: s.semaforo,
     motivo: s.motivo,
     motivos: s.motivos,
@@ -324,7 +363,7 @@ export const IA_TOOLS = {
         ins.historico
       ).map((m) => ({
         id: m.id,
-        nome: m.nome,
+        nome: m.nome, // FilaItem.nome já vem coalescido (social ?? civil)
         origem: m.origem,
         esperando_desde: m.desde,
       }));
@@ -366,7 +405,7 @@ export const IA_TOOLS = {
           ].filter((t): t is "dpp" | "especialista" => t != null);
           return trilhas.map((trilha) => ({
             mentor_id: p.id,
-            nome: p.nome,
+            nome: p.nome_social ?? p.nome,
             trilha,
             em_uso: ins.contagemPorMentor[`${p.id}:${trilha}`] ?? 0,
             capacidade: tetoMentor(p, ins.mentorProfiles[p.id], trilha),
@@ -395,8 +434,8 @@ export const IA_TOOLS = {
         truncado: total > duplas.length,
         duplas: duplas.map((d) => ({
           dupla_id: d.id,
-          mentor: d.mentor?.nome ?? null,
-          mentorado: d.mentorado?.nome ?? null,
+          mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
+          mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
           trilha: d.trilha,
           status: d.status,
           turma: d.turma,
@@ -424,8 +463,9 @@ export const IA_TOOLS = {
         total: encontros.length,
         encontros: encontros.map((e) => ({
           dupla_id: e.dupla.id,
-          mentor: e.dupla.mentor?.nome ?? null,
-          mentorado: e.dupla.mentorado?.nome ?? null,
+          mentor: e.dupla.mentor?.nome_social ?? e.dupla.mentor?.nome ?? null,
+          mentorado:
+            e.dupla.mentorado?.nome_social ?? e.dupla.mentorado?.nome ?? null,
           numero: e.numero,
           status: e.status,
           data_hora: e.data_hora,
@@ -475,6 +515,9 @@ export const IA_TOOLS = {
         total: itens.length,
         ...porStatus,
         chamados: itens.map((c) => ({
+          // id vai junto: as tools de escrita de chamado (MCP) endereçam
+          // por uuid — o número CHA segue fora por ser ruído de protocolo
+          id: c.id,
           numero: c.numero,
           categoria: c.categoria,
           assunto: c.assunto,
@@ -591,6 +634,9 @@ export const IA_TOOLS = {
       );
       return {
         proximos: proximos.map((e) => ({
+          // id vai junto: as tools de escrita do jovem (desmarcar,
+          // marcar aconteceu/não aconteceu) endereçam o encontro por uuid
+          id: e.id,
           dupla_id: e.dupla_id,
           mentor: nomes.get(e.dupla_id) ?? null,
           numero: e.numero,
@@ -617,6 +663,8 @@ export const IA_TOOLS = {
       if (!pendentes.length && !feitos.length) return null;
       return {
         pendentes: pendentes.map((c) => ({
+          // id pra jovem_marcar_combinado (MCP) endereçar por uuid
+          id: c.id,
           texto: c.texto,
           prazo: c.prazo,
           criado_em: c.created_at,
@@ -664,7 +712,14 @@ export const IA_TOOLS = {
       if (!lista.length) return null;
       return {
         pedidos: lista.map((p) => ({
-          especialista: p.especialista_nome,
+          // id pra confirmar_sugestao_especialista (MCP) endereçar o pedido
+          id: p.id,
+          especialista:
+            p.especialista_nome_social ??
+            p.especialista_nome ??
+            // pedido 'sugerida' sem aceite ainda: mostra quem foi sugerido
+            p.especialista_desejado_nome ??
+            null,
           sobre: p.demanda ?? p.motivo,
           status: p.status_efetivo ?? p.status,
           criado_em: p.created_at,
@@ -711,6 +766,520 @@ export const IA_TOOLS = {
       };
     },
   },
+
+  // ---------- leitura complementar das tools de escrita ----------
+
+  mural_especialista: {
+    nome: "mural_especialista",
+    descricao:
+      "Mural de pedidos de especialista no escopo do papel (a view solicitacoes_mural escopa sozinha: coord tudo, especialista os abertos + os dele, mentor DPP os das duplas dele). Devolve o id de cada pedido — é o id que as tools de escrita de especialista consomem. Use pra 'quais pedidos chegaram?', 'o que tá esperando especialista'.",
+    schema: semArgs,
+    roles: ["coordenacao", "supervisor", "mentor_especialista", "mentor_dpp"],
+    run: async (_args: z.infer<typeof semArgs>, ctx) => {
+      const { data, error } = await ctx.supabase
+        .from("solicitacoes_mural")
+        .select(
+          "id, status, status_efetivo, demanda, motivo, slot_proposto, origem, turma, mentorado_nome, mentorado_nome_social, especialista_nome, especialista_nome_social, created_at"
+        )
+        .order("created_at", { ascending: false })
+        .limit(40);
+      if (error) throw error;
+      return {
+        pedidos: (data ?? []).map((p) => ({
+          ...p,
+          mentorado: p.mentorado_nome_social ?? p.mentorado_nome,
+          especialista: p.especialista_nome_social ?? p.especialista_nome,
+          mentorado_nome: undefined,
+          mentorado_nome_social: undefined,
+          especialista_nome: undefined,
+          especialista_nome_social: undefined,
+        })),
+      };
+    },
+  },
+
+  // ---------- escrita (só MCP; 2 passos com confirmação) ----------
+  //
+  // `escreve: true` muda o contrato no executarTool: a 1ª chamada NÃO roda
+  // `run` — grava a prévia em ia_confirmacoes (0163) e devolve
+  // {pendente_confirmacao: {confirmacao_id, resumo, args}}; a 2ª repete os
+  // mesmos argumentos + `confirmacao_id`, a RPC consome atomicamente (uso
+  // único, dono, mesma tool e mesmo hash de args) e aí o `run` executa.
+  // A RLS/RPC definer segura o domínio; este envelope é a prova de
+  // intenção humana — e só existe no canal MCP por enquanto.
+
+  abrir_chamado: {
+    nome: "abrir_chamado",
+    descricao:
+      "Abre um chamado de apoio pra equipe (a própria pessoa é a autora)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        categoria: z
+          .enum(["agenda", "metodologia", "plataforma", "urgencia", "outro"])
+          .describe("categoria do pedido"),
+        assunto: z.string().min(2).max(200).describe("assunto em uma linha"),
+        mensagem: z
+          .string()
+          .min(1)
+          .max(4000)
+          .describe("primeira mensagem ao apoio"),
+        descricao_outro: z
+          .string()
+          .max(280)
+          .optional()
+          .describe("obrigatória quando categoria=outro"),
+        dupla_id: z
+          .uuid()
+          .optional()
+          .describe("dupla ligada ao pedido, se houver"),
+      })
+      .strict(),
+    roles: TODOS_PAPEIS,
+    escreve: true,
+    resumo: (a: { categoria: string; assunto: string }) =>
+      `Abrir chamado "${a.assunto}" (categoria ${a.categoria})`,
+    run: async (
+      a: {
+        categoria: string;
+        assunto: string;
+        mensagem: string;
+        descricao_outro?: string;
+        dupla_id?: string;
+      },
+      ctx
+    ) =>
+      rpcEscreve(ctx, "abrir_chamado", {
+        p_categoria: a.categoria,
+        p_assunto: a.assunto,
+        p_mensagem: a.mensagem,
+        p_descricao_outro: a.descricao_outro ?? null,
+        p_dupla_id: a.dupla_id ?? null,
+      }),
+  },
+
+  comentar_chamado: {
+    nome: "comentar_chamado",
+    descricao:
+      "Escreve no chamado como a pessoa logada (autor vira mensagem pública; equipe vira nota ou resposta conforme a RPC decide)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        chamado_id: z.uuid().describe("id do chamado (uuid — chamados_resumo lista)"),
+        texto: z.string().min(1).max(4000),
+      })
+      .strict(),
+    roles: TODOS_PAPEIS,
+    escreve: true,
+    resumo: (a: { chamado_id: string }) =>
+      `Comentar no chamado ${a.chamado_id}`,
+    run: async (a: { chamado_id: string; texto: string }, ctx) =>
+      rpcEscreve(ctx, "comentar_chamado", {
+        p_id: a.chamado_id,
+        p_texto: a.texto,
+      }),
+  },
+
+  acrescentar_info_chamado: {
+    nome: "acrescentar_info_chamado",
+    descricao:
+      "Acrescenta informação ao próprio chamado aberto (só o autor; a RPC barra os demais)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        chamado_id: z.uuid(),
+        texto: z.string().min(1).max(4000),
+      })
+      .strict(),
+    roles: TODOS_PAPEIS,
+    escreve: true,
+    resumo: (a: { chamado_id: string }) =>
+      `Acrescentar informação ao chamado ${a.chamado_id}`,
+    run: async (a: { chamado_id: string; texto: string }, ctx) =>
+      rpcEscreve(ctx, "acrescentar_info_chamado", {
+        p_id: a.chamado_id,
+        p_texto: a.texto,
+      }),
+  },
+
+  pedir_reabertura_chamado: {
+    nome: "pedir_reabertura_chamado",
+    descricao:
+      "Pede a reabertura de um chamado resolvido do qual a pessoa é autora." +
+      ESCRITA_DOC,
+    schema: z.object({ chamado_id: z.uuid() }).strict(),
+    roles: TODOS_PAPEIS,
+    escreve: true,
+    resumo: (a: { chamado_id: string }) =>
+      `Pedir reabertura do chamado ${a.chamado_id}`,
+    run: async (a: { chamado_id: string }, ctx) =>
+      rpcEscreve(ctx, "pedir_reabertura_chamado", { p_id: a.chamado_id }),
+  },
+
+  assumir_chamado: {
+    nome: "assumir_chamado",
+    descricao:
+      "Assume um chamado da fila como dono (equipe)." + ESCRITA_DOC,
+    schema: z.object({ chamado_id: z.uuid() }).strict(),
+    roles: ["coordenacao", "supervisor"],
+    escreve: true,
+    resumo: (a: { chamado_id: string }) => `Assumir o chamado ${a.chamado_id}`,
+    run: async (a: { chamado_id: string }, ctx) =>
+      rpcEscreve(ctx, "assumir_chamado", { p_id: a.chamado_id }),
+  },
+
+  atribuir_chamado: {
+    nome: "atribuir_chamado",
+    descricao:
+      "Atribui um chamado a outra pessoa da equipe (para = profile_id, pessoas_busca lista)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        chamado_id: z.uuid(),
+        para: z.uuid().describe("profile_id do novo dono"),
+      })
+      .strict(),
+    roles: ["coordenacao", "supervisor"],
+    escreve: true,
+    resumo: (a: { chamado_id: string; para: string }) =>
+      `Atribuir o chamado ${a.chamado_id} para ${a.para}`,
+    run: async (a: { chamado_id: string; para: string }, ctx) =>
+      rpcEscreve(ctx, "atribuir_chamado", {
+        p_id: a.chamado_id,
+        p_para: a.para,
+      }),
+  },
+
+  devolver_chamado_fila: {
+    nome: "devolver_chamado_fila",
+    descricao: "Devolve o chamado à fila sem dono (equipe)." + ESCRITA_DOC,
+    schema: z.object({ chamado_id: z.uuid() }).strict(),
+    roles: ["coordenacao", "supervisor"],
+    escreve: true,
+    resumo: (a: { chamado_id: string }) =>
+      `Devolver o chamado ${a.chamado_id} à fila`,
+    run: async (a: { chamado_id: string }, ctx) =>
+      rpcEscreve(ctx, "devolver_chamado_fila", { p_id: a.chamado_id }),
+  },
+
+  resolver_chamado: {
+    nome: "resolver_chamado",
+    descricao:
+      "Marca o chamado como resolvido com o resumo da solução (equipe)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        chamado_id: z.uuid(),
+        resumo: z.string().min(1).max(2000),
+      })
+      .strict(),
+    roles: ["coordenacao", "supervisor"],
+    escreve: true,
+    resumo: (a: { chamado_id: string }) => `Resolver o chamado ${a.chamado_id}`,
+    run: async (a: { chamado_id: string; resumo: string }, ctx) =>
+      rpcEscreve(ctx, "resolver_chamado", {
+        p_id: a.chamado_id,
+        p_resumo: a.resumo,
+      }),
+  },
+
+  reabrir_chamado: {
+    nome: "reabrir_chamado",
+    descricao: "Reabre um chamado resolvido (equipe)." + ESCRITA_DOC,
+    schema: z.object({ chamado_id: z.uuid() }).strict(),
+    roles: ["coordenacao", "supervisor"],
+    escreve: true,
+    resumo: (a: { chamado_id: string }) => `Reabrir o chamado ${a.chamado_id}`,
+    run: async (a: { chamado_id: string }, ctx) =>
+      rpcEscreve(ctx, "reabrir_chamado", { p_id: a.chamado_id }),
+  },
+
+  publicar_atualizacao_chamado: {
+    nome: "publicar_atualizacao_chamado",
+    descricao:
+      "Publica uma atualização visível pro autor no chamado em atendimento (equipe)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        chamado_id: z.uuid(),
+        texto: z.string().min(1).max(4000),
+      })
+      .strict(),
+    roles: ["coordenacao", "supervisor"],
+    escreve: true,
+    resumo: (a: { chamado_id: string }) =>
+      `Publicar atualização no chamado ${a.chamado_id}`,
+    run: async (a: { chamado_id: string; texto: string }, ctx) =>
+      rpcEscreve(ctx, "publicar_atualizacao_chamado", {
+        p_id: a.chamado_id,
+        p_texto: a.texto,
+      }),
+  },
+
+  jovem_marcar_combinado: {
+    nome: "jovem_marcar_combinado",
+    descricao:
+      "Marca um combinado do jovem como feito ou desfaz a marca (meus_combinados lista o id)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        combinado_id: z.uuid(),
+        feito: z.boolean(),
+      })
+      .strict(),
+    roles: ["mentorado"],
+    escreve: true,
+    resumo: (a: { combinado_id: string; feito: boolean }) =>
+      `${a.feito ? "Marcar feito" : "Desmarcar"} o combinado ${a.combinado_id}`,
+    run: async (a: { combinado_id: string; feito: boolean }, ctx) =>
+      rpcEscreve(ctx, "marcar_combinado", {
+        p_id: a.combinado_id,
+        p_feito: a.feito,
+      }),
+  },
+
+  jovem_agendar_encontro: {
+    nome: "jovem_agendar_encontro",
+    descricao:
+      "Agenda um encontro da dupla DPP do jovem (número do encontro + data/hora; link e motivo opcionais)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        dupla_id: z.uuid().describe("id da dupla DPP (minha_dupla lista)"),
+        numero: z.number().int().min(1).max(16).describe("número do encontro"),
+        data_hora: z
+          .string()
+          .describe("data/hora ISO 8601 com fuso, ex. 2026-11-10T19:00:00-03:00"),
+        link: z.string().max(500).optional().describe("link da chamada"),
+        motivo: z
+          .string()
+          .max(280)
+          .optional()
+          .describe("motivo quando é remarcação"),
+      })
+      .strict(),
+    roles: ["mentorado"],
+    escreve: true,
+    resumo: (a: { numero: number; data_hora: string }) =>
+      `Agendar o ${a.numero}º encontro em ${a.data_hora}`,
+    run: async (
+      a: {
+        dupla_id: string;
+        numero: number;
+        data_hora: string;
+        link?: string;
+        motivo?: string;
+      },
+      ctx
+    ) =>
+      rpcEscreve(ctx, "agendar_encontro_mentorado", {
+        p_dupla: a.dupla_id,
+        p_numero: a.numero,
+        p_data_hora: a.data_hora,
+        p_link: a.link ?? null,
+        p_motivo: a.motivo ?? null,
+      }),
+  },
+
+  desmarcar_encontro: {
+    nome: "desmarcar_encontro",
+    descricao:
+      "Desmarca um encontro agendado futuro (bilateral: mentor da dupla, jovem ou coordenação; encontro passado não se apaga — marque como não realizado). A minha_agenda/agenda_do_periodo lista o id." +
+      ESCRITA_DOC,
+    schema: z.object({ encontro_id: z.uuid() }).strict(),
+    roles: ["mentor_dpp", "mentorado", "coordenacao"],
+    escreve: true,
+    resumo: (a: { encontro_id: string }) =>
+      `Desmarcar o encontro ${a.encontro_id}`,
+    run: async (a: { encontro_id: string }, ctx) =>
+      rpcEscreve(ctx, "desmarcar_encontro", { p_encontro: a.encontro_id }),
+  },
+
+  jovem_marcar_aconteceu: {
+    nome: "jovem_marcar_aconteceu",
+    descricao:
+      "Confirma que o encontro da dupla do jovem aconteceu (minha_agenda lista o id)." +
+      ESCRITA_DOC,
+    schema: z.object({ encontro_id: z.uuid() }).strict(),
+    roles: ["mentorado"],
+    escreve: true,
+    resumo: (a: { encontro_id: string }) =>
+      `Confirmar que o encontro ${a.encontro_id} aconteceu`,
+    run: async (a: { encontro_id: string }, ctx) =>
+      rpcEscreve(ctx, "marcar_aconteceu_mentorado", {
+        p_encontro: a.encontro_id,
+      }),
+  },
+
+  jovem_marcar_nao_aconteceu: {
+    nome: "jovem_marcar_nao_aconteceu",
+    descricao:
+      "Marca que o encontro passado não aconteceu (minha_agenda lista o id)." +
+      ESCRITA_DOC,
+    schema: z.object({ encontro_id: z.uuid() }).strict(),
+    roles: ["mentorado"],
+    escreve: true,
+    resumo: (a: { encontro_id: string }) =>
+      `Marcar o encontro ${a.encontro_id} como não realizado`,
+    run: async (a: { encontro_id: string }, ctx) =>
+      rpcEscreve(ctx, "marcar_nao_aconteceu_mentorado", {
+        p_encontro: a.encontro_id,
+      }),
+  },
+
+  jovem_pedir_especialista: {
+    nome: "jovem_pedir_especialista",
+    descricao:
+      "Pede um mentor especialista (demanda/motivo em texto livre; especialista_id e slot só quando a pessoa já sabe quem e quando)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        especialista_id: z
+          .uuid()
+          .optional()
+          .describe("profile_id do especialista desejado, se escolhido"),
+        demanda: z
+          .string()
+          .max(2000)
+          .optional()
+          .describe("o que a pessoa quer trabalhar"),
+        motivo: z.string().max(2000).optional(),
+        slot: z
+          .string()
+          .optional()
+          .describe("horário preferido ISO 8601 com fuso"),
+      })
+      .strict(),
+    roles: ["mentorado"],
+    escreve: true,
+    resumo: () => `Pedir um mentor especialista`,
+    run: async (
+      a: {
+        especialista_id?: string;
+        demanda?: string;
+        motivo?: string;
+        slot?: string;
+      },
+      ctx
+    ) =>
+      rpcEscreve(ctx, "pedir_especialista_jovem", {
+        p_especialista_id: a.especialista_id ?? null,
+        p_demanda: a.demanda ?? null,
+        p_motivo: a.motivo ?? null,
+        p_slot: a.slot ?? null,
+      }),
+  },
+
+  confirmar_sugestao_especialista: {
+    nome: "confirmar_sugestao_especialista",
+    descricao:
+      "Aceita a sugestão de especialista que a equipe fez pro jovem (meus_pedidos lista o id do pedido sugerido)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        solicitacao_id: z.uuid(),
+        demanda: z.string().max(2000).optional(),
+        objetivo: z.string().max(2000).optional(),
+        especialista_id: z.uuid().optional(),
+      })
+      .strict(),
+    roles: ["mentorado"],
+    escreve: true,
+    resumo: () => `Aceitar a sugestão de especialista`,
+    run: async (
+      a: {
+        solicitacao_id: string;
+        demanda?: string;
+        objetivo?: string;
+        especialista_id?: string;
+      },
+      ctx
+    ) =>
+      rpcEscreve(ctx, "confirmar_sugestao_especialista", {
+        p_id: a.solicitacao_id,
+        p_demanda: a.demanda ?? null,
+        p_objetivo: a.objetivo ?? null,
+        p_especialista_id: a.especialista_id ?? null,
+      }),
+  },
+
+  aceitar_solicitacao: {
+    nome: "aceitar_solicitacao",
+    descricao:
+      "Aceita um pedido de mentor especialista do mural (mural_especialista lista o id; slot opcional marca a primeira sessão)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        solicitacao_id: z.uuid(),
+        slot: z
+          .string()
+          .optional()
+          .describe("data/hora da primeira sessão ISO 8601 com fuso"),
+      })
+      .strict(),
+    roles: ["mentor_especialista"],
+    escreve: true,
+    resumo: (a: { solicitacao_id: string }) =>
+      `Aceitar o pedido de especialista ${a.solicitacao_id}`,
+    run: async (a: { solicitacao_id: string; slot?: string }, ctx) =>
+      rpcEscreve(ctx, "aceitar_solicitacao", {
+        p_id: a.solicitacao_id,
+        p_slot: a.slot ?? null,
+      }),
+  },
+
+  contra_propor_solicitacao: {
+    nome: "contra_propor_solicitacao",
+    descricao:
+      "Contra-propõe outro horário pra um pedido de especialista (mural_especialista lista o id)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        solicitacao_id: z.uuid(),
+        slot: z
+          .string()
+          .describe("horário proposto ISO 8601 com fuso"),
+        mensagem: z.string().max(2000).optional(),
+      })
+      .strict(),
+    roles: ["mentor_especialista"],
+    escreve: true,
+    resumo: (a: { slot: string }) => `Contra-propor horário ${a.slot}`,
+    run: async (
+      a: { solicitacao_id: string; slot: string; mensagem?: string },
+      ctx
+    ) =>
+      rpcEscreve(ctx, "contra_propor_solicitacao", {
+        p_id: a.solicitacao_id,
+        p_slot: a.slot,
+        p_mensagem: a.mensagem ?? null,
+      }),
+  },
+
+  recusar_solicitacao: {
+    nome: "recusar_solicitacao",
+    descricao:
+      "Recusa um pedido de especialista com justificativa (mural_especialista lista o id)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        solicitacao_id: z.uuid(),
+        justificativa: z.string().min(1).max(2000),
+      })
+      .strict(),
+    roles: ["mentor_especialista"],
+    escreve: true,
+    resumo: (a: { solicitacao_id: string }) =>
+      `Recusar o pedido de especialista ${a.solicitacao_id}`,
+    run: async (
+      a: { solicitacao_id: string; justificativa: string },
+      ctx
+    ) =>
+      rpcEscreve(ctx, "recusar_solicitacao", {
+        p_id: a.solicitacao_id,
+        p_justificativa: a.justificativa,
+      }),
+  },
 } satisfies Record<
   string,
   {
@@ -718,8 +1287,10 @@ export const IA_TOOLS = {
     descricao: string;
     schema: z.ZodType;
     roles: readonly Papel[];
-    // `args: never` é o supertipo universal de qualquer run — o satisfies
-    // confere a forma sem apagar o tipo preciso de cada schema
+    escreve?: boolean;
+    // `args: never` é o supertipo universal de qualquer run/resumo — o
+    // satisfies confere a forma sem apagar o tipo preciso de cada schema
+    resumo?: (args: never) => string;
     run: (args: never, ctx: ContextoIa) => Promise<unknown>;
   }
 >;
@@ -767,6 +1338,17 @@ function argsParaLog(v: unknown): Record<string, unknown> {
 const ARGS_MINIMIZADOS: Record<string, readonly string[]> = {
   guia_consulta: ["pergunta"],
   pessoas_busca: ["nome"],
+  // texto livre das tools de escrita — o ledger guarda a ação, não a fala
+  abrir_chamado: ["assunto", "mensagem", "descricao_outro"],
+  comentar_chamado: ["texto"],
+  acrescentar_info_chamado: ["texto"],
+  resolver_chamado: ["resumo"],
+  publicar_atualizacao_chamado: ["texto"],
+  jovem_pedir_especialista: ["demanda", "motivo"],
+  confirmar_sugestao_especialista: ["demanda", "objetivo"],
+  contra_propor_solicitacao: ["mensagem"],
+  recusar_solicitacao: ["justificativa"],
+  jovem_agendar_encontro: ["motivo", "link"],
 };
 
 function argsMinimizados(
@@ -855,7 +1437,36 @@ export async function executarTool(
       | undefined;
     if (!tool) throw new ErroTool(`Tool desconhecida: ${nome}`);
 
-    const parsed = tool.schema.safeParse(args ?? {});
+    // tools de escrita são MCP-only por enquanto: a Liza interna segue
+    // leitura até o card de confirmação existir no chat
+    if ((tool as { escreve?: boolean }).escreve && canal !== "mcp") {
+      throw new ErroTool(
+        "Esta ação ainda não está disponível neste canal — pelo app ela fica na tela correspondente."
+      );
+    }
+
+    // `confirmacao_id` chega fora do schema (a prévia instrui a repetição
+    // com ele) — sai antes do parse e nunca entra no hash nem no log
+    const confirmacaoId =
+      (tool as { escreve?: boolean }).escreve &&
+      args &&
+      typeof args === "object" &&
+      !Array.isArray(args)
+        ? (args as Record<string, unknown>).confirmacao_id
+        : undefined;
+    const argsDominio =
+      (tool as { escreve?: boolean }).escreve &&
+      args &&
+      typeof args === "object" &&
+      !Array.isArray(args)
+        ? Object.fromEntries(
+            Object.entries(args as Record<string, unknown>).filter(
+              ([k]) => k !== "confirmacao_id"
+            )
+          )
+        : args;
+
+    const parsed = tool.schema.safeParse(argsDominio ?? {});
     if (!parsed.success)
       throw new ErroTool(`Argumentos inválidos: ${resumoZod(parsed.error)}`);
     argsLog = argsParaLog(parsed.data);
@@ -871,10 +1482,62 @@ export async function executarTool(
     if (!papel)
       throw new ErroTool("Esta consulta não está disponível pro seu papel.");
 
-    // `parsed.data` já passou no schema da própria tool — o `as never`
-    // casa com a união dos params tipados de cada run
-    dados = await tool.run(parsed.data as never, { supabase, papel });
-    ok = true;
+    if ((tool as { escreve?: boolean }).escreve) {
+      // 2 passos: sem confirmacao_id grava a prévia e devolve o envelope
+      // (ok=true, sem efeito); com ele consome atomicamente (dono, mesma
+      // tool, mesmo hash, uso único, não expirado) e só então executa
+      const resumo =
+        (tool as { resumo?: (a: never) => string }).resumo?.(
+          parsed.data as never
+        ) ?? `${tool.nome} ${canonico(parsed.data)}`.slice(0, 300);
+      if (typeof confirmacaoId !== "string" || !confirmacaoId) {
+        const { data: cid, error: eCriar } = await supabase.rpc(
+          "ia_confirmacao_criar",
+          { p_tool: nome, p_args: parsed.data, p_resumo: resumo }
+        );
+        if (eCriar || !cid) {
+          console.error("ia_confirmacao_criar:", eCriar);
+          throw new ErroTool(
+            "Não consegui preparar a confirmação — tente de novo."
+          );
+        }
+        dados = {
+          pendente_confirmacao: {
+            confirmacao_id: cid,
+            tool: nome,
+            args: parsed.data,
+            resumo,
+            expira_em_minutos: 10,
+            instrucao:
+              "Nada foi alterado ainda. Para executar, chame a mesma tool com os mesmos argumentos mais confirmacao_id.",
+          },
+        };
+        ok = true;
+      } else {
+        const { data: consumida, error: eConsumir } = await supabase.rpc(
+          "ia_confirmacao_consumir",
+          { p_id: confirmacaoId, p_tool: nome, p_args: parsed.data }
+        );
+        if (eConsumir) {
+          console.error("ia_confirmacao_consumir:", eConsumir);
+          throw new ErroTool(
+            "Não consegui validar a confirmação — tente de novo."
+          );
+        }
+        if (!consumida) {
+          throw new ErroTool(
+            "Confirmação inválida, expirada ou já utilizada (ou os argumentos mudaram) — peça a prévia de novo."
+          );
+        }
+        dados = await tool.run(parsed.data as never, { supabase, papel });
+        ok = true;
+      }
+    } else {
+      // `parsed.data` já passou no schema da própria tool — o `as never`
+      // casa com a união dos params tipados de cada run
+      dados = await tool.run(parsed.data as never, { supabase, papel });
+      ok = true;
+    }
   } catch (e) {
     if (e instanceof ErroTool) {
       erro = e.message;

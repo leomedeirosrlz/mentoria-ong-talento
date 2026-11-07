@@ -58,9 +58,9 @@ export const papeisDoUsuario = cache(
  *  ampliar aqui junto (o type DuplaIa mostra o que a tool enxerga). */
 export const IA_SAUDE_SELECT = `
   id, turma, trilha, status, cronograma_id, iniciada_em, demanda,
-  mentor:profiles!duplas_mentor_id_fkey(nome),
-  mentorado:mentorados(nome),
-  supervisor:profiles!duplas_supervisor_id_fkey(nome),
+  mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+  mentorado:mentorados(nome, nome_social),
+  supervisor:profiles!duplas_supervisor_id_fkey(nome, nome_social),
   encontros(
     numero, status, data_hora, realizado_em,
     registro:registros(precisa_apoio, avaliacao, dificuldade),
@@ -80,9 +80,9 @@ export type DuplaIa = {
   cronograma_id: string | null;
   iniciada_em: string | null;
   demanda: string | null;
-  mentor: { nome: string } | null;
-  mentorado: { nome: string } | null;
-  supervisor: { nome: string } | null;
+  mentor: { nome: string; nome_social: string | null } | null;
+  mentorado: { nome: string; nome_social: string | null } | null;
+  supervisor: { nome: string; nome_social: string | null } | null;
   encontros: {
     numero: number;
     status: string;
@@ -231,6 +231,7 @@ export type PessoaFilaIa = Pick<
   Profile,
   | "id"
   | "nome"
+  | "nome_social"
   | "role"
   | "papeis"
   | "ativo"
@@ -244,6 +245,7 @@ export type MentoradoFilaIa = Pick<
   Mentorado,
   | "id"
   | "nome"
+  | "nome_social"
   | "ong_origem"
   | "origem"
   | "situacao"
@@ -271,11 +273,11 @@ export const getFilaInsumos = cache(
         supabase
           .from("profiles")
           .select(
-            "id, nome, role, ativo, origem, consent_lgpd_em, created_at, profile_papeis(papel)"
+            "id, nome, nome_social, role, ativo, origem, consent_lgpd_em, created_at, profile_papeis(papel)"
           ),
         supabase
           .from("mentorados")
-          .select("id, nome, ong_origem, origem, situacao, created_at"),
+          .select("id, nome, nome_social, ong_origem, origem, situacao, created_at"),
         getCarimboMap(supabase, "profiles_pessoal"),
         getCarimboMap(supabase, "mentorados_pessoal"),
         supabase.from("duplas").select("mentor_id, mentorado_id, status, trilha"),
@@ -338,14 +340,17 @@ export const getCapacidadeInsumos = cache(
   async (
     supabase: SupabaseClient
   ): Promise<{
-    pessoas: Pick<Profile, "id" | "nome" | "role" | "papeis" | "ativo">[];
+    pessoas: Pick<
+      Profile,
+      "id" | "nome" | "nome_social" | "role" | "papeis" | "ativo"
+    >[];
     mentorProfiles: Record<string, MentorProfile>;
     contagemPorMentor: Record<string, number>;
   }> => {
     const [pessoas, duplas, mps] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, nome, role, ativo, profile_papeis(papel)"),
+        .select("id, nome, nome_social, role, ativo, profile_papeis(papel)"),
       supabase.from("duplas").select("mentor_id, status, trilha"),
       supabase
         .from("mentor_profiles")
@@ -372,7 +377,7 @@ export const getCapacidadeInsumos = cache(
     return {
       pessoas: ((pessoas.data ?? []) as (Pick<
         Profile,
-        "id" | "nome" | "role" | "ativo"
+        "id" | "nome" | "nome_social" | "role" | "ativo"
       > & { profile_papeis?: { papel: AppRole }[] })[]).map((p) => {
         const { profile_papeis, ...rest } = p;
         return {
@@ -456,8 +461,8 @@ export type DuplaResumoIa = {
   trilha: Trilha;
   status: DuplaStatus;
   turma: string;
-  mentor: { nome: string } | null;
-  mentorado: { nome: string } | null;
+  mentor: { nome: string; nome_social: string | null } | null;
+  mentorado: { nome: string; nome_social: string | null } | null;
 };
 
 /** Índice enxuto das duplas vivas no escopo do papel — é como o modelo
@@ -476,8 +481,8 @@ export const getDuplasResumoIa = cache(
       .from("duplas")
       .select(
         `id, trilha, status, turma,
-         mentor:profiles!duplas_mentor_id_fkey(nome),
-         mentorado:mentorados(nome)`,
+         mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+         mentorado:mentorados(nome, nome_social)`,
         { count: "exact" }
       )
       .in("status", ["ativa", "pausada"])
@@ -508,8 +513,8 @@ export const getAgendaPeriodoIa = cache(
         `numero, status, data_hora, realizado_em,
          dupla:duplas!inner(
            id,
-           mentor:profiles!duplas_mentor_id_fkey(nome),
-           mentorado:mentorados(nome)
+           mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+           mentorado:mentorados(nome, nome_social)
          )`
       )
       .gte("data_hora", desdeIso)
@@ -524,8 +529,8 @@ export const getAgendaPeriodoIa = cache(
       realizado_em: string | null;
       dupla: {
         id: string;
-        mentor: { nome: string } | null;
-        mentorado: { nome: string } | null;
+        mentor: { nome: string; nome_social: string | null } | null;
+        mentorado: { nome: string; nome_social: string | null } | null;
       };
     }[];
   }
@@ -717,6 +722,7 @@ const cachePainelIa = new CacheTtl<PainelIaDados>(PAINEL_IA_TTL_MS, 3);
 
 export function limparCachePainelIa() {
   cachePainelIa.limpar();
+  cacheConsumoPlano.limpar();
 }
 
 /** Chave do cache do painel, ou null = não cachear. Exceção consciente ao
@@ -771,6 +777,43 @@ export async function getPainelIa(
   const chave = chavePainelIa(papel, dias);
   return chave
     ? cachePainelIa.obter(chave, carregar, () => !semNomes)
+    : carregar();
+}
+
+/** Consumo do plano Go pra previsão do painel /ia: só modelo, allowance e
+ *  data das respostas desde `desdeMs` (começo do ciclo ou 30 dias), sem
+ *  depender do período escolhido nos chips. Select de 3 colunas e só
+ *  linhas com allowance: a leitura mais barata que responde "o plano
+ *  aguenta até renovar?". Mesmo cache coord-only de 60s do painel. */
+const cacheConsumoPlano = new CacheTtl<Record<string, unknown>[]>(PAINEL_IA_TTL_MS, 2);
+
+export async function getConsumoPlanoIa(
+  supabase: SupabaseClient,
+  papel: AppRole | null | undefined,
+  desdeMs: number
+): Promise<Record<string, unknown>[]> {
+  // arredonda pra hora cheia: a chave do cache e o filtro andam juntos
+  const desde = new Date(Math.floor(desdeMs / 3600_000) * 3600_000).toISOString();
+  const carregar = async () => {
+    const linhas: Record<string, unknown>[] = [];
+    for (let i = 0; i < IA_EVENTOS_TETO; i += IA_EVENTOS_PAGINA) {
+      const { data, error } = await supabase
+        .from("ia_eventos")
+        .select("modelo, allowance_usd, created_at")
+        .eq("tool", "resposta")
+        .not("allowance_usd", "is", null)
+        .gte("created_at", desde)
+        .order("created_at", { ascending: false })
+        .range(i, i + IA_EVENTOS_PAGINA - 1);
+      if (error) throw error;
+      linhas.push(...(data ?? []));
+      if ((data ?? []).length < IA_EVENTOS_PAGINA) break;
+    }
+    return linhas;
+  };
+  const base = chavePainelIa(papel, 0);
+  return base
+    ? cacheConsumoPlano.obter(`${base}|plano|${desde}`, carregar)
     : carregar();
 }
 
@@ -889,13 +932,15 @@ export async function getJovemProgressoIa(supabase: SupabaseClient) {
 export async function getJovemPedidosIa(supabase: SupabaseClient, limite = 40) {
   const { data, error } = await supabase
     .from("solicitacoes_mural")
-    .select("id, status, status_efetivo, demanda, motivo, especialista_nome, created_at")
+    .select("id, status, status_efetivo, demanda, motivo, especialista_nome, especialista_nome_social, especialista_desejado_nome, created_at")
     .order("created_at", { ascending: false })
     .limit(limite);
   if (error) throw error;
   return (data ?? []) as {
     id: string; status: string; status_efetivo: string | null;
     demanda: string | null; motivo: string | null;
-    especialista_nome: string | null; created_at: string;
+    especialista_nome: string | null;
+    especialista_nome_social: string | null;
+    especialista_desejado_nome: string | null; created_at: string;
   }[];
 }
