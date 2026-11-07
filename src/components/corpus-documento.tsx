@@ -512,8 +512,10 @@ export function CorpusDocumento({
     <main
       className={cn(
         "mx-auto max-w-3xl px-4 py-6 print:px-0",
-        // long guides get the TOC rail — make room for the column
-        doc.secoes.length > TOC_MINIMO && "xl:max-w-5xl"
+        // wider reading surface on desktop — long docs also carry a 15rem
+        // TOC rail inside this container
+        doc.secoes.length <= TOC_MINIMO && "xl:max-w-4xl",
+        doc.secoes.length > TOC_MINIMO && "xl:max-w-6xl 2xl:max-w-7xl"
       )}
     >
       <Link

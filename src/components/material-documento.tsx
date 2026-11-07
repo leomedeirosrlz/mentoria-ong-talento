@@ -506,7 +506,7 @@ export function MaterialDocumento({
   if (!doc) return null;
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6 print:px-0">
+    <main className="mx-auto max-w-3xl px-4 py-6 print:px-0 lg:max-w-4xl xl:max-w-5xl">
       <Link
         href={voltar.href}
         className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground print:hidden"
