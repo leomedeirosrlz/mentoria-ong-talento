@@ -956,6 +956,9 @@ describe("executarTool — auditoria", () => {
         {
           guia: "guia-mentor-dpp",
           secao: "2º encontro",
+          // chunk sem a coluna da 0165: âncora na slugify da seção
+          ancora: "2-encontro",
+          material: null,
           trecho: "Apresente os resultados consolidados…",
         },
       ],

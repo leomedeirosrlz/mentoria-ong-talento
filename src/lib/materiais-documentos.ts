@@ -6,11 +6,20 @@
 
 export type DocBloco =
   | { kind: "par"; html: string }
-  | { kind: "lista"; itens: string[] }
+  // ordenada=false → <ul> (listas "-" do corpus); ausente/true → <ol>
+  | { kind: "lista"; itens: string[]; ordenada?: boolean }
   | { kind: "pergunta"; texto: string }
   | { kind: "subj"; texto: string }
   | { kind: "nota"; html: string }
-  | { kind: "tabela"; cabecalho: string[]; linhas: string[][] };
+  // marcacao: colunas > 0 desenham checkbox vazio (fichas de marcação do
+  // cap. 14); sem a flag, toda célula renderiza o próprio conteúdo (tabelas
+  // de dados do corpus)
+  | {
+      kind: "tabela";
+      cabecalho: string[];
+      linhas: string[][];
+      marcacao?: boolean;
+    };
 
 export type MaterialDocumento = {
   slug: string;
@@ -23,8 +32,8 @@ export type MaterialDocumento = {
 
 export const MATERIAIS_DOCUMENTOS: Record<string, MaterialDocumento> = {
   // cap. 14, item 1 — as 10 competências com as duas colunas de marcação;
-  // o renderer de "tabela" desenha o checkbox em toda coluna > 0, então as
-  // células de "Já faço bem" / "Preciso desenvolver" vão vazias de propósito;
+  // com marcacao: true o renderer desenha o checkbox em toda coluna > 0,
+  // então as células de "Já faço bem" / "Preciso desenvolver" vão vazias;
   // texto do corpus sanitizado em 04/11/2026, docs/rag/checklist-competencias.md
   "checklist-competencias": {
     slug: "checklist-competencias",
@@ -41,6 +50,7 @@ export const MATERIAIS_DOCUMENTOS: Record<string, MaterialDocumento> = {
       },
       {
         kind: "tabela",
+        marcacao: true,
         cabecalho: ["Competência", "Já faço bem", "Preciso desenvolver"],
         linhas: [
           ["Escutar sem interromper e sem antecipar conclusões", "", ""],

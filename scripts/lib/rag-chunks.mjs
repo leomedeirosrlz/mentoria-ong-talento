@@ -20,6 +20,19 @@ const NATUREZAS = new Set(["transcrito", "consolidado", "sintese-operacional"]);
 // até aqui (chars) a intro de um ## com ### é contexto, não seção própria
 export const INTRO_CONTEXTO = 300;
 
+// Âncora estável da seção: sufixo # do link /materiais/documento/<slug>
+// que a citação da Liza monta. Slugify: minúsculas, NFD sem diacríticos,
+// [^a-z0-9]+→"-", trim "-".
+// keep in sync with src/lib/materiais/corpus-anchor.ts
+export function secaoAnchor(secao) {
+  return secao
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
 // ---------- front-matter + seções ----------
 
 export function parseDoc(nome, raw) {
@@ -82,7 +95,9 @@ export function parseDoc(nome, raw) {
     titulo: meta.titulo,
     material: meta.material,
     natureza: meta.natureza,
-    secoes,
+    // a âncora sai da seção inteira, não da `secao` truncada do insert —
+    // tem que bater com o id que a página põe no ##/###
+    secoes: secoes.map((s) => ({ ...s, secao_anchor: secaoAnchor(s.secao) })),
   };
 }
 

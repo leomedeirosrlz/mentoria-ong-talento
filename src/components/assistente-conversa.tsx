@@ -1370,7 +1370,7 @@ export function AssistenteConversa({
                         </Link>
                       ))}
                       {fontesDone.map((f, j) => {
-                        const meta = metaFonte(f.guia, soJovem);
+                        const meta = metaFonte(f.guia, soJovem, f);
                         // seção pode chegar a 200 chars no chunk — corta pra
                         // não estourar o chip (o inteiro vai no title);
                         // o travessão do título vira dois-pontos (copy)

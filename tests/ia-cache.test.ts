@@ -166,9 +166,16 @@ describe("buscarNosGuias", () => {
     expect(b).toEqual(a);
     expect(embed).toHaveBeenCalledTimes(1);
     expect(sb.rpc).toHaveBeenCalledTimes(1);
-    // seção única + chunk inteiro no lugar do headline
+    // seção única + chunk inteiro no lugar do headline; a âncora cai na
+    // slugify da seção enquanto a coluna da 0165 não vem no chunk
     expect(a).toEqual([
-      { guia: "instrumento-roda-da-vida", secao: "O que é", trecho: "Texto inteiro do chunk." },
+      {
+        guia: "instrumento-roda-da-vida",
+        secao: "O que é",
+        ancora: "o-que-e",
+        material: null,
+        trecho: "Texto inteiro do chunk.",
+      },
     ]);
   });
 

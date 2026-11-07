@@ -2604,8 +2604,10 @@ export type Database = {
           embedding_modelo: string | null
           guia: string
           id: string
+          material: string | null
           pagina: number | null
           secao: string | null
+          secao_anchor: string | null
           texto: string
           tsv: unknown
         }
@@ -2615,8 +2617,10 @@ export type Database = {
           embedding_modelo?: string | null
           guia: string
           id?: string
+          material?: string | null
           pagina?: number | null
           secao?: string | null
+          secao_anchor?: string | null
           texto: string
           tsv?: unknown
         }
@@ -2626,8 +2630,10 @@ export type Database = {
           embedding_modelo?: string | null
           guia?: string
           id?: string
+          material?: string | null
           pagina?: number | null
           secao?: string | null
+          secao_anchor?: string | null
           texto?: string
           tsv?: unknown
         }

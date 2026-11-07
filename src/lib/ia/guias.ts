@@ -8,15 +8,24 @@
 // (chip de sugestão, dúvida comum) dentro de 10 min: zero.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { secaoAnchor } from "@/lib/materiais/corpus-anchor";
 import { CacheTtl, chavePergunta } from "./cache";
 import { embedConfigurado, embedQuery } from "./embed";
 import { topSecoes } from "./busca-guias";
 import { limparTrecho } from "./fontes";
-import { matchGuiaIa, textosChunksIa } from "./queries";
+import { matchGuiaIa, textosChunksIa, type ChunkCitavel } from "./queries";
 
 export type FonteCitavel = {
   guia: string;
   secao: string | null;
+  /** âncora da seção no documento nativo — sufixo # do link da fonte.
+   *  Sai da coluna ia_chunks.secao_anchor quando o chunk é pós-0165;
+   *  nos chunks antigos cai na slugify da seção calculada na hora
+   *  (mesma regra, corpus-anchor.ts) até o re-ingest rodar. */
+  ancora: string | null;
+  /** slug do documento nativo (ia_chunks.material) — a metaFonte monta
+   *  /materiais/documento/<material> a partir dele */
+  material: string | null;
   trecho: string;
 };
 
@@ -68,16 +77,24 @@ export function buscarNosGuias(
     // mas não fica 10 min guardado
     const textos = await textosChunksIa(supabase, top).catch(() => {
       degradado = true;
-      return new Map<string, string>();
+      return new Map<string, ChunkCitavel>();
     });
     // score e pagina saem fora — ranking não ajuda a citar e pagina é o id
     // sintético do chunk (lia como "pág. 200"); trecho limpo, sem <b> do
     // headline nem markdown cru
-    return top.map((f) => ({
-      guia: f.guia,
-      secao: f.secao,
-      trecho: limparTrecho(textos.get(`${f.guia}|${f.pagina}`) ?? f.trecho, 1100),
-    }));
+    return top.map((f) => {
+      const chunk = textos.get(`${f.guia}|${f.pagina}`);
+      return {
+        guia: f.guia,
+        secao: f.secao,
+        // coluna da 0165 quando o chunk é novo; calculada da seção nos
+        // chunks antigos (e quando a leitura degradou) — mesma slugify
+        ancora:
+          chunk?.secaoAnchor ?? (f.secao ? secaoAnchor(f.secao) : null),
+        material: chunk?.material ?? null,
+        trecho: limparTrecho(chunk?.texto ?? f.trecho, 1100),
+      };
+    });
   }, () => !degradado);
 }
 

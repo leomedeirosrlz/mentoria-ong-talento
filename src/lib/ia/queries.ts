@@ -606,6 +606,15 @@ export type FonteGuia = {
   score: number;
 };
 
+/** Um chunk do corpus com o texto inteiro e os metadados de citação da
+ *  0165 (`material` = slug do doc nativo, `secaoAnchor` = âncora da seção
+ *  na página do documento — ambos null até o re-ingest). */
+export type ChunkCitavel = {
+  texto: string;
+  material: string | null;
+  secaoAnchor: string | null;
+};
+
 /** Texto inteiro dos chunks vencedores. O `trecho` da RPC é a janela de
  *  ~40 palavras do ts_headline (ou 220 chars no hit vetorial) e cortava
  *  a frase nas duas pontas: o modelo respondia com meio fato (P1). A
@@ -613,7 +622,7 @@ export type FonteGuia = {
 export async function textosChunksIa(
   supabase: SupabaseClient,
   chaves: { guia: string; pagina: number | null }[]
-): Promise<Map<string, string>> {
+): Promise<Map<string, ChunkCitavel>> {
   const guias = [...new Set(chaves.map((c) => c.guia))];
   const paginas = [
     ...new Set(chaves.flatMap((c) => (c.pagina == null ? [] : [c.pagina]))),
@@ -621,12 +630,19 @@ export async function textosChunksIa(
   if (!guias.length || !paginas.length) return new Map();
   const { data, error } = await supabase
     .from("ia_chunks")
-    .select("guia, pagina, texto")
+    .select("guia, pagina, texto, material, secao_anchor")
     .in("guia", guias)
     .in("pagina", paginas);
   if (error) throw error;
   return new Map(
-    (data ?? []).map((r) => [`${r.guia}|${r.pagina}`, r.texto as string])
+    (data ?? []).map((r) => [
+      `${r.guia}|${r.pagina}`,
+      {
+        texto: r.texto as string,
+        material: (r.material as string | null) ?? null,
+        secaoAnchor: (r.secao_anchor as string | null) ?? null,
+      },
+    ])
   );
 }
 

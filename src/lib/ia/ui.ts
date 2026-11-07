@@ -173,6 +173,11 @@ export type UiFontes = {
     guia: string;
     secao: string | null;
     trecho: string;
+    /** citação da 0165: slug do doc nativo + âncora da seção — a metaFonte
+     *  linka /materiais/documento/<material>#<ancora>; ausentes em fontes
+     *  sem página de documento */
+    material?: string | null;
+    ancora?: string | null;
   }[];
 };
 
@@ -454,6 +459,8 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           guia: String(f.guia),
           secao: str(f.secao),
           trecho: limparTrecho(str(f.trecho), 320),
+          material: str(f.material),
+          ancora: str(f.ancora),
         })),
       };
     }

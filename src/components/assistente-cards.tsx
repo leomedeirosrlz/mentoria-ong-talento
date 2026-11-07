@@ -1178,7 +1178,9 @@ function FonteItem({
 }) {
   const [aberto, setAberto] = useState(false);
   const id = useId();
-  const meta = metaFonte(f.guia, jovem);
+  // material/ancora do chunk (0165) resolvem documento/<slug>#seção;
+  // sem eles cai no destino base do guia
+  const meta = metaFonte(f.guia, jovem, f);
   // rótulos do catálogo podem trazer travessão; na tela vira dois-pontos
   const rotulo = meta.rotulo.replace(/\s+—\s+/g, ": ");
   // a referência citável é guia + seção — o "pagina" do banco era o id
