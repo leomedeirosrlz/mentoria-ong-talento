@@ -4,8 +4,9 @@
 // evento 'resposta' correlacionado por request_id e fecha o run quando a
 // fila esvazia. Uma request HTTP por item → nunca estoura timeout.
 //
-// Sessão de teste: EVAL_EMAIL/EVAL_SENHA contra o Supabase do MESMO
-// ambiente do app (os envs públicos já são dele) — igual ao eval-ia.mjs.
+// Sessão de teste por papel do run: EVAL_EMAIL/EVAL_SENHA (staff) ou
+// EVAL_EMAIL_JOVEM/EVAL_SENHA_JOVEM (mentorado), contra o Supabase do
+// MESMO ambiente do app (os envs públicos já são dele).
 // O override de modelo só vale com IA_EVAL_KEY no env do servidor.
 
 import { readFileSync } from "node:fs";
@@ -155,15 +156,21 @@ export function avaliarRubrica(
 }
 
 /** Cookie de sessão do formato do app (mesmo jar do eval-ia.mjs): sign-in
- *  por senha no Supabase do ambiente, token vivo só nesta execução. */
-async function cookieDeSessao() {
-  const email = process.env.EVAL_EMAIL;
-  const senha = process.env.EVAL_SENHA;
+ *  por senha no Supabase do ambiente, token vivo só nesta execução. A conta
+ *  segue o papel do run — EVAL_EMAIL/_SENHA pra staff, EVAL_EMAIL_JOVEM/
+ *  _SENHA_JOVEM pra mentorado. Sem fallback cruzado: um run mentorado
+ *  logado como staff testa o toolset errado e falha de propósito. */
+async function cookieDeSessao(papel: "staff" | "mentorado") {
+  const jovem = papel === "mentorado";
+  const email = jovem ? process.env.EVAL_EMAIL_JOVEM : process.env.EVAL_EMAIL;
+  const senha = jovem ? process.env.EVAL_SENHA_JOVEM : process.env.EVAL_SENHA;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
   if (!email || !senha || !url || !anon)
     throw new Error(
-      "eval precisa de EVAL_EMAIL/EVAL_SENHA no env do servidor"
+      jovem
+        ? "run mentorado precisa de EVAL_EMAIL_JOVEM/EVAL_SENHA_JOVEM no env do servidor"
+        : "eval precisa de EVAL_EMAIL/EVAL_SENHA no env do servidor"
     );
   const jar = new Map<string, string>();
   const sb = createServerClient(url, anon, {
@@ -265,7 +272,14 @@ export async function executarProximoItem(
   let trecho: string | null = null;
 
   try {
-    const cookie = await cookieDeSessao();
+    // papel do run decide a conta de teste (o cookie NÃO é por item)
+    const { data: run } = await supabase
+      .from("ia_eval_runs")
+      .select("papel")
+      .eq("id", runId)
+      .single();
+    const papelRun = run?.papel === "mentorado" ? "mentorado" : "staff";
+    const cookie = await cookieDeSessao(papelRun);
     const res = await fetch(`${baseUrl}/api/ia/chat`, {
       method: "POST",
       headers: {

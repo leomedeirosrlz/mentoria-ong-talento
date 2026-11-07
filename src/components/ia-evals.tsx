@@ -283,6 +283,12 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
                 </Chip>
               ))}
             </div>
+            <p className="text-[11px] text-muted-foreground">
+              conta do env:{" "}
+              {form.papel === "mentorado"
+                ? "EVAL_EMAIL_JOVEM"
+                : "EVAL_EMAIL"}
+            </p>
           </div>
           <div className="space-y-1.5">
             <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">

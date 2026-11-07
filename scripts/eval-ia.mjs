@@ -59,8 +59,12 @@ async function roteador() {
  *  createServerClient do @supabase/ssr escreve os mesmos cookies
  *  (nome sb-<ref>-auth-token, chunks, base64-) que o middleware lê. O
  *  token só vive neste processo. */
-async function cookieDeSessao() {
-  const { EVAL_EMAIL: email, EVAL_SENHA: senha } = process.env;
+async function cookieDeSessao(papel) {
+  // conta por papel: EVAL_PAPEL=mentorado usa EVAL_EMAIL_JOVEM/_SENHA_JOVEM
+  // (sem fallback cruzado — papel errado testa o toolset errado)
+  const jovem = papel === "mentorado";
+  const email = jovem ? process.env.EVAL_EMAIL_JOVEM : process.env.EVAL_EMAIL;
+  const senha = jovem ? process.env.EVAL_SENHA_JOVEM : process.env.EVAL_SENHA;
   const url = process.env.EVAL_SUPABASE_URL;
   const anon = process.env.EVAL_SUPABASE_ANON_KEY;
   if (!email || !senha) return null;
@@ -91,16 +95,18 @@ async function cookieDeSessao() {
 
 async function live() {
   const base = process.env.EVAL_BASE_URL;
-  const cookie = (await cookieDeSessao()) ?? process.env.EVAL_COOKIE;
+  // caso de outro papel daria FAIL falso (tool que a conta nem pode usar)
+  const papel = process.env.EVAL_PAPEL;
+  const cookie = (await cookieDeSessao(papel)) ?? process.env.EVAL_COOKIE;
   if (!base || !cookie) {
     console.error(
-      "live precisa de EVAL_BASE_URL e de EVAL_EMAIL+EVAL_SENHA (ou EVAL_COOKIE)"
+      papel === "mentorado"
+        ? "live mentorado precisa de EVAL_BASE_URL e de EVAL_EMAIL_JOVEM+EVAL_SENHA_JOVEM (ou EVAL_COOKIE)"
+        : "live precisa de EVAL_BASE_URL e de EVAL_EMAIL+EVAL_SENHA (ou EVAL_COOKIE)"
     );
     process.exit(2);
   }
   const resultados = [];
-  // caso de outro papel daria FAIL falso (tool que a conta nem pode usar)
-  const papel = process.env.EVAL_PAPEL;
   const doPapel = casos.live.filter(
     (c) => !papel || c.papel_esperado === "qualquer" || c.papel_esperado === papel
   );
