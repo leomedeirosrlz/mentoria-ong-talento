@@ -218,7 +218,8 @@ describe("UiCard: conteúdo", () => {
     expect(html(de("fila"))).toContain("Nenhum mentor com vaga livre");
     expect(html(de("capacidade"))).toContain("Sem vaga");
     expect(html(de("pessoas"))).toContain("Mentor DPP");
-    expect(html(de("chamados"))).toContain("CHA-000012");
+    // número CHA não aparece no card — assunto + categoria + status bastam
+    expect(html(de("chamados"))).toContain("Remarcar encontro");
     expect(html(de("chamados"))).toContain("ontem");
     const inst = html(de("instrumentos"));
     expect(inst).toContain("1 de 3 respondidos");

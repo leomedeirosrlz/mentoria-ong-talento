@@ -212,9 +212,9 @@ export function sugestoes(papeis: AppRole[], pagina: string): string[] {
     return ["O que tenho pra fazer?", "Como tá minha jornada?", "Quem é meu mentor?"];
   }
   if (/^\/duplas\/[0-9a-f-]{36}/.test(pagina))
-    return papeis.includes("mentorado")
-      ? ["Quando é o próximo encontro?", "O que é o PDM?"]
-      : ["Resuma esta dupla", "O que falta registrar?", "Escreva um lembrete pra dupla"];
+    // ficha de staff — híbrido (mentorado + papel de equipe) lê chips de
+    // equipe; mentorado puro nunca alcança esta rota
+    return ["Resuma esta dupla", "O que falta registrar?", "Escreva um lembrete pra dupla"];
   if (pagina.startsWith("/agenda") && !papeis.includes("mentorado"))
     return ["Encontros desta semana", "Alguém sem encontro marcado?", "Escreva um lembrete pra dupla"];
   if (pagina.startsWith("/duplas") && staff)

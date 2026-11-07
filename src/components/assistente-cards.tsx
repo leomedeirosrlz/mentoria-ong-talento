@@ -42,6 +42,7 @@ import type {
 import { metaFonte } from "@/lib/ia/fontes";
 import {
   AVALIACAO_LABEL,
+  CHAMADO_CATEGORIA_LABEL,
   CHAMADO_STATUS_LABEL,
   DIFICULDADE_LABEL,
   PROXIMO_PASSO_LABEL,
@@ -62,7 +63,6 @@ import type {
   EncontroStatus,
 } from "@/lib/types";
 import { Avatar, type PapelVisual } from "@/components/avatar";
-import { CategoriaBadge } from "@/components/chamados-shared";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import type { TomSituacao } from "@/components/dupla-linha";
 import {
@@ -1082,22 +1082,25 @@ export function CardChamados({ b, r = rotas(false) }: { b: UiChamados; r?: Rotas
             return (
               <li key={c.numero} style={passo(i + 1)} className="animate-enter py-2 first:pt-0 last:pb-0">
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <span className="font-mono text-xs text-muted-foreground">{c.numero}</span>
-                  <CategoriaBadge categoria={c.categoria} />
-                  <span className="ml-auto">
-                    <Pill tom={st.tom} icone={st.icone}>
-                      {CHAMADO_STATUS_LABEL[c.status]}
-                    </Pill>
-                  </span>
-                </div>
-                <p className={cn("mt-1 text-sm leading-snug", c.assunto ? "font-medium" : "text-muted-foreground")}>
-                  {c.assunto ?? "Sem assunto"}
-                </p>
-                {valida(c.criado_em) && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    Aberto <time dateTime={c.criado_em}>{tempoRelativo(c.criado_em, agora)}</time>
+                  {/* assunto primeiro, como nas filas — o número CHA não
+                      aparece (ruído de protocolo, e o card vai pro jovem
+                      também) */}
+                  <p className={cn("min-w-0 flex-1 break-words text-sm font-medium leading-snug", !c.assunto && "font-normal text-muted-foreground")}>
+                    {c.assunto ?? "Sem assunto"}
                   </p>
-                )}
+                  <Pill tom={st.tom} icone={st.icone}>
+                    {CHAMADO_STATUS_LABEL[c.status]}
+                  </Pill>
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {CHAMADO_CATEGORIA_LABEL[c.categoria]}
+                  {valida(c.criado_em) && (
+                    <>
+                      {" · Aberto "}
+                      <time dateTime={c.criado_em}>{tempoRelativo(c.criado_em, agora)}</time>
+                    </>
+                  )}
+                </p>
               </li>
             );
           })}
