@@ -59,11 +59,26 @@ const INLINE = /(\*\*[^\s*](?:[^*\n]*[^\s*])?\*\*|(?<!\w)\*[^\s*](?:[^*\n]*[^\s*
  *  entram suave — a velocidade de exibição continua a da rede (sem
  *  throttle de TPS), só a aparição é amortecida. */
 function Tokens({ texto }: { texto: string }) {
+  // fatias de ~6 code points — for..of itera code point (não unidade
+  // UTF-16), então um emoji nunca é partido em dois spans (surrogate
+  // solto renderizaria "�")
+  const pedacos: string[] = [];
+  let cur = "";
+  let n = 0;
+  for (const ch of texto) {
+    cur += ch;
+    if (++n === 6) {
+      pedacos.push(cur);
+      cur = "";
+      n = 0;
+    }
+  }
+  if (cur) pedacos.push(cur);
   return (
     <>
-      {Array.from({ length: Math.ceil(texto.length / 6) }, (_, i) => (
+      {pedacos.map((p, i) => (
         <span key={i} className="ia-tok">
-          {texto.slice(i * 6, i * 6 + 6)}
+          {p}
         </span>
       ))}
     </>

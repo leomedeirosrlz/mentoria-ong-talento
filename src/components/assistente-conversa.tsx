@@ -333,6 +333,9 @@ export function AssistenteConversa({
   } | null>(null);
   const chips = sugestoes(papeis, pagina);
   const [busca, setBusca] = useState("");
+  // topo anterior do log — o detach por direção compara gesto, não
+  // distância (programático só empurra pra baixo, usuário sobe)
+  const ultimoTopRef = useRef(0);
   // links dos cards apontam pras telas do jovem quando ele é só mentorado
   const soJovem = papeis.length > 0 && papeis.every((p) => p === "mentorado");
   // início da rodada (handler de evento) — vira o "em N s" da meta
@@ -568,7 +571,15 @@ export function AssistenteConversa({
       1,
       Math.ceil((700 - (agora() - filaDesdeRef.current)) / (1000 / 60))
     );
-    const fatia = Math.max(2, Math.ceil(pend.length / restantes));
+    let fatia = Math.max(2, Math.ceil(pend.length / restantes));
+    // nunca corta no meio de um par surrogate — emoji/acento fora do BMP
+    // piscaria como "�" por um quadro antes da metade chegar
+    if (
+      fatia < pend.length &&
+      pend.charCodeAt(fatia - 1) >= 0xd800 &&
+      pend.charCodeAt(fatia - 1) <= 0xdbff
+    )
+      fatia += 1;
     tokensRef.current = pend.slice(fatia);
     const sai = pend.slice(0, fatia);
     setMsgs((ms) =>
@@ -1070,8 +1081,18 @@ export function AssistenteConversa({
           onScroll={() => {
             const el = logRef.current;
             if (el) {
-              pertoDoFim.current =
-                el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+              // detach por direção: qualquer scroll pra CIMA é gesto do
+              // usuário querendo ler — solta na hora, mesmo a 20px do
+              // fundo (o limiar de 96px de "perto" puxava de volta a cada
+              // token durante o stream). Re-atacha só chegando ao fundo
+              // de verdade; scroll pra baixo no meio nunca vira "perto"
+              const subiu = el.scrollTop < ultimoTopRef.current - 1;
+              ultimoTopRef.current = el.scrollTop;
+              if (subiu) pertoDoFim.current = false;
+              else if (
+                el.scrollHeight - el.scrollTop - el.clientHeight < 32
+              )
+                pertoDoFim.current = true;
               setLongeDoFim(!pertoDoFim.current);
             }
           }}

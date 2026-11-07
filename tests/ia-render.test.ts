@@ -906,6 +906,38 @@ describe("segurarParcial", () => {
     for (const t of textos) expect(segurarParcial(t)).toBe(t);
   });
 
+  it("link inline sendo digitado espera — só o rabo do markdown é segurado", () => {
+    expect(segurarParcial("Em [materiais](/materiais?aba=instru")).toBe(
+      "Em"
+    );
+    expect(segurarParcial("Em [materiais](/materiais?aba=instr")).toBe("Em");
+    expect(segurarParcial("Em [materiais]")).toBe("Em");
+    expect(segurarParcial("Veja [o relatório")).toBe("Veja");
+    // link completo na última linha não espera nada
+    expect(
+      segurarParcial("Em [materiais](/materiais?aba=instrumentos), aba")
+    ).toBe("Em [materiais](/materiais?aba=instrumentos), aba");
+    expect(segurarParcial("Ver [ficha](/duplas/123)")).toBe(
+      "Ver [ficha](/duplas/123)"
+    );
+    // link pronto + texto depois: o que segue continua fluindo
+    expect(segurarParcial("Em [m](/m), aba Inst")).toBe("Em [m](/m), aba Inst");
+  });
+
+  it("negrito e crase abertos esperam; fechados passam", () => {
+    expect(segurarParcial("Todos **em atendimen")).toBe("Todos");
+    expect(segurarParcial("**em atendimento** já")).toBe("**em atendimento** já");
+    // "**a** x **b": o último par abre bold novo → segura só ele
+    expect(segurarParcial("**a** x **b")).toBe("**a** x");
+    expect(segurarParcial("roda `npm run de")).toBe("roda");
+    expect(segurarParcial("rode `npm run dev`")).toBe("rode `npm run dev`");
+  });
+
+  it("construto inline dentro de fence não é segurado de novo", () => {
+    // fence aberto: a linha com "[" fica crua como código mesmo
+    expect(segurarParcial("```\nEm [mat](/x")).toBe("```\nEm [mat](/x");
+  });
+
   it("encadeado com extrairBlocos no stream não mostra cru nem pisca", () => {
     const { textoSemBloco } = extrairBlocos(
       segurarParcial("Resumo:\n\n```stats\n[{\"valor\":\"1"),

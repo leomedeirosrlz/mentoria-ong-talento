@@ -465,6 +465,40 @@ const SEP_PARCIAL = /^\|[\s:|-]*$/;
 // 1 ou 2 crases sozinhas na linha: começo de um ``` que ainda não chegou
 const CRASE_PARCIAL = /^\s*`{1,2}\s*$/;
 
+/** Posição inicial do construto inline ainda aberto no fim da linha
+ *  (-1 = nada a segurar): link "[" sem "]" ou "](" sem ")", negrito "**"
+ *  sem o par de fechar e crase "`" de contagem ímpar. Cada um vira
+ *  sintaxe crua visível enquanto o modelo digita o resto — segurar até
+ *  fechar é o que impede "](/materiais" de piscar como texto. */
+function inicioInlineParcial(linha: string): number {
+  // link: "[" sem "]" depois; "]" exatamente no fim (o "(" pode ser o
+  // próximo token); ou "](" sem o ")" fechando
+  const abreLink = linha.lastIndexOf("[");
+  if (abreLink >= 0) {
+    const depois = linha.slice(abreLink);
+    if (
+      !depois.includes("]") ||
+      depois.endsWith("]") ||
+      /\]\([^)\s]*$/.test(depois)
+    )
+      return abreLink;
+  }
+  // "**texto" sem o "**" de fechar — conta os pares ANTES do último:
+  // par = ele abre um bold novo (segura), ímpar = ele é o fechar de um
+  // bold já aberto ("**a** x" não segura nada)
+  const abreBold = linha.lastIndexOf("**");
+  if (abreBold >= 0 && !linha.slice(abreBold + 2).includes("**")) {
+    const paresAntes = linha.slice(0, abreBold).split("**").length - 1;
+    if (paresAntes % 2 === 0) return abreBold;
+  }
+  // "`code" sem fechar: contagem ímpar de crases — desconta a run de
+  // fence na abertura da linha ("```grafico" tem 3 e já foi tratado)
+  const semFence = linha.replace(/^\s*`{3,}/, "");
+  const crases = semFence.split("`").length - 1;
+  if (crases % 2 === 1) return linha.lastIndexOf("`");
+  return -1;
+}
+
 /** Durante o stream, tira do FIM do texto o pedaço que ainda não dá pra
  *  renderizar direito: cabeçalho de tabela sem separador completo (senão
  *  pisca como parágrafo de pipes e vira tabela um token depois), linha de
@@ -498,6 +532,17 @@ export function segurarParcial(texto: string): string {
   let fim = n;
   if (ultima.trim() === "") fim--;
   const novaLinha = fim < n;
+  // linha parcial (ainda sem "\n"): segura inline aberto — "[", "](" sem
+  // ")", "**" e "`" aparecem como sintaxe crua enquanto o modelo digita.
+  // Só revelam quando fecham; se nunca fechar, o texto final mostra cru
+  // (segurarParcial só vale no stream, nunca esconde conteúdo do fim)
+  if (!novaLinha && !dentro[n - 1]) {
+    const corte = inicioInlineParcial(ultima);
+    if (corte >= 0)
+      return [...linhas.slice(0, n - 1), ultima.slice(0, corte)]
+        .join("\n")
+        .trimEnd();
+  }
   // corrida final de linhas pipe fora de fence
   let k = fim;
   while (k > 0 && !dentro[k - 1] && linhas[k - 1].trim().startsWith("|")) k--;
