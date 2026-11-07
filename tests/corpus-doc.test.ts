@@ -10,10 +10,16 @@ import {
   corpusServeJovem,
   corpusServePapel,
   gruposCorpus,
+  jornadaCorpus,
   listarDocsCorpus,
   montarDocCorpus,
+  tomSemantico,
 } from "@/lib/materiais/corpus-doc";
 import { CorpusDocBody } from "@/components/corpus-documento";
+import {
+  itensDoc,
+  linhasDoc,
+} from "@/lib/materiais-documentos";
 import type { DocBloco } from "@/lib/materiais-documentos";
 
 describe("secaoAnchor", () => {
@@ -259,7 +265,7 @@ describe("blocos de encontro", () => {
     expect(b.roteiro).toBeUndefined();
   });
 
-  it("o card renderiza âncora, eyebrow, tarefa e o link do roteiro", () => {
+  it("o card renderiza âncora, eyebrow, tarefa e o chip-link do roteiro", () => {
     const html = renderToStaticMarkup(createElement(CorpusDocBody, { doc }));
     expect(html).toContain('id="fase-1-chegada-1-encontro-acordos-e-vinculo"');
     expect(html).toContain("1º encontro");
@@ -269,6 +275,164 @@ describe("blocos de encontro", () => {
       'href="/materiais/documento/roteiro-encontro-01"'
     );
     expect(html).toContain("Roteiro do 1º encontro");
+    // o slot "Passo a passo" virou pill âmbar com o aria-label do slot
+    expect(html).toContain('aria-label="Passo a passo: Roteiro do 1º encontro"');
+    expect(html).toContain("rounded-full");
+  });
+});
+
+const FIXTURE_FASES = `---
+fonte: fases
+titulo: Fases
+material: fases
+natureza: consolidado
+---
+
+# Fases
+
+## Os 16 encontros
+
+Abertura da jornada.
+
+## Encontros 1 a 4 · Fase um
+
+Intro da fase um.
+
+### 1º encontro · Um
+
+Corpo um.
+
+### 2º encontro · Dois
+
+Corpo dois.
+
+## Seção neutra
+
+Texto neutro.
+
+## Encontros 5 e 6 · Fase dois
+
+### 5º encontro · Cinco
+
+Corpo cinco.
+
+### 6º encontro · Seis
+
+Corpo seis.
+`;
+
+describe("fases (bandas do PDF)", () => {
+  const doc = montarDocCorpus("fases", FIXTURE_FASES)!;
+  const grupos = gruposCorpus(doc.secoes);
+
+  it("## que casa FASE_RE numera a fase na ordem do doc", () => {
+    expect(grupos.map((g) => [g.titulo, g.fase])).toEqual([
+      ["Os 16 encontros", 0],
+      ["Encontros 1 a 4 · Fase um", 1],
+      ["Seção neutra", null],
+      // ## sem intro: a fase implícita conta no ponto em que o grupo aparece
+      ["Encontros 5 e 6 · Fase dois", 2],
+    ]);
+    // a flag fica na seção de nível 2; ### nunca é fase
+    expect(doc.secoes.find((s) => s.titulo === "Os 16 encontros")?.fase).toBe(0);
+    expect(
+      doc.secoes.every((s) => s.nivel === 2 || s.fase === null)
+    ).toBe(true);
+  });
+
+  it("banda renderiza o tom rotacionado (lima → destaque → info)", () => {
+    const html = renderToStaticMarkup(createElement(CorpusDocBody, { doc }));
+    expect(html).toContain("bg-[var(--brand-lime)]/16"); // Os 16 → lima
+    expect(html).toContain("bg-[var(--destaque-suave)]"); // 1 a 4 → âmbar
+    expect(html).toContain("bg-[var(--info)]/12"); // 5 e 6 → teal
+    // seção neutra segue com a regra lima, sem banda
+    expect(html).toMatch(
+      /<h2 id="secao-neutra"[\s\S]*?border-\[var\(--brand-lime\)\]/
+    );
+  });
+});
+
+describe("jornadaCorpus + trilha", () => {
+  const doc = montarDocCorpus("fases", FIXTURE_FASES)!;
+  const jornada = jornadaCorpus(gruposCorpus(doc.secoes))!;
+
+  it("agrupa os cards com âncora por fase, na cor da banda", () => {
+    expect(jornada.total).toBe(4);
+    expect(jornada.home).toBe("os-16-encontros");
+    expect(jornada.inicio).toBe("encontros-1-a-4-fase-um");
+    expect(jornada.fases.map((f) => [f.rotulo, f.tom])).toEqual([
+      ["Encontros 1 a 4", "destaque"],
+      ["Encontros 5 e 6", "info"],
+    ]);
+    expect(jornada.fases[0].pontos.map((p) => p.numero)).toEqual(["1", "2"]);
+    // o dot linka a âncora do próprio card — a mesma da citação
+    expect(jornada.fases[0].pontos[0].anchor).toBe(
+      doc.secoes.find((s) => s.titulo === "1º encontro · Um")?.anchor
+    );
+  });
+
+  it("a trilha renderiza dots linkados sob o grupo 'Os 16 encontros'", () => {
+    const html = renderToStaticMarkup(createElement(CorpusDocBody, { doc }));
+    expect(html).toContain('aria-label="Mapa dos 4 encontros"');
+    for (const f of jornada.fases) {
+      for (const p of f.pontos) {
+        expect(html).toContain(`href="#${p.anchor}"`);
+        expect(html).toContain(`>${p.numero}</a>`);
+      }
+    }
+  });
+
+  it("menos de 4 dots ou cards sem âncora → sem trilha", () => {
+    // fixture de 1 card ancorado + inline: total abaixo do mínimo
+    const curto = montarDocCorpus("enc", FIXTURE_ENC)!;
+    expect(jornadaCorpus(gruposCorpus(curto.secoes))).toBeNull();
+  });
+});
+
+describe("itensDoc / linhasDoc (grade e e-mail)", () => {
+  const par = { kind: "par", html: "x" } as DocBloco;
+  const numero = (n: string) =>
+    ({ kind: "numero", numero: n, titulo: `T${n}`, html: "y" }) as DocBloco;
+
+  it("sequências de numero viram um único grupo de grade", () => {
+    expect(itensDoc([par, numero("1"), numero("2"), par])).toEqual([
+      par,
+      { kind: "nums", itens: [numero("1"), numero("2")] },
+      par,
+    ]);
+  });
+
+  it("subj abre o card de e-mail com o corpo até o próximo subj ou fim", () => {
+    const subj = (t: string) => ({ kind: "subj", texto: t }) as DocBloco;
+    const linhas = linhasDoc([par, subj("A"), par, par, subj("B"), par]);
+    expect(linhas).toEqual([
+      { kind: "item", item: par },
+      { kind: "email", assunto: "A", corpo: [par, par] },
+      { kind: "email", assunto: "B", corpo: [par] },
+    ]);
+  });
+
+  it("a grade e o card renderizam com chip do tom semântico e header Assunto", () => {
+    const raw = `---\nfonte: x\ntitulo: X\nmaterial: x\nnatureza: consolidado\n---\n\n# X\n\n## As nove funções: trabalho e carreira\n\n**1. Uma.** Texto um.\n\n**2. Duas.** Texto dois.\n\n## Modelo\n\n**Assunto:** Assunto de teste\n\nCorpo do e-mail.\n`;
+    const doc = montarDocCorpus("x", raw)!;
+    const html = renderToStaticMarkup(createElement(CorpusDocBody, { doc }));
+    expect(html).toContain("sm:grid-cols-2");
+    // "trabalho e carreira" → teal/info no chip
+    expect(html).toContain("bg-[var(--info)] text-[var(--status-foreground)]");
+    // card de e-mail: barra lima + header Assunto
+    expect(html).toContain("border-l-4 border-[var(--brand-lime)]");
+    expect(html).toContain("<b class=\"font-semibold\">Assunto:</b>");
+    expect(html).toContain("Assunto de teste");
+    expect(html).toContain("Corpo do e-mail.");
+  });
+
+  it("tomSemantico mapeia a dimensão do título (e null fora do mapa)", () => {
+    expect(tomSemantico("As nove funções: trabalho e carreira")).toBe("info");
+    expect(tomSemantico("As nove funções: apoio socioemocional")).toBe(
+      "destaque"
+    );
+    expect(tomSemantico("As nove funções: função modelar")).toBe("lima");
+    expect(tomSemantico("Perguntas Eficazes")).toBeNull();
   });
 });
 
@@ -333,6 +497,48 @@ describe("carregarDocCorpus (corpus real)", () => {
     expect(e16.corpo.some((b) => b.kind === "callout")).toBe(true);
     // toda âncora de card é a da seção — a mesma que a citação resolve
     for (const b of encs) expect(b.anchor).toMatch(/encontro-/);
+  });
+
+  it("guia DPP: as 8 bandas de fase e a trilha dos 16 encontros", async () => {
+    const doc = await carregarDocCorpus("guia-mentor-dpp");
+    const grupos = gruposCorpus(doc!.secoes);
+    // Os 16 + os 6 grupos de mês + Modelos e instrumentos = 8 bandas
+    const bandas = grupos.filter((g) => g.fase != null);
+    expect(bandas.map((g) => [g.titulo.split(" ·")[0], g.fase])).toEqual([
+      ["Os 16 encontros", 0],
+      ["Encontros 1 a 4", 1],
+      ["Encontros 5 a 7", 2],
+      ["Encontros 8 e 9", 3],
+      ["Encontros 10 e 11", 4],
+      ["Encontros 12 a 14", 5],
+      ["Encontros 15 e 16", 6],
+      ["Modelos e instrumentos citados no guia", 7],
+    ]);
+
+    const jornada = jornadaCorpus(grupos)!;
+    expect(jornada.total).toBe(16);
+    expect(jornada.home).toBe("os-16-encontros");
+    // os 6 grupos de mês herdam a cor da própria banda (fases 1..6)
+    expect(jornada.fases.map((f) => f.tom)).toEqual([
+      "destaque",
+      "info",
+      "lima",
+      "destaque",
+      "info",
+      "lima",
+    ]);
+    expect(
+      jornada.fases.flatMap((f) => f.pontos.map((p) => p.numero))
+    ).toEqual(Array.from({ length: 16 }, (_, i) => `${i + 1}`));
+
+    const html = renderToStaticMarkup(
+      createElement(CorpusDocBody, { doc: doc! })
+    );
+    expect(html).toContain('aria-label="Mapa dos 16 encontros"');
+    // um dot aria-label por encontro + cada um linka a âncora do card
+    expect(html.match(/aria-label="\d+º encontro · /g)).toHaveLength(16);
+    for (const f of jornada.fases)
+      for (const p of f.pontos) expect(html).toContain(`href="#${p.anchor}"`);
   });
 
   it("guia especialista: os 5 encontros inline viram cards sem âncora", async () => {

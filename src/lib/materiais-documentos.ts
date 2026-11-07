@@ -9,6 +9,11 @@
  *  hints) and note (italic gray, editorial reflection). */
 export type CalloutTom = "info" | "warn" | "tip" | "note";
 
+/** The three rotating colors of the guide's visual grammar — lime (brand
+ *  default), destaque (the journey's amber) and info (support teal). Drives
+ *  phase bands, numbered-item chips, journey dots and the TOC marker. */
+export type DocTom = "lima" | "destaque" | "info";
+
 export type DocBloco =
   | { kind: "par"; html: string }
   // ordenada=false → <ul> (listas "-" do corpus); ausente/true → <ol>
@@ -52,6 +57,74 @@ export type MaterialDocumento = {
   objetivo: string;
   blocos: DocBloco[];
 };
+
+// ---------- render units ----------
+
+type NumeroBloco = Extract<DocBloco, { kind: "numero" }>;
+
+/** Render unit of DocBlocos: a single block or one run of consecutive
+ *  `numero` blocks, which render together as a card grid (the guide's
+ *  numbered pills: the nine mentor functions as cards, not a dotted list). */
+export type DocItem = DocBloco | { kind: "nums"; itens: NumeroBloco[] };
+
+/** Top-level line of DocBlocos: a render item or the e-mail card opened by
+ *  a `subj` ("**Assunto:** …") block — the message templates of cap. 14. */
+export type DocLinha =
+  | { kind: "item"; item: DocItem }
+  | { kind: "email"; assunto: string; corpo: DocItem[] };
+
+/** Consecutive `numero` blocks fold into a single `nums` unit; everything
+ *  else passes through in order. */
+export function itensDoc(blocos: DocBloco[]): DocItem[] {
+  const itens: DocItem[] = [];
+  let run: NumeroBloco[] = [];
+  const flush = () => {
+    if (run.length > 0) {
+      itens.push({ kind: "nums", itens: run });
+      run = [];
+    }
+  };
+  for (const b of blocos) {
+    if (b.kind === "numero") run.push(b);
+    else {
+      flush();
+      itens.push(b);
+    }
+  }
+  flush();
+  return itens;
+}
+
+/** Splits the block list at each `subj`: the subject line becomes the
+ *  header of an e-mail card holding every block up to the next `subj` or
+ *  the end of the list. Blocks before the first `subj` stay outside. */
+export function linhasDoc(blocos: DocBloco[]): DocLinha[] {
+  const linhas: DocLinha[] = [];
+  let seg: DocBloco[] = [];
+  const flush = () => {
+    for (const item of itensDoc(seg)) linhas.push({ kind: "item", item });
+    seg = [];
+  };
+  let i = 0;
+  while (i < blocos.length) {
+    const b = blocos[i];
+    if (b.kind !== "subj") {
+      seg.push(b);
+      i++;
+      continue;
+    }
+    flush();
+    const corpo: DocBloco[] = [];
+    i++;
+    while (i < blocos.length && blocos[i].kind !== "subj") {
+      corpo.push(blocos[i]);
+      i++;
+    }
+    linhas.push({ kind: "email", assunto: b.texto, corpo: itensDoc(corpo) });
+  }
+  flush();
+  return linhas;
+}
 
 export const MATERIAIS_DOCUMENTOS: Record<string, MaterialDocumento> = {
   // cap. 14, item 1 — as 10 competências com as duas colunas de marcação;

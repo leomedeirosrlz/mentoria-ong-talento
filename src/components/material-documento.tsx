@@ -1,8 +1,25 @@
 import Link from "next/link";
 import type { ReactNode } from "react";
-import { ArrowLeft } from "@phosphor-icons/react/dist/ssr";
-import { materialDocumento } from "@/lib/materiais-documentos";
-import type { CalloutTom, DocBloco } from "@/lib/materiais-documentos";
+import {
+  ArrowLeft,
+  ArrowRight,
+  CalendarCheck,
+  ChatCenteredDots,
+  CheckCircle,
+  EnvelopeSimple,
+  Info,
+  Lightbulb,
+  MapTrifold,
+  Quotes,
+  Warning,
+} from "@phosphor-icons/react/dist/ssr";
+import { linhasDoc, materialDocumento } from "@/lib/materiais-documentos";
+import type {
+  CalloutTom,
+  DocBloco,
+  DocItem,
+  DocTom,
+} from "@/lib/materiais-documentos";
 import { cn } from "@/lib/utils";
 
 // Documento nativo de /materiais — os templates do cap. 14 do guia DPP vivem
@@ -127,13 +144,74 @@ function DocTabela({
   );
 }
 
-// tone → border+background pair (the app's status tokens cover the guide's
-// 4 tones: info teal, warn amber, tip lime/pale green, note italic gray)
-const CALLOUT_TOM: Record<CalloutTom, string> = {
-  info: "border-[var(--info)] bg-[var(--info-bg)]",
-  warn: "border-[var(--warn)] bg-[var(--warn-bg)]",
-  tip: "border-[var(--brand-lime)] bg-[var(--ok-bg)]",
-  note: "border-[var(--pausa-border)] bg-muted italic text-muted-foreground",
+// tone → class set: tinted band, strong text/icon color, accent bar,
+// numbered chip, journey dot and connector. Only existing tokens: lime =
+// brand, destaque = journey amber, info = support teal — the trio the PDF
+// rotates on its chapter bands.
+export const TOM_DOC: Record<
+  DocTom,
+  {
+    banda: string;
+    forte: string;
+    barra: string;
+    chip: string;
+    dot: string;
+    trilho: string;
+  }
+> = {
+  lima: {
+    banda: "bg-[var(--brand-lime)]/16",
+    forte: "text-[var(--ring)]",
+    barra: "bg-[var(--brand-lime)]",
+    chip: "bg-[var(--brand-lime)] text-[var(--brand-ink)]",
+    dot: "border-[var(--ring)]/45 bg-[var(--brand-lime)]/15 text-[var(--ring)]",
+    trilho: "bg-[var(--ring)]/35",
+  },
+  destaque: {
+    banda: "bg-[var(--destaque-suave)]",
+    forte: "text-[var(--warn-text)]",
+    barra: "bg-[var(--destaque)]",
+    chip: "bg-[var(--destaque)] text-[var(--destaque-foreground)]",
+    dot: "border-[var(--destaque-borda)] bg-[var(--destaque-suave)] text-[var(--warn-text)]",
+    trilho: "bg-[var(--destaque-borda)]",
+  },
+  info: {
+    banda: "bg-[var(--info)]/12",
+    forte: "text-[var(--info)]",
+    barra: "bg-[var(--info)]",
+    chip: "bg-[var(--info)] text-[var(--status-foreground)]",
+    dot: "border-[var(--info)]/45 bg-[var(--info-bg)] text-[var(--info)]",
+    trilho: "bg-[var(--info-border)]",
+  },
+};
+
+// tone → border+background+icon (the app's status tokens cover the guide's
+// 4 tones: info teal, warn amber, tip lime/pale green, note italic gray).
+// Tints sit a step above the pale -bg tokens so the boxes read colored.
+const CALLOUT_TOM: Record<
+  CalloutTom,
+  { box: string; Icone: typeof Info; iconeCls: string }
+> = {
+  info: {
+    box: "border-[var(--info)] bg-[var(--info)]/12",
+    Icone: Info,
+    iconeCls: "text-[var(--info)]",
+  },
+  warn: {
+    box: "border-[var(--warn)] bg-[var(--warn)]/12",
+    Icone: Warning,
+    iconeCls: "text-[var(--warn)]",
+  },
+  tip: {
+    box: "border-[var(--brand-lime)] bg-[var(--brand-lime)]/20",
+    Icone: Lightbulb,
+    iconeCls: "text-[var(--ring)]",
+  },
+  note: {
+    box: "border-[var(--pausa-border)] bg-muted italic text-muted-foreground",
+    Icone: ChatCenteredDots,
+    iconeCls: "text-[var(--pausa-text)]",
+  },
 };
 
 /** The guide's encounter card — thick lime side bar (amber on the 16th,
@@ -145,10 +223,11 @@ function EncontroCard({ b }: { b: Extract<DocBloco, { kind: "encontro" }> }) {
     <>
       <span
         className={cn(
-          "block text-[11px] font-bold uppercase tracking-[0.14em]",
+          "flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.14em]",
           encerramento ? "text-[var(--warn-text)]" : "text-[var(--ring)]"
         )}
       >
+        <CalendarCheck size={13} aria-hidden />
         {b.numero}º encontro
       </span>
       <span className="mt-0.5 block text-base font-semibold tracking-tight">
@@ -185,23 +264,31 @@ function EncontroCard({ b }: { b: Extract<DocBloco, { kind: "encontro" }> }) {
         </div>
       ) : null}
       {b.tarefa || b.roteiro ? (
-        <div className="mt-3.5 space-y-1.5 border-t border-border/60 pt-3 text-sm">
+        <div className="mt-3.5 space-y-2 border-t border-border/60 pt-3 text-sm">
           {b.tarefa ? (
-            <p>
-              <b className="font-semibold">Tarefa:</b>{" "}
-              <span dangerouslySetInnerHTML={{ __html: `${b.tarefa}.` }} />
+            <p className="flex items-start gap-1.5">
+              <CheckCircle
+                size={16}
+                aria-hidden
+                className="mt-0.5 shrink-0 text-[var(--ring)]"
+              />
+              <span>
+                <b className="font-semibold">Tarefa:</b>{" "}
+                <span dangerouslySetInnerHTML={{ __html: `${b.tarefa}.` }} />
+              </span>
             </p>
           ) : null}
           {b.roteiro ? (
             <p>
-              <b className="font-semibold text-[var(--warn-text)]">
-                Passo a passo:
-              </b>{" "}
+              {/* the guide's "Passo a passo" slot as an amber chip-link */}
               <Link
                 href={`/materiais/documento/${b.roteiro.slug}`}
-                className="font-medium underline decoration-muted-foreground/50 underline-offset-4 hover:decoration-foreground"
+                aria-label={`Passo a passo: ${b.roteiro.rotulo}`}
+                className="inline-flex items-center gap-1.5 rounded-full border border-[var(--warn-border)] bg-[var(--warn-bg)] px-3 py-1 text-xs font-semibold text-[var(--warn-text)] transition-colors hover:border-[var(--warn)]"
               >
+                <MapTrifold size={14} aria-hidden />
                 {b.roteiro.rotulo}
+                <ArrowRight size={13} aria-hidden />
               </Link>
             </p>
           ) : null}
@@ -211,43 +298,83 @@ function EncontroCard({ b }: { b: Extract<DocBloco, { kind: "encontro" }> }) {
   );
 }
 
-function DocBlocoView({ b }: { b: DocBloco }) {
+/** The guide's numbered item as a card — colored numeric chip + bold title
+ *  + body (the semantic pill diagram of the PDF). Renders solo or inside
+ *  the `nums` grid (DocItemView); `tom` is the section's semantic color. */
+function NumeroCard({
+  b,
+  tom,
+}: {
+  b: Extract<DocBloco, { kind: "numero" }>;
+  tom: DocTom;
+}) {
+  return (
+    <div className="rounded-xl border border-border/60 bg-card p-3.5 shadow-[var(--shadow-border)]">
+      <div className="flex items-center gap-2.5">
+        <span
+          aria-hidden
+          className={cn(
+            "grid size-7 shrink-0 place-items-center rounded-lg text-xs font-bold",
+            TOM_DOC[tom].chip
+          )}
+        >
+          {b.numero}
+        </span>
+        <b className="text-sm font-semibold">{b.titulo}</b>
+      </div>
+      <p
+        className="mt-1.5 text-sm leading-relaxed"
+        dangerouslySetInnerHTML={{ __html: b.html }}
+      />
+    </div>
+  );
+}
+
+function DocBlocoView({ b, tom }: { b: DocBloco; tom: DocTom }) {
   switch (b.kind) {
     case "subj":
+      // stray subject outside a card (linhasDoc wraps every subj — fallback)
       return (
-        <p className="rounded-lg bg-muted px-4 py-2.5 text-sm">
-          <b className="font-semibold text-muted-foreground">Assunto:</b>{" "}
-          {b.texto}
+        <p className="flex items-center gap-2 rounded-lg bg-muted px-4 py-2.5 text-sm">
+          <EnvelopeSimple
+            size={16}
+            aria-hidden
+            className="shrink-0 text-[var(--ring)]"
+          />
+          <span>
+            <b className="font-semibold">Assunto:</b> {b.texto}
+          </span>
         </p>
       );
-    case "callout":
+    case "callout": {
+      const { box, Icone, iconeCls } = CALLOUT_TOM[b.tom];
       return (
-        <p
+        <div
           className={cn(
-            "rounded-r-xl rounded-l-md border-l-4 px-4 py-3 text-sm leading-relaxed print:shadow-none",
-            CALLOUT_TOM[b.tom]
+            "flex gap-2.5 rounded-r-xl rounded-l-md border-l-4 px-4 py-3 text-sm leading-relaxed print:shadow-none",
+            box
           )}
-          dangerouslySetInnerHTML={{ __html: b.html }}
-        />
-      );
-    case "numero":
-      return (
-        <div className="flex gap-2.5 px-1 text-sm leading-relaxed">
-          <span
+        >
+          <Icone
+            size={18}
             aria-hidden
-            className="shrink-0 font-bold text-[var(--ring)]"
-          >
-            {b.numero}.
-          </span>
-          <p>
-            <b className="font-semibold">{b.titulo}.</b>{" "}
-            <span dangerouslySetInnerHTML={{ __html: b.html }} />
-          </p>
+            className={cn("mt-0.5 shrink-0", iconeCls)}
+          />
+          <p dangerouslySetInnerHTML={{ __html: b.html }} />
         </div>
       );
+    }
+    case "numero":
+      return <NumeroCard b={b} tom={tom} />;
     case "quote":
       return (
         <blockquote className="rounded-r-xl border-l-4 border-[var(--brand-lime)] bg-card px-4 py-3 shadow-[var(--shadow-border)] print:shadow-none">
+          <Quotes
+            size={18}
+            weight="fill"
+            aria-hidden
+            className="mb-1 text-[var(--ring)]"
+          />
           <p
             className="text-sm italic leading-relaxed"
             dangerouslySetInnerHTML={{ __html: b.html }}
@@ -297,14 +424,73 @@ function DocBlocoView({ b }: { b: DocBloco }) {
   }
 }
 
+function DocItemView({ item, tom }: { item: DocItem; tom: DocTom }) {
+  if (item.kind === "nums") {
+    return (
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
+        {item.itens.map((n) => (
+          <NumeroCard key={n.numero} b={n} tom={tom} />
+        ))}
+      </div>
+    );
+  }
+  return <DocBlocoView b={item} tom={tom} />;
+}
+
+/** The message templates of cap. 14 as an e-mail: gray card with the lime
+ *  side bar, "Assunto:" as the header line (envelope icon + bold) and the
+ *  message body below — reads like a real message, ready to copy. */
+function EmailCard({
+  assunto,
+  corpo,
+  tom,
+}: {
+  assunto: string;
+  corpo: DocItem[];
+  tom: DocTom;
+}) {
+  return (
+    <div className="overflow-hidden rounded-xl border-l-4 border-[var(--brand-lime)] bg-muted/60 shadow-[var(--shadow-border)] print:shadow-none">
+      <p className="flex items-center gap-2 border-b border-border/60 px-4 py-2.5 text-sm">
+        <EnvelopeSimple
+          size={16}
+          aria-hidden
+          className="shrink-0 text-[var(--ring)]"
+        />
+        <span className="min-w-0">
+          <b className="font-semibold">Assunto:</b>{" "}
+          <span className="font-medium">{assunto}</span>
+        </span>
+      </p>
+      <div className="space-y-2.5 px-4 py-3.5">
+        {corpo.map((item, i) => (
+          <DocItemView key={i} item={item} tom={tom} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 /** Fileira de blocos do documento — espaçamento entre irmãos fica por conta
- *  do container (`space-y-3`), igual ao corpo do documento nativo. */
-export function DocBlocos({ blocos }: { blocos: DocBloco[] }) {
+ *  do container (`space-y-3`), igual ao corpo do documento nativo. `subj`
+ *  abre o card de e-mail (até o próximo `subj` ou o fim); sequências de
+ *  `numero` viram grade de cards; `tom` colore os chips numéricos. */
+export function DocBlocos({
+  blocos,
+  tom = "lima",
+}: {
+  blocos: DocBloco[];
+  tom?: DocTom;
+}) {
   return (
     <>
-      {blocos.map((b, i) => (
-        <DocBlocoView key={i} b={b} />
-      ))}
+      {linhasDoc(blocos).map((l, i) =>
+        l.kind === "email" ? (
+          <EmailCard key={i} assunto={l.assunto} corpo={l.corpo} tom={tom} />
+        ) : (
+          <DocItemView key={i} item={l.item} tom={tom} />
+        )
+      )}
     </>
   );
 }

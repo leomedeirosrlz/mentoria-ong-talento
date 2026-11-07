@@ -15,7 +15,7 @@
 import { readdir, readFile } from "node:fs/promises";
 import path from "node:path";
 import { cache } from "react";
-import type { CalloutTom, DocBloco } from "@/lib/materiais-documentos";
+import type { CalloutTom, DocBloco, DocTom } from "@/lib/materiais-documentos";
 import { veMaterial } from "@/lib/materiais";
 import type { AppRole } from "@/lib/types";
 import { secaoAnchor } from "./corpus-anchor";
@@ -30,6 +30,10 @@ export type CorpusSecao = {
   nivel: 2 | 3;
   /** secaoAnchor(secao) — id do heading na página. */
   anchor: string;
+  /** índice da fase (0-based) quando o ## casa FASE_RE e renderiza como
+   *  banda colorida — os grupos de mês da jornada e as seções que abrem
+   *  grandes partes do guia. null nos ## comuns e em toda ###. */
+  fase: number | null;
   blocos: DocBloco[];
 };
 
@@ -58,6 +62,9 @@ export type CorpusGrupo = {
   anchor: string;
   intro: CorpusSecao | null;
   subs: CorpusSecao[];
+  /** mesma numeração de fase das seções — propagada pela intro ou
+   *  re-derivada do título quando o ## não gerou seção (só subs). */
+  fase: number | null;
 };
 
 const DIR = () => path.join(process.cwd(), "docs", "rag");
@@ -293,6 +300,109 @@ function blocoPar(texto: string): DocBloco[] {
 
 const RE_ITEM_LISTA = /^(-|\d+\.)\s/;
 
+// ---------- fases, tons e a trilha de encontros ----------
+// The PDF rotates full-width chapter bands (lime/amber/teal): `##` matching
+// FASE_RE renders as a tinted band and gets a phase index in doc order —
+// the "Encontros N a M" month groups plus the sections opening big parts.
+
+/** `##` que vira banda: grupos de mês da jornada ("Encontros 1 a 4",
+ *  "Encontros 8 e 9"), a abertura "Os 16 encontros" e o apêndice de
+ *  templates/modelos. Âncora no início — "Depois de cada encontro" não é
+ *  banda. */
+const FASE_RE =
+  /^(?:encontros\s+\d+\s+[ae]\s+\d+|os\s+16\s+encontros\b|(?:templates|modelos)\s+e\s+instrumentos)/i;
+
+/** Rotação de tons das bandas — a sequência do PDF (lima → âmbar → teal). */
+const FASE_TONS: DocTom[] = ["lima", "destaque", "info"];
+
+export function tomDeFase(fase: number): DocTom {
+  return FASE_TONS[((fase % FASE_TONS.length) + FASE_TONS.length) % FASE_TONS.length];
+}
+
+/** Title normalized for keyword checks: lowercase, no diacritics. */
+export function normTitulo(t: string): string {
+  return t
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim();
+}
+
+// semantic tone of the PDF's pill diagram: the dimension named in the
+// section title colors the numbered-item chips (trabalho e carreira → teal,
+// socioemocional → amber, modelar → lime). No match → default lime.
+const TOM_SECAO: [RegExp, DocTom][] = [
+  [/trabalho e carreira/, "info"],
+  [/socioemocional/, "destaque"],
+  [/modelar/, "lima"],
+];
+
+/** Tom semântico da seção pros chips dos itens numerados — null quando o
+ *  título não casa a dimensão (o render cai no lime default). */
+export function tomSemantico(titulo: string): DocTom | null {
+  const t = normTitulo(titulo);
+  for (const [re, tom] of TOM_SECAO) if (re.test(t)) return tom;
+  return null;
+}
+
+// ---------- jornada (trilha clicável dos encontros) ----------
+
+export type JornadaPonto = { numero: string; titulo: string; anchor: string };
+export type JornadaFase = {
+  /** rótulo do grupo de fase ("Encontros 1 a 4" — o texto antes do "·"). */
+  rotulo: string;
+  tom: DocTom;
+  pontos: JornadaPonto[];
+};
+
+export type CorpusJornada = {
+  fases: JornadaFase[];
+  total: number;
+  /** anchor do grupo "Os 16 encontros" — a trilha pendura sob o heading
+   *  dele; sem esse grupo, ela entra ANTES do grupo `inicio`. */
+  home: string | null;
+  /** anchor do primeiro grupo que contribui dots. */
+  inicio: string | null;
+};
+
+const RE_JORNADA_HOME = /^os 16 encontros\b/i;
+const JORNADA_MINIMA = 4;
+
+/** O mini-mapa da jornada: dots numerados pros cards de encontro COM âncora
+ *  (os ### "Nº encontro · Título" — cards inline do guia especialista não
+ *  têm âncora e ficam fora). Agrupados por fase na cor da banda. null abaixo
+ *  de JORNADA_MINIMA pontos ou quando nenhum card tem âncora. */
+export function jornadaCorpus(grupos: CorpusGrupo[]): CorpusJornada | null {
+  const fases: JornadaFase[] = [];
+  let inicio: string | null = null;
+  let home: string | null = null;
+  let total = 0;
+  for (const g of grupos) {
+    if (RE_JORNADA_HOME.test(g.titulo)) home = g.anchor;
+    const corpo = [
+      ...(g.intro?.blocos ?? []),
+      ...g.subs.flatMap((s) => s.blocos),
+    ];
+    const pontos: JornadaPonto[] = [];
+    for (const b of corpo) {
+      if (b.kind === "encontro" && b.anchor) {
+        pontos.push({ numero: b.numero, titulo: b.titulo, anchor: b.anchor });
+      }
+    }
+    if (pontos.length === 0) continue;
+    if (!inicio) inicio = g.anchor;
+    total += pontos.length;
+    fases.push({
+      rotulo: g.titulo.split("·")[0].trim(),
+      // fora de banda (doc sem fases) a cor segue a ordem da própria trilha
+      tom: tomDeFase(g.fase ?? fases.length),
+      pontos,
+    });
+  }
+  if (total < JORNADA_MINIMA) return null;
+  return { fases, total, home, inicio };
+}
+
 /** Corpo de seção → blocos. Linha vazia fecha o segmento; dentro de um mesmo
  *  trecho, linha abrindo com "|", "- " ou "N. " inicia segmento novo —
  *  o corpus também usa lista colada no parágrafo sem linha em branco. */
@@ -378,7 +488,8 @@ function mkSecao(
   titulo: string,
   grupo: string | null,
   nivel: 2 | 3,
-  texto: string
+  texto: string,
+  fase: number | null = null
 ): CorpusSecao {
   const limpo = tituloLimpo(titulo);
   const anchor = secaoAnchor(secao);
@@ -391,6 +502,7 @@ function mkSecao(
     grupo,
     nivel,
     anchor,
+    fase,
     blocos,
   };
 }
@@ -423,10 +535,12 @@ export function montarDocCorpus(slug: string, raw: string): CorpusDoc | null {
     i = 1;
   }
 
+  let faseIdx = 0; // índice de banda na ordem do doc — conta mesmo ## sem intro
   for (; i < partes.length; i++) {
     const { cab: t2, corpo: c2 } = cabecalho(partes[i]);
+    const fase = FASE_RE.test(tituloLimpo(t2)) ? faseIdx++ : null;
     const [intro, ...subs] = c2.split(/^### /m).map((s) => s.trim());
-    if (intro) secoes.push(mkSecao(t2, t2, null, 2, intro));
+    if (intro) secoes.push(mkSecao(t2, t2, null, 2, intro, fase));
     for (const s of subs) {
       const { cab: sub, corpo: txt } = cabecalho(s);
       if (!txt) continue; // ### sem corpo não é seção (mesmo corte do ingest)
@@ -456,17 +570,30 @@ export function montarDocCorpus(slug: string, raw: string): CorpusDoc | null {
 export function gruposCorpus(secoes: CorpusSecao[]): CorpusGrupo[] {
   const grupos: CorpusGrupo[] = [];
   let atual: CorpusGrupo | null = null;
+  // fase implícita (## sem intro) numera no ponto em que o grupo aparece —
+  // s.fase já desconta as bandas anteriores, então o contador só anda em
+  // título que casa FASE_RE e se ressincroniza a cada intro numerada
+  let proxFase = 0;
   for (const s of secoes) {
     if (s.nivel === 2) {
-      atual = { titulo: s.titulo, anchor: s.anchor, intro: s, subs: [] };
+      atual = {
+        titulo: s.titulo,
+        anchor: s.anchor,
+        intro: s,
+        subs: [],
+        fase: s.fase,
+      };
+      if (s.fase != null) proxFase = s.fase + 1;
       grupos.push(atual);
     } else {
       if (!atual || atual.titulo !== s.grupo) {
+        const titulo = s.grupo ?? s.titulo;
         atual = {
-          titulo: s.grupo ?? s.titulo,
+          titulo,
           anchor: secaoAnchor(s.grupo ?? s.secao),
           intro: null,
           subs: [],
+          fase: FASE_RE.test(tituloLimpo(titulo)) ? proxFase++ : null,
         };
         grupos.push(atual);
       }

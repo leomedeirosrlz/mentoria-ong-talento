@@ -1,25 +1,65 @@
 import Link from "next/link";
+import { Fragment, type ReactNode } from "react";
 import {
   ArrowLeft,
+  BookOpen,
+  Buildings,
+  Calendar,
   CaretDown,
+  ChartBar,
+  Chats,
+  ChatsCircle,
+  Compass,
+  EnvelopeOpen,
+  Files,
+  Flag,
+  FlagCheckered,
+  GraduationCap,
+  Handshake,
+  Info,
   ListBullets,
+  ListChecks,
+  MapTrifold,
+  MonitorPlay,
+  Question,
+  Sparkle,
+  SteeringWheel,
+  Target,
+  Toolbox,
+  UserCheck,
+  Users,
+  UsersThree,
 } from "@phosphor-icons/react/dist/ssr";
 import type {
   CorpusDoc,
   CorpusGrupo,
+  CorpusJornada,
   CorpusSecao,
 } from "@/lib/materiais/corpus-doc";
-import { gruposCorpus } from "@/lib/materiais/corpus-doc";
+import {
+  gruposCorpus,
+  jornadaCorpus,
+  normTitulo,
+  tomDeFase,
+  tomSemantico,
+} from "@/lib/materiais/corpus-doc";
+import type { DocTom } from "@/lib/materiais-documentos";
 import { cn } from "@/lib/utils";
-import { DocBlocos, DocumentoHero, LinkSecao } from "./material-documento";
+import {
+  DocBlocos,
+  DocumentoHero,
+  LinkSecao,
+  TOM_DOC,
+} from "./material-documento";
 
 // RAG corpus document (docs/rag/*.md) rendered natively — the PDF guide's
-// visual grammar: ink hero, navy h2 with the full-width lime rule, caps
-// eyebrow on the "X · Título" prefix, encounter cards, callouts, charcoal
-// tables and a TOC with lime marker + dotted leader (collapsible on
-// mobile, sticky rail at xl on long guides). The per-section anchor
-// (id = secaoAnchor) is the same slug the assistant uses to cite the
-// source — headings link to their own anchor, no JS.
+// visual grammar: ink hero, keyword icons and the full-width lime rule on
+// h2, rotating phase bands for the journey's month groups, the clickable
+// 16-dot journey strip, encounter cards, callouts, charcoal tables and a
+// TOC with tone markers + dotted leader (collapsible on mobile, sticky
+// rail at xl on long guides). The per-section anchor (id = secaoAnchor)
+// is the same slug the assistant uses to cite the source — headings link
+// to their own anchor, no JS.
 
 const TOC_MINIMO = 8; // above 8 sections the TOC shows at the top
 
@@ -50,11 +90,96 @@ function eyebrowDe(titulo: string): { eyebrow: string | null; resto: string } {
   return m ? { eyebrow: m[1], resto: m[2] } : { eyebrow: null, resto: titulo };
 }
 
-/** The guide's h2: caps lime eyebrow (when the title carries "X · ") +
- *  navy bold title + the full-width lime rule below — the guide's
- *  signature. */
+// h2 icon by exact keyword in the normalized title (word boundary) — the
+// first match wins; a title with no keyword keeps no icon, never a
+// placeholder. Mirrors the PDF's chapter pictograms.
+const H2_ICONE: [RegExp, typeof Info][] = [
+  [/\bcarta\b/, EnvelopeOpen],
+  [/\binstituto\b/, Buildings],
+  [/\bintroducao\b/, Compass],
+  [/\bjornada\b/, MapTrifold],
+  [/\bplataforma\b/, MonitorPlay],
+  [/\bfuncoes\b/, Sparkle],
+  [/\binstrumentos\b/, Toolbox],
+  [/\bperguntas\b/, Question],
+  [/\bfeedback\b/, ChatsCircle],
+  [/\b(?:pdm|plano)\b/, Target],
+  [/\b(?:visao|metas)\b/, Flag],
+  [/\broda\b/, SteeringWheel],
+  [/\b(?:matching|duplas)\b/, Handshake],
+  [/\b(?:cronograma|ritmo)\b/, Calendar],
+  [/\bencontros\b/, UsersThree],
+  [/\b(?:ferramentas|comunicacao)\b/, Chats],
+  [/\b(?:avaliacao|suporte)\b/, ChartBar],
+  [/\b(?:conteudo|complementar)\b/, BookOpen],
+  [/\b(?:consideracoes|finais)\b/, FlagCheckered],
+  [/\btemplates\b/, Files],
+  [/\bchecklist\b/, ListChecks],
+  [/\b(?:pre-requisitos|equipe)\b/, Users],
+  [/\b(?:dedicacao|formacao)\b/, GraduationCap],
+  [/\bperfil\b/, UserCheck],
+];
+
+// returns the node, not the type — JSX on a render-scope variable trips
+// react-hooks/static-components (property lookups are the project's
+// workaround everywhere else; a regex scan needs the function instead)
+function iconeTitulo(titulo: string, className: string): ReactNode {
+  const t = normTitulo(titulo);
+  for (const [re, Icone] of H2_ICONE) {
+    if (re.test(t)) {
+      return <Icone size={20} aria-hidden className={className} />;
+    }
+  }
+  return null;
+}
+
+/** The guide's h2 in two shapes: phase sections (grupo.fase) render as the
+ *  PDF's full-width band — tinted bg of the rotating tone + caps eyebrow +
+ *  icon + title + the tone's accent bar; regular sections keep the caps
+ *  lime eyebrow + navy bold title + the full-width lime rule. */
 function TituloGrupo({ grupo }: { grupo: CorpusGrupo }) {
   const { eyebrow, resto } = eyebrowDe(grupo.titulo);
+  const tom = grupo.fase != null ? TOM_DOC[tomDeFase(grupo.fase)] : null;
+  const titulo = (
+    <>
+      {iconeTitulo(
+        grupo.titulo,
+        cn("shrink-0", tom ? tom.forte : "text-[var(--ring)]")
+      )}
+      <a
+        href={`#${grupo.anchor}`}
+        className="decoration-muted-foreground/40 underline-offset-4 hover:underline"
+      >
+        {resto}
+      </a>
+      <LinkSecao anchor={grupo.anchor} titulo={grupo.titulo} />
+    </>
+  );
+  if (tom) {
+    return (
+      <h2 id={grupo.anchor} className="group scroll-mt-20 md:scroll-mt-8">
+        <div className={cn("rounded-xl px-4 py-4 sm:px-5", tom.banda)}>
+          {eyebrow ? (
+            <span
+              className={cn(
+                "mb-1 block text-[11px] font-bold uppercase tracking-[0.14em]",
+                tom.forte
+              )}
+            >
+              {eyebrow}
+            </span>
+          ) : null}
+          <span className="flex items-center gap-2.5 text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+            {titulo}
+          </span>
+          <span
+            aria-hidden
+            className={cn("mt-3 block h-[3px] w-12 rounded-full", tom.barra)}
+          />
+        </div>
+      </h2>
+    );
+  }
   return (
     <h2 id={grupo.anchor} className="group scroll-mt-20 md:scroll-mt-8">
       {eyebrow ? (
@@ -62,14 +187,8 @@ function TituloGrupo({ grupo }: { grupo: CorpusGrupo }) {
           {eyebrow}
         </span>
       ) : null}
-      <span className="block border-b-2 border-[var(--brand-lime)] pb-2 text-lg font-semibold tracking-tight text-foreground sm:text-xl">
-        <a
-          href={`#${grupo.anchor}`}
-          className="decoration-muted-foreground/40 underline-offset-4 hover:underline"
-        >
-          {resto}
-        </a>
-        <LinkSecao anchor={grupo.anchor} titulo={grupo.titulo} />
+      <span className="flex items-center gap-2.5 border-b-2 border-[var(--brand-lime)] pb-2 text-lg font-semibold tracking-tight text-foreground sm:text-xl">
+        {titulo}
       </span>
     </h2>
   );
@@ -97,44 +216,59 @@ function TituloSub({ s }: { s: CorpusSecao }) {
   );
 }
 
-function GrupoSecao({ grupo }: { grupo: CorpusGrupo }) {
+function GrupoSecao({
+  grupo,
+  trilha,
+}: {
+  grupo: CorpusGrupo;
+  trilha?: ReactNode;
+}) {
+  // semantic tone of the numbered chips (the PDF's pill diagram) — the sub
+  // inherits the parent section's tone when it has no dimension of its own
+  const tomGrupo = tomSemantico(grupo.titulo) ?? undefined;
   return (
     <section>
       <TituloGrupo grupo={grupo} />
+      {trilha}
       {grupo.intro ? (
         <div className="mt-3 space-y-3">
-          <DocBlocos blocos={grupo.intro.blocos} />
+          <DocBlocos blocos={grupo.intro.blocos} tom={tomGrupo} />
         </div>
       ) : null}
-      {grupo.subs.map((s) => (
-        <section key={s.anchor} className="mt-5">
-          {s.blocos[0]?.kind === "encontro" ? (
-            // encounter section: the card itself carries heading + anchor
-            <DocBlocos blocos={s.blocos} />
-          ) : (
-            <>
-              <TituloSub s={s} />
-              <div className="mt-2 space-y-3">
-                <DocBlocos blocos={s.blocos} />
-              </div>
-            </>
-          )}
-        </section>
-      ))}
+      {grupo.subs.map((s) => {
+        const tomSub = tomSemantico(s.titulo) ?? tomGrupo;
+        return (
+          <section key={s.anchor} className="mt-5">
+            {s.blocos[0]?.kind === "encontro" ? (
+              // encounter section: the card itself carries heading + anchor
+              <DocBlocos blocos={s.blocos} tom={tomSub} />
+            ) : (
+              <>
+                <TituloSub s={s} />
+                <div className="mt-2 space-y-3">
+                  <DocBlocos blocos={s.blocos} tom={tomSub} />
+                </div>
+              </>
+            )}
+          </section>
+        );
+      })}
     </section>
   );
 }
 
-/** TOC item: lime marker + title + dotted leader — the guide's printed
- *  TOC rite. */
+/** TOC item: tone marker (the phase's own color on bands, lime elsewhere)
+ *  + title + dotted leader — the guide's printed TOC rite. */
 function SumarioItem({
   anchor,
   titulo,
   sub,
+  tom,
 }: {
   anchor: string;
   titulo: string;
   sub?: boolean;
+  tom?: DocTom;
 }) {
   return (
     <a
@@ -147,8 +281,9 @@ function SumarioItem({
       <span
         aria-hidden
         className={cn(
-          "shrink-0 self-center rounded-full bg-[var(--brand-lime)]",
-          sub ? "size-1" : "size-1.5"
+          "shrink-0 self-center rounded-full",
+          sub ? "size-1" : "size-1.5",
+          tom ? TOM_DOC[tom].barra : "bg-[var(--brand-lime)]"
         )}
       />
       <span className="min-w-0">{titulo}</span>
@@ -165,7 +300,11 @@ function SumarioLista({ grupos }: { grupos: CorpusGrupo[] }) {
     <ol className="space-y-0.5">
       {grupos.map((g) => (
         <li key={g.anchor}>
-          <SumarioItem anchor={g.anchor} titulo={g.titulo} />
+          <SumarioItem
+            anchor={g.anchor}
+            titulo={g.titulo}
+            tom={g.fase != null ? tomDeFase(g.fase) : undefined}
+          />
           {g.subs.length > 0 ? (
             <ol className="mb-1.5 ml-4 mt-0.5 space-y-0.5 border-l border-border/60 pl-3">
               {g.subs.map((s) => (
@@ -240,10 +379,79 @@ function SumarioRail({
   );
 }
 
+/** The clickable journey map the PDF doesn't have: one numbered dot per
+ *  encounter card, grouped and colored by phase band, connected by a line.
+ *  Each dot links to the card's own anchor (the same secaoAnchor the
+ *  citations use). Scrolls horizontally on mobile, hidden in print. */
+function JornadaStrip({ jornada }: { jornada: CorpusJornada }) {
+  return (
+    <nav
+      aria-label={`Mapa dos ${jornada.total} encontros`}
+      className="mt-4 overflow-x-auto rounded-xl border border-border/60 bg-card px-4 py-3.5 shadow-[var(--shadow-border)] print:hidden"
+    >
+      <ol className="flex w-max items-start">
+        {jornada.fases.map((f, i) => {
+          const t = TOM_DOC[f.tom];
+          return (
+            <li key={f.rotulo} className="flex items-start">
+              {i > 0 ? (
+                // mt-[15px] = center of the size-8 dot row, so the link
+                // between phase groups sits on the same line as the
+                // intra-group connectors
+                <span
+                  aria-hidden
+                  className="mx-2.5 mt-[15px] h-0.5 w-3.5 shrink-0 rounded-full bg-border"
+                />
+              ) : null}
+              <div>
+                <ol className="flex items-center">
+                  {f.pontos.map((p, j) => (
+                    <li key={p.anchor} className="flex items-center">
+                      {j > 0 ? (
+                        <span
+                          aria-hidden
+                          className={cn(
+                            "h-0.5 w-2.5 rounded-full",
+                            t.trilho
+                          )}
+                        />
+                      ) : null}
+                      <a
+                        href={`#${p.anchor}`}
+                        title={`${p.numero}º encontro · ${p.titulo}`}
+                        aria-label={`${p.numero}º encontro · ${p.titulo}`}
+                        className={cn(
+                          "grid size-8 shrink-0 place-items-center rounded-full border-2 text-xs font-bold transition-transform hover:-translate-y-0.5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                          t.dot
+                        )}
+                      >
+                        {p.numero}
+                      </a>
+                    </li>
+                  ))}
+                </ol>
+                <p
+                  className={cn(
+                    "mt-1.5 text-[11px] font-semibold uppercase tracking-[0.08em]",
+                    t.forte
+                  )}
+                >
+                  {f.rotulo}
+                </p>
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </nav>
+  );
+}
+
 /** Document body: lede + TOC + sections. Exported apart from the shell
  *  (without the "back" Link) for direct render in tests. */
 export function CorpusDocBody({ doc }: { doc: CorpusDoc }) {
   const grupos = gruposCorpus(doc.secoes);
+  const jornada = jornadaCorpus(grupos);
   const longo = doc.secoes.length > TOC_MINIMO;
   return (
     <div className={cn("mt-5", longo && "xl:grid xl:grid-cols-[15rem_minmax(0,1fr)] xl:gap-10")}>
@@ -263,7 +471,19 @@ export function CorpusDocBody({ doc }: { doc: CorpusDoc }) {
 
         <div className="mt-6 space-y-8">
           {grupos.map((g) => (
-            <GrupoSecao key={g.anchor} grupo={g} />
+            <Fragment key={g.anchor}>
+              {jornada && !jornada.home && jornada.inicio === g.anchor ? (
+                <JornadaStrip jornada={jornada} />
+              ) : null}
+              <GrupoSecao
+                grupo={g}
+                trilha={
+                  jornada && jornada.home === g.anchor ? (
+                    <JornadaStrip jornada={jornada} />
+                  ) : undefined
+                }
+              />
+            </Fragment>
           ))}
         </div>
       </div>
