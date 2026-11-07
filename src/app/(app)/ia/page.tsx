@@ -634,6 +634,8 @@ export default async function IaPage({
   const chaveRecorte = `${dias}|${canal}|${modelo ?? ""}`;
 
   const totalTier = mt.porTier.reduce((s, t) => s + t.respostas, 0);
+  const totalUsos = mt.topTools.reduce((s, t) => s + t.chamadas, 0);
+  const totalPerguntas = mt.porPessoa.reduce((s, p) => s + p.mensagens, 0);
   const CORES_TIER: Record<string, string> = {
     rapido: "bg-[var(--chart-3)]",
     balanceado: "bg-[var(--chart-5)]",
@@ -710,8 +712,10 @@ export default async function IaPage({
       </div>
 
       {truncado && (
-        <p className="text-xs text-muted-foreground">
-          Mostrando só os eventos mais recentes deste período.
+        <p className="rounded-lg border border-[var(--warn-border)] bg-[var(--warn-bg)] px-3 py-2 text-sm text-[var(--warn-text)]">
+          Período com volume alto: mostrando só os eventos mais recentes. Os
+          totais dos gráficos seguem completos — só as listas abaixo foram
+          cortadas.
         </p>
       )}
 
@@ -795,7 +799,15 @@ export default async function IaPage({
           <Kpi rotulo="Latência média" valor={ms(mt.msMedio)} detalhe={`p95 ${ms(mt.msP95)}`} />
           <Kpi
             rotulo="Erro"
-            valor={pct(mt.erroRate)}
+            valor={
+              <span
+                className={
+                  mt.erroRate > 0.05 ? "text-[var(--danger-text)]" : undefined
+                }
+              >
+                {pct(mt.erroRate)}
+              </span>
+            }
             detalhe={`${mt.respostas - mt.respostasOk} de ${mt.respostas} respostas`}
           />
           <Kpi
@@ -816,10 +828,23 @@ export default async function IaPage({
           <ul className="divide-y divide-border/60">
             {mt.porModelo.map((l) => (
               // no celular o nome ocupa a linha e as métricas descem sob o
-              // cabeçalho; título de item não trunca
-              <li key={l.modelo} className="flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-2 sm:gap-x-3">
+              // cabeçalho; título de item não trunca. O modelo do filtro
+              // fica marcado na própria lista (feedback do recorte ativo)
+              <li
+                key={l.modelo}
+                className={cn(
+                  "flex flex-wrap items-baseline gap-x-2 gap-y-0.5 py-2 sm:gap-x-3",
+                  modelo === l.modelo &&
+                    "-mx-2 rounded-md bg-primary/5 px-2 ring-1 ring-primary/20"
+                )}
+              >
                 <span className="w-full min-w-0 break-words text-sm font-medium sm:w-auto sm:flex-1">
                   {l.modelo}
+                  {modelo === l.modelo && (
+                    <span className="ml-2 rounded-full border border-primary/30 bg-primary/10 px-1.5 py-px text-[10px] font-semibold text-foreground">
+                      filtro
+                    </span>
+                  )}
                 </span>
                 <span className="ml-auto w-10 text-right text-xs tabular-nums sm:ml-0">{num.format(l.respostas)}</span>
                 <span className="w-20 text-right sm:w-24 text-xs tabular-nums text-muted-foreground">
@@ -866,10 +891,18 @@ export default async function IaPage({
               <span className="w-12 text-right">Tempo</span>
             </div>
             <ul className="divide-y divide-border/60">
-              {mt.topTools.map((t) => (
+              {mt.topTools.map((t) => {
+                const fr = totalUsos ? t.chamadas / totalUsos : 0;
+                return (
                 <li key={t.tool} className="flex items-baseline gap-x-3 py-2">
                   <span className="min-w-0 flex-1 break-words text-sm font-medium">
                     {rotuloTool(t.tool)}
+                  </span>
+                  <span aria-hidden className="h-1.5 w-10 shrink-0 self-center overflow-hidden rounded-full bg-muted sm:w-14">
+                    <span
+                      className="block h-full rounded-full bg-[var(--chart-5)]"
+                      style={{ width: `${Math.min(100, fr * 100)}%` }}
+                    />
                   </span>
                   <span className="w-10 text-right text-xs tabular-nums">{num.format(t.chamadas)}</span>
                   <span className={cn(
@@ -880,7 +913,8 @@ export default async function IaPage({
                   </span>
                   <span className="w-12 text-right text-xs tabular-nums text-muted-foreground">{ms(t.msMedio)}</span>
                 </li>
-              ))}
+                );
+              })}
               {!mt.topTools.length && (
                 <li className="py-2 text-sm text-muted-foreground">Nenhuma ferramenta usada no período.</li>
               )}
@@ -894,15 +928,24 @@ export default async function IaPage({
               <span className="w-16 text-right">Plano</span>
             </div>
             <ul className="divide-y divide-border/60">
-              {mt.porPessoa.map((p) => (
+              {mt.porPessoa.map((p) => {
+                const fr = totalPerguntas ? p.mensagens / totalPerguntas : 0;
+                return (
                 <li key={p.profileId} className="flex items-baseline gap-x-3 py-2">
                   <span className="min-w-0 flex-1 break-words text-sm font-medium">
                     {nomes.get(p.profileId) ?? "Sem nome"}
                   </span>
+                  <span aria-hidden className="h-1.5 w-10 shrink-0 self-center overflow-hidden rounded-full bg-muted sm:w-14">
+                    <span
+                      className="block h-full rounded-full bg-[var(--chart-2)]"
+                      style={{ width: `${Math.min(100, fr * 100)}%` }}
+                    />
+                  </span>
                   <span className="w-14 text-right text-xs tabular-nums">{num.format(p.mensagens)}</span>
                   <span className="w-16 text-right text-xs tabular-nums text-muted-foreground">{usdExato(p.allowance)}</span>
                 </li>
-              ))}
+                );
+              })}
               {!mt.porPessoa.length && (
                 <li className="py-2 text-sm text-muted-foreground">Sem uso no período.</li>
               )}
@@ -910,7 +953,12 @@ export default async function IaPage({
           </Secao>
         </div>
 
-        <IaEvals modelosSugeridos={modelosCfg} />
+        <div className="border-t border-border pt-6">
+          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            Qualidade
+          </p>
+          <IaEvals modelosSugeridos={modelosCfg} />
+        </div>
       </div>
     </div>
   );
