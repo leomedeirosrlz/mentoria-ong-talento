@@ -5,8 +5,17 @@
 // request (POST /executar) — progresso ao vivo, retomável se a aba fechar.
 // Métricas (latência, tokens, custo) vêm do evento 'resposta' do chat.
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { CaretDown } from "@phosphor-icons/react";
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useId,
+  useMemo,
+  useRef,
+  useState,
+  type CSSProperties,
+} from "react";
+import { CaretDown, CircleNotch, Pause, Play } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,6 +25,7 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Skeleton } from "@/components/ui/skeleton";
+import { BarraSegmentada, Sparkline } from "@/components/viz";
 
 type Caso = { id: string; papel_esperado: string; msg: string };
 type Run = {
@@ -61,6 +71,36 @@ const STATUS_ITEM: Record<Item["status"], { rotulo: string; cls: string }> = {
   erro: { rotulo: "erro", cls: "bg-[var(--warn-bg)] text-[var(--warn-text)]" },
 };
 
+const STATUS_RUN: Record<Run["status"], { rotulo: string; cls: string }> = {
+  pendente: { rotulo: "na fila", cls: "bg-muted text-muted-foreground" },
+  rodando: {
+    rotulo: "rodando",
+    cls: "bg-[var(--info-bg)] text-[var(--info-text)]",
+  },
+  concluido: {
+    rotulo: "concluído",
+    cls: "bg-[var(--ok-bg)] text-[var(--ok-text)]",
+  },
+  falhou: {
+    rotulo: "falhou",
+    cls: "bg-[var(--danger-bg)] text-[var(--danger-text)]",
+  },
+};
+
+/** chip sólido da célula da matriz — a mesma gramática dos marcadores do
+ *  app (fill de status + --status-foreground); pendente fica em contorno
+ *  tracejado ("ainda não aconteceu") e rodando pulsa em --info. */
+const CELULA: Record<Item["status"], string> = {
+  pendente:
+    "border border-dashed border-muted-foreground/50 text-muted-foreground",
+  rodando: "bg-[var(--info)] text-[var(--status-foreground)] animate-pulse",
+  ok: "bg-[var(--ok)] text-[var(--status-foreground)]",
+  falhou: "bg-[var(--danger)] text-[var(--status-foreground)]",
+  erro: "bg-[var(--warn)] text-[var(--status-foreground)]",
+};
+
+type FiltroItem = "todos" | "ok" | "falhou" | "erro";
+
 const num = new Intl.NumberFormat("pt-BR");
 const usd = (v: number | null) =>
   v == null ? "—" : v === 0 ? "US$ 0" : `US$ ${v.toFixed(4)}`;
@@ -73,6 +113,20 @@ const dataCurta = (iso: string) =>
     hour: "2-digit",
     minute: "2-digit",
   });
+const diaCurta = (iso: string) =>
+  new Date(iso).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  });
+const compacto = new Intl.NumberFormat("pt-BR", {
+  notation: "compact",
+  maximumFractionDigits: 1,
+});
+const stagger = (i: number) => ({ "--i": Math.min(i, 10) }) as CSSProperties;
+/** leitura de uma execução pro title da célula (hover repete latência +
+ *  tokens sem abrir o painel) */
+const descItem = (i: Item) =>
+  `rep ${i.repeticao}: ${STATUS_ITEM[i.status].rotulo} · ${ms(i.latencia_ms)} · ${num.format(i.tokens_in ?? 0)}+${num.format(i.tokens_out ?? 0)} tok · ${usd(i.custo_usd)}`;
 
 function Chip({
   ativo,
@@ -502,140 +556,791 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
         </div>
       </div>
 
-      {/* runs recentes */}
-      {runs && runs.length > 0 && (
-        <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-          <h3 className="text-sm font-semibold">Runs recentes</h3>
-          <ul className="mt-2 divide-y divide-border/60">
-            {runs.map((r) => (
-              <li
-                key={r.id}
-                className="flex flex-wrap items-baseline gap-x-3 py-2.5"
-              >
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => void carregarDetalhe(r.id)}
-                  className="h-auto min-w-0 flex-1 justify-start p-0 text-left font-normal hover:bg-transparent"
-                >
-                  <span className="text-sm font-medium">
-                    {dataCurta(r.created_at)} · {r.ambiente} ·{" "}
-                    {r.papel === "staff" ? "Staff" : "Mentorado"}
-                  </span>
-                  <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                    {r.modelos.join(", ")} · {r.repeticoes}×
-                  </span>
-                </Button>
-                <span className="text-xs tabular-nums text-muted-foreground">
-                  {r.resumo
-                    ? `${r.resumo.ok}/${r.resumo.total} ok · ${ms(r.resumo.latencia_media_ms)} · ${usd(r.resumo.custo_usd)}`
-                    : r.status}
-                </span>
-                {r.status !== "concluido" && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      void carregarDetalhe(r.id);
-                      void dirigir(r.id);
-                    }}
-                    className="min-h-11 px-2 text-xs sm:min-h-7"
-                  >
-                    Continuar
-                  </Button>
-                )}
-              </li>
-            ))}
-          </ul>
+      {/* histórico de runs + saúde do eval */}
+      <FaixaRuns
+        runs={runs}
+        selecionado={detalhe?.run.id ?? null}
+        driving={driving}
+        onAbrir={(id) => void carregarDetalhe(id)}
+        onContinuar={(id) => {
+          void carregarDetalhe(id);
+          void dirigir(id);
+        }}
+      />
+
+      {/* detalhe do run aberto — remonta por run (a entrada animada roda de
+          novo) e conserva estado interno durante as atualizações do laço */}
+      {detalhe && (
+        <DetalheRun
+          key={detalhe.run.id}
+          run={detalhe.run}
+          itens={detalhe.itens}
+          feitos={feitos ?? 0}
+          driving={driving === detalhe.run.id}
+          bloqueado={driving !== null && driving !== detalhe.run.id}
+          onContinuar={() => void dirigir(detalhe.run.id)}
+          onPausar={() => {
+            parar.current = true;
+          }}
+        />
+      )}
+    </section>
+  );
+}
+
+/** Card de KPI do run aberto — número grande tabular + meta embaixo,
+ *  entrada com stagger (--i). */
+function Kpi({
+  rotulo,
+  valor,
+  meta,
+  i,
+}: {
+  rotulo: string;
+  valor: string;
+  meta?: string;
+  i: number;
+}) {
+  return (
+    <div
+      className="animate-enter rounded-xl border border-border bg-card p-3 sm:p-4"
+      style={stagger(i)}
+    >
+      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+        {rotulo}
+      </p>
+      <p className="mt-1 text-xl font-semibold tabular-nums tracking-tight sm:text-2xl">
+        {valor}
+      </p>
+      {meta && <p className="mt-0.5 text-xs text-muted-foreground">{meta}</p>}
+    </div>
+  );
+}
+
+/** Faixa de runs: sparkline do pass rate ao longo do tempo (a saúde do
+ *  eval) + cards compactos selecionáveis. O run aberto ganha ring; run não
+ *  concluído oferece Continuar — o laço é global, um run por vez. */
+function FaixaRuns({
+  runs,
+  selecionado,
+  driving,
+  onAbrir,
+  onContinuar,
+}: {
+  runs: Run[] | null;
+  selecionado: string | null;
+  driving: string | null;
+  onAbrir: (id: string) => void;
+  onContinuar: (id: string) => void;
+}) {
+  if (!runs?.length) return null;
+  // a API devolve desc — o eixo do tempo cresce pra direita, então inverte
+  const ultimos = runs.slice(0, 14).reverse();
+  const serie = ultimos.map((r) =>
+    r.resumo && r.resumo.total > 0
+      ? Math.round((r.resumo.ok / r.resumo.total) * 100)
+      : null
+  );
+  const passoRotulo = Math.max(1, Math.ceil(ultimos.length / 7));
+  const labelsX = ultimos.map((r, i) =>
+    i % passoRotulo === 0 || i === ultimos.length - 1
+      ? diaCurta(r.created_at)
+      : ""
+  );
+  return (
+    <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h3 className="text-base font-semibold">Runs recentes</h3>
+        <span className="text-xs tabular-nums text-muted-foreground">
+          {runs.length} {runs.length === 1 ? "run" : "runs"}
+        </span>
+      </div>
+
+      {ultimos.length > 1 && serie.some((v) => v != null) && (
+        <div className="mt-4">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+            Pass rate ao longo do tempo
+          </p>
+          <Sparkline
+            className="mt-1"
+            series={[
+              { valores: serie, rotulo: "pass rate", cor: "var(--chart-1)" },
+            ]}
+            min={0}
+            max={100}
+            labelsX={labelsX}
+            atencaoAbaixoDe={50}
+            altura={90}
+            formatarValor={(v) => `${Math.round(v)}%`}
+          />
         </div>
       )}
 
-      {/* detalhe do run */}
-      {detalhe && (
-        <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-          <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h3 className="text-sm font-semibold">
-              Run {dataCurta(detalhe.run.created_at)} · {detalhe.run.ambiente}
+      <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+        {runs.map((r, idx) => {
+          const sel = r.id === selecionado;
+          const res = r.resumo;
+          const naFila = res
+            ? res.total - res.ok - res.falhas - res.erros
+            : 0;
+          return (
+            <li
+              key={r.id}
+              style={stagger(idx)}
+              className={cn(
+                "animate-enter overflow-hidden rounded-xl border bg-card transition-[border-color,box-shadow] duration-200 ease-snappy",
+                sel ? "border-transparent ring-2 ring-ring" : "border-border"
+              )}
+            >
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => onAbrir(r.id)}
+                aria-current={sel || undefined}
+                className="h-auto w-full flex-col items-stretch gap-1.5 rounded-none px-3 py-2.5 text-left font-normal whitespace-normal hover:bg-muted/40"
+              >
+                <span className="flex items-baseline justify-between gap-2">
+                  <span className="text-sm font-medium">
+                    {dataCurta(r.created_at)}
+                  </span>
+                  <span className="shrink-0 text-[11px] text-muted-foreground">
+                    {r.ambiente} · {r.papel === "staff" ? "Staff" : "Mentorado"}
+                  </span>
+                </span>
+                <span
+                  className="truncate text-xs text-muted-foreground"
+                  title={r.modelos.join(", ")}
+                >
+                  {r.modelos.join(", ")} · {r.repeticoes}× por caso
+                </span>
+                {res ? (
+                  <>
+                    <BarraSegmentada
+                      className="mt-0.5"
+                      altura="sm"
+                      denominador={res.total}
+                      segmentos={[
+                        {
+                          valor: res.ok,
+                          rotulo: "passou",
+                          cls: "bg-[var(--ok)]",
+                        },
+                        {
+                          valor: res.falhas,
+                          rotulo: "falhou",
+                          cls: "bg-[var(--danger)]",
+                        },
+                        {
+                          valor: res.erros,
+                          rotulo: "erro",
+                          cls: "bg-[var(--warn)]",
+                        },
+                        { valor: naFila, rotulo: "na fila" },
+                      ]}
+                    />
+                    <span className="mt-1 flex items-baseline justify-between gap-2">
+                      <span className="text-sm font-semibold tabular-nums">
+                        {res.total > 0
+                          ? `${Math.round((res.ok / res.total) * 100)}%`
+                          : "—"}
+                        <span className="ml-1 text-xs font-normal text-muted-foreground">
+                          passou
+                        </span>
+                      </span>
+                      <span className="text-xs tabular-nums text-muted-foreground">
+                        {ms(res.latencia_media_ms)} · {usd(res.custo_usd)}
+                      </span>
+                    </span>
+                  </>
+                ) : (
+                  <span className="mt-0.5 flex items-center gap-1.5">
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
+                        STATUS_RUN[r.status].cls
+                      )}
+                    >
+                      {r.status === "rodando" && (
+                        <CircleNotch
+                          size={11}
+                          aria-hidden
+                          className="animate-spin"
+                        />
+                      )}
+                      {STATUS_RUN[r.status].rotulo}
+                    </span>
+                    <span className="text-xs text-muted-foreground">
+                      sem resumo ainda
+                    </span>
+                  </span>
+                )}
+              </Button>
+              {r.status !== "concluido" && (
+                <div className="border-t border-border/60 px-2 py-1.5">
+                  {driving === r.id ? (
+                    <span
+                      role="status"
+                      className="flex min-h-7 items-center justify-center gap-1.5 text-xs font-medium text-[var(--info-text)]"
+                    >
+                      <CircleNotch
+                        size={12}
+                        aria-hidden
+                        className="animate-spin"
+                      />
+                      rodando…
+                    </span>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      disabled={driving !== null}
+                      onClick={() => onContinuar(r.id)}
+                      className="w-full text-xs"
+                    >
+                      <Play aria-hidden />
+                      Continuar
+                    </Button>
+                  )}
+                </div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+/** Detalhe do run aberto — o painel high-end: faixa-herói com progresso e
+ *  composição (BarraSegmentada grande), 4 KPIs, e a matriz caso × modelo
+ *  com células clicáveis, painel de detalhe inline (um por vez), filtro por
+ *  status e resumo por modelo no rodapé. O laço atualiza só o status dos
+ *  itens: os chips mudam de cor com um pop e as barras interpolam. */
+function DetalheRun({
+  run,
+  itens,
+  feitos,
+  driving,
+  bloqueado,
+  onContinuar,
+  onPausar,
+}: {
+  run: Run;
+  itens: Item[];
+  feitos: number;
+  driving: boolean;
+  bloqueado: boolean;
+  onContinuar: () => void;
+  onPausar: () => void;
+}) {
+  const painelId = useId();
+  const [filtro, setFiltro] = useState<FiltroItem>("todos");
+  const [aberto, setAberto] = useState<{
+    caso: string;
+    modelo: string;
+  } | null>(null);
+
+  // (a animação de troca de status mora no chip: a key `id:status` remonta
+  // só o chip que mudou e o .ia-pop do globals dá o pop — zero bookkeeping)
+
+  const stats = useMemo(() => {
+    const por = (s: Item["status"]) =>
+      itens.filter((i) => i.status === s).length;
+    const lats = itens
+      .map((i) => i.latencia_ms)
+      .filter((v): v is number => v != null)
+      .sort((a, b) => a - b);
+    const soma = (k: "tokens_in" | "tokens_out" | "custo_usd") =>
+      itens.reduce((acc, i) => acc + (i[k] ?? 0), 0);
+    return {
+      total: itens.length,
+      ok: por("ok"),
+      falhas: por("falhou"),
+      erros: por("erro"),
+      rodando: por("rodando"),
+      naFila: por("pendente"),
+      latMedia: lats.length
+        ? lats.reduce((a, b) => a + b, 0) / lats.length
+        : null,
+      p95: lats.length
+        ? lats[Math.min(lats.length - 1, Math.ceil(lats.length * 0.95) - 1)]
+        : null,
+      tokensIn: soma("tokens_in"),
+      tokensOut: soma("tokens_out"),
+      custo: soma("custo_usd"),
+    };
+  }, [itens]);
+
+  // casos e modelos na ordem da grade (itens vêm ordenados por id = ordem
+  // de criação do produto cartesiano)
+  const casosOrdem = useMemo(() => {
+    const vistos = new Map<string, string>();
+    for (const i of itens) if (!vistos.has(i.caso_id)) vistos.set(i.caso_id, i.msg);
+    return [...vistos].map(([id, msg]) => ({ id, msg }));
+  }, [itens]);
+  const modelosOrdem = useMemo(() => {
+    const vistos = new Set<string>();
+    for (const i of itens) vistos.add(i.modelo);
+    return [...vistos];
+  }, [itens]);
+  const grade = useMemo(() => {
+    const m = new Map<string, Item[]>();
+    for (const i of itens) {
+      const k = `${i.caso_id}§${i.modelo}`;
+      const arr = m.get(k) ?? [];
+      arr.push(i);
+      m.set(k, arr);
+    }
+    return m;
+  }, [itens]);
+  const porModelo = useMemo(() => {
+    const acc = new Map<
+      string,
+      { n: number; ok: number; falhou: number; erro: number; lats: number[] }
+    >();
+    for (const i of itens) {
+      const e = acc.get(i.modelo) ?? {
+        n: 0,
+        ok: 0,
+        falhou: 0,
+        erro: 0,
+        lats: [],
+      };
+      e.n++;
+      if (i.status === "ok") e.ok++;
+      else if (i.status === "falhou") e.falhou++;
+      else if (i.status === "erro") e.erro++;
+      if (i.latencia_ms != null) e.lats.push(i.latencia_ms);
+      acc.set(i.modelo, e);
+    }
+    return acc;
+  }, [itens]);
+
+  const bate = (i: Item) => filtro === "todos" || i.status === filtro;
+  const celula = (casoId: string, modelo: string) =>
+    grade.get(`${casoId}§${modelo}`) ?? [];
+
+  return (
+    <div className="space-y-3">
+      {/* faixa-herói: título, ações, progresso fino e composição por status */}
+      <div className="animate-enter rounded-xl border border-border bg-card p-4 sm:p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="min-w-0">
+            <h3 className="text-base font-semibold">
+              Run de {dataCurta(run.created_at)}
+              <span className="font-normal text-muted-foreground">
+                {" "}
+                · {run.ambiente} · {run.papel === "staff" ? "Staff" : "Mentorado"}
+              </span>
             </h3>
-            <span className="text-xs tabular-nums text-muted-foreground">
-              {feitos}/{detalhe.itens.length}
-              {driving === detalhe.run.id ? " · rodando…" : ""}
+            <p
+              className="mt-0.5 truncate text-xs text-muted-foreground"
+              title={run.modelos.join(", ")}
+            >
+              {run.modelos.join(", ")} · {run.repeticoes}× por caso
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <span
+              role="status"
+              aria-live="polite"
+              className="flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground"
+            >
+              {driving && (
+                <CircleNotch size={12} aria-hidden className="animate-spin" />
+              )}
+              {feitos}/{stats.total}
+              {driving
+                ? " · rodando…"
+                : run.status !== "concluido"
+                  ? ` · ${STATUS_RUN[run.status].rotulo}`
+                  : ""}
             </span>
+            {driving ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onPausar}
+              >
+                <Pause aria-hidden />
+                Pausar
+              </Button>
+            ) : run.status !== "concluido" ? (
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={onContinuar}
+                disabled={bloqueado}
+              >
+                <Play aria-hidden />
+                Continuar
+              </Button>
+            ) : null}
           </div>
+        </div>
+
+        <div
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={stats.total}
+          aria-valuenow={feitos}
+          aria-label="Itens executados"
+          className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"
+        >
           <div
-            role="progressbar"
-            aria-valuemin={0}
-            aria-valuemax={detalhe.itens.length}
-            aria-valuenow={feitos}
-            className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
+            className="relative h-full bg-primary transition-[width] duration-500 ease-snappy"
+            style={{
+              width: `${stats.total ? (feitos / stats.total) * 100 : 0}%`,
+            }}
           >
-            <div
-              className="h-full bg-primary transition-all"
-              style={{
-                width: `${detalhe.itens.length ? (feitos! / detalhe.itens.length) * 100 : 0}%`,
-              }}
-            />
+            {driving && (
+              <span
+                aria-hidden
+                className="absolute inset-0 animate-shimmer bg-[linear-gradient(90deg,transparent_30%,hsl(0_0%_100%/0.5)_50%,transparent_70%)] bg-[length:200%_100%]"
+              />
+            )}
           </div>
-          <ul className="mt-3 divide-y divide-border/60">
-            {[...new Set(detalhe.itens.map((i) => i.caso_id))].map(
-              (casoId) => (
-                <li key={casoId} className="py-2.5">
-                  <p className="text-sm font-medium">
-                    {detalhe.itens.find((i) => i.caso_id === casoId)?.msg}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground">{casoId}</p>
-                  <ul className="mt-1.5 space-y-1">
-                    {detalhe.itens
-                      .filter((i) => i.caso_id === casoId)
-                      .map((i) => {
-                        const s = STATUS_ITEM[i.status];
-                        return (
-                          <li
-                            key={i.id}
-                            className="flex flex-wrap items-baseline gap-x-3 text-xs"
+        </div>
+
+        <BarraSegmentada
+          className="mt-3"
+          altura="lg"
+          legenda
+          animate
+          denominador={stats.total}
+          segmentos={[
+            { valor: stats.ok, rotulo: "passou", cls: "bg-[var(--ok)]" },
+            { valor: stats.falhas, rotulo: "falhou", cls: "bg-[var(--danger)]" },
+            { valor: stats.erros, rotulo: "erro", cls: "bg-[var(--warn)]" },
+            { valor: stats.rodando, rotulo: "rodando", cls: "bg-[var(--info)]" },
+            { valor: stats.naFila, rotulo: "na fila" },
+          ]}
+        />
+      </div>
+
+      {/* KPIs do run aberto */}
+      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <Kpi
+          i={1}
+          rotulo="Pass rate"
+          valor={
+            stats.total
+              ? `${Math.round((stats.ok / stats.total) * 100)}%`
+              : "—"
+          }
+          meta={`${stats.ok} de ${stats.total} itens`}
+        />
+        <Kpi
+          i={2}
+          rotulo="Latência média"
+          valor={ms(stats.latMedia)}
+          meta={stats.p95 != null ? `p95 ${ms(stats.p95)}` : undefined}
+        />
+        <Kpi
+          i={3}
+          rotulo="Tokens"
+          valor={compacto.format(stats.tokensIn + stats.tokensOut)}
+          meta={`${compacto.format(stats.tokensIn)} entrada · ${compacto.format(stats.tokensOut)} saída`}
+        />
+        <Kpi
+          i={4}
+          rotulo="Custo"
+          valor={usd(stats.custo)}
+          meta={
+            feitos > 0 ? `${usd(stats.custo / feitos)} por item` : undefined
+          }
+        />
+      </div>
+
+      {/* matriz caso × modelo */}
+      <div
+        className="animate-enter rounded-xl border border-border bg-card p-4 sm:p-5"
+        style={stagger(5)}
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h3 className="text-base font-semibold">Casos × modelos</h3>
+          <div
+            className="flex flex-wrap gap-1.5"
+            role="group"
+            aria-label="Filtrar itens por status"
+          >
+            {(
+              [
+                ["todos", "Todos", stats.total],
+                ["ok", "Passou", stats.ok],
+                ["falhou", "Falhou", stats.falhas],
+                ["erro", "Erro", stats.erros],
+              ] as const
+            ).map(([f, rotulo, n]) => (
+              <Chip
+                key={f}
+                ativo={filtro === f}
+                onClick={() => setFiltro(f)}
+              >
+                {rotulo} {n}
+              </Chip>
+            ))}
+          </div>
+        </div>
+
+        {!casosOrdem.length ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Sem itens neste run.
+          </p>
+        ) : (
+          <div className="scroll-fina -mx-4 mt-2 overflow-x-auto px-4 pb-1 sm:-mx-5 sm:px-5">
+            <table className="w-full min-w-[34rem] border-separate [border-spacing:0_5px]">
+              <thead>
+                <tr>
+                  <th
+                    scope="col"
+                    className="sticky left-0 z-10 w-[12rem] min-w-[12rem] max-w-[12rem] bg-card py-1 pr-3 text-left align-bottom text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+                  >
+                    caso
+                  </th>
+                  {modelosOrdem.map((m) => (
+                    <th
+                      key={m}
+                      scope="col"
+                      title={m}
+                      className="min-w-[4.5rem] py-1 text-center align-bottom text-[11px] font-semibold text-muted-foreground"
+                    >
+                      <span className="mx-auto block max-w-[9rem] truncate">
+                        {m}
+                      </span>
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              {/* re-key no filtro: a troca remonta as linhas e re-roda o
+                  stagger de entrada, nunca um repaint seco de tabela */}
+              <tbody key={filtro}>
+                {casosOrdem.map((c, ri) => {
+                  const algumBate = itens.some(
+                    (i) => i.caso_id === c.id && bate(i)
+                  );
+                  return (
+                    <Fragment key={c.id}>
+                      <tr className="animate-enter" style={stagger(ri)}>
+                        <th
+                          scope="row"
+                          className={cn(
+                            "sticky left-0 z-10 bg-card py-1 pr-3 text-left align-middle transition-opacity duration-300",
+                            !algumBate && "opacity-40"
+                          )}
+                        >
+                          <span
+                            className="block truncate text-xs font-medium"
+                            title={c.msg}
                           >
-                            <span
-                              className={cn(
-                                "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                                s.cls
-                              )}
-                            >
-                              {s.rotulo}
-                            </span>
-                            <span className="font-medium">
-                              {i.modelo}
-                              {i.modelo_usado && i.modelo_usado !== i.modelo && (
-                                <span className="text-muted-foreground">
-                                  {" "}
-                                  → {i.modelo_usado}
+                            {c.msg}
+                          </span>
+                          <span className="block truncate text-[11px] text-muted-foreground">
+                            {c.id}
+                          </span>
+                        </th>
+                        {modelosOrdem.map((m) => {
+                          const its = celula(c.id, m);
+                          const expandida =
+                            aberto?.caso === c.id && aberto?.modelo === m;
+                          return (
+                            <td key={m} className="p-0 align-middle">
+                              {its.length ? (
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  aria-expanded={expandida}
+                                  aria-controls={
+                                    expandida ? painelId : undefined
+                                  }
+                                  aria-label={`${c.id}, modelo ${m}: ${its
+                                    .map(
+                                      (i) =>
+                                        `rep ${i.repeticao} ${STATUS_ITEM[i.status].rotulo}`
+                                    )
+                                    .join(", ")}`}
+                                  title={its.map(descItem).join("\n")}
+                                  onClick={() =>
+                                    setAberto(
+                                      expandida
+                                        ? null
+                                        : { caso: c.id, modelo: m }
+                                    )
+                                  }
+                                  className={cn(
+                                    "h-auto min-h-9 w-full justify-center gap-1 rounded-md px-1 py-1",
+                                    expandida &&
+                                      "bg-muted shadow-[inset_0_0_0_1px_var(--ring)]"
+                                  )}
+                                >
+                                  {its.map((i) => (
+                                    <span
+                                      key={`${i.id}:${i.status}`}
+                                      aria-hidden
+                                      className={cn(
+                                        "ia-pop inline-flex size-5 items-center justify-center rounded-[5px] text-[10px] leading-none font-bold transition-[opacity,background-color,border-color] duration-300",
+                                        CELULA[i.status],
+                                        filtro !== "todos" &&
+                                          i.status !== filtro &&
+                                          "opacity-25"
+                                      )}
+                                    >
+                                      {its.length > 1 ? i.repeticao : ""}
+                                    </span>
+                                  ))}
+                                </Button>
+                              ) : (
+                                <span
+                                  aria-hidden
+                                  className="block text-center text-muted-foreground/30"
+                                >
+                                  ·
                                 </span>
                               )}
-                            </span>
-                            <span className="text-muted-foreground">
-                              rep {i.repeticao}
-                            </span>
-                            <span className="tabular-nums text-muted-foreground">
-                              {ms(i.latencia_ms)} ·{" "}
-                              {num.format(i.tokens_in ?? 0)}+{num.format(i.tokens_out ?? 0)} tok · {usd(i.custo_usd)}
-                            </span>
-                            {(i.detalhe || i.resposta_trecho) && (
-                              <span
-                                className="min-w-0 flex-1 truncate text-muted-foreground"
-                                title={i.detalhe ?? i.resposta_trecho ?? ""}
-                              >
-                                {i.detalhe ?? i.resposta_trecho}
-                              </span>
-                            )}
-                          </li>
-                        );
-                      })}
-                  </ul>
-                </li>
-              )
-            )}
-          </ul>
-        </div>
-      )}
-    </section>
+                            </td>
+                          );
+                        })}
+                      </tr>
+                      {aberto?.caso === c.id && (
+                        <tr>
+                          <td
+                            colSpan={modelosOrdem.length + 1}
+                            className="p-0 pb-1"
+                          >
+                            <div
+                              id={painelId}
+                              role="region"
+                              aria-label={`Detalhe: ${aberto.modelo} em ${aberto.caso}`}
+                              className="animate-enter rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5"
+                            >
+                              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                                {aberto.modelo} · {c.msg}
+                              </p>
+                              <ul className="mt-1.5 space-y-2.5">
+                                {celula(aberto.caso, aberto.modelo).map((i) => {
+                                  const s = STATUS_ITEM[i.status];
+                                  return (
+                                    <li
+                                      key={i.id}
+                                      className="border-t border-border/50 pt-2 first:border-t-0 first:pt-0"
+                                    >
+                                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                                        <span
+                                          className={cn(
+                                            "rounded-full px-2 py-0.5 text-[10px] font-medium",
+                                            s.cls
+                                          )}
+                                        >
+                                          {s.rotulo}
+                                        </span>
+                                        <span className="text-xs font-medium">
+                                          rep {i.repeticao}
+                                          {i.modelo_usado &&
+                                            i.modelo_usado !== i.modelo && (
+                                              <span className="font-normal text-muted-foreground">
+                                                {" "}
+                                                · usado {i.modelo_usado}
+                                              </span>
+                                            )}
+                                        </span>
+                                        <span className="text-xs tabular-nums text-muted-foreground">
+                                          {ms(i.latencia_ms)} ·{" "}
+                                          {num.format(i.tokens_in ?? 0)}+
+                                          {num.format(i.tokens_out ?? 0)} tok ·{" "}
+                                          {usd(i.custo_usd)}
+                                        </span>
+                                      </div>
+                                      {i.detalhe && (
+                                        <p
+                                          className={cn(
+                                            "mt-1 text-xs",
+                                            i.status === "falhou" ||
+                                              i.status === "erro"
+                                              ? "text-[var(--danger-text)]"
+                                              : "text-muted-foreground"
+                                          )}
+                                        >
+                                          {i.detalhe}
+                                        </p>
+                                      )}
+                                      {i.resposta_trecho && (
+                                        <p className="mt-1 border-l-2 border-border pl-2 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                                          {i.resposta_trecho}
+                                        </p>
+                                      )}
+                                    </li>
+                                  );
+                                })}
+                              </ul>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </Fragment>
+                  );
+                })}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <th
+                    scope="row"
+                    className="sticky left-0 z-10 border-t border-border/60 bg-card py-2 pr-3 text-left align-top text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+                  >
+                    por modelo
+                  </th>
+                  {modelosOrdem.map((m) => {
+                    const e = porModelo.get(m);
+                    const media =
+                      e && e.lats.length
+                        ? e.lats.reduce((a, b) => a + b, 0) / e.lats.length
+                        : null;
+                    return (
+                      <td
+                        key={m}
+                        className="border-t border-border/60 px-1 py-2 text-center align-top"
+                      >
+                        <p className="text-xs font-semibold tabular-nums">
+                          {e && e.n
+                            ? `${Math.round((e.ok / e.n) * 100)}%`
+                            : "—"}
+                        </p>
+                        <BarraSegmentada
+                          className="mt-1"
+                          altura="sm"
+                          denominador={e?.n ?? 0}
+                          segmentos={[
+                            {
+                              valor: e?.ok ?? 0,
+                              rotulo: "passou",
+                              cls: "bg-[var(--ok)]",
+                            },
+                            {
+                              valor: e?.falhou ?? 0,
+                              rotulo: "falhou",
+                              cls: "bg-[var(--danger)]",
+                            },
+                            {
+                              valor: e?.erro ?? 0,
+                              rotulo: "erro",
+                              cls: "bg-[var(--warn)]",
+                            },
+                          ]}
+                        />
+                        <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">
+                          {ms(media)}
+                        </p>
+                      </td>
+                    );
+                  })}
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
