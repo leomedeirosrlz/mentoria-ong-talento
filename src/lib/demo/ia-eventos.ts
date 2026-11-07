@@ -1,9 +1,11 @@
-// Dataset demo da /ia: eventos de ia_eventos plausíveis e determinísticos —
-// a mesma renderização em /demo mostra sempre o mesmo recorte (seed por dia).
+// Dataset demo da /ia: eventos de ia_eventos plausíveis e determinísticos:
+// a mesma renderização em /demo mostra sempre o mesmo recorte (seed por dia),
+// com dois picos e um modelo apertando o teto do plano.
 // Perfis: Marina (coord, uid 0001), Paulo (supervisor 0002), Ricardo
 // (mentor_dpp 0003) e Sofia (especialista 0004) — os mesmos do dataset demo.
 
 import type { IaEventoRow } from "@/lib/ia/metricas";
+import type { PlanoIa } from "@/lib/ia/config";
 
 const uid = (n: number): string =>
   `de000000-0000-4000-8000-${String(n).padStart(12, "0")}`;
@@ -16,16 +18,31 @@ export const DEMO_IA_NOMES = new Map<string, string>([
   [uid(4), "Sofia Nogueira"],
 ]);
 
-const MODELOS = [
-  { slug: "deepseek-v4.1-flash", peso: 0.62, ms: [4200, 7800] },
-  { slug: "glm-4.6", peso: 0.26, ms: [5500, 9800] },
-  { slug: "qwen3-32b", peso: 0.12, ms: [8800, 14000] },
-] as const;
+// tier → modelo como no seed da 0148 (rápido glm-5.3-flash, balanceado
+// deepseek-v4.1-flash, forte deepseek-v4-pro) + um fallback ocasional do
+// balanceado. Preço por milhão de tokens (US$) é o que vira allowance:
+// dentro do Go o custo cobrado é ~0 e o plano desconta o preço de tabela.
+// O forte lê contexto longo (análises): é ele que aperta o teto de US$ 15
+// e fica em "atenção" na previsão.
 const TIERS = [
-  { t: "balanceado", peso: 0.55 },
-  { t: "rapido", peso: 0.3 },
-  { t: "forte", peso: 0.15 },
+  {
+    t: "rapido", peso: 0.27, slug: "glm-5.3-flash", ms: [1800, 4200],
+    tin: [1800, 5000], tout: [60, 260], preco: { in: 0.1, out: 0.4 },
+  },
+  {
+    t: "balanceado", peso: 0.45, slug: "deepseek-v4.1-flash", ms: [4200, 7800],
+    tin: [6000, 18000], tout: [180, 700], preco: { in: 0.14, out: 0.28 },
+  },
+  {
+    t: "forte", peso: 0.28, slug: "deepseek-v4-pro", ms: [9000, 16000],
+    tin: [30000, 72000], tout: [600, 1800], preco: { in: 4, out: 16 },
+  },
 ] as const;
+const FALLBACK = { slug: "mimo-v2.6-flash", ms: [8800, 14000], preco: { in: 0.1, out: 0.3 } } as const;
+
+/** Dias de pico (contados de hoje pra trás): fechamento de relatório e
+ *  véspera de encontro de formação. Evergreen: sempre a 3 e a 17 dias. */
+const PICOS: Record<number, number> = { 3: 2.4, 17: 2 };
 const TOOLS = [
   { t: "resumo_semana", peso: 0.3 },
   { t: "ficha_dupla", peso: 0.25 },
@@ -62,15 +79,20 @@ function pick<T extends { peso: number }>(r: () => number, xs: readonly T[]): T 
 export function demoIaEventos(dias: number): IaEventoRow[] {
   const eventos: IaEventoRow[] = [];
   const hoje = new Date();
+  const agora = hoje.getTime();
   for (let i = 0; i < dias; i++) {
     const d = new Date(hoje);
     d.setDate(d.getDate() - i);
     const iso = d.toISOString().slice(0, 10);
     const diaNum = Number(iso.replace(/-/g, ""));
     const r = rng(diaNum);
-    // fim de semana quase não tem uso; dia útil varia 2-9 mensagens
+    // fim de semana quase não tem uso; dia útil varia 8-19 perguntas e
+    // os dias de pico multiplicam
     const dow = d.getDay();
-    const n = dow === 0 || dow === 6 ? Math.floor(r() * 2) : 2 + Math.floor(r() * 8);
+    const fds = dow === 0 || dow === 6;
+    const n = Math.round(
+      (fds ? Math.floor(r() * 3) : 8 + Math.floor(r() * 12)) * (PICOS[i] ?? 1)
+    );
     for (let j = 0; j < n; j++) {
       const pessoa = PESSOAS[Math.floor(r() * (PESSOAS.length - (dow === 0 ? 2 : 0)))];
       const base = new Date(d);
@@ -81,6 +103,12 @@ export function demoIaEventos(dias: number): IaEventoRow[] {
       // /ia casa a cadeia inteira por ele, como no real)
       const canal = r() < 0.9 ? "chat" : "mcp";
       const requestId = uid(5000 + i * 100 + j);
+      const t = pick(r, [...TIERS]);
+      const fb = t.t === "balanceado" && r() < 0.06;
+      const m = fb ? { ...FALLBACK } : { slug: t.slug, ms: t.ms, preco: t.preco };
+      const ms = Math.round(m.ms[0] + r() * (m.ms[1] - m.ms[0]));
+      // pergunta que ainda não "aconteceu" hoje fica de fora
+      if (base.getTime() + ms > agora) continue;
       eventos.push({
         profile_id: pessoa, canal, tool: "mensagem", request_id: requestId,
         ok: true, args: { n_mensagens: 1 }, duracao_ms: 0,
@@ -89,11 +117,8 @@ export function demoIaEventos(dias: number): IaEventoRow[] {
         allowance_usd: null, billing_source: null, iteracoes: null,
         created_at: base.toISOString(),
       });
-      const m = pick(r, [...MODELOS]);
-      const t = pick(r, [...TIERS]);
-      const ms = Math.round(m.ms[0] + r() * (m.ms[1] - m.ms[0]));
-      const tin = Math.round(3000 + r() * 14000);
-      const tout = Math.round(80 + r() * 500);
+      const tin = Math.round(t.tin[0] + r() * (t.tin[1] - t.tin[0]));
+      const tout = Math.round(t.tout[0] + r() * (t.tout[1] - t.tout[0]));
       const falhou = r() < 0.04;
       const nTools = falhou ? 0 : r() < 0.4 ? 0 : r() < 0.8 ? 1 : 2;
       const toolsUsadas: string[] = [];
@@ -109,19 +134,31 @@ export function demoIaEventos(dias: number): IaEventoRow[] {
           created_at: new Date(base.getTime() + 200 + k * 900).toISOString(),
         });
       }
+      const reasoning = t.t === "forte" ? Math.round(300 + r() * 1200) : null;
+      const allowance =
+        (tin * m.preco.in + (tout + (reasoning ?? 0)) * m.preco.out) / 1e6;
       if (canal === "chat")
       eventos.push({
         profile_id: pessoa, canal, tool: "resposta", request_id: requestId,
-        ok: !falhou, args: { tools: toolsUsadas, list_cost: tout * 0.000009 },
+        ok: !falhou, args: { tools: toolsUsadas, list_cost: allowance },
         duracao_ms: ms, modelo: m.slug, tier: t.t,
         tokens_in: tin, tokens_out: tout,
-        tokens_reasoning: t.t === "forte" ? Math.round(200 + r() * 900) : null,
+        tokens_reasoning: reasoning,
         cache_read: Math.round(tin * r() * 0.4),
-        custo_usd: tout * 0.0000075, allowance_usd: tout * 0.0000075,
+        // dentro do Go o cobrado fica ~0; o plano desconta o de tabela
+        custo_usd: 0, allowance_usd: allowance,
         billing_source: "go", iteracoes: nTools + 1,
         created_at: new Date(base.getTime() + ms).toISOString(),
       });
     }
   }
   return eventos.sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+/** Plano da demo: Go com renovação 12 dias atrás (ciclo no meio, data
+ *  evergreen); dia ≤ 28 pra não cair na regra de mês curto. */
+export function demoIaPlano(): PlanoIa {
+  const d = new Date();
+  d.setDate(d.getDate() - 12);
+  return { plano: "go", diaRenovacao: Math.min(d.getDate(), 28), tetos: {} };
 }
