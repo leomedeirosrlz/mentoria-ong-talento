@@ -211,11 +211,14 @@ function montarBody(
   stream: boolean,
   papeis: AppRole[] | undefined
 ) {
+  const tools = toolsPayload(papeis);
   return JSON.stringify({
     model: modelo || process.env.IA_MODEL,
     messages,
-    tools: toolsPayload(papeis),
-    tool_choice: "auto",
+    // sem tools (papel sem acesso a nenhuma, ou tier rapido: saudação e
+    // fora de escopo não consultam dados) — omite a chave em vez de
+    // mandar [], que alguns providers recusam com 400
+    ...(tools.length ? { tools, tool_choice: "auto" as const } : {}),
     ...(esforco ? { reasoning_effort: EFFORT[esforco] } : {}),
     max_tokens: MAX_TOKENS_POR_ESFORCO[esforco ?? "baixo"],
     ...(stream

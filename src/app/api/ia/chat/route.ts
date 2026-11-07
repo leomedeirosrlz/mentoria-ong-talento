@@ -187,8 +187,10 @@ export async function POST(req: Request) {
     fallbacks: evalOverride ? [] : fallbacksDoTier(iaCfg, tier),
     // REALIZA-333: o payload de tools sai filtrado por papel — não anunciar
     // pro modelo o que ele não pode rodar (ele papagaiava a descrição das
-    // tools coord-only ao explicar a negação)
-    papeis,
+    // tools coord-only ao explicar a negação). Tier rapido (saudação,
+    // fora de escopo — nunca consulta dados) sai SEM tools: ~2k tokens
+    // de schema economizados por rodada
+    papeis: tier === "rapido" ? [] : papeis,
   };
 
   // sessão estável por usuário — o provider Go exige pra rotear/cachear;
