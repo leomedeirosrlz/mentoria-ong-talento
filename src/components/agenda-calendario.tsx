@@ -4070,14 +4070,16 @@ function EncontroDuplaRow({
     .filter((e) => e.status !== "feito")
     .sort((a, b) => (a.prazo ?? "9999").localeCompare(b.prazo ?? "9999"));
 
-  // candidato ao follow-up inline: realizado sem registro, ou agendado com
-  // horário (quando ele vence vira limbo — o RevelarApos abaixo segura o
-  // "já passou?" no tempo, então o bloco monta mesmo com a hora por vir)
+  // candidato ao follow-up inline: realizado sem registro, ou qualquer
+  // encontro com horário marcado — agendado/remarcado vencido vira limbo e
+  // nao_aconteceu/cancelado podem ter rolado de fato (o salvarRegistro
+  // corrige o status pra realizado, igual na ficha; o RevelarApos segura
+  // o "já passou?" no tempo enquanto a hora não chega)
   const podeTerRegistro =
     ehMentor &&
     !encontro.registro &&
     (encontro.status === "realizado" ||
-      (encontro.status === "agendado" && encontro.data_hora != null));
+      encontro.data_hora != null);
 
   // CTA do follow-up. "Aconteceu?" no limbo porque a pergunta é real: o
   // encontro agendado pode não ter rolado — remarcar segue no bloco do dia.
@@ -4098,7 +4100,9 @@ function EncontroDuplaRow({
   // pro mentor); coord/sup monitoram e repassam o link, então copiam — um
   // "abrir" acidental na call da dupla é pior que a fricção de colar
   const linkChamada =
-    encontro.status === "agendado" ? linkSeguro(encontro.link) : null;
+    encontro.status === "agendado" || encontro.status === "remarcado"
+      ? linkSeguro(encontro.link)
+      : null;
   const chamada =
     linkChamada == null ? null : ehMentor ? (
       <a
@@ -4120,7 +4124,8 @@ function EncontroDuplaRow({
   // do "adicionar" — o lápis ocupa o lugar do chip quando ele não existe.
   // Coord/sup copiam o link, nunca editam (regra da action, não só daqui)
   const editarLink =
-    ehMentor && encontro.status === "agendado" ? (
+    ehMentor &&
+    (encontro.status === "agendado" || encontro.status === "remarcado") ? (
       <EditarLinkDialog encontroId={encontro.id} linkAtual={encontro.link} />
     ) : null;
 

@@ -862,6 +862,9 @@ export default async function DuplaPage({
         jornadaViva={
           dupla.status === "ativa" || dupla.status === "pausada"
         }
+        lacunaAnterior={
+          enc == null && passo.numero > proximoNumero ? proximoNumero : null
+        }
         souCoord={souCoord}
         autorId={me.id}
         autorNome={me.nome_social ?? me.nome}

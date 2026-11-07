@@ -119,7 +119,10 @@ export function painelDuplasDoDia({
           linhas.push(
             encontro.status === "agendado" ||
               encontro.status === "remarcado" ||
-              encontro.status === "nao_aconteceu"
+              encontro.status === "nao_aconteceu" ||
+              // cancelado também precisa de nova data — antes caía na linha
+              // de status inerte (zero ações) enquanto a ficha já remarcava
+              encontro.status === "cancelado"
               ? { tipo: "remarcar", encontro }
               : { tipo: "encontro", encontro }
           );

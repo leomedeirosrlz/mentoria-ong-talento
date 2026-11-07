@@ -149,6 +149,19 @@ describe("demais casos da regra", () => {
     expect(numeros(p.semana[0].linhas)).toEqual([8]);
   });
 
+  it("oficial cancelado também pede remarcar — não fica linha inerte", () => {
+    const d = ana([
+      ...feitos(7),
+      mkEncontro(8, {
+        status: "cancelado",
+        data_hora: "2025-11-25T19:00:00-03:00",
+      }),
+    ]);
+    const p = painel([d], SABADO);
+    expect(tipos(p.semana[0].linhas)).toEqual(["remarcar"]);
+    expect(numeros(p.semana[0].linhas)).toEqual([8]);
+  });
+
   it("dupla sem nada no dia nem na semana some do quadro", () => {
     // o oficial da semana cai no próprio dia selecionado e não há pendência
     // anterior — nada sobra pra "Também nesta semana"

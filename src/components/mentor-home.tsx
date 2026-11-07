@@ -217,10 +217,13 @@ export function MentorHome({
           (encontroAlvo?.data_hora && new Date(encontroAlvo.data_hora) > hoje
             ? encontroAlvo
             : null);
-        // "Agendar próximo encontro" no estado quieto: primeiro número livre depois
-        // do agendado — livre = sem row realizada/agendada/remarcada
+        // "Agendar próximo encontro" no estado quieto: primeiro número
+        // PENDENTE do ciclo — livre = sem row realizada/agendada/remarcada
         // (nao_aconteceu e cancelado voltam a ser agendáveis; o dialog
-        // recebe a row em `atual` e edita em vez de criar duplicata)
+        // recebe a row em `atual` e edita em vez de criar duplicata).
+        // Antes era o primeiro livre DEPOIS do agendado: com um buraco
+        // atrás (9º marcado, 8º pulado) a home sugeria pular adiante pro
+        // 10º — divergia do "resolve na ordem" das outras superfícies
         const numerosOcupados = new Set(
           dupla.encontros
             .filter(
@@ -233,7 +236,7 @@ export function MentorHome({
         );
         let seguinteNumero: number | null = null;
         if (agendado) {
-          for (let n = agendado.numero + 1; n <= totalDupla; n++) {
+          for (let n = 1; n <= totalDupla; n++) {
             if (!numerosOcupados.has(n)) {
               seguinteNumero = n;
               break;
@@ -475,14 +478,17 @@ export function MentorHome({
                           : "já passou."}
                       </p>
                       <p className="text-sm text-muted-foreground mt-0.5">
-                        {encontroAlvo.status === "nao_aconteceu" ||
-                        encontroAlvo.status === "cancelado"
+                        {encontroAlvo.status === "nao_aconteceu"
                           ? "Remarque quando puder, ou desfaça na ficha se rolou."
-                          : "Se rolou, registre na ficha da dupla; se não, remarque."}
+                          : encontroAlvo.status === "cancelado"
+                            ? "Remarque quando puder, ou registre como foi na ficha se rolou."
+                            : "Se rolou, registre na ficha da dupla; se não, remarque."}
                       </p>
                       <div className="mt-3 flex flex-wrap justify-end gap-2">
-                        {encontroAlvo.status !== "nao_aconteceu" &&
-                          encontroAlvo.status !== "cancelado" && (
+                        {/* nao_aconteceu tem o Desfazer na ficha (undo da
+                            marcação); pro cancelado e pro passado o caminho
+                            é o registro — o salvarRegistro corrige o status */}
+                        {encontroAlvo.status !== "nao_aconteceu" && (
                             <Link
                               href={`/duplas/${dupla.id}?aba=encontros#registrar-${encontroAlvo.id}`}
                               className={buttonVariants({ variant: "outline", size: "sm" })}
