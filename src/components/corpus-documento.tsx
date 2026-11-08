@@ -56,8 +56,8 @@ import {
 // visual grammar: ink hero, keyword icons and the full-width lime rule on
 // h2, rotating phase bands for the journey's month groups, the clickable
 // 16-dot journey strip, encounter cards, callouts, charcoal tables and a
-// TOC with tone markers + dotted leader (collapsible on mobile, sticky
-// rail at xl on long guides). The per-section anchor (id = secaoAnchor)
+// TOC with tone markers + dotted leader (sticky collapsible pill below xl,
+// sticky rail at xl on long guides). The per-section anchor (id = secaoAnchor)
 // is the same slug the assistant uses to cite the source — headings link
 // to their own anchor, no JS.
 
@@ -137,9 +137,11 @@ function iconeTitulo(titulo: string, className: string): ReactNode {
  *  PDF's full-width band — tinted bg of the rotating tone + caps eyebrow +
  *  icon + title + the tone's accent bar; regular sections keep the caps
  *  lime eyebrow + navy bold title + the full-width lime rule. */
-function TituloGrupo({ grupo }: { grupo: CorpusGrupo }) {
+function TituloGrupo({ grupo, num }: { grupo: CorpusGrupo; num: number }) {
   const { eyebrow, resto } = eyebrowDe(grupo.titulo);
   const tom = grupo.fase != null ? TOM_DOC[tomDeFase(grupo.fase)] : null;
+  // número do capítulo na posição do eyebrow — "05 · PDM" ou só "05"
+  const rotulo = `${String(num).padStart(2, "0")}${eyebrow ? ` · ${eyebrow}` : ""}`;
   const titulo = (
     <>
       {iconeTitulo(
@@ -159,16 +161,14 @@ function TituloGrupo({ grupo }: { grupo: CorpusGrupo }) {
     return (
       <h2 id={grupo.anchor} className="group scroll-mt-20 md:scroll-mt-8">
         <div className={cn("rounded-xl px-4 py-4 sm:px-5", tom.banda)}>
-          {eyebrow ? (
-            <span
-              className={cn(
-                "mb-1 block text-[11px] font-bold uppercase tracking-[0.14em]",
-                tom.forte
-              )}
-            >
-              {eyebrow}
-            </span>
-          ) : null}
+          <span
+            className={cn(
+              "mb-1 block text-[11px] font-bold uppercase tracking-[0.14em]",
+              tom.forte
+            )}
+          >
+            {rotulo}
+          </span>
           <span className="flex items-center gap-2.5 text-lg font-semibold tracking-tight text-foreground sm:text-xl">
             {titulo}
           </span>
@@ -182,11 +182,9 @@ function TituloGrupo({ grupo }: { grupo: CorpusGrupo }) {
   }
   return (
     <h2 id={grupo.anchor} className="group scroll-mt-20 md:scroll-mt-8">
-      {eyebrow ? (
-        <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--ring)]">
-          {eyebrow}
-        </span>
-      ) : null}
+      <span className="mb-1 block text-[11px] font-bold uppercase tracking-[0.14em] text-[var(--ring)]">
+        {rotulo}
+      </span>
       <span className="flex items-center gap-2.5 border-b-2 border-[var(--brand-lime)] pb-2 text-lg font-semibold tracking-tight text-foreground sm:text-xl">
         {titulo}
       </span>
@@ -218,9 +216,11 @@ function TituloSub({ s }: { s: CorpusSecao }) {
 
 function GrupoSecao({
   grupo,
+  num,
   trilha,
 }: {
   grupo: CorpusGrupo;
+  num: number;
   trilha?: ReactNode;
 }) {
   // semantic tone of the numbered chips (the PDF's pill diagram) — the sub
@@ -228,7 +228,7 @@ function GrupoSecao({
   const tomGrupo = tomSemantico(grupo.titulo) ?? undefined;
   return (
     <section>
-      <TituloGrupo grupo={grupo} />
+      <TituloGrupo grupo={grupo} num={num} />
       {trilha}
       {grupo.intro ? (
         <div className="mt-3 space-y-3">
@@ -264,11 +264,13 @@ function SumarioItem({
   titulo,
   sub,
   tom,
+  num,
 }: {
   anchor: string;
   titulo: string;
   sub?: boolean;
   tom?: DocTom;
+  num?: number;
 }) {
   return (
     <a
@@ -278,14 +280,27 @@ function SumarioItem({
         sub ? "px-2 py-0.5 text-[13px] text-muted-foreground hover:text-foreground" : "px-2"
       )}
     >
-      <span
-        aria-hidden
-        className={cn(
-          "shrink-0 self-center rounded-full",
-          sub ? "size-1" : "size-1.5",
-          tom ? TOM_DOC[tom].barra : "bg-[var(--brand-lime)]"
-        )}
-      />
+      {num != null ? (
+        // capítulo: número no lugar do marcador (subs mantêm o ponto)
+        <span
+          aria-hidden
+          className={cn(
+            "w-6 shrink-0 text-[11px] font-bold tabular-nums",
+            tom ? TOM_DOC[tom].forte : "text-[var(--ring)]"
+          )}
+        >
+          {String(num).padStart(2, "0")}
+        </span>
+      ) : (
+        <span
+          aria-hidden
+          className={cn(
+            "shrink-0 self-center rounded-full",
+            sub ? "size-1" : "size-1.5",
+            tom ? TOM_DOC[tom].barra : "bg-[var(--brand-lime)]"
+          )}
+        />
+      )}
       <span className="min-w-0">{titulo}</span>
       <span
         aria-hidden
@@ -298,11 +313,12 @@ function SumarioItem({
 function SumarioLista({ grupos }: { grupos: CorpusGrupo[] }) {
   return (
     <ol className="space-y-0.5">
-      {grupos.map((g) => (
+      {grupos.map((g, i) => (
         <li key={g.anchor}>
           <SumarioItem
             anchor={g.anchor}
             titulo={g.titulo}
+            num={i + 1}
             tom={g.fase != null ? tomDeFase(g.fase) : undefined}
           />
           {g.subs.length > 0 ? (
@@ -320,12 +336,13 @@ function SumarioLista({ grupos }: { grupos: CorpusGrupo[] }) {
   );
 }
 
-/** Collapsible TOC (native <details>, same pattern as the agenda) with both
- *  section levels — links to the anchors. Hidden at xl (the side rail takes
- *  over) and in print: sections already come out open on paper. */
+/** Sumário colapsável (<details> nativo, mesmo padrão da agenda) com os dois
+ *  níveis — pill sticky sob o header do shell no mobile (em md+ não há
+ *  header, sobe pra top-3). Escondido no xl (o rail lateral assume) e no
+ *  print, onde as seções já saem abertas. */
 function Sumario({ grupos, total }: { grupos: CorpusGrupo[]; total: number }) {
   return (
-    <details className="group mt-6 overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)] xl:hidden print:hidden">
+    <details className="group sticky top-[calc(env(safe-area-inset-top)+4rem)] z-30 mt-6 overflow-hidden rounded-full bg-card/95 shadow-[var(--shadow-border)] backdrop-blur open:rounded-2xl md:top-3 xl:hidden print:hidden">
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2.5 px-4 py-3 text-sm font-medium select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
         <ListBullets
           size={16}
@@ -344,7 +361,7 @@ function Sumario({ grupos, total }: { grupos: CorpusGrupo[]; total: number }) {
       </summary>
       <nav
         aria-label="Sumário do documento"
-        className="scroll-fina max-h-96 overflow-y-auto border-t border-border/60 px-3 py-3"
+        className="scroll-fina max-h-[60dvh] overflow-y-auto border-t border-border/60 px-3 py-3"
       >
         <SumarioLista grupos={grupos} />
       </nav>
@@ -470,13 +487,14 @@ export function CorpusDocBody({ doc }: { doc: CorpusDoc }) {
         {longo ? <Sumario grupos={grupos} total={doc.secoes.length} /> : null}
 
         <div className="mt-6 space-y-8">
-          {grupos.map((g) => (
+          {grupos.map((g, i) => (
             <Fragment key={g.anchor}>
               {jornada && !jornada.home && jornada.inicio === g.anchor ? (
                 <JornadaStrip jornada={jornada} />
               ) : null}
               <GrupoSecao
                 grupo={g}
+                num={i + 1}
                 trilha={
                   jornada && jornada.home === g.anchor ? (
                     <JornadaStrip jornada={jornada} />
@@ -535,7 +553,7 @@ export function CorpusDocumento({
       <CorpusDocBody doc={doc} />
 
       <footer className="mt-8 border-t border-border/60 pt-3 text-xs text-muted-foreground">
-        {doc.origem ?? `Fonte: ${doc.fonte}.`}
+        Fonte: {doc.fonte}.
       </footer>
     </main>
   );

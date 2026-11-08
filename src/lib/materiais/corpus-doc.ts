@@ -483,6 +483,11 @@ function blocosEncontro(
   return [mkEncontro(numero, titulo, anchor, corpoHtml, fora)];
 }
 
+// seções cujas listas são de marcação (a ficha "Antes do encontro" dos
+// roteiros, o checklist de competências, blocos de preparação) — itens
+// viram linhas de checkbox no render
+const CHECKLIST_RE = /checklist|antes do encontro|preparacao|preparar/;
+
 function mkSecao(
   secao: string,
   titulo: string,
@@ -496,6 +501,9 @@ function mkSecao(
   let blocos = blocosDeTexto(texto);
   const mEnc = nivel === 3 ? RE_ENCONTRO_TITULO.exec(limpo) : null;
   if (mEnc) blocos = blocosEncontro(mEnc[1], mEnc[2].trim(), anchor, blocos);
+  if (CHECKLIST_RE.test(normTitulo(limpo))) {
+    for (const b of blocos) if (b.kind === "lista") b.check = true;
+  }
   return {
     secao,
     titulo: limpo,
@@ -507,9 +515,206 @@ function mkSecao(
   };
 }
 
+// ---------- referências internas (`documento X`, `seção "Y"`) ----------
+// O corpus referencia outros materiais por nome ("documento Mensagem de
+// encaminhamento", "o instrumento Construindo a sua Visão") e seções do
+// próprio doc por título (seção "Depois de cada encontro"). linkRefs
+// injeta <a> no html já escapado: link de documento é `./<slug>` relativo
+// — resolve /materiais/documento/ no app e /jovem/materiais/documento/ no
+// shell do jovem (o layout do app redireciona mentorado pra /jovem, e o
+// mesmo doc parseado serve as duas rotas); link de seção aponta a âncora
+// local — navegação por <a> real mantém o histórico, então "voltar"
+// retorna ao ponto de leitura.
+
+/** Referência navegável a outro doc do corpus: slug + título oficial + as
+ *  formas como o texto o cita (título curto sem sufixo/parênteses, alias). */
+export type CorpusDocRef = {
+  slug: string;
+  titulo: string;
+  formas: string[];
+};
+
+// alias editorial do corpus: formas curtas que não derivam do título
+// (o texto diz "documento PDM", o título é "PDM: Plano de Desenvolvimento…")
+const ALIAS_REF: [RegExp, string[]][] = [
+  [/^pdm\b/i, ["PDM"]],
+  [/^guia do mentor de desenvolvimento/i, ["Guia do Mentor DPP"]],
+];
+
+/** Formas citáveis de um doc: título integral, título sem ": sufixo" e sem
+ *  "(parênteses)" + aliases do ALIAS_REF. Formas derivadas pedem ≥ 4 chars
+ *  (truncar demais vira falso positivo); alias curado entra sempre — "PDM"
+ *  tem 3 letras e é justamente a forma como o texto o cita. */
+function formasRef(titulo: string): string[] {
+  const curtas = new Set<string>([titulo]);
+  const semDois = titulo.split(":")[0].trim();
+  const semParen = titulo.replace(/\s*\([^)]*\)\s*/g, " ").trim();
+  if (semDois.length >= 4) curtas.add(semDois);
+  if (semParen.length >= 4) curtas.add(semParen);
+  const derivadas = [...curtas].filter((f) => f.length >= 4);
+  for (const [re, alias] of ALIAS_REF) {
+    if (re.test(titulo)) derivadas.push(...alias);
+  }
+  return [...new Set(derivadas)];
+}
+
+/** Catálogo de refs a partir das entradas lidas (lerCorpus já traz o
+ *  título do frontmatter — não reparsa corpo). */
+export function refsDeEntradas(
+  entradas: { slug: string; titulo: string }[]
+): CorpusDocRef[] {
+  return entradas.map((e) => ({
+    slug: e.slug,
+    titulo: e.titulo,
+    formas: formasRef(e.titulo),
+  }));
+}
+
+const LINK_REF_CLS =
+  "font-medium text-[var(--ring)] underline decoration-[var(--ring)]/40 underline-offset-2 transition-colors hover:decoration-[var(--ring)]";
+
+function escapeRegExp(s: string): string {
+  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+/** lookup do candidato capturado após `documento|instrumento`: casa forma
+ *  exata ou título que comece pelo candidato + fronteira de palavra
+ *  ("Mensagem de encaminhamento" → "Mensagem de encaminhamento entre
+ *  encontros"). Retorna o slug ou null. */
+function lookupDocRef(refs: CorpusDocRef[], cand: string): string | null {
+  const norm = normTitulo(cand).replace(/&amp;/g, "&");
+  if (norm.length < 2) return null;
+  for (const r of refs) {
+    for (const f of r.formas) {
+      if (normTitulo(f) === norm) return r.slug;
+    }
+    if (normTitulo(r.titulo).startsWith(`${norm} `)) return r.slug;
+  }
+  return null;
+}
+
+type RefCtx = {
+  refs: CorpusDocRef[];
+  /** normTitulo(titulo de seção) → anchor local. */
+  secoes: Map<string, string>;
+};
+
+function linkRefs(html: string, ctx: RefCtx): string {
+  // `seção "X"` / `capítulo "X"` → âncora do próprio documento
+  html = html.replace(
+    /(seção|capítulo)\s+"([^"]+)"/g,
+    (m, kw: string, cand: string) => {
+      const a = ctx.secoes.get(normTitulo(cand));
+      return a
+        ? `${kw} "<a class="${LINK_REF_CLS}" href="#${a}">${cand}</a>"`
+        : m;
+    }
+  );
+  // `Roteiro do Nº encontro` → roteiro nativo (só quando o doc existe)
+  html = html.replace(
+    /\bRoteiro do (\d+)º encontro\b/g,
+    (m, n: string) => {
+      const slug = `roteiro-encontro-${n.padStart(2, "0")}`;
+      return ctx.refs.some((r) => r.slug === slug)
+        ? `<a class="${LINK_REF_CLS}" href="./${slug}">${m}</a>`
+        : m;
+    }
+  );
+  // `documento|instrumento <forma exata>` — alternância das formas citáveis
+  // (maior primeiro) resolve referência no meio da frase, sem delimitador
+  const formas = ctx.refs
+    .flatMap((r) => r.formas.map((f) => ({ f, slug: r.slug })))
+    .sort((a, b) => b.f.length - a.f.length);
+  if (formas.length > 0) {
+    const alt = formas.map(({ f }) => escapeRegExp(escapeHtml(f))).join("|");
+    const re = new RegExp(
+      `\\b(documento|instrumento)\\s+("?)(${alt})\\b\\2`,
+      "gi"
+    );
+    const mapa = new Map(formas.map(({ f, slug }) => [normTitulo(f), slug]));
+    html = html.replace(
+      re,
+      (m, kw: string, q: string, cand: string) =>
+        `${kw} ${q}<a class="${LINK_REF_CLS}" href="./${mapa.get(normTitulo(cand.replace(/&amp;/g, "&")))}">${cand}</a>${q}`
+    );
+  }
+  // `documento|instrumento <candidato solto>` — o candidato para em
+  // delimitador de frase/tag. Lookup direto primeiro (forma exata ou
+  // título que comece pelo candidato); se não casar, tenta a forma como
+  // prefixo DO candidato e linka só o trecho que casa ("documento
+  // Mensagem de encaminhamento no encontro" → linka até "encontro")
+  const porForma = formas
+    .map(({ f, slug }) => ({
+      slug,
+      re: new RegExp(`^${escapeRegExp(escapeHtml(f))}\\b`, "i"),
+    }))
+    .sort((a, b) => b.re.source.length - a.re.source.length);
+  html = html.replace(
+    /(documento|instrumento)\s+("[^"]+"|[^"(),;.<]{3,70})/g,
+    (m, kw: string, cand: string) => {
+      const limpo = cand.replace(/^"|"$/g, "").trim();
+      const slug = lookupDocRef(ctx.refs, limpo);
+      if (slug) {
+        return `${kw} <a class="${LINK_REF_CLS}" href="./${slug}">${limpo}</a>`;
+      }
+      for (const { slug: s, re } of porForma) {
+        const mm = re.exec(limpo);
+        if (mm) {
+          return `${kw} <a class="${LINK_REF_CLS}" href="./${s}">${mm[0]}</a>${limpo.slice(mm[0].length)}`;
+        }
+      }
+      return m;
+    }
+  );
+  return html;
+}
+
+function linkBloco(b: DocBloco, ctx: RefCtx): void {
+  switch (b.kind) {
+    case "par":
+    case "callout":
+    case "numero":
+    case "quote":
+      b.html = linkRefs(b.html, ctx);
+      break;
+    case "lista":
+      b.itens = b.itens.map((it) => linkRefs(it, ctx));
+      break;
+    case "tabela":
+      b.linhas = b.linhas.map((ln) => ln.map((c) => linkRefs(c, ctx)));
+      break;
+    case "encontro":
+      for (const interno of b.corpo) linkBloco(interno, ctx);
+      if (b.tarefa) b.tarefa = linkRefs(b.tarefa, ctx);
+      break;
+  }
+}
+
+/** Injeta os links de referência no doc já montado. Índice de seções por
+ *  título (## e ###) + o lede com o título do próprio doc. */
+function aplicarRefs(doc: CorpusDoc, refs: CorpusDocRef[]): void {
+  const secoes = new Map<string, string>();
+  for (const s of doc.secoes) {
+    secoes.set(normTitulo(s.titulo), s.anchor);
+    secoes.set(normTitulo(s.secao), s.anchor);
+  }
+  if (doc.ledeAnchor) secoes.set(normTitulo(doc.titulo), doc.ledeAnchor);
+  // o próprio doc sai do mapa de documentos — referência a si mesmo cai no
+  // lookup de seções (título do doc → lede) em vez de linkar a própria URL
+  const ctx: RefCtx = { refs: refs.filter((r) => r.slug !== doc.slug), secoes };
+  for (const b of doc.lede) linkBloco(b, ctx);
+  for (const s of doc.secoes) for (const b of s.blocos) linkBloco(b, ctx);
+}
+
 /** Parse completo de um md do corpus. Exportado puro (slug + conteúdo) pra
- *  teste sem fs — carregarDocCorpus é o wrapper com leitura de arquivo. */
-export function montarDocCorpus(slug: string, raw: string): CorpusDoc | null {
+ *  teste sem fs — carregarDocCorpus é o wrapper com leitura de arquivo.
+ *  `refs` (catálogo título→slug do corpus) ativa os links internos;
+ *  omitido, o texto sai sem âncoras de documento. */
+export function montarDocCorpus(
+  slug: string,
+  raw: string,
+  refs?: CorpusDocRef[]
+): CorpusDoc | null {
   const fm = frontmatter(raw);
   if (!fm) return null;
   const { meta, corpo } = fm;
@@ -548,7 +753,7 @@ export function montarDocCorpus(slug: string, raw: string): CorpusDoc | null {
     }
   }
 
-  return {
+  const doc: CorpusDoc = {
     slug,
     fonte: meta["fonte"] ?? slug,
     titulo: meta["titulo"] ?? slug,
@@ -561,6 +766,8 @@ export function montarDocCorpus(slug: string, raw: string): CorpusDoc | null {
     ledeAnchor,
     secoes,
   };
+  if (refs?.length) aplicarRefs(doc, refs);
+  return doc;
 }
 
 /** Agrupa as seções flat numa árvore de render: ## vira grupo com a intro
@@ -626,7 +833,7 @@ export function corpusServePapel(
 
 // ---------- leitura do diretório ----------
 
-type EntradaCorpus = { arquivo: string; slug: string; raw: string };
+type EntradaCorpus = { arquivo: string; slug: string; titulo: string; raw: string };
 
 async function lerCorpus(): Promise<EntradaCorpus[]> {
   let nomes: string[];
@@ -645,7 +852,12 @@ async function lerCorpus(): Promise<EntradaCorpus[]> {
       const meta = frontmatter(raw)?.meta;
       const slug =
         meta?.["material"] || meta?.["fonte"] || nome.replace(/\.md$/, "");
-      entradas.push({ arquivo: nome, slug, raw });
+      entradas.push({
+        arquivo: nome,
+        slug,
+        titulo: meta?.["titulo"] ?? slug,
+        raw,
+      });
     } catch (e) {
       console.error(`[corpus] ${nome}: falha de leitura`, e);
     }
@@ -679,7 +891,10 @@ export const carregarDocCorpus = cache(
     if (!ent) return null;
     if (process.env.NODE_ENV === "production" && cacheDocs.has(ent.slug))
       return cacheDocs.get(ent.slug)!;
-    const doc = Promise.resolve().then(() => montarDocCorpus(ent.slug, ent.raw));
+    const refs = refsDeEntradas(entradas);
+    const doc = Promise.resolve().then(() =>
+      montarDocCorpus(ent.slug, ent.raw, refs)
+    );
     if (process.env.NODE_ENV === "production") cacheDocs.set(ent.slug, doc);
     return doc;
   }

@@ -13,8 +13,10 @@ import {
   jornadaCorpus,
   listarDocsCorpus,
   montarDocCorpus,
+  refsDeEntradas,
   tomSemantico,
 } from "@/lib/materiais/corpus-doc";
+import type { CorpusDocRef } from "@/lib/materiais/corpus-doc";
 import { CorpusDocBody } from "@/components/corpus-documento";
 import {
   itensDoc,
@@ -206,6 +208,251 @@ describe("montarDocCorpus", () => {
     expect(grupos[1].intro).toBeNull();
     expect(grupos[1].subs.map((s) => s.titulo)).toEqual(["Sub A", "Sub B"]);
     expect(grupos[1].anchor).toBe("secao-dois");
+  });
+});
+
+// catálogo sintético de refs — o 3º argumento de montarDocCorpus é o que
+// carregarDocCorpus monta com refsDeEntradas sobre os docs/rag reais
+const REFS_CORPUS = refsDeEntradas([
+  {
+    slug: "instrumento-pdm",
+    titulo: "PDM: Plano de Desenvolvimento do Mentorado",
+  },
+  {
+    slug: "msg-encaminhamento",
+    titulo: "Mensagem de encaminhamento entre encontros",
+  },
+  { slug: "construindo-visao", titulo: "Construindo a sua Visão" },
+  { slug: "roteiro-encontro-01", titulo: "Roteiro do 1º encontro" },
+]);
+
+const docRefs = (corpo: string, refs = REFS_CORPUS) =>
+  montarDocCorpus(
+    "refs-doc",
+    `---\nfonte: refs-doc\ntitulo: Doc de Refs\nmaterial: refs-doc\n---\n\n# Doc de Refs\n\n## Corpo\n\n${corpo}\n`,
+    refs
+  )!;
+
+// primeiro bloco da seção "Corpo" como parágrafo — os casos abaixo sempre
+// recebem um parágrafo de uma linha
+const parRefs = (corpo: string, refs = REFS_CORPUS) => {
+  const b = docRefs(corpo, refs).secoes[0].blocos[0];
+  return b.kind === "par" ? b.html : "";
+};
+
+describe("referências internas (refs)", () => {
+  it('"documento <título>" vira link pro doc nativo', () => {
+    const html = parRefs(
+      "Ver o documento Mensagem de encaminhamento entre encontros."
+    );
+    // href "./<slug>" relativo — resolve sob /materiais/documento/ e sob
+    // /jovem/materiais/documento/ (o mesmo doc serve as duas rotas)
+    expect(html).toContain('href="./msg-encaminhamento"');
+    expect(html).toContain(
+      ">Mensagem de encaminhamento entre encontros</a>."
+    );
+  });
+
+  it("instrumento no meio da frase linka a forma exata, sem delimitador", () => {
+    const html = parRefs(
+      "o instrumento Construindo a sua Visão ajuda o mentorado."
+    );
+    expect(html).toContain('href="./construindo-visao"');
+    expect(html).toContain(">Construindo a sua Visão</a> ajuda o mentorado.");
+  });
+
+  it("a forma exata linka entre aspas — as aspas ficam fora do <a>", () => {
+    const html = parRefs('o documento "Construindo a sua Visão" ajuda.');
+    expect(html).toContain('documento "<a class=');
+    expect(html).toContain('href="./construindo-visao"');
+    expect(html).toContain(">Construindo a sua Visão</a>\"");
+  });
+
+  it("candidato solto que é prefixo de título linka na fronteira de palavra", () => {
+    // "Mensagem de encaminhamento" é prefixo do título "… entre encontros"
+    const html = parRefs("Use o documento Mensagem de encaminhamento.");
+    expect(html).toContain('href="./msg-encaminhamento"');
+    expect(html).toContain(">Mensagem de encaminhamento</a>.");
+    // sem delimitador o resto da frase entra no candidato e o prefixo não casa
+    expect(
+      parRefs("Use o documento Mensagem de encaminhamento no encontro.")
+    ).toBe("Use o documento Mensagem de encaminhamento no encontro.");
+  });
+
+  it('forma curta cadastrada ("PDM") linka — o alias entra na alternância', () => {
+    const refs: CorpusDocRef[] = [
+      {
+        slug: "instrumento-pdm",
+        titulo: "PDM: Plano de Desenvolvimento do Mentorado",
+        formas: ["PDM"],
+      },
+    ];
+    const html = parRefs("Use o documento PDM no encontro.", refs);
+    expect(html).toContain('href="./instrumento-pdm"');
+    expect(html).toContain(">PDM</a>");
+    expect(parRefs('o documento "PDM" guia o ciclo.', refs)).toContain(
+      'documento "<a class='
+    );
+  });
+
+  it('refsDeEntradas preserva o alias curado "PDM" (piso de 4 chars só p/ derivadas)', () => {
+    const refs = refsDeEntradas([
+      {
+        slug: "instrumento-pdm",
+        titulo: "PDM: Plano de Desenvolvimento do Mentorado",
+      },
+    ]);
+    // o piso de ≥4 chars corta truncamentos, mas o alias de ALIAS_REF é
+    // curado e entra mesmo com 3 — "documento PDM" é a forma real do texto
+    expect(refs[0].formas).toEqual([
+      "PDM: Plano de Desenvolvimento do Mentorado",
+      "PDM",
+    ]);
+    expect(parRefs("Use o documento PDM no encontro.", refs)).toContain(
+      'href="./instrumento-pdm"'
+    );
+  });
+
+  it('"Roteiro do Nº encontro" linka só quando o roteiro existe no catálogo', () => {
+    const html = parRefs(
+      "Abra o Roteiro do 1º encontro. O Roteiro do 9º encontro não existe."
+    );
+    expect(html).toContain('href="./roteiro-encontro-01"');
+    expect(html).toContain(">Roteiro do 1º encontro</a>");
+    expect(html).not.toContain("roteiro-encontro-09");
+    expect(html).toContain("O Roteiro do 9º encontro não existe.");
+  });
+
+  it('seção|capítulo "X" resolve na âncora local — título da ### ou caminho "grupo › sub"', () => {
+    const doc = docRefs(
+      'Ver a seção "Sub Alfa", a seção "Corpo › Sub Alfa" e o capítulo "Nada Aqui".\n\n### Sub Alfa\n\ntexto da sub.'
+    );
+    const b = doc.secoes[0].blocos[0];
+    const html = b.kind === "par" ? b.html : "";
+    // as duas formas apontam a mesma âncora da sub
+    expect(html.match(/href="#corpo-sub-alfa"/g)).toHaveLength(2);
+    // sem match no mapa de seções → aspas e texto ficam como estão
+    expect(html).toContain('capítulo "Nada Aqui"');
+  });
+
+  it("o próprio doc sai do mapa de documentos — auto-referência cai na seção", () => {
+    const refs = refsDeEntradas([
+      { slug: "guia-teste", titulo: "Guia de Teste" },
+      { slug: "construindo-visao", titulo: "Construindo a sua Visão" },
+    ]);
+    const doc = montarDocCorpus(
+      "guia-teste",
+      `---\nfonte: guia-teste\ntitulo: Guia de Teste\nmaterial: guia-teste\n---\n\n# Guia de Teste\n\nIntro do guia.\n\n## Corpo\n\nVer a seção "Guia de Teste" e o documento Guia de Teste.\n`,
+      refs
+    )!;
+    const b = doc.secoes[0].blocos[0];
+    const html = b.kind === "par" ? b.html : "";
+    // seção "<título do doc>" → âncora do lede; "documento <título do doc>"
+    // não linka a própria URL — sai texto puro
+    expect(html).toContain('seção "<a class=');
+    expect(html).toContain('href="#guia-de-teste"');
+    expect(html).toContain("o documento Guia de Teste.");
+    expect(html).not.toContain("documento <a");
+  });
+
+  it("candidato sem match no catálogo fica texto puro", () => {
+    expect(parRefs("O documento Guia de Avaliação Final não existe.")).toBe(
+      "O documento Guia de Avaliação Final não existe."
+    );
+  });
+
+  it("o link entra em lede, lista, tabela, callout e card de encontro", () => {
+    const doc = montarDocCorpus(
+      "refs-doc",
+      `---\nfonte: refs-doc\ntitulo: Doc de Refs\nmaterial: refs-doc\n---\n\n# Doc de Refs\n\nLede citando o instrumento Construindo a sua Visão.\n\n## Corpo\n\n- usar o instrumento Construindo a sua Visão\n- item neutro\n\n| Coluna |\n|---|\n| ver o documento Mensagem de encaminhamento |\n\n*(Dica: ver o instrumento Construindo a sua Visão.)*\n\n### 2º encontro · Prática\n\nCorpo com o instrumento Construindo a sua Visão. A tarefa é preencher o instrumento Construindo a sua Visão.\n`,
+      REFS_CORPUS
+    )!;
+    const href = 'href="./construindo-visao"';
+    const lede = doc.lede[0] as Extract<DocBloco, { kind: "par" }>;
+    expect(lede.html).toContain(href);
+    const [lista, tabela, callout] = doc.secoes[0].blocos as [
+      Extract<DocBloco, { kind: "lista" }>,
+      Extract<DocBloco, { kind: "tabela" }>,
+      Extract<DocBloco, { kind: "callout" }>,
+    ];
+    expect(lista.itens[0]).toContain(href);
+    expect(lista.itens[1]).toBe("item neutro");
+    expect(tabela.linhas[0][0]).toContain('href="./msg-encaminhamento"');
+    expect(callout.html).toContain(href);
+    const enc = doc.secoes[1].blocos[0] as Extract<
+      DocBloco,
+      { kind: "encontro" }
+    >;
+    expect((enc.corpo[0] as Extract<DocBloco, { kind: "par" }>).html).toContain(
+      href
+    );
+    expect(enc.tarefa).toContain(href);
+  });
+});
+
+const FIXTURE_CHECK = `---
+fonte: chk
+titulo: Check
+material: chk
+---
+
+# Check
+
+## Antes do encontro
+
+- revisar a ficha
+- levar o material
+
+## Preparação da semana
+
+1. ler o guia
+2. enviar a mensagem
+
+## Seção comum
+
+- item neutro
+
+### Checklist do mentor
+
+- escutar
+- perguntar
+`;
+
+describe("check nas listas de marcação + origem", () => {
+  const doc = montarDocCorpus("chk", FIXTURE_CHECK)!; // sem refs — independe
+
+  it("lista sob ##/### de marcação ganha check; seção comum não", () => {
+    const [antes, prep, comum, sub] = doc.secoes;
+    expect(antes.blocos[0]).toMatchObject({ kind: "lista", check: true });
+    // diacrítico normalizado: "Preparação" casa "preparacao" — ol também vira
+    expect(prep.blocos[0]).toMatchObject({
+      kind: "lista",
+      ordenada: true,
+      check: true,
+    });
+    expect(
+      (comum.blocos[0] as Extract<DocBloco, { kind: "lista" }>).check
+    ).toBeUndefined();
+    // o ### usa o próprio título, não o caminho "grupo › sub"
+    expect(sub.secao).toBe("Seção comum › Checklist do mentor");
+    expect(sub.blocos[0]).toMatchObject({ kind: "lista", check: true });
+  });
+
+  it("check renderiza um checkbox por item; a lista comum segue com bullets", () => {
+    const html = renderToStaticMarkup(
+      createElement(CorpusDocBody, { doc })
+    );
+    expect(html.match(/type="checkbox"/g)).toHaveLength(6);
+  });
+
+  it("origem do frontmatter vira doc.origem e não vaza no render", () => {
+    const ori = montarDocCorpus(
+      "ori",
+      `---\nfonte: ori\ntitulo: Doc Origem\nmaterial: ori\norigem: PDF Guia do Mentor páginas 4 a 6\n---\n\n# Doc Origem\n\n## S\n\nTexto.\n`
+    )!;
+    expect(ori.origem).toBe("PDF Guia do Mentor páginas 4 a 6");
+    const html = renderToStaticMarkup(createElement(CorpusDocBody, { doc: ori }));
+    expect(html).not.toContain("PDF Guia do Mentor");
   });
 });
 

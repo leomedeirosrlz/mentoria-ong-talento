@@ -17,7 +17,9 @@ export type DocTom = "lima" | "destaque" | "info";
 export type DocBloco =
   | { kind: "par"; html: string }
   // ordenada=false → <ul> (listas "-" do corpus); ausente/true → <ol>
-  | { kind: "lista"; itens: string[]; ordenada?: boolean }
+  // check: itens de marcação (seções "Antes do encontro", checklist) —
+  // o renderer desenha checkbox real em vez de bullet
+  | { kind: "lista"; itens: string[]; ordenada?: boolean; check?: boolean }
   | { kind: "pergunta"; texto: string }
   | { kind: "subj"; texto: string }
   | { kind: "callout"; tom: CalloutTom; html: string }

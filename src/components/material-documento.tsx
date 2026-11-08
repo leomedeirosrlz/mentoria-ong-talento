@@ -5,7 +5,6 @@ import {
   ArrowRight,
   CalendarCheck,
   ChatCenteredDots,
-  CheckCircle,
   EnvelopeSimple,
   Info,
   Lightbulb,
@@ -130,7 +129,14 @@ function DocTabela({
                   )}
                 >
                   {marcacao && k > 0 ? (
-                    <span className="inline-block size-4 rounded border-[1.5px] border-muted-foreground/50" />
+                    // ficha de marcação real — o mentor marca no app; sem
+                    // estado persistido, é affordance de leitura (imprime
+                    // marcado, diferente do quadrado vazio do PDF)
+                    <input
+                      type="checkbox"
+                      aria-label={`${ln[0].replace(/<[^>]+>/g, "")} — ${b.cabecalho[k].replace(/<[^>]+>/g, "")}`}
+                      className="size-4 cursor-pointer accent-[var(--ring)] print:[-webkit-print-color-adjust:exact]"
+                    />
                   ) : (
                     <span dangerouslySetInnerHTML={{ __html: cel }} />
                   )}
@@ -266,17 +272,17 @@ function EncontroCard({ b }: { b: Extract<DocBloco, { kind: "encontro" }> }) {
       {b.tarefa || b.roteiro ? (
         <div className="mt-3.5 space-y-2 border-t border-border/60 pt-3 text-sm">
           {b.tarefa ? (
-            <p className="flex items-start gap-1.5">
-              <CheckCircle
-                size={16}
-                aria-hidden
-                className="mt-0.5 shrink-0 text-[var(--ring)]"
+            <label className="flex cursor-pointer items-start gap-2">
+              <input
+                type="checkbox"
+                aria-label={`Marcar tarefa como feita: ${b.tarefa.replace(/<[^>]+>/g, "")}`}
+                className="peer mt-0.5 size-4 shrink-0 cursor-pointer accent-[var(--ring)]"
               />
-              <span>
+              <span className="peer-checked:text-muted-foreground peer-checked:line-through">
                 <b className="font-semibold">Tarefa:</b>{" "}
                 <span dangerouslySetInnerHTML={{ __html: `${b.tarefa}.` }} />
               </span>
-            </p>
+            </label>
           ) : null}
           {b.roteiro ? (
             <p>
@@ -396,6 +402,29 @@ function DocBlocoView({ b, tom }: { b: DocBloco; tom: DocTom }) {
         />
       );
     case "lista": {
+      if (b.check) {
+        // lista de marcação (fichas "Antes do encontro", checklist): linha
+        // clicável com checkbox — label envolve input+texto e o traçado é
+        // o peer-checked, sem JS
+        return (
+          <ul className="space-y-2 px-1 text-sm leading-relaxed">
+            {b.itens.map((it, j) => (
+              <li key={j}>
+                <label className="flex cursor-pointer items-start gap-2.5 rounded-md px-1 py-1 hover:bg-muted/60">
+                  <input
+                    type="checkbox"
+                    className="peer mt-0.5 size-4 shrink-0 cursor-pointer accent-[var(--ring)]"
+                  />
+                  <span
+                    className="peer-checked:text-muted-foreground peer-checked:line-through"
+                    dangerouslySetInnerHTML={{ __html: it }}
+                  />
+                </label>
+              </li>
+            ))}
+          </ul>
+        );
+      }
       const Tag = b.ordenada === false ? "ul" : "ol";
       return (
         <Tag
