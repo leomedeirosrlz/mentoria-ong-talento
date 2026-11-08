@@ -272,7 +272,7 @@ function SumarioItem({
   return (
     <a
       href={`#${anchor}`}
-      className="flex items-baseline gap-2.5 rounded-md px-2 py-1 text-sm hover:bg-muted/60"
+      className="flex items-baseline gap-2.5 rounded-md px-3 py-2.5 text-sm hover:bg-muted/60"
     >
       {num != null ? (
         // capítulo: número no lugar do marcador
@@ -305,7 +305,7 @@ function SumarioItem({
 
 function SumarioLista({ grupos }: { grupos: CorpusGrupo[] }) {
   return (
-    <ol className="space-y-0.5">
+    <ol className="space-y-1">
       {grupos.map((g, i) => (
         <li key={g.anchor}>
           <SumarioItem
