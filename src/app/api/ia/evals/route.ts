@@ -99,3 +99,20 @@ export async function POST(req: Request) {
     );
   }
 }
+
+/** ?run=<id> apaga um run; sem param limpa o histórico inteiro — itens
+ *  caem pelo cascade. PostgREST exige WHERE no delete, daí o not-null. */
+export async function DELETE(req: Request) {
+  const supabase = await createClient();
+  const g = await gateCoord(supabase);
+  if (g.erro === "sessao")
+    return jsonErro("Sessão expirada. Entre de novo.", 401);
+  if (!g.ok) return jsonErro("Área da coordenação.", 403);
+  const runId = new URL(req.url).searchParams.get("run");
+  const q = supabase.from("ia_eval_runs").delete();
+  const { error } = await (runId
+    ? q.eq("id", runId)
+    : q.not("id", "is", null));
+  if (error) return jsonErro("Não consegui apagar — tente de novo.", 500);
+  return NextResponse.json({ ok: true });
+}

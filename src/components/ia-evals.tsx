@@ -15,9 +15,24 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { CaretDown, CircleNotch, Pause, Play } from "@phosphor-icons/react";
+import {
+  CaretDown,
+  CircleNotch,
+  Pause,
+  Play,
+  Trash,
+} from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
   Popover,
@@ -169,6 +184,7 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
   const [erro, setErro] = useState<string | null>(null);
   const [criando, setCriando] = useState(false);
   const [driving, setDriving] = useState<string | null>(null);
+  const [limpando, setLimpando] = useState(false);
   const parar = useRef(false);
 
   const carregarRuns = useCallback(async () => {
@@ -178,6 +194,26 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
   const carregarDetalhe = useCallback(async (runId: string) => {
     const r = await fetch(`/api/ia/evals?run=${runId}`);
     if (r.ok) setDetalhe(await r.json());
+  }, []);
+
+  // histórico zerado pra rodada nova não misturar com resultados velhos —
+  // devolve se limpou pro diálogo fechar só no sucesso
+  const limparHistorico = useCallback(async () => {
+    setLimpando(true);
+    setErro(null);
+    try {
+      const r = await fetch("/api/ia/evals", { method: "DELETE" });
+      if (!r.ok) {
+        const j = await r.json().catch(() => null);
+        setErro(j?.error ?? "Não consegui limpar os resultados.");
+        return false;
+      }
+      setRuns([]);
+      setDetalhe(null);
+      return true;
+    } finally {
+      setLimpando(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -561,6 +597,8 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
         runs={runs}
         selecionado={detalhe?.run.id ?? null}
         driving={driving}
+        limpando={limpando}
+        onLimpar={limparHistorico}
         onAbrir={(id) => void carregarDetalhe(id)}
         onContinuar={(id) => {
           void carregarDetalhe(id);
@@ -624,15 +662,20 @@ function FaixaRuns({
   runs,
   selecionado,
   driving,
+  limpando,
+  onLimpar,
   onAbrir,
   onContinuar,
 }: {
   runs: Run[] | null;
   selecionado: string | null;
   driving: string | null;
+  limpando: boolean;
+  onLimpar: () => Promise<boolean>;
   onAbrir: (id: string) => void;
   onContinuar: (id: string) => void;
 }) {
+  const [confirmando, setConfirmando] = useState(false);
   if (!runs?.length) return null;
   // a API devolve desc — o eixo do tempo cresce pra direita, então inverte
   const ultimos = runs.slice(0, 14).reverse();
@@ -651,9 +694,60 @@ function FaixaRuns({
     <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <h3 className="text-base font-semibold">Runs recentes</h3>
-        <span className="text-xs tabular-nums text-muted-foreground">
-          {runs.length} {runs.length === 1 ? "run" : "runs"}
-        </span>
+        <div className="flex items-center gap-1">
+          <span className="text-xs tabular-nums text-muted-foreground">
+            {runs.length} {runs.length === 1 ? "run" : "runs"}
+          </span>
+          <Dialog open={confirmando} onOpenChange={setConfirmando}>
+            <DialogTrigger
+              render={
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Limpar histórico de runs"
+                  disabled={limpando || driving !== null}
+                  className="size-7 text-muted-foreground hover:text-[var(--danger-text)]"
+                >
+                  {limpando ? (
+                    <CircleNotch aria-hidden className="animate-spin" />
+                  ) : (
+                    <Trash aria-hidden />
+                  )}
+                </Button>
+              }
+            />
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Limpar histórico de runs?</DialogTitle>
+                <DialogDescription>
+                  Apaga os {runs.length}{" "}
+                  {runs.length === 1 ? "run" : "runs"} e todos os itens.
+                  Resultados antigos não se misturam com a próxima rodada —
+                  não dá pra desfazer.
+                </DialogDescription>
+              </DialogHeader>
+              <DialogFooter>
+                <Button
+                  variant="outline"
+                  onClick={() => setConfirmando(false)}
+                >
+                  Cancelar
+                </Button>
+                <Button
+                  variant="destructive"
+                  disabled={limpando}
+                  onClick={() => {
+                    void onLimpar().then(
+                      (ok) => ok && setConfirmando(false)
+                    );
+                  }}
+                >
+                  {limpando ? "Limpando…" : "Limpar tudo"}
+                </Button>
+              </DialogFooter>
+            </DialogContent>
+          </Dialog>
+        </div>
       </div>
 
       {ultimos.length > 1 && serie.some((v) => v != null) && (
