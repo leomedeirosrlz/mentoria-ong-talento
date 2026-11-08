@@ -100,8 +100,10 @@ export async function POST(req: Request) {
   }
 }
 
-/** ?run=<id> apaga um run; sem param limpa o histórico inteiro — itens
- *  caem pelo cascade. PostgREST exige WHERE no delete, daí o not-null. */
+/** ?run=<id> apaga um run; sem param limpa o histórico inteiro. A RPC
+ *  ia_eval_limpar (0166) derruba também os ia_eventos dos itens —
+ *  request_id correlaciona a cadeia mensagem→tools→resposta, e os
+ *  indicadores do painel não ficam sujos com runs superadas. */
 export async function DELETE(req: Request) {
   const supabase = await createClient();
   const g = await gateCoord(supabase);
@@ -109,10 +111,9 @@ export async function DELETE(req: Request) {
     return jsonErro("Sessão expirada. Entre de novo.", 401);
   if (!g.ok) return jsonErro("Área da coordenação.", 403);
   const runId = new URL(req.url).searchParams.get("run");
-  const q = supabase.from("ia_eval_runs").delete();
-  const { error } = await (runId
-    ? q.eq("id", runId)
-    : q.not("id", "is", null));
+  const { data: apagados, error } = await supabase.rpc("ia_eval_limpar", {
+    p_run: runId,
+  });
   if (error) return jsonErro("Não consegui apagar — tente de novo.", 500);
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, apagados: apagados ?? 0 });
 }
