@@ -721,10 +721,9 @@ function FaixaRuns({
                 <DialogTitle>Limpar histórico de runs?</DialogTitle>
                 <DialogDescription>
                   Apaga os {runs.length}{" "}
-                  {runs.length === 1 ? "run" : "runs"} e todos os itens,
-                  junto com os indicadores deles no painel. Resultados
-                  antigos não se misturam com a próxima rodada — não dá pra
-                  desfazer.
+                  {runs.length === 1 ? "run" : "runs"} e todos os itens.
+                  Resultados antigos não se misturam com a próxima rodada —
+                  não dá pra desfazer.
                 </DialogDescription>
               </DialogHeader>
               <DialogFooter>

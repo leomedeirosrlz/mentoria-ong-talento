@@ -100,10 +100,10 @@ export async function POST(req: Request) {
   }
 }
 
-/** ?run=<id> apaga um run; sem param limpa o histórico inteiro. A RPC
- *  ia_eval_limpar (0166) derruba também os ia_eventos dos itens —
- *  request_id correlaciona a cadeia mensagem→tools→resposta, e os
- *  indicadores do painel não ficam sujos com runs superadas. */
+/** ?run=<id> apaga um run; sem param limpa o histórico inteiro — itens
+ *  caem pelo cascade na RPC ia_eval_limpar (0166). Os indicadores do
+ *  painel saem por outro botão (DELETE /api/ia/eventos): limpezas
+ *  independentes, por decisão da coordenação. */
 export async function DELETE(req: Request) {
   const supabase = await createClient();
   const g = await gateCoord(supabase);

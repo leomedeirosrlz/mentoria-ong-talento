@@ -27,6 +27,7 @@ import { getIaConfig, PLANOS_GO, TETOS_GO_USD, type PlanoIa } from "@/lib/ia/con
 import { rotuloTool } from "@/lib/ia/fontes";
 import { getConsumoPlanoIa, getPainelIa } from "@/lib/ia/queries";
 import { IaEvals } from "@/components/ia-evals";
+import { IaLimparEventos } from "@/components/ia-limpar-eventos";
 import { PageHeader } from "@/components/page-header";
 import { buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -659,6 +660,8 @@ export default async function IaPage({
         title="Uso da Liza"
         meta="Consumo do plano, tokens e custo por requisição, quem usou e com qual modelo"
         actions={
+          <div className="flex items-center gap-1">
+          <IaLimparEventos />
           <Popover>
             <PopoverTrigger
               className={cn(
@@ -684,6 +687,7 @@ export default async function IaPage({
               </dl>
             </PopoverContent>
           </Popover>
+          </div>
         }
       />
 
