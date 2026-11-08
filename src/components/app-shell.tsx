@@ -48,7 +48,7 @@ const NAV = [
   // 0084: a fila de chamados é casa nova da coordenação/auxiliar — badge =
   // chamados sem dono (quem assumir primeiro trata)
   { href: "/chamados", label: "Chamados", curto: "Chamados", icon: Lifebuoy, roles: ["coordenacao", "supervisor"], grupo: "Acompanhar" },
-  { href: "/materiais", label: "Materiais de apoio", curto: "Materiais", icon: FolderOpen, roles: null, grupo: "Programa" },
+  { href: "/materiais", label: "Materiais", curto: "Materiais", icon: FolderOpen, roles: null, grupo: "Programa" },
   { href: "/formularios", label: "Formulários", curto: "Forms", icon: ListChecks, roles: ["coordenacao"], grupo: "Programa" },
   { href: "/turmas", label: "Turmas", curto: "Turmas", icon: ChalkboardTeacher, roles: ["coordenacao"], grupo: "Programa" },
   { href: "/registros", label: "Registros", curto: "Registros", icon: ClipboardText, roles: ["coordenacao", "supervisor"], grupo: "Dados" },
