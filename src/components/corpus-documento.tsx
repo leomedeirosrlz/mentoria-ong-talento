@@ -5,7 +5,6 @@ import {
   BookOpen,
   Buildings,
   Calendar,
-  CaretDown,
   ChartBar,
   Chats,
   ChatsCircle,
@@ -17,7 +16,6 @@ import {
   GraduationCap,
   Handshake,
   Info,
-  ListBullets,
   ListChecks,
   MapTrifold,
   MonitorPlay,
@@ -45,6 +43,7 @@ import {
 } from "@/lib/materiais/corpus-doc";
 import type { DocTom } from "@/lib/materiais-documentos";
 import { cn } from "@/lib/utils";
+import { SumarioPill } from "./sumario-pill";
 import {
   DocBlocos,
   DocumentoHero,
@@ -336,36 +335,16 @@ function SumarioLista({ grupos }: { grupos: CorpusGrupo[] }) {
   );
 }
 
-/** Sumário colapsável (<details> nativo, mesmo padrão da agenda) com os dois
- *  níveis — pill sticky sob o header do shell no mobile (em md+ não há
- *  header, sobe pra top-3). Escondido no xl (o rail lateral assume) e no
- *  print, onde as seções já saem abertas. */
+/** Sumário mobile: pill sticky colapsável (SumarioPill — client: fecha em
+ *  clique fora/Esc/link e anima abre/fecha com grid-rows; o <details>
+ *  nativo esconde o conteúdo na hora e não deixa animar o fechamento). A
+ *  lista é renderizada no server e chega como children. Escondido no xl
+ *  (rail lateral assume) e no print, onde as seções já saem abertas. */
 function Sumario({ grupos, total }: { grupos: CorpusGrupo[]; total: number }) {
   return (
-    <details className="group sticky top-[calc(env(safe-area-inset-top)+4rem)] z-30 mt-6 overflow-hidden rounded-full bg-card/95 shadow-[var(--shadow-border)] backdrop-blur open:rounded-2xl md:top-3 xl:hidden print:hidden">
-      <summary className="flex min-h-11 cursor-pointer list-none items-center gap-2.5 px-4 py-3 text-sm font-medium select-none focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-        <ListBullets
-          size={16}
-          className="shrink-0 text-muted-foreground"
-          aria-hidden
-        />
-        Neste documento
-        <span className="ml-1 text-xs font-normal text-muted-foreground">
-          {total} seções
-        </span>
-        <CaretDown
-          size={14}
-          className="ml-auto shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
-          aria-hidden
-        />
-      </summary>
-      <nav
-        aria-label="Sumário do documento"
-        className="scroll-fina max-h-[60dvh] overflow-y-auto border-t border-border/60 px-3 py-3"
-      >
-        <SumarioLista grupos={grupos} />
-      </nav>
-    </details>
+    <SumarioPill total={total}>
+      <SumarioLista grupos={grupos} />
+    </SumarioPill>
   );
 }
 

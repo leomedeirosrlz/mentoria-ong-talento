@@ -122,6 +122,7 @@ export default async function JovemLayout({
       assistente={
         acessoIa ? (
           <AssistenteBolhaLazy
+            key="assistente"
             papeis={["mentorado"]}
             demo={demo != null}
             configurado={providerConfigurado()}
