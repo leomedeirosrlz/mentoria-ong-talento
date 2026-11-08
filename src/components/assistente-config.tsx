@@ -14,6 +14,7 @@ import {
   ArrowUp,
   Check,
   CircleNotch,
+  ClipboardText,
   Copy,
   Key,
   Trash,
@@ -39,6 +40,7 @@ import {
   type PlanoGo,
   type PlanoIa,
 } from "@/lib/ia/config";
+import { promptMcp } from "@/lib/ia/mcp-prompt";
 import { cn } from "@/lib/utils";
 
 type Tier = "rapido" | "balanceado" | "forte";
@@ -134,6 +136,8 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
   const [tokens, setTokens] = useState<TokenMcp[] | null>(null);
   const [tokenNovo, setTokenNovo] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
+  const [copiadoPrompt, setCopiadoPrompt] = useState<"token" | "base" | null>(null);
+  const [copiadoUrl, setCopiadoUrl] = useState(false);
   const [gerando, setGerando] = useState(false);
   /** saude por slug: probe de 1 token via /api/ia/modelos — undefined =
    *  não provado (fora do cap de 8), medindo = probe em voo */
@@ -297,6 +301,33 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
       setCopiado(true);
     } catch {
       // clipboard bloqueado: o token continua selecionável na caixa
+    }
+  };
+
+  const copiarUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        `${window.location.origin}/api/mcp`
+      );
+      setCopiadoUrl(true);
+      setTimeout(() => setCopiadoUrl(false), 1600);
+    } catch {
+      // clipboard bloqueado: a URL segue selecionável no chip
+    }
+  };
+
+  const copiarPrompt = async (qual: "token" | "base") => {
+    try {
+      await navigator.clipboard.writeText(
+        promptMcp(window.location.origin, qual === "token" ? tokenNovo : null)
+      );
+      setCopiadoPrompt(qual);
+      setTimeout(
+        () => setCopiadoPrompt((c) => (c === qual ? null : c)),
+        1600
+      );
+    } catch {
+      // clipboard bloqueado: o token do card segue copiável por botão próprio
     }
   };
 
@@ -786,13 +817,43 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
                   IA externa (MCP)
                 </h3>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Token pra conectar Claude, Cursor ou outro cliente MCP em
-                  <code className="mx-0.5 rounded bg-muted px-1 font-mono text-[11px]">
-                    /api/mcp
-                  </code>
-                  . Carrega o seu papel; quem tem acesso revoga aqui.
+                  Token pra conectar Claude, Cursor ou outro cliente MCP.
+                  Carrega o seu papel; quem tem acesso revoga aqui.
                 </p>
               </div>
+
+              <div className="flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-2">
+                <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
+                  POST {window.location.origin}/api/mcp
+                </code>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Copiar endpoint"
+                  onClick={copiarUrl}
+                  className="shrink-0"
+                >
+                  {copiadoUrl ? (
+                    <Check aria-hidden className="text-[var(--ok-text)]" />
+                  ) : (
+                    <Copy aria-hidden />
+                  )}
+                </Button>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => copiarPrompt("base")}
+                className="w-full"
+              >
+                {copiadoPrompt === "base" ? (
+                  <Check aria-hidden className="text-[var(--ok-text)]" />
+                ) : (
+                  <ClipboardText aria-hidden />
+                )}
+                Copiar prompt de conexão
+              </Button>
 
               {tokenNovo && (
                 <div className="space-y-1.5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn-bg)]/40 p-2.5">
@@ -817,6 +878,19 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
                       )}
                     </Button>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copiarPrompt("token")}
+                    className="w-full"
+                  >
+                    {copiadoPrompt === "token" ? (
+                      <Check aria-hidden className="text-[var(--ok-text)]" />
+                    ) : (
+                      <ClipboardText aria-hidden />
+                    )}
+                    Copiar prompt com contexto + token
+                  </Button>
                 </div>
               )}
 

@@ -20,6 +20,7 @@ import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { executarTool, IA_TOOL_CATALOGO } from "@/lib/ia/tools";
+import { MCP_INSTRUCOES } from "@/lib/ia/mcp-prompt";
 import { consumirLimiteIa } from "@/lib/ia/rate-limit";
 import { clientImpersonado } from "@/lib/ia/impersonar";
 import type { AppRole } from "@/lib/types";
@@ -73,7 +74,7 @@ function clientServico() {
 }
 
 export async function POST(req: Request) {
-  // ---- auth: Bearer PAT → profile + papéis (gate coord/staff) ----
+  // ---- auth: Bearer PAT → profile + papéis (papel no programa) ----
   const token = /^Bearer\s+(.+)$/.exec(req.headers.get("authorization") ?? "")
     ?.[1]?.trim();
   if (!token) {
@@ -129,6 +130,7 @@ export async function POST(req: Request) {
         protocolVersion: PROTOCOLO,
         capabilities: { tools: {} },
         serverInfo: { name: "realiza-mcp", version: "1.0.0" },
+        instructions: MCP_INSTRUCOES,
       });
     case "ping":
       return rpcResult(id, {});
