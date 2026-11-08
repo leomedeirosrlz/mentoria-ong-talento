@@ -261,26 +261,21 @@ function GrupoSecao({
 function SumarioItem({
   anchor,
   titulo,
-  sub,
   tom,
   num,
 }: {
   anchor: string;
   titulo: string;
-  sub?: boolean;
   tom?: DocTom;
   num?: number;
 }) {
   return (
     <a
       href={`#${anchor}`}
-      className={cn(
-        "flex items-baseline gap-2.5 rounded-md py-1 text-sm hover:bg-muted/60",
-        sub ? "px-2 py-0.5 text-[13px] text-muted-foreground hover:text-foreground" : "px-2"
-      )}
+      className="flex items-baseline gap-2.5 rounded-md px-2 py-1 text-sm hover:bg-muted/60"
     >
       {num != null ? (
-        // capítulo: número no lugar do marcador (subs mantêm o ponto)
+        // capítulo: número no lugar do marcador
         <span
           aria-hidden
           className={cn(
@@ -294,8 +289,7 @@ function SumarioItem({
         <span
           aria-hidden
           className={cn(
-            "shrink-0 self-center rounded-full",
-            sub ? "size-1" : "size-1.5",
+            "size-1.5 shrink-0 self-center rounded-full",
             tom ? TOM_DOC[tom].barra : "bg-[var(--brand-lime)]"
           )}
         />
@@ -320,15 +314,6 @@ function SumarioLista({ grupos }: { grupos: CorpusGrupo[] }) {
             num={i + 1}
             tom={g.fase != null ? tomDeFase(g.fase) : undefined}
           />
-          {g.subs.length > 0 ? (
-            <ol className="mb-1.5 ml-4 mt-0.5 space-y-0.5 border-l border-border/60 pl-3">
-              {g.subs.map((s) => (
-                <li key={s.anchor}>
-                  <SumarioItem anchor={s.anchor} titulo={s.titulo} sub />
-                </li>
-              ))}
-            </ol>
-          ) : null}
         </li>
       ))}
     </ol>
