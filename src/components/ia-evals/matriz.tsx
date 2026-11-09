@@ -9,9 +9,10 @@
 // shrunken table.
 
 import { Fragment, useId, useMemo, useState } from "react";
-import { CaretDown } from "@phosphor-icons/react";
+import { CaretDown, MagnifyingGlass } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { filterChipCls } from "@/components/ui/filter-chip";
 import {
   Popover,
@@ -276,6 +277,7 @@ export function MatrizCasos({
   const painelId = useId();
   const [aberto, setAberto] = useState<CelulaKey | null>(null);
   const [hover, setHover] = useState<Hover>(null);
+  const [busca, setBusca] = useState("");
 
   // corpus order from the run's snapshot; items of unknown casos trail
   const casosOrdem = useMemo(() => {
@@ -320,16 +322,31 @@ export function MatrizCasos({
     return m;
   }, [itens]);
 
+  // quick case filter: matches id and question, accent-insensitive
+  const casosVisiveis = useMemo(() => {
+    const q = busca
+      .trim()
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/\p{Diacritic}/gu, "");
+    if (!q) return casosOrdem;
+    const norm = (s: string) =>
+      s.toLowerCase().normalize("NFD").replace(/\p{Diacritic}/gu, "");
+    return casosOrdem.filter(
+      (c) => norm(c.id).includes(q) || norm(c.msg).includes(q)
+    );
+  }, [casosOrdem, busca]);
+
   const grupos = useMemo(() => {
     const g: { grupo: string; casos: CasoLinha[] }[] = [];
-    for (const c of casosOrdem) {
+    for (const c of casosVisiveis) {
       const nome = grupoDoCaso(c.id);
       const ultimo = g[g.length - 1];
       if (ultimo?.grupo === nome) ultimo.casos.push(c);
       else g.push({ grupo: nome, casos: [c] });
     }
     return g;
-  }, [casosOrdem]);
+  }, [casosVisiveis]);
 
   const stats = useMemo(() => {
     const por = (s: Item["status"]) => itens.filter((i) => i.status === s).length;
@@ -379,11 +396,27 @@ export function MatrizCasos({
             </button>
           )}
         </div>
-        <div
-          className="flex flex-wrap gap-1.5"
-          role="group"
-          aria-label="Filtrar itens por status"
-        >
+        <div className="flex flex-wrap items-center gap-1.5">
+          <label className="relative">
+            <span className="sr-only">Buscar caso</span>
+            <MagnifyingGlass
+              size={13}
+              aria-hidden
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted-foreground"
+            />
+            <Input
+              type="search"
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar caso…"
+              className="h-9 w-36 rounded-full border-border bg-card pl-7 pr-2 text-xs shadow-none focus-visible:ring-2 md:h-9 md:text-xs sm:w-44"
+            />
+          </label>
+          <div
+            className="flex flex-wrap gap-1.5"
+            role="group"
+            aria-label="Filtrar itens por status"
+          >
           {(
             [
               ["todos", "Todos", stats.total],
@@ -406,6 +439,7 @@ export function MatrizCasos({
                 {rotulo} <span className="tabular-nums">{n}</span>
               </button>
             ))}
+          </div>
         </div>
       </div>
 
@@ -442,9 +476,9 @@ export function MatrizCasos({
               ))}
             </tr>
           </thead>
-          {/* re-key on filter: the swap remounts the rows and replays the
-              enter stagger — never a dry full-table repaint */}
-          <tbody key={filtro}>
+          {/* re-key on filter/search: the swap remounts the rows and
+              replays the enter stagger — never a dry full-table repaint */}
+          <tbody key={`${filtro}|${busca}`}>
             {grupos.map(({ grupo, casos: lista }) => (
               <Fragment key={grupo}>
                 {multiplosGrupos && (
@@ -640,9 +674,11 @@ export function MatrizCasos({
         ))}
       </div>
 
-      {!algumaLinha && (
+      {(!algumaLinha || !casosVisiveis.length) && (
         <p className="mt-3 text-sm text-muted-foreground">
-          Nenhum item com esse status neste run.
+          {!casosVisiveis.length
+            ? "Nenhum caso bate com a busca."
+            : "Nenhum item com esse status neste run."}
         </p>
       )}
     </div>

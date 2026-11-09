@@ -91,6 +91,8 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
     const url = new URL(window.location.href);
     if (id) url.searchParams.set("eval", id);
     else url.searchParams.delete("eval");
+    // evals live on their own tab — the deep link stays coherent
+    url.searchParams.set("aba", "evals");
     window.history.replaceState(null, "", url);
   }, []);
 

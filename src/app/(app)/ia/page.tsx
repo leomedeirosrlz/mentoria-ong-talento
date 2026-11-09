@@ -26,6 +26,7 @@ import {
 import { getIaConfig, PLANOS_GO, TETOS_GO_USD, type PlanoIa } from "@/lib/ia/config";
 import { rotuloTool } from "@/lib/ia/fontes";
 import { getConsumoPlanoIa, getPainelIa } from "@/lib/ia/queries";
+import { AbasAgenda } from "@/components/agenda-abas";
 import { IaEvals } from "@/components/ia-evals";
 import { IaLimparEventos } from "@/components/ia-limpar-eventos";
 import { PageHeader } from "@/components/page-header";
@@ -460,13 +461,14 @@ function SecaoPlano({ previsao, plano }: { previsao: PrevisaoPlano; plano: Plano
 // ---------- gráficos ----------
 
 function CardGrafico({
-  titulo, valor, legenda, detalhe, vazio, children,
+  titulo, valor, legenda, detalhe, vazio, vazioTexto, children,
 }: {
   titulo: string;
   valor: string;
   legenda: string;
   detalhe?: React.ReactNode;
   vazio: boolean;
+  vazioTexto?: string;
   children: React.ReactNode;
 }) {
   return (
@@ -480,7 +482,7 @@ function CardGrafico({
       <div className="mt-3">
         {vazio ? (
           <p className="flex h-40 items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
-            Sem requisições no período.
+            {vazioTexto ?? "Sem requisições no período."}
           </p>
         ) : (
           children
@@ -554,7 +556,14 @@ export default async function IaPage({
   if (me?.role !== "coordenacao") redirect("/");
 
   const demo = await demoAtivo();
-  const { dias: dP, canal: cP, modelo: mP } = await searchParams;
+  const { dias: dP, canal: cP, modelo: mP, aba: abaP, eval: evalP } =
+    await searchParams;
+  // evals moram na própria aba (observabilidade ≠ engenharia); ?eval=<id>
+  // sem aba é deep-link antigo e abre direto na aba de evals
+  const aba =
+    abaP === "evals" || (!abaP && typeof evalP === "string" && evalP)
+      ? "evals"
+      : "uso";
   const dias = DIAS_OPCOES.includes(Number(dP) as (typeof DIAS_OPCOES)[number])
     ? Number(dP)
     : 30;
@@ -638,6 +647,11 @@ export default async function IaPage({
   const periodoTxt = `${dias === 1 ? "nas últimas 24 horas" : `nos últimos ${dias} dias`}${porSemana ? ", por semana" : ""}`;
   const unidadeTempo = porSemana ? "Semana" : "Dia";
   const vazio = uso.requisicoes === 0;
+  // modelo gratuito (beam-free etc): a série do plano é zero em tudo e o
+  // gráfico vira uma linha morta em US$ 0 — o estado vazio compacto informa
+  // mais e devolve a área nobre
+  const custoZerado =
+    !vazio && uso.pontos.every((p) => !p.planoPorReq);
   const chaveRecorte = `${dias}|${canal}|${modelo ?? ""}`;
 
   // fração do input servida do cache do provedor — sem leitura de cache
@@ -659,40 +673,69 @@ export default async function IaPage({
       <PageHeader
         kicker="Dados"
         title="Uso da Liza"
-        meta="Consumo do plano, tokens e custo por requisição, quem usou e com qual modelo"
+        meta={
+          aba === "uso"
+            ? "Consumo do plano, tokens e custo por requisição, quem usou e com qual modelo"
+            : "Grade de avaliações: casos reais × modelos × repetições contra o chat"
+        }
         actions={
-          <div className="flex items-center gap-1">
-          {/* demo não tem ia_eventos reais pra limpar — a rota daria 401 */}
-          {!demo && <IaLimparEventos />}
-          <Popover>
-            <PopoverTrigger
-              className={cn(
-                buttonVariants({ variant: "ghost", size: "sm" }),
-                "min-h-11 text-xs font-semibold text-foreground/80 sm:min-h-8"
-              )}
-            >
-              <Info size={14} aria-hidden />
-              Como calculamos
-            </PopoverTrigger>
-            <PopoverContent
-              align="end"
-              className="scroll-fina max-h-[min(70vh,34rem)] w-[min(24rem,calc(100vw-2rem))] overflow-y-auto p-4"
-            >
-              <p className="text-sm font-semibold">Como calculamos</p>
-              <dl className="mt-3 grid gap-3 text-sm">
-                {REGRAS.map((r) => (
-                  <div key={r.termo}>
-                    <dt className="font-semibold">{r.termo}</dt>
-                    <dd className="mt-0.5 text-muted-foreground">{r.texto}</dd>
-                  </div>
-                ))}
-              </dl>
-            </PopoverContent>
-          </Popover>
-          </div>
+          // as ações do cabeçalho são da superfície de uso — na aba de
+          // evals os controles moram dentro do painel dela
+          aba === "uso" ? (
+            <div className="flex items-center gap-1">
+            {/* demo não tem ia_eventos reais pra limpar — a rota daria 401 */}
+            {!demo && <IaLimparEventos />}
+            <Popover>
+              <PopoverTrigger
+                className={cn(
+                  buttonVariants({ variant: "ghost", size: "sm" }),
+                  "min-h-11 text-xs font-semibold text-foreground/80 sm:min-h-8"
+                )}
+              >
+                <Info size={14} aria-hidden />
+                Como calculamos
+              </PopoverTrigger>
+              <PopoverContent
+                align="end"
+                className="scroll-fina max-h-[min(70vh,34rem)] w-[min(24rem,calc(100vw-2rem))] overflow-y-auto p-4"
+              >
+                <p className="text-sm font-semibold">Como calculamos</p>
+                <dl className="mt-3 grid gap-3 text-sm">
+                  {REGRAS.map((r) => (
+                    <div key={r.termo}>
+                      <dt className="font-semibold">{r.termo}</dt>
+                      <dd className="mt-0.5 text-muted-foreground">{r.texto}</dd>
+                    </div>
+                  ))}
+                </dl>
+              </PopoverContent>
+            </Popover>
+            </div>
+          ) : undefined
         }
       />
 
+      <AbasAgenda
+        abas={[
+          { id: "uso", rotulo: "Uso", href: params({ dias, canal, modelo }) },
+          { id: "evals", rotulo: "Evals", href: "/ia?aba=evals" },
+        ]}
+        ativa={aba}
+        painelId="painel-ia"
+        idPrefix="aba-ia"
+        ariaLabel="Seções do painel da Liza"
+      />
+
+      <div
+        id="painel-ia"
+        role="tabpanel"
+        aria-labelledby={`aba-ia-${aba}`}
+        className="space-y-6"
+      >
+      {aba === "evals" ? (
+        <IaEvals modelosSugeridos={modelosCfg} />
+      ) : (
+      <>
       <SecaoPlano previsao={previsao} plano={plano} />
 
       {/* filtros deep-linkáveis: valem pros gráficos e listas abaixo; a
@@ -769,7 +812,8 @@ export default async function IaPage({
                 ? undefined
                 : `cobrado ${usd(m.custoPorReq)} · tabela ${usd(m.tabelaPorReq ?? 0)} por requisição`
             }
-            vazio={vazio}
+            vazio={vazio || custoZerado}
+            vazioTexto="Sem custo no período (modelo gratuito)."
           >
             <GraficoTempo
               tipo="linha"
@@ -805,7 +849,7 @@ export default async function IaPage({
           </CardGrafico>
         </div>
 
-        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
           <Kpi
             rotulo="Gasto do plano"
             valor={usd(mt.allowanceUsd)}
@@ -972,13 +1016,9 @@ export default async function IaPage({
             </ul>
           </Secao>
         </div>
-
-        <div className="border-t border-border pt-6">
-          <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            Qualidade
-          </p>
-          <IaEvals modelosSugeridos={modelosCfg} />
-        </div>
+      </div>
+      </>
+      )}
       </div>
     </div>
   );
