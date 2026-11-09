@@ -76,7 +76,10 @@ test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
     await expect(
       page.getByRole("heading", { name: "Checklist de competências do mentor", level: 1 })
     ).toBeVisible();
-    await expect(page.getByText(/Competência/)).toBeVisible();
+    // a tabela de competências aparece mais de uma vez no documento
+    await expect(
+      page.getByRole("columnheader", { name: "Competência" }).first()
+    ).toBeVisible();
     await page
       .locator("#conteudo")
       .getByRole("link", { name: "Materiais de apoio" })

@@ -30,7 +30,8 @@ test.describe("demo — combinados do registro (REALIZA-339)", () => {
     const bloco4 = card4.locator("#combinados-4");
     const item = bloco4.locator("li", { hasText: PENDENTE });
     await expect(item).toBeVisible();
-    await expect(item).toContainText("Ana");
+    // nome social da jovem (Ana Beatriz → Bia)
+    await expect(item).toContainText("Bia");
     await expect(item).toContainText(/até \d{2}\/\d{2}\/\d{4}/);
     // pendente não vem riscado
     await expect(item.getByText(PENDENTE)).not.toHaveClass(/line-through/);
