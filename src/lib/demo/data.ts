@@ -2937,13 +2937,18 @@ function build(): DemoData {
   // warnrow da Minha agenda aponta), o 3º agendado no passado sem registro
   // (limbo — exercita o "remarcar/não aconteceu") e o 4º já marcado pra
   // semana seguinte.
+  // datas ancoradas na segunda da semana (TERCA_ENCONTRO_5 - 1), não em
+  // HOJE-n: numa segunda "ontem" caía na semana anterior e a agenda perdia a
+  // 2ª dupla em "Também nesta semana"; num domingo HOJE-6 colidia com o 3º
+  const SEG_T2C = addDias(TERCA_ENCONTRO_5, -1);
   const encT2c: Encontro[] = [
     comRegistro(
-      realizado(uid(D.t2c), 1, addDias(HOJE, -14), { duracao: 75 }),
+      realizado(uid(D.t2c), 1, addDias(SEG_T2C, -14), { duracao: 75 }),
       ricardo, "Matheus", "dpp"
     ),
-    realizado(uid(D.t2c), 2, addDias(HOJE, -6), { duracao: 60, origem: "externo" }),
-    agendado(uid(D.t2c), 3, addDias(HOJE, -1), {}),
+    realizado(uid(D.t2c), 2, addDias(SEG_T2C, -7), { duracao: 60, origem: "externo" }),
+    // de terça em diante segue no passado (o limbo continua exercitado)
+    agendado(uid(D.t2c), 3, SEG_T2C, {}),
     // âncora na terça (não em HOJE+n): a segunda da próxima semana é
     // sempre segunda — com HOJE+n o dia varia com o dia da build e um
     // "agendado pra semana seguinte" podia cair no domingo da semana
@@ -2958,7 +2963,7 @@ function build(): DemoData {
     turma: "T2 · 2026/2027",
     cronograma_id: cronogramaT2,
     status: "ativa",
-    iniciada_em: ymd(addDias(HOJE, -18)),
+    iniciada_em: ymd(addDias(SEG_T2C, -17)),
     trilha: "dpp",
     demanda: null,
     solicitacao_id: null,
