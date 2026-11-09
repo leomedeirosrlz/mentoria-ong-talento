@@ -51,14 +51,35 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
   const runId = url.searchParams.get("run");
+  const proximoRun = url.searchParams.get("proximo");
   if (url.searchParams.has("casos")) {
     return NextResponse.json({
       casos: listarCasosLive().map((c) => ({
         id: c.id,
         papel_esperado: c.papel_esperado,
         msg: c.msg,
+        pagina: c.pagina ?? null,
+        rubrica: {
+          tools_esperadas: c.tools_esperadas,
+          tools_nao_pode: c.tools_nao_pode,
+          resposta_contem: c.resposta_contem,
+          resposta_nao_contem: c.resposta_nao_contem,
+        },
       })),
     });
+  }
+  // primeiro pendente na MESMA ordem do claim (order by id) — a UI marca a
+  // célula em voo antes do POST /executar responder
+  if (proximoRun) {
+    const { data: prox } = await supabase
+      .from("ia_eval_itens")
+      .select("id, caso_id, modelo, repeticao, msg")
+      .eq("run_id", proximoRun)
+      .eq("status", "pendente")
+      .order("id")
+      .limit(1)
+      .maybeSingle();
+    return NextResponse.json({ proximo: prox ?? null });
   }
   if (runId) {
     const [{ data: run }, { data: itens }] = await Promise.all([
@@ -116,4 +137,46 @@ export async function DELETE(req: Request) {
   });
   if (error) return jsonErro("Não consegui apagar — tente de novo.", 500);
   return NextResponse.json({ ok: true, apagados: apagados ?? 0 });
+}
+
+const ReagendarBody = z.object({ run_id: z.string().uuid() }).strict();
+
+/** PATCH {run_id} — reagenda os itens falhos/travados do run pra fila:
+ *  falhou/erro (e rodando zumbi de sessão morta) voltam a 'pendente' com
+ *  o resultado limpo, e o run reabre como 'rodando' pro laço retomar.
+ *  Update direto — a policy `for all` de coord já cobre (0164). */
+export async function PATCH(req: Request) {
+  const supabase = await createClient();
+  const g = await gateCoord(supabase);
+  if (g.erro === "sessao")
+    return jsonErro("Sessão expirada. Entre de novo.", 401);
+  if (!g.ok) return jsonErro("Área da coordenação.", 403);
+  const body = ReagendarBody.safeParse(await req.json().catch(() => null));
+  if (!body.success) return jsonErro("run_id inválido.", 400);
+
+  const { data: reagendados, error } = await supabase
+    .from("ia_eval_itens")
+    .update({
+      status: "pendente",
+      detalhe: null,
+      request_id: null,
+      latencia_ms: null,
+      tokens_in: null,
+      tokens_out: null,
+      custo_usd: null,
+      modelo_usado: null,
+      tools_usadas: [],
+      resposta_trecho: null,
+      executado_em: null,
+    })
+    .eq("run_id", body.data.run_id)
+    .in("status", ["falhou", "erro", "rodando"])
+    .select("id");
+  if (error) return jsonErro("Não consegui reagendar — tente de novo.", 500);
+  if (reagendados?.length)
+    await supabase
+      .from("ia_eval_runs")
+      .update({ status: "rodando" })
+      .eq("id", body.data.run_id);
+  return NextResponse.json({ ok: true, reagendados: reagendados?.length ?? 0 });
 }

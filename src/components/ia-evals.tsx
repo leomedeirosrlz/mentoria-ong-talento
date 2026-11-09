@@ -1,220 +1,130 @@
 "use client";
 
-// Evals persistidos da Liza (0164): a coordenação monta a grade
-// casos × modelos × repetições aqui no /ia e o laço executa um item por
-// request (POST /executar) — progresso ao vivo, retomável se a aba fechar.
-// Métricas (latência, tokens, custo) vêm do evento 'resposta' do chat.
+// Persisted evals of the Liza (0164) — the /ia panel for coordination.
+// A run = casos × modelos × repetições; the drive loop executes one item
+// per request (POST /executar) and each answer carries the full item
+// payload, so KPIs, cost and the matrix move item by item without a
+// refetch. Before every POST, GET ?proximo returns the exact item the
+// claim will pick (same order by id) — the cell pulses optimistically.
+// The run is resumable (pending items live in the bank) and ?eval=<id>
+// deep-links straight into a run. Blocks live in ./ia-evals/*.
 
-import {
-  Fragment,
-  useCallback,
-  useEffect,
-  useId,
-  useMemo,
-  useRef,
-  useState,
-  type CSSProperties,
-} from "react";
-import {
-  CaretDown,
-  CircleNotch,
-  Pause,
-  Play,
-  Trash,
-} from "@phosphor-icons/react";
-import { cn } from "@/lib/utils";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Flask, Info, Plus } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { Skeleton } from "@/components/ui/skeleton";
-import { BarraSegmentada, Sparkline } from "@/components/viz";
+import { HistoricoRuns } from "./ia-evals/historico";
+import { NovoRunDialog, type FormGrade } from "./ia-evals/novo-run";
+import { DetalheRun } from "./ia-evals/detalhe";
+import type {
+  Caso,
+  Item,
+  ProximoItem,
+  Run,
+  RunDetalhe,
+} from "./ia-evals/tipos";
 
-type Caso = { id: string; papel_esperado: string; msg: string };
-type Run = {
-  id: string;
-  created_at: string;
-  status: "pendente" | "rodando" | "concluido" | "falhou";
-  ambiente: string;
-  papel: string;
-  modelos: string[];
-  repeticoes: number;
-  resumo: {
-    total: number;
-    ok: number;
-    falhas: number;
-    erros: number;
-    latencia_media_ms: number | null;
-    custo_usd: number;
-    tokens_in: number;
-    tokens_out: number;
-  } | null;
-};
-type Item = {
-  id: string;
-  caso_id: string;
-  msg: string;
-  modelo: string;
-  repeticao: number;
-  status: "pendente" | "rodando" | "ok" | "falhou" | "erro";
-  latencia_ms: number | null;
-  tokens_in: number | null;
-  tokens_out: number | null;
-  custo_usd: number | null;
-  modelo_usado: string | null;
-  detalhe: string | null;
-  resposta_trecho: string | null;
-};
+type Detalhe = { run: RunDetalhe; itens: Item[] };
 
-const STATUS_ITEM: Record<Item["status"], { rotulo: string; cls: string }> = {
-  pendente: { rotulo: "na fila", cls: "bg-muted text-muted-foreground" },
-  rodando: { rotulo: "rodando", cls: "bg-[var(--info-bg)] text-[var(--info-text)]" },
-  ok: { rotulo: "passou", cls: "bg-[var(--ok-bg)] text-[var(--ok-text)]" },
-  falhou: { rotulo: "falhou", cls: "bg-[var(--danger-bg)] text-[var(--danger-text)]" },
-  erro: { rotulo: "erro", cls: "bg-[var(--warn-bg)] text-[var(--warn-text)]" },
-};
-
-const STATUS_RUN: Record<Run["status"], { rotulo: string; cls: string }> = {
-  pendente: { rotulo: "na fila", cls: "bg-muted text-muted-foreground" },
-  rodando: {
-    rotulo: "rodando",
-    cls: "bg-[var(--info-bg)] text-[var(--info-text)]",
+const COMO_CALCULAMOS = [
+  {
+    termo: "O que um run testa",
+    texto:
+      "Uma grade casos × modelos × repetições. Cada célula é uma pergunta real ao chat da Liza, com a conta de teste do papel escolhido; a repetição mede a variância do modelo.",
   },
-  concluido: {
-    rotulo: "concluído",
-    cls: "bg-[var(--ok-bg)] text-[var(--ok-text)]",
+  {
+    termo: "Status dos itens",
+    texto:
+      "Na fila → rodando → passou, falhou ou erro. Falhou é a rubrica reprovada (tool errada, trecho proibido na resposta). Erro é infra (HTTP ou stream quebrado): vale reexecutar e não conta como erro de raciocínio do modelo.",
   },
-  falhou: {
-    rotulo: "falhou",
-    cls: "bg-[var(--danger-bg)] text-[var(--danger-text)]",
+  {
+    termo: "Rubrica",
+    texto:
+      "Cada caso do corpus declara as ferramentas que a Liza deve chamar, as que não pode e os trechos obrigatórios ou proibidos na resposta. O checklist do item mostra cada um com ✓ ou ✗.",
   },
-};
-
-/** chip sólido da célula da matriz — a mesma gramática dos marcadores do
- *  app (fill de status + --status-foreground); pendente fica em contorno
- *  tracejado ("ainda não aconteceu") e rodando pulsa em --info. */
-const CELULA: Record<Item["status"], string> = {
-  pendente:
-    "border border-dashed border-muted-foreground/50 text-muted-foreground",
-  rodando: "bg-[var(--info)] text-[var(--status-foreground)] animate-pulse",
-  ok: "bg-[var(--ok)] text-[var(--status-foreground)]",
-  falhou: "bg-[var(--danger)] text-[var(--status-foreground)]",
-  erro: "bg-[var(--warn)] text-[var(--status-foreground)]",
-};
-
-type FiltroItem = "todos" | "ok" | "falhou" | "erro";
-
-const num = new Intl.NumberFormat("pt-BR");
-const usd = (v: number | null) =>
-  v == null ? "—" : v === 0 ? "US$ 0" : `US$ ${v.toFixed(4)}`;
-const ms = (v: number | null) =>
-  v == null ? "—" : v >= 1000 ? `${(v / 1000).toFixed(1)}s` : `${v}ms`;
-const dataCurta = (iso: string) =>
-  new Date(iso).toLocaleString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-const diaCurta = (iso: string) =>
-  new Date(iso).toLocaleDateString("pt-BR", {
-    day: "2-digit",
-    month: "2-digit",
-  });
-const compacto = new Intl.NumberFormat("pt-BR", {
-  notation: "compact",
-  maximumFractionDigits: 1,
-});
-const stagger = (i: number) => ({ "--i": Math.min(i, 10) }) as CSSProperties;
-/** leitura de uma execução pro title da célula (hover repete latência +
- *  tokens sem abrir o painel) */
-const descItem = (i: Item) =>
-  `rep ${i.repeticao}: ${STATUS_ITEM[i.status].rotulo} · ${ms(i.latencia_ms)} · ${num.format(i.tokens_in ?? 0)}+${num.format(i.tokens_out ?? 0)} tok · ${usd(i.custo_usd)}`;
-
-function Chip({
-  ativo,
-  onClick,
-  children,
-}: {
-  ativo?: boolean;
-  onClick?: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <Button
-      type="button"
-      variant={ativo ? "default" : "outline"}
-      onClick={onClick}
-      className={cn(
-        "min-h-11 rounded-full px-3 text-xs sm:min-h-7",
-        !ativo && "hover:bg-muted"
-      )}
-    >
-      {children}
-    </Button>
-  );
-}
+  {
+    termo: "Latência, tokens e custo",
+    texto:
+      "A latência cobre a pergunta inteira (modelo + ferramentas). Tokens e custo vêm do evento 'resposta' que a própria request do chat grava, correlacionado pelo id da request.",
+  },
+  {
+    termo: "Retomável",
+    texto:
+      "Os itens pendentes ficam no banco: fechar a aba não perde nada. Continuar retoma de onde parou e Reexecutar falhas devolve só os itens com falha ou erro pra fila.",
+  },
+];
 
 export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
   const [casos, setCasos] = useState<Caso[] | null>(null);
   const [runs, setRuns] = useState<Run[] | null>(null);
-  const [detalhe, setDetalhe] = useState<{ run: Run; itens: Item[] } | null>(
-    null
-  );
-  const [form, setForm] = useState({
+  const [detalhe, setDetalhe] = useState<Detalhe | null>(null);
+  const [form, setForm] = useState<FormGrade>({
     ambiente: "staging",
-    papel: "staff" as "staff" | "mentorado",
-    modelos: [] as string[],
+    papel: "staff",
+    modelos: [],
     repeticoes: 1,
-    casoIds: null as string[] | null, // null = todos do papel
+    casoIds: null,
     modeloInput: "",
   });
+  const [dialogAberto, setDialogAberto] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   const [criando, setCriando] = useState(false);
   const [driving, setDriving] = useState<string | null>(null);
+  const [atual, setAtual] = useState<ProximoItem | null>(null);
+  const [feed, setFeed] = useState<Item[]>([]);
+  // runId that just closed inside this session — the close-out moment
+  const [fechado, setFechado] = useState<string | null>(null);
   const [limpando, setLimpando] = useState(false);
+  const [reexecutando, setReexecutando] = useState(false);
+  const [apagando, setApagando] = useState(false);
   const parar = useRef(false);
+  // ref twin of `driving`: the loop body reads it, the state renders it
+  const dirigindo = useRef<string | null>(null);
+
+  // ?eval=<id> via replaceState — never router.push (no server re-render)
+  const escreverEvalUrl = useCallback((id: string | null) => {
+    const url = new URL(window.location.href);
+    if (id) url.searchParams.set("eval", id);
+    else url.searchParams.delete("eval");
+    window.history.replaceState(null, "", url);
+  }, []);
 
   const carregarRuns = useCallback(async () => {
     const r = await fetch("/api/ia/evals");
     if (r.ok) setRuns((await r.json()).runs);
   }, []);
-  const carregarDetalhe = useCallback(async (runId: string) => {
-    const r = await fetch(`/api/ia/evals?run=${runId}`);
-    if (r.ok) setDetalhe(await r.json());
-  }, []);
 
-  // histórico zerado pra rodada nova não misturar com resultados velhos —
-  // devolve se limpou pro diálogo fechar só no sucesso
-  const limparHistorico = useCallback(async () => {
-    setLimpando(true);
-    setErro(null);
-    try {
-      const r = await fetch("/api/ia/evals", { method: "DELETE" });
-      if (!r.ok) {
-        const j = await r.json().catch(() => null);
-        setErro(j?.error ?? "Não consegui limpar os resultados.");
-        return false;
-      }
-      setRuns([]);
-      setDetalhe(null);
+  const carregarDetalhe = useCallback(
+    async (runId: string) => {
+      const r = await fetch(`/api/ia/evals?run=${runId}`);
+      if (!r.ok) return false;
+      setDetalhe(await r.json());
+      escreverEvalUrl(runId);
       return true;
-    } finally {
-      setLimpando(false);
-    }
-  }, []);
+    },
+    [escreverEvalUrl]
+  );
+
+  const abrirRun = useCallback(
+    (id: string) => {
+      setFechado(null);
+      setFeed([]);
+      return carregarDetalhe(id);
+    },
+    [carregarDetalhe]
+  );
+
+  const fecharDetalhe = useCallback(() => {
+    setDetalhe(null);
+    setFeed([]);
+    setFechado(null);
+    escreverEvalUrl(null);
+  }, [escreverEvalUrl]);
 
   useEffect(() => {
     let vivo = true;
@@ -228,23 +138,94 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
       .then((r) => (r.ok ? r.json() : null))
       .then((j) => {
         if (vivo && j) setRuns(j.runs);
+        // deep-link: open the run pointed by ?eval=<id>
+        const ev = new URLSearchParams(window.location.search).get("eval");
+        if (ev) void carregarDetalhe(ev);
       })
       .catch(() => {});
     return () => {
       vivo = false;
     };
-  }, []);
+  }, [carregarDetalhe]);
 
-  // laço executor: uma request por item até a fila esvaziar — pausável,
-  // retomável (os itens restantes ficam 'pendente' no run)
+  const limparHistorico = useCallback(async () => {
+    setLimpando(true);
+    setErro(null);
+    try {
+      const r = await fetch("/api/ia/evals", { method: "DELETE" });
+      if (!r.ok) {
+        const j = await r.json().catch(() => null);
+        setErro(j?.error ?? "Não consegui limpar os resultados.");
+        return false;
+      }
+      setRuns([]);
+      fecharDetalhe();
+      return true;
+    } finally {
+      setLimpando(false);
+    }
+  }, [fecharDetalhe]);
+
+  const apagarRun = useCallback(
+    async (runId: string) => {
+      setApagando(true);
+      setErro(null);
+      try {
+        const r = await fetch(`/api/ia/evals?run=${runId}`, {
+          method: "DELETE",
+        });
+        if (!r.ok) {
+          const j = await r.json().catch(() => null);
+          setErro(j?.error ?? "Não consegui apagar o run.");
+          return false;
+        }
+        setRuns((rs) => rs?.filter((x) => x.id !== runId) ?? rs);
+        if (detalhe?.run.id === runId) fecharDetalhe();
+        return true;
+      } finally {
+        setApagando(false);
+      }
+    },
+    [detalhe?.run.id, fecharDetalhe]
+  );
+
+  /** The drive loop: one POST per item until the queue empties — pausable
+   *  (parar ref between iterations) and resumable. `?proximo` marks the
+   *  exact in-flight cell before the claim, then the item payload patches
+   *  the state (no refetch per item). */
   const dirigir = useCallback(
     async (runId: string) => {
-      if (driving) return;
+      if (dirigindo.current) return;
       parar.current = false;
+      dirigindo.current = runId;
       setDriving(runId);
+      setFechado(null);
+      setFeed([]);
       try {
         for (;;) {
           if (parar.current) break;
+          let prox: ProximoItem | null = null;
+          try {
+            const rp = await fetch(`/api/ia/evals?proximo=${runId}`);
+            if (rp.ok) prox = ((await rp.json()).proximo ?? null) as ProximoItem | null;
+          } catch {
+            /* optimism is best-effort — the POST below still drives */
+          }
+          if (parar.current) break;
+          setAtual(prox);
+          if (prox) {
+            const pid = prox.id;
+            setDetalhe((d) =>
+              d && d.run.id === runId
+                ? {
+                    ...d,
+                    itens: d.itens.map((i) =>
+                      i.id === pid ? { ...i, status: "rodando" as const } : i
+                    ),
+                  }
+                : d
+            );
+          }
           const r = await fetch("/api/ia/evals/executar", {
             method: "POST",
             headers: { "content-type": "application/json" },
@@ -255,44 +236,91 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
             setErro(j.error ?? "falha ao executar item");
             break;
           }
-          if (j.item?.id)
+          if (j.item?.id) {
+            const pronto = j.item as Partial<Item> & { id: string };
+            setFeed((f) =>
+              [pronto as Item, ...f.filter((x) => x.id !== pronto.id)].slice(0, 6)
+            );
             setDetalhe((d) =>
               d && d.run.id === runId
                 ? {
                     ...d,
                     itens: d.itens.map((i) =>
-                      i.id === j.item.id ? { ...i, status: j.item.status } : i
+                      i.id === pronto.id ? { ...i, ...pronto } : i
                     ),
                   }
                 : d
             );
-          if (j.feito) break;
+          }
+          if (j.feito) {
+            setFechado(runId);
+            break;
+          }
         }
       } finally {
+        dirigindo.current = null;
         setDriving(null);
+        setAtual(null);
         void carregarDetalhe(runId);
         void carregarRuns();
       }
     },
-    [driving, carregarDetalhe, carregarRuns]
+    [carregarDetalhe, carregarRuns]
   );
 
-  const casosFiltrados = (casos ?? []).filter(
-    (c) => c.papel_esperado === "qualquer" || c.papel_esperado === form.papel
-  );
-  const casosEscolhidos = form.casoIds ?? casosFiltrados.map((c) => c.id);
-  const totalGrade =
-    casosEscolhidos.length * form.modelos.length * form.repeticoes;
-  // grupos pelo prefixo do id ("live-hist-30d" → "live", "hist-*" → "hist")
-  const gruposDeCasos = casosFiltrados.reduce<[string, Caso[]][]>(
-    (grupos, c) => {
-      const grupo = c.id.split("-")[0];
-      const g = grupos.find(([nome]) => nome === grupo);
-      if (g) g[1].push(c);
-      else grupos.push([grupo, [c]]);
-      return grupos;
+  /** PATCH — failed/error/zombie items back to pendente and the run
+   *  reopens 'rodando'; the loop resumes right after. */
+  const reexecutar = useCallback(
+    async (runId: string) => {
+      if (dirigindo.current) return;
+      setReexecutando(true);
+      setErro(null);
+      try {
+        const r = await fetch("/api/ia/evals", {
+          method: "PATCH",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ run_id: runId }),
+        });
+        const j = await r.json().catch(() => ({}));
+        if (!r.ok) {
+          setErro(j.error ?? "Não consegui reagendar as falhas.");
+          return;
+        }
+        // mirror of the server reset — clean result, back to the queue
+        setDetalhe((d) =>
+          d && d.run.id === runId
+            ? {
+                run: { ...d.run, status: "rodando" as const },
+                itens: d.itens.map((i) =>
+                  i.status === "falhou" ||
+                  i.status === "erro" ||
+                  i.status === "rodando"
+                    ? {
+                        ...i,
+                        status: "pendente" as const,
+                        detalhe: null,
+                        request_id: null,
+                        latencia_ms: null,
+                        tokens_in: null,
+                        tokens_out: null,
+                        custo_usd: null,
+                        modelo_usado: null,
+                        tools_usadas: [],
+                        resposta_trecho: null,
+                        executado_em: null,
+                      }
+                    : i
+                ),
+              }
+            : d
+        );
+        setFechado(null);
+        void dirigir(runId);
+      } finally {
+        setReexecutando(false);
+      }
     },
-    []
+    [dirigir]
   );
 
   const criar = async () => {
@@ -307,9 +335,7 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
           papel: form.papel,
           modelos: form.modelos,
           repeticoes: form.repeticoes,
-          ...(form.casoIds
-            ? { casoIds: form.casoIds }
-            : {}),
+          ...(form.casoIds ? { casoIds: form.casoIds } : {}),
         }),
       });
       const j = await r.json().catch(() => ({}));
@@ -317,1124 +343,180 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
         setErro(j.error ?? "falha ao criar o run");
         return;
       }
-      await carregarDetalhe(j.id);
+      setDialogAberto(false);
+      void carregarRuns();
+      await abrirRun(j.id);
       void dirigir(j.id);
     } finally {
       setCriando(false);
     }
   };
 
-  const feitos = detalhe?.itens.filter(
-    (i) => i.status === "ok" || i.status === "falhou" || i.status === "erro"
-  ).length;
+  /** "Repetir esta grade" — the list payload has no casos, so the caso
+   *  ids come from the detail endpoint before opening the form. */
+  const repetirGrade = useCallback(
+    async (runId: string) => {
+      const fonte =
+        detalhe?.run.id === runId
+          ? detalhe.run
+          : await (async () => {
+              const r = await fetch(`/api/ia/evals?run=${runId}`);
+              return r.ok ? ((await r.json()).run as RunDetalhe) : null;
+            })();
+      if (!fonte) return;
+      setForm((f) => ({
+        ...f,
+        ambiente: fonte.ambiente,
+        papel: fonte.papel,
+        modelos: [...fonte.modelos],
+        repeticoes: fonte.repeticoes,
+        casoIds: (fonte.casos ?? []).map((c) => c.id),
+      }));
+      setDialogAberto(true);
+    },
+    [detalhe]
+  );
+
+  const ultimoComResumo =
+    runs?.find((r) => r.resumo && r.resumo.total > 0) ?? null;
 
   return (
     <section aria-labelledby="titulo-evals" className="space-y-3">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="titulo-evals" className="text-base font-semibold">
-          Evals da Liza
-        </h2>
-        <span className="text-xs text-muted-foreground">
-          casos × modelos × repetições · persiste no banco
-        </span>
-      </div>
-
-      {/* form da grade */}
-      <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-              Ambiente
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {["local", "staging", "preview", "prod"].map((a) => (
-                <Chip
-                  key={a}
-                  ativo={form.ambiente === a}
-                  onClick={() => setForm({ ...form, ambiente: a })}
-                >
-                  {a}
-                </Chip>
-              ))}
-            </div>
-          </div>
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-              Papel da conta de teste
-            </p>
-            <div className="flex flex-wrap gap-1.5">
-              {(["staff", "mentorado"] as const).map((p) => (
-                <Chip
-                  key={p}
-                  ativo={form.papel === p}
-                  onClick={() => setForm({ ...form, papel: p })}
-                >
-                  {p === "staff" ? "Staff" : "Mentorado"}
-                </Chip>
-              ))}
-            </div>
-            <p className="text-[11px] text-muted-foreground">
-              conta do env:{" "}
-              {form.papel === "mentorado"
-                ? "EVAL_EMAIL_JOVEM"
-                : "EVAL_EMAIL"}
-            </p>
-          </div>
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-              Repetições por caso
-            </p>
-            <Input
-              type="number"
-              min={1}
-              max={10}
-              value={form.repeticoes}
-              onChange={(e) =>
-                setForm({
-                  ...form,
-                  repeticoes: Math.max(
-                    1,
-                    Math.min(10, Number(e.target.value) || 1)
-                  ),
-                })
-              }
-              className="h-11 w-24 rounded-md border border-border bg-background px-3 text-base sm:h-9 sm:text-sm"
-            />
-          </div>
-          <div className="space-y-1.5 sm:col-span-2 lg:col-span-1">
-            <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-              Grade
-            </p>
-            <p className="text-sm font-medium tabular-nums">
-              {totalGrade || "—"} execuções
-              <span className="ml-1 font-normal text-muted-foreground">
-                ({casosEscolhidos.length} × {form.modelos.length || 0} ×{" "}
-                {form.repeticoes})
-              </span>
-            </p>
-          </div>
-        </div>
-
-        <div className="mt-4 space-y-1.5">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-            Modelos
-          </p>
-          <div className="flex flex-wrap items-center gap-1.5">
-            {form.modelos.map((m) => (
-              <Chip
-                key={m}
-                ativo
-                onClick={() =>
-                  setForm({
-                    ...form,
-                    modelos: form.modelos.filter((x) => x !== m),
-                  })
-                }
-              >
-                {m} ×
-              </Chip>
-            ))}
-            <Input
-              value={form.modeloInput}
-              onChange={(e) =>
-                setForm({ ...form, modeloInput: e.target.value })
-              }
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
-                const m = form.modeloInput.trim();
-                if (m && !form.modelos.includes(m))
-                  setForm({
-                    ...form,
-                    modelos: [...form.modelos, m],
-                    modeloInput: "",
-                  });
-              }}
-              placeholder="slug do modelo + Enter"
-              className="h-11 min-w-44 flex-1 rounded-md border border-border bg-background px-3 text-base sm:h-9 sm:flex-none sm:text-sm"
-            />
-          </div>
-          {modelosSugeridos.length > 0 && (
-            <div className="flex flex-wrap gap-1.5 pt-1">
-              {modelosSugeridos
-                .filter((m) => !form.modelos.includes(m))
-                .map((m) => (
-                  <Button
-                    key={m}
-                    type="button"
-                    variant="outline"
-                    onClick={() =>
-                      setForm({ ...form, modelos: [...form.modelos, m] })
-                    }
-                    className="min-h-11 rounded-md border-dashed px-2 text-[11px] font-normal text-muted-foreground sm:min-h-7"
-                  >
-                    + {m}
-                  </Button>
-                ))}
-            </div>
-          )}
-        </div>
-
-        <div className="mt-4 space-y-1.5">
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-            Casos
-          </p>
-          {casos === null ? (
-            <Skeleton className="h-11 w-56" />
-          ) : !casosFiltrados.length ? (
-            <p className="text-sm text-muted-foreground">
-              Nenhum caso live pro papel {form.papel} no corpus
-              (tests/evals/casos.json).
-            </p>
-          ) : (
-            <Popover>
-              <PopoverTrigger className="inline-flex min-h-11 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm font-medium hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9">
-                {casosEscolhidos.length === casosFiltrados.length
-                  ? `Todos os ${casosFiltrados.length} casos`
-                  : `${casosEscolhidos.length} de ${casosFiltrados.length} casos`}
-                <CaretDown size={14} aria-hidden className="text-muted-foreground" />
-              </PopoverTrigger>
-              <PopoverContent
-                align="start"
-                className="scroll-fina max-h-80 w-[min(26rem,calc(100vw-2rem))] overflow-y-auto p-0"
-              >
-                <div className="sticky top-0 flex items-center justify-between gap-2 border-b border-border/60 bg-popover px-3 py-2">
-                  <span className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-                    {casosEscolhidos.length} de {casosFiltrados.length}
-                  </span>
-                  <span className="flex gap-1">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() =>
-                        setForm({
-                          ...form,
-                          casoIds: casosFiltrados.map((c) => c.id),
-                        })
-                      }
-                      className="min-h-9 px-2 text-xs sm:min-h-7"
-                    >
-                      Todas
-                    </Button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      onClick={() => setForm({ ...form, casoIds: [] })}
-                      className="min-h-9 px-2 text-xs sm:min-h-7"
-                    >
-                      Nenhuma
-                    </Button>
-                  </span>
-                </div>
-                {gruposDeCasos.map(([grupo, itens]) => (
-                  <div key={grupo}>
-                    <p className="px-3 pt-2.5 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                      {grupo}
-                    </p>
-                    <ul>
-                      {itens.map((c) => {
-                        const marcado = casosEscolhidos.includes(c.id);
-                        return (
-                          <li key={c.id}>
-                            <label className="flex min-h-11 cursor-pointer items-center gap-3 px-3 py-1.5 hover:bg-muted/50">
-                              <input
-                                type="checkbox"
-                                checked={marcado}
-                                onChange={() => {
-                                  const sel = new Set(casosEscolhidos);
-                                  if (marcado) sel.delete(c.id);
-                                  else sel.add(c.id);
-                                  setForm({ ...form, casoIds: [...sel] });
-                                }}
-                                className="size-4 shrink-0 accent-primary"
-                              />
-                              <span className="min-w-0 flex-1">
-                                <span className="block truncate text-sm font-medium">
-                                  {c.msg}
-                                </span>
-                                <span className="text-[11px] text-muted-foreground">
-                                  {c.id}
-                                </span>
-                              </span>
-                            </label>
-                          </li>
-                        );
-                      })}
-                    </ul>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          <h2 id="titulo-evals" className="text-base font-semibold">
+            Evals da Liza
+          </h2>
+          <Popover>
+            <PopoverTrigger
+              aria-label="Como calculamos os evals"
+              className="grid min-h-11 min-w-11 place-items-center rounded-lg text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8 sm:min-w-8"
+            >
+              <Info size={15} aria-hidden />
+            </PopoverTrigger>
+            <PopoverContent
+              align="start"
+              className="scroll-fina max-h-96 w-[min(22rem,calc(100vw-2rem))] overflow-y-auto p-4"
+            >
+              <p className="text-sm font-semibold">Como calculamos</p>
+              <dl className="mt-3 grid gap-3 text-sm">
+                {COMO_CALCULAMOS.map((r) => (
+                  <div key={r.termo}>
+                    <dt className="font-medium">{r.termo}</dt>
+                    <dd className="mt-0.5 text-muted-foreground">{r.texto}</dd>
                   </div>
                 ))}
-              </PopoverContent>
-            </Popover>
-          )}
+              </dl>
+            </PopoverContent>
+          </Popover>
+          <span className="hidden text-xs text-muted-foreground sm:inline">
+            casos × modelos × repetições
+          </span>
         </div>
+        <Button size="sm" onClick={() => setDialogAberto(true)}>
+          <Plus aria-hidden />
+          Novo run
+        </Button>
+      </div>
 
-        <div className="mt-4 flex flex-wrap items-center gap-3">
-          <Button
-            onClick={criar}
-            disabled={criando || !totalGrade || driving !== null}
-          >
-            {criando ? "Criando…" : "Rodar eval"}
+      {erro && (
+        <p
+          role="alert"
+          className="rounded-lg border border-[var(--danger-border)] bg-[var(--danger-bg)] px-3 py-2 text-sm text-[var(--danger-text)]"
+        >
+          {erro}
+        </p>
+      )}
+
+      {runs === null ? (
+        <div className="grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
+          {[0, 1, 2].map((i) => (
+            <Skeleton key={i} className="h-28 rounded-xl" />
+          ))}
+        </div>
+      ) : runs.length === 0 ? (
+        <div className="animate-enter rounded-xl border border-dashed border-border bg-card p-6 text-center sm:p-10">
+          <div className="mx-auto grid size-12 place-items-center rounded-full bg-muted text-muted-foreground">
+            <Flask size={24} aria-hidden />
+          </div>
+          <h3 className="mt-4 text-base font-semibold">
+            Teste a Liza de verdade
+          </h3>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
+            Um eval faz perguntas reais ao chat, como um usuário faria, e
+            confere o que voltou: as ferramentas que a Liza chamou e o texto
+            da resposta, caso a caso.
+          </p>
+          <ul className="mx-auto mt-4 grid max-w-md gap-1.5 text-left text-sm text-muted-foreground">
+            <li className="flex gap-2">
+              <span aria-hidden className="text-foreground">·</span>
+              A grade repete cada pergunta nos modelos que você escolher.
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden className="text-foreground">·</span>
+              Você vê cada célula executando ao vivo, com custo correndo.
+            </li>
+            <li className="flex gap-2">
+              <span aria-hidden className="text-foreground">·</span>
+              Pausar não perde nada: os itens na fila ficam no banco.
+            </li>
+          </ul>
+          <Button className="mt-5" onClick={() => setDialogAberto(true)}>
+            <Plus aria-hidden />
+            Criar o primeiro run
           </Button>
-          {driving && (
-            <Button
-              variant="outline"
-              onClick={() => {
+        </div>
+      ) : (
+        <>
+          <HistoricoRuns
+            runs={runs}
+            detalhe={detalhe}
+            driving={driving}
+            limpando={limpando}
+            onLimpar={limparHistorico}
+            onAbrir={abrirRun}
+            onContinuar={(id) => {
+              void carregarDetalhe(id);
+              void dirigir(id);
+            }}
+            onRepetir={repetirGrade}
+          />
+          {detalhe && (
+            <DetalheRun
+              key={detalhe.run.id}
+              run={detalhe.run}
+              itens={detalhe.itens}
+              driving={driving === detalhe.run.id}
+              bloqueado={driving !== null && driving !== detalhe.run.id}
+              atual={driving === detalhe.run.id ? atual : null}
+              feed={driving === detalhe.run.id || fechado === detalhe.run.id ? feed : []}
+              celebrar={fechado === detalhe.run.id}
+              reexecutando={reexecutando}
+              apagando={apagando}
+              onContinuar={() => void dirigir(detalhe.run.id)}
+              onPausar={() => {
                 parar.current = true;
               }}
-            >
-              Pausar laço
-            </Button>
-          )}
-          {erro && (
-            <p role="alert" className="text-sm text-[var(--danger-text)]">
-              {erro}
-            </p>
-          )}
-        </div>
-      </div>
-
-      {/* histórico de runs + saúde do eval */}
-      <FaixaRuns
-        runs={runs}
-        selecionado={detalhe?.run.id ?? null}
-        driving={driving}
-        limpando={limpando}
-        onLimpar={limparHistorico}
-        onAbrir={(id) => void carregarDetalhe(id)}
-        onContinuar={(id) => {
-          void carregarDetalhe(id);
-          void dirigir(id);
-        }}
-      />
-
-      {/* detalhe do run aberto — remonta por run (a entrada animada roda de
-          novo) e conserva estado interno durante as atualizações do laço */}
-      {detalhe && (
-        <DetalheRun
-          key={detalhe.run.id}
-          run={detalhe.run}
-          itens={detalhe.itens}
-          feitos={feitos ?? 0}
-          driving={driving === detalhe.run.id}
-          bloqueado={driving !== null && driving !== detalhe.run.id}
-          onContinuar={() => void dirigir(detalhe.run.id)}
-          onPausar={() => {
-            parar.current = true;
-          }}
-        />
-      )}
-    </section>
-  );
-}
-
-/** Card de KPI do run aberto — número grande tabular + meta embaixo,
- *  entrada com stagger (--i). */
-function Kpi({
-  rotulo,
-  valor,
-  meta,
-  i,
-}: {
-  rotulo: string;
-  valor: string;
-  meta?: string;
-  i: number;
-}) {
-  return (
-    <div
-      className="animate-enter rounded-xl border border-border bg-card p-3 sm:p-4"
-      style={stagger(i)}
-    >
-      <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-        {rotulo}
-      </p>
-      <p className="mt-1 text-xl font-semibold tabular-nums tracking-tight sm:text-2xl">
-        {valor}
-      </p>
-      {meta && <p className="mt-0.5 text-xs text-muted-foreground">{meta}</p>}
-    </div>
-  );
-}
-
-/** Faixa de runs: sparkline do pass rate ao longo do tempo (a saúde do
- *  eval) + cards compactos selecionáveis. O run aberto ganha ring; run não
- *  concluído oferece Continuar — o laço é global, um run por vez. */
-function FaixaRuns({
-  runs,
-  selecionado,
-  driving,
-  limpando,
-  onLimpar,
-  onAbrir,
-  onContinuar,
-}: {
-  runs: Run[] | null;
-  selecionado: string | null;
-  driving: string | null;
-  limpando: boolean;
-  onLimpar: () => Promise<boolean>;
-  onAbrir: (id: string) => void;
-  onContinuar: (id: string) => void;
-}) {
-  const [confirmando, setConfirmando] = useState(false);
-  if (!runs?.length) return null;
-  // a API devolve desc — o eixo do tempo cresce pra direita, então inverte
-  const ultimos = runs.slice(0, 14).reverse();
-  const serie = ultimos.map((r) =>
-    r.resumo && r.resumo.total > 0
-      ? Math.round((r.resumo.ok / r.resumo.total) * 100)
-      : null
-  );
-  const passoRotulo = Math.max(1, Math.ceil(ultimos.length / 7));
-  const labelsX = ultimos.map((r, i) =>
-    i % passoRotulo === 0 || i === ultimos.length - 1
-      ? diaCurta(r.created_at)
-      : ""
-  );
-  return (
-    <div className="rounded-xl border border-border bg-card p-4 sm:p-5">
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h3 className="text-base font-semibold">Runs recentes</h3>
-        <div className="flex items-center gap-1">
-          <span className="text-xs tabular-nums text-muted-foreground">
-            {runs.length} {runs.length === 1 ? "run" : "runs"}
-          </span>
-          <Dialog open={confirmando} onOpenChange={setConfirmando}>
-            <DialogTrigger
-              render={
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Limpar histórico de runs"
-                  disabled={limpando || driving !== null}
-                  className="size-7 text-muted-foreground hover:text-[var(--danger-text)]"
-                >
-                  {limpando ? (
-                    <CircleNotch aria-hidden className="animate-spin" />
-                  ) : (
-                    <Trash aria-hidden />
-                  )}
-                </Button>
-              }
+              onReexecutar={() => void reexecutar(detalhe.run.id)}
+              onApagar={() => void apagarRun(detalhe.run.id)}
+              onFechar={fecharDetalhe}
             />
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Limpar histórico de runs?</DialogTitle>
-                <DialogDescription>
-                  Apaga os {runs.length}{" "}
-                  {runs.length === 1 ? "run" : "runs"} e todos os itens.
-                  Resultados antigos não se misturam com a próxima rodada —
-                  não dá pra desfazer.
-                </DialogDescription>
-              </DialogHeader>
-              <DialogFooter>
-                <Button
-                  variant="outline"
-                  onClick={() => setConfirmando(false)}
-                >
-                  Cancelar
-                </Button>
-                <Button
-                  variant="destructive"
-                  disabled={limpando}
-                  onClick={() => {
-                    void onLimpar().then(
-                      (ok) => ok && setConfirmando(false)
-                    );
-                  }}
-                >
-                  {limpando ? "Limpando…" : "Limpar tudo"}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      {ultimos.length > 1 && serie.some((v) => v != null) && (
-        <div className="mt-4">
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            Pass rate ao longo do tempo
-          </p>
-          <Sparkline
-            className="mt-1"
-            series={[
-              { valores: serie, rotulo: "pass rate", cor: "var(--chart-1)" },
-            ]}
-            min={0}
-            max={100}
-            labelsX={labelsX}
-            atencaoAbaixoDe={50}
-            altura={90}
-            formatarValor={(v) => `${Math.round(v)}%`}
-          />
-        </div>
+          )}
+        </>
       )}
 
-      <ul className="mt-3 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
-        {runs.map((r, idx) => {
-          const sel = r.id === selecionado;
-          const res = r.resumo;
-          const naFila = res
-            ? res.total - res.ok - res.falhas - res.erros
-            : 0;
-          return (
-            <li
-              key={r.id}
-              style={stagger(idx)}
-              className={cn(
-                "animate-enter overflow-hidden rounded-xl border bg-card transition-[border-color,box-shadow] duration-200 ease-snappy",
-                sel ? "border-transparent ring-2 ring-ring" : "border-border"
-              )}
-            >
-              <Button
-                type="button"
-                variant="ghost"
-                onClick={() => onAbrir(r.id)}
-                aria-current={sel || undefined}
-                className="h-auto w-full flex-col items-stretch gap-1.5 rounded-none px-3 py-2.5 text-left font-normal whitespace-normal hover:bg-muted/40"
-              >
-                <span className="flex items-baseline justify-between gap-2">
-                  <span className="text-sm font-medium">
-                    {dataCurta(r.created_at)}
-                  </span>
-                  <span className="shrink-0 text-[11px] text-muted-foreground">
-                    {r.ambiente} · {r.papel === "staff" ? "Staff" : "Mentorado"}
-                  </span>
-                </span>
-                <span
-                  className="truncate text-xs text-muted-foreground"
-                  title={r.modelos.join(", ")}
-                >
-                  {r.modelos.join(", ")} · {r.repeticoes}× por caso
-                </span>
-                {res ? (
-                  <>
-                    <BarraSegmentada
-                      className="mt-0.5"
-                      altura="sm"
-                      denominador={res.total}
-                      segmentos={[
-                        {
-                          valor: res.ok,
-                          rotulo: "passou",
-                          cls: "bg-[var(--ok)]",
-                        },
-                        {
-                          valor: res.falhas,
-                          rotulo: "falhou",
-                          cls: "bg-[var(--danger)]",
-                        },
-                        {
-                          valor: res.erros,
-                          rotulo: "erro",
-                          cls: "bg-[var(--warn)]",
-                        },
-                        { valor: naFila, rotulo: "na fila" },
-                      ]}
-                    />
-                    <span className="mt-1 flex items-baseline justify-between gap-2">
-                      <span className="text-sm font-semibold tabular-nums">
-                        {res.total > 0
-                          ? `${Math.round((res.ok / res.total) * 100)}%`
-                          : "—"}
-                        <span className="ml-1 text-xs font-normal text-muted-foreground">
-                          passou
-                        </span>
-                      </span>
-                      <span className="text-xs tabular-nums text-muted-foreground">
-                        {ms(res.latencia_media_ms)} · {usd(res.custo_usd)}
-                      </span>
-                    </span>
-                  </>
-                ) : (
-                  <span className="mt-0.5 flex items-center gap-1.5">
-                    <span
-                      className={cn(
-                        "inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium",
-                        STATUS_RUN[r.status].cls
-                      )}
-                    >
-                      {r.status === "rodando" && (
-                        <CircleNotch
-                          size={11}
-                          aria-hidden
-                          className="animate-spin"
-                        />
-                      )}
-                      {STATUS_RUN[r.status].rotulo}
-                    </span>
-                    <span className="text-xs text-muted-foreground">
-                      sem resumo ainda
-                    </span>
-                  </span>
-                )}
-              </Button>
-              {r.status !== "concluido" && (
-                <div className="border-t border-border/60 px-2 py-1.5">
-                  {driving === r.id ? (
-                    <span
-                      role="status"
-                      className="flex min-h-7 items-center justify-center gap-1.5 text-xs font-medium text-[var(--info-text)]"
-                    >
-                      <CircleNotch
-                        size={12}
-                        aria-hidden
-                        className="animate-spin"
-                      />
-                      rodando…
-                    </span>
-                  ) : (
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      disabled={driving !== null}
-                      onClick={() => onContinuar(r.id)}
-                      className="w-full text-xs"
-                    >
-                      <Play aria-hidden />
-                      Continuar
-                    </Button>
-                  )}
-                </div>
-              )}
-            </li>
-          );
-        })}
-      </ul>
-    </div>
-  );
-}
-
-/** Detalhe do run aberto — o painel high-end: faixa-herói com progresso e
- *  composição (BarraSegmentada grande), 4 KPIs, e a matriz caso × modelo
- *  com células clicáveis, painel de detalhe inline (um por vez), filtro por
- *  status e resumo por modelo no rodapé. O laço atualiza só o status dos
- *  itens: os chips mudam de cor com um pop e as barras interpolam. */
-function DetalheRun({
-  run,
-  itens,
-  feitos,
-  driving,
-  bloqueado,
-  onContinuar,
-  onPausar,
-}: {
-  run: Run;
-  itens: Item[];
-  feitos: number;
-  driving: boolean;
-  bloqueado: boolean;
-  onContinuar: () => void;
-  onPausar: () => void;
-}) {
-  const painelId = useId();
-  const [filtro, setFiltro] = useState<FiltroItem>("todos");
-  const [aberto, setAberto] = useState<{
-    caso: string;
-    modelo: string;
-  } | null>(null);
-
-  // (a animação de troca de status mora no chip: a key `id:status` remonta
-  // só o chip que mudou e o .ia-pop do globals dá o pop — zero bookkeeping)
-
-  const stats = useMemo(() => {
-    const por = (s: Item["status"]) =>
-      itens.filter((i) => i.status === s).length;
-    const lats = itens
-      .map((i) => i.latencia_ms)
-      .filter((v): v is number => v != null)
-      .sort((a, b) => a - b);
-    const soma = (k: "tokens_in" | "tokens_out" | "custo_usd") =>
-      itens.reduce((acc, i) => acc + (i[k] ?? 0), 0);
-    return {
-      total: itens.length,
-      ok: por("ok"),
-      falhas: por("falhou"),
-      erros: por("erro"),
-      rodando: por("rodando"),
-      naFila: por("pendente"),
-      latMedia: lats.length
-        ? lats.reduce((a, b) => a + b, 0) / lats.length
-        : null,
-      p95: lats.length
-        ? lats[Math.min(lats.length - 1, Math.ceil(lats.length * 0.95) - 1)]
-        : null,
-      tokensIn: soma("tokens_in"),
-      tokensOut: soma("tokens_out"),
-      custo: soma("custo_usd"),
-    };
-  }, [itens]);
-
-  // casos e modelos na ordem da grade (itens vêm ordenados por id = ordem
-  // de criação do produto cartesiano)
-  const casosOrdem = useMemo(() => {
-    const vistos = new Map<string, string>();
-    for (const i of itens) if (!vistos.has(i.caso_id)) vistos.set(i.caso_id, i.msg);
-    return [...vistos].map(([id, msg]) => ({ id, msg }));
-  }, [itens]);
-  const modelosOrdem = useMemo(() => {
-    const vistos = new Set<string>();
-    for (const i of itens) vistos.add(i.modelo);
-    return [...vistos];
-  }, [itens]);
-  const grade = useMemo(() => {
-    const m = new Map<string, Item[]>();
-    for (const i of itens) {
-      const k = `${i.caso_id}§${i.modelo}`;
-      const arr = m.get(k) ?? [];
-      arr.push(i);
-      m.set(k, arr);
-    }
-    return m;
-  }, [itens]);
-  const porModelo = useMemo(() => {
-    const acc = new Map<
-      string,
-      { n: number; ok: number; falhou: number; erro: number; lats: number[] }
-    >();
-    for (const i of itens) {
-      const e = acc.get(i.modelo) ?? {
-        n: 0,
-        ok: 0,
-        falhou: 0,
-        erro: 0,
-        lats: [],
-      };
-      e.n++;
-      if (i.status === "ok") e.ok++;
-      else if (i.status === "falhou") e.falhou++;
-      else if (i.status === "erro") e.erro++;
-      if (i.latencia_ms != null) e.lats.push(i.latencia_ms);
-      acc.set(i.modelo, e);
-    }
-    return acc;
-  }, [itens]);
-
-  const bate = (i: Item) => filtro === "todos" || i.status === filtro;
-  const celula = (casoId: string, modelo: string) =>
-    grade.get(`${casoId}§${modelo}`) ?? [];
-
-  return (
-    <div className="space-y-3">
-      {/* faixa-herói: título, ações, progresso fino e composição por status */}
-      <div className="animate-enter rounded-xl border border-border bg-card p-4 sm:p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="min-w-0">
-            <h3 className="text-base font-semibold">
-              Run de {dataCurta(run.created_at)}
-              <span className="font-normal text-muted-foreground">
-                {" "}
-                · {run.ambiente} · {run.papel === "staff" ? "Staff" : "Mentorado"}
-              </span>
-            </h3>
-            <p
-              className="mt-0.5 truncate text-xs text-muted-foreground"
-              title={run.modelos.join(", ")}
-            >
-              {run.modelos.join(", ")} · {run.repeticoes}× por caso
-            </p>
-          </div>
-          <div className="flex items-center gap-2">
-            <span
-              role="status"
-              aria-live="polite"
-              className="flex items-center gap-1.5 text-xs tabular-nums text-muted-foreground"
-            >
-              {driving && (
-                <CircleNotch size={12} aria-hidden className="animate-spin" />
-              )}
-              {feitos}/{stats.total}
-              {driving
-                ? " · rodando…"
-                : run.status !== "concluido"
-                  ? ` · ${STATUS_RUN[run.status].rotulo}`
-                  : ""}
-            </span>
-            {driving ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onPausar}
-              >
-                <Pause aria-hidden />
-                Pausar
-              </Button>
-            ) : run.status !== "concluido" ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                onClick={onContinuar}
-                disabled={bloqueado}
-              >
-                <Play aria-hidden />
-                Continuar
-              </Button>
-            ) : null}
-          </div>
-        </div>
-
-        <div
-          role="progressbar"
-          aria-valuemin={0}
-          aria-valuemax={stats.total}
-          aria-valuenow={feitos}
-          aria-label="Itens executados"
-          className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"
-        >
-          <div
-            className="relative h-full bg-primary transition-[width] duration-500 ease-snappy"
-            style={{
-              width: `${stats.total ? (feitos / stats.total) * 100 : 0}%`,
-            }}
-          >
-            {driving && (
-              <span
-                aria-hidden
-                className="absolute inset-0 animate-shimmer bg-[linear-gradient(90deg,transparent_30%,hsl(0_0%_100%/0.5)_50%,transparent_70%)] bg-[length:200%_100%]"
-              />
-            )}
-          </div>
-        </div>
-
-        <BarraSegmentada
-          className="mt-3"
-          altura="lg"
-          legenda
-          animate
-          denominador={stats.total}
-          segmentos={[
-            { valor: stats.ok, rotulo: "passou", cls: "bg-[var(--ok)]" },
-            { valor: stats.falhas, rotulo: "falhou", cls: "bg-[var(--danger)]" },
-            { valor: stats.erros, rotulo: "erro", cls: "bg-[var(--warn)]" },
-            { valor: stats.rodando, rotulo: "rodando", cls: "bg-[var(--info)]" },
-            { valor: stats.naFila, rotulo: "na fila" },
-          ]}
-        />
-      </div>
-
-      {/* KPIs do run aberto */}
-      <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-        <Kpi
-          i={1}
-          rotulo="Pass rate"
-          valor={
-            stats.total
-              ? `${Math.round((stats.ok / stats.total) * 100)}%`
-              : "—"
-          }
-          meta={`${stats.ok} de ${stats.total} itens`}
-        />
-        <Kpi
-          i={2}
-          rotulo="Latência média"
-          valor={ms(stats.latMedia)}
-          meta={stats.p95 != null ? `p95 ${ms(stats.p95)}` : undefined}
-        />
-        <Kpi
-          i={3}
-          rotulo="Tokens"
-          valor={compacto.format(stats.tokensIn + stats.tokensOut)}
-          meta={`${compacto.format(stats.tokensIn)} entrada · ${compacto.format(stats.tokensOut)} saída`}
-        />
-        <Kpi
-          i={4}
-          rotulo="Custo"
-          valor={usd(stats.custo)}
-          meta={
-            feitos > 0 ? `${usd(stats.custo / feitos)} por item` : undefined
-          }
-        />
-      </div>
-
-      {/* matriz caso × modelo */}
-      <div
-        className="animate-enter rounded-xl border border-border bg-card p-4 sm:p-5"
-        style={stagger(5)}
-      >
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h3 className="text-base font-semibold">Casos × modelos</h3>
-          <div
-            className="flex flex-wrap gap-1.5"
-            role="group"
-            aria-label="Filtrar itens por status"
-          >
-            {(
-              [
-                ["todos", "Todos", stats.total],
-                ["ok", "Passou", stats.ok],
-                ["falhou", "Falhou", stats.falhas],
-                ["erro", "Erro", stats.erros],
-              ] as const
-            ).map(([f, rotulo, n]) => (
-              <Chip
-                key={f}
-                ativo={filtro === f}
-                onClick={() => setFiltro(f)}
-              >
-                {rotulo} {n}
-              </Chip>
-            ))}
-          </div>
-        </div>
-
-        {!casosOrdem.length ? (
-          <p className="mt-3 text-sm text-muted-foreground">
-            Sem itens neste run.
-          </p>
-        ) : (
-          <div className="scroll-fina -mx-4 mt-2 overflow-x-auto px-4 pb-1 sm:-mx-5 sm:px-5">
-            <table className="w-full min-w-[34rem] border-separate [border-spacing:0_5px]">
-              <thead>
-                <tr>
-                  <th
-                    scope="col"
-                    className="sticky left-0 z-10 w-[12rem] min-w-[12rem] max-w-[12rem] bg-card py-1 pr-3 text-left align-bottom text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
-                  >
-                    caso
-                  </th>
-                  {modelosOrdem.map((m) => (
-                    <th
-                      key={m}
-                      scope="col"
-                      title={m}
-                      className="min-w-[4.5rem] py-1 text-center align-bottom text-[11px] font-semibold text-muted-foreground"
-                    >
-                      <span className="mx-auto block max-w-[9rem] truncate">
-                        {m}
-                      </span>
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              {/* re-key no filtro: a troca remonta as linhas e re-roda o
-                  stagger de entrada, nunca um repaint seco de tabela */}
-              <tbody key={filtro}>
-                {casosOrdem.map((c, ri) => {
-                  const algumBate = itens.some(
-                    (i) => i.caso_id === c.id && bate(i)
-                  );
-                  return (
-                    <Fragment key={c.id}>
-                      <tr className="animate-enter" style={stagger(ri)}>
-                        <th
-                          scope="row"
-                          className={cn(
-                            "sticky left-0 z-10 bg-card py-1 pr-3 text-left align-middle transition-opacity duration-300",
-                            !algumBate && "opacity-40"
-                          )}
-                        >
-                          <span
-                            className="block truncate text-xs font-medium"
-                            title={c.msg}
-                          >
-                            {c.msg}
-                          </span>
-                          <span className="block truncate text-[11px] text-muted-foreground">
-                            {c.id}
-                          </span>
-                        </th>
-                        {modelosOrdem.map((m) => {
-                          const its = celula(c.id, m);
-                          const expandida =
-                            aberto?.caso === c.id && aberto?.modelo === m;
-                          return (
-                            <td key={m} className="p-0 align-middle">
-                              {its.length ? (
-                                <Button
-                                  type="button"
-                                  variant="ghost"
-                                  aria-expanded={expandida}
-                                  aria-controls={
-                                    expandida ? painelId : undefined
-                                  }
-                                  aria-label={`${c.id}, modelo ${m}: ${its
-                                    .map(
-                                      (i) =>
-                                        `rep ${i.repeticao} ${STATUS_ITEM[i.status].rotulo}`
-                                    )
-                                    .join(", ")}`}
-                                  title={its.map(descItem).join("\n")}
-                                  onClick={() =>
-                                    setAberto(
-                                      expandida
-                                        ? null
-                                        : { caso: c.id, modelo: m }
-                                    )
-                                  }
-                                  className={cn(
-                                    "h-auto min-h-9 w-full justify-center gap-1 rounded-md px-1 py-1",
-                                    expandida &&
-                                      "bg-muted shadow-[inset_0_0_0_1px_var(--ring)]"
-                                  )}
-                                >
-                                  {its.map((i) => (
-                                    <span
-                                      key={`${i.id}:${i.status}`}
-                                      aria-hidden
-                                      className={cn(
-                                        "ia-pop inline-flex size-5 items-center justify-center rounded-[5px] text-[10px] leading-none font-bold transition-[opacity,background-color,border-color] duration-300",
-                                        CELULA[i.status],
-                                        filtro !== "todos" &&
-                                          i.status !== filtro &&
-                                          "opacity-25"
-                                      )}
-                                    >
-                                      {its.length > 1 ? i.repeticao : ""}
-                                    </span>
-                                  ))}
-                                </Button>
-                              ) : (
-                                <span
-                                  aria-hidden
-                                  className="block text-center text-muted-foreground/30"
-                                >
-                                  ·
-                                </span>
-                              )}
-                            </td>
-                          );
-                        })}
-                      </tr>
-                      {aberto?.caso === c.id && (
-                        <tr>
-                          <td
-                            colSpan={modelosOrdem.length + 1}
-                            className="p-0 pb-1"
-                          >
-                            <div
-                              id={painelId}
-                              role="region"
-                              aria-label={`Detalhe: ${aberto.modelo} em ${aberto.caso}`}
-                              className="animate-enter rounded-lg border border-border/70 bg-muted/30 px-3 py-2.5"
-                            >
-                              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                                {aberto.modelo} · {c.msg}
-                              </p>
-                              <ul className="mt-1.5 space-y-2.5">
-                                {celula(aberto.caso, aberto.modelo).map((i) => {
-                                  const s = STATUS_ITEM[i.status];
-                                  return (
-                                    <li
-                                      key={i.id}
-                                      className="border-t border-border/50 pt-2 first:border-t-0 first:pt-0"
-                                    >
-                                      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                                        <span
-                                          className={cn(
-                                            "rounded-full px-2 py-0.5 text-[10px] font-medium",
-                                            s.cls
-                                          )}
-                                        >
-                                          {s.rotulo}
-                                        </span>
-                                        <span className="text-xs font-medium">
-                                          rep {i.repeticao}
-                                          {i.modelo_usado &&
-                                            i.modelo_usado !== i.modelo && (
-                                              <span className="font-normal text-muted-foreground">
-                                                {" "}
-                                                · usado {i.modelo_usado}
-                                              </span>
-                                            )}
-                                        </span>
-                                        <span className="text-xs tabular-nums text-muted-foreground">
-                                          {ms(i.latencia_ms)} ·{" "}
-                                          {num.format(i.tokens_in ?? 0)}+
-                                          {num.format(i.tokens_out ?? 0)} tok ·{" "}
-                                          {usd(i.custo_usd)}
-                                        </span>
-                                      </div>
-                                      {i.detalhe && (
-                                        <p
-                                          className={cn(
-                                            "mt-1 text-xs",
-                                            i.status === "falhou" ||
-                                              i.status === "erro"
-                                              ? "text-[var(--danger-text)]"
-                                              : "text-muted-foreground"
-                                          )}
-                                        >
-                                          {i.detalhe}
-                                        </p>
-                                      )}
-                                      {i.resposta_trecho && (
-                                        <p className="mt-1 border-l-2 border-border pl-2 text-xs leading-relaxed whitespace-pre-wrap text-muted-foreground">
-                                          {i.resposta_trecho}
-                                        </p>
-                                      )}
-                                    </li>
-                                  );
-                                })}
-                              </ul>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                    </Fragment>
-                  );
-                })}
-              </tbody>
-              <tfoot>
-                <tr>
-                  <th
-                    scope="row"
-                    className="sticky left-0 z-10 border-t border-border/60 bg-card py-2 pr-3 text-left align-top text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
-                  >
-                    por modelo
-                  </th>
-                  {modelosOrdem.map((m) => {
-                    const e = porModelo.get(m);
-                    const media =
-                      e && e.lats.length
-                        ? e.lats.reduce((a, b) => a + b, 0) / e.lats.length
-                        : null;
-                    return (
-                      <td
-                        key={m}
-                        className="border-t border-border/60 px-1 py-2 text-center align-top"
-                      >
-                        <p className="text-xs font-semibold tabular-nums">
-                          {e && e.n
-                            ? `${Math.round((e.ok / e.n) * 100)}%`
-                            : "—"}
-                        </p>
-                        <BarraSegmentada
-                          className="mt-1"
-                          altura="sm"
-                          denominador={e?.n ?? 0}
-                          segmentos={[
-                            {
-                              valor: e?.ok ?? 0,
-                              rotulo: "passou",
-                              cls: "bg-[var(--ok)]",
-                            },
-                            {
-                              valor: e?.falhou ?? 0,
-                              rotulo: "falhou",
-                              cls: "bg-[var(--danger)]",
-                            },
-                            {
-                              valor: e?.erro ?? 0,
-                              rotulo: "erro",
-                              cls: "bg-[var(--warn)]",
-                            },
-                          ]}
-                        />
-                        <p className="mt-1 text-[11px] tabular-nums text-muted-foreground">
-                          {ms(media)}
-                        </p>
-                      </td>
-                    );
-                  })}
-                </tr>
-              </tfoot>
-            </table>
-          </div>
-        )}
-      </div>
-    </div>
+      <NovoRunDialog
+        open={dialogAberto}
+        onOpenChange={setDialogAberto}
+        form={form}
+        onForm={setForm}
+        casos={casos}
+        modelosSugeridos={modelosSugeridos}
+        ultimoComResumo={ultimoComResumo}
+        criando={criando}
+        bloqueado={driving !== null}
+        onCriar={criar}
+      />
+    </section>
   );
 }

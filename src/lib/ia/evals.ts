@@ -353,7 +353,27 @@ export async function executarProximoItem(
     })
     .eq("id", it.id);
   if (eUp) throw new Error(eUp.message);
-  return { feito: false, item: { id: it.id, caso_id: it.caso_id, status } };
+  // item completo pro laço: a UI dá patch sem refetch — KPIs e a matriz
+  // correm item a item
+  return {
+    feito: false,
+    item: {
+      id: it.id,
+      caso_id: it.caso_id,
+      modelo: it.modelo,
+      repeticao: it.repeticao,
+      status,
+      detalhe,
+      request_id: requestId,
+      latencia_ms: latencia,
+      tokens_in: uso?.tokens_in ?? null,
+      tokens_out: uso?.tokens_out ?? null,
+      custo_usd: uso?.custo_usd ?? null,
+      modelo_usado: uso?.modelo ?? null,
+      tools_usadas: tools,
+      resposta_trecho: trecho,
+    },
+  };
 }
 
 /** Fecha o run quando a fila esvazia: resumo com agregados prontos pro
