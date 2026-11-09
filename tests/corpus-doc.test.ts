@@ -819,9 +819,9 @@ describe("corpusServeJovem", () => {
     expect(corpusServeJovem(fake(["mentorado"]))).toBe(true);
     expect(corpusServeJovem(fake([]))).toBe(true);
     expect(corpusServeJovem(fake(["mentor_dpp", "coordenacao"]))).toBe(false);
-    const feedback = await carregarDocCorpus("feedback-construtivo");
+    const etica = await carregarDocCorpus("codigo-etica-conduta");
     const guia = await carregarDocCorpus("guia-mentor-dpp");
-    expect(corpusServeJovem(feedback!)).toBe(true);
+    expect(corpusServeJovem(etica!)).toBe(true);
     expect(corpusServeJovem(guia!)).toBe(false);
   });
 });
@@ -832,12 +832,12 @@ describe("corpusServePapel", () => {
 
   it("espelha a regra do catálogo: coordenação vê tudo, todos/aberto serve", async () => {
     const termo = await carregarDocCorpus("termo-mentorando"); // [coordenacao]
-    const feedback = await carregarDocCorpus("feedback-construtivo"); // [todos]
+    const etica = await carregarDocCorpus("codigo-etica-conduta"); // [todos]
     const mentor = { role: "mentor_dpp" as const };
     const coord = { role: "coordenacao" as const };
     expect(corpusServePapel(termo!, mentor)).toBe(false);
     expect(corpusServePapel(termo!, coord)).toBe(true);
-    expect(corpusServePapel(feedback!, mentor)).toBe(true);
+    expect(corpusServePapel(etica!, mentor)).toBe(true);
     expect(corpusServePapel(fake([]), null)).toBe(true); // audiência ausente serve
   });
 });

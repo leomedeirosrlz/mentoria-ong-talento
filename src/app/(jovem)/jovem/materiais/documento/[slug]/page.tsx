@@ -17,9 +17,9 @@ import { CorpusDocumento } from "@/components/corpus-documento";
 
 export const dynamicParams = false;
 
-// os 4 templates do cap. 14 que já viviam nesta rota antes do corpus
+// templates do cap. 14 que já viviam nesta rota antes do corpus (o Feedback
+// Construtivo saiu: audiência de equipe desde a 0167)
 const LEGADO_JOVEM = [
-  "feedback-construtivo",
   "mensagem-preparacao",
   "mensagem-indicadas",
   "mensagem-encaminhamento",

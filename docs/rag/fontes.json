@@ -1,5 +1,5 @@
 {
-  "gerado_em": "2026-11-09T13:30:15.420Z",
+  "gerado_em": "2026-11-09T13:37:11.752Z",
   "docs": 36,
   "chunks": 464,
   "fontes": [
@@ -92,7 +92,10 @@
       "material": "feedback-construtivo",
       "natureza": "consolidado",
       "audiencia": [
-        "todos"
+        "coordenacao",
+        "supervisor",
+        "mentor_dpp",
+        "mentor_especialista"
       ],
       "arquivo": "feedback-construtivo.md",
       "secoes": 5,

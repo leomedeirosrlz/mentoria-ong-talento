@@ -105,6 +105,18 @@ update public.materiais set audiencias = case audiencia
   else array['todos'] end
 where audiencia <> 'todos' and audiencias = array['todos'];
 
+-- 0167: material de mentor serve o supervisor; Feedback Construtivo sem o
+-- jovem; Formação EaD pra mentores e mentorados (mesmo corpo da migration)
+update public.materiais set audiencias = array_append(audiencias, 'supervisor')
+where audiencias && array['mentor_dpp', 'mentor_especialista']
+  and not ('supervisor' = any (audiencias)) and not ('todos' = any (audiencias));
+update public.materiais
+  set audiencias = array['coordenacao', 'supervisor', 'mentor_dpp', 'mentor_especialista'], audiencia = 'dpp'
+where titulo = 'Feedback Construtivo' and audiencias = array['todos'];
+update public.materiais
+  set audiencias = array['mentor_dpp', 'mentor_especialista', 'mentorado'], audiencia = 'dpp'
+where titulo = 'Formação EaD gratuita' and audiencias = array['todos'];
+
 -- 0140: desfecho auditável — colunas desfecho/desfecho_motivo/desfecho_obs/
 -- desfecho_em/desfecho_por já existem (migration). Backfill coerente com o
 -- status legado, pra que o histórico antigo não suma. Duplas ainda em curso

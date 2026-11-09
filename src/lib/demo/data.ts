@@ -64,6 +64,7 @@ import type {
 } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
 import { disponibilidadeDeConjuntos, toDateStr } from "../ciclo";
+import { audienciasDe } from "../materiais";
 
 // ---------- tabelas da rodada de telas finais (ainda sem migration) ----------
 // Espelhos do plano `docs/planos/implementacao-telas-finais.md` — os WPs
@@ -3244,7 +3245,7 @@ function build(): DemoData {
   // do app), Perguntas Eficazes (o documento que o guia cita) e os links
   // públicos. Arquivos resolvem pro PDF placeholder da rota demo; doc: abre o
   // doc real.
-  const materiais: Material[] = [
+  const catalogo: Material[] = [
     { id: uid(0x2001), titulo: "Guia do Mentor DPP", descricao: "Metodologia completa: jornada, 16 encontros, instrumentos e templates.", tipo: "guia", url: null, path: "materiais/guia-dpp.pdf", audiencia: "dpp", encontro_num: null, ordem: 1 },
     { id: uid(0x2002), titulo: "Guia do Mentor Especialista", descricao: "Metodologia da mentoria com especialista: 5 encontros e cinco funções.", tipo: "guia", url: null, path: "materiais/guia-especialista.pdf", audiencia: "especialista", encontro_num: null, ordem: 2 },
     ...Array.from({ length: 16 }, (_, i) => i + 1).map((n, i) => ({
@@ -3271,6 +3272,18 @@ function build(): DemoData {
     { id: uid(0x203a), titulo: "Formação EaD gratuita", descricao: "Trilha opcional com certificado para mentores.", tipo: "link", url: "https://ead.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 29 },
     { id: uid(0x203b), titulo: "Checklist de competências do mentor", descricao: "As 10 competências do guia para marcar antes do ciclo e no 16º encontro.", tipo: "template", url: null, path: "doc:checklist-competencias", audiencia: "dpp", encontro_num: null, ordem: 30 },
   ];
+  // audiências da 0167: material de mentor serve o supervisor, Feedback
+  // Construtivo sai do jovem, Formação EaD é de mentores e mentorados
+  const materiais: Material[] = catalogo.map((m) => {
+    if (m.titulo === "Feedback Construtivo")
+      return { ...m, audiencias: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"] };
+    if (m.titulo === "Formação EaD gratuita")
+      return { ...m, audiencias: ["mentor_dpp", "mentor_especialista", "mentorado"] };
+    const base = audienciasDe(m);
+    return base.includes("mentor_dpp") || base.includes("mentor_especialista")
+      ? { ...m, audiencias: [...base, "supervisor"] }
+      : m;
+  });
 
   // ---------- notificações por papel ----------
   // 2-3 por persona; algumas não lidas pra badge do sino sair de zero

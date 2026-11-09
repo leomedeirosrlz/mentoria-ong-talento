@@ -131,7 +131,6 @@ const META_FONTE: Record<
   "feedback-construtivo": {
     rotulo: "Feedback Construtivo",
     doc: "feedback-construtivo",
-    docJovem: true,
   },
   "mensagem-preparacao": {
     rotulo: "Mensagem de preparação",
