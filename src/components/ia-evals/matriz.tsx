@@ -38,16 +38,9 @@ type CasoLinha = { id: string; msg: string; pagina: string | null };
 type CelulaKey = { caso: string; modelo: string };
 type Hover = { caso: string; modelo: string } | null;
 
-/** Pips (≤3 reps) or segmented micro-bar (>3) — the cell's visual. */
-function RepsVisuais({
-  its,
-  filtro,
-}: {
-  its: Item[];
-  filtro: FiltroItem;
-}) {
-  const dim = (i: Item) =>
-    filtro !== "todos" && i.status !== filtro ? "opacity-25" : "";
+/** Pips (≤3 reps) or segmented micro-bar (>3) — the cell's visual. The
+ *  status filter already removed non-matching items upstream. */
+function RepsVisuais({ its }: { its: Item[] }) {
   if (its.length <= 3) {
     return (
       <span className="inline-flex items-center gap-1">
@@ -58,9 +51,8 @@ function RepsVisuais({
             key={`${i.id}:${i.status}`}
             aria-hidden
             className={cn(
-              "ia-pop inline-flex size-5 items-center justify-center rounded-[5px] text-[10px] leading-none font-bold transition-[opacity,background-color,border-color] duration-300",
-              CELULA[i.status],
-              dim(i)
+              "ia-pop inline-flex size-5 items-center justify-center rounded-[5px] text-[10px] leading-none font-bold transition-[background-color,border-color] duration-300",
+              CELULA[i.status]
             )}
           >
             {its.length > 1 ? i.repeticao : ""}
@@ -76,9 +68,8 @@ function RepsVisuais({
           key={`${i.id}:${i.status}`}
           aria-hidden
           className={cn(
-            "ia-pop min-w-1 flex-1 transition-[opacity,background-color] duration-300",
-            CELULA_BARRA[i.status],
-            dim(i)
+            "ia-pop min-w-1 flex-1 transition-[background-color] duration-300",
+            CELULA_BARRA[i.status]
           )}
         />
       ))}
@@ -156,7 +147,6 @@ function CelulaMatriz({
   its,
   caso,
   modelo,
-  filtro,
   fila,
   expandida,
   onToggle,
@@ -165,7 +155,6 @@ function CelulaMatriz({
   its: Item[];
   caso: CasoLinha;
   modelo: string;
-  filtro: FiltroItem;
   /** row dimmed by the divergent-case focus */
   fila: boolean;
   expandida: boolean;
@@ -211,7 +200,7 @@ function CelulaMatriz({
                 its.length > 3 && "px-1.5"
               )}
             >
-              <RepsVisuais its={its} filtro={filtro} />
+              <RepsVisuais its={its} />
             </span>
           </Button>
         }
@@ -355,6 +344,11 @@ export function MatrizCasos({
   const celula = (casoId: string, modelo: string) =>
     grade.get(`${casoId}§${modelo}`) ?? [];
   const bate = (i: Item) => filtro === "todos" || i.status === filtro;
+  // true filter: non-matching items leave the cell, rows with nothing
+  // left leave the table — no dimmed "disabled" leftovers
+  const celulaVis = (casoId: string, modelo: string) =>
+    filtro === "todos" ? celula(casoId, modelo) : celula(casoId, modelo).filter(bate);
+  const algumaLinha = filtro === "todos" || itens.some(bate);
   const multiplosGrupos = grupos.length > 1;
   const casoAberto = aberto ? casosOrdem.find((c) => c.id === aberto.caso) : null;
 
@@ -397,17 +391,21 @@ export function MatrizCasos({
               ["falhou", "Falhou", stats.falhas],
               ["erro", "Erro", stats.erros],
             ] as const
-          ).map(([f, rotulo, n]) => (
-            <button
-              key={f}
-              type="button"
-              aria-pressed={filtro === f}
-              onClick={() => onFiltro(f)}
-              className={filterChipCls(filtro === f)}
-            >
-              {rotulo} <span className="tabular-nums">{n}</span>
-            </button>
-          ))}
+          )
+            // zero-count statuses hide — the active one stays so the
+            // applied filter remains visible even emptied
+            .filter(([f, , n]) => f === "todos" || n > 0 || filtro === f)
+            .map(([f, rotulo, n]) => (
+              <button
+                key={f}
+                type="button"
+                aria-pressed={filtro === f}
+                onClick={() => onFiltro(f)}
+                className={filterChipCls(filtro === f)}
+              >
+                {rotulo} <span className="tabular-nums">{n}</span>
+              </button>
+            ))}
         </div>
       </div>
 
@@ -468,6 +466,8 @@ export function MatrizCasos({
                   const algumBate = itens.some(
                     (i) => i.caso_id === c.id && bate(i)
                   );
+                  // the filter unmounts empty cases instead of dimming
+                  if (filtro !== "todos" && !algumBate) return null;
                   const foraDeFoco = casoFoco != null && casoFoco !== c.id;
                   return (
                     <Fragment key={c.id}>
@@ -480,7 +480,7 @@ export function MatrizCasos({
                           className={cn(
                             "sticky left-0 z-10 py-1 pr-3 text-left align-middle transition-[opacity,background-color] duration-200",
                             hover?.caso === c.id ? "bg-muted" : "bg-card",
-                            (foraDeFoco || !algumBate) && "opacity-40"
+                            foraDeFoco && "opacity-40"
                           )}
                         >
                           <span
@@ -504,10 +504,9 @@ export function MatrizCasos({
                             )}
                           >
                             <CelulaMatriz
-                              its={celula(c.id, m)}
+                              its={celulaVis(c.id, m)}
                               caso={c}
                               modelo={m}
-                              filtro={filtro}
                               fila={foraDeFoco}
                               expandida={
                                 aberto?.caso === c.id && aberto?.modelo === m
@@ -534,7 +533,7 @@ export function MatrizCasos({
                               painelId={painelId}
                               caso={casoAberto}
                               modelo={aberto.modelo}
-                              its={celula(aberto.caso, aberto.modelo)}
+                              its={celulaVis(aberto.caso, aberto.modelo)}
                               latMedia={latMedia}
                             />
                           </td>
@@ -558,7 +557,13 @@ export function MatrizCasos({
                 {grupo}
               </p>
             )}
-            {lista.map((c, ri) => (
+            {lista.map((c, ri) => {
+              if (
+                filtro !== "todos" &&
+                !itens.some((i) => i.caso_id === c.id && bate(i))
+              )
+                return null;
+              return (
               <div
                 key={c.id}
                 style={stagger(ri)}
@@ -578,7 +583,7 @@ export function MatrizCasos({
                 </div>
                 <ul className="mt-1 divide-y divide-border/60">
                   {modelosOrdem.map((m) => {
-                    const its = celula(c.id, m);
+                    const its = celulaVis(c.id, m);
                     const expandida =
                       aberto?.caso === c.id && aberto?.modelo === m;
                     if (!its.length) return null;
@@ -600,7 +605,7 @@ export function MatrizCasos({
                           >
                             {m}
                           </span>
-                          <RepsVisuais its={its} filtro={filtro} />
+                          <RepsVisuais its={its} />
                           <CaretDown
                             size={13}
                             aria-hidden
@@ -629,10 +634,17 @@ export function MatrizCasos({
                   })}
                 </ul>
               </div>
-            ))}
+              );
+            })}
           </div>
         ))}
       </div>
+
+      {!algumaLinha && (
+        <p className="mt-3 text-sm text-muted-foreground">
+          Nenhum item com esse status neste run.
+        </p>
+      )}
     </div>
   );
 }

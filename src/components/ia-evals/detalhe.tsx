@@ -9,7 +9,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowsClockwise,
+  CaretDown,
   CircleNotch,
+  FileCsv,
+  FileJs,
+  FileText,
   Pause,
   Play,
   Trash,
@@ -27,9 +31,16 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { BarraSegmentada } from "@/components/viz";
 import { MatrizCasos } from "./matriz";
 import { NumeroVivo } from "./numero-vivo";
+import { baixarArquivo, evalCsv, evalJson, evalMarkdown } from "./exportar";
 import {
   compacto,
   dataCurta,
@@ -103,8 +114,9 @@ function ChipFeed({ item }: { item: Item }) {
   );
 }
 
-/** Close-out moment: confirm-pop/draw check + a result phrase + the next
- *  step (filter the failures / reexecute them). */
+/** Close-out moment: the surface and the icon follow the outcome (ok
+ *  green when clean, warn when there are items to review), the number
+ *  carries the weight — and the next step sits on the right. */
 function Fechamento({
   stats,
   onVerFalhas,
@@ -118,43 +130,73 @@ function Fechamento({
 }) {
   const pct = stats.total ? Math.round((stats.ok / stats.total) * 100) : 0;
   const revisar = stats.falhas + stats.erros;
-  const frase =
-    revisar === 0
-      ? `Fechou verde: ${pct}% passou (${stats.ok} de ${stats.total} itens).`
-      : `Fechou com ${revisar} ${revisar === 1 ? "item pra revisar" : "itens pra revisar"} · ${pct}% passou.`;
+  const limpo = revisar === 0;
+  const tom = limpo ? "ok" : "warn";
   return (
-    <div className="animate-enter flex flex-wrap items-center gap-3 rounded-xl border border-[var(--destaque-borda)] bg-[var(--destaque-suave)] p-4">
+    <div
+      className={cn(
+        "animate-enter flex flex-wrap items-center gap-3 rounded-xl border p-4",
+        limpo
+          ? "border-[var(--ok-border)] bg-[var(--ok-bg)]"
+          : "border-[var(--warn-border)] bg-[var(--warn-bg)]",
+      )}
+    >
       <svg viewBox="0 0 52 52" className="size-10 shrink-0" aria-hidden>
         <circle
           cx="26"
           cy="26"
           r="25"
-          fill="var(--brand-lime)"
+          fill={`var(--${tom})`}
           className="confirm-pop"
         />
-        <path
-          d="M15 27l7.5 7.5L37 19"
-          fill="none"
-          stroke="var(--brand-ink)"
-          strokeWidth="4"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className="confirm-draw"
-        />
+        {limpo ? (
+          <path
+            d="M15 27l7.5 7.5L37 19"
+            fill="none"
+            stroke="var(--status-foreground)"
+            strokeWidth="4"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className="confirm-draw"
+          />
+        ) : (
+          <>
+            <path
+              d="M26 16v15"
+              fill="none"
+              stroke="var(--status-foreground)"
+              strokeWidth="4"
+              strokeLinecap="round"
+              className="confirm-draw"
+            />
+            <circle cx="26" cy="37" r="2.6" fill="var(--status-foreground)" />
+          </>
+        )}
       </svg>
       <div className="min-w-0 flex-1">
-        <p className="text-sm font-semibold text-[var(--destaque-foreground)]">
-          {frase}
+        <p
+          className={cn(
+            "text-sm font-semibold",
+            limpo ? "text-[var(--ok-text)]" : "text-[var(--warn-text)]",
+          )}
+        >
+          {limpo
+            ? "Fechou verde"
+            : `Fechou com ${revisar} ${revisar === 1 ? "item pra revisar" : "itens pra revisar"}`}
         </p>
-        {revisar > 0 && (
-          <p className="mt-0.5 text-xs text-[var(--destaque-foreground)]/80">
-            {stats.falhas > 0 &&
-              `${stats.falhas} ${stats.falhas === 1 ? "falha" : "falhas"} de rubrica`}
-            {stats.falhas > 0 && stats.erros > 0 && " · "}
-            {stats.erros > 0 &&
-              `${stats.erros} ${stats.erros === 1 ? "erro" : "erros"} de infra`}
-          </p>
-        )}
+        <p
+          className={cn(
+            "mt-0.5 text-xs",
+            limpo ? "text-[var(--ok-text)]/75" : "text-[var(--warn-text)]/75",
+          )}
+        >
+          <span className="text-sm font-semibold tabular-nums">{pct}%</span>
+          {` passou · ${stats.ok} de ${stats.total} itens`}
+          {stats.falhas > 0 &&
+            ` · ${stats.falhas} ${stats.falhas === 1 ? "falha" : "falhas"} de rubrica`}
+          {stats.erros > 0 &&
+            ` · ${stats.erros} ${stats.erros === 1 ? "erro" : "erros"} de infra`}
+        </p>
       </div>
       {revisar > 0 && (
         <div className="flex flex-wrap gap-2">
@@ -414,6 +456,17 @@ export function DetalheRun({
   }, [itens]);
 
   const feitos = stats.ok + stats.falhas + stats.erros;
+  const revisar = stats.falhas + stats.erros;
+  const pct = stats.total ? Math.round((stats.ok / stats.total) * 100) : 0;
+
+  const exportar = (fmt: "json" | "csv" | "md") => {
+    const base = `eval-${run.id.slice(0, 8)}-${run.created_at.slice(0, 10)}`;
+    if (fmt === "json")
+      baixarArquivo(`${base}.json`, evalJson(run, itens), "application/json");
+    else if (fmt === "csv")
+      baixarArquivo(`${base}.csv`, evalCsv(run, itens), "text/csv");
+    else baixarArquivo(`${base}.md`, evalMarkdown(run, itens), "text/markdown");
+  };
 
   // Live pace: items/min of this drive session → ETA, falling back to the
   // run's own mean latency (+ per-item overhead) before the first item
@@ -485,6 +538,18 @@ export function DetalheRun({
             </p>
           </div>
           <div className="flex items-center gap-2">
+            {run.status === "concluido" && (
+              <span
+                className={cn(
+                  "inline-flex items-center rounded-full border px-2 py-0.5 text-[11px] font-semibold tabular-nums",
+                  revisar === 0
+                    ? "border-[var(--ok-border)] bg-[var(--ok-bg)] text-[var(--ok-text)]"
+                    : "border-[var(--warn-border)] bg-[var(--warn-bg)] text-[var(--warn-text)]",
+                )}
+              >
+                {pct}% passou
+              </span>
+            )}
             <span
               role="status"
               aria-live="polite"
@@ -540,6 +605,45 @@ export function DetalheRun({
                 Reexecutar falhas
               </Button>
             )}
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={!itens.length}
+                  >
+                    <FileJs aria-hidden />
+                    Exportar
+                    <CaretDown size={12} aria-hidden />
+                  </Button>
+                }
+              />
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuItem onClick={() => exportar("json")}>
+                  <FileJs aria-hidden />
+                  JSON
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    dados completos
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportar("csv")}>
+                  <FileCsv aria-hidden />
+                  CSV
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    planilha
+                  </span>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => exportar("md")}>
+                  <FileText aria-hidden />
+                  Markdown
+                  <span className="ml-auto text-xs text-muted-foreground">
+                    relatório
+                  </span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Dialog open={confirmApagar} onOpenChange={setConfirmApagar}>
               <DialogTrigger
                 render={
