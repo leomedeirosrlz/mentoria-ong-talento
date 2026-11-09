@@ -36,7 +36,7 @@ import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Uso da Liza" };
 
-const DIAS_OPCOES = [7, 30, 90] as const;
+const DIAS_OPCOES = [1, 7, 30, 90] as const;
 const CANAL_OPCOES = ["todos", "chat", "mcp"] as const;
 const DIA_MS = 86400_000;
 
@@ -553,6 +553,7 @@ export default async function IaPage({
   const me = await getMe();
   if (me?.role !== "coordenacao") redirect("/");
 
+  const demo = await demoAtivo();
   const { dias: dP, canal: cP, modelo: mP } = await searchParams;
   const dias = DIAS_OPCOES.includes(Number(dP) as (typeof DIAS_OPCOES)[number])
     ? Number(dP)
@@ -634,7 +635,7 @@ export default async function IaPage({
   const m = uso.medias;
   const nomePico = (i: number | null, pts: PontoGrafico[]) =>
     i == null ? "" : ` Pico em ${pts[i].rotulo}: ${pts[i].valorExato ?? pts[i].valorFmt}.`;
-  const periodoTxt = `nos últimos ${dias} dias${porSemana ? ", por semana" : ""}`;
+  const periodoTxt = `${dias === 1 ? "nas últimas 24 horas" : `nos últimos ${dias} dias`}${porSemana ? ", por semana" : ""}`;
   const unidadeTempo = porSemana ? "Semana" : "Dia";
   const vazio = uso.requisicoes === 0;
   const chaveRecorte = `${dias}|${canal}|${modelo ?? ""}`;
@@ -661,7 +662,8 @@ export default async function IaPage({
         meta="Consumo do plano, tokens e custo por requisição, quem usou e com qual modelo"
         actions={
           <div className="flex items-center gap-1">
-          <IaLimparEventos />
+          {/* demo não tem ia_eventos reais pra limpar — a rota daria 401 */}
+          {!demo && <IaLimparEventos />}
           <Popover>
             <PopoverTrigger
               className={cn(

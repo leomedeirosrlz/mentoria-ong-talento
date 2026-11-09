@@ -5,6 +5,7 @@
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
+import { limparCachePainelIa } from "@/lib/ia/queries";
 
 export async function DELETE() {
   const supabase = await createClient();
@@ -21,5 +22,8 @@ export async function DELETE() {
       { error: "Não consegui limpar os indicadores — tente de novo." },
       { status: 500 }
     );
+  // sem isso o refresh relia até 60s de eventos já apagados e o painel
+  // parecia não limpar
+  limparCachePainelIa();
   return NextResponse.json({ ok: true, apagados: apagados ?? 0 });
 }

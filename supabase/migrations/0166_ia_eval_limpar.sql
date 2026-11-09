@@ -9,7 +9,9 @@
 --   - pg-safeupdate do PostgREST barra DELETE sem WHERE até dentro de
 --     security definer → o "limpa tudo" usa WHERE true.
 --   - `<>` com NULL passa (usuário sem papel cairia no else) → o gate usa
---     IS DISTINCT FROM, e ia_eval_pegar_item (0164) leva a mesma correção.
+--     has_papel('coordenacao'), o mesmo predicado da rota via my_papeis;
+--     my_role() só lê o papel primário e barrava quem tem coordenacao como
+--     papel adicional (0085). ia_eval_pegar_item (0164) leva a mesma correção.
 
 begin;
 
@@ -20,7 +22,7 @@ as $$
 declare
   v_runs int;
 begin
-  if public.my_role() is distinct from 'coordenacao' then
+  if not public.has_papel('coordenacao') then
     raise exception 'sem permissão';
   end if;
   delete from public.ia_eval_runs r
@@ -36,7 +38,7 @@ as $$
 declare
   v_eventos int;
 begin
-  if public.my_role() is distinct from 'coordenacao' then
+  if not public.has_papel('coordenacao') then
     raise exception 'sem permissão';
   end if;
   delete from public.ia_eventos where true;
@@ -52,7 +54,7 @@ as $$
 declare
   v_item public.ia_eval_itens;
 begin
-  if public.my_role() is distinct from 'coordenacao' then
+  if not public.has_papel('coordenacao') then
     raise exception 'sem permissão';
   end if;
   update public.ia_eval_itens i
