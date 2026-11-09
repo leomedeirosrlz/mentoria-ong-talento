@@ -150,7 +150,12 @@ function LinhaContato({
 
   function reemitir() {
     start(async () => {
-      const r = await reemitirConviteTerceiro(contato.id);
+      // rede caída rejeita a action — sem o catch o erro subia pro boundary
+      const r = await reemitirConviteTerceiro(contato.id).catch(() => null);
+      if (!r) {
+        toast.error("Sem conexão. Tente de novo.");
+        return;
+      }
       if ("error" in r) {
         toast.error(r.error);
         return;
@@ -374,7 +379,11 @@ function EditarContatoDialog({
         nome,
         vinculo,
         whatsapp: whatsapp || null,
-      });
+      }).catch(() => null);
+      if (!r) {
+        toast.error("Sem conexão. Tente de novo.");
+        return;
+      }
       if ("error" in r) {
         toast.error(r.error);
         return;
@@ -472,7 +481,11 @@ function NovoContatoDialog({
         nome,
         vinculo,
         whatsapp: whatsapp || null,
-      });
+      }).catch(() => null);
+      if (!r) {
+        toast.error("Sem conexão. Tente de novo.");
+        return;
+      }
       if ("error" in r) {
         toast.error(r.error);
         return;
@@ -576,7 +589,11 @@ function Consolidacao({
 
   function salvar(publicar: boolean) {
     start(async () => {
-      const r = await salvarConsolidadoTerceiros(duplaId, texto, publicar);
+      const r = await salvarConsolidadoTerceiros(duplaId, texto, publicar).catch(() => null);
+      if (!r) {
+        toast.error("Sem conexão. Tente de novo.");
+        return;
+      }
       if ("error" in r) {
         toast.error(r.error);
         return;

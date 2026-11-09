@@ -151,9 +151,13 @@ export function ChamadoDetalhe({
   // traz a página re-renderizada, sem router.refresh() extra
   function acao(fn: () => Promise<{ ok?: boolean; error?: string }>, okMsg: string) {
     start(async () => {
-      const r = await fn();
-      if (r.error) toast.error(r.error);
-      else toast.success(okMsg);
+      try {
+        const r = await fn();
+        if (r.error) toast.error(r.error);
+        else toast.success(okMsg);
+      } catch {
+        toast.error("Sem conexão. Tente de novo.");
+      }
     });
   }
 

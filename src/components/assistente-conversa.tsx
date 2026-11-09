@@ -508,14 +508,24 @@ export function AssistenteConversa({
   /** limpa a conversa ativa (a anterior já está gravada no histórico) —
    *  o header oferece "Nova conversa" */
   function novaConversa() {
-    abortRef.current?.abort();
+    soltarStream();
     setConversaId(null);
     setMsgs([]);
+    setPending(false);
+    setStatus(null);
     setTexto("");
     setVisao("chat");
     focarComposer(inputRef.current);
   }
-  useEffect(() => registrarNova?.(novaConversa), [registrarNova]);
+  // mesmo padrão do enviarRef: registrada uma vez, lê a versão mais nova
+  const novaRef = useRef(novaConversa);
+  useEffect(() => {
+    novaRef.current = novaConversa;
+  });
+  useEffect(
+    () => registrarNova?.(() => novaRef.current()),
+    [registrarNova]
+  );
   /** botão do header: transcript ↔ histórico — a lista recarrega do
    *  storage a cada abertura (a persistência mora no effect de msgs) */
   function alternarHistorico() {
@@ -537,16 +547,28 @@ export function AssistenteConversa({
     [registrarEnviar]
   );
 
-  /** troca pra uma conversa do histórico — aborta um stream em andamento
-   *  (os tokens já gravados ficam na conversa de origem) */
-  function abrirConversa(c: Conversa) {
+  /** Troca/limpeza de conversa: aborta o stream e solta o controller ANTES
+   *  do catch rodar — sem isso o fechamento "interrompido" caía no setMsgs
+   *  da conversa recém-aberta e reescrevia a última resposta dela. */
+  function soltarStream() {
     abortRef.current?.abort();
+    abortRef.current = null;
     if (flushRef.current) {
       cancelAnimationFrame(flushRef.current);
       flushRef.current = 0;
     }
     tokensRef.current = "";
     fecharRef.current = null;
+  }
+
+  /** "parar" mantém o controller: só o stream que ainda é da tela fecha */
+  function interromper(ctrl: AbortController) {
+    if (abortRef.current === ctrl) finalizar("interrompido");
+  }
+
+  /** troca pra uma conversa do histórico — aborta um stream em andamento */
+  function abrirConversa(c: Conversa) {
+    soltarStream();
     setConversaId(c.id);
     setMsgs(c.msgs);
     setPending(false);
@@ -563,13 +585,7 @@ export function AssistenteConversa({
       return prox;
     });
     if (conversaId === id) {
-      abortRef.current?.abort();
-      if (flushRef.current) {
-        cancelAnimationFrame(flushRef.current);
-        flushRef.current = 0;
-      }
-      tokensRef.current = "";
-      fecharRef.current = null;
+      soltarStream();
       setConversaId(null);
       setMsgs([]);
       setPending(false);
@@ -829,7 +845,7 @@ export function AssistenteConversa({
       else finalizar("ok", { tools, fontes, reqId });
     } catch (e) {
       if (ctrl.signal.aborted) {
-        finalizar("interrompido");
+        interromper(ctrl);
         return;
       }
       // rede ou provider fora: uma retentativa automática (a bolha de
@@ -838,7 +854,7 @@ export function AssistenteConversa({
         setStatus("Reconectando…");
         await new Promise((r) => setTimeout(r, 1200));
         if (ctrl.signal.aborted) {
-          finalizar("interrompido");
+          interromper(ctrl);
           return;
         }
         return rodar(base, tentativas + 1);
@@ -881,14 +897,14 @@ export function AssistenteConversa({
       if (r?.ui.length) {
         setStatus("Consultando os dados de exemplo…");
         await espera(450);
-        if (ctrl.signal.aborted) return finalizar("interrompido");
+        if (ctrl.signal.aborted) return interromper(ctrl);
         r.ui.forEach(receberUi);
         await espera(250);
       }
       const content = r?.content ?? respostaDemo(pergunta);
       // fatias de ~4 palavras a cada 28ms — o mesmo fade por fatia do stream
       for (const pedaco of content.match(/(\S+\s*){1,4}|\s+/g) ?? []) {
-        if (ctrl.signal.aborted) return finalizar("interrompido");
+        if (ctrl.signal.aborted) return interromper(ctrl);
         enfileirarToken(pedaco);
         await espera(28);
       }

@@ -1313,7 +1313,8 @@ export async function updatePessoa(profileId: string, formData: FormData) {
     ...civis,
     ...consentPatch(formData, atual?.consent_lgpd_em),
   };
-  if (formData.has("voluntario")) {
+  // sentinela: checkbox desmarcado não posta (mesmo padrão do salvarOnboarding)
+  if (formData.has("decl_voluntario")) {
     patch.voluntario = formData.get("voluntario") === "on";
   }
   // quem já tem login troca o e-mail no auth.users (o trigger 0060 espelha

@@ -139,7 +139,12 @@ export function NovoChamadoDialog({
         mensagem: mensagem.trim() || undefined,
         descricaoOutro: descricaoFinal || undefined,
         duplaId: jovem ? undefined : dupla || undefined,
-      });
+      }).catch(() => null);
+      // rede caída: o texto fica no form pra tentar de novo
+      if (!r) {
+        toast.error("Sem conexão. Tente de novo.");
+        return;
+      }
       if (r.error) {
         toast.error(r.error);
         return;
