@@ -165,6 +165,17 @@ export async function POST(req: Request) {
           "Não consegui autenticar a execução — tente de novo."
         );
       }
+      // gate por papel ANTES de reservar o slot do rate-limit — chamada
+      // negada não pode queimar a cota do dono
+      const tool = IA_TOOL_CATALOGO.find((t) => t.nome === nome);
+      if (!tool) return rpcErro(id, -32602, "Tool desconhecida.");
+      if (!tool.roles.some((r) => papeis.includes(r))) {
+        return rpcErro(
+          id,
+          -32000,
+          "Esta consulta não está disponível pro seu papel."
+        );
+      }
       // mesmo limite do chat (20/min por pessoa) — a PAT é da pessoa, o
       // dono responde pelo uso dela; a reserva é atômica sob lock
       const limite = await consumirLimiteIa(clientExec, { tool: nome }, "mcp");

@@ -236,7 +236,16 @@ export function MentorHome({
         );
         let seguinteNumero: number | null = null;
         if (agendado) {
-          for (let n = 1; n <= totalDupla; n++) {
+          // mesmo piso do alvoAgendamento (ciclo.ts): quem entrou a meio do
+          // ciclo não tem buraco antes da entrada — sem o piso o nº1 era
+          // sugerido e virava row fantasma
+          const inicioSeg = dupla.iniciada_em;
+          const pisoSeguinte = inicioSeg
+            ? (eventosDaDupla.find(
+                (e) => e.tipo === "encontro" && e.numero != null && e.data != null && e.data >= inicioSeg
+              )?.numero ?? 1)
+            : 1;
+          for (let n = pisoSeguinte; n <= totalDupla; n++) {
             if (!numerosOcupados.has(n)) {
               seguinteNumero = n;
               break;
@@ -638,7 +647,7 @@ export function MentorHome({
                       />
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {dupla.status === "concluida" ? "Concluída" : "Desistente"} ·{" "}
+                      {dupla.status === "concluida" ? "Concluída" : "Encerrada"} ·{" "}
                       <span className="tabular-nums">
                         {saude.feitos}/{totalDupla}
                       </span>{" "}

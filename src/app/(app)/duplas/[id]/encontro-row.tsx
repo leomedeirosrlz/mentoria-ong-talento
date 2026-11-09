@@ -240,7 +240,7 @@ export function EncontroRow({
       semanaSugerida &&
       `semana sugerida ${diaMesCurto(semanaSugerida.seg)} a ${diaMesCurto(semanaSugerida.dom)}`,
     encontro?.data_hora &&
-      `${feito && !diverge ? "realizado" : "agendado"} ${formatDateTime(encontro.data_hora)}`,
+      `${feito && !diverge ? "realizado" : encontro.status === "cancelado" ? "cancelado" : "agendado"} ${formatDateTime(encontro.data_hora)}`,
     naoAconteceu && "não aconteceu",
   ]
     .filter(Boolean)

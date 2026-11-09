@@ -2940,11 +2940,14 @@ export async function agendarEncontro(formData: FormData) {
   const motivoOutro = String(formData.get("motivo_outro") ?? "").trim();
   if (!dupla_id || !numero || !data_hora) return { error: "Data e horário são obrigatórios." };
   const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", dupla_id).single();
-  if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
+  // sem row a RLS escondeu (não é dele) ou a dupla não existe — os `d!`
+  // abaixo estourariam TypeError em vez do contrato { error }
+  if (!d) return { error: "Dupla não encontrada." };
+  if (d.status !== "ativa") return { error: "Essa dupla não está ativa." };
   // DPP sem cronograma é dado inválido (o CHECK da 0061 impede criar, mas uma
   // dupla antiga pode chegar aqui) — sem calendário o teto de número seria
   // uma mentira; aponta a correção em vez de agendar contra nada
-  if (d && d.trilha !== "especialista" && !d.cronograma_id) {
+  if (d.trilha !== "especialista" && !d.cronograma_id) {
     return { error: "Essa dupla está sem cronograma — a coordenação vincula um na edição da dupla." };
   }
   const quando = parseDataHora(data_hora);
@@ -2960,7 +2963,7 @@ export async function agendarEncontro(formData: FormData) {
   // trilha especialista (0074): sessão nova só nasce de pedido aceito —
   // agendarEncontro continua servindo pra REMARCAR uma tentativa existente,
   // nunca pra criar row do zero
-  if (d?.trilha === "especialista" && !existente) {
+  if (d.trilha === "especialista" && !existente) {
     return {
       error:
         "As sessões da trilha especialista nascem dos pedidos aceitos — combine com o jovem ou a coordenação.",
@@ -2982,13 +2985,13 @@ export async function agendarEncontro(formData: FormData) {
   // teto de nº por trilha — especialista conta TENTATIVAS (o CHECK do banco
   // aceita até 24; aqui só passa row existente, então o teto é o do banco);
   // DPP mede contra o calendário DA DUPLA (0061), nunca o global
-  const maxNum = d?.trilha === "especialista"
+  const maxNum = d.trilha === "especialista"
     ? 24
     : (
         await supabase
           .from("ciclo_eventos").select("numero")
           .eq("tipo", "encontro")
-          .eq("cronograma_id", d!.cronograma_id!)
+          .eq("cronograma_id", d.cronograma_id!)
           .order("numero", { ascending: false }).limit(1).maybeSingle()
       ).data?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
@@ -3118,7 +3121,9 @@ export async function salvarLinkEncontro(encontroId: string, link: string | null
     .eq("id", encontroId)
     .maybeSingle();
   if (!encontro) return { error: "Encontro não encontrado." };
-  if (encontro.status !== "agendado") {
+  // remarcado é legado mantido (marcarNaoAconteceu aceita): a row ainda é
+  // agendável, só o status ficou velho — bloquear impedia trocar o link
+  if (encontro.status !== "agendado" && encontro.status !== "remarcado") {
     return { error: "Só dá pra mexer no link de um encontro agendado." };
   }
   const dupla = Array.isArray(encontro.duplas) ? encontro.duplas[0] : encontro.duplas;
@@ -3153,7 +3158,7 @@ export async function salvarLinkEncontro(encontroId: string, link: string | null
       .from("encontros")
       .update({ link: linkLimpo })
       .eq("id", encontroId)
-      .eq("status", "agendado")
+      .in("status", ["agendado", "remarcado"])
       .select("id");
     if (error) return { error: erroAmigavel(error) };
     if (!data?.length) return { error: "Esse encontro não está mais agendado." };
@@ -3514,20 +3519,21 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
   }
 
   const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", duplaId).single();
-  if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
-  if (d && d.trilha !== "especialista" && !d.cronograma_id) {
+  if (!d) return { error: "Dupla não encontrada." };
+  if (d.status !== "ativa") return { error: "Essa dupla não está ativa." };
+  if (d.trilha !== "especialista" && !d.cronograma_id) {
     return { error: "Essa dupla está sem cronograma — a coordenação vincula um na edição da dupla." };
   }
 
   // teto de nº por trilha — a nota segue o passo do guia (16 DPP / 5
   // especialista); no DPP o teto é do cronograma dela, não do calendário global
-  const maxNum = d?.trilha === "especialista"
+  const maxNum = d.trilha === "especialista"
     ? maxEncontros("especialista")
     : (
         await supabase
           .from("ciclo_eventos").select("numero")
           .eq("tipo", "encontro")
-          .eq("cronograma_id", d!.cronograma_id!)
+          .eq("cronograma_id", d.cronograma_id!)
           .order("numero", { ascending: false }).limit(1).maybeSingle()
       ).data?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
@@ -3583,20 +3589,21 @@ export async function criarCombinadoEncontro(
   }
 
   const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", duplaId).single();
-  if (d && d.status !== "ativa") return { error: "Essa dupla não está ativa." };
-  if (d && d.trilha !== "especialista" && !d.cronograma_id) {
+  if (!d) return { error: "Dupla não encontrada." };
+  if (d.status !== "ativa") return { error: "Essa dupla não está ativa." };
+  if (d.trilha !== "especialista" && !d.cronograma_id) {
     return { error: "Essa dupla está sem cronograma. A coordenação vincula um na edição da dupla." };
   }
 
   // teto de nº por trilha — o combinado segue o passo do guia (16 DPP / 5
   // especialista); no DPP o teto é do cronograma dela, não do calendário global
-  const maxNum = d?.trilha === "especialista"
+  const maxNum = d.trilha === "especialista"
     ? maxEncontros("especialista")
     : (
         await supabase
           .from("ciclo_eventos").select("numero")
           .eq("tipo", "encontro")
-          .eq("cronograma_id", d!.cronograma_id!)
+          .eq("cronograma_id", d.cronograma_id!)
           .order("numero", { ascending: false }).limit(1).maybeSingle()
       ).data?.numero ?? 16;
   if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {

@@ -1714,7 +1714,14 @@ export function alvoAgendamento(
     const numerosFeitos = new Set(
       dupla.encontros.filter((e) => e.status === "realizado").map((e) => e.numero)
     );
-    let primeiroFaltante = 1;
+    // piso = 1º evento oficial após a entrada da dupla (a mesma régua dos
+    // faltantes abaixo): dupla que entra a meio do ciclo não tem "1º
+    // faltante" — sugerir o nº1 mintava uma row fantasma no passado
+    const inicio = dupla.iniciada_em;
+    let primeiroFaltante = inicio
+      ? (encontroEventos.find((e) => e.numero != null && e.data >= inicio)
+          ?.numero ?? total)
+      : 1;
     while (numerosFeitos.has(primeiroFaltante)) primeiroFaltante++;
     proximoNumero = saude.proximo?.numero ?? Math.min(primeiroFaltante, total);
     // a row real desse número é o que o dialog edita; saude.proximo só cobre
