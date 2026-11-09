@@ -86,6 +86,21 @@ describe("Rascunho", () => {
     expect(html).not.toContain("você escolhe o contato");
   });
 
+  it("numero no bloco (contato da ficha) abre o wa.me direto", () => {
+    const html = renderToStaticMarkup(
+      createElement(Rascunho, {
+        b: {
+          canal: "whatsapp",
+          para: "Ana",
+          numero: "+55 11 98765-4003",
+          texto,
+        },
+      })
+    );
+    expect(html).toContain("https://wa.me/5511987654003?text=");
+    expect(html).not.toContain("você escolhe o contato");
+  });
+
   it("whatsapp sem número cai no compartilhar do wa.me", () => {
     const html = renderToStaticMarkup(
       createElement(Rascunho, { b: { canal: "whatsapp", texto } })

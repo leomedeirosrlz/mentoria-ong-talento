@@ -167,6 +167,9 @@ export type BlocoEscolha = z.infer<typeof escolhaSchema>;
 const rascunhoSchema = z.object({
   canal: z.enum(["whatsapp", "email", "texto"]).default("texto"),
   para: z.string().trim().min(1).max(60).optional(),
+  // `numero` is separate from `para` (display name): the model copies the
+  // contact a tool returned verbatim, and waLink strips non-digits
+  numero: z.string().trim().min(4).max(24).optional(),
   assunto: z.string().trim().min(1).max(80).optional(),
   texto: z.string().trim().min(1).max(1200),
 });
