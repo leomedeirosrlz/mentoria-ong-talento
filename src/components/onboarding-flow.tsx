@@ -25,7 +25,7 @@ import {
   HandHeart,
   Handshake,
   Heart,
-  ImageSquare,
+  CaretDown,
   LinkedinLogo,
   ListChecks,
   MapPin,
@@ -94,42 +94,43 @@ const FORM_ID = "onboarding-passo";
 type Recurso = {
   icon: Icon;
   texto: string;
+  /** nome-base do print em public/onboarding (scripts/capturar-onboarding.mjs):
+   *  `<img>.webp` é a coluna de conteúdo no desktop, `<img>-m.webp` a tela do
+   *  celular. Sem img o item fica só como texto (o mentorado não passa aqui) */
   img?: string;
-  /** variante mobile do print (captura em celular) — usada na moldura
-   *  retrato do passo 2; sem ela o print desktop vai cortado */
-  imgM?: string;
   alt?: string;
 };
 
-/** "O que você pode fazer aqui" — os 4-5 pontos que mudam a rotina de cada papel. */
+/** "O que você pode fazer aqui" — os pontos que mudam a rotina de cada papel,
+ *  cada um com a tela real onde ele acontece. */
 const RECURSOS: Record<AppRole, Recurso[]> = {
   coordenacao: [
-    { icon: TrafficSignal, texto: "O andamento das duplas em tempo real: quem precisa de atenção aparece destacado.", img: "/onboarding/coordenacao-home.jpg", imgM: "/onboarding/coordenacao-home-m.jpg", alt: "Visão geral da coordenação: turmas, situação das duplas e pendências" },
-    { icon: HandHeart, texto: "Pedidos de apoio e de mentoria especializada chegam pra você.", img: "/onboarding/coordenacao-dupla.jpg", alt: "Ficha de uma dupla com pedido de apoio" },
-    { icon: UsersThree, texto: "Formar duplas e acompanhar cada jornada.", img: "/onboarding/coordenacao-duplas.jpg", alt: "Lista de duplas com estado e filtros" },
-    { icon: AddressBook, texto: "Gerenciar os cadastros da equipe e dos mentorados.", img: "/onboarding/coordenacao-pessoas.jpg", alt: "Lista de pessoas com papéis, vínculos e cadastros" },
-    { icon: Megaphone, texto: "Comunicados pra equipe e pra cada grupo de mentores." },
-    { icon: ChartLineUp, texto: "Exportar relatórios do programa." },
+    { icon: TrafficSignal, texto: "O andamento das duplas em tempo real: quem precisa de atenção aparece destacado.", img: "coordenacao-home", alt: "Visão geral da coordenação: turmas, situação das duplas e o que precisa de você hoje" },
+    { icon: HandHeart, texto: "Pedidos de apoio e de mentoria especializada chegam pra você.", img: "coordenacao-dupla", alt: "Ficha de uma dupla em risco com apoio aberto e especialista solicitado" },
+    { icon: UsersThree, texto: "Formar duplas e acompanhar cada jornada.", img: "coordenacao-duplas", alt: "Lista de duplas com situação, motivo e encontros" },
+    { icon: AddressBook, texto: "Gerenciar os cadastros da equipe e dos mentorados.", img: "coordenacao-pessoas", alt: "Lista de pessoas com papéis, filtros e cadastros" },
+    { icon: Megaphone, texto: "Comunicados pra equipe e pra cada grupo de mentores.", img: "coordenacao-comunicados", alt: "Avisos publicados para a equipe e para os mentores, com botão de novo aviso" },
+    { icon: ChartLineUp, texto: "Exportar relatórios do programa.", img: "coordenacao-relatorios", alt: "Construtor de relatórios com filtros de turma, linhas e colunas e exportação em CSV" },
   ],
   supervisor: [
-    { icon: UsersThree, texto: "As duplas sob sua supervisão num lugar só.", img: "/onboarding/supervisor-duplas.jpg", alt: "Lista de duplas supervisionadas" },
-    { icon: NotePencil, texto: "Notas de acompanhamento na ficha de cada dupla.", img: "/onboarding/supervisor-dupla.jpg", alt: "Ficha de uma dupla com notas e encontros" },
-    { icon: TrafficSignal, texto: "O andamento de cada dupla: quem vai bem e quem precisa de atenção.", img: "/onboarding/supervisor-home.jpg", imgM: "/onboarding/supervisor-home-m.jpg", alt: "Visão geral do supervisor com andamento das duplas" },
-    { icon: FolderOpen, texto: "Os materiais de apoio do programa." },
+    { icon: UsersThree, texto: "As duplas sob sua supervisão num lugar só.", img: "supervisor-duplas", alt: "Lista das duplas supervisionadas com a situação de cada uma" },
+    { icon: NotePencil, texto: "Notas de acompanhamento na ficha de cada dupla.", img: "supervisor-dupla", alt: "Ficha de uma dupla com a jornada e o próximo encontro" },
+    { icon: TrafficSignal, texto: "O andamento de cada dupla: quem vai bem e quem precisa de atenção.", img: "supervisor-home", alt: "Visão geral do supervisor com a situação das duplas" },
+    { icon: FolderOpen, texto: "Os materiais de apoio do programa.", img: "supervisor-materiais", alt: "Instrumentos do programa com respostas por dupla" },
   ],
   mentor_dpp: [
-    { icon: CalendarCheck, texto: "Agendar e registrar os encontros com a sua dupla.", img: "/onboarding/mentor_dpp-dupla.jpg", alt: "Ficha da dupla com encontros e registros" },
-    { icon: Users, texto: "As suas duplas num lugar só, com o próximo passo de cada uma.", img: "/onboarding/mentor_dpp-duplas.jpg", alt: "Lista das suas duplas com o próximo passo de cada uma" },
-    { icon: MapTrifold, texto: "A jornada dos 16 encontros do guia, passo a passo.", img: "/onboarding/mentor_dpp-home.jpg", imgM: "/onboarding/mentor_dpp-home-m.jpg", alt: "Visão geral do mentor com a jornada dos encontros" },
-    { icon: HandHeart, texto: "Pedir apoio à coordenação quando precisar." },
-    { icon: UserPlus, texto: "Solicitar um mentor especialista pro seu mentorado." },
-    { icon: FolderOpen, texto: "Os materiais de apoio do programa.", img: "/onboarding/mentor_dpp-materiais.jpg", alt: "Biblioteca de materiais de apoio do programa" },
+    { icon: CalendarCheck, texto: "Agendar e registrar os encontros com a sua dupla.", img: "mentor_dpp-dupla", alt: "Ficha da dupla com o próximo encontro e o botão de remarcar" },
+    { icon: Users, texto: "As suas duplas num lugar só, com o próximo passo de cada uma.", img: "mentor_dpp-duplas", alt: "Lista das suas duplas com o próximo passo de cada uma" },
+    { icon: MapTrifold, texto: "A jornada dos 16 encontros do guia, passo a passo.", img: "mentor_dpp-home", alt: "Visão geral do mentor com a jornada dos encontros" },
+    { icon: HandHeart, texto: "Pedir apoio à coordenação quando precisar.", img: "mentor_dpp-apoio", alt: "Meus chamados: pedidos de apoio à coordenação e o andamento de cada um" },
+    { icon: UserPlus, texto: "Solicitar um mentor especialista pro seu mentorado.", img: "mentor_dpp-especialista", alt: "Agenda por mentorado com o pedido de especialista em andamento" },
+    { icon: FolderOpen, texto: "Os materiais de apoio do programa.", img: "mentor_dpp-materiais", alt: "Materiais de apoio do encontro desta semana" },
   ],
   mentor_especialista: [
-    { icon: ClipboardText, texto: "Uma lista de pedidos que combinam com o seu perfil.", img: "/onboarding/mentor_especialista-home.jpg", imgM: "/onboarding/mentor_especialista-home-m.jpg", alt: "Mural de pedidos de mentoria especializada" },
-    { icon: Handshake, texto: "Aceitar um pedido e conduzir até 5 encontros." },
-    { icon: NotePencil, texto: "Registrar cada encontro realizado." },
-    { icon: FolderOpen, texto: "Os materiais de apoio do programa.", img: "/onboarding/mentor_especialista-materiais.jpg", alt: "Biblioteca de materiais de apoio do programa" },
+    { icon: ClipboardText, texto: "Uma lista de pedidos que combinam com o seu perfil.", img: "mentor_especialista-home", alt: "Mural de pedidos de mentoria especializada com filtros por tema" },
+    { icon: Handshake, texto: "Aceitar um pedido e conduzir até 5 encontros.", img: "mentor_especialista-trilha", alt: "Ficha da trilha de especialista com a jornada de 5 encontros" },
+    { icon: NotePencil, texto: "Registrar cada encontro realizado.", img: "mentor_especialista-registro", alt: "Encontros da trilha com o botão de registrar" },
+    { icon: FolderOpen, texto: "Os materiais de apoio do programa.", img: "mentor_especialista-materiais", alt: "Materiais de apoio da mentoria especializada" },
   ],
   // o jovem não passa por este wizard (o dele é o OnboardingJovem do
   // /jovem, REALIZA-114) — a entrada existe porque o Record pede todos os
@@ -140,6 +141,9 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
     { icon: FolderOpen, texto: "Os materiais de apoio do programa." },
   ],
 };
+
+const printDesktop = (img: string) => `/onboarding/${img}.webp`;
+const printMobile = (img: string) => `/onboarding/${img}-m.webp`;
 
 // índices dos passos por papel — as declarações (voluntário + LGPD) abrem o
 // fluxo pra garantir o consent antes de qualquer dado pedido; o "Sobre você"
@@ -180,6 +184,23 @@ function MolduraTela({
         <span className="size-2 rounded-full bg-border" />
       </div>
       {children}
+    </div>
+  );
+}
+
+/** Tela de celular pro print mobile — moldura de aparelho na tinta da marca,
+ *  estreita o bastante pro item e o print caberem juntos na vista. */
+function TelaCelular({ src, alt }: { src: string; alt: string }) {
+  return (
+    <div className="mx-auto mb-1 mt-2.5 w-[min(100%,17.5rem)] overflow-hidden rounded-[1.75rem] border-[5px] border-[var(--brand-ink)] bg-card shadow-border">
+      <Image
+        src={src}
+        alt={alt}
+        width={390}
+        height={520}
+        sizes="17.5rem"
+        className="block h-auto w-full"
+      />
     </div>
   );
 }
@@ -698,7 +719,7 @@ export function OnboardingFlow({
       case 1:
         return "Rapidinho: diz se você é voluntário(a). A segunda confirmação, obrigatória, autoriza o uso dos dados do cadastro.";
       case 2:
-        return "O essencial da sua rotina no programa cabe nesta lista. Os itens com o ícone de imagem têm print da tela real pra espiar.";
+        return "O essencial da sua rotina no programa. Escolha um item pra ver a tela onde ele acontece.";
       case 3:
         return "Aparece no seu perfil e nas duplas. Dá pra colocar depois.";
       case 4:
@@ -880,121 +901,132 @@ export function OnboardingFlow({
       }
       case 2: {
         const recursos = RECURSOS[me.role ?? "mentor_dpp"];
-        const comImg = recursos.filter((r) => r.img);
+        const ativo = recursos[recursoAtivo];
         return (
-          <div className="space-y-4">
-            <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,5fr)_minmax(0,8fr)] sm:items-start sm:gap-5">
-              <ul className="space-y-2">
-                {recursos.map((r, i) => {
-                  const ativo = !!r.img && i === recursoAtivo;
-                  const cartao = cn(
-                    "flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left outline-none transition-colors",
-                    ativo
-                      ? "border-[var(--brand-lime)] bg-[var(--brand-lime)]/10"
-                      : cn(
-                          "border-border bg-card",
-                          r.img && "hover:border-foreground/40"
-                        )
-                  );
-                  const conteudo = (
-                    <>
-                      {/* o disco lime é sinal de estado (mesma regra do
-                          CaixaSelecao): neutro no repouso, aceso no ativo */}
-                      <span
+          <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:items-start sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)]">
+            <ul className="space-y-2">
+              {recursos.map((r, i) => {
+                const aceso = !!r.img && i === recursoAtivo;
+                const painelId = `recurso-tela-${i}`;
+                const cartao = cn(
+                  "flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left outline-none transition-colors",
+                  aceso
+                    ? "border-[var(--brand-lime)] bg-[var(--brand-lime)]/10"
+                    : cn(
+                        "border-border bg-card",
+                        r.img && "hover:border-foreground/40"
+                      )
+                );
+                const conteudo = (
+                  <>
+                    {/* o disco lime é sinal de estado (mesma regra do
+                        CaixaSelecao): neutro no repouso, aceso no ativo */}
+                    <span
+                      className={cn(
+                        "grid size-10 shrink-0 place-items-center rounded-full transition-colors",
+                        aceso
+                          ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
+                          : "bg-muted text-muted-foreground"
+                      )}
+                    >
+                      <r.icon size={18} weight="fill" aria-hidden />
+                    </span>
+                    <span className="text-sm leading-snug">{r.texto}</span>
+                    {r.img && (
+                      <CaretDown
+                        size={16}
+                        aria-hidden
                         className={cn(
-                          "grid size-10 shrink-0 place-items-center rounded-full transition-colors",
-                          ativo
-                            ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
-                            : "bg-muted text-muted-foreground"
+                          "ml-auto shrink-0 text-muted-foreground transition-transform duration-300 sm:hidden",
+                          aceso && "rotate-180 text-foreground"
+                        )}
+                      />
+                    )}
+                  </>
+                );
+                return (
+                  <li key={r.texto} className="scroll-mb-28 scroll-mt-20">
+                    {r.img ? (
+                      <button
+                        type="button"
+                        onMouseEnter={() => setRecursoAtivo(i)}
+                        onFocus={() => setRecursoAtivo(i)}
+                        onClick={(e) => {
+                          setRecursoAtivo(i);
+                          // no celular o painel anterior fecha acima do
+                          // toque e o item sobe — traz ele de volta à vista
+                          // depois da animação
+                          const li = e.currentTarget.parentElement;
+                          window.setTimeout(
+                            () => li?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
+                            320
+                          );
+                        }}
+                        aria-expanded={aceso}
+                        aria-controls={painelId}
+                        className={cn(
+                          cartao,
+                          "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring/60"
                         )}
                       >
-                        <r.icon size={18} weight="fill" aria-hidden />
-                      </span>
-                      <span className="text-sm leading-snug">{r.texto}</span>
-                      {/* o printinho marca quais itens têm tela pra espiar —
-                          no ativo ele ganha tinta, reforçando a ligação */}
-                      {r.img && (
-                        <ImageSquare
-                          size={16}
-                          aria-hidden
-                          className={cn(
-                            "ml-auto shrink-0 transition-colors",
-                            ativo ? "text-foreground" : "text-muted-foreground/70"
-                          )}
-                        />
-                      )}
-                    </>
-                  );
-                  return (
-                    <li key={r.texto}>
-                      {r.img ? (
-                        <button
-                          type="button"
-                          onMouseEnter={() => setRecursoAtivo(i)}
-                          onFocus={() => setRecursoAtivo(i)}
-                          onClick={() => setRecursoAtivo(i)}
-                          aria-current={ativo || undefined}
-                          className={cn(
-                            cartao,
-                            "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring/60"
-                          )}
-                        >
-                          {conteudo}
-                        </button>
-                      ) : (
-                        <div className={cartao}>{conteudo}</div>
-                      )}
-                    </li>
-                  );
-                })}
-              </ul>
-              {/* painel com crossfade: cada recurso com print troca a tela —
-                  os itens sem print mantêm o último exibido. No mobile a
-                  moldura é retrato (order-first, acima da lista) e prefere a
-                  captura mobile do recurso; no desktop a paisagem clássica */}
-              {comImg.length > 0 && (
-                <>
-                  <MolduraTela className="order-first sm:hidden">
-                    <div className="relative aspect-[4/5]" aria-live="polite">
-                      {comImg.map((r) => (
-                        <Image
-                          key={`m-${r.img}`}
-                          src={r.imgM ?? r.img!}
-                          alt={recursos.indexOf(r) === recursoAtivo ? (r.alt ?? "") : ""}
-                          fill
-                          sizes="92vw"
-                          className={cn(
-                            "object-cover object-top transition-opacity duration-300",
-                            recursos.indexOf(r) === recursoAtivo
-                              ? "opacity-100"
-                              : "opacity-0"
-                          )}
-                        />
-                      ))}
-                    </div>
-                  </MolduraTela>
-                  <MolduraTela className="hidden sm:block">
-                    <div className="relative aspect-[8/5]" aria-live="polite">
-                      {comImg.map((r) => (
-                        <Image
-                          key={r.img}
-                          src={r.img!}
-                          alt={recursos.indexOf(r) === recursoAtivo ? (r.alt ?? "") : ""}
-                          fill
-                          sizes="(min-width: 1200px) 680px, 57vw"
-                          className={cn(
-                            "object-cover object-top transition-opacity duration-300",
-                            recursos.indexOf(r) === recursoAtivo
-                              ? "opacity-100"
-                              : "opacity-0"
-                          )}
-                        />
-                      ))}
-                    </div>
-                  </MolduraTela>
-                </>
-              )}
-            </div>
+                        {conteudo}
+                      </button>
+                    ) : (
+                      <div className={cartao}>{conteudo}</div>
+                    )}
+                    {/* celular: a tela abre logo abaixo do toque — antes o
+                        print ficava acima da lista e a troca acontecia fora
+                        da vista. Só o aberto monta a imagem */}
+                    {r.img && (
+                      <div
+                        id={painelId}
+                        className={cn(
+                          "grid transition-[grid-template-rows] duration-300 sm:hidden",
+                          aceso ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
+                        )}
+                      >
+                        <div className="overflow-hidden">
+                          {aceso && <TelaCelular src={printMobile(r.img)} alt={r.alt ?? ""} />}
+                        </div>
+                      </div>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            {/* desktop: a coluna de conteúdo da tela real ao lado, com
+                crossfade — capturada a 876px, sai perto do tamanho real */}
+            {ativo?.img && (
+              // a largura acompanha a altura da janela (24rem = header,
+              // balão e footer fixos): em 1280×720 a moldura passava do
+              // footer e a página rolava; assim a proporção do print se mantém
+              <figure className="hidden sm:sticky sm:top-20 sm:block sm:max-w-[calc((100dvh-24rem)*73/60)]">
+                <MolduraTela>
+                  <div className="relative aspect-[73/60]" aria-live="polite">
+                    {recursos.map(
+                      (r, i) =>
+                        r.img && (
+                          <Image
+                            key={r.img}
+                            src={printDesktop(r.img)}
+                            alt={i === recursoAtivo ? (r.alt ?? "") : ""}
+                            fill
+                            sizes="(min-width: 1152px) 780px, 60vw"
+                            priority={i === recursoAtivo}
+                            className={cn(
+                              "object-cover object-top transition-opacity duration-300",
+                              i === recursoAtivo ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                        )
+                    )}
+                  </div>
+                </MolduraTela>
+                <figcaption className="mt-2 px-1 text-xs text-muted-foreground">
+                  {ativo.alt}
+                </figcaption>
+              </figure>
+            )}
           </div>
         );
       }
