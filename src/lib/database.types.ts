@@ -2678,6 +2678,216 @@ export type Database = {
         }
         Relationships: []
       }
+      ia_confirmacoes: {
+        Row: {
+          args: Json
+          args_hash: string
+          consumido_em: string | null
+          criado_em: string
+          expira_em: string
+          id: string
+          profile_id: string
+          resumo: string
+          tool: string
+        }
+        Insert: {
+          args: Json
+          args_hash: string
+          consumido_em?: string | null
+          criado_em?: string
+          expira_em?: string
+          id?: string
+          profile_id: string
+          resumo: string
+          tool: string
+        }
+        Update: {
+          args?: Json
+          args_hash?: string
+          consumido_em?: string | null
+          criado_em?: string
+          expira_em?: string
+          id?: string
+          profile_id?: string
+          resumo?: string
+          tool?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ia_confirmacoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_confirmacoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_confirmacoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_confirmacoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ia_eval_itens: {
+        Row: {
+          caso_id: string
+          custo_usd: number | null
+          detalhe: string | null
+          executado_em: string | null
+          id: string
+          latencia_ms: number | null
+          modelo: string
+          modelo_usado: string | null
+          msg: string
+          pagina: string | null
+          repeticao: number
+          request_id: string | null
+          resposta_trecho: string | null
+          rubrica: Json | null
+          run_id: string
+          status: string
+          tokens_in: number | null
+          tokens_out: number | null
+          tools_usadas: string[] | null
+        }
+        Insert: {
+          caso_id: string
+          custo_usd?: number | null
+          detalhe?: string | null
+          executado_em?: string | null
+          id?: string
+          latencia_ms?: number | null
+          modelo: string
+          modelo_usado?: string | null
+          msg: string
+          pagina?: string | null
+          repeticao: number
+          request_id?: string | null
+          resposta_trecho?: string | null
+          rubrica?: Json | null
+          run_id: string
+          status?: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+          tools_usadas?: string[] | null
+        }
+        Update: {
+          caso_id?: string
+          custo_usd?: number | null
+          detalhe?: string | null
+          executado_em?: string | null
+          id?: string
+          latencia_ms?: number | null
+          modelo?: string
+          modelo_usado?: string | null
+          msg?: string
+          pagina?: string | null
+          repeticao?: number
+          request_id?: string | null
+          resposta_trecho?: string | null
+          rubrica?: Json | null
+          run_id?: string
+          status?: string
+          tokens_in?: number | null
+          tokens_out?: number | null
+          tools_usadas?: string[] | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ia_eval_itens_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "ia_eval_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ia_eval_runs: {
+        Row: {
+          ambiente: string
+          casos: Json
+          created_at: string
+          created_by: string
+          erro: string | null
+          id: string
+          modelos: string[]
+          papel: string
+          repeticoes: number
+          resumo: Json | null
+          status: string
+        }
+        Insert: {
+          ambiente: string
+          casos: Json
+          created_at?: string
+          created_by: string
+          erro?: string | null
+          id?: string
+          modelos: string[]
+          papel: string
+          repeticoes: number
+          resumo?: Json | null
+          status?: string
+        }
+        Update: {
+          ambiente?: string
+          casos?: Json
+          created_at?: string
+          created_by?: string
+          erro?: string | null
+          id?: string
+          modelos?: string[]
+          papel?: string
+          repeticoes?: number
+          resumo?: Json | null
+          status?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ia_eval_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_eval_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_eval_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_eval_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ia_eventos: {
         Row: {
           allowance_usd: number | null
@@ -5460,12 +5670,15 @@ export type Database = {
           dupla_dpp_id: string | null
           dupla_id: string | null
           especialista_desejado_id: string | null
+          especialista_desejado_nome: string | null
           especialista_id: string | null
           especialista_nome: string | null
+          especialista_nome_social: string | null
           id: string | null
           justificativa_recusa: string | null
           mentorado_id: string | null
           mentorado_nome: string | null
+          mentorado_nome_social: string | null
           motivo: string | null
           origem: string | null
           respondida_em: string | null
@@ -5887,6 +6100,14 @@ export type Database = {
             }
             Returns: boolean
           }
+      ia_confirmacao_consumir: {
+        Args: { p_args: Json; p_id: string; p_tool: string }
+        Returns: string
+      }
+      ia_confirmacao_criar: {
+        Args: { p_args: Json; p_resumo: string; p_tool: string }
+        Returns: string
+      }
       ia_contexto_e_limite: {
         Args: { p_args?: Json; p_canal?: string; p_limite?: number }
         Returns: {
@@ -5898,6 +6119,38 @@ export type Database = {
           usados: number
         }[]
       }
+      ia_eval_limpar: { Args: { p_run?: string }; Returns: number }
+      ia_eval_pegar_item: {
+        Args: { p_run: string }
+        Returns: {
+          caso_id: string
+          custo_usd: number | null
+          detalhe: string | null
+          executado_em: string | null
+          id: string
+          latencia_ms: number | null
+          modelo: string
+          modelo_usado: string | null
+          msg: string
+          pagina: string | null
+          repeticao: number
+          request_id: string | null
+          resposta_trecho: string | null
+          rubrica: Json | null
+          run_id: string
+          status: string
+          tokens_in: number | null
+          tokens_out: number | null
+          tools_usadas: string[] | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "ia_eval_itens"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      ia_eventos_limpar: { Args: never; Returns: number }
       ia_mcp_autorizar: {
         Args: { p_token: string }
         Returns: {
