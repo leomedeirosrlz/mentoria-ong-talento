@@ -203,7 +203,7 @@ function Fechamento({
           <Button variant="outline" size="sm" onClick={onVerFalhas}>
             Ver só as falhas
           </Button>
-          <Button size="sm" onClick={onReexecutar} disabled={reexecutando}>
+          <Button variant="outline" size="sm" onClick={onReexecutar} disabled={reexecutando}>
             <ArrowsClockwise
               aria-hidden
               className={reexecutando ? "animate-spin" : undefined}
@@ -579,6 +579,7 @@ export function DetalheRun({
               run.status !== "concluido" && (
                 <Button
                   type="button"
+                  variant="outline"
                   size="sm"
                   onClick={onContinuar}
                   disabled={bloqueado}
@@ -590,7 +591,10 @@ export function DetalheRun({
                 </Button>
               )
             )}
-            {!driving && (stats.falhas > 0 || stats.erros > 0) && (
+            {/* zombie 'rodando' (driver died in another tab) has no other
+                path back to the queue — the PATCH requeues it too */}
+            {!driving &&
+              (stats.falhas > 0 || stats.erros > 0 || stats.rodando > 0) && (
               <Button
                 type="button"
                 variant="outline"
@@ -602,7 +606,9 @@ export function DetalheRun({
                   aria-hidden
                   className={reexecutando ? "animate-spin" : undefined}
                 />
-                Reexecutar falhas
+                {stats.falhas > 0 || stats.erros > 0
+                  ? "Reexecutar falhas"
+                  : "Retomar fila"}
               </Button>
             )}
             <DropdownMenu>

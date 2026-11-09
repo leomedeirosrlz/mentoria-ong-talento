@@ -85,6 +85,23 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
   const parar = useRef(false);
   // ref twin of `driving`: the loop body reads it, the state renders it
   const dirigindo = useRef<string | null>(null);
+  // mount guard — the drive loop must stop spending when the component
+  // unmounts (aba switch, navigation), not just on pause
+  const montado = useRef(true);
+  // ref mirror of the open detail id: the loop's `finally` reads it to
+  // decide whether revalidating this run's detail is still what the user
+  // sees (stale-closure-safe, unlike the `detalhe` state)
+  const detalheId = useRef<string | null>(null);
+
+  useEffect(() => {
+    montado.current = true;
+    return () => {
+      montado.current = false;
+    };
+  }, []);
+  useEffect(() => {
+    detalheId.current = detalhe?.run.id ?? null;
+  }, [detalhe]);
 
   // ?eval=<id> via replaceState — never router.push (no server re-render)
   const escreverEvalUrl = useCallback((id: string | null) => {
@@ -192,9 +209,9 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
   );
 
   /** The drive loop: one POST per item until the queue empties — pausable
-   *  (parar ref between iterations) and resumable. `?proximo` marks the
-   *  exact in-flight cell before the claim, then the item payload patches
-   *  the state (no refetch per item). */
+   *  (parar ref between iterations), resumable and bound to mount: leaving
+   *  the tab/page must stop the spend, and finishing must not yank the URL
+   *  or reopen a detail the user closed or swapped mid-drive. */
   const dirigir = useCallback(
     async (runId: string) => {
       if (dirigindo.current) return;
@@ -203,9 +220,10 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
       setDriving(runId);
       setFechado(null);
       setFeed([]);
+      let errosSeguidos = 0;
       try {
         for (;;) {
-          if (parar.current) break;
+          if (parar.current || !montado.current) break;
           let prox: ProximoItem | null = null;
           try {
             const rp = await fetch(`/api/ia/evals?proximo=${runId}`);
@@ -213,7 +231,7 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
           } catch {
             /* optimism is best-effort — the POST below still drives */
           }
-          if (parar.current) break;
+          if (parar.current || !montado.current) break;
           setAtual(prox);
           if (prox) {
             const pid = prox.id;
@@ -228,11 +246,17 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
                 : d
             );
           }
-          const r = await fetch("/api/ia/evals/executar", {
-            method: "POST",
-            headers: { "content-type": "application/json" },
-            body: JSON.stringify({ run_id: runId }),
-          });
+          let r: Response;
+          try {
+            r = await fetch("/api/ia/evals/executar", {
+              method: "POST",
+              headers: { "content-type": "application/json" },
+              body: JSON.stringify({ run_id: runId }),
+            });
+          } catch {
+            setErro("Falha de rede ao executar o item. Tente continuar de novo.");
+            break;
+          }
           const j = await r.json().catch(() => ({}));
           if (!r.ok) {
             setErro(j.error ?? "falha ao executar item");
@@ -240,6 +264,10 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
           }
           if (j.item?.id) {
             const pronto = j.item as Partial<Item> & { id: string };
+            // circuit breaker: systemic failure (missing EVAL_* env, chat
+            // down) turns every item into 'erro' — stop before the whole
+            // queue burns through it one request at a time
+            errosSeguidos = pronto.status === "erro" ? errosSeguidos + 1 : 0;
             setFeed((f) =>
               [pronto as Item, ...f.filter((x) => x.id !== pronto.id)].slice(0, 6)
             );
@@ -254,6 +282,12 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
                 : d
             );
           }
+          if (errosSeguidos >= 3) {
+            setErro(
+              "Três falhas seguidas de infra — o run pausou. Confira as credenciais do eval e retome."
+            );
+            break;
+          }
           if (j.feito) {
             setFechado(runId);
             break;
@@ -261,10 +295,14 @@ export function IaEvals({ modelosSugeridos }: { modelosSugeridos: string[] }) {
         }
       } finally {
         dirigindo.current = null;
-        setDriving(null);
-        setAtual(null);
-        void carregarDetalhe(runId);
-        void carregarRuns();
+        if (montado.current) {
+          setDriving(null);
+          setAtual(null);
+          // só revalida o detalhe se o usuário continua olhando ESTE run —
+          // fechar ou abrir outro no meio do drive tem que valer
+          if (detalheId.current === runId) void carregarDetalhe(runId);
+          void carregarRuns();
+        }
       }
     },
     [carregarDetalhe, carregarRuns]

@@ -17,8 +17,8 @@ import {
   type Item,
 } from "./tipos";
 
-/** Bolha de resposta com a gramática do chat da Liza (arredondamento +
- *  sombra do assistente), reduzida pro contexto do dossiê. */
+/** Answer bubble with the Liza chat grammar (assistant rounding +
+ *  shadow), reduced for the dossier context. */
 function BolhaLiza({ item }: { item: Item }) {
   if (item.status === "rodando") {
     return (
@@ -75,8 +75,8 @@ function IconeAssert({ ok }: { ok: boolean | null }) {
   );
 }
 
-/** Dossiê de um item: usado dentro da linha expandida da matriz e nos
- *  cards mobile. `latMedia` (ms) contextualiza a latência do item. */
+/** Item dossier: used inside the matrix's expanded row and in the mobile
+ *  cards. `latMedia` (ms) contextualizes the item's latency. */
 export function DossieItem({
   item,
   latMedia,

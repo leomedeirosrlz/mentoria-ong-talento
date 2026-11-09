@@ -1,7 +1,7 @@
-// DELETE /api/ia/eventos — zera os indicadores do painel /ia (ia_eventos
-// inteiro: mensagens, tools e respostas de todos os canais). Coord-only
-// igual à página; a escrita em si é a RPC definer ia_eventos_limpar (0166)
-// porque a tabela é select-only pra authenticated.
+// DELETE /api/ia/eventos — wipes the /ia panel indicators (all of
+// ia_eventos: messages, tools and answers from every channel). Coord-only
+// like the page; the write itself is the definer RPC ia_eventos_limpar
+// (0166) because the table is select-only for authenticated.
 
 import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";

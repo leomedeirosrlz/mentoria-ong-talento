@@ -336,6 +336,7 @@ export async function executarProximoItem(
     uso = data;
   }
 
+  const executadoEm = new Date().toISOString();
   const { error: eUp } = await supabase
     .from("ia_eval_itens")
     .update({
@@ -349,7 +350,7 @@ export async function executarProximoItem(
       modelo_usado: uso?.modelo ?? null,
       tools_usadas: tools,
       resposta_trecho: trecho,
-      executado_em: new Date().toISOString(),
+      executado_em: executadoEm,
     })
     .eq("id", it.id);
   if (eUp) throw new Error(eUp.message);
@@ -372,6 +373,7 @@ export async function executarProximoItem(
       modelo_usado: uso?.modelo ?? null,
       tools_usadas: tools,
       resposta_trecho: trecho,
+      executado_em: executadoEm,
     },
   };
 }

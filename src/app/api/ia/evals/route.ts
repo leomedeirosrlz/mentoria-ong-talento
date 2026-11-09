@@ -121,10 +121,10 @@ export async function POST(req: Request) {
   }
 }
 
-/** ?run=<id> apaga um run; sem param limpa o histórico inteiro — itens
- *  caem pelo cascade na RPC ia_eval_limpar (0166). Os indicadores do
- *  painel saem por outro botão (DELETE /api/ia/eventos): limpezas
- *  independentes, por decisão da coordenação. */
+/** ?run=<id> deletes one run; no param wipes the whole history — items
+ *  cascade inside the ia_eval_limpar RPC (0166). Panel indicators go
+ *  through a different button (DELETE /api/ia/eventos): independent
+ *  wipes, by coordination's decision. */
 export async function DELETE(req: Request) {
   const supabase = await createClient();
   const g = await gateCoord(supabase);
@@ -132,6 +132,9 @@ export async function DELETE(req: Request) {
     return jsonErro("Sessão expirada. Entre de novo.", 401);
   if (!g.ok) return jsonErro("Área da coordenação.", 403);
   const runId = new URL(req.url).searchParams.get("run");
+  if (runId && !z.string().uuid().safeParse(runId).success) {
+    return jsonErro("Run inválido.", 400);
+  }
   const { data: apagados, error } = await supabase.rpc("ia_eval_limpar", {
     p_run: runId,
   });
@@ -141,10 +144,10 @@ export async function DELETE(req: Request) {
 
 const ReagendarBody = z.object({ run_id: z.string().uuid() }).strict();
 
-/** PATCH {run_id} — reagenda os itens falhos/travados do run pra fila:
- *  falhou/erro (e rodando zumbi de sessão morta) voltam a 'pendente' com
- *  o resultado limpo, e o run reabre como 'rodando' pro laço retomar.
- *  Update direto — a policy `for all` de coord já cobre (0164). */
+/** PATCH {run_id} — requeues the run's failed/stuck items: falhou/erro
+ *  (and zombie rodando from a dead session) go back to 'pendente' with
+ *  cleared results, and the run reopens as 'rodando' for the loop to
+ *  resume. Direct update — coord's `for all` policy already covers (0164). */
 export async function PATCH(req: Request) {
   const supabase = await createClient();
   const g = await gateCoord(supabase);

@@ -1560,7 +1560,7 @@ export function AssistenteConversa({
 
       {/* composer — pb com safe-area: no Sheet mobile o composer não cola
           na home indicator */}
-      <div className="space-y-2 border-t border-border/60 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+      <div className="space-y-2 border-t border-border/60 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
         {!configurado && !demo ? (
           <Card className="px-4 py-3 text-sm text-muted-foreground">
             A Liza está indisponível no momento. Tente de novo em instantes.

@@ -1,10 +1,10 @@
 "use client";
 
-// Botão do header do /ia: zera ia_eventos (os indicadores de todos os
-// gráficos e listas) via DELETE /api/ia/eventos. O painel é server-render,
-// então o sucesso dá router.refresh() pros números recomporem do zero.
-// Limpeza separada do histórico de evals por decisão — apagar runs não
-// mexe aqui, e este botão não mexe nos runs.
+// Header button of /ia: wipes ia_eventos (every chart's indicators) via
+// DELETE /api/ia/eventos. The panel is server-rendered, so success calls
+// router.refresh() to recompose from zero. Separate from the evals
+// history wipe by decision — deleting runs doesn't touch this, and this
+// button doesn't touch runs.
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";

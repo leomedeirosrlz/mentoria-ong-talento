@@ -558,10 +558,13 @@ export default async function IaPage({
   const demo = await demoAtivo();
   const { dias: dP, canal: cP, modelo: mP, aba: abaP, eval: evalP } =
     await searchParams;
-  // evals moram na própria aba (observabilidade ≠ engenharia); ?eval=<id>
-  // sem aba é deep-link antigo e abre direto na aba de evals
+  // evals live on their own tab (observability ≠ engineering); ?eval=<id>
+  // without aba is a legacy deep link and opens straight on the evals
+  // tab. In demo the evals API 401s (no session) — the tab hides instead
+  // of rendering an eternal skeleton
   const aba =
-    abaP === "evals" || (!abaP && typeof evalP === "string" && evalP)
+    !demo &&
+    (abaP === "evals" || (!abaP && typeof evalP === "string" && evalP))
       ? "evals"
       : "uso";
   const dias = DIAS_OPCOES.includes(Number(dP) as (typeof DIAS_OPCOES)[number])
@@ -647,9 +650,9 @@ export default async function IaPage({
   const periodoTxt = `${dias === 1 ? "nas últimas 24 horas" : `nos últimos ${dias} dias`}${porSemana ? ", por semana" : ""}`;
   const unidadeTempo = porSemana ? "Semana" : "Dia";
   const vazio = uso.requisicoes === 0;
-  // modelo gratuito (beam-free etc): a série do plano é zero em tudo e o
-  // gráfico vira uma linha morta em US$ 0 — o estado vazio compacto informa
-  // mais e devolve a área nobre
+  // free model (beam-free etc): the plan series is all-zero and the
+  // chart becomes a dead US$ 0 line — a compact empty state says more
+  // and gives the prime area back
   const custoZerado =
     !vazio && uso.pontos.every((p) => !p.planoPorReq);
   const chaveRecorte = `${dias}|${canal}|${modelo ?? ""}`;
@@ -679,8 +682,8 @@ export default async function IaPage({
             : "Grade de avaliações: casos reais × modelos × repetições contra o chat"
         }
         actions={
-          // as ações do cabeçalho são da superfície de uso — na aba de
-          // evals os controles moram dentro do painel dela
+          // header actions belong to the usage surface — on the evals
+          // tab the controls live inside its own panel
           aba === "uso" ? (
             <div className="flex items-center gap-1">
             {/* demo não tem ia_eventos reais pra limpar — a rota daria 401 */}
@@ -718,7 +721,7 @@ export default async function IaPage({
       <AbasAgenda
         abas={[
           { id: "uso", rotulo: "Uso", href: params({ dias, canal, modelo }) },
-          { id: "evals", rotulo: "Evals", href: "/ia?aba=evals" },
+          ...(demo ? [] : [{ id: "evals", rotulo: "Evals", href: "/ia?aba=evals" }]),
         ]}
         ativa={aba}
         painelId="painel-ia"

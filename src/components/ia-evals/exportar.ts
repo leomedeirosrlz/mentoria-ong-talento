@@ -25,10 +25,12 @@ export function evalJson(run: RunDetalhe, itens: Item[]): string {
 }
 
 // RFC 4180: wrap in quotes when the field carries separators, double the
-// quotes inside
+// quotes inside. A leading =+-@ would evaluate as a formula when the csv
+// opens in a spreadsheet — prefix a quote to disarm it
 const csvCampo = (v: string | number | null | undefined) => {
   const s = v == null ? "" : String(v);
-  return /[";,\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  const safe = /^[\t ]*[=+\-@]/.test(s) ? `'${s}` : s;
+  return /[";,\n\r]/.test(safe) ? `"${safe.replace(/"/g, '""')}"` : safe;
 };
 
 export function evalCsv(run: RunDetalhe, itens: Item[]): string {
@@ -131,7 +133,7 @@ export function evalMarkdown(run: RunDetalhe, itens: Item[]): string {
     "| --- | " + run.modelos.map(() => "---").join(" | ") + " |",
     ...casos.map(
       ([id, msg]) =>
-        `| ${msg.replace(/\|/g, "\\|")} | ${run.modelos
+        `| ${msg.replace(/\s+/g, " ").replace(/\|/g, "\\|")} | ${run.modelos
           .map((m) => celula(id, m) || "·")
           .join(" | ")} |`,
     ),
@@ -145,8 +147,11 @@ export function evalMarkdown(run: RunDetalhe, itens: Item[]): string {
       linhas.push(
         `- **${i.caso_id}** · ${i.modelo} rep ${i.repeticao} · ${STATUS_ITEM[i.status].rotulo} · ${ms(i.latencia_ms)}`,
       );
-      if (i.detalhe) linhas.push(`  - ${i.detalhe}`);
-      if (i.resposta_trecho) linhas.push(`  - > ${i.resposta_trecho}`);
+      // collapse newlines — one bullet must stay one line or it breaks
+      // out of the list block
+      if (i.detalhe) linhas.push(`  - ${i.detalhe.replace(/\s+/g, " ")}`);
+      if (i.resposta_trecho)
+        linhas.push(`  - > ${i.resposta_trecho.replace(/\s+/g, " ")}`);
     }
   }
   return `${linhas.join("\n")}\n`;

@@ -626,6 +626,7 @@ export function MatrizCasos({
                         <button
                           type="button"
                           aria-expanded={expandida}
+                          aria-controls={expandida ? `${painelId}-m` : undefined}
                           onClick={() =>
                             setAberto(
                               expandida ? null : { caso: c.id, modelo: m }

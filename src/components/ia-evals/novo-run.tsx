@@ -17,6 +17,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { filterChipCls } from "@/components/ui/filter-chip";
 import {
   Popover,
   PopoverContent,
@@ -49,24 +50,24 @@ const MAX_PREVIEW_LINHAS = 12;
 function Chip({
   ativo,
   onClick,
+  acao,
   children,
 }: {
   ativo?: boolean;
   onClick?: () => void;
+  /** action chips (e.g. "Remover x") announce the action, not a toggle */
+  acao?: string;
   children: React.ReactNode;
 }) {
   return (
-    <Button
+    <button
       type="button"
-      variant={ativo ? "default" : "outline"}
+      {...(acao ? { "aria-label": acao } : { "aria-pressed": !!ativo })}
       onClick={onClick}
-      className={cn(
-        "min-h-11 rounded-full px-3 text-xs sm:min-h-7",
-        !ativo && "hover:bg-muted"
-      )}
+      className={cn(filterChipCls(!!ativo), "px-3 text-xs sm:min-h-7")}
     >
       {children}
-    </Button>
+    </button>
   );
 }
 
@@ -259,6 +260,7 @@ export function NovoRunDialog({
           <div className="space-y-1.5">
             <Rotulo>Repetições por caso</Rotulo>
             <Input
+              aria-label="Repetições por caso"
               type="number"
               min={1}
               max={10}
@@ -283,6 +285,7 @@ export function NovoRunDialog({
               <Chip
                 key={m}
                 ativo
+                acao={`Remover ${m}`}
                 onClick={() =>
                   set({ modelos: form.modelos.filter((x) => x !== m) })
                 }
@@ -291,6 +294,7 @@ export function NovoRunDialog({
               </Chip>
             ))}
             <Input
+              aria-label="Adicionar modelo"
               value={form.modeloInput}
               onChange={(e) => set({ modeloInput: e.target.value })}
               onKeyDown={(e) => {
