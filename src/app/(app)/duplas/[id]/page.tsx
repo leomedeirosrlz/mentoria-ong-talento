@@ -50,7 +50,7 @@ import {
 import { getFormularios, getInstrumentosDaDupla } from "@/lib/forms/queries";
 import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
 import { getPdmDaDupla, getPdmResumo } from "@/lib/queries-pdm";
-import { dadosResumoJornada } from "@/lib/encerramento";
+import { dadosResumoJornada, encerramentoDecidido } from "@/lib/encerramento";
 import { getAnexosPorRegistros } from "@/lib/anexos";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -509,13 +509,15 @@ export default async function DuplaPage({
   // relatório vazio
   const mostrarResumo =
     resumoJornada.realizados > 0 ||
-    !!encerramento?.tipo ||
+    encerramentoDecidido(encerramento) ||
     !!dupla.encerrada_em;
 
   // concluída pelo automático (0102) com o rito ainda pendente — o mentor
   // segue podendo mexer no registro do último encontro e nos anexos dele
   const ritoPendente =
-    dupla.status === "concluida" && encerramento != null && !encerramento.tipo;
+    dupla.status === "concluida" &&
+    encerramento != null &&
+    !encerramentoDecidido(encerramento);
 
   // "reta final" e fechamento: a aba Agora carrega o encerramento só quando a
   // dupla chegou ao fim (penúltimo encontro feito ou já fechada). Fora disso

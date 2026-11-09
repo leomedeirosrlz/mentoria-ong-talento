@@ -898,8 +898,9 @@ export type Encerramento = {
   id: string;
   dupla_id: string;
   /** 'concluida' = jornada completa · 'encerrada' = fechamento antecipado ·
-   *  null = rito aberto (último encontro já concluiu, decisão pendente). */
-  tipo: "concluida" | "encerrada" | null;
+   *  'pendente' = rito aberto (último encontro já concluiu, decisão pendente;
+   *  0156 trocou o NULL por valor explícito). */
+  tipo: "concluida" | "encerrada" | "pendente";
   checklist: EncerramentoChecklist;
   /** Snapshot gerado dos dados da jornada no momento do fechamento. */
   resumo_jornada: string | null;

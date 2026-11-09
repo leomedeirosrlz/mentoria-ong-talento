@@ -60,7 +60,7 @@ export const getEncerramentosPendentes = cache(
     const { data, error } = await supabase
       .from("encerramentos")
       .select("dupla_id")
-      .is("tipo", null);
+      .eq("tipo", "pendente");
     if (error) {
       console.error("getEncerramentosPendentes:", error);
       return [];
