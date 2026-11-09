@@ -64,6 +64,13 @@ describe("extrairAcoes", () => {
     expect(acoes).toEqual([{ rotulo: "ficha", href: "/duplas/1" }]);
   });
 
+  it("'//host' e '/\\host' passam no regex mas são externos — fora", () => {
+    const acoes = extrairAcoes(
+      "[ver](//evil.com) [ver](/\\evil.com) [ficha](/duplas/1)"
+    );
+    expect(acoes).toEqual([{ rotulo: "ficha", href: "/duplas/1" }]);
+  });
+
   it("limita em 3 ações", () => {
     const acoes = extrairAcoes(
       "[a](/1) [b](/2) [c](/3) [d](/4) [e](/5)"

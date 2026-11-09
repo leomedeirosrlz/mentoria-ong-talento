@@ -25,7 +25,7 @@ import {
 } from "@/lib/ia/render";
 import { BlocoSkeleton, BlocoView } from "@/components/assistente-blocos";
 import { CodeBlock } from "@/components/assistente-genui";
-import { cn } from "@/lib/utils";
+import { cn, pathInterno } from "@/lib/utils";
 
 export type Analise = ReturnType<typeof extrairBlocos>;
 
@@ -131,7 +131,7 @@ export function Inline({ texto, animar }: { texto: string; animar?: boolean }) {
           // interno vai por next/link: navegação SPA mantém o fetch do
           // stream vivo; <a> puro dava full nav e matava a resposta
           // (REALIZA-332)
-          if (href.startsWith("/"))
+          if (pathInterno(href))
             return (
               <Link key={i} href={href} className={LINK_CLS}>
                 {animar ? <Tokens texto={rotulo} /> : rotulo}
