@@ -1199,13 +1199,15 @@ export function resumoSemana(
  *  consomem (um encontro pertence a uma dupla, mas a leitura é por encontro). */
 export type ItemEncontroDupla = { encontro: Encontro; dupla: Dupla };
 
-/** "Limbo": agendado cuja data já passou e ainda não tem registro — pode ter
- *  rolado ou não; a ambiguidade exige ação do mentor (registrar, remarcar ou
- *  marcar não-aconteceu), então conta como pendência de registro, não atraso.
- *  Única definição — semáforo, trilha e agenda liam a mesma regra duplicada. */
+/** "Limbo": encontro em aberto (agendado ou remarcado — status legado que
+ *  nenhum fluxo grava mais, mas row importada existe) cuja data já passou e
+ *  ainda não tem registro — pode ter rolado ou não; a ambiguidade exige ação
+ *  do mentor (registrar, remarcar ou marcar não-aconteceu), então conta como
+ *  pendência de registro, não atraso. Única definição — semáforo, trilha,
+ *  agenda e ficha liam a mesma regra. */
 export function emLimbo(e: Encontro, agoraMs: number): boolean {
   return (
-    e.status === "agendado" &&
+    (e.status === "agendado" || e.status === "remarcado") &&
     !e.registro &&
     e.data_hora != null &&
     new Date(e.data_hora).getTime() < agoraMs
@@ -1360,7 +1362,12 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
       [...limbo].filter((n) => numerosEsperados.has(n)).length;
   const proximo =
     dupla.encontros
-      .filter((e) => e.status === "agendado" && e.data_hora && new Date(e.data_hora) >= hoje)
+      .filter(
+        (e) =>
+          (e.status === "agendado" || e.status === "remarcado") &&
+          e.data_hora &&
+          new Date(e.data_hora) >= hoje
+      )
       .sort((a, b) => new Date(a.data_hora!).getTime() - new Date(b.data_hora!).getTime())[0] ??
     null;
 
@@ -1534,7 +1541,7 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
   if (pendencia) {
     const quando = pendencia.realizado_em ?? pendencia.data_hora;
     sinais.push(
-      pendencia.status === "agendado"
+      pendencia.status === "agendado" || pendencia.status === "remarcado"
         ? {
             tipo: "limbo",
             tom: "atencao",
@@ -1707,7 +1714,14 @@ export function alvoAgendamento(
     const numerosFeitos = new Set(
       dupla.encontros.filter((e) => e.status === "realizado").map((e) => e.numero)
     );
-    let primeiroFaltante = 1;
+    // piso = 1º evento oficial após a entrada da dupla (a mesma régua dos
+    // faltantes abaixo): dupla que entra a meio do ciclo não tem "1º
+    // faltante" — sugerir o nº1 mintava uma row fantasma no passado
+    const inicio = dupla.iniciada_em;
+    let primeiroFaltante = inicio
+      ? (encontroEventos.find((e) => e.numero != null && e.data >= inicio)
+          ?.numero ?? total)
+      : 1;
     while (numerosFeitos.has(primeiroFaltante)) primeiroFaltante++;
     proximoNumero = saude.proximo?.numero ?? Math.min(primeiroFaltante, total);
     // a row real desse número é o que o dialog edita; saude.proximo só cobre

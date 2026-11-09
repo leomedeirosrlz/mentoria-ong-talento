@@ -184,6 +184,20 @@ describe("UiCard: conteúdo", () => {
     expect(out).toContain("Ver minha jornada");
   });
 
+  it("dupla encerrada do jovem lê 'Encerrada', nunca 'Desistente'", () => {
+    // na voz do jovem a encerrada é neutra — "desistente" é vocabulário
+    // interno da equipe, que segue vendo o rótulo de sempre
+    const encerrada = {
+      ...(de("dupla") as Extract<UiBloco, { kind: "dupla" }>),
+      status: "encerrada" as const,
+    };
+    const jovem = { ...encerrada };
+    delete jovem.semaforo;
+    expect(html(jovem)).toContain("Encerrada");
+    expect(html(jovem)).not.toContain("Desistente");
+    expect(html(encerrada)).toContain("Desistente");
+  });
+
   it("agenda agrupa por dia (Hoje) e deixa sem data no fim", () => {
     const out = html(de("agenda"));
     expect(out).toContain("Hoje");
@@ -204,14 +218,15 @@ describe("UiCard: conteúdo", () => {
     expect(html(de("fila"))).toContain("Nenhum mentor com vaga livre");
     expect(html(de("capacidade"))).toContain("Sem vaga");
     expect(html(de("pessoas"))).toContain("Mentor DPP");
-    expect(html(de("chamados"))).toContain("CHA-000012");
+    // número CHA não aparece no card — assunto + categoria + status bastam
+    expect(html(de("chamados"))).toContain("Remarcar encontro");
     expect(html(de("chamados"))).toContain("ontem");
     const inst = html(de("instrumentos"));
     expect(inst).toContain("1 de 3 respondidos");
     expect(inst).toContain("Aguardando resposta");
     expect(inst).toContain("Não enviado");
     const fontes = html(de("fontes"));
-    expect(fontes).toContain("Instrumento: Definindo Minhas Metas");
+    expect(fontes).toContain("Definindo Minhas Metas");
     expect(fontes).toContain("Metas SMART");
     // a referência citável é guia + seção: "pág." do banco era o id do
     // chunk e lia como página inexistente no documento

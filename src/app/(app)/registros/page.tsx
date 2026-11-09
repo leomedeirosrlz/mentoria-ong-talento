@@ -108,7 +108,10 @@ function duplaDoBloco(
 ): { mentor: string; mentorado: string } | null {
   const d = itens[0]?.encontro?.dupla;
   return d?.mentor && d?.mentorado
-    ? { mentor: d.mentor.nome, mentorado: d.mentorado.nome }
+    ? {
+        mentor: d.mentor.nome_social ?? d.mentor.nome,
+        mentorado: d.mentorado.nome_social ?? d.mentorado.nome,
+      }
     : null;
 }
 

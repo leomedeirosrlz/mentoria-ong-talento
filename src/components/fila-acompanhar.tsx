@@ -277,8 +277,8 @@ function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
             duplaId={item.duplaId}
             destNome={
               linha.destino === "mentorado"
-                ? linha.mentorado.nome
-                : (linha.mentor?.nome ?? "mentor")
+                ? (linha.mentorado.nome_social ?? linha.mentorado.nome)
+                : (linha.mentor?.nome_social ?? linha.mentor?.nome ?? "mentor")
             }
             telefone={telefone}
             mensagem={lembrete.corpo}
@@ -317,7 +317,7 @@ function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
         />
       }
       fichaHref={`/duplas/${item.duplaId}`}
-      fichaNome={linha.mentorado.nome.split(" ")[0]}
+      fichaNome={(linha.mentorado.nome_social ?? linha.mentorado.nome).split(" ")[0]}
     />
   );
 }

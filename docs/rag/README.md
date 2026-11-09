@@ -45,19 +45,24 @@ origem: <de onde o texto saiu + o que fazer quando divergir>
 
 | arquivo | guia | material (slug de citação) | natureza |
 |---|---|---|---|
-| `guia-mentor-dpp.md` | `guia-mentor-dpp` | `guia-mentor-dpp` (PDF) | consolidado |
-| `guia-mentor-especialista.md` | `guia-mentor-especialista` | `guia-mentor-especialista` (PDF) | consolidado |
-| `ciclo-2026-2027.md` | `ciclo-cronograma` | `ciclo-cronograma` (PDF "Cronograma do programa — Turma 1") | transcrito |
-| `ciclo-turma2-2026-2027.md` | `ciclo-turma2-cronograma` | `ciclo-turma2-cronograma` (PDF "Cronograma do programa — Turma 2") | transcrito |
+| `guia-mentor-dpp.md` | `guia-mentor-dpp` | `guia-mentor-dpp` | consolidado |
+| `guia-mentor-especialista.md` | `guia-mentor-especialista` | `guia-mentor-especialista` | consolidado |
 | `plataforma-e-operacao.md` | `plataforma-e-operacao` | `plataforma-e-operacao` | sintese-operacional |
-| `roteiros-encontros-11-16.md` | `roteiros-encontros-11-16` | `roteiros-encontros-11-16` (6 PDFs) | sintese-operacional |
-| `perguntas-eficazes.md` | `perguntas-eficazes` | `perguntas-eficazes` (PDF) | sintese-operacional |
-| `feedback-construtivo.md` | `feedback-construtivo` | `feedback-construtivo` (doc nativo) | transcrito |
-| `checklist-competencias.md` | `checklist-competencias` | `checklist-competencias` (doc nativo) | transcrito |
-| `mensagem-preparacao.md` | `mensagem-preparacao` | `mensagem-preparacao` (doc nativo) | transcrito |
-| `mensagem-indicadas.md` | `mensagem-indicadas` | `mensagem-indicadas` (doc nativo) | transcrito |
-| `mensagem-encaminhamento.md` | `mensagem-encaminhamento` | `mensagem-encaminhamento` (doc nativo) | transcrito |
-| `instrumento-definindo-minhas-metas.md` | `instrumento-definindo-minhas-metas` | `instrumento-definindo-minhas-metas` (PDF) | transcrito |
+| `ciclo-2026-2027.md` | `ciclo-cronograma` | `ciclo-cronograma` | consolidado |
+| `ciclo-turma2-2026-2027.md` | `ciclo-turma2-cronograma` | `ciclo-turma2-cronograma` | consolidado |
+| `roteiro-encontro-01.md` … `roteiro-encontro-16.md` | `roteiro-encontro-NN` | `roteiro-encontro-NN` (PDF "Roteiro Semana N") | consolidado |
+| `instrumento-roda-da-vida.md` | `instrumento-roda-da-vida` | `instrumento-roda-da-vida` | consolidado |
+| `instrumento-pdm.md` | `instrumento-pdm` | `instrumento-pdm` | consolidado |
+| `instrumento-construindo-visao.md` | `instrumento-construindo-visao` | `instrumento-construindo-visao` | consolidado |
+| `instrumento-definindo-minhas-metas.md` | `instrumento-definindo-minhas-metas` | `instrumento-definindo-minhas-metas` | consolidado |
+| `perguntas-eficazes.md` | `perguntas-eficazes` | `perguntas-eficazes` | consolidado |
+| `escuta-ativa-e-comunicacao.md` | `escuta-ativa-e-comunicacao` | `escuta-ativa-e-comunicacao` | consolidado |
+| `feedback-construtivo.md` | `feedback-construtivo` | `feedback-construtivo` | consolidado |
+| `checklist-competencias.md` | `checklist-competencias` | `checklist-competencias` | consolidado |
+| `codigo-etica-conduta.md` | `codigo-etica-conduta` | `codigo-etica-conduta` | consolidado |
+| `mensagem-preparacao.md` | `mensagem-preparacao` | `mensagem-preparacao` | consolidado |
+| `mensagem-indicadas.md` | `mensagem-indicadas` | `mensagem-indicadas` | consolidado |
+| `mensagem-encaminhamento.md` | `mensagem-encaminhamento` | `mensagem-encaminhamento` | consolidado |
 | `termo-adesao-voluntario.md` | `termo-adesao-voluntario` | `termo-adesao-voluntario` | transcrito |
 | `termo-mentorando.md` | `termo-mentorando` | `termo-mentorando` | transcrito |
 | `autorizacao-responsavel.md` | `autorizacao-responsavel` | `autorizacao-responsavel` | transcrito |
@@ -74,12 +79,15 @@ origem: <de onde o texto saiu + o que fazer quando divergir>
   avaliação por terceiros nativa, instrumentos digitais, regras
   operacionais). Cada turma tem seu calendário — encontro duplo na quinta
   e sem a folga de 15 dias só existem na Turma 2.
-- `roteiros-encontros-11-16.md` e `perguntas-eficazes.md` são sínteses
-  operacionais: os PDFs existem no acervo mas não estão transcritos —
-  o roteiro 11–16 é extração do cap. 10 do guia (migration 0135) e o
-  "Perguntas Eficazes" é consolidado do que os guias trazem sobre o
-  instrumento. Quando os PDFs forem transcritos em `docs/fontes/`, estes
-  docs passam a `transcrito`.
+- **Consolidação de 04/11/2026** (revisão em `.auditoria-rag/`, fora do git):
+  todos os docs não jurídicos foram reescritos como texto consolidado e
+  sanitizado a partir dos PDFs publicados, dos docs do Drive e do código.
+  Eles **prevalecem sobre o PDF publicado** quando divergirem. Regras fixas:
+  sem travessão, âncora por encontro (nunca por mês), só o que é vigente,
+  Roda da Vida com duas aplicações na plataforma e escala 1 a 10, terceiros
+  (Erlich e afins) só como origem citada.
+- Os `roteiro-encontro-NN.md` são a fonte por encontro; o cap. "Os 16
+  encontros" do guia DPP é só um resumo que remete a eles.
 - `feedback-construtivo.md`, `checklist-competencias.md` e os três
   `mensagem-*.md` reproduzem os **documentos nativos** do app
   (`src/lib/materiais-documentos.ts`, texto do cap. 14 do guia) — é o que
@@ -101,6 +109,48 @@ mantêm o banco idempotente. Decisão nova de plataforma/operação → edita
 `plataforma-e-operacao.md` (ou cria um `.md` novo com o front-matter
 completo — `fonte`, `titulo`, `material` e `natureza` são obrigatórios).
 Metadados novos → `pnpm ingerir:guias --manifest` regera `fontes.json`.
+Doc removido ou renomeado → o `--apply` apaga do banco os chunks do slug
+que saiu do corpus. Slug novo → entrada em `META_FONTE`
+(`src/lib/ia/fontes.ts`), senão a citação sai como texto cru.
+
+A busca pesa os termos pela frequência de documento guardada em
+`ia_chunks_df` (migration `0161`), não recontada a cada chamada. O
+`--apply` recalcula essa tabela no fim (`atualizar_ia_chunks_df`, depois
+da limpeza de órfãos). Mexeu em `ia_chunks` por fora do script → rode
+`select public.atualizar_ia_chunks_df();` no SQL editor (ou
+`supabase.rpc("atualizar_ia_chunks_df")` com a service role; anon e
+authenticated não executam), senão os pesos ficam defasados.
+
+## Recorte e escrita para a busca
+
+O recorte é `scripts/lib/rag-chunks.mjs` (testes em
+`tests/rag-chunks.test.ts`):
+
+- cada `###` vira seção própria, `secao = "<##> › <###>"`; a intro curta
+  de um `##` (até 300 chars) vai como contexto na frente de cada `###`;
+  o h1 sozinho não vira chunk;
+- o texto do chunk não repete o título (ele está em `secao`, peso A no
+  FTS, e entra no embedding como `secao + texto`);
+- parágrafo grande é fatiado por frase, nunca no meio da palavra; o
+  overlap é a última frase completa do chunk anterior.
+
+Na escrita: cada `##`/`###` tem de fazer sentido sozinho (diga o
+encontro ou o instrumento no título) e não cite slug no texto (escreva
+"no documento Mensagem de encaminhamento", não `` `mensagem-encaminhamento` ``):
+o modelo repete o que lê.
+
+## Avaliação da busca
+
+`avaliacao-busca.json` tem perguntas reais com a seção que deve aparecer
+entre os 4 trechos que o modelo recebe. Rode antes e depois de mexer no
+corpus ou na busca (só lê; o alvo vem do ambiente, nunca do `.env.local`):
+
+```
+SUPABASE_URL=… SUPABASE_SERVICE_ROLE_KEY=… node scripts/avaliar-busca-guias.mjs --vetor
+```
+
+Referência em 05/11/2026 (staging, corpus de 04/11): híbrida 27/27 no
+top-4 (18 em 1º); só FTS 22/27. Corpus anterior: 4/27.
 
 ## Gap de schema (TODO de migration)
 

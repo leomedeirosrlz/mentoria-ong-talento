@@ -37,12 +37,14 @@ export function SemaforoDot({ nivel, className }: { nivel: Semaforo; className?:
 
 export function SemaforoBadge({ nivel, motivo }: { nivel: Semaforo; motivo?: string }) {
   return (
-    <span className="inline-flex items-center gap-2 text-sm">
+    <span className="inline-flex flex-wrap items-center gap-x-2 text-sm">
       <SemaforoDot nivel={nivel} />
-      <span className="font-medium">{ROTULOS[nivel]}</span>
-      {/* motivo "Em dia" do ok-sem-pendência repetiria o rótulo — suprime */}
+      <span className="shrink-0 font-medium">{ROTULOS[nivel]}</span>
+      {/* motivo "Em dia" do ok-sem-pendência repetiria o rótulo — suprime.
+          min-w-0+break-words: motivo longo ("Encontro 7 ainda não
+          aconteceu (reposição na mesma semana)") quebrava o card no 390px */}
       {motivo && motivo !== ROTULOS[nivel] && (
-        <span className="text-muted-foreground">{motivo}</span>
+        <span className="min-w-0 break-words text-muted-foreground">{motivo}</span>
       )}
     </span>
   );

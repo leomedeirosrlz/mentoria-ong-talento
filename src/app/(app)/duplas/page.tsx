@@ -175,7 +175,7 @@ export default async function DuplasPage({
         eventos={eventos}
         agora={new Date().toISOString()}
         visao={visao}
-        meuNome={me.nome.split(" ")[0]}
+        meuNome={(me.nome_social ?? me.nome).split(" ")[0]}
         especialistaEventos={espEventos}
         nudges={nudges}
         origem={origem}

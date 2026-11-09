@@ -98,9 +98,16 @@ function podeRecusar(s: SolicitacaoEspecialista, meuId: string): boolean {
   return s.especialista_desejado_id === meuId || s.especialista_id === meuId;
 }
 
+/** O nome exibido é o social quando existe — o civil segue sendo o campo
+ *  de escrita; quem lê (staff, jovem, especialista) reconhece a pessoa pelo
+ *  nome que ela usa. */
+const nomeDe = (
+  p?: { nome: string; nome_social?: string | null } | null
+): string | null => (p ? (p.nome_social ?? p.nome) : null);
+
 /** " por Sofia" — quem recusou, quando o nome chega no mural. */
 function quemRecusou(sol: SolicitacaoEspecialista) {
-  const n = sol.especialista?.nome ?? sol.desejado?.nome;
+  const n = nomeDe(sol.especialista) ?? nomeDe(sol.desejado);
   return n ? ` por ${n}` : "";
 }
 
@@ -115,14 +122,13 @@ function nomeAutor(
   p: SolicitacaoProposta,
   s: SolicitacaoEspecialista
 ): string | null {
-  if (p.autor?.nome) return p.autor.nome;
-  if (p.autor_id === s.especialista_id) return s.especialista?.nome ?? null;
-  if (p.autor_id === s.especialista_desejado_id)
-    return s.desejado?.nome ?? null;
+  if (p.autor?.nome) return nomeDe(p.autor);
+  if (p.autor_id === s.especialista_id) return nomeDe(s.especialista);
+  if (p.autor_id === s.especialista_desejado_id) return nomeDe(s.desejado);
   if (p.autor_id === s.created_by)
     return (
-      s.solicitante?.nome ??
-      (s.origem === "jovem" ? s.mentorado?.nome ?? null : "a equipe")
+      nomeDe(s.solicitante) ??
+      (s.origem === "jovem" ? (nomeDe(s.mentorado) ?? null) : "a equipe")
     );
   return null;
 }
@@ -437,7 +443,7 @@ export function SolicitacaoNegociacao({
     // estados encerrados — o que aconteceu conta história, não pede ação
     if (efetivo === "recusada" && s.justificativa_recusa) {
       // pro jovem, a voz é a dele: quem não pegou + a saída honesta
-      const quem = s.especialista?.nome ?? s.desejado?.nome;
+      const quem = nomeDe(s.especialista) ?? nomeDe(s.desejado);
       return papel === "mentorado" ? (
         <p className="text-sm text-muted-foreground">
           {quem ? `${quem} não pôde pegar o pedido` : "O pedido não rolou"}:
@@ -606,7 +612,7 @@ export function SolicitacaoNegociacao({
               {(propostas.length < 4 || podeRecusar(s, meuId)) && (
                 <DropdownMenu>
                   <DropdownMenuTrigger
-                    aria-label={`Ações do pedido de ${s.mentorado?.nome ?? "especialista"}`}
+                    aria-label={`Ações do pedido de ${nomeDe(s.mentorado) ?? "especialista"}`}
                     className={cn(
                       buttonVariants({ variant: "ghost", size: "icon" }),
                       "size-11 shrink-0 sm:size-8"
@@ -717,7 +723,7 @@ export function SolicitacaoNegociacao({
               papel !== "coordenacao" ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger
-                    aria-label={`Ações do pedido de ${s.mentorado?.nome ?? "especialista"}`}
+                    aria-label={`Ações do pedido de ${nomeDe(s.mentorado) ?? "especialista"}`}
                     className={cn(
                       buttonVariants({ variant: "ghost", size: "icon" }),
                       "size-11 shrink-0 sm:size-8"
@@ -809,16 +815,16 @@ export function SolicitacaoNegociacao({
             </div>
           ) : !autorPodeAceitar && efetivo === "contra_proposta" ? (
             <p className="text-xs text-muted-foreground">
-              Aguardando {s.especialista?.nome ?? "o especialista"} responder.
+              Aguardando {nomeDe(s.especialista) ?? "o especialista"} responder.
             </p>
           ) : efetivo === "aberta" ? (
             <p className="text-xs text-muted-foreground">
               {papel === "mentorado"
-                ? s.desejado?.nome
-                  ? `Aguardando ${s.desejado.nome} responder.`
+                ? nomeDe(s.desejado)
+                  ? `Aguardando ${nomeDe(s.desejado)} responder.`
                   : "Aguardando um especialista responder."
                 : `Aguardando um especialista${
-                    s.desejado?.nome ? ` (${s.desejado.nome})` : ""
+                    nomeDe(s.desejado) ? ` (${nomeDe(s.desejado)})` : ""
                   } responder.`}
             </p>
           ) : null}
@@ -828,12 +834,12 @@ export function SolicitacaoNegociacao({
         // quem senta na mesa é o staff
         <p className="text-xs text-muted-foreground">
           Esse pedido foi aberto pela equipe pra você. Quem combina o
-          horário é ela com {s.especialista?.nome ?? "o especialista"}.
+          horário é ela com {nomeDe(s.especialista) ?? "o especialista"}.
         </p>
       ) : (
         <p className="text-xs text-muted-foreground">
           Negociação em andamento entre o autor e{" "}
-          {s.especialista?.nome ?? "os especialistas"}.
+          {nomeDe(s.especialista) ?? "os especialistas"}.
         </p>
       )}
     </div>

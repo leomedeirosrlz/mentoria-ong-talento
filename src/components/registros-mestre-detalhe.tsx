@@ -281,7 +281,10 @@ function LinhaRegistro({
             <span className="font-normal text-muted-foreground">Sem tema registrado</span>
           )
         ) : dupla?.mentor && dupla?.mentorado ? (
-          <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
+          <DuplaNomes
+            mentor={dupla.mentor.nome_social ?? dupla.mentor.nome}
+            mentorado={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+          />
         ) : (
           "Dupla removida"
         )}

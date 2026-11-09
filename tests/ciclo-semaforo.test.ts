@@ -281,6 +281,41 @@ describe("saudadeDaDupla — pendência de registro (limbo e >24h)", () => {
     expect(s.motivo).toBe("1º encontro agendado já passou. Falta o registro");
   });
 
+  it("remarcado vencido sem registro é limbo também — pendência, não atraso", () => {
+    // status legado: antes do emLimbo unificado ele virava "atraso" no
+    // semáforo enquanto a agenda já o tratava como "rolou?"
+    const dupla = mkDupla({
+      encontros: [
+        mkEncontro(1, {
+          status: "remarcado",
+          data_hora: "2025-10-07T19:00:00-03:00",
+        }),
+      ],
+    });
+    const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-08"));
+    expect(s.semaforo).toBe("atencao");
+    expect(s.motivo).toBe("1º encontro agendado já passou. Falta o registro");
+    expect(s.esperado).toBe(0);
+    expect(s.registroPendente).toBe(true);
+  });
+
+  it("remarcado futuro conta como próximo encontro (desliga o preventivo)", () => {
+    // mesmo caso do "próximo agendado de outro número" — a row é remarcada,
+    // não agendada: o compromisso futuro vale igual
+    const dupla = mkDupla({
+      encontros: [
+        encRealizado(1, "2025-10-07"),
+        mkEncontro(3, {
+          status: "remarcado",
+          data_hora: "2025-10-21T19:00:00-03:00",
+        }),
+      ],
+    });
+    const s = saudadeDaDupla(dupla, CICLO_16, dt("2025-10-13"));
+    expect(s.semaforo).toBe("ok");
+    expect(s.proximo?.numero).toBe(3);
+  });
+
   it("agendado passado COM registro não é limbo nem pendência", () => {
     const dupla = mkDupla({
       encontros: [

@@ -64,6 +64,7 @@ import type {
 } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
 import { disponibilidadeDeConjuntos, toDateStr } from "../ciclo";
+import { audienciasDe } from "../materiais";
 
 // ---------- tabelas da rodada de telas finais (ainda sem migration) ----------
 // Espelhos do plano `docs/planos/implementacao-telas-finais.md` — os WPs
@@ -2936,13 +2937,18 @@ function build(): DemoData {
   // warnrow da Minha agenda aponta), o 3º agendado no passado sem registro
   // (limbo — exercita o "remarcar/não aconteceu") e o 4º já marcado pra
   // semana seguinte.
+  // datas ancoradas na segunda da semana (TERCA_ENCONTRO_5 - 1), não em
+  // HOJE-n: numa segunda "ontem" caía na semana anterior e a agenda perdia a
+  // 2ª dupla em "Também nesta semana"; num domingo HOJE-6 colidia com o 3º
+  const SEG_T2C = addDias(TERCA_ENCONTRO_5, -1);
   const encT2c: Encontro[] = [
     comRegistro(
-      realizado(uid(D.t2c), 1, addDias(HOJE, -14), { duracao: 75 }),
+      realizado(uid(D.t2c), 1, addDias(SEG_T2C, -14), { duracao: 75 }),
       ricardo, "Matheus", "dpp"
     ),
-    realizado(uid(D.t2c), 2, addDias(HOJE, -6), { duracao: 60, origem: "externo" }),
-    agendado(uid(D.t2c), 3, addDias(HOJE, -1), {}),
+    realizado(uid(D.t2c), 2, addDias(SEG_T2C, -7), { duracao: 60, origem: "externo" }),
+    // de terça em diante segue no passado (o limbo continua exercitado)
+    agendado(uid(D.t2c), 3, SEG_T2C, {}),
     // âncora na terça (não em HOJE+n): a segunda da próxima semana é
     // sempre segunda — com HOJE+n o dia varia com o dia da build e um
     // "agendado pra semana seguinte" podia cair no domingo da semana
@@ -2957,7 +2963,7 @@ function build(): DemoData {
     turma: "T2 · 2026/2027",
     cronograma_id: cronogramaT2,
     status: "ativa",
-    iniciada_em: ymd(addDias(HOJE, -18)),
+    iniciada_em: ymd(addDias(SEG_T2C, -17)),
     trilha: "dpp",
     demanda: null,
     solicitacao_id: null,
@@ -3244,7 +3250,7 @@ function build(): DemoData {
   // do app), Perguntas Eficazes (o documento que o guia cita) e os links
   // públicos. Arquivos resolvem pro PDF placeholder da rota demo; doc: abre o
   // doc real.
-  const materiais: Material[] = [
+  const catalogo: Material[] = [
     { id: uid(0x2001), titulo: "Guia do Mentor DPP", descricao: "Metodologia completa: jornada, 16 encontros, instrumentos e templates.", tipo: "guia", url: null, path: "materiais/guia-dpp.pdf", audiencia: "dpp", encontro_num: null, ordem: 1 },
     { id: uid(0x2002), titulo: "Guia do Mentor Especialista", descricao: "Metodologia da mentoria com especialista: 5 encontros e cinco funções.", tipo: "guia", url: null, path: "materiais/guia-especialista.pdf", audiencia: "especialista", encontro_num: null, ordem: 2 },
     ...Array.from({ length: 16 }, (_, i) => i + 1).map((n, i) => ({
@@ -3271,6 +3277,18 @@ function build(): DemoData {
     { id: uid(0x203a), titulo: "Formação EaD gratuita", descricao: "Trilha opcional com certificado para mentores.", tipo: "link", url: "https://ead.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 29 },
     { id: uid(0x203b), titulo: "Checklist de competências do mentor", descricao: "As 10 competências do guia para marcar antes do ciclo e no 16º encontro.", tipo: "template", url: null, path: "doc:checklist-competencias", audiencia: "dpp", encontro_num: null, ordem: 30 },
   ];
+  // audiências da 0167: material de mentor serve o supervisor, Feedback
+  // Construtivo sai do jovem, Formação EaD é de mentores e mentorados
+  const materiais: Material[] = catalogo.map((m) => {
+    if (m.titulo === "Feedback Construtivo")
+      return { ...m, audiencias: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"] };
+    if (m.titulo === "Formação EaD gratuita")
+      return { ...m, audiencias: ["mentor_dpp", "mentor_especialista", "mentorado"] };
+    const base = audienciasDe(m);
+    return base.includes("mentor_dpp") || base.includes("mentor_especialista")
+      ? { ...m, audiencias: [...base, "supervisor"] }
+      : m;
+  });
 
   // ---------- notificações por papel ----------
   // 2-3 por persona; algumas não lidas pra badge do sino sair de zero

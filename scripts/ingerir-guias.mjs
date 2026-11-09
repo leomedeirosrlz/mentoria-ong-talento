@@ -15,11 +15,10 @@
 // `material` (slug de /materiais/documento/<slug> ou o identificador do doc)
 // e `natureza` (transcrito | consolidado | sintese-operacional) são
 // OBRIGATÓRIOS — o doc sem eles é recusado, pra manter o corpus uniforme.
-// Os chunks CARREGAM titulo/material no pipeline, mas o insert fica no
-// schema da 0136 — `ia_chunks` não tem coluna pra eles (gap documentado no
-// README; quando uma migration abrir `material`/`titulo` basta incluir no
-// CAMPOS_INSERT abaixo). Até lá o mapa guia → metadados vive no
-// front-matter e em docs/rag/fontes.json (--manifest).
+// `material` e `secao_anchor` (a âncora da seção, rag-chunks) viraram
+// coluna na 0165 e entram no insert — são a ponta de citação: o app linka
+// /materiais/documento/<material>#<secao_anchor>. `titulo` segue fora do
+// banco, só no pipeline e no manifest (docs/rag/fontes.json).
 //
 // Gate anti-PII: qualquer doc que contenha marcadores de dados pessoais reais
 // (CPF, RG, nome do exemplar do termo, endereço do exemplar) é recusado — o
@@ -28,6 +27,7 @@
 import { createClient } from "@supabase/supabase-js";
 import { readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { fatiar, parseDoc } from "./lib/rag-chunks.mjs";
 
 const APPLY = process.argv.includes("--apply");
 const MANIFEST = process.argv.includes("--manifest");
@@ -53,87 +53,13 @@ const PII_MARCADORES = [
   /ALCIDES\s+CANDIDO/i,
 ];
 
-const NATUREZAS = new Set(["transcrito", "consolidado", "sintese-operacional"]);
-
-// ---------- frontmatter + seções ----------
-
-function parseDoc(nome, raw) {
-  const fm = /^---\n([\s\S]*?)\n---\n([\s\S]*)$/.exec(raw);
-  if (!fm) throw new Error(`${nome}: sem frontmatter`);
-  const meta = Object.fromEntries(
-    fm[1].split("\n")
-      .map((l) => /^([a-z_]+):\s*(.*)$/.exec(l.trim()))
-      .filter(Boolean)
-      .map(([, k, v]) => [k, v.replace(/\s+/g, " ").trim()])
-  );
-  for (const req of ["fonte", "titulo", "material", "natureza"]) {
-    if (!meta[req]) throw new Error(`${nome}: frontmatter sem '${req}'`);
-  }
-  if (!NATUREZAS.has(meta.natureza)) {
-    throw new Error(
-      `${nome}: natureza '${meta.natureza}' inválida — use uma de ${[...NATUREZAS].join(", ")}`
-    );
-  }
-  if (meta.fonte.length > 80) {
-    throw new Error(`${nome}: fonte > 80 chars (limite da coluna guia)`);
-  }
-
-  const body = fm[2];
-  const partes = body.split(/^## /m).map((s) => s.trim()).filter(Boolean);
-  const secoes = partes.map((p) => {
-    const nl = p.indexOf("\n");
-    const cab = nl === -1 ? p : p.slice(0, nl).trim();
-    const resto = nl === -1 ? "" : p.slice(nl + 1).trim();
-    const secao = cab.replace(/^# /, "").trim(); // primeira parte pode ser o h1 do doc
-    return { secao, texto: resto ? `${cab}\n\n${resto}` : cab };
-  });
-  return {
-    fonte: meta.fonte,
-    titulo: meta.titulo,
-    material: meta.material,
-    natureza: meta.natureza,
-    secoes,
-  };
-}
-
-// ---------- chunking ----------
-
-const ALVO = 800;
-const MAX = 900;
-const OVERLAP = 120;
-
-function fatiar(texto) {
-  if (texto.length <= MAX) return [texto];
-  const paras = texto.split(/\n{2,}/).filter((p) => p.trim());
-  const chunks = [];
-  let buf = "";
-  const flush = () => {
-    if (!buf.trim()) return;
-    chunks.push(buf.trim());
-    buf = buf.length > OVERLAP ? buf.slice(-OVERLAP).replace(/^.*?[.!?]\s/, "… ") : buf;
-  };
-  for (const p of paras) {
-    if (p.length > MAX) {
-      // parágrafo gigante (tabela, lista longa): fatia por janela
-      flush();
-      for (let i = 0; i < p.length; i += ALVO - OVERLAP)
-        chunks.push("… " + p.slice(i, i + ALVO).trim());
-      buf = "";
-      continue;
-    }
-    if (buf.length + p.length + 2 > MAX) flush();
-    buf = buf ? `${buf}\n\n${p}` : p;
-  }
-  flush();
-  return chunks.length ? chunks : [texto.slice(0, MAX)];
-}
-
 // ---------- persistência ----------
 
-// Colunas que o insert preenche — o schema da 0136 é (guia, secao, pagina,
-// texto). titulo/material viajam no chunk e saem pelo manifest/dry-run;
-// quando uma migration abrir a coluna, incluir o nome aqui propaga sozinho.
-const CAMPOS_INSERT = ["guia", "secao", "pagina", "texto"];
+// Colunas que o insert preenche — guia/secao/pagina/texto da 0136 +
+// material/secao_anchor da 0165. `titulo` viaja no chunk e sai pelo
+// manifest/dry-run; quando uma migration abrir a coluna, incluir o nome
+// aqui propaga sozinho.
+const CAMPOS_INSERT = ["guia", "secao", "pagina", "texto", "material", "secao_anchor"];
 
 const paraInsert = (chunk) =>
   Object.fromEntries(CAMPOS_INSERT.map((c) => [c, chunk[c]]));
@@ -203,10 +129,11 @@ for (const f of arquivos) {
       // limparTrecho/metaFonte em src/lib/ia/fontes.ts)
       pagina: si * 100 + ci,
       texto: texto.slice(0, 4000),
-      // metadados do doc propagados ao chunk — fora do insert enquanto o
-      // schema não tiver coluna (ver CAMPOS_INSERT e o gap no README)
+      // metadados do doc propagados ao chunk: material/secao_anchor são
+      // coluna (0165, em CAMPOS_INSERT); titulo segue só no pipeline
       titulo: doc.titulo,
       material: doc.material,
+      secao_anchor: s.secao_anchor,
     }))
   );
   docs.push({ arquivo: f, ...doc, chunks });
@@ -219,7 +146,10 @@ for (const d of docs) {
     `  ${d.arquivo.padEnd(42)} ${String(d.chunks.length).padStart(3)} chunks · ${d.secoes.length} seções · ${d.natureza} · material=${d.material}`
   );
 }
-console.log(`\namostra:\n${docs[0].chunks[0].texto.slice(0, 300)}\n…`);
+const amostra = docs[0].chunks[0];
+console.log(
+  `\namostra: ${amostra.guia} · "${amostra.secao}" · material=${amostra.material} · secao_anchor=${amostra.secao_anchor}\n${amostra.texto.slice(0, 300)}\n…`
+);
 
 // ---------- manifest (guia → metadados das fontes) ----------
 
@@ -228,6 +158,7 @@ const fontes = docs.map((d) => ({
   titulo: d.titulo,
   material: d.material,
   natureza: d.natureza,
+  audiencia: d.audiencia,
   arquivo: d.arquivo,
   secoes: d.secoes.length,
   chunks: d.chunks.length,
@@ -275,8 +206,12 @@ for (const d of docs) {
     // insert, então nunca fica corpus parcialmente embedado do doc
     try {
       for (let i = 0; i < linhas.length; i += EMBED_LOTE) {
+        // seção + texto: o texto do chunk não repete o título (rag-chunks),
+        // e sem ele o vetor perdia o contexto ("12º encontro", "Roda da Vida")
         const embs = await embedLote(
-          linhas.slice(i, i + EMBED_LOTE).map((l) => l.texto)
+          linhas
+            .slice(i, i + EMBED_LOTE)
+            .map((l) => `${l.secao}\n\n${l.texto}`)
         );
         embs.forEach((e, j) => {
           linhas[i + j].embedding = `[${e.join(",")}]`;
@@ -297,5 +232,39 @@ for (const d of docs) {
   }
   console.log(`✓ ${d.fonte}: ${d.chunks.length} chunks`);
 }
+
+// guia que saiu do corpus (doc removido ou renomeado) fica órfão no banco:
+// o delete acima é por guia presente. Ex.: roteiros-encontros-11-16 virou
+// um roteiro-encontro-NN por encontro em 04/11/2026.
+const { data: noBanco, error: lsErr } = await supabase.from("ia_chunks").select("guia");
+if (lsErr) {
+  console.error(`✗ listar guias do banco falhou — ${lsErr.message}`);
+  process.exit(1);
+}
+const vigentes = new Set(docs.map((d) => d.fonte));
+const orfaos = [...new Set((noBanco ?? []).map((r) => r.guia))].filter(
+  (g) => !vigentes.has(g)
+);
+for (const g of orfaos) {
+  const { error } = await supabase.from("ia_chunks").delete().eq("guia", g);
+  if (error) {
+    console.error(`✗ ${g}: remoção do órfão falhou — ${error.message}`);
+    process.exit(1);
+  }
+  console.log(`− ${g}: saiu do corpus, chunks removidos`);
+}
+
+// match_ia_chunks lê o df dos lexemas de ia_chunks_df (0161) em vez de
+// recontar o corpus a cada busca: sem o recompute os pesos ficam defasados.
+const { data: linhasDf, error: dfErr } = await supabase.rpc("atualizar_ia_chunks_df");
+if (dfErr) {
+  console.error(
+    `✗ recálculo do df (atualizar_ia_chunks_df) falhou — ${dfErr.message}. ` +
+      "Os chunks já foram gravados; a busca usa pesos antigos até rodar " +
+      "`select public.atualizar_ia_chunks_df();` no SQL editor."
+  );
+  process.exit(1);
+}
+console.log(`✓ df recalculado: ${linhasDf} lexemas`);
 
 console.log(`\n== ingestão ok: ${total} chunks em ${docs.length} documentos.`);

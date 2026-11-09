@@ -27,15 +27,17 @@ export default async function JovemPerfil({
   searchParams: Promise<{ c?: string }>;
 }) {
   const { c } = await searchParams;
-  const [me, perfil, meusChamados] = await Promise.all([
+  const cSel = c && UUID_RE.test(c) ? c : null;
+  // detalhe junto com a lista: getChamadoDetalhe reaproveita a linha do
+  // getChamados (React.cache) em vez de esperar a lista terminar
+  const [me, perfil, meusChamados, detalhe] = await Promise.all([
     getMe(),
     getJovemPerfil(),
     getChamados(),
+    cSel ? getChamadoDetalhe(cSel) : Promise.resolve(null),
   ]);
   if (!me) redirect("/login"); // o layout já barra — convenção das páginas
   const tema = temaValido((await cookies()).get(TEMA_COOKIE)?.value);
-  const cSel = c && UUID_RE.test(c) ? c : null;
-  const detalhe = cSel ? await getChamadoDetalhe(cSel) : null;
 
   const nomeTela = me.nome_social || me.nome;
   const escolaridadeRotulo = perfil?.escolaridade

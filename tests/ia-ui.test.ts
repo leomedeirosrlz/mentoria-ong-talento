@@ -208,3 +208,135 @@ describe("prompt v3", () => {
     expect(systemPromptIa(["mentor_dpp"])).not.toContain("está agora na página");
   });
 });
+
+// ---------- mentorado (pacote liza nov/2026) ----------
+// As tools do jovem projetam sem vazar instrumento de equipe: a dupla dele
+// não tem semáforo/motivo, os pedidos saem com rótulo próprio e a ajuda
+// vira citação "Ajuda do Realiza" no card de fontes.
+
+describe("tools do mentorado → cards", () => {
+  it("minha_dupla → dupla sem semáforo (ramo jovem)", () => {
+    const b = uiDaTool("minha_dupla", {
+      dupla_id: "d-1",
+      trilha: "dpp",
+      status: "ativa",
+      turma: "T1",
+      mentor: "Ana",
+      supervisor: "Paulo",
+      encontros: [
+        { numero: 1, status: "realizado", data_hora: "2026-01-10T19:00:00Z" },
+        { numero: 2, status: "agendado", data_hora: "2026-01-20T19:00:00Z" },
+      ],
+    });
+    expect(b?.kind).toBe("dupla");
+    if (b?.kind !== "dupla") return;
+    expect(b.semaforo).toBeUndefined();
+    expect(b.feitos).toBe(1);
+    expect(b.proximo).toEqual({ numero: 2, data_hora: "2026-01-20T19:00:00Z" });
+    expect(b.encontros.every((e) => !e.tem_registro)).toBe(true);
+  });
+
+  it("minha_dupla → remarcado conta como próximo (mesma regra da agenda)", () => {
+    const b = uiDaTool("minha_dupla", {
+      dupla_id: "d-1",
+      trilha: "dpp",
+      status: "ativa",
+      turma: "T1",
+      mentor: "Ana",
+      supervisor: "Paulo",
+      encontros: [
+        { numero: 1, status: "realizado", data_hora: "2026-01-10T19:00:00Z" },
+        { numero: 2, status: "remarcado", data_hora: "2026-01-22T19:00:00Z" },
+      ],
+    });
+    if (b?.kind !== "dupla") throw new Error("sem card");
+    expect(b.proximo).toEqual({ numero: 2, data_hora: "2026-01-22T19:00:00Z" });
+  });
+
+  it("ficha_dupla no ramo jovem usa o mentorado que a tool emite (\"Você\")", () => {
+    const b = uiDaTool("ficha_dupla", {
+      dupla_id: "d-1",
+      trilha: "dpp",
+      status: "ativa",
+      turma: "T1",
+      mentor: "Ricardo",
+      mentorado: "Você",
+      encontros: [{ numero: 1, status: "realizado" }],
+      proximo_encontro: { numero: 2, data_hora: "2026-02-03T19:00:00Z" },
+    });
+    if (b?.kind !== "dupla") throw new Error("sem card");
+    expect(b.mentorado).toBe("Você");
+    expect(b.proximo).toEqual({ numero: 2, data_hora: "2026-02-03T19:00:00Z" });
+    expect(b).not.toHaveProperty("semaforo");
+  });
+
+  it("minha_agenda → agenda só com próximos", () => {
+    const b = uiDaTool("minha_agenda", {
+      proximos: [
+        { dupla_id: "d-1", numero: 3, data_hora: "2026-02-03T19:00:00Z", status: "agendado" },
+        { dupla_id: "d-1", numero: 4, data_hora: "2026-02-10T19:00:00Z", status: "agendado" },
+      ],
+      ultimos_realizados: [{ numero: 2, realizado_em: "2026-01-27T19:00:00Z" }],
+    });
+    expect(b?.kind).toBe("agenda");
+    if (b?.kind !== "agenda") return;
+    expect(b.encontros).toHaveLength(2);
+    expect(b.encontros[0].mentor).toBeNull();
+  });
+
+  it("meus_combinados → combinados pendente + feito", () => {
+    const b = uiDaTool("meus_combinados", {
+      pendentes: [{ texto: "Atualizar o PDM", prazo: "2026-02-05", criado_em: "x" }],
+      feitos_recentes: [{ texto: "Responder a Visão" }],
+    });
+    expect(b?.kind).toBe("combinados");
+    if (b?.kind !== "combinados") return;
+    expect(b.pendentes[0].texto).toBe("Atualizar o PDM");
+    expect(b.feitos).toEqual(["Responder a Visão"]);
+  });
+
+  it("meu_progresso → jornada com esteira respondido × pendente", () => {
+    const b = uiDaTool("meu_progresso", {
+      dupla_id: "d-1",
+      instrumentos: [
+        { sistema: "visao", titulo: "Visão", respondidos: 1, pendentes: 0 },
+        { sistema: "pdm", titulo: "PDM", respondidos: 0, pendentes: 1 },
+      ],
+      total_respondidos: 1,
+      total_pendentes: 1,
+    });
+    expect(b?.kind).toBe("jornada");
+    if (b?.kind !== "jornada") return;
+    expect(b.instrumentos).toHaveLength(2);
+    expect(b.total_respondidos).toBe(1);
+  });
+
+  it("meus_pedidos → pedidos até 5, sem campos internos", () => {
+    const b = uiDaTool("meus_pedidos", {
+      pedidos: [
+        { especialista: "Dra. Lia", sobre: "carreira", status: "aberta", criado_em: "2026-01-01" },
+      ],
+    });
+    expect(b?.kind).toBe("pedidos");
+    if (b?.kind !== "pedidos") return;
+    expect(b.pedidos[0].especialista).toBe("Dra. Lia");
+    expect("mentorado_id" in b.pedidos[0]).toBe(false);
+  });
+
+  it("ajuda_faq → fontes com rótulo da Ajuda", () => {
+    const b = uiDaTool("ajuda_faq", {
+      respostas: [
+        { pergunta: "Quem marca os encontros?", resposta: "Você e seu mentor…", links: [] },
+      ],
+    });
+    expect(b?.kind).toBe("fontes");
+    if (b?.kind !== "fontes") return;
+    expect(b.fontes[0].guia).toBe("Ajuda do Realiza");
+  });
+
+  it("lista vazia não vira card (minha_dupla sem dupla, agenda sem encontro)", () => {
+    expect(uiDaTool("minha_dupla", null)).toBeNull();
+    expect(uiDaTool("minha_agenda", { proximos: [] })).toBeNull();
+    expect(uiDaTool("meus_combinados", { pendentes: [], feitos_recentes: [] })).toBeNull();
+  });
+});

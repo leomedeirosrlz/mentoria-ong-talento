@@ -41,14 +41,15 @@ test.describe("demo — combinados do encontro (0157)", () => {
     ).toBeChecked();
     await expect(bloco.getByText(FEITO)).toHaveClass(/line-through/);
 
-    // de antes: o do preparo (Você) e o do registro do 4º (Ana, com prazo)
+    // de antes: o do preparo (Você) e o do registro do 4º (Bia, com prazo)
+    // — a jovem aparece pelo nome social (Ana Beatriz → Bia)
     await expect(bloco.getByText("De antes")).toBeVisible();
     await expect(
       bloco.getByText(new RegExp(`do 3º encontro · ${CARRY}`))
     ).toBeVisible();
     const doRegistro = bloco.locator("label", { hasText: DO_REGISTRO });
     await expect(doRegistro).toContainText("do 4º encontro");
-    await expect(doRegistro).toContainText(/Ana · até \d{2}\/\d{2}\/\d{4}/);
+    await expect(doRegistro).toContainText(/Bia · até \d{2}\/\d{2}\/\d{4}/);
 
     // criar com o mentorado como responsável e prazo: o item nasce com o
     // nome dele e a data
@@ -56,11 +57,11 @@ test.describe("demo — combinados do encontro (0157)", () => {
     await bloco
       .getByRole("textbox", { name: "Novo combinado do 5º encontro" })
       .fill(novo);
-    await bloco.getByRole("button", { name: "Ana", exact: true }).click();
+    await bloco.getByRole("button", { name: "Bia", exact: true }).click();
     await bloco.getByLabel("Prazo").fill("2030-12-31");
     await bloco.getByRole("button", { name: "Adicionar" }).click();
     const liNovo = bloco.locator("li", { hasText: novo });
-    await expect(liNovo).toContainText("Ana");
+    await expect(liNovo).toContainText("Bia");
     await expect(liNovo).toContainText(/até 31\/12\/2030/);
     await expect(trigger).toContainText("4 pendentes");
 

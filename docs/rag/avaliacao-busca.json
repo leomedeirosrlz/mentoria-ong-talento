@@ -1,0 +1,661 @@
+{
+  "versao": "2026-11-05",
+  "perguntas": [
+    {
+      "id": "roda-o-que-diz-o-guia",
+      "pergunta": "O que diz o guia sobre a Roda da Vida?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "instrumento-roda-da-vida",
+          "secao_contem": "O que é"
+        },
+        {
+          "guia": "instrumento-roda-da-vida",
+          "secao_contem": "As duas aplicações"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "roteiro-encontro-12"
+        },
+        {
+          "guia": "roteiro-encontro-11"
+        }
+      ]
+    },
+    {
+      "id": "roda-o-que-e",
+      "pergunta": "O que é a Roda da Vida do programa?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "instrumento-roda-da-vida",
+          "secao_contem": "O que é"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Roda da Vida"
+        }
+      ]
+    },
+    {
+      "id": "roda-quando-aplicada",
+      "pergunta": "Em que momentos da mentoria a Roda da Vida é usada? Qual a diferença entre leitura inicial e aplicação formal?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "instrumento-roda-da-vida",
+          "secao_contem": "As duas aplicações na jornada"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Roda da Vida"
+        },
+        {
+          "guia": "roteiro-encontro-12"
+        },
+        {
+          "guia": "roteiro-encontro-01"
+        }
+      ]
+    },
+    {
+      "id": "roda-escala",
+      "pergunta": "A nota de cada área da Roda da Vida vai de quanto a quanto?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "instrumento-roda-da-vida",
+          "secao_contem": "Escala de 1 a 10"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Roda da Vida"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Roda da Vida"
+        }
+      ]
+    },
+    {
+      "id": "roda-como-faco-mentorado",
+      "pergunta": "como faço a roda da vida com meu mentorado?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "instrumento-roda-da-vida",
+          "secao_contem": "Como conduzir"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Roda da Vida"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "roteiro-encontro-12"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Roda da Vida"
+        }
+      ]
+    },
+    {
+      "id": "encontro-07-o-que-fazer",
+      "pergunta": "O que fazer no 7º encontro da mentoria?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "roteiro-encontro-07"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "7º encontro"
+        },
+        {
+          "guia": "ciclo-turma2-cronograma",
+          "secao_contem": "Encontro a encontro"
+        }
+      ]
+    },
+    {
+      "id": "encontro-revisao-meio-percurso",
+      "pergunta": "Tem um encontro chamado revisão de meio de percurso. O que se faz nele?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "roteiro-encontro-09"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "instrumento-pdm",
+          "secao_contem": "revisão no 9º"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "9º encontro"
+        },
+        {
+          "guia": "ciclo-turma2-cronograma",
+          "secao_contem": "Encontro a encontro"
+        }
+      ]
+    },
+    {
+      "id": "pdm-o-que-e",
+      "pergunta": "O que é o PDM e o que ele contém?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "instrumento-pdm",
+          "secao_contem": "O que é"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "instrumento-pdm",
+          "secao_contem": "Estrutura"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "PDM: o plano da mentoria"
+        }
+      ]
+    },
+    {
+      "id": "pdm-onde-fica",
+      "pergunta": "Onde fica o PDM? O mentor responde o PDM onde?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "instrumento-pdm",
+          "secao_contem": "Onde fica na plataforma"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "plataforma-e-operacao",
+          "secao_contem": "Instrumentos oficiais"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "A plataforma de mentoria"
+        }
+      ]
+    },
+    {
+      "id": "visao-como-funciona",
+      "pergunta": "O que é o instrumento Construindo a sua Visão e quando o jovem responde?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "instrumento-construindo-visao",
+          "secao_contem": "O que é"
+        },
+        {
+          "guia": "instrumento-construindo-visao",
+          "secao_contem": "Quando na jornada"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "roteiro-encontro-01"
+        },
+        {
+          "guia": "roteiro-encontro-02"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Visão, metas e o modelo SMART"
+        }
+      ]
+    },
+    {
+      "id": "metas-checagem-smart",
+      "pergunta": "Como o jovem define as metas? O que é a checagem SMART do 3º encontro?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "instrumento-definindo-minhas-metas",
+          "secao_contem": "O que é"
+        },
+        {
+          "guia": "instrumento-definindo-minhas-metas",
+          "secao_contem": "checagem SMART"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "roteiro-encontro-03"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "modelo SMART"
+        }
+      ]
+    },
+    {
+      "id": "terceiros-como-funciona",
+      "pergunta": "Como funciona a avaliação por terceiros? Quem indica as pessoas, quantas são e como o link chega até elas?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "plataforma-e-operacao",
+          "secao_contem": "Avaliação por terceiros"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Avaliação por terceiros"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "mensagem-indicadas"
+        },
+        {
+          "guia": "roteiro-encontro-02"
+        },
+        {
+          "guia": "roteiro-encontro-01",
+          "secao_contem": "Depois do encontro"
+        }
+      ]
+    },
+    {
+      "id": "encontro-16-avaliacao-360",
+      "pergunta": "O que acontece no 16º encontro e o que é a Avaliação Geral - 360º?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "roteiro-encontro-16"
+        },
+        {
+          "guia": "plataforma-e-operacao",
+          "secao_contem": "Fechamento do ciclo"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Avaliação Geral - 360º"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "ciclo-cronograma",
+          "secao_contem": "Encerramento"
+        },
+        {
+          "guia": "ciclo-turma2-cronograma",
+          "secao_contem": "Encerramento"
+        }
+      ]
+    },
+    {
+      "id": "remarcar-repor-encontro",
+      "pergunta": "O encontro não aconteceu no dia previsto. Posso remarcar? Qual é a regra de reposição?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "plataforma-e-operacao",
+          "secao_contem": "situação da dupla"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "O ritmo do ciclo"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "codigo-etica-conduta",
+          "secao_contem": "Combinados e disponibilidade"
+        },
+        {
+          "guia": "escuta-ativa-e-comunicacao",
+          "secao_contem": "Dicas de comunicação"
+        },
+        {
+          "guia": "roteiro-encontro-01",
+          "secao_contem": "Acordos de convivência"
+        },
+        {
+          "guia": "ciclo-turma2-cronograma",
+          "secao_contem": "Observações"
+        }
+      ]
+    },
+    {
+      "id": "registro-avaliacao-pos-encontro",
+      "pergunta": "Depois de cada encontro, o que é registrado na plataforma por cada lado da dupla?",
+      "papel": "coordenacao",
+      "esperado": [
+        {
+          "guia": "plataforma-e-operacao",
+          "secao_contem": "Registro do(a) mentor(a) após cada encontro"
+        },
+        {
+          "guia": "plataforma-e-operacao",
+          "secao_contem": "Avaliação rápida do(a) jovem"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Depois de cada encontro"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "roteiro-encontro-01",
+          "secao_contem": "Depois do encontro"
+        },
+        {
+          "guia": "roteiro-encontro-16",
+          "secao_contem": "Depois do encontro"
+        }
+      ]
+    },
+    {
+      "id": "especialista-quantos-encontros",
+      "pergunta": "Quantos encontros tem a trilha do mentor especialista e em quanto tempo ela precisa acontecer?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "guia-mentor-especialista",
+          "secao_contem": "Visão geral dos cinco encontros"
+        },
+        {
+          "guia": "guia-mentor-especialista",
+          "secao_contem": "Cronograma e carga horária"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "plataforma-e-operacao",
+          "secao_contem": "Especialista na plataforma"
+        },
+        {
+          "guia": "guia-mentor-especialista",
+          "secao_contem": "contato mentor-mentorado"
+        }
+      ]
+    },
+    {
+      "id": "feedback-modelo-de-fala",
+      "pergunta": "Como dou um feedback construtivo para o jovem? Tem um modelo de fala?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "feedback-construtivo",
+          "secao_contem": "Modelo de fala"
+        },
+        {
+          "guia": "feedback-construtivo",
+          "secao_contem": "O que é"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Feedback Construtivo"
+        },
+        {
+          "guia": "guia-mentor-especialista",
+          "secao_contem": "Feedback construtivo"
+        },
+        {
+          "guia": "roteiro-encontro-07",
+          "secao_contem": "Feedback Construtivo"
+        }
+      ]
+    },
+    {
+      "id": "perguntas-evitar",
+      "pergunta": "Que tipo de pergunta devo evitar ao conversar com o jovem?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "perguntas-eficazes",
+          "secao_contem": "O que evitar"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "perguntas-eficazes",
+          "secao_contem": "O que são perguntas eficazes"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Perguntas Eficazes"
+        }
+      ]
+    },
+    {
+      "id": "escuta-ativa-pratica",
+      "pergunta": "O que é escuta ativa e como praticá-la nos encontros?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "escuta-ativa-e-comunicacao",
+          "secao_contem": "Escuta ativa"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "guia-mentor-especialista",
+          "secao_contem": "Escuta ativa"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Ferramentas de comunicação"
+        }
+      ]
+    },
+    {
+      "id": "etica-presente-e-contato",
+      "pergunta": "O jovem quer me dar um presente de despedida e manter contato depois do ciclo. O que o programa diz sobre isso?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "codigo-etica-conduta",
+          "secao_contem": "Presentes e contato depois do ciclo"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "roteiro-encontro-16",
+          "secao_contem": "Encaminhamento final"
+        }
+      ]
+    },
+    {
+      "id": "etica-sigilo",
+      "pergunta": "O que o código de ética determina sobre o sigilo do que o jovem conta nos encontros?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "codigo-etica-conduta",
+          "secao_contem": "Confidencialidade e privacidade"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Privacidade, limites"
+        },
+        {
+          "guia": "escuta-ativa-e-comunicacao",
+          "secao_contem": "Dicas de comunicação"
+        },
+        {
+          "guia": "termo-mentorando",
+          "secao_contem": "Sigilo"
+        }
+      ]
+    },
+    {
+      "id": "msg-preparacao-modelo",
+      "pergunta": "Existe um modelo de mensagem para enviar ao jovem antes do primeiro encontro? O que ela deve pedir?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "mensagem-preparacao"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "roteiro-encontro-01",
+          "secao_contem": "jovem prepara"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Preparação antes do 1º encontro"
+        }
+      ]
+    },
+    {
+      "id": "msg-indicadas-modelo",
+      "pergunta": "Tem modelo de mensagem para eu mandar às pessoas que o jovem indicou na avaliação por terceiros?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "mensagem-indicadas"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "plataforma-e-operacao",
+          "secao_contem": "Avaliação por terceiros"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Avaliação por terceiros"
+        }
+      ]
+    },
+    {
+      "id": "msg-encaminhamento-modelo",
+      "pergunta": "Existe modelo de mensagem para manter o vínculo entre um encontro e outro?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "mensagem-encaminhamento"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Os 16 encontros"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Modelos e instrumentos citados"
+        }
+      ]
+    },
+    {
+      "id": "turma2-inicio-fim",
+      "pergunta": "Quando começa e quando termina a Turma 2?",
+      "papel": "coordenacao",
+      "esperado": [
+        {
+          "guia": "ciclo-turma2-cronograma",
+          "secao_contem": "Preparação"
+        },
+        {
+          "guia": "ciclo-turma2-cronograma",
+          "secao_contem": "Encerramento"
+        },
+        {
+          "guia": "ciclo-turma2-cronograma",
+          "secao_contem": "Cronograma do Programa de Mentoria"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "ciclo-cronograma"
+        },
+        {
+          "guia": "plataforma-e-operacao",
+          "secao_contem": "Duas turmas"
+        }
+      ]
+    },
+    {
+      "id": "checklist-competencias-uso",
+      "pergunta": "O que é o checklist de competências do mentor e quando devo usá-lo?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "checklist-competencias"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "Preparação antes do 1º encontro"
+        },
+        {
+          "guia": "roteiro-encontro-16",
+          "secao_contem": "Depois do encontro"
+        },
+        {
+          "guia": "plataforma-e-operacao",
+          "secao_contem": "material publicado difere"
+        }
+      ]
+    },
+    {
+      "id": "primeiro-encontro-o-que-levar",
+      "pergunta": "oq levar no primeiro encontro",
+      "papel": "jovem",
+      "esperado": [
+        {
+          "guia": "roteiro-encontro-01",
+          "secao_contem": "jovem prepara"
+        },
+        {
+          "guia": "roteiro-encontro-01",
+          "secao_contem": "Ficha do encontro"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "mensagem-preparacao"
+        }
+      ]
+    },
+    {
+      "id": "jovem-preencher-antes-primeiro-encontro",
+      "pergunta": "O que eu preciso preencher antes do primeiro encontro?",
+      "papel": "jovem",
+      "esperado": [
+        {
+          "guia": "roteiro-encontro-01",
+          "secao_contem": "jovem prepara"
+        },
+        {
+          "guia": "mensagem-preparacao"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "instrumento-roda-da-vida",
+          "secao_contem": "duas aplicações"
+        },
+        {
+          "guia": "plataforma-e-operacao",
+          "secao_contem": "Instrumentos oficiais"
+        }
+      ]
+    }
+  ]
+}

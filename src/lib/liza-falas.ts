@@ -40,6 +40,26 @@ export function dicaDaPagina(
 ): Omit<FalaLiza, "tipo"> | null {
   const mentorado = papeis.includes("mentorado");
   const staff = papeis.some((p) => p === "coordenacao" || p === "supervisor");
+  if (pagina.startsWith("/jovem/agenda") && mentorado)
+    return {
+      texto: "Quer saber quando é o seu próximo encontro? É só perguntar.",
+      pergunta: "Quando é o próximo encontro?",
+    };
+  if (pagina.startsWith("/jovem/especialistas") && mentorado)
+    return {
+      texto: "Dúvida no pedido de especialista? Eu conto em que pé tá o seu.",
+      pergunta: "E meu pedido de especialista?",
+    };
+  if (pagina.startsWith("/jovem/materiais") && mentorado)
+    return {
+      texto: "Quer entender um material do programa? Eu explico o que é.",
+      pergunta: "O que é o PDM?",
+    };
+  if (pagina.startsWith("/jovem") && mentorado)
+    return {
+      texto: "Posso mostrar o que você tem pra fazer ou como tá a sua jornada.",
+      pergunta: "O que tenho pra fazer?",
+    };
   if (/^\/duplas\/[0-9a-f-]{36}/.test(pagina) && !mentorado)
     return {
       texto: "Vai conversar com esta dupla? Eu faço um resumo do que já aconteceu.",
@@ -83,7 +103,7 @@ export function proximaFala({
     const n = primeiroNome(nome);
     return {
       tipo: "apresentacao",
-      texto: `Oi${n ? `, ${n}` : ""}! Eu sou a Liza, a assistente do programa. Pode me perguntar sobre os guias, os encontros e as suas duplas.`,
+      texto: `Oi${n ? `, ${n}` : ""}! Eu sou a Liza, a assistente do programa. Pode me perguntar sobre os guias, os encontros e ${papeis.length > 0 && papeis.every((p) => p === "mentorado") ? "a sua mentoria" : "as suas duplas"}.`,
       pergunta: perguntaPadrao,
     };
   }

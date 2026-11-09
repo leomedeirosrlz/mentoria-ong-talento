@@ -196,7 +196,7 @@ export function DashboardCoordenacao({
     .filter(({ dupla, saude }) => dupla.status === "ativa" && saude.semaforo === "risco")
     .map(
       ({ dupla, saude }) =>
-        `${primeiroNome(dupla.mentor.nome)} & ${primeiroNome(dupla.mentorado.nome)} (${motivoCurto(saude)})`
+        `${primeiroNome(dupla.mentor.nome_social || dupla.mentor.nome)} & ${primeiroNome(dupla.mentorado.nome_social || dupla.mentorado.nome)} (${motivoCurto(saude)})`
     );
 
   const pedidosAbertos = solicitacoes.filter((s) =>
@@ -610,7 +610,7 @@ function montarPrecisa({
       <div className="[&_button]:min-h-11 md:[&_button]:min-h-8">
         <DuplaWaAcao
           duplaId={d.id}
-          destNome={d.mentor?.nome ?? "mentor"}
+          destNome={d.mentor?.nome_social || d.mentor?.nome || "mentor"}
           telefone={d.mentor?.whatsapp ?? null}
           mensagem={lembrete.corpo}
           destinatarios={{
@@ -618,7 +618,7 @@ function montarPrecisa({
             // nunca a cobrança operacional
             padrao: "mentor",
             mentor: {
-              nome: d.mentor?.nome ?? "mentor",
+              nome: d.mentor?.nome_social || d.mentor?.nome || "mentor",
               telefone: d.mentor?.whatsapp ?? null,
               mensagem: lembrete.corpo,
             },
@@ -628,7 +628,9 @@ function montarPrecisa({
               mensagem:
                 msgsContato({
                   eu: meuNome,
-                  mentorNome: primeiroNome(d.mentor?.nome ?? "mentor"),
+                  mentorNome: primeiroNome(
+                    d.mentor?.nome_social || d.mentor?.nome || "mentor"
+                  ),
                   mentoradoNome: nomeJovem,
                 }).mentorado ?? "",
             },
@@ -657,7 +659,7 @@ function montarPrecisa({
       rank,
       ordem: ordemFila.get(d.id) ?? Number.MAX_SAFE_INTEGER,
       duplaId: d.id,
-      fichaNome: primeiroNome(d.mentorado.nome),
+      fichaNome: primeiroNome(d.mentorado.nome_social || d.mentorado.nome),
       linha: {
         mentor: pessoaLinha(d.mentor),
         mentorado: pessoaLinha(d.mentorado),
@@ -713,8 +715,18 @@ function situacaoDaDupla(d: Dupla, saude: DuplaSaude): { rotulo: string; tom: To
   return { rotulo: "Em dia", tom: "neutro" };
 }
 
-function pessoaLinha(p: { id: string; nome: string; avatar_path?: string | null }): PessoaLinha {
-  return { id: p.id, nome: p.nome, avatar_path: p.avatar_path ?? null };
+function pessoaLinha(p: {
+  id: string;
+  nome: string;
+  nome_social?: string | null;
+  avatar_path?: string | null;
+}): PessoaLinha {
+  return {
+    id: p.id,
+    nome: p.nome,
+    nome_social: p.nome_social ?? null,
+    avatar_path: p.avatar_path ?? null,
+  };
 }
 
 const BOTAO_ACAO =

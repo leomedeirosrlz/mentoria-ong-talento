@@ -98,4 +98,23 @@ describe("dicaDaPagina", () => {
     ] as const)
       expect(dicaDaPagina(pag, [pap])?.texto).not.toMatch(/[—–]/);
   });
+
+  it("ramos /jovem só pro mentorado", () => {
+    expect(dicaDaPagina("/jovem/agenda", ["mentorado"])?.pergunta).toBe(
+      "Quando é o próximo encontro?"
+    );
+    expect(dicaDaPagina("/jovem/especialistas", ["mentorado"])?.pergunta).toBe(
+      "E meu pedido de especialista?"
+    );
+    expect(dicaDaPagina("/jovem/materiais", ["mentorado"])?.pergunta).toBe(
+      "O que é o PDM?"
+    );
+    expect(dicaDaPagina("/jovem", ["mentorado"])?.pergunta).toBe(
+      "O que tenho pra fazer?"
+    );
+    // staff nunca navega /jovem (o layout redireciona), mas se caísse
+    // ali a dica não pode fingir voz de mentorado
+    expect(dicaDaPagina("/jovem/agenda", ["coordenacao"])).toBeNull();
+    expect(dicaDaPagina("/jovem", ["mentor_dpp"])).toBeNull();
+  });
 });

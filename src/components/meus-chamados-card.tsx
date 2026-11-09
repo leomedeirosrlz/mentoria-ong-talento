@@ -5,7 +5,6 @@ import { Lifebuoy } from "@phosphor-icons/react";
 import type { ChamadoFilaItem } from "@/lib/types";
 import { CHAMADO_CATEGORIA_LABEL } from "@/lib/ciclo";
 import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { ChamadoStatusBadge } from "@/components/chamados-shared";
 import { NovoChamadoDialog } from "@/components/novo-chamado-dialog";
@@ -67,25 +66,26 @@ export function MeusChamadosCard({
             <ul className="mt-4 space-y-1.5 border-t border-border pt-4">
               {abertos.slice(0, 3).map((c) => (
                 <li key={c.id}>
+                  {/* linha de duas linhas como nas filas: assunto em cima,
+                      categoria+tempo e status embaixo — sem o número CHA */}
                   <Link
                     href={`/chamados?c=${c.id}`}
-                    className="flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="block rounded-lg px-2 py-2 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {c.numero}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">
+                    <p className="min-w-0 break-words text-sm font-medium leading-snug">
                       {c.assunto}
-                    </span>
-                    <Badge variant="outline" className="shrink-0 text-[10px] font-normal">
-                      {CHAMADO_CATEGORIA_LABEL[c.categoria]}
-                    </Badge>
-                    <ChamadoStatusBadge
-                      status={c.status}
-                      dono={c.atribuido_nome}
-                      visao="autor"
-                      className="shrink-0 text-[10px]"
-                    />
+                    </p>
+                    <div className="mt-1 flex items-center gap-2">
+                      <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                        {CHAMADO_CATEGORIA_LABEL[c.categoria]}
+                      </p>
+                      <ChamadoStatusBadge
+                        status={c.status}
+                        dono={c.atribuido_nome}
+                        visao="autor"
+                        className="shrink-0 text-[10px]"
+                      />
+                    </div>
                   </Link>
                 </li>
               ))}
