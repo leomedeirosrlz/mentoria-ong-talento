@@ -4,7 +4,7 @@ material: roteiro-encontro-01
 titulo: "Roteiro do 1º encontro: Boas-vindas, Histórias de Vida & Abertura do PDM"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-1 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

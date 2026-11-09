@@ -43,6 +43,30 @@ export type IaToolCall = {
   function: { name: string; arguments: string };
 };
 
+/** usage da resposta (sdd D4): OpenAI-compatible estendido pelo Zen — cost
+ *  é USD real (≈0 dentro do plano Go), allowance é o que o request descontou
+ *  do teto mensal do plano (a métrica de custo real), list_cost o preço de
+ *  tabela. Campos opcionais: provider que não estende devolve só os tokens. */
+export type UsoIa = {
+  prompt_tokens?: number;
+  completion_tokens?: number;
+  cost?: number;
+  opencode?: {
+    billing_source?: string;
+    list_cost?: number;
+    allowance?: number;
+    estimated?: boolean;
+    tokens?: {
+      input?: number;
+      output?: number;
+      reasoning?: number;
+      cache_read?: number;
+      cache_write_5m?: number;
+      cache_write_1h?: number;
+    };
+  };
+};
+
 export const IA_MSG_INDISPONIVEL =
   "O assistente está indisponível no momento — tente de novo em instantes.";
 
@@ -65,6 +89,10 @@ function toolsPayload(papeis: AppRole[] | undefined) {
   let cached = toolsCache.get(chave);
   if (!cached) {
     cached = Object.values(IA_TOOLS)
+      // tools de escrita nunca entram no payload do chat: são MCP-only —
+      // anunciar pro modelo interno só ensinaria a chamar o que o canal
+      // bloqueia (mesma lógica do filtro por papel)
+      .filter((t) => !(t as { escreve?: boolean }).escreve)
       .filter((t) => !papeis || t.roles.some((r) => papeis.includes(r)))
       .map((t) => ({
         type: "function",
@@ -160,6 +188,17 @@ function esperar(ms: number, signal?: AbortSignal): Promise<boolean> {
 
 const EFFORT = { baixo: "low", medio: "medium", alto: "high" } as const;
 
+// teto de saída por rodada (sdd D3) — depende do esforço porque tokens de
+// raciocínio consomem o MESMO max_tokens: em "alto" um teto de 1600 era
+// engolido pelo raciocínio e a resposta saía vazia ou cortada. Sem
+// reasoning (ou "baixo") segue o 1600 de sempre — cobre folgado o formato
+// da casa (resposta curta + blocos GenUI)
+const MAX_TOKENS_POR_ESFORCO: Record<EsforcoIa, number> = {
+  baixo: 1600,
+  medio: 4000,
+  alto: 8000,
+};
+
 /** Corpo compartilhado das duas chamadas: tier de modelo vem do roteador
  *  (ia_config), não do env direto — slug ausente cai no IA_MODEL de
  *  sempre. reasoning_effort só entra quando configurado; provider que
@@ -172,13 +211,19 @@ function montarBody(
   stream: boolean,
   papeis: AppRole[] | undefined
 ) {
+  const tools = toolsPayload(papeis);
   return JSON.stringify({
     model: modelo || process.env.IA_MODEL,
     messages,
-    tools: toolsPayload(papeis),
-    tool_choice: "auto",
+    // sem tools (papel sem acesso a nenhuma, ou tier rapido: saudação e
+    // fora de escopo não consultam dados) — omite a chave em vez de
+    // mandar [], que alguns providers recusam com 400
+    ...(tools.length ? { tools, tool_choice: "auto" as const } : {}),
     ...(esforco ? { reasoning_effort: EFFORT[esforco] } : {}),
-    ...(stream ? { stream: true } : {}),
+    max_tokens: MAX_TOKENS_POR_ESFORCO[esforco ?? "baixo"],
+    ...(stream
+      ? { stream: true, stream_options: { include_usage: true } }
+      : {}),
   });
 }
 
@@ -198,7 +243,10 @@ export async function chamarModelo(
     fallbacks?: string[];
     papeis?: AppRole[];
   }
-): Promise<{ ok: true; mensagem: MsgChat } | { ok: false; erro: string }> {
+): Promise<
+  | { ok: true; mensagem: MsgChat; usage?: UsoIa; modelo?: string }
+  | { ok: false; erro: string }
+> {
   const cadeia = cadeiaDeModelos(opts?.modelo, opts?.fallbacks);
   let esperaMs = 0; // Retry-After de um 429 carrega pro próximo modelo
   for (let i = 0; i < cadeia.length; i++) {
@@ -247,14 +295,18 @@ export async function chamarModelo(
           }
           return { ok: false, erro: IA_MSG_INDISPONIVEL };
         }
-        const msg = (await res.json())?.choices?.[0]?.message as
-          | MsgChat
-          | undefined;
+        const json = await res.json();
+        const msg = json?.choices?.[0]?.message as MsgChat | undefined;
         if (!msg || (msg.content == null && !msg.tool_calls?.length)) {
           console.error("chamarModelo: resposta sem mensagem utilizável");
           return { ok: false, erro: IA_MSG_INDISPONIVEL };
         }
-        return { ok: true, mensagem: msg };
+        return {
+          ok: true,
+          mensagem: msg,
+          usage: json?.usage as UsoIa | undefined,
+          modelo: cadeia[i] ?? process.env.IA_MODEL,
+        };
       } catch (e) {
         console.error(`chamarModelo: ${cadeia[i] ?? "env"}`, e);
         if (!ultimo && erroTransitorio(e)) {
@@ -271,7 +323,13 @@ export async function chamarModelo(
 // ---------- streaming (SSE) ----------
 
 export type ResultadoStream =
-  | { ok: true; content: string; toolCalls: IaToolCall[] }
+  | {
+      ok: true;
+      content: string;
+      toolCalls: IaToolCall[];
+      usage?: UsoIa;
+      modelo?: string;
+    }
   // fallback=true: o provider recusou o stream (HTTP != 2xx ou corpo que
   // não é SSE) — a rota refaz a rodada via chamarModelo, mesmo contrato
   | { ok: false; erro: string; fallback?: boolean; abortado?: boolean };
@@ -377,6 +435,7 @@ export async function chamarModeloStream(
       const decoder = new TextDecoder();
       let buffer = "";
       let content = "";
+      let usage: UsoIa | undefined;
       const calls = new Map<number, IaToolCall>();
       // token com delay artificial nenhum — onToken é enfileirado direto na
       // resposta da rota; a velocidade de exibição é a da rede do provider
@@ -401,9 +460,14 @@ export async function chamarModeloStream(
         } catch {
           return true; // linha não-JSON (comentário/heartbeat): ignora
         }
-        const delta = (chunk as {
+        const c = chunk as {
           choices?: { delta?: { content?: string | null; tool_calls?: DeltaToolCall[] } }[];
-        })?.choices?.[0]?.delta;
+          usage?: UsoIa;
+        };
+        // stream_options.include_usage: o último chunk traz usage e
+        // choices vazio (sdd D4) — telemetria da rodada inteira
+        if (c.usage) usage = c.usage;
+        const delta = c.choices?.[0]?.delta;
         if (delta?.content) {
           saiuAlgo = true;
           content += delta.content;
@@ -448,6 +512,8 @@ export async function chamarModeloStream(
         ok: true,
         content,
         toolCalls: [...calls.entries()].sort(([a], [b]) => a - b).map(([, t]) => t),
+        usage,
+        modelo: cadeia[i] ?? process.env.IA_MODEL,
       };
     } catch (e) {
       if (opts.clienteAbortou()) {

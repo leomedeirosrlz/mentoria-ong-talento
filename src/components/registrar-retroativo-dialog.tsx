@@ -136,7 +136,9 @@ export function RegistrarRetroativoDialog({
             } else {
               scrollTarget.current = `registrar-${res.encontroId}`;
               // cobre a navegação entre páginas (ex.: registrar a partir da home)
-              router.push(`/duplas/${duplaId}#registrar-${res.encontroId}`);
+              // ?aba= explícito: na própria ficha o AbaPorHash não roda de
+              // novo (só no mount) e o form mora na aba Encontros
+              router.push(`/duplas/${duplaId}?aba=encontros#registrar-${res.encontroId}`);
               // pushState não dispara hashchange — avisa os cards pra abrir o
               // form do encontro recém-criado (mesma página) ou ignorar (outra)
               window.dispatchEvent(new Event("realiza:hash"));

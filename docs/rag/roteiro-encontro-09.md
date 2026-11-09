@@ -4,7 +4,7 @@ material: roteiro-encontro-09
 titulo: "Roteiro do 9º encontro: Revisão de Meio de Percurso"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-9 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

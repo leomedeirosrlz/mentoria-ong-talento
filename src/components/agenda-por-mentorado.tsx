@@ -1169,7 +1169,10 @@ function PedidoEspecialistaBlock({
   const s = solicitacao;
   const efetivo = s.status_efetivo ?? s.status;
   const quem =
-    s.especialista?.nome ?? s.especialista_nome ?? s.desejado?.nome ?? null;
+    (s.especialista?.nome_social || s.especialista?.nome) ??
+    s.especialista_nome ??
+    (s.desejado?.nome_social || s.desejado?.nome) ??
+    null;
   const diasNoMural = diffDias(hoje, toDateStr(new Date(s.created_at)));
   const tema = s.demanda ?? s.motivo;
 

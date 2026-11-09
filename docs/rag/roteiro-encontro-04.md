@@ -4,7 +4,7 @@ material: roteiro-encontro-04
 titulo: "Roteiro do 4º encontro: Submetas & Compromisso"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-4 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

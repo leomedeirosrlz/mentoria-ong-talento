@@ -14,12 +14,14 @@ import {
   ArrowUp,
   Check,
   CircleNotch,
+  ClipboardText,
   Copy,
   Key,
   Trash,
   X,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import {
   Select,
   SelectContent,
@@ -30,6 +32,15 @@ import {
 import { Switch } from "@/components/ui/switch";
 import { Skeleton } from "@/components/ui/skeleton";
 import { createClient } from "@/lib/supabase/client";
+import {
+  lerPlanoIa,
+  planoParaJson,
+  PLANOS_GO,
+  tetoDoModelo,
+  type PlanoGo,
+  type PlanoIa,
+} from "@/lib/ia/config";
+import { promptMcp } from "@/lib/ia/mcp-prompt";
 import { cn } from "@/lib/utils";
 
 type Tier = "rapido" | "balanceado" | "forte";
@@ -45,23 +56,26 @@ type Config = {
    *  o mapa completo */
   esforco: Record<Tier, Esforco>;
   roteamento: boolean;
+  /** chave `plano`: assinatura, dia de renovação e tetos sobrescritos —
+   *  alimenta a previsão do painel /ia */
+  plano: PlanoIa;
 };
 
 const TIERS: { chave: Tier; rotulo: string; dica: string }[] = [
   {
     chave: "rapido",
     rotulo: "Rápido",
-    dica: "saudações e conversa curta — menor latência",
+    dica: "saudações e conversa curta, menor latência",
   },
   {
     chave: "balanceado",
     rotulo: "Balanceado",
-    dica: "o padrão — dados de duplas, agenda, guias",
+    dica: "o padrão: dados de duplas, agenda, guias",
   },
   {
     chave: "forte",
     rotulo: "Forte",
-    dica: "análises e sínteses longas — mais lento, mais capaz",
+    dica: "análises e sínteses longas, mais lento e mais capaz",
   },
 ];
 
@@ -122,6 +136,8 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
   const [tokens, setTokens] = useState<TokenMcp[] | null>(null);
   const [tokenNovo, setTokenNovo] = useState<string | null>(null);
   const [copiado, setCopiado] = useState(false);
+  const [copiadoPrompt, setCopiadoPrompt] = useState<"token" | "base" | null>(null);
+  const [copiadoUrl, setCopiadoUrl] = useState(false);
   const [gerando, setGerando] = useState(false);
   /** saude por slug: probe de 1 token via /api/ia/modelos — undefined =
    *  não provado (fora do cap de 8), medindo = probe em voo */
@@ -150,7 +166,9 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
         forte: "medio",
       };
       let roteamento = true;
+      let plano = lerPlanoIa(null);
       for (const row of data ?? []) {
+        if (row.chave === "plano") plano = lerPlanoIa(row.valor);
         if (row.chave === "modelos" && row.valor && typeof row.valor === "object") {
           const m = row.valor as Record<string, unknown>;
           for (const t of TIERS)
@@ -180,7 +198,7 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
         if (row.chave === "roteamento" && typeof row.valor === "boolean")
           roteamento = row.valor;
       }
-      setCfg({ modelos, fallbacks, esforco, roteamento });
+      setCfg({ modelos, fallbacks, esforco, roteamento, plano });
 
       // reconhecimento automático: probe dos slugs configurados — com
       // cache de 3min: reabrir a aba não refaz chamadas ao provider
@@ -262,7 +280,7 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
       setCopiado(false);
       setTokens((t) => [row as TokenMcp, ...(t ?? [])]);
     } catch {
-      setErro("Não consegui gerar o token — tente de novo.");
+      setErro("Não consegui gerar o token. Tente de novo.");
     } finally {
       setGerando(false);
     }
@@ -286,6 +304,33 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
     }
   };
 
+  const copiarUrl = async () => {
+    try {
+      await navigator.clipboard.writeText(
+        `${window.location.origin}/api/mcp`
+      );
+      setCopiadoUrl(true);
+      setTimeout(() => setCopiadoUrl(false), 1600);
+    } catch {
+      // clipboard bloqueado: a URL segue selecionável no chip
+    }
+  };
+
+  const copiarPrompt = async (qual: "token" | "base") => {
+    try {
+      await navigator.clipboard.writeText(
+        promptMcp(window.location.origin, qual === "token" ? tokenNovo : null)
+      );
+      setCopiadoPrompt(qual);
+      setTimeout(
+        () => setCopiadoPrompt((c) => (c === qual ? null : c)),
+        1600
+      );
+    } catch {
+      // clipboard bloqueado: o token do card segue copiável por botão próprio
+    }
+  };
+
   const flash = useCallback((campo: string) => {
     setSalvo(campo);
     if (salvoTimer.current) clearTimeout(salvoTimer.current);
@@ -305,7 +350,7 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
       });
       setSalvando(null);
       if (error) {
-        setErro("Não consegui salvar — tente de novo.");
+        setErro("Não consegui salvar. Tente de novo.");
         return;
       }
       flash(campo);
@@ -349,6 +394,34 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
     if (!cfg) return;
     setCfg({ ...cfg, roteamento: v });
     void gravar("roteamento", "roteamento", v);
+  };
+
+  const mudarPlano = (campo: string, plano: PlanoIa) => {
+    if (!cfg) return;
+    setCfg({ ...cfg, plano });
+    void gravar(campo, "plano", planoParaJson(plano));
+  };
+  /** dia digitado: vazio limpa (previsão volta aos últimos 30 dias);
+   *  fora de 1..31 não grava e o campo volta ao salvo no blur */
+  const mudarDia = (texto: string) => {
+    if (!cfg) return;
+    const t = texto.trim();
+    const d = t === "" ? null : Number(t);
+    if (d !== null && !(Number.isInteger(d) && d >= 1 && d <= 31)) return;
+    if (d === cfg.plano.diaRenovacao) return;
+    mudarPlano("plano:dia", { ...cfg.plano, diaRenovacao: d });
+  };
+  /** teto digitado por modelo: vazio volta ao da tabela do plano */
+  const mudarTeto = (slug: string, texto: string) => {
+    if (!cfg) return;
+    const t = texto.trim().replace(",", ".");
+    const v = t === "" ? null : Number(t);
+    if (v !== null && !(Number.isFinite(v) && v > 0)) return;
+    if (v === (cfg.plano.tetos[slug] ?? null)) return;
+    const tetos = { ...cfg.plano.tetos };
+    if (v === null) delete tetos[slug];
+    else tetos[slug] = v;
+    mudarPlano(`plano:teto:${slug}`, { ...cfg.plano, tetos });
   };
 
   // função de render, não componente: o lint proíbe componente criado
@@ -614,24 +687,178 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
               </div>
             </section>
 
+            <section className="space-y-3 border-t border-border pt-4">
+              <div>
+                <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                  Plano do opencode
+                </h3>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Alimenta a previsão de consumo no painel Uso da Liza.
+                </p>
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-medium">Assinatura</span>
+                  {marcaDeSalvo("plano:plano")}
+                </div>
+                <div
+                  className="grid grid-cols-3 gap-1 rounded-md bg-muted p-0.5"
+                  role="group"
+                  aria-label="Assinatura do opencode"
+                >
+                  {PLANOS_GO.map((p) => (
+                    <Button
+                      key={p.chave}
+                      variant="ghost"
+                      size="sm"
+                      aria-pressed={cfg.plano.plano === p.chave}
+                      onClick={() =>
+                        cfg.plano.plano !== p.chave &&
+                        mudarPlano("plano:plano", { ...cfg.plano, plano: p.chave as PlanoGo })
+                      }
+                      className={cn(
+                        "h-7 rounded px-1.5 text-xs transition-colors duration-150",
+                        cfg.plano.plano === p.chave
+                          ? "bg-popover font-medium shadow-sm hover:bg-popover"
+                          : "text-muted-foreground hover:bg-transparent hover:text-foreground"
+                      )}
+                    >
+                      {p.rotulo}
+                    </Button>
+                  ))}
+                </div>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <label htmlFor="ia-dia-renovacao" className="text-sm font-medium">
+                  Dia de renovação
+                </label>
+                <span className="flex items-center gap-1.5">
+                  {marcaDeSalvo("plano:dia")}
+                  <Input
+                    id="ia-dia-renovacao"
+                    key={`dia-${cfg.plano.diaRenovacao ?? ""}`}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    max={31}
+                    placeholder="1 a 31"
+                    defaultValue={cfg.plano.diaRenovacao ?? ""}
+                    onBlur={(e) => {
+                      mudarDia(e.currentTarget.value);
+                      e.currentTarget.value = String(cfg.plano.diaRenovacao ?? "");
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") e.currentTarget.blur();
+                    }}
+                    className="w-24 text-right tabular-nums"
+                  />
+                </span>
+              </div>
+              {(() => {
+                const slugs = [
+                  ...new Set(
+                    TIERS.flatMap((t) => [cfg.modelos[t.chave], ...cfg.fallbacks[t.chave]])
+                  ),
+                ].filter((s): s is string => Boolean(s));
+                if (!slugs.length) return null;
+                const semManual = { ...cfg.plano, tetos: {} };
+                return (
+                  <div className="space-y-1.5">
+                    <p className="text-sm font-medium">Teto mensal por modelo (US$)</p>
+                    <ul className="space-y-1.5">
+                      {slugs.map((slug) => {
+                        const padrao = tetoDoModelo(semManual, slug);
+                        return (
+                          <li key={slug} className="flex items-center gap-2">
+                            <label
+                              htmlFor={`ia-teto-${slug}`}
+                              className="min-w-0 flex-1 truncate font-mono text-xs"
+                              title={slug}
+                            >
+                              {slug}
+                            </label>
+                            {marcaDeSalvo(`plano:teto:${slug}`)}
+                            <Input
+                              id={`ia-teto-${slug}`}
+                              key={`teto-${slug}-${cfg.plano.tetos[slug] ?? ""}`}
+                              inputMode="decimal"
+                              placeholder={padrao != null ? `${padrao}` : "sem teto"}
+                              aria-describedby={`ia-teto-${slug}-dica`}
+                              defaultValue={cfg.plano.tetos[slug] ?? ""}
+                              onBlur={(e) => {
+                                mudarTeto(slug, e.currentTarget.value);
+                                e.currentTarget.value = String(cfg.plano.tetos[slug] ?? "");
+                              }}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") e.currentTarget.blur();
+                              }}
+                              className="w-24 text-right tabular-nums"
+                            />
+                            <span id={`ia-teto-${slug}-dica`} className="sr-only">
+                              {padrao != null
+                                ? `Vazio usa o teto do plano, US$ ${padrao}`
+                                : "Sem teto conhecido no plano; vazio deixa sem teto"}
+                            </span>
+                          </li>
+                        );
+                      })}
+                    </ul>
+                    <p className="text-[11px] text-muted-foreground">
+                      Vazio usa o teto do plano (o número em cinza).
+                    </p>
+                  </div>
+                );
+              })()}
+            </section>
+
             <section className="space-y-2 border-t border-border pt-4">
               <div>
                 <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                   IA externa (MCP)
                 </h3>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Token pra conectar Claude, Cursor ou outro cliente MCP em
-                  <code className="mx-0.5 rounded bg-muted px-1 font-mono text-[11px]">
-                    /api/mcp
-                  </code>
-                  . Carrega o seu papel — quem tem acesso, revoga aqui.
+                  Token pra conectar Claude, Cursor ou outro cliente MCP.
+                  Carrega o seu papel; quem tem acesso revoga aqui.
                 </p>
               </div>
+
+              <div className="flex items-center gap-1.5 rounded-lg border border-border bg-muted/40 px-2.5 py-2">
+                <code className="min-w-0 flex-1 truncate font-mono text-[11px] text-muted-foreground">
+                  POST {window.location.origin}/api/mcp
+                </code>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  aria-label="Copiar endpoint"
+                  onClick={copiarUrl}
+                  className="shrink-0"
+                >
+                  {copiadoUrl ? (
+                    <Check aria-hidden className="text-[var(--ok-text)]" />
+                  ) : (
+                    <Copy aria-hidden />
+                  )}
+                </Button>
+              </div>
+
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => copiarPrompt("base")}
+                className="w-full"
+              >
+                {copiadoPrompt === "base" ? (
+                  <Check aria-hidden className="text-[var(--ok-text)]" />
+                ) : (
+                  <ClipboardText aria-hidden />
+                )}
+                Copiar prompt de conexão
+              </Button>
 
               {tokenNovo && (
                 <div className="space-y-1.5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn-bg)]/40 p-2.5">
                   <p className="text-[11px] font-medium">
-                    Copie agora — o token não aparece de novo:
+                    Copie agora, o token não aparece de novo:
                   </p>
                   <div className="flex items-center gap-1.5">
                     <code className="min-w-0 flex-1 select-all truncate rounded bg-muted px-2 py-1.5 font-mono text-[11px]">
@@ -651,6 +878,19 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
                       )}
                     </Button>
                   </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => copiarPrompt("token")}
+                    className="w-full"
+                  >
+                    {copiadoPrompt === "token" ? (
+                      <Check aria-hidden className="text-[var(--ok-text)]" />
+                    ) : (
+                      <ClipboardText aria-hidden />
+                    )}
+                    Copiar prompt com contexto + token
+                  </Button>
                 </div>
               )}
 

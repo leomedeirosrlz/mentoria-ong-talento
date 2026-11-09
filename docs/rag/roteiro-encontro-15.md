@@ -4,7 +4,7 @@ material: roteiro-encontro-15
 titulo: "Roteiro do 15º encontro: Reflexão & Reconhecimento"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-15 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

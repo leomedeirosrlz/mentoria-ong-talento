@@ -1,8 +1,9 @@
 "use client";
 
 // Markdown-lite da resposta do assistente (saiu da conversa no v3): bold,
-// listas, links, código, tabela pipe e as linhas-marca da genUI — blocos
-// por linha, inline por regex. O modelo só emite esse subconjunto (system
+// listas (com um nível de sub-item), citação agrupada, separador ---,
+// links, código, tabela pipe e as linhas-marca da genUI — blocos por
+// linha, inline por regex. O modelo só emite esse subconjunto (system
 // prompt). A análise (extrairBlocos) roda uma vez por render da bolha em
 // `analisarResposta`; o MdLite só desenha.
 
@@ -11,6 +12,7 @@ import type { CSSProperties, ReactNode } from "react";
 import {
   ehTabelaMd,
   extrairBlocos,
+  HR_LINHA,
   MARCA_BLOCO,
   MARCA_PENDENTE,
   parseTabelaMd,
@@ -23,7 +25,7 @@ import {
 } from "@/lib/ia/render";
 import { BlocoSkeleton, BlocoView } from "@/components/assistente-blocos";
 import { CodeBlock } from "@/components/assistente-genui";
-import { cn } from "@/lib/utils";
+import { cn, pathInterno } from "@/lib/utils";
 
 export type Analise = ReturnType<typeof extrairBlocos>;
 
@@ -49,18 +51,36 @@ export function ehRica(a: Analise, temUi: boolean): boolean {
   );
 }
 
-const INLINE = /(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/g;
+// itálico em CommonMark simplificado: o conteúdo não começa nem termina
+// com espaço e o * de abertura não cola em caractere de palavra — sem a
+// régua, "2 * 3 = 6 e 4 * 5" virava <em> no meio da conta
+const INLINE = /(\*\*[^\s*](?:[^*\n]*[^\s*])?\*\*|(?<!\w)\*[^\s*](?:[^*\n]*[^\s*])?\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/g;
 
 /** Texto fatiado em ~6 chars com fade por fatia (stream): o conteúdo
  *  só cresce no fim, então spans anteriores não re-animam e as novas
  *  entram suave — a velocidade de exibição continua a da rede (sem
  *  throttle de TPS), só a aparição é amortecida. */
 function Tokens({ texto }: { texto: string }) {
+  // fatias de ~6 code points — for..of itera code point (não unidade
+  // UTF-16), então um emoji nunca é partido em dois spans (surrogate
+  // solto renderizaria "�")
+  const pedacos: string[] = [];
+  let cur = "";
+  let n = 0;
+  for (const ch of texto) {
+    cur += ch;
+    if (++n === 6) {
+      pedacos.push(cur);
+      cur = "";
+      n = 0;
+    }
+  }
+  if (cur) pedacos.push(cur);
   return (
     <>
-      {Array.from({ length: Math.ceil(texto.length / 6) }, (_, i) => (
+      {pedacos.map((p, i) => (
         <span key={i} className="ia-tok">
-          {texto.slice(i * 6, i * 6 + 6)}
+          {p}
         </span>
       ))}
     </>
@@ -74,11 +94,26 @@ export function Inline({ texto, animar }: { texto: string; animar?: boolean }) {
   return (
     <>
       {texto.split(INLINE).map((parte, i) => {
-        if (parte.startsWith("**") && parte.endsWith("**"))
+        // split com grupo de captura: índice ímpar = trecho que casou o
+        // INLINE; par = texto solto ("* fora *" não pode virar <em>)
+        const casou = i % 2 === 1;
+        if (casou && parte.startsWith("**") && parte.endsWith("**"))
           return (
             <strong key={i}>
               {animar ? <Tokens texto={parte.slice(2, -2)} /> : parte.slice(2, -2)}
             </strong>
+          );
+        if (
+          casou &&
+          parte.length > 2 &&
+          parte.startsWith("*") &&
+          parte.endsWith("*") &&
+          !parte.startsWith("**")
+        )
+          return (
+            <em key={i}>
+              {animar ? <Tokens texto={parte.slice(1, -1)} /> : parte.slice(1, -1)}
+            </em>
           );
         if (parte.startsWith("`") && parte.endsWith("`"))
           return (
@@ -96,7 +131,7 @@ export function Inline({ texto, animar }: { texto: string; animar?: boolean }) {
           // interno vai por next/link: navegação SPA mantém o fetch do
           // stream vivo; <a> puro dava full nav e matava a resposta
           // (REALIZA-332)
-          if (href.startsWith("/"))
+          if (pathInterno(href))
             return (
               <Link key={i} href={href} className={LINK_CLS}>
                 {animar ? <Tokens texto={rotulo} /> : rotulo}
@@ -259,32 +294,82 @@ function MdLite({
 }) {
   const linhas = texto.split("\n");
   const saida: ReactNode[] = [];
-  let lista: string[] | null = null;
+  // item com `sub` = marcador indentado ≥2 espaços embaixo dele — vira
+  // <ul> filha do <li> (só 1 nível de aninhamento)
+  type ItemLista = { texto: string; sub?: string[] };
+  let lista: ItemLista[] | null = null;
   let listaOrd = false;
+  // linhas ">" seguidas acumulam num blockquote só (um <p> por linha)
+  let citacao: string[] | null = null;
   let emCodigo = false;
   let codigo: string[] = [];
   // tag do fence corrente (```sql) — vira o rótulo do header do CodeBlock
   let langCodigo: string | undefined;
   let key = 0;
-  const flush = () => {
+  // ```nota é a observação de rodapé — texto menor e apagado, não código
+  // (chatgpt-style footnote; o prompt a usa p/ "não se aplica quando…",
+  // detalhe de cálculo, lembrete fino). Vale no fence fechado e no aberto
+  // (stream ou fim truncado): já renderiza como rodapé, nunca CodeBlock
+  const notaRodape = () => (
+    <div
+      key={key++}
+      className="text-xs leading-relaxed text-muted-foreground opacity-80"
+    >
+      {codigo.map((l, i) => (
+        <p key={i}>
+          <Inline texto={l} animar={animar} />
+        </p>
+      ))}
+    </div>
+  );
+  const flushLista = () => {
     if (!lista?.length) return;
-    const items = lista.map((l, i) => (
+    const items = lista.map((item, i) => (
       <li key={i}>
-        <Inline texto={l} animar={animar} />
+        <Inline texto={item.texto} animar={animar} />
+        {item.sub?.length ? (
+          <ul className="mt-1.5 list-disc space-y-1 pl-4 marker:text-muted-foreground">
+            {item.sub.map((s, j) => (
+              <li key={j}>
+                <Inline texto={s} animar={animar} />
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </li>
     ));
     saida.push(
       listaOrd ? (
-        <ol key={key++} className="list-decimal space-y-1 pl-5 marker:text-muted-foreground">
+        <ol key={key++} className="list-decimal space-y-1.5 pl-5 marker:text-muted-foreground">
           {items}
         </ol>
       ) : (
-        <ul key={key++} className="list-disc space-y-1 pl-5 marker:text-muted-foreground">
+        <ul key={key++} className="list-disc space-y-1.5 pl-5 marker:text-muted-foreground">
           {items}
         </ul>
       )
     );
     lista = null;
+  };
+  // fecha o que estiver aberto na posição do texto: a citação agrupada e
+  // a lista nunca coexistem (uma fecha a outra), então a ordem é neutra
+  const flush = () => {
+    if (citacao?.length) {
+      saida.push(
+        <blockquote
+          key={key++}
+          className="space-y-1 border-l-[3px] border-border pl-3 text-muted-foreground"
+        >
+          {citacao.map((l, i) => (
+            <p key={i}>
+              <Inline texto={l} animar={animar} />
+            </p>
+          ))}
+        </blockquote>
+      );
+      citacao = null;
+    }
+    flushLista();
   };
   let pularAte = -1;
   linhas.forEach((linha, idx) => {
@@ -293,9 +378,11 @@ function MdLite({
     // e copiar), sem inline
     if (emCodigo) {
       if (/^\s*```/.test(linha)) {
-        saida.push(
-          <CodeBlock key={key++} codigo={codigo.join("\n")} linguagem={langCodigo} />
-        );
+        if (langCodigo === "nota") saida.push(notaRodape());
+        else
+          saida.push(
+            <CodeBlock key={key++} codigo={codigo.join("\n")} linguagem={langCodigo} />
+          );
         emCodigo = false;
         codigo = [];
         langCodigo = undefined;
@@ -336,34 +423,69 @@ function MdLite({
         return;
       }
     }
-    const bullet = /^\s*[-*•]\s+(.+)$/.exec(linha);
-    const num = /^\s*\d+[.)]\s+(.+)$/.exec(linha);
+    // separador de bloco temático: 3+ do mesmo char colado ("---", "***",
+    // "___"). Vem antes do bullet: "- - -" não casa aqui (o regex exige
+    // os chars colados) e segue como lista; "---" puro já não casaria no
+    // bullet de qualquer forma (ele pede espaço depois do marcador)
+    if (HR_LINHA.test(linha)) {
+      flush();
+      saida.push(<hr key={key++} className="border-border/70" />);
+      return;
+    }
+    const quote = /^>\s?(.*)$/.exec(linha);
+    if (quote) {
+      // ">" seguidas formam UMA citação (não uma barra por linha): só a
+      // lista pendente fecha aqui; a citação em si sai no próximo flush
+      flushLista();
+      (citacao ??= []).push(quote[1]);
+      return;
+    }
+    const bullet = /^(\s*)[-*•]\s+(.+)$/.exec(linha);
+    const num = /^(\s*)\d+[.)]\s+(.+)$/.exec(linha);
     if (bullet || num) {
+      const m = (bullet ?? num)!;
+      // marcador indentado ≥2 espaços = sub-item do anterior (a sublista
+      // é sempre <ul>, numerado ou não); sem lista aberta cai como item
+      // de topo — conteúdo nunca some
+      if (m[1].length >= 2 && lista?.length) {
+        (lista[lista.length - 1].sub ??= []).push(m[2]);
+        return;
+      }
       if (!lista || listaOrd !== Boolean(num)) {
         flush();
         lista = [];
         listaOrd = Boolean(num);
       }
-      lista.push((bullet ?? num)![1]);
+      lista.push({ texto: m[2] });
       return;
     }
     flush();
     if (!linha.trim()) return;
-    const h = /^#{1,3}\s+(.+)$/.exec(linha);
+    const h = /^(#{1,4})\s+(.+)$/.exec(linha);
     if (h) {
+      // títulos curtos na hierarquia do painel: ## = seção, ### =
+      // subseção, #### = nível miúdo — a bolha vive dentro da página (o
+      // h1 já é dela), então nem o modelo emite h1 e um eventual # cai
+      // no mesmo nível do ##. pt-N abre a seção de verdade e first:pt-0
+      // zera quando o título é o 1º bloco da resposta
+      const nivel = h[1].length;
+      const Tag = (nivel >= 4 ? "h4" : nivel >= 3 ? "h3" : "h2") as
+        | "h2"
+        | "h3"
+        | "h4";
       saida.push(
-        <p key={key++} className="font-semibold">
-          <Inline texto={h[1]} animar={animar} />
-        </p>
-      );
-      return;
-    }
-    const quote = /^>\s?(.*)$/.exec(linha);
-    if (quote) {
-      saida.push(
-        <blockquote key={key++} className="border-l-2 border-border pl-3 text-muted-foreground">
-          <Inline texto={quote[1]} animar={animar} />
-        </blockquote>
+        <Tag
+          key={key++}
+          className={
+            nivel >= 4
+              ? "text-sm font-semibold pt-2 first:pt-0"
+              : nivel >= 3
+                ? "text-base font-semibold tracking-tight pt-3 first:pt-0"
+                : "text-lg font-semibold tracking-tight pt-4 first:pt-0"
+          }
+        >
+          <Inline texto={h[2]} animar={animar} />
+        </Tag>
       );
       return;
     }
@@ -374,17 +496,25 @@ function MdLite({
     );
   });
   flush();
-  // fence comum aberto no fim do stream: mostra o que chegou — copiar fica
-  // desabilitado até o fence fechar (o bloco ainda está incompleto)
+  // fence aberto no fim do stream (ou texto truncado sem fechamento):
+  // fence comum mostra o que chegou com copiar desabilitado; ```nota
+  // aberto já renderiza como rodapé — nunca vira bloco de código
   if (emCodigo && codigo.length)
-    saida.push(
-      <CodeBlock key={key++} codigo={codigo.join("\n")} linguagem={langCodigo} pronto={false} />
-    );
+    langCodigo === "nota"
+      ? saida.push(notaRodape())
+      : saida.push(
+          <CodeBlock key={key++} codigo={codigo.join("\n")} linguagem={langCodigo} pronto={false} />
+        );
   // overflow-wrap: links longos e código sem quebra não vazam da coluna
   // estreita do painel (REALIZA-334). ia-stream põe o caret no fim do
   // último parágrafo/item (CSS), não numa linha própria
   return (
-    <div className={cn("space-y-2.5 [overflow-wrap:anywhere]", animar && "ia-stream")}>
+    <div
+      className={cn(
+        "space-y-3 leading-relaxed [overflow-wrap:anywhere]",
+        animar && "ia-stream"
+      )}
+    >
       {saida}
     </div>
   );

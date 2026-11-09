@@ -1,6 +1,7 @@
 import {
   BookOpen,
   CalendarBlank,
+  CalendarPlus,
   CaretDown,
   HandHeart,
   VideoCamera,
@@ -85,6 +86,7 @@ export function EncontroRow({
   jovemNome,
   jovemWhatsapp,
   jornadaViva,
+  lacunaAnterior,
   autorNome,
 }: {
   /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
@@ -142,6 +144,10 @@ export function EncontroRow({
   /** Dupla viva (ativa|pausada) — destrava as ações de link da pendência
    *  de avaliação; fechada deixa só o aviso como fato. */
   jornadaViva: boolean;
+  /** Nº do primeiro passo ainda pendente, quando anterior a este — gera a
+   *  explicação da lacuna no "Agendar" de um passo fora de ordem (o híbrido:
+   *  não restringe, mas sempre diz o que está aberto antes). */
+  lacunaAnterior?: number | null;
   /** Nome de quem vê — assina o convite de avaliação pro jovem. */
   autorNome?: string;
 }) {
@@ -177,7 +183,7 @@ export function EncontroRow({
     ? new Date(encontro.data_hora).getTime() - new Date().getTime()
     : null;
   const chamadaAgora =
-    encontro?.status === "agendado" &&
+    (encontro?.status === "agendado" || encontro?.status === "remarcado") &&
     msAteInicio != null &&
     msAteInicio <= 15 * 60000 &&
     msAteInicio >= -2 * 3600000;
@@ -193,15 +199,30 @@ export function EncontroRow({
         ? <RevelarApos from={encontro.data_hora}>{node}</RevelarApos>
         : null;
   const podeRegistrar = !!(encontro && !reg && podeEditar);
-  // remarcar e trocar o link são gestos do encontro agendado — mentor de
-  // dupla ativa; a coord (e o sup) copia o link, nunca edita
-  const podeRemarcar = encontro?.status === "agendado" && podeEditar;
+  // remarcar e trocar o link são gestos do encontro em aberto — o servidor
+  // aceita reagendar remarcado/nao_aconteceu/cancelado via `atual` (só
+  // realizado é barrado), então a linha oferece o mesmo caminho da agenda;
+  // a coord (e o sup) copia o link, nunca edita
+  const emAberto =
+    encontro?.status === "agendado" ||
+    encontro?.status === "remarcado" ||
+    encontro?.status === "nao_aconteceu" ||
+    encontro?.status === "cancelado";
+  const podeRemarcar = emAberto && podeEditar;
+  // passo ainda sem row: a linha também oferece o agendamento (o dialog
+  // cobre os dois sentidos — data futura agenda, passada vira retroativo)
+  // e avisa quando um passo anterior segue pendente. Antes a linha ficava
+  // muda e o único caminho era o cabeçalho, que só opera o alvo
+  const podeAgendarPasso = encontro == null && souMentor && ativa;
   // ≤3 ações por linha: status à esquerda, primária da pendência, o resto ghost
   const temAcoes =
     registroPendente ||
     podeRegistrar ||
     podeRemarcar ||
-    (encontro?.status === "agendado" && podeMarcar && !!encontro.data_hora) ||
+    podeAgendarPasso ||
+    ((encontro?.status === "agendado" || encontro?.status === "remarcado") &&
+      podeMarcar &&
+      !!encontro.data_hora) ||
     (naoAconteceu && podeMarcar) ||
     !!reg?.precisa_apoio;
   // linha 1 (data + situação): a 1ª cláusula é a semana que o guia sugere,
@@ -219,7 +240,7 @@ export function EncontroRow({
       semanaSugerida &&
       `semana sugerida ${diaMesCurto(semanaSugerida.seg)} a ${diaMesCurto(semanaSugerida.dom)}`,
     encontro?.data_hora &&
-      `${feito && !diverge ? "realizado" : "agendado"} ${formatDateTime(encontro.data_hora)}`,
+      `${feito && !diverge ? "realizado" : encontro.status === "cancelado" ? "cancelado" : "agendado"} ${formatDateTime(encontro.data_hora)}`,
     naoAconteceu && "não aconteceu",
   ]
     .filter(Boolean)
@@ -426,13 +447,40 @@ export function EncontroRow({
             )}
             {/* o botão só vale depois do horário — RevelarApos faz ele aparecer
                 pra quem ficou com a aba aberta atravessando o encontro */}
-            {encontro?.status === "agendado" && podeMarcar && encontro.data_hora && (
+            {(encontro?.status === "agendado" || encontro?.status === "remarcado") &&
+              podeMarcar &&
+              encontro.data_hora && (
               <RevelarApos from={encontro.data_hora}>
                 <NaoAconteceuButton encontroId={encontro.id} duplaId={duplaId} />
               </RevelarApos>
             )}
             {naoAconteceu && podeMarcar && (
               <DesfazerNaoAconteceuButton encontroId={encontro.id} duplaId={duplaId} />
+            )}
+            {podeAgendarPasso && (
+              <span className="flex flex-col items-end gap-1">
+                <AgendarEncontroDialog
+                  duplaId={duplaId}
+                  numero={passo.numero}
+                  atual={null}
+                  sugerido={passo.data ?? undefined}
+                  piso={piso}
+                  jovemNome={jovemNome}
+                  rotulo={ehEsp ? "sessão de especialista" : undefined}
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      <CalendarPlus size={16} />
+                      Agendar
+                    </Button>
+                  }
+                />
+                {lacunaAnterior != null && (
+                  <span className="max-w-56 text-right text-[11px] leading-snug text-muted-foreground">
+                    o {lacunaAnterior}º ainda está pendente — você pode agendar
+                    este mesmo assim
+                  </span>
+                )}
+              </span>
             )}
             {reg?.precisa_apoio && souCoord && (
               <ResolverApoioButton registroId={reg.id} duplaId={duplaId} />

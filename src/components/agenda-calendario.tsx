@@ -1897,20 +1897,42 @@ export function AgendaCalendario({
           <DuplaSemEncontroLinha dupla={d} previsto={linha.numero} />
           <div className="flex flex-wrap items-center gap-2 pb-1.5 pl-[1.625rem] pr-2">
             {selecionado < hoje ? (
-              <RegistrarRetroativoDialog
-                duplaId={d.id}
-                faltantes={opcoes}
-                numeroInicial={linha.numero}
-                quandoPadrao={selecionado}
-                esp={d.trilha === "especialista"}
-                onCreated={(id, dia) => encontroCriado(d.id, id, dia)}
-                trigger={
-                  <Button variant="outline" size="sm">
-                    <ClockCounterClockwise size={16} />
-                    {`Registrar o ${linha.numero}º encontro`}
-                  </Button>
-                }
-              />
+              <>
+                <RegistrarRetroativoDialog
+                  duplaId={d.id}
+                  faltantes={opcoes}
+                  numeroInicial={linha.numero}
+                  quandoPadrao={selecionado}
+                  esp={d.trilha === "especialista"}
+                  onCreated={(id, dia) => encontroCriado(d.id, id, dia)}
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      <ClockCounterClockwise size={16} />
+                      {`Registrar o ${linha.numero}º encontro`}
+                    </Button>
+                  }
+                />
+                {/* "rolou sem agendar" (Registrar) não é o único desfecho:
+                    a dupla pode não ter encontrado e querer agendar pra
+                    frente. O dialog sugere hoje (não o dia passado) e
+                    qualquer data vale — passada vira retroativo, futura
+                    agenda normal */}
+                <AgendarEncontroDialog
+                  duplaId={d.id}
+                  numero={linha.numero}
+                  atual={null}
+                  sugerido={hoje}
+                  piso={d.iniciada_em ?? undefined}
+                  jovemNome={d.mentorado.nome.split(" ")[0]}
+                  onCreated={(id, dia) => encontroCriado(d.id, id, dia)}
+                  trigger={
+                    <Button variant="outline" size="sm">
+                      <CalendarPlus size={16} />
+                      {`Agendar o ${linha.numero}º encontro`}
+                    </Button>
+                  }
+                />
+              </>
             ) : (
               <AgendarEncontroDialog
                 duplaId={d.id}
@@ -4048,14 +4070,16 @@ function EncontroDuplaRow({
     .filter((e) => e.status !== "feito")
     .sort((a, b) => (a.prazo ?? "9999").localeCompare(b.prazo ?? "9999"));
 
-  // candidato ao follow-up inline: realizado sem registro, ou agendado com
-  // horário (quando ele vence vira limbo — o RevelarApos abaixo segura o
-  // "já passou?" no tempo, então o bloco monta mesmo com a hora por vir)
+  // candidato ao follow-up inline: realizado sem registro, ou qualquer
+  // encontro com horário marcado — agendado/remarcado vencido vira limbo e
+  // nao_aconteceu/cancelado podem ter rolado de fato (o salvarRegistro
+  // corrige o status pra realizado, igual na ficha; o RevelarApos segura
+  // o "já passou?" no tempo enquanto a hora não chega)
   const podeTerRegistro =
     ehMentor &&
     !encontro.registro &&
     (encontro.status === "realizado" ||
-      (encontro.status === "agendado" && encontro.data_hora != null));
+      encontro.data_hora != null);
 
   // CTA do follow-up. "Aconteceu?" no limbo porque a pergunta é real: o
   // encontro agendado pode não ter rolado — remarcar segue no bloco do dia.
@@ -4076,7 +4100,9 @@ function EncontroDuplaRow({
   // pro mentor); coord/sup monitoram e repassam o link, então copiam — um
   // "abrir" acidental na call da dupla é pior que a fricção de colar
   const linkChamada =
-    encontro.status === "agendado" ? linkSeguro(encontro.link) : null;
+    encontro.status === "agendado" || encontro.status === "remarcado"
+      ? linkSeguro(encontro.link)
+      : null;
   const chamada =
     linkChamada == null ? null : ehMentor ? (
       <a
@@ -4098,7 +4124,8 @@ function EncontroDuplaRow({
   // do "adicionar" — o lápis ocupa o lugar do chip quando ele não existe.
   // Coord/sup copiam o link, nunca editam (regra da action, não só daqui)
   const editarLink =
-    ehMentor && encontro.status === "agendado" ? (
+    ehMentor &&
+    (encontro.status === "agendado" || encontro.status === "remarcado") ? (
       <EditarLinkDialog encontroId={encontro.id} linkAtual={encontro.link} />
     ) : null;
 

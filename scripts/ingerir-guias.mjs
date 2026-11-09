@@ -15,11 +15,10 @@
 // `material` (slug de /materiais/documento/<slug> ou o identificador do doc)
 // e `natureza` (transcrito | consolidado | sintese-operacional) são
 // OBRIGATÓRIOS — o doc sem eles é recusado, pra manter o corpus uniforme.
-// Os chunks CARREGAM titulo/material no pipeline, mas o insert fica no
-// schema da 0136 — `ia_chunks` não tem coluna pra eles (gap documentado no
-// README; quando uma migration abrir `material`/`titulo` basta incluir no
-// CAMPOS_INSERT abaixo). Até lá o mapa guia → metadados vive no
-// front-matter e em docs/rag/fontes.json (--manifest).
+// `material` e `secao_anchor` (a âncora da seção, rag-chunks) viraram
+// coluna na 0165 e entram no insert — são a ponta de citação: o app linka
+// /materiais/documento/<material>#<secao_anchor>. `titulo` segue fora do
+// banco, só no pipeline e no manifest (docs/rag/fontes.json).
 //
 // Gate anti-PII: qualquer doc que contenha marcadores de dados pessoais reais
 // (CPF, RG, nome do exemplar do termo, endereço do exemplar) é recusado — o
@@ -56,10 +55,11 @@ const PII_MARCADORES = [
 
 // ---------- persistência ----------
 
-// Colunas que o insert preenche — o schema da 0136 é (guia, secao, pagina,
-// texto). titulo/material viajam no chunk e saem pelo manifest/dry-run;
-// quando uma migration abrir a coluna, incluir o nome aqui propaga sozinho.
-const CAMPOS_INSERT = ["guia", "secao", "pagina", "texto"];
+// Colunas que o insert preenche — guia/secao/pagina/texto da 0136 +
+// material/secao_anchor da 0165. `titulo` viaja no chunk e sai pelo
+// manifest/dry-run; quando uma migration abrir a coluna, incluir o nome
+// aqui propaga sozinho.
+const CAMPOS_INSERT = ["guia", "secao", "pagina", "texto", "material", "secao_anchor"];
 
 const paraInsert = (chunk) =>
   Object.fromEntries(CAMPOS_INSERT.map((c) => [c, chunk[c]]));
@@ -129,10 +129,11 @@ for (const f of arquivos) {
       // limparTrecho/metaFonte em src/lib/ia/fontes.ts)
       pagina: si * 100 + ci,
       texto: texto.slice(0, 4000),
-      // metadados do doc propagados ao chunk — fora do insert enquanto o
-      // schema não tiver coluna (ver CAMPOS_INSERT e o gap no README)
+      // metadados do doc propagados ao chunk: material/secao_anchor são
+      // coluna (0165, em CAMPOS_INSERT); titulo segue só no pipeline
       titulo: doc.titulo,
       material: doc.material,
+      secao_anchor: s.secao_anchor,
     }))
   );
   docs.push({ arquivo: f, ...doc, chunks });
@@ -145,7 +146,10 @@ for (const d of docs) {
     `  ${d.arquivo.padEnd(42)} ${String(d.chunks.length).padStart(3)} chunks · ${d.secoes.length} seções · ${d.natureza} · material=${d.material}`
   );
 }
-console.log(`\namostra:\n${docs[0].chunks[0].texto.slice(0, 300)}\n…`);
+const amostra = docs[0].chunks[0];
+console.log(
+  `\namostra: ${amostra.guia} · "${amostra.secao}" · material=${amostra.material} · secao_anchor=${amostra.secao_anchor}\n${amostra.texto.slice(0, 300)}\n…`
+);
 
 // ---------- manifest (guia → metadados das fontes) ----------
 
@@ -154,6 +158,7 @@ const fontes = docs.map((d) => ({
   titulo: d.titulo,
   material: d.material,
   natureza: d.natureza,
+  audiencia: d.audiencia,
   arquivo: d.arquivo,
   secoes: d.secoes.length,
   chunks: d.chunks.length,
@@ -248,5 +253,18 @@ for (const g of orfaos) {
   }
   console.log(`− ${g}: saiu do corpus, chunks removidos`);
 }
+
+// match_ia_chunks lê o df dos lexemas de ia_chunks_df (0161) em vez de
+// recontar o corpus a cada busca: sem o recompute os pesos ficam defasados.
+const { data: linhasDf, error: dfErr } = await supabase.rpc("atualizar_ia_chunks_df");
+if (dfErr) {
+  console.error(
+    `✗ recálculo do df (atualizar_ia_chunks_df) falhou — ${dfErr.message}. ` +
+      "Os chunks já foram gravados; a busca usa pesos antigos até rodar " +
+      "`select public.atualizar_ia_chunks_df();` no SQL editor."
+  );
+  process.exit(1);
+}
+console.log(`✓ df recalculado: ${linhasDf} lexemas`);
 
 console.log(`\n== ingestão ok: ${total} chunks em ${docs.length} documentos.`);

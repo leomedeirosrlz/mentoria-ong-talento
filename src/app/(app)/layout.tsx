@@ -162,6 +162,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
       assistente={
         acessoIa ? (
           <AssistenteBolhaLazy
+            key="assistente"
             papeis={papeisIa}
             demo={demo != null}
             configurado={providerConfigurado()}

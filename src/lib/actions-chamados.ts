@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { enviarEmailsLote, SITE_URL } from "@/lib/email";
 import {
@@ -35,12 +36,50 @@ function erroRpc(error: { message?: string } | null): string {
   return error?.message || "Não foi possível concluir. Tente de novo.";
 }
 
-function revalidaChamado(extra?: string) {
+/** Só as telas que mostram chamado: /chamados, a home (MeusChamadosCard e
+ *  o badge "sem dono" do layout) e, pro jovem, /jovem/perfil — /jovem não
+ *  lista chamado. As páginas são dinâmicas, então isso só invalida o router
+ *  cache de quem agiu; a página atual já volta re-renderizada na resposta da
+ *  action (qualquer revalidação faz o Next renderizá-la). */
+function revalidaChamado(papel: string | null, opts?: { home?: boolean }) {
   revalidatePath("/chamados");
-  revalidatePath("/"); // badge/cards das homes
-  revalidatePath("/jovem");
-  revalidatePath("/jovem/perfil");
-  if (extra) revalidatePath(extra);
+  if (opts?.home !== false) revalidatePath("/");
+  if (papel === "mentorado") revalidatePath("/jovem/perfil");
+}
+
+/** E-mail redundante + log depois da resposta: o Resend (e o rpc de log)
+ *  não seguram o usuário. Em server action o after() ainda enxerga os
+ *  cookies, então o client de sessão segue válido pro rpc. Nunca lança. */
+function enviaEmailChamadoDepois(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  envio: {
+    chamadoId: string | undefined;
+    para: string[];
+    assunto: string;
+    html: string;
+    contexto: string;
+  }
+) {
+  after(async () => {
+    try {
+      const r = await enviarEmailsLote({
+        para: envio.para,
+        assunto: envio.assunto,
+        html: envio.html,
+      });
+      // log via RPC definer — policy de emails_enviados é coord-only
+      const { error } = await supabase.rpc("registrar_email_chamado", {
+        p_chamado_id: envio.chamadoId,
+        p_assunto: envio.assunto,
+        p_destinatarios: envio.para.length,
+        p_enviados: r.enviados,
+        p_falhas: r.falhas,
+      });
+      if (error) console.error(`${envio.contexto}: log email`, error);
+    } catch (e) {
+      console.error(`${envio.contexto}: email`, e);
+    }
+  });
 }
 
 export type AbrirChamadoInput = {
@@ -98,37 +137,29 @@ export async function abrirChamado(
     .map((d) => d.email)
     .filter((e): e is string => !!e);
   if (emails.length) {
-    const html = emailChamadoUrgencia({
-      numero: ret.numero ?? "",
-      assunto,
-      categoria: input.categoria,
-      autorNome: profile.nome,
-      href: `${SITE_URL}/chamados?c=${ret.id}`,
-    });
-    const envio = await enviarEmailsLote({
+    enviaEmailChamadoDepois(supabase, {
+      chamadoId: ret.id,
       para: emails,
       assunto: `Chamado ${ret.numero ?? ""} — ${assunto}`,
-      html,
+      html: emailChamadoUrgencia({
+        numero: ret.numero ?? "",
+        assunto,
+        categoria: input.categoria,
+        autorNome: profile.nome,
+        href: `${SITE_URL}/chamados?c=${ret.id}`,
+      }),
+      contexto: "abrirChamado",
     });
-    // log via RPC definer — policy de emails_enviados é coord-only
-    const { error: errLog } = await supabase.rpc("registrar_email_chamado", {
-      p_chamado_id: ret.id,
-      p_assunto: `Chamado ${ret.numero ?? ""} — ${assunto}`,
-      p_destinatarios: emails.length,
-      p_enviados: envio.enviados,
-      p_falhas: envio.falhas,
-    });
-    if (errLog) console.error("abrirChamado: log email", errLog);
   }
 
-  revalidaChamado();
+  revalidaChamado(profile.role);
   return { ok: true, id: ret?.id, numero: ret?.numero };
 }
 
 async function rpcSimples(
   nome: string,
   args: Record<string, unknown>,
-  extraPath?: string
+  opts?: { home?: boolean }
 ): Promise<{ ok?: boolean; error?: string }> {
   if (await demoRole()) return { error: DEMO_MSG };
   const { supabase, me: profile } = await me();
@@ -138,7 +169,7 @@ async function rpcSimples(
   }
   const { error } = await supabase.rpc(nome, args);
   if (error) return { error: erroRpc(error) };
-  revalidaChamado(extraPath);
+  revalidaChamado(profile.role, opts);
   return { ok: true };
 }
 
@@ -176,7 +207,7 @@ export async function atribuirChamado(id: string, responsavelId: string | null) 
     p_para: responsavelId,
   });
   if (error) return { error: erroRpc(error) };
-  revalidaChamado();
+  revalidaChamado(profile.role);
   return { ok: true };
 }
 
@@ -198,26 +229,19 @@ export async function publicarAtualizacaoChamado(id: string, texto: string) {
   const autor = (data as { autor?: { email?: string | null; nome?: string | null; profile_id?: string } | null })
     ?.autor;
   if (autor?.email) {
-    const html = emailChamadoAtualizacao({
-      autorNome: autor.nome ?? "",
-      texto: texto.trim(),
-      href: `${SITE_URL}/chamados?c=${id}`,
-    });
-    const envio = await enviarEmailsLote({
+    enviaEmailChamadoDepois(supabase, {
+      chamadoId: id,
       para: [autor.email],
       assunto: "Atualização no seu pedido de apoio",
-      html,
+      html: emailChamadoAtualizacao({
+        autorNome: autor.nome ?? "",
+        texto: texto.trim(),
+        href: `${SITE_URL}/chamados?c=${id}`,
+      }),
+      contexto: "publicarAtualizacaoChamado",
     });
-    const { error: errLog } = await supabase.rpc("registrar_email_chamado", {
-      p_chamado_id: id,
-      p_assunto: "Atualização no seu pedido de apoio",
-      p_destinatarios: 1,
-      p_enviados: envio.enviados,
-      p_falhas: envio.falhas,
-    });
-    if (errLog) console.error("publicarAtualizacaoChamado: log", errLog);
   }
-  revalidaChamado();
+  revalidaChamado(profile.role);
   return { ok: true };
 }
 
@@ -230,11 +254,12 @@ export async function comentarChamado(
     return { error: "Escreva o comentário (até 4000 caracteres)." };
   }
   const validos = (mencionados ?? []).filter((m) => UUID_RE.test(m));
-  return rpcSimples("comentar_chamado", {
-    p_id: id,
-    p_texto: texto.trim(),
-    p_mencionados: validos,
-  });
+  // comentário interno não muda estado nem dono: home e badge não mudam
+  return rpcSimples(
+    "comentar_chamado",
+    { p_id: id, p_texto: texto.trim(), p_mencionados: validos },
+    { home: false }
+  );
 }
 
 /** Compensação do pipeline de anexo: a policy do storage exige a row de
@@ -279,7 +304,7 @@ export async function descartarChamadoAnexo(
   if (profile.role === "coordenacao") {
     await admin.storage.from("chamado-anexos").remove([row.path]);
   }
-  revalidaChamado();
+  revalidaChamado(profile.role, { home: false });
   return { ok: true };
 }
 
@@ -308,6 +333,9 @@ export async function resolverApoioChamado(
     p_resumo: resumo?.trim() || null,
   });
   if (error) return { error: erroRpc(error) };
-  revalidaChamado();
+  revalidaChamado(profile.role);
+  // a flag de apoio sai do registro/avaliação na mesma RPC
+  revalidatePath("/registros");
+  revalidatePath("/duplas/[id]", "page");
   return { ok: true };
 }

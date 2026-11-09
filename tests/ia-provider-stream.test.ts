@@ -174,6 +174,53 @@ describe("chamarModeloStream", () => {
     expect(res).toMatchObject({ ok: false, fallback: true });
   });
 
+  it("captura o chunk final de usage (choices vazio) e o modelo efetivo", async () => {
+    const tokens: string[] = [];
+    const spy = vi.fn().mockResolvedValue(
+      sseResposta([
+        sse(
+          { choices: [{ delta: { content: "Oi" } }] },
+          // stream_options.include_usage: o último chunk vem sem delta —
+          // só telemetria da rodada (sdd D4)
+          {
+            choices: [],
+            usage: {
+              prompt_tokens: 120,
+              completion_tokens: 9,
+              cost: 0.0004,
+              opencode: {
+                billing_source: "go",
+                list_cost: 0.0011,
+                allowance: 0.0004,
+                tokens: { input: 100, output: 8, reasoning: 1, cache_read: 20 },
+              },
+            },
+          }
+        ),
+      ])
+    );
+    vi.stubGlobal("fetch", spy);
+
+    const res = await chamar({ tokens });
+    expect(res).toMatchObject({
+      ok: true,
+      content: "Oi",
+      modelo: "modelo-teste",
+      usage: {
+        prompt_tokens: 120,
+        completion_tokens: 9,
+        cost: 0.0004,
+        opencode: { billing_source: "go" },
+      },
+    });
+    // o body pede o usage — sem stream_options o provider não manda
+    const body = JSON.parse(String(spy.mock.calls[0]?.[1]?.body));
+    expect(body.stream_options).toEqual({ include_usage: true });
+    expect(body.max_tokens).toBe(1600);
+    // o chunk de usage não vaza como token pro cliente
+    expect(tokens).toEqual(["Oi"]);
+  });
+
   it("abort do cliente devolve abortado (não erro)", async () => {
     vi.stubGlobal(
       "fetch",

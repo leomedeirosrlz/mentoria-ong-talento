@@ -113,6 +113,14 @@ Doc removido ou renomeado → o `--apply` apaga do banco os chunks do slug
 que saiu do corpus. Slug novo → entrada em `META_FONTE`
 (`src/lib/ia/fontes.ts`), senão a citação sai como texto cru.
 
+A busca pesa os termos pela frequência de documento guardada em
+`ia_chunks_df` (migration `0161`), não recontada a cada chamada. O
+`--apply` recalcula essa tabela no fim (`atualizar_ia_chunks_df`, depois
+da limpeza de órfãos). Mexeu em `ia_chunks` por fora do script → rode
+`select public.atualizar_ia_chunks_df();` no SQL editor (ou
+`supabase.rpc("atualizar_ia_chunks_df")` com a service role; anon e
+authenticated não executam), senão os pesos ficam defasados.
+
 ## Recorte e escrita para a busca
 
 O recorte é `scripts/lib/rag-chunks.mjs` (testes em

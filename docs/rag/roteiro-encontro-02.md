@@ -4,7 +4,7 @@ material: roteiro-encontro-02
 titulo: "Roteiro do 2º encontro: Avaliação por Terceiros & Visão de Futuro"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-2 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

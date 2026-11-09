@@ -4,7 +4,7 @@ material: roteiro-encontro-14
 titulo: "Roteiro do 14º encontro: Desdobramento & Plano de Continuidade"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-14 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

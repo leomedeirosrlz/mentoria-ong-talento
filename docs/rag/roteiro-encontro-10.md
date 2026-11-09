@@ -4,7 +4,7 @@ material: roteiro-encontro-10
 titulo: "Roteiro do 10º encontro: O Mentor como Espelho"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-10 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

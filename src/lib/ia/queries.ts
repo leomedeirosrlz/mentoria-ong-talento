@@ -28,6 +28,7 @@ import type {
   Trilha,
 } from "@/lib/types";
 import type { InstrumentoDupla } from "@/lib/forms/queries";
+import { CacheTtl } from "./cache";
 import { perguntaFts } from "@/lib/ia/busca-guias";
 
 /** Papéis efetivos do dono do client — a mesma my_papeis() que o getMe usa
@@ -57,9 +58,9 @@ export const papeisDoUsuario = cache(
  *  ampliar aqui junto (o type DuplaIa mostra o que a tool enxerga). */
 export const IA_SAUDE_SELECT = `
   id, turma, trilha, status, cronograma_id, iniciada_em, demanda,
-  mentor:profiles!duplas_mentor_id_fkey(nome),
-  mentorado:mentorados(nome),
-  supervisor:profiles!duplas_supervisor_id_fkey(nome),
+  mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+  mentorado:mentorados(nome, nome_social),
+  supervisor:profiles!duplas_supervisor_id_fkey(nome, nome_social),
   encontros(
     numero, status, data_hora, realizado_em,
     registro:registros(precisa_apoio, avaliacao, dificuldade),
@@ -79,9 +80,9 @@ export type DuplaIa = {
   cronograma_id: string | null;
   iniciada_em: string | null;
   demanda: string | null;
-  mentor: { nome: string } | null;
-  mentorado: { nome: string } | null;
-  supervisor: { nome: string } | null;
+  mentor: { nome: string; nome_social: string | null } | null;
+  mentorado: { nome: string; nome_social: string | null } | null;
+  supervisor: { nome: string; nome_social: string | null } | null;
   encontros: {
     numero: number;
     status: string;
@@ -230,6 +231,7 @@ export type PessoaFilaIa = Pick<
   Profile,
   | "id"
   | "nome"
+  | "nome_social"
   | "role"
   | "papeis"
   | "ativo"
@@ -243,6 +245,7 @@ export type MentoradoFilaIa = Pick<
   Mentorado,
   | "id"
   | "nome"
+  | "nome_social"
   | "ong_origem"
   | "origem"
   | "situacao"
@@ -270,11 +273,11 @@ export const getFilaInsumos = cache(
         supabase
           .from("profiles")
           .select(
-            "id, nome, role, ativo, origem, consent_lgpd_em, created_at, profile_papeis(papel)"
+            "id, nome, nome_social, role, ativo, origem, consent_lgpd_em, created_at, profile_papeis(papel)"
           ),
         supabase
           .from("mentorados")
-          .select("id, nome, ong_origem, origem, situacao, created_at"),
+          .select("id, nome, nome_social, ong_origem, origem, situacao, created_at"),
         getCarimboMap(supabase, "profiles_pessoal"),
         getCarimboMap(supabase, "mentorados_pessoal"),
         supabase.from("duplas").select("mentor_id, mentorado_id, status, trilha"),
@@ -337,14 +340,17 @@ export const getCapacidadeInsumos = cache(
   async (
     supabase: SupabaseClient
   ): Promise<{
-    pessoas: Pick<Profile, "id" | "nome" | "role" | "papeis" | "ativo">[];
+    pessoas: Pick<
+      Profile,
+      "id" | "nome" | "nome_social" | "role" | "papeis" | "ativo"
+    >[];
     mentorProfiles: Record<string, MentorProfile>;
     contagemPorMentor: Record<string, number>;
   }> => {
     const [pessoas, duplas, mps] = await Promise.all([
       supabase
         .from("profiles")
-        .select("id, nome, role, ativo, profile_papeis(papel)"),
+        .select("id, nome, nome_social, role, ativo, profile_papeis(papel)"),
       supabase.from("duplas").select("mentor_id, status, trilha"),
       supabase
         .from("mentor_profiles")
@@ -371,7 +377,7 @@ export const getCapacidadeInsumos = cache(
     return {
       pessoas: ((pessoas.data ?? []) as (Pick<
         Profile,
-        "id" | "nome" | "role" | "ativo"
+        "id" | "nome" | "nome_social" | "role" | "ativo"
       > & { profile_papeis?: { papel: AppRole }[] })[]).map((p) => {
         const { profile_papeis, ...rest } = p;
         return {
@@ -395,7 +401,9 @@ export type JovemDuplaIa = {
   iniciada_em: string | null;
   demanda: string | null;
   mentor_nome: string | null;
+  mentor_nome_social: string | null;
   supervisor_nome: string | null;
+  supervisor_nome_social: string | null;
 };
 
 /** A dupla do jovem pela view jovem_duplas (0067) — o papel 'mentorado' não
@@ -419,7 +427,7 @@ export const getJovemDuplaIa = cache(
     const { data, error } = await supabase
       .from("jovem_duplas")
       .select(
-        "id, trilha, status, turma, iniciada_em, demanda, mentor_nome, supervisor_nome"
+        "id, trilha, status, turma, iniciada_em, demanda, mentor_nome, mentor_nome_social, supervisor_nome, supervisor_nome_social"
       )
       .eq("id", duplaId)
       .maybeSingle();
@@ -453,8 +461,8 @@ export type DuplaResumoIa = {
   trilha: Trilha;
   status: DuplaStatus;
   turma: string;
-  mentor: { nome: string } | null;
-  mentorado: { nome: string } | null;
+  mentor: { nome: string; nome_social: string | null } | null;
+  mentorado: { nome: string; nome_social: string | null } | null;
 };
 
 /** Índice enxuto das duplas vivas no escopo do papel — é como o modelo
@@ -473,8 +481,8 @@ export const getDuplasResumoIa = cache(
       .from("duplas")
       .select(
         `id, trilha, status, turma,
-         mentor:profiles!duplas_mentor_id_fkey(nome),
-         mentorado:mentorados(nome)`,
+         mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+         mentorado:mentorados(nome, nome_social)`,
         { count: "exact" }
       )
       .in("status", ["ativa", "pausada"])
@@ -505,8 +513,8 @@ export const getAgendaPeriodoIa = cache(
         `numero, status, data_hora, realizado_em,
          dupla:duplas!inner(
            id,
-           mentor:profiles!duplas_mentor_id_fkey(nome),
-           mentorado:mentorados(nome)
+           mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+           mentorado:mentorados(nome, nome_social)
          )`
       )
       .gte("data_hora", desdeIso)
@@ -521,8 +529,46 @@ export const getAgendaPeriodoIa = cache(
       realizado_em: string | null;
       dupla: {
         id: string;
-        mentor: { nome: string } | null;
-        mentorado: { nome: string } | null;
+        mentor: { nome: string; nome_social: string | null } | null;
+        mentorado: { nome: string; nome_social: string | null } | null;
+      };
+    }[];
+  }
+);
+
+/** Janela passada de encontros pra agregação (esperados × realizados por
+ *  dupla/período) — mesmo escopo RLS + !inner da agenda_do_periodo, mas sem
+ *  teto de data (remarcado pra depois de hoje entra como "futuro" na
+ *  contagem) e com trilha pra separar DPP de especialista. dupla_id
+ *  restringe a uma dupla quando a pergunta é pontual. */
+export const getHistoricoEncontrosIa = cache(
+  async (supabase: SupabaseClient, desdeIso: string, duplaId?: string) => {
+    let q = supabase
+      .from("encontros")
+      .select(
+        `numero, status, data_hora, realizado_em,
+         dupla:duplas!inner(
+           id, trilha,
+           mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+           mentorado:mentorados(nome, nome_social)
+         )`
+      )
+      .gte("data_hora", desdeIso)
+      .order("data_hora", { ascending: true })
+      .limit(600);
+    if (duplaId) q = q.eq("dupla_id", duplaId);
+    const { data, error } = await q;
+    if (error) throw error;
+    return (data ?? []) as unknown as {
+      numero: number;
+      status: string;
+      data_hora: string | null;
+      realizado_em: string | null;
+      dupla: {
+        id: string;
+        trilha: string | null;
+        mentor: { nome: string; nome_social: string | null } | null;
+        mentorado: { nome: string; nome_social: string | null } | null;
       };
     }[];
   }
@@ -560,6 +606,15 @@ export type FonteGuia = {
   score: number;
 };
 
+/** Um chunk do corpus com o texto inteiro e os metadados de citação da
+ *  0165 (`material` = slug do doc nativo, `secaoAnchor` = âncora da seção
+ *  na página do documento — ambos null até o re-ingest). */
+export type ChunkCitavel = {
+  texto: string;
+  material: string | null;
+  secaoAnchor: string | null;
+};
+
 /** Texto inteiro dos chunks vencedores. O `trecho` da RPC é a janela de
  *  ~40 palavras do ts_headline (ou 220 chars no hit vetorial) e cortava
  *  a frase nas duas pontas: o modelo respondia com meio fato (P1). A
@@ -567,7 +622,7 @@ export type FonteGuia = {
 export async function textosChunksIa(
   supabase: SupabaseClient,
   chaves: { guia: string; pagina: number | null }[]
-): Promise<Map<string, string>> {
+): Promise<Map<string, ChunkCitavel>> {
   const guias = [...new Set(chaves.map((c) => c.guia))];
   const paginas = [
     ...new Set(chaves.flatMap((c) => (c.pagina == null ? [] : [c.pagina]))),
@@ -575,12 +630,19 @@ export async function textosChunksIa(
   if (!guias.length || !paginas.length) return new Map();
   const { data, error } = await supabase
     .from("ia_chunks")
-    .select("guia, pagina, texto")
+    .select("guia, pagina, texto, material, secao_anchor")
     .in("guia", guias)
     .in("pagina", paginas);
   if (error) throw error;
   return new Map(
-    (data ?? []).map((r) => [`${r.guia}|${r.pagina}`, r.texto as string])
+    (data ?? []).map((r) => [
+      `${r.guia}|${r.pagina}`,
+      {
+        texto: r.texto as string,
+        material: (r.material as string | null) ?? null,
+        secaoAnchor: (r.secao_anchor as string | null) ?? null,
+      },
+    ])
   );
 }
 
@@ -646,7 +708,10 @@ export async function getPessoasBuscaIa(
 ): Promise<
   { id: string; nome: string; nome_social: string | null; role: string | null }[]
 > {
-  const termo = nome.trim().replace(/[%_]/g, "");
+  // %_ são curinga do ilike; ,()." quebram a sintaxe do .or() do PostgREST
+  // — sem o escape o termo abria oráculo de enumeração em qualquer coluna
+  // (sdd D3, pacote nov/2026)
+  const termo = nome.trim().replace(/[%_,()."\\]/g, "");
   if (termo.length < 2) return [];
   const { data, error } = await supabase
     .from("profiles")
@@ -661,5 +726,275 @@ export async function getPessoasBuscaIa(
     nome: string;
     nome_social: string | null;
     role: string | null;
+  }[];
+}
+
+/** Eventos de auditoria da Liza pra tela /ia (sdd D4): o recorte por dias
+ *  sai do clock aqui — fora do componente — e a RLS já faz o escopo
+ *  (coordenação lê tudo, outras pessoas só os próprios eventos). Pagina em
+ *  blocos de IA_EVENTOS_PAGINA: o PostgREST corta em max_rows (1000,
+ *  supabase/config.toml) e um .limit maior voltava silenciosamente
+ *  truncado. `truncado` sinaliza o teto atingido — a tela avisa que o
+ *  recorte mostra só os eventos mais recentes. */
+const IA_EVENTOS_PAGINA = 1000;
+const IA_EVENTOS_TETO = 20000;
+
+export async function getIaEventos(supabase: SupabaseClient, dias: number) {
+  const desde = new Date(Date.now() - dias * 86400_000).toISOString();
+  const eventos: Record<string, unknown>[] = [];
+  let truncado = false;
+  for (let i = 0; i < IA_EVENTOS_TETO; i += IA_EVENTOS_PAGINA) {
+    const { data, error } = await supabase
+      .from("ia_eventos")
+      .select(
+        "profile_id, canal, tool, request_id, ok, args, duracao_ms, modelo, tier, tokens_in, tokens_out, tokens_reasoning, cache_read, custo_usd, allowance_usd, billing_source, iteracoes, created_at"
+      )
+      .gte("created_at", desde)
+      .order("created_at", { ascending: false })
+      .range(i, i + IA_EVENTOS_PAGINA - 1);
+    if (error) throw error;
+    eventos.push(...(data ?? []));
+    if ((data ?? []).length < IA_EVENTOS_PAGINA) break;
+  }
+  // página cheia no último bloco = pode haver mais além do teto
+  truncado = eventos.length >= IA_EVENTOS_TETO;
+  return { eventos, truncado };
+}
+
+export type PainelIaDados = {
+  eventos: Record<string, unknown>[];
+  truncado: boolean;
+  /** profile_id → nome de exibição, só das pessoas presentes nos eventos */
+  nomes: Map<string, string>;
+};
+
+// Cache do painel /ia: os chips de canal/modelo filtram em memória, então
+// cada clique refazia até 20 páginas de ia_eventos + profiles pro MESMO
+// período. 60s cobre a navegação entre chips sem atrasar muito o dado novo.
+const PAINEL_IA_TTL_MS = 60_000;
+const cachePainelIa = new CacheTtl<PainelIaDados>(PAINEL_IA_TTL_MS, 3);
+
+export function limparCachePainelIa() {
+  cachePainelIa.limpar();
+  cacheConsumoPlano.limpar();
+}
+
+/** Chave do cache do painel, ou null = não cachear. Exceção consciente ao
+ *  "nada recortado pela RLS" de cache.ts: só a coordenação tem chave, e
+ *  pra ela o recorte é o conjunto inteiro (ia_eventos_select, 0083:
+ *  `my_role() = 'coordenacao'` lê tudo; profiles_select, 0141, idem) —
+ *  qualquer pessoa da coordenação veria exatamente as mesmas linhas, então
+ *  dividir a leitura entre elas não vaza nada. Outro papel só vê os
+ *  próprios eventos e nunca entra aqui. O prefixo `coord|` deixa isso
+ *  explícito na chave. Demo não passa por este caminho (page.tsx). */
+export function chavePainelIa(
+  papel: AppRole | null | undefined,
+  dias: number
+): string | null {
+  return papel === "coordenacao" ? `coord|${dias}` : null;
+}
+
+/** Eventos do período + nomes das pessoas que aparecem neles. `papel` é o
+ *  do viewer JÁ verificado pela página; fora da coordenação lê direto. */
+export async function getPainelIa(
+  supabase: SupabaseClient,
+  papel: AppRole | null | undefined,
+  dias: number
+): Promise<PainelIaDados> {
+  // falha em profiles mantém o painel no ar com "Sem nome" (como antes),
+  // mas esse resultado degradado não fica 60s no cache
+  let semNomes = false;
+  const carregar = async (): Promise<PainelIaDados> => {
+    const { eventos, truncado } = await getIaEventos(supabase, dias);
+    const ids = [
+      ...new Set(
+        eventos
+          .map((e) => e.profile_id as string | null)
+          .filter((x): x is string => !!x)
+      ),
+    ];
+    const nomes = new Map<string, string>();
+    if (ids.length) {
+      const { data: ps, error } = await supabase
+        .from("profiles")
+        .select("id, nome, nome_social")
+        .in("id", ids);
+      if (error) {
+        console.error("getPainelIa profiles:", error);
+        semNomes = true;
+      }
+      for (const p of (ps ?? []) as { id: string; nome: string | null; nome_social: string | null }[])
+        nomes.set(p.id, p.nome_social ?? p.nome ?? "Sem nome");
+    }
+    return { eventos, truncado, nomes };
+  };
+  const chave = chavePainelIa(papel, dias);
+  return chave
+    ? cachePainelIa.obter(chave, carregar, () => !semNomes)
+    : carregar();
+}
+
+/** Consumo do plano Go pra previsão do painel /ia: só modelo, allowance e
+ *  data das respostas desde `desdeMs` (começo do ciclo ou 30 dias), sem
+ *  depender do período escolhido nos chips. Select de 3 colunas e só
+ *  linhas com allowance: a leitura mais barata que responde "o plano
+ *  aguenta até renovar?". Mesmo cache coord-only de 60s do painel. */
+const cacheConsumoPlano = new CacheTtl<Record<string, unknown>[]>(PAINEL_IA_TTL_MS, 2);
+
+export async function getConsumoPlanoIa(
+  supabase: SupabaseClient,
+  papel: AppRole | null | undefined,
+  desdeMs: number
+): Promise<Record<string, unknown>[]> {
+  // arredonda pra hora cheia: a chave do cache e o filtro andam juntos
+  const desde = new Date(Math.floor(desdeMs / 3600_000) * 3600_000).toISOString();
+  const carregar = async () => {
+    const linhas: Record<string, unknown>[] = [];
+    for (let i = 0; i < IA_EVENTOS_TETO; i += IA_EVENTOS_PAGINA) {
+      const { data, error } = await supabase
+        .from("ia_eventos")
+        .select("modelo, allowance_usd, created_at")
+        .eq("tool", "resposta")
+        .not("allowance_usd", "is", null)
+        .gte("created_at", desde)
+        .order("created_at", { ascending: false })
+        .range(i, i + IA_EVENTOS_PAGINA - 1);
+      if (error) throw error;
+      linhas.push(...(data ?? []));
+      if ((data ?? []).length < IA_EVENTOS_PAGINA) break;
+    }
+    return linhas;
+  };
+  const base = chavePainelIa(papel, 0);
+  return base
+    ? cacheConsumoPlano.obter(`${base}|plano|${desde}`, carregar)
+    : carregar();
+}
+
+// ---------- mentorado (sdd D5, pacote liza nov/2026) ----------
+// Leituras do jovem pelas MESMAS fronteiras do shell /jovem: views definer
+// `jovem_*` (0067+) e tabelas de policy aberta — nunca duplas/mentorados/
+// profiles base, que o papel não tem grant. Funcionam com o JWT da sessão
+// e com o impersonado do MCP (my_mentorado_id/my_role leem o JWT do caller).
+
+/** A dupla do jovem por descoberta (sem id — destrava as outras tools):
+ *  jovem_duplas já é escopada por my_mentorado_id(). Com duas duplas
+ *  (DPP + trilha de especialista) a DPP é "a dupla" — ela carrega o par. */
+export async function getMinhaDuplaIa(
+  supabase: SupabaseClient
+): Promise<JovemDuplaIa | null> {
+  const { data, error } = await supabase
+    .from("jovem_duplas")
+    .select(
+      "id, trilha, status, turma, iniciada_em, demanda, mentor_nome, mentor_nome_social, supervisor_nome, supervisor_nome_social"
+    )
+    .order("iniciada_em", { ascending: false });
+  if (error) throw error;
+  const lista = (data ?? []) as JovemDuplaIa[];
+  // trilha NULL conta como dpp (coalesce na 0087)
+  return lista.find((d) => d.trilha !== "especialista") ?? lista[0] ?? null;
+}
+
+export type JovemEncontroIa = {
+  id: string;
+  dupla_id: string;
+  numero: number;
+  data_hora: string | null;
+  realizado_em: string | null;
+  duracao_min: number | null;
+  status: string;
+  link: string | null;
+};
+
+/** Agenda do jovem — a RLS de encontros escopa às duplas dele via
+ *  exists(jovem_duplas) (0068). Próximos primeiro; os passados recentes
+ *  fecham o "como foi" sem virar histórico inteiro. */
+export async function getJovemAgendaIa(
+  supabase: SupabaseClient,
+  limite = 8
+): Promise<{ proximos: JovemEncontroIa[]; passados: JovemEncontroIa[] }> {
+  const { data, error } = await supabase
+    .from("encontros")
+    .select("id, dupla_id, numero, data_hora, realizado_em, duracao_min, status, link")
+    .order("data_hora", { ascending: true, nullsFirst: false })
+    .limit(40);
+  if (error) throw error;
+  const todos = (data ?? []) as JovemEncontroIa[];
+  const agora = new Date().toISOString();
+  // agendado + remarcado contam como futuros — mesma conjunção de
+  // estado-encontro.ts e das outras leituras de agenda do app
+  const futuros = todos.filter(
+    (e) =>
+      (e.status === "agendado" || e.status === "remarcado") &&
+      (e.data_hora == null || e.data_hora >= agora)
+  );
+  const feitos = todos
+    .filter((e) => e.status === "realizado")
+    .sort((a, b) => String(b.data_hora).localeCompare(String(a.data_hora)))
+    .slice(0, 3);
+  return { proximos: futuros.slice(0, limite), passados: feitos };
+}
+
+export type JovemCombinadoIa = {
+  id: string;
+  texto: string;
+  status: string;
+  prazo: string | null;
+  created_at: string;
+};
+
+/** Combinados do jovem (view jovem_encaminhamentos) — pendente primeiro,
+ *  feito recente só pra confirmar o que já foi marcado. */
+export async function getJovemCombinadosIa(
+  supabase: SupabaseClient
+): Promise<{ pendentes: JovemCombinadoIa[]; feitos: JovemCombinadoIa[] }> {
+  const { data, error } = await supabase
+    .from("jovem_encaminhamentos")
+    // a view expõe `descricao` (0070); o alias mantém o contrato `texto` da
+    // tool e do card
+    .select("id, texto:descricao, status, prazo, created_at")
+    .order("status")
+    .order("prazo", { ascending: true, nullsFirst: false });
+  if (error) throw error;
+  const lista = (data ?? []) as JovemCombinadoIa[];
+  return {
+    pendentes: lista.filter((c) => c.status === "pendente"),
+    feitos: lista.filter((c) => c.status !== "pendente").slice(0, 5),
+  };
+}
+
+/** Progresso da jornada (RPC jovem_jornada, 0096) — instrumentos com
+ *  entregas + cronograma; self-scoped por my_mentorado_id(). */
+export async function getJovemProgressoIa(supabase: SupabaseClient) {
+  const { data, error } = await supabase.rpc("jovem_jornada");
+  if (error) throw error;
+  return data as {
+    dupla_id: string;
+    cronograma: unknown[];
+    instrumentos: {
+      sistema: string;
+      titulo?: string;
+      entregas: { status: string; destino?: string }[];
+    }[];
+    avaliacao_360: unknown[];
+  } | null;
+}
+
+/** Pedidos de especialista do jovem — a view solicitacoes_mural escopa às
+ *  duplas dele. Sem embeds de profiles (o papel não lê profiles): o nome
+ *  do especialista é a coluna plana da view (especialista_nome). */
+export async function getJovemPedidosIa(supabase: SupabaseClient, limite = 40) {
+  const { data, error } = await supabase
+    .from("solicitacoes_mural")
+    .select("id, status, status_efetivo, demanda, motivo, especialista_nome, especialista_nome_social, especialista_desejado_nome, created_at")
+    .order("created_at", { ascending: false })
+    .limit(limite);
+  if (error) throw error;
+  return (data ?? []) as {
+    id: string; status: string; status_efetivo: string | null;
+    demanda: string | null; motivo: string | null;
+    especialista_nome: string | null;
+    especialista_nome_social: string | null;
+    especialista_desejado_nome: string | null; created_at: string;
   }[];
 }

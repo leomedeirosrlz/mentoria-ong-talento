@@ -7,6 +7,12 @@
 export type FonteIa = {
   guia: string;
   secao?: string | null;
+  /** slug do documento nativo citado (ia_chunks.material, 0165) — base do
+   *  href quando o guia tem página em /materiais/documento */
+  material?: string | null;
+  /** âncora da seção no documento nativo — a metaFonte pendura no href
+   *  como #<ancora> quando o destino é uma página /documento/ */
+  ancora?: string | null;
 };
 
 /** O `pagina` do ia_chunks é o id sintético do chunk (seção×100+ordem,
@@ -55,27 +61,32 @@ export function limparTrecho(bruto: string | null | undefined, max: number): str
   return `${(espaco > max * 0.4 ? janela.slice(0, espaco) : janela).trimEnd()}…`;
 }
 
-// um rótulo + destino por guia do corpus (docs/rag/fontes.json). Guias,
-// roteiros e termos são PDFs do catálogo → biblioteca; os instrumentos
-// vivem na aba Instrumentos; os 5 documentos nativos têm página própria em
-// /materiais/documento/<slug>; o cronograma é a própria agenda. Sem
-// `href` (conteúdo só do corpus, sem material no catálogo) a fonte sai
-// com o rótulo e sem link; sem entrada aqui, sai o slug como texto.
-const BIB = "/materiais?aba=biblioteca";
-const INSTR = "/materiais?aba=instrumentos";
+// um rótulo + destino por guia do corpus (docs/rag/fontes.json). Todo doc
+// do corpus renderiza nativo em /materiais/documento/<slug> — `doc` marca
+// isso e guarda o slug (o `material` do chunk cobre o caso de divergência).
+// `docJovem` marca o doc cuja audiência do frontmatter serve o mentorado
+// (corpusServeJovem, materiais/corpus-doc.ts): doc sem a flag remapa pro
+// hub /jovem/materiais em vez de linkar página que daria 404. Destino que
+// não é corpus (agenda, ajuda) segue em `href`; sem `href` nem `doc` a
+// fonte sai como texto, e guia sem entrada sai o slug como texto.
 const DOC = "/materiais/documento";
-// um roteiro por encontro (roteiro-encontro-01 … 16)
+const HUB_JOVEM = "/jovem/materiais";
+// um roteiro por encontro (roteiro-encontro-01 … 16) — cada um tem
+// documento nativo próprio, âncora por seção
 const ROTEIROS = Object.fromEntries(
-  Array.from({ length: 16 }, (_, i) => [
-    `roteiro-encontro-${String(i + 1).padStart(2, "0")}`,
-    { rotulo: `Roteiro do ${i + 1}º encontro`, href: BIB },
-  ])
+  Array.from({ length: 16 }, (_, i) => {
+    const slug = `roteiro-encontro-${String(i + 1).padStart(2, "0")}`;
+    return [slug, { rotulo: `Roteiro do ${i + 1}º encontro`, doc: slug }];
+  })
 );
-const META_FONTE: Record<string, { rotulo: string; href?: string }> = {
-  "guia-mentor-dpp": { rotulo: "Guia do Mentor DPP", href: BIB },
+const META_FONTE: Record<
+  string,
+  { rotulo: string; href?: string; doc?: string; docJovem?: boolean }
+> = {
+  "guia-mentor-dpp": { rotulo: "Guia do Mentor DPP", doc: "guia-mentor-dpp" },
   "guia-mentor-especialista": {
     rotulo: "Guia do Mentor Especialista",
-    href: BIB,
+    doc: "guia-mentor-especialista",
   },
   "ciclo-cronograma": { rotulo: "Cronograma do ciclo, Turma 1", href: "/agenda" },
   "ciclo-turma2-cronograma": {
@@ -83,64 +94,104 @@ const META_FONTE: Record<string, { rotulo: string; href?: string }> = {
     href: "/agenda",
   },
   ...ROTEIROS,
-  "plataforma-e-operacao": { rotulo: "Plataforma e operação", href: BIB },
-  "perguntas-eficazes": { rotulo: "Perguntas Eficazes", href: BIB },
-  "escuta-ativa-e-comunicacao": { rotulo: "Escuta ativa e comunicação" },
-  "codigo-etica-conduta": { rotulo: "Código de ética e conduta" },
-  "instrumento-roda-da-vida": { rotulo: "Roda da Vida", href: INSTR },
+  "plataforma-e-operacao": {
+    rotulo: "Plataforma e operação",
+    doc: "plataforma-e-operacao",
+  },
+  "perguntas-eficazes": { rotulo: "Perguntas Eficazes", doc: "perguntas-eficazes" },
+  "escuta-ativa-e-comunicacao": {
+    rotulo: "Escuta ativa e comunicação",
+    doc: "escuta-ativa-e-comunicacao",
+  },
+  "codigo-etica-conduta": {
+    rotulo: "Código de ética e conduta",
+    doc: "codigo-etica-conduta",
+    docJovem: true,
+  },
+  "instrumento-roda-da-vida": {
+    rotulo: "Roda da Vida",
+    doc: "instrumento-roda-da-vida",
+  },
   "instrumento-pdm": {
     rotulo: "PDM (Plano de Desenvolvimento do Mentorado)",
-    href: INSTR,
+    doc: "instrumento-pdm",
   },
   "instrumento-construindo-visao": {
     rotulo: "Construindo a sua Visão",
-    href: INSTR,
+    doc: "instrumento-construindo-visao",
   },
   "instrumento-definindo-minhas-metas": {
     rotulo: "Definindo Minhas Metas",
-    href: INSTR,
+    doc: "instrumento-definindo-minhas-metas",
   },
   "checklist-competencias": {
     rotulo: "Checklist de competências do mentor",
-    href: `${DOC}/checklist-competencias`,
+    doc: "checklist-competencias",
   },
   "feedback-construtivo": {
     rotulo: "Feedback Construtivo",
-    href: `${DOC}/feedback-construtivo`,
+    doc: "feedback-construtivo",
   },
   "mensagem-preparacao": {
     rotulo: "Mensagem de preparação",
-    href: `${DOC}/mensagem-preparacao`,
+    doc: "mensagem-preparacao",
   },
   "mensagem-indicadas": {
     rotulo: "Mensagem às pessoas indicadas",
-    href: `${DOC}/mensagem-indicadas`,
+    doc: "mensagem-indicadas",
   },
   "mensagem-encaminhamento": {
     rotulo: "Mensagem de encaminhamento",
-    href: `${DOC}/mensagem-encaminhamento`,
+    doc: "mensagem-encaminhamento",
   },
   "autorizacao-responsavel": {
     rotulo: "Autorização do responsável legal",
-    href: BIB,
+    doc: "autorizacao-responsavel",
   },
-  "termo-adesao-voluntario": { rotulo: "Termo de adesão", href: BIB },
-  "termo-mentorando": { rotulo: "Termo do mentorando", href: BIB },
+  "termo-adesao-voluntario": {
+    rotulo: "Termo de adesão",
+    doc: "termo-adesao-voluntario",
+  },
+  "termo-mentorando": {
+    rotulo: "Termo do mentorando",
+    doc: "termo-mentorando",
+  },
+  // ajuda_faq cita a FAQ pelo nome dela (ui.ts), não por slug de guia — o
+  // destino já é a rota do jovem, que metaFonte devolve intacta abaixo
+  "Ajuda do Realiza": { rotulo: "Ajuda do Realiza", href: "/jovem/ajuda" },
 };
 
 /** Rótulo legível + destino real da fonte. `jovem` troca os caminhos do
  *  (app) pelos do mentorado: ele vive em /jovem — o documento nativo tem
- *  página própria lá e o resto vai pro hub de materiais dele. */
+ *  página própria lá e o resto vai pro hub de materiais dele. `ref` traz
+ *  os metadados do chunk citado (0165): `material` refina o slug do
+ *  documento nativo (o mapa `doc` cobre o chunk antigo sem a coluna) e
+ *  `ancora` vira o sufixo # do link quando o destino é página /documento/
+ *  — o ##/### lá tem o id que a âncora nomeia. */
 export function metaFonte(
   guia: string,
-  jovem?: boolean
+  jovem?: boolean,
+  ref?: { material?: string | null; ancora?: string | null }
 ): { rotulo: string; href?: string } {
   const meta = META_FONTE[guia];
   if (!meta) return { rotulo: guia };
-  if (!jovem || !meta.href) return meta;
-  if (meta.href.startsWith(DOC)) return { ...meta, href: `/jovem${meta.href}` };
-  if (meta.href === "/agenda") return { ...meta, href: "/jovem/agenda" };
-  return { ...meta, href: "/jovem/materiais" };
+  let href = meta.doc ? `${DOC}/${ref?.material || meta.doc}` : meta.href;
+  if (jovem && href) {
+    // destino que já é do jovem (Ajuda do Realiza) não passa pelo remap
+    if (href.startsWith("/jovem")) href = href;
+    else if (href.startsWith(DOC))
+      // doc que a audiência do frontmatter não libera pro mentorado
+      // cairia em 404 (corpusServeJovem) — vai pro hub, como o resto
+      href = meta.docJovem ? `/jovem${href}` : HUB_JOVEM;
+    else if (href === "/agenda") href = "/jovem/agenda";
+    else href = HUB_JOVEM;
+  }
+  // fora de /documento/ a âncora não resolve nada (não tem ##/### com id
+  // esperando) — cai no href base
+  if (href && ref?.ancora && href.includes("/documento/")) {
+    href = `${href}#${ref.ancora}`;
+  }
+  return { rotulo: meta.rotulo, href };
 }
 
 // Nome interno da tool → rótulo que o usuário entende (a meta "fontes:"
@@ -157,6 +208,12 @@ const ROTULO_TOOL: Record<string, string> = {
   chamados_resumo: "chamados",
   pessoas_busca: "pessoas",
   instrumentos_da_dupla: "instrumentos da dupla",
+  minha_dupla: "sua dupla",
+  minha_agenda: "sua agenda",
+  meus_combinados: "seus combinados",
+  meu_progresso: "sua jornada",
+  meus_pedidos: "seus pedidos",
+  ajuda_faq: "ajuda do Realiza",
 };
 
 export function rotuloTool(nome: string): string {

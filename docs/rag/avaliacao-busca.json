@@ -175,6 +175,27 @@
       ]
     },
     {
+      "id": "pdm-onde-fica",
+      "pergunta": "Onde fica o PDM? O mentor responde o PDM onde?",
+      "papel": "mentor",
+      "esperado": [
+        {
+          "guia": "instrumento-pdm",
+          "secao_contem": "Onde fica na plataforma"
+        }
+      ],
+      "aceitavel": [
+        {
+          "guia": "plataforma-e-operacao",
+          "secao_contem": "Instrumentos oficiais"
+        },
+        {
+          "guia": "guia-mentor-dpp",
+          "secao_contem": "A plataforma de mentoria"
+        }
+      ]
+    },
+    {
       "id": "visao-como-funciona",
       "pergunta": "O que é o instrumento Construindo a sua Visão e quando o jovem responde?",
       "papel": "mentor",

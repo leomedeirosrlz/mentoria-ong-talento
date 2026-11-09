@@ -4,7 +4,7 @@ titulo: Roda da Vida (instrumento)
 material: instrumento-roda-da-vida
 tipo: instrumento
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: consolidado de Roda-da-Vida---Realiza.vc.txt (material do instrumento),
   roteiro-semana-11.txt a roteiro-semana-14.txt, guia-mentor-dpp.md (cap. 14),
@@ -41,7 +41,7 @@ Cada área recebe uma nota inteira de 1 a 10, em que 1 é totalmente insatisfeit
 
 A nota mede satisfação, não desempenho, e vale o presente. Vale orientar o(a) jovem a responder com calma, em um momento tranquilo e sem interferências, com honestidade: notas infladas ou pessimistas demais atrapalham a leitura depois.
 
-*(Atualização: o PDF publicado do roteiro do 11º encontro ainda diz "de 0 a 10"; vale a escala da plataforma, de 1 a 10.)*
+*(Atualização: na plataforma vigente, cada área da Roda da Vida recebe nota inteira de 1 a 10; o PDF publicado do roteiro do 11º encontro que diz "de 0 a 10" está desatualizado.)*
 
 ## Roda da Vida · As duas aplicações na jornada
 
@@ -111,4 +111,4 @@ As mesmas perguntas abertas valem para os outros dois quadrantes, Relacionamento
 
 A Roda da Vida é respondida na plataforma e fica registrada na ficha da dupla (aba Instrumentos), onde as notas viram o desenho da roda. O(a) mentor(a) emite o link pela ficha; o link também aparece na jornada do(a) jovem quando chega a hora de cada aplicação. Em /materiais, a aba Instrumentos mostra os dois cards: "Roda da Vida · leitura inicial" (enc. 1) e "Roda da Vida · aplicação formal" (enc. 12 a 14).
 
-*(Atualização: o guia físico ainda diz que a Roda fica fora da plataforma, como documento da dupla; vale o registro na ficha.)*
+*(Atualização: na plataforma vigente, a Roda da Vida fica na ficha da dupla, aba Instrumentos: o(a) mentor(a) emite o link e o(a) jovem responde; o guia impresso que diz "fora da plataforma" está desatualizado.)*

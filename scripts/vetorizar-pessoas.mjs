@@ -255,7 +255,8 @@ const mentorados = await sql`
    where situacao = 'ativo'`;
 
 const existentes = await sql`
-  select dono_tipo, dono_id, doc_hash, temas from public.matching_perfis`;
+  select dono_tipo, dono_id, doc_hash, temas, embedding is null as sem_vetor
+    from public.matching_perfis`;
 const atual = new Map(
   existentes.map((r) => [`${r.dono_tipo}:${r.dono_id}`, r])
 );
@@ -313,6 +314,17 @@ for (const alvo of alvos) {
                    where dono_tipo = ${alvo.tipo} and dono_id = ${alvo.id}`;
         soTemas++;
         console.log(`  ~ ${chave} — temas preenchidos: ${temas.join(", ")}`);
+      }
+    }
+    // embedding que falhou (timeout/429/sem chave) gravou null com o hash
+    // atual — sem isto o vetor só voltava quando o doc mudasse
+    if (APPLY && EMBED_KEY && ex.sem_vetor && doc.trim()) {
+      const vec = await embedUm(doc);
+      if (vec) {
+        await sql`update public.matching_perfis set embedding = ${`[${vec.join(",")}]`}::vector,
+                   gerado_em = now()
+                   where dono_tipo = ${alvo.tipo} and dono_id = ${alvo.id}`;
+        console.log(`  ~ ${chave} — vetor preenchido`);
       }
     }
     pulados++;

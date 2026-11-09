@@ -4,7 +4,7 @@ material: roteiro-encontro-07
 titulo: "Roteiro do 7º encontro: Ajustes no Plano"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-7 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

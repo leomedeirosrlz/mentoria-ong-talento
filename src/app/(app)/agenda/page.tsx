@@ -418,7 +418,7 @@ export default async function AgendaPage({
               // staff+mentor também: o deep-link do dia no strip precisa do
               // ?visao=dpp (mesma régua da barra no ramo calendário)
               hibrido={duasVisoes || (papelStaff ?? false)}
-              meuNome={me!.nome.split(" ")[0]}
+              meuNome={(me!.nome_social ?? me!.nome).split(" ")[0]}
               hoje={hoje}
               agora={agora.getTime()}
             />
@@ -460,7 +460,7 @@ export default async function AgendaPage({
           eventos={eventosCtx}
           cronogramas={cronogramasCtx}
           nudges={nudgesAux}
-          meuNome={me.nome.split(" ")[0]}
+          meuNome={(me.nome_social ?? me.nome).split(" ")[0]}
           hoje={hoje}
           agora={agora.getTime()}
           // supervisor+mentor tem superfície de dia própria — os cards da
@@ -509,7 +509,7 @@ export default async function AgendaPage({
           cronogramas={cronogramasCtx}
           nudges={nudgesCoord}
           encerramentosPendentes={new Set(encerramentosPendentes)}
-          meuNome={me.nome.split(" ")[0]}
+          meuNome={(me.nome_social ?? me.nome).split(" ")[0]}
           hoje={hoje}
           agora={agora.getTime()}
           seletorContexto={seletorTurma}

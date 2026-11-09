@@ -249,7 +249,7 @@ function LinhaDupla({
     d.turma ? turmaLonga(d.turma) : null,
     mostrarSupervisor
       ? d.supervisor
-        ? `auxiliar executivo ${d.supervisor.nome}`
+        ? `auxiliar executivo ${d.supervisor.nome_social ?? d.supervisor.nome}`
         : "sem auxiliar executivo"
       : null,
   ]
@@ -309,7 +309,7 @@ function LinhaDupla({
       acao={wa}
       menu={menu}
       fichaHref={`/duplas/${d.id}`}
-      fichaNome={d.mentorado.nome.split(" ")[0]}
+      fichaNome={(d.mentorado.nome_social ?? d.mentorado.nome).split(" ")[0]}
       className={dimDesistentes && desistenteDa(d) ? "opacity-60" : undefined}
     />
   );
@@ -352,11 +352,14 @@ function LinhaMini({
           o WA sobe pra z-20 e o "Ver ficha" vira decorativo — 1 tab por linha */}
       <Link
         href={`/duplas/${d.id}`}
-        aria-label={`Ver ficha da dupla de ${d.mentorado.nome.split(" ")[0]}`}
+        aria-label={`Ver ficha da dupla de ${(d.mentorado.nome_social ?? d.mentorado.nome).split(" ")[0]}`}
         className="absolute inset-0 z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
       <span className="flex min-w-0 flex-wrap items-center gap-1.5 font-medium">
-        <DuplaNomes mentor={d.mentor.nome} mentorado={d.mentorado.nome} />
+        <DuplaNomes
+          mentor={d.mentor.nome_social ?? d.mentor.nome}
+          mentorado={d.mentorado.nome_social ?? d.mentorado.nome}
+        />
         {d.turma && (
           <span
             title={d.turma}
@@ -957,14 +960,19 @@ function VisaoCoordenacao({
     ...new Map(
       lista
         .filter((d) => d.supervisor)
-        .map((d) => [d.supervisor!.id, d.supervisor!.nome])
+        .map((d) => [
+          d.supervisor!.id,
+          d.supervisor!.nome_social ?? d.supervisor!.nome,
+        ])
     ).entries(),
   ]
     .map(([id, nome]) => ({ id, nome }))
     .sort((a, b) => comparaNome(a.nome, b.nome));
   const temSemSup = lista.some((d) => !d.supervisor);
   const mentores = [
-    ...new Map(lista.map((d) => [d.mentor.id, d.mentor.nome])).entries(),
+    ...new Map(
+      lista.map((d) => [d.mentor.id, d.mentor.nome_social ?? d.mentor.nome])
+    ).entries(),
   ]
     .map(([id, nome]) => ({ id, nome }))
     .sort((a, b) => comparaNome(a.nome, b.nome));
@@ -1915,13 +1923,16 @@ function VisaoMentor({
                     são decorativos — 1 tab-stop por card */}
                 <Link
                   href={`/duplas/${d.id}`}
-                  aria-label={`Ver ficha da dupla de ${d.mentorado.nome.split(" ")[0]}`}
+                  aria-label={`Ver ficha da dupla de ${(d.mentorado.nome_social ?? d.mentorado.nome).split(" ")[0]}`}
                   className="absolute inset-0 z-10 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
                 <header className="flex flex-wrap items-center justify-between gap-2">
                   <p className="flex min-w-0 flex-wrap items-center gap-1.5 font-semibold">
                     <DuplaAvatares mentor={d.mentor} mentorado={d.mentorado} size={28} />
-                    <DuplaNomes mentor={d.mentor.nome} mentorado={d.mentorado.nome} />
+                    <DuplaNomes
+                      mentor={d.mentor.nome_social ?? d.mentor.nome}
+                      mentorado={d.mentorado.nome_social ?? d.mentorado.nome}
+                    />
                     {d.turma && (
                       <span
                         title={d.turma}
@@ -2148,7 +2159,7 @@ function VisaoEspecialista({
                       aria-hidden
                       className="size-2.5 shrink-0 rounded-full bg-[var(--role-mentorado)] ring-1 ring-foreground/15"
                     />
-                    <span>{d.mentorado.nome}</span>
+                    <span>{d.mentorado.nome_social ?? d.mentorado.nome}</span>
                     {d.turma && (
                       <span
                         title={d.turma}

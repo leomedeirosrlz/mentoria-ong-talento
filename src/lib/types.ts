@@ -377,7 +377,7 @@ export type Registro = {
   created_by: string | null;
   created_at: string;
   /** Autor do registro — só vem no embed `autor:profiles!registros_created_by_fkey(nome)` da dupla. */
-  autor?: { nome: string } | null;
+  autor?: { nome: string; nome_social?: string | null } | null;
 };
 
 // ---------- avaliação do encontro FEITA PELO JOVEM (0071 / D4) ----------
@@ -451,7 +451,7 @@ export type RegistroAnexo = {
   created_by: string | null;
   created_at: string;
   /** Autor do anexo — só vem no embed `autor:profiles!registro_anexos_created_by_fkey(nome)`. */
-  autor?: { nome: string } | null;
+  autor?: { nome: string; nome_social?: string | null } | null;
 };
 
 export type Encontro = {
@@ -601,7 +601,7 @@ export type Comunicado = {
   prioridade: ComunicadoPrioridade;
   created_by: string;
   created_at: string;
-  autor?: { nome: string } | null;
+  autor?: { nome: string; nome_social?: string | null } | null;
 };
 
 export type Notificacao = {
@@ -826,12 +826,12 @@ export type SolicitacaoEspecialista = {
   created_at: string;
   respondida_em: string | null;
   // embeds quando selecionados:
-  mentorado?: { nome: string } | null;
-  solicitante?: { nome: string } | null;
-  especialista?: { nome: string } | null;
+  mentorado?: { nome: string; nome_social?: string | null } | null;
+  solicitante?: { nome: string; nome_social?: string | null } | null;
+  especialista?: { nome: string; nome_social?: string | null } | null;
   /** Nome de quem recebeu o pedido direcionado — embed de profiles via
    *  especialista_desejado_id (null = broadcast pra todo especialista). */
-  desejado?: { nome: string } | null;
+  desejado?: { nome: string; nome_social?: string | null } | null;
   /** Nome do especialista engajado — coluna plana da view (0074); fallback
    *  quando o embed de profiles não resolve. */
   especialista_nome?: string | null;
@@ -853,7 +853,7 @@ export type SolicitacaoProposta = {
   mensagem: string | null;
   created_at: string;
   /** embed de profiles via autor_id — quem falou por último na negociação. */
-  autor?: { nome: string } | null;
+  autor?: { nome: string; nome_social?: string | null } | null;
 };
 
 // ---------- agenda real do especialista (0073) ----------
@@ -898,15 +898,16 @@ export type Encerramento = {
   id: string;
   dupla_id: string;
   /** 'concluida' = jornada completa · 'encerrada' = fechamento antecipado ·
-   *  null = rito aberto (último encontro já concluiu, decisão pendente). */
-  tipo: "concluida" | "encerrada" | null;
+   *  'pendente' = rito aberto (último encontro já concluiu, decisão pendente;
+   *  0156 trocou o NULL por valor explícito). */
+  tipo: "concluida" | "encerrada" | "pendente";
   checklist: EncerramentoChecklist;
   /** Snapshot gerado dos dados da jornada no momento do fechamento. */
   resumo_jornada: string | null;
   decidido_por: string | null;
   created_at: string;
   /** embed `decidido:profiles!encerramentos_decidido_por_fkey(nome)`. */
-  decidido?: { nome: string } | null;
+  decidido?: { nome: string; nome_social?: string | null } | null;
 };
 
 // ---------- documentos & assinaturas (0033) ----------
@@ -1105,7 +1106,7 @@ export type Devolutiva = {
   id: string;
   dupla_id: string;
   autor_id: string;
-  autor?: { nome: string } | null;
+  autor?: { nome: string; nome_social?: string | null } | null;
   texto: string;
   created_at: string;
 };

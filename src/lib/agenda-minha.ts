@@ -265,18 +265,13 @@ function diaDoIso(iso: string | null): string | null {
   return iso ? toDateStr(new Date(iso)) : null;
 }
 
-/** Limbo "aberto" no recorte da agenda: além do `emLimbo` canônico
- *  (agendado vencido), cobre o status legado "remarcado" — a RPC atual só
- *  escreve "agendado", mas uma row remarcada vencida tem a mesma
- *  ambiguidade (rolou?). Sem isso ela sumiria da agenda sem virar aviso. */
+/** Limbo "aberto" no recorte da agenda: hoje é o próprio `emLimbo`
+ *  canônico — o status legado "remarcado" entrou na definição única quando
+ *  o semáforo foi unificado (antes um remarcado vencido virava "atraso" no
+ *  semáforo enquanto a agenda já o tratava como limbo). Alias mantida: o
+ *  nome aberto/fechado é o vocabulário da agenda. */
 export function limboAberto(e: Encontro, agoraMs: number): boolean {
-  if (emLimbo(e, agoraMs)) return true;
-  return (
-    e.status === "remarcado" &&
-    !e.registro &&
-    e.data_hora != null &&
-    new Date(e.data_hora).getTime() < agoraMs
-  );
+  return emLimbo(e, agoraMs);
 }
 
 /** Limbo "fechado": vencido E o horário previsto já acabou. Enquanto
@@ -475,6 +470,11 @@ function itensDaDupla(
         acoes.push("remarcar");
       } else if (e.status === "realizado" && !e.registro) {
         acoes.push("registrar");
+      } else if (e.status === "nao_aconteceu" || e.status === "cancelado") {
+        // fechado mas com data futura (marcou não-aconteceu/cancelou antes
+        // da hora): a row existe e o dialog remarca ela — mesmo caminho do
+        // item "a agendar" abaixo, só que aqui o dia ainda está por vir
+        acoes.push("remarcar");
       }
     }
 
@@ -536,6 +536,16 @@ function itensDaDupla(
     for (const f of alvo.faltantes)
       if (!previstos.has(f.numero))
         previstos.set(f.numero, { dia: f.dataSugerida, encontro: null });
+    // TODA row falha segue acionável, não só a do alvo: dois nao_aconteceu
+    // seguidos deixavam o segundo sem nenhum caminho aqui (a data já passou,
+    // então ele nem entra como item de dia) — a ficha já remarcava, a
+    // agenda não
+    for (const e of d.encontros)
+      if (
+        (e.status === "nao_aconteceu" || e.status === "cancelado") &&
+        !previstos.has(e.numero)
+      )
+        previstos.set(e.numero, { dia: null, encontro: e });
 
     for (const [numero, p] of [...previstos].sort((a, b) => a[0] - b[0])) {
       // data oficial já passada não senta no dia dela — cai no grupo "a

@@ -1,10 +1,12 @@
 "use client";
 
-// Detalhe do chamado (o artigo master-detail): fatos, trilha da conversa,
-// composers da equipe e do autor. Extraído do chamados-app pra que a ficha
-// do jovem (jovem-chamados) não baixe a fila inteira do staff.
+// Detalhe do chamado (o artigo master-detail): cabeçalho com a ação do
+// estado, trilha da conversa e composers da equipe e do autor. Extraído do
+// chamados-app pra que a ficha do jovem (jovem-chamados) não baixe a fila
+// inteira do staff.
 
 import {
+  Fragment,
   useEffect,
   useId,
   useMemo,
@@ -19,18 +21,14 @@ import { AnimatePresence, motion, useReducedMotion } from "motion/react";
 import {
   ArrowLeft,
   ArrowSquareOut,
+  CaretDown,
   Check,
   CheckCircle,
   CircleNotch,
-  Clock,
-  Eye,
-  EyeSlash,
+  DotsThreeVertical,
   Lock,
   Paperclip,
-  PaperPlaneRight,
   Sparkle,
-  UserPlus,
-  WarningCircle,
   X,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -39,11 +37,7 @@ import type {
   ChamadoFilaItem,
   ChamadoTimelineItem,
 } from "@/lib/types";
-import {
-  CHAMADO_ORIGEM_LABEL,
-  formatDiaMes,
-  formatTamanho,
-} from "@/lib/ciclo";
+import { formatDiaMes, formatTamanho, papelLabel } from "@/lib/ciclo";
 import {
   acrescentarInfoChamado,
   assumirChamado,
@@ -68,10 +62,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import {
   Dialog,
   DialogContent,
@@ -90,8 +85,8 @@ import {
   useAnexosPendentes,
 } from "@/components/chamado-anexos";
 import {
-  CategoriaBadge,
   ChamadoStatusBadge,
+  UrgenciaMarca,
   primeiroNome,
   relTempo,
   type Equipe,
@@ -100,10 +95,11 @@ import {
 
 type Papel = string;
 
+const ITEM_MENU = "min-h-11 px-2.5 md:min-h-8";
+
 export function ChamadoDetalhe({
   papel,
   meuId,
-  meuNome,
   chamado,
   timeline,
   equipe,
@@ -118,23 +114,24 @@ export function ChamadoDetalhe({
   equipe: Equipe;
   onVoltar: () => void;
   /** O voltar some no desktop quando a lista continua visível ao lado
-   *  (master-detail do staff). Onde o detalhe SUBSTITUI a lista (perfil
-   *  do jovem), ele fica sempre — senão vira beco sem saída. */
+   *  (master-detail do staff). Onde o detalhe SUBSTITUI a lista (autor),
+   *  ele fica sempre — senão vira beco sem saída. */
   voltarDesktop?: boolean;
 }) {
-  const router = useRouter();
   const [pending, start] = useTransition();
   const staff = papel === "coordenacao" || papel === "supervisor";
+  const coord = papel === "coordenacao";
   const souDono = chamado.atribuido_a === meuId;
-  const podeTratar = !chamado.restrito && chamado.status !== "resolvido";
+  const resolvido = chamado.status === "resolvido";
+  const podeTratar = !chamado.restrito && !resolvido;
   const [resolveOpen, setResolveOpen] = useState(false);
   const [atribuirOpen, setAtribuirOpen] = useState(false);
   const [resumo, setResumo] = useState("");
   const [para, setPara] = useState<string>(chamado.atribuido_a ?? "");
   /** "acabou de chegar" por identidade, não por janela de relógio: no envio
-   *  a gente fotografa os ids da trilha — o que volta do refresh com id
-   *  fora da foto (o item postado, ou algo que chegou junto) entra com
-   *  animação + chip "agora". A foto expira em ~5s pra não eternizar. */
+   *  a gente fotografa os ids da trilha — o que volta da action com id fora
+   *  da foto (o item postado, ou algo que chegou junto) entra com animação
+   *  + chip "agora". A foto expira em ~5s pra não eternizar. */
   const [fotoTrilha, setFotoTrilha] = useState<Set<string> | null>(null);
   const timerMarca = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(
@@ -150,394 +147,221 @@ export function ChamadoDetalhe({
     timerMarca.current = setTimeout(() => setFotoTrilha(null), 5000);
   }
 
+  // as actions revalidam /chamados (e o perfil do jovem): a resposta já
+  // traz a página re-renderizada, sem router.refresh() extra
   function acao(fn: () => Promise<{ ok?: boolean; error?: string }>, okMsg: string) {
     start(async () => {
-      const r = await fn();
-      if (r.error) toast.error(r.error);
-      else {
-        toast.success(okMsg);
-        router.refresh();
+      try {
+        const r = await fn();
+        if (r.error) toast.error(r.error);
+        else toast.success(okMsg);
+      } catch {
+        toast.error("Sem conexão. Tente de novo.");
       }
     });
   }
 
-  const passos = [
-    {
-      rotulo: "Recebido",
-      feito: true,
-      atual: false,
-      detalhe: formatDiaMes(chamado.created_at),
-    },
-    chamado.status === "resolvido"
-      ? {
-          rotulo: "Em atendimento",
-          feito: true,
-          atual: false,
-          detalhe: "",
-        }
-      : chamado.status === "em_atendimento"
-        ? {
-            rotulo: "Em atendimento",
-            feito: false,
-            atual: true,
-            detalhe: chamado.atribuido_nome
-              ? `com ${primeiroNome(chamado.atribuido_nome)}`
-              : "a equipe está vendo",
-          }
-        : {
-            rotulo: "Aguardando",
-            feito: false,
-            atual: true,
-            detalhe: "ninguém assumiu ainda",
-          },
-    {
-      rotulo: "Resolvido",
-      feito: chamado.status === "resolvido",
-      atual: chamado.status === "resolvido",
-      detalhe: chamado.resolvido_em ? formatDiaMes(chamado.resolvido_em) : "—",
-    },
-  ];
+  const autorPrimeiro = chamado.autor_nome
+    ? primeiroNome(chamado.autor_nome)
+    : null;
+
+  // uma ação principal por estado; o resto mora no ⋯
+  type Acao = { rotulo: string; run: () => void };
+  const assumir: Acao = {
+    rotulo: chamado.atribuido_nome && !souDono
+      ? `Assumir de ${primeiroNome(chamado.atribuido_nome)}`
+      : "Assumir",
+    run: () => acao(() => assumirChamado(chamado.id), "Chamado assumido. Agora é com você."),
+  };
+  const resolver: Acao = { rotulo: "Resolver", run: () => setResolveOpen(true) };
+  const reabrir: Acao = {
+    rotulo: "Reabrir",
+    run: () => acao(() => reabrirChamado(chamado.id), "Chamado reaberto."),
+  };
+  const atribuir: Acao = { rotulo: "Atribuir…", run: () => setAtribuirOpen(true) };
+  const devolver: Acao = {
+    rotulo: "Devolver à fila",
+    run: () => acao(() => devolverChamadoFila(chamado.id), "Chamado devolvido à fila."),
+  };
+
+  let principal: Acao | null = null;
+  const extras: Acao[] = [];
+  if (staff && !chamado.restrito) {
+    if (resolvido) {
+      principal = reabrir;
+    } else {
+      const podeResolver = souDono || coord;
+      if (!chamado.atribuido_a) principal = assumir;
+      else if (podeResolver) principal = resolver;
+      else if (coord) principal = assumir;
+      if (coord && chamado.atribuido_a && !souDono && principal !== assumir)
+        extras.push(assumir);
+      if (podeResolver && principal !== resolver) extras.push(resolver);
+      if (coord) extras.push(atribuir);
+      if ((souDono || coord) && chamado.atribuido_a) extras.push(devolver);
+    }
+  }
+
+  const meta = [
+    staff ? chamado.autor_nome : null,
+    // pro jovem a dupla é ele mesmo, o contexto só repetiria o nome dele
+    papel === "mentorado" ? null : chamado.contexto,
+    `aberto ${formatDiaMes(chamado.created_at)}`,
+    chamado.numero,
+  ].filter(Boolean);
 
   return (
     <article className="min-w-0 overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
-      <div className="border-b border-border px-4 py-3.5 sm:px-5">
-        <div className="flex items-start gap-3">
+      <header className="border-b border-border px-4 pb-4 pt-3 sm:px-5">
+        <div className="flex min-h-11 items-center gap-2 md:min-h-9">
           <Button
             type="button"
             variant="ghost"
             size="icon-sm"
             onClick={onVoltar}
-            aria-label="Voltar pra lista"
+            aria-label="Voltar para a lista"
             className={cn(
-              "shrink-0 text-muted-foreground",
-              voltarDesktop ? "lg:grid" : "lg:hidden"
+              "-ml-2 shrink-0 text-muted-foreground",
+              voltarDesktop ? "" : "lg:hidden"
             )}
           >
             <ArrowLeft aria-hidden />
           </Button>
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-              <span className="font-mono text-xs text-muted-foreground">
-                {chamado.numero}
-              </span>
-              <CategoriaBadge categoria={chamado.categoria} />
-              <ChamadoStatusBadge
-                status={chamado.status}
-                dono={chamado.restrito ? null : chamado.atribuido_nome}
-                restrito={chamado.restrito}
-                visao={staff ? "staff" : "autor"}
-              />
-              {staff && (
-                <span className="ml-auto text-xs text-muted-foreground">
-                  {CHAMADO_ORIGEM_LABEL[chamado.origem]}
-                </span>
-              )}
-            </div>
-            <h2 className="mt-1.5 break-words text-base font-semibold leading-snug sm:text-lg">
-              {chamado.restrito ? "Chamado restrito à coordenação" : chamado.assunto}
-            </h2>
+          <ChamadoStatusBadge
+            status={chamado.status}
+            dono={chamado.restrito ? null : chamado.atribuido_nome}
+            souDono={souDono}
+            restrito={chamado.restrito}
+            visao={staff ? "staff" : "autor"}
+          />
+          {chamado.categoria === "urgencia" && <UrgenciaMarca />}
+          <div className="ml-auto flex shrink-0 items-center gap-1">
+            {principal && (
+              <Button
+                size="sm"
+                // reabrir é exceção, não o próximo passo: sem lima
+                variant={principal === reabrir ? "outline" : "default"}
+                disabled={pending}
+                onClick={principal.run}
+              >
+                {pending && <CircleNotch className="animate-spin" aria-hidden />}
+                {principal.rotulo}
+              </Button>
+            )}
+            {extras.length > 0 && (
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  render={
+                    <Button
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-label="Mais ações"
+                      disabled={pending}
+                      className="text-muted-foreground"
+                    />
+                  }
+                >
+                  <DotsThreeVertical weight="bold" aria-hidden />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-48">
+                  {extras.map((a) => (
+                    <DropdownMenuItem
+                      key={a.rotulo}
+                      className={ITEM_MENU}
+                      onClick={a.run}
+                    >
+                      {a.rotulo}
+                    </DropdownMenuItem>
+                  ))}
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
           </div>
         </div>
+        <h2 className="mt-2 break-words text-lg font-semibold leading-snug tracking-tight text-balance">
+          {chamado.restrito ? "Restrito à coordenação" : chamado.assunto}
+        </h2>
+        <p className="mt-1 text-xs text-muted-foreground">
+          {meta.map((m, i) => (
+            <Fragment key={i}>
+              {i > 0 && " · "}
+              <span className="whitespace-nowrap">{m}</span>
+            </Fragment>
+          ))}
+        </p>
+      </header>
 
-        {/* stepper do "seu pedido" — só pro autor; a equipe lê a fila */}
-        {!staff && (
-          <ol
-            className="mt-4 grid grid-cols-3 gap-2"
-            aria-label="Andamento do chamado"
-          >
-            {passos.map((p, i) => {
-              // mock: cor semântica mora SÓ no ícone — etapa atual ganha a
-              // borda marcada neutra, feito fica neutro, futuro é tracejado
-              const cor = p.atual
-                ? "border-foreground/40"
-                : p.feito
-                  ? "border-border"
-                  : "border-dashed border-border";
-              const IconePasso = p.feito
-                ? CheckCircle
-                : i === 2
-                  ? CheckCircle
-                  : p.atual && chamado.status === "aberto"
-                    ? WarningCircle
-                    : Clock;
-              const iconeCor = p.atual
-                ? chamado.status === "aberto"
-                  ? "text-destructive"
-                  : chamado.status === "resolvido"
-                    ? "text-[var(--ok-text)]"
-                    : "text-[var(--warn-text)]"
-                : p.feito
-                  ? "text-[var(--ok-text)]"
-                  : "text-muted-foreground";
-              return (
-                <li
-                  key={p.rotulo}
-                  aria-current={p.atual ? "step" : undefined}
-                  className={cn("rounded-lg border px-2.5 py-2", cor)}
-                >
-                  <span
-                    className={cn(
-                      "flex items-center gap-1 text-xs font-medium",
-                      p.feito || p.atual ? "text-foreground" : "text-muted-foreground"
-                    )}
-                  >
-                    <IconePasso size={13} aria-hidden className={iconeCor} />
-                    {p.rotulo}
-                  </span>
-                  <span className="mt-0.5 block truncate text-xs sm:text-[10px] text-muted-foreground">
-                    {p.detalhe}
-                  </span>
-                </li>
-              );
-            })}
-          </ol>
-        )}
-
-        {/* fatos do chamado — a linha "quem/o quê/com quem" do mock */}
-        {!chamado.restrito && (
-          <dl className="mt-3.5 grid grid-cols-2 gap-x-4 gap-y-2 sm:grid-cols-4">
-            {staff ? (
-              <>
-                <FatoChamado
-                  rotulo="Autor(a)"
-                  valor={chamado.autor_nome ?? "—"}
-                />
-                <FatoChamado
-                  rotulo="Contexto"
-                  valor={chamado.contexto ?? "—"}
-                />
-                <FatoChamado
-                  rotulo="Responsável"
-                  valor={
-                    chamado.atribuido_nome ??
-                    (chamado.status === "aberto" ? "Sem dono" : "—")
-                  }
-                />
-                <FatoChamado
-                  rotulo="Aberto em"
-                  valor={`${formatDiaMes(chamado.created_at)} · ${relTempo(chamado.created_at)}`}
-                />
-              </>
-            ) : (
-              <>
-                <FatoChamado
-                  rotulo="Quem cuida"
-                  valor={
-                    chamado.atribuido_nome
-                      ? primeiroNome(chamado.atribuido_nome)
-                      : "Ainda sem responsável"
-                  }
-                />
-                {/* pro jovem o mentorado da dupla é ele mesmo — omitir */}
-                {chamado.mentorado_nome && papel !== "mentorado" && (
-                  <FatoChamado
-                    rotulo="Mentorado"
-                    valor={chamado.mentorado_nome}
-                  />
-                )}
-                <FatoChamado
-                  rotulo="Aberto em"
-                  valor={formatDiaMes(chamado.created_at)}
-                />
-              </>
-            )}
-          </dl>
-        )}
-
-        {/* pedido original — a mensagem que abriu o chamado não aparecia */}
-        {!chamado.restrito && chamado.mensagem && (
-          <div className="mt-3.5 rounded-lg border border-border bg-muted/30 px-3.5 py-3">
-            <h3 className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
-              {staff
-                ? `Pedido original · ${chamado.autor_nome ?? "autor"}`
-                : "Você escreveu"}
-            </h3>
-            <p className="mt-1.5 whitespace-pre-line break-words text-sm leading-relaxed text-foreground/90">
-              {chamado.mensagem}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* ações da equipe */}
-      {staff && !chamado.restrito && (
-        <div className="flex flex-wrap items-center gap-2 border-b border-border bg-muted/30 px-4 py-2.5 sm:px-5">
-          {chamado.status !== "resolvido" && (
-            <>
-              {(!chamado.atribuido_a || papel === "coordenacao") && !souDono && (
-                <Button
-                  size="sm"
-                  disabled={pending}
-                  onClick={() => acao(() => assumirChamado(chamado.id), "Chamado assumido. É com você.")}
-                >
-                  {chamado.atribuido_nome
-                    ? `Assumir de ${chamado.atribuido_nome}`
-                    : "Assumir"}
-                </Button>
-              )}
-              {(souDono || papel === "coordenacao") && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={pending}
-                  onClick={() => setResolveOpen(true)}
-                >
-                  Resolver
-                </Button>
-              )}
-              {papel === "coordenacao" && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={pending}
-                  onClick={() => setAtribuirOpen(true)}
-                >
-                  Atribuir
-                </Button>
-              )}
-              {(souDono || papel === "coordenacao") && chamado.atribuido_a && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  disabled={pending}
-                  onClick={() => acao(() => devolverChamadoFila(chamado.id), "Chamado devolvido à fila.")}
-                >
-                  Devolver à fila
-                </Button>
-              )}
-            </>
-          )}
-          {chamado.status === "resolvido" && (
-            <Button
-              variant="outline"
-              size="sm"
-              disabled={pending}
-              onClick={() => acao(() => reabrirChamado(chamado.id), "Chamado reaberto.")}
-            >
-              Reabrir
-            </Button>
-          )}
-        </div>
-      )}
-      {staff && chamado.restrito && (
-        <div className="flex items-center gap-2 px-4 py-6 text-sm text-muted-foreground sm:px-5">
-          <Lock size={15} aria-hidden className="shrink-0" />
-          <span>
-            <strong className="text-foreground">Chamado restrito à coordenação.</strong>{" "}
-            Chamados de plataforma são tratados pela coordenação: assunto,
-            autor e conversa não aparecem pra supervisão.
-          </span>
-        </div>
+      {chamado.restrito ? (
+        <p className="flex items-start gap-2 px-4 py-6 text-sm text-muted-foreground sm:px-5">
+          <Lock size={15} aria-hidden className="mt-0.5 shrink-0" />
+          Chamados de plataforma ficam só com a coordenação.
+        </p>
+      ) : (
+        <Trilha
+          chamado={chamado}
+          timeline={timeline}
+          meuId={meuId}
+          staff={staff}
+          fotoTrilha={fotoTrilha}
+        />
       )}
 
-      {/* linha do tempo — restrito (plataforma pro auxiliar) não revela nem
-          a existência da conversa: no banco a RLS já devolve vazio */}
-      {!chamado.restrito && (
-        <div>
-          {staff && (
-            <div
-              role="group"
-              aria-label="Legenda da trilha"
-              className="flex flex-wrap items-center gap-x-3.5 gap-y-1 border-b border-border/60 px-4 py-2.5 text-xs sm:text-[11px] text-muted-foreground sm:px-5"
-            >
-              <span className="font-medium text-foreground/80">Legenda</span>
-              <span className="flex items-center gap-1">
-                <Eye size={12} aria-hidden /> Pública: o autor vê
-              </span>
-              <span className="flex items-center gap-1">
-                <EyeSlash size={12} aria-hidden /> Interna: só a equipe
-              </span>
-              <span className="flex items-center gap-1">
-                <Sparkle size={12} aria-hidden /> Automática: do sistema
-              </span>
-            </div>
-          )}
-          {!staff && timeline.length > 0 && (
-            <p className="border-b border-border/60 px-4 py-2.5 text-xs sm:text-[11px] text-muted-foreground sm:px-5">
-              Você vê o que a equipe publica pra você e o que acrescentou.
-            </p>
-          )}
-          <ol className="divide-y divide-border/60 px-4 sm:px-5" aria-label="Conversa">
-            {timeline.map((t) => (
-              <TimelineItem
-                key={`${t.tipo}-${t.item.id}`}
-                entry={t}
-                meuId={meuId}
-                staff={staff}
-                recente={
-                  fotoTrilha !== null && !fotoTrilha.has(t.item.id)
-                }
-              />
-            ))}
-            {timeline.length === 0 && (
-              <li className="py-6 text-center text-sm text-muted-foreground">
-                A conversa começa quando a equipe responder.
-              </li>
-            )}
-          </ol>
-        </div>
-      )}
-
-      {/* resolução visível pra todos */}
-      {chamado.status === "resolvido" && chamado.resolucao_resumo && (
+      {/* resolução visível pra todos — a resposta final fecha a conversa */}
+      {resolvido && chamado.resolucao_resumo && (
         <div className="border-t border-border bg-[var(--ok)]/10 px-4 py-3.5 text-sm sm:px-5">
-          <strong className="flex items-center gap-1.5 text-[var(--ok-text)]">
+          <p className="flex items-center gap-1.5 font-medium text-[var(--ok-text)]">
             <CheckCircle size={15} aria-hidden />
             Resolvido
-          </strong>
-          {chamado.resolvido_em && (
-            <span className="text-muted-foreground">
-              {" "}· {formatDiaMes(chamado.resolvido_em)}
-            </span>
-          )}
+            {chamado.resolvido_em && (
+              <span className="font-normal text-muted-foreground">
+                · {formatDiaMes(chamado.resolvido_em)}
+              </span>
+            )}
+          </p>
           <p className="mt-1 break-words leading-relaxed">{chamado.resolucao_resumo}</p>
         </div>
       )}
 
-      {/* composer */}
       {staff && podeTratar && (
         <ChamadoComposer
           chamadoId={chamado.id}
           equipe={equipe}
           meuId={meuId}
           autorId={chamado.autor_id}
-          autorNome={chamado.autor_nome ?? "o autor"}
+          autorPrimeiro={autorPrimeiro}
           pending={pending}
           onEnviou={registrarEnvio}
         />
       )}
-      {!staff && (
-        <div className="border-t border-border px-4 py-4 sm:px-5">
-          {chamado.status === "resolvido" ? (
-            <div className="space-y-3">
-              <p className="text-sm text-muted-foreground">
-                Ainda precisa de ajuda com isso? Peça a reabertura. A equipe é
-                avisada e o chamado volta pra fila.
-              </p>
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={pending}
-                onClick={() =>
-                  acao(() => pedirReaberturaChamado(chamado.id), "Pedido enviado. A equipe retoma o chamado.")
-                }
-              >
-                Pedir reabertura
-              </Button>
-            </div>
-          ) : (
-            <AutorComposer
-              chamadoId={chamado.id}
-              meuId={meuId}
-              meuNome={meuNome}
-              pending={pending}
-              onEnviou={registrarEnvio}
-            />
-          )}
-        </div>
-      )}
+      {!staff &&
+        (resolvido ? (
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border px-4 py-3.5 sm:px-5">
+            <p className="text-sm text-muted-foreground">
+              Ainda precisa de ajuda com isso?
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={pending}
+              onClick={() =>
+                acao(
+                  () => pedirReaberturaChamado(chamado.id),
+                  "Pedido enviado. A equipe retoma o chamado."
+                )
+              }
+            >
+              Pedir reabertura
+            </Button>
+          </div>
+        ) : (
+          <AutorComposer
+            chamadoId={chamado.id}
+            meuId={meuId}
+            pending={pending}
+            onEnviou={registrarEnvio}
+          />
+        ))}
 
-      {/* dialog resolver */}
       <Dialog
         open={resolveOpen}
         onOpenChange={(o) => {
@@ -547,37 +371,32 @@ export function ChamadoDetalhe({
       >
         <DialogContent size="md">
           <DialogHeader>
-            <DialogTitle>Resolver {chamado.numero}</DialogTitle>
+            <DialogTitle>Resolver chamado</DialogTitle>
             <DialogDescription>
-              O resumo vai pro autor como resposta final e fica na trilha do
-              chamado.
+              {autorPrimeiro
+                ? `${autorPrimeiro} recebe este resumo como resposta final.`
+                : "O autor recebe este resumo como resposta final."}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-1.5">
-            <Label htmlFor="resumo-resolucao">Resumo da resolução</Label>
+            <Label htmlFor="resumo-resolucao">Resumo</Label>
             <Textarea
               id="resumo-resolucao"
               value={resumo}
               onChange={(e) => setResumo(e.target.value)}
               rows={3}
               maxLength={1000}
-              placeholder="Ex.: conversei com o mentor e o encontro foi reagendado pra quinta."
+              placeholder="Ex.: conversei com o mentor e o encontro foi para quinta."
             />
           </div>
           <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setResolveOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setResolveOpen(false)}>
               Cancelar
             </Button>
             <Button
               disabled={pending || resumo.trim().length < 2}
               onClick={() => {
-                acao(
-                  () => resolverChamado(chamado.id, resumo),
-                  "Chamado resolvido."
-                );
+                acao(() => resolverChamado(chamado.id, resumo), "Chamado resolvido.");
                 setResolveOpen(false);
               }}
             >
@@ -587,27 +406,25 @@ export function ChamadoDetalhe({
         </DialogContent>
       </Dialog>
 
-      {/* dialog atribuir */}
       <Dialog
         open={atribuirOpen}
         onOpenChange={(o) => {
           setAtribuirOpen(o);
-          // ressincroniza com o dono atual — abre espelhando o real e não
-          // carrega uma seleção abandonada da vez passada
+          // abre espelhando o dono real, não uma seleção abandonada
           setPara(chamado.atribuido_a ?? "");
         }}
       >
         <DialogContent size="md">
           <DialogHeader>
-            <DialogTitle>Atribuir {chamado.numero}</DialogTitle>
-            <DialogDescription>
-              Quem assumir trata. Auxiliar executivo só recebe chamado não
-              técnico.
-            </DialogDescription>
+            <DialogTitle>Atribuir chamado</DialogTitle>
           </DialogHeader>
-          <Select value={para} onValueChange={(v) => setPara(v ?? "")}>
-            <SelectTrigger aria-label="Responsável">
-              <SelectValue placeholder="Escolha o responsável" />
+          <Select
+            value={para}
+            items={Object.fromEntries(equipe.map((p) => [p.id, p.nome_social || p.nome]))}
+            onValueChange={(v) => setPara(v ?? "")}
+          >
+            <SelectTrigger aria-label="Responsável" className="w-full">
+              <SelectValue placeholder="Escolha quem vai cuidar" />
             </SelectTrigger>
             <SelectContent>
               {equipe.map((p) => (
@@ -618,32 +435,13 @@ export function ChamadoDetalhe({
             </SelectContent>
           </Select>
           <DialogFooter>
-            {/* ação secundária do próprio fluxo (devolve à fila) fica à
-                esquerda — não é um "cancelar" */}
-            <Button
-              variant="ghost"
-              className="sm:me-auto"
-              disabled={pending || !chamado.atribuido_a}
-              onClick={() => {
-                acao(() => atribuirChamado(chamado.id, null), "Chamado devolvido à fila.");
-                setAtribuirOpen(false);
-              }}
-            >
-              Tirar responsável
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => setAtribuirOpen(false)}
-            >
+            <Button variant="outline" onClick={() => setAtribuirOpen(false)}>
               Cancelar
             </Button>
             <Button
-              disabled={pending || !para}
+              disabled={pending || !para || para === chamado.atribuido_a}
               onClick={() => {
-                acao(
-                  () => atribuirChamado(chamado.id, para),
-                  "Chamado atribuído."
-                );
+                acao(() => atribuirChamado(chamado.id, para), "Chamado atribuído.");
                 setAtribuirOpen(false);
               }}
             >
@@ -656,37 +454,228 @@ export function ChamadoDetalhe({
   );
 }
 
-function FatoChamado({ rotulo, valor }: { rotulo: string; valor: string }) {
+// ---------- trilha ----------
+
+type BlocoTrilha =
+  | { tipo: "item"; entry: ChamadoTimelineItem }
+  | { tipo: "eventos"; entries: ChamadoTimelineItem[] };
+
+/** Eventos automáticos seguidos viram um bloco só ("3 atualizações") — a
+ *  conversa humana fica em primeiro plano. Um evento sozinho segue inline. */
+function agrupar(timeline: ChamadoTimelineItem[]): BlocoTrilha[] {
+  const out: BlocoTrilha[] = [];
+  let run: ChamadoTimelineItem[] = [];
+  const fecha = () => {
+    if (run.length >= 2) out.push({ tipo: "eventos", entries: run });
+    else if (run.length === 1) out.push({ tipo: "item", entry: run[0] });
+    run = [];
+  };
+  for (const t of timeline) {
+    if (t.tipo === "sistema") run.push(t);
+    else {
+      fecha();
+      out.push({ tipo: "item", entry: t });
+    }
+  }
+  fecha();
+  return out;
+}
+
+function Trilha({
+  chamado,
+  timeline,
+  meuId,
+  staff,
+  fotoTrilha,
+}: {
+  chamado: ChamadoFilaItem;
+  timeline: ChamadoTimelineItem[];
+  meuId: string;
+  staff: boolean;
+  fotoTrilha: Set<string> | null;
+}) {
+  const blocos = useMemo(() => {
+    // a caixa verde de resolução já mostra "Resolvido" + o resumo — o
+    // evento de sistema que a RPC grava ("Chamado resolvido — …") sai da
+    // conversa pra não contar duas vezes. Só o mais recente: uma
+    // resolução anterior de ciclo reaberto segue no histórico.
+    let tl = timeline;
+    if (chamado.status === "resolvido" && chamado.resolucao_resumo) {
+      for (let i = tl.length - 1; i >= 0; i--) {
+        const t = tl[i];
+        if (t.tipo === "sistema" && t.item.texto.startsWith("Chamado resolvido")) {
+          tl = [...tl.slice(0, i), ...tl.slice(i + 1)];
+          break;
+        }
+      }
+    }
+    return agrupar(tl);
+  }, [timeline, chamado.status, chamado.resolucao_resumo]);
+  const recente = (id: string) => fotoTrilha !== null && !fotoTrilha.has(id);
+  const vazio = !chamado.mensagem && blocos.length === 0;
+
   return (
-    <div className="min-w-0">
-      <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-        {rotulo}
-      </dt>
-      <dd className="mt-0.5 truncate text-xs font-medium text-foreground">
-        {valor}
-      </dd>
+    <ol className="space-y-4 px-4 py-4 sm:px-5" aria-label="Conversa">
+      {/* o pedido que abriu o chamado é a primeira mensagem da conversa */}
+      {chamado.mensagem && (
+        <li>
+          <Mensagem
+            autor={chamado.autor_nome ?? "Autor"}
+            souEu={!!chamado.autor_id && chamado.autor_id === meuId}
+            quando={chamado.created_at}
+            texto={chamado.mensagem}
+          />
+        </li>
+      )}
+      {blocos.map((b) =>
+        b.tipo === "eventos" ? (
+          <GrupoEventos
+            key={`g-${b.entries[0].item.id}`}
+            entries={b.entries}
+            recente={recente}
+          />
+        ) : (
+          <TimelineItem
+            key={`${b.entry.tipo}-${b.entry.item.id}`}
+            entry={b.entry}
+            meuId={meuId}
+            staff={staff}
+            recente={recente(b.entry.item.id)}
+          />
+        )
+      )}
+      {vazio && (
+        <li className="py-4 text-center text-sm text-muted-foreground">
+          A conversa começa quando a equipe responder.
+        </li>
+      )}
+    </ol>
+  );
+}
+
+function GrupoEventos({
+  entries,
+  recente,
+}: {
+  entries: ChamadoTimelineItem[];
+  recente: (id: string) => boolean;
+}) {
+  const [aberto, setAberto] = useState(false);
+  const id = useId();
+  const ultimo = entries[entries.length - 1];
+  return (
+    <li>
+      <Button
+        variant="ghost"
+        size="sm"
+        aria-expanded={aberto}
+        aria-controls={id}
+        onClick={() => setAberto((v) => !v)}
+        className="-ml-2.5 text-xs font-normal text-muted-foreground"
+      >
+        <Sparkle aria-hidden />
+        {entries.length} atualizações
+        <span aria-hidden>·</span>
+        <time dateTime={ultimo.item.created_at}>{relTempo(ultimo.item.created_at)}</time>
+        <CaretDown
+          aria-hidden
+          className={cn("transition-transform", aberto && "rotate-180")}
+        />
+      </Button>
+      {aberto && (
+        <ol id={id} className="mt-1 space-y-2 border-l border-border pl-3">
+          {entries.map((t, i) => (
+            <li
+              key={t.item.id}
+              className="animate-enter"
+              style={{ "--i": i } as React.CSSProperties}
+            >
+              {t.tipo === "sistema" && (
+                <EventoLinha entry={t} agora={recente(t.item.id)} />
+              )}
+            </li>
+          ))}
+        </ol>
+      )}
+    </li>
+  );
+}
+
+function EventoLinha({
+  entry,
+  agora,
+}: {
+  entry: Extract<ChamadoTimelineItem, { tipo: "sistema" | "publica" }>;
+  agora?: boolean;
+}) {
+  return (
+    <div className="flex items-start gap-2 text-xs text-muted-foreground">
+      <Sparkle size={13} aria-hidden className="mt-0.5 shrink-0" />
+      <span className="min-w-0 flex-1 break-words">{entry.item.texto}</span>
+      {agora && <ChipAgora />}
+      <time dateTime={entry.item.created_at} className="shrink-0">
+        {relTempo(entry.item.created_at)}
+      </time>
     </div>
   );
 }
 
-/** Tag de audiência do item da trilha (molde .tag do v5) — só a equipe vê:
- *  o autor recebe uma trilha única e limpa, sem jargão de "pública". */
-function TagTrilha({ tipo }: { tipo: "publica" | "interno" | "sistema" }) {
-  const conf = {
-    publica: { rotulo: "Pública", Icone: Eye, cls: "border-border text-muted-foreground" },
-    interno: { rotulo: "Interna", Icone: EyeSlash, cls: "border-dashed border-[var(--warn)]/60 text-[var(--warn-text)]" },
-    sistema: { rotulo: "Automática", Icone: Sparkle, cls: "border-dashed border-border text-muted-foreground" },
-  }[tipo];
+function ChipAgora() {
   return (
-    <span
+    <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--ok)]/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wider text-[var(--ok-text)]">
+      agora
+    </span>
+  );
+}
+
+/** Mensagem da conversa: o pedido original, respostas públicas e notas
+ *  internas usam o mesmo desenho; a nota interna ganha borda tracejada,
+ *  fundo e o único selo ("Interna") da trilha. */
+function Mensagem({
+  autor,
+  souEu,
+  quando,
+  texto,
+  interna,
+  agora,
+}: {
+  autor: string;
+  souEu: boolean;
+  quando: string;
+  texto: string;
+  interna?: boolean;
+  agora?: boolean;
+}) {
+  return (
+    <div
       className={cn(
-        "inline-flex shrink-0 items-center gap-1 rounded-full border px-1.5 py-px text-[10px] font-semibold uppercase tracking-wider",
-        conf.cls
+        interna &&
+          "rounded-lg border border-dashed border-[var(--warn)]/50 bg-[var(--warn)]/8 px-3 py-2.5"
       )}
     >
-      <conf.Icone size={10} aria-hidden />
-      {conf.rotulo}
-    </span>
+      <div className="flex items-center gap-2">
+        <Avatar nome={autor} size={22} />
+        <span className="min-w-0 truncate text-sm font-medium">
+          {souEu ? "Você" : autor}
+        </span>
+        {interna && (
+          <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-dashed border-[var(--warn)]/60 px-1.5 py-px text-[11px] font-medium text-[var(--warn-text)]">
+            <Lock size={10} aria-hidden />
+            Interna
+          </span>
+        )}
+        {agora && <ChipAgora />}
+        <time
+          dateTime={quando}
+          className="ml-auto shrink-0 text-xs text-muted-foreground"
+        >
+          {relTempo(quando)}
+        </time>
+      </div>
+      <p className="mt-1 whitespace-pre-line break-words text-sm sm:pl-[30px] leading-relaxed">
+        {texto}
+      </p>
+    </div>
   );
 }
 
@@ -703,9 +692,8 @@ function TimelineItem({
   recente?: boolean;
 }) {
   const reduz = useReducedMotion();
-  // scroll pro item novo — uma vez só. O callback-ref recriado a cada
-  // render re-disparava o scroll em qualquer re-render do detalhe; com
-  // effect + flag ele acontece só na chegada do item.
+  // scroll pro item novo uma vez só: effect + flag, não callback-ref (que
+  // re-disparava em qualquer re-render do detalhe)
   const liRef = useRef<HTMLLIElement | null>(null);
   const rolouRef = useRef(false);
   useEffect(() => {
@@ -716,40 +704,11 @@ function TimelineItem({
       behavior: reduz ? "auto" : "smooth",
     });
   }, [recente, reduz]);
-  const quando = (
-    <time
-      dateTime={entry.item.created_at}
-      className="shrink-0 text-xs sm:text-[11px] text-muted-foreground"
-    >
-      {relTempo(entry.item.created_at)}
-    </time>
-  );
-  const chipAgora = recente && (
-    <span className="inline-flex shrink-0 items-center rounded-full bg-[var(--ok)]/15 px-1.5 py-px text-[10px] font-bold uppercase tracking-wider text-[var(--ok-text)]">
-      agora
-    </span>
-  );
-  // halo ok-tinted que evapora — a "chegada" do item novo na trilha
-  const halo = recente && (
-    <motion.span
-      aria-hidden
-      className="pointer-events-none absolute inset-0 -mx-4 rounded-lg bg-[var(--ok)]/10 sm:-mx-5"
-      initial={{ opacity: 1 }}
-      animate={{ opacity: 0 }}
-      transition={{ duration: 0.7, delay: 0.2, ease: EASE }}
-    />
-  );
 
   if (entry.tipo === "sistema") {
     return (
-      <ItemTrilha recente={recente} refEl={liRef} halo={halo} className="py-2.5">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <Sparkle size={13} aria-hidden className="shrink-0" />
-          <span className="min-w-0 flex-1 break-words">{entry.item.texto}</span>
-          {staff && <TagTrilha tipo="sistema" />}
-          {chipAgora}
-          {quando}
-        </div>
+      <ItemTrilha recente={recente} refEl={liRef}>
+        <EventoLinha entry={entry} agora={recente} />
       </ItemTrilha>
     );
   }
@@ -758,18 +717,21 @@ function TimelineItem({
     const href = `/api/chamado-anexo/${a.id}`;
     const tipo = tipoAnexo(a.mime);
     return (
-      <ItemTrilha recente={recente} refEl={liRef} halo={halo} className="py-3">
-        <div className="flex items-center gap-2 text-xs">
-          <Paperclip size={13} aria-hidden className="shrink-0 text-muted-foreground" />
+      <ItemTrilha recente={recente} refEl={liRef}>
+        <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <Paperclip size={13} aria-hidden className="shrink-0" />
           <span className="min-w-0 flex-1 truncate">
-            <strong className="font-medium text-foreground">Anexo</strong>
-            <span className="text-muted-foreground">
-              {a.autor_nome ? ` · ${a.autor_nome}` : ""}
-            </span>
+            {a.created_by === meuId ? "Você" : (a.autor_nome ?? "Equipe")} anexou
           </span>
-          {staff && <TagTrilha tipo={a.interno ? "interno" : "publica"} />}
-          {chipAgora}
-          {quando}
+          {staff && a.interno && (
+            <span className="shrink-0 rounded-full border border-dashed border-[var(--warn)]/60 px-1.5 py-px text-[11px] font-medium text-[var(--warn-text)]">
+              Interna
+            </span>
+          )}
+          {recente && <ChipAgora />}
+          <time dateTime={a.created_at} className="shrink-0">
+            {relTempo(a.created_at)}
+          </time>
         </div>
         <a
           href={href}
@@ -779,80 +741,134 @@ function TimelineItem({
         >
           <AnexoThumb src={href} mime={a.mime} />
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-xs font-medium">{a.nome}</span>
-            <span className="block truncate text-xs sm:text-[11px] text-muted-foreground">
+            <span className="block truncate text-sm font-medium">{a.nome}</span>
+            <span className="block truncate text-xs text-muted-foreground">
               {ROTULO_ANEXO[tipo]}
               {a.tamanho ? ` · ${formatTamanho(a.tamanho)}` : ""}
-              {" · "}abre em nova aba
             </span>
           </span>
-          <ArrowSquareOut size={14} aria-hidden className="shrink-0 text-muted-foreground" />
+          <ArrowSquareOut size={14} aria-label="Abre em nova aba" className="shrink-0 text-muted-foreground" />
         </a>
       </ItemTrilha>
     );
   }
-  const interno = entry.tipo === "interno";
-  const autor =
-    "autor_nome" in entry.item ? entry.item.autor_nome : null;
+  const autor = "autor_nome" in entry.item ? entry.item.autor_nome : null;
   const souEu = "autor_id" in entry.item && entry.item.autor_id === meuId;
   return (
-    <ItemTrilha
-      recente={recente}
-      refEl={liRef}
-      halo={halo}
-      className={cn(
-        "py-3.5",
-        interno &&
-          "my-1 rounded-lg border border-dashed border-[var(--warn)]/50 bg-[var(--warn)]/8 px-3.5"
-      )}
-    >
-      <div className="flex items-center gap-2">
-        <Avatar nome={autor ?? "Equipe"} size={20} />
-        <span className="min-w-0 truncate text-sm font-medium">
-          {souEu ? "Você" : (autor ?? "Equipe")}
-        </span>
-        {staff && <TagTrilha tipo={interno ? "interno" : "publica"} />}
-        {chipAgora}
-        <span className="ml-auto">{quando}</span>
-      </div>
-      <p className="mt-1 whitespace-pre-line break-words text-sm leading-relaxed text-foreground/90">
-        {entry.item.texto}
-      </p>
+    <ItemTrilha recente={recente} refEl={liRef}>
+      <Mensagem
+        autor={autor ?? "Equipe"}
+        souEu={souEu}
+        quando={entry.item.created_at}
+        texto={entry.item.texto}
+        interna={entry.tipo === "interno"}
+        agora={recente}
+      />
     </ItemTrilha>
   );
 }
 
 /** <li> da trilha que vira motion.li quando `recente` — entrada ~300ms com
- *  halo verde evaporando (o "acabou de chegar" do mock, tl-in). */
+ *  halo verde evaporando (o "acabou de chegar"). */
 function ItemTrilha({
   recente,
   refEl,
-  halo,
-  className,
   children,
 }: {
   recente?: boolean;
   refEl: React.RefObject<HTMLLIElement | null>;
-  halo: React.ReactNode;
-  className?: string;
   children: React.ReactNode;
 }) {
   if (recente) {
     return (
       <motion.li
         ref={refEl}
-        className={cn("relative", className)}
+        className="relative"
         initial={{ opacity: 0, y: 10 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.28, ease: EASE }}
       >
-        {halo}
+        <motion.span
+          aria-hidden
+          className="pointer-events-none absolute -inset-x-2 -inset-y-1 rounded-lg bg-[var(--ok)]/10"
+          initial={{ opacity: 1 }}
+          animate={{ opacity: 0 }}
+          transition={{ duration: 0.7, delay: 0.2, ease: EASE }}
+        />
         {children}
       </motion.li>
     );
   }
-  return <li className={className}>{children}</li>;
+  return <li>{children}</li>;
 }
+
+// ---------- botão de envio com confirmação ----------
+
+function BotaoEnviar({
+  rotulo,
+  rotuloOk,
+  enviado,
+  busy,
+  disabled,
+  onClick,
+}: {
+  rotulo: string;
+  rotuloOk: string;
+  enviado: boolean;
+  busy: boolean;
+  disabled: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <Button
+      size="sm"
+      disabled={!enviado && disabled}
+      onClick={onClick}
+      className={cn(
+        "transition-colors",
+        // o ✓ ficaria disabled (campo limpo): fora do disabled e sem o
+        // opacity-50, senão o verde de sucesso sai apagado
+        enviado &&
+          "bg-[var(--ok)] text-[var(--status-foreground)] hover:bg-[var(--ok)] disabled:opacity-100"
+      )}
+    >
+      <AnimatePresence mode="wait" initial={false}>
+        {enviado ? (
+          <motion.span
+            key="ok"
+            className="flex items-center gap-1.5"
+            initial={{ opacity: 0, scale: 0.85 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.85 }}
+            transition={{ duration: 0.15, ease: EASE }}
+          >
+            <Check size={14} weight="bold" aria-hidden />
+            {rotuloOk}
+          </motion.span>
+        ) : (
+          <motion.span
+            key="idle"
+            className="flex items-center gap-1.5"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.12, ease: EASE }}
+          >
+            {busy && <CircleNotch size={14} className="animate-spin" aria-hidden />}
+            {rotulo}
+          </motion.span>
+        )}
+      </AnimatePresence>
+    </Button>
+  );
+}
+
+/** Caixa do composer: campo sem borda própria + barra com clipe e envio,
+ *  tudo num contorno só — o botão fica colado no que se escreve. */
+const CAIXA =
+  "relative rounded-lg border bg-card transition-[border-color,box-shadow] focus-within:border-ring focus-within:ring-3 focus-within:ring-ring/50";
+const CAMPO =
+  "min-h-20 resize-none rounded-b-none border-0 bg-transparent px-3 pt-2.5 focus-visible:border-0 focus-visible:ring-0";
 
 // ---------- composer da equipe ----------
 
@@ -875,20 +891,21 @@ function consultaMencao(
   return { inicio: ultimo, prefixo };
 }
 
-const rotuloEquipe = (role: string | null | undefined) =>
-  role === "coordenacao" ? "Coordenação" : role === "supervisor" ? "Auxiliar executivo" : null;
+// rótulo do papel na equipe — papelLabel, a fonte única ("Auxiliar
+// executivo", nunca "supervisor" na superfície)
+const rotuloEquipe = papelLabel;
 
-/** Composer da equipe: comentário interno × atualização pública. O "@" abre
- *  autocomplete da equipe (listbox), quem é marcado vira chip removível e
- *  recebe notificação no app — o comentário interno nunca sai por e-mail.
- *  O autor do chamado e quem escreve não entram como alvo. Mentor não vê
- *  este composer (o dele é o AutorComposer, sem menções). */
+/** Composer da equipe: nota interna × resposta ao autor. Abre em "Nota
+ *  interna" de propósito: uma nota que vaza pro autor não tem volta. O "@"
+ *  abre autocomplete da equipe (listbox); quem é marcado vira chip removível
+ *  e recebe notificação no app, nunca por e-mail. O autor do chamado e quem
+ *  escreve não entram como alvo. */
 function ChamadoComposer({
   chamadoId,
   equipe,
   meuId,
   autorId,
-  autorNome,
+  autorPrimeiro,
   pending,
   onEnviou,
 }: {
@@ -896,7 +913,7 @@ function ChamadoComposer({
   equipe: Equipe;
   meuId: string;
   autorId: string | null;
-  autorNome: string;
+  autorPrimeiro: string | null;
   pending: boolean;
   onEnviou?: () => void;
 }) {
@@ -910,8 +927,7 @@ function ChamadoComposer({
     prefixo: string;
   } | null>(null);
   const [ativo, setAtivo] = useState(0);
-  // "texto" × "anexo" — o ✓ do botão diz o que de fato saiu
-  const [enviado, setEnviado] = useState<"texto" | "anexo" | null>(null);
+  const [enviado, setEnviado] = useState(false);
   const anexos = useAnexosPendentes(chamadoId, meuId);
   const taRef = useRef<HTMLTextAreaElement>(null);
   const timerOk = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -923,6 +939,8 @@ function ChamadoComposer({
     []
   );
 
+  const interno = modo === "interno";
+  const destino = autorPrimeiro ?? "autor";
   const nomeDe = (p: EquipeLinha) => p.nome_social || p.nome;
   const marcadasIds = useMemo(
     () => new Set(mencoes.map((m) => m.id)),
@@ -930,10 +948,9 @@ function ChamadoComposer({
   );
 
   /** linhas do listbox: equipe filtrada pelo prefixo — eu, o autor e quem já
-   *  está marcada entram como linhas desabilitadas (transparência do "por
-   *  que não dá pra marcar") em vez de sumir em silêncio. */
+   *  está marcada entram desabilitadas (o "por que não dá") em vez de sumir. */
   const linhasMencao = useMemo(() => {
-    if (!consulta || modo !== "interno") return [];
+    if (!consulta || !interno) return [];
     const q = normaliza(consulta.prefixo);
     return equipe
       .filter((p) => normaliza(nomeDe(p)).includes(q))
@@ -948,57 +965,50 @@ function ChamadoComposer({
                 ? ("marcada" as const)
                 : ("livre" as const),
       }));
-  }, [consulta, modo, equipe, meuId, autorId, marcadasIds]);
+  }, [consulta, interno, equipe, meuId, autorId, marcadasIds]);
 
   const selecionaveis = linhasMencao.filter((l) => l.estado === "livre");
   const ativoOk = Math.min(ativo, Math.max(0, selecionaveis.length - 1));
-  const popAberto = consulta !== null && modo === "interno" && equipe.length > 0;
+  const popAberto = consulta !== null && interno && equipe.length > 0;
 
   /** Fim de token: espaço, fim do texto OU pontuação que fecha a menção —
-   *  "@Paula)," e "@Paula." mantêm o chip (antes só \s|$ desmarcava). */
+   *  "@Paula)," e "@Paula." mantêm o chip. */
   function tokenPresente(t: string, token: string) {
     return new RegExp(`${escapeRe(token)}(?=[\\s.,;:!?)]|$)`).test(t);
   }
 
-  function marcar(p: EquipeLinha, comToken: boolean) {
+  function marcar(p: EquipeLinha) {
     if (p.id === meuId || p.id === autorId || marcadasIds.has(p.id)) return;
     const nome = nomeDe(p);
-    let novoCaret: number | null = null;
-    let token: string | null = null;
-    if (comToken) {
-      const el = taRef.current;
-      const caret = el?.selectionStart ?? texto.length;
-      const c = consulta ?? consultaMencao(texto, caret);
-      token = `@${nome}`;
-      let novo: string;
-      if (c) {
-        novo = texto.slice(0, c.inicio) + token + " " + texto.slice(caret);
-        novoCaret = c.inicio + token.length + 1;
-      } else {
-        const base = texto.replace(/\s+$/, "");
-        novo = base ? `${base} ${token} ` : `${token} `;
-        novoCaret = novo.length;
-      }
-      setTexto(novo);
-      setMencoes((m) => [...m, { id: p.id, nome, token }]);
-      setConsulta(null);
+    const el = taRef.current;
+    const caret = el?.selectionStart ?? texto.length;
+    const c = consulta ?? consultaMencao(texto, caret);
+    const token = `@${nome}`;
+    let novo: string;
+    let novoCaret: number;
+    if (c) {
+      novo = texto.slice(0, c.inicio) + token + " " + texto.slice(caret);
+      novoCaret = c.inicio + token.length + 1;
     } else {
-      setMencoes((m) => [...m, { id: p.id, nome, token: null }]);
+      const base = texto.replace(/\s+$/, "");
+      novo = base ? `${base} ${token} ` : `${token} `;
+      novoCaret = novo.length;
     }
+    setTexto(novo);
+    setMencoes((m) => [...m, { id: p.id, nome, token }]);
+    setConsulta(null);
     requestAnimationFrame(() => {
-      const el = taRef.current;
-      if (!el) return;
-      el.focus();
-      if (novoCaret !== null) el.setSelectionRange(novoCaret, novoCaret);
+      const el2 = taRef.current;
+      if (!el2) return;
+      el2.focus();
+      el2.setSelectionRange(novoCaret, novoCaret);
     });
   }
 
   function desmarcar(id: string) {
-    const m = mencoes.find((x) => x.id === id);
-    const token = m?.token;
+    const token = mencoes.find((x) => x.id === id)?.token;
     if (token) {
-      // flag global: primeira ocorrência podia ser texto solto idêntico ao
-      // token — tirar todas garante que chip e texto nunca divergem
+      // flag global: tirar todas as ocorrências garante chip e texto iguais
       setTexto((t) =>
         t.replace(new RegExp(`${escapeRe(token)}(?=[\\s.,;:!?)]|$)`, "g"), "")
       );
@@ -1009,12 +1019,10 @@ function ChamadoComposer({
   function mudarTexto(e: ChangeEvent<HTMLTextAreaElement>) {
     const v = e.target.value;
     setTexto(v);
-    // token apagado no texto desmarca a pessoa — chip e texto nunca divergem
-    setMencoes((l) =>
-      l.filter((m) => !m.token || tokenPresente(v, m.token))
-    );
+    // token apagado no texto desmarca a pessoa
+    setMencoes((l) => l.filter((m) => !m.token || tokenPresente(v, m.token)));
     const c = consultaMencao(v, e.target.selectionStart ?? v.length);
-    setConsulta(modo === "interno" ? c : null);
+    setConsulta(interno ? c : null);
     if (c) setAtivo(0);
   }
 
@@ -1028,7 +1036,7 @@ function ChamadoComposer({
       setAtivo((i) => (i - 1 + selecionaveis.length) % selecionaveis.length);
     } else if (e.key === "Enter" && selecionaveis[ativoOk]) {
       e.preventDefault();
-      marcar(selecionaveis[ativoOk].pessoa, true);
+      marcar(selecionaveis[ativoOk].pessoa);
     } else if (e.key === "Escape") {
       e.preventDefault();
       setConsulta(null);
@@ -1039,7 +1047,7 @@ function ChamadoComposer({
     const el = e.currentTarget;
     const c = consultaMencao(el.value, el.selectionStart ?? 0);
     if ((c === null) !== (consulta === null) || c?.prefixo !== consulta?.prefixo) {
-      setConsulta(modo === "interno" ? c : null);
+      setConsulta(interno ? c : null);
     }
   }
 
@@ -1049,54 +1057,49 @@ function ChamadoComposer({
     start(async () => {
       let falhou = false;
       let saiu = false;
+      let subiuAnexo = false;
       if (t) {
-        const r =
-          modo === "interno"
-            ? await comentarChamado(chamadoId, t, mencoes.map((m) => m.id))
-            : await publicarAtualizacaoChamado(chamadoId, t);
+        const r = interno
+          ? await comentarChamado(chamadoId, t, mencoes.map((m) => m.id))
+          : await publicarAtualizacaoChamado(chamadoId, t);
         if (r.error) {
           toast.error(r.error);
           falhou = true;
         } else {
           saiu = true;
-          // o texto já publicou — limpa agora: se um anexo falhar, o retry
-          // manda só o arquivo (antes repostava o comentário)
+          // o texto já publicou: se um anexo falhar, o retry manda só o
+          // arquivo (antes repostava o comentário)
           setTexto("");
           setMencoes([]);
           setConsulta(null);
         }
       }
       if (!falhou && anexos.pendentes.length) {
-        const falhas = await anexos.enviar(modo === "interno");
+        const falhas = await anexos.enviar(interno);
         if (falhas) {
           toast.error(
             falhas === 1
-              ? "Um anexo não subiu. Ele continua na lista pra você tentar de novo."
-              : `${falhas} anexos não subiram. Eles continuam na lista pra você tentar de novo.`
+              ? "Um anexo não subiu. Ele continua na lista para tentar de novo."
+              : `${falhas} anexos não subiram. Eles continuam na lista para tentar de novo.`
           );
           falhou = true;
         }
-        if (falhas < anexos.pendentes.length) saiu = true;
+        if (falhas < anexos.pendentes.length) {
+          saiu = true;
+          subiuAnexo = true;
+        }
       }
-      // publicação parcial também já tá na trilha — refresh/marca mesmo com
-      // retry de anexo pendente (o usuário vê que o texto foi)
-      if (saiu) {
-        onEnviou?.();
-        router.refresh();
-      }
+      if (saiu) onEnviou?.();
+      // texto sai por server action (que já revalida); anexo sobe direto do
+      // browser pro storage, então só ele precisa pedir a trilha nova
+      if (subiuAnexo) router.refresh();
       if (falhou) return;
       toast.success(
-        t
-          ? modo === "interno"
-            ? "Comentário interno registrado. Só a equipe vê."
-            : "Atualização enviada ao autor."
-          : modo === "interno"
-            ? "Anexo enviado. Só a equipe vê."
-            : "Anexo enviado ao autor."
+        interno ? "Nota salva. Só a equipe vê." : `Enviado a ${destino}.`
       );
-      setEnviado(t ? "texto" : "anexo");
+      setEnviado(true);
       if (timerOk.current) clearTimeout(timerOk.current);
-      timerOk.current = setTimeout(() => setEnviado(null), 1600);
+      timerOk.current = setTimeout(() => setEnviado(false), 1600);
     });
   }
 
@@ -1104,45 +1107,42 @@ function ChamadoComposer({
     <div
       className={cn(
         "border-t px-4 py-4 sm:px-5",
-        modo === "interno"
-          ? "border-[var(--warn)]/40 bg-[var(--warn)]/[0.05]"
-          : "border-border"
+        interno ? "border-[var(--warn)]/40 bg-[var(--warn)]/[0.05]" : "border-border"
       )}
     >
       <div
-        role="group"
+        role="radiogroup"
         aria-label="Tipo de mensagem"
-        className="mb-3 inline-flex rounded-lg border border-border bg-card p-0.5 shadow-sm"
+        className="mb-2.5 inline-flex max-w-full rounded-lg bg-muted p-0.5"
       >
         {(
           [
-            ["interno", "Comentário interno", EyeSlash],
-            ["publico", "Resposta ao autor", PaperPlaneRight],
+            ["interno", "Nota interna"],
+            ["publico", `Responder a ${destino}`],
           ] as const
-        ).map(([v, l, Icone]) => (
-          <button
+        ).map(([v, l]) => (
+          <Button
             key={v}
-            type="button"
+            variant="ghost"
+            role="radio"
+            aria-checked={modo === v}
             onClick={() => {
               setModo(v);
               setConsulta(null);
             }}
-            aria-pressed={modo === v}
             className={cn(
-              "flex min-h-11 items-center gap-1.5 rounded-md px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8",
+              "h-auto min-h-11 min-w-0 rounded-md px-3 md:min-h-7",
               modo === v
-                ? "bg-foreground text-background"
-                : "text-muted-foreground hover:text-foreground"
+                ? "bg-foreground text-background hover:bg-foreground hover:text-background"
+                : "text-muted-foreground"
             )}
           >
-            <Icone size={13} aria-hidden />
-            {l}
-          </button>
+            <span className="truncate">{l}</span>
+          </Button>
         ))}
       </div>
 
-      {/* chips de quem será marcado — vivem acima do campo, como no mock */}
-      {modo === "interno" && mencoes.length > 0 && (
+      {interno && mencoes.length > 0 && (
         <div
           role="group"
           className="mb-2 flex flex-wrap items-center gap-1.5"
@@ -1155,17 +1155,18 @@ function ChamadoComposer({
             >
               <Avatar nome={m.nome} size={18} />
               <span className="font-medium">{m.nome}</span>
-              <button
-                type="button"
+              <Button
+                variant="ghost"
+                size="icon-xs"
                 onClick={() => desmarcar(m.id)}
                 aria-label={`Remover marcação de ${m.nome}`}
-                className="-my-1.5 -ml-0.5 -mr-1 grid size-11 place-items-center rounded-full text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:size-8"
+                className="-my-2.5 -mr-1 rounded-full text-muted-foreground md:-my-1"
               >
-                <X size={11} aria-hidden />
-              </button>
+                <X aria-hidden />
+              </Button>
             </span>
           ))}
-          <span className="text-xs sm:text-[11px] text-[var(--warn-text)]">
+          <span className="text-xs text-[var(--warn-text)]">
             {mencoes.length === 1
               ? "1 pessoa será notificada no app"
               : `${mencoes.length} pessoas serão notificadas no app`}
@@ -1173,7 +1174,12 @@ function ChamadoComposer({
         </div>
       )}
 
-      <div className="relative">
+      <div
+        className={cn(
+          CAIXA,
+          interno ? "border-dashed border-[var(--warn)]/60" : "border-input"
+        )}
+      >
         <Textarea
           ref={taRef}
           value={texto}
@@ -1182,9 +1188,9 @@ function ChamadoComposer({
           onSelect={aoMoverCursor}
           onClick={aoMoverCursor}
           onBlur={() => setConsulta(null)}
-          rows={3}
+          rows={2}
           maxLength={4000}
-          aria-label={modo === "interno" ? "Comentário interno" : "Resposta ao autor"}
+          aria-label={interno ? "Nota interna" : `Resposta a ${destino}`}
           aria-expanded={popAberto}
           aria-controls={popAberto ? listaId : undefined}
           aria-autocomplete="list"
@@ -1194,12 +1200,11 @@ function ChamadoComposer({
               : undefined
           }
           placeholder={
-            modo === "interno"
-              ? `Só a equipe vê. ${autorNome} não é notificado. Digite @ pra marcar alguém da equipe.`
-              : `Escreva a resposta que vai pra ${autorNome}…`
+            interno ? "Nota para a equipe. Use @ para marcar" : `Responder a ${destino}…`
           }
+          className={CAMPO}
         />
-        {/* listbox do "@" — popover ancorado acima do campo (molde .m-pop) */}
+        {/* listbox do "@" — ancorado acima do campo */}
         {popAberto && (
           <div className="absolute bottom-full left-0 z-10 mb-1.5 w-full min-w-0 max-w-80">
             <ul
@@ -1208,17 +1213,12 @@ function ChamadoComposer({
               aria-label="Marcar alguém da equipe"
               className="overflow-hidden rounded-lg border border-border bg-popover py-1 shadow-[var(--shadow-overlay)]"
             >
-              <li
-                role="presentation"
-                className="px-3 pb-1 pt-1.5 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]"
-              >
-                Marcar alguém. Continue digitando pra filtrar
-              </li>
               {linhasMencao.map((l) => {
                 const nome = nomeDe(l.pessoa);
-                const idxSel = l.estado === "livre"
-                  ? selecionaveis.findIndex((s) => s.pessoa.id === l.pessoa.id)
-                  : -1;
+                const idxSel =
+                  l.estado === "livre"
+                    ? selecionaveis.findIndex((s) => s.pessoa.id === l.pessoa.id)
+                    : -1;
                 const desabilitada = l.estado !== "livre";
                 return (
                   <li
@@ -1228,20 +1228,18 @@ function ChamadoComposer({
                     aria-selected={idxSel === ativoOk && idxSel >= 0}
                     aria-disabled={desabilitada || undefined}
                     onMouseDown={(e) => e.preventDefault()} // clique não tira o foco do campo
-                    onClick={() => !desabilitada && marcar(l.pessoa, true)}
+                    onClick={() => !desabilitada && marcar(l.pessoa)}
                     className={cn(
-                      "flex min-h-11 cursor-pointer items-center gap-2 px-3 py-1.5 text-sm",
+                      "flex min-h-11 cursor-pointer items-center gap-2 px-3 py-1.5 text-sm md:min-h-9",
                       idxSel === ativoOk && idxSel >= 0 && "bg-muted",
-                      desabilitada
-                        ? "cursor-default opacity-55"
-                        : "hover:bg-muted"
+                      desabilitada ? "cursor-default opacity-55" : "hover:bg-muted"
                     )}
                   >
                     <Avatar nome={nome} size={20} />
                     <span className="min-w-0 flex-1 truncate font-medium">
                       {nome}
                     </span>
-                    <span className="shrink-0 text-xs sm:text-[11px] text-muted-foreground">
+                    <span className="shrink-0 text-xs text-muted-foreground">
                       {l.estado === "voce"
                         ? "você"
                         : l.estado === "autor"
@@ -1263,180 +1261,51 @@ function ChamadoComposer({
                   Ninguém da equipe com esse nome.
                 </li>
               )}
-              <li
-                role="presentation"
-                aria-hidden
-                className="border-t border-border/60 px-3 py-1.5 text-xs sm:text-[10px] text-muted-foreground"
-              >
-                <kbd className="rounded border border-border bg-muted px-1">↑↓</kbd>{" "}
-                navega ·{" "}
-                <kbd className="rounded border border-border bg-muted px-1">Enter</kbd>{" "}
-                marca ·{" "}
-                <kbd className="rounded border border-border bg-muted px-1">Esc</kbd>{" "}
-                fecha
-              </li>
             </ul>
           </div>
         )}
-      </div>
-
-      <p className="mt-1.5 text-xs sm:text-[11px] text-muted-foreground">
-        {modo === "interno" ? (
-          <>
-            Só a equipe vê. {autorNome} não é notificado. Digite{" "}
-            <kbd className="rounded border border-border bg-muted px-1">@</kbd>{" "}
-            pra marcar alguém ou use “+ pessoas”. Marcados recebem
-            notificação no app.
-          </>
-        ) : (
-          <>
-            Visível para {autorNome}: recebe notificação por e-mail e no app.
-            Evite dados sensíveis de terceiros.
-          </>
-        )}
-      </p>
-
-      <AnexosPendentes
-        itens={anexos.pendentes}
-        interno={modo === "interno"}
-        onRemover={anexos.remover}
-      />
-
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <div className="flex min-w-0 flex-wrap items-center gap-1">
-          <ChamadoAnexos onArquivo={anexos.adicionar} disabled={busy || pending} />
-          {modo === "interno" && equipe.length > 0 && (
-            <Popover>
-              <PopoverTrigger
-                // Label-in-Name: o nome acessível começa pelo rótulo visível
-                aria-label="+ pessoas: marcar alguém da equipe"
-                className="flex min-h-11 items-center gap-1.5 rounded-lg px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9"
-              >
-                <UserPlus size={15} aria-hidden />+ pessoas
-              </PopoverTrigger>
-              <PopoverContent side="top" align="start" className="w-72 max-w-[calc(100vw-2rem)] p-1.5">
-                <p className="px-2.5 pb-1 pt-2 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
-                  Marcar alguém da equipe
-                </p>
-                <ul>
-                  {equipe.map((p) => {
-                    const nome = nomeDe(p);
-                    const souEu = p.id === meuId;
-                    const eAutor = p.id === autorId;
-                    const marcada = marcadasIds.has(p.id);
-                    const travada = souEu || eAutor;
-                    return (
-                      <li key={p.id}>
-                        <label
-                          className={cn(
-                            "flex min-h-11 items-center gap-2 rounded-lg px-2.5 text-sm",
-                            travada
-                              ? "opacity-55"
-                              : "cursor-pointer hover:bg-muted"
-                          )}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={marcada}
-                            disabled={travada}
-                            onChange={(e) =>
-                              e.target.checked
-                                ? marcar(p, false)
-                                : desmarcar(p.id)
-                            }
-                            className="size-4 shrink-0 accent-[var(--brand-lime)]"
-                          />
-                          <Avatar nome={nome} size={20} />
-                          <span className="min-w-0 flex-1 truncate font-medium">
-                            {nome}
-                          </span>
-                          <span className="shrink-0 text-xs sm:text-[11px] text-muted-foreground">
-                            {souEu
-                              ? "você"
-                              : eAutor
-                                ? "autor(a)"
-                                : marcada
-                                  ? "marcada"
-                                  : rotuloEquipe(p.role)}
-                          </span>
-                        </label>
-                      </li>
-                    );
-                  })}
-                </ul>
-                <p className="border-t border-border/60 px-2.5 py-2 text-xs sm:text-[10px] text-muted-foreground">
-                  Marcados viram chips acima do campo e recebem notificação no
-                  app, nunca por e-mail.
-                </p>
-              </PopoverContent>
-            </Popover>
-          )}
+        <div className="px-2">
+          <AnexosPendentes
+            itens={anexos.pendentes}
+            interno={interno}
+            onRemover={anexos.remover}
+          />
         </div>
-        <Button
-          size="sm"
-          disabled={
-            !enviado &&
-            (busy ||
+        <div className="flex items-center justify-between gap-2 p-1.5">
+          <ChamadoAnexos
+            compacto
+            onArquivo={anexos.adicionar}
+            disabled={busy || pending}
+          />
+          <BotaoEnviar
+            rotulo={interno ? "Salvar nota" : `Enviar a ${destino}`}
+            rotuloOk={interno ? "Nota salva" : "Enviado"}
+            enviado={enviado}
+            busy={busy}
+            disabled={
+              busy ||
               pending ||
               (!texto.trim() && anexos.pendentes.length === 0) ||
-              anexos.pendentes.some((a) => a.status === "enviando"))
-          }
-          onClick={enviar}
-          className={cn(
-            "min-w-28 transition-colors",
-            // o ✓ ficaria disabled (campo limpo) — fora do disabled E sem
-            // o opacity-50, senão o verde de sucesso saía apagado
-            enviado &&
-              "bg-[var(--ok)] text-[var(--status-foreground)] hover:bg-[var(--ok)] disabled:opacity-100"
-          )}
-        >
-          <AnimatePresence mode="wait" initial={false}>
-            {enviado ? (
-              <motion.span
-                key="ok"
-                className="flex items-center gap-1.5"
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.85 }}
-                transition={{ duration: 0.15, ease: EASE }}
-              >
-                <Check size={14} weight="bold" aria-hidden />
-                {enviado === "texto" && modo === "interno"
-                  ? "Comentário registrado"
-                  : "Enviado"}
-              </motion.span>
-            ) : (
-              <motion.span
-                key="idle"
-                className="flex items-center gap-1.5"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12, ease: EASE }}
-              >
-                {busy && <CircleNotch size={14} className="animate-spin" aria-hidden />}
-                {modo === "interno" ? "Comentar" : "Enviar ao autor"}
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </Button>
+              anexos.pendentes.some((a) => a.status === "enviando")
+            }
+            onClick={enviar}
+          />
+        </div>
       </div>
     </div>
   );
 }
 
-/** Composer do autor: acrescenta informação à trilha pública — sem menções
- *  (decisão do produto: @ é só pra equipe), anexos públicos pro staff. */
+/** Composer do autor: escreve pra equipe na trilha pública — sem menções
+ *  (o @ é instrumento da equipe); anexos chegam públicos pro staff. */
 function AutorComposer({
   chamadoId,
   meuId,
-  meuNome,
   pending,
   onEnviou,
 }: {
   chamadoId: string;
   meuId: string;
-  meuNome: string;
   pending: boolean;
   onEnviou?: () => void;
 }) {
@@ -1459,6 +1328,7 @@ function AutorComposer({
     start(async () => {
       let falhou = false;
       let saiu = false;
+      let subiuAnexo = false;
       if (t) {
         const r = await acrescentarInfoChamado(chamadoId, t);
         if (r.error) {
@@ -1466,7 +1336,7 @@ function AutorComposer({
           falhou = true;
         } else {
           saiu = true;
-          // saiu — o retry de um anexo falho não reposta o texto
+          // saiu: o retry de um anexo falho não reposta o texto
           setTexto("");
         }
       }
@@ -1475,20 +1345,21 @@ function AutorComposer({
         if (falhas) {
           toast.error(
             falhas === 1
-              ? "Um anexo não subiu. Ele continua na lista pra você tentar de novo."
-              : `${falhas} anexos não subiram. Eles continuam na lista pra você tentar de novo.`
+              ? "Um anexo não subiu. Ele continua na lista para tentar de novo."
+              : `${falhas} anexos não subiram. Eles continuam na lista para tentar de novo.`
           );
           falhou = true;
         }
-        if (falhas < anexos.pendentes.length) saiu = true;
+        if (falhas < anexos.pendentes.length) {
+          saiu = true;
+          subiuAnexo = true;
+        }
       }
-      // publicação parcial também já tá na trilha
-      if (saiu) {
-        onEnviou?.();
-        router.refresh();
-      }
+      if (saiu) onEnviou?.();
+      // anexo sobe direto pro storage, fora de server action
+      if (subiuAnexo) router.refresh();
       if (falhou) return;
-      toast.success("Informação enviada à equipe.");
+      toast.success("Enviado à equipe.");
       setEnviado(true);
       if (timerOk.current) clearTimeout(timerOk.current);
       timerOk.current = setTimeout(() => setEnviado(false), 1600);
@@ -1496,76 +1367,45 @@ function AutorComposer({
   }
 
   return (
-    <div>
-      <Label htmlFor="autor-info" className="text-sm font-medium">
-        Acrescentar informação
-      </Label>
-      <Textarea
-        id="autor-info"
-        value={texto}
-        onChange={(e) => setTexto(e.target.value)}
-        rows={3}
-        maxLength={4000}
-        className="mt-1.5"
-        placeholder={`${meuNome.split(" ")[0]}, conte pra equipe se algo mudou ou se faltou detalhe…`}
-      />
-      <p className="mt-1.5 text-xs sm:text-[11px] text-muted-foreground">
-        Só você e a equipe veem. Ninguém mais recebe cópia.
-      </p>
-      <AnexosPendentes
-        itens={anexos.pendentes}
-        interno={false}
-        visaoAutor
-        onRemover={anexos.remover}
-      />
-      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-        <ChamadoAnexos onArquivo={anexos.adicionar} disabled={busy || pending} />
-        <Button
-          size="sm"
-          disabled={
-            !enviado &&
-            (busy ||
+    <div className="border-t border-border px-4 py-4 sm:px-5">
+      <div className={cn(CAIXA, "border-input")}>
+        <Textarea
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          rows={2}
+          maxLength={4000}
+          aria-label="Mensagem para a equipe"
+          placeholder="Escreva para a equipe…"
+          className={CAMPO}
+        />
+        <div className="px-2">
+          <AnexosPendentes
+            itens={anexos.pendentes}
+            interno={false}
+            visaoAutor
+            onRemover={anexos.remover}
+          />
+        </div>
+        <div className="flex items-center justify-between gap-2 p-1.5">
+          <ChamadoAnexos
+            compacto
+            onArquivo={anexos.adicionar}
+            disabled={busy || pending}
+          />
+          <BotaoEnviar
+            rotulo="Enviar"
+            rotuloOk="Enviado"
+            enviado={enviado}
+            busy={busy}
+            disabled={
+              busy ||
               pending ||
               (!texto.trim() && anexos.pendentes.length === 0) ||
-              anexos.pendentes.some((a) => a.status === "enviando"))
-          }
-          onClick={enviar}
-          className={cn(
-            "min-w-20 transition-colors",
-            // o ✓ ficaria disabled (campo limpo) — fora do disabled E sem
-            // o opacity-50, senão o verde de sucesso saía apagado
-            enviado &&
-              "bg-[var(--ok)] text-[var(--status-foreground)] hover:bg-[var(--ok)] disabled:opacity-100"
-          )}
-        >
-          <AnimatePresence mode="wait" initial={false}>
-            {enviado ? (
-              <motion.span
-                key="ok"
-                className="flex items-center gap-1.5"
-                initial={{ opacity: 0, scale: 0.85 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.85 }}
-                transition={{ duration: 0.15, ease: EASE }}
-              >
-                <Check size={14} weight="bold" aria-hidden />
-                Enviado
-              </motion.span>
-            ) : (
-              <motion.span
-                key="idle"
-                className="flex items-center gap-1.5"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.12, ease: EASE }}
-              >
-                {busy && <CircleNotch size={14} className="animate-spin" aria-hidden />}
-                Enviar
-              </motion.span>
-            )}
-          </AnimatePresence>
-        </Button>
+              anexos.pendentes.some((a) => a.status === "enviando")
+            }
+            onClick={enviar}
+          />
+        </div>
       </div>
     </div>
   );

@@ -111,10 +111,18 @@ export function painelDuplasDoDia({
         } else if (numeros.has(encontro.numero) || naSemana) {
           // o nº oficial da semana marcado em outro dia, ou qualquer
           // encontro da dupla com data nesta semana (dupla adiantada ou
-          // atrasada em relação ao calendário oficial). Não-aconteceu vira
-          // "remarcar" (reagendar); os demais seguem na row de status
+          // atrasada em relação ao calendário oficial). Todo encontro
+          // aberto ganha "Remarcar o Nº" — antes o oficial agendado ficava
+          // mudo na row de status enquanto um nº menor remarcava (regra
+          // invisível flagada em revisão). Em limbo o CTA deduplica no
+          // render via limboAberto; realizado segue na row de status.
           linhas.push(
-            encontro.status === "nao_aconteceu"
+            encontro.status === "agendado" ||
+              encontro.status === "remarcado" ||
+              encontro.status === "nao_aconteceu" ||
+              // cancelado também precisa de nova data — antes caía na linha
+              // de status inerte (zero ações) enquanto a ficha já remarcava
+              encontro.status === "cancelado"
               ? { tipo: "remarcar", encontro }
               : { tipo: "encontro", encontro }
           );
@@ -123,6 +131,15 @@ export function painelDuplasDoDia({
       for (const o of oficiais)
         if (!dupla.encontros.some((e) => e.numero === o.numero))
           linhas.push({ tipo: "agendar", numero: o.numero! });
+      // oficial vencido de semana ANTERIOR sem row (a dupla pulou a
+      // semana): fora daqui ele não aparece em lugar nenhum do painel — a
+      // semana dele só oferece "Registrar" (retroativo) e as outras semanas
+      // olham só o oficial delas. Sem a linha, o encontro fica impossível
+      // de agendar pra frente pelo calendário (caso real: 8º pulado, mentor
+      // clicando na semana do 9º via "Agendar o 9º" e nada pro 8º)
+      for (const f of alvoAgendamento(dupla, eventos, hojeBase).faltantes)
+        if (!numeros.has(f.numero))
+          linhas.push({ tipo: "agendar", numero: f.numero });
     } else {
       // semana sem oficial no cronograma dela (recesso/gap, ou trilha
       // especialista sem calendário): o próximo pendente — mesmo ramo

@@ -1,62 +1,68 @@
 "use client";
 
-// A fila de chamados (staff = master-detail, mentor/jovem = "meus
-// pedidos"). O detalhe mora em chamado-detalhe.tsx e as pills/helpers
-// compartilhados em chamados-shared.tsx — home do mentor e perfil do
-// jovem importam só o que usam.
+// A fila de chamados (staff = master-detail, mentor = "meus chamados"). O
+// detalhe mora em chamado-detalhe.tsx e as pills/helpers compartilhados em
+// chamados-shared.tsx — home do mentor e perfil do jovem importam só o que
+// usam.
 
-import { useMemo, useState, type CSSProperties } from "react";
+import {
+  useMemo,
+  useState,
+  useSyncExternalStore,
+  useTransition,
+  type CSSProperties,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
+import { createPortal } from "react-dom";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-  CaretRight,
   ChatCircleText,
-  Lifebuoy,
+  Funnel,
+  Lock,
+  MagnifyingGlass,
   Plus,
 } from "@phosphor-icons/react";
 import type { ChamadoFilaItem, ChamadoTimelineItem } from "@/lib/types";
-import {
-  CHAMADO_CATEGORIA_LABEL,
-  CHAMADO_ORIGEM_LABEL,
-  CHAMADO_STATUS_LABEL,
-} from "@/lib/ciclo";
+import { CHAMADO_CATEGORIA_LABEL } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Skeleton } from "@/components/ui/skeleton";
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { FiltrosButton } from "@/components/ui/filtros-button";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { filterChipCls } from "@/components/ui/filter-chip";
 import { NovoChamadoDialog } from "@/components/novo-chamado-dialog";
 import { ChamadoDetalhe } from "@/components/chamado-detalhe";
 import {
-  CategoriaBadge,
   ChamadoStatusBadge,
+  UrgenciaMarca,
   relTempo,
   type Equipe,
 } from "@/components/chamados-shared";
 
 type Papel = string;
 
-const OVERLINE =
-  "text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]";
+const nadaMuda = () => () => {};
 
-function idadeAberto(iso: string): string {
-  const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
-  if (d <= 0) return "hoje";
-  if (d === 1) return "há 1 dia";
-  return `há ${d} dias`;
-}
+// "sem dono" exclui restrito: pro auxiliar o atribuido_a chega mascarado
+// (null) e a linha contaria errado como sem dono
+const semDono = (c: ChamadoFilaItem) =>
+  c.status === "aberto" && !c.atribuido_a && !c.restrito;
+const ehMeu = (c: ChamadoFilaItem, meuId: string) =>
+  c.atribuido_a === meuId && c.status !== "resolvido";
+type Aba = "semdono" | "meus" | "todos";
+
+const ABAS: { v: Aba; rotulo: string }[] = [
+  { v: "semdono", rotulo: "Sem dono" },
+  { v: "meus", rotulo: "Meus" },
+  { v: "todos", rotulo: "Todos" },
+];
 
 export function ChamadosApp({
   papel,
@@ -84,58 +90,43 @@ export function ChamadosApp({
   const router = useRouter();
   const staff = papel === "coordenacao" || papel === "supervisor";
   const [busca, setBusca] = useState("");
-  const [fFila, setFFila] = useState<
-    "todos" | "fila" | "semdono" | "meus" | "resolvidos"
-  >("todos");
+  const [aba, setAba] = useState<Aba>("todos");
   const [fCategoria, setFCategoria] = useState<string>("todas");
-  const [fStatus, setFStatus] = useState<string>("todos");
-  // categoria/estado são secundários — moram no painel "Filtros (n)",
-  // não na barra (o modal aplica de uma vez, como em /registros)
-  const [painelAberto, setPainelAberto] = useState(false);
-  const [draftCat, setDraftCat] = useState("todas");
-  const [draftStatus, setDraftStatus] = useState("todos");
+  const [verResolvidos, setVerResolvidos] = useState(false);
+  // a linha clicada acende na hora e o detalhe vira esqueleto enquanto a
+  // navegação (server component) não volta — sem isso o clique parece morto
+  const [navegando, startNav] = useTransition();
+  const [alvo, setAlvo] = useState<string | null>(null);
 
-  // critério só oferece valores que existem na fila — categoria/estado
-  // sem nenhum chamado não filtra nada; select com <2 opções úteis nem
-  // renderiza (um filtro ativo mantém o controle pra não prender ninguém)
+  const sel = selecionadoInicial;
+  const detalhe = detalheInicial;
+  const emFoco = navegando ? alvo : sel;
+  const carregandoDetalhe =
+    navegando && !!alvo && alvo !== detalhe?.chamado.id;
+
+  // categoria só oferece o que existe na fila — filtro sem efeito é ruído
   const categoriasPresentes = useMemo(
     () =>
-      Object.keys(CHAMADO_CATEGORIA_LABEL).filter((k) =>
-        itens.some((c) => c.categoria === k)
+      (Object.keys(CHAMADO_CATEGORIA_LABEL) as (keyof typeof CHAMADO_CATEGORIA_LABEL)[]).filter(
+        (k) => itens.some((c) => c.categoria === k)
       ),
     [itens]
   );
-  const estadosPresentes = useMemo(
-    () =>
-      Object.keys(CHAMADO_STATUS_LABEL).filter((k) =>
-        itens.some((c) => c.status === k)
-      ),
+  const nResolvidos = useMemo(
+    () => itens.filter((c) => c.status === "resolvido").length,
     [itens]
   );
-  const catShow = categoriasPresentes.length >= 2 || fCategoria !== "todas";
-  const statusShow = estadosPresentes.length >= 2 || fStatus !== "todos";
-  const temSecundarios = catShow || statusShow;
-  const ativosSec =
-    (fCategoria !== "todas" ? 1 : 0) + (fStatus !== "todos" ? 1 : 0);
-  const draftAtivos =
-    (draftCat !== "todas" ? 1 : 0) + (draftStatus !== "todos" ? 1 : 0);
+  const filtrosAtivos =
+    (fCategoria !== "todas" ? 1 : 0) + (verResolvidos ? 1 : 0);
 
-  const filtrados = useMemo(() => {
+  // base da contagem das abas = o recorte dos filtros secundários e da
+  // busca; aba e resultado usam o mesmo predicado, então nunca divergem
+  const base = useMemo(() => {
     let l = itens;
     if (staff) {
-      if (fFila === "fila") l = l.filter((c) => c.status === "aberto");
-      // "sem dono" exclui restrito: pro auxiliar o atribuido_a chega
-      // mascarado (null) e a linha contaria errado como sem-dono
-      if (fFila === "semdono")
-        l = l.filter(
-          (c) => c.status === "aberto" && !c.atribuido_a && !c.restrito
-        );
-      if (fFila === "meus")
-        l = l.filter((c) => c.atribuido_a === meuId && c.status !== "resolvido");
-      if (fFila === "resolvidos") l = l.filter((c) => c.status === "resolvido");
+      if (!verResolvidos) l = l.filter((c) => c.status !== "resolvido");
       if (fCategoria !== "todas")
         l = l.filter((c) => c.categoria === fCategoria);
-      if (fStatus !== "todos") l = l.filter((c) => c.status === fStatus);
     }
     const q = busca.trim().toLowerCase();
     if (q) {
@@ -143,380 +134,399 @@ export function ChamadosApp({
         (c) =>
           c.numero.toLowerCase().includes(q) ||
           (c.assunto ?? "").toLowerCase().includes(q) ||
-          (c.autor_nome ?? "").toLowerCase().includes(q)
+          (c.autor_nome ?? "").toLowerCase().includes(q) ||
+          (c.contexto ?? "").toLowerCase().includes(q)
       );
     }
     return l;
-  }, [itens, staff, fFila, fCategoria, fStatus, busca, meuId]);
+  }, [itens, staff, verResolvidos, fCategoria, busca]);
 
-  // contagens dos chips da fila (mock: "Todos 8 · Sem dono 3 · ...") — o
-  // predicado é o mesmo do filtro, então chip e resultado nunca divergem
-  const contFila = useMemo(
-    () => ({
-      todos: itens.length,
-      fila: itens.filter((c) => c.status === "aberto").length,
-      semdono: itens.filter(
-        (c) => c.status === "aberto" && !c.atribuido_a && !c.restrito
-      ).length,
-      meus: itens.filter(
-        (c) => c.atribuido_a === meuId && c.status !== "resolvido"
-      ).length,
-      resolvidos: itens.filter((c) => c.status === "resolvido").length,
-    }),
-    [itens, meuId]
+  const meu = (c: ChamadoFilaItem) => ehMeu(c, meuId);
+  const contAba = {
+    semdono: base.filter(semDono).length,
+    meus: base.filter(meu).length,
+    todos: base.length,
+  };
+
+  const filtrados = !staff
+    ? base
+    : aba === "semdono"
+      ? base.filter(semDono)
+      : aba === "meus"
+        ? base.filter(meu)
+        : base;
+
+  function teclaAba(e: KeyboardEvent<HTMLElement>, i: number) {
+    const n = ABAS.length;
+    const prox =
+      e.key === "ArrowRight"
+        ? (i + 1) % n
+        : e.key === "ArrowLeft"
+          ? (i - 1 + n) % n
+          : e.key === "Home"
+            ? 0
+            : e.key === "End"
+              ? n - 1
+              : null;
+    if (prox === null) return;
+    e.preventDefault();
+    setAba(ABAS[prox].v);
+    const irmaos = e.currentTarget.parentElement?.querySelectorAll<HTMLElement>('[role="tab"]');
+    irmaos?.[prox]?.focus();
+  }
+
+  function navegar(href: string, id: string | null) {
+    setAlvo(id);
+    startNav(() => router.push(href));
+  }
+
+  function abrir(e: MouseEvent<HTMLAnchorElement>, id: string) {
+    // ctrl/cmd/shift-clique segue o Link (nova aba) sem roubar a navegação
+    if (e.metaKey || e.ctrlKey || e.shiftKey || e.button !== 0) return;
+    e.preventDefault();
+    navegar(`/chamados?c=${id}`, id);
+  }
+  const fechar = () => navegar("/chamados", null);
+
+  const novo = (
+    <NovoChamadoDialog
+      papel={papel}
+      duplas={duplas}
+      trigger={
+        // com um chamado aberto a ação da tela é a do detalhe (Assumir,
+        // Resolver): "Novo chamado" recua pra contorno — um lima por tela
+        <Button variant={sel ? "outline" : "default"} className="max-md:hidden">
+          <Plus aria-hidden />
+          Novo chamado
+        </Button>
+      }
+    />
   );
 
-  const naFila = itens.filter((c) => c.status === "aberto" && !c.restrito);
-  const maisAntigo = naFila.length
-    ? naFila.reduce((a, b) =>
-        new Date(a.created_at) < new Date(b.created_at) ? a : b
-      )
-    : null;
+  // no celular o "Novo chamado" desce pra zona do polegar, acima da
+  // bottom-nav e à esquerda da bolha da Liza. Vai por portal: o template da
+  // rota anima com transform, que prenderia o `fixed` ao conteúdo
+  const noCliente = useSyncExternalStore(
+    nadaMuda,
+    () => true,
+    () => false
+  );
+  const novoMobile = noCliente && createPortal(
+    <NovoChamadoDialog
+      papel={papel}
+      duplas={duplas}
+      trigger={
+        <Button className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-30 h-12 rounded-full px-4 shadow-[var(--shadow-overlay)] md:hidden">
+          <Plus aria-hidden />
+          Novo chamado
+        </Button>
+      }
+    />,
+    document.body
+  );
 
-  const sel = selecionadoInicial;
-  const detalhe = detalheInicial;
+  // autor: o detalhe SUBSTITUI a lista em qualquer largura (com voltar)
+  const autorNoDetalhe = !staff && !!emFoco;
+  const listaVisivelMobile = staff ? !emFoco : !autorNoDetalhe;
 
-  function abrir(id: string) {
-    router.push(`/chamados?c=${id}`);
-  }
-  function fechar() {
-    router.push("/chamados");
-  }
-
-  // mobile: lista OU detalhe; desktop: lado a lado
-  return (
-    <div
+  const lista = (
+    <section
+      aria-label={staff ? "Fila de chamados" : "Seus chamados"}
       className={cn(
-        "grid gap-4",
-        staff && "lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start"
+        "min-w-0 pb-20 md:pb-0",
+        staff && emFoco && "hidden lg:block",
+        autorNoDetalhe && "hidden"
       )}
     >
-      <section
-        aria-label={staff ? "Fila de chamados" : "Seus chamados"}
-        className={cn("min-w-0", sel && staff && "hidden lg:block")}
-      >
+      <div className="mb-3 flex items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <MagnifyingGlass
+            size={16}
+            aria-hidden
+            className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-muted-foreground"
+          />
+          <Input
+            type="search"
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar"
+            aria-label="Buscar por assunto, pessoa ou número"
+            className="h-11 pl-9 text-base md:h-9 md:text-sm"
+          />
+        </div>
         {staff && (
-          <div className="mb-3 space-y-2.5">
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Lifebuoy size={15} aria-hidden className="shrink-0" />
-              <span>
-                <strong className="text-foreground">{naFila.length}</strong> na
-                fila
-                {maisAntigo && (
-                  <>
-                    {" "}· mais antigo {idadeAberto(maisAntigo.created_at)}
-                  </>
-                )}
-              </span>
-            </div>
-            {/* "Busca + Filtros (n)" — a linha compacta; categoria/estado
-                são secundários e moram no painel (Dialog, padrão
-                /registros). Chips de fila ficam inline por serem a
-                navegação principal, e chip com 0 resultado não renderiza */}
-            <div className="flex items-center gap-2">
-              <Input
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                placeholder="Buscar nº, assunto ou autor…"
-                aria-label="Buscar chamado"
-                className="h-11 min-w-0 flex-1 text-sm md:h-9 md:max-w-64"
-              />
-              {temSecundarios && (
-                <FiltrosButton
-                  ativos={ativosSec}
-                  onClick={() => {
-                    setDraftCat(fCategoria);
-                    setDraftStatus(fStatus);
-                    setPainelAberto(true);
-                  }}
+          <Popover>
+            <PopoverTrigger
+              render={
+                <Button
+                  variant="outline"
+                  size="icon"
+                  className="relative md:size-9"
+                  aria-label={
+                    filtrosAtivos
+                      ? `Filtros, ${filtrosAtivos} ${filtrosAtivos === 1 ? "ativo" : "ativos"}`
+                      : "Filtros"
+                  }
                 />
-              )}
-            </div>
-            <div
-              role="group"
-              aria-label="Filtrar por fila"
-              className="flex flex-wrap gap-1.5"
+              }
             >
-              {(
-                [
-                  ["todos", "Todos"],
-                  ["fila", "Na fila"],
-                  ["semdono", "Sem dono"],
-                  ["meus", "Meus"],
-                  ["resolvidos", "Resolvidos"],
-                ] as const
-              ).map(([v, l]) => {
-                const n = contFila[v];
-                // chip com 0 resultado não filtra nada — esconde (o ativo
-                // fica pra não prender a pessoa num filtro sem saída)
-                if (v !== "todos" && n === 0 && fFila !== v) return null;
-                return (
-                  <button
-                    key={v}
-                    onClick={() => setFFila(v)}
-                    aria-pressed={fFila === v}
-                    className={cn(
-                      "min-h-11 rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8",
-                      fFila === v
-                        ? "border-transparent bg-foreground text-background"
-                        : "border-border bg-card text-muted-foreground hover:bg-muted"
-                    )}
-                  >
-                    {l}{" "}
-                    <span
-                      className={cn(
-                        "text-[10px] font-semibold tabular-nums",
-                        fFila === v ? "opacity-70" : "text-muted-foreground"
-                      )}
-                    >
-                      {n}
-                    </span>
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-        {staff && (
-          <Dialog open={painelAberto} onOpenChange={setPainelAberto}>
-            <DialogContent size="md">
-              <DialogHeader>
-                <DialogTitle>Filtros</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                {catShow && (
-                  <fieldset>
-                    <legend className={OVERLINE}>Categoria</legend>
-                    <div className="mt-1.5">
-                      <Select
-                        value={draftCat}
-                        onValueChange={(v) => setDraftCat(v ?? "todas")}
+              <Funnel aria-hidden />
+              {filtrosAtivos > 0 && (
+                <span
+                  aria-hidden
+                  className="absolute -top-1 -right-1 grid size-4 place-items-center rounded-full bg-foreground text-[10px] font-bold text-background"
+                >
+                  {filtrosAtivos}
+                </span>
+              )}
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="w-72 max-w-[calc(100vw-2rem)] space-y-4 p-4"
+            >
+              {categoriasPresentes.length >= 2 && (
+                <fieldset>
+                  <legend className="text-xs font-medium text-muted-foreground">
+                    Categoria
+                  </legend>
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {(["todas", ...categoriasPresentes] as const).map((v) => (
+                      <Button
+                        key={v}
+                        variant="outline"
+                        aria-pressed={fCategoria === v}
+                        onClick={() => setFCategoria(v)}
+                        className={cn("h-auto", filterChipCls(fCategoria === v))}
                       >
-                        <SelectTrigger aria-label="Filtrar por categoria">
-                          <SelectValue placeholder="Categoria" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todas">
-                            Todas as categorias
-                          </SelectItem>
-                          {categoriasPresentes.map((v) => (
-                            <SelectItem key={v} value={v}>
-                              {
-                                CHAMADO_CATEGORIA_LABEL[
-                                  v as keyof typeof CHAMADO_CATEGORIA_LABEL
-                                ]
-                              }
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </fieldset>
-                )}
-                {statusShow && (
-                  <fieldset>
-                    <legend className={OVERLINE}>Estado</legend>
-                    <div className="mt-1.5">
-                      <Select
-                        value={draftStatus}
-                        onValueChange={(v) => setDraftStatus(v ?? "todos")}
-                      >
-                        <SelectTrigger aria-label="Filtrar por estado">
-                          <SelectValue placeholder="Estado" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="todos">
-                            Todos os estados
-                          </SelectItem>
-                          {estadosPresentes.map((v) => (
-                            <SelectItem key={v} value={v}>
-                              {
-                                CHAMADO_STATUS_LABEL[
-                                  v as keyof typeof CHAMADO_STATUS_LABEL
-                                ]
-                              }
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </fieldset>
-                )}
-              </div>
-              <DialogFooter sticky>
+                        {v === "todas" ? "Todas" : CHAMADO_CATEGORIA_LABEL[v]}
+                      </Button>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
+              <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-sm md:min-h-8">
+                <span>
+                  Mostrar resolvidos{" "}
+                  <span className="text-muted-foreground tabular-nums">
+                    {nResolvidos}
+                  </span>
+                </span>
+                <Switch
+                  checked={verResolvidos}
+                  onCheckedChange={setVerResolvidos}
+                />
+              </label>
+              {filtrosAtivos > 0 && (
                 <Button
-                  type="button"
                   variant="ghost"
-                  className="sm:me-auto"
-                  disabled={draftAtivos === 0}
+                  size="sm"
+                  className="w-full"
                   onClick={() => {
-                    setDraftCat("todas");
-                    setDraftStatus("todos");
+                    setFCategoria("todas");
+                    setVerResolvidos(false);
                   }}
                 >
-                  Limpar
+                  Limpar filtros
                 </Button>
-                <Button
-                  type="button"
-                  onClick={() => {
-                    setFCategoria(draftCat);
-                    setFStatus(draftStatus);
-                    setPainelAberto(false);
-                  }}
-                >
-                  Aplicar{draftAtivos > 0 ? ` (${draftAtivos})` : ""}
-                </Button>
-              </DialogFooter>
-            </DialogContent>
-          </Dialog>
+              )}
+            </PopoverContent>
+          </Popover>
         )}
-        {!staff && (
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <Input
-              value={busca}
-              onChange={(e) => setBusca(e.target.value)}
-              placeholder="Buscar nos seus chamados…"
-              aria-label="Buscar chamado"
-              className="h-11 max-w-72 text-sm md:h-9"
-            />
-            <NovoChamadoDialog
-              papel={papel}
-              duplas={duplas}
-              trigger={
-                <Button size="sm">
-                  <Plus size={15} aria-hidden />
-                  Novo pedido
-                </Button>
-              }
-            />
-          </div>
-        )}
-        {staff && (
-          <div className="mb-3 flex justify-end">
-            <NovoChamadoDialog
-              papel={papel}
-              duplas={duplas}
-              trigger={
-                <Button variant="outline" size="sm">
-                  <Plus size={15} aria-hidden />
-                  Abrir chamado
-                </Button>
-              }
-            />
-          </div>
-        )}
-        {/* a troca de filtro/busca re-monta a lista — o animate-enter
-            re-roda por linha em vez de um repaint seco (convenção) */}
-        <ul
-          key={`${fFila}|${fCategoria}|${fStatus}|${busca}`}
-          className="space-y-2"
+        {novo}
+      </div>
+
+      {staff && (
+        <div
+          role="tablist"
+          aria-label="Recorte da fila"
+          className="mb-3 flex rounded-lg bg-muted p-0.5"
         >
-          {filtrados.length === 0 && (
-            <li className="rounded-xl border border-dashed border-border px-5 py-8 text-center text-sm text-muted-foreground">
-              {staff
-                ? "Nenhum chamado nessa visão. Bom trabalho de fila!"
-                : "Você ainda não abriu nenhum pedido. Se precisar, é só tocar em “Novo pedido”."}
-            </li>
-          )}
-          {filtrados.map((c, i) => (
+          {ABAS.map(({ v, rotulo }, i) => (
+            <Button
+              key={v}
+              variant="ghost"
+              role="tab"
+              aria-selected={aba === v}
+              tabIndex={aba === v ? 0 : -1}
+              onClick={() => setAba(v)}
+              onKeyDown={(e) => teclaAba(e, i)}
+              className={cn(
+                "h-auto min-h-11 flex-1 gap-1.5 rounded-md px-2 md:min-h-8",
+                aba === v
+                  ? "bg-foreground text-background hover:bg-foreground hover:text-background"
+                  : "text-muted-foreground"
+              )}
+            >
+              {rotulo}
+              <span
+                className={cn(
+                  "text-xs tabular-nums",
+                  aba === v ? "text-background/70" : "text-muted-foreground"
+                )}
+              >
+                {contAba[v]}
+              </span>
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {/* a troca de filtro/busca re-monta a lista: o animate-enter re-roda
+          por linha em vez de um repaint seco (convenção) */}
+      <ul
+        key={`${aba}|${fCategoria}|${verResolvidos}|${busca}`}
+        className="space-y-1.5"
+      >
+        {filtrados.length === 0 && (
+          <li className="rounded-xl border border-dashed border-border px-5 py-8 text-center text-sm text-muted-foreground">
+            {busca.trim()
+              ? "Nenhum chamado com essa busca."
+              : staff
+                ? aba === "semdono"
+                  ? "Todos os chamados têm dono."
+                  : "Nenhum chamado aqui."
+                : "Você ainda não abriu nenhum chamado."}
+          </li>
+        )}
+        {filtrados.map((c, i) => {
+          const ativo = emFoco === c.id;
+          const meta = c.restrito
+            ? [CHAMADO_CATEGORIA_LABEL[c.categoria], relTempo(c.created_at)]
+            : staff
+              ? [c.autor_nome, c.contexto, relTempo(c.created_at)]
+              : [c.contexto, relTempo(c.updated_at)];
+          return (
             <li
               key={c.id}
               className="animate-enter min-w-0"
               style={{ "--i": Math.min(i, 10) } as CSSProperties}
             >
-              <button
-                onClick={() => abrir(c.id)}
-                aria-current={sel === c.id ? "true" : undefined}
+              <Link
+                href={`/chamados?c=${c.id}`}
+                onClick={(e) => abrir(e, c.id)}
+                aria-current={ativo ? "true" : undefined}
                 className={cn(
-                  "block w-full min-w-0 rounded-xl border bg-card px-4 py-3 text-left shadow-[var(--shadow-border)] transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-                  sel === c.id ? "border-foreground/30 ring-1 ring-foreground/20" : "border-transparent"
+                  "block min-w-0 rounded-xl border px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                  ativo
+                    ? "border-foreground/25 bg-muted/70"
+                    : "border-transparent bg-card shadow-[var(--shadow-border)] hover:bg-muted/40"
                 )}
               >
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-xs text-muted-foreground">
-                    {c.numero}
-                  </span>
-                  <CategoriaBadge categoria={c.categoria} />
-                  <span className="ml-auto flex shrink-0 items-center gap-1 text-xs sm:text-[11px] text-muted-foreground">
-                    <time dateTime={c.created_at}>{relTempo(c.created_at)}</time>
-                    <CaretRight size={12} aria-hidden />
-                  </span>
+                <div className="flex items-start gap-2">
+                  <p className="min-w-0 flex-1 break-words text-sm font-medium leading-snug">
+                    {c.restrito ? (
+                      <span className="inline-flex items-center gap-1.5">
+                        <Lock size={13} aria-hidden className="text-muted-foreground" />
+                        Restrito à coordenação
+                      </span>
+                    ) : (
+                      c.assunto
+                    )}
+                  </p>
+                  {c.categoria === "urgencia" && <UrgenciaMarca className="mt-px" />}
                 </div>
-                <p className="mt-1 break-words text-sm font-medium leading-snug">
-                  {c.restrito
-                    ? "Chamado restrito à coordenação"
-                    : c.assunto}
-                </p>
-                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                  {c.restrito
-                    ? "Assunto e autor visíveis só pra coordenação."
-                    : staff
-                      ? [
-                          c.autor_nome ? `por ${c.autor_nome}` : null,
-                          CHAMADO_ORIGEM_LABEL[c.origem],
-                          c.contexto,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")
-                      : [
-                          c.mentorado_nome
-                            ? `Mentorado: ${c.mentorado_nome}`
-                            : null,
-                          `Atualizado ${relTempo(c.updated_at)}`,
-                        ]
-                          .filter(Boolean)
-                          .join(" · ")}
-                </p>
-                <div className="mt-1.5">
+                <div className="mt-1 flex items-center gap-2">
+                  <p className="min-w-0 flex-1 truncate text-xs text-muted-foreground">
+                    {meta.filter(Boolean).join(" · ")}
+                  </p>
                   <ChamadoStatusBadge
                     status={c.status}
                     dono={c.restrito ? null : c.atribuido_nome}
+                    souDono={c.atribuido_a === meuId}
                     restrito={c.restrito}
                     visao={staff ? "staff" : "autor"}
-                    className="text-[11px]"
+                    className="shrink-0"
                   />
                 </div>
-              </button>
+              </Link>
             </li>
-          ))}
-        </ul>
-      </section>
+          );
+        })}
+      </ul>
+      {listaVisivelMobile && novoMobile}
+    </section>
+  );
 
-      {staff && (
-        <section aria-label="Detalhe do chamado" className={cn("min-w-0", !sel && "hidden lg:block")}>
-          {detalhe ? (
-            <ChamadoDetalhe
-              key={detalhe.chamado.id}
-              papel={papel}
-              meuId={meuId}
-              meuNome={meuNome}
-              chamado={detalhe.chamado}
-              timeline={detalhe.timeline}
-              equipe={detalhe.equipe}
-              onVoltar={fechar}
-            />
-          ) : (
-            <div className="flex min-h-64 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
-              <ChatCircleText size={28} aria-hidden />
-              Selecione um chamado da fila pra ver a conversa.
+  const painelDetalhe = carregandoDetalhe ? (
+    <DetalheEsqueleto />
+  ) : detalhe && emFoco === detalhe.chamado.id ? (
+    <ChamadoDetalhe
+      key={detalhe.chamado.id}
+      papel={papel}
+      meuId={meuId}
+      meuNome={meuNome}
+      chamado={detalhe.chamado}
+      timeline={detalhe.timeline}
+      equipe={detalhe.equipe}
+      onVoltar={fechar}
+      voltarDesktop={!staff}
+    />
+  ) : null;
+
+  if (!staff) {
+    return (
+      <div className="min-w-0">
+        {lista}
+        {autorNoDetalhe && (
+          <section aria-label="Detalhe do chamado" className="min-w-0">
+            {painelDetalhe}
+          </section>
+        )}
+      </div>
+    );
+  }
+
+  // mobile: lista OU detalhe; desktop: lado a lado
+  return (
+    <div className="grid gap-4 lg:grid-cols-[minmax(0,380px)_minmax(0,1fr)] lg:items-start">
+      {lista}
+      <section
+        aria-label="Detalhe do chamado"
+        className={cn("min-w-0", !emFoco && "hidden lg:block")}
+      >
+        {painelDetalhe ?? (
+          <div className="flex min-h-64 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
+            <ChatCircleText size={28} aria-hidden />
+            Escolha um chamado para ver a conversa.
+          </div>
+        )}
+      </section>
+    </div>
+  );
+}
+
+/** Esqueleto do detalhe durante a navegação — mesma silhueta do artigo
+ *  (cabeçalho, mensagens, composer) pra troca não pular. */
+function DetalheEsqueleto() {
+  return (
+    <div
+      aria-busy="true"
+      aria-label="Carregando chamado"
+      className="min-w-0 overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]"
+    >
+      <div className="space-y-3 border-b border-border px-4 py-4 sm:px-5">
+        <div className="flex items-center gap-2">
+          <Skeleton className="h-5 w-28 rounded-full" />
+          <Skeleton className="ml-auto h-8 w-24" />
+        </div>
+        <Skeleton className="h-6 w-3/4" />
+        <Skeleton className="h-4 w-1/2" />
+      </div>
+      <div className="space-y-5 px-4 py-5 sm:px-5">
+        {[0, 1].map((i) => (
+          <div key={i} className="space-y-2">
+            <div className="flex items-center gap-2">
+              <Skeleton className="size-6 rounded-full" />
+              <Skeleton className="h-4 w-32" />
             </div>
-          )}
-        </section>
-      )}
-      {!staff && sel && detalhe && (
-        <section aria-label="Detalhe do pedido" className="min-w-0">
-          <ChamadoDetalhe
-            key={detalhe.chamado.id}
-            papel={papel}
-            meuId={meuId}
-            meuNome={meuNome}
-            chamado={detalhe.chamado}
-            timeline={detalhe.timeline}
-            equipe={detalhe.equipe}
-            onVoltar={fechar}
-          />
-        </section>
-      )}
+            <Skeleton className="h-4 w-full" />
+            <Skeleton className="h-4 w-2/3" />
+          </div>
+        ))}
+      </div>
+      <div className="border-t border-border px-4 py-4 sm:px-5">
+        <Skeleton className="h-24 w-full rounded-lg" />
+      </div>
     </div>
   );
 }

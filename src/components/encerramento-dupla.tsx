@@ -1,5 +1,5 @@
 import { Check, FlagCheckered, LockSimple, Minus, PaperPlaneTilt } from "@phosphor-icons/react/dist/ssr";
-import { CHECKLIST_ENCERRAMENTO } from "@/lib/encerramento";
+import { CHECKLIST_ENCERRAMENTO, encerramentoDecidido } from "@/lib/encerramento";
 import { formatDateTime, formatDiaMes } from "@/lib/ciclo";
 import { EncerrarDuplaDialog } from "@/components/encerrar-dupla-dialog";
 import { EnviarFormularioDialog, type FormularioOpcao } from "@/components/enviar-formulario-dialog";
@@ -12,7 +12,7 @@ import { cn } from "@/lib/utils";
  *  - Coordenação: checklist + decisão (concluir a jornada ou encerrar antes).
  *  - Mentor: acompanha o que já chegou e vê o registro depois da decisão.
  *  - Supervisor: acompanha o que já foi registrado.
- *  A row nasce pendente no último encontro (0102); tipo null = rito aberto. */
+ *  A row nasce pendente no último encontro (0102); tipo 'pendente' = rito aberto. */
 export function EncerramentoDupla({
   dupla,
   encerramento,
@@ -35,7 +35,7 @@ export function EncerramentoDupla({
    *  aparecia em qualquer dupla nova, enc. 4/16) */
   realizadosCount: number;
 }) {
-  const decidido = !!encerramento?.tipo;
+  const decidido = encerramentoDecidido(encerramento);
   const aberta = dupla.status === "ativa" || dupla.status === "pausada";
   // fechamento automático (0102): o último encontro conclui a dupla e a row
   // nasce pendente — o rito continua aberto aqui (360 tardio, checklist da
@@ -158,12 +158,12 @@ export function EncerramentoDupla({
                       duplaId={dupla.id}
                       mentor={{
                         id: dupla.mentor.id,
-                        nome: dupla.mentor.nome,
+                        nome: dupla.mentor.nome_social ?? dupla.mentor.nome,
                         whatsapp: dupla.mentor.whatsapp,
                       }}
                       mentorado={{
                         id: dupla.mentorado.id,
-                        nome: dupla.mentorado.nome,
+                        nome: dupla.mentorado.nome_social ?? dupla.mentorado.nome,
                         whatsapp: dupla.mentorado.whatsapp,
                       }}
                       sugestao="360"
@@ -184,7 +184,11 @@ export function EncerramentoDupla({
       {decidido ? (
         <>
           <p className="text-xs text-muted-foreground">
-            Registrado por {encerramento!.decidido?.nome ?? "a coordenação"} ·{" "}
+            Registrado por{" "}
+            {encerramento!.decidido?.nome_social ??
+              encerramento!.decidido?.nome ??
+              "a coordenação"}{" "}
+            ·{" "}
             {formatDateTime(encerramento!.created_at)}
           </p>
         </>

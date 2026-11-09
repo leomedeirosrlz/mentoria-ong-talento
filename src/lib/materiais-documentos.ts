@@ -4,13 +4,52 @@
  *  pela convenção `path = "doc:<slug>"` — a biblioteca resolve o href, sem
  *  passar pelo storage. */
 
+/** Tone of a callout — the guide's side box: info (gray-teal, notes and
+ *  platform updates), warn (cream/amber, attention), tip (pale green/lime,
+ *  hints) and note (italic gray, editorial reflection). */
+export type CalloutTom = "info" | "warn" | "tip" | "note";
+
+/** The three rotating colors of the guide's visual grammar — lime (brand
+ *  default), destaque (the journey's amber) and info (support teal). Drives
+ *  phase bands, numbered-item chips, journey dots and the TOC marker. */
+export type DocTom = "lima" | "destaque" | "info";
+
 export type DocBloco =
   | { kind: "par"; html: string }
-  | { kind: "lista"; itens: string[] }
+  // ordenada=false → <ul> (listas "-" do corpus); ausente/true → <ol>
+  // check: itens de marcação (seções "Antes do encontro", checklist) —
+  // o renderer desenha checkbox real em vez de bullet
+  | { kind: "lista"; itens: string[]; ordenada?: boolean; check?: boolean }
   | { kind: "pergunta"; texto: string }
   | { kind: "subj"; texto: string }
-  | { kind: "nota"; html: string }
-  | { kind: "tabela"; cabecalho: string[]; linhas: string[][] };
+  | { kind: "callout"; tom: CalloutTom; html: string }
+  // "**N. Título.**" of the guide — numbered item with highlighted digit
+  | { kind: "numero"; numero: string; titulo: string; html: string }
+  // blockquote: *"text" (attribution)*
+  | { kind: "quote"; html: string; fonte?: string }
+  // the guide's encounter card: "Nº ENCONTRO" eyebrow, title, body and the
+  // trailing slots (assigned task + link to the encounter route)
+  | {
+      kind: "encontro";
+      numero: string;
+      titulo: string;
+      /** anchor of the source section (###-derived cards); absent on inline
+       *  cards ("**Nº ENCONTRO: ...**" inside a paragraph). */
+      anchor?: string;
+      corpo: DocBloco[];
+      /** assigned-task text (already-escaped html), without the "Tarefa:" */
+      tarefa?: string;
+      roteiro?: { slug: string; rotulo: string };
+    }
+  // marcacao: colunas > 0 desenham checkbox vazio (fichas de marcação do
+  // cap. 14); sem a flag, toda célula renderiza o próprio conteúdo (tabelas
+  // de dados do corpus)
+  | {
+      kind: "tabela";
+      cabecalho: string[];
+      linhas: string[][];
+      marcacao?: boolean;
+    };
 
 export type MaterialDocumento = {
   slug: string;
@@ -21,10 +60,78 @@ export type MaterialDocumento = {
   blocos: DocBloco[];
 };
 
+// ---------- render units ----------
+
+type NumeroBloco = Extract<DocBloco, { kind: "numero" }>;
+
+/** Render unit of DocBlocos: a single block or one run of consecutive
+ *  `numero` blocks, which render together as a card grid (the guide's
+ *  numbered pills: the nine mentor functions as cards, not a dotted list). */
+export type DocItem = DocBloco | { kind: "nums"; itens: NumeroBloco[] };
+
+/** Top-level line of DocBlocos: a render item or the e-mail card opened by
+ *  a `subj` ("**Assunto:** …") block — the message templates of cap. 14. */
+export type DocLinha =
+  | { kind: "item"; item: DocItem }
+  | { kind: "email"; assunto: string; corpo: DocItem[] };
+
+/** Consecutive `numero` blocks fold into a single `nums` unit; everything
+ *  else passes through in order. */
+export function itensDoc(blocos: DocBloco[]): DocItem[] {
+  const itens: DocItem[] = [];
+  let run: NumeroBloco[] = [];
+  const flush = () => {
+    if (run.length > 0) {
+      itens.push({ kind: "nums", itens: run });
+      run = [];
+    }
+  };
+  for (const b of blocos) {
+    if (b.kind === "numero") run.push(b);
+    else {
+      flush();
+      itens.push(b);
+    }
+  }
+  flush();
+  return itens;
+}
+
+/** Splits the block list at each `subj`: the subject line becomes the
+ *  header of an e-mail card holding every block up to the next `subj` or
+ *  the end of the list. Blocks before the first `subj` stay outside. */
+export function linhasDoc(blocos: DocBloco[]): DocLinha[] {
+  const linhas: DocLinha[] = [];
+  let seg: DocBloco[] = [];
+  const flush = () => {
+    for (const item of itensDoc(seg)) linhas.push({ kind: "item", item });
+    seg = [];
+  };
+  let i = 0;
+  while (i < blocos.length) {
+    const b = blocos[i];
+    if (b.kind !== "subj") {
+      seg.push(b);
+      i++;
+      continue;
+    }
+    flush();
+    const corpo: DocBloco[] = [];
+    i++;
+    while (i < blocos.length && blocos[i].kind !== "subj") {
+      corpo.push(blocos[i]);
+      i++;
+    }
+    linhas.push({ kind: "email", assunto: b.texto, corpo: itensDoc(corpo) });
+  }
+  flush();
+  return linhas;
+}
+
 export const MATERIAIS_DOCUMENTOS: Record<string, MaterialDocumento> = {
   // cap. 14, item 1 — as 10 competências com as duas colunas de marcação;
-  // o renderer de "tabela" desenha o checkbox em toda coluna > 0, então as
-  // células de "Já faço bem" / "Preciso desenvolver" vão vazias de propósito;
+  // com marcacao: true o renderer desenha o checkbox em toda coluna > 0,
+  // então as células de "Já faço bem" / "Preciso desenvolver" vão vazias;
   // texto do corpus sanitizado em 04/11/2026, docs/rag/checklist-competencias.md
   "checklist-competencias": {
     slug: "checklist-competencias",
@@ -36,11 +143,13 @@ export const MATERIAIS_DOCUMENTOS: Record<string, MaterialDocumento> = {
     blocos: [
       { kind: "par", html: "Marque no início do ciclo o que já faz bem e o que quer desenvolver, e revisite a lista no fechamento." },
       {
-        kind: "nota",
+        kind: "callout",
+        tom: "tip",
         html: "Marque como prioritário aquilo que você quer desenvolver e exercite esses pontos no dia a dia, com amigos, família e no trabalho, antes de aplicá-los na mentoria.",
       },
       {
         kind: "tabela",
+        marcacao: true,
         cabecalho: ["Competência", "Já faço bem", "Preciso desenvolver"],
         linhas: [
           ["Escutar sem interromper e sem antecipar conclusões", "", ""],
@@ -72,7 +181,8 @@ export const MATERIAIS_DOCUMENTOS: Record<string, MaterialDocumento> = {
         html: "O Feedback Construtivo melhora a autoconsciência, contribui para o aumento da autoconfiança, estimula a aprendizagem, eleva a motivação e incrementa o desempenho. Mesmo quando for necessário apontar aspectos negativos, o feedback deve ser construtivo. <b>Não precisa ser agendado:</b> pode surgir espontaneamente no decorrer de um encontro, desde que feito com responsabilidade e respeito.",
       },
       {
-        kind: "nota",
+        kind: "callout",
+        tom: "tip",
         html: "<b>Modelo sugerido:</b> “Olha, quando acontece determinada situação, eu me sinto <i>(descreva como você se sente)</i>, porque <i>(explique o motivo)</i>. Eu gostaria que você considerasse <i>(apresente uma sugestão ou alternativa)</i>.” Em seguida, pergunte: “O que você pensa sobre o que acabei de dizer?”",
       },
       {
@@ -107,7 +217,8 @@ export const MATERIAIS_DOCUMENTOS: Record<string, MaterialDocumento> = {
     objetivo: "Envie antes do primeiro encontro, assim que a dupla for formada.",
     blocos: [
       {
-        kind: "nota",
+        kind: "callout",
+        tom: "tip",
         html: "<b>Dica:</b> adapte a linguagem ao seu jeito de escrever e à realidade do(a) jovem. É um ponto de partida, não um formulário obrigatório.",
       },
       { kind: "subj", texto: "Vamos começar a nossa mentoria!" },
@@ -144,7 +255,8 @@ export const MATERIAIS_DOCUMENTOS: Record<string, MaterialDocumento> = {
       "Envie a cada pessoa que o(a) jovem indicou o link dela, gerado na ficha da dupla na plataforma.",
     blocos: [
       {
-        kind: "nota",
+        kind: "callout",
+        tom: "warn",
         html: "<b>Importante:</b> as respostas alimentam a avaliação inicial e ninguém saberá quem disse o quê. Diga isso com clareza, como no modelo.",
       },
       {

@@ -158,7 +158,7 @@ Todas as mentorias acontecem na plataforma (**mentoria.realiza.vc**).
 - **Pós-encontro:** ao final de cada encontro, você registra a sessão na ficha da dupla e o(a) jovem responde a própria avaliação rápida na plataforma.
 - **Especialistas:** organizados por área, como design, eventos, finanças, inteligência emocional, planejamento de carreira e tecnologia.
 
-**Onde ficam o PDM e a Roda da Vida:** são instrumentos oficiais respondidos na ficha da dupla (aba Instrumentos). *(Atualização: o guia publicado ainda diz que ficam com a dupla; vale a ficha da dupla na plataforma.)*
+**Onde ficam o PDM e a Roda da Vida:** são instrumentos oficiais respondidos na ficha da dupla (aba Instrumentos). *(Atualização: na plataforma vigente, o PDM e a Roda da Vida são respondidos na ficha da dupla, aba Instrumentos; o guia publicado que diz que ficam com a dupla está desatualizado.)*
 
 **Não confunda:** mentoria.realiza.vc é a plataforma da mentoria; ead.realiza.vc é a plataforma de cursos EaD.
 

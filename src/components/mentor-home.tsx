@@ -115,7 +115,7 @@ export function MentorHome({
           da grade (em xl ela esticava na altura do 1º card) */}
       <div className={cn("space-y-4", duplas.length > 1 && "xl:col-span-2")}>
         <header>
-          <h1 className="text-2xl font-semibold tracking-tight">Olá, {me.nome.split(" ")[0]}</h1>
+          <h1 className="text-2xl font-semibold tracking-tight">Olá, {(me.nome_social ?? me.nome).split(" ")[0]}</h1>
           {eventoSemana && !soEspecialista && (
             <p className="text-sm text-muted-foreground mt-1 flex items-center gap-1.5">
               <span aria-hidden className="size-2 shrink-0 rounded-full bg-[var(--brand-lime)]" />
@@ -217,10 +217,13 @@ export function MentorHome({
           (encontroAlvo?.data_hora && new Date(encontroAlvo.data_hora) > hoje
             ? encontroAlvo
             : null);
-        // "Agendar próximo encontro" no estado quieto: primeiro número livre depois
-        // do agendado — livre = sem row realizada/agendada/remarcada
+        // "Agendar próximo encontro" no estado quieto: primeiro número
+        // PENDENTE do ciclo — livre = sem row realizada/agendada/remarcada
         // (nao_aconteceu e cancelado voltam a ser agendáveis; o dialog
-        // recebe a row em `atual` e edita em vez de criar duplicata)
+        // recebe a row em `atual` e edita em vez de criar duplicata).
+        // Antes era o primeiro livre DEPOIS do agendado: com um buraco
+        // atrás (9º marcado, 8º pulado) a home sugeria pular adiante pro
+        // 10º — divergia do "resolve na ordem" das outras superfícies
         const numerosOcupados = new Set(
           dupla.encontros
             .filter(
@@ -233,7 +236,16 @@ export function MentorHome({
         );
         let seguinteNumero: number | null = null;
         if (agendado) {
-          for (let n = agendado.numero + 1; n <= totalDupla; n++) {
+          // mesmo piso do alvoAgendamento (ciclo.ts): quem entrou a meio do
+          // ciclo não tem buraco antes da entrada — sem o piso o nº1 era
+          // sugerido e virava row fantasma
+          const inicioSeg = dupla.iniciada_em;
+          const pisoSeguinte = inicioSeg
+            ? (eventosDaDupla.find(
+                (e) => e.tipo === "encontro" && e.numero != null && e.data != null && e.data >= inicioSeg
+              )?.numero ?? 1)
+            : 1;
+          for (let n = pisoSeguinte; n <= totalDupla; n++) {
             if (!numerosOcupados.has(n)) {
               seguinteNumero = n;
               break;
@@ -268,18 +280,23 @@ export function MentorHome({
                       mentorado é o que distingue um card do outro */}
                   <p className="text-xs font-semibold uppercase tracking-[0.08em] text-white/50 sm:text-[11px]">
                     {duplas.length > 1
-                      ? `Dupla · ${dupla.mentorado.nome}`
+                      ? `Dupla · ${dupla.mentorado.nome_social ?? dupla.mentorado.nome}`
                       : "Sua dupla"}
                   </p>
                   <CardTitle className="text-lg font-semibold mt-1">
-                    <DuplaNomes mentor="Você" mentorado={dupla.mentorado.nome} onDark />
+                    <DuplaNomes
+                      mentor="Você"
+                      mentorado={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+                      onDark
+                    />
                   </CardTitle>
                   {/* o auxiliar executivo que acompanha a dupla — meta discreto
                       sob o lockup; white/70 mantém o nome legível no ink (o
                       white/50 do overline mede ~4.4:1 pra dado lido) */}
                   {dupla.supervisor && (
                     <p className="mt-0.5 text-xs text-white/70 sm:text-[11px]">
-                      Auxiliar executivo: {dupla.supervisor.nome}
+                      Auxiliar executivo:{" "}
+                      {dupla.supervisor.nome_social ?? dupla.supervisor.nome}
                     </p>
                   )}
                   {/* prazo de 3 meses da trilha — o diferenciador entre duplas
@@ -444,7 +461,9 @@ export function MentorHome({
                             atual={encontroSeguinte}
                             sugerido={sugeridoSeguinte}
                             piso={dupla.iniciada_em ?? undefined}
-                            jovemNome={dupla.mentorado.nome.split(" ")[0]}
+                            jovemNome={
+                              (dupla.mentorado.nome_social ?? dupla.mentorado.nome).split(" ")[0]
+                            }
                             trigger={
                               <Button variant="outline" size="sm">
                                 <CalendarPlus size={16} />
@@ -468,14 +487,17 @@ export function MentorHome({
                           : "já passou."}
                       </p>
                       <p className="text-sm text-muted-foreground mt-0.5">
-                        {encontroAlvo.status === "nao_aconteceu" ||
-                        encontroAlvo.status === "cancelado"
+                        {encontroAlvo.status === "nao_aconteceu"
                           ? "Remarque quando puder, ou desfaça na ficha se rolou."
-                          : "Se rolou, registre na ficha da dupla; se não, remarque."}
+                          : encontroAlvo.status === "cancelado"
+                            ? "Remarque quando puder, ou registre como foi na ficha se rolou."
+                            : "Se rolou, registre na ficha da dupla; se não, remarque."}
                       </p>
                       <div className="mt-3 flex flex-wrap justify-end gap-2">
-                        {encontroAlvo.status !== "nao_aconteceu" &&
-                          encontroAlvo.status !== "cancelado" && (
+                        {/* nao_aconteceu tem o Desfazer na ficha (undo da
+                            marcação); pro cancelado e pro passado o caminho
+                            é o registro — o salvarRegistro corrige o status */}
+                        {encontroAlvo.status !== "nao_aconteceu" && (
                             <Link
                               href={`/duplas/${dupla.id}?aba=encontros#registrar-${encontroAlvo.id}`}
                               className={buttonVariants({ variant: "outline", size: "sm" })}
@@ -490,7 +512,9 @@ export function MentorHome({
                           atual={encontroAlvo}
                           sugerido={sugeridoProximo}
                           piso={dupla.iniciada_em ?? undefined}
-                          jovemNome={dupla.mentorado.nome.split(" ")[0]}
+                          jovemNome={
+                            (dupla.mentorado.nome_social ?? dupla.mentorado.nome).split(" ")[0]
+                          }
                           trigger={
                             <Button size="sm">
                               <CalendarPlus size={16} />
@@ -523,7 +547,9 @@ export function MentorHome({
                           atual={encontroAlvo}
                           sugerido={sugeridoProximo}
                           piso={dupla.iniciada_em ?? undefined}
-                          jovemNome={dupla.mentorado.nome.split(" ")[0]}
+                          jovemNome={
+                            (dupla.mentorado.nome_social ?? dupla.mentorado.nome).split(" ")[0]
+                          }
                         />
                       </div>
                     </>
@@ -615,10 +641,13 @@ export function MentorHome({
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
                     <p className="text-sm font-semibold">
-                      <DuplaNomes mentor="Você" mentorado={dupla.mentorado.nome} />
+                      <DuplaNomes
+                        mentor="Você"
+                        mentorado={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+                      />
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {dupla.status === "concluida" ? "Concluída" : "Desistente"} ·{" "}
+                      {dupla.status === "concluida" ? "Concluída" : "Encerrada"} ·{" "}
                       <span className="tabular-nums">
                         {saude.feitos}/{totalDupla}
                       </span>{" "}

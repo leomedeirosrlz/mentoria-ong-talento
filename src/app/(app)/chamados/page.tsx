@@ -28,13 +28,15 @@ export default async function ChamadosPage({
   // escopo inteiro da coordenação, não as duplas dela)
   const ehMentor =
     temPapel(me, "mentor_dpp") || temPapel(me, "mentor_especialista");
-  const [{ itens }, minhasDuplas] = await Promise.all([
+  const selecionado = c && UUID_RE.test(c) ? c : null;
+  // o detalhe sai junto: a trilha não espera a fila, e a linha do chamado
+  // vem da própria fila (getChamados é React.cache — uma leitura só)
+  const [{ itens }, minhasDuplas, detalhe] = await Promise.all([
     getChamados(),
     ehMentor ? getMinhasDuplas() : Promise.resolve([]),
+    selecionado ? getChamadoDetalhe(selecionado) : Promise.resolve(null),
   ]);
   const duplasOpcoes = duplasOpcoesChamado(minhasDuplas, me.id);
-  const selecionado = c && UUID_RE.test(c) ? c : null;
-  const detalhe = selecionado ? await getChamadoDetalhe(selecionado) : null;
 
   return (
     <div className="mx-auto w-full max-w-6xl">
@@ -43,11 +45,6 @@ export default async function ChamadosPage({
           <h1 className="text-xl font-semibold tracking-tight sm:text-2xl">
             {staff ? "Chamados" : "Meus chamados"}
           </h1>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {staff
-              ? "Quem assumir primeiro trata. Resposta combinada em 1 dia útil."
-              : "Acompanhe aqui as respostas da equipe aos seus pedidos."}
-          </p>
         </div>
       </header>
       <ChamadosApp

@@ -4,7 +4,7 @@ material: roteiro-encontro-11
 titulo: "Roteiro do 11º encontro: Rede de Apoio & Novos Espaços"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-11 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);
@@ -60,7 +60,7 @@ Conversem sobre os novos espaços que ampliam a rede: cursos, projetos sociais, 
 
 Apresente a Roda da Vida como instrumento da plataforma: 16 áreas organizadas em quatro quadrantes, avaliadas com notas de 1 a 10, como um retrato do momento atual. A leitura inicial aconteceu no 1º encontro; agora começa a aplicação formal do ciclo.
 
-*(Atualização: o roteiro publicado diz que as áreas são avaliadas "de 0 a 10"; na plataforma a escala é de 1 a 10.)*
+*(Atualização: na plataforma vigente, cada área é avaliada de 1 a 10; o roteiro publicado que diz "de 0 a 10" está desatualizado.)*
 
 ### Momento 4 · Combinar a nova leitura
 

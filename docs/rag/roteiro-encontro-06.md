@@ -4,7 +4,7 @@ material: roteiro-encontro-06
 titulo: "Roteiro do 6º encontro: Superando Barreiras"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-6 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { AssistenteBolhaLazy } from "@/components/assistente-bolha-lazy";
 import { DemoBar } from "@/components/demo-bar";
 import { JovemShell } from "@/components/jovem-shell";
 import { TelaConta } from "@/components/telas-conta";
@@ -6,6 +7,7 @@ import { getDemoData } from "@/lib/demo/data";
 import { demoRole } from "@/lib/demo/mode";
 import { getMe, getNotificacoes } from "@/lib/queries";
 import { getJovemAssinaturas, getJovemPerfil } from "@/lib/queries-jovem";
+import { providerConfigurado } from "@/lib/ia/provider";
 import type { AppRole } from "@/lib/types";
 import { OnboardingJovemLazy } from "./onboarding-jovem-lazy";
 
@@ -107,8 +109,28 @@ export default async function JovemLayout({
   }
 
   const notificacoes = await getNotificacoes();
+  // bolha do assistente pro jovem (pacote liza nov/2026, sdd D5): a MESMA
+  // flag IA_BOLHA do shell de staff — off por padrão, inclusive em prod.
+  // O /api/ia/chat já responde a mentorado; as tools dele são read-only e
+  // leem o recorte que as views jovem_* entregam.
+  const acessoIa = process.env.IA_BOLHA === "1";
   return (
-    <JovemShell me={me} notificacoes={notificacoes} demo={demoDock || undefined}>
+    <JovemShell
+      me={me}
+      notificacoes={notificacoes}
+      demo={demoDock || undefined}
+      assistente={
+        acessoIa ? (
+          <AssistenteBolhaLazy
+            key="assistente"
+            papeis={["mentorado"]}
+            demo={demo != null}
+            configurado={providerConfigurado()}
+            nome={me.nome_social || me.nome}
+          />
+        ) : undefined
+      }
+    >
       {children}
       {demoFloat}
     </JovemShell>

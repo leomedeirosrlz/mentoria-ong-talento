@@ -174,36 +174,24 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await expect(
       acervo.getByText(/Para ler e consultar quando quiser/)
     ).toBeVisible();
-    // o acervo do mentorado é só audiencia='todos' (a policy do 0065):
-    // os Guias dos mentores não aparecem — os links prontos viram grid e o
-    // doc "Feedback Construtivo" abre nativo no grupo "Conteúdos" (o
-    // checklist de autoavaliação saiu do catálogo — REALIZA-236)
+    // o acervo do mentorado é `todos` + `mentorado` (0139/0167): guias,
+    // roteiros e o Feedback Construtivo (instrumento de fala do mentor) não
+    // aparecem — sobram os links, Formação EaD inclusa
     await expect(acervo.getByText("Links")).toBeVisible();
-    await expect(acervo.getByText("Conteúdos")).toBeVisible();
+    await expect(acervo.getByText("Conteúdos")).toHaveCount(0);
     await expect(acervo.getByText("Modelos")).toHaveCount(0);
-    const docJovem = acervo.getByRole("link", {
-      name: /Feedback Construtivo/,
-    });
-    await expect(docJovem).toHaveAttribute(
-      "href",
-      "/jovem/materiais/documento/feedback-construtivo"
-    );
-    // a rota nativa do jovem renderiza o documento de verdade e volta pro
-    // acervo — não pode vazar pra /materiais (layout app redireciona o papel)
-    await docJovem.click();
-    await expect(page).toHaveURL(
-      "/jovem/materiais/documento/feedback-construtivo"
-    );
     await expect(
-      page.getByRole("heading", {
-        name: "Feedback Construtivo",
-        level: 1,
-      })
+      acervo.getByRole("link", { name: /Formação EaD gratuita/ })
     ).toBeVisible();
-    await page
-      .getByRole("link", { name: "Acervo de materiais" })
-      .click();
-    await expect(page).toHaveURL(/\/jovem\/materiais#acervo/);
+    await expect(
+      acervo.getByRole("link", { name: /Feedback Construtivo/ })
+    ).toHaveCount(0);
+    // a rota nativa segue a audiência do frontmatter — nem por URL direta
+    await page.goto("/jovem/materiais/documento/feedback-construtivo");
+    await expect(
+      page.getByRole("heading", { name: "Feedback Construtivo", level: 1 })
+    ).toHaveCount(0);
+    await page.goto("/jovem/materiais#acervo");
     await expect(acervo.getByText("Guias")).toHaveCount(0);
     // catálogo todo acionável: sem linha apagada nem badge "em breve"
     await expect(acervo.getByText("A caminho")).toHaveCount(0);

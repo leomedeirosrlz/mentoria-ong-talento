@@ -4,7 +4,7 @@ material: roteiro-encontro-12
 titulo: "Roteiro do 12º encontro: Leitura da Roda da Vida"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-12 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

@@ -91,7 +91,7 @@ Além dos dois encontros de formação, o Instituto oferece uma trilha EaD extra
 
 ## Perfil dos(as) mentorados(as)
 
-O perfil dos jovens que ingressam na Mentoria Social é levantado antes do início da mentoria, a partir do cadastro respondido pelo(a) jovem na plataforma. Essas informações ajudam a compreender a realidade de cada pessoa, qualificar o matching e orientar o trabalho dos mentores. *(Atualização: o PDF publicado cita a Anamnese Social nessa etapa; o perfil é levantado pelo cadastro do(a) jovem na plataforma.)*
+O perfil dos jovens que ingressam na Mentoria Social é levantado antes do início da mentoria, a partir do cadastro respondido pelo(a) jovem na plataforma. Essas informações ajudam a compreender a realidade de cada pessoa, qualificar o matching e orientar o trabalho dos mentores. *(Atualização: na plataforma vigente, o perfil do(a) jovem é levantado pelo cadastro que ele(a) responde na plataforma antes do início da mentoria; o PDF publicado que cita a "Anamnese Social" nessa etapa está desatualizado.)*
 
 Tratando-se de jovens em situação de vulnerabilidade social: moradores de territórios em vulnerabilidade convivem diariamente com as diferentes facetas de uma sociedade extremamente desigual. Muitas vezes o acesso a direitos básicos, segurança e lazer não faz parte do repertório desse jovem. Esse cenário de precariedade leva muitos deles a desenvolver ansiedade e urgência na resolução dos próprios problemas.
 
@@ -161,7 +161,7 @@ Todas as mentorias acontecem na plataforma de mentoria do Instituto Realiza.vc, 
 - **Acompanhamento:** ao final de cada encontro, o(a) mentor(a) registra a sessão na ficha da dupla e o(a) jovem responde a própria avaliação rápida (campos na seção "Depois de cada encontro").
 - **Especialistas:** a plataforma reúne mentores voluntários capacitados e especialistas de mercado, organizados por área: design, eventos, finanças, inteligência emocional, planejamento de carreira, tecnologia, entre outras.
 
-Os instrumentos oficiais ficam na ficha da dupla, na plataforma: Construindo a sua Visão, Definindo Minhas Metas, PDM (Plano de Desenvolvimento do Mentorado) e Roda da Vida. Também são respondidos na plataforma o cadastro (intake) de mentor e de mentorado, a avaliação por terceiros, o registro pós-encontro do(a) mentor(a), a avaliação rápida do(a) jovem e o par Avaliação Geral - 360º no encerramento. *(Atualização: o PDF publicado diz que o PDM e a Roda da Vida são documentos de trabalho guardados pela dupla, fora da plataforma; ambos são instrumentos oficiais preenchidos na ficha da dupla, o que permite à coordenação acompanhar o progresso.)*
+Os instrumentos oficiais ficam na ficha da dupla, na plataforma: Construindo a sua Visão, Definindo Minhas Metas, PDM (Plano de Desenvolvimento do Mentorado) e Roda da Vida. Também são respondidos na plataforma o cadastro (intake) de mentor e de mentorado, a avaliação por terceiros, o registro pós-encontro do(a) mentor(a), a avaliação rápida do(a) jovem e o par Avaliação Geral - 360º no encerramento. *(Atualização: na plataforma vigente, o PDM e a Roda da Vida são instrumentos oficiais respondidos na ficha da dupla, aba Instrumentos: o(a) mentor(a) emite o link, o(a) jovem responde e a coordenação acompanha o progresso; o PDF publicado que os descreve como documentos de trabalho "guardados pela dupla, fora da plataforma" está desatualizado.)*
 
 Não confunda os dois endereços: mentoria.realiza.vc é a plataforma onde a mentoria acontece; ead.realiza.vc é a plataforma de cursos, com a formação EaD opcional e gratuita.
 
@@ -265,7 +265,7 @@ Mentores e mentorados respondem a um formulário com perguntas pessoais (trajet�
 
 ## O ritmo do ciclo
 
-Os 16 encontros individuais acontecem ao longo do ciclo, nas datas do cronograma oficial de cada turma. O percurso mantém as seis fases e os instrumentos desenhados por este guia. *(Atualização: o PDF publicado desenha o percurso em seis meses; no ciclo atual os 16 encontros acontecem ao longo do ciclo, com ritmo semanal.)*
+Os 16 encontros individuais acontecem ao longo do ciclo, nas datas do cronograma oficial de cada turma. O percurso mantém as seis fases e os instrumentos desenhados por este guia. *(Atualização: no ciclo vigente, os 16 encontros acontecem ao longo do ciclo, nas datas do cronograma oficial de cada turma, com ritmo semanal; o PDF publicado que desenha o percurso "em seis meses" está desatualizado.)*
 
 As seis fases do percurso:
 
@@ -381,7 +381,7 @@ Mentor(a) e mentorado(a) refletem sobre toda a jornada: o(a) jovem é incentivad
 
 ### 16º encontro · Encerramento e celebração
 
-O último encontro celebra o percurso e encerra formalmente a mentoria: revisitem o PDM e a Roda da Vida, conversem sobre as necessidades futuras e reforce a continuidade do autodesenvolvimento. No encontro, cada participante responde a sua Avaliação Geral - 360º na plataforma, e a dupla combina como fica o contato depois do ciclo (não há regra escrita sobre presentes nem sobre contato: a coordenação orienta). Uma sugestão de fechamento: agradeça a confiança, verbalize as qualidades que percebeu e pergunte "Pelo que você é grato(a) nesta jornada?". Passo a passo: Roteiro do 16º encontro. *(Atualização: o PDF publicado ainda lista a autoavaliação do(a) mentor(a) entre os materiais do 16º encontro; vale a Avaliação Geral - 360º de cada participante.)*
+O último encontro celebra o percurso e encerra formalmente a mentoria: revisitem o PDM e a Roda da Vida, conversem sobre as necessidades futuras e reforce a continuidade do autodesenvolvimento. No encontro, cada participante responde a sua Avaliação Geral - 360º na plataforma, e a dupla combina como fica o contato depois do ciclo (não há regra escrita sobre presentes nem sobre contato: a coordenação orienta). Uma sugestão de fechamento: agradeça a confiança, verbalize as qualidades que percebeu e pergunte "Pelo que você é grato(a) nesta jornada?". Passo a passo: Roteiro do 16º encontro. *(Atualização: na plataforma vigente, cada participante responde a própria Avaliação Geral - 360º na plataforma, no 16º encontro; o PDF publicado que lista a "autoavaliação do(a) mentor(a)" entre os materiais do encontro está desatualizado.)*
 
 ## Ferramentas de comunicação
 
@@ -418,7 +418,7 @@ O(a) jovem também pode marcar "Preciso de ajuda", que avisa a coordenação na 
 
 ## Avaliação por terceiros
 
-A avaliação inicial feita por pessoas próximas do(a) jovem acontece na plataforma. Antes do 1º encontro, o(a) jovem indica ao(à) mentor(a) três amigos, três familiares e, se estiver trabalhando, três colegas de trabalho; o(a) mentor(a) cadastra essas pessoas na ficha da dupla, gera e envia o link de cada uma, e cada pessoa indicada responde pelo link, sem precisar de conta. *(Atualização: o PDF publicado traz o envio por e-mail às pessoas indicadas; cada pessoa responde pelo link gerado na ficha da dupla.)*
+A avaliação inicial feita por pessoas próximas do(a) jovem acontece na plataforma. Antes do 1º encontro, o(a) jovem indica ao(à) mentor(a) três amigos, três familiares e, se estiver trabalhando, três colegas de trabalho; o(a) mentor(a) cadastra essas pessoas na ficha da dupla, gera e envia o link de cada uma, e cada pessoa indicada responde pelo link, sem precisar de conta. *(Atualização: na plataforma vigente, cada pessoa indicada responde pelo link que o(a) mentor(a) gera na ficha da dupla, sem precisar de conta; o PDF publicado que traz o "envio por e-mail" está desatualizado.)*
 
 Cada pessoa responde a duas perguntas:
 
@@ -429,7 +429,7 @@ O(a) mentor(a) lê as respostas, consolida agrupando o que se repete (pontos for
 
 ## Avaliação Geral - 360º
 
-No encerramento do ciclo, no 16º encontro, mentor(a) e mentorado(a) respondem cada um a sua Avaliação Geral - 360º na plataforma: o(a) jovem avalia a mentoria e o(a) mentor(a) avalia o programa e a própria experiência, incluindo a disponibilidade para o próximo ciclo e quantos jovens pode acompanhar. *(Atualização: o PDF publicado diz "formulário enviado pela coordenação"; cada participante responde a sua avaliação na plataforma.)*
+No encerramento do ciclo, no 16º encontro, mentor(a) e mentorado(a) respondem cada um a sua Avaliação Geral - 360º na plataforma: o(a) jovem avalia a mentoria e o(a) mentor(a) avalia o programa e a própria experiência, incluindo a disponibilidade para o próximo ciclo e quantos jovens pode acompanhar. *(Atualização: na plataforma vigente, cada participante responde a própria Avaliação Geral - 360º na plataforma; o PDF publicado que diz "formulário enviado pela coordenação" está desatualizado.)*
 
 A avaliação olha para a jornada inteira: a qualidade do vínculo construído, a evolução percebida no(a) jovem, os resultados do PDM e da Roda da Vida e a experiência do(a) mentor(a) com o programa. É o único formulário formal do ciclo, respondido só na trilha DPP, e consolida o fechamento alimentando o aprimoramento contínuo da Mentoria Social.
 

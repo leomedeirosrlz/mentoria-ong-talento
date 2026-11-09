@@ -23,10 +23,13 @@ import {
   MagnifyingGlass,
   PaperPlaneRight,
   Square,
+  ThumbsDown,
+  ThumbsUp,
   Trash,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { extrairAcoes, montarEnvioChat, msgAmigavel } from "@/lib/ia/mensagens";
+import { deveMostrarFeedback, temLinkMarkdown } from "@/lib/ia/feedback";
 import { metaFonte, rotuloTool, type FonteIa } from "@/lib/ia/fontes";
 import { extrairFontesTexto } from "@/lib/ia/render";
 import { juntarUi, type UiBloco } from "@/lib/ia/ui";
@@ -45,6 +48,7 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { AppRole } from "@/lib/types";
+import { createClient } from "@/lib/supabase/client";
 import { cn } from "@/lib/utils";
 import { novoUuid } from "@/lib/uuid";
 
@@ -60,6 +64,9 @@ type Msg = {
   ui?: UiBloco[];
   /** ms entre o envio e a resposta pronta — "Consultou … em 3 s" */
   dur?: number;
+  /** x-ia-request-id of the response — ties the thumbs vote to the
+   *  round logged in ia_eventos; absent on demo/error/interrupted */
+  reqId?: string;
 };
 
 /** Estado que a bolha traduz em expressão do mascote. */
@@ -80,6 +87,13 @@ const hhmm = (em?: number) =>
 // só é lida em handler de evento, nunca durante render
 const agora = () => Date.now();
 
+// o dreno só existe pra animar — reduced-motion dispensa e em aba oculta
+// o rAF não roda; nos dois casos a fila despeja direto em vez de travar
+// a bolha esperando um frame que não vem
+const semAnimacao = () =>
+  matchMedia("(prefers-reduced-motion: reduce)").matches ||
+  document.visibilityState === "hidden";
+
 // conversas ficam no aparelho (localStorage, client-side — LGPD igual ao
 // sessionStorage anterior, mas sobrevivem ao fechamento). A mais recente
 // reabre como conversa ativa; a lista completa vira a visão "histórico".
@@ -94,10 +108,18 @@ function lerConversas(): Conversa[] {
   try {
     const raw = localStorage.getItem(STORAGE_CONVERSAS);
     const parsed = raw ? (JSON.parse(raw) as unknown) : [];
+    // TTL 30d (sdd D3): conversa com nomes/notas de menores não vive pra
+    // sempre no aparelho — minimização LGPD alinhada à decisão do storage
+    const piso = Date.now() - 30 * 24 * 60 * 60 * 1000;
     return Array.isArray(parsed)
       ? (parsed.filter(
           (c): c is Conversa =>
-            !!c && typeof c === "object" && "id" in c && Array.isArray((c as Conversa).msgs)
+            !!c &&
+            typeof c === "object" &&
+            "id" in c &&
+            Array.isArray((c as Conversa).msgs) &&
+            typeof (c as Conversa).em === "number" &&
+            (c as Conversa).em > piso
         ) as Conversa[])
       : [];
   } catch {
@@ -186,10 +208,20 @@ function respostaDemo(texto: string): string {
  *  sobre ela (o prompt recebe a rota e resolve "esta dupla"). */
 export function sugestoes(papeis: AppRole[], pagina: string): string[] {
   const staff = papeis.some((p) => p === "coordenacao" || p === "supervisor");
+  const soJovem = papeis.length > 0 && papeis.every((p) => p === "mentorado");
+  if (soJovem) {
+    if (pagina.startsWith("/jovem/agenda"))
+      return ["Quando é o próximo encontro?", "Tive encontro essa semana?", "O que é o PDM?"];
+    if (pagina.startsWith("/jovem/especialistas"))
+      return ["E meu pedido de especialista?", "Como funciona o especialista?", "Como tá minha jornada?"];
+    if (pagina.startsWith("/jovem/materiais"))
+      return ["O que é o PDM?", "O que tenho pra fazer?", "Como tá minha jornada?"];
+    return ["O que tenho pra fazer?", "Como tá minha jornada?", "Quem é meu mentor?"];
+  }
   if (/^\/duplas\/[0-9a-f-]{36}/.test(pagina))
-    return papeis.includes("mentorado")
-      ? ["Quando é o próximo encontro?", "O que é o PDM?"]
-      : ["Resuma esta dupla", "O que falta registrar?", "Escreva um lembrete pra dupla"];
+    // ficha de staff — híbrido (mentorado + papel de equipe) lê chips de
+    // equipe; mentorado puro nunca alcança esta rota
+    return ["Resuma esta dupla", "O que falta registrar?", "Escreva um lembrete pra dupla"];
   if (pagina.startsWith("/agenda") && !papeis.includes("mentorado"))
     return ["Encontros desta semana", "Alguém sem encontro marcado?", "Escreva um lembrete pra dupla"];
   if (pagina.startsWith("/duplas") && staff)
@@ -265,6 +297,7 @@ export function AssistenteConversa({
   }) => React.ReactNode;
 }) {
   const pagina = usePathname();
+  const supabase = createClient();
   const [msgs, setMsgs] = useState<Msg[]>([]);
   // id da conversa ativa no histórico — criado no 1º envio, zerado em
   // "Nova conversa"; estado (não ref) porque a lista o lê durante render
@@ -276,6 +309,12 @@ export function AssistenteConversa({
   const [pending, setPending] = useState(false);
   const [status, setStatus] = useState<string | null>(null);
   const [copiado, setCopiado] = useState<number | null>(null);
+  // thumbs votes keyed by request_id — a Map, not a Set: the direction
+  // fills the voted thumb, not just "already voted"
+  const [votos, setVotos] = useState(() => new Map<string, 1 | -1>());
+  // request_id whose "Valeu pelo retorno!" is still up (~2s, then just
+  // the filled thumb remains)
+  const [agradecimento, setAgradecimento] = useState<string | null>(null);
   // espelho renderizável do pertoDoFim ref — a pill "ir ao fim" precisa de
   // estado porque evento de scroll não dispara render por si só
   const [longeDoFim, setLongeDoFim] = useState(false);
@@ -296,8 +335,26 @@ export function AssistenteConversa({
   // SSE manda deltas pequenos demais pra re-render por delta
   const tokensRef = useRef("");
   const flushRef = useRef(0);
+  // marca do último crescimento da fila — o dreno tem ~700ms a partir
+  // dele pra esvaziar, então nem backlog nem o fim da resposta despejam
+  // de uma vez
+  const filaDesdeRef = useRef(0);
+  // fechamento adiado: done/erro chegou com a fila ainda escorrendo —
+  // o dreno termina (curto) e o fechar roda no fim dele
+  const fecharRef = useRef<{
+    estado: "ok" | "erro" | "interrompido";
+    extra?: {
+      tools?: string[];
+      erro?: string;
+      fontes?: FonteIa[];
+      reqId?: string;
+    };
+  } | null>(null);
   const chips = sugestoes(papeis, pagina);
   const [busca, setBusca] = useState("");
+  // topo anterior do log — o detach por direção compara gesto, não
+  // distância (programático só empurra pra baixo, usuário sobe)
+  const ultimoTopRef = useRef(0);
   // links dos cards apontam pras telas do jovem quando ele é só mentorado
   const soJovem = papeis.length > 0 && papeis.every((p) => p === "mentorado");
   // início da rodada (handler de evento) — vira o "em N s" da meta
@@ -451,14 +508,24 @@ export function AssistenteConversa({
   /** limpa a conversa ativa (a anterior já está gravada no histórico) —
    *  o header oferece "Nova conversa" */
   function novaConversa() {
-    abortRef.current?.abort();
+    soltarStream();
     setConversaId(null);
     setMsgs([]);
+    setPending(false);
+    setStatus(null);
     setTexto("");
     setVisao("chat");
     focarComposer(inputRef.current);
   }
-  useEffect(() => registrarNova?.(novaConversa), [registrarNova]);
+  // mesmo padrão do enviarRef: registrada uma vez, lê a versão mais nova
+  const novaRef = useRef(novaConversa);
+  useEffect(() => {
+    novaRef.current = novaConversa;
+  });
+  useEffect(
+    () => registrarNova?.(() => novaRef.current()),
+    [registrarNova]
+  );
   /** botão do header: transcript ↔ histórico — a lista recarrega do
    *  storage a cada abertura (a persistência mora no effect de msgs) */
   function alternarHistorico() {
@@ -480,15 +547,28 @@ export function AssistenteConversa({
     [registrarEnviar]
   );
 
-  /** troca pra uma conversa do histórico — aborta um stream em andamento
-   *  (os tokens já gravados ficam na conversa de origem) */
-  function abrirConversa(c: Conversa) {
+  /** Troca/limpeza de conversa: aborta o stream e solta o controller ANTES
+   *  do catch rodar — sem isso o fechamento "interrompido" caía no setMsgs
+   *  da conversa recém-aberta e reescrevia a última resposta dela. */
+  function soltarStream() {
     abortRef.current?.abort();
+    abortRef.current = null;
     if (flushRef.current) {
       cancelAnimationFrame(flushRef.current);
       flushRef.current = 0;
     }
     tokensRef.current = "";
+    fecharRef.current = null;
+  }
+
+  /** "parar" mantém o controller: só o stream que ainda é da tela fecha */
+  function interromper(ctrl: AbortController) {
+    if (abortRef.current === ctrl) finalizar("interrompido");
+  }
+
+  /** troca pra uma conversa do histórico — aborta um stream em andamento */
+  function abrirConversa(c: Conversa) {
+    soltarStream();
     setConversaId(c.id);
     setMsgs(c.msgs);
     setPending(false);
@@ -505,7 +585,7 @@ export function AssistenteConversa({
       return prox;
     });
     if (conversaId === id) {
-      abortRef.current?.abort();
+      soltarStream();
       setConversaId(null);
       setMsgs([]);
       setPending(false);
@@ -518,17 +598,42 @@ export function AssistenteConversa({
     flushRef.current = 0;
     const pend = tokensRef.current;
     if (!pend) return;
-    tokensRef.current = "";
-    // texto voltou a chegar: a tool acabou — o status sai e o mascote
-    // passa de "consultando" pra "escrevendo"
-    setStatus(null);
+    // dreno com teto (pacote nov/2026): cada quadro tira o suficiente
+    // pra esvaziar a fila em ~700ms desde o último crescimento dela —
+    // backlog grande acelera (nunca fica pra trás) e o fim da resposta
+    // escorre curto em vez de despejar de uma vez
+    const restantes = Math.max(
+      1,
+      Math.ceil((700 - (agora() - filaDesdeRef.current)) / (1000 / 60))
+    );
+    let fatia = Math.max(2, Math.ceil(pend.length / restantes));
+    // nunca corta no meio de um par surrogate — emoji/acento fora do BMP
+    // piscaria como "�" por um quadro antes da metade chegar
+    if (
+      fatia < pend.length &&
+      pend.charCodeAt(fatia - 1) >= 0xd800 &&
+      pend.charCodeAt(fatia - 1) <= 0xdbff
+    )
+      fatia += 1;
+    tokensRef.current = pend.slice(fatia);
+    const sai = pend.slice(0, fatia);
     setMsgs((ms) =>
       ms.map((m, i) =>
         i === ms.length - 1 && m.estado === "stream"
-          ? { ...m, content: m.content + pend }
+          ? { ...m, content: m.content + sai }
           : m
       )
     );
+    // ainda tem fila → agenda o próximo dreno; sem fila o cursor para
+    if (tokensRef.current) {
+      flushRef.current = requestAnimationFrame(flushTokens);
+    } else if (fecharRef.current) {
+      // a rodada já encerrou no servidor e a fila esvaziou no ritmo —
+      // fecha a bolha agora, não num despejo
+      const f = fecharRef.current;
+      fecharRef.current = null;
+      fechar(f.estado, f.extra);
+    }
   }
 
   /** card da genUI direta chegou: entra já na bolha que está sendo
@@ -545,6 +650,11 @@ export function AssistenteConversa({
 
   function enfileirarToken(t: string) {
     tokensRef.current += t;
+    filaDesdeRef.current = agora();
+    // token novo do servidor depois de um status de tool: a tool acabou —
+    // o status sai aqui, na chegada. Antes o dreno apagava no quadro
+    // seguinte e um status chegando com texto escorrendo ficava invisível
+    setStatus(null);
     if (!flushRef.current)
       flushRef.current = requestAnimationFrame(flushTokens);
   }
@@ -558,6 +668,7 @@ export function AssistenteConversa({
       flushRef.current = 0;
     }
     tokensRef.current = "";
+    fecharRef.current = null;
     setMsgs((ms) =>
       ms.map((m, i) =>
         i === ms.length - 1 && m.estado === "stream" ? { ...m, content: "" } : m
@@ -565,18 +676,50 @@ export function AssistenteConversa({
     );
   }
 
-  /** Fecha a rodada: flush dos tokens pendentes + marca o estado final da
-   *  bolha (ok vira ausência de estado; erro ganha retry). */
+  /** Fecha a rodada: com fila ainda escorrendo e a animação ligada, o
+   *  dreno termina (curto — o teto de ~700ms já corre desde o último
+   *  token) e o fechar roda no fim dele; com reduced-motion ou aba
+   *  oculta não há dreno que valha a espera — despeja direto. */
   function finalizar(
     estado: "ok" | "erro" | "interrompido",
-    extra?: { tools?: string[]; erro?: string; fontes?: FonteIa[] }
+    extra?: {
+      tools?: string[];
+      erro?: string;
+      fontes?: FonteIa[];
+      reqId?: string;
+    }
   ) {
+    const pend = tokensRef.current;
+    // "parar" é parar: interrompido nunca escorre o resto da fila
+    if (pend && estado !== "interrompido" && !semAnimacao()) {
+      fecharRef.current = { estado, extra };
+      if (!flushRef.current)
+        flushRef.current = requestAnimationFrame(flushTokens);
+      return;
+    }
     if (flushRef.current) {
       cancelAnimationFrame(flushRef.current);
       flushRef.current = 0;
     }
-    const pend = tokensRef.current;
     tokensRef.current = "";
+    fecharRef.current = null;
+    fechar(estado, extra, pend);
+  }
+
+  /** O fechamento em si: `pend` é o que sobrou da fila no despejo direto
+   *  (reduced-motion, aba oculta ou fila já vazia) — no caminho animado
+   *  o dreno já imprimiu tudo e `pend` chega "". Marca o estado final da
+   *  bolha: ok vira ausência de estado; erro ganha retry. */
+  function fechar(
+    estado: "ok" | "erro" | "interrompido",
+    extra?: {
+      tools?: string[];
+      erro?: string;
+      fontes?: FonteIa[];
+      reqId?: string;
+    },
+    pend = ""
+  ) {
     setMsgs((ms) => {
       const ultima = ms[ms.length - 1];
       if (!ultima || ultima.role !== "assistant") return ms;
@@ -601,6 +744,7 @@ export function AssistenteConversa({
           tools: extra?.tools?.length ? extra.tools : undefined,
           acoes: estado === "ok" ? extrairAcoes(content) : undefined,
           fontes: extra?.fontes?.length ? extra.fontes : undefined,
+          reqId: extra?.reqId,
           ui: ultima.ui,
           em: agora(),
           dur: inicioRef.current ? agora() - inicioRef.current : undefined,
@@ -644,6 +788,9 @@ export function AssistenteConversa({
         signal: ctrl.signal,
       });
       statusHttp = res.status;
+      // ties this response to the round logged in ia_eventos — becomes
+      // the bubble's reqId at close (feedback gate + vote key)
+      const reqId = res.headers.get("x-ia-request-id") ?? undefined;
       const tipo = res.headers.get("content-type") ?? "";
       // gates pré-stream respondem JSON (401/429/503) ou redirect (307→
       // página de login em HTML) — qualquer um deles vira erro legível
@@ -695,10 +842,10 @@ export function AssistenteConversa({
       }
       if (falha) finalizar("erro", { erro: falha });
       // stream fechou sem done (rede caiu no fim): finaliza com o que tem
-      else finalizar("ok", { tools, fontes });
+      else finalizar("ok", { tools, fontes, reqId });
     } catch (e) {
       if (ctrl.signal.aborted) {
-        finalizar("interrompido");
+        interromper(ctrl);
         return;
       }
       // rede ou provider fora: uma retentativa automática (a bolha de
@@ -707,7 +854,7 @@ export function AssistenteConversa({
         setStatus("Reconectando…");
         await new Promise((r) => setTimeout(r, 1200));
         if (ctrl.signal.aborted) {
-          finalizar("interrompido");
+          interromper(ctrl);
           return;
         }
         return rodar(base, tentativas + 1);
@@ -750,14 +897,14 @@ export function AssistenteConversa({
       if (r?.ui.length) {
         setStatus("Consultando os dados de exemplo…");
         await espera(450);
-        if (ctrl.signal.aborted) return finalizar("interrompido");
+        if (ctrl.signal.aborted) return interromper(ctrl);
         r.ui.forEach(receberUi);
         await espera(250);
       }
       const content = r?.content ?? respostaDemo(pergunta);
       // fatias de ~4 palavras a cada 28ms — o mesmo fade por fatia do stream
       for (const pedaco of content.match(/(\S+\s*){1,4}|\s+/g) ?? []) {
-        if (ctrl.signal.aborted) return finalizar("interrompido");
+        if (ctrl.signal.aborted) return interromper(ctrl);
         enfileirarToken(pedaco);
         await espera(28);
       }
@@ -788,6 +935,40 @@ export function AssistenteConversa({
     } catch {
       toast.error("Não consegui copiar.");
     }
+  }
+
+  /** Thumbs vote — one per answer (keyed by request_id; a retry gets a
+   *  fresh id, so a re-asked question can be rated again). Postgrest
+   *  RPCs are lazy: only .then() actually sends, and a telemetry failure
+   *  must never surface in the chat — rejection handler stays empty. */
+  function avaliar(m: Msg, nota: 1 | -1) {
+    const reqId = m.reqId;
+    if (!reqId || votos.has(reqId)) return;
+    setVotos((prev) => new Map(prev).set(reqId, nota));
+    setAgradecimento(reqId);
+    setTimeout(
+      () => setAgradecimento((atual) => (atual === reqId ? null : atual)),
+      2200
+    );
+    void supabase
+      .rpc("registrar_ia_eventos_lote", {
+        p_eventos: [
+          {
+            canal: "chat",
+            tool: "avaliacao",
+            args: { nota, request_id: reqId },
+            ok: true,
+            duracao_ms: 0,
+            request_id: reqId,
+          },
+        ],
+      })
+      .then(
+        ({ error }) => {
+          if (error) console.error("liza feedback:", error.message);
+        },
+        () => {}
+      );
   }
 
   /** remove do histórico com "Desfazer" no toast — apagar por engano numa
@@ -944,8 +1125,9 @@ export function AssistenteConversa({
                 {primeiroNome(nome) ? `Oi, ${primeiroNome(nome)}! Eu sou a Liza.` : "Oi! Eu sou a Liza."}
               </p>
               <p className="mt-1 text-sm text-pretty text-muted-foreground">
-                Posso ajudar com a sua operação ou com o que dizem os guias do
-                programa.
+                {soJovem
+                  ? "Posso ajudar com a sua mentoria ou com o que dizem os guias do programa."
+                  : "Posso ajudar com a sua operação ou com o que dizem os guias do programa."}
               </p>
             </div>
           </div>
@@ -965,10 +1147,9 @@ export function AssistenteConversa({
           </div>
         </div>
       ) : (
-      /* transcript — role=log + aria-live pra resposta nova; a rolagem só
-          segue o fim quando o usuário já está perto dele. scroll-fina =
-          scrollbar thin muted (REALIZA-282); fade no topo emoldura o topo
-          do log quando rolado */
+      /* transcript — role=log; a rolagem só segue o fim quando o usuário
+          já está perto dele. scroll-fina = scrollbar thin muted
+          (REALIZA-282); fade no topo emoldura o topo do log quando rolado */
       <div
         className="relative min-h-0 flex-1"
         onClick={(e) => {
@@ -983,16 +1164,40 @@ export function AssistenteConversa({
           onScroll={() => {
             const el = logRef.current;
             if (el) {
-              pertoDoFim.current =
-                el.scrollHeight - el.scrollTop - el.clientHeight < 96;
+              // detach por direção: qualquer scroll pra CIMA é gesto do
+              // usuário querendo ler — solta na hora, mesmo a 20px do
+              // fundo (o limiar de 96px de "perto" puxava de volta a cada
+              // token durante o stream). Re-atacha só chegando ao fundo
+              // de verdade; scroll pra baixo no meio nunca vira "perto"
+              const subiu = el.scrollTop < ultimoTopRef.current - 1;
+              ultimoTopRef.current = el.scrollTop;
+              if (subiu) pertoDoFim.current = false;
+              else if (
+                el.scrollHeight - el.scrollTop - el.clientHeight < 32
+              )
+                pertoDoFim.current = true;
               setLongeDoFim(!pertoDoFim.current);
             }
           }}
           role="log"
-          aria-live="polite"
+          aria-live="off"
           aria-label="Conversa com a Liza"
           className="scroll-fina @container h-full space-y-5 overflow-y-auto overscroll-contain px-4 py-4"
         >
+          {/* role=log seria live por definição (ARIA 1.2) — aria-live=off
+              silencia a rajada de tokens; a região sr-only anuncia só as
+              bordas (começou/terminou) e a resposta fica no log */}
+          <div aria-live="polite" className="sr-only">
+            {pending
+              ? "A Liza está respondendo…"
+              : ultimaMsg?.role === "assistant"
+                ? ultimaMsg.estado === "erro"
+                  ? // frase fixa: no erro o content pode ser a resposta
+                    // parcial inteira, longa demais pra um anúncio
+                    "A Liza não conseguiu responder."
+                  : "A Liza respondeu."
+                : ""}
+          </div>
           {msgs.map((m, i) => {
             if (m.role === "user")
               return (
@@ -1093,6 +1298,17 @@ export function AssistenteConversa({
               : extrairFontesTexto(m.content).filter(
                   (ft) => !m.fontes?.some((f) => f.guia === ft.slug)
                 );
+            // thumbs only on a closed (done), complex, sampled answer —
+            // the gate is deterministic by request_id (lib/ia/feedback)
+            const voto = m.reqId ? votos.get(m.reqId) : undefined;
+            const mostrarFeedback =
+              !!m.reqId &&
+              !m.estado &&
+              deveMostrarFeedback(m.reqId, {
+                tools: m.tools?.length,
+                contentLen: m.content.length,
+                hasLink: temLinkMarkdown(m.content),
+              });
             return (
               <div
                 key={i}
@@ -1170,7 +1386,7 @@ export function AssistenteConversa({
                         </Link>
                       ))}
                       {fontesDone.map((f, j) => {
-                        const meta = metaFonte(f.guia, soJovem);
+                        const meta = metaFonte(f.guia, soJovem, f);
                         // seção pode chegar a 200 chars no chunk — corta pra
                         // não estourar o chip (o inteiro vai no title);
                         // o travessão do título vira dois-pontos (copy)
@@ -1260,6 +1476,61 @@ export function AssistenteConversa({
                           Tentar de novo
                         </button>
                       )}
+                      {mostrarFeedback && m.reqId ? (
+                        voto === undefined ? (
+                          <span
+                            role="group"
+                            aria-label="Avaliar resposta"
+                            className="ml-auto inline-flex items-center gap-0.5"
+                          >
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => avaliar(m, 1)}
+                              aria-label="Resposta foi útil"
+                              className="size-9 text-muted-foreground hover:text-primary"
+                            >
+                              <ThumbsUp size={16} aria-hidden />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              onClick={() => avaliar(m, -1)}
+                              aria-label="Resposta não foi útil"
+                              className="size-9 text-muted-foreground hover:text-primary"
+                            >
+                              <ThumbsDown size={16} aria-hidden />
+                            </Button>
+                          </span>
+                        ) : (
+                          /* voted: the pair leaves, the filled thumb and
+                             the ~2s "thanks" stay */
+                          <span className="ml-auto inline-flex items-center gap-1.5 text-xs text-muted-foreground sm:text-[11px]">
+                            {agradecimento === m.reqId && (
+                              <span className="animate-in fade-in-0 duration-200">
+                                Valeu pelo retorno!
+                              </span>
+                            )}
+                            {voto === 1 ? (
+                              <ThumbsUp
+                                size={16}
+                                weight="fill"
+                                aria-hidden
+                                className="text-foreground"
+                              />
+                            ) : (
+                              <ThumbsDown
+                                size={16}
+                                weight="fill"
+                                aria-hidden
+                                className="text-foreground"
+                              />
+                            )}
+                          </span>
+                        )
+                      ) : null}
                     </div>
                   )}
                 </div>
@@ -1305,7 +1576,7 @@ export function AssistenteConversa({
 
       {/* composer — pb com safe-area: no Sheet mobile o composer não cola
           na home indicator */}
-      <div className="space-y-2 border-t border-border/60 px-4 pb-[max(1rem,env(safe-area-inset-bottom))] pt-3">
+      <div className="space-y-2 border-t border-border/60 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
         {!configurado && !demo ? (
           <Card className="px-4 py-3 text-sm text-muted-foreground">
             A Liza está indisponível no momento. Tente de novo em instantes.

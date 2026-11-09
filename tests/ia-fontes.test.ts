@@ -5,7 +5,7 @@
 // texto corrido, ponta de chunk aparada e corte no fim de frase.
 
 import { describe, expect, it } from "vitest";
-import { limparTrecho } from "@/lib/ia/fontes";
+import { limparTrecho, metaFonte, rotuloTool } from "@/lib/ia/fontes";
 
 describe("limparTrecho", () => {
   it("tira as marcas <b> do ts_headline e o negrito markdown", () => {
@@ -65,5 +65,39 @@ describe("limparTrecho", () => {
     expect(limparTrecho(null, 320)).toBe("");
     expect(limparTrecho(undefined, 320)).toBe("");
     expect(limparTrecho("", 320)).toBe("");
+  });
+});
+
+describe("metaFonte", () => {
+  it("'Ajuda do Realiza' (ajuda_faq) linka a rota do jovem, sem remap", () => {
+    expect(metaFonte("Ajuda do Realiza", true)).toEqual({
+      rotulo: "Ajuda do Realiza",
+      href: "/jovem/ajuda",
+    });
+    expect(metaFonte("Ajuda do Realiza")).toEqual({
+      rotulo: "Ajuda do Realiza",
+      href: "/jovem/ajuda",
+    });
+  });
+
+  it("guia fora do catálogo sai como texto sem link", () => {
+    expect(metaFonte("slug-inexistente")).toEqual({
+      rotulo: "slug-inexistente",
+    });
+  });
+});
+
+describe("rotuloTool", () => {
+  it("tools do mentorado têm rótulo legível", () => {
+    expect(rotuloTool("minha_dupla")).toBe("sua dupla");
+    expect(rotuloTool("minha_agenda")).toBe("sua agenda");
+    expect(rotuloTool("meus_combinados")).toBe("seus combinados");
+    expect(rotuloTool("meu_progresso")).toBe("sua jornada");
+    expect(rotuloTool("meus_pedidos")).toBe("seus pedidos");
+    expect(rotuloTool("ajuda_faq")).toBe("ajuda do Realiza");
+  });
+
+  it("tool fora do mapa devolve o nome cru", () => {
+    expect(rotuloTool("tool_nova")).toBe("tool_nova");
   });
 });

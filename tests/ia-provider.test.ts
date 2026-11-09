@@ -8,6 +8,7 @@ import {
   IA_MSG_INDISPONIVEL,
   providerConfigurado,
 } from "@/lib/ia/provider";
+import type { EsforcoIa } from "@/lib/ia/config";
 
 const ENV = {
   IA_API_BASE: "https://ia.test/v1",
@@ -60,6 +61,9 @@ describe("chamarModelo", () => {
     expect(r).toEqual({
       ok: true,
       mensagem: { role: "assistant", content: "Tudo certo." },
+      // telemetria (sdd D4): o slug efetivo volta pra rota auditar —
+      // sem usage no corpo o campo sai undefined
+      modelo: "modelo-x",
     });
 
     const [url, init] = spy.mock.calls[0];
@@ -70,6 +74,11 @@ describe("chamarModelo", () => {
     const body = JSON.parse(String(init?.body));
     expect(body.model).toBe("modelo-x");
     expect(body.messages).toEqual([{ role: "user", content: "oi" }]);
+    // teto de saída (sdd D4): sem max_tokens uma resposta descontrolada
+    // queimava o orçamento inteiro da função em texto
+    expect(body.max_tokens).toBe(1600);
+    // sem esforço configurado nenhum reasoning_effort viaja
+    expect(body.reasoning_effort).toBeUndefined();
     // as tools saem em JSON Schema — function.name/description/parameters
     const nomes = body.tools.map((t: { function: { name: string } }) => t.function.name);
     expect(nomes).toContain("resumo_semana");
@@ -78,6 +87,28 @@ describe("chamarModelo", () => {
     );
     expect(resumo.function.parameters.type).toBe("object");
     expect(resumo.function.parameters.properties.dupla_id).toBeTruthy();
+  });
+
+  it("max_tokens escala com o esforço — o raciocínio come o mesmo teto", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    const spy = stubFetch(() =>
+      respostaOpenAi({ role: "assistant", content: "ok" })
+    );
+    const esperado: Record<EsforcoIa, number> = {
+      baixo: 1600,
+      medio: 4000,
+      alto: 8000,
+    };
+    for (const [esforco, max] of Object.entries(esperado)) {
+      await chamarModelo([{ role: "user", content: "oi" }], undefined, {
+        esforco: esforco as EsforcoIa,
+      });
+      const body = JSON.parse(
+        String(spy.mock.calls[spy.mock.calls.length - 1]?.[1]?.body)
+      );
+      expect(body.max_tokens).toBe(max);
+      expect(body.reasoning_effort).toBeTruthy();
+    }
   });
 
   it("tool_calls do assistente passam intactas pro loop", async () => {
@@ -142,6 +173,9 @@ describe("chamarModelo — cadeia de fallback (REALIZA-307)", () => {
     expect(r).toEqual({
       ok: true,
       mensagem: { role: "assistant", content: "foi" },
+      // o modelo reportado é o que de fato respondeu — o primário 503ou,
+      // a resposta veio do fb-1 e é ele que a auditoria tem que ver
+      modelo: "fb-1",
     });
     expect(spy).toHaveBeenCalledTimes(2);
     expect(modeloDaChamada(spy, 0)).toBe("primario");

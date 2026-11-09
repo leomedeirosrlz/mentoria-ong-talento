@@ -37,6 +37,13 @@ describe("pathInterno — guarda contra open redirect", () => {
     expect(pathInterno("")).toBeNull();
     expect(pathInterno(null)).toBeNull();
   });
+
+  it("tab/CR/LF somem no parser e viram '//host' — null", () => {
+    expect(pathInterno("/\t/evil.com")).toBeNull();
+    expect(pathInterno("/\n/evil.com")).toBeNull();
+    expect(pathInterno("/\r\\evil.com")).toBeNull();
+    expect(pathInterno("/duplas\t/1")).toBeNull();
+  });
 });
 
 describe("erroAmigavel — tradução de erros do Postgres pra UI", () => {

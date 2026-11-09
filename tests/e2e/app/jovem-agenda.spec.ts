@@ -53,6 +53,15 @@ function emDias(dias: number, hora = "19:00") {
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${hora}`;
 }
 
+/** Primeira terça a pelo menos `min` dias — a grade da fixture (mentor e
+ *  mentorada) só marca terça/quinta à noite; fora dela o dialog pede
+ *  "Agendar mesmo assim" e o spec dependia do dia da semana em que rodava. */
+function naTerca(min: number, hora = "19:00") {
+  const d = new Date(Date.now() + min * 86400e3);
+  const ate = (2 - d.getDay() + 7) % 7;
+  return emDias(min + ate, hora);
+}
+
 /** Linha da agenda do jovem pra um nº — ancora no <p> "Nº encontro" e sobe
  *  dois níveis (texto → row com botões e badge). O `exact` é o que separa
  *  o 6º do 16º. */
@@ -577,7 +586,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     const numero = titulo.match(/(\d+)º/)?.[1];
     expect(numero).toBeTruthy();
 
-    await dialog.locator("#data_hora").fill(emDias(6));
+    await dialog.locator("#data_hora").fill(naTerca(6));
     await dialog
       .getByRole("button", { name: "Confirmar agendamento" })
       .click();

@@ -5,7 +5,7 @@
 // auditoria em .auditoria-rag/A-pipeline.md).
 
 import { describe, expect, it } from "vitest";
-import { fatiar, MAX, OVERLAP, parseDoc } from "../scripts/lib/rag-chunks.mjs";
+import { fatiar, MAX, parseDoc } from "../scripts/lib/rag-chunks.mjs";
 
 const FM = `---
 fonte: doc-teste
@@ -44,8 +44,8 @@ describe("parseDoc", () => {
     const intro = "Frase longa da introdução do capítulo. ".repeat(10).trim();
     const doc = parseDoc("t.md", `${FM}## A\n\n${intro}\n\n### B\n\nCorpo de B.`);
     expect(doc.secoes).toEqual([
-      { secao: "A", texto: intro },
-      { secao: "A › B", texto: "Corpo de B." },
+      { secao: "A", texto: intro, secao_anchor: "a" },
+      { secao: "A › B", texto: "Corpo de B.", secao_anchor: "a-b" },
     ]);
   });
 
@@ -61,7 +61,9 @@ describe("parseDoc", () => {
 
   it("doc que começa direto em ## (sem h1) segue o mesmo recorte", () => {
     const doc = parseDoc("t.md", `${FM}## A\n\nCorpo de A.`);
-    expect(doc.secoes).toEqual([{ secao: "A", texto: "Corpo de A." }]);
+    expect(doc.secoes).toEqual([
+      { secao: "A", texto: "Corpo de A.", secao_anchor: "a" },
+    ]);
   });
 
   it("mantém o shape {fonte, titulo, material, natureza, secoes}", () => {

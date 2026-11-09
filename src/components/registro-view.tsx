@@ -34,7 +34,7 @@ export function RegistroView({
         <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
           <span>
             Registrado em {formatDiaMes(reg.created_at)}
-            {reg.autor?.nome ? ` por ${reg.autor.nome}` : ""}
+            {reg.autor?.nome ? ` por ${reg.autor.nome_social ?? reg.autor.nome}` : ""}
           </span>
           {tardio && (
             <Badge

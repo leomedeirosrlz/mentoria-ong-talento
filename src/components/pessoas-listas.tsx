@@ -1049,24 +1049,18 @@ function PessoaRow({
             "Nome email +55…" (o Avatar já é aria-hidden) */}
         <Link
           href={`/pessoas/${p.id}`}
-          aria-label={`Abrir perfil de ${p.nome}`}
+          aria-label={`Abrir perfil de ${p.nome_social ?? p.nome}`}
           className="group -my-1 flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Avatar
-            nome={p.nome}
+            nome={p.nome_social ?? p.nome}
             src={p.avatar_path ? avatarPublicUrl(p.avatar_path) : null}
             papel={papelAvatar}
             size={40}
           />
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium underline-offset-4 transition-colors group-hover:underline">
-              {p.nome}
-              {!souCoord && p.nome_social && (
-                <span className="font-normal text-muted-foreground">
-                  {" "}
-                  ({p.nome_social})
-                </span>
-              )}
+              {p.nome_social ?? p.nome}
             </span>
             <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
               {/* badge de papel saiu da linha: os grupos já separam por
@@ -1144,7 +1138,7 @@ function PessoaRow({
         )}
       </div>
       {souCoord && mentor && (
-        <DetalhesRegiao id={detalhesId} nome={p.nome}>
+        <DetalhesRegiao id={detalhesId} nome={p.nome_social ?? p.nome}>
           <ItemDetalhe icone={Users}>
             {/* X/Y explícito (REALIZA-116): ativas + pausadas contra o teto
                 da pool — o "sem vaga" avisa que o próximo par pede ajuste.
@@ -1165,7 +1159,7 @@ function PessoaRow({
                 {" · "}
                 <CapacidadeMentorDialog
                   mentorId={p.id}
-                  nome={p.nome}
+                  nome={p.nome_social ?? p.nome}
                   atual={capacidade}
                   emUso={usoPrimario}
                   trilha={trilhaPrimaria}
@@ -1206,7 +1200,7 @@ function PessoaRow({
                         {" · "}
                         <CapacidadeMentorDialog
                           mentorId={p.id}
-                          nome={p.nome}
+                          nome={p.nome_social ?? p.nome}
                           atual={cap2}
                           emUso={uso2}
                           trilha={trilha2}
@@ -1284,7 +1278,7 @@ function PessoaRow({
       {/* equipe sem papel de mentor (coordenação, supervisor, auxiliar,
           pré-cadastro): pendências + contato — mesma gramática do mentor */}
       {souCoord && !mentor && (
-        <DetalhesRegiao id={detalhesId} nome={p.nome}>
+        <DetalhesRegiao id={detalhesId} nome={p.nome_social ?? p.nome}>
           {p.voluntario !== false &&
             !papelEhMentorado &&
             (termoOk ? (
@@ -1404,11 +1398,11 @@ function MentoradoRow({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <Link
           href={`/pessoas/${m.id}`}
-          aria-label={`Abrir perfil de ${m.nome}`}
+          aria-label={`Abrir perfil de ${m.nome_social ?? m.nome}`}
           className="group -my-1 flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <Avatar
-            nome={m.nome}
+            nome={m.nome_social ?? m.nome}
             src={m.avatar_path ? avatarPublicUrl(m.avatar_path) : null}
             papel="mentorado"
             size={40}
@@ -1421,7 +1415,7 @@ function MentoradoRow({
                   fora && "text-muted-foreground"
                 )}
               >
-                {m.nome}
+                {m.nome_social ?? m.nome}
               </span>
             </span>
             <span className="mt-0.5 block truncate text-xs text-muted-foreground">
@@ -1475,7 +1469,7 @@ function MentoradoRow({
         )}
       </div>
       {souCoord && temDocs && (
-        <DetalhesRegiao id={detalhesId} nome={m.nome}>
+        <DetalhesRegiao id={detalhesId} nome={m.nome_social ?? m.nome}>
           {/* whatsapp saiu do meta (rodada out/2026) — contato fica aqui */}
           {m.whatsapp && (
             <ItemDetalhe icone={WhatsappLogo}>

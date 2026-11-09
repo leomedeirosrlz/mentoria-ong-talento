@@ -520,6 +520,57 @@ describe("passo oficial sem row — 'a agendar'", () => {
   });
 });
 
+describe("row falha segue acionável — não só a do alvo", () => {
+  // duas semanas furadas seguidas: antes só a primeira (o alvo) tinha
+  // caminho — a segunda sumia da agenda, da ficha e da home
+  it("dois nao_aconteceu seguidos viram dois itens 'a agendar' com remarcar", () => {
+    const eventos = [
+      mkEvento(1, "2026-09-29"),
+      mkEvento(2, "2026-10-06"),
+      mkEvento(3, "2026-10-13"),
+    ];
+    const d = mkDupla({
+      encontros: [
+        mkEncontro({
+          numero: 1,
+          status: "nao_aconteceu",
+          data_hora: "2026-09-29T19:00:00-03:00",
+        }),
+        mkEncontro({
+          numero: 2,
+          status: "nao_aconteceu",
+          data_hora: "2026-10-06T19:00:00-03:00",
+        }),
+      ],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d], eventos });
+    const previstos = todosOsItens(a).filter((i) => i.tipo === "a_agendar");
+    expect(previstos.map((p) => p.numero)).toEqual([1, 2]);
+    expect(previstos.every((p) => p.acoes.includes("remarcar"))).toBe(true);
+    // a remarcação edita a própria row — nunca cria duplicata
+    expect(previstos[0].encontro?.numero).toBe(1);
+    expect(previstos[1].encontro?.numero).toBe(2);
+  });
+
+  it("cancelado/não-aconteceu com data FUTURA vira item de dia com remarcar", () => {
+    const d = mkDupla({
+      encontros: [
+        mkEncontro({
+          numero: 1,
+          status: "cancelado",
+          data_hora: `${AMANHA}T19:00:00-03:00`,
+        }),
+      ],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [d], eventos: [mkEvento(1, AMANHA)] });
+    const itens = todosOsItens(a).filter(
+      (i) => i.tipo === "encontro" && i.numero === 1
+    );
+    expect(itens).toHaveLength(1);
+    expect(itens[0].acoes).toEqual(["remarcar"]);
+  });
+});
+
 describe("sessões de especialista — sempre convidadas", () => {
   it("sessão marcada entra como guest sem link nem ação de entrar", () => {
     const trilha = mkTrilha({
