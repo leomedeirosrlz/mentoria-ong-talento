@@ -239,7 +239,7 @@ function linkCanal(
 ): string | null {
   if (b.canal === "whatsapp")
     return (
-      waLink(telefone, texto) ??
+      waLink(telefone ?? b.numero, texto) ??
       `https://wa.me/?text=${encodeURIComponent(texto)}`
     );
   if (b.canal === "email") {
@@ -296,7 +296,7 @@ export function Rascunho({
   const editado = texto !== b.texto || assunto !== (b.assunto ?? "");
   const href = vazio ? null : linkCanal(b, texto.trim(), assunto.trim(), telefone);
   const semNumero =
-    b.canal === "whatsapp" && !waLink(telefone, "x");
+    b.canal === "whatsapp" && !waLink(telefone ?? b.numero, "x");
 
   async function copiar() {
     const ok = await copiarTexto(texto.trim());

@@ -41,6 +41,7 @@ import {
   getInstrumentosDaDuplaIa,
   getJovemAgendaIa,
   getJovemCombinadosIa,
+  getJovemContatoIa,
   getJovemDuplaIa,
   getJovemPedidosIa,
   getJovemProgressoIa,
@@ -254,6 +255,20 @@ export function projetarFicha(d: DuplaIa, eventos: CicloEvento[]) {
     mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
     mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
     supervisor: d.supervisor?.nome_social ?? d.supervisor?.nome ?? null,
+    // per-person contact: only leaves on the ficha (single, RLS-scoped
+    // slice) — the rascunho block copies whatsapp into `numero` for the
+    // direct wa.me link
+    contatos: {
+      mentor: d.mentor
+        ? { nome: d.mentor.nome_social ?? d.mentor.nome, whatsapp: d.mentor.whatsapp ?? null }
+        : null,
+      mentorado: d.mentorado
+        ? { nome: d.mentorado.nome_social ?? d.mentorado.nome, whatsapp: d.mentorado.whatsapp ?? null }
+        : null,
+      supervisor: d.supervisor
+        ? { nome: d.supervisor.nome_social ?? d.supervisor.nome, whatsapp: d.supervisor.whatsapp ?? null }
+        : null,
+    },
     semaforo: s.semaforo,
     motivo: s.motivo,
     motivos: s.motivos,
@@ -306,13 +321,18 @@ export const IA_TOOLS = {
       // o jovem não tem grant na tabela duplas — a ficha dele vem da view
       // escopada jovem_duplas + os encontros que ele mesmo lê
       if (ctx.papel === "mentorado") {
-        const r = await getJovemDuplaIa(ctx.supabase, dupla_id);
+        const [r, contatos] = await Promise.all([
+          getJovemDuplaIa(ctx.supabase, dupla_id),
+          getJovemContatoIa(ctx.supabase, dupla_id),
+        ]);
         if (!r) return null;
         // o jovem é o outro lado da própria dupla — "Você" como no
         // projetor minha_dupla; sem ele o card voltava a "a definir"
         const prox = r.encontros.find(
           (e) => e.status === "agendado" || e.status === "remarcado"
         );
+        const wa = (papel: string) =>
+          contatos.find((c) => c.papel === papel)?.whatsapp ?? null;
         return {
           dupla_id: r.dupla.id,
           trilha: r.dupla.trilha,
@@ -323,6 +343,16 @@ export const IA_TOOLS = {
           mentor: r.dupla.mentor_nome_social ?? r.dupla.mentor_nome,
           mentorado: "Você",
           supervisor: r.dupla.supervisor_nome_social ?? r.dupla.supervisor_nome,
+          contatos: {
+            mentor: {
+              nome: r.dupla.mentor_nome_social ?? r.dupla.mentor_nome,
+              whatsapp: wa("mentor"),
+            },
+            supervisor: {
+              nome: r.dupla.supervisor_nome_social ?? r.dupla.supervisor_nome,
+              whatsapp: wa("supervisor"),
+            },
+          },
           encontros: r.encontros,
           proximo_encontro: prox
             ? { numero: prox.numero, data_hora: prox.data_hora }
