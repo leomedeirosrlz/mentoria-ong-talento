@@ -785,13 +785,15 @@ function TrilhaBlock({
       aria-label={`Trilha de especialista · ${nomeEsp}`}
       className="space-y-3 rounded-lg border border-dashed border-[var(--warn)]/50 bg-[var(--warn)]/8 p-4"
     >
-      <header className="flex items-start gap-2.5">
+      {/* flex-wrap + piso de largura no texto: a 390px o selo dividia a
+          linha e espremia a explicação numa coluna de duas palavras */}
+      <header className="flex flex-wrap items-start gap-2.5">
         <Eye
           size={18}
           aria-hidden
           className="mt-0.5 shrink-0 text-[var(--warn-text)]"
         />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[min(100%,12rem)] flex-1">
           <p className="text-sm font-semibold">Você acompanha, não participa</p>
           <p className="text-xs text-muted-foreground">
             Trilha com {nomeEsp}
@@ -1238,13 +1240,15 @@ function PedidoEspecialistaBlock({
       aria-label="Pedido de especialista em andamento"
       className="space-y-3 rounded-lg border border-dashed border-[var(--warn)]/50 bg-[var(--warn)]/8 p-4"
     >
-      <header className="flex items-start gap-2.5">
+      {/* flex-wrap + piso de largura no texto: a 390px o selo dividia a
+          linha e espremia a explicação numa coluna de duas palavras */}
+      <header className="flex flex-wrap items-start gap-2.5">
         <Eye
           size={18}
           aria-hidden
           className="mt-0.5 shrink-0 text-[var(--warn-text)]"
         />
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[min(100%,12rem)] flex-1">
           <p className="text-sm font-semibold">Você acompanha, não participa</p>
           <p className="text-xs text-muted-foreground">
             {primeiroNome} ainda <b>não tem trilha</b>

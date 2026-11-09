@@ -80,9 +80,9 @@ export type DuplaIa = {
   cronograma_id: string | null;
   iniciada_em: string | null;
   demanda: string | null;
-  mentor: { nome: string; nome_social: string | null } | null;
-  mentorado: { nome: string; nome_social: string | null } | null;
-  supervisor: { nome: string; nome_social: string | null } | null;
+  mentor: { nome: string; nome_social: string | null; whatsapp?: string | null } | null;
+  mentorado: { nome: string; nome_social: string | null; whatsapp?: string | null } | null;
+  supervisor: { nome: string; nome_social: string | null; whatsapp?: string | null } | null;
   encontros: {
     numero: number;
     status: string;
@@ -110,6 +110,15 @@ export const getDuplasVivasIa = cache(
   }
 );
 
+/** IA_SAUDE_SELECT + whatsapp on the three people — only on the SINGLE-dupla
+ *  slice (ficha_dupla is its only consumer): the WhatsApp draft block needs
+ *  the number to build the direct wa.me link. List tools keep no raw
+ *  contact — bulk phone export to the model stays off the table. */
+const IA_FICHA_SELECT = IA_SAUDE_SELECT.replace(
+  "(nome, nome_social)",
+  "(nome, nome_social, whatsapp)"
+);
+
 /** Uma dupla por id, no escopo do papel — null quando a RLS não a entrega
  *  (inexistente ou fora do alcance: o "não achei" é honesto, não vaza
  *  existência). */
@@ -117,11 +126,28 @@ export const getDuplaIa = cache(
   async (supabase: SupabaseClient, id: string): Promise<DuplaIa | null> => {
     const { data, error } = await supabase
       .from("duplas")
-      .select(IA_SAUDE_SELECT)
+      .select(IA_FICHA_SELECT)
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
     return (data as unknown as DuplaIa | null) ?? null;
+  }
+);
+
+/** WhatsApp of the jovem's dupla adults (jovem_contatos view, 0067 —
+ *  definer scoped by my_mentorado_id): mentor and supervisor. The "text my
+ *  mentor" draft picks the number from here. */
+export const getJovemContatoIa = cache(
+  async (
+    supabase: SupabaseClient,
+    duplaId: string
+  ): Promise<{ papel: string; whatsapp: string | null }[]> => {
+    const { data, error } = await supabase
+      .from("jovem_contatos")
+      .select("papel, whatsapp")
+      .eq("dupla_id", duplaId);
+    if (error) throw error;
+    return (data ?? []) as { papel: string; whatsapp: string | null }[];
   }
 );
 

@@ -308,7 +308,9 @@ export function EncontroRow({
           registroPendente && "bg-[var(--warn)]/5"
         )}
       >
-        <div className="flex min-w-0 flex-1 items-center gap-4">
+        {/* piso de largura: com min-w-0 o título encolhia até uma palavra
+            por linha no celular em vez de mandar as ações pra baixo */}
+        <div className="flex min-w-[min(100%,16rem)] flex-1 items-center gap-4">
           <span
             className={cn(
               // disco do nº do encontro — lime cheio = aconteceu; lime de
