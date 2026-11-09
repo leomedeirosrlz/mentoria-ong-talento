@@ -4,7 +4,7 @@ material: roteiro-encontro-13
 titulo: "Roteiro do 13º encontro: Metas das Áreas Prioritárias"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-13 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

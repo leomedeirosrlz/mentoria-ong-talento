@@ -1,6 +1,6 @@
 // Leitura dos guias pra guia_consulta, com cache (cache.ts). O corpus é
-// institucional e igual pra todo mundo (ia_chunks não tem recorte por
-// pessoa) e só muda quando o ingest roda — então a mesma pergunta não
+// institucional e só muda quando o ingest roda; o recorte por papel sai da
+// audiência do frontmatter (manifest docs/rag/fontes.json) — então a mesma pergunta não
 // precisa repetir embedding + RPC + leitura dos chunks a cada vez, e o
 // catálogo (view ia_guias_catalogo) não precisa ser relido por chamada.
 //
@@ -8,7 +8,10 @@
 // (chip de sugestão, dúvida comum) dentro de 10 min: zero.
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import manifesto from "../../../docs/rag/fontes.json";
+import { veMaterial } from "@/lib/materiais";
 import { secaoAnchor } from "@/lib/materiais/corpus-anchor";
+import { temPapel, type AppRole } from "@/lib/types";
 import { CacheTtl, chavePergunta } from "./cache";
 import { embedConfigurado, embedQuery } from "./embed";
 import { topSecoes } from "./busca-guias";
@@ -40,6 +43,20 @@ const cacheResultado = new CacheTtl<FonteCitavel[]>(RESULTADO_TTL_MS, 300);
 const cacheVetor = new CacheTtl<number[] | null>(VETOR_TTL_MS, 500);
 const cacheCatalogo = new CacheTtl<string[]>(RESULTADO_TTL_MS, 1);
 
+export type LeitorGuia = { role: AppRole | null; papeis: AppRole[] };
+
+const AUDIENCIA = new Map<string, string[]>(
+  manifesto.fontes.map((f) => [f.guia, f.audiencia])
+);
+
+/** Mesma regra do corpusServePapel: audiência vazia serve a todos. Guia
+ *  fora do manifest (chunk de ingest antigo) fica só pra coordenação. */
+export function guiaVisivel(guia: string, leitor: LeitorGuia): boolean {
+  const aud = AUDIENCIA.get(guia);
+  if (!aud) return temPapel(leitor, "coordenacao");
+  return aud.length === 0 || veMaterial(aud, leitor);
+}
+
 export function limparCacheGuias() {
   cacheResultado.limpar();
   cacheVetor.limpar();
@@ -58,7 +75,9 @@ function vetorDaPergunta(chave: string, pergunta: string) {
 export function buscarNosGuias(
   supabase: SupabaseClient,
   pergunta: string,
-  busca: "fts" | "hibrida"
+  busca: "fts" | "hibrida",
+  /** sem leitor = corpus inteiro (eval/admin) */
+  leitor?: LeitorGuia
 ): Promise<FonteCitavel[]> {
   const chave = chavePergunta(pergunta);
   // sem chave de embedding o ambiente é só FTS — conta como "fts" pro
@@ -68,11 +87,20 @@ export function buscarNosGuias(
   // resposta desta vez mas não fica guardado, senão a busca ficava só no
   // FTS por 10 min por causa de uma falha passageira
   let degradado = false;
-  return cacheResultado.obter(`${modo}|${chave}`, async () => {
+  const filtra = leitor && !temPapel(leitor, "coordenacao");
+  const recorte = filtra
+    ? [...new Set([leitor.role, ...leitor.papeis])].sort().join(",")
+    : "*";
+  return cacheResultado.obter(`${modo}|${recorte}|${chave}`, async () => {
     const vetor = modo === "fts" ? null : await vetorDaPergunta(chave, pergunta);
     degradado = modo === "hibrida" && vetor === null;
-    // pede 10 e fica com 4 seções únicas (topSecoes, busca-guias.ts)
-    const top = topSecoes(await matchGuiaIa(supabase, pergunta, 10, vetor), 4);
+    // pede 10 e fica com 4 seções únicas (topSecoes, busca-guias.ts); com
+    // recorte pede mais, senão os docs de staff ocupavam o top inteiro
+    const brutos = await matchGuiaIa(supabase, pergunta, filtra ? 30 : 10, vetor);
+    const top = topSecoes(
+      filtra ? brutos.filter((f) => guiaVisivel(f.guia, leitor)) : brutos,
+      4
+    );
     // sem o texto inteiro o trecho cai no headline da RPC: serve agora,
     // mas não fica 10 min guardado
     const textos = await textosChunksIa(supabase, top).catch(() => {
@@ -100,9 +128,12 @@ export function buscarNosGuias(
 
 /** Os documentos do corpus (nomes únicos, ordenados). Erro devolve lista
  *  vazia sem guardar — a busca em si não depende do catálogo. */
-export async function catalogoGuias(supabase: SupabaseClient): Promise<string[]> {
+export async function catalogoGuias(
+  supabase: SupabaseClient,
+  leitor?: LeitorGuia
+): Promise<string[]> {
   let falhou = false;
-  return cacheCatalogo.obter(
+  const todos = await cacheCatalogo.obter(
     "catalogo",
     async () => {
       // a view (0162) já deduplica no banco: uma linha por guia em vez de
@@ -119,4 +150,5 @@ export async function catalogoGuias(supabase: SupabaseClient): Promise<string[]>
     },
     () => !falhou
   );
+  return leitor ? todos.filter((g) => guiaVisivel(g, leitor)) : todos;
 }

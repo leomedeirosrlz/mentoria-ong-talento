@@ -4,7 +4,7 @@ titulo: Roda da Vida (instrumento)
 material: instrumento-roda-da-vida
 tipo: instrumento
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: consolidado de Roda-da-Vida---Realiza.vc.txt (material do instrumento),
   roteiro-semana-11.txt a roteiro-semana-14.txt, guia-mentor-dpp.md (cap. 14),

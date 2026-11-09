@@ -4,7 +4,7 @@ titulo: Construindo a sua Visão
 material: instrumento-construindo-visao
 tipo: instrumento
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: consolidado de supabase/migrations/0080_instrumentos_dupla.sql
   (form visao), guia-mentor-dpp.md (cap. 14), roteiro-semana-1.md,

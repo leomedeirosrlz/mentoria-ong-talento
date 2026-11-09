@@ -1,13 +1,16 @@
 {
-  "gerado_em": "2026-11-05T04:48:39.890Z",
+  "gerado_em": "2026-11-09T13:30:15.420Z",
   "docs": 36,
-  "chunks": 461,
+  "chunks": 464,
   "fontes": [
     {
       "guia": "autorizacao-responsavel",
       "titulo": "Autorização do Responsável Legal (modelo)",
       "material": "autorizacao-responsavel",
       "natureza": "transcrito",
+      "audiencia": [
+        "coordenacao"
+      ],
       "arquivo": "autorizacao-responsavel.md",
       "secoes": 4,
       "chunks": 4
@@ -17,6 +20,11 @@
       "titulo": "Checklist de competências do mentor",
       "material": "checklist-competencias",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "coordenacao",
+        "supervisor"
+      ],
       "arquivo": "checklist-competencias.md",
       "secoes": 2,
       "chunks": 2
@@ -26,6 +34,12 @@
       "titulo": "\"Cronograma do Programa de Mentoria: Turma 1, Ciclo 2026/2027\"",
       "material": "ciclo-cronograma",
       "natureza": "consolidado",
+      "audiencia": [
+        "coordenacao",
+        "supervisor",
+        "mentor_dpp",
+        "mentor_especialista"
+      ],
       "arquivo": "ciclo-2026-2027.md",
       "secoes": 5,
       "chunks": 6
@@ -35,6 +49,12 @@
       "titulo": "\"Cronograma do Programa de Mentoria: Turma 2, Ciclo 2026/2027\"",
       "material": "ciclo-turma2-cronograma",
       "natureza": "consolidado",
+      "audiencia": [
+        "coordenacao",
+        "supervisor",
+        "mentor_dpp",
+        "mentor_especialista"
+      ],
       "arquivo": "ciclo-turma2-2026-2027.md",
       "secoes": 6,
       "chunks": 9
@@ -44,6 +64,9 @@
       "titulo": "Código de ética e conduta do mentor",
       "material": "codigo-etica-conduta",
       "natureza": "consolidado",
+      "audiencia": [
+        "todos"
+      ],
       "arquivo": "codigo-etica-conduta.md",
       "secoes": 10,
       "chunks": 10
@@ -53,6 +76,12 @@
       "titulo": "Escuta ativa e comunicação não violenta",
       "material": "escuta-ativa-e-comunicacao",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "mentor_especialista",
+        "coordenacao",
+        "supervisor"
+      ],
       "arquivo": "escuta-ativa-e-comunicacao.md",
       "secoes": 6,
       "chunks": 10
@@ -62,6 +91,9 @@
       "titulo": "Feedback Construtivo",
       "material": "feedback-construtivo",
       "natureza": "consolidado",
+      "audiencia": [
+        "todos"
+      ],
       "arquivo": "feedback-construtivo.md",
       "secoes": 5,
       "chunks": 5
@@ -71,24 +103,38 @@
       "titulo": "Guia do Mentor de Desenvolvimento Pessoal e Profissional",
       "material": "guia-mentor-dpp",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "coordenacao",
+        "supervisor"
+      ],
       "arquivo": "guia-mentor-dpp.md",
       "secoes": 55,
-      "chunks": 83
+      "chunks": 85
     },
     {
       "guia": "guia-mentor-especialista",
       "titulo": "Guia do Mentor Especialista",
       "material": "guia-mentor-especialista",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_especialista",
+        "coordenacao",
+        "supervisor"
+      ],
       "arquivo": "guia-mentor-especialista.md",
       "secoes": 41,
-      "chunks": 54
+      "chunks": 55
     },
     {
       "guia": "instrumento-construindo-visao",
       "titulo": "Construindo a sua Visão",
       "material": "instrumento-construindo-visao",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "instrumento-construindo-visao.md",
       "secoes": 5,
       "chunks": 6
@@ -98,6 +144,10 @@
       "titulo": "Definindo Minhas Metas",
       "material": "instrumento-definindo-minhas-metas",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "instrumento-definindo-minhas-metas.md",
       "secoes": 5,
       "chunks": 7
@@ -107,6 +157,10 @@
       "titulo": "PDM: Plano de Desenvolvimento do Mentorado",
       "material": "instrumento-pdm",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "instrumento-pdm.md",
       "secoes": 6,
       "chunks": 7
@@ -116,6 +170,10 @@
       "titulo": "Roda da Vida (instrumento)",
       "material": "instrumento-roda-da-vida",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "instrumento-roda-da-vida.md",
       "secoes": 12,
       "chunks": 17
@@ -125,6 +183,11 @@
       "titulo": "Mensagem de encaminhamento entre encontros",
       "material": "mensagem-encaminhamento",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "coordenacao",
+        "supervisor"
+      ],
       "arquivo": "mensagem-encaminhamento.md",
       "secoes": 2,
       "chunks": 2
@@ -134,6 +197,11 @@
       "titulo": "Mensagem às pessoas indicadas",
       "material": "mensagem-indicadas",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "coordenacao",
+        "supervisor"
+      ],
       "arquivo": "mensagem-indicadas.md",
       "secoes": 2,
       "chunks": 3
@@ -143,6 +211,11 @@
       "titulo": "Mensagem de preparação do(a) mentorado(a)",
       "material": "mensagem-preparacao",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "coordenacao",
+        "supervisor"
+      ],
       "arquivo": "mensagem-preparacao.md",
       "secoes": 2,
       "chunks": 3
@@ -152,6 +225,11 @@
       "titulo": "Perguntas Eficazes",
       "material": "perguntas-eficazes",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "coordenacao",
+        "supervisor"
+      ],
       "arquivo": "perguntas-eficazes.md",
       "secoes": 5,
       "chunks": 10
@@ -161,6 +239,12 @@
       "titulo": "\"Plataforma e operação: decisões vigentes\"",
       "material": "plataforma-e-operacao",
       "natureza": "consolidado",
+      "audiencia": [
+        "coordenacao",
+        "supervisor",
+        "mentor_dpp",
+        "mentor_especialista"
+      ],
       "arquivo": "plataforma-e-operacao.md",
       "secoes": 13,
       "chunks": 16
@@ -170,6 +254,10 @@
       "titulo": "\"Roteiro do 1º encontro: Boas-vindas, Histórias de Vida & Abertura do PDM\"",
       "material": "roteiro-encontro-01",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-01.md",
       "secoes": 12,
       "chunks": 13
@@ -179,6 +267,10 @@
       "titulo": "\"Roteiro do 2º encontro: Avaliação por Terceiros & Visão de Futuro\"",
       "material": "roteiro-encontro-02",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-02.md",
       "secoes": 11,
       "chunks": 12
@@ -188,6 +280,10 @@
       "titulo": "\"Roteiro do 3º encontro: Metas & Checagem SMART\"",
       "material": "roteiro-encontro-03",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-03.md",
       "secoes": 12,
       "chunks": 13
@@ -197,6 +293,10 @@
       "titulo": "\"Roteiro do 4º encontro: Submetas & Compromisso\"",
       "material": "roteiro-encontro-04",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-04.md",
       "secoes": 12,
       "chunks": 13
@@ -206,6 +306,10 @@
       "titulo": "\"Roteiro do 5º encontro: Primeiros Resultados\"",
       "material": "roteiro-encontro-05",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-05.md",
       "secoes": 11,
       "chunks": 13
@@ -215,6 +319,10 @@
       "titulo": "\"Roteiro do 6º encontro: Superando Barreiras\"",
       "material": "roteiro-encontro-06",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-06.md",
       "secoes": 11,
       "chunks": 13
@@ -224,6 +332,10 @@
       "titulo": "\"Roteiro do 7º encontro: Ajustes no Plano\"",
       "material": "roteiro-encontro-07",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-07.md",
       "secoes": 11,
       "chunks": 12
@@ -233,6 +345,10 @@
       "titulo": "\"Roteiro do 8º encontro: Monitoramento & Responsabilidade\"",
       "material": "roteiro-encontro-08",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-08.md",
       "secoes": 11,
       "chunks": 13
@@ -242,6 +358,10 @@
       "titulo": "\"Roteiro do 9º encontro: Revisão de Meio de Percurso\"",
       "material": "roteiro-encontro-09",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-09.md",
       "secoes": 11,
       "chunks": 13
@@ -251,6 +371,10 @@
       "titulo": "\"Roteiro do 10º encontro: O Mentor como Espelho\"",
       "material": "roteiro-encontro-10",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-10.md",
       "secoes": 11,
       "chunks": 13
@@ -260,6 +384,10 @@
       "titulo": "\"Roteiro do 11º encontro: Rede de Apoio & Novos Espaços\"",
       "material": "roteiro-encontro-11",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-11.md",
       "secoes": 10,
       "chunks": 11
@@ -269,6 +397,10 @@
       "titulo": "\"Roteiro do 12º encontro: Leitura da Roda da Vida\"",
       "material": "roteiro-encontro-12",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-12.md",
       "secoes": 9,
       "chunks": 10
@@ -278,6 +410,10 @@
       "titulo": "\"Roteiro do 13º encontro: Metas das Áreas Prioritárias\"",
       "material": "roteiro-encontro-13",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-13.md",
       "secoes": 9,
       "chunks": 10
@@ -287,6 +423,10 @@
       "titulo": "\"Roteiro do 14º encontro: Desdobramento & Plano de Continuidade\"",
       "material": "roteiro-encontro-14",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-14.md",
       "secoes": 9,
       "chunks": 10
@@ -296,6 +436,10 @@
       "titulo": "\"Roteiro do 15º encontro: Reflexão & Reconhecimento\"",
       "material": "roteiro-encontro-15",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-15.md",
       "secoes": 10,
       "chunks": 11
@@ -305,6 +449,10 @@
       "titulo": "\"Roteiro do 16º encontro: Encerramento & Celebração\"",
       "material": "roteiro-encontro-16",
       "natureza": "consolidado",
+      "audiencia": [
+        "mentor_dpp",
+        "supervisor"
+      ],
       "arquivo": "roteiro-encontro-16.md",
       "secoes": 11,
       "chunks": 12
@@ -314,6 +462,9 @@
       "titulo": "Termo de Adesão ao Trabalho Voluntário (modelo)",
       "material": "termo-adesao-voluntario",
       "natureza": "transcrito",
+      "audiencia": [
+        "coordenacao"
+      ],
       "arquivo": "termo-adesao-voluntario.md",
       "secoes": 7,
       "chunks": 7
@@ -323,6 +474,9 @@
       "titulo": "Termo de Adesão e Participação no Programa de Mentoria Social (modelo)",
       "material": "termo-mentorando",
       "natureza": "transcrito",
+      "audiencia": [
+        "coordenacao"
+      ],
       "arquivo": "termo-mentorando.md",
       "secoes": 8,
       "chunks": 8

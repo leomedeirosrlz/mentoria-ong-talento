@@ -158,6 +158,7 @@ const fontes = docs.map((d) => ({
   titulo: d.titulo,
   material: d.material,
   natureza: d.natureza,
+  audiencia: d.audiencia,
   arquivo: d.arquivo,
   secoes: d.secoes.length,
   chunks: d.chunks.length,

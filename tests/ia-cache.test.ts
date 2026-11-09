@@ -8,7 +8,12 @@ vi.mock("@/lib/ia/embed", () => ({ embedQuery: vi.fn(), embedConfigurado: () => 
 
 import { CacheTtl, chavePergunta } from "@/lib/ia/cache";
 import { embedQuery } from "@/lib/ia/embed";
-import { buscarNosGuias, catalogoGuias, limparCacheGuias } from "@/lib/ia/guias";
+import {
+  buscarNosGuias,
+  catalogoGuias,
+  guiaVisivel,
+  limparCacheGuias,
+} from "@/lib/ia/guias";
 import { getIaConfig, limparCacheIaConfig } from "@/lib/ia/config";
 import { chavePainelIa, getPainelIa, limparCachePainelIa } from "@/lib/ia/queries";
 
@@ -154,6 +159,46 @@ describe("CacheTtl", () => {
 describe("chavePergunta", () => {
   it("ignora caixa, acento, pontuação e espaço", () => {
     expect(chavePergunta("  O que é a Roda da Vida?? ")).toBe(chavePergunta("o que e a roda da vida"));
+  });
+});
+
+describe("audiência dos guias (frontmatter → fontes.json)", () => {
+  const jovem = { role: "mentorado" as const, papeis: ["mentorado" as const] };
+  const dpp = { role: "mentor_dpp" as const, papeis: ["mentor_dpp" as const] };
+  const coord = { role: "coordenacao" as const, papeis: ["coordenacao" as const] };
+
+  it("guiaVisivel segue o gate de /materiais/documento", () => {
+    expect(guiaVisivel("codigo-etica-conduta", jovem)).toBe(true);
+    expect(guiaVisivel("roteiro-encontro-03", jovem)).toBe(false);
+    expect(guiaVisivel("roteiro-encontro-03", dpp)).toBe(true);
+    expect(
+      guiaVisivel("roteiro-encontro-03", { role: "supervisor", papeis: ["supervisor"] })
+    ).toBe(true);
+    expect(
+      guiaVisivel("roteiro-encontro-03", {
+        role: "mentor_especialista",
+        papeis: ["mentor_especialista"],
+      })
+    ).toBe(false);
+    expect(guiaVisivel("termo-mentorando", dpp)).toBe(false);
+    expect(guiaVisivel("termo-mentorando", coord)).toBe(true);
+    // fora do manifest (ingest antigo): só coordenação
+    expect(guiaVisivel("guia-sumido", dpp)).toBe(false);
+    expect(guiaVisivel("guia-sumido", coord)).toBe(true);
+  });
+
+  it("jovem não recebe trecho de instrumento DPP e o cache não vaza entre recortes", async () => {
+    const sb = clienteFalso();
+    expect(await buscarNosGuias(sb, "roda da vida", "fts", jovem)).toEqual([]);
+    const doMentor = await buscarNosGuias(sb, "roda da vida", "fts", dpp);
+    expect(doMentor.map((f) => f.guia)).toEqual(["instrumento-roda-da-vida"]);
+    expect(await buscarNosGuias(sb, "roda da vida", "fts", jovem)).toEqual([]);
+  });
+
+  it("catálogo do jovem esconde guia fora da audiência", async () => {
+    const sb = clienteFalso();
+    expect(await catalogoGuias(sb, coord)).toEqual(["a", "b"]);
+    expect(await catalogoGuias(sb, jovem)).toEqual([]);
   });
 });
 

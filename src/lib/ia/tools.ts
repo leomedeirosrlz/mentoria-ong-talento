@@ -69,6 +69,8 @@ export type ResultadoTool =
 type ContextoIa = {
   supabase: SupabaseClient;
   papel: Papel;
+  /** papéis efetivos (my_papeis) — recorte de audiência dos guias */
+  papeis: Papel[];
 };
 
 const TODOS_PAPEIS: readonly Papel[] = [
@@ -588,11 +590,14 @@ export const IA_TOOLS = {
       // "fts" vale em até 30s por instância (TTL da config), não na hora:
       // atraso aceito em troca de não ler ia_config a cada busca
       const { busca } = await getIaConfig(ctx.supabase);
+      // audiência do frontmatter vale aqui como em /materiais/documento:
+      // roteiro e instrumento DPP não chegam ao jovem pelo chat
+      const leitor = { role: ctx.papel, papeis: ctx.papeis };
       const [fontes, guias] = await Promise.all([
-        buscarNosGuias(ctx.supabase, pergunta, busca),
-        // catálogo completo sempre junto — "que guias você tem" se responde
+        buscarNosGuias(ctx.supabase, pergunta, busca, leitor),
+        // catálogo sempre junto — "que guias você tem" se responde
         // mesmo quando a busca não retorna trecho pro termo perguntado
-        catalogoGuias(ctx.supabase),
+        catalogoGuias(ctx.supabase, leitor),
       ]);
       return { fontes, guias };
     },
@@ -1652,7 +1657,7 @@ export async function executarTool(
             "Confirmação inválida, expirada ou já utilizada (ou os argumentos mudaram) — peça a prévia de novo."
           );
         }
-        dados = await tool.run(parsed.data as never, { supabase, papel });
+        dados = await tool.run(parsed.data as never, { supabase, papel, papeis });
         ok = true;
       }
     } else {
@@ -1675,11 +1680,11 @@ export async function executarTool(
         // never` casa com a união dos params tipados de cada run
         dados = await dedupTools.obter(chaveDedup, async () => {
           rodou = true;
-          return tool.run(parsed.data as never, { supabase, papel });
+          return tool.run(parsed.data as never, { supabase, papel, papeis });
         });
         dedupHit = !rodou;
       } else {
-        dados = await tool.run(parsed.data as never, { supabase, papel });
+        dados = await tool.run(parsed.data as never, { supabase, papel, papeis });
       }
       ok = true;
     }

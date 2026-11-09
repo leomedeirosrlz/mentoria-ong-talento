@@ -4,7 +4,7 @@ titulo: PDM: Plano de Desenvolvimento do Mentorado
 material: instrumento-pdm
 tipo: instrumento
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: consolidado de guia-mentor-dpp.md (cap. 14), roteiro-semana-3.md,
   roteiro-semana-4.md, roteiro-semana-9.txt,

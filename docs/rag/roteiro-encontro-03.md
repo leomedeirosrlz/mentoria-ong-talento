@@ -4,7 +4,7 @@ material: roteiro-encontro-03
 titulo: "Roteiro do 3º encontro: Metas & Checagem SMART"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp]
+audiencia: [dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-3 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

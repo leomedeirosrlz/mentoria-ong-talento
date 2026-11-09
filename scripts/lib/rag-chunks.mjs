@@ -95,6 +95,15 @@ export function parseDoc(nome, raw) {
     titulo: meta.titulo,
     material: meta.material,
     natureza: meta.natureza,
+    // mesma normalização do corpusDoc (audienciaDe, corpus-doc.ts): o app
+    // filtra os trechos do chat por ela — o gate de /materiais/documento
+    audiencia: (meta.audiencia ?? "")
+      .replace(/^\[/, "")
+      .replace(/\]$/, "")
+      .split(",")
+      .map((s) => s.trim())
+      .filter(Boolean)
+      .map((a) => ({ dpp: "mentor_dpp", especialista: "mentor_especialista" })[a] ?? a),
     // a âncora sai da seção inteira, não da `secao` truncada do insert —
     // tem que bater com o id que a página põe no ##/###
     secoes: secoes.map((s) => ({ ...s, secao_anchor: secaoAnchor(s.secao) })),
