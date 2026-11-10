@@ -104,32 +104,32 @@ type Recurso = {
  *  cada um com a tela real onde ele acontece. */
 const RECURSOS: Record<AppRole, Recurso[]> = {
   coordenacao: [
-    { icon: TrafficSignal, texto: "Painel geral", img: "coordenacao-home", alt: "Visão geral da coordenação: turmas, situação das duplas e o que precisa de você hoje" },
+    { icon: TrafficSignal, texto: "Andamento das duplas", img: "coordenacao-home", alt: "Visão geral da coordenação: turmas, situação das duplas e o que precisa de você hoje" },
     { icon: HandHeart, texto: "Pedidos de apoio", img: "coordenacao-dupla", alt: "Ficha de uma dupla em risco com apoio aberto e especialista solicitado" },
-    { icon: UsersThree, texto: "Duplas", img: "coordenacao-duplas", alt: "Lista de duplas com situação, motivo e encontros" },
-    { icon: AddressBook, texto: "Pessoas", img: "coordenacao-pessoas", alt: "Lista de pessoas com papéis, filtros e cadastros" },
+    { icon: UsersThree, texto: "Formar e acompanhar duplas", img: "coordenacao-duplas", alt: "Lista de duplas com situação, motivo e encontros" },
+    { icon: AddressBook, texto: "Pessoas e cadastros", img: "coordenacao-pessoas", alt: "Lista de pessoas com papéis, filtros e cadastros" },
     { icon: Megaphone, texto: "Comunicados", img: "coordenacao-comunicados", alt: "Avisos publicados para a equipe e para os mentores, com botão de novo aviso" },
     { icon: ChartLineUp, texto: "Relatórios", img: "coordenacao-relatorios", alt: "Construtor de relatórios com filtros de turma, linhas e colunas e exportação em CSV" },
   ],
   supervisor: [
     { icon: UsersThree, texto: "Minhas duplas", img: "supervisor-duplas", alt: "Lista das duplas supervisionadas com a situação de cada uma" },
-    { icon: NotePencil, texto: "Acompanhamento", img: "supervisor-dupla", alt: "Ficha de uma dupla com a jornada e o próximo encontro" },
-    { icon: TrafficSignal, texto: "Painel", img: "supervisor-home", alt: "Visão geral do supervisor com a situação das duplas" },
-    { icon: FolderOpen, texto: "Materiais", img: "supervisor-materiais", alt: "Instrumentos do programa com respostas por dupla" },
+    { icon: NotePencil, texto: "Notas de acompanhamento", img: "supervisor-dupla", alt: "Ficha de uma dupla com a jornada e o próximo encontro" },
+    { icon: TrafficSignal, texto: "Situação das duplas", img: "supervisor-home", alt: "Visão geral do supervisor com a situação das duplas" },
+    { icon: FolderOpen, texto: "Materiais de apoio", img: "supervisor-materiais", alt: "Instrumentos do programa com respostas por dupla" },
   ],
   mentor_dpp: [
-    { icon: CalendarCheck, texto: "Encontros", img: "mentor_dpp-dupla", alt: "Ficha da dupla com o próximo encontro e o botão de remarcar" },
+    { icon: CalendarCheck, texto: "Agendar e registrar encontros", img: "mentor_dpp-dupla", alt: "Ficha da dupla com o próximo encontro e o botão de remarcar" },
     { icon: Users, texto: "Minhas duplas", img: "mentor_dpp-duplas", alt: "Lista das suas duplas com o próximo passo de cada uma" },
-    { icon: MapTrifold, texto: "Jornada", img: "mentor_dpp-home", alt: "Visão geral do mentor com a jornada dos encontros" },
+    { icon: MapTrifold, texto: "Jornada dos encontros", img: "mentor_dpp-home", alt: "Visão geral do mentor com a jornada dos encontros" },
     { icon: HandHeart, texto: "Pedir apoio", img: "mentor_dpp-apoio", alt: "Meus chamados: pedidos de apoio à coordenação e o andamento de cada um" },
-    { icon: UserPlus, texto: "Especialista", img: "mentor_dpp-especialista", alt: "Agenda por mentorado com o pedido de especialista em andamento" },
-    { icon: FolderOpen, texto: "Materiais", img: "mentor_dpp-materiais", alt: "Materiais de apoio do encontro desta semana" },
+    { icon: UserPlus, texto: "Mentor especialista", img: "mentor_dpp-especialista", alt: "Agenda por mentorado com o pedido de especialista em andamento" },
+    { icon: FolderOpen, texto: "Materiais de apoio", img: "mentor_dpp-materiais", alt: "Materiais de apoio do encontro desta semana" },
   ],
   mentor_especialista: [
-    { icon: ClipboardText, texto: "Pedidos", img: "mentor_especialista-home", alt: "Mural de pedidos de mentoria especializada com filtros por tema" },
-    { icon: Handshake, texto: "Trilha", img: "mentor_especialista-trilha", alt: "Ficha da trilha de especialista com a jornada de 5 encontros" },
-    { icon: NotePencil, texto: "Registros", img: "mentor_especialista-registro", alt: "Encontros da trilha com o botão de registrar" },
-    { icon: FolderOpen, texto: "Materiais", img: "mentor_especialista-materiais", alt: "Materiais de apoio da mentoria especializada" },
+    { icon: ClipboardText, texto: "Pedidos de mentoria", img: "mentor_especialista-home", alt: "Mural de pedidos de mentoria especializada com filtros por tema" },
+    { icon: Handshake, texto: "Trilha de encontros", img: "mentor_especialista-trilha", alt: "Ficha da trilha de especialista com a jornada de 5 encontros" },
+    { icon: NotePencil, texto: "Registrar encontros", img: "mentor_especialista-registro", alt: "Encontros da trilha com o botão de registrar" },
+    { icon: FolderOpen, texto: "Materiais de apoio", img: "mentor_especialista-materiais", alt: "Materiais de apoio da mentoria especializada" },
   ],
   // o jovem não passa por este wizard (o dele é o OnboardingJovem do
   // /jovem, REALIZA-114) — a entrada existe porque o Record pede todos os
