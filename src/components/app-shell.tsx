@@ -163,7 +163,9 @@ export function AppShell({
 }: {
   me: Profile;
   avatarUrl: string | null;
-  gravatarUrl: string;
+  /** Gravatar do próprio usuário já confirmado no server — null = iniciais
+   *  direto, sem o /_next/image?d=404 condenado. */
+  gravatarUrl: string | null;
   notificacoes: { itens: Notificacao[]; naoLidas: number };
   /** badge do item Chamados — fila sem dono (0084) */
   chamadosSemDono?: number;

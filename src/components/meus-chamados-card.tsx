@@ -70,6 +70,7 @@ export function MeusChamadosCard({
                       categoria+tempo e status embaixo — sem o número CHA */}
                   <Link
                     href={`/chamados?c=${c.id}`}
+                    prefetch={false}
                     className="block rounded-lg px-2 py-2 transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   >
                     <p className="min-w-0 break-words text-sm font-medium leading-snug">

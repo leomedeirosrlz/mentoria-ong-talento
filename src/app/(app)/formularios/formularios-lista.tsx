@@ -149,6 +149,7 @@ export function FormulariosLista({
             >
               <Link
                 href={`/formularios/${f.id}`}
+                prefetch={false}
                 className={cn(
                   "group block rounded-xl bg-card px-4 py-3.5 shadow-[var(--shadow-border)] transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:shadow-[var(--shadow-border-hover)] sm:px-5",
                   // encerrado é histórico — sai do foco visual sem sumir

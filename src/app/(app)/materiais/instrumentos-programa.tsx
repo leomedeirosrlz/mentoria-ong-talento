@@ -282,6 +282,7 @@ function LinhaAtrasado({
       <div className="flex items-center gap-2">
         <Link
           href={`/duplas/${linha.dupla_id}?aba=instrumentos#instrumentos`}
+          prefetch={false}
           className={buttonVariants({ variant: "ghost", size: "sm" })}
         >
           Ver ficha
@@ -390,6 +391,7 @@ export function InstrumentosPrograma({
             >
               <Link
                 href={`/materiais/instrumentos/${card.chave}`}
+                prefetch={false}
                 aria-label={`Abrir ${card.titulo}`}
                 className="absolute inset-0 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               />

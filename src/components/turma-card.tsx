@@ -517,6 +517,7 @@ export function TurmaCard({
   return (
     <Link
       href={`/turmas/${c.id}`}
+      prefetch={false}
       className="group flex h-full flex-col overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)] transition-[background-color,box-shadow,translate] ease-snappy hover:-translate-y-px hover:shadow-[var(--shadow-border-hover)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <TurmaBanner cronograma={c} dados={linhaDadosTurma(c, eventos, hoje)} />

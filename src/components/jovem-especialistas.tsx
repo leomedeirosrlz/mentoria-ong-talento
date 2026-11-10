@@ -87,6 +87,7 @@ function Acao({
   return (
     <Link
       href={href}
+      prefetch={false}
       className="group flex min-h-11 items-center gap-3 rounded-xl px-5 py-3.5 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50"
     >
       <span className="min-w-0 flex-1">

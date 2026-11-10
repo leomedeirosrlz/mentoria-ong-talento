@@ -268,6 +268,7 @@ function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
           // checklist inteiro
           <Link
             href={`/duplas/${item.duplaId}`}
+            prefetch={false}
             className={buttonVariants({ size: "sm" })}
           >
             {linha.rotulo}

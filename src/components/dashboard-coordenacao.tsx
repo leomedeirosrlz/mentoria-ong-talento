@@ -372,6 +372,7 @@ export function DashboardCoordenacao({
                               // podem ter o mesmo número)
                               cronograma ? `&turma=${cronograma.id}` : ""
                             }`}
+                            prefetch={false}
                             className={cn(
                               buttonVariants({ variant: "link", size: "sm" }),
                               "group"
@@ -523,6 +524,7 @@ function PedidoParadoLinha({ alerta, i }: { alerta: AlertaPedido; i: number }) {
       </div>
       <Link
         href="#pedidos-especialista"
+        prefetch={false}
         className={cn(
           buttonVariants({ variant: "link", size: "sm" }),
           "ml-auto"

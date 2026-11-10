@@ -40,7 +40,8 @@ import {
 import { cn, maskCep, maskCpf } from "@/lib/utils";
 import { getDocumentosPessoa, getMe, getPessoaPerfil } from "@/lib/queries";
 import { getResumoFormacao } from "@/lib/queries-presenca";
-import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
+import { avatarPublicUrl } from "@/lib/avatar";
+import { gravatarUrlSeExiste } from "@/lib/gravatar";
 import {
   COR_RACA_LABELS,
   disponibilidadeTexto,
@@ -241,7 +242,10 @@ export default async function PessoaPerfilPage({
 
   const ehMentorado = perfil.tipo === "mentorado";
   const avatarSrc = p.avatar_path ? avatarPublicUrl(p.avatar_path) : null;
-  const gravatar = !ehMentorado && "email" in p && p.email ? gravatarUrl(p.email) : null;
+  const gravatar =
+    !ehMentorado && "email" in p && p.email
+      ? await gravatarUrlSeExiste(p.email)
+      : null;
   const wa = p.whatsapp ? waLink(p.whatsapp, "") : null;
 
   // apresentação profissional (0030) — só profiles têm; o card some quando
@@ -1019,6 +1023,7 @@ export default async function PessoaPerfilPage({
                     <li key={d.id}>
                       <Link
                         href={`/duplas/${d.id}`}
+                        prefetch={false}
                         className="group flex min-h-11 items-center gap-2 rounded-lg px-2 py-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                       >
                         {d.mentor && d.mentorado && (

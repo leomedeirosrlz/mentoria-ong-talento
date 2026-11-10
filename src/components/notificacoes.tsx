@@ -388,7 +388,7 @@ export function NotificacoesBell({
                       setAberto(false);
                     };
                     return hrefOk ? (
-                      <Link href={hrefOk} onClick={aoClicar} className={classe}>
+                      <Link href={hrefOk} prefetch={false} onClick={aoClicar} className={classe}>
                         {conteudo}
                       </Link>
                     ) : (

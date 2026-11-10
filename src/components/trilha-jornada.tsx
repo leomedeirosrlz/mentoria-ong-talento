@@ -226,6 +226,7 @@ export function TrilhaJornada({
                       ? `/duplas/${duplaId}?aba=encontros#registrar-${no.encontro.id}`
                       : `/duplas/${duplaId}?aba=encontros`
                   }
+                  prefetch={false}
                   aria-label={rotulo}
                   title={rotulo}
                   aria-current={atual ? "step" : undefined}

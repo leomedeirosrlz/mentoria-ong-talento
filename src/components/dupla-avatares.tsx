@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { Avatar } from "@/components/avatar";
-import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
+import { avatarPublicUrl } from "@/lib/avatar";
 
 type Pessoa = {
   id: string;
@@ -8,6 +8,10 @@ type Pessoa = {
   nome_social?: string | null;
   avatar_path?: string | null;
   email?: string | null;
+  /** URL do Gravatar já confirmada no server (lib/gravatar) — sem ela o
+   *  Avatar não tenta o fallback e vai direto às iniciais, sem o
+   *  /_next/image?d=404 condenado por pessoa na lista. */
+  gravatar_url?: string | null;
 };
 
 /** Os dois discos sobrepostos que representam a dupla como unidade visual
@@ -33,7 +37,7 @@ export function DuplaAvatares({
         <Avatar
           nome={mentor.nome_social ?? mentor.nome}
           src={mentor.avatar_path ? avatarPublicUrl(mentor.avatar_path) : null}
-          fallbackSrc={mentor.email ? gravatarUrl(mentor.email) : undefined}
+          fallbackSrc={mentor.gravatar_url ?? undefined}
           size={size}
           className={anel}
         />

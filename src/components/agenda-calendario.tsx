@@ -3963,6 +3963,7 @@ function DuplaSemEncontroLinha({
   return (
     <Link
       href={`/duplas/${dupla.id}`}
+      prefetch={false}
       className="group flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >
       <span
@@ -4173,6 +4174,7 @@ function EncontroDuplaRow({
       {ehMentor ? (
         <Link
           href={href}
+          prefetch={false}
           className="group flex min-h-11 items-center gap-2.5 rounded-lg px-2 py-2 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           <span
@@ -4521,6 +4523,7 @@ function LinhaSemEncontro({
     <li className="flex items-center gap-1 rounded-lg py-1 pr-1 pl-3 transition-colors hover:bg-muted/50 sm:pl-4">
       <Link
         href={`/duplas/${dupla.id}`}
+        prefetch={false}
         className="flex min-h-11 min-w-0 flex-1 items-center rounded-sm text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <DuplaNomes
@@ -4813,6 +4816,7 @@ function BlocoEncontro({
   return (
     <Link
       href={hrefEncontroMentor(item, agora)}
+      prefetch={false}
       title={`${encontro.numero}º encontro · ${STATUS_ENCONTRO_LABEL[encontro.status].toLowerCase()}${iso ? `, ${formatDateTime(iso)}` : ""}`}
       className={cn(
         // o bloco flutua sobre a superfície clicável da coluna — o clique nele

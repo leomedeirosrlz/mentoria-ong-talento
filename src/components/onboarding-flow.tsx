@@ -354,6 +354,9 @@ export function OnboardingFlow({
   // segue montado (footer fixo), então sem isso o foco não acompanharia a
   // "pergunta" nova (mesmo padrão das etapas do importar-csv)
   useEffect(() => {
+    // voltar ao topo antes do foco — sem isso um passo novo pode abrir já
+    // rolado (ex.: saindo do termo com a página no fim)
+    window.scrollTo(0, 0);
     tituloRef.current?.focus();
   }, [step]);
 
@@ -1225,7 +1228,7 @@ export function OnboardingFlow({
           pb-40 no mobile cobre o footer empilhado (~154px com safe-area) */}
       <main
         className={cn(
-          "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col pb-40 pt-20 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] transition-[max-width] duration-500 sm:justify-center sm:px-6 sm:pb-32",
+          "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col pb-40 pt-[calc(5rem+env(safe-area-inset-top))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] transition-[max-width] duration-500 sm:justify-center sm:px-6 sm:pb-32",
           step === 2 && "sm:max-w-6xl"
         )}
       >

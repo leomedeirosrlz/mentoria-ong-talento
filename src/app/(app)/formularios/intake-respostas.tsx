@@ -150,6 +150,7 @@ export function IntakeRespostas({
                           <Link
                             href={`/api/form-anexo/${a.id}`}
                             target="_blank"
+                            prefetch={false}
                             className="inline-flex items-center gap-1.5 font-medium underline underline-offset-4"
                           >
                             <FileText aria-hidden size={14} />
@@ -163,6 +164,7 @@ export function IntakeRespostas({
                     {promovida ? (
                       <Link
                         href={`/pessoas/${criadoId}`}
+                        prefetch={false}
                         className="text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
                       >
                         Abrir o cadastro criado

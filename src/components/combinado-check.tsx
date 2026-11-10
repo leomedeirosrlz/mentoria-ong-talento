@@ -96,6 +96,7 @@ export function CombinadoCheck({
       </label>
       <Link
         href={`/duplas/${duplaId}#combinado-${id}`}
+        prefetch={false}
         aria-label="Ver combinado na ficha da dupla"
         className="inline-flex size-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:size-8"
       >

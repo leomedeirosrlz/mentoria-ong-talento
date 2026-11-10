@@ -253,6 +253,7 @@ function LinhaRegistro({
   return (
     <Link
       href={href}
+      prefetch={false}
       scroll={false}
       data-registro={r.id}
       tabIndex={foco ? 0 : -1}

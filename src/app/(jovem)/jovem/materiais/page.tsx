@@ -714,6 +714,7 @@ function InstrumentoCard({ est, sistema, campos }: EstacaoProps) {
     return (
       <Link
         href={`/f/${est.token}`}
+        prefetch={false}
         style={instrumentoVars(est.chave)}
         className={cn(
           shell,
@@ -728,6 +729,7 @@ function InstrumentoCard({ est, sistema, campos }: EstacaoProps) {
     return (
       <Link
         href="/jovem/pdm"
+        prefetch={false}
         style={instrumentoVars(est.chave)}
         className={cn(
           shell,

@@ -403,6 +403,7 @@ export function ChamadosApp({
             >
               <Link
                 href={`/chamados?c=${c.id}`}
+                prefetch={false}
                 onClick={(e) => abrir(e, c.id)}
                 aria-current={ativo ? "true" : undefined}
                 className={cn(

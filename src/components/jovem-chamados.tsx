@@ -85,6 +85,7 @@ export function JovemChamados({
                   O número CHA não aparece: é ruído de protocolo */}
               <Link
                 href={`/jovem/perfil?c=${c.id}`}
+                prefetch={false}
                 aria-current={cSel === c.id ? "true" : undefined}
                 className={cn(
                   "block min-h-11 rounded-xl border px-4 py-3 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",

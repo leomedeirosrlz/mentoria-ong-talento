@@ -352,6 +352,7 @@ function LinhaMini({
           o WA sobe pra z-20 e o "Ver ficha" vira decorativo — 1 tab por linha */}
       <Link
         href={`/duplas/${d.id}`}
+        prefetch={false}
         aria-label={`Ver ficha da dupla de ${(d.mentorado.nome_social ?? d.mentorado.nome).split(" ")[0]}`}
         className="absolute inset-0 z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       />
@@ -1923,6 +1924,7 @@ function VisaoMentor({
                     são decorativos — 1 tab-stop por card */}
                 <Link
                   href={`/duplas/${d.id}`}
+                  prefetch={false}
                   aria-label={`Ver ficha da dupla de ${(d.mentorado.nome_social ?? d.mentorado.nome).split(" ")[0]}`}
                   className="absolute inset-0 z-10 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 />
@@ -2034,6 +2036,7 @@ function VisaoMentor({
                     {pendente && (
                       <Link
                         href={`/duplas/${d.id}#registrar-${pendente.id}`}
+                        prefetch={false}
                         className={cn(buttonVariants({ size: "sm" }), "relative z-20 mt-2")}
                       >
                         Registrar encontro {pendente.numero}
@@ -2180,6 +2183,7 @@ function VisaoEspecialista({
                     </Pill>
                     <Link
                       href={`/duplas/${d.id}`}
+                      prefetch={false}
                       className={buttonVariants({ size: "sm" })}
                     >
                       Abrir trilha

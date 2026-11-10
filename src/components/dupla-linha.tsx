@@ -33,6 +33,8 @@ export type PessoaLinha = {
   nome_social?: string | null;
   avatar_path?: string | null;
   email?: string | null;
+  /** Gravatar confirmado no server — ver DuplaAvatares/Pessoa. */
+  gravatar_url?: string | null;
 };
 
 /** Tom da situação: risco e atenção pedem ação; "neutro" é a dupla em dia
@@ -142,6 +144,7 @@ export function DuplaLinha({
             — 1 tab por card */}
         <Link
           href={fichaHref}
+          prefetch={false}
           aria-label={`Ver ficha da dupla de ${fichaNome}`}
           className="absolute inset-0 z-10 rounded-xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring @4xl:rounded-none"
         />

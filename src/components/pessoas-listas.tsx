@@ -1049,6 +1049,7 @@ function PessoaRow({
             "Nome email +55…" (o Avatar já é aria-hidden) */}
         <Link
           href={`/pessoas/${p.id}`}
+          prefetch={false}
           aria-label={`Abrir perfil de ${p.nome_social ?? p.nome}`}
           className="group -my-1 flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
@@ -1398,6 +1399,7 @@ function MentoradoRow({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <Link
           href={`/pessoas/${m.id}`}
+          prefetch={false}
           aria-label={`Abrir perfil de ${m.nome_social ?? m.nome}`}
           className="group -my-1 flex min-w-0 flex-1 basis-48 items-center gap-3 rounded-lg py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >

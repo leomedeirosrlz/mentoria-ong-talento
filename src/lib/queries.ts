@@ -50,6 +50,7 @@ import {
   type RegistrosPanorama,
 } from "./registros";
 import { temPapel } from "./types";
+import { gravatarMapa, gravatarUrlDo } from "./gravatar";
 import type { AppRole, AvaliacaoEncontro, AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, DocumentoTemplate, Dupla, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
 
 /** mentor_profiles — re-export do tipo canônico (types.ts): os callers da
@@ -421,6 +422,29 @@ function mergeContatoDuplas(
   }));
 }
 
+/** Gravatar do mentor resolvido no server, em lote: `gravatar_url` só viaja
+ *  no objeto quando o HEAD cacheado (lib/gravatar, 24h) confirmou a foto —
+ *  sem ela o Avatar pula o fallback e cai direto nas iniciais, sem queimar
+ *  um /_next/image?d=404 por dupla na lista. Cobre Dupla e DuplaPerfil
+ *  (mesmo formato de `mentor`). */
+async function comGravatarMentores<
+  T extends { mentor?: { email?: string | null } | null }
+>(itens: T[]): Promise<T[]> {
+  const mapa = await gravatarMapa(itens.map((d) => d.mentor?.email));
+  if (mapa.size === 0) return itens;
+  return itens.map((d) =>
+    d.mentor?.email
+      ? {
+          ...d,
+          mentor: {
+            ...d.mentor,
+            gravatar_url: gravatarUrlDo(mapa, d.mentor.email),
+          },
+        }
+      : d
+  ) as T[];
+}
+
 export const getDuplas = cache(async (): Promise<Dupla[]> => {
   const demo = await demoRole();
   if (demo) return demoDuplas(demo);
@@ -433,7 +457,9 @@ export const getDuplas = cache(async (): Promise<Dupla[]> => {
     getContatos(),
   ]);
   if (error) throw error;
-  return mergeContatoDuplas((data as unknown as Dupla[]) ?? [], contatos);
+  return comGravatarMentores(
+    mergeContatoDuplas((data as unknown as Dupla[]) ?? [], contatos)
+  );
 });
 
 export const getDupla = cache(async (id: string): Promise<Dupla | null> => {
@@ -451,7 +477,11 @@ export const getDupla = cache(async (id: string): Promise<Dupla | null> => {
     getContatos(),
   ]);
   if (error) throw error;
-  return data ? mergeContatoDuplas([data as unknown as Dupla], contatos)[0] : null;
+  if (!data) return null;
+  const [dupla] = await comGravatarMentores(
+    mergeContatoDuplas([data as unknown as Dupla], contatos)
+  );
+  return dupla;
 });
 
 export const getMinhasDuplas = cache(async (): Promise<Dupla[]> => {
@@ -471,7 +501,9 @@ export const getMinhasDuplas = cache(async (): Promise<Dupla[]> => {
     getContatos(),
   ]);
   if (error) throw error;
-  return mergeContatoDuplas((data as unknown as Dupla[]) ?? [], contatos);
+  return comGravatarMentores(
+    mergeContatoDuplas((data as unknown as Dupla[]) ?? [], contatos)
+  );
 });
 
 /** Mínimo de uma dupla da linhagem de remanejo (0063) — id + nomes pro link
@@ -658,7 +690,7 @@ export type DuplaPerfil = {
   /** Trilha da dupla (WP6b) — a ficha do mentor híbrido conta vagas por
    *  pool (DPP × especialista), sem ela o X/Y misturava as duas. */
   trilha: Trilha;
-  mentor: { id: string; nome: string; nome_social?: string | null; avatar_path?: string | null; email?: string | null } | null;
+  mentor: { id: string; nome: string; nome_social?: string | null; avatar_path?: string | null; email?: string | null; gravatar_url?: string | null } | null;
   mentorado: { id: string; nome: string; nome_social?: string | null; avatar_path?: string | null } | null;
 };
 
@@ -725,7 +757,9 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
       tipo: "profile",
       pessoa: comPessoal(comContato(perfil, contatos), pessoalProf) as Profile,
       mentorProfile: (mp as MentorProfile | null) ?? null,
-      duplas: ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail),
+      duplas: await comGravatarMentores(
+        ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail)
+      ),
       notas: (notas as unknown as PessoaNota[]) ?? [],
     };
   }
@@ -740,7 +774,9 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
     return {
       tipo: "mentorado",
       pessoa: comCurriculo(comPessoal(m, pessoalMent), curriculo) as Mentorado,
-      duplas: ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail),
+      duplas: await comGravatarMentores(
+        ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail)
+      ),
       notas: (notas as unknown as PessoaNota[]) ?? [],
     };
   }
@@ -913,7 +949,7 @@ export type RegistroResumo = Registro & {
       status: DuplaStatus;
       trilha: Trilha;
       cronograma_id: string | null;
-      mentor: { id: string; nome: string; nome_social?: string | null; email: string | null; avatar_path: string | null } | null;
+      mentor: { id: string; nome: string; nome_social?: string | null; email: string | null; avatar_path: string | null; gravatar_url?: string | null } | null;
       mentorado: { id: string; nome: string; nome_social?: string | null; avatar_path: string | null } | null;
     } | null;
   } | null;
@@ -1047,11 +1083,42 @@ export const getRegistros = cache(
       );
     }
     // o count do PostgREST ignorou o filtro JS — o total real é o que sobrou
-    return { itens, total: itens.length };
+    return { itens: await comGravatarRegistros(itens), total: itens.length };
   }
-  return { itens, total: count ?? 0 };
+  return { itens: await comGravatarRegistros(itens), total: count ?? 0 };
   }
 );
+
+/** Gravatar do mentor nos resumos de registro — o detalhe do registro
+ *  selecionado é o único consumidor do avatar; lote cacheado igual ao das
+ *  duplas (e-mails distintos se repetem muito entre registros da mesma
+ *  dupla, então o custo real é baixo). */
+async function comGravatarRegistros(
+  itens: RegistroResumo[]
+): Promise<RegistroResumo[]> {
+  const mapa = await gravatarMapa(
+    itens.map((r) => r.encontro?.dupla?.mentor?.email)
+  );
+  if (mapa.size === 0) return itens;
+  return itens.map((r) => {
+    const dupla = r.encontro?.dupla;
+    const mentor = dupla?.mentor;
+    if (!r.encontro || !dupla || !mentor?.email) return r;
+    return {
+      ...r,
+      encontro: {
+        ...r.encontro,
+        dupla: {
+          ...dupla,
+          mentor: {
+            ...mentor,
+            gravatar_url: gravatarUrlDo(mapa, mentor.email),
+          },
+        },
+      },
+    };
+  });
+}
 
 /** Limite do recorte "últimas N semanas" em ISO — corta por quando o
  *  encontro aconteceu (mesma régua da timeline e das colunas do painel). */
