@@ -114,7 +114,7 @@ export const getDuplasVivasIa = cache(
  *  slice (ficha_dupla is its only consumer): the WhatsApp draft block needs
  *  the number to build the direct wa.me link. List tools keep no raw
  *  contact — bulk phone export to the model stays off the table. */
-const IA_FICHA_SELECT = IA_SAUDE_SELECT.replace(
+const IA_FICHA_SELECT = IA_SAUDE_SELECT.replaceAll(
   "(nome, nome_social)",
   "(nome, nome_social, whatsapp)"
 );

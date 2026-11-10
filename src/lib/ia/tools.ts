@@ -331,8 +331,11 @@ export const IA_TOOLS = {
         const prox = r.encontros.find(
           (e) => e.status === "agendado" || e.status === "remarcado"
         );
-        const wa = (papel: string) =>
-          contatos.find((c) => c.papel === papel)?.whatsapp ?? null;
+        // especialista-trilha labels the adult 'especialista' in
+        // jovem_contatos (0076) — the "mentor" figure for the jovem is
+        // whichever adult the dupla has, not the literal papel
+        const wa = (papeis: string[]) =>
+          contatos.find((c) => papeis.includes(c.papel))?.whatsapp ?? null;
         return {
           dupla_id: r.dupla.id,
           trilha: r.dupla.trilha,
@@ -346,11 +349,11 @@ export const IA_TOOLS = {
           contatos: {
             mentor: {
               nome: r.dupla.mentor_nome_social ?? r.dupla.mentor_nome,
-              whatsapp: wa("mentor"),
+              whatsapp: wa(["mentor", "especialista"]),
             },
             supervisor: {
               nome: r.dupla.supervisor_nome_social ?? r.dupla.supervisor_nome,
-              whatsapp: wa("supervisor"),
+              whatsapp: wa(["supervisor"]),
             },
           },
           encontros: r.encontros,
@@ -731,8 +734,15 @@ export const IA_TOOLS = {
       const d = await getMinhaDuplaIa(ctx.supabase);
       if (!d) return null;
       // encontros alimentam os quadrados do card — mesma leitura da
-      // ficha_dupla do jovem (encontros_select já escopa à dupla dele)
-      const ficha = await getJovemDuplaIa(ctx.supabase, d.id);
+      // ficha_dupla do jovem (encontros_select já escopa à dupla dele);
+      // contatos vêm da view escopada como na ficha — "manda mensagem pro
+      // meu mentor" chama minha_dupla, não ficha_dupla
+      const [ficha, contatos] = await Promise.all([
+        getJovemDuplaIa(ctx.supabase, d.id),
+        getJovemContatoIa(ctx.supabase, d.id),
+      ]);
+      const wa = (papeis: string[]) =>
+        contatos.find((c) => papeis.includes(c.papel))?.whatsapp ?? null;
       return {
         dupla_id: d.id,
         trilha: d.trilha,
@@ -742,6 +752,16 @@ export const IA_TOOLS = {
         demanda: d.demanda,
         mentor: d.mentor_nome_social ?? d.mentor_nome,
         supervisor: d.supervisor_nome_social ?? d.supervisor_nome,
+        contatos: {
+          mentor: {
+            nome: d.mentor_nome_social ?? d.mentor_nome,
+            whatsapp: wa(["mentor", "especialista"]),
+          },
+          supervisor: {
+            nome: d.supervisor_nome_social ?? d.supervisor_nome,
+            whatsapp: wa(["supervisor"]),
+          },
+        },
         encontros: ficha?.encontros ?? [],
       };
     },
