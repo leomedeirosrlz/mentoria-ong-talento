@@ -138,13 +138,15 @@ describe("alvoAgendamento", () => {
     ]);
   });
 
-  it("iniciada_em poda faltantes anteriores ao início da dupla", () => {
+  it("iniciada_em não poda faltantes: defasados entram na fila do catch-up", () => {
     const a = alvoAgendamento(
       mkDupla({ iniciada_em: "2025-10-21" }),
       CICLO_16,
       dt("2025-10-28")
     );
     expect(a.faltantes).toEqual([
+      { numero: 1, dataSugerida: "2025-10-07" },
+      { numero: 2, dataSugerida: "2025-10-14" },
       { numero: 3, dataSugerida: "2025-10-21" },
       { numero: 4, dataSugerida: "2025-10-28" },
     ]);
