@@ -25,7 +25,7 @@ import {
   HandHeart,
   Handshake,
   Heart,
-  CaretDown,
+  ImageSquare,
   LinkedinLogo,
   ListChecks,
   MapPin,
@@ -188,23 +188,6 @@ function MolduraTela({
   );
 }
 
-/** Tela de celular pro print mobile — moldura de aparelho na tinta da marca,
- *  estreita o bastante pro item e o print caberem juntos na vista. */
-function TelaCelular({ src, alt }: { src: string; alt: string }) {
-  return (
-    <div className="mx-auto mb-1 mt-2.5 w-[min(100%,17.5rem)] overflow-hidden rounded-[1.75rem] border-[5px] border-[var(--brand-ink)] bg-card shadow-border">
-      <Image
-        src={src}
-        alt={alt}
-        width={390}
-        height={520}
-        sizes="17.5rem"
-        className="block h-auto w-full"
-      />
-    </div>
-  );
-}
-
 /** Label com micro-ícone do assunto — no primeiro acesso o ícone ancora o
  *  campo antes da leitura (os forms densos do app seguem com label puro). */
 function Rotulo({
@@ -299,9 +282,9 @@ export function OnboardingFlow({
   const [interesses, setInteresses] = useState<string[]>(me.interesses ?? []);
   const [motivacao, setMotivacao] = useState(pessoal?.motivacao ?? "");
   const [consent, setConsent] = useState(false);
-  // recurso cuja tela ilustra o passo "o que você pode fazer" — hover, foco
-  // ou toque no item trocam o print (o último gesto vale); no mobile o
-  // painel fica acima da lista pra resposta do toque aparecer na hora
+  // feature whose screen illustrates the "what you can do" step — hover,
+  // focus or tap on a row swaps the shot (last gesture wins); on mobile the
+  // frame pins under the header so the tap feedback stays in view
   const [recursoAtivo, setRecursoAtivo] = useState(() =>
     Math.max(0, RECURSOS[me.role ?? "mentor_dpp"].findIndex((r) => r.img))
   );
@@ -904,10 +887,39 @@ export function OnboardingFlow({
         const ativo = recursos[recursoAtivo];
         return (
           <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:items-start sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)]">
+            {/* mobile: the frame pins under the fixed header while the list
+                scrolls beneath — a tap swaps the shot in place, no layout
+                shift. The band is opaque and edge-to-edge (-mx-4 cancels the
+                page gutter) so rows slide under it without peeking through
+                the gap to the header */}
+            {ativo?.img && (
+              <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 -mx-4 bg-background px-4 pb-3 pt-2 sm:hidden">
+                <MolduraTela>
+                  <div className="relative h-44" aria-live="polite">
+                    {recursos.map(
+                      (r, i) =>
+                        r.img && (
+                          <Image
+                            key={`m-${r.img}`}
+                            src={printMobile(r.img)}
+                            alt={i === recursoAtivo ? (r.alt ?? "") : ""}
+                            fill
+                            sizes="92vw"
+                            priority={i === recursoAtivo}
+                            className={cn(
+                              "object-cover object-top transition-opacity duration-300",
+                              i === recursoAtivo ? "opacity-100" : "opacity-0"
+                            )}
+                          />
+                        )
+                    )}
+                  </div>
+                </MolduraTela>
+              </div>
+            )}
             <ul className="space-y-2">
               {recursos.map((r, i) => {
                 const aceso = !!r.img && i === recursoAtivo;
-                const painelId = `recurso-tela-${i}`;
                 const cartao = cn(
                   "flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left outline-none transition-colors",
                   aceso
@@ -932,38 +944,29 @@ export function OnboardingFlow({
                       <r.icon size={18} weight="fill" aria-hidden />
                     </span>
                     <span className="text-sm leading-snug">{r.texto}</span>
+                    {/* the small screen icon marks which rows have a shot to
+                        preview — a caret read as a dropdown that never opened */}
                     {r.img && (
-                      <CaretDown
+                      <ImageSquare
                         size={16}
                         aria-hidden
                         className={cn(
-                          "ml-auto shrink-0 text-muted-foreground transition-transform duration-300 sm:hidden",
-                          aceso && "rotate-180 text-foreground"
+                          "ml-auto shrink-0 transition-colors",
+                          aceso ? "text-foreground" : "text-muted-foreground/70"
                         )}
                       />
                     )}
                   </>
                 );
                 return (
-                  <li key={r.texto} className="scroll-mb-28 scroll-mt-20">
+                  <li key={r.texto}>
                     {r.img ? (
                       <button
                         type="button"
                         onMouseEnter={() => setRecursoAtivo(i)}
                         onFocus={() => setRecursoAtivo(i)}
-                        onClick={(e) => {
-                          setRecursoAtivo(i);
-                          // no celular o painel anterior fecha acima do
-                          // toque e o item sobe — traz ele de volta à vista
-                          // depois da animação
-                          const li = e.currentTarget.parentElement;
-                          window.setTimeout(
-                            () => li?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
-                            320
-                          );
-                        }}
-                        aria-expanded={aceso}
-                        aria-controls={painelId}
+                        onClick={() => setRecursoAtivo(i)}
+                        aria-current={aceso || undefined}
                         className={cn(
                           cartao,
                           "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring/60"
@@ -973,22 +976,6 @@ export function OnboardingFlow({
                       </button>
                     ) : (
                       <div className={cartao}>{conteudo}</div>
-                    )}
-                    {/* celular: a tela abre logo abaixo do toque — antes o
-                        print ficava acima da lista e a troca acontecia fora
-                        da vista. Só o aberto monta a imagem */}
-                    {r.img && (
-                      <div
-                        id={painelId}
-                        className={cn(
-                          "grid transition-[grid-template-rows] duration-300 sm:hidden",
-                          aceso ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                        )}
-                      >
-                        <div className="overflow-hidden">
-                          {aceso && <TelaCelular src={printMobile(r.img)} alt={r.alt ?? ""} />}
-                        </div>
-                      </div>
                     )}
                   </li>
                 );
