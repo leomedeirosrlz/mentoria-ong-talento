@@ -185,6 +185,39 @@ describe("saudadeDaDupla — atenção", () => {
     );
   });
 
+  it("late dupla names the owed step, not a catch-up item still waiting its turn", () => {
+    // entry 10-21, today 10-22: the recovery queue only bills step 1 so far
+    // (step 2 comes due 10-23) and the owed in-window official is step 3 —
+    // with step 1 done, the real miss is step 3, inside its own week
+    const s = saudadeDaDupla(
+      mkDupla({
+        iniciada_em: "2025-10-21",
+        encontros: [encRealizado(1, "2025-10-22")],
+      }),
+      CICLO_16,
+      dt("2025-10-22")
+    );
+    expect(s.semaforo).toBe("atencao");
+    expect(s.motivo).toBe(
+      "Encontro 3 ainda não aconteceu (reposição na mesma semana)"
+    );
+  });
+
+  it("a due catch-up step promises the accelerated pace, not the same week", () => {
+    // entry 10-22 (Wed, past step 3's Tuesday): only step 1 came due in the
+    // queue and no in-window official is due — the miss is a catch-up step
+    // whose official week predates the dupla
+    const s = saudadeDaDupla(
+      mkDupla({ iniciada_em: "2025-10-22" }),
+      CICLO_16,
+      dt("2025-10-22")
+    );
+    expect(s.semaforo).toBe("atencao");
+    expect(s.motivo).toBe(
+      "Encontro 1 ainda não aconteceu (reposição em ritmo acelerado)"
+    );
+  });
+
   it("avaliação baixa (sem dificuldade) é atenção", () => {
     const dupla = mkDupla({
       encontros: [
