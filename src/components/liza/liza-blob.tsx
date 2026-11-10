@@ -476,11 +476,13 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
   const kOlho = Math.min(1, Math.max(0, (tamanho - 28) / 36));
   // olhos ~17% maiores que a primeira versão (feedback de design: a
   // expressão era genérica) — o oval e o afastamento seguem, e no mini
-  // continuam legíveis sem encostar um no outro
+  // continuam legíveis sem encostar um no outro. O topo da escala sobe
+  // pra 11.4/14: a curva ainda favorece os pequenos, mas a Liza grande
+  // (chat vazio 96, onboarding 64) não fica de olhos apertados
   const olhoDims = detalhe
     ? {
-        rx: 12.8 - 2.3 * kOlho,
-        ry: 15.8 - 2.9 * kOlho,
+        rx: 12.8 - 1.4 * kOlho,
+        ry: 15.8 - 1.8 * kOlho,
         cy: 48.5 - 2 * kOlho,
         dx: 19 - 1.5 * kOlho,
       }

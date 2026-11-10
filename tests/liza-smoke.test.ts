@@ -40,8 +40,8 @@ describe("liza — contrato dos conceitos", () => {
 
   it("LizaBlob: o olho cresce na proporção do rosto abaixo de 64px", () => {
     // o FAB do celular (48px) e o header (34px) interpolam o rx cheio
-    // (10,5) rumo ao mini (12,8) — era o "olho minúsculo" do flutuante.
-    // Valores da versão de olhos ~17% maiores (nov/2026)
+    // (11,4) rumo ao mini (12,8) — era o "olho minúsculo" do flutuante.
+    // Valores da versão de olhos ~17% maiores (nov/2026) + bump do topo
     const fab = renderToStaticMarkup(
       createElement(LizaBlob, { estado: "parado", tamanho: 48 })
     );
@@ -54,6 +54,6 @@ describe("liza — contrato dos conceitos", () => {
         ...[...html.matchAll(/M -([\d.]+) 0C/g)].map((m) => Number(m[1]))
       );
     expect(rxOlho(fab)).toBeGreaterThan(11);
-    expect(rxOlho(grande)).toBe(10.5);
+    expect(rxOlho(grande)).toBe(11.4);
   });
 });
