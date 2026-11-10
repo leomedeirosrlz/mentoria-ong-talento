@@ -934,14 +934,12 @@ export function OnboardingFlow({
                 the gap to the header */}
             {ativo?.img && (
               <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 -mx-4 bg-background px-4 pb-3 pt-2 sm:hidden">
-                <MolduraTela>
-                  {/* height tracks the viewport (min 7.5rem, ideal 22dvh,
-                      max 11rem) — a fixed h-44 ate a third of small phones
-                      on top of header + footer chrome */}
-                  <div
-                    className="relative h-[clamp(7.5rem,22dvh,11rem)]"
-                    aria-live="polite"
-                  >
+                {/* phone bezel, not the browser-chrome MolduraTela: the
+                    prints are portrait 3:4 phone captures — inside a monitor
+                    frame at band height they cropped to an unreadable 16:9
+                    sliver. aspect-[3/4] keeps the whole shot legible */}
+                <div className="mx-auto w-[min(100%,12rem)] overflow-hidden rounded-[1.75rem] border-[5px] border-[var(--brand-ink)] bg-card shadow-border">
+                  <div className="relative aspect-[3/4]" aria-live="polite">
                     {recursos.map(
                       (r, i) =>
                         r.img && (
@@ -955,7 +953,7 @@ export function OnboardingFlow({
                         )
                     )}
                   </div>
-                </MolduraTela>
+                </div>
               </div>
             )}
             <ul className="space-y-2">
