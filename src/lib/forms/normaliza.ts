@@ -414,6 +414,9 @@ export function normalizaEscolaridade(s: string): NormResult<Escolaridade> {
 /** Papel da equipe — "auxiliar executivo(a)" é o nome na UI; "supervisor"
  *  segue aceito pra planilhas antigas. */
 export function normalizaPapel(s: string): NormResult<AppRole> {
+  // "mentorado(a)" casaria /mentor/ e viraria mentor_dpp — jovem não é papel
+  // de equipe: entra pela ficha de mentorado e o vínculo vem no 1º login
+  if (/mentorad/.test(semAcento(s))) return { valor: null, mudou: true };
   return normEnum<AppRole>(s, [
     [/coord/, "coordenacao"],
     [/supervis|auxiliar/, "supervisor"],

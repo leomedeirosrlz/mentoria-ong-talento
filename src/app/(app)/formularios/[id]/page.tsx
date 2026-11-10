@@ -74,9 +74,19 @@ export default async function FormularioPage({
   // form, nunca responde). O papel alimenta o agrupamento do dialog — por
   // isso não se repete no detalhe da linha: profile mostra nada além do
   // título do grupo; mentorado traz a ONG, que o grupo não diz.
+  // conta de jovem já entra pela ficha — a linha de profile duplicaria a
+  // pessoa e o link sairia com dest_profile_id, fora da âncora da jornada
+  const vinculados = new Set(
+    mentorados.map((m) => m.profile_id).filter((id): id is string => Boolean(id))
+  );
   const destinatarios: DestinoOpcao[] = [
     ...pessoas
-      .filter((p) => p.ativo && p.role !== "coordenacao")
+      .filter(
+        (p) =>
+          p.ativo &&
+          p.role !== "coordenacao" &&
+          !(p.role === "mentorado" && vinculados.has(p.id))
+      )
       .map((p) => ({
         tipo: "profile" as const,
         id: p.id,

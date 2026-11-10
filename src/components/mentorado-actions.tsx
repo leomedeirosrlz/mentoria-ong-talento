@@ -144,12 +144,11 @@ export function MentoradoActions({
               <Input
                 id="em_email" name="email" type="email"
                 defaultValue={mentorado.email ?? ""}
-                readOnly={Boolean(mentorado.profile_id)}
               />
               {mentorado.profile_id && (
                 <p className="text-xs text-muted-foreground">
-                  Já entrou na plataforma — o e-mail de acesso só muda pelo
-                  perfil dela.
+                  Já entrou na plataforma — trocar aqui muda o e-mail de acesso
+                  dela.
                 </p>
               )}
             </div>

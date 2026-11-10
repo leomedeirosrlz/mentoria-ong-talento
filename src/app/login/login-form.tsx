@@ -309,12 +309,18 @@ export function LoginForm() {
         },
       });
       if (error) {
-        // 429 = um link acabou de sair — honesto mostrar o painel com o
-        // cooldown real ("after N seconds") em vez de um erro
+        // 429 com "after N seconds" = cooldown por e-mail: um link acabou de
+        // sair, honesto mostrar o painel. Sem os segundos é o limite global
+        // de envios do projeto — nenhum e-mail saiu, o painel prometeria um
+        // link que não vem (turma inteira logando junto bate nele)
         const seg = /after (\d+) seconds/.exec(error.message);
-        if (error.code === "over_email_send_rate_limit" || seg) {
+        if (seg) {
           setEnviado(true);
-          setCooldown(seg ? Number(seg[1]) : COOLDOWN);
+          setCooldown(Number(seg[1]));
+        } else if (error.code === "over_email_send_rate_limit") {
+          setErro(
+            "Muita gente pediu link agora e o envio pausou. Tente de novo em alguns minutos — se persistir, fale com a coordenação."
+          );
         } else {
           setErro(mensagemErro(error, "link"));
         }
