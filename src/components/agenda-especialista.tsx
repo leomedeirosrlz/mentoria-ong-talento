@@ -347,6 +347,7 @@ function LinhaPendencia({
         <div className="flex w-full flex-wrap items-center justify-end gap-2 sm:w-auto sm:shrink-0 sm:self-center">
           <Link
             href={p.href}
+            prefetch={false}
             className={buttonVariants({
               variant: destaque ? "default" : "outline",
               size: "sm",
@@ -547,6 +548,7 @@ function CardTrilha({ r, indice }: { r: RecorteDupla; indice: number }) {
         </p>
         <Link
           href={`/duplas/${d.id}`}
+          prefetch={false}
           className="inline-flex min-h-11 items-center rounded-sm text-sm font-semibold text-foreground underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8"
         >
           Abrir trilha ›

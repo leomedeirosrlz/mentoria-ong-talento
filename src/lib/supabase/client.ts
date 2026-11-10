@@ -13,11 +13,13 @@ import { demoRoleClient } from "@/lib/demo/shared";
 // demo/*.
 import { createDemoClient } from "@/lib/demo/client-stub";
 
-// Secure só em produção: dev roda em http — localhost aceita Secure por
-// exceção do spec, mas http+IP/hostname (Tailscale, LAN) o browser descarta
-// e a sessão nunca persiste (login "não entra"). Mesma régua dos cookies
-// do modo demo (src/lib/demo/mode.ts).
-const SECURE = process.env.NODE_ENV === "production";
+// Secure follows the real page scheme, not NODE_ENV: a prod build served
+// over http+IP/hostname (Tailscale, LAN) makes the browser drop Secure
+// cookies and the session never persists (login "doesn't enter"). The
+// window guard covers SSR — no cookie is written there anyway. Same rule
+// as the demo cookie (src/lib/demo/mode.ts).
+const SECURE =
+  typeof window !== "undefined" && window.location.protocol === "https:";
 
 function realClient() {
   return createBrowserClient(
@@ -76,6 +78,10 @@ export function createOtpClient(): SupabaseClient {
         persistSession: false,
         detectSessionInUrl: false,
         autoRefreshToken: false,
+        // own key so the OTP client doesn't trip the "multiple
+        // GoTrueClient instances" warning against the main client's
+        // storage — the session is never persisted anyway
+        storageKey: "realiza-otp",
       },
     }
   );

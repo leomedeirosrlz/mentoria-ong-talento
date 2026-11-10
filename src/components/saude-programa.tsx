@@ -256,6 +256,7 @@ function Atalho({
     return (
       <Link
         href={`${linkBase}${linkBase.includes("?") ? "&" : "?"}recorte=${id}`}
+        prefetch={false}
         className={cls}
       >
         {children}

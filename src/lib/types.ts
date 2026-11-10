@@ -99,6 +99,10 @@ export type Profile = {
   created_at?: string;
   /** Foto no bucket público `avatares` (<profile_id>/<arquivo>.<ext>) — fallback de exibição: Gravatar do e-mail → iniciais. */
   avatar_path?: string | null;
+  /** URL do Gravatar já confirmada no server (check cacheado em
+   *  lib/gravatar) — preenchida pelas queries de lista/ficha; ausente, o
+   *  Avatar pula o fallback e cai direto nas iniciais sem request condenado. */
+  gravatar_url?: string | null;
   /** Documento oficial no bucket `documentos` (termo de responsabilidade) — só a coordenação vê e gerencia. */
   documento_path?: string | null;
   /** Apresentação profissional (0030) — legível por qualquer autenticado,

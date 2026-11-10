@@ -213,6 +213,7 @@ function ContatoLinha({
     <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
       <Link
         href={`/jovem/pessoas/${c.id}`}
+        prefetch={false}
         className="flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <Avatar
@@ -278,6 +279,7 @@ function ColegaLinha({
     <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
       <Link
         href={`/jovem/pessoas/${c.id}`}
+        prefetch={false}
         className="flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <Avatar nome={nome} papel="mentorado" size={40} />

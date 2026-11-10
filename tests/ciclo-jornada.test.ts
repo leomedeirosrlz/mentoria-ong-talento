@@ -76,19 +76,19 @@ describe("jornadaDaDupla", () => {
     expect(j.nos[2].marco).toBeNull(); // marco só depois de cruzado
     expect(j.faseAtual).toEqual({ indice: 1, total: 2, nome: "Fase 1" });
     expect(j.completa).toBe(false);
-    expect(j.janelaCortada).toBe(false);
   });
 
-  it("iniciada_em poda o início: posição renumera e janelaCortada acende", () => {
+  it("iniciada_em não poda: a trilha mostra o guia inteiro com defasados pendentes", () => {
     const j = jornadaDaDupla(
       mkDupla({ iniciada_em: "2025-10-21" }),
       PASSOS,
       HOJE
     );
-    expect(j.total).toBe(14); // encontros 3–16
-    expect(j.nos[0].numero).toBe(3);
+    expect(j.total).toBe(16);
+    expect(j.nos[0].numero).toBe(1);
     expect(j.nos[0].posicao).toBe(1);
-    expect(j.janelaCortada).toBe(true);
+    // "você está aqui" volta pro 1º passo — os defasados são refeitos antes
+    expect(j.proximoNumero).toBe(1);
   });
 
   it("trilha completa: proximoNumero null e marco no último nó", () => {

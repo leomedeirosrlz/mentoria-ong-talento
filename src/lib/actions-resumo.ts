@@ -1,6 +1,6 @@
 "use server";
 
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import * as Sentry from "@sentry/nextjs";
 import { createClient } from "@/lib/supabase/server";
 import { rastroAcesso, resumoCookie } from "@/lib/resumo-acesso";
@@ -52,7 +52,12 @@ export async function desbloquearResumo(
       httpOnly: true,
       maxAge: COOKIE_MAX_AGE,
       sameSite: "lax",
-      secure: process.env.NODE_ENV === "production",
+      // scheme-aware like the session cookie (supabase/server.ts): a
+      // Secure cookie over LAN HTTP would be dropped and the unlocked
+      // report would keep asking for the password
+      secure:
+        process.env.NODE_ENV === "production" &&
+        (await headers()).get("x-forwarded-proto") === "https",
     });
     return { ok: true };
   }

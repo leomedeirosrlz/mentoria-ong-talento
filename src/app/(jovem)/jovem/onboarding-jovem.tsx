@@ -106,8 +106,12 @@ export function OnboardingJovem({
   const [compartilha, setCompartilha] = useState(compartilhaInicial);
 
   // o botão do footer segue montado — foco no título do balão a cada passo,
-  // mesmo padrão do OnboardingFlow e das etapas do importar-csv
+  // mesmo padrão do OnboardingFlow e das etapas do importar-csv. O scrollTo
+  // vem antes: sem ele a troca de passo só grampeia no fim do passo novo
+  // quando ele é mais baixo que o scroll atual — o cartão de título
+  // aparecia escondido embaixo do header fixo
   useEffect(() => {
+    window.scrollTo(0, 0);
     tituloRef.current?.focus();
   }, [step]);
 
@@ -115,6 +119,12 @@ export function OnboardingJovem({
     (me.nome_social || me.nome).trim().split(/\s+/)[0] || me.nome;
   const ultimo = step === total - 1;
   const temWhatsapp = perfil?.whatsapp != null;
+  // texto único do dd de contato — o truncate precisa do title com o valor
+  // inteiro pra ler o que ficou de fora (mesmo padrão do resumo do staff)
+  const whatsappTxt = perfil?.whatsapp
+    ? formatWhatsApp(perfil.whatsapp)
+    : "Ainda não cadastrado. A coordenação inclui";
+  const emailTxt = perfil?.email ?? me.email;
 
   function avancar() {
     setStep((s) => Math.min(s + 1, total - 1));
@@ -220,7 +230,7 @@ export function OnboardingJovem({
               rotulo: "Continuar para seus dados ↓",
             }}
           />
-          <div id="ob-termo-dados" className="scroll-mt-24 space-y-2">
+          <div id="ob-termo-dados" className="scroll-mt-[calc(6rem+env(safe-area-inset-top))] space-y-2">
             <h2 className="text-base font-semibold">Seus dados para assinar</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
               {civis
@@ -270,7 +280,7 @@ export function OnboardingJovem({
               icone={false}
               iconSize={13}
               label="Não é você? Sair e voltar ao login"
-              className="mx-auto mt-2 block text-xs text-muted-foreground underline transition-colors hover:text-foreground"
+              className="mt-2 flex min-h-11 w-full items-center justify-center text-xs text-muted-foreground underline transition-colors hover:text-foreground"
             />
           </div>
         );
@@ -295,10 +305,8 @@ export function OnboardingJovem({
                 </span>
                 <div className="min-w-0 flex-1">
                   <dt className="text-xs text-muted-foreground">Seu WhatsApp</dt>
-                  <dd className="truncate text-sm font-medium">
-                    {perfil?.whatsapp
-                      ? formatWhatsApp(perfil.whatsapp)
-                      : "Ainda não cadastrado. A coordenação inclui"}
+                  <dd className="truncate text-sm font-medium" title={whatsappTxt}>
+                    {whatsappTxt}
                   </dd>
                 </div>
               </div>
@@ -308,8 +316,8 @@ export function OnboardingJovem({
                 </span>
                 <div className="min-w-0 flex-1">
                   <dt className="text-xs text-muted-foreground">Seu e-mail</dt>
-                  <dd className="truncate text-sm font-medium">
-                    {perfil?.email ?? me.email}
+                  <dd className="truncate text-sm font-medium" title={emailTxt}>
+                    {emailTxt}
                   </dd>
                 </div>
               </div>
@@ -397,15 +405,23 @@ export function OnboardingJovem({
               style={{ width: `${((step + 1) / total) * 100}%` }}
             />
           </div>
-          <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
+          {/* aria-hidden: o progressbar já anuncia "Passo X de Y" — o
+              contador cru leria o mesmo dado duas vezes (paridade staff) */}
+          <span aria-hidden className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
             {step + 1}/{total}
           </span>
           {demo}
         </div>
       </header>
 
-      {/* coluna central — pb/pt compensam header e footer fixos */}
-      <main className="mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col justify-center px-4 pb-32 pt-20 sm:px-6">
+      {/* coluna central — pb/pt compensam header e footer fixos. pt soma o
+          safe-area-top porque o header cresce com o notch (57px + inset) e
+          80px fixos deixariam o topo do conteúdo embaixo dele em retrato;
+          pl/pr idem pros lados. Mobile ancora no topo (justify-center
+          deixava espaço morto sob o header e o balão pulava de altura a
+          cada passo) — o centro vertical volta a partir de sm, mesmo
+          desenho do OnboardingFlow de staff */}
+      <main className="mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col pb-32 pt-[calc(5rem+env(safe-area-inset-top))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:justify-center sm:px-6">
         <Logo size="sm" className="mb-6 self-start" />
         <div key={step} className="animate-rise">
           <div className="rounded-3xl rounded-bl-md border border-border bg-card px-5 py-4">

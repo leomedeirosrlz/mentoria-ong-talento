@@ -49,6 +49,7 @@ export function RegistrosAgrupar({
               <li key={g}>
                 <Link
                   href={hrefs[g]}
+                  prefetch={false}
                   scroll={false}
                   aria-current={grupo === g ? "page" : undefined}
                   className={cn(
@@ -79,6 +80,7 @@ export function RegistrosAgrupar({
             <Link
               key={g}
               href={hrefs[g]}
+              prefetch={false}
               scroll={false}
               aria-current={grupo === g ? "page" : undefined}
               className={cn(

@@ -9,7 +9,8 @@ import { getMe, getMeuMentorProfile, getMeusDadosPessoais, getNotificacoes } fro
 import { getChamadosSemDono } from "@/lib/queries-chamados";
 import { getMeusDadosCivis, getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { providerConfigurado } from "@/lib/ia/provider";
-import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
+import { avatarPublicUrl } from "@/lib/avatar";
+import { gravatarUrlSeExiste } from "@/lib/gravatar";
 import type { AppRole } from "@/lib/types";
 import { Children } from "react";
 import { redirect } from "next/navigation";
@@ -155,7 +156,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     <AppShell
       me={me}
       avatarUrl={me.avatar_path ? avatarPublicUrl(me.avatar_path) : null}
-      gravatarUrl={gravatarUrl(me.email)}
+      gravatarUrl={demo ? null : await gravatarUrlSeExiste(me.email)}
       notificacoes={notificacoes}
       chamadosSemDono={chamadosSemDono}
       demo={demoDock}

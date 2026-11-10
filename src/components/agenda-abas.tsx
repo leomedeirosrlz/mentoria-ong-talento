@@ -78,10 +78,11 @@ export function AbasAgenda({
             aria-controls={painelId}
             tabIndex={i === indiceAtivo ? 0 : -1}
             href={aba.href}
+            prefetch={false}
             scroll={false}
             onKeyDown={(e) => onKeyDown(e, i)}
             className={cn(
-              "inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-md px-3 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background sm:min-h-8",
+              "inline-flex min-h-11 shrink-0 items-center whitespace-nowrap rounded-md px-2 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background sm:min-h-8 sm:px-3",
               selecionada
                 ? // lima da marca = item ativo (mesma régua da nav): tinta
                   // sobre o preenchimento passa de 5:1, não é só um degrau

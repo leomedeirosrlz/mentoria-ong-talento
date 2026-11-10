@@ -133,16 +133,17 @@ describe("saudadeDaDupla — risco", () => {
     expect(s.feitos).toBe(0);
   });
 
-  it("atraso conta só a janela da dupla (iniciada_em poda o começo do ciclo)", () => {
-    // hoje = 28/10: esperados dentro da janela são só os encontros 3 e 4
+  it("atraso soma os defasados vencidos da fila de recuperação", () => {
+    // hoje = 28/10, entrada 21/10: oficiais da janela são os encontros 3 e 4;
+    // os defasados 1 e 2 já venceram na fila (~2-3/semana) → esperado = 4
     const s = saudadeDaDupla(
       mkDupla({ iniciada_em: "2025-10-21" }),
       CICLO_16,
       dt("2025-10-28")
     );
     expect(s.semaforo).toBe("risco");
-    expect(s.motivo).toBe("2 encontros em atraso");
-    expect(s.esperado).toBe(2);
+    expect(s.motivo).toBe("4 encontros em atraso");
+    expect(s.esperado).toBe(4);
   });
 
   it("avaliação baixa + dificuldade no último registro é risco (antes do atraso)", () => {
@@ -181,6 +182,39 @@ describe("saudadeDaDupla — atenção", () => {
     expect(s.semaforo).toBe("atencao");
     expect(s.motivo).toBe(
       "Encontro 1 ainda não aconteceu (reposição na mesma semana)"
+    );
+  });
+
+  it("late dupla names the owed step, not a catch-up item still waiting its turn", () => {
+    // entry 10-21, today 10-22: the recovery queue only bills step 1 so far
+    // (step 2 comes due 10-23) and the owed in-window official is step 3 —
+    // with step 1 done, the real miss is step 3, inside its own week
+    const s = saudadeDaDupla(
+      mkDupla({
+        iniciada_em: "2025-10-21",
+        encontros: [encRealizado(1, "2025-10-22")],
+      }),
+      CICLO_16,
+      dt("2025-10-22")
+    );
+    expect(s.semaforo).toBe("atencao");
+    expect(s.motivo).toBe(
+      "Encontro 3 ainda não aconteceu (reposição na mesma semana)"
+    );
+  });
+
+  it("a due catch-up step promises the accelerated pace, not the same week", () => {
+    // entry 10-22 (Wed, past step 3's Tuesday): only step 1 came due in the
+    // queue and no in-window official is due — the miss is a catch-up step
+    // whose official week predates the dupla
+    const s = saudadeDaDupla(
+      mkDupla({ iniciada_em: "2025-10-22" }),
+      CICLO_16,
+      dt("2025-10-22")
+    );
+    expect(s.semaforo).toBe("atencao");
+    expect(s.motivo).toBe(
+      "Encontro 1 ainda não aconteceu (reposição em ritmo acelerado)"
     );
   });
 

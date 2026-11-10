@@ -465,7 +465,15 @@ export function EncontroRow({
                   duplaId={duplaId}
                   numero={passo.numero}
                   atual={null}
-                  sugerido={passo.data ?? undefined}
+                  // a defasado step (official date < dupla start) gets
+                  // no suggestion: clamping to the piso lands in the
+                  // past and the dialog would open "Registrar" on a
+                  // "Agendar" gesture
+                  sugerido={
+                    passo.data && (!piso || passo.data >= piso)
+                      ? passo.data
+                      : undefined
+                  }
                   piso={piso}
                   jovemNome={jovemNome}
                   rotulo={ehEsp ? "sessão de especialista" : undefined}

@@ -80,6 +80,8 @@ export type DuplaIa = {
   cronograma_id: string | null;
   iniciada_em: string | null;
   demanda: string | null;
+  mentor_id?: string | null;
+  supervisor_id?: string | null;
   mentor: { nome: string; nome_social: string | null; whatsapp?: string | null } | null;
   mentorado: { nome: string; nome_social: string | null; whatsapp?: string | null } | null;
   supervisor: { nome: string; nome_social: string | null; whatsapp?: string | null } | null;
@@ -110,13 +112,18 @@ export const getDuplasVivasIa = cache(
   }
 );
 
-/** IA_SAUDE_SELECT + whatsapp on the three people — only on the SINGLE-dupla
- *  slice (ficha_dupla is its only consumer): the WhatsApp draft block needs
- *  the number to build the direct wa.me link. List tools keep no raw
- *  contact — bulk phone export to the model stays off the table. */
+/** IA_SAUDE_SELECT + the single-dupla extras for ficha_dupla (its only
+ *  consumer): the WhatsApp draft needs the numbers for the wa.me link.
+ *  whatsapp can only embed on `mentorados` (column grant, 0034) — profiles
+ *  has no whatsapp grant (0026): staff numbers come from the
+ *  profiles_contato view, looked up by mentor_id/supervisor_id.
+ *  List tools keep no raw contact — bulk export stays off the table. */
 const IA_FICHA_SELECT = IA_SAUDE_SELECT.replace(
-  "(nome, nome_social)",
-  "(nome, nome_social, whatsapp)"
+  "id, turma",
+  "id, turma, mentor_id, supervisor_id"
+).replace(
+  "mentorados(nome, nome_social)",
+  "mentorados(nome, nome_social, whatsapp)"
 );
 
 /** Uma dupla por id, no escopo do papel — null quando a RLS não a entrega
@@ -130,7 +137,29 @@ export const getDuplaIa = cache(
       .eq("id", id)
       .maybeSingle();
     if (error) throw error;
-    return (data as unknown as DuplaIa | null) ?? null;
+    const d = (data as unknown as DuplaIa | null) ?? null;
+    if (!d) return null;
+    // staff whatsapp comes from the scoped view, not the profiles embed:
+    // coord → both, supervisor → own mentores, others → self only. What the
+    // papel can't see stays null and the draft falls back to the share link
+    const staffIds = [d.mentor_id, d.supervisor_id].filter(
+      (v): v is string => v != null
+    );
+    if (staffIds.length > 0) {
+      const { data: contatos } = await supabase
+        .from("profiles_contato")
+        .select("id, whatsapp")
+        .in("id", staffIds);
+      const wa = new Map(
+        (contatos ?? []).map((c: { id: string; whatsapp: string | null }) => [
+          c.id,
+          c.whatsapp,
+        ])
+      );
+      if (d.mentor) d.mentor.whatsapp = wa.get(d.mentor_id!) ?? null;
+      if (d.supervisor) d.supervisor.whatsapp = wa.get(d.supervisor_id!) ?? null;
+    }
+    return d;
   }
 );
 

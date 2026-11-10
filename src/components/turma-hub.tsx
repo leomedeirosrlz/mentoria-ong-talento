@@ -149,6 +149,7 @@ export function TurmaHubCard({
   return (
     <Link
       href={`/?turma=${encodeURIComponent(turma)}`}
+      prefetch={false}
       aria-current={ativa ? "page" : undefined}
       aria-label={`${nome}${ano ? ` · ${ano}` : ""}, ${saude.emAndamento} ${
         saude.emAndamento === 1 ? "dupla ativa" : "duplas ativas"

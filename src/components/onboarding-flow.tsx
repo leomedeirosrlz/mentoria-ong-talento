@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -25,7 +24,7 @@ import {
   HandHeart,
   Handshake,
   Heart,
-  CaretDown,
+  ImageSquare,
   LinkedinLogo,
   ListChecks,
   MapPin,
@@ -105,32 +104,32 @@ type Recurso = {
  *  cada um com a tela real onde ele acontece. */
 const RECURSOS: Record<AppRole, Recurso[]> = {
   coordenacao: [
-    { icon: TrafficSignal, texto: "O andamento das duplas em tempo real: quem precisa de atenção aparece destacado.", img: "coordenacao-home", alt: "Visão geral da coordenação: turmas, situação das duplas e o que precisa de você hoje" },
-    { icon: HandHeart, texto: "Pedidos de apoio e de mentoria especializada chegam pra você.", img: "coordenacao-dupla", alt: "Ficha de uma dupla em risco com apoio aberto e especialista solicitado" },
-    { icon: UsersThree, texto: "Formar duplas e acompanhar cada jornada.", img: "coordenacao-duplas", alt: "Lista de duplas com situação, motivo e encontros" },
-    { icon: AddressBook, texto: "Gerenciar os cadastros da equipe e dos mentorados.", img: "coordenacao-pessoas", alt: "Lista de pessoas com papéis, filtros e cadastros" },
-    { icon: Megaphone, texto: "Comunicados pra equipe e pra cada grupo de mentores.", img: "coordenacao-comunicados", alt: "Avisos publicados para a equipe e para os mentores, com botão de novo aviso" },
-    { icon: ChartLineUp, texto: "Exportar relatórios do programa.", img: "coordenacao-relatorios", alt: "Construtor de relatórios com filtros de turma, linhas e colunas e exportação em CSV" },
+    { icon: TrafficSignal, texto: "Andamento das duplas", img: "coordenacao-home", alt: "Visão geral da coordenação: turmas, situação das duplas e o que precisa de você hoje" },
+    { icon: HandHeart, texto: "Pedidos de apoio", img: "coordenacao-dupla", alt: "Ficha de uma dupla em risco com apoio aberto e especialista solicitado" },
+    { icon: UsersThree, texto: "Formar e acompanhar duplas", img: "coordenacao-duplas", alt: "Lista de duplas com situação, motivo e encontros" },
+    { icon: AddressBook, texto: "Pessoas e cadastros", img: "coordenacao-pessoas", alt: "Lista de pessoas com papéis, filtros e cadastros" },
+    { icon: Megaphone, texto: "Comunicados", img: "coordenacao-comunicados", alt: "Avisos publicados para a equipe e para os mentores, com botão de novo aviso" },
+    { icon: ChartLineUp, texto: "Relatórios", img: "coordenacao-relatorios", alt: "Construtor de relatórios com filtros de turma, linhas e colunas e exportação em CSV" },
   ],
   supervisor: [
-    { icon: UsersThree, texto: "As duplas sob sua supervisão num lugar só.", img: "supervisor-duplas", alt: "Lista das duplas supervisionadas com a situação de cada uma" },
-    { icon: NotePencil, texto: "Notas de acompanhamento na ficha de cada dupla.", img: "supervisor-dupla", alt: "Ficha de uma dupla com a jornada e o próximo encontro" },
-    { icon: TrafficSignal, texto: "O andamento de cada dupla: quem vai bem e quem precisa de atenção.", img: "supervisor-home", alt: "Visão geral do supervisor com a situação das duplas" },
-    { icon: FolderOpen, texto: "Os materiais de apoio do programa.", img: "supervisor-materiais", alt: "Instrumentos do programa com respostas por dupla" },
+    { icon: UsersThree, texto: "Minhas duplas", img: "supervisor-duplas", alt: "Lista das duplas supervisionadas com a situação de cada uma" },
+    { icon: NotePencil, texto: "Notas de acompanhamento", img: "supervisor-dupla", alt: "Ficha de uma dupla com a jornada e o próximo encontro" },
+    { icon: TrafficSignal, texto: "Situação das duplas", img: "supervisor-home", alt: "Visão geral do supervisor com a situação das duplas" },
+    { icon: FolderOpen, texto: "Materiais de apoio", img: "supervisor-materiais", alt: "Instrumentos do programa com respostas por dupla" },
   ],
   mentor_dpp: [
-    { icon: CalendarCheck, texto: "Agendar e registrar os encontros com a sua dupla.", img: "mentor_dpp-dupla", alt: "Ficha da dupla com o próximo encontro e o botão de remarcar" },
-    { icon: Users, texto: "As suas duplas num lugar só, com o próximo passo de cada uma.", img: "mentor_dpp-duplas", alt: "Lista das suas duplas com o próximo passo de cada uma" },
-    { icon: MapTrifold, texto: "A jornada dos 16 encontros do guia, passo a passo.", img: "mentor_dpp-home", alt: "Visão geral do mentor com a jornada dos encontros" },
-    { icon: HandHeart, texto: "Pedir apoio à coordenação quando precisar.", img: "mentor_dpp-apoio", alt: "Meus chamados: pedidos de apoio à coordenação e o andamento de cada um" },
-    { icon: UserPlus, texto: "Solicitar um mentor especialista pro seu mentorado.", img: "mentor_dpp-especialista", alt: "Agenda por mentorado com o pedido de especialista em andamento" },
-    { icon: FolderOpen, texto: "Os materiais de apoio do programa.", img: "mentor_dpp-materiais", alt: "Materiais de apoio do encontro desta semana" },
+    { icon: CalendarCheck, texto: "Agendar e registrar encontros", img: "mentor_dpp-dupla", alt: "Ficha da dupla com o próximo encontro e o botão de remarcar" },
+    { icon: Users, texto: "Minhas duplas", img: "mentor_dpp-duplas", alt: "Lista das suas duplas com o próximo passo de cada uma" },
+    { icon: MapTrifold, texto: "Jornada dos encontros", img: "mentor_dpp-home", alt: "Visão geral do mentor com a jornada dos encontros" },
+    { icon: HandHeart, texto: "Pedir apoio", img: "mentor_dpp-apoio", alt: "Meus chamados: pedidos de apoio à coordenação e o andamento de cada um" },
+    { icon: UserPlus, texto: "Mentor especialista", img: "mentor_dpp-especialista", alt: "Agenda por mentorado com o pedido de especialista em andamento" },
+    { icon: FolderOpen, texto: "Materiais de apoio", img: "mentor_dpp-materiais", alt: "Materiais de apoio do encontro desta semana" },
   ],
   mentor_especialista: [
-    { icon: ClipboardText, texto: "Uma lista de pedidos que combinam com o seu perfil.", img: "mentor_especialista-home", alt: "Mural de pedidos de mentoria especializada com filtros por tema" },
-    { icon: Handshake, texto: "Aceitar um pedido e conduzir até 5 encontros.", img: "mentor_especialista-trilha", alt: "Ficha da trilha de especialista com a jornada de 5 encontros" },
-    { icon: NotePencil, texto: "Registrar cada encontro realizado.", img: "mentor_especialista-registro", alt: "Encontros da trilha com o botão de registrar" },
-    { icon: FolderOpen, texto: "Os materiais de apoio do programa.", img: "mentor_especialista-materiais", alt: "Materiais de apoio da mentoria especializada" },
+    { icon: ClipboardText, texto: "Pedidos de mentoria", img: "mentor_especialista-home", alt: "Mural de pedidos de mentoria especializada com filtros por tema" },
+    { icon: Handshake, texto: "Trilha de encontros", img: "mentor_especialista-trilha", alt: "Ficha da trilha de especialista com a jornada de 5 encontros" },
+    { icon: NotePencil, texto: "Registrar encontros", img: "mentor_especialista-registro", alt: "Encontros da trilha com o botão de registrar" },
+    { icon: FolderOpen, texto: "Materiais de apoio", img: "mentor_especialista-materiais", alt: "Materiais de apoio da mentoria especializada" },
   ],
   // o jovem não passa por este wizard (o dele é o OnboardingJovem do
   // /jovem, REALIZA-114) — a entrada existe porque o Record pede todos os
@@ -144,6 +143,47 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
 
 const printDesktop = (img: string) => `/onboarding/${img}.webp`;
 const printMobile = (img: string) => `/onboarding/${img}-m.webp`;
+
+/** 1px transparent gif — <img> fallback when the <source media> doesn't
+ *  match, so the other breakpoint downloads zero bytes (see PrintShot). */
+const PIXEL_VAZIO =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+/** Screen print pinned to one breakpoint: the <source media> only supplies
+ *  the file where it actually renders — elsewhere the <img> falls back to
+ *  the empty pixel and never hits the network. Plain <img> (no next/image):
+ *  the files are captured at the exact display size, and the old `priority`
+ *  eagerly fetched the ~100KB DESKTOP print inside a `hidden` figure on
+ *  mobile (and the mobile one on desktop). eager/high on the active shot is
+ *  now safe — on the wrong breakpoint it resolves to the pixel, not bytes. */
+function PrintShot({
+  src,
+  media,
+  ativo,
+  alt,
+}: {
+  src: string;
+  /** media query of the breakpoint that uses this print */
+  media: string;
+  ativo: boolean;
+  alt: string;
+}) {
+  return (
+    <picture className="contents">
+      <source media={media} srcSet={src} />
+      <img
+        src={PIXEL_VAZIO}
+        alt={alt}
+        loading={ativo ? "eager" : "lazy"}
+        fetchPriority={ativo ? "high" : "auto"}
+        className={cn(
+          "absolute inset-0 size-full object-cover object-top transition-opacity duration-300",
+          ativo ? "opacity-100" : "opacity-0"
+        )}
+      />
+    </picture>
+  );
+}
 
 // índices dos passos por papel — as declarações (voluntário + LGPD) abrem o
 // fluxo pra garantir o consent antes de qualquer dado pedido; o "Sobre você"
@@ -184,23 +224,6 @@ function MolduraTela({
         <span className="size-2 rounded-full bg-border" />
       </div>
       {children}
-    </div>
-  );
-}
-
-/** Tela de celular pro print mobile — moldura de aparelho na tinta da marca,
- *  estreita o bastante pro item e o print caberem juntos na vista. */
-function TelaCelular({ src, alt }: { src: string; alt: string }) {
-  return (
-    <div className="mx-auto mb-1 mt-2.5 w-[min(100%,17.5rem)] overflow-hidden rounded-[1.75rem] border-[5px] border-[var(--brand-ink)] bg-card shadow-border">
-      <Image
-        src={src}
-        alt={alt}
-        width={390}
-        height={520}
-        sizes="17.5rem"
-        className="block h-auto w-full"
-      />
     </div>
   );
 }
@@ -299,12 +322,20 @@ export function OnboardingFlow({
   const [interesses, setInteresses] = useState<string[]>(me.interesses ?? []);
   const [motivacao, setMotivacao] = useState(pessoal?.motivacao ?? "");
   const [consent, setConsent] = useState(false);
-  // recurso cuja tela ilustra o passo "o que você pode fazer" — hover, foco
-  // ou toque no item trocam o print (o último gesto vale); no mobile o
-  // painel fica acima da lista pra resposta do toque aparecer na hora
+  // feature whose screen illustrates the "what you can do" step — hover,
+  // focus or tap on a row swaps the shot (last gesture wins); on mobile the
+  // frame pins under the header so the tap feedback stays in view
   const [recursoAtivo, setRecursoAtivo] = useState(() =>
     Math.max(0, RECURSOS[me.role ?? "mentor_dpp"].findIndex((r) => r.img))
   );
+  // só o ativo e o anterior ficam montados — o crossfade de 300ms precisa
+  // dos dois, mas cada webp conta request: sem o recorte todas as imgs do
+  // papel baixavam ao entrar no passo
+  const [recursoAnterior, setRecursoAnterior] = useState(recursoAtivo);
+  useEffect(() => {
+    const t = setTimeout(() => setRecursoAnterior(recursoAtivo), 350);
+    return () => clearTimeout(t);
+  }, [recursoAtivo]);
   // sub-passos do "Sobre você" colapsam quando a importação da coordenação já
   // preencheu — "Corrigir" expande o form de volta pra editar
   const [editarSobre, setEditarSobre] = useState<Record<number, boolean>>({});
@@ -331,6 +362,9 @@ export function OnboardingFlow({
   // segue montado (footer fixo), então sem isso o foco não acompanharia a
   // "pergunta" nova (mesmo padrão das etapas do importar-csv)
   useEffect(() => {
+    // voltar ao topo antes do foco — sem isso um passo novo pode abrir já
+    // rolado (ex.: saindo do termo com a página no fim)
+    window.scrollTo(0, 0);
     tituloRef.current?.focus();
   }, [step]);
 
@@ -782,7 +816,7 @@ export function OnboardingFlow({
                 rotulo: "Continuar para seus dados ↓",
               }}
             />
-            <div id="ob-termo-dados" className="scroll-mt-24 space-y-2">
+            <div id="ob-termo-dados" className="scroll-mt-[calc(6rem+env(safe-area-inset-top))] space-y-2">
               <h2 className="text-base font-semibold">Seus dados para assinar</h2>
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {civis
@@ -812,7 +846,7 @@ export function OnboardingFlow({
               rotulo: "Continuar para seus dados ↓",
             }}
           />
-          <div id="ob-termo-dados" className="scroll-mt-24 space-y-2">
+          <div id="ob-termo-dados" className="scroll-mt-[calc(6rem+env(safe-area-inset-top))] space-y-2">
             <h2 className="text-base font-semibold">Seus dados para assinar</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
               {civis
@@ -904,12 +938,38 @@ export function OnboardingFlow({
         const ativo = recursos[recursoAtivo];
         return (
           <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:items-start sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)]">
+            {/* mobile: the frame pins under the fixed header while the list
+                scrolls beneath — a tap swaps the shot in place, no layout
+                shift. The band is opaque and edge-to-edge (-mx-4 cancels the
+                page gutter) so rows slide under it without peeking through
+                the gap to the header */}
+            {ativo?.img && (
+              <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 -mx-4 bg-background px-4 pb-3 pt-2 sm:hidden">
+                {/* portrait shot at its native 3:4 — height-driven so the
+                    whole capture shows uncropped (width follows the ratio);
+                    object-top keeps the app chrome in frame on any drift */}
+                <div className="relative mx-auto aspect-[3/4] h-[clamp(11rem,42dvh,16rem)] overflow-hidden rounded-2xl border border-border bg-card shadow-border" aria-live="polite">
+                  {recursos.map(
+                    (r, i) =>
+                      r.img &&
+                      (i === recursoAtivo || i === recursoAnterior) && (
+                        <PrintShot
+                          key={`m-${r.img}`}
+                          src={printMobile(r.img)}
+                          media="(max-width: 639.98px)"
+                          ativo={i === recursoAtivo}
+                          alt={i === recursoAtivo ? (r.alt ?? "") : ""}
+                        />
+                      )
+                  )}
+                </div>
+              </div>
+            )}
             <ul className="space-y-2">
               {recursos.map((r, i) => {
                 const aceso = !!r.img && i === recursoAtivo;
-                const painelId = `recurso-tela-${i}`;
                 const cartao = cn(
-                  "flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left outline-none transition-colors",
+                  "flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left outline-none transition-colors sm:px-4 sm:py-3",
                   aceso
                     ? "border-[var(--brand-lime)] bg-[var(--brand-lime)]/10"
                     : cn(
@@ -932,38 +992,29 @@ export function OnboardingFlow({
                       <r.icon size={18} weight="fill" aria-hidden />
                     </span>
                     <span className="text-sm leading-snug">{r.texto}</span>
+                    {/* the small screen icon marks which rows have a shot to
+                        preview — a caret read as a dropdown that never opened */}
                     {r.img && (
-                      <CaretDown
+                      <ImageSquare
                         size={16}
                         aria-hidden
                         className={cn(
-                          "ml-auto shrink-0 text-muted-foreground transition-transform duration-300 sm:hidden",
-                          aceso && "rotate-180 text-foreground"
+                          "ml-auto shrink-0 transition-colors",
+                          aceso ? "text-foreground" : "text-muted-foreground/70"
                         )}
                       />
                     )}
                   </>
                 );
                 return (
-                  <li key={r.texto} className="scroll-mb-28 scroll-mt-20">
+                  <li key={r.texto}>
                     {r.img ? (
                       <button
                         type="button"
                         onMouseEnter={() => setRecursoAtivo(i)}
                         onFocus={() => setRecursoAtivo(i)}
-                        onClick={(e) => {
-                          setRecursoAtivo(i);
-                          // no celular o painel anterior fecha acima do
-                          // toque e o item sobe — traz ele de volta à vista
-                          // depois da animação
-                          const li = e.currentTarget.parentElement;
-                          window.setTimeout(
-                            () => li?.scrollIntoView({ block: "nearest", behavior: "smooth" }),
-                            320
-                          );
-                        }}
-                        aria-expanded={aceso}
-                        aria-controls={painelId}
+                        onClick={() => setRecursoAtivo(i)}
+                        aria-current={aceso || undefined}
                         className={cn(
                           cartao,
                           "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring/60"
@@ -973,22 +1024,6 @@ export function OnboardingFlow({
                       </button>
                     ) : (
                       <div className={cartao}>{conteudo}</div>
-                    )}
-                    {/* celular: a tela abre logo abaixo do toque — antes o
-                        print ficava acima da lista e a troca acontecia fora
-                        da vista. Só o aberto monta a imagem */}
-                    {r.img && (
-                      <div
-                        id={painelId}
-                        className={cn(
-                          "grid transition-[grid-template-rows] duration-300 sm:hidden",
-                          aceso ? "grid-rows-[1fr]" : "grid-rows-[0fr]"
-                        )}
-                      >
-                        <div className="overflow-hidden">
-                          {aceso && <TelaCelular src={printMobile(r.img)} alt={r.alt ?? ""} />}
-                        </div>
-                      </div>
                     )}
                   </li>
                 );
@@ -1005,18 +1040,14 @@ export function OnboardingFlow({
                   <div className="relative aspect-[73/60]" aria-live="polite">
                     {recursos.map(
                       (r, i) =>
-                        r.img && (
-                          <Image
+                        r.img &&
+                        (i === recursoAtivo || i === recursoAnterior) && (
+                          <PrintShot
                             key={r.img}
                             src={printDesktop(r.img)}
+                            media="(min-width: 640px)"
+                            ativo={i === recursoAtivo}
                             alt={i === recursoAtivo ? (r.alt ?? "") : ""}
-                            fill
-                            sizes="(min-width: 1152px) 780px, 60vw"
-                            priority={i === recursoAtivo}
-                            className={cn(
-                              "object-cover object-top transition-opacity duration-300",
-                              i === recursoAtivo ? "opacity-100" : "opacity-0"
-                            )}
                           />
                         )
                     )}
@@ -1201,10 +1232,13 @@ export function OnboardingFlow({
       {/* coluna central — pb/pt compensam header e footer fixos. O passo de
           recursos com telas reais respira em desktop (balão apertado deixava
           o print ilegível); os demais passos ficam na coluna estreita de
-          conversa */}
+          conversa. Mobile ancora no topo (justify-center deixava ~200px
+          mortos sob o header e o balão flutuando no meio da tela) — o
+          centro vertical volta a partir de sm, onde o wizard lê como card.
+          pb-40 no mobile cobre o footer empilhado (~154px com safe-area) */}
       <main
         className={cn(
-          "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col justify-center px-4 pb-32 pt-20 transition-[max-width] duration-500 sm:px-6",
+          "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col pb-40 pt-[calc(5rem+env(safe-area-inset-top))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] transition-[max-width] duration-500 sm:justify-center sm:px-6 sm:pb-32",
           step === 2 && "sm:max-w-6xl"
         )}
       >
@@ -1241,11 +1275,14 @@ export function OnboardingFlow({
         </div>
       </main>
 
-      {/* footer fixo: "Pular etapa" nos passos opcionais + primário */}
+      {/* footer fixo: "Pular etapa" nos passos opcionais + primário.
+          Mobile empilha (ghosts centrados em cima, primário full-width
+          colado na borda = polegar) — em linha única os dois ghosts +
+          Continuar estouravam 390px e o primário saía cortado da tela */}
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/85 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
+        <div className="mx-auto flex w-full max-w-xl flex-col items-stretch gap-1.5 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:flex-row sm:items-center sm:gap-3 sm:px-6">
           {(passoComCampos || ehPassoTermo) && (
-            <div className="flex shrink-0 flex-wrap items-center gap-x-3">
+            <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-3">
               {/* no termo o ghost é "Assinar depois": avança sem gravar —
                   a pendência segue como ausência de assinatura. Nos demais
                   passos da demo sem form o primário cobre o pulo; no termo
@@ -1304,7 +1341,7 @@ export function OnboardingFlow({
                 }
               }}
               disabled={pending}
-              className="h-11 flex-1 font-semibold"
+              className="h-11 w-full font-semibold sm:flex-1"
             >
               {pending
                 ? ultimo || ehPassoTermo

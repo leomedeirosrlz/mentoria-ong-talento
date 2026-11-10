@@ -114,8 +114,8 @@ export function Linha({
       >
         <dt
           className={cn(
-            "shrink-0 text-muted-foreground",
-            !empilhado && "sm:w-32"
+            "min-w-0 [overflow-wrap:anywhere] text-muted-foreground",
+            !empilhado && "sm:w-32 sm:shrink-0"
           )}
         >
           {rotulo}
@@ -967,7 +967,8 @@ export function PerfilForm({
   tema: Tema;
   mentorProfile: MentorProfile | null;
   avatarUrl: string | null;
-  gravatarUrl: string;
+  /** Gravatar já confirmado no server — null = iniciais direto. */
+  gravatarUrl: string | null;
   /** Termo de voluntariado do próprio usuário — pendência do cadastro que
    *  não é campo de form (a assinatura é outra página, /assinar). */
   assinaturaTermo: Assinatura | null;

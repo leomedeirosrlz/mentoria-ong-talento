@@ -170,6 +170,7 @@ export function TrilhasCoordPanel({
                     </p>
                     <Link
                       href={`/duplas/${t.duplaId}`}
+                      prefetch={false}
                       className="group inline-flex min-h-11 shrink-0 items-center gap-1 rounded-md px-1 text-xs font-medium underline underline-offset-2 transition-colors hover:text-foreground md:min-h-8"
                     >
                       Ver ficha

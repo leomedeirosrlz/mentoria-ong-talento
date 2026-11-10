@@ -400,6 +400,7 @@ export function RegistrosFiltros({
               <li key={c.rotulo}>
                 <Link
                   href={c.href}
+                  prefetch={false}
                   scroll={false}
                   aria-label={`Remover filtro ${c.rotulo}`}
                   className="inline-flex min-h-11 items-center gap-1 rounded-full border bg-card px-3 text-xs font-semibold transition-colors hover:bg-muted focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)] sm:min-h-7"

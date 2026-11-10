@@ -113,12 +113,10 @@ function textoProximo(no: NoJornada | undefined): string | null {
 export function TrilhaJornada({
   jornada,
   statusDupla,
-  inicioDupla,
   duplaId,
 }: {
   jornada: JornadaDupla;
   statusDupla: DuplaStatus;
-  inicioDupla?: string | null;
   duplaId: string;
 }) {
   const refAtual = useRef<HTMLLIElement | null>(null);
@@ -228,6 +226,7 @@ export function TrilhaJornada({
                       ? `/duplas/${duplaId}?aba=encontros#registrar-${no.encontro.id}`
                       : `/duplas/${duplaId}?aba=encontros`
                   }
+                  prefetch={false}
                   aria-label={rotulo}
                   title={rotulo}
                   aria-current={atual ? "step" : undefined}
@@ -281,13 +280,6 @@ export function TrilhaJornada({
               </>
             )}
             {textoProximo(noAtual)}
-          </>
-        )}
-        {jornada.janelaCortada && (
-          <>
-            {" "}
-            · a contagem começa no início da dupla
-            {inicioDupla ? ` (${formatDate(inicioDupla)})` : ""}
           </>
         )}
       </p>

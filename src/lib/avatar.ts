@@ -28,11 +28,16 @@ export function avatarPublicUrl(path: string): string {
   return `${process.env.NEXT_PUBLIC_SUPABASE_URL}/storage/v1/object/public/avatares/${path}`;
 }
 
+/** MD5 do e-mail normalizado — a chave do Gravatar (e do nosso cache de
+ *  existência em lib/gravatar). */
+export function gravatarHash(email: string): string {
+  return createHash("md5").update(email.trim().toLowerCase()).digest("hex");
+}
+
 /** Fallback do e-mail — d=404 devolve nada quando não existe, o <Avatar>
  *  cai pra iniciais no onError. Server-only (md5 via node:crypto). */
 export function gravatarUrl(email: string, size = 128): string {
-  const hash = createHash("md5").update(email.trim().toLowerCase()).digest("hex");
-  return `https://www.gravatar.com/avatar/${hash}?s=${size}&d=404`;
+  return `https://www.gravatar.com/avatar/${gravatarHash(email)}?s=${size}&d=404`;
 }
 
 /** "Thiago Costa" -> "TC" · "madalena" -> "MA" */

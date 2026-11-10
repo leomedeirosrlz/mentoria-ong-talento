@@ -309,7 +309,10 @@ function MdLite({
   // ```nota é a observação de rodapé — texto menor e apagado, não código
   // (chatgpt-style footnote; o prompt a usa p/ "não se aplica quando…",
   // detalhe de cálculo, lembrete fino). Vale no fence fechado e no aberto
-  // (stream ou fim truncado): já renderiza como rodapé, nunca CodeBlock
+  // (stream ou fim truncado): já renderiza como rodapé, nunca CodeBlock.
+  // Tolerant match: "```Nota"/"``` nota" from the model must not fall
+  // into CodeBlock — a nota never renders as code
+  const ehNota = () => langCodigo?.toLowerCase() === "nota";
   const notaRodape = () => (
     <div
       key={key++}
@@ -378,7 +381,7 @@ function MdLite({
     // e copiar), sem inline
     if (emCodigo) {
       if (/^\s*```/.test(linha)) {
-        if (langCodigo === "nota") saida.push(notaRodape());
+        if (ehNota()) saida.push(notaRodape());
         else
           saida.push(
             <CodeBlock key={key++} codigo={codigo.join("\n")} linguagem={langCodigo} />
@@ -389,7 +392,7 @@ function MdLite({
       } else codigo.push(linha);
       return;
     }
-    const abreFence = /^\s*```(\S*)/.exec(linha);
+    const abreFence = /^\s*```\s*(\S*)/.exec(linha);
     if (abreFence) {
       flush();
       emCodigo = true;
@@ -499,12 +502,13 @@ function MdLite({
   // fence aberto no fim do stream (ou texto truncado sem fechamento):
   // fence comum mostra o que chegou com copiar desabilitado; ```nota
   // aberto já renderiza como rodapé — nunca vira bloco de código
-  if (emCodigo && codigo.length)
-    langCodigo === "nota"
-      ? saida.push(notaRodape())
-      : saida.push(
-          <CodeBlock key={key++} codigo={codigo.join("\n")} linguagem={langCodigo} pronto={false} />
-        );
+  if (emCodigo && codigo.length) {
+    if (ehNota()) saida.push(notaRodape());
+    else
+      saida.push(
+        <CodeBlock key={key++} codigo={codigo.join("\n")} linguagem={langCodigo} pronto={false} />
+      );
+  }
   // overflow-wrap: links longos e código sem quebra não vazam da coluna
   // estreita do painel (REALIZA-334). ia-stream põe o caret no fim do
   // último parágrafo/item (CSS), não numa linha própria

@@ -5,7 +5,7 @@ const LINK_FICHA =
 
 export function AuxCardAcoes({ href }: { href: string }) {
   return (
-    <Link href={href} className={LINK_FICHA}>
+    <Link href={href} prefetch={false} className={LINK_FICHA}>
       Ver ficha ›
     </Link>
   );

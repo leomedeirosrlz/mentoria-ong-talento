@@ -1,14 +1,16 @@
 import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 
-// o default do ssr não marca Secure — sem ele um cookie escrito em http
-// ficaria solto; em produção tudo é https mesmo (localhost é exceção do spec)
-// — mas em dev http+IP/hostname (Tailscale, LAN) o Secure seria descartado
-// e a sessão nunca persistiria
-const COOKIE_OPTS = {
-  secure: process.env.NODE_ENV === "production",
+// Secure follows the real request scheme, not NODE_ENV: a prod build over
+// LAN HTTP (192.168.x.x / Tailscale QA) silently drops Secure cookies and
+// the session never persists — same rule as the demo cookie (demo/mode.ts).
+// Vercel sets x-forwarded-proto=https, so real prod keeps Secure.
+const cookieOpts = async () => ({
+  secure:
+    process.env.NODE_ENV === "production" &&
+    (await headers()).get("x-forwarded-proto") === "https",
   sameSite: "lax",
-} as const;
+}) as const;
 
 export async function createClient() {
   const cookieStore = await cookies();
@@ -17,7 +19,7 @@ export async function createClient() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
-      cookieOptions: COOKIE_OPTS,
+      cookieOptions: await cookieOpts(),
       cookies: {
         getAll() {
           return cookieStore.getAll();

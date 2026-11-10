@@ -1032,31 +1032,60 @@ export function encontroEsperado(eventos: CicloEvento[], hoje: Date, desde?: str
   ).length;
 }
 
-/** Número do 1º encontro esperado (data <= hoje, >= início da dupla) sem `realizado`
- *  correspondente em dupla.encontros — é o encontro que "ainda não aconteceu".
- *  `limbo` exclui numeros agendados vencidos: eles são pendência de registro,
- *  não falta confirmada. */
+/** Cadência de recuperação dos passos defasados — a dupla que entra depois
+ *  do início do ciclo refaz os encontros oficiais anteriores à entrada em
+ *  ritmo acelerado (~2-3 por semana) em vez de pulá-los. */
+const CATCHUP_POR_SEMANA = 2.5;
+
+/** Passos oficiais anteriores à entrada da dupla cuja vez na fila de
+ *  recuperação já venceu: o k-ésimo (0-based, em ordem de data) vence
+ *  `iniciada_em + floor(k*7/2.5)` dias — os primeiros cobram rápido e o
+ *  backlog escoa em ~N/2.5 semanas. */
+export function defasadosVencidos(
+  eventos: CicloEvento[],
+  iniciadaEm: string,
+  hojeStr: string
+): EventoDatado[] {
+  const fila = eventos
+    .filter(
+      (e): e is EventoDatado =>
+        encontroDatado(e) && e.numero != null && e.data < iniciadaEm
+    )
+    .sort((a, b) => a.data.localeCompare(b.data));
+  const inicio = new Date(`${iniciadaEm}T12:00:00`);
+  return fila.filter((_, i) => {
+    const venc = new Date(inicio);
+    venc.setDate(venc.getDate() + Math.floor((i * 7) / CATCHUP_POR_SEMANA));
+    return toDateStr(venc) <= hojeStr;
+  });
+}
+
+/** Earliest expected official encounter without a matching `realizado` —
+ *  the step that "ainda não aconteceu". `expected` is the enforced scope
+ *  (the dupla's own window + due catch-up queue items — all already past
+ *  their official date by construction): a pre-entry step still waiting
+ *  its turn in the queue isn't owed yet, so it's not even a candidate.
+ *  `limbo` numbers are excluded too — pending registration, not a
+ *  confirmed miss. */
 function primeiroEncontroFaltante(
   dupla: Dupla,
   eventos: CicloEvento[],
-  hoje: Date,
-  limbo: ReadonlySet<number> = new Set()
-): number | null {
-  const hojeStr = toDateStr(hoje);
+  expected: ReadonlySet<number>,
+  limbo: ReadonlySet<number>
+): EventoDatado | null {
   const feitos = new Set(
     dupla.encontros.filter((e) => e.status === "realizado").map((e) => e.numero)
   );
-  const faltante = eventos
-    .filter(
-      (e): e is EventoDatado =>
-        encontroDatado(e) &&
-        e.numero != null &&
-        e.data <= hojeStr &&
-        (!dupla.iniciada_em || e.data >= dupla.iniciada_em)
-    )
-    .sort((a, b) => a.data.localeCompare(b.data))
-    .find((e) => e.numero != null && !feitos.has(e.numero) && !limbo.has(e.numero));
-  return faltante?.numero ?? null;
+  return (
+    eventos
+      .filter(
+        (e): e is EventoDatado =>
+          encontroDatado(e) && e.numero != null && expected.has(e.numero)
+      )
+      .sort((a, b) => a.data.localeCompare(b.data))
+      .find((e) => e.numero != null && !feitos.has(e.numero) && !limbo.has(e.numero)) ??
+    null
+  );
 }
 
 /** Bounds "YYYY-MM-DD" da semana calendário (seg–dom) que contém `hoje`.
@@ -1343,10 +1372,17 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
   const feitos = dupla.encontros.filter((e) => e.status === "realizado").length;
   // um encontro em limbo cobre o evento esperado do seu número — sai da conta
   // de atraso enquanto a pendência estiver aberta
+  // passos oficiais anteriores à entrada da dupla: a trilha os refaz
+  // retroativamente — entram no esperado quando a vez na fila de
+  // recuperação vence (~2-3/semana desde a entrada)
+  const defasados =
+    ehEspecialista || !dupla.iniciada_em
+      ? []
+      : defasadosVencidos(eventos, dupla.iniciada_em, hojeStr);
   const numerosEsperados = ehEspecialista
     ? new Set<number>()
-    : new Set(
-        eventos
+    : new Set([
+        ...eventos
           .filter(
             (e) =>
               encontroDatado(e) &&
@@ -1354,11 +1390,13 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
               e.data <= hojeStr &&
               (!dupla.iniciada_em || e.data >= dupla.iniciada_em)
           )
-          .map((e) => e.numero)
-      );
+          .map((e) => e.numero!),
+        ...defasados.map((e) => e.numero!),
+      ]);
   const esperado = ehEspecialista
     ? feitos
-    : encontroEsperado(eventos, hoje, dupla.iniciada_em) -
+    : encontroEsperado(eventos, hoje, dupla.iniciada_em) +
+      defasados.length -
       [...limbo].filter((n) => numerosEsperados.has(n)).length;
   const proximo =
     dupla.encontros
@@ -1482,11 +1520,24 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
   if (!ehEspecialista && atraso > 0) {
     // encontros oficiais já vencidos que nenhum realizado cobre — vira o
     // "6º e 7º" da linha; só sai no detalhe quando bate com a conta (um
-    // realizado fora da janela pode cobrir outro número)
-    const faltantes = [...numerosEsperados].filter(
-      (n) =>
-        !dupla.encontros.some((e) => e.numero === n && e.status === "realizado")
-    );
+    // realizado fora da janela pode cobrir outro número). Sorted by
+    // numero: the set is born post-entry first and catch-up second,
+    // which read "4º e 1º e 2º e 3º"
+    const faltantes = [...numerosEsperados]
+      .filter(
+        (n) =>
+          !dupla.encontros.some((e) => e.numero === n && e.status === "realizado")
+      )
+      .sort((a, b) => a - b);
+    // the named step must be one that's actually due — naming a catch-up
+    // item still waiting its turn in the queue would blame the dupla for a
+    // miss the régua doesn't even count yet
+    const faltante = primeiroEncontroFaltante(dupla, eventos, numerosEsperados, limbo);
+    // a due catch-up step has no "same week" to make it up in — its official
+    // week ended before the dupla existed. The truthful cadence is the
+    // accelerated recovery queue (~2-3/week), not the weekly norm
+    const catchupStep =
+      faltante != null && defasados.some((e) => e.id === faltante.id);
     sinais.push(
       atraso >= 2
         ? {
@@ -1500,7 +1551,7 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
         : {
             tipo: "atraso",
             tom: "atencao",
-            texto: `Encontro ${primeiroEncontroFaltante(dupla, eventos, hoje, limbo) ?? esperado} ainda não aconteceu (reposição na mesma semana)`,
+            texto: `Encontro ${faltante?.numero ?? esperado} ainda não aconteceu (${catchupStep ? "reposição em ritmo acelerado" : "reposição na mesma semana"})`,
           }
     );
   }
@@ -1714,14 +1765,12 @@ export function alvoAgendamento(
     const numerosFeitos = new Set(
       dupla.encontros.filter((e) => e.status === "realizado").map((e) => e.numero)
     );
-    // piso = 1º evento oficial após a entrada da dupla (a mesma régua dos
-    // faltantes abaixo): dupla que entra a meio do ciclo não tem "1º
-    // faltante" — sugerir o nº1 mintava uma row fantasma no passado
-    const inicio = dupla.iniciada_em;
-    let primeiroFaltante = inicio
-      ? (encontroEventos.find((e) => e.numero != null && e.data >= inicio)
-          ?.numero ?? total)
-      : 1;
+    // a fila recomeça no 1º passo oficial — os defasados anteriores à
+    // entrada da dupla são os primeiros a entrar no catch-up retroativo
+    let primeiroFaltante =
+      encontroEventos
+        .filter((e) => e.numero != null)
+        .sort((a, b) => a.data.localeCompare(b.data))[0]?.numero ?? 1;
     while (numerosFeitos.has(primeiroFaltante)) primeiroFaltante++;
     proximoNumero = saude.proximo?.numero ?? Math.min(primeiroFaltante, total);
     // a row real desse número é o que o dialog edita; saude.proximo só cobre
@@ -1731,11 +1780,19 @@ export function alvoAgendamento(
   // sem calendário oficial não há data a sugerir — o dialog abre em branco.
   // A data oficial é a do PDF como ela é — quinta-feira numa semana de
   // encontro duplo sugere quinta, não terça.
+  const hojeStr = toDateStr(hoje);
+  // defasado tem data oficial anterior à entrada da dupla — sugerir ela
+  // agendaria no passado; o dialog abre em branco e a dupla escolhe a
+  // reposição. Passo pós-entrada sugere a data oficial mesmo vencida:
+  // é o caso do faltante retroativo ("rolou sem agendar").
   const sugeridoProximo = ehEspecialista
     ? undefined
-    : encontroEventos.find((e) => e.numero === proximoNumero)?.data ?? undefined;
-
-  const hojeStr = toDateStr(hoje);
+    : (() => {
+        const ev = encontroEventos.find((e) => e.numero === proximoNumero);
+        return ev && (!dupla.iniciada_em || ev.data >= dupla.iniciada_em)
+          ? ev.data
+          : undefined;
+      })();
   const comEncontro = new Set(dupla.encontros.map((e) => e.numero));
   // passo com tentativa ainda em aberto (agendada/remarcada) não é faltante:
   // "rolou mesmo assim" se resolve marcando ESSA row, não criando outra
@@ -1759,9 +1816,19 @@ export function alvoAgendamento(
     : encontroEventos.flatMap((e) =>
         e.numero != null &&
         e.data <= hojeStr &&
-        (!dupla.iniciada_em || e.data >= dupla.iniciada_em) &&
         !comEncontro.has(e.numero)
-          ? [{ numero: e.numero, dataSugerida: e.data }]
+          ? [
+              {
+                numero: e.numero,
+                // defasado: the official date predates the entry — the
+                // raw suggestion fails server-side ("antes do início da
+                // mentoria"), so it climbs to the dupla's piso
+                dataSugerida:
+                  dupla.iniciada_em != null && e.data < dupla.iniciada_em
+                    ? dupla.iniciada_em
+                    : e.data,
+              },
+            ]
           : []
       );
 
@@ -1814,8 +1881,6 @@ export type JornadaDupla = {
   proximoNumero: number | null;
   faseAtual: { indice: number; total: number; nome: string } | null;
   completa: boolean;
-  /** iniciada_em podou encontros do início do ciclo — a trilha começa depois. */
-  janelaCortada: boolean;
 };
 
 /** Limiares dos marcos sobre `feitos` — por posição na janela, nunca por nº
@@ -1849,9 +1914,10 @@ export function jornadaDaDupla(
   hoje = new Date()
 ): JornadaDupla {
   const oficiais = [...passos].sort((a, b) => a.numero - b.numero);
-  const janela = dupla.iniciada_em
-    ? oficiais.filter((e) => e.data == null || e.data >= dupla.iniciada_em!)
-    : oficiais;
+  // a trilha mostra o guia inteiro: passos anteriores à entrada da dupla
+  // ficam visíveis como pendentes — são os defasados do catch-up
+  // retroativo (~2-3/semana, ver defasadosVencidos)
+  const janela = oficiais;
   const total = janela.length;
   // DPP: numero é a identidade do passo. Especialista (0074): numero é a
   // tentativa — o passo é o rank entre realizados; várias tentativas miram o
@@ -1915,7 +1981,6 @@ export function jornadaDaDupla(
     proximoNumero: noAtual?.numero ?? null,
     faseAtual,
     completa: total > 0 && feitos >= total,
-    janelaCortada: janela.length < oficiais.length,
   };
 }
 

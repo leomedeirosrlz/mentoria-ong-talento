@@ -921,6 +921,7 @@ function ContatoLinha({
     <li className="flex items-center gap-2 py-0.5">
       <Link
         href={`/jovem/pessoas/${c.id}`}
+        prefetch={false}
         className="flex min-h-11 min-w-0 flex-1 items-center gap-2.5 rounded-md outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
       >
         <Avatar

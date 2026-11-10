@@ -469,6 +469,7 @@ function Rail({ agenda }: { agenda: AgendaMinhaDerivada }) {
               <li key={d.id}>
                 <Link
                   href={`/duplas/${d.id}`}
+                  prefetch={false}
                   className="group flex min-h-11 items-center gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-muted/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 >
                   <Avatar

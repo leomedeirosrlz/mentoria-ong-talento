@@ -490,6 +490,7 @@ export function RelatorioCanvas({
       return (
         <Link
           href={l.__links.par}
+          prefetch={false}
           onClick={(e) => e.stopPropagation()}
           className="break-words rounded-sm underline-offset-2 decoration-muted-foreground/40 hover:decoration-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
