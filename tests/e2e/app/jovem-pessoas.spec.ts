@@ -274,10 +274,10 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
       page.getByRole("heading", { name: "Pessoas", level: 1 })
     ).toBeVisible();
 
-    // o jovem DA DUPLA dele aparece (profile e ficha são coisas distintas:
-    // "Jovem E2E" em Mentores e equipe, "Mentorada E2E" em Mentorados)
-    await expect(page.getByText("Jovem E2E").first()).toBeVisible();
-    await expect(page.getByText("Mentorada E2E").first()).toBeVisible();
+    // o jovem DA DUPLA dele aparece uma vez só, pela ficha: o profile
+    // "Jovem E2E" está vinculado a "Mentorada E2E" e a linha de conta some
+    await expect(page.getByText("Mentorada E2E", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Jovem E2E", { exact: true })).toHaveCount(0);
     // o outro jovem logado não é de dupla dele — some das duas seções
     await expect(page.getByText("Jovem E2E Sem DPP")).toHaveCount(0);
     // e as fichas e2e sem vínculo com ele também
