@@ -236,15 +236,13 @@ export function MentorHome({
         );
         let seguinteNumero: number | null = null;
         if (agendado) {
-          // mesmo piso do alvoAgendamento (ciclo.ts): quem entrou a meio do
-          // ciclo não tem buraco antes da entrada — sem o piso o nº1 era
-          // sugerido e virava row fantasma
-          const inicioSeg = dupla.iniciada_em;
-          const pisoSeguinte = inicioSeg
-            ? (eventosDaDupla.find(
-                (e) => e.tipo === "encontro" && e.numero != null && e.data != null && e.data >= inicioSeg
-              )?.numero ?? 1)
-            : 1;
+          // same queue as alvoAgendamento (ciclo.ts): restarts at the 1st
+          // official step — pre-entry defasados lead the retro catch-up,
+          // they are not a forbidden gap
+          const pisoSeguinte =
+            eventosDaDupla
+              .filter((e) => e.tipo === "encontro" && e.numero != null && e.data != null)
+              .sort((a, b) => a.data!.localeCompare(b.data!))[0]?.numero ?? 1;
           for (let n = pisoSeguinte; n <= totalDupla; n++) {
             if (!numerosOcupados.has(n)) {
               seguinteNumero = n;
@@ -256,12 +254,18 @@ export function MentorHome({
           seguinteNumero != null
             ? (dupla.encontros.find((e) => e.numero === seguinteNumero) ?? null)
             : null;
-        const sugeridoSeguinte =
-          seguinteNumero != null && !ehEsp
-            ? (eventosDaDupla.find(
-                (e) => e.tipo === "encontro" && e.numero === seguinteNumero
-              )?.data ?? undefined)
+        // same guard as sugeridoProximo: a defasado's official date is
+        // before the dupla joined — suggesting it would prefill the past
+        const sugeridoSeguinte = (() => {
+          if (seguinteNumero == null || ehEsp) return undefined;
+          const ev = eventosDaDupla.find(
+            (e) => e.tipo === "encontro" && e.numero === seguinteNumero
+          );
+          return ev?.data != null &&
+            (!dupla.iniciada_em || ev.data >= dupla.iniciada_em)
+            ? ev.data
             : undefined;
+        })();
 
         // --card-spacing=5 no sm+: padding uniforme p-4→sm:p-5 no card
         // inteiro via a var (header, content e gap vertical seguem juntos)

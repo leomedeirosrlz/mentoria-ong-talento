@@ -475,14 +475,15 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
   // k: 0 aos 28px (medidas do mini) → 1 aos 64px+ (medidas cheias)
   const kOlho = Math.min(1, Math.max(0, (tamanho - 28) / 36));
   // olhos ~17% maiores que a primeira versão (feedback de design: a
-  // expressão era genérica) — o oval e o afastamento seguem, e no mini
-  // continuam legíveis sem encostar um no outro
+  // expressão era genérica) e mais ~15% na escala cheia: com o olho menor o
+  // disco sobrava embaixo e a Liza lia como gordinha. No mini continuam
+  // legíveis sem encostar um no outro
   const olhoDims = detalhe
     ? {
-        rx: 12.8 - 2.3 * kOlho,
-        ry: 15.8 - 2.9 * kOlho,
-        cy: 48.5 - 2 * kOlho,
-        dx: 19 - 1.5 * kOlho,
+        rx: 12.8 - 0.7 * kOlho,
+        ry: 15.8 - 1 * kOlho,
+        cy: 48.5 - 3 * kOlho,
+        dx: 19 - 0.4 * kOlho,
       }
     : { rx: 12.8, ry: 15.8, cy: 48.5, dx: 19 };
   // cílios em todas as escalas: acima de 40 o par fino; abaixo, um traço
@@ -588,7 +589,7 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
               ))}
             {detalhe && (efetivo !== "parado" || BOCA_NO_PARADO) && (
               <motion.g style={{ x: bx, y: by }}>
-                <g transform="translate(50 62)">
+                <g transform="translate(50 63)">
                   <BocaForma ativa={pose.boca === "sorriso"} transicao={transicao} escala={pose.bocaEscala}>
                     <path d="M-4.2 -1.2Q0 2.8 4.2 -1.2" fill="none" stroke={TINTA} strokeWidth={2.6} strokeLinecap="round" />
                   </BocaForma>
