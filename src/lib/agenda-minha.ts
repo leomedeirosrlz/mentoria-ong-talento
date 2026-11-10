@@ -527,15 +527,36 @@ function itensDaDupla(
       alvo.encontroAlvo != null &&
       (alvo.encontroAlvo.status === "nao_aconteceu" ||
         alvo.encontroAlvo.status === "cancelado");
-    const previstos = new Map<number, { dia: string | null; encontro: Encontro | null }>();
+    // official date of the step in the dupla's cronograma — what the meta
+    // line reports ("a data oficial já passou"), even when it's a defasado
+    const dataOficialDe = (n: number) =>
+      evCronograma.find(
+        (e) => e.tipo === "encontro" && e.numero === n && e.data != null
+      )?.data ?? null;
+    // a defasado's official date predates the dupla — passing it to the
+    // dialog clamps to `piso` (already past) and opens "Registrar" on an
+    // "a agendar" item. Blank opens "Agendar", which is the item's action
+    const sugestaoAgenda = (oficial: string | null) =>
+      oficial != null && (!d.iniciada_em || oficial >= d.iniciada_em)
+        ? oficial
+        : null;
+    const previstos = new Map<
+      number,
+      { dia: string | null; sugerido: string | null; encontro: Encontro | null }
+    >();
     if (!alvo.cicloCompleto && (alvo.encontroAlvo == null || alvoFalhou))
       previstos.set(alvo.proximoNumero, {
-        dia: alvo.sugeridoProximo ?? null,
+        dia: dataOficialDe(alvo.proximoNumero),
+        sugerido: alvo.sugeridoProximo ?? null,
         encontro: alvoFalhou ? alvo.encontroAlvo : null,
       });
     for (const f of alvo.faltantes)
       if (!previstos.has(f.numero))
-        previstos.set(f.numero, { dia: f.dataSugerida, encontro: null });
+        previstos.set(f.numero, {
+          dia: dataOficialDe(f.numero),
+          sugerido: sugestaoAgenda(dataOficialDe(f.numero)),
+          encontro: null,
+        });
     // TODA row falha segue acionável, não só a do alvo: dois nao_aconteceu
     // seguidos deixavam o segundo sem nenhum caminho aqui (a data já passou,
     // então ele nem entra como item de dia) — a ficha já remarcava, a
@@ -545,7 +566,7 @@ function itensDaDupla(
         (e.status === "nao_aconteceu" || e.status === "cancelado") &&
         !previstos.has(e.numero)
       )
-        previstos.set(e.numero, { dia: null, encontro: e });
+        previstos.set(e.numero, { dia: null, sugerido: null, encontro: e });
 
     for (const [numero, p] of [...previstos].sort((a, b) => a[0] - b[0])) {
       // data oficial já passada não senta no dia dela — cai no grupo "a
@@ -581,7 +602,7 @@ function itensDaDupla(
         duplaId: d.id,
         encontro: p.encontro,
         numero,
-        sugeridoDia: p.dia,
+        sugeridoDia: p.sugerido,
         eventoId: null,
         link: null,
         acoes: p.encontro ? ["remarcar"] : ["agendar"],
