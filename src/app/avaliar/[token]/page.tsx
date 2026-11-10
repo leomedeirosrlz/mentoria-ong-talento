@@ -77,7 +77,7 @@ export default async function AvaliarTokenPage({
           <header className="mb-6">
             <Logo size="lg" />
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Mentoria Social
+              Programa de Mentoria Social
             </p>
           </header>
 
