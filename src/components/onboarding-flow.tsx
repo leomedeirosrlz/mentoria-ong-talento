@@ -934,25 +934,23 @@ export function OnboardingFlow({
                 the gap to the header */}
             {ativo?.img && (
               <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 -mx-4 bg-background px-4 pb-3 pt-2 sm:hidden">
-                {/* phone bezel, not the browser-chrome MolduraTela: the
-                    prints are portrait 3:4 phone captures — inside a monitor
-                    frame at band height they cropped to an unreadable 16:9
-                    sliver. aspect-[3/4] keeps the whole shot legible */}
-                <div className="mx-auto w-[min(100%,12rem)] overflow-hidden rounded-[1.75rem] border-[5px] border-[var(--brand-ink)] bg-card shadow-border">
-                  <div className="relative aspect-[3/4]" aria-live="polite">
-                    {recursos.map(
-                      (r, i) =>
-                        r.img && (
-                          <PrintShot
-                            key={`m-${r.img}`}
-                            src={printMobile(r.img)}
-                            media="(max-width: 639px)"
-                            ativo={i === recursoAtivo}
-                            alt={i === recursoAtivo ? (r.alt ?? "") : ""}
-                          />
-                        )
-                    )}
-                  </div>
+                {/* full-bleed portrait shot — a bezel at this size reads as a
+                    toy and a monitor frame cropped the 3:4 print to a 16:9
+                    sliver. ~38dvh keeps the app top bar + first cards
+                    readable; object-top crops the bottom, never the top */}
+                <div className="relative h-[clamp(9rem,38dvh,15rem)] overflow-hidden rounded-2xl border border-border bg-card shadow-border" aria-live="polite">
+                  {recursos.map(
+                    (r, i) =>
+                      r.img && (
+                        <PrintShot
+                          key={`m-${r.img}`}
+                          src={printMobile(r.img)}
+                          media="(max-width: 639px)"
+                          ativo={i === recursoAtivo}
+                          alt={i === recursoAtivo ? (r.alt ?? "") : ""}
+                        />
+                      )
+                  )}
                 </div>
               </div>
             )}
@@ -960,7 +958,7 @@ export function OnboardingFlow({
               {recursos.map((r, i) => {
                 const aceso = !!r.img && i === recursoAtivo;
                 const cartao = cn(
-                  "flex w-full items-center gap-3 rounded-2xl border px-4 py-3 text-left outline-none transition-colors",
+                  "flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left outline-none transition-colors sm:px-4 sm:py-3",
                   aceso
                     ? "border-[var(--brand-lime)] bg-[var(--brand-lime)]/10"
                     : cn(
