@@ -114,8 +114,8 @@ export function Linha({
       >
         <dt
           className={cn(
-            "shrink-0 text-muted-foreground",
-            !empilhado && "sm:w-32"
+            "min-w-0 [overflow-wrap:anywhere] text-muted-foreground",
+            !empilhado && "sm:w-32 sm:shrink-0"
           )}
         >
           {rotulo}
