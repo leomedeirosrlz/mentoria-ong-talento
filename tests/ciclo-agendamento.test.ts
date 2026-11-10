@@ -145,8 +145,10 @@ describe("alvoAgendamento", () => {
       dt("2025-10-28")
     );
     expect(a.faltantes).toEqual([
-      { numero: 1, dataSugerida: "2025-10-07" },
-      { numero: 2, dataSugerida: "2025-10-14" },
+      // defasados: a oficial é anterior à entrada — a sugestão sobe pro
+      // piso da dupla (registrar antes dele daria erro no server)
+      { numero: 1, dataSugerida: "2025-10-21" },
+      { numero: 2, dataSugerida: "2025-10-21" },
       { numero: 3, dataSugerida: "2025-10-21" },
       { numero: 4, dataSugerida: "2025-10-28" },
     ]);

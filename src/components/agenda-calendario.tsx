@@ -1888,10 +1888,16 @@ export function AgendaCalendario({
   ): ReactNode => {
     if (linha.tipo === "agendar") {
       // dia passado: o retroativo registra o que rolou sem agendamento —
-      // o nº precisa constar nas opções mesmo fora da janela de faltantes
+      // o nº precisa constar nas opções mesmo fora da janela de faltantes.
+      // A clicked day before the dupla's start clamps to the piso — the
+      // raw suggestion would fail server-side ("antes do início")
+      const diaPadrao =
+        d.iniciada_em != null && selecionado < d.iniciada_em
+          ? d.iniciada_em
+          : selecionado;
       const opcoes = [...(alvosPorDupla.get(d.id)?.faltantes ?? [])];
       if (!opcoes.some((f) => f.numero === linha.numero))
-        opcoes.push({ numero: linha.numero, dataSugerida: selecionado });
+        opcoes.push({ numero: linha.numero, dataSugerida: diaPadrao });
       return (
         <div key={`agendar-${linha.numero}`}>
           <DuplaSemEncontroLinha dupla={d} previsto={linha.numero} />
@@ -1902,7 +1908,7 @@ export function AgendaCalendario({
                   duplaId={d.id}
                   faltantes={opcoes}
                   numeroInicial={linha.numero}
-                  quandoPadrao={selecionado}
+                  quandoPadrao={diaPadrao}
                   esp={d.trilha === "especialista"}
                   onCreated={(id, dia) => encontroCriado(d.id, id, dia)}
                   trigger={

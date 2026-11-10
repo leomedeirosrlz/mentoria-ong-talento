@@ -1041,7 +1041,7 @@ const CATCHUP_POR_SEMANA = 2.5;
  *  recuperação já venceu: o k-ésimo (0-based, em ordem de data) vence
  *  `iniciada_em + floor(k*7/2.5)` dias — os primeiros cobram rápido e o
  *  backlog escoa em ~N/2.5 semanas. */
-function defasadosVencidos(
+export function defasadosVencidos(
   eventos: CicloEvento[],
   iniciadaEm: string,
   hojeStr: string
@@ -1520,11 +1520,15 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
   if (!ehEspecialista && atraso > 0) {
     // encontros oficiais já vencidos que nenhum realizado cobre — vira o
     // "6º e 7º" da linha; só sai no detalhe quando bate com a conta (um
-    // realizado fora da janela pode cobrir outro número)
-    const faltantes = [...numerosEsperados].filter(
-      (n) =>
-        !dupla.encontros.some((e) => e.numero === n && e.status === "realizado")
-    );
+    // realizado fora da janela pode cobrir outro número). Sorted by
+    // numero: the set is born post-entry first and catch-up second,
+    // which read "4º e 1º e 2º e 3º"
+    const faltantes = [...numerosEsperados]
+      .filter(
+        (n) =>
+          !dupla.encontros.some((e) => e.numero === n && e.status === "realizado")
+      )
+      .sort((a, b) => a - b);
     // the named step must be one that's actually due — naming a catch-up
     // item still waiting its turn in the queue would blame the dupla for a
     // miss the régua doesn't even count yet
@@ -1813,7 +1817,18 @@ export function alvoAgendamento(
         e.numero != null &&
         e.data <= hojeStr &&
         !comEncontro.has(e.numero)
-          ? [{ numero: e.numero, dataSugerida: e.data }]
+          ? [
+              {
+                numero: e.numero,
+                // defasado: the official date predates the entry — the
+                // raw suggestion fails server-side ("antes do início da
+                // mentoria"), so it climbs to the dupla's piso
+                dataSugerida:
+                  dupla.iniciada_em != null && e.data < dupla.iniciada_em
+                    ? dupla.iniciada_em
+                    : e.data,
+              },
+            ]
           : []
       );
 

@@ -3,6 +3,7 @@ import {
   TRILHA_LEN,
   comparaNome,
   cronogramasOpcoes,
+  defasadosVencidos,
   diaSemanaDe,
   duplasSemEncontroDoNumero,
   emLimbo,
@@ -116,26 +117,37 @@ function pendenciaDeRegistro(d: Dupla, agoraMs: number): Encontro | null {
   );
 }
 
-/** Oficiais já vencidos na janela da dupla sem `realizado` correspondente —
- *  espelho do `faltantes` do semáforo (o detalhe "6º e 7º" do sinal atraso).
+/** Oficiais já esperados sem `realizado` correspondente — espelho do
+ *  `faltantes` do semáforo (o detalhe "6º e 7º" do sinal atraso): vencidos
+ *  dentro da janela da dupla + defasados cuja vez na fila de recuperação
+ *  já chegou (mesma régua do `numerosEsperados`).
  *  Limbo conta como faltante aqui (tem row, não tem realizado); o semáforo
  *  já o tirou do `esperado`, então nem sempre faltantes.length == atraso. */
 function encontrosFaltantes(d: Dupla, evs: CicloEvento[], hoje: Date): number[] {
   const hojeStr = toDateStr(hoje);
-  return evs
-    .filter(
-      (e) =>
-        e.tipo === "encontro" &&
-        e.numero != null &&
-        e.data != null &&
-        e.data <= hojeStr &&
-        (!d.iniciada_em || e.data >= d.iniciada_em) &&
-        !d.encontros.some(
-          (x) => x.numero === e.numero && x.status === "realizado"
-        )
-    )
-    .map((e) => e.numero!)
-    .sort((a, b) => a - b);
+  const realizados = new Set(
+    d.encontros.filter((x) => x.status === "realizado").map((x) => x.numero)
+  );
+  return [
+    ...new Set(
+      [
+        ...evs.filter(
+          (e) =>
+            e.tipo === "encontro" &&
+            e.numero != null &&
+            e.data != null &&
+            e.data <= hojeStr &&
+            (!d.iniciada_em || e.data >= d.iniciada_em)
+        ),
+        // catch-up: pre-entry steps whose queue turn is already due —
+        // the old rule pretended the dupla didn't owe them and the
+        // line lied about the count
+        ...(d.iniciada_em ? defasadosVencidos(evs, d.iniciada_em, hojeStr) : []),
+      ]
+        .map((e) => e.numero!)
+        .filter((n) => !realizados.has(n))
+    ),
+  ].sort((a, b) => a - b);
 }
 
 /** "3 e 4" / "3, 4 e 5" — lista de números em prosa. */
@@ -403,7 +415,8 @@ export function contextoDuplaAux(
     const lead =
       atraso === 1
         ? `${tag(nums[0] ?? falt[0] ?? vig?.numero ?? saude.esperado)} atrasado`
-        : `Encontros ${juntaNums(nums)}${turmaDa} atrasados`;
+        : // empty nums (limbo covered the count) must not leak "Encontros  da"
+          `Encontros${nums.length ? ` ${juntaNums(nums)}` : ""}${turmaDa} atrasados`;
     const tail =
       pend?.status === "agendado"
         ? `O ${pend.numero}º agendado já passou sem registro`

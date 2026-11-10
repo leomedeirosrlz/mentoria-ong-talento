@@ -219,9 +219,12 @@ const PERIODO_DE: Record<Periodo, string> = {
 };
 
 /** Colunas da grade: rótulo de período + 7 dias — a mesma largura no
- *  cabeçalho e nas 3 linhas pra matriz alinhar. */
+ *  cabeçalho e nas 3 linhas pra matriz alinhar. On mobile the label is a
+ *  full-width strip above its row (col-span-7) so all 7 cells share the
+ *  whole row width and clear the 44px tap target even at 360px; sm+ keeps
+ *  the label as the leading column. */
 const GRADE_COLS =
-  "grid grid-cols-[2.75rem_repeat(7,minmax(0,1fr))] items-stretch gap-1";
+  "grid grid-cols-[repeat(7,minmax(0,1fr))] items-stretch gap-[3px] sm:grid-cols-[2.75rem_repeat(7,minmax(0,1fr))] sm:gap-1";
 
 /** Grade semanal — matriz 7 dias × 3 períodos, uma célula por encaixe
  *  (0100): "ter de manhã e qui à noite" era impossível de dizer com o
@@ -388,11 +391,14 @@ export function CampoDisponibilidade({
       <div
         role="grid"
         aria-label="Dias e períodos livres na semana"
-        className="touch-none select-none space-y-1"
+        // -mx-1 bleeds 4px into the page gutter on mobile for extra cell
+        // width; the corner placeholder hides below sm where the grid is
+        // 7 columns instead of 8
+        className="-mx-1 touch-none select-none space-y-1 sm:mx-0"
       >
         {/* cabeçalho de dias — cada um alterna a coluna inteira */}
         <div role="row" className={GRADE_COLS}>
-          <span role="columnheader" aria-hidden />
+          <span role="columnheader" aria-hidden className="hidden sm:block" />
           {DIAS_SEMANA.map((d) => (
             <span role="columnheader" key={d} className="min-w-0">
               <button
@@ -408,12 +414,12 @@ export function CampoDisponibilidade({
         </div>
         {PERIODOS.map((p, pi) => (
           <div role="row" key={p} className={GRADE_COLS}>
-            <span role="rowheader" className="min-w-0">
+            <span role="rowheader" className="col-span-7 min-w-0 sm:col-span-1">
               <button
                 type="button"
                 onClick={() => alternarLinha(p)}
                 aria-label={`Alternar ${PERIODOS_LABELS[p]} inteira`}
-                className="flex h-full min-h-11 w-full items-center rounded-md px-1.5 text-[11px] font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:min-h-0"
+                className="flex h-11 w-full items-center rounded-md px-2 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:h-full sm:min-h-0 sm:px-1.5 sm:text-[11px]"
               >
                 {PERIODOS_LABELS[p]}
               </button>
