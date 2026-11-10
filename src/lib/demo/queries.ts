@@ -483,7 +483,11 @@ export function demoDuplasResumo(role: AppRole, todas: boolean): DuplaResumo[] {
 
 export function demoContagemPessoas(): number {
   const data = getDemoData();
-  return data.profiles.length + data.mentorados.length;
+  // idem real: conta de jovem (role=mentorado) já conta via mentorados
+  return (
+    data.profiles.filter((p) => p.role !== "mentorado").length +
+    data.mentorados.length
+  );
 }
 
 /** /pessoas lista os profiles legíveis pelo papel (profiles_select,

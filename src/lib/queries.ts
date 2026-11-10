@@ -635,7 +635,12 @@ export const getContagemPessoas = cache(async (): Promise<number> => {
     // select=* falharia até no head:true — o * expande pras colunas sem
     // grant (0026 em profiles, 0034 em mentorados) e a query inteira dá
     // permission denied; id basta pra contar
-    supabase.from("profiles").select("id", { count: "exact", head: true }),
+    // conta de jovem (role=mentorado) já entra pela tabela mentorados —
+    // somar profiles contaria a mesma pessoa duas vezes
+    supabase
+      .from("profiles")
+      .select("id", { count: "exact", head: true })
+      .or("role.is.null,role.neq.mentorado"),
     supabase.from("mentorados").select("id", { count: "exact", head: true }),
   ]);
   if (profiles.error) throw profiles.error;

@@ -286,6 +286,9 @@ describe("enums — fuzzy pro vocabulário fechado", () => {
     expect(normalizaPapel("auxiliar executivo").valor).toBe("supervisor");
     expect(normalizaPapel("coordenação").valor).toBe("coordenacao");
     expect(normalizaPapel("especialista").valor).toBe("mentor_especialista");
+    // jovem não vira papel de equipe — "mentorado" casaria /mentor/
+    expect(normalizaPapel("Mentorado").valor).toBeNull();
+    expect(normalizaPapel("mentorada").valor).toBeNull();
   });
 
   it("mudou=false quando já veio canônico; vazio → null", () => {

@@ -141,7 +141,16 @@ export function MentoradoActions({
             </div>
             <div className="space-y-2">
               <Label htmlFor="em_email">E-mail</Label>
-              <Input id="em_email" name="email" type="email" defaultValue={mentorado.email ?? ""} />
+              <Input
+                id="em_email" name="email" type="email"
+                defaultValue={mentorado.email ?? ""}
+              />
+              {mentorado.profile_id && (
+                <p className="text-xs text-muted-foreground">
+                  Já entrou na plataforma — trocar aqui muda o e-mail de acesso
+                  dela.
+                </p>
+              )}
             </div>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">

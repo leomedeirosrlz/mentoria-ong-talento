@@ -229,6 +229,16 @@ export async function publicarAtualizacaoChamado(id: string, texto: string) {
   const autor = (data as { autor?: { email?: string | null; nome?: string | null; profile_id?: string } | null })
     ?.autor;
   if (autor?.email) {
+    // jovem não alcança /chamados (o layout manda pra /jovem e o pedido se
+    // perde) — os pedidos dele vivem em /jovem/perfil. Admin client: quem
+    // atende nem sempre lê o profile do jovem pelo RLS
+    let jovem = false;
+    if (autor.profile_id) {
+      const { createAdminClient } = await import("./supabase/admin");
+      const { data: papel } = await createAdminClient()
+        .from("profiles").select("role").eq("id", autor.profile_id).maybeSingle();
+      jovem = papel?.role === "mentorado";
+    }
     enviaEmailChamadoDepois(supabase, {
       chamadoId: id,
       para: [autor.email],
@@ -236,7 +246,9 @@ export async function publicarAtualizacaoChamado(id: string, texto: string) {
       html: emailChamadoAtualizacao({
         autorNome: autor.nome ?? "",
         texto: texto.trim(),
-        href: `${SITE_URL}/chamados?c=${id}`,
+        href: jovem
+          ? `${SITE_URL}/jovem/perfil?c=${id}`
+          : `${SITE_URL}/chamados?c=${id}`,
       }),
       contexto: "publicarAtualizacaoChamado",
     });

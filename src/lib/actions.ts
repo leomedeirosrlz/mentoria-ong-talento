@@ -927,6 +927,17 @@ export async function setPessoaRole(profileId: string, role: string | null) {
   const primarioAtual =
     (ppAtuais ?? []).find((r) => r.primario)?.papel ?? null;
 
+  // conta de jovem: o papel 'mentorado' só sai pela promoção a mentor
+  // (promoverMentorado, que respeita situacao e faz a ponte de identidade).
+  // Setar outro papel aqui — ou "Sem papel" — deixaria o jovem sem acesso
+  // ao /jovem e sem caminho de volta pela UI
+  if ((ppAtuais ?? []).some((r) => r.papel === "mentorado")) {
+    return {
+      error:
+        "Essa pessoa é jovem do programa — a mudança de papel segue pelo fluxo de promoção a mentor.",
+    };
+  }
+
   // conceder o lado que falta: primário já é mentor_* → só entra o
   // secundário. O mentor em dupla DPP ativa pode virar híbrido sem passar
   // pelo "mova a dupla antes" — nada deixa de existir pra ele
@@ -1564,6 +1575,59 @@ export async function updateMentorado(id: string, formData: FormData) {
   const whatsappRaw = String(formData.get("whatsapp") ?? "");
   const whatsapp = normWhatsapp(whatsappRaw);
   if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp: use DDD e o número completo." };
+  // ficha vinculada a conta: o e-mail de acesso mora em auth.users. Trocar
+  // só a ficha divergiria os três stores (0177 recusa) e o próximo login
+  // criaria conta fantasma — então a troca vai pelo auth, igual ao
+  // updatePessoa, e o sync 0060/0176 traz profiles e a ficha junto. É o
+  // caminho de suporte da coordenação pro jovem que perdeu o e-mail antigo
+  const { data: atualMd } = await supabase
+    .from("mentorados").select("email, profile_id").eq("id", id).single();
+  if (
+    atualMd?.profile_id &&
+    (normEmail(atualMd.email ?? "") || null) !== (email || null)
+  ) {
+    if (eu.role !== "coordenacao") {
+      return { error: "Só a coordenação troca o e-mail de acesso." };
+    }
+    if (!email) {
+      return {
+        error:
+          "Essa pessoa já entrou na plataforma — o e-mail de acesso não pode ficar vazio.",
+      };
+    }
+    const { data: livre, error: erroRpc } = await supabase.rpc(
+      "email_disponivel",
+      { p_email: email }
+    );
+    if (erroRpc) {
+      return { error: "Não foi possível verificar o e-mail. Tente de novo." };
+    }
+    if (!livre) {
+      return { error: "Esse e-mail já está em outro cadastro do programa." };
+    }
+    const { createAdminClient } = await import("./supabase/admin");
+    const admin = createAdminClient();
+    const { data: conta } = await admin
+      .from("profiles").select("user_id").eq("id", atualMd.profile_id).single();
+    if (conta?.user_id) {
+      const { error: erroAuth } = await admin.auth.admin.updateUserById(
+        conta.user_id,
+        { email, email_confirm: true }
+      );
+      if (erroAuth) {
+        return {
+          error: /already|registered|exists|duplicate/i.test(erroAuth.message)
+            ? "Esse e-mail já está em outro cadastro do programa."
+            : "Não foi possível trocar o e-mail. Tente de novo.",
+        };
+      }
+    } else {
+      // conta desfeita (sem auth): o profile ainda é a âncora do vínculo
+      const { error: erroProfile } = await admin
+        .from("profiles").update({ email }).eq("id", atualMd.profile_id);
+      if (erroProfile) return { error: erroAmigavel(erroProfile) };
+    }
+  }
   const ficha = camposFicha(formData, { de: "mentorado" });
   if ("error" in ficha) return { error: ficha.error };
   const { data, error } = await supabase.from("mentorados").update({
@@ -1609,6 +1673,16 @@ export async function deleteMentorado(id: string) {
     .from("duplas").select("id").eq("mentorado_id", id).limit(1);
   if (duplas?.length)
     return { error: "Esse mentorado já está em uma dupla. Encerre a dupla antes de excluir." };
+  // ficha com conta: apagar deixaria a conta 'mentorado' órfã (/jovem vazio)
+  // e o jovem continuaria entrando — saída do programa é pela situação
+  const { data: vinculo } = await supabase
+    .from("mentorados").select("profile_id").eq("id", id).single();
+  if (vinculo?.profile_id) {
+    return {
+      error:
+        "Essa pessoa já entrou na plataforma — marque como desistente em vez de excluir.",
+    };
+  }
   const [{ data: m }, { data: cv }] = await Promise.all([
     supabase.from("mentorados").select("documento_path").eq("id", id).single(),
     // curriculo_path está fora do grant de coluna — a view escopada é o
@@ -1753,6 +1827,18 @@ export async function salvarCampoRelatorio(
         const { data: atual } = await supabase
           .from("profiles").select("user_id").eq("id", id).single();
         if (atual?.user_id) {
+          return {
+            error:
+              "Essa pessoa já entrou na plataforma — o e-mail de acesso só muda pelo perfil dela.",
+          };
+        }
+      }
+      // idem ficha de jovem vinculada (mentorados.profile_id): o e-mail de
+      // acesso mora na conta e divergir aqui abriria conta fantasma
+      if (tabela === "mentorados") {
+        const { data: atual } = await supabase
+          .from("mentorados").select("profile_id").eq("id", id).single();
+        if (atual?.profile_id) {
           return {
             error:
               "Essa pessoa já entrou na plataforma — o e-mail de acesso só muda pelo perfil dela.",
@@ -2617,10 +2703,14 @@ export async function importMentorados(rows: LinhaImportada[]) {
   if (rows.length > MAX_IMPORT) {
     return { error: `O arquivo tem ${rows.length} linhas. Importe em lotes de até ${MAX_IMPORT}.` };
   }
-  const { data: existentes } = await supabase.from("mentorados").select("nome, whatsapp");
+  const { data: existentes } = await supabase.from("mentorados").select("nome, whatsapp, email");
   const nomes = new Set((existentes ?? []).map((m) => normNome(m.nome).toLowerCase()));
   const was = new Set(
     (existentes ?? []).map((m) => normWhatsapp(m.whatsapp ?? "")).filter(Boolean)
+  );
+  // e-mail é a chave do login (unique 0177) — repetido derrubaria o lote todo
+  const emails = new Set(
+    (existentes ?? []).map((m) => normEmail(m.email ?? "")).filter(Boolean)
   );
   const vistos = new Set<string>();
   const vistosWa = new Set<string>();
@@ -2643,8 +2733,12 @@ export async function importMentorados(rows: LinhaImportada[]) {
         vistos.has(chave) || (whatsapp && vistosWa.has(whatsapp))) {
       puladas.push(`${nome}: já existe`); continue;
     }
+    if (email && emails.has(email)) {
+      puladas.push(`${nome}: e-mail já usado em outro cadastro`); continue;
+    }
     vistos.add(chave);
     if (whatsapp) vistosWa.add(whatsapp);
+    if (email) emails.add(email);
     validas.push({
       nome,
       email: email || null,

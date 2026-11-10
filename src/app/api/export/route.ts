@@ -226,7 +226,7 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
     supabase.from("profiles_contato").select("id,email,whatsapp"),
     supabase
       .from("mentorados")
-      .select("id,nome,email,whatsapp,ong_origem,situacao,saiu_em,motivo_saida"),
+      .select("id,nome,email,whatsapp,ong_origem,situacao,saiu_em,motivo_saida,profile_id"),
     supabase
       .from("mentor_profiles")
       .select("profile_id,capacidade,capacidade_especialista"),
@@ -252,12 +252,18 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
     (pessoalP ?? []).map((p) => [p.id, { responsavel: null, ...p }])
   );
   const pessoalMentoradoPorId = new Map((pessoalM ?? []).map((m) => [m.id, m]));
+  // conta de jovem já sai pela ficha — exportar o profile duplicaria a linha
+  const vinculados = new Set(
+    (mentorados ?? []).map((m) => m.profile_id).filter(Boolean)
+  );
 
   return csvResponse(
     csvPessoas(
       ((pessoas ?? []) as (Pick<Profile, "id" | "nome" | "role" | "ativo"> & {
         profile_papeis?: { papel: AppRole }[];
-      })[]).map((p) => {
+      })[])
+        .filter((p) => !(p.role === "mentorado" && vinculados.has(p.id)))
+        .map((p) => {
         const { profile_papeis, ...rest } = p;
         return {
           ...rest,
