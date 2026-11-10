@@ -927,6 +927,17 @@ export async function setPessoaRole(profileId: string, role: string | null) {
   const primarioAtual =
     (ppAtuais ?? []).find((r) => r.primario)?.papel ?? null;
 
+  // conta de jovem: o papel 'mentorado' só sai pela promoção a mentor
+  // (promoverMentorado, que respeita situacao e faz a ponte de identidade).
+  // Setar outro papel aqui — ou "Sem papel" — deixaria o jovem sem acesso
+  // ao /jovem e sem caminho de volta pela UI
+  if ((ppAtuais ?? []).some((r) => r.papel === "mentorado")) {
+    return {
+      error:
+        "Essa pessoa é jovem do programa — a mudança de papel segue pelo fluxo de promoção a mentor.",
+    };
+  }
+
   // conceder o lado que falta: primário já é mentor_* → só entra o
   // secundário. O mentor em dupla DPP ativa pode virar híbrido sem passar
   // pelo "mova a dupla antes" — nada deixa de existir pra ele
@@ -1564,6 +1575,21 @@ export async function updateMentorado(id: string, formData: FormData) {
   const whatsappRaw = String(formData.get("whatsapp") ?? "");
   const whatsapp = normWhatsapp(whatsappRaw);
   if (whatsappRaw.trim() && !whatsapp) return { error: "Confira o WhatsApp: use DDD e o número completo." };
+  // ficha vinculada a conta: o e-mail de acesso mora em auth.users e só
+  // muda pelo self-service do jovem (trocarEmail → sync auth→profiles→
+  // mentorados, 0060/0176). Editar aqui divergiria os três stores e a
+  // próxima tentativa de login criaria conta fantasma
+  const { data: atualMd } = await supabase
+    .from("mentorados").select("email, profile_id").eq("id", id).single();
+  if (
+    atualMd?.profile_id &&
+    (normEmail(atualMd.email ?? "") || null) !== (email || null)
+  ) {
+    return {
+      error:
+        "Essa pessoa já entrou na plataforma — o e-mail de acesso só muda pelo perfil dela.",
+    };
+  }
   const ficha = camposFicha(formData, { de: "mentorado" });
   if ("error" in ficha) return { error: ficha.error };
   const { data, error } = await supabase.from("mentorados").update({
@@ -1753,6 +1779,18 @@ export async function salvarCampoRelatorio(
         const { data: atual } = await supabase
           .from("profiles").select("user_id").eq("id", id).single();
         if (atual?.user_id) {
+          return {
+            error:
+              "Essa pessoa já entrou na plataforma — o e-mail de acesso só muda pelo perfil dela.",
+          };
+        }
+      }
+      // idem ficha de jovem vinculada (mentorados.profile_id): o e-mail de
+      // acesso mora na conta e divergir aqui abriria conta fantasma
+      if (tabela === "mentorados") {
+        const { data: atual } = await supabase
+          .from("mentorados").select("profile_id").eq("id", id).single();
+        if (atual?.profile_id) {
           return {
             error:
               "Essa pessoa já entrou na plataforma — o e-mail de acesso só muda pelo perfil dela.",

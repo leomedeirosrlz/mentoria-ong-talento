@@ -38,7 +38,7 @@ export default async function PessoasPage() {
   // fora da coordenação a página é um diretório de colegas: os resumos
   // operacionais (vínculos de dupla, fichas de mentor, assinaturas) viriam
   // escopados pelo RLS e renderizariam badges falsos — nem dispara
-  const [pessoas, mentorados, duplas, todasDuplas, perfisMentor, resumoAss] =
+  const [pessoasRaw, mentorados, duplas, todasDuplas, perfisMentor, resumoAss] =
     await Promise.all([
       getPessoas(),
       getMentorados(),
@@ -47,6 +47,17 @@ export default async function PessoasPage() {
       souCoord ? getMentorProfiles() : Promise.resolve([]),
       souCoord ? getAssinaturasResumo() : Promise.resolve([]),
     ]);
+
+  // conta de jovem (profile role=mentorado) já aparece como ficha de
+  // mentorado — a linha de profile duplicaria a pessoa e a ficha dela é
+  // um shell sem os dados de dupla. Profile de staff vinculado a ficha de
+  // jovem (ex-mentorado promovido) tem papel de mentor e fica.
+  const vinculados = new Set(
+    mentorados.map((m) => m.profile_id).filter((id): id is string => Boolean(id))
+  );
+  const pessoas = pessoasRaw.filter(
+    (p) => !(p.role === "mentorado" && vinculados.has(p.id))
+  );
 
   const comDupla = new Set(
     duplas

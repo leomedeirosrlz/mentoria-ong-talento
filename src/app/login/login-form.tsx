@@ -215,6 +215,7 @@ export function LoginForm() {
         access_token?: string;
         refresh_token?: string;
         failed?: boolean;
+        expired?: boolean;
       } | null;
       // a aba do e-mail achou o link queimado/expirado — para de esperar e
       // mostra o mesmo card de link inválido (aqui o "pedir novo link" faz
@@ -223,6 +224,16 @@ export function LoginForm() {
         entrou = true;
         setEnviado(false);
         router.replace(urlErroLink());
+        return;
+      }
+      // handoff publicado mas a aba dormiu além do TTL de 10min — os tokens
+      // morreram no servidor e nunca vão chegar; esperar era spinner eterno
+      if (tokens?.expired) {
+        entrou = true;
+        setEnviado(false);
+        setErro(
+          "O link expirou antes de ser aberto. Peça um novo — ele vale por 1 hora."
+        );
         return;
       }
       if (!tokens?.access_token || !tokens.refresh_token) return;
