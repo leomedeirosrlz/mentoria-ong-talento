@@ -919,7 +919,6 @@ export default async function DuplaPage({
         <TrilhaJornada
           jornada={jornada}
           statusDupla={dupla.status}
-          inicioDupla={dupla.iniciada_em}
           duplaId={dupla.id}
         />
       </section>

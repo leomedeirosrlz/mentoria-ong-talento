@@ -367,7 +367,6 @@ export function MentorHome({
               <TrilhaJornada
                 jornada={jornada}
                 statusDupla={dupla.status}
-                inicioDupla={dupla.iniciada_em}
                 duplaId={dupla.id}
               />
               <MarcoNotifier duplaId={dupla.id} feitos={jornada.feitos} total={jornada.total} />

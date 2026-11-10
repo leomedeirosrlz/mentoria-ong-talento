@@ -152,6 +152,35 @@ describe("alvoAgendamento", () => {
     ]);
   });
 
+  it("late dupla: proximoNumero is the 1st official step, with no suggested date", () => {
+    const a = alvoAgendamento(
+      mkDupla({ iniciada_em: "2025-10-21" }),
+      CICLO_16,
+      dt("2025-10-28")
+    );
+    // the queue restarts at the first official step — iniciada_em doesn't
+    // floor it to the first post-entry one
+    expect(a.proximoNumero).toBe(1);
+    // step 1's official date precedes the entry — suggesting it would
+    // schedule in the past, so the dialog opens blank for the make-up
+    expect(a.sugeridoProximo).toBeUndefined();
+  });
+
+  it("late dupla past the catch-up steps: post-entry target suggests the official date", () => {
+    const a = alvoAgendamento(
+      mkDupla({
+        iniciada_em: "2025-10-21",
+        encontros: [encRealizado(1, "2025-10-22"), encRealizado(2, "2025-10-24")],
+      }),
+      CICLO_16,
+      dt("2025-10-28")
+    );
+    expect(a.proximoNumero).toBe(3);
+    // step 3's official date is inside the dupla's window — suggesting it is
+    // the retroactive case ("it happened without being scheduled")
+    expect(a.sugeridoProximo).toBe("2025-10-21");
+  });
+
   it("ciclo completo: 16 realizados → proximoNumero no teto e CTA desligado", () => {
     const dupla = mkDupla({
       encontros: CICLO_16.filter((e) => e.tipo === "encontro").map((e) =>
