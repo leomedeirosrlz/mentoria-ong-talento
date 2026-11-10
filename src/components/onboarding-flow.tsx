@@ -328,6 +328,14 @@ export function OnboardingFlow({
   const [recursoAtivo, setRecursoAtivo] = useState(() =>
     Math.max(0, RECURSOS[me.role ?? "mentor_dpp"].findIndex((r) => r.img))
   );
+  // só o ativo e o anterior ficam montados — o crossfade de 300ms precisa
+  // dos dois, mas cada webp conta request: sem o recorte todas as imgs do
+  // papel baixavam ao entrar no passo
+  const [recursoAnterior, setRecursoAnterior] = useState(recursoAtivo);
+  useEffect(() => {
+    const t = setTimeout(() => setRecursoAnterior(recursoAtivo), 350);
+    return () => clearTimeout(t);
+  }, [recursoAtivo]);
   // sub-passos do "Sobre você" colapsam quando a importação da coordenação já
   // preencheu — "Corrigir" expande o form de volta pra editar
   const [editarSobre, setEditarSobre] = useState<Record<number, boolean>>({});
@@ -808,7 +816,7 @@ export function OnboardingFlow({
                 rotulo: "Continuar para seus dados ↓",
               }}
             />
-            <div id="ob-termo-dados" className="scroll-mt-24 space-y-2">
+            <div id="ob-termo-dados" className="scroll-mt-[calc(6rem+env(safe-area-inset-top))] space-y-2">
               <h2 className="text-base font-semibold">Seus dados para assinar</h2>
               <p className="text-sm leading-relaxed text-muted-foreground">
                 {civis
@@ -838,7 +846,7 @@ export function OnboardingFlow({
               rotulo: "Continuar para seus dados ↓",
             }}
           />
-          <div id="ob-termo-dados" className="scroll-mt-24 space-y-2">
+          <div id="ob-termo-dados" className="scroll-mt-[calc(6rem+env(safe-area-inset-top))] space-y-2">
             <h2 className="text-base font-semibold">Seus dados para assinar</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
               {civis
@@ -943,11 +951,12 @@ export function OnboardingFlow({
                 <div className="relative mx-auto aspect-[3/4] h-[clamp(11rem,42dvh,16rem)] overflow-hidden rounded-2xl border border-border bg-card shadow-border" aria-live="polite">
                   {recursos.map(
                     (r, i) =>
-                      r.img && (
+                      r.img &&
+                      (i === recursoAtivo || i === recursoAnterior) && (
                         <PrintShot
                           key={`m-${r.img}`}
                           src={printMobile(r.img)}
-                          media="(max-width: 639px)"
+                          media="(max-width: 639.98px)"
                           ativo={i === recursoAtivo}
                           alt={i === recursoAtivo ? (r.alt ?? "") : ""}
                         />
@@ -1031,7 +1040,8 @@ export function OnboardingFlow({
                   <div className="relative aspect-[73/60]" aria-live="polite">
                     {recursos.map(
                       (r, i) =>
-                        r.img && (
+                        r.img &&
+                        (i === recursoAtivo || i === recursoAnterior) && (
                           <PrintShot
                             key={r.img}
                             src={printDesktop(r.img)}

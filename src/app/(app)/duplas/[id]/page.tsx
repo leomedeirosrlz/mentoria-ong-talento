@@ -1305,6 +1305,7 @@ export default async function DuplaPage({
             <Avatar
               nome={dupla.mentor.nome_social ?? dupla.mentor.nome}
               src={dupla.mentor.avatar_path ? avatarPublicUrl(dupla.mentor.avatar_path) : null}
+              fallbackSrc={dupla.mentor.gravatar_url ?? null}
               size={32}
             />
             <span className="min-w-0 text-sm font-semibold underline-offset-4 transition-colors group-hover:underline">

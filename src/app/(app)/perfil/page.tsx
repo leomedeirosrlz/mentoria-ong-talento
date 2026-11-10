@@ -6,6 +6,7 @@ import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { getMinhaGrade, getMinhasExcecoes } from "@/lib/queries-especialista";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { gravatarUrlSeExiste } from "@/lib/gravatar";
+import { demoRole } from "@/lib/demo/mode";
 import { temPapel } from "@/lib/types";
 import { TEMA_COOKIE, temaValido } from "@/lib/tema";
 import { EspecialistaHorarios } from "@/components/especialista-horarios";
@@ -28,6 +29,7 @@ export default async function PerfilPage() {
     getMinhaAssinaturaTermo(),
   ]);
   if (!me) redirect("/login");
+  const demo = await demoRole();
   // a agenda do especialista (grade semanal + exceções) edita no perfil
   // (REALIZA-207) — só se busca pra quem tem o papel, híbrido incluso
   const souEspecialista = temPapel(me, "mentor_especialista");
@@ -44,7 +46,7 @@ export default async function PerfilPage() {
       tema={tema}
       mentorProfile={mentorProfile}
       avatarUrl={me.avatar_path ? avatarPublicUrl(me.avatar_path) : null}
-      gravatarUrl={await gravatarUrlSeExiste(me.email)}
+      gravatarUrl={demo ? null : await gravatarUrlSeExiste(me.email)}
       assinaturaTermo={assinaturaTermo}
       horarios={
         souEspecialista ? (

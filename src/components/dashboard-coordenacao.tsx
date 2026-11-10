@@ -722,12 +722,14 @@ function pessoaLinha(p: {
   nome: string;
   nome_social?: string | null;
   avatar_path?: string | null;
+  gravatar_url?: string | null;
 }): PessoaLinha {
   return {
     id: p.id,
     nome: p.nome,
     nome_social: p.nome_social ?? null,
     avatar_path: p.avatar_path ?? null,
+    gravatar_url: p.gravatar_url ?? null,
   };
 }
 
