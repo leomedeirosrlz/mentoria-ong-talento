@@ -1,4 +1,4 @@
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import type { AppRole } from "@/lib/types";
 import {
   DEMO_ROLE_COOKIE,
@@ -13,13 +13,18 @@ import {
 // reais (src/lib/queries*.ts) checam `demoRole()` antes de bater no Supabase,
 // então a demo inteira roda sem sessão e sem tocar no banco.
 
-const COOKIE_OPTS = {
+// Secure follows the real request scheme, not NODE_ENV: a prod build over
+// LAN HTTP (phone QA at 192.168.x.x:3100) silently drops Secure cookies —
+// /demo exited the moment a papel was picked. Vercel sets x-forwarded-proto
+// https, so prod keeps Secure.
+const cookieOpts = async () => ({
   path: "/",
   maxAge: 60 * 60 * 24 * 30,
-  sameSite: "lax",
-  // dev local é http — Secure só em produção (https)
-  secure: process.env.NODE_ENV === "production",
-} as const;
+  sameSite: "lax" as const,
+  secure:
+    process.env.NODE_ENV === "production" &&
+    (await headers()).get("x-forwarded-proto") === "https",
+});
 
 /** Papel ativo da demo — null = sessão normal (autenticada ou não). */
 export async function demoRole(): Promise<AppRole | null> {
@@ -40,11 +45,11 @@ export async function demoOnboarded(papel: AppRole): Promise<boolean> {
 }
 
 export async function definirPapelDemo(papel: AppRole) {
-  (await cookies()).set(DEMO_ROLE_COOKIE, papel, COOKIE_OPTS);
+  (await cookies()).set(DEMO_ROLE_COOKIE, papel, await cookieOpts());
 }
 
 export async function marcarOnboardingDemo(papel: AppRole) {
-  (await cookies()).set(demoObCookie(papel), "1", COOKIE_OPTS);
+  (await cookies()).set(demoObCookie(papel), "1", await cookieOpts());
 }
 
 export async function desmarcarOnboardingDemo(papel: AppRole) {
@@ -83,7 +88,7 @@ export async function marcarDemoLidas(ids: string[]) {
   (await cookies()).set(
     DEMO_LIDAS_COOKIE,
     JSON.stringify([...lidas].slice(-DEMO_LIDAS_MAX)),
-    COOKIE_OPTS
+    await cookieOpts()
   );
 }
 
