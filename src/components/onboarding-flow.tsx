@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -144,6 +143,47 @@ const RECURSOS: Record<AppRole, Recurso[]> = {
 
 const printDesktop = (img: string) => `/onboarding/${img}.webp`;
 const printMobile = (img: string) => `/onboarding/${img}-m.webp`;
+
+/** 1px transparent gif — <img> fallback when the <source media> doesn't
+ *  match, so the other breakpoint downloads zero bytes (see PrintShot). */
+const PIXEL_VAZIO =
+  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
+
+/** Screen print pinned to one breakpoint: the <source media> only supplies
+ *  the file where it actually renders — elsewhere the <img> falls back to
+ *  the empty pixel and never hits the network. Plain <img> (no next/image):
+ *  the files are captured at the exact display size, and the old `priority`
+ *  eagerly fetched the ~100KB DESKTOP print inside a `hidden` figure on
+ *  mobile (and the mobile one on desktop). eager/high on the active shot is
+ *  now safe — on the wrong breakpoint it resolves to the pixel, not bytes. */
+function PrintShot({
+  src,
+  media,
+  ativo,
+  alt,
+}: {
+  src: string;
+  /** media query of the breakpoint that uses this print */
+  media: string;
+  ativo: boolean;
+  alt: string;
+}) {
+  return (
+    <picture className="contents">
+      <source media={media} srcSet={src} />
+      <img
+        src={PIXEL_VAZIO}
+        alt={alt}
+        loading={ativo ? "eager" : "lazy"}
+        fetchPriority={ativo ? "high" : "auto"}
+        className={cn(
+          "absolute inset-0 size-full object-cover object-top transition-opacity duration-300",
+          ativo ? "opacity-100" : "opacity-0"
+        )}
+      />
+    </picture>
+  );
+}
 
 // índices dos passos por papel — as declarações (voluntário + LGPD) abrem o
 // fluxo pra garantir o consent antes de qualquer dado pedido; o "Sobre você"
@@ -895,21 +935,22 @@ export function OnboardingFlow({
             {ativo?.img && (
               <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 -mx-4 bg-background px-4 pb-3 pt-2 sm:hidden">
                 <MolduraTela>
-                  <div className="relative h-44" aria-live="polite">
+                  {/* height tracks the viewport (min 7.5rem, ideal 22dvh,
+                      max 11rem) — a fixed h-44 ate a third of small phones
+                      on top of header + footer chrome */}
+                  <div
+                    className="relative h-[clamp(7.5rem,22dvh,11rem)]"
+                    aria-live="polite"
+                  >
                     {recursos.map(
                       (r, i) =>
                         r.img && (
-                          <Image
+                          <PrintShot
                             key={`m-${r.img}`}
                             src={printMobile(r.img)}
+                            media="(max-width: 639px)"
+                            ativo={i === recursoAtivo}
                             alt={i === recursoAtivo ? (r.alt ?? "") : ""}
-                            fill
-                            sizes="92vw"
-                            priority={i === recursoAtivo}
-                            className={cn(
-                              "object-cover object-top transition-opacity duration-300",
-                              i === recursoAtivo ? "opacity-100" : "opacity-0"
-                            )}
                           />
                         )
                     )}
@@ -993,17 +1034,12 @@ export function OnboardingFlow({
                     {recursos.map(
                       (r, i) =>
                         r.img && (
-                          <Image
+                          <PrintShot
                             key={r.img}
                             src={printDesktop(r.img)}
+                            media="(min-width: 640px)"
+                            ativo={i === recursoAtivo}
                             alt={i === recursoAtivo ? (r.alt ?? "") : ""}
-                            fill
-                            sizes="(min-width: 1152px) 780px, 60vw"
-                            priority={i === recursoAtivo}
-                            className={cn(
-                              "object-cover object-top transition-opacity duration-300",
-                              i === recursoAtivo ? "opacity-100" : "opacity-0"
-                            )}
                           />
                         )
                     )}
@@ -1188,10 +1224,13 @@ export function OnboardingFlow({
       {/* coluna central — pb/pt compensam header e footer fixos. O passo de
           recursos com telas reais respira em desktop (balão apertado deixava
           o print ilegível); os demais passos ficam na coluna estreita de
-          conversa */}
+          conversa. Mobile ancora no topo (justify-center deixava ~200px
+          mortos sob o header e o balão flutuando no meio da tela) — o
+          centro vertical volta a partir de sm, onde o wizard lê como card.
+          pb-40 no mobile cobre o footer empilhado (~154px com safe-area) */}
       <main
         className={cn(
-          "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col justify-center px-4 pb-32 pt-20 transition-[max-width] duration-500 sm:px-6",
+          "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col pb-40 pt-20 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] transition-[max-width] duration-500 sm:justify-center sm:px-6 sm:pb-32",
           step === 2 && "sm:max-w-6xl"
         )}
       >
@@ -1228,11 +1267,14 @@ export function OnboardingFlow({
         </div>
       </main>
 
-      {/* footer fixo: "Pular etapa" nos passos opcionais + primário */}
+      {/* footer fixo: "Pular etapa" nos passos opcionais + primário.
+          Mobile empilha (ghosts centrados em cima, primário full-width
+          colado na borda = polegar) — em linha única os dois ghosts +
+          Continuar estouravam 390px e o primário saía cortado da tela */}
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/85 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
+        <div className="mx-auto flex w-full max-w-xl flex-col items-stretch gap-1.5 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:flex-row sm:items-center sm:gap-3 sm:px-6">
           {(passoComCampos || ehPassoTermo) && (
-            <div className="flex shrink-0 flex-wrap items-center gap-x-3">
+            <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-3">
               {/* no termo o ghost é "Assinar depois": avança sem gravar —
                   a pendência segue como ausência de assinatura. Nos demais
                   passos da demo sem form o primário cobre o pulo; no termo
@@ -1291,7 +1333,7 @@ export function OnboardingFlow({
                 }
               }}
               disabled={pending}
-              className="h-11 flex-1 font-semibold"
+              className="h-11 w-full font-semibold sm:flex-1"
             >
               {pending
                 ? ultimo || ehPassoTermo
