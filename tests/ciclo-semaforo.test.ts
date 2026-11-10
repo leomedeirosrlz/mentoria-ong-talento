@@ -133,16 +133,17 @@ describe("saudadeDaDupla — risco", () => {
     expect(s.feitos).toBe(0);
   });
 
-  it("atraso conta só a janela da dupla (iniciada_em poda o começo do ciclo)", () => {
-    // hoje = 28/10: esperados dentro da janela são só os encontros 3 e 4
+  it("atraso soma os defasados vencidos da fila de recuperação", () => {
+    // hoje = 28/10, entrada 21/10: oficiais da janela são os encontros 3 e 4;
+    // os defasados 1 e 2 já venceram na fila (~2-3/semana) → esperado = 4
     const s = saudadeDaDupla(
       mkDupla({ iniciada_em: "2025-10-21" }),
       CICLO_16,
       dt("2025-10-28")
     );
     expect(s.semaforo).toBe("risco");
-    expect(s.motivo).toBe("2 encontros em atraso");
-    expect(s.esperado).toBe(2);
+    expect(s.motivo).toBe("4 encontros em atraso");
+    expect(s.esperado).toBe(4);
   });
 
   it("avaliação baixa + dificuldade no último registro é risco (antes do atraso)", () => {
