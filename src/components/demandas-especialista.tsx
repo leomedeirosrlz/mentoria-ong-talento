@@ -307,6 +307,7 @@ export function DemandasEspecialista({
                   <li key={s.id} className="py-2 first:pt-0 last:pb-0">
                     <Link
                       href={s.dupla_id ? `/duplas/${s.dupla_id}` : "/agenda"}
+                      prefetch={false}
                       className="group flex items-center gap-2 text-sm"
                     >
                       <CheckCircle

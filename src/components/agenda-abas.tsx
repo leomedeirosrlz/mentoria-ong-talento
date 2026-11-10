@@ -78,6 +78,7 @@ export function AbasAgenda({
             aria-controls={painelId}
             tabIndex={i === indiceAtivo ? 0 : -1}
             href={aba.href}
+            prefetch={false}
             scroll={false}
             onKeyDown={(e) => onKeyDown(e, i)}
             className={cn(

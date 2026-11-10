@@ -967,7 +967,8 @@ export function PerfilForm({
   tema: Tema;
   mentorProfile: MentorProfile | null;
   avatarUrl: string | null;
-  gravatarUrl: string;
+  /** Gravatar já confirmado no server — null = iniciais direto. */
+  gravatarUrl: string | null;
   /** Termo de voluntariado do próprio usuário — pendência do cadastro que
    *  não é campo de form (a assinatura é outra página, /assinar). */
   assinaturaTermo: Assinatura | null;

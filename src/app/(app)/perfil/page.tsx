@@ -4,7 +4,8 @@ import { cookies } from "next/headers";
 import { getMe, getMeuMentorProfile, getMeusDadosPessoais } from "@/lib/queries";
 import { getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { getMinhaGrade, getMinhasExcecoes } from "@/lib/queries-especialista";
-import { avatarPublicUrl, gravatarUrl } from "@/lib/avatar";
+import { avatarPublicUrl } from "@/lib/avatar";
+import { gravatarUrlSeExiste } from "@/lib/gravatar";
 import { temPapel } from "@/lib/types";
 import { TEMA_COOKIE, temaValido } from "@/lib/tema";
 import { EspecialistaHorarios } from "@/components/especialista-horarios";
@@ -43,7 +44,7 @@ export default async function PerfilPage() {
       tema={tema}
       mentorProfile={mentorProfile}
       avatarUrl={me.avatar_path ? avatarPublicUrl(me.avatar_path) : null}
-      gravatarUrl={gravatarUrl(me.email)}
+      gravatarUrl={await gravatarUrlSeExiste(me.email)}
       assinaturaTermo={assinaturaTermo}
       horarios={
         souEspecialista ? (

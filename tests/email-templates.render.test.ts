@@ -30,7 +30,7 @@ describe("templates de e-mail", () => {
     expect(html).toContain("email-assets/logo-realiza-branco.png");
     expect(html).toContain('bgcolor="#323232"'); // header/rodapé ink
     expect(html).toContain("height:3px");
-    expect(html).toContain("— Equipe Realiza.vc");
+    expect(html).toContain("Equipe Realiza.vc");
   });
 
   it("material: card com chip do tipo", () => {

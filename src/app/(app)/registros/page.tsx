@@ -413,6 +413,7 @@ export default async function RegistrosPage({
             pagina: String(paginaCarregada + 1),
             r: selecionadoId,
           })}
+          prefetch={false}
           scroll={false}
           className={buttonVariants({ variant: "outline" })}
         >
@@ -458,6 +459,7 @@ export default async function RegistrosPage({
                 <Link
                   key={v}
                   href={hrefCom({ persp: v === "mentor" ? null : v })}
+                  prefetch={false}
                   scroll={false}
                   aria-current={perspectiva === v ? "page" : undefined}
                   className={cn(
@@ -508,6 +510,7 @@ export default async function RegistrosPage({
               <div className="inline-flex items-center gap-0.5 rounded-full border bg-card p-0.5">
                 <Link
                   href={hrefCom({ turma: null, pagina: null })}
+                  prefetch={false}
                   scroll={false}
                   aria-current={!filtros.turma ? "page" : undefined}
                   className={pillCls(!filtros.turma)}
@@ -524,6 +527,7 @@ export default async function RegistrosPage({
                     <Link
                       key={c.id}
                       href={hrefCom({ turma: c.id, pagina: null })}
+                      prefetch={false}
                       scroll={false}
                       aria-label={longa === curta ? curta : `${longa} (${curta})`}
                       aria-current={filtros.turma === c.id ? "page" : undefined}
@@ -553,6 +557,7 @@ export default async function RegistrosPage({
                       periodo: o.valor === "ciclo" ? null : o.valor,
                       pagina: null,
                     })}
+                    prefetch={false}
                     scroll={false}
                     aria-current={ativo ? "page" : undefined}
                     className={pillCls(ativo)}

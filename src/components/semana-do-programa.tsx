@@ -98,6 +98,7 @@ function CardPrograma({
         {comLinkDia ? (
           <Link
             href={href}
+            prefetch={false}
             className="rounded-sm underline-offset-2 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
             {item.titulo}

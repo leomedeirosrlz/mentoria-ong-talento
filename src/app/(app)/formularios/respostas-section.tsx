@@ -391,6 +391,7 @@ export function RespostasSection({
                     {l.dest_url && l.dest_nome ? (
                       <Link
                         href={l.dest_url}
+                        prefetch={false}
                         className="text-xs text-muted-foreground underline underline-offset-4 transition-colors hover:text-foreground"
                       >
                         Abrir ficha de {primeiroNome(l.dest_nome)}

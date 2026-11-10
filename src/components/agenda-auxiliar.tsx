@@ -600,6 +600,7 @@ function LinhaConsolidada({
                 {item.tipo === "encontro" && item.href && (
                   <Link
                     href={item.href}
+                    prefetch={false}
                     className="inline-flex min-h-11 items-center rounded-lg px-2 text-xs font-semibold text-foreground/80 transition-colors hover:bg-muted hover:text-foreground sm:min-h-8"
                   >
                     Ver ficha ›

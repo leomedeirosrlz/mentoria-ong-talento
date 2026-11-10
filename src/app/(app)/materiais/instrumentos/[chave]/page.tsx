@@ -165,6 +165,7 @@ function LinhaDupla({ l, children }: { l: LinhaSpec; children?: React.ReactNode 
         )}
         <Link
           href={`/duplas/${l.duplaId}?aba=instrumentos#instrumentos`}
+          prefetch={false}
           className="inline-flex min-h-8 items-center rounded-md text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
           Ficha
