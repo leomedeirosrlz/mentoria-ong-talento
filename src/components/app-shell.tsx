@@ -258,7 +258,7 @@ export function AppShell({
           <Link href="/" className="inline-block">
             <Logo />
           </Link>
-          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mt-2">Mentoria Social</p>
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mt-2">Programa de Mentoria Social</p>
         </div>
 
         {/* min-h-0 + overflow: com os grupos a lista passa da altura em telas
@@ -405,7 +405,7 @@ export function AppShell({
                 <SheetTitle className="sr-only">Menu</SheetTitle>
                 <Logo />
                 <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  Mentoria Social
+                  Programa de Mentoria Social
                 </p>
               </div>
               <nav aria-label="Menu" className="flex-1 px-3 pb-3">

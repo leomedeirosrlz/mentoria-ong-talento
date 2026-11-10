@@ -29,7 +29,7 @@ export const metadata: Metadata = {
   // sem ele, metadata com url relativa é erro de build no Next 16
   metadataBase: new URL(SITE_URL),
   title: {
-    default: "Realiza.vc · Mentoria Social",
+    default: "Realiza.vc · Programa de Mentoria Social",
     template: "%s · Realiza.vc",
   },
   description: DESCRICAO,

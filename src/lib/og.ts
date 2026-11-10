@@ -15,7 +15,7 @@ export const sharedOg = {
       url: "/og-cover.png",
       width: 1200,
       height: 630,
-      alt: "Realiza.vc · Mentoria Social",
+      alt: "Realiza.vc · Programa de Mentoria Social",
     },
   ],
 } satisfies NonNullable<Metadata["openGraph"]>;

@@ -73,7 +73,7 @@ export default async function FormularioTokenPage({
             {/* width/height naturais reservam a proporção — sem CLS */}
             <Logo size="lg" />
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Mentoria Social
+              Programa de Mentoria Social
             </p>
           </header>
 
