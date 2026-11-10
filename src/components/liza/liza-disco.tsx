@@ -157,7 +157,9 @@ export function LizaDisco({ estado, tamanho, seguirCursor = true, className }: L
     ? { y: { duration: 2.6, repeat: Infinity, ease: "easeInOut" }, rotate: transicao }
     : transicao;
 
-  const dims = detalhe ? { w: 14, h: 21, cy: 45 } : { w: 17, h: 25, cy: 46 };
+  // +17% eyes like the blob (8363514 enlarged the blob's eyes but the
+  // concept variants were left on the old dims)
+  const dims = detalhe ? { w: 16.4, h: 24.6, cy: 45 } : { w: 19.9, h: 29.3, cy: 46 };
 
   return (
     <svg
