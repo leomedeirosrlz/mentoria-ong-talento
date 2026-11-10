@@ -65,7 +65,7 @@ function LoginFallback() {
           <span className="text-[var(--brand-lime)]">VC</span>
         </p>
         <h1 className="relative mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
-          Programa de Mentoria Social
+          Mentoria Social
         </h1>
         <div className="relative mt-6 flex items-end justify-center gap-3">
           <Skeleton className="aspect-[4/3] w-[46%] rotate-[-2deg] rounded-2xl bg-white/10" />

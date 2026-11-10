@@ -152,7 +152,7 @@ export function JovemShell({
               <Logo />
             </Link>
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground mt-2">
-              Programa de Mentoria Social
+              Mentoria Social
             </p>
           </div>
 
@@ -292,7 +292,7 @@ export function JovemShell({
                   <SheetTitle className="sr-only">Menu</SheetTitle>
                   <Logo />
                   <p className="mt-2 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    Programa de Mentoria Social
+                    Mentoria Social
                   </p>
                 </div>
                 <nav aria-label="Menu" className="flex-1 space-y-1 px-3 pb-3">

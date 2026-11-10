@@ -32,7 +32,7 @@ export function SiteFooter({
               <span className="text-[var(--brand-lime)]">VC</span>
             </span>
             <span className="text-xs not-italic text-white/50">
-              Programa de Mentoria Social
+              Mentoria Social
             </span>
           </p>
           <nav
@@ -63,7 +63,7 @@ export function SiteFooter({
   return (
     <footer className={className}>
       <div className="flex flex-wrap items-center justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
-        <span>Realiza.vc · Programa de Mentoria Social</span>
+        <span>Realiza.vc · Mentoria Social</span>
         <span aria-hidden className="text-border">·</span>
         {/* min-h-11 mobile / min-h-8 desktop: os links text-xs ficavam
             abaixo até do mínimo AA (24px) — e a variante light não tinha

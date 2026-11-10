@@ -18,7 +18,7 @@ export default function Loading() {
           <header className="mb-6">
             <Logo size="lg" />
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Programa de Mentoria Social
+              Mentoria Social
             </p>
           </header>
 

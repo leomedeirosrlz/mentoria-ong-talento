@@ -108,7 +108,7 @@ ${
               <img src="${LOGO_BRANCO_URL}" alt="Realiza.vc" width="140" class="email-logo" style="display:block;width:140px;max-width:45%;height:auto;border:0;outline:none;">
               ${
                 tagline
-                  ? `<p style="margin:7px 0 0;font-family:${FONT};font-size:13px;font-weight:500;line-height:1.4;color:#b9b9c0;">${esc(tagline)}</p>`
+                  ? `<p style="margin:7px 0 0;font-family:${FONT};font-size:13px;font-weight:500;line-height:1.4;color:${AMARELO};">${esc(tagline)}</p>`
                   : ""
               }
             </td>
@@ -122,14 +122,14 @@ ${
     <tr><td style="height:3px;line-height:3px;font-size:1px;background-color:${LIME};background-image:linear-gradient(90deg,${LIME} 0%,${LIME_CLARO} 100%);">&nbsp;</td></tr>
     <tr>
       <td class="email-body" style="padding:28px 36px;font-size:15px;line-height:1.6;color:${INK};">
-        <h1 style="margin:0 0 16px;font-size:22px;line-height:1.35;font-weight:600;color:${INK};">${esc(titulo)}</h1>
+        <h1 style="margin:0 0 16px;font-size:22px;line-height:1.35;font-weight:700;color:${INK};">${esc(titulo)}</h1>
         ${conteudoHtml}
         ${ctaRender}
       </td>
     </tr>
-    <tr><td class="email-extra" style="padding:0 36px 24px;font-size:14px;line-height:1.55;color:${INK};"><p style="margin:0;color:${MUTED};">— Equipe Realiza.vc</p></td></tr>
+    <tr><td class="email-extra" style="padding:0 36px 24px;font-size:14px;line-height:1.55;color:${INK};"><p style="margin:0;color:${MUTED};">Equipe Realiza.vc</p></td></tr>
     <tr><td class="email-legal" bgcolor="${INK}" style="background:${INK};padding:20px 36px 24px;font-size:11px;line-height:1.6;color:${MUTED};text-align:center;">
-      Instituto Realiza.vc &middot; <a href="${esc(SITE_URL)}" style="color:${MUTED};text-decoration:underline;">${esc(SITE_URL.replace(/^https?:\/\//, ""))}</a>
+      Instituto Realiza.vc &middot; Mentoria Social &middot; <a href="${esc(SITE_URL)}" style="color:${MUTED};text-decoration:underline;">${esc(SITE_URL.replace(/^https?:\/\//, ""))}</a>
       ${rodapeExtra ? `<br>${rodapeExtra}` : ""}
     </td></tr>
   </table>
@@ -178,9 +178,9 @@ export function emailAviso({
     ctaLabel: "Abrir avisos",
     ctaHref: ctaHref ?? `${SITE_URL}/#avisos`,
     tagline: "Aviso da coordenação",
-    preheader: `${tema ? `${tema.texto}: ` : ""}${titulo} — ${corpo.slice(0, 90)}`,
+    preheader: `${tema ? `${tema.texto}: ` : ""}${titulo}: ${corpo.slice(0, 90)}`,
     rodapeExtra:
-      "Este aviso também está na plataforma, na aba inicial — você pode conferir por lá a qualquer momento.",
+      "Este aviso também está na plataforma, na aba inicial. Você pode conferir por lá a qualquer momento.",
   });
 }
 
@@ -243,15 +243,15 @@ export function emailDocumentoAssinatura({
     : `Seu documento “${esc(docTitulo)}”`;
   const conteudoHtml =
     `<p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:${INK};">${esc(saudacao)}</p>` +
-    `<p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:${INK};">${objeto} está pronto pra assinatura eletrônica no Realiza.vc.</p>` +
-    `<p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:${INK};">Os dados já vêm preenchidos do cadastro — é só conferir, completar o que faltar e assinar com o nome completo. Leva cerca de 1 minuto.</p>`;
+    `<p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:${INK};">${objeto} está pronto pra assinatura eletrônica na Mentoria Social.</p>` +
+    `<p style="margin:0 0 14px;font-size:16px;line-height:1.6;color:${INK};">Os dados já vêm preenchidos do cadastro: é só conferir, completar o que faltar e assinar com o nome completo. Leva cerca de 1 minuto.</p>`;
   return emailLayout({
     titulo: docTitulo,
     conteudoHtml,
     ctaLabel: "Ler e assinar o documento",
     ctaHref: link,
     tagline: "Documento para assinar",
-    preheader: `${docTitulo}: link pra assinar — leva ~1 minuto`,
+    preheader: `${docTitulo}: link pra assinar, leva ~1 minuto`,
     rodapeExtra: `Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;">${esc(link)}</span><br>Este link é pessoal. Se ele expirar, peça um novo à coordenação.`,
   });
 }
@@ -264,13 +264,13 @@ export function emailSenhaAlterada({ email }: { email: string }): string {
     titulo: "Sua senha foi alterada",
     tagline: "Segurança da conta",
     conteudoHtml:
-      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Olá! Esta é uma confirmação de que a senha da conta <strong>${esc(email)}</strong> no <strong>Realiza.vc</strong> acaba de ser alterada.</p>` +
-      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Se foi você quem fez essa alteração, pode ignorar este e-mail — está tudo certo.</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Olá! Esta é uma confirmação de que a senha da conta <strong>${esc(email)}</strong> no <strong>Mentoria Social</strong> acaba de ser alterada.</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Se foi você quem fez essa alteração, pode ignorar este e-mail: está tudo certo.</p>` +
       `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Se <strong>não foi você</strong>, entre pelo link de e-mail, troque a senha no seu perfil e avise a coordenação.</p>`,
     ctaLabel: "Acessar minha conta",
     ctaHref: `${SITE_URL}/perfil`,
     preheader:
-      "Sua senha no Realiza.vc foi alterada — se não foi você, aja agora.",
+      "Sua senha na Mentoria Social foi alterada. Se não foi você, aja agora.",
     rodapeExtra:
       "Você está recebendo este e-mail porque a senha da sua conta no Instituto Realiza.vc foi alterada.",
   });
@@ -290,12 +290,12 @@ export function emailEmailAlterado({
     titulo: "Seu e-mail de acesso mudou",
     tagline: "Segurança da conta",
     conteudoHtml:
-      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Olá! O e-mail de acesso da sua conta no <strong>Realiza.vc</strong> mudou de <strong>${esc(antigo)}</strong> para <strong>${esc(novo)}</strong>.</p>` +
-      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Se foi você quem fez essa alteração, pode ignorar este e-mail — está tudo certo.</p>` +
-      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Se <strong>não foi você</strong>, sua conta pode estar em risco — fale com a coordenação agora.</p>`,
-    ctaLabel: "Acessar o Realiza.vc",
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Olá! O e-mail de acesso da sua conta na <strong>Mentoria Social</strong> mudou de <strong>${esc(antigo)}</strong> para <strong>${esc(novo)}</strong>.</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Se foi você quem fez essa alteração, pode ignorar este e-mail: está tudo certo.</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Se <strong>não foi você</strong>, sua conta pode estar em risco. Fale com a coordenação agora.</p>`,
+    ctaLabel: "Acessar a Mentoria Social",
     ctaHref: SITE_URL,
-    preheader: `Seu acesso mudou de ${antigo} para ${novo} — se não foi você, fale com a coordenação.`,
+    preheader: `Seu acesso mudou de ${antigo} para ${novo}. Se não foi você, fale com a coordenação.`,
     rodapeExtra:
       "Você está recebendo este e-mail porque o endereço de acesso da sua conta no Instituto Realiza.vc foi alterado.",
   });
@@ -369,11 +369,11 @@ export function emailInstrumentoJovem({
     tagline: "Instrumento da jornada",
     conteudoHtml:
       `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${primeiroNome ? `, ${esc(primeiroNome)}` : ""}!</p>` +
-      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Chegou a sua vez de responder <strong>${esc(instrumento)}</strong> — um exercício da sua jornada de mentoria.</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Chegou a sua vez de responder <strong>${esc(instrumento)}</strong>: um exercício da sua jornada de mentoria.</p>` +
       `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">É só seu: responda no seu tempo, direto pelo botão abaixo. Não precisa de senha nem de cadastro.</p>`,
     ctaLabel: "Responder agora",
     ctaHref: link,
-    preheader: `${instrumento}: seu link chegou — responda no seu tempo, sem senha.`,
+    preheader: `${instrumento}: seu link chegou. Responda no seu tempo, sem senha.`,
     rodapeExtra: `Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;">${esc(link)}</span><br>Este link é pessoal e só seu.`,
   });
 }
@@ -400,7 +400,7 @@ export function emailInstrumentoRepasseMentor({
     conteudoHtml:
       `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${primeiroMentor ? `, ${esc(primeiroMentor)}` : ""}!</p>` +
       `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};"><strong>${esc(jovemNome)}</strong> não tem e-mail cadastrado, então o link de <strong>${esc(instrumento)}</strong> veio pra você.</p>` +
-      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Repasse pra ${esc(primeiroJovem) || "a jovem"} — o exercício faz parte da jornada de mentoria e a resposta é dela. O link abre direto, sem senha.</p>`,
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Repasse pra ${esc(primeiroJovem) || "a jovem"}: o exercício faz parte da jornada de mentoria e a resposta é dela. O link abre direto, sem senha.</p>`,
     ctaLabel: "Abrir o link",
     ctaHref: link,
     preheader: `${instrumento}: o link de ${jovemNome} veio pra você repassar.`,
@@ -455,7 +455,7 @@ export function emailDesfechoRepasseMentor({
     conteudoHtml:
       `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${primeiroMentor ? `, ${esc(primeiroMentor)}` : ""}!</p>` +
       `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};"><strong>${esc(jovemNome)}</strong> não tem e-mail cadastrado, então o link do questionário <strong>Depois da mentoria</strong> veio pra você.</p>` +
-      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Repasse pra ${esc(primeiroJovem) || "a jovem"} — são 2 perguntinhas sobre como ela está depois da jornada, e a resposta é dela. O link abre direto, sem senha.</p>`,
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Repasse pra ${esc(primeiroJovem) || "a jovem"}: são 2 perguntinhas sobre como ela está depois da jornada, e a resposta é dela. O link abre direto, sem senha.</p>`,
     ctaLabel: "Abrir o link",
     ctaHref: link,
     preheader: `Depois da mentoria: o link de ${jovemNome} veio pra você repassar.`,
@@ -506,7 +506,7 @@ export function emailChamadoAtualizacao({
 }): string {
   return emailLayout({
     titulo: "Atualização no seu pedido",
-    tagline: "Chamados · Realiza",
+    tagline: "Chamados · Mentoria Social",
     conteudoHtml:
       `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${autorNome ? `, ${esc(autorNome.split(" ")[0])}` : ""}! A equipe respondeu no seu pedido de apoio:</p>` +
       `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;background:${CARD_SUAVE};border-radius:10px;"><tr><td style="padding:14px 16px;font-size:15px;line-height:1.55;color:${INK};">${paragrafos(texto)}</td></tr></table>`,
@@ -514,6 +514,6 @@ export function emailChamadoAtualizacao({
     ctaHref: href,
     preheader: `A equipe respondeu no seu pedido de apoio.`,
     rodapeExtra:
-      "Você está recebendo este e-mail porque abriu um pedido de apoio no Realiza.",
+      "Você está recebendo este e-mail porque abriu um pedido de apoio na Mentoria Social.",
   });
 }

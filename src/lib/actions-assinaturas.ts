@@ -538,7 +538,7 @@ export async function enviarLinksAssinatura({
   if (!limpos.length)
     return { error: "Nenhum destinatário com e-mail cadastrado." };
 
-  const assunto = `${docTitulo} — link pra assinar`;
+  const assunto = `${docTitulo}: link pra assinar`;
   const { enviados, falhas, error } = await enviarEmailsIndividuais({
     mensagens: limpos.map((e) => {
       // a autorização sai da caixa da família: saúda o responsável

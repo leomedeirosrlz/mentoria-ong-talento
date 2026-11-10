@@ -517,8 +517,8 @@ export async function enviarInstrumentoLote(input: {
       via === "jovem" ? primeiroNome(r.jovem?.nome) : primeiroNome(r.mentor?.nome);
     const subject =
       via === "jovem"
-        ? `${titulo} — chegou a sua vez na jornada`
-        : `${titulo} — link de ${primeiroNome(r.jovem?.nome) || "sua jovem"}`;
+        ? `${titulo}: chegou a sua vez na jornada`
+        : `${titulo}: link de ${primeiroNome(r.jovem?.nome) || "sua jovem"}`;
     const html =
       via === "jovem"
         ? emailInstrumentoJovem({
@@ -755,8 +755,8 @@ export async function enviarDesfechoLote(input: {
         : primeiroNome(r.mentor?.nome);
     const subject =
       via === "jovem"
-        ? `${DESFECHO_TITULO} — como você está?`
-        : `${DESFECHO_TITULO} — link de ${primeiroNome(r.jovem?.nome) || "sua jovem"}`;
+        ? `${DESFECHO_TITULO}: como você está?`
+        : `${DESFECHO_TITULO}: link de ${primeiroNome(r.jovem?.nome) || "sua jovem"}`;
     const html =
       via === "jovem"
         ? emailDesfechoJovem({ primeiroNome: nomeDestino, link })

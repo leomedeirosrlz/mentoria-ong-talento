@@ -405,7 +405,7 @@ export function LoginForm() {
           <span className="text-[var(--brand-lime)]">VC</span>
         </p>
         <h1 className="relative mt-2 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
-          Programa de Mentoria Social
+          Mentoria Social
         </h1>
         <div className="relative mt-6 flex items-end justify-center gap-3">
           {FOTOS_MOBILE.map((f) => (
@@ -854,7 +854,7 @@ function LoginHero() {
           <span className="text-[var(--brand-lime)]">VC</span>
         </p>
         <p className="mt-3 text-[11px] font-semibold uppercase tracking-[0.14em] text-white/60">
-          Programa de Mentoria Social
+          Mentoria Social
         </p>
         <p className="mx-auto mt-6 max-w-sm text-xl font-semibold tracking-tight text-balance text-white xl:text-2xl">
           A jornada da mentoria,{" "}

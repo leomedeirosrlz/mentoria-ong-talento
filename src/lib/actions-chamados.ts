@@ -140,7 +140,7 @@ export async function abrirChamado(
     enviaEmailChamadoDepois(supabase, {
       chamadoId: ret.id,
       para: emails,
-      assunto: `Chamado ${ret.numero ?? ""} — ${assunto}`,
+      assunto: `Chamado ${ret.numero ?? ""}: ${assunto}`,
       html: emailChamadoUrgencia({
         numero: ret.numero ?? "",
         assunto,

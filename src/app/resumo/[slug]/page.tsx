@@ -249,7 +249,7 @@ export default async function ResumoPage({
         <div className="w-full">
           <header className="mx-auto max-w-6xl">
             <Logo size="lg" />
-            <p className="mt-1.5 text-xs text-muted-foreground">Programa de Mentoria Social</p>
+            <p className="mt-1.5 text-xs text-muted-foreground">Mentoria Social</p>
           </header>
 
           <div className="mx-auto mt-6 max-w-6xl">

@@ -52,7 +52,7 @@ export default async function TerceiroTokenPage({
           <header className="mb-6">
             <Logo size="lg" />
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Programa de Mentoria Social
+              Mentoria Social
             </p>
           </header>
 
