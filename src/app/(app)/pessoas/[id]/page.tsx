@@ -42,6 +42,7 @@ import { getDocumentosPessoa, getMe, getPessoaPerfil } from "@/lib/queries";
 import { getResumoFormacao } from "@/lib/queries-presenca";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { gravatarUrlSeExiste } from "@/lib/gravatar";
+import { demoRole } from "@/lib/demo/mode";
 import {
   COR_RACA_LABELS,
   disponibilidadeTexto,
@@ -242,8 +243,9 @@ export default async function PessoaPerfilPage({
 
   const ehMentorado = perfil.tipo === "mentorado";
   const avatarSrc = p.avatar_path ? avatarPublicUrl(p.avatar_path) : null;
+  const demo = await demoRole();
   const gravatar =
-    !ehMentorado && "email" in p && p.email
+    !demo && !ehMentorado && "email" in p && p.email
       ? await gravatarUrlSeExiste(p.email)
       : null;
   const wa = p.whatsapp ? waLink(p.whatsapp, "") : null;

@@ -230,7 +230,7 @@ export function OnboardingJovem({
               rotulo: "Continuar para seus dados ↓",
             }}
           />
-          <div id="ob-termo-dados" className="scroll-mt-24 space-y-2">
+          <div id="ob-termo-dados" className="scroll-mt-[calc(6rem+env(safe-area-inset-top))] space-y-2">
             <h2 className="text-base font-semibold">Seus dados para assinar</h2>
             <p className="text-sm leading-relaxed text-muted-foreground">
               {civis
