@@ -19,7 +19,7 @@ process.env.NEXT_PUBLIC_SITE_URL = "{{ .SiteURL }}";
 const jiti = createJiti(import.meta.url, {
   alias: { "@": fileURLToPath(new URL("../src", import.meta.url)) },
 });
-const { emailLayout } = await jiti.import("../src/lib/email-templates.ts");
+const { emailLayout } = (await jiti.import("../src/lib/email-templates.ts")) as typeof import("../src/lib/email-templates.ts");
 
 const CONFIRM_URL = "{{ .ConfirmationURL }}";
 const EMAIL = "{{ .Email }}";
