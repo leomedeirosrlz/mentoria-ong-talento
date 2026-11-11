@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowCounterClockwise,
   DotsThreeVertical,
+  PaperPlaneTilt,
   PencilSimple,
   SignOut,
   Trash,
@@ -12,6 +13,7 @@ import {
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { deleteMentorado, marcarSaidaMentorado, updateMentorado } from "@/lib/actions";
+import { convidarAcesso } from "@/lib/actions-convite";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { FotoField } from "@/components/foto-field";
 import {
@@ -323,6 +325,46 @@ export function MentoradoActions({
               Promover a mentor…
             </DropdownMenuItem>
           )}
+          {/* convite de acesso (0180): o link vai pro e-mail do cadastro e
+              só vale ~1h — "Reenviar" cobre o token expirado. Sobe até a
+              conta vinculada passar pelo onboarding (embed `conta`) */}
+          {mentorado.email &&
+            !fora &&
+            !mentorado.conta?.onboarded_em && (
+              <DropdownMenuItem
+                disabled={pending}
+                onClick={() =>
+                  start(async () => {
+                    try {
+                      const res = await convidarAcesso({
+                        tipo: "mentorado",
+                        id: mentorado.id,
+                      });
+                      if ("error" in res) toast.error(res.error);
+                      else if ("demo" in res) {
+                        toast.success("Modo demo: nada é enviado de verdade.");
+                      } else {
+                        toast.success(
+                          `Convite enviado pra ${res.email}. O link vale ~1 hora.`
+                        );
+                        router.refresh();
+                      }
+                    } catch {
+                      toast.error("Sem conexão. Tente de novo.");
+                    }
+                  })
+                }
+              >
+                <PaperPlaneTilt
+                  size={16}
+                  data-icon="inline-start"
+                  aria-hidden
+                />{" "}
+                {mentorado.profile_id
+                  ? "Reenviar convite de acesso"
+                  : "Enviar convite de acesso"}
+              </DropdownMenuItem>
+            )}
           <DropdownMenuSeparator />
           <DropdownMenuItem
             variant="destructive"

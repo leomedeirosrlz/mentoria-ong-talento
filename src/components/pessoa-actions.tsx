@@ -4,6 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   DotsThreeVertical,
+  PaperPlaneTilt,
   PencilSimple,
   Prohibit,
   Trash,
@@ -11,6 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { deletePessoa, setPessoaAtivo, updatePessoa } from "@/lib/actions";
+import { convidarAcesso } from "@/lib/actions-convite";
 import { createClient } from "@/lib/supabase/client";
 import { EscopoAuxiliarDialog } from "@/components/escopo-auxiliar-dialog";
 import { RoleSelect } from "@/components/role-select";
@@ -490,6 +492,40 @@ export function PessoaActions({
             <UserSwitch size={16} data-icon="inline-start" aria-hidden />{" "}
             Alterar papel
           </DropdownMenuItem>
+          {/* convite de acesso (0180): só com papel (é o que libera a
+              conta) e só até o onboarding — "Reenviar" cobre o link de 1h
+              expirado depois do 1º envio */}
+          {pessoa.ativo && pessoa.role != null && !pessoa.onboarded_em && (
+            <DropdownMenuItem
+              disabled={pending}
+              onClick={() =>
+                start(async () => {
+                  try {
+                    const res = await convidarAcesso({
+                      tipo: "profile",
+                      id: pessoa.id,
+                    });
+                    if ("error" in res) toast.error(res.error);
+                    else if ("demo" in res) {
+                      toast.success("Modo demo: nada é enviado de verdade.");
+                    } else {
+                      toast.success(
+                        `Convite enviado pra ${res.email}. O link vale ~1 hora.`
+                      );
+                      router.refresh();
+                    }
+                  } catch {
+                    toast.error("Sem conexão. Tente de novo.");
+                  }
+                })
+              }
+            >
+              <PaperPlaneTilt size={16} data-icon="inline-start" aria-hidden />{" "}
+              {pessoa.user_id
+                ? "Reenviar convite de acesso"
+                : "Enviar convite de acesso"}
+            </DropdownMenuItem>
+          )}
           {ehAuxiliar && (
             <DropdownMenuItem onClick={() => setEscopoOpen(true)}>
               <PencilSimple size={16} data-icon="inline-start" aria-hidden />{" "}

@@ -1110,8 +1110,12 @@ function PessoaRow({
             inativa
           </Badge>
         )}
-        {souCoord && p.ativo && !p.user_id && (
-          <Badge variant="outline" className="text-xs shrink-0">ainda não entrou</Badge>
+        {/* convite de acesso (0180): o envio já cria a conta — a régua de
+            "entrou" é o onboarded_em, não o user_id */}
+        {souCoord && p.ativo && !p.onboarded_em && (
+          <Badge variant="outline" className="text-xs shrink-0">
+            {p.user_id ? "convite enviado" : "não convidado"}
+          </Badge>
         )}
         {souCoord && p.ativo && !termoOk && (
           <Badge
@@ -1297,9 +1301,11 @@ function PessoaRow({
                 Termo de adesão pendente de assinatura
               </ItemDetalhe>
             ))}
-          {p.ativo && !p.user_id && (
+          {p.ativo && !p.onboarded_em && (
             <ItemDetalhe icone={UserPlus}>
-              Ainda não entrou na plataforma
+              {p.user_id
+                ? "Convite enviado, aguardando o primeiro acesso"
+                : "Ainda não entrou na plataforma"}
             </ItemDetalhe>
           )}
           {p.email && (
@@ -1455,6 +1461,13 @@ function MentoradoRow({
               : menor
                 ? "autorização pendente"
                 : "termo pendente"}
+          </Badge>
+        )}
+        {/* convite de acesso (0180) — a conta do jovem nasce no envio;
+            "convite enviado" vale até o onboarding dela (embed `conta`) */}
+        {souCoord && !fora && m.email && !m.conta?.onboarded_em && (
+          <Badge variant="outline" className="text-xs shrink-0">
+            {m.profile_id ? "convite enviado" : "não convidado"}
           </Badge>
         )}
         {/* Detalhes + ⋮ no mesmo cluster — quebram juntos pra linha 2, sem

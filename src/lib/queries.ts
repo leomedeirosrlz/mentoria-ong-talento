@@ -93,7 +93,7 @@ const comPapeis = <T extends object>(
 // em permission denied; com o grant ele fecha a história do vínculo
 // jovem↔conta na UI (promoção ex-mentorado → mentor)
 const MENTORADO_COLS_PUBLICAS =
-  "id, nome, email, whatsapp, ong_origem, notas, avatar_path, documento_path, created_at, nome_social, cidade, uf, interesses, objetivos, escolaridade, origem, disponibilidade, situacao, saiu_em, motivo_saida, profile_id";
+  "id, nome, email, whatsapp, ong_origem, notas, avatar_path, documento_path, created_at, nome_social, cidade, uf, interesses, objetivos, escolaridade, origem, disponibilidade, situacao, saiu_em, motivo_saida, profile_id, conta:profiles!mentorados_profile_id_fkey(onboarded_em)";
 
 /** Subconjunto do mentorado que vai no embed da dupla (0076): o que o par
  *  e a ficha consomem — notas e documento_path do jovem não saem no select
@@ -778,7 +778,9 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
     ]);
     return {
       tipo: "mentorado",
-      pessoa: comCurriculo(comPessoal(m, pessoalMent), curriculo) as Mentorado,
+      // supabase-js tipa o embed conta como array (isOneToOne: false na FK,
+      // mas a direção mentorado→profile devolve objeto ou null no runtime)
+      pessoa: comCurriculo(comPessoal(m, pessoalMent), curriculo) as unknown as Mentorado,
       duplas: await comGravatarMentores(
         ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail)
       ),
