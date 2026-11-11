@@ -3244,11 +3244,11 @@ function build(): DemoData {
     { numero: 5, titulo: "Encerramento, reflexão e celebração", foco: "Reflexão sobre aprendizados; desafios futuros; feedback do jovem; registro final no PDM" },
   ];
 
-  // o catálogo de prod depois da 0135 (e da 0138) — 30 linhas, todas
-  // acionáveis: roteiros das 16 semanas (o guia cobre a jornada inteira), os
-  // templates do cap. 14 como documentos nativos (path "doc:<slug>" → página
-  // do app), Perguntas Eficazes (o documento que o guia cita) e os links
-  // públicos. Arquivos resolvem pro PDF placeholder da rota demo; doc: abre o
+  // o catálogo de prod depois da 0135/0138 e do flip da 0185 — 30 linhas,
+  // todas acionáveis: roteiros das 16 semanas e os instrumentos de corpus
+  // (Roda, Definindo Metas) são documentos nativos (path "doc:<slug>" →
+  // página do app), Perguntas Eficazes e os cronogramas por turma seguem
+  // PDF. Arquivos resolvem pro PDF placeholder da rota demo; doc: abre o
   // doc real.
   const catalogo: Material[] = [
     { id: uid(0x2001), titulo: "Guia do Mentor DPP", descricao: "Metodologia completa: jornada, 16 encontros, instrumentos e templates.", tipo: "guia", url: null, path: "materiais/guia-dpp.pdf", audiencia: "dpp", encontro_num: null, ordem: 1 },
@@ -3259,7 +3259,7 @@ function build(): DemoData {
       descricao: n <= 10 ? null : `Roteiro do ${n}º encontro: ${["mapear a rede de apoio, abrir portas e apresentar a Roda da Vida","ler a Roda quadrante por quadrante e abrir as metas das 16 áreas","revisar as metas da Roda e eleger as áreas prioritárias a detalhar","validar o mapa de submetas e montar o plano de continuidade","olhar a jornada, reconhecer conquistas e trocar feedback mútuo","celebrar o percurso, revisar PDM e Roda e responder a avaliação geral"][i - 10]}.`,
       tipo: "conteudo" as const,
       url: null,
-      path: `materiais/roteiro-semana-${n}.pdf`,
+      path: `doc:roteiro-encontro-${String(n).padStart(2, "0")}`,
       audiencia: "dpp" as const,
       encontro_num: n,
       ordem: n + 2,
@@ -3267,9 +3267,9 @@ function build(): DemoData {
     { id: uid(0x2030), titulo: "Mensagem de preparação do mentorado", descricao: "Modelo para enviar antes do 1º encontro: história de vida, Roda da Vida e contatos para avaliação.", tipo: "template", url: null, path: "doc:mensagem-preparacao", audiencia: "dpp", encontro_num: 1, ordem: 19 },
     { id: uid(0x2031), titulo: "Mensagem às pessoas indicadas", descricao: "Modelo de contato para a avaliação por terceiros (duas perguntas).", tipo: "template", url: null, path: "doc:mensagem-indicadas", audiencia: "dpp", encontro_num: 1, ordem: 20 },
     { id: uid(0x2032), titulo: "Mensagem de encaminhamento entre encontros", descricao: "Modelo curto para manter o vínculo e deixar a próxima tarefa clara.", tipo: "template", url: null, path: "doc:mensagem-encaminhamento", audiencia: "dpp", encontro_num: null, ordem: 21 },
-    { id: uid(0x2033), titulo: "Roda da Vida: roteiro de aplicação", descricao: "Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.", tipo: "template", url: null, path: "materiais/roda-da-vida.pdf", audiencia: "dpp", encontro_num: 12, ordem: 22 },
+    { id: uid(0x2033), titulo: "Roda da Vida (instrumento)", descricao: "Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.", tipo: "template", url: null, path: "doc:instrumento-roda-da-vida", audiencia: "dpp", encontro_num: 12, ordem: 22 },
     { id: uid(0x2034), titulo: "Feedback Construtivo", descricao: "Instrumento do guia: o modelo de fala e os cuidados para feedback sobre comportamento negativo.", tipo: "conteudo", url: null, path: "doc:feedback-construtivo", audiencia: "todos", encontro_num: null, ordem: 23 },
-    { id: uid(0x2035), titulo: "Instrumento: Definindo Metas", descricao: "Metas SMART do mentorado — instrumento de preenchimento entre encontros.", tipo: "template", url: null, path: "materiais/definindo-metas.pdf", audiencia: "dpp", encontro_num: null, ordem: 24 },
+    { id: uid(0x2035), titulo: "Instrumento: Definindo Metas", descricao: "Metas SMART do mentorado — instrumento de preenchimento entre encontros.", tipo: "template", url: null, path: "doc:instrumento-definindo-minhas-metas", audiencia: "dpp", encontro_num: null, ordem: 24 },
     { id: uid(0x2036), titulo: "Perguntas Eficazes", descricao: "Documento complementar do guia: o que são, o que evitar e o banco de perguntas por momento da conversa.", tipo: "conteudo", url: null, path: "materiais/perguntas-eficazes.pdf", audiencia: "dpp", encontro_num: null, ordem: 25 },
     { id: uid(0x2037), titulo: "Cronograma do programa — Turma 1", descricao: null, tipo: "conteudo", url: null, path: "materiais/cronograma-turma-1.pdf", audiencia: "dpp", encontro_num: null, ordem: 26 },
     { id: uid(0x2038), titulo: "Cronograma do programa — Turma 2", descricao: null, tipo: "conteudo", url: null, path: "materiais/cronograma-turma-2.pdf", audiencia: "dpp", encontro_num: null, ordem: 27 },

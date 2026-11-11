@@ -1,6 +1,7 @@
 import { getDemoData, type DemoData } from "./data";
 import type { TermoSimulado } from "./shared";
-import { audienciasDe, veMaterial } from "../materiais";
+import { audienciasDe, veMaterial, veMaterialDaTurma } from "../materiais";
+import { turmaDaDupla, turmaNumero } from "../turma";
 import { comparaNome, registroTardio, semanaBounds } from "../ciclo";
 import { slotsLivresEspecialista } from "./agenda";
 import { normaliza } from "../utils";
@@ -410,18 +411,28 @@ export function demoSlotsLivres(profileId: string, dias = 21): string[] {
 }
 
 /** Policy materiais_select (0065): 'todos' alcança qualquer papel — inclusive
- *  o mentorado; 'dpp'/'especialista' só o papel homônimo; coordenação vê tudo. */
+ *  o mentorado; 'dpp'/'especialista' só o papel homônimo; coordenação vê tudo.
+ *  O recorte de turma do getMateriais vale igual: material "— Turma N" só
+ *  aparece pra quem tem dupla nela. */
 export function demoMateriais(role: AppRole): Material[] {
   const data = getDemoData();
   const eu = data.personas[role];
   // papéis efetivos da persona (profile_papeis do dataset) — é o que faz o
   // híbrido ver os dois lados; o `role` sozinho perderia o secundário
   const papeis = papeisDe(data, eu);
+  const turmas = papeis.includes("coordenacao")
+    ? null
+    : new Set(
+        duplasDoPapel(data, role).map((d) =>
+          turmaNumero(turmaDaDupla(d, data.cronogramas) ?? "")
+        )
+      );
   return data.materiais
     .filter((m) =>
       // mesma régua do app/RLS (0139): audiencias cumulativas por papel
       veMaterial(audienciasDe(m), { role: eu.role, papeis })
     )
+    .filter((m) => veMaterialDaTurma(m, turmas))
     .sort((a, b) => a.ordem - b.ordem);
 }
 

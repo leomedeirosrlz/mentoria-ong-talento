@@ -1058,7 +1058,8 @@ export function RegistroForm({
                   <p className="text-sm font-medium">Evidências</p>
                   <p className="text-xs text-muted-foreground">
                     Foto do encontro, print ou atividade feita: PDF ou imagem
-                    até 10&nbsp;MB. Opcional.
+                    até 50&nbsp;MB. Fotos são comprimidas automaticamente.
+                    Opcional.
                   </p>
                 </div>
                 <Button
