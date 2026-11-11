@@ -70,7 +70,7 @@ export async function registrarEncerramento(
       .select(
         `id, status, trilha, iniciada_em, mentor_id, supervisor_id, cronograma_id,
          mentor:profiles!duplas_mentor_id_fkey(nome),
-         mentorado:mentorados!duplas_mentorado_id_fkey(nome),
+         mentorado:mentorados!duplas_mentorado_id_fkey(nome, profile_id),
          encontros(numero, status, data_hora, realizado_em,
                   registro:registros(tema, avaliacao)),
          encaminhamentos(status)`
@@ -191,6 +191,7 @@ export async function registrarEncerramento(
   // ato — a notificação daqui vira o registro do rito, não repeteco
   const jaConcluida = duplaRow.status === "concluida";
   const nomeMd = norm(duplaRow.mentorado)?.nome;
+  const jovemProfileId = norm(duplaRow.mentorado)?.profile_id ?? null;
   await notificar(
     supabase,
     [
@@ -222,6 +223,19 @@ export async function registrarEncerramento(
             href: `/duplas/${duplaId}`,
           }
         : null,
+      // jovem com conta recebe o desfecho no sino dele — o resumo da
+      // jornada mora na página dele, não na ficha de staff
+      {
+        profile_id: jovemProfileId,
+        tipo: "dupla_formada",
+        titulo: jaConcluida
+          ? "Encerramento registrado"
+          : tipo === "concluida"
+            ? "Sua dupla concluiu a jornada"
+            : "Sua dupla foi encerrada",
+        corpo: "O resumo da jornada fica na sua página.",
+        href: "/jovem",
+      },
     ].filter((r): r is NonNullable<typeof r> => r !== null),
     eu.id
   );

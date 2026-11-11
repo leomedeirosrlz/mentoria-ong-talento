@@ -149,6 +149,38 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
   ).toContainText("Coordenação");
 });
 
+test("DemoBar: variante jovem sem ficha mostra a espera pelo vínculo", async ({
+  page,
+}) => {
+  // demo_sem_ficha (REALIZA-372): a conta órfã cai no wizard e o passo da
+  // grade vira o aviso de vínculo pendente — o mesmo texto do jovem real
+  await entrarNaDemo(page, "coordenacao");
+  await page.goto("/");
+  await page
+    .getByRole("button", { name: "Controles da demonstração" })
+    .click();
+  await page
+    .getByRole("button", { name: /conta sem ficha vinculada/ })
+    .click();
+  await page.waitForURL((url) => url.pathname === "/jovem");
+  await page.getByRole("button", { name: "Continuar", exact: true }).click();
+  await expect(
+    page.getByText(/Sua ficha ainda não foi conectada/)
+  ).toBeVisible();
+
+  // trocar pra persona Jovem normal sai da variante — a ficha da Bia volta.
+  // ^Mentorado: o trigger dock também carrega o papel no aria-label ("Modo
+  // demonstração · Mentorado") e um match solto pegaria os dois
+  await page
+    .getByRole("button", { name: "Controles da demonstração" })
+    .click();
+  await page.getByRole("button", { name: /^Mentorado/ }).click();
+  await page.waitForURL((url) => url.pathname === "/jovem");
+  await expect(
+    page.getByRole("heading", { name: /Bem-vindo\(a\) ao Realiza, Bia/i })
+  ).toBeVisible();
+});
+
 test("stub demo: tabelas da rodada têm dataset (sem aviso no console)", async ({
   page,
 }) => {

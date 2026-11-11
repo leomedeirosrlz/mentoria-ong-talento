@@ -23,8 +23,9 @@ import {
   reverOnboardingDemo,
   sairDaDemo,
   trocarPapelDemo,
+  verJovemSemVinculo,
 } from "@/lib/demo/actions";
-import { DEMO_ROLES } from "@/lib/demo/shared";
+import { DEMO_ROLES, demoSemFichaClient } from "@/lib/demo/shared";
 import type { AppRole } from "@/lib/types";
 import {
   Popover,
@@ -91,6 +92,10 @@ export function DemoBar({
   }
 
   const rotulo = `Demo · ${papelLabel(papel)}`;
+  // a variante órfã compartilha o papel mentorado — sem ler o cookie a linha
+  // "Jovem" marcaria ativo nas duas ao mesmo tempo. Lido na abertura do
+  // popover: cookie não existe no SSR e o valor só importa com a lista visível
+  const [semFicha, setSemFicha] = useState(false);
 
   const trigger = (
     /* tinta, não lima: na sidebar a pill fica perto do item ativo e lima é
@@ -142,7 +147,13 @@ export function DemoBar({
   );
 
   return (
-    <Popover open={aberto} onOpenChange={setAberto}>
+    <Popover
+      open={aberto}
+      onOpenChange={(v) => {
+        setAberto(v);
+        if (v) setSemFicha(demoSemFichaClient());
+      }}
+    >
       {/* acima do bottom nav mobile (z-40) e do footer fixo do onboarding —
           a pill não pode ficar escondida em nenhum estado da demo */}
       {dock ? (
@@ -175,7 +186,8 @@ export function DemoBar({
           <div className="mt-1 pb-1.5">
             {DEMO_ROLES.map((role) => {
               const Icone = PAPEL_ICON[role];
-              const ativo = role === papel;
+              const ativo =
+                role === papel && !(role === "mentorado" && semFicha);
               return (
                 <button
                   key={role}
@@ -207,6 +219,36 @@ export function DemoBar({
                 </button>
               );
             })}
+            {/* variante "conta sem ficha" da persona jovem (REALIZA-372): a
+                conta existe, a ficha ainda não foi vinculada — o onboarding
+                dela é o estado de espera pelo vínculo */}
+            <button
+              type="button"
+              disabled={pending}
+              aria-current={(papel === "mentorado" && semFicha) || undefined}
+              onClick={() => executar(verJovemSemVinculo)}
+              className="flex w-full items-center gap-3 px-4 py-2.5 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:bg-muted/60 disabled:pointer-events-none disabled:opacity-50"
+            >
+              <span className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
+                <Student size={15} weight="fill" aria-hidden />
+              </span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-sm font-semibold">
+                  Jovem
+                </span>
+                <span className="block truncate text-xs text-muted-foreground">
+                  conta sem ficha vinculada
+                </span>
+              </span>
+              {papel === "mentorado" && semFicha && (
+                <Check
+                  size={16}
+                  weight="bold"
+                  aria-hidden
+                  className="shrink-0"
+                />
+              )}
+            </button>
           </div>
 
           <div className="border-t border-border py-1.5">

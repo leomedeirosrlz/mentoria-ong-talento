@@ -60,6 +60,7 @@ import type {
   DadosPessoais,
   DuplaOpcao,
   DuplaPerfil,
+  FichaJovemPerfil,
   FiltrosRegistro,
   MentorProfile,
   PessoaPerfil,
@@ -662,7 +663,13 @@ function duplaPerfil(
 export function demoPessoaPerfil(
   role: AppRole,
   id: string
-): (PessoaPerfil & { duplas: DuplaPerfil[]; notas: PessoaNota[] }) | null {
+):
+  | (PessoaPerfil & {
+      duplas: DuplaPerfil[];
+      notas: PessoaNota[];
+      fichaJovem: FichaJovemPerfil;
+    })
+  | null {
   const data = getDemoData();
   const eu = data.personas[role];
   const contatos = demoContatosMap(role);
@@ -682,6 +689,20 @@ export function demoPessoaPerfil(
     // lados — DPP de uma dupla E especialista com trilha (ou grade aberta)
     const ehMentor =
       temPapel(data, p, "mentor_dpp") || temPapel(data, p, "mentor_especialista");
+    // conta de jovem → ficha canônica, escopada como mentorados_select:
+    // coord sempre; os demais só se a ficha é de um mentorado de dupla dele
+    const ficha = data.mentorados.find((x) => x.profile_id === id);
+    const fichaJovem =
+      ficha &&
+      (role === "coordenacao" ||
+        escopo.some((d) => d.mentorado?.id === ficha.id))
+        ? {
+            id: ficha.id,
+            nome: ficha.nome,
+            nome_social: ficha.nome_social ?? null,
+            whatsapp: ficha.whatsapp ?? null,
+          }
+        : null;
     return {
       tipo: "profile",
       pessoa: role === "coordenacao" ? comContato(p, contatos) : semPessoal(comContato(p, contatos)),
@@ -693,6 +714,7 @@ export function demoPessoaPerfil(
         .sort(desc)
         .map((d) => duplaPerfil(d, contatos)),
       notas: notasDe("profile_id"),
+      fichaJovem,
     };
   }
   const m = data.mentorados.find((x) => x.id === id);
@@ -716,6 +738,7 @@ export function demoPessoaPerfil(
       },
       duplas,
       notas: notasDe("mentorado_id"),
+      fichaJovem: null,
     };
   }
   return null;
@@ -807,8 +830,13 @@ function mentoradoDaPersona(data: DemoData, role: AppRole): Mentorado | null {
 
 /** jovem_perfil (0067): a própria ficha — inclui os sensíveis DELA (a view é
  *  definer e self-scoped), mas nunca notas/documento_path/form_bruto. */
-export function demoJovemPerfil(role: AppRole): JovemPerfil | null {
-  const m = mentoradoDaPersona(getDemoData(), role);
+export function demoJovemPerfil(
+  role: AppRole,
+  // variante "conta sem ficha" (demo_sem_ficha): a persona jovem vira uma
+  // conta órfã — ficha/assinaturas voltam vazias como no jovem real sem vínculo
+  semFicha = false
+): JovemPerfil | null {
+  const m = semFicha ? null : mentoradoDaPersona(getDemoData(), role);
   if (!m) return null;
   return {
     id: m.id,
@@ -991,10 +1019,11 @@ export function demoJovemAssinaturas(
   role: AppRole,
   // a assinatura simulada do wizard vira "assinado" aqui também — o card
   // Documentos da home e o passo de termo do onboarding refletem a sessão
-  simulado: TermoSimulado | null = null
+  simulado: TermoSimulado | null = null,
+  semFicha = false
 ): JovemAssinatura[] {
   const data = getDemoData();
-  const m = mentoradoDaPersona(data, role);
+  const m = semFicha ? null : mentoradoDaPersona(data, role);
   if (!m) return [];
   return data.assinaturas
     .filter((a) => a.mentorado_id === m.id)

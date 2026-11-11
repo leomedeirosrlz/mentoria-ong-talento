@@ -18,6 +18,12 @@ export const demoObCookie = (role: AppRole) => `demo_onboarded_${role}`;
  *  banner, /assinar, perfil e a via em PDF refletem a assinatura da sessão. */
 export const DEMO_TERMO_COOKIE = "demo_termo";
 
+/** Cookie da variante "conta sem ficha" da persona jovem (REALIZA-372):
+ *  com ele ligado, a persona mentorado é uma conta órfã — o onboarding
+ *  mostra o estado "ficha não vinculada" e as leituras dela voltam
+ *  vazias. Trocar de papel sai da variante (definirPapelDemo apaga). */
+export const DEMO_SEM_FICHA_COOKIE = "demo_sem_ficha";
+
 export type TermoSimulado = {
   papel: AppRole;
   nome: string;
@@ -134,6 +140,15 @@ export function demoAtivoClient(): boolean {
   return demoRoleClient() != null;
 }
 
+/** Par client de demoSemFicha (mode.ts) — a DemoBar lê direto do cookie
+ *  pra marcar a variante como ativa sem prop vinda do servidor. */
+export function demoSemFichaClient(): boolean {
+  if (typeof document === "undefined") return false;
+  return document.cookie
+    .split("; ")
+    .some((c) => c === `${DEMO_SEM_FICHA_COOKIE}=1`);
+}
+
 // par client do mesmo nome em mode.ts (módulo server — não importa aqui)
 const DEMO_LIDAS_COOKIE = "demo_lidas";
 
@@ -147,6 +162,7 @@ export function limparCookiesDemo() {
     DEMO_ROLE_COOKIE,
     DEMO_LIDAS_COOKIE,
     DEMO_TERMO_COOKIE,
+    DEMO_SEM_FICHA_COOKIE,
     ...DEMO_ROLES.map(demoObCookie),
   ]) {
     document.cookie = `${nome}=;path=/;max-age=0`;

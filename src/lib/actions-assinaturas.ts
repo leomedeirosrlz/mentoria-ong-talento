@@ -265,6 +265,20 @@ export async function solicitarAssinatura({
     return { error: "Este documento não existe pra esse cadastro." };
   if (!UUID_RE.test(id)) return { error: "Cadastro inválido." };
 
+  // conta de jovem não recebe o pool de staff (termo-voluntario): os
+  // documentos dela saem pela ficha de mentorado — mesmo filtro do lote
+  if (tipo === "profile") {
+    const { data: ficha } = await supabase
+      .from("mentorados")
+      .select("id")
+      .eq("profile_id", id)
+      .maybeSingle();
+    if (ficha)
+      return {
+        error: "Essa conta pertence a um jovem do programa. Emita o documento pela ficha dele.",
+      };
+  }
+
   const { data: tpl } = await supabase
     .from("documento_templates")
     .select("id")
@@ -341,13 +355,25 @@ export async function emitirAssinaturasEmLote({
       : null;
   if (!tipo) return { error: "Documento desconhecido." };
   // o pool do documento é fechado — alvo de outro tipo é ignorado, não erro
-  const ids = [
+  let ids = [
     ...new Set(
       (Array.isArray(alvos) ? alvos : [])
         .filter((a) => a?.tipo === tipo && UUID_RE.test(a?.id ?? ""))
         .map((a) => a.id)
     ),
   ];
+  // conta de jovem no pool de staff também é alvo errado: sai como um tipo
+  // estranho — o documento certo dela é emitido pela ficha de mentorado
+  if (tipo === "profile" && ids.length) {
+    const { data: fichas } = await supabase
+      .from("mentorados")
+      .select("profile_id")
+      .in("profile_id", ids);
+    if (fichas?.length) {
+      const deJovem = new Set(fichas.map((f) => f.profile_id));
+      ids = ids.filter((id) => !deJovem.has(id));
+    }
+  }
   if (!ids.length) return { error: "Escolha ao menos uma pessoa." };
 
   const { data: tpl } = await supabase
