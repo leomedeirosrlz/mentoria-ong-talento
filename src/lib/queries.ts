@@ -4,7 +4,13 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { comparaNome, registroTardio } from "./ciclo";
-import { audienciasDe, veMaterial } from "./materiais";
+import {
+  audienciasDe,
+  turmaDoMaterial,
+  veMaterial,
+  veMaterialDaTurma,
+} from "./materiais";
+import { turmaDaDupla, turmaNumero } from "./turma";
 import { demoLidas, demoOnboarded, demoRole } from "./demo/mode";
 import {
   demoAlertasRegistros,
@@ -819,7 +825,23 @@ export const getMateriais = cache(async (): Promise<Material[]> => {
       : buscaMateriais(await createClient()),
     getMe(),
   ]);
-  return todos.filter((m) => veMaterial(audienciasDe(m), me));
+  const visiveis = todos.filter((m) => veMaterial(audienciasDe(m), me));
+  // material de turma ("Cronograma do programa — Turma N") só vale pra quem
+  // tem dupla nela: a RLS não tem coluna de turma, então o recorte é aqui.
+  // Sem material amarrado a turma o catálogo passa intacto, sem query extra;
+  // coordenação lê tudo sempre.
+  if (!visiveis.some((m) => turmaDoMaterial(m.titulo) != null)) {
+    return visiveis;
+  }
+  if (temPapel(me, "coordenacao")) return visiveis;
+  const [duplas, cronogramas] = await Promise.all([
+    getDuplasInfo(),
+    getCronogramas(),
+  ]);
+  const turmas = new Set(
+    duplas.map((d) => turmaNumero(turmaDaDupla(d, cronogramas) ?? ""))
+  );
+  return visiveis.filter((m) => veMaterialDaTurma(m, turmas));
 });
 
 /** mentor_profiles é table-level legível por autenticado (0001) — a lista

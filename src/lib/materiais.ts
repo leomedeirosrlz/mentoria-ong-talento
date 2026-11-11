@@ -62,6 +62,28 @@ export function veMaterial(
   return audiencias.some((a) => temPapel(pessoa, a as AppRole));
 }
 
+/** Materiais de UMA turma carregam o nº dela no título ("Cronograma do
+ *  programa — Turma 2"). Devolve esse nº, ou null quando o material é do
+ *  programa inteiro. A régua é o título porque `materiais` não tem coluna
+ *  de turma — o recorte acontece na query/UI, não na RLS. */
+export function turmaDoMaterial(
+  titulo: string | null | undefined
+): string | null {
+  // dígito só: "turma da"/"turma toda" não é âncora de turma
+  return titulo?.match(/\bturma\s+(\d+)\b/i)?.[1] ?? null;
+}
+
+/** Material de turma só aparece pra quem tem dupla nela. `turmas` = os nºs
+ *  das turmas do recorte da pessoa (turmaDaDupla → turmaNumero); null
+ *  desliga o recorte (coordenação lê o catálogo inteiro). */
+export function veMaterialDaTurma(
+  m: { titulo?: string | null },
+  turmas: ReadonlySet<string> | null
+): boolean {
+  const t = turmaDoMaterial(m.titulo);
+  return t == null || turmas == null || turmas.has(t);
+}
+
 /** Valor legado (`audiencia` de uma coluna) derivado do array — o código
  *  antigo que ainda estiver rodando durante o deploy continua funcionando. */
 export function audienciaLegada(audiencias: readonly string[]): string {

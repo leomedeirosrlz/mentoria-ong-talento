@@ -61,8 +61,8 @@ select cron.id, v.tipo, v.numero::smallint, v.data::date, v.titulo, v.fase,
 -- ===== materiais =====
 -- path 'doc:<slug>' = documento nativo renderizado em /materiais/documento/<slug>
 -- (não passa pelo storage): os 16 roteiros e os instrumentos de corpus
--- apontam pra página própria em vez do PDF. O flip equivalente em prod é
--- pendência de rollout (UPDATE nos paths das mesmas linhas).
+-- apontam pra página própria em vez do PDF. O flip equivalente em prod
+-- chega pela migration 0185 (UPDATE nos paths das mesmas linhas).
 insert into public.materiais (titulo, descricao, tipo, url, audiencia, encontro_num, ordem, path) values
   ('Guia do Mentor DPP', 'Metodologia completa: jornada, 16 encontros, instrumentos e templates. PDM e Roda da Vida são respondidos na ficha da dupla, aba Instrumentos.', 'guia', null, 'dpp', null, 1, 'materiais/5dc4d7d1-e69d-410c-b0b0-f8a80dcc906b-Guia-do-Mentor-de-Desenvolvimento-Pessoal-e-Profissional---Realiza.vc-Equipe-Executiva-1-.pdf'),
   ('Guia do Mentor Especialista', 'Metodologia da mentoria com especialista: 5 encontros e cinco funções.', 'guia', null, 'especialista', null, 2, 'materiais/7a83fe5a-5128-47c3-9c4c-c2eeb5ae0288-Guia-do-Mentor-Especialista---Realiza.vc-Equipe-Executiva-1-.pdf'),
@@ -85,7 +85,7 @@ insert into public.materiais (titulo, descricao, tipo, url, audiencia, encontro_
   ('Mensagem de preparação do mentorado', 'Modelo para enviar antes do 1º encontro: história de vida, Roda da Vida e contatos para avaliação.', 'template', null, 'dpp', 1, 19, 'doc:mensagem-preparacao'),
   ('Mensagem às pessoas indicadas', 'Modelo de contato para a avaliação por terceiros (duas perguntas).', 'template', null, 'dpp', 1, 20, 'doc:mensagem-indicadas'),
   ('Mensagem de encaminhamento entre encontros', 'Modelo curto para manter o vínculo e deixar a próxima tarefa clara.', 'template', null, 'dpp', null, 21, 'doc:mensagem-encaminhamento'),
-  ('Roda da Vida: roteiro de aplicação', 'Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.', 'template', null, 'dpp', 12, 22, 'doc:instrumento-roda-da-vida'),
+  ('Roda da Vida (instrumento)', 'Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.', 'template', null, 'dpp', 12, 22, 'doc:instrumento-roda-da-vida'),
   ('Feedback Construtivo', 'Instrumento do guia: o modelo de fala e os cuidados para feedback sobre comportamento negativo.', 'conteudo', null, 'todos', null, 23, 'doc:feedback-construtivo'),
   ('Instrumento: Definindo Metas', 'Metas SMART do mentorado — instrumento de preenchimento entre encontros.', 'template', null, 'dpp', null, 24, 'doc:instrumento-definindo-minhas-metas'),
   ('Perguntas Eficazes', 'Documento complementar do guia: o que são, o que evitar e o banco de perguntas por momento da conversa.', 'conteudo', null, 'dpp', null, 25, 'materiais/1a8277af-eb2b-4196-98e7-9fade2899a34-perguntas-eficazes.pdf'),

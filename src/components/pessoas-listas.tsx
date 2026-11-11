@@ -93,7 +93,7 @@ const GRUPO_ORDEM: Grupo[] = [
 
 const GRUPO_LABEL: Record<Grupo, string> = {
   equipe: "Coordenação e equipe",
-  supervisores: "Supervisores",
+  supervisores: "Auxiliares executivos",
   mentores: "Mentores",
   mentorados: "Mentorados",
   sempapel: "Sem papel",
