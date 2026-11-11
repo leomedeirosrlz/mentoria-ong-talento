@@ -43,6 +43,28 @@ export type IaToolCall = {
   function: { name: string; arguments: string };
 };
 
+/** Tool ad-hoc fora do registry do chat (ex.: match_semantico da
+ *  importação assistida — a saída do modelo chega SÓ por function-call,
+ *  nunca por texto livre parseado). Quando o caller a passa, substitui o
+ *  payload por papel — não é anunciável no chat. */
+export type IaToolDef = {
+  type: "function";
+  function: {
+    name: string;
+    description: string;
+    parameters: Record<string, unknown>;
+  };
+};
+
+/** `tool_choice` do chat.completions — "required"/função nomeada forçam a
+ *  saída por tool_call (a importação exige: sem call válida a linha fica
+ *  como estava). */
+export type IaToolChoice =
+  | "auto"
+  | "none"
+  | "required"
+  | { type: "function"; function: { name: string } };
+
 /** usage da resposta (sdd D4): OpenAI-compatible estendido pelo Zen — cost
  *  é USD real (≈0 dentro do plano Go), allowance é o que o request descontou
  *  do teto mensal do plano (a métrica de custo real), list_cost o preço de
@@ -224,16 +246,21 @@ function montarBody(
   modelo: string | undefined,
   esforco: EsforcoIa | undefined,
   stream: boolean,
-  papeis: AppRole[] | undefined
+  papeis: AppRole[] | undefined,
+  ferramentas?: { tools: IaToolDef[]; toolChoice?: IaToolChoice }
 ) {
-  const tools = toolsPayload(papeis);
+  // tools ad-hoc ganham do payload por papel — o caller que as passa quer
+  // exatamente elas no ar (a filtragem por papel é do registry do chat)
+  const tools = ferramentas?.tools ?? toolsPayload(papeis);
   return JSON.stringify({
     model: modelo || process.env.IA_MODEL,
     messages,
     // sem tools (papel sem acesso a nenhuma, ou tier rapido: saudação e
     // fora de escopo não consultam dados) — omite a chave em vez de
     // mandar [], que alguns providers recusam com 400
-    ...(tools.length ? { tools, tool_choice: "auto" as const } : {}),
+    ...(tools.length
+      ? { tools, tool_choice: ferramentas?.toolChoice ?? ("auto" as const) }
+      : {}),
     ...(esforco ? { reasoning_effort: EFFORT[esforco] } : {}),
     max_tokens: MAX_TOKENS_POR_ESFORCO[esforco ?? "baixo"],
     ...(stream
@@ -257,6 +284,11 @@ export async function chamarModelo(
     esforco?: EsforcoIa;
     fallbacks?: string[];
     papeis?: AppRole[];
+    /** tools ad-hoc fora do registry — substituem o payload por papel
+     *  (classificação estruturada, ex.: match_semantico da importação) */
+    tools?: IaToolDef[];
+    /** força a saída por tool_call — par de `tools` ad-hoc */
+    toolChoice?: IaToolChoice;
   }
 ): Promise<
   | { ok: true; mensagem: MsgChat; usage?: UsoIa; modelo?: string }
@@ -288,7 +320,10 @@ export async function chamarModelo(
             cadeia[i],
             mandarEsforco ? opts?.esforco : undefined,
             false,
-            opts?.papeis
+            opts?.papeis,
+            opts?.tools
+              ? { tools: opts.tools, toolChoice: opts.toolChoice }
+              : undefined
           ),
           signal: AbortSignal.timeout(Number(process.env.IA_TIMEOUT_MS ?? 20_000)),
         });

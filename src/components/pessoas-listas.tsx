@@ -1,18 +1,23 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useTransition } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import dynamic from "next/dynamic";
 import { Collapsible } from "@base-ui/react/collapsible";
+import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox";
+import { toast } from "sonner";
 import {
   Briefcase,
   CaretDown,
+  Check,
   EnvelopeSimple,
   FileText,
   GraduationCap,
   MagnifyingGlass,
   MapPin,
+  PaperPlaneTilt,
+  Signature,
   SignOut,
   UserPlus,
   Users,
@@ -24,6 +29,22 @@ import { temPapel } from "@/lib/types";
 import type { Mentorado, Profile } from "@/lib/types";
 import type { MentorProfile } from "@/lib/queries";
 import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
+import {
+  PAPEL_TURMA_LABEL,
+  STATUS_PESSOA_LABEL,
+  rankNaTurma,
+  slugDocMentorado,
+  statusDePessoa,
+  termoOkMentorado,
+  termoOkProfile,
+  turmasDePessoa,
+  type MapasTurma,
+  type PapelTurma,
+  type StatusPessoa,
+  type StatusPessoas,
+} from "@/lib/pessoas-status";
+import { turmaLonga, turmaAno } from "@/lib/turma";
+import { actionPessoasLote, type AlvoPessoaLote } from "@/lib/actions-pessoas";
 import { cn, normaliza } from "@/lib/utils";
 import {
   comparaNome,
@@ -81,7 +102,6 @@ const ORDEM_PESSOAS_LABEL: Record<OrdemPessoas, string> = {
  *  de papel/trilha/status. "sempapel" = pré-cadastro aguardando papel,
  *  grupo que só a coordenação enxerga. */
 type Grupo = "equipe" | "supervisores" | "mentores" | "mentorados" | "sempapel";
-type CategoriaPessoas = "todos" | Grupo;
 
 const GRUPO_ORDEM: Grupo[] = [
   "equipe",
@@ -178,6 +198,128 @@ function formatarWhatsApp(wa: string): string {
   return wa;
 }
 
+// ---------- status por pessoa (REALIZA-39) ----------
+// O vocabulário fechado do /pessoas — derivado dos mesmos insumos dos
+// badges que ele substitui (termo/docs via a mesma régua dos detalhes,
+// acesso via a view profiles_acesso da 0192). Só a coordenação vê.
+
+/** Estilo do chip de status — o primário é o badge cheio da régua; os
+ *  secundários (pendências que coexistem) vêm esmaecidos. */
+const STATUS_CHIP_CLS: Record<StatusPessoa, string> = {
+  inativo: "border-[var(--danger)]/50 text-[var(--danger)]",
+  convidado: "text-muted-foreground",
+  nao_acessou: "border-[var(--warn)]/60 text-[var(--warn-text)]",
+  termo_pendente: "border-[var(--warn)]/60 text-[var(--warn-text)]",
+  docs_pendentes: "border-[var(--warn)]/60 text-[var(--warn-text)]",
+  ativo: "border-[var(--ok)]/50 text-[var(--ok-text,var(--ok))]",
+};
+
+function StatusChips({ status }: { status: StatusPessoas }) {
+  return (
+    <>
+      <Badge
+        variant="outline"
+        className={cn("text-xs shrink-0", STATUS_CHIP_CLS[status.primario])}
+      >
+        {STATUS_PESSOA_LABEL[status.primario]}
+      </Badge>
+      {status.secundarios.map((s) => (
+        <Badge
+          key={s}
+          variant="outline"
+          className={cn("text-[11px] shrink-0 opacity-80", STATUS_CHIP_CLS[s])}
+        >
+          {STATUS_PESSOA_LABEL[s]}
+        </Badge>
+      ))}
+    </>
+  );
+}
+
+/** Status do profile — a mesma régua dos badges antigos (termo pela régua
+ *  do papel, "convite enviado" = conta sem onboarding) + o "não acessou"
+ *  novo, do último acesso real da 0192. Civis faltantes só contam quando
+ *  o termo ainda não saiu assinado (depois disso não há o que completar). */
+function statusDeProfile(
+  p: Profile,
+  mp: MentorProfile | undefined,
+  docs: DocsPessoa | undefined,
+  faltantesTermo: string[] | undefined,
+  ultimoAcessoEm: string | null | undefined
+): StatusPessoas {
+  const termoOk = termoOkProfile(p, mp, docs);
+  return statusDePessoa({
+    ativo: p.ativo,
+    contaVinculada: Boolean(p.user_id),
+    onboardedEm: p.onboarded_em,
+    ultimoAcessoEm: ultimoAcessoEm ?? null,
+    termoOk,
+    docsFaltantes: termoOk ? [] : (faltantesTermo ?? []),
+  });
+}
+
+/** Idem pro jovem — o documento devido vira "documentos pendentes" (o
+ *  slug da autorização não é "termo"); acesso/onboarding via a conta
+ *  vinculada (profile_id → profiles_acesso). */
+function statusDeMentorado(
+  m: Mentorado,
+  docs: DocsPessoa | undefined,
+  faltantesDoc: string[] | undefined,
+  ultimoAcessoEm: string | null | undefined
+): StatusPessoas {
+  const docOk = termoOkMentorado(m, docs);
+  return statusDePessoa({
+    ativo: !foraDoPrograma(m),
+    contaVinculada: Boolean(m.profile_id),
+    onboardedEm: m.conta?.onboarded_em ?? null,
+    ultimoAcessoEm: m.profile_id ? (ultimoAcessoEm ?? null) : null,
+    termoOk: true,
+    docsFaltantes: docOk ? [] : (faltantesDoc?.length ? faltantesDoc : ["x"]),
+  });
+}
+
+// ---------- seleção + lote (REALIZA-39) ----------
+
+/** Unidade da seleção em lote — a chave cruza as duas fontes (profile e
+ *  mentorado podem ter ids iguais por acaso; o par tipo+id é a verdade). */
+const chaveAlvo = (a: { tipo: "profile" | "mentorado"; id: string }) =>
+  `${a.tipo}:${a.id}`;
+
+/** Checkbox compacto da linha — a seleção em lote é gesto ocasional, mas
+ *  a caixa fica sempre visível pra coordenação (sem modo "selecionar"
+ *  escondido: a ação existir já tem que se anunciar). */
+function CaixaLinha({
+  checked,
+  onCheckedChange,
+  label,
+}: {
+  checked: boolean;
+  onCheckedChange: (v: boolean) => void;
+  label: string;
+}) {
+  return (
+    <CheckboxPrimitive.Root
+      checked={checked}
+      onCheckedChange={(v) => onCheckedChange(v === true)}
+      aria-label={label}
+      className="grid size-5 shrink-0 cursor-pointer place-items-center rounded-md border border-border bg-background transition-colors hover:border-foreground/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring data-checked:border-primary data-checked:bg-primary"
+    >
+      <CheckboxPrimitive.Indicator className="grid place-items-center text-[var(--brand-ink)]">
+        <Check size={13} weight="bold" aria-hidden />
+      </CheckboxPrimitive.Indicator>
+    </CheckboxPrimitive.Root>
+  );
+}
+
+/** Um item da lista unificada no modo turma — a pessoa aparece em CADA
+ *  turma a que pertence (não é dedup global); dentro da turma, os papéis
+ *  dela naquele recorte viram chips contextuais. */
+type ItemTurma =
+  | { tipo: "profile"; p: Profile; papeis: PapelTurma[] }
+  | { tipo: "mentorado"; m: Mentorado; papeis: PapelTurma[] };
+
+const SEM_TURMA = "__sem_turma__";
+
 export function PessoasListas({
   pessoas,
   mentorados,
@@ -188,6 +330,8 @@ export function PessoasListas({
   contagemPorMentor,
   assinaturas,
   faltantes,
+  mapasTurma,
+  acesso,
   euNome,
   souCoord,
 }: {
@@ -207,6 +351,13 @@ export function PessoasListas({
    *  alimenta o "civis incompletos" do Detalhes quando o doc ainda não saiu
    *  assinado. Labels, nunca valores. */
   faltantes?: Record<string, Record<string, string[]>>;
+  /** Filiação por turma (REALIZA-39) — duplas (com o rótulo vivo já
+   *  resolvido na page) + inscrições + grants escopados. Coord-only: no
+   *  diretório chega vazio e o modo turma nem liga. */
+  mapasTurma?: MapasTurma;
+  /** profile_id → último acesso (profiles_acesso, 0192) — insumo do
+   *  status "não acessou". Coord-only. */
+  acesso?: Record<string, string | null>;
   /** Nome de quem opera — assina a mensagem pronta de WhatsApp na fila. */
   euNome?: string | null;
   /** false = diretório de colegas (supervisor/mentores): mesma lista, sem
@@ -219,14 +370,16 @@ export function PessoasListas({
     return new URLSearchParams(window.location.search).get("busca") ?? "";
   });
   const [buscaDebounced, setBuscaDebounced] = useState(busca);
-  // categoria = o próprio agrupamento da lista usado como filtro
-  // (rodada out/2026 — antes: selects de papel, trilha e status)
-  const [cat, setCat] = useState<CategoriaPessoas>(() => {
+  // categoria = o próprio agrupamento da lista usado como filtro — por
+  // papel são os GRUPO_* de antes, por turma é o label da turma (ou
+  // "Sem turma"). String livre: o conjunto de opções depende do modo.
+  // Na URL o valor de turma vai namespaced ("turma:<slug>") pra não se
+  // confundir com um grupo de papel homônimo no deep-link
+  const [cat, setCat] = useState<string>(() => {
     if (typeof window === "undefined") return "todos";
-    const v = new URLSearchParams(window.location.search).get("cat");
-    return (GRUPO_ORDEM as string[]).includes(v ?? "") || v === "todos"
-      ? (v as CategoriaPessoas)
-      : "todos";
+    const c = new URLSearchParams(window.location.search).get("cat");
+    if (c?.startsWith("turma:")) return c.slice(6);
+    return c ?? "todos";
   });
   // "Fora do programa" inverte o recorte: a lista passa a mostrar SÓ quem
   // saiu (0077); desligado, eles moram no arquivo colapsável do fim
@@ -237,6 +390,23 @@ export function PessoasListas({
   const [foraAberto, setForaAberto] = useState(false);
   const [inativosAberto, setInativosAberto] = useState(false);
   const [ordem, setOrdem] = useState<OrdemPessoas>("nome");
+  // agrupamento da página (REALIZA-39): turma é o padrão operacional —
+  // ?agrupar=papel restaura a leitura global por papel. Só a coordenação
+  // tem os mapas de filiação; no diretório o grupo é sempre o papel.
+  const [agrupar, setAgrupar] = useState<"turma" | "papel">(() => {
+    if (typeof window === "undefined") return "turma";
+    return new URLSearchParams(window.location.search).get("agrupar") ===
+      "papel"
+      ? "papel"
+      : "turma";
+  });
+  const porTurma = souCoord && agrupar === "turma";
+  // seleção em lote (coord-only) — a chave tipo:id faz a pessoa ser uma só
+  // mesmo aparecendo em várias turmas
+  const [selecionados, setSelecionados] = useState<
+    Map<string, AlvoPessoaLote>
+  >(new Map());
+  const [lotePendente, startLote] = useTransition();
   const emDupla = useMemo(() => new Set(comDupla), [comDupla]);
   const temQualquerDupla = useMemo(() => new Set(comQualquerDupla), [comQualquerDupla]);
 
@@ -246,17 +416,20 @@ export function PessoasListas({
     return () => clearTimeout(t);
   }, [busca]);
 
-  // persistência da busca/categoria na URL (deep-link)
+  // persistência da busca/categoria/agrupamento na URL (deep-link)
   useEffect(() => {
     if (typeof window === "undefined") return;
     const sp = new URLSearchParams(window.location.search);
     if (busca) sp.set("busca", busca);
     else sp.delete("busca");
-    if (cat !== "todos") sp.set("cat", cat);
+    if (cat !== "todos")
+      sp.set("cat", souCoord && agrupar === "turma" ? `turma:${cat}` : cat);
     else sp.delete("cat");
+    if (souCoord && agrupar !== "turma") sp.set("agrupar", agrupar);
+    else sp.delete("agrupar");
     const qs = sp.toString();
     window.history.replaceState(null, "", qs ? `?${qs}` : window.location.pathname);
-  }, [busca, cat]);
+  }, [busca, cat, agrupar, souCoord]);
 
   const q = normaliza(buscaDebounced.trim());
   // diretório de colegas: sem papel ainda não é colega — pré-cadastro que
@@ -280,8 +453,12 @@ export function PessoasListas({
     normaliza(m.nome_social ?? "").includes(q) ||
     normaliza(m.email ?? "").includes(q) ||
     normaliza(m.ong_origem).includes(q);
-  const catOkPessoa = (p: Profile) => cat === "todos" || grupoDePessoa(p) === cat;
-  const catOkMentorado = cat === "todos" || cat === "mentorados";
+  // a categoria acompanha o agrupamento: por papel filtra GRUPO, por turma
+  // filtra a seção (o check por pessoa não faz sentido — a turma é dela,
+  // não de um papel global) — por isso aqui embaixo os dois modos passam
+  const catOkPessoa = (p: Profile) =>
+    porTurma || cat === "todos" || grupoDePessoa(p) === cat;
+  const catOkMentorado = porTurma || cat === "todos" || cat === "mentorados";
 
   // pra coordenação, cadastro desativado sai do grupo principal e vive na
   // seção "Inativos" no fim — visível, mas sem diluir a leitura de quem segue
@@ -348,14 +525,21 @@ export function PessoasListas({
   const pessoasEscopo = verFora
     ? []
     : basePessoas.filter(
-        (p) => p.ativo && catOkPessoa(p) && (!verFila || filaIds.has(p.id))
+        (p) =>
+          // no modo turma o inativo aparece no grupo com o chip "inativo"
+          // (a filiação é histórica); no modo papel ele fica no arquivo
+          (porTurma || p.ativo) &&
+          catOkPessoa(p) &&
+          (!verFila || filaIds.has(p.id))
       );
   const mentoradosEscopo = !catOkMentorado
     ? []
     : mentorados.filter((m) =>
         verFora
           ? foraDoPrograma(m)
-          : !foraDoPrograma(m) && (!verFila || filaIds.has(m.id))
+          : // idem: quem saiu continua contando como membro histórico da
+            // turma — a situação dela vira badge própria na linha
+            (porTurma || !foraDoPrograma(m)) && (!verFila || filaIds.has(m.id))
       );
 
   // quem saiu se ordena pela saída mais recente — arquivo cronológico, não
@@ -399,6 +583,208 @@ export function PessoasListas({
             comparaNome(a.nome, b.nome)
           : comparaNome(a.nome, b.nome)
     );
+
+  // ---------- modo turma (REALIZA-39) ----------
+  const mapas: MapasTurma = mapasTurma ?? {
+    duplas: [],
+    inscricoes: [],
+    papeisEscopo: [],
+  };
+
+  // cada pessoa aparece em TODA turma a que pertence — os papéis dentro
+  // dela viram chips da linha. Sem evidência nenhuma → balde "Sem turma"
+  // (pré-cadastros, equipe global, quem ainda não entrou em ciclo nenhum).
+  // Sem useMemo manual: as fontes (pessoasExibidas etc.) já são derivadas
+  // a cada render — o React Compiler memoiza o bloco inteiro sozinho
+  const gruposTurma = ((): { turma: string; itens: ItemTurma[] }[] => {
+    if (!porTurma) return [];
+    const porT = new Map<string, ItemTurma[]>();
+    const distribui = (
+      item: ItemTurma,
+      ts: { turma: string; papel: PapelTurma }[]
+    ) => {
+      if (!ts.length) {
+        const arr =
+          porT.get(SEM_TURMA) ?? porT.set(SEM_TURMA, []).get(SEM_TURMA)!;
+        arr.push(item);
+        return;
+      }
+      // uma linha por turma com TODOS os papéis dela nela (dedup por turma)
+      const unica = new Map<string, PapelTurma[]>();
+      for (const t of ts)
+        unica.set(t.turma, [...(unica.get(t.turma) ?? []), t.papel]);
+      for (const [turma, papeis] of unica) {
+        const arr = porT.get(turma) ?? porT.set(turma, []).get(turma)!;
+        arr.push({ ...item, papeis });
+      }
+    };
+    for (const p of pessoasExibidas)
+      distribui(
+        { tipo: "profile", p, papeis: [] },
+        turmasDePessoa({ tipo: "profile", id: p.id }, mapas)
+      );
+    for (const m of mentoradosExibidos)
+      distribui(
+        { tipo: "mentorado", m, papeis: [] },
+        turmasDePessoa({ tipo: "mentorado", id: m.id }, mapas)
+      );
+    // turmas mais recentes primeiro (número/período desc), "Sem turma" por último
+    const pendenciasItem = (i: ItemTurma) =>
+      i.tipo === "profile"
+        ? pendenciasPessoa(
+            i.p,
+            mentorProfiles[i.p.id],
+            temVaga(i.p),
+            assinaturas[i.p.id]
+          )
+        : pendenciasMentorado(i.m, !emDupla.has(i.m.id), assinaturas[i.m.id]);
+    return [...porT.entries()]
+      .sort(([a], [b]) =>
+        a === SEM_TURMA
+          ? 1
+          : b === SEM_TURMA
+            ? -1
+            : b.localeCompare(a, "pt-BR", { numeric: true })
+      )
+      .map(([turma, itens]) => ({
+        turma,
+        itens: itens.sort((x, y) => {
+          const nomeX = x.tipo === "profile" ? x.p.nome : x.m.nome;
+          const nomeY = y.tipo === "profile" ? y.p.nome : y.m.nome;
+          // dentro da turma: subseção por papel contextual (mentorados →
+          // mentores → staff) e o mesmo sort nome|pendencias da lista
+          return (
+            rankNaTurma(x.papeis, x.tipo) - rankNaTurma(y.papeis, y.tipo) ||
+            (ordem === "pendencias"
+              ? pendenciasItem(y) - pendenciasItem(x)
+              : 0) ||
+            comparaNome(nomeX, nomeY)
+          );
+        }),
+      }));
+  })();
+
+  // opções do filtro de seção acompanham o agrupamento
+  const catEfetiva = porTurma
+    ? cat === "todos" ||
+      cat === SEM_TURMA ||
+      gruposTurma.some((g) => g.turma === cat)
+      ? cat
+      : "todos"
+    : cat;
+  const gruposTurmaVisiveis =
+    catEfetiva === "todos"
+      ? gruposTurma
+      : gruposTurma.filter((g) => g.turma === catEfetiva);
+
+  // ---------- status + seleção (coord-only) ----------
+  const statusProfile = (p: Profile) =>
+    statusDeProfile(
+      p,
+      mentorProfiles[p.id],
+      assinaturas[p.id],
+      faltantes?.[p.id]?.["termo-voluntario"],
+      acesso?.[p.id]
+    );
+  const statusMentorado = (m: Mentorado) =>
+    statusDeMentorado(
+      m,
+      assinaturas[m.id],
+      faltantes?.[m.id]?.[slugDocMentorado(m)],
+      m.profile_id ? acesso?.[m.profile_id] : null
+    );
+
+  const toggleSel =
+    (alvo: AlvoPessoaLote) => (v: boolean) =>
+      setSelecionados((prev) => {
+        const next = new Map(prev);
+        if (v) next.set(chaveAlvo(alvo), alvo);
+        else next.delete(chaveAlvo(alvo));
+        return next;
+      });
+  const selProps = (tipo: "profile" | "mentorado", id: string, nome: string) =>
+    souCoord
+      ? {
+          checked: selecionados.has(`${tipo}:${id}`),
+          toggle: toggleSel({ tipo, id, nome }),
+        }
+      : undefined;
+
+  const rodarLote = (acao: "convite" | "termo") => {
+    const alvos = [...selecionados.values()];
+    if (!alvos.length) return;
+    startLote(async () => {
+      const r = await actionPessoasLote({ acao, alvos });
+      if ("error" in r) {
+        toast.error(r.error);
+        return;
+      }
+      // quem falhou fica selecionado — o retry é um clique só
+      const falhou = new Set(r.falhas.map((f) => `${f.tipo}:${f.id}`));
+      setSelecionados((prev) => {
+        const next = new Map<string, AlvoPessoaLote>();
+        for (const [k, v] of prev) if (falhou.has(k)) next.set(k, v);
+        return next;
+      });
+      const partes: string[] = [];
+      if (acao === "convite") {
+        partes.push(
+          `${r.feitos} ${r.feitos === 1 ? "convite enviado" : "convites enviados"}`
+        );
+      } else {
+        partes.push(
+          `${r.feitos} ${r.feitos === 1 ? "link emitido" : "links emitidos"}`
+        );
+        if (r.enviados) partes.push(`${r.enviados} enviados por e-mail`);
+        if (r.jaAssinados)
+          partes.push(`${r.jaAssinados} já tinham assinado`);
+      }
+      if (r.falhas.length) {
+        toast.error(
+          `${partes.join(" · ")} · ${r.falhas.length} ${
+            r.falhas.length === 1 ? "falhou" : "falharam"
+          }: ${r.falhas
+            .slice(0, 3)
+            .map((f) => `${f.nome ?? "cadastro"} (${f.erro})`)
+            .join("; ")}${r.falhas.length > 3 ? "…" : ""}`
+        );
+      } else {
+        toast.success(partes.join(" · ") || "Nada pra fazer na seleção.");
+      }
+    });
+  };
+
+  // caminho manual do lote (REALIZA-39): quem prefere o nudge na mão copia
+  // os wa.me da seleção — um por linha, pronto pra colar no WhatsApp
+  const copiarWhatsApp = async () => {
+    const linhas: string[] = [];
+    const semNumero: string[] = [];
+    for (const a of selecionados.values()) {
+      const wa =
+        a.tipo === "profile"
+          ? pessoaPorId.get(a.id)?.whatsapp
+          : mentoradoPorId.get(a.id)?.whatsapp;
+      const digits = wa?.replace(/\D/g, "");
+      if (digits?.length)
+        linhas.push(`${a.nome ?? "Cadastro"}: https://wa.me/${digits}`);
+      else semNumero.push(a.nome ?? "Cadastro");
+    }
+    if (!linhas.length) {
+      toast.error("Ninguém na seleção tem WhatsApp cadastrado.");
+      return;
+    }
+    try {
+      await navigator.clipboard.writeText(linhas.join("\n"));
+      toast.success(
+        `${linhas.length} ${linhas.length === 1 ? "link copiado" : "links copiados"}` +
+          (semNumero.length
+            ? ` · ${semNumero.length} sem WhatsApp`
+            : "")
+      );
+    } catch {
+      toast.error("Não foi possível copiar — o browser bloqueou a área de transferência.");
+    }
+  };
 
   // a lista unificada em grupos — cada bloco com seu rótulo; grupo vazio
   // não renderiza (busca/filtro que zera um grupo não deixa casca). O grupo
@@ -444,30 +830,88 @@ export function PessoasListas({
             className="pl-8"
           />
         </div>
+        {/* agrupamento da página (REALIZA-39): turma é o recorte
+            operacional padrão — a própria seção é a evidência; "Por papel"
+            restaura a leitura global por função de antes */}
+        {souCoord && (
+          <div
+            role="group"
+            aria-label="Agrupar lista"
+            className="flex items-center gap-1"
+          >
+            <button
+              type="button"
+              aria-pressed={porTurma}
+              onClick={() => {
+                setAgrupar("turma");
+                setCat("todos");
+              }}
+              className={filterChipCls(porTurma)}
+            >
+              Por turma
+            </button>
+            <button
+              type="button"
+              aria-pressed={!porTurma}
+              onClick={() => {
+                setAgrupar("papel");
+                setCat("todos");
+              }}
+              className={filterChipCls(!porTurma)}
+            >
+              Por papel
+            </button>
+          </div>
+        )}
         <Select
-          value={cat}
-          onValueChange={(v) => setCat(v as CategoriaPessoas)}
-          items={{
-            todos: "Todos",
-            ...GRUPO_LABEL,
-          }}
+          value={catEfetiva}
+          onValueChange={(v) => setCat(v ?? "todos")}
+          items={
+            porTurma
+              ? {
+                  todos: "Todas as turmas",
+                  ...Object.fromEntries(
+                    gruposTurma.map((g) => [
+                      g.turma,
+                      g.turma === SEM_TURMA
+                        ? "Sem turma"
+                        : turmaAno(g.turma)
+                          ? `${turmaLonga(g.turma)} · ${turmaAno(g.turma)}`
+                          : turmaLonga(g.turma),
+                    ])
+                  ),
+                }
+              : { todos: "Todos", ...GRUPO_LABEL }
+          }
         >
           <SelectTrigger
             size="sm"
-            aria-label="Filtrar por categoria"
+            aria-label={porTurma ? "Filtrar por turma" : "Filtrar por categoria"}
             className="w-auto"
           >
             <SelectValue />
           </SelectTrigger>
           <SelectContent alignItemWithTrigger={false}>
-            <SelectItem value="todos">Todos</SelectItem>
-            {GRUPO_ORDEM.filter((g) => souCoord || g !== "sempapel").map(
-              (g) => (
-                <SelectItem key={g} value={g}>
-                  {GRUPO_LABEL[g]}
-                </SelectItem>
-              )
-            )}
+            <SelectItem value="todos">
+              {porTurma ? "Todas as turmas" : "Todos"}
+            </SelectItem>
+            {porTurma
+              ? gruposTurma.map((g) => (
+                  <SelectItem key={g.turma} value={g.turma}>
+                    {g.turma === SEM_TURMA
+                      ? "Sem turma"
+                      : turmaAno(g.turma)
+                        ? `${turmaLonga(g.turma)} · ${turmaAno(g.turma)}`
+                        : turmaLonga(g.turma)}
+                  </SelectItem>
+                ))
+              : GRUPO_ORDEM.filter((g) => souCoord || g !== "sempapel").map(
+                  (g) => (
+                    <SelectItem key={g} value={g}>
+                      {GRUPO_LABEL[g]}
+                    </SelectItem>
+                  )
+                )}
           </SelectContent>
         </Select>
         {souCoord && totalFila > 0 && (
@@ -570,12 +1014,84 @@ export function PessoasListas({
         />
       )}
 
-      {/* lista única agrupada por categoria (rodada out/2026): um bloco
-          por grupo, linhas ricas em grade no desktop e coluna única no
-          mobile — "achar o perfil" é a tarefa, a posição do grupo já diz
-          a categoria */}
+      {/* lista única agrupada — por turma (REALIZA-39, padrão da
+          coordenação: a pessoa aparece em cada turma dela) ou por papel
+          (rodada out/2026 — leitura global por função e o diretório dos
+          demais papéis). Grade 2 colunas no desktop, coluna única no
+          mobile — "achar o perfil" é a tarefa */}
       <div className="space-y-5">
-        {grupos.map(({ g, pessoas: gp, mentorados: gm }) => (
+        {porTurma &&
+          gruposTurmaVisiveis.map(({ turma, itens }) => (
+            <section key={turma} className="space-y-2">
+              <h2 className="text-sm font-semibold tabular-nums">
+                {turma === SEM_TURMA
+                  ? "Sem turma"
+                  : turmaAno(turma)
+                    ? `${turmaLonga(turma)} · ${turmaAno(turma)}`
+                    : turmaLonga(turma)}{" "}
+                <span className="font-normal text-muted-foreground">
+                  ({itens.length})
+                </span>
+              </h2>
+              <div
+                key={`${q}|${catEfetiva}|${ordem}|${verFora ? 1 : 0}|${verFila ? 1 : 0}|${turma}`}
+                className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2"
+              >
+                {itens.map((item, i) =>
+                  item.tipo === "profile" ? (
+                    <PessoaRow
+                      key={`${turma}:${item.p.id}`}
+                      p={item.p}
+                      indice={i}
+                      temHistorico={temQualquerDupla.has(item.p.id)}
+                      podeExcluir={
+                        !item.p.user_id && !temQualquerDupla.has(item.p.id)
+                      }
+                      mentorProfile={mentorProfiles[item.p.id]}
+                      usadas={{
+                        dpp: contagemPorMentor[`${item.p.id}:dpp`] ?? 0,
+                        especialista:
+                          contagemPorMentor[`${item.p.id}:especialista`] ?? 0,
+                      }}
+                      docs={assinaturas[item.p.id]}
+                      faltantesTermo={
+                        faltantes?.[item.p.id]?.["termo-voluntario"] ?? []
+                      }
+                      status={statusProfile(item.p)}
+                      papeisTurma={item.papeis}
+                      selecao={selProps(
+                        "profile",
+                        item.p.id,
+                        item.p.nome_social ?? item.p.nome
+                      )}
+                      souCoord={souCoord}
+                    />
+                  ) : (
+                    <MentoradoRow
+                      key={`${turma}:${item.m.id}`}
+                      m={item.m}
+                      indice={i}
+                      emDupla={emDupla.has(item.m.id)}
+                      temDupla={temQualquerDupla.has(item.m.id)}
+                      duplaVivaId={duplaVivaPorMentorado[item.m.id] ?? null}
+                      docs={assinaturas[item.m.id]}
+                      faltantes={faltantes?.[item.m.id]}
+                      status={statusMentorado(item.m)}
+                      papeisTurma={item.papeis}
+                      selecao={selProps(
+                        "mentorado",
+                        item.m.id,
+                        item.m.nome_social ?? item.m.nome
+                      )}
+                      souCoord={souCoord}
+                    />
+                  )
+                )}
+              </div>
+            </section>
+          ))}
+        {!porTurma &&
+          grupos.map(({ g, pessoas: gp, mentorados: gm }) => (
           <section key={g} className="space-y-2">
             <h2 className="text-sm font-semibold tabular-nums">
               {verFora && g === "mentorados"
@@ -611,6 +1127,8 @@ export function PessoasListas({
                   }}
                   docs={assinaturas[p.id]}
                   faltantesTermo={faltantes?.[p.id]?.["termo-voluntario"] ?? []}
+                  status={souCoord ? statusProfile(p) : undefined}
+                  selecao={selProps("profile", p.id, p.nome_social ?? p.nome)}
                   souCoord={souCoord}
                 />
               ))}
@@ -624,6 +1142,8 @@ export function PessoasListas({
                   duplaVivaId={duplaVivaPorMentorado[m.id] ?? null}
                   docs={assinaturas[m.id]}
                   faltantes={faltantes?.[m.id]}
+                  status={souCoord ? statusMentorado(m) : undefined}
+                  selecao={selProps("mentorado", m.id, m.nome_social ?? m.nome)}
                   souCoord={souCoord}
                 />
               ))}
@@ -631,7 +1151,7 @@ export function PessoasListas({
           </section>
         ))}
 
-        {grupos.length === 0 && (
+        {(porTurma ? gruposTurmaVisiveis.length : grupos.length) === 0 && (
           <div className="flex flex-col items-center gap-1.5 rounded-xl bg-card py-10 text-center shadow-[var(--shadow-border)]">
             {basePessoas.length === 0 && mentorados.length === 0 ? (
               souCoord ? (
@@ -726,8 +1246,10 @@ export function PessoasListas({
       {/* arquivo de quem saiu do programa (0077) — colapsável, fora do
           grupo principal pra não confundir "ativo" com "desistente"; a
           busca força aberto pra o nome ainda ser encontrável. Com o chip
-          ligado a lista principal já é ela — não repete */}
-      {!verFora && foraExibidos.length > 0 && (
+          ligado a lista principal já é ela — não repete. No modo turma
+          quem saiu já aparece no grupo dela — o arquivo só faz sentido
+          na leitura por papel */}
+      {!porTurma && !verFora && foraExibidos.length > 0 && (
         <Collapsible.Root
           open={foraAberto || Boolean(q)}
           onOpenChange={setForaAberto}
@@ -760,6 +1282,8 @@ export function PessoasListas({
                   duplaVivaId={duplaVivaPorMentorado[m.id] ?? null}
                   docs={assinaturas[m.id]}
                   faltantes={faltantes?.[m.id]}
+                  status={souCoord ? statusMentorado(m) : undefined}
+                  selecao={selProps("mentorado", m.id, m.nome_social ?? m.nome)}
                   souCoord={souCoord}
                 />
               ))}
@@ -769,8 +1293,9 @@ export function PessoasListas({
       )}
 
       {/* idem pros cadastros desativados da equipe — mesma gramática do
-          arquivo de saídas (só coord vê; pros demais nem chegam) */}
-      {souCoord && inativasExibidas.length > 0 && (
+          arquivo de saídas (só coord vê; pros demais nem chegam). Modo
+          turma absorve os inativos nos grupos com chip próprio */}
+      {!porTurma && souCoord && inativasExibidas.length > 0 && (
         <Collapsible.Root
           open={inativosAberto || Boolean(q)}
           onOpenChange={setInativosAberto}
@@ -809,12 +1334,63 @@ export function PessoasListas({
                   }}
                   docs={assinaturas[p.id]}
                   faltantesTermo={faltantes?.[p.id]?.["termo-voluntario"] ?? []}
+                  status={statusProfile(p)}
+                  selecao={selProps("profile", p.id, p.nome_social ?? p.nome)}
                   souCoord={souCoord}
                 />
               ))}
             </div>
           </Collapsible.Panel>
         </Collapsible.Root>
+      )}
+
+      {/* barra de ações em lote (REALIZA-39) — aparece só com seleção;
+          convite e emissão rodam pelas primitivas existentes no servidor
+          (gate de coordenação lá, não aqui). Quem falhou fica selecionado
+          pra retry direto */}
+      {souCoord && selecionados.size > 0 && (
+        <div className="fixed inset-x-0 bottom-4 z-40 flex justify-center px-4">
+          <div className="flex flex-wrap items-center justify-center gap-2 rounded-2xl bg-card px-4 py-3 shadow-[var(--shadow-border)]">
+            <span className="text-sm font-medium tabular-nums">
+              {selecionados.size}{" "}
+              {selecionados.size === 1 ? "selecionada" : "selecionadas"}
+            </span>
+            <Button
+              size="sm"
+              disabled={lotePendente}
+              onClick={() => rodarLote("convite")}
+            >
+              <PaperPlaneTilt aria-hidden size={15} />
+              Convidar acesso
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={lotePendente}
+              onClick={() => rodarLote("termo")}
+            >
+              <Signature aria-hidden size={15} />
+              Emitir documento
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={lotePendente}
+              onClick={copiarWhatsApp}
+            >
+              <WhatsappLogo aria-hidden size={15} />
+              Copiar WhatsApp
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={lotePendente}
+              onClick={() => setSelecionados(new Map())}
+            >
+              Limpar
+            </Button>
+          </div>
+        </div>
       )}
     </>
   );
@@ -934,6 +1510,9 @@ function PessoaRow({
   usadas,
   docs: docsProp,
   faltantesTermo = [],
+  status,
+  papeisTurma,
+  selecao,
   souCoord,
   emInativos = false,
 }: {
@@ -950,6 +1529,13 @@ function PessoaRow({
   docs: DocsPessoa | undefined;
   /** labels do que falta na ficha pro termo do voluntário — coord-only */
   faltantesTermo?: string[];
+  /** vocabulário de status do /pessoas (REALIZA-39) — substitui os badges
+   *  soltos de antes ("inativa", "convite enviado", "termo pendente") */
+  status?: StatusPessoas;
+  /** papéis contextuais NA turma da seção — chips no modo turma */
+  papeisTurma?: PapelTurma[];
+  /** seleção em lote — caixa na linha (coord-only) */
+  selecao?: { checked: boolean; toggle: (v: boolean) => void };
   souCoord: boolean;
   /** Na seção "Inativos" o badge "inativa" seria redundante em cada linha —
    *  e as pendências operacionais (termo, não-entrou) não se aplicam mais. */
@@ -1044,6 +1630,13 @@ function PessoaRow({
       style={{ "--i": Math.min(indice, 10) } as CSSProperties}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {selecao && (
+          <CaixaLinha
+            checked={selecao.checked}
+            onCheckedChange={selecao.toggle}
+            label={`Selecionar ${p.nome_social ?? p.nome}`}
+          />
+        )}
         {/* um Link só engloba avatar+nome+meta — tabstop único e alvo
             de toque maior; aria-label pro nome acessível não virar
             "Nome email +55…" (o Avatar já é aria-hidden) */}
@@ -1102,22 +1695,41 @@ function PessoaRow({
             )}
           </span>
         </Link>
-        {/* idem pro não-coord: sem badge de papel à direita — a seção já
-            nomeia o grupo e o subtítulo (cargo · empresa / cidade · UF)
-            vale mais que repetir o rótulo */}
-        {souCoord && !p.ativo && !emInativos && (
+        {/* papéis contextuais da turma (modo turma): o que a pessoa faz
+            NAQUELE ciclo — mentor DPP, especialista, auxiliar, aguardando */}
+        {papeisTurma?.map((pp) => (
+          <Badge
+            key={pp}
+            variant="outline"
+            className="text-xs shrink-0 bg-muted/60"
+          >
+            {PAPEL_TURMA_LABEL[pp]}
+          </Badge>
+        ))}
+        {/* status operacional (REALIZA-39): primário + pendências
+            secundárias no vocabulário fechado — substitui os badges
+            soltos de antes. "não convidado" fica como dica de ação: quem
+            nem conta tem não cabe no vocabulário (cai em "ativo" com as
+            pendências dela) mas é o alvo natural do convite em lote */}
+        {status && <StatusChips status={status} />}
+        {souCoord && status && p.ativo && !p.user_id && !p.onboarded_em && (
+          <Badge variant="outline" className="text-xs shrink-0">
+            não convidado
+          </Badge>
+        )}
+        {/* sem status (diretório não-coord): sem badge de papel à direita
+            — a seção já nomeia o grupo e o subtítulo vale mais */}
+        {!status && souCoord && !p.ativo && !emInativos && (
           <Badge variant="outline" className="text-xs shrink-0 border-[var(--danger)]/50 text-[var(--danger)]">
             inativa
           </Badge>
         )}
-        {/* convite de acesso (0180): o envio já cria a conta — a régua de
-            "entrou" é o onboarded_em, não o user_id */}
-        {souCoord && p.ativo && !p.onboarded_em && (
+        {!status && souCoord && p.ativo && !p.onboarded_em && (
           <Badge variant="outline" className="text-xs shrink-0">
             {p.user_id ? "convite enviado" : "não convidado"}
           </Badge>
         )}
-        {souCoord && p.ativo && !termoOk && (
+        {!status && souCoord && p.ativo && !termoOk && (
           <Badge
             variant="outline"
             className="text-xs shrink-0 border-[var(--warn)]/60 text-[var(--warn-text)]"
@@ -1344,6 +1956,9 @@ function MentoradoRow({
   duplaVivaId,
   docs: docsProp,
   faltantes,
+  status,
+  papeisTurma,
+  selecao,
   souCoord,
 }: {
   m: Mentorado;
@@ -1356,6 +1971,13 @@ function MentoradoRow({
   docs: DocsPessoa | undefined;
   /** slug → labels de faltante civil da ficha (coord-only, labels só) */
   faltantes?: Record<string, string[]>;
+  /** vocabulário de status do /pessoas (REALIZA-39) — fora do programa
+   *  segue com a badge de situação (mais informativa que "inativo") */
+  status?: StatusPessoas;
+  /** papéis contextuais NA turma da seção — chips no modo turma */
+  papeisTurma?: PapelTurma[];
+  /** seleção em lote — caixa na linha (coord-only) */
+  selecao?: { checked: boolean; toggle: (v: boolean) => void };
   souCoord: boolean;
 }) {
   const detalhesId = `detalhes-${m.id}`;
@@ -1403,6 +2025,13 @@ function MentoradoRow({
       style={{ "--i": Math.min(indice, 10) } as CSSProperties}
     >
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        {selecao && (
+          <CaixaLinha
+            checked={selecao.checked}
+            onCheckedChange={selecao.toggle}
+            label={`Selecionar ${m.nome_social ?? m.nome}`}
+          />
+        )}
         <Link
           href={`/pessoas/${m.id}`}
           prefetch={false}
@@ -1445,7 +2074,30 @@ function MentoradoRow({
             {SITUACAO_MENTORADO_LABEL[m.situacao ?? "ativo"]}
           </Badge>
         )}
-        {souCoord && !fora && !docOk && (
+        {/* papéis contextuais da turma — "Mentorado(a)" / "Aguardando par"
+            por evidência (dupla, inscrição), não pelo cadastro */}
+        {papeisTurma?.map((pp) => (
+          <Badge
+            key={pp}
+            variant="outline"
+            className="text-xs shrink-0 bg-muted/60"
+          >
+            {PAPEL_TURMA_LABEL[pp]}
+          </Badge>
+        ))}
+        {/* status operacional (REALIZA-39): docs/vínculo/acesso no
+            vocabulário fechado — quem saiu segue com a badge de situação
+            acima (Desistente/Concluiu informam mais que "inativo"). "não
+            convidado" fica como dica de ação junto aos chips */}
+        {status && !fora && <StatusChips status={status} />}
+        {souCoord && status && !fora && !m.profile_id && m.email && (
+          <Badge variant="outline" className="text-xs shrink-0">
+            não convidado
+          </Badge>
+        )}
+        {/* fallback sem o mapa de status (defensivo — hoje toda linha
+            coord passa status): mantém os badges antigos */}
+        {!status && souCoord && !fora && !docOk && (
           <Badge
             variant="outline"
             className={cn(
@@ -1463,10 +2115,7 @@ function MentoradoRow({
                 : "termo pendente"}
           </Badge>
         )}
-        {/* convite/vínculo de acesso (0180) — a conta do jovem nasce no
-            envio; depois do onboarding o profile_id segue sendo a verdade
-            do vínculo e o badge vira "conta vinculada" */}
-        {souCoord && !fora && (m.email || m.profile_id) && (
+        {!status && souCoord && !fora && (m.email || m.profile_id) && (
           <Badge variant="outline" className="text-xs shrink-0">
             {m.profile_id
               ? m.conta?.onboarded_em

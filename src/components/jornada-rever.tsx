@@ -15,7 +15,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/ciclo";
-import { ehInstrumento } from "@/lib/forms/instrumentos";
+import { ehInstrumentoDeDupla } from "@/lib/forms/instrumentos";
 import type {
   FormularioCampo,
   FormularioSistema,
@@ -33,6 +33,7 @@ export function ReverRespostaDialog({
   sistema,
   campos,
   respostas,
+  respostasAnterior = null,
   label = "Rever resposta",
   trigger,
   acao,
@@ -42,6 +43,9 @@ export function ReverRespostaDialog({
   sistema: FormularioSistema | null;
   campos: FormularioCampo[];
   respostas: Record<string, RespostaValor>;
+  /** earlier-moment payload (initial roda / início checklist) — enables
+   *  the before/after reading in InstrumentoResultado */
+  respostasAnterior?: Record<string, RespostaValor> | null;
   label?: string;
   /** gatilho custom — o card inteiro da estante (v5c) é render prop com
    *  `nativeButton={false}` (role=button + tabstop pela base); sem ele,
@@ -50,7 +54,7 @@ export function ReverRespostaDialog({
   /** saída contextual no rodapé ("Abrir o plano" no PDM) */
   acao?: { rotulo: string; href: string };
 }) {
-  const estruturado = ehInstrumento(sistema);
+  const estruturado = ehInstrumentoDeDupla(sistema);
   return (
     <Dialog>
       <DialogTrigger
@@ -80,6 +84,7 @@ export function ReverRespostaDialog({
             sistema={sistema}
             campos={campos}
             respostas={respostas}
+            respostasAnterior={respostasAnterior}
           />
         ) : (
           <RespostaLista campos={campos} respostas={respostas} />

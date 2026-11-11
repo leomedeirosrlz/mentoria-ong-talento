@@ -60,6 +60,8 @@ export const DEMO_TOKENS = {
   luizaAvaliacao360: "demo-tok-360-luiza-oficial1",
   isabelaAvaliacao360: "demo-tok-360-isabela-oficia",
   ricardoAvaliacao360: "demo-tok-360-ricardo-ofici",
+  anaAvaliacao360: "demo-tok-360-ana-00000001",
+  ricardoRitoAvaliacao360: "demo-tok-360-ricardo-rito1",
   // instrumentos da jornada (0080) — dupla Ricardo×Ana
   anaVisao: "demo-tok-visao-ana-00000001",
   anaMetas: "demo-tok-metas-ana-00000001",
@@ -76,6 +78,15 @@ export const DEMO_TOKENS = {
   matheusRoda: "demo-tok-roda-matheus-00001",
   pedroVisao: "demo-tok-visao-pedro-0000001",
   dandaraVisao: "demo-tok-visao-dandara-00001",
+  // REALIZA-18/-359 — a dupla fechada (Luiza×Isabela) carrega o par antes
+  // × depois completo: as duas rodas e as duas marcações do checklist —
+  // é o que a retrospectiva compara; a viva (Ricardo×Ana) marca o início
+  luizaChecklistInicio: "demo-tok-check-luiza-inicio01",
+  luizaChecklistFinal: "demo-tok-check-luiza-final001",
+  isabelaRodaInicial: "demo-tok-roda-isabela-inicial",
+  isabelaRodaFormal: "demo-tok-roda-isabela-formal",
+  ricardoChecklistInicio: "demo-tok-check-ricardo-inicio",
+  joaoPedroChecklist: "demo-tok-check-joaopedro-00001",
 } as const;
 
 /** Metadados de upload do intake no dataset (mesma forma de
@@ -422,6 +433,35 @@ export function getDemoFormularios(): DemoFormularios {
     updated_at: haDias(240, "09:00"),
   };
 
+  // ---------- 11b. checklist de competências do mentor (0190 — campos
+  // verbatim do seed; o instrumento é do MENTOR, não do jovem) ----------
+  const fChecklist: Formulario = {
+    id: uid(0x400e),
+    titulo: "Checklist de competências do mentor",
+    descricao:
+      "Autoavaliação do mentor sobre as 10 competências do guia: marca uma vez no início da jornada e revisita no fechamento — o antes × depois aparece na retrospectiva.",
+    sistema: "competencias_mentor",
+    campos: [
+      { id: "sec_intro", tipo: "secao", label: "Como você se avalia hoje?", obrigatorio: false, descricao: "Marque “Já faço bem” nas competências que já fazem parte do seu jeito de escutar e “Preciso desenvolver” nas que você quer trabalhar nesta mentoria. Sem nota certa — é um retrato seu, não uma prova." },
+      { id: "comp_1", tipo: "select", label: "Escutar sem interromper e sem antecipar conclusões", obrigatorio: true, opcoes: ["Já faço bem", "Preciso desenvolver"] },
+      { id: "comp_2", tipo: "select", label: "Fazer perguntas abertas em vez de dar respostas prontas", obrigatorio: true, opcoes: ["Já faço bem", "Preciso desenvolver"] },
+      { id: "comp_3", tipo: "select", label: "Sustentar o silêncio quando o outro está pensando", obrigatorio: true, opcoes: ["Já faço bem", "Preciso desenvolver"] },
+      { id: "comp_4", tipo: "select", label: "Dar feedback focado no comportamento, não na pessoa", obrigatorio: true, opcoes: ["Já faço bem", "Preciso desenvolver"] },
+      { id: "comp_5", tipo: "select", label: "Reconhecer e nomear progressos concretos", obrigatorio: true, opcoes: ["Já faço bem", "Preciso desenvolver"] },
+      { id: "comp_6", tipo: "select", label: "Admitir quando não sei algo", obrigatorio: true, opcoes: ["Já faço bem", "Preciso desenvolver"] },
+      { id: "comp_7", tipo: "select", label: "Manter postura não julgadora diante de escolhas diferentes das minhas", obrigatorio: true, opcoes: ["Já faço bem", "Preciso desenvolver"] },
+      { id: "comp_8", tipo: "select", label: "Cumprir combinados e avisar com antecedência quando preciso remarcar", obrigatorio: true, opcoes: ["Já faço bem", "Preciso desenvolver"] },
+      { id: "comp_9", tipo: "select", label: "Separar o meu projeto de vida do projeto do(a) jovem", obrigatorio: true, opcoes: ["Já faço bem", "Preciso desenvolver"] },
+      { id: "comp_10", tipo: "select", label: "Perceber quando uma questão extrapola o meu papel e acionar apoio", obrigatorio: true, opcoes: ["Já faço bem", "Preciso desenvolver"] },
+      { id: "desenvolver", tipo: "texto_longo", label: "O que você quer desenvolver nos próximos meses?", obrigatorio: false },
+    ],
+    ativo: true,
+    versao: 1,
+    created_by: null,
+    created_at: haDias(240, "09:00"),
+    updated_at: haDias(240, "09:00"),
+  };
+
   // ---------- 12. inscrição de mentores (intake oficial, 0115 — campos
   // verbatim do seed: uma grade de horários só, "Outro" em cor/raça,
   // pergunta condicional de experiência, uploads privados) ----------
@@ -611,6 +651,22 @@ export function getDemoFormularios(): DemoFormularios {
       dupla_id: duplaDe("Ricardo", "Ana"), contexto: { origem: "ficha" },
       usado_em: haDias(3, "21:05"), expira_em: null, created_by: marina, created_at: haDias(6),
     },
+    // pending 360 links are the only ones that render the trajectory card
+    // (REALIZA-71) in /f/<token>: Ana's side of d-ok is still open, and
+    // Ricardo's link on the still-open d-rito rite shows the mentor card
+    // with Gustavo's quantized media released (3-eval batch)
+    {
+      id: uid(0x4229), formulario_id: fAvaliacaoFinalMentorado.id, token: DEMO_TOKENS.anaAvaliacao360,
+      dest_profile_id: null, dest_mentorado_id: ment("Ana"),
+      dupla_id: duplaDe("Ricardo", "Ana"), contexto: { origem: "ficha" },
+      usado_em: null, expira_em: null, created_by: marina, created_at: haDias(6),
+    },
+    {
+      id: uid(0x4232), formulario_id: fAvaliacaoFinalMentor.id, token: DEMO_TOKENS.ricardoRitoAvaliacao360,
+      dest_profile_id: porNome("Ricardo"), dest_mentorado_id: null,
+      dupla_id: duplaDe("Ricardo", "Gustavo"), contexto: { origem: "ficha" },
+      usado_em: null, expira_em: null, created_by: marina, created_at: haDias(4),
+    },
     // instrumentos da jornada (0080), dupla Ricardo×Ana — a história da
     // jornada: visão, metas e PDM respondidos; Roda da Vida ainda não
     // entregue (entra no 5º mês). No Eduardo (dupla João Pedro) a visão
@@ -702,6 +758,57 @@ export function getDemoFormularios(): DemoFormularios {
       dupla_id: duplaDe("André", "Pedro"), contexto: { origem: "instrumentos" },
       // venceu sem resposta — o painel mostra "expirado", a ficha "Reenviar"
       usado_em: null, expira_em: haDias(16), created_by: porNome("André"), created_at: haDias(30),
+    },
+    // REALIZA-18/-359 · a dupla encerrada (Luiza×Isabela, ~8 meses atrás)
+    // carrega o antes × depois inteiro: a roda inicial do 1º encontro, a
+    // formal do enc. 12–14 e as duas marcações do checklist — é o par que
+    // a retrospectiva e o "Ver resultado" comparam. O checklist responde
+    // o MENTOR (dest_profile_id), não a jovem.
+    {
+      id: uid(0x4232), formulario_id: fRodaVida.id, token: DEMO_TOKENS.isabelaRodaInicial,
+      dest_profile_id: null, dest_mentorado_id: ment("Isabela"),
+      dupla_id: duplaDe("Luiza", "Isabela"),
+      contexto: { origem: "instrumentos", momento: "inicial" },
+      usado_em: haDias(343, "20:12"), expira_em: null, created_by: porNome("Luiza"), created_at: haDias(345),
+    },
+    {
+      id: uid(0x4233), formulario_id: fRodaVida.id, token: DEMO_TOKENS.isabelaRodaFormal,
+      dest_profile_id: null, dest_mentorado_id: ment("Isabela"),
+      dupla_id: duplaDe("Luiza", "Isabela"),
+      contexto: { origem: "instrumentos", momento: "formal" },
+      usado_em: haDias(257, "19:48"), expira_em: null, created_by: porNome("Luiza"), created_at: haDias(259),
+    },
+    {
+      id: uid(0x4234), formulario_id: fChecklist.id, token: DEMO_TOKENS.luizaChecklistInicio,
+      dest_profile_id: porNome("Luiza"), dest_mentorado_id: null,
+      dupla_id: duplaDe("Luiza", "Isabela"),
+      contexto: { origem: "autoemit", momento: "inicio" },
+      usado_em: haDias(344, "21:03"), expira_em: null, created_by: marina, created_at: haDias(345),
+    },
+    {
+      id: uid(0x4235), formulario_id: fChecklist.id, token: DEMO_TOKENS.luizaChecklistFinal,
+      dest_profile_id: porNome("Luiza"), dest_mentorado_id: null,
+      dupla_id: duplaDe("Luiza", "Isabela"),
+      contexto: { origem: "autoemit", momento: "final" },
+      usado_em: haDias(241, "20:36"), expira_em: null, created_by: marina, created_at: haDias(243),
+    },
+    // a viva (Ricardo×Ana) marcou só o início — a linha mostra "respondido"
+    // com a leitura de marcação única; a final ainda não existe
+    {
+      id: uid(0x4236), formulario_id: fChecklist.id, token: DEMO_TOKENS.ricardoChecklistInicio,
+      dest_profile_id: porNome("Ricardo"), dest_mentorado_id: null,
+      dupla_id: duplaDe("Ricardo", "Ana"),
+      contexto: { origem: "autoemit", momento: "inicio" },
+      usado_em: haDias(34, "21:15"), expira_em: null, created_by: marina, created_at: haDias(36),
+    },
+    // João Pedro com o checklist de início pendente — o estado "link
+    // enviado" da linha, e o lembrete vai pro WhatsApp do próprio mentor
+    {
+      id: uid(0x4237), formulario_id: fChecklist.id, token: DEMO_TOKENS.joaoPedroChecklist,
+      dest_profile_id: porNome("João Pedro"), dest_mentorado_id: null,
+      dupla_id: duplaDe("João Pedro", "Eduardo"),
+      contexto: { origem: "autoemit", momento: "inicio" },
+      usado_em: null, expira_em: null, created_by: marina, created_at: haDias(2),
     },
     // link de inscrição do intake (0115): UM endereço público, N
     // respostas anônimas — usado_em fica null pra sempre, a contagem sai
@@ -909,6 +1016,72 @@ export function getDemoFormularios(): DemoFormularios {
       },
       respondido_em: haDias(32, "20:15"),
     },
+    // REALIZA-18 · o par de rodas da Isabela — a inicial do enc. 1 e a
+    // formal do enc. 12–14: notas sobem nas áreas do plano (escola,
+    // carreira, finanças) e ficam onde já estavam bem — a comparação é o
+    // coração da retrospectiva dela
+    {
+      id: uid(0x4418), link_id: uid(0x4232),
+      respostas: {
+        p_saude: 6, p_intelecto: 5, p_equilibrio: 5, p_independencia: 5,
+        pr_carreira: 3, pr_financas: 3, pr_escola: 5, pr_contribuicao: 4,
+        r_familia: 7, r_amigos: 7, r_amoroso: 5, r_social: 6,
+        q_hobbies: 6, q_atividade: 4, q_realizacao: 5, q_espiritualidade: 6,
+        reflexao: "Escola e carreira são o que mais pesam — quero uma profissão de verdade. Família é o que me segura.",
+      },
+      respondido_em: haDias(343, "20:12"),
+    },
+    {
+      id: uid(0x4419), link_id: uid(0x4233),
+      respostas: {
+        p_saude: 7, p_intelecto: 7, p_equilibrio: 6, p_independencia: 7,
+        pr_carreira: 7, pr_financas: 6, pr_escola: 8, pr_contribuicao: 6,
+        r_familia: 8, r_amigos: 7, r_amoroso: 6, r_social: 7,
+        q_hobbies: 7, q_atividade: 5, q_realizacao: 8, q_espiritualidade: 6,
+        reflexao: "Olhando as duas rodas, o que mudou foi acreditar que consigo — a escola virou rotina e o trabalho veio junto.",
+      },
+      respondido_em: haDias(257, "19:48"),
+    },
+    // REALIZA-359 · o checklist da Luiza: na marcação de início 6 "já faço
+    // bem"; na revisitação 9 — silêncio, perguntas abertas e separar os
+    // projetos eram os pontos que ela queria desenvolver
+    {
+      id: uid(0x4420), link_id: uid(0x4234),
+      respostas: {
+        comp_1: "Já faço bem", comp_2: "Preciso desenvolver",
+        comp_3: "Preciso desenvolver", comp_4: "Já faço bem",
+        comp_5: "Já faço bem", comp_6: "Já faço bem",
+        comp_7: "Já faço bem", comp_8: "Já faço bem",
+        comp_9: "Preciso desenvolver", comp_10: "Preciso desenvolver",
+        desenvolver: "Sustentar o silêncio sem preencher com conselho — e lembrar que o projeto de vida é dela, não meu.",
+      },
+      respondido_em: haDias(344, "21:03"),
+    },
+    {
+      id: uid(0x4421), link_id: uid(0x4235),
+      respostas: {
+        comp_1: "Já faço bem", comp_2: "Já faço bem",
+        comp_3: "Já faço bem", comp_4: "Já faço bem",
+        comp_5: "Já faço bem", comp_6: "Já faço bem",
+        comp_7: "Já faço bem", comp_8: "Já faço bem",
+        comp_9: "Já faço bem", comp_10: "Preciso desenvolver",
+        desenvolver: "Revisito o checklist no próximo ciclo — perceber quando passar do meu papel ainda é o ponto a trabalhar.",
+      },
+      respondido_em: haDias(241, "20:36"),
+    },
+    // Ricardo — só a marcação de início (a final vem no fechamento)
+    {
+      id: uid(0x4422), link_id: uid(0x4236),
+      respostas: {
+        comp_1: "Já faço bem", comp_2: "Já faço bem",
+        comp_3: "Preciso desenvolver", comp_4: "Já faço bem",
+        comp_5: "Preciso desenvolver", comp_6: "Já faço bem",
+        comp_7: "Já faço bem", comp_8: "Já faço bem",
+        comp_9: "Preciso desenvolver", comp_10: "Já faço bem",
+        desenvolver: "Esperar a resposta madurar em vez de apressar — e deixar o plano ser dela.",
+      },
+      respondido_em: haDias(34, "21:15"),
+    },
     // candidata já promovida — a resposta carimba o profile criado (a
     // Luiza, que hoje é mentora DPP na base demo)
     {
@@ -1073,6 +1246,7 @@ export function getDemoFormularios(): DemoFormularios {
       fMetas,
       fPdm,
       fRodaVida,
+      fChecklist,
       fIntakeMentor,
       fIntakeMentorado,
     ],
@@ -1136,7 +1310,13 @@ type InstrumentoDemo = Omit<
   "entregas"
 > & { entregas: EntregaDemo[] };
 
-const ORDEM_JORNADA = { visao: 1, metas: 2, pdm: 3, roda_vida: 4 } as const;
+const ORDEM_JORNADA = {
+  visao: 1,
+  metas: 2,
+  pdm: 3,
+  roda_vida: 4,
+  competencias_mentor: 5,
+} as const;
 
 /** link → entrega: status deriva de usado_em/expira_em (o mesmo CASE das
  *  três RPCs da 0096) e `destino` separa o lado do mentor do lado do
@@ -1169,9 +1349,11 @@ function linkParaEntrega(
   };
 }
 
-/** Os 4 instrumentos da jornada com as entregas DA dupla — a projeção da
- *  RPC instrumentos_da_dupla, sem o gate de papel (cada mirror aplica o
- *  seu: ficha por vínculo, jornada pelo mentorado, painel por escopo). */
+/** Os 5 instrumentos da dupla com as entregas DELA — a projeção da RPC
+ *  instrumentos_da_dupla (0190 — o checklist do mentor entra como 5º),
+ *  sem o gate de papel (cada mirror aplica o seu: ficha por vínculo,
+ *  jornada pelo mentorado — que tira o item inteiro —, painel por
+ *  escopo). */
 function instrumentosDaDuplaRaw(dupla: Dupla): InstrumentoDemo[] {
   const { formularios, links, respostas } = getDemoFormularios();
   const agora = Date.now();
@@ -1184,7 +1366,7 @@ function instrumentosDaDuplaRaw(dupla: Dupla): InstrumentoDemo[] {
     )
     .map((f) => ({
       sistema:
-        f.sistema as import("../forms/schema").InstrumentoSistema,
+        f.sistema as import("../forms/schema").InstrumentoDuplaSistema,
       formulario_id: f.id,
       titulo: f.titulo,
       descricao: f.descricao,
@@ -1281,12 +1463,47 @@ export function demoJovemJornada(role: AppRole): JovemJornadaDados | null {
         })
     : [];
 
-  const instrumentos: InstrumentoJornada[] = instrumentosDaDuplaRaw(dupla);
+  const instrumentos: InstrumentoJornada[] = instrumentosDaDuplaRaw(dupla)
+    // a RPC 0190 tira o item inteiro do payload dela — o checklist é do
+    // mentor, nunca chega nem o nome do instrumento na jornada do jovem
+    .filter((i) => i.sistema !== "competencias_mentor")
+    // entrega endereçada a outro → sem bearer token nem resposta (0096)
+    .map((i) => ({
+      ...i,
+      entregas: i.entregas.map((e) =>
+        e.destino === "mentorado"
+          ? e
+          : { ...e, token: null, respostas: null }
+      ),
+    }));
+
+  // 0190 — o recorte da retrospectiva: destrava no 16º realizado ou na
+  // dupla fechada (mesma régua da RPC) e carrega só nº/data/tema —
+  // avaliação, notas e apoio ficam de fora do payload dela
+  const realizados = (dupla.encontros ?? [])
+    .filter((e) => e.status === "realizado")
+    .sort((a, b) => a.numero - b.numero);
+  const retrospectiva =
+    realizados.length > 0
+      ? {
+          desbloqueada:
+            realizados.some((e) => e.numero === 16) ||
+            dupla.status === "concluida" ||
+            dupla.status === "encerrada",
+          encontros: realizados.map((e) => ({
+            numero: e.numero,
+            data: e.realizado_em ?? e.data_hora,
+            tema: e.registro?.tema ?? null,
+          })),
+        }
+      : null;
+
   return {
     dupla_id: dupla.id,
     cronograma,
     instrumentos,
     avaliacao_360,
+    retrospectiva,
   };
 }
 
@@ -1404,7 +1621,21 @@ export function demoInstrumentosDaDupla(
     supervisionaDuplaDemo(data, eu.id, dupla) ||
     souMentorado;
   if (!podeVer) return [];
-  return instrumentosDaDuplaRaw(dupla);
+  const itens = instrumentosDaDuplaRaw(dupla);
+  // 0096 — a jovem nunca carrega bearer token nem resposta de entrega
+  // endereçada a outro; com o checklist (0190) é o que esconde as
+  // marcações do mentor sem tirar o item do payload
+  if (souMentorado) {
+    return itens.map((i) => ({
+      ...i,
+      entregas: i.entregas.map((e) =>
+        e.destino === "mentorado"
+          ? e
+          : { ...e, token: null, respostas: null }
+      ),
+    }));
+  }
+  return itens;
 }
 
 /** Estado do link da avaliação geral da trilha de especialista (0104) —

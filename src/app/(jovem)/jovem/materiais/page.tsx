@@ -39,6 +39,7 @@ import {
   encCorrenteDe,
   estacoesJornada,
   materialLiberadoParaJovem,
+  parRoda,
   resumoJornada,
   SISTEMA_DA_ESTACAO,
   type Estacao,
@@ -54,14 +55,18 @@ import { getMateriais, getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import {
   getJovemDuplas,
+  getJovemEncaminhamentos,
   getJovemEncontros,
   getJovemJornada,
 } from "@/lib/queries-jovem";
+import { getPdmResumo } from "@/lib/queries-pdm";
+import { dadosRetrospectivaJovem } from "@/lib/retrospectiva";
+import { RetrospectivaJornada } from "@/components/retrospectiva-jornada";
 import { getConsolidadoTerceirosJovem } from "@/lib/terceiros/queries";
 import { MaterialMenu } from "@/components/material-actions";
 import { PreviewLink } from "@/components/material-preview-pdf";
 import { MaterialThumb } from "@/components/material-thumb";
-import type { Material } from "@/lib/types";
+import type { Material, Trilha } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Minha jornada" };
@@ -307,6 +312,14 @@ export default async function JovemMateriais() {
    *  pelos campos do sistema). A recorrente saiu da estante: ela vive no
    *  banner de pendência e no histórico, não como produto de entrega
    *  única. */
+  // REALIZA-18 — o par inicial × formal das entregas dela: o Rever da
+  // estação roda_formal vira o antes × depois (o ghost da leitura inicial
+  // por baixo do polígono, como na ficha)
+  const rodaPar = parRoda(
+    (jornada.instrumentos ?? []).find((i) => i.sistema === "roda_vida")
+      ?.entregas ?? []
+  );
+
   const propsEstacao = (chave: EstacaoChave) => ({
     sistema:
       chave === "avaliacao_360"
@@ -316,7 +329,53 @@ export default async function JovemMateriais() {
       chave === "avaliacao_360"
         ? campos360
         : (camposPorSistema.get(SISTEMA_DA_ESTACAO[chave] ?? "") ?? []),
+    respostasAnterior:
+      chave === "roda_formal"
+        ? ((rodaPar.inicial?.respostas ?? null) as Record<
+            string,
+            RespostaValor
+          > | null)
+        : null,
   });
+
+  // ---------- retrospectiva (REALIZA-359) ----------
+  // destravada pela RPC (16º realizado ou dupla fechada); as fontes são as
+  // que já são dela — a timeline do payload, os encontros/combinados das
+  // views dela e o PDM (a RPC dele também escopa por papel). O checklist
+  // do mentor nem chega no payload — a autoavaliação é recorte de staff.
+  const retroAberto = jornada.retrospectiva?.desbloqueada === true;
+  const [combinadosJovem, pdmResumo] = retroAberto
+    ? await Promise.all([
+        getJovemEncaminhamentos(),
+        getPdmResumo(jornada.dupla_id).catch(() => null),
+      ])
+    : [null, null];
+  const retroJovem = retroAberto
+    ? dadosRetrospectivaJovem({
+        dupla: {
+          trilha: (dupla.trilha ?? "dpp") as Trilha,
+          status: dupla.status!,
+          iniciada_em: dupla.iniciada_em,
+          encerrada_em: dupla.encerrada_em,
+          mentorNome:
+            dupla.mentor_nome_social ?? dupla.mentor_nome ?? "Seu mentor",
+        },
+        mentoradoNome: me.nome_social || me.nome,
+        cronograma: jornada.cronograma,
+        encontros: encontrosDpp,
+        temas: jornada.retrospectiva?.encontros ?? [],
+        combinados: (combinadosJovem ?? []).filter(
+          (c) => c.dupla_id === jornada.dupla_id
+        ),
+        instrumentos: (jornada.instrumentos ?? []).map((i) => ({
+          sistema: i.sistema,
+          campos: (i.campos as FormularioCampo[] | null) ?? [],
+          entregas: i.entregas,
+        })),
+        pdm: pdmResumo,
+        desbloqueada: true,
+      })
+    : null;
 
   return (
     <div className="space-y-6">
@@ -497,6 +556,11 @@ export default async function JovemMateriais() {
         </p>
       </section>
 
+      {/* REALIZA-359 — a retrospectiva DELA: mesma tela derivada da
+          ficha, alimentada só pelo recorte mentee (sem notas do mentor,
+          sem a autoavaliação dele — o bloco nem renderiza) */}
+      {retroJovem && <RetrospectivaJornada dados={retroJovem} />}
+
       {/* Como as pessoas próximas te veem (0103): a síntese anônima que o
           mentor publica. A coleta ficou fora da plataforma (decisão Leo,
           out/2026) — o que mora aqui é só a devolutiva já consolidada */}
@@ -576,6 +640,9 @@ type EstacaoProps = {
   est: Estacao;
   sistema: FormularioSistema | null;
   campos: FormularioCampo[];
+  /** aplicação anterior do mesmo instrumento (REALIZA-18 — roda inicial
+   *  alimenta a comparação do Rever da formal) */
+  respostasAnterior?: Record<string, RespostaValor> | null;
 };
 
 function TagAFazer() {
@@ -633,7 +700,12 @@ function EstadoLinha({ est }: { est: Estacao }) {
  *  "Continuar" na re-emissão). No mobile cada card é uma linha: lombada
  *  na cor + marca + título + estado + chevron. Trancada mantém a tinta
  *  em sussurro e a liberação em texto, nunca laje cinza nem cadeado. */
-function InstrumentoCard({ est, sistema, campos }: EstacaoProps) {
+function InstrumentoCard({
+  est,
+  sistema,
+  campos,
+  respostasAnterior = null,
+}: EstacaoProps) {
   const trancada = est.estado === "trancada";
   const linkavel =
     est.estado === "a_fazer" && !!est.token && !est.respostas;
@@ -768,6 +840,7 @@ function InstrumentoCard({ est, sistema, campos }: EstacaoProps) {
         sistema={sistema}
         campos={campos}
         respostas={est.respostas as Record<string, RespostaValor>}
+        respostasAnterior={respostasAnterior}
         trigger={card}
         acao={acao}
       />

@@ -1,5 +1,6 @@
 import { Check, FlagCheckered, LockSimple, Minus, PaperPlaneTilt } from "@phosphor-icons/react/dist/ssr";
 import { CHECKLIST_ENCERRAMENTO, encerramentoDecidido } from "@/lib/encerramento";
+import type { AvaliacaoJovemResumo } from "@/lib/avaliacao-agregado";
 import { formatDateTime, formatDiaMes } from "@/lib/ciclo";
 import { EncerrarDuplaDialog } from "@/components/encerrar-dupla-dialog";
 import { EnviarFormularioDialog, type FormularioOpcao } from "@/components/enviar-formulario-dialog";
@@ -20,6 +21,7 @@ export function EncerramentoDupla({
   souCoord,
   formularios,
   avaliacao360Em,
+  avaliacaoJovem,
   realizadosCount,
 }: {
   dupla: Pick<Dupla, "id" | "status" | "mentor" | "mentorado">;
@@ -31,6 +33,9 @@ export function EncerramentoDupla({
   /** respondido_em da resposta 360º oficial (join resposta←link←form, 0042)
    *  — null em marcação manual antiga ou papel sem acesso aos forms */
   avaliacao360Em: string | null;
+  /** young-person series already cut to the viewer's privacy (REALIZA-71)
+   *  — the trajectory line under the checked 360 item */
+  avaliacaoJovem: AvaliacaoJovemResumo | null;
   /** encontros realizados — a régua que "abre" o rito (0097: o form
    *  aparecia em qualquer dupla nova, enc. 4/16) */
   realizadosCount: number;
@@ -145,6 +150,27 @@ export function EncerramentoDupla({
                     · recebida via formulário em {formatDiaMes(avaliacao360Em)}
                   </span>
                 )}
+                {/* trajectory line (REALIZA-71): the 360 reads better with
+                    the cycle's eval series next to it — already cut to the
+                    viewer (mentor gets media+n only, never per-encontro) */}
+                {item.key === "avaliacao_360_enviada" &&
+                  feito &&
+                  avaliacaoJovem && (
+                    <span className="mt-0.5 block text-muted-foreground">
+                      a jornada avaliada pelo jovem:{" "}
+                      {avaliacaoJovem.media != null
+                        ? `média ${avaliacaoJovem.media
+                            .toFixed(1)
+                            .replace(".", ",")}/5 · `
+                        : ""}
+                      {avaliacaoJovem.n}{" "}
+                      {avaliacaoJovem.n === 1 ? "avaliação" : "avaliações"}
+                      {avaliacaoJovem.trajetoria &&
+                        ` · 1º→último ${avaliacaoJovem.trajetoria.primeiro}★→${avaliacaoJovem.trajetoria.ultimo}★`}
+                      {avaliacaoJovem.media == null &&
+                        " · a média abre a partir de 3"}
+                    </span>
+                  )}
               </span>
               {/* facilitador do 360º — o checklist continua marcação manual;
                   o botão só abre o envio com os forms "360" sugeridos */}

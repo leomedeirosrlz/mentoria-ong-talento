@@ -187,7 +187,7 @@ describe("textoResumoJornada", () => {
     expect(t).toContain("Trilha DPP · início 30 de set. de 2025");
     expect(t).toContain("em andamento");
     expect(t).toContain("Encontros realizados: 1 de 16 (esperados pelo calendário: 2)");
-    expect(t).toContain("Avaliação média do jovem: 4.0/4 (excelente)");
+    expect(t).toContain("Avaliação média do mentor: 4.0/4 (excelente)");
     expect(t).toContain("Combinados cumpridos: 1 de 1");
     expect(t).toContain("Últimos registros:");
     expect(t).toContain("· 2º encontro (14 de out. de 2025) · Roda da Vida · avaliação excelente");
@@ -208,6 +208,24 @@ describe("textoResumoJornada", () => {
     expect(esp).not.toContain("esperados pelo calendário");
     expect(esp).toContain("Sem avaliações registradas");
     expect(esp).not.toContain("Últimos registros:");
+  });
+
+  it("série do jovem entra como linha própria — ou a ausência honesta", () => {
+    // sem série: a linha admite o vazio em vez de omitir a métrica
+    expect(textoResumoJornada(resumo)).toContain("Sem avaliações do jovem");
+
+    const comJovem = textoResumoJornada({
+      ...resumo,
+      avaliacaoJovem: {
+        n: 6,
+        media: 4.2,
+        trajetoria: { primeiro: 3, ultimo: 5 },
+        temasTop: ["carreira"],
+      },
+    });
+    expect(comJovem).toContain(
+      "Avaliação do jovem: média 4.2/5 em 6 avaliações (3★→5★)"
+    );
   });
 });
 
