@@ -21,6 +21,7 @@ import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
 import { executarTool, IA_TOOL_CATALOGO } from "@/lib/ia/tools";
 import { MCP_INSTRUCOES } from "@/lib/ia/mcp-prompt";
+import { PAPEIS_MCP } from "@/lib/ia/mcp-papeis";
 import { consumirLimiteIa } from "@/lib/ia/rate-limit";
 import { clientImpersonado } from "@/lib/ia/impersonar";
 import type { AppRole } from "@/lib/types";
@@ -31,14 +32,9 @@ export const maxDuration = 30;
 // todos os papéis conectam via MCP (fase escrita): a execução roda sob o
 // JWT real do dono — RLS + allowlist `roles` de cada tool + o envelope
 // pendente_confirmacao pra qualquer escrita; este gate passou a ser só
-// "tem papel no programa", não mais staff-only
-const PAPEIS_MCP: readonly AppRole[] = [
-  "coordenacao",
-  "supervisor",
-  "mentor_dpp",
-  "mentor_especialista",
-  "mentorado",
-];
+// "tem papel no programa", não mais staff-only. A lista mora em
+// mcp-papeis: a mesma fonte que esconde a seção de token pra perfil sem
+// papel (um PAT daí tomaria 403 aqui mesmo).
 
 const Rpc = z.object({
   jsonrpc: z.literal("2.0"),
