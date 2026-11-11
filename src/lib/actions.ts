@@ -10,7 +10,6 @@ import {
   DOCUMENTO_PESSOA_TIPOS,
   ESCOLARIDADES,
   GENEROS,
-  MOTIVOS_REAGENDAMENTO,
   PREF_GENEROS,
   UFS,
   cronogramaVigente,
@@ -51,6 +50,13 @@ import {
   type ResolucaoPar,
 } from "@/lib/importar-duplas";
 import { notificar } from "./notificar";
+import {
+  agendarEncontroCore,
+  marcarSaidaMentoradoCore,
+  parseDataHora,
+  salvarCampoRelatorioCore,
+  urlOk,
+} from "./escritas";
 import {
   depoisDe,
   removerMatchingPerfil,
@@ -1677,64 +1683,21 @@ export async function deleteMentorado(id: string) {
   return { ok: true };
 }
 
-const SITUACOES_MENTORADO = ["ativo", "desistente", "concluido"] as const;
-
 /** Marca a saída do mentorado do programa (0077) — desistente/concluído —
- *  ou a reativação (situacao 'ativo' limpa carimbo e motivo). Coord-only;
- *  a dupla viva é pré-condição: quem tem par em andamento passa ANTES pelo
- *  rito de encerramento da ficha da dupla (checklist + resumo da jornada) —
- *  marcar a saída por cima deixaria vaga ocupada por quem já saiu. */
+ *  ou a reativação (situacao 'ativo' limpa carimbo e motivo). A regra mora
+ *  no core (lib/escritas): coord-only, dupla viva bloqueia, desistente
+ *  exige motivo — o mesmo contrato que a tool `marcar_situacao_mentorado`
+ *  consome pelo canal de IA. */
 export async function marcarSaidaMentorado(
   id: string,
   situacao: SituacaoMentorado,
   motivo?: string | null
-) {
+): Promise<{ error?: string; ok?: boolean; duplaId?: string }> {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  if (eu.role !== "coordenacao") {
-    return { error: "Só a coordenação marca a saída de mentorados." };
-  }
-  if (!(SITUACOES_MENTORADO as readonly string[]).includes(situacao)) {
-    return { error: "Escolha uma situação válida." };
-  }
-  const motivoTxt = (motivo ?? "").trim() || null;
-  if (motivoTxt && motivoTxt.length > 300) {
-    return { error: "O motivo da saída aceita até 300 caracteres." };
-  }
-  // o motivo é o "porquê" que a ficha e a lista exibem — desistente sem ele
-  // vira dado mudo; concluído dispensa (a jornada se explica)
-  if (situacao === "desistente" && !motivoTxt) {
-    return { error: "Conte o motivo da saída — ele aparece na ficha e na lista." };
-  }
-  if (situacao !== "ativo") {
-    const { data: vivas } = await supabase
-      .from("duplas")
-      .select("id")
-      .eq("mentorado_id", id)
-      .in("status", ["ativa", "pausada"])
-      .limit(1);
-    if (vivas?.length) {
-      return {
-        error:
-          "Tem dupla em andamento — registre o encerramento na ficha da dupla antes de marcar a saída.",
-        duplaId: vivas[0].id,
-      };
-    }
-  }
-  const { data, error } = await supabase
-    .from("mentorados")
-    .update(
-      situacao === "ativo"
-        ? { situacao, saiu_em: null, motivo_saida: null }
-        : { situacao, saiu_em: new Date().toISOString(), motivo_saida: motivoTxt }
-    )
-    .eq("id", id)
-    .select("id");
-  if (error) return { error: erroAmigavel(error) };
-  if (!data?.length) {
-    return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
-  }
+  const r = await marcarSaidaMentoradoCore(supabase, eu, { id, situacao, motivo });
+  if ("error" in r) return r;
   depoisDe(() => sincronizarMatchingPerfilMentorado(id));
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${id}`);
@@ -1742,114 +1705,25 @@ export async function marcarSaidaMentorado(
   return { ok: true };
 }
 
-/** Campos de cadastro que a grade de relatórios edita inline (typo/contato).
- *  Tudo que tem fluxo próprio — status e demanda de dupla, papel, datas —
- *  fica de fora de propósito: a grade corrige ficha, não opera o ciclo. */
-const CAMPOS_RELATORIO = ["nome", "email", "whatsapp", "cidade", "uf"] as const;
-
+/** Edição inline da grade de relatórios — o core (lib/escritas) valida a
+ *  allowlist e normaliza igual aos dialogs completos. */
 export async function salvarCampoRelatorio(
   tabela: "profiles" | "mentorados",
   id: string,
   campo: string,
   valor: string
-) {
+): Promise<{ error?: string; ok?: boolean; valor?: string | null }> {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  if (eu.role !== "coordenacao") {
-    return { error: "Só a coordenação edita cadastros." };
-  }
-  if (tabela !== "profiles" && tabela !== "mentorados") {
-    return { error: "Não foi possível concluir. Tente de novo." };
-  }
-  if (!(CAMPOS_RELATORIO as readonly string[]).includes(campo)) {
-    return { error: "Esse campo não é editável por aqui." };
-  }
-
-  // mesmas normalizações dos dialogs completos (updatePessoa/updateMentorado
-  // + camposFicha) — um campo digitado na grade vale o mesmo que no form
-  const v = valor.trim();
-  let normalizado: string | null;
-  switch (campo as (typeof CAMPOS_RELATORIO)[number]) {
-    case "nome": {
-      normalizado = nomeProprio(v);
-      if (!normalizado) return { error: "Nome é obrigatório." };
-      break;
-    }
-    case "email": {
-      normalizado = normEmail(v) || null;
-      if (normalizado && !emailValido(normalizado)) {
-        return { error: "Confira o e-mail." };
-      }
-      // e-mail de profile já vinculado a uma conta só muda pelo sync do
-      // auth (0060): a troca é self-service, feita pela própria pessoa
-      if (tabela === "profiles") {
-        const { data: atual } = await supabase
-          .from("profiles").select("user_id").eq("id", id).single();
-        if (atual?.user_id) {
-          return {
-            error:
-              "Essa pessoa já entrou na plataforma — o e-mail de acesso só muda pelo perfil dela.",
-          };
-        }
-      }
-      // idem ficha de jovem vinculada (mentorados.profile_id): o e-mail de
-      // acesso mora na conta e divergir aqui abriria conta fantasma
-      if (tabela === "mentorados") {
-        const { data: atual } = await supabase
-          .from("mentorados").select("profile_id").eq("id", id).single();
-        if (atual?.profile_id) {
-          return {
-            error:
-              "Essa pessoa já entrou na plataforma — o e-mail de acesso só muda pelo perfil dela.",
-          };
-        }
-      }
-      break;
-    }
-    case "whatsapp": {
-      normalizado = v ? normWhatsapp(v) : null;
-      // lixo digitado não pode zerar o campo silenciosamente
-      if (v && !normalizado) {
-        return { error: "Confira o WhatsApp: use DDD e o número completo." };
-      }
-      break;
-    }
-    case "cidade": {
-      normalizado = nomeProprio(v) || null;
-      if (normalizado && normalizado.length > 100) {
-        return { error: 'O campo "Cidade" aceita até 100 caracteres.' };
-      }
-      break;
-    }
-    case "uf": {
-      const uf = v.toUpperCase();
-      if (!uf) normalizado = null;
-      else if (!(UFS as readonly string[]).includes(uf)) {
-        return { error: "Escolha um estado (UF) válido." };
-      } else normalizado = uf;
-      break;
-    }
-  }
-
-  // UPDATE direto na tabela (nunca na view profiles_contato): coord cobre a
-  // row inteira pela policy *_coord for all (0001) — o grant por coluna da
-  // 0026/0034 só estreitou SELECT
-  const { data, error } = await supabase
-    .from(tabela)
-    .update({ [campo]: normalizado })
-    .eq("id", id)
-    .select("id");
-  if (error) return { error: erroAmigavel(error) };
-  if (!data?.length) {
-    return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
-  }
+  const r = await salvarCampoRelatorioCore(supabase, eu, { tabela, id, campo, valor });
+  if ("error" in r) return r;
   revalidatePath("/relatorios");
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${id}`);
   // devolve o valor gravado: a grade aplica o normalizado no estado local
   // (o que aparece na célula é o que ficou no banco, não o que se digitou)
-  return { ok: true, valor: normalizado };
+  return r;
 }
 
 export async function updateDupla(duplaId: string, formData: FormData) {
@@ -2964,130 +2838,25 @@ export async function importDuplas(linhas: LinhaPar[]) {
 
 // ---------- encontros (mentor da dupla) ----------
 
-
-/** URL só http/https — javascript:/data: armazenável renderiza <a href> direto. */
-function urlOk(s: string): boolean {
-  try { return ["http:", "https:"].includes(new URL(s).protocol); } catch { return false; }
-}
-
-/** Aceita os dois formatos que o client manda: ISO com fuso ("...Z" / "+03:00")
- *  vira Date direto; `datetime-local` naïve ("YYYY-MM-DDTHH:mm", sem offset) é
- *  interpretado como horário de São Paulo (-03:00 fixo, sem horário de verão). */
-function parseDataHora(s: string): Date | null {
-  const d = new Date(/Z|[+-]\d{2}:?\d{2}$/.test(s) ? s : `${s}-03:00`);
-  return isNaN(d.getTime()) ? null : d;
-}
-
-export async function agendarEncontro(formData: FormData) {
+/** Agenda ou remarca um encontro — a regra (inclusive o guard "a dupla
+ *  agenda", que a RLS larga de correções não cobriria) mora no core
+ *  compartilhado com a tool `agendar_encontro` do canal de IA. */
+export async function agendarEncontro(
+  formData: FormData
+): Promise<{ error?: string; ok?: boolean }> {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  // a regra "a dupla agenda" mora na action, não só na UI — a RLS deixaria
-  // a coord escrever (policy larga pra correções), então o contrato é aqui
-  if (eu.role === "coordenacao") {
-    return { error: "Quem agenda é a dupla. A coordenação acompanha o andamento." };
-  }
   const dupla_id = String(formData.get("dupla_id") ?? "");
-  const numero = Number(formData.get("numero"));
-  const data_hora = String(formData.get("data_hora") ?? "");
-  const link = String(formData.get("link") ?? "").trim() || null;
-  const motivo = String(formData.get("motivo") ?? "").trim();
-  const motivoOutro = String(formData.get("motivo_outro") ?? "").trim();
-  if (!dupla_id || !numero || !data_hora) return { error: "Data e horário são obrigatórios." };
-  const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", dupla_id).single();
-  // sem row a RLS escondeu (não é dele) ou a dupla não existe — os `d!`
-  // abaixo estourariam TypeError em vez do contrato { error }
-  if (!d) return { error: "Dupla não encontrada." };
-  if (d.status !== "ativa") return { error: "Essa dupla não está ativa." };
-  // DPP sem cronograma é dado inválido (o CHECK da 0061 impede criar, mas uma
-  // dupla antiga pode chegar aqui) — sem calendário o teto de número seria
-  // uma mentira; aponta a correção em vez de agendar contra nada
-  if (d.trilha !== "especialista" && !d.cronograma_id) {
-    return { error: "Essa dupla está sem cronograma — a coordenação vincula um na edição da dupla." };
-  }
-  const quando = parseDataHora(data_hora);
-  if (!quando) return { error: "Confira a data." };
-
-  // não derruba um encontro já realizado (re-agendar apagaria o "realizado")
-  const { data: existente } = await supabase
-    .from("encontros").select("id, status, data_hora").eq("dupla_id", dupla_id).eq("numero", numero).maybeSingle();
-  if (existente?.status === "realizado") {
-    return { error: "Esse encontro já foi realizado e não pode ser remarcado." };
-  }
-
-  // trilha especialista (0074): sessão nova só nasce de pedido aceito —
-  // agendarEncontro continua servindo pra REMARCAR uma tentativa existente,
-  // nunca pra criar row do zero
-  if (d.trilha === "especialista" && !existente) {
-    return {
-      error:
-        "As sessões da trilha especialista nascem dos pedidos aceitos — combine com o jovem ou a coordenação.",
-    };
-  }
-
-  // agendamento é sempre pra frente — encontro que já aconteceu entra pelo fluxo
-  // retroativo (grava realizado_em); mover um agendado pro passado esconderia
-  // atraso. A mensagem aponta o controle que EXISTE, por contexto.
-  if (quando.getTime() <= Date.now()) {
-    return {
-      error: existente
-        ? "Essa data já passou. Se o encontro aconteceu, registre como foi ou marque 'não aconteceu' na ficha da dupla."
-        : "Essa data já passou. Use 'Registrar encontro já realizado' na ficha da dupla ou na agenda do dia.",
-    };
-  }
-  if (link && !urlOk(link)) return { error: "Confira o link: precisa ser um endereço completo (https://…)." };
-
-  // teto de nº por trilha — especialista conta TENTATIVAS (o CHECK do banco
-  // aceita até 24; aqui só passa row existente, então o teto é o do banco);
-  // DPP mede contra o calendário DA DUPLA (0061), nunca o global
-  const maxNum = d.trilha === "especialista"
-    ? 24
-    : (
-        await supabase
-          .from("ciclo_eventos").select("numero")
-          .eq("tipo", "encontro")
-          .eq("cronograma_id", d.cronograma_id!)
-          .order("numero", { ascending: false }).limit(1).maybeSingle()
-      ).data?.numero ?? 16;
-  if (!Number.isInteger(numero) || numero < 1 || numero > maxNum) {
-    return { error: "Escolha um encontro da lista." };
-  }
-
-  // remarcação de verdade = a data mudou; salvar de novo com a mesma data
-  // (só pra trocar o link, p.ex.) não exige motivo nem mexe no já registrado.
-  // compara o instante, não a string — PostgREST devolve "+00:00", toISOString "Z"
-  const ehReagendamento =
-    existente != null &&
-    existente.data_hora != null &&
-    new Date(existente.data_hora).getTime() !== quando.getTime();
-  let motivoReagendamento: string | null = null;
-  if (ehReagendamento) {
-    if (!motivo) return { error: "Conte o motivo do reagendamento." };
-    if (motivo === "outro") {
-      if (motivoOutro.length < 2 || motivoOutro.length > 140) {
-        return { error: "Descreva o motivo do reagendamento (2 a 140 caracteres)." };
-      }
-      motivoReagendamento = motivoOutro;
-    } else {
-      const preset = MOTIVOS_REAGENDAMENTO.find((m) => m.value === motivo);
-      if (!preset) return { error: "Escolha um motivo de reagendamento." };
-      motivoReagendamento = preset.label;
-    }
-  }
-
-  // update preserva created_by; insert é a primeira vez do encontro.
-  // motivo_reagendamento só entra no payload quando houve remarcação — edição
-  // que não muda a data não pode sobrescrever o motivo já auditado
-  const payload = {
-    data_hora: quando.toISOString(),
-    link,
-    status: "agendado" as const,
-    ...(motivoReagendamento ? { motivo_reagendamento: motivoReagendamento } : {}),
-  };
-  const { error } = existente
-    ? await supabase.from("encontros").update(payload).eq("id", existente.id)
-    : await supabase.from("encontros").insert({ ...payload, dupla_id, numero, created_by: eu.id });
-  if (error) return { error: erroAmigavel(error) };
+  const r = await agendarEncontroCore(supabase, eu, {
+    dupla_id,
+    numero: Number(formData.get("numero")),
+    data_hora: String(formData.get("data_hora") ?? ""),
+    link: String(formData.get("link") ?? "").trim() || null,
+    motivo: String(formData.get("motivo") ?? "").trim(),
+    motivo_outro: String(formData.get("motivo_outro") ?? "").trim(),
+  });
+  if ("error" in r) return r;
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath("/agenda");

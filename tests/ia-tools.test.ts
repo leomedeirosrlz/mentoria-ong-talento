@@ -4,7 +4,7 @@
 // O supabase fake é chainable no mínimo que as queries usam — as linhas
 // voltam prontas (a RLS real não roda aqui; o que se testa é a tool).
 
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
   executarTool,
@@ -35,6 +35,8 @@ const UUID = "11111111-2222-4333-8444-555555555555";
 
 type Opts = {
   papel?: string | null;
+  // papéis efetivos quando diferem do primário (híbrido coord+mentor)
+  papeis?: string[] | null;
   tabelas?: Record<string, unknown[]>;
   // count exato por tabela — o índice de duplas pede { count: "exact" } pra
   // sinalizar truncamento; null = sem cabeçalho (o que a query tolera)
@@ -45,6 +47,7 @@ type Opts = {
 
 function supaFake({
   papel = "coordenacao",
+  papeis = null,
   tabelas = {},
   contagens = {},
   rpcData = {},
@@ -52,6 +55,8 @@ function supaFake({
 }: Opts = {}) {
   const auditCalls: Record<string, unknown>[] = [];
   const fromCalls: string[] = [];
+  // escritas observadas por tabela — prova de que a tool executou de fato
+  const escritas: { tabela: string; op: string; payload: unknown }[] = [];
   // o rpc do supabase-js é lazy: chamar sem await nunca chega no PostgREST.
   // O flag vira só quando o retorno é awaited — prova de que executarTool
   // espera a auditoria, não só dispara.
@@ -63,10 +68,25 @@ function supaFake({
       select: () => b,
       in: () => b,
       eq: () => b,
+      neq: () => b,
+      gt: () => b,
       gte: () => b,
       lte: () => b,
       order: () => b,
       limit: () => b,
+      insert: (p: unknown) => {
+        escritas.push({ tabela, op: "insert", payload: p });
+        return b;
+      },
+      update: (p: unknown) => {
+        escritas.push({ tabela, op: "update", payload: p });
+        return b;
+      },
+      delete: () => {
+        escritas.push({ tabela, op: "delete", payload: null });
+        return b;
+      },
+      single: () => Promise.resolve({ data: rows()[0] ?? null, error: null }),
       maybeSingle: () =>
         Promise.resolve({ data: rows()[0] ?? null, error: null }),
       then: (
@@ -89,9 +109,18 @@ function supaFake({
     },
     rpc: (nome: string, args?: Record<string, unknown>) => {
       // o gate virou my_papeis (0085) — o papel do fixture volta como o
-      // conjunto efetivo de 1 elemento
+      // conjunto efetivo de 1 elemento salvo override explícito
       if (nome === "my_papeis")
-        return { data: papel ? [papel] : [], error: null };
+        return { data: papeis ?? (papel ? [papel] : []), error: null };
+      // os cores de escrita resolvem o ator por estas duas RPCs — o
+      // primário é o `papel` do fixture salvo override (híbrido)
+      if (nome === "my_role")
+        return {
+          data: "my_role" in rpcData ? rpcData.my_role : papel,
+          error: null,
+        };
+      if (nome === "my_profile_id")
+        return { data: rpcData.my_profile_id ?? "profile-fake", error: null };
       if (nome === "registrar_ia_evento") {
         auditCalls.push(args ?? {});
         const erro = rpcErro[nome] ?? null;
@@ -110,6 +139,7 @@ function supaFake({
     supabase: supabase as unknown as SupabaseClient,
     auditCalls,
     fromCalls,
+    escritas,
     auditAwaited: () => auditAwaited,
   };
 }
@@ -127,6 +157,7 @@ describe("registry", () => {
         "acrescentar_info_chamado",
         "aceitar_solicitacao",
         "agenda_do_periodo",
+        "agendar_encontro",
         "aguardando_par",
         "ajuda_faq",
         "assumir_chamado",
@@ -139,6 +170,8 @@ describe("registry", () => {
         "desmarcar_encontro",
         "devolver_chamado_fila",
         "duplas_do_usuario",
+        "editar_campo_pessoa",
+        "emitir_link_instrumento",
         "ficha_dupla",
         "guia_consulta",
         "historico_encontros",
@@ -148,6 +181,7 @@ describe("registry", () => {
         "jovem_marcar_combinado",
         "jovem_marcar_nao_aconteceu",
         "jovem_pedir_especialista",
+        "marcar_situacao_mentorado",
         "meu_progresso",
         "meus_combinados",
         "meus_pedidos",
@@ -159,6 +193,7 @@ describe("registry", () => {
         "publicar_atualizacao_chamado",
         "reabrir_chamado",
         "recusar_solicitacao",
+        "registrar_interacao",
         "registros_da_dupla",
         "resolver_chamado",
         "resumo_semana",
@@ -983,8 +1018,29 @@ describe("executarTool — auditoria", () => {
 
 describe("tools de escrita — canal e confirmação (0163)", () => {
   const CID = "99999999-8888-4777-8666-555555555555";
+  afterEach(() => vi.unstubAllEnvs());
 
-  it("tool de escrita não roda no chat — a Liza interna segue leitura", async () => {
+  it("escrita no chat devolve o MESMO pendente_confirmacao do MCP (REALIZA-126)", async () => {
+    const { supabase, escritas } = supaFake({
+      papel: "coordenacao",
+      rpcData: { ia_confirmacao_criar: CID },
+    });
+    const r = await executarTool(
+      "resolver_chamado",
+      { chamado_id: UUID, resumo: "x" },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(true);
+    const d = dadosDe(r).pendente_confirmacao as Record<string, unknown>;
+    expect(d.confirmacao_id).toBe(CID);
+    expect(d.expira_em_minutos).toBe(10);
+    // a prévia não executou nada
+    expect(escritas).toHaveLength(0);
+  });
+
+  it("IA_ESCRITAS=0 restaura o erro de canal pra TODA escrita no chat", async () => {
+    vi.stubEnv("IA_ESCRITAS", "0");
     const { supabase } = supaFake({ papel: "coordenacao" });
     const r = await executarTool(
       "resolver_chamado",
@@ -994,6 +1050,30 @@ describe("tools de escrita — canal e confirmação (0163)", () => {
     );
     expect(r.ok).toBe(false);
     if (!r.ok) expect(r.erro).toContain("não está disponível neste canal");
+  });
+
+  it("IA_ESCRITAS=0 no MCP derruba só as 5 do domínio — chamados/jovem seguem", async () => {
+    vi.stubEnv("IA_ESCRITAS", "0");
+    const { supabase } = supaFake({
+      papel: "coordenacao",
+      rpcData: { ia_confirmacao_criar: CID },
+    });
+    const rDom = await executarTool(
+      "registrar_interacao",
+      { dupla_id: UUID, tipo: "contato" },
+      supabase,
+      "mcp"
+    );
+    expect(rDom.ok).toBe(false);
+    if (!rDom.ok) expect(rDom.erro).toContain("não está disponível");
+    // as escritas de chamados eram live antes da flag — não quebram
+    const rChamado = await executarTool(
+      "resolver_chamado",
+      { chamado_id: UUID, resumo: "x" },
+      supabase,
+      "mcp"
+    );
+    expect(rChamado.ok).toBe(true);
   });
 
   it("1ª chamada MCP devolve pendente_confirmacao SEM tocar a RPC de domínio", async () => {
@@ -1124,5 +1204,295 @@ describe("tools de escrita — canal e confirmação (0163)", () => {
     );
     expect(r.ok).toBe(true);
     expect(rpcCalls).toContain("aceitar_solicitacao");
+  });
+});
+
+describe("escritas do domínio (REALIZA-126)", () => {
+  const CID = "99999999-8888-4777-8666-555555555555";
+  const FUTURO = "2099-01-05T19:00:00-03:00";
+  afterEach(() => vi.unstubAllEnvs());
+
+  const espiaRpc = (supabase: SupabaseClient) => {
+    const rpcCalls: string[] = [];
+    const orig = supabase.rpc.bind(supabase);
+    vi.spyOn(supabase, "rpc").mockImplementation(((n: string, a?: unknown) => {
+      rpcCalls.push(n);
+      return orig(n, a as Record<string, unknown>);
+    }) as never);
+    return rpcCalls;
+  };
+
+  it("as 5 pedem prévia no chat e NÃO tocam a tabela sem confirmacao_id", async () => {
+    const chamadas: [string, Record<string, unknown>][] = [
+      ["registrar_interacao", { dupla_id: UUID, tipo: "contato", nota: "ok" }],
+      ["marcar_situacao_mentorado", { mentorado_id: UUID, situacao: "concluido" }],
+      ["emitir_link_instrumento", { dupla_id: UUID, sistema: "visao" }],
+      ["editar_campo_pessoa", { pessoa_id: UUID, campo: "whatsapp", valor: "11987654321" }],
+    ];
+    for (const [tool, args] of chamadas) {
+      const { supabase, escritas } = supaFake({
+        papel: "coordenacao",
+        rpcData: { ia_confirmacao_criar: CID },
+      });
+      const r = await executarTool(tool, args, supabase, "chat");
+      expect(r.ok).toBe(true);
+      const d = dadosDe(r).pendente_confirmacao as Record<string, unknown>;
+      expect(d.confirmacao_id).toBe(CID);
+      expect(d.tool).toBe(tool);
+      // a prévia não executou o domínio
+      expect(escritas).toHaveLength(0);
+    }
+    // agendar_encontro é do mentor, não da coord — idem
+    const { supabase, escritas } = supaFake({
+      papel: "mentor_dpp",
+      rpcData: { ia_confirmacao_criar: CID },
+    });
+    const r = await executarTool(
+      "agendar_encontro",
+      { dupla_id: UUID, numero: 6, data_hora: FUTURO },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(true);
+    expect(escritas).toHaveLength(0);
+  });
+
+  it("registrar_interacao: consumo grava canal in_app e o autor da sessão", async () => {
+    const { supabase, escritas } = supaFake({
+      papel: "coordenacao",
+      tabelas: { interacoes: [{ id: UUID }] },
+      rpcData: { ia_confirmacao_consumir: "Registrar contato na dupla" },
+    });
+    const r = await executarTool(
+      "registrar_interacao",
+      {
+        dupla_id: UUID,
+        tipo: "apoio",
+        nota: "atendido o pedido",
+        confirmacao_id: CID,
+      },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(true);
+    expect(escritas).toHaveLength(1);
+    expect(escritas[0]).toMatchObject({
+      tabela: "interacoes",
+      op: "insert",
+      payload: {
+        dupla_id: UUID,
+        canal: "in_app",
+        tipo: "apoio",
+        autor_id: "profile-fake",
+        nota: "atendido o pedido",
+      },
+    });
+  });
+
+  it("registrar_interacao: 'nudge' é recusado pelo schema — nem gera prévia", async () => {
+    const { supabase } = supaFake({ papel: "coordenacao" });
+    const rpcCalls = espiaRpc(supabase);
+    const r = await executarTool(
+      "registrar_interacao",
+      { dupla_id: UUID, tipo: "nudge" },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erro).toContain("Argumentos inválidos");
+    expect(rpcCalls).not.toContain("ia_confirmacao_criar");
+  });
+
+  it("registrar_interacao: mentorado não alcança nem a prévia", async () => {
+    const { supabase } = supaFake({ papel: "mentorado" });
+    const rpcCalls = espiaRpc(supabase);
+    const r = await executarTool(
+      "registrar_interacao",
+      { dupla_id: UUID, tipo: "contato" },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erro).toContain("não está disponível pro seu papel");
+    expect(rpcCalls).not.toContain("ia_confirmacao_criar");
+  });
+
+  it("marcar_situacao_mentorado: consumo executa e devolve a recusa do core", async () => {
+    const { supabase, escritas } = supaFake({
+      papel: "coordenacao",
+      tabelas: {
+        duplas: [{ id: "dupla-viva-1" }], // bloqueia a saída
+        mentorados: [{ id: UUID }],
+      },
+      rpcData: { ia_confirmacao_consumir: "Marcar situação" },
+    });
+    const r = await executarTool(
+      "marcar_situacao_mentorado",
+      { mentorado_id: UUID, situacao: "concluido", confirmacao_id: CID },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erro).toContain("dupla em andamento");
+    // consumo aconteceu, a gravação não — o core recusou
+    expect(escritas).toHaveLength(0);
+  });
+
+  it("marcar_situacao_mentorado: mentor DPP não alcança a prévia", async () => {
+    const { supabase } = supaFake({ papel: "mentor_dpp" });
+    const rpcCalls = espiaRpc(supabase);
+    const r = await executarTool(
+      "marcar_situacao_mentorado",
+      { mentorado_id: UUID, situacao: "ativo" },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(false);
+    expect(rpcCalls).not.toContain("ia_confirmacao_criar");
+  });
+
+  it("emitir_link_instrumento: consumo devolve a URL /f/<token> da RPC", async () => {
+    const { supabase } = supaFake({
+      papel: "mentor_dpp",
+      rpcData: {
+        ia_confirmacao_consumir: "Emitir o link",
+        emitir_link_instrumento: { token: "tok123", reutilizado: false },
+      },
+    });
+    const r = await executarTool(
+      "emitir_link_instrumento",
+      { dupla_id: UUID, sistema: "visao", confirmacao_id: CID },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(true);
+    expect(dadosDe(r)).toMatchObject({
+      url: "/f/tok123",
+      reutilizado: false,
+    });
+  });
+
+  it("agendar_encontro: coord não executa — 'quem agenda é a dupla' no core", async () => {
+    // híbrido coord+mentor: o gate de papéis passa por mentor_dpp, mas o
+    // core resolve o ator pelo PRIMÁRIO (my_role=coordenacao) e recusa —
+    // a regra de domínio não é contornável pelo conjunto de papéis
+    const { supabase, escritas } = supaFake({
+      papel: "coordenacao",
+      papeis: ["coordenacao", "mentor_dpp"],
+      tabelas: {
+        duplas: [{ status: "ativa", trilha: "dpp", cronograma_id: "c1" }],
+      },
+      rpcData: {
+        ia_confirmacao_consumir: "Agendar",
+        my_role: "coordenacao",
+        my_profile_id: "coord-1",
+      },
+    });
+    const r = await executarTool(
+      "agendar_encontro",
+      { dupla_id: UUID, numero: 6, data_hora: FUTURO, confirmacao_id: CID },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok)
+      expect(r.erro).toBe(
+        "Quem agenda é a dupla. A coordenação acompanha o andamento."
+      );
+    expect(escritas).toHaveLength(0);
+  });
+
+  it("agendar_encontro: mentor executa no consumo e grava agendado", async () => {
+    const { supabase, escritas } = supaFake({
+      papel: "mentor_dpp",
+      tabelas: {
+        duplas: [{ status: "ativa", trilha: "dpp", cronograma_id: "c1" }],
+        ciclo_eventos: [{ numero: 16 }],
+      },
+      rpcData: {
+        ia_confirmacao_consumir: "Agendar",
+        my_role: "mentor_dpp",
+        my_profile_id: "mentor-1",
+      },
+    });
+    const r = await executarTool(
+      "agendar_encontro",
+      { dupla_id: UUID, numero: 6, data_hora: FUTURO, confirmacao_id: CID },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(true);
+    expect(escritas).toHaveLength(1);
+    expect(escritas[0]).toMatchObject({
+      tabela: "encontros",
+      op: "insert",
+      payload: { dupla_id: UUID, numero: 6, status: "agendado" },
+    });
+  });
+
+  it("editar_campo_pessoa: allowlist do domínio — 'email' morre no schema", async () => {
+    const { supabase } = supaFake({ papel: "coordenacao" });
+    const rpcCalls = espiaRpc(supabase);
+    for (const campo of ["email", "papel", "dados_civis", "nome"]) {
+      const r = await executarTool(
+        "editar_campo_pessoa",
+        { pessoa_id: UUID, campo, valor: "x" },
+        supabase,
+        "chat"
+      );
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.erro).toContain("Argumentos inválidos");
+    }
+    expect(rpcCalls).not.toContain("ia_confirmacao_criar");
+  });
+
+  it("editar_campo_pessoa: 'notas' em profiles é recusa do core após consumir", async () => {
+    const { supabase, escritas } = supaFake({
+      papel: "coordenacao",
+      tabelas: { profiles: [{ id: UUID }] },
+      rpcData: {
+        ia_confirmacao_consumir: "Editar notas",
+        my_role: "coordenacao",
+        my_profile_id: "coord-1",
+      },
+    });
+    const r = await executarTool(
+      "editar_campo_pessoa",
+      { pessoa_id: UUID, campo: "notas", valor: "obs", confirmacao_id: CID },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.erro).toBe("Esse campo não é editável por aqui.");
+    expect(escritas).toHaveLength(0);
+  });
+
+  it("editar_campo_pessoa: whatsapp normaliza e grava em profiles", async () => {
+    const { supabase, escritas } = supaFake({
+      papel: "coordenacao",
+      tabelas: { profiles: [{ id: UUID }] },
+      rpcData: {
+        ia_confirmacao_consumir: "Editar whatsapp",
+        my_role: "coordenacao",
+        my_profile_id: "coord-1",
+      },
+    });
+    const r = await executarTool(
+      "editar_campo_pessoa",
+      {
+        pessoa_id: UUID,
+        campo: "whatsapp",
+        valor: "11 98765-4321",
+        confirmacao_id: CID,
+      },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(true);
+    expect(escritas[0]).toMatchObject({
+      tabela: "profiles",
+      op: "update",
+      payload: { whatsapp: "5511987654321" },
+    });
   });
 });

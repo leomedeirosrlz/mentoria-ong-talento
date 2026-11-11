@@ -1306,7 +1306,15 @@ export function AssistenteConversa({
                 {ui.length ? (
                   <div className="space-y-2.5">
                     {ui.map((b) => (
-                      <UiCard key={b.kind} bloco={b} jovem={soJovem} />
+                      // duas prévias de escrita podem coexistir na mesma
+                      // resposta — a chave delas é o confirmacao_id
+                      <UiCard
+                        key={
+                          b.kind === "confirmacao" ? b.confirmacao_id : b.kind
+                        }
+                        bloco={b}
+                        jovem={soJovem}
+                      />
                     ))}
                   </div>
                 ) : null}

@@ -217,6 +217,24 @@ export type UiPedidos = {
   }[];
 };
 
+/** Prévia de escrita aguardando o "sim" humano (REALIZA-126): a rota
+ *  emite quando a tool devolve `pendente_confirmacao`. O `confirmacao_id`
+ *  mora AQUI — vai pro card do usuário, nunca pro histórico do modelo
+ *  (com ele na mão a tool se auto-aprovaria). `args` viaja junto porque
+ *  o Confirmar reposta o mesmo payload que gravou a prévia. */
+export type UiConfirmacao = {
+  kind: "confirmacao";
+  confirmacao_id: string;
+  tool: string;
+  args: Record<string, unknown>;
+  resumo: string;
+  expira_em_minutos: number;
+  /** request_id da reserva da mensagem que propôs — o card reposta no
+   *  Confirmar e o evento da execução sai com o MESMO id da prévia:
+   *  o par "proposto × aprovado" fica correlacionado em ia_eventos. */
+  request_id?: string | null;
+};
+
 export type UiBloco =
   | UiSaude
   | UiDupla
@@ -230,7 +248,8 @@ export type UiBloco =
   | UiFontes
   | UiCombinados
   | UiJornada
-  | UiPedidos;
+  | UiPedidos
+  | UiConfirmacao;
 
 export type UiKind = UiBloco["kind"];
 
@@ -253,6 +272,13 @@ export const STATUS_TOOL: Record<string, string> = {
   meu_progresso: "Olhando sua jornada…",
   meus_pedidos: "Vendo seus pedidos…",
   ajuda_faq: "Buscando na ajuda…",
+  // escritas do domínio (126) — a 1ª chamada só prepara a prévia, então
+  // o status conta "preparando", não "executando"
+  registrar_interacao: "Preparando o registro de contato…",
+  marcar_situacao_mentorado: "Preparando a mudança de situação…",
+  emitir_link_instrumento: "Preparando o link do instrumento…",
+  agendar_encontro: "Preparando o agendamento…",
+  editar_campo_pessoa: "Preparando a edição…",
 };
 
 // ---------- projetores (puros) ----------
@@ -616,7 +642,11 @@ export function uiDosInstrumentos(
 }
 
 /** Dedup por kind — o último bloco do mesmo tipo vence (o modelo pode
- *  chamar a mesma tool duas vezes ao refinar a busca). */
+ *  chamar a mesma tool duas vezes ao refinar a busca). `confirmacao` é
+ *  multi-instância: duas prévias de escrita coexistem na mesma resposta,
+ *  então a identidade é o confirmacao_id, não o kind. */
 export function juntarUi(lista: UiBloco[], novo: UiBloco): UiBloco[] {
-  return [...lista.filter((b) => b.kind !== novo.kind), novo];
+  const chave = (b: UiBloco) =>
+    b.kind === "confirmacao" ? `confirmacao:${b.confirmacao_id}` : b.kind;
+  return [...lista.filter((b) => chave(b) !== chave(novo)), novo];
 }

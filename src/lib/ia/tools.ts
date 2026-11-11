@@ -53,6 +53,13 @@ import {
 } from "./queries";
 import { PERGUNTAS } from "@/lib/ajuda/conteudo";
 import { normaliza } from "@/lib/utils";
+import {
+  agendarEncontroCore,
+  editarCampoPessoaCore,
+  marcarSaidaMentoradoCore,
+  registrarInteracaoCore,
+  type AtorEscrita,
+} from "@/lib/escritas";
 import { getIaConfig } from "./config";
 import { CacheTtl } from "./cache";
 import { buscarNosGuias, catalogoGuias } from "./guias";
@@ -151,6 +158,18 @@ const semaforoOrd = { risco: 0, atencao: 1, ok: 2 } as const;
 
 // ---------- tools de escrita ----------
 
+/** As 5 escritas do domínio (REALIZA-126): o conjunto que o kill-switch
+ *  IA_ESCRITAS=0 desliga nos dois canais e o único que o payload do chat
+ *  anuncia. As escritas de chamados/jovem já eram live via MCP antes da
+ *  flag existir — desligar tudo quebraria quem depende delas. */
+export const ESCRITAS_DOMINIO = new Set([
+  "registrar_interacao",
+  "marcar_situacao_mentorado",
+  "emitir_link_instrumento",
+  "agendar_encontro",
+  "editar_campo_pessoa",
+]);
+
 /** Sufixo de descrição das tools `escreve` — ensina o client o protocolo de
  *  2 passos (prévia → confirmação). Fica na descrição porque é o texto que
  *  o modelo lê pra usar a tool. */
@@ -171,6 +190,29 @@ async function rpcEscreve(
   if (d && typeof d === "object" && typeof d.error === "string")
     throw new ErroTool(d.error);
   return data ?? { ok: true };
+}
+
+/** O "eu" que os cores de escrita (lib/escritas) esperam — resolve pelas
+ *  mesmas RPCs de sempre (my_profile_id/my_role funcionam no JWT do chat
+ *  e no impersonado do MCP). */
+async function atorDoCanal(ctx: ContextoIa): Promise<AtorEscrita> {
+  const [pid, role] = await Promise.all([
+    ctx.supabase.rpc("my_profile_id"),
+    ctx.supabase.rpc("my_role"),
+  ]);
+  const id = (pid.data as string | null) ?? null;
+  if (!id) throw new ErroTool("Sessão expirada. Entre de novo.");
+  return { id, role: (role.data as AppRole | null) ?? null };
+}
+
+/** Converte o contrato dos cores ({error}|{ok}) no das tools (ErroTool) —
+ *  a mensagem pt-BR do domínio sobe intacta pro modelo/card. */
+async function rodarCore<T>(p: Promise<T | { error: string }>): Promise<T> {
+  const r = await p;
+  if (r && typeof r === "object" && "error" in r) {
+    throw new ErroTool(String((r as { error: string }).error));
+  }
+  return r as T;
 }
 
 /** JSON estável pra casar args na confirmação — chaves ordenadas em
@@ -953,7 +995,7 @@ export const IA_TOOLS = {
     },
   },
 
-  // ---------- escrita (só MCP; 2 passos com confirmação) ----------
+  // ---------- escrita (2 passos com confirmação) ----------
   //
   // `escreve: true` muda o contrato no executarTool: a 1ª chamada NÃO roda
   // `run` — grava a prévia em ia_confirmacoes (0163) e devolve
@@ -961,7 +1003,9 @@ export const IA_TOOLS = {
   // mesmos argumentos + `confirmacao_id`, a RPC consome atomicamente (uso
   // único, dono, mesma tool e mesmo hash de args) e aí o `run` executa.
   // A RLS/RPC definer segura o domínio; este envelope é a prova de
-  // intenção humana — e só existe no canal MCP por enquanto.
+  // intenção humana. No MCP o client lê o envelope direto; no chat a rota
+  // intercepta, emite o card e sanitiza o resultado (o confirmacao_id
+  // nunca chega ao modelo — auto-aprovação vedada).
 
   abrir_chamado: {
     nome: "abrir_chamado",
@@ -1435,6 +1479,178 @@ export const IA_TOOLS = {
         p_justificativa: a.justificativa,
       }),
   },
+
+  // ---------- escrita do domínio (REALIZA-126) ----------
+  //
+  // As 5 abaixo são as únicas anunciadas no payload do chat (ESCRITAS_
+  // DOMINIO + provider) e delegam aos MESMOS cores/RPC das actions —
+  // regra nenhuma é reimplementada aqui. O envelope pendente_confirmacao
+  // é o contrato dos dois canais: no chat o card do cliente é a via de
+  // approve (POST /api/ia/confirmacao, sem LLM); no MCP o client pede o
+  // "sim" pelo UX próprio e re-chama com confirmacao_id.
+
+  registrar_interacao: {
+    nome: "registrar_interacao",
+    descricao:
+      "Registra um contato com a dupla na timeline (interacoes): tipo 'contato' pra interação em geral (respondeu, remarcou por fora), 'apoio' pra atendimento de um pedido de apoio. 'nudge' não entra — nudge é artefato do fluxo Lembrar. Escopo: equipe em qualquer dupla, mentor e supervisor só na deles." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        dupla_id: z.uuid().describe("id da dupla (uuid — duplas_do_usuario/ficha_dupla devolvem)"),
+        tipo: z.enum(["contato", "apoio"]).describe("contato em geral ou atendimento de apoio"),
+        nota: z
+          .string()
+          .max(300)
+          .optional()
+          .describe("resumo do contato em uma linha (opcional)"),
+      })
+      .strict(),
+    roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
+    escreve: true,
+    resumo: (a: { tipo: string; nota?: string }) =>
+      `Registrar ${a.tipo} na dupla${a.nota ? `: ${a.nota}` : ""}`,
+    run: async (a: { dupla_id: string; tipo: "contato" | "apoio"; nota?: string }, ctx) =>
+      rodarCore(registrarInteracaoCore(ctx.supabase, await atorDoCanal(ctx), a)),
+  },
+
+  marcar_situacao_mentorado: {
+    nome: "marcar_situacao_mentorado",
+    descricao:
+      "Marca a situação do mentorado no programa: 'desistente' ou 'concluido' gravam a saída (desistente exige motivo; uma dupla ativa/pausada bloqueia — encerre a dupla antes); 'ativo' reativa. pessoas_busca lista o mentorado_id." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        mentorado_id: z.uuid().describe("id do mentorado (uuid)"),
+        situacao: z.enum(["ativo", "desistente", "concluido"]),
+        motivo: z
+          .string()
+          .max(300)
+          .optional()
+          .describe("obrigatório quando situacao=desistente"),
+      })
+      .strict(),
+    roles: ["coordenacao"],
+    escreve: true,
+    resumo: (a: { situacao: string; mentorado_id: string }) =>
+      `Marcar situação "${a.situacao}" do mentorado ${a.mentorado_id}`,
+    run: async (
+      a: { mentorado_id: string; situacao: "ativo" | "desistente" | "concluido"; motivo?: string },
+      ctx
+    ) =>
+      rodarCore(
+        marcarSaidaMentoradoCore(ctx.supabase, await atorDoCanal(ctx), {
+          id: a.mentorado_id,
+          situacao: a.situacao,
+          motivo: a.motivo ?? null,
+        })
+      ),
+  },
+
+  emitir_link_instrumento: {
+    nome: "emitir_link_instrumento",
+    descricao:
+      "Emite o link do instrumento pro jovem da dupla responder (visão de futuro, roda da vida, PDM, metas). Devolve a URL /f/<token> pra enviar a ele — link pendente vigente é reusado, não duplicado. Escopo: equipe em qualquer dupla; mentor DPP só na dupla viva dele." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        dupla_id: z.uuid().describe("id da dupla (uuid)"),
+        sistema: z
+          .enum(["visao", "roda_vida", "pdm", "metas"])
+          .describe("qual instrumento emitir"),
+      })
+      .strict(),
+    roles: ["coordenacao", "mentor_dpp"],
+    escreve: true,
+    resumo: (a: { sistema: string }) =>
+      `Emitir o link do instrumento ${a.sistema} pra dupla`,
+    run: async (a: { dupla_id: string; sistema: string }, ctx) => {
+      const d = (await rpcEscreve(ctx, "emitir_link_instrumento", {
+        p_dupla_id: a.dupla_id,
+        p_sistema: a.sistema,
+      })) as { token?: string; reutilizado?: boolean } | null;
+      return {
+        url: d?.token ? `/f/${d.token}` : null,
+        reutilizado: d?.reutilizado === true,
+      };
+    },
+  },
+
+  agendar_encontro: {
+    nome: "agendar_encontro",
+    descricao:
+      "Agenda (ou remarca) um encontro da própria dupla do mentor — data futura, número dentro do cronograma. Remarcar exige o motivo; encontro já realizado não mexe. A coordenação NÃO agenda (quem agenda é a dupla) e a trilha especialista não cria sessão fora do pedido aceito — esses casos voltam como recusa na confirmação." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        dupla_id: z.uuid().describe("id da própria dupla (uuid — duplas_do_usuario devolve)"),
+        numero: z.number().int().min(1).max(24).describe("número do encontro na jornada"),
+        data_hora: z.string().describe("data/hora ISO 8601 com fuso (ex.: 2026-12-01T19:00:00-03:00)"),
+        link: z
+          .string()
+          .max(500)
+          .optional()
+          .describe("link https da chamada (opcional)"),
+        motivo: z
+          .string()
+          .max(140)
+          .optional()
+          .describe("obrigatório quando é remarcação — por que a data mudou"),
+      })
+      .strict(),
+    roles: ["mentor_dpp", "mentor_especialista"],
+    escreve: true,
+    resumo: (a: { numero: number; data_hora: string }) =>
+      `Agendar o ${a.numero}º encontro da dupla em ${a.data_hora}`,
+    run: async (
+      a: { dupla_id: string; numero: number; data_hora: string; link?: string; motivo?: string },
+      ctx
+    ) => {
+      // o core conhece o vocabulário de presets de remarcação: um motivo
+      // que casa com o value entra como preset, texto livre vira "outro"
+      const preset = (a.motivo ?? "").trim();
+      const ehPreset =
+        preset === "ausencia_mentorado" ||
+        preset === "ausencia_mentor" ||
+        preset === "conflito" ||
+        preset === "imprevisto";
+      return rodarCore(
+        agendarEncontroCore(ctx.supabase, await atorDoCanal(ctx), {
+          dupla_id: a.dupla_id,
+          numero: a.numero,
+          data_hora: a.data_hora,
+          link: a.link?.trim() || null,
+          motivo: ehPreset ? preset : preset ? "outro" : undefined,
+          motivo_outro: ehPreset ? undefined : preset || undefined,
+        })
+      );
+    },
+  },
+
+  editar_campo_pessoa: {
+    nome: "editar_campo_pessoa",
+    descricao:
+      "Corrige um campo de cadastro de uma pessoa (profiles ou mentorados): whatsapp ou nome_social em qualquer uma; notas (observação interna) só em mentorados. Email, papel, dados civis e datas NÃO entram — têm fluxo próprio. pessoas_busca lista o pessoa_id." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        pessoa_id: z.uuid().describe("id da pessoa (uuid — pessoas_busca devolve)"),
+        campo: z.enum(["whatsapp", "nome_social", "notas"]),
+        valor: z.string().max(10000).describe("novo valor do campo"),
+      })
+      .strict(),
+    roles: ["coordenacao"],
+    escreve: true,
+    resumo: (a: { campo: string; valor: string }) =>
+      `Editar ${a.campo} da pessoa pra "${a.valor.slice(0, 80)}"`,
+    run: async (a: { pessoa_id: string; campo: string; valor: string }, ctx) =>
+      rodarCore(
+        editarCampoPessoaCore(ctx.supabase, await atorDoCanal(ctx), {
+          pessoa_id: a.pessoa_id,
+          campo: a.campo,
+          valor: a.valor,
+        })
+      ),
+  },
 } satisfies Record<
   string,
   {
@@ -1504,6 +1720,11 @@ const ARGS_MINIMIZADOS: Record<string, readonly string[]> = {
   contra_propor_solicitacao: ["mensagem"],
   recusar_solicitacao: ["justificativa"],
   jovem_agendar_encontro: ["motivo", "link"],
+  // escritas do domínio (126): nota/motivo/valor podem citar pessoa — idem
+  registrar_interacao: ["nota"],
+  marcar_situacao_mentorado: ["motivo"],
+  agendar_encontro: ["motivo", "link"],
+  editar_campo_pessoa: ["valor"],
 };
 
 function argsMinimizados(
@@ -1615,12 +1836,21 @@ export async function executarTool(
       | undefined;
     if (!tool) throw new ErroTool(`Tool desconhecida: ${nome}`);
 
-    // tools de escrita são MCP-only por enquanto: a Liza interna segue
-    // leitura até o card de confirmação existir no chat
-    if ((tool as { escreve?: boolean }).escreve && canal !== "mcp") {
-      throw new ErroTool(
-        "Esta ação ainda não está disponível neste canal — pelo app ela fica na tela correspondente."
-      );
+    // escritas no chat passam pelo mesmo pendente_confirmacao do MCP
+    // (REALIZA-126) — a diferença é só o transporte de volta. Kill-switch
+    // IA_ESCRITAS=0: no chat restaura o erro de canal pra TODA escrita
+    // (o canal volta read-only); no MCP só as 5 do domínio saem do ar —
+    // as de chamados/jovem já eram live antes da flag existir
+    if ((tool as { escreve?: boolean }).escreve) {
+      const desligadas = process.env.IA_ESCRITAS === "0";
+      if (canal !== "mcp" && desligadas) {
+        throw new ErroTool(
+          "Esta ação ainda não está disponível neste canal — pelo app ela fica na tela correspondente."
+        );
+      }
+      if (canal === "mcp" && desligadas && ESCRITAS_DOMINIO.has(nome)) {
+        throw new ErroTool("Esta ação não está disponível no momento.");
+      }
     }
 
     // `confirmacao_id` chega fora do schema (a prévia instrui a repetição

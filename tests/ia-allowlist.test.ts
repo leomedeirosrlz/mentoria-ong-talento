@@ -82,6 +82,17 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
     slot: "2026-11-15T19:00:00-03:00",
   },
   recusar_solicitacao: { solicitacao_id: UUID, justificativa: "Sem agenda" },
+  // escritas do domínio (REALIZA-126) — chat + MCP, confirmacao_id fica
+  // fora do schema (executarTool extrai antes do parse)
+  registrar_interacao: { dupla_id: UUID, tipo: "contato" },
+  marcar_situacao_mentorado: { mentorado_id: UUID, situacao: "concluido" },
+  emitir_link_instrumento: { dupla_id: UUID, sistema: "visao" },
+  agendar_encontro: {
+    dupla_id: UUID,
+    numero: 6,
+    data_hora: "2026-11-10T19:00:00-03:00",
+  },
+  editar_campo_pessoa: { pessoa_id: UUID, campo: "whatsapp", valor: "11987654321" },
 };
 
 describe("allowlist — forma do registry", () => {
