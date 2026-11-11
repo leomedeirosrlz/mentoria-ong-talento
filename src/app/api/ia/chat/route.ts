@@ -38,7 +38,11 @@ import {
   getIaConfig,
   modeloDoTier,
 } from "@/lib/ia/config";
-import { rotearTier } from "@/lib/ia/roteador";
+import {
+  papelDecisivo,
+  rotearTier,
+  tarefaDaPergunta,
+} from "@/lib/ia/roteador";
 import { contextoELimiteIa } from "@/lib/ia/rate-limit";
 import type { FonteIa } from "@/lib/ia/fontes";
 import {
@@ -169,14 +173,22 @@ export async function POST(req: Request) {
   // de mexer no prompt sem versionar o texto inteiro nos eventos
   const promptV = createHash("sha256").update(system).digest("hex").slice(0, 8);
 
-  // tier da pergunta (REALIZA-329): roteador determinístico — saudação
-  // vai pro raso, pedido analítico pro forte, resto no balanceado;
-  // desligado na config = sempre balanceado. Slug ausente cai no
-  // IA_MODEL do ambiente, então config vazia não quebra nada
+  // tier da pergunta (REALIZA-329/299): roteador determinístico —
+  // tarefa derivada do formato da mensagem × papel efetivo (staff faz
+  // análise no forte; mentor/jovem capam no balanceado); desligado na
+  // config = sempre balanceado. tarefa e papelDecisivo saem daqui já
+  // calculados porque o evento 'resposta' grava os mesmos valores em
+  // args.roteador — uma derivação só, auditável sem coluna nova.
+  // Slug ausente cai no IA_MODEL do ambiente, então config vazia não
+  // quebra nada
   const ultimaPergunta =
     [...body.data.messages].reverse().find((m) => m.role === "user")
       ?.content ?? "";
-  const tier = iaCfg.roteamento ? rotearTier(ultimaPergunta) : "balanceado";
+  const tarefa = tarefaDaPergunta(ultimaPergunta);
+  const papelRota = papelDecisivo(papeis);
+  const tier = iaCfg.roteamento
+    ? rotearTier(ultimaPergunta, { papel: papeis, tarefa })
+    : "balanceado";
   // eval (0164): o runner do /ia manda x-ia-eval-key + modelo e mede aquele
   // slug — a cadeia de fallback sai do caminho senão a métrica mente (o
   // 'resposta' grava o modelo REAL usado, mas um fallback esconderia a
@@ -472,6 +484,9 @@ export async function POST(req: Request) {
           tools: toolsUsadas,
           list_cost: uso.listCost || undefined,
           prompt_v: promptV,
+          // decisão do roteador auditável no jsonb já existente
+          // (REALIZA-299): por que essa mensagem caiu nesse tier
+          roteador: { tier, tarefa, papel: papelRota },
         },
         ok: concluido,
         erro: erroEmitido ? "erro" : null,
