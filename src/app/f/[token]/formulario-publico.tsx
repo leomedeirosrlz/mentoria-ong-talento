@@ -4,6 +4,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import {
+  ArrowLeft,
+  ArrowRight,
   ArrowUp,
   CaretDown,
   CheckCircle,
@@ -33,8 +35,9 @@ import {
   coletaRespostas,
   leDeFormData,
   validaRespostas,
+  validaSecao,
 } from "@/lib/forms/resposta";
-import { ehInstrumento } from "@/lib/forms/instrumentos";
+import { agrupaEmSecoes, ehInstrumento } from "@/lib/forms/instrumentos";
 import { GridDisponibilidade } from "@/components/forms/grid-disponibilidade";
 import { fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
@@ -125,6 +128,31 @@ function FormularioGenerico({
   // cima, a pergunta condicional fora da condição nem entra na conta.
   const perguntas = camposPerguntas(campos).filter((c) => visivel(c, atuais));
 
+  // wizard por seções (REALIZA-144): ≥2 seções COM PERGUNTA ligam o
+  // stepper; 0–1 seção segue a página única. A contagem é ESTÁTICA (olha
+  // a definição, não o visivel() do momento): se uma condicional escondesse
+  // a última pergunta de uma seção no meio da resposta, um wizard que liga
+  // e desliga desmontaria inputs não-controlados e perderia a digitação.
+  const blocosWizard = agrupaEmSecoes(campos).filter(
+    (b) => b.campos.length > 0
+  );
+  const wizard = blocosWizard.length >= 2;
+  const [etapa, setEtapa] = useState(0);
+  // campos é estável na prática, mas a prévia da coordenação reedita a
+  // definição — o clamp garante uma seção visível mesmo encolhendo
+  const etapaAtiva = wizard
+    ? Math.min(etapa, blocosWizard.length - 1)
+    : 0;
+  const ultimaEtapa = etapaAtiva === blocosWizard.length - 1;
+  // o efeito de troca rola/foca — a pintura inicial não (o rascunho
+  // restaurado muda a etapa e aí sim leva a pessoa de volta). Comparar
+  // com a etapa anterior, não um flag de "montou": sob StrictMode o efeito
+  // de mount roda duas vezes e um flag deixaria a segunda passar
+  const etapaAnterior = useRef(0); // etapa começa em 0 — igual à inicial
+  // submit com erro em outra seção: a seção errada abre e o foco cai no
+  // campo marcado em vez do título — a troca consome este id uma vez
+  const focoPendente = useRef<string | null>(null);
+
   // rascunho por token+pergunta: o mentorado responde no celular e texto
   // longo não pode morrer num reload (rede caindo, troca de app). Um JSON
   // por token cujo mapa interno é por campo — some quando a resposta sai.
@@ -137,6 +165,48 @@ function FormularioGenerico({
     el.scrollIntoView({ block: "center" });
     el.focus({ preventScroll: true });
   }, []);
+
+  // troca de seção do wizard: rola a seção nova pro topo (abaixo da pill
+  // fixa, por isso scroll-mt) e entrega o foco no título — o botão que
+  // disparou a navegação segue montado no footer, então sem isso o foco
+  // não acompanharia o conteúdo novo (padrão do onboarding). A etapa
+  // também entra no rascunho aqui: vale pra Avançar, Voltar e a seção
+  // restaurada — reabrir o link cai onde a pessoa parou.
+  useEffect(() => {
+    if (etapaAnterior.current === etapaAtiva) return;
+    etapaAnterior.current = etapaAtiva;
+    const form = formRef.current;
+    const sec =
+      form?.querySelector<HTMLElement>(`[data-secao="${etapaAtiva}"]`) ?? null;
+    const pendente = focoPendente.current;
+    focoPendente.current = null;
+    if (form && sec) {
+      if (pendente) {
+        const alvo = sec.querySelector<HTMLElement>(
+          `[data-campo="${CSS.escape(pendente)}"]`
+        );
+        alvo?.scrollIntoView({ block: "center" });
+        alvo
+          ?.querySelector<HTMLElement>("input, select, textarea")
+          ?.focus({ preventScroll: true });
+      } else {
+        sec.scrollIntoView({ block: "start" });
+        sec.querySelector<HTMLElement>("h2")?.focus({ preventScroll: true });
+      }
+    }
+    if (chaveRascunho && form) {
+      try {
+        const coletado = coleta(new FormData(form)).respostas;
+        localStorage.setItem(
+          chaveRascunho,
+          JSON.stringify({ ...coletado, ...extras, etapa: etapaAtiva })
+        );
+      } catch {
+        // quota/storage desligado — o rascunho é conveniência, não requisito
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- dispara só na troca de seção; chaveRascunho/coleta/extras são estáveis por render
+  }, [etapaAtiva]);
 
   const setExtra = useCallback(
     (id: string, v: RespostaValor | null) => {
@@ -209,6 +279,18 @@ function FormularioGenerico({
         const rascunho = JSON.parse(raw) as Record<string, RespostaValor>;
         const form = formRef.current;
         if (!form) return;
+        // a seção onde a pessoa parou viaja junto ('etapa' é chave
+        // reservada do rascunho: ids de campo são c_* do builder ou o
+        // vocabulário fechado dos oficiais — nunca colide). Rascunho
+        // antigo, de antes do wizard, não tem a chave e cai na seção 1
+        if (wizard && typeof rascunho.etapa === "number") {
+          setEtapa(
+            Math.min(
+              Math.max(0, Math.floor(rascunho.etapa)),
+              blocosWizard.length - 1
+            )
+          );
+        }
         const nome = (id: string) => CSS.escape(id);
         const extrasRest: Record<string, RespostaValor> = {};
         for (const c of camposPerguntas(campos)) {
@@ -271,9 +353,11 @@ function FormularioGenerico({
     );
     if (chaveRascunho) {
       try {
+        // a seção corrente viaja junto das respostas — reabrir o link cai
+        // onde a pessoa parou (a troca de seção também grava, no efeito)
         localStorage.setItem(
           chaveRascunho,
-          JSON.stringify({ ...coletado, ...extras })
+          JSON.stringify({ ...coletado, ...extras, etapa: etapaAtiva })
         );
       } catch {
         // quota/storage desligado — o rascunho é conveniência, não requisito
@@ -290,9 +374,76 @@ function FormularioGenerico({
       setErro((prev) => (prev === ERRO_VALIDACAO ? null : prev));
   }
 
+  /** "Avançar" do wizard — valida SÓ a seção visível com a mesma pipeline
+   *  do submit (coleta o FormData inteiro, junta extras, compõe "Outro");
+   *  o que muda é o escopo: o validador recebe só o bloco corrente, então
+   *  o erro fica marcado onde ele está e o resto do form não bloqueia a
+   *  navegação. Erro pendente nunca é apagado daqui — o Voltar é livre e
+   *  a seção marcada mostra o aviso quando a pessoa voltar. */
+  function avancar() {
+    const form = formRef.current;
+    if (!form) return;
+    const fd = new FormData(form);
+    const { respostas: coletado, falhas } = coleta(fd);
+    const atuaisAgora = { ...coletado, ...extras };
+    // snapshot fresco: `perguntas`/`atuais` do render podem ficar um tick
+    // atrás de um gatilho recém-respondido — aqui a visibilidade é lida do
+    // FormData da hora do clique
+    const perguntasAgora = camposPerguntas(campos).filter((c) =>
+      visivel(c, atuaisAgora)
+    );
+    const respostas = aplicaOutro(
+      perguntasAgora,
+      { ...atuaisAgora },
+      (c) => String(fd.get(`${c.id}__outro`) ?? "")
+    );
+    const bloco = blocosWizard[etapaAtiva];
+    const mapa = validaSecao(bloco.campos, respostas, falhas, atuaisAgora);
+    // limpa erros velhos da seção e grava os novos — erro de outra seção
+    // (a pessoa pode ter voltado com campo inválido) segue marcado
+    const idsBloco = new Set(bloco.campos.map((c) => c.id));
+    const next = { ...erros };
+    for (const id of Object.keys(next)) {
+      if (idsBloco.has(id)) delete next[id];
+    }
+    Object.assign(next, mapa);
+    setErros(next);
+    if (Object.keys(mapa).length) {
+      const primeiro = bloco.campos.find((c) => mapa[c.id]);
+      const alvo =
+        primeiro &&
+        form.querySelector(`[data-campo="${CSS.escape(primeiro.id)}"]`);
+      if (alvo) {
+        alvo.scrollIntoView({ block: "center" });
+        alvo
+          .querySelector<HTMLElement>("input, select, textarea")
+          ?.focus({ preventScroll: true });
+      }
+      return;
+    }
+    // a seção saiu limpa: se não sobra campo marcado em lugar nenhum, o
+    // banner global de validação (do submit anterior) também sai
+    if (!Object.keys(next).length)
+      setErro((prev) => (prev === ERRO_VALIDACAO ? null : prev));
+    setEtapa((e) => Math.min(e + 1, blocosWizard.length - 1));
+  }
+
+  /** Voltar nunca valida nem bloqueia — as seções seguem montadas com a
+   *  digitação no DOM (e a etapa nova entra no rascunho pelo efeito). */
+  function voltar() {
+    setEtapa((e) => Math.max(e - 1, 0));
+  }
+
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     if (preview) return;
+    // Enter num campo de texto dispara submit implícito — no wizard o
+    // gesto é "próxima seção" (o enterKeyHint "next" já promete isso); o
+    // envio de verdade só mora no botão da última seção
+    if (wizard && !ultimaEtapa) {
+      avancar();
+      return;
+    }
     const fd = new FormData(e.currentTarget);
     const { respostas: coletado, falhas } = coleta(fd);
     // controlados (arquivo/grid) entram por cima do FormData e o "Outro"
@@ -307,6 +458,18 @@ function FormularioGenerico({
       setErros(mapa);
       setErro(ERRO_VALIDACAO);
       const primeiro = perguntas.find((c) => mapa[c.id]);
+      if (wizard && primeiro) {
+        // erro mora em seção escondida → abre ela primeiro; o foco no
+        // campo sai pelo efeito de troca de seção (focoPendente)
+        const i = blocosWizard.findIndex((b) =>
+          b.campos.some((c) => mapa[c.id])
+        );
+        if (i >= 0 && i !== etapaAtiva) {
+          focoPendente.current = primeiro.id;
+          setEtapa(i);
+          return;
+        }
+      }
       const alvo =
         primeiro &&
         formRef.current?.querySelector(
@@ -366,6 +529,30 @@ function FormularioGenerico({
     .reverse()
     .find((c) => TIPOS_COM_ENTER.includes(c.tipo))?.id;
 
+  // a numeração conta só perguntas — 'secao' é rótulo de estrutura e não
+  // entra na contagem nem no "1." do card
+  const numeroPorId = new Map(perguntas.map((c, i) => [c.id, i + 1]));
+
+  function renderCampo(c: FormularioCampo) {
+    // condicional fora da condição não renderiza — some da tela, da
+    // numeração e da coleta (a RPC concorda)
+    if (c.tipo !== "secao" && !visivel(c, atuais)) return null;
+    return (
+      <CampoRenderer
+        key={c.id}
+        campo={c}
+        n={numeroPorId.get(c.id) ?? 0}
+        erro={erros[c.id]}
+        enterKeyHint={c.id === ultimoComEnter ? "send" : "next"}
+        token={token}
+        preview={preview}
+        valor={extras[c.id]}
+        atual={atuais[c.id]}
+        onValor={setExtra}
+      />
+    );
+  }
+
   return (
     <AnimatePresence mode="wait" initial={false}>
       {enviado ? (
@@ -402,26 +589,35 @@ function FormularioGenerico({
           className="space-y-3"
         >
           {/* progresso fora dos cards: pill sticky que acompanha o scroll de
-              forms longos (safe-area no top, padrão do onboarding) */}
+              forms longos (safe-area no top, padrão do onboarding). No
+              wizard a régua conta seções, não perguntas — "Seção N de M" */}
           <div className="sticky top-[max(0.5rem,env(safe-area-inset-top))] z-10 flex items-center gap-3 rounded-full bg-card/90 px-4 py-2.5 shadow-[var(--shadow-border)] backdrop-blur">
             <div
               role="progressbar"
-              aria-valuenow={respondidos}
-              aria-valuemin={0}
-              aria-valuemax={total}
+              aria-valuenow={wizard ? etapaAtiva + 1 : respondidos}
+              aria-valuemin={wizard ? 1 : 0}
+              aria-valuemax={wizard ? blocosWizard.length : total}
               aria-label="Progresso do formulário"
-              aria-valuetext={`${respondidos} de ${total} perguntas respondidas`}
+              aria-valuetext={
+                wizard
+                  ? `Seção ${etapaAtiva + 1} de ${blocosWizard.length}`
+                  : `${respondidos} de ${total} perguntas respondidas`
+              }
               className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
             >
               <div
                 className="h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-500"
                 style={{
-                  width: `${(respondidos / Math.max(total, 1)) * 100}%`,
+                  width: wizard
+                    ? `${((etapaAtiva + 1) / blocosWizard.length) * 100}%`
+                    : `${(respondidos / Math.max(total, 1)) * 100}%`,
                 }}
               />
             </div>
             <span className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
-              {respondidos} de {total}
+              {wizard
+                ? `Seção ${etapaAtiva + 1} de ${blocosWizard.length}`
+                : `${respondidos} de ${total}`}
             </span>
           </div>
 
@@ -480,32 +676,76 @@ function FormularioGenerico({
             noValidate
             className="space-y-3"
           >
-            {/* a numeração conta só perguntas — 'secao' é rótulo de
-                estrutura e não entra na contagem nem no "1." do card */}
-            {(() => {
-              const numeroPorId = new Map(
-                perguntas.map((c, i) => [c.id, i + 1])
-              );
-              return campos.map((c) => {
-                // condicional fora da condição não renderiza — some da
-                // tela, da numeração e da coleta (a RPC concorda)
-                if (c.tipo !== "secao" && !visivel(c, atuais)) return null;
-                return (
-                  <CampoRenderer
-                    key={c.id}
-                    campo={c}
-                    n={numeroPorId.get(c.id) ?? 0}
-                    erro={erros[c.id]}
-                    enterKeyHint={c.id === ultimoComEnter ? "send" : "next"}
-                    token={token}
-                    preview={preview}
-                    valor={extras[c.id]}
-                    atual={atuais[c.id]}
-                    onValor={setExtra}
-                  />
-                );
-              });
-            })()}
+            {wizard
+              ? /* uma seção por vez, mas TODAS montadas: só a corrente sai
+                   do `hidden`. É o que mantém o FormData byte-a-byte igual
+                   ao da página única (coleta/leDeFormData sem mudança), o
+                   rascunho no mesmo formato e o Voltar sem perda — os inputs
+                   não são controlados, remontar seria perder a digitação.
+                   Por isso sem AnimatePresence aqui: a seção que sai some
+                   de vez e a que entra anima pelo `animate` (o mesmo recorte
+                   visual do mode="wait": saída instantânea + entrada suave) */
+                blocosWizard.map((b, i) => {
+                  const ativa = i === etapaAtiva;
+                  const temErro = b.campos.some(
+                    (c) => erros[c.id] && visivel(c, atuais)
+                  );
+                  return (
+                    <motion.section
+                      key={b.secao?.id ?? `bloco-${i}`}
+                      data-secao={i}
+                      hidden={!ativa}
+                      initial={false}
+                      animate={
+                        ativa ? { opacity: 1, y: 0 } : { opacity: 0, y: -3 }
+                      }
+                      transition={T.enter}
+                      aria-labelledby={`f-sec-titulo-${i}`}
+                      className="scroll-mt-20 space-y-3"
+                    >
+                      {b.secao ? (
+                        <header className="px-1 pb-1">
+                          {/* título da seção recebe o foco na troca — o
+                              leitor de tela anuncia a página nova */}
+                          <h2
+                            id={`f-sec-titulo-${i}`}
+                            tabIndex={-1}
+                            className="text-base font-semibold tracking-tight outline-none sm:text-lg"
+                          >
+                            {b.secao.label}
+                          </h2>
+                          {b.secao.descricao && (
+                            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                              {b.secao.descricao}
+                            </p>
+                          )}
+                        </header>
+                      ) : (
+                        // bloco sem 'secao' (form que abre direto com
+                        // perguntas) ainda precisa do alvo de foco
+                        <h2
+                          id={`f-sec-titulo-${i}`}
+                          tabIndex={-1}
+                          className="sr-only outline-none"
+                        >
+                          Perguntas
+                        </h2>
+                      )}
+                      {/* sumário curto no topo da seção marcada — os erros
+                          em si seguem inline, no card de cada campo */}
+                      {temErro && (
+                        <p
+                          role="alert"
+                          className="rounded-lg bg-destructive/10 px-3 py-2 text-sm leading-snug text-destructive"
+                        >
+                          Revise os campos marcados nesta seção.
+                        </p>
+                      )}
+                      {b.campos.map(renderCampo)}
+                    </motion.section>
+                  );
+                })
+              : campos.map(renderCampo)}
 
             {/* honeypot anti-spam: invisível pra humanos, bots preenchem —
                 o servidor finge sucesso e não grava nada. Depois dos cards
@@ -537,22 +777,88 @@ function FormularioGenerico({
               {erro}
             </p>
 
-            {/* title no wrapper: button disabled tem pointer-events-none e o
-                hint "envio desligado" nunca apareceria sobre ele */}
-            <div title={preview ? "Envio desligado na prévia" : undefined}>
-              <Button
-                type="submit"
-                className="h-11 w-full md:h-10"
-                disabled={pending || preview}
-              >
-                {pending ? (
-                  <CircleNotch size={16} className="animate-spin" aria-hidden />
-                ) : (
-                  <PaperPlaneRight size={16} aria-hidden />
+            {wizard ? (
+              /* navegação do wizard numa pill sticky na base — espelha a
+                 pill de progresso do topo. sticky (não fixed): resolve
+                 contra o scrollport mais próximo, então também gruda na
+                 prévia do coordenador (o dialog é o scrollport dele) */
+              <div className="sticky bottom-[max(0.75rem,env(safe-area-inset-bottom))] z-10 flex items-center gap-2 rounded-full bg-card/90 p-2 shadow-[var(--shadow-border)] backdrop-blur">
+                {/* Voltar nunca valida nem bloqueia — some só na capa
+                    (primeira seção), onde não há pra onde voltar */}
+                {etapaAtiva > 0 && (
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={voltar}
+                    disabled={pending}
+                    className="h-11 rounded-full md:h-10"
+                  >
+                    <ArrowLeft size={16} aria-hidden />
+                    Voltar
+                  </Button>
                 )}
-                {pending ? "Enviando…" : "Enviar resposta"}
-              </Button>
-            </div>
+                {/* title no wrapper: button disabled tem pointer-events-none
+                    e o hint "envio desligado" nunca apareceria sobre ele */}
+                <div
+                  className="min-w-0 flex-1"
+                  title={
+                    preview && ultimaEtapa
+                      ? "Envio desligado na prévia"
+                      : undefined
+                  }
+                >
+                  {ultimaEtapa ? (
+                    <Button
+                      type="submit"
+                      className="h-11 w-full rounded-full md:h-10"
+                      disabled={pending || preview}
+                    >
+                      {pending ? (
+                        <CircleNotch
+                          size={16}
+                          className="animate-spin"
+                          aria-hidden
+                        />
+                      ) : (
+                        <PaperPlaneRight size={16} aria-hidden />
+                      )}
+                      {pending ? "Enviando…" : "Enviar resposta"}
+                    </Button>
+                  ) : (
+                    <Button
+                      type="button"
+                      onClick={avancar}
+                      disabled={pending}
+                      className="h-11 w-full rounded-full md:h-10"
+                    >
+                      Avançar
+                      <ArrowRight size={16} aria-hidden />
+                    </Button>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* title no wrapper: button disabled tem pointer-events-none e o
+                 hint "envio desligado" nunca apareceria sobre ele */
+              <div title={preview ? "Envio desligado na prévia" : undefined}>
+                <Button
+                  type="submit"
+                  className="h-11 w-full md:h-10"
+                  disabled={pending || preview}
+                >
+                  {pending ? (
+                    <CircleNotch
+                      size={16}
+                      className="animate-spin"
+                      aria-hidden
+                    />
+                  ) : (
+                    <PaperPlaneRight size={16} aria-hidden />
+                  )}
+                  {pending ? "Enviando…" : "Enviar resposta"}
+                </Button>
+              </div>
+            )}
           </form>
         </motion.div>
       )}

@@ -5,6 +5,7 @@ import {
   coletaRespostas,
   leDeFormData,
   validaRespostas,
+  validaSecao,
 } from "./resposta";
 import { visivel, type FormularioCampo } from "./schema";
 
@@ -160,5 +161,64 @@ describe("validaRespostas", () => {
       new Set()
     );
     expect(mapa).toEqual({});
+  });
+});
+
+describe("validaSecao", () => {
+  const secao = [
+    C("s_titulo", "secao", { obrigatorio: false }),
+    C("q1", "texto"),
+    C("q2", "texto", { obrigatorio: false }),
+  ];
+
+  it("marca só os campos da seção — erro de outra seção não aparece aqui", () => {
+    // como o "Avançar" do wizard: o form inteiro foi coletado, mas só a
+    // seção corrente entra no mapa — a obrigatória vazia de outra seção
+    // ("outra") é problema do submit, não deste passo
+    const outra = [C("outra", "texto")];
+    const mapa = validaSecao(secao, {}, new Set(), {});
+    expect(mapa.q1).toBe("Responda esta pergunta.");
+    expect(mapa.q2).toBeUndefined();
+    expect(mapa.outra).toBeUndefined();
+    // e o contrário: validar a outra seção não reclama da primeira
+    expect(validaSecao(outra, {}, new Set(), {}).outra).toBe(
+      "Responda esta pergunta."
+    );
+    expect(validaSecao(outra, {}, new Set(), {}).q1).toBeUndefined();
+  });
+
+  it("seção sem obrigatórios passa mesmo vazia", () => {
+    const livre = [
+      C("s_titulo", "secao", { obrigatorio: false }),
+      C("q1", "texto", { obrigatorio: false }),
+      C("q2", "escala_1_5", { obrigatorio: false }),
+    ];
+    expect(validaSecao(livre, {}, new Set(), {})).toEqual({});
+  });
+
+  it("condicional oculta dentro da seção não bloqueia", () => {
+    const comCond = [
+      C("s_titulo", "secao", { obrigatorio: false }),
+      C("gatilho", "sim_nao"),
+      C("filha", "texto", {
+        visible_if: { campo: "gatilho", em: ["sim"] },
+      }),
+    ];
+    // gatilho respondido "nao" → a filha obrigatória some do escopo
+    const mapa = validaSecao(
+      comCond,
+      { gatilho: "nao" },
+      new Set(),
+      { gatilho: "nao" }
+    );
+    expect(mapa).toEqual({});
+    // gatilho "sim" → a filha entra e cobra
+    const comErro = validaSecao(
+      comCond,
+      { gatilho: "sim" },
+      new Set(),
+      { gatilho: "sim" }
+    );
+    expect(comErro.filha).toBe("Responda esta pergunta.");
   });
 });
