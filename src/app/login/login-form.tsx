@@ -15,6 +15,14 @@ import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { cn, pathInterno } from "@/lib/utils";
 import { novoUuid } from "@/lib/uuid";
+import {
+  cooldownRestante,
+  gravarPedido,
+  JANELA_PEDIDO,
+  lerPedido,
+  limparPedido,
+  type PedidoLogin,
+} from "@/lib/login-pedido";
 
 // janela do resend do supabase — quando o 429 traz "after N seconds" usa o N real
 const COOLDOWN = 60;
@@ -60,15 +68,17 @@ export function LoginForm() {
   // client implícito só pro pedido do link — o ssr força pkce, que prende o
   // acesso ao browser que pediu (ver createOtpClient)
   const otp = useMemo(() => createOtpClient(), []);
-  // nonce do handoff: viaja no link (?h=) — a aba que abre devolve os tokens
-  // pro servidor, e esta aba os resgata no poll (login_handoffs, 0049). É o
-  // que faz a sessão chegar na aba que pediu mesmo se o link abrir em outro
-  // navegador/app de e-mail — cookies não atravessam, a RPC atravessa.
-  const handoffRef = useRef<string | null>(null);
-  // e-mail do pedido que gerou o nonce — os tokens resgatados são bearer:
-  // a sessão só entra se o e-mail bater (fixação via depósito de tokens
-  // alheios morre na checagem do poll)
-  const emailPedidoRef = useRef<string | null>(null);
+  // o pedido vivo: h (nonce) viaja no link (?h=) — a aba que abre devolve
+  // os tokens pro servidor, e esta aba os resgata no poll (login_handoffs,
+  // 0049). É o que faz a sessão chegar na aba que pediu mesmo se o link
+  // abrir em outro navegador/app de e-mail — cookies não atravessam, a RPC
+  // atravessa. O e-mail do pedido acompanha porque os tokens resgatados são
+  // bearer: a sessão só entra se o e-mail bater (fixação via depósito de
+  // tokens alheios morre na checagem do poll). h+email+em vivem juntos num
+  // objeto só — restaurar um sem o outro criaria mismatch (emailPedido
+  // null) ou deadline errado; o em régua janela do link e o cooldown.
+  // Espelhado na sessionStorage (login-pedido) pra sobreviver a reload.
+  const pedidoRef = useRef<PedidoLogin | null>(null);
   // o painel "enviado" monta só depois do exit do form (mode="wait") — um
   // useEffect([enviado]) dispararia com o ref ainda null e perderia o foco;
   // ref callback foca quando o nó existe de verdade
@@ -104,11 +114,41 @@ export function LoginForm() {
     router.replace(urlErroLink());
   }, [router, urlErroLink]);
 
+  // o pedido sobrevive a reload/reabertura da aba: remonta o painel e o
+  // poll retoma de onde parou. NÃO no initializer — sessionStorage no SSR
+  // não existe e o valor divergiria da hidratação; effect de mount é o
+  // lugar certo. ?erro= na URL = link queimado consumido aqui: o pedido
+  // morreu junto, limpa em vez de restaurar um nonce morto
+  useEffect(() => {
+    // restaurar mora em função própria como o falhar() do /auth/link —
+    // setState direto no corpo do efeito cascateia render
+    const restaurar = () => {
+      if (params.get("erro") != null) {
+        pedidoRef.current = null;
+        limparPedido();
+        return;
+      }
+      // restaura uma vez — um pedido já vivo (pedirLink desta montagem) não
+      // é sobrescrito por uma row mais velha do storage
+      if (pedidoRef.current) return;
+      const pedido = lerPedido();
+      if (!pedido) return;
+      pedidoRef.current = pedido;
+      setEmail(pedido.email);
+      setEnviado(true);
+      setCooldown(cooldownRestante(pedido.em));
+    };
+    restaurar();
+  }, [params]);
+
   // destino pós-login com sessão: quem nunca definiu senha (nem dispensou o
   // onboarding) passa por ele primeiro — o desvio que o /auth/confirm fazia
   // no fluxo pkce, agora aplicado na aba que AGUARDA o link
   const entrar = useCallback(
     (session: Session | null) => {
+      // sessão real = saída terminal do funil — o pedido morre junto
+      pedidoRef.current = null;
+      limparPedido();
       // login real venceu — a demo (se estava ativa) morre junto
       limparCookiesDemo();
       const destino = destinoFinal();
@@ -208,10 +248,22 @@ export function LoginForm() {
       }
       // link aberto em outro navegador/app: a aba do e-mail depositou os
       // tokens no handoff — resgata aqui (uso único) e assina nesta aba
-      const nonce = handoffRef.current;
-      if (!nonce) return;
+      const pedido = pedidoRef.current;
+      if (!pedido) return;
+      // deadline do pedido (em + janela): o link OTP vale 1h — passado
+      // disso nem o clique mais válido resolve, e sem saída o painel gira
+      // o poll até a pessoa desistir. Depois do getSession de propósito:
+      // uma sessão que já chegou entra mesmo com o pedido vencido
+      if (Date.now() - pedido.em > JANELA_PEDIDO) {
+        entrou = true;
+        pedidoRef.current = null;
+        limparPedido();
+        setEnviado(false);
+        setErro("O link expirou. Peça um novo pra entrar.");
+        return;
+      }
       const { data: h } = await supabase.rpc("pegar_login_handoff", {
-        p_nonce: nonce,
+        p_nonce: pedido.h,
       });
       const tokens = h as {
         access_token?: string;
@@ -224,6 +276,8 @@ export function LoginForm() {
       // sentido: é o mesmo navegador)
       if (tokens?.failed) {
         entrou = true;
+        pedidoRef.current = null;
+        limparPedido();
         setEnviado(false);
         router.replace(urlErroLink());
         return;
@@ -232,10 +286,10 @@ export function LoginForm() {
       // morreram no servidor e nunca vão chegar; esperar era spinner eterno
       if (tokens?.expired) {
         entrou = true;
+        pedidoRef.current = null;
+        limparPedido();
         setEnviado(false);
-        setErro(
-          "O link expirou antes de ser aberto. Peça um novo — ele vale por 1 hora."
-        );
+        setErro("O link expirou antes de ser aberto. Peça um novo link.");
         return;
       }
       if (!tokens?.access_token || !tokens.refresh_token) return;
@@ -248,6 +302,8 @@ export function LoginForm() {
       // esperar num nonce consumido não resolve nada
       if (error || !s.session) {
         entrou = true;
+        pedidoRef.current = null;
+        limparPedido();
         setEnviado(false);
         router.replace(urlErroLink());
         return;
@@ -257,8 +313,10 @@ export function LoginForm() {
       // o link — mismatch derruba a sessão plantada na hora
       const { data: u } = await supabase.auth.getUser();
       const emailSessao = (u.user?.email ?? s.session.user.email)?.toLowerCase();
-      if (emailSessao !== emailPedidoRef.current) {
+      if (emailSessao !== pedido.email) {
         entrou = true;
+        pedidoRef.current = null;
+        limparPedido();
         await supabase.auth.signOut();
         setEnviado(false);
         setErro("Este link não corresponde a este e-mail. Peça um novo.");
@@ -328,10 +386,15 @@ export function LoginForm() {
         }
       } else {
         // o nonce só vale pro link que saiu de verdade — num 429 nenhum
-        // e-mail novo carrega este h, e sobrescrever o ref orfanaria o
-        // nonce do link anterior que ainda pode ser clicado
-        handoffRef.current = handoff;
-        emailPedidoRef.current = email.trim().toLowerCase();
+        // e-mail novo carrega este h, e sobrescrever o ref (ou a storage)
+        // orfanaria o nonce do link anterior que ainda pode ser clicado
+        const pedido: PedidoLogin = {
+          h: handoff,
+          email: email.trim().toLowerCase(),
+          em: Date.now(),
+        };
+        pedidoRef.current = pedido;
+        gravarPedido(pedido);
         setEnviado(true);
         setCooldown(COOLDOWN);
       }
@@ -474,6 +537,9 @@ export function LoginForm() {
                 type="button"
                 className="mt-5 w-full"
                 onClick={() => {
+                  // saída terminal: o card de erro é o fim deste pedido
+                  pedidoRef.current = null;
+                  limparPedido();
                   const next = params.get("next");
                   router.replace(
                     `/login${next ? `?next=${encodeURIComponent(next)}` : ""}`
@@ -533,6 +599,11 @@ export function LoginForm() {
                   size="sm"
                   className="w-full"
                   onClick={() => {
+                    // troca de e-mail = pedido novo: o nonce anterior morre
+                    // junto senão um clique no link velho entraria na conta
+                    // errada depois de um novo pedido
+                    pedidoRef.current = null;
+                    limparPedido();
                     setEnviado(false);
                     setCooldown(0);
                     setErro(null);
