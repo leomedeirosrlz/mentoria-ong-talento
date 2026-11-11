@@ -78,6 +78,9 @@ export type ProfilePapel = {
   papel: AppRole;
   /** null = papel vale pro programa todo; preenchido = só naquela turma. */
   escopo_turma: string | null;
+  /** Alcance do auxiliar (0125): só tem efeito em papel 'supervisor' —
+   *  'turma' + escopo_turma amplia a supervisão pra turma inteira. */
+  escopo_supervisao: "duplas" | "turma";
   primario: boolean;
   criado_em?: string;
 };
@@ -1328,6 +1331,7 @@ function build(): DemoData {
             profile_id: p.id,
             papel: p.role,
             escopo_turma: null,
+            escopo_supervisao: "duplas" as const,
             primario: true,
             criado_em: p.created_at ?? undefined,
           },
@@ -1339,10 +1343,22 @@ function build(): DemoData {
       profile_id: p.id,
       papel: "mentor_especialista",
       escopo_turma: null,
+      escopo_supervisao: "duplas",
       primario: false,
       criado_em: p.created_at ?? undefined,
     });
   }
+  // grant de turma (0125): o Paulo supervisiona a t2b e a t2c direto e
+  // enxerga a T2 INTEIRA — a d-t2a (Beatriz × André/Kauã) entra no escopo
+  // dele pela linha escopada, não pelo supervisor_id. É o que exercita o
+  // supervisiona_dupla demo (queries.ts) fora do caminho direto.
+  profilePapeis.push({
+    profile_id: paulo.id,
+    papel: "supervisor",
+    escopo_turma: "T2 · 2026/2027",
+    escopo_supervisao: "turma",
+    primario: false,
+  });
 
   const mentorProfiles: MentorProfile[] = [
     // Ricardo sem termo_ok: persona mentor_dpp entra na demo com o banner
@@ -3977,4 +3993,29 @@ export function getDemoData(): DemoData {
   if (!cache || Date.now() - cache.at > DEMO_TTL_MS)
     cache = { at: Date.now(), data: build() };
   return cache.data;
+}
+
+/** Espelho da RPC `supervisiona_dupla` (0125): supervisor_id direto OU uma
+ *  linha de papel 'supervisor' com escopo_supervisao='turma' cuja
+ *  escopo_turma casa com duplas.turma OU com a turma do cronograma dela
+ *  (a dupla pode herdar a turma pelo calendário — os dois caminhos contam).
+ *  Vive aqui e não em queries.ts porque forms-data/pdm-data importam de
+ *  queries — o ciclo viria de graça. */
+export function supervisionaDuplaDemo(
+  data: DemoData,
+  euId: string,
+  d: Dupla
+): boolean {
+  if (d.supervisor?.id === euId) return true;
+  const turmaCronograma = d.cronograma_id
+    ? data.cronogramas.find((c) => c.id === d.cronograma_id)?.turma
+    : null;
+  return data.profilePapeis.some(
+    (pp) =>
+      pp.profile_id === euId &&
+      pp.papel === "supervisor" &&
+      pp.escopo_supervisao === "turma" &&
+      pp.escopo_turma != null &&
+      (pp.escopo_turma === d.turma || pp.escopo_turma === turmaCronograma)
+  );
 }

@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { notificar } from "@/lib/notificar";
 import { demoAtivo } from "./demo/mode";
@@ -225,7 +226,8 @@ export async function registrarEncerramento(
     eu.id
   );
 
-  void snapshotDuplaHoje(duplaId).catch(() => {});
+  // pós-resposta: snapshot idempotente, não segura o usuário
+  after(() => snapshotDuplaHoje(duplaId).catch(() => {}));
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath(`/duplas/${duplaId}`);
@@ -360,7 +362,8 @@ export async function encerrarTrilhaEspecialista(
     eu.id
   );
 
-  void snapshotDuplaHoje(duplaId).catch(() => {});
+  // pós-resposta: snapshot idempotente, não segura o usuário
+  after(() => snapshotDuplaHoje(duplaId).catch(() => {}));
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath(`/duplas/${duplaId}`);

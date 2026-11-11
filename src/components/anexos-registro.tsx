@@ -73,8 +73,14 @@ export async function enviarAnexo(
       .from(BUCKET)
       .upload(path, file);
     if (upError) {
-      // sem o arquivo a row não vale (e seguraria o path pra sempre)
-      await supabase.from("registro_anexos").delete().eq("id", row.id);
+      // sem o arquivo a row não vale (e seguraria o path pra sempre) —
+      // se nem a limpeza rodar a row órfã fica: loga no console
+      const { error: delError } = await supabase
+        .from("registro_anexos")
+        .delete()
+        .eq("id", row.id);
+      if (delError)
+        console.error("enviarAnexo: limpeza da row de metadados:", delError);
       return { error: "Falha ao enviar o arquivo. Tente de novo." };
     }
     return { row: row as RegistroAnexo };

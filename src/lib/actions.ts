@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath, updateTag } from "next/cache";
+import { after } from "next/server";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { AVATAR_MAX_BYTES, avisoImagemGrande } from "@/lib/avatar";
@@ -3528,17 +3529,25 @@ export async function salvarRegistro(formData: FormData) {
         .eq("dupla_id", dupla_id)
     : { data: null };
   const plano = reconciliaCombinados(existentes ?? [], enc);
-  for (const u of plano.atualizar) {
-    // status nunca entra — feito/pendente é preservado; dupla+registro no
-    // where impedem cruzar pra combinado de outra dupla ou outro registro
-    const { error: upErr } = await supabase
-      .from("encaminhamentos")
-      .update({ descricao: u.descricao, responsavel: u.responsavel, prazo: u.prazo })
-      .eq("id", u.id)
-      .eq("dupla_id", dupla_id)
-      .eq("registro_id", registro.id);
-    if (upErr) return { error: erroAmigavel(upErr) };
-  }
+  // o registro e o status do encontro já estão gravados — daqui em diante
+  // uma falha NÃO é "o registro falhou": vira aviso no toast do ok (mesmo
+  // padrão do bloco `concluir` abaixo), nunca { error } sobre estado
+  // parcialmente reconciliado
+  const avisos: string[] = [];
+  let reconcileFalhou = false;
+  // status nunca entra — feito/pendente é preservado; dupla+registro no
+  // where impedem cruzar pra combinado de outra dupla ou outro registro
+  const updates = await Promise.all(
+    plano.atualizar.map((u) =>
+      supabase
+        .from("encaminhamentos")
+        .update({ descricao: u.descricao, responsavel: u.responsavel, prazo: u.prazo })
+        .eq("id", u.id)
+        .eq("dupla_id", dupla_id)
+        .eq("registro_id", registro.id)
+    )
+  );
+  if (updates.some((r) => r.error)) reconcileFalhou = true;
   // delete só com a lista completa da edição (combinados_completos) — o
   // form novo sobre registro que já existe (aba desatualizada) só insere
   if (formData.get("combinados_completos") === "1" && plano.remover.length) {
@@ -3548,7 +3557,7 @@ export async function salvarRegistro(formData: FormData) {
       .in("id", plano.remover)
       .eq("dupla_id", dupla_id)
       .eq("registro_id", registro.id);
-    if (delErr) return { error: erroAmigavel(delErr) };
+    if (delErr) reconcileFalhou = true;
   }
   if (plano.inserir.length) {
     const { error: encErr } = await supabase
@@ -3560,7 +3569,10 @@ export async function salvarRegistro(formData: FormData) {
         created_by: eu.id,
         ...t,
       })));
-    if (encErr) return { error: erroAmigavel(encErr) };
+    if (encErr) reconcileFalhou = true;
+  }
+  if (reconcileFalhou) {
+    avisos.push("O registro foi salvo, mas nem todos os combinados entraram.");
   }
 
   // combinados de encontros anteriores marcados como feitos neste registro —
@@ -3570,7 +3582,6 @@ export async function salvarRegistro(formData: FormData) {
     ...new Set(formData.getAll("concluir_encaminhamento").map(String).filter(Boolean)),
   ];
   let concluidos = 0;
-  let aviso: string | undefined;
   if (concluirIds.length) {
     const { data: feitos, error: concErr } = await supabase
       .from("encaminhamentos")
@@ -3578,19 +3589,26 @@ export async function salvarRegistro(formData: FormData) {
       .in("id", concluirIds)
       .eq("dupla_id", dupla_id)
       .select("id");
+    // as falhas acumulam no toast: reconciliação e conclusão são blocos
+    // independentes e cada um falhou de um jeito — relatar só o primeiro
+    // esconderia o outro
     if (concErr) {
-      aviso = "Não foi possível marcar os combinados anteriores como feitos. Marque na lista de combinados.";
+      avisos.push("Não foi possível marcar os combinados anteriores como feitos.");
     } else {
       concluidos = feitos?.length ?? 0;
       if (concluidos < concluirIds.length) {
-        aviso = `Só ${concluidos} de ${concluirIds.length} combinados foram marcados como feitos. Confira a lista de combinados.`;
+        avisos.push(`Só ${concluidos} de ${concluirIds.length} combinados foram marcados como feitos.`);
       }
     }
   }
+  const aviso = avisos.length
+    ? `${avisos.join(" ")} Confira a lista de combinados.`
+    : undefined;
 
-  // o dia ganha snapshot na hora do evento, não só no tick — fire-and-
-  // forget: a RPC é idempotente (unique dupla_id+dia, reescrever é inócuo)
-  void snapshotDuplaHoje(dupla_id).catch(() => {});
+  // o dia ganha snapshot na hora do evento, não só no tick — after() pra
+  // a promessa não morrer no flush da resposta serverless; a RPC é
+  // idempotente (unique dupla_id+dia, reescrever é inócuo)
+  after(() => snapshotDuplaHoje(dupla_id).catch(() => {}));
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath("/agenda");
@@ -3639,9 +3657,16 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
   if (limpo.length > 10000) return { error: "Anotação muito longa (máx. 10.000 caracteres)." };
 
   if (!limpo) {
-    const { error } = await supabase
-      .from("encontro_notas").delete().eq("dupla_id", duplaId).eq("numero", numero);
+    // o .select("id") denuncia o delete que não removeu nada — row sumida
+    // na RLS (ou apagada por outra sessão) voltaria ok silencioso e a
+    // tela continuaria mostrando a nota como salva
+    const { data, error } = await supabase
+      .from("encontro_notas").delete().eq("dupla_id", duplaId).eq("numero", numero)
+      .select("id");
     if (error) return { error: erroAmigavel(error) };
+    if (!data?.length) {
+      return { error: "Não foi possível apagar. Recarregue a página e tente de novo." };
+    }
   } else {
     // update preserva created_by de quem anotou primeiro; insert marca o autor
     const { data: existente } = await supabase
@@ -3807,8 +3832,10 @@ export async function editarEncaminhamento(id: string, duplaId: string, formData
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  // o texto do acordo é da dupla — a coord só marca feito (toggleEncaminhamento)
-  if (eu.role === "coordenacao") {
+  // o texto do acordo é da dupla — a coord só marca feito (toggleEncaminhamento).
+  // allowlist de mentor como em criarCombinadoEncontro: blocklist por role
+  // deixaria passar jovem/supervisor até a RLS negar no banco
+  if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
     return { error: "O combinado é da dupla. A coordenação só pode marcar como feito." };
   }
   const { data: dupla } = await supabase
@@ -3846,7 +3873,8 @@ export async function excluirEncaminhamento(id: string, duplaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  if (eu.role === "coordenacao") {
+  // mesma allowlist do editar/criar — o combinado é da dupla
+  if (!temPapel(eu, "mentor_dpp") && !temPapel(eu, "mentor_especialista")) {
     return { error: "O combinado é da dupla. A coordenação só pode marcar como feito." };
   }
   const { data: dupla } = await supabase
@@ -3885,7 +3913,7 @@ export async function resolverApoio(registroId: string, duplaId: string) {
           : erroAmigavel(error),
     };
   }
-  void snapshotDuplaHoje(duplaId).catch(() => {});
+  after(() => snapshotDuplaHoje(duplaId).catch(() => {}));
   revalidatePath("/");
   revalidatePath("/duplas");
   revalidatePath("/registros");

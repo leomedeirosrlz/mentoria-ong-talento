@@ -1,4 +1,8 @@
-import { getDemoData, type DemoData } from "./data";
+import {
+  getDemoData,
+  supervisionaDuplaDemo,
+  type DemoData,
+} from "./data";
 import type { TermoSimulado } from "./shared";
 import { audienciasDe, veMaterial } from "../materiais";
 import { comparaNome, registroTardio, semanaBounds } from "../ciclo";
@@ -115,12 +119,16 @@ const temPapel = (data: DemoData, p: Profile, papel: AppRole) =>
   papeisDe(data, p).includes(papel);
 
 /** Escopo de vínculo do papel — o mesmo das policies duplas_select: coord
- *  tudo; supervisor as supervisionadas; mentor/especialista as mentoradas. */
+ *  tudo; supervisor as supervisionadas + as da turma do escopo dele (0125)
+ *  + as que ele mentora (mentor_id=me é ramo próprio da policy); demais
+ *  papéis as mentoradas. */
 function duplasDoPapel(data: DemoData, role: AppRole): Dupla[] {
   const eu = data.personas[role];
   if (role === "coordenacao") return data.duplas;
   if (role === "supervisor")
-    return data.duplas.filter((d) => d.supervisor?.id === eu.id);
+    return data.duplas.filter(
+      (d) => d.mentor?.id === eu.id || supervisionaDuplaDemo(data, eu.id, d)
+    );
   return data.duplas.filter((d) => d.mentor?.id === eu.id);
 }
 
@@ -141,7 +149,7 @@ function jovemProfileVisivel(
   return data.duplas.some(
     (d) =>
       d.mentorado?.id === ficha.id &&
-      (d.mentor?.id === eu.id || d.supervisor?.id === eu.id)
+      (d.mentor?.id === eu.id || supervisionaDuplaDemo(data, eu.id, d))
   );
 }
 
@@ -160,7 +168,7 @@ export function demoContatosMap(role: AppRole): Map<string, Contato> {
       // idem à view profiles_contato: só dupla ativa/pausada expõe o
       // contato do mentor — concluída/encerrada é capítulo fechado
       if (
-        d.supervisor?.id === eu.id &&
+        supervisionaDuplaDemo(data, eu.id, d) &&
         (d.status === "ativa" || d.status === "pausada") &&
         d.mentor
       ) {
@@ -446,14 +454,15 @@ export function demoDupla(role: AppRole, id: string): Dupla | null {
   return demoDuplas(role).find((d) => d.id === id) ?? null;
 }
 
-/** mentor_id = eu OR supervisor_id = eu — getMinhasDuplas não ramifica por
- *  papel, então pra coordenação devolve as duplas em que ela é parte (nenhuma
- *  no dataset típico — a home dela usa getDuplas). */
+/** mentor_id = eu OR supervisiona_dupla — a real não filtra em TS: a RLS
+ *  devolve as mentoradas + as supervisionadas + as da turma do escopo
+ *  (0125). Pra coordenação devolve as em que ela é parte (nenhuma no
+ *  dataset típico — a home dela usa getDuplas). */
 export function demoMinhasDuplas(role: AppRole): Dupla[] {
   const data = getDemoData();
   const eu = data.personas[role];
   const minhas = data.duplas.filter(
-    (d) => d.mentor?.id === eu.id || d.supervisor?.id === eu.id
+    (d) => d.mentor?.id === eu.id || supervisionaDuplaDemo(data, eu.id, d)
   );
   return comContatoDuplas(
     comAvaliacaoJovem(
@@ -1474,7 +1483,7 @@ export function demoTrilhasDosJovens(
       dpp != null &&
       dpp.trilha === "dpp" &&
       (dpp.mentor?.id === eu.id ||
-        dpp.supervisor?.id === eu.id ||
+        supervisionaDuplaDemo(data, eu.id, dpp) ||
         temPapel(data, eu, "coordenacao"));
     if (!autorizado || !dpp.mentorado?.id) return [id, []];
 
@@ -1926,7 +1935,7 @@ function presencaVisivel(data: DemoData, role: AppRole, p: Presenca): boolean {
   if (role !== "supervisor") return false;
   return data.duplas.some(
     (d) =>
-      d.supervisor?.id === eu.id &&
+      supervisionaDuplaDemo(data, eu.id, d) &&
       d.mentor?.id === p.profile_id &&
       (d.status === "ativa" || d.status === "pausada")
   );
