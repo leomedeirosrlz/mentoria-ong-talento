@@ -34,7 +34,7 @@ import {
   type LinkStatus,
 } from "@/lib/forms/schema";
 import type { LinkResolvido } from "@/lib/forms/queries";
-import { ehInstrumento } from "@/lib/forms/instrumentos";
+import { ehInstrumentoDeDupla } from "@/lib/forms/instrumentos";
 import { comparaNome, waLink } from "@/lib/ciclo";
 import type { AppRole } from "@/lib/types";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
@@ -347,7 +347,7 @@ export function FormularioLinks({
   // trilha de especialista sai sozinha no encerramento (0104) — nos dois
   // casos o link manual daqui é rejeitado pela action: esconder é melhor
   // que falhar
-  const instrumento = ehInstrumento(formularioSistema);
+  const instrumento = ehInstrumentoDeDupla(formularioSistema);
   const avaliacaoTrilha = formularioSistema === "avaliacao_especialista";
   const [pending, start] = useTransition();
   // opções do "Vincular a um jovem" nos links genéricos legados (REALIZA-16)

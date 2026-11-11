@@ -51,6 +51,7 @@ import { getFormularios, getInstrumentosDaDupla } from "@/lib/forms/queries";
 import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
 import { getPdmDaDupla, getPdmResumo } from "@/lib/queries-pdm";
 import { dadosResumoJornada, encerramentoDecidido } from "@/lib/encerramento";
+import { dadosRetrospectiva } from "@/lib/retrospectiva";
 import { getAnexosPorRegistros } from "@/lib/anexos";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -103,6 +104,7 @@ import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
 import { TrilhaFechamento } from "@/components/trilha-fechamento";
 import { EncerramentoDupla } from "@/components/encerramento-dupla";
 import { ResumoJornadaSection } from "@/components/resumo-jornada";
+import { RetrospectivaJornada } from "@/components/retrospectiva-jornada";
 import { DesfechoDuplaCard } from "@/components/desfecho-dupla";
 import {
   SolicitacaoNegociacao,
@@ -511,6 +513,20 @@ export default async function DuplaPage({
     resumoJornada.realizados > 0 ||
     encerramentoDecidido(encerramento) ||
     !!dupla.encerrada_em;
+
+  // REALIZA-359 — a retrospectiva derivada: destrava no 16º encontro
+  // realizado ou no fechamento da dupla. A ficha é superfície
+  // mentor/staff, então o recorte carrega as notas internas do registro
+  // e o checklist do mentor (a jovem recebe outro payload, pela RPC).
+  const retro = dadosRetrospectiva({
+    dupla,
+    passos,
+    eventos: eventosDaDupla,
+    fim: encerramento?.created_at ?? dupla.encerrada_em ?? null,
+    pdm: pdmResumo,
+    instrumentos,
+    comNotasInternas: true,
+  });
 
   // concluída pelo automático (0102) com o rito ainda pendente — o mentor
   // segue podendo mexer no registro do último encontro e nos anexos dele
@@ -1096,8 +1112,12 @@ export default async function DuplaPage({
                 realizadosCount={realizadosCount}
               />
             )}
-            {mostrarResumo && (
-              <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+            {retro?.desbloqueada ? (
+              <RetrospectivaJornada dados={retro} mostrarChecklist />
+            ) : (
+              mostrarResumo && (
+                <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+              )
             )}
             {souCoord && desfechoEntregas.length > 0 && (
               <DesfechoDuplaCard entregas={desfechoEntregas} />
@@ -1210,9 +1230,14 @@ export default async function DuplaPage({
             realizadosCount={realizadosCount}
           />
         )}
-        {!fechamentoEmFoco && mostrarResumo && (
-          <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
-        )}
+        {!fechamentoEmFoco &&
+          (retro?.desbloqueada ? (
+            <RetrospectivaJornada dados={retro} mostrarChecklist />
+          ) : (
+            mostrarResumo && (
+              <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+            )
+          ))}
         {souCoord && desfechoEntregas.length > 0 && (
           <DesfechoDuplaCard entregas={desfechoEntregas} />
         )}
@@ -1230,6 +1255,8 @@ export default async function DuplaPage({
           itens={instrumentos}
           mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
           mentoradoWhatsapp={dupla.mentorado.whatsapp}
+          mentorNome={dupla.mentor.nome_social ?? dupla.mentor.nome}
+          mentorWhatsapp={dupla.mentor.whatsapp}
           podeEnviar={souCoord || souMentor}
           jornadaViva={
             dupla.status === "ativa" || dupla.status === "pausada"

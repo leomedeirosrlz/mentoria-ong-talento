@@ -121,7 +121,9 @@ export type DuplaParaResumo = {
 export function dadosResumoJornada(
   dupla: DuplaParaResumo,
   passos: PassoGuia[],
-  eventos: CicloEvento[],
+  // só tipo+data entram na régua de "esperados" — o payload do jovem_jornada
+  // (EventoJornada) serve direto, sem fingir a row inteira de ciclo_eventos
+  eventos: Pick<CicloEvento, "tipo" | "data">[],
   fim: string | null,
   hoje = new Date(),
   pdm: PdmResumo | null = null

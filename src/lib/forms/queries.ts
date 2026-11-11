@@ -14,7 +14,7 @@ import type {
   FormularioLink,
   FormularioResposta,
   FormularioSistema,
-  InstrumentoSistema,
+  InstrumentoDuplaSistema,
   RespostaValor,
 } from "./schema";
 
@@ -314,7 +314,7 @@ export type InstrumentoEntrega = {
 
 /** Um instrumento oficial no contexto da dupla — definição + entregas. */
 export type InstrumentoDupla = {
-  sistema: InstrumentoSistema;
+  sistema: InstrumentoDuplaSistema;
   formulario_id: string;
   titulo: string;
   descricao: string | null;

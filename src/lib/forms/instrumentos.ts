@@ -7,19 +7,32 @@
 //     formam o grupo de uma meta; submetas_N é o desdobramento do PDM.
 
 import {
+  INSTRUMENTOS_DUPLA_SISTEMA,
   INSTRUMENTOS_SISTEMA,
   type FormularioCampo,
   type FormularioSistema,
+  type InstrumentoDuplaSistema,
   type InstrumentoSistema,
 } from "./schema";
 
 /** O sistema é um dos 4 instrumentos de jornada (0080) com experiência
  *  sob medida no /f/<token> — 360/avaliação da trilha, intakes e forms
- *  criados pela coordenação seguem no renderer genérico. */
+ *  criados pela coordenação seguem no renderer genérico. O checklist do
+ *  mentor (0190) fica fora: o preenchimento é o renderer genérico mesmo
+ *  (10 selects + 1 texto livre) — a diferença dele é só no resultado. */
 export function ehInstrumento(
   s: FormularioSistema | null | undefined
 ): s is InstrumentoSistema {
   return !!s && (INSTRUMENTOS_SISTEMA as readonly string[]).includes(s);
+}
+
+/** Os 5 instrumentos emitidos pela ficha da dupla (0080 + 0190) — a via é
+ *  sempre emitir_link_instrumento (carrega dupla_id/momento/destinatário),
+ *  nunca o link genérico; e os 5 têm resultado estruturado na leitura. */
+export function ehInstrumentoDeDupla(
+  s: FormularioSistema | null | undefined
+): s is InstrumentoDuplaSistema {
+  return !!s && (INSTRUMENTOS_DUPLA_SISTEMA as readonly string[]).includes(s);
 }
 
 // ---------- agrupamento por seções ----------

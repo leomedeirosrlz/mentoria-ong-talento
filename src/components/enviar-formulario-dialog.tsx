@@ -40,7 +40,7 @@ import {
 } from "@/components/ui/select";
 import { normaliza } from "@/lib/utils";
 import { SISTEMA_LABEL, type FormularioSistema } from "@/lib/forms/schema";
-import { ehInstrumento } from "@/lib/forms/instrumentos";
+import { ehInstrumentoDeDupla } from "@/lib/forms/instrumentos";
 
 export type FormularioOpcao = {
   id: string;
@@ -103,7 +103,9 @@ export function EnviarFormularioDialog({
   const selecionaveis = useMemo(
     () =>
       formularios.filter(
-        (f) => !ehInstrumento(f.sistema) && f.sistema !== "avaliacao_especialista"
+        (f) =>
+          !ehInstrumentoDeDupla(f.sistema) &&
+          f.sistema !== "avaliacao_especialista"
       ),
     [formularios]
   );

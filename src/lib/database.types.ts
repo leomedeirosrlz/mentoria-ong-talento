@@ -6063,7 +6063,7 @@ export type Database = {
         Returns: Json
       }
       emitir_link_instrumento: {
-        Args: { p_dupla_id: string; p_sistema: string }
+        Args: { p_dupla_id: string; p_momento?: string; p_sistema: string }
         Returns: Json
       }
       encerramento_checklist_ok: { Args: { c: Json }; Returns: boolean }
