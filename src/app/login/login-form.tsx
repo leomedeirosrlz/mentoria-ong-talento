@@ -562,6 +562,11 @@ export function LoginForm() {
                 <span className="font-medium text-foreground">{email}</span>. Se
                 não chegar em alguns minutos, confira o spam.
               </p>
+              {/* reenvio invalida o anterior — evita o clique no e-mail
+                  velho que cai no card de link inválido */}
+              <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
+                Pediu mais de uma vez? Só o link mais recente funciona.
+              </p>
               <p className="mt-3 flex items-center gap-2 text-xs text-muted-foreground">
                 <CircleNotch size={13} className="animate-spin shrink-0" aria-hidden="true" />
                 Esta página entra sozinha quando você abrir o link.
@@ -729,9 +734,9 @@ export function LoginForm() {
                       role="status"
                       className="rounded-lg border border-border px-3 py-2.5 text-center text-xs leading-relaxed text-muted-foreground"
                     >
-                      Link de redefinição enviado pra{" "}
-                      <span className="font-medium text-foreground">{email}</span>.
-                      Abra o e-mail pra criar a nova senha.
+                      Se esse e-mail estiver cadastrado, o link de
+                      redefinição chega em alguns minutos. Não chegou? Entre
+                      pelo link de e-mail, que não precisa de senha.
                     </p>
                   ) : (
                     <div className="space-y-1">
