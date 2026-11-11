@@ -1145,12 +1145,11 @@ export default async function DuplaPage({
                 realizadosCount={realizadosCount}
               />
             )}
-            {retro?.desbloqueada ? (
+            {mostrarResumo && (
+              <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+            )}
+            {retro?.desbloqueada && (
               <RetrospectivaJornada dados={retro} mostrarChecklist />
-            ) : (
-              mostrarResumo && (
-                <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
-              )
             )}
             {souCoord && desfechoEntregas.length > 0 && (
               <DesfechoDuplaCard entregas={desfechoEntregas} />
@@ -1264,14 +1263,16 @@ export default async function DuplaPage({
             realizadosCount={realizadosCount}
           />
         )}
-        {!fechamentoEmFoco &&
-          (retro?.desbloqueada ? (
-            <RetrospectivaJornada dados={retro} mostrarChecklist />
-          ) : (
-            mostrarResumo && (
+        {!fechamentoEmFoco && (
+          <>
+            {mostrarResumo && (
               <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
-            )
-          ))}
+            )}
+            {retro?.desbloqueada && (
+              <RetrospectivaJornada dados={retro} mostrarChecklist />
+            )}
+          </>
+        )}
         {souCoord && desfechoEntregas.length > 0 && (
           <DesfechoDuplaCard entregas={desfechoEntregas} />
         )}
