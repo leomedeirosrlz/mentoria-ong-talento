@@ -1597,7 +1597,10 @@ export const IA_TOOLS = {
           .describe("obrigatório quando é remarcação — por que a data mudou"),
       })
       .strict(),
-    roles: ["mentor_dpp", "mentor_especialista"],
+    // coord stays in the allowlist on purpose: the domain guard in
+    // agendarEncontroCore must answer "Quem agenda é a dupla" instead of
+    // the generic role denial — the refusal is the teaching moment
+    roles: ["mentor_dpp", "mentor_especialista", "coordenacao"],
     escreve: true,
     resumo: (a: { numero: number; data_hora: string }) =>
       `Agendar o ${a.numero}º encontro da dupla em ${a.data_hora}`,
