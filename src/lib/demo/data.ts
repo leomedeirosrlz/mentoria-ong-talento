@@ -137,6 +137,9 @@ export type DemoData = {
   /** turma_inscricoes (0111 · REALIZA-167) — quem é da turma sem estar em
    *  dupla; alimenta a linha "Sem dupla" do relatório no modo demo. */
   turmaInscricoes: TurmaInscricao[];
+  /** profiles_acesso (0192 · REALIZA-39) — último acesso por profile_id;
+   *  só quem tem user_id tem linha (idem a view real). */
+  acessoMap: Record<string, string | null>;
 };
 
 // ---------- ids ----------
@@ -1359,6 +1362,20 @@ function build(): DemoData {
     escopo_supervisao: "turma",
     primario: false,
   });
+
+  // ---------- profiles_acesso (0192 · REALIZA-39) ----------
+  // Último acesso por profile com conta — o "não acessou" do /pessoas lê
+  // daqui. A Luiza completou o onboarding do ciclo novo e sumiu (acesso de
+  // 75d, fora da janela); a Camila nunca voltou desde que entrou (null);
+  // todo o resto acessou essa semana. Quem nem conta tem (Renata) fica
+  // fora do mapa — sem linha, sem badge inventado.
+  const acessoMap: Record<string, string | null> = Object.fromEntries(
+    profiles
+      .filter((p) => p.user_id)
+      .map((p) => [p.id, p.onboarded_em ? haDias(3) : haDias(15)])
+  );
+  acessoMap[luiza.id] = haDias(75);
+  acessoMap[camila.id] = null;
 
   const mentorProfiles: MentorProfile[] = [
     // Ricardo sem termo_ok: persona mentor_dpp entra na demo com o banner
@@ -3764,6 +3781,75 @@ function build(): DemoData {
       respondido_por_profile_id: null, // Caio não tem login — veio pelo token
       created_at: depoisDe(encD2[3].realizado_em!, 6),
     },
+    // série completa do fim de ciclo (REALIZA-71): os 16 encontros da
+    // d-fim avaliados pela Isabela — o 360º dela e da Luiza abrem com a
+    // trajetória inteira (estrelas subindo junto com a série do mentor;
+    // o pedido de apoio do enc 5 já foi resolvido na época — hoje é só
+    // histórico e exercita a régua de nunca vazar pro mentor)
+    ...[
+      [3, "mais_ou_menos", "um_pouco", ["pdm", "estudos"], false, false],
+      [3, "mais_ou_menos", "um_pouco", ["pdm"], false, false],
+      [4, "bem", "sim", ["estudos", "familia"], false, false],
+      [3, "mais_ou_menos", "um_pouco", ["bem_estar"], false, false],
+      [2, "desconfortavel", "nao", ["familia"], true, false],
+      [4, "bem", "sim", ["bem_estar", "estudos"], false, false],
+      [4, "bem", "sim", ["carreira"], false, true],
+      [4, "bem", "sim", ["pdm", "carreira"], false, false],
+      [4, "muito_bem", "sim", ["estudos"], false, false],
+      [5, "muito_bem", "sim", ["carreira", "estudos"], false, false],
+      [4, "bem", "sim", ["pdm"], false, false],
+      [4, "muito_bem", "sim", ["carreira"], false, true],
+      [5, "muito_bem", "sim", ["estudos", "carreira"], false, false],
+      [5, "muito_bem", "sim", ["carreira"], false, false],
+      [5, "muito_bem", "sim", ["pdm", "carreira"], false, false],
+      [5, "muito_bem", "sim", ["carreira"], false, false],
+    ].map(([estrelas, sentimento, avancei, temas, apoio, visivel], i) => ({
+      id: uid(0x4407 + i), dupla_id: duplaFim.id,
+      encontro_id: encD5[i].id,
+      estrelas: estrelas as number,
+      sentimento: sentimento as string,
+      avancei: avancei as AvaliacaoEncontro["avancei"],
+      temas: temas as string[],
+      comentario:
+        i === 4
+          ? "Semana ruim em casa, não consegui focar. A Luiza ajudou a reorganizar e a coordenação entrou em contato depois."
+          : i === 15
+            ? "Fecho do ciclo — saio com o plano pronto e muita saudade dessas terças."
+            : null,
+      pedir_apoio: Boolean(apoio),
+      avaliacao_visivel_mentor: Boolean(visivel),
+      // a Isabela nunca teve login — as respostas dela vieram pelo token
+      respondido_por_profile_id: null,
+      created_at: depoisDe(encD5[i].realizado_em!, 3 + (i % 4)),
+    })),
+    // three on d-rito: the minimum batch that releases the quantized media,
+    // so Ricardo's pending 360 link there opens the mentor card with
+    // Gustavo's aggregate visible
+    {
+      id: uid(0x4417), dupla_id: duplaRito.id, encontro_id: encRito[0].id,
+      estrelas: 4, sentimento: "bem", avancei: "sim",
+      temas: ["pdm", "carreira"], comentario: null,
+      pedir_apoio: false, avaliacao_visivel_mentor: false,
+      respondido_por_profile_id: null,
+      created_at: depoisDe(encRito[0].realizado_em!, 4),
+    },
+    {
+      id: uid(0x4418), dupla_id: duplaRito.id, encontro_id: encRito[1].id,
+      estrelas: 3, sentimento: "mais_ou_menos", avancei: "um_pouco",
+      temas: ["estudos"], comentario: null,
+      pedir_apoio: false, avaliacao_visivel_mentor: false,
+      respondido_por_profile_id: null,
+      created_at: depoisDe(encRito[1].realizado_em!, 2),
+    },
+    {
+      id: uid(0x4419), dupla_id: duplaRito.id, encontro_id: encRito[2].id,
+      estrelas: 4, sentimento: "bem", avancei: "sim",
+      temas: ["carreira", "dinheiro"], comentario:
+        "O papo sobre o curso de elétrica destravou — agora é correr atrás da inscrição.",
+      pedir_apoio: false, avaliacao_visivel_mentor: true,
+      respondido_por_profile_id: null,
+      created_at: depoisDe(encRito[2].realizado_em!, 5),
+    },
   ];
 
   // O trigger real minta um link por encontro realizado — a demo replica:
@@ -3975,6 +4061,7 @@ function build(): DemoData {
     avaliacoes,
     avaliacaoLinks,
     turmaInscricoes,
+    acessoMap,
     chamados,
     chamadoAtualizacoes,
     chamadoComentarios,

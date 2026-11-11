@@ -35,6 +35,8 @@ import {
   validaRespostas,
 } from "@/lib/forms/resposta";
 import { ehInstrumento } from "@/lib/forms/instrumentos";
+import type { ContextoAvaliacao } from "@/lib/forms/queries";
+import { ContextoAvaliacaoCard } from "@/components/contexto-avaliacao";
 import { GridDisponibilidade } from "@/components/forms/grid-disponibilidade";
 import { fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
@@ -78,6 +80,9 @@ export function FormularioPublico(props: {
   destinatario: string | null;
   /** 0042 — instrumento oficial ganha selo discreto (vem da RPC) */
   sistema?: FormularioSistema | null;
+  /** 0191 — trajetória read-only da dupla do link (só avaliacao_final_*);
+   *  os instrumentos da jornada já trazem o contexto deles, ignoram */
+  contextoAvaliacao?: ContextoAvaliacao | null;
   /** prévia na ficha da coordenação — campos vivos, envio desligado */
   preview?: boolean;
 }) {
@@ -98,6 +103,7 @@ function FormularioGenerico({
   campos,
   destinatario,
   sistema,
+  contextoAvaliacao,
   preview = false,
 }: {
   token: string;
@@ -106,6 +112,7 @@ function FormularioGenerico({
   campos: FormularioCampo[];
   destinatario: string | null;
   sistema?: FormularioSistema | null;
+  contextoAvaliacao?: ContextoAvaliacao | null;
   preview?: boolean;
 }) {
   const [enviado, setEnviado] = useState(false);
@@ -472,6 +479,13 @@ function FormularioGenerico({
               </p>
             </div>
           </div>
+
+          {/* trajetória da dupla no 360º (0191) — entre o cabeçalho e a
+              1ª pergunta, pra resposta nascer situada. Read-only: não é
+              campo, não coleta nada */}
+          {contextoAvaliacao && (
+            <ContextoAvaliacaoCard contexto={contextoAvaliacao} />
+          )}
 
           <form
             ref={formRef}

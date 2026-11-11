@@ -60,6 +60,8 @@ export const DEMO_TOKENS = {
   luizaAvaliacao360: "demo-tok-360-luiza-oficial1",
   isabelaAvaliacao360: "demo-tok-360-isabela-oficia",
   ricardoAvaliacao360: "demo-tok-360-ricardo-ofici",
+  anaAvaliacao360: "demo-tok-360-ana-00000001",
+  ricardoRitoAvaliacao360: "demo-tok-360-ricardo-rito1",
   // instrumentos da jornada (0080) — dupla Ricardo×Ana
   anaVisao: "demo-tok-visao-ana-00000001",
   anaMetas: "demo-tok-metas-ana-00000001",
@@ -610,6 +612,22 @@ export function getDemoFormularios(): DemoFormularios {
       dest_profile_id: porNome("Ricardo"), dest_mentorado_id: null,
       dupla_id: duplaDe("Ricardo", "Ana"), contexto: { origem: "ficha" },
       usado_em: haDias(3, "21:05"), expira_em: null, created_by: marina, created_at: haDias(6),
+    },
+    // pending 360 links are the only ones that render the trajectory card
+    // (REALIZA-71) in /f/<token>: Ana's side of d-ok is still open, and
+    // Ricardo's link on the still-open d-rito rite shows the mentor card
+    // with Gustavo's quantized media released (3-eval batch)
+    {
+      id: uid(0x4229), formulario_id: fAvaliacaoFinalMentorado.id, token: DEMO_TOKENS.anaAvaliacao360,
+      dest_profile_id: null, dest_mentorado_id: ment("Ana"),
+      dupla_id: duplaDe("Ricardo", "Ana"), contexto: { origem: "ficha" },
+      usado_em: null, expira_em: null, created_by: marina, created_at: haDias(6),
+    },
+    {
+      id: uid(0x4232), formulario_id: fAvaliacaoFinalMentor.id, token: DEMO_TOKENS.ricardoRitoAvaliacao360,
+      dest_profile_id: porNome("Ricardo"), dest_mentorado_id: null,
+      dupla_id: duplaDe("Ricardo", "Gustavo"), contexto: { origem: "ficha" },
+      usado_em: null, expira_em: null, created_by: marina, created_at: haDias(4),
     },
     // instrumentos da jornada (0080), dupla Ricardo×Ana — a história da
     // jornada: visão, metas e PDM respondidos; Roda da Vida ainda não

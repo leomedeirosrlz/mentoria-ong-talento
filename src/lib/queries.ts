@@ -37,14 +37,18 @@ import {
   demoNotificacoes,
   demoPessoalMap,
   demoPessoaPerfil,
+  demoPapeisEscopo,
+  demoMapaAcesso,
   demoPessoas,
   demoRegistros,
   demoRelatorioLinks,
   demoTurmaInscricoesAguardando,
+  demoTurmaInscricoesPessoas,
 } from "./demo/queries";
 import { getDemoData } from "./demo/data";
 import { demoPainelInstrumentosJornada } from "./demo/forms-data";
 import type { PainelJornadaLinha } from "./jornada";
+import type { InscricaoTurma, PapelEscopo } from "./pessoas-status";
 import type { InscricaoFilaTurma, RelatorioLinkItem } from "./relatorio";
 import {
   agregarTentativas,
@@ -72,8 +76,11 @@ export type { MentorProfile } from "./types";
  *  email/whatsapp/documento_path ficam de fora, assim como os sensíveis da
  *  0034 (data_nascimento/genero/pref_genero_par/motivacao): pedir qualquer
  *  um deles em profiles dá permission denied. */
+// `voluntario` (0142) só virou legível na 0192 — o grant por coluna é o
+// mesmo das vizinhas e o flag alimenta o status "termo pendente" do
+// /pessoas (e acorda os checks `=== false` que liam undefined)
 const PROFILE_COLS_PUBLICAS =
-  "id, user_id, nome, role, ativo, avatar_path, created_at, bio, linkedin, areas, voluntariado, onboarded_em, nome_social, cidade, uf, interesses, cargo, empresa, origem, consent_lgpd_em";
+  "id, user_id, nome, role, ativo, avatar_path, created_at, bio, linkedin, areas, voluntariado, voluntario, onboarded_em, nome_social, cidade, uf, interesses, cargo, empresa, origem, consent_lgpd_em";
 
 /** Versão com papéis efetivos embutidos (WP6b) — usada onde a lista decide
  *  por papel, não por role primário (fila, pools de dialog). A policy de
@@ -586,7 +593,7 @@ export const getDuplasResumo = cache(async (): Promise<DuplaResumo[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("duplas")
-    .select("id,mentor_id,mentorado_id,supervisor_id,trilha")
+    .select("id,mentor_id,mentorado_id,supervisor_id,trilha,turma,cronograma_id")
     // "está em dupla" = ocupa vaga — concluída e encerrada já liberaram
     .in("status", ["ativa", "pausada"]);
   if (error) throw error;
@@ -601,7 +608,7 @@ export const getDuplasResumoTodas = cache(async (): Promise<DuplaResumo[]> => {
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("duplas")
-    .select("id,mentor_id,mentorado_id,supervisor_id,trilha");
+    .select("id,mentor_id,mentorado_id,supervisor_id,trilha,turma,cronograma_id");
   if (error) throw error;
   return data ?? [];
 });
@@ -1487,6 +1494,88 @@ export const getTurmaInscricoesAguardando = cache(
         ];
       return [];
     });
+  }
+);
+
+// ---------- /pessoas por turma (REALIZA-39) ----------
+// Os três mapas que alimentam turmasDePessoa/statusDePessoa — a filiação
+// deriva de duplas.turma + turma_inscricoes + profile_papeis escopado; o
+// último acesso vem da view profiles_acesso (0192). Todos coord-only:
+// fora da coordenação a página é diretório e nem dispara.
+
+/** Todas as inscrições de turma (qualquer status — 'aguardando' marca o
+ *  papel "Aguardando par"; formada/desistiu seguem valendo como filiação).
+ *  Falha de leitura → [] com log, idem a vizinha de fila. */
+export const getTurmaInscricoesPessoas = cache(
+  async (): Promise<InscricaoTurma[]> => {
+    const demo = await demoRole();
+    if (demo) return demoTurmaInscricoesPessoas(demo);
+    const me = await getMe();
+    if (me?.role !== "coordenacao") return [];
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("turma_inscricoes")
+      .select("turma, profile_id, mentorado_id, papel_esperado, status");
+    if (error) {
+      console.error("getTurmaInscricoesPessoas:", error);
+      return [];
+    }
+    // status/papel_esperado são CHECK no banco — o tipo gerado é string
+    return (data ?? []) as InscricaoTurma[];
+  }
+);
+
+/** Grants escopados de profile_papeis (escopo_turma não-null) — staff que
+ *  pertence a uma turma sem passar por dupla (auxiliar/coord de turma). */
+export const getPapeisEscopo = cache(async (): Promise<PapelEscopo[]> => {
+  const demo = await demoRole();
+  if (demo) return demoPapeisEscopo(demo);
+  const me = await getMe();
+  if (me?.role !== "coordenacao") return [];
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("profile_papeis")
+    .select("profile_id, papel, escopo_turma")
+    .not("escopo_turma", "is", null);
+  if (error) {
+    console.error("getPapeisEscopo:", error);
+    return [];
+  }
+  return (data ?? []).flatMap((r) =>
+    r.escopo_turma
+      ? [
+          {
+            profile_id: r.profile_id,
+            papel: r.papel,
+            escopo_turma: r.escopo_turma,
+          },
+        ]
+      : []
+  );
+});
+
+/** Último acesso por profile (view profiles_acesso, 0192) — insumo do
+ *  status "não acessou". Sem a view a lista cai no vocabulário sem esse
+ *  badge — o erro fica no log em vez de fabricar sinal. */
+export const getMapaAcesso = cache(
+  async (): Promise<Record<string, string | null>> => {
+    const demo = await demoRole();
+    if (demo) return demoMapaAcesso(demo);
+    const me = await getMe();
+    if (me?.role !== "coordenacao") return {};
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("profiles_acesso")
+      .select("id, ultimo_acesso_em");
+    if (error) {
+      console.error("getMapaAcesso:", error);
+      return {};
+    }
+    return Object.fromEntries(
+      (data ?? [])
+        .filter((r): r is typeof r & { id: string } => r.id != null)
+        .map((r) => [r.id, r.ultimo_acesso_em])
+    );
   }
 );
 

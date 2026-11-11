@@ -51,6 +51,7 @@ import { getFormularios, getInstrumentosDaDupla } from "@/lib/forms/queries";
 import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
 import { getPdmDaDupla, getPdmResumo } from "@/lib/queries-pdm";
 import { dadosResumoJornada, encerramentoDecidido } from "@/lib/encerramento";
+import { resumoAvaliacaoJovem } from "@/lib/avaliacao-agregado";
 import { getAnexosPorRegistros } from "@/lib/anexos";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -495,6 +496,36 @@ export default async function DuplaPage({
     (souMentor || souCoord) &&
     (dupla.status === "ativa" || dupla.status === "pausada") &&
     !dupla.encerrada_em;
+  // young-person series cut per viewer (REALIZA-71): staff/own-jovem get
+  // the RLS-visible rows aggregated; the DPP mentor only the quantized
+  // media — the embed under his policy carries just the released rows,
+  // so aggregating it would leak a wrong subset mean
+  const avaliacaoJovemResumo = souMentor
+    ? mediaJovem && mediaJovem.n > 0
+      ? {
+          // base = how many evals the released media actually covers —
+          // "média de N" must not claim the total when only k entered
+          n: mediaJovem.liberado
+            ? (mediaJovem.base ?? mediaJovem.n)
+            : mediaJovem.n,
+          media: mediaJovem.liberado ? (mediaJovem.media ?? null) : null,
+          trajetoria: null,
+          temasTop: [],
+        }
+      : null
+    : resumoAvaliacaoJovem(
+        dupla.encontros.flatMap((e) =>
+          e.avaliacao_jovem
+            ? [
+                {
+                  numero: e.numero,
+                  estrelas: e.avaliacao_jovem.estrelas,
+                  temas: e.avaliacao_jovem.temas,
+                },
+              ]
+            : []
+        )
+      );
   // resumo da jornada — gerado dos dados; o "fim" é o carimbo do fechamento
   // (decisão DPP ou encerrada_em da trilha especialista)
   const resumoJornada = dadosResumoJornada(
@@ -503,7 +534,8 @@ export default async function DuplaPage({
     eventosDaDupla,
     encerramento?.created_at ?? dupla.encerrada_em ?? null,
     new Date(),
-    pdmResumo
+    pdmResumo,
+    avaliacaoJovemResumo
   );
   // bloco só vale a pena com história — dupla zerada mostra a trilha, não um
   // relatório vazio
@@ -1093,6 +1125,7 @@ export default async function DuplaPage({
                 souCoord={souCoord}
                 formularios={formulariosAtivos}
                 avaliacao360Em={avaliacao360Em}
+                avaliacaoJovem={avaliacaoJovemResumo}
                 realizadosCount={realizadosCount}
               />
             )}
@@ -1207,6 +1240,7 @@ export default async function DuplaPage({
             souCoord={souCoord}
             formularios={formulariosAtivos}
             avaliacao360Em={avaliacao360Em}
+            avaliacaoJovem={avaliacaoJovemResumo}
             realizadosCount={realizadosCount}
           />
         )}
