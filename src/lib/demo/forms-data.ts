@@ -19,7 +19,7 @@
  * contatos que o resto da demo.
  */
 
-import { getDemoData } from "./data";
+import { getDemoData, supervisionaDuplaDemo } from "./data";
 import type { AppRole, Dupla } from "../types";
 import type {
   Formulario,
@@ -1323,7 +1323,8 @@ export function demoPainelInstrumentosJornada(
         (d.status === "ativa" || d.status === "pausada")
     )
     .filter(
-      (d) => role === "coordenacao" || d.supervisor?.id === eu.id
+      (d) =>
+        role === "coordenacao" || supervisionaDuplaDemo(data, eu.id, d)
     )
     .map((d) => {
       const entregas: PainelJornadaLinha["entregas"] = {};
@@ -1400,7 +1401,7 @@ export function demoInstrumentosDaDupla(
   const podeVer =
     role === "coordenacao" ||
     dupla.mentor?.id === eu.id ||
-    dupla.supervisor?.id === eu.id ||
+    supervisionaDuplaDemo(data, eu.id, dupla) ||
     souMentorado;
   if (!podeVer) return [];
   return instrumentosDaDuplaRaw(dupla);

@@ -1,4 +1,4 @@
-import { getDemoData } from "./data";
+import { getDemoData, supervisionaDuplaDemo } from "./data";
 import type { AppRole, Encerramento } from "../types";
 
 // Dados do fechamento de ciclo no modo demo — arquivo próprio pra não tocar
@@ -19,8 +19,8 @@ const S_ACEITA1 = uid(0x2401); // Sofia × Bia — a solicitacao aceita da d-ok
 const haDias = (n: number) =>
   new Date(Date.now() - n * 24 * 3600 * 1000).toISOString();
 
-/** Escopo da policy encerramentos_select: coord tudo; mentor e supervisor da
- *  própria dupla. */
+/** Escopo da policy encerramentos_select: coord tudo; mentor e supervisor
+ *  da própria dupla (0125 — o grant de turma do auxiliar conta). */
 function noEscopo(role: AppRole, duplaId: string): boolean {
   const data = getDemoData();
   const dupla = data.duplas.find((d) => d.id === duplaId);
@@ -29,7 +29,7 @@ function noEscopo(role: AppRole, duplaId: string): boolean {
   return (
     role === "coordenacao" ||
     dupla.mentor?.id === eu.id ||
-    dupla.supervisor?.id === eu.id
+    supervisionaDuplaDemo(data, eu.id, dupla)
   );
 }
 

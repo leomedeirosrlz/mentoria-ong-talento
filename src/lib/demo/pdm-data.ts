@@ -1,7 +1,7 @@
 import type { AppRole } from "../types";
 import type { PdmDoc, PdmItem, PdmResumo } from "../pdm";
 import { resumoPdm } from "../pdm";
-import { getDemoData } from "./data";
+import { getDemoData, supervisionaDuplaDemo } from "./data";
 
 // ---------- PDM vivo da demo (REALIZA-181) ----------
 //
@@ -221,7 +221,7 @@ export function demoPdmDaDupla(role: AppRole, duplaId: string): PdmDoc | null {
   const podeVer =
     role === "coordenacao" ||
     dupla.mentor?.id === eu.id ||
-    dupla.supervisor?.id === eu.id ||
+    supervisionaDuplaDemo(data, eu.id, dupla) ||
     souMentorado;
   if (!podeVer) return null;
   return pdmPorDupla(duplaId);

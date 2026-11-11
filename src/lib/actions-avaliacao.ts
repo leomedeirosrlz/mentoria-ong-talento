@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { after } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
@@ -302,7 +303,7 @@ export async function resolverApoioJovem(avaliacaoId: string, duplaId: string) {
     };
   }
   revalidatePath("/");
-  void snapshotDuplaHoje(duplaId).catch(() => {});
+  after(() => snapshotDuplaHoje(duplaId).catch(() => {}));
   revalidatePath("/duplas");
   revalidatePath("/chamados");
   revalidatePath(`/duplas/${duplaId}`);

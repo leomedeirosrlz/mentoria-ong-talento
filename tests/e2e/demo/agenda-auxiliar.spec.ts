@@ -2,26 +2,28 @@ import { agirComConfirma, entrarNaDemo, expect, test } from "../helpers";
 
 // WP5 — a agenda do auxiliar executivo (role "supervisor") no dataset demo:
 // "Por turma" agrupa as supervisionadas pelo calendário delas (a coord
-// monitora tudo; o supervisor só as dele — duplas.supervisor_id é a aresta)
-// e "Consolidada" vira a agenda única da pessoa — encontros das duplas,
-// supervisões dela, eventos oficiais e sessões de especialista em modo
-// convidado ("só acompanhamento"). Ele supervisiona e registra supervisão —
-// nunca agenda por dupla.
+// monitora tudo; o supervisor só as dele — duplas.supervisor_id + o grant
+// de turma do profile_papeis são as arestas, 0125) e "Consolidada" vira a
+// agenda única da pessoa — encontros das duplas, supervisões dela, eventos
+// oficiais e sessões de especialista em modo convidado ("só acompanhamento").
+// Ele supervisiona e registra supervisão — nunca agenda por dupla.
 //
-// Dataset demo (src/lib/demo/data.ts) — o Paulo supervisiona 7 duplas:
+// Dataset demo (src/lib/demo/data.ts) — o Paulo enxerga 8 duplas: as 7 que
+// supervisiona direto + a d-t2a inteira pelo grant de turma T2 (0125):
 //   · d-ok (Bia · Ricardo) e d-pend (Caio · Carlos) na T1 — a do Caio é a
 //     única supervisionada sem row do vigente (enc. 5) → card com contexto
 //     de problema + warnbox "Sem encontro agendado (1)" + item "a agendar"
 //     na consolidada
-//   · d-t2b (Laura · Luiza) e d-t2c (Matheus · Ricardo) na T2
+//   · d-t2a (Kauã · André) — a da Beatriz, que entra pelo grant de turma —
+//     e as supervisionadas d-t2b (Laura · Luiza) e d-t2c (Matheus · Ricardo)
 //   · d-esp1 (Bia × Sofia) — trilha de especialista supervisionada: cai no
 //     grupo "Trilhas de especialista" (sem cronograma; o componente relata
 //     o tipo em vez de "Sem turma") e na consolidada entra como convidado
 //     âmbar
 //   · d-fim (concluída) e d-esp4 (concluída) — contam no resumo "Situação
 //     das duplas", não no "Por turma" (que só lista ativa/pausada)
-// A Beatriz supervisiona a d-risco/d-atraso/d-esp2/d-esp3 — nenhuma delas
-// pode aparecer na agenda do Paulo (checagem negativa de escopo).
+// A Beatriz supervisiona a d-risco/d-atraso/d-esp2/d-esp3 na T1 — nenhuma
+// delas pode aparecer na agenda do Paulo (checagem negativa de escopo).
 // Público, sem writes: Lembrar e o dialog de supervisão respondem o modo
 // demo sem gravar nada.
 
@@ -44,22 +46,22 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
     ).toBeVisible();
     // o cabeçalho abriu espaço pra semana; os números do escopo moram no
     // resumo "Situação das duplas" (o mesmo SaudePrograma de /duplas e da
-    // agenda da coordenação): 5 correndo (ok, pend, esp1, t2b, t2c) + 2
-    // concluídas (fim, esp4) — e o apoio lê como pill à parte, nunca como
-    // situação da dupla
+    // agenda da coordenação): 6 correndo (ok, pend, esp1, t2a+t2b+t2c — a
+    // t2a entra pelo grant de turma) + 2 concluídas (fim, esp4) — e o apoio
+    // lê como pill à parte, nunca como situação da dupla
     await expect(
       page.getByText(/Turma 1 e Turma 2 · semana \d+, \d+ a \d+ de \w+/)
     ).toBeVisible();
     const saude = page.locator('section[aria-label="Situação das duplas"]');
     await expect(saude).toBeVisible();
     await expect(
-      saude.getByText(/5 em andamento · 2 concluídas · 0 pausadas/)
+      saude.getByText(/6 em andamento · 2 concluídas · 0 pausadas/)
     ).toBeVisible();
     // a barra nomeia o split inteiro — risco/atenção/dia drifta com o
-    // relógio; o denominador (5) e o apoio do Caio (pedido do jovem) não
+    // relógio; o denominador (6) e o apoio do Caio (pedido do jovem) não
     await expect(saude.getByRole("img")).toHaveAttribute(
       "aria-label",
-      /5 em andamento: \d+ em risco, \d+ em atenção, \d+ em dia\. 0 pausadas, 2 concluídas, \d+ desistentes\. 1 com apoio aberto\./
+      /6 em andamento: \d+ em risco, \d+ em atenção, \d+ em dia\. 0 pausadas, 2 concluídas, \d+ desistentes\. 1 com apoio aberto\./
     );
     await expect(saude.getByText(/com apoio aberto/)).toBeVisible();
 
@@ -89,8 +91,9 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
     // saiu e a prova agora é a própria estrutura: 3 grupos (T1, T2 e
     // "Trilhas de especialista", o rótulo honesto do grupo sem cronograma)
 
-    // grupos por cronograma: T1 com Bia e Caio, T2 com Laura e Matheus, e
-    // o grupo sem cronograma da trilha esp supervisionada
+    // grupos por cronograma: T1 com Bia e Caio, T2 com Kauã (grant de
+    // turma), Laura e Matheus, e o grupo sem cronograma da trilha esp
+    // supervisionada
     const t1 = page.locator('section[aria-label="Duplas da Turma 1"]');
     const t2 = page.locator('section[aria-label="Duplas da Turma 2"]');
     await expect(t1).toBeVisible();
@@ -217,13 +220,14 @@ test.describe("agenda demo do supervisor — Por turma / Consolidada (WP5)", () 
       });
     }
 
-    // escopo: nenhuma dupla da Beatriz (nem jovem sem par) aparece — os 5
-    // cards são ok+pend na T1, t2b+t2c na T2 e a trilha esp1
+    // escopo: as duplas da Beatriz na T1 (e jovens sem par) não aparecem —
+    // os 6 cards são ok+pend na T1, t2a+t2b+t2c na T2 (o Kauã entra pelo
+    // grant de turma, supervisionada da Beatriz) e a trilha esp1
     const grupos = page.locator('section[aria-label^="Duplas da"]');
-    await expect(grupos.locator("article")).toHaveCount(5);
+    await expect(grupos.locator("article")).toHaveCount(6);
     await expect(
       grupos.locator("article", {
-        hasText: /Dandara|Eduardo Lima|Kauã|Pedro|Rafael|Wendel/,
+        hasText: /Dandara|Eduardo Lima|Pedro|Rafael|Wendel/,
       })
     ).toHaveCount(0);
 

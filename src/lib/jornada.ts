@@ -868,7 +868,10 @@ export function painelTurmaCtx(
   cronogramaId: string | null,
   agora: Date = new Date()
 ): PainelTurmaCtx {
-  const hoje = agora.toISOString().slice(0, 10);
+  // toDateStr dá o dia civil em America/Sao_Paulo — toISOString seria UTC
+  // (entre 21h e 23:59 BRT o "hoje" UTC já é amanhã e o painel libera a
+  // estação um dia antes).
+  const hoje = toDateStr(agora);
   const datas = new Map<number, string>();
   for (const e of eventos) {
     if (
