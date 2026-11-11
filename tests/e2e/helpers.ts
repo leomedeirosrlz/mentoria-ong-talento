@@ -429,7 +429,10 @@ export async function rpcViaServiceRole<T = unknown>(
   });
   if (!res.ok)
     throw new Error(`rpc ${fn} falhou: ${res.status} ${await res.text()}`);
-  return (await res.json()) as T;
+  // rpcs void (registrar/falhar_login_handoff) devolvem corpo vazio —
+  // res.json() estouraria em "Unexpected end of JSON input"
+  const texto = await res.text();
+  return (texto ? JSON.parse(texto) : null) as T;
 }
 
 /** Access token de um usuário de teste (grant password do GoTrue) — pra
@@ -458,6 +461,36 @@ export async function jwtDoUsuario(
   const body = (await res.json()) as { access_token?: string };
   if (!body.access_token) throw new Error(`login ${email} sem access_token`);
   return body.access_token;
+}
+
+/** Par access+refresh de um usuário de teste — mesma grant do jwtDoUsuario,
+ *  mas devolve os dois: o handoff e o /auth/link precisam do refresh real
+ *  (uso único, casado com o access) pro setSession do gesto e do resgate.
+ *  Mesmo hard-stop: spec app nunca fala com prod. */
+export async function tokensDoUsuario(
+  email: string,
+  senha: string
+): Promise<{ access_token: string; refresh_token: string }> {
+  if (supabaseUrl.includes(PROD_REF))
+    throw new Error("E2E_SUPABASE_URL aponta pra produção — login abortado");
+  const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
+  const res = await fetch(
+    `${supabaseUrl}/auth/v1/token?grant_type=password`,
+    {
+      method: "POST",
+      headers: { apikey: key, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: senha }),
+    }
+  );
+  if (!res.ok)
+    throw new Error(`login ${email} → ${res.status}: ${await res.text()}`);
+  const body = (await res.json()) as {
+    access_token?: string;
+    refresh_token?: string;
+  };
+  if (!body.access_token || !body.refresh_token)
+    throw new Error(`login ${email} sem par de tokens`);
+  return { access_token: body.access_token, refresh_token: body.refresh_token };
 }
 
 /** REST autenticado como o usuário do JWT — apikey service + Bearer dele:

@@ -121,14 +121,26 @@ export function DefinirSenhaForm() {
   }
 
   // pular: marca pra não cobrar de novo — a senha continua definível no
-  // perfil. No recovery o botão não existe (quem pediu reset não pula)
+  // perfil. No recovery o botão não existe (quem pediu reset não pula).
+  // Se a marca falhar NÃO entra: entrar sem gravar senha_dispensada faz a
+  // tela voltar no próximo login — um loop de onboarding que parecia bug
   async function pular() {
+    setLoading(true);
+    setErro(null);
     try {
-      await supabase.auth.updateUser({ data: { senha_dispensada: true } });
+      const { error } = await supabase.auth.updateUser({
+        data: { senha_dispensada: true },
+      });
+      if (error) {
+        setErro("Não foi possível salvar sua escolha. Tente de novo.");
+        return;
+      }
+      router.push(destino);
     } catch {
-      // marca falhou — entra mesmo assim; o pior caso é a tela voltar
+      setErro("Sem conexão. Tente de novo.");
+    } finally {
+      setLoading(false);
     }
-    router.push(destino);
   }
 
   return (
@@ -221,6 +233,7 @@ export function DefinirSenhaForm() {
                   variant="link"
                   size="sm"
                   className="w-full"
+                  disabled={loading}
                   onClick={() => void pular()}
                 >
                   Prefiro entrar só pelo link
