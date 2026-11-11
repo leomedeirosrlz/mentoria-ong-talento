@@ -23,32 +23,15 @@ import {
   limparPedido,
   type PedidoLogin,
 } from "@/lib/login-pedido";
+import {
+  ehErroInfraSignup,
+  INSTAVEL,
+  mensagemErro,
+  NAO_CADASTRADO,
+} from "@/lib/login-erros";
 
 // janela do resend do supabase — quando o 429 traz "after N seconds" usa o N real
 const COOLDOWN = 60;
-
-function mensagemErro(error: { message: string; code?: string }, modo: "link" | "senha"): string {
-  const texto = `${error.code ?? ""} ${error.message}`.toLowerCase();
-  if (texto.includes("invalid_credentials") || texto.includes("invalid login credentials")) {
-    return "E-mail ou senha incorretos. Confira e tente de novo.";
-  }
-  if (texto.includes("email_not_confirmed") || texto.includes("email not confirmed")) {
-    return "Confirme seu e-mail antes de entrar.";
-  }
-  // e-mail fora da allowlist: o trigger 0045 aborta o insert e o GoTrue
-  // devolve um 500 genérico; otp_disabled cobre signup desligado no painel
-  if (
-    texto.includes("otp_disabled") ||
-    texto.includes("signups not allowed") ||
-    texto.includes("database error saving new user") ||
-    texto.includes("cadastrados do programa")
-  ) {
-    return "E-mail não cadastrado. Fale com a coordenação pra liberar seu acesso.";
-  }
-  return modo === "link"
-    ? "Não foi possível enviar o link. Confira o e-mail ou tente de novo em alguns minutos."
-    : "Não foi possível entrar. Tente de novo em alguns minutos.";
-}
 
 export function LoginForm() {
   const params = useSearchParams();
@@ -377,10 +360,22 @@ export function LoginForm() {
         if (seg) {
           setEnviado(true);
           setCooldown(Number(seg[1]));
-        } else if (error.code === "over_email_send_rate_limit") {
-          setErro(
-            "Muita gente pediu link agora e o envio pausou. Tente de novo em alguns minutos — se persistir, fale com a coordenação."
-          );
+        } else if (
+          error.code === "over_email_send_rate_limit" ||
+          error.code === "over_request_rate_limit"
+        ) {
+          // limite de envios/pedidos do GoTrue: pausa temporária, não erro
+          // do e-mail — o cooldown segura o reenvio pra não martelar
+          setErro("Muitos pedidos de uma vez. Tente de novo em alguns minutos.");
+          setCooldown(COOLDOWN);
+        } else if (ehErroInfraSignup(error)) {
+          // 500 pelado do signup: allowlist-miss ou infra? A RPC anon
+          // confere a allowlist de verdade; se ela falhar assume instável —
+          // acusar "não cadastrado" numa pessoa cadastrada é o pior erro
+          const { data: liberado } = await supabase.rpc("email_liberado", {
+            p_email: email.trim().toLowerCase(),
+          });
+          setErro(liberado === false ? NAO_CADASTRADO : INSTAVEL);
         } else {
           setErro(mensagemErro(error, "link"));
         }

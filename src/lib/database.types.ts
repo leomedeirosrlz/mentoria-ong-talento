@@ -6002,6 +6002,7 @@ export type Database = {
       disponibilidade_ok: { Args: { d: Json }; Returns: boolean }
       eh_equipe: { Args: never; Returns: boolean }
       email_disponivel: { Args: { p_email: string }; Returns: boolean }
+      email_liberado: { Args: { p_email: string }; Returns: boolean }
       emitir_avaliacao_esp: {
         Args: { p_dupla: string; p_mentor: string }
         Returns: undefined
