@@ -29,9 +29,13 @@ export function JornadaRascunho({
         if (!raw) return false;
         const obj = JSON.parse(raw) as Record<string, unknown>;
         // resposta parcial de verdade: qualquer campo com valor preenchido
-        // (o form limpa a chave no submit — achar a chave já é quase tudo)
-        return Object.values(obj).some(
-          (v) =>
+        // (o form limpa a chave no submit — achar a chave já é quase tudo).
+        // "etapa" é a seção do wizard gravada junto (REALIZA-144) —
+        // metadado de navegação, não resposta: um rascunho que só tem ela
+        // não marca "Em andamento"
+        return Object.entries(obj).some(
+          ([k, v]) =>
+            k !== "etapa" &&
             v != null &&
             v !== "" &&
             v !== false &&
