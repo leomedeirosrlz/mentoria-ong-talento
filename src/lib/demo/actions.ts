@@ -5,6 +5,7 @@ import type { AppRole } from "@/lib/types";
 import { papelDemoValido } from "./shared";
 import {
   definirPapelDemo,
+  definirSemFichaDemo,
   demoRole,
   desmarcarOnboardingDemo,
   limparDemo,
@@ -50,6 +51,16 @@ export async function recomecarDemo() {
 export async function reverOnboardingDemo() {
   const papel = await demoRole();
   if (papel) await desmarcarOnboardingDemo(papel);
+  redirect("/");
+}
+
+/** Variante da persona jovem: conta órfã, sem ficha vinculada (REALIZA-372).
+ *  O papel é o mesmo mentorado — a flag demo_sem_ficha faz as leituras dela
+ *  voltarem vazias e segura o "já vi" do onboarding, então o wizard mostra o
+ *  estado "aguardando vínculo" até o visitante trocar de papel na DemoBar. */
+export async function verJovemSemVinculo() {
+  await definirPapelDemo("mentorado");
+  await definirSemFichaDemo();
   redirect("/");
 }
 

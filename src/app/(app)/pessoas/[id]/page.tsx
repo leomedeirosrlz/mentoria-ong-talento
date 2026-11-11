@@ -332,9 +332,12 @@ export default async function PessoaPerfilPage({
   const dispTxt = disponibilidadeTexto(mp?.disponibilidade);
   const dispMentoradoTxt = disponibilidadeTexto(ment?.disponibilidade);
   // documentos do intake (0054) — coord-only; pra outro papel a query
-  // nem dispara
+  // nem dispara. Na conta de um jovem o alvo é a ficha canônica: sem o
+  // apontador a seção ofereceria o pool de documentos de staff
+  const docTipo = ehMentorado || perfil.fichaJovem ? "mentorado" : "profile";
+  const docId = perfil.fichaJovem?.id ?? p.id;
   const documentos = souCoord
-    ? await getDocumentosPessoa(perfil.tipo, p.id)
+    ? await getDocumentosPessoa(docTipo, docId)
     : [];
   // dados civis + responsável (0046) — chegam null fora da coordenação
   // (view *_pessoal); renderizam fechados num Collapsible no fim do Cadastro
@@ -561,6 +564,18 @@ export default async function PessoaPerfilPage({
                       ? "Convite enviado, aguardando primeiro acesso"
                       : "Não convidado ainda"}
                   </Badge>
+                )}
+                {/* conta de jovem vinculada: esta página é a CONTA — dupla,
+                    encontros e documentos moram na ficha de mentorado
+                    (espelho do "conta na plataforma" do outro lado) */}
+                {perfil.fichaJovem && (
+                  <Link
+                    href={`/pessoas/${perfil.fichaJovem.id}`}
+                    className="inline-flex items-center gap-1 text-xs text-muted-foreground underline-offset-4 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+                  >
+                    <UserSwitch size={13} aria-hidden />
+                    ficha de jovem
+                  </Link>
                 )}
               </>
             )}
@@ -1118,18 +1133,19 @@ export default async function PessoaPerfilPage({
                 <Collapsible.Panel className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden">
                   <div className="border-t border-border/60 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
                     {/* anexos do form de inscrição (0054) — RG, comprovante,
-                        currículo */}
+                        currículo. Na conta de jovem os alvos são a ficha
+                        canônica (docTipo/docId acima) */}
                     <DocumentosPessoa
-                      tipo={ehMentorado ? "mentorado" : "profile"}
-                      pessoaId={p.id}
+                      tipo={docTipo}
+                      pessoaId={docId}
                       documentos={documentos}
                     />
                     <div className="mt-4 border-t border-border pt-3">
                       <AssinaturasPessoa
-                        tipo={ehMentorado ? "mentorado" : "profile"}
-                        id={p.id}
-                        nome={p.nome}
-                        whatsapp={p.whatsapp}
+                        tipo={docTipo}
+                        id={docId}
+                        nome={perfil.fichaJovem?.nome ?? p.nome}
+                        whatsapp={perfil.fichaJovem?.whatsapp ?? p.whatsapp}
                       />
                     </div>
                   </div>

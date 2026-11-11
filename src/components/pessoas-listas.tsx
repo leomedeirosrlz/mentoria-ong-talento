@@ -1463,11 +1463,16 @@ function MentoradoRow({
                 : "termo pendente"}
           </Badge>
         )}
-        {/* convite de acesso (0180) — a conta do jovem nasce no envio;
-            "convite enviado" vale até o onboarding dela (embed `conta`) */}
-        {souCoord && !fora && m.email && !m.conta?.onboarded_em && (
+        {/* convite/vínculo de acesso (0180) — a conta do jovem nasce no
+            envio; depois do onboarding o profile_id segue sendo a verdade
+            do vínculo e o badge vira "conta vinculada" */}
+        {souCoord && !fora && (m.email || m.profile_id) && (
           <Badge variant="outline" className="text-xs shrink-0">
-            {m.profile_id ? "convite enviado" : "não convidado"}
+            {m.profile_id
+              ? m.conta?.onboarded_em
+                ? "conta vinculada"
+                : "convite enviado"
+              : "não convidado"}
           </Badge>
         )}
         {/* Detalhes + ⋮ no mesmo cluster — quebram juntos pra linha 2, sem

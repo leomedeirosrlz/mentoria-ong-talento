@@ -865,7 +865,7 @@ export async function createDupla(formData: FormData) {
   if (error) return { error: erroAmigavel(error) };
   // avisa o mentor — o pareamento é a notícia que muda a rotina dele
   const { data: md } = await supabase
-    .from("mentorados").select("nome").eq("id", mentorado_id).single();
+    .from("mentorados").select("nome, profile_id").eq("id", mentorado_id).single();
   const hrefDupla = novaDupla?.id ? `/duplas/${novaDupla.id}` : "/duplas";
   await notificar(supabase, [
     {
@@ -881,6 +881,15 @@ export async function createDupla(formData: FormData) {
       titulo: "Nova dupla sob sua supervisão",
       corpo: md?.nome ? `${md.nome}: acompanhe a ficha da dupla.` : null,
       href: hrefDupla,
+    },
+    // jovem com conta recebe o marco no sino dele — a home dele mostra a
+    // dupla e os contatos da equipe (href /jovem, não a ficha de staff)
+    {
+      profile_id: md?.profile_id,
+      tipo: "dupla_formada",
+      titulo: "Sua dupla foi formada",
+      corpo: "A mentoria começou. Combine o 1º encontro com seu mentor.",
+      href: "/jovem",
     },
   ], eu.id);
   revalidatePath("/duplas");
@@ -1933,7 +1942,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   }
   const { data: mentor } = await supabase
     .from("profiles")
-    .select("role, profile_papeis(papel)")
+    .select("role, nome, nome_social, profile_papeis(papel)")
     .eq("id", mentor_id)
     .single();
   const papeisMentor = new Set<AppRole>(
@@ -2216,8 +2225,11 @@ export async function updateDupla(duplaId: string, formData: FormData) {
     (status === "pausada" || status === "encerrada" || status === "concluida");
   if (atualDupla && (trocouPessoas || mudouStatus)) {
     const { data: mdTroca } = await supabase
-      .from("mentorados").select("nome").eq("id", mentorado_id).single();
+      .from("mentorados").select("nome, profile_id").eq("id", mentorado_id).single();
     const nomeMd = mdTroca?.nome;
+    // jovem com conta recebe o marco no sino dele — paridade com a equipe
+    const jovemProfileId = mdTroca?.profile_id ?? null;
+    const nomeMentorNovo = primeiroNomeDe(mentor?.nome_social ?? mentor?.nome);
     await notificar(supabase, [
       mentor_id !== atualDupla.mentor_id ? {
         profile_id: mentor_id,
@@ -2252,6 +2264,22 @@ export async function updateDupla(duplaId: string, formData: FormData) {
           : "A coordenação reorganizou as duplas.",
         href: "/",
       } : null,
+      mentor_id !== atualDupla.mentor_id ? {
+        profile_id: jovemProfileId,
+        tipo: "dupla_formada",
+        titulo: "Seu mentor mudou",
+        corpo: nomeMentorNovo
+          ? `Agora a mentoria é com ${nomeMentorNovo}. A coordenação reorganizou as duplas.`
+          : "A coordenação reorganizou as duplas.",
+        href: "/jovem",
+      } : null,
+      atualDupla.supervisor_id && supervisorFinal !== atualDupla.supervisor_id ? {
+        profile_id: jovemProfileId,
+        tipo: "dupla_formada",
+        titulo: "Seu supervisor mudou",
+        corpo: "A coordenação reorganizou as duplas. A equipe nova aparece na sua página.",
+        href: "/jovem",
+      } : null,
       mudouStatus ? {
         profile_id: mentor_id,
         tipo: "dupla_formada",
@@ -2263,6 +2291,18 @@ export async function updateDupla(duplaId: string, formData: FormData) {
               : "Sua dupla foi encerrada",
         corpo: "A coordenação atualizou a sua dupla. Fale com ela se tiver dúvidas.",
         href: `/duplas/${duplaId}`,
+      } : null,
+      mudouStatus ? {
+        profile_id: jovemProfileId,
+        tipo: "dupla_formada",
+        titulo:
+          status === "pausada"
+            ? "Sua dupla foi pausada"
+            : status === "concluida"
+              ? "Sua dupla concluiu a jornada"
+              : "Sua dupla foi encerrada",
+        corpo: "A coordenação atualizou a sua dupla. Fale com ela se tiver dúvidas.",
+        href: "/jovem",
       } : null,
       mudouStatus && supervisorFinal ? {
         profile_id: supervisorFinal,
@@ -2418,7 +2458,7 @@ export async function remanejarDupla(
     .select(
       `id, mentor_id, mentorado_id, supervisor_id, status, trilha,
        mentor:profiles!duplas_mentor_id_fkey(nome),
-       mentorado:mentorados!duplas_mentorado_id_fkey(nome)`
+       mentorado:mentorados!duplas_mentorado_id_fkey(nome, profile_id)`
     )
     .eq("id", duplaId)
     .maybeSingle();
@@ -2483,24 +2523,28 @@ export async function remanejarDupla(
     };
   }
 
-  // notícias do remanejo. O mentorado não tem login — o sino só alcança
-  // profiles: mentor que entra, mentor que fica, mentor que sai e o
-  // supervisor. Este último CONTINUA na nova dupla, então recebe um aviso
-  // só — não o par "encerrada + formada" que a leitura literal do
-  // updateDupla mandaria.
+  // notícias do remanejo. Com a conta vinculada o jovem também tem sino:
+  // mentor que entra, mentor que fica, mentor que sai, supervisor e os
+  // profiles do(s) jovem(ns) tocados. Este último CONTINUA na nova dupla,
+  // então recebe um aviso só — não o par "encerrada + formada" que a
+  // leitura literal do updateDupla mandaria.
   const norm = <T,>(v: T | T[] | null | undefined): T | null =>
     Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
   const nomeMentor = norm(atual.mentor)?.nome ?? null;
-  const nomeMd = norm(atual.mentorado)?.nome ?? null;
+  const mdAtual = norm(atual.mentorado);
+  const nomeMd = mdAtual?.nome ?? null;
+  const jovemAtualProfileId = mdAtual?.profile_id ?? null;
   let nomeNovo: string | null = null;
+  let jovemNovoProfileId: string | null = null;
   if (lado === "mentor") {
     const { data: p } = await supabase
       .from("profiles").select("nome").eq("id", novoId).single();
     nomeNovo = p?.nome ?? null;
   } else {
     const { data: m } = await supabase
-      .from("mentorados").select("nome").eq("id", novoId).single();
+      .from("mentorados").select("nome, profile_id").eq("id", novoId).single();
     nomeNovo = m?.nome ?? null;
+    jovemNovoProfileId = m?.profile_id ?? null;
   }
   await notificar(
     supabase,
@@ -2550,6 +2594,36 @@ export async function remanejarDupla(
             href: `/duplas/${novaDuplaId}`,
           }
         : null,
+      // o jovem da troca também tem sino: troca de mentor avisa quem fica;
+      // troca de mentorado fecha a jornada de quem sai e abre a de quem entra
+      lado === "mentor"
+        ? {
+            profile_id: jovemAtualProfileId,
+            tipo: "dupla_formada",
+            titulo: "Seu mentor mudou",
+            corpo: nomeNovo
+              ? `Agora a mentoria é com ${nomeNovo}. A coordenação reorganizou as duplas.`
+              : "A coordenação reorganizou as duplas.",
+            href: "/jovem",
+          }
+        : {
+            profile_id: jovemNovoProfileId,
+            tipo: "dupla_formada",
+            titulo: "Sua dupla foi formada",
+            corpo: nomeMentor
+              ? `Agora a mentoria é com ${nomeMentor}.`
+              : "A mentoria começou. Combine o 1º encontro com seu mentor.",
+            href: "/jovem",
+          },
+      lado === "mentorado"
+        ? {
+            profile_id: jovemAtualProfileId,
+            tipo: "dupla_formada",
+            titulo: "Sua dupla foi encerrada",
+            corpo: "A coordenação reorganizou as duplas. Fale com ela se tiver dúvidas.",
+            href: "/jovem",
+          }
+        : null,
     ].filter((r): r is NonNullable<typeof r> => r !== null),
     eu.id
   );
@@ -2594,6 +2668,13 @@ export async function importPessoas(rows: LinhaImportada[]) {
   // devolve todas as linhas pra coordenação, que é quem chega até aqui
   const { data: existentes } = await supabase.from("profiles_contato").select("email");
   const noBanco = new Set((existentes ?? []).map((p) => p.email.toLowerCase()));
+  // email de ficha de jovem também bloqueia a linha — um profile staff com o
+  // email do jovem ocupa a identidade e o vínculo mentorados.profile_id do
+  // login real não fecha mais (0177)
+  const { data: fichasJovens } = await supabase.from("mentorados").select("email");
+  const emailsJovem = new Set(
+    (fichasJovens ?? []).map((m) => normEmail(m.email ?? "")).filter(Boolean)
+  );
   const vistos = new Set<string>();
   const validas: Record<string, unknown>[] = [];
   // email → ficha de mentor (experiência/formação) — a correlação com o id
@@ -2632,6 +2713,9 @@ export async function importPessoas(rows: LinhaImportada[]) {
     const disp = eMentor ? parseDisponibilidade(String(r.disponibilidade ?? "")) : null;
     if (disp && "error" in disp) { puladas.push(`${nome}: ${disp.error}`); continue; }
     if (noBanco.has(email) || vistos.has(email)) { puladas.push(`${email}: já existe`); continue; }
+    if (emailsJovem.has(email)) {
+      puladas.push(`${nome}: e-mail já é de uma ficha de jovem`); continue;
+    }
     vistos.add(email);
     validas.push({ nome, email, whatsapp, role, ...ficha });
     if (exp || form || disp) {
@@ -2789,7 +2873,7 @@ async function diretorioPareamento(supabase: Supa): Promise<DiretorioPar> {
     // (WP6b) e resolverPares decide por papel efetivo, não pelo primário
     supabase.from("profiles").select("id, nome, role, ativo, nome_social, profile_papeis(papel)"),
     supabase.from("profiles_contato").select("id, email"),
-    supabase.from("mentorados").select("id, nome, email, nome_social"),
+    supabase.from("mentorados").select("id, nome, email, nome_social, profile_id"),
     supabase
       .from("duplas")
       .select("mentor_id, mentorado_id, trilha, status, turma, created_at"),
@@ -2855,6 +2939,7 @@ function diretorioPareamentoDemo(): DiretorioPar {
       nome: m.nome,
       email: m.email,
       nome_social: m.nome_social ?? null,
+      profile_id: m.profile_id ?? null,
     })),
     duplas: d.duplas.map((x) => ({
       mentor_id: x.mentor.id,
@@ -2989,6 +3074,15 @@ export async function importDuplas(linhas: LinhaPar[]) {
             titulo: "Nova dupla sob sua supervisão",
             corpo: `${p.mentorado.nome} × ${p.mentor.nome}: acompanhe a ficha da dupla.`,
             href: `/duplas/${c.id}`,
+          },
+          // jovem com conta recebe o marco no sino dele — mesmo aviso do
+          // cadastro manual (createDupla)
+          {
+            profile_id: p.mentorado.profile_id,
+            tipo: "dupla_formada",
+            titulo: "Sua dupla foi formada",
+            corpo: "A mentoria começou. Combine o 1º encontro com seu mentor.",
+            href: "/jovem",
           },
         ];
       }),
@@ -4507,6 +4601,17 @@ export async function registrarDocumentoPessoa(
   }
   if (!DOCUMENTO_PATH_RE.test(path)) {
     return { error: "Revise os campos: um dos valores não é válido." };
+  }
+  // conta de jovem não recebe anexo de staff — a ficha canônica é o alvo
+  if (tipo === "profile") {
+    const { data: ficha } = await supabase
+      .from("mentorados")
+      .select("id")
+      .eq("profile_id", pessoaId)
+      .maybeSingle();
+    if (ficha) {
+      return { error: "Essa conta pertence a um jovem do programa. Use a ficha dele." };
+    }
   }
   const { data, error } = await supabase
     .from("documentos_pessoa")

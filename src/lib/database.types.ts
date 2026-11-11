@@ -414,6 +414,13 @@ export type Database = {
             foreignKeyName: "chamado_anexos_chamado_id_fkey"
             columns: ["chamado_id"]
             isOneToOne: false
+            referencedRelation: "chamados_contexto"
+            referencedColumns: ["chamado_id"]
+          },
+          {
+            foreignKeyName: "chamado_anexos_chamado_id_fkey"
+            columns: ["chamado_id"]
+            isOneToOne: false
             referencedRelation: "chamados_fila"
             referencedColumns: ["id"]
           },
@@ -512,6 +519,13 @@ export type Database = {
             foreignKeyName: "chamado_atualizacoes_chamado_id_fkey"
             columns: ["chamado_id"]
             isOneToOne: false
+            referencedRelation: "chamados_contexto"
+            referencedColumns: ["chamado_id"]
+          },
+          {
+            foreignKeyName: "chamado_atualizacoes_chamado_id_fkey"
+            columns: ["chamado_id"]
+            isOneToOne: false
             referencedRelation: "chamados_fila"
             referencedColumns: ["id"]
           },
@@ -574,6 +588,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "chamados"
             referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chamado_comentarios_chamado_id_fkey"
+            columns: ["chamado_id"]
+            isOneToOne: false
+            referencedRelation: "chamados_contexto"
+            referencedColumns: ["chamado_id"]
           },
           {
             foreignKeyName: "chamado_comentarios_chamado_id_fkey"
@@ -5122,6 +5143,14 @@ export type Database = {
       }
     }
     Views: {
+      chamados_contexto: {
+        Row: {
+          atribuido_nome: string | null
+          chamado_id: string | null
+          mentorado_nome: string | null
+        }
+        Relationships: []
+      }
       chamados_fila: {
         Row: {
           assunto: string | null

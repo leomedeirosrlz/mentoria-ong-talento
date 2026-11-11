@@ -9,7 +9,7 @@ import {
   demoChamadosSemDono,
   demoEquipeChamados,
 } from "./demo/queries";
-import { anexarMentorado, comparaNome } from "./ciclo";
+import { comparaNome } from "./ciclo";
 import type {
   ChamadoAnexo,
   ChamadoFilaItem,
@@ -93,48 +93,31 @@ export const getChamados = cache(
       return { papel: me.role, itens: [] };
     }
     // o autor vê o nome do responsável ("Responsável: Marina" no mock) e o
-    // mentorado da dupla vinculada — duas leituras em lote, sem N+1
-    const atribIds = [...new Set(
-      (data ?? []).map((c) => c.atribuido_a).filter(Boolean) as string[]
-    )];
-    const duplaIds = [...new Set(
-      (data ?? []).map((c) => c.dupla_id).filter(Boolean) as string[]
-    )];
-    const nomes = new Map<string, string>();
-    const mentoradoPorDupla = new Map<string, string | null>();
-    if (atribIds.length || duplaIds.length) {
-      const [psRes, dsRes] = await Promise.all([
-        atribIds.length
-          ? supabase
-              .from("profiles")
-              .select("id, nome, nome_social")
-              .in("id", atribIds)
-          : Promise.resolve({ data: [] }),
-        duplaIds.length
-          ? supabase
-              .from("duplas")
-              .select("id, mentorado:mentorados!duplas_mentorado_id_fkey(nome, nome_social)")
-              .in("id", duplaIds)
-          : Promise.resolve({ data: [] }),
-      ]);
-      for (const p of psRes.data ?? [])
-        nomes.set(p.id, p.nome_social || p.nome);
-      for (const d of dsRes.data ?? [])
-        mentoradoPorDupla.set(d.id, nomeMentoradoEmbed(d.mentorado));
-    }
-    const itens = anexarMentorado(
-      (data ?? []).map((c) => ({
+    // mentorado da dupla vinculada — a view definer projeta os dois nomes
+    // sob o escopo do autor; ler profiles/duplas direto devolvia vazio pra
+    // jovem porque a RLS dessas tabelas não alcança a equipe nem a ficha
+    const ids = (data ?? []).map((c) => c.id);
+    const { data: ctx } = ids.length
+      ? await supabase
+          .from("chamados_contexto")
+          .select("chamado_id, atribuido_nome, mentorado_nome")
+          .in("chamado_id", ids)
+      : { data: [] };
+    const ctxPorId = new Map(
+      (ctx ?? []).map((x) => [x.chamado_id, x])
+    );
+    const itens = (data ?? []).map((c) => {
+      const x = ctxPorId.get(c.id);
+      return {
         ...c,
         restrito: false,
         autor_nome: null,
         autor_papel: null,
-        atribuido_nome: c.atribuido_a
-          ? (nomes.get(c.atribuido_a) ?? null)
-          : null,
+        atribuido_nome: c.atribuido_a ? (x?.atribuido_nome ?? null) : null,
         contexto: null,
-      })),
-      mentoradoPorDupla
-    ) as ChamadoFilaItem[];
+        mentorado_nome: c.dupla_id ? (x?.mentorado_nome ?? null) : null,
+      };
+    }) as ChamadoFilaItem[];
     return { papel: me.role, itens };
   }
 );
@@ -422,33 +405,22 @@ async function leChamadoAvulso(
     const [item] = await enriqueceItens(supabase, [linha], mascaradoSupervisor);
     return item ?? null;
   }
-  // o autor vê o nome do responsável e o mentorado da dupla vinculada
-  const [prRes, dRes] = await Promise.all([
-    linha.atribuido_a
-      ? supabase
-          .from("profiles")
-          .select("nome, nome_social")
-          .eq("id", linha.atribuido_a)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-    linha.dupla_id
-      ? supabase
-          .from("duplas")
-          .select("id, mentorado:mentorados!duplas_mentorado_id_fkey(nome, nome_social)")
-          .eq("id", linha.dupla_id)
-          .maybeSingle()
-      : Promise.resolve({ data: null }),
-  ]);
+  // o autor vê o nome do responsável e o mentorado da dupla vinculada —
+  // mesma view definer da fila (0187): RLS de profiles/duplas nega a
+  // leitura direta pro jovem
+  const { data: ctx } = await supabase
+    .from("chamados_contexto")
+    .select("atribuido_nome, mentorado_nome")
+    .eq("chamado_id", id)
+    .maybeSingle();
   return {
     ...(linha as unknown as ChamadoFilaItem),
     restrito: false,
     autor_nome: null,
     autor_papel: null,
-    atribuido_nome: prRes.data
-      ? prRes.data.nome_social || prRes.data.nome
-      : null,
+    atribuido_nome: linha.atribuido_a ? (ctx?.atribuido_nome ?? null) : null,
     contexto: null,
-    mentorado_nome: nomeMentoradoEmbed(dRes.data?.mentorado),
+    mentorado_nome: linha.dupla_id ? (ctx?.mentorado_nome ?? null) : null,
   };
 }
 

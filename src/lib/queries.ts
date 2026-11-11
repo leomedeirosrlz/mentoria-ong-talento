@@ -703,11 +703,26 @@ export type PessoaPerfil =
   | { tipo: "profile"; pessoa: Profile; mentorProfile: MentorProfile | null }
   | { tipo: "mentorado"; pessoa: Mentorado };
 
+/** Ficha de jovem alcançável quando o id é de uma CONTA de jovem (profile
+ *  role='mentorado' vinculado por mentorados.profile_id) — a página mostra
+ *  o atalho pra ficha canônica. RLS-scoped como o resto do perfil: volta
+ *  null pra quem não lê a linha do mentorado. */
+export type FichaJovemPerfil = {
+  id: string;
+  nome: string;
+  nome_social: string | null;
+  whatsapp: string | null;
+} | null;
+
 /** Perfil público interno (/pessoas/[id]) — resolve profile OU mentorado pelo
  *  id, traz as duplas da pessoa e o mural de notas. O RLS já limita: mentor
  *  que consulta mentorado fora da própria dupla recebe null → notFound. */
 export const getPessoaPerfil = cache(async (id: string): Promise<
-  (PessoaPerfil & { duplas: DuplaPerfil[]; notas: PessoaNota[] }) | null
+  (PessoaPerfil & {
+    duplas: DuplaPerfil[];
+    notas: PessoaNota[];
+    fichaJovem: FichaJovemPerfil;
+  }) | null
 > => {
   // modo demo: fora do escopo do papel -> null -> a page dá notFound() igual
   const demo = await demoRole();
@@ -724,10 +739,13 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   // seria sempre eu mesmo, então não vale o join
   const NOTA_SELECT = `id, profile_id, mentorado_id, texto, created_by, created_at`;
 
-  const [{ data: p }, { data: m }, contatos, pessoalProf, pessoalMent, curriculo] =
+  const [{ data: p }, { data: m }, { data: ficha }, contatos, pessoalProf, pessoalMent, curriculo] =
     await Promise.all([
       supabase.from("profiles").select(PROFILE_COLS_COM_PAPEIS).eq("id", id).maybeSingle(),
       supabase.from("mentorados").select(MENTORADO_COLS_PUBLICAS).eq("id", id).maybeSingle(),
+      // conta de jovem → ficha canônica (o id aqui é de profile; pra ficha
+      // direta o lookup acima já resolve e este volta null)
+      supabase.from("mentorados").select("id, nome, nome_social, whatsapp").eq("profile_id", id).maybeSingle(),
       getContatos(),
       getPessoalMap("profiles_pessoal"),
       getPessoalMap("mentorados_pessoal"),
@@ -766,6 +784,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
         ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail)
       ),
       notas: (notas as unknown as PessoaNota[]) ?? [],
+      fichaJovem: ficha as FichaJovemPerfil,
     };
   }
   if (m) {
@@ -785,6 +804,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
         ((duplas as unknown as DuplaPerfil[]) ?? []).map(comEmail)
       ),
       notas: (notas as unknown as PessoaNota[]) ?? [],
+      fichaJovem: null,
     };
   }
   return null;

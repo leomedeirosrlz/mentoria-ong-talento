@@ -3,6 +3,7 @@ import type { AppRole } from "@/lib/types";
 import {
   DEMO_ROLE_COOKIE,
   DEMO_ROLES,
+  DEMO_SEM_FICHA_COOKIE,
   DEMO_TERMO_COOKIE,
   demoObCookie,
   papelDemoValido,
@@ -41,11 +42,29 @@ export async function demoAtivo(): Promise<boolean> {
  *  wizard de cada uma na primeira vez. */
 export async function demoOnboarded(papel: AppRole): Promise<boolean> {
   const store = await cookies();
+  // a conta órfã não "conclui" onboarding — o wizard dela é o estado de
+  // espera pelo vínculo, então a flag anula o "já vi" enquanto estiver ativa
+  if (papel === "mentorado" && store.get(DEMO_SEM_FICHA_COOKIE)?.value === "1") {
+    return false;
+  }
   return store.get(demoObCookie(papel))?.value === "1";
 }
 
+/** Variante "conta sem ficha" da persona jovem — lê o DEMO_SEM_FICHA_COOKIE
+ *  (shared.ts). As queries dela devolvem ficha/assinaturas vazias. */
+export async function demoSemFicha(): Promise<boolean> {
+  return (await cookies()).get(DEMO_SEM_FICHA_COOKIE)?.value === "1";
+}
+
+export async function definirSemFichaDemo() {
+  (await cookies()).set(DEMO_SEM_FICHA_COOKIE, "1", await cookieOpts());
+}
+
 export async function definirPapelDemo(papel: AppRole) {
-  (await cookies()).set(DEMO_ROLE_COOKIE, papel, await cookieOpts());
+  const store = await cookies();
+  store.set(DEMO_ROLE_COOKIE, papel, await cookieOpts());
+  // trocar de papel sai da variante órfã — ela só volta pelo atalho da DemoBar
+  store.delete(DEMO_SEM_FICHA_COOKIE);
 }
 
 export async function marcarOnboardingDemo(papel: AppRole) {
@@ -122,5 +141,6 @@ export async function limparDemo() {
   store.delete(DEMO_ROLE_COOKIE);
   store.delete(DEMO_LIDAS_COOKIE);
   store.delete(DEMO_TERMO_COOKIE);
+  store.delete(DEMO_SEM_FICHA_COOKIE);
   await resetarOnboardingDemo();
 }

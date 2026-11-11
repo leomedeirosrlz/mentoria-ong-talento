@@ -129,6 +129,9 @@ export type PessoaRef = {
   role?: AppRole | null;
   papeis?: AppRole[];
   ativo?: boolean;
+  /** mentorados só: conta de jovem vinculada — o sino dela recebe o
+   *  pareamento junto com o do mentor (importDuplas) */
+  profile_id?: string | null;
 };
 
 /** Dupla como o diretório precisa — o status decide se ocupa vaga.
