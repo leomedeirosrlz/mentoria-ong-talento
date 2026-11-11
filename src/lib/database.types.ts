@@ -6049,15 +6049,27 @@ export type Database = {
         }
         Returns: Json
       }
-      emitir_instrumento_core: {
-        Args: {
-          p_created_by: string
-          p_dupla_id: string
-          p_origem?: string
-          p_sistema: string
-        }
-        Returns: Json
-      }
+      emitir_instrumento_core:
+        | {
+            Args: {
+              p_created_by: string
+              p_dupla_id: string
+              p_origem?: string
+              p_sistema: string
+            }
+            Returns: Json
+          }
+        | {
+            Args: {
+              p_created_by: string
+              p_destino: string
+              p_dupla_id: string
+              p_momento: string
+              p_origem: string
+              p_sistema: string
+            }
+            Returns: Json
+          }
       emitir_instrumento_lote: {
         Args: { p_dupla_ids: string[]; p_sistema: string }
         Returns: Json
