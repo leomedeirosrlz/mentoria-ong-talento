@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { erroAmigavel } from "./utils";
+import { papelLabel } from "./ciclo";
 import {
   normalizaEvento,
   totaisCronograma,
@@ -127,6 +128,71 @@ async function renumerar(
 
 const STATUS_CRONOGRAMA = ["rascunho", "ativo", "encerrado"] as const;
 
+/** Rename de turma que órfã o label velho faz o trigger
+ *  `cronograma_turma_propaga` (0127/0179) migrar os snapshots por label —
+ *  inclusive `profile_papeis.escopo_turma`. Quem já tem o MESMO papel no
+ *  label novo colidiria no unique (profile_id, papel, escopo_turma): o
+ *  banco segura com dedup (a linha fica com o label velho pra revisão),
+ *  mas o merge silencioso não é o que a coordenação espera — devolve a
+ *  mensagem que nomeia o conflito, ou null quando o caminho está livre. */
+async function colisaoPapeisNoRename(
+  supabase: Supa,
+  cronogramaId: string,
+  turmaVelha: string,
+  turmaNova: string
+): Promise<{ error: string } | null> {
+  // label velho segue vivo em outro cronograma → o trigger não migra
+  // snapshots por label → sem risco de colisão no unique de papéis
+  const { data: outros, error: cErr } = await supabase
+    .from("cronogramas")
+    .select("id")
+    .eq("turma", turmaVelha)
+    .neq("id", cronogramaId)
+    .limit(1);
+  if (cErr) return { error: erroAmigavel(cErr) };
+  if (outros?.length) return null;
+
+  const { data: papeis, error: pErr } = await supabase
+    .from("profile_papeis")
+    .select("profile_id, papel, escopo_turma")
+    .in("escopo_turma", [turmaVelha, turmaNova]);
+  if (pErr) return { error: erroAmigavel(pErr) };
+
+  // o unique garante no máx. uma linha por (profile_id, papel) em cada
+  // label — o par presente nos DOIS é o conflito que o rename uniu
+  const vistos = new Map<string, string | null>();
+  const conflitos: { profile_id: string; papel: string }[] = [];
+  for (const r of papeis ?? []) {
+    const chave = `${r.profile_id}|${r.papel}`;
+    const anterior = vistos.get(chave);
+    if (anterior !== undefined && anterior !== r.escopo_turma) {
+      conflitos.push({ profile_id: r.profile_id, papel: r.papel });
+    } else {
+      vistos.set(chave, r.escopo_turma);
+    }
+  }
+  if (!conflitos.length) return null;
+
+  const { data: pessoas } = await supabase
+    .from("profiles")
+    .select("id, nome")
+    .in(
+      "id",
+      [...new Set(conflitos.map((c) => c.profile_id))]
+    );
+  const nomeDe = new Map((pessoas ?? []).map((p) => [p.id, p.nome]));
+  const lista = conflitos.map(
+    (c) =>
+      `${nomeDe.get(c.profile_id) ?? "Alguém da equipe"} já é ${papelLabel(c.papel)}`
+  );
+  const plural = conflitos.length > 1;
+  return {
+    error:
+      `Renomear pra "${turmaNova}" duplicaria papéis: ${lista.join(", ")} nas duas turmas. ` +
+      `Ajuste ${plural ? "os papéis na ficha das pessoas" : "o papel na ficha da pessoa"} antes de unir os nomes.`,
+  };
+}
+
 /** Cria a turma/cronograma com os eventos já materializados — a lista sai do
  *  gerador revista/editável na prévia. Sem transação multi-row no PostgREST:
  *  se a inserção dos eventos falhar, a row do cronograma é removida pra não
@@ -221,6 +287,27 @@ export async function atualizarCronograma(
     patch.status = input.status;
   }
   if (!Object.keys(patch).length) return { ok: true };
+
+  // rename efetivo: a pré-checagem nomeia quem repete papel nos dois
+  // labels em vez de deixar o merge silencioso do trigger acontecer
+  if (patch.turma != null) {
+    const { data: atual, error: selErr } = await supabase
+      .from("cronogramas")
+      .select("turma")
+      .eq("id", id)
+      .maybeSingle();
+    if (selErr) return { error: erroAmigavel(selErr) };
+    if (!atual) return { error: "Cronograma não encontrado." };
+    if (atual.turma !== patch.turma) {
+      const colisao = await colisaoPapeisNoRename(
+        supabase,
+        id,
+        atual.turma,
+        patch.turma
+      );
+      if (colisao) return colisao;
+    }
+  }
 
   const { data, error: upErr } = await supabase
     .from("cronogramas")
