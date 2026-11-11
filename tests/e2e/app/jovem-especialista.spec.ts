@@ -551,9 +551,13 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
     await page.goto("/");
     await abrirMural(page);
     const card = mural(page).locator("li", { hasText: MOTIVO_MURAL });
-    await expect(card.getByText("Mentorada E2E")).toBeVisible();
+    await expect(
+      card.getByText("Mentorada E2E", { exact: true })
+    ).toBeVisible();
     await expect(card.getByText("pedido do jovem")).toBeVisible();
-    await expect(card.getByText(/Solicitado por Jovem E2E/)).toBeVisible();
+    await expect(
+      card.getByText(/Solicitado por Mentorada E2E/)
+    ).toBeVisible();
   });
 
   test("jovem aceita a contra-proposta — a sessão nasce na agenda", async ({

@@ -1021,7 +1021,7 @@ await vincularAuth(jovem3, JOVEM3_EMAIL);
 // boas-vindas; a convergência cobre a fixture manual do staging, que nasceu
 // sem o carimbo (e qualquer drift de papel/ativo).
 let [jovem] = await rest(
-  `profiles?select=id,user_id,role,ativo,onboarded_em&email=eq.${JOVEM_EMAIL}`
+  `profiles?select=id,user_id,role,ativo,onboarded_em,nome&email=eq.${JOVEM_EMAIL}`
 );
 if (!jovem) {
   [jovem] = await rest("profiles", {
@@ -1029,7 +1029,8 @@ if (!jovem) {
     body: JSON.stringify({
       id: IDS.jovemProfile,
       email: JOVEM_EMAIL,
-      nome: "Jovem E2E",
+      // 0173: the linked mentorado record is the canonical name source
+      nome: "Mentorada E2E",
       role: "mentorado",
       ativo: true,
       onboarded_em: new Date().toISOString(),
@@ -1041,6 +1042,7 @@ if (!jovem) {
   if (jovem.role !== "mentorado") fixes.role = "mentorado";
   if (!jovem.ativo) fixes.ativo = true;
   if (!jovem.onboarded_em) fixes.onboarded_em = new Date().toISOString();
+  if (jovem.nome !== "Mentorada E2E") fixes.nome = "Mentorada E2E";
   if (Object.keys(fixes).length) {
     await patch(`profiles?id=eq.${jovem.id}`, fixes);
     console.log(`profile jovem convergido (${Object.keys(fixes).join(", ")})`);
