@@ -6,6 +6,7 @@ import {
   numerosDaSemana,
   paraAcompanhar,
   resumosPorCronograma,
+  saudeDoRecorte,
   sinteseMonitoramento,
   type ItemParaAcompanhar,
 } from "@/lib/agenda-coordenacao";
@@ -364,18 +365,18 @@ describe("paraAcompanhar", () => {
     expect(itens).toHaveLength(1);
     expect(itens[0].motivos).toEqual(["sem_data"]);
     expect(itens[0].contexto).toBe(
-      "Encontro 8 da Turma 1 ainda sem data nesta semana (prazo: dom 11)"
+      "Encontro 8 da Turma 1 ainda sem agendamento nesta semana (prazo: dom 11)"
     );
     expect(itens[0].rotuloLembrete).toBe("Lembrar");
     expect(itens[0].saude.semaforo).toBe("atencao"); // preventivo aceso
   });
 
-  it("vigente futuro: 'sem data' nomeia o dia do encontro, não 'nesta semana'", () => {
+  it("vigente futuro: 'sem agendamento' nomeia o dia do encontro, não 'nesta semana'", () => {
     const dFutura = mkDupla({ id: "dF", turma: "T3", cronograma_id: "c3" });
     const itens = paraAcompanhar([dFutura], EVENTOS, {}, AGORA);
     expect(itens[0].motivos).toEqual(["sem_data"]);
     expect(itens[0].contexto).toBe(
-      "Encontro 1 da Turma 3 ainda sem data para 13/10 (prazo: dom 18)"
+      "Encontro 1 da Turma 3 ainda sem agendamento para 13/10 (prazo: dom 18)"
     );
   });
 
@@ -384,7 +385,7 @@ describe("paraAcompanhar", () => {
     expect(itens).toHaveLength(1);
     expect(itens[0].motivos).toEqual(["atraso", "sem_data"]);
     expect(itens[0].contexto).toBe(
-      "3 encontros atrasados (encontros 6 e 7 e 8 da Turma 1). Sem data para o 8"
+      "3 encontros atrasados (encontros 6 e 7 e 8 da Turma 1). Sem agendamento pro 8"
     );
     expect(itens[0].saude.semaforo).toBe("risco");
     expect(itens[0].rotuloLembrete).toBe("Lembrar");
@@ -714,7 +715,7 @@ describe("dimensoesDoItem + sinteseMonitoramento", () => {
     expect(d.operacional).toBeNull();
   });
 
-  it("limbo → 'agendamento vencido'; sem_data sozinho → 'sem data' muted", () => {
+  it("limbo → 'agendamento vencido'; sem_data sozinho → 'sem agendamento' muted", () => {
     const dLimbo = mkDupla({
       id: "dLimbo",
       mentorado: mkMentorado("Bela Ruas"),
@@ -795,20 +796,20 @@ describe("dimensoesDoItem + sinteseMonitoramento", () => {
     const [item] = paraAcompanhar([dAtrasada], EVENTOS, {}, AGORA_SEG);
     expect(item.contextoPartes).toEqual([
       "2 encontros atrasados (encontros 6 e 7 da Turma 1)",
-      "Sem data para o 8",
+      "Sem agendamento pro 8",
     ]);
     // o texto legado continua colando o lead com " — "
     expect(item.contexto).toBe(
-      "2 encontros atrasados (encontros 6 e 7 da Turma 1). Sem data para o 8"
+      "2 encontros atrasados (encontros 6 e 7 da Turma 1). Sem agendamento pro 8"
     );
     const [pend] = paraAcompanhar([dReg], EVENTOS, {}, AGORA_SEG);
     // a pendência é o motivo que pôs a dupla na fila — encabeça as partes
-    // (o "ainda sem data" vira contexto secundário, não a boa notícia)
+    // (o "ainda sem agendamento" vira contexto secundário, não a boa notícia)
     expect(pend.contextoPartes[0]).toBe("Registro do 6º encontro pendente");
-    expect(pend.contextoPartes[1]).toContain("ainda sem data");
+    expect(pend.contextoPartes[1]).toContain("ainda sem agendamento");
   });
 
-  it("síntese: counts da fila + 'sem data' reconciliado com os cards", () => {
+  it("síntese: counts da fila + 'sem agendamento' reconciliado com os cards", () => {
     const nudgeRecente: Interacao = {
       dupla_id: "dRP",
       tipo: "nudge",
@@ -1241,5 +1242,31 @@ describe("numerosDaSemana — opções do toggle por recorte", () => {
       AGORA.getTime()
     );
     expect(opcoes).toEqual([]); // só C1 tem eventos → 1 opção efetiva → sem toggle
+  });
+});
+
+// ============================================================
+describe("saudeDoRecorte — situação canônica por fatias", () => {
+  it("separa Encerrada formal de Desistente; emAndamento = risco + atenção + em dia", () => {
+    const duplas = [
+      mkDupla({ id: "dA" }), // ativa — cai em risco/atencao/emDia conforme o semáforo
+      mkDupla({ id: "dP", status: "pausada" }),
+      mkDupla({ id: "dC", status: "concluida" }),
+      mkDupla({ id: "dC2", status: "encerrada", desfecho: "concluida" }),
+      mkDupla({ id: "dDJ", status: "encerrada", desfecho: "desistencia_jovem" }),
+      mkDupla({ id: "dDM", status: "encerrada", desfecho: "desistencia_mentor" }),
+      mkDupla({ id: "dLeg", status: "encerrada" }), // legado sem desfecho
+      mkDupla({ id: "dR", status: "encerrada", desfecho: "remanejada" }),
+      mkDupla({ id: "dO", status: "encerrada", desfecho: "outro" }),
+    ];
+    const s = saudeDoRecorte(duplas, EVENTOS, AGORA_SEG);
+    expect(s.desistentes).toBe(3); // desistencia_* + legado
+    expect(s.encerradas).toBe(2); // remanejada + outro
+    expect(s.concluidas).toBe(2);
+    expect(s.pausadas).toBe(1);
+    expect(s.emAndamento).toBe(1);
+    expect(s.emAndamento).toBe(s.risco + s.atencao + s.emDia);
+    // o total reconcilia com o conjunto — nenhuma dupla some da conta
+    expect(s.total).toBe(duplas.length);
   });
 });

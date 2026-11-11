@@ -15,6 +15,7 @@
  *  demo (lib/demo/ia-ui.ts) e a nota de cards em prompts.ts. */
 
 import type { Semaforo } from "@/lib/ciclo";
+import type { DuplaDesfecho } from "@/lib/dupla-desfecho";
 import type {
   AppRole,
   AvaliacaoJovem,
@@ -37,6 +38,7 @@ export type UiDuplaMini = {
   mentorado: string | null;
   trilha: Trilha;
   status: DuplaStatus;
+  desfecho?: DuplaDesfecho | null;
   semaforo: Semaforo;
   motivo: string | null;
   apoio: boolean;
@@ -53,6 +55,9 @@ export type UiSaude = {
     em_dia: number;
     apoio: number;
     pausadas: number;
+    concluidas: number;
+    desistentes: number;
+    encerradas: number;
   };
   /** até 5 duplas que pedem ação (apoio → risco → atenção), na ordem da tool */
   destaques: UiDuplaMini[];
@@ -68,6 +73,7 @@ export type UiDupla = {
   supervisor: string | null;
   trilha: Trilha;
   status: DuplaStatus;
+  desfecho?: DuplaDesfecho | null;
   turma: string | null;
   /** ausente pro jovem — o semáforo é instrumento da equipe */
   semaforo?: Semaforo;
@@ -318,6 +324,9 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           em_dia: num(s.em_dia),
           apoio: num(s.apoio),
           pausadas: num(s.pausadas),
+          concluidas: num(s.concluidas),
+          desistentes: num(s.desistentes),
+          encerradas: num(s.encerradas),
         },
         pedem_acao: pedem.length,
         destaques: pedem.slice(0, 5).map((x) => ({
@@ -326,6 +335,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           mentorado: str(x.mentorado),
           trilha: x.trilha as Trilha,
           status: x.status as DuplaStatus,
+          desfecho: (str(x.desfecho) as DuplaDesfecho | null) ?? null,
           semaforo: x.semaforo as Semaforo,
           motivo: corta(str(x.motivo), 120),
           apoio: obj(x.apoio)?.aberto === true,
@@ -351,6 +361,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
         supervisor: str(d.supervisor),
         trilha: d.trilha as Trilha,
         status: d.status as DuplaStatus,
+        desfecho: (str(d.desfecho) as DuplaDesfecho | null) ?? null,
         turma: str(d.turma),
         ...(temSemaforo
           ? {
@@ -517,6 +528,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
         supervisor: str(d.supervisor),
         trilha: d.trilha as Trilha,
         status: d.status as DuplaStatus,
+        desfecho: (str(d.desfecho) as DuplaDesfecho | null) ?? null,
         turma: str(d.turma),
         feitos: encontros.filter((e) => e.status === "realizado").length,
         encontros,

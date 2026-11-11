@@ -17,6 +17,7 @@ import {
   type DuplaSaude,
 } from "@/lib/ciclo";
 import { paraAcompanhar, saudeDoRecorte } from "@/lib/agenda-coordenacao";
+import { situacaoDaDupla, SITUACAO_DUPLA_LABEL } from "@/lib/dupla-desfecho";
 import { painelTrilhasCoord, type AlertaPedido } from "@/lib/trilhas-coord";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import { lembreteDaDupla } from "@/components/agenda-partes";
@@ -665,7 +666,7 @@ function montarPrecisa({
       linha: {
         mentor: pessoaLinha(d.mentor),
         mentorado: pessoaLinha(d.mentorado),
-        situacao: situacaoDaDupla(d, saude),
+        situacao: situacaoLinha(d, saude),
         apoio: pedeApoio ? { detalhe: ORIGEM_APOIO[saude.apoio.origem ?? "mentor"] } : null,
         meta: meta || null,
         motivo: item ? item.contextoPartes.join(" · ") : saude.motivo,
@@ -708,10 +709,11 @@ function lembreteDoItem(
 
 type ItemFila = ReturnType<typeof paraAcompanhar>[number];
 
-function situacaoDaDupla(d: Dupla, saude: DuplaSaude): { rotulo: string; tom: TomSituacao } {
-  if (d.status === "concluida") return { rotulo: "Concluída", tom: "pausa" };
-  if (d.status === "encerrada") return { rotulo: "Desistente", tom: "pausa" };
-  if (d.status === "pausada") return { rotulo: "Pausada", tom: "pausa" };
+/** Linha da ficha-resumo: fechadas leem a situação canônica
+ *  (dupla-desfecho); as ativas leem o semáforo. */
+function situacaoLinha(d: Dupla, saude: DuplaSaude): { rotulo: string; tom: TomSituacao } {
+  if (d.status !== "ativa")
+    return { rotulo: SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)], tom: "pausa" };
   if (saude.semaforo === "risco") return { rotulo: "Em risco", tom: "risco" };
   if (saude.semaforo === "atencao") return { rotulo: "Atenção", tom: "atencao" };
   return { rotulo: "Em dia", tom: "neutro" };

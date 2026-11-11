@@ -57,6 +57,11 @@ import {
 } from "@/lib/ciclo";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
 import type { RecorteFatia } from "@/lib/agenda-coordenacao";
+import {
+  situacaoDaDupla,
+  SITUACAO_DUPLA_LABEL,
+  type DuplaDesfecho,
+} from "@/lib/dupla-desfecho";
 import type {
   AppRole,
   ChamadoStatus,
@@ -118,19 +123,26 @@ const plural = (n: number, um: string, varios: string) =>
 
 const primeiroNome = (n: string | null) => (n ?? "").split(" ")[0] || "dupla";
 
-/** Mesma régua do situacaoDaDupla da home: status fora da jornada manda;
- *  ativa lê a situação. Em dia é neutro, sem cor de status. Na voz do
- *  jovem a dupla encerrada lê "Encerrada" (neutro) — "desistente" é o
- *  vocabulário interno da equipe, nunca sobre ele mesmo. */
+/** Mesma régua do situacaoLinha da home: fechada lê a situação canônica
+ *  (dupla-desfecho), ativa lê o semáforo. Em dia é neutro, sem cor de
+ *  status. Na voz do jovem a dupla encerrada lê "Encerrada" (neutro) —
+ *  "desistente" é o vocabulário interno da equipe, nunca sobre ele mesmo. */
 function situacao(
-  status: DuplaStatus,
+  d: { status: DuplaStatus; desfecho?: DuplaDesfecho | null },
   semaforo?: Semaforo,
   jovem = false
 ): { rotulo: string; tom: TomSituacao } {
-  if (status === "concluida") return { rotulo: "Concluída", tom: "pausa" };
-  if (status === "encerrada")
-    return { rotulo: jovem ? "Encerrada" : "Desistente", tom: "pausa" };
-  if (status === "pausada") return { rotulo: "Pausada", tom: "pausa" };
+  if (d.status !== "ativa") {
+    // desfecho separa Desistente × Encerrada pra equipe; pro jovem a
+    // palavra neutra cobre qualquer fechamento cedo (pausada e
+    // concluída seguem lendo o próprio nome)
+    const sit = situacaoDaDupla(d);
+    const rotulo =
+      jovem && (sit === "desistente" || sit === "encerrada")
+        ? SITUACAO_DUPLA_LABEL.encerrada
+        : SITUACAO_DUPLA_LABEL[sit];
+    return { rotulo, tom: "pausa" };
+  }
   if (semaforo === "risco") return { rotulo: "Em risco", tom: "risco" };
   if (semaforo === "atencao") return { rotulo: "Atenção", tom: "atencao" };
   return { rotulo: "Em dia", tom: "neutro" };
@@ -421,6 +433,33 @@ export function CardSaude({ b }: { b: UiSaude }) {
             href="/duplas?recorte=pausada"
           />
         )}
+        {c.concluidas > 0 && (
+          <Contagem
+            n={c.concluidas}
+            rotulo={c.concluidas === 1 ? "concluída" : "concluídas"}
+            dot="bg-muted-foreground"
+            texto="text-foreground"
+            href="/duplas?recorte=concluida"
+          />
+        )}
+        {c.desistentes > 0 && (
+          <Contagem
+            n={c.desistentes}
+            rotulo={c.desistentes === 1 ? "desistente" : "desistentes"}
+            dot="viz-hatch-desistente"
+            texto="text-muted-foreground"
+            href="/duplas?recorte=desistente"
+          />
+        )}
+        {c.encerradas > 0 && (
+          <Contagem
+            n={c.encerradas}
+            rotulo={c.encerradas === 1 ? "encerrada" : "encerradas"}
+            dot="bg-muted-foreground/40"
+            texto="text-muted-foreground"
+            href="/duplas?recorte=encerrada"
+          />
+        )}
         {c.apoio > 0 && (
           // apoio é sobreposição: pill à parte, não soma nem tira do risco
           <li>
@@ -493,7 +532,7 @@ function Contagem({
 /** DuplaLinha de bolso: situação + apoio, nomes que não truncam, motivo
  *  em até duas linhas, n de esperados. O card inteiro abre a ficha. */
 function DestaqueLinha({ d, i }: { d: UiDuplaMini; i: number }) {
-  const sit = situacao(d.status, d.semaforo);
+  const sit = situacao(d, d.semaforo);
   return (
     <li
       style={passo(i)}
@@ -647,7 +686,7 @@ export function CardDupla({
   r?: Rotas;
 }) {
   const agora = useAgora();
-  const sit = situacao(b.status, b.semaforo, jovem);
+  const sit = situacao(b, b.semaforo, jovem);
   const mentor = b.mentor ?? "Mentor a definir";
   const mentorado = b.mentorado ?? "Mentorado a definir";
   const turma = b.turma ? turmaCurta(b.turma) : null;
@@ -715,13 +754,13 @@ const STATUS_ENCONTRO: Record<EncontroStatus, { rotulo: string; tom: Tom }> = {
 
 export function CardAgenda({ b, r = rotas(false) }: { b: UiAgenda; r?: Rotas }) {
   const agora = useAgora();
-  // agrupa por dia no fuso; sem data vai pro fim
+  // agrupa por dia no fuso; sem agendamento vai pro fim
   const grupos: { chave: string; rotulo: string; itens: UiAgenda["encontros"] }[] = [];
   for (const e of b.encontros) {
     const chave = valida(e.data_hora) ? toDateStr(quando(e.data_hora)) : "9999-12-31";
     let g = grupos.find((x) => x.chave === chave);
     if (!g) {
-      g = { chave, rotulo: valida(e.data_hora) ? rotuloDia(e.data_hora, agora) : "Sem data", itens: [] };
+      g = { chave, rotulo: valida(e.data_hora) ? rotuloDia(e.data_hora, agora) : "Sem agendamento", itens: [] };
       grupos.push(g);
     }
     g.itens.push(e);

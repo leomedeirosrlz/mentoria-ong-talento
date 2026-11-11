@@ -27,6 +27,7 @@ import type {
   Registro,
   Trilha,
 } from "@/lib/types";
+import type { DuplaDesfecho } from "@/lib/dupla-desfecho";
 import type { InstrumentoDupla } from "@/lib/forms/queries";
 import { CacheTtl } from "./cache";
 import { perguntaFts } from "@/lib/ia/busca-guias";
@@ -57,7 +58,7 @@ export const papeisDoUsuario = cache(
  *  tema ficam fora por construção — se o semáforo passar a ler outro campo,
  *  ampliar aqui junto (o type DuplaIa mostra o que a tool enxerga). */
 export const IA_SAUDE_SELECT = `
-  id, turma, trilha, status, cronograma_id, iniciada_em, demanda,
+  id, turma, trilha, status, desfecho, cronograma_id, iniciada_em, demanda,
   mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
   mentorado:mentorados(nome, nome_social),
   supervisor:profiles!duplas_supervisor_id_fkey(nome, nome_social),
@@ -77,6 +78,9 @@ export type DuplaIa = {
   turma: string;
   trilha: Trilha;
   status: DuplaStatus;
+  /** Por que fechou — o ficha_dupla alcança dupla fechada e o card lê a
+   *  situação canônica (Desistente × Encerrada). */
+  desfecho?: DuplaDesfecho | null;
   cronograma_id: string | null;
   iniciada_em: string | null;
   demanda: string | null;
@@ -107,6 +111,22 @@ export const getDuplasVivasIa = cache(
       .from("duplas")
       .select(IA_SAUDE_SELECT)
       .in("status", ["ativa", "pausada"]);
+    if (error) throw error;
+    return (data ?? []) as unknown as DuplaIa[];
+  }
+);
+
+/** Situação mínima das duplas fechadas no escopo — o resumo da semana as
+ *  conta na partição (Concluída/Desistente/Encerrada, a mesma das telas)
+ *  sem trafegar encontros nem contatos pro modelo. */
+export const getFechadasIa = cache(
+  async (supabase: SupabaseClient): Promise<DuplaIa[]> => {
+    const { data, error } = await supabase
+      .from("duplas")
+      .select(
+        "id, turma, trilha, status, desfecho, cronograma_id, iniciada_em, demanda"
+      )
+      .in("status", ["concluida", "encerrada"]);
     if (error) throw error;
     return (data ?? []) as unknown as DuplaIa[];
   }

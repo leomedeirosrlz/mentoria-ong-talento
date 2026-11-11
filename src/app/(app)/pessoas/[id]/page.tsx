@@ -44,6 +44,11 @@ import { avatarPublicUrl } from "@/lib/avatar";
 import { gravatarUrlSeExiste } from "@/lib/gravatar";
 import { demoRole } from "@/lib/demo/mode";
 import {
+  situacaoDaDupla,
+  SITUACAO_DUPLA_LABEL,
+  type DuplaDesfecho,
+} from "@/lib/dupla-desfecho";
+import {
   COR_RACA_LABELS,
   disponibilidadeTexto,
   ESCOLARIDADE_LABELS,
@@ -85,12 +90,10 @@ export async function generateMetadata({
   return { title: perfil ? perfil.pessoa.nome : "Pessoa" };
 }
 
-const STATUS_DUPLA: Record<string, string> = {
-  ativa: "ativa",
-  pausada: "pausada",
-  concluida: "concluída",
-  encerrada: "desistente",
-};
+/** Situação da dupla na linha do perfil — minúscula pra correr no meta
+ *  ("em andamento · desde 12/03"), rótulo único do mapa canônico. */
+const situacaoTxt = (d: { status: string; desfecho?: DuplaDesfecho | null }) =>
+  SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)].toLowerCase();
 
 /** Campo da ficha — ícone de escaneio + rótulo uppercase pequeno sobre o
  *  valor: leitura de perfil, não de resposta de formulário. Some quando o
@@ -1078,7 +1081,7 @@ export default async function PessoaPerfilPage({
                             )}
                           </span>
                           <span className="block text-xs text-muted-foreground">
-                            {STATUS_DUPLA[d.status]}
+                            {situacaoTxt(d)}
                             {d.iniciada_em ? ` · desde ${formatDate(d.iniciada_em)}` : ""}
                           </span>
                         </span>
