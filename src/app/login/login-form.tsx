@@ -43,7 +43,10 @@ function mensagemErro(error: { message: string; code?: string }, modo: "link" | 
 }
 
 export function LoginForm() {
-  const [email, setEmail] = useState("");
+  const params = useSearchParams();
+  // ?e= pré-seleciona o e-mail — o rodapé do convite de acesso cai aqui com
+  // o endereço pronto pra pedir link novo quando o do convite expira (0180)
+  const [email, setEmail] = useState(() => params.get("e")?.trim() ?? "");
   const [senha, setSenha] = useState("");
   const [modo, setModo] = useState<"link" | "senha">("link");
   const [enviado, setEnviado] = useState(false);
@@ -53,7 +56,6 @@ export function LoginForm() {
   const [erro, setErro] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const router = useRouter();
-  const params = useSearchParams();
   const supabase = useMemo(() => createAuthClient(), []);
   // client implícito só pro pedido do link — o ssr força pkce, que prende o
   // acesso ao browser que pediu (ver createOtpClient)

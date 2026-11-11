@@ -520,6 +520,15 @@ export function demoPessoas(role: AppRole): Profile[] {
     .sort(porNome);
 }
 
+/** Réplica do embed `conta` de MENTORADO_COLS_PUBLICAS (0180) — o
+ *  onboarded_em do profile vinculado resolve as 3 fases do convite.
+ *  Left join como o PostgREST: profile fora do dataset vira null. */
+function comConta(data: DemoData, m: Mentorado): Mentorado {
+  if (!m.profile_id) return m;
+  const conta = data.profiles.find((p) => p.id === m.profile_id);
+  return { ...m, conta: conta ? { onboarded_em: conta.onboarded_em } : null };
+}
+
 export function demoMentorados(role: AppRole): Mentorado[] {
   const data = getDemoData();
   // mentorados_select (0023): coordenação lê todos; mentor e supervisor só
@@ -533,7 +542,7 @@ export function demoMentorados(role: AppRole): Mentorado[] {
   // pra qualquer papel ≠ coordenação (a real lê pela view mentorados_pessoal)
   return data.mentorados
     .filter((m) => !vinculados || vinculados.has(m.id))
-    .map((m) => (role === "coordenacao" ? m : semPessoal(m)))
+    .map((m) => comConta(data, role === "coordenacao" ? m : semPessoal(m)))
     .sort(porNome);
 }
 
@@ -681,7 +690,7 @@ export function demoPessoaPerfil(
     return {
       tipo: "mentorado",
       pessoa: {
-        ...(role === "coordenacao" ? m : semPessoal(m)),
+        ...comConta(data, role === "coordenacao" ? m : semPessoal(m)),
         curriculo_path: cv?.curriculo_path ?? null,
         curriculo_url: cv?.curriculo_url ?? null,
       },

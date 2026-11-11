@@ -463,6 +463,50 @@ export function emailDesfechoRepasseMentor({
   });
 }
 
+/** Convite de acesso emitido pela coordenação (0180): a conta já existe
+ *  quando o e-mail sai (generateLink invite → handle_new_user vincula o
+ *  cadastro no envio), então o CTA é o token_hash direto no /auth/confirm —
+ *  a página pede o gesto explícito antes de plantar a sessão. Duas
+ *  variantes pela `trilha`: staff (mentor, supervisor, coordenação) ouve
+ *  "o que a plataforma tem pra você", jovem ouve "a sua jornada". O rodapé
+ *  leva o link copiável e o plano B pro token de 1h: pedir link novo no
+ *  login, já com o e-mail preenchido (?e=). */
+export function emailConviteAcesso({
+  trilha,
+  primeiroNome,
+  link,
+  email,
+}: {
+  trilha: "staff" | "jovem";
+  primeiroNome: string;
+  link: string;
+  email: string;
+}): string {
+  const jovem = trilha === "jovem";
+  const loginUrl = `${SITE_URL}/login?e=${encodeURIComponent(email)}`;
+  return emailLayout({
+    titulo: jovem
+      ? "Sua jornada de mentoria começou"
+      : "Sua conta na Mentoria Social está pronta",
+    tagline: jovem ? "Sua jornada de mentoria" : "Boas-vindas",
+    conteudoHtml:
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${primeiroNome ? `, ${esc(primeiroNome)}` : ""}!</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">A coordenação preparou o seu acesso à <strong>Mentoria Social</strong>, a plataforma do programa de mentoria.</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">${
+        jovem
+          ? "Por lá você acompanha a sua jornada: os encontros, os instrumentos e a sua turma."
+          : "Por lá você encontra a sua dupla, a agenda de encontros e os registros e materiais da jornada."
+      }</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">O primeiro acesso leva cerca de 1 minuto: é só abrir o link e confirmar a entrada.</p>`,
+    ctaLabel: "Entrar na Mentoria Social",
+    ctaHref: link,
+    preheader: jovem
+      ? "Sua jornada de mentoria começou: primeiro acesso em cerca de 1 minuto."
+      : "Sua conta na Mentoria Social está pronta: primeiro acesso em cerca de 1 minuto.",
+    rodapeExtra: `Se o botão não abrir, copie este endereço no navegador:<br><span style="word-break:break-all;">${esc(link)}</span><br>Este link é pessoal e vale por cerca de 1 hora. Se expirar, peça um novo em <a href="${esc(loginUrl)}" style="color:${MUTED};text-decoration:underline;">${esc(loginUrl)}</a>.`,
+  });
+}
+
 // 0084 — chamados unificados: urgência/origem jovem avisa a equipe por
 // e-mail (o sino não é garantia pra canal de segurança) e atualização
 // pública chega ao autor também fora do app.

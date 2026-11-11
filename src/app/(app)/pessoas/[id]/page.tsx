@@ -516,6 +516,17 @@ export default async function PessoaPerfilPage({
                     {ment.saiu_em ? ` · ${formatDiaMes(ment.saiu_em)}` : ""}
                   </Badge>
                 )}
+                {/* convite de acesso (0180) — a conta do jovem nasce no
+                    envio; "convite enviado" até o onboarding dela */}
+                {souCoord &&
+                  ment &&
+                  !foraMent &&
+                  ment.email &&
+                  !ment.conta?.onboarded_em && (
+                    <Badge variant="outline" className="font-normal text-muted-foreground">
+                      {ment.profile_id ? "Convite enviado" : "Não convidado"}
+                    </Badge>
+                  )}
                 {/* conta vinculada (0066): após a promoção a mentor
                     (REALIZA-159) é a porta pra ficha de equipe da mesma
                     pessoa — a ficha de jovem segue sendo o histórico */}
@@ -542,9 +553,13 @@ export default async function PessoaPerfilPage({
                     inativa
                   </Badge>
                 )}
-                {ehStaff && "user_id" in p && !p.user_id && p.ativo && (
+                {/* o convite já cria a conta — "entrou" se mede pelo
+                    onboarded_em, não pelo user_id (0180) */}
+                {ehStaff && "user_id" in p && p.ativo && !p.onboarded_em && (
                   <Badge variant="outline" className="font-normal text-muted-foreground">
-                    Nunca acessou a plataforma
+                    {p.user_id
+                      ? "Convite enviado, aguardando primeiro acesso"
+                      : "Não convidado ainda"}
                   </Badge>
                 )}
               </>

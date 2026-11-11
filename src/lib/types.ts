@@ -210,6 +210,10 @@ export type Mentorado = {
   /** Vínculo com o login do jovem (0066) — `profiles.id` da conta com
    *  role='mentorado'. null = participante sem acesso à plataforma. */
   profile_id?: string | null;
+  /** Embed do profile vinculado (0180) — só `onboarded_em`: a UI distingue
+   *  "convite enviado" (conta sem onboarding) de "entrou". Só preenche
+   *  onde MENTORADO_COLS_PUBLICAS carrega o embed. */
+  conta?: { onboarded_em: string | null } | null;
   /** Opt-in colega↔colega (0076): ligado, o WhatsApp do cadastro aparece
    *  aos colegas de turma com conta (view mentorados_turma). O dono do
    *  toggle é o próprio jovem (RPC set_contato_compartilhado). */
