@@ -84,6 +84,18 @@ describe("erroAmigavel — tradução de erros do Postgres pra UI", () => {
     );
   });
 
+  it("23505 de profile_papeis_uniq → papel com escopo de turma repetido", () => {
+    // o update do trigger de rename de turma (0127/0179) e o grant manual
+    // de escopo batem no mesmo unique — a copy fala de papel, não de cadastro
+    expect(
+      erroAmigavel({
+        code: "23505",
+        message:
+          'duplicate key value violates unique constraint "profile_papeis_uniq"',
+      })
+    ).toBe("Já existe um papel com esse escopo de turma.");
+  });
+
   it("42501 / row-level security → permissão", () => {
     expect(erroAmigavel({ code: "42501", message: "x" })).toBe(
       "Você não tem permissão para essa ação."
