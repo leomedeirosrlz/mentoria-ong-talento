@@ -50,8 +50,23 @@ const STATUS_DUPLA: Record<string, string> = {
   encerrada: "Desistente",
 };
 
-export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
-  const [open, setOpen] = useState(false);
+export function EditarDuplaDialog({
+  dupla,
+  trigger,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
+}: {
+  dupla: Dupla;
+  /** null = controlled mode, no own trigger (a menu item owns the open
+   *  state — same convention as RemanejarDuplaDialog). undefined = default
+   *  "Editar" trigger. */
+  trigger?: React.ReactElement | null;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [openInt, setOpenInt] = useState(false);
+  const open = openProp ?? openInt;
+  const setOpen = onOpenChangeProp ?? setOpenInt;
   const [delOpen, setDelOpen] = useState(false);
   const [mentores, setMentores] = useState<Opt[]>([]);
   const [mentorados, setMentorados] = useState<Opt[]>([]);
@@ -91,6 +106,23 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
   );
   const [pending, start] = useTransition();
   const router = useRouter();
+  // estado fresco por abertura — edição abortada não pode vazar seleção pra
+  // próxima vez. Ajuste durante o render na borda de subida do `open` (sem
+  // frame de seleção velha): no modo controlado o item de menu abre de fora
+  // e o Base UI não chama onOpenChange — a transição da prop é o evento
+  // confiável (mesmo padrão do RemanejarDuplaDialog)
+  const [abertoAntes, setAbertoAntes] = useState(open);
+  if (open !== abertoAntes) {
+    setAbertoAntes(open);
+    if (open) {
+      setStatusSel(dupla.status);
+      setMentorSel(dupla.mentor.id);
+      setDesfechoSel(dupla.desfecho ?? "");
+      setMotivoSel(dupla.desfecho_motivo ?? "");
+      setTrilhaEsc(dupla.trilha === "especialista" ? "especialista" : "dpp");
+      setFalha(false);
+    }
+  }
   // 1ª carga com skeleton; refetch de reabertura usa o cache — falha ali vira
   // toast, não bloqueio (as opções já carregadas continuam valendo)
   const carregou = useRef(false);
@@ -359,21 +391,20 @@ export function EditarDuplaDialog({ dupla }: { dupla: Dupla }) {
 
   return (
     <>
-      <Dialog
-        open={open}
-        onOpenChange={(o) => {
-          setOpen(o);
-          // Select desmonta com o dialog e volta ao defaultValue — alinha a nota
-          if (o) {
-            setStatusSel(dupla.status);
-            setMentorSel(dupla.mentor.id);
-            setDesfechoSel(dupla.desfecho ?? "");
-            setMotivoSel(dupla.desfecho_motivo ?? "");
-            setFalha(false);
-          }
-        }}
-      >
-        <DialogTrigger render={<Button variant="outline" size="sm"><PencilSimple size={15} /> Editar</Button>} />
+      {/* o reset por abertura é o ajuste no render acima — aqui só flui o
+          pedido de mudança do Base UI (fechar por Esc/backdrop/trigger) */}
+      <Dialog open={open} onOpenChange={setOpen}>
+        {trigger !== null && (
+          <DialogTrigger
+            render={
+              trigger ?? (
+                <Button variant="outline" size="sm">
+                  <PencilSimple size={15} /> Editar
+                </Button>
+              )
+            }
+          />
+        )}
         <DialogContent size="xl">
           <DialogHeader>
             <DialogTitle>Editar dupla</DialogTitle>

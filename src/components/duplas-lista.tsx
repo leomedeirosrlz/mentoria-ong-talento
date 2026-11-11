@@ -1115,7 +1115,7 @@ function VisaoCoordenacao({
   const menuDa = (d: Dupla) => (
     <DuplaLinhaMenu
       dupla={d}
-      fichaHref={`/duplas/${d.id}`}
+      editar
       formulario
       remanejar
       encerrar={
@@ -1788,14 +1788,8 @@ function VisaoSupervisor({
                             saude={s}
                             eventos={eventos}
                             mostrarSupervisor={false}
-                            menu={
-                              // supervisor não tem ação de coordenação —
-                              // o ⋯ leva o "Ver ficha" explícito
-                              <DuplaLinhaMenu
-                                dupla={d}
-                                fichaHref={`/duplas/${d.id}`}
-                              />
-                            }
+                            // supervisor não tem ação de coordenação —
+                            // sem menu o ⋯ decorativo mantém o visual
                             dimDesistentes={filtro === "todas"}
                             wa={
                               <DuplaWaAcao

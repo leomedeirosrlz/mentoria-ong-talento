@@ -1,27 +1,28 @@
 "use client";
 
 // O ⋯ real da linha de dupla (DuplaLinha): um dropdown Base UI com as
-// ações que o contexto do caller sustenta. "Ver ficha" é sempre o 1º item
-// — a linha inteira já navega pelo link esticado, mas o menu explicita o
-// destino pra quem abre procurando ação. Os demais itens só aparecem
-// quando os dados do caller dão conta: o catálogo de formulários carrega
-// do banco na 1ª abertura (a linha não pagava um fetch por card), e
-// remanejar/encerrar leem status e trilha da própria dupla.
+// ações que o contexto do caller sustenta — a linha inteira já navega
+// pelo link esticado, então o menu só traz ação real ("Ver ficha" saiu:
+// era o mesmo destino do clique na linha). Os itens só aparecem quando
+// os dados do caller dão conta: o catálogo de formulários carrega do
+// banco na 1ª abertura (a linha não pagava um fetch por card), e
+// editar/remanejar/encerrar leem status e trilha da própria dupla.
 //
 // O trigger replica o ⋯ decorativo que substitui (outline sm, "Ações" a
 // partir do md) e o wrapper no DuplaLinha o põe em z-20, acima do link
 // esticado: o clique abre o menu, nunca navega. Os dialogs ficam fora do
 // popup, controlados por estado — mesmo padrão do "Mais" da ficha
 // (REALIZA-157): fechar o menu não os desmonta e o foco volta pro ⋯.
+// Sem nenhum item o componente rende nada — o caller cai no ⋯ decorativo
+// do DuplaLinha quando passa o menu como null/undefined.
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import {
-  ArrowRight,
   ArrowsLeftRight,
   DotsThree,
   FlagCheckered,
   PaperPlaneTilt,
+  PencilSimple,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import type { Dupla } from "@/lib/types";
@@ -31,6 +32,7 @@ import {
   EnviarFormularioDialog,
   type FormularioOpcao,
 } from "@/components/enviar-formulario-dialog";
+import { EditarDuplaDialog } from "@/components/editar-dupla-dialog";
 import { EncerrarTrilhaDialog } from "@/components/encerrar-trilha-dialog";
 import { RemanejarDuplaDialog } from "@/components/remanejar-dupla-dialog";
 import { buttonVariants } from "@/components/ui/button";
@@ -38,12 +40,11 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 
-type DialogId = "form" | "remanejar" | "encerrar";
+type DialogId = "editar" | "form" | "remanejar" | "encerrar";
 
 // tamanho e cor explícitos — é o que alinha o texto do item com o da linha
 // (mesma norma do ICONE do Mais da ficha)
@@ -51,14 +52,15 @@ const ICONE = "size-4 shrink-0 text-muted-foreground";
 
 export function DuplaLinhaMenu({
   dupla,
-  fichaHref,
+  editar = false,
   formulario = false,
   remanejar = false,
   encerrar = false,
 }: {
   dupla: Dupla;
-  /** destino do "Ver ficha" — o mesmo do link esticado da linha */
-  fichaHref: string;
+  /** "Editar dupla" — a edição completa da coordenação (o mesmo dialog
+   *  do cabeçalho da ficha) */
+  editar?: boolean;
   /** "Enviar formulário" (dupla viva) — o catálogo dos ativos carrega na
    *  1ª abertura do dialog, sem fetch na montagem da linha */
   formulario?: boolean;
@@ -68,7 +70,6 @@ export function DuplaLinhaMenu({
    *  aberta); o dialog trava motivo e devolutiva */
   encerrar?: boolean;
 }) {
-  const router = useRouter();
   const [aberto, setAberto] = useState<DialogId | null>(null);
   const [forms, setForms] = useState<FormularioOpcao[] | null>(null);
   const [carregandoForms, setCarregandoForms] = useState(false);
@@ -112,6 +113,10 @@ export function DuplaLinhaMenu({
     }
   }
 
+  // caller sem ações sobrando (ex.: supervisor) não abre menu — o ⋯
+  // decorativo do DuplaLinha mantém o visual da casa
+  if (!editar && !temForm && !temRemanejar && !encerrar) return null;
+
   return (
     <>
       <DropdownMenu>
@@ -128,11 +133,15 @@ export function DuplaLinhaMenu({
         {/* w-56: o popup é mais largo que o trigger — a âncora ficaria
             apertada pros labels de ação (mesma norma do Mais da ficha) */}
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem onClick={() => router.push(fichaHref)}>
-            <ArrowRight aria-hidden className={ICONE} />
-            Ver ficha
-          </DropdownMenuItem>
-          {(temForm || temRemanejar || encerrar) && <DropdownMenuSeparator />}
+          {editar && (
+            <DropdownMenuItem
+              aria-haspopup="dialog"
+              onClick={() => abrir("editar")}
+            >
+              <PencilSimple aria-hidden className={ICONE} />
+              Editar dupla
+            </DropdownMenuItem>
+          )}
           {temForm && (
             <DropdownMenuItem
               aria-haspopup="dialog"
@@ -165,6 +174,14 @@ export function DuplaLinhaMenu({
 
       {/* fora do popup, controlados — fechar o menu não desmonta o dialog
           e o foco volta pro ⋯ ao sair */}
+      {editar && (
+        <EditarDuplaDialog
+          dupla={dupla}
+          trigger={null}
+          open={aberto === "editar"}
+          onOpenChange={(o) => setAberto(o ? "editar" : null)}
+        />
+      )}
       {temForm && (
         <EnviarFormularioDialog
           formularios={forms ?? []}

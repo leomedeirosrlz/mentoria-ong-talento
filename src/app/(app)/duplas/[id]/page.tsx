@@ -1162,7 +1162,7 @@ export default async function DuplaPage({
         )}
       </section>
 
-      <ArquivosDupla arquivos={arquivosDaDupla} />
+      <ArquivosDupla arquivos={arquivosDaDupla} pdm={pdm} />
 
       {ehEsp && (devolutivasFeed.length > 0 || souMentor) && (
         <section aria-labelledby="devolutivas-trilha" className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] space-y-3">

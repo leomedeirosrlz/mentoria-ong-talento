@@ -173,22 +173,22 @@ export function DashboardCoordenacao({
     encerramentos,
     alertas: alertas?.alertas ?? [],
     meuNome,
-    // o ⋯ leva as ações de coordenação só pra coordenação — pro supervisor
-    // fica o "Ver ficha" (a tela é compartilhada)
-    menuDa: (d) => (
-      <DuplaLinhaMenu
-        dupla={d}
-        fichaHref={`/duplas/${d.id}`}
-        formulario={!supervisor}
-        remanejar={!supervisor}
-        encerrar={
-          !supervisor &&
-          d.trilha === "especialista" &&
-          !d.encerrada_em &&
-          (d.status === "ativa" || d.status === "pausada")
-        }
-      />
-    ),
+    // o ⋯ leva as ações de coordenação só pra coordenação — supervisor não
+    // tem ação sobrando, o ⋯ decorativo mantém o visual (tela compartilhada)
+    menuDa: (d) =>
+      supervisor ? null : (
+        <DuplaLinhaMenu
+          dupla={d}
+          editar
+          formulario
+          remanejar
+          encerrar={
+            d.trilha === "especialista" &&
+            !d.encerrada_em &&
+            (d.status === "ativa" || d.status === "pausada")
+          }
+        />
+      ),
   });
 
   const emRisco = duplas

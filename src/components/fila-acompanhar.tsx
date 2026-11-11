@@ -307,7 +307,7 @@ function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
       menu={
         <DuplaLinhaMenu
           dupla={dupla}
-          fichaHref={`/duplas/${item.duplaId}`}
+          editar
           formulario
           remanejar
           encerrar={
