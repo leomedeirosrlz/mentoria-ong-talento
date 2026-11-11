@@ -6,6 +6,7 @@ import { createAdminClient } from "./supabase/admin";
 import { demoAtivo } from "./demo/mode";
 import { enviarEmailsIndividuais, SITE_URL } from "./email";
 import { emailConviteAcesso } from "./email-templates";
+import { papelLabel } from "./ciclo";
 
 // Convite de primeiro acesso pela ficha (0180). Antes a pessoa descobria
 // sozinha que tinha conta: o cadastro existia, a allowlist aceitava, mas
@@ -43,7 +44,7 @@ type Resultado =
   | { error: string };
 
 type Alvo =
-  | { email: string; primeiroNome: string; audiencia: string }
+  | { email: string; primeiroNome: string; nome: string; audiencia: string }
   | { error: string };
 
 /** Resolve o destinatário e as guardas de estado. O e-mail é sempre lido
@@ -85,6 +86,8 @@ async function alvoConvite(
     return {
       email,
       primeiroNome: primeiro(p.nome, p.nome_social),
+      // full display name: the email states whose account the link opens (REALIZA-35)
+      nome: (p.nome_social || p.nome).trim(),
       audiencia: p.role,
     };
   }
@@ -115,6 +118,7 @@ async function alvoConvite(
   return {
     email,
     primeiroNome: primeiro(m.nome, m.nome_social),
+    nome: (m.nome_social || m.nome).trim(),
     audiencia: "mentorado",
   };
 }
@@ -177,6 +181,8 @@ export async function convidarAcesso({
         html: emailConviteAcesso({
           trilha: jovem ? "jovem" : "staff",
           primeiroNome: alvo.primeiroNome,
+          nome: alvo.nome,
+          papel: papelLabel(alvo.audiencia),
           link: url,
           email: alvo.email,
         }),

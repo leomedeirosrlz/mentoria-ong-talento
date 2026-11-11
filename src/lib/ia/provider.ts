@@ -68,7 +68,13 @@ export type UsoIa = {
 };
 
 export const IA_MSG_INDISPONIVEL =
-  "O assistente está indisponível no momento — tente de novo em instantes.";
+  "O assistente está indisponível no momento. Tente de novo em instantes.";
+
+/** `dormindo` on a failure = the provider let us down (rate limit/quota,
+ *  5xx, dead model slug, timeout, network drop, chain exhausted), so the
+ *  UI shows the sleeping-Liza state instead of a generic error
+ *  (REALIZA-363). Absent on real faults of ours: generic 400 payloads,
+ *  non-transient exceptions — those must not dress up as a nap. */
 
 /** Flag honesta: sem as três envs o assistente se esconde em vez de falhar
  *  em runtime (rollback = unset IA_API_KEY, plan §Rollback). */
@@ -245,7 +251,7 @@ export async function chamarModelo(
   }
 ): Promise<
   | { ok: true; mensagem: MsgChat; usage?: UsoIa; modelo?: string }
-  | { ok: false; erro: string }
+  | { ok: false; erro: string; dormindo?: boolean }
 > {
   const cadeia = cadeiaDeModelos(opts?.modelo, opts?.fallbacks);
   let esperaMs = 0; // Retry-After de um 429 carrega pro próximo modelo
@@ -293,13 +299,17 @@ export async function chamarModelo(
             esperaMs = delayDoRetry(res);
             break;
           }
-          return { ok: false, erro: IA_MSG_INDISPONIVEL };
+          return {
+            ok: false,
+            erro: IA_MSG_INDISPONIVEL,
+            dormindo: avancaCadeia(res.status, corpo) || undefined,
+          };
         }
         const json = await res.json();
         const msg = json?.choices?.[0]?.message as MsgChat | undefined;
         if (!msg || (msg.content == null && !msg.tool_calls?.length)) {
           console.error("chamarModelo: resposta sem mensagem utilizável");
-          return { ok: false, erro: IA_MSG_INDISPONIVEL };
+          return { ok: false, erro: IA_MSG_INDISPONIVEL, dormindo: true };
         }
         return {
           ok: true,
@@ -313,11 +323,16 @@ export async function chamarModelo(
           esperaMs = RETRY_BACKOFF_MS;
           break;
         }
-        return { ok: false, erro: IA_MSG_INDISPONIVEL };
+        return {
+          ok: false,
+          erro: IA_MSG_INDISPONIVEL,
+          dormindo: erroTransitorio(e) || undefined,
+        };
       }
     }
   }
-  return { ok: false, erro: IA_MSG_INDISPONIVEL };
+  // chain exhausted: every model left on a transient/chain-advancing cause
+  return { ok: false, erro: IA_MSG_INDISPONIVEL, dormindo: true };
 }
 
 // ---------- streaming (SSE) ----------
@@ -331,8 +346,16 @@ export type ResultadoStream =
       modelo?: string;
     }
   // fallback=true: o provider recusou o stream (HTTP != 2xx ou corpo que
-  // não é SSE) — a rota refaz a rodada via chamarModelo, mesmo contrato
-  | { ok: false; erro: string; fallback?: boolean; abortado?: boolean };
+  // não é SSE) — a rota refaz a rodada via chamarModelo, mesmo contrato.
+  // dormindo: falha do lado do provider (429/cota/5xx/timeout) → UI da
+  // Liza dormindo; ausente em erro nosso (400 genérico) — REALIZA-363
+  | {
+      ok: false;
+      erro: string;
+      fallback?: boolean;
+      abortado?: boolean;
+      dormindo?: boolean;
+    };
 
 /** Delta de tool_call como o OpenAI manda no stream: id/name vêm uma vez,
  *  arguments chega em pedaços — tudo indexado por `index`. */
@@ -384,7 +407,12 @@ export async function chamarModeloStream(
       if (!(await esperar(esperaMs, opts.signal)))
         return opts.clienteAbortou()
           ? { ok: false, erro: "interrompido", abortado: true }
-          : { ok: false, erro: IA_MSG_INDISPONIVEL, fallback: true };
+          : {
+              ok: false,
+              erro: IA_MSG_INDISPONIVEL,
+              fallback: true,
+              dormindo: true,
+            };
       esperaMs = 0;
     }
     let mandarEsforco = Boolean(opts.esforco);
@@ -428,7 +456,12 @@ export async function chamarModeloStream(
           esperaMs = delayDoRetry(res);
           break;
         }
-        return { ok: false, erro: IA_MSG_INDISPONIVEL, fallback: true };
+        return {
+          ok: false,
+          erro: IA_MSG_INDISPONIVEL,
+          fallback: true,
+          dormindo: avancaCadeia(res.status, corpo) || undefined,
+        };
       }
 
       const reader = res.body.getReader();
@@ -531,12 +564,25 @@ export async function chamarModeloStream(
         saiuAlgo ||
         !erroTransitorio(e)
       ) {
-        return { ok: false, erro: IA_MSG_INDISPONIVEL, fallback: true };
+        return {
+          ok: false,
+          erro: IA_MSG_INDISPONIVEL,
+          fallback: true,
+          // route-side timeout (signal sem ser do cliente) e erro de rede
+          // são falha do provider; exceção não-transitória segue erro real
+          dormindo:
+            erroTransitorio(e) || opts.signal.aborted || undefined,
+        };
       }
       esperaMs = RETRY_BACKOFF_MS;
       break;
     }
     }
   }
-  return { ok: false, erro: IA_MSG_INDISPONIVEL, fallback: true };
+  return {
+    ok: false,
+    erro: IA_MSG_INDISPONIVEL,
+    fallback: true,
+    dormindo: true,
+  };
 }

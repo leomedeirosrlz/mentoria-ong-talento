@@ -41,10 +41,10 @@ import {
 } from "@/components/assistente-md";
 import { Sugestoes } from "@/components/assistente-blocos";
 import { UiCard } from "@/components/assistente-cards";
+import { LizaDormindo } from "@/components/liza/liza-dormindo";
 import { T } from "@/components/motion";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import type { AppRole } from "@/lib/types";
@@ -67,10 +67,18 @@ type Msg = {
   /** x-ia-request-id of the response — ties the thumbs vote to the
    *  round logged in ia_eventos; absent on demo/error/interrupted */
   reqId?: string;
+  /** falha do provider (evento error da rota com `dormindo`): a bolha
+   *  mostra a LizaDormindo em vez de texto de erro — REALIZA-363 */
+  dormindo?: boolean;
 };
 
 /** Estado que a bolha traduz em expressão do mascote. */
-export type EstadoConversa = "parado" | "consultando" | "escrevendo" | "erro";
+export type EstadoConversa =
+  | "parado"
+  | "consultando"
+  | "escrevendo"
+  | "erro"
+  | "sonolento";
 
 const primeiroNome = (nome?: string) => nome?.trim().split(/\s+/)[0];
 
@@ -348,6 +356,7 @@ export function AssistenteConversa({
       erro?: string;
       fontes?: FonteIa[];
       reqId?: string;
+      dormindo?: boolean;
     };
   } | null>(null);
   const chips = sugestoes(papeis, pagina);
@@ -361,14 +370,17 @@ export function AssistenteConversa({
   const inicioRef = useRef(0);
 
   // estado da rodada pra fora (mascote): status de tool = consultando,
-  // token chegando = escrevendo, bolha de erro = erro
+  // token chegando = escrevendo, bolha de erro = erro — e falha do
+  // provider cochila o rosto inteiro (REALIZA-363)
   const ultimaMsg = msgs[msgs.length - 1];
   const estado: EstadoConversa = pending
     ? status || !ultimaMsg?.content
       ? "consultando"
       : "escrevendo"
     : ultimaMsg?.estado === "erro"
-      ? "erro"
+      ? ultimaMsg.dormindo
+        ? "sonolento"
+        : "erro"
       : "parado";
   useEffect(() => onEstado?.(estado), [estado, onEstado]);
 
@@ -687,6 +699,7 @@ export function AssistenteConversa({
       erro?: string;
       fontes?: FonteIa[];
       reqId?: string;
+      dormindo?: boolean;
     }
   ) {
     const pend = tokensRef.current;
@@ -717,6 +730,7 @@ export function AssistenteConversa({
       erro?: string;
       fontes?: FonteIa[];
       reqId?: string;
+      dormindo?: boolean;
     },
     pend = ""
   ) {
@@ -729,8 +743,14 @@ export function AssistenteConversa({
           ...ms.slice(0, -1),
           {
             role: "assistant",
-            content: content || extra?.erro || FALHA,
+            // dormindo keeps only the real partial text — the error
+            // string is replaced by the LizaDormindo card, not shown
+            // as prose inside the bubble (REALIZA-363)
+            content: extra?.dormindo
+              ? content
+              : content || extra?.erro || FALHA,
             estado: "erro",
+            dormindo: extra?.dormindo || undefined,
             ui: ultima.ui,
           },
         ];
@@ -810,6 +830,8 @@ export function AssistenteConversa({
       let tools: string[] | undefined;
       let fontes: FonteIa[] | undefined;
       let falha: string | null = null;
+      // a rota marca erro do provider com `dormindo` (REALIZA-363)
+      let falhaDormindo = false;
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
@@ -836,11 +858,16 @@ export function AssistenteConversa({
               tools = d.tools;
               fontes = d.fontes;
             }
-            else if (ev.type === "error") falha = (ev as { e: string }).e;
+            else if (ev.type === "error") {
+              const d = ev as { e: string; dormindo?: boolean };
+              falha = d.e;
+              falhaDormindo = d.dormindo === true;
+            }
           }
         }
       }
-      if (falha) finalizar("erro", { erro: falha });
+      if (falha)
+        finalizar("erro", { erro: falha, dormindo: falhaDormindo || undefined });
       // stream fechou sem done (rede caiu no fim): finaliza com o que tem
       else finalizar("ok", { tools, fontes, reqId });
     } catch (e) {
@@ -859,7 +886,12 @@ export function AssistenteConversa({
         }
         return rodar(base, tentativas + 1);
       }
-      finalizar("erro", { erro: msgAmigavel(e, statusHttp, FALHA) });
+      finalizar("erro", {
+        erro: msgAmigavel(e, statusHttp, FALHA),
+        // 503 pré-stream = provider desconfigurado: mesma cara de sono
+        // que a rota emite por evento — não é erro de pedido nosso
+        dormindo: statusHttp === 503 || undefined,
+      });
     }
   }
 
@@ -1194,7 +1226,9 @@ export function AssistenteConversa({
                 ? ultimaMsg.estado === "erro"
                   ? // frase fixa: no erro o content pode ser a resposta
                     // parcial inteira, longa demais pra um anúncio
-                    "A Liza não conseguiu responder."
+                    ultimaMsg.dormindo
+                    ? "A Liza está dormindo e volta mais tarde."
+                    : "A Liza não conseguiu responder."
                   : "A Liza respondeu."
                 : ""}
           </div>
@@ -1239,7 +1273,9 @@ export function AssistenteConversa({
                 : ultimaDaConversa && celebra
                   ? "pronto"
                   : m.estado === "erro"
-                    ? "erro"
+                    ? m.dormindo
+                      ? "sonolento"
+                      : "erro"
                     : "parado";
             // indicador pré-token: status da tool (shimmer) ou a onda de
             // pontos — dentro da própria resposta, nunca bolha de espera dupla
@@ -1276,6 +1312,15 @@ export function AssistenteConversa({
                 ) : null}
                 {esperando ? (
                   indicador
+                ) : m.estado === "erro" && m.dormindo ? (
+                  // provider dormiu: o pedaço real que chegou fica legível
+                  // e o card leva o "volte mais tarde" — sem texto de erro
+                  <>
+                    {m.content ? (
+                      <RespostaMd analise={analise} ctx={ctx} />
+                    ) : null}
+                    <LizaDormindo compacto />
+                  </>
                 ) : (
                   <RespostaMd analise={analise} ctx={ctx} />
                 )}
@@ -1437,8 +1482,9 @@ export function AssistenteConversa({
                     />
                   ) : null}
                   {/* meta: hora + o que consultou + copy/retry — discreto,
-                      sempre no ar (touch não tem hover) */}
-                  {!streaming && (m.content || m.estado === "erro") && (
+                      sempre no ar (touch não tem hover). Dormindo não tem
+                      linha: o card já carrega a saída "volte mais tarde" */}
+                  {!streaming && (m.content || m.estado === "erro") && !m.dormindo && (
                     <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1 pl-0.5">
                       {m.em && (
                         <span className="text-xs text-muted-foreground sm:text-[11px]">
@@ -1578,9 +1624,9 @@ export function AssistenteConversa({
           na home indicator */}
       <div className="space-y-2 border-t border-border/60 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3">
         {!configurado && !demo ? (
-          <Card className="px-4 py-3 text-sm text-muted-foreground">
-            A Liza está indisponível no momento. Tente de novo em instantes.
-          </Card>
+          // provider desligado = Liza dormindo (REALIZA-363), o mesmo
+          // estado que uma falha de quota exibiria na conversa
+          <LizaDormindo compacto />
         ) : (
           <>
             <form

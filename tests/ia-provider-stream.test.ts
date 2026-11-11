@@ -312,6 +312,30 @@ describe("chamarModeloStream — retry (REALIZA-307)", () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
+  it("marca dormindo nas falhas do provider; 400 genérico não (REALIZA-363)", async () => {
+    const dormindo = (r: unknown) =>
+      (r as { dormindo?: boolean }).dormindo === true;
+
+    // exhausted quota and provider 5xx put Liza to sleep
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("quota", { status: 429 }))
+    );
+    expect(dormindo(await chamar())).toBe(true);
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("pau", { status: 500 }))
+    );
+    expect(dormindo(await chamar())).toBe(true);
+
+    // our own 400 payload stays a generic error, not sleep
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(new Response("invalid payload", { status: 400 }))
+    );
+    expect(dormindo(await chamar())).toBe(false);
+  });
+
   it("quebra depois de token emitido NÃO retenta — vira fallback", async () => {
     const enc = new TextEncoder();
     // pull no 1º read entrega o evento do token; no 2º quebra — c.error

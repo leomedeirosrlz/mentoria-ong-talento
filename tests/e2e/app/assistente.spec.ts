@@ -7,8 +7,9 @@ import {
 
 // REALIZA-243/244 — o assistente saiu da nav e virou bolha flutuante
 // (FAB bottom-right → drop-up). A rota /assistente virou redirect pra /.
-// Sem IA_API_* no ambiente de e2e a feature se apresenta honesta: card de
-// indisponível no painel, composer escondido — comportamento de rollback.
+// Sem IA_API_* no ambiente de e2e a feature se apresenta honesta: card da
+// Liza dormindo no painel (REALIZA-363), composer escondido —
+// comportamento de rollback.
 //
 // A API coberta por sessão: POST sem login não chega na rota — o proxy
 // desvia pra /login. As respostas de gate (503/429/400) seguem JSON —
@@ -42,7 +43,7 @@ test.describe("assistente", () => {
     await expect(fab).toHaveAttribute("aria-expanded", "true");
 
     // painel: header + saudação. O composer depende do provider: o e2e
-    // local roda sem IA_API_* (card "indisponível" honesto); o preview da
+    // local roda sem IA_API_* (Liza dormindo — REALIZA-363); o preview da
     // Vercel tem as envs e mostra o composer de verdade.
     const painel = page.locator("#painel-assistente");
     await expect(painel).toBeVisible();
@@ -54,7 +55,7 @@ test.describe("assistente", () => {
       await expect(composer).toBeVisible();
     } else {
       await expect(
-        painel.getByText(/Liza está indisponível/i)
+        painel.getByText(/Liza está dormindo/i)
       ).toBeVisible();
     }
 

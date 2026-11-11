@@ -9,6 +9,7 @@ import { getMe, getMeuMentorProfile, getMeusDadosPessoais, getNotificacoes } fro
 import { getChamadosSemDono } from "@/lib/queries-chamados";
 import { getMeusDadosCivis, getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
 import { providerConfigurado } from "@/lib/ia/provider";
+import { pedirAcessoHref } from "@/lib/login-erros";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { gravatarUrlSeExiste } from "@/lib/gravatar";
 import type { AppRole } from "@/lib/types";
@@ -40,6 +41,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           Sua conta não está vinculada a um cadastro. Se você entrou com o
           e-mail errado, saia e entre com o e-mail cadastrado pela coordenação.
         </p>
+        <p className="mt-2">
+          Ainda não foi cadastrado?{" "}
+          <a
+            href={pedirAcessoHref()}
+            className="font-medium text-foreground underline underline-offset-2"
+          >
+            Peça acesso por e-mail
+          </a>
+          .
+        </p>
       </TelaConta>
     );
   }
@@ -63,6 +74,16 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           no programa. Assim que liberar, entre de novo por aqui. Se você entrou
           com o e-mail errado, saia e entre com o e-mail cadastrado pela
           coordenação.
+        </p>
+        <p className="mt-2">
+          Dúvidas?{" "}
+          <a
+            href="mailto:mentoria@realiza.vc"
+            className="font-medium text-foreground underline underline-offset-2"
+          >
+            Fale com a coordenação
+          </a>
+          .
         </p>
       </TelaConta>
     );

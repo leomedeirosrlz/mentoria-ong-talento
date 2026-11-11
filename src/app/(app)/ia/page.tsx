@@ -24,12 +24,14 @@ import {
   type UsoJanela,
 } from "@/lib/ia/metricas";
 import { getIaConfig, PLANOS_GO, TETOS_GO_USD, type PlanoIa } from "@/lib/ia/config";
+import { providerConfigurado } from "@/lib/ia/provider";
 import { rotuloTool } from "@/lib/ia/fontes";
 import { getConsumoPlanoIa, getPainelIa } from "@/lib/ia/queries";
 import { AbasAgenda } from "@/components/agenda-abas";
 import { IaEvals } from "@/components/ia-evals";
 import { IaLimparEventos } from "@/components/ia-limpar-eventos";
 import { PageHeader } from "@/components/page-header";
+import { LizaDormindo } from "@/components/liza/liza-dormindo";
 import { buttonVariants } from "@/components/ui/button";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { BarraSegmentada, GraficoTempo, type PontoGrafico } from "@/components/viz";
@@ -292,6 +294,13 @@ function CardModelo({
     : m.diasRestantes > (p.diasAteRenovar ?? CICLO_PADRAO_DIAS)
       ? p.cicloConhecido ? "não chega ao teto antes de renovar" : "não chega ao teto em 30 dias"
     : `${num.format(Math.floor(m.diasRestantes))} ${Math.floor(m.diasRestantes) === 1 ? "dia" : "dias"} restantes no ritmo atual`;
+  // janela estourada = o modelo não responde AGORA (regra do plano: para
+  // até liberar) — o retrato honesto é a Liza dormindo, não só o chip
+  // vermelho de quem estoura depois (REALIZA-363)
+  const dormindo =
+    (m.janela5h.limite != null && m.janela5h.usado >= m.janela5h.limite) ||
+    (m.semana.limite != null && m.semana.usado >= m.semana.limite) ||
+    (m.teto != null && m.ciclo.usado >= m.teto);
   return (
     <article
       className={cn("animate-enter rounded-xl border border-border bg-card p-4", className)}
@@ -324,6 +333,14 @@ function CardModelo({
         {p.cicloConhecido && ` · ${usd(m.ritmoCiclo)}/dia no ciclo`}
         {restante && ` · ${restante}`}
       </p>
+      {dormindo && (
+        <LizaDormindo
+          compacto
+          titulo="Este modelo dormiu"
+          detalhe="Parou de responder até a janela liberar."
+          className="mt-3"
+        />
+      )}
     </article>
   );
 }
@@ -739,6 +756,13 @@ export default async function IaPage({
         <IaEvals modelosSugeridos={modelosCfg} />
       ) : (
       <>
+      {/* provider desligado = a Liza está dormindo pra todo mundo — o
+          banner abre a aba porque os números abaixo seguem valendo */}
+      {!providerConfigurado() && (
+        <LizaDormindo
+          detalhe="O provedor está desligado na configuração: ninguém consegue falar com ela até ele voltar."
+        />
+      )}
       <SecaoPlano previsao={previsao} plano={plano} />
 
       {/* filtros deep-linkáveis: valem pros gráficos e listas abaixo; a
