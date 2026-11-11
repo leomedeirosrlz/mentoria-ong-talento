@@ -18,20 +18,18 @@ import { EscopoAuxiliarDialog } from "@/components/escopo-auxiliar-dialog";
 import { RoleSelect } from "@/components/role-select";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { FotoField } from "@/components/foto-field";
-import { TagInput } from "@/components/tag-input";
 import {
   CampoConsentimento,
   CampoDisponibilidade,
   CampoCorRaca,
   CampoGenero,
-  CampoInteresses,
   CampoNascimento,
   CampoPrefGenero,
   CampoUf,
   WizardFicha,
   type PassoFicha,
 } from "@/components/campos-pessoais";
-import { AREAS_SUGESTOES, formatWhatsApp } from "@/lib/ciclo";
+import { formatWhatsApp } from "@/lib/ciclo";
 import { cn, maskWhatsApp } from "@/lib/utils";
 import { temPapel } from "@/lib/types";
 import type { Disponibilidade, Profile } from "@/lib/types";
@@ -49,19 +47,18 @@ import { AssinaturasPessoa } from "@/components/assinaturas-pessoa";
 import { DadosCivisFields } from "@/components/assinatura-form";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 
-// subset do mentor_profile que a coordenação edita — inclui a ficha de
-// matching da 0034 (experiência/formação/disponibilidade) e os dois pools
-// de capacidade da 0073 (o híbrido edita os dois, um por trilha — WP6b)
+// subset do mentor_profile que a coordenação edita — a parte operacional
+// da ficha de matching da 0034 (disponibilidade/áreas) e os dois pools de
+// capacidade da 0073 (o híbrido edita os dois, um por trilha — WP6b). Os
+// textos autodeclarados (experiência prévia, formação externa) ficam fora:
+// são da pessoa, ela edita no próprio perfil
 type MentorProfile = {
   capacidade: number;
   capacidade_especialista: number | null;
   areas: string[];
   termo_ok: boolean;
   formacao_ok: boolean;
-  experiencia_previa: string | null;
-  formacao_externa: string | null;
   disponibilidade: Disponibilidade | null;
 } | null;
 
@@ -81,10 +78,6 @@ export function PessoaActions({
   // contagem num primeiro chamado e esse dialog conclui com forcar=true
   const [duplasEmCurso, setDuplasEmCurso] = useState(0);
   const [mp, setMp] = useState<MentorProfile | undefined>(undefined);
-  const [bioLen, setBioLen] = useState(0);
-  const [volLen, setVolLen] = useState(0);
-  const [areasPerfil, setAreasPerfil] = useState<string[]>(pessoa.areas ?? []);
-  const [interesses, setInteresses] = useState<string[]>(pessoa.interesses ?? []);
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -99,7 +92,7 @@ export function PessoaActions({
     if (!editOpen || !ehMentor) return;
     createClient()
       .from("mentor_profiles")
-      .select("capacidade, capacidade_especialista, areas, termo_ok, formacao_ok, experiencia_previa, formacao_externa, disponibilidade")
+      .select("capacidade, capacidade_especialista, areas, termo_ok, formacao_ok, disponibilidade")
       .eq("profile_id", pessoa.id)
       .maybeSingle()
       .then(({ data, error }) => {
@@ -132,9 +125,9 @@ export function PessoaActions({
     });
   }
 
-  // um passo por SecaoFicha — 8 seções seguidas de scroll viravam parede
-  // de campos; a "Ficha de mentor" entra quando o mentor_profiles carrega
-  // (salvar antes disso não zera nada: a action só toca o que veio no FormData)
+  // um passo por tema — o scroll de seções virava parede de campos; a
+  // "Ficha de mentor" entra quando o mentor_profiles carrega (salvar
+  // antes disso não zera nada: a action só toca o que veio no FormData)
   const passos: PassoFicha[] = [
     {
       titulo: "Identificação e contato",
@@ -186,10 +179,13 @@ export function PessoaActions({
       ),
     },
     {
-      // dados pessoais e documento ficam fora do passo de contato — a
-      // coordenação abre o cadastro pelo que usa no dia a dia (nome, zap,
-      // e-mail) e só desce pro resto quando precisa
-      titulo: "Dados pessoais e documento",
+      // dados pessoais fora do passo de contato — a coordenação abre o
+      // cadastro pelo que usa no dia a dia (nome, zap, e-mail) e só desce
+      // pro resto quando precisa. Os campos autodeclarados (interesses,
+      // motivação, cargo/empresa, origem, apresentação) saíram da edição
+      // da coordenação: são da pessoa — ela preenche no onboarding/perfil
+      // e a ficha (/pessoas/[id]) segue exibindo tudo pra leitura
+      titulo: "Dados pessoais",
       conteudo: (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -197,133 +193,12 @@ export function PessoaActions({
             <CampoGenero defaultValue={pessoa.genero ?? ""} />
           </div>
           <CampoCorRaca defaultValue={pessoa.cor_raca ?? ""} />
-          <p className="text-xs text-muted-foreground">
-            CPF, RG e endereço vão como estão no documento para o termo de
-            adesão. Só a coordenação vê estes campos.
-          </p>
-          {/* CPF/RG/endereço do termo (dados_civis, coord-only) — mesmos
-              campos da assinatura, com prefixo pra não colidir com os do
-              perfil (cidade/uf do matching são outros) */}
-          <DadosCivisFields
-            defaults={pessoa.dados_civis}
-            prefix="civ_"
-            opcional
-            compacto
-          />
-        </>
-      ),
-    },
-    {
-      titulo: "Localização e interesses",
-      conteudo: (
-        <>
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="e_cidade">Cidade</Label>
               <Input id="e_cidade" name="cidade" maxLength={100} defaultValue={pessoa.cidade ?? ""} />
             </div>
             <CampoUf defaultValue={pessoa.uf ?? ""} />
-          </div>
-          <CampoInteresses value={interesses} onChange={setInteresses} />
-        </>
-      ),
-    },
-    {
-      titulo: "Trabalho e origem",
-      conteudo: (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div className="space-y-2">
-              <Label htmlFor="e_cargo">Cargo</Label>
-              <Input id="e_cargo" name="cargo" maxLength={120} defaultValue={pessoa.cargo ?? ""} />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="e_empresa">Empresa</Label>
-              <Input id="e_empresa" name="empresa" maxLength={150} defaultValue={pessoa.empresa ?? ""} />
-            </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="e_origem">Como chegou ao programa</Label>
-            <Input id="e_origem" name="origem" maxLength={300} defaultValue={pessoa.origem ?? ""} />
-          </div>
-        </>
-      ),
-    },
-    {
-      titulo: ehMentor ? "Motivação e pareamento" : "Motivação",
-      conteudo: (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="e_motivacao">Motivação</Label>
-            <Textarea
-              id="e_motivacao" name="motivacao" rows={2} maxLength={2000}
-              defaultValue={pessoa.motivacao ?? ""}
-              placeholder="O que traz a pessoa ao programa"
-            />
-          </div>
-          {/* quem não é mentor não tem par — a preferência some da ficha
-              (REALIZA-231); o save de updatePessoa é parcial, então o valor
-              já gravado sobrevive a uma edição sem esse campo */}
-          {ehMentor && (
-            <CampoPrefGenero defaultValue={pessoa.pref_genero_par ?? ""} />
-          )}
-        </>
-      ),
-    },
-    {
-      // apresentação profissional (0030) — mesmos campos do /perfil; o
-      // `areas` do mentor_profile já existe, então o do perfil vai como
-      // `areas_perfil` pra não colidir no FormData
-      titulo: "Apresentação pública",
-      conteudo: (
-        <>
-          <div className="space-y-2">
-            <div className="flex items-baseline justify-between gap-2">
-              <Label htmlFor="e_bio">Biografia</Label>
-              <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
-                {bioLen}/1.000
-              </span>
-            </div>
-            <Textarea
-              id="e_bio" name="bio" rows={3} maxLength={1000}
-              defaultValue={pessoa.bio ?? ""}
-              onChange={(e) => setBioLen(e.target.value.length)}
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="e_linkedin">LinkedIn</Label>
-            <Input
-              id="e_linkedin" name="linkedin" type="url" inputMode="url"
-              defaultValue={pessoa.linkedin ?? ""}
-              placeholder="https://linkedin.com/in/..."
-            />
-          </div>
-          {/* o hidden do TagInput manda JSON — camposApresentacao aceita
-              JSON ou vírgula, então os dois formatos continuam valendo */}
-          <div className="space-y-2">
-            {/* TagInput tem aria-label próprio — <p> em vez de <Label> órfão */}
-            <p className="text-sm font-medium">Áreas de atuação</p>
-            <TagInput
-              name="areas_perfil"
-              sugestoes={AREAS_SUGESTOES}
-              value={areasPerfil}
-              onChange={setAreasPerfil}
-              inputLabel="Digite uma área e pressione Enter"
-            />
-          </div>
-          <div className="space-y-2">
-            <div className="flex items-baseline justify-between gap-2">
-              <Label htmlFor="e_voluntariado">Experiência com voluntariado</Label>
-              <span aria-hidden className="text-xs tabular-nums text-muted-foreground">
-                {volLen}/300
-              </span>
-            </div>
-            <Input
-              id="e_voluntariado" name="voluntariado" maxLength={300}
-              defaultValue={pessoa.voluntariado ?? ""}
-              onChange={(e) => setVolLen(e.target.value.length)}
-              placeholder="ex.: 2 anos como voluntário no Projeto X"
-            />
           </div>
         </>
       ),
@@ -379,21 +254,11 @@ export function PessoaActions({
                   />
                 </div>
               </div>
+              {/* preferência de par é campo de profiles (0034), não do
+                  mentor_profile — mas é dado de pareamento, então vive
+                  aqui junto da capacidade/disponibilidade */}
+              <CampoPrefGenero defaultValue={pessoa.pref_genero_par ?? ""} />
               <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
-              <div className="space-y-2">
-                <Label htmlFor="e_exp">Experiência prévia como mentor</Label>
-                <Textarea
-                  id="e_exp" name="experiencia_previa" rows={2} maxLength={2000}
-                  defaultValue={mp?.experiencia_previa ?? ""}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="e_form">Formação e certificações externas</Label>
-                <Textarea
-                  id="e_form" name="formacao_externa" rows={2} maxLength={2000}
-                  defaultValue={mp?.formacao_externa ?? ""}
-                />
-              </div>
               <div className="flex gap-6">
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
                   <input type="checkbox" name="termo_ok" defaultChecked={mp?.termo_ok} className="accent-primary" />
@@ -585,27 +450,23 @@ export function PessoaActions({
         open={editOpen}
         onOpenChange={(o) => {
           setEditOpen(o);
-          // contadores e chips acompanham o valor carregado na abertura do dialog
-          if (o) {
-            setBioLen(pessoa.bio?.length ?? 0);
-            setVolLen(pessoa.voluntariado?.length ?? 0);
-            setAreasPerfil(pessoa.areas ?? []);
-            setInteresses(pessoa.interesses ?? []);
-            setDisponibilidade(null);
-          }
+          // a grade volta zerada na abertura — o fetch do mentor_profiles
+          // repovoa (falha nele esconde a seção, nunca zera o banco)
+          if (o) setDisponibilidade(null);
         }}
       >
         <DialogContent size="2xl">
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
             <DialogDescription>
-              Os dados do cadastro em etapas: salve no fim.
+              Os dados do cadastro em etapas. Salve de qualquer uma.
             </DialogDescription>
           </DialogHeader>
           <WizardFicha
             passos={passos}
             pending={pending}
             submitLabel="Salvar"
+            saveAnywhere
             onSubmit={submit}
           />
         </DialogContent>

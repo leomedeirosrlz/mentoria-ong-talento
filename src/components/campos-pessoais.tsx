@@ -510,20 +510,26 @@ export type PassoFicha = {
 
 /** Wizard de etapas pros dialogs de cadastro/edição de pessoa — o mesmo
  *  padrão do registro-form: cabeçalho "Passo N de M · título", barras de
- *  progresso, todos os passos montados (`hidden` nos inativos) e rodapé
- *  sticky com Voltar/Avançar/Salvar. O form fica aqui dentro: `onSubmit` só
- *  é chamado no último passo — Enter antes dele avança, não salva. */
+ *  progresso clicáveis (trás livre, pra frente com a etapa atual válida),
+ *  todos os passos montados (`hidden` nos inativos) e rodapé sticky com
+ *  Voltar/Avançar/Salvar. O form fica aqui dentro: Enter antes do último
+ *  passo avança, não salva. Com `saveAnywhere` o Salvar fica sempre à mão —
+ *  o FormData viaja inteiro de qualquer etapa porque nada desmonta. */
 export function WizardFicha({
   passos,
   pending,
   submitLabel,
   pendingLabel = "Salvando…",
+  saveAnywhere = false,
   onSubmit,
 }: {
   passos: PassoFicha[];
   pending: boolean;
   submitLabel: string;
   pendingLabel?: string;
+  /** edição: salva sem chegar no último passo — a ação vive no rodapé em
+   *  todas as etapas (edição é patch, cada save leva o form todo) */
+  saveAnywhere?: boolean;
   onSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
 }) {
   const [etapa, setEtapa] = useState(0);
@@ -534,6 +540,11 @@ export function WizardFicha({
   // foco pedido junto com a troca de etapa — o efeito roda depois do commit,
   // quando o `hidden` da seção alvo já saiu da árvore renderizada
   const focoPendente = useRef(false);
+  // controle inválido a reportar quando a etapa dele ficar visível —
+  // reportValidity num passo `hidden` falha calado (controle infocável)
+  const invalidoPendente = useRef<
+    HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null
+  >(null);
   const ultima = passos.length - 1;
 
   // passo condicional pode sumir (papel trocado, ficha async ainda não
@@ -547,6 +558,10 @@ export function WizardFicha({
     if (!focoPendente.current) return;
     focoPendente.current = false;
     tituloEtapaRef.current?.focus();
+    // a validação que forçou a navegação reporta agora, com o campo visível
+    const invalido = invalidoPendente.current;
+    invalidoPendente.current = null;
+    invalido?.reportValidity();
   });
 
   function irPara(proxima: number) {
@@ -555,13 +570,13 @@ export function WizardFicha({
     setEtapa(proxima);
   }
 
-  /** Os campos do passo visível precisam valer antes de avançar. Input
-   *  `required` num passo `hidden` falha calado no Chrome (controle
-   *  infocável), então a checagem roda aqui com o campo ainda visível —
-   *  assim o reportValidity tem onde aparecer. */
-  function passoValido(): boolean {
-    const passo = passosRef.current[etapa];
-    if (!passo) return true;
+  /** Primeiro controle inválido da etapa — input `required` num passo
+   *  `hidden` falha calado no Chrome (controle infocável), então quem chama
+   *  decide: reportar na hora (etapa visível) ou navegar primeiro. */
+  function primeiroInvalido(
+    passo: HTMLDivElement | null | undefined
+  ): HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement | null {
+    if (!passo) return null;
     for (const c of passo.querySelectorAll("input, select, textarea")) {
       if (
         (c instanceof HTMLInputElement ||
@@ -569,7 +584,30 @@ export function WizardFicha({
           c instanceof HTMLTextAreaElement) &&
         !c.checkValidity()
       ) {
-        c.reportValidity();
+        return c;
+      }
+    }
+    return null;
+  }
+
+  /** Os campos do passo visível precisam valer antes de avançar — a
+   *  checagem roda com o campo ainda visível pro reportValidity aparecer. */
+  function passoValido(): boolean {
+    const c = primeiroInvalido(passosRef.current[etapa]);
+    if (!c) return true;
+    c.reportValidity();
+    return false;
+  }
+
+  /** O save cobre TODAS as etapas, não só a atual — pode vir de qualquer
+   *  uma (saveAnywhere) e a barra de etapas pula sem checar o meio. Ao
+   *  achar um inválido escondido, vai até a etapa dele e reporta lá. */
+  function todasEtapasValidas(): boolean {
+    for (let i = 0; i < passos.length; i++) {
+      const c = primeiroInvalido(passosRef.current[i]);
+      if (c) {
+        invalidoPendente.current = c;
+        irPara(i);
         return false;
       }
     }
@@ -581,14 +619,27 @@ export function WizardFicha({
     irPara(etapa + 1);
   }
 
+  /** Barra de etapas: pra trás é livre; pra frente a etapa atual tem que
+   *  valer (o que faltar no meio o save cobra na validação inteira). */
+  function pularPara(i: number) {
+    if (i === etapa) return;
+    if (i > etapa && !passoValido()) return;
+    irPara(i);
+  }
+
   function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    // Enter/submit antes do último passo avança, não salva — o submit
-    // implícito do browser chega aqui por qualquer campo de texto
-    if (etapa < ultima) {
-      e.preventDefault();
+    e.preventDefault();
+    // submit sem botão marcado (Enter implícito, requestSubmit) antes do
+    // último passo avança; o clique no Salvar grava de qualquer etapa —
+    // o FormData sempre tem tudo porque os passos seguem montados
+    const sub = (e.nativeEvent as SubmitEvent).submitter;
+    const salvar =
+      sub instanceof HTMLElement && sub.hasAttribute("data-salvar");
+    if (etapa < ultima && !salvar) {
       avancar();
       return;
     }
+    if (!todasEtapasValidas()) return;
     onSubmit(e);
   }
 
@@ -611,23 +662,36 @@ export function WizardFicha({
 
   return (
     <form onSubmit={handleSubmit} onKeyDown={onEnterKey} className="space-y-4">
-      {/* cabeçalho do wizard — barras finas, uma por seção (SecaoFicha vira
-          passo); os nomes ficam no sr-only e no título falado */}
+      {/* cabeçalho do wizard — cada barra navega direto pra etapa (trás
+          livre, pra frente com a atual válida); os nomes ficam no
+          aria-label e no title de cada uma */}
       <div className="space-y-2">
         <h3 ref={tituloEtapaRef} tabIndex={-1} className="text-sm font-medium outline-none">
           Passo {etapaAtual + 1} de {passos.length} · {passos[etapaAtual].titulo}
         </h3>
         <ol className="flex gap-1" aria-label="Etapas">
           {passos.map((p, i) => (
-            <li
-              key={p.titulo}
-              aria-current={i === etapa ? "step" : undefined}
-              className={cn(
-                "h-1.5 flex-1 rounded-full transition-colors",
-                i <= etapa ? "bg-primary" : "bg-muted"
-              )}
-            >
-              <span className="sr-only">{p.titulo}</span>
+            <li key={p.titulo} className="min-w-0 flex-1">
+              <button
+                type="button"
+                onClick={() => pularPara(i)}
+                aria-current={i === etapaAtual ? "step" : undefined}
+                aria-label={`Etapa ${i + 1} de ${passos.length}: ${p.titulo}`}
+                title={p.titulo}
+                // o alvo real continua fino (h-1.5) — o py-1/-my-1 dobra a
+                // área de toque sem mudar o traço
+                className="group -my-1 block w-full rounded-sm py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
+              >
+                <span
+                  aria-hidden
+                  className={cn(
+                    "block h-1.5 rounded-full transition-colors",
+                    i <= etapaAtual
+                      ? "bg-primary"
+                      : "bg-muted group-hover:bg-muted-foreground/40"
+                  )}
+                />
+              </button>
             </li>
           ))}
         </ol>
@@ -647,9 +711,13 @@ export function WizardFicha({
         </div>
       ))}
 
-      {/* rodapé do wizard — o DialogFooter compartilhado no modo sticky
-          (o DialogContent é o scrollport): Voltar é nav de etapa, fica à
-          esquerda; Avançar/Salvar ocupa o resto da linha */}
+      {/* rodapé do wizard — Avançar e Salvar ficam montados o tempo todo
+          (`hidden` alterna): um botão que VIRASSE submit no mesmo clique
+          disparava o form — o default action do clique é avaliado depois
+          do re-render, então o último "Avançar" já salvava e a etapa da
+          foto/consentimento era pulada. O Salvar leva formNoValidate: a
+          validação inteira é manual (todasEtapasValidas), senão um
+          required escondido bloqueava o submit sem aviso */}
       <DialogFooter sticky>
         {etapa > 0 && (
           <Button
@@ -661,15 +729,25 @@ export function WizardFicha({
             <CaretLeft size={14} /> Voltar
           </Button>
         )}
-        {etapa < ultima ? (
-          <Button type="button" className="flex-1" onClick={avancar}>
-            Avançar <CaretRight size={14} />
-          </Button>
-        ) : (
-          <Button type="submit" className="flex-1" disabled={pending}>
-            {pending ? pendingLabel : submitLabel}
-          </Button>
-        )}
+        <Button
+          type="button"
+          className="flex-1"
+          hidden={etapaAtual >= ultima}
+          onClick={avancar}
+        >
+          Avançar <CaretRight size={14} />
+        </Button>
+        <Button
+          type="submit"
+          formNoValidate
+          data-salvar
+          className="flex-1"
+          variant={etapaAtual >= ultima ? "default" : "outline"}
+          hidden={etapaAtual < ultima && !saveAnywhere}
+          disabled={pending}
+        >
+          {pending ? pendingLabel : submitLabel}
+        </Button>
       </DialogFooter>
     </form>
   );

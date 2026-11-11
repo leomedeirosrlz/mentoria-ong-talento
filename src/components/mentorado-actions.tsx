@@ -395,13 +395,14 @@ export function MentoradoActions({
           <DialogHeader>
             <DialogTitle>Editar {primeiroNome}</DialogTitle>
             <DialogDescription>
-              Os dados do cadastro em etapas: salve no fim.
+              Os dados do cadastro em etapas. Salve de qualquer uma.
             </DialogDescription>
           </DialogHeader>
           <WizardFicha
             passos={passos}
             pending={pending}
             submitLabel="Salvar"
+            saveAnywhere
             onSubmit={submit}
           />
         </DialogContent>

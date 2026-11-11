@@ -1222,46 +1222,6 @@ export async function setEscopoAuxiliar(
 
 // ---------- gestao ----------
 
-/** Dados civis do termo (0046) — CPF, RG e endereço, coluna coord-only.
- *  Merge parcial: só os campos que o form mandou entram; o resto do jsonb
- *  fica como estava. CPF com DV conferido, CEP só dígitos. */
-function camposCivis(
-  formData: FormData,
-  atual: DadosCivis | null
-): { dados_civis: DadosCivis } | { error: string } | Record<string, never> {
-  const chaves = [
-    "civ_cpf", "civ_rg", "civ_cep", "civ_logradouro", "civ_numero",
-    "civ_complemento", "civ_bairro", "civ_cidade", "civ_uf",
-  ];
-  if (!chaves.some((k) => formData.has(k))) return {};
-
-  const texto = (k: string, anterior: string | null | undefined) =>
-    formData.has(k) ? String(formData.get(k) ?? "").trim() || null : (anterior ?? null);
-
-  const cpfRaw = String(formData.get("civ_cpf") ?? "").replace(/\D/g, "");
-  if (cpfRaw && !cpfValido(cpfRaw)) {
-    return { error: "Confira o CPF (dígito verificador)." };
-  }
-  const e = atual?.endereco;
-  return {
-    dados_civis: {
-      nome_civil: atual?.nome_civil ?? null,
-      data_nascimento: atual?.data_nascimento ?? null,
-      cpf: cpfRaw || null,
-      rg: texto("civ_rg", atual?.rg),
-      endereco: {
-        logradouro: texto("civ_logradouro", e?.logradouro) ?? "",
-        numero: texto("civ_numero", e?.numero) ?? "",
-        complemento: texto("civ_complemento", e?.complemento),
-        bairro: texto("civ_bairro", e?.bairro) ?? "",
-        cidade: texto("civ_cidade", e?.cidade) ?? "",
-        uf: (texto("civ_uf", e?.uf) ?? "").toUpperCase().slice(0, 2),
-        cep: (texto("civ_cep", e?.cep) ?? "").replace(/\D/g, "").slice(0, 8),
-      },
-    },
-  };
-}
-
 export async function updatePessoa(profileId: string, formData: FormData) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -1299,29 +1259,28 @@ export async function updatePessoa(profileId: string, formData: FormData) {
   // 0060). A pessoa troca o próprio em /perfil (trocarEmail).
   const { data: atual } = await supabase
     .from("profiles").select("user_id, role, email, dados_civis, consent_lgpd_em, profile_papeis(papel)").eq("id", profileId).single();
-  // campos de apresentação (0030) — a coordenação edita os mesmos que a
-  // pessoa edita em /perfil; o form manda `areas_perfil` porque `areas` já é
-  // o campo do mentor_profile
-  const apresentacao = camposApresentacao(formData, { areasKey: "areas_perfil" });
+  // campos de apresentação (0030) são da pessoa — ela edita em /perfil e o
+  // dialog da coordenação nem renderiza; parcial pra chave ausente nunca
+  // zerar o que está gravado. `areas_perfil` porque `areas` já é o campo
+  // do mentor_profile no FormData
+  const apresentacao = camposApresentacao(formData, { areasKey: "areas_perfil", parcial: true });
   if ("error" in apresentacao) return { error: apresentacao.error };
   // ficha pessoal/matching (0034) — a escrita é table-level: coord edita de
   // qualquer um; os sensíveis que ela lê via view ela também grava aqui.
   // Patch parcial de propósito: campo que o form não renderiza (a preferência
   // de par de quem não é mentor, REALIZA-231) não pode virar null no save —
   // o dado já gravado sobrevive a uma edição feita por outro recorte de papel.
+  // Inclui os dados civis do termo (0046) via prefixo `civis_`.
   const ficha = camposFicha(formData, { de: "pessoa", parcial: true });
   if ("error" in ficha) return { error: ficha.error };
-  const mentorCampos = camposMentor(formData);
+  // mentor_profile idem — só o que o form mandou entra no upsert
+  const mentorCampos = camposMentor(formData, { parcial: true });
   if ("error" in mentorCampos) return { error: mentorCampos.error };
-  // dados civis do termo (0046) — CPF/RG/endereço, coord-only
-  const civis = camposCivis(formData, (atual?.dados_civis ?? null) as DadosCivis | null);
-  if ("error" in civis) return { error: civis.error };
   const patch: Record<string, unknown> = {
     nome,
     whatsapp: whatsapp || null,
     ...apresentacao,
     ...ficha,
-    ...civis,
     ...consentPatch(formData, atual?.consent_lgpd_em),
   };
   // sentinela: checkbox desmarcado não posta (mesmo padrão do salvarOnboarding)
