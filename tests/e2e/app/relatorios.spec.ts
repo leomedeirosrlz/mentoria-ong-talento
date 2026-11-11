@@ -3,6 +3,7 @@ import {
   appEnvOk,
   expect,
   loginComSenha,
+  relogar,
   test,
 } from "../helpers";
 
@@ -83,12 +84,13 @@ test.describe("/api/export — os 6 tipos novos (coord)", () => {
   });
 
   test("mentor recebe 403; supervisor também", async ({ page }) => {
-    await loginComSenha(page, MENTOR_EMAIL, SENHA);
+    // beforeEach já logou coord — troca de papel exige o relogar (limpa o
+    // cookie antes, senão /login desvia pra home e o pill nunca aparece)
+    await relogar(page, MENTOR_EMAIL, SENHA);
     const rMentor = await apiGetApp(page, "/api/export?tipo=aderencia");
     expect(rMentor.status()).toBe(403);
 
-    await page.context().clearCookies();
-    await loginComSenha(page, SUP_EMAIL, SENHA);
+    await relogar(page, SUP_EMAIL, SENHA);
     const rSup = await apiGetApp(page, "/api/export?tipo=solicitacoes");
     expect(rSup.status()).toBe(403);
   });

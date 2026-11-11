@@ -173,7 +173,7 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
     page,
   }) => {
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
-    await page.goto("/relatorios");
+    await page.goto("/relatorios?aba=grade");
 
     // a turma existe SÓ na fila (sem dupla nenhuma) — entra no seletor
     // pela união com turma_inscricoes; selecionar mostra a linha do
@@ -242,7 +242,7 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
     page,
   }) => {
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
-    await page.goto("/relatorios");
+    await page.goto("/relatorios?aba=grade");
 
     // o "Compartilhar" da toolbar concentra criar + gerir — o card
     // permanente de links não existe mais na página
@@ -318,7 +318,7 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
     page,
   }) => {
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
-    await page.goto("/relatorios");
+    await page.goto("/relatorios?aba=grade");
 
     await page.getByRole("button", { name: "Compartilhar" }).click();
     await page.getByRole("button", { name: "Novo link público" }).click();
@@ -352,7 +352,7 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
     // rotação pelo menu: "Redefinir senha" gera a forte e troca o hash na
     // hora — a página revalida o cookie a cada render, então o visitante
     // com a senha velha cai no form sem aviso no próximo acesso
-    await page.goto("/relatorios");
+    await page.goto("/relatorios?aba=grade");
     await page.getByRole("button", { name: "Compartilhar" }).click();
     const card = page
       .locator("li")
@@ -391,7 +391,7 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
     page,
   }) => {
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
-    await page.goto("/relatorios");
+    await page.goto("/relatorios?aba=grade");
 
     await page.getByRole("button", { name: "Compartilhar" }).click();
     await page.getByRole("button", { name: "Novo link público" }).click();
@@ -434,7 +434,7 @@ test.describe("/resumo — gate por relatorio_links + fila turma_inscricoes", ()
 
     // revogação pelo Compartilhar: confirmar tira o ar na hora — o
     // próximo acesso vê o card neutro, não a grade
-    await page.goto("/relatorios");
+    await page.goto("/relatorios?aba=grade");
     await page.getByRole("button", { name: "Compartilhar" }).click();
     const card = page
       .locator("li")
