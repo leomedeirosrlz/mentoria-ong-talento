@@ -9,6 +9,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AppRole } from "@/lib/types";
+import type { CanalIa } from "./tools";
 
 export type VeredictoLimite =
   | { permitido: true; usados: number; requestId: string }
@@ -22,7 +23,7 @@ export type VeredictoLimite =
 export async function consumirLimiteIa(
   supabase: SupabaseClient,
   args: Record<string, unknown>,
-  canal: "chat" | "mcp" = "chat",
+  canal: CanalIa = "chat",
   limite = 20
 ): Promise<VeredictoLimite> {
   const { data, error } = await supabase.rpc("consumir_limite_ia", {

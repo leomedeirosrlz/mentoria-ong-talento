@@ -42,6 +42,7 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   instrumentos_da_dupla: { dupla_id: UUID },
   chamados_resumo: {},
   pessoas_busca: { nome: "Maria" },
+  combinados_das_duplas: {},
   // mentorado (pacote nov/2026) — semArgs no resto, tópico na FAQ
   minha_dupla: {},
   minha_agenda: {},

@@ -7,6 +7,7 @@ import {
   type PassoGuia,
 } from "./ciclo";
 import type { PdmResumo } from "./pdm";
+import type { AvaliacaoJovemResumo } from "./avaliacao-agregado";
 import type {
   AvaliacaoJovem,
   CicloEvento,
@@ -55,8 +56,8 @@ export const CHECKLIST_ENCERRAMENTO: {
 // ---------- resumo da jornada (relatório final do guia) ----------
 
 /** Peso 1–4 da avaliação do jovem — a escala do form semanal em número.
- *  Exportado pra média do relatório de aderência (REALIZA-178) — fonte
- *  única, não duplicar. */
+ *  Fonte única: a média do relatório de aderência (178) e o agregado do
+ *  360º (avaliacao-agregado.ts, 71) usam a mesma régua. */
 export const PESO_AVALIACAO: Record<AvaliacaoJovem, number> = {
   excelente: 4,
   boa: 3,
@@ -95,6 +96,10 @@ export type ResumoJornada = {
    *  atingidas com datas — a retro que o guia pede, pronta. Null quando a
    *  dupla não tem PDM (especialista, jornada anterior ao nativo). */
   pdm: PdmResumo | null;
+  /** The young person's star series (REALIZA-71) — already shaped to the
+   *  viewer's privacy cut by the caller: full series for coord/sup/jovem,
+   *  the quantized media for the DPP mentor. Null when no evals exist. */
+  avaliacaoJovem: AvaliacaoJovemResumo | null;
 };
 
 /** O que o resumo precisa da dupla — estrutural e estreito pra servir tanto
@@ -124,10 +129,13 @@ export type DuplaParaResumo = {
 export function dadosResumoJornada(
   dupla: DuplaParaResumo,
   passos: PassoGuia[],
-  eventos: CicloEvento[],
+  // só tipo+data entram na régua de "esperados" — o payload do jovem_jornada
+  // (EventoJornada) serve direto, sem fingir a row inteira de ciclo_eventos
+  eventos: Pick<CicloEvento, "tipo" | "data">[],
   fim: string | null,
   hoje = new Date(),
-  pdm: PdmResumo | null = null
+  pdm: PdmResumo | null = null,
+  avaliacaoJovem: AvaliacaoJovemResumo | null = null
 ): ResumoJornada {
   const realizados = dupla.encontros.filter(
     (e) => e.status === "realizado"
@@ -182,6 +190,7 @@ export function dadosResumoJornada(
     combinadosFeitos,
     combinadosTotal: dupla.encaminhamentos.length,
     pdm,
+    avaliacaoJovem,
   };
 }
 
@@ -210,8 +219,18 @@ export function textoResumoJornada(r: ResumoJornada): string {
     `Encontros realizados: ${r.realizados} de ${r.total}` +
       (r.esperados != null ? ` (esperados pelo calendário: ${r.esperados})` : ""),
     r.mediaAvaliacao != null
-      ? `Avaliação média do jovem: ${r.mediaAvaliacao.toFixed(1)}/4 (${mediaAvaliacaoLabel(r.mediaAvaliacao).toLowerCase()})`
+      ? `Avaliação média do mentor: ${r.mediaAvaliacao.toFixed(1)}/4 (${mediaAvaliacaoLabel(r.mediaAvaliacao).toLowerCase()})`
       : "Sem avaliações registradas",
+    // young-person side (REALIZA-71): the snapshot is a coord report, so
+    // the series it carries is always the full one
+    r.avaliacaoJovem != null
+      ? `Avaliação do jovem: média ${r.avaliacaoJovem.media != null ? r.avaliacaoJovem.media.toFixed(1) : "—"}/5 em ${r.avaliacaoJovem.n} ${
+          r.avaliacaoJovem.n === 1 ? "avaliação" : "avaliações"
+        }` +
+          (r.avaliacaoJovem.trajetoria
+            ? ` (${r.avaliacaoJovem.trajetoria.primeiro}★→${r.avaliacaoJovem.trajetoria.ultimo}★)`
+            : "")
+      : "Sem avaliações do jovem",
     `Combinados cumpridos: ${r.combinadosFeitos} de ${r.combinadosTotal}`,
   ];
   if (r.pdm) {

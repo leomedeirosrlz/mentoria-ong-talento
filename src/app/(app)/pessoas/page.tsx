@@ -1,17 +1,22 @@
 import { redirect } from "next/navigation";
 import type { Metadata } from "next";
 import {
+  getCronogramas,
   getDuplasResumo,
   getDuplasResumoTodas,
+  getMapaAcesso,
   getMe,
   getMentorados,
   getMentorProfiles,
+  getPapeisEscopo,
   getPessoas,
+  getTurmaInscricoesPessoas,
   type MentorProfile,
 } from "@/lib/queries";
 import { getAssinaturasResumo } from "@/lib/queries-assinaturas";
 import { faltantesDocumento } from "@/lib/documentos/texto";
 import { foraDoPrograma } from "@/lib/ciclo";
+import { turmaDaDupla } from "@/lib/turma";
 import type { DocsPessoa } from "@/components/pessoas-listas";
 import {
   NovaPessoaDialog,
@@ -36,17 +41,43 @@ export default async function PessoasPage() {
   const souCoord = me.role === "coordenacao";
 
   // fora da coordenação a página é um diretório de colegas: os resumos
-  // operacionais (vínculos de dupla, fichas de mentor, assinaturas) viriam
-  // escopados pelo RLS e renderizariam badges falsos — nem dispara
-  const [pessoasRaw, mentorados, duplas, todasDuplas, perfisMentor, resumoAss] =
-    await Promise.all([
-      getPessoas(),
-      getMentorados(),
-      souCoord ? getDuplasResumo() : Promise.resolve([]),
-      souCoord ? getDuplasResumoTodas() : Promise.resolve([]),
-      souCoord ? getMentorProfiles() : Promise.resolve([]),
-      souCoord ? getAssinaturasResumo() : Promise.resolve([]),
-    ]);
+  // operacionais (vínculos de dupla, fichas de mentor, assinaturas, mapas
+  // de turma/acesso) viriam escopados pelo RLS e renderizariam badges
+  // falsos — nem dispara
+  const [
+    pessoasRaw,
+    mentorados,
+    duplas,
+    todasDuplas,
+    perfisMentor,
+    resumoAss,
+    inscricoes,
+    papeisEscopo,
+    acesso,
+    cronogramas,
+  ] = await Promise.all([
+    getPessoas(),
+    getMentorados(),
+    souCoord ? getDuplasResumo() : Promise.resolve([]),
+    souCoord ? getDuplasResumoTodas() : Promise.resolve([]),
+    souCoord ? getMentorProfiles() : Promise.resolve([]),
+    souCoord ? getAssinaturasResumo() : Promise.resolve([]),
+    souCoord ? getTurmaInscricoesPessoas() : Promise.resolve([]),
+    souCoord ? getPapeisEscopo() : Promise.resolve([]),
+    souCoord ? getMapaAcesso() : Promise.resolve({}),
+    souCoord ? getCronogramas() : Promise.resolve([]),
+  ]);
+
+  // filiação por turma (REALIZA-39): duplas.turma é selo — o rótulo vivo
+  // resolve pelo cronograma (renomear a turma não fatia o grupo em duas)
+  const mapasTurma = {
+    duplas: todasDuplas.map((d) => ({
+      ...d,
+      turma: turmaDaDupla(d, cronogramas),
+    })),
+    inscricoes,
+    papeisEscopo,
+  };
 
   // conta de jovem (profile role=mentorado) já aparece como ficha de
   // mentorado — a linha de profile duplicaria a pessoa e a ficha dela é
@@ -197,6 +228,8 @@ export default async function PessoasPage() {
         contagemPorMentor={contagemPorMentor}
         assinaturas={docsPorPessoa}
         faltantes={faltantesPorPessoa}
+        mapasTurma={mapasTurma}
+        acesso={acesso}
         euNome={me.nome}
         souCoord={souCoord}
       />

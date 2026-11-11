@@ -57,6 +57,12 @@ function supaFake({
   const fromCalls: string[] = [];
   // escritas observadas por tabela — prova de que a tool executou de fato
   const escritas: { tabela: string; op: string; payload: unknown }[] = [];
+  // args capturados por builder — prova de que a query pede o filtro/
+  // projeção certa pro PostgREST (a RLS em si não roda no fake)
+  const selectCalls: { tabela: string; sel: unknown }[] = [];
+  const eqCalls: { tabela: string; campo: string; valor: unknown }[] = [];
+  const orderCalls: { tabela: string; campo: string; op: unknown }[] = [];
+  const limitCalls: { tabela: string; n: number }[] = [];
   // o rpc do supabase-js é lazy: chamar sem await nunca chega no PostgREST.
   // O flag vira só quando o retorno é awaited — prova de que executarTool
   // espera a auditoria, não só dispara.
@@ -65,15 +71,27 @@ function supaFake({
   const builder = (tabela: string) => {
     const rows = () => tabelas[tabela] ?? [];
     const b: Record<string, unknown> = {
-      select: () => b,
+      select: (sel?: unknown) => {
+        selectCalls.push({ tabela, sel });
+        return b;
+      },
       in: () => b,
-      eq: () => b,
+      eq: (campo: string, valor: unknown) => {
+        eqCalls.push({ tabela, campo, valor });
+        return b;
+      },
       neq: () => b,
       gt: () => b,
       gte: () => b,
       lte: () => b,
-      order: () => b,
-      limit: () => b,
+      order: (campo: string, op?: unknown) => {
+        orderCalls.push({ tabela, campo, op });
+        return b;
+      },
+      limit: (n: number) => {
+        limitCalls.push({ tabela, n });
+        return b;
+      },
       insert: (p: unknown) => {
         escritas.push({ tabela, op: "insert", payload: p });
         return b;
@@ -140,6 +158,10 @@ function supaFake({
     auditCalls,
     fromCalls,
     escritas,
+    selectCalls,
+    eqCalls,
+    orderCalls,
+    limitCalls,
     auditAwaited: () => auditAwaited,
   };
 }
@@ -164,6 +186,7 @@ describe("registry", () => {
         "atribuir_chamado",
         "capacidade_mentores",
         "chamados_resumo",
+        "combinados_das_duplas",
         "comentar_chamado",
         "confirmar_sugestao_especialista",
         "contra_propor_solicitacao",
@@ -828,6 +851,170 @@ describe("executarTool — tools", () => {
       p_tool: "instrumentos_da_dupla",
       p_ok: false,
     });
+  });
+
+  it("combinados_das_duplas devolve contexto da dupla, atraso derivado e totais", async () => {
+    // a linha vem do embed duplas!inner — o fake devolve o shape pronto
+    const linha = (over: Record<string, unknown>) => ({
+      id: "t-1",
+      descricao: "Enviar o currículo",
+      responsavel: "mentor",
+      prazo: "2020-01-05", // passado de longe → atrasado determinístico
+      status: "pendente",
+      numero: 7,
+      feito_em: null,
+      created_at: "2025-11-01T00:00:00-03:00",
+      dupla: {
+        id: "d-1",
+        trilha: "dpp",
+        turma: "T1",
+        status: "ativa",
+        mentor: { nome: "Ana", nome_social: null },
+        mentorado: { nome: "João", nome_social: "Joca" },
+      },
+      // colunas que o select não pede — não podem vazar nem serializadas
+      registro_id: "r-9",
+      created_by: "u-9",
+      ...over,
+    });
+    const { supabase } = supaFake({
+      tabelas: {
+        encaminhamentos: [
+          linha({ id: "t-atrasado" }),
+          linha({ id: "t-emdia", prazo: "2999-01-01" }),
+          linha({ id: "t-semprazo", prazo: null }),
+          linha({
+            id: "t-feito",
+            status: "feito",
+            prazo: "2020-01-05", // vencido mas feito → não conta atraso
+            feito_em: "2025-11-02T00:00:00-03:00",
+          }),
+        ],
+      },
+    });
+    const r = await executarTool(
+      "combinados_das_duplas",
+      { status: "todos" },
+      supabase,
+      "chat"
+    );
+    const dados = dadosDe(r) as {
+      total: number;
+      vencidos: number;
+      combinados: Record<string, unknown>[];
+    };
+    expect(dados.total).toBe(4);
+    expect(dados.vencidos).toBe(1);
+    const porId = Object.fromEntries(
+      dados.combinados.map((c) => [c.id as string, c])
+    );
+    expect(porId["t-atrasado"].atrasado).toBe(true);
+    expect(porId["t-emdia"].atrasado).toBe(false);
+    expect(porId["t-semprazo"].atrasado).toBe(false);
+    expect(porId["t-feito"].atrasado).toBe(false);
+    expect(porId["t-atrasado"]).toMatchObject({
+      dupla_id: "d-1",
+      mentor: "Ana",
+      mentorado: "Joca", // nome_social ganha do civil
+      trilha: "dpp",
+      turma: "T1",
+      numero: 7,
+      texto: "Enviar o currículo",
+      responsavel: "mentor",
+      prazo: "2020-01-05",
+      status: "pendente",
+    });
+    // o shape é fechado — embed cru e colunas internas ficam fora
+    for (const campo of ["dupla", "registro_id", "created_by", "descricao"]) {
+      expect(porId["t-atrasado"]).not.toHaveProperty(campo);
+    }
+    expect(JSON.stringify(dados)).not.toContain("r-9");
+  });
+
+  it("combinados_das_duplas aplica dupla_id/status/limite na query", async () => {
+    const { supabase, eqCalls, orderCalls, limitCalls, selectCalls } =
+      supaFake({ tabelas: { encaminhamentos: [] } });
+    const r = await executarTool(
+      "combinados_das_duplas",
+      { dupla_id: UUID, limite: 5 },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(true);
+    const eq = eqCalls.filter((c) => c.tabela === "encaminhamentos");
+    // sem status no args o padrão é pendente (o recorte "o que cobrar")
+    expect(eq).toEqual(
+      expect.arrayContaining([
+        { tabela: "encaminhamentos", campo: "dupla_id", valor: UUID },
+        { tabela: "encaminhamentos", campo: "status", valor: "pendente" },
+      ])
+    );
+    expect(limitCalls).toContainEqual({ tabela: "encaminhamentos", n: 5 });
+    // vencidos primeiro: prazo asc com nulls por último, desempate recente
+    expect(orderCalls).toEqual(
+      expect.arrayContaining([
+        {
+          tabela: "encaminhamentos",
+          campo: "prazo",
+          op: { ascending: true, nullsFirst: false },
+        },
+        {
+          tabela: "encaminhamentos",
+          campo: "created_at",
+          op: { ascending: false },
+        },
+      ])
+    );
+    // o embed !inner é o cinto da RLS — combinado de dupla invisível não sai
+    const sel = selectCalls.find((c) => c.tabela === "encaminhamentos")!;
+    expect(String(sel.sel)).toContain("duplas!inner");
+  });
+
+  it("combinados_das_duplas com status='todos' não filtra por status", async () => {
+    const { supabase, eqCalls } = supaFake({
+      tabelas: { encaminhamentos: [] },
+    });
+    await executarTool(
+      "combinados_das_duplas",
+      { status: "todos" },
+      supabase,
+      "chat"
+    );
+    const eq = eqCalls.filter(
+      (c) => c.tabela === "encaminhamentos" && c.campo === "status"
+    );
+    expect(eq).toHaveLength(0);
+  });
+
+  it("combinados_das_duplas é staff — jovem é barrado antes de ler", async () => {
+    expect(IA_TOOLS.combinados_das_duplas.roles).toEqual([
+      "coordenacao",
+      "supervisor",
+      "mentor_dpp",
+      "mentor_especialista",
+    ]);
+    const { supabase, fromCalls, auditCalls } = supaFake({
+      papel: "mentorado",
+    });
+    const r = await executarTool(
+      "combinados_das_duplas",
+      {},
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(false);
+    expect(fromCalls).not.toContain("encaminhamentos");
+    expect(auditCalls[0].p_ok).toBe(false);
+    // mentor passa o gate — o recorte fino é da RLS (mentor vê só a sua)
+    const m = supaFake({ papel: "mentor_dpp", tabelas: { encaminhamentos: [] } });
+    const r2 = await executarTool(
+      "combinados_das_duplas",
+      {},
+      m.supabase,
+      "chat"
+    );
+    expect(r2.ok).toBe(true);
+    expect(m.fromCalls).toContain("encaminhamentos");
   });
 });
 

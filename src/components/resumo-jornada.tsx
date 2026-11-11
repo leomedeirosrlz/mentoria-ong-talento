@@ -1,10 +1,16 @@
-import { AVALIACAO_LABEL, formatDate, TRILHA_LABEL } from "@/lib/ciclo";
+import {
+  AVALIACAO_LABEL,
+  formatDate,
+  TEMA_AVALIACAO_LABEL,
+  TRILHA_LABEL,
+} from "@/lib/ciclo";
 import {
   encerramentoDecidido,
   mediaAvaliacaoLabel,
   type ResumoJornada,
 } from "@/lib/encerramento";
 import { ImprimirButton } from "@/components/imprimir-button";
+import { Badge } from "@/components/ui/badge";
 import type { Encerramento } from "@/lib/types";
 
 /** "Resumo da jornada" — o bloco print-friendly da ficha, gerado dos dados
@@ -61,7 +67,7 @@ export function ResumoJornadaSection({
         </div>
         <div className="rounded-lg bg-muted/40 px-3 py-2.5">
           <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            Avaliação média
+            Avaliação do mentor
           </dt>
           <dd className="mt-0.5 font-mono text-sm tabular-nums">
             {resumo.mediaAvaliacao != null
@@ -74,6 +80,44 @@ export function ResumoJornadaSection({
             </dd>
           )}
         </div>
+        {/* young-person tile (REALIZA-71): media+n in print; temas and
+            trajectory are qualitative — screen only, off the report */}
+        {resumo.avaliacaoJovem && (
+          <div className="rounded-lg bg-muted/40 px-3 py-2.5">
+            <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              Avaliação do jovem
+            </dt>
+            <dd className="mt-0.5 font-mono text-sm tabular-nums">
+              {resumo.avaliacaoJovem.media != null
+                ? `${resumo.avaliacaoJovem.media.toFixed(1)}/5`
+                : `${resumo.avaliacaoJovem.n}×`}
+            </dd>
+            <dd className="text-xs text-muted-foreground">
+              {resumo.avaliacaoJovem.media != null
+                ? `média de ${resumo.avaliacaoJovem.n} ${
+                    resumo.avaliacaoJovem.n === 1
+                      ? "avaliação"
+                      : "avaliações"
+                  }`
+                : "média a partir de 3 avaliações"}
+            </dd>
+            {resumo.avaliacaoJovem.trajetoria && (
+              <dd className="text-xs text-muted-foreground print:hidden">
+                1º→último: {resumo.avaliacaoJovem.trajetoria.primeiro}★ →{" "}
+                {resumo.avaliacaoJovem.trajetoria.ultimo}★
+              </dd>
+            )}
+            {resumo.avaliacaoJovem.temasTop.length > 0 && (
+              <dd className="mt-1 flex flex-wrap gap-1 print:hidden">
+                {resumo.avaliacaoJovem.temasTop.map((t) => (
+                  <Badge key={t} variant="outline" className="text-[10px]">
+                    {TEMA_AVALIACAO_LABEL[t] ?? t}
+                  </Badge>
+                ))}
+              </dd>
+            )}
+          </div>
+        )}
         <div className="rounded-lg bg-muted/40 px-3 py-2.5">
           <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             Combinados

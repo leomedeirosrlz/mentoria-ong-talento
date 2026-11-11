@@ -73,7 +73,10 @@ import type {
   AvaliacaoTokenInfo,
   JovemAvaliacao,
 } from "../queries-avaliacao";
-import type { FormularioPublico } from "../forms/queries";
+import type { ContextoAvaliacao, FormularioPublico } from "../forms/queries";
+import type { FormularioLink } from "../forms/schema";
+import { mediaQuantizadaDpp } from "../avaliacao-agregado";
+import type { InscricaoTurma, PapelEscopo } from "../pessoas-status";
 import { getDemoFormularios } from "./forms-data";
 import type { Interacao } from "../interacoes";
 import type {
@@ -497,6 +500,8 @@ export function demoDuplasResumo(role: AppRole, todas: boolean): DuplaResumo[] {
       mentorado_id: d.mentorado.id,
       supervisor_id: d.supervisor?.id ?? null,
       trilha: d.trilha,
+      turma: d.turma,
+      cronograma_id: d.cronograma_id,
     }));
 }
 
@@ -2082,7 +2087,52 @@ export function demoFormularioPorToken(
       versao: f.versao,
       sistema: f.sistema ?? null,
     },
+    contexto_avaliacao: demoContextoAvaliacao(l, f.sistema ?? null),
   };
+}
+
+/** Espelho do contexto_avaliacao da 0191: nos links dos 360º com dupla,
+ *  mentor recebe a série 1–4 dele + a média do jovem pela MESMA régua
+ *  quantizada (mediaQuantizadaDpp, módulo puro); mentorado, as estrelas
+ *  dele. Os fixtures demo avaliações por dupla_id/encontro_id como o join
+ *  real — a série sai idêntica. */
+function demoContextoAvaliacao(
+  l: FormularioLink,
+  sistema: string | null
+): ContextoAvaliacao | null {
+  if (!l.dupla_id) return null;
+  const data = getDemoData();
+  const dupla = data.duplas.find((d) => d.id === l.dupla_id);
+  if (sistema === "avaliacao_final_mentor") {
+    const registros = (dupla?.encontros ?? [])
+      .map((e) => ({
+        numero: e.numero,
+        avaliacao: e.registro?.avaliacao ?? null,
+      }))
+      .filter((r) => r.avaliacao != null)
+      .sort((a, b) => a.numero - b.numero);
+    const porData = data.avaliacoes
+      .filter((a) => a.dupla_id === l.dupla_id)
+      .sort((a, b) => a.created_at.localeCompare(b.created_at));
+    const q = mediaQuantizadaDpp(porData.map((a) => a.estrelas));
+    return { registros, media_jovem: q.liberado ? (q.media ?? null) : null };
+  }
+  if (sistema === "avaliacao_final_mentorado") {
+    const numeroPorEncontro = new Map(
+      (dupla?.encontros ?? []).map((e) => [e.id, e.numero])
+    );
+    const estrelas = data.avaliacoes
+      .filter((a) => a.dupla_id === l.dupla_id)
+      .map((a) => ({
+        numero: numeroPorEncontro.get(a.encontro_id) ?? 0,
+        estrelas: a.estrelas,
+        avancei: a.avancei,
+      }))
+      .filter((a) => a.numero > 0)
+      .sort((a, b) => a.numero - b.numero);
+    return { estrelas };
+  }
+  return null;
 }
 
 // ---------- avaliação estrela do jovem (0071) ----------
@@ -2445,6 +2495,44 @@ export function demoTurmaInscricoesAguardando(
         ];
       return [];
     });
+}
+
+// ---------- /pessoas por turma (REALIZA-39) — mesmos gates coord-only das
+// queries reais; o status deriva em pessoas-status.ts sobre estes mapas
+
+/** Todas as inscrições (o /pessoas precisa das três: aguardando marca o
+ *  papel; formada/desistiu seguem valendo como filiação à turma). */
+export function demoTurmaInscricoesPessoas(role: AppRole): InscricaoTurma[] {
+  if (role !== "coordenacao") return [];
+  return getDemoData().turmaInscricoes.map((i) => ({
+    turma: i.turma,
+    profile_id: i.profile_id,
+    mentorado_id: i.mentorado_id,
+    papel_esperado: i.papel_esperado,
+    status: i.status,
+  }));
+}
+
+/** Grants escopados — o Paulo supervisiona a T2 inteira pelo escopo; é a
+ *  única linha não-global do dataset e cobre o papel "Auxiliar executivo". */
+export function demoPapeisEscopo(role: AppRole): PapelEscopo[] {
+  if (role !== "coordenacao") return [];
+  return getDemoData()
+    .profilePapeis.filter((pp) => pp.escopo_turma != null)
+    .map((pp) => ({
+      profile_id: pp.profile_id,
+      papel: pp.papel,
+      escopo_turma: pp.escopo_turma!,
+    }));
+}
+
+/** Último acesso por profile (espelho da view profiles_acesso, 0192) — o
+ *  mapa vem do dataset; quem não tem user_id não tem linha, como no real. */
+export function demoMapaAcesso(
+  role: AppRole
+): Record<string, string | null> {
+  if (role !== "coordenacao") return {};
+  return getDemoData().acessoMap;
 }
 
 /** Painel de links públicos da coordenação (REALIZA-170/201) — fixture

@@ -1,4 +1,6 @@
 import {
+  COMPETENCIAS_MENTOR,
+  COMPETENCIA_OPCOES,
   extraiMetas,
   extraiRodaDaVida,
   respostaFormatada,
@@ -10,6 +12,7 @@ import { parseSubmetasLinhas } from "@/lib/pdm";
 import { cn } from "@/lib/utils";
 import { RespostaLista } from "./resposta-lista";
 import { RodaSvg } from "./instrumentos/roda-svg";
+import { RodaComparada } from "./instrumentos/roda-comparada";
 
 // Leitura estruturada das respostas dos instrumentos oficiais (0080) —
 // o form genérico guarda {campo_id: valor}; aqui o resultado vira o que o
@@ -83,13 +86,31 @@ function dataBr(iso: string): string {
 function RodaResultado({
   campos,
   respostas,
+  respostasAnterior = null,
 }: {
   campos: FormularioCampo[];
   respostas: Record<string, RespostaValor>;
+  /** initial application payload — when the two moments share the area
+   *  structure the view becomes the REALIZA-18 comparison; otherwise it
+   *  is ignored and the single wheel renders as before */
+  respostasAnterior?: Record<string, RespostaValor> | null;
 }) {
   const roda = extraiRodaDaVida(campos, respostas);
   if (!roda) return null;
   const reflexao = valorDe(campos, respostas, "reflexao");
+
+  const rodaAnterior = respostasAnterior
+    ? extraiRodaDaVida(campos, respostasAnterior)
+    : null;
+  if (rodaAnterior) {
+    return (
+      <RodaComparada
+        rodaAtual={roda}
+        rodaAnterior={rodaAnterior}
+        reflexao={reflexao}
+      />
+    );
+  }
 
   return (
     <div className="space-y-4">
@@ -377,6 +398,115 @@ function VisaoResultado({
   );
 }
 
+// ---------- checklist de competências do mentor (0190) ----------
+
+/** Mentor checklist marking — one row per competency with the "Já faço
+ *  bem / Preciso desenvolver" choice. With `respostasInicio` the row shows
+ *  the início × fim pair (REALIZA-359); without it, a single marking. */
+export function CompetenciasResultado({
+  campos,
+  respostas,
+  respostasInicio = null,
+}: {
+  campos: FormularioCampo[];
+  respostas: Record<string, RespostaValor>;
+  respostasInicio?: Record<string, RespostaValor> | null;
+}) {
+  const linhas = COMPETENCIAS_MENTOR.map((texto, i) => {
+    const campo = campos.find((c) => c.id === `comp_${i + 1}`);
+    const atual = campo ? respostaFormatada(campo, respostas[campo.id]) : "";
+    const inicio =
+      campo && respostasInicio
+        ? respostaFormatada(campo, respostasInicio[campo.id])
+        : "";
+    return { texto, atual, inicio };
+  });
+  const bem = COMPETENCIA_OPCOES[0];
+  const dev = COMPETENCIA_OPCOES[1];
+  const totalBem = linhas.filter((l) => l.atual === bem).length;
+  const inicioBem = respostasInicio
+    ? linhas.filter((l) => l.inicio === bem).length
+    : null;
+
+  return (
+    <div className="space-y-3">
+      {respostasInicio != null && (
+        <p className="text-sm text-muted-foreground">
+          “{bem}”{" "}
+          <strong className="font-semibold tabular-nums text-foreground">
+            {inicioBem ?? "—"} → {totalBem}
+          </strong>{" "}
+          de {COMPETENCIAS_MENTOR.length} competências
+        </p>
+      )}
+      <ul className="space-y-1.5">
+        {linhas.map((l, i) => (
+          <li key={i} className="flex items-start gap-2 text-sm">
+            <span className="min-w-0 flex-1 leading-snug">{l.texto}</span>
+            {respostasInicio != null ? (
+              <span className="shrink-0 text-right text-xs tabular-nums text-muted-foreground">
+                <span>{l.inicio || "—"}</span>
+                <span className="mx-1" aria-hidden>
+                  →
+                </span>
+                <span
+                  className={cn(
+                    "font-medium",
+                    l.atual === bem ? "text-[var(--ok-text)]" : "text-foreground"
+                  )}
+                >
+                  {l.atual || "—"}
+                </span>
+              </span>
+            ) : (
+              <span
+                className={cn(
+                  "shrink-0 text-xs font-medium tabular-nums",
+                  l.atual === bem
+                    ? "text-[var(--ok-text)]"
+                    : l.atual === dev
+                      ? "text-foreground"
+                      : "text-muted-foreground"
+                )}
+              >
+                {l.atual || "—"}
+              </span>
+            )}
+          </li>
+        ))}
+      </ul>
+      {/* campo livre do instrumento ("o que quero desenvolver") — a frase
+          de intenção que o mentor escreveu; some quando não respondeu */}
+      {(() => {
+        const campoDev = campos.find((c) => c.id === "desenvolver");
+        const textoDev = campoDev
+          ? respostaFormatada(campoDev, respostas[campoDev.id])
+          : "";
+        const textoDevInicio =
+          campoDev && respostasInicio
+            ? respostaFormatada(campoDev, respostasInicio[campoDev.id])
+            : "";
+        if (!textoDev && !textoDevInicio) return null;
+        return (
+          <div className="border-t border-border/60 pt-2.5">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              {campoDev?.label ?? "O que quer desenvolver"}
+            </p>
+            {textoDevInicio && textoDev !== textoDevInicio && (
+              <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap text-muted-foreground">
+                {textoDevInicio}
+              </p>
+            )}
+            <p className="mt-1 text-sm leading-relaxed whitespace-pre-wrap">
+              {textoDev || textoDevInicio}
+            </p>
+          </div>
+        );
+      })()}
+    </div>
+  );
+}
+
 /** Vista estruturada de uma resposta de instrumento oficial. Devolve null
  *  quando o sistema não é instrumento de dupla (0080) ou o payload não tem
  *  o que extrair — o chamador cai na lista crua campo a campo. */
@@ -384,15 +514,25 @@ export function InstrumentoResultado({
   sistema,
   campos,
   respostas,
+  respostasAnterior = null,
 }: {
   sistema: FormularioSistema | null | undefined;
   campos: FormularioCampo[];
   respostas: Record<string, RespostaValor>;
+  /** earlier-moment payload of the same instrument (initial roda / início
+   *  checklist) — turns the view into the before/after comparison */
+  respostasAnterior?: Record<string, RespostaValor> | null;
 }) {
   const conteudo = (() => {
     switch (sistema) {
       case "roda_vida":
-        return <RodaResultado campos={campos} respostas={respostas} />;
+        return (
+          <RodaResultado
+            campos={campos}
+            respostas={respostas}
+            respostasAnterior={respostasAnterior}
+          />
+        );
       case "metas":
       case "pdm":
         return (
@@ -404,6 +544,14 @@ export function InstrumentoResultado({
         );
       case "visao":
         return <VisaoResultado campos={campos} respostas={respostas} />;
+      case "competencias_mentor":
+        return (
+          <CompetenciasResultado
+            campos={campos}
+            respostas={respostas}
+            respostasInicio={respostasAnterior}
+          />
+        );
       default:
         return null;
     }

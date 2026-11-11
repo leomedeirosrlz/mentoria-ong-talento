@@ -68,6 +68,14 @@ export function dia(iso: string | null | undefined): string {
   return isNaN(d.getTime()) ? "" : fmtData.format(d);
 }
 
+/** coluna `date` ("YYYY-MM-DD") -> "dd/mm/aaaa" — manipulação de string,
+ *  sem Date: `new Date("2025-09-03")` é midnight UTC e caía na véspera
+ *  no fuso de SP (ciclo_eventos.data é `date`, não timestamptz). */
+export function diaColuna(iso: string | null | undefined): string {
+  const m = iso?.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+}
+
 // ---------- nomes de arquivo ----------
 
 /** Nome canônico por tipo: `<tipo>-AAAA-MM-DD.csv` — exports de dias

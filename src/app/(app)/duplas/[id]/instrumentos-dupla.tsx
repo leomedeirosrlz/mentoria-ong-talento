@@ -13,13 +13,15 @@ import {
 import { enviarInstrumentoMentorado } from "@/lib/actions-formularios";
 import {
   INSTRUMENTO_INFO,
-  INSTRUMENTOS_SISTEMA,
-  type InstrumentoSistema,
+  INSTRUMENTOS_DUPLA_SISTEMA,
+  type InstrumentoDuplaSistema,
+  type RespostaValor,
 } from "@/lib/forms/schema";
 import type {
   InstrumentoDupla,
   InstrumentoEntrega,
 } from "@/lib/forms/queries";
+import { parChecklist, parRoda } from "@/lib/jornada";
 import { formatDate } from "@/lib/ciclo";
 import { GUIA_ENCONTRO } from "@/lib/como-conduzir";
 import {
@@ -81,9 +83,13 @@ function LinhaInstrumento({
   duplaId,
   mentoradoNome,
   mentoradoWhatsapp,
+  mentorNome,
+  mentorWhatsapp,
   podeEnviar,
   jornadaViva,
   remetenteMentorNome,
+  rodaPar,
+  checklistPar,
 }: {
   /** null quando o instrumento ainda não foi semeado no banco — a linha
    *  existe pra jornada completa aparecer, mas sem ação */
@@ -91,6 +97,9 @@ function LinhaInstrumento({
   duplaId: string;
   mentoradoNome: string;
   mentoradoWhatsapp: string | null;
+  /** destinatário do checklist de competências (0190) — o mentor */
+  mentorNome: string;
+  mentorWhatsapp: string | null;
   podeEnviar: boolean;
   /** ativa|pausada — dupla fechada esconde TODAS as ações de link pra
    *  qualquer papel (Copiar/WhatsApp/Gerar): o link que o jovem já tem
@@ -99,13 +108,16 @@ function LinhaInstrumento({
   /** Quando quem vê é o mentor: a msg do link sai na voz dele ("seu
    *  mentor"), não "a equipe" — o texto vai do número dele. */
   remetenteMentorNome?: string;
+  /** pares antes × depois já derivados das entregas (REALIZA-18 / -359) */
+  rodaPar: ReturnType<typeof parRoda<InstrumentoEntrega>>;
+  checklistPar: ReturnType<typeof parChecklist<InstrumentoEntrega>>;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [enviado, setEnviado] = useState<string | null>(null);
   const origem = useOrigem();
 
-  const sistema = (item?.sistema ?? null) as InstrumentoSistema | null;
+  const sistema = (item?.sistema ?? null) as InstrumentoDuplaSistema | null;
   const info = sistema ? INSTRUMENTO_INFO[sistema] : null;
   const titulo = item?.titulo ?? info?.titulo ?? "Instrumento";
 
@@ -114,6 +126,23 @@ function LinhaInstrumento({
     ? { status: "pendente" as const, entrega: null }
     : estadoAtual(item?.entregas ?? []);
   const tokenVivo = enviado ?? (status === "pendente" ? entrega?.token : null);
+
+  // o checklist vai pro mentor; os 4 de jornada, pro mentorado — destino
+  // por sistema, não por linha (o whatsapp e o nome da msg acompanham)
+  const destNome =
+    sistema === "competencias_mentor" ? mentorNome : mentoradoNome;
+  const destWhatsapp =
+    sistema === "competencias_mentor" ? mentorWhatsapp : mentoradoWhatsapp;
+
+  // payload do momento anterior pra leitura comparada — só quando a
+  // entrega exibida é a ponta do fim (a inicial sozinha não compara)
+  const respostasAnterior: Record<string, RespostaValor> | null =
+    sistema === "roda_vida" && entrega?.link_id === rodaPar.formal?.link_id
+      ? (rodaPar.inicial?.respostas ?? null)
+      : sistema === "competencias_mentor" &&
+          entrega?.link_id === checklistPar.final?.link_id
+        ? (checklistPar.inicio?.respostas ?? null)
+        : null;
 
   function enviar() {
     if (!sistema) return;
@@ -217,7 +246,7 @@ function LinhaInstrumento({
               <DialogHeader>
                 <DialogTitle>{item.titulo}</DialogTitle>
                 <DialogDescription>
-                  Respondido por {mentoradoNome}
+                  Respondido por {destNome}
                   {entrega.respondido_em &&
                     ` em ${formatDate(entrega.respondido_em)}`}
                   .
@@ -227,6 +256,7 @@ function LinhaInstrumento({
                 sistema={item.sistema}
                 campos={item.campos}
                 respostas={entrega.respostas}
+                respostasAnterior={respostasAnterior}
               />
             </DialogContent>
           </Dialog>
@@ -240,13 +270,17 @@ function LinhaInstrumento({
           >
             <CopiarLink token={tokenVivo} />
             <NudgeButton
-              telefone={mentoradoWhatsapp}
+              telefone={destWhatsapp}
               mensagem={msgLinkWhatsApp(
                 titulo,
-                mentoradoNome,
+                destNome,
                 tokenVivo,
                 origem,
-                remetenteMentorNome
+                // "your mentor" voice only fits the mentee — the checklist
+                // goes to the mentor himself, institutional voice is right
+                sistema === "competencias_mentor"
+                  ? undefined
+                  : remetenteMentorNome
               )}
               duplaId={duplaId}
               label="Enviar no WhatsApp"
@@ -284,6 +318,8 @@ export function InstrumentosDupla({
   itens,
   mentoradoNome,
   mentoradoWhatsapp,
+  mentorNome,
+  mentorWhatsapp,
   podeEnviar,
   jornadaViva,
   remetenteMentorNome,
@@ -294,6 +330,9 @@ export function InstrumentosDupla({
   itens: InstrumentoDupla[];
   mentoradoNome: string;
   mentoradoWhatsapp: string | null;
+  /** o checklist de competências responde o mentor (0190) */
+  mentorNome: string;
+  mentorWhatsapp: string | null;
   /** coord sempre; o mentor DPP da dupla viva também entrega (o guia é dele) */
   podeEnviar: boolean;
   /** ativa|pausada — dupla fechada vira só leitura de resultados */
@@ -304,6 +343,13 @@ export function InstrumentosDupla({
 }) {
   if (!itens.length) return null;
   const porSistema = new Map(itens.map((i) => [i.sistema, i]));
+  // os pares antes × depois derivam UMA vez das entregas já carregadas —
+  // a leitura inicial da roda e a marcação de início do checklist alimentam
+  // a comparação do "Ver resultado" de cada linha (REALIZA-18/-359)
+  const rodaPar = parRoda(porSistema.get("roda_vida")?.entregas ?? []);
+  const checklistPar = parChecklist(
+    porSistema.get("competencias_mentor")?.entregas ?? []
+  );
   return (
     <section
       id="instrumentos"
@@ -318,16 +364,20 @@ export function InstrumentosDupla({
         login, e o resultado volta estruturado aqui.
       </p>
       <ul className="mt-2 divide-y divide-border/60">
-        {INSTRUMENTOS_SISTEMA.map((s) => (
+        {INSTRUMENTOS_DUPLA_SISTEMA.map((s) => (
           <LinhaInstrumento
             key={s}
             item={porSistema.get(s) ?? null}
             duplaId={duplaId}
             mentoradoNome={mentoradoNome}
             mentoradoWhatsapp={mentoradoWhatsapp}
+            mentorNome={mentorNome}
+            mentorWhatsapp={mentorWhatsapp}
             podeEnviar={podeEnviar}
             jornadaViva={jornadaViva}
             remetenteMentorNome={remetenteMentorNome}
+            rodaPar={rodaPar}
+            checklistPar={checklistPar}
           />
         ))}
       </ul>

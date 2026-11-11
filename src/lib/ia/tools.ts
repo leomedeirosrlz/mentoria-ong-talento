@@ -17,7 +17,7 @@
 import { createHash } from "crypto";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { comparaNome, saudadeDaDupla } from "@/lib/ciclo";
+import { comparaNome, saudadeDaDupla, toDateStr } from "@/lib/ciclo";
 import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
 import { saudeDoRecorte } from "@/lib/agenda-coordenacao";
 import { temPapel } from "@/lib/types";
@@ -36,6 +36,7 @@ import {
   getDuplaIa,
   getDuplasResumoIa,
   getDuplasVivasIa,
+  getEncaminhamentosIa,
   getFechadasIa,
   getFilaInsumos,
   getHistoricoEncontrosIa,
@@ -65,8 +66,9 @@ import { getIaConfig } from "./config";
 import { CacheTtl } from "./cache";
 import { buscarNosGuias, catalogoGuias } from "./guias";
 
-/** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário. */
-export type CanalIa = "chat" | "mcp";
+/** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário
+ *  ('importacao' entrou na 0193: match semântico/revisão NL do import CSV). */
+export type CanalIa = "chat" | "mcp" | "importacao";
 
 /** O `roles` do registry — vocabulário do banco (app_role). */
 export type Papel = AppRole;
@@ -152,6 +154,28 @@ const guiaArgs = z
       .min(3)
       .max(300)
       .describe("a pergunta em linguagem natural, como o usuário fez"),
+  })
+  .strict();
+
+const combinadosArgs = z
+  .object({
+    dupla_id: z
+      .uuid()
+      .optional()
+      .describe("restringe a uma dupla (padrão: todas no escopo)"),
+    status: z
+      .enum(["pendente", "feito", "todos"])
+      .optional()
+      .describe(
+        "recorte por status (padrão pendente; 'todos' inclui os feitos)"
+      ),
+    limite: z
+      .number()
+      .int()
+      .min(1)
+      .max(100)
+      .optional()
+      .describe("máximo de combinados, vencidos primeiro (padrão 40)"),
   })
   .strict();
 
@@ -668,6 +692,53 @@ export const IA_TOOLS = {
         ...(encontros.length === 600
           ? { aviso: "janela cortada em 600 linhas — números parciais" }
           : {}),
+      };
+    },
+  },
+
+  combinados_das_duplas: {
+    nome: "combinados_das_duplas",
+    descricao:
+      "Os combinados (encaminhamentos) das duplas no escopo da pessoa: o que ficou prometido, pra quando, por quem — com a dupla, trilha e turma de contexto; vencido vem marcado em `atrasado`. A RLS decide o recorte (coordenação tudo, auxiliar as supervisionadas, mentor as próprias). Use pra 'combinados vencidos', 'o que a dupla X prometeu', 'pendências que eu preciso cobrar'. Pro jovem os dele saem por meus_combinados.",
+    schema: combinadosArgs,
+    roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
+    run: async (
+      { dupla_id, status, limite }: z.infer<typeof combinadosArgs>,
+      ctx
+    ) => {
+      const linhas = await getEncaminhamentosIa(ctx.supabase, {
+        duplaId: dupla_id,
+        status: status ?? "pendente",
+        limite: limite ?? 40,
+      });
+      const hoje = toDateStr(new Date());
+      const combinados = linhas.map((t) => ({
+        // id endereça a linha — quando a ação de staff sobre combinado
+        // existir ela endereça por uuid, como jovem_marcar_combinado
+        id: t.id,
+        dupla_id: t.dupla.id,
+        mentor: t.dupla.mentor?.nome_social ?? t.dupla.mentor?.nome ?? null,
+        mentorado:
+          t.dupla.mentorado?.nome_social ?? t.dupla.mentorado?.nome ?? null,
+        trilha: t.dupla.trilha,
+        turma: t.dupla.turma,
+        // passo do guia que gerou o combinado (0157) — null em antigo
+        // sem registro; diz em que ponto da jornada a promessa nasceu
+        numero: t.numero,
+        texto: t.descricao,
+        responsavel: t.responsavel,
+        prazo: t.prazo,
+        status: t.status,
+        // 'atrasado' é valor-fantasma (deriva de data, nunca se grava) —
+        // a tool computa com a mesma régua do semáforo (ciclo.ts)
+        atrasado: t.status === "pendente" && t.prazo != null && t.prazo < hoje,
+        feito_em: t.feito_em,
+        criado_em: t.created_at,
+      }));
+      return {
+        total: combinados.length,
+        vencidos: combinados.filter((c) => c.atrasado).length,
+        combinados,
       };
     },
   },

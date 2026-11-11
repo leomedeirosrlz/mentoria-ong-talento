@@ -270,6 +270,7 @@ export const STATUS_TOOL: Record<string, string> = {
   agenda_do_periodo: "Abrindo a agenda…",
   guia_consulta: "Buscando nos guias…",
   chamados_resumo: "Lendo os chamados…",
+  combinados_das_duplas: "Lendo os combinados…",
   pessoas_busca: "Procurando a pessoa…",
   instrumentos_da_dupla: "Abrindo os instrumentos…",
   minha_dupla: "Olhando sua dupla…",
