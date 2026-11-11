@@ -36,6 +36,7 @@ import {
   getDuplaIa,
   getDuplasResumoIa,
   getDuplasVivasIa,
+  getFechadasIa,
   getFilaInsumos,
   getHistoricoEncontrosIa,
   getInstrumentosDaDuplaIa,
@@ -232,7 +233,11 @@ function canonico(v: unknown): string {
 
 /** Saída do resumo_semana a partir das duplas vivas — pura, pra a demo
  *  (/demo, dataset em memória) responder pelo MESMO caminho da tool. */
-export function projetarResumo(duplas: DuplaIa[], eventos: CicloEvento[]) {
+export function projetarResumo(
+  duplas: DuplaIa[],
+  eventos: CicloEvento[],
+  fechadas: DuplaIa[] = []
+) {
   const itens = duplas.map((d) => {
     // a projeção de IA_SAUDE_SELECT é exatamente o que saudadeDaDupla
     // lê — o contrato é a constante compartilhada, não a linha solta
@@ -243,6 +248,7 @@ export function projetarResumo(duplas: DuplaIa[], eventos: CicloEvento[]) {
       mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
       trilha: d.trilha,
       status: d.status,
+      desfecho: d.desfecho ?? null,
       semaforo: s.semaforo,
       motivo: s.motivo,
       // todos os critérios acesos — o semáforo resume, a lista explica
@@ -267,8 +273,17 @@ export function projetarResumo(duplas: DuplaIa[], eventos: CicloEvento[]) {
       comparaNome(a.mentor ?? "", b.mentor ?? "")
   );
   // contagem pela regra única das telas (saudeDoRecorte) — o card do
-  // chat e o texto do modelo leem o mesmo número da home e de /duplas
-  const saude = saudeDoRecorte(duplas as unknown as Dupla[], eventos, new Date());
+  // chat e o texto do modelo leem o mesmo número da home e de /duplas.
+  // As fechadas entram só na partição (projeção mínima, sem encontros:
+  // arrays vazios pro saudadeDaDupla não tropeçar), nunca no `itens`.
+  const saude = saudeDoRecorte(
+    [
+      ...duplas,
+      ...fechadas.map((d) => ({ ...d, encontros: [], encaminhamentos: [] })),
+    ] as unknown as Dupla[],
+    eventos,
+    new Date()
+  );
   return {
     gerado_em: new Date().toISOString(),
     total: itens.length,
@@ -279,6 +294,9 @@ export function projetarResumo(duplas: DuplaIa[], eventos: CicloEvento[]) {
       em_dia: saude.emDia,
       apoio: saude.apoio,
       pausadas: saude.pausadas,
+      concluidas: saude.concluidas,
+      desistentes: saude.desistentes,
+      encerradas: saude.encerradas,
     },
     duplas: itens,
   };
@@ -291,6 +309,7 @@ export function projetarFicha(d: DuplaIa, eventos: CicloEvento[]) {
     dupla_id: d.id,
     trilha: d.trilha,
     status: d.status,
+    desfecho: d.desfecho ?? null,
     turma: d.turma,
     iniciada_em: d.iniciada_em,
     demanda: d.demanda,
@@ -345,11 +364,12 @@ export const IA_TOOLS = {
     schema: semArgs,
     roles: ["coordenacao", "supervisor"],
     run: async (_args: z.infer<typeof semArgs>, ctx) => {
-      const [duplas, eventos] = await Promise.all([
+      const [duplas, fechadas, eventos] = await Promise.all([
         getDuplasVivasIa(ctx.supabase),
+        getFechadasIa(ctx.supabase),
         getCicloEventosIa(ctx.supabase),
       ]);
-      return projetarResumo(duplas, eventos);
+      return projetarResumo(duplas, eventos, fechadas);
     },
   },
 

@@ -23,7 +23,7 @@ const dupla = (i: number, extra: Record<string, unknown> = {}) => ({
 });
 
 describe("resumo_semana → saude", () => {
-  const saude = { em_andamento: 8, risco: 2, atencao: 3, em_dia: 3, apoio: 1, pausadas: 1 };
+  const saude = { em_andamento: 8, risco: 2, atencao: 3, em_dia: 3, apoio: 1, pausadas: 1, concluidas: 2, desistentes: 1, encerradas: 1 };
 
   it("contagem vem pronta da tool e destaques só pegam quem pede ação", () => {
     const duplas = [

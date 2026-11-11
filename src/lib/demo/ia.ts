@@ -316,7 +316,14 @@ export async function responderDemoIa(
   }
 
   if (STAFF.includes(role) && /resumo|semana|risco|aten|como est|duplas|apoio/.test(p)) {
-    const ui = uiDaTool("resumo_semana", projetarResumo(duplas, eventos));
+    // as fechadas contam na partição do resumo, como no getFechadasIa real
+    const fechadas = demoDuplas(role).filter((d) =>
+      ["concluida", "encerrada"].includes(d.status)
+    ) as unknown as DuplaIa[];
+    const ui = uiDaTool(
+      "resumo_semana",
+      projetarResumo(duplas, eventos, fechadas)
+    );
     const pedem = ui?.kind === "saude" ? ui.pedem_acao : 0;
     return {
       content: `Na demonstração os números são de exemplo. ${

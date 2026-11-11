@@ -223,6 +223,8 @@ const D = {
   t2b: 0x060c,
   t2c: 0x060d, // Ricardo × Matheus — a 2ª dupla DPP do híbrido (WP3)
   rito: 0x060e, // Ricardo × Gustavo — concluída com o rito de encerramento aberto
+  reman: 0x060f, // Patrícia × Eduardo — encerrada formal (remanejada)
+  desist: 0x0610, // Carlos × Laura — desistência do jovem no ciclo anterior
 } as const;
 
 // cronogramas (0061) — um por turma; a T2 é a turma que começou um mês depois
@@ -2995,7 +2997,93 @@ function build(): DemoData {
     notas: [],
   };
 
-  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaRito, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b, duplaT2c];
+  // d-reman · Patrícia × Eduardo — o primeiro par do Eduardo na T1: a
+  // Patrícia avisou o afastamento do ciclo (perfil inativo dela) e a
+  // coordenação encerrou a dupla pra remanejar o jovem — o João Pedro
+  // assumiu na sequência (a d-atraso). É a fatia "Encerrada" do resumo:
+  // fechamento formal, não desistência.
+  const INICIO_REMAN = ymd(addDias(HOJE, -70));
+  const fechoRemanDia = addDias(HOJE, -42);
+  const FECHO_REMAN = ymd(fechoRemanDia);
+  const encReman: Encontro[] = [
+    comRegistro(
+      realizado(uid(D.reman), 1, addDias(fechoRemanDia, -28), { duracao: 60 }),
+      patricia, "Eduardo", "dpp"
+    ),
+    comRegistro(
+      realizado(uid(D.reman), 2, addDias(fechoRemanDia, -21), { duracao: 75 }),
+      patricia, "Eduardo", "dpp"
+    ),
+  ];
+
+  const duplaReman: Dupla = {
+    id: uid(D.reman),
+    turma: "T1 · 2026/2027",
+    cronograma_id: cronogramaT1,
+    status: "encerrada",
+    iniciada_em: INICIO_REMAN,
+    trilha: "dpp",
+    demanda: null,
+    solicitacao_id: null,
+    mentor: patricia,
+    mentorado: eduardo,
+    supervisor: beatriz,
+    encontros: encReman,
+    encaminhamentos: [],
+    notas: [],
+    encerrada_em: FECHO_REMAN,
+    desfecho: "remanejada",
+    desfecho_motivo: "Remanejamento de mentor",
+    desfecho_obs:
+      "A Patrícia avisou o afastamento do ciclo; a coordenação encerrou a dupla e o Eduardo foi remanejado pro João Pedro.",
+    desfecho_em: FECHO_REMAN,
+    desfecho_por: null,
+  };
+
+  // d-desist · Carlos × Laura — ciclo anterior: a Laura desistiu na
+  // semana 3 (mudança de escola); meses depois a família reviu e ela
+  // reentrou na T2 com a Luiza (a d-t2b). É a fatia "Desistente" — quem
+  // saiu foi o jovem, distinta do fechamento formal da d-reman.
+  const INICIO_DESIST = ymd(addDias(HOJE, -220));
+  const fechoDesistDia = addDias(HOJE, -200);
+  const FECHO_DESIST = ymd(fechoDesistDia);
+  const encDesist: Encontro[] = [
+    comRegistro(
+      realizado(uid(D.desist), 1, addDias(fechoDesistDia, -14), { duracao: 60 }),
+      carlos, "Laura", "dpp"
+    ),
+    comRegistro(
+      realizado(uid(D.desist), 2, addDias(fechoDesistDia, -7), { duracao: 60 }),
+      carlos, "Laura", "dpp"
+    ),
+    naoAconteceu(uid(D.desist), 3, fechoDesistDia, {}),
+  ];
+
+  const duplaDesist: Dupla = {
+    id: uid(D.desist),
+    turma: "2025/2026",
+    cronograma_id: null,
+    status: "encerrada",
+    iniciada_em: INICIO_DESIST,
+    trilha: "dpp",
+    demanda: null,
+    solicitacao_id: null,
+    mentor: carlos,
+    mentorado: laura,
+    supervisor: paulo,
+    encontros: encDesist,
+    encaminhamentos: [],
+    notas: [],
+    encerrada_em: FECHO_DESIST,
+    desfecho: "desistencia_jovem",
+    desfecho_motivo: "Mudança de cidade/escola",
+    desfecho_obs:
+      "A Laura mudou de escola e desistiu na semana 3. A família voltou a procurar meses depois — reentrou na T2 com a Luiza.",
+    desfecho_em: FECHO_DESIST,
+    desfecho_por: null,
+  };
+
+  const duplas = [duplaOk, duplaPend, duplaRisco, duplaAtraso, duplaFim, duplaRito, duplaEsp1, duplaEsp2, duplaEsp3, duplaEsp4, duplaPausa, duplaT2a, duplaT2b, duplaT2c, duplaReman, duplaDesist];
   // combinado do registro herda o nº do encontro (backfill da 0157)
   for (const d of duplas) {
     const numeroPorRegistro = new Map(

@@ -42,12 +42,14 @@ const NENHUM = "__nenhum";
 const papeisDe = (m: Opt | null | undefined): AppRole[] =>
   m?.papeis?.length ? m.papeis : m?.role ? [m.role as AppRole] : [];
 
-// sem items o trigger fechado mostra o value cru (UUID/enum)
+// sem items o trigger fechado mostra o value cru (UUID/enum). Rótulo do
+// ENUM (o valor que o form grava), não a situação derivada — quem lê o
+// desfecho pra separar Desistente × Encerrada é o SITUACAO_DUPLA_LABEL.
 const STATUS_DUPLA: Record<string, string> = {
   ativa: "Ativa",
   pausada: "Pausada",
   concluida: "Concluída",
-  encerrada: "Desistente",
+  encerrada: "Encerrada",
 };
 
 export function EditarDuplaDialog({

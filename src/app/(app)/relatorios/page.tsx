@@ -50,6 +50,7 @@ export default async function RelatoriosPage({
       mentorado_id: d.mentorado.id,
       supervisor_id: d.supervisor?.id ?? null,
       status: d.status,
+      desfecho: d.desfecho,
       iniciada_em: d.iniciada_em,
       demanda: d.demanda,
     }));
@@ -108,7 +109,7 @@ export default async function RelatoriosPage({
     const [dRes, pRes, mRes, contatos] = await Promise.all([
       supabase
         .from("duplas")
-        .select("id, turma, cronograma_id, mentor_id, mentorado_id, supervisor_id, status, iniciada_em, demanda")
+        .select("id, turma, cronograma_id, mentor_id, mentorado_id, supervisor_id, status, desfecho, iniciada_em, demanda")
         .order("iniciada_em"),
       // user_id alimenta o gate do e-mail editável na grade (conta
       // vinculada → e-mail só muda pelo sync do auth, 0060)

@@ -29,7 +29,11 @@ import {
 } from "@/lib/ciclo";
 import { prazoTrilhaEspecialista } from "@/lib/encerramento";
 import { saudeDoRecorte, type RecorteFatia } from "@/lib/agenda-coordenacao";
-import { ehConcluida, ehDesistente } from "@/lib/dupla-desfecho";
+import {
+  ehDesistente,
+  situacaoDaDupla,
+  SITUACAO_DUPLA_LABEL,
+} from "@/lib/dupla-desfecho";
 import { gravarTurmaFocoClient } from "@/lib/turma-contexto";
 import { turmaDaDupla, turmaLonga } from "@/lib/turma";
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
@@ -122,23 +126,22 @@ function Pill({ tom, children }: { tom: TomPill; children: React.ReactNode }) {
   );
 }
 
-const STATUS_LABEL: Record<string, { label: string; tom: TomPill }> = {
+const SEMAFORO_LABEL: Record<string, { label: string; tom: TomPill }> = {
   risco: { label: "Em risco", tom: "risco" },
   atencao: { label: "Atenção", tom: "atencao" },
   ok: { label: "Em dia", tom: "ok" },
-  pausada: { label: "Pausada", tom: "pausa" },
-  concluida: { label: "Concluída", tom: "pausa" },
-  encerrada: { label: "Desistente", tom: "pausa" },
 };
 
-/** O pill de estado da linha: status da dupla fora da régua, senão o
- *  semáforo da jornada. Apoio NÃO vira estado — é pill própria ao lado. */
+/** O pill de estado da linha: situação canônica (dupla-desfecho) fora da
+ *  régua, senão o semáforo da jornada. Apoio NÃO vira estado — é pill
+ *  própria ao lado. */
 function estadoDaDupla(
   d: Dupla,
   saude: Saude
 ): { label: string; tom: TomPill } {
-  if (d.status !== "ativa") return STATUS_LABEL[d.status] ?? STATUS_LABEL.pausada;
-  return STATUS_LABEL[saude.semaforo];
+  if (d.status !== "ativa")
+    return { label: SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)], tom: "pausa" };
+  return SEMAFORO_LABEL[saude.semaforo];
 }
 
 /** Tom do pill de estado na linha canônica — mesma régua, cor da linha. */
@@ -258,13 +261,11 @@ function LinhaDupla({
   const legenda =
     d.status === "pausada"
       ? "em pausa"
-      : d.status === "concluida"
-        ? "concluída"
-        : d.status === "encerrada"
-          ? "desistente"
-          : ehEsp
-            ? "sessões"
-            : `esperado ${saude.esperado}`;
+      : d.status === "ativa"
+        ? ehEsp
+          ? "sessões"
+          : `esperado ${saude.esperado}`
+        : SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)].toLowerCase();
 
   return (
     <DuplaLinha
@@ -310,7 +311,7 @@ function LinhaDupla({
       menu={menu}
       fichaHref={`/duplas/${d.id}`}
       fichaNome={(d.mentorado.nome_social ?? d.mentorado.nome).split(" ")[0]}
-      className={dimDesistentes && desistenteDa(d) ? "opacity-60" : undefined}
+      className={dimDesistentes && ehEncerradaCedo(d) ? "opacity-60" : undefined}
     />
   );
 }
@@ -468,22 +469,22 @@ const CATS: { id: FiltroCat; nome: string; dot: string | null }[] = [
   { id: "pausada", nome: "Pausadas", dot: null },
   { id: "concluida", nome: "Concluídas", dot: null },
   { id: "desistente", nome: "Desistentes", dot: null },
+  { id: "encerrada", nome: "Encerradas", dot: null },
   { id: "apoio", nome: "Apoio", dot: null },
 ];
 
-/** O critério único de desistente — o chip, a contagem do cabeçalho e o
- *  esmaecer da linha leem a mesma regra: encerrada OU desfecho que não é
- *  conclusão (concluída com sucesso nunca conta). */
-function desistenteDa(d: Dupla): boolean {
-  return (
-    d.status === "encerrada" ||
-    ehDesistente({ desfecho: d.desfecho, status: d.status })
-  );
+/** Saiu da régua sem concluir (desistente ou encerrada-formal) — o que
+ *  esmaece na visão "todas". Distinto do chip: lá cada uma é fatia
+ *  própria; aqui as duas perdem destaque juntas. */
+function ehEncerradaCedo(d: Dupla): boolean {
+  const sit = situacaoDaDupla(d);
+  return sit === "desistente" || sit === "encerrada";
 }
 
 /** Cada chip é uma parte da mesma régua do resumo: "Em andamento" são as
- *  ativas (risco e atenção incluídas); "Concluídas" são as que fecharam com
- *  êxito; "Desistentes" são as encerradas/interrompidas. */
+ *  ativas (risco e atenção incluídas); as fechadas se separam pela
+ *  situação canônica (dupla-desfecho) — "Desistentes" são as que alguém
+ *  saiu antes do fim, "Encerradas" o fechamento formal da coordenação. */
 function chipBate(f: FiltroCat, d: Dupla, s: Saude): boolean {
   switch (f) {
     case "todas":
@@ -497,9 +498,11 @@ function chipBate(f: FiltroCat, d: Dupla, s: Saude): boolean {
     case "pausada":
       return d.status === "pausada";
     case "concluida":
-      return d.status === "concluida" || ehConcluida({ desfecho: d.desfecho });
+      return situacaoDaDupla(d) === "concluida";
     case "desistente":
-      return desistenteDa(d);
+      return ehDesistente(d);
+    case "encerrada":
+      return situacaoDaDupla(d) === "encerrada";
     case "apoio":
       return s.apoio.aberto;
   }
@@ -551,7 +554,12 @@ function resumoDaLista(
   lista: Dupla[],
   saudePorId: Map<string, Saude>,
   visao: VisaoDuplas
-): { n: string; desistentes: number; itens: { texto: string; forte?: boolean }[] } {
+): {
+  n: string;
+  desistentes: number;
+  encerradas: number;
+  itens: { texto: string; forte?: boolean }[];
+} {
   const cont = { risco: 0, atencao: 0, andamento: 0, pausada: 0, apoio: 0 };
   for (const d of lista) {
     const s = saudePorId.get(d.id)!;
@@ -560,9 +568,12 @@ function resumoDaLista(
       cont[s.semaforo === "ok" ? "andamento" : s.semaforo]++;
     else if (d.status === "pausada") cont.pausada++;
   }
-  // desistentes não contam no sujeito — a mancha vai no sufixo discreto
-  const desistentes = lista.filter(desistenteDa).length;
-  const nVivas = lista.length - desistentes;
+  // fechadas cedo não contam no sujeito — a mancha vai no sufixo discreto
+  const desistentes = lista.filter(ehDesistente).length;
+  const encerradas = lista.filter(
+    (d) => situacaoDaDupla(d) === "encerrada"
+  ).length;
+  const nVivas = lista.length - desistentes - encerradas;
   const sujeito =
     visao === "especialista"
       ? `${nVivas} ${nVivas === 1 ? "trilha" : "trilhas"}`
@@ -574,7 +585,7 @@ function resumoDaLista(
     cont.pausada > 0 && { texto: `${cont.pausada} pausada${cont.pausada > 1 ? "s" : ""}` },
     cont.andamento > 0 && { texto: `${cont.andamento} em dia` },
   ].filter(Boolean) as { texto: string; forte?: boolean }[];
-  return { n: sujeito, desistentes, itens };
+  return { n: sujeito, desistentes, encerradas, itens };
 }
 
 function ResumoLinha({ resumo }: { resumo: ReturnType<typeof resumoDaLista> }) {
@@ -586,6 +597,13 @@ function ResumoLinha({ resumo }: { resumo: ReturnType<typeof resumoDaLista> }) {
           {" · "}
           {resumo.desistentes}{" "}
           {resumo.desistentes === 1 ? "desistente" : "desistentes"}
+        </span>
+      )}
+      {resumo.encerradas > 0 && (
+        <span className="text-xs">
+          {" · "}
+          {resumo.encerradas}{" "}
+          {resumo.encerradas === 1 ? "encerrada" : "encerradas"}
         </span>
       )}
       {resumo.itens.map((it, i) => (
@@ -1400,27 +1418,36 @@ function VisaoCoordenacao({
         </DialogContent>
       </Dialog>
 
-      {/* barra da lista: contagem viva + legenda dos dots. Desistentes não
-          inflam o número principal — a mancha vai no sufixo discreto (no
-          chip Desistentes a contagem é delas mesmas) */}
+      {/* barra da lista: contagem viva + legenda dos dots. Fechadas cedo
+          (desistente/encerrada) não inflam o número principal — a mancha
+          vai no sufixo discreto (no chip delas a contagem é delas mesmas) */}
       <div className="mb-2 mt-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-[13px] text-muted-foreground">
           {(() => {
-            const nDes = exibidas.filter(desistenteDa).length;
-            const nPrincipais = exibidas.length - nDes;
+            const nDes = exibidas.filter(ehDesistente).length;
+            const nEnc = exibidas.filter(
+              (d) => situacaoDaDupla(d) === "encerrada"
+            ).length;
+            const nPrincipais = exibidas.length - nDes - nEnc;
             return filtro === "desistente" ? (
               <b className="font-semibold text-foreground">
                 {nDes} {nDes === 1 ? "desistente" : "desistentes"}
+              </b>
+            ) : filtro === "encerrada" ? (
+              <b className="font-semibold text-foreground">
+                {nEnc} {nEnc === 1 ? "encerrada" : "encerradas"}
               </b>
             ) : (
               <>
                 <b className="font-semibold text-foreground">
                   {nPrincipais} {nPrincipais === 1 ? "dupla" : "duplas"}
                 </b>
-                {nDes > 0 && (
+                {(nDes > 0 || nEnc > 0) && (
                   <span className="text-xs">
-                    {" "}
-                    · {nDes} {nDes === 1 ? "desistente" : "desistentes"}
+                    {nDes > 0 &&
+                      ` · ${nDes} ${nDes === 1 ? "desistente" : "desistentes"}`}
+                    {nEnc > 0 &&
+                      ` · ${nEnc} ${nEnc === 1 ? "encerrada" : "encerradas"}`}
                   </span>
                 )}
               </>
@@ -1696,26 +1723,35 @@ function VisaoSupervisor({
         </div>
       )}
 
-      {/* desistentes fora do número principal (mesma régua da
+      {/* fechadas cedo fora do número principal (mesma régua da
           coordenação) */}
       <div className="mb-2 mt-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-[13px] text-muted-foreground">
           {(() => {
-            const nDes = exibidas.filter(desistenteDa).length;
-            const nPrincipais = exibidas.length - nDes;
+            const nDes = exibidas.filter(ehDesistente).length;
+            const nEnc = exibidas.filter(
+              (d) => situacaoDaDupla(d) === "encerrada"
+            ).length;
+            const nPrincipais = exibidas.length - nDes - nEnc;
             return filtro === "desistente" ? (
               <b className="font-semibold text-foreground">
                 {nDes} {nDes === 1 ? "desistente" : "desistentes"}
+              </b>
+            ) : filtro === "encerrada" ? (
+              <b className="font-semibold text-foreground">
+                {nEnc} {nEnc === 1 ? "encerrada" : "encerradas"}
               </b>
             ) : (
               <>
                 <b className="font-semibold text-foreground">
                   {nPrincipais} {nPrincipais === 1 ? "dupla" : "duplas"}
                 </b>
-                {nDes > 0 && (
+                {(nDes > 0 || nEnc > 0) && (
                   <span className="text-xs">
-                    {" "}
-                    · {nDes} {nDes === 1 ? "desistente" : "desistentes"}
+                    {nDes > 0 &&
+                      ` · ${nDes} ${nDes === 1 ? "desistente" : "desistentes"}`}
+                    {nEnc > 0 &&
+                      ` · ${nEnc} ${nEnc === 1 ? "encerrada" : "encerradas"}`}
                   </span>
                 )}
               </>
@@ -2173,7 +2209,7 @@ function VisaoEspecialista({
                       <span aria-hidden className="size-1.5 rounded-full bg-current" />
                       {d.status === "ativa"
                         ? "Trilha ativa"
-                        : (STATUS_LABEL[d.status]?.label ?? d.status)}
+                        : SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)]}
                     </Pill>
                     <Link
                       href={`/duplas/${d.id}`}

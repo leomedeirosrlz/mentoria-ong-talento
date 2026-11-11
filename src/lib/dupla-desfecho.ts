@@ -49,12 +49,50 @@ export function ehConcluida(d: { desfecho?: DuplaDesfecho | null | undefined } |
   return d?.desfecho === "concluida";
 }
 
-/** A dupla conta como "desistente" (interrompeu no meio)? */
+/** A dupla conta como "desistente" (o jovem ou o mentor saiu antes do
+ *  fim)? Só `desistencia_*` + legado `encerrada` sem desfecho —
+ *  remanejada/outro são encerramento formal da coordenação, fatia própria
+ *  ("Encerrada"), não desistência. */
 export function ehDesistente(d: { desfecho?: DuplaDesfecho | null | undefined; status?: string | null } | null | undefined): boolean {
   if (!d) return false;
-  if (d.desfecho && d.desfecho !== "concluida") return true;
+  if (d.desfecho === "desistencia_jovem" || d.desfecho === "desistencia_mentor") return true;
   // legado: encerrada sem desfecho = tratamos como desistência (não sucesso)
   return d.desfecho == null && d.status === "encerrada";
+}
+
+/** Situação canônica da dupla — o "como ela se chama" derivado de
+ *  status + desfecho. Única fonte do conceito: toda tela que mostra a
+ *  situação da dupla lê daqui (ou do mapa de rótulos abaixo), nunca de
+ *  um mapa local. Semáforo (risco/atenção/em dia) e apoio aberto são
+ *  eixos à parte — refinam a situação "andamento", não a substituem. */
+export type SituacaoDupla =
+  | "andamento"
+  | "pausada"
+  | "concluida"
+  | "desistente"
+  | "encerrada";
+
+export const SITUACAO_DUPLA_LABEL: Record<SituacaoDupla, string> = {
+  andamento: "Em andamento",
+  pausada: "Pausada",
+  concluida: "Concluída",
+  desistente: "Desistente",
+  encerrada: "Encerrada",
+};
+
+/** status + desfecho → a fatia canônica. Qualquer valor fora dos
+ *  conhecidos (ou nulo) cai em "andamento" — o único balde não
+ *  terminal, idem ao "desconhecido é ativo" do saudadeDaDupla. */
+export function situacaoDaDupla(
+  d: { status?: string | null; desfecho?: DuplaDesfecho | null } | null | undefined
+): SituacaoDupla {
+  if (d?.status === "pausada") return "pausada";
+  if (ehConcluida(d) || d?.status === "concluida") return "concluida";
+  if (ehDesistente(d)) return "desistente";
+  // desfecho preenchido sempre termina a dupla — remanejada/outro aqui
+  // (concluida e desistencia_* já saíram acima)
+  if (d?.status === "encerrada" || d?.desfecho != null) return "encerrada";
+  return "andamento";
 }
 
 /** Deriva o desfecho a partir do status antigo — usado por linhas legadas

@@ -582,7 +582,7 @@ function itensDaDupla(
           ? `data oficial: ${capitalizar(formatDiaSemana(dia))} ${formatDiaMes(dia)}`
           : p.dia != null
             ? `a data oficial (${formatDiaMes(p.dia)}) já passou: combine um novo horário`
-            : "sem data oficial no calendário: a dupla agenda"
+            : "sem dia oficial no calendário: a dupla agenda"
       );
       itens.push({
         id: `prev-${d.id}-${numero}`,
@@ -776,7 +776,7 @@ export function secoesDaAgenda(itens: AgendaItem[], hoje: string): AgendaSecao[]
   );
   if (semDia.length > 0)
     proximos.push(
-      grupoDo(null, semDia.sort(cmpItens), "A agendar, sem data marcada")
+      grupoDo(null, semDia.sort(cmpItens), "A agendar, ainda sem agendamento")
     );
 
   return [

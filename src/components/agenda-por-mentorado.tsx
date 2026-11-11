@@ -41,6 +41,10 @@ import {
   TRILHA_LEN,
   foraDoPrograma,
 } from "@/lib/ciclo";
+import {
+  situacaoDaDupla,
+  SITUACAO_DUPLA_LABEL,
+} from "@/lib/dupla-desfecho";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
 import type {
   CicloEvento,
@@ -381,11 +385,7 @@ function CardMentorado({
             </Badge>
             {dupla.status !== "ativa" && (
               <Badge variant="outline" className="text-muted-foreground">
-                {dupla.status === "pausada"
-                  ? "pausada"
-                  : dupla.status === "concluida"
-                    ? "concluída"
-                    : "desistente"}
+                {SITUACAO_DUPLA_LABEL[situacaoDaDupla(dupla)].toLowerCase()}
               </Badge>
             )}
             {mentoradoFora && (
@@ -1149,9 +1149,13 @@ function TrilhasAnteriores({ trilhas }: { trilhas: TrilhaJovem[] }) {
               <p className="text-xs text-muted-foreground">
                 {feitas} de {TRILHA_LEN.especialista} sessões
                 {t.iniciada_em && ` · iniciada ${formatDate(t.iniciada_em)}`}
+                {/* a RPC trilha_do_jovem não traz desfecho — sem ela a
+                    regra canônica não separa desistente × encerrada, e o
+                    fechamento da trilha esp é rito formal: "encerrada" é
+                    a palavra neutra que não acusa desistência */}
                 {t.encerrada_em &&
                   ` · ${
-                    t.status === "concluida" ? "concluída" : "desistente"
+                    t.status === "concluida" ? "concluída" : "encerrada"
                   } ${formatDate(t.encerrada_em)}`}
                 {t.motivo_encerramento && ` · ${t.motivo_encerramento}`}
               </p>
