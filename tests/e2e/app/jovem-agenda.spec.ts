@@ -250,7 +250,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
       .filter((n) => n.titulo === "6º encontro marcado");
     expect(notif).toBeTruthy();
     expect(notif?.corpo).toMatch(
-      /Jovem E2E marcou para \d{2}\/\d{2} às \d{2}:\d{2}\./
+      /Mentorada E2E marcou para \d{2}\/\d{2} às \d{2}:\d{2}\./
     );
     expect(notif?.href).toBe(`/duplas/${DUPLA_ID}`);
   });
@@ -300,7 +300,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     const [notif] = (await sinosDe(IDS.mentorProfile, "encontro_alterado"))
       .filter((n) => n.titulo === "7º encontro alterado");
     expect(notif?.corpo).toMatch(
-      /Jovem E2E moveu para \d{2}\/\d{2} às \d{2}:\d{2}\./
+      /Mentorada E2E moveu para \d{2}\/\d{2} às \d{2}:\d{2}\./
     );
     expect(notif?.corpo).toContain("Motivo: Conflito de agenda");
   });
@@ -346,7 +346,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     const [notif] = (await sinosDe(IDS.mentorProfile, "encontro_alterado"))
       .filter((n) => n.titulo === "9º encontro alterado");
     expect(notif?.corpo).toMatch(
-      /Jovem E2E atualizou o link do encontro de \d{2}\/\d{2}\./
+      /Mentorada E2E atualizou o link do encontro de \d{2}\/\d{2}\./
     );
   });
 
@@ -383,7 +383,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     const [notif] = (await sinosDe(IDS.mentorProfile, "encontro_desfeito"))
       .filter((n) => n.titulo === "10º encontro desmarcado");
     expect(notif?.corpo).toMatch(
-      /Jovem E2E desmarcou o encontro de \d{2}\/\d{2}\./
+      /Mentorada E2E desmarcou o encontro de \d{2}\/\d{2}\./
     );
   });
 
@@ -426,7 +426,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     const [notif] = (await sinosDe(IDS.mentorProfile, "encontro_desfeito"))
       .filter((n) => n.titulo === "6º encontro não aconteceu");
     expect(notif?.corpo).toMatch(
-      /Jovem E2E marcou que o encontro de \d{2}\/\d{2} não aconteceu\./
+      /Mentorada E2E marcou que o encontro de \d{2}\/\d{2} não aconteceu\./
     );
   });
 
@@ -661,7 +661,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
       .filter((n) => n.titulo === "5º encontro alterado");
     expect(notif).toBeTruthy();
     expect(notif?.corpo).toMatch(
-      /Jovem E2E atualizou o link do encontro de \d{2}\/\d{2}\./
+      /Mentorada E2E atualizou o link do encontro de \d{2}\/\d{2}\./
     );
     expect(notif?.href).toBe(`/duplas/${DUPLA_ID}`);
   });
@@ -724,7 +724,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     const [notif] = (await sinosDe(IDS.mentorProfile, "encontro_alterado"))
       .filter((n) => n.titulo === "4º encontro alterado");
     expect(notif?.corpo).toMatch(
-      /Jovem E2E moveu para \d{2}\/\d{2} às \d{2}:\d{2}\./
+      /Mentorada E2E moveu para \d{2}\/\d{2} às \d{2}:\d{2}\./
     );
     expect(notif?.corpo).toContain("Motivo: Conflito de agenda");
   });

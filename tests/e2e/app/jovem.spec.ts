@@ -146,7 +146,7 @@ test.describe("mentorado — shell /jovem", () => {
   }) => {
     // o beforeEach já pousou em /jovem — a home apresenta a dupla dele
     await expect(
-      page.getByRole("heading", { name: /Olá, Jovem/ })
+      page.getByRole("heading", { name: /Olá, Mentorada/ })
     ).toBeVisible();
     const mentoria = page.locator('section[aria-labelledby="dupla-titulo"]');
     await expect(mentoria.getByText("Mentor E2E")).toBeVisible();
@@ -444,7 +444,7 @@ test.describe("mentorado — shell /jovem", () => {
   }) => {
     await page.goto("/jovem/perfil");
     await expect(
-      page.getByRole("heading", { name: "Jovem E2E", level: 1 })
+      page.getByRole("heading", { name: "Mentorada E2E", level: 1 })
     ).toBeVisible();
     // o desenho é o do perfil de todo mundo: badge de papel no header,
     // ficha como gaveta (summary), dados como seção e conta no fim
