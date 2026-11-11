@@ -6,6 +6,11 @@ import {
   TRILHA_LABEL,
 } from "@/lib/ciclo";
 import { turmaDaDupla, turmaLonga } from "@/lib/turma";
+import {
+  situacaoDaDupla,
+  SITUACAO_DUPLA_LABEL,
+  type DuplaDesfecho,
+} from "@/lib/dupla-desfecho";
 import type { Cronograma, EncontroStatus, Trilha } from "@/lib/types";
 
 // ---------- config ----------
@@ -127,6 +132,11 @@ export type DuplaFonte = {
   mentorado_id: string;
   supervisor_id: string | null;
   status: string;
+  /** Por que fechou — separa "Encerrada" (remanejada/outro) de
+   *  "Desistente" (desistencia_*). Opcional: o snapshot público
+   *  (abrir_relatorio RPC) ainda não carrega a coluna — lá a encerrada
+   *  sem desfecho segue a regra legada e lê "Desistente". */
+  desfecho?: DuplaDesfecho | null;
   iniciada_em: string | null;
   demanda: string | null;
   /** só o recorte público 'ciclo' carrega (desambigua trilha/esp e o nº do
@@ -224,15 +234,16 @@ function alvosDe(
   return out;
 }
 
-const STATUS_LABEL: Record<string, string> = {
-  ativa: "Ativa",
-  encerrada: "Desistente",
-  pausada: "Pausada",
-  concluida: "Concluída",
-};
-
-export function labelStatus(s: string): string {
-  return STATUS_LABEL[s] ?? s;
+/** Rótulo da situação da dupla no CSV/print — mesma fonte das telas
+ *  (dupla-desfecho). Status fora do enum conhecido vaza cru em vez de
+ *  ler "Em andamento" por engano. */
+export function labelStatus(d: {
+  status: string;
+  desfecho?: DuplaDesfecho | null;
+}): string {
+  return ["ativa", "pausada", "concluida", "encerrada"].includes(d.status)
+    ? SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)]
+    : d.status;
 }
 
 function cidadeUf(p: Pick<PessoaFonte, "cidade" | "uf">): string {
@@ -286,7 +297,7 @@ export function montarLinhas(
           mentorado: mentorado?.nome ?? "",
           contato_mentor: mentor ? contato(mentor) : "",
           contato_mentorado: mentorado ? contato(mentorado) : "",
-          status_dupla: labelStatus(d.status),
+          status_dupla: labelStatus(d),
           iniciada_em: formatDate(d.iniciada_em),
           demanda: d.demanda ?? "",
           auxiliar: sup?.nome ?? "",
@@ -323,7 +334,7 @@ export function montarLinhas(
         whatsapp: mentor.whatsapp ?? "",
         cidade_uf: cidadeUf(mentor),
         par: mentorado?.nome ?? "",
-        status_dupla: labelStatus(d.status),
+        status_dupla: labelStatus(d),
         iniciada_em: formatDate(d.iniciada_em),
         demanda: d.demanda ?? "",
         auxiliar: sup?.nome ?? "",
@@ -344,7 +355,7 @@ export function montarLinhas(
         whatsapp: mentorado.whatsapp ?? "",
         cidade_uf: cidadeUf(mentorado),
         par: mentor?.nome ?? "",
-        status_dupla: labelStatus(d.status),
+        status_dupla: labelStatus(d),
         iniciada_em: formatDate(d.iniciada_em),
         demanda: d.demanda ?? "",
         auxiliar: sup?.nome ?? "",

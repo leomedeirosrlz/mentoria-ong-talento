@@ -59,7 +59,30 @@ describe("montarLinhas · metadados de exibição", () => {
     expect(mentor.__status).toBe("ativa");
     expect(mentor.__papel).toBe("mentor");
     expect(jovem.__papel).toBe("mentorado");
-    expect(textoCelula(mentor, "status_dupla")).toBe("Ativa");
+    expect(textoCelula(mentor, "status_dupla")).toBe("Em andamento");
+  });
+
+  it("status_dupla lê a situação canônica — desfecho separa Desistente × Encerrada", () => {
+    const casos = [
+      ["ativa", null, "Em andamento"],
+      ["pausada", null, "Pausada"],
+      ["concluida", null, "Concluída"],
+      ["encerrada", "desistencia_jovem", "Desistente"],
+      ["encerrada", "desistencia_mentor", "Desistente"],
+      ["encerrada", null, "Desistente"], // legado sem desfecho
+      ["encerrada", "remanejada", "Encerrada"],
+      ["encerrada", "outro", "Encerrada"],
+    ] as const;
+    for (const [status, desfecho, esperado] of casos) {
+      const linhas = montarLinhas(
+        CFG_PESSOAS,
+        [{ ...DUPLA, status, desfecho }],
+        mapa(MENTOR),
+        mapa(JOVEM)
+      );
+      const mentor = linhas.find((l) => textoCelula(l, "papel") === "Mentor(a)")!;
+      expect(textoCelula(mentor, "status_dupla")).toBe(esperado);
+    }
   });
 
   it("sem paraApp não emite __alvos nem __links (resumo público)", () => {

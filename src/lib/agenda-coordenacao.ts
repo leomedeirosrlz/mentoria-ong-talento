@@ -20,7 +20,7 @@ import {
 import { primeiroNomeDaDupla } from "./agenda-minha";
 import { guiaDoEncontro } from "./como-conduzir";
 import { turmaCurta, turmaLonga } from "./turma";
-import { ehConcluida, ehDesistente } from "./dupla-desfecho";
+import { situacaoDaDupla } from "./dupla-desfecho";
 import type {
   CicloEvento,
   Cronograma,
@@ -263,7 +263,7 @@ export type ItemParaAcompanhar = {
   turma: string;
   saude: DuplaSaude;
   motivos: MotivoAcompanhar[];
-  /** Linha pronta: "Encontro 8 · T1 — ainda sem data (prazo: dom 12)". */
+  /** Linha pronta: "Encontro 8 · T1 — ainda sem agendamento (prazo: dom 12)". */
   contexto: string;
   /** As partes do contexto reordenadas (REALIZA-161): [0] é o caso
    *  decisório — o motivo que pôs a dupla na fila (pendência > atraso >
@@ -280,10 +280,11 @@ export type ItemParaAcompanhar = {
 };
 
 /** Linha de contexto do card "Para acompanhar" — as combinações do mock:
- *  sem_data puro ("Encontro 8 · T1 — ainda sem data nesta semana (prazo:
- *  dom 12)"), atraso dominando ("2 encontros atrasados — sem data para o
- *  8"), registro solto ("Encontro 5 · T2 agendado qua 8, 19h — registro do
- *  4 pendente"). Devolve o texto pronto E as partes: a fila nova
+ *  sem_data puro ("Encontro 8 · T1 — ainda sem agendamento nesta semana
+ *  (prazo: dom 12)"), atraso dominando ("2 encontros atrasados — sem
+ *  agendamento pro 8"), registro solto ("Encontro 5 · T2 agendado qua 8,
+ *  19h — registro do 4 pendente"). Devolve o texto pronto E as partes: a
+ *  fila nova
  *  (REALIZA-161) destaca a primeira como "caso" decisório — por isso as
  *  partes são reordenadas (a pendência encabeça; o `contexto` legado
  *  mantém a ordem de montagem) — sem re-duplicar a montagem na tela. */
@@ -326,8 +327,8 @@ function contextoAcompanhar(
       novaNaTurma
         ? `${rotuloEnc} ${vig.numero}${daTurma(d.turma)}. Dupla nova: 1º agendamento pendente`
         : lead
-          ? `Sem data para o ${vig.numero}`
-          : `${rotuloEnc} ${vig.numero}${daTurma(d.turma)} ainda sem data${
+          ? `Sem agendamento pro ${vig.numero}`
+          : `${rotuloEnc} ${vig.numero}${daTurma(d.turma)} ainda sem agendamento${
               nestaSemana
                 ? " nesta semana"
                 : ` para ${vig.data.slice(8, 10)}/${vig.data.slice(5, 7)}`
@@ -973,9 +974,11 @@ function coberturaDoVigente(
  *  - `risco` + `atencao` + `emDia` PARTICIONAM `emAndamento` pelo semáforo.
  *  - `apoio` é SOBREPOSIÇÃO: conta pedido de apoio aberto (ativa ou pausada)
  *    à parte e nunca tira a dupla da sua situação.
- *  - `pausadas`, `concluidas` (concluída com êxito) e `desistentes`
- *    (encerrada / desistência / remanejada / outro) ficam fora da régua.
- *  - `total` = emAndamento + pausadas + concluidas + desistentes: o denominador da barra. */
+ *  - `pausadas`, `concluidas` (concluída com êxito), `desistentes`
+ *    (desistência do jovem/mentor + encerrada legada sem desfecho) e
+ *    `encerradas` (fechamento formal: remanejada/outro) ficam fora da régua.
+ *  - `total` = emAndamento + pausadas + concluidas + desistentes + encerradas:
+ *    o denominador da barra. */
 export type SaudeRecorte = {
   emAndamento: number;
   risco: number;
@@ -985,6 +988,7 @@ export type SaudeRecorte = {
   pausadas: number;
   concluidas: number;
   desistentes: number;
+  encerradas: number;
   total: number;
 };
 
@@ -1003,6 +1007,7 @@ export function saudeDoRecorte(
     pausadas: 0,
     concluidas: 0,
     desistentes: 0,
+    encerradas: 0,
     total: 0,
   };
   for (const d of duplas) {
@@ -1014,15 +1019,16 @@ export function saudeDoRecorte(
       if (saude.semaforo === "risco") s.risco++;
       else if (saude.semaforo === "atencao") s.atencao++;
       else s.emDia++;
-    } else if (d.status === "pausada") {
-      s.pausadas++;
-    } else if (ehConcluida({ desfecho: d.desfecho }) || d.status === "concluida") {
-      s.concluidas++;
-    } else if (ehDesistente({ desfecho: d.desfecho, status: d.status }) || d.status === "encerrada") {
-      s.desistentes++;
+    } else {
+      const sit = situacaoDaDupla(d);
+      if (sit === "pausada") s.pausadas++;
+      else if (sit === "concluida") s.concluidas++;
+      else if (sit === "desistente") s.desistentes++;
+      else if (sit === "encerrada") s.encerradas++;
     }
   }
-  s.total = s.emAndamento + s.pausadas + s.concluidas + s.desistentes;
+  s.total =
+    s.emAndamento + s.pausadas + s.concluidas + s.desistentes + s.encerradas;
   return s;
 }
 
@@ -1036,6 +1042,7 @@ export type RecorteFatia =
   | "pausada"
   | "concluida"
   | "desistente"
+  | "encerrada"
   | "apoio";
 
 export const RECORTES_FATIA: readonly RecorteFatia[] = [
@@ -1045,6 +1052,7 @@ export const RECORTES_FATIA: readonly RecorteFatia[] = [
   "pausada",
   "concluida",
   "desistente",
+  "encerrada",
   "apoio",
 ];
 

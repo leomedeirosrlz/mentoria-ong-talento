@@ -15,6 +15,10 @@ import {
   type ItemConsolidado,
 } from "@/lib/agenda-auxiliar";
 import { itensDaSemanaPrograma, saudeDoRecorte } from "@/lib/agenda-coordenacao";
+import {
+  situacaoDaDupla,
+  SITUACAO_DUPLA_LABEL,
+} from "@/lib/dupla-desfecho";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
 import {
@@ -314,12 +318,9 @@ const SEM_CARD: Record<Semaforo, { tom: TomTag; rotulo: string }> = {
   risco: { tom: "danger", rotulo: "Risco" },
 };
 
-const ROTULO_STATUS: Record<Dupla["status"], string> = {
-  ativa: "",
-  pausada: "Pausada",
-  concluida: "Concluída",
-  encerrada: "Desistente",
-};
+// label canônico da situação (desfecho separa Desistente × Encerrada)
+const rotuloStatus = (d: Dupla): string =>
+  d.status === "ativa" ? "" : SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)];
 
 /** O sinal mais grave que um lembrete endereça — o primeiro da fila do
  *  semáforo já vem na ordem de prioridade; o mapa traduz pro caso do
@@ -356,7 +357,7 @@ function CardDuplaAux({
     d.mentorado?.nome_social || d.mentorado?.nome || "Jovem";
   const tag =
     d.status !== "ativa"
-      ? { tom: "muted" as TomTag, rotulo: ROTULO_STATUS[d.status] }
+      ? { tom: "muted" as TomTag, rotulo: rotuloStatus(d) }
       : SEM_CARD[saude.semaforo];
   // Lembrar existe quando há pendência apontável — em dia não leva nudge
   const lembrete =

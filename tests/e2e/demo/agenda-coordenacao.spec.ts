@@ -452,14 +452,14 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
       ).toBeVisible();
       if (dowHoje === 1) {
         await expect(
-          pend.getByText(/Encontro \d+ da Turma 1 ainda sem data/)
+          pend.getByText(/Encontro \d+ da Turma 1 ainda sem agendamento/)
         ).toBeVisible();
       }
       if (dowHoje === 2) {
         await expect(
           pend.getByText(/1 encontro atrasado/)
         ).toBeVisible();
-        await expect(pend).toContainText(/ainda sem data/);
+        await expect(pend).toContainText(/ainda sem agendamento/);
       }
       // "Ver ficha" aponta pra ficha da dupla — o nome acessível leva o
       // primeiro nome do mentorado; id estável do dataset

@@ -2,11 +2,14 @@ import { describe, expect, it } from "vitest";
 import {
   ehConcluida,
   ehDesistente,
+  situacaoDaDupla,
   desfechoLegacy,
   desfechoValido,
   DESFECHO_MOTIVOS,
   DESFECHO_LABEL,
+  SITUACAO_DUPLA_LABEL,
   type DuplaDesfecho,
+  type SituacaoDupla,
 } from "./dupla-desfecho";
 
 describe("dupla-desfecho", () => {
@@ -17,13 +20,40 @@ describe("dupla-desfecho", () => {
     expect(ehConcluida(null)).toBe(false);
   });
 
-  it("ehDesistente: qualquer desfecho != concluida, ou encerrada legada", () => {
+  it("ehDesistente: só desistencia_* ou encerrada legada sem desfecho", () => {
     expect(ehDesistente({ desfecho: "desistencia_jovem" })).toBe(true);
-    expect(ehDesistente({ desfecho: "remanejada" })).toBe(true);
-    expect(ehDesistente({ desfecho: "outro" })).toBe(true);
+    expect(ehDesistente({ desfecho: "desistencia_mentor" })).toBe(true);
+    // encerramento formal da coordenação NÃO é desistência
+    expect(ehDesistente({ desfecho: "remanejada" })).toBe(false);
+    expect(ehDesistente({ desfecho: "outro" })).toBe(false);
     expect(ehDesistente({ desfecho: "concluida" })).toBe(false);
+    // legado: encerrada sem desfecho segue lendo "Desistente"
     expect(ehDesistente({ desfecho: null, status: "encerrada" })).toBe(true);
     expect(ehDesistente({ desfecho: null, status: "ativa" })).toBe(false);
+    expect(ehDesistente(null)).toBe(false);
+  });
+
+  it("situacaoDaDupla: o mapa canônico de status + desfecho", () => {
+    const casos: [Parameters<typeof situacaoDaDupla>[0], SituacaoDupla][] = [
+      [{ status: "ativa" }, "andamento"],
+      [{ status: "pausada" }, "pausada"],
+      [{ status: "concluida" }, "concluida"],
+      [{ status: "encerrada", desfecho: "concluida" }, "concluida"],
+      [{ status: "encerrada", desfecho: "desistencia_jovem" }, "desistente"],
+      [{ status: "encerrada", desfecho: "desistencia_mentor" }, "desistente"],
+      [{ status: "encerrada", desfecho: null }, "desistente"], // legado
+      [{ status: "encerrada", desfecho: "remanejada" }, "encerrada"],
+      [{ status: "encerrada", desfecho: "outro" }, "encerrada"],
+      [{ status: "encerrada" }, "desistente"], // desfecho ausente = legado
+      // desfecho terminal vale mesmo fora de status='encerrada'
+      [{ status: "ativa", desfecho: "remanejada" }, "encerrada"],
+      [null, "andamento"],
+      [{ status: "algo_novo" }, "andamento"],
+    ];
+    for (const [d, esperada] of casos) {
+      expect(situacaoDaDupla(d)).toBe(esperada);
+      expect(SITUACAO_DUPLA_LABEL[esperada]).toBeTruthy();
+    }
   });
 
   it("desfechoLegacy", () => {

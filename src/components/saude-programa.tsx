@@ -58,8 +58,12 @@ const REGRAS: { termo: string; texto: string }[] = [
   },
   {
     termo: "Desistente",
+    texto: "O jovem ou o mentor saiu antes do fim da jornada.",
+  },
+  {
+    termo: "Encerrada",
     texto:
-      "Finalizaram a jornada por impeditivos ou motivos de força maior.",
+      "A coordenação fechou a dupla (remanejo, fim de ciclo fora do rito, outro motivo).",
   },
 ];
 
@@ -98,6 +102,7 @@ export function SaudePrograma({
     pausadas,
     concluidas,
     desistentes,
+    encerradas,
     total,
   } = saude;
   const segmentos = [
@@ -105,10 +110,12 @@ export function SaudePrograma({
     { valor: atencao, rotulo: "em atenção", cls: "bg-[var(--warn)]" },
     { valor: emDia, rotulo: "em dia", cls: "bg-[var(--ok)]" },
     { valor: pausadas, rotulo: "pausadas", cls: "bg-[var(--info)]" },
-    // fechadas saem da régua de status: concluída é cinza sólido,
-    // desistente o mesmo cinza em listra — sem cor de alerta
+    // fechadas saem da régua de status, sem cor de alerta: concluída é
+    // cinza sólido, desistente o mesmo cinza em listra, encerrada o cinza
+    // mais claro — três texturas neutras distintas
     { valor: concluidas, rotulo: "concluídas", cls: "bg-muted-foreground" },
     { valor: desistentes, rotulo: "desistentes", cls: "viz-hatch-desistente" },
+    { valor: encerradas, rotulo: "encerradas", cls: "bg-muted-foreground/40" },
   ];
 
   return (
@@ -142,6 +149,12 @@ export function SaudePrograma({
                 {desistentes} {desistentes === 1 ? "desistente" : "desistentes"}
               </span>
             </Atalho>
+            {" · "}
+            <Atalho id="encerrada" linkBase={linkBase} onRecorte={onRecorte}>
+              <span className="tabular-nums">
+                {encerradas} {encerradas === 1 ? "encerrada" : "encerradas"}
+              </span>
+            </Atalho>
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -169,7 +182,7 @@ export function SaudePrograma({
             denominador={total}
             animate
             segmentos={segmentos}
-            ariaLabel={`${emAndamento} em andamento: ${risco} em risco, ${atencao} em atenção, ${emDia} em dia. ${pausadas} pausadas, ${concluidas} concluídas, ${desistentes} desistentes. ${apoio} com apoio aberto.`}
+            ariaLabel={`${emAndamento} em andamento: ${risco} em risco, ${atencao} em atenção, ${emDia} em dia. ${pausadas} pausadas, ${concluidas} concluídas, ${desistentes} desistentes, ${encerradas} encerradas. ${apoio} com apoio aberto.`}
           />
           <ul className="mt-3 flex flex-wrap gap-x-5 gap-y-2 text-sm">
             <Item
@@ -207,6 +220,12 @@ export function SaudePrograma({
               n={desistentes}
               rotulo="desistentes"
               dot="viz-hatch-desistente"
+              texto="text-muted-foreground"
+            />
+            <Item
+              n={encerradas}
+              rotulo="encerradas"
+              dot="bg-muted-foreground/40"
               texto="text-muted-foreground"
             />
           </ul>

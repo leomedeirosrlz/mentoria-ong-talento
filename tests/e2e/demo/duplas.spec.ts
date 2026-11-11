@@ -41,17 +41,18 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     ).toBeVisible();
     await expect(
       resumo.getByRole("img", {
-        name: /\d+ em andamento: \d+ em risco, \d+ em atenção, \d+ em dia\. \d+ pausadas, \d+ concluídas, \d+ desistentes\. \d+ com apoio aberto\./,
+        name: /\d+ em andamento: \d+ em risco, \d+ em atenção, \d+ em dia\. \d+ pausadas, \d+ concluídas, \d+ desistentes, \d+ encerradas\. \d+ com apoio aberto\./,
       })
     ).toBeVisible();
     const legenda = resumo.getByRole("listitem");
-    await expect(legenda).toHaveCount(6);
+    await expect(legenda).toHaveCount(7);
     await expect(legenda.nth(0)).toContainText("em risco");
     await expect(legenda.nth(1)).toContainText("em atenção");
     await expect(legenda.nth(2)).toContainText("em dia");
     await expect(legenda.nth(3)).toContainText("pausadas");
     await expect(legenda.nth(4)).toContainText("concluídas");
     await expect(legenda.nth(5)).toContainText("desistentes");
+    await expect(legenda.nth(6)).toContainText("encerradas");
     await expect(resumo.getByText(/com apoio aberto/)).toBeVisible();
     // a definição da régua não fica na tela — mora no popover "Como
     // calculamos" (convenção: a interface não explica a si mesma)
@@ -83,6 +84,12 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     ).toBeVisible();
     await expect(
       chips.getByRole("button", { name: /Concluídas \d+/ })
+    ).toBeVisible();
+    await expect(
+      chips.getByRole("button", { name: /Desistentes \d+/ })
+    ).toBeVisible();
+    await expect(
+      chips.getByRole("button", { name: /Encerradas \d+/ })
     ).toBeVisible();
     await expect(
       chips.getByRole("button", { name: /Apoio \d+/ })

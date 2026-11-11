@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { comparaNome, registroTardio } from "./ciclo";
+import type { DuplaDesfecho } from "./dupla-desfecho";
 import {
   audienciasDe,
   turmaDoMaterial,
@@ -697,6 +698,9 @@ export const getMentorados = cache(async (): Promise<Mentorado[]> => {
 export type DuplaPerfil = {
   id: string;
   status: DuplaStatus;
+  /** Por que fechou — separa "Encerrada" (remanejada/outro) de
+   *  "Desistente" (desistencia_*): a ficha lê a situação canônica. */
+  desfecho?: DuplaDesfecho | null;
   iniciada_em: string | null;
   /** Trilha da dupla (WP6b) — a ficha do mentor híbrido conta vagas por
    *  pool (DPP × especialista), sem ela o X/Y misturava as duas. */
@@ -737,7 +741,7 @@ export const getPessoaPerfil = cache(async (id: string): Promise<
   // email não entra no embed de profiles (grant de coluna, 0026) — vem do
   // merge com a view quando o papel alcança; o gravatar cai nas iniciais senão
   const DUPLA_PERFIL_SELECT = `
-    id, status, iniciada_em, trilha,
+    id, status, desfecho, iniciada_em, trilha,
     mentor:profiles!duplas_mentor_id_fkey(id, nome, nome_social, avatar_path),
     mentorado:mentorados(id, nome, nome_social, avatar_path)
   `;

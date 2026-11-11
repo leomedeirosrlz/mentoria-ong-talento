@@ -16,6 +16,10 @@ import {
   totalDaTrilha,
 } from "@/lib/ciclo";
 import { limboFechado } from "@/lib/agenda-minha";
+import {
+  situacaoDaDupla,
+  SITUACAO_DUPLA_LABEL,
+} from "@/lib/dupla-desfecho";
 import { temPapel } from "@/lib/types";
 import type {
   CicloEvento,
@@ -650,7 +654,7 @@ export function MentorHome({
                       />
                     </p>
                     <p className="mt-0.5 text-xs text-muted-foreground">
-                      {dupla.status === "concluida" ? "Concluída" : "Encerrada"} ·{" "}
+                      {SITUACAO_DUPLA_LABEL[situacaoDaDupla(dupla)]} ·{" "}
                       <span className="tabular-nums">
                         {saude.feitos}/{totalDupla}
                       </span>{" "}
