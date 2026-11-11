@@ -429,7 +429,10 @@ export async function rpcViaServiceRole<T = unknown>(
   });
   if (!res.ok)
     throw new Error(`rpc ${fn} falhou: ${res.status} ${await res.text()}`);
-  return (await res.json()) as T;
+  // rpcs void (registrar/falhar_login_handoff) devolvem corpo vazio —
+  // res.json() estouraria em "Unexpected end of JSON input"
+  const texto = await res.text();
+  return (texto ? JSON.parse(texto) : null) as T;
 }
 
 /** Access token de um usuário de teste (grant password do GoTrue) — pra
