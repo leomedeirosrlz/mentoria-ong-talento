@@ -460,6 +460,36 @@ export async function jwtDoUsuario(
   return body.access_token;
 }
 
+/** Par access+refresh de um usuário de teste — mesma grant do jwtDoUsuario,
+ *  mas devolve os dois: o handoff e o /auth/link precisam do refresh real
+ *  (uso único, casado com o access) pro setSession do gesto e do resgate.
+ *  Mesmo hard-stop: spec app nunca fala com prod. */
+export async function tokensDoUsuario(
+  email: string,
+  senha: string
+): Promise<{ access_token: string; refresh_token: string }> {
+  if (supabaseUrl.includes(PROD_REF))
+    throw new Error("E2E_SUPABASE_URL aponta pra produção — login abortado");
+  const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
+  const res = await fetch(
+    `${supabaseUrl}/auth/v1/token?grant_type=password`,
+    {
+      method: "POST",
+      headers: { apikey: key, "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password: senha }),
+    }
+  );
+  if (!res.ok)
+    throw new Error(`login ${email} → ${res.status}: ${await res.text()}`);
+  const body = (await res.json()) as {
+    access_token?: string;
+    refresh_token?: string;
+  };
+  if (!body.access_token || !body.refresh_token)
+    throw new Error(`login ${email} sem par de tokens`);
+  return { access_token: body.access_token, refresh_token: body.refresh_token };
+}
+
 /** REST autenticado como o usuário do JWT — apikey service + Bearer dele:
  *  o gateway valida a key e o PostgREST resolve a role pelo Bearer (é o
  *  mesmo par que o supabase-js manda, só que com a key elevada). Devolve a
