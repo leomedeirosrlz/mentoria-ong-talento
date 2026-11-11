@@ -607,7 +607,14 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     // a linha inteira na linha do encontro (aba Encontros) — o comentário
     // chega pra coord
     await page.goto(`/duplas/${DUPLA_ID}?aba=encontros`);
-    await expect(page.getByText("Avaliação do jovem", { exact: true })).toBeVisible();
+    // escopo na lista: o tile do Resumo da jornada também diz "Avaliação
+    // do jovem" quando o bloco renderiza (mesma ficha)
+    const listaEncontros = page.locator(
+      'section[aria-labelledby="lista-encontros"]'
+    );
+    await expect(
+      listaEncontros.getByText("Avaliação do jovem", { exact: true })
+    ).toBeVisible();
     await expect(
       page.getByRole("img", { name: "5 de 5 estrelas" }).first()
     ).toBeVisible();
