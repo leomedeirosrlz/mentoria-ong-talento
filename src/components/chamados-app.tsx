@@ -135,7 +135,8 @@ export function ChamadosApp({
           c.numero.toLowerCase().includes(q) ||
           (c.assunto ?? "").toLowerCase().includes(q) ||
           (c.autor_nome ?? "").toLowerCase().includes(q) ||
-          (c.contexto ?? "").toLowerCase().includes(q)
+          (c.contexto ?? "").toLowerCase().includes(q) ||
+          (c.mentorado_nome ?? "").toLowerCase().includes(q)
       );
     }
     return l;
@@ -394,7 +395,14 @@ export function ChamadosApp({
             ? [CHAMADO_CATEGORIA_LABEL[c.categoria], relTempo(c.created_at)]
             : staff
               ? [c.autor_nome, c.contexto, relTempo(c.created_at)]
-              : [c.contexto, relTempo(c.updated_at)];
+              : [
+                  // na fila do autor o contexto vem null — o mentorado é a
+                  // âncora da dupla (pro jovem é ele mesmo: omite)
+                  papel !== "mentorado" && c.mentorado_nome
+                    ? `Mentorado: ${c.mentorado_nome}`
+                    : c.contexto,
+                  relTempo(c.updated_at),
+                ];
           return (
             <li
               key={c.id}

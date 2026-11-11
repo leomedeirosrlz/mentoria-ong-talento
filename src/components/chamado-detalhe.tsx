@@ -204,8 +204,13 @@ export function ChamadoDetalhe({
 
   const meta = [
     staff ? chamado.autor_nome : null,
-    // pro jovem a dupla é ele mesmo, o contexto só repetiria o nome dele
-    papel === "mentorado" ? null : chamado.contexto,
+    // pro jovem a dupla é ele mesmo, o contexto só repetiria o nome dele.
+    // Pro autor o contexto vem null — o mentorado nomeado é a âncora da
+    // dupla (pro staff o contexto já o embute: "Dupla de <nome>")
+    papel === "mentorado"
+      ? null
+      : (chamado.contexto ??
+        (chamado.mentorado_nome ? `Mentorado: ${chamado.mentorado_nome}` : null)),
     `aberto ${formatDiaMes(chamado.created_at)}`,
     chamado.numero,
   ].filter(Boolean);

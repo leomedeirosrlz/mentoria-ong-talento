@@ -162,6 +162,8 @@ export function PdmDupla({
 
   return (
     <section
+      // âncora do deep link — "Documentos da dupla" aponta pra cá
+      id="pdm"
       aria-label="Plano de desenvolvimento"
       className={cn(
         "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-6 lg:p-7",
