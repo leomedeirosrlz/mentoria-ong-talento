@@ -66,6 +66,18 @@ function queryFake() {
   return q;
 }
 
+/** queryFake com linhas — pra servir uma ia_config específica (ex.:
+ *  roteamento desligado). */
+function queryComData(data: unknown[]) {
+  const q = {
+    select: () => q,
+    eq: () => q,
+    then: (res: (v: unknown) => unknown) =>
+      Promise.resolve({ data, error: null }).then(res),
+  };
+  return q;
+}
+
 const CTX_OK = {
   status: "ok",
   profileId: "prof-1",
@@ -122,6 +134,10 @@ const chamadasStream = () =>
     onToken: (t: string) => void;
     signal: AbortSignal;
     clienteAbortou: () => boolean;
+    modelo?: string;
+    esforco?: string;
+    fallbacks?: string[];
+    papeis?: string[];
   }][];
 
 describe("gates — JSON antes do stream abrir", () => {
@@ -564,5 +580,97 @@ describe("stream SSE", () => {
     const texto = await lerStream(res);
     expect(texto).toContain('data: {"type":"error","e":"payload inválido"}');
     expect(texto).not.toContain("dormindo");
+  });
+});
+
+describe("roteador — papel × tarefa e auditoria (REALIZA-299)", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.stubEnv("IA_BOLHA", "1");
+    vi.stubEnv("IA_MODEL", "base-env");
+    vi.stubEnv("IA_MODEL_LEVE", "leve-env");
+    vi.stubEnv("IA_MODEL_MEDIO", "medio-env");
+    vi.stubEnv("IA_MODEL_FORTE", "forte-env");
+    autenticado();
+    m.chamarModeloStream.mockResolvedValue({
+      ok: true,
+      content: "ok",
+      toolCalls: [],
+    });
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  const MSG_ANALISE = "analise as duplas em risco e me dê um diagnóstico";
+
+  it("o evento 'resposta' grava args.roteador {tier, tarefa, papel} coerente com a pergunta", async () => {
+    await lerStream(await POST(req()));
+    const evs = chamadasLote()[0][1].p_eventos;
+    const resposta = evs.find((e) => e.tool === "resposta")!;
+    expect(resposta.tier).toBe("rapido");
+    expect(resposta.args).toMatchObject({
+      roteador: { tier: "rapido", tarefa: "saudacao", papel: "coordenacao" },
+    });
+  });
+
+  it("coord com pedido analítico cai no forte — modelo vem do env do tier", async () => {
+    await lerStream(
+      await POST(req({ messages: [{ role: "user", content: MSG_ANALISE }] }))
+    );
+    expect(chamadasStream()[0][2].modelo).toBe("forte-env");
+    const resposta = chamadasLote()[0][1].p_eventos.find(
+      (e) => e.tool === "resposta"
+    )!;
+    expect(resposta.tier).toBe("forte");
+    expect(resposta.args).toMatchObject({
+      roteador: { tier: "forte", tarefa: "analise", papel: "coordenacao" },
+    });
+    // o forte sempre carrega o médio como último degrau da cadeia
+    expect(chamadasStream()[0][2].fallbacks).toEqual(["medio-env"]);
+  });
+
+  it("mentor com o MESMO pedido analítico capa no balanceado", async () => {
+    m.contextoELimiteIa.mockResolvedValue({
+      ...CTX_OK,
+      role: "mentor_dpp",
+      papeis: ["mentor_dpp"],
+    });
+    await lerStream(
+      await POST(req({ messages: [{ role: "user", content: MSG_ANALISE }] }))
+    );
+    expect(chamadasStream()[0][2].modelo).toBe("medio-env");
+    const resposta = chamadasLote()[0][1].p_eventos.find(
+      (e) => e.tool === "resposta"
+    )!;
+    expect(resposta.tier).toBe("balanceado");
+    expect(resposta.args).toMatchObject({
+      roteador: { tier: "balanceado", tarefa: "analise", papel: "mentor_dpp" },
+    });
+  });
+
+  it("tier rapido sai sem tools anunciadas; balanceado leva os papéis", async () => {
+    await lerStream(await POST(req())); // "oi" → rapido
+    expect(chamadasStream()[0][2].papeis).toEqual([]);
+
+    m.chamarModeloStream.mockClear();
+    await lerStream(
+      await POST(
+        req({ messages: [{ role: "user", content: "como está minha dupla?" }] })
+      )
+    );
+    expect(chamadasStream()[0][2].papeis).toEqual(["coordenacao"]);
+  });
+
+  it("roteamento desligado na config cai no balanceado pra todos", async () => {
+    m.from.mockImplementation(() =>
+      queryComData([{ chave: "roteamento", valor: false }])
+    );
+    await lerStream(
+      await POST(req({ messages: [{ role: "user", content: MSG_ANALISE }] }))
+    );
+    expect(chamadasStream()[0][2].modelo).toBe("medio-env");
+    const resposta = chamadasLote()[0][1].p_eventos.find(
+      (e) => e.tool === "resposta"
+    )!;
+    expect(resposta.tier).toBe("balanceado");
   });
 });

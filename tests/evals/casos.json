@@ -7,15 +7,20 @@
       { "id": "tier-saudacao-2", "msg": "bom dia!", "espera": "rapido" },
       { "id": "tier-pergunta", "msg": "como está a semana?", "espera": "balanceado" },
       { "id": "tier-dominio-curto", "msg": "encontro 12", "espera": "balanceado" },
-      { "id": "tier-analise", "msg": "analise a evolução das duplas em risco no último mês e priorize quem precisa de ação", "espera": "forte" },
+      { "id": "tier-analise", "msg": "analise a evolução das duplas em risco no último mês e priorize quem precisa de ação", "opts": { "papel": "coordenacao" }, "espera": "forte" },
+      { "id": "tier-analise-supervisor", "msg": "analise a evolução das duplas em risco no último mês e priorize quem precisa de ação", "opts": { "papel": "supervisor" }, "espera": "forte" },
+      { "id": "tier-analise-mentor", "msg": "analise a evolução das duplas em risco no último mês e priorize quem precisa de ação", "opts": { "papel": "mentor_dpp" }, "espera": "balanceado" },
+      { "id": "tier-analise-jovem", "msg": "analise a evolução das duplas em risco no último mês e priorize quem precisa de ação", "opts": { "papel": "mentorado" }, "espera": "balanceado" },
+      { "id": "tier-analise-sem-papel", "msg": "analise a evolução das duplas em risco no último mês e priorize quem precisa de ação", "espera": "balanceado" },
       { "id": "tier-pos-tool", "msg": "ok", "opts": { "posTool": true }, "espera": "balanceado" },
+      { "id": "tier-pos-tool-staff", "msg": "ok", "opts": { "posTool": true, "papel": "coordenacao" }, "espera": "balanceado" },
       { "id": "tier-fora-escopo", "msg": "me escreve um código em python que inverte uma árvore binária", "espera": "balanceado" },
       { "id": "tier-saudacao-obg", "msg": "obg", "espera": "rapido" },
       { "id": "tier-agenda-curta", "msg": "encontros amanhã", "espera": "balanceado" },
       { "id": "tier-historico-30d", "msg": "quantos encontros rolaram nos últimos 30 dias?", "espera": "balanceado" },
       { "id": "tier-historico-atraso", "msg": "quais duplas estão atrasando encontro?", "espera": "balanceado" },
-      { "id": "tier-resumo-mes", "msg": "resuma como foi o mês das duplas", "espera": "forte" },
-      { "id": "tier-cruza", "msg": "cruza os atrasos com as notas dos mentores", "espera": "forte" }
+      { "id": "tier-resumo-mes", "msg": "resuma como foi o mês das duplas", "opts": { "papel": "coordenacao" }, "espera": "forte" },
+      { "id": "tier-cruza", "msg": "cruza os atrasos com as notas dos mentores", "opts": { "papel": "coordenacao" }, "espera": "forte" }
     ],
     "gate": [
       { "id": "gate-jovem-sua-dupla", "papeis": ["mentorado"], "tool": "minha_dupla", "espera": "permitida" },
