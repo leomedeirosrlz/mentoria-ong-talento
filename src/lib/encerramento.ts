@@ -54,7 +54,10 @@ export const CHECKLIST_ENCERRAMENTO: {
 
 // ---------- resumo da jornada (relatório final do guia) ----------
 
-const PESO_AVALIACAO: Record<AvaliacaoJovem, number> = {
+/** Peso 1–4 da avaliação do jovem — a escala do form semanal em número.
+ *  Exportado pra média do relatório de aderência (REALIZA-178) — fonte
+ *  única, não duplicar. */
+export const PESO_AVALIACAO: Record<AvaliacaoJovem, number> = {
   excelente: 4,
   boa: 3,
   regular: 2,

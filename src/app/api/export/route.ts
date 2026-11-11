@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { demoRole } from "@/lib/demo/mode";
 import { getDemoData } from "@/lib/demo/data";
 import { demoPessoalMap } from "@/lib/demo/queries";
+import { demoEncerramentos } from "@/lib/demo/encerramento-data";
 import { getDemoFormularios } from "@/lib/demo/forms-data";
 import {
   camposPerguntas,
@@ -10,24 +11,67 @@ import {
   type FormularioCampo,
   type RespostaValor,
 } from "@/lib/forms/schema";
-import { normaliza } from "@/lib/utils";
-import { turmaDaDupla } from "@/lib/turma";
 import {
   AVALIACAO_LABEL,
   COR_RACA_LABELS,
   GENERO_LABELS,
   papelLabel,
   PREF_GENERO_LABELS,
-  toDateStr,
   TRILHA_LABEL,
 } from "@/lib/ciclo";
 import type { DadosPessoais } from "@/lib/queries";
 import { temPapel } from "@/lib/types";
 import type { AppRole, Dupla, EncontroStatus, Mentorado, Profile } from "@/lib/types";
+import {
+  csvDoc,
+  csvResponse,
+  dataHora,
+  dia,
+  filtraPorRecorte,
+  nomeCsv,
+  nomeCsvAssinaturas,
+  nomeCsvCiclo,
+  nomeCsvPessoas,
+  nomeCsvRespostas,
+  recorteDeParams,
+} from "@/lib/relatorios/csv-core";
+import {
+  csvAderencia,
+  csvAssinaturasPendentes,
+  csvEncerramento,
+  csvFormsTaxa,
+  csvInteracoes,
+  csvSolicitacoes,
+} from "@/lib/relatorios/csv";
+import {
+  dadosAderencia,
+  dadosAderenciaDemo,
+  dadosAssinaturasPendentes,
+  dadosAssinaturasPendentesDemo,
+  dadosEncerramento,
+  dadosEncerramentoDemo,
+  dadosFormsTaxa,
+  dadosFormsTaxaDemo,
+  dadosInteracoes,
+  dadosInteracoesDemo,
+  dadosSolicitacoes,
+  dadosSolicitacoesDemo,
+} from "@/lib/relatorios/dados";
 
-// GET /api/export — só pra coordenação. ?tipo=ciclo (default): relatório do
-// ciclo em CSV, uma linha por encontro — a prestação de contas. ?tipo=pessoas:
-// cadastro completo (equipe + mentorados) pra mala direta/backup.
+// GET /api/export — só pra coordenação. Catálogo:
+//   ciclo (default)   uma linha por encontro — a prestação de contas
+//   pessoas           cadastro completo (equipe + mentorados) pra mala direta
+//   assinaturas       backup dos contratos com evidências
+//   respostas&id=<f>  respostas de um formulário, uma linha por link
+//   aderencia         uma linha por dupla — plano × fato + semáforo vivo
+//   assinaturas-pendentes  documento × pessoa sem assinado_em (anti-join)
+//   interacoes        log de nudges/contatos/apoios da coordenação
+//   solicitacoes      pedidos de especialista e latência de resposta
+//   encerramento      ritos de fechamento por dupla
+//   forms-taxa        um linha por link de formulário — taxa de resposta
+// ?turma= e ?cronograma= recortam os tipos por dupla (mesma regra
+// turmaDaDupla do ciclo). Convenção: `;` + BOM + tudo entre aspas + CRLF +
+// filename datado — núcleo compartilhado em lib/relatorios/csv-core.
 export async function GET(request: NextRequest) {
   const tipo = request.nextUrl.searchParams.get("tipo");
 
@@ -42,6 +86,45 @@ export async function GET(request: NextRequest) {
       );
     }
     const d = getDemoData();
+    const recorte = recorteDeParams(request.nextUrl.searchParams);
+    if (tipo === "aderencia") {
+      return csvResponse(
+        csvAderencia(dadosAderenciaDemo(d, recorte)),
+        nomeCsv("aderencia")
+      );
+    }
+    if (tipo === "assinaturas-pendentes") {
+      return csvResponse(
+        csvAssinaturasPendentes(dadosAssinaturasPendentesDemo(d, recorte)),
+        nomeCsv("assinaturas-pendentes")
+      );
+    }
+    if (tipo === "interacoes") {
+      return csvResponse(
+        csvInteracoes(dadosInteracoesDemo(d, recorte)),
+        nomeCsv("interacoes")
+      );
+    }
+    if (tipo === "solicitacoes") {
+      return csvResponse(
+        csvSolicitacoes(dadosSolicitacoesDemo(d, recorte)),
+        nomeCsv("solicitacoes")
+      );
+    }
+    if (tipo === "encerramento") {
+      return csvResponse(
+        csvEncerramento(
+          dadosEncerramentoDemo(d, recorte, demoEncerramentos(demo))
+        ),
+        nomeCsv("encerramento")
+      );
+    }
+    if (tipo === "forms-taxa") {
+      return csvResponse(
+        csvFormsTaxa(dadosFormsTaxaDemo(d, recorte)),
+        nomeCsv("forms-taxa")
+      );
+    }
     if (tipo === "assinaturas") {
       const nomes = new Map(
         [...d.profiles, ...d.mentorados].map((p) => [p.id, p.nome] as const)
@@ -105,11 +188,7 @@ export async function GET(request: NextRequest) {
     const cronDemo = new Map(d.cronogramas.map((c) => [c.id, c.nome]));
     return csvResponse(
       csvCiclo(
-        filtraCsvCiclo(
-          d.duplas,
-          request.nextUrl.searchParams,
-          d.cronogramas
-        ),
+        filtraPorRecorte(d.duplas, recorte, d.cronogramas),
         cronDemo
       ),
       nomeCsvCiclo()
@@ -138,6 +217,54 @@ export async function GET(request: NextRequest) {
     return NextResponse.json(
       { error: "Só a coordenação pode exportar o relatório do programa." },
       { status: 403 }
+    );
+  }
+
+  const recorte = recorteDeParams(request.nextUrl.searchParams);
+  try {
+    if (tipo === "aderencia") {
+      return csvResponse(
+        csvAderencia(await dadosAderencia(supabase, recorte)),
+        nomeCsv("aderencia")
+      );
+    }
+    if (tipo === "assinaturas-pendentes") {
+      return csvResponse(
+        csvAssinaturasPendentes(
+          await dadosAssinaturasPendentes(supabase, recorte)
+        ),
+        nomeCsv("assinaturas-pendentes")
+      );
+    }
+    if (tipo === "interacoes") {
+      return csvResponse(
+        csvInteracoes(await dadosInteracoes(supabase, recorte)),
+        nomeCsv("interacoes")
+      );
+    }
+    if (tipo === "solicitacoes") {
+      return csvResponse(
+        csvSolicitacoes(await dadosSolicitacoes(supabase, recorte)),
+        nomeCsv("solicitacoes")
+      );
+    }
+    if (tipo === "encerramento") {
+      return csvResponse(
+        csvEncerramento(await dadosEncerramento(supabase, recorte)),
+        nomeCsv("encerramento")
+      );
+    }
+    if (tipo === "forms-taxa") {
+      return csvResponse(
+        csvFormsTaxa(await dadosFormsTaxa(supabase, recorte)),
+        nomeCsv("forms-taxa")
+      );
+    }
+  } catch (e) {
+    console.error("export", tipo, e);
+    return NextResponse.json(
+      { error: "Não foi possível gerar o relatório. Tente de novo." },
+      { status: 500 }
     );
   }
 
@@ -178,30 +305,13 @@ export async function GET(request: NextRequest) {
   const cronogramas = new Map(
     (crons ?? []).map((c) => [c.id, c.nome] as const)
   );
-  const duplas = filtraCsvCiclo(
+  const duplas = filtraPorRecorte(
     (data as unknown as Dupla[]) ?? [],
-    request.nextUrl.searchParams,
+    recorte,
     crons ?? []
   );
 
   return csvResponse(csvCiclo(duplas, cronogramas), nomeCsvCiclo());
-}
-
-/** ?turma= e ?cronograma= recortam a prestação de contas — com turmas em
- *  paralelo, o relatório misto pode servir de recibo por turma. O label
- *  casa pelo rótulo vivo (`turmaDaDupla`), não pelo selo da dupla. */
-function filtraCsvCiclo(
-  duplas: Dupla[],
-  p: URLSearchParams,
-  crons: { id: string; nome: string; turma: string }[]
-): Dupla[] {
-  const turma = p.get("turma")?.trim();
-  const cronograma = p.get("cronograma")?.trim();
-  return duplas.filter(
-    (d) =>
-      (!turma || turmaDaDupla(d, crons) === turma) &&
-      (!cronograma || d.cronograma_id === cronograma)
-  );
 }
 
 // tipo=pessoas — cadastro único: equipe (papel, status) + mentorados (ONG de
@@ -529,19 +639,29 @@ function csvCiclo(duplas: Dupla[], cronogramas: Map<string, string>): string {
             r?.avaliacao ? (AVALIACAO_LABEL[r.avaliacao] ?? r.avaliacao) : "",
             r?.atividades?.join(" | ") ?? "",
             r ? (r.precisa_apoio ? "sim" : "não") : "",
-          ]
-            .map(celula)
-            .join(";");
+          ];
         })
     );
 
-  return (
-    "\uFEFF" +
+  return csvDoc(
     [
-      "dupla_mentor;dupla_mentorado;auxiliar_executivo;trilha;turma;cronograma;encontro_num;data_agendada;realizado_em;status;motivo_reagendamento;registro_em;registro_avaliacao;registro_atividades;precisa_apoio",
-      ...linhas,
-    ].join("\r\n") +
-    "\r\n"
+      "dupla_mentor",
+      "dupla_mentorado",
+      "auxiliar_executivo",
+      "trilha",
+      "turma",
+      "cronograma",
+      "encontro_num",
+      "data_agendada",
+      "realizado_em",
+      "status",
+      "motivo_reagendamento",
+      "registro_em",
+      "registro_avaliacao",
+      "registro_atividades",
+      "precisa_apoio",
+    ],
+    linhas
   );
 }
 
@@ -643,15 +763,26 @@ function csvPessoas(
     })),
   ];
 
-  return (
-    "\uFEFF" +
+  return csvDoc(
     [
-      "nome;tipo;email;whatsapp;capacidade;ong_origem;status;data_nascimento;genero;cor_raca;pref_genero_par;motivacao;saiu_em;motivo_saida",
-      ...linhas
-        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
-        .map((l) => [l.nome, ...l.resto].map(celula).join(";")),
-    ].join("\r\n") +
-    "\r\n"
+      "nome",
+      "tipo",
+      "email",
+      "whatsapp",
+      "capacidade",
+      "ong_origem",
+      "status",
+      "data_nascimento",
+      "genero",
+      "cor_raca",
+      "pref_genero_par",
+      "motivacao",
+      "saiu_em",
+      "motivo_saida",
+    ],
+    linhas
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+      .map((l) => [l.nome, ...l.resto])
   );
 }
 
@@ -722,15 +853,32 @@ function csvAssinaturas(
     };
   });
 
-  return (
-    "\uFEFF" +
+  return csvDoc(
     [
-      "nome;id;tipo;documento;versao;status;emitido_em;emitido_por;expira_em;assinado_em;nome_assinado;signatario_civil;cpf;rg;parentesco;ip;user_agent;sha256;url_pdf;snapshot_json",
-      ...linhas
-        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
-        .map((l) => [l.nome, ...l.resto].map(celula).join(";")),
-    ].join("\r\n") +
-    "\r\n"
+      "nome",
+      "id",
+      "tipo",
+      "documento",
+      "versao",
+      "status",
+      "emitido_em",
+      "emitido_por",
+      "expira_em",
+      "assinado_em",
+      "nome_assinado",
+      "signatario_civil",
+      "cpf",
+      "rg",
+      "parentesco",
+      "ip",
+      "user_agent",
+      "sha256",
+      "url_pdf",
+      "snapshot_json",
+    ],
+    linhas
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+      .map((l) => [l.nome, ...l.resto])
   );
 }
 
@@ -761,27 +909,19 @@ function csvRespostas(
     ...orfas,
   ];
 
-  return (
-    "\uFEFF" +
-    [
-      header.map(celula).join(";"),
-      // mais recente primeiro — mesma leitura da aba Respostas
-      ...linhas
-        .sort((a, b) => b.respondido_em.localeCompare(a.respondido_em))
-        .map((l) =>
-          [
-            l.destinatario,
-            l.tipo,
-            l.dupla,
-            dataHora(l.respondido_em),
-            ...perguntas.map((c) => celulaResposta(c, l.respostas[c.id])),
-            ...orfas.map((k) => celulaResposta(undefined, l.respostas[k])),
-          ]
-            .map(celula)
-            .join(";")
-        ),
-    ].join("\r\n") +
-    "\r\n"
+  return csvDoc(
+    header,
+    // mais recente primeiro — mesma leitura da aba Respostas
+    linhas
+      .sort((a, b) => b.respondido_em.localeCompare(a.respondido_em))
+      .map((l) => [
+        l.destinatario,
+        l.tipo,
+        l.dupla,
+        dataHora(l.respondido_em),
+        ...perguntas.map((c) => celulaResposta(c, l.respostas[c.id])),
+        ...orfas.map((k) => celulaResposta(undefined, l.respostas[k])),
+      ])
   );
 }
 
@@ -807,40 +947,6 @@ function celulaResposta(
   return String(valor);
 }
 
-/** CSV como attachment — os dois relatórios saem no mesmo formato. */
-function csvResponse(csv: string, filename: string) {
-  return new NextResponse(csv, {
-    headers: {
-      "Content-Type": "text/csv; charset=utf-8",
-      "Content-Disposition": `attachment; filename="${filename}"`,
-    },
-  });
-}
-
-// mês no nome do relatório do ciclo: exports de meses diferentes não se
-// sobrepõem na pasta de downloads
-const nomeCsvCiclo = () => `encontros-${toDateStr(new Date()).slice(0, 7)}.csv`;
-const nomeCsvPessoas = () => `pessoas-${toDateStr(new Date())}.csv`;
-const nomeCsvAssinaturas = () => `assinaturas-${toDateStr(new Date())}.csv`;
-
-// título do form entra no nome do arquivo (ascii kebab) — exports de forms
-// diferentes não se sobrepõem na pasta de downloads
-const slugCsv = (s: string) =>
-  normaliza(s)
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "")
-    .slice(0, 40) || "formulario";
-const nomeCsvRespostas = (titulo: string) =>
-  `respostas-${slugCsv(titulo)}-${toDateStr(new Date())}.csv`;
-
-function celula(v: string | null | undefined): string {
-  let s = v ?? "";
-  // formula injection: Excel/Sheets executam célula abrindo com = + - @ (ou
-  // após tab/CR) — campos de texto livre do mentor passam por aqui
-  if (/^[\t\r ]*[=+\-@]/.test(s)) s = `'${s}`;
-  return `"${s.replace(/"/g, '""')}"`;
-}
-
 // mesmo mapa do STATUS_ENCONTRO_LABEL da agenda — copiado porque lá é local
 const STATUS_ENCONTRO: Record<EncontroStatus, string> = {
   agendado: "agendado",
@@ -849,33 +955,3 @@ const STATUS_ENCONTRO: Record<EncontroStatus, string> = {
   nao_aconteceu: "não aconteceu",
   cancelado: "cancelado",
 };
-
-const TZ = "America/Sao_Paulo";
-// os formatters de ciclo.ts abreviam o mês ("06 de out."); aqui é dd/mm/aaaa
-// numérico, mais fácil de ordenar/filtrar na planilha
-const fmtData = new Intl.DateTimeFormat("pt-BR", {
-  timeZone: TZ,
-  day: "2-digit",
-  month: "2-digit",
-  year: "numeric",
-});
-const fmtHora = new Intl.DateTimeFormat("pt-BR", {
-  timeZone: TZ,
-  hour: "2-digit",
-  minute: "2-digit",
-  hourCycle: "h23",
-});
-
-/** timestamptz ISO -> "dd/mm/aaaa hh:mm" no fuso do programa ("" se vazio). */
-function dataHora(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? "" : `${fmtData.format(d)} ${fmtHora.format(d)}`;
-}
-
-/** timestamptz ISO -> "dd/mm/aaaa" no fuso do programa ("" se vazio). */
-function dia(iso: string | null | undefined): string {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return isNaN(d.getTime()) ? "" : fmtData.format(d);
-}
