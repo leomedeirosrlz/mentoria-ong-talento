@@ -179,6 +179,12 @@ jobs:
           SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY || secrets.E2E_SUPABASE_SERVICE_ROLE_KEY }}
           RESEND_API_KEY: re_placeholder
           EMAIL_FROM: noreply@realiza.vc
+      - name: cache playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-playwright-
       - name: playwright browsers
         run: pnpm exec playwright install --with-deps chromium
       # Fixtures só no modo local (stack nasce zerada): as do e2e e o

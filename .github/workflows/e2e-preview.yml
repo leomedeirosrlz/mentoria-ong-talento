@@ -95,6 +95,13 @@ jobs:
       - if: steps.check.outputs.skip != '1'
         run: pnpm install --frozen-lockfile
       - if: steps.check.outputs.skip != '1'
+        name: cache playwright browsers
+        uses: actions/cache@v4
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-playwright-
+      - if: steps.check.outputs.skip != '1'
         run: pnpm exec playwright install --with-deps chromium
       # fixtures NÃO são re-seedadas aqui — os pisos dos specs (convergirPiso
       # & cia) re-criam o estado volátil e a base persiste no staging. Re-seed
