@@ -55,8 +55,9 @@ export const CHECKLIST_ENCERRAMENTO: {
 
 // ---------- resumo da jornada (relatório final do guia) ----------
 
-/** Peso da escala 1–4 do registro semanal — exportado pro agregado do
- *  360º (avaliacao-agregado.ts, REALIZA-71) usar a mesma régua. */
+/** Peso 1–4 da avaliação do jovem — a escala do form semanal em número.
+ *  Fonte única: a média do relatório de aderência (178) e o agregado do
+ *  360º (avaliacao-agregado.ts, 71) usam a mesma régua. */
 export const PESO_AVALIACAO: Record<AvaliacaoJovem, number> = {
   excelente: 4,
   boa: 3,

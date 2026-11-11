@@ -23,6 +23,8 @@ import {
   type InstrumentoSistema,
 } from "@/lib/forms/schema";
 import { erroAmigavel } from "@/lib/utils";
+import { semanaBounds } from "@/lib/ciclo";
+import { montarDigestSemanal } from "@/lib/relatorios/digest";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import type { ComunicadoPrioridade } from "@/lib/types";
@@ -854,5 +856,42 @@ export async function enviarDesfechoLote(input: {
     pulados: linhas.filter((l) => l.status === "pulado").length,
     envioLiberado: EMAIL_ENVIO_LIBERADO,
     linhas,
+  };
+}
+
+/** Disparo manual do digest semanal (REALIZA-178) — botão da aba
+ *  Operação do /relatorios. Ignora a dedup do cron de propósito (o clique
+ *  de uma pessoa é a intenção, não o retry cego); a mesma row de log do
+ *  job grava aqui com o autor_id da coordenação. */
+export async function enviarDigestSemanal(): Promise<{
+  ok?: true;
+  enviados?: number;
+  destinatarios?: number;
+  error?: string;
+}> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (eu?.role !== "coordenacao") {
+    return { error: "Só a coordenação pode disparar o digest." };
+  }
+  const digest = await montarDigestSemanal(supabase, semanaBounds(new Date()));
+  const envio = digest.mensagens.length
+    ? await enviarEmailsIndividuais({ mensagens: digest.mensagens })
+    : { enviados: 0, falhas: [] as string[] };
+  const { error: errLog } = await supabase.from("emails_enviados").insert({
+    autor_id: eu.id,
+    tipo: "digest",
+    assunto: digest.assunto,
+    audiencia: ["coordenacao"],
+    destinatarios: digest.mensagens.length,
+    enviados: envio.enviados,
+    falhas: envio.falhas,
+  });
+  if (errLog) console.error("enviarDigestSemanal: log", errLog);
+  if (envio.error) return { error: envio.error };
+  return {
+    ok: true,
+    enviados: envio.enviados,
+    destinatarios: digest.mensagens.length,
   };
 }

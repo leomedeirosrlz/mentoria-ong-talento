@@ -1247,7 +1247,7 @@ function efetivo(s: SolicitacaoEspecialista): SolicitacaoEspecialistaStatus {
 
 /** Devolve a solicitação como a view solicitacoes_mural — com status_efetivo
  *  computado na leitura (a coluna só existe na view, não no dataset). */
-function comEfetivo(s: SolicitacaoEspecialista): SolicitacaoEspecialista {
+export function comEfetivo(s: SolicitacaoEspecialista): SolicitacaoEspecialista {
   return { ...s, status_efetivo: efetivo(s) };
 }
 

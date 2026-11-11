@@ -22,8 +22,10 @@ const LOGO_BRANCO_URL =
   process.env.EMAIL_LOGO_URL ??
   "https://yhjzmxleotahijinjepl.supabase.co/storage/v1/object/public/email-assets/logo-realiza-branco.png";
 
-/** Conteúdo digitado pela coordenação vai pra HTML de e-mail — escapa sempre. */
-function esc(s: string): string {
+/** Escape HTML — conteúdo digitado pela coordenação vai pra HTML de e-mail;
+ *  exportada pro digest (relatorios/digest.ts), que monta o próprio corpo
+ *  em vez de um template fechado daqui. */
+export function esc(s: string): string {
   return s
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

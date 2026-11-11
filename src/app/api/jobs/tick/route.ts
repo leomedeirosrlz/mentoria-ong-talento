@@ -8,6 +8,7 @@ import {
 } from "@/lib/jobs";
 import { rodarLembretesRegistro } from "@/lib/jobs-lembretes-registro";
 import { rodarLembretesTrilha } from "@/lib/jobs-lembretes-trilha";
+import { rodarDigestSemanal } from "@/lib/jobs-digest";
 
 export const dynamic = "force-dynamic";
 // o diário cabe folgado; a folga é pro backfill (dias corridos × duplas)
@@ -35,6 +36,9 @@ const JOBS: Record<string, (ctx: JobContext) => Promise<JobResult>> = {
   lembretes_trilha: rodarLembretesTrilha,
   // REALIZA-214 — lembretes de registro pendente (24h/72h; ledger 0122)
   lembretes_registro: rodarLembretesRegistro,
+  // REALIZA-178 — digest semanal da coordenação (só segunda; dedup por
+  // emails_enviados enviados>0 na semana — re-run e não-segunda são inócuos)
+  digest_semanal: rodarDigestSemanal,
 };
 
 async function tick(request: NextRequest): Promise<NextResponse> {

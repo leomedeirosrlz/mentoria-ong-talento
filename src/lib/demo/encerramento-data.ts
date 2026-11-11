@@ -95,6 +95,14 @@ export function demoEncerramentoDaDupla(
   return ENCERRAMENTOS[duplaId] ?? null;
 }
 
+/** Todas as rows no escopo do papel — pra o CSV de encerramento da demo
+ *  (REALIZA-178), que precisa das decididas além das pendentes. */
+export function demoEncerramentos(role: AppRole): Encerramento[] {
+  return Object.values(ENCERRAMENTOS).filter((enc) =>
+    noEscopo(role, enc.dupla_id)
+  );
+}
+
 /** Espelho do `.eq("tipo", "pendente")` real: ids das rows sem decisão no escopo
  *  do papel. A d-ok entra aqui mas a dupla segue ativa — quem consome filtra
  *  o status, como na query. */
