@@ -26,6 +26,7 @@ import { PessoaBanner } from "@/components/pessoa-banner";
 import { SignOutButton } from "@/components/signout-button";
 import { TagInput } from "@/components/tag-input";
 import { TemaToggle } from "@/components/tema-toggle";
+import { TokensMcp } from "@/components/tokens-mcp";
 import type { Tema } from "@/lib/tema";
 import {
   CampoConsentimento,
@@ -67,6 +68,7 @@ import {
 } from "@/lib/ciclo";
 import { cn, maskWhatsApp, sessaoFresca } from "@/lib/utils";
 import { temPapel } from "@/lib/types";
+import { PAPEIS_MCP } from "@/lib/ia/mcp-papeis";
 import type { Assinatura, Disponibilidade, MentorProfile, Profile } from "@/lib/types";
 import Link from "next/link";
 import { novoUuid } from "@/lib/uuid";
@@ -956,6 +958,7 @@ export function DialogoEmail({ email }: { email: string }) {
 export function PerfilForm({
   me,
   tema,
+  demo,
   mentorProfile,
   avatarUrl,
   gravatarUrl,
@@ -965,6 +968,9 @@ export function PerfilForm({
   me: Profile;
   /** preferência de tema do cookie (lida na page) — alimenta o TemaToggle */
   tema: Tema;
+  /** sessão demo (cookie demo_role lido na page) — sem backend real, a
+   *  seção de token MCP não monta (RLS derrubaria o insert) */
+  demo: boolean;
   mentorProfile: MentorProfile | null;
   avatarUrl: string | null;
   /** Gravatar já confirmado no server — null = iniciais direto. */
@@ -1004,6 +1010,9 @@ export function PerfilForm({
     Boolean(mentorProfile) ||
     temPapel(me, "mentor_dpp") ||
     temPapel(me, "mentor_especialista");
+  // PAT do MCP é de todo papel do programa — perfil sem papel esconde a
+  // seção (o endpoint negaria com 403 de qualquer jeito)
+  const papelMcp = PAPEIS_MCP.some((p) => temPapel(me, p));
   const anosNasc = idade(me.data_nascimento);
   // `valor` é a leitura do campo no <dl> do preview; `node` é o input que o
   // Dialog da seção renderiza — a mesma ordem nos dois lugares
@@ -1588,6 +1597,29 @@ export function PerfilForm({
               borda
             />
           </section>
+
+          {/* PAT de IA externa — credencial pessoal, irmã da Conta (mesmo
+              assunto: acesso). Demo não monta: sem sessão real o insert
+              morreria na RLS owner-only */}
+          {!demo && papelMcp && (
+            <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
+              <h2 className="text-base font-semibold">Conectar IA externa</h2>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Um token pessoal conecta um cliente de IA (Claude, Cursor,
+                ChatGPT) à sua conta, sempre com as suas permissões.
+              </p>
+              <TokensMcp
+                className="mt-4"
+                textos={{
+                  gerar: "Gerar token",
+                  campoRotulo: {
+                    label: "Rótulo",
+                    placeholder: "ex.: Claude desktop",
+                  },
+                }}
+              />
+            </section>
+          )}
         </div>
       </div>
     </div>

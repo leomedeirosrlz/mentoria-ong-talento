@@ -519,6 +519,17 @@ export async function restComoUsuario(
   });
 }
 
+/** Deterministic e2e PATs for /api/mcp (REALIZA-297): the seed stores
+ *  only the sha256 of each in ia_mcp_tokens (MCP_PAT_FIXTURES in
+ *  scripts/seed-e2e-staging.mjs) — the plaintexts here MUST match that
+ *  map; change one side, change the other. */
+export const MCP_PAT = {
+  mentor: "rlz_mcp_e2e_mentor_1111111111111111111111111111111111",
+  coord: "rlz_mcp_e2e_coord_222222222222222222222222222222222222",
+  jovem: "rlz_mcp_e2e_jovem_333333333333333333333333333333333333",
+  semPapel: "rlz_mcp_e2e_sem_papel_4444444444444444444444444444444",
+} as const;
+
 /** Confirma o AgendarEncontroDialog do mentor. Quando o horário cai fora da
  *  grade de disponibilidade de alguém, o primeiro clique só mostra o aviso
  *  ("Quer agendar mesmo assim?") e o botão vira "… mesmo assim" — o segundo
