@@ -133,10 +133,33 @@ test.describe("turmas — rename pra label que já existe", () => {
   test("dialog bloqueia o merge nomeando a pessoa e o papel repetido", async ({
     page,
   }) => {
-    const origemId = await montarCenario();
+    // a página /turmas/[id] lê a lista via unstable_cache de 1h com a
+    // service role setada — um cronograma inserido via PostgREST nunca
+    // aparece na UI (a página 404ia). A origem é o cronograma do seed
+    // ("Turma E2E"); o destino segue inserido porque a UI nunca abre ele —
+    // só precisa existir pro check de label vivo e pro papel repetido.
+    const SEED_CRON = "e2e00000-0000-4000-8000-0000000000e2";
+    const [{ turma: origemLabel }] = await buscarViaServiceRole<
+      { turma: string }[]
+    >("cronogramas", `select=turma&id=eq.${SEED_CRON}`);
+    await inserirViaServiceRole("cronogramas", {
+      nome: "Calendário E2E rename · destino",
+      turma: DESTINO,
+      status: "ativo",
+    });
+    // a auxiliar E2E já é "supervisor" na "Turma E2E" do seed — só o papel
+    // repetido no label novo monta a colisão que a pré-validação nomeia.
+    // O rename é bloqueado antes do update: o seed volta intacto e a
+    // limpeza só precisa varrer os labels "E2E " (beforeEach/afterEach).
+    await inserirViaServiceRole("profile_papeis", {
+      profile_id: SUP_PROFILE,
+      papel: "supervisor",
+      escopo_turma: DESTINO,
+      escopo_supervisao: "turma",
+    });
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
 
-    await page.goto(`/turmas/${origemId}`);
+    await page.goto(`/turmas/${SEED_CRON}`);
     await page
       .getByRole("button", { name: "Editar dados do cronograma" })
       .click();
@@ -157,8 +180,8 @@ test.describe("turmas — rename pra label que já existe", () => {
     // o label da origem não mudou — rename bloqueado de verdade
     const [cron] = await buscarViaServiceRole<{ turma: string }[]>(
       "cronogramas",
-      `select=turma&id=eq.${origemId}`
+      `select=turma&id=eq.${SEED_CRON}`
     );
-    expect(cron.turma).toBe(ORIGEM);
+    expect(cron.turma).toBe(origemLabel);
   });
 });
