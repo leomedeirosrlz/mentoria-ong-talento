@@ -1,9 +1,11 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
-// REALIZA-73 — contexto de turma no demo (fase A): hub da home, seletor
-// "Turma em foco", cookie turma_foco + ?turma= na URL e a aterrissagem da
-// /duplas. Read-only — seguro em qualquer deploy, produção inclusa (o
-// cookie turma_foco é conveniência de UI, nunca autorização).
+// REALIZA-73 — contexto de turma no demo (fase A): hub da home, cookie
+// turma_foco + ?turma= na URL e a aterrissagem da /duplas. O seletor
+// "Turma em foco" só existe pro supervisor (escopo); a coord usa os
+// cards do hub — troca por clique e re-clique limpa (REALIZA-365).
+// Read-only — seguro em qualquer deploy, produção inclusa (o cookie
+// turma_foco é conveniência de UI, nunca autorização).
 
 const T1 = "T1 · 2026/2027";
 const T2 = "T2 · 2026/2027";
@@ -34,7 +36,8 @@ test.describe("demo — contexto de turma (REALIZA-73 · fase A)", () => {
     await entrarNaDemo(page, "coordenacao");
     await page.goto("/");
 
-    // (1) sem contexto: hub com T1+T2 e o seletor "Turma em foco" em "Todas"
+    // (1) sem contexto: hub com T1+T2; a coord não tem mais o seletor
+    // "Turma em foco" (REALIZA-365 — o hub cobre a troca e o re-clique)
     const hub = page.locator('section[aria-label="Turmas"]');
     await expect(hub).toBeVisible();
     const cards = hub.locator('a[href^="/?turma="]');
@@ -43,7 +46,7 @@ test.describe("demo — contexto de turma (REALIZA-73 · fase A)", () => {
     await expect(cards.filter({ hasText: "Turma 2" })).toBeVisible();
     await expect(
       page.getByRole("combobox", { name: "Turma em foco" })
-    ).toBeVisible();
+    ).toHaveCount(0);
 
     // (2) clicar o card da T2 filtra a home — URL honesta + faixa + cookie
     await cards.filter({ hasText: "Turma 2" }).click();
@@ -92,7 +95,7 @@ test.describe("demo — contexto de turma (REALIZA-73 · fase A)", () => {
     ).toHaveCount(0);
   });
 
-  test("URL vence cookie; lixo cai em todas sem erro; seletor troca em lugar", async ({
+  test("URL vence cookie; lixo cai em todas sem erro; cards trocam e re-clique limpa", async ({
     page,
   }) => {
     await entrarNaDemo(page, "coordenacao");
@@ -112,13 +115,31 @@ test.describe("demo — contexto de turma (REALIZA-73 · fase A)", () => {
     ).toBeVisible();
     await esperaCookie(page, T2);
 
-    // trocar pelo seletor — mesma gravação, sem sair da página. A URL já
+    // trocar pelo card — mesma gravação, sem sair da página. A URL já
     // tem ?turma= (estamos no foco T2): esperar pelo valor novo, não pelo
-    // param — /turma=/ resolveria na hora e correria com o router.replace.
-    // searchParams (não decodeURIComponent): o seletor escreve via
-    // URLSearchParams.toString(), que codifica espaço como "+"
-    await page.getByRole("combobox", { name: "Turma em foco" }).click();
-    await page.getByRole("option", { name: /^Turma 1/ }).click();
+    // param — /turma=/ resolveria na hora e correria com a navegação.
+    const hub = page.locator('section[aria-label="Turmas"]');
+    await hub
+      .locator('a[href^="/?turma="]')
+      .filter({ hasText: "Turma 1" })
+      .click();
+    await page.waitForURL((url) => url.searchParams.get("turma") === T1);
+    await esperaCookie(page, T1);
+
+    // re-clique no card do foco limpa o recorte (REALIZA-365) — o card
+    // ativo é o único com aria-current e aponta ?turma=todas
+    await hub.locator('a[aria-current="page"]').click();
+    await page.waitForURL(/\?turma=todas/);
+    await esperaCookie(page, null);
+    await expect(
+      page.getByRole("status").filter({ hasText: "Mostrando:" })
+    ).toHaveCount(0);
+
+    // re-filtra T1 — o teste de param lixo abaixo espera o cookie T1
+    await hub
+      .locator('a[href^="/?turma="]')
+      .filter({ hasText: "Turma 1" })
+      .click();
     await page.waitForURL((url) => url.searchParams.get("turma") === T1);
     await esperaCookie(page, T1);
 

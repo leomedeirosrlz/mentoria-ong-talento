@@ -1,4 +1,5 @@
 import { Badge } from "@/components/ui/badge";
+import { cn } from "@/lib/utils";
 import type { SolicitacaoEspecialista } from "@/lib/types";
 
 /** Chip do header da ficha DPP: onde a solicitação de especialista está.
@@ -24,82 +25,64 @@ export function SolicitacaoStatusChip({
     solicitacao.desejado?.nome ??
     "a definir";
 
+  let label: string;
+  let cls: string;
   // a trilha fechou → a devolutiva chegou ao PDM; vale pro status aceita
   if (efetivo === "aceita" && solicitacao.trilha_encerrada_em) {
-    return (
-      <Badge
-        variant="outline"
-        className="border-[var(--ok)]/60 text-[var(--ok-text)]"
-      >
-        Especialista: {quem} · trilha encerrada
-      </Badge>
-    );
+    label = `Especialista: ${quem} · trilha encerrada`;
+    cls = "border-[var(--ok)]/60 text-[var(--ok-text)]";
+  } else {
+    switch (efetivo) {
+      case "aberta":
+        label =
+          solicitacao.origem === "jovem"
+            ? "Especialista pedido pelo jovem"
+            : "Especialista solicitado";
+        cls = "border-[var(--warn)]/60 text-[var(--warn-text)]";
+        break;
+      case "sugerida":
+        // WP6: a sugestão do mentor espera a resposta do jovem — ainda não
+        // é pedido (não entra na mesa nem nos tetos). Neutro: é espera,
+        // não alerta — laranja fica pra atenção da dupla
+        label = "Sugestão com o jovem";
+        cls =
+          "border-[var(--pausa-border)] bg-[var(--pausa-bg)] text-[var(--pausa-text)]";
+        break;
+      case "aguardando_coord":
+        label = "Pedido com a coordenação";
+        cls = "border-[var(--warn)]/60 text-[var(--warn-text)]";
+        break;
+      case "contra_proposta":
+        label = `Negociando horário${quem !== "a definir" ? ` com ${quem}` : ""}`;
+        cls = "border-[var(--warn)]/60 text-[var(--warn-text)]";
+        break;
+      case "aceita":
+        label = `Especialista: ${quem}`;
+        cls = "border-[var(--ok)]/60 text-[var(--ok-text)]";
+        break;
+      case "recusada":
+        label = `Pedido recusado${quem !== "a definir" ? ` por ${quem}` : ""}`;
+        cls = "text-muted-foreground";
+        break;
+      case "expirada":
+        label = "Horário expirado";
+        cls = "text-muted-foreground";
+        break;
+      default:
+        return null;
+    }
   }
 
-  switch (efetivo) {
-    case "aberta":
-      return (
-        <Badge
-          variant="outline"
-          className="border-[var(--warn)]/60 text-[var(--warn-text)]"
-        >
-          {solicitacao.origem === "jovem"
-            ? "Especialista pedido pelo jovem"
-            : "Especialista solicitado"}
-        </Badge>
-      );
-    case "sugerida":
-      // WP6: a sugestão do mentor espera a resposta do jovem — ainda não é
-      // pedido (não entra na mesa nem nos tetos). Neutro: é espera, não
-      // alerta — laranja fica pra atenção da dupla
-      return (
-        <Badge
-          variant="outline"
-          className="border-[var(--pausa-border)] bg-[var(--pausa-bg)] text-[var(--pausa-text)]"
-        >
-          Sugestão com o jovem
-        </Badge>
-      );
-    case "aguardando_coord":
-      return (
-        <Badge
-          variant="outline"
-          className="border-[var(--warn)]/60 text-[var(--warn-text)]"
-        >
-          Pedido com a coordenação
-        </Badge>
-      );
-    case "contra_proposta":
-      return (
-        <Badge
-          variant="outline"
-          className="border-[var(--warn)]/60 text-[var(--warn-text)]"
-        >
-          Negociando horário{quem !== "a definir" ? ` com ${quem}` : ""}
-        </Badge>
-      );
-    case "aceita":
-      return (
-        <Badge
-          variant="outline"
-          className="border-[var(--ok)]/60 text-[var(--ok-text)]"
-        >
-          Especialista: {quem}
-        </Badge>
-      );
-    case "recusada":
-      return (
-        <Badge variant="outline" className="text-muted-foreground">
-          Pedido recusado{quem !== "a definir" ? ` por ${quem}` : ""}
-        </Badge>
-      );
-    case "expirada":
-      return (
-        <Badge variant="outline" className="text-muted-foreground">
-          Horário expirado
-        </Badge>
-      );
-    default:
-      return null;
-  }
+  // o Badge global é shrink-0 + nowrap: um nome de especialista comprido
+  // esticava o documento na horizontal a 390px (REALIZA-367). O chip cede
+  // com reticências e o rótulo íntegro fica no title
+  return (
+    <Badge
+      variant="outline"
+      title={label}
+      className={cn(cls, "min-w-0 max-w-full shrink")}
+    >
+      <span className="truncate">{label}</span>
+    </Badge>
+  );
 }

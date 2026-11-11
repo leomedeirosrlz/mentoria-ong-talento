@@ -260,6 +260,40 @@ test.describe("agenda demo do mentor DPP — Minha agenda / Por mentorado / Cale
     ).toHaveCount(0);
   });
 
+  test("Por mentorado a 390px: nenhum chip/badge estica o documento (REALIZA-367)", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentor_dpp");
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/agenda?aba=por-mentorado");
+
+    // a medição é da página real carregada — os três cards do Ricardo
+    // (trilha ativa, pedido no mural, concluída) são a superfície da 367
+    await expect(page.getByText("Bia").first()).toBeVisible();
+    await expect(page.getByText(/Matheus Gonçalves/).first()).toBeVisible();
+    await expect(page.getByText(/Gustavo Batista/).first()).toBeVisible();
+
+    // a regressão era um badge nowrap + shrink-0 que empurrava o documento
+    // pra além do viewport: scrollWidth é a régua objetiva e nenhum badge
+    // pode vazar a borda direita do próprio card
+    const medidas = await page.evaluate(() => {
+      const badgesVazando = [...document.querySelectorAll("article")]
+        .flatMap((card) => {
+          const borda = card.getBoundingClientRect().right;
+          return [...card.querySelectorAll('[data-slot="badge"]')]
+            .filter((b) => b.getBoundingClientRect().right > borda + 1)
+            .map((b) => b.textContent?.trim() ?? "");
+        });
+      return {
+        scrollWidth: document.documentElement.scrollWidth,
+        innerWidth: window.innerWidth,
+        badgesVazando,
+      };
+    });
+    expect(medidas.badgesVazando).toEqual([]);
+    expect(medidas.scrollWidth).toBeLessThanOrEqual(medidas.innerWidth);
+  });
+
   test("Calendário renderiza o AgendaCalendario de sempre", async ({ page }) => {
     await entrarNaDemo(page, "mentor_dpp");
     await page.goto("/agenda?aba=calendario");
