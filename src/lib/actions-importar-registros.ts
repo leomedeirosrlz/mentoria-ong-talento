@@ -19,10 +19,33 @@ import {
   parseCsvRegistros,
   processaLinhas,
   saneiaLinhaReg,
+  scoreLinha,
   type DuplaCandidata,
   type LinhaReg,
   type UniversoReg,
 } from "./importar-registros";
+import { chamarModelo, providerConfigurado } from "./ia/provider";
+import {
+  esforcoDoTier,
+  fallbacksDoTier,
+  getIaConfig,
+  modeloDoTier,
+} from "./ia/config";
+import { consumirLimiteIa } from "./ia/rate-limit";
+import type { EventoIa } from "./ia/tools";
+import {
+  argsMatchSemantico,
+  MAX_CHAMADAS_IA_LOTE,
+  registrarEventosImportacao,
+} from "./importar/lote";
+import {
+  aplicarSemantico,
+  candidatosParaIa,
+  matchSemantico,
+  wa4De,
+  type ChamarSemantico,
+  type SugestaoIa,
+} from "./importar/match-semantico";
 import type { Json } from "./database.types";
 
 const MAX_IMPORT = 500;
@@ -45,7 +68,12 @@ type Supa = Awaited<ReturnType<typeof createClient>>;
  *  "atualiza" = já tem registro, o form sobrescreve os campos mapeados. */
 export type EncontroInfo = "novo" | "anexa" | "atualiza";
 
-export type LinhaPrev = LinhaReg & { encontroInfo: EncontroInfo | null };
+export type LinhaPrev = LinhaReg & {
+  encontroInfo: EncontroInfo | null;
+  /** overlay do match semântico (REALIZA-180 fase 1) — a 2ª passada
+   *  enriquecerPrevComIa preenche; o pipeline determinístico não conhece. */
+  sugeridoIa?: SugestaoIa | null;
+};
 
 /** Universo do match — uma leva de selects, resolução toda em memória.
  *  TODAS as duplas entram (ativa/pausada/encerrada): registro histórico é
@@ -287,4 +315,197 @@ export async function executarImportRegistros(linhas: LinhaReg[]) {
   revalidatePath("/");
   revalidatePath("/duplas");
   return { ok: true as const, criados, atualizados, encontrosCriados, erros };
+}
+
+// ---------- fase 1: match semântico sobre a fila 'manual' (REALIZA-180) ----------
+
+/** Linha no mínimo que a 2ª passada precisa — o server re-roda scoreLinha
+ *  pra decidir sozinho quem é 'manual' e quem são as candidatas (nada de
+ *  confiar no nivel/candidatos que vieram do client). */
+export type LinhaParaIa = {
+  n: number;
+  mentorTxt: string;
+  mentoradoTxt: string;
+  numero: number | null;
+  dataIso: string | null;
+};
+
+/** Sugestão pronta pra merge no client — SugestaoIa + os nomes da dupla
+ *  sugerida (linha 'manual' não tem nomes resolvidos pra exibir). */
+export type SugestaoLinhaIa = SugestaoIa & {
+  mentorNome: string;
+  mentoradoNome: string;
+};
+
+const CONC_IA = 8; // chamadas em paralelo — tool-call curta, ~30 no teto
+
+/** 2ª passada da prévia (REALIZA-180 fase 1): o modelo escolhe ENTRE as
+ *  top-5 do determinístico nas linhas 'manual' — classificação por
+ *  function-calling, nunca texto livre. Uma reserva de rate limit por
+ *  passada; cada chamada grava ia_eventos canal 'importacao' com args
+ *  {lote,n,txtLen} sob o request_id da reserva. Falha de provider deixa a
+ *  linha exatamente como estava + evento ok:false. Retorno discrimina
+ *  `ativa:false` (provider desconfigurado ou 429) pra UI mostrar o
+ *  estado desligado honesto — o CSV puro não depende dela. */
+export async function enriquecerPrevComIa(
+  linhas: LinhaParaIa[],
+  lote: string
+): Promise<
+  | {
+      ok: true;
+      ativa: true;
+      sugestoes: Record<number, SugestaoLinhaIa>;
+      restantes: number;
+    }
+  | { ok: true; ativa: false; motivo: "sem_provider" | "limite" }
+  | { error: string }
+> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "coordenacao") {
+    return { error: "Só a coordenação importa registros." };
+  }
+  if (!providerConfigurado()) {
+    return { ok: true as const, ativa: false as const, motivo: "sem_provider" as const };
+  }
+  if (!Array.isArray(linhas)) return { error: "Lote inválido." };
+  if (typeof lote !== "string" || !UUID_RE.test(lote)) {
+    return { error: "Lote inválido." };
+  }
+
+  const saneadas = (linhas.slice(0, MAX_IMPORT) as Partial<LinhaParaIa>[])
+    .map((l, i) => ({
+      n:
+        typeof l?.n === "number" && Number.isInteger(l.n) && l.n > 0
+          ? l.n
+          : i + 1,
+      mentorTxt: (typeof l?.mentorTxt === "string" ? l.mentorTxt : "").slice(0, 200),
+      mentoradoTxt: (typeof l?.mentoradoTxt === "string" ? l.mentoradoTxt : "").slice(0, 200),
+      numero:
+        typeof l?.numero === "number" && Number.isInteger(l.numero) && l.numero > 0
+          ? l.numero
+          : null,
+      dataIso:
+        typeof l?.dataIso === "string" && /^\d{4}-\d{2}-\d{2}$/.test(l.dataIso)
+          ? l.dataIso
+          : null,
+    }))
+    .filter((l) => l.numero != null && (l.mentorTxt || l.mentoradoTxt));
+  if (!saneadas.length) {
+    return { ok: true as const, ativa: true as const, sugestoes: {}, restantes: 0 };
+  }
+
+  const [{ universo }, iaCfg] = await Promise.all([
+    universoRegistros(supabase),
+    getIaConfig(supabase),
+  ]);
+
+  // recorte server-side: só 'manual' recebe a 2ª passada — re-roda o
+  // scorer pra garantir que a decisão e as candidatas são as mesmas da
+  // prévia (claimed já foi resolvido lá; aqui o hoje basta)
+  const hojeIso = new Date().toISOString().slice(0, 10);
+  const alvos: { l: (typeof saneadas)[number]; cands: DuplaCandidata[] }[] = [];
+  for (const l of saneadas) {
+    const m = scoreLinha(l.mentorTxt, l.mentoradoTxt, l.numero, l.dataIso, universo, {
+      hoje: hojeIso,
+    });
+    if (m.nivel === "manual" && m.candidatos.length) {
+      alvos.push({ l, cands: m.candidatos.slice(0, 5) });
+    }
+  }
+  const chamadas = alvos.slice(0, MAX_CHAMADAS_IA_LOTE);
+  const restantes = alvos.length - chamadas.length;
+  if (!chamadas.length) {
+    return { ok: true as const, ativa: true as const, sugestoes: {}, restantes };
+  }
+
+  // uma reserva por passada — o 429 bloqueia tudo de uma vez, não por linha
+  const lim = await consumirLimiteIa(
+    supabase,
+    { lote, linhas: chamadas.length },
+    "importacao"
+  );
+  if (!lim.permitido) {
+    return { ok: true as const, ativa: false as const, motivo: "limite" as const };
+  }
+
+  // wa4 das candidatas — últimos 4 dígitos do whatsapp do mentorado pra
+  // desempate ("a do whatsapp 41 9…"), único pedaço do telefone que sai
+  const idsJovens = [
+    ...new Set(chamadas.flatMap((a) => a.cands.map((c) => c.mentorado_id))),
+  ];
+  const { data: jovens } = await supabase
+    .from("mentorados")
+    .select("id, whatsapp")
+    .in("id", idsJovens);
+  const wa4PorMentorado = new Map<string, string | null>(
+    (jovens ?? []).map((j) => [j.id, wa4De(j.whatsapp)])
+  );
+
+  // tier 'balanceado' da ia_config — classificação estruturada, mesma
+  // cadeia de fallbacks do chat; ajuste quente pelo painel /ia
+  const chamar: ChamarSemantico = (msgs, tools, toolChoice) =>
+    chamarModelo(msgs, lote, {
+      modelo: modeloDoTier(iaCfg, "balanceado"),
+      esforco: esforcoDoTier(iaCfg, "balanceado"),
+      fallbacks: fallbacksDoTier(iaCfg, "balanceado"),
+      tools,
+      toolChoice,
+    });
+
+  const sugestoes: Record<number, SugestaoLinhaIa> = {};
+  const eventos: EventoIa[] = [];
+  let idx = 0;
+  const workers = Array.from(
+    { length: Math.min(CONC_IA, chamadas.length) },
+    async () => {
+      while (idx < chamadas.length) {
+        const a = chamadas[idx++];
+        const candsIa = candidatosParaIa(a.cands, wa4PorMentorado);
+        const t0 = Date.now();
+        const r = await matchSemantico(
+          {
+            mentorTxt: a.l.mentorTxt,
+            mentoradoTxt: a.l.mentoradoTxt,
+            candidatos: candsIa,
+          },
+          { chamar }
+        );
+        const dur = Date.now() - t0;
+        // 'manual' no overlay: o recorte já garante — aplicarSemantico
+        // confere de novo e devolve null quando não convence
+        const overlay = r.ok
+          ? aplicarSemantico(r.saida, a.cands, { nivel: "manual" })
+          : null;
+        if (overlay) {
+          sugestoes[a.l.n] = {
+            ...overlay.sugeridoIa,
+            mentorNome: overlay.mentorNome,
+            mentoradoNome: overlay.mentoradoNome,
+          };
+        }
+        eventos.push({
+          canal: "importacao",
+          tool: "match_semantico",
+          args: argsMatchSemantico(
+            lote,
+            candsIa.length,
+            a.l.mentorTxt.length + a.l.mentoradoTxt.length
+          ),
+          ok: r.ok,
+          erro: r.ok ? null : r.erro,
+          duracao_ms: dur,
+          modelo: r.modelo ?? null,
+          tier: "balanceado",
+          tokens_in: r.ok ? (r.tokensIn ?? null) : null,
+          tokens_out: r.ok ? (r.tokensOut ?? null) : null,
+          request_id: lim.requestId,
+        });
+      }
+    }
+  );
+  await Promise.all(workers);
+  await registrarEventosImportacao(supabase, eventos);
+  return { ok: true as const, ativa: true as const, sugestoes, restantes };
 }

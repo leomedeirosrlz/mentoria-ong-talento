@@ -65,8 +65,9 @@ import { getIaConfig } from "./config";
 import { CacheTtl } from "./cache";
 import { buscarNosGuias, catalogoGuias } from "./guias";
 
-/** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário. */
-export type CanalIa = "chat" | "mcp";
+/** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário
+ *  ('importacao' entrou na 0193: match semântico/revisão NL do import CSV). */
+export type CanalIa = "chat" | "mcp" | "importacao";
 
 /** O `roles` do registry — vocabulário do banco (app_role). */
 export type Papel = AppRole;
