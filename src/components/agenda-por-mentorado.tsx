@@ -348,10 +348,14 @@ function CardMentorado({
   const mentoradoFora = foraDoPrograma(dupla.mentorado);
 
   return (
-    <article className="flex flex-col gap-4 rounded-xl bg-card p-5 shadow-[var(--shadow-border)]">
+    // min-w-0 no article e nos filhos diretos: eles são flex/grid items
+    // cujo min-width:auto resolve pro min-content — sem o piso explícito,
+    // qualquer conteúdo largo (chip com nome comprido, REALIZA-367)
+    // propagava a largura pra cima e esticava o documento inteiro
+    <article className="flex min-w-0 flex-col gap-4 rounded-xl bg-card p-5 shadow-[var(--shadow-border)]">
       {/* header: identidade + saúde da dupla — o texto do semáforo carrega
           o estado (cor nunca é o único canal, PV-2) */}
-      <div className="flex flex-wrap items-start gap-3">
+      <div className="flex min-w-0 flex-wrap items-start gap-3">
         <Avatar
           papel="mentorado"
           nome={nome}
@@ -365,7 +369,16 @@ function CardMentorado({
         <div className="min-w-28 flex-1">
           <h3 className="flex flex-wrap items-center gap-x-2 gap-y-1 font-semibold leading-snug">
             <span className="truncate">{nome}</span>
-            <Badge variant="secondary">{turmaLonga(dupla.turma)}</Badge>
+            {/* rótulo de turma é texto livre — o Badge global é shrink-0 +
+                nowrap, então um label comprido esticaria o documento
+                (REALIZA-367): trunca com a forma íntegra no title */}
+            <Badge
+              variant="secondary"
+              title={turmaLonga(dupla.turma)}
+              className="min-w-0 max-w-full shrink"
+            >
+              <span className="truncate">{turmaLonga(dupla.turma)}</span>
+            </Badge>
             {dupla.status !== "ativa" && (
               <Badge variant="outline" className="text-muted-foreground">
                 {dupla.status === "pausada"
@@ -393,7 +406,7 @@ function CardMentorado({
 
       {/* progresso DPP: "encontro N de 16" é o passo corrente; a barra
           mede o que já aconteceu de verdade (realizados) */}
-      <div>
+      <div className="min-w-0">
         <div className="flex items-baseline justify-between gap-2 text-sm">
           <p className="font-medium">
             {jornadaFechada
@@ -472,7 +485,7 @@ function CardMentorado({
       )}
 
       {/* pendências acionáveis — deep link direto pro ponto da ficha */}
-      <section aria-label="Pendências da dupla" className="space-y-2">
+      <section aria-label="Pendências da dupla" className="min-w-0 space-y-2">
         <h4 className="text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Pendências da dupla
         </h4>
@@ -581,7 +594,7 @@ function CardMentorado({
           ficha, que é onde a dupla agenda (o mentor DPP não marca sessão
           de especialista nem recebe CTA dela aqui). O "Lembrar" (D5) é o
           canal leve com o jovem — notificação + WhatsApp, nunca cobrança */}
-      <div className="mt-auto flex flex-wrap gap-2 border-t border-border/60 pt-4">
+      <div className="mt-auto flex min-w-0 flex-wrap gap-2 border-t border-border/60 pt-4">
         <Link
           href={`/duplas/${dupla.id}`}
           className={buttonVariants({ variant: "outline", size: "sm" })}
@@ -720,7 +733,7 @@ function ProximoEncontro({
   }
 
   return (
-    <div className="flex items-start gap-3 rounded-lg bg-muted/50 px-4 py-3 shadow-[var(--shadow-inset)]">
+    <div className="flex min-w-0 items-start gap-3 rounded-lg bg-muted/50 px-4 py-3 shadow-[var(--shadow-inset)]">
       <CalendarDots
         size={20}
         aria-hidden
@@ -783,7 +796,7 @@ function TrilhaBlock({
   return (
     <section
       aria-label={`Trilha de especialista · ${nomeEsp}`}
-      className="space-y-3 rounded-lg border border-dashed border-[var(--warn)]/50 bg-[var(--warn)]/8 p-4"
+      className="min-w-0 space-y-3 rounded-lg border border-dashed border-[var(--warn)]/50 bg-[var(--warn)]/8 p-4"
     >
       {/* flex-wrap + piso de largura no texto: a 390px o selo dividia a
           linha e espremia a explicação numa coluna de duas palavras */}
@@ -1092,7 +1105,7 @@ function RegistroSessao({ registro }: { registro: TrilhaJovemRegistro }) {
           <Paperclip size={13} aria-hidden />
           {registro.anexos.length}{" "}
           {registro.anexos.length === 1 ? "anexo" : "anexos"}
-          <span className="min-w-0">
+          <span className="min-w-0 break-words">
             · {registro.anexos.map((a) => a.nome).join(", ")}
           </span>
         </p>
@@ -1108,7 +1121,7 @@ function RegistroSessao({ registro }: { registro: TrilhaJovemRegistro }) {
 
 function TrilhasAnteriores({ trilhas }: { trilhas: TrilhaJovem[] }) {
   return (
-    <details className="group/hist rounded-lg border border-border/70 bg-muted/30 px-4 py-2.5">
+    <details className="group/hist min-w-0 rounded-lg border border-border/70 bg-muted/30 px-4 py-2.5">
       <summary className="flex min-h-11 cursor-pointer list-none items-center gap-1.5 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-9 [&::-webkit-details-marker]:hidden">
         <CaretDown
           size={13}
@@ -1238,7 +1251,7 @@ function PedidoEspecialistaBlock({
   return (
     <section
       aria-label="Pedido de especialista em andamento"
-      className="space-y-3 rounded-lg border border-dashed border-[var(--warn)]/50 bg-[var(--warn)]/8 p-4"
+      className="min-w-0 space-y-3 rounded-lg border border-dashed border-[var(--warn)]/50 bg-[var(--warn)]/8 p-4"
     >
       {/* flex-wrap + piso de largura no texto: a 390px o selo dividia a
           linha e espremia a explicação numa coluna de duas palavras */}
@@ -1324,7 +1337,7 @@ function SemTrilhaBlock({
   return (
     <section
       aria-label="Trilha de especialista"
-      className="flex flex-wrap items-center gap-3 rounded-lg border border-dashed border-border px-4 py-3"
+      className="flex min-w-0 flex-wrap items-center gap-3 rounded-lg border border-dashed border-border px-4 py-3"
     >
       <Sparkle
         size={18}
@@ -1432,7 +1445,7 @@ function PedidosAnterioresLine({
 }) {
   const visiveis = solicitacoes.slice(0, 2);
   return (
-    <p className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
+    <p className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1 text-xs text-muted-foreground">
       Pedido{solicitacoes.length > 1 ? "s" : ""} anterior
       {solicitacoes.length > 1 ? "es" : ""}:
       {visiveis.map((s) => (

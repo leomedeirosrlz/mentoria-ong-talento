@@ -37,11 +37,17 @@ export function DemoEnterButton({
             )}
           </span>
           <div className="min-w-0">
-            <p className="font-semibold leading-tight">{titulo}</p>
+            {/* min-h de 2 linhas só no grid de 2 colunas (min-[360px]):
+                "Auxiliar executivo"/"Mentor especialista" quebram em duas
+                linhas e desalinhavam persona + descrição dos irmãos;
+                text-balance fecha a quebra sem viúva feia (REALIZA-365) */}
+            <p className="font-semibold leading-tight text-balance min-[360px]:min-h-10">
+              {titulo}
+            </p>
             <p className="truncate text-xs text-muted-foreground">{persona}</p>
           </div>
         </div>
-        <p className="mt-3 text-sm leading-snug text-muted-foreground">
+        <p className="mt-3 text-sm leading-snug text-pretty text-muted-foreground">
           {descricao}
         </p>
       </div>

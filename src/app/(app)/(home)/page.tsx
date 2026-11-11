@@ -29,7 +29,10 @@ import {
 } from "@/lib/turma-contexto";
 import { turmaDaDupla } from "@/lib/turma";
 import { DashboardCoordenacao } from "@/components/dashboard-coordenacao";
-import { TurmaContextoSelect } from "@/components/turma-contexto-select";
+import {
+  TurmaContextoSelect,
+  TurmaFocoSync,
+} from "@/components/turma-contexto-select";
 import {
   FaixaTurmaEscopo,
   FaixaTurmaFoco,
@@ -118,10 +121,11 @@ export default async function HomePage({
           termo={termoPendente ? <TermoBanner /> : null}
           turmaFoco={foco.turma}
           seletorContexto={
-            // o sync do cookie mora dentro do seletor mesmo quando ele se
-            // esconde (1 turma) — a ?turma= aterrissada grava igual
-            <TurmaContextoSelect
-              turmas={navegaveis}
+            // REALIZA-365: sem seletor no topo — o hub de turmas logo
+            // abaixo já é o controle de contexto (card ativo re-clicado
+            // limpa, "ver todas" idem). O sync headless segue gravando a
+            // ?turma= aterrissada no cookie
+            <TurmaFocoSync
               foco={{ turma: foco.turma, origem: foco.origem }}
             />
           }
