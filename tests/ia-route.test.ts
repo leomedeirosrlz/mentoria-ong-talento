@@ -517,4 +517,52 @@ describe("stream SSE", () => {
     const texto = await lerStream(res);
     expect(texto).toContain('data: {"type":"error","e":"caiu geral"}');
   });
+
+  it("falha marcada dormindo chega no evento error (REALIZA-363)", async () => {
+    m.chamarModeloStream.mockResolvedValue({
+      ok: false,
+      erro: "quota esgotada",
+      dormindo: true,
+    });
+    const res = await POST(req());
+    const texto = await lerStream(res);
+    expect(texto).toContain(
+      'data: {"type":"error","e":"quota esgotada","dormindo":true}'
+    );
+  });
+
+  it("dormindo viaja pelo fallback JSON também — é o resultado que falha", async () => {
+    m.chamarModeloStream.mockResolvedValue({
+      ok: false,
+      erro: "provider recusou stream",
+      fallback: true,
+      dormindo: true,
+    });
+    m.chamarModelo.mockResolvedValue({
+      ok: false,
+      erro: "quota esgotada",
+      dormindo: true,
+    });
+    const res = await POST(req());
+    const texto = await lerStream(res);
+    expect(texto).toContain(
+      'data: {"type":"error","e":"quota esgotada","dormindo":true}'
+    );
+  });
+
+  it("erro não-dormindo não leva a flag — erro real segue genérico", async () => {
+    m.chamarModeloStream.mockResolvedValue({
+      ok: false,
+      erro: "payload inválido",
+      fallback: true,
+    });
+    m.chamarModelo.mockResolvedValue({
+      ok: false,
+      erro: "payload inválido",
+    });
+    const res = await POST(req());
+    const texto = await lerStream(res);
+    expect(texto).toContain('data: {"type":"error","e":"payload inválido"}');
+    expect(texto).not.toContain("dormindo");
+  });
 });

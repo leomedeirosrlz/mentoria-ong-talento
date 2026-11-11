@@ -136,11 +136,44 @@ describe("chamarModelo", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     stubFetch(() => new Response("quota", { status: 402 }));
     const r1 = await chamarModelo([{ role: "user", content: "oi" }]);
-    expect(r1).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
+    // provider-side quota failure puts Liza to sleep (REALIZA-363)
+    expect(r1).toEqual({
+      ok: false,
+      erro: IA_MSG_INDISPONIVEL,
+      dormindo: true,
+    });
 
     stubFetch(() => Promise.reject(new Error("socket")) as never);
     const r2 = await chamarModelo([{ role: "user", content: "oi" }]);
+    // non-transient exception is not sleep: stays a generic error
     expect(r2).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
+    consoleSpy.mockRestore();
+  });
+
+  it("marca dormindo nas falhas do provider; 400 genérico e erro nosso não", async () => {
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const dormindo = (r: unknown) =>
+      (r as { dormindo?: boolean }).dormindo === true;
+
+    stubFetch(() => new Response("rate", { status: 429 }));
+    expect(dormindo(await chamarModelo([{ role: "user", content: "oi" }]))).toBe(true);
+    stubFetch(() => new Response("pau", { status: 502 }));
+    expect(dormindo(await chamarModelo([{ role: "user", content: "oi" }]))).toBe(true);
+    stubFetch(
+      () => Promise.reject(new DOMException("estourou", "TimeoutError")) as never
+    );
+    expect(dormindo(await chamarModelo([{ role: "user", content: "oi" }]))).toBe(true);
+    stubFetch(
+      () => Promise.reject(new TypeError("fetch failed")) as never
+    );
+    expect(dormindo(await chamarModelo([{ role: "user", content: "oi" }]))).toBe(true);
+
+    // not sleep: our own 400 payload and an oddball exception
+    stubFetch(() => new Response("invalid payload", { status: 400 }));
+    expect(dormindo(await chamarModelo([{ role: "user", content: "oi" }]))).toBe(false);
+    stubFetch(() => Promise.reject(new RangeError("?")) as never);
+    expect(dormindo(await chamarModelo([{ role: "user", content: "oi" }]))).toBe(false);
     consoleSpy.mockRestore();
   });
 });
@@ -188,7 +221,11 @@ describe("chamarModelo — cadeia de fallback (REALIZA-307)", () => {
     const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
     const spy = stubFetch(() => new Response("pau", { status: 503 }));
     const r = await chamarModelo([{ role: "user", content: "oi" }]);
-    expect(r).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
+    expect(r).toEqual({
+      ok: false,
+      erro: IA_MSG_INDISPONIVEL,
+      dormindo: true,
+    });
     expect(spy).toHaveBeenCalledTimes(1);
     consoleSpy.mockRestore();
   });
@@ -226,7 +263,12 @@ describe("chamarModelo — cadeia de fallback (REALIZA-307)", () => {
       undefined,
       OPTS
     );
-    expect(r).toEqual({ ok: false, erro: IA_MSG_INDISPONIVEL });
+    // fully exhausted transient chain → sleep, not a generic error
+    expect(r).toEqual({
+      ok: false,
+      erro: IA_MSG_INDISPONIVEL,
+      dormindo: true,
+    });
     expect(spy).toHaveBeenCalledTimes(3); // primario + fb-1 + fb-2
 
     // TimeoutError do AbortSignal interno → transitório, próximo slug resolve

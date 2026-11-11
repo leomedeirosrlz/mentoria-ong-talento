@@ -463,22 +463,31 @@ export function emailDesfechoRepasseMentor({
   });
 }
 
-/** Convite de acesso emitido pela coordenação (0180): a conta já existe
- *  quando o e-mail sai (generateLink invite → handle_new_user vincula o
- *  cadastro no envio), então o CTA é o token_hash direto no /auth/confirm —
- *  a página pede o gesto explícito antes de plantar a sessão. Duas
- *  variantes pela `trilha`: staff (mentor, supervisor, coordenação) ouve
- *  "o que a plataforma tem pra você", jovem ouve "a sua jornada". O rodapé
- *  leva o link copiável e o plano B pro token de 1h: pedir link novo no
- *  login, já com o e-mail preenchido (?e=). */
+/** Access invite sent by the coordination (0180): the account already
+ *  exists when the e-mail goes out (generateLink invite → handle_new_user
+ *  binds the record on send), so the CTA is the token_hash straight into
+ *  /auth/confirm — the page asks for the explicit gesture before planting
+ *  the session. Two `trilha` variants: staff (mentor, supervisor,
+ *  coordination) hears "what the platform has for you", the youth hears
+ *  "your journey". The body states whose account the link opens (name +
+ *  role + email, REALIZA-35): /auth/confirm cannot show identity before
+ *  verifyOtp, so the email is the honest surface. The footer carries the
+ *  copyable link and the plan B for the 1h token: ask for a new link at
+ *  login, with the e-mail already filled (?e=). */
 export function emailConviteAcesso({
   trilha,
   primeiroNome,
+  nome,
+  papel,
   link,
   email,
 }: {
   trilha: "staff" | "jovem";
   primeiroNome: string;
+  /** full display name (nome_social || nome) — whose account this is */
+  nome: string;
+  /** account role label (papelLabel) — what the access unlocks */
+  papel: string;
   link: string;
   email: string;
 }): string {
@@ -492,6 +501,7 @@ export function emailConviteAcesso({
     conteudoHtml:
       `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${primeiroNome ? `, ${esc(primeiroNome)}` : ""}!</p>` +
       `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">A coordenação preparou o seu acesso à <strong>Mentoria Social</strong>, a plataforma do programa de mentoria.</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">O link abaixo é só seu: ele abre a conta de <strong>${esc(nome)}</strong>, ${esc(papel)}, no e-mail ${esc(email)}.</p>` +
       `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">${
         jovem
           ? "Por lá você acompanha a sua jornada: os encontros, os instrumentos e a sua turma."

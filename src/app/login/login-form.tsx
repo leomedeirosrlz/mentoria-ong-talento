@@ -28,6 +28,7 @@ import {
   INSTAVEL,
   mensagemErro,
   NAO_CADASTRADO,
+  pedirAcessoHref,
 } from "@/lib/login-erros";
 
 // janela do resend do supabase — quando o 429 traz "after N seconds" usa o N real
@@ -560,7 +561,8 @@ export function LoginForm() {
               <p className="text-sm text-muted-foreground mt-2 leading-relaxed">
                 Enviamos um link para{" "}
                 <span className="font-medium text-foreground">{email}</span>. Se
-                não chegar em alguns minutos, confira o spam.
+                não chegar em alguns minutos, confira a pasta de spam ou lixo
+                eletrônico.
               </p>
               {/* reenvio invalida o anterior — evita o clique no e-mail
                   velho que cai no card de link inválido */}
@@ -575,7 +577,15 @@ export function LoginForm() {
                 {/* falha do reenvio — o form está desmontado, o erro mora aqui */}
                 {erro && (
                   <p role="alert" className="text-sm text-destructive">
-                    {erro}
+                    {erro}{" "}
+                    {erro === NAO_CADASTRADO && (
+                      <a
+                        href={pedirAcessoHref(email)}
+                        className="inline-flex min-h-8 items-center font-medium text-foreground underline underline-offset-2"
+                      >
+                        Pedir acesso
+                      </a>
+                    )}
                   </p>
                 )}
                 <Button
@@ -718,7 +728,17 @@ export function LoginForm() {
 
                 {erro && (
                   <p role="alert" className="text-sm text-destructive">
-                    {erro}
+                    {erro}{" "}
+                    {/* allowlist miss gets a real way out: the mailto carries
+                        the typed email in the body so it is not retyped (REALIZA-35) */}
+                    {erro === NAO_CADASTRADO && (
+                      <a
+                        href={pedirAcessoHref(email)}
+                        className="inline-flex min-h-8 items-center font-medium text-foreground underline underline-offset-2"
+                      >
+                        Pedir acesso
+                      </a>
+                    )}
                   </p>
                 )}
 
@@ -735,8 +755,9 @@ export function LoginForm() {
                       className="rounded-lg border border-border px-3 py-2.5 text-center text-xs leading-relaxed text-muted-foreground"
                     >
                       Se esse e-mail estiver cadastrado, o link de
-                      redefinição chega em alguns minutos. Não chegou? Entre
-                      pelo link de e-mail, que não precisa de senha.
+                      redefinição chega em alguns minutos. Não chegou? Confira
+                      o spam ou lixo eletrônico, ou entre pelo link de e-mail,
+                      que não precisa de senha.
                     </p>
                   ) : (
                     <div className="space-y-1">

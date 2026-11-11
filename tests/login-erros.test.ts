@@ -4,6 +4,7 @@ import {
   INSTAVEL,
   mensagemErro,
   NAO_CADASTRADO,
+  pedirAcessoHref,
 } from "@/lib/login-erros";
 
 // casos em tabela: [descrição, erro, modo, esperado]
@@ -90,6 +91,26 @@ const CASOS: [
 describe("mensagemErro — tradução dos erros de login", () => {
   it.each(CASOS)("%s", (_desc, erro, modo, esperado) => {
     expect(mensagemErro(erro, modo)).toBe(esperado);
+  });
+});
+
+describe("pedirAcessoHref — the real path out of NAO_CADASTRADO (REALIZA-35)", () => {
+  it("mailto to coordination with a request subject", () => {
+    const href = pedirAcessoHref("ana@exemplo.org");
+    expect(href.startsWith("mailto:mentoria@realiza.vc?subject=")).toBe(true);
+    expect(href).toContain(encodeURIComponent("Pedido de acesso à Mentoria Social"));
+    // the typed e-mail already lands in the body — no retyping
+    expect(href).toContain(encodeURIComponent("ana@exemplo.org"));
+  });
+
+  it("without e-mail the body leaves the field for the person to fill", () => {
+    const href = pedirAcessoHref();
+    expect(href.startsWith("mailto:mentoria@realiza.vc")).toBe(true);
+    expect(href).toContain(encodeURIComponent("Meu e-mail é:"));
+  });
+
+  it("blank e-mail falls into the same omitted case", () => {
+    expect(pedirAcessoHref("   ")).toContain(encodeURIComponent("Meu e-mail é:"));
   });
 });
 

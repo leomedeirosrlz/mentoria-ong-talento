@@ -78,11 +78,13 @@ describe("templates de e-mail", () => {
     expect(html).toContain("coordenação");
   });
 
-  it("convite staff: boas-vindas, dupla/agenda/registros e link pessoal", () => {
+  it("convite staff: boas-vindas, identidade da conta e link pessoal", () => {
     const link = "https://app.test/auth/confirm?token_hash=h1&type=invite";
     const html = emailConviteAcesso({
       trilha: "staff",
       primeiroNome: "Marina",
+      nome: "Marina Duarte",
+      papel: "Mentor DPP",
       link,
       email: "marina@exemplo.org",
     });
@@ -93,6 +95,10 @@ describe("templates de e-mail", () => {
     expect(html).toContain("Entrar na Mentoria Social");
     expect(html).toContain("token_hash=h1&amp;type=invite");
     expect(html).toContain("cerca de 1 hora");
+    // REALIZA-35: o e-mail diz de quem é a conta que o link abre —
+    // /auth/confirm não mostra identidade antes do verifyOtp
+    expect(html).toContain("<strong>Marina Duarte</strong>, Mentor DPP");
+    expect(html).toContain("no e-mail marina@exemplo.org");
     // link expirado cai no /login com o endereço preenchido
     expect(html).toContain("/login?e=marina%40exemplo.org");
     expect(html).not.toContain("sua turma");
@@ -102,6 +108,8 @@ describe("templates de e-mail", () => {
     const html = emailConviteAcesso({
       trilha: "jovem",
       primeiroNome: "Bia",
+      nome: "Ana Beatriz Silva",
+      papel: "Mentorado",
       link: "https://app.test/auth/confirm?token_hash=h2&type=magiclink",
       email: "bia@exemplo.org",
     });
@@ -111,6 +119,7 @@ describe("templates de e-mail", () => {
     expect(html).toContain("sua turma");
     expect(html).toContain("instrumentos");
     expect(html).toContain("Entrar na Mentoria Social");
+    expect(html).toContain("<strong>Ana Beatriz Silva</strong>, Mentorado");
     expect(html).not.toContain("sua dupla");
     expect(html).not.toContain("—"); // sem travessão na copy visível
   });

@@ -345,7 +345,7 @@ export function MentoradoActions({
                         toast.success("Modo demo: nada é enviado de verdade.");
                       } else {
                         toast.success(
-                          `Convite enviado pra ${res.email}. O link vale ~1 hora.`
+                          `Convite enviado pra ${res.email}. O link vale ~1 hora. Se não chegar, peça pra conferir o spam.`
                         );
                         router.refresh();
                       }

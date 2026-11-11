@@ -11,6 +11,17 @@ const NAO_CADASTRADO =
 const INSTAVEL =
   "O acesso está instável agora. Tente de novo em alguns minutos. Se persistir, fale com a coordenação.";
 
+/** "Pedir acesso" path when the email is not on the allowlist: the real
+ *  channel today is the coordination mailbox (same one SiteFooter shows).
+ *  With the typed address the body ships pre-filled; without it (blocked
+ *  account screens) the body leaves a blank for the person to fill in. */
+export function pedirAcessoHref(email?: string): string {
+  const corpo = email?.trim()
+    ? `Olá! Quero pedir acesso à plataforma com este e-mail: ${email.trim()}.`
+    : "Olá! Quero pedir acesso à plataforma. Meu e-mail é:";
+  return `mailto:mentoria@realiza.vc?subject=${encodeURIComponent("Pedido de acesso à Mentoria Social")}&body=${encodeURIComponent(corpo)}`;
+}
+
 function textoDe(error: { message: string; code?: string }): string {
   return `${error.code ?? ""} ${error.message}`.toLowerCase();
 }

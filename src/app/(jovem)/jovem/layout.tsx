@@ -8,6 +8,7 @@ import { demoRole } from "@/lib/demo/mode";
 import { getMe, getNotificacoes } from "@/lib/queries";
 import { getJovemAssinaturas, getJovemPerfil } from "@/lib/queries-jovem";
 import { providerConfigurado } from "@/lib/ia/provider";
+import { pedirAcessoHref } from "@/lib/login-erros";
 import type { AppRole } from "@/lib/types";
 import { OnboardingJovemLazy } from "./onboarding-jovem-lazy";
 
@@ -33,6 +34,16 @@ export default async function JovemLayout({
           Sua conta não está vinculada a um cadastro. Se você entrou com o
           e-mail errado, saia e entre com o e-mail cadastrado pela coordenação.
         </p>
+        <p className="mt-2">
+          Ainda não foi cadastrado?{" "}
+          <a
+            href={pedirAcessoHref()}
+            className="font-medium text-foreground underline underline-offset-2"
+          >
+            Peça acesso por e-mail
+          </a>
+          .
+        </p>
       </TelaConta>
     );
   }
@@ -54,6 +65,16 @@ export default async function JovemLayout({
         <p>
           Seu acesso foi criado, mas a coordenação ainda não definiu o seu papel
           no programa. Assim que liberar, entre de novo por aqui.
+        </p>
+        <p className="mt-2">
+          Dúvidas?{" "}
+          <a
+            href="mailto:mentoria@realiza.vc"
+            className="font-medium text-foreground underline underline-offset-2"
+          >
+            Fale com a coordenação
+          </a>
+          .
         </p>
       </TelaConta>
     );

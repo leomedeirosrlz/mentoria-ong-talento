@@ -49,12 +49,12 @@ export function msgAmigavel(e: unknown, status: number, fallback: string): strin
     e instanceof TypeError ||
     (typeof navigator !== "undefined" && navigator.onLine === false)
   )
-    return "Sem conexão — verifique sua internet e tente de novo.";
+    return "Sem conexão. Verifique sua internet e tente de novo.";
   if (status === 429)
-    return "Muitas perguntas em sequência — aguarde um instante e tente de novo.";
+    return "Muitas perguntas em sequência. Aguarde um instante e tente de novo.";
   if (status === 401 || status === 403)
-    return "Sua sessão expirou — entre de novo pelo login.";
+    return "Sua sessão expirou. Entre de novo pelo login.";
   if (status === 503)
-    return "O assistente está indisponível agora — tente de novo em alguns minutos.";
+    return "O assistente está indisponível agora. Tente de novo em alguns minutos.";
   return e instanceof Error && e.message ? e.message : fallback;
 }

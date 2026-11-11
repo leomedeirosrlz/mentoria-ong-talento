@@ -138,6 +138,10 @@ describe("convidarAcesso — staff (profile)", () => {
     expect(msg.html).toContain(
       "/auth/confirm?token_hash=hash-1&amp;type=invite"
     );
+    // REALIZA-35: the e-mail is the identity surface — display name +
+    // role label + destination e-mail
+    expect(msg.html).toContain("<strong>Marina Duarte</strong>, Mentor DPP");
+    expect(msg.html).toContain("no e-mail marina@exemplo.org");
     expect(m.logInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         tipo: "convite",
@@ -243,6 +247,9 @@ describe("convidarAcesso — jovem (mentorado)", () => {
     const msg = m.enviarEmailsIndividuais.mock.calls[0][0].mensagens[0];
     expect(msg.subject).toBe("Sua jornada de mentoria começou");
     expect(msg.html).toContain("Bia"); // sauda o nome social
+    // nome_social wins on "whose account it is"; the youth role is
+    // mentorado (papelLabel)
+    expect(msg.html).toContain("<strong>Bia</strong>, Mentorado");
     expect(m.logInsert).toHaveBeenCalledWith(
       expect.objectContaining({
         tipo: "convite",

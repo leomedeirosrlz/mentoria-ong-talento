@@ -70,7 +70,7 @@ const STREAM_BUDGET_MS = 50_000;
 const MAX_EVENTOS_LOTE = 50;
 
 const MSG_FALHA =
-  "Não consegui concluir essa consulta agora — tente perguntar de outra forma.";
+  "Não consegui concluir essa consulta agora. Tente perguntar de outra forma.";
 
 const MsgBody = z
   .object({
@@ -263,10 +263,15 @@ export async function POST(req: Request) {
         if (u.opencode?.billing_source) uso.billing = u.opencode.billing_source;
       };
       let erroEmitido = false;
-      const sendErro = (e: string) => {
-        send({ type: "error", e });
+      const sendErro = (e: string, dormindo?: boolean) => {
+        // dormindo: falha do provider (429/cota/5xx/timeout) → o cliente
+        // mostra a Liza dormindo em vez do erro genérico (REALIZA-363)
+        send({ type: "error", e, ...(dormindo ? { dormindo: true } : {}) });
         erroEmitido = true;
       };
+      // o último resultado do provider decide a cara do erro de orçamento
+      // esgotado: provider lento/atolado dorme, ferramenta nossa lenta não
+      let dormindoUltimo = false;
       let guiaChamado = false;
       const prazo = Date.now() + STREAM_BUDGET_MS;
       let iteracoes = 0;
@@ -303,6 +308,7 @@ export async function POST(req: Request) {
         } else if (r.abortado) {
           break; // usuário fechou/stop — sai do loop sem erro
         } else if (r.fallback) {
+          dormindoUltimo = Boolean(r.dormindo);
           // provider recusou SSE ou o stream morreu no meio: a rodada
           // refaz em JSON — mas é uma GERAÇÃO NOVA, sem prefixo comum com
           // o que já saiu. Se algo já foi emitido, `reset` manda a bolha
@@ -310,7 +316,7 @@ export async function POST(req: Request) {
           if (Date.now() >= prazo) break;
           const alt = await chamarModelo(historico, sessao, chamada);
           if (!alt.ok) {
-            sendErro(alt.erro);
+            sendErro(alt.erro, alt.dormindo);
             break;
           }
           somarUso(alt.usage, alt.modelo);
@@ -320,7 +326,7 @@ export async function POST(req: Request) {
             send({ type: "token", c: msg.content });
           }
         } else {
-          sendErro(r.erro);
+          sendErro(r.erro, r.dormindo);
           break;
         }
 
@@ -451,7 +457,7 @@ export async function POST(req: Request) {
       }
 
       if (!concluido && !erroEmitido && !req.signal.aborted && !fechado) {
-        send({ type: "error", e: MSG_FALHA });
+        sendErro(MSG_FALHA, dormindoUltimo);
       }
 
       // evento-resumo da request (sdd D4): um 'resposta' por mensagem com
