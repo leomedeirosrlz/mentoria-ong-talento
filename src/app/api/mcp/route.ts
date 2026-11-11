@@ -19,7 +19,7 @@
 import { NextResponse } from "next/server";
 import { createClient as createSupabaseClient } from "@supabase/supabase-js";
 import { z } from "zod";
-import { executarTool, IA_TOOL_CATALOGO } from "@/lib/ia/tools";
+import { ESCRITAS_DOMINIO, executarTool, IA_TOOL_CATALOGO } from "@/lib/ia/tools";
 import { MCP_INSTRUCOES } from "@/lib/ia/mcp-prompt";
 import { PAPEIS_MCP } from "@/lib/ia/mcp-papeis";
 import { consumirLimiteIa } from "@/lib/ia/rate-limit";
@@ -131,8 +131,13 @@ export async function POST(req: Request) {
     case "ping":
       return rpcResult(id, {});
     case "tools/list": {
-      const tools = IA_TOOL_CATALOGO.filter((t) =>
-        t.roles.some((r) => papeis.includes(r))
+      // IA_ESCRITAS=0 esconde as 5 do domínio também do catálogo — o
+      // gate no executarTool é a garantia; aqui elas nem aparecem
+      const escritasOff = process.env.IA_ESCRITAS === "0";
+      const tools = IA_TOOL_CATALOGO.filter(
+        (t) =>
+          t.roles.some((r) => papeis.includes(r)) &&
+          !(escritasOff && ESCRITAS_DOMINIO.has(t.nome))
       ).map((t) => ({
         name: t.nome,
         description: t.descricao,

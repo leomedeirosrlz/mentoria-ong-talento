@@ -417,6 +417,69 @@ describe("stream SSE", () => {
     });
   });
 
+  it("escrita em prévia emite o card de confirmação e SANITIZA o tool-result (REALIZA-126)", async () => {
+    // o envelope sai da executarTool completo (confirmacao_id incluso) —
+    // a rota é quem o divide: o id vai só pro UiBloco do card (a via de
+    // approve é POST /api/ia/confirmacao) e o histórico do modelo recebe
+    // o marcador sem id. Com o id na mão a tool se auto-aprovaria.
+    m.executarTool.mockResolvedValue({
+      ok: true,
+      dados: {
+        pendente_confirmacao: {
+          confirmacao_id: "conf-secreto-1",
+          tool: "agendar_encontro",
+          args: { dupla_id: "d-1", numero: 6 },
+          resumo: "Agendar o 6º encontro da dupla em 2099-01-05",
+          expira_em_minutos: 10,
+          instrucao: "Nada foi alterado ainda.",
+        },
+      },
+    });
+    m.chamarModeloStream
+      .mockResolvedValueOnce({
+        ok: true,
+        content: "",
+        toolCalls: [
+          {
+            id: "call_w",
+            type: "function",
+            function: { name: "agendar_encontro", arguments: "{}" },
+          },
+        ],
+      })
+      .mockImplementationOnce(
+        async (_msgs: MsgChat[], _s: string, opts: { onToken: (t: string) => void }) => {
+          opts.onToken("Confirma no card.");
+          return { ok: true, content: "Confirma no card.", toolCalls: [] };
+        }
+      );
+
+    const texto = await lerStream(await POST(req()));
+
+    // o card chega pelo evento ui ANTES da resposta do modelo — com o
+    // request_id da reserva pra correlação prévia×execução no card→endpoint
+    expect(texto).toContain(
+      'data: {"type":"ui","b":{"kind":"confirmacao","confirmacao_id":"conf-secreto-1"'
+    );
+    expect(texto).toContain('"resumo":"Agendar o 6º encontro da dupla em 2099-01-05"');
+    expect(texto).toContain('"request_id":"req-teste"');
+
+    // e o que volta ao modelo NÃO carrega o id — é a garantia de que a
+    // tool não se auto-aprova mesmo que o modelo tente re-chamar
+    const hist2 = chamadasStream()[1][0];
+    const toolMsg = hist2.find((x) => x.role === "tool");
+    expect(toolMsg).toMatchObject({ name: "agendar_encontro" });
+    expect(String(toolMsg?.content)).not.toContain("confirmacao_id");
+    expect(String(toolMsg?.content)).not.toContain("conf-secreto-1");
+    expect(JSON.parse(String(toolMsg?.content))).toEqual({
+      ok: true,
+      dados: {
+        status: "aguardando_confirmacao_humana",
+        resumo: "Agendar o 6º encontro da dupla em 2099-01-05",
+      },
+    });
+  });
+
   it("papeis vazio cai no papel do profile", async () => {
     m.contextoELimiteIa.mockResolvedValue({
       ...CTX_OK,

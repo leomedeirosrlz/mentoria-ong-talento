@@ -10,7 +10,7 @@
 // quadrado, sempre com rótulo. Dupla em dia é neutra; apoio é pill à
 // parte, nunca fatia. Entrada: .animate-enter com --i curto (≤300ms).
 
-import { useId, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useId, useState, type CSSProperties, type ReactNode } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "motion/react";
 import {
@@ -28,6 +28,7 @@ import type {
   UiCapacidade,
   UiChamados,
   UiCombinados,
+  UiConfirmacao,
   UiDupla,
   UiJornada,
   UiPedidos,
@@ -356,6 +357,8 @@ export function UiCard({ bloco, jovem }: { bloco: UiBloco; jovem?: boolean }) {
       return <CardJornada b={bloco} />;
     case "pedidos":
       return <CardPedidos b={bloco} />;
+    case "confirmacao":
+      return <CardConfirmacao b={bloco} />;
   }
 }
 
@@ -1353,6 +1356,148 @@ export function CardJornada({ b }: { b: UiJornada }) {
           </li>
         ))}
       </ul>
+    </Cartao>
+  );
+}
+
+// ---------- confirmacao (escritas REALIZA-126) ----------
+
+/** Prévia de escrita aguardando o "sim" humano — o card é a ÚNICA via de
+ *  approve (o confirmacao_id nunca vai pro modelo, então só este botão
+ *  executa). Confirmar chama o endpoint determinístico e o resultado da
+ *  escrita fica inline; Cancelar descarta e a prévia expira sozinha.
+ *  Uso único: confirmado, recusado, cancelado ou expirado, o card trava. */
+export function CardConfirmacao({ b }: { b: UiConfirmacao }) {
+  type Estado =
+    | "pendente"
+    | "enviando"
+    | "feito"
+    | "erro"
+    | "cancelado"
+    | "expirado";
+  const [estado, setEstado] = useState<Estado>("pendente");
+  const [detalhe, setDetalhe] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+  // o prazo visual espelha o do banco (a linha tem expira_em) — vencer
+  // aqui poupa um clique fadado a falhar no servidor
+  const [expiraEm] = useState(() => Date.now() + b.expira_em_minutos * 60_000);
+  useEffect(() => {
+    if (estado !== "pendente") return;
+    const t = setTimeout(
+      () => setEstado("expirado"),
+      Math.max(expiraEm - Date.now(), 0)
+    );
+    return () => clearTimeout(t);
+  }, [estado, expiraEm]);
+
+  async function confirmar() {
+    setEstado("enviando");
+    setDetalhe(null);
+    try {
+      const res = await fetch("/api/ia/confirmacao", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          confirmacao_id: b.confirmacao_id,
+          tool: b.tool,
+          args: b.args,
+          request_id: b.request_id,
+        }),
+      });
+      const j = (await res.json().catch(() => null)) as
+        | {
+            ok?: boolean;
+            erro?: string;
+            dados?: { url?: string | null } | null;
+          }
+        | null;
+      if (!res.ok || !j) {
+        // falha de transporte não consumiu a prévia — volta pra tentar
+        setDetalhe("Não consegui concluir. Tente de novo.");
+        setEstado("pendente");
+        return;
+      }
+      if (j.ok) {
+        setUrl(j.dados?.url ?? null);
+        setEstado("feito");
+      } else {
+        // o servidor é quem sabe: recusa de domínio consumiu a prévia e
+        // inválida/expirada/usada já não prestava — as duas encerram o card
+        setDetalhe(j.erro ?? "Não foi possível confirmar.");
+        setEstado("erro");
+      }
+    } catch {
+      setDetalhe("Falha de rede. Tente de novo.");
+      setEstado("pendente");
+    }
+  }
+
+  return (
+    <Cartao
+      titulo="Confirmação pendente"
+      meta={
+        estado === "pendente" || estado === "enviando"
+          ? `expira em ${b.expira_em_minutos} min`
+          : undefined
+      }
+    >
+      <p className="text-sm leading-snug">{b.resumo}</p>
+      {estado === "feito" ? (
+        <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-[var(--ok-text)]">
+          <CheckCircle size={16} aria-hidden className="shrink-0" />
+          Feito.
+          {url && (
+            <a
+              href={url}
+              target="_blank"
+              rel="noreferrer"
+              className={cn(
+                "rounded-sm font-semibold text-foreground underline-offset-2 hover:underline",
+                FOCO
+              )}
+            >
+              {url}
+            </a>
+          )}
+        </div>
+      ) : estado === "erro" ? (
+        <p className="mt-2.5 flex items-start gap-1.5 text-sm text-[var(--danger-text)]">
+          <WarningCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+          {detalhe}
+        </p>
+      ) : estado === "cancelado" ? (
+        <p className="mt-2.5 text-sm text-muted-foreground">
+          Cancelado. Nada foi alterado.
+        </p>
+      ) : estado === "expirado" ? (
+        <p className="mt-2.5 flex items-center gap-1.5 text-sm text-muted-foreground">
+          <Clock size={16} aria-hidden className="shrink-0" />
+          A prévia expirou. Peça a ação de novo.
+        </p>
+      ) : (
+        <>
+          <div className="mt-2.5 flex items-center gap-2">
+            <Button
+              size="sm"
+              onClick={confirmar}
+              disabled={estado === "enviando"}
+            >
+              {estado === "enviando" ? "Confirmando…" : "Confirmar"}
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setEstado("cancelado")}
+              disabled={estado === "enviando"}
+            >
+              Cancelar
+            </Button>
+          </div>
+          {detalhe && (
+            <p className="mt-2 text-xs text-[var(--danger-text)]">{detalhe}</p>
+          )}
+        </>
+      )}
     </Cartao>
   );
 }

@@ -417,18 +417,55 @@ export async function POST(req: Request) {
               })
               .finally(() => clearTimeout(timerPrazo));
             if (res === null) break;
-            // genUI direto: o card sai já — antes da próxima rodada do
-            // modelo, que ainda vai pensar e escrever por cima dele
             const resTool = res as ResultadoTool;
             if (resTool.ok) {
-              const bloco =
-                tc.function.name === "instrumentos_da_dupla"
-                  ? uiDosInstrumentos(
-                      String((args as { dupla_id?: unknown } | null)?.dupla_id ?? ""),
-                      resTool.dados
-                    )
-                  : uiDaTool(tc.function.name, resTool.dados);
-              if (bloco) send({ type: "ui", b: bloco });
+              // escrita em prévia (REALIZA-126): o envelope vai pro card
+              // do usuário — a única via de approve — e o tool-result que
+              // o modelo recebe é o marcador sanitizado. O confirmacao_id
+              // NUNCA entra no histórico: com ele na mão, a tool se
+              // auto-aprovaria e o portão humano viraria decorativo.
+              const pend = (
+                resTool.dados as
+                  | { pendente_confirmacao?: Record<string, unknown> }
+                  | null
+                  | undefined
+              )?.pendente_confirmacao;
+              if (pend && typeof pend === "object") {
+                send({
+                  type: "ui",
+                  b: {
+                    kind: "confirmacao",
+                    confirmacao_id: pend.confirmacao_id,
+                    tool: pend.tool,
+                    args: pend.args ?? {},
+                    resumo: pend.resumo,
+                    expira_em_minutos: pend.expira_em_minutos,
+                    // correlaciona o evento da execução com o da prévia —
+                    // o endpoint repassa no dispatch
+                    request_id: requestId,
+                  },
+                });
+                res = {
+                  ok: true,
+                  dados: {
+                    status: "aguardando_confirmacao_humana",
+                    resumo: pend.resumo,
+                  },
+                };
+              } else {
+                // genUI direto: o card sai já — antes da próxima rodada
+                // do modelo, que ainda vai pensar e escrever por cima
+                const bloco =
+                  tc.function.name === "instrumentos_da_dupla"
+                    ? uiDosInstrumentos(
+                        String(
+                          (args as { dupla_id?: unknown } | null)?.dupla_id ?? ""
+                        ),
+                        resTool.dados
+                      )
+                    : uiDaTool(tc.function.name, resTool.dados);
+                if (bloco) send({ type: "ui", b: bloco });
+              }
             }
             if (tc.function.name === "guia_consulta") {
               // envelope ResultadoTool — os dados moram em .dados; só

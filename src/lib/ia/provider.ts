@@ -25,7 +25,7 @@
 import { z } from "zod";
 import type { AppRole } from "@/lib/types";
 import type { EsforcoIa } from "./config";
-import { IA_TOOLS } from "./tools";
+import { ESCRITAS_DOMINIO, IA_TOOLS } from "./tools";
 
 /** Mensagem no formato chat.completions — `tool_calls`/`tool_call_id` são
  *  o que o provider devolve/exige no loop de tools. */
@@ -91,14 +91,23 @@ export function providerConfigurado(): boolean {
 // mentores" de tools coord-only. Cache por conjunto de papéis.
 const toolsCache = new Map<string, unknown[]>();
 function toolsPayload(papeis: AppRole[] | undefined) {
-  const chave = papeis ? [...papeis].sort().join("|") : "*";
+  // as 5 escritas do domínio entram no chat quando IA_ESCRITAS≠0 — o card
+  // de confirmação é a via de approve delas; as demais (chamados, jovem_*)
+  // seguem não anunciadas aqui e entram por issues próprias. O env entra
+  // na chave: o conjunto muda com a flag sem restart em teste
+  const escritasChat = process.env.IA_ESCRITAS !== "0";
+  const chave = `${papeis ? [...papeis].sort().join("|") : "*"}|${escritasChat ? "1" : "0"}`;
   let cached = toolsCache.get(chave);
   if (!cached) {
     cached = Object.values(IA_TOOLS)
-      // tools de escrita nunca entram no payload do chat: são MCP-only —
-      // anunciar pro modelo interno só ensinaria a chamar o que o canal
-      // bloqueia (mesma lógica do filtro por papel)
-      .filter((t) => !(t as { escreve?: boolean }).escreve)
+      // escrita fora do lote do domínio nunca entra no payload do chat:
+      // anunciar o que o canal não aprovaria só ensinava o modelo a
+      // chamar (mesma lógica do filtro por papel — REALIZA-333)
+      .filter(
+        (t) =>
+          !(t as { escreve?: boolean }).escreve ||
+          (escritasChat && ESCRITAS_DOMINIO.has(t.nome))
+      )
       .filter((t) => !papeis || t.roles.some((r) => papeis.includes(r)))
       .map((t) => ({
         type: "function",
