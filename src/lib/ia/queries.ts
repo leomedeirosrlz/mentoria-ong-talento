@@ -649,6 +649,62 @@ export const getHistoricoEncontrosIa = cache(
   }
 );
 
+/** Um combinado (encaminhamento) com a dupla de contexto — a projeção é a
+ *  do select abaixo; `atrasado` não se lê aqui porque é derivado da data. */
+export type EncaminhamentoIa = {
+  id: string;
+  descricao: string;
+  responsavel: "mentor" | "mentorado";
+  prazo: string | null;
+  status: string;
+  numero: number | null;
+  feito_em: string | null;
+  created_at: string;
+  dupla: {
+    id: string;
+    trilha: string | null;
+    turma: string;
+    status: string;
+    mentor: { nome: string; nome_social: string | null } | null;
+    mentorado: { nome: string; nome_social: string | null } | null;
+  };
+};
+
+/** Combinados das duplas no escopo do papel (staff — a do jovem é
+ *  getJovemCombinadosIa via view). A policy encaminhamentos_select (0125)
+ *  faz o recorte: coord tudo, mentor a própria dupla, auxiliar as
+ *  supervisionadas — e o !inner na dupla garante que combinado de dupla
+ *  invisível não aparece nem órfão. Pendente com prazo vencido primeiro
+ *  (a ordenação padrão é "o que cobrar primeiro"); status='todos' traz os
+ *  feitos junto pra perguntas de histórico. */
+export async function getEncaminhamentosIa(
+  supabase: SupabaseClient,
+  op?: {
+    duplaId?: string;
+    status?: "pendente" | "feito" | "todos";
+    limite?: number;
+  }
+): Promise<EncaminhamentoIa[]> {
+  let q = supabase
+    .from("encaminhamentos")
+    .select(
+      `id, descricao, responsavel, prazo, status, numero, feito_em, created_at,
+       dupla:duplas!inner(
+         id, trilha, turma, status,
+         mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+         mentorado:mentorados(nome, nome_social)
+       )`
+    )
+    .order("prazo", { ascending: true, nullsFirst: false })
+    .order("created_at", { ascending: false })
+    .limit(op?.limite ?? 40);
+  if (op?.duplaId) q = q.eq("dupla_id", op.duplaId);
+  if (op?.status && op.status !== "todos") q = q.eq("status", op.status);
+  const { data, error } = await q;
+  if (error) throw error;
+  return (data ?? []) as unknown as EncaminhamentoIa[];
+}
+
 // ---------- instrumentos da dupla (RPC homônima, 0080) ----------
 
 /** Respostas dos 4 instrumentos oficiais da dupla — a RPC security definer

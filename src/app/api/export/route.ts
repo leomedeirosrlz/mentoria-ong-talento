@@ -13,23 +13,50 @@ import {
 import { normaliza } from "@/lib/utils";
 import { turmaDaDupla } from "@/lib/turma";
 import {
+  ATIVIDADES_ENCONTRO,
   AVALIACAO_LABEL,
+  celulasDe,
   COR_RACA_LABELS,
+  DIAS_SEMANA_CURTOS,
   GENERO_LABELS,
   papelLabel,
+  PERIODOS_LABELS,
   PREF_GENERO_LABELS,
   toDateStr,
   TRILHA_LABEL,
 } from "@/lib/ciclo";
 import type { DadosPessoais } from "@/lib/queries";
 import { temPapel } from "@/lib/types";
-import type { AppRole, Dupla, EncontroStatus, Mentorado, Profile } from "@/lib/types";
+import type {
+  AppRole,
+  CicloEvento,
+  Cronograma,
+  Disponibilidade,
+  Dupla,
+  EncontroStatus,
+  Mentorado,
+  MentorProfile,
+  PrefGeneroPar,
+  Presenca,
+  Profile,
+} from "@/lib/types";
 
-// GET /api/export — só pra coordenação. ?tipo=ciclo (default): relatório do
-// ciclo em CSV, uma linha por encontro — a prestação de contas. ?tipo=pessoas:
-// cadastro completo (equipe + mentorados) pra mala direta/backup.
+// GET /api/export — só pra coordenação. Catálogo (REALIZA-68):
+//   ciclo (default) — uma linha por encontro, a prestação de contas;
+//                     `encontros` é alias puro (mesmo CSV, mesmo nome);
+//   atividades      — uma linha por atividade registrada (catálogo + "outro");
+//   matching        — o universo do board de pareamento com em_dupla marcado;
+//   presencas       — uma linha por chamada marcada em evento de formação;
+//   pessoas         — cadastro completo (equipe + mentorados);
+//   assinaturas     — backup dos contratos;
+//   respostas       — respostas de um formulário (?id=<uuid>).
+// ?turma=/?cronograma= recortam ciclo/atividades/presencas; no matching o
+// ?turma= filtra por inscrição na fila da turma (turma_inscricoes).
 export async function GET(request: NextRequest) {
-  const tipo = request.nextUrl.searchParams.get("tipo");
+  let tipo = request.nextUrl.searchParams.get("tipo");
+  // alias de nomenclatura: a prestação de contas já sai uma linha por
+  // encontro — normaliza antes dos dois ramos pra resposta byte a byte igual
+  if (tipo === "encontros") tipo = "ciclo";
 
   // modo demo: sem sessão nem banco — os mesmos CSVs saem do dataset em
   // memória, com a mesma regra de papel (export é só da coordenação)
@@ -102,6 +129,25 @@ export async function GET(request: NextRequest) {
         d
       );
     }
+    if (tipo === "atividades") {
+      return csvResponse(
+        csvAtividades(
+          filtraCsvCiclo(
+            d.duplas,
+            request.nextUrl.searchParams,
+            d.cronogramas
+          ),
+          d.cronogramas
+        ),
+        nomeCsvAtividades()
+      );
+    }
+    if (tipo === "matching") {
+      return exportMatchingDemo(d, request.nextUrl.searchParams);
+    }
+    if (tipo === "presencas") {
+      return exportPresencasDemo(d, request.nextUrl.searchParams);
+    }
     const cronDemo = new Map(d.cronogramas.map((c) => [c.id, c.nome]));
     return csvResponse(
       csvCiclo(
@@ -155,6 +201,18 @@ export async function GET(request: NextRequest) {
 
   if (tipo === "respostas") {
     return exportRespostas(supabase, request.nextUrl.searchParams.get("id"));
+  }
+
+  if (tipo === "atividades") {
+    return exportAtividades(supabase, request.nextUrl.searchParams);
+  }
+
+  if (tipo === "matching") {
+    return exportMatching(supabase, request.nextUrl.searchParams);
+  }
+
+  if (tipo === "presencas") {
+    return exportPresencas(supabase, request.nextUrl.searchParams);
   }
 
   const { data, error } = await supabase
@@ -279,6 +337,236 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
     ),
     nomeCsvPessoas()
   );
+}
+
+// tipo=atividades — uma linha por atividade registrada. O "outro" livre já
+// mora dentro de registros.atividades[] (o form o empurra, actions.ts) —
+// não existe coluna atividade_outro; a origem se deduz pelo catálogo
+// (ATIVIDADES_ENCONTRO). ?turma=/?cronograma= filtram a dupla antes de
+// explodir, mesma régua do ciclo.
+async function exportAtividades(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  params: URLSearchParams
+) {
+  const [{ data, error }, { data: crons }] = await Promise.all([
+    supabase
+      .from("duplas")
+      .select(
+        `trilha, turma, cronograma_id,
+        mentor:profiles!duplas_mentor_id_fkey(nome),
+        mentorado:mentorados(nome),
+        encontros(numero, realizado_em, status,
+          registro:registros(atividades, avaliacao, created_at))`
+      ),
+    supabase.from("cronogramas").select("id, nome, turma"),
+  ]);
+  if (error) {
+    return NextResponse.json(
+      { error: "Não foi possível gerar o relatório. Tente de novo." },
+      { status: 500 }
+    );
+  }
+  const duplas = filtraCsvCiclo(
+    (data as unknown as Dupla[]) ?? [],
+    params,
+    crons ?? []
+  );
+  return csvResponse(csvAtividades(duplas, crons ?? []), nomeCsvAtividades());
+}
+
+// tipo=matching — o universo inteiro de pareamento (spec REALIZA-68):
+// mentores por papel EFETIVO (união role ∪ profile_papeis — a régua do
+// tipoPessoa/temPapel, não dá pra pedir no PostgREST) + mentorados ativos.
+// em_dupla marca quem já pareia; o recorte "livre" é do leitor da planilha.
+// Sensíveis (pref_genero_par/motivacao) e contato seguem o mesmo funil
+// coord-only do exportPessoas; form_bruto/dados_civis nunca entram.
+async function exportMatching(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  params: URLSearchParams
+) {
+  const [
+    { data: pessoas, error: eP },
+    { data: contatos, error: eC },
+    { data: mentorados, error: eM },
+    { data: mps, error: eMP },
+    { data: pessoalP, error: ePP },
+    { data: pessoalM, error: ePM },
+    { data: fila, error: eF },
+    { data: duplas, error: eD },
+  ] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("id,nome,role,ativo,cidade,uf,profile_papeis(papel)")
+      .eq("ativo", true),
+    supabase.from("profiles_contato").select("id,email,whatsapp"),
+    supabase
+      .from("mentorados")
+      .select("id,nome,email,whatsapp,cidade,uf,disponibilidade,situacao")
+      .eq("situacao", "ativo"),
+    supabase
+      .from("mentor_profiles")
+      .select("profile_id,capacidade,capacidade_especialista,experiencia_previa,formacao_externa,disponibilidade"),
+    supabase.from("profiles_pessoal").select("id,pref_genero_par,motivacao"),
+    supabase.from("mentorados_pessoal").select("id,pref_genero_par,motivacao"),
+    supabase
+      .from("turma_inscricoes")
+      .select("profile_id,mentorado_id,turma")
+      .eq("status", "aguardando"),
+    supabase.from("duplas").select("mentor_id,mentorado_id").eq("status", "ativa"),
+  ]);
+  if (eP || eC || eM || eMP || ePP || ePM || eF || eD) {
+    return NextResponse.json(
+      { error: "Não foi possível gerar o relatório. Tente de novo." },
+      { status: 500 }
+    );
+  }
+
+  return csvResponse(
+    csvMatching(
+      linhasMatching({
+        pessoas: (
+          (pessoas ?? []) as unknown as (PessoaMatching & {
+            profile_papeis?: { papel: AppRole }[];
+          })[]
+        ).map((p) => {
+          const { profile_papeis, ...rest } = p;
+          return {
+            ...rest,
+            papeis: (profile_papeis ?? []).map((r) => r.papel),
+          };
+        }),
+        contatos: new Map((contatos ?? []).map((c) => [c.id, c] as const)),
+        mentorados: (mentorados ?? []) as MentoradoMatching[],
+        mps: new Map((mps ?? []).map((m) => [m.profile_id, m] as const)),
+        pessoalP: new Map((pessoalP ?? []).map((p) => [p.id, p] as const)),
+        pessoalM: new Map((pessoalM ?? []).map((m) => [m.id, m] as const)),
+        filaPorPessoa: filaMatchingPorPessoa(
+          (fila ?? []) as TurmaInscricaoFila[]
+        ),
+        emDuplaP: new Set((duplas ?? []).map((d) => d.mentor_id)),
+        emDuplaM: new Set((duplas ?? []).map((d) => d.mentorado_id)),
+        turma: params.get("turma")?.trim() || undefined,
+      })
+    ),
+    nomeCsvMatching()
+  );
+}
+
+// tipo=presencas — a chamada dos eventos de formação (0040): uma linha por
+// (evento, profile marcado). Sem row em presencas = "não marcado", nunca
+// "faltou" — não se sintetiza ausência. ciclo_eventos não carrega turma:
+// ?turma= resolve pelo cronograma dono do evento (mesmo mapa do ciclo).
+async function exportPresencas(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  params: URLSearchParams
+) {
+  const [
+    { data: eventos, error: eE },
+    { data: crons, error: eC },
+    { data: pessoas, error: eP },
+    { data: mps, error: eMP },
+  ] = await Promise.all([
+    supabase
+      .from("ciclo_eventos")
+      .select(
+        "id,titulo,data,cronograma_id,presencas(profile_id,presente,marcado_em)"
+      )
+      .eq("tipo", "formacao")
+      .order("data"),
+    supabase.from("cronogramas").select("id,nome,turma"),
+    supabase.from("profiles").select("id,nome,role"),
+    supabase.from("mentor_profiles").select("profile_id,formacao_ok"),
+  ]);
+  if (eE || eC || eP || eMP) {
+    return NextResponse.json(
+      { error: "Não foi possível gerar o relatório. Tente de novo." },
+      { status: 500 }
+    );
+  }
+  const pessoasPorId = new Map(
+    (pessoas ?? []).map((p) => [p.id, p] as const)
+  );
+  const formacaoOk = new Map(
+    (mps ?? []).map((m) => [m.profile_id, m.formacao_ok] as const)
+  );
+  const linhas = linhasPresencas(
+    filtraEventosFormacao(
+      (eventos ?? []) as EventoChamada[],
+      params,
+      crons ?? []
+    ),
+    pessoasPorId,
+    formacaoOk,
+    crons ?? []
+  );
+  return csvResponse(csvPresencas(linhas), nomeCsvPresencas());
+}
+
+/** Versão demo do matching — mesmos merges da query real sobre o dataset:
+ *  contato já mora na linha do profile, os sensíveis passam pelo funil
+ *  coord-only de demoPessoalMap e a fila vem de turmaInscricoes. */
+function exportMatchingDemo(
+  d: ReturnType<typeof getDemoData>,
+  params: URLSearchParams
+) {
+  const papeisDemo = new Map<string, AppRole[]>();
+  for (const pp of d.profilePapeis) {
+    papeisDemo.set(pp.profile_id, [
+      ...(papeisDemo.get(pp.profile_id) ?? []),
+      pp.papel,
+    ]);
+  }
+  const ativas = d.duplas.filter((x) => x.status === "ativa");
+  return csvResponse(
+    csvMatching(
+      linhasMatching({
+        pessoas: d.profiles.map((p) => ({
+          ...p,
+          papeis: papeisDemo.get(p.id) ?? [],
+        })),
+        contatos: new Map(
+          d.profiles.map(
+            (p) => [p.id, { email: p.email, whatsapp: p.whatsapp }] as const
+          )
+        ),
+        mentorados: d.mentorados,
+        mps: new Map(d.mentorProfiles.map((m) => [m.profile_id, m] as const)),
+        pessoalP: demoPessoalMap("coordenacao", "profiles_pessoal"),
+        pessoalM: demoPessoalMap("coordenacao", "mentorados_pessoal"),
+        filaPorPessoa: filaMatchingPorPessoa(d.turmaInscricoes),
+        emDuplaP: new Set(ativas.map((x) => x.mentor.id)),
+        emDuplaM: new Set(ativas.map((x) => x.mentorado.id)),
+        turma: params.get("turma")?.trim() || undefined,
+      })
+    ),
+    nomeCsvMatching()
+  );
+}
+
+/** Versão demo da chamada — as presencas do dataset agrupam por evento e
+ *  o resto do merge (nomes, formacao_ok, turma via cronograma) é o mesmo. */
+function exportPresencasDemo(
+  d: ReturnType<typeof getDemoData>,
+  params: URLSearchParams
+) {
+  const porEvento = new Map<string, Presenca[]>();
+  for (const p of d.presencas) {
+    const l = porEvento.get(p.ciclo_evento_id) ?? [];
+    l.push(p);
+    porEvento.set(p.ciclo_evento_id, l);
+  }
+  const eventos: EventoChamada[] = d.cicloEventos
+    .filter((e) => e.tipo === "formacao")
+    .map((e) => ({ ...e, presencas: porEvento.get(e.id) ?? [] }));
+  const linhas = linhasPresencas(
+    filtraEventosFormacao(eventos, params, d.cronogramas),
+    new Map(
+      d.profiles.map((p) => [p.id, { nome: p.nome, role: p.role }] as const)
+    ),
+    new Map(d.mentorProfiles.map((m) => [m.profile_id, m.formacao_ok] as const)),
+    d.cronogramas
+  );
+  return csvResponse(csvPresencas(linhas), nomeCsvPresencas());
 }
 
 // tipo=assinaturas — backup dos contratos: quem assinou o quê, quando, com
@@ -540,6 +828,355 @@ function csvCiclo(duplas: Dupla[], cronogramas: Map<string, string>): string {
     [
       "dupla_mentor;dupla_mentorado;auxiliar_executivo;trilha;turma;cronograma;encontro_num;data_agendada;realizado_em;status;motivo_reagendamento;registro_em;registro_avaliacao;registro_atividades;precisa_apoio",
       ...linhas,
+    ].join("\r\n") +
+    "\r\n"
+  );
+}
+
+/** ?tipo=atividades — explode registros.atividades[]: uma linha por
+ *  atividade. `crons` resolve a turma viva (turmaDaDupla) e o nome do
+ *  cronograma nas duas primeiras colunas. */
+function csvAtividades(
+  duplas: Dupla[],
+  crons: readonly Pick<Cronograma, "id" | "nome" | "turma">[]
+): string {
+  const cronogramas = new Map(crons.map((c) => [c.id, c.nome] as const));
+  const catalogo = new Set<string>(ATIVIDADES_ENCONTRO);
+  const linhas = duplas
+    .sort((a, b) => a.mentor.nome.localeCompare(b.mentor.nome, "pt-BR"))
+    .flatMap((d) =>
+      [...(d.encontros ?? [])]
+        .sort((a, b) => a.numero - b.numero)
+        .flatMap((e) => {
+          const r = e.registro;
+          // encontro sem registro não gera linha — a planilha conta
+          // atividade feita, não encontro realizado
+          if (!r) return [];
+          const base = [
+            turmaDaDupla(d, crons) ?? "",
+            d.cronograma_id ? (cronogramas.get(d.cronograma_id) ?? "") : "",
+            TRILHA_LABEL[d.trilha] ?? d.trilha,
+            d.mentor.nome,
+            d.mentorado.nome,
+            String(e.numero),
+            dia(e.realizado_em),
+          ];
+          return (r.atividades ?? []).map((a) => [
+            ...base,
+            a,
+            catalogo.has(a) ? "catalogo" : "outro",
+            r.avaliacao ? (AVALIACAO_LABEL[r.avaliacao] ?? r.avaliacao) : "",
+          ]);
+        })
+    );
+
+  return (
+    "\uFEFF" +
+    [
+      "turma;cronograma;trilha;dupla_mentor;dupla_mentorado;encontro_num;realizado_em;atividade;origem;registro_avaliacao",
+      ...linhas.map((l) => l.map(celula).join(";")),
+    ].join("\r\n") +
+    "\r\n"
+  );
+}
+
+// ---------- matching ----------
+
+/** Subconjunto de turma_inscricoes que a fila do matching usa — o id da
+ *  pessoa é profile_id OU mentorado_id conforme o papel esperado. */
+type TurmaInscricaoFila = {
+  profile_id: string | null;
+  mentorado_id: string | null;
+  turma: string;
+};
+
+/** pessoa (profile_id ou mentorado_id) → turmas onde aguarda par. */
+function filaMatchingPorPessoa(
+  fila: TurmaInscricaoFila[]
+): Map<string, string[]> {
+  const porPessoa = new Map<string, string[]>();
+  for (const f of fila) {
+    const id = f.profile_id ?? f.mentorado_id;
+    if (!id) continue;
+    porPessoa.set(id, [...(porPessoa.get(id) ?? []), f.turma]);
+  }
+  return porPessoa;
+}
+
+type PessoaMatching = Pick<
+  Profile,
+  "id" | "nome" | "role" | "ativo" | "cidade" | "uf"
+> & { papeis: AppRole[] };
+
+type MentoradoMatching = Pick<
+  Mentorado,
+  "id" | "nome" | "email" | "whatsapp" | "cidade" | "uf" | "disponibilidade" | "situacao"
+>;
+
+type MpMatching = Pick<
+  MentorProfile,
+  "capacidade" | "capacidade_especialista" | "experiencia_previa" | "formacao_externa" | "disponibilidade"
+>;
+
+type SensMatching = {
+  pref_genero_par?: PrefGeneroPar | null;
+  motivacao?: string | null;
+};
+
+/** Linha pronta pro CSV de matching — real e demo convergem pra este shape. */
+type LinhaMatching = {
+  nome: string;
+  tipo_pessoa: string;
+  trilhas: string;
+  email: string;
+  whatsapp: string;
+  cidade_uf: string;
+  capacidade_dpp: string;
+  capacidade_esp: string;
+  experiencia_previa: string;
+  formacao_externa: string;
+  disponibilidade: string;
+  pref_genero_par: string;
+  motivacao: string;
+  em_dupla: string;
+  fila_turmas: string;
+};
+
+const cidadeUf = (cidade?: string | null, uf?: string | null): string =>
+  [cidade, uf].filter(Boolean).join("/");
+
+/** "seg noite | ter manhã" — uma célula por (dia, período) da grade
+ *  canônica; vazio/ausente → "". */
+const disponibilidadeCsv = (d: Disponibilidade | null | undefined): string =>
+  celulasDe(d)
+    .map(
+      (c) =>
+        `${(DIAS_SEMANA_CURTOS[c.dia] ?? c.dia).toLocaleLowerCase("pt-BR")} ${(PERIODOS_LABELS[c.periodo] ?? c.periodo).toLocaleLowerCase("pt-BR")}`
+    )
+    .join(" | ");
+
+const prefLabel = (p?: PrefGeneroPar | null): string =>
+  p ? (PREF_GENERO_LABELS[p] ?? p) : "";
+
+/** União das trilhas de mentoria que a pessoa atende (DPP e/ou
+ *  Especialista) — label de trilha, não de papel, pro híbrido ler
+ *  "DPP + Especialista" sem repetir o tipo_pessoa. */
+const trilhasMentoria = (p: PessoaMatching): string =>
+  [
+    temPapel(p, "mentor_dpp") ? TRILHA_LABEL.dpp : null,
+    temPapel(p, "mentor_especialista") ? TRILHA_LABEL.especialista : null,
+  ]
+    .filter(Boolean)
+    .join(" + ");
+
+/** Monta as linhas do matching a partir dos merges já resolvidos — o mesmo
+ *  coração pros dois ramos (query real × dataset demo). `turma` é o recorte
+ *  ?turma=: casa pela inscrição aguardando da pessoa naquela turma. */
+function linhasMatching(o: {
+  pessoas: PessoaMatching[];
+  contatos: Map<string, { email: string | null; whatsapp: string | null }>;
+  mentorados: MentoradoMatching[];
+  mps: Map<string, MpMatching>;
+  pessoalP: Map<string, SensMatching>;
+  pessoalM: Map<string, SensMatching>;
+  filaPorPessoa: Map<string, string[]>;
+  emDuplaP: Set<string>;
+  emDuplaM: Set<string>;
+  turma?: string;
+}): LinhaMatching[] {
+  const naFila = (id: string) =>
+    !o.turma || (o.filaPorPessoa.get(id) ?? []).includes(o.turma);
+  return [
+    ...o.pessoas
+      .filter(
+        (p) =>
+          p.ativo &&
+          (temPapel(p, "mentor_dpp") || temPapel(p, "mentor_especialista")) &&
+          naFila(p.id)
+      )
+      .map((p): LinhaMatching => {
+        const mp = o.mps.get(p.id);
+        const s = o.pessoalP.get(p.id);
+        return {
+          nome: p.nome,
+          tipo_pessoa: tipoPessoa(p),
+          trilhas: trilhasMentoria(p),
+          email: o.contatos.get(p.id)?.email ?? "",
+          whatsapp: o.contatos.get(p.id)?.whatsapp ?? "",
+          cidade_uf: cidadeUf(p.cidade, p.uf),
+          // as capacidades só existem quando há linha em mentor_profiles —
+          // quem nunca foi ficha de mentor exporta "" nos dois campos
+          capacidade_dpp: mp ? String(mp.capacidade ?? "") : "",
+          capacidade_esp: mp ? String(mp.capacidade_especialista ?? "") : "",
+          experiencia_previa: mp?.experiencia_previa ?? "",
+          formacao_externa: mp?.formacao_externa ?? "",
+          disponibilidade: disponibilidadeCsv(mp?.disponibilidade),
+          pref_genero_par: prefLabel(s?.pref_genero_par),
+          motivacao: s?.motivacao ?? "",
+          em_dupla: o.emDuplaP.has(p.id) ? "sim" : "não",
+          fila_turmas: (o.filaPorPessoa.get(p.id) ?? []).join(" | "),
+        };
+      }),
+    ...o.mentorados
+      .filter((m) => m.situacao === "ativo" && naFila(m.id))
+      .map((m): LinhaMatching => {
+        const s = o.pessoalM.get(m.id);
+        return {
+          nome: m.nome,
+          tipo_pessoa: "Mentorado",
+          trilhas: "",
+          email: m.email ?? "",
+          whatsapp: m.whatsapp ?? "",
+          cidade_uf: cidadeUf(m.cidade, m.uf),
+          capacidade_dpp: "",
+          capacidade_esp: "",
+          experiencia_previa: "",
+          formacao_externa: "",
+          disponibilidade: disponibilidadeCsv(m.disponibilidade),
+          pref_genero_par: prefLabel(s?.pref_genero_par),
+          motivacao: s?.motivacao ?? "",
+          em_dupla: o.emDuplaM.has(m.id) ? "sim" : "não",
+          fila_turmas: (o.filaPorPessoa.get(m.id) ?? []).join(" | "),
+        };
+      }),
+  ];
+}
+
+/** ?tipo=matching — uma linha por pessoa do universo de pareamento. */
+function csvMatching(linhas: LinhaMatching[]): string {
+  return (
+    "\uFEFF" +
+    [
+      "nome;tipo_pessoa;trilhas;email;whatsapp;cidade_uf;capacidade_dpp;capacidade_esp;experiencia_previa;formacao_externa;disponibilidade;pref_genero_par;motivacao;em_dupla;fila_turmas",
+      ...linhas
+        .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"))
+        .map((l) =>
+          [
+            l.nome,
+            l.tipo_pessoa,
+            l.trilhas,
+            l.email,
+            l.whatsapp,
+            l.cidade_uf,
+            l.capacidade_dpp,
+            l.capacidade_esp,
+            l.experiencia_previa,
+            l.formacao_externa,
+            l.disponibilidade,
+            l.pref_genero_par,
+            l.motivacao,
+            l.em_dupla,
+            l.fila_turmas,
+          ]
+            .map(celula)
+            .join(";")
+        ),
+    ].join("\r\n") +
+    "\r\n"
+  );
+}
+
+// ---------- presencas ----------
+
+/** Marca de chamada (subselect de presencas no evento — ou o dataset demo
+ *  agrupado por ciclo_evento_id). */
+type MarcaPresenca = Pick<Presenca, "profile_id" | "presente" | "marcado_em">;
+
+/** Evento de formação com as marcas embutidas — real e demo convergem. */
+type EventoChamada = Pick<
+  CicloEvento,
+  "id" | "titulo" | "data" | "cronograma_id"
+> & { presencas?: MarcaPresenca[] };
+
+/** Linha pronta pro CSV de presenças — grão (evento formacao × marcado). */
+type LinhaPresenca = {
+  evento: string;
+  /** "YYYY-MM-DD" — sai dd/mm/aaaa via dia() na montagem. */
+  data: string | null;
+  turma: string;
+  cronograma: string;
+  nome: string;
+  papel: string;
+  presente: boolean;
+  marcado_em: string | null;
+  /** null = não-mentor (sem linha em mentor_profiles) → célula vazia. */
+  formacao_ok: boolean | null;
+};
+
+/** ?turma=/?cronograma= da chamada — ciclo_eventos não tem coluna turma;
+ *  o recorte por turma resolve pelo cronograma dono do evento. */
+function filtraEventosFormacao<T extends { cronograma_id: string }>(
+  eventos: T[],
+  p: URLSearchParams,
+  crons: readonly Pick<Cronograma, "id" | "turma">[]
+): T[] {
+  const turma = p.get("turma")?.trim();
+  const cronograma = p.get("cronograma")?.trim();
+  if (!turma && !cronograma) return eventos;
+  return eventos.filter(
+    (e) =>
+      (!cronograma || e.cronograma_id === cronograma) &&
+      (!turma ||
+        crons.find((c) => c.id === e.cronograma_id)?.turma === turma)
+  );
+}
+
+/** Explode (evento × marca) nas linhas do CSV — sem marca, sem linha. */
+function linhasPresencas(
+  eventos: EventoChamada[],
+  pessoas: Map<string, { nome: string; role: string | null }>,
+  formacaoOk: Map<string, boolean>,
+  crons: readonly Pick<Cronograma, "id" | "nome" | "turma">[]
+): LinhaPresenca[] {
+  const cronPorId = new Map(crons.map((c) => [c.id, c] as const));
+  return eventos.flatMap((ev) => {
+    const cron = cronPorId.get(ev.cronograma_id);
+    return (ev.presencas ?? []).map(
+      (p): LinhaPresenca => ({
+        evento: ev.titulo,
+        data: ev.data,
+        turma: cron?.turma ?? "",
+        cronograma: cron?.nome ?? "",
+        nome: pessoas.get(p.profile_id)?.nome ?? "",
+        papel: papelLabel(pessoas.get(p.profile_id)?.role),
+        presente: p.presente,
+        marcado_em: p.marcado_em,
+        formacao_ok: formacaoOk.has(p.profile_id)
+          ? (formacaoOk.get(p.profile_id) ?? null)
+          : null,
+      })
+    );
+  });
+}
+
+/** ?tipo=presencas — uma linha por chamada marcada, ordenada por data. */
+function csvPresencas(linhas: LinhaPresenca[]): string {
+  return (
+    "\uFEFF" +
+    [
+      "evento;data;turma;cronograma;nome;papel;presente;marcado_em;formacao_ok",
+      ...linhas
+        .sort(
+          (a, b) =>
+            (a.data ?? "").localeCompare(b.data ?? "") ||
+            a.evento.localeCompare(b.evento, "pt-BR") ||
+            a.nome.localeCompare(b.nome, "pt-BR")
+        )
+        .map((l) =>
+          [
+            l.evento,
+            diaColuna(l.data),
+            l.turma,
+            l.cronograma,
+            l.nome,
+            l.papel,
+            l.presente ? "sim" : "não",
+            dataHora(l.marcado_em),
+            l.formacao_ok == null ? "" : l.formacao_ok ? "sim" : "não",
+          ]
+            .map(celula)
+            .join(";")
+        ),
     ].join("\r\n") +
     "\r\n"
   );
@@ -820,6 +1457,9 @@ function csvResponse(csv: string, filename: string) {
 // mês no nome do relatório do ciclo: exports de meses diferentes não se
 // sobrepõem na pasta de downloads
 const nomeCsvCiclo = () => `encontros-${toDateStr(new Date()).slice(0, 7)}.csv`;
+const nomeCsvAtividades = () => `atividades-${toDateStr(new Date())}.csv`;
+const nomeCsvMatching = () => `matching-${toDateStr(new Date())}.csv`;
+const nomeCsvPresencas = () => `presencas-${toDateStr(new Date())}.csv`;
 const nomeCsvPessoas = () => `pessoas-${toDateStr(new Date())}.csv`;
 const nomeCsvAssinaturas = () => `assinaturas-${toDateStr(new Date())}.csv`;
 
@@ -878,4 +1518,12 @@ function dia(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
   return isNaN(d.getTime()) ? "" : fmtData.format(d);
+}
+
+/** coluna `date` ("YYYY-MM-DD") -> "dd/mm/aaaa" — manipulação de string,
+ *  sem Date: `new Date("2025-09-03")` é midnight UTC e caía na véspera
+ *  no fuso de SP (ciclo_eventos.data é `date`, não timestamptz). */
+function diaColuna(iso: string | null | undefined): string {
+  const m = iso?.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
 }

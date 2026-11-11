@@ -9,7 +9,7 @@ import {
   RODA_RAIO,
   RODA_ROTULO_GAP,
 } from "@/lib/forms/instrumentos";
-import type { RodaDaVida } from "@/lib/forms/schema";
+import { mesmasAreas, type RodaDaVida } from "@/lib/forms/schema";
 import { cn } from "@/lib/utils";
 
 // Desenho da Roda da Vida — o mesmo SVG pra leitura (ficha da dupla, tela
@@ -40,6 +40,7 @@ const ROTULO_LH = 11.5;
 
 export function RodaSvg({
   roda,
+  anterior = null,
   ativo = null,
   onMudanca,
   onFim,
@@ -47,6 +48,11 @@ export function RodaSvg({
   className,
 }: {
   roda: RodaDaVida;
+  /** leitura anterior (inicial) desenhada em tracejado sob o polígono
+   *  atual — a comparação antes × depois (REALIZA-18). Guardada por
+   *  mesmasAreas: estrutura divergente desliga o ghost em vez de
+   *  desalinhar eixos. Só leitura — o preenchimento nunca a recebe. */
+  anterior?: RodaDaVida | null;
   /** índice do eixo em edição — ganha o destaque lime */
   ativo?: number | null;
   /** presente = roda interativa: o arraste converte ângulo→eixo, raio→nota */
@@ -61,6 +67,11 @@ export function RodaSvg({
   const areas = roda.quadrantes.flatMap((q) => q.areas);
   const total = areas.length;
   if (!total) return null;
+
+  const areasAnterior =
+    anterior && mesmasAreas(anterior, roda)
+      ? anterior.quadrantes.flatMap((q) => q.areas)
+      : null;
 
   const vb = rotuloEixos ? VB_ROTULADA : VB_COMPACTA;
   const dados = pontosPoligono(
@@ -104,7 +115,9 @@ export function RodaSvg({
           }
         : {
             role: "img",
-            "aria-label": `Roda da Vida: média ${roda.media?.toLocaleString("pt-BR") ?? "sem notas"} em ${total} áreas`,
+            "aria-label": areasAnterior
+              ? `Roda da Vida antes e depois: média ${roda.media?.toLocaleString("pt-BR") ?? "—"} agora, ${anterior!.media?.toLocaleString("pt-BR") ?? "—"} na leitura anterior`
+              : `Roda da Vida: média ${roda.media?.toLocaleString("pt-BR") ?? "sem notas"} em ${total} áreas`,
           })}
       onPointerDown={
         interativo
@@ -160,6 +173,20 @@ export function RodaSvg({
             />
           );
         })}
+        {areasAnterior && (
+          /* ghost da leitura anterior (REALIZA-18): tracejado cinza sob o
+             polígono atual — sem fill pra não competir com a área lima */
+          <polygon
+            points={pontosPoligono(
+              total,
+              areasAnterior.map((a) => (a.nota ?? 0) / 10)
+            )}
+            className="fill-none stroke-muted-foreground/70"
+            strokeWidth={1.6}
+            strokeDasharray="5 3"
+            strokeLinejoin="round"
+          />
+        )}
         <polygon
           points={dados}
           className="fill-[var(--brand-lime)]/25 stroke-[var(--ok-text)] transition-all duration-150"

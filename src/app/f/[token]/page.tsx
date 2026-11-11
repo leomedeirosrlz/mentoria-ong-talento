@@ -194,6 +194,7 @@ export default async function FormularioTokenPage({
                 campos={info.formulario.campos}
                 destinatario={info.destinatario}
                 sistema={info.formulario.sistema}
+                contextoAvaliacao={info.contexto_avaliacao}
               />
             </>
           )}

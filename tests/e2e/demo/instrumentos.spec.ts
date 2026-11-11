@@ -32,9 +32,9 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await expect(sec.getByText("Definindo Minhas Metas")).toBeVisible();
     await expect(sec.getByText("Roda da Vida")).toBeVisible();
 
-    // quatro respondidos — a roda inicial da Ana entrou na WP7 (fixture
-    // "jornada completa"), fechando visão/metas/PDM/roda
-    await expect(sec.getByText("respondido", { exact: true })).toHaveCount(4);
+    // cinco respondidos — a roda inicial da Ana entrou na WP7 (fixture
+    // "jornada completa"), fechando visão/metas/PDM/roda/checklist 0190
+    await expect(sec.getByText("respondido", { exact: true })).toHaveCount(5);
     await expect(
       sec.getByRole("button", { name: "Ver resultado" }).first()
     ).toBeVisible();

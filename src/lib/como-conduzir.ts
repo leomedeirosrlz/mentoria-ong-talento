@@ -45,6 +45,7 @@
 
 import {
   INSTRUMENTOS_SISTEMA,
+  type InstrumentoDuplaSistema,
   type InstrumentoSistema,
 } from "./forms/schema";
 import { ESTACOES, SISTEMA_DA_ESTACAO, type EstacaoChave } from "./jornada";
@@ -82,7 +83,7 @@ export type CronogramaEncontros = readonly {
  *  de jornada) + a condução em uma frase + a cobertura pra coordenação.
  *  `chip`/`conduzir` são verbatim do GUIA_ENCONTRO original da ficha —
  *  o spec demo da ficha casa texto solto nesses campos, não reescrever. */
-export const GUIA_ENCONTRO: Record<InstrumentoSistema, GuiaInstrumento> = {
+export const GUIA_ENCONTRO: Record<InstrumentoDuplaSistema, GuiaInstrumento> = {
   visao: {
     chip: "Enc. 1–4",
     conduzir:
@@ -110,6 +111,13 @@ export const GUIA_ENCONTRO: Record<InstrumentoSistema, GuiaInstrumento> = {
       "Duas aplicações: a leitura inicial no enc. 1 — o ponto de partida — e a aplicação formal nos enc. 12–14, que se compara com a primeira. O jovem dá nota de 1 a 10 nas 16 áreas; o desenho vira a roda e orienta as metas das áreas prioritárias.",
     cobre:
       "Duas aplicações: leitura inicial no encontro 1 (o ponto de partida) e aplicação formal nos encontros 12–14, comparada com a primeira — as 16 áreas orientam as metas do plano de continuidade.",
+  },
+  competencias_mentor: {
+    chip: "Início · fechamento",
+    conduzir:
+      "Autoavaliação do mentor em duas marcações: no início do ciclo, marcando onde já se sente seguro e o que quer desenvolver; e no fechamento, revisitando a mesma lista — o antes × depois aparece na retrospectiva da jornada.",
+    cobre:
+      "Checklist das 10 competências do guia respondido pelo mentor: marcação de início ao formar a dupla e revisitação no fechamento — a comparação alimenta a retrospectiva.",
   },
 };
 

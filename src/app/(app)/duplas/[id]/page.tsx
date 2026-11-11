@@ -51,6 +51,8 @@ import { getFormularios, getInstrumentosDaDupla } from "@/lib/forms/queries";
 import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
 import { getPdmDaDupla, getPdmResumo } from "@/lib/queries-pdm";
 import { dadosResumoJornada, encerramentoDecidido } from "@/lib/encerramento";
+import { dadosRetrospectiva } from "@/lib/retrospectiva";
+import { resumoAvaliacaoJovem } from "@/lib/avaliacao-agregado";
 import { getAnexosPorRegistros } from "@/lib/anexos";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -103,6 +105,7 @@ import { TrilhaPrazoBadge } from "@/components/trilha-prazo-badge";
 import { TrilhaFechamento } from "@/components/trilha-fechamento";
 import { EncerramentoDupla } from "@/components/encerramento-dupla";
 import { ResumoJornadaSection } from "@/components/resumo-jornada";
+import { RetrospectivaJornada } from "@/components/retrospectiva-jornada";
 import { DesfechoDuplaCard } from "@/components/desfecho-dupla";
 import {
   SolicitacaoNegociacao,
@@ -495,6 +498,36 @@ export default async function DuplaPage({
     (souMentor || souCoord) &&
     (dupla.status === "ativa" || dupla.status === "pausada") &&
     !dupla.encerrada_em;
+  // young-person series cut per viewer (REALIZA-71): staff/own-jovem get
+  // the RLS-visible rows aggregated; the DPP mentor only the quantized
+  // media — the embed under his policy carries just the released rows,
+  // so aggregating it would leak a wrong subset mean
+  const avaliacaoJovemResumo = souMentor
+    ? mediaJovem && mediaJovem.n > 0
+      ? {
+          // base = how many evals the released media actually covers —
+          // "média de N" must not claim the total when only k entered
+          n: mediaJovem.liberado
+            ? (mediaJovem.base ?? mediaJovem.n)
+            : mediaJovem.n,
+          media: mediaJovem.liberado ? (mediaJovem.media ?? null) : null,
+          trajetoria: null,
+          temasTop: [],
+        }
+      : null
+    : resumoAvaliacaoJovem(
+        dupla.encontros.flatMap((e) =>
+          e.avaliacao_jovem
+            ? [
+                {
+                  numero: e.numero,
+                  estrelas: e.avaliacao_jovem.estrelas,
+                  temas: e.avaliacao_jovem.temas,
+                },
+              ]
+            : []
+        )
+      );
   // resumo da jornada — gerado dos dados; o "fim" é o carimbo do fechamento
   // (decisão DPP ou encerrada_em da trilha especialista)
   const resumoJornada = dadosResumoJornada(
@@ -503,7 +536,8 @@ export default async function DuplaPage({
     eventosDaDupla,
     encerramento?.created_at ?? dupla.encerrada_em ?? null,
     new Date(),
-    pdmResumo
+    pdmResumo,
+    avaliacaoJovemResumo
   );
   // bloco só vale a pena com história — dupla zerada mostra a trilha, não um
   // relatório vazio
@@ -511,6 +545,20 @@ export default async function DuplaPage({
     resumoJornada.realizados > 0 ||
     encerramentoDecidido(encerramento) ||
     !!dupla.encerrada_em;
+
+  // REALIZA-359 — a retrospectiva derivada: destrava no 16º encontro
+  // realizado ou no fechamento da dupla. A ficha é superfície
+  // mentor/staff, então o recorte carrega as notas internas do registro
+  // e o checklist do mentor (a jovem recebe outro payload, pela RPC).
+  const retro = dadosRetrospectiva({
+    dupla,
+    passos,
+    eventos: eventosDaDupla,
+    fim: encerramento?.created_at ?? dupla.encerrada_em ?? null,
+    pdm: pdmResumo,
+    instrumentos,
+    comNotasInternas: true,
+  });
 
   // concluída pelo automático (0102) com o rito ainda pendente — o mentor
   // segue podendo mexer no registro do último encontro e nos anexos dele
@@ -1093,11 +1141,15 @@ export default async function DuplaPage({
                 souCoord={souCoord}
                 formularios={formulariosAtivos}
                 avaliacao360Em={avaliacao360Em}
+                avaliacaoJovem={avaliacaoJovemResumo}
                 realizadosCount={realizadosCount}
               />
             )}
             {mostrarResumo && (
               <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+            )}
+            {retro?.desbloqueada && (
+              <RetrospectivaJornada dados={retro} mostrarChecklist />
             )}
             {souCoord && desfechoEntregas.length > 0 && (
               <DesfechoDuplaCard entregas={desfechoEntregas} />
@@ -1207,11 +1259,19 @@ export default async function DuplaPage({
             souCoord={souCoord}
             formularios={formulariosAtivos}
             avaliacao360Em={avaliacao360Em}
+            avaliacaoJovem={avaliacaoJovemResumo}
             realizadosCount={realizadosCount}
           />
         )}
-        {!fechamentoEmFoco && mostrarResumo && (
-          <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+        {!fechamentoEmFoco && (
+          <>
+            {mostrarResumo && (
+              <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
+            )}
+            {retro?.desbloqueada && (
+              <RetrospectivaJornada dados={retro} mostrarChecklist />
+            )}
+          </>
         )}
         {souCoord && desfechoEntregas.length > 0 && (
           <DesfechoDuplaCard entregas={desfechoEntregas} />
@@ -1230,6 +1290,8 @@ export default async function DuplaPage({
           itens={instrumentos}
           mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
           mentoradoWhatsapp={dupla.mentorado.whatsapp}
+          mentorNome={dupla.mentor.nome_social ?? dupla.mentor.nome}
+          mentorWhatsapp={dupla.mentor.whatsapp}
           podeEnviar={souCoord || souMentor}
           jornadaViva={
             dupla.status === "ativa" || dupla.status === "pausada"

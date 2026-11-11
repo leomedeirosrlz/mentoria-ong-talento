@@ -14,9 +14,11 @@ import {
   textoResumoJornada,
 } from "./encerramento";
 import { getPdmResumo } from "./queries-pdm";
+import { resumoAvaliacaoJovem } from "./avaliacao-agregado";
 import { snapshotDuplaHoje } from "./jobs";
 import { erroAmigavel as erroAmigavelBase } from "./utils";
 import type {
+  AvaliacaoEncontro,
   CicloEvento,
   EncerramentoChecklist,
   Encontro,
@@ -72,7 +74,8 @@ export async function registrarEncerramento(
          mentor:profiles!duplas_mentor_id_fkey(nome),
          mentorado:mentorados!duplas_mentorado_id_fkey(nome, profile_id),
          encontros(numero, status, data_hora, realizado_em,
-                  registro:registros(tema, avaliacao)),
+                  registro:registros(tema, avaliacao),
+                  avaliacao_jovem:avaliacoes_encontro(estrelas, temas)),
          encaminhamentos(status)`
       )
       .eq("id", duplaId)
@@ -149,6 +152,9 @@ export async function registrarEncerramento(
     encontros: (duplaRow.encontros ?? []).map((e) => ({
       ...e,
       registro: norm(e.registro as Registro | Registro[] | null),
+      avaliacao_jovem: norm(
+        e.avaliacao_jovem as AvaliacaoEncontro | AvaliacaoEncontro[] | null
+      ),
     })) as Encontro[],
     encaminhamentos: duplaRow.encaminhamentos ?? [],
   };
@@ -162,8 +168,23 @@ export async function registrarEncerramento(
   // o PDM vivo entra no snapshot: as metas atingidas com datas já são a
   // retro que o checklist "PDM revisado" pede (o item em si segue manual)
   const pdmResumo = await getPdmResumo(duplaId).catch(() => null);
+  // the young-person series joins the snapshot too (REALIZA-71) — this
+  // runs as coordenacao, so the embed carries the full series
+  const avaliacaoJovem = resumoAvaliacaoJovem(
+    duplaParaResumo.encontros.flatMap((e) =>
+      e.avaliacao_jovem
+        ? [
+            {
+              numero: e.numero,
+              estrelas: e.avaliacao_jovem.estrelas,
+              temas: e.avaliacao_jovem.temas,
+            },
+          ]
+        : []
+    )
+  );
   const resumoJornada = textoResumoJornada(
-    dadosResumoJornada(duplaParaResumo, passos, evsDaDupla, agora.toISOString(), agora, pdmResumo)
+    dadosResumoJornada(duplaParaResumo, passos, evsDaDupla, agora.toISOString(), agora, pdmResumo, avaliacaoJovem)
   );
 
   const { error: errEnc } = await supabase.from("encerramentos").upsert(

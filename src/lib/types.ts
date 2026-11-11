@@ -565,13 +565,18 @@ export type Dupla = {
   notas?: EncontroNota[];
 };
 
-/** Versão enxuta de Dupla — só os ids de vínculo, sem a árvore de encontros. */
+/** Versão enxuta de Dupla — só os ids de vínculo + turma (a filiação da
+ *  pessoa à turma deriva daqui, REALIZA-39), sem a árvore de encontros. */
 export type DuplaResumo = {
   id: string;
   mentor_id: string;
   mentorado_id: string;
   supervisor_id: string | null;
   trilha: Trilha;
+  /** selo gravado no pareamento — o rótulo vivo resolve por
+   *  turmaDaDupla(cronograma_id, cronogramas) (REALIZA-223) */
+  turma: string | null;
+  cronograma_id: string | null;
 };
 
 export type Material = {

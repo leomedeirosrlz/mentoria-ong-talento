@@ -6,7 +6,7 @@ import { DEMO_MSG } from "./demo/shared";
 import { gerarLinksFormulario, type DestinoLink } from "./forms/actions";
 import { getInstrumentosDaDupla } from "./forms/queries";
 import {
-  INSTRUMENTOS_SISTEMA,
+  INSTRUMENTOS_DUPLA_SISTEMA,
   type FormularioCampo,
   type FormularioSistema,
   type InstrumentoSistema,
@@ -87,7 +87,7 @@ export async function gerarLinksParaDupla(input: {
   if (eForm) return { error: erroAmigavel(eForm) };
   if (!form) return { error: "Formulário não encontrado." };
   if (
-    (INSTRUMENTOS_SISTEMA as readonly string[]).includes(
+    (INSTRUMENTOS_DUPLA_SISTEMA as readonly string[]).includes(
       (form.sistema as FormularioSistema | null) ?? ""
     )
   )
@@ -241,19 +241,28 @@ export async function detalheInstrumentoDaDupla(
  *  é dele. */
 export async function enviarInstrumentoMentorado(
   duplaId: string,
-  sistema: string
+  sistema: string,
+  momento?: string
 ): Promise<
   { error: string } | { ok: true; token: string; reutilizado: boolean }
 > {
   if (await demoAtivo()) return { error: DEMO_MSG };
   if (!UUID_RE.test(duplaId)) return { error: "Dupla inválida." };
-  if (!(INSTRUMENTOS_SISTEMA as readonly string[]).includes(sistema))
+  if (!(INSTRUMENTOS_DUPLA_SISTEMA as readonly string[]).includes(sistema))
     return { error: "Instrumento inválido." };
+  // vocabulário por sistema — a RPC também filtra; aqui falha rápido
+  const MOMENTOS: Record<string, readonly string[]> = {
+    roda_vida: ["inicial", "formal"],
+    competencias_mentor: ["inicio", "final"],
+  };
+  if (momento != null && !(MOMENTOS[sistema] ?? []).includes(momento))
+    return { error: "Momento inválido." };
 
   const supabase = await createClient();
   const { data, error } = await supabase.rpc("emitir_link_instrumento", {
     p_dupla_id: duplaId,
     p_sistema: sistema,
+    p_momento: momento ?? null,
   });
   if (error) return { error: erroAmigavel(error) };
   const token = (data as { token?: string } | null)?.token;

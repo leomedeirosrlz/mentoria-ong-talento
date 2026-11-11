@@ -90,7 +90,7 @@ export type EntregaJornada = {
 };
 
 export type InstrumentoJornada = {
-  sistema: "visao" | "metas" | "pdm" | "roda_vida";
+  sistema: "visao" | "metas" | "pdm" | "roda_vida" | "competencias_mentor";
   formulario_id: string;
   titulo: string;
   descricao: string | null;
@@ -120,6 +120,18 @@ export type JovemJornadaDados = {
   cronograma: EventoJornada[];
   instrumentos: InstrumentoJornada[];
   avaliacao_360: Entrega360[];
+  /** Linha do tempo da retrospectiva (0190): encontros realizados com o
+   *  tema do registro — o recorte que o mentorado pode ver (sem notas
+   *  internas: observações, pedido de apoio e avaliação do mentor ficam
+   *  fora do payload definer). */
+  retrospectiva?: {
+    desbloqueada: boolean;
+    encontros: {
+      numero: number;
+      data: string | null;
+      tema: string | null;
+    }[];
+  } | null;
 };
 
 /** Encontro mínimo pra estação "avaliação do encontro" — mesmo shape de
@@ -328,6 +340,96 @@ export function entregasDoMomento<
       e.contexto?.["momento"] !== "formal"
   );
   return ord.filter((e, i) => momentoRoda(e, i === idxSemMarca) === momento);
+}
+
+/** A entrega corrente de um momento — a mais recente respondida (a
+ *  re-emissão substitui a anterior na leitura; pendente não tem payload). */
+function ultimaRespondidaDoMomento<
+  T extends {
+    contexto?: Record<string, unknown> | null;
+    created_at?: string;
+    respondido_em?: string | null;
+    respostas?: unknown;
+  },
+>(entregas: T[], momento: "inicial" | "formal" | "inicio" | "final"): T | null {
+  const respondidas = (
+    momento === "inicial" || momento === "formal"
+      ? entregasDoMomento(entregas, momento)
+      : entregasDoMomentoChecklist(entregas, momento)
+  ).filter((e) => e.respostas != null);
+  return (
+    [...respondidas].sort((a, b) =>
+      (b.respondido_em ?? b.created_at ?? "").localeCompare(
+        a.respondido_em ?? a.created_at ?? ""
+      )
+    )[0] ?? null
+  );
+}
+
+/** O par inicial × formal da roda da dupla (REALIZA-18) — cada ponta é a
+ *  aplicação respondida mais recente do seu momento. Null quando o
+ *  momento ainda não tem resposta. */
+export function parRoda<
+  T extends {
+    contexto?: Record<string, unknown> | null;
+    created_at?: string;
+    respondido_em?: string | null;
+    respostas?: unknown;
+  },
+>(entregas: T[]): { inicial: T | null; formal: T | null } {
+  return {
+    inicial: ultimaRespondidaDoMomento(entregas, "inicial"),
+    formal: ultimaRespondidaDoMomento(entregas, "formal"),
+  };
+}
+
+// ---------- checklist de competências do mentor (0190) ----------
+
+/** Separa as duas marcações do checklist de competências: `inicio`
+ *  (formação da dupla) × `final` (revisitação do fechamento). Mesma régua
+ *  da roda: marca explícita do contexto vence; sem marca, a primeira
+ *  entrega é a do início. */
+export function momentoChecklist(
+  e: { contexto?: Record<string, unknown> | null },
+  primeiraSemMarca: boolean
+): "inicio" | "final" {
+  const m = e.contexto?.["momento"];
+  if (m === "inicio" || m === "final") return m;
+  return primeiraSemMarca ? "inicio" : "final";
+}
+
+/** Filtra as entregas do checklist de um momento — mesmo desenho de
+ *  entregasDoMomento, vocabulário início × fim. */
+export function entregasDoMomentoChecklist<
+  T extends { contexto?: Record<string, unknown> | null; created_at?: string },
+>(entregas: T[], momento: "inicio" | "final"): T[] {
+  const ord = [...entregas].sort((a, b) =>
+    (a.created_at ?? "").localeCompare(b.created_at ?? "")
+  );
+  const idxSemMarca = ord.findIndex(
+    (e) =>
+      e.contexto?.["momento"] !== "inicio" &&
+      e.contexto?.["momento"] !== "final"
+  );
+  return ord.filter(
+    (e, i) => momentoChecklist(e, i === idxSemMarca) === momento
+  );
+}
+
+/** O par início × fim do checklist — a marcação respondida mais recente
+ *  de cada momento. */
+export function parChecklist<
+  T extends {
+    contexto?: Record<string, unknown> | null;
+    created_at?: string;
+    respondido_em?: string | null;
+    respostas?: unknown;
+  },
+>(entregas: T[]): { inicio: T | null; final: T | null } {
+  return {
+    inicio: ultimaRespondidaDoMomento(entregas, "inicio"),
+    final: ultimaRespondidaDoMomento(entregas, "final"),
+  };
 }
 
 /** Conta os itens de um campo submetas_N: enumerações "1. … 2. …" (mesmo

@@ -7,14 +7,14 @@ import {
   demoInstrumentosDaDupla,
   getDemoFormularios,
 } from "../demo/forms-data";
-import type { AppRole } from "../types";
+import type { AppRole, AvaliacaoJovem, AvanceiAvaliacao } from "../types";
 import type {
   Formulario,
   FormularioCampo,
   FormularioLink,
   FormularioResposta,
   FormularioSistema,
-  InstrumentoSistema,
+  InstrumentoDuplaSistema,
   RespostaValor,
 } from "./schema";
 
@@ -79,6 +79,25 @@ export type FormularioDetalhe = {
   anexos: FormularioAnexo[];
 };
 
+/** Contexto de trajetória no 360º (0191 · REALIZA-71): derivado na
+ *  leitura da dupla do link — só sai nos sistemas avaliacao_final_*.
+ *  Mentor: a própria série 1–4 de registros + a média do jovem quantizada
+ *  (null quando a régua de lote ≥3 da 0071 não libera). Mentorado: as
+ *  próprias estrelas. Read-only — não é campo de resposta; 'outra_pessoa'
+ *  sai da RPC antes, sem contexto. */
+export type ContextoAvaliacao =
+  | {
+      registros: { numero: number; avaliacao: AvaliacaoJovem | null }[];
+      media_jovem: number | null;
+    }
+  | {
+      estrelas: {
+        numero: number;
+        estrelas: number;
+        avancei: AvanceiAvaliacao | null;
+      }[];
+    };
+
 /** Payload público do /f/<token> — o que formulario_por_token devolve. */
 export type FormularioPublico = {
   /** 0070 — 'outra_pessoa' quando uma sessão autenticada abre o link de
@@ -96,6 +115,9 @@ export type FormularioPublico = {
     /** 0042 — selo do instrumento oficial na página pública */
     sistema?: FormularioSistema | null;
   };
+  /** 0191 — trajetória da dupla do link nos 360º; ausente nos demais
+   *  sistemas e no corte 'outra_pessoa'. */
+  contexto_avaliacao?: ContextoAvaliacao | null;
 };
 
 // embed to-one pode vir array no client não-tipado — mesma norm() de queries.ts
@@ -314,7 +336,7 @@ export type InstrumentoEntrega = {
 
 /** Um instrumento oficial no contexto da dupla — definição + entregas. */
 export type InstrumentoDupla = {
-  sistema: InstrumentoSistema;
+  sistema: InstrumentoDuplaSistema;
   formulario_id: string;
   titulo: string;
   descricao: string | null;
