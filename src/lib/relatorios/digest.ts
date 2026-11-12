@@ -244,7 +244,9 @@ export async function montarDigestSemanal(
     preheader: `${riscos.length} em risco · ${nPendentes} pendência(s)`,
     conteudoHtml,
     ctaLabel: "Abrir relatórios",
-    ctaHref: `${SITE_URL}/relatorios`,
+    // o panorama do digest mora na subpágina operacional desde a 375 —
+    // /relatorios abre direto na grade livre
+    ctaHref: `${SITE_URL}/relatorios/operacionais`,
   });
 
   return {

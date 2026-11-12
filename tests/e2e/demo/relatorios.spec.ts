@@ -34,20 +34,20 @@ test.describe("demo — /api/export paridade", () => {
 test.describe("demo — hub /relatorios", () => {
   test("abas renderizam com prévias do dataset", async ({ page }) => {
     await entrarNaDemo(page, "coordenacao");
-    await page.goto("/relatorios?aba=interacoes");
+    await page.goto("/relatorios/operacionais?aba=interacoes");
     await expect(
       page.getByRole("heading", { name: "Interações" })
     ).toBeVisible();
     const csv = page.getByRole("link", { name: "Baixar CSV completo" });
     expect(await csv.getAttribute("href")).toContain("tipo=interacoes");
     // a aba Saúde mostra o estado de acumulação (demo não tem snapshots)
-    await page.goto("/relatorios?aba=visao");
+    await page.goto("/relatorios/operacionais?aba=visao");
     await expect(page.getByText("Acumulando histórico")).toBeVisible();
   });
 
   test("digest: disparo manual volta com DEMO_MSG", async ({ page }) => {
     await entrarNaDemo(page, "coordenacao");
-    await page.goto("/relatorios?aba=visao");
+    await page.goto("/relatorios/operacionais?aba=visao");
     const botao = page.getByRole("button", { name: /Enviar digest agora/ });
     // click antes da hidratação cai no vazio — tenta de novo até o feedback
     // da action aparecer (o disparo é idempotente: sempre DEMO_MSG na demo)

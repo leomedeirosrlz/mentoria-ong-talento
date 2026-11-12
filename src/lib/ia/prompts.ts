@@ -25,7 +25,7 @@ export function systemPromptIa(papeis: AppRole[], pagina?: string): string {
   const soJovem = papeis.length > 0 && papeis.every((p) => p === "mentorado");
   const listaRotas = soJovem
     ? "/jovem (sua página), /jovem/agenda, /jovem/materiais, /jovem/perfil e /jovem/ajuda. Ex.: [sua agenda](/jovem/agenda). Não invente rotas fora dessa lista"
-    : "/duplas (lista), /duplas/<id> (ficha), /agenda, /registros, /materiais, /pessoas/<id>, /chamados, /relatorios. Ex.: [Ver a ficha da dupla](/duplas/abc-123). Não invente rotas fora dessa lista";
+    : "/duplas (lista), /duplas/<id> (ficha), /agenda, /registros, /materiais, /pessoas/<id>, /chamados, /relatorios, /relatorios/operacionais. Ex.: [Ver a ficha da dupla](/duplas/abc-123). Não invente rotas fora dessa lista";
   const vozJovem = soJovem
     ? `
 
