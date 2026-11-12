@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { audienciasDe } from "@/lib/materiais";
+import { audienciasDe, hrefMaterial } from "@/lib/materiais";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
@@ -776,11 +776,7 @@ export default async function DuplaPage({
   const materialAtual = passoAtual
     ? (materiaisPorNumero.get(passoAtual.numero) ?? []).find((m) => m.path || m.url) ?? null
     : null;
-  const materialAtualHref = materialAtual
-    ? materialAtual.path
-      ? `/api/material/${materialAtual.id}`
-      : linkSeguro(materialAtual.url)
-    : null;
+  const materialAtualHref = materialAtual ? hrefMaterial(materialAtual) : null;
   const notaAtual = passoAtual
     ? (dupla.notas?.find((n) => n.numero === passoAtual.numero)?.texto ?? null)
     : null;

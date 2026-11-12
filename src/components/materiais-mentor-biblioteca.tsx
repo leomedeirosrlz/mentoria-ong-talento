@@ -8,6 +8,7 @@ import {
   PuzzlePiece,
 } from "@phosphor-icons/react/dist/ssr";
 import { formatDiaMes, formatDiaSemana, linkSeguro } from "@/lib/ciclo";
+import { hrefMaterial } from "@/lib/materiais";
 import { guiaDoEncontro } from "@/lib/como-conduzir";
 import type { Material } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -75,11 +76,7 @@ function LinhaMaterial({ m }: { m: Material }) {
   // (página do app); sem os três, "em breve"
   const urlOk = linkSeguro(m.url);
   const ehDoc = m.path?.startsWith("doc:") ?? false;
-  const href = ehDoc
-    ? `/materiais/documento/${m.path!.slice(4)}`
-    : m.path
-      ? `/api/material/${m.id}`
-      : urlOk;
+  const href = hrefMaterial(m);
   const conteudo = (
     <>
       <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
