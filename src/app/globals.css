@@ -820,6 +820,41 @@
     border: none;
     box-shadow: none;
   }
+  /* resumo compacto (378): o relatório completo dorme num Collapsible na
+     tela; no papel o painel sai aberto — o relatório nunca imprime vazio.
+     `hidden="until-found"` esconde via content-visibility, não display —
+     sem a declaração abaixo o painel imprimiria como caixa vazia */
+  .resumo-jornada [hidden] {
+    display: block !important;
+    content-visibility: visible !important;
+    height: auto;
+  }
+  /* idem nas seções recolhidas da retrospectiva — na ficha staff ela já
+     sai invisível pelo isolamento acima; na página da jovem é ela quem
+     imprime, então o conteúdo atrás dos disclosures também abre */
+  section[aria-label="Retrospectiva da jornada"] [hidden] {
+    display: block !important;
+    content-visibility: visible !important;
+    height: auto;
+  }
+  /* isolamento simétrico pra superfície que NÃO tem resumo (a página da
+     jovem): só a retrospectiva sai no papel. O :not(:has(.resumo-jornada))
+     é o que impede a regra de re-exibi-la na ficha staff, onde o resumo
+     é o relatório canônico */
+  body:not(:has(.resumo-jornada)):has(section[aria-label="Retrospectiva da jornada"]) * {
+    visibility: hidden;
+  }
+  body:not(:has(.resumo-jornada)) section[aria-label="Retrospectiva da jornada"],
+  body:not(:has(.resumo-jornada)) section[aria-label="Retrospectiva da jornada"] * {
+    visibility: visible;
+  }
+  body:not(:has(.resumo-jornada)) section[aria-label="Retrospectiva da jornada"] {
+    position: absolute;
+    inset: 0 auto auto 0;
+    width: 100%;
+    border: none;
+    box-shadow: none;
+  }
 }
 
 /* ==== instrumentos interativos ==== */
