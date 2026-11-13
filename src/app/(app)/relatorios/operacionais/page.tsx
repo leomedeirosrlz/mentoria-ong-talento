@@ -66,8 +66,18 @@ export default async function RelatoriosOperacionaisPage({
 
   const sp = await searchParams;
   const abaParam = typeof sp.aba === "string" ? sp.aba : undefined;
-  // ?aba=grade aqui é sobra de link editado — a grade mora um nível acima
-  if (abaParam === "grade") redirect("/relatorios");
+  // ?aba=grade aqui é sobra de link editado — a grade mora um nível acima;
+  // o redirect preserva o recorte como o inverso em /relatorios faz
+  if (abaParam === "grade") {
+    const q = new URLSearchParams();
+    for (const [k, v] of Object.entries(sp)) {
+      if (k === "aba") continue;
+      for (const item of Array.isArray(v) ? v : v != null ? [v] : []) {
+        q.append(k, item);
+      }
+    }
+    redirect(`/relatorios${q.size ? `?${q}` : ""}`);
+  }
   const aba: AbaRelatorios = ABAS.some((a) => a.id === abaParam)
     ? (abaParam as AbaRelatorios)
     : "visao";
