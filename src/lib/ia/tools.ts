@@ -319,7 +319,6 @@ export function projetarResumo(
       apoio: saude.apoio,
       pausadas: saude.pausadas,
       concluidas: saude.concluidas,
-      desistentes: saude.desistentes,
       encerradas: saude.encerradas,
     },
     duplas: itens,

@@ -442,15 +442,6 @@ export function CardSaude({ b }: { b: UiSaude }) {
             href="/duplas?recorte=concluida"
           />
         )}
-        {c.desistentes > 0 && (
-          <Contagem
-            n={c.desistentes}
-            rotulo={c.desistentes === 1 ? "desistente" : "desistentes"}
-            dot="viz-hatch-desistente"
-            texto="text-muted-foreground"
-            href="/duplas?recorte=desistente"
-          />
-        )}
         {c.encerradas > 0 && (
           <Contagem
             n={c.encerradas}

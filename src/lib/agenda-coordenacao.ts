@@ -974,10 +974,12 @@ function coberturaDoVigente(
  *  - `risco` + `atencao` + `emDia` PARTICIONAM `emAndamento` pelo semáforo.
  *  - `apoio` é SOBREPOSIÇÃO: conta pedido de apoio aberto (ativa ou pausada)
  *    à parte e nunca tira a dupla da sua situação.
- *  - `pausadas`, `concluidas` (concluída com êxito), `desistentes`
- *    (desistência do jovem/mentor + encerrada legada sem desfecho) e
- *    `encerradas` (fechamento formal: remanejada/outro) ficam fora da régua.
- *  - `total` = emAndamento + pausadas + concluidas + desistentes + encerradas:
+ *  - `pausadas`, `concluidas` (concluída com êxito) e `encerradas` ficam
+ *    fora da régua. Encerrada é o balde único dos fechamentos sem êxito:
+ *    desistência do jovem/mentor (+ legado sem desfecho) e fechamento
+ *    formal (remanejada/outro) — o desfecho distingue na linha, não na
+ *    contagem.
+ *  - `total` = emAndamento + pausadas + concluidas + encerradas:
  *    o denominador da barra. */
 export type SaudeRecorte = {
   emAndamento: number;
@@ -987,7 +989,6 @@ export type SaudeRecorte = {
   apoio: number;
   pausadas: number;
   concluidas: number;
-  desistentes: number;
   encerradas: number;
   total: number;
 };
@@ -1006,7 +1007,6 @@ export function saudeDoRecorte(
     apoio: 0,
     pausadas: 0,
     concluidas: 0,
-    desistentes: 0,
     encerradas: 0,
     total: 0,
   };
@@ -1023,12 +1023,10 @@ export function saudeDoRecorte(
       const sit = situacaoDaDupla(d);
       if (sit === "pausada") s.pausadas++;
       else if (sit === "concluida") s.concluidas++;
-      else if (sit === "desistente") s.desistentes++;
-      else if (sit === "encerrada") s.encerradas++;
+      else s.encerradas++;
     }
   }
-  s.total =
-    s.emAndamento + s.pausadas + s.concluidas + s.desistentes + s.encerradas;
+  s.total = s.emAndamento + s.pausadas + s.concluidas + s.encerradas;
   return s;
 }
 
@@ -1041,7 +1039,6 @@ export type RecorteFatia =
   | "andamento"
   | "pausada"
   | "concluida"
-  | "desistente"
   | "encerrada"
   | "apoio";
 
@@ -1051,10 +1048,27 @@ export const RECORTES_FATIA: readonly RecorteFatia[] = [
   "andamento",
   "pausada",
   "concluida",
-  "desistente",
   "encerrada",
   "apoio",
 ];
+
+/** Valores legados de `?recorte=` → a fatia atual. Deep links antigos de
+ *  "desistente" (época do chip próprio) aterrissam em "encerrada" — o
+ *  balde que cobre desistência + fechamento formal. */
+const RECORTE_ALIAS: Record<string, RecorteFatia> = {
+  desistente: "encerrada",
+};
+
+/** `?recorte=` cru → fatia válida (ou null quando desconhecida). Valores
+ *  fora do vocabulário não viram chip fantasma — caem fora como ausência
+ *  de recorte, o mesmo contrato de sempre. */
+export function resolveRecorteFatia(
+  param: string | null | undefined
+): RecorteFatia | null {
+  if (!param) return null;
+  if (param in RECORTE_ALIAS) return RECORTE_ALIAS[param];
+  return RECORTES_FATIA.find((r) => r === param) ?? null;
+}
 
 /** Pulso de registro da semana — encontros realizados nos últimos 14 dias
  *  (a janela do mock) das duplas do recorte: entregue × aguardando + a

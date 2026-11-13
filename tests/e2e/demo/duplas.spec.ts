@@ -41,18 +41,19 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     ).toBeVisible();
     await expect(
       resumo.getByRole("img", {
-        name: /\d+ em andamento: \d+ em risco, \d+ em atenção, \d+ em dia\. \d+ pausadas, \d+ concluídas, \d+ desistentes, \d+ encerradas\. \d+ com apoio aberto\./,
+        name: /\d+ em andamento: \d+ em risco, \d+ em atenção, \d+ em dia\. \d+ pausadas, \d+ concluídas, \d+ encerradas\. \d+ com apoio aberto\./,
       })
     ).toBeVisible();
     const legenda = resumo.getByRole("listitem");
-    await expect(legenda).toHaveCount(7);
+    await expect(legenda).toHaveCount(6);
     await expect(legenda.nth(0)).toContainText("em risco");
     await expect(legenda.nth(1)).toContainText("em atenção");
     await expect(legenda.nth(2)).toContainText("em dia");
     await expect(legenda.nth(3)).toContainText("pausadas");
     await expect(legenda.nth(4)).toContainText("concluídas");
-    await expect(legenda.nth(5)).toContainText("desistentes");
-    await expect(legenda.nth(6)).toContainText("encerradas");
+    // "encerradas" é um balde só — desistência e fechamento formal somam
+    // na mesma fatia (REALIZA-377); a linha distingue pelo desfecho
+    await expect(legenda.nth(5)).toContainText("encerradas");
     await expect(resumo.getByText(/com apoio aberto/)).toBeVisible();
     // a definição da régua não fica na tela — mora no popover "Como
     // calculamos" (convenção: a interface não explica a si mesma)
@@ -85,9 +86,11 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     await expect(
       chips.getByRole("button", { name: /Concluídas \d+/ })
     ).toBeVisible();
+    // desistente não tem chip próprio — entra no balde "Encerradas"
+    // (REALIZA-377): o chip único cobre desistência + fechamento formal
     await expect(
-      chips.getByRole("button", { name: /Desistentes \d+/ })
-    ).toBeVisible();
+      chips.getByRole("button", { name: /Desistentes/ })
+    ).toHaveCount(0);
     await expect(
       chips.getByRole("button", { name: /Encerradas \d+/ })
     ).toBeVisible();
@@ -561,6 +564,27 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     await expect(linhas).toHaveCount(nApoio);
     for (let i = 0; i < nApoio; i++)
       await expect(linhas.nth(i).getByText("Apoio pedido")).toBeVisible();
+
+    // deep link antigo: ?recorte=desistente (época do chip próprio)
+    // aterrissa no chip "Encerradas" — o balde que cobre desistência
+    // + fechamento formal (REALIZA-377)
+    await page.goto("/duplas?recorte=desistente");
+    await expect(
+      chips.getByRole("button", { name: /Encerradas \d+/ })
+    ).toHaveAttribute("aria-pressed", "true");
+    await expect(linhas).toHaveCount(await nDoChip(/Encerradas \d+/));
+    // a linha continua distinguindo o desfecho: a desistente do fixture
+    // (Carlos × Laura) lê "Desistente" e a remanejada lê "Encerrada"
+    await expect(
+      linhas
+        .filter({ hasText: "Laura" })
+        .getByText("Desistente", { exact: true })
+    ).toBeVisible();
+    await expect(
+      linhas
+        .filter({ hasText: "Eduardo" })
+        .getByText("Encerrada", { exact: true })
+    ).toBeVisible();
 
     // recorte desconhecido não vira chip fantasma — cai em "Todas"
     await page.goto("/duplas?recorte=bogus");

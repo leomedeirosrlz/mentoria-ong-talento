@@ -61,7 +61,7 @@ import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { NovaPessoaDialog, NovoMentoradoDialog } from "@/components/pessoas-dialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -811,8 +811,9 @@ export function PessoasListas({
     <>
       {/* barra de filtros enxuta (rodada out/2026): busca + categoria +
           escopos. O select de papel/trilha/status morreu — o próprio
-          agrupamento da lista virou o filtro */}
-      <div className="flex flex-wrap items-center gap-2">
+          agrupamento da lista virou o filtro. Uma linha só: o overflow
+          rola na horizontal (REALIZA-383) */}
+      <FilterChipRow>
         <div className="relative w-full sm:max-w-sm">
           <MagnifyingGlass
             aria-hidden
@@ -993,7 +994,7 @@ export function PessoasListas({
             Limpar filtros
           </Button>
         )}
-      </div>
+      </FilterChipRow>
 
       {/* fila + pareamento no mesmo card (fev/2026): a fila é o contexto
           da decisão e o modo Parear transforma as próprias colunas no

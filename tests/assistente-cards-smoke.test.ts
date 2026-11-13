@@ -17,7 +17,7 @@ const em = (dias: number, h = 19) => {
 const BLOCOS: UiBloco[] = [
   {
     kind: "saude",
-    contagem: { em_andamento: 12, risco: 2, atencao: 3, em_dia: 7, apoio: 1, pausadas: 1, concluidas: 0, desistentes: 0, encerradas: 0 },
+    contagem: { em_andamento: 12, risco: 2, atencao: 3, em_dia: 7, apoio: 1, pausadas: 1, concluidas: 0, encerradas: 0 },
     pedem_acao: 6,
     destaques: [
       {

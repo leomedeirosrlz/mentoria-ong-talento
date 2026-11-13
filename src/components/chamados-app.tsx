@@ -36,7 +36,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import { NovoChamadoDialog } from "@/components/novo-chamado-dialog";
 import { ChamadoDetalhe } from "@/components/chamado-detalhe";
 import {
@@ -290,7 +290,7 @@ export function ChamadosApp({
                   <legend className="text-xs font-medium text-muted-foreground">
                     Categoria
                   </legend>
-                  <div className="mt-2 flex flex-wrap gap-1.5">
+                  <FilterChipRow className="mt-2 gap-1.5">
                     {(["todas", ...categoriasPresentes] as const).map((v) => (
                       <Button
                         key={v}
@@ -302,7 +302,7 @@ export function ChamadosApp({
                         {v === "todas" ? "Todas" : CHAMADO_CATEGORIA_LABEL[v]}
                       </Button>
                     ))}
-                  </div>
+                  </FilterChipRow>
                 </fieldset>
               )}
               <label className="flex min-h-11 cursor-pointer items-center justify-between gap-3 text-sm md:min-h-8">

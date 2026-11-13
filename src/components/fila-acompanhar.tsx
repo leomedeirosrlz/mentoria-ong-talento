@@ -24,7 +24,7 @@ import {
   type TomSituacao,
 } from "@/components/dupla-linha";
 import { buttonVariants } from "@/components/ui/button";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 
 // ============================================================
@@ -132,10 +132,10 @@ export function FilaAcompanhar({ linhas }: { linhas: LinhaFila[] }) {
 
   return (
     <>
-      <div
+      <FilterChipRow
         role="group"
         aria-label="Filtrar a fila de acompanhamento"
-        className="mt-3 flex flex-wrap items-center gap-2"
+        className="mt-3"
       >
         {FILTROS.map((f) => {
           const n = itens.filter(MATCH_FILTRO[f.id]).length;
@@ -169,7 +169,7 @@ export function FilaAcompanhar({ linhas }: { linhas: LinhaFila[] }) {
             className="w-full sm:ml-auto sm:w-52"
           />
         )}
-      </div>
+      </FilterChipRow>
 
       {visiveis.length === 0 ? (
         <p className="mt-3 rounded-xl border border-dashed px-4 py-3 text-sm text-muted-foreground">

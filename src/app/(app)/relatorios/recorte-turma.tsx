@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { FilterChipRow } from "@/components/ui/filter-chip";
 
 /** Filtro de turma do hub — chips que são links (?turma=), não um select
  *  com JS: a página segue 100% server e o recorte é deep-linkável.
@@ -32,7 +33,7 @@ export function RecorteTurma({
         scroll={false}
         aria-current={on ? "true" : undefined}
         className={cn(
-          "inline-flex min-h-9 items-center rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+          "inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
           on
             ? "border-[var(--brand-lime)] bg-[var(--brand-lime)]/15 text-foreground"
             : "border-border text-muted-foreground hover:text-foreground"
@@ -43,13 +44,13 @@ export function RecorteTurma({
     );
   };
   return (
-    <div
+    <FilterChipRow
       role="group"
       aria-label="Recorte por turma"
-      className="flex flex-wrap items-center gap-1.5"
+      className="gap-1.5"
     >
       {chip("Todas as turmas")}
       {turmas.map((t) => chip(t, t))}
-    </div>
+    </FilterChipRow>
   );
 }
