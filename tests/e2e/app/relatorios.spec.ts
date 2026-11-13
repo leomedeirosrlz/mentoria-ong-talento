@@ -96,26 +96,29 @@ test.describe("/api/export — os 6 tipos novos (coord)", () => {
   });
 });
 
-test.describe("/relatorios — hub por abas", () => {
+test.describe("/relatorios — grade principal + hub operacional", () => {
   test.beforeEach(async ({ page }) => {
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
   });
 
-  test("abas renderizam; inválida cai na default", async ({ page }) => {
+  test("?aba= antiga redirecta pra operacionais; inválida cai na default", async ({
+    page,
+  }) => {
     await page.goto("/relatorios?aba=nao-existe");
-    // a default (Saúde) abre com a tendência ou o estado de acumulação
+    // o deep-link do hub antigo pousa na subpágina, que cai na aba Saúde
+    await expect(page).toHaveURL(/\/relatorios\/operacionais\?aba=/);
     await expect(
       page.getByRole("heading", { name: "Saúde do programa" })
     ).toBeVisible();
     await expect(
-      page.getByRole("tab", { name: "Grade livre" })
+      page.getByRole("tab", { name: "Aderência" })
     ).toBeVisible();
   });
 
   test("aba aderencia mostra prévia e o CSV aponta o tipo certo", async ({
     page,
   }) => {
-    await page.goto("/relatorios?aba=aderencia");
+    await page.goto("/relatorios/operacionais?aba=aderencia");
     await expect(
       page.getByRole("heading", { name: "Aderência ao ciclo" })
     ).toBeVisible();
@@ -128,7 +131,7 @@ test.describe("/relatorios — hub por abas", () => {
 
   test("recorte ?turma= entra no link de download", async ({ page }) => {
     await page.goto(
-      `/relatorios?aba=interacoes&turma=${encodeURIComponent("Turma E2E")}`
+      `/relatorios/operacionais?aba=interacoes&turma=${encodeURIComponent("Turma E2E")}`
     );
     const csv = page.getByRole("link", { name: "Baixar CSV completo" });
     const href = await csv.getAttribute("href");
@@ -136,16 +139,23 @@ test.describe("/relatorios — hub por abas", () => {
     expect(href).toContain("turma=Turma%20E2E");
   });
 
-  test("aba grade preserva o builder livre", async ({ page }) => {
+  test("/relatorios abre direto na grade livre", async ({ page }) => {
+    // o link antigo ?aba=grade também resolve — redirecta pra a página
+    // limpa e o RelatorioBuilder renderiza com o "Outros relatórios"
     await page.goto("/relatorios?aba=grade");
-    // a grade livre continua sendo o RelatorioBuilder — o canvas renderiza
+    await expect(page).toHaveURL(/\/relatorios$/);
     await expect(page.locator("main")).toContainText("Colunas");
+    const outros = page.getByRole("link", { name: "Outros relatórios" });
+    await expect(outros).toBeVisible();
+    expect(await outros.getAttribute("href")).toBe(
+      "/relatorios/operacionais"
+    );
   });
 
   test("digest: disparo manual mostra feedback (enviado ou erro honesto)", async ({
     page,
   }) => {
-    await page.goto("/relatorios?aba=visao");
+    await page.goto("/relatorios/operacionais?aba=visao");
     const botao = page.getByRole("button", { name: /Enviar digest agora/ });
     await expect(botao).toBeVisible();
     // RESEND configurado → "Enviado para N de M"; sem envio → a mensagem de

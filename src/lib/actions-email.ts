@@ -862,8 +862,8 @@ export async function enviarDesfechoLote(input: {
   };
 }
 
-/** Disparo manual do digest semanal (REALIZA-178) — botão da aba
- *  Operação do /relatorios. Ignora a dedup do cron de propósito (o clique
+/** Disparo manual do digest semanal (REALIZA-178) — botão da aba Saúde
+ *  de /relatorios/operacionais. Ignora a dedup do cron de propósito (o clique
  *  de uma pessoa é a intenção, não o retry cego); a mesma row de log do
  *  job grava aqui com o autor_id da coordenação. */
 export async function enviarDigestSemanal(): Promise<{
