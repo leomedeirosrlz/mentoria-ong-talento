@@ -1,3 +1,5 @@
+import { Collapsible } from "@base-ui/react/collapsible";
+import { CaretDown } from "@phosphor-icons/react/dist/ssr";
 import {
   AVALIACAO_LABEL,
   formatDate,
@@ -16,28 +18,25 @@ import type { Encerramento } from "@/lib/types";
 /** "Resumo da jornada" — o bloco print-friendly da ficha, gerado dos dados
  *  (não é campo livre): mentor/mentorado, encontros realizados vs. esperados,
  *  avaliação média, últimos registros e combinados. É a base do relatório
- *  final do guia — no print o CSS isola este bloco. */
+ *  final do guia — no print o CSS isola este bloco.
+ *
+ *  `compacta` (REALIZA-378): quando a retrospectiva está aberta na mesma
+ *  superfície, o resumo vira o relatório sob disclosure — cabeçalho + meta
+ *  visíveis, o corpo completo (tiles, listas, carimbo) a um toque. No print
+ *  o CSS força o painel aberto, então o relatório sai íntegro. */
 export function ResumoJornadaSection({
   resumo,
   encerramento,
+  compacta = false,
 }: {
   resumo: ResumoJornada;
   /** Quando já decidido, carimba quem fechou e quando. */
   encerramento: Encerramento | null;
+  /** modo enxuto pra quando a retrospectiva ocupa o papel de destaque */
+  compacta?: boolean;
 }) {
-  return (
-    <section
-      aria-label="Resumo da jornada"
-      className="resumo-jornada rounded-xl bg-card p-4 shadow-[var(--shadow-border)] print:shadow-none"
-    >
-      <div className="flex items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-base font-semibold">
-          <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
-          Resumo da jornada
-        </h2>
-        <ImprimirButton />
-      </div>
-
+  const cabecalho = (
+    <>
       <p className="mt-2 text-sm font-medium">
         {resumo.mentorNome} e {resumo.mentoradoNome}
       </p>
@@ -50,7 +49,11 @@ export function ResumoJornadaSection({
             ? " · jornada fechada"
             : " · em andamento"}
       </p>
+    </>
+  );
 
+  const corpo = (
+    <>
       <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-5">
         <div className="rounded-lg bg-muted/40 px-3 py-2.5">
           <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
@@ -185,6 +188,65 @@ export function ResumoJornadaSection({
           ? `Encerramento registrado por ${encerramento.decidido?.nome ?? "a coordenação"} em ${formatDate(encerramento.created_at)}. Este resumo foi gerado dos dados da jornada.`
           : "Gerado dos dados da jornada. Serve de base pro relatório final do ciclo."}
       </p>
+    </>
+  );
+
+  if (compacta) {
+    return (
+      <section
+        aria-label="Resumo da jornada"
+        className="resumo-jornada rounded-xl bg-card p-4 shadow-[var(--shadow-border)] print:shadow-none"
+      >
+        <Collapsible.Root>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="flex items-center gap-2 text-base font-semibold">
+              <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
+              Resumo da jornada
+            </h2>
+            <ImprimirButton />
+          </div>
+          <p className="mt-1.5 text-xs text-muted-foreground">
+            {resumo.mentorNome} e {resumo.mentoradoNome} · Trilha{" "}
+            {TRILHA_LABEL[resumo.trilha]} · início {formatDate(resumo.inicio)}
+            {resumo.fim
+              ? ` · encerramento ${formatDate(resumo.fim)}`
+              : resumo.status === "concluida" || resumo.status === "encerrada"
+                ? " · jornada fechada"
+                : ""}
+          </p>
+          <Collapsible.Trigger className="group -mx-2 mt-1 flex min-h-11 w-[calc(100%+1rem)] cursor-pointer items-center gap-1.5 rounded-lg px-2 py-2 text-left text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring print:hidden">
+            Ver os dados completos
+            <CaretDown
+              size={14}
+              aria-hidden
+              className="transition-transform group-data-[panel-open]:rotate-180"
+            />
+          </Collapsible.Trigger>
+          <Collapsible.Panel
+            hiddenUntilFound
+            className="h-[var(--collapsible-panel-height)] overflow-hidden transition-[height] duration-150 data-ending-style:h-0 data-starting-style:h-0 [&[hidden]:not([hidden='until-found'])]:hidden"
+          >
+            {corpo}
+          </Collapsible.Panel>
+        </Collapsible.Root>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      aria-label="Resumo da jornada"
+      className="resumo-jornada rounded-xl bg-card p-4 shadow-[var(--shadow-border)] print:shadow-none"
+    >
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-base font-semibold">
+          <span aria-hidden className="size-1.5 rounded-full bg-[var(--brand-lime)]" />
+          Resumo da jornada
+        </h2>
+        <ImprimirButton />
+      </div>
+      {cabecalho}
+      {corpo}
     </section>
   );
 }

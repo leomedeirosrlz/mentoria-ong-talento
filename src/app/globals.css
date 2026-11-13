@@ -832,6 +832,19 @@
     border: none;
     box-shadow: none;
   }
+  /* resumo compacto (378): o relatório completo dorme num Collapsible na
+     tela; no papel o painel sai aberto — o relatório nunca imprime vazio */
+  .resumo-jornada [hidden] {
+    display: block !important;
+    height: auto;
+  }
+  /* idem nas seções recolhidas da retrospectiva — na ficha staff ela já
+     sai invisível pelo isolamento acima; na página da jovem é ela quem
+     imprime, então o conteúdo atrás dos disclosures também abre */
+  section[aria-label="Retrospectiva da jornada"] [hidden] {
+    display: block !important;
+    height: auto;
+  }
 }
 
 /* ==== instrumentos interativos ==== */

@@ -364,6 +364,19 @@ export default async function JovemMateriais() {
         cronograma: jornada.cronograma,
         encontros: encontrosDpp,
         temas: jornada.retrospectiva?.encontros ?? [],
+        // as estrelas dela alimentam a sparkline + o tile "Avaliação do
+        // jovem" da retrospectiva (378) — dados que já são dela
+        avaliacoes: avaliacoesDpp.flatMap((a) =>
+          a.encontro?.numero != null
+            ? [
+                {
+                  numero: a.encontro.numero,
+                  estrelas: a.estrelas,
+                  temas: a.temas,
+                },
+              ]
+            : []
+        ),
         combinados: (combinadosJovem ?? []).filter(
           (c) => c.dupla_id === jornada.dupla_id
         ),

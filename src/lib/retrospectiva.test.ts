@@ -449,6 +449,42 @@ describe("dadosRetrospectiva — conteúdo e recorte", () => {
     });
     expect(d.pdm?.atingidas).toBe(2);
   });
+
+  it("avaliacaoJovem chega no resumo e starSeries vira slots da trilha", () => {
+    const d = dadosRetrospectiva({
+      ...baseRetro(),
+      dupla: duplaBase({ status: "concluida", encontros: [enc(16)] }),
+      avaliacaoJovem: {
+        n: 3,
+        media: 4.3,
+        trajetoria: { primeiro: 3, ultimo: 5 },
+        temasTop: ["carreira"],
+      },
+      // estrelas com buraco: encontro 2 não foi avaliado
+      starSeries: [
+        { numero: 1, estrelas: 3 },
+        { numero: 3, estrelas: 5 },
+        { numero: 16, estrelas: 4 },
+      ],
+    });
+    expect(d.resumo.avaliacaoJovem?.media).toBe(4.3);
+    // 16 slots (o total da trilha), null onde não houve estrela
+    expect(d.starSeries).toHaveLength(16);
+    expect(d.starSeries?.[0]).toBe(3);
+    expect(d.starSeries?.[1]).toBeNull();
+    expect(d.starSeries?.[2]).toBe(5);
+    expect(d.starSeries?.[15]).toBe(4);
+  });
+
+  it("sem starSeries a série sai null — o recorte do mentor vira só média", () => {
+    const d = dadosRetrospectiva({
+      ...baseRetro(),
+      dupla: duplaBase({ status: "concluida", encontros: [enc(16)] }),
+      avaliacaoJovem: { n: 4, media: 3.5, trajetoria: null, temasTop: [] },
+    });
+    expect(d.starSeries).toBeNull();
+    expect(d.resumo.avaliacaoJovem?.media).toBe(3.5);
+  });
 });
 
 describe("linhaChecklistResumo", () => {
@@ -546,5 +582,24 @@ describe("dadosRetrospectivaJovem", () => {
       ],
     });
     expect(d.checklist).toBeNull();
+  });
+
+  it("as estrelas dela viram série e agregado — dados que já são dela", () => {
+    const d = dadosRetrospectivaJovem({
+      ...base,
+      avaliacoes: [
+        { numero: 1, estrelas: 3, temas: ["familia"] },
+        { numero: 16, estrelas: 5, temas: ["carreira", "familia"] },
+      ],
+    });
+    expect(d.resumo.avaliacaoJovem).toMatchObject({
+      n: 2,
+      media: 4,
+      trajetoria: { primeiro: 3, ultimo: 5 },
+    });
+    expect(d.resumo.avaliacaoJovem?.temasTop[0]).toBe("familia");
+    expect(d.starSeries).toHaveLength(16);
+    expect(d.starSeries?.[0]).toBe(3);
+    expect(d.starSeries?.[15]).toBe(5);
   });
 });

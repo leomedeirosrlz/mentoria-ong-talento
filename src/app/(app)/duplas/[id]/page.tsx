@@ -550,6 +550,16 @@ export default async function DuplaPage({
   // realizado ou no fechamento da dupla. A ficha é superfície
   // mentor/staff, então o recorte carrega as notas internas do registro
   // e o checklist do mentor (a jovem recebe outro payload, pela RPC).
+  // A série de estrelas (378): staff/jovem vêem os pontos do embed do RLS
+  // na sparkline; pro mentor DPP o recorte segue sendo só a média
+  // quantizada — por isso a série nem chega a ser montada pra ele.
+  const starSeries = souMentor
+    ? null
+    : dupla.encontros.flatMap((e) =>
+        e.avaliacao_jovem
+          ? [{ numero: e.numero, estrelas: e.avaliacao_jovem.estrelas }]
+          : []
+      );
   const retro = dadosRetrospectiva({
     dupla,
     passos,
@@ -557,6 +567,8 @@ export default async function DuplaPage({
     fim: encerramento?.created_at ?? dupla.encerrada_em ?? null,
     pdm: pdmResumo,
     instrumentos,
+    avaliacaoJovem: avaliacaoJovemResumo,
+    starSeries: starSeries ?? undefined,
     comNotasInternas: true,
   });
 
@@ -1145,11 +1157,17 @@ export default async function DuplaPage({
                 realizadosCount={realizadosCount}
               />
             )}
-            {mostrarResumo && (
-              <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
-            )}
+            {/* retro destravada vira o destaque; o resumo fica embaixo,
+                compacto — relatório completo sob disclosure (378) */}
             {retro?.desbloqueada && (
               <RetrospectivaJornada dados={retro} mostrarChecklist />
+            )}
+            {mostrarResumo && (
+              <ResumoJornadaSection
+                resumo={resumoJornada}
+                encerramento={encerramento}
+                compacta={!!retro?.desbloqueada}
+              />
             )}
             {souCoord && desfechoEntregas.length > 0 && (
               <DesfechoDuplaCard entregas={desfechoEntregas} />
@@ -1265,11 +1283,15 @@ export default async function DuplaPage({
         )}
         {!fechamentoEmFoco && (
           <>
-            {mostrarResumo && (
-              <ResumoJornadaSection resumo={resumoJornada} encerramento={encerramento} />
-            )}
             {retro?.desbloqueada && (
               <RetrospectivaJornada dados={retro} mostrarChecklist />
+            )}
+            {mostrarResumo && (
+              <ResumoJornadaSection
+                resumo={resumoJornada}
+                encerramento={encerramento}
+                compacta={!!retro?.desbloqueada}
+              />
             )}
           </>
         )}

@@ -825,12 +825,17 @@ test.describe("PDM vivo (REALIZA-181)", () => {
 
     // §E.32 — "Metas do PDM" no Resumo da jornada: X de Y + a lista das
     // atingidas com data (o encontro realizado da fixture liga o bloco).
-    // O bloco mora na aba Encontros da ficha
+    // O bloco mora na aba Encontros da ficha; com a retrospectiva aberta
+    // (o 16º realizado a destrava) o resumo fica compacto — o corpo
+    // completo abre sob a disclosure (378)
     await page.goto(`/duplas/${DUPLA_ID}?aba=encontros`);
     const resumo = page.locator('section[aria-label="Resumo da jornada"]');
     await expect(
       resumo.getByRole("heading", { name: "Resumo da jornada" })
     ).toBeVisible();
+    await resumo
+      .getByRole("button", { name: "Ver os dados completos" })
+      .click();
     const cardMetas = resumo.locator("div", { hasText: "Metas do PDM" });
     await expect(cardMetas.getByText("1 de 2")).toBeVisible();
     await expect(cardMetas.getByText("atingidas")).toBeVisible();
