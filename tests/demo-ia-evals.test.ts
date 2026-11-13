@@ -15,6 +15,8 @@ vi.mock("next/headers", () => ({
 }));
 
 import {
+  demoEvalApagar,
+  demoEvalCriar,
   demoEvalDetalhe,
   demoEvalExecutar,
   demoEvalProximo,
@@ -81,12 +83,15 @@ describe("laço /executar", () => {
     while (!feito)
       feito = (await demoEvalExecutar(run.id, { semDelay: true })).feito;
 
-    const { reagendados } = await demoEvalReagendar(run.id);
-    const d = await demoEvalDetalhe(run.id);
-    const falhosos = d!.itens.filter(
+    // conta os ruins ANTES do PATCH — depois de reagendados eles já
+    // voltaram a "pendente" e a contagem mediria sempre zero
+    const antes = await demoEvalDetalhe(run.id);
+    const falhosos = antes!.itens.filter(
       (i) => i.status === "falhou" || i.status === "erro"
     ).length;
-    expect(reagendados).toBe(falhosos + 0); // reagendou exatamente os ruins
+    const { reagendados } = await demoEvalReagendar(run.id);
+    const d = await demoEvalDetalhe(run.id);
+    expect(reagendados).toBe(falhosos); // reagendou exatamente os ruins
     if (reagendados > 0) {
       expect(d!.run.status === "concluido").toBe(false);
       const p = await demoEvalProximo(run.id);
@@ -95,5 +100,36 @@ describe("laço /executar", () => {
       // grade toda ok: nada pra reagendar, run segue concluído
       expect(d!.run.status).toBe("concluido");
     }
+  });
+});
+
+describe("demoEvalCriar", () => {
+  it("capa o run em MAX_ITENS mesmo com grade pedida maior", async () => {
+    const { id, itens } = await demoEvalCriar({
+      ambiente: "demo",
+      papel: "staff",
+      modelos: ["a", "b", "c", "d", "e", "f", "g", "h"],
+      repeticoes: 10,
+    });
+    expect(itens).toBeLessThanOrEqual(36);
+    const d = await demoEvalDetalhe(id);
+    expect(d!.itens.length).toBeLessThanOrEqual(36);
+    expect(d!.itens.length).toBe(itens);
+  });
+});
+
+describe("demoEvalApagar", () => {
+  it("run fixo apagado fica dirigível em nada (tombstone)", async () => {
+    const run = (await runNaFila())!;
+    const { apagados } = await demoEvalApagar(run.id);
+    expect(apagados).toBe(1);
+    expect(await demoEvalDetalhe(run.id)).toBeNull();
+    expect(await demoEvalProximo(run.id)).toEqual({ proximo: null });
+    expect(await demoEvalExecutar(run.id, { semDelay: true })).toEqual({
+      feito: true,
+    });
+    expect(await demoEvalReagendar(run.id)).toEqual({ reagendados: 0 });
+    const runs = await demoEvalRuns();
+    expect(runs.some((r) => r.id === run.id)).toBe(false);
   });
 });

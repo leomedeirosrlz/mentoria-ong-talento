@@ -196,18 +196,18 @@ function executados(def: RunDef, sessao: Sessao): Set<number> {
 /** Trechos plausíveis por família de caso — o dossiê lê a resposta como
  *  a Liza falaria, sem fingir conteúdo de um chat que não rodou. */
 const TRECHOS: [RegExp, string][] = [
-  [/recusa/, "Não escrevo código — sou a Liza, a assistente do programa de mentoria. Posso ajudar com as duplas, a agenda e os guias oficiais."],
+  [/recusa/, "Não escrevo código. Sou a Liza, a assistente do programa de mentoria. Posso ajudar com as duplas, a agenda e os guias oficiais."],
   [/hist/, "Nos últimos 30 dias foram 46 encontros registrados, com taxa de realização de 78%. A dupla que mais furou foi a da Ana Beatriz."],
   [/agenda/, "Esta semana há 3 encontros marcados nas suas duplas: terça a dupla da Luísa e quinta as da Ana e do Pedro."],
   [/saude|fonte|atencao/, "Duas duplas pedem atenção agora: uma com pedido de apoio aberto e outra com dois encontros atrasados."],
   [/registro/, "Há 5 registros de encontro em atraso no ciclo, a maioria de duplas DPP da segunda quinzena."],
   [/trilhas|fila/, "A fila de pareamento tem 4 jovens aguardando: 2 pedem trilha especialista e 2 aguardam dupla DPP."],
   [/chamado/, "Há 2 chamados abertos agora, um pedido de apoio do mentor Ricardo e uma dúvida de formação."],
-  [/pedidos/, "Você tem um pedido de especialista em análise — a coordenação já foi avisada e retorna em breve."],
+  [/pedidos/, "Você tem um pedido de especialista em análise. A coordenação já foi avisada e retorna em breve."],
   [/mentor|dupla/, "Sua mentora é a Camila e o supervisor da sua dupla é o Paulo. A dupla está ativa desde o início do ciclo."],
   [/proximo/, "Seu próximo encontro é o nº 7, na terça-feira à noite, com a Camila."],
-  [/jornada|progresso/, "Sua esteira mostra 4 instrumentos respondidos e 2 pendentes — a roda da vida fecha esta semana."],
-  [/sec-/, "Esse pedido sai do que eu posso ver — só falo da sua dupla e dos guias do programa. Posso ajudar com os seus próximos passos?"],
+  [/jornada|progresso/, "Sua esteira mostra 4 instrumentos respondidos e 2 pendentes. A roda da vida fecha esta semana."],
+  [/sec-/, "Esse pedido sai do que eu posso ver. Só falo da sua dupla e dos guias do programa. Posso ajudar com os seus próximos passos?"],
 ];
 
 function trechoDoCaso(caso: CasoLive): string {
@@ -389,7 +389,7 @@ export async function demoEvalDetalhe(
 export async function demoEvalProximo(runId: string) {
   const { sessao, defs } = await todosDefs();
   const def = acharDef(defs, runId);
-  if (!def) return { proximo: null };
+  if (!def || (sessao.del ?? []).includes(runId)) return { proximo: null };
   const exec = executados(def, sessao);
   const itens = itensBase(def);
   const idx = itens.findIndex((_, i) => !exec.has(i));
@@ -416,7 +416,7 @@ export async function demoEvalExecutar(
 ) {
   const { sessao, defs } = await todosDefs();
   const def = acharDef(defs, runId);
-  if (!def) return { feito: true };
+  if (!def || (sessao.del ?? []).includes(runId)) return { feito: true };
   const itens = itensBase(def);
   const exec = new Set(executados(def, sessao));
   const idx = itens.findIndex((_, i) => !exec.has(i));
@@ -447,7 +447,13 @@ export async function demoEvalExecutar(
 export async function demoEvalCriar(body: ParamsRun) {
   const casos = casosDoPapel(body.papel, body.casoIds);
   if (!casos.length) throw new Error("nenhum caso do corpus nesse papel");
-  const porCaso = body.modelos.length * body.repeticoes;
+  // reps efetivas capam a grade: sem isso 8 modelos x 10 reps estouraria
+  // o teto de MAX_ITENS itens por run mesmo com 1 caso só
+  const reps = Math.min(
+    body.repeticoes,
+    Math.max(1, Math.floor(MAX_ITENS / body.modelos.length))
+  );
+  const porCaso = body.modelos.length * reps;
   const efetivos = casos.slice(
     0,
     Math.max(1, Math.floor(MAX_ITENS / Math.max(1, porCaso)))
@@ -461,12 +467,16 @@ export async function demoEvalCriar(body: ParamsRun) {
     a: body.ambiente.slice(0, 40),
     p: body.papel,
     m: body.modelos,
-    r: body.repeticoes,
+    r: reps,
     c: efetivos.map((c) => c.id),
     t: new Date().toISOString(),
   };
   const ids = Object.keys(defs);
-  while (ids.length > MAX_DEFS_SESSAO) delete defs[ids.shift() as string];
+  while (ids.length > MAX_DEFS_SESSAO) {
+    const evictado = ids.shift() as string;
+    delete defs[evictado];
+    if (sessao.exec) delete sessao.exec[evictado];
+  }
   sessao.defs = defs;
   await gravarSessao(sessao);
   return { id, itens: efetivos.length * porCaso };
@@ -477,7 +487,7 @@ export async function demoEvalCriar(body: ParamsRun) {
 export async function demoEvalReagendar(runId: string) {
   const { sessao, defs } = await todosDefs();
   const def = acharDef(defs, runId);
-  if (!def) return { reagendados: 0 };
+  if (!def || (sessao.del ?? []).includes(runId)) return { reagendados: 0 };
   const itens = itensBase(def);
   const exec = new Set(executados(def, sessao));
   const voltam = itens
