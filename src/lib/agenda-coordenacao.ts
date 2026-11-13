@@ -1066,7 +1066,9 @@ export function resolveRecorteFatia(
   param: string | null | undefined
 ): RecorteFatia | null {
   if (!param) return null;
-  if (param in RECORTE_ALIAS) return RECORTE_ALIAS[param];
+  // own-property: `in` casaria toString/constructor e devolveria uma
+  // Function no lugar da fatia (param forjado à mão)
+  if (Object.hasOwn(RECORTE_ALIAS, param)) return RECORTE_ALIAS[param];
   return RECORTES_FATIA.find((r) => r === param) ?? null;
 }
 
