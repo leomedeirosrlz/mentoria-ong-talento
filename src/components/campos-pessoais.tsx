@@ -505,16 +505,20 @@ export function CampoConsentimento({
 export type PassoFicha = {
   /** título da seção — o mesmo que a SecaoFicha exibia dentro do form */
   titulo: string;
+  /** símbolo da seção no stepper — a nav do wizard é visual: cada etapa
+   *  tem um ícone próprio, o nome legível fica no heading da etapa ativa */
+  icone: Icon;
   conteudo: React.ReactNode;
 };
 
-/** Wizard de etapas pros dialogs de cadastro/edição de pessoa — o mesmo
- *  padrão do registro-form: cabeçalho "Passo N de M · título", barras de
- *  progresso clicáveis (trás livre, pra frente com a etapa atual válida),
- *  todos os passos montados (`hidden` nos inativos) e rodapé sticky com
- *  Voltar/Avançar/Salvar. O form fica aqui dentro: Enter antes do último
- *  passo avança, não salva. Com `saveAnywhere` o Salvar fica sempre à mão —
- *  o FormData viaja inteiro de qualquer etapa porque nada desmonta. */
+/** Wizard de etapas pros dialogs de cadastro/edição de pessoa — stepper
+ *  de círculos com símbolo por seção + heading "Passo N de M · título":
+ *  os círculos navegam direto (trás livre, pra frente com a etapa atual
+ *  válida), todos os passos ficam montados (`hidden` nos inativos) e o
+ *  rodapé sticky tem Voltar/Avançar/Salvar com alvos de toque de verdade.
+ *  O form fica aqui dentro: Enter antes do último passo avança, não salva.
+ *  Com `saveAnywhere` o Salvar fica sempre à mão — o FormData viaja
+ *  inteiro de qualquer etapa porque nada desmonta. */
 export function WizardFicha({
   passos,
   pending,
@@ -606,6 +610,12 @@ export function WizardFicha({
     for (let i = 0; i < passos.length; i++) {
       const c = primeiroInvalido(passosRef.current[i]);
       if (c) {
+        // inválido na etapa atual: irPara é no-op (ambos os estados já
+        // batem) e o reportValidity pendente nunca dispararia — clique morto
+        if (i === etapa) {
+          c.reportValidity();
+          return false;
+        }
         invalidoPendente.current = c;
         irPara(i);
         return false;
@@ -662,39 +672,68 @@ export function WizardFicha({
 
   return (
     <form onSubmit={handleSubmit} onKeyDown={onEnterKey} className="space-y-4">
-      {/* cabeçalho do wizard — cada barra navega direto pra etapa (trás
+      {/* cabeçalho do wizard — stepper visual na linguagem da trilha
+          (trilha-jornada): círculo com o símbolo da seção, conectores que
+          preenchem o percorrido e o nome legível no heading (âncora de
+          foco a cada troca). Cada círculo navega direto pra etapa (trás
           livre, pra frente com a atual válida); os nomes ficam no
-          aria-label e no title de cada uma */}
-      <div className="space-y-2">
+          aria-label e no title */}
+      <div className="space-y-2.5">
+        <ol className="flex items-center" aria-label="Etapas">
+          {passos.map((p, i) => {
+            const Icone = p.icone;
+            const atual = i === etapaAtual;
+            return (
+              <li
+                key={p.titulo}
+                className={cn("flex items-center", i > 0 && "min-w-0 flex-1")}
+              >
+                {i > 0 && (
+                  <span
+                    aria-hidden
+                    className={cn(
+                      // o conector encolhe até sumir antes dos círculos se
+                      // tocarem — em 320px o alvo de toque segue garantido
+                      "h-0.5 min-w-0 flex-1 rounded-full transition-colors",
+                      i <= etapaAtual ? "bg-primary/60" : "bg-muted"
+                    )}
+                  />
+                )}
+                <button
+                  type="button"
+                  onClick={() => pularPara(i)}
+                  aria-current={atual ? "step" : undefined}
+                  aria-label={`Etapa ${i + 1} de ${passos.length}: ${p.titulo}`}
+                  title={p.titulo}
+                  // 40px de alvo (eram barras de ~14px de hit) — em telas
+                  // muito estreitas o círculo encolhe até o disco (32px)
+                  // em vez de cortar a última etapa
+                  className="group grid size-10 shrink min-w-8 place-items-center rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring/50 sm:size-11"
+                >
+                  <span
+                    className={cn(
+                      "grid size-8 place-items-center rounded-full transition-[color,background-color,transform] group-hover:scale-105",
+                      atual
+                        ? "bg-primary text-primary-foreground"
+                        : i < etapaAtual
+                          ? "bg-primary/25 text-foreground group-hover:bg-primary/40"
+                          : "bg-muted text-muted-foreground group-hover:bg-muted-foreground/25"
+                    )}
+                  >
+                    <Icone
+                      size={16}
+                      weight={atual ? "fill" : "regular"}
+                      aria-hidden
+                    />
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+        </ol>
         <h3 ref={tituloEtapaRef} tabIndex={-1} className="text-sm font-medium outline-none">
           Passo {etapaAtual + 1} de {passos.length} · {passos[etapaAtual].titulo}
         </h3>
-        <ol className="flex gap-1" aria-label="Etapas">
-          {passos.map((p, i) => (
-            <li key={p.titulo} className="min-w-0 flex-1">
-              <button
-                type="button"
-                onClick={() => pularPara(i)}
-                aria-current={i === etapaAtual ? "step" : undefined}
-                aria-label={`Etapa ${i + 1} de ${passos.length}: ${p.titulo}`}
-                title={p.titulo}
-                // o alvo real continua fino (h-1.5) — o py-1/-my-1 dobra a
-                // área de toque sem mudar o traço
-                className="group -my-1 block w-full rounded-sm py-1 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring/50"
-              >
-                <span
-                  aria-hidden
-                  className={cn(
-                    "block h-1.5 rounded-full transition-colors",
-                    i <= etapaAtual
-                      ? "bg-primary"
-                      : "bg-muted group-hover:bg-muted-foreground/40"
-                  )}
-                />
-              </button>
-            </li>
-          ))}
-        </ol>
       </div>
 
       {passos.map((p, i) => (
@@ -723,25 +762,30 @@ export function WizardFicha({
           <Button
             type="button"
             variant="ghost"
-            className="sm:me-auto"
+            size="lg"
+            // alvo de 48px + texto maior no toque — botão fino era o bug
+            // do mobile; no md+ volta pro degrau lg do sistema
+            className="h-12 text-base sm:me-auto md:text-sm"
             onClick={() => irPara(etapa - 1)}
           >
-            <CaretLeft size={14} /> Voltar
+            <CaretLeft /> Voltar
           </Button>
         )}
         <Button
           type="button"
-          className="flex-1"
+          size="lg"
+          className="h-12 flex-1 text-base md:text-sm"
           hidden={etapaAtual >= ultima}
           onClick={avancar}
         >
-          Avançar <CaretRight size={14} />
+          Avançar <CaretRight />
         </Button>
         <Button
           type="submit"
           formNoValidate
           data-salvar
-          className="flex-1"
+          size="lg"
+          className="h-12 flex-1 text-base md:text-sm"
           variant={etapaAtual >= ultima ? "default" : "outline"}
           hidden={etapaAtual < ultima && !saveAnywhere}
           disabled={pending}
