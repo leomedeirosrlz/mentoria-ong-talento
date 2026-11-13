@@ -65,6 +65,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { FiltrosButton } from "@/components/ui/filtros-button";
+import { OVERLINE } from "@/components/ui/filtro-opcoes";
 import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 import {
@@ -74,9 +75,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-
-const OVERLINE =
-  "text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]";
 
 // dialogs da coordenação — atrás de clique, viram chunk sob demanda
 const NovaDuplaDialog = dynamic(() =>
