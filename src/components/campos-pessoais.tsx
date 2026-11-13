@@ -610,6 +610,12 @@ export function WizardFicha({
     for (let i = 0; i < passos.length; i++) {
       const c = primeiroInvalido(passosRef.current[i]);
       if (c) {
+        // inválido na etapa atual: irPara é no-op (ambos os estados já
+        // batem) e o reportValidity pendente nunca dispararia — clique morto
+        if (i === etapa) {
+          c.reportValidity();
+          return false;
+        }
         invalidoPendente.current = c;
         irPara(i);
         return false;
