@@ -149,36 +149,30 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
   ).toContainText("Coordenação");
 });
 
-test("DemoBar: variante jovem sem ficha mostra a espera pelo vínculo", async ({
+test("DemoBar: cinco papéis e nenhuma variante de conta órfã", async ({
   page,
 }) => {
-  // demo_sem_ficha (REALIZA-372): a conta órfã cai no wizard e o passo da
-  // grade vira o aviso de vínculo pendente — o mesmo texto do jovem real
+  // REALIZA-381: a persona "Jovem · conta sem ficha vinculada" saiu da
+  // DemoBar — ela parecia um papel mas é um estado de produção (conta sem
+  // ficha vinculada), que segue coberto pelo fluxo real de onboarding
   await entrarNaDemo(page, "coordenacao");
   await page.goto("/");
   await page
     .getByRole("button", { name: "Controles da demonstração" })
     .click();
-  await page
-    .getByRole("button", { name: /conta sem ficha vinculada/ })
-    .click();
-  await page.waitForURL((url) => url.pathname === "/jovem");
-  await page.getByRole("button", { name: "Continuar", exact: true }).click();
-  await expect(
-    page.getByText(/Sua ficha ainda não foi conectada/)
-  ).toBeVisible();
 
-  // trocar pra persona Jovem normal sai da variante — a ficha da Bia volta.
-  // ^Mentorado: o trigger dock também carrega o papel no aria-label ("Modo
-  // demonstração · Mentorado") e um match solto pegaria os dois
-  await page
-    .getByRole("button", { name: "Controles da demonstração" })
-    .click();
-  await page.getByRole("button", { name: /^Mentorado/ }).click();
-  await page.waitForURL((url) => url.pathname === "/jovem");
+  for (const nome of [
+    /Coordenação/,
+    /Auxiliar executivo/,
+    /Mentor DPP/,
+    /Mentor especialista/,
+    /^Mentorado/,
+  ]) {
+    await expect(page.getByRole("button", { name: nome })).toBeVisible();
+  }
   await expect(
-    page.getByRole("heading", { name: /Bem-vindo\(a\) ao Realiza, Bia/i })
-  ).toBeVisible();
+    page.getByRole("button", { name: /sem ficha vinculada/ })
+  ).toHaveCount(0);
 });
 
 test("stub demo: tabelas da rodada têm dataset (sem aviso no console)", async ({

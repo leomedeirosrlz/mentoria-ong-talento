@@ -642,18 +642,17 @@ export function AssistenteBolha({
   // continua montada por baixo (estado do chat e do stream preservados:
   // um swap de elemento desmontava e órfanava a resposta — REALIZA-332),
   // o painel de config cobre. contents deixa a bolha filha direta do flex;
-  // hidden esconde sem desmontar. Só coordenação fora da demo (a RLS fecha
-  // a escrita de qualquer jeito — o botão é só cortesia de não mostrar o
-  // que nega)
+  // hidden esconde sem desmontar. Só coordenação — na demo a aba abre com
+  // dados de exemplo e nada grava (REALIZA-382)
   const [viewConfig, setViewConfig] = useState(false);
-  const onConfig = papeis.includes("coordenacao") && !demo
+  const onConfig = papeis.includes("coordenacao")
     ? () => setViewConfig(true)
     : undefined;
   const corpo = (
     <>
       <div className={viewConfig ? "hidden" : "contents"}>{conversa}</div>
       {viewConfig && (
-        <AssistenteConfig onVoltar={() => setViewConfig(false)} />
+        <AssistenteConfig demo={demo} onVoltar={() => setViewConfig(false)} />
       )}
     </>
   );

@@ -1,9 +1,9 @@
 import { cookies, headers } from "next/headers";
 import type { AppRole } from "@/lib/types";
 import {
+  DEMO_EVAL_COOKIE,
   DEMO_ROLE_COOKIE,
   DEMO_ROLES,
-  DEMO_SEM_FICHA_COOKIE,
   DEMO_TERMO_COOKIE,
   demoObCookie,
   papelDemoValido,
@@ -18,7 +18,7 @@ import {
 // LAN HTTP (phone QA at 192.168.x.x:3100) silently drops Secure cookies —
 // /demo exited the moment a papel was picked. Vercel sets x-forwarded-proto
 // https, so prod keeps Secure.
-const cookieOpts = async () => ({
+export const demoCookieOpts = async () => ({
   path: "/",
   maxAge: 60 * 60 * 24 * 30,
   sameSite: "lax" as const,
@@ -42,33 +42,15 @@ export async function demoAtivo(): Promise<boolean> {
  *  wizard de cada uma na primeira vez. */
 export async function demoOnboarded(papel: AppRole): Promise<boolean> {
   const store = await cookies();
-  // a conta órfã não "conclui" onboarding — o wizard dela é o estado de
-  // espera pelo vínculo, então a flag anula o "já vi" enquanto estiver ativa
-  if (papel === "mentorado" && store.get(DEMO_SEM_FICHA_COOKIE)?.value === "1") {
-    return false;
-  }
   return store.get(demoObCookie(papel))?.value === "1";
 }
 
-/** Variante "conta sem ficha" da persona jovem — lê o DEMO_SEM_FICHA_COOKIE
- *  (shared.ts). As queries dela devolvem ficha/assinaturas vazias. */
-export async function demoSemFicha(): Promise<boolean> {
-  return (await cookies()).get(DEMO_SEM_FICHA_COOKIE)?.value === "1";
-}
-
-export async function definirSemFichaDemo() {
-  (await cookies()).set(DEMO_SEM_FICHA_COOKIE, "1", await cookieOpts());
-}
-
 export async function definirPapelDemo(papel: AppRole) {
-  const store = await cookies();
-  store.set(DEMO_ROLE_COOKIE, papel, await cookieOpts());
-  // trocar de papel sai da variante órfã — ela só volta pelo atalho da DemoBar
-  store.delete(DEMO_SEM_FICHA_COOKIE);
+  (await cookies()).set(DEMO_ROLE_COOKIE, papel, await demoCookieOpts());
 }
 
 export async function marcarOnboardingDemo(papel: AppRole) {
-  (await cookies()).set(demoObCookie(papel), "1", await cookieOpts());
+  (await cookies()).set(demoObCookie(papel), "1", await demoCookieOpts());
 }
 
 export async function desmarcarOnboardingDemo(papel: AppRole) {
@@ -107,13 +89,19 @@ export async function marcarDemoLidas(ids: string[]) {
   (await cookies()).set(
     DEMO_LIDAS_COOKIE,
     JSON.stringify([...lidas].slice(-DEMO_LIDAS_MAX)),
-    await cookieOpts()
+    await demoCookieOpts()
   );
 }
 
 /** "Lidas" é estado da sessão — entrar na demo de novo recomeça zerado. */
 export async function limparDemoLidas() {
   (await cookies()).delete(DEMO_LIDAS_COOKIE);
+}
+
+/** Sessão de evals (runs criados + células dirigidas + lápides) — mesma
+ *  regra das lidas: entra de novo, recomeça zerado. */
+export async function limparDemoEval() {
+  (await cookies()).delete(DEMO_EVAL_COOKIE);
 }
 
 /** Assinatura simulada do termo nesta sessão demo (o writer client é
@@ -141,6 +129,6 @@ export async function limparDemo() {
   store.delete(DEMO_ROLE_COOKIE);
   store.delete(DEMO_LIDAS_COOKIE);
   store.delete(DEMO_TERMO_COOKIE);
-  store.delete(DEMO_SEM_FICHA_COOKIE);
+  await limparDemoEval();
   await resetarOnboardingDemo();
 }

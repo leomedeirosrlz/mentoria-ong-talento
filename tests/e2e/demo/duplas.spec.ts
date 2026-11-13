@@ -362,6 +362,11 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     );
     expect(scrollW).toBeLessThanOrEqual(390);
 
+    // a página ainda assenta quando a lista aparece (entrada escalonada,
+    // stagger até ~530ms) — o boundingBox já leu 43.99px contra o piso
+    // de 44 numa medição no meio do gesto; espera terminar antes de medir
+    await page.waitForTimeout(600);
+
     for (let i = 0; i < n; i++) {
       const card = cards.nth(i);
       // exatamente um "Ver ficha" por card — nunca duplicado topo+rodapé

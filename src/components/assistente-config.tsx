@@ -36,6 +36,11 @@ import {
   type PlanoGo,
   type PlanoIa,
 } from "@/lib/ia/config";
+import {
+  DEMO_IA_CATALOGO,
+  DEMO_IA_SAUDE,
+  demoIaConfig,
+} from "@/lib/demo/ia-eventos";
 import { TokensMcp } from "@/components/tokens-mcp";
 import { cn } from "@/lib/utils";
 
@@ -92,21 +97,63 @@ type SaudeMap = Record<
 let probeCache: { chave: string; ate: number; saude: SaudeMap } | null = null;
 const PROBE_CACHE_MS = 3 * 60_000;
 
-export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
+/** IaConfig da demo → shape local do painel (a chave `modelos` carrega
+ *  primários + cadeia juntos; aqui são separados). */
+function configDemo(): Config {
+  const d = demoIaConfig();
+  const modelos: Config["modelos"] = {};
+  const fallbacks: Config["fallbacks"] = {
+    rapido: [],
+    balanceado: [],
+    forte: [],
+  };
+  for (const t of TIERS) {
+    if (typeof d.modelos[t.chave] === "string")
+      modelos[t.chave] = d.modelos[t.chave];
+    const f = d.modelos.fallbacks;
+    fallbacks[t.chave] = Array.isArray(f) ? f : (f?.[t.chave] ?? []);
+  }
+  return {
+    modelos,
+    fallbacks,
+    esforco: d.esforco,
+    roteamento: d.roteamento,
+    plano: d.plano,
+  };
+}
+
+export function AssistenteConfig({
+  onVoltar,
+  demo,
+}: {
+  onVoltar: () => void;
+  /** demo (REALIZA-382): config/catálogo/saúde de exemplo locais — o
+   *  painel abre e os controles respondem, mas nada sai pro Supabase e
+   *  o probe não chama /api/ia/modelos */
+  demo?: boolean;
+}) {
   const supabase = createClient();
-  const [cfg, setCfg] = useState<Config | null>(null);
-  const [catalogo, setCatalogo] = useState<string[]>([]);
+  // demo hidrata por lazy init, sem effect nem fetch — o painel abre
+  // pronto e o estado local é o único que existe (nada persiste)
+  const [cfg, setCfg] = useState<Config | null>(() =>
+    demo ? configDemo() : null
+  );
+  const [catalogo, setCatalogo] = useState<string[]>(() =>
+    demo ? DEMO_IA_CATALOGO : []
+  );
   const [salvando, setSalvando] = useState<string | null>(null);
   const [salvo, setSalvo] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   /** saude por slug: probe de 1 token via /api/ia/modelos — undefined =
-   *  não provado (fora do cap de 8), medindo = probe em voo */
+   *  não provado (fora do cap de 8), medindo = probe em voo. Na demo vem
+   *  pronto do dataset (probe real não roda sem provider) */
   const [saude, setSaude] = useState<
     Record<string, { ok: boolean; ms: number; status: number } | "medindo">
-  >({});
+  >(() => (demo ? DEMO_IA_SAUDE : {}));
   const salvoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
+    if (demo) return; // lazy init já cobriu — nenhum fetch em demo
     let vivo = true;
 
     // 1) ia_config é o único fetch que destrava a tela — resolve sozinho
@@ -205,7 +252,7 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
     return () => {
       vivo = false;
     };
-  }, [supabase]);
+  }, [supabase, demo]);
 
   const flash = useCallback((campo: string) => {
     setSalvo(campo);
@@ -217,6 +264,15 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
     async (campo: string, chave: string, valor: unknown) => {
       setErro(null);
       setSalvando(campo);
+      if (demo) {
+        // demo: o estado local já mudou; o spinner+check ainda piscam
+        // pra leitura ficar igual, mas nada persiste — nem ia_config
+        // existe fora da sessão real
+        await new Promise((r) => setTimeout(r, 350));
+        setSalvando(null);
+        flash(campo);
+        return;
+      }
       const { data: u } = await supabase.auth.getUser();
       const { error } = await supabase.from("ia_config").upsert({
         chave,
@@ -231,7 +287,7 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
       }
       flash(campo);
     },
-    [supabase, flash]
+    [supabase, flash, demo]
   );
 
   // a chave `modelos` no banco carrega primários + cadeias juntos —
@@ -347,6 +403,11 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
         <p className="text-sm font-semibold">Ajustes do assistente</p>
       </div>
       <div className="min-h-0 flex-1 space-y-5 overflow-y-auto p-4">
+        {demo && (
+          <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
+            Na demonstração, os ajustes são de exemplo e nada é gravado.
+          </p>
+        )}
         {erro && <p className="text-sm text-[var(--danger-text)]">{erro}</p>}
         {!cfg ? (
           /* skeleton no formato do painel — label+select+segmento por
@@ -687,18 +748,20 @@ export function AssistenteConfig({ onVoltar }: { onVoltar: () => void }) {
               })()}
             </section>
 
-            <section className="space-y-2 border-t border-border pt-4">
-              <div>
-                <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                  IA externa (MCP)
-                </h3>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Token pra conectar Claude, Cursor ou outro cliente MCP.
-                  Carrega o seu papel; quem tem acesso revoga aqui.
-                </p>
-              </div>
-              <TokensMcp textos={{ gerar: "Gerar novo token" }} />
-            </section>
+            {!demo && (
+              <section className="space-y-2 border-t border-border pt-4">
+                <div>
+                  <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                    IA externa (MCP)
+                  </h3>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Token pra conectar Claude, Cursor ou outro cliente MCP.
+                    Carrega o seu papel; quem tem acesso revoga aqui.
+                  </p>
+                </div>
+                <TokensMcp textos={{ gerar: "Gerar novo token" }} />
+              </section>
+            )}
           </>
         )}
       </div>

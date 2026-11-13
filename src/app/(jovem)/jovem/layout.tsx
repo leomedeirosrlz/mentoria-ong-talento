@@ -131,10 +131,11 @@ export default async function JovemLayout({
 
   const notificacoes = await getNotificacoes();
   // bolha do assistente pro jovem (pacote liza nov/2026, sdd D5): a MESMA
-  // flag IA_BOLHA do shell de staff — off por padrão, inclusive em prod.
-  // O /api/ia/chat já responde a mentorado; as tools dele são read-only e
-  // leem o recorte que as views jovem_* entregam.
-  const acessoIa = process.env.IA_BOLHA === "1";
+  // flag IA_BOLHA do shell de staff — off por padrão fora da demo, onde
+  // ela sempre aparece (vitrine do assistente, REALIZA-382). O /api/ia/chat
+  // já responde a mentorado; as tools dele são read-only e leem o recorte
+  // que as views jovem_* entregam.
+  const acessoIa = demo != null || process.env.IA_BOLHA === "1";
   return (
     <JovemShell
       me={me}

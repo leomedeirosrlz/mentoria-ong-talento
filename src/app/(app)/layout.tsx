@@ -164,11 +164,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // que a página antiga passava
   const papeisIa =
     me.papeis && me.papeis.length ? me.papeis : me.role ? [me.role] : [];
-  // a bolha está DESLIGADA por padrão enquanto o assistente fecha a rodada
-  // de UI (gravação da demo, out/2026). IA_BOLHA=1 liga no ambiente — o e2e
-  // do app liga explicitamente; sem a flag não há entrada nenhuma pra staff
+  // a bolha está DESLIGADA por padrão fora da demo enquanto o assistente
+  // fecha a rodada de UI (gravação da demo, out/2026). IA_BOLHA=1 liga no
+  // ambiente — na demo ela sempre aparece: é a vitrine do assistente, com
+  // respostas e ajustes de exemplo (REALIZA-382)
   const acessoIa =
-    process.env.IA_BOLHA === "1" &&
+    (demo != null || process.env.IA_BOLHA === "1") &&
     ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"].some(
       (r) => papeisIa.includes(r as AppRole)
     );

@@ -8,6 +8,8 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { executarProximoItem } from "@/lib/ia/evals";
+import { demoRole } from "@/lib/demo/mode";
+import { demoEvalExecutar } from "@/lib/demo/ia-evals";
 
 const jsonErro = (mensagem: string, status: number) =>
   NextResponse.json({ error: mensagem }, { status });
@@ -17,6 +19,16 @@ const Body = z
   .strict();
 
 export async function POST(req: Request) {
+  // demo: o laço do painel executa a grade simulada — um POST por item,
+  // avanço persistido no cookie (ver lib/demo/ia-evals)
+  const demo = await demoRole();
+  if (demo) {
+    if (demo !== "coordenacao")
+      return jsonErro("Área da coordenação.", 403);
+    const body = Body.safeParse(await req.json().catch(() => null));
+    if (!body.success) return jsonErro("run_id inválido.", 400);
+    return NextResponse.json(await demoEvalExecutar(body.data.run_id));
+  }
   const supabase = await createClient();
   const { data: claims } = await supabase.auth.getClaims();
   if (!claims?.claims?.sub)
