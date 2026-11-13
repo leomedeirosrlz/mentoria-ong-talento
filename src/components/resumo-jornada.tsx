@@ -212,7 +212,7 @@ export function ResumoJornadaSection({
               ? ` · encerramento ${formatDate(resumo.fim)}`
               : resumo.status === "concluida" || resumo.status === "encerrada"
                 ? " · jornada fechada"
-                : ""}
+                : " · em andamento"}
           </p>
           <Collapsible.Trigger className="group -mx-2 mt-1 flex min-h-11 w-[calc(100%+1rem)] cursor-pointer items-center gap-1.5 rounded-lg px-2 py-2 text-left text-sm text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring print:hidden">
             Ver os dados completos

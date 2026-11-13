@@ -41,22 +41,23 @@ import { cn } from "@/lib/utils";
 /** Mesma escala do SemaforoDot/TrajetoriaAvaliacoes: verde → lima → âmbar →
  *  vermelho, por avaliação do mentor. */
 const COR_AVALIACAO: Record<string, string> = {
-  excelente: "bg-[var(--ok)]",
-  boa: "bg-[var(--brand-lime)]",
-  regular: "bg-[var(--warn)]",
-  baixa: "bg-[var(--danger)]",
+  excelente: "bg-[var(--ok)] text-[var(--status-foreground)]",
+  // sobre o lima a tinta é a --brand-ink, nunca branco (regra do token)
+  boa: "bg-[var(--brand-lime)] text-[var(--brand-ink)]",
+  regular: "bg-[var(--warn)] text-[var(--status-foreground)]",
+  baixa: "bg-[var(--danger)] text-[var(--status-foreground)]",
 };
 
 /** Escala de estrelas do jovem (1–5) traduzida pra mesma gramática —
  *  usada no recorte dela, onde não há avaliação do mentor pra colorir. */
 const COR_ESTRELA = (n: number): string =>
   n >= 5
-    ? "bg-[var(--ok)]"
+    ? "bg-[var(--ok)] text-[var(--status-foreground)]"
     : n === 4
-      ? "bg-[var(--brand-lime)]"
+      ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
       : n === 3
-        ? "bg-[var(--warn)]"
-        : "bg-[var(--danger)]";
+        ? "bg-[var(--warn)] text-[var(--status-foreground)]"
+        : "bg-[var(--danger)] text-[var(--status-foreground)]";
 
 function Secao({
   titulo,
@@ -132,7 +133,12 @@ function TiraEncontros({
   const a11y = encontros
     .map(
       (e) =>
-        `${e.numero}º${e.avaliacao ? ` ${AVALIACAO_LABEL[e.avaliacao]?.toLowerCase() ?? e.avaliacao}` : ""}`
+        `${e.numero}º` +
+        (e.avaliacao
+          ? ` ${AVALIACAO_LABEL[e.avaliacao]?.toLowerCase() ?? e.avaliacao}`
+          : starSeries?.[e.numero - 1] != null
+            ? ` ${estrelasTexto(starSeries[e.numero - 1]!)}`
+            : "")
     )
     .join(", ");
   return (
@@ -165,10 +171,10 @@ function TiraEncontros({
               e == null
                 ? "bg-muted text-muted-foreground shadow-[inset_0_0_0_1px_var(--border)]"
                 : e.avaliacao
-                  ? cn(COR_AVALIACAO[e.avaliacao], "text-[var(--status-foreground)]")
+                  ? COR_AVALIACAO[e.avaliacao]
                   : estrelas != null
-                    ? cn(COR_ESTRELA(estrelas), "text-[var(--status-foreground)]")
-                    : "bg-muted-foreground/45 text-[var(--status-foreground)]"
+                    ? COR_ESTRELA(estrelas)
+                    : "bg-muted-foreground/45 text-foreground"
             )}
           >
             {numero}
@@ -269,11 +275,13 @@ export function RetrospectivaJornada({
             />
             <p className="mt-1.5 text-xs text-muted-foreground">
               Um bloco por encontro
-              {temAvaliacao
-                ? " · a cor é a avaliação do mentor"
-                : temEstrela
-                  ? " · a cor é a estrela do jovem"
-                  : ""}
+              {temAvaliacao && temEstrela
+                ? " · a cor é a avaliação do mentor ou a estrela do jovem"
+                : temAvaliacao
+                  ? " · a cor é a avaliação do mentor"
+                  : temEstrela
+                    ? " · a cor é a estrela do jovem"
+                    : ""}
               {dados.encontros.length < totalSlots
                 ? " · contorno = não realizado"
                 : ""}
