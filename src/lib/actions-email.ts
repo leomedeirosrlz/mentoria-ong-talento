@@ -224,11 +224,14 @@ export async function dispararMaterialEmail({
   autorId: string;
   excluirRoles?: string[];
 }): Promise<ResumoEnvioEmail> {
-  // mesma regra da página de materiais: path ganha da url; sem nenhum dos
-  // dois o material está "a caminho" e o CTA cai na biblioteca
-  const destino = material.path
-    ? `${SITE_URL}/api/material/${material.id}`
-    : (material.url ?? `${SITE_URL}/materiais`);
+  // mesma regra da página de materiais: "doc:<slug>" abre o documento
+  // nativo, path de arquivo ganha da url; sem nenhum dos dois o material
+  // está "a caminho" e o CTA cai na biblioteca
+  const destino = material.path?.startsWith("doc:")
+    ? `${SITE_URL}/materiais/documento/${material.path.slice(4)}`
+    : material.path
+      ? `${SITE_URL}/api/material/${material.id}`
+      : (material.url ?? `${SITE_URL}/materiais`);
   const html = emailMaterial({
     titulo: material.titulo,
     descricao: material.descricao,

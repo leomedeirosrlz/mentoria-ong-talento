@@ -187,7 +187,8 @@ export function emailAviso({
 }
 
 /** Aviso de material novo — card com chip do tipo + descrição e CTA pro
- *  destino real (arquivo assinado via /api/material ou o link externo). */
+ *  destino real (documento nativo, arquivo assinado via /api/material ou
+ *  o link externo). */
 export function emailMaterial({
   titulo,
   descricao,

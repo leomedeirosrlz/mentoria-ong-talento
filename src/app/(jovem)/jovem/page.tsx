@@ -37,12 +37,12 @@ import {
   formatDate,
   formatDateTime,
   formatDiaMes,
-  linkSeguro,
   maxEncontros,
   passoEsp,
   toDateStr,
   waLink,
 } from "@/lib/ciclo";
+import { hrefMaterial } from "@/lib/materiais";
 import { agrupaContatosPorPessoa } from "@/lib/jovem-contatos";
 import {
   datasOficiaisDe,
@@ -841,7 +841,7 @@ export default async function JovemHome() {
             <CardContent className="divide-y divide-border/60 p-0">
               {materiaisVisiveis.slice(0, 3).map((m) => {
                 const Icone = TIPO_ICONE_MATERIAL[m.tipo];
-                const href = m.path ? `/api/material/${m.id}` : linkSeguro(m.url);
+                const href = hrefMaterial(m, "/jovem/materiais/documento");
                 const interno = (
                   <>
                     <span className="grid size-8 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
