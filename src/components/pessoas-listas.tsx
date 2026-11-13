@@ -1331,7 +1331,9 @@ export function PessoasListas({
           turma absorve os inativos nos grupos com chip próprio */}
       {!porTurma && souCoord && inativasExibidas.length > 0 && (
         <Collapsible.Root
-          open={inativosAberto || Boolean(q)}
+          open={
+            inativosAberto || Boolean(q) || statusSelEf === "inativo"
+          }
           onOpenChange={setInativosAberto}
           className="space-y-2"
         >
