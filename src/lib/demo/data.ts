@@ -3365,15 +3365,14 @@ function build(): DemoData {
     { numero: 5, titulo: "Encerramento, reflexão e celebração", foco: "Reflexão sobre aprendizados; desafios futuros; feedback do jovem; registro final no PDM" },
   ];
 
-  // o catálogo de prod depois da 0135/0138 e do flip da 0185 — 30 linhas,
-  // todas acionáveis: roteiros das 16 semanas e os instrumentos de corpus
-  // (Roda, Definindo Metas) são documentos nativos (path "doc:<slug>" →
-  // página do app), Perguntas Eficazes e os cronogramas por turma seguem
-  // PDF. Arquivos resolvem pro PDF placeholder da rota demo; doc: abre o
-  // doc real.
+  // o catálogo de prod depois da 0135/0138 e dos flips da 0185/0194 — 30
+  // linhas, todas acionáveis: guias, roteiros das 16 semanas, Perguntas
+  // Eficazes, cronogramas por turma e os instrumentos de corpus são
+  // documentos nativos (path "doc:<slug>" → página do app); os demais
+  // itens são links externos. doc: abre o doc real da demo.
   const catalogo: Material[] = [
-    { id: uid(0x2001), titulo: "Guia do Mentor DPP", descricao: "Metodologia completa: jornada, 16 encontros, instrumentos e templates.", tipo: "guia", url: null, path: "materiais/guia-dpp.pdf", audiencia: "dpp", encontro_num: null, ordem: 1 },
-    { id: uid(0x2002), titulo: "Guia do Mentor Especialista", descricao: "Metodologia da mentoria com especialista: 5 encontros e cinco funções.", tipo: "guia", url: null, path: "materiais/guia-especialista.pdf", audiencia: "especialista", encontro_num: null, ordem: 2 },
+    { id: uid(0x2001), titulo: "Guia do Mentor DPP", descricao: "Metodologia completa: jornada, 16 encontros, instrumentos e templates.", tipo: "guia", url: null, path: "doc:guia-mentor-dpp", audiencia: "dpp", encontro_num: null, ordem: 1 },
+    { id: uid(0x2002), titulo: "Guia do Mentor Especialista", descricao: "Metodologia da mentoria com especialista: 5 encontros e cinco funções.", tipo: "guia", url: null, path: "doc:guia-mentor-especialista", audiencia: "especialista", encontro_num: null, ordem: 2 },
     ...Array.from({ length: 16 }, (_, i) => i + 1).map((n, i) => ({
       id: uid(0x2010 + i),
       titulo: `Roteiro Semana ${n} — ${["Boas-vindas e histórias de vida","Avaliação por terceiros e visão de futuro","Metas e checagem SMART","Submetas e compromisso","Primeiros resultados","Superando barreiras","Ajustes no plano","Monitoramento e responsabilidade","Revisão de meio de percurso","O mentor como espelho","Rede de apoio e novos espaços","Leitura da Roda da Vida","Metas das áreas prioritárias","Desdobramento e plano de continuidade","Reflexão e reconhecimento","Encerramento e celebração"][i]}`,
@@ -3391,9 +3390,9 @@ function build(): DemoData {
     { id: uid(0x2033), titulo: "Roda da Vida (instrumento)", descricao: "Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.", tipo: "template", url: null, path: "doc:instrumento-roda-da-vida", audiencia: "dpp", encontro_num: 12, ordem: 22 },
     { id: uid(0x2034), titulo: "Feedback Construtivo", descricao: "Instrumento do guia: o modelo de fala e os cuidados para feedback sobre comportamento negativo.", tipo: "conteudo", url: null, path: "doc:feedback-construtivo", audiencia: "todos", encontro_num: null, ordem: 23 },
     { id: uid(0x2035), titulo: "Instrumento: Definindo Metas", descricao: "Metas SMART do mentorado — instrumento de preenchimento entre encontros.", tipo: "template", url: null, path: "doc:instrumento-definindo-minhas-metas", audiencia: "dpp", encontro_num: null, ordem: 24 },
-    { id: uid(0x2036), titulo: "Perguntas Eficazes", descricao: "Documento complementar do guia: o que são, o que evitar e o banco de perguntas por momento da conversa.", tipo: "conteudo", url: null, path: "materiais/perguntas-eficazes.pdf", audiencia: "dpp", encontro_num: null, ordem: 25 },
-    { id: uid(0x2037), titulo: "Cronograma do programa — Turma 1", descricao: null, tipo: "conteudo", url: null, path: "materiais/cronograma-turma-1.pdf", audiencia: "dpp", encontro_num: null, ordem: 26 },
-    { id: uid(0x2038), titulo: "Cronograma do programa — Turma 2", descricao: null, tipo: "conteudo", url: null, path: "materiais/cronograma-turma-2.pdf", audiencia: "dpp", encontro_num: null, ordem: 27 },
+    { id: uid(0x2036), titulo: "Perguntas Eficazes", descricao: "Documento complementar do guia: o que são, o que evitar e o banco de perguntas por momento da conversa.", tipo: "conteudo", url: null, path: "doc:perguntas-eficazes", audiencia: "dpp", encontro_num: null, ordem: 25 },
+    { id: uid(0x2037), titulo: "Cronograma do programa — Turma 1", descricao: null, tipo: "conteudo", url: null, path: "doc:ciclo-cronograma", audiencia: "dpp", encontro_num: null, ordem: 26 },
+    { id: uid(0x2038), titulo: "Cronograma do programa — Turma 2", descricao: null, tipo: "conteudo", url: null, path: "doc:ciclo-turma2-cronograma", audiencia: "dpp", encontro_num: null, ordem: 27 },
     { id: uid(0x2039), titulo: "Plataforma de mentoria", descricao: "Onde os encontros oficiais são agendados e avaliados.", tipo: "link", url: "https://mentoria.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 28 },
     { id: uid(0x203a), titulo: "Formação EaD gratuita", descricao: "Trilha opcional com certificado para mentores.", tipo: "link", url: "https://ead.realiza.vc", path: null, audiencia: "todos", encontro_num: null, ordem: 29 },
     { id: uid(0x203b), titulo: "Checklist de competências do mentor", descricao: "As 10 competências do guia para marcar antes do ciclo e no 16º encontro.", tipo: "template", url: null, path: "doc:checklist-competencias", audiencia: "dpp", encontro_num: null, ordem: 30 },

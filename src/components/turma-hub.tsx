@@ -188,9 +188,9 @@ export function TurmaHubCard({
           {saude.emAndamento}
         </b>{" "}
         {saude.emAndamento === 1 ? "dupla ativa" : "duplas ativas"}
-        {saude.pausadas + saude.concluidas + saude.desistentes + saude.encerradas >
+        {saude.pausadas + saude.concluidas + saude.encerradas >
           0 &&
-          ` · ${saude.pausadas + saude.concluidas + saude.desistentes + saude.encerradas} pausadas, concluídas ou encerradas`}
+          ` · ${saude.pausadas + saude.concluidas + saude.encerradas} pausadas, concluídas ou encerradas`}
         {saude.risco > 0 && (
           <span className="font-semibold text-[var(--danger-text)]">
             {" "}

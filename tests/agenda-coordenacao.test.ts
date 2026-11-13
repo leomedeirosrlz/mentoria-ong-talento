@@ -5,6 +5,7 @@ import {
   itensSemanaProgramaMentor,
   numerosDaSemana,
   paraAcompanhar,
+  resolveRecorteFatia,
   resumosPorCronograma,
   saudeDoRecorte,
   sinteseMonitoramento,
@@ -1247,7 +1248,7 @@ describe("numerosDaSemana — opções do toggle por recorte", () => {
 
 // ============================================================
 describe("saudeDoRecorte — situação canônica por fatias", () => {
-  it("separa Encerrada formal de Desistente; emAndamento = risco + atenção + em dia", () => {
+  it("encerradas cobre desistência + fechamento formal; emAndamento = risco + atenção + em dia", () => {
     const duplas = [
       mkDupla({ id: "dA" }), // ativa — cai em risco/atencao/emDia conforme o semáforo
       mkDupla({ id: "dP", status: "pausada" }),
@@ -1260,13 +1261,33 @@ describe("saudeDoRecorte — situação canônica por fatias", () => {
       mkDupla({ id: "dO", status: "encerrada", desfecho: "outro" }),
     ];
     const s = saudeDoRecorte(duplas, EVENTOS, AGORA_SEG);
-    expect(s.desistentes).toBe(3); // desistencia_* + legado
-    expect(s.encerradas).toBe(2); // remanejada + outro
+    // desistencia_* + legado + remanejada + outro — o desfecho distingue
+    // na linha, a fatia é uma só
+    expect(s.encerradas).toBe(5);
     expect(s.concluidas).toBe(2);
     expect(s.pausadas).toBe(1);
     expect(s.emAndamento).toBe(1);
     expect(s.emAndamento).toBe(s.risco + s.atencao + s.emDia);
     // o total reconcilia com o conjunto — nenhuma dupla some da conta
     expect(s.total).toBe(duplas.length);
+  });
+});
+
+// ============================================================
+describe("resolveRecorteFatia — ?recorte= → fatia (REALIZA-377)", () => {
+  it("fatias atuais passam direto", () => {
+    for (const r of ["risco", "atencao", "andamento", "pausada", "concluida", "encerrada", "apoio"] as const)
+      expect(resolveRecorteFatia(r)).toBe(r);
+  });
+
+  it("deep link antigo 'desistente' aterrissa em 'encerrada'", () => {
+    expect(resolveRecorteFatia("desistente")).toBe("encerrada");
+  });
+
+  it("desconhecido/vazio cai fora — nunca chip fantasma", () => {
+    expect(resolveRecorteFatia("bogus")).toBeNull();
+    expect(resolveRecorteFatia("")).toBeNull();
+    expect(resolveRecorteFatia(null)).toBeNull();
+    expect(resolveRecorteFatia(undefined)).toBeNull();
   });
 });

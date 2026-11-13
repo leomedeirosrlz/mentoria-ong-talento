@@ -10,8 +10,7 @@ import {
   MagnifyingGlass,
   PuzzlePiece,
 } from "@phosphor-icons/react";
-import { linkSeguro } from "@/lib/ciclo";
-import { AUDIENCIA_LABEL, audienciasDe } from "@/lib/materiais";
+import { AUDIENCIA_LABEL, audienciasDe, hrefMaterial } from "@/lib/materiais";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
@@ -79,13 +78,8 @@ function Linha({
   // arquivo oficial ganha da url externa; "doc:<slug>" é documento nativo
   // (página do app); sem os três o material ainda não chegou ("em breve"
   // pro leitor, "sem conteúdo" pra coord que publica)
-  const urlOk = linkSeguro(m.url);
   const ehDoc = m.path?.startsWith("doc:") ?? false;
-  const href = ehDoc
-    ? `/materiais/documento/${m.path!.slice(4)}`
-    : m.path
-      ? `/api/material/${m.id}`
-      : urlOk;
+  const href = hrefMaterial(m);
   const meta = [
     TIPO_LABEL[m.tipo],
     m.encontro_num != null ? `Encontro ${m.encontro_num}` : null,

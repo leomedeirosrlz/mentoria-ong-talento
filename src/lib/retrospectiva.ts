@@ -1,5 +1,9 @@
 import { DIFICULDADE_LABEL, PROXIMO_PASSO_LABEL } from "./ciclo";
 import {
+  resumoAvaliacaoJovem,
+  type AvaliacaoJovemResumo,
+} from "./avaliacao-agregado";
+import {
   dadosResumoJornada,
   prazoTrilhaEspecialista,
   type DuplaParaResumo,
@@ -81,6 +85,10 @@ export type DadosRetrospectiva = {
     final: RetroAplicacao | null;
   } | null;
   pdm: PdmResumo | null;
+  /** Star series the viewer may see per encontro slot (1..total, null on
+   *  holes) — feeds the sparkline. Null when the caller's cut carries no
+   *  series (the DPP mentor only gets the quantized media). */
+  starSeries: (number | null)[] | null;
 };
 
 type DuplaParaRetro = Omit<
@@ -150,6 +158,13 @@ export function dadosRetrospectiva(input: {
     campos: FormularioCampo[];
     entregas: EntregaRetro[];
   }[];
+  /** the viewer-cut young-person summary (REALIZA-71) — forwarded into
+   *  the resumo so the retro can show the tile it used to lack */
+  avaliacaoJovem?: AvaliacaoJovemResumo | null;
+  /** raw stars by encontro numero — ONLY what the viewer's policy already
+   *  released (staff/jovem full series; the DPP mentor passes nothing:
+   *  his cut is the quantized media inside `avaliacaoJovem`) */
+  starSeries?: { numero: number; estrelas: number }[];
   /** mentor/staff view → include internal record fields; mentee → false */
   comNotasInternas: boolean;
 }): DadosRetrospectiva {
@@ -252,21 +267,43 @@ export function dadosRetrospectiva(input: {
         }
       : null;
 
+  const resumo = dadosResumoJornada(
+    dupla,
+    input.passos,
+    input.eventos,
+    input.fim,
+    hoje,
+    input.pdm ?? null,
+    input.avaliacaoJovem ?? null
+  );
+
+  // slots 1..total alinhados à trilha — dupla histórica sem cronograma usa
+  // o maior nº realizado pra não encolher a série no vazio
+  const porNumero = new Map(
+    (input.starSeries ?? []).map((s) => [s.numero, s.estrelas])
+  );
+  const starSeries = porNumero.size
+    ? Array.from(
+        {
+          length: Math.max(
+            resumo.total,
+            ...encontros.map((e) => e.numero),
+            ...porNumero.keys()
+          ),
+        },
+        (_, i) => porNumero.get(i + 1) ?? null
+      )
+    : null;
+
   return {
     desbloqueada: enc16 || fechada || prazoPassou,
-    resumo: dadosResumoJornada(
-      dupla,
-      input.passos,
-      input.eventos,
-      input.fim,
-      hoje,
-      input.pdm ?? null
-    ),
+    resumo,
     encontros,
     combinados,
     roda,
     checklist,
     pdm: input.pdm ?? null,
+    starSeries,
   };
 }
 
@@ -338,6 +375,13 @@ type JovemRetroInput = {
     campos: FormularioCampo[];
     entregas: EntregaRetro[];
   }[];
+  /** as avaliações de encontro DELA (getJovemAvaliacoes + embed do nº) —
+   *  alimentam o tile "Avaliação do jovem" e a sparkline da retrospectiva */
+  avaliacoes?: {
+    numero: number;
+    estrelas: number;
+    temas?: string[] | null;
+  }[];
   pdm?: PdmResumo | null;
   /** a RPC decide quem destrava — a lib não repete a régua */
   desbloqueada: boolean;
@@ -406,6 +450,12 @@ export function dadosRetrospectivaJovem(
     instrumentos: (input.instrumentos ?? []).filter(
       (i) => i.sistema !== "competencias_mentor"
     ),
+    // dela é a série inteira — ela vê as próprias estrelas
+    avaliacaoJovem: resumoAvaliacaoJovem(input.avaliacoes ?? []),
+    starSeries: (input.avaliacoes ?? []).map((a) => ({
+      numero: a.numero,
+      estrelas: a.estrelas,
+    })),
     comNotasInternas: false,
   });
 

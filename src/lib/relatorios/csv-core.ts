@@ -1,5 +1,5 @@
-// Núcleo compartilhado dos exports CSV (/api/export e os previews do hub
-// /relatorios). Convenção consolidada: delimitador `;` + tudo entre aspas =
+// Núcleo compartilhado dos exports CSV (/api/export e os previews de
+// /relatorios/operacionais). Convenção consolidada: delimitador `;` + tudo entre aspas =
 // Excel pt-BR; `""` escapa aspas internas; BOM no início pro Excel abrir os
 // acentos como UTF-8; CRLF em toda linha; filename datado.
 

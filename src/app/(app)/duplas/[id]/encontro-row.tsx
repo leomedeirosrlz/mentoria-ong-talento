@@ -22,6 +22,7 @@ import {
   semanaBounds,
   type PassoGuia,
 } from "@/lib/ciclo";
+import { hrefMaterial } from "@/lib/materiais";
 import type { DestinoWA } from "@/components/whatsapp-rapido";
 import { WhatsAppRapido } from "@/components/whatsapp-rapido";
 import { AvaliacaoBadge } from "@/components/semaforo";
@@ -174,9 +175,7 @@ export function EncontroRow({
   // material do encontro: com destino (arquivo oficial ou url) vira chip; sem, só o título muted
   const material = materiais.find((m) => m.path || m.url) ?? materiais[0] ?? null;
   const materiaisComDestino = materiais.filter((m) => m.path || linkSeguro(m.url));
-  const materialHref = material?.path
-    ? `/api/material/${material.id}`
-    : linkSeguro(material?.url);
+  const materialHref = material ? hrefMaterial(material) : null;
   // a chamada é a ação nº1 na janela do encontro (15 min antes a 2h depois do
   // início) — vira CTA primário; fora da janela fica chip de apoio comum
   const msAteInicio = encontro?.data_hora
@@ -397,7 +396,7 @@ export function EncontroRow({
                         {materiaisComDestino.map((m) => (
                           <li key={m.id}>
                             <a
-                              href={m.path ? `/api/material/${m.id}` : linkSeguro(m.url)!}
+                              href={hrefMaterial(m)!}
                               target="_blank"
                               rel="noopener noreferrer"
                               className="flex min-h-11 items-center gap-2 rounded-md px-2 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9"

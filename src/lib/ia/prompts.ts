@@ -25,7 +25,7 @@ export function systemPromptIa(papeis: AppRole[], pagina?: string): string {
   const soJovem = papeis.length > 0 && papeis.every((p) => p === "mentorado");
   const listaRotas = soJovem
     ? "/jovem (sua página), /jovem/agenda, /jovem/materiais, /jovem/perfil e /jovem/ajuda. Ex.: [sua agenda](/jovem/agenda). Não invente rotas fora dessa lista"
-    : "/duplas (lista), /duplas/<id> (ficha), /agenda, /registros, /materiais, /pessoas/<id>, /chamados, /relatorios. Ex.: [Ver a ficha da dupla](/duplas/abc-123). Não invente rotas fora dessa lista";
+    : "/duplas (lista), /duplas/<id> (ficha), /agenda, /registros, /materiais, /pessoas/<id>, /chamados, /relatorios, /relatorios/operacionais. Ex.: [Ver a ficha da dupla](/duplas/abc-123). Não invente rotas fora dessa lista";
   const vozJovem = soJovem
     ? `
 
@@ -63,7 +63,7 @@ SQL, código e comandos sempre em fenced block com a linguagem (\`\`\`sql, \`\`\
 
 Quando sugerir um próximo passo que existe na plataforma, inclua o link interno em markdown — a interface transforma em botão de ação. Rotas: ${listaRotas}.
 
-Ao citar um documento oficial do acervo, linke em markdown pra /materiais/documento/<slug> (ex.: [Feedback Construtivo](/materiais/documento/feedback-construtivo)) — a interface mostra na fileira "Fontes". Guias que não têm slug próprio (Guia do Mentor, cronograma): cite em texto e linke a seção, ex.: [a biblioteca de materiais](/materiais?aba=biblioteca).
+Ao citar um documento oficial do acervo, linke em markdown pra /materiais/documento/<slug> (ex.: [Feedback Construtivo](/materiais/documento/feedback-construtivo), [Guia do Mentor DPP](/materiais/documento/guia-mentor-dpp)) — a interface mostra na fileira "Fontes". O que não tem página própria (links externos do catálogo): cite em texto e linke a seção, ex.: [a biblioteca de materiais](/materiais?aba=biblioteca).
 
 O usuário tem o papel de ${papel}. Hoje é ${hoje} — interprete "essa semana", "ontem", "em dezembro" e prazos relativos a partir dessa data. O fuso da operação é America/Sao_Paulo: datas e horários que as ferramentas devolvem vêm em ISO UTC — converta pro horário de Brasília antes de falar (22:00Z são 19h em São Paulo), nunca estime a conversão. As ferramentas já respeitam as permissões dele — e permissão é bastidor, nunca assunto da resposta: NUNCA exponha a mecânica (ferramenta, consulta, escopo, permissão, papel, nome de função) nem cite consulta que negou ou falhou. Quando uma ferramenta negar ou não existir, diga só que a pessoa não tem acesso a essa informação e sugira o próximo passo: falar com a coordenação ou [abrir um chamado](/chamados). Se a pergunta mistura o que ela vê com o que não vê, responda a parte dela sem enumerar o que ficou de fora.
 

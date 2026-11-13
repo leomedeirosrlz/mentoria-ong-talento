@@ -1,3 +1,4 @@
+import { linkSeguro } from "./ciclo";
 import type { AppRole } from "./types";
 import { temPapel } from "./types";
 
@@ -82,6 +83,19 @@ export function veMaterialDaTurma(
 ): boolean {
   const t = turmaDoMaterial(m.titulo);
   return t == null || turmas == null || turmas.has(t);
+}
+
+/** Destino único do material: "doc:<slug>" é documento nativo (a base muda
+ *  por casa — /materiais no staff, /jovem no mentorado); arquivo oficial
+ *  ganha da url externa; sem os três não há link pra abrir. Resolver aqui
+ *  porque o path "doc:" não passa pelo /api/material (a rota devolve 404
+ *  pra ele de propósito — o PDF de storage deixou de existir na 0194). */
+export function hrefMaterial(
+  m: { id: string; path?: string | null; url?: string | null },
+  docBase = "/materiais/documento"
+): string | null {
+  if (m.path?.startsWith("doc:")) return `${docBase}/${m.path.slice(4)}`;
+  return m.path ? `/api/material/${m.id}` : linkSeguro(m.url);
 }
 
 /** Valor legado (`audiencia` de uma coluna) derivado do array — o código

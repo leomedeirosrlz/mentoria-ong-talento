@@ -28,9 +28,12 @@ import {
   ultimoRegistro,
 } from "@/lib/ciclo";
 import { prazoTrilhaEspecialista } from "@/lib/encerramento";
-import { saudeDoRecorte, type RecorteFatia } from "@/lib/agenda-coordenacao";
 import {
-  ehDesistente,
+  resolveRecorteFatia,
+  saudeDoRecorte,
+  type RecorteFatia,
+} from "@/lib/agenda-coordenacao";
+import {
   situacaoDaDupla,
   SITUACAO_DUPLA_LABEL,
 } from "@/lib/dupla-desfecho";
@@ -46,7 +49,6 @@ import type {
   EspecialistaEvento,
 } from "@/lib/types";
 import { cn, normaliza } from "@/lib/utils";
-import { useFadeX } from "@/lib/use-fade-x";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { DuplaLinha, GRID_DUPLA_LG, type TomSituacao } from "@/components/dupla-linha";
@@ -64,7 +66,7 @@ import {
 } from "@/components/ui/dialog";
 import { FiltrosButton } from "@/components/ui/filtros-button";
 import { OVERLINE } from "@/components/ui/filtro-opcoes";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import { Input } from "@/components/ui/input";
 import {
   Select,
@@ -218,7 +220,7 @@ function LinhaDupla({
   mostrarSupervisor,
   wa,
   menu,
-  dimDesistentes,
+  dimEncerradas,
   i,
 }: {
   d: Dupla;
@@ -230,9 +232,10 @@ function LinhaDupla({
   wa: React.ReactNode;
   /** o ⋯ real — o caller decide o conteúdo por papel */
   menu?: React.ReactNode;
-  /** na visão "todas" a desistente esmaece — está fora da régua, não é
-   *  prioridade do radar (a ficha continua a um clique) */
-  dimDesistentes?: boolean;
+  /** na visão "todas" a encerrada cedo esmaece (desistente e fechamento
+   *  formal juntos) — está fora da régua, não é prioridade do radar (a
+   *  ficha continua a um clique) */
+  dimEncerradas?: boolean;
   i: number;
 }) {
   const estado = estadoDaDupla(d, saude);
@@ -309,7 +312,7 @@ function LinhaDupla({
       menu={menu}
       fichaHref={`/duplas/${d.id}`}
       fichaNome={(d.mentorado.nome_social ?? d.mentorado.nome).split(" ")[0]}
-      className={dimDesistentes && ehEncerradaCedo(d) ? "opacity-60" : undefined}
+      className={dimEncerradas && ehEncerradaCedo(d) ? "opacity-60" : undefined}
     />
   );
 }
@@ -466,14 +469,14 @@ const CATS: { id: FiltroCat; nome: string; dot: string | null }[] = [
   { id: "andamento", nome: "Em andamento", dot: null },
   { id: "pausada", nome: "Pausadas", dot: null },
   { id: "concluida", nome: "Concluídas", dot: null },
-  { id: "desistente", nome: "Desistentes", dot: null },
   { id: "encerrada", nome: "Encerradas", dot: null },
   { id: "apoio", nome: "Apoio", dot: null },
 ];
 
 /** Saiu da régua sem concluir (desistente ou encerrada-formal) — o que
- *  esmaece na visão "todas". Distinto do chip: lá cada uma é fatia
- *  própria; aqui as duas perdem destaque juntas. */
+ *  esmaece na visão "todas" e o que o chip "Encerradas" cobre: no modelo
+ *  canônico desistente é encerrada com desfecho, então a fatia é uma só
+ *  e a linha distingue pelo rótulo. */
 function ehEncerradaCedo(d: Dupla): boolean {
   const sit = situacaoDaDupla(d);
   return sit === "desistente" || sit === "encerrada";
@@ -481,8 +484,8 @@ function ehEncerradaCedo(d: Dupla): boolean {
 
 /** Cada chip é uma parte da mesma régua do resumo: "Em andamento" são as
  *  ativas (risco e atenção incluídas); as fechadas se separam pela
- *  situação canônica (dupla-desfecho) — "Desistentes" são as que alguém
- *  saiu antes do fim, "Encerradas" o fechamento formal da coordenação. */
+ *  situação canônica (dupla-desfecho) — "Encerradas" cobre desistência e
+ *  fechamento formal num balde só. */
 function chipBate(f: FiltroCat, d: Dupla, s: Saude): boolean {
   switch (f) {
     case "todas":
@@ -497,10 +500,8 @@ function chipBate(f: FiltroCat, d: Dupla, s: Saude): boolean {
       return d.status === "pausada";
     case "concluida":
       return situacaoDaDupla(d) === "concluida";
-    case "desistente":
-      return ehDesistente(d);
     case "encerrada":
-      return situacaoDaDupla(d) === "encerrada";
+      return ehEncerradaCedo(d);
     case "apoio":
       return s.apoio.aberto;
   }
@@ -554,7 +555,6 @@ function resumoDaLista(
   visao: VisaoDuplas
 ): {
   n: string;
-  desistentes: number;
   encerradas: number;
   itens: { texto: string; forte?: boolean }[];
 } {
@@ -566,12 +566,11 @@ function resumoDaLista(
       cont[s.semaforo === "ok" ? "andamento" : s.semaforo]++;
     else if (d.status === "pausada") cont.pausada++;
   }
-  // fechadas cedo não contam no sujeito — a mancha vai no sufixo discreto
-  const desistentes = lista.filter(ehDesistente).length;
-  const encerradas = lista.filter(
-    (d) => situacaoDaDupla(d) === "encerrada"
-  ).length;
-  const nVivas = lista.length - desistentes - encerradas;
+  // fechadas cedo não contam no sujeito — a mancha vai no sufixo discreto.
+  // desistência e fechamento formal são o mesmo balde ("encerradas"):
+  // o desfecho distingue na linha, não na contagem
+  const encerradas = lista.filter(ehEncerradaCedo).length;
+  const nVivas = lista.length - encerradas;
   const sujeito =
     visao === "especialista"
       ? `${nVivas} ${nVivas === 1 ? "trilha" : "trilhas"}`
@@ -583,20 +582,13 @@ function resumoDaLista(
     cont.pausada > 0 && { texto: `${cont.pausada} pausada${cont.pausada > 1 ? "s" : ""}` },
     cont.andamento > 0 && { texto: `${cont.andamento} em dia` },
   ].filter(Boolean) as { texto: string; forte?: boolean }[];
-  return { n: sujeito, desistentes, encerradas, itens };
+  return { n: sujeito, encerradas, itens };
 }
 
 function ResumoLinha({ resumo }: { resumo: ReturnType<typeof resumoDaLista> }) {
   return (
     <p className="mt-1 text-sm text-muted-foreground">
       {resumo.n}
-      {resumo.desistentes > 0 && (
-        <span className="text-xs">
-          {" · "}
-          {resumo.desistentes}{" "}
-          {resumo.desistentes === 1 ? "desistente" : "desistentes"}
-        </span>
-      )}
       {resumo.encerradas > 0 && (
         <span className="text-xs">
           {" · "}
@@ -915,7 +907,6 @@ function VisaoCoordenacao({
   const [painelAberto, setPainelAberto] = useState(false);
   const [draftSup, setDraftSup] = useState("todas");
   const [draftMentor, setDraftMentor] = useState("todos");
-  const { ref: chipsRef, maskStyle: chipsMask } = useFadeX<HTMLDivElement>();
 
   // link da home pousa aqui sem remontar a rota — realinha o chip quando
   // o contexto resolvido muda. Ajuste durante o render (padrão react.dev),
@@ -1015,7 +1006,7 @@ function VisaoCoordenacao({
     setSpStrVisto(spStr);
     const params = new URLSearchParams(spStr);
     const r = params.get("recorte");
-    setFiltro(CATS.some((c) => c.id === r) ? (r as FiltroCat) : "todas");
+    setFiltro(resolveRecorteFatia(r) ?? "todas");
     setBusca(params.get("q") ?? "");
     setSupSel(params.get("sup") ?? "todas");
     setMentorSel(params.get("mentor"));
@@ -1171,7 +1162,7 @@ function VisaoCoordenacao({
         mostrarSupervisor
         wa={waDa(d, s)}
         menu={menuDa(d)}
-        dimDesistentes={filtro === "todas"}
+        dimEncerradas={filtro === "todas"}
         i={i}
       />
     );
@@ -1229,10 +1220,8 @@ function VisaoCoordenacao({
       {/* chips por situação com contador; a régua de cada uma está no
           "Como calculamos" do resumo. Clicar de novo desfaz o filtro. */}
       {lista.length > 0 && (
-        <div
-          ref={chipsRef}
-          style={chipsMask}
-          className="-mx-4 mt-5 flex gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:px-0"
+        <FilterChipRow
+          className="-mx-4 mt-5 px-4 sm:mx-0 sm:px-0"
           role="group"
           aria-label="Filtrar por situação"
         >
@@ -1253,7 +1242,7 @@ function VisaoCoordenacao({
               />
             );
           })}
-        </div>
+        </FilterChipRow>
       )}
 
       {/* filtros: turma é primária e fica em chips; supervisão/mentor são
@@ -1262,14 +1251,15 @@ function VisaoCoordenacao({
       {(turmas.length > 1 || temSecundarios) && (
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-2">
           {turmas.length > 1 && (
-            <span
-              className="flex flex-wrap items-center gap-1.5"
-              role="group"
-              aria-label="Filtrar por turma"
-            >
-              <span className="text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
+            <span className="flex w-full min-w-0 items-center gap-1.5 sm:w-auto">
+              <span className="shrink-0 text-xs font-semibold uppercase tracking-[0.08em] text-muted-foreground sm:text-[11px]">
                 Turma
               </span>
+              <FilterChipRow
+                className="flex-1 gap-1.5"
+                role="group"
+                aria-label="Filtrar por turma"
+              >
               <button
                 type="button"
                 aria-pressed={turmaSel === null}
@@ -1305,6 +1295,7 @@ function VisaoCoordenacao({
                   </span>
                 </button>
               ))}
+              </FilterChipRow>
             </span>
           )}
           {temSecundarios && (
@@ -1417,21 +1408,15 @@ function VisaoCoordenacao({
       </Dialog>
 
       {/* barra da lista: contagem viva + legenda dos dots. Fechadas cedo
-          (desistente/encerrada) não inflam o número principal — a mancha
-          vai no sufixo discreto (no chip delas a contagem é delas mesmas) */}
+          não inflam o número principal — a mancha vai no sufixo discreto
+          como "encerradas" (desistência e fechamento formal no mesmo
+          balde; o desfecho distingue na linha) */}
       <div className="mb-2 mt-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-[13px] text-muted-foreground">
           {(() => {
-            const nDes = exibidas.filter(ehDesistente).length;
-            const nEnc = exibidas.filter(
-              (d) => situacaoDaDupla(d) === "encerrada"
-            ).length;
-            const nPrincipais = exibidas.length - nDes - nEnc;
-            return filtro === "desistente" ? (
-              <b className="font-semibold text-foreground">
-                {nDes} {nDes === 1 ? "desistente" : "desistentes"}
-              </b>
-            ) : filtro === "encerrada" ? (
+            const nEnc = exibidas.filter(ehEncerradaCedo).length;
+            const nPrincipais = exibidas.length - nEnc;
+            return filtro === "encerrada" ? (
               <b className="font-semibold text-foreground">
                 {nEnc} {nEnc === 1 ? "encerrada" : "encerradas"}
               </b>
@@ -1440,12 +1425,9 @@ function VisaoCoordenacao({
                 <b className="font-semibold text-foreground">
                   {nPrincipais} {nPrincipais === 1 ? "dupla" : "duplas"}
                 </b>
-                {(nDes > 0 || nEnc > 0) && (
+                {nEnc > 0 && (
                   <span className="text-xs">
-                    {nDes > 0 &&
-                      ` · ${nDes} ${nDes === 1 ? "desistente" : "desistentes"}`}
-                    {nEnc > 0 &&
-                      ` · ${nEnc} ${nEnc === 1 ? "encerrada" : "encerradas"}`}
+                    {` · ${nEnc} ${nEnc === 1 ? "encerrada" : "encerradas"}`}
                   </span>
                 )}
               </>
@@ -1576,7 +1558,6 @@ function VisaoSupervisor({
   // ficha preserva e o voltar aterrissa de volta neles)
   const [busca, setBusca] = useState(() => sp.get("q") ?? "");
   const [filtro, setFiltro] = useState<FiltroCat>(recorteInicial ?? "todas");
-  const { ref: chipsRef, maskStyle: chipsMask } = useFadeX<HTMLDivElement>();
 
   // um ?recorte= resolvido novo realinha a fatia — ajuste no render, o
   // mesmo padrão da visão de coordenação
@@ -1595,7 +1576,7 @@ function VisaoSupervisor({
     setSpStrVisto(spStr);
     const params = new URLSearchParams(spStr);
     const r = params.get("recorte");
-    setFiltro(CATS.some((c) => c.id === r) ? (r as FiltroCat) : "todas");
+    setFiltro(resolveRecorteFatia(r) ?? "todas");
     setBusca(params.get("q") ?? "");
   }
 
@@ -1694,10 +1675,8 @@ function VisaoSupervisor({
           supervisor não tem linha de filtro; "Todas" (ou clicar de novo
           no chip ativo) devolve a lista inteira e esconde a linha */}
       {filtro !== "todas" && (
-        <div
-          ref={chipsRef}
-          style={chipsMask}
-          className="-mx-4 mt-5 flex gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:flex-wrap sm:px-0"
+        <FilterChipRow
+          className="-mx-4 mt-5 px-4 sm:mx-0 sm:px-0"
           role="group"
           aria-label="Filtrar por situação"
         >
@@ -1718,24 +1697,17 @@ function VisaoSupervisor({
               />
             );
           })}
-        </div>
+        </FilterChipRow>
       )}
 
       {/* fechadas cedo fora do número principal (mesma régua da
-          coordenação) */}
+          coordenação — "encerradas" cobre desistência e fechamento) */}
       <div className="mb-2 mt-5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
         <p className="text-[13px] text-muted-foreground">
           {(() => {
-            const nDes = exibidas.filter(ehDesistente).length;
-            const nEnc = exibidas.filter(
-              (d) => situacaoDaDupla(d) === "encerrada"
-            ).length;
-            const nPrincipais = exibidas.length - nDes - nEnc;
-            return filtro === "desistente" ? (
-              <b className="font-semibold text-foreground">
-                {nDes} {nDes === 1 ? "desistente" : "desistentes"}
-              </b>
-            ) : filtro === "encerrada" ? (
+            const nEnc = exibidas.filter(ehEncerradaCedo).length;
+            const nPrincipais = exibidas.length - nEnc;
+            return filtro === "encerrada" ? (
               <b className="font-semibold text-foreground">
                 {nEnc} {nEnc === 1 ? "encerrada" : "encerradas"}
               </b>
@@ -1744,12 +1716,9 @@ function VisaoSupervisor({
                 <b className="font-semibold text-foreground">
                   {nPrincipais} {nPrincipais === 1 ? "dupla" : "duplas"}
                 </b>
-                {(nDes > 0 || nEnc > 0) && (
+                {nEnc > 0 && (
                   <span className="text-xs">
-                    {nDes > 0 &&
-                      ` · ${nDes} ${nDes === 1 ? "desistente" : "desistentes"}`}
-                    {nEnc > 0 &&
-                      ` · ${nEnc} ${nEnc === 1 ? "encerrada" : "encerradas"}`}
+                    {` · ${nEnc} ${nEnc === 1 ? "encerrada" : "encerradas"}`}
                   </span>
                 )}
               </>
@@ -1824,7 +1793,7 @@ function VisaoSupervisor({
                             mostrarSupervisor={false}
                             // supervisor não tem ação de coordenação —
                             // sem menu o ⋯ decorativo mantém o visual
-                            dimDesistentes={filtro === "todas"}
+                            dimEncerradas={filtro === "todas"}
                             wa={
                               <DuplaWaAcao
                                 {...acaoWhatsAppDupla({

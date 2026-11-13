@@ -40,7 +40,6 @@ import {
 } from "@/lib/pessoas-status";
 import { turmaLonga, turmaAno } from "@/lib/turma";
 import { cn, normaliza } from "@/lib/utils";
-import { useFadeX } from "@/lib/use-fade-x";
 import {
   comparaNome,
   foraDoPrograma,
@@ -56,7 +55,7 @@ import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { NovaPessoaDialog, NovoMentoradoDialog } from "@/components/pessoas-dialogs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import { FiltrosButton } from "@/components/ui/filtros-button";
 import {
   OpcaoCheck,
@@ -430,7 +429,6 @@ export function PessoasListas({
     pendencias: false,
     ordem: "nome",
   });
-  const { ref: chipsRef, maskStyle: chipsMask } = useFadeX<HTMLDivElement>();
   const emDupla = useMemo(() => new Set(comDupla), [comDupla]);
   const temQualquerDupla = useMemo(() => new Set(comQualquerDupla), [comQualquerDupla]);
 
@@ -996,16 +994,14 @@ export function PessoasListas({
           )}
         </div>
         {/* pills de turma — uma linha só, rola na horizontal quando passa
-            da largura (o fade lateral do useFadeX marca o corte) */}
+            da largura (o fade lateral do FilterChipRow marca o corte) */}
         {souCoord &&
           turmasInfo.turmas.length + (turmasInfo.semTurma > 0 ? 1 : 0) >
             1 && (
-            <div
-              ref={chipsRef}
-              style={chipsMask}
-              className="-mx-4 flex gap-2 overflow-x-auto overscroll-x-contain px-4 pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:mx-0 sm:px-0"
+            <FilterChipRow
               role="group"
               aria-label="Filtrar por turma"
+              className="-mx-4 px-4 pb-1 sm:mx-0 sm:px-0"
             >
               <button
                 type="button"
@@ -1063,7 +1059,7 @@ export function PessoasListas({
                   </span>
                 </button>
               )}
-            </div>
+            </FilterChipRow>
           )}
       </div>
 

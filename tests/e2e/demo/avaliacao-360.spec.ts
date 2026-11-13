@@ -87,8 +87,24 @@ test.describe("demo — 360º com contexto da trajetória", () => {
     await entrarNaDemo(page, "coordenacao");
     await page.goto(`/duplas/${DUPLA_FIM}`);
 
-    const resumo = page.locator("section", { hasText: "Resumo da jornada" });
+    // 378 — a retrospectiva é o bloco de destaque: faixa de celebração,
+    // tira de encontros e a série do jovem em sparkline. O resumo coexiste
+    // embaixo, compacto — o relatório completo abre sob disclosure.
+    const retro = page.locator('section[aria-label="Retrospectiva da jornada"]');
+    await expect(retro).toBeVisible();
+    await expect(
+      retro.getByRole("img", { name: /Encontros realizados: 1º/ })
+    ).toBeVisible();
+    await expect(
+      retro.getByRole("img", { name: /Estrelas do jovem/ })
+    ).toBeVisible();
+    await expect(retro.getByText("4.0/5")).toBeVisible();
+
+    const resumo = page.locator('section[aria-label="Resumo da jornada"]');
     await expect(resumo).toBeVisible();
+    await resumo
+      .getByRole("button", { name: "Ver os dados completos" })
+      .click();
     // the mentor tile keeps its own scale — renamed to disambiguate
     await expect(resumo.getByText("Avaliação do mentor")).toBeVisible();
     // 16 evals [3,3,4,3,2,4,4,4,4,5,4,4,5,5,5,5] → mean 4.0, 3★→5★

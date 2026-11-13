@@ -63,7 +63,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import {
   Select,
   SelectContent,
@@ -767,7 +767,7 @@ export function FormularioLinks({
         <div className="flex flex-wrap items-center gap-2">
           {/* chips de status — um gesto filtra a lista sem sair da página;
               a contagem junto do chip já diz se vale o clique */}
-          <ul className="flex flex-wrap items-center gap-1.5" aria-label="Filtrar links por status">
+          <FilterChipRow tag="ul" className="gap-1.5" aria-label="Filtrar links por status">
             <li>
               <button
                 type="button"
@@ -792,7 +792,7 @@ export function FormularioLinks({
                 </button>
               </li>
             ))}
-          </ul>
+          </FilterChipRow>
           <div className="relative min-w-40 flex-1 sm:max-w-56">
             <MagnifyingGlass
               size={14}

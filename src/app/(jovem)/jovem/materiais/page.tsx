@@ -51,6 +51,7 @@ import type {
   FormularioSistema,
   RespostaValor,
 } from "@/lib/forms/schema";
+import { hrefMaterial } from "@/lib/materiais";
 import { getMateriais, getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import {
@@ -364,6 +365,19 @@ export default async function JovemMateriais() {
         cronograma: jornada.cronograma,
         encontros: encontrosDpp,
         temas: jornada.retrospectiva?.encontros ?? [],
+        // as estrelas dela alimentam a sparkline + o tile "Avaliação do
+        // jovem" da retrospectiva (378) — dados que já são dela
+        avaliacoes: avaliacoesDpp.flatMap((a) =>
+          a.encontro?.numero != null
+            ? [
+                {
+                  numero: a.encontro.numero,
+                  estrelas: a.estrelas,
+                  temas: a.temas,
+                },
+              ]
+            : []
+        ),
         combinados: (combinadosJovem ?? []).filter(
           (c) => c.dupla_id === jornada.dupla_id
         ),
@@ -868,11 +882,7 @@ function MaterialCard({ m }: { m: Material }) {
   // "doc:<slug>" é documento nativo — abre na casa do jovem (a rota do app
   // expulsa o papel mentorado) e navega na mesma aba, sem ícone de saída
   const ehDoc = m.path?.startsWith("doc:") ?? false;
-  const href = ehDoc
-    ? `/jovem/materiais/documento/${m.path!.slice(4)}`
-    : m.path
-      ? `/api/material/${m.id}`
-      : urlOk;
+  const href = hrefMaterial(m, "/jovem/materiais/documento");
   const interno = (
     <>
       <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">

@@ -13,12 +13,12 @@ export type AbaRelatorios =
   | "interacoes"
   | "solicitacoes"
   | "encerramento"
-  | "formularios"
-  | "grade";
+  | "formularios";
 
 export type AbaRelatoriosItem = { id: AbaRelatorios; rotulo: string };
 
-/** Abas do hub /relatorios (REALIZA-178): links com ?aba= preservando
+/** Abas de /relatorios/operacionais (REALIZA-178; a 375 tirou a grade
+ *  daqui e ela virou a página principal): links com ?aba= preservando
  *  turma/cronograma do recorte — o voltar do navegador troca de aba e o
  *  recorte não se perde entre seções. Setas/Home/End movem o foco e
  *  ativam; o painel remonta com .animate-enter a cada troca — mesmo
@@ -52,7 +52,7 @@ export function RelatoriosAbas({
   }
 
   const href = (id: string) =>
-    `/relatorios?aba=${id}${extraParams ? `&${extraParams}` : ""}`;
+    `/relatorios/operacionais?aba=${id}${extraParams ? `&${extraParams}` : ""}`;
 
   return (
     <>
