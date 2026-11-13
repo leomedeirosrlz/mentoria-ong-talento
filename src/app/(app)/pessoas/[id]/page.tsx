@@ -346,13 +346,11 @@ export default async function PessoaPerfilPage({
   // (view *_pessoal); renderizam fechados num Collapsible no fim do Cadastro
   const civis = p.dados_civis ?? null;
   const resp = ment?.responsavel ?? null;
-  const anamneseRef = ehMentorado && "notas" in p ? p.notas : null;
   const temFicha = Boolean(
     p.nome_social || local || interesses.length || p.origem ||
     nascimentoTxt || p.genero || p.cor_raca || p.motivacao || p.pref_genero_par ||
     (prof && (prof.cargo || prof.empresa || mp)) ||
-    (ment && (ment.escolaridade || ment.objetivos || dispMentoradoTxt)) ||
-    anamneseRef
+    (ment && (ment.escolaridade || ment.objetivos || dispMentoradoTxt))
   );
   // grupos do cadastro — o cabeçalho da subseção só aparece quando há pelo
   // menos um campo visível dentro dele (pra coord `sempre` garante isso)
@@ -951,16 +949,6 @@ export default async function PessoaPerfilPage({
                           </div>
                         )}
 
-                        {/* referência da anamnese (campo notas do intake) —
-                            contexto da jornada, mora como subseção do cadastro */}
-                        {anamneseRef && (
-                          <div className="mt-5 border-t border-border/60 pt-5">
-                            <SubFicha titulo="Referência da anamnese" />
-                            <p className="mt-2 whitespace-pre-wrap text-muted-foreground">
-                              {anamneseRef}
-                            </p>
-                          </div>
-                        )}
                       </>
                     ) : (
                       <p className="mt-2 text-muted-foreground">

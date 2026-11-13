@@ -4,10 +4,15 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   DotsThreeVertical,
+  FileText,
+  Handshake,
+  IdentificationCard,
+  Paperclip,
   PaperPlaneTilt,
   PencilSimple,
   Prohibit,
   Trash,
+  User,
   UserSwitch,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -127,10 +132,13 @@ export function PessoaActions({
 
   // um passo por tema — o scroll de seções virava parede de campos; a
   // "Ficha de mentor" entra quando o mentor_profiles carrega (salvar
-  // antes disso não zera nada: a action só toca o que veio no FormData)
+  // antes disso não zera nada: a action só toca o que veio no FormData).
+  // Ordem: identidade/contato → operacional/papel → dados pessoais por
+  // último (REALIZA-384)
   const passos: PassoFicha[] = [
     {
       titulo: "Identificação e contato",
+      icone: IdentificationCard,
       conteudo: (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -178,34 +186,10 @@ export function PessoaActions({
         </>
       ),
     },
-    {
-      // dados pessoais fora do passo de contato — a coordenação abre o
-      // cadastro pelo que usa no dia a dia (nome, zap, e-mail) e só desce
-      // pro resto quando precisa. Os campos autodeclarados (interesses,
-      // motivação, cargo/empresa, origem, apresentação) saíram da edição
-      // da coordenação: são da pessoa — ela preenche no onboarding/perfil
-      // e a ficha (/pessoas/[id]) segue exibindo tudo pra leitura
-      titulo: "Dados pessoais",
-      conteudo: (
-        <>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <CampoNascimento id="e_nasc" defaultValue={pessoa.data_nascimento ?? ""} />
-            <CampoGenero defaultValue={pessoa.genero ?? ""} />
-          </div>
-          <CampoCorRaca defaultValue={pessoa.cor_raca ?? ""} />
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="space-y-2 sm:col-span-2">
-              <Label htmlFor="e_cidade">Cidade</Label>
-              <Input id="e_cidade" name="cidade" maxLength={100} defaultValue={pessoa.cidade ?? ""} />
-            </div>
-            <CampoUf defaultValue={pessoa.uf ?? ""} />
-          </div>
-        </>
-      ),
-    },
     ...(ehMentor && mp !== undefined
       ? [{
           titulo: "Ficha de mentor",
+          icone: Handshake,
           conteudo: (
             <div className="space-y-4 rounded-lg bg-muted p-3.5">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -275,6 +259,7 @@ export function PessoaActions({
       : []),
     {
       titulo: "Documentos (termo de adesão)",
+      icone: FileText,
       conteudo: (
         <>
           <DadosCivisFields
@@ -291,6 +276,7 @@ export function PessoaActions({
     },
     {
       titulo: "Arquivos e consentimento",
+      icone: Paperclip,
       conteudo: (
         <>
           <FotoField
@@ -328,6 +314,32 @@ export function PessoaActions({
             </label>
           )}
           <CampoConsentimento carimbadoEm={pessoa.consent_lgpd_em} />
+        </>
+      ),
+    },
+    {
+      // dados pessoais por último — a coordenação abre o cadastro pelo que
+      // usa no dia a dia (nome, zap, e-mail) e só desce pro resto quando
+      // precisa. Os campos autodeclarados (interesses, motivação,
+      // cargo/empresa, origem, apresentação) saíram da edição da
+      // coordenação: são da pessoa — ela preenche no onboarding/perfil e
+      // a ficha (/pessoas/[id]) segue exibindo tudo pra leitura
+      titulo: "Dados pessoais",
+      icone: User,
+      conteudo: (
+        <>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <CampoNascimento id="e_nasc" defaultValue={pessoa.data_nascimento ?? ""} />
+            <CampoGenero defaultValue={pessoa.genero ?? ""} />
+          </div>
+          <CampoCorRaca defaultValue={pessoa.cor_raca ?? ""} />
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div className="space-y-2 sm:col-span-2">
+              <Label htmlFor="e_cidade">Cidade</Label>
+              <Input id="e_cidade" name="cidade" maxLength={100} defaultValue={pessoa.cidade ?? ""} />
+            </div>
+            <CampoUf defaultValue={pessoa.uf ?? ""} />
+          </div>
         </>
       ),
     },
