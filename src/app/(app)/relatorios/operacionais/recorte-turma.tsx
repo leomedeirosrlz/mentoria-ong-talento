@@ -2,9 +2,9 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { FilterChipRow } from "@/components/ui/filter-chip";
 
-/** Filtro de turma do hub — chips que são links (?turma=), não um select
- *  com JS: a página segue 100% server e o recorte é deep-linkável.
- *  Preserva aba e cronograma ativos na query de cada chip. */
+/** Filtro de turma do hub operacional — chips que são links (?turma=),
+ *  não um select com JS: a página segue 100% server e o recorte é
+ *  deep-linkável. Preserva aba e cronograma ativos na query de cada chip. */
 export function RecorteTurma({
   aba,
   turmas,
@@ -22,7 +22,7 @@ export function RecorteTurma({
     const q = new URLSearchParams({ aba });
     if (turma) q.set("turma", turma);
     if (cronograma) q.set("cronograma", cronograma);
-    return `/relatorios?${q.toString()}`;
+    return `/relatorios/operacionais?${q.toString()}`;
   };
   const chip = (rotulo: string, turma?: string) => {
     const on = ativa === turma || (!ativa && !turma);

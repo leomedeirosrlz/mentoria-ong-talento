@@ -60,12 +60,14 @@ select cron.id, v.tipo, v.numero::smallint, v.data::date, v.titulo, v.fase,
 
 -- ===== materiais =====
 -- path 'doc:<slug>' = documento nativo renderizado em /materiais/documento/<slug>
--- (não passa pelo storage): os 16 roteiros e os instrumentos de corpus
--- apontam pra página própria em vez do PDF. O flip equivalente em prod
--- chega pela migration 0185 (UPDATE nos paths das mesmas linhas).
+-- (não passa pelo storage): o catálogo inteiro é nativo — os dois guias,
+-- os 16 roteiros, Perguntas Eficazes, os cronogramas por turma e os
+-- instrumentos de corpus apontam pra página própria em vez do PDF. Os
+-- flips equivalentes em prod chegaram pelas migrations 0185 e 0194
+-- (UPDATE nos paths das mesmas linhas).
 insert into public.materiais (titulo, descricao, tipo, url, audiencia, encontro_num, ordem, path) values
-  ('Guia do Mentor DPP', 'Metodologia completa: jornada, 16 encontros, instrumentos e templates. PDM e Roda da Vida são respondidos na ficha da dupla, aba Instrumentos.', 'guia', null, 'dpp', null, 1, 'materiais/5dc4d7d1-e69d-410c-b0b0-f8a80dcc906b-Guia-do-Mentor-de-Desenvolvimento-Pessoal-e-Profissional---Realiza.vc-Equipe-Executiva-1-.pdf'),
-  ('Guia do Mentor Especialista', 'Metodologia da mentoria com especialista: 5 encontros e cinco funções.', 'guia', null, 'especialista', null, 2, 'materiais/7a83fe5a-5128-47c3-9c4c-c2eeb5ae0288-Guia-do-Mentor-Especialista---Realiza.vc-Equipe-Executiva-1-.pdf'),
+  ('Guia do Mentor DPP', 'Metodologia completa: jornada, 16 encontros, instrumentos e templates. PDM e Roda da Vida são respondidos na ficha da dupla, aba Instrumentos.', 'guia', null, 'dpp', null, 1, 'doc:guia-mentor-dpp'),
+  ('Guia do Mentor Especialista', 'Metodologia da mentoria com especialista: 5 encontros e cinco funções.', 'guia', null, 'especialista', null, 2, 'doc:guia-mentor-especialista'),
   ('Roteiro Semana 1 — Boas-vindas e histórias de vida', null, 'conteudo', null, 'dpp', 1, 3, 'doc:roteiro-encontro-01'),
   ('Roteiro Semana 2 — Avaliação por terceiros e visão de futuro', null, 'conteudo', null, 'dpp', 2, 4, 'doc:roteiro-encontro-02'),
   ('Roteiro Semana 3 — Metas e checagem SMART', null, 'conteudo', null, 'dpp', 3, 5, 'doc:roteiro-encontro-03'),
@@ -88,9 +90,9 @@ insert into public.materiais (titulo, descricao, tipo, url, audiencia, encontro_
   ('Roda da Vida (instrumento)', 'Aplicação em três momentos a partir do 5º mês: explicação, discussão e validação.', 'template', null, 'dpp', 12, 22, 'doc:instrumento-roda-da-vida'),
   ('Feedback Construtivo', 'Instrumento do guia: o modelo de fala e os cuidados para feedback sobre comportamento negativo.', 'conteudo', null, 'todos', null, 23, 'doc:feedback-construtivo'),
   ('Instrumento: Definindo Metas', 'Metas SMART do mentorado — instrumento de preenchimento entre encontros.', 'template', null, 'dpp', null, 24, 'doc:instrumento-definindo-minhas-metas'),
-  ('Perguntas Eficazes', 'Documento complementar do guia: o que são, o que evitar e o banco de perguntas por momento da conversa.', 'conteudo', null, 'dpp', null, 25, 'materiais/1a8277af-eb2b-4196-98e7-9fade2899a34-perguntas-eficazes.pdf'),
-  ('Cronograma do programa — Turma 1', null, 'conteudo', null, 'dpp', null, 26, 'materiais/84c8a989-48f0-4497-8b28-58754a2ca02e-cronograma-turma-1.pdf'),
-  ('Cronograma do programa — Turma 2', null, 'conteudo', null, 'dpp', null, 27, 'materiais/6eabec09-3d3f-42ba-9407-8077e9373b6c-cronograma-turma-2.pdf'),
+  ('Perguntas Eficazes', 'Documento complementar do guia: o que são, o que evitar e o banco de perguntas por momento da conversa.', 'conteudo', null, 'dpp', null, 25, 'doc:perguntas-eficazes'),
+  ('Cronograma do programa — Turma 1', null, 'conteudo', null, 'dpp', null, 26, 'doc:ciclo-cronograma'),
+  ('Cronograma do programa — Turma 2', null, 'conteudo', null, 'dpp', null, 27, 'doc:ciclo-turma2-cronograma'),
   ('Plataforma de mentoria', 'Onde os encontros oficiais são agendados e avaliados.', 'link', 'https://mentoria.realiza.vc', 'todos', null, 28, null),
   ('Formação EaD gratuita', 'Trilha opcional com certificado para mentores.', 'link', 'https://ead.realiza.vc', 'todos', null, 29, null),
   ('Checklist de competências do mentor', 'As 10 competências do guia para marcar antes do ciclo e no 16º encontro.', 'template', null, 'dpp', null, 30, 'doc:checklist-competencias')

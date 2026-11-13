@@ -660,7 +660,8 @@ export async function createMentorado(formData: FormData) {
     email: email || null,
     whatsapp: whatsapp || null,
     ong_origem: String(formData.get("ong_origem") ?? "").trim() || null,
-    notas: String(formData.get("notas") ?? "").trim() || null,
+    // notas fora: a coluna é resíduo da anamnese externa (REALIZA-384) —
+    // nada mais alimenta até a auditoria decidir o drop
     ...ficha,
   }).select("id").single();
   if (error) return { error: erroAmigavel(error) };
@@ -1610,7 +1611,8 @@ export async function updateMentorado(id: string, formData: FormData) {
     email: email || null,
     whatsapp: whatsapp || null,
     ong_origem: String(formData.get("ong_origem") ?? "").trim() || null,
-    notas: String(formData.get("notas") ?? "").trim() || null,
+    // sem `notas` no update: o campo saiu da UI (REALIZA-384) e escrever
+    // null zerava o valor guardado a cada edição, antes da auditoria
     ...ficha,
   }).eq("id", id).select("id");
   if (error) return { error: erroAmigavel(error) };

@@ -19,12 +19,12 @@ import {
   editarMaterial,
   removerArquivoMaterial,
 } from "@/lib/actions";
-import { linkSeguro, TRILHA_LEN } from "@/lib/ciclo";
+import { TRILHA_LEN } from "@/lib/ciclo";
 import { createClient } from "@/lib/supabase/client";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AudienciasPicker } from "@/components/audiencias-picker";
-import { audienciasDe, type Audiencia } from "@/lib/materiais";
+import { audienciasDe, hrefMaterial, type Audiencia } from "@/lib/materiais";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { EnviarEmailDialog } from "@/components/enviar-email-dialog";
@@ -68,15 +68,6 @@ const TIPO_LABEL = {
   conteudo: "Conteúdo",
   link: "Link",
 } as const;
-
-/** Destino do material — o mesmo das linhas/cards: "doc:<slug>" é o
- *  documento nativo (a base muda por casa: /materiais no staff, /jovem no
- *  mentorado); arquivo oficial ganha da url externa; sem os três não há
- *  link pra abrir/copiar. */
-function hrefMaterial(m: Material, docBase = "/materiais/documento"): string | null {
-  if (m.path?.startsWith("doc:")) return `${docBase}/${m.path.slice(4)}`;
-  return m.path ? `/api/material/${m.id}` : linkSeguro(m.url);
-}
 
 /** Link compartilhável: material com path copia a rota interna absoluta
  *  (ela 302→signed URL exige login do papel certo — compartilhar com quem

@@ -1,12 +1,13 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
 // REALIZA-250 — a biblioteca deixa de ser uma lista única e vira seções
-// derivadas do `tipo` do material. Depois da 0135/0138 o dataset demo
-// espelha o catálogo de prod: 30 linhas, todas acionáveis — 16 roteiros e
-// Perguntas Eficazes caem em "Conteúdos e roteiros", os templates do cap. 14
-// são documentos nativos (path "doc:<slug>" → /materiais/documento/<slug>,
-// sem passar pela rota de arquivo). "Encontro N" segue meta da linha, nunca
-// seção. Read-only — seguro em qualquer ambiente.
+// derivadas do `tipo` do material. Depois da 0135/0138 e da 0194 o dataset
+// demo espelha o catálogo de prod: 30 linhas, todas acionáveis — 16 roteiros
+// e Perguntas Eficazes caem em "Conteúdos e roteiros", e TODO material com
+// arquivo é documento nativo (path "doc:<slug>" → /materiais/documento/<slug>,
+// sem passar pela rota de arquivo — guias, cronogramas e templates do cap. 14
+// inclusos). "Encontro N" segue meta da linha, nunca seção. Read-only —
+// seguro em qualquer ambiente.
 
 test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
   test("coordenação: seções nomeadas, vazia some e busca filtra dentro", async ({
@@ -54,6 +55,21 @@ test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
       conteudos.getByRole("link", { name: /Perguntas Eficazes/ })
     ).toBeVisible();
 
+    // REALIZA-380 — os guias e os cronogramas também são nativos: a linha
+    // abre o documento do app, nunca a rota de arquivo nem PDF de storage
+    await expect(
+      guias.getByRole("link", { name: /Guia do Mentor DPP/ })
+    ).toHaveAttribute("href", "/materiais/documento/guia-mentor-dpp");
+    await expect(
+      guias.getByRole("link", { name: /Guia do Mentor Especialista/ })
+    ).toHaveAttribute("href", "/materiais/documento/guia-mentor-especialista");
+    await expect(
+      conteudos.getByRole("link", { name: /Perguntas Eficazes/ })
+    ).toHaveAttribute("href", "/materiais/documento/perguntas-eficazes");
+    await expect(
+      conteudos.getByRole("link", { name: /Cronograma do programa — Turma 1/ })
+    ).toHaveAttribute("href", "/materiais/documento/ciclo-cronograma");
+
     // os templates do cap. 14 são documentos nativos — o link abre a
     // página do app, nunca a rota de arquivo (/api/material) nem "em breve"
     const doc = modelos.getByRole("link", {
@@ -85,6 +101,20 @@ test.describe("demo — biblioteca por categoria (REALIZA-250)", () => {
       .getByRole("link", { name: "Materiais de apoio" })
       .click();
     await expect(page).toHaveURL(/\/materiais\?aba=biblioteca/);
+    // o guia nativo renderiza no padrão dos demais docs de corpus: hero
+    // com o título oficial e os cards de encontro do capítulo "Os 16
+    // encontros" (REALIZA-380)
+    await page.goto("/materiais/documento/guia-mentor-dpp");
+    await expect(
+      page.getByRole("heading", {
+        name: "Guia do Mentor de Desenvolvimento Pessoal e Profissional",
+        level: 1,
+      })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: /Os 16 encontros/ })
+    ).toBeVisible();
+
     await page.goto("/materiais/documento/nao-existe");
     await expect(page.getByText(/não encontrada|not found/i).first()).toBeVisible();
     await page.goto("/materiais?aba=biblioteca");

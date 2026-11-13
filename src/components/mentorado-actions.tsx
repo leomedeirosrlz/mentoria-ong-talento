@@ -4,11 +4,18 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import {
   ArrowCounterClockwise,
+  Clock,
   DotsThreeVertical,
+  FileText,
+  IdentificationCard,
+  MapPin,
+  Paperclip,
   PaperPlaneTilt,
   PencilSimple,
   SignOut,
+  Sparkle,
   Trash,
+  Users,
   UserSwitch,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -109,10 +116,13 @@ export function MentoradoActions({
   }
 
   // um passo por SecaoFicha — 7 seções seguidas de scroll viravam parede
-  // de campos (docs do jovem e do responsável ficam perto do fim)
+  // de campos. Ordem: identidade/contato → operacional → dados pessoais
+  // por último (interesses e objetivos fecham o wizard — REALIZA-384).
+  // Anamnese é instrumento externo ao programa: o campo de notas saiu da UI.
   const passos: PassoFicha[] = [
     {
       titulo: "Identificação e contato",
+      icone: IdentificationCard,
       conteudo: (
         <>
           <div className="grid gap-4 sm:grid-cols-2">
@@ -165,6 +175,7 @@ export function MentoradoActions({
     },
     {
       titulo: "Onde vive e origem",
+      icone: MapPin,
       conteudo: (
         <>
           <div className="grid gap-4 sm:grid-cols-3">
@@ -193,7 +204,71 @@ export function MentoradoActions({
       ),
     },
     {
+      titulo: "Disponibilidade semanal",
+      icone: Clock,
+      conteudo: (
+        <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
+      ),
+    },
+    {
+      titulo: "Documentos do(a) jovem (termo de participação)",
+      icone: FileText,
+      conteudo: (
+        <DadosCivisFields
+          prefix="civis_"
+          opcional
+          compacto
+          defaults={mentorado.dados_civis}
+        />
+      ),
+    },
+    {
+      titulo: "Responsável legal (autorização de menor)",
+      icone: Users,
+      conteudo: (
+        <>
+          <div className="space-y-2">
+            <Label htmlFor="em_parentesco">Parentesco com o(a) jovem</Label>
+            <Input
+              id="em_parentesco" name="resp_parentesco" maxLength={60}
+              autoCapitalize="sentences" placeholder="Mãe, pai, avó, tio…"
+              defaultValue={mentorado.responsavel?.parentesco ?? ""}
+            />
+          </div>
+          <DadosCivisFields
+            prefix="resp_"
+            opcional
+            defaults={mentorado.responsavel}
+          />
+        </>
+      ),
+    },
+    {
+      titulo: "Arquivos",
+      icone: Paperclip,
+      conteudo: (
+        <>
+          <FotoField
+            id="em_foto"
+            defaultUrl={mentorado.avatar_path ? avatarPublicUrl(mentorado.avatar_path) : null}
+          />
+          <DocumentoPessoa
+            tipo="mentorado"
+            id={mentorado.id}
+            documentoPath={mentorado.documento_path}
+          />
+          <AssinaturasPessoa
+            tipo="mentorado"
+            id={mentorado.id}
+            nome={mentorado.nome}
+            whatsapp={mentorado.whatsapp}
+          />
+        </>
+      ),
+    },
+    {
       titulo: "Interesses e objetivos",
+      icone: Sparkle,
       conteudo: (
         <>
           <CampoInteresses value={interesses} onChange={setInteresses} />
@@ -214,69 +289,6 @@ export function MentoradoActions({
             />
           </div>
           <CampoPrefGenero defaultValue={mentorado.pref_genero_par ?? ""} />
-        </>
-      ),
-    },
-    {
-      titulo: "Disponibilidade semanal",
-      conteudo: (
-        <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
-      ),
-    },
-    {
-      titulo: "Documentos do(a) jovem (termo de participação)",
-      conteudo: (
-        <DadosCivisFields
-          prefix="civis_"
-          opcional
-          compacto
-          defaults={mentorado.dados_civis}
-        />
-      ),
-    },
-    {
-      titulo: "Responsável legal (autorização de menor)",
-      conteudo: (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="em_parentesco">Parentesco com o(a) jovem</Label>
-            <Input
-              id="em_parentesco" name="resp_parentesco" maxLength={60}
-              autoCapitalize="sentences" placeholder="Mãe, pai, avó, tio…"
-              defaultValue={mentorado.responsavel?.parentesco ?? ""}
-            />
-          </div>
-          <DadosCivisFields
-            prefix="resp_"
-            opcional
-            defaults={mentorado.responsavel}
-          />
-        </>
-      ),
-    },
-    {
-      titulo: "Anamnese e arquivos",
-      conteudo: (
-        <>
-          <div className="space-y-2">
-            <Label htmlFor="em_notas">Notas / referência da anamnese</Label>
-            <Textarea id="em_notas" name="notas" rows={2} defaultValue={mentorado.notas ?? ""} />
-          </div>
-          <FotoField
-            id="em_foto"
-            defaultUrl={mentorado.avatar_path ? avatarPublicUrl(mentorado.avatar_path) : null}
-          />
-          <DocumentoPessoa
-            tipo="mentorado"
-            id={mentorado.id}
-            documentoPath={mentorado.documento_path}
-          />
-          <AssinaturasPessoa
-            tipo="mentorado"
-            id={mentorado.id}
-            nome={mentorado.nome}
-            whatsapp={mentorado.whatsapp}
-          />
           <p className="text-xs text-muted-foreground">
             Nascimento, gênero, cor/raça, motivação e preferência de par ficam visíveis só pra coordenação.
           </p>
