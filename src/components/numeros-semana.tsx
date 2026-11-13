@@ -7,7 +7,7 @@ import type { CoberturaVigente, NumerosSemana } from "@/lib/agenda-coordenacao";
 import { BarraSegmentada } from "@/components/viz";
 import { SaudePrograma } from "@/components/saude-programa";
 import { PillTurma } from "@/components/agenda-partes";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 
 // ============================================================
 // "Números da semana" (REALIZA-195 · mock v8b) — os três eixos
@@ -54,14 +54,14 @@ export function NumerosSemanaSecao({
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <h2 className="text-base font-semibold">Números da semana</h2>
         {opcoes.length > 1 && (
-          <div
+          <FilterChipRow
             role="group"
             aria-label="Recortar os números por turma"
-            // w-full no mobile: a fileira pula pra linha própria e os
-            // chips quebram dentro dela — o grupo sem wrap (562px com 4+
-            // turmas) estourava o flex-wrap do pai e alargava a página
-            // inteira, levando o FAB fixo pra fora da tela
-            className="flex flex-wrap items-center gap-2 w-full sm:w-auto"
+            // w-full no mobile: a fileira ocupa a linha própria e rola na
+            // horizontal — sem ela o grupo (562px com 4+ turmas) estourava
+            // o flex-wrap do pai e alargava a página, levando o FAB fixo
+            // pra fora da tela
+            className="w-full gap-2 sm:w-auto"
           >
             {opcoes.map((o) => (
               <button
@@ -74,7 +74,7 @@ export function NumerosSemanaSecao({
                 {o.rotulo}
               </button>
             ))}
-          </div>
+          </FilterChipRow>
         )}
       </div>
 

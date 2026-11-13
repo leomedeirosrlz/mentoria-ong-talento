@@ -56,7 +56,6 @@ export type UiSaude = {
     apoio: number;
     pausadas: number;
     concluidas: number;
-    desistentes: number;
     encerradas: number;
   };
   /** até 5 duplas que pedem ação (apoio → risco → atenção), na ordem da tool */
@@ -325,7 +324,6 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           apoio: num(s.apoio),
           pausadas: num(s.pausadas),
           concluidas: num(s.concluidas),
-          desistentes: num(s.desistentes),
           encerradas: num(s.encerradas),
         },
         pedem_acao: pedem.length,

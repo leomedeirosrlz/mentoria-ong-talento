@@ -20,7 +20,7 @@ import {
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { Avatar } from "@/components/avatar";
 import { Button, buttonVariants } from "@/components/ui/button";
-import { filterChipCls } from "@/components/ui/filter-chip";
+import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import { avatarPublicUrl } from "@/lib/avatar";
 import {
   deriveAgendaMinha,
@@ -630,7 +630,7 @@ export function AgendaMinha({
         <span className="text-xs font-medium text-muted-foreground">
           Agenda de:
         </span>
-        <div role="group" aria-label="Escopo da agenda" className="flex flex-wrap gap-1.5">
+        <FilterChipRow role="group" aria-label="Escopo da agenda" className="gap-1.5">
           {agenda.chips.map((chip) => (
             <button
               key={chip.id}
@@ -642,7 +642,7 @@ export function AgendaMinha({
               {chip.rotulo}
             </button>
           ))}
-        </div>
+        </FilterChipRow>
       </div>
 
       <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_290px]">
