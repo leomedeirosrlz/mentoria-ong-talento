@@ -6,7 +6,12 @@ import { getMe } from "@/lib/queries";
 import type { AppRole } from "@/lib/types";
 import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "@/lib/demo/mode";
-import { demoIaEventos, demoIaPlano, DEMO_IA_NOMES } from "@/lib/demo/ia-eventos";
+import {
+  demoIaConfig,
+  demoIaEventos,
+  demoIaPlano,
+  DEMO_IA_NOMES,
+} from "@/lib/demo/ia-eventos";
 import {
   CICLO_PADRAO_DIAS,
   filtrarEventosIa,
@@ -23,7 +28,17 @@ import {
   type StatusPlano,
   type UsoJanela,
 } from "@/lib/ia/metricas";
-import { getIaConfig, PLANOS_GO, TETOS_GO_USD, type PlanoIa } from "@/lib/ia/config";
+import {
+  esforcoDoTier,
+  fallbacksDoTier,
+  getIaConfig,
+  modeloDoTier,
+  PLANOS_GO,
+  TETOS_GO_USD,
+  type IaConfig,
+  type PlanoIa,
+  type TierIa,
+} from "@/lib/ia/config";
 import { providerConfigurado } from "@/lib/ia/provider";
 import { rotuloTool } from "@/lib/ia/fontes";
 import { getConsumoPlanoIa, getPainelIa } from "@/lib/ia/queries";
@@ -509,12 +524,100 @@ function CardGrafico({
   );
 }
 
+// ---------- modelo / roteador (status do ia_config) ----------
+
+/** Slugs configurados por tier + os da tabela do plano = sugestões do
+ *  seletor de modelos do eval (slug solto continua possível). */
+function modelosSugeridos(cfg: IaConfig): string[] {
+  return [
+    ...new Set([
+      ...Object.values(cfg.modelos).filter(
+        (v): v is string => typeof v === "string"
+      ),
+      ...Object.keys(TETOS_GO_USD),
+    ]),
+  ].sort();
+}
+
+const TIER_ROTULO: Record<TierIa, { rotulo: string; dica: string }> = {
+  rapido: {
+    rotulo: "Rápido",
+    dica: "saudações e conversa curta",
+  },
+  balanceado: {
+    rotulo: "Balanceado",
+    dica: "o padrão: dados de duplas, agenda, guias",
+  },
+  forte: {
+    rotulo: "Forte",
+    dica: "análises e sínteses longas",
+  },
+};
+
+const ESFORCO_ROTULO = { baixo: "baixo", medio: "médio", alto: "alto" } as const;
+
+/** "Modelo de IA": o que o roteador resolve hoje por tier — slug que de
+ *  fato responde, esforço e a cadeia de fallback (inclui o degrau
+ *  implícito forte→médio da 299). Os ajustes são na bolha; aqui é leitura. */
+function SecaoModelo({ cfg }: { cfg: IaConfig }) {
+  const tiers = Object.keys(TIER_ROTULO) as TierIa[];
+  return (
+    <section aria-labelledby="titulo-modelo" className="space-y-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <h2
+          id="titulo-modelo"
+          className="text-base font-semibold tracking-tight sm:text-lg"
+        >
+          Modelo de IA
+        </h2>
+        <p className="text-xs text-muted-foreground">
+          {cfg.roteamento
+            ? "Roteamento automático: a pergunta escolhe o tier"
+            : "Roteamento desligado: tudo responde no balanceado"}
+        </p>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-3">
+        {tiers.map((tier) => {
+          const slug = modeloDoTier(cfg, tier);
+          const cadeia = fallbacksDoTier(cfg, tier);
+          return (
+            <article
+              key={tier}
+              className="rounded-xl border border-border bg-card p-4"
+            >
+              <div className="flex items-baseline justify-between gap-2">
+                <h3 className="text-sm font-semibold">{TIER_ROTULO[tier].rotulo}</h3>
+                <span className="rounded-full border border-border bg-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+                  esforço {ESFORCO_ROTULO[esforcoDoTier(cfg, tier)]}
+                </span>
+              </div>
+              <p className="mt-1.5 break-words font-mono text-xs">
+                {slug || "padrão do ambiente"}
+              </p>
+              {cadeia.length > 0 && (
+                <p className="mt-1 break-words text-[11px] text-muted-foreground">
+                  reserva:{" "}
+                  <span className="font-mono">{cadeia.join(" → ")}</span>
+                </p>
+              )}
+              <p className="mt-1.5 text-[11px] text-muted-foreground">
+                {TIER_ROTULO[tier].dica}
+              </p>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
 /** Leitura do painel fora do render (o relógio também: o recorte por
  *  dias e a previsão andam com o mesmo `agora`). */
 async function carregarDados(papel: AppRole, dias: number) {
   const agora = Date.now();
   if (await demoAtivo()) {
     const plano = demoIaPlano();
+    const cfg = demoIaConfig();
     const desde = inicioConsultaPlano(plano.diaRenovacao, agora);
     return {
       agora,
@@ -522,10 +625,11 @@ async function carregarDados(papel: AppRole, dias: number) {
       nomes: DEMO_IA_NOMES,
       truncado: false,
       plano,
+      cfg,
       consumo: demoIaEventos(Math.ceil((agora - desde) / DIA_MS) + 1).filter(
         (e) => e.tool === "resposta"
       ) as ConsumoPlanoRow[],
-      modelosCfg: [] as string[],
+      modelosCfg: modelosSugeridos(cfg),
     };
   }
   // papel já foi checado pela página (coordenação): só então os caches
@@ -550,17 +654,9 @@ async function carregarDados(papel: AppRole, dias: number) {
     nomes: res.nomes,
     truncado: res.truncado,
     plano: cfg.plano,
+    cfg,
     consumo,
-    // slugs configurados por tier + os da tabela do plano = sugestões do
-    // seletor de modelos do eval (slug solto continua possível)
-    modelosCfg: [
-      ...new Set([
-        ...Object.values(cfg.modelos).filter(
-          (v): v is string => typeof v === "string"
-        ),
-        ...Object.keys(TETOS_GO_USD),
-      ]),
-    ].sort(),
+    modelosCfg: modelosSugeridos(cfg),
   };
 }
 
@@ -577,11 +673,9 @@ export default async function IaPage({
     await searchParams;
   // evals live on their own tab (observability ≠ engineering); ?eval=<id>
   // without aba is a legacy deep link and opens straight on the evals
-  // tab. In demo the evals API 401s (no session) — the tab hides instead
-  // of rendering an eternal skeleton
+  // tab. In demo the API serves the deterministic dataset (ia-evals.ts).
   const aba =
-    !demo &&
-    (abaP === "evals" || (!abaP && typeof evalP === "string" && evalP))
+    abaP === "evals" || (!abaP && typeof evalP === "string" && evalP)
       ? "evals"
       : "uso";
   const dias = DIAS_OPCOES.includes(Number(dP) as (typeof DIAS_OPCOES)[number])
@@ -592,7 +686,7 @@ export default async function IaPage({
     : "todos";
   const modelo = typeof mP === "string" && mP ? mP : null;
 
-  const { agora, eventos, nomes, truncado, plano, consumo, modelosCfg } = await carregarDados(
+  const { agora, eventos, nomes, truncado, plano, cfg, consumo, modelosCfg } = await carregarDados(
     me.role,
     dias
   );
@@ -738,7 +832,7 @@ export default async function IaPage({
       <AbasAgenda
         abas={[
           { id: "uso", rotulo: "Uso", href: params({ dias, canal, modelo }) },
-          ...(demo ? [] : [{ id: "evals", rotulo: "Evals", href: "/ia?aba=evals" }]),
+          { id: "evals", rotulo: "Evals", href: "/ia?aba=evals" },
         ]}
         ativa={aba}
         painelId="painel-ia"
@@ -757,13 +851,16 @@ export default async function IaPage({
       ) : (
       <>
       {/* provider desligado = a Liza está dormindo pra todo mundo — o
-          banner abre a aba porque os números abaixo seguem valendo */}
-      {!providerConfigurado() && (
+          banner abre a aba porque os números abaixo seguem valendo. Na
+          demo ela responde com dados de exemplo, provider ou não */}
+      {!demo && !providerConfigurado() && (
         <LizaDormindo
           detalhe="O provedor está desligado na configuração: ninguém consegue falar com ela até ele voltar."
         />
       )}
       <SecaoPlano previsao={previsao} plano={plano} />
+
+      <SecaoModelo cfg={cfg} />
 
       {/* filtros deep-linkáveis: valem pros gráficos e listas abaixo; a
           previsão do plano acima não depende deles */}

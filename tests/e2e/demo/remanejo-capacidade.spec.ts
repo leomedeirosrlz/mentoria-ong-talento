@@ -1,4 +1,4 @@
-import { entrarNaDemo, expect, test } from "../helpers";
+import { agirComConfirma, entrarNaDemo, expect, test } from "../helpers";
 
 // REALIZA-115/116 no modo demo — a dupla-risco (Fernanda × Dandara) carrega
 // o card de sugestão com o pool real do dataset: Luiza e Carlos têm vaga
@@ -29,7 +29,12 @@ test.describe("demo — sugestão de remanejo e capacidade", () => {
       name: /Sugerir remanejamento/,
     });
     await expect(trigger).toHaveAttribute("aria-expanded", "false");
-    await trigger.click();
+    // clique pode cair pré-hidratação (o Collapsible ainda sem handler) —
+    // repete o gesto até o aria-expanded confirmar a abertura
+    await agirComConfirma(
+      () => trigger.click(),
+      async () => (await trigger.getAttribute("aria-expanded")) === "true"
+    );
     await expect(
       card.getByText(/Avaliação baixa e dificuldade de participação/).first()
     ).toBeVisible();
@@ -71,8 +76,15 @@ test.describe("demo — sugestão de remanejo e capacidade", () => {
     const card = page.locator(
       'section[aria-labelledby="remanejo-sugerido-titulo"]'
     );
-    // card recolhido por padrão — expande antes de clicar no candidato
-    await card.getByRole("button", { name: /Sugerir remanejamento/ }).click();
+    // card recolhido por padrão — expande (com retry de hidratação)
+    // antes de clicar no candidato
+    const trigger = card.getByRole("button", {
+      name: /Sugerir remanejamento/,
+    });
+    await agirComConfirma(
+      () => trigger.click(),
+      async () => (await trigger.getAttribute("aria-expanded")) === "true"
+    );
     await card
       .locator("li", { hasText: "Luiza Campos" })
       .getByRole("button", { name: "Remanejar", exact: true })

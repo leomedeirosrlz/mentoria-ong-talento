@@ -835,13 +835,8 @@ function mentoradoDaPersona(data: DemoData, role: AppRole): Mentorado | null {
 
 /** jovem_perfil (0067): a própria ficha — inclui os sensíveis DELA (a view é
  *  definer e self-scoped), mas nunca notas/documento_path/form_bruto. */
-export function demoJovemPerfil(
-  role: AppRole,
-  // variante "conta sem ficha" (demo_sem_ficha): a persona jovem vira uma
-  // conta órfã — ficha/assinaturas voltam vazias como no jovem real sem vínculo
-  semFicha = false
-): JovemPerfil | null {
-  const m = semFicha ? null : mentoradoDaPersona(getDemoData(), role);
+export function demoJovemPerfil(role: AppRole): JovemPerfil | null {
+  const m = mentoradoDaPersona(getDemoData(), role);
   if (!m) return null;
   return {
     id: m.id,
@@ -1024,11 +1019,10 @@ export function demoJovemAssinaturas(
   role: AppRole,
   // a assinatura simulada do wizard vira "assinado" aqui também — o card
   // Documentos da home e o passo de termo do onboarding refletem a sessão
-  simulado: TermoSimulado | null = null,
-  semFicha = false
+  simulado: TermoSimulado | null = null
 ): JovemAssinatura[] {
   const data = getDemoData();
-  const m = semFicha ? null : mentoradoDaPersona(data, role);
+  const m = mentoradoDaPersona(data, role);
   if (!m) return [];
   return data.assinaturas
     .filter((a) => a.mentorado_id === m.id)

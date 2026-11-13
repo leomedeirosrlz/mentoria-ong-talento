@@ -1,7 +1,7 @@
 import { cache } from "react";
 import { createClient } from "@/lib/supabase/server";
 import { comparaNome } from "./ciclo";
-import { demoRole, demoSemFicha, demoTermoSimulado } from "./demo/mode";
+import { demoRole, demoTermoSimulado } from "./demo/mode";
 import {
   demoDevolutivas,
   demoTrilhaEsp,
@@ -50,7 +50,7 @@ import type {
  *  profiles↔mentorados ainda não foi feito pela coordenação. */
 export const getJovemPerfil = cache(async (): Promise<JovemPerfil | null> => {
   const demo = await demoRole();
-  if (demo) return demoJovemPerfil(demo, await demoSemFicha());
+  if (demo) return demoJovemPerfil(demo);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("jovem_perfil")
@@ -163,11 +163,7 @@ export const getJovemAssinaturas = cache(
   async (): Promise<JovemAssinatura[]> => {
     const demo = await demoRole();
     if (demo)
-      return demoJovemAssinaturas(
-        demo,
-        await demoTermoSimulado(),
-        await demoSemFicha()
-      );
+      return demoJovemAssinaturas(demo, await demoTermoSimulado());
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("jovem_assinaturas")

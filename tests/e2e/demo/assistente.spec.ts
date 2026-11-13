@@ -18,11 +18,8 @@ test("demo: bolha abre e chips respondem enlatado sem chamar a API", async ({
 
   // seletor estável entre os rótulos Abrir/Fechar (o nome muda no clique)
   const fab = page.locator('[aria-controls="painel-assistente"]');
-  // bolha desligada por padrão (IA_BOLHA != 1) enquanto a rodada de UI não
-  // fecha — o CI liga a flag pra exercitar a feature
-  if ((await fab.count()) === 0) {
-    test.skip(true, "bolha desligada (IA_BOLHA != 1)");
-  }
+  // REALIZA-382: na demo a bolha sempre aparece (vitrine do assistente),
+  // IA_BOLHA ou não — sem flag nem sessão ela responde com dados de exemplo
   await expect(fab).toBeVisible();
   await fab.click();
 
@@ -41,4 +38,48 @@ test("demo: bolha abre e chips respondem enlatado sem chamar a API", async ({
   await painel.getByRole("button", { name: "Enviar mensagem" }).click();
   await expect(painel.getByText(/respostas de exemplo/)).toBeVisible();
   expect(chamadasApi).toBe(0);
+});
+
+test("demo: aba de ajustes abre com config de exemplo e nada persiste", async ({
+  page,
+}) => {
+  // REALIZA-382: o gear da bolha é coord-only — na demo abre o painel com
+  // dataset local (modelos/tier/esforço/health prontos), sem Supabase e
+  // sem o probe de /api/ia/modelos
+  let chamadasModelos = 0;
+  await page.route("**/api/ia/modelos**", (route) => {
+    chamadasModelos++;
+    return route.abort();
+  });
+  await entrarNaDemo(page, "coordenacao");
+  await page.goto("/");
+
+  const fab = page.locator('[aria-controls="painel-assistente"]');
+  await expect(fab).toBeVisible();
+  await fab.click();
+  const painel = page.locator("#painel-assistente");
+
+  await painel
+    .getByRole("button", { name: "Ajustes do assistente" })
+    .click();
+
+  await expect(
+    painel.getByText(/ajustes são de exemplo e nada é gravado/)
+  ).toBeVisible();
+  // selects dos três tiers abrem com os slugs do dataset demo
+  await expect(painel.getByLabel("Modelo Rápido")).toContainText(
+    "glm-5.3-flash"
+  );
+  await expect(painel.getByLabel("Modelo Balanceado")).toContainText(
+    "deepseek-v4.1-flash"
+  );
+  await expect(painel.getByLabel("Modelo Forte")).toContainText(
+    "deepseek-v4-pro"
+  );
+  // o interruptor do roteador responde localmente (estado muda, nada grava)
+  const roteamento = painel.getByLabel("Roteamento automático");
+  await expect(roteamento).toBeChecked();
+  await roteamento.click();
+  await expect(roteamento).not.toBeChecked();
+  expect(chamadasModelos).toBe(0);
 });

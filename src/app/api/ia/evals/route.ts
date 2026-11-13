@@ -7,9 +7,34 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { createClient } from "@/lib/supabase/server";
 import { criarRun, listarCasosLive } from "@/lib/ia/evals";
+import { demoRole } from "@/lib/demo/mode";
+import {
+  demoEvalApagar,
+  demoEvalCriar,
+  demoEvalDetalhe,
+  demoEvalProximo,
+  demoEvalReagendar,
+  demoEvalRuns,
+} from "@/lib/demo/ia-evals";
 
 const jsonErro = (mensagem: string, status: number) =>
   NextResponse.json({ error: mensagem }, { status });
+
+const casosJson = () =>
+  NextResponse.json({
+    casos: listarCasosLive().map((c) => ({
+      id: c.id,
+      papel_esperado: c.papel_esperado,
+      msg: c.msg,
+      pagina: c.pagina ?? null,
+      rubrica: {
+        tools_esperadas: c.tools_esperadas,
+        tools_nao_pode: c.tools_nao_pode,
+        resposta_contem: c.resposta_contem,
+        resposta_nao_contem: c.resposta_nao_contem,
+      },
+    })),
+  });
 
 const CriarBody = z
   .object({
@@ -43,30 +68,32 @@ async function gateCoord(supabase: Awaited<ReturnType<typeof createClient>>) {
 }
 
 export async function GET(req: Request) {
+  const url = new URL(req.url);
+  const runId = url.searchParams.get("run");
+  const proximoRun = url.searchParams.get("proximo");
+  // demo: mesmos contratos, dados determinísticos do dataset (lib/demo/
+  // ia-evals) — o painel renderiza e o laço dirige de verdade via cookie
+  const demo = await demoRole();
+  if (demo) {
+    if (demo !== "coordenacao") return jsonErro("Área da coordenação.", 403);
+    if (url.searchParams.has("casos")) return casosJson();
+    if (proximoRun) return NextResponse.json(await demoEvalProximo(proximoRun));
+    if (runId) {
+      const d = await demoEvalDetalhe(runId);
+      if (!d) return jsonErro("Run não encontrado.", 404);
+      return NextResponse.json(d);
+    }
+    return NextResponse.json({ runs: await demoEvalRuns() });
+  }
+
   const supabase = await createClient();
   const g = await gateCoord(supabase);
   if (g.erro === "sessao")
     return jsonErro("Sessão expirada. Entre de novo.", 401);
   if (!g.ok) return jsonErro("Área da coordenação.", 403);
 
-  const url = new URL(req.url);
-  const runId = url.searchParams.get("run");
-  const proximoRun = url.searchParams.get("proximo");
   if (url.searchParams.has("casos")) {
-    return NextResponse.json({
-      casos: listarCasosLive().map((c) => ({
-        id: c.id,
-        papel_esperado: c.papel_esperado,
-        msg: c.msg,
-        pagina: c.pagina ?? null,
-        rubrica: {
-          tools_esperadas: c.tools_esperadas,
-          tools_nao_pode: c.tools_nao_pode,
-          resposta_contem: c.resposta_contem,
-          resposta_nao_contem: c.resposta_nao_contem,
-        },
-      })),
-    });
+    return casosJson();
   }
   // primeiro pendente na MESMA ordem do claim (order by id) — a UI marca a
   // célula em voo antes do POST /executar responder
@@ -102,14 +129,27 @@ export async function GET(req: Request) {
 }
 
 export async function POST(req: Request) {
+  const body = CriarBody.safeParse(await req.json().catch(() => null));
+  if (!body.success) return jsonErro("Parâmetros inválidos.", 400);
+  const demo = await demoRole();
+  if (demo) {
+    if (demo !== "coordenacao") return jsonErro("Área da coordenação.", 403);
+    try {
+      const r = await demoEvalCriar(body.data);
+      return NextResponse.json(r, { status: 201 });
+    } catch (e) {
+      return jsonErro(
+        e instanceof Error ? e.message : "Falha ao criar o run.",
+        400
+      );
+    }
+  }
   const supabase = await createClient();
   const g = await gateCoord(supabase);
   if (g.erro === "sessao")
     return jsonErro("Sessão expirada. Entre de novo.", 401);
   if (!g.ok || !g.profileId)
     return jsonErro("Área da coordenação.", 403);
-  const body = CriarBody.safeParse(await req.json().catch(() => null));
-  if (!body.success) return jsonErro("Parâmetros inválidos.", 400);
   try {
     const r = await criarRun(supabase, g.profileId, body.data);
     return NextResponse.json(r, { status: 201 });
@@ -126,12 +166,21 @@ export async function POST(req: Request) {
  *  through a different button (DELETE /api/ia/eventos): independent
  *  wipes, by coordination's decision. */
 export async function DELETE(req: Request) {
+  const runId = new URL(req.url).searchParams.get("run");
+  const demo = await demoRole();
+  if (demo) {
+    if (demo !== "coordenacao") return jsonErro("Área da coordenação.", 403);
+    if (runId && !z.string().uuid().safeParse(runId).success) {
+      return jsonErro("Run inválido.", 400);
+    }
+    const { apagados } = await demoEvalApagar(runId);
+    return NextResponse.json({ ok: true, apagados });
+  }
   const supabase = await createClient();
   const g = await gateCoord(supabase);
   if (g.erro === "sessao")
     return jsonErro("Sessão expirada. Entre de novo.", 401);
   if (!g.ok) return jsonErro("Área da coordenação.", 403);
-  const runId = new URL(req.url).searchParams.get("run");
   if (runId && !z.string().uuid().safeParse(runId).success) {
     return jsonErro("Run inválido.", 400);
   }
@@ -149,13 +198,19 @@ const ReagendarBody = z.object({ run_id: z.string().uuid() }).strict();
  *  cleared results, and the run reopens as 'rodando' for the loop to
  *  resume. Direct update — coord's `for all` policy already covers (0164). */
 export async function PATCH(req: Request) {
+  const body = ReagendarBody.safeParse(await req.json().catch(() => null));
+  if (!body.success) return jsonErro("run_id inválido.", 400);
+  const demo = await demoRole();
+  if (demo) {
+    if (demo !== "coordenacao") return jsonErro("Área da coordenação.", 403);
+    const { reagendados } = await demoEvalReagendar(body.data.run_id);
+    return NextResponse.json({ ok: true, reagendados });
+  }
   const supabase = await createClient();
   const g = await gateCoord(supabase);
   if (g.erro === "sessao")
     return jsonErro("Sessão expirada. Entre de novo.", 401);
   if (!g.ok) return jsonErro("Área da coordenação.", 403);
-  const body = ReagendarBody.safeParse(await req.json().catch(() => null));
-  if (!body.success) return jsonErro("run_id inválido.", 400);
 
   const { data: reagendados, error } = await supabase
     .from("ia_eval_itens")
