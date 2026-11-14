@@ -17,7 +17,7 @@ import {
 // jovem_duplas — um embed errado aqui morria silencioso).
 //
 // Piso: o sweep zera os convites/consolidado da dupla …0030 antes de cada
-// run (e no afterAll) — spec idempotente, o cap 3-por-vínculo não acumula.
+// run (e no afterAll) — spec idempotente, o cap total de 9 não acumula.
 
 const MENTOR_EMAIL = process.env.E2E_MENTOR_EMAIL ?? "e2e-mentor@realiza.test";
 const JOVEM_EMAIL = process.env.E2E_JOVEM_EMAIL ?? "jovem-e2e@realiza.test";

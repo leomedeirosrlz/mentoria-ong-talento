@@ -134,7 +134,7 @@ const run = async () => {
   const coord = await as(COORD);
   const esp = await as(ESP);
 
-  // ---------- 1) cap por vínculo em UPDATE ----------
+  // ---------- 1) vínculo é rótulo — 0195 tirou o cap por vínculo ----------
 
   for (let i = 1; i <= 3; i++) {
     const r = await api("terceiros_contatos", { method: "POST", token: mentor,
@@ -146,25 +146,18 @@ const run = async () => {
   const solto = r.data?.[0];
   check("seed 3 amigos + 1 outro", !!solto?.id);
 
-  // o buraco: PATCH vinculo outro→amigo com 3 amigos vivos tem que bater no cap
+  // vínculo virou rótulo informativo — outro→amigo com 3 amigos vivos passa
   r = await api(`terceiros_contatos?id=eq.${solto.id}`, { method: "PATCH", token: mentor,
     body: { vinculo: "amigo" } });
-  check("UPDATE de vinculo respeita o cap 3 (outro→amigo negado)",
-    r.status >= 400, `status=${r.status} ${JSON.stringify(r.data)?.slice(0, 140)}`);
-  const aindaOutro = (await svc(`terceiros_contatos?id=eq.${solto.id}&select=vinculo`)).data?.[0];
-  check("vinculo ficou 'outro' após a tentativa", aindaOutro?.vinculo === "outro");
+  check("UPDATE de vinculo livre (outro→amigo com cap cheio)",
+    r.status === 200 && r.data?.[0]?.vinculo === "amigo",
+    `status=${r.status} ${JSON.stringify(r.data)?.slice(0, 140)}`);
 
-  // mover pra um vínculo com vaga funciona
-  r = await api(`terceiros_contatos?id=eq.${solto.id}`, { method: "PATCH", token: mentor,
-    body: { vinculo: "colega" } });
-  check("UPDATE de vinculo dentro do cap passa (outro→colega)",
-    r.status === 200 && r.data?.[0]?.vinculo === "colega");
-
-  // PATCH idempotente no mesmo vínculo não se auto-conta (cap com a própria row fora)
+  // PATCH idempotente no mesmo vínculo segue íntegro (policy de update)
   const amigo1 = (await svc(`terceiros_contatos?dupla_id=eq.${DUPLA}&vinculo=eq.amigo&select=id&limit=1`)).data[0];
   r = await api(`terceiros_contatos?id=eq.${amigo1.id}`, { method: "PATCH", token: mentor,
     body: { vinculo: "amigo", nome: "Amigo 1 (renomeado)" } });
-  check("UPDATE no mesmo vínculo não se auto-conta", r.status === 200);
+  check("UPDATE no mesmo vínculo idempotente", r.status === 200);
 
   // ---------- 2) dupla fechada = histórico ----------
 
