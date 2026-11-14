@@ -4,7 +4,7 @@ material: roteiro-encontro-16
 titulo: "Roteiro do 16º encontro: Encerramento & Celebração"
 tipo: conteudo
 natureza: consolidado
-audiencia: [dpp, supervisor]
+audiencia: [mentor_dpp, supervisor]
 versao: vigente
 origem: roteiro-semana-16 publicado (PDF do catálogo de materiais) e
   capítulo "Os 16 encontros" do Guia do Mentor DPP (guia-mentor-dpp);

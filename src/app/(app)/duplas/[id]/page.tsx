@@ -1,5 +1,9 @@
 import Link from "next/link";
-import { audienciasDe, hrefMaterial } from "@/lib/materiais";
+import {
+  audienciasDe,
+  enriquecerMateriaisPorEncontro,
+  hrefMaterial,
+} from "@/lib/materiais";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
 import type { Metadata } from "next";
@@ -501,6 +505,15 @@ export default async function DuplaPage({
     arr.push(m);
     materiaisPorNumero.set(m.encontro_num, arr);
   }
+  // REALIZA-394 — cada encontro DPP herda o kit do guia oficial: roteiro da
+  // semana, docs dos instrumentos em jogo e das técnicas que o evento nomeia
+  // (mesma derivação do chip de instrumento), mesmo quando a linha do
+  // catálogo é transversal ou falta. Dedup por slug — a linha real vence.
+  // A trilha especialista fica fora: os 5 passos não têm janela nem roteiro.
+  if (!ehEsp) {
+    enriquecerMateriaisPorEncontro(materiaisPorNumero, eventosDaDupla);
+  }
+
   const hojeStr = toDateStr(new Date());
   const podeRetroativo = souMentor && dupla.status === "ativa" && faltantes.length > 0;
 

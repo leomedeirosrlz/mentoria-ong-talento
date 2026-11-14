@@ -4,7 +4,7 @@ titulo: Feedback Construtivo
 material: feedback-construtivo
 tipo: instrumento
 natureza: consolidado
-audiencia: [coordenacao, supervisor, dpp, especialista]
+audiencia: [coordenacao, supervisor, mentor_dpp, mentor_especialista]
 versao: vigente (documento nativo em /materiais/documento/feedback-construtivo)
 origem: texto do documento nativo (src/lib/materiais-documentos.ts),
   extraído do Guia do Mentor DPP (cap. 07, "Feedback construtivo"). Texto
