@@ -92,6 +92,9 @@ const nextConfig: NextConfig = {
     "192.168.15.4",
     "100.116.25.126",
     "nb-linux.tailf3e87b.ts.net",
+    // loopback explícito — proxies de preview locais chegam como 127.0.0.1
+    "127.0.0.1",
+    "localhost",
   ],
   async headers() {
     return [
