@@ -44,7 +44,7 @@ A preparação do 1º encontro começa assim que a dupla é formada: o(a) mentor
 
 - Resumo da história de vida pessoal e profissional, para guardar e trazer à conversa (não precisa enviar antes).
 - A Roda da Vida respondida na plataforma, com uma reflexão sobre as áreas que gostaria de melhorar.
-- Nome e contato de pelo menos 3 amigos e 3 familiares (e 3 colegas, se estiver trabalhando), que participam da avaliação por terceiros.
+- Nome e contato de pelo menos 3 pessoas que conhecem bem o(a) jovem (o guia sugere misturar amigos, familiares e colegas), que participam da avaliação por terceiros.
 
 ## 1º encontro · Durante o encontro
 

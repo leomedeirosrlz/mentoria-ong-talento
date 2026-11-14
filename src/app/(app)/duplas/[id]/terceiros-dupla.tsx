@@ -27,6 +27,11 @@ import type {
   TerceiroConsolidacao,
   TerceiroVinculo,
 } from "@/lib/terceiros/queries";
+import {
+  descricaoIndicacao,
+  RESUMO_TERCEIROS,
+  vagasTerceiros,
+} from "@/lib/terceiros/regua";
 import { formatDate, waLink } from "@/lib/ciclo";
 import { CopiarLink } from "@/components/forms/copiar-link";
 import { primeiroNome, urlPublica } from "@/components/forms/link-shared";
@@ -63,10 +68,12 @@ import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
 // Painel "Avaliação por terceiros" da ficha da dupla (0103 — guia DPP
-// semana 1→2). O jovem indica até 9 pessoas (3 amigos + 3 familiares + 3
-// colegas); o mentor manda a cada uma um link com 2 perguntas abertas,
-// lê as respostas identificadas e consolida ANONIMAMENTE pro jovem — que
-// só vê a síntese depois de publicada.
+// semana 1→2; régua flexibilizada na 0195, REALIZA-387). O jovem indica
+// pelo menos 3 pessoas que o conhecem bem, até 9 no total — o 3+3+3 do
+// guia virou sugestão de composição na copy (vínculo = rótulo). O mentor
+// manda a cada uma um link com 2 perguntas abertas, lê as respostas
+// identificadas e consolida ANONIMAMENTE pro jovem — que só vê a síntese
+// depois de publicada.
 
 const VINCULO_LABEL: Record<TerceiroVinculo, string> = {
   amigo: "amigo(a)",
@@ -505,10 +512,7 @@ function NovoContatoDialog({
     <DialogContent size="md">
       <DialogHeader>
         <DialogTitle>Indicar pessoa</DialogTitle>
-        <DialogDescription>
-          O guia prevê até 9 pessoas: 3 amigos, 3 familiares e 3 colegas
-          (restam {vagas}). Cada uma recebe um link próprio, sem login.
-        </DialogDescription>
+        <DialogDescription>{descricaoIndicacao(vagas)}</DialogDescription>
       </DialogHeader>
       <div className="space-y-3">
         <div className="space-y-1.5">
@@ -708,7 +712,7 @@ export function TerceirosDupla({
 }) {
   const [dialogAberto, setDialogAberto] = useState(false);
   const respondidos = contatos.filter((c) => c.status === "respondido").length;
-  const vagas = 9 - contatos.length;
+  const vagas = vagasTerceiros(contatos.length);
   const aberto = contatos.length > 0;
 
   return (
@@ -731,11 +735,7 @@ export function TerceirosDupla({
           </Badge>
         )}
       </div>
-      <p className="mt-1 text-xs text-muted-foreground">
-        Guia semana 1→2: o jovem indica até 9 pessoas (3 amigos, 3 familiares,
-        3 colegas); cada uma responde 2 perguntas por link próprio. Você lê
-        identificado e consolida anônimo. O jovem só vê a síntese publicada.
-      </p>
+      <p className="mt-1 text-xs text-muted-foreground">{RESUMO_TERCEIROS}</p>
 
       {aberto && (
         <ul className="mt-2 divide-y divide-border/60">
