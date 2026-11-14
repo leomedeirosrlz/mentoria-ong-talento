@@ -16,6 +16,7 @@ import {
   papelLabel,
   saudadeDaDupla,
   TRILHA_LABEL,
+  type DuplaSaude,
   type Semaforo,
 } from "@/lib/ciclo";
 import { PESO_AVALIACAO } from "@/lib/encerramento";
@@ -63,7 +64,7 @@ const SEMAFORO_LABEL: Record<Semaforo, string> = {
 
 /** Duplas mínimas pra resolver turma/cronograma e nomes — o mapa por trás
  *  dos recortes não-dupla (interacao, solicitação, form, assinatura). */
-type DuplaMapa = {
+export type DuplaMapa = {
   id: string;
   turma: string | null;
   cronograma_id: string | null;
@@ -137,34 +138,39 @@ async function duplasMapaReal(
 // nova de semáforo — reusa, não reimplementa).
 // =====================================================================
 
-export function linhasAderencia(
-  duplas: Dupla[],
+/** A linha de uma dupla + a saúde por trás dela: a seção acionável do hub
+ *  (REALIZA-389) lê os dois da mesma derivação — um número só, duas
+ *  leituras (ficha e export nunca divergem). */
+export function itemAderencia(
+  d: Dupla,
   eventos: CicloEvento[],
   crons: readonly Pick<Cronograma, "id" | "nome" | "turma">[],
-  hoje = new Date()
-): LinhaAderencia[] {
-  const cronNome = new Map(crons.map((c) => [c.id, c.nome]));
-  return duplas.map((d) => {
-    const saude = saudadeDaDupla(d, eventos, hoje);
-    const esperados = encontroEsperado(
-      eventosDoCronograma(eventos, d.cronograma_id),
-      hoje,
-      d.iniciada_em
-    );
-    const realizados = d.encontros.filter(
-      (e) => e.status === "realizado"
-    ).length;
-    const atrasos = d.encontros
-      .filter((e) => e.registro)
-      .map((e) => diasAtrasoRegistro(e.registro!, e));
-    const avaliacoes = d.encontros
-      .map((e) => e.registro?.avaliacao)
-      .filter((a): a is AvaliacaoJovem => !!a);
-    let remarcacoes = 0;
-    for (const n of contagemRemarcacoes(d).values()) remarcacoes += n;
-    return {
+  hoje: Date
+): { saude: DuplaSaude; linha: LinhaAderencia } {
+  const saude = saudadeDaDupla(d, eventos, hoje);
+  const esperados = encontroEsperado(
+    eventosDoCronograma(eventos, d.cronograma_id),
+    hoje,
+    d.iniciada_em
+  );
+  const realizados = d.encontros.filter(
+    (e) => e.status === "realizado"
+  ).length;
+  const atrasos = d.encontros
+    .filter((e) => e.registro)
+    .map((e) => diasAtrasoRegistro(e.registro!, e));
+  const avaliacoes = d.encontros
+    .map((e) => e.registro?.avaliacao)
+    .filter((a): a is AvaliacaoJovem => !!a);
+  let remarcacoes = 0;
+  for (const n of contagemRemarcacoes(d).values()) remarcacoes += n;
+  return {
+    saude,
+    linha: {
       turma: turmaDaDupla(d, crons) ?? "",
-      cronograma: d.cronograma_id ? (cronNome.get(d.cronograma_id) ?? "") : "",
+      cronograma: d.cronograma_id
+        ? (crons.find((c) => c.id === d.cronograma_id)?.nome ?? "")
+        : "",
       trilha: TRILHA_LABEL[d.trilha] ?? d.trilha,
       mentor: d.mentor?.nome ?? "",
       mentorado: d.mentorado?.nome ?? "",
@@ -183,8 +189,17 @@ export function linhasAderencia(
       remarcacoes,
       semaforo: SEMAFORO_LABEL[saude.semaforo],
       motivos: saude.motivos.join(" | "),
-    };
-  });
+    },
+  };
+}
+
+export function linhasAderencia(
+  duplas: Dupla[],
+  eventos: CicloEvento[],
+  crons: readonly Pick<Cronograma, "id" | "nome" | "turma">[],
+  hoje = new Date()
+): LinhaAderencia[] {
+  return duplas.map((d) => itemAderencia(d, eventos, crons, hoje).linha);
 }
 
 export async function dadosAderencia(
@@ -544,7 +559,7 @@ export function dadosSolicitacoesDemo(
 // tipo=encerramento — 1 linha/dupla com row de encerramentos.
 // =====================================================================
 
-const ENCERRAMENTO_TIPO_LABEL: Record<string, string> = {
+export const ENCERRAMENTO_TIPO_LABEL: Record<string, string> = {
   concluida: "concluída",
   encerrada: "encerrada",
   pendente: "pendente",
@@ -557,7 +572,7 @@ const CHECKLIST_CHAVES: (keyof EncerramentoChecklist)[] = [
   "avaliacao_360_enviada",
 ];
 
-type RowEncerramento = {
+export type RowEncerramento = {
   dupla_id: string;
   tipo: string;
   checklist: EncerramentoChecklist;
@@ -565,6 +580,28 @@ type RowEncerramento = {
   created_at: string;
   decidido: string;
 };
+
+/** A linha de um encerramento + o checklist já contado: a fila acionável do
+ *  hub (REALIZA-389) mostra a contagem sem repetir a régua. */
+export function linhaEncerramento(
+  e: RowEncerramento,
+  d: DuplaMapa | undefined
+): { linha: LinhaEncerramento; feitos: number; total: number } {
+  const feitos = CHECKLIST_CHAVES.filter((k) => e.checklist?.[k] === true).length;
+  return {
+    feitos,
+    total: CHECKLIST_CHAVES.length,
+    linha: {
+      mentor: d?.mentor?.nome ?? "",
+      mentorado: d?.mentorado?.nome ?? "",
+      tipo: ENCERRAMENTO_TIPO_LABEL[e.tipo] ?? e.tipo,
+      checklist: `${feitos} de ${CHECKLIST_CHAVES.length}`,
+      decidido_por: e.decidido,
+      resumo_jornada: e.resumo_jornada ? "sim" : "não",
+      created_at: e.created_at,
+    },
+  };
+}
 
 export function linhasEncerramento(
   rows: RowEncerramento[],
@@ -577,18 +614,7 @@ export function linhasEncerramento(
     const d = porId.get(e.dupla_id);
     if (d && !duplaNoRecorte(d, recorte, crons)) continue;
     if (!d && (recorte.turma || recorte.cronogramaId)) continue;
-    const feitos = CHECKLIST_CHAVES.filter(
-      (k) => e.checklist?.[k] === true
-    ).length;
-    out.push({
-      mentor: d?.mentor?.nome ?? "",
-      mentorado: d?.mentorado?.nome ?? "",
-      tipo: ENCERRAMENTO_TIPO_LABEL[e.tipo] ?? e.tipo,
-      checklist: `${feitos} de ${CHECKLIST_CHAVES.length}`,
-      decidido_por: e.decidido,
-      resumo_jornada: e.resumo_jornada ? "sim" : "não",
-      created_at: e.created_at,
-    });
+    out.push(linhaEncerramento(e, d).linha);
   }
   return out;
 }

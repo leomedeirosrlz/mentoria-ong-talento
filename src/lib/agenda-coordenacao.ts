@@ -999,6 +999,19 @@ export function saudeDoRecorte(
   hoje: Date,
   cronogramaId: string | null = null
 ): SaudeRecorte {
+  return saudeRecorteDeItens(
+    duplas
+      .filter((d) => cronogramaId == null || d.cronograma_id === cronogramaId)
+      .map((dupla) => ({ dupla, saude: saudadeDaDupla(dupla, eventos, hoje) }))
+  );
+}
+
+/** A mesma contagem do saudeDoRecorte sobre saúdes JÁ derivadas — quem já
+ *  calculou saudadeDaDupla por outro motivo (o resumo de aderência do hub)
+ *  não repassa pela derivação só pra contar. Uma régua só. */
+export function saudeRecorteDeItens(
+  itens: readonly { dupla: Dupla; saude: DuplaSaude }[]
+): SaudeRecorte {
   const s: SaudeRecorte = {
     emAndamento: 0,
     risco: 0,
@@ -1010,9 +1023,7 @@ export function saudeDoRecorte(
     encerradas: 0,
     total: 0,
   };
-  for (const d of duplas) {
-    if (cronogramaId != null && d.cronograma_id !== cronogramaId) continue;
-    const saude = saudadeDaDupla(d, eventos, hoje);
+  for (const { dupla: d, saude } of itens) {
     if (saude.apoio.aberto) s.apoio++;
     if (d.status === "ativa") {
       s.emAndamento++;
