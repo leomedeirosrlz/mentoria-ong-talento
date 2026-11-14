@@ -27,6 +27,25 @@ export function encerramentoDecidido(
   return enc != null && enc.tipo !== "pendente";
 }
 
+/** Onde o bloco de fechamento mora na ficha: a aba Agora só o carrega quando
+ *  a dupla está em reta final (penúltimo passo feito) ou já fechada — fora
+ *  disso ele vive na aba Encontros. Predicado único: a ficha decide a
+ *  renderização com ele e a fila do hub linka pra mesma aba que ele abriria.
+ *  `total` é o nº de passos da trilha (passosDaTrilha — NÃO totalDaTrilha:
+ *  sem cronograma não há reta final a medir) e `feitos` os realizados. */
+export function fechamentoEmFoco(
+  d: Pick<Dupla, "status" | "encerrada_em" | "trilha">,
+  total: number,
+  feitos: number
+): boolean {
+  return (
+    d.status === "concluida" ||
+    d.status === "encerrada" ||
+    !!d.encerrada_em ||
+    (d.trilha !== "especialista" && total > 0 && feitos >= total - 1)
+  );
+}
+
 // ---------- checklist do fechamento (guia DPP, cap. encerramento) ----------
 
 /** Ordem canônica do checklist — todos os itens são atestação da coordenação;

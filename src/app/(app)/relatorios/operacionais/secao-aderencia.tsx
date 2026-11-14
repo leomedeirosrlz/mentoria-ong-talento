@@ -75,7 +75,7 @@ export function SecaoAderencia({
     <section className="space-y-4">
       <RelatorioSecaoTopo
         titulo="Aderência ao ciclo"
-        descricao="Quem está no ritmo do calendário, quem pede ação e o que fazer — a mesma régua que o CSV resume linha a linha."
+        descricao="Quem está no ritmo do calendário, quem pede ação e o que fazer. A mesma régua que o CSV resume linha a linha."
         csvHref={csvHref}
       />
 
@@ -321,7 +321,11 @@ function Stat({
  *  /duplas) ou o trabalho a fazer quando a régua está limpa. */
 function motivoDaItem(item: ItemAderencia): string | null {
   const d = item.dupla;
-  if (d.status === "pausada") return "Jornada congelada, sem cobrança";
+  // pausada só entra na fila pelo apoio — o motivo é o pedido, não a pausa
+  if (d.status === "pausada")
+    return item.saude.apoio.aberto
+      ? "Pedido de apoio em aberto"
+      : "Jornada congelada, sem cobrança";
   if (d.status !== "ativa") return null;
   if (item.saude.sinais.length === 0)
     return item.saude.apoio.aberto ? "Pedido de apoio em aberto" : null;
@@ -462,7 +466,7 @@ function LinhaAderencia({
         />
       }
       fichaHref={`/duplas/${d.id}`}
-      fichaNome={d.mentorado.nome_social ?? d.mentorado.nome}
+      fichaNome={(d.mentorado.nome_social ?? d.mentorado.nome).split(" ")[0]}
     />
   );
 }

@@ -64,6 +64,7 @@ export function RelatorioSecaoTopo({
       </div>
       <Link
         href={csvHref}
+        prefetch={false}
         className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
       >
         <DownloadSimple aria-hidden />

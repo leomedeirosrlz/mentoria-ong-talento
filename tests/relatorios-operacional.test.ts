@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
-  linhasEncerramentoDosPares,
+  fichaRitoHref,
   paresEncerramento,
   resumoAderencia,
   resumoEncerramento,
@@ -238,13 +238,65 @@ describe("resumoAderencia — régua agregada", () => {
     ]);
   });
 
-  it("itens mantêm a ordem do recorte — paridade literal com o CSV", () => {
-    expect(resumo.itens.map((i) => i.dupla.id)).toEqual(
-      DUPLAS.map((d) => d.id)
+  it("itens vêm na ordem do CSV — a prévia é literalmente o início do export", () => {
+    const esperado = [...linhasAderencia(DUPLAS, EVENTOS, CRONS, HOJE)].sort(
+      (a, b) =>
+        a.mentor.localeCompare(b.mentor, "pt-BR") ||
+        a.mentorado.localeCompare(b.mentorado, "pt-BR")
     );
-    expect(resumo.itens.map((i) => i.linha)).toEqual(
-      linhasAderencia(DUPLAS, EVENTOS, CRONS, HOJE)
+    expect(resumo.itens.map((i) => i.linha)).toEqual(esperado);
+    // André Lima (pausada e concluída) abre; demais por nome do mentor
+    expect(resumo.itens.map((i) => i.dupla.id)).toEqual([
+      "dPausada",
+      "dFechada",
+      "dOk",
+      "dAtencao",
+      "dRisco",
+      "dApoio",
+    ]);
+  });
+
+  it("catch-up conta no agregado — a régua do card é a do semáforo", () => {
+    // dupla que entrou depois do ciclo: os passos oficiais anteriores à
+    // entrada vencem na fila de recuperação (defasadosVencidos) — a contagem
+    // do semáforo cobra, a do card não pode ficar pra trás
+    const eventosDef = [
+      mkEvento(3, "2026-09-01"),
+      mkEvento(4, "2026-09-08"),
+      mkEvento(5, "2026-09-15"),
+      ...EVENTOS,
+    ];
+    const dTardia = mkDupla({
+      id: "dTardia",
+      iniciada_em: "2026-09-29",
+    });
+    const r = resumoAderencia([dTardia], eventosDef, CRONS, HOJE);
+    // 4 defasados vencidos (ev3-6 a 0/2/5/8 dias da entrada) + 2 devidos
+    // pós-entrada (ev7 em 29/09, ev8 em 06/10) = 6 — a régua antiga dava 2
+    expect(r.esperados).toBe(6);
+    expect(r.emAtraso).toBe(6);
+    expect(r.atrasDoCalendario).toBe(1);
+    // a linha do CSV segue na régua dela (devidos pós-entrada): intencional
+    expect(r.itens[0].linha.esperados).toBe(2);
+  });
+
+  it("pausada entra na fila só por pedido de apoio", () => {
+    const dPausadaApoio = mkDupla({
+      id: "dPausadaApoio",
+      status: "pausada",
+      encontros: [
+        encRealizado("dPausadaApoio", 6, "2026-09-22", reg({ precisa_apoio: true })),
+      ],
+    });
+    const r = resumoAderencia(
+      [dPausadaApoio, dPausada, dOk],
+      EVENTOS,
+      CRONS,
+      HOJE
     );
+    // apoio aberto é trabalho da coordenação mesmo com a jornada congelada;
+    // pausada sem apoio segue fora (sem cobrança)
+    expect(r.fila.map((i) => i.dupla.id)).toEqual(["dPausadaApoio"]);
   });
 
   it("adiantados somam o que passou do devido", () => {
@@ -413,11 +465,19 @@ describe("resumoEncerramento", () => {
   it("pendentes mais antigos primeiro; decididos mais recentes primeiro", () => {
     expect(resumo.pendentes.map((i) => i.enc.id)).toEqual([
       "e1", // 22 dias
-      "eOrfao", // 6 dias
       "e2", // 2 dias
     ]);
     expect(resumo.decididos.map((i) => i.enc.id)).toEqual(["e4", "e3"]);
     expect(resumo.maisAntigoDias).toBe(22);
+  });
+
+  it("órfão fica fora da fila e dos faltantes mas conta no total e na prévia", () => {
+    // eOrfao (dupla fora do escopo) não é trabalho acionável — a fila só
+    // mostra o que pode abrir; o total e a linha do CSV cobrem o fato
+    expect(resumo.pendentes.some((i) => i.enc.id === "eOrfao")).toBe(false);
+    expect(resumo.faltantes.every((f) => f.n <= 2)).toBe(true);
+    expect(resumo.linhasCsv).toHaveLength(5);
+    expect(resumo.linhasCsv.map((l) => l.checklist)).toContain("0 de 4");
   });
 
   it("conta concluída/encerrada separadas do pendente", () => {
@@ -435,12 +495,12 @@ describe("resumoEncerramento", () => {
   });
 
   it("faltantes agrega o que falta nos pendentes, mais frequente primeiro", () => {
-    // e1: mutuo+360 · e2: os 4 · órfão: os 4
+    // e1: mutuo+360 · e2: os 4 — o órfão não entra (fora da fila)
     expect(resumo.faltantes).toEqual([
-      { key: "feedback_mutuo", n: 3 },
-      { key: "avaliacao_360_enviada", n: 3 },
-      { key: "feedback_final", n: 2 },
-      { key: "revisao_pdm", n: 2 },
+      { key: "feedback_mutuo", n: 2 },
+      { key: "avaliacao_360_enviada", n: 2 },
+      { key: "feedback_final", n: 1 },
+      { key: "revisao_pdm", n: 1 },
     ]);
   });
 
@@ -458,16 +518,17 @@ describe("resumoEncerramento", () => {
   });
 });
 
-describe("linhasEncerramentoDosPares — paridade com o CSV", () => {
-  it("produz as mesmas linhas de linhasEncerramento sobre os mesmos dados", () => {
+describe("linhasCsv — paridade com o CSV", () => {
+  it("produz as mesmas linhas de linhasEncerramento, na ordem do export", () => {
     const crons = [
       { id: "c1", turma: "T1" },
       { id: "c2", turma: "T2" },
     ];
     const pares = paresEncerramento(ENCS, DUPLAS_E, {}, crons);
-    const viaPares = linhasEncerramentoDosPares(pares);
+    const viaPares = resumoEncerramento(pares, HOJE).linhasCsv;
 
-    // o caminho do export: rows + mapa de duplas + linhasEncerramento
+    // o caminho do export: rows + mapa de duplas + linhasEncerramento +
+    // a ordenação do csvEncerramento (mentor, depois mentorado)
     const rows = ENCS.map((e) => ({
       dupla_id: e.dupla_id,
       tipo: e.tipo,
@@ -490,10 +551,49 @@ describe("linhasEncerramentoDosPares — paridade com o CSV", () => {
         },
       ])
     );
-    const viaLinhas = linhasEncerramento(rows, porId, {}, crons);
+    const viaLinhas = linhasEncerramento(rows, porId, {}, crons).sort(
+      (a, b) =>
+        a.mentor.localeCompare(b.mentor, "pt-BR") ||
+        a.mentorado.localeCompare(b.mentorado, "pt-BR")
+    );
     expect(viaPares).toEqual(viaLinhas);
-    expect(viaPares[2].checklist).toBe("4 de 4");
-    expect(viaPares[2].decidido_por).toBe("Clara Costa");
-    expect(viaPares[2].resumo_jornada).toBe("sim");
+    const decidida = viaPares.find((l) => l.decidido_por === "Clara Costa")!;
+    expect(decidida.checklist).toBe("4 de 4");
+    expect(decidida.resumo_jornada).toBe("sim");
+  });
+});
+
+describe("fichaRitoHref — mesmo predicado da ficha", () => {
+  it("dupla já fechada (ou carimbo de saída) → aba Agora", () => {
+    expect(fichaRitoHref(dE3, EVENTOS)).toBe("/duplas/dE3");
+    expect(fichaRitoHref(dE4, EVENTOS)).toBe("/duplas/dE4");
+  });
+  it("ativa em reta final (penúltimo passo feito) → aba Agora", () => {
+    const dReta = mkDupla({
+      id: "dReta",
+      encontros: [6, 7, 8].map((n) =>
+        encRealizado("dReta", n, "2026-10-0" + (n - 5))
+      ),
+    });
+    // 4 passos no cronograma c1, 3 feitos → penúltimo = reta final
+    expect(fichaRitoHref(dReta, EVENTOS)).toBe("/duplas/dReta");
+  });
+  it("ativa fora da reta final → ?aba=encontros (onde o bloco mora)", () => {
+    expect(fichaRitoHref(mkDupla({ id: "dMeio" }), EVENTOS)).toBe(
+      "/duplas/dMeio?aba=encontros"
+    );
+  });
+  it("sem cronograma → ?aba=encontros (o fallback ||16 não cola reta final)", () => {
+    // sem passos de trilha não há "penúltimo" — totalDaTrilha devolveria 16
+    // pelo teto canônico e 15 realizados colocariam a dupla em reta final
+    // na ficha; aqui e lá a régua é a mesma: sem cronograma vai pra Encontros
+    const dLegada = mkDupla({
+      id: "dLegada",
+      cronograma_id: null,
+      encontros: Array.from({ length: 15 }, (_, i) =>
+        encRealizado("dLegada", i + 1, "2026-09-01")
+      ),
+    });
+    expect(fichaRitoHref(dLegada, EVENTOS)).toBe("/duplas/dLegada?aba=encontros");
   });
 });

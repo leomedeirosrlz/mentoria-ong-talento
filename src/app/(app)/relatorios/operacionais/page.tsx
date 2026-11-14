@@ -37,7 +37,6 @@ import {
   type DiaSaude,
 } from "@/lib/relatorios/dados";
 import {
-  linhasEncerramentoDosPares,
   paresEncerramento,
   resumoAderencia,
   resumoEncerramento,
@@ -348,10 +347,11 @@ async function renderAba({
         recorte,
         crons
       );
+      const resumo = resumoEncerramento(pares);
       return (
         <SecaoEncerramento
-          resumo={resumoEncerramento(pares)}
-          linhas={linhasEncerramentoDosPares(pares)}
+          resumo={resumo}
+          linhas={resumo.linhasCsv}
           csvHref={csvHref("encerramento")}
           eventos={eventos}
           crons={crons}

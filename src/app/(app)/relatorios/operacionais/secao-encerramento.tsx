@@ -14,9 +14,10 @@ import {
 import { turmaDaDupla, turmaLonga } from "@/lib/turma";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
-import type { CicloEvento, Cronograma, Dupla } from "@/lib/types";
+import type { CicloEvento, Cronograma } from "@/lib/types";
 import {
   CHECKLIST_CURTO,
+  fichaRitoHref,
   type ItemEncerramento,
   type ResumoEncerramento,
 } from "@/lib/relatorios/operacional";
@@ -264,23 +265,6 @@ export function SecaoEncerramento({
   );
 }
 
-/** Onde o passo do rito mora na ficha: na aba Agora quando a dupla já está
- *  em reta final ou fechada, na aba Encontros antes disso (a mesma régua
- *  do fechamentoEmFoco da ficha). */
-function fichaRitoHref(d: Dupla, eventos: CicloEvento[]): string {
-  const total = totalDaTrilha(
-    d.trilha,
-    eventosDoCronograma(eventos, d.cronograma_id)
-  );
-  const feitos = d.encontros.filter((e) => e.status === "realizado").length;
-  const emFoco =
-    d.status === "concluida" ||
-    d.status === "encerrada" ||
-    !!d.encerrada_em ||
-    (d.trilha !== "especialista" && total > 0 && feitos >= total - 1);
-  return `/duplas/${d.id}${emFoco ? "" : "?aba=encontros"}`;
-}
-
 function LinhaRito({
   item,
   eventos,
@@ -375,7 +359,7 @@ function LinhaRito({
       }
       menu={<DuplaLinhaMenu dupla={d} editar formulario />}
       fichaHref={fichaRitoHref(d, eventos)}
-      fichaNome={d.mentorado.nome_social ?? d.mentorado.nome}
+      fichaNome={(d.mentorado.nome_social ?? d.mentorado.nome).split(" ")[0]}
     />
   );
 }

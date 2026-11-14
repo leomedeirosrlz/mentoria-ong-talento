@@ -50,7 +50,11 @@ import {
 import { getFormularios, getInstrumentosDaDupla } from "@/lib/forms/queries";
 import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
 import { getPdmDaDupla, getPdmResumo } from "@/lib/queries-pdm";
-import { dadosResumoJornada, encerramentoDecidido } from "@/lib/encerramento";
+import {
+  dadosResumoJornada,
+  encerramentoDecidido,
+  fechamentoEmFoco,
+} from "@/lib/encerramento";
 import { dadosRetrospectiva } from "@/lib/retrospectiva";
 import { resumoAvaliacaoJovem } from "@/lib/avaliacao-agregado";
 import { getAnexosPorRegistros } from "@/lib/anexos";
@@ -595,12 +599,9 @@ export default async function DuplaPage({
 
   // "reta final" e fechamento: a aba Agora carrega o encerramento só quando a
   // dupla chegou ao fim (penúltimo encontro feito ou já fechada). Fora disso
-  // o bloco mora na aba Encontros, sem sumir
-  const fechamentoEmFoco =
-    dupla.status === "concluida" ||
-    dupla.status === "encerrada" ||
-    !!dupla.encerrada_em ||
-    (!ehEsp && total > 0 && saude.feitos >= total - 1);
+  // o bloco mora na aba Encontros, sem sumir. Predicado compartilhado com a
+  // fila de ritos do hub operacional — ela linka pra mesma aba
+  const emFoco = fechamentoEmFoco(dupla, total, saude.feitos);
 
   // dupla sem cronograma (histórica, ou cadastro ainda sem vínculo): não há
   // trilha pra montar, mas os encontros registrados são fato — a lista cai
@@ -1180,7 +1181,7 @@ export default async function DuplaPage({
       )}
 
       <Suspense fallback={<Skeleton className="h-24 w-full" />}>
-        {fechamentoEmFoco && (
+        {emFoco && (
           <>
             {ehEsp && <TrilhaFechamento dupla={dupla} avaliacao={avaliacaoEsp} />}
             {!ehEsp && (
@@ -1307,7 +1308,7 @@ export default async function DuplaPage({
       {/* fechamento e resumo que não estão na Agora (dupla ainda no meio do
           ciclo): ficam aqui, no fim da lista, sem sumir */}
       <Suspense fallback={<Skeleton className="h-24 w-full" />}>
-        {!fechamentoEmFoco && !ehEsp && (
+        {!emFoco && !ehEsp && (
           <EncerramentoDupla
             dupla={dupla}
             encerramento={encerramento}
@@ -1319,7 +1320,7 @@ export default async function DuplaPage({
             realizadosCount={realizadosCount}
           />
         )}
-        {!fechamentoEmFoco && (
+        {!emFoco && (
           <>
             {retro?.desbloqueada && (
               <RetrospectivaJornada dados={retro} mostrarChecklist />
