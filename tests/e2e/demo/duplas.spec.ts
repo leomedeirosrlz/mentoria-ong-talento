@@ -708,4 +708,52 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
       await expect(card.locator("div.border-dashed")).toHaveCount(0);
     }
   });
+
+  // REALIZA-390 — a coluna "Dupla" cicla: prioridade (radar) → A a Z →
+  // Z a A → prioridade, com a ordem persistida em ?ordem= como os demais
+  // recortes da página. A asserção de ordem compara o lockup inteiro
+  // ("Mentor e Mentorado") na mesma collation pt-BR do porNomeDupla.
+  test("coordenação: coluna Dupla cicla prioridade → A a Z → Z a A", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/duplas");
+    const linhas = page.locator(LINHAS_COORD);
+    const nomesDuplas = async () =>
+      (await linhas.locator("p.text-sm.font-semibold").allInnerTexts()).map(
+        (t) => t.replace(/\s+/g, " ").trim()
+      );
+    const cmp = (a: string, b: string) =>
+      a.localeCompare(b, "pt-BR", { sensitivity: "base" });
+    const padrao = await nomesDuplas();
+    expect(padrao.length).toBeGreaterThan(3);
+
+    // o header clicável da coluna — seta só quando ordenada (aria-sort),
+    // a legenda "por prioridade/A a Z" repete o gesto no mobile
+    const btnOrdem = page.getByRole("button", {
+      name: "Dupla",
+      exact: true,
+    });
+    await expect(btnOrdem).toBeVisible();
+
+    await btnOrdem.click();
+    await expect(btnOrdem).toHaveAttribute("aria-sort", "ascending");
+    await expect(page).toHaveURL(/[?&]ordem=az/);
+    const az = await nomesDuplas();
+    expect(az).toEqual([...az].sort(cmp));
+    // a massa saudável não colapsa em ordem alfabética — todas as duplas
+    // do recorte estão na lista chapa
+    expect(az.length).toBeGreaterThanOrEqual(padrao.length);
+
+    await btnOrdem.click();
+    await expect(btnOrdem).toHaveAttribute("aria-sort", "descending");
+    await expect(page).toHaveURL(/[?&]ordem=za/);
+    expect(await nomesDuplas()).toEqual([...az].reverse());
+
+    // terceiro clique devolve o radar — o param sai da URL e a ordem de
+    // prioridade (com a massa colapsada, se havia) volta intacta
+    await btnOrdem.click();
+    await expect(page).not.toHaveURL(/[?&]ordem=/);
+    expect(await nomesDuplas()).toEqual(padrao);
+  });
 });
