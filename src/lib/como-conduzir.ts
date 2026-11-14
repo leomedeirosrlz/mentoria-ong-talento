@@ -44,11 +44,13 @@
 //     "Os 16 encontros") — não expandir com condução inventada.
 
 import {
+  INSTRUMENTOS_DUPLA_SISTEMA,
   INSTRUMENTOS_SISTEMA,
   type InstrumentoDuplaSistema,
   type InstrumentoSistema,
 } from "./forms/schema";
 import { ESTACOES, SISTEMA_DA_ESTACAO, type EstacaoChave } from "./jornada";
+import type { Audiencia } from "./materiais";
 
 /** Entrada de guia por instrumento — `chip` alimenta o badge da janela,
  *  `conduzir` o <details> do mentor e `cobre` a leitura da coordenação. */
@@ -308,6 +310,150 @@ export function instrumentoDoEncontro(
     ...daJanela(encontroNum),
   ]);
   return INSTRUMENTOS_SISTEMA.filter((s) => uniao.has(s));
+}
+
+// ---------- documento nativo ↔ instrumento de sistema (REALIZA-386) ----------
+
+/** O documento nativo (corpus docs/rag — material "doc:<slug>") que
+ *  acompanha cada instrumento de sistema da dupla: a ponte catálogo ↔
+ *  instrumento ao vivo nos dois sentidos — a linha da ficha ganha "Ler o
+ *  guia" e o documento ganha "Abrir instrumento". `titulo` repete o do
+ *  frontmatter de propósito: a linha de material sintetizada a partir
+ *  daqui mostra o mesmo nome que o leitor encontra ao abrir o doc. */
+export type DocApoio = {
+  slug: string;
+  titulo: string;
+  /** papéis do doc no catálogo (espelha o frontmatter do corpus) — a linha
+   *  de material sintetizada herda (coord vê tudo). */
+  audiencias: readonly Audiencia[];
+  /** tipo da linha sintetizada — "template" espelha a convenção do
+   *  catálogo pros docs de instrumento ("Instrumento: X" são modelos). */
+  tipo: "conteudo" | "template";
+};
+
+const AUDIENCIA_DOC_STAFF: readonly Audiencia[] = ["mentor_dpp", "supervisor"];
+
+export const DOC_DO_SISTEMA: Record<InstrumentoDuplaSistema, DocApoio> = {
+  visao: {
+    slug: "instrumento-construindo-visao",
+    titulo: "Construindo a sua Visão",
+    audiencias: ["mentor_dpp", "supervisor", "mentorado"],
+    tipo: "template",
+  },
+  metas: {
+    slug: "instrumento-definindo-minhas-metas",
+    titulo: "Definindo Minhas Metas",
+    audiencias: ["mentor_dpp", "supervisor", "mentorado"],
+    tipo: "template",
+  },
+  pdm: {
+    slug: "instrumento-pdm",
+    titulo: "PDM: Plano de Desenvolvimento do Mentorado",
+    audiencias: ["mentor_dpp", "supervisor", "mentorado"],
+    tipo: "template",
+  },
+  roda_vida: {
+    slug: "instrumento-roda-da-vida",
+    titulo: "Roda da Vida (instrumento)",
+    audiencias: ["mentor_dpp", "supervisor", "mentorado"],
+    tipo: "template",
+  },
+  // o checklist é do mentor, não da entrega do jovem — segue de staff
+  competencias_mentor: {
+    slug: "checklist-competencias",
+    titulo: "Checklist de competências do mentor",
+    audiencias: ["mentor_dpp", "coordenacao", "supervisor"],
+    tipo: "template",
+  },
+};
+
+/** Slug `doc:` do guia de um instrumento de sistema — destino do "Ler o
+ *  guia" na ficha, na régua de /materiais e na jornada do jovem. */
+export function docDoSistema(sistema: InstrumentoDuplaSistema): string {
+  return DOC_DO_SISTEMA[sistema].slug;
+}
+
+/** O instrumento de sistema que um documento nativo acompanha — null pra
+ *  roteiro, guia, template e técnica (esses não têm instrumento ao vivo). */
+export function sistemaDoDoc(slug: string): InstrumentoDuplaSistema | null {
+  for (const s of INSTRUMENTOS_DUPLA_SISTEMA) {
+    if (DOC_DO_SISTEMA[s].slug === slug) return s;
+  }
+  return null;
+}
+
+/** Técnica do guia nomeada pelo evento → documento de apoio do corpus.
+ *  Não têm instrumento de sistema (NOME_INSTRUMENTO não as mapeia, então
+ *  não viram chip na ficha), mas existem como doc nativo — entram na
+ *  lista de material do encontro que as nomeia. "Papel de modelo" e
+ *  "Modelo SMART" ficam de fora: não têm doc próprio (regra "não inventar").
+ *  As audiências espelham o frontmatter de cada doc — feedback-construtivo
+ *  é de staff e mentores, não do jovem (decisão da 0167). */
+const NOME_DOC_TECNICA: Record<string, DocApoio> = {
+  "perguntas eficazes": {
+    slug: "perguntas-eficazes",
+    titulo: "Perguntas Eficazes",
+    audiencias: ["mentor_dpp", "coordenacao", "supervisor"],
+    tipo: "conteudo",
+  },
+  "escuta ativa": {
+    slug: "escuta-ativa-e-comunicacao",
+    titulo: "Escuta ativa e comunicação não violenta",
+    audiencias: ["mentor_dpp", "mentor_especialista", "coordenacao", "supervisor"],
+    tipo: "conteudo",
+  },
+  "feedback construtivo": {
+    slug: "feedback-construtivo",
+    titulo: "Feedback Construtivo",
+    audiencias: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
+    tipo: "conteudo",
+  },
+};
+
+/** Todos os documentos nativos ligados a um encontro DPP (REALIZA-394):
+ *  o roteiro oficial (slug canônico `roteiro-encontro-NN`), os guias dos
+ *  instrumentos de sistema em jogo — a mesma união de
+ *  `instrumentoDoEncontro`, sem duplicar regra — e as técnicas que o
+ *  evento nomeia e existem como doc. O checklist de competências entra
+ *  no 1º e no 16º (marcação de início e revisitação — o chip da ficha diz
+ *  "Início · fechamento"). Ordem de leitura: roteiro, instrumentos na
+ *  ordem canônica e técnicas na ordem do evento. Domínio DPP — quem
+ *  chama filtra a trilha (a especialista tem passos próprios, sem
+ *  janelas nem roteiros neste modelo). */
+export function docsDoEncontro(
+  encontroNum: number,
+  cronograma: CronogramaEncontros = []
+): DocApoio[] {
+  const docs: DocApoio[] = [];
+  if (encontroNum >= 1 && encontroNum <= 16) {
+    docs.push({
+      slug: `roteiro-encontro-${String(encontroNum).padStart(2, "0")}`,
+      titulo: `Roteiro Semana ${encontroNum}`,
+      audiencias: AUDIENCIA_DOC_STAFF,
+      tipo: "conteudo",
+    });
+  }
+  // doEvento + daJanela só produzem sistemas da dupla — o estreitamento é
+  // de tipo, não de domínio (o mapa editorial não nomeia outro sistema)
+  const sistemas = new Set(
+    instrumentoDoEncontro(encontroNum, cronograma)
+  ) as Set<InstrumentoDuplaSistema>;
+  if (encontroNum === 1 || encontroNum === 16) {
+    sistemas.add("competencias_mentor");
+  }
+  for (const s of INSTRUMENTOS_DUPLA_SISTEMA) {
+    if (sistemas.has(s)) {
+      docs.push(DOC_DO_SISTEMA[s]);
+    }
+  }
+  const ev = cronograma.find(
+    (e) => e.numero === encontroNum && (e.tipo == null || e.tipo === "encontro")
+  );
+  for (const nome of ev?.instrumentos ?? []) {
+    const doc = NOME_DOC_TECNICA[normaNome(nome)];
+    if (doc && !docs.some((d) => d.slug === doc.slug)) docs.push(doc);
+  }
+  return docs;
 }
 
 /** Como conduzir (voz do mentor) do instrumento — null nunca: as 4

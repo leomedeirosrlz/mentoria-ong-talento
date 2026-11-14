@@ -49,8 +49,15 @@ import {
 import type {
   FormularioCampo,
   FormularioSistema,
+  InstrumentoDuplaSistema,
   RespostaValor,
 } from "@/lib/forms/schema";
+import { INSTRUMENTOS_DUPLA_SISTEMA } from "@/lib/forms/schema";
+import { docDoSistema } from "@/lib/como-conduzir";
+import {
+  corpusServeJovem,
+  listarDocsCorpus,
+} from "@/lib/materiais/corpus-doc";
 import { hrefMaterial } from "@/lib/materiais";
 import { getMateriais, getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
@@ -287,6 +294,24 @@ export default async function JovemMateriais() {
       inst.sistema,
       (inst.campos as FormularioCampo[] | null) ?? []
     );
+  }
+
+  // REALIZA-386 — "Ler o guia" por estação: só quando o doc nativo do
+  // instrumento existe E serve o jovem (corpusServeJovem — doc de staff
+  // não vira link morto na casa dele). Estações sem instrumento de
+  // sistema (avaliação recorrente, 360º) não têm guia pra ler.
+  const corpusPorSlug = new Map(
+    (await listarDocsCorpus()).map((d) => [d.slug, d])
+  );
+  const guiaPorEstacao = new Map<EstacaoChave, string>();
+  for (const est of estacoes) {
+    const s = SISTEMA_DA_ESTACAO[est.chave];
+    if (!s || !(INSTRUMENTOS_DUPLA_SISTEMA as readonly string[]).includes(s))
+      continue;
+    const doc = corpusPorSlug.get(docDoSistema(s as InstrumentoDuplaSistema));
+    if (doc && corpusServeJovem(doc)) {
+      guiaPorEstacao.set(est.chave, `/jovem/materiais/documento/${doc.slug}`);
+    }
   }
 
   // 360º respondida: o payload da RPC não carrega os campos do form — a
@@ -547,15 +572,29 @@ export default async function JovemMateriais() {
         )}
         <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
           {/* ordem do guia: as 4 de construção e as duas de fechamento —
-              a recorrente mora no banner/histórico, não aqui */}
+              a recorrente mora no banner/histórico, não aqui. O "Ler o
+              guia" fica fora do card — UM gesto por card (a ação
+              secundária mora no destino do card; o guia é leitura, não
+              gesto de entrega) */}
           {estacoes
             .filter((est) => est.chave !== "avaliacao_encontro")
             .map((est) => (
-              <InstrumentoCard
-                key={est.chave}
-                est={est}
-                {...propsEstacao(est.chave)}
-              />
+              <div key={est.chave}>
+                <InstrumentoCard
+                  est={est}
+                  {...propsEstacao(est.chave)}
+                />
+                {guiaPorEstacao.has(est.chave) && (
+                  <Link
+                    href={guiaPorEstacao.get(est.chave)!}
+                    prefetch={false}
+                    className="mt-1 inline-flex min-h-8 items-center gap-1.5 px-1 text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <BookOpen size={12} aria-hidden />
+                    Ler o guia
+                  </Link>
+                )}
+              </div>
             ))}
         </div>
         {/* a bandeira terminal — o encontro 16 da turma dela */}

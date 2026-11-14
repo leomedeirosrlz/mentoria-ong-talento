@@ -4,7 +4,7 @@ titulo: Definindo Minhas Metas
 material: instrumento-definindo-minhas-metas
 tipo: instrumento
 natureza: consolidado
-audiencia: [dpp, supervisor]
+audiencia: [mentor_dpp, supervisor, mentorado]
 versao: vigente
 origem: consolidado de definindo-metas.md (PDF do instrumento),
   supabase/migrations/0080_instrumentos_dupla.sql (form metas),

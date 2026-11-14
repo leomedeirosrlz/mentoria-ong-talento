@@ -1,5 +1,5 @@
 {
-  "gerado_em": "2026-11-09T13:37:11.752Z",
+  "gerado_em": "2026-11-14T16:36:17.628Z",
   "docs": 36,
   "chunks": 464,
   "fontes": [
@@ -136,7 +136,8 @@
       "natureza": "consolidado",
       "audiencia": [
         "mentor_dpp",
-        "supervisor"
+        "supervisor",
+        "mentorado"
       ],
       "arquivo": "instrumento-construindo-visao.md",
       "secoes": 5,
@@ -149,7 +150,8 @@
       "natureza": "consolidado",
       "audiencia": [
         "mentor_dpp",
-        "supervisor"
+        "supervisor",
+        "mentorado"
       ],
       "arquivo": "instrumento-definindo-minhas-metas.md",
       "secoes": 5,
@@ -162,7 +164,8 @@
       "natureza": "consolidado",
       "audiencia": [
         "mentor_dpp",
-        "supervisor"
+        "supervisor",
+        "mentorado"
       ],
       "arquivo": "instrumento-pdm.md",
       "secoes": 6,
@@ -175,7 +178,8 @@
       "natureza": "consolidado",
       "audiencia": [
         "mentor_dpp",
-        "supervisor"
+        "supervisor",
+        "mentorado"
       ],
       "arquivo": "instrumento-roda-da-vida.md",
       "secoes": 12,

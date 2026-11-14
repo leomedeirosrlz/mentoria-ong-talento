@@ -9,7 +9,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { formatDiaMes, formatDiaSemana, linkSeguro } from "@/lib/ciclo";
 import { hrefMaterial } from "@/lib/materiais";
-import { guiaDoEncontro } from "@/lib/como-conduzir";
+import { guiaDoEncontro, sistemaDoDoc } from "@/lib/como-conduzir";
 import type { Material } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { BibliotecaLista } from "@/components/biblioteca-lista";
@@ -93,7 +93,7 @@ function LinhaMaterial({ m }: { m: Material }) {
           {TIPO_LABEL[m.tipo]}
           {m.path
             ? m.path.startsWith("doc:")
-              ? " · documento"
+              ? ` · documento${sistemaDoDoc(m.path.slice(4)) ? " · instrumento oficial" : ""}`
               : " · arquivo"
             : urlOk && m.tipo !== "link"
               ? " · link externo"
@@ -268,10 +268,21 @@ export function MateriaisMentorBiblioteca({
 }) {
   // um card por turma com o encontro da semana; abaixo, o acervo agrupado
   // por categoria (REALIZA-250) — sem próximos/adiante/anteriores
+  // Dedup por path (REALIZA-394): a linha sintetizada do encontro e a real
+  // apontam pro mesmo `doc:<slug>` — a real sempre vence (ela carrega
+  // descrição e ordem do catálogo; a sintética só cobre a lacuna).
   const todos = new Map<string, Material>();
+  const sinteticos: Material[] = [];
   for (const lista of porEncontro.values())
-    for (const m of lista) todos.set(m.id, m);
-  for (const m of referenciais) todos.set(m.id, m);
+    for (const m of lista) {
+      if (m.id.startsWith("doc-")) sinteticos.push(m);
+      else todos.set(m.path ?? m.id, m);
+    }
+  for (const m of referenciais) todos.set(m.path ?? m.id, m);
+  for (const m of sinteticos) {
+    const chave = m.path ?? m.id;
+    if (!todos.has(chave)) todos.set(chave, m);
+  }
   const vigentes = turmas.map((t) => t.vigente).filter((n): n is number => n != null);
 
   return (

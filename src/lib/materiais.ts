@@ -1,5 +1,10 @@
 import { linkSeguro } from "./ciclo";
-import type { AppRole } from "./types";
+import {
+  docsDoEncontro,
+  type CronogramaEncontros,
+  type DocApoio,
+} from "./como-conduzir";
+import type { AppRole, Material } from "./types";
 import { temPapel } from "./types";
 
 /** Audiências possíveis de um material — uma por papel, na ordem do select.
@@ -105,4 +110,59 @@ export function audienciaLegada(audiencias: readonly string[]): string {
   if (audiencias.includes("mentor_dpp")) return "dpp";
   if (audiencias.includes("mentor_especialista")) return "especialista";
   return "coordenacao";
+}
+
+// ---------- material de apoio por encontro (REALIZA-394) ----------
+
+/** A linha-síntese de um doc nativo: o que o encontro ganha quando o
+ *  catálogo não amarra o doc ao número (linha transversal — encontro_num
+ *  nulo — ou ausente). id estável `doc-<slug>`: a dedup é pelo `path`
+ *  (`doc:<slug>`), então a linha real sempre vence a sintética. */
+function materialDeDoc(d: DocApoio, encontroNum: number): Material {
+  return {
+    id: `doc-${d.slug}`,
+    titulo: d.titulo,
+    descricao: null,
+    tipo: d.tipo,
+    url: null,
+    path: `doc:${d.slug}`,
+    audiencia: audienciaLegada(d.audiencias) as Material["audiencia"],
+    audiencias: [...d.audiencias],
+    encontro_num: encontroNum,
+    ordem: 40, // depois das linhas do catálogo (roteiros ordem 3–18)
+  };
+}
+
+/** Completa o material de apoio de cada encontro DPP do mapa: além das
+ *  linhas que o catálogo já amarra ao nº, o encontro herda os docs nativos
+ *  que o guia oficial põe em jogo — o roteiro da semana, os guias dos
+ *  instrumentos na janela e as técnicas que o evento nomeia (a derivação é
+ *  `docsDoEncontro`, a mesma do chip de instrumento da ficha). Dedup por
+ *  slug `doc:` dentro de cada lista — a linha real sempre vence. Domínio
+ *  DPP: a trilha especialista não tem janelas nem roteiros neste modelo —
+ *  quem chama só passa o mapa dela. */
+export function enriquecerMateriaisPorEncontro(
+  porNumero: Map<number, Material[]>,
+  cronograma: CronogramaEncontros = []
+): Map<number, Material[]> {
+  const numeros = new Set<number>([
+    ...porNumero.keys(),
+    ...cronograma
+      .filter((e) => e.tipo == null || e.tipo === "encontro")
+      .map((e) => e.numero)
+      .filter((n): n is number => n != null),
+  ]);
+  for (const n of numeros) {
+    const lista = porNumero.get(n) ?? [];
+    const presentes = new Set(
+      lista
+        .map((m) => (m.path?.startsWith("doc:") ? m.path.slice(4) : null))
+        .filter((s): s is string => s != null)
+    );
+    const extras = docsDoEncontro(n, cronograma)
+      .filter((d) => !presentes.has(d.slug))
+      .map((d) => materialDeDoc(d, n));
+    if (extras.length) porNumero.set(n, [...lista, ...extras]);
+  }
+  return porNumero;
 }

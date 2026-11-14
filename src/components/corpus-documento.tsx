@@ -41,6 +41,13 @@ import {
   tomDeFase,
   tomSemantico,
 } from "@/lib/materiais/corpus-doc";
+import { sistemaDoDoc } from "@/lib/como-conduzir";
+import { INSTRUMENTO_INFO } from "@/lib/forms/schema";
+import {
+  InstrumentoEmblema,
+  instrumentoVars,
+} from "@/components/instrumento-icone";
+import { buttonVariants } from "@/components/ui/button";
 import type { DocTom } from "@/lib/materiais-documentos";
 import { cn } from "@/lib/utils";
 import { SumarioPill } from "./sumario-pill";
@@ -478,6 +485,7 @@ export function CorpusDocumento({
   doc,
   voltar,
   lizaPergunta,
+  ponte,
 }: {
   doc: CorpusDoc;
   voltar: { href: string; rotulo: string };
@@ -485,7 +493,13 @@ export function CorpusDocumento({
    *  "Pedir pra Liza personalizar" — os templates de mensagem chegam por
    *  este renderer (docs/rag/mensagem-*.md, tipo: template) */
   lizaPergunta?: string;
+  /** Ponte doc → instrumento ao vivo (REALIZA-386): o destino do "Abrir
+   *  instrumento" + a frase que diz onde ele mora na casa de quem lê.
+   *  Renderiza só nos docs de instrumento de sistema (sistemaDoDoc) —
+   *  roteiros, guias e templates a ignoram. */
+  ponte?: { href: string; rotulo: string; dica: string };
 }) {
+  const sistema = sistemaDoDoc(doc.slug);
   const meta = [
     // the frontmatter version carries parenthesized editorial notes
     // ("documento nativo em /materiais/...") — meta shows only the status
@@ -519,6 +533,32 @@ export function CorpusDocumento({
         titulo={doc.titulo}
         meta={meta}
       />
+
+      {/* a outra ponta do cross-link: este doc acompanha um instrumento
+          oficial — a régua da ficha que emite o link e recebe a resposta */}
+      {sistema && ponte && (
+        <div
+          style={instrumentoVars(sistema)}
+          className="mt-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-card px-4 py-3 shadow-[var(--shadow-border)] print:hidden"
+        >
+          <InstrumentoEmblema instrumento={sistema} size={34} />
+          <div className="min-w-0 flex-1 basis-48">
+            <p className="text-sm font-semibold leading-snug">
+              {INSTRUMENTO_INFO[sistema].titulo}
+            </p>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              {ponte.dica}
+            </p>
+          </div>
+          <Link
+            href={ponte.href}
+            prefetch={false}
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            {ponte.rotulo}
+          </Link>
+        </div>
+      )}
 
       <CorpusDocBody doc={doc} />
 

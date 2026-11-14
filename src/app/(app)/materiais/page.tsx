@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
-import { audienciasDe, veMaterial } from "@/lib/materiais";
+import {
+  audienciasDe,
+  enriquecerMateriaisPorEncontro,
+  veMaterial,
+} from "@/lib/materiais";
 import Link from "next/link";
 import {
   getCicloEventos,
@@ -224,6 +228,15 @@ export default async function MateriaisPage({
     }
   }
 
+  // REALIZA-394 — o encontro da semana do mentor herda o kit do guia:
+  // roteiro, docs dos instrumentos na janela e técnicas nomeadas pelo
+  // evento — mesmo quando a linha do catálogo é transversal. Só na trilha
+  // DPP: especialista sem cronograma (turmas vazia) segue com o catálogo.
+  const porEncontroMentor =
+    ehMentor && turmasMentor.length > 0
+      ? enriquecerMateriaisPorEncontro(new Map(porEncontro), eventos)
+      : porEncontro;
+
   // duas abas: Instrumentos (staff abre aqui — o estado da coorte e a fila
   // de atrasados moram nos cards) e Biblioteca. A antiga aba Jornada saiu:
   // o retrato fino por dupla é da ficha. Mentor e especialista abrem na
@@ -304,7 +317,7 @@ export default async function MateriaisPage({
              (sem cronograma) lê a lista plana */
           <MateriaisMentorBiblioteca
             turmas={turmasMentor}
-            porEncontro={porEncontro}
+            porEncontro={porEncontroMentor}
             referenciais={
               turmasMentor.length > 0
                 ? transversais.flatMap((g) => g.itens)

@@ -11,6 +11,7 @@ import {
   PuzzlePiece,
 } from "@phosphor-icons/react";
 import { AUDIENCIA_LABEL, audienciasDe, hrefMaterial } from "@/lib/materiais";
+import { sistemaDoDoc } from "@/lib/como-conduzir";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { fuzzyMatch } from "@/lib/fuzzy";
@@ -77,6 +78,10 @@ function Linha({
   // pro leitor, "sem conteúdo" pra coord que publica)
   const ehDoc = m.path?.startsWith("doc:") ?? false;
   const href = hrefMaterial(m);
+  // REALIZA-386 — o doc que acompanha um instrumento ao vivo ganha o selo:
+  // o catálogo avisa que por trás dele existe a entrega na ficha
+  const ehInstrumento =
+    ehDoc && sistemaDoDoc(m.path!.slice(4)) != null;
   const meta = [
     TIPO_LABEL[m.tipo],
     m.encontro_num != null ? `Encontro ${m.encontro_num}` : null,
@@ -105,6 +110,11 @@ function Linha({
         )}
         <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
           {meta}
+          {ehInstrumento && (
+            <Badge variant="outline" className="text-[11px]">
+              instrumento oficial
+            </Badge>
+          )}
           {desta && <Badge variant="outline" className="text-[11px]">desta semana</Badge>}
         </span>
       </span>
