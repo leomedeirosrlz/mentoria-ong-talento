@@ -728,16 +728,16 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     const padrao = await nomesDuplas();
     expect(padrao.length).toBeGreaterThan(3);
 
-    // o header clicável da coluna — seta só quando ordenada (aria-sort),
-    // a legenda "por prioridade/A a Z" repete o gesto no mobile
+    // o header clicável da coluna — o nome acessível anuncia a ordenação
+    // corrente (aria-sort não vale em <button>), e a legenda
+    // "por prioridade/A a Z" repete o gesto no mobile
     const btnOrdem = page.getByRole("button", {
-      name: "Dupla",
-      exact: true,
+      name: /^Ordenar por nome da dupla/,
     });
     await expect(btnOrdem).toBeVisible();
 
     await btnOrdem.click();
-    await expect(btnOrdem).toHaveAttribute("aria-sort", "ascending");
+    await expect(btnOrdem).toHaveAttribute("aria-label", /de A a Z/);
     await expect(page).toHaveURL(/[?&]ordem=az/);
     const az = await nomesDuplas();
     expect(az).toEqual([...az].sort(cmp));
@@ -746,7 +746,7 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     expect(az.length).toBeGreaterThanOrEqual(padrao.length);
 
     await btnOrdem.click();
-    await expect(btnOrdem).toHaveAttribute("aria-sort", "descending");
+    await expect(btnOrdem).toHaveAttribute("aria-label", /de Z a A/);
     await expect(page).toHaveURL(/[?&]ordem=za/);
     expect(await nomesDuplas()).toEqual([...az].reverse());
 

@@ -155,16 +155,28 @@ function matchToken(
   return null;
 }
 
+/** O char em `i` continua o grafema anterior: marca combinante (o acento
+ *  de um texto decomposto — import CSV pode chegar NFD) ou a metade baixa
+ *  de um surrogate pair (emoji). Um trecho nunca corta no meio disso —
+ *  acento solto vira glifo órfão e surrogate partido renderiza mojibake. */
+const ehExtensaoGrafema = (texto: string, i: number): boolean => {
+  const cp = texto.codePointAt(i);
+  if (cp === undefined) return false;
+  if (cp >= 0xdc00 && cp <= 0xdfff) return true;
+  return /\p{M}/u.test(String.fromCodePoint(cp));
+};
+
 /** Posições normalizadas → trechos [início, fim) do texto ORIGINAL,
- *  fundidas quando adjacentes. */
-function paraTrechos(pos: number[], mapa: number[]): Trechos {
+ *  fundidas quando adjacentes e estendidas até a borda do grafema. */
+function paraTrechos(pos: number[], mapa: number[], texto: string): Trechos {
   const ordenadas = [...new Set(pos)].sort((a, b) => a - b);
   const trechos: Trechos = [];
   for (const p of ordenadas) {
     const inicio = mapa[p];
-    const fim = mapa[p] + 1;
+    let fim = mapa[p] + 1;
+    while (fim < texto.length && ehExtensaoGrafema(texto, fim)) fim++;
     const ultima = trechos[trechos.length - 1];
-    if (ultima && inicio <= ultima[1]) ultima[1] = fim;
+    if (ultima && inicio <= ultima[1]) ultima[1] = Math.max(ultima[1], fim);
     else trechos.push([inicio, fim]);
   }
   return trechos;
@@ -192,7 +204,7 @@ export function fuzzyMatch(query: string, texto: string): FuzzyHit | null {
   const q = tokens.join(" ");
   if (norm.includes(q)) score += 60;
   if (norm.startsWith(q)) score += 25;
-  return { score, trechos: paraTrechos(pos, mapa) };
+  return { score, trechos: paraTrechos(pos, mapa, texto) };
 }
 
 /** Trechos tolerantes pro highlight: devolve as faixas dos tokens que
@@ -210,5 +222,5 @@ export function fuzzyTrechos(query: string, texto: string): Trechos {
     const m = matchToken(t, norm, ps);
     if (m) pos.push(...m.pos);
   }
-  return paraTrechos(pos, mapa);
+  return paraTrechos(pos, mapa, texto);
 }

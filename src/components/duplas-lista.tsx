@@ -505,13 +505,9 @@ function CabecalhoColunas({
       <button
         type="button"
         onClick={onCiclar}
-        aria-sort={
-          ordem === "az"
-            ? "ascending"
-            : ordem === "za"
-              ? "descending"
-              : undefined
-        }
+        // aria-sort só é válido em columnheader/rowheader — num <button> o
+        // leitor ignora. O estado vai no nome acessível (a seta é aria-hidden)
+        aria-label={`Ordenar por nome da dupla — ${ordem === "az" ? "de A a Z" : ordem === "za" ? "de Z a A" : "por prioridade"}`}
         title="Ordenar pelo nome da dupla"
         className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-sm text-left uppercase tracking-[0.08em] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
@@ -1105,7 +1101,10 @@ function VisaoCoordenacao({
     else params.set("recorte", filtro);
     const qt = busca.trim();
     if (!qt) params.delete("q");
-    else params.set("q", qt);
+    // a query crua, não o trim — o eco URL→estado abaixo devolve o param ao
+    // input; um espaço digitado no meio da busca (token novo começando) não
+    // pode sumir ao clicar noutro controle
+    else params.set("q", busca);
     if (supSelEf === "todas") params.delete("sup");
     else params.set("sup", supSelEf);
     if (!mentorSelEf) params.delete("mentor");
@@ -1164,10 +1163,16 @@ function VisaoCoordenacao({
 
   // busca fuzzy (REALIZA-391): todo token bate em algum nome da dupla, a
   // ordem das palavras é livre e erro leve entra — o score decide a
-  // relevância quando não há ordenação explícita
+  // relevância quando não há ordenação explícita. Score pré-computado por
+  // id (mesma régua do scorePorId de /pessoas): dentro do comparador do
+  // sort seriam O(n log n) chamadas de matcher por tecla
   const qt = busca.trim();
+  const scorePorId = new Map<string, number>();
+  if (qt) {
+    for (const d of recorte) scorePorId.set(d.id, scoreDaDupla(qt, d));
+  }
   const base = qt
-    ? recorte.filter((d) => scoreDaDupla(qt, d) > 0)
+    ? recorte.filter((d) => (scorePorId.get(d.id) ?? 0) > 0)
     : [...recorte];
   const exibidas = base
     .filter((d) => chipBate(filtro, d, saudePorId.get(d.id)!))
@@ -1175,7 +1180,9 @@ function VisaoCoordenacao({
       ordem
         ? (a, b) => (ordem === "az" ? porNomeDupla(a, b) : porNomeDupla(b, a))
         : qt
-          ? (a, b) => scoreDaDupla(qt, b) - scoreDaDupla(qt, a) || porPrioridade(a, b)
+          ? (a, b) =>
+              (scorePorId.get(b.id) ?? 0) - (scorePorId.get(a.id) ?? 0) ||
+              porPrioridade(a, b)
           : porPrioridade
     );
 
@@ -1702,7 +1709,8 @@ function VisaoSupervisor({
     else params.set("recorte", filtro);
     const qt = busca.trim();
     if (!qt) params.delete("q");
-    else params.set("q", qt);
+    // query crua — o eco URL→estado não pode mastigar o espaço mid-typing
+    else params.set("q", busca);
     if (!ordem) params.delete("ordem");
     else params.set("ordem", ordem);
     const qs = params.toString();
@@ -1728,10 +1736,15 @@ function VisaoSupervisor({
     setOrdem((o) => (o == null ? "az" : o === "az" ? "za" : null));
 
   // busca fuzzy (REALIZA-391) — a mesma da visão de coordenação: qualquer
-  // nome da dupla (social ou civil) vale, score ordena na busca livre
+  // nome da dupla (social ou civil) vale, score ordena na busca livre.
+  // Score por id pré-computado — comparador do sort não roda matcher
   const qt = busca.trim();
+  const scorePorId = new Map<string, number>();
+  if (qt) {
+    for (const d of lista) scorePorId.set(d.id, scoreDaDupla(qt, d));
+  }
   const base = qt
-    ? lista.filter((d) => scoreDaDupla(qt, d) > 0)
+    ? lista.filter((d) => (scorePorId.get(d.id) ?? 0) > 0)
     : [...lista];
   // o mesmo chipBate da coordenação — fatia chega pela URL ou pelo atalho
   // do resumo; "todas" é a ausência de recorte. A ordenação pedida vale
@@ -1742,7 +1755,9 @@ function VisaoSupervisor({
       ordem
         ? (a, b) => (ordem === "az" ? porNomeDupla(a, b) : porNomeDupla(b, a))
         : qt
-          ? (a, b) => scoreDaDupla(qt, b) - scoreDaDupla(qt, a) || porPrioridade(a, b)
+          ? (a, b) =>
+              (scorePorId.get(b.id) ?? 0) - (scorePorId.get(a.id) ?? 0) ||
+              porPrioridade(a, b)
           : porPrioridade
     );
 
@@ -1861,7 +1876,8 @@ function VisaoSupervisor({
             title="Ordenar pelo nome da dupla"
             className="cursor-pointer underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
-            · {ordem ? `por ${ORDEM_ROTULO[ordem]}` : "por prioridade"}
+            <span aria-hidden>· </span>
+            {ordem ? `por ${ORDEM_ROTULO[ordem]}` : "por prioridade"}
           </button>
         </p>
         <p className="text-xs text-muted-foreground">

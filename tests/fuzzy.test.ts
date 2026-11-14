@@ -93,4 +93,25 @@ describe("trechos (ranges no texto original)", () => {
     expect(marcado).toBe("Silva");
     expect(fuzzyTrechos("maria", "João Silva")).toEqual([]);
   });
+
+  it("texto decomposto (NFD, chega via import) marca o grafema inteiro", () => {
+    // "João" gravado como Jose + U+0301: o trecho do 'o' precisa engolir a
+    // marca combinante — cortar no meio renderizava o acento fora do <mark>
+    const nfd = "Joa\u0303o Silva";
+    const hit = fuzzyMatch("joao", nfd)!;
+    const marcado = hit.trechos.map(([i, f]) => nfd.slice(i, f)).join("");
+    expect(marcado).toBe("Joa\u0303o");
+  });
+
+  it("surrogate pair (emoji no nome) não é fatiado no meio", () => {
+    const texto = "Ana 🌟 Souza";
+    const hit = fuzzyMatch("ana", texto)!;
+    const marcado = hit.trechos.map(([i, f]) => texto.slice(i, f)).join("");
+    expect(marcado).toBe("Ana");
+    // buscando o emoji ele entra inteiro — nunca a metade baixa sozinha
+    const hitEmoji = fuzzyMatch("🌟", texto)!;
+    expect(
+      hitEmoji.trechos.map(([i, f]) => texto.slice(i, f)).join("")
+    ).toBe("🌟");
+  });
 });
