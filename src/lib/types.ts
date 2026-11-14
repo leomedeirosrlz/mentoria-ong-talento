@@ -549,7 +549,8 @@ export type Dupla = {
   /** Motivo estruturado ligado ao desfecho (obrigatório quando não é
    *  'concluida'). */
   desfecho_motivo?: string | null;
-  /** Observação livre da coordenação (obrigatória quando 'outro'). */
+  /** Observação livre da coordenação — sempre opcional (a obrigatoriedade
+   *  de 'outro' migrou pro motivo em texto livre, REALIZA-392). */
   desfecho_obs?: string | null;
   /** Quando o desfecho foi registrado. */
   desfecho_em?: string | null;

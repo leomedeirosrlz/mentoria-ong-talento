@@ -1912,10 +1912,21 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   const desfechoNovo = desfechoVeio && desfechoRaw !== (desfechoAtual ?? "");
   const encerrando =
     statusMudouDupla && (status === "encerrada" || status === "concluida");
+  // motivo/obs também disparam a gravação auditável — corrigir só o
+  // motivo (o caso típico: trocar o 'legado' do backfill pelo real) sem
+  // mexer no desfecho não pode ser no-op silencioso
+  const motivoMudou =
+    formData.has("desfecho_motivo") &&
+    (String(formData.get("desfecho_motivo") ?? "").trim() || null) !==
+      (atualDupla?.desfecho_motivo ?? null);
+  const obsMudou =
+    formData.has("desfecho_obs") &&
+    (String(formData.get("desfecho_obs") ?? "").trim() || null) !==
+      (atualDupla?.desfecho_obs ?? null);
   const desfechoMudouMesmoStatus =
     !statusMudouDupla &&
     (status === "encerrada" || status === "concluida") &&
-    desfechoNovo;
+    (desfechoNovo || motivoMudou || obsMudou);
   const reabrindo =
     statusMudouDupla &&
     (status === "ativa" || status === "pausada") &&
@@ -1953,9 +1964,16 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         ? String(formData.get("demanda") ?? "").trim() || null
         : null,
     // dupla viva (ativa/pausada) não carrega carimbo de fechamento — reabrir
-    // uma trilha especialista limpa o rastro do encerramento anterior
+    // uma trilha especialista limpa o rastro do encerramento anterior. O
+    // concluida_em do trigger também sai: um reabrir posterior não pode
+    // re-ancorar a espera da fila na conclusão de um ciclo reaberto
     ...(status === "ativa" || status === "pausada"
-      ? { encerrada_em: null, motivo_encerramento: null, devolutiva_pdm: null }
+      ? {
+          encerrada_em: null,
+          concluida_em: null,
+          motivo_encerramento: null,
+          devolutiva_pdm: null,
+        }
       : {}),
   };
   // desfecho auditável (0140): grava quando fecha/muda; limpa quando reabre.

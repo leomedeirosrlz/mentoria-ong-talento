@@ -392,4 +392,26 @@ describe("filaMentores", () => {
     const semPapel = mkProfile({ id: "p-null", role: null });
     expect(filaMentores([inativa, supervisor, semPapel], {}, {})).toHaveLength(0);
   });
+
+  it("wiring: o mapa de disponibilidade ancora a espera ATUAL do mentor de volta", () => {
+    // REALIZA-393 — quem saiu de uma dupla não espera desde o cadastro:
+    // o 4º arg (mapa de disponivelDesdePorId) tem que mudar o `desde` do
+    // item, não ficar ignorado como na versão pré-ticket
+    const mentor = mkProfile({
+      id: "p-volta",
+      nome: "Mentor de Volta",
+      role: "mentor_dpp",
+      created_at: "2025-06-01T10:00:00-03:00",
+    });
+    const disponivel = {
+      "p-volta": "2026-10-10T10:00:00-03:00", // dupla encerrou há 4 dias
+    };
+    const fila = filaMentores([mentor], {}, {}, disponivel);
+    expect(fila).toHaveLength(1);
+    expect(fila[0].desde).toBe("2026-10-10T13:00:00.000Z");
+    // sem o mapa a espera mede da entrada original (o bug)
+    expect(filaMentores([mentor], {}, {})[0].desde).toBe(
+      "2025-06-01T13:00:00.000Z"
+    );
+  });
 });
