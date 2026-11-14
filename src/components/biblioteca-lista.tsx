@@ -13,9 +13,11 @@ import {
 import { AUDIENCIA_LABEL, audienciasDe, hrefMaterial } from "@/lib/materiais";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { fuzzyMatch } from "@/lib/fuzzy";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { MaterialActions } from "@/components/material-actions";
+import { HighlightText } from "@/components/highlight-text";
 
 // Biblioteca em seções por categoria (REALIZA-250): a lista única da
 // REALIZA-210 misturava guia, modelo, roteiro e link — a coordenação não
@@ -47,14 +49,6 @@ const CATEGORIAS: { tipo: Material["tipo"]; rotulo: string }[] = [
   { tipo: "link", rotulo: "Links" },
 ];
 
-/** sem acento e minúsculo — "visao" acha "Visão". */
-function normaliza(s: string): string {
-  return s
-    .normalize("NFD")
-    .replace(/\p{Diacritic}/gu, "")
-    .toLowerCase();
-}
-
 function ordena(a: Material, b: Material): number {
   const ea = a.encontro_num ?? 0;
   const eb = b.encontro_num ?? 0;
@@ -67,12 +61,15 @@ function Linha({
   maxEncontro,
   vigente,
   indice,
+  marca,
 }: {
   m: Material;
   ehCoord: boolean;
   maxEncontro: number;
   vigente: number | null;
   indice: number;
+  /** busca ativa — marca os trechos casados no título e na descrição */
+  marca?: string;
 }) {
   const Icone = TIPO_ICONE[m.tipo];
   // arquivo oficial ganha da url externa; "doc:<slug>" é documento nativo
@@ -94,10 +91,16 @@ function Linha({
         <Icone size={17} aria-hidden />
       </span>
       <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium">{m.titulo}</span>
+        <span className="block text-sm font-medium">
+          {marca ? <HighlightText texto={m.titulo} query={marca} /> : m.titulo}
+        </span>
         {m.descricao && (
           <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">
-            {m.descricao}
+            {marca ? (
+              <HighlightText texto={m.descricao} query={marca} />
+            ) : (
+              m.descricao
+            )}
           </span>
         )}
         <span className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-muted-foreground">
@@ -176,11 +179,21 @@ export function BibliotecaLista({
   const [busca, setBusca] = useState("");
   const baseId = useId();
   const ordenados = useMemo(() => [...materiais].sort(ordena), [materiais]);
-  const q = normaliza(busca.trim());
-  const visiveis = q
-    ? ordenados.filter((m) =>
-        normaliza(`${m.titulo} ${m.descricao ?? ""} ${TIPO_LABEL[m.tipo]}`).includes(q)
-      )
+  const qt = busca.trim();
+  // busca fuzzy (REALIZA-391): título, descrição e o tipo visível pesquisam;
+  // o score do melhor campo ranqueia dentro de cada seção
+  const scoreDe = (m: Material) =>
+    qt
+      ? Math.max(
+          ...[m.titulo, m.descricao, TIPO_LABEL[m.tipo]].map(
+            (t) => (t ? (fuzzyMatch(qt, t)?.score ?? 0) : 0)
+          )
+        )
+      : 0;
+  const visiveis = qt
+    ? ordenados
+        .filter((m) => scoreDe(m) > 0)
+        .sort((a, b) => scoreDe(b) - scoreDe(a) || ordena(a, b))
     : ordenados;
 
   return (
@@ -217,7 +230,7 @@ export function BibliotecaLista({
       ) : (
         // re-key na busca: as seções remontam e a entrada anima (convenção
         // de movimento — troca de filtro nunca é repaint seco)
-        <div key={q} className="space-y-5">
+        <div key={qt} className="space-y-5">
           {CATEGORIAS.map(({ tipo, rotulo }) => {
             const itens = visiveis.filter((m) => m.tipo === tipo);
             if (itens.length === 0) return null;
@@ -241,6 +254,7 @@ export function BibliotecaLista({
                       maxEncontro={maxEncontro}
                       vigente={vigente}
                       indice={i}
+                      marca={qt || undefined}
                     />
                   ))}
                 </ul>

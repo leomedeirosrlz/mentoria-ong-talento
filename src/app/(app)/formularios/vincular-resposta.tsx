@@ -16,19 +16,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { PessoaSelect } from "@/components/pessoa-select";
 
 // "Vincular a um jovem" (REALIZA-16): a resposta de um link genérico legado
 // (anônimo, pré-0116) ganha dest_mentorado_id — e a dupla DPP dele quando
-// existe — sem tocar no payload. O picker é o Select de ui/ com a lista de
-// mentorados carregada na página (padrão nova-dupla-dialog: Select simples
-// com opções resolvidas no servidor, nada de Command/busca assíncrona).
+// existe — sem tocar no payload. O picker é o PessoaSelect (REALIZA-391):
+// a lista de mentorados carregada na página, filtrada pela busca fuzzy no
+// popup (padrão nova-dupla-dialog — opções resolvidas no servidor, nada
+// de busca assíncrona).
 
 export function VincularResposta({
   linkId,
@@ -104,30 +99,15 @@ export function VincularResposta({
 
         <div className="space-y-2">
           <Label id="vinculo-mentorado-label">Jovem</Label>
-          <Select
+          <PessoaSelect
             value={sel}
-            onValueChange={(v) => setSel(v ? String(v) : null)}
-            items={Object.fromEntries(mentorados.map((m) => [m.id, m.nome]))}
-          >
-            <SelectTrigger
-              id="vinculo-mentorado"
-              aria-labelledby="vinculo-mentorado-label vinculo-mentorado"
-            >
-              <SelectValue placeholder="Selecione" />
-            </SelectTrigger>
-            <SelectContent alignItemWithTrigger={false}>
-              {mentorados.length === 0 && (
-                <SelectItem value="__vazio" disabled>
-                  Nenhum jovem cadastrado
-                </SelectItem>
-              )}
-              {mentorados.map((m) => (
-                <SelectItem key={m.id} value={m.id}>
-                  {m.nome}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            onValueChange={setSel}
+            itens={mentorados.map((m) => ({ value: m.id, label: m.nome }))}
+            id="vinculo-mentorado"
+            aria-labelledby="vinculo-mentorado-label vinculo-mentorado"
+            placeholder="Selecione"
+            vazio="Nenhum jovem cadastrado"
+          />
           {escolhido && (
             <p className="rounded-lg bg-muted px-3 py-2 text-xs text-muted-foreground">
               Vincular esta resposta a {escolhido.nome}? Todo o histórico dela

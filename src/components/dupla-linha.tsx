@@ -96,6 +96,8 @@ export type DuplaLinhaProps = {
   fichaNome: string;
   /** índice do stagger (--i) */
   i?: number;
+  /** busca ativa — os trechos casados nos nomes ganham <mark> */
+  marca?: string;
   className?: string;
 };
 
@@ -113,6 +115,7 @@ export function DuplaLinha({
   fichaHref,
   fichaNome,
   i = 0,
+  marca,
   className,
 }: DuplaLinhaProps) {
   const realizados = new Set(progresso?.realizados ?? []);
@@ -181,6 +184,7 @@ export function DuplaLinha({
               <DuplaNomes
                 mentor={mentor.nome_social ?? mentor.nome}
                 mentorado={mentorado.nome_social ?? mentorado.nome}
+                marca={marca}
               />
             </p>
             {meta && <p className="mt-0.5 text-xs text-muted-foreground">{meta}</p>}

@@ -40,6 +40,8 @@ import {
 } from "@/lib/pessoas-status";
 import { turmaLonga, turmaAno } from "@/lib/turma";
 import { cn, normaliza } from "@/lib/utils";
+import { fuzzyMatch } from "@/lib/fuzzy";
+import { HighlightText } from "@/components/highlight-text";
 import {
   comparaNome,
   foraDoPrograma,
@@ -442,7 +444,8 @@ export function PessoasListas({
     return () => clearTimeout(t);
   }, [busca]);
 
-  const q = normaliza(buscaDebounced.trim());
+  const qtBusca = buscaDebounced.trim();
+  const q = normaliza(qtBusca);
   // diretório de colegas: sem papel ainda não é colega — pré-cadastro que
   // só a coordenação precisa enxergar; cadastro inativo (saiu da equipe)
   // idem — pro diretório ele não é mais colega. A base filtrada também é o
@@ -451,19 +454,42 @@ export function PessoasListas({
     ? pessoas
     : pessoas.filter((p) => p.role != null && p.ativo);
 
-  // pra não-coord o e-mail não chega (view profiles_contato só devolve o
-  // escopo do papel) — a busca é por nome (+ nome social, que é público)
-  const qPessoa = (p: Profile) =>
-    !q ||
-    normaliza(p.nome).includes(q) ||
-    normaliza(p.nome_social ?? "").includes(q) ||
-    (souCoord && normaliza(p.email).includes(q));
-  const qMentorado = (m: Mentorado) =>
-    !q ||
-    normaliza(m.nome).includes(q) ||
-    normaliza(m.nome_social ?? "").includes(q) ||
-    normaliza(m.email ?? "").includes(q) ||
-    normaliza(m.ong_origem).includes(q);
+  // busca fuzzy (REALIZA-391): o score do item é o MELHOR match entre os
+  // campos pesquisáveis — nome (civil e social) pra todos; e-mail e ONG
+  // só pra coordenação (a view do diretório nem devolve esses dados, um
+  // match neles filtraria sem explicar por quê). O mapa pré-computado
+  // poupa o re-score por comparação no sort e dá o ranqueamento por
+  // relevância que precede as ordenações de leitura
+  const scorePessoa = (p: Profile) =>
+    Math.max(
+      ...[
+        p.nome,
+        p.nome_social,
+        souCoord ? p.email : null,
+      ].map((t) => (t ? (fuzzyMatch(qtBusca, t)?.score ?? 0) : 0))
+    );
+  const scoreMentorado = (m: Mentorado) =>
+    Math.max(
+      ...[
+        m.nome,
+        m.nome_social,
+        m.email,
+        m.ong_origem,
+      ].map((t) => (t ? (fuzzyMatch(qtBusca, t)?.score ?? 0) : 0))
+    );
+  // bloco derivado — o React Compiler memoiza sozinho (mesma regra dos
+  // filtros abaixo; useMemo manual só entraria com custo real medido)
+  const scorePorId = new Map<string, number>();
+  if (q) {
+    for (const p of basePessoas) scorePorId.set(p.id, scorePessoa(p));
+    for (const m of mentorados) scorePorId.set(m.id, scoreMentorado(m));
+  }
+  const qPessoa = (p: Profile) => !q || (scorePorId.get(p.id) ?? 0) > 0;
+  const qMentorado = (m: Mentorado) => !q || (scorePorId.get(m.id) ?? 0) > 0;
+  /** relevância da busca — 0-0 quando não há query, então o critério de
+   *  leitura (nome, pendências) segura sozinho */
+  const porRelevancia = (a: { id: string }, b: { id: string }) =>
+    (scorePorId.get(b.id) ?? 0) - (scorePorId.get(a.id) ?? 0);
   // ---------- filtros derivados ----------
   // mapas de filiação (coord) — a turma da pessoa deriva das mesmas 3
   // fontes do modo "por turma": a dupla (turmaDaDupla resolvida na page),
@@ -707,37 +733,44 @@ export function PessoasListas({
     .filter(
       (m) => filtrosMentorado(m) && foraDoPrograma(m) && qMentorado(m)
     )
-    .sort(porSaidaRecente);
+    .sort((a, b) => porRelevancia(a, b) || porSaidaRecente(a, b));
   const inativasExibidas = [
     ...inativas.filter((p) => filtrosPessoa(p) && qPessoa(p)),
-  ].sort((a, b) => comparaNome(a.nome, b.nome));
+  ].sort((a, b) => porRelevancia(a, b) || comparaNome(a.nome, b.nome));
 
   // "pendências primeiro" usa a mesma régua dos badges da linha (termo,
-  // formação, não-entrou, sem dupla); dentro de cada grupo
-  const pessoasExibidas = pessoasEscopo.filter(qPessoa).sort((a, b) =>
-    ordemEf === "pendencias"
-      ? pendenciasPessoa(
-            b,
-            mentorProfiles[b.id],
-            temVaga(b),
-            assinaturas[b.id]
-          ) -
-          pendenciasPessoa(
-            a,
-            mentorProfiles[a.id],
-            temVaga(a),
-            assinaturas[a.id]
-          ) || comparaNome(a.nome, b.nome)
-      : comparaNome(a.nome, b.nome)
-  );
+  // formação, não-entrou, sem dupla); dentro de cada grupo. Com busca a
+  // relevância do match vem antes de qualquer um dos dois critérios
+  const pessoasExibidas = pessoasEscopo
+    .filter(qPessoa)
+    .sort(
+      (a, b) =>
+        porRelevancia(a, b) ||
+        (ordemEf === "pendencias"
+          ? pendenciasPessoa(
+                b,
+                mentorProfiles[b.id],
+                temVaga(b),
+                assinaturas[b.id]
+              ) -
+              pendenciasPessoa(
+                a,
+                mentorProfiles[a.id],
+                temVaga(a),
+                assinaturas[a.id]
+              ) || comparaNome(a.nome, b.nome)
+          : comparaNome(a.nome, b.nome))
+    );
   const mentoradosExibidos = mentoradosEscopo
     .filter(qMentorado)
-    .sort((a, b) =>
-      ordemEf === "pendencias"
-        ? pendenciasMentorado(b, !emDupla.has(b.id), assinaturas[b.id]) -
-            pendenciasMentorado(a, !emDupla.has(a.id), assinaturas[a.id]) ||
-          comparaNome(a.nome, b.nome)
-        : comparaNome(a.nome, b.nome)
+    .sort(
+      (a, b) =>
+        porRelevancia(a, b) ||
+        (ordemEf === "pendencias"
+          ? pendenciasMentorado(b, !emDupla.has(b.id), assinaturas[b.id]) -
+              pendenciasMentorado(a, !emDupla.has(a.id), assinaturas[a.id]) ||
+            comparaNome(a.nome, b.nome)
+          : comparaNome(a.nome, b.nome))
     );
 
   // ---------- agrupamento por turma ----------
@@ -801,9 +834,13 @@ export function PessoasListas({
         itens: itens.sort((x, y) => {
           const nomeX = x.tipo === "profile" ? x.p.nome : x.m.nome;
           const nomeY = y.tipo === "profile" ? y.p.nome : y.m.nome;
-          // dentro da turma: subseção por papel contextual (mentorados →
-          // mentores → staff) e o mesmo sort nome|pendencias da lista
+          const idX = x.tipo === "profile" ? x.p.id : x.m.id;
+          const idY = y.tipo === "profile" ? y.p.id : y.m.id;
+          // dentro da turma: relevância da busca, subseção por papel
+          // contextual (mentorados → mentores → staff) e o mesmo sort
+          // nome|pendencias da lista
           return (
+            porRelevancia({ id: idX }, { id: idY }) ||
             rankNaTurma(x.papeis, x.tipo) - rankNaTurma(y.papeis, y.tipo) ||
             (ordemEf === "pendencias"
               ? pendenciasItem(y) - pendenciasItem(x)
@@ -1201,6 +1238,7 @@ export function PessoasListas({
                       status={statusProfile(item.p)}
                       papeisTurma={item.papeis}
                       souCoord={souCoord}
+                      marca={q ? qtBusca : undefined}
                     />
                   ) : (
                     <MentoradoRow
@@ -1215,6 +1253,7 @@ export function PessoasListas({
                       status={statusMentorado(item.m)}
                       papeisTurma={item.papeis}
                       souCoord={souCoord}
+                      marca={q ? qtBusca : undefined}
                     />
                   )
                 )}
@@ -1256,6 +1295,7 @@ export function PessoasListas({
                   faltantesTermo={faltantes?.[p.id]?.["termo-voluntario"] ?? []}
                   status={souCoord ? statusProfile(p) : undefined}
                   souCoord={souCoord}
+                  marca={q ? qtBusca : undefined}
                 />
               ))}
               {gm.map((m, i) => (
@@ -1270,6 +1310,7 @@ export function PessoasListas({
                   faltantes={faltantes?.[m.id]}
                   status={souCoord ? statusMentorado(m) : undefined}
                   souCoord={souCoord}
+                  marca={q ? qtBusca : undefined}
                 />
               ))}
             </div>
@@ -1389,6 +1430,7 @@ export function PessoasListas({
                   faltantes={faltantes?.[m.id]}
                   status={souCoord ? statusMentorado(m) : undefined}
                   souCoord={souCoord}
+                  marca={q ? qtBusca : undefined}
                 />
               ))}
             </div>
@@ -1442,6 +1484,7 @@ export function PessoasListas({
                   faltantesTermo={faltantes?.[p.id]?.["termo-voluntario"] ?? []}
                   status={statusProfile(p)}
                   souCoord={souCoord}
+                  marca={q ? qtBusca : undefined}
                 />
               ))}
             </div>
@@ -1737,6 +1780,7 @@ function PessoaRow({
   status,
   papeisTurma,
   souCoord,
+  marca,
   emInativos = false,
 }: {
   p: Profile;
@@ -1758,6 +1802,8 @@ function PessoaRow({
   /** papéis contextuais NA turma da seção — chips no modo turma */
   papeisTurma?: PapelTurma[];
   souCoord: boolean;
+  /** busca ativa — marca os trechos casados no nome e no meta */
+  marca?: string;
   /** Na seção "Inativos" o badge "inativa" seria redundante em cada linha —
    *  e as pendências operacionais (termo, não-entrou) não se aplicam mais. */
   emInativos?: boolean;
@@ -1868,7 +1914,14 @@ function PessoaRow({
           />
           <span className="min-w-0">
             <span className="block truncate text-sm font-medium underline-offset-4 transition-colors group-hover:underline">
-              {p.nome_social ?? p.nome}
+              {marca ? (
+                <HighlightText
+                  texto={p.nome_social ?? p.nome}
+                  query={marca}
+                />
+              ) : (
+                (p.nome_social ?? p.nome)
+              )}
             </span>
             <span className="mt-0.5 flex min-w-0 items-center gap-1.5 text-xs text-muted-foreground">
               {/* badge de papel saiu da linha: os grupos já separam por
@@ -1877,13 +1930,25 @@ function PessoaRow({
               <span className="truncate">
                 {souCoord ? (
                   <>
-                    {metaCoord}
+                    {marca ? (
+                      <HighlightText texto={metaCoord} query={marca} />
+                    ) : (
+                      metaCoord
+                    )}
                     {semVagaDpp && (
                       <span className="text-[var(--warn-text)]">
                         {" · sem vaga"}
                       </span>
                     )}
                   </>
+                ) : marca ? (
+                  <HighlightText
+                    texto={
+                      [trilha, subtitulo].filter(Boolean).join(" · ") ||
+                      "\u00A0"
+                    }
+                    query={marca}
+                  />
                 ) : (
                   [trilha, subtitulo].filter(Boolean).join(" · ") || "\u00A0"
                 )}
@@ -2173,6 +2238,7 @@ function MentoradoRow({
   status,
   papeisTurma,
   souCoord,
+  marca,
 }: {
   m: Mentorado;
   indice: number;
@@ -2190,6 +2256,8 @@ function MentoradoRow({
   /** papéis contextuais NA turma da seção — chips no modo turma */
   papeisTurma?: PapelTurma[];
   souCoord: boolean;
+  /** busca ativa — marca os trechos casados no nome e no meta */
+  marca?: string;
 }) {
   const detalhesId = `detalhes-${m.id}`;
   // quem saiu do programa (0077): fora do grupo principal — sem badges de
@@ -2256,11 +2324,18 @@ function MentoradoRow({
                   fora && "text-muted-foreground"
                 )}
               >
-                {m.nome_social ?? m.nome}
+                {marca ? (
+                  <HighlightText
+                    texto={m.nome_social ?? m.nome}
+                    query={marca}
+                  />
+                ) : (
+                  (m.nome_social ?? m.nome)
+                )}
               </span>
             </span>
             <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-              {metaLinha}
+              {marca ? <HighlightText texto={metaLinha} query={marca} /> : metaLinha}
             </span>
           </span>
         </Link>

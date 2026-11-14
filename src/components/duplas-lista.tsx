@@ -48,7 +48,8 @@ import type {
   Dupla,
   EspecialistaEvento,
 } from "@/lib/types";
-import { cn, normaliza } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { fuzzyMatch } from "@/lib/fuzzy";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { DuplaLinha, GRID_DUPLA_LG, type TomSituacao } from "@/components/dupla-linha";
@@ -209,6 +210,46 @@ const APOIO_ORIGEM_LABEL = {
   ambos: "pedido pelo mentor e pelo mentorado",
 } as const;
 
+// ---------- ordenação e relevância da lista ----------
+
+/** O ciclo da coluna Dupla (REALIZA-390), na convenção do /relatorios:
+ *  ausência de ?ordem= é a ordem do radar; os dois estados nomeados
+ *  alternam antes de voltar ao default — prioridade → az → za → prioridade. */
+type OrdemDupla = "az" | "za";
+
+const ORDENS_DUPLA = new Set<string>(["az", "za"]);
+const parseOrdemDupla = (v: string | null): OrdemDupla | null =>
+  v && ORDENS_DUPLA.has(v) ? (v as OrdemDupla) : null;
+
+const ORDEM_ROTULO: Record<OrdemDupla, string> = {
+  az: "nome de A a Z",
+  za: "nome de Z a A",
+};
+
+/** O nome que a linha mostra (social primeiro) — ordenar e buscar no que
+ *  se lê, não no campo civil. */
+const nomeExib = (p: { nome: string; nome_social?: string | null }) =>
+  p.nome_social ?? p.nome;
+
+/** O A→Z da coluna desempata na ordem de leitura do lockup: mentor, depois
+ *  mentorado — "Ana e Bruno" vem antes de "Ana e Carla". */
+const porNomeDupla = (a: Dupla, b: Dupla) =>
+  comparaNome(nomeExib(a.mentor), nomeExib(b.mentor)) ||
+  comparaNome(nomeExib(a.mentorado), nomeExib(b.mentorado));
+
+/** Relevância fuzzy da dupla: o melhor match entre os 4 nomes possíveis
+ *  (social e civil de cada ponta — quem lembra do nome de batismo acha a
+ *  dupla mesmo com a lista mostrando o social). */
+const scoreDaDupla = (q: string, d: Dupla): number =>
+  Math.max(
+    ...[
+      d.mentor.nome,
+      d.mentor.nome_social,
+      d.mentorado.nome,
+      d.mentorado.nome_social,
+    ].map((n) => (n ? (fuzzyMatch(q, n)?.score ?? 0) : 0))
+  );
+
 // ---------- a linha densa (v1 → v5) ----------
 
 /** A linha da dupla em /duplas: monta os dados e entrega à linha canônica.
@@ -221,6 +262,7 @@ function LinhaDupla({
   wa,
   menu,
   dimEncerradas,
+  marca,
   i,
 }: {
   d: Dupla;
@@ -236,6 +278,8 @@ function LinhaDupla({
    *  formal juntos) — está fora da régua, não é prioridade do radar (a
    *  ficha continua a um clique) */
   dimEncerradas?: boolean;
+  /** busca ativa — marca os trechos casados nos nomes */
+  marca?: string;
   i: number;
 }) {
   const estado = estadoDaDupla(d, saude);
@@ -312,6 +356,7 @@ function LinhaDupla({
       menu={menu}
       fichaHref={`/duplas/${d.id}`}
       fichaNome={(d.mentorado.nome_social ?? d.mentorado.nome).split(" ")[0]}
+      marca={marca}
       className={dimEncerradas && ehEncerradaCedo(d) ? "opacity-60" : undefined}
     />
   );
@@ -327,6 +372,7 @@ function LinhaMini({
   hojeStr,
   wa,
   menu,
+  marca,
   i,
 }: {
   d: Dupla;
@@ -336,6 +382,7 @@ function LinhaMini({
   wa: React.ReactNode;
   /** o ⋯ real — colapsada não significa sem ações */
   menu?: React.ReactNode;
+  marca?: string;
   i: number;
 }) {
   const feitos = d.encontros.filter((e) => e.status === "realizado").length;
@@ -362,6 +409,7 @@ function LinhaMini({
         <DuplaNomes
           mentor={d.mentor.nome_social ?? d.mentor.nome}
           mentorado={d.mentorado.nome_social ?? d.mentorado.nome}
+          marca={marca}
         />
         {d.turma && (
           <span
@@ -434,24 +482,49 @@ function LinhaMini({
 }
 
 /** O cabeçalho da tabela densa — usa a mesma grade da linha canônica, pra
- *  cada rótulo cair em cima da sua coluna. */
-function CabecalhoColunas() {
+ *  cada rótulo cair em cima da sua coluna. A coluna "Dupla" é clicável
+ *  (REALIZA-390): cicla prioridade → A a Z → Z a A → prioridade, no
+ *  padrão do header de /relatorios. Fora disso é rótulo visual (os dados
+ *  da linha já carregam o significado), então os demais spans ficam
+ *  presentacionais. */
+function CabecalhoColunas({
+  ordem,
+  onCiclar,
+}: {
+  ordem: OrdemDupla | null;
+  onCiclar: () => void;
+}) {
   return (
     <div
-      aria-hidden
       className={cn(
         "hidden border-b border-border px-5 py-2.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground @4xl:grid @4xl:gap-x-3",
         GRID_DUPLA_LG
       )}
     >
-      <span>Situação</span>
-      <span>Dupla</span>
-      <span>Motivo</span>
-      <span title="Cada quadrado é um encontro da trilha; o traço marca quantos o calendário já esperava até hoje">
+      <span aria-hidden>Situação</span>
+      <button
+        type="button"
+        onClick={onCiclar}
+        // aria-sort só é válido em columnheader/rowheader — num <button> o
+        // leitor ignora. O estado vai no nome acessível (a seta é aria-hidden)
+        aria-label={`Ordenar por nome da dupla — ${ordem === "az" ? "de A a Z" : ordem === "za" ? "de Z a A" : "por prioridade"}`}
+        title="Ordenar pelo nome da dupla"
+        className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-sm text-left uppercase tracking-[0.08em] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        Dupla
+        <span aria-hidden className="w-3 text-[10px]">
+          {ordem === "az" ? "↑" : ordem === "za" ? "↓" : "↕"}
+        </span>
+      </button>
+      <span aria-hidden>Motivo</span>
+      <span
+        aria-hidden
+        title="Cada quadrado é um encontro da trilha; o traço marca quantos o calendário já esperava até hoje"
+      >
         Encontros
       </span>
-      <span>Nota</span>
-      <span />
+      <span aria-hidden>Nota</span>
+      <span aria-hidden />
     </div>
   );
 }
@@ -902,6 +975,10 @@ function VisaoCoordenacao({
   const [mentorSel, setMentorSel] = useState<string | null>(() =>
     sp.get("mentor")
   );
+  // a coluna "Dupla" ciclável — prioridade → az → za → prioridade (?ordem=)
+  const [ordem, setOrdem] = useState<OrdemDupla | null>(() =>
+    parseOrdemDupla(sp.get("ordem"))
+  );
   // supervisão/mentor são secundários — moram no painel "Filtros (n)",
   // não na barra (o modal aplica de uma vez, como em /registros)
   const [painelAberto, setPainelAberto] = useState(false);
@@ -1010,6 +1087,7 @@ function VisaoCoordenacao({
     setBusca(params.get("q") ?? "");
     setSupSel(params.get("sup") ?? "todas");
     setMentorSel(params.get("mentor"));
+    setOrdem(parseOrdemDupla(params.get("ordem")));
   }
 
   // estado → URL: replaceState NATIVO, nunca router.replace — a navegação
@@ -1023,17 +1101,22 @@ function VisaoCoordenacao({
     else params.set("recorte", filtro);
     const qt = busca.trim();
     if (!qt) params.delete("q");
-    else params.set("q", qt);
+    // a query crua, não o trim — o eco URL→estado abaixo devolve o param ao
+    // input; um espaço digitado no meio da busca (token novo começando) não
+    // pode sumir ao clicar noutro controle
+    else params.set("q", busca);
     if (supSelEf === "todas") params.delete("sup");
     else params.set("sup", supSelEf);
     if (!mentorSelEf) params.delete("mentor");
     else params.set("mentor", mentorSelEf);
+    if (!ordem) params.delete("ordem");
+    else params.set("ordem", ordem);
     const qs = params.toString();
     const url = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
     if (url !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, "", url);
     }
-  }, [filtro, busca, supSelEf, mentorSelEf]);
+  }, [filtro, busca, supSelEf, mentorSelEf, ordem]);
 
   // critério secundário só existe com ≥2 opções úteis (regra de silêncio
   // dos filtros); se um deles está ativo o controle fica — ninguém fica
@@ -1073,21 +1156,42 @@ function VisaoCoordenacao({
     comparaNome(a.mentor.nome, b.mentor.nome) ||
     comparaNome(a.mentorado.nome, b.mentorado.nome);
 
-  const q = normaliza(busca.trim());
-  const base = [...recorte].sort(porPrioridade).filter(
-    (d) =>
-      !q ||
-      normaliza(d.mentor.nome).includes(q) ||
-      normaliza(d.mentorado.nome).includes(q)
-  );
-  const exibidas = base.filter((d) =>
-    chipBate(filtro, d, saudePorId.get(d.id)!)
-  );
+  // a coluna "Dupla" ciclável: prioridade → A a Z → Z a A → prioridade
+  // (o terceiro clique devolve o radar — mesmo ciclo do /relatorios)
+  const ciclarOrdem = () =>
+    setOrdem((o) => (o == null ? "az" : o === "az" ? "za" : null));
+
+  // busca fuzzy (REALIZA-391): todo token bate em algum nome da dupla, a
+  // ordem das palavras é livre e erro leve entra — o score decide a
+  // relevância quando não há ordenação explícita. Score pré-computado por
+  // id (mesma régua do scorePorId de /pessoas): dentro do comparador do
+  // sort seriam O(n log n) chamadas de matcher por tecla
+  const qt = busca.trim();
+  const scorePorId = new Map<string, number>();
+  if (qt) {
+    for (const d of recorte) scorePorId.set(d.id, scoreDaDupla(qt, d));
+  }
+  const base = qt
+    ? recorte.filter((d) => (scorePorId.get(d.id) ?? 0) > 0)
+    : [...recorte];
+  const exibidas = base
+    .filter((d) => chipBate(filtro, d, saudePorId.get(d.id)!))
+    .sort(
+      ordem
+        ? (a, b) => (ordem === "az" ? porNomeDupla(a, b) : porNomeDupla(b, a))
+        : qt
+          ? (a, b) =>
+              (scorePorId.get(b.id) ?? 0) - (scorePorId.get(a.id) ?? 0) ||
+              porPrioridade(a, b)
+          : porPrioridade
+    );
 
   // na visão "todas" sem recortes a massa saudável colapsa — destaques são
-  // quem tem encontro batendo nos próximos 3 dias (v5)
+  // quem tem encontro batendo nos próximos 3 dias (v5). Ordem alfabética
+  // explícita pede a lista chapa — esconder duplas sob "mostrar as outras"
+  // quebraria o A→Z que a pessoa acabou de pedir
   const semRecorte =
-    !q && !turmaSel && supSelEf === "todas" && !mentorSelEf;
+    !qt && !ordem && !turmaSel && supSelEf === "todas" && !mentorSelEf;
   const mostrarMassa =
     filtro === "todas" && semRecorte && exibidas.length > 0;
   const LIMITE_MASSA = 5;
@@ -1163,6 +1267,7 @@ function VisaoCoordenacao({
         wa={waDa(d, s)}
         menu={menuDa(d)}
         dimEncerradas={filtro === "todas"}
+        marca={qt || undefined}
         i={i}
       />
     );
@@ -1433,7 +1538,18 @@ function VisaoCoordenacao({
               </>
             );
           })()}{" "}
-          · ordenadas por prioridade
+          {/* a ordenação corrente é afordância — clicar cicla (o header da
+              coluna só existe na grade @4xl; aqui o controle serve também
+              no mobile). Subtil: pontilhado, não botão */}
+          ·{" "}
+          <button
+            type="button"
+            onClick={ciclarOrdem}
+            title="Ordenar pelo nome da dupla"
+            className="cursor-pointer underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+          >
+            {ordem ? `por ${ORDEM_ROTULO[ordem]}` : "por prioridade"}
+          </button>
         </p>
         <p className="text-xs text-muted-foreground">
           <span aria-hidden className="mx-1 inline-block size-2 rounded-full bg-[var(--role-mentorado)] align-[-1px] ring-1 ring-foreground/15" />
@@ -1469,12 +1585,13 @@ function VisaoCoordenacao({
             className="@container"
           >
             <div className="@4xl:overflow-hidden @4xl:rounded-xl @4xl:bg-card @4xl:shadow-[var(--shadow-border)]">
-              <CabecalhoColunas />
-              {/* filtro, turma, supervisão e busca sempre animam (convenção do
-                  AGENTS.md): a re-key remonta as linhas e o animate-enter re-roda
-                  com o stagger do --i. A busca entra na key de propósito. */}
+              <CabecalhoColunas ordem={ordem} onCiclar={ciclarOrdem} />
+              {/* filtro, turma, supervisão, ordenação e busca sempre animam
+                  (convenção do AGENTS.md): a re-key remonta as linhas e o
+                  animate-enter re-roda com o stagger do --i. A busca entra
+                  na key de propósito. */}
               <div
-                key={`${filtro}|${turmaSel ?? ""}|${supSelEf}|${mentorSelEf ?? ""}|${q}`}
+                key={`${filtro}|${turmaSel ?? ""}|${supSelEf}|${mentorSelEf ?? ""}|${ordem ?? ""}|${qt}`}
                 className="space-y-3 @4xl:space-y-0 @4xl:divide-y @4xl:divide-border/60"
               >
                 {antes.map((d) => linha(d, i++))}
@@ -1502,6 +1619,7 @@ function VisaoCoordenacao({
                             hojeStr={hojeStr}
                             wa={waDa(d, s)}
                             menu={menuDa(d)}
+                            marca={qt || undefined}
                             i={i++}
                           />
                         );
@@ -1558,6 +1676,10 @@ function VisaoSupervisor({
   // ficha preserva e o voltar aterrissa de volta neles)
   const [busca, setBusca] = useState(() => sp.get("q") ?? "");
   const [filtro, setFiltro] = useState<FiltroCat>(recorteInicial ?? "todas");
+  // a coluna "Dupla" ciclável — mesmo ?ordem= da visão de coordenação
+  const [ordem, setOrdem] = useState<OrdemDupla | null>(() =>
+    parseOrdemDupla(sp.get("ordem"))
+  );
 
   // um ?recorte= resolvido novo realinha a fatia — ajuste no render, o
   // mesmo padrão da visão de coordenação
@@ -1578,6 +1700,7 @@ function VisaoSupervisor({
     const r = params.get("recorte");
     setFiltro(resolveRecorteFatia(r) ?? "todas");
     setBusca(params.get("q") ?? "");
+    setOrdem(parseOrdemDupla(params.get("ordem")));
   }
 
   useEffect(() => {
@@ -1586,13 +1709,16 @@ function VisaoSupervisor({
     else params.set("recorte", filtro);
     const qt = busca.trim();
     if (!qt) params.delete("q");
-    else params.set("q", qt);
+    // query crua — o eco URL→estado não pode mastigar o espaço mid-typing
+    else params.set("q", busca);
+    if (!ordem) params.delete("ordem");
+    else params.set("ordem", ordem);
     const qs = params.toString();
     const url = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
     if (url !== `${window.location.pathname}${window.location.search}`) {
       window.history.replaceState(null, "", url);
     }
-  }, [filtro, busca]);
+  }, [filtro, busca, ordem]);
 
   const pesoFila = (d: Dupla) => {
     const s = saudePorId.get(d.id)!;
@@ -1605,18 +1731,35 @@ function VisaoSupervisor({
     comparaNome(a.mentor.nome, b.mentor.nome) ||
     comparaNome(a.mentorado.nome, b.mentorado.nome);
 
-  const q = normaliza(busca.trim());
-  const base = [...lista].sort(porPrioridade).filter(
-    (d) =>
-      !q ||
-      normaliza(d.mentor.nome).includes(q) ||
-      normaliza(d.mentorado.nome).includes(q)
-  );
+  // a coluna "Dupla" ciclável: prioridade → A a Z → Z a A → prioridade
+  const ciclarOrdem = () =>
+    setOrdem((o) => (o == null ? "az" : o === "az" ? "za" : null));
+
+  // busca fuzzy (REALIZA-391) — a mesma da visão de coordenação: qualquer
+  // nome da dupla (social ou civil) vale, score ordena na busca livre.
+  // Score por id pré-computado — comparador do sort não roda matcher
+  const qt = busca.trim();
+  const scorePorId = new Map<string, number>();
+  if (qt) {
+    for (const d of lista) scorePorId.set(d.id, scoreDaDupla(qt, d));
+  }
+  const base = qt
+    ? lista.filter((d) => (scorePorId.get(d.id) ?? 0) > 0)
+    : [...lista];
   // o mesmo chipBate da coordenação — fatia chega pela URL ou pelo atalho
-  // do resumo; "todas" é a ausência de recorte
-  const exibidas = base.filter((d) =>
-    chipBate(filtro, d, saudePorId.get(d.id)!)
-  );
+  // do resumo; "todas" é a ausência de recorte. A ordenação pedida vale
+  // dentro de cada grupo de turma (a ordem dos grupos continua a da turma)
+  const exibidas = base
+    .filter((d) => chipBate(filtro, d, saudePorId.get(d.id)!))
+    .sort(
+      ordem
+        ? (a, b) => (ordem === "az" ? porNomeDupla(a, b) : porNomeDupla(b, a))
+        : qt
+          ? (a, b) =>
+              (scorePorId.get(b.id) ?? 0) - (scorePorId.get(a.id) ?? 0) ||
+              porPrioridade(a, b)
+          : porPrioridade
+    );
 
   // sub-headers por turma dentro da mesma tabela — supervisionadas podem
   // misturar estados dentro da turma, a régua de critérios não se repete
@@ -1724,7 +1867,18 @@ function VisaoSupervisor({
               </>
             );
           })()}{" "}
-          · agrupadas por turma
+          · agrupadas por turma{" "}
+          {/* dentro de cada turma, a ordenação corrente — clicar cicla
+              (mesmo controle do header da coluna; serve no mobile) */}
+          <button
+            type="button"
+            onClick={ciclarOrdem}
+            title="Ordenar pelo nome da dupla"
+            className="cursor-pointer underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
+          >
+            <span aria-hidden>· </span>
+            {ordem ? `por ${ORDEM_ROTULO[ordem]}` : "por prioridade"}
+          </button>
         </p>
         <p className="text-xs text-muted-foreground">
           <span aria-hidden className="mx-1 inline-block size-2 rounded-full bg-[var(--role-mentorado)] align-[-1px] ring-1 ring-foreground/15" />
@@ -1750,11 +1904,11 @@ function VisaoSupervisor({
           className="@container"
         >
           <div className="@4xl:overflow-hidden @4xl:rounded-xl @4xl:bg-card @4xl:shadow-[var(--shadow-border)]">
-            <CabecalhoColunas />
-            {/* re-key só no recorte (nunca na busca) — remontar a cada
-                  tecla recolhia os grupos e matava um dialog
-                  aberto; a troca de chip re-roda o animate-enter das linhas */}
-            <div key={filtro}>
+            <CabecalhoColunas ordem={ordem} onCiclar={ciclarOrdem} />
+            {/* re-key só no recorte e na ordenação (nunca na busca) —
+                  remontar a cada tecla recolhia os grupos e matava um
+                  dialog aberto; chip e ordem re-rodam o animate-enter */}
+            <div key={`${filtro}|${ordem ?? ""}`}>
               {gruposOrdenados.map(([turma, duplas], gi) => {
                 // o próximo encontro oficial do calendário da turma — o "esta
                 // semana é o N" do sub-header (duplas da turma correm o mesmo
@@ -1810,6 +1964,7 @@ function VisaoSupervisor({
                                 })}
                               />
                             }
+                            marca={qt || undefined}
                             i={i++}
                           />
                         );
