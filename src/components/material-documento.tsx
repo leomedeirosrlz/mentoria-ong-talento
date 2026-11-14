@@ -19,6 +19,7 @@ import type {
   DocItem,
   DocTom,
 } from "@/lib/materiais-documentos";
+import { PedirLizaPersonalizar } from "@/components/pedir-liza-personalizar";
 import { cn } from "@/lib/utils";
 
 // Documento nativo de /materiais — os templates do cap. 14 do guia DPP vivem
@@ -527,9 +528,14 @@ export function DocBlocos({
 export function MaterialDocumento({
   slug,
   voltar,
+  lizaPergunta,
 }: {
   slug: string;
   voltar: { href: string; rotulo: string };
+  /** quando setada (só a rota de staff, com a bolha ligada), mostra o CTA
+   *  "Pedir pra Liza personalizar" — a página manda a pergunta pronta com
+   *  o slug; o documento em si segue verbatim */
+  lizaPergunta?: string;
 }) {
   const doc = materialDocumento(slug);
   if (!doc) return null;
@@ -559,6 +565,12 @@ export function MaterialDocumento({
       <div className="mt-5 space-y-3">
         <DocBlocos blocos={doc.blocos} />
       </div>
+
+      {lizaPergunta ? (
+        <div className="mt-6">
+          <PedirLizaPersonalizar pergunta={lizaPergunta} />
+        </div>
+      ) : null}
 
       <footer className="mt-8 border-t border-border/60 pt-3 text-xs text-muted-foreground">
         Template do guia do programa — adapte ao seu jeito de escrever.

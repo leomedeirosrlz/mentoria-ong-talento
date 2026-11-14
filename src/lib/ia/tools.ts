@@ -51,9 +51,15 @@ import {
   getMinhaDuplaIa,
   getPessoasBuscaIa,
   getRegistrosDaDuplaIa,
+  getTerceirosIa,
   papeisDoUsuario,
   type DuplaIa,
 } from "./queries";
+import {
+  MENSAGEM_TEMPLATE_SLUGS,
+  mensagemTemplateTexto,
+} from "./mensagem-templates";
+import { SITE_URL } from "@/lib/site";
 import { PERGUNTAS } from "@/lib/ajuda/conteudo";
 import { normaliza } from "@/lib/utils";
 import {
@@ -177,6 +183,20 @@ const combinadosArgs = z
       .max(100)
       .optional()
       .describe("máximo de combinados, vencidos primeiro (padrão 40)"),
+  })
+  .strict();
+
+const mensagemTemplateArgs = z
+  .object({
+    slug: z
+      .enum(MENSAGEM_TEMPLATE_SLUGS)
+      .describe("slug do template de mensagem do guia"),
+    dupla_id: z
+      .uuid()
+      .optional()
+      .describe(
+        "dupla destino — ausente na 1ª chamada, quando a pessoa ainda não escolheu"
+      ),
   })
   .strict();
 
@@ -632,6 +652,115 @@ export const IA_TOOLS = {
           status: d.status,
           turma: d.turma,
         })),
+      };
+    },
+  },
+
+  mensagem_template: {
+    nome: "mensagem_template",
+    descricao:
+      "Template de mensagem do guia (cap. 14) pronto pra personalizar: o texto do modelo com os [colchetes] visíveis + os dados da dupla pra preencher — nomes reais, whatsapp, próximo encontro e, conforme o template, as tarefas pendentes ou cada pessoa indicada com o link próprio. Use quando a pessoa pedir pra personalizar/usar um modelo de mensagem — preparação do(a) mentorado(a), mensagem às pessoas indicadas ou encaminhamento entre encontros. SEM dupla_id devolve o template + as duplas do escopo: com duas ou mais, pergunte qual com ```escolha antes de montar o texto; com uma só (ou a dupla já óbvia na conversa), chame de novo com o dupla_id. COM dupla_id devolve o template + a dupla — monte a mensagem final num bloco ```rascunho seguindo a `nota` do template.",
+    schema: mensagemTemplateArgs,
+    // mentorado fica fora: os templates são mensagens do ADULTO pra dupla
+    // ou pras pessoas indicadas — a casa dele não manda isso
+    roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
+    run: async ({ slug, dupla_id }: z.infer<typeof mensagemTemplateArgs>, ctx) => {
+      const template = mensagemTemplateTexto(slug);
+      if (!template) return null;
+      if (!dupla_id) {
+        // sem a dupla ainda: o índice do escopo alimenta a escolha — com
+        // 2+ duplas a pergunta "qual dupla?" vem antes do texto
+        const { duplas, total } = await getDuplasResumoIa(ctx.supabase);
+        return {
+          template,
+          total,
+          truncado: total > duplas.length,
+          duplas: duplas.map((d) => ({
+            dupla_id: d.id,
+            mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
+            mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
+            trilha: d.trilha,
+            status: d.status,
+            turma: d.turma,
+          })),
+        };
+      }
+      const [d, eventos] = await Promise.all([
+        getDuplaIa(ctx.supabase, dupla_id),
+        getCicloEventosIa(ctx.supabase),
+      ]);
+      if (!d) return { template, dupla: null };
+      // insumos por template, no escopo do que cada um precisa preencher:
+      // tarefa+prazo (encaminhamento) e as indicadas com link (indicadas)
+      const [combinados, indicadas] = await Promise.all([
+        slug === "mensagem-encaminhamento"
+          ? getEncaminhamentosIa(ctx.supabase, {
+              duplaId: dupla_id,
+              status: "pendente",
+              limite: 6,
+            })
+          : Promise.resolve(null),
+        slug === "mensagem-indicadas"
+          ? getTerceirosIa(ctx.supabase, dupla_id)
+          : Promise.resolve(null),
+      ]);
+      const s = saudadeDaDupla(d as unknown as Dupla, eventos);
+      const ultimo = d.encontros
+        .filter((e) => e.status === "realizado")
+        .sort((a, b) => b.numero - a.numero)[0];
+      const contato = (
+        p: { nome: string; nome_social: string | null; whatsapp?: string | null } | null
+      ) =>
+        p
+          ? {
+              nome: p.nome_social ?? p.nome,
+              whatsapp: p.whatsapp ?? null,
+            }
+          : null;
+      return {
+        template,
+        dupla: {
+          dupla_id: d.id,
+          trilha: d.trilha,
+          status: d.status,
+          turma: d.turma,
+          mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
+          mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
+          // contato por pessoa: o ```rascunho copia o whatsapp pra `numero`
+          contatos: {
+            mentor: contato(d.mentor),
+            mentorado: contato(d.mentorado),
+            supervisor: contato(d.supervisor),
+          },
+          proximo_encontro: s.proximo
+            ? { numero: s.proximo.numero, data_hora: s.proximo.data_hora }
+            : null,
+          ultimo_encontro: ultimo
+            ? { numero: ultimo.numero, realizado_em: ultimo.realizado_em }
+            : null,
+          ...(combinados
+            ? {
+                combinados_pendentes: combinados.map((t) => ({
+                  texto: t.descricao,
+                  prazo: t.prazo,
+                })),
+              }
+            : {}),
+          ...(indicadas
+            ? {
+                indicadas: indicadas.map((c) => ({
+                  nome: c.nome,
+                  vinculo: c.vinculo,
+                  whatsapp: c.whatsapp,
+                  // link público individual do convite — vai no [link] do
+                  // texto; a base é a do deploy (SITE_URL), igual aos CTAs
+                  link: `${SITE_URL}/t/${c.token}`,
+                  expira_em: c.expira_em,
+                  status: c.status,
+                })),
+              }
+            : {}),
+        },
       };
     },
   },

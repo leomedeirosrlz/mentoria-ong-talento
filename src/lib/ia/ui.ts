@@ -150,6 +150,9 @@ export type UiChamados = {
   em_atendimento: number;
   /** até 5, mais recentes primeiro */
   chamados: {
+    /** uuid — o deep-link da linha (?c=); opcional por defesa a bloco
+     *  montado sem id */
+    id?: string;
     numero: string;
     categoria: ChamadoCategoria;
     assunto: string | null;
@@ -295,6 +298,7 @@ export const STATUS_TOOL: Record<string, string> = {
   chamados_resumo: "Lendo os chamados…",
   combinados_das_duplas: "Lendo os combinados…",
   pessoas_busca: "Procurando a pessoa…",
+  mensagem_template: "Pegando o template da mensagem…",
   instrumentos_da_dupla: "Abrindo os instrumentos…",
   minha_dupla: "Olhando sua dupla…",
   minha_agenda: "Abrindo sua agenda…",
@@ -533,6 +537,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           .sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)))
           .slice(0, 5)
           .map((c) => ({
+            id: str(c.id) || undefined,
             numero: String(c.numero),
             categoria: c.categoria as ChamadoCategoria,
             assunto: corta(str(c.assunto), 90),

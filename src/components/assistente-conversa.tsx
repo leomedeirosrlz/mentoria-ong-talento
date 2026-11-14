@@ -551,6 +551,9 @@ export function AssistenteConversa({
   // enviar fecha sobre msgs/pending do render — a bolha chama a versão
   // mais nova pelo ref (registrada uma vez, lida só no clique)
   const enviarRef = useRef<(t: string) => void>(() => {});
+  // CTA externo clicado durante um stream não pode sumir — fila de um
+  // slot: a última pergunta pendente dispara quando a rodada fecha
+  const filaEnvioRef = useRef<string | null>(null);
   useEffect(() => {
     enviarRef.current = (t) => void enviar(t);
   });
@@ -565,6 +568,7 @@ export function AssistenteConversa({
   function soltarStream() {
     abortRef.current?.abort();
     abortRef.current = null;
+    filaEnvioRef.current = null;
     if (flushRef.current) {
       cancelAnimationFrame(flushRef.current);
       flushRef.current = 0;
@@ -778,6 +782,16 @@ export function AssistenteConversa({
       onRespostaPronta?.();
       setCelebra(true);
     }
+    // drena a pergunta que chegou durante o stream — "parar" não dispara
+    // (quem interrompeu não quer outra rodada logo atrás)
+    if (estado !== "interrompido" && filaEnvioRef.current) {
+      const prox = filaEnvioRef.current;
+      filaEnvioRef.current = null;
+      // um tick: enviarRef lê o render novo, já com pending false
+      setTimeout(() => enviarRef.current(prox), 0);
+    } else {
+      filaEnvioRef.current = null;
+    }
     focarComposer(inputRef.current);
   }
 
@@ -897,7 +911,13 @@ export function AssistenteConversa({
 
   async function enviar(conteudo: string) {
     const limpo = conteudo.trim();
-    if (!limpo || pending) return;
+    if (!limpo) return;
+    // stream em andamento: guarda a última pergunta — dispara no fechar()
+    // em vez de sumir (CTA "Pedir pra Liza" clicado no meio da resposta)
+    if (pending) {
+      filaEnvioRef.current = limpo;
+      return;
+    }
     if (!conversaId) setConversaId(novoUuid());
     setVisao("chat");
     const novas: Msg[] = [

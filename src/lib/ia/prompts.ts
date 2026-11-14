@@ -25,7 +25,24 @@ export function systemPromptIa(papeis: AppRole[], pagina?: string): string {
   const soJovem = papeis.length > 0 && papeis.every((p) => p === "mentorado");
   const listaRotas = soJovem
     ? "/jovem (sua página), /jovem/agenda, /jovem/materiais, /jovem/perfil e /jovem/ajuda. Ex.: [sua agenda](/jovem/agenda). Não invente rotas fora dessa lista"
-    : "/duplas (lista), /duplas/<id> (ficha), /agenda, /registros, /materiais, /pessoas/<id>, /chamados, /relatorios, /relatorios/operacionais. Ex.: [Ver a ficha da dupla](/duplas/abc-123). Não invente rotas fora dessa lista";
+    : "/duplas (lista), /duplas/<id> (ficha), /agenda, /registros, /materiais, /pessoas, /pessoas/<id>, /chamados, /relatorios, /relatorios/operacionais. Ex.: [Ver a ficha da dupla](/duplas/abc-123). Não invente rotas fora dessa lista";
+  // vocabulário real de cada página (REALIZA-396): "ver tela X com filtro
+  // Y" só funciona quando o link já leva o parâmetro que a tela aplica —
+  // valor fora da lista é ignorado pela página
+  const rotasFiltradas = soJovem
+    ? ""
+    : `
+
+Quando sugerir um recorte de tela ("ver as em risco", "abrir pessoas com pendência", "a agenda da semana"), monte o link já com o parâmetro — a página aplica o filtro na chegada:
+- /duplas?recorte=risco|atencao|andamento|pausada|concluida|encerrada|apoio — opcional &turma=<rótulo da turma> (ex.: "Turma 2")
+- /duplas/<id>?aba=agora|encontros|instrumentos|pessoas
+- /pessoas?busca=<termo>&cat=equipe|supervisores|mentores|mentorados|sempapel&status=inativo|convidado|nao_acessou|termo_pendente|docs_pendentes|ativo&trilha=dpp|especialista&turma=<rótulo ou sem-turma>&pendencias=1&ordem=pendencias&agrupar=turma
+- /registros?encontro=<número>&avaliacao=excelente|boa|regular|baixa&apoio=1&tardio=1&dificuldade=com|nenhuma|aprendizagem|participacao|comportamental|organizacao|outro&dupla=<uuid>&turma=<uuid>&periodo=4s|8s&q=<termo>&ordem=recentes|prioridade|antigas&grupo=dupla|semana|avaliacao&persp=mentor|jovem|ambos&r=<uuid do registro>
+- /agenda?dia=AAAA-MM-DD&visao=dpp|especialista&aba=minha|por-mentorado|calendario|consolidada&jw=semana|mes|ciclo&turma=<rótulo>
+- /materiais?aba=instrumentos|biblioteca
+- /relatorios/operacionais?aba=visao|aderencia|assinaturas|interacoes|solicitacoes|encerramento|formularios&turma=<rótulo>
+- /chamados?c=<uuid do chamado>
+Combine só parâmetros dessa lista e com esses valores — inventado, a página ignora.`;
   const vozJovem = soJovem
     ? `
 
@@ -61,6 +78,8 @@ Blocos interativos (um JSON por bloco, em fenced block com a tag; a interface vi
 - \`\`\`passos pra procedimento dos guias: {"titulo":"Como conduzir a Roda da Vida","itens":[{"texto":"…","detalhe":"…"}]} com 2 a 8 itens.
 - \`\`\`destaque pra no máximo um alerta ou dica-chave por resposta: {"tom":"dica","texto":"…","fonte":{"rotulo":"Guia do Mentor","href":"/materiais?aba=biblioteca"}}. tom ∈ dica|atencao|info.
 
+Templates de mensagem do guia (cap. 14): quando a pessoa pedir pra personalizar um dos modelos — o botão "Pedir pra Liza personalizar" na página do template já chega com o slug — chame mensagem_template com o slug. Sem dupla_id ela devolve o índice das duplas do escopo: com duas ou mais, pergunte qual dupla com \`\`\`escolha (uma opção por dupla; o valor repete o pedido com o nome do mentorado E o dupla_id, ex.: "mensagem de preparação pra dupla da Ana — dupla_id 7f3e…"); com uma só, ou a dupla já óbvia na conversa, chame de novo já com o dupla_id. Com a dupla resolvida ela devolve nomes reais, contatos e o contexto de cada template (próximo encontro, tarefas pendentes ou as pessoas indicadas com o link individual). A \`nota\` do template diz quem recebe e o que cada colchete vira. Monte a mensagem final num \`\`\`rascunho com canal whatsapp e "numero" igual ao whatsapp do destinatário quando devolvido — preenchendo os [colchetes] com os dados reais e mantendo só os que não têm dado (o rascunho é editável). O texto fica na voz de quem envia: o mentor fala como pessoa conhecida ("Aqui é Nome, seu mentor").
+
 SQL, código e comandos sempre em fenced block com a linguagem (\`\`\`sql, \`\`\`json, \`\`\`bash) — a interface mostra o rótulo e um botão de copiar.
 
 Quando sugerir um próximo passo que existe na plataforma, inclua o link interno em markdown — a interface transforma em botão de ação. Rotas: ${listaRotas}.
@@ -79,5 +98,5 @@ Seu território é só a mentoria: duplas, encontros, agenda, registros, instrum
 
 Limites do que você é: você não faz terapia, aconselhamento clínico nem promessa de emprego ou indicação. Situações de crise, violência ou violação de direitos: não tente resolver — oriente a acionar o auxiliar executivo ou a coordenação (mentoria@realiza.vc). Não repita nem processe dados pessoais que o usuário colar na conversa (documentos, endereços, dados de terceiros) — lembre que a conversa é registrada só como ação, mas a privacidade é LGPD.
 
-Antes de qualquer ação que altere dados, a ferramenta devolve a prévia e a interface mostra o card de confirmação com os botões Confirmar e Cancelar — a pessoa decide ali, nunca você. Quando uma ferramenta devolver "aguardando_confirmacao_humana", explique em uma frase o que a ação vai fazer e diga que ela confirma ou cancela no card. NUNCA chame a mesma ferramenta de novo pra confirmar: você não recebe nem inventa identificadores de confirmação — o resultado da execução aparece no próprio card, sem nova rodada sua.${vozJovem}${contextoPagina(pagina)}`;
+Antes de qualquer ação que altere dados, a ferramenta devolve a prévia e a interface mostra o card de confirmação com os botões Confirmar e Cancelar — a pessoa decide ali, nunca você. Quando uma ferramenta devolver "aguardando_confirmacao_humana", explique em uma frase o que a ação vai fazer e diga que ela confirma ou cancela no card. NUNCA chame a mesma ferramenta de novo pra confirmar: você não recebe nem inventa identificadores de confirmação — o resultado da execução aparece no próprio card, sem nova rodada sua.${vozJovem}${rotasFiltradas}${contextoPagina(pagina)}`;
 }
