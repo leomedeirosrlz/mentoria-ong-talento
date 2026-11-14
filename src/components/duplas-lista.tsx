@@ -48,7 +48,8 @@ import type {
   Dupla,
   EspecialistaEvento,
 } from "@/lib/types";
-import { cn, normaliza } from "@/lib/utils";
+import { cn } from "@/lib/utils";
+import { fuzzyMatch } from "@/lib/fuzzy";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { DuplaLinha, GRID_DUPLA_LG, type TomSituacao } from "@/components/dupla-linha";
@@ -209,6 +210,21 @@ const APOIO_ORIGEM_LABEL = {
   ambos: "pedido pelo mentor e pelo mentorado",
 } as const;
 
+// ---------- busca fuzzy da lista (REALIZA-391) ----------
+
+/** Relevância fuzzy da dupla: o melhor match entre os 4 nomes possíveis
+ *  (social e civil de cada ponta — quem lembra do nome de batismo acha a
+ *  dupla mesmo com a lista mostrando o social). */
+const scoreDaDupla = (q: string, d: Dupla): number =>
+  Math.max(
+    ...[
+      d.mentor.nome,
+      d.mentor.nome_social,
+      d.mentorado.nome,
+      d.mentorado.nome_social,
+    ].map((n) => (n ? (fuzzyMatch(q, n)?.score ?? 0) : 0))
+  );
+
 // ---------- a linha densa (v1 → v5) ----------
 
 /** A linha da dupla em /duplas: monta os dados e entrega à linha canônica.
@@ -221,6 +237,7 @@ function LinhaDupla({
   wa,
   menu,
   dimEncerradas,
+  marca,
   i,
 }: {
   d: Dupla;
@@ -236,6 +253,8 @@ function LinhaDupla({
    *  formal juntos) — está fora da régua, não é prioridade do radar (a
    *  ficha continua a um clique) */
   dimEncerradas?: boolean;
+  /** busca ativa — marca os trechos casados nos nomes */
+  marca?: string;
   i: number;
 }) {
   const estado = estadoDaDupla(d, saude);
@@ -312,6 +331,7 @@ function LinhaDupla({
       menu={menu}
       fichaHref={`/duplas/${d.id}`}
       fichaNome={(d.mentorado.nome_social ?? d.mentorado.nome).split(" ")[0]}
+      marca={marca}
       className={dimEncerradas && ehEncerradaCedo(d) ? "opacity-60" : undefined}
     />
   );
@@ -327,6 +347,7 @@ function LinhaMini({
   hojeStr,
   wa,
   menu,
+  marca,
   i,
 }: {
   d: Dupla;
@@ -336,6 +357,7 @@ function LinhaMini({
   wa: React.ReactNode;
   /** o ⋯ real — colapsada não significa sem ações */
   menu?: React.ReactNode;
+  marca?: string;
   i: number;
 }) {
   const feitos = d.encontros.filter((e) => e.status === "realizado").length;
@@ -362,6 +384,7 @@ function LinhaMini({
         <DuplaNomes
           mentor={d.mentor.nome_social ?? d.mentor.nome}
           mentorado={d.mentorado.nome_social ?? d.mentorado.nome}
+          marca={marca}
         />
         {d.turma && (
           <span
@@ -1073,21 +1096,27 @@ function VisaoCoordenacao({
     comparaNome(a.mentor.nome, b.mentor.nome) ||
     comparaNome(a.mentorado.nome, b.mentorado.nome);
 
-  const q = normaliza(busca.trim());
-  const base = [...recorte].sort(porPrioridade).filter(
-    (d) =>
-      !q ||
-      normaliza(d.mentor.nome).includes(q) ||
-      normaliza(d.mentorado.nome).includes(q)
-  );
-  const exibidas = base.filter((d) =>
-    chipBate(filtro, d, saudePorId.get(d.id)!)
-  );
+  // busca fuzzy (REALIZA-391): todo token bate em algum nome da dupla, a
+  // ordem das palavras é livre e erro leve entra — o score decide a
+  // relevância enquanto a busca está ativa
+  const qt = busca.trim();
+  const base = qt
+    ? recorte.filter((d) => scoreDaDupla(qt, d) > 0)
+    : [...recorte];
+  const exibidas = base
+    .filter((d) => chipBate(filtro, d, saudePorId.get(d.id)!))
+    .sort(
+      qt
+        ? (a, b) => scoreDaDupla(qt, b) - scoreDaDupla(qt, a) || porPrioridade(a, b)
+        : porPrioridade
+    );
 
   // na visão "todas" sem recortes a massa saudável colapsa — destaques são
-  // quem tem encontro batendo nos próximos 3 dias (v5)
+  // quem tem encontro batendo nos próximos 3 dias (v5). Busca ativa pede
+  // a lista chapa — esconder resultados sob "mostrar as outras" quebraria
+  // a relevância que a pessoa acabou de pedir
   const semRecorte =
-    !q && !turmaSel && supSelEf === "todas" && !mentorSelEf;
+    !qt && !turmaSel && supSelEf === "todas" && !mentorSelEf;
   const mostrarMassa =
     filtro === "todas" && semRecorte && exibidas.length > 0;
   const LIMITE_MASSA = 5;
@@ -1163,6 +1192,7 @@ function VisaoCoordenacao({
         wa={waDa(d, s)}
         menu={menuDa(d)}
         dimEncerradas={filtro === "todas"}
+        marca={qt || undefined}
         i={i}
       />
     );
@@ -1433,7 +1463,7 @@ function VisaoCoordenacao({
               </>
             );
           })()}{" "}
-          · ordenadas por prioridade
+          · {qt ? "por relevância" : "ordenadas por prioridade"}
         </p>
         <p className="text-xs text-muted-foreground">
           <span aria-hidden className="mx-1 inline-block size-2 rounded-full bg-[var(--role-mentorado)] align-[-1px] ring-1 ring-foreground/15" />
@@ -1474,7 +1504,7 @@ function VisaoCoordenacao({
                   AGENTS.md): a re-key remonta as linhas e o animate-enter re-roda
                   com o stagger do --i. A busca entra na key de propósito. */}
               <div
-                key={`${filtro}|${turmaSel ?? ""}|${supSelEf}|${mentorSelEf ?? ""}|${q}`}
+                key={`${filtro}|${turmaSel ?? ""}|${supSelEf}|${mentorSelEf ?? ""}|${qt}`}
                 className="space-y-3 @4xl:space-y-0 @4xl:divide-y @4xl:divide-border/60"
               >
                 {antes.map((d) => linha(d, i++))}
@@ -1502,6 +1532,7 @@ function VisaoCoordenacao({
                             hojeStr={hojeStr}
                             wa={waDa(d, s)}
                             menu={menuDa(d)}
+                            marca={qt || undefined}
                             i={i++}
                           />
                         );
@@ -1605,18 +1636,21 @@ function VisaoSupervisor({
     comparaNome(a.mentor.nome, b.mentor.nome) ||
     comparaNome(a.mentorado.nome, b.mentorado.nome);
 
-  const q = normaliza(busca.trim());
-  const base = [...lista].sort(porPrioridade).filter(
-    (d) =>
-      !q ||
-      normaliza(d.mentor.nome).includes(q) ||
-      normaliza(d.mentorado.nome).includes(q)
-  );
+  // busca fuzzy (REALIZA-391) — a mesma da visão de coordenação: qualquer
+  // nome da dupla (social ou civil) vale, score ordena na busca livre
+  const qt = busca.trim();
+  const base = qt
+    ? lista.filter((d) => scoreDaDupla(qt, d) > 0)
+    : [...lista];
   // o mesmo chipBate da coordenação — fatia chega pela URL ou pelo atalho
   // do resumo; "todas" é a ausência de recorte
-  const exibidas = base.filter((d) =>
-    chipBate(filtro, d, saudePorId.get(d.id)!)
-  );
+  const exibidas = base
+    .filter((d) => chipBate(filtro, d, saudePorId.get(d.id)!))
+    .sort(
+      qt
+        ? (a, b) => scoreDaDupla(qt, b) - scoreDaDupla(qt, a) || porPrioridade(a, b)
+        : porPrioridade
+    );
 
   // sub-headers por turma dentro da mesma tabela — supervisionadas podem
   // misturar estados dentro da turma, a régua de critérios não se repete
@@ -1810,6 +1844,7 @@ function VisaoSupervisor({
                                 })}
                               />
                             }
+                            marca={qt || undefined}
                             i={i++}
                           />
                         );

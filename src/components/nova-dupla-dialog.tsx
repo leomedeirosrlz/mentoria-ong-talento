@@ -20,6 +20,7 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
+import { PessoaSelect } from "@/components/pessoa-select";
 import type {
   AppRole,
   CorRaca,
@@ -465,16 +466,20 @@ export function NovaDuplaDialog({
               <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentor)]" />
               Mentor
             </Label>
-            <Select
+            {/* seletor com busca (REALIZA-391): dezenas de mentores +
+                vagas no meta — digitar filtra com relevância e marca os
+                trechos; sem vaga segue selecionável (marcar é o convite
+                pra comparar a afinidade e abrir "aumentar capacidade") */}
+            <PessoaSelect
               name="mentor_id"
               required
-              value={mentorSel ?? undefined}
-              items={Object.fromEntries(mentoresOrd.map((m) => {
-                const rotulo = `${m.nome_social ?? m.nome} · ${vagasLabel(m)}`;
-                return [m.id, rotulo];
+              value={mentorSel}
+              itens={mentoresOrd.map((m) => ({
+                value: m.id,
+                label: m.nome_social ?? m.nome,
+                meta: vagasLabel(m),
               }))}
-              onValueChange={(v) => {
-                const id = v ? String(v) : null;
+              onValueChange={(id) => {
                 setMentorSel(id);
                 // troca de mentor rederiva a trilha default dos papéis
                 // EFETIVOS dele — papel de mentor só secundário (primário
@@ -491,22 +496,11 @@ export function NovaDuplaDialog({
                     : "dpp"
                 );
               }}
-            >
-              <SelectTrigger id="mentor" aria-labelledby="mentor-label mentor"><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                {mentores.length === 0 && (
-                  <SelectItem value="__vazio" disabled>Nenhum mentor cadastrado</SelectItem>
-                )}
-                {mentoresOrd.map((m) => (
-                  // sem vaga segue selecionável — marcar é o convite pra
-                  // comparar a afinidade e abrir "aumentar capacidade";
-                  // esconder seria fingir que o mentor certo não existe
-                  <SelectItem key={m.id} value={m.id}>
-                    {m.nome_social ?? m.nome} · {vagasLabel(m)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              id="mentor"
+              aria-labelledby="mentor-label mentor"
+              placeholder="Selecione"
+              vazio="Nenhum mentor cadastrado"
+            />
             {mentorSelObj && mentorLotado && (
               <div
                 role="alert"
@@ -596,35 +590,24 @@ export function NovaDuplaDialog({
               <span aria-hidden className="size-1.5 rounded-full bg-[var(--role-mentorado)]" />
               Mentorado
             </Label>
-            <Select
+            <PessoaSelect
               name="mentorado_id"
               required
-              value={mentoradoSel ?? undefined}
-              items={Object.fromEntries(mentoradosOrd.map((m) => [
-                m.id,
-                rotuloOcupado(m.id)
-                  ? `${m.nome_social ?? m.nome} (${rotuloOcupado(m.id)})`
-                  : (m.nome_social ?? m.nome),
-              ]))}
-              onValueChange={(v) => setMentoradoSel(v ? String(v) : null)}
-            >
-              <SelectTrigger id="mentorado" aria-labelledby="mentorado-label mentorado"><SelectValue placeholder="Selecione" /></SelectTrigger>
-              <SelectContent>
-                {mentorados.length === 0 && (
-                  <SelectItem value="__vazio" disabled>Nenhum mentorado cadastrado</SelectItem>
-                )}
-                {mentoradosOrd.map((m) => {
-                  const ocupado = ocupadoEm(m.id) != null;
-                  return (
-                    <SelectItem key={m.id} value={m.id} disabled={ocupado}>
-                      {rotuloOcupado(m.id)
-                        ? `${m.nome_social ?? m.nome} (${rotuloOcupado(m.id)})`
-                        : (m.nome_social ?? m.nome)}
-                    </SelectItem>
-                  );
-                })}
-              </SelectContent>
-            </Select>
+              value={mentoradoSel}
+              itens={mentoradosOrd.map((m) => ({
+                value: m.id,
+                label: m.nome_social ?? m.nome,
+                meta: rotuloOcupado(m.id),
+                // ocupada só na trilha em curso — estar na DPP não
+                // impede a de especialista; o "por que" fica no meta
+                disabled: ocupadoEm(m.id) != null,
+              }))}
+              onValueChange={setMentoradoSel}
+              id="mentorado"
+              aria-labelledby="mentorado-label mentorado"
+              placeholder="Selecione"
+              vazio="Nenhum mentorado cadastrado"
+            />
             {mentorados.length === 0 && (
               <CampoVazio texto="Nenhum mentorado cadastrado ainda." />
             )}
@@ -678,19 +661,27 @@ export function NovaDuplaDialog({
           {!ehEsp && (
             <div className="space-y-2">
               <Label id="supervisor-label">Auxiliar executivo (opcional)</Label>
-              <Select
+              <PessoaSelect
                 name="supervisor_id"
                 defaultValue={NENHUM}
-                items={{ [NENHUM]: "Nenhum", ...Object.fromEntries(supervisoresOrd.map((m) => [m.id, m.nome_social ?? m.nome])) }}
-              >
-                <SelectTrigger id="supervisor" aria-labelledby="supervisor-label supervisor"><SelectValue placeholder="Nenhum" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NENHUM}>Nenhum</SelectItem>
-                  {supervisoresOrd.map((m) => (
-                    <SelectItem key={m.id} value={m.id}>{m.nome_social ?? m.nome}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                itens={[
+                  { value: NENHUM, label: "Nenhum" },
+                  // carga em meta — a ordenação menos-carregado-primeiro
+                  // ganha o porquê visível
+                  ...supervisoresOrd.map((m) => ({
+                    value: m.id,
+                    label: m.nome_social ?? m.nome,
+                    meta:
+                      emSup[m.id] != null
+                        ? `${emSup[m.id]} ${emSup[m.id] === 1 ? "dupla" : "duplas"}`
+                        : null,
+                  })),
+                ]}
+                id="supervisor"
+                aria-labelledby="supervisor-label supervisor"
+                placeholder="Nenhum"
+                vazio="Nenhum auxiliar cadastrado"
+              />
             </div>
           )}
           {ehEsp && (

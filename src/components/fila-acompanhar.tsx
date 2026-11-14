@@ -9,7 +9,7 @@ import {
 } from "@/lib/agenda-coordenacao";
 import { formatDiaMes, LEMBRETE_INTERVALO_MS } from "@/lib/ciclo";
 import { turmaLonga } from "@/lib/turma";
-import { normaliza } from "@/lib/utils";
+import { fuzzyMatch } from "@/lib/fuzzy";
 import type { LembreteDestino } from "@/lib/actions-lembrete";
 import type { Dupla } from "@/lib/types";
 import {
@@ -115,17 +115,28 @@ export function FilaAcompanhar({ linhas }: { linhas: LinhaFila[] }) {
   );
 
   // a busca só filtra enquanto o input existe — um router.refresh() pode
-  // encolher a fila pra ≤10 e desmontar o controle, e um `q` órfão ia
+  // encolher a fila pra ≤10 e desmontar o controle, e um `qt` órfão ia
   // continuar escondendo linhas sem jeito de limpar
-  const q = linhas.length > 10 ? normaliza(busca.trim()) : "";
-  const visiveis = itens.filter(
-    (l) => MATCH_FILTRO[filtro](l) && (!q || normaliza(l.mentorado.nome).includes(q) || normaliza(l.mentor.nome).includes(q))
-  );
+  const qt = linhas.length > 10 ? busca.trim() : "";
+  // busca fuzzy (REALIZA-391): qualquer nome da dupla (social ou civil)
+  // vale; o score ordena a fila por relevância enquanto a busca está ativa
+  const scoreDa = (l: LinhaComDimensoes) =>
+    Math.max(
+      ...[
+        l.mentor.nome,
+        l.mentor.nome_social,
+        l.mentorado.nome,
+        l.mentorado.nome_social,
+      ].map((n) => (n ? (fuzzyMatch(qt, n)?.score ?? 0) : 0))
+    );
+  const visiveis = itens
+    .filter((l) => MATCH_FILTRO[filtro](l) && (!qt || scoreDa(l) > 0))
+    .sort((a, b) => scoreDa(b) - scoreDa(a));
 
   // sem seleção ativa a fila se divide: quem precisa de intervenção em cima,
   // o resto abaixo (a ordem risco→atenção do paraAcompanhar se mantém dentro
   // de cada grupo). Um grupo só não ganha cabeçalho — seria só ruído.
-  const semSelecao = filtro === "todas" && q === "";
+  const semSelecao = filtro === "todas" && qt === "";
   const urgentes = visiveis.filter(MATCH_FILTRO.urgentes);
   const demais = visiveis.filter((l) => !MATCH_FILTRO.urgentes(l));
   const dividir = semSelecao && urgentes.length > 0 && demais.length > 0;
@@ -180,17 +191,23 @@ export function FilaAcompanhar({ linhas }: { linhas: LinhaFila[] }) {
           <GrupoFila
             titulo={`Urgentes (${urgentes.length})`}
             linhas={urgentes}
-            chave={`${filtro}|${q}|u`}
+            chave={`${filtro}|${qt}|u`}
+            marca={qt || undefined}
           />
           <GrupoFila
             titulo={`Demais duplas (${demais.length})`}
             linhas={demais}
-            chave={`${filtro}|${q}|d`}
+            chave={`${filtro}|${qt}|d`}
+            marca={qt || undefined}
           />
         </div>
       ) : (
         <div className="mt-3">
-          <ListaFila linhas={visiveis} chave={`${filtro}|${q}`} />
+          <ListaFila
+            linhas={visiveis}
+            chave={`${filtro}|${qt}`}
+            marca={qt || undefined}
+          />
         </div>
       )}
     </>
@@ -201,22 +218,32 @@ function GrupoFila({
   titulo,
   linhas,
   chave,
+  marca,
 }: {
   titulo: string;
   linhas: LinhaComDimensoes[];
   chave: string;
+  marca?: string;
 }) {
   return (
     <div>
       <h3 className="mb-2 text-sm font-semibold">{titulo}</h3>
-      <ListaFila linhas={linhas} chave={chave} />
+      <ListaFila linhas={linhas} chave={chave} marca={marca} />
     </div>
   );
 }
 
 /** A lista de linhas. Filtro e busca trocam a `key`, então a entrada anima
  *  de novo (convenção de movimento do AGENTS.md). */
-function ListaFila({ linhas, chave }: { linhas: LinhaComDimensoes[]; chave: string }) {
+function ListaFila({
+  linhas,
+  chave,
+  marca,
+}: {
+  linhas: LinhaComDimensoes[];
+  chave: string;
+  marca?: string;
+}) {
   return (
     <section
       aria-label="Duplas para acompanhar"
@@ -228,7 +255,7 @@ function ListaFila({ linhas, chave }: { linhas: LinhaComDimensoes[]; chave: stri
       >
         {linhas.map((l) => (
           <li key={l.item.duplaId}>
-            <LinhaAcompanhar linha={l} />
+            <LinhaAcompanhar linha={l} marca={marca} />
           </li>
         ))}
       </ul>
@@ -236,7 +263,13 @@ function ListaFila({ linhas, chave }: { linhas: LinhaComDimensoes[]; chave: stri
   );
 }
 
-function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
+function LinhaAcompanhar({
+  linha,
+  marca,
+}: {
+  linha: LinhaComDimensoes;
+  marca?: string;
+}) {
   const { item, lembrete, telefone, dupla } = linha;
   // cap D5 em curso = "aguardando a dupla": o lembrete saiu há <48h e a
   // próxima ação é dela. `bloqueadoAte` não-null ⟺ bloqueada no render do
@@ -319,6 +352,7 @@ function LinhaAcompanhar({ linha }: { linha: LinhaComDimensoes }) {
       }
       fichaHref={`/duplas/${item.duplaId}`}
       fichaNome={(linha.mentorado.nome_social ?? linha.mentorado.nome).split(" ")[0]}
+      marca={marca}
     />
   );
 }
