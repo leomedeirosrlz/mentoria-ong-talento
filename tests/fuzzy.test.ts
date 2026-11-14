@@ -35,6 +35,23 @@ describe("fuzzyMatch", () => {
     expect(fuzzyMatch("js", "João Silva")).not.toBeNull();
   });
 
+  it("subsequência é só pra token curto — palavra inteira não espalha", () => {
+    // "mentor" espalhado por uma descrição longa casava sem significar
+    // nada ("modelo ... comportamento negativo") e mantinha seções da
+    // biblioteca vivas na busca "Guia do Mentor"
+    expect(
+      fuzzyMatch(
+        "guia do mentor",
+        "Instrumento do guia: o modelo de fala e os cuidados para feedback sobre comportamento negativo."
+      )
+    ).toBeNull();
+    // o caminho legítimo continua: substring e typo seguem valendo
+    expect(
+      fuzzyMatch("guia do mentor", "O Guia do Mentor completo")
+    ).not.toBeNull();
+    expect(fuzzyMatch("metnor", "O mentor da dupla")).not.toBeNull();
+  });
+
   it("tolera 1 edição leve em token ≥4 letras", () => {
     // transposição de vizinhos, letra a menos e letra trocada
     expect(fuzzyMatch("marai", "Maria")).not.toBeNull();

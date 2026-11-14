@@ -102,35 +102,40 @@ function matchToken(
 
   // 2) subsequência — letras na ordem com espaços entre elas ("mra" acha
   // "Maria", "js" acha "João Silva"). Menor span vence (run apertado
-  // vale mais que letras espalhadas pelo texto).
-  let melhorIdx: number[] | null = null;
-  let melhorSpan = Infinity;
-  for (let i = 0; i <= norm.length - token.length; i++) {
-    if (norm[i] !== token[0]) continue;
-    const idx = [i];
-    let j = i;
-    for (let k = 1; k < token.length; k++) {
-      j = norm.indexOf(token[k], j + 1);
-      if (j === -1) break;
-      idx.push(j);
+  // vale mais que letras espalhadas pelo texto). Só pra token curto
+  // (iniciais/abreviação): uma palavra de 4+ letras espalhada sobre um
+  // texto longo ("mentor" em "modelo ... comportamento negativo") casa
+  // sem significar nada — aí vale só substring ou typo.
+  if (token.length <= 3) {
+    let melhorIdx: number[] | null = null;
+    let melhorSpan = Infinity;
+    for (let i = 0; i <= norm.length - token.length; i++) {
+      if (norm[i] !== token[0]) continue;
+      const idx = [i];
+      let j = i;
+      for (let k = 1; k < token.length; k++) {
+        j = norm.indexOf(token[k], j + 1);
+        if (j === -1) break;
+        idx.push(j);
+      }
+      if (idx.length !== token.length) continue;
+      const span = idx[idx.length - 1] - idx[0] + 1;
+      if (span < melhorSpan) {
+        melhorSpan = span;
+        melhorIdx = idx;
+      }
     }
-    if (idx.length !== token.length) continue;
-    const span = idx[idx.length - 1] - idx[0] + 1;
-    if (span < melhorSpan) {
-      melhorSpan = span;
-      melhorIdx = idx;
+    if (melhorIdx) {
+      const cobertura = token.length / melhorSpan;
+      return {
+        score:
+          40 +
+          cobertura * 25 +
+          (ehBordaDePalavra(norm, melhorIdx[0]) ? 5 : 0) -
+          melhorIdx[0] * 0.1,
+        pos: melhorIdx,
+      };
     }
-  }
-  if (melhorIdx) {
-    const cobertura = token.length / melhorSpan;
-    return {
-      score:
-        40 +
-        cobertura * 25 +
-        (ehBordaDePalavra(norm, melhorIdx[0]) ? 5 : 0) -
-        melhorIdx[0] * 0.1,
-      pos: melhorIdx,
-    };
   }
 
   // 3) typo — token ≥4 letras a 1 edição de uma palavra do texto
