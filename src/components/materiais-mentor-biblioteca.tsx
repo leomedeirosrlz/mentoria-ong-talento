@@ -9,7 +9,7 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { formatDiaMes, formatDiaSemana, linkSeguro } from "@/lib/ciclo";
 import { hrefMaterial } from "@/lib/materiais";
-import { guiaDoEncontro } from "@/lib/como-conduzir";
+import { guiaDoEncontro, sistemaDoDoc } from "@/lib/como-conduzir";
 import type { Material } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
 import { BibliotecaLista } from "@/components/biblioteca-lista";
@@ -93,7 +93,7 @@ function LinhaMaterial({ m }: { m: Material }) {
           {TIPO_LABEL[m.tipo]}
           {m.path
             ? m.path.startsWith("doc:")
-              ? " · documento"
+              ? ` · documento${sistemaDoDoc(m.path.slice(4)) ? " · instrumento oficial" : ""}`
               : " · arquivo"
             : urlOk && m.tipo !== "link"
               ? " · link externo"

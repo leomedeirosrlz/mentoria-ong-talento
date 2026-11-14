@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import {
+  BookOpen,
   CaretLeft,
   Check,
   LockSimple,
@@ -32,9 +33,12 @@ import {
   estrelasTexto,
 } from "@/lib/ciclo";
 import {
+  INSTRUMENTOS_DUPLA_SISTEMA,
   type FormularioCampo,
+  type InstrumentoDuplaSistema,
   type RespostaValor,
 } from "@/lib/forms/schema";
+import { docDoSistema } from "@/lib/como-conduzir";
 import type { InstrumentoDupla, InstrumentoEntrega } from "@/lib/forms/queries";
 import { turmaCurta } from "@/lib/turma";
 import {
@@ -299,6 +303,11 @@ export default async function InstrumentoPage({
   const ehForm = !ehAvaliacaoEncontro && !eh360;
   const estacao = card.estacao;
   const sistema = estacao ? SISTEMA_DA_ESTACAO[estacao] : undefined;
+  // ponte instrumento → doc (REALIZA-386): os 4 de jornada têm guia nativo
+  const docGuia =
+    sistema && (INSTRUMENTOS_DUPLA_SISTEMA as readonly string[]).includes(sistema)
+      ? docDoSistema(sistema as InstrumentoDuplaSistema)
+      : null;
 
   // tudo sobe numa leva só: o filtro "duplas DPP vivas do mentor" repete a
   // expressão das linhas pra destravar a RPC por dupla (definer — uma por
@@ -467,6 +476,16 @@ export default async function InstrumentoPage({
               </span>
             ))}
             <span>{card.descricao}</span>
+            {docGuia && (
+              <Link
+                href={`/materiais/documento/${docGuia}`}
+                prefetch={false}
+                className="inline-flex min-h-8 items-center gap-1 rounded-md text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <BookOpen size={12} aria-hidden />
+                Ler o guia
+              </Link>
+            )}
           </span>
         }
       />

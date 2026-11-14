@@ -1,10 +1,12 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import {
+  BookOpen,
   CircleNotch,
   Eye,
   ListChecks,
@@ -23,7 +25,7 @@ import type {
 } from "@/lib/forms/queries";
 import { parChecklist, parRoda } from "@/lib/jornada";
 import { formatDate } from "@/lib/ciclo";
-import { GUIA_ENCONTRO } from "@/lib/como-conduzir";
+import { docDoSistema, GUIA_ENCONTRO } from "@/lib/como-conduzir";
 import {
   ehInstrumentoChave,
   InstrumentoEmblema,
@@ -80,6 +82,7 @@ function estadoAtual(entregas: InstrumentoEntrega[]): {
 
 function LinhaInstrumento({
   item,
+  sistema: sistemaEsperado,
   duplaId,
   mentoradoNome,
   mentoradoWhatsapp,
@@ -94,6 +97,9 @@ function LinhaInstrumento({
   /** null quando o instrumento ainda não foi semeado no banco — a linha
    *  existe pra jornada completa aparecer, mas sem ação */
   item: InstrumentoDupla | null;
+  /** a chave da régua — cobre o item não-semeado (o guia e o doc do
+   *  instrumento existem independente da semente). */
+  sistema: InstrumentoDuplaSistema;
   duplaId: string;
   mentoradoNome: string;
   mentoradoWhatsapp: string | null;
@@ -117,7 +123,7 @@ function LinhaInstrumento({
   const [enviado, setEnviado] = useState<string | null>(null);
   const origem = useOrigem();
 
-  const sistema = (item?.sistema ?? null) as InstrumentoDuplaSistema | null;
+  const sistema = (item?.sistema ?? sistemaEsperado) as InstrumentoDuplaSistema;
   const info = sistema ? INSTRUMENTO_INFO[sistema] : null;
   const titulo = item?.titulo ?? info?.titulo ?? "Instrumento";
 
@@ -212,14 +218,26 @@ function LinhaInstrumento({
             </p>
           )}
           {sistema && (
-            <details className="group mt-1.5">
-              <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground underline-offset-2 outline-none transition-colors hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring">
-                Como conduzir
-              </summary>
-              <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">
-                {GUIA_ENCONTRO[sistema].conduzir}
-              </p>
-            </details>
+            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
+              <details className="group">
+                <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground underline-offset-2 outline-none transition-colors hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring">
+                  Como conduzir
+                </summary>
+                <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">
+                  {GUIA_ENCONTRO[sistema].conduzir}
+                </p>
+              </details>
+              {/* ponte instrumento → doc (REALIZA-386): o guia nativo; o
+                  ?dupla= faz o "Abrir instrumento" do doc voltar pra cá */}
+              <Link
+                href={`/materiais/documento/${docDoSistema(sistema)}?dupla=${duplaId}`}
+                prefetch={false}
+                className="inline-flex min-h-8 items-center gap-1 rounded-md text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                <BookOpen size={12} aria-hidden />
+                Ler o guia
+              </Link>
+            </div>
           )}
           {status === "respondido" && entrega?.respondido_em && (
             <p className="mt-1 text-xs tabular-nums text-muted-foreground">
@@ -368,6 +386,7 @@ export function InstrumentosDupla({
           <LinhaInstrumento
             key={s}
             item={porSistema.get(s) ?? null}
+            sistema={s}
             duplaId={duplaId}
             mentoradoNome={mentoradoNome}
             mentoradoWhatsapp={mentoradoWhatsapp}

@@ -501,7 +501,6 @@ export default async function DuplaPage({
     arr.push(m);
     materiaisPorNumero.set(m.encontro_num, arr);
   }
-
   const hojeStr = toDateStr(new Date());
   const podeRetroativo = souMentor && dupla.status === "ativa" && faltantes.length > 0;
 
@@ -802,7 +801,15 @@ export default async function DuplaPage({
   const materialAtual = passoAtual
     ? (materiaisPorNumero.get(passoAtual.numero) ?? []).find((m) => m.path || m.url) ?? null
     : null;
-  const materialAtualHref = materialAtual ? hrefMaterial(materialAtual) : null;
+  // doc nativo carrega a ficha no ?dupla= — o "Abrir instrumento" do
+  // documento volta pra esta dupla (REALIZA-386)
+  const materialAtualHref = materialAtual
+    ? hrefMaterial(materialAtual)
+    : null;
+  const materialAtualHrefCtx =
+    materialAtualHref && materialAtual?.path?.startsWith("doc:")
+      ? `${materialAtualHref}?dupla=${dupla.id}`
+      : materialAtualHref;
   const notaAtual = passoAtual
     ? (dupla.notas?.find((n) => n.numero === passoAtual.numero)?.texto ?? null)
     : null;
@@ -1076,7 +1083,7 @@ export default async function DuplaPage({
                 <p className="mt-1 whitespace-pre-line break-words">{notaAtual}</p>
               </div>
             )}
-            {(chamadaAtual && !chamadaNoCabecalho || materialAtualHref) && (
+            {(chamadaAtual && !chamadaNoCabecalho || materialAtualHrefCtx) && (
               <div className="flex flex-wrap items-center gap-2">
                 {chamadaAtual && !chamadaNoCabecalho &&
                   (souMentor ? (
@@ -1092,11 +1099,12 @@ export default async function DuplaPage({
                   ) : (
                     <CopiarChamada url={chamadaAtual} />
                   ))}
-                {materialAtualHref && (
+                {materialAtualHrefCtx && (
                   <a
-                    href={materialAtualHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    href={materialAtualHrefCtx}
+                    {...(materialAtual?.path?.startsWith("doc:")
+                      ? {}
+                      : { target: "_blank", rel: "noopener noreferrer" })}
                     className={buttonVariants({ variant: "outline", size: "sm" })}
                   >
                     <BookOpen aria-hidden />

@@ -179,7 +179,15 @@ export function EncontroRow({
   // material do encontro: com destino (arquivo oficial ou url) vira chip; sem, só o título muted
   const material = materiais.find((m) => m.path || m.url) ?? materiais[0] ?? null;
   const materiaisComDestino = materiais.filter((m) => m.path || linkSeguro(m.url));
-  const materialHref = material ? hrefMaterial(material) : null;
+  // doc nativo navega na mesma aba e carrega a ficha no ?dupla= — o
+  // "Abrir instrumento" do documento volta pra esta dupla (REALIZA-386);
+  // arquivo/storage e url externa seguem em aba nova
+  const ehDoc = (m: Material) => m.path?.startsWith("doc:") ?? false;
+  const hrefDoMaterial = (m: Material) => {
+    const h = hrefMaterial(m);
+    return h && ehDoc(m) ? `${h}?dupla=${duplaId}` : h;
+  };
+  const materialHref = material ? hrefDoMaterial(material) : null;
   // a chamada é a ação nº1 na janela do encontro (15 min antes a 2h depois do
   // início) — vira CTA primário; fora da janela fica chip de apoio comum
   const msAteInicio = encontro?.data_hora
@@ -376,8 +384,9 @@ export function EncontroRow({
                 {materialHref && materiaisComDestino.length <= 1 && (
                   <a
                     href={materialHref}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    {...(ehDoc(material!)
+                      ? {}
+                      : { target: "_blank", rel: "noopener noreferrer" })}
                     className={buttonVariants({ variant: "outline", size: "sm" })}
                   >
                     <BookOpen />
@@ -396,13 +405,14 @@ export function EncontroRow({
                       <PopoverTitle className="px-2 pb-1 pt-1 text-sm font-semibold">
                         Material de apoio
                       </PopoverTitle>
-                      <ul>
+                      <ul className="max-h-80 overflow-y-auto">
                         {materiaisComDestino.map((m) => (
                           <li key={m.id}>
                             <a
-                              href={hrefMaterial(m)!}
-                              target="_blank"
-                              rel="noopener noreferrer"
+                              href={hrefDoMaterial(m)!}
+                              {...(ehDoc(m)
+                                ? {}
+                                : { target: "_blank", rel: "noopener noreferrer" })}
                               className="flex min-h-11 items-center gap-2 rounded-md px-2 text-sm transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-9"
                             >
                               <BookOpen aria-hidden size={15} className="shrink-0 text-muted-foreground" />

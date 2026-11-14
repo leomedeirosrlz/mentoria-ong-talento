@@ -44,11 +44,13 @@
 //     "Os 16 encontros") — não expandir com condução inventada.
 
 import {
+  INSTRUMENTOS_DUPLA_SISTEMA,
   INSTRUMENTOS_SISTEMA,
   type InstrumentoDuplaSistema,
   type InstrumentoSistema,
 } from "./forms/schema";
 import { ESTACOES, SISTEMA_DA_ESTACAO, type EstacaoChave } from "./jornada";
+import type { Audiencia } from "./materiais";
 
 /** Entrada de guia por instrumento — `chip` alimenta o badge da janela,
  *  `conduzir` o <details> do mentor e `cobre` a leitura da coordenação. */
@@ -308,6 +310,74 @@ export function instrumentoDoEncontro(
     ...daJanela(encontroNum),
   ]);
   return INSTRUMENTOS_SISTEMA.filter((s) => uniao.has(s));
+}
+
+// ---------- documento nativo ↔ instrumento de sistema (REALIZA-386) ----------
+
+/** O documento nativo (corpus docs/rag — material "doc:<slug>") que
+ *  acompanha cada instrumento de sistema da dupla: a ponte catálogo ↔
+ *  instrumento ao vivo nos dois sentidos — a linha da ficha ganha "Ler o
+ *  guia" e o documento ganha "Abrir instrumento". `titulo` repete o do
+ *  frontmatter de propósito: a linha de material sintetizada a partir
+ *  daqui mostra o mesmo nome que o leitor encontra ao abrir o doc. */
+export type DocApoio = {
+  slug: string;
+  titulo: string;
+  /** papéis do doc no catálogo (espelha o frontmatter do corpus) — a linha
+   *  de material sintetizada herda (coord vê tudo). */
+  audiencias: readonly Audiencia[];
+  /** tipo da linha sintetizada — "template" espelha a convenção do
+   *  catálogo pros docs de instrumento ("Instrumento: X" são modelos). */
+  tipo: "conteudo" | "template";
+};
+
+export const DOC_DO_SISTEMA: Record<InstrumentoDuplaSistema, DocApoio> = {
+  visao: {
+    slug: "instrumento-construindo-visao",
+    titulo: "Construindo a sua Visão",
+    audiencias: ["mentor_dpp", "supervisor", "mentorado"],
+    tipo: "template",
+  },
+  metas: {
+    slug: "instrumento-definindo-minhas-metas",
+    titulo: "Definindo Minhas Metas",
+    audiencias: ["mentor_dpp", "supervisor", "mentorado"],
+    tipo: "template",
+  },
+  pdm: {
+    slug: "instrumento-pdm",
+    titulo: "PDM: Plano de Desenvolvimento do Mentorado",
+    audiencias: ["mentor_dpp", "supervisor", "mentorado"],
+    tipo: "template",
+  },
+  roda_vida: {
+    slug: "instrumento-roda-da-vida",
+    titulo: "Roda da Vida (instrumento)",
+    audiencias: ["mentor_dpp", "supervisor", "mentorado"],
+    tipo: "template",
+  },
+  // o checklist é do mentor, não da entrega do jovem — segue de staff
+  competencias_mentor: {
+    slug: "checklist-competencias",
+    titulo: "Checklist de competências do mentor",
+    audiencias: ["mentor_dpp", "coordenacao", "supervisor"],
+    tipo: "template",
+  },
+};
+
+/** Slug `doc:` do guia de um instrumento de sistema — destino do "Ler o
+ *  guia" na ficha, na régua de /materiais e na jornada do jovem. */
+export function docDoSistema(sistema: InstrumentoDuplaSistema): string {
+  return DOC_DO_SISTEMA[sistema].slug;
+}
+
+/** O instrumento de sistema que um documento nativo acompanha — null pra
+ *  roteiro, guia, template e técnica (esses não têm instrumento ao vivo). */
+export function sistemaDoDoc(slug: string): InstrumentoDuplaSistema | null {
+  for (const s of INSTRUMENTOS_DUPLA_SISTEMA) {
+    if (DOC_DO_SISTEMA[s].slug === slug) return s;
+  }
+  return null;
 }
 
 /** Como conduzir (voz do mentor) do instrumento — null nunca: as 4

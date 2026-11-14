@@ -42,10 +42,24 @@ export async function generateMetadata({
 
 export default async function DocumentoPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ slug: string }>;
+  searchParams: Promise<{ dupla?: string }>;
 }) {
-  const { slug } = await params;
+  const [{ slug }, { dupla: duplaParam }] = await Promise.all([
+    params,
+    searchParams,
+  ]);
+  // ?dupla=<id> vem dos links da ficha — o "Abrir instrumento" volta pra
+  // ela; sem contexto (biblioteca, catálogo) aponta a régua de /materiais
+  const duplaId =
+    duplaParam &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
+      duplaParam
+    )
+      ? duplaParam
+      : null;
   const corpus = await carregarDocCorpus(slug);
   if (corpus) {
     // getMe é React.cache — o layout já a chamou neste request (cache hit)
@@ -54,6 +68,19 @@ export default async function DocumentoPage({
       <CorpusDocumento
         doc={corpus}
         voltar={{ href: "/materiais?aba=biblioteca", rotulo: "Materiais de apoio" }}
+        ponte={
+          duplaId
+            ? {
+                href: `/duplas/${duplaId}?aba=instrumentos#instrumentos`,
+                rotulo: "Abrir instrumento",
+                dica: "Este guia acompanha o instrumento ao vivo, emitido e acompanhado na ficha da dupla.",
+              }
+            : {
+                href: "/materiais?aba=instrumentos",
+                rotulo: "Ver instrumentos",
+                dica: "Instrumento oficial do programa. O mentor emite o link na ficha da dupla e o resultado volta estruturado.",
+              }
+        }
       />
     );
   }
