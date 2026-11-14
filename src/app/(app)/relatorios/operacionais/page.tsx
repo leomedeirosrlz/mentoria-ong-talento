@@ -1,10 +1,17 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { getCronogramas, getMe } from "@/lib/queries";
+import {
+  getCicloEventos,
+  getCronogramas,
+  getDuplas,
+  getMe,
+} from "@/lib/queries";
+import { getUltimasInteracoes } from "@/lib/interacoes";
+import { getEncerramentos } from "@/lib/queries-encerramento";
 import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "@/lib/demo/mode";
 import { getDemoData } from "@/lib/demo/data";
-import { demoEncerramentos } from "@/lib/demo/encerramento-data";
 import { PageHeader } from "@/components/page-header";
 import { VoltarLink } from "@/components/voltar-link";
 import { GraficoTempo } from "@/components/viz/grafico-tempo";
@@ -13,16 +20,13 @@ import { formatDate } from "@/lib/ciclo";
 import {
   dataHora,
   dia,
+  filtraPorRecorte,
   recorteDeParams,
   type RecorteCsv,
 } from "@/lib/relatorios/csv-core";
 import {
-  dadosAderencia,
-  dadosAderenciaDemo,
   dadosAssinaturasPendentes,
   dadosAssinaturasPendentesDemo,
-  dadosEncerramento,
-  dadosEncerramentoDemo,
   dadosFormsTaxa,
   dadosFormsTaxaDemo,
   dadosInteracoes,
@@ -32,8 +36,16 @@ import {
   dadosTendenciaSaude,
   type DiaSaude,
 } from "@/lib/relatorios/dados";
+import {
+  linhasEncerramentoDosPares,
+  paresEncerramento,
+  resumoAderencia,
+  resumoEncerramento,
+} from "@/lib/relatorios/operacional";
 import { RelatoriosAbas, type AbaRelatorios } from "./relatorios-abas";
 import { RelatorioSecao } from "./relatorio-secao";
+import { SecaoAderencia } from "./secao-aderencia";
+import { SecaoEncerramento } from "./secao-encerramento";
 import { RecorteTurma } from "./recorte-turma";
 import { DigestBotao } from "./digest-botao";
 
@@ -50,11 +62,6 @@ const ABAS: { id: AbaRelatorios; rotulo: string }[] = [
 ];
 
 const PREVIA = 8;
-
-/** Converte uma linha tipada do export nas células de prévia (mesma ordem
- *  que o CSV — quem vê a tabela reconhece o arquivo que baixa). */
-const cell = (v: string | number | null | undefined) =>
-  v == null || v === "" ? "—" : String(v);
 
 export default async function RelatoriosOperacionaisPage({
   searchParams,
@@ -148,6 +155,12 @@ export default async function RelatoriosOperacionaisPage({
   const csvHref = (tipo: string) =>
     `/api/export?tipo=${tipo}${extraParams ? `&${extraParams}` : ""}`;
 
+  // pra ação Lembrar das filas acionáveis (REALIZA-389): quem assina o
+  // texto e o proto+host do deploy do link que vai dentro dele
+  const meuNome = (me.nome_social ?? me.nome).split(" ")[0];
+  const hdrs = await headers();
+  const origem = `${hdrs.get("x-forwarded-proto") ?? "https"}://${hdrs.get("host")}`;
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -168,6 +181,8 @@ export default async function RelatoriosOperacionaisPage({
           supabase,
           recorte,
           csvHref,
+          meuNome,
+          origem,
         })}
       </RelatoriosAbas>
     </div>
@@ -185,12 +200,16 @@ async function renderAba({
   supabase,
   recorte,
   csvHref,
+  meuNome,
+  origem,
 }: {
   aba: AbaRelatorios;
   demo: boolean;
   supabase: Awaited<ReturnType<typeof createClient>> | null;
   recorte: RecorteCsv;
   csvHref: (tipo: string) => string;
+  meuNome: string;
+  origem: string;
 }) {
   const d = demo ? getDemoData() : null;
 
@@ -203,35 +222,28 @@ async function renderAba({
     }
 
     case "aderencia": {
-      const linhas = d
-        ? dadosAderenciaDemo(d, recorte)
-        : await dadosAderencia(supabase!, recorte);
+      // a seção acionável (REALIZA-389): resumo + fila; a prévia do export
+      // sai das linhas que o próprio resumo já derivou — paridade literal
+      const [duplas, eventos, crons] = await Promise.all([
+        getDuplas(),
+        getCicloEventos(),
+        getCronogramas(),
+      ]);
+      const recDuplas = filtraPorRecorte(duplas, recorte, crons);
+      const nudges = await getUltimasInteracoes(
+        recDuplas.map((x) => x.id),
+        "nudge"
+      );
       return (
-        <RelatorioSecao
-          titulo="Aderência ao ciclo"
-          descricao="Plano × fato por dupla: encontros esperados e realizados, atraso médio de registro e o semáforo vivo com os motivos."
-          colunas={[
-            "Mentorado",
-            "Mentor",
-            "Turma",
-            "Esperados",
-            "Realizados",
-            "Aderência",
-            "Semáforo",
-            "Motivos",
-          ]}
-          linhas={linhas.slice(0, PREVIA).map((l) => [
-            l.mentorado,
-            l.mentor,
-            cell(l.turma),
-            String(l.esperados),
-            String(l.realizados),
-            l.aderencia == null ? "—" : `${l.aderencia}%`,
-            l.semaforo,
-            l.motivos || "—",
-          ])}
-          total={linhas.length}
+        <SecaoAderencia
+          resumo={resumoAderencia(recDuplas, eventos, crons)}
           csvHref={csvHref("aderencia")}
+          eventos={eventos}
+          crons={crons}
+          nudges={nudges}
+          meuNome={meuNome}
+          origem={origem}
+          hoje={new Date()}
         />
       );
     }
@@ -322,33 +334,27 @@ async function renderAba({
     }
 
     case "encerramento": {
-      const linhas = d
-        ? dadosEncerramentoDemo(d, recorte, demoEncerramentos("coordenacao"))
-        : await dadosEncerramento(supabase!, recorte);
+      // a seção acionável (REALIZA-389): resumo + fila de ritos; a prévia
+      // do export deriva dos mesmos pares encerramento×dupla do recorte
+      const [duplas, eventos, crons, encerramentos] = await Promise.all([
+        getDuplas(),
+        getCicloEventos(),
+        getCronogramas(),
+        getEncerramentos(),
+      ]);
+      const pares = paresEncerramento(
+        encerramentos,
+        duplas,
+        recorte,
+        crons
+      );
       return (
-        <RelatorioSecao
-          titulo="Encerramentos"
-          descricao="Ritos de fechamento por dupla — tipo, checklist do rito e quem decidiu."
-          colunas={[
-            "Mentor",
-            "Mentorado",
-            "Tipo",
-            "Checklist",
-            "Decidido por",
-            "Resumo",
-            "Criado em",
-          ]}
-          linhas={linhas.slice(0, PREVIA).map((l) => [
-            l.mentor,
-            l.mentorado,
-            l.tipo,
-            l.checklist,
-            l.decidido_por || "—",
-            l.resumo_jornada,
-            dataHora(l.created_at) || "—",
-          ])}
-          total={linhas.length}
+        <SecaoEncerramento
+          resumo={resumoEncerramento(pares)}
+          linhas={linhasEncerramentoDosPares(pares)}
           csvHref={csvHref("encerramento")}
+          eventos={eventos}
+          crons={crons}
         />
       );
     }
