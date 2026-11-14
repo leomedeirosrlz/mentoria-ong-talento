@@ -58,6 +58,7 @@ import {
 } from "@/lib/ciclo";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
 import type { RecorteFatia } from "@/lib/agenda-coordenacao";
+import { rotaDupla, rotaDuplas, rotaPessoa } from "@/lib/ia/rotas";
 import {
   situacaoDaDupla,
   SITUACAO_DUPLA_LABEL,
@@ -328,9 +329,11 @@ function rotas(jovem: boolean) {
         agenda: "/jovem/agenda",
       }
     : {
-        ficha: (id: string) => `/duplas/${id}`,
-        encontros: (id: string) => `/duplas/${id}?aba=encontros`,
-        instrumentos: (id: string) => `/duplas/${id}?aba=instrumentos`,
+        // os builders de ia/rotas centralizam o vocabulário de params —
+        // link com filtro errado abria a tela sem aplicar (REALIZA-396)
+        ficha: (id: string) => rotaDupla(id),
+        encontros: (id: string) => rotaDupla(id, "encontros"),
+        instrumentos: (id: string) => rotaDupla(id, "instrumentos"),
         chamados: "/chamados",
         agenda: "/agenda",
       };
@@ -392,7 +395,7 @@ export function CardSaude({ b }: { b: UiSaude }) {
       titulo="Situação das duplas"
       meta={
         <Link
-          href="/duplas?recorte=andamento"
+          href={rotaDuplas({ recorte: "andamento" })}
           className={cn("rounded-sm underline-offset-2 hover:underline", FOCO)}
         >
           <b className="font-semibold text-foreground">{c.em_andamento}</b> em
@@ -401,7 +404,7 @@ export function CardSaude({ b }: { b: UiSaude }) {
       }
       rodape={
         resto > 0 ? (
-          <Rodape href={`/duplas?recorte=${recorteAcao}`}>
+          <Rodape href={rotaDuplas({ recorte: recorteAcao })}>
             Ver todas as {b.pedem_acao} que pedem ação
           </Rodape>
         ) : (
@@ -424,8 +427,8 @@ export function CardSaude({ b }: { b: UiSaude }) {
         />
       )}
       <ul className="mt-2.5 flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
-        <Contagem n={c.risco} rotulo="em risco" dot="bg-[var(--danger)]" texto="text-[var(--danger-text)]" href="/duplas?recorte=risco" />
-        <Contagem n={c.atencao} rotulo="em atenção" dot="bg-[var(--warn)]" texto="text-[var(--warn-text)]" href="/duplas?recorte=atencao" />
+        <Contagem n={c.risco} rotulo="em risco" dot="bg-[var(--danger)]" texto="text-[var(--danger-text)]" href={rotaDuplas({ recorte: "risco" })} />
+        <Contagem n={c.atencao} rotulo="em atenção" dot="bg-[var(--warn)]" texto="text-[var(--warn-text)]" href={rotaDuplas({ recorte: "atencao" })} />
         <Contagem n={c.em_dia} rotulo="em dia" dot="bg-[var(--ok)]" texto="text-[var(--ok-text)]" />
         {c.pausadas > 0 && (
           <Contagem
@@ -433,7 +436,7 @@ export function CardSaude({ b }: { b: UiSaude }) {
             rotulo={c.pausadas === 1 ? "pausada" : "pausadas"}
             dot="bg-[var(--pausa)]"
             texto="text-muted-foreground"
-            href="/duplas?recorte=pausada"
+            href={rotaDuplas({ recorte: "pausada" })}
           />
         )}
         {c.concluidas > 0 && (
@@ -442,7 +445,7 @@ export function CardSaude({ b }: { b: UiSaude }) {
             rotulo={c.concluidas === 1 ? "concluída" : "concluídas"}
             dot="bg-muted-foreground"
             texto="text-foreground"
-            href="/duplas?recorte=concluida"
+            href={rotaDuplas({ recorte: "concluida" })}
           />
         )}
         {c.encerradas > 0 && (
@@ -451,14 +454,14 @@ export function CardSaude({ b }: { b: UiSaude }) {
             rotulo={c.encerradas === 1 ? "encerrada" : "encerradas"}
             dot="bg-muted-foreground/40"
             texto="text-muted-foreground"
-            href="/duplas?recorte=encerrada"
+            href={rotaDuplas({ recorte: "encerrada" })}
           />
         )}
         {c.apoio > 0 && (
           // apoio é sobreposição: pill à parte, não soma nem tira do risco
           <li>
             <Link
-              href="/duplas?recorte=apoio"
+              href={rotaDuplas({ recorte: "apoio" })}
               className={cn(
                 "inline-flex min-h-7 items-center gap-1 rounded-full border px-2 text-xs font-semibold transition-colors hover:brightness-95",
                 PILL.info,
@@ -533,7 +536,7 @@ function DestaqueLinha({ d, i }: { d: UiDuplaMini; i: number }) {
       className="animate-enter relative rounded-lg border border-border/70 p-2.5 transition-colors hover:bg-muted/50"
     >
       <Link
-        href={`/duplas/${d.id}`}
+        href={rotaDupla(d.id)}
         aria-label={`Ver ficha da dupla de ${primeiroNome(d.mentorado)}`}
         className={cn("absolute inset-0 z-10 rounded-lg", FOCO)}
       />
@@ -1027,7 +1030,7 @@ export function CardFila({ b }: { b: UiFila }) {
             return (
               <LinhaPessoa
                 key={m.id}
-                href={`/pessoas/${m.id}`}
+                href={rotaPessoa(m.id)}
                 nome={m.nome}
                 meta={ha && (ha === "desde hoje" ? "Entrou na fila hoje" : `Esperando ${ha}`)}
                 i={i + 1}
@@ -1045,7 +1048,7 @@ export function CardFila({ b }: { b: UiFila }) {
             return (
               <LinhaPessoa
                 key={m.id}
-                href={`/pessoas/${m.id}`}
+                href={rotaPessoa(m.id)}
                 nome={m.nome}
                 meta={[plural(m.vagas, "vaga livre", "vagas livres"), ha && `com vaga ${ha}`]
                   .filter(Boolean)
@@ -1085,7 +1088,7 @@ export function CardCapacidade({ b }: { b: UiCapacidade }) {
             <li key={m.id} style={passo(i + 1)} className="animate-enter">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
                 <Link
-                  href={`/pessoas/${m.id}`}
+                  href={rotaPessoa(m.id)}
                   className={cn("rounded-sm text-sm font-medium underline-offset-2 hover:underline", FOCO)}
                 >
                   {m.nome}
@@ -1150,7 +1153,7 @@ export function CardPessoas({ b }: { b: UiPessoas }) {
         {b.pessoas.map((p, i) => (
           <li key={p.id} style={passo(i + 1)} className="animate-enter">
             <Link
-              href={`/pessoas/${p.id}`}
+              href={rotaPessoa(p.id)}
               className={cn(
                 "-mx-1.5 flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-muted/60",
                 FOCO
