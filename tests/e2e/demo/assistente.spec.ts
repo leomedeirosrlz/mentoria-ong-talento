@@ -40,6 +40,49 @@ test("demo: bolha abre e chips respondem enlatado sem chamar a API", async ({
   expect(chamadasApi).toBe(0);
 });
 
+test("demo: CTA do template abre a bolha, escolhe a dupla e sai o rascunho", async ({
+  page,
+}) => {
+  // REALIZA-388: o documento segue verbatim; o botão "Pedir pra Liza
+  // personalizar" dispara o evento que a bolha escuta — mesma conversa
+  // local da demo (nada de API), escolha da dupla, rascunho editável
+  let chamadasApi = 0;
+  await page.route("**/api/ia/chat", (route) => {
+    chamadasApi++;
+    return route.abort();
+  });
+  await entrarNaDemo(page, "mentor_dpp");
+  await page.goto("/materiais/documento/mensagem-preparacao");
+
+  // o template continua com os colchetes do guia — nada interpolado na página
+  await expect(page.getByText(/\[Nome\], seja muito bem-vindo/)).toBeVisible();
+  // clique pré-hidratação é no-op silencioso (a página chega por stream e
+  // o handler liga depois) — repete até o painel abrir, mesmo padrão do
+  // pularOnboarding
+  const painel = page.locator("#painel-assistente");
+  await expect(async () => {
+    await page
+      .getByRole("button", { name: "Pedir pra Liza personalizar" })
+      .click();
+    await expect(painel).toBeVisible({ timeout: 1500 });
+  }).toPass();
+  // Ricardo tem mais de uma dupla: a escolha vem antes do texto pronto
+  await expect(
+    painel.getByText("Pra qual dupla eu monto a mensagem de preparação?")
+  ).toBeVisible();
+  await painel.getByRole("button", { name: /^Bia · / }).click();
+
+  // o rascunho sai com os dados de exemplo da dupla — editável + canais
+  await expect(painel.getByText(/Bia, seja muito bem-vindo/)).toBeVisible();
+  await expect(
+    painel.getByRole("button", { name: "Copiar mensagem" })
+  ).toBeVisible();
+  await expect(
+    painel.getByRole("link", { name: "Abrir no WhatsApp" })
+  ).toBeVisible();
+  expect(chamadasApi).toBe(0);
+});
+
 test("demo: aba de ajustes abre com config de exemplo e nada persiste", async ({
   page,
 }) => {

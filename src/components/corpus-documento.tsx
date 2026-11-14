@@ -50,6 +50,7 @@ import {
   LinkSecao,
   TOM_DOC,
 } from "./material-documento";
+import { PedirLizaPersonalizar } from "./pedir-liza-personalizar";
 
 // RAG corpus document (docs/rag/*.md) rendered natively — the PDF guide's
 // visual grammar: ink hero, keyword icons and the full-width lime rule on
@@ -476,9 +477,14 @@ export function CorpusDocBody({ doc }: { doc: CorpusDoc }) {
 export function CorpusDocumento({
   doc,
   voltar,
+  lizaPergunta,
 }: {
   doc: CorpusDoc;
   voltar: { href: string; rotulo: string };
+  /** quando setada (só a rota de staff, com a bolha ligada), mostra o CTA
+   *  "Pedir pra Liza personalizar" — os templates de mensagem chegam por
+   *  este renderer (docs/rag/mensagem-*.md, tipo: template) */
+  lizaPergunta?: string;
 }) {
   const meta = [
     // the frontmatter version carries parenthesized editorial notes
@@ -515,6 +521,12 @@ export function CorpusDocumento({
       />
 
       <CorpusDocBody doc={doc} />
+
+      {lizaPergunta ? (
+        <div className="mt-6">
+          <PedirLizaPersonalizar pergunta={lizaPergunta} />
+        </div>
+      ) : null}
 
       <footer className="mt-8 border-t border-border/60 pt-3 text-xs text-muted-foreground">
         Fonte: {doc.fonte}.

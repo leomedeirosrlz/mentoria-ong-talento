@@ -295,6 +295,7 @@ export const STATUS_TOOL: Record<string, string> = {
   chamados_resumo: "Lendo os chamados…",
   combinados_das_duplas: "Lendo os combinados…",
   pessoas_busca: "Procurando a pessoa…",
+  mensagem_template: "Pegando o template da mensagem…",
   instrumentos_da_dupla: "Abrindo os instrumentos…",
   minha_dupla: "Olhando sua dupla…",
   minha_agenda: "Abrindo sua agenda…",

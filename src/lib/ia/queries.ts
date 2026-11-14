@@ -573,6 +573,40 @@ export const getDuplasResumoIa = cache(
   }
 );
 
+/** Contatos da avaliação por terceiros de uma dupla — a tool
+ *  mensagem_template (REALIZA-388) personaliza o convite pras pessoas
+ *  indicadas e precisa do nome, vínculo, whatsapp e token do link de cada
+ *  uma. A resposta NUNCA entra no select (texto livre sobre o jovem fica
+ *  fora da allowlist, mesmo princípio dos registros). A RLS escopa: mentor
+ *  da dupla, supervisor e coordenação. */
+export type TerceiroIa = {
+  id: string;
+  nome: string;
+  vinculo: "amigo" | "familiar" | "colega" | "outro";
+  whatsapp: string | null;
+  token: string;
+  expira_em: string;
+  status: "pendente" | "respondido" | "expirado";
+  created_at: string;
+};
+
+export const getTerceirosIa = cache(
+  async (
+    supabase: SupabaseClient,
+    duplaId: string
+  ): Promise<TerceiroIa[]> => {
+    const { data, error } = await supabase
+      .from("terceiros_contatos")
+      .select(
+        "id, nome, vinculo, whatsapp, token, expira_em, status, created_at"
+      )
+      .eq("dupla_id", duplaId)
+      .order("created_at");
+    if (error) throw error;
+    return (data ?? []) as TerceiroIa[];
+  }
+);
+
 /** Encontros numa janela — visíveis pela RLS (mentor vê os das próprias
  *  duplas, supervisor as supervisionadas, coord tudo). O !inner na dupla
  *  filtra de novo pelo lado do embed: encontro de dupla invisível não

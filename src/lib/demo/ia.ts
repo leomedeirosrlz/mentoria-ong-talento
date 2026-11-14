@@ -90,6 +90,112 @@ export async function responderDemoIa(
   ) as unknown as DuplaIa[];
   const eventos = demoCicloEventos();
 
+  // templates do cap. 14 (REALIZA-388): mesmo desenho da rota real — sem
+  // a dupla nomeada no pedido a escolha vem primeiro; com ela, o rascunho
+  // sai com os dados demo da dupla (nomes e números de exemplo). O gatilho
+  // é o slug no pedido ("personalizar o template mensagem-…"): palavra
+  // solta tipo "encaminhamento" não basta
+  const slugDemo = /mensagem-preparacao|preparac|preparaç/.test(p)
+    ? "mensagem-preparacao"
+    : /mensagem-indicadas|indicad/.test(p)
+      ? "mensagem-indicadas"
+      : /mensagem-encaminhamento|encaminhamento/.test(p)
+        ? "mensagem-encaminhamento"
+        : null;
+  if (
+    role !== "mentorado" &&
+    slugDemo &&
+    /template|personaliz|modelo|pedido|pede/.test(p)
+  ) {
+    const pn = normaliza(pergunta);
+    const primeiro = (nome: string | null | undefined) =>
+      normaliza((nome ?? "").split(" ")[0]);
+    const marcada = duplas.find((x) => {
+      const n = primeiro(x.mentorado?.nome_social ?? x.mentorado?.nome);
+      return n.length > 1 && pn.includes(n);
+    });
+    const d = marcada ?? (duplas.length === 1 ? duplas[0] : null);
+    const rotuloTemplate =
+      slugDemo === "mensagem-preparacao"
+        ? "mensagem de preparação"
+        : slugDemo === "mensagem-indicadas"
+          ? "mensagem pras pessoas indicadas"
+          : "mensagem de encaminhamento";
+    if (!d) {
+      return {
+        content:
+          `Na demonstração a Liza perguntaria qual dupla antes de montar o texto, igual à rota real.\n\n` +
+          `\`\`\`escolha\n${JSON.stringify({
+            pergunta: `Pra qual dupla eu monto a ${rotuloTemplate}?`,
+            opcoes: duplas.slice(0, 5).map((x) => ({
+              rotulo: `${x.mentorado?.nome_social ?? x.mentorado?.nome ?? "dupla"} · ${x.mentor?.nome_social ?? x.mentor?.nome ?? "mentor"}`,
+              valor: `pedido: personaliza a ${rotuloTemplate} pra dupla d${
+                primeiro(x.mentorado?.nome_social ?? x.mentorado?.nome).endsWith("a")
+                  ? "a"
+                  : "o"
+              } ${primeiro(x.mentorado?.nome_social ?? x.mentorado?.nome)}`,
+            })),
+          })}\n\`\`\`${sugestoes(["Como está minha dupla?", "Resumo da semana"])}`,
+        ui: [],
+      };
+    }
+    const jovem = d.mentorado?.nome_social ?? d.mentorado?.nome ?? "jovem";
+    const jovemPrimeiro = jovem.split(" ")[0];
+    const mentor = d.mentor?.nome_social ?? d.mentor?.nome ?? "seu mentor";
+    const numero = d.mentorado?.whatsapp ?? null;
+    const proximo = d.encontros
+      .filter(
+        (e) =>
+          (e.status === "agendado" || e.status === "remarcado") &&
+          e.data_hora &&
+          e.data_hora > new Date().toISOString()
+      )
+      .sort((a, b) => String(a.data_hora).localeCompare(String(b.data_hora)))[0];
+    const fmtDiaHora = (iso: string | null | undefined) =>
+      iso
+        ? new Intl.DateTimeFormat("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: "America/Sao_Paulo",
+          }).format(new Date(iso))
+        : null;
+    const fmtDia = (iso: string | null | undefined) =>
+      iso
+        ? new Intl.DateTimeFormat("pt-BR", {
+            day: "2-digit",
+            month: "2-digit",
+            timeZone: "America/Sao_Paulo",
+          }).format(new Date(iso))
+        : null;
+    // a ficha demo veio como DuplaIa (projeção mínima da IA) — os
+    // encaminhamentos completos ficam no Dupla original do dataset
+    const pendente = ((d as unknown as Dupla).encaminhamentos ?? []).find(
+      (e) => e.status === "pendente"
+    );
+    const texto =
+      slugDemo === "mensagem-preparacao"
+        ? `${jovemPrimeiro}, seja muito bem-vindo(a) à mentoria!\n\nMuito prazer, meu nome é ${mentor} e vou ser seu(sua) mentor(a) ao longo do ciclo, com 16 encontros. Estou animado com essa jornada.\n\nPara o nosso primeiro encontro, preciso de três coisas:\n\n1. Os nomes e contatos de pelo menos três amigos e três familiares (e três colegas de trabalho, se você estiver trabalhando). Vou enviar a cada uma um link pra responder duas perguntas rápidas sobre você. Avise essas pessoas de que o link vai chegar.\n2. Um resumo da sua história de vida, pessoal e profissional, em ordem cronológica. Não precisa me enviar: guarde pra conversarmos no encontro.\n3. A sua Roda da Vida respondida na plataforma.\n\nFaça as tarefas com calma. Tudo o que você compartilhar comigo é confidencial. Qualquer dúvida, é só me chamar. Até logo!`
+        : slugDemo === "mensagem-indicadas"
+          ? `Prezada Maria,\n\nMeu nome é ${mentor}. ${jovemPrimeiro} está participando do Programa de Mentoria Social do Instituto Realiza.vc e eu sou o(a) mentor(a) que vai acompanhá-lo(a) nessa jornada.\n\nPara ajudar nesse trabalho, peço a sua colaboração respondendo a duas perguntas rápidas pelo link: https://realiza.vc/t/exemplo. Se puder, até a próxima semana.\n\nO seu nome foi indicado pelo(a) próprio(a) ${jovemPrimeiro}. Não há obrigação de responder, mas a sua contribuição ajuda muito. As respostas serão lidas apenas por mim e, ao comentá-las, não indicarei quem disse o quê.\n\n1. O que você considera pontos fortes d${jovemPrimeiro.endsWith("a") ? "a" : "o"} ${jovemPrimeiro}, na vida pessoal e profissional?\n2. Em quais aspectos ele(a) precisaria melhorar pra obter mais resultados?`
+          : `${jovemPrimeiro},\n\nGostei muito da nossa conversa. A sua abertura vai fazer diferença no nosso trabalho.\n\nSempre que a conversa gerar alguma reflexão, anote e traga no próximo encontro. Se for algo urgente, me chame antes.\n\nPróxima tarefa: ${pendente?.descricao ?? "revisar os combinados do último encontro"}. Prazo: ${fmtDia(pendente?.prazo) ?? "até o próximo encontro"}.\n\nNosso próximo encontro: ${fmtDiaHora(proximo?.data_hora) ?? "a combinar"}, já agendado na plataforma.\n\nAbraço!`;
+    return {
+      content:
+        `Na demonstração os dados são de exemplo: no ambiente real a Liza puxa nomes, contatos${slugDemo === "mensagem-indicadas" ? " e os links de cada indicada" : ", tarefas e agenda"} da própria plataforma.\n\n` +
+        `\`\`\`rascunho\n${JSON.stringify({
+          canal: "whatsapp",
+          para:
+            slugDemo === "mensagem-indicadas"
+              ? `Maria (pessoa indicada d${jovemPrimeiro.endsWith("a") ? "a" : "o"} ${jovemPrimeiro}, exemplo)`
+              : `${jovem} (mentorado)`,
+          ...(numero && slugDemo !== "mensagem-indicadas" ? { numero } : {}),
+          texto,
+        })}\n\`\`\`${sugestoes(["Como está minha dupla?", "Próximos encontros"])}`,
+      ui: [],
+    };
+  }
+
   // o rascunho é fala de staff pra dupla ("Oi, pessoal!") — pro mentorado
   // cai no bloco próprio abaixo em vez de um texto sem sentido pra ele
   if (role !== "mentorado" && /mensagem|lembrete|escrev|rascunho|convite/.test(p)) {

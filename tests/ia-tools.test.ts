@@ -205,6 +205,7 @@ describe("registry", () => {
         "jovem_marcar_nao_aconteceu",
         "jovem_pedir_especialista",
         "marcar_situacao_mentorado",
+        "mensagem_template",
         "meu_progresso",
         "meus_combinados",
         "meus_pedidos",

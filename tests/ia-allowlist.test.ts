@@ -36,6 +36,7 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   aguardando_par: {},
   capacidade_mentores: {},
   duplas_do_usuario: {},
+  mensagem_template: { slug: "mensagem-preparacao" },
   agenda_do_periodo: {},
   historico_encontros: {},
   guia_consulta: { pergunta: "como funciona o encontro?" },
