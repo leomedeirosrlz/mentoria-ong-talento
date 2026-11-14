@@ -566,7 +566,10 @@ export type Dupla = {
 };
 
 /** Versão enxuta de Dupla — só os ids de vínculo + turma (a filiação da
- *  pessoa à turma deriva daqui, REALIZA-39), sem a árvore de encontros. */
+ *  pessoa à turma deriva daqui, REALIZA-39), sem a árvore de encontros.
+ *  Os carimbos de fechamento vêm só no resumo "todas" (fila de espera
+ *  deriva a disponibilidade deles, REALIZA-393); o resumo das vivas não
+ *  os seleciona — por isso opcionais. */
 export type DuplaResumo = {
   id: string;
   mentor_id: string;
@@ -577,6 +580,12 @@ export type DuplaResumo = {
    *  turmaDaDupla(cronograma_id, cronogramas) (REALIZA-223) */
   turma: string | null;
   cronograma_id: string | null;
+  status?: string;
+  created_at?: string;
+  encerrada_em?: string | null;
+  concluida_em?: string | null;
+  desfecho_em?: string | null;
+  remanejada_de?: string | null;
 };
 
 export type Material = {

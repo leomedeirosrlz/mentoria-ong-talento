@@ -23,6 +23,7 @@ import {
   getDuplaVinculo,
   getDuplasResumo,
   getDuplasResumoTodas,
+  getEncerramentosResumo,
   getEspecialistaEventos,
   getMateriais,
   getMe,
@@ -122,7 +123,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { temPapel } from "@/lib/types";
 import type { Dupla, Encontro, Material } from "@/lib/types";
-import { filaMentorados } from "@/lib/fila";
+import { disponivelDesdePorId, filaMentorados } from "@/lib/fila";
 import {
   ladoDeMentor,
   ladoDeMentorado,
@@ -143,13 +144,15 @@ import { acaoWhatsAppDupla } from "@/lib/acao-lembrete";
  *  "Aguardando par" pura ranqueada por afinidade com o mentor. As queries
  *  são as do board /pessoas — React.cache reusa o que a página já buscou. */
 async function montarSugestaoRemanejo(dupla: Dupla) {
-  const [pessoas, mentorados, mps, resumo, resumoTodas] = await Promise.all([
-    getPessoas(),
-    getMentorados(),
-    getMentorProfiles(),
-    getDuplasResumo(),
-    getDuplasResumoTodas(),
-  ]);
+  const [pessoas, mentorados, mps, resumo, resumoTodas, encerramentos] =
+    await Promise.all([
+      getPessoas(),
+      getMentorados(),
+      getMentorProfiles(),
+      getDuplasResumo(),
+      getDuplasResumoTodas(),
+      getEncerramentosResumo(),
+    ]);
   const mpMap: Record<string, MentorProfile> = Object.fromEntries(
     mps.map((mp) => [mp.profile_id, mp])
   );
@@ -163,7 +166,12 @@ async function montarSugestaoRemanejo(dupla: Dupla) {
     ocupados.add(d.mentorado_id);
   }
   const historico = new Set(resumoTodas.map((d) => d.mentorado_id));
-  const fila = filaMentorados(mentorados, ocupados, historico);
+  const fila = filaMentorados(
+    mentorados,
+    ocupados,
+    historico,
+    disponivelDesdePorId(resumoTodas, encerramentos)
+  );
   const papel =
     dupla.trilha === "especialista" ? "mentor_especialista" : "mentor_dpp";
   // os lados que ficam vêm do cadastro completo — o embed da dupla não

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   carimboFormBruto,
+  disponivelDesdePorId,
   esperaDesde,
   filaMentorados,
   filaMentores,
@@ -82,6 +83,148 @@ describe("esperaDesde", () => {
     expect(
       esperaDesde({ consent_lgpd_em: null, created_at: "não-data" })
     ).toBeNull();
+  });
+
+  it("disponivelDesde mais recente que a entrada vence — espera ATUAL (REALIZA-393)", () => {
+    // entrou no programa em setembro, saiu de uma dupla em outubro: o
+    // "há N dias" mede da saída, não da entrada
+    expect(
+      esperaDesde(
+        { created_at: "2026-09-01T10:00:00-03:00" },
+        "2026-10-10T15:00:00-03:00"
+      )
+    ).toBe("2026-10-10T18:00:00.000Z");
+  });
+
+  it("disponivelDesde mais antigo que a entrada não anda pra trás", () => {
+    // carimbo de fechamento torto/anterior ao cadastro não deve rebaixar
+    // a espera abaixo da entrada original
+    expect(
+      esperaDesde(
+        { created_at: "2026-10-10T10:00:00-03:00" },
+        "2026-09-01T10:00:00-03:00"
+      )
+    ).toBe("2026-10-10T13:00:00.000Z");
+    expect(
+      esperaDesde({ created_at: "2026-10-10T10:00:00-03:00" }, "lixo")
+    ).toBe("2026-10-10T13:00:00.000Z");
+  });
+
+  it("disponivelDesde sozinho já dá carimbo quando nenhum outro existe", () => {
+    expect(esperaDesde({}, "2026-10-10T15:00:00-03:00")).toBe(
+      "2026-10-10T18:00:00.000Z"
+    );
+  });
+});
+
+describe("disponivelDesdePorId", () => {
+  it("marca os dois lados da dupla fechada pelo carimbo mais confiável", () => {
+    // concluida_em (trigger) > rito > desfecho_em — desfecho_em só sobra
+    // quando nada mais existe (edição tardia não move a espera)
+    const mapa = disponivelDesdePorId([
+      {
+        id: "d1",
+        mentor_id: "p-ana",
+        mentorado_id: "m-joao",
+        status: "concluida",
+        concluida_em: "2026-10-01T10:00:00-03:00",
+        desfecho_em: "2026-10-05T10:00:00-03:00",
+      },
+      {
+        id: "d2",
+        mentor_id: "p-bia",
+        mentorado_id: "m-ju",
+        status: "encerrada",
+        desfecho_em: "2026-10-08T10:00:00-03:00",
+      },
+    ]);
+    expect(mapa["p-ana"]).toBe("2026-10-01T13:00:00.000Z");
+    expect(mapa["m-joao"]).toBe("2026-10-01T13:00:00.000Z");
+    expect(mapa["p-bia"]).toBe("2026-10-08T13:00:00.000Z");
+  });
+
+  it("sucessora criada no rematch carimba o fechamento da anterior", () => {
+    // o rematch DPP não grava encerrada_em — a sucessora (remanejada_de)
+    // nasce no mesmo instante do fechamento
+    const mapa = disponivelDesdePorId([
+      {
+        id: "d-velha",
+        mentor_id: "p-ana",
+        mentorado_id: "m-joao",
+        status: "encerrada",
+      },
+      {
+        id: "d-nova",
+        mentor_id: "p-ana",
+        mentorado_id: "m-outro",
+        status: "ativa",
+        created_at: "2026-10-09T10:00:00-03:00",
+        remanejada_de: "d-velha",
+      },
+    ]);
+    expect(mapa["m-joao"]).toBe("2026-10-09T13:00:00.000Z");
+    // o mentor seguiu na sucessora — não ficou disponível nesse instante;
+    // mas o fechamento ainda marca a última transição dele (o max depois
+    // compara com a entrada; quem segue ativo nem entra na fila)
+    expect(mapa["p-ana"]).toBe("2026-10-09T13:00:00.000Z");
+  });
+
+  it("rito de encerramento carimba quando a dupla não tem data própria", () => {
+    const mapa = disponivelDesdePorId(
+      [
+        {
+          id: "d1",
+          mentor_id: "p-ana",
+          mentorado_id: "m-joao",
+          status: "encerrada",
+        },
+      ],
+      [{ dupla_id: "d1", created_at: "2026-10-07T20:00:00-03:00" }]
+    );
+    expect(mapa["m-joao"]).toBe("2026-10-07T23:00:00.000Z");
+  });
+
+  it("última dupla vence — a disponibilidade é o fechamento mais recente", () => {
+    const mapa = disponivelDesdePorId([
+      {
+        id: "d1",
+        mentor_id: "p-ana",
+        mentorado_id: "m-joao",
+        status: "concluida",
+        concluida_em: "2026-08-01T10:00:00-03:00",
+      },
+      {
+        id: "d2",
+        mentor_id: "p-bia",
+        mentorado_id: "m-joao",
+        status: "encerrada",
+        desfecho_em: "2026-10-02T10:00:00-03:00",
+      },
+    ]);
+    expect(mapa["m-joao"]).toBe("2026-10-02T13:00:00.000Z");
+  });
+
+  it("ignora trilha especialista e duplas ainda vivas", () => {
+    const mapa = disponivelDesdePorId([
+      {
+        id: "d-esp",
+        mentor_id: "p-esp",
+        mentorado_id: "m-joao",
+        trilha: "especialista",
+        status: "encerrada",
+        encerrada_em: "2026-10-01T10:00:00-03:00",
+      },
+      {
+        id: "d-ativa",
+        mentor_id: "p-ana",
+        mentorado_id: "m-ju",
+        status: "ativa",
+        created_at: "2026-10-05T10:00:00-03:00",
+      },
+    ]);
+    expect(mapa["p-esp"]).toBeUndefined();
+    expect(mapa["m-joao"]).toBeUndefined();
+    expect(mapa["p-ana"]).toBeUndefined();
   });
 });
 

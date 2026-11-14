@@ -4,6 +4,7 @@ import {
   getCronogramas,
   getDuplasResumo,
   getDuplasResumoTodas,
+  getEncerramentosResumo,
   getMapaAcesso,
   getMe,
   getMentorados,
@@ -13,6 +14,7 @@ import {
   getTurmaInscricoesPessoas,
   type MentorProfile,
 } from "@/lib/queries";
+import { disponivelDesdePorId } from "@/lib/fila";
 import { getAssinaturasResumo } from "@/lib/queries-assinaturas";
 import { faltantesDocumento } from "@/lib/documentos/texto";
 import { foraDoPrograma } from "@/lib/ciclo";
@@ -55,6 +57,7 @@ export default async function PessoasPage() {
     papeisEscopo,
     acesso,
     cronogramas,
+    encerramentosResumo,
   ] = await Promise.all([
     getPessoas(),
     getMentorados(),
@@ -66,7 +69,13 @@ export default async function PessoasPage() {
     souCoord ? getPapeisEscopo() : Promise.resolve([]),
     souCoord ? getMapaAcesso() : Promise.resolve({}),
     souCoord ? getCronogramas() : Promise.resolve([]),
+    souCoord ? getEncerramentosResumo() : Promise.resolve([]),
   ]);
+
+  // "voltou a ficar disponível" por pessoa — o "há N dias" da fila mede a
+  // espera ATUAL: quem sai de uma dupla recomeça a contar da saída, não da
+  // entrada original no programa (REALIZA-393)
+  const disponivelDesde = disponivelDesdePorId(todasDuplas, encerramentosResumo);
 
   // filiação por turma (REALIZA-39): duplas.turma é selo — o rótulo vivo
   // resolve pelo cronograma (renomear a turma não fatia o grupo em duas)
@@ -226,6 +235,7 @@ export default async function PessoasPage() {
         duplaVivaPorMentorado={duplaVivaPorMentorado}
         mentorProfiles={mentorProfiles}
         contagemPorMentor={contagemPorMentor}
+        disponivelDesde={disponivelDesde}
         assinaturas={docsPorPessoa}
         faltantes={faltantesPorPessoa}
         mapasTurma={mapasTurma}

@@ -67,12 +67,20 @@ export function carimboFormBruto(
  *  (sem form) — e, sendo a primeira presença da pessoa no sistema, também
  *  vale pro pré-cadastro feito antes do consentimento. Por isso o mínimo
  *  dos três: quem chegou pelo formulário conta desde o envio, não desde a
- *  importação da planilha. */
-export function esperaDesde(p: {
-  consent_lgpd_em?: string | null;
-  created_at?: string | null;
-  form_bruto?: Record<string, unknown> | null;
-}): string | null {
+ *  importação da planilha.
+ *
+ *  `disponivelDesde` é o carimbo da última vez que a pessoa voltou a ficar
+ *  disponível (ver disponivelDesdePorId) — a espera ATUAL de quem sai de
+ *  uma dupla começa na saída, não na entrada original no programa: sem o
+ *  max() o "há N dias" contava o programa inteiro pra quem re-pareia. */
+export function esperaDesde(
+  p: {
+    consent_lgpd_em?: string | null;
+    created_at?: string | null;
+    form_bruto?: Record<string, unknown> | null;
+  },
+  disponivelDesde?: string | null
+): string | null {
   let melhor: number | null = null;
   for (const f of [
     p.consent_lgpd_em,
@@ -84,7 +92,86 @@ export function esperaDesde(p: {
     if (Number.isNaN(t)) continue;
     if (melhor === null || t < melhor) melhor = t;
   }
+  const disp = disponivelDesde ? Date.parse(disponivelDesde) : NaN;
+  if (!Number.isNaN(disp) && (melhor === null || disp > melhor)) melhor = disp;
   return melhor === null ? null : new Date(melhor).toISOString();
+}
+
+/** Subset de duplas que a derivação de disponibilidade lê — o resumo que
+ *  getDuplasResumoTodas busca. `created_at`/`remanejada_de` cobrem o
+ *  fechamento sem carimbo próprio (o rematch não grava encerrada_em em
+ *  DPP: a sucessora nasce no mesmo instante em que a anterior fecha). */
+export type DuplaFecho = {
+  id: string;
+  mentor_id: string;
+  mentorado_id: string;
+  status?: string | null;
+  trilha?: string | null;
+  created_at?: string | null;
+  encerrada_em?: string | null;
+  concluida_em?: string | null;
+  desfecho_em?: string | null;
+  remanejada_de?: string | null;
+};
+
+const parseMs = (v: string | null | undefined): number | null => {
+  if (!v) return null;
+  const t = Date.parse(v);
+  return Number.isNaN(t) ? null : t;
+};
+
+/** id de pessoa (profile OU mentorado) → ISO da disponibilidade mais
+ *  recente: quando a última dupla DPP dela fechou. A fila é DPP — a
+ *  trilha de especialista nunca ocupou vaga nela, então o fechamento de
+ *  uma esp não recomeça a espera DPP.
+ *
+ *  Carimbo do fechamento, na ordem de confiança:
+ *   - os carimbos "do fato" — concluida_em (trigger do status),
+ *     encerrada_em (fechamento de trilha esp / rematch esp), a sucessora
+ *     criada no rematch (remanejada_de: a fechada por remanejo não grava
+ *     carimbo próprio, mas a nova dupla nasce na mesma transação) e o
+ *     rito (encerramentos.created_at — a row nasce na decisão ou, quando
+ *     'pendente' já existia, no último encontro: o fim de fato da jornada;
+ *     o insert antecipado por autoavaliação morreu em 0128)
+ *   - desfecho_em só quando nenhum existe: é o carimbo do REGISTRO, que
+ *     uma edição tardia do desfecho sobrescreve — usá-lo por cima dos
+ *     outros moveria a espera pra data do ajuste, não do fechamento.
+ *
+ *  Sem nenhum carimbo a pessoa não entra no mapa (a espera cai na entrada
+ *  original — comportamento anterior). */
+export function disponivelDesdePorId(
+  duplas: readonly DuplaFecho[],
+  encerramentos: readonly { dupla_id: string; created_at: string | null }[] = []
+): Record<string, string> {
+  const sucessoraDe = new Map(
+    duplas.flatMap((d) => (d.remanejada_de ? [[d.remanejada_de, d] as const] : []))
+  );
+  const ritoDe = new Map(encerramentos.map((e) => [e.dupla_id, e.created_at]));
+  const mapa: Record<string, number> = {};
+  const marca = (id: string, t: number | null) => {
+    if (t === null) return;
+    if (!(id in mapa) || t > mapa[id]) mapa[id] = t;
+  };
+  for (const d of duplas) {
+    if (d.trilha === "especialista") continue;
+    if (d.status !== "encerrada" && d.status !== "concluida") continue;
+    // carimbos do fato primeiro; desfecho_em (carimbo do registro) só sobra
+    const exato = [
+      parseMs(d.concluida_em),
+      parseMs(d.encerrada_em),
+      parseMs(sucessoraDe.get(d.id)?.created_at),
+      parseMs(ritoDe.get(d.id)),
+    ].reduce<number | null>(
+      (m, t) => (t !== null && (m === null || t > m) ? t : m),
+      null
+    );
+    const fecho = exato ?? parseMs(d.desfecho_em);
+    marca(d.mentor_id, fecho);
+    marca(d.mentorado_id, fecho);
+  }
+  return Object.fromEntries(
+    Object.entries(mapa).map(([id, t]) => [id, new Date(t).toISOString()])
+  );
 }
 
 /** "há N dias" da espera — granularidade de dia (a fila não mede em horas
@@ -116,7 +203,8 @@ const porEspera = (a: FilaItem, b: FilaItem) =>
 export function filaMentorados(
   mentorados: Mentorado[],
   ocupados: ReadonlySet<string>,
-  historico: ReadonlySet<string>
+  historico: ReadonlySet<string>,
+  disponivelDesde: Record<string, string> = {}
 ): FilaItem[] {
   return mentorados
     .filter(
@@ -129,7 +217,7 @@ export function filaMentorados(
       avatar_path: m.avatar_path,
       whatsapp: m.whatsapp,
       origem: m.ong_origem ?? m.origem ?? null,
-      desde: esperaDesde(m),
+      desde: esperaDesde(m, disponivelDesde[m.id]),
     }))
     .sort(porEspera);
 }
@@ -164,7 +252,8 @@ export function tetoMentor(
 export function filaMentores(
   pessoas: Profile[],
   mentorProfiles: Record<string, MentorProfile>,
-  contagem: Record<string, number>
+  contagem: Record<string, number>,
+  disponivelDesde: Record<string, string> = {}
 ): FilaItem[] {
   const itens: FilaItem[] = [];
   for (const p of pessoas) {
@@ -178,7 +267,7 @@ export function filaMentores(
       avatar_path: p.avatar_path,
       whatsapp: p.whatsapp,
       origem: p.origem ?? null,
-      desde: esperaDesde(p),
+      desde: esperaDesde(p, disponivelDesde[p.id]),
       vagas: teto - usadas,
     });
   }
