@@ -94,6 +94,7 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
     data_hora: "2026-11-10T19:00:00-03:00",
   },
   editar_campo_pessoa: { pessoa_id: UUID, campo: "whatsapp", valor: "11987654321" },
+  plano_em_dia: { dupla_id: UUID },
 };
 
 describe("allowlist — forma do registry", () => {

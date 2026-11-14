@@ -169,6 +169,28 @@ export type UiInstrumentos = {
   }[];
 };
 
+/** Plano "ficar em dia" (REALIZA-397): a sequência calculada pelo planner —
+ *  cada passo com a data sugerida e a ação (agendar, remarcar, já marcado).
+ *  O card aponta pra ficha, onde o mentor executa — o plano é proposta,
+ *  nunca cronograma gravado pela IA. */
+export type UiPlano = {
+  kind: "plano";
+  dupla_id: string;
+  em_dia: boolean;
+  data_recuperacao: string | null;
+  passos: {
+    numero: number;
+    titulo: string;
+    acao: "agendar" | "remarcar" | "travado";
+    data: string;
+    precondicao: string | null;
+    aviso: string | null;
+  }[];
+  /** limbo/registro pendente que vem antes do plano */
+  pendencias: { numero: number; estado: "limbo" | "pendente_registro" }[];
+  avisos: string[];
+};
+
 export type UiFontes = {
   kind: "fontes";
   /** até 4 trechos citáveis — o card expande o trecho ao tocar no chip.
@@ -254,6 +276,7 @@ export type UiBloco =
   | UiCombinados
   | UiJornada
   | UiPedidos
+  | UiPlano
   | UiConfirmacao;
 
 export type UiKind = UiBloco["kind"];
@@ -263,6 +286,7 @@ export const STATUS_TOOL: Record<string, string> = {
   resumo_semana: "Lendo o resumo da semana…",
   ficha_dupla: "Abrindo a ficha da dupla…",
   registros_da_dupla: "Lendo os registros da dupla…",
+  plano_em_dia: "Montando o plano pra ficar em dia…",
   aguardando_par: "Olhando a fila de pareamento…",
   capacidade_mentores: "Conferindo as vagas dos mentores…",
   duplas_do_usuario: "Procurando a dupla…",
@@ -395,6 +419,37 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           status: e.status as EncontroStatus,
           data_hora: str(e.data_hora),
         })),
+      };
+    }
+    case "plano_em_dia": {
+      if (!str(d.dupla_id) || d.aplicavel !== true) return null;
+      const passos = arr(d.passos)
+        .map((p) => ({
+          numero: num(p.numero),
+          titulo: String(p.titulo ?? ""),
+          acao: p.acao as UiPlano["passos"][number]["acao"],
+          data: String(p.data_sugerida ?? ""),
+          precondicao: str(p.precondicao),
+          aviso: str(p.aviso),
+        }))
+        .filter((p) => p.numero > 0);
+      if (!passos.length) return null;
+      return {
+        kind: "plano",
+        dupla_id: String(d.dupla_id),
+        em_dia: d.em_dia === true,
+        data_recuperacao: str(d.data_recuperacao),
+        passos,
+        pendencias: arr(d.pendencias_registro).map((p) => ({
+          numero: num(p.numero),
+          estado: (str(p.estado) === "limbo" ? "limbo" : "pendente_registro") as
+            | "limbo"
+            | "pendente_registro",
+        })),
+        avisos: arr(d.avisos)
+          .map((a) => str(a))
+          .filter((a): a is string => a != null)
+          .slice(0, 3),
       };
     }
     case "registros_da_dupla": {

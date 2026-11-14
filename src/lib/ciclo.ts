@@ -1035,7 +1035,7 @@ export function encontroEsperado(eventos: CicloEvento[], hoje: Date, desde?: str
 /** Cadência de recuperação dos passos defasados — a dupla que entra depois
  *  do início do ciclo refaz os encontros oficiais anteriores à entrada em
  *  ritmo acelerado (~2-3 por semana) em vez de pulá-los. */
-const CATCHUP_POR_SEMANA = 2.5;
+export const CATCHUP_POR_SEMANA = 2.5;
 
 /** Passos oficiais anteriores à entrada da dupla cuja vez na fila de
  *  recuperação já venceu: o k-ésimo (0-based, em ordem de data) vence

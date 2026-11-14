@@ -9,6 +9,8 @@
 
 import { projetarFicha, projetarResumo } from "@/lib/ia/tools";
 import type { DuplaIa } from "@/lib/ia/queries";
+import { montarPlanoEmDia } from "@/lib/plano-em-dia";
+import type { Dupla } from "@/lib/types";
 import { uiDaTool, type UiBloco } from "@/lib/ia/ui";
 import { PERGUNTAS } from "@/lib/ajuda/conteudo";
 import { normaliza } from "@/lib/utils";
@@ -102,6 +104,56 @@ export async function responderDemoIa(
         }
       )}\n\`\`\`${sugestoes(["Próximos encontros", "Como está minha dupla?"])}`,
       ui: [],
+    };
+  }
+
+  // catch-up (REALIZA-397): o plano sai do mesmo planner da ficha — roda
+  // antes do branch de agenda, que casaria com "adiantar encontros"
+  if (
+    role !== "mentorado" &&
+    /ficar em dia|atrasad|recupera|adiant|plano d[ae] recupera|plano pra ficar/.test(p)
+  ) {
+    let ui = null;
+    for (const d of duplas) {
+      const r = montarPlanoEmDia({
+        dupla: d as unknown as Dupla,
+        eventos,
+        hoje: new Date(),
+      });
+      if (r.aplicavel && !r.emDia && r.passos.length) {
+        ui = uiDaTool("plano_em_dia", {
+          dupla_id: d.id,
+          trilha: d.trilha,
+          aplicavel: true,
+          em_dia: r.emDia,
+          pendencias_registro: r.pendenciasRegistro.map((p2) => ({
+            encontro_id: p2.encontroId,
+            numero: p2.numero,
+            estado: p2.estado,
+            data_hora: p2.dataHora,
+          })),
+          passos: r.passos.map((p2) => ({
+            numero: p2.numero,
+            titulo: p2.titulo,
+            acao: p2.acao,
+            encontro_id: p2.encontroId,
+            data_sugerida: p2.data,
+            data_oficial: p2.dataOficial,
+            precondicao: p2.precondicao ?? null,
+            aviso: p2.aviso ?? null,
+          })),
+          data_recuperacao: r.dataRecuperacao,
+          encerramento: r.encerramento,
+          avisos: r.avisos,
+        });
+        break;
+      }
+    }
+    return {
+      content: ui
+        ? `Na demonstração o plano é de exemplo, calculado pelo mesmo motor da ficha da dupla. A sequência com as datas sugeridas tá acima: dois encontros por semana quando couber, respeitando os intervalos do guia. Quem agenda é a dupla, na ficha.${sugestoes(["Resumo da semana", "Escreva um lembrete pra dupla"])}`
+        : `Na demonstração nenhuma dupla está atrasada o bastante pra um plano de recuperação. No ambiente real a Liza monta o plano com o mesmo motor do card "Para ficar em dia".${sugestoes(["Resumo da semana"])}`,
+      ui: ui ? [ui] : [],
     };
   }
 

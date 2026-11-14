@@ -213,6 +213,7 @@ describe("registry", () => {
         "mural_especialista",
         "pedir_reabertura_chamado",
         "pessoas_busca",
+        "plano_em_dia",
         "publicar_atualizacao_chamado",
         "reabrir_chamado",
         "recusar_solicitacao",

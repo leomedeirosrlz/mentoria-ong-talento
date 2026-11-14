@@ -49,6 +49,7 @@ export function AgendarEncontroDialog({
   numero,
   atual,
   sugerido,
+  proposta,
   piso,
   jovemNome,
   rotulo,
@@ -64,6 +65,10 @@ export function AgendarEncontroDialog({
    *  remarcação; dia solto entra às 19h, a grade de horários (REALIZA-25)
    *  chega com a hora do slot clicado. */
   sugerido?: string;
+  /** Proposta de data NOVA pra remarcação (a sugestão do plano "Para ficar
+   *  em dia", REALIZA-397). Preenche o campo no lugar da data atual — como
+   *  a data já vem mudada, o motivo nasce obrigatório. */
+  proposta?: string;
   /** YYYY-MM-DD do início da dupla — a sugestão nunca cai antes dele (o
    *  retroativo rejeitaria a data oficial de um encontro pré-dupla). */
   piso?: string;
@@ -91,9 +96,6 @@ export function AgendarEncontroDialog({
   const [pending, start] = useTransition();
   // controlado pra revelar o campo de texto livre quando o motivo é "outro"
   const [motivo, setMotivo] = useState("");
-  // motivo só é obrigatório quando a data muda — salvar a mesma data (ex.: só
-  // pra trocar o link) não é reagendamento e o server também não exige motivo
-  const [dataMudou, setDataMudou] = useState(false);
   const [motivoLen, setMotivoLen] = useState(0);
   // overlap com sessão da OUTRA dupla do mesmo jovem — warning, não bloqueio.
   // Guardado com a data consultada: resposta atrasada de data que já mudou
@@ -120,6 +122,17 @@ export function AgendarEncontroDialog({
   const router = useRouter();
 
   const valorAtual = atual?.data_hora ? paraInputLocal(new Date(atual.data_hora)) : null;
+  const propostaLocal = proposta
+    ? proposta.includes("T")
+      ? proposta
+      : `${proposta}T19:00`
+    : null;
+  // the reason is only mandatory when the date changes — saving the same date
+  // (e.g. just swapping the link) isn't a reschedule and the server doesn't
+  // require it either. With `proposta` the date already differs — born changed.
+  const [dataMudou, setDataMudou] = useState(
+    propostaLocal != null && propostaLocal !== valorAtual
+  );
   const agora = paraInputLocal(new Date());
   // com remarcação o piso segue valendo (ou a data original, se já vencida —
   // salvar sem mudar a data não pode virar inválido). Encontro novo aceita
@@ -140,6 +153,7 @@ export function AgendarEncontroDialog({
   // retroativo; mas nunca antes do início da dupla (a action rejeitaria)
   const pisoLocal = piso ? `${piso}T19:00` : "";
   const defaultValue =
+    propostaLocal ??
     valorAtual ??
     (sugeridoLocal && pisoLocal && sugeridoLocal < pisoLocal ? pisoLocal : sugeridoLocal);
   // valor vivo do campo — decide se o submit agenda ou registra (modo dual).
@@ -155,7 +169,7 @@ export function AgendarEncontroDialog({
     setAbertoAntes(open);
     if (open) {
       setMotivo("");
-      setDataMudou(false);
+      setDataMudou(propostaLocal != null && propostaLocal !== valorAtual);
       setValorData(defaultValue);
       setAvisoDisp(null);
       // as grades da abertura anterior não valem — a leitura nova chega no

@@ -63,7 +63,7 @@ export const IA_SAUDE_SELECT = `
   mentorado:mentorados(nome, nome_social),
   supervisor:profiles!duplas_supervisor_id_fkey(nome, nome_social),
   encontros(
-    numero, status, data_hora, realizado_em,
+    id, numero, status, data_hora, realizado_em,
     registro:registros(precisa_apoio, avaliacao, dificuldade),
     avaliacao_jovem:avaliacoes_encontro(pedir_apoio)
   ),
@@ -90,6 +90,7 @@ export type DuplaIa = {
   mentorado: { nome: string; nome_social: string | null; whatsapp?: string | null } | null;
   supervisor: { nome: string; nome_social: string | null; whatsapp?: string | null } | null;
   encontros: {
+    id: string;
     numero: number;
     status: string;
     data_hora: string | null;

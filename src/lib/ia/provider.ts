@@ -229,12 +229,64 @@ const EFFORT = { baixo: "low", medio: "medium", alto: "high" } as const;
 // raciocínio consomem o MESMO max_tokens: em "alto" um teto de 1600 era
 // engolido pelo raciocínio e a resposta saía vazia ou cortada. Sem
 // reasoning (ou "baixo") segue o 1600 de sempre — cobre folgado o formato
-// da casa (resposta curta + blocos GenUI)
+// da casa (resposta curta + blocos GenUI). medio/alto sobem (REALIZA-397):
+// plano multi-parte de recuperação precisava de espaço; o finish_reason
+// capturado agora permite ver se o corte realmente vinha do teto
 const MAX_TOKENS_POR_ESFORCO: Record<EsforcoIa, number> = {
   baixo: 1600,
-  medio: 4000,
-  alto: 8000,
+  medio: 6000,
+  alto: 12000,
 };
+
+/** Pedido de continuação após finish_reason=length — anexa ao histórico
+ *  como user msg; o modelo retoma no ponto de corte em vez de recomeçar. */
+const CONTINUAR_MSG =
+  "Continue exatamente de onde parou, sem repetir o que já escreveu.";
+
+/** Uma continuação por rodada: o plano inteiro quase sempre cabe em 2× o
+ *  teto; além disso o texto segue cortado e a rota emite o affordance de
+ *  "continuar" honesto em vez de gastar o orçamento em loop. */
+const MAX_CONTINUACOES = 1;
+
+/** Soma o usage de duas rodadas (original + continuação) — a telemetria da
+ *  request mede o total real, não só a última chamada. */
+function somarUsoIa(a?: UsoIa, b?: UsoIa): UsoIa | undefined {
+  if (!a) return b;
+  if (!b) return a;
+  const num = (x?: number, y?: number) =>
+    x != null || y != null ? (x ?? 0) + (y ?? 0) : undefined;
+  const tokens = (
+    t?: NonNullable<UsoIa["opencode"]>["tokens"],
+    u?: NonNullable<UsoIa["opencode"]>["tokens"]
+  ) =>
+    t || u
+      ? {
+          input: num(t?.input, u?.input),
+          output: num(t?.output, u?.output),
+          reasoning: num(t?.reasoning, u?.reasoning),
+          cache_read: num(t?.cache_read, u?.cache_read),
+          cache_write_5m: num(t?.cache_write_5m, u?.cache_write_5m),
+          cache_write_1h: num(t?.cache_write_1h, u?.cache_write_1h),
+        }
+      : undefined;
+  return {
+    prompt_tokens: num(a.prompt_tokens, b.prompt_tokens),
+    completion_tokens: num(a.completion_tokens, b.completion_tokens),
+    cost: num(a.cost, b.cost),
+    opencode:
+      a.opencode || b.opencode
+        ? {
+            billing_source:
+              b.opencode?.billing_source ?? a.opencode?.billing_source,
+            list_cost: num(a.opencode?.list_cost, b.opencode?.list_cost),
+            allowance: num(a.opencode?.allowance, b.opencode?.allowance),
+            estimated:
+              a.opencode?.estimated || b.opencode?.estimated || undefined,
+            tokens: tokens(a.opencode?.tokens, b.opencode?.tokens),
+          }
+        : undefined,
+  };
+}
 
 /** Corpo compartilhado das duas chamadas: tier de modelo vem do roteador
  *  (ia_config), não do env direto — slug ausente cai no IA_MODEL de
@@ -289,9 +341,22 @@ export async function chamarModelo(
     tools?: IaToolDef[];
     /** força a saída por tool_call — par de `tools` ad-hoc */
     toolChoice?: IaToolChoice;
-  }
+    /** cap da rodada em ms (rota passa o que resta do orçamento do stream —
+     *  o fallback JSON não pode estourar o prazo da função) */
+    timeoutMs?: number;
+  },
+  continuacoesRestantes = MAX_CONTINUACOES
 ): Promise<
-  | { ok: true; mensagem: MsgChat; usage?: UsoIa; modelo?: string }
+  | {
+      ok: true;
+      mensagem: MsgChat;
+      usage?: UsoIa;
+      modelo?: string;
+      /** finish_reason cru do provider — "length" é o corte de max_tokens */
+      finishReason?: string;
+      /** a resposta voltou cortada mesmo depois das continuações possíveis */
+      truncado?: boolean;
+    }
   | { ok: false; erro: string; dormindo?: boolean }
 > {
   const cadeia = cadeiaDeModelos(opts?.modelo, opts?.fallbacks);
@@ -325,7 +390,9 @@ export async function chamarModelo(
               ? { tools: opts.tools, toolChoice: opts.toolChoice }
               : undefined
           ),
-          signal: AbortSignal.timeout(Number(process.env.IA_TIMEOUT_MS ?? 20_000)),
+          signal: AbortSignal.timeout(
+            Number(opts?.timeoutMs ?? process.env.IA_TIMEOUT_MS ?? 45_000)
+          ),
         });
         if (!res.ok) {
           // provider que não conhece reasoning_effort: tira o campo e
@@ -355,11 +422,53 @@ export async function chamarModelo(
           console.error("chamarModelo: resposta sem mensagem utilizável");
           return { ok: false, erro: IA_MSG_INDISPONIVEL, dormindo: true };
         }
+        const finishReason = json?.choices?.[0]?.finish_reason as
+          | string
+          | undefined;
+        const usage = json?.usage as UsoIa | undefined;
+        const modelo = cadeia[i] ?? process.env.IA_MODEL;
+        // corte por max_tokens: continua onde parou — ANEXA ao parcial em
+        // vez de re-gerar (recomeçar re-imprime texto). Tool_call truncada
+        // não continua: o arguments chegou quebrado e não tem remendo
+        if (
+          finishReason === "length" &&
+          !msg.tool_calls?.length &&
+          msg.content &&
+          continuacoesRestantes > 0
+        ) {
+          const cont = await chamarModelo(
+            [
+              ...messages,
+              { role: "assistant", content: msg.content },
+              { role: "user", content: CONTINUAR_MSG },
+            ],
+            sessao,
+            opts,
+            continuacoesRestantes - 1
+          );
+          if (cont.ok) {
+            return {
+              ok: true,
+              mensagem: {
+                ...cont.mensagem,
+                content: `${msg.content}${cont.mensagem.content ?? ""}`,
+              },
+              usage: somarUsoIa(usage, cont.usage),
+              modelo: cont.modelo ?? modelo,
+              finishReason: cont.finishReason,
+              truncado: cont.truncado,
+            };
+          }
+          // a continuação falhou: o parcial segue válido, só sinalizado
+          return { ok: true, mensagem: msg, usage, modelo, finishReason, truncado: true };
+        }
         return {
           ok: true,
           mensagem: msg,
-          usage: json?.usage as UsoIa | undefined,
-          modelo: cadeia[i] ?? process.env.IA_MODEL,
+          usage,
+          modelo,
+          finishReason,
+          truncado: finishReason === "length" || undefined,
         };
       } catch (e) {
         console.error(`chamarModelo: ${cadeia[i] ?? "env"}`, e);
@@ -388,6 +497,10 @@ export type ResultadoStream =
       toolCalls: IaToolCall[];
       usage?: UsoIa;
       modelo?: string;
+      /** finish_reason cru do último chunk — "length" é o corte de max_tokens */
+      finishReason?: string;
+      /** saiu cortado mesmo depois das continuações possíveis */
+      truncado?: boolean;
     }
   // fallback=true: o provider recusou o stream (HTTP != 2xx ou corpo que
   // não é SSE) — a rota refaz a rodada via chamarModelo, mesmo contrato.
@@ -438,7 +551,8 @@ export async function chamarModeloStream(
     /** papéis do usuário — o payload de tools já sai filtrado por eles
      *  (REALIZA-333); ausente = todas (MCP/tests que não têm papel) */
     papeis?: AppRole[];
-  }
+  },
+  continuacoesRestantes = MAX_CONTINUACOES
 ): Promise<ResultadoStream> {
   // retry só vale com a saída ainda limpa — depois de token emitido,
   // recomeçar (mesmo em outro modelo) re-imprime texto na tela
@@ -513,6 +627,7 @@ export async function chamarModeloStream(
       let buffer = "";
       let content = "";
       let usage: UsoIa | undefined;
+      let finishReason: string | undefined;
       const calls = new Map<number, IaToolCall>();
       // token com delay artificial nenhum — onToken é enfileirado direto na
       // resposta da rota; a velocidade de exibição é a da rede do provider
@@ -538,12 +653,18 @@ export async function chamarModeloStream(
           return true; // linha não-JSON (comentário/heartbeat): ignora
         }
         const c = chunk as {
-          choices?: { delta?: { content?: string | null; tool_calls?: DeltaToolCall[] } }[];
+          choices?: {
+            delta?: { content?: string | null; tool_calls?: DeltaToolCall[] };
+            finish_reason?: string | null;
+          }[];
           usage?: UsoIa;
         };
         // stream_options.include_usage: o último chunk traz usage e
         // choices vazio (sdd D4) — telemetria da rodada inteira
         if (c.usage) usage = c.usage;
+        // "length" = cortou no max_tokens — sinaliza pra continuação anexar
+        if (c.choices?.[0]?.finish_reason)
+          finishReason = c.choices[0].finish_reason;
         const delta = c.choices?.[0]?.delta;
         if (delta?.content) {
           saiuAlgo = true;
@@ -585,12 +706,60 @@ export async function chamarModeloStream(
         }
       }
       decoder.decode(); // flush do restante multibyte
+      const toolCalls = [...calls.entries()]
+        .sort(([a], [b]) => a - b)
+        .map(([, t]) => t);
+      const modelo = cadeia[i] ?? process.env.IA_MODEL;
+      // corte por max_tokens: a continuação é uma request nova que ANEXA
+      // texto (os tokens seguem saindo por onToken — não é retry, não
+      // re-imprime). Tool_call truncada não continua: arguments quebrado
+      if (
+        finishReason === "length" &&
+        !toolCalls.length &&
+        content &&
+        continuacoesRestantes > 0
+      ) {
+        const cont = await chamarModeloStream(
+          [
+            ...messages,
+            { role: "assistant", content },
+            { role: "user", content: CONTINUAR_MSG },
+          ],
+          sessao,
+          opts,
+          continuacoesRestantes - 1
+        );
+        if (cont.ok) {
+          return {
+            ok: true,
+            content: content + cont.content,
+            toolCalls: cont.toolCalls,
+            usage: somarUsoIa(usage, cont.usage),
+            modelo: cont.modelo ?? modelo,
+            finishReason: cont.finishReason,
+            truncado: cont.truncado,
+          };
+        }
+        // continuação falhou (abort/erro): o parcial emitido é honesto,
+        // só sinalizado — a rota oferece o "continuar" ao usuário
+        return {
+          ok: true,
+          content,
+          toolCalls,
+          usage,
+          modelo,
+          finishReason,
+          truncado: true,
+        };
+      }
       return {
         ok: true,
         content,
-        toolCalls: [...calls.entries()].sort(([a], [b]) => a - b).map(([, t]) => t),
+        toolCalls,
         usage,
-        modelo: cadeia[i] ?? process.env.IA_MODEL,
+        modelo,
+        finishReason,
+        truncado: finishReason === "length" || undefined,
       };
     } catch (e) {
       if (opts.clienteAbortou()) {

@@ -105,6 +105,7 @@ export function RegistroForm({
   onSaved,
   embutido = false,
   origem,
+  proximoRegistro = null,
 }: {
   encontroId: string;
   duplaId: string;
@@ -128,6 +129,11 @@ export function RegistroForm({
    *  derivam de `encontro.origem` ("externo" = retroativo); sem a prop o
    *  form infere do `registro` (edição) — nunca afeta comportamento. */
   origem?: "novo" | "retroativo";
+  /** Next encounter still owing a registro (REALIZA-397): the post-save
+   *  surface offers "Registrar o Nº também?" — a click opens that row's own
+   *  form via its `#registrar-{id}` anchor with the shared fields prefilled
+   *  through the draft mechanism. Only the pair page passes this. */
+  proximoRegistro?: { encontroId: string; numero: number } | null;
 }) {
   // edição nasce com os combinados já gravados pelo registro — o id de
   // banco viaja na linha e volta no submit (o Adicionar usa uuid local,
@@ -187,6 +193,19 @@ export function RegistroForm({
     anexos: RegistroAnexo[];
     /** arquivos do passo 3 que não subiram — o uploader fica logo abaixo */
     falhas: number;
+    /** chain target for a double session (REALIZA-397): the shared fields
+     *  captured at save time — the next form opens prefilled through its
+     *  own draft, each registro still saved independently */
+    chain?: {
+      encontroId: string;
+      numero: number;
+      shared: {
+        duracaoMin: string;
+        avaliacao: string;
+        dificuldade: string;
+        proximoPasso: string;
+      };
+    };
   } | null>(null);
   // evidências escolhidas no passo 3 do registro NOVO — ficam no navegador
   // até o save: o FK do anexo exige a row do registro, então elas sobem
@@ -611,6 +630,18 @@ export function RegistroForm({
                 aviso: res?.aviso,
                 anexos: enviados,
                 falhas,
+                chain: proximoRegistro
+                  ? {
+                      encontroId: proximoRegistro.encontroId,
+                      numero: proximoRegistro.numero,
+                      shared: {
+                        duracaoMin: String(fd.get("duracao_min") ?? "60"),
+                        avaliacao: String(fd.get("avaliacao") ?? ""),
+                        dificuldade,
+                        proximoPasso,
+                      },
+                    }
+                  : undefined,
               });
             } else {
               // sem a row à mão não dá pra montar o uploader — cai no fluxo
@@ -634,6 +665,37 @@ export function RegistroForm({
     router.refresh();
   }
 
+  // double session (REALIZA-397): seeds the next encounter's draft with the
+  // shared fields and opens its own form through the #registrar-{id} anchor —
+  // the same surface, one save per encounter, no merged side effects
+  function encadearProximo() {
+    const chain = posSave?.chain;
+    if (!chain) return;
+    if (!demo) {
+      try {
+        const draft: RegistroDraft = {
+          savedAt: new Date().toISOString(),
+          tema: "", ferramenta: "", reflexoes: "", observacoes: "",
+          atividades: [], atividadeOutro: "",
+          dificuldadeDetalhe: "", proximoPassoDetalhe: "",
+          precisaApoio: false, encaminhamentos: [], concluirIds: [],
+          duracaoMin: chain.shared.duracaoMin,
+          avaliacao: chain.shared.avaliacao,
+          dificuldade: chain.shared.dificuldade,
+          proximoPasso: chain.shared.proximoPasso,
+        };
+        localStorage.setItem(
+          `registro-draft-${chain.encontroId}`,
+          JSON.stringify(draft)
+        );
+      } catch {
+        // storage indisponível — o próximo form abre vazio, segue o jogo
+      }
+    }
+    window.location.hash = `registrar-${chain.encontroId}`;
+    fecharPosSave();
+  }
+
   // K1 — criação bem-sucedida cede a tela pra etapa de evidências no
   // mesmo container (dialog da agenda ou card inline da ficha): o FK do
   // anexo exige a row gravada, por isso a etapa existe só depois do save
@@ -652,6 +714,8 @@ export function RegistroForm({
         aviso={posSave.aviso}
         anexos={posSave.anexos}
         falhas={posSave.falhas}
+        proximoNumero={posSave.chain?.numero ?? null}
+        onEncadear={posSave.chain ? encadearProximo : undefined}
         onFechar={fecharPosSave}
         embutido={embutido}
       />
@@ -1195,6 +1259,8 @@ function PosSaveRegistro({
   aviso,
   anexos,
   falhas,
+  proximoNumero = null,
+  onEncadear,
   onFechar,
   embutido = false,
 }: {
@@ -1206,6 +1272,10 @@ function PosSaveRegistro({
   anexos: RegistroAnexo[];
   /** quantas do passo 3 não subiram */
   falhas: number;
+  /** double session (REALIZA-397): outro encontro da dupla ainda deve
+   *  registro — o botão encadeado abre o form dele já preenchido */
+  proximoNumero?: number | null;
+  onEncadear?: () => void;
   onFechar: () => void;
   /** dentro de dialog o rodapé é o DialogFooter compartilhado; inline ele
       segue a barrinha própria do card */
@@ -1245,12 +1315,22 @@ function PosSaveRegistro({
       />
       {embutido ? (
         <DialogFooter>
+          {onEncadear && proximoNumero != null && (
+            <Button type="button" variant="outline" onClick={onEncadear}>
+              Registrar o {proximoNumero}º também
+            </Button>
+          )}
           <Button type="button" onClick={onFechar}>
             Concluir
           </Button>
         </DialogFooter>
       ) : (
-        <div className="flex justify-end border-t pt-3">
+        <div className="flex justify-end gap-2 border-t pt-3">
+          {onEncadear && proximoNumero != null && (
+            <Button type="button" variant="outline" onClick={onEncadear}>
+              Registrar o {proximoNumero}º também
+            </Button>
+          )}
           <Button type="button" onClick={onFechar}>
             Concluir
           </Button>

@@ -401,3 +401,103 @@ describe("chamarModeloStream — retry (REALIZA-307)", () => {
     expect(spy).toHaveBeenCalledTimes(1);
   });
 });
+
+describe("chamarModeloStream — truncamento por max_tokens (REALIZA-397)", () => {
+  beforeEach(() => {
+    vi.resetModules();
+    for (const [k, v] of Object.entries(ENV)) vi.stubEnv(k, v);
+  });
+
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
+  it("finish_reason=length continua anexando — tokens seguem no mesmo onToken", async () => {
+    const tokens: string[] = [];
+    let n = 0;
+    const spy = vi.fn<(url: RequestInfo | URL, init?: RequestInit) => Promise<Response>>(() =>
+      Promise.resolve(
+        n++ === 0
+          ? sseResposta([
+              sse(
+                { choices: [{ delta: { content: "Primeira " } }] },
+                {
+                  choices: [{ delta: { content: "parte" }, finish_reason: "length" }],
+                  usage: { prompt_tokens: 10, completion_tokens: 5 },
+                }
+              ),
+            ])
+          : sseResposta([
+              sse(
+                { choices: [{ delta: { content: " e fim." }, finish_reason: "stop" }] },
+                { choices: [], usage: { prompt_tokens: 8, completion_tokens: 4 } }
+              ),
+            ])
+      )
+    );
+    vi.stubGlobal("fetch", spy);
+
+    const res = await chamar({ tokens });
+    // a continuação emite pro mesmo onToken — o cliente vê um texto só
+    expect(tokens).toEqual(["Primeira ", "parte", " e fim."]);
+    expect(res).toMatchObject({
+      ok: true,
+      content: "Primeira parte e fim.",
+      finishReason: "stop",
+      usage: { prompt_tokens: 18, completion_tokens: 9 },
+    });
+    expect(spy).toHaveBeenCalledTimes(2);
+    // a 2ª request carrega o parcial como assistant + o "continue"
+    const msgs = JSON.parse(String(spy.mock.calls[1]?.[1]?.body)).messages;
+    expect(msgs.at(-2)).toEqual({ role: "assistant", content: "Primeira parte" });
+    expect(msgs.at(-1).role).toBe("user");
+  });
+
+  it("continuação também cortada devolve truncado (cap: sem loop)", async () => {
+    const spy = vi.fn(() =>
+      Promise.resolve(
+        sseResposta([
+          sse({
+            choices: [{ delta: { content: "x" }, finish_reason: "length" }],
+          }),
+        ])
+      )
+    );
+    vi.stubGlobal("fetch", spy);
+
+    const res = await chamar();
+    expect(res).toMatchObject({ ok: true, content: "xx", truncado: true });
+    expect(spy).toHaveBeenCalledTimes(2);
+  });
+
+  it("tool_call cortada NÃO continua — arguments quebrado não tem remendo", async () => {
+    const spy = vi.fn(() =>
+      Promise.resolve(
+        sseResposta([
+          sse({
+            choices: [
+              {
+                delta: {
+                  tool_calls: [
+                    {
+                      index: 0,
+                      id: "c1",
+                      function: { name: "ficha_dupla", arguments: '{"du' },
+                    },
+                  ],
+                },
+                finish_reason: "length",
+              },
+            ],
+          }),
+        ])
+      )
+    );
+    vi.stubGlobal("fetch", spy);
+
+    const res = await chamar();
+    expect(res).toMatchObject({ ok: true, truncado: true });
+    expect(spy).toHaveBeenCalledTimes(1);
+  });
+});

@@ -18,6 +18,7 @@ import { createHash } from "crypto";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { comparaNome, saudadeDaDupla, toDateStr } from "@/lib/ciclo";
+import { montarPlanoEmDia } from "@/lib/plano-em-dia";
 import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
 import { saudeDoRecorte } from "@/lib/agenda-coordenacao";
 import { temPapel } from "@/lib/types";
@@ -452,6 +453,57 @@ export const IA_TOOLS = {
         getCicloEventosIa(ctx.supabase),
       ]);
       return d ? projetarFicha(d, eventos) : null;
+    },
+  },
+
+  plano_em_dia: {
+    nome: "plano_em_dia",
+    descricao:
+      "Plano de recuperação de uma dupla DPP atrasada ('ficar em dia'): passo a passo determinístico com data sugerida por encontro — dois por semana quando couber, respeitando os intervalos de prática/tarefa do guia, os recessos e o encerramento do ciclo. Devolve cada passo com a ação (agendar, remarcar ou já marcado), pendências de registro que vêm antes de qualquer plano, e a data em que a dupla volta pro calendário oficial. Use pra 'como a dupla X fica em dia?', 'ela começou atrasada, o que fazer?', 'monta um plano de recuperação', 'dá pra adiantar encontro?'. null quando a dupla não existe ou está fora do alcance do papel.",
+    schema: duplaIdArgs,
+    // DPP-only tool: especialista track has no official calendar to catch
+    // up to (the planner itself returns aplicavel:false) and the youth
+    // never sees scheduling machinery — that's the pair's gesture
+    roles: ["coordenacao", "supervisor", "mentor_dpp"],
+    run: async ({ dupla_id }: z.infer<typeof duplaIdArgs>, ctx) => {
+      const [d, eventos] = await Promise.all([
+        getDuplaIa(ctx.supabase, dupla_id),
+        getCicloEventosIa(ctx.supabase),
+      ]);
+      if (!d) return null;
+      const r = montarPlanoEmDia({
+        dupla: d as unknown as Dupla,
+        eventos,
+        hoje: new Date(),
+      });
+      if (!r.aplicavel) {
+        return { dupla_id, trilha: d.trilha, aplicavel: false, motivo: r.motivo };
+      }
+      return {
+        dupla_id,
+        trilha: d.trilha,
+        aplicavel: true,
+        em_dia: r.emDia,
+        pendencias_registro: r.pendenciasRegistro.map((p) => ({
+          encontro_id: p.encontroId,
+          numero: p.numero,
+          estado: p.estado,
+          data_hora: p.dataHora,
+        })),
+        passos: r.passos.map((p) => ({
+          numero: p.numero,
+          titulo: p.titulo,
+          acao: p.acao,
+          encontro_id: p.encontroId,
+          data_sugerida: p.data,
+          data_oficial: p.dataOficial,
+          precondicao: p.precondicao ?? null,
+          aviso: p.aviso ?? null,
+        })),
+        data_recuperacao: r.dataRecuperacao,
+        encerramento: r.encerramento,
+        avisos: r.avisos,
+      };
     },
   },
 

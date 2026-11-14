@@ -92,6 +92,8 @@ import {
   VozDoJovemEspecialista,
 } from "@/components/avaliacao-jovem";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
+import { PlanoEmDiaCard } from "@/components/plano-em-dia-card";
+import { montarPlanoEmDia } from "@/lib/plano-em-dia";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { EditarDuplaDialog } from "@/components/editar-dupla-dialog";
 import { RemanejoSugerido } from "@/components/remanejo-sugerido";
@@ -392,6 +394,18 @@ export default async function DuplaPage({
   const { proximoNumero, encontroAlvo, sugeridoProximo, faltantes } =
     alvoAgendamento(dupla, eventos);
   const jornada = jornadaDaDupla(dupla, passos);
+  // catch-up plan (REALIZA-397): same journey derivation — the card only
+  // shows at 2+ due steps; a single delay stays on the usual "Agendar Nº" CTA.
+  // Everything already scheduled or done = nothing to plan.
+  const planoEmDia = montarPlanoEmDia({ dupla, eventos, hoje: agora });
+  const passosAgendaveis = planoEmDia.aplicavel
+    ? planoEmDia.passos.filter((p) => p.acao !== "travado")
+    : [];
+  const mostrarPlanoEmDia =
+    planoEmDia.aplicavel &&
+    !planoEmDia.emDia &&
+    passosAgendaveis.length >= 2 &&
+    dupla.status === "ativa";
 
   const primeiroNomeMentor = (
     dupla.mentor.nome_social ?? dupla.mentor.nome
@@ -946,6 +960,25 @@ export default async function DuplaPage({
             c.numero < passo.numero &&
             c.status !== "feito"
         )}
+        // pós-save chaining (REALIZA-397): o outro encontro da sessão dupla
+        // também deve registro — "registrar o Nº também?" abre o form dele
+        // com os campos compartilhados preenchidos. Menor nº devendo registro
+        // primeiro: a fila anda na ordem do guia
+        proximoRegistro={(() => {
+          if (ehEsp) return null;
+          const prox = dupla.encontros
+            .filter(
+              (e) =>
+                e.id !== enc?.id &&
+                !e.registro &&
+                (e.status === "realizado" ||
+                  ((e.status === "agendado" || e.status === "remarcado") &&
+                    e.data_hora != null &&
+                    new Date(e.data_hora) <= agora))
+            )
+            .sort((a, b) => a.numero - b.numero)[0];
+          return prox ? { encontroId: prox.id, numero: prox.numero } : null;
+        })()}
         registroAberto={passo.numero === numeroAtual}
         apoioDestinos={apoioDestinos}
         linkAvaliacao={
@@ -1083,6 +1116,15 @@ export default async function DuplaPage({
           </p>
         )}
       </section>
+
+      {mostrarPlanoEmDia && (
+        <PlanoEmDiaCard
+          plano={planoEmDia}
+          dupla={dupla}
+          souMentor={souMentor}
+          jovemNome={primeiroNomeMentorado}
+        />
+      )}
 
       {pedidos.length > 0 && (
         <section aria-labelledby="pedidos-abertos" className="space-y-3">

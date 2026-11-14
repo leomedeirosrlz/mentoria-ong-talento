@@ -94,6 +94,7 @@ test.describe("servidor MCP (/api/mcp)", () => {
       "duplas_do_usuario",
       "guia_consulta",
       "agenda_do_periodo",
+      "plano_em_dia",
     ])
       expect(nomes).toContain(t);
     // staff de coord/sup e a praia do mentorado ficam de fora
@@ -132,6 +133,7 @@ test.describe("servidor MCP (/api/mcp)", () => {
       "aguardando_par",
       "pessoas_busca",
       "registros_da_dupla",
+      "plano_em_dia",
     ])
       expect(nomes).not.toContain(t);
   });
@@ -211,6 +213,70 @@ test.describe("servidor MCP (/api/mcp)", () => {
       "guia-e2e"
     );
     expect(dados.guias).toContain("guia-e2e");
+  });
+
+  test("plano_em_dia do mentor na própria dupla: envelope aplicavel", async ({
+    page,
+  }) => {
+    const { status, body } = await rpc(page, MCP_PAT.mentor, {
+      id: 10,
+      method: "tools/call",
+      params: {
+        name: "plano_em_dia",
+        arguments: { dupla_id: DUPLA_ID },
+      },
+    });
+    expect(status).toBe(200);
+    expect(body.error).toBeUndefined();
+    const dados = dadosTool(body);
+    // a fixture decide se há plano: aplicavel=true traz os passos com ação
+    // e data; false explica o motivo — o contrato vale pros dois ramos
+    expect(dados).not.toBeNull();
+    expect(typeof dados.aplicavel).toBe("boolean");
+    if (dados.aplicavel) {
+      expect(Array.isArray(dados.passos)).toBe(true);
+      for (const p of dados.passos) {
+        expect(["agendar", "remarcar", "travado"]).toContain(p.acao);
+        expect(typeof p.data_sugerida).toBe("string");
+      }
+    } else {
+      expect(typeof dados.motivo).toBe("string");
+    }
+  });
+
+  test("plano_em_dia de dupla alheia ao mentor devolve null (RLS)", async ({
+    page,
+  }) => {
+    const { status, body } = await rpc(page, MCP_PAT.mentor, {
+      id: 11,
+      method: "tools/call",
+      params: {
+        name: "plano_em_dia",
+        arguments: { dupla_id: DUPLA2_ID },
+      },
+    });
+    expect(status).toBe(200);
+    expect(body.error).toBeUndefined();
+    expect(body.result?.isError).toBeUndefined();
+    expect(dadosTool(body)).toBeNull();
+  });
+
+  test("gate por tool: jovem chama plano_em_dia → erro JSON-RPC -32000", async ({
+    page,
+  }) => {
+    const { status, body } = await rpc(page, MCP_PAT.jovem, {
+      id: 12,
+      method: "tools/call",
+      params: {
+        name: "plano_em_dia",
+        arguments: { dupla_id: DUPLA_ID },
+      },
+    });
+    expect(status).toBe(200);
+    expect(body.result).toBeUndefined();
+    const erro = body.error as { code: number; message: string };
+    expect(erro.code).toBe(-32000);
+    expect(erro.message).toContain("não está disponível pro seu papel");
   });
 
   test("gate por tool: jovem chama resumo_semana → erro JSON-RPC -32000", async ({

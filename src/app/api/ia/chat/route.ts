@@ -67,8 +67,10 @@ const MAX_ITERACOES = 6;
 // orçamento total do stream (REALIZA-304): a plataforma encerra a função
 // aos 60s sem avisar — se o teto por rodada fosse o único limite, uma
 // rodada lenta morria no meio e nenhum evento de erro chegava ao cliente.
-// 50s a partir da abertura do stream deixa ~10s pros gates pré-stream
-const STREAM_BUDGET_MS = 50_000;
+// 55s a partir da abertura do stream deixa ~5s pros gates pré-stream e
+// pro lote de telemetria (awaited antes do close). O teto de tokens subiu
+// junto (REALIZA-397): resposta de 12000 tokens precisa de mais janela
+const STREAM_BUDGET_MS = 55_000;
 
 // espelha o teto do registrar_ia_eventos_lote (0160)
 const MAX_EVENTOS_LOTE = 50;
@@ -216,7 +218,7 @@ export async function POST(req: Request) {
   // teto por rodada — o orçamento do stream (STREAM_BUDGET_MS) capa
   // esse valor a cada iteração, então na prática o que manda é o que
   // ainda falta pro prazo
-  const timeoutRound = Number(process.env.IA_TIMEOUT_MS ?? 20_000) * 4;
+  const timeoutRound = Number(process.env.IA_TIMEOUT_MS ?? 45_000) * 4;
 
   const stream = new ReadableStream({
     async start(controller) {
@@ -275,6 +277,10 @@ export async function POST(req: Request) {
         if (u.opencode?.billing_source) uso.billing = u.opencode.billing_source;
       };
       let erroEmitido = false;
+      // a resposta final saiu cortada mesmo com a continuação interna do
+      // provider — vai na telemetria do 'resposta' pra medir quanto o
+      // teto de tokens ainda aperta
+      let truncouFinal = false;
       const sendErro = (e: string, dormindo?: boolean) => {
         // dormindo: falha do provider (429/cota/5xx/timeout) → o cliente
         // mostra a Liza dormindo em vez do erro genérico (REALIZA-363)
@@ -299,6 +305,10 @@ export async function POST(req: Request) {
           AbortSignal.timeout(Math.min(timeoutRound, restante)),
         ]);
         let emitido = 0; // tokens da rodada que já saíram pro cliente
+        // o provider cortou no teto de tokens mesmo depois da continuação
+        // interna — se esta rodada vira a resposta final, o cliente ganha
+        // o chip "continuar" em vez de um texto quebrado em silêncio
+        let truncadoMsg = false;
         const r = await chamarModeloStream(historico, sessao, {
           signal,
           onToken: (t) => {
@@ -312,6 +322,7 @@ export async function POST(req: Request) {
         let msg: MsgChat;
         if (r.ok) {
           somarUso(r.usage, r.modelo);
+          truncadoMsg = Boolean(r.truncado);
           msg = {
             role: "assistant",
             content: r.content || null,
@@ -325,13 +336,20 @@ export async function POST(req: Request) {
           // refaz em JSON — mas é uma GERAÇÃO NOVA, sem prefixo comum com
           // o que já saiu. Se algo já foi emitido, `reset` manda a bolha
           // recomeçar (emendar o rabo de outra resposta corrompia o texto)
-          if (Date.now() >= prazo) break;
-          const alt = await chamarModelo(historico, sessao, chamada);
+          const restanteJson = prazo - Date.now();
+          if (restanteJson <= 0) break;
+          const alt = await chamarModelo(historico, sessao, {
+            ...chamada,
+            // o fallback JSON não corre contra o `signal` combinado — o
+            // timeoutMs é o cap dele; ~1.5s fica pra emitir token + done
+            timeoutMs: Math.max(restanteJson - 1_500, 500),
+          });
           if (!alt.ok) {
             sendErro(alt.erro, alt.dormindo);
             break;
           }
           somarUso(alt.usage, alt.modelo);
+          truncadoMsg = Boolean(alt.truncado);
           msg = alt.mensagem;
           if (msg.content) {
             if (emitido > 0) send({ type: "reset" });
@@ -347,6 +365,16 @@ export async function POST(req: Request) {
           (c) => c.type === "function"
         );
         if (!calls.length) {
+          // saiu cortada: em vez de um texto quebrado no ar, o chip
+          // ```sugestoes oferece retomar — o histórico já carrega o
+          // parcial, então a próxima rodada continua de onde parou
+          if (truncadoMsg) {
+            truncouFinal = true;
+            send({
+              type: "token",
+              c: '\n\n```sugestoes\n["Continuar de onde parei"]\n```',
+            });
+          }
           send({
             type: "done",
             tools: toolsUsadas,
@@ -524,6 +552,7 @@ export async function POST(req: Request) {
           // decisão do roteador auditável no jsonb já existente
           // (REALIZA-299): por que essa mensagem caiu nesse tier
           roteador: { tier, tarefa, papel: papelRota },
+          truncado: truncouFinal || undefined,
         },
         ok: concluido,
         erro: erroEmitido ? "erro" : null,

@@ -32,6 +32,7 @@ import type {
   UiDupla,
   UiJornada,
   UiPedidos,
+  UiPlano,
   UiDuplaMini,
   UiFila,
   UiFontes,
@@ -369,6 +370,8 @@ export function UiCard({ bloco, jovem }: { bloco: UiBloco; jovem?: boolean }) {
       return <CardJornada b={bloco} />;
     case "pedidos":
       return <CardPedidos b={bloco} />;
+    case "plano":
+      return <CardPlano b={bloco} r={r} />;
     case "confirmacao":
       return <CardConfirmacao b={bloco} />;
   }
@@ -817,6 +820,80 @@ export function CardAgenda({ b, r = rotas(false) }: { b: UiAgenda; r?: Rotas }) 
         </ul>
       ) : (
         <Vazio>Nenhum encontro marcado no período</Vazio>
+      )}
+    </Cartao>
+  );
+}
+
+// ---------- plano em dia (REALIZA-397) ----------
+
+const ACAO_PLANO: Record<UiPlano["passos"][number]["acao"], string> = {
+  agendar: "sugestão",
+  remarcar: "remarcar pra",
+  travado: "marcado pra",
+};
+
+/** O plano de recuperação sai pronto do planner — o card só mostra a
+ *  sequência com datas; quem agenda é a dupla, por isso o rodapé leva à
+ *  ficha (a Liza propõe, nunca grava cronograma). */
+export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
+  const agora = useAgora();
+  return (
+    <Cartao
+      titulo="Plano pra ficar em dia"
+      meta={
+        b.data_recuperacao && valida(b.data_recuperacao)
+          ? `em dia ${quandoTexto(b.data_recuperacao, agora)}`
+          : undefined
+      }
+      rodape={<Rodape href={r.encontros(b.dupla_id)}>Ver encontros na ficha</Rodape>}
+    >
+      {b.pendencias.length > 0 && (
+        <p className="mb-2 rounded-lg bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground">
+          Antes do plano: {b.pendencias.map((p) => (
+            `${p.numero}º ${p.estado === "limbo" ? "(confirmar se aconteceu)" : "(falta o registro)"}`
+          )).join(", ")}.
+        </p>
+      )}
+      <ol className="divide-y divide-border/60">
+        {b.passos.map((p, i) => (
+          <li
+            key={p.numero}
+            style={passo(i + 1)}
+            className="animate-enter flex items-start gap-2.5 py-2 first:pt-0 last:pb-0"
+          >
+            <span
+              aria-hidden
+              className={cn(
+                "grid size-7 shrink-0 place-items-center rounded-full font-mono text-[11px] font-semibold tabular-nums",
+                p.acao === "travado"
+                  ? "bg-[var(--ok-bg)] text-[var(--ok-text)] ring-1 ring-[var(--ok-border)]"
+                  : "bg-[var(--destaque)]/25 text-foreground"
+              )}
+            >
+              {p.numero}
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-sm font-medium leading-snug">
+                {p.titulo}
+              </span>
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                {ACAO_PLANO[p.acao]}{" "}
+                {valida(p.data) ? diaSemanaCurto(p.data) : "a definir"}
+              </span>
+              {(p.precondicao || p.aviso) && (
+                <span className="mt-0.5 block text-xs text-muted-foreground">
+                  {p.precondicao ? `Precisa antes: ${p.precondicao}` : p.aviso}
+                </span>
+              )}
+            </span>
+          </li>
+        ))}
+      </ol>
+      {b.avisos.length > 0 && (
+        <p className="mt-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
+          {b.avisos[0]}
+        </p>
       )}
     </Cartao>
   );
