@@ -374,6 +374,15 @@ export function AgendarEncontroDialog({
                 Se o encontro já aconteceu, escolha a data real. Ele entra como realizado.
               </p>
             )}
+            {propostaLocal && (
+              <p className="text-xs text-muted-foreground">
+                Sugestão do plano pra ficar em dia
+                {atual?.data_hora
+                  ? `, antes estava marcado pra ${formatDiaHora(atual.data_hora)}`
+                  : ""}
+                . Ajuste se precisar.
+              </p>
+            )}
             {conflitos.length > 0 && (
               <p className="flex items-start gap-1.5 text-xs leading-relaxed text-[var(--warn-text)]">
                 <Warning size={13} aria-hidden className="mt-0.5 shrink-0" />

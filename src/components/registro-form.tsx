@@ -94,6 +94,19 @@ type RegistroDraft = {
   concluirIds: string[];
 };
 
+/** Reads another encounter's saved draft — the double-session chain uses it
+ *  to overlay shared fields without wiping partial work the mentor started. */
+function rascunhoDoEncontro(encontroId: string): RegistroDraft | null {
+  try {
+    const raw = localStorage.getItem(`registro-draft-${encontroId}`);
+    if (!raw) return null;
+    const d = JSON.parse(raw);
+    return d && typeof d === "object" ? (d as RegistroDraft) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function RegistroForm({
   encontroId,
   duplaId,
@@ -673,21 +686,24 @@ export function RegistroForm({
     if (!chain) return;
     if (!demo) {
       try {
+        const chave = `registro-draft-${chain.encontroId}`;
+        // overlay the shared fields on any existing partial draft — a draft
+        // the mentor started on the target must not be wiped by the chain
+        const anterior = rascunhoDoEncontro(chain.encontroId);
         const draft: RegistroDraft = {
+          ...(anterior ?? {
+            tema: "", ferramenta: "", reflexoes: "", observacoes: "",
+            atividades: [], atividadeOutro: "",
+            dificuldadeDetalhe: "", proximoPassoDetalhe: "",
+            precisaApoio: false, encaminhamentos: [], concluirIds: [],
+          }),
           savedAt: new Date().toISOString(),
-          tema: "", ferramenta: "", reflexoes: "", observacoes: "",
-          atividades: [], atividadeOutro: "",
-          dificuldadeDetalhe: "", proximoPassoDetalhe: "",
-          precisaApoio: false, encaminhamentos: [], concluirIds: [],
           duracaoMin: chain.shared.duracaoMin,
           avaliacao: chain.shared.avaliacao,
           dificuldade: chain.shared.dificuldade,
           proximoPasso: chain.shared.proximoPasso,
         };
-        localStorage.setItem(
-          `registro-draft-${chain.encontroId}`,
-          JSON.stringify(draft)
-        );
+        localStorage.setItem(chave, JSON.stringify(draft));
       } catch {
         // storage indisponível — o próximo form abre vazio, segue o jogo
       }

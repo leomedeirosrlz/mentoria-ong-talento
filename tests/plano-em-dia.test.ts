@@ -299,3 +299,79 @@ describe("montarPlanoEmDia — encerramento e pré-condições", () => {
     expect(marcos).toEqual([1, 9, 16]);
   });
 });
+
+describe("montarPlanoEmDia — âncora do último encontro (review)", () => {
+  it("realizado ontem com exige pratica empurra o próximo passo 7d", () => {
+    // enc.4 (pratica) feito 11-04; hoje 11-05 — o 5º NÃO pode ser amanhã
+    const d = mkDupla({
+      iniciada_em: "2025-10-01",
+      encontros: [1, 2, 3].map((n, i) =>
+        encRealizado(n, ["2025-10-07", "2025-10-14", "2025-10-21"][i])
+      ).concat([encRealizado(4, "2025-11-04")]),
+    });
+    const r = plano(d, "2025-11-05");
+    if (!r.aplicavel) throw new Error("não aplicável");
+    const p5 = r.passos.find((p) => p.numero === 5)!;
+    expect(p5.data).toBe("2025-11-11"); // 04 + 7d, não hoje+1
+  });
+
+  it("limbo de ontem também ancora o gap conservadoramente", () => {
+    // enc.4 agendado ontem sem registro: pode ter acontecido — mesmo piso
+    const limbo = encAgendado(4, "2025-11-04");
+    const d = mkDupla({
+      iniciada_em: "2025-10-01",
+      encontros: [1, 2, 3].map((n, i) =>
+        encRealizado(n, ["2025-10-07", "2025-10-14", "2025-10-21"][i])
+      ).concat([limbo]),
+    });
+    const r = plano(d, "2025-11-05");
+    if (!r.aplicavel) throw new Error("não aplicável");
+    const p5 = r.passos.find((p) => p.numero === 5)!;
+    expect(p5.data).toBe("2025-11-11");
+  });
+});
+
+describe("montarPlanoEmDia — piso running-max (review)", () => {
+  it("travado fora de ordem não regride a âncora do gap", () => {
+    // travado 9 (sem exige, gap 2d) datado logo após hoje, enquanto o
+    // devido 8 (prática, gap 7d) só cabe em janeiro — se o 10º herdar a
+    // âncora regrida sai 1 dia depois do 8º e quebra o piso mínimo
+    const travado9 = encAgendado(9, "2025-12-10");
+    const d = mkDupla({
+      iniciada_em: "2025-10-01",
+      encontros: [travado9],
+    });
+    const r = plano(d, "2025-12-09"); // devidos: 1-8 e 10 (oficial 12-09)
+    if (!r.aplicavel) throw new Error("não aplicável");
+    const p8 = r.passos.find((p) => p.numero === 8)!;
+    const p10 = r.passos.find((p) => p.numero === 10)!;
+    expect(p8.data).toBe("2026-01-26");
+    // piso = max(8º+7d=02-02, travado9+2d=12-12) → 02-02; com a âncora
+    // regrida pelo travado saía 01-27 (1 dia depois do 8º, quebra o piso)
+    expect(p10.data).toBe("2026-02-02");
+    expect(r.avisos.join(" ")).toMatch(/antes da data sugerida/);
+  });
+});
+
+describe("montarPlanoEmDia — gates de escopo (review)", () => {
+  it("dupla não ativa retorna não se aplica", () => {
+    const d = mkDupla({ status: "pausada", encontros: [] });
+    const r = plano(d, "2025-11-20");
+    expect(r).toEqual({ aplicavel: false, motivo: expect.any(String) });
+  });
+
+  it("agendado sem data ('a combinar') vencido vira remarcar na mesma row", () => {
+    const semData = mkEncontro(5, { status: "agendado", data_hora: null });
+    const d = mkDupla({
+      iniciada_em: "2025-10-01",
+      encontros: [1, 2, 3, 4].map((n, i) =>
+        encRealizado(n, ["2025-10-07", "2025-10-14", "2025-10-21", "2025-10-28"][i])
+      ).concat([semData]),
+    });
+    const r = plano(d, "2025-11-20");
+    if (!r.aplicavel) throw new Error("não aplicável");
+    const p5 = r.passos.find((p) => p.numero === 5)!;
+    expect(p5.acao).toBe("remarcar");
+    expect(p5.encontroId).toBe(semData.id);
+  });
+});

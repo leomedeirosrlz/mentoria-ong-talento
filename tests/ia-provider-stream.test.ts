@@ -234,6 +234,99 @@ describe("chamarModeloStream", () => {
     const res = await chamar({ clienteAbortou: () => true });
     expect(res).toMatchObject({ ok: false, abortado: true });
   });
+
+  it("deadline da rota no meio do texto devolve o parcial como truncado", async () => {
+    // REALIZA-397 review: stream morto pelo prazo da rota (signal que não
+    // é do cliente) com texto já emitido vira resposta truncada — chip de
+    // continuação na rota em vez de "dormiu" com texto solto na tela
+    const ctrl = new AbortController();
+    const enc = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(
+          enc.encode(
+            `data: ${JSON.stringify({ choices: [{ delta: { content: "parcial " } }] })}\n\n`
+          )
+        );
+        // o stream trava aqui — só o abort do signal da rota destrava,
+        // como um fetch real que morre no deadline
+        ctrl.signal.addEventListener("abort", () =>
+          c.error(new DOMException("aborted", "AbortError"))
+        );
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(body, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      )
+    );
+
+    const p = chamar({ signal: ctrl.signal });
+    await new Promise((r) => setTimeout(r, 30));
+    ctrl.abort();
+    const res = await p;
+
+    expect(res.ok).toBe(true);
+    if (res.ok) {
+      expect(res.content).toBe("parcial ");
+      expect(res.truncado).toBe(true);
+      expect(res.finishReason).toBe("route_deadline");
+      expect(res.toolCalls).toEqual([]);
+    }
+  });
+
+  it("deadline da rota com tool_call pendente NÃO devolve parcial (fallback)", async () => {
+    // tool_call cortado no meio tem arguments inválidos — executar seria
+    // pior que o fallback, então segue o caminho antigo
+    const ctrl = new AbortController();
+    const enc = new TextEncoder();
+    const body = new ReadableStream<Uint8Array>({
+      start(c) {
+        c.enqueue(
+          enc.encode(
+            `data: ${JSON.stringify({
+              choices: [
+                {
+                  delta: {
+                    tool_calls: [
+                      {
+                        index: 0,
+                        id: "call_1",
+                        function: { name: "plano_em_dia", arguments: '{"dupla' },
+                      },
+                    ],
+                  },
+                },
+              ],
+            })}\n\n`
+          )
+        );
+        ctrl.signal.addEventListener("abort", () =>
+          c.error(new DOMException("aborted", "AbortError"))
+        );
+      },
+    });
+    vi.stubGlobal(
+      "fetch",
+      vi.fn().mockResolvedValue(
+        new Response(body, {
+          status: 200,
+          headers: { "Content-Type": "text/event-stream" },
+        })
+      )
+    );
+
+    const p = chamar({ signal: ctrl.signal });
+    await new Promise((r) => setTimeout(r, 30));
+    ctrl.abort();
+    const res = await p;
+
+    expect(res).toMatchObject({ ok: false, fallback: true });
+  });
 });
 
 describe("chamarModeloStream — retry (REALIZA-307)", () => {

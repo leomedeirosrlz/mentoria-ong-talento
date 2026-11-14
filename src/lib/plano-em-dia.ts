@@ -1,7 +1,9 @@
 /** "Para ficar em dia" — pure deterministic catch-up planner for DPP pairs
- *  (REALIZA-397). Consumes the SAME derivations the semáforo and the
- *  journey track already use (`jornadaDaDupla` over `passosDaTrilha`), so
- *  the ficha card and the Liza tool can never disagree with the agenda.
+ *  (REALIZA-397). Consumes `jornadaDaDupla` over `passosDaTrilha` — the same
+ *  state machine the journey track uses — so the ficha card and the Liza
+ *  tool can never disagree. Devidos are the FULL backlog (official steps
+ *  before the pair's entry included): the semáforo's count differs for
+ *  late-entry pairs by design — it paces, the plan enumerates.
  *
  *  Domain rules encoded here (all reviewed against the official guides):
  *  - the pair schedules its own encounters; the plan only proposes dates
@@ -111,6 +113,15 @@ export function montarPlanoEmDia(input: {
         "A trilha de especialista combina os encontros livremente, não existe calendário oficial pra ficar em dia.",
     };
   }
+  // lifecycle gate: a plan proposes future meetings — meaningless for a
+  // pair that paused, closed or desisted (scheduling is refused anyway)
+  if (dupla.status !== "ativa") {
+    return {
+      aplicavel: false,
+      motivo:
+        "A dupla não está em andamento no momento, então não existe plano de recuperação.",
+    };
+  }
   const eventos = eventosDoCronograma(input.eventos, dupla.cronograma_id);
   if (!eventos.some((e) => e.tipo === "encontro")) {
     return {
@@ -162,6 +173,24 @@ export function montarPlanoEmDia(input: {
         numero: no.numero,
         encontroId: no.encontro.id,
         data: toDateStr(new Date(no.encontro.data_hora)),
+        oficialData,
+      });
+      continue;
+    }
+    // scheduled row without a date ("a combinar") whose official window
+    // already passed: owed — the same row gets a real date, never a new one
+    // (unique(dupla_id, numero) would refuse a duplicate)
+    if (
+      no.estado === "agendado" &&
+      oficialData &&
+      oficialData <= hojeStr &&
+      no.encontro &&
+      !no.encontro.data_hora
+    ) {
+      devidos.push({
+        numero: no.numero,
+        acao: "remarcar",
+        encontroId: no.encontro.id,
         oficialData,
       });
       continue;
@@ -224,7 +253,39 @@ export function montarPlanoEmDia(input: {
     })),
   ].sort((a, b) => a.numero - b.numero);
 
+  // gap floor: a step can't come sooner than every earlier item's required
+  // spacing — a running max (item.data + gapApos(item.numero)), so an
+  // out-of-order locked row can warn without pulling the floor back. Seeded
+  // by the pair's last realized/pending/limbo encounter: meeting the 4º
+  // (practice week) yesterday doesn't unlock the 5º tomorrow.
+  // typed init via `as`: a literal `= null` narrows the var to `null`
+  // and mutations inside the sobePiso closure stay invisible to CFA
+  let pisoGap = null as string | null;
+  let pisoNumero = null as number | null;
+  const sobePiso = (numero: number, data: string) => {
+    const limite = addDias(data, gapApos(numero));
+    if (!pisoGap || limite > pisoGap) {
+      pisoGap = limite;
+      pisoNumero = numero;
+    }
+  };
+  for (const no of jornada.nos) {
+    if (
+      no.estado === "realizado_completo" ||
+      no.estado === "pendente_registro" ||
+      no.estado === "limbo"
+    ) {
+      const quando = no.encontro?.realizado_em ?? no.encontro?.data_hora;
+      if (quando) sobePiso(no.numero, toDateStr(new Date(quando)));
+    }
+  }
+
   let cursor = addDias(hojeStr, 1);
+  // the server refuses dates before the pair's start — the plan obeys too
+  if (dupla.iniciada_em && dupla.iniciada_em > cursor)
+    cursor = dupla.iniciada_em;
+  // previous item in sequence order (número): the out-of-order warning
+  // compares each locked row against the step right before it
   let prevNumero: number | null = null;
   let prevData: string | null = null;
 
@@ -240,36 +301,42 @@ export function montarPlanoEmDia(input: {
     };
 
     if (passo.acao === "travado") {
+      const dataTravado = passo.travado!.data;
       // locked row: the sequence can't cross it — a future official step
       // scheduled before today's leftovers get a warning, not a move
-      if (prevData && passo.travado!.data <= prevData) {
+      if (prevData && dataTravado <= prevData) {
         avisos.push(
-          `O encontro ${passo.numero} está marcado pra ${fmtData(passo.travado!.data)}, antes do plano do ${prevNumero}º, então vale remarcar pra manter a ordem do guia.`
+          `O encontro ${passo.numero} está marcado pra ${fmtData(dataTravado)}, antes da data sugerida pro ${prevNumero}º, então vale remarcar pra manter a ordem do guia.`
         );
       }
+      const avisoTravado = dentroRecesso(dataTravado)
+        ? "A data cai dentro do recesso do programa."
+        : undefined;
+      sobePiso(passo.numero, dataTravado);
       prevNumero = passo.numero;
-      prevData = passo.travado!.data;
+      prevData = dataTravado;
       passosPlano.push({
         ...base,
         acao: "travado",
         encontroId: passo.encontroId,
-        data: passo.travado!.data,
+        data: dataTravado,
         dataOficial: passo.oficialData,
+        aviso: avisoTravado,
       });
       continue;
     }
 
-    // earliest slot: tomorrow's cursor, the previous step's required gap,
-    // recess bounds, weekly pace and occupied dates — in that order
+    // earliest slot: tomorrow's cursor, the running gap floor, recess
+    // bounds, weekly pace and occupied dates — in that order
     let data = cursor;
-    if (prevData) {
-      const comGap = addDias(prevData, gapApos(prevNumero));
-      if (comGap > data) data = comGap;
-    }
+    if (pisoGap && pisoGap > data) data = pisoGap;
     let motivoAviso: string | undefined;
-    const exigePrev = prevNumero != null ? META_PASSOS_PLANO[prevNumero]?.exige : undefined;
-    if (prevData && exigePrev === "pratica" && data === addDias(prevData, GAP_DIAS_EXIGE.pratica)) {
-      motivoAviso = `O ${prevNumero}º pede tempo de prática entre um encontro e outro, por isso a semana de espera.`;
+    if (
+      data === pisoGap &&
+      pisoNumero != null &&
+      META_PASSOS_PLANO[pisoNumero]?.exige === "pratica"
+    ) {
+      motivoAviso = `O ${pisoNumero}º pede tempo de prática entre um encontro e outro, por isso a semana de espera.`;
     }
     for (;;) {
       const r = dentroRecesso(data);
@@ -281,10 +348,12 @@ export function montarPlanoEmDia(input: {
       const semana = segundaDaSemana(data);
       if ((porSemana.get(semana) ?? 0) >= ritmo) {
         data = addDias(semana, 7);
+        motivoAviso = motivoAviso ?? "Já tem encontros demais nessa semana, a data foi pra próxima.";
         continue;
       }
       if (ocupados.has(data)) {
         data = addDias(data, 1);
+        motivoAviso = motivoAviso ?? "Esse dia já tem encontro marcado, foi pro dia seguinte.";
         continue;
       }
       break;
@@ -292,6 +361,7 @@ export function montarPlanoEmDia(input: {
     ocupados.add(data);
     somarSemana(data);
 
+    sobePiso(passo.numero, data);
     prevNumero = passo.numero;
     prevData = data;
     cursor = addDias(data, 1);

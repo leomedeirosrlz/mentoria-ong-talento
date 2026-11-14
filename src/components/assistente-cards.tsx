@@ -840,7 +840,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
   const agora = useAgora();
   return (
     <Cartao
-      titulo="Plano pra ficar em dia"
+      titulo="Para ficar em dia"
       meta={
         b.data_recuperacao && valida(b.data_recuperacao)
           ? `em dia ${quandoTexto(b.data_recuperacao, agora)}`

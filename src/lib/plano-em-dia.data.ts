@@ -15,9 +15,6 @@ export type MetaPassoPlano = {
   exige?: "pratica" | "tarefa";
   /** Hard milestone of the journey — 1 kick-off, 9 half-way review, 16 close. */
   marco?: boolean;
-  /** Informational load — light steps combine naturally as the second slot
-   *  of a double week; dense ones deserve their own day. */
-  densidade: "leve" | "media" | "densa";
   /** Work/instrument that must exist BEFORE this encounter — external
    *  action (youth answering a link, coordination issuing a form, third
    *  parties responding), never schedulable by the pair itself. Surfaced
@@ -29,36 +26,29 @@ export type MetaPassoPlano = {
  *  double-week floor. Guard every read with `total === 16`-style checks in
  *  the caller: the planner may serve other track lengths. */
 export const META_PASSOS_PLANO: Record<number, MetaPassoPlano> = {
-  1: { exige: "tarefa", marco: true, densidade: "media" },
+  1: { exige: "tarefa", marco: true },
   2: {
     exige: "tarefa",
-    densidade: "media",
     precondicao: "Visão/Declaração consolidada e avaliação de terceiros respondida",
   },
   3: {
     exige: "tarefa",
-    densidade: "media",
     precondicao: "Metas definidas pelo jovem por conta própria",
   },
-  4: { exige: "pratica", densidade: "media" },
-  5: { exige: "pratica", densidade: "media" },
-  6: { exige: "pratica", densidade: "media" },
-  7: { exige: "pratica", densidade: "media" },
-  8: { exige: "pratica", densidade: "media" },
-  9: { marco: true, densidade: "media" },
-  10: { densidade: "leve" },
-  11: { exige: "tarefa", densidade: "leve" },
+  4: { exige: "pratica" },
+  5: { exige: "pratica" },
+  6: { exige: "pratica" },
+  7: { exige: "pratica" },
+  8: { exige: "pratica" },
+  9: { marco: true },
+  11: { exige: "tarefa" },
   12: {
     exige: "tarefa",
-    densidade: "media",
     precondicao: "Roda da Vida respondida pelo jovem",
   },
-  13: { exige: "tarefa", densidade: "media" },
-  14: { densidade: "leve" },
-  15: { densidade: "media" },
+  13: { exige: "tarefa" },
   16: {
     marco: true,
-    densidade: "densa",
     precondicao: "Avaliação 360º emitida pela coordenação",
   },
 };

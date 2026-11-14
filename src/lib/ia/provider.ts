@@ -342,8 +342,13 @@ export async function chamarModelo(
     /** força a saída por tool_call — par de `tools` ad-hoc */
     toolChoice?: IaToolChoice;
     /** cap da rodada em ms (rota passa o que resta do orçamento do stream —
-     *  o fallback JSON não pode estourar o prazo da função) */
+     *  o fallback JSON não pode estourar o prazo da função). Vira um
+     *  deadline absoluto na entrada: cada tentativa da cadeia e cada
+     *  continuação consomem do MESMO orçamento. */
     timeoutMs?: number;
+    /** deadline absoluto (epoch ms) — set interno pela recursão da
+     *  continuação pra não rearmar o cap a cada chamada. */
+    prazoLimite?: number;
   },
   continuacoesRestantes = MAX_CONTINUACOES
 ): Promise<
@@ -360,6 +365,16 @@ export async function chamarModelo(
   | { ok: false; erro: string; dormindo?: boolean }
 > {
   const cadeia = cadeiaDeModelos(opts?.modelo, opts?.fallbacks);
+  // deadline compartilhado por TODA a chamada: sem ele, cada modelo da
+  // cadeia e cada continuação rearmariam o cap — modelos × requests
+  // estourariam o prazo da função e a resposta morria parcial sem evento
+  const prazo =
+    opts?.prazoLimite ??
+    (opts?.timeoutMs != null ? Date.now() + opts.timeoutMs : null);
+  const timeoutRestante = () =>
+    prazo != null
+      ? Math.max(prazo - Date.now(), 1)
+      : Number(process.env.IA_TIMEOUT_MS ?? 45_000);
   let esperaMs = 0; // Retry-After de um 429 carrega pro próximo modelo
   for (let i = 0; i < cadeia.length; i++) {
     const ultimo = i === cadeia.length - 1;
@@ -390,9 +405,7 @@ export async function chamarModelo(
               ? { tools: opts.tools, toolChoice: opts.toolChoice }
               : undefined
           ),
-          signal: AbortSignal.timeout(
-            Number(opts?.timeoutMs ?? process.env.IA_TIMEOUT_MS ?? 45_000)
-          ),
+          signal: AbortSignal.timeout(timeoutRestante()),
         });
         if (!res.ok) {
           // provider que não conhece reasoning_effort: tira o campo e
@@ -443,7 +456,7 @@ export async function chamarModelo(
               { role: "user", content: CONTINUAR_MSG },
             ],
             sessao,
-            opts,
+            { ...opts, prazoLimite: prazo ?? undefined },
             continuacoesRestantes - 1
           );
           if (cont.ok) {
@@ -575,6 +588,12 @@ export async function chamarModeloStream(
     }
     let mandarEsforco = Boolean(opts.esforco);
     for (;;) {
+    // hoisted out of `try` so the catch can return the emitted partial —
+    // a retry only happens before the stream opens (empty anyway)
+    let content = "";
+    let usage: UsoIa | undefined;
+    let finishReason: string | undefined;
+    const calls = new Map<number, IaToolCall>();
     try {
       const res = await fetch(`${process.env.IA_API_BASE}/chat/completions`, {
         method: "POST",
@@ -625,10 +644,6 @@ export async function chamarModeloStream(
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let content = "";
-      let usage: UsoIa | undefined;
-      let finishReason: string | undefined;
-      const calls = new Map<number, IaToolCall>();
       // token com delay artificial nenhum — onToken é enfileirado direto na
       // resposta da rota; a velocidade de exibição é a da rede do provider
 
@@ -764,6 +779,21 @@ export async function chamarModeloStream(
     } catch (e) {
       if (opts.clienteAbortou()) {
         return { ok: false, erro: "interrompido", abortado: true };
+      }
+      // route deadline killed the stream mid-answer: the emitted text is
+      // already on screen and complete tool_calls can't be trusted, so a
+      // clean text-only partial returns as `truncado` — the route closes
+      // the round with the continue chip instead of an error
+      if (opts.signal.aborted && saiuAlgo && !calls.size) {
+        return {
+          ok: true,
+          content,
+          toolCalls: [],
+          usage,
+          modelo: cadeia[i] ?? process.env.IA_MODEL,
+          finishReason: "route_deadline",
+          truncado: true,
+        };
       }
       console.error(`chamarModeloStream: ${cadeia[i] ?? "env"}`, e);
       // não avança quando: o signal da rota abortou sem ser o cliente

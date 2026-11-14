@@ -124,8 +124,18 @@ export function PlanoEmDiaCard({
                   duplaId={dupla.id}
                   numero={p.numero}
                   atual={encontro}
-                  sugerido={p.acao === "agendar" ? p.data : undefined}
-                  proposta={p.acao === "remarcar" ? p.data : undefined}
+                  // a "remarcar" sem data atual é um "a combinar" vencido:
+                  // sugerido preenche sem cobrar motivo de remarcação
+                  sugerido={
+                    p.acao === "agendar" || !encontro?.data_hora
+                      ? p.data
+                      : undefined
+                  }
+                  proposta={
+                    p.acao === "remarcar" && encontro?.data_hora
+                      ? p.data
+                      : undefined
+                  }
                   piso={dupla.iniciada_em ?? undefined}
                   jovemNome={jovemNome}
                   trigger={

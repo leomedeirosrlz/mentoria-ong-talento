@@ -340,9 +340,10 @@ export async function POST(req: Request) {
           if (restanteJson <= 0) break;
           const alt = await chamarModelo(historico, sessao, {
             ...chamada,
-            // o fallback JSON não corre contra o `signal` combinado — o
-            // timeoutMs é o cap dele; ~1.5s fica pra emitir token + done
-            timeoutMs: Math.max(restanteJson - 1_500, 500),
+            // o fallback JSON não corre contra o `signal` combinado —
+            // compartilha o deadline absoluto da rodada; ~1.5s fica pra
+            // emitir token + done
+            prazoLimite: prazo - 1_500,
           });
           if (!alt.ok) {
             sendErro(alt.erro, alt.dormindo);

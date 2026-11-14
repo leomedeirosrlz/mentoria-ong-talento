@@ -30,7 +30,6 @@ function criarEncontro(numero: number, status: string, emDiasAtras: number) {
     data_hora: quando,
     status,
     ...(status === "realizado" ? { realizado_em: quando } : {}),
-    ...(status === "nao_aconteceu" ? { motivo: "Semana de prova (e2e)" } : {}),
   });
 }
 
@@ -77,17 +76,18 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     await page.goto(`/duplas/${DUPLA_ID}?aba=encontros`);
 
     // abre o form do 3º pela âncora própria — a linha realizado-sem-registro
-    // nasce com o trigger "Registrar" pra quem edita
+    // nasce com o trigger "Registrar" (um <a> apesar do visual de botão)
     const linha3 = page.locator(`#registrar-${String(e3.id)}`);
-    await linha3.getByRole("button", { name: "Registrar" }).click();
+    await linha3.getByRole("link", { name: "Registrar" }).click();
 
     const form3 = linha3.locator("form");
     await expect(form3).toBeVisible();
-    // avaliacao é o único campo com portão — fica na etapa 1 ("Como foi")
-    await form3.locator('input[name="avaliacao"][value="boa"]').check();
+    // avaliacao é o único campo com portão — fica na etapa 1 ("Como foi");
+    // o input é sr-only, clica no rótulo visível
+    await form3.getByText("Boa", { exact: true }).click();
     // duração não-default: é o campo compartilhado que o rascunho do 4º herda
     await form3.locator("#duracao-select").click();
-    await page.getByRole("option", { name: "75 min" }).click();
+    await page.getByRole("option", { name: "1h30" }).click();
 
     await form3.getByRole("button", { name: "Avançar" }).click();
     await form3.getByRole("button", { name: "Avançar" }).click();
@@ -115,6 +115,6 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     await expect(
       form4.locator('input[name="avaliacao"][value="boa"]')
     ).toBeChecked();
-    await expect(form4.locator("#duracao-select")).toContainText("75 min");
+    await expect(form4.locator("#duracao-select")).toContainText("1h30");
   });
 });
