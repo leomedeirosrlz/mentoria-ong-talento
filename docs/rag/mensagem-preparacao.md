@@ -29,7 +29,7 @@ Muito prazer, meu nome é [seu nome] e vou ser seu(sua) mentor(a) ao longo do ci
 
 Para o nosso primeiro encontro, preciso de três coisas:
 
-1. Os nomes e contatos de pelo menos **três amigos e três familiares** (e três colegas de trabalho, se você estiver trabalhando). Vou enviar a cada uma um link para responder duas perguntas rápidas sobre você. Avise essas pessoas de que o link vai chegar.
+1. Os nomes e contatos de pelo menos **três pessoas que conhecem você bem**. Vale misturar os vínculos: amigos, familiares e colegas de trabalho ou de escola. Vou enviar a cada uma um link para responder duas perguntas rápidas sobre você. Avise essas pessoas de que o link vai chegar.
 2. Um **resumo da sua história de vida**, pessoal e profissional. Sugiro listar em ordem cronológica os fatos que foram importantes para você, formando uma linha do tempo. Não precisa me enviar: guarde para conversarmos no encontro.
 3. A sua **Roda da Vida** respondida na plataforma, com uma reflexão sobre as áreas que você mais gostaria de melhorar.
 

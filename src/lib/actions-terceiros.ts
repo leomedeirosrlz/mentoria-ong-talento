@@ -6,7 +6,8 @@ import { DEMO_MSG } from "./demo/shared";
 import { erroAmigavel } from "./utils";
 import { normWhatsapp } from "./importar";
 
-// Actions da avaliação por terceiros (0103 — guia DPP semana 1→2).
+// Actions da avaliação por terceiros (0103 — guia DPP semana 1→2; régua
+// flexibilizada na 0195: mistura livre até 9, sem cap por vínculo).
 // O respondente externo submete por bearer token + RPC definer; dentro da
 // app, contato se cadastra por INSERT direto (token se auto-minta) e tudo
 // que mexe em status/token sai só pelas RPCs — o grant de coluna e a RLS
@@ -58,10 +59,10 @@ function saneiaWhatsapp(v: unknown): string | null | undefined {
 }
 
 function traduzErro(message: string): string {
+  // 0195 (REALIZA-387): only the total of 9 is still raised by the DB;
+  // the per-vínculo cap became a composition suggestion in copy
   if (/9 pessoas/.test(message))
-    return "O guia prevê até 9 pessoas indicadas (3 amigos, 3 familiares, 3 colegas).";
-  if (/3 pessoas por vínculo/.test(message))
-    return "O guia prevê até 3 pessoas por vínculo — distribua entre amigos, familiares e colegas.";
+    return "Dá pra indicar até 9 pessoas por dupla.";
   if (/usado ou expirou/.test(message))
     return "Este link já foi respondido ou expirou.";
   if (/antes de publicar/.test(message))

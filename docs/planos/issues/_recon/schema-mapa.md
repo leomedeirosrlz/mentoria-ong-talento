@@ -413,8 +413,8 @@ status ∈ ('pendente','respondido','expirado'), created_by default
 my_profile_id(). Policies: select coord/mentor/supervisor da dupla; insert
 coord/mentor da dupla DPP ativa|pausada; update só pendente/expirado por
 coord/mentor (0105 +dupla viva); delete só pendente coord/mentor.
-Trigger `guard_terceiros_cap`: máx 9 por dupla, 3 por vínculo (insert+update of
-vinculo; 0103→0105).
+Trigger `guard_terceiros_cap`: máx 9 por dupla, mistura de vínculos livre
+(insert-only; 0103→0105→0195 — o cap 3-por-vínculo saiu na 0195).
 respostas: contato_id unique, pontos_fortes + a_melhorar (1–4000), imutável;
 select coord/mentor/supervisor (jovem nunca).
 consolidacao: dupla_id PK, consolidado ≤8000, publicado_em, escrito_por;

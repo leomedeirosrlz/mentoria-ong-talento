@@ -418,7 +418,7 @@ O(a) jovem também pode marcar "Preciso de ajuda", que avisa a coordenação na 
 
 ## Avaliação por terceiros
 
-A avaliação inicial feita por pessoas próximas do(a) jovem acontece na plataforma. Antes do 1º encontro, o(a) jovem indica ao(à) mentor(a) três amigos, três familiares e, se estiver trabalhando, três colegas de trabalho; o(a) mentor(a) cadastra essas pessoas na ficha da dupla, gera e envia o link de cada uma, e cada pessoa indicada responde pelo link, sem precisar de conta. *(Atualização: na plataforma vigente, cada pessoa indicada responde pelo link que o(a) mentor(a) gera na ficha da dupla, sem precisar de conta; o PDF publicado que traz o "envio por e-mail" está desatualizado.)*
+A avaliação inicial feita por pessoas próximas do(a) jovem acontece na plataforma. Antes do 1º encontro, o(a) jovem indica ao(à) mentor(a) pelo menos três pessoas que o(a) conhecem bem, até nove no total; o guia sugere misturar amigos, familiares e, se estiver trabalhando, colegas de trabalho. O(a) mentor(a) cadastra essas pessoas na ficha da dupla, gera e envia o link de cada uma, e cada pessoa indicada responde pelo link, sem precisar de conta. *(Atualização: na plataforma vigente, a indicação é livre até nove pessoas e a composição por vínculo é só sugestão; o PDF publicado que pede três amigos, três familiares e três colegas e que traz o "envio por e-mail" está desatualizado.)*
 
 Cada pessoa responde a duas perguntas:
 

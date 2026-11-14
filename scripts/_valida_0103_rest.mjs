@@ -88,24 +88,25 @@ const run = async () => {
   const amigo = r.data?.[0];
   if (!amigo) { console.log("sem fixture — abortando"); process.exit(1); }
 
-  // o guia é 3+3+3 — cap por vínculo além do total de 9
+  // 0195: o cap por vínculo saiu — mistura livre, só o total de 9 segue
   for (let i = 1; i <= 2; i++) {
     await api("terceiros_contatos", { method: "POST", token: mentor,
       body: { dupla_id: DUPLA, nome: `Amigo ${i}`, vinculo: "amigo" } });
   }
   r = await api("terceiros_contatos", { method: "POST", token: mentor,
     body: { dupla_id: DUPLA, nome: "Quarto Amigo", vinculo: "amigo" } });
-  ok("4º do mesmo vínculo bloqueado", r.status >= 400 && JSON.stringify(r.data).includes("3 pessoas por"), `${r.status} ${JSON.stringify(r.data).slice(0, 160)}`);
+  ok("4º do mesmo vínculo passa (mistura livre)", r.status === 201, `${r.status} ${JSON.stringify(r.data).slice(0, 160)}`);
 
-  for (const vinculo of ["familiar", "colega"]) {
-    for (let i = 1; i <= 3; i++) {
+  // enche até o teto: 4 amigos + 3 familiares + 2 colegas = 9
+  for (const [vinculo, n] of [["familiar", 3], ["colega", 2]]) {
+    for (let i = 1; i <= n; i++) {
       await api("terceiros_contatos", { method: "POST", token: mentor,
         body: { dupla_id: DUPLA, nome: `${vinculo} ${i}`, vinculo } });
     }
   }
   r = await api("terceiros_contatos", { method: "POST", token: mentor,
     body: { dupla_id: DUPLA, nome: "Décimo", vinculo: "outro" } });
-  ok("10º bloqueado", r.status >= 400 && JSON.stringify(r.data).includes("9 pessoas"), `${r.status} ${JSON.stringify(r.data).slice(0, 160)}`);
+  ok("10º bloqueado pelo total de 9", r.status >= 400 && JSON.stringify(r.data).includes("9 pessoas"), `${r.status} ${JSON.stringify(r.data).slice(0, 160)}`);
 
   r = await api("terceiros_contatos", { method: "POST", token: mentor,
     body: { dupla_id: ESP, nome: "Esp", vinculo: "amigo" } });
