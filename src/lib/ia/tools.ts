@@ -550,7 +550,8 @@ export const IA_TOOLS = {
       const mentorados = filaMentorados(
         ins.mentorados as Mentorado[],
         ins.ocupados,
-        ins.historico
+        ins.historico,
+        ins.disponivelDesde
       ).map((m) => ({
         id: m.id,
         nome: m.nome, // FilaItem.nome já vem coalescido (social ?? civil)
@@ -560,7 +561,8 @@ export const IA_TOOLS = {
       const mentores = filaMentores(
         ins.pessoas as Profile[],
         ins.mentorProfiles,
-        ins.contagemPorMentor
+        ins.contagemPorMentor,
+        ins.disponivelDesde
       ).map((m) => ({
         id: m.id,
         nome: m.nome,

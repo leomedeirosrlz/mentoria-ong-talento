@@ -502,6 +502,10 @@ export function demoDuplasResumo(role: AppRole, todas: boolean): DuplaResumo[] {
       trilha: d.trilha,
       turma: d.turma,
       cronograma_id: d.cronograma_id,
+      status: d.status,
+      encerrada_em: d.encerrada_em ?? null,
+      desfecho_em: d.desfecho_em ?? null,
+      remanejada_de: d.remanejada_de ?? null,
     }));
 }
 

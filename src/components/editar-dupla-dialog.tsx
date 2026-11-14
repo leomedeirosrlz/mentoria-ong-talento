@@ -740,64 +740,84 @@ export function EditarDuplaDialog({
                     </SelectContent>
                   </Select>
                 </div>
-                {desfechoSel &&
-                  (DESFECHO_MOTIVOS[desfechoSel as keyof typeof DESFECHO_MOTIVOS] ?? [])
-                    .length > 0 && (
-                    <div className="space-y-2">
-                      <Label id="edit-desfecho-motivo-label">Motivo</Label>
-                      <Select
-                        key={desfechoSel}
-                        name="desfecho_motivo"
-                        required
-                        value={motivoSel || undefined}
-                        items={Object.fromEntries(
-                          (
-                            DESFECHO_MOTIVOS[
-                              desfechoSel as keyof typeof DESFECHO_MOTIVOS
-                            ] ?? []
-                          ).map((m) => [m, m])
-                        )}
-                        onValueChange={(v) => setMotivoSel(v ?? "")}
-                      >
-                        <SelectTrigger
-                          id="edit-desfecho-motivo-select"
-                          aria-labelledby="edit-desfecho-motivo-label edit-desfecho-motivo-select"
+                {desfechoSel && desfechoSel !== "concluida" && (
+                  <div className="space-y-2">
+                    {(DESFECHO_MOTIVOS[
+                      desfechoSel as keyof typeof DESFECHO_MOTIVOS
+                    ] ?? []).length > 0 ? (
+                      <>
+                        <Label id="edit-desfecho-motivo-label">Motivo</Label>
+                        <Select
+                          key={desfechoSel}
+                          name="desfecho_motivo"
+                          required
+                          value={motivoSel || undefined}
+                          items={Object.fromEntries(
+                            (
+                              DESFECHO_MOTIVOS[
+                                desfechoSel as keyof typeof DESFECHO_MOTIVOS
+                              ] ?? []
+                            ).map((m) => [m, m])
+                          )}
+                          onValueChange={(v) => setMotivoSel(v ?? "")}
                         >
-                          <SelectValue placeholder="Selecione o motivo" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {(
-                            DESFECHO_MOTIVOS[
-                              desfechoSel as keyof typeof DESFECHO_MOTIVOS
-                            ] ?? []
-                          ).map((m) => (
-                            <SelectItem key={m} value={m}>
-                              {m}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  )}
+                          <SelectTrigger
+                            id="edit-desfecho-motivo-select"
+                            aria-labelledby="edit-desfecho-motivo-label edit-desfecho-motivo-select"
+                          >
+                            <SelectValue placeholder="Selecione o motivo" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {(
+                              DESFECHO_MOTIVOS[
+                                desfechoSel as keyof typeof DESFECHO_MOTIVOS
+                              ] ?? []
+                            ).map((m) => (
+                              <SelectItem key={m} value={m}>
+                                {m}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </>
+                    ) : (
+                      // desfecho sem vocabulário ('outro'): o motivo é
+                      // texto livre OBRIGATÓRIO no mesmo campo — antes a
+                      // Observação assumia o papel e o motivo saía vazio.
+                      // `key` re-inicializa ao trocar de desfecho; o
+                      // prefill só vale quando o desfecho salvo é o mesmo
+                      // ('legado' é o sentinela do backfill 0140, não motivo)
+                      <>
+                        <Label htmlFor="edit-desfecho-motivo-input">
+                          Motivo
+                        </Label>
+                        <Input
+                          key={desfechoSel}
+                          id="edit-desfecho-motivo-input"
+                          name="desfecho_motivo"
+                          required
+                          maxLength={300}
+                          placeholder="Descreva o motivo"
+                          defaultValue={
+                            desfechoSel === (dupla.desfecho ?? "") &&
+                            dupla.desfecho_motivo !== "legado"
+                              ? (dupla.desfecho_motivo ?? "")
+                              : ""
+                          }
+                        />
+                      </>
+                    )}
+                  </div>
+                )}
                 <div className="space-y-2">
                   <Label htmlFor="edit-desfecho-obs">Observação</Label>
                   <Textarea
                     id="edit-desfecho-obs"
                     name="desfecho_obs"
                     rows={3}
-                    required={desfechoSel === "outro"}
                     defaultValue={dupla.desfecho_obs ?? ""}
-                    placeholder={
-                      desfechoSel === "outro"
-                        ? "Descreva o motivo"
-                        : "Observações (opcional)"
-                    }
+                    placeholder="Observações (opcional)"
                   />
-                  {desfechoSel === "outro" && (
-                    <p className="text-xs text-muted-foreground">
-                      Obrigatório quando o desfecho é “Outro motivo”.
-                    </p>
-                  )}
                 </div>
               </div>
             )}

@@ -313,6 +313,7 @@ export function PessoasListas({
   duplaVivaPorMentorado,
   mentorProfiles,
   contagemPorMentor,
+  disponivelDesde,
   assinaturas,
   faltantes,
   mapasTurma,
@@ -330,6 +331,10 @@ export function PessoasListas({
   duplaVivaPorMentorado: Record<string, string>;
   mentorProfiles: Record<string, MentorProfile>;
   contagemPorMentor: Record<string, number>;
+  /** id → quando a pessoa voltou a ficar disponível (fechamento da última
+   *  dupla) — a espera da fila mede a disponibilidade atual, não a entrada
+   *  original (REALIZA-393). Chega vazio fora da coordenação. */
+  disponivelDesde: Record<string, string>;
   /** id da pessoa → documentos assinados/pendentes (badge "assinou vs. não"). */
   assinaturas: Record<string, DocsPessoa>;
   /** id → slug → labels de faltante civil (coord-only, calculado na page) —
@@ -639,12 +644,12 @@ export function PessoasListas({
   // fila "Aguardando par" (REALIZA-101): mentorados que NUNCA tiveram dupla
   // + mentores ativos com vaga livre — derivação pura em @/lib/fila
   const filaMds = useMemo(
-    () => (souCoord ? filaMentorados(mentorados, emDupla, temQualquerDupla) : []),
-    [souCoord, mentorados, emDupla, temQualquerDupla]
+    () => (souCoord ? filaMentorados(mentorados, emDupla, temQualquerDupla, disponivelDesde) : []),
+    [souCoord, mentorados, emDupla, temQualquerDupla, disponivelDesde]
   );
   const filaMts = useMemo(
-    () => (souCoord ? filaMentores(pessoas, mentorProfiles, contagemPorMentor) : []),
-    [souCoord, pessoas, mentorProfiles, contagemPorMentor]
+    () => (souCoord ? filaMentores(pessoas, mentorProfiles, contagemPorMentor, disponivelDesde) : []),
+    [souCoord, pessoas, mentorProfiles, contagemPorMentor, disponivelDesde]
   );
   // fichas completas por id — o ⋯ da fila reusa as mesmas ações das linhas
   const mentoradoPorId = useMemo(

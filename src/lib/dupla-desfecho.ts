@@ -24,21 +24,29 @@ export const DESFECHO_LABEL: Record<DuplaDesfecho, string> = {
   outro: "Outro motivo",
 };
 
-/** Motivos estruturados por tipo de desfecho — o que o dialog oferece. */
+/** Motivos estruturados por tipo de desfecho — o que o dialog oferece.
+ *  A coluna é texto livre (`desfecho_motivo` é `text`, não enum): editar
+ *  aqui não exige migration. Lista vazia em `outro` é de propósito — o
+ *  motivo ali é texto livre, não opção fechada (o dialog rende input). */
 export const DESFECHO_MOTIVOS: Record<DuplaDesfecho, readonly string[]> = {
   concluida: [],
   desistencia_jovem: [
     "Abandono (sumiu, não responde)",
     "Mudança de cidade/escola",
     "Não se adaptou à metodologia",
+    "Nunca iniciou",
     "Problemas de saúde",
     "Problemas familiares",
+    "Rompimento da relação (conflito/perda de confiança)",
   ],
   desistencia_mentor: [
-    "Sobrecarga de trabalho",
-    "Mudança de cidade",
-    "Problemas de saúde",
+    "Abandono (sumiu, não responde)",
     "Desalinhamento com a metodologia",
+    "Mudança de cidade",
+    "Nunca iniciou (não compareceu)",
+    "Problemas de saúde",
+    "Rompimento da relação (conflito/perda de confiança)",
+    "Sobrecarga de trabalho",
   ],
   remanejada: ["Remanejamento de mentor", "Remanejamento de jovem", "Troca de turma"],
   outro: [],
@@ -103,14 +111,15 @@ export function desfechoLegacy(status: string | null | undefined): DuplaDesfecho
   return null;
 }
 
-/** Desfecho exige motivo quando não é "concluída" (e "outro" exige obs). */
+/** Desfecho exige motivo quando não é "concluída" — select quando há
+ *  vocabulário, texto livre quando não há ('outro'). A observação é
+ *  sempre opcional: 'outro' já exigia ela no lugar do motivo, o que
+ *  colava o motivo no campo errado (desfecho_obs) e deixava
+ *  desfecho_motivo vazio. */
 export function desfechoValido(d: { desfecho: DuplaDesfecho | null; motivo?: string | null; obs?: string | null }): string | null {
   if (!d.desfecho) return "Escolha o desfecho da dupla.";
   if (d.desfecho !== "concluida" && !(d.motivo ?? "").trim()) {
     return "Informe o motivo.";
-  }
-  if (d.desfecho === "outro" && !(d.obs ?? "").trim()) {
-    return "Descreva o motivo em 'Outro'.";
   }
   return null;
 }

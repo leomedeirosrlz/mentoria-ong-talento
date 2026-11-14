@@ -63,12 +63,16 @@ describe("dupla-desfecho", () => {
     expect(desfechoLegacy(null)).toBeNull();
   });
 
-  it("desfechoValido exige motivo (exceto concluida) e obs (outro)", () => {
+  it("desfechoValido exige motivo em todo não-concluida — 'outro' incluso, obs nunca exigida", () => {
     expect(desfechoValido({ desfecho: null })).not.toBeNull();
     expect(desfechoValido({ desfecho: "concluida" })).toBeNull();
     expect(desfechoValido({ desfecho: "desistencia_jovem" })).not.toBeNull();
     expect(desfechoValido({ desfecho: "desistencia_jovem", motivo: "x" })).toBeNull();
-    expect(desfechoValido({ desfecho: "outro", motivo: "x" })).not.toBeNull();
+    // 'outro' exige o MOTIVO em texto livre, não a observação — a obs
+    // voltou a ser opcional em qualquer desfecho (REALIZA-392)
+    expect(desfechoValido({ desfecho: "outro" })).not.toBeNull();
+    expect(desfechoValido({ desfecho: "outro", obs: "y" })).not.toBeNull();
+    expect(desfechoValido({ desfecho: "outro", motivo: "x" })).toBeNull();
     expect(desfechoValido({ desfecho: "outro", motivo: "x", obs: "y" })).toBeNull();
   });
 
@@ -76,6 +80,20 @@ describe("dupla-desfecho", () => {
     for (const d of ["concluida", "desistencia_jovem", "desistencia_mentor", "remanejada", "outro"] as DuplaDesfecho[]) {
       expect(DESFECHO_LABEL[d]).toBeTruthy();
       expect(DESFECHO_MOTIVOS[d]).toBeDefined();
+    }
+  });
+
+  it("vocabulário dos motivos (REALIZA-392): abandono/nunca-iniciou por lado, rompimento nos dois", () => {
+    expect(DESFECHO_MOTIVOS.desistencia_mentor).toContain("Abandono (sumiu, não responde)");
+    expect(DESFECHO_MOTIVOS.desistencia_mentor).toContain("Nunca iniciou (não compareceu)");
+    expect(DESFECHO_MOTIVOS.desistencia_mentor).toContain("Rompimento da relação (conflito/perda de confiança)");
+    expect(DESFECHO_MOTIVOS.desistencia_jovem).toContain("Nunca iniciou");
+    expect(DESFECHO_MOTIVOS.desistencia_jovem).toContain("Rompimento da relação (conflito/perda de confiança)");
+    // 'outro' segue sem opções: motivo em texto livre (o dialog rende input)
+    expect(DESFECHO_MOTIVOS.outro).toHaveLength(0);
+    // motivo nunca se repete dentro da mesma lista
+    for (const lista of Object.values(DESFECHO_MOTIVOS)) {
+      expect(new Set(lista).size).toBe(lista.length);
     }
   });
 });

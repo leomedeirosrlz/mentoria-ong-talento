@@ -31,6 +31,7 @@ import type { DuplaDesfecho } from "@/lib/dupla-desfecho";
 import type { InstrumentoDupla } from "@/lib/forms/queries";
 import { CacheTtl } from "./cache";
 import { perguntaFts } from "@/lib/ia/busca-guias";
+import { disponivelDesdePorId, type DuplaFecho } from "@/lib/fila";
 
 /** Papéis efetivos do dono do client — a mesma my_papeis() que o getMe usa
  *  (0085): a leitura sai de uma fonte só (o banco), nunca de claim
@@ -343,8 +344,9 @@ export const getFilaInsumos = cache(
     ocupados: Set<string>;
     historico: Set<string>;
     contagemPorMentor: Record<string, number>;
+    disponivelDesde: Record<string, string>;
   }> => {
-    const [pessoas, mentorados, carimboP, carimboM, duplas, mps] =
+    const [pessoas, mentorados, carimboP, carimboM, duplas, mps, encs] =
       await Promise.all([
         supabase
           .from("profiles")
@@ -356,10 +358,17 @@ export const getFilaInsumos = cache(
           .select("id, nome, nome_social, ong_origem, origem, situacao, created_at"),
         getCarimboMap(supabase, "profiles_pessoal"),
         getCarimboMap(supabase, "mentorados_pessoal"),
-        supabase.from("duplas").select("mentor_id, mentorado_id, status, trilha"),
+        // carimbos de fechamento alimentam a disponibilidade da fila
+        // (REALIZA-393) — a tool responde a espera ATUAL como a página
+        supabase
+          .from("duplas")
+          .select(
+            "id, mentor_id, mentorado_id, status, trilha, created_at, encerrada_em, concluida_em, desfecho_em, remanejada_de"
+          ),
         supabase
           .from("mentor_profiles")
           .select("profile_id, tipo, capacidade, capacidade_especialista"),
+        supabase.from("encerramentos").select("dupla_id, created_at"),
       ]);
     if (pessoas.error) throw pessoas.error;
     if (mentorados.error) throw mentorados.error;
@@ -387,6 +396,12 @@ export const getFilaInsumos = cache(
     for (const mp of (mps.data ?? []) as MentorProfile[]) {
       mentorProfiles[mp.profile_id] = mp;
     }
+    // encerramentos falha-soft: sem o carimbo do rito a fila degrada
+    // pros outros selos do fechamento, não quebra a tool
+    const disponivelDesde = disponivelDesdePorId(
+      (duplas.data ?? []) as DuplaFecho[],
+      encs.error ? [] : (encs.data ?? [])
+    );
     return {
       pessoas: ((pessoas.data ?? []) as (PessoaFilaIa & {
         profile_papeis?: { papel: AppRole }[];
@@ -403,6 +418,7 @@ export const getFilaInsumos = cache(
         form_bruto: carimboM.get(m.id) ?? null,
       })),
       mentorProfiles,
+      disponivelDesde,
       ocupados,
       historico,
       contagemPorMentor,

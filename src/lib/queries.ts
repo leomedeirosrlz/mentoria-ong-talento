@@ -47,6 +47,7 @@ import {
   demoTurmaInscricoesPessoas,
 } from "./demo/queries";
 import { getDemoData } from "./demo/data";
+import { demoEncerramentos } from "./demo/encerramento-data";
 import { demoPainelInstrumentosJornada } from "./demo/forms-data";
 import type { PainelJornadaLinha } from "./jornada";
 import type { InscricaoTurma, PapelEscopo } from "./pessoas-status";
@@ -604,17 +605,39 @@ export const getDuplasResumo = cache(async (): Promise<DuplaResumo[]> => {
 });
 
 /** Vínculos de qualquer status (inclusive encerrada) — espelha a guarda de
- *  exclusão das actions, que bloqueia pessoa/mentorado com QUALQUER dupla. */
+ *  exclusão das actions, que bloqueia pessoa/mentorado com QUALQUER dupla.
+ *  Traz também status + carimbos de fechamento: a fila "Aguardando par"
+ *  deriva deles a disponibilidade de quem volta (REALIZA-393). */
 export const getDuplasResumoTodas = cache(async (): Promise<DuplaResumo[]> => {
   const demo = await demoRole();
   if (demo) return demoDuplasResumo(demo, true);
   const supabase = await createClient();
   const { data, error } = await supabase
     .from("duplas")
-    .select("id,mentor_id,mentorado_id,supervisor_id,trilha,turma,cronograma_id");
+    .select("id,mentor_id,mentorado_id,supervisor_id,trilha,turma,cronograma_id,status,created_at,encerrada_em,concluida_em,desfecho_em,remanejada_de");
   if (error) throw error;
   return data ?? [];
 });
+
+/** Carimbo do rito de encerramento por dupla (0037) — a "encerrada antes
+ *  do fim" decidida pelo rito grava a data aqui, não na dupla. Insumo da
+ *  disponibilidade da fila (REALIZA-393). Falha → [] com log, idem a
+ *  vizinha de inscrições: a fila degrada pro carimbo seguinte, não quebra. */
+export const getEncerramentosResumo = cache(
+  async (): Promise<{ dupla_id: string; created_at: string | null }[]> => {
+    const demo = await demoRole();
+    if (demo) return demoEncerramentos(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("encerramentos")
+      .select("dupla_id, created_at");
+    if (error) {
+      console.error("getEncerramentosResumo:", error);
+      return [];
+    }
+    return data ?? [];
+  }
+);
 
 /** Encontros mínimos de um conjunto de duplas — o passo do guia da trilha
  *  especialista é o rank entre realizados (0074), então derivá-lo exige o
