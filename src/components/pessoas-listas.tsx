@@ -111,7 +111,6 @@ type DraftFiltros = {
   agrupar: "papel" | "turma";
   cat: string;
   status: StatusPessoa | "todos";
-  trilha: "todas" | "dpp" | "especialista";
   pendencias: boolean;
   ordem: OrdemPessoas;
 };
@@ -380,7 +379,8 @@ export function PessoasListas({
     return t === "sem-turma" || t === SEM_TURMA ? SEM_TURMA : t;
   });
   // filtros do modal (REALIZA-376): status operacional no vocabulário
-  // fechado, trilha do mentor e "somente com pendências"
+  // fechado e "somente com pendências" — a trilha do mentor virou pill
+  // na barra (um tap pro catálogo de especialistas)
   const [statusSel, setStatusSel] = useState<StatusPessoa | "todos">(() => {
     if (typeof window === "undefined") return "todos";
     const s = new URLSearchParams(window.location.search).get("status");
@@ -425,7 +425,6 @@ export function PessoasListas({
     agrupar: "papel",
     cat: "todos",
     status: "todos",
-    trilha: "todas",
     pendencias: false,
     ordem: "nome",
   });
@@ -519,6 +518,18 @@ export function PessoasListas({
       semTurma: sem,
     };
   }, [souCoord, basePessoas, mentorados, mapas]);
+
+  // track-pill counts share the turma denominator (whole base, not the
+  // filtered slice); a hybrid mentor counts in both pools
+  const trilhaInfo = useMemo(() => {
+    let dpp = 0;
+    let esp = 0;
+    for (const p of basePessoas) {
+      if (temPapel(p, "mentor_dpp")) dpp++;
+      if (temPapel(p, "mentor_especialista")) esp++;
+    }
+    return { dpp, esp };
+  }, [basePessoas]);
 
   // valor efetivo dos recortes — um deep-link pode apontar pra turma que
   // não existe mais (ou "sempapel" no diretório): cai no neutro
@@ -823,17 +834,16 @@ export function PessoasListas({
     trilhaSelEf !== "todas" ||
     soPendEf;
 
-  // selo do botão "Filtros": só os filtros de verdade — turma e busca já
-  // são pills/campo próprios; agrupar e ordenar são controles de visão
+  // selo do botão "Filtros": só os filtros de verdade — turma, trilha e
+  // busca já são pills/campo próprios; agrupar e ordenar são controles
+  // de visão
   const ativosFiltro =
     (catEf !== "todos" ? 1 : 0) +
     (statusSelEf !== "todos" ? 1 : 0) +
-    (trilhaSelEf !== "todas" ? 1 : 0) +
     (soPendEf ? 1 : 0);
   const draftAtivos =
     (draft.cat !== "todos" ? 1 : 0) +
     (draft.status !== "todos" ? 1 : 0) +
-    (draft.trilha !== "todas" ? 1 : 0) +
     (draft.pendencias ? 1 : 0);
 
   const limparFiltros = () => {
@@ -851,7 +861,6 @@ export function PessoasListas({
       agrupar,
       cat: catEf,
       status: statusSel,
-      trilha: trilhaSel,
       pendencias: soPendencias,
       ordem,
     });
@@ -861,7 +870,6 @@ export function PessoasListas({
     setAgrupar(draft.agrupar);
     setCat(draft.cat);
     setStatusSel(draft.status);
-    setTrilhaSel(draft.trilha);
     setSoPendencias(draft.pendencias);
     setOrdem(draft.ordem);
     setFiltrosAberto(false);
@@ -1061,6 +1069,67 @@ export function PessoasListas({
               )}
             </FilterChipRow>
           )}
+        {/* mentor-track pills — one tap to the specialist catalogue (the
+            row already carries "DPP 1/2 · Esp 0/1" in the meta). Hidden
+            when no specialist exists: an all-DPP program gains nothing */}
+        {souCoord && trilhaInfo.esp > 0 && (
+          <FilterChipRow
+            role="group"
+            aria-label="Filtrar por trilha de mentor"
+            className="-mx-4 px-4 pb-1 sm:mx-0 sm:px-0"
+          >
+            <button
+              type="button"
+              aria-pressed={trilhaSelEf === "todas"}
+              onClick={() => setTrilhaSel("todas")}
+              className={filterChipCls(trilhaSelEf === "todas")}
+            >
+              Todas trilhas
+            </button>
+            <button
+              type="button"
+              aria-pressed={trilhaSelEf === "dpp"}
+              onClick={() =>
+                setTrilhaSel(trilhaSelEf === "dpp" ? "todas" : "dpp")
+              }
+              className={filterChipCls(trilhaSelEf === "dpp")}
+            >
+              DPP
+              <span
+                className={cn(
+                  "text-[11px] tabular-nums",
+                  trilhaSelEf === "dpp"
+                    ? "text-background/70"
+                    : "text-muted-foreground"
+                )}
+              >
+                {trilhaInfo.dpp}
+              </span>
+            </button>
+            <button
+              type="button"
+              aria-pressed={trilhaSelEf === "especialista"}
+              onClick={() =>
+                setTrilhaSel(
+                  trilhaSelEf === "especialista" ? "todas" : "especialista"
+                )
+              }
+              className={filterChipCls(trilhaSelEf === "especialista")}
+            >
+              Especialista
+              <span
+                className={cn(
+                  "text-[11px] tabular-nums",
+                  trilhaSelEf === "especialista"
+                    ? "text-background/70"
+                    : "text-muted-foreground"
+                )}
+              >
+                {trilhaInfo.esp}
+              </span>
+            </button>
+          </FilterChipRow>
+        )}
       </div>
 
       {/* fila + pareamento no mesmo card (fev/2026): a fila é o contexto
@@ -1483,50 +1552,6 @@ export function PessoasListas({
               </div>
             </fieldset>
             <fieldset>
-              <legend className={OVERLINE}>Trilha</legend>
-              <div className="mt-1.5 grid grid-cols-3 gap-1.5">
-                <OpcaoPilula
-                  nome="flt-trilha"
-                  valor="todas"
-                  atual={draft.trilha}
-                  onSelect={(v) =>
-                    setDraft((d) => ({
-                      ...d,
-                      trilha: v as DraftFiltros["trilha"],
-                    }))
-                  }
-                >
-                  Todas
-                </OpcaoPilula>
-                <OpcaoPilula
-                  nome="flt-trilha"
-                  valor="dpp"
-                  atual={draft.trilha}
-                  onSelect={(v) =>
-                    setDraft((d) => ({
-                      ...d,
-                      trilha: v as DraftFiltros["trilha"],
-                    }))
-                  }
-                >
-                  DPP
-                </OpcaoPilula>
-                <OpcaoPilula
-                  nome="flt-trilha"
-                  valor="especialista"
-                  atual={draft.trilha}
-                  onSelect={(v) =>
-                    setDraft((d) => ({
-                      ...d,
-                      trilha: v as DraftFiltros["trilha"],
-                    }))
-                  }
-                >
-                  Especialista
-                </OpcaoPilula>
-              </div>
-            </fieldset>
-            <fieldset>
               <legend className={OVERLINE}>Pendências</legend>
               <div className="mt-1.5 -mx-1 space-y-0.5">
                 <OpcaoCheck
@@ -1574,7 +1599,6 @@ export function PessoasListas({
                   ...d,
                   cat: "todos",
                   status: "todos",
-                  trilha: "todas",
                   pendencias: false,
                 }))
               }

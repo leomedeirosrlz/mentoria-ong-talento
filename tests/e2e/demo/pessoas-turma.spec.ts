@@ -174,9 +174,50 @@ test.describe("demo — /pessoas por cargo + pills de turma", () => {
     ).toBeVisible();
   });
 
-  test("filtros do modal aplicam juntos (categoria + trilha)", async ({
+  test("pills de trilha: catálogo de especialistas num tap", async ({
     page,
   }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/pessoas");
+
+    // trilha é pill na barra (um tap pro catálogo) — não mora mais no modal
+    const trilha = page.getByRole("group", {
+      name: "Filtrar por trilha de mentor",
+    });
+    await expect(
+      trilha.getByRole("button", { name: "Todas trilhas" })
+    ).toHaveAttribute("aria-pressed", "true");
+    for (const rotulo of [/^DPP/, /^Especialista/]) {
+      await expect(
+        trilha.getByRole("button", { name: rotulo })
+      ).toBeVisible();
+    }
+
+    // Especialista isola as quatro do pool + híbridos; DPP puro sai de cena
+    await trilha.getByRole("button", { name: /^Especialista/ }).click();
+    await expect(page).toHaveURL(/trilha=especialista/);
+    for (const nome of [
+      "Sofia Nogueira",
+      "Helena Prado",
+      "Marcos Vinícius",
+      "Camila Ferraz",
+    ]) {
+      await expect(
+        page.getByRole("link", { name: `Abrir perfil de ${nome}` })
+      ).toBeVisible();
+    }
+    await expect(
+      page.getByRole("link", { name: "Abrir perfil de Fernanda Alves" })
+    ).toHaveCount(0);
+
+    // toggle off volta pro conjunto inteiro (mesmo gesto da pill de turma)
+    await trilha.getByRole("button", { name: "Todas trilhas" }).click();
+    await expect(
+      page.getByRole("link", { name: "Abrir perfil de Fernanda Alves" })
+    ).toBeVisible();
+  });
+
+  test("pill de trilha compõe com a categoria do modal", async ({ page }) => {
     await entrarNaDemo(page, "coordenacao");
     await page.goto("/pessoas");
 
@@ -184,14 +225,18 @@ test.describe("demo — /pessoas por cargo + pills de turma", () => {
     const dialog = page.getByRole("dialog");
     // o radio fica sr-only — quem recebe o clique é a label que o envolve
     await dialog.locator("label", { hasText: "Mentores" }).click();
-    await dialog.locator("label", { hasText: "Especialista" }).click();
     await dialog.getByRole("button", { name: /^Aplicar/ }).click();
+
+    await page
+      .getByRole("group", { name: "Filtrar por trilha de mentor" })
+      .getByRole("button", { name: /^Especialista/ })
+      .click();
 
     await expect(page).toHaveURL(/cat=mentores/);
     await expect(page).toHaveURL(/trilha=especialista/);
-    // o selo conta os dois filtros — turma e agrupar não entram
+    // o selo conta só os filtros do modal — trilha é pill própria
     await expect(
-      page.getByRole("button", { name: /Filtros, 2 ativos/ })
+      page.getByRole("button", { name: /Filtros, 1 ativo/ })
     ).toBeVisible();
     // especialista pura fica, DPP puro some
     await expect(
@@ -239,9 +284,12 @@ test.describe("demo — /pessoas por cargo + pills de turma", () => {
     await entrarNaDemo(page, "supervisor");
     await page.goto("/pessoas");
 
-    // sem pills de turma, sem botão do modal nem seleção em lote
+    // sem pills de turma/trilha, sem botão do modal nem seleção em lote
     await expect(
       page.getByRole("group", { name: "Filtrar por turma" })
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("group", { name: "Filtrar por trilha de mentor" })
     ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: /^Filtros/ })
