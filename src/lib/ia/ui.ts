@@ -150,6 +150,9 @@ export type UiChamados = {
   em_atendimento: number;
   /** até 5, mais recentes primeiro */
   chamados: {
+    /** uuid — o deep-link da linha (?c=); opcional por defesa a bloco
+     *  montado sem id */
+    id?: string;
     numero: string;
     categoria: ChamadoCategoria;
     assunto: string | null;
@@ -534,6 +537,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           .sort((a, b) => String(b.criado_em).localeCompare(String(a.criado_em)))
           .slice(0, 5)
           .map((c) => ({
+            id: str(c.id) || undefined,
             numero: String(c.numero),
             categoria: c.categoria as ChamadoCategoria,
             assunto: corta(str(c.assunto), 90),

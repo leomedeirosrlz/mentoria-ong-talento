@@ -127,17 +127,19 @@ describe("demais tools", () => {
     expect(b.mentores.map((m) => m.nome)).toEqual(["Cheio", "Livre"]);
   });
 
-  it("chamados vêm mais recentes primeiro", () => {
+  it("chamados vêm mais recentes primeiro, com o id do deep-link", () => {
     const b = uiDaTool("chamados_resumo", {
       aberto: 1,
       em_atendimento: 1,
       chamados: [
-        { numero: "C-1", categoria: "agenda", assunto: "x", status: "aberto", criado_em: "2026-10-01" },
-        { numero: "C-2", categoria: "outro", assunto: "y", status: "em_atendimento", criado_em: "2026-10-20" },
+        { id: "cha-1", numero: "C-1", categoria: "agenda", assunto: "x", status: "aberto", criado_em: "2026-10-01" },
+        { id: "cha-2", numero: "C-2", categoria: "outro", assunto: "y", status: "em_atendimento", criado_em: "2026-10-20" },
       ],
     });
     if (b?.kind !== "chamados") throw new Error("sem card");
     expect(b.chamados[0].numero).toBe("C-2");
+    // o card linka cada linha pra /chamados?c=<uuid> — sem id vaza nada
+    expect(b.chamados[0].id).toBe("cha-2");
   });
 
   it("guia limpa o trecho, corta na frase e nunca leva a pagina sintética", () => {

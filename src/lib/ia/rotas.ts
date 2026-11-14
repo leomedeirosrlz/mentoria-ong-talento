@@ -127,7 +127,7 @@ export function rotaAgenda(
   o: {
     dia?: string;
     visao?: "dpp" | "especialista";
-    aba?: "minha" | "por-mentorado" | "calendario";
+    aba?: "minha" | "por-mentorado" | "calendario" | "consolidada";
     jw?: "semana" | "mes" | "ciclo";
     turma?: string;
   } = {}

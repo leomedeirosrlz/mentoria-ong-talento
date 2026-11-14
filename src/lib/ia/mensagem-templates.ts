@@ -39,7 +39,7 @@ const NOTA: Record<MensagemTemplateSlug, string> = {
   "mensagem-preparacao":
     "Destinatária: a pessoa mentorada da dupla (numero = o whatsapp dela, quando devolvido). [Nome] vira o primeiro nome dela e [seu nome] o nome do mentor — quem pergunta.",
   "mensagem-indicadas":
-    "Cada pessoa indicada recebe uma mensagem própria com o link dela — monte um rascunho por contato em `indicadas` com status pendente: [nome] vira o primeiro nome do contato, [nome do(a) jovem] o primeiro nome do mentorado, [seu nome] o do mentor e [link] a URL individual (campo `link`). Contato sem whatsapp sai só com Copiar. Status expirado/respondido não recebe rascunho — avise que o link expirado precisa ser reemitido na ficha.",
+    "Cada pessoa indicada recebe uma mensagem própria com o link dela — monte um rascunho por contato em `indicadas` com status pendente: [nome] vira o primeiro nome do contato, [nome do(a) jovem] o primeiro nome do mentorado, [seu nome] o do mentor, [link] a URL individual (campo `link`) e [data] a `expira_em` do link formatada em pt-BR (sem expiração, corte o trecho 'Se puder, até…'). Contato sem whatsapp sai só com Copiar. Status expirado/respondido não recebe rascunho — avise que o link expirado precisa ser reemitido na ficha.",
   "mensagem-encaminhamento":
     "Destinatária: a pessoa mentorada (numero = o whatsapp dela, quando devolvido). [Nome] vira o primeiro nome dela; 'Próxima tarefa' e 'Prazo' saem de `combinados_pendentes` (o mais próximo de vencer primeiro — sem pendente, escreva o lembrete genérico do guia); 'data e horário' sai de `proximo_encontro`. Sem encontro agendado, diga que falta agendar e aponte a ficha.",
 };

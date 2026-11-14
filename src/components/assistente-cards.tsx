@@ -58,7 +58,12 @@ import {
 } from "@/lib/ciclo";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
 import type { RecorteFatia } from "@/lib/agenda-coordenacao";
-import { rotaDupla, rotaDuplas, rotaPessoa } from "@/lib/ia/rotas";
+import {
+  rotaChamados,
+  rotaDupla,
+  rotaDuplas,
+  rotaPessoa,
+} from "@/lib/ia/rotas";
 import {
   situacaoDaDupla,
   SITUACAO_DUPLA_LABEL,
@@ -325,7 +330,7 @@ function rotas(jovem: boolean) {
         ficha: () => "/jovem",
         encontros: () => "/jovem/agenda",
         instrumentos: () => "/jovem",
-        chamados: "/jovem/perfil",
+        chamados: () => "/jovem/perfil",
         agenda: "/jovem/agenda",
       }
     : {
@@ -334,7 +339,7 @@ function rotas(jovem: boolean) {
         ficha: (id: string) => rotaDupla(id),
         encontros: (id: string) => rotaDupla(id, "encontros"),
         instrumentos: (id: string) => rotaDupla(id, "instrumentos"),
-        chamados: "/chamados",
+        chamados: (id?: string) => rotaChamados(id),
         agenda: "/agenda",
       };
 }
@@ -1183,7 +1188,7 @@ const STATUS_CHAMADO: Record<ChamadoStatus, { tom: Tom; icone: ReactNode }> = {
 export function CardChamados({ b, r = rotas(false) }: { b: UiChamados; r?: Rotas }) {
   const agora = useAgora();
   return (
-    <Cartao titulo="Chamados" rodape={<Rodape href={r.chamados}>Abrir chamados</Rodape>}>
+    <Cartao titulo="Chamados" rodape={<Rodape href={r.chamados()}>Abrir chamados</Rodape>}>
       <ul className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
         <Contagem n={b.aberto} rotulo={b.aberto === 1 ? "aberto" : "abertos"} dot="bg-[var(--danger)]" texto="text-[var(--danger-text)]" />
         <Contagem n={b.em_atendimento} rotulo="em atendimento" dot="bg-[var(--warn)]" texto="text-[var(--warn-text)]" />
@@ -1193,27 +1198,32 @@ export function CardChamados({ b, r = rotas(false) }: { b: UiChamados; r?: Rotas
           {b.chamados.map((c, i) => {
             const st = STATUS_CHAMADO[c.status];
             return (
-              <li key={c.numero} style={passo(i + 1)} className="animate-enter py-2 first:pt-0 last:pb-0">
-                <div className="flex flex-wrap items-center gap-1.5">
-                  {/* assunto primeiro, como nas filas — o número CHA não
-                      aparece (ruído de protocolo, e o card vai pro jovem
-                      também) */}
-                  <p className={cn("min-w-0 flex-1 break-words text-sm font-medium leading-snug", !c.assunto && "font-normal text-muted-foreground")}>
-                    {c.assunto ?? "Sem assunto"}
-                  </p>
-                  <Pill tom={st.tom} icone={st.icone}>
-                    {CHAMADO_STATUS_LABEL[c.status]}
-                  </Pill>
-                </div>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  {CHAMADO_CATEGORIA_LABEL[c.categoria]}
-                  {valida(c.criado_em) && (
-                    <>
-                      {" · Aberto "}
-                      <time dateTime={c.criado_em}>{tempoRelativo(c.criado_em, agora)}</time>
-                    </>
-                  )}
-                </p>
+              <li key={c.id ?? c.numero} style={passo(i + 1)} className="animate-enter py-2 first:pt-0 last:pb-0">
+                <Link
+                  href={r.chamados(c.id)}
+                  className="-mx-2 block rounded-md px-2 py-0.5 transition-colors hover:bg-muted/60 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  <span className="flex flex-wrap items-center gap-1.5">
+                    {/* assunto primeiro, como nas filas — o número CHA não
+                        aparece (ruído de protocolo, e o card vai pro jovem
+                        também) */}
+                    <span className={cn("min-w-0 flex-1 break-words text-sm font-medium leading-snug", !c.assunto && "font-normal text-muted-foreground")}>
+                      {c.assunto ?? "Sem assunto"}
+                    </span>
+                    <Pill tom={st.tom} icone={st.icone}>
+                      {CHAMADO_STATUS_LABEL[c.status]}
+                    </Pill>
+                  </span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">
+                    {CHAMADO_CATEGORIA_LABEL[c.categoria]}
+                    {valida(c.criado_em) && (
+                      <>
+                        {" · Aberto "}
+                        <time dateTime={c.criado_em}>{tempoRelativo(c.criado_em, agora)}</time>
+                      </>
+                    )}
+                  </span>
+                </Link>
               </li>
             );
           })}

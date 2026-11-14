@@ -168,6 +168,13 @@ describe("rotaAgenda", () => {
   it("limpa devolve a agenda", () => {
     expect(rotaAgenda()).toBe("/agenda");
   });
+
+  it("aba consolidada — a visão do supervisor que a página já parseia", () => {
+    // /agenda lê abaParam === "consolidada" direto do searchParam
+    expect(params(rotaAgenda({ aba: "consolidada" })).get("aba")).toBe(
+      "consolidada"
+    );
+  });
 });
 
 describe("rotaMateriais / rotaRelatoriosOperacionais / rotaChamados", () => {

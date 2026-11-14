@@ -585,6 +585,7 @@ export function AssistenteBolha({
   const novaConversaRef = useRef<(() => void) | null>(null);
   const historicoRef = useRef<(() => void) | null>(null);
   const enviarRef = useRef<((pergunta: string) => void) | null>(null);
+  const rafPedido = useRef<number | null>(null);
   const conversa = (
     <AssistenteConversa
       papeis={papeis}
@@ -639,9 +640,8 @@ export function AssistenteBolha({
   };
   // "Pedir pra Liza" fora do painel (REALIZA-388 — CTA dos templates de
   // mensagem): a página dispara o CustomEvent e aqui vira abrir+enviar,
-  // mesmo caminho do chip do balão. Stream em andamento segura o envio
-  // (o `pending` da conversa ignora) — o painel ainda abre e a pessoa
-  // vê a rodada atual
+  // mesmo caminho do chip do balão. Stream em andamento enfileira a
+  // pergunta na conversa — dispara sozinha quando a rodada fecha
   useEffect(() => {
     const ouvir = (e: Event) => {
       const pergunta = (e as CustomEvent<{ pergunta?: unknown }>).detail
@@ -650,13 +650,16 @@ export function AssistenteBolha({
       // o clique que disparou o CustomEvent continua borbulhando pro
       // document — abrir no mesmo tick faz o outside-press do popover ler
       // essa abertura como "clique fora" e fechar o painel na hora
-      requestAnimationFrame(() => {
+      rafPedido.current = requestAnimationFrame(() => {
         mudar(true);
         enviarRef.current?.(pergunta);
       });
     };
     window.addEventListener(LIZA_PEDIDO_EVENTO, ouvir);
-    return () => window.removeEventListener(LIZA_PEDIDO_EVENTO, ouvir);
+    return () => {
+      window.removeEventListener(LIZA_PEDIDO_EVENTO, ouvir);
+      if (rafPedido.current != null) cancelAnimationFrame(rafPedido.current);
+    };
   }, [mudar]);
   const alternarHistorico = () => historicoRef.current?.();
 
