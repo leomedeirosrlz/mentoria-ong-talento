@@ -433,8 +433,9 @@ export function docsDoEncontro(
       tipo: "conteudo",
     });
   }
-  // doEvento + daJanela só produzem sistemas da dupla — o estreitamento é
-  // de tipo, não de domínio (o mapa editorial não nomeia outro sistema)
+  // daJanela também devolve chaves de estação (avaliacao_encontro,
+  // avaliacao_360) que não são sistema da dupla — quem restringe ao
+  // domínio é o `for` em INSTRUMENTOS_DUPLA_SISTEMA, não o mapa editorial
   const sistemas = new Set(
     instrumentoDoEncontro(encontroNum, cronograma)
   ) as Set<InstrumentoDuplaSistema>;
