@@ -725,6 +725,9 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
       );
     const cmp = (a: string, b: string) =>
       a.localeCompare(b, "pt-BR", { sensitivity: "base" });
+    // a lista chega por stream — espera a primeira linha pintar antes de
+    // medir (allInnerTexts não tem retry e a máquina de CI pode estar lenta)
+    await expect(linhas.first()).toBeVisible();
     const padrao = await nomesDuplas();
     expect(padrao.length).toBeGreaterThan(3);
 
@@ -739,6 +742,7 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     await btnOrdem.click();
     await expect(btnOrdem).toHaveAttribute("aria-label", /de A a Z/);
     await expect(page).toHaveURL(/[?&]ordem=az/);
+    await expect(linhas.first()).toBeVisible();
     const az = await nomesDuplas();
     expect(az).toEqual([...az].sort(cmp));
     // a massa saudável não colapsa em ordem alfabética — todas as duplas
@@ -748,12 +752,14 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     await btnOrdem.click();
     await expect(btnOrdem).toHaveAttribute("aria-label", /de Z a A/);
     await expect(page).toHaveURL(/[?&]ordem=za/);
+    await expect(linhas.first()).toBeVisible();
     expect(await nomesDuplas()).toEqual([...az].reverse());
 
     // terceiro clique devolve o radar — o param sai da URL e a ordem de
     // prioridade (com a massa colapsada, se havia) volta intacta
     await btnOrdem.click();
     await expect(page).not.toHaveURL(/[?&]ordem=/);
+    await expect(linhas.first()).toBeVisible();
     expect(await nomesDuplas()).toEqual(padrao);
   });
 });
