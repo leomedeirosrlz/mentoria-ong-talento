@@ -371,9 +371,12 @@ export function AssistenteConversa({
 
   // estado da rodada pra fora (mascote): status de tool = consultando,
   // token chegando = escrevendo, bolha de erro = erro — e falha do
-  // provider cochila o rosto inteiro (REALIZA-363)
+  // provider cochila o rosto inteiro (REALIZA-363). Provider desligado
+  // na configuração é o mesmo sono, sem precisar de uma falha primeiro
   const ultimaMsg = msgs[msgs.length - 1];
-  const estado: EstadoConversa = pending
+  const estado: EstadoConversa = !configurado && !demo
+    ? "sonolento"
+    : pending
     ? status || !ultimaMsg?.content
       ? "consultando"
       : "escrevendo"
@@ -1170,7 +1173,16 @@ export function AssistenteConversa({
               não ícone decorativo centralizado */}
           <div className="animate-enter flex items-start gap-4">
             <div className="shrink-0">
-              <Avatar tamanho={96} estado={aberto ? "aberto" : "parado"} />
+              <Avatar
+                tamanho={96}
+                estado={
+                  !configurado && !demo
+                    ? "sonolento"
+                    : aberto
+                      ? "aberto"
+                      : "parado"
+                }
+              />
             </div>
             <div className="min-w-0 pt-4 text-left">
               <p className="text-base font-semibold text-balance">

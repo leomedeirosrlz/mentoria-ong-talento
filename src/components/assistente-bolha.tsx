@@ -508,9 +508,11 @@ export function AssistenteBolha({
 
   // decide a fala da página depois que ela assenta. Uma por aba: a
   // apresentação (até abrir a Liza uma vez) ou uma dica de página; troca
-  // de rota re-avalia enquanto a aba ainda não falou
+  // de rota re-avalia enquanto a aba ainda não falou. Provider desligado
+  // = sem balão: dica que convida a "perguntar" enquanto ela dorme é
+  // propaganda enganosa (a demo responde — lá a fala fica)
   useEffect(() => {
-    if (!pronto || aberto) return;
+    if (!pronto || aberto || (!configurado && !demo)) return;
     const t = setTimeout(() => {
       const memoria = lerMemoria();
       const nova = proximaFala({
