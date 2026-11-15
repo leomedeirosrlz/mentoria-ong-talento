@@ -477,18 +477,19 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
   // olhos ~17% maiores que a primeira versão (feedback de design: a
   // expressão era genérica) e mais ~15% na escala cheia: com o olho menor o
   // disco sobrava embaixo e a Liza lia como gordinha. No mini continuam
-  // legíveis sem encostar um no outro
+  // legíveis sem encostar um no outro. Nov/26: mais 15% lineares — os olhos
+  // carregam a expressão e ainda liam pequenos nos tamanhos médios
   const olhoDims = detalhe
     ? {
-        rx: 12.8 - 0.7 * kOlho,
-        ry: 15.8 - 1 * kOlho,
+        rx: 14.72 - 0.7 * kOlho,
+        ry: 18.17 - 1 * kOlho,
         cy: 48.5 - 3 * kOlho,
         dx: 19 - 0.4 * kOlho,
       }
-    : { rx: 12.8, ry: 15.8, cy: 48.5, dx: 19 };
-  // cílios em todas as escalas: acima de 40 o par fino; abaixo, um traço
-  // só mais grosso — o par fino lia como borrão no header (34) e nos
-  // avatares da conversa (22/24)
+    : { rx: 14.72, ry: 18.17, cy: 48.5, dx: 19 };
+  // cílios em todas as escalas: no mini o par continua, mas mais grosso e
+  // mais afastado — as mesmas duas hastes do grande fundiriam num borrão
+  // nos avatares da conversa (22/24) e no header (34)
   const ciliosMini = tamanho < 40;
   // o olho inteiro viaja no rosto (raio) e o reflexo faz um contra-movimento
   // (hx) — o clássico de mascote; a boca anda ~metade: o rosto "vira" em 3D
@@ -763,7 +764,7 @@ function Olho({
   const borda = (fator: number) => -fator * ry + 2 * ry * palp;
   const r1x = lado * 0.88 * rx * pose.sx;
   const r1y = Math.max(-0.51 * ry * topo * pose.sy, borda(0.86));
-  const r2x = lado * 0.69 * rx * pose.sx;
+  const r2x = lado * (ciliosMini ? 0.55 : 0.69) * rx * pose.sx;
   const r2y = Math.max(-0.75 * ry * topo * pose.sy, borda(0.85));
   const cilio1 = `M${r1x} ${r1y}q${lado * 1.5} ${-1.5} ${lado * 3.8} ${-1.3}`;
   const cilio2 = `M${r2x} ${r2y}q${lado * 1.1} ${-1.8} ${lado * 2.8} ${-2.4}`;
@@ -853,20 +854,18 @@ function Olho({
             transition={transicao}
             fill="none"
             stroke={TINTA}
-            strokeWidth={ciliosMini ? 2.7 : 1.9}
+            strokeWidth={ciliosMini ? 2.5 : 1.9}
             strokeLinecap="round"
           />
-          {!ciliosMini && (
-            <motion.path
-              initial={false}
-              animate={{ d: cilio2 }}
-              transition={transicao}
-              fill="none"
-              stroke={TINTA}
-              strokeWidth={1.7}
-              strokeLinecap="round"
-            />
-          )}
+          <motion.path
+            initial={false}
+            animate={{ d: cilio2 }}
+            transition={transicao}
+            fill="none"
+            stroke={TINTA}
+            strokeWidth={ciliosMini ? 2.2 : 1.7}
+            strokeLinecap="round"
+          />
         </motion.g>
       </motion.g>
 
