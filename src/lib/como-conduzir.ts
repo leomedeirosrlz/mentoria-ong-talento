@@ -382,6 +382,26 @@ export function sistemaDoDoc(slug: string): InstrumentoDuplaSistema | null {
   return null;
 }
 
+/** A chave da régua (/materiais/instrumentos/<chave>) que acompanha o
+ *  instrumento de sistema — a roda tem duas estações e o doc cobre as
+ *  duas, então cai na primeira aplicação e o seletor da página troca pra
+ *  formal. O checklist não tem card na régua: null devolve o fallback
+ *  genérico da aba. */
+const CHAVE_DO_SISTEMA: Partial<
+  Record<InstrumentoDuplaSistema, EstacaoChave>
+> = {
+  roda_vida: "roda_inicial",
+  visao: "visao",
+  metas: "metas",
+  pdm: "pdm",
+};
+
+export function chaveDoSistema(
+  sistema: InstrumentoDuplaSistema
+): EstacaoChave | null {
+  return CHAVE_DO_SISTEMA[sistema] ?? null;
+}
+
 /** Técnica do guia nomeada pelo evento → documento de apoio do corpus.
  *  Não têm instrumento de sistema (NOME_INSTRUMENTO não as mapeia, então
  *  não viram chip na ficha), mas existem como doc nativo — entram na

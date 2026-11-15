@@ -9,6 +9,7 @@ import {
   corpusServePapel,
   listarDocsCorpus,
 } from "@/lib/materiais/corpus-doc";
+import { chaveDoSistema, sistemaDoDoc } from "@/lib/como-conduzir";
 import { getMe } from "@/lib/queries";
 import { demoRole } from "@/lib/demo/mode";
 import {
@@ -105,11 +106,23 @@ export default async function DocumentoPage({
                 rotulo: "Abrir instrumento",
                 dica: "Este guia acompanha o instrumento ao vivo, emitido e acompanhado na ficha da dupla.",
               }
-            : {
-                href: "/materiais?aba=instrumentos",
-                rotulo: "Ver instrumentos",
-                dica: "Instrumento oficial do programa. O mentor emite o link na ficha da dupla e o resultado volta estruturado.",
-              }
+            : (() => {
+                // deep-link ao instrumento que o doc acompanha (REALIZA-414):
+                // a régua por chave; sem card próprio cai na aba toda
+                const sistema = sistemaDoDoc(slug);
+                const chave = sistema ? chaveDoSistema(sistema) : null;
+                return chave
+                  ? {
+                      href: `/materiais/instrumentos/${chave}`,
+                      rotulo: "Abrir instrumento",
+                      dica: "Instrumento oficial do programa — o estado dele em cada dupla do seu escopo.",
+                    }
+                  : {
+                      href: "/materiais?aba=instrumentos",
+                      rotulo: "Ver instrumentos",
+                      dica: "Instrumento oficial do programa. O mentor emite o link na ficha da dupla e o resultado volta estruturado.",
+                    };
+              })()
         }
       />
     );

@@ -119,18 +119,35 @@ test.describe("demo — ponte instrumento ↔ documento (REALIZA-386)", () => {
     );
   });
 
-  test("doc sem contexto aponta a régua; o card da régua aponta o guia", async ({
+  test("doc sem contexto aponta o instrumento; a régua mostra a síntese e o guia", async ({
     page,
   }) => {
     await entrarNaDemo(page, "coordenacao");
-    // biblioteca/bibliografia direta: sem ?dupla a ponte cai na régua
+    // biblioteca/bibliografia direta: sem ?dupla a ponte cai no deep-link
+    // do instrumento (REALIZA-414), não mais na aba toda
     await page.goto("/materiais/documento/instrumento-roda-da-vida");
-    const ver = page.getByRole("link", { name: "Ver instrumentos" });
-    await expect(ver).toHaveAttribute("href", "/materiais?aba=instrumentos");
+    const ver = page.getByRole("link", { name: "Abrir instrumento" });
+    await expect(ver).toHaveAttribute(
+      "href",
+      "/materiais/instrumentos/roda_inicial"
+    );
 
-    // a página do instrumento no painel também linka o guia nativo
+    // a página do instrumento no painel mostra a síntese do guia nativo
+    // ("O que é" + jornada) e linka o doc completo (REALIZA-414)
     await page.goto("/materiais/instrumentos/visao");
-    const guia = page.getByRole("link", { name: "Ler o guia" });
+    const sintese = page.locator("section[aria-label='Sobre o instrumento']");
+    await expect(sintese).toBeVisible();
+    await expect(sintese.getByRole("heading", { name: "O que é" })).toBeVisible();
+    await expect(
+      sintese.getByRole("heading", { name: "Quando na jornada" })
+    ).toBeVisible();
+    await expect(
+      sintese.getByRole("link", { name: "Ler o guia completo" })
+    ).toHaveAttribute(
+      "href",
+      "/materiais/documento/instrumento-construindo-visao"
+    );
+    const guia = page.getByRole("link", { name: "Ler o guia", exact: true });
     await expect(guia).toHaveAttribute(
       "href",
       "/materiais/documento/instrumento-construindo-visao"
@@ -138,7 +155,7 @@ test.describe("demo — ponte instrumento ↔ documento (REALIZA-386)", () => {
     // instrumento sem doc nativo (avaliação recorrente) não ganha o link
     await page.goto("/materiais/instrumentos/avaliacao_encontro");
     await expect(
-      page.getByRole("link", { name: "Ler o guia" })
+      page.getByRole("link", { name: "Ler o guia", exact: true })
     ).toHaveCount(0);
   });
 

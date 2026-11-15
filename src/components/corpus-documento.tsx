@@ -91,10 +91,25 @@ function capitalizar(s: string): string {
 
 /** "PDM · Onde fica na plataforma" → eyebrow "PDM" + title "Onde fica na
  *  plataforma". The corpus ` · ` separator always marks parent·child
- *  (phase, instrument, chapter); a title without it has no eyebrow. */
-function eyebrowDe(titulo: string): { eyebrow: string | null; resto: string } {
+ *  (phase, instrument, chapter); a title without it has no eyebrow.
+ *  The eyebrow is dropped when it adds nothing in this doc: repeating
+ *  the doc's own subject ("Roda da Vida · …" inside the Roda da Vida
+ *  doc — every section stamped alike tires reading) or a bare chapter
+ *  number ("01 · Carta…" — grupos already carry their own numbering). */
+function eyebrowDe(
+  titulo: string,
+  docTitulo?: string
+): { eyebrow: string | null; resto: string } {
   const m = /^(.{1,40}?)\s+·\s+(.+)$/.exec(titulo);
-  return m ? { eyebrow: m[1], resto: m[2] } : { eyebrow: null, resto: titulo };
+  if (!m) return { eyebrow: null, resto: titulo };
+  const [, eyebrow, resto] = m;
+  if (/^\d+$/.test(eyebrow.trim())) return { eyebrow: null, resto };
+  if (
+    docTitulo &&
+    normTitulo(docTitulo).includes(normTitulo(eyebrow))
+  )
+    return { eyebrow: null, resto };
+  return { eyebrow, resto };
 }
 
 // h2 icon by exact keyword in the normalized title (word boundary) — the
@@ -144,8 +159,16 @@ function iconeTitulo(titulo: string, className: string): ReactNode {
  *  PDF's full-width band — tinted bg of the rotating tone + caps eyebrow +
  *  icon + title + the tone's accent bar; regular sections keep the caps
  *  lime eyebrow + navy bold title + the full-width lime rule. */
-function TituloGrupo({ grupo, num }: { grupo: CorpusGrupo; num: number }) {
-  const { eyebrow, resto } = eyebrowDe(grupo.titulo);
+function TituloGrupo({
+  grupo,
+  num,
+  docTitulo,
+}: {
+  grupo: CorpusGrupo;
+  num: number;
+  docTitulo?: string;
+}) {
+  const { eyebrow, resto } = eyebrowDe(grupo.titulo, docTitulo);
   const tom = grupo.fase != null ? TOM_DOC[tomDeFase(grupo.fase)] : null;
   // número do capítulo na posição do eyebrow — "05 · PDM" ou só "05"
   const rotulo = `${String(num).padStart(2, "0")}${eyebrow ? ` · ${eyebrow}` : ""}`;
@@ -201,8 +224,14 @@ function TituloGrupo({ grupo, num }: { grupo: CorpusGrupo; num: number }) {
 
 /** h3: navy bold, no rule (the eyebrow applies here too — "Momento N · …"
  *  and the routes' "Nº encontro · …" come out in caps lime). */
-function TituloSub({ s }: { s: CorpusSecao }) {
-  const { eyebrow, resto } = eyebrowDe(s.titulo);
+function TituloSub({
+  s,
+  docTitulo,
+}: {
+  s: CorpusSecao;
+  docTitulo?: string;
+}) {
+  const { eyebrow, resto } = eyebrowDe(s.titulo, docTitulo);
   return (
     <h3 id={s.anchor} className="group scroll-mt-20 md:scroll-mt-8">
       {eyebrow ? (
@@ -225,17 +254,19 @@ function GrupoSecao({
   grupo,
   num,
   trilha,
+  docTitulo,
 }: {
   grupo: CorpusGrupo;
   num: number;
   trilha?: ReactNode;
+  docTitulo?: string;
 }) {
   // semantic tone of the numbered chips (the PDF's pill diagram) — the sub
   // inherits the parent section's tone when it has no dimension of its own
   const tomGrupo = tomSemantico(grupo.titulo) ?? undefined;
   return (
     <section>
-      <TituloGrupo grupo={grupo} num={num} />
+      <TituloGrupo grupo={grupo} num={num} docTitulo={docTitulo} />
       {trilha}
       {grupo.intro ? (
         <div className="mt-3 space-y-3">
@@ -251,7 +282,7 @@ function GrupoSecao({
               <DocBlocos blocos={s.blocos} tom={tomSub} />
             ) : (
               <>
-                <TituloSub s={s} />
+                <TituloSub s={s} docTitulo={docTitulo} />
                 <div className="mt-2 space-y-3">
                   <DocBlocos blocos={s.blocos} tom={tomSub} />
                 </div>
@@ -264,6 +295,13 @@ function GrupoSecao({
   );
 }
 
+/** Texto do sumário: com o eyebrow informativo fica o título inteiro;
+ *  redundante (assunto do doc ou número cru) mostra só o resto. */
+function rotuloDe(titulo: string, docTitulo?: string): string {
+  const { eyebrow, resto } = eyebrowDe(titulo, docTitulo);
+  return eyebrow ? titulo : resto;
+}
+
 /** TOC item: tone marker (the phase's own color on bands, lime elsewhere)
  *  + title + dotted leader — the guide's printed TOC rite. */
 function SumarioItem({
@@ -271,11 +309,13 @@ function SumarioItem({
   titulo,
   tom,
   num,
+  docTitulo,
 }: {
   anchor: string;
   titulo: string;
   tom?: DocTom;
   num?: number;
+  docTitulo?: string;
 }) {
   return (
     <a
@@ -302,7 +342,7 @@ function SumarioItem({
           )}
         />
       )}
-      <span className="min-w-0">{titulo}</span>
+      <span className="min-w-0">{rotuloDe(titulo, docTitulo)}</span>
       <span
         aria-hidden
         className="ml-1 min-w-4 flex-1 border-b border-dotted border-muted-foreground/40"
@@ -311,7 +351,13 @@ function SumarioItem({
   );
 }
 
-function SumarioLista({ grupos }: { grupos: CorpusGrupo[] }) {
+function SumarioLista({
+  grupos,
+  docTitulo,
+}: {
+  grupos: CorpusGrupo[];
+  docTitulo?: string;
+}) {
   return (
     <ol className="space-y-1">
       {grupos.map((g, i) => (
@@ -321,6 +367,7 @@ function SumarioLista({ grupos }: { grupos: CorpusGrupo[] }) {
             titulo={g.titulo}
             num={i + 1}
             tom={g.fase != null ? tomDeFase(g.fase) : undefined}
+            docTitulo={docTitulo}
           />
         </li>
       ))}
@@ -333,10 +380,18 @@ function SumarioLista({ grupos }: { grupos: CorpusGrupo[] }) {
  *  nativo esconde o conteúdo na hora e não deixa animar o fechamento). A
  *  lista é renderizada no server e chega como children. Escondido no xl
  *  (rail lateral assume) e no print, onde as seções já saem abertas. */
-function Sumario({ grupos, total }: { grupos: CorpusGrupo[]; total: number }) {
+function Sumario({
+  grupos,
+  total,
+  docTitulo,
+}: {
+  grupos: CorpusGrupo[];
+  total: number;
+  docTitulo?: string;
+}) {
   return (
     <SumarioPill total={total}>
-      <SumarioLista grupos={grupos} />
+      <SumarioLista grupos={grupos} docTitulo={docTitulo} />
     </SumarioPill>
   );
 }
@@ -346,9 +401,11 @@ function Sumario({ grupos, total }: { grupos: CorpusGrupo[]; total: number }) {
 function SumarioRail({
   grupos,
   total,
+  docTitulo,
 }: {
   grupos: CorpusGrupo[];
   total: number;
+  docTitulo?: string;
 }) {
   return (
     <nav
@@ -362,7 +419,7 @@ function SumarioRail({
         </span>
       </p>
       <div className="mt-3">
-        <SumarioLista grupos={grupos} />
+        <SumarioLista grupos={grupos} docTitulo={docTitulo} />
       </div>
     </nav>
   );
@@ -444,7 +501,13 @@ export function CorpusDocBody({ doc }: { doc: CorpusDoc }) {
   const longo = doc.secoes.length > TOC_MINIMO;
   return (
     <div className={cn("mt-5", longo && "xl:grid xl:grid-cols-[15rem_minmax(0,1fr)] xl:gap-10")}>
-      {longo ? <SumarioRail grupos={grupos} total={doc.secoes.length} /> : null}
+      {longo ? (
+        <SumarioRail
+          grupos={grupos}
+          total={doc.secoes.length}
+          docTitulo={doc.titulo}
+        />
+      ) : null}
       <div className="min-w-0">
         {doc.lede.length > 0 ? (
           <section
@@ -456,7 +519,13 @@ export function CorpusDocBody({ doc }: { doc: CorpusDoc }) {
           </section>
         ) : null}
 
-        {longo ? <Sumario grupos={grupos} total={doc.secoes.length} /> : null}
+        {longo ? (
+          <Sumario
+            grupos={grupos}
+            total={doc.secoes.length}
+            docTitulo={doc.titulo}
+          />
+        ) : null}
 
         <div className="mt-6 space-y-8">
           {grupos.map((g, i) => (
@@ -467,6 +536,7 @@ export function CorpusDocBody({ doc }: { doc: CorpusDoc }) {
               <GrupoSecao
                 grupo={g}
                 num={i + 1}
+                docTitulo={doc.titulo}
                 trilha={
                   jornada && jornada.home === g.anchor ? (
                     <JornadaStrip jornada={jornada} />

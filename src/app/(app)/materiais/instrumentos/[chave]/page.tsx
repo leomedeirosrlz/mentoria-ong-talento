@@ -39,6 +39,12 @@ import {
   type RespostaValor,
 } from "@/lib/forms/schema";
 import { docDoSistema } from "@/lib/como-conduzir";
+import {
+  carregarDocCorpus,
+  normTitulo,
+  type CorpusSecao,
+} from "@/lib/materiais/corpus-doc";
+import { DocBlocos } from "@/components/material-documento";
 import type { InstrumentoDupla, InstrumentoEntrega } from "@/lib/forms/queries";
 import { turmaCurta } from "@/lib/turma";
 import {
@@ -309,6 +315,20 @@ export default async function InstrumentoPage({
       ? docDoSistema(sistema as InstrumentoDuplaSistema)
       : null;
 
+  // síntese do instrumento (REALIZA-414): "O que é" + a seção de jornada
+  // do guia nativo — pra que serve, quem responde e quando entra — com o
+  // link pro doc completo. Os docs seguem o mesmo gabarito de seções.
+  const docCorpus = docGuia ? await carregarDocCorpus(docGuia) : null;
+  const secoesSintese = docCorpus
+    ? [/\bo que e\b/, /jornada|aplicacoes|encontros/]
+        .map((re) =>
+          docCorpus.secoes.find(
+            (s) => s.nivel === 2 && re.test(normTitulo(s.titulo))
+          )
+        )
+        .filter((s): s is CorpusSecao => s != null)
+    : [];
+
   // tudo sobe numa leva só: o filtro "duplas DPP vivas do mentor" repete a
   // expressão das linhas pra destravar a RPC por dupla (definer — uma por
   // dupla, em paralelo, sem esperar o resto); o detalhe do 360º encadeia
@@ -517,6 +537,35 @@ export default async function InstrumentoPage({
           ))}
         </ul>
       </FadeX>
+
+      {/* síntese do instrumento: pra que serve e quando entra na jornada,
+          direto do guia nativo — o doc completo fica a um clique */}
+      {secoesSintese.length > 0 && docGuia && (
+        <section
+          aria-label="Sobre o instrumento"
+          className="rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5"
+          style={instrumentoVars(card.chave)}
+        >
+          {secoesSintese.map((s, i) => (
+            <div key={s.anchor} className={i > 0 ? "mt-4" : undefined}>
+              <h2 className="text-sm font-semibold">
+                {s.titulo.split("·").pop()!.trim()}
+              </h2>
+              <div className="mt-2 space-y-3">
+                <DocBlocos blocos={s.blocos} />
+              </div>
+            </div>
+          ))}
+          <Link
+            href={`/materiais/documento/${docGuia}`}
+            prefetch={false}
+            className="mt-3 inline-flex min-h-8 items-center gap-1 rounded-md text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <BookOpen size={12} aria-hidden />
+            Ler o guia completo
+          </Link>
+        </section>
+      )}
 
       <section
         aria-label={`Duplas — ${card.titulo}`}
