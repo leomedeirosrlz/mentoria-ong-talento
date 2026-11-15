@@ -52,6 +52,6 @@ Depois da revisão, a Roda da Vida alimenta o PDM: as metas das áreas prioritá
 
 ## PDM · Onde fica na plataforma
 
-O PDM é instrumento oficial na ficha da dupla (aba Instrumentos): o(a) mentor(a) emite o link e o(a) jovem responde na plataforma, porque é ele(a) quem escreve o próprio plano. A Declaração de Visão, as metas com IS e prazo e o mapa de submetas ficam registrados e consultáveis pela dupla e pela coordenação. A aba Instrumentos de /materiais mostra o card "PDM · Plano de Desenvolvimento" (construção nos enc. 1 a 4, revisão no 9º).
+O PDM é instrumento oficial na ficha da dupla (aba Instrumentos): o link chega pro(a) jovem automaticamente quando chega a vez na jornada e a resposta acontece na plataforma, porque é ele(a) quem escreve o próprio plano. A Declaração de Visão, as metas com IS e prazo e o mapa de submetas ficam registrados e consultáveis pela dupla e pela coordenação. A aba Instrumentos de /materiais mostra o card "PDM · Plano de Desenvolvimento" (construção nos enc. 1 a 4, revisão no 9º).
 
-*(Atualização: na plataforma vigente, o PDM fica na ficha da dupla, aba Instrumentos: o(a) mentor(a) emite o link e o(a) jovem responde; o guia impresso que diz "fora da plataforma" está desatualizado.)*
+*(Atualização: na plataforma vigente, o PDM fica na ficha da dupla, aba Instrumentos: o link chega pro(a) jovem automaticamente e a resposta acontece na plataforma; o guia impresso que diz "fora da plataforma" está desatualizado.)*

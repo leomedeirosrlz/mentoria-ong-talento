@@ -391,13 +391,19 @@ describe("estacoesJornada — a_fazer", () => {
     const v = por(est, "visao");
     expect(v.estado).toBe("a_fazer");
     expect(v.token).toBeNull();
-    expect(v.detalhe).toBe("o mentor envia quando chegar a hora");
+    expect(v.detalhe).toBe(
+      "o link já devia ter chegado sozinho: fala com teu mentor"
+    );
   });
 
-  it("sem entrega dentro da janela → 'envia quando chegar a hora' por emissor", () => {
+  it("sem entrega dentro da janela → copy de anomalia (auto-emissão falhou)", () => {
     const est = estacoesJornada(base({ encontros: realizados(1) }));
-    expect(por(est, "visao").detalhe).toBe("o mentor envia quando chegar a hora");
-    expect(por(est, "metas").detalhe).toBe("o mentor envia quando chegar a hora");
+    expect(por(est, "visao").detalhe).toBe(
+      "o link já devia ter chegado sozinho: fala com teu mentor"
+    );
+    expect(por(est, "metas").detalhe).toBe(
+      "o link já devia ter chegado sozinho: fala com teu mentor"
+    );
   });
 
   it("sem entrega com a janela já passada → copy honesta, sem promessa futura", () => {
