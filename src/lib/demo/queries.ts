@@ -6,7 +6,9 @@ import {
 import type { TermoSimulado } from "./shared";
 import { audienciasDe, veMaterial, veMaterialDaTurma } from "../materiais";
 import { turmaDaDupla, turmaNumero } from "../turma";
-import { comparaNome, registroTardio, semanaBounds } from "../ciclo";
+import { comparaNome, registroTardio, saudadeDaDupla, semanaBounds } from "../ciclo";
+import type { DiaSaude } from "../relatorios/dados";
+import type { RecorteCsv } from "../relatorios/csv-core";
 import { slotsLivresEspecialista } from "./agenda";
 import { normaliza } from "../utils";
 import type {
@@ -2634,4 +2636,42 @@ export function demoResumoAcessos(): ResumoAcessoItem[] {
       origem: "a1b2c3d4e5",
     },
   ];
+}
+
+/** Tendência da aba Saúde na demo — o job de snapshots não existe no
+ *  dataset em memória, mas as datas são evergreen: recalcular o semáforo
+ *  de cada dupla viva a cada dia reproduz o histórico que a RPC gravaria
+ *  (mesma regra do backfill do job — dados atuais, não replay). O filtro
+ *  espelha duplaNoRecorte sem importar csv-core (que puxa next/server). */
+export function demoTendenciaSaude(
+  data: DemoData,
+  recorte: RecorteCsv,
+  dias = 30,
+  hoje = new Date()
+): DiaSaude[] {
+  const vivas = data.duplas.filter(
+    (d) =>
+      (d.status === "ativa" || d.status === "pausada") &&
+      (!recorte.turma ||
+        turmaDaDupla(d, data.cronogramas) === recorte.turma) &&
+      (!recorte.cronogramaId || d.cronograma_id === recorte.cronogramaId)
+  );
+  const porDia = new Map<string, DiaSaude>();
+  for (let i = dias - 1; i >= 0; i--) {
+    const d = new Date(hoje.getTime() - i * 86400000);
+    const cur = porDia.get(d.toISOString().slice(0, 10)) ?? {
+      dia: d.toISOString().slice(0, 10),
+      risco: 0,
+      atencao: 0,
+      ok: 0,
+    };
+    for (const dupla of vivas) {
+      const s = saudadeDaDupla(dupla, data.cicloEventos, d).semaforo;
+      if (s === "risco") cur.risco++;
+      else if (s === "atencao") cur.atencao++;
+      else cur.ok++;
+    }
+    porDia.set(cur.dia, cur);
+  }
+  return [...porDia.values()];
 }

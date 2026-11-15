@@ -12,6 +12,7 @@ import { getEncerramentos } from "@/lib/queries-encerramento";
 import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "@/lib/demo/mode";
 import { getDemoData } from "@/lib/demo/data";
+import { demoTendenciaSaude } from "@/lib/demo/queries";
 import { PageHeader } from "@/components/page-header";
 import { VoltarLink } from "@/components/voltar-link";
 import { GraficoTempo } from "@/components/viz/grafico-tempo";
@@ -215,7 +216,7 @@ async function renderAba({
   switch (aba) {
     case "visao": {
       const tendencia = demo
-        ? []
+        ? demoTendenciaSaude(d!, recorte)
         : await dadosTendenciaSaude(supabase!, recorte);
       return <AbaSaude tendencia={tendencia} />;
     }

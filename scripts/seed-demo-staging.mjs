@@ -138,20 +138,32 @@ async function limpar() {
     ["formulario_links", "respondido_por_profile_id"],
     ["ia_eventos", "profile_id"],
     ["emails_enviados", "autor_id"],
-    ["encontro_notas", "created_by"],
+    ["encontro_notas", "created_by"], ["encontro_notas", "dupla_id"],
+    ["encontro_remarcacoes", "dupla_id"], ["encontro_remarcacoes", "created_by"],
     ["registro_anexos", "created_by"],
     ["registros", "created_by"], ["registros", "encontro_id"],
+    ["registro_tentativas", "dupla_id"], ["registro_tentativas", "profile_id"],
+    ["dupla_saude_snapshots", "dupla_id"],
+    ["dupla_eventos", "dupla_id"], ["dupla_eventos", "por"],
+    ["pdm", "dupla_id"], ["pdm_itens", "created_by"],
+    ["terceiros_consolidacao", "dupla_id"], ["terceiros_consolidacao", "escrito_por"],
+    ["terceiros_contatos", "dupla_id"], ["terceiros_contatos", "created_by"],
+    ["trilha_lembretes", "dupla_id"],
     ["pessoa_notas", "profile_id"], ["pessoa_notas", "mentorado_id"], ["pessoa_notas", "created_by"],
     ["solicitacao_propostas", "solicitacao_id"], ["solicitacao_propostas", "autor_id"],
     // solicitacoes_mural é VIEW — a tabela real é solicitacoes_especialista
     ["solicitacoes_especialista", "id"], ["solicitacoes_especialista", "mentorado_id"],
-    ["solicitacoes_especialista", "dupla_id"], ["solicitacoes_especialista", "created_by"],
+    ["solicitacoes_especialista", "dupla_id"], ["solicitacoes_especialista", "dupla_dpp_id"],
+    ["solicitacoes_especialista", "especialista_desejado_id"], ["solicitacoes_especialista", "especialista_id"],
+    ["solicitacoes_especialista", "created_by"],
     // devolutivas (WP6) — filho de duplas × profiles, antes deles
     ["devolutivas", "dupla_id"], ["devolutivas", "autor_id"],
     ["especialista_grade", "profile_id"], ["especialista_excecoes", "profile_id"],
     ["encerramentos", "dupla_id"],
     ["formulario_links", "dupla_id"], ["formulario_links", "dest_profile_id"], ["formulario_links", "dest_mentorado_id"],
-    ["assinaturas", "profile_id"], ["assinaturas", "mentorado_id"],
+    ["formulario_links", "created_by"],
+    ["formulario_respostas", "promovido_profile_id"], ["formulario_respostas", "promovido_mentorado_id"],
+    ["assinaturas", "profile_id"], ["assinaturas", "mentorado_id"], ["assinaturas", "created_by"],
     ["encontros", "dupla_id"], ["encontros", "created_by"],
     ["duplas", "id"],
     // 2º cronograma demo (de000000-…0500) — eventos antes do pai
@@ -159,7 +171,13 @@ async function limpar() {
     ["cronogramas", "created_by"], ["cronogramas", "id"],
     ["mentor_profiles", "profile_id"],
     ["comunicados", "created_by"],
+    ["documentos_pessoa", "mentorado_id"], ["documentos_pessoa", "profile_id"], ["documentos_pessoa", "created_by"],
+    ["turma_inscricoes", "mentorado_id"], ["turma_inscricoes", "profile_id"], ["turma_inscricoes", "created_by"],
     ["mentorados", "id"],
+    ["formularios", "created_by"],
+    ["ia_confirmacoes", "profile_id"], ["ia_eval_runs", "created_by"], ["ia_mcp_tokens", "profile_id"],
+    ["profile_papeis", "profile_id"],
+    ["relatorio_links", "criado_por"], ["relatorio_links", "revogado_por"],
     ["profiles", "id"],
   ];
   // uuid não aceita LIKE no PostgREST — range scan no prefixo de000000-…-8000-*
@@ -182,6 +200,10 @@ async function limpar() {
     }
     await del(`chamados?id=in.(${csv})`);
   }
+  // self-FK: remanejada_de apontando pra outra dupla do range bloqueia o
+  // delete em lote — zera primeiro (a re-semeadura reconstrói o vínculo)
+  try { await patch(`duplas?${emRange("id")}`, { remanejada_de: null }); }
+  catch (e) { console.log(`  skip remanejada_de: ${e.message.slice(0, 80)}`); }
   for (const [tabela, col] of porFk) {
     try { await del(`${tabela}?${emRange(col)}`); } catch (e) { console.log(`  skip ${tabela}.${col}: ${e.message.slice(0, 80)}`); }
   }
@@ -214,8 +236,25 @@ async function garantirAuthUser(email, profileId) {
     body: JSON.stringify({ email, password: SENHA, email_confirm: true,
       user_metadata: { senha_em: new Date().toISOString() } }),
   });
-  if (!res.ok) throw new Error(`admin createUser ${email} → ${res.status}: ${await res.text()}`);
-  const user = await res.json();
+  let user = null;
+  if (res.ok) {
+    user = await res.json();
+  } else if (res.status === 422) {
+    // delete do auth falhou na limpeza (admin API instável) — reaproveita o
+    // user existente: reseta a senha e vincula ao profile novo
+    const l = await fetch(`${URL_}/auth/v1/admin/users?filter=${encodeURIComponent(email)}`, { headers: H });
+    const u = ((await l.json())?.users ?? []).find((x) => x.email?.toLowerCase() === email);
+    if (!u) throw new Error(`admin createUser ${email} → 422 e user não encontrado na lista`);
+    const up = await fetch(`${URL_}/auth/v1/admin/users/${u.id}`, {
+      method: "PUT", headers: HJ,
+      body: JSON.stringify({ password: SENHA, email_confirm: true,
+        user_metadata: { senha_em: new Date().toISOString() } }),
+    });
+    if (!up.ok) throw new Error(`admin updateUser ${email} → ${up.status}: ${await up.text()}`);
+    user = u;
+  } else {
+    throw new Error(`admin createUser ${email} → ${res.status}: ${await res.text()}`);
+  }
   await patch(`profiles?id=eq.${profileId}`, { user_id: user.id });
   console.log(`  login ${email} → ${user.id}`);
 }
