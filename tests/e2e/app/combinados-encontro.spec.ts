@@ -40,13 +40,20 @@ async function montarCardDoPasso(page: Page, numero: number) {
   return bloco;
 }
 
-/** Garante o painel aberto — ele nasce aberto quando há itens (pendente
- *  de antes conta), fechado quando vazio; clicar às cegas fecharia. */
+/** Garante painel e form abertos — o painel nasce aberto quando há itens
+ *  e o form nasce recolhido atrás do "+ Adicionar" (REALIZA-416); clicar
+ *  no trigger às cegas fecharia um painel já aberto. */
 async function abrirCombinados(bloco: Locator) {
   const input = bloco.getByRole("textbox", { name: /Novo combinado/ });
-  if (!(await input.isVisible())) {
+  const gatilho = bloco.getByRole("button", {
+    name: "Adicionar combinado",
+    exact: true,
+  });
+  // painel fechado esconde gatilho e input; aberto, só um dos dois some
+  if (!(await gatilho.isVisible()) && !(await input.isVisible())) {
     await bloco.getByRole("button", { name: /^Combinados/ }).click();
   }
+  if (await gatilho.isVisible()) await gatilho.click();
   await expect(input).toBeVisible();
 }
 

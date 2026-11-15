@@ -52,8 +52,11 @@ test.describe("demo — combinados do encontro (0157)", () => {
     await expect(doRegistro).toContainText(/Bia · até \d{2}\/\d{2}\/\d{4}/);
 
     // criar com o mentorado como responsável e prazo: o item nasce com o
-    // nome dele e a data
+    // nome dele e a data. O form mora atrás do "+ Adicionar" (REALIZA-416)
     const novo = "E2E · trazer o boletim";
+    await bloco
+      .getByRole("button", { name: "Adicionar combinado", exact: true })
+      .click();
     await bloco
       .getByRole("textbox", { name: "Novo combinado do 5º encontro" })
       .fill(novo);
@@ -142,6 +145,9 @@ test.describe("demo — combinados do encontro (0157)", () => {
     await expect(bloco.getByRole("checkbox").first()).toBeVisible();
     await expect(
       bloco.getByRole("textbox", { name: /Novo combinado/ })
+    ).toHaveCount(0);
+    await expect(
+      bloco.getByRole("button", { name: "Adicionar combinado", exact: true })
     ).toHaveCount(0);
     await expect(
       bloco.getByRole("button", { name: /Ações do combinado/ })

@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Collapsible } from "@base-ui/react/collapsible";
-import { CaretDown } from "@phosphor-icons/react";
+import { CaretDown, Plus, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import {
   criarCombinadoEncontro,
@@ -30,6 +30,11 @@ import { novoUuid } from "@/lib/uuid";
  *  logo após criar (bug visto no e2e). O mapa por (dupla,nº) devolve a
  *  escolha do usuário na remontagem; reload de página recomeça pelo padrão. */
 const abertoPorBloco = new Map<string, boolean>();
+/** Mesmo motivo do mapa acima: o form aberto (REALIZA-416) e o foco
+ *  pendente pro input sobrevivem à remontagem do bloco — sem eles, criar
+ *  o 1º pendente fecharia o form logo após o add. */
+const formAbertoPorBloco = new Map<string, boolean>();
+const focoPendente = new Set<string>();
 
 type Responsavel = "mentor" | "mentorado";
 
@@ -86,7 +91,27 @@ export function CombinadosEncontro({
       abertoPorBloco.get(chaveBloco) ??
       itens.length + pendentesAnteriores.length > 0
   );
+  // form de novo combinado nasce recolhido atrás do "+ Adicionar"
+  // (REALIZA-416): um campo visível por encontro poluía a ficha inteira
+  const [formAberto, setFormAberto] = useState(
+    () => formAbertoPorBloco.get(chaveBloco) ?? false
+  );
+  const botaoNovoRef = useRef<HTMLButtonElement>(null);
   const router = useRouter();
+
+  function abrirForm() {
+    focoPendente.add(chaveBloco); // o input ainda não existe — foca na montagem
+    setFormAberto(true);
+    formAbertoPorBloco.set(chaveBloco, true);
+  }
+
+  function fecharForm() {
+    focoPendente.delete(chaveBloco);
+    setFormAberto(false);
+    formAbertoPorBloco.set(chaveBloco, false);
+    // devolve o foco ao gatilho — ele remonta no mesmo commit
+    requestAnimationFrame(() => botaoNovoRef.current?.focus());
+  }
 
   // deep link #combinados-<nº> (aviso "Combinados em aberto" da Minha
   // agenda): a aba Encontros já está montada quando este card existe —
@@ -221,6 +246,9 @@ export function CombinadosEncontro({
     const prazoLimpo = prazo;
     setNovo("");
     setPrazo("");
+    // entrada rápida: o form segue aberto e o foco volta pro input mesmo
+    // se o refresh remontar o bloco (flag consumida na montagem dele)
+    focoPendente.add(chaveBloco);
     if (demo) {
       const agora = new Date().toISOString();
       setItensLoc((l) => [
@@ -409,15 +437,34 @@ export function CombinadosEncontro({
                 </ul>
               </div>
             )}
-            {podeEditar && (
+            {podeEditar && !formAberto && (
+              <Button
+                ref={botaoNovoRef}
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={abrirForm}
+                className="mt-1 -ml-2 text-muted-foreground hover:text-foreground"
+              >
+                <Plus aria-hidden />
+                Adicionar combinado
+              </Button>
+            )}
+            {podeEditar && formAberto && (
               <form
                 className="mt-1 flex flex-wrap items-center gap-2 sm:flex-nowrap"
                 onSubmit={(e) => {
                   e.preventDefault();
                   adicionar();
                 }}
+                onKeyDown={(e) => {
+                  if (e.key === "Escape") fecharForm();
+                }}
               >
                 <Input
+                  ref={(el: HTMLInputElement | null) => {
+                    if (el && focoPendente.delete(chaveBloco)) el.focus();
+                  }}
                   value={novo}
                   onChange={(e) => setNovo(e.target.value)}
                   maxLength={500}
@@ -469,6 +516,16 @@ export function CombinadosEncontro({
                   disabled={pending || novo.trim().length < 2}
                 >
                   Adicionar
+                </Button>
+                <Button
+                  type="button"
+                  size="icon-sm"
+                  variant="ghost"
+                  aria-label="Fechar"
+                  onClick={fecharForm}
+                  className="text-muted-foreground"
+                >
+                  <X aria-hidden />
                 </Button>
               </form>
             )}
