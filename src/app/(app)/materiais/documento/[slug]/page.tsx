@@ -20,6 +20,7 @@ import {
 import type { AppRole } from "@/lib/types";
 import { MaterialDocumento } from "@/components/material-documento";
 import { CorpusDocumento } from "@/components/corpus-documento";
+import { RegistrarMaterialLido } from "@/components/material-leitura";
 
 // Documento nativo de /materiais — casa do staff e do mentor; o jovem tem a
 // rota própria em /jovem/materiais/documento (o layout (app) o redireciona
@@ -95,45 +96,51 @@ export default async function DocumentoPage({
     // getMe é React.cache — o layout já a chamou neste request (cache hit)
     if (!corpusServePapel(corpus, me)) notFound();
     return (
-      <CorpusDocumento
-        doc={corpus}
-        voltar={{ href: "/materiais?aba=biblioteca", rotulo: "Materiais de apoio" }}
-        lizaPergunta={lizaPergunta}
-        ponte={
-          duplaId
-            ? {
-                href: `/duplas/${duplaId}?aba=instrumentos#instrumentos`,
-                rotulo: "Abrir instrumento",
-                dica: "Este guia acompanha o instrumento ao vivo, emitido e acompanhado na ficha da dupla.",
-              }
-            : (() => {
-                // deep-link ao instrumento que o doc acompanha (REALIZA-414):
-                // a régua por chave; sem card próprio cai na aba toda
-                const sistema = sistemaDoDoc(slug);
-                const chave = sistema ? chaveDoSistema(sistema) : null;
-                return chave
-                  ? {
-                      href: `/materiais/instrumentos/${chave}`,
-                      rotulo: "Abrir instrumento",
-                      dica: "Instrumento oficial do programa — o estado dele em cada dupla do seu escopo.",
-                    }
-                  : {
-                      href: "/materiais?aba=instrumentos",
-                      rotulo: "Ver instrumentos",
-                      dica: "Instrumento oficial do programa. O mentor emite o link na ficha da dupla e o resultado volta estruturado.",
-                    };
-              })()
-        }
-      />
+      <>
+        <RegistrarMaterialLido materialRef={`doc:${slug}`} />
+        <CorpusDocumento
+          doc={corpus}
+          voltar={{ href: "/materiais?aba=biblioteca", rotulo: "Materiais de apoio" }}
+          lizaPergunta={lizaPergunta}
+          ponte={
+            duplaId
+              ? {
+                  href: `/duplas/${duplaId}?aba=instrumentos#instrumentos`,
+                  rotulo: "Abrir instrumento",
+                  dica: "Este guia acompanha o instrumento ao vivo, emitido e acompanhado na ficha da dupla.",
+                }
+              : (() => {
+                  // deep-link ao instrumento que o doc acompanha (REALIZA-414):
+                  // a régua por chave; sem card próprio cai na aba toda
+                  const sistema = sistemaDoDoc(slug);
+                  const chave = sistema ? chaveDoSistema(sistema) : null;
+                  return chave
+                    ? {
+                        href: `/materiais/instrumentos/${chave}`,
+                        rotulo: "Abrir instrumento",
+                        dica: "Instrumento oficial do programa — o estado dele em cada dupla do seu escopo.",
+                      }
+                    : {
+                        href: "/materiais?aba=instrumentos",
+                        rotulo: "Ver instrumentos",
+                        dica: "Instrumento oficial do programa. O mentor emite o link na ficha da dupla e o resultado volta estruturado.",
+                      };
+                })()
+          }
+        />
+      </>
     );
   }
   if (!materialDocumento(slug)) notFound();
 
   return (
-    <MaterialDocumento
-      slug={slug}
-      voltar={{ href: "/materiais?aba=biblioteca", rotulo: "Materiais de apoio" }}
-      lizaPergunta={lizaPergunta}
-    />
+    <>
+      <RegistrarMaterialLido materialRef={`doc:${slug}`} />
+      <MaterialDocumento
+        slug={slug}
+        voltar={{ href: "/materiais?aba=biblioteca", rotulo: "Materiais de apoio" }}
+        lizaPergunta={lizaPergunta}
+      />
+    </>
   );
 }

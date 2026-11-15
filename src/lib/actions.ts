@@ -70,7 +70,7 @@ import {
   dispararComunicadoEmail,
   dispararMaterialEmail,
 } from "./actions-email";
-import { demoAtivo, demoLidas, demoRole, limparDemo, marcarDemoLidas, marcarOnboardingDemo } from "./demo/mode";
+import { demoAtivo, demoLidas, demoRole, limparDemo, marcarDemoLidas, marcarDemoMaterialLido, marcarOnboardingDemo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import { getDemoData } from "./demo/data";
 import { demoNotificacoes } from "./demo/queries";
@@ -4877,5 +4877,29 @@ export async function marcarTodasNotificacoesLidas() {
     .eq("profile_id", eu.id)
     .is("lida_em", null);
   if (error) return { error: "Não foi possível marcar como lidas." };
+  return { ok: true };
+}
+
+/** Registra a abertura do material (0196) — chamada pelo clique do card, pela
+ *  página de documento nativo e pela rota /api/material. Upsert mantém a
+ *  leitura mais recente; a chamada é fire-and-forget: falha só loga, nunca
+ *  interrompe a navegação. */
+export async function marcarMaterialLido(ref: string) {
+  if (await demoAtivo()) {
+    await marcarDemoMaterialLido(ref);
+    return { ok: true };
+  }
+  const { supabase, me: eu } = await me();
+  if (!eu) return { ok: true }; // visitante sem sessão não marca — silencioso
+  const { error } = await supabase
+    .from("material_leituras")
+    .upsert(
+      { profile_id: eu.id, ref, lido_em: new Date().toISOString() },
+      { onConflict: "profile_id,ref" }
+    );
+  if (error) {
+    console.error("marcarMaterialLido:", error);
+    return { error: "Não foi possível registrar a leitura." };
+  }
   return { ok: true };
 }

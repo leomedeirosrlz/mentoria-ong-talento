@@ -12,7 +12,7 @@ import {
   veMaterialDaTurma,
 } from "./materiais";
 import { turmaDaDupla, turmaNumero } from "./turma";
-import { demoLidas, demoOnboarded, demoRole } from "./demo/mode";
+import { demoLidas, demoLidosMateriais, demoOnboarded, demoRole } from "./demo/mode";
 import {
   demoAlertasRegistros,
   demoCicloEventos,
@@ -29,6 +29,7 @@ import {
   demoEncontrosPorDuplas,
   demoEspecialistaEventos,
   demoMateriais,
+  demoBaseMateriaisLidos,
   demoMe,
   demoMentorados,
   demoMentorProfiles,
@@ -898,6 +899,30 @@ export const getMateriais = cache(async (): Promise<Material[]> => {
     duplas.map((d) => turmaNumero(turmaDaDupla(d, cronogramas) ?? ""))
   );
   return visiveis.filter((m) => veMaterialDaTurma(m, turmas));
+});
+
+/** Refs (0196 — doc:<slug> ou material.id) que a pessoa já abriu — alimenta
+ *  o indicador de leitura dos cards de materiais. Falha degrada pra set
+ *  vazio com log: os cards seguem sem marca, não a página inteira. */
+export const getMateriaisLidos = cache(async (): Promise<Set<string>> => {
+  const demo = await demoRole();
+  if (demo) {
+    const lidos = await demoLidosMateriais();
+    for (const r of demoBaseMateriaisLidos(demo)) lidos.add(r);
+    return lidos;
+  }
+  const me = await getMe();
+  if (!me) return new Set();
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from("material_leituras")
+    .select("ref")
+    .eq("profile_id", me.id);
+  if (error) {
+    console.error("getMateriaisLidos:", error);
+    return new Set();
+  }
+  return new Set((data ?? []).map((r) => r.ref as string));
 });
 
 /** mentor_profiles é table-level legível por autenticado (0001) — a lista

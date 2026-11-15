@@ -98,6 +98,39 @@ export async function limparDemoLidas() {
   (await cookies()).delete(DEMO_LIDAS_COOKIE);
 }
 
+/** Leituras de material marcadas na sessão demo (0196) — mesma mecânica
+ *  das lidas de notificação: cookie de refs, zera na troca de sessão. */
+const DEMO_MAT_LIDOS_COOKIE = "demo_materiais_lidos";
+
+export async function demoLidosMateriais(): Promise<Set<string>> {
+  const raw = (await cookies()).get(DEMO_MAT_LIDOS_COOKIE)?.value;
+  if (!raw) return new Set();
+  try {
+    const parsed: unknown = JSON.parse(raw);
+    return new Set(
+      Array.isArray(parsed)
+        ? parsed.filter((x): x is string => typeof x === "string")
+        : []
+    );
+  } catch {
+    return new Set();
+  }
+}
+
+export async function marcarDemoMaterialLido(ref: string) {
+  const lidos = await demoLidosMateriais();
+  lidos.add(ref);
+  (await cookies()).set(
+    DEMO_MAT_LIDOS_COOKIE,
+    JSON.stringify([...lidos].slice(-DEMO_LIDAS_MAX)),
+    await demoCookieOpts()
+  );
+}
+
+export async function limparDemoMateriaisLidos() {
+  (await cookies()).delete(DEMO_MAT_LIDOS_COOKIE);
+}
+
 /** Sessão de evals (runs criados + células dirigidas + lápides) — mesma
  *  regra das lidas: entra de novo, recomeça zerado. */
 export async function limparDemoEval() {
@@ -129,6 +162,7 @@ export async function limparDemo() {
   store.delete(DEMO_ROLE_COOKIE);
   store.delete(DEMO_LIDAS_COOKIE);
   store.delete(DEMO_TERMO_COOKIE);
+  store.delete(DEMO_MAT_LIDOS_COOKIE);
   await limparDemoEval();
   await resetarOnboardingDemo();
 }

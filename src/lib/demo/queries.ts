@@ -450,6 +450,24 @@ export function demoMateriais(role: AppRole): Material[] {
     .sort((a, b) => a.ordem - b.ordem);
 }
 
+/** Leituras prévias da persona (0196) — baseline narrativo; as da sessão
+ *  ficam no cookie demo_materiais_lidos e a query real mescla (este módulo
+ *  também entra no grafo client via client-stub — nada de next/headers). */
+export function demoBaseMateriaisLidos(role: AppRole): string[] {
+  return role === "mentor_dpp"
+    ? [
+        "doc:guia-mentor-dpp",
+        // roteiros dos encontros já realizados (a demo ancora a semana no
+        // 5º) — o da semana corrente segue por ler, que é o gesto visível
+        ...[1, 2, 3, 4].map(
+          (n) => `doc:roteiro-encontro-${String(n).padStart(2, "0")}`
+        ),
+      ]
+    : role === "mentor_especialista"
+      ? ["doc:guia-mentor-especialista"]
+      : [];
+}
+
 // ---------- duplas ----------
 
 export function demoDuplas(role: AppRole): Dupla[] {

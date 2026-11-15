@@ -5,12 +5,14 @@ import type { CSSProperties } from "react";
 import {
   ArrowSquareOut,
   BookOpen,
+  Check,
   FileText,
   LinkSimple,
   MagnifyingGlass,
   PuzzlePiece,
 } from "@phosphor-icons/react";
-import { AUDIENCIA_LABEL, audienciasDe, hrefMaterial } from "@/lib/materiais";
+import { AUDIENCIA_LABEL, audienciasDe, hrefMaterial, refDoMaterial } from "@/lib/materiais";
+import { LinkComLeitura } from "@/components/material-leitura";
 import { sistemaDoDoc } from "@/lib/como-conduzir";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -63,6 +65,7 @@ function Linha({
   vigente,
   indice,
   marca,
+  lido = false,
 }: {
   m: Material;
   ehCoord: boolean;
@@ -71,6 +74,8 @@ function Linha({
   indice: number;
   /** busca ativa — marca os trechos casados no título e na descrição */
   marca?: string;
+  /** leitura já registrada (0196) — selo discreto na meta da linha */
+  lido?: boolean;
 }) {
   const Icone = TIPO_ICONE[m.tipo];
   // arquivo oficial ganha da url externa; "doc:<slug>" é documento nativo
@@ -116,6 +121,12 @@ function Linha({
             </Badge>
           )}
           {desta && <Badge variant="outline" className="text-[11px]">desta semana</Badge>}
+          {lido && (
+            <Badge variant="outline" className="gap-1 text-[11px]">
+              <Check size={10} aria-hidden />
+              lido
+            </Badge>
+          )}
         </span>
       </span>
     </>
@@ -128,9 +139,10 @@ function Linha({
       style={{ "--i": Math.min(indice, 10) } as CSSProperties}
     >
       {href ? (
-        <a
+        <LinkComLeitura
+          materialRef={refDoMaterial(m)}
           href={href}
-          {...(ehDoc ? {} : { target: "_blank", rel: "noopener noreferrer" })}
+          externo={!ehDoc}
           className={cn(
             cls,
             "rounded-lg transition-colors hover:bg-muted/50 active:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
@@ -140,7 +152,7 @@ function Linha({
           {!ehCoord && !ehDoc && (
             <ArrowSquareOut size={17} aria-hidden className="shrink-0 text-muted-foreground" />
           )}
-        </a>
+        </LinkComLeitura>
       ) : (
         <div className={cls}>
           {corpo}
@@ -178,6 +190,7 @@ export function BibliotecaLista({
   maxEncontro = 16,
   vigente = null,
   titulo = "Todos os materiais de apoio",
+  lidos,
 }: {
   materiais: Material[];
   ehCoord?: boolean;
@@ -185,6 +198,8 @@ export function BibliotecaLista({
   /** encontro da semana (mentor) — marca as linhas dele. */
   vigente?: number | null;
   titulo?: string;
+  /** refs já lidas pelo usuário (0196) — selo "lido" na linha. */
+  lidos?: Set<string>;
 }) {
   const [busca, setBusca] = useState("");
   const baseId = useId();
@@ -265,6 +280,7 @@ export function BibliotecaLista({
                       vigente={vigente}
                       indice={i}
                       marca={qt || undefined}
+                      lido={lidos?.has(refDoMaterial(m))}
                     />
                   ))}
                 </ul>

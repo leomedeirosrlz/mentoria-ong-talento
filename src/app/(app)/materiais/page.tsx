@@ -9,6 +9,7 @@ import {
   getCicloEventos,
   getDuplasInfo,
   getMateriais,
+  getMateriaisLidos,
   getMe,
   getPainelInstrumentosJornada,
 } from "@/lib/queries";
@@ -49,10 +50,11 @@ export default async function MateriaisPage({
   searchParams: Promise<{ aba?: string }>;
 }) {
   const { aba: abaParam } = await searchParams;
-  const [materiais, me, eventos] = await Promise.all([
+  const [materiais, me, eventos, lidos] = await Promise.all([
     getMateriais(),
     getMe(),
     getCicloEventos(),
+    getMateriaisLidos(),
   ]);
 
   // coordenação por papel (não só o primário): o híbrido supervisor+coord
@@ -323,6 +325,7 @@ export default async function MateriaisPage({
                 ? transversais.flatMap((g) => g.itens)
                 : visiveis
             }
+            lidos={lidos}
           />
         ) : (
           /* staff: a biblioteca inteira agrupada por categoria
@@ -332,6 +335,7 @@ export default async function MateriaisPage({
             materiais={visiveis}
             ehCoord={ehCoord}
             maxEncontro={maxEncontro}
+            lidos={lidos}
           />
         )}
       </MateriaisAbas>

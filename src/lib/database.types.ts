@@ -3497,6 +3497,60 @@ export type Database = {
         }
         Relationships: []
       }
+      material_leituras: {
+        Row: {
+          lido_em: string
+          profile_id: string
+          ref: string
+        }
+        Insert: {
+          lido_em?: string
+          profile_id: string
+          ref: string
+        }
+        Update: {
+          lido_em?: string
+          profile_id?: string
+          ref?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "material_leituras_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_leituras_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_leituras_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_leituras_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_leituras_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       mentor_profiles: {
         Row: {
           areas: string[]

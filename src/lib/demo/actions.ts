@@ -10,6 +10,7 @@ import {
   limparDemo,
   limparDemoEval,
   limparDemoLidas,
+  limparDemoMateriaisLidos,
   limparTermoSimulado,
   resetarOnboardingDemo,
 } from "./mode";
@@ -23,6 +24,7 @@ export async function entrarNaDemo(papel: AppRole) {
   await resetarOnboardingDemo();
   await limparDemoLidas();
   await limparDemoEval();
+  await limparDemoMateriaisLidos();
   await limparTermoSimulado();
   redirect("/");
 }

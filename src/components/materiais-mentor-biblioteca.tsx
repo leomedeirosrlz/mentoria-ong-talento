@@ -3,12 +3,14 @@ import {
   ArrowSquareOut,
   BookOpen,
   CaretDown,
+  Check,
   FileText,
   LinkSimple,
   PuzzlePiece,
 } from "@phosphor-icons/react/dist/ssr";
 import { formatDiaMes, formatDiaSemana, linkSeguro } from "@/lib/ciclo";
-import { hrefMaterial } from "@/lib/materiais";
+import { hrefMaterial, refDoMaterial } from "@/lib/materiais";
+import { LinkComLeitura } from "@/components/material-leitura";
 import { guiaDoEncontro, sistemaDoDoc } from "@/lib/como-conduzir";
 import type { Material } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -70,7 +72,7 @@ function quandoCurto(data: string): string {
  *  descrição curta, ação à direita (abrir arquivo/link em nova aba). Sem
  *  selo de público nem ⋯ — a linha inteira é o gesto; "em breve" é o
  *  estado legítimo de quem ainda não tem destino e não vira link. */
-function LinhaMaterial({ m }: { m: Material }) {
+function LinhaMaterial({ m, lido = false }: { m: Material; lido?: boolean }) {
   const Icone = TIPO_ICONE[m.tipo];
   // arquivo oficial ganha da url externa; "doc:<slug>" é documento nativo
   // (página do app); sem os três, "em breve"
@@ -116,18 +118,25 @@ function LinhaMaterial({ m }: { m: Material }) {
     );
   }
   return (
-    <a
+    <LinkComLeitura
+      materialRef={refDoMaterial(m)}
       href={href}
-      {...(ehDoc ? {} : { target: "_blank", rel: "noopener noreferrer" })}
+      externo={!ehDoc}
       className={cn(
         cls,
         "transition-colors hover:bg-muted/50 active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
       )}
     >
       {conteudo}
-      {/* um ícone só no trilho direito — "Abrir em nova aba", o mesmo do
-          ⋯ do MaterialMenu; documento nativo navega na mesma aba e não
-          leva o ícone de saída */}
+      {/* trilho direito: check discreto do já-lido (0196) + "Abrir em nova
+          aba" do ⋯ do MaterialMenu; doc nativo navega na mesma aba, sem
+          ícone de saída */}
+      {lido && (
+        <span className="shrink-0 text-muted-foreground" title="Lido">
+          <Check size={15} aria-hidden />
+          <span className="sr-only">Lido</span>
+        </span>
+      )}
       {!ehDoc && (
         <ArrowSquareOut
           size={17}
@@ -135,7 +144,7 @@ function LinhaMaterial({ m }: { m: Material }) {
           className="shrink-0 text-muted-foreground"
         />
       )}
-    </a>
+    </LinkComLeitura>
   );
 }
 
@@ -153,10 +162,12 @@ function CardSemana({
   turma,
   itens,
   indice,
+  lidos,
 }: {
   turma: TurmaMateriais;
   itens: Material[];
   indice: number;
+  lidos?: Set<string>;
 }) {
   const encontro = turma.encontros.find((e) => e.numero === turma.vigente);
   if (!encontro) return null;
@@ -240,7 +251,11 @@ function CardSemana({
         {itens.length > 0 ? (
           <div className="divide-y divide-border/60">
             {itens.map((m) => (
-              <LinhaMaterial key={m.id} m={m} />
+              <LinhaMaterial
+                key={m.id}
+                m={m}
+                lido={lidos?.has(refDoMaterial(m))}
+              />
             ))}
           </div>
         ) : (
@@ -257,6 +272,7 @@ export function MateriaisMentorBiblioteca({
   turmas,
   porEncontro,
   referenciais,
+  lidos,
 }: {
   /** Turmas do mentor DPP (vigente + encontros do cronograma); vazia =
    *  especialista — a biblioteca vira lista plana, sem encontros. */
@@ -265,6 +281,8 @@ export function MateriaisMentorBiblioteca({
   porEncontro: Map<number, Material[]>;
   /** transversais pro mentor DPP; pro especialista, tudo que ele vê. */
   referenciais: Material[];
+  /** refs já lidas pelo usuário (0196) — check discreto na linha. */
+  lidos?: Set<string>;
 }) {
   // um card por turma com o encontro da semana; abaixo, o acervo agrupado
   // por categoria (REALIZA-250) — sem próximos/adiante/anteriores
@@ -296,12 +314,14 @@ export function MateriaisMentorBiblioteca({
             turma={t}
             itens={porEncontro.get(vigenteE.numero) ?? []}
             indice={i}
+            lidos={lidos}
           />
         ) : null;
       })}
       <BibliotecaLista
         materiais={[...todos.values()]}
         vigente={vigentes.length === 1 ? vigentes[0]! : null}
+        lidos={lidos}
       />
     </section>
   );

@@ -103,6 +103,16 @@ export function hrefMaterial(
   return m.path ? `/api/material/${m.id}` : linkSeguro(m.url);
 }
 
+/** Chave de leitura do material (0196): "doc:<slug>" marca pelo documento
+ *  nativo — a linha de catálogo e a sintética do encontro apontam pro
+ *  mesmo doc e ler um vale pros dois; arquivo/link externo marca pelo id. */
+export function refDoMaterial(m: {
+  id: string;
+  path?: string | null;
+}): string {
+  return m.path?.startsWith("doc:") ? m.path : m.id;
+}
+
 /** Valor legado (`audiencia` de uma coluna) derivado do array — o código
  *  antigo que ainda estiver rodando durante o deploy continua funcionando. */
 export function audienciaLegada(audiencias: readonly string[]): string {

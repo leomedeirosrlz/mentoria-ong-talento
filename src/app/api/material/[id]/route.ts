@@ -80,5 +80,24 @@ export async function GET(
     return apiErro("Não foi possível abrir o material.", { status: 404 });
   }
 
+  // marca a leitura (0196): duas queries baratas no caminho — falha só loga,
+  // nunca segura o download
+  const { data: p } = await supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", claims.claims.sub)
+    .maybeSingle();
+  if (p) {
+    const { error: lErr } = await supabase.from("material_leituras").upsert(
+      {
+        profile_id: p.id,
+        ref: material.id,
+        lido_em: new Date().toISOString(),
+      },
+      { onConflict: "profile_id,ref" }
+    );
+    if (lErr) console.error("material_leituras:", lErr);
+  }
+
   return NextResponse.redirect(signed.signedUrl);
 }
