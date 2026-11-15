@@ -357,7 +357,7 @@ function LinhaRito({
           </Link>
         )
       }
-      menu={<DuplaLinhaMenu dupla={d} editar formulario />}
+      menu={<DuplaLinhaMenu dupla={d} editar formulario remanejar />}
       fichaHref={fichaRitoHref(d, eventos)}
       fichaNome={(d.mentorado.nome_social ?? d.mentorado.nome).split(" ")[0]}
     />

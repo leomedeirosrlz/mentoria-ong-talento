@@ -709,10 +709,11 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     }
   });
 
-  // REALIZA-390 — a coluna "Dupla" cicla: prioridade (radar) → A a Z →
-  // Z a A → prioridade, com a ordem persistida em ?ordem= como os demais
-  // recortes da página. A asserção de ordem compara o lockup inteiro
-  // ("Mentor e Mentorado") na mesma collation pt-BR do porNomeDupla.
+  // REALIZA-390/405 — as três colunas ordenáveis (Dupla/Encontros/Nota)
+  // ciclam asc → desc → default, uma ativa por vez, persistidas em
+  // ?ordem= (<col> / <col>-desc). A asserção de ordem compara o lockup
+  // inteiro ("Mentor e Mentorado") na mesma collation pt-BR do
+  // porNomeDupla.
   test("coordenação: coluna Dupla cicla prioridade → A a Z → Z a A", async ({
     page,
   }) => {
@@ -741,7 +742,7 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
 
     await btnOrdem.click();
     await expect(btnOrdem).toHaveAttribute("aria-label", /de A a Z/);
-    await expect(page).toHaveURL(/[?&]ordem=az/);
+    await expect(page).toHaveURL(/[?&]ordem=nome(&|$)/);
     await expect(linhas.first()).toBeVisible();
     const az = await nomesDuplas();
     expect(az).toEqual([...az].sort(cmp));
@@ -751,7 +752,7 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
 
     await btnOrdem.click();
     await expect(btnOrdem).toHaveAttribute("aria-label", /de Z a A/);
-    await expect(page).toHaveURL(/[?&]ordem=za/);
+    await expect(page).toHaveURL(/[?&]ordem=nome-desc/);
     await expect(linhas.first()).toBeVisible();
     expect(await nomesDuplas()).toEqual([...az].reverse());
 
@@ -761,5 +762,73 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     await expect(page).not.toHaveURL(/[?&]ordem=/);
     await expect(linhas.first()).toBeVisible();
     expect(await nomesDuplas()).toEqual(padrao);
+  });
+
+  // REALIZA-405 — Encontros e Nota seguem o mesmo ciclo: asc → desc →
+  // default, e uma coluna ativa substitui a outra no header e no param.
+  test("coordenação: Encontros e Nota ciclam e alternam a coluna ativa", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/duplas");
+    const linhas = page.locator(LINHAS_COORD);
+    await expect(linhas.first()).toBeVisible();
+
+    // a contagem de encontros realizados de cada linha, lida do
+    // aria-label dos quadrados ("N de M encontros realizados…")
+    const encontrosFeitos = async () =>
+      (
+        await linhas
+          .locator("[aria-label*='encontros realizados']")
+          .evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))
+      ).map((s) => {
+        const m = /(\d+) de \d+ encontros/.exec(s ?? "");
+        return m ? Number(m[1]) : -1;
+      });
+
+    const btnEnc = page.getByRole("button", {
+      name: /^Ordenar por quantidade de encontros/,
+    });
+    const btnNota = page.getByRole("button", {
+      name: /^Ordenar por nota do mentor/,
+    });
+    const btnNome = page.getByRole("button", {
+      name: /^Ordenar por nome da dupla/,
+    });
+
+    // Encontros asc → as contagens sobem (ou empatam) na leitura
+    await btnEnc.click();
+    await expect(page).toHaveURL(/[?&]ordem=encontros(&|$)/);
+    await expect(btnEnc).toHaveAttribute("aria-label", /menos encontros/);
+    await expect(linhas.first()).toBeVisible();
+    const asc = await encontrosFeitos();
+    expect(asc).toEqual([...asc].sort((a, b) => a - b));
+
+    // Encontros desc — mesmas contagens na ordem inversa
+    await btnEnc.click();
+    await expect(page).toHaveURL(/[?&]ordem=encontros-desc/);
+    await expect(btnEnc).toHaveAttribute("aria-label", /mais encontros/);
+    expect(await encontrosFeitos()).toEqual([...asc].reverse());
+
+    // Nota substitui Encontros como coluna ativa — uma por vez
+    await btnNota.click();
+    await expect(page).toHaveURL(/[?&]ordem=nota(&|$)/);
+    await expect(btnNota).toHaveAttribute("aria-label", /menor nota/);
+    await expect(btnEnc).toHaveAttribute("aria-label", /por prioridade/);
+
+    // ciclo da Nota: desc e volta ao radar
+    await btnNota.click();
+    await expect(page).toHaveURL(/[?&]ordem=nota-desc/);
+    await btnNota.click();
+    await expect(page).not.toHaveURL(/[?&]ordem=/);
+
+    // Nome continua ciclando igual — a interação entre colunas não
+    // quebrou o gesto original
+    await btnNome.click();
+    await expect(page).toHaveURL(/[?&]ordem=nome(&|$)/);
+    await btnNome.click();
+    await expect(page).toHaveURL(/[?&]ordem=nome-desc/);
+    await btnNome.click();
+    await expect(page).not.toHaveURL(/[?&]ordem=/);
   });
 });

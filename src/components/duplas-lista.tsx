@@ -212,18 +212,32 @@ const APOIO_ORIGEM_LABEL = {
 
 // ---------- ordenação e relevância da lista ----------
 
-/** O ciclo da coluna Dupla (REALIZA-390), na convenção do /relatorios:
- *  ausência de ?ordem= é a ordem do radar; os dois estados nomeados
- *  alternam antes de voltar ao default — prioridade → az → za → prioridade. */
-type OrdemDupla = "az" | "za";
+/** A ordenação explícita (REALIZA-390/405), na convenção do /relatorios:
+ *  ausência de ?ordem= é a ordem do radar; cada coluna cicla asc → desc →
+ *  default e só uma fica ativa por vez. ?ordem= carrega coluna+direção
+ *  ("nome", "nome-desc", "encontros", …) — os valores legados "az"/"za"
+ *  ainda resolvem pra nome. */
+type OrdemCol = "nome" | "encontros" | "nota";
+type OrdemDupla = { col: OrdemCol; dir: 1 | -1 };
 
-const ORDENS_DUPLA = new Set<string>(["az", "za"]);
-const parseOrdemDupla = (v: string | null): OrdemDupla | null =>
-  v && ORDENS_DUPLA.has(v) ? (v as OrdemDupla) : null;
+const parseOrdemDupla = (v: string | null): OrdemDupla | null => {
+  if (!v) return null;
+  if (v === "az") return { col: "nome", dir: 1 };
+  if (v === "za") return { col: "nome", dir: -1 };
+  const desc = v.endsWith("-desc");
+  const col = (desc ? v.slice(0, -5) : v) as OrdemCol;
+  return col === "nome" || col === "encontros" || col === "nota"
+    ? { col, dir: desc ? -1 : 1 }
+    : null;
+};
 
-const ORDEM_ROTULO: Record<OrdemDupla, string> = {
-  az: "nome de A a Z",
-  za: "nome de Z a A",
+const escreveOrdem = (o: OrdemDupla) =>
+  o.dir === 1 ? o.col : `${o.col}-desc`;
+
+const ORDEM_ROTULO: Record<OrdemCol, Record<"1" | "-1", string>> = {
+  nome: { "1": "nome de A a Z", "-1": "nome de Z a A" },
+  encontros: { "1": "menos encontros", "-1": "mais encontros" },
+  nota: { "1": "menor nota", "-1": "maior nota" },
 };
 
 /** O nome que a linha mostra (social primeiro) — ordenar e buscar no que
@@ -236,6 +250,35 @@ const nomeExib = (p: { nome: string; nome_social?: string | null }) =>
 const porNomeDupla = (a: Dupla, b: Dupla) =>
   comparaNome(nomeExib(a.mentor), nomeExib(b.mentor)) ||
   comparaNome(nomeExib(a.mentorado), nomeExib(b.mentorado));
+
+const encontrosFeitos = (d: Dupla) =>
+  d.encontros.reduce((n, e) => n + (e.status === "realizado" ? 1 : 0), 0);
+
+const NOTA_PESO: Record<string, number> = {
+  baixa: 1,
+  regular: 2,
+  boa: 3,
+  excelente: 4,
+};
+
+/** O comparador da coluna ativa — nome e contagem de encontros têm valor
+ *  em toda linha; "sem nota" vai sempre pro fim, nas duas direções, e o
+ *  desempate cai no A→Z da dupla (ordem estável e previsível). */
+const comparadorDe = (o: OrdemDupla) => {
+  const dir = o.dir;
+  if (o.col === "encontros")
+    return (a: Dupla, b: Dupla) =>
+      (encontrosFeitos(a) - encontrosFeitos(b)) * dir || porNomeDupla(a, b);
+  if (o.col === "nota")
+    return (a: Dupla, b: Dupla) => {
+      const na = NOTA_PESO[ultimoRegistro(a)?.avaliacao ?? ""] ?? 0;
+      const nb = NOTA_PESO[ultimoRegistro(b)?.avaliacao ?? ""] ?? 0;
+      if (na === 0 || nb === 0)
+        return na === 0 && nb === 0 ? porNomeDupla(a, b) : na === 0 ? 1 : -1;
+      return (na - nb) * dir || porNomeDupla(a, b);
+    };
+  return (a: Dupla, b: Dupla) => porNomeDupla(a, b) * dir;
+};
 
 /** Relevância fuzzy da dupla: o melhor match entre os 4 nomes possíveis
  *  (social e civil de cada ponta — quem lembra do nome de batismo acha a
@@ -482,17 +525,48 @@ function LinhaMini({
 }
 
 /** O cabeçalho da tabela densa — usa a mesma grade da linha canônica, pra
- *  cada rótulo cair em cima da sua coluna. A coluna "Dupla" é clicável
- *  (REALIZA-390): cicla prioridade → A a Z → Z a A → prioridade, no
- *  padrão do header de /relatorios. Fora disso é rótulo visual (os dados
- *  da linha já carregam o significado), então os demais spans ficam
- *  presentacionais. */
+ *  cada rótulo cair em cima da sua coluna. As colunas com ordenação são
+ *  clicáveis (REALIZA-405): cada uma cicla asc → desc → default no padrão
+ *  do header de /relatorios, e só uma fica ativa por vez. Os spans
+ *  restantes ficam presentacionais (o dado já carrega o significado). */
+function ColunaOrdenavel({
+  col,
+  rotulo,
+  dica,
+  ordem,
+  onCiclar,
+}: {
+  col: OrdemCol;
+  rotulo: string;
+  dica: string;
+  ordem: OrdemDupla | null;
+  onCiclar: (col: OrdemCol) => void;
+}) {
+  const ativa = ordem?.col === col;
+  return (
+    <button
+      type="button"
+      onClick={() => onCiclar(col)}
+      // aria-sort só é válido em columnheader/rowheader — num <button> o
+      // leitor ignora. O estado vai no nome acessível (a seta é aria-hidden)
+      aria-label={`Ordenar por ${dica} — ${ativa ? ORDEM_ROTULO[col][String(ordem!.dir) as "1" | "-1"] : "por prioridade"}`}
+      title={`Ordenar por ${dica}`}
+      className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-sm text-left uppercase tracking-[0.08em] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      {rotulo}
+      <span aria-hidden className="w-3 text-[10px]">
+        {ativa ? (ordem!.dir === 1 ? "↑" : "↓") : "↕"}
+      </span>
+    </button>
+  );
+}
+
 function CabecalhoColunas({
   ordem,
   onCiclar,
 }: {
   ordem: OrdemDupla | null;
-  onCiclar: () => void;
+  onCiclar: (col: OrdemCol) => void;
 }) {
   return (
     <div
@@ -502,28 +576,28 @@ function CabecalhoColunas({
       )}
     >
       <span aria-hidden>Situação</span>
-      <button
-        type="button"
-        onClick={onCiclar}
-        // aria-sort só é válido em columnheader/rowheader — num <button> o
-        // leitor ignora. O estado vai no nome acessível (a seta é aria-hidden)
-        aria-label={`Ordenar por nome da dupla — ${ordem === "az" ? "de A a Z" : ordem === "za" ? "de Z a A" : "por prioridade"}`}
-        title="Ordenar pelo nome da dupla"
-        className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-sm text-left uppercase tracking-[0.08em] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      >
-        Dupla
-        <span aria-hidden className="w-3 text-[10px]">
-          {ordem === "az" ? "↑" : ordem === "za" ? "↓" : "↕"}
-        </span>
-      </button>
+      <ColunaOrdenavel
+        col="nome"
+        rotulo="Dupla"
+        dica="nome da dupla"
+        ordem={ordem}
+        onCiclar={onCiclar}
+      />
       <span aria-hidden>Motivo</span>
-      <span
-        aria-hidden
-        title="Cada quadrado é um encontro da trilha; o traço marca quantos o calendário já esperava até hoje"
-      >
-        Encontros
-      </span>
-      <span aria-hidden>Nota</span>
+      <ColunaOrdenavel
+        col="encontros"
+        rotulo="Encontros"
+        dica="quantidade de encontros"
+        ordem={ordem}
+        onCiclar={onCiclar}
+      />
+      <ColunaOrdenavel
+        col="nota"
+        rotulo="Nota"
+        dica="nota do mentor"
+        ordem={ordem}
+        onCiclar={onCiclar}
+      />
       <span aria-hidden />
     </div>
   );
@@ -1110,7 +1184,7 @@ function VisaoCoordenacao({
     if (!mentorSelEf) params.delete("mentor");
     else params.set("mentor", mentorSelEf);
     if (!ordem) params.delete("ordem");
-    else params.set("ordem", ordem);
+    else params.set("ordem", escreveOrdem(ordem));
     const qs = params.toString();
     const url = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
     if (url !== `${window.location.pathname}${window.location.search}`) {
@@ -1156,10 +1230,30 @@ function VisaoCoordenacao({
     comparaNome(a.mentor.nome, b.mentor.nome) ||
     comparaNome(a.mentorado.nome, b.mentorado.nome);
 
-  // a coluna "Dupla" ciclável: prioridade → A a Z → Z a A → prioridade
-  // (o terceiro clique devolve o radar — mesmo ciclo do /relatorios)
-  const ciclarOrdem = () =>
-    setOrdem((o) => (o == null ? "az" : o === "az" ? "za" : null));
+  // cada coluna cicla asc → desc → default e só uma fica ativa — mesmo
+  // ciclo dos headers de /relatorios
+  const clicarColuna = (col: OrdemCol) =>
+    setOrdem((o) =>
+      !o || o.col !== col ? { col, dir: 1 } : o.dir === 1 ? { col, dir: -1 } : null
+    );
+
+  // o controle móvel não tem colunas — um botão só percorre os 7 estados
+  // na sequência (prioridade é a ausência de ordem)
+  const ciclarTodas = () => {
+    const ciclo: OrdemDupla[] = [
+      { col: "nome", dir: 1 },
+      { col: "nome", dir: -1 },
+      { col: "encontros", dir: 1 },
+      { col: "encontros", dir: -1 },
+      { col: "nota", dir: 1 },
+      { col: "nota", dir: -1 },
+    ];
+    setOrdem((o) => {
+      if (!o) return ciclo[0];
+      const i = ciclo.findIndex((c) => c.col === o.col && c.dir === o.dir);
+      return i === ciclo.length - 1 ? null : ciclo[i + 1];
+    });
+  };
 
   // busca fuzzy (REALIZA-391): todo token bate em algum nome da dupla, a
   // ordem das palavras é livre e erro leve entra — o score decide a
@@ -1178,7 +1272,7 @@ function VisaoCoordenacao({
     .filter((d) => chipBate(filtro, d, saudePorId.get(d.id)!))
     .sort(
       ordem
-        ? (a, b) => (ordem === "az" ? porNomeDupla(a, b) : porNomeDupla(b, a))
+        ? comparadorDe(ordem)
         : qt
           ? (a, b) =>
               (scorePorId.get(b.id) ?? 0) - (scorePorId.get(a.id) ?? 0) ||
@@ -1544,11 +1638,13 @@ function VisaoCoordenacao({
           ·{" "}
           <button
             type="button"
-            onClick={ciclarOrdem}
-            title="Ordenar pelo nome da dupla"
+            onClick={ciclarTodas}
+            title="Ordenar a lista"
             className="cursor-pointer underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
-            {ordem ? `por ${ORDEM_ROTULO[ordem]}` : "por prioridade"}
+            {ordem
+              ? `por ${ORDEM_ROTULO[ordem.col][String(ordem.dir) as "1" | "-1"]}`
+              : "por prioridade"}
           </button>
         </p>
         <p className="text-xs text-muted-foreground">
@@ -1585,13 +1681,13 @@ function VisaoCoordenacao({
             className="@container"
           >
             <div className="@4xl:overflow-hidden @4xl:rounded-xl @4xl:bg-card @4xl:shadow-[var(--shadow-border)]">
-              <CabecalhoColunas ordem={ordem} onCiclar={ciclarOrdem} />
+              <CabecalhoColunas ordem={ordem} onCiclar={clicarColuna} />
               {/* filtro, turma, supervisão, ordenação e busca sempre animam
                   (convenção do AGENTS.md): a re-key remonta as linhas e o
                   animate-enter re-roda com o stagger do --i. A busca entra
                   na key de propósito. */}
               <div
-                key={`${filtro}|${turmaSel ?? ""}|${supSelEf}|${mentorSelEf ?? ""}|${ordem ?? ""}|${qt}`}
+                key={`${filtro}|${turmaSel ?? ""}|${supSelEf}|${mentorSelEf ?? ""}|${ordem ? escreveOrdem(ordem) : ""}|${qt}`}
                 className="space-y-3 @4xl:space-y-0 @4xl:divide-y @4xl:divide-border/60"
               >
                 {antes.map((d) => linha(d, i++))}
@@ -1712,7 +1808,7 @@ function VisaoSupervisor({
     // query crua — o eco URL→estado não pode mastigar o espaço mid-typing
     else params.set("q", busca);
     if (!ordem) params.delete("ordem");
-    else params.set("ordem", ordem);
+    else params.set("ordem", escreveOrdem(ordem));
     const qs = params.toString();
     const url = `${window.location.pathname}${qs ? `?${qs}` : ""}`;
     if (url !== `${window.location.pathname}${window.location.search}`) {
@@ -1731,9 +1827,26 @@ function VisaoSupervisor({
     comparaNome(a.mentor.nome, b.mentor.nome) ||
     comparaNome(a.mentorado.nome, b.mentorado.nome);
 
-  // a coluna "Dupla" ciclável: prioridade → A a Z → Z a A → prioridade
-  const ciclarOrdem = () =>
-    setOrdem((o) => (o == null ? "az" : o === "az" ? "za" : null));
+  // cada coluna cicla asc → desc → default — mesmo modelo da coordenação
+  const clicarColuna = (col: OrdemCol) =>
+    setOrdem((o) =>
+      !o || o.col !== col ? { col, dir: 1 } : o.dir === 1 ? { col, dir: -1 } : null
+    );
+  const ciclarTodas = () => {
+    const ciclo: OrdemDupla[] = [
+      { col: "nome", dir: 1 },
+      { col: "nome", dir: -1 },
+      { col: "encontros", dir: 1 },
+      { col: "encontros", dir: -1 },
+      { col: "nota", dir: 1 },
+      { col: "nota", dir: -1 },
+    ];
+    setOrdem((o) => {
+      if (!o) return ciclo[0];
+      const i = ciclo.findIndex((c) => c.col === o.col && c.dir === o.dir);
+      return i === ciclo.length - 1 ? null : ciclo[i + 1];
+    });
+  };
 
   // busca fuzzy (REALIZA-391) — a mesma da visão de coordenação: qualquer
   // nome da dupla (social ou civil) vale, score ordena na busca livre.
@@ -1753,7 +1866,7 @@ function VisaoSupervisor({
     .filter((d) => chipBate(filtro, d, saudePorId.get(d.id)!))
     .sort(
       ordem
-        ? (a, b) => (ordem === "az" ? porNomeDupla(a, b) : porNomeDupla(b, a))
+        ? comparadorDe(ordem)
         : qt
           ? (a, b) =>
               (scorePorId.get(b.id) ?? 0) - (scorePorId.get(a.id) ?? 0) ||
@@ -1872,12 +1985,14 @@ function VisaoSupervisor({
               (mesmo controle do header da coluna; serve no mobile) */}
           <button
             type="button"
-            onClick={ciclarOrdem}
-            title="Ordenar pelo nome da dupla"
+            onClick={ciclarTodas}
+            title="Ordenar a lista"
             className="cursor-pointer underline decoration-dotted decoration-muted-foreground/50 underline-offset-2 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-sm"
           >
             <span aria-hidden>· </span>
-            {ordem ? `por ${ORDEM_ROTULO[ordem]}` : "por prioridade"}
+            {ordem
+              ? `por ${ORDEM_ROTULO[ordem.col][String(ordem.dir) as "1" | "-1"]}`
+              : "por prioridade"}
           </button>
         </p>
         <p className="text-xs text-muted-foreground">
@@ -1904,11 +2019,11 @@ function VisaoSupervisor({
           className="@container"
         >
           <div className="@4xl:overflow-hidden @4xl:rounded-xl @4xl:bg-card @4xl:shadow-[var(--shadow-border)]">
-            <CabecalhoColunas ordem={ordem} onCiclar={ciclarOrdem} />
+            <CabecalhoColunas ordem={ordem} onCiclar={clicarColuna} />
             {/* re-key só no recorte e na ordenação (nunca na busca) —
                   remontar a cada tecla recolhia os grupos e matava um
                   dialog aberto; chip e ordem re-rodam o animate-enter */}
-            <div key={`${filtro}|${ordem ?? ""}`}>
+            <div key={`${filtro}|${ordem ? escreveOrdem(ordem) : ""}`}>
               {gruposOrdenados.map(([turma, duplas], gi) => {
                 // o próximo encontro oficial do calendário da turma — o "esta
                 // semana é o N" do sub-header (duplas da turma correm o mesmo

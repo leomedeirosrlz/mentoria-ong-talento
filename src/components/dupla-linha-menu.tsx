@@ -74,10 +74,11 @@ export function DuplaLinhaMenu({
   const [forms, setForms] = useState<FormularioOpcao[] | null>(null);
   const [carregandoForms, setCarregandoForms] = useState(false);
 
-  // formulário e remanejo são de dupla viva; encerrar trilha já chega
-  // decidido (o caller conhece a trilha e o encerrada_em)
+  // remanejo troca ponta de dupla viva; formulário vale também em dupla
+  // fechada — pesquisa de saída e follow-up são casos reais e o dialog
+  // só precisa dos contatos. encerrar já chega decidido pelo caller
   const viva = dupla.status === "ativa" || dupla.status === "pausada";
-  const temForm = formulario && viva;
+  const temForm = formulario;
   const temRemanejar = remanejar && viva;
 
   async function carregarFormularios() {
