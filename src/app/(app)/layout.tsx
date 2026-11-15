@@ -2,6 +2,7 @@ import { AppShell } from "@/components/app-shell";
 import { AssistenteBolhaLazy } from "@/components/assistente-bolha-lazy";
 import { DemoBar } from "@/components/demo-bar";
 import { OnboardingFlowLazy } from "@/components/onboarding-flow-lazy";
+import { ProdutoTelemetry } from "@/components/produto-telemetry";
 import { TelaConta } from "@/components/telas-conta";
 import { getDemoData } from "@/lib/demo/data";
 import { demoRole } from "@/lib/demo/mode";
@@ -196,7 +197,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     >
       {/* toArray atribui keys — dois filhos soltos disparavam o warning
           de "each child in a list" no render do AppShell */}
-      {Children.toArray([children, demoFloat])}
+      {Children.toArray([children, demoFloat, <ProdutoTelemetry key="telemetry" />])}
     </AppShell>
   );
 }

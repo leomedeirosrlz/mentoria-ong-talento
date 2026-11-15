@@ -4271,6 +4271,72 @@ export type Database = {
           },
         ]
       }
+      produto_eventos: {
+        Row: {
+          acao: string
+          created_at: string
+          id: string
+          meta: Json
+          papel: string
+          profile_id: string
+          superficie: string
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          id?: string
+          meta?: Json
+          papel: string
+          profile_id: string
+          superficie: string
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          id?: string
+          meta?: Json
+          papel?: string
+          profile_id?: string
+          superficie?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "produto_eventos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produto_eventos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produto_eventos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produto_eventos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "produto_eventos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile_papeis: {
         Row: {
           created_at: string
@@ -6912,6 +6978,7 @@ export type Database = {
         Args: { p_access: string; p_nonce: string; p_refresh: string }
         Returns: undefined
       }
+      registrar_produto_eventos: { Args: { p_eventos: Json }; Returns: number }
       relatorio_link_info: { Args: { p_slug: string }; Returns: Json }
       relatorio_links_stats: { Args: never; Returns: Json }
       rematch_dupla: {

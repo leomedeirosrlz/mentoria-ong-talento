@@ -11,6 +11,7 @@ import { providerConfigurado } from "@/lib/ia/provider";
 import { pedirAcessoHref } from "@/lib/login-erros";
 import type { AppRole } from "@/lib/types";
 import { OnboardingJovemLazy } from "./onboarding-jovem-lazy";
+import { ProdutoTelemetry } from "@/components/produto-telemetry";
 
 /** Gate do lado do jovem (REALIZA-108): os mesmos três becos do shell de
  *  staff (sem cadastro / desativado / sem papel) + a régua de papel — só
@@ -155,6 +156,7 @@ export default async function JovemLayout({
     >
       {children}
       {demoFloat}
+      <ProdutoTelemetry />
     </JovemShell>
   );
 }

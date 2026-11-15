@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import {
   ArrowSquareOut,
@@ -13,6 +13,7 @@ import {
 } from "@phosphor-icons/react";
 import { AUDIENCIA_LABEL, audienciasDe, hrefMaterial, refDoMaterial } from "@/lib/materiais";
 import { LinkComLeitura } from "@/components/material-leitura";
+import { trackProduto } from "@/components/produto-telemetry";
 import { sistemaDoDoc } from "@/lib/como-conduzir";
 import type { Material } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -203,8 +204,16 @@ export function BibliotecaLista({
 }) {
   const [busca, setBusca] = useState("");
   const baseId = useId();
+  const buscaQ = busca.trim();
+  // adoção (0197): emite o gesto depois de 800ms parado — cada tecla não é
+  // uma busca; o texto nunca sai daqui (só o comprimento, zero conteúdo)
+  useEffect(() => {
+    if (!buscaQ) return;
+    const t = setTimeout(() => trackProduto("busca", { len: buscaQ.length }), 800);
+    return () => clearTimeout(t);
+  }, [buscaQ]);
   const ordenados = useMemo(() => [...materiais].sort(ordena), [materiais]);
-  const qt = busca.trim();
+  const qt = buscaQ;
   // busca fuzzy (REALIZA-391): título, descrição e o tipo visível pesquisam;
   // o score do melhor campo ranqueia dentro de cada seção
   const scoreDe = (m: Material) =>

@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import type { ReactNode } from "react";
 import { marcarMaterialLido } from "@/lib/actions";
+import { trackProduto } from "@/components/produto-telemetry";
 
 /** Marca o documento como lido na montagem (0196) — cobre todo caminho de
  *  entrada (card, biblioteca, deep link, reload), não só o clique. */
@@ -39,7 +40,10 @@ export function LinkComLeitura({
       href={href}
       {...(externo ? { target: "_blank", rel: "noopener noreferrer" } : {})}
       className={className}
-      onClick={() => void marcarMaterialLido(materialRef)}
+      onClick={() => {
+        trackProduto("material_aberto", { ref: materialRef });
+        void marcarMaterialLido(materialRef);
+      }}
     >
       {children}
     </a>

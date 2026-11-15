@@ -38,6 +38,7 @@ import {
   SITUACAO_DUPLA_LABEL,
 } from "@/lib/dupla-desfecho";
 import { gravarTurmaFocoClient } from "@/lib/turma-contexto";
+import { trackProduto } from "@/components/produto-telemetry";
 import { turmaDaDupla, turmaLonga } from "@/lib/turma";
 import { rotuloDiaAgenda } from "@/lib/agenda-minha";
 import { acaoWhatsAppDupla, encontroPendente } from "@/lib/acao-lembrete";
@@ -1232,14 +1233,17 @@ function VisaoCoordenacao({
 
   // cada coluna cicla asc → desc → default e só uma fica ativa — mesmo
   // ciclo dos headers de /relatorios
-  const clicarColuna = (col: OrdemCol) =>
+  const clicarColuna = (col: OrdemCol) => {
+    trackProduto("sort", { col });
     setOrdem((o) =>
       !o || o.col !== col ? { col, dir: 1 } : o.dir === 1 ? { col, dir: -1 } : null
     );
+  };
 
   // o controle móvel não tem colunas — um botão só percorre os 7 estados
   // na sequência (prioridade é a ausência de ordem)
   const ciclarTodas = () => {
+    trackProduto("sort", { col: "ciclo" });
     const ciclo: OrdemDupla[] = [
       { col: "nome", dir: 1 },
       { col: "nome", dir: -1 },
@@ -1828,11 +1832,14 @@ function VisaoSupervisor({
     comparaNome(a.mentorado.nome, b.mentorado.nome);
 
   // cada coluna cicla asc → desc → default — mesmo modelo da coordenação
-  const clicarColuna = (col: OrdemCol) =>
+  const clicarColuna = (col: OrdemCol) => {
+    trackProduto("sort", { col });
     setOrdem((o) =>
       !o || o.col !== col ? { col, dir: 1 } : o.dir === 1 ? { col, dir: -1 } : null
     );
+  };
   const ciclarTodas = () => {
+    trackProduto("sort", { col: "ciclo" });
     const ciclo: OrdemDupla[] = [
       { col: "nome", dir: 1 },
       { col: "nome", dir: -1 },
