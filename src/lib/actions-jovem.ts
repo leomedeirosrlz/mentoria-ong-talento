@@ -2,7 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { parseDisponibilidade } from "./ciclo";
+import {
+  ESCOLARIDADES,
+  parseDisponibilidade,
+  SENTINEL_VAZIO,
+} from "./ciclo";
 import { getSlotsLivres } from "./queries-especialista";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
@@ -78,6 +82,95 @@ export async function salvarDisponibilidadeJovem(
   if (error) return { error: erroAmigavel(error) };
   revalidatePath("/jovem");
   revalidatePath("/jovem/perfil");
+  return { ok: true };
+}
+
+/** Ficha do programa editável pelo próprio jovem (REALIZA-420) — os 4
+ *  campos auto-descritivos (objetivos, motivação, escolaridade, origem)
+ *  descem pela RPC jovem_update_ficha (0200): a whitelist de colunas mora
+ *  no banco, porque mentorados não tem UPDATE pro papel. A validação
+ *  espelha camposFicha (trim + teto dos CHECKs da 0034) pra devolver o
+ *  erro claro em vez do 23514; a RPC revalida de novo no servidor. O form
+ *  sempre manda o conjunto completo — vazio vira null ("limpar"). */
+export async function salvarFichaJovem(formData: FormData) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Só o próprio jovem edita a ficha dele." };
+  }
+
+  const campos: Record<string, string | null> = {};
+  for (const [k, max, rotulo] of [
+    ["objetivos", 2000, "Objetivos com a mentoria"],
+    ["motivacao", 2000, "Motivação"],
+    ["origem", 300, "Como você chegou ao programa"],
+  ] as const) {
+    const v = String(formData.get(k) ?? "").trim() || null;
+    if (v && v.length > max) {
+      return { error: `O campo "${rotulo}" aceita até ${max} caracteres.` };
+    }
+    campos[k] = v;
+  }
+  // SelectOpcional emite SENTINEL_VAZIO no "Não informado" (contrato do
+  // camposFicha): sentinela e branco viram null; fora do vocabulário é erro
+  const escolaridadeRaw = String(formData.get("escolaridade") ?? "").trim();
+  const escolaridade =
+    escolaridadeRaw === SENTINEL_VAZIO ? "" : escolaridadeRaw;
+  if (!escolaridade) {
+    campos.escolaridade = null;
+  } else if (!(ESCOLARIDADES as readonly string[]).includes(escolaridade)) {
+    return { error: "Escolha uma escolaridade válida." };
+  } else {
+    campos.escolaridade = escolaridade;
+  }
+
+  const { error } = await supabase.rpc("jovem_update_ficha", {
+    p_objetivos: campos.objetivos,
+    p_motivacao: campos.motivacao,
+    p_escolaridade: campos.escolaridade,
+    p_origem: campos.origem,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  revalidatePath("/jovem/perfil");
+  return { ok: true };
+}
+
+/** Foto do jovem no bucket `avatares` (REALIZA-419) — o arquivo já subiu
+ *  na pasta do profile_id pelo client (a policy da 0014/0024 garante); a
+ *  RPC jovem_set_avatar (0200) grava mentorados.avatar_path, a coluna que
+ *  jovem_perfil e mentorados_turma projetam (profiles.avatar_path é a dos
+ *  adultos). Mesmo protocolo do setAvatarPath de staff: path fora da
+ *  própria pasta é rejeitado e o arquivo antigo sai do bucket. */
+export async function setAvatarJovem(path: string | null) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Só o próprio jovem troca a foto dele." };
+  }
+  if (path != null && !path.startsWith(`${eu.id}/`)) {
+    return { error: "Não foi possível usar esse arquivo." };
+  }
+
+  // jovem_perfil já é self-scoped — o path antigo sai sem round extra
+  const { data: atual } = await supabase
+    .from("jovem_perfil")
+    .select("avatar_path")
+    .maybeSingle();
+  const { error } = await supabase.rpc("jovem_set_avatar", {
+    p_path: path ?? undefined,
+  });
+  if (error) return { error: erroAmigavel(error) };
+
+  const antigo = atual?.avatar_path;
+  if (antigo && antigo !== path) {
+    await supabase.storage.from("avatares").remove([antigo]);
+  }
+  revalidatePath("/jovem/perfil");
+  revalidatePath("/jovem/pessoas");
+  // o avatar do rodapé da sidebar vem do layout — revalida o grupo inteiro
+  revalidatePath("/jovem", "layout");
   return { ok: true };
 }
 

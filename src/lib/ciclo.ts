@@ -307,6 +307,12 @@ export const COR_RACAS = [
 export const DIAS_SEMANA = ["seg", "ter", "qua", "qui", "sex", "sab", "dom"] as const satisfies readonly DiaSemana[];
 export const PERIODOS = ["manha", "tarde", "noite"] as const satisfies readonly Periodo[];
 
+/** Sentinela dos Selects opcionais ("Não informado") — a action trata como
+ *  vazio (mesmo contrato do `__nenhum` de supervisor nos dialogs de dupla).
+ *  Mora no domínio porque server actions também leem (campos-pessoais
+ *  reexporta pros forms de client). */
+export const SENTINEL_VAZIO = "__nenhum";
+
 export const GENERO_LABELS: Record<Genero, string> = {
   feminino: "Feminino",
   masculino: "Masculino",

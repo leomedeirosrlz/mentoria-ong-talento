@@ -15,6 +15,7 @@ import {
   PERIODOS,
   PERIODOS_LABELS,
   PREF_GENERO_LABELS,
+  SENTINEL_VAZIO,
   UFS,
 } from "@/lib/ciclo";
 import type { DiaSemana, Disponibilidade, Periodo } from "@/lib/types";
@@ -27,9 +28,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
 
-/** Sentinela dos Selects opcionais ("Não informado") — o action trata como
- *  vazio (mesmo contrato do `__nenhum` de supervisor nos dialogs de dupla). */
-export const SENTINEL_VAZIO = "__nenhum";
+// a sentinela dos Selects opcionais mora no domínio (ciclo.ts) — server
+// actions também a leem; o reexport mantém os imports dos forms de client
+export { SENTINEL_VAZIO };
 
 /** Título de bloco dentro de dialog/form — mesma gramática dos uppercase
  *  de /pessoas/[id]: ficha longa vira seções em vez de parede de campos. */

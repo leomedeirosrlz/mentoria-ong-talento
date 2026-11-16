@@ -6804,6 +6804,16 @@ export type Database = {
       jornada_autoemit: { Args: { p_dupla_id: string }; Returns: undefined }
       jovem_jornada: { Args: never; Returns: Json }
       jovem_relacionado: { Args: { p_profile: string }; Returns: boolean }
+      jovem_set_avatar: { Args: { p_path?: string }; Returns: undefined }
+      jovem_update_ficha: {
+        Args: {
+          p_escolaridade?: string
+          p_motivacao?: string
+          p_objetivos?: string
+          p_origem?: string
+        }
+        Returns: undefined
+      }
       marcar_aconteceu_mentorado: {
         Args: { p_encontro: string }
         Returns: Json

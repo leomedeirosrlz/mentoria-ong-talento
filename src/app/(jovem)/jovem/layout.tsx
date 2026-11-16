@@ -8,6 +8,8 @@ import { papeisDe } from "@/lib/demo/queries";
 import { demoRole } from "@/lib/demo/mode";
 import { getMe, getNotificacoes } from "@/lib/queries";
 import { getJovemAssinaturas, getJovemPerfil } from "@/lib/queries-jovem";
+import { avatarPublicUrl } from "@/lib/avatar";
+import { gravatarUrlSeExiste } from "@/lib/gravatar";
 import { providerConfigurado } from "@/lib/ia/provider";
 import { pedirAcessoHref } from "@/lib/login-erros";
 import type { AppRole } from "@/lib/types";
@@ -141,7 +143,13 @@ export default async function JovemLayout({
     );
   }
 
-  const notificacoes = await getNotificacoes();
+  const [notificacoes, perfil] = await Promise.all([
+    getNotificacoes(),
+    // a foto do rodapé da sidebar é a do mentorado (avatar_path via
+    // jovem_perfil) — mesma fonte do banner do perfil; o React.cache
+    // divide a query com a página que também a pede
+    getJovemPerfil(),
+  ]);
   // bolha do assistente pro jovem (pacote liza nov/2026, sdd D5): a MESMA
   // flag IA_BOLHA do shell de staff — off por padrão fora da demo, onde
   // ela sempre aparece (vitrine do assistente, REALIZA-382). O /api/ia/chat
@@ -151,6 +159,10 @@ export default async function JovemLayout({
   return (
     <JovemShell
       me={me}
+      fotoUrl={
+        perfil?.avatar_path ? avatarPublicUrl(perfil.avatar_path) : null
+      }
+      gravatarUrl={demo ? null : await gravatarUrlSeExiste(me.email)}
       notificacoes={notificacoes}
       demo={demoDock || undefined}
       assistente={

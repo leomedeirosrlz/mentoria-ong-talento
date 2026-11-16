@@ -63,12 +63,18 @@ function ativo(pathname: string, href: string) {
 
 export function JovemShell({
   me,
+  fotoUrl,
+  gravatarUrl,
   notificacoes,
   demo,
   assistente,
   children,
 }: {
   me: Profile;
+  /** mentorados.avatar_path já resolvido pra URL pública — null cai nas
+   *  iniciais (com o gravatar do e-mail como degrau do meio) */
+  fotoUrl?: string | null;
+  gravatarUrl?: string | null;
   notificacoes: { itens: Notificacao[]; naoLidas: number };
   /** pill compacta da DemoBar dockada no header mobile (no lugar do nome —
    *  mesmo trade-off do AppShell, que docka sobre o rótulo de papel) */
@@ -201,9 +207,15 @@ export function JovemShell({
                 aria-current={ativo(pathname, "/jovem/perfil") ? "page" : undefined}
                 className="flex min-w-0 flex-1 items-center gap-3 rounded-lg px-2 py-2 transition-colors outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-3 focus-visible:ring-ring/50"
               >
-                {/* foto nunca: a decisão de produto é iniciais na v1 — o
-                    disco amarelo já é a marca do jovem no app inteiro */}
-                <Avatar nome={nomeTela} papel="mentorado" size={32} />
+                {/* o disco de iniciais amarelo segue o fallback — a foto
+                    que ele sobe no perfil (REALIZA-419) aparece aqui */}
+                <Avatar
+                  nome={nomeTela}
+                  papel="mentorado"
+                  src={fotoUrl}
+                  fallbackSrc={gravatarUrl}
+                  size={32}
+                />
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate" title={nomeTela}>
                     {nomeTela}
