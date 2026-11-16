@@ -9,6 +9,7 @@ import {
 import { rodarLembretesRegistro } from "@/lib/jobs-lembretes-registro";
 import { rodarLembretesTrilha } from "@/lib/jobs-lembretes-trilha";
 import { rodarDigestSemanal } from "@/lib/jobs-digest";
+import { rodarRetencaoProduto } from "@/lib/jobs-retencao";
 
 export const dynamic = "force-dynamic";
 // o diário cabe folgado; a folga é pro backfill (dias corridos × duplas)
@@ -39,6 +40,9 @@ const JOBS: Record<string, (ctx: JobContext) => Promise<JobResult>> = {
   // REALIZA-178 — digest semanal da coordenação (só segunda; dedup por
   // emails_enviados enviados>0 na semana — re-run e não-segunda são inócuos)
   digest_semanal: rodarDigestSemanal,
+  // REALIZA-417 fase B — rollup diário + retenção 90d do cru de
+  // produto_eventos (0201; idempotente, rollup antes do delete)
+  retencao_produto: rodarRetencaoProduto,
 };
 
 async function tick(request: NextRequest): Promise<NextResponse> {

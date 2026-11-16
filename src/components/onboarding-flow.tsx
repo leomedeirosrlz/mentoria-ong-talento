@@ -24,7 +24,6 @@ import {
   HandHeart,
   Handshake,
   Heart,
-  ImageSquare,
   LinkedinLogo,
   ListChecks,
   MapPin,
@@ -85,24 +84,18 @@ import type {
 } from "@/lib/types";
 import { Logo } from "@/components/logo";
 import { LizaBlob } from "@/components/liza/liza-blob";
+import {
+  PassoRecursos,
+  type RecursoTour,
+} from "@/components/onboarding-recursos";
 import { cn } from "cn";
 
 /** Um form por passo — o botão do footer fixo submete via atributo `form`. */
 const FORM_ID = "onboarding-passo";
 
-type Recurso = {
-  icon: Icon;
-  texto: string;
-  /** nome-base do print em public/onboarding (scripts/capturar-onboarding.mjs):
-   *  `<img>.webp` é a coluna de conteúdo no desktop, `<img>-m.webp` a tela do
-   *  celular. Sem img o item fica só como texto (o mentorado não passa aqui) */
-  img?: string;
-  alt?: string;
-};
-
 /** "O que você pode fazer aqui" — os pontos que mudam a rotina de cada papel,
  *  cada um com a tela real onde ele acontece. */
-const RECURSOS: Record<AppRole, Recurso[]> = {
+const RECURSOS: Record<AppRole, RecursoTour[]> = {
   coordenacao: [
     { icon: TrafficSignal, texto: "Andamento das duplas", img: "coordenacao-home", alt: "Visão geral da coordenação: turmas, situação das duplas e o que precisa de você hoje" },
     { icon: HandHeart, texto: "Pedidos de apoio", img: "coordenacao-dupla", alt: "Ficha de uma dupla em risco com apoio aberto e especialista solicitado" },
