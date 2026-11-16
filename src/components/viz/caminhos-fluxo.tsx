@@ -54,8 +54,13 @@ export function CaminhosFluxo({
     >
       {linhas.map((c, idx) => {
         const trechos = [c.de, c.meio, c.para];
+        const caminhoTxt = trechos.map(nomeSuperficie).join(" → ");
         return (
-          <li key={`${c.de}>${c.meio}>${c.para}`}>
+          // o respiro negativo dá corpo ao hover sem mudar o ritmo vertical
+          <li
+            key={`${c.de}>${c.meio}>${c.para}`}
+            className="-mx-1.5 rounded-md px-1.5 transition-colors hover:bg-muted/50"
+          >
             <div className="flex items-center justify-between gap-3">
               <p className="flex min-w-0 flex-wrap items-center gap-1">
                 {trechos.map((sup, t) => (
@@ -65,7 +70,12 @@ export function CaminhosFluxo({
                         →
                       </span>
                     )}
-                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium whitespace-nowrap">
+                    {/* rounded-md+borda: é dado, não chip clicável — o
+                        title repete o caminho inteiro em cada trecho */}
+                    <span
+                      title={caminhoTxt}
+                      className="rounded-md border border-border/70 bg-muted/50 px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
+                    >
                       {nomeSuperficie(sup)}
                     </span>
                   </span>
@@ -77,10 +87,10 @@ export function CaminhosFluxo({
               </span>
             </div>
             {/* barra de reforço — proporcional ao caminho mais percorrido;
-                o trilho muted afirma a régua sem declarar denominador */}
+                trilho fino e quieto: 100% do trilho lia como "meta" */}
             <div
               aria-hidden
-              className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-muted"
+              className="mt-1.5 h-[3px] w-full overflow-hidden rounded-full bg-muted/50"
             >
               <span
                 className={cn(

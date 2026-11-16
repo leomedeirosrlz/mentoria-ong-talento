@@ -1,7 +1,7 @@
 "use client";
 
 import type { KeyboardEvent, ReactNode } from "react";
-import { useRef } from "react";
+import { useEffect, useRef } from "react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useFadeX } from "@/lib/use-fade-x";
@@ -38,6 +38,16 @@ export function RelatoriosAbas({
 }) {
   const refs = useRef<Record<string, HTMLAnchorElement | null>>({});
   const { ref, maskStyle } = useFadeX<HTMLDivElement>();
+
+  // a tablist é scroller horizontal: no mobile a aba ativa pode nascer
+  // fora da faixa visível (Adoção é a 8ª) — recentraliza no mount e a
+  // cada troca. block:"nearest" segura a rolagem vertical da página
+  useEffect(() => {
+    refs.current[ativa]?.scrollIntoView({
+      block: "nearest",
+      inline: "center",
+    });
+  }, [ativa]);
 
   function onKeyDown(e: KeyboardEvent<HTMLAnchorElement>, i: number) {
     let proximo: number | null = null;

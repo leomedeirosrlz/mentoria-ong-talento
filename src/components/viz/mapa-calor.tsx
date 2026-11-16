@@ -8,9 +8,10 @@ const FMT_INT = new Intl.NumberFormat("pt-BR");
 /* Piso e teto do preenchimento sequencial: 10% garante que "1 pessoa" já
  * leia como presença (só o zero é vazio — o buraco honesto); 95% preserva
  * respiro pro número. O matiz é um só (--brand-lime): escala sequencial
- * nunca é arco-íris. */
+ * nunca é arco-íris. A curva é sqrt, não linear: numa grade de máximo 60,
+ * valores 1–5 caíam todos na faixa pálida e o miolo não se separava. */
 const PREENCHIMENTO = (i: number) =>
-  `color-mix(in oklab, var(--brand-lime) ${Math.round(10 + i * 85)}%, var(--card))`;
+  `color-mix(in oklab, var(--brand-lime) ${Math.round(10 + Math.sqrt(Math.min(1, Math.max(0, i))) * 85)}%, var(--card))`;
 
 /* Acima desta intensidade o número troca pra tinta da marca — o fill já é
  * majoritariamente lima nos dois temas (lima é constante de marca) e o par
@@ -35,7 +36,7 @@ function Numero({
   }
   return (
     <span
-      className="font-semibold tabular-nums"
+      className="text-sm font-medium tabular-nums"
       style={intensidade >= LIMIAR_TINTA ? { color: "var(--brand-ink)" } : undefined}
     >
       {FMT_INT.format(valor)}
@@ -59,7 +60,13 @@ function Numero({
  *  `onCelula` liga o drill: cada célula vira um button real cobrindo a td.
  *  Componente sem estado — server-safe: prop de função só pode vir de
  *  árvore client (boundary do RSC não serializa handler), então render
- *  server-side sempre sai como tabela estática, sem custo de JS.
+ *  server-side sempre sai como tabela estática, sem custo de JS. O hover
+ *  da célula (brightness + ring) e o crosshair do rótulo da linha são
+ *  CSS puro — feedback idêntico nos dois ramos.
+ *
+ *  A coluna de rótulos é sticky no scroll horizontal (border-separate +
+ *  border-spacing-0, padrão do relatorio-secao); a borda direita da
+ *  coluna marca a separação do miolo rolante.
  *
  *  Cabeçalho de coluna traz rótulo + total; coluna "total" à direita e
  *  linha "total" no <tfoot> — os três denominadores à vista. */
@@ -128,7 +135,7 @@ export function MapaCalor({
         aria-label={rotuloCelula}
         className={cn(
           cls,
-          "cursor-pointer outline-none transition-[filter] duration-150 ease-snappy hover:brightness-95 focus-visible:ring-2 focus-visible:ring-ring"
+          "cursor-pointer outline-none transition-[filter] duration-150 ease-snappy hover:brightness-95 hover:ring-1 hover:ring-inset hover:ring-foreground/25 focus-visible:ring-2 focus-visible:ring-ring"
         )}
         style={estilo}
         onClick={() => onCelula(linha.id, papel)}
@@ -136,7 +143,16 @@ export function MapaCalor({
         <Numero valor={valor} intensidade={iCel} />
       </ButtonPrimitive>
     ) : (
-      <span className={cls} style={estilo} title={rotuloCelula}>
+      <span
+        // o mesmo hover do ramo clicável: CSS puro funciona em RSC e o
+        // mapa é o mesmo com ou sem drill ligado
+        className={cn(
+          cls,
+          "transition-[filter] duration-150 ease-snappy hover:brightness-95 hover:ring-1 hover:ring-inset hover:ring-foreground/25"
+        )}
+        style={estilo}
+        title={rotuloCelula}
+      >
         <Numero valor={valor} intensidade={iCel} />
       </span>
     );
@@ -157,13 +173,21 @@ export function MapaCalor({
         tabIndex={0}
         className="scroll-fina overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <table className="w-full">
+        {/* border-separate segura o sticky da 1ª coluna (padrão do
+            relatorio-secao); com papel único o w-full esticava a linha e
+            o valor fugia ~600px pra direita — w-auto encolhe a grade */}
+        <table
+          className={cn(
+            "border-separate border-spacing-0",
+            grade.colunas.length === 1 ? "w-auto min-w-[320px]" : "w-full"
+          )}
+        >
           <caption className="sr-only">{caption}</caption>
           <thead>
             <tr>
               <th
                 scope="col"
-                className="py-1 pr-2 text-left text-xs font-medium text-muted-foreground"
+                className="sticky left-0 z-10 border-r border-border/60 bg-card py-1 pr-2 text-left text-xs font-medium text-muted-foreground"
               >
                 superfície
               </th>
@@ -191,11 +215,11 @@ export function MapaCalor({
             {grade.linhas.map((l) => {
               const parada = l.total === 0;
               return (
-                <tr key={l.id}>
+                <tr key={l.id} className="group/tr">
                   <th
                     scope="row"
                     className={cn(
-                      "py-0.5 pr-2 text-left text-xs font-medium whitespace-nowrap",
+                      "sticky left-0 z-10 border-r border-border/60 bg-card py-0.5 pr-2 text-left text-xs font-medium whitespace-nowrap transition-colors group-hover/tr:bg-muted",
                       // parada segue nomeada, só mais quieta — a linha zerada
                       // é exatamente o que a aba existe pra mostrar
                       parada ? "text-muted-foreground" : "text-foreground"
@@ -224,7 +248,7 @@ export function MapaCalor({
             <tr>
               <th
                 scope="row"
-                className="border-t-2 border-border py-1.5 pr-2 text-left text-xs font-semibold"
+                className="sticky left-0 z-10 border-r border-border/60 border-t-2 border-t-border bg-card py-1.5 pr-2 text-left text-xs font-semibold"
               >
                 total
               </th>
@@ -243,6 +267,22 @@ export function MapaCalor({
           </tfoot>
         </table>
       </div>
+      {/* a escala morava só no caption sr-only — a faixa gradiente declara
+          piso→teto (mesma rampa da célula, stops em i=0..1) sem linha de
+          texto corrido. aria-hidden: repete o que a tabela já mostra */}
+      <p
+        aria-hidden
+        className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground"
+      >
+        menos
+        <span
+          className="h-2 w-16 rounded-sm"
+          style={{
+            background: `linear-gradient(90deg, ${PREENCHIMENTO(0)}, ${PREENCHIMENTO(0.25)}, ${PREENCHIMENTO(0.5)}, ${PREENCHIMENTO(0.75)}, ${PREENCHIMENTO(1)})`,
+          }}
+        />
+        mais
+      </p>
     </div>
   );
 }

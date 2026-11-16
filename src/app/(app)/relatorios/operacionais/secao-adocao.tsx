@@ -1,14 +1,14 @@
 import Link from "next/link";
+import type { CSSProperties } from "react";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { cn } from "@/lib/utils";
-import { FilterChipRow } from "@/components/ui/filter-chip";
-import { formatDate, tempoRelativo } from "@/lib/ciclo";
+import { filterChipCls, FilterChipRow } from "@/components/ui/filter-chip";
+import { formatDate } from "@/lib/ciclo";
 import {
   JANELA_DEFAULT,
   JANELAS,
   PAPEIS_ADOCAO,
   ROTULO_PAPEL,
-  ROTULO_SUPERFICIE,
   SUPERFICIES,
   coorteParaGrade,
   deltaPct,
@@ -49,12 +49,12 @@ import {
   CoorteGrade,
   FunilEtapas,
   GraficoTempo,
-  MapaCalor,
   MetricTile,
-  Sparkline,
   type PontoGrafico,
 } from "@/components/viz";
 import { GestosVivos } from "./gestos-vivos";
+import { MapaCalorDrill } from "./adocao-interativo";
+import { TabelaSuperficies } from "./tabela-superficies";
 
 // Aba Adoção (REALIZA-417 fase 2): a 8ª do workbench, na anatomia do
 // design.md — régua própria (janela × papel × medida, chips-link como o
@@ -76,15 +76,9 @@ const FMT_MES_ANO = new Intl.DateTimeFormat("pt-BR", {
 
 const SEMANAS_COORTE = 10;
 const TOP_CAMINHOS = 8;
-const MAX_RECENTES = 30;
+const MAX_RECENTES = 12;
 
 const CARD = "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5";
-
-const ORDEM_PAPEL = new Map(PAPEIS_ADOCAO.map((p, i) => [p.id, i]));
-const ordenaPapeis = (ids: string[]) =>
-  [...ids].sort(
-    (a, b) => (ORDEM_PAPEL.get(a) ?? 99) - (ORDEM_PAPEL.get(b) ?? 99)
-  );
 
 type Supa = SupabaseClient;
 
@@ -126,14 +120,14 @@ export async function SecaoAdocao({
 
   if (d) {
     resumo = dadosAdocaoResumoDemo(d, janela, papel);
-    celulas = dadosAdocaoMatrizDemo(d);
+    celulas = dadosAdocaoMatrizDemo(d, janela);
     const serieDemo = dadosAdocaoSerieDiaDemo(d, janela);
     serie = papel ? serieDemo.filter((s) => s.papel === papel) : serieDemo;
-    linhasSup = linhasSuperficieDemo(d, papel, agora);
+    linhasSup = linhasSuperficieDemo(d, papel, janela, agora);
     linhasCoorte = dadosAdocaoCoorteDemo(SEMANAS_COORTE);
-    caminhos = dadosAdocaoCaminhosDemo(papel);
+    caminhos = dadosAdocaoCaminhosDemo(papel, janela);
     funil = dadosFunilInstrumentosDemo();
-    recentes = dadosAdocaoRecentesDemo();
+    recentes = dadosAdocaoRecentesDemo(janela);
   } else {
     [resumo, celulas, serie, linhasSup, linhasCoorte, caminhos, funil, recentes] =
       await Promise.all([
@@ -184,7 +178,7 @@ export async function SecaoAdocao({
     .reduce((s, f) => s + f.respondidos, 0);
 
   const secaoInstrumentos = (
-    <section className="space-y-3">
+    <section className="min-w-0 space-y-3">
       <div>
         <h2 className="text-base font-semibold">Instrumentos</h2>
         <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
@@ -197,14 +191,14 @@ export async function SecaoAdocao({
           instrumentos={funil}
           janelaDias={FUNIL_JANELA_DIAS}
           animate
-          i={5}
+          i={6}
         />
       </div>
     </section>
   );
 
   const secaoRecentes = (
-    <section className="space-y-3">
+    <section className="min-w-0 space-y-3">
       <div>
         <h2 className="text-base font-semibold">Gestos recentes</h2>
         <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
@@ -212,7 +206,11 @@ export async function SecaoAdocao({
           real{papel ? " · todos os papéis" : ""}.
         </p>
       </div>
-      <div className={CARD}>
+      {/* GestosVivos não tem animate próprio — a entrada mora no card */}
+      <div
+        className={cn(CARD, "animate-enter")}
+        style={{ "--i": 10 } as CSSProperties}
+      >
         <GestosVivos inicial={recentes} />
       </div>
     </section>
@@ -232,25 +230,30 @@ export async function SecaoAdocao({
           papeis={papeisChips}
           extraParams={extraParams}
         />
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-base font-semibold">Quem usa o quê</h2>
-            <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
-              Pessoas únicas por superfície e papel, caminhos e retorno.
-            </p>
-          </div>
-          <div className="rounded-xl bg-card px-4 py-6 shadow-[var(--shadow-border)]">
-            <p className="text-sm font-medium">Acumulando histórico</p>
-            <p className="mt-1 max-w-xl text-sm text-muted-foreground">
-              {resumo.coletando_desde
-                ? `A coleta de gestos começou em ${FMT_MES_ANO.format(new Date(resumo.coletando_desde))} e esta aba enche conforme o uso.`
-                : "A coleta de gestos começou agora e esta aba enche conforme o uso."}{" "}
-              Nenhum gesto foi registrado neste período ainda.
-            </p>
-          </div>
-        </section>
-        {emitidos > 0 && secaoInstrumentos}
-        {recentes.length > 0 && secaoRecentes}
+        {/* re-key do recorte: remontar os blocos re-roda o animate-enter
+            de cada card — a convenção pede animação em toda troca de
+            filtro, nunca repaint seco */}
+        <div key={`${janela}-${papel}-${medida}`} className="space-y-5">
+          <section className="space-y-3">
+            <div>
+              <h2 className="text-base font-semibold">Quem usa o quê</h2>
+              <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
+                Pessoas únicas por superfície e papel, caminhos e retorno.
+              </p>
+            </div>
+            <div className="rounded-xl bg-card px-4 py-6 shadow-[var(--shadow-border)]">
+              <p className="text-sm font-medium">Acumulando histórico</p>
+              <p className="mt-1 max-w-xl text-sm text-muted-foreground">
+                {resumo.coletando_desde
+                  ? `A coleta de gestos começou em ${FMT_MES_ANO.format(new Date(resumo.coletando_desde))} e esta aba enche conforme o uso.`
+                  : "A coleta de gestos começou agora e esta aba enche conforme o uso."}{" "}
+                Nenhum gesto foi registrado neste período ainda.
+              </p>
+            </div>
+          </section>
+          {emitidos > 0 && secaoInstrumentos}
+          {recentes.length > 0 && secaoRecentes}
+        </div>
       </div>
     );
   }
@@ -258,8 +261,11 @@ export async function SecaoAdocao({
   // um slot por dia da janela — dia sem evento é zero (existe e ninguém
   // usou), não buraco: a barra simplesmente não sobe
   const gestosDia = new Map<string, number>();
-  for (const s of serie)
+  const ativasDia = new Map<string, number>();
+  for (const s of serie) {
     gestosDia.set(s.dia, (gestosDia.get(s.dia) ?? 0) + s.gestos);
+    ativasDia.set(s.dia, (ativasDia.get(s.dia) ?? 0) + s.pessoas);
+  }
   const hoje = new Date(agora);
   const pontos: PontoGrafico[] = Array.from({ length: janela }, (_, i) => {
     const dt = new Date(hoje.getTime() - (janela - 1 - i) * 86400000);
@@ -275,6 +281,11 @@ export async function SecaoAdocao({
       valorFmt: v === 1 ? "1 gesto" : `${FMT_INT.format(v)} gestos`,
     };
   });
+  // spark do herói: ativas por dia nos mesmos slots do gráfico. A soma
+  // por papel pode inflar um dia (uma pessoa em dois papéis conta 2×) —
+  // pro formato da janela, que é o que o spark mostra, serve; o número
+  // oficial é o resumo.ativas ao lado
+  const sparkAtivas = pontos.map((p) => ativasDia.get(p.chave) ?? 0);
   // a média vem dos slots (mesma agregação da série) — resumo.gestos
   // respeita o mesmo recorte de papel desde a 0198, mas o slot diário
   // é a conta que o gráfico mostra
@@ -309,257 +320,198 @@ export async function SecaoAdocao({
         extraParams={extraParams}
       />
 
-      {/* L1 — os quatro números de relance; o hero é quem usa */}
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-semibold">Panorama</h2>
-          <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
-            Os números de relance dos últimos {janela} dias: quem usa,
-            quanto usa e quanto responde.
-          </p>
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <MetricTile
-            rotulo="Pessoas ativas"
-            valor={FMT_INT.format(resumo.ativas)}
-            delta={deltaPct(resumo.ativas, resumo.ativas_prev)}
-            deltaRotulo={`vs. os ${janela} dias anteriores`}
-            deltaBom="sobe"
-            destaque
-            animate
-            i={0}
-            className={CARD}
-          />
-          <MetricTile
-            rotulo="Gestos por dia"
-            valor={FMT_COMPACTO.format(
-              Math.round(resumo.gestos / janela)
-            )}
-            // média por dia nos dois lados — janelas do mesmo tamanho, a
-            // fração sai igual direto do total
-            delta={deltaPct(resumo.gestos, resumo.gestos_prev)}
-            deltaRotulo={`vs. os ${janela} dias anteriores`}
-            deltaBom="neutro"
-            nota={`${FMT_INT.format(resumo.gestos)} gestos no período`}
-            animate
-            i={1}
-            className={CARD}
-          />
-          <MetricTile
-            rotulo="Superfícies vivas"
-            valor={`${vivas} de ${SUPERFICIES.length}`}
-            delta={null}
-            deltaRotulo=""
-            deltaVazio="sem dado do período anterior"
-            nota={notaVivas}
-            animate
-            i={2}
-            className={CARD}
-          />
-          <MetricTile
-            rotulo="Taxa de resposta"
-            valor={
-              emitidos > 0
-                ? `${Math.round((respondidos / emitidos) * 100)}%`
-                : "—"
-            }
-            delta={null}
-            deltaRotulo=""
-            deltaVazio="sem dado do período anterior"
-            nota={
-              emitidos > 0
-                ? `${FMT_INT.format(respondidos)} de ${FMT_INT.format(emitidos)} respondidos em até ${FUNIL_JANELA_DIAS} dias${papel ? " · todos os papéis" : ""}`
-                : "sem instrumentos no período"
-            }
-            animate
-            i={3}
-            className={CARD}
-          />
-        </div>
-      </section>
-
-      {/* L2 — o herói: superfície × papel */}
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-semibold">Quem usa o quê</h2>
-          <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
-            {medida === "pessoas" ? "Pessoas únicas" : "Gestos"} por
-            superfície e papel nos últimos {janela} dias.
-          </p>
-        </div>
-        <div className={CARD}>
-          <MapaCalor
-            grade={grade}
-            medida={medida}
-            medidaRotulo={
-              medida === "pessoas" ? "pessoas únicas" : "gestos"
-            }
-            contexto={`nos últimos ${janela} dias`}
-            animate
-            i={4}
-          />
-        </div>
-      </section>
-
-      {/* L2 — formas: ritmo diário e destino dos instrumentos */}
-      <div className="grid gap-5 lg:grid-cols-2">
+      {/* re-key do recorte: remontar os blocos re-roda o animate-enter
+          + --i de cada card — a convenção pede animação em toda troca de
+          filtro, nunca repaint seco de página inteira */}
+      <div key={`${janela}-${papel}-${medida}`} className="space-y-5">
+        {/* L1 — os quatro números de relance; o hero é quem usa */}
         <section className="space-y-3">
           <div>
-            <h2 className="text-base font-semibold">Gestos por dia</h2>
+            <h2 className="text-base font-semibold">Panorama</h2>
             <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
-              Total de gestos por dia no período
-              {rotuloPapel ? ` · só ${rotuloPapel}` : ""}.
+              Os números de relance dos últimos {janela} dias: quem usa,
+              quanto usa e quanto responde.
             </p>
           </div>
-          <div className={CARD}>
-            <GraficoTempo
-              pontos={pontos}
-              tipo="barras"
-              formato="inteiro"
-              media={media}
-              pico={pico}
-              ariaLabel={ariaSerie}
-              rotuloTempo="Dia"
-              rotuloValor="Gestos"
+          {/* 2 colunas já na base: uma coluna só empilhava 4 tiles de
+              ~155px antes do mapa no celular; o herói fica full-width */}
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+            <MetricTile
+              rotulo="Pessoas ativas"
+              valor={FMT_INT.format(resumo.ativas)}
+              delta={deltaPct(resumo.ativas, resumo.ativas_prev)}
+              deltaRotulo={`vs. os ${janela} dias anteriores`}
+              deltaBom="sobe"
+              destaque
+              spark={sparkAtivas}
+              animate
+              i={0}
+              className={cn(CARD, "col-span-2 lg:col-span-1")}
+            />
+            <MetricTile
+              rotulo="Gestos por dia"
+              valor={FMT_COMPACTO.format(
+                Math.round(resumo.gestos / janela)
+              )}
+              // média por dia nos dois lados — janelas do mesmo tamanho,
+              // a fração sai igual direto do total
+              delta={deltaPct(resumo.gestos, resumo.gestos_prev)}
+              deltaRotulo={`vs. os ${janela} dias anteriores`}
+              deltaBom="neutro"
+              nota={`${FMT_INT.format(resumo.gestos)} gestos no período`}
+              animate
+              i={1}
+              className={CARD}
+            />
+            <MetricTile
+              rotulo="Superfícies vivas"
+              valor={`${vivas} de ${SUPERFICIES.length}`}
+              delta={null}
+              deltaRotulo=""
+              deltaVazio="sem dado do período anterior"
+              nota={notaVivas}
+              animate
+              i={2}
+              className={CARD}
+            />
+            <MetricTile
+              rotulo="Taxa de resposta"
+              valor={
+                emitidos > 0
+                  ? `${Math.round((respondidos / emitidos) * 100)}%`
+                  : "—"
+              }
+              delta={null}
+              deltaRotulo=""
+              deltaVazio="sem dado do período anterior"
+              nota={
+                emitidos > 0
+                  ? `${FMT_INT.format(respondidos)} de ${FMT_INT.format(emitidos)} respondidos em até ${FUNIL_JANELA_DIAS} dias${papel ? " · todos os papéis" : ""}`
+                  : "sem instrumentos no período"
+              }
+              animate
+              i={3}
+              className={CARD}
             />
           </div>
         </section>
-        {secaoInstrumentos}
-      </div>
 
-      {/* L2 — o uso fica? coorte de retorno e jornada */}
-      <div className="grid gap-5 lg:grid-cols-2">
+        {/* L2 — o herói: superfície × papel */}
         <section className="space-y-3">
           <div>
-            <h2 className="text-base font-semibold">Retorno por coorte</h2>
+            <h2 className="text-base font-semibold">Quem usa o quê</h2>
             <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
-              % de pessoas ativas por semana após o primeiro uso, por
-              semana de entrada. Programa inteiro: retenção é por
-              pessoa, não por papel.
+              {medida === "pessoas" ? "Pessoas únicas" : "Gestos"} por
+              superfície e papel nos últimos {janela} dias.
             </p>
           </div>
           <div className={CARD}>
-            <CoorteGrade grade={gradeCoorte} animate i={6} />
+            <MapaCalorDrill
+              grade={grade}
+              medida={medida}
+              medidaRotulo={
+                medida === "pessoas" ? "pessoas únicas" : "gestos"
+              }
+              contexto={`nos últimos ${janela} dias`}
+              papelAtivo={papel}
+              animate
+              i={4}
+            />
           </div>
         </section>
-        <section className="space-y-3">
-          <div>
-            <h2 className="text-base font-semibold">
-              Caminhos mais percorridos
-            </h2>
-            <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
-              As sequências de superfícies mais percorridas no período
-              {rotuloPapel ? ` · só ${rotuloPapel}` : ""}.
-            </p>
-          </div>
-          <div className={CARD}>
-            <CaminhosFluxo caminhos={caminhos} animate i={7} />
-          </div>
-        </section>
-      </div>
 
-      {/* L3 — a lista de trabalho: melhorar, matar ou ensinar */}
-      <section className="space-y-3">
-        <div>
-          <h2 className="text-base font-semibold">Superfícies</h2>
-          <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
-            Gestos, alcance por papel e último uso de cada superfície na
-            janela.
-          </p>
-        </div>
-        <div className={CARD}>
-          <div
-            role="region"
-            aria-label="Uso por superfície. Role horizontalmente"
-            tabIndex={0}
-            className="scroll-fina overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <table className="w-full text-left text-[13px]">
-              <thead>
-                <tr className="text-xs text-muted-foreground">
-                  <th scope="col" className="py-1 pr-3 font-medium">
-                    superfície
-                  </th>
-                  <th scope="col" className="px-2 py-1 text-right font-medium">
-                    gestos
-                  </th>
-                  <th scope="col" className="px-2 py-1 text-right font-medium">
-                    pessoas
-                  </th>
-                  <th scope="col" className="px-2 py-1 font-medium">
-                    papéis
-                  </th>
-                  <th scope="col" className="px-2 py-1 text-right font-medium">
-                    tendência
-                  </th>
-                  <th scope="col" className="py-1 pl-2 text-right font-medium">
-                    último uso
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                {[...linhasSup]
-                  .sort((a, b) => b.pessoas - a.pessoas)
-                  .map((l) => {
-                    const valores = tendenciaParaSerie(l.tendencia, janela, agora);
-                    return (
-                    <tr key={l.superficie} className="border-t border-border/50">
-                      <td className="py-1.5 pr-3 font-medium whitespace-nowrap">
-                        {ROTULO_SUPERFICIE.get(l.superficie) ?? l.superficie}
-                      </td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">
-                        {FMT_INT.format(l.gestos)}
-                      </td>
-                      <td className="px-2 py-1.5 text-right tabular-nums">
-                        {FMT_INT.format(l.pessoas)}
-                      </td>
-                      <td className="px-2 py-1.5">
-                        <span className="flex flex-wrap gap-1">
-                          {ordenaPapeis(l.papeis).map((p) => (
-                            <span
-                              key={p}
-                              className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium whitespace-nowrap"
-                            >
-                              {ROTULO_PAPEL.get(p) ?? p}
-                            </span>
-                          ))}
-                        </span>
-                      </td>
-                      <td className="w-24 px-2 py-1.5">
-                        {valores && (
-                          <Sparkline
-                            series={[
-                              {
-                                valores,
-                                rotulo: `gestos por dia em ${ROTULO_SUPERFICIE.get(l.superficie) ?? l.superficie}`,
-                              },
-                            ]}
-                            min={0}
-                            max={Math.max(1, ...valores.map((v) => v ?? 0))}
-                            eixo={false}
-                            altura={28}
-                            ariaLabel={`tendência diária de gestos em ${ROTULO_SUPERFICIE.get(l.superficie) ?? l.superficie}: ${valores.map((v) => v ?? 0).join(", ")}`}
-                          />
-                        )}
-                      </td>
-                      <td className="py-1.5 pl-2 text-right text-muted-foreground whitespace-nowrap">
-                        {tempoRelativo(l.ultimo, agora)}
-                      </td>
-                    </tr>
-                    );
-                  })}
-              </tbody>
-            </table>
-            {linhasSup.length === 0 && (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                Nenhuma superfície com uso neste recorte.
+        {/* L2 — formas: ritmo diário e destino dos instrumentos.
+            grid-cols-1 explícito + min-w-0 nos filhos: sem eles o
+            min-width de conteúdo (tabela, mapa) empurrava a página pra
+            fora da viewport no mobile — medido: 586px num viewport de
+            390 */}
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <section className="min-w-0 space-y-3">
+            <div>
+              <h2 className="text-base font-semibold">Gestos por dia</h2>
+              <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
+                Total de gestos por dia no período
+                {rotuloPapel ? ` · só ${rotuloPapel}` : ""}.
               </p>
-            )}
-          </div>
+            </div>
+            {/* GraficoTempo não aceita animate — a entrada mora no card */}
+            <div
+              className={cn(CARD, "animate-enter")}
+              style={{ "--i": 5 } as CSSProperties}
+            >
+              <GraficoTempo
+                pontos={pontos}
+                tipo="barras"
+                formato="inteiro"
+                media={media}
+                pico={pico}
+                ariaLabel={ariaSerie}
+                rotuloTempo="Dia"
+                rotuloValor="Gestos"
+              />
+            </div>
+          </section>
+          {secaoInstrumentos}
         </div>
-      </section>
 
-      {secaoRecentes}
+        {/* L2 — o uso fica? coorte de retorno e jornada */}
+        <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+          <section className="min-w-0 space-y-3">
+            <div>
+              <h2 className="text-base font-semibold">
+                Retorno por coorte
+              </h2>
+              <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
+                % de pessoas ativas por semana após o primeiro uso, por
+                semana de entrada. Programa inteiro: retenção é por
+                pessoa, não por papel.
+              </p>
+            </div>
+            <div className={CARD}>
+              <CoorteGrade grade={gradeCoorte} animate i={7} />
+            </div>
+          </section>
+          <section className="min-w-0 space-y-3">
+            <div>
+              <h2 className="text-base font-semibold">
+                Caminhos mais percorridos
+              </h2>
+              <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
+                As sequências de superfícies mais percorridas no período
+                {rotuloPapel ? ` · só ${rotuloPapel}` : ""}.
+              </p>
+            </div>
+            <div className={CARD}>
+              <CaminhosFluxo caminhos={caminhos} animate i={8} />
+            </div>
+          </section>
+        </div>
+
+        {/* L3 — a lista de trabalho: melhorar, matar ou ensinar */}
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold">Superfícies</h2>
+            <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
+              Gestos, alcance por papel e último uso de cada superfície na
+              janela.
+            </p>
+          </div>
+          {/* ordenação/links são interativos — a tabela mora no boundary
+              client próprio; a entrada fica aqui no card */}
+          <div
+            className={cn(CARD, "animate-enter")}
+            style={{ "--i": 9 } as CSSProperties}
+          >
+            <TabelaSuperficies
+              linhas={linhasSup}
+              janela={janela}
+              agora={agora}
+            />
+          </div>
+        </section>
+
+        {secaoRecentes}
+      </div>
     </div>
   );
 }
@@ -602,41 +554,46 @@ function RecorteAdocao({
       href={destino}
       scroll={false}
       aria-current={on ? "true" : undefined}
-      className={cn(
-        "inline-flex min-h-9 shrink-0 items-center whitespace-nowrap rounded-full border px-3 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-        on
-          ? "border-[var(--brand-lime)] bg-[var(--brand-lime)]/15 text-foreground"
-          : "border-border text-muted-foreground hover:text-foreground"
-      )}
+      className={filterChipCls(on)}
     >
       {rotulo}
     </Link>
   );
+  const eyebrow = "text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground";
   return (
-    <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
-      <FilterChipRow role="group" aria-label="Janela" className="gap-1.5">
-        {JANELAS.map((j) =>
-          chip(`${j} dias`, href({ janela: j }), j === janela)
-        )}
-      </FilterChipRow>
-      <FilterChipRow role="group" aria-label="Papel" className="gap-1.5">
-        {chip("Todos os papéis", href({ papel: null }), !papel)}
-        {papeis.map((p) =>
-          chip(p.rotulo, href({ papel: p.id }), papel === p.id)
-        )}
-      </FilterChipRow>
-      <FilterChipRow
-        role="group"
-        aria-label="Medida do mapa de calor"
-        className="gap-1.5"
-      >
-        {chip(
-          "Pessoas únicas",
-          href({ medida: "pessoas" }),
-          medida === "pessoas"
-        )}
-        {chip("Gestos", href({ medida: "gestos" }), medida === "gestos")}
-      </FilterChipRow>
+    <div className="flex flex-wrap gap-x-6 gap-y-3">
+      <div className="min-w-0 space-y-1.5">
+        <p className={eyebrow}>período</p>
+        <FilterChipRow role="group" aria-label="Período" className="gap-1.5">
+          {JANELAS.map((j) =>
+            chip(`${j} dias`, href({ janela: j }), j === janela)
+          )}
+        </FilterChipRow>
+      </div>
+      <div className="min-w-0 space-y-1.5">
+        <p className={eyebrow}>papel</p>
+        <FilterChipRow role="group" aria-label="Papel" className="gap-1.5">
+          {chip("Todos os papéis", href({ papel: null }), !papel)}
+          {papeis.map((p) =>
+            chip(p.rotulo, href({ papel: p.id }), papel === p.id)
+          )}
+        </FilterChipRow>
+      </div>
+      <div className="min-w-0 space-y-1.5">
+        <p className={eyebrow}>medida</p>
+        <FilterChipRow
+          role="group"
+          aria-label="Medida do mapa de calor"
+          className="gap-1.5"
+        >
+          {chip(
+            "Pessoas únicas",
+            href({ medida: "pessoas" }),
+            medida === "pessoas"
+          )}
+          {chip("Gestos", href({ medida: "gestos" }), medida === "gestos")}
+        </FilterChipRow>
+      </div>
     </div>
   );
 }
@@ -649,13 +606,14 @@ function RecorteAdocao({
 function linhasSuperficieDemo(
   d: DemoData,
   papel: string | null,
+  janela: number,
   agora: number
 ): LinhaSuperficie[] {
-  const completas = dadosAdocaoSuperficiesDemo(d);
+  const completas = dadosAdocaoSuperficiesDemo(d, janela);
   if (!papel) return completas;
   const completa = new Map(completas.map((l) => [l.superficie, l]));
   const porSup = new Map<string, LinhaSuperficie>();
-  for (const c of dadosAdocaoMatrizDemo(d)) {
+  for (const c of dadosAdocaoMatrizDemo(d, janela)) {
     if (c.papel !== papel) continue;
     const cheia = completa.get(c.superficie);
     const l = porSup.get(c.superficie) ?? {
@@ -683,20 +641,4 @@ function linhasSuperficieDemo(
     }));
   }
   return [...porSup.values()].sort((a, b) => b.pessoas - a.pessoas);
-}
-
-/** Série diária esparsa da RPC → slots da janela pro Sparkline (dia sem
- *  gesto = 0: a linha assenta no chão, não é buraco — a superfície
- *  existe e ninguém usou). null quando a superfície não tem série. */
-function tendenciaParaSerie(
-  tendencia: { d: string; g: number }[] | null | undefined,
-  janela: number,
-  agora: number
-): (number | null)[] | null {
-  if (!tendencia?.length) return null;
-  const porDia = new Map(tendencia.map((t) => [t.d, t.g]));
-  return Array.from({ length: janela }, (_, i) => {
-    const dt = new Date(agora - (janela - 1 - i) * 86400000);
-    return porDia.get(dt.toISOString().slice(0, 10)) ?? 0;
-  });
 }

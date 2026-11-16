@@ -1,6 +1,7 @@
 "use client";
 
 import { useId, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { CaretRight } from "@phosphor-icons/react";
 import { cn } from "@/lib/utils";
 
 /** Um slot do eixo do tempo. O servidor manda os textos prontos (a página
@@ -117,10 +118,9 @@ export function GraficoTempo({
   };
 
   const lido = sel ?? pico;
-  const leitura =
-    lido != null && pontos[lido]
-      ? `${sel == null ? "Pico: " : ""}${pontos[lido].rotulo}, ${pontos[lido].valorFmt}`
-      : "Toque ou passe o mouse para ler um dia";
+  // sem seleção a linha lê o pico E o convite de interação — antes o hint
+  // só existia quando nem pico havia, e o crosshair ficava invisível
+  const leitura = "Toque ou passe o mouse para ler um dia";
 
   // trechos contíguos com dado (linha): null quebra o traço
   const trechos: number[][] = [];
@@ -147,6 +147,7 @@ export function GraficoTempo({
             {sel == null && "Pico: "}
             {pontos[lido].rotulo},{" "}
             <span className="font-semibold text-foreground">{pontos[lido].valorFmt}</span>
+            {sel == null && " · passe o mouse ou toque para ler um dia"}
           </>
         ) : (
           leitura
@@ -194,7 +195,8 @@ export function GraficoTempo({
                     style={{
                       height: p.valor ? `${Math.max(1.5, 100 - y(p.valor))}%` : 0,
                       backgroundColor: cor,
-                      opacity: i === pico || i === sel ? 1 : 0.62,
+                      // 0.62 lia como série desabilitada; sel/pico seguem 1
+                      opacity: i === pico || i === sel ? 1 : 0.9,
                     }}
                   />
                 </div>
@@ -252,7 +254,10 @@ export function GraficoTempo({
               className="absolute inset-x-0 border-t-[1.5px] border-dashed border-foreground/55"
               style={{ top: `${y(media)}%` }}
             >
-              <span className="absolute right-0 -translate-y-full rounded-sm bg-card/90 px-1 text-[10px] font-semibold text-foreground">
+              {/* start-2 dentro do plot: no right-0 o chip colidia com a
+                  barra mais recente (hoje); a gutter variável não fecha
+                  com a largura da palavra, então o chip fica no miolo */}
+              <span className="absolute start-2 -translate-y-full rounded-sm bg-card/90 px-1 text-[10px] font-semibold text-foreground">
                 média
               </span>
             </span>
@@ -304,8 +309,9 @@ export function GraficoTempo({
           </span>
         ))}
       </div>
-      <details className="mt-2 text-xs text-muted-foreground">
-        <summary className="inline-flex min-h-11 cursor-pointer items-center font-semibold text-foreground underline-offset-4 hover:underline sm:min-h-8">
+      <details className="group mt-2 text-xs text-muted-foreground">
+        <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1 font-semibold text-foreground underline-offset-4 hover:underline sm:min-h-8">
+          <CaretRight className="size-3.5 transition-transform duration-150 ease-snappy group-open:rotate-90" />
           ver dados em tabela
         </summary>
         <div

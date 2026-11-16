@@ -30,6 +30,31 @@ export const SUPERFICIES: { id: string; rotulo: string }[] = [
 
 export const ROTULO_SUPERFICIE = new Map(SUPERFICIES.map((s) => [s.id, s.rotulo]));
 
+/** Destino de cada superfície na tabela da aba — a linha inteira vira
+ *  atalho pra área que o gesto mediu. Espelho das rotas de app/(app);
+ *  ficha_dupla cai na lista /duplas (a ficha pede um id que a linha não
+ *  tem). Superfície fora do mapa (evento de área aposentada) segue sem
+ *  link — o nome continua visível. */
+export const ROTA_SUPERFICIE: Record<string, string> = {
+  home: "/",
+  duplas: "/duplas",
+  ficha_dupla: "/duplas",
+  turmas: "/turmas",
+  agenda: "/agenda",
+  registros: "/registros",
+  materiais: "/materiais",
+  jovem: "/jovem",
+  relatorios: "/relatorios/operacionais",
+  formularios: "/formularios",
+  pessoas: "/pessoas",
+  chamados: "/chamados",
+  ia: "/ia",
+  assistente: "/assistente",
+  perfil: "/perfil",
+  ajuda: "/ajuda",
+  assinar: "/assinar",
+};
+
 /** Papel gravado no evento = app_role + 'desconhecido' (fallback do RPC
  *  quando my_role() veio null). Ordem de exibição nas colunas do mapa. */
 export const PAPEIS_ADOCAO: { id: string; rotulo: string }[] = [
@@ -207,7 +232,9 @@ export function coorteParaGrade(
   for (const l of linhas) {
     totais.set(l.coorte, Math.max(totais.get(l.coorte) ?? 0, l.total));
     const m = pct.get(l.coorte) ?? new Map<number, number>();
-    m.set(l.semana, l.total > 0 ? l.ativas / l.total : 0);
+    // clamp em 1: retenção >100% é impossível — sem o teto um ativas>total
+    // (jitter do demo, dedupe da RPC) imprime "108%" e estoura o fill
+    m.set(l.semana, l.total > 0 ? Math.min(1, l.ativas / l.total) : 0);
     pct.set(l.coorte, m);
   }
   const fmt = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit" });

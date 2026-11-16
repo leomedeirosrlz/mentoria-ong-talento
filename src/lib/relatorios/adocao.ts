@@ -300,7 +300,16 @@ const PESO_SUP: Record<string, Record<string, number>> = {
   assinar: { coordenacao: 0.45, mentor_dpp: 0.3 },
 };
 
-export function dadosAdocaoMatrizDemo(d: DemoData): CelulaMatriz[] {
+export function dadosAdocaoMatrizDemo(
+  d: DemoData,
+  janela: number
+): CelulaMatriz[] {
+  // os gêmeos honram a janela como a RPC faria: gestos acumulam ~linear
+  // com os dias (7d ≈ 1/4 de 30d, 90d ≈ 3×); pessoas únicas crescem
+  // amortecidas — quem já usava volta, não entra gente nova na mesma
+  // proporção — e nunca passam da população do papel
+  const fatorGestos = janela / 30;
+  const fatorPessoas = Math.pow(janela / 30, 0.45);
   const out: CelulaMatriz[] = [];
   for (const sup of SUPERFICIES) {
     for (const papel of PAPEIS_ADOCAO) {
@@ -310,10 +319,13 @@ export function dadosAdocaoMatrizDemo(d: DemoData): CelulaMatriz[] {
       if (peso <= 0) continue;
       const base = pessoasDemo(d, papel.id);
       const jit = 0.7 + semeado(`${sup.id}:${papel.id}`) * 0.6;
-      const pessoas = Math.round(base * peso * jit);
+      const pessoas30 = base * peso * jit;
+      const pessoas = Math.min(base, Math.round(pessoas30 * fatorPessoas));
       if (pessoas <= 0) continue;
       const gestos = Math.round(
-        pessoas * (4 + semeado(`g:${sup.id}:${papel.id}`) * 10)
+        pessoas30 *
+          (4 + semeado(`g:${sup.id}:${papel.id}`) * 10) *
+          fatorGestos
       );
       out.push({ superficie: sup.id, papel: papel.id, pessoas, gestos });
     }
@@ -326,7 +338,7 @@ export function dadosAdocaoResumoDemo(
   janela: number,
   papel: string | null = null
 ): ResumoAdocao {
-  const matriz = dadosAdocaoMatrizDemo(d).filter(
+  const matriz = dadosAdocaoMatrizDemo(d, janela).filter(
     (c) => !papel || c.papel === papel
   );
   const ativas = new Map<string, number>();
@@ -336,7 +348,9 @@ export function dadosAdocaoResumoDemo(
   const ativasTotal = Math.round(
     [...ativas.values()].reduce((s, v) => s + v, 0) * 0.55
   );
-  const gestos = matriz.reduce((s, c) => s + c.gestos, 0) * janela;
+  // matriz já carrega o volume da janela inteira — somar de novo por
+  // dias inflaria 30× (foi o "24.900 vs 830" que brigava com o mapa)
+  const gestos = matriz.reduce((s, c) => s + c.gestos, 0);
   const vivas = new Set(matriz.map((c) => c.superficie)).size;
   const fatorPrev = 0.82 + semeado("prev") * 0.2;
   return {
@@ -356,12 +370,16 @@ export function dadosAdocaoSerieDiaDemo(
   janela: number,
   hoje = new Date()
 ): DiaSerie[] {
-  const matriz = dadosAdocaoMatrizDemo(d);
+  const matriz = dadosAdocaoMatrizDemo(d, janela);
   const gestosDia = new Map<string, number>();
   for (const c of matriz)
     gestosDia.set(
       c.papel,
-      (gestosDia.get(c.papel) ?? 0) + Math.max(1, Math.round(c.gestos / 4))
+      // a célula carrega o total da janela — a taxa diária é a fração
+      // dela, então a soma da série ≈ resumo.gestos (consistente com o
+      // herói em qualquer janela)
+      (gestosDia.get(c.papel) ?? 0) +
+        Math.max(1, Math.round(c.gestos / janela))
     );
   const out: DiaSerie[] = [];
   for (let i = janela - 1; i >= 0; i--) {
@@ -386,9 +404,12 @@ export function dadosAdocaoSerieDiaDemo(
   return out;
 }
 
-export function dadosAdocaoSuperficiesDemo(d: DemoData): LinhaSuperficie[] {
+export function dadosAdocaoSuperficiesDemo(
+  d: DemoData,
+  janela: number
+): LinhaSuperficie[] {
   const porSup = new Map<string, LinhaSuperficie>();
-  for (const c of dadosAdocaoMatrizDemo(d)) {
+  for (const c of dadosAdocaoMatrizDemo(d, janela)) {
     const l = porSup.get(c.superficie) ?? {
       superficie: c.superficie,
       gestos: 0,
@@ -408,12 +429,16 @@ export function dadosAdocaoSuperficiesDemo(d: DemoData): LinhaSuperficie[] {
       ultimo: new Date(
         agora - semeado(`u:${l.superficie}`) * 86400000 * 3
       ).toISOString(),
-      tendencia: Array.from({ length: 14 }, (_, i) => ({
-        d: new Date(agora - (13 - i) * 86400000).toISOString().slice(0, 10),
+      // a tendência cobre a janela inteira (a série fixa de 14 dias
+      // deixava 2/3 do spark zerado em 90d)
+      tendencia: Array.from({ length: janela }, (_, i) => ({
+        d: new Date(agora - (janela - 1 - i) * 86400000)
+          .toISOString()
+          .slice(0, 10),
         g: Math.max(
           1,
           Math.round(
-            (l.gestos / 14) * (0.5 + semeado(`t:${l.superficie}:${i}`))
+            (l.gestos / janela) * (0.5 + semeado(`t:${l.superficie}:${i}`))
           )
         ),
       })),
@@ -432,10 +457,15 @@ export function dadosAdocaoCoorteDemo(semanas = 10): LinhaCoorte[] {
     const total = 6 + Math.round(semeado(`ct:${chave}`) * 14);
     for (let s = 0; s <= c; s++) {
       const decaimento = s === 0 ? 1 : Math.max(0.15, 0.85 - s * 0.09);
-      const ativas = Math.max(
-        1,
-        Math.round(
-          total * decaimento * (0.85 + semeado(`ct:${chave}:${s}`) * 0.3)
+      // ativas nunca passa do total da coorte — o jitter até 1,15 na
+      // semana 0 fabricava "108% de retenção"
+      const ativas = Math.min(
+        total,
+        Math.max(
+          1,
+          Math.round(
+            total * decaimento * (0.85 + semeado(`ct:${chave}:${s}`) * 0.3)
+          )
         )
       );
       out.push({ coorte: chave, semana: s, ativas, total });
@@ -445,7 +475,8 @@ export function dadosAdocaoCoorteDemo(semanas = 10): LinhaCoorte[] {
 }
 
 export function dadosAdocaoCaminhosDemo(
-  papel: string | null = null
+  papel: string | null = null,
+  janela: number
 ): Caminho[] {
   const pares: [string, string, string, number][] = [
     ["home", "agenda", "ficha_dupla", 41],
@@ -466,19 +497,22 @@ export function dadosAdocaoCaminhosDemo(
     supervisor: 0.4,
     mentor_especialista: 0.35,
   };
+  // a contagem do caminho também é acumulado de janela — sem o fator a
+  // lista ficava igual em 7d e 90d
+  const fator = janela / 30;
   return pares
     .map(([de, meio, para, pessoas]) => ({
       de,
       meio,
       para,
-      pessoas: papel
-        ? Math.round(pessoas * (peso[papel] ?? 0.3))
-        : pessoas,
+      pessoas: Math.round(
+        pessoas * (papel ? (peso[papel] ?? 0.3) : 1) * fator
+      ),
     }))
     .filter((c) => c.pessoas >= 1);
 }
 
-export function dadosAdocaoRecentesDemo(): EventoRecente[] {
+export function dadosAdocaoRecentesDemo(janela: number): EventoRecente[] {
   const agora = Date.now();
   const base: [string, string, string][] = [
     ["ficha_dupla", "pageview", "mentor_dpp"],
@@ -494,7 +528,13 @@ export function dadosAdocaoRecentesDemo(): EventoRecente[] {
     ["pessoas", "busca", "coordenacao"],
     ["agenda", "pageview", "mentorado"],
   ];
-  return base.map(([superficie, acao, papel], i) => ({
+  // janela menor = menos gesto acumulado pra exibir — o feed encolhe
+  // junto em vez de repetir os mesmos 12 em qualquer recorte
+  const n = Math.max(
+    3,
+    Math.min(base.length, Math.round((base.length * janela) / 30))
+  );
+  return base.slice(0, n).map(([superficie, acao, papel], i) => ({
     superficie,
     acao,
     papel,

@@ -1,5 +1,6 @@
 import type { CSSProperties } from "react";
 import { cn } from "@/lib/utils";
+import { Sparkline } from "./sparkline";
 
 /** Direção que conta como "boa" pro delta do tile. "neutro" = a métrica não
  *  tem lado bom (ex.: gestos sobem por curiosidade, não necessariamente
@@ -32,6 +33,7 @@ export function MetricTile({
   deltaVazio,
   deltaBom = "sobe",
   nota,
+  spark,
   destaque = false,
   animate = false,
   i = 0,
@@ -53,6 +55,10 @@ export function MetricTile({
   deltaBom?: DeltaBom;
   /** contexto pequeno sob o delta ("3 paradas há mais de 14 dias") */
   nota?: string;
+  /** série opcional pro rodapé do tile — a spark compacta ocupa o espaço
+   *  morto do herói (sem eixo, sem label de último ponto); null = buraco
+   *  honesto, a linha quebra e retoma */
+  spark?: (number | null)[];
   /** o tile-herói da régua (Pessoas ativas, topo-esquerda do F-pattern) */
   destaque?: boolean;
   /** entrada animada uma vez (fade+rise) — reduced-motion zera */
@@ -83,7 +89,7 @@ export function MetricTile({
       <p
         className={cn(
           "mt-1 font-semibold tabular-nums tracking-tight",
-          destaque ? "text-4xl sm:text-5xl" : "text-3xl sm:text-4xl"
+          destaque ? "text-4xl sm:text-6xl" : "text-3xl sm:text-4xl"
         )}
       >
         {valor}
@@ -104,6 +110,20 @@ export function MetricTile({
         )}
       </p>
       {nota && <p className="mt-1 text-xs text-muted-foreground">{nota}</p>}
+      {spark && (
+        <Sparkline
+          series={[{ valores: spark, rotulo }]}
+          min={0}
+          max={Math.max(1, ...spark.map((v) => v ?? 0))}
+          eixo={false}
+          compacto
+          altura={36}
+          // slots sem labelsX: a enumeração padrão ("1º: N…") diria pouco —
+          // o número e o delta acima já carregam o dado do tile
+          ariaLabel={`${rotulo}: evolução no período`}
+          className="mt-3"
+        />
+      )}
     </div>
   );
 }

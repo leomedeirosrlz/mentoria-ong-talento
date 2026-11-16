@@ -1,4 +1,5 @@
 import type { CSSProperties } from "react";
+import { CaretRight } from "@phosphor-icons/react/dist/ssr";
 import type { FunilInstrumento } from "@/lib/relatorios/adocao";
 import { cn } from "@/lib/utils";
 import { BarraSegmentada, SEGMENTO_NEUTRO } from "./barra-segmentada";
@@ -81,7 +82,9 @@ export function FunilEtapas({
                   </span>
                 )}
               </p>
-              <p className="text-xs tabular-nums text-muted-foreground">
+              {/* ml-auto: quando o nome quebra linha (campanha traz a tag
+                  ao lado), o resumo continua à direita como as demais */}
+              <p className="ml-auto text-xs tabular-nums text-muted-foreground">
                 {f.emitidos > 0 ? resumoLinha(f, janelaDias) : "nenhum emitido"}
               </p>
             </div>
@@ -89,8 +92,10 @@ export function FunilEtapas({
               // a largura carrega a comparação entre linhas; dentro, a
               // barra segmentada carrega a composição (denominador literal).
               // Sem piso de largura: uma linha miúda é miúda de verdade.
+              // cursor-help + brightness: sinaliza que há detalhe (o title
+              // de cada segmento) sem mentir clique
               <div
-                className="mt-1.5"
+                className="mt-1.5 cursor-help transition-[filter] hover:brightness-[0.97]"
                 style={{ width: `${(f.emitidos / maxEmit) * 100}%` }}
               >
                 <BarraSegmentada
@@ -140,12 +145,18 @@ export function FunilEtapas({
           expiraram sem responder
         </span>
         <span className="inline-flex items-center gap-1">
-          <span aria-hidden className={cn("size-2 rounded-full", SEGMENTO_NEUTRO)} />
+          {/* hatch em 8px vira borrão — o swatch retangular (mesmo padrão
+              do recesso do cronograma) mostra o ritmo das listras */}
+          <span
+            aria-hidden
+            className={cn("h-2 w-4 rounded-sm ring-1 ring-inset ring-border", SEGMENTO_NEUTRO)}
+          />
           aguardando resposta
         </span>
       </p>
-      <details className="mt-2 text-xs text-muted-foreground">
-        <summary className="inline-flex min-h-11 cursor-pointer items-center font-semibold text-foreground underline-offset-4 hover:underline sm:min-h-8">
+      <details className="group mt-2 text-xs text-muted-foreground">
+        <summary className="inline-flex min-h-11 cursor-pointer items-center gap-1 font-semibold text-foreground underline-offset-4 hover:underline sm:min-h-8">
+          <CaretRight className="size-3.5 transition-transform duration-150 ease-snappy group-open:rotate-90" />
           ver dados em tabela
         </summary>
         <div
