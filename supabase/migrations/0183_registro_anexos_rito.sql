@@ -14,7 +14,7 @@
 -- gate de status. O insert do storage.objects idem — ele só confere a row
 -- de metadados, que é onde este check mora.
 
-drop policy registro_anexos_mentor_insert on public.registro_anexos;
+drop policy if exists registro_anexos_mentor_insert on public.registro_anexos;
 
 create policy registro_anexos_mentor_insert on public.registro_anexos
   for insert with check (

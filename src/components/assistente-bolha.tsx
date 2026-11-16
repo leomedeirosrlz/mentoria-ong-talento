@@ -54,6 +54,7 @@ import {
   type MemoriaFalas,
 } from "@/lib/liza-falas";
 import { LIZA_PEDIDO_EVENTO } from "@/lib/liza-pedido";
+import { trackProduto } from "@/components/produto-telemetry";
 import type { AppRole } from "@/lib/types";
 
 // acima da bottom-nav (~57px + safe-area): o toaster usa 4.5rem, a pill da
@@ -597,6 +598,7 @@ export function AssistenteBolha({
   // offset do teclado iOS — declarado antes de mudar (que o zera ao fechar)
   const [kb, setKb] = useState(0);
   const mudar = useCallback((v: boolean) => {
+    const estavaAberto = abertoRef.current;
     abertoRef.current = v;
     setAberto(v);
     setTrocou(true);
@@ -607,6 +609,11 @@ export function AssistenteBolha({
       // abriu uma vez: ela já se apresentou de verdade
       setFala(null);
       gravarMemoria((m) => ({ ...m, abriu: true }));
+      // telemetria (417): abrir a Liza é o gesto "dialog" na superfície
+      // "ia" — fire-and-forget, só empilha na fila do beacon. Só na
+      // transição fechado→aberto: um pedido com o painel já aberto não
+      // conta abertura de novo
+      if (!estavaAberto) trackProduto("dialog", undefined, "ia");
     }
     // fecha com offset zerado — sem isso uma reabertura herda o último kb
     // por um frame (flash de bottom: N antes da primeira medição)
@@ -937,7 +944,13 @@ export function AssistenteBolha({
       const fim = g;
       g = null;
       arrastandoRef.current = false;
-      if (!fim?.engatou) return;
+      if (!fim?.engatou) {
+        // o inicio() baixou o transition antes do gesto engatar — sem
+        // devolver aqui um scroll nativo (ou um segundo dedo, que zera
+        // g no mover) deixava a sheet "dura" pra sempre
+        el.style.transition = "";
+        return;
+      }
       soltarArrastoSheet(el, fim.dy, velocidadeDe(fim.amostras), () =>
         mudar(false),
       );

@@ -25,7 +25,7 @@ begin;
 
 -- ---------- 1) vocabulário + seed ----------
 
-alter table public.formularios drop constraint formularios_sistema_check;
+alter table public.formularios drop constraint if exists formularios_sistema_check;
 
 alter table public.formularios add constraint formularios_sistema_check
   check (sistema is null or sistema in (
@@ -233,7 +233,7 @@ revoke all on function public.emitir_instrumento_core(uuid, text, uuid, text)
 -- deixaria toda chamada de 2 args ambígua
 drop function if exists public.emitir_link_instrumento(uuid, text);
 
-create function public.emitir_link_instrumento(
+create or replace function public.emitir_link_instrumento(
   p_dupla_id uuid, p_sistema text, p_momento text default null
 ) returns jsonb
 language plpgsql security definer set search_path = public as $$

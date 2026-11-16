@@ -24,7 +24,7 @@ Issue: `importacao`,`ia`,`lgpd`,`coordenacao`. Fonte: `docs/planos/issues/REALIZ
 1. **Match semântico** — LLM decide entre os `candidatos` que o determinístico marcou `manual`/`revisar`, com confiança + razão. Nunca vira `auto`.
 2. **Revisão em linguagem natural** — a coord responde em texto livre ("é a outra Nicolly, a do whatsapp 41 9xxxx", "numera a partir do 3º") e a IA traduz em ação tipada sobre a linha/lote. Semântica `interpretar_revisao` → `AcaoRevisao` union.
 3. **Extração por visão** — `.pdf/.png/.jpg/.webp` além de `.csv`: documentos escaneados, foto de ficha em papel, print de planilha → linhas no formato `LinhaRegCsv`. **Exige estender o provider** (content parts `image_url`) + modelo com visão configurável — e é a superfície LGPD mais larga (o documento inteiro sai do perímetro).
-4. **Auditoria por lote** — `ia_eventos.canal='importacao'` [migration 0189]; `args.lote` agrupa a importação; args = metadados + o texto da coord capado, nunca payload do documento.
+4. **Auditoria por lote** — `ia_eventos.canal='importacao'` [migration 0193]; `args.lote` agrupa a importação; args = metadados + o texto da coord capado, nunca payload do documento.
 
 **Princípio inviolável:** a IA só toca estado de linha **antes** da execução — a escrita continua exclusiva das RPCs existentes (`importar_registros`; `criar_dupla` delega ao fluxo humano `NovaDuplaDialog`; remanejo por `rematch_dupla` quando a linha indicar par errado — sempre via action humana, nunca pelo modelo — mesmo desenho das tools de escrita MCP-only de `tools.ts`).
 
@@ -42,7 +42,7 @@ Issue: `importacao`,`ia`,`lgpd`,`coordenacao`. Fonte: `docs/planos/issues/REALIZ
 10. **Visão roda antes do determinístico** — produz `LinhaRegCsv[]` e entra no **mesmo** `processaLinhas`: visão errada cai nas mesmas redes do CSV (data "32/13" saneada, ano absurdo → flag, placeholder não auto-matcheia). Nada entra sem a tabela de revisão.
 11. **Intake de turma (`transformar-intake`, `importar.ts`, `importar-duplas.ts`) fica fora desta spec** — a arquitetura generaliza (`matchSemantico` recebe candidatos+textos), mas a shape de universo do intake é outra (pessoa, não dupla) e o ganho é menor (CSV já nasce canônico do script). É a fase natural seguinte, spec própria quando doer.
 
-## Schema — migration `0189_ia_canal_importacao.sql`
+## Schema — migration `0193_ia_canal_importacao.sql`
 
 Estende o vocabulário de `canal` da auditoria — 5 pontos a tocar, todos com a mesma lista:
 
@@ -120,7 +120,7 @@ src/components/importar-registros-dialog.tsx — +tag "sugerido por IA" (sparkle
 
 ### Fase 1 — match semântico (a fatia que esta spec entrega)
 
-- [ ] Migration 0189 aplicada: `ia_eventos.canal` aceita `'importacao'`; `registrar_ia_evento`, `registrar_ia_eventos_lote`, `consumir_limite_ia`, `ia_contexto_e_limite` validam o novo valor (verificado contra `pg_get_functiondef` do alvo, não de memória).
+- [ ] Migration 0193 aplicada: `ia_eventos.canal` aceita `'importacao'`; `registrar_ia_evento`, `registrar_ia_eventos_lote`, `consumir_limite_ia`, `ia_contexto_e_limite` validam o novo valor (verificado contra `pg_get_functiondef` do alvo, não de memória).
 - [ ] `enriquecerPrevComIa` só roda em linhas `manual`/`revisar`, cap ≤30 chamadas/lote, devolve `sugeridoIa` por linha (não altera `LinhaReg` original).
 - [ ] Sugestão semântica nunca marca `status='ok'` nem `nivel='auto'` — a confirmação é sempre o clique humano no Select.
 - [ ] Payload do match contém **somente** `{mentorTxt,mentoradoTxt}` + candidatos `{i,mentorNome,mentoradoNome,trilha,wa4}` — assert de teste que `dados_civis`, e-mail, `form_bruto`, reflexões, whatsapp completo não aparecem.

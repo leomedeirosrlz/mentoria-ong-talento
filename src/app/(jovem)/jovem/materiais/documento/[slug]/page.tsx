@@ -8,10 +8,11 @@ import {
 import { CorpusDocumento } from "@/components/corpus-documento";
 
 // Documento do corpus na casa do jovem — só entra quando a audiência do
-// frontmatter cobre o jovem (todos/mentorado/ausente). Doc de staff/mentor
-// cai em notFound como qualquer slug inválido: é o caso dos templates do
-// cap. 14 (audiência de equipe) e do Feedback Construtivo (0167), que já
-// viveram aqui como documentos nativos antes do corpus.
+// frontmatter cobre o jovem (todos/mentorado; ausente é fail-closed). Um
+// doc de staff/mentor cai em notFound como qualquer slug inválido: é o
+// caso dos templates do cap. 14 (audiência de equipe) e do Feedback
+// Construtivo (0167), que já viveram aqui como documentos nativos antes
+// do corpus.
 
 export const dynamicParams = false;
 

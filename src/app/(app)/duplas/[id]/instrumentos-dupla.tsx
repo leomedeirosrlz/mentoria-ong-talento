@@ -23,7 +23,12 @@ import type {
   InstrumentoDupla,
   InstrumentoEntrega,
 } from "@/lib/forms/queries";
-import { parChecklist, parRoda } from "@/lib/jornada";
+import {
+  entregasDoMomento,
+  entregasDoMomentoChecklist,
+  parChecklist,
+  parRoda,
+} from "@/lib/jornada";
 import { formatDate } from "@/lib/ciclo";
 import { docDoSistema, GUIA_ENCONTRO } from "@/lib/como-conduzir";
 import {
@@ -62,7 +67,10 @@ import { cn } from "@/lib/utils";
 
 /** O estado que a ficha mostra: respondido ganha sempre (a resposta é o
  *  produto); depois pendente (tem link vivo pra mandar); expirado e "não
- *  enviado" pedem o botão de envio. */
+ *  enviado" pedem o botão de envio. A linha ainda assim pode precisar
+ *  mostrar DOIS estados — respondido de um momento + pendente do outro
+ *  (checklist início×fim, roda inicial×formal): isso é derivado à parte
+ *  no `pendenteOutroMomento` da LinhaInstrumento. */
 function estadoAtual(entregas: InstrumentoEntrega[]): {
   status: "respondido" | "pendente" | "expirado" | "nao_enviado";
   entrega: InstrumentoEntrega | null;
@@ -131,7 +139,40 @@ function LinhaInstrumento({
   const { status, entrega } = enviado
     ? { status: "pendente" as const, entrega: null }
     : estadoAtual(item?.entregas ?? []);
-  const tokenVivo = enviado ?? (status === "pendente" ? entrega?.token : null);
+
+  // instrumento de 2 momentos (roda inicial×formal, checklist início×
+  // fim): a linha mostrando o respondido de um momento escondia a
+  // pendente do OUTRO — o link do 2º momento ficava inalcançável.
+  // Mesma régua dos pares (jornada.ts): contexto->>'momento' marcado
+  // primeiro; sem marca, a primeira entrega é a do primeiro momento.
+  const pendenteOutroMomento = (() => {
+    if (status !== "respondido" || !entrega || !item) return null;
+    if (sistema !== "roda_vida" && sistema !== "competencias_mentor")
+      return null;
+    const entregas = item.entregas;
+    const momentoDe = (e: InstrumentoEntrega) =>
+      sistema === "roda_vida"
+        ? entregasDoMomento(entregas, "inicial").includes(e)
+          ? "inicial"
+          : "formal"
+        : entregasDoMomentoChecklist(entregas, "inicio").includes(e)
+          ? "inicio"
+          : "final";
+    const momentoResp = momentoDe(entrega);
+    return (
+      entregas.find(
+        (e) => e.status === "pendente" && momentoDe(e) !== momentoResp
+      ) ?? null
+    );
+  })();
+
+  // token da ação de link: pendente normal OU a do outro momento (os
+  // dois nunca coexistem — pendente pura só aparece sem respondido)
+  const tokenVivo =
+    enviado ??
+    (status === "pendente"
+      ? (entrega?.token ?? null)
+      : (pendenteOutroMomento?.token ?? null));
 
   // o checklist vai pro mentor; os 4 de jornada, pro mentorado — destino
   // por sistema, não por linha (o whatsapp e o nome da msg acompanham)
@@ -203,7 +244,7 @@ function LinhaInstrumento({
                 respondido
               </Badge>
             )}
-            {status === "pendente" && (
+            {(status === "pendente" || pendenteOutroMomento != null) && (
               <Badge className="bg-[var(--warn)]/15 text-[var(--warn-text)]">
                 link enviado
               </Badge>
@@ -280,7 +321,9 @@ function LinhaInstrumento({
           </Dialog>
         )}
 
-        {status === "pendente" && tokenVivo && jornadaViva && (
+        {(status === "pendente" || pendenteOutroMomento != null) &&
+          tokenVivo &&
+          jornadaViva && (
           <motion.div
             {...fade}
             transition={T.enter}

@@ -89,8 +89,10 @@ export function GestosVivos({ inicial }: { inicial: EventoRecente[] }) {
       {eventos.map((e) => (
         <li
           // chave composta e estável — com o índice na chave o prepend do
-          // canal remontava a lista inteira a cada evento novo
-          key={`${e.criado_em}-${e.superficie}-${e.acao}`}
+          // canal remontava a lista inteira a cada evento novo. O papel
+          // entra porque um lote batelado pode empatar ts+superfície+ação
+          // (o flush grava vários gestos num statement só)
+          key={`${e.criado_em}-${e.superficie}-${e.acao}-${e.papel}`}
           className={cn(
             "flex items-baseline gap-2 py-1.5 text-xs",
             e.novo && "animate-flash-ok"

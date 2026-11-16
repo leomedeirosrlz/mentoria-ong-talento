@@ -13,7 +13,7 @@
 
 begin;
 
-create table public.produto_eventos (
+create table if not exists public.produto_eventos (
   id uuid primary key default gen_random_uuid(),
   profile_id uuid not null references public.profiles (id),
   papel text not null,
@@ -23,11 +23,11 @@ create table public.produto_eventos (
   created_at timestamptz not null default now()
 );
 
-create index produto_eventos_profile_idx
+create index if not exists produto_eventos_profile_idx
   on public.produto_eventos (profile_id, created_at desc);
-create index produto_eventos_created_idx
+create index if not exists produto_eventos_created_idx
   on public.produto_eventos (created_at desc);
-create index produto_eventos_sup_idx
+create index if not exists produto_eventos_sup_idx
   on public.produto_eventos (superficie, acao, created_at desc);
 
 alter table public.produto_eventos enable row level security;
@@ -38,6 +38,7 @@ alter table public.produto_eventos enable row level security;
 revoke all on public.produto_eventos from public, anon, authenticated;
 grant select on public.produto_eventos to authenticated;
 
+drop policy if exists produto_eventos_select on public.produto_eventos;
 create policy produto_eventos_select on public.produto_eventos for select
   using (
     profile_id = public.my_profile_id()

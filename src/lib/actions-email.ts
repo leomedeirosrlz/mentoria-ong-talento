@@ -31,6 +31,7 @@ import {
   emitirProdutoEvento,
   superficieDaOrigem,
 } from "./produto-eventos-server";
+import { temPapel } from "@/lib/types";
 import type { ComunicadoPrioridade } from "@/lib/types";
 
 type Supa = Awaited<ReturnType<typeof createClient>>;
@@ -903,7 +904,10 @@ export async function enviarDigestSemanal(): Promise<{
 }> {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
-  if (eu?.role !== "coordenacao") {
+  // papel efetivo (0085): primário + secundários — a my_papeis cobre a
+  // coordenação carregada como papel extra (híbrido)
+  const { data: papeis } = await supabase.rpc("my_papeis");
+  if (!eu || !temPapel({ ...eu, papeis }, "coordenacao")) {
     return { error: "Só a coordenação pode disparar o digest." };
   }
   const digest = await montarDigestSemanal(supabase, semanaBounds(new Date()));

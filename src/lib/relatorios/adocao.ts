@@ -137,24 +137,48 @@ export async function dadosFunilInstrumentos(
   desde: Date
 ): Promise<FunilInstrumento[]> {
   const iso = desde.toISOString();
-  const [aRes, fRes] = await Promise.all([
+  const [aRes, fRes, cRes] = await Promise.all([
     supabase
       .from("avaliacao_links")
       .select("status, respondido_em, expira_em, created_at")
       .gte("created_at", iso),
+    // link manual (uso único) entra pela emissão na janela — a resposta
+    // é 1:1, então o embed fica barato
     supabase
       .from("formulario_links")
       .select(
-        `usado_em, expira_em, created_at, multi_uso,
+        `usado_em, expira_em, created_at,
          formularios(titulo), resposta:formulario_respostas(respondido_em)`
       )
-      // link manual entra pela emissão na janela; o de campanha
-      // (multi_uso) é mintado uma vez e segue colhendo respostas —
-      // entra sempre e a janela recorta as respostas, não o link
-      .or(`multi_uso.eq.true,created_at.gte.${iso}`),
+      .eq("multi_uso", false)
+      .gte("created_at", iso),
+    // o de campanha (multi_uso) é mintado uma vez e segue colhendo
+    // respostas — entra sempre e a janela recorta as respostas, não o
+    // link. SEM o embed: com ele cada linha arrastava TODAS as respostas
+    // históricas da campanha — a contagem vai na query recortada abaixo
+    supabase
+      .from("formulario_links")
+      .select("id, formularios(titulo)")
+      .eq("multi_uso", true),
   ]);
   if (aRes.error) throw aRes.error;
   if (fRes.error) throw fRes.error;
+  if (cRes.error) throw cRes.error;
+
+  // respostas da janela por link de campanha — o SQL já recorta por
+  // respondido_em, então aqui só sobra o group-by por link
+  const idsCampanha = (cRes.data ?? []).map((l) => l.id);
+  const { data: respCampanha, error: errResp } = idsCampanha.length
+    ? await supabase
+        .from("formulario_respostas")
+        .select("link_id, respondido_em")
+        .in("link_id", idsCampanha)
+        .gte("respondido_em", iso)
+    : { data: [] as { link_id: string; respondido_em: string }[], error: null };
+  if (errResp) throw errResp;
+  const respPorLink = new Map<string, number>();
+  for (const r of respCampanha ?? [])
+    respPorLink.set(r.link_id, (respPorLink.get(r.link_id) ?? 0) + 1);
 
   const agora = Date.now();
   const janelaMs = FUNIL_JANELA_DIAS * 86400000;
@@ -189,49 +213,31 @@ export async function dadosFunilInstrumentos(
       s.expirados++;
     else s.pendentes++;
   }
-  const desdeMs = desde.getTime();
-  for (const l of fRes.data ?? []) {
-    // os embeds formularios(titulo) e resposta:formulario_respostas vêm
-    // objeto (n:1 — resposta tem unique em link_id) ou array conforme a
-    // leitura do PostgREST — os dois formatos resolvem igual
+  // o embed formularios(titulo) vem objeto ou array conforme a leitura
+  // do PostgREST — os dois formatos resolvem igual
+  const tituloDe = (l: unknown): string => {
     const emb = (
       l as {
         formularios?: { titulo?: string } | { titulo?: string }[] | null;
       }
     ).formularios;
-    const titulo =
-      (Array.isArray(emb) ? emb[0]?.titulo : emb?.titulo) ?? "Formulário";
-    const embResp = (
-      l as {
-        resposta?:
-          | { respondido_em?: string | null }
-          | { respondido_em?: string | null }[]
-          | null;
-      }
-    ).resposta;
-    const respostas = Array.isArray(embResp)
-      ? embResp
-      : embResp
-        ? [embResp]
-        : [];
+    return (Array.isArray(emb) ? emb[0]?.titulo : emb?.titulo) ?? "Formulário";
+  };
 
-    if ((l as { multi_uso?: boolean }).multi_uso === true) {
-      // campanha (origem='intake'): 1 link, N respostas anônimas e nunca
-      // carimba usado_em (0115) — contar pelo link deixaria o intake
-      // "pendente" pra sempre. Cada resposta na janela é um instrumento
-      // respondido; não há pool de pendentes observável em divulgação.
-      const n = respostas.filter(
-        (r) => r.respondido_em != null && new Date(r.respondido_em).getTime() >= desdeMs
-      ).length;
-      if (n === 0) continue;
-      const s = slot(titulo);
-      s.campanha = true;
-      s.emitidos += n;
-      s.respondidos += n;
-      continue;
-    }
-
-    const s = slot(titulo);
+  for (const l of cRes.data ?? []) {
+    // campanha (origem='intake'): 1 link, N respostas anônimas e nunca
+    // carimba usado_em (0115) — contar pelo link deixaria o intake
+    // "pendente" pra sempre. Cada resposta na janela é um instrumento
+    // respondido; não há pool de pendentes observável em divulgação.
+    const n = respPorLink.get(l.id) ?? 0;
+    if (n === 0) continue;
+    const s = slot(tituloDe(l));
+    s.campanha = true;
+    s.emitidos += n;
+    s.respondidos += n;
+  }
+  for (const l of fRes.data ?? []) {
+    const s = slot(tituloDe(l));
     s.emitidos++;
     const resp =
       l.usado_em != null

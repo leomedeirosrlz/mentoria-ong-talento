@@ -254,12 +254,17 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const { data: me } = await supabase
-    .from("profiles")
-    .select("role")
-    .eq("user_id", sub)
-    .maybeSingle();
-  if (me?.role !== "coordenacao") {
+  const [{ data: me }, { data: papeis }] = await Promise.all([
+    supabase
+      .from("profiles")
+      .select("role")
+      .eq("user_id", sub)
+      .maybeSingle(),
+    // papel efetivo (0085): primário + secundários — coordenação como
+    // papel secundário exporta igual (a mesma my_papeis do getMe)
+    supabase.rpc("my_papeis"),
+  ]);
+  if (!temPapel(me ? { ...me, papeis } : null, "coordenacao")) {
     return NextResponse.json(
       { error: "Só a coordenação pode exportar o relatório do programa." },
       { status: 403 }

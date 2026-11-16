@@ -2033,7 +2033,7 @@ export const IA_TOOLS = {
       })) as { token?: string; reutilizado?: boolean } | null;
       // telemetria (417): a emissão via Liza é form_emitido na superfície
       // "ia" — a origem do gesto é o canal, não a tela (chat grava com o
-      // JWT da sessão; no MCP o client sem JWT no-op'a dentro da RPC).
+      // JWT da sessão; no MCP o JWT impersonado carimba o dono da PAT).
       // Sem token não houve link — só conta emissão real
       if (d?.token) {
         await emitirProdutoEvento(ctx.supabase, {
@@ -2286,9 +2286,10 @@ export async function executarTool(
    *  my_papeis), então a rota passa os papéis que a autorização devolveu.
    *  Ausente → resolve do JWT como sempre. */
   papeisForcados?: AppRole[],
-  /** profile_id explícito pra auditoria — idem: no MCP não existe JWT, o
-   *  my_profile_id() da RPC sairia NULL e o evento não gravaria. O caller
-   *  passa o dono da PAT; no chat fica ausente e a RPC usa o JWT. */
+  /** profile_id explícito pra auditoria — hoje nenhuma rota passa (a
+   *  do MCP vai undefined): o client da execução já é o JWT impersonado
+   *  do dono da PAT, então my_profile_id() resolve a pessoa na RPC
+   *  igual à sessão do chat. Escape pra um futuro caller sem JWT. */
   autorProfileId?: string,
   /** request_id da reserva do limite — correla os eventos da tool com a
    *  mensagem que a disparou (sdd D4). Ausente no MCP por enquanto. */

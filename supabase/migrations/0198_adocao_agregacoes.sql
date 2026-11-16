@@ -131,7 +131,7 @@ create or replace function public.adocao_serie_dia(
 )
 returns table(dia date, papel text, gestos bigint, pessoas bigint)
 language sql stable set search_path = public as $$
-  select created_at::date, papel,
+  select (created_at at time zone 'America/Sao_Paulo')::date, papel,
          count(*),
          count(distinct profile_id)
   from produto_eventos
@@ -156,7 +156,8 @@ language sql stable set search_path = public as $$
          jsonb_agg(distinct s.papel order by s.papel),
          max(s.created_at),
          (select jsonb_agg(jsonb_build_object('d', t.dia, 'g', t.g) order by t.dia)
-            from (select e.created_at::date as dia, count(*) as g
+            from (select (e.created_at at time zone 'America/Sao_Paulo')::date as dia,
+                         count(*) as g
                     from produto_eventos e
                     where e.superficie = s.superficie
                       and e.created_at >= p_desde
@@ -182,7 +183,8 @@ create or replace function public.adocao_coorte(
 returns table(coorte date, semana int, ativas bigint, total bigint)
 language sql stable set search_path = public as $$
   with primeiros as (
-    select profile_id, date_trunc('week', min(created_at))::date as c0
+    select profile_id,
+           date_trunc('week', min(created_at) at time zone 'America/Sao_Paulo')::date as c0
     from produto_eventos
     group by profile_id
   ), coortes as (
@@ -199,11 +201,13 @@ language sql stable set search_path = public as $$
     from coortes c
   ), ativ as (
     select p.c0,
-           ((date_trunc('week', e.created_at)::date - p.c0) / 7)::int as semana,
+           ((date_trunc('week', e.created_at at time zone 'America/Sao_Paulo')::date - p.c0) / 7)::int as semana,
            count(distinct e.profile_id) as ativas
     from primeiros p
     join produto_eventos e on e.profile_id = p.profile_id
     where e.acao = 'pageview'
+      -- bound pela coorte viva (≤12 semanas): não varrer o histórico todo
+      and e.created_at >= (select min(c0) from coortes)
     group by 1, 2
   )
   select s.c0, s.semana, coalesce(a.ativas, 0), c.total
@@ -214,11 +218,12 @@ language sql stable set search_path = public as $$
 $$;
 
 -- ---------- caminhos: trios de superfícies mais percorridos ----------
--- Sessionização "islands" por profile+dia (sessão não cruza a meia-
--- noite — um pageview de segunda não emenda num de sexta): colapsa
--- pageviews repetidos da mesma superfície (home→home→agenda =
--- home→agenda), depois conta trios ordenados por profile. Responde
--- "como navegam" mais legível que sankey nesta escala.
+-- Sessionização "islands" — sessão = mesma pessoa, mesmo dia (SP), sem
+-- gap >30min: o dia corta no fuso local (não às 21h de Brasília) e um
+-- intervalo longo longe do app quebra a ilha em duas. Colapsa pageviews
+-- repetidos da mesma superfície (home→home→agenda = home→agenda),
+-- depois conta trios ordenados por profile. Responde "como navegam"
+-- mais legível que sankey nesta escala.
 create or replace function public.adocao_caminhos(
   p_desde timestamptz,
   p_top int default 8,
@@ -227,16 +232,21 @@ create or replace function public.adocao_caminhos(
 returns table(de text, meio text, para text, pessoas bigint)
 language sql stable set search_path = public as $$
   with pv as (
-    select profile_id, created_at::date as dia, superficie, created_at,
-           lag(superficie) over (
-             partition by profile_id, created_at::date
-             order by created_at) as prev
+    select profile_id, (created_at at time zone 'America/Sao_Paulo')::date as dia,
+           superficie, created_at,
+           lag(superficie) over w as prev_sup,
+           lag(created_at) over w as prev_ts
     from produto_eventos
     where acao = 'pageview' and created_at >= p_desde
       and (p_papel is null or papel = p_papel)
+    window w as (partition by profile_id,
+                          (created_at at time zone 'America/Sao_Paulo')::date
+                 order by created_at)
   ), ilhas as (
     select profile_id, dia, superficie, created_at,
-           sum(case when prev is distinct from superficie then 1 else 0 end)
+           sum(case when superficie is distinct from prev_sup
+                      or created_at - prev_ts > interval '30 minutes'
+                    then 1 else 0 end)
              over (partition by profile_id, dia order by created_at
                    rows unbounded preceding) as g
     from pv

@@ -287,9 +287,11 @@ function EncontroCard({ b }: { b: Extract<DocBloco, { kind: "encontro" }> }) {
           ) : null}
           {b.roteiro ? (
             <p>
-              {/* the guide's "Passo a passo" slot as an amber chip-link */}
+              {/* the guide's "Passo a passo" slot as an amber chip-link —
+                  "./" relativo como os refs do corpus: resolve na casa de
+                  quem lê (/materiais no staff, /jovem no mentorado) */}
               <Link
-                href={`/materiais/documento/${b.roteiro.slug}`}
+                href={`./${b.roteiro.slug}`}
                 aria-label={`Passo a passo: ${b.roteiro.rotulo}`}
                 className="inline-flex items-center gap-1.5 rounded-full border border-[var(--warn-border)] bg-[var(--warn-bg)] px-3 py-1 text-xs font-semibold text-[var(--warn-text)] transition-colors hover:border-[var(--warn)]"
               >

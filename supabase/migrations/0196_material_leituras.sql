@@ -11,7 +11,7 @@
 -- (a futura cobertura de leitura dos guias sai daqui sem migration nova).
 begin;
 
-create table public.material_leituras (
+create table if not exists public.material_leituras (
   profile_id uuid not null references public.profiles(id) on delete cascade,
   ref text not null,
   lido_em timestamptz not null default now(),
@@ -23,14 +23,17 @@ alter table public.material_leituras enable row level security;
 revoke all on public.material_leituras from public, anon;
 grant select, insert, update on public.material_leituras to authenticated;
 
+drop policy if exists material_leituras_select on public.material_leituras;
 create policy material_leituras_select on public.material_leituras
   for select using (
     profile_id = public.my_profile_id() or public.my_role() = 'coordenacao'
   );
 
+drop policy if exists material_leituras_insert on public.material_leituras;
 create policy material_leituras_insert on public.material_leituras
   for insert with check (profile_id = public.my_profile_id());
 
+drop policy if exists material_leituras_update on public.material_leituras;
 create policy material_leituras_update on public.material_leituras
   for update using (profile_id = public.my_profile_id())
   with check (profile_id = public.my_profile_id());

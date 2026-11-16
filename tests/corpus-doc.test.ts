@@ -518,9 +518,9 @@ describe("blocos de encontro", () => {
     expect(html).toContain("1º encontro");
     expect(html).toContain("Acordos e vínculo");
     expect(html).toContain("preencher a ficha");
-    expect(html).toContain(
-      'href="/materiais/documento/roteiro-encontro-01"'
-    );
+    // chip "./" relativo como os refs do corpus — resolve nas duas casas
+    // (/materiais/documento e /jovem/materiais/documento)
+    expect(html).toContain('href="./roteiro-encontro-01"');
     expect(html).toContain("Roteiro do 1º encontro");
     // o slot "Passo a passo" virou pill âmbar com o aria-label do slot
     expect(html).toContain('aria-label="Passo a passo: Roteiro do 1º encontro"');
@@ -817,7 +817,9 @@ describe("corpusServeJovem", () => {
   it("só serve audiência que cubra o jovem", async () => {
     expect(corpusServeJovem(fake(["todos"]))).toBe(true);
     expect(corpusServeJovem(fake(["mentorado"]))).toBe(true);
-    expect(corpusServeJovem(fake([]))).toBe(true);
+    // fail-closed: audiência ausente NÃO serve o jovem — um md de staff
+    // sem o campo não pode vazar pra ele
+    expect(corpusServeJovem(fake([]))).toBe(false);
     expect(corpusServeJovem(fake(["mentor_dpp", "coordenacao"]))).toBe(false);
     const etica = await carregarDocCorpus("codigo-etica-conduta");
     const guia = await carregarDocCorpus("guia-mentor-dpp");
@@ -838,7 +840,11 @@ describe("corpusServePapel", () => {
     expect(corpusServePapel(termo!, mentor)).toBe(false);
     expect(corpusServePapel(termo!, coord)).toBe(true);
     expect(corpusServePapel(etica!, mentor)).toBe(true);
-    expect(corpusServePapel(fake([]), null)).toBe(true); // audiência ausente serve
+    // audiência ausente também é fail-closed: cai no veMaterial vazio —
+    // não serve ninguém, exceto quem tem o bypass de staff
+    expect(corpusServePapel(fake([]), null)).toBe(false);
+    expect(corpusServePapel(fake([]), mentor)).toBe(false);
+    expect(corpusServePapel(fake([]), coord)).toBe(true);
   });
 });
 

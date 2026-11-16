@@ -68,8 +68,9 @@ export function trackProduto(
 export function ProdutoTelemetry() {
   const pathname = usePathname();
 
-  // um pageview por troca de superfície (dedupe por sup — trocar de ficha
-  // dentro da mesma área conta uma nova página, re-render não conta nada)
+  // um pageview por troca de superfície (dedupe por sup — navegar entre
+  // telas da mesma área não re-emite: ficha A → ficha B conta zero, o
+  // que conta é entrar numa superfície nova; re-render não conta nada)
   useEffect(() => {
     if (demoRoleClient()) return;
     const sup = superficieDoPath(pathname);
