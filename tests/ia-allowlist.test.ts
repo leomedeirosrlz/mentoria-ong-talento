@@ -35,6 +35,7 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   registros_da_dupla: { dupla_id: UUID },
   aguardando_par: {},
   capacidade_mentores: {},
+  adocao_por_superficie: {},
   duplas_do_usuario: {},
   mensagem_template: { slug: "mensagem-preparacao" },
   agenda_do_periodo: {},

@@ -58,7 +58,10 @@ export function trackProduto(
     (typeof window !== "undefined"
       ? superficieDoPath(window.location.pathname)
       : "outros");
-  fila.push({ superficie: sup, acao, meta });
+  // ts do client em meta: o lote grava num statement só e created_at=
+  // transaction_timestamp() empataria os 20 eventos do flush — sem o
+  // ts a RPC não tem como ordenar (sessionização dos caminhos depende)
+  fila.push({ superficie: sup, acao, meta: { ...meta, ts: Date.now() } });
   if (fila.length >= FILA_MAX) flush();
 }
 
@@ -72,7 +75,11 @@ export function ProdutoTelemetry() {
     const sup = superficieDoPath(pathname);
     if (sup === ultimaSup) return;
     ultimaSup = sup;
-    fila.push({ superficie: sup, acao: "pageview" });
+    fila.push({
+      superficie: sup,
+      acao: "pageview",
+      meta: { ts: Date.now() },
+    });
     if (fila.length >= FILA_MAX) flush();
   }, [pathname]);
 

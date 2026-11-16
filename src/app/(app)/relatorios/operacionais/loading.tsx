@@ -35,7 +35,7 @@ export default function Loading() {
 
       {/* tabstrip — fileira de tabs na borda */}
       <div className="flex items-center gap-1 border-b border-border/70">
-        {["w-14", "w-24", "w-24", "w-24", "w-28", "w-28", "w-24"].map((w, i) => (
+        {["w-14", "w-24", "w-24", "w-24", "w-28", "w-28", "w-24", "w-16"].map((w, i) => (
           <Skeleton key={i} className={`h-10 ${w} rounded-t-md`} />
         ))}
       </div>

@@ -3,8 +3,15 @@ import { createClient } from "@/lib/supabase/server";
 import { DEMO_ROLE_COOKIE, papelDemoValido } from "@/lib/demo/shared";
 import { LEMBRETE_INTERVALO_MS } from "@/lib/ciclo";
 import type { InteracaoTipo } from "@/lib/interacoes";
+import {
+  emitirProdutoEvento,
+  superficieDeReferer,
+} from "@/lib/produto-eventos-server";
 
 const TIPOS: ReadonlySet<string> = new Set<InteracaoTipo>(["nudge", "contato", "apoio"]);
+// ?s= anota a superfície do gesto (os links saem com rel="noreferrer" —
+// sem ele o referer não chega); snake_case curta, senão cai pro referer
+const SUP_RE = /^[a-z_]{1,32}$/;
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 // destino obrigatoriamente wa.me/<dígitos> — qualquer outra URL seria open
@@ -115,6 +122,19 @@ export async function GET(request: NextRequest) {
           tipo,
         });
         if (error) console.error("nudge: falha ao registrar interação", error);
+      }
+      // telemetria (417): o ping por WhatsApp é o gesto "lembrete_whatsapp"
+      // — conta o disparo mesmo quando o dedupe de 60s pulou o insert (o
+      // clique aconteceu); o cap de 48h sai antes como bloqueio, não gesto
+      if (tipo === "nudge") {
+        const s = searchParams.get("s") ?? "";
+        await emitirProdutoEvento(supabase, {
+          superficie: SUP_RE.test(s)
+            ? s
+            : superficieDeReferer(request.headers.get("referer")),
+          acao: "lembrete_whatsapp",
+          meta: { dupla_id: duplaId },
+        });
       }
     }
   }

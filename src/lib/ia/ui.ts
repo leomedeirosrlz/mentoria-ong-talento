@@ -292,6 +292,7 @@ export const STATUS_TOOL: Record<string, string> = {
   plano_em_dia: "Montando o plano pra ficar em dia…",
   aguardando_par: "Olhando a fila de pareamento…",
   capacidade_mentores: "Conferindo as vagas dos mentores…",
+  adocao_por_superficie: "Lendo a adoção por superfície…",
   duplas_do_usuario: "Procurando a dupla…",
   agenda_do_periodo: "Abrindo a agenda…",
   guia_consulta: "Buscando nos guias…",

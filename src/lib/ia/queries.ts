@@ -1180,3 +1180,55 @@ export async function getJovemPedidosIa(supabase: SupabaseClient, limite = 40) {
     especialista_desejado_nome: string | null; created_at: string;
   }[];
 }
+
+// ---------- adoção do produto (REALIZA-417, fase 2) ----------
+// As RPCs adocao_* (0198) devolvem o agregado na forma pronta — a tool
+// não refaz agregação em JS. Security invoker: a RLS de produto_eventos
+// já recorta (coordenação vê o programa todo; fora dela a tool nem abre).
+
+export type AdocaoResumoIa = {
+  ativas: number;
+  ativas_prev: number;
+  gestos: number;
+  gestos_prev: number;
+  sups_vivas: number;
+};
+
+export type AdocaoSuperficieIa = {
+  superficie: string;
+  gestos: number;
+  pessoas: number;
+  papeis: string[];
+  ultimo: string;
+};
+
+/** KPIs da régua da aba Adoção — janela × janela anterior equivalente. */
+export async function getAdocaoResumoIa(
+  supabase: SupabaseClient,
+  desdeIso: string,
+  papel: string | null = null
+): Promise<AdocaoResumoIa> {
+  const { data, error } = await supabase.rpc("adocao_resumo", {
+    p_desde: desdeIso,
+    p_papel: papel,
+  });
+  if (error) throw error;
+  return data as unknown as AdocaoResumoIa;
+}
+
+/** A lista de trabalho da aba Adoção — uma linha por superfície com
+ *  pessoas únicas (distinct no SQL, não soma por papel — o híbrido não
+ *  conta duas vezes), gestos, papéis que usaram e o último gesto.
+ *  `papel` = recorte da régua (null = todos). */
+export async function getAdocaoSuperficiesIa(
+  supabase: SupabaseClient,
+  desdeIso: string,
+  papel: string | null
+): Promise<AdocaoSuperficieIa[]> {
+  const { data, error } = await supabase.rpc("adocao_superficies", {
+    p_desde: desdeIso,
+    p_papel: papel,
+  });
+  if (error) throw error;
+  return (data ?? []) as AdocaoSuperficieIa[];
+}

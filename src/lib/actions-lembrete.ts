@@ -2,6 +2,10 @@
 
 import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "./demo/mode";
+import {
+  emitirProdutoEvento,
+  superficieDaOrigem,
+} from "./produto-eventos-server";
 
 export type LembreteDestino = "mentor" | "mentorado";
 
@@ -36,7 +40,17 @@ export async function enviarLembrete(
   const r = data as
     | { ok: true }
     | { ok: false; erro: string; bloqueado_ate?: string };
-  if (r.ok) return { ok: true };
+  if (r.ok) {
+    // telemetria (417): o lembrete in-app é o gesto "nudge" — superfície do
+    // referer (onde a pessoa clicou), nunca onde a action mora. O await é
+    // barato (uma RPC) e garante o insert antes da resposta ir embora
+    await emitirProdutoEvento(supabase, {
+      superficie: await superficieDaOrigem(),
+      acao: "nudge",
+      meta: { dupla_id: duplaId, destino },
+    });
+    return { ok: true };
+  }
   switch (r.erro) {
     case "intervalo_48h":
       return {

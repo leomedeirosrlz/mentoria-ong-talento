@@ -6,3 +6,8 @@
 export { BarraSegmentada, SEGMENTO_NEUTRO, type SegmentoBarra } from "./barra-segmentada";
 export { Sparkline, type SerieSpark } from "./sparkline";
 export { GraficoTempo, type PontoGrafico, type FormatoEixo } from "./grafico-tempo";
+export { MetricTile, type DeltaBom } from "./metrica-tile";
+export { MapaCalor } from "./mapa-calor";
+export { FunilEtapas } from "./funil-etapas";
+export { CoorteGrade } from "./coorte-grade";
+export { CaminhosFluxo } from "./caminhos-fluxo";

@@ -13,7 +13,8 @@ export type AbaRelatorios =
   | "interacoes"
   | "solicitacoes"
   | "encerramento"
-  | "formularios";
+  | "formularios"
+  | "adocao";
 
 export type AbaRelatoriosItem = { id: AbaRelatorios; rotulo: string };
 

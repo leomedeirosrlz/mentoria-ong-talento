@@ -13,6 +13,10 @@ import {
   type RespostaValor,
 } from "./forms/schema";
 import { entregasDoMomento, SISTEMA_DA_ESTACAO, type EstacaoChave } from "./jornada";
+import {
+  emitirProdutoEvento,
+  superficieDaOrigem,
+} from "./produto-eventos-server";
 import { erroAmigavel } from "./utils";
 
 // "Enviar formulário" a partir da ficha da dupla — a action do motor
@@ -267,9 +271,14 @@ export async function enviarInstrumentoMentorado(
   if (error) return { error: erroAmigavel(error) };
   const token = (data as { token?: string } | null)?.token;
   if (!token) return { error: "Link emitido, mas o token não voltou." };
-  return {
-    ok: true,
-    token,
-    reutilizado: (data as { reutilizado?: boolean }).reutilizado === true,
-  };
+  const reutilizado =
+    (data as { reutilizado?: boolean }).reutilizado === true;
+  // telemetria (417): o gesto "emitir instrumento" conta mesmo com link
+  // reutilizado — a intenção de entrega aconteceu; meta sinaliza o reuso
+  await emitirProdutoEvento(supabase, {
+    superficie: await superficieDaOrigem(),
+    acao: "form_emitido",
+    meta: { dupla_id: duplaId, sistema, momento: momento ?? null, reutilizado },
+  });
+  return { ok: true, token, reutilizado };
 }

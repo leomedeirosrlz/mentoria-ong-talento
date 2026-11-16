@@ -1,8 +1,10 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { usePathname } from "next/navigation";
 import { CircleNotch, WhatsappLogo } from "@phosphor-icons/react";
 import { waLink } from "@/lib/ciclo";
+import { superficieDoPath } from "@/lib/produto-eventos";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
@@ -42,9 +44,12 @@ export function NudgeButton({
   }
 
   const wa = waLink(telefone, mensagem);
+  // s= carrega a superfície do gesto pra telemetria (417) — rel="noreferrer"
+  // tira o referer do GET, então a origem vai anotada no próprio href
+  const sup = superficieDoPath(usePathname());
   const href =
     wa && duplaId
-      ? `/api/nudge?d=${encodeURIComponent(duplaId)}&to=${encodeURIComponent(wa)}&t=${encodeURIComponent(t ?? "nudge")}`
+      ? `/api/nudge?d=${encodeURIComponent(duplaId)}&to=${encodeURIComponent(wa)}&t=${encodeURIComponent(t ?? "nudge")}&s=${encodeURIComponent(sup)}`
       : wa;
   if (!href) {
     // desabilitado explica por quê inline — no toque não existe hover/tooltip

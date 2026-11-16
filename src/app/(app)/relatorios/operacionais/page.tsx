@@ -42,9 +42,16 @@ import {
   resumoAderencia,
   resumoEncerramento,
 } from "@/lib/relatorios/operacional";
+import {
+  janelaDeParam,
+  papelDeParam,
+  type Janela,
+  type MedidaAdocao,
+} from "@/lib/adocao";
 import { RelatoriosAbas, type AbaRelatorios } from "./relatorios-abas";
 import { RelatorioSecao } from "./relatorio-secao";
 import { SecaoAderencia } from "./secao-aderencia";
+import { SecaoAdocao } from "./secao-adocao";
 import { SecaoEncerramento } from "./secao-encerramento";
 import { RecorteTurma } from "./recorte-turma";
 import { DigestBotao } from "./digest-botao";
@@ -59,6 +66,7 @@ const ABAS: { id: AbaRelatorios; rotulo: string }[] = [
   { id: "solicitacoes", rotulo: "Especialistas" },
   { id: "encerramento", rotulo: "Encerramento" },
   { id: "formularios", rotulo: "Formulários" },
+  { id: "adocao", rotulo: "Adoção" },
 ];
 
 const PREVIA = 8;
@@ -142,6 +150,18 @@ export default async function RelatoriosOperacionaisPage({
       : undefined;
   if (turmaAtiva !== recorte.turma) recorte.turma = null;
 
+  // recorte próprio da aba Adoção (REALIZA-417): janela/papel/medida —
+  // validados pela mesma regra dos outros params (valor estranho cai no
+  // default), turma/cronograma não se aplicam a evento e seguem na URL
+  // só como passageiros dos links de aba
+  const janela = janelaDeParam(
+    typeof sp.janela === "string" ? sp.janela : undefined
+  );
+  const papel = papelDeParam(
+    typeof sp.papel === "string" ? sp.papel : undefined
+  );
+  const medida: MedidaAdocao = sp.medida === "gestos" ? "gestos" : "pessoas";
+
   // params extras que as abas preservam entre si
   const extraParams = [
     turmaAtiva ? `turma=${encodeURIComponent(turmaAtiva)}` : "",
@@ -169,12 +189,16 @@ export default async function RelatoriosOperacionaisPage({
         meta="Panorama do programa e exports operacionais em CSV"
       />
       <RelatoriosAbas abas={ABAS} ativa={aba} extraParams={extraParams}>
-        <RecorteTurma
-          aba={aba}
-          turmas={turmas}
-          ativa={turmaAtiva}
-          cronograma={recorte.cronogramaId ?? undefined}
-        />
+        {/* a régua de turma não recorta evento — a aba Adoção monta a
+            régua própria (janela × papel × medida) dentro da seção */}
+        {aba !== "adocao" && (
+          <RecorteTurma
+            aba={aba}
+            turmas={turmas}
+            ativa={turmaAtiva}
+            cronograma={recorte.cronogramaId ?? undefined}
+          />
+        )}
         {await renderAba({
           aba,
           demo,
@@ -183,6 +207,10 @@ export default async function RelatoriosOperacionaisPage({
           csvHref,
           meuNome,
           origem,
+          janela,
+          papel,
+          medida,
+          extraParams,
         })}
       </RelatoriosAbas>
     </div>
@@ -202,6 +230,10 @@ async function renderAba({
   csvHref,
   meuNome,
   origem,
+  janela,
+  papel,
+  medida,
+  extraParams,
 }: {
   aba: AbaRelatorios;
   demo: boolean;
@@ -210,6 +242,13 @@ async function renderAba({
   csvHref: (tipo: string) => string;
   meuNome: string;
   origem: string;
+  /** recorte da aba Adoção — só o case "adocao" lê */
+  janela: Janela;
+  papel: string | null;
+  medida: MedidaAdocao;
+  /** turma/cronograma ativos — a régua da Adoção os preserva nos chips
+   *  (inertes pra ela) pra não derrubar o recorte das outras abas */
+  extraParams: string;
 }) {
   const d = demo ? getDemoData() : null;
 
@@ -386,6 +425,19 @@ async function renderAba({
           ])}
           total={linhas.length}
           csvHref={csvHref("forms-taxa")}
+        />
+      );
+    }
+
+    case "adocao": {
+      return (
+        <SecaoAdocao
+          d={d}
+          supabase={supabase}
+          janela={janela}
+          papel={papel}
+          medida={medida}
+          extraParams={extraParams}
         />
       );
     }

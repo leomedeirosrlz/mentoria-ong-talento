@@ -30,6 +30,8 @@ import type {
   Profile,
 } from "@/lib/types";
 import {
+  getAdocaoResumoIa,
+  getAdocaoSuperficiesIa,
   getAgendaPeriodoIa,
   getCapacidadeInsumos,
   getChamadosIa,
@@ -72,6 +74,7 @@ import {
 import { getIaConfig } from "./config";
 import { CacheTtl } from "./cache";
 import { buscarNosGuias, catalogoGuias } from "./guias";
+import { emitirProdutoEvento } from "../produto-eventos-server";
 
 /** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário
  *  ('importacao' entrou na 0193: match semântico/revisão NL do import CSV). */
@@ -196,6 +199,30 @@ const mensagemTemplateArgs = z
       .optional()
       .describe(
         "dupla destino — ausente na 1ª chamada, quando a pessoa ainda não escolheu"
+      ),
+  })
+  .strict();
+
+const adocaoArgs = z
+  .object({
+    dias: z
+      .number()
+      .int()
+      .min(1)
+      .max(90)
+      .optional()
+      .describe("janela pra trás em dias — típico 7/30/90 (padrão 30)"),
+    papel: z
+      .enum([
+        "coordenacao",
+        "supervisor",
+        "mentor_dpp",
+        "mentor_especialista",
+        "mentorado",
+      ])
+      .optional()
+      .describe(
+        "recorta só os gestos emitidos com esse papel efetivo (padrão: todos)"
       ),
   })
   .strict();
@@ -625,6 +652,34 @@ export const IA_TOOLS = {
         })
         .sort((a, b) => comparaNome(a.nome, b.nome));
       return { mentores, total: mentores.length };
+    },
+  },
+
+  adocao_por_superficie: {
+    nome: "adocao_por_superficie",
+    descricao:
+      "Adoção do produto por superfície (analytics interno — gestos coletados pelo beacon e server-side): as áreas do app (duplas, ficha_dupla, agenda, materiais, formularios…) ordenadas por gestos na janela, cada uma com pessoas únicas, total de gestos, os papéis que usaram e o último gesto. Devolve também os KPIs da janela — pessoas ativas, gestos e superfícies vivas, comparados à janela anterior equivalente (respeitam o recorte `papel` quando informado). Use pra 'o que mais usam?', 'adoção por superfície', 'a área X é usada?', 'mentor usa o quê?'.",
+    schema: adocaoArgs,
+    roles: ["coordenacao"],
+    run: async (
+      { dias, papel }: z.infer<typeof adocaoArgs>,
+      ctx
+    ) => {
+      const janela = dias ?? 30;
+      const desde = new Date(
+        Date.now() - janela * 86400_000
+      ).toISOString();
+      const [superficies, resumo] = await Promise.all([
+        getAdocaoSuperficiesIa(ctx.supabase, desde, papel ?? null),
+        getAdocaoResumoIa(ctx.supabase, desde, papel ?? null),
+      ]);
+      return {
+        janela_dias: janela,
+        papel: papel ?? "todos",
+        resumo,
+        total_superficies: superficies.length,
+        superficies,
+      };
     },
   },
 
@@ -1841,6 +1896,21 @@ export const IA_TOOLS = {
         p_dupla_id: a.dupla_id,
         p_sistema: a.sistema,
       })) as { token?: string; reutilizado?: boolean } | null;
+      // telemetria (417): a emissão via Liza é form_emitido na superfície
+      // "ia" — a origem do gesto é o canal, não a tela (chat grava com o
+      // JWT da sessão; no MCP o client sem JWT no-op'a dentro da RPC).
+      // Sem token não houve link — só conta emissão real
+      if (d?.token) {
+        await emitirProdutoEvento(ctx.supabase, {
+          superficie: "ia",
+          acao: "form_emitido",
+          meta: {
+            dupla_id: a.dupla_id,
+            sistema: a.sistema,
+            reutilizado: d?.reutilizado === true,
+          },
+        });
+      }
       return {
         url: d?.token ? `/f/${d.token}` : null,
         reutilizado: d?.reutilizado === true,

@@ -27,6 +27,10 @@ import { semanaBounds } from "@/lib/ciclo";
 import { montarDigestSemanal } from "@/lib/relatorios/digest";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
+import {
+  emitirProdutoEvento,
+  superficieDaOrigem,
+} from "./produto-eventos-server";
 import type { ComunicadoPrioridade } from "@/lib/types";
 
 type Supa = Awaited<ReturnType<typeof createClient>>;
@@ -458,6 +462,19 @@ export async function enviarInstrumentoLote(input: {
   });
   if (error) return { error: erroAmigavel(error) };
 
+  // telemetria (417): o gesto é a emissão do lote — e-mail e WhatsApp são
+  // entrega, não parte do gesto; emitidos = linhas ok (link emitido ou
+  // pendente reutilizado)
+  await emitirProdutoEvento(supabase, {
+    superficie: await superficieDaOrigem(),
+    acao: "form_emitido",
+    meta: {
+      sistema,
+      duplas: ids.length,
+      emitidos: ((data ?? []) as LinhaRpcLote[]).filter((r) => r.ok).length,
+    },
+  });
+
   const titulo = INSTRUMENTO_INFO[sistema as InstrumentoSistema].titulo;
   const linhas: LoteInstrumentoLinha[] = [];
   const mensagens: {
@@ -691,6 +708,18 @@ export async function enviarDesfechoLote(input: {
     p_dupla_ids: ids,
   });
   if (error) return { error: erroAmigavel(error) };
+
+  // telemetria (417) — mesma régua do lote de instrumento acima: a emissão
+  // dos links é o gesto; a entrega por e-mail vem depois e não muda a conta
+  await emitirProdutoEvento(supabase, {
+    superficie: await superficieDaOrigem(),
+    acao: "form_emitido",
+    meta: {
+      sistema: "desfecho_6m",
+      duplas: ids.length,
+      emitidos: ((data ?? []) as LinhaRpcLote[]).filter((r) => r.ok).length,
+    },
+  });
 
   const linhas: LoteInstrumentoLinha[] = [];
   const mensagens: {

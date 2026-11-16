@@ -14,6 +14,10 @@ import {
   type RespostaValor,
 } from "./schema";
 import { erroAmigavel as erroAmigavelBase } from "../utils";
+import {
+  emitirProdutoEvento,
+  superficieDaOrigem,
+} from "../produto-eventos-server";
 import type { CorRaca, Genero, PrefGeneroPar } from "../types";
 
 // Actions da engine de formulários (0034).
@@ -388,6 +392,18 @@ export async function gerarLinksFormulario(input: {
   }
 
   revalidatePath(`/formularios/${input.formularioId}`);
+  // telemetria (417): um gesto por disparo — os volumes ficam em meta;
+  // a superfície vem do referer (dialog na tela onde a pessoa emitiu)
+  await emitirProdutoEvento(supabase, {
+    superficie: await superficieDaOrigem(),
+    acao: "form_emitido",
+    meta: {
+      formulario_id: input.formularioId,
+      criados,
+      reutilizados,
+      destinos: unicos.length,
+    },
+  });
   return { ok: true, criados, reutilizados, links };
 }
 

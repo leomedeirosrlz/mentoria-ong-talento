@@ -1,7 +1,9 @@
 "use client";
 
+import { usePathname } from "next/navigation";
 import { CaretDown, WhatsappLogo } from "@phosphor-icons/react";
 import { waLink } from "@/lib/ciclo";
+import { superficieDoPath } from "@/lib/produto-eventos";
 import { NudgeButton } from "@/components/nudge-button";
 import { Button } from "@/components/ui/button";
 import {
@@ -23,12 +25,18 @@ export type DestinoWA = {
 };
 
 /** Mesma âncora do NudgeButton: com duplaId o clique passa por /api/nudge
- *  (loga o contato) e só então redireciona pro wa.me. */
-function hrefDestino(d: DestinoWA, duplaId?: string): string | null {
+ *  (loga o contato) e só então redireciona pro wa.me. `sup` anota a
+ *  superfície do gesto pra telemetria (417) — noreferrer tira o referer,
+ *  então a origem viaja no próprio href. */
+function hrefDestino(
+  d: DestinoWA,
+  duplaId?: string,
+  sup?: string
+): string | null {
   const wa = waLink(d.telefone, d.mensagem);
   if (!wa) return null;
   return duplaId
-    ? `/api/nudge?d=${encodeURIComponent(duplaId)}&to=${encodeURIComponent(wa)}&t=${encodeURIComponent(d.t)}`
+    ? `/api/nudge?d=${encodeURIComponent(duplaId)}&to=${encodeURIComponent(wa)}&t=${encodeURIComponent(d.t)}&s=${encodeURIComponent(sup ?? "outros")}`
     : wa;
 }
 
@@ -55,6 +63,7 @@ export function WhatsAppRapido({
   const validos = destinos.filter(
     (d) => waLink(d.telefone, d.mensagem) != null
   );
+  const sup = superficieDoPath(usePathname());
 
   if (icone) {
     if (validos.length === 0) {
@@ -72,7 +81,7 @@ export function WhatsAppRapido({
       const d = validos[0];
       return (
         <a
-          href={hrefDestino(d, duplaId)!}
+          href={hrefDestino(d, duplaId, sup)!}
           target="_blank"
           rel="noopener noreferrer"
           aria-label={d.rotulo}
@@ -93,7 +102,7 @@ export function WhatsAppRapido({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-auto min-w-56">
           {destinos.map((d) => {
-            const href = hrefDestino(d, duplaId);
+            const href = hrefDestino(d, duplaId, sup);
             return (
               <DropdownMenuItem
                 key={d.rotulo}
@@ -151,7 +160,7 @@ export function WhatsAppRapido({
       />
       <DropdownMenuContent align="end" className="w-auto min-w-56">
         {destinos.map((d) => {
-          const href = hrefDestino(d, duplaId);
+          const href = hrefDestino(d, duplaId, sup);
           return (
             <DropdownMenuItem
               key={d.rotulo}

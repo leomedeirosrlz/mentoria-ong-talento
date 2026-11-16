@@ -178,6 +178,7 @@ describe("registry", () => {
         "abrir_chamado",
         "acrescentar_info_chamado",
         "aceitar_solicitacao",
+        "adocao_por_superficie",
         "agenda_do_periodo",
         "agendar_encontro",
         "aguardando_par",
