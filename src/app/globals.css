@@ -428,6 +428,21 @@
   }
 }
 
+/* chegada do FAB da Liza: um pulinho com overshoot — scale de 55% + leve
+   subida, ease back-out (y>1 passa do final e assenta). transform+opacity,
+   compositor; origem na base (50% 100%) — ela "aterrissa" no canto como a
+   squash do blob. Uma animação só: sem placeholder, sem dupla entrada. */
+@keyframes fab-chega {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.55);
+  }
+}
+.animate-fab-chega {
+  animation: fab-chega 450ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  transform-origin: 50% 100%;
+}
+
 /* stagger de entrada de listas: .animate-enter + --i inline (0, 1, 2…).
    O guard global de prefers-reduced-motion zera a animação.
    NB: keyframes nomeados enter-stagger — "enter" já existe no tw-animate-css

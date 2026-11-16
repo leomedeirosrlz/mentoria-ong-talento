@@ -44,7 +44,6 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import { Button } from "@/components/ui/button";
-import { FAB_CLS, FAB_POS } from "@/components/assistente-bolha-shell";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import {
   APRESENTACOES_MAX,
@@ -57,8 +56,14 @@ import {
 import { LIZA_PEDIDO_EVENTO } from "@/lib/liza-pedido";
 import type { AppRole } from "@/lib/types";
 
-// posição e bolha do FAB moram no shell compartilhado — o placeholder do
-// dynamic (LizaFabShell) usa os mesmos consts pra troca ser invisível
+// acima da bottom-nav (~57px + safe-area): o toaster usa 4.5rem, a pill da
+// demo 4.75rem — mesma faixa. z-40: fica sob sheet/dialog/popover (z-50) e
+// infinitamente sob o toaster (o sonner não dá pra superar — e não deve)
+const FAB_POS =
+  "fixed z-40 right-[max(1rem,env(safe-area-inset-right))] bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6";
+
+const FAB_CLS =
+  "group/fab grid size-12 md:size-14 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)] outline-none transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:scale-105 hover:shadow-[var(--shadow-modal)] active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-offset-2";
 
 // tamanho vem de --painel-w/--painel-h (inline, redimensionável); o min()
 // segura viewport estreita e o --available-height do positioner segura
@@ -823,10 +828,9 @@ export function AssistenteBolha({
   if (desktop) {
     return (
       <Popover open={aberto} onOpenChange={mudar}>
-        {/* sem animate-in: a entrada já aconteceu no LizaFabShell do
-            loading — re-animar no mount real piscava a bolha (visível →
-            opacity 0 → fade de novo) */}
-        <div className={FAB_POS}>
+        {/* entrada única, do mount: pulinho com overshoot (fab-chega) —
+            uma animação só, sem placeholder nem gate de estado */}
+        <div className={`${FAB_POS} animate-fab-chega`}>
           <PopoverTrigger
             aria-label={rotuloFab}
             aria-expanded={aberto}
@@ -886,8 +890,8 @@ export function AssistenteBolha({
 
   return (
     <>
-      {/* idem braço desktop — a entrada é do placeholder, aqui é o "acordar" */}
-      <div className={FAB_POS}>
+      {/* idem braço desktop — um pulinho só na chegada */}
+      <div className={`${FAB_POS} animate-fab-chega`}>
         <Button
           aria-label={rotuloFab}
           aria-expanded={aberto}
