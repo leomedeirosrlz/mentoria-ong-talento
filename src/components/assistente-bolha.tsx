@@ -372,6 +372,10 @@ export function AssistenteBolha({
     () => true
   );
   const [aberto, setAberto] = useState(false);
+  // o giro X↔rosto é da TROCA de estado, não da chegada — sem ele o mount
+  // inicial animava a cara girando dentro do disco que o fab-chega ainda
+  // trazia (dois movimentos, rosto varrendo pra fora da bolha)
+  const [trocou, setTrocou] = useState(false);
   // voz do jovem: só mentorado troca "operação" por "mentoria" no header
   const soJovem = papeis.length > 0 && papeis.every((p) => p === "mentorado");
   // aberto "agora", fora do ciclo de render: o chip do balão abre e envia
@@ -482,6 +486,7 @@ export function AssistenteBolha({
   const mudar = useCallback((v: boolean) => {
     abertoRef.current = v;
     setAberto(v);
+    setTrocou(true);
     // abrir consome os avisos — a resposta já está visível no painel
     if (v) {
       setRespostaPronta(false);
@@ -777,7 +782,7 @@ export function AssistenteBolha({
         <X
           size={24}
           weight="bold"
-          className="animate-in zoom-in-50 spin-in-45 duration-200"
+          className={trocou ? "animate-in zoom-in-50 spin-in-45 duration-200" : undefined}
         />
       ) : (
         // mobile enche o botão (a bolha é da mesma lima do FAB — só a
@@ -785,7 +790,7 @@ export function AssistenteBolha({
         <LizaBlob
           tamanho={desktop ? 44 : 48}
           estado={falando(estadoFab)}
-          className="animate-in zoom-in-50 spin-in-[-45deg] duration-200"
+          className={trocou ? "animate-in zoom-in-50 spin-in-[-45deg] duration-200" : undefined}
         />
       )}
     </span>
