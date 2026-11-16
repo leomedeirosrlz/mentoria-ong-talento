@@ -53,6 +53,6 @@ Do 3º ao 4º encontro, a tarefa é desdobrar cada meta em submetas ("o que eu p
 
 ## Definindo Minhas Metas · Onde fica na plataforma
 
-Definindo Minhas Metas é instrumento oficial na ficha da dupla (aba Instrumentos): o link chega pro(a) jovem automaticamente quando chega a vez na jornada e a resposta acontece na plataforma. As metas ficam registradas na ficha e alimentam o PDM; o card do instrumento (enc. 2 a 3) aparece na aba Instrumentos de /materiais e o andamento segue na jornada do(a) jovem.
+Definindo Minhas Metas é instrumento oficial na ficha da dupla (aba Instrumentos): é liberado pro(a) jovem automaticamente conforme os encontros avançam e a resposta acontece na plataforma. As metas ficam registradas na ficha e alimentam o PDM; o card do instrumento (enc. 2 a 3) aparece na aba Instrumentos de /materiais e o andamento segue na jornada do(a) jovem.
 
 *(Atualização: na plataforma vigente, o instrumento é respondido na ficha da dupla, aba Instrumentos; o PDF do template que circula como folha de preenchimento está desatualizado.)*

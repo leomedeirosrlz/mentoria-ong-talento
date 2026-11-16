@@ -84,12 +84,11 @@ export function CombinadosEncontro({
     carryOver: boolean;
   } | null>(null);
   const chaveBloco = `${duplaId}:${numero}`;
-  // abre sozinho quando há o que ver — fechado escondia o que a dupla
-  // combinou atrás de um rótulo que ninguém abria
+  // nasce recolhido em qualquer caso — o header fechado já resume
+  // ("N pendentes" / "tudo feito"); o deep link #combinados-N abre
+  // explicitamente quando o aviso aponta pra cá
   const [aberto, setAberto] = useState(
-    () =>
-      abertoPorBloco.get(chaveBloco) ??
-      itens.length + pendentesAnteriores.length > 0
+    () => abertoPorBloco.get(chaveBloco) ?? false
   );
   // form de novo combinado nasce recolhido atrás do "+ Adicionar"
   // (REALIZA-416): um campo visível por encontro poluía a ficha inteira

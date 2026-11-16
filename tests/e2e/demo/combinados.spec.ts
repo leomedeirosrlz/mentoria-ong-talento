@@ -28,6 +28,7 @@ test.describe("demo — combinados do registro (REALIZA-339)", () => {
       .locator('[id^="registrar-"]')
       .filter({ hasText: "Fechamento da construção do PDM" });
     const bloco4 = card4.locator("#combinados-4");
+    await bloco4.getByRole("button", { name: /^Combinados/ }).click();
     const item = bloco4.locator("li", { hasText: PENDENTE });
     await expect(item).toBeVisible();
     // nome social da jovem (Ana Beatriz → Bia)
@@ -40,6 +41,7 @@ test.describe("demo — combinados do registro (REALIZA-339)", () => {
     const card1 = page
       .locator('[id^="registrar-"]')
       .filter({ hasText: "Boas-vindas e histórias de vida" });
+    await card1.getByRole("button", { name: /^Combinados/ }).click();
     await expect(
       card1.getByText(FEITO)
     ).toBeVisible();

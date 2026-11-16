@@ -345,7 +345,7 @@ test.describe("mentorado — shell /jovem", () => {
     await expect(
       trilha
         .getByText(
-          /o mentor envia quando chegar a hora|a coordenação envia quando chegar a hora/
+          /o instrumento já devia estar liberado: fala com teu mentor|a coordenação libera quando chegar a hora/
         )
         .first()
     ).toBeVisible();

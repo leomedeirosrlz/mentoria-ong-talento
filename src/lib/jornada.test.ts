@@ -392,32 +392,32 @@ describe("estacoesJornada — a_fazer", () => {
     expect(v.estado).toBe("a_fazer");
     expect(v.token).toBeNull();
     expect(v.detalhe).toBe(
-      "o link já devia ter chegado sozinho: fala com teu mentor"
+      "o instrumento já devia estar liberado: fala com teu mentor"
     );
   });
 
   it("sem entrega dentro da janela → copy de anomalia (auto-emissão falhou)", () => {
     const est = estacoesJornada(base({ encontros: realizados(1) }));
     expect(por(est, "visao").detalhe).toBe(
-      "o link já devia ter chegado sozinho: fala com teu mentor"
+      "o instrumento já devia estar liberado: fala com teu mentor"
     );
     expect(por(est, "metas").detalhe).toBe(
-      "o link já devia ter chegado sozinho: fala com teu mentor"
+      "o instrumento já devia estar liberado: fala com teu mentor"
     );
   });
 
   it("sem entrega com a janela já passada → copy honesta, sem promessa futura", () => {
     const est = estacoesJornada(base({ encontros: realizados(16) }));
     expect(por(est, "visao").detalhe).toBe(
-      "o link ainda não chegou: fala com teu mentor"
+      "ainda não foi liberado: fala com teu mentor"
     );
     expect(por(est, "roda_formal").detalhe).toBe(
-      "o link ainda não chegou: fala com teu mentor"
+      "ainda não foi liberado: fala com teu mentor"
     );
     // a janela da 360º é o próprio enc. 16 — no teto da régua ela segue
     // "dentro da janela"; atraso dela aparece via link expirado
     expect(por(est, "avaliacao_360").detalhe).toBe(
-      "a coordenação envia quando chegar a hora"
+      "a coordenação libera quando chegar a hora"
     );
   });
 

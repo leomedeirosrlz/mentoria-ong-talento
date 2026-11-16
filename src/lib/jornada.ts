@@ -65,7 +65,7 @@ export type Estacao = {
   /** "Você escreveu…" — citação real de respostas (campo canônico por
    *  instrumento). Null quando não há resposta ou campo citável. */
   snippet: { tag: string; texto: string } | null;
-  /** Estado honesto em texto: "o link já devia ter chegado sozinho",
+  /** Estado honesto em texto: "o instrumento já devia estar liberado",
    *  "libera no enc. 12 (4 nov)", "em dia · 5 de 6", "falta avaliar o
    *  encontro 7". Null quando o pill+CTA já dizem tudo. */
   detalhe: string | null;
@@ -630,11 +630,11 @@ function resolveEstacao<
       : "o link expirou: peça à coordenação pra reenviar"
     : passou
       ? ctx.emissor === "mentor"
-        ? "o link ainda não chegou: fala com teu mentor"
-        : "o link ainda não chegou: a coordenação pode ajudar"
+        ? "ainda não foi liberado: fala com teu mentor"
+        : "ainda não foi liberado: a coordenação pode ajudar"
       : ctx.emissor === "mentor"
-        ? "o link já devia ter chegado sozinho: fala com teu mentor"
-        : "a coordenação envia quando chegar a hora";
+        ? "o instrumento já devia estar liberado: fala com teu mentor"
+        : "a coordenação libera quando chegar a hora";
   return {
     estado: "a_fazer",
     respondidoEm: null,
@@ -653,8 +653,8 @@ function resolveEstacao<
  * Regras:
  *  - `feito`: entrega respondida da janela → data + snippet do campo
  *    canônico; `a_fazer`: janela aberta/corrente, sem resposta (link vivo
- *    → token "Continuar"; sem link → detalhe "o link já devia ter
- *    chegado sozinho" — com auto-emissão (0099) a falta é anomalia);
+ *    → token "Continuar"; sem link → detalhe "o instrumento já devia
+ *    estar liberado" — com auto-emissão (0099) a falta é anomalia);
  *    `trancada`: janela ainda não abriu (detalhe
  *    "libera no enc. N ({data da turma})", NUNCA botão).
  *  - Roda duas vezes: `momento` = contexto->>'momento' quando existir

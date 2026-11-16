@@ -42,6 +42,6 @@ A Declaração de Visão que sai do instrumento ocupa o topo do PDM: é a primei
 
 ## Construindo a sua Visão · Onde fica na plataforma
 
-Construindo a sua Visão é instrumento oficial na ficha da dupla (aba Instrumentos): o link chega pro(a) jovem automaticamente quando chega a vez na jornada e a resposta acontece na plataforma. A resposta fica registrada na ficha, o card do instrumento (enc. 1 a 4) aparece na aba Instrumentos de /materiais e o andamento segue na jornada do(a) jovem.
+Construindo a sua Visão é instrumento oficial na ficha da dupla (aba Instrumentos): é liberado pro(a) jovem automaticamente conforme os encontros avançam e a resposta acontece na plataforma. A resposta fica registrada na ficha, o card do instrumento (enc. 1 a 4) aparece na aba Instrumentos de /materiais e o andamento segue na jornada do(a) jovem.
 
-*(Atualização: na plataforma vigente, o instrumento é respondido na plataforma, pelo link que chega pro(a) jovem automaticamente quando chega a vez na jornada; o guia impresso que descreve a atividade como "entregue em papel" está desatualizado.)*
+*(Atualização: na plataforma vigente, o instrumento é respondido na plataforma — liberado pro(a) jovem automaticamente conforme os encontros avançam; o guia impresso que descreve a atividade como "entregue em papel" está desatualizado.)*

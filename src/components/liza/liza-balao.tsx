@@ -257,10 +257,10 @@ export function LizaBalao({ estado, tamanho, seguirCursor = true, className }: L
     tamanho,
   });
 
-  // +17% eyes like the blob (8363514 enlarged the blob's eyes but the
-  // concept variants were left on the old dims)
-  const olho = detalhe ? { r: 8.2, dx: 15, cy: 44 } : { r: 10.3, dx: 16, cy: 45 };
-  const ponto = detalhe ? { r: 5, dx: 18, cy: 49 } : { r: 6.2, dx: 19, cy: 49 };
+  // mesmas medidas do blob: +17% (8363514), depois -5% de ajuste fino e
+  // +2% de separação — as variantes seguem a cara vigente
+  const olho = detalhe ? { r: 7.8, dx: 15.3, cy: 44 } : { r: 9.8, dx: 16.3, cy: 45 };
+  const ponto = detalhe ? { r: 5, dx: 18.4, cy: 49 } : { r: 6.2, dx: 19.4, cy: 49 };
   const flutuaRosto = !reduzido && efetivo === "consultando";
 
   return (

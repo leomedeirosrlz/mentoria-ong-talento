@@ -479,15 +479,16 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
   // disco sobrava embaixo e a Liza lia como gordinha. No mini continuam
   // legíveis sem encostar um no outro. Nov/26: mais 15% lineares — os olhos
   // carregam a expressão e ainda liam pequenos nos tamanhos médios.
-  // Depois do +15% ficaram grandes demais — -5% de ajuste fino
+  // Depois do +15% ficaram grandes demais — -5% de ajuste fino; e os
+  // centros afastam +2% (dx 19→19,4): juntos liam apertados na cara
   const olhoDims = detalhe
     ? {
         rx: 14 - 0.7 * kOlho,
         ry: 17.25 - 1 * kOlho,
         cy: 48.5 - 3 * kOlho,
-        dx: 19 - 0.4 * kOlho,
+        dx: 19.4 - 0.4 * kOlho,
       }
-    : { rx: 14, ry: 17.25, cy: 48.5, dx: 19 };
+    : { rx: 14, ry: 17.25, cy: 48.5, dx: 19.4 };
   // cílios em todas as escalas: no mini o par continua, mas mais grosso e
   // mais afastado — as mesmas duas hastes do grande fundiriam num borrão
   // nos avatares da conversa (22/24) e no header (34)

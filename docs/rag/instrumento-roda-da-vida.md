@@ -109,6 +109,6 @@ As mesmas perguntas abertas valem para os outros dois quadrantes, Relacionamento
 
 ## Roda da Vida · Onde fica na plataforma
 
-A Roda da Vida é respondida na plataforma e fica registrada na ficha da dupla (aba Instrumentos), onde as notas viram o desenho da roda. O link chega pro(a) jovem automaticamente quando chega a hora de cada aplicação e aparece na jornada do(a) jovem. Em /materiais, a aba Instrumentos mostra os dois cards: "Roda da Vida · leitura inicial" (enc. 1) e "Roda da Vida · aplicação formal" (enc. 12 a 14).
+A Roda da Vida é respondida na plataforma e fica registrada na ficha da dupla (aba Instrumentos), onde as notas viram o desenho da roda. Ela é liberada pro(a) jovem automaticamente na hora de cada aplicação e aparece na jornada do(a) jovem. Em /materiais, a aba Instrumentos mostra os dois cards: "Roda da Vida · leitura inicial" (enc. 1) e "Roda da Vida · aplicação formal" (enc. 12 a 14).
 
-*(Atualização: na plataforma vigente, a Roda da Vida fica na ficha da dupla, aba Instrumentos: o link chega pro(a) jovem automaticamente e a resposta acontece na plataforma; o guia impresso que diz "fora da plataforma" está desatualizado.)*
+*(Atualização: na plataforma vigente, a Roda da Vida fica na ficha da dupla, aba Instrumentos: é liberada pro(a) jovem automaticamente conforme os encontros avançam e a resposta acontece na plataforma; o guia impresso que diz "fora da plataforma" está desatualizado.)*

@@ -45,9 +45,12 @@ function SheetContent({
 } & Pick<DialogPrimitive.Portal.Props, "keepMounted">) {
   return (
     <DialogPrimitive.Portal keepMounted={keepMounted}>
+      {/* sem backdrop-blur: blur animado sobre scrim translúcido pisca
+          preto no Chrome Android (camada do filtro compõe antes de
+          amostrar o fundo) — e blur-xs num scrim de 20% nem se percebe */}
       <DialogPrimitive.Backdrop
         data-slot="sheet-overlay"
-        className="fixed inset-0 isolate z-50 bg-[var(--overlay-forte)] duration-200 ease-[cubic-bezier(0.2,0,0,1)] supports-backdrop-filter:backdrop-blur-xs data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
+        className="fixed inset-0 z-50 bg-[var(--overlay-forte)] duration-200 ease-[cubic-bezier(0.2,0,0,1)] data-open:animate-in data-open:fade-in-0 data-closed:animate-out data-closed:fade-out-0"
       />
       <DialogPrimitive.Popup
         data-slot="sheet-content"

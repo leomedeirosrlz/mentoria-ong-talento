@@ -123,7 +123,7 @@ export default async function DocumentoPage({
                     : {
                         href: "/materiais?aba=instrumentos",
                         rotulo: "Ver instrumentos",
-                        dica: "Instrumento oficial do programa. O mentor emite o link na ficha da dupla e o resultado volta estruturado.",
+                        dica: "Instrumento oficial do programa — liberado na ficha da dupla e o resultado volta estruturado.",
                       };
                 })()
           }
