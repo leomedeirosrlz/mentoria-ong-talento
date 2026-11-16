@@ -385,6 +385,49 @@
   --shadow-inset: inset 0 1px 2px 0 hsl(0 0% 0% / 0.05);
 }
 
+/* animate-in/out do tw-animate-css compilam pra keyframes `enter`/`exit`
+   que fecham o frame com `filter: blur(var(--tw-…-blur))` — mesmo em
+   blur(0), filter na lista animada força re-raster por frame no mobile
+   (a sheet da Liza re-desenhava o shadow-modal inteiro a cada frame do
+   slide). blur-in/out não é usado no app, então o namespace é trocado por
+   keyframes sem o canal de filtro — mesmo contrato de custom props
+   (translate/scale/rotate/opacity), só compositor. Nome único proposital:
+   redeclarar @keyframes enter aqui perde pro do import na dedupe do
+   compilador. blur-in/out passa a ser no-op — se um dia entrar, declarar
+   o filter naquele elemento, não no keyframe global. */
+@theme {
+  --animate-in: enter-flat var(--tw-animation-duration, var(--tw-duration, 0.15s))
+    var(--tw-ease, ease) var(--tw-animation-delay, 0s)
+    var(--tw-animation-iteration-count, 1)
+    var(--tw-animation-direction, normal)
+    var(--tw-animation-fill-mode, none);
+  --animate-out: exit-flat var(--tw-animation-duration, var(--tw-duration, 0.15s))
+    var(--tw-ease, ease) var(--tw-animation-delay, 0s)
+    var(--tw-animation-iteration-count, 1)
+    var(--tw-animation-direction, normal)
+    var(--tw-animation-fill-mode, none);
+}
+@keyframes enter-flat {
+  from {
+    opacity: var(--tw-enter-opacity, 1);
+    transform: translate3d(
+        var(--tw-enter-translate-x, 0), var(--tw-enter-translate-y, 0), 0
+      )
+      scale3d(var(--tw-enter-scale, 1), var(--tw-enter-scale, 1), var(--tw-enter-scale, 1))
+      rotate(var(--tw-enter-rotate, 0));
+  }
+}
+@keyframes exit-flat {
+  to {
+    opacity: var(--tw-exit-opacity, 1);
+    transform: translate3d(
+        var(--tw-exit-translate-x, 0), var(--tw-exit-translate-y, 0), 0
+      )
+      scale3d(var(--tw-exit-scale, 1), var(--tw-exit-scale, 1), var(--tw-exit-scale, 1))
+      rotate(var(--tw-exit-rotate, 0));
+  }
+}
+
 /* stagger de entrada de listas: .animate-enter + --i inline (0, 1, 2…).
    O guard global de prefers-reduced-motion zera a animação.
    NB: keyframes nomeados enter-stagger — "enter" já existe no tw-animate-css

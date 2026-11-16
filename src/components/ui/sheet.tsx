@@ -55,7 +55,10 @@ function SheetContent({
       <DialogPrimitive.Popup
         data-slot="sheet-content"
         className={cn(
-          "fixed z-50 flex flex-col overflow-y-auto border-sidebar-border bg-sidebar text-sidebar-foreground shadow-[var(--shadow-modal)] outline-none duration-200 ease-[cubic-bezier(0.2,0,0,1)] data-open:animate-in data-closed:animate-out",
+          /* will-change aqui é just-in-time de graça: keepMounted deixa o
+             popup hidden (sem camada); ao exibir, ele já nasce promovido —
+             sem o raster em main-thread + re-promoção no meio do slide */
+          "fixed z-50 flex flex-col overflow-y-auto border-sidebar-border bg-sidebar text-sidebar-foreground shadow-[var(--shadow-modal)] outline-none duration-200 ease-[cubic-bezier(0.2,0,0,1)] will-change-transform data-open:animate-in data-closed:animate-out",
           LADO[side],
           className
         )}
