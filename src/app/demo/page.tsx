@@ -12,9 +12,10 @@ import {
 // quebraria a página (server component) se viesse como import de valor
 import type { Icon } from "@phosphor-icons/react";
 import { DemoEnterButton } from "@/components/demo-enter-button";
-import { papelLabel } from "@/lib/ciclo";
+import { papelLabelComposto } from "@/lib/ciclo";
 import { entrarNaDemo } from "@/lib/demo/actions";
 import { getDemoData } from "@/lib/demo/data";
+import { papeisDe } from "@/lib/demo/queries";
 import { demoRole } from "@/lib/demo/mode";
 import type { AppRole } from "@/lib/types";
 import { Logo } from "@/components/logo";
@@ -41,7 +42,7 @@ const PAPEIS: readonly { role: AppRole; icon: Icon; descricao: string }[] = [
     role: "mentor_dpp",
     icon: MapTrifold,
     descricao:
-      "A jornada dos 16 encontros: agendar, registrar, pedir apoio e especialista.",
+      "A jornada dos 16 encontros: agendar, registrar e pedir apoio. O Ricardo também atende pedidos como especialista — é o mentor híbrido do programa.",
   },
   {
     role: "mentor_especialista",
@@ -60,7 +61,8 @@ export default async function DemoPage() {
   // demo já ativa → a troca de papel é pela DemoBar, não por esta página
   if (await demoRole()) redirect("/");
 
-  const { personas } = getDemoData();
+  const data = getDemoData();
+  const { personas } = data;
 
   return (
     // flex + m-auto (não place-items-center): quando o conteúdo excede o
@@ -92,7 +94,10 @@ export default async function DemoPage() {
             <form key={role} action={entrarNaDemo.bind(null, role)} className="min-w-0">
               <DemoEnterButton
                 icon={<Icone size={18} weight="fill" aria-hidden />}
-                titulo={papelLabel(role)}
+                titulo={papelLabelComposto({
+                  role,
+                  papeis: papeisDe(data, personas[role]),
+                })}
                 persona={personas[role].nome}
                 descricao={descricao}
               />

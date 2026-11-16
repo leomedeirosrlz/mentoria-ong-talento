@@ -5,6 +5,7 @@ import { OnboardingFlowLazy } from "@/components/onboarding-flow-lazy";
 import { ProdutoTelemetry } from "@/components/produto-telemetry";
 import { TelaConta } from "@/components/telas-conta";
 import { getDemoData } from "@/lib/demo/data";
+import { papeisDe } from "@/lib/demo/queries";
 import { demoRole } from "@/lib/demo/mode";
 import { getMe, getMeuMentorProfile, getMeusDadosPessoais, getNotificacoes } from "@/lib/queries";
 import { getChamadosSemDono } from "@/lib/queries-chamados";
@@ -100,24 +101,35 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // personas tem uma entrada por AppRole (a da mentorada existe no dataset
   // mesmo sem card na demo) — derivar dela mantém o Record completo e
   // verdadeiro, sem cast sobre DEMO_ROLES.
-  const demoPersonas = demo
+  const demoData = demo ? getDemoData() : null;
+  const demoPersonas = demoData
     ? (Object.fromEntries(
-        Object.values(getDemoData().personas).map((p) => [
+        Object.values(demoData.personas).map((p) => [
           p.role,
           p.nome.split(" ")[0],
         ])
       ) as Record<AppRole, string>)
     : null;
+  // o híbrido DPP+especialista rotula composto na DemoBar (senão a persona
+  // do Ricardo parece DPP puro vendo demanda alheia)
+  const demoPapeis = demoData
+    ? (Object.fromEntries(
+        Object.values(demoData.personas).map((p) => [
+          p.role,
+          papeisDe(demoData, p),
+        ])
+      ) as Record<AppRole, AppRole[]>)
+    : null;
   // dock: pill compacta dockada no header mobile (AppShell) e no header do
   // wizard (OnboardingFlow) — badge sempre visível, zero overlay de conteúdo.
   // float: pill fixa do desktop; display:none no mobile remove trigger e
   // popover (o dock já cobre esse breakpoint).
-  const demoDock = demo && demoPersonas && (
-    <DemoBar variant="dock" papel={demo} personas={demoPersonas} />
+  const demoDock = demo && demoPersonas && demoPapeis && (
+    <DemoBar variant="dock" papel={demo} personas={demoPersonas} papeis={demoPapeis} />
   );
-  const demoFloat = demo && demoPersonas && (
+  const demoFloat = demo && demoPersonas && demoPapeis && (
     <div key="demo-float" className="hidden md:block">
-      <DemoBar variant="float" papel={demo} personas={demoPersonas} />
+      <DemoBar variant="float" papel={demo} personas={demoPersonas} papeis={demoPapeis} />
     </div>
   );
 

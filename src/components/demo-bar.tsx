@@ -18,7 +18,7 @@ import {
   UsersThree,
   type Icon,
 } from "@phosphor-icons/react";
-import { papelLabel } from "@/lib/ciclo";
+import { papelLabelComposto } from "@/lib/ciclo";
 import {
   reverOnboardingDemo,
   sairDaDemo,
@@ -70,10 +70,14 @@ export function DemoSlotProvider({
 export function DemoBar({
   papel,
   personas,
+  papeis,
   variant = "float",
 }: {
   papel: AppRole;
   personas: Record<AppRole, string>;
+  /** Papéis efetivos de cada persona — o híbrido (DPP + especialista)
+   *  rotula composto em vez de esconder o segundo papel. */
+  papeis?: Partial<Record<AppRole, AppRole[]>>;
   variant?: "dock" | "float";
 }) {
   const [aberto, setAberto] = useState(false);
@@ -90,7 +94,7 @@ export function DemoBar({
     });
   }
 
-  const rotulo = `Demo · ${papelLabel(papel)}`;
+  const rotulo = `Demo · ${papelLabelComposto({ role: papel, papeis: papeis?.[papel] })}`;
 
   const trigger = (
     /* tinta, não lima: na sidebar a pill fica perto do item ativo e lima é
@@ -98,7 +102,7 @@ export function DemoBar({
     <PopoverTrigger
       aria-label={
         dock
-          ? `Modo demonstração · ${papelLabel(papel)}. Abrir controles`
+          ? `Modo demonstração · ${papelLabelComposto({ role: papel, papeis: papeis?.[papel] })}. Abrir controles`
           : "Controles da demonstração"
       }
       className={cn(
@@ -190,7 +194,7 @@ export function DemoBar({
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-sm font-semibold">
-                      {papelLabel(role)}
+                      {papelLabelComposto({ role, papeis: papeis?.[role] })}
                     </span>
                     <span className="block truncate text-xs text-muted-foreground">
                       {personas[role]}

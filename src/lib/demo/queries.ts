@@ -117,7 +117,7 @@ const criadoEm = (d: Dupla) =>
  *  profile_papeis dela — o backfill garante uma por role e o híbrido
  *  carrega duas. Sem linha na tabela, cai no profiles.role (estado
  *  pré-migration); é o que o has_papel real fará quando a tabela sair. */
-function papeisDe(data: DemoData, profile: Profile): AppRole[] {
+export function papeisDe(data: DemoData, profile: Profile): AppRole[] {
   const linhas = data.profilePapeis.filter((r) => r.profile_id === profile.id);
   if (linhas.length === 0) return profile.role ? [profile.role] : [];
   return [...new Set(linhas.map((r) => r.papel))];

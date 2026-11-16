@@ -7,6 +7,24 @@ import { entrarNaDemo, expect, test } from "../helpers";
 // sumia — sem mural na home e sem editor de horários.
 // Público, sem writes: vale em qualquer deploy, produção inclusive.
 
+test("rótulo do híbrido: picker e DemoBar dizem 'DPP + especialista'", async ({
+  page,
+}) => {
+  // a persona DPP da demo carrega os dois papéis — o card rotula composto
+  // pra ninguém achar que um DPP puro enxerga o mural de especialista
+  await page.goto("/demo");
+  const card = page.getByRole("button", { name: /Mentor DPP \+ especialista/ });
+  await expect(card.getByText("Ricardo Tavares")).toBeVisible();
+  await expect(card.getByText(/mentor híbrido/)).toBeVisible();
+
+  // a pill da DemoBar segue o mesmo rótulo depois de entrar
+  await entrarNaDemo(page, "mentor_dpp");
+  await page.goto("/");
+  await expect(
+    page.getByText(/Demo · Mentor DPP \+ especialista/).first()
+  ).toBeVisible();
+});
+
 test("home do híbrido: mural de especialista monta junto com a visão DPP", async ({
   page,
 }) => {

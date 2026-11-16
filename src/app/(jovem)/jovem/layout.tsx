@@ -4,6 +4,7 @@ import { DemoBar } from "@/components/demo-bar";
 import { JovemShell } from "@/components/jovem-shell";
 import { TelaConta } from "@/components/telas-conta";
 import { getDemoData } from "@/lib/demo/data";
+import { papeisDe } from "@/lib/demo/queries";
 import { demoRole } from "@/lib/demo/mode";
 import { getMe, getNotificacoes } from "@/lib/queries";
 import { getJovemAssinaturas, getJovemPerfil } from "@/lib/queries-jovem";
@@ -88,20 +89,30 @@ export default async function JovemLayout({
   // mesma montagem do (app)/layout: mapa papel→primeiro nome + dock no header
   // mobile do shell + pill flutuante do desktop
   const demo = await demoRole();
-  const demoPersonas = demo
+  const demoData = demo ? getDemoData() : null;
+  const demoPersonas = demoData
     ? (Object.fromEntries(
-        Object.values(getDemoData().personas).map((p) => [
+        Object.values(demoData.personas).map((p) => [
           p.role,
           p.nome.split(" ")[0],
         ])
       ) as Record<AppRole, string>)
     : null;
-  const demoDock = demo && demoPersonas && (
-    <DemoBar variant="dock" papel={demo} personas={demoPersonas} />
+  // idem (app)/layout — a persona híbrida rotula "Mentor DPP + especialista"
+  const demoPapeis = demoData
+    ? (Object.fromEntries(
+        Object.values(demoData.personas).map((p) => [
+          p.role,
+          papeisDe(demoData, p),
+        ])
+      ) as Record<AppRole, AppRole[]>)
+    : null;
+  const demoDock = demo && demoPersonas && demoPapeis && (
+    <DemoBar variant="dock" papel={demo} personas={demoPersonas} papeis={demoPapeis} />
   );
-  const demoFloat = demo && demoPersonas && (
+  const demoFloat = demo && demoPersonas && demoPapeis && (
     <div className="hidden md:block">
-      <DemoBar variant="float" papel={demo} personas={demoPersonas} />
+      <DemoBar variant="float" papel={demo} personas={demoPersonas} papeis={demoPapeis} />
     </div>
   );
   if (!me.onboarded_em) {
