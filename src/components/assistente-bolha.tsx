@@ -188,11 +188,14 @@ function soltarArrastoSheet(
     );
     anim.onfinish = () => {
       fechar(); // o data-closed assume por baixo do fill do WAAPI
-      // libera o fill um frame depois do React commitar — sem salto
-      requestAnimationFrame(() => {
+      // o fill segura a sheet fora da tela durante TODA a saída CSS — a
+      // slide-out interpola do valor base (~descanso), então soltar o fill
+      // cedo re-exibia a sheet aberta por alguns frames (o flash do double
+      // close). 450ms > duration-300 da saída
+      setTimeout(() => {
         anim.cancel();
-        setTimeout(limpar, 450); // limpa depois que a saída termina
-      });
+        limpar();
+      }, 450);
     };
   } else {
     // mola de volta — overshoot leve no ease + duração pela distância
