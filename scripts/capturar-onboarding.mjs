@@ -57,6 +57,16 @@ const SHOTS = {
     { arquivo: "mentor_especialista-registro", rota: `${dupla(D_ESP3)}?aba=encontros`, foco: '[role="tabpanel"]' },
     { arquivo: "mentor_especialista-materiais", rota: "/materiais" },
   ],
+  // o lado do jovem (REALIZA-426) — rotas /jovem/*; os focos nas seções da
+  // home e do perfil usam os ids dos h2 (aria-labelledby de cada seção)
+  mentorado: [
+    { arquivo: "mentorado-home", rota: "/jovem" },
+    { arquivo: "mentorado-agenda", rota: "/jovem/agenda" },
+    { arquivo: "mentorado-avaliacoes", rota: "/jovem", foco: "#avaliacoes-titulo" },
+    { arquivo: "mentorado-combinados", rota: "/jovem", foco: "#combinados-titulo" },
+    { arquivo: "mentorado-ajuda", rota: "/jovem/perfil", foco: "#jovem-chamados-titulo" },
+    { arquivo: "mentorado-perfil", rota: "/jovem/perfil" },
+  ],
 };
 
 const VIEWS = {

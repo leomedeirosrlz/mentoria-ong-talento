@@ -63,13 +63,21 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
   await page.waitForURL((url) => url.pathname === "/jovem");
 
   // primeiro acesso da persona: wizard do jovem (REALIZA-114), não o de
-  // staff — boas-vindas → grade semanal → termo (a Bia tem o
-  // termo-mentorando pendente na fixture) → contato
+  // staff — boas-vindas → tour das telas → grade semanal → termo (a Bia
+  // tem o termo-mentorando pendente na fixture) → contato
   await expect(
     page.getByRole("heading", { name: /Bem-vindo\(a\) ao Realiza, Bia/i })
   ).toBeVisible();
 
-  // passo da grade: a ficha demo da Bia já traz ter/qui × noite pré-marcada
+  // passo do tour (REALIZA-426): os itens são botões que trocam o print da
+  // tela real — o mesmo desenho do passo de recursos do wizard de staff
+  await page.getByRole("button", { name: "Continuar" }).click();
+  await expect(
+    page.getByRole("heading", { name: "O que você pode fazer aqui" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /Seus combinados/ })
+  ).toBeVisible();
   await page.getByRole("button", { name: "Continuar" }).click();
   await expect(
     page.getByRole("heading", { name: "Quando dá pra você?" })
@@ -94,7 +102,7 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
   await page.getByRole("button", { name: "Continuar" }).click();
 
   // passo do termo de participação — a Bia tem o termo-mentorando pendente
-  // emitido na fixture demo, então o wizard dela é 4 passos; "Assinar
+  // emitido na fixture demo, então o wizard dela é 5 passos; "Assinar
   // depois" preserva a pendência e segue pro contato
   await expect(
     page.getByRole("heading", { name: "Seu termo de participação" })

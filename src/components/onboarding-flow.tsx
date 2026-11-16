@@ -125,58 +125,15 @@ const RECURSOS: Record<AppRole, RecursoTour[]> = {
     { icon: FolderOpen, texto: "Materiais de apoio", img: "mentor_especialista-materiais", alt: "Materiais de apoio da mentoria especializada" },
   ],
   // o jovem não passa por este wizard (o dele é o OnboardingJovem do
-  // /jovem, REALIZA-114) — a entrada existe porque o Record pede todos os
-  // papéis e as demos/queries compartilham a lista
+  // /jovem, REALIZA-114, com um passo de recursos próprio) — a entrada
+  // existe porque o Record pede todos os papéis e as demos/queries
+  // compartilham a lista
   mentorado: [
     { icon: CalendarCheck, texto: "Sua agenda de encontros com o mentor." },
     { icon: ListChecks, texto: "Os combinados que ficaram pra você." },
     { icon: FolderOpen, texto: "Os materiais de apoio do programa." },
   ],
 };
-
-const printDesktop = (img: string) => `/onboarding/${img}.webp`;
-const printMobile = (img: string) => `/onboarding/${img}-m.webp`;
-
-/** 1px transparent gif — <img> fallback when the <source media> doesn't
- *  match, so the other breakpoint downloads zero bytes (see PrintShot). */
-const PIXEL_VAZIO =
-  "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
-
-/** Screen print pinned to one breakpoint: the <source media> only supplies
- *  the file where it actually renders — elsewhere the <img> falls back to
- *  the empty pixel and never hits the network. Plain <img> (no next/image):
- *  the files are captured at the exact display size, and the old `priority`
- *  eagerly fetched the ~100KB DESKTOP print inside a `hidden` figure on
- *  mobile (and the mobile one on desktop). eager/high on the active shot is
- *  now safe — on the wrong breakpoint it resolves to the pixel, not bytes. */
-function PrintShot({
-  src,
-  media,
-  ativo,
-  alt,
-}: {
-  src: string;
-  /** media query of the breakpoint that uses this print */
-  media: string;
-  ativo: boolean;
-  alt: string;
-}) {
-  return (
-    <picture className="contents">
-      <source media={media} srcSet={src} />
-      <img
-        src={PIXEL_VAZIO}
-        alt={alt}
-        loading={ativo ? "eager" : "lazy"}
-        fetchPriority={ativo ? "high" : "auto"}
-        className={cn(
-          "absolute inset-0 size-full object-cover object-top transition-opacity duration-300",
-          ativo ? "opacity-100" : "opacity-0"
-        )}
-      />
-    </picture>
-  );
-}
 
 // índices dos passos por papel — as declarações (voluntário + LGPD) abrem o
 // fluxo pra garantir o consent antes de qualquer dado pedido; o "Sobre você"
@@ -191,35 +148,6 @@ const PASSO_SOBRE = (ehMentor: boolean) => (ehMentor ? 7 : 3);
 const SUBPASSOS_SOBRE = 3;
 const PASSO_PAREAMENTO = 10;
 const PASSO_DISPONIBILIDADE = 11;
-
-/** Moldura de "janela de navegador" pros prints de tela reais — os três
- *  pontinhos vendem "isso é o produto de verdade" sem custar copy. */
-function MolduraTela({
-  children,
-  className,
-}: {
-  children: React.ReactNode;
-  className?: string;
-}) {
-  return (
-    <div
-      className={cn(
-        "overflow-hidden rounded-2xl border border-border bg-card shadow-border",
-        className
-      )}
-    >
-      <div
-        aria-hidden
-        className="flex items-center gap-1.5 border-b border-border/60 bg-muted/60 px-3 py-2"
-      >
-        <span className="size-2 rounded-full bg-border" />
-        <span className="size-2 rounded-full bg-border" />
-        <span className="size-2 rounded-full bg-border" />
-      </div>
-      {children}
-    </div>
-  );
-}
 
 /** Label com micro-ícone do assunto — no primeiro acesso o ícone ancora o
  *  campo antes da leitura (os forms densos do app seguem com label puro). */
@@ -315,20 +243,6 @@ export function OnboardingFlow({
   const [interesses, setInteresses] = useState<string[]>(me.interesses ?? []);
   const [motivacao, setMotivacao] = useState(pessoal?.motivacao ?? "");
   const [consent, setConsent] = useState(false);
-  // feature whose screen illustrates the "what you can do" step — hover,
-  // focus or tap on a row swaps the shot (last gesture wins); on mobile the
-  // frame pins under the header so the tap feedback stays in view
-  const [recursoAtivo, setRecursoAtivo] = useState(() =>
-    Math.max(0, RECURSOS[me.role ?? "mentor_dpp"].findIndex((r) => r.img))
-  );
-  // só o ativo e o anterior ficam montados — o crossfade de 300ms precisa
-  // dos dois, mas cada webp conta request: sem o recorte todas as imgs do
-  // papel baixavam ao entrar no passo
-  const [recursoAnterior, setRecursoAnterior] = useState(recursoAtivo);
-  useEffect(() => {
-    const t = setTimeout(() => setRecursoAnterior(recursoAtivo), 350);
-    return () => clearTimeout(t);
-  }, [recursoAtivo]);
   // sub-passos do "Sobre você" colapsam quando a importação da coordenação já
   // preencheu — "Corrigir" expande o form de volta pra editar
   const [editarSobre, setEditarSobre] = useState<Record<number, boolean>>({});
@@ -926,134 +840,8 @@ export function OnboardingFlow({
           </div>
         );
       }
-      case 2: {
-        const recursos = RECURSOS[me.role ?? "mentor_dpp"];
-        const ativo = recursos[recursoAtivo];
-        return (
-          <div className="flex flex-col gap-4 sm:grid sm:grid-cols-[minmax(0,2fr)_minmax(0,3fr)] sm:items-start sm:gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,2.4fr)]">
-            {/* mobile: the frame pins under the fixed header while the list
-                scrolls beneath — a tap swaps the shot in place, no layout
-                shift. The band is opaque and edge-to-edge (-mx-4 cancels the
-                page gutter) so rows slide under it without peeking through
-                the gap to the header */}
-            {ativo?.img && (
-              <div className="sticky top-[calc(3.5rem+env(safe-area-inset-top))] z-10 -mx-4 bg-background px-4 pb-3 pt-2 sm:hidden">
-                {/* portrait shot at its native 3:4 — height-driven so the
-                    whole capture shows uncropped (width follows the ratio);
-                    object-top keeps the app chrome in frame on any drift */}
-                <div className="relative mx-auto aspect-[3/4] h-[clamp(11rem,42dvh,16rem)] overflow-hidden rounded-2xl border border-border bg-card shadow-border" aria-live="polite">
-                  {recursos.map(
-                    (r, i) =>
-                      r.img &&
-                      (i === recursoAtivo || i === recursoAnterior) && (
-                        <PrintShot
-                          key={`m-${r.img}`}
-                          src={printMobile(r.img)}
-                          media="(max-width: 639.98px)"
-                          ativo={i === recursoAtivo}
-                          alt={i === recursoAtivo ? (r.alt ?? "") : ""}
-                        />
-                      )
-                  )}
-                </div>
-              </div>
-            )}
-            <ul className="space-y-2">
-              {recursos.map((r, i) => {
-                const aceso = !!r.img && i === recursoAtivo;
-                const cartao = cn(
-                  "flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left outline-none transition-colors sm:px-4 sm:py-3",
-                  aceso
-                    ? "border-[var(--brand-lime)] bg-[var(--brand-lime)]/10"
-                    : cn(
-                        "border-border bg-card",
-                        r.img && "hover:border-foreground/40"
-                      )
-                );
-                const conteudo = (
-                  <>
-                    {/* o disco lime é sinal de estado (mesma regra do
-                        CaixaSelecao): neutro no repouso, aceso no ativo */}
-                    <span
-                      className={cn(
-                        "grid size-10 shrink-0 place-items-center rounded-full transition-colors",
-                        aceso
-                          ? "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
-                          : "bg-muted text-muted-foreground"
-                      )}
-                    >
-                      <r.icon size={18} weight="fill" aria-hidden />
-                    </span>
-                    <span className="text-sm leading-snug">{r.texto}</span>
-                    {/* the small screen icon marks which rows have a shot to
-                        preview — a caret read as a dropdown that never opened */}
-                    {r.img && (
-                      <ImageSquare
-                        size={16}
-                        aria-hidden
-                        className={cn(
-                          "ml-auto shrink-0 transition-colors",
-                          aceso ? "text-foreground" : "text-muted-foreground/70"
-                        )}
-                      />
-                    )}
-                  </>
-                );
-                return (
-                  <li key={r.texto}>
-                    {r.img ? (
-                      <button
-                        type="button"
-                        onMouseEnter={() => setRecursoAtivo(i)}
-                        onFocus={() => setRecursoAtivo(i)}
-                        onClick={() => setRecursoAtivo(i)}
-                        aria-current={aceso || undefined}
-                        className={cn(
-                          cartao,
-                          "cursor-pointer focus-visible:ring-2 focus-visible:ring-ring/60"
-                        )}
-                      >
-                        {conteudo}
-                      </button>
-                    ) : (
-                      <div className={cartao}>{conteudo}</div>
-                    )}
-                  </li>
-                );
-              })}
-            </ul>
-            {/* desktop: a coluna de conteúdo da tela real ao lado, com
-                crossfade — capturada a 876px, sai perto do tamanho real */}
-            {ativo?.img && (
-              // a largura acompanha a altura da janela (24rem = header,
-              // balão e footer fixos): em 1280×720 a moldura passava do
-              // footer e a página rolava; assim a proporção do print se mantém
-              <figure className="hidden sm:sticky sm:top-20 sm:block sm:max-w-[calc((100dvh-24rem)*73/60)]">
-                <MolduraTela>
-                  <div className="relative aspect-[73/60]" aria-live="polite">
-                    {recursos.map(
-                      (r, i) =>
-                        r.img &&
-                        (i === recursoAtivo || i === recursoAnterior) && (
-                          <PrintShot
-                            key={r.img}
-                            src={printDesktop(r.img)}
-                            media="(min-width: 640px)"
-                            ativo={i === recursoAtivo}
-                            alt={i === recursoAtivo ? (r.alt ?? "") : ""}
-                          />
-                        )
-                    )}
-                  </div>
-                </MolduraTela>
-                <figcaption className="mt-2 px-1 text-xs text-muted-foreground">
-                  {ativo.alt}
-                </figcaption>
-              </figure>
-            )}
-          </div>
-        );
-      }
+      case 2:
+        return <PassoRecursos recursos={RECURSOS[me.role ?? "mentor_dpp"]} />;
       case 3:
         return (
           <div className="flex flex-col items-center gap-3 py-1">

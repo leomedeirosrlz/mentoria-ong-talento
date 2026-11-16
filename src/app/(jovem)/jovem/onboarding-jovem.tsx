@@ -12,6 +12,10 @@ import {
   EnvelopeSimple,
   HandHeart,
   Handshake,
+  House,
+  ListChecks,
+  Star,
+  UserCircle,
   WhatsappLogo,
   type Icon,
 } from "@phosphor-icons/react";
@@ -32,12 +36,18 @@ import { Switch } from "@/components/ui/switch";
 import { formatWhatsApp } from "@/lib/ciclo";
 import type { DadosCivis, Disponibilidade, JovemPerfil, Profile } from "@/lib/types";
 import { Logo } from "@/components/logo";
+import { LizaBlob } from "@/components/liza/liza-blob";
+import {
+  PassoRecursos,
+  type RecursoTour,
+} from "@/components/onboarding-recursos";
+import { cn } from "cn";
 
-type Recurso = { icon: Icon; texto: string };
+type Promessa = { icon: Icon; texto: string };
 
 /** "O que esperar" do passo de boas-vindas — a promessa do programa em 3
  *  linhas: a dupla, o espaço dele aqui e a rede de segurança. */
-const RECURSOS: Recurso[] = [
+const PROMESSA: Promessa[] = [
   {
     icon: Handshake,
     texto:
@@ -55,16 +65,71 @@ const RECURSOS: Recurso[] = [
   },
 ];
 
-/** Wizard de primeiro acesso do mentorado (REALIZA-114): boas-vindas, a
- *  grade de disponibilidade (o insumo que o cruzamento da agenda precisa
- *  — sem ela o mentor vê "nenhum horário em comum" em tudo), o termo de
- *  participação quando há um pendente (mesmo desenho do passo de termo do
- *  OnboardingFlow: documento, dados civis, AssinaturaForm, "Assinar
- *  depois") e a confirmação de contato com o opt-in colega↔colega. O gate
- *  mora no layout: onboarded_em null renderiza isto no lugar do shell;
- *  "Preencher depois" é permitido mas a pendência vira lembrete
- *  permanente na home até a grade existir. Mesma gramática visual do
- *  OnboardingFlow de staff (header fixo + progressbar, balão por passo,
+/** O tour do passo "O que você pode fazer aqui" (REALIZA-426) — as seis
+ *  superfícies do lado do jovem, cada uma com o print da tela real em
+ *  public/onboarding (mesma mecânica do passo de recursos do wizard de
+ *  staff; os arquivos saem do scripts/capturar-onboarding.mjs, papel
+ *  mentorado). */
+const TOUR: RecursoTour[] = [
+  {
+    icon: House,
+    texto:
+      "Sua página inicial: o próximo encontro, sua jornada e o que fazer agora.",
+    img: "mentorado-home",
+    alt: "Página inicial do mentorado com o próximo encontro, a jornada e o que fazer agora",
+  },
+  {
+    icon: CalendarCheck,
+    texto:
+      "Sua agenda de encontros com o mentor: confirmar ou pedir pra trocar dia e hora.",
+    img: "mentorado-agenda",
+    alt: "Agenda do mentorado com os próximos encontros e o histórico",
+  },
+  {
+    icon: Star,
+    texto:
+      "Avaliar como foi cada encontro: sua nota e seu comentário chegam pra equipe.",
+    img: "mentorado-avaliacoes",
+    alt: "A seção Suas avaliações da home do mentorado",
+  },
+  {
+    icon: ListChecks,
+    texto:
+      "Seus combinados: as tarefas entre um encontro e outro, pra marcar o que já fez.",
+    img: "mentorado-combinados",
+    alt: "A seção Meus combinados da home do mentorado",
+  },
+  {
+    icon: HandHeart,
+    texto:
+      "Pedir ajuda quando precisar: a equipe recebe na hora e responde por aqui.",
+    img: "mentorado-ajuda",
+    alt: "A seção Meus pedidos de ajuda do perfil do mentorado",
+  },
+  {
+    icon: UserCircle,
+    texto:
+      "Seu perfil: sua foto, seus horários e o que você escolhe compartilhar.",
+    img: "mentorado-perfil",
+    alt: "Perfil do mentorado com foto, dados, disponibilidade e privacidade",
+  },
+];
+
+const PASSO_TOUR = 1;
+const PASSO_GRADE = 2;
+
+/** Wizard de primeiro acesso do mentorado (REALIZA-114; tour e Liza na
+ *  REALIZA-426): boas-vindas com a Liza e a promessa do programa, o tour
+ *  das telas reais, a grade de disponibilidade (o insumo que o cruzamento
+ *  da agenda precisa — sem ela o mentor vê "nenhum horário em comum" em
+ *  tudo), o termo de participação quando há um pendente (mesmo desenho do
+ *  passo de termo do OnboardingFlow: documento, dados civis,
+ *  AssinaturaForm, "Assinar depois") e a confirmação de contato com o
+ *  opt-in colega↔colega. O gate mora no layout: onboarded_em null
+ *  renderiza isto no lugar do shell; "Preencher depois" é permitido mas a
+ *  pendência vira lembrete permanente na home até a grade existir. Mesma
+ *  gramática visual do OnboardingFlow de staff (header fixo +
+ *  progressbar, balão por passo com a Liza abrindo e fechando a jornada,
  *  footer fixo). */
 export function OnboardingJovem({
   me,
@@ -79,7 +144,7 @@ export function OnboardingJovem({
   perfil: JovemPerfil | null;
   /** token do termo-mentorando pendente (o jovem assina pelo próprio
    *  token, como em /assinar/[token]) — null = sem pendência: o passo
-   *  não existe e o wizard fica em 3 */
+   *  não existe e o wizard fica em 4 */
   termo?: { token: string } | null;
   /** pill da DemoBar dockada no header (demo ativa) — presença também é a
    *  flag "não grava nada": o wizard demo flui igual, sem writes */
@@ -92,7 +157,7 @@ export function OnboardingJovem({
   const [termoOk, setTermoOk] = useState(false);
 
   const temTermo = !!termo;
-  const total = temTermo ? 4 : 3;
+  const total = temTermo ? 5 : 4;
   // penúltimo, como no wizard de staff — o passo seguinte (contato) é o
   // fechamento
   const passoTermo = temTermo ? total - 2 : -1;
@@ -184,7 +249,9 @@ export function OnboardingJovem({
     switch (step) {
       case 0:
         return `Bem-vindo(a) ao Realiza, ${primeiroNome}!`;
-      case 1:
+      case PASSO_TOUR:
+        return "O que você pode fazer aqui";
+      case PASSO_GRADE:
         return "Quando dá pra você?";
       default:
         return "Seu contato tá certo?";
@@ -197,8 +264,10 @@ export function OnboardingJovem({
     }
     switch (step) {
       case 0:
-        return "O Programa de Mentoria Social te conecta com um mentor pra caminhar junto: encontros, planos e o que você quiser construir. Três passos rápidos e você entra.";
-      case 1:
+        return "O Programa de Mentoria Social te conecta com um mentor pra caminhar junto: encontros, planos e o que você quiser construir. Em poucos passos a gente te mostra tudo e você entra.";
+      case PASSO_TOUR:
+        return "O essencial do app no seu dia a dia. Toque num item pra ver a tela onde ele acontece.";
+      case PASSO_GRADE:
         return "Marque os dias e períodos em que costuma ter tempo livre. A agenda cruza a sua grade com a do seu mentor pra achar horários em comum.";
       default:
         return "É por esses canais que seu mentor e a coordenação falam com você. Se algo estiver errado ou faltando, avisa a equipe.";
@@ -262,7 +331,7 @@ export function OnboardingJovem({
         return (
           <div className="space-y-2">
             <ul className="space-y-2">
-              {RECURSOS.map((r) => (
+              {PROMESSA.map((r) => (
                 <li
                   key={r.texto}
                   className="flex items-center gap-3 rounded-2xl border border-border bg-card px-4 py-3"
@@ -284,7 +353,15 @@ export function OnboardingJovem({
             />
           </div>
         );
-      case 1:
+      case PASSO_TOUR:
+        return (
+          <PassoRecursos
+            recursos={TOUR}
+            acento="var(--role-mentorado)"
+            acentoTexto="var(--destaque-foreground)"
+          />
+        );
+      case PASSO_GRADE:
         return perfil ? (
           <CampoDisponibilidade value={grade} onChange={setGrade} />
         ) : (
@@ -414,27 +491,46 @@ export function OnboardingJovem({
         </div>
       </header>
 
-      {/* coluna central — pb/pt compensam header e footer fixos. pt soma o
-          safe-area-top porque o header cresce com o notch (57px + inset) e
-          80px fixos deixariam o topo do conteúdo embaixo dele em retrato;
-          pl/pr idem pros lados. Mobile ancora no topo (justify-center
-          deixava espaço morto sob o header e o balão pulava de altura a
-          cada passo) — o centro vertical volta a partir de sm, mesmo
-          desenho do OnboardingFlow de staff */}
-      <main className="mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col pb-32 pt-[calc(5rem+env(safe-area-inset-top))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:justify-center sm:px-6">
+      {/* coluna central — pb/pt compensam header e footer fixos. O passo do
+          tour com telas reais respira em desktop (balão apertado deixava o
+          print ilegível); os demais passos ficam na coluna estreita de
+          conversa. pt soma o safe-area-top porque o header cresce com o
+          notch (57px + inset) e 80px fixos deixariam o topo do conteúdo
+          embaixo dele em retrato; pl/pr idem pros lados. Mobile ancora no
+          topo (justify-center deixava espaço morto sob o header e o balão
+          pulava de altura a cada passo) — o centro vertical volta a partir
+          de sm, mesmo desenho do OnboardingFlow de staff */}
+      <main
+        className={cn(
+          "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col pb-32 pt-[calc(5rem+env(safe-area-inset-top))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] transition-[max-width] duration-500 sm:justify-center sm:px-6",
+          step === PASSO_TOUR && "sm:max-w-6xl"
+        )}
+      >
         <Logo size="sm" className="mb-6 self-start" />
         <div key={step} className="animate-rise">
-          <div className="rounded-3xl rounded-bl-md border border-border bg-card px-5 py-4">
-            <h1
-              ref={tituloRef}
-              tabIndex={-1}
-              className="text-xl font-semibold leading-snug outline-none"
-            >
-              {titulo}
-            </h1>
-            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
-              {hint}
-            </p>
+          <div className="flex items-end gap-3">
+            {/* a Liza abre e fecha a jornada — a cauda do balão aponta pra
+                ela; nos passos do meio ela sai pra não disputar o conteúdo
+                (mesma regra do OnboardingFlow) */}
+            {(step === 0 || ultimo) && (
+              <LizaBlob
+                estado={ultimo ? "pronto" : "atento"}
+                tamanho={64}
+                className="mb-1 shrink-0"
+              />
+            )}
+            <div className="min-w-0 flex-1 rounded-3xl rounded-bl-md border border-border bg-card px-5 py-4 sm:max-w-xl">
+              <h1
+                ref={tituloRef}
+                tabIndex={-1}
+                className="text-xl font-semibold leading-snug outline-none"
+              >
+                {titulo}
+              </h1>
+              <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+                {hint}
+              </p>
+            </div>
           </div>
           <div className="mt-5">{corpo}</div>
         </div>
@@ -448,7 +544,7 @@ export function OnboardingJovem({
           com o OnboardingFlow) */}
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
-          {step === 1 && perfil && (
+          {step === PASSO_GRADE && perfil && (
             <Button
               type="button"
               variant="ghost"
@@ -473,7 +569,7 @@ export function OnboardingJovem({
             type="button"
             onClick={() => {
               if (ultimo) entrar();
-              else if (step === 1) salvarGrade();
+              else if (step === PASSO_GRADE) salvarGrade();
               else avancar();
             }}
             disabled={pending}

@@ -47,7 +47,7 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
     );
   });
 
-  test("wizard de 3 passos aparece no 1º acesso e grava a grade", async ({
+  test("wizard de 4 passos aparece no 1º acesso e grava a grade", async ({
     page,
   }) => {
     await loginComSenha(page, JOVEM3_EMAIL, SENHA);
@@ -55,13 +55,24 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
     // layout dele serve o wizard em vez do shell (sem carimbo)
     await page.waitForURL((u) => u.pathname === "/jovem", { timeout: 15_000 });
 
-    // passo 1 — boas-vindas com a promessa do programa
+    // passo 1 — boas-vindas com a promessa do programa (e a Liza abrindo a
+    // jornada, REALIZA-426)
     await expect(
       page.getByRole("heading", { name: /Bem-vindo\(a\) ao Realiza/ })
     ).toBeVisible();
     await page.getByRole("button", { name: "Continuar" }).click();
 
-    // passo 2 — a grade semanal (seg–dom × manhã/tarde/noite): marca e
+    // passo 2 — o tour das telas reais: os itens são botões que trocam o
+    // print (a grade vem logo depois)
+    await expect(
+      page.getByRole("heading", { name: "O que você pode fazer aqui" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: /Sua página inicial/ })
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Continuar" }).click();
+
+    // passo 3 — a grade semanal (seg–dom × manhã/tarde/noite): marca e
     // segue — o "Continuar" aqui grava pela RPC do jovem
     await expect(
       page.getByRole("heading", { name: "Quando dá pra você?" })
@@ -71,7 +82,7 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
       .click();
     await page.getByRole("button", { name: "Continuar" }).click();
 
-    // passo 3 — contato: WhatsApp da ficha formatado + o toggle do opt-in
+    // passo 4 — contato: WhatsApp da ficha formatado + o toggle do opt-in
     // (mesma semântica do card Privacidade do perfil)
     await expect(
       page.getByRole("heading", { name: "Seu contato tá certo?" })
@@ -112,6 +123,11 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
     await page.waitForURL((u) => u.pathname === "/jovem", { timeout: 15_000 });
 
     // pula a grade — permitido, mas a pendência não é silenciosa
+    await page.getByRole("button", { name: "Continuar" }).click();
+    // o tour das telas fica entre as boas-vindas e a grade
+    await expect(
+      page.getByRole("heading", { name: "O que você pode fazer aqui" })
+    ).toBeVisible();
     await page.getByRole("button", { name: "Continuar" }).click();
     await expect(
       page.getByRole("heading", { name: "Quando dá pra você?" })
