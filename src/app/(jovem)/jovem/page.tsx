@@ -614,8 +614,10 @@ export default async function JovemHome() {
       />
 
       {/* Suas avaliações (0071) — as pendentes e as duas últimas respondidas;
-          o resto recolhe em "Ver todas as avaliações" dentro do componente */}
-      {(avaliacoesPendentes.length > 0 || avaliacoesFeitas.length > 0) && (
+          o resto recolhe em "Ver todas as avaliações" dentro do componente.
+          Com dupla viva a seção entra mesmo vazia: o rodapé explica por que
+          um encontro já acontecido pode não aparecer aqui (REALIZA-428) */}
+      {(avaliacoesPendentes.length > 0 || avaliacoesFeitas.length > 0 || duplaEmCurso) && (
         <section aria-labelledby="avaliacoes-titulo">
           <h2 id="avaliacoes-titulo" className="mb-2.5 flex items-center gap-2 font-semibold">
             <Star size={18} className="text-muted-foreground" aria-hidden />
@@ -628,6 +630,13 @@ export default async function JovemHome() {
                 feitas={avaliacoesFeitas}
                 primeiroNome={primeiroNome}
               />
+              {duplaEmCurso && (
+                <p className="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground sm:px-6">
+                  Quer avaliar um encontro que não apareceu aqui? Ele precisa
+                  estar agendado primeiro. Peça pro seu mentor registrar na
+                  agenda, mesmo que já tenha acontecido.
+                </p>
+              )}
             </CardContent>
           </Card>
         </section>

@@ -31,6 +31,11 @@ export function JovemChamados({
   cSel: string | null;
 }) {
   const router = useRouter();
+  // REALIZA-424: sem pedidos a seção não ocupa a tela — a home já tem o
+  // botão de pedir ajuda, um card vazio aqui só repete espaço
+  if (itens.length === 0 && !(detalhe && cSel === detalhe.chamado.id)) {
+    return null;
+  }
   return (
     <section
       aria-labelledby="jovem-chamados-titulo"
