@@ -297,3 +297,37 @@ Correções que a auditoria obrigatória trouxe antes da aba subir:
 - **`tardios` no funil** + linha de **campanha** rotulada (multi_uso).
 - **Migration endurecida**: revoke public/anon, publication idempotente,
   `coletando_desde` no resumo, `tendencia` por superfície (spark da L3).
+
+## Fase B — o que subiu (explorador ad-hoc + export)
+
+Entregue na aba Adoção, coord-only via a página (que já redireciona não-coord):
+
+- **`GET /api/adocao/export`** (`src/app/api/adocao/export/route.ts`):
+  parquet cru de `produto_eventos` via `hyparquet-writer` (JS puro, sem
+  wasm no servidor — `parquet-wasm` foi descartado). `?formato=parquet`
+  único formato; `?desde=YYYY-MM-DD` com default 90d e clamp em 400d;
+  teto de 500k linhas. Gate = mesmo da aba (demo coord ou claims +
+  `temPapel`). Paginação de 1k via gerador async → `parquetWriteRows`
+  escreve row-group a row-group, memória plana. Sem join de profiles:
+  `profile_id` vai cru (decisão do ticket — PII fica fora do arquivo).
+  Attachment `application/octet-stream`, `Cache-Control: private, no-store`.
+- **Explorador** (`adocao-explorador.tsx` + `lib/adocao-duckdb.ts` +
+  `lib/adocao-sql.ts`): seção "Explorar os dados" no fim da aba. Fechada
+  é um botão; abrir dispara o dynamic import do módulo DuckDB
+  (`@duckdb/duckdb-wasm` nunca entra no bundle da aba), `selectBundle`
+  escolhe mvp/eh — os dois **sem threads**, logo sem COOP/COEP. O wasm e
+  os workers do pacote são emitidos como assets pelas `turbopack.rules`
+  do `next.config` (imports devolvem URL). Fetch do parquet da janela
+  ativa → `registerFileBuffer` → view `eventos`. Chips de pergunta
+  pronta (superfícies, ações, horário, top pessoas, amostra crua) + SQL
+  livre com guard SELECT-only (`sqlSomenteLeitura`: uma declaração, sem
+  verbos de escrita/DDL — contrato de leitura, não muralha, o banco é
+  efêmero e local). Resultado embrulhado em `LIMIT 501` (a extra vira
+  flag "truncado"). Fechar o painel termina o worker. CSP ganhou
+  `wasm-unsafe-eval` no `script-src` — `WebAssembly.instantiate` exige.
+- **Demo**: `/api/adocao/export` responde parquet fabricado de
+  `dadosAdocaoEventosDemo` (mesma matriz sintética da aba) — o
+  explorador funciona no modo demo sem saber a diferença.
+- **Retenção 90d + rollup diário** (`0201`): implementada em paralelo
+  por outro trabalho — não faz parte deste diff. O export lê só o cru;
+  o rollup `produto_eventos_dia` fica pras agregações futuras.

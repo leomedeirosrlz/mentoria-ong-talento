@@ -13,6 +13,7 @@ import {
   type DiaSerie,
   type EventoRecente,
   type LinhaCoorte,
+  type LinhaEventoExport,
   type LinhaSuperficie,
   type ResumoAdocao,
 } from "@/lib/adocao";
@@ -623,4 +624,94 @@ export function dadosFunilInstrumentosDemo(): FunilInstrumento[] {
       pendentes: 3,
     },
   ];
+}
+
+/** Cru demo do export (fase B): a matriz agregada vira linhas de
+ *  evento — o explorador da aba mastiga o mesmo parquet no modo demo.
+ *  Distribuição determinística: gestos espalhados pela janela com
+ *  jitter hash (mesma regra dos irmãos), ação pesada pra pageview,
+ *  profile_id cíclico dentro do pool do papel. `limite` escala
+ *  proporcionalmente — a forma do dataset se mantém em qualquer teto. */
+const PAPEL_DEMO_ROLES: Record<string, string[]> = {
+  coordenacao: ["coordenacao"],
+  mentor_dpp: ["mentor_dpp"],
+  mentor_especialista: ["mentor_especialista"],
+  supervisor: ["supervisor"],
+};
+
+const ACOES_PESO: [string, number][] = [
+  ["pageview", 68],
+  ["busca", 10],
+  ["sort", 8],
+  ["dialog", 6],
+  ["material_aberto", 4],
+  ["nudge", 2],
+  ["form_emitido", 1],
+  ["lembrete_whatsapp", 1],
+];
+
+export function dadosAdocaoEventosDemo(
+  d: DemoData,
+  janela: number,
+  limite: number
+): LinhaEventoExport[] {
+  const matriz = dadosAdocaoMatrizDemo(d, janela);
+  const totalGestos = matriz.reduce((s, c) => s + c.gestos, 0);
+  const fator = totalGestos > 0 ? Math.min(1, limite / totalGestos) : 0;
+
+  // pools de pessoas por papel — mentorado usa profile_id quando há
+  // (conta vinculada 0066) ou o próprio id da linha como identificador
+  const poolPorPapel = new Map<string, string[]>();
+  for (const [papel, roles] of Object.entries(PAPEL_DEMO_ROLES)) {
+    poolPorPapel.set(
+      papel,
+      d.profiles.filter((p) => roles.includes(p.role ?? "")).map((p) => p.id)
+    );
+  }
+  poolPorPapel.set(
+    "mentorado",
+    d.mentorados.map((m) => m.profile_id ?? m.id)
+  );
+
+  const agora = Date.now();
+  const janelaMs = janela * 86400000;
+  const out: LinhaEventoExport[] = [];
+  let seq = 0;
+  for (const c of matriz) {
+    const n = Math.round(c.gestos * fator);
+    const pool = poolPorPapel.get(c.papel) ?? [];
+    if (n <= 0 || pool.length === 0) continue;
+    for (let i = 0; i < n; i++) {
+      const chave = `${c.superficie}:${c.papel}:${i}`;
+      // espalha pela janela com jitter horário — sem o espalhamento o
+      // histograma do explorador virava um bloco só
+      const frac = (i + semeado(`e:${chave}`)) / n;
+      const criado = new Date(agora - janelaMs * (1 - frac));
+      const a = semeado(`a:${chave}`) * 100;
+      let acao = "pageview";
+      let acc = 0;
+      for (const [nome, peso] of ACOES_PESO) {
+        acc += peso;
+        if (a <= acc) {
+          acao = nome;
+          break;
+        }
+      }
+      out.push({
+        id: `de000000-0000-4000-8000-${String(seq++).padStart(12, "0")}`,
+        profile_id: pool[Math.floor(semeado(`p:${chave}`) * pool.length)]!,
+        papel: c.papel,
+        superficie: c.superficie,
+        acao,
+        meta:
+          acao === "busca"
+            ? { q: "exemplo" }
+            : acao === "pageview"
+              ? { path: `/${c.superficie}` }
+              : {},
+        created_at: criado,
+      });
+    }
+  }
+  return out.sort((a, b) => a.created_at.getTime() - b.created_at.getTime());
 }

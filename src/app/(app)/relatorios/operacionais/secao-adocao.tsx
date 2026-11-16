@@ -53,6 +53,7 @@ import {
   type PontoGrafico,
 } from "@/components/viz";
 import { GestosVivos } from "./gestos-vivos";
+import { AdocaoExplorador } from "./adocao-explorador";
 import { MapaCalorDrill } from "./adocao-interativo";
 import { TabelaSuperficies } from "./tabela-superficies";
 
@@ -513,6 +514,25 @@ export async function SecaoAdocao({
         </section>
 
         {secaoRecentes}
+
+        {/* fase B — explorador ad-hoc: o fechado é só um convite; abrir
+            baixa o motor DuckDB-WASM no navegador e registra o parquet
+            do /api/adocao/export na mesma janela da régua */}
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold">Explorar os dados</h2>
+            <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
+              Perguntas fora do script: SQL livre sobre os gestos dos
+              últimos {janela} dias, no navegador.
+            </p>
+          </div>
+          <div
+            className={cn(CARD, "animate-enter")}
+            style={{ "--i": 11 } as CSSProperties}
+          >
+            <AdocaoExplorador desde={desde.toISOString().slice(0, 10)} />
+          </div>
+        </section>
       </div>
     </div>
   );

@@ -125,6 +125,20 @@ export type EventoRecente = {
   criado_em: string;
 };
 
+/** Linha do export parquet (fase B — /api/adocao/export): espelho do
+ *  cru `produto_eventos`, já com created_at em Date pro TIMESTAMP do
+ *  parquet. O export nunca embute profile (nome é PII a mais, não a
+ *  menos) — quem cruza puxa por profile_id. */
+export type LinhaEventoExport = {
+  id: string;
+  profile_id: string;
+  papel: string;
+  superficie: string;
+  acao: string;
+  meta: unknown;
+  created_at: Date;
+};
+
 // ---------- derivações puras ----------
 
 /** Delta honesto da régua: null quando a janela anterior era zero

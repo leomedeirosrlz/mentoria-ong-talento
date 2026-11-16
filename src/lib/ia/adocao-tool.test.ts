@@ -207,15 +207,25 @@ describe("adocao_coorte", () => {
 describe("adocao_funil", () => {
   // o funil não é RPC — lê avaliacao_links + formulario_links via .from()
   function supaFrom(linhas: Record<string, unknown[]>): SupabaseClient {
-    const fim = (t: string) =>
-      Promise.resolve({ data: linhas[t] ?? [], error: null });
+    // cadeia thenable: qualquer método (eq/in/gte/or/…) devolve o mesmo
+    // objeto e o await resolve linhas[t] — o stub não filtra por
+    // argumento, então consultas diferentes à mesma tabela (link manual
+    // × campanha) recebem o mesmo conjunto
     return {
-      from: (t: string) => ({
-        select: () => ({
-          gte: () => fim(t),
-          or: () => fim(t),
-        }),
-      }),
+      from: (t: string) => {
+        const fim = Promise.resolve({
+          data: linhas[t] ?? [],
+          error: null,
+        });
+        const cadeia: object = new Proxy(
+          {},
+          {
+            get: (_o, k) =>
+              k === "then" ? fim.then.bind(fim) : () => cadeia,
+          }
+        );
+        return { select: () => cadeia };
+      },
     } as unknown as SupabaseClient;
   }
 

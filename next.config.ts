@@ -9,7 +9,11 @@ const CSP = [
   // 'unsafe-inline' é exigência do hydration/RSC do Next sem nonce middleware;
   // 'unsafe-eval' só em dev — React Dev o usa pra reconstruir callstacks
   // (em produção o React nunca chama eval, então a diretiva fica fora)
-  `script-src 'self' 'unsafe-inline'${
+  // 'wasm-unsafe-eval' habilita WebAssembly.instantiate — exigência do
+  // DuckDB-WASM do explorador de adoção (fase B) no Chrome; sem ela o
+  // módulo nem compila. Escopo estreito: só libera compilar wasm, não
+  // eval de JS.
+  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'${
     process.env.NODE_ENV === "development" ? " 'unsafe-eval'" : ""
   }`,
   "style-src 'self' 'unsafe-inline'",
@@ -61,6 +65,16 @@ const nextConfig: NextConfig = {
   // sem "X-Powered-By: Next.js" — banner de stack não ajuda ninguém
   poweredByHeader: false,
   images: { remotePatterns },
+  // Explorador de adoção (REALIZA-417 fase B): os binários do
+  // @duckdb/duckdb-wasm (wasm + worker pré-empacotado, bundles mvp/eh sem
+  // thread) são emitidos como assets — o import devolve a URL e o
+  // download só acontece quando o explorador abre, num chunk lazy.
+  turbopack: {
+    rules: {
+      "duckdb-{mvp,eh}.wasm": { type: "asset" },
+      "duckdb-browser-{mvp,eh}.worker.js": { type: "asset" },
+    },
+  },
   // router cache do cliente: tela dinâmica revisitada em até 30s renderiza
   // do payload guardado em vez de refazer todas as queries no banco. As
   // actions já invalidam com revalidatePath — escrita continua fresca.
