@@ -133,3 +133,131 @@ describe("adocao_por_superficie — dados", () => {
     expect(resumo?.params.p_papel).toBe("mentor_dpp");
   });
 });
+
+// As demais tools de adoção (mesma exposição via MCP — catalogo filtra por
+// roles): cada uma delega na mesma RPC/query que a aba usa.
+
+const rodarTool = (
+  nome: string,
+  args: unknown,
+  supabase: SupabaseClient,
+  papeis: ("coordenacao" | "mentor_dpp")[] = ["coordenacao"]
+) =>
+  executarTool(nome, args, supabase, "chat", papeis, undefined, undefined, {
+    coletarEvento: (ev) => eventos.push(ev),
+  });
+
+describe("adocao_por_dia", () => {
+  it("delega em adocao_serie_dia com janela e papel", async () => {
+    const chamadas: ChamadaRpc[] = [];
+    const r = await rodarTool(
+      "adocao_por_dia",
+      { dias: 7, papel: "mentorado" },
+      supaRpc({ adocao_serie_dia: [{ dia: "2026-11-15", gestos: 4 }] }, chamadas)
+    );
+    expect(r.ok).toBe(true);
+    const c = chamadas.find((x) => x.fn === "adocao_serie_dia");
+    expect(c?.params.p_papel).toBe("mentorado");
+  });
+
+  it("fora da coordenação não passa", async () => {
+    const r = await rodarTool("adocao_por_dia", {}, supaRpc({}), ["mentor_dpp"]);
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("adocao_caminhos", () => {
+  it("passa top/papel pra RPC e rejeita top fora do range", async () => {
+    const chamadas: ChamadaRpc[] = [];
+    const r = await rodarTool(
+      "adocao_caminhos",
+      { top: 3, papel: "supervisor" },
+      supaRpc({ adocao_caminhos: [] }, chamadas)
+    );
+    expect(r.ok).toBe(true);
+    const c = chamadas.find((x) => x.fn === "adocao_caminhos");
+    expect(c?.params.p_top).toBe(3);
+    expect(c?.params.p_papel).toBe("supervisor");
+
+    const r2 = await rodarTool("adocao_caminhos", { top: 99 }, supaRpc({}));
+    expect(r2.ok).toBe(false);
+  });
+});
+
+describe("adocao_coorte", () => {
+  it("delega em adocao_coorte com semanas e não recorta papel", async () => {
+    const chamadas: ChamadaRpc[] = [];
+    const r = await rodarTool(
+      "adocao_coorte",
+      { semanas: 4 },
+      supaRpc({ adocao_coorte: [] }, chamadas)
+    );
+    expect(r.ok).toBe(true);
+    const c = chamadas.find((x) => x.fn === "adocao_coorte");
+    expect(c?.params.p_semanas).toBe(4);
+    expect("p_papel" in (c?.params ?? {})).toBe(false);
+  });
+
+  it("rejeita semanas acima de 12", async () => {
+    const r = await rodarTool("adocao_coorte", { semanas: 30 }, supaRpc({}));
+    expect(r.ok).toBe(false);
+  });
+});
+
+describe("adocao_funil", () => {
+  // o funil não é RPC — lê avaliacao_links + formulario_links via .from()
+  function supaFrom(linhas: Record<string, unknown[]>): SupabaseClient {
+    const fim = (t: string) =>
+      Promise.resolve({ data: linhas[t] ?? [], error: null });
+    return {
+      from: (t: string) => ({
+        select: () => ({
+          gte: () => fim(t),
+          or: () => fim(t),
+        }),
+      }),
+    } as unknown as SupabaseClient;
+  }
+
+  it("agrega emitidos/respondidos por instrumento com janela de 14d", async () => {
+    const r = await rodarTool(
+      "adocao_funil",
+      { dias: 30 },
+      supaFrom({
+        avaliacao_links: [
+          {
+            status: "respondido",
+            respondido_em: new Date().toISOString(),
+            expira_em: null,
+            created_at: new Date().toISOString(),
+          },
+          {
+            status: "pendente",
+            respondido_em: null,
+            expira_em: null,
+            created_at: new Date().toISOString(),
+          },
+        ],
+        formulario_links: [],
+      })
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    const d = r.dados as {
+      conversao_dias: number;
+      instrumentos: {
+        instrumento: string;
+        emitidos: number;
+        respondidos: number;
+        pendentes: number;
+      }[];
+    };
+    expect(d.conversao_dias).toBe(14);
+    const aval = d.instrumentos.find((i) =>
+      i.instrumento.toLowerCase().includes("avalia")
+    );
+    expect(aval?.emitidos).toBe(2);
+    expect(aval?.respondidos).toBe(1);
+    expect(aval?.pendentes).toBe(1);
+  });
+});

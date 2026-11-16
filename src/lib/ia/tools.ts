@@ -58,6 +58,13 @@ import {
   type DuplaIa,
 } from "./queries";
 import {
+  dadosAdocaoCaminhos,
+  dadosAdocaoCoorte,
+  dadosAdocaoSerieDia,
+  dadosFunilInstrumentos,
+  FUNIL_JANELA_DIAS,
+} from "@/lib/relatorios/adocao";
+import {
   MENSAGEM_TEMPLATE_SLUGS,
   mensagemTemplateTexto,
 } from "./mensagem-templates";
@@ -223,6 +230,63 @@ const adocaoArgs = z
       .optional()
       .describe(
         "recorta só os gestos emitidos com esse papel efetivo (padrão: todos)"
+      ),
+  })
+  .strict();
+
+const adocaoJanelaArgs = z
+  .object({
+    dias: z
+      .number()
+      .int()
+      .min(1)
+      .max(90)
+      .optional()
+      .describe("janela pra trás em dias — típico 7/30/90 (padrão 30)"),
+  })
+  .strict();
+
+const adocaoCaminhosArgs = z
+  .object({
+    dias: z
+      .number()
+      .int()
+      .min(1)
+      .max(90)
+      .optional()
+      .describe("janela pra trás em dias — típico 7/30/90 (padrão 30)"),
+    papel: z
+      .enum([
+        "coordenacao",
+        "supervisor",
+        "mentor_dpp",
+        "mentor_especialista",
+        "mentorado",
+      ])
+      .optional()
+      .describe(
+        "recorta só os gestos emitidos com esse papel efetivo (padrão: todos)"
+      ),
+    top: z
+      .number()
+      .int()
+      .min(1)
+      .max(20)
+      .optional()
+      .describe("quantas sequências devolver (padrão 8, máx 20)"),
+  })
+  .strict();
+
+const adocaoCoorteArgs = z
+  .object({
+    semanas: z
+      .number()
+      .int()
+      .min(1)
+      .max(12)
+      .optional()
+      .describe(
+        "quantas coortes semanais recentes (padrão 8 — a RPC devolve no máx 12)"
       ),
   })
   .strict();
@@ -652,6 +716,77 @@ export const IA_TOOLS = {
         })
         .sort((a, b) => comparaNome(a.nome, b.nome));
       return { mentores, total: mentores.length };
+    },
+  },
+
+  adocao_por_dia: {
+    nome: "adocao_por_dia",
+    descricao:
+      "Gestos de produto por dia na janela (a série temporal da aba Adoção): um ponto por dia com o total de gestos — respeita o recorte `papel`. Use pra 'o uso está crescendo?', 'teve pico/dia parado?', 'movimento desta semana'.",
+    schema: adocaoArgs,
+    roles: ["coordenacao"],
+    run: async ({ dias, papel }: z.infer<typeof adocaoArgs>, ctx) => {
+      const janela = dias ?? 30;
+      const desde = new Date(Date.now() - janela * 86400_000);
+      const serie = await dadosAdocaoSerieDia(
+        ctx.supabase,
+        desde,
+        papel ?? null
+      );
+      return { janela_dias: janela, papel: papel ?? "todos", serie };
+    },
+  },
+
+  adocao_caminhos: {
+    nome: "adocao_caminhos",
+    descricao:
+      "Sequências de superfícies mais percorridas na janela (sessionizadas por pessoa×dia, repetições adjacentes colapsadas): cada caminho devolve os trechos na ordem e quantas pessoas percorreram. Respeita `papel`. Use pra 'por onde as pessoas navegam?', 'fluxo típico do mentor', 'abrem o quê depois do quê?'.",
+    schema: adocaoCaminhosArgs,
+    roles: ["coordenacao"],
+    run: async (
+      { dias, papel, top }: z.infer<typeof adocaoCaminhosArgs>,
+      ctx
+    ) => {
+      const janela = dias ?? 30;
+      const desde = new Date(Date.now() - janela * 86400_000);
+      const caminhos = await dadosAdocaoCaminhos(
+        ctx.supabase,
+        desde,
+        top ?? 8,
+        papel ?? null
+      );
+      return { janela_dias: janela, papel: papel ?? "todos", caminhos };
+    },
+  },
+
+  adocao_coorte: {
+    nome: "adocao_coorte",
+    descricao:
+      "Retenção semanal por coorte de entrada no produto: % das pessoas ativas em cada semana após a primeira (sem 0-8), com 0% real distinto de semana futura. Programa inteiro — retenção é dimensão-pessoa, não recorta por papel. Use pra 'as pessoas voltam?', 'retenção das turmas novas', 'engajamento morre depois de quanto tempo?'.",
+    schema: adocaoCoorteArgs,
+    roles: ["coordenacao"],
+    run: async ({ semanas }: z.infer<typeof adocaoCoorteArgs>, ctx) => {
+      const n = semanas ?? 8;
+      const coortes = await dadosAdocaoCoorte(ctx.supabase, n);
+      return { semanas: n, escopo: "programa", coortes };
+    },
+  },
+
+  adocao_funil: {
+    nome: "adocao_funil",
+    descricao:
+      "Funil dos instrumentos na janela (avaliações + formulários): emitidos → respondidos com janela de conversão de 14 dias declarada, mais tardios (responderam depois do prazo), expirados e pendentes nomeados; linhas `campanha` são links multi-uso de divulgação sem denominador observável. Escopo programa — não recorta por papel. Use pra 'respondem os formulários?', 'taxa da avaliação de encontro', 'o link de intake converte?'.",
+    schema: adocaoJanelaArgs,
+    roles: ["coordenacao"],
+    run: async ({ dias }: z.infer<typeof adocaoJanelaArgs>, ctx) => {
+      const janela = dias ?? 30;
+      const desde = new Date(Date.now() - janela * 86400_000);
+      const instrumentos = await dadosFunilInstrumentos(ctx.supabase, desde);
+      return {
+        janela_dias: janela,
+        conversao_dias: FUNIL_JANELA_DIAS,
+        instrumentos,
+      };
     },
   },
 
