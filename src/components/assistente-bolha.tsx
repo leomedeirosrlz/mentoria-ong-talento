@@ -809,6 +809,10 @@ export function AssistenteBolha({
     dy: number;
     amostras: { t: number; dy: number }[];
   } | null>(null);
+  // gesto de sheet em curso — congela os updates do teclado (o bottom do
+  // iOS mudaria a base enquanto o translate carrega o dedo: dois escritores
+  // de posição = o flicker de "volta uns frames")
+  const arrastandoRef = useRef(false);
   const iniciarArrasto = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse") return;
     arrastoRef.current = {
@@ -816,9 +820,16 @@ export function AssistenteBolha({
       dy: 0,
       amostras: [{ t: performance.now(), dy: 0 }],
     };
-    // re-grab no meio da mola de volta: mata a transição, resposta imediata
+    arrastandoRef.current = true;
     const el = popupRef.current;
-    if (el) el.style.transition = "none";
+    if (el) {
+      // re-grab no meio da mola de volta: mata a transição, resposta
+      // imediata; e cancela animações em curso (a enter de abertura
+      // sobrescrevia o inline por frame — a sheet "ignorava" o dedo e
+      // saltava no fim da animação)
+      el.style.transition = "none";
+      el.getAnimations().forEach((a) => a.cancel());
+    }
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const moverArrasto = (e: ReactPointerEvent<HTMLDivElement>) => {
@@ -833,6 +844,7 @@ export function AssistenteBolha({
   const soltarArrasto = () => {
     const a = arrastoRef.current;
     arrastoRef.current = null;
+    arrastandoRef.current = false;
     const el = popupRef.current;
     if (!a || !el) return;
     soltarArrastoSheet(el, a.dy, velocidadeDe(a.amostras), () => mudar(false));
@@ -907,6 +919,10 @@ export function AssistenteBolha({
           return;
         }
         g.engatou = true;
+        arrastandoRef.current = true;
+        // cancela animações em curso (a enter de abertura sobrescrevia o
+        // inline por frame — a sheet "ignorava" o dedo e saltava no fim)
+        el.getAnimations().forEach((a) => a.cancel());
       }
       e.preventDefault();
       g.dy = dy; // cru — negativo vira a borracha contrária
@@ -917,6 +933,7 @@ export function AssistenteBolha({
     const soltar = () => {
       const fim = g;
       g = null;
+      arrastandoRef.current = false;
       if (!fim?.engatou) return;
       soltarArrastoSheet(el, fim.dy, velocidadeDe(fim.amostras), () =>
         mudar(false),
@@ -928,6 +945,7 @@ export function AssistenteBolha({
     el.addEventListener("touchcancel", soltar);
     return () => {
       g = null;
+      arrastandoRef.current = false;
       el.removeEventListener("touchstart", inicio);
       el.removeEventListener("touchmove", mover);
       el.removeEventListener("touchend", soltar);
@@ -949,6 +967,9 @@ export function AssistenteBolha({
       // re-layout na sheet
       cancelAnimationFrame(raf);
       raf = requestAnimationFrame(() => {
+        // arrasto em curso: o bottom mudaria a base enquanto o translate
+        // segue o dedo — dois escritores de posição = flicker
+        if (arrastandoRef.current) return;
         const diff = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
         // teclado de verdade só quando o composer está focado e a diferença
         // passa de 100px — movimentos de URL bar / scroll-lock (~60px) são

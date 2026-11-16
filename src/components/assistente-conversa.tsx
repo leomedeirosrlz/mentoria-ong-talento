@@ -1066,7 +1066,7 @@ export function AssistenteConversa({
           transition={T.panel}
           className="relative min-h-0 flex-1"
         >
-          <div className="scroll-fina h-full overflow-y-auto px-4 py-4">
+          <div className="scroll-fina h-full overflow-y-auto overscroll-y-none px-4 py-4">
             {conversas.length > 4 && (
               <label className="relative mb-3 block">
                 <span className="sr-only">Buscar conversa</span>
@@ -1168,7 +1168,7 @@ export function AssistenteConversa({
           exclusivo com o transcript: os dois com flex-1 dividiam a altura
           e o conteúdo centralizado transbordava pra cima do header */}
       {restaurada && msgs.length === 0 ? (
-        <div className="scroll-fina flex min-h-0 flex-1 flex-col overflow-y-auto px-6 py-8">
+        <div className="scroll-fina flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-none px-6 py-8">
           {/* a Liza senta no canto superior esquerdo — mascote de verdade,
               não ícone decorativo centralizado */}
           <div className="animate-enter flex items-start gap-4">
@@ -1246,7 +1246,7 @@ export function AssistenteConversa({
           role="log"
           aria-live="off"
           aria-label="Conversa com a Liza"
-          className="scroll-fina @container h-full space-y-5 overflow-y-auto overscroll-contain px-4 py-4"
+          className="scroll-fina @container h-full space-y-5 overflow-y-auto overscroll-y-none px-4 py-4"
         >
           {/* role=log seria live por definição (ARIA 1.2) — aria-live=off
               silencia a rajada de tokens; a região sr-only anuncia só as
