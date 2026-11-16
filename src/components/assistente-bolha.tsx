@@ -842,8 +842,12 @@ export function AssistenteBolha({
             aria-controls="painel-assistente"
             onPointerEnter={() => setAtento(true)}
             onPointerLeave={() => setAtento(false)}
-            // foco de teclado merece a mesma atenção do hover
-            onFocus={() => setAtento(true)}
+            // só foco-via-teclado merece a atenção do hover — o focus-restore
+            // do dialog ao fechar (programático) não marca :focus-visible;
+            // sem o gate ela ficava "atenta" (olhos maiores) após cada fechar
+            onFocus={(e) => {
+              if (e.currentTarget.matches(":focus-visible")) setAtento(true);
+            }}
             onBlur={() => setAtento(false)}
             className={FAB_CLS}
           >
@@ -903,7 +907,11 @@ export function AssistenteBolha({
           aria-controls="painel-assistente"
           onPointerEnter={() => setAtento(true)}
           onPointerLeave={() => setAtento(false)}
-          onFocus={() => setAtento(true)}
+          // idem braço desktop — :focus-visible só, senão o focus-restore
+          // da sheet a deixava atenta (olhos maiores) ao fechar
+          onFocus={(e) => {
+            if (e.currentTarget.matches(":focus-visible")) setAtento(true);
+          }}
           onBlur={() => setAtento(false)}
           onClick={() => mudar(true)}
           className={FAB_CLS}
