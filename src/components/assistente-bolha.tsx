@@ -102,6 +102,116 @@ const limitar = (t: { w: number; h: number }) => ({
   h: Math.round(Math.min(TAM_MAX.h, Math.max(TAM_MIN.h, t.h))),
 });
 
+// física do arrasto da sheet (alça + overscroll do corpo): o dedo manda 1:1
+// no sentido de fechar; empurrando no contrário a borracha resiste (band
+// estilo iOS) e a soltura devolve com mola. O release decide por distância
+// + velocidade e CONTINUA o slide de onde o dedo soltou via WAAPI —
+// limpar o transform e chamar mudar direto teleportava a sheet pro
+// descanso antes da saída animada (o "pulo" anti-físico)
+const BORRACHA_MAX = 72; // px de overshoot máximo empurrando a sheet pra cima
+const borracha = (d: number) =>
+  Math.round((1 - 1 / ((d * 0.6) / BORRACHA_MAX + 1)) * BORRACHA_MAX);
+
+// velocidade instantânea de release: cauda do gesto (~100ms), não a
+// média — arrasto lento desde longe não pode "flickar" no final, e um
+// flick curto fecha mesmo sem percorrer os 88px
+const velocidadeDe = (amostras: { t: number; dy: number }[]) => {
+  const fim = amostras[amostras.length - 1];
+  if (!fim) return 0;
+  let ini = amostras[0];
+  for (let i = amostras.length - 2; i >= 0; i--) {
+    if (fim.t - amostras[i].t > 100) break;
+    ini = amostras[i];
+  }
+  const dt = ini ? fim.t - ini.t : 0;
+  // floor baixo: dt>0 já protege de /0 — dy>24 no caller filtra o jitter
+  return dt > 0 ? (fim.dy - ini.dy) / dt : 0; // px/ms
+};
+
+const overlayDaSheet = (popup: HTMLElement) =>
+  popup.parentElement?.querySelector<HTMLElement>(
+    "[data-slot='sheet-overlay']",
+  ) ?? null;
+
+// aplica o dedo: desce 1:1 (dy>0) ou sobe com resistência (dy<0); o scrim
+// afrouxa junto, proporcional ao quanto já desceu
+function aplicarArrastoSheet(popup: HTMLElement, dy: number) {
+  const t = dy >= 0 ? dy : -borracha(-dy);
+  popup.style.transform = `translateY(${t}px)`;
+  const ov = overlayDaSheet(popup);
+  if (ov)
+    ov.style.opacity = String(
+      Math.min(1, Math.max(0, 1 - Math.max(0, t) / popup.offsetHeight)),
+    );
+}
+
+// soltura: fecha (distância ou flick pra baixo — jogar pra cima cancela)
+// deslizando do ponto atual, senão volta com mola leve pro descanso
+function soltarArrastoSheet(
+  popup: HTMLElement,
+  dy: number,
+  v: number,
+  fechar: () => void,
+) {
+  const ov = overlayDaSheet(popup);
+  const t = dy >= 0 ? dy : -borracha(-dy);
+  const fecha = (dy > 88 || (dy > 24 && v > 0.45)) && v > -0.35;
+  const limpar = () => {
+    if (!popup.isConnected) return;
+    popup.style.transition = "";
+    popup.style.transform = "";
+    if (ov?.isConnected) {
+      ov.style.opacity = "";
+      ov.style.transition = "";
+    }
+  };
+  if (fecha) {
+    if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      fechar();
+      limpar();
+      return;
+    }
+    const dur = Math.min(
+      340,
+      Math.round(150 + (popup.offsetHeight - Math.max(0, t)) * 0.25),
+    );
+    const anim = popup.animate(
+      [
+        { transform: `translateY(${t}px)` },
+        { transform: "translateY(115%)" },
+      ],
+      {
+        duration: dur,
+        easing: "cubic-bezier(0.32,0.72,0,1)",
+        fill: "forwards",
+      },
+    );
+    anim.onfinish = () => {
+      fechar(); // o data-closed assume por baixo do fill do WAAPI
+      // libera o fill um frame depois do React commitar — sem salto
+      requestAnimationFrame(() => {
+        anim.cancel();
+        setTimeout(limpar, 450); // limpa depois que a saída termina
+      });
+    };
+  } else {
+    // mola de volta — overshoot leve no ease + duração pela distância
+    popup.style.transition = `transform ${Math.min(
+      340,
+      Math.round(160 + Math.abs(t) * 1.2),
+    )}ms cubic-bezier(0.34,1.25,0.64,1)`;
+    popup.style.transform = "";
+    if (ov) {
+      ov.style.transition = "opacity 180ms cubic-bezier(0.2,0,0,1)";
+      ov.style.opacity = "";
+    }
+    setTimeout(() => {
+      if (popup.isConnected) popup.style.transition = "";
+      if (ov?.isConnected) ov.style.transition = "";
+    }, 400);
+  }
+}
+
 /** Alças de redimensionar do painel ancorado embaixo à direita: ele cresce
  *  pra cima e pra esquerda, então as alças moram na borda esquerda, no topo
  *  e no canto superior esquerdo. O arrasto escreve as CSS vars direto no
@@ -688,38 +798,44 @@ export function AssistenteBolha({
     </>
   );
 
-  // arrastar p/ baixo fecha — a alça no topo da sheet rastreia o dedo 1:1
-  // via transform (compositor, 60fps); >88px confirma, senão snap de volta.
-  // Só toque/stylus: mouse usa X/Esc/backdrop como sempre. Os refs ficam
+  // arrastar p/ baixo fecha — a alça no topo da sheet rastreia o dedo via
+  // transform (compositor, 60fps) com a física compartilhada: borracha no
+  // contrário, scrim proporcional, velocidade decide o release. Só
+  // toque/stylus: mouse usa X/Esc/backdrop como sempre. Os refs ficam
   // antes do effect do teclado (o lint proíbe mutar ref lido em effect).
   const popupRef = useRef<HTMLDivElement | null>(null);
-  const arrastoRef = useRef<{ y0: number; dy: number } | null>(null);
+  const arrastoRef = useRef<{
+    y0: number;
+    dy: number;
+    amostras: { t: number; dy: number }[];
+  } | null>(null);
   const iniciarArrasto = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (e.pointerType === "mouse") return;
-    arrastoRef.current = { y0: e.clientY, dy: 0 };
+    arrastoRef.current = {
+      y0: e.clientY,
+      dy: 0,
+      amostras: [{ t: performance.now(), dy: 0 }],
+    };
+    // re-grab no meio da mola de volta: mata a transição, resposta imediata
+    const el = popupRef.current;
+    if (el) el.style.transition = "none";
     e.currentTarget.setPointerCapture(e.pointerId);
   };
   const moverArrasto = (e: ReactPointerEvent<HTMLDivElement>) => {
     const a = arrastoRef.current;
     const el = popupRef.current;
     if (!a || !el) return;
-    a.dy = Math.max(0, e.clientY - a.y0);
-    el.style.transform = `translateY(${a.dy}px)`;
+    a.dy = e.clientY - a.y0; // cru — negativo vira a borracha contrária
+    a.amostras.push({ t: performance.now(), dy: a.dy });
+    if (a.amostras.length > 8) a.amostras.shift();
+    aplicarArrastoSheet(el, a.dy);
   };
   const soltarArrasto = () => {
     const a = arrastoRef.current;
     arrastoRef.current = null;
     const el = popupRef.current;
     if (!a || !el) return;
-    el.style.transform = "";
-    if (a.dy > 88) {
-      mudar(false); // a saída animada do Sheet termina o gesto
-    } else {
-      el.style.transition = "transform 180ms cubic-bezier(0.2,0,0,1)";
-      setTimeout(() => {
-        if (el.isConnected) el.style.transition = "";
-      }, 200);
-    }
+    soltarArrastoSheet(el, a.dy, velocidadeDe(a.amostras), () => mudar(false));
   };
 
   // puxar p/ baixo no corpo com o scroll no topo também arrasta a sheet —
@@ -738,6 +854,7 @@ export function AssistenteBolha({
       dy: number;
       scroller: HTMLElement | null;
       engatou: boolean;
+      amostras: { t: number; dy: number }[];
     } | null = null;
     const inicio = (e: TouchEvent) => {
       // arrastoRef set = a alça pegou este toque no pointerdown (vem antes
@@ -758,7 +875,16 @@ export function AssistenteBolha({
           break;
         }
       }
-      g = { y0: t.clientY, x0: t.clientX, dy: 0, scroller, engatou: false };
+      // re-grab no meio da mola de volta: mata a transição, resposta imediata
+      el.style.transition = "none";
+      g = {
+        y0: t.clientY,
+        x0: t.clientX,
+        dy: 0,
+        scroller,
+        engatou: false,
+        amostras: [{ t: performance.now(), dy: 0 }],
+      };
     };
     const mover = (e: TouchEvent) => {
       if (!g || e.touches.length !== 1) {
@@ -783,22 +909,18 @@ export function AssistenteBolha({
         g.engatou = true;
       }
       e.preventDefault();
-      g.dy = Math.max(0, dy);
-      el.style.transform = `translateY(${g.dy}px)`;
+      g.dy = dy; // cru — negativo vira a borracha contrária
+      g.amostras.push({ t: performance.now(), dy });
+      if (g.amostras.length > 8) g.amostras.shift();
+      aplicarArrastoSheet(el, dy);
     };
     const soltar = () => {
       const fim = g;
       g = null;
       if (!fim?.engatou) return;
-      el.style.transform = "";
-      if (fim.dy > 88) {
-        mudar(false); // a saída animada do Sheet termina o gesto
-      } else {
-        el.style.transition = "transform 180ms cubic-bezier(0.2,0,0,1)";
-        setTimeout(() => {
-          if (el.isConnected) el.style.transition = "";
-        }, 200);
-      }
+      soltarArrastoSheet(el, fim.dy, velocidadeDe(fim.amostras), () =>
+        mudar(false),
+      );
     };
     el.addEventListener("touchstart", inicio, { passive: true });
     el.addEventListener("touchmove", mover, { passive: false });
