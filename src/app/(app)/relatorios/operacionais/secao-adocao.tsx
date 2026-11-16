@@ -402,7 +402,8 @@ export async function SecaoAdocao({
             <h2 className="text-base font-semibold">Quem usa o quê</h2>
             <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
               {medida === "pessoas" ? "Pessoas únicas" : "Gestos"} por
-              superfície e papel nos últimos {janela} dias.
+              superfície e papel nos últimos {janela} dias
+              {rotuloPapel ? ` · só ${rotuloPapel}` : ""}.
             </p>
           </div>
           <div className={CARD}>
@@ -492,8 +493,9 @@ export async function SecaoAdocao({
           <div>
             <h2 className="text-base font-semibold">Superfícies</h2>
             <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
-              Gestos, alcance por papel e último uso de cada superfície na
-              janela.
+              Gestos, alcance por papel e último uso de cada superfície
+              nos últimos {janela} dias
+              {rotuloPapel ? ` · só ${rotuloPapel}` : ""}.
             </p>
           </div>
           {/* ordenação/links são interativos — a tabela mora no boundary

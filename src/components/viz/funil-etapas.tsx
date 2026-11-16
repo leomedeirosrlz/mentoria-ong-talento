@@ -161,14 +161,14 @@ export function FunilEtapas({
         </summary>
         <div
           role="region"
-          aria-label="Funil de instrumentos em tabela"
+          aria-label="Funil de instrumentos em tabela. Role horizontalmente"
           tabIndex={0}
-          className="scroll-fina mt-2 max-h-72 overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="scroll-fina mt-2 max-h-72 overflow-x-auto overflow-y-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
         >
-          <table className="w-full text-left tabular-nums">
+          <table className="w-full border-separate border-spacing-0 text-left tabular-nums">
             <thead>
               <tr className="text-muted-foreground">
-                <th scope="col" className="py-1 pr-3 font-medium">instrumento</th>
+                <th scope="col" className="sticky left-0 z-10 border-r border-border/60 bg-card py-1 pr-3 font-medium">instrumento</th>
                 <th scope="col" className="py-1 px-2 text-right font-medium">emitidos</th>
                 <th scope="col" className="py-1 px-2 text-right font-medium">responderam</th>
                 <th scope="col" className="py-1 px-2 text-right font-medium">após prazo</th>
@@ -176,10 +176,13 @@ export function FunilEtapas({
                 <th scope="col" className="py-1 text-right font-medium">aguardando</th>
               </tr>
             </thead>
-            <tbody>
+            {/* border-separate ignora borda em tr — as divisórias de
+                linha vivem nas células (o sticky da 1ª coluna exige o
+                modelo separado pra borda/bg acompanharem) */}
+            <tbody className="[&_td]:border-t [&_td]:border-border/50">
               {linhas.map((f) => (
-                <tr key={f.instrumento} className="border-t border-border/50">
-                  <td className="py-1 pr-3">
+                <tr key={f.instrumento}>
+                  <td className="sticky left-0 z-10 border-r border-border/60 bg-card py-1 pr-3">
                     {f.instrumento}
                     {f.campanha && " (campanha)"}
                   </td>

@@ -103,7 +103,9 @@ export function MetricTile({
         ) : (
           <>
             <span className={cn("font-semibold tabular-nums", corDelta)}>
-              {seta} {textoDelta(delta)}
+              {/* delta 0: a seta "→" já diz "igual" — "0%" ao lado é
+                  redundância, não informação */}
+              {delta === 0 ? seta : `${seta} ${textoDelta(delta)}`}
             </span>{" "}
             <span className="text-muted-foreground">{deltaRotulo}</span>
           </>

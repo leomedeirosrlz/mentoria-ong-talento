@@ -69,7 +69,7 @@ export function CoorteGrade({
         tabIndex={0}
         className="scroll-fina overflow-x-auto focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
-        <table className="w-full">
+        <table className="w-full border-separate border-spacing-0">
           <caption className="sr-only">
             Retenção semanal por coorte: para cada semana de entrada, a % de
             pessoas ativas nas semanas seguintes sobre o total da coorte.
@@ -79,7 +79,7 @@ export function CoorteGrade({
             <tr>
               <th
                 scope="col"
-                className="py-1 pr-2 text-left text-xs font-medium text-muted-foreground"
+                className="sticky left-0 z-10 border-r border-border/60 bg-card py-1 pr-2 text-left text-xs font-medium text-muted-foreground"
               >
                 coorte
               </th>
@@ -102,7 +102,7 @@ export function CoorteGrade({
                 <tr key={l.coorte} className="group/tr">
                   <th
                     scope="row"
-                    className="rounded-l-md py-0.5 pr-2 text-left whitespace-nowrap transition-colors group-hover/tr:bg-muted/60"
+                    className="sticky left-0 z-10 border-r border-border/60 bg-card py-0.5 pr-2 text-left whitespace-nowrap transition-colors group-hover/tr:bg-muted"
                   >
                     <span className="block text-xs font-medium">{l.rotulo}</span>
                     {/* o denominador da linha — toda % da coorte é sobre ele */}

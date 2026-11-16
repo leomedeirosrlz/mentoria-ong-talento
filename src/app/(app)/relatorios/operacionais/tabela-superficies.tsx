@@ -301,9 +301,18 @@ export function TabelaSuperficies({
         {ordenadas.map((l) => {
           const valores = serieDe(l);
           return (
-            <li key={l.superficie} className="flex items-center gap-3 py-2.5">
+            <li
+              key={l.superficie}
+              className="relative flex items-center gap-3 py-2.5"
+            >
               <div className="min-w-0 flex-1">
-                {nomeSup(l, "text-sm font-medium")}
+                {/* after:inset-0 estica o link pelo card inteiro — o nome
+                    com 22px de altura deixaria o único drill mobile do
+                    bloco abaixo do alvo de toque */}
+                {nomeSup(
+                  l,
+                  "text-sm font-medium after:absolute after:inset-0"
+                )}
                 <p className="mt-0.5 text-xs tabular-nums text-muted-foreground">
                   {FMT_INT.format(l.gestos)}{" "}
                   {l.gestos === 1 ? "gesto" : "gestos"} ·{" "}

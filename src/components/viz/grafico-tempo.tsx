@@ -254,10 +254,18 @@ export function GraficoTempo({
               className="absolute inset-x-0 border-t-[1.5px] border-dashed border-foreground/55"
               style={{ top: `${y(media)}%` }}
             >
-              {/* start-2 dentro do plot: no right-0 o chip colidia com a
-                  barra mais recente (hoje); a gutter variável não fecha
-                  com a largura da palavra, então o chip fica no miolo */}
-              <span className="absolute start-2 -translate-y-full rounded-sm bg-card/90 px-1 text-[10px] font-semibold text-foreground">
+              {/* dentro do plot, na ponta com a barra mais baixa — a
+                  gutter variável não fecha com a largura da palavra e um
+                  lado fixo colidiria quando a barra da ponta é o pico */}
+              <span
+                className={cn(
+                  "absolute -translate-y-full rounded-sm bg-card/90 px-1 text-[10px] font-semibold text-foreground",
+                  (pontos[pontos.length - 1]?.valor ?? 0) <=
+                    (pontos[0]?.valor ?? 0)
+                    ? "end-2"
+                    : "start-2"
+                )}
+              >
                 média
               </span>
             </span>
