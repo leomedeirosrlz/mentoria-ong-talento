@@ -1,11 +1,17 @@
 import { MapPin } from "@phosphor-icons/react/dist/ssr";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
-import { getJovemPerfil } from "@/lib/queries-jovem";
+import {
+  getJovemDuplas,
+  getJovemEncontros,
+  getJovemPerfil,
+} from "@/lib/queries-jovem";
+import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
+import { marcosEntre, maxEncontros, papelLabel } from "@/lib/ciclo";
 import { getMe } from "@/lib/queries";
 import { getChamados, getChamadoDetalhe } from "@/lib/queries-chamados";
 import { JovemChamados } from "@/components/jovem-chamados";
-import { papelLabel } from "@/lib/ciclo";
+import { ConquistasCard } from "./conquistas-card";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { gravatarUrlSeExiste } from "@/lib/gravatar";
 import { Badge } from "@/components/ui/badge";
@@ -37,12 +43,17 @@ export default async function JovemPerfil({
   const cSel = c && UUID_RE.test(c) ? c : null;
   // detalhe junto com a lista: getChamadoDetalhe reaproveita a linha do
   // getChamados (React.cache) em vez de esperar a lista terminar
-  const [me, perfil, meusChamados, detalhe] = await Promise.all([
-    getMe(),
-    getJovemPerfil(),
-    getChamados(),
-    cSel ? getChamadoDetalhe(cSel) : Promise.resolve(null),
-  ]);
+  const [me, perfil, meusChamados, detalhe, duplas, encontros, avaliacoes] =
+    await Promise.all([
+      getMe(),
+      getJovemPerfil(),
+      getChamados(),
+      cSel ? getChamadoDetalhe(cSel) : Promise.resolve(null),
+      // jornada/conquistas: mesmas leituras cacheadas da home
+      getJovemDuplas(),
+      getJovemEncontros(),
+      getJovemAvaliacoes(),
+    ]);
   if (!me) redirect("/login"); // o layout já barra — convenção das páginas
   const tema = temaValido((await cookies()).get(TEMA_COOKIE)?.value);
   const demo = await demoRole();
@@ -53,6 +64,34 @@ export default async function JovemPerfil({
   const avatarUrl = perfil?.avatar_path
     ? avatarPublicUrl(perfil.avatar_path)
     : null;
+  // conquistas (REALIZA-427): mesma derivação da home — realizados por
+  // trilha, sem somar mentor e especialista no mesmo número
+  const trilhaPorDupla = new Map(duplas.map((d) => [d.id, d.trilha]));
+  const realizados = encontros.filter((e) => e.status === "realizado");
+  const feitosDpp = realizados.filter(
+    (e) => trilhaPorDupla.get(e.dupla_id) !== "especialista"
+  ).length;
+  const feitosEsp = realizados.length - feitosDpp;
+  const temDpp = duplas.some((d) => d.trilha !== "especialista");
+  const jornadaAtual = temDpp ? feitosDpp : feitosEsp;
+  const jornadaMeta = maxEncontros(temDpp ? "dpp" : "especialista");
+  const marcos = marcosEntre(0, jornadaAtual, jornadaMeta);
+  const conquistasStats = [
+    temDpp
+      ? `${feitosDpp} de ${jornadaMeta} encontros com seu mentor`
+      : null,
+    feitosEsp > 0
+      ? `${feitosEsp} ${feitosEsp === 1 ? "sessão" : "sessões"} com especialista`
+      : null,
+    avaliacoes.length > 0
+      ? `${avaliacoes.length} ${
+          avaliacoes.length === 1 ? "avaliação enviada" : "avaliações enviadas"
+        }`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   const meta = [
     perfil?.ong_origem?.trim() || null,
     me.cidade && me.uf
@@ -129,6 +168,12 @@ export default async function JovemPerfil({
           )}
 
           <FichaSecao perfil={perfil} />
+
+          {/* mesma condição da home: jornada existe quando há trilha
+              DPP ou sessão de especialista já feita */}
+          {(temDpp || feitosEsp > 0) && (
+            <ConquistasCard marcos={marcos} stats={conquistasStats} />
+          )}
 
           {/* 0084: "Meus pedidos" do jovem mora no perfil — trilha pública
               dos chamados dele, sem comentário interno nem vitrine pro
