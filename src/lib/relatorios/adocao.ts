@@ -318,13 +318,15 @@ export function dadosAdocaoMatrizDemo(
       const peso = w[papel.id] ?? w.todos ?? 0;
       if (peso <= 0) continue;
       const base = pessoasDemo(d, papel.id);
-      const jit = 0.7 + semeado(`${sup.id}:${papel.id}`) * 0.6;
+      // jitter largo de propósito: 0,45–1,6 separa célula quente de cauda
+      // longa — uniforme demais deixava o mapa pálido e sem história
+      const jit = 0.45 + semeado(`${sup.id}:${papel.id}`) * 1.15;
       const pessoas30 = base * peso * jit;
       const pessoas = Math.min(base, Math.round(pessoas30 * fatorPessoas));
       if (pessoas <= 0) continue;
       const gestos = Math.round(
         pessoas30 *
-          (4 + semeado(`g:${sup.id}:${papel.id}`) * 10) *
+          (3 + semeado(`g:${sup.id}:${papel.id}`) * 17) *
           fatorGestos
       );
       out.push({ superficie: sup.id, papel: papel.id, pessoas, gestos });
@@ -386,11 +388,19 @@ export function dadosAdocaoSerieDiaDemo(
     const dia = new Date(hoje.getTime() - i * 86400000)
       .toISOString()
       .slice(0, 10);
+    // dia morto honesto (~5%): ninguém usou — a série precisa de buraco
+    // pra contar a mesma história do dado real
+    if (semeado(`morto:${dia}`) < 0.05 && i > 0) continue;
     const dow = new Date(`${dia}T12:00:00`).getDay();
     const fds = dow === 0 || dow === 6 ? 0.35 : 1;
+    // tendência de crescimento: dias antigos ~62% dos recentes — o
+    // gráfico lê "o uso vem crescendo", não ruído estacionário
+    const tend = 0.62 + ((janela - 1 - i) / Math.max(1, janela - 1)) * 0.75;
+    // pico esporádico (~8%): um dia de campanha/mutirão
+    const pico = semeado(`pico:${dia}`) < 0.08 ? 1.9 : 1;
     for (const [papel, base] of gestosDia) {
       const gestos = Math.round(
-        base * fds * (0.6 + semeado(`${dia}:${papel}`) * 0.8)
+        base * fds * tend * pico * (0.6 + semeado(`${dia}:${papel}`) * 0.8)
       );
       if (gestos <= 0) continue;
       out.push({
@@ -454,9 +464,14 @@ export function dadosAdocaoCoorteDemo(semanas = 10): LinhaCoorte[] {
   for (let c = semanas - 1; c >= 0; c--) {
     const c0 = new Date(segunda.getTime() - c * 7 * 86400000);
     const chave = c0.toISOString().slice(0, 10);
-    const total = 6 + Math.round(semeado(`ct:${chave}`) * 14);
+    // coortes com personalidade: tamanho 5–24 e força inicial 55%–100%
+    // (uma semana de onboarding fraca fica visível na primeira coluna)
+    const total = 5 + Math.round(semeado(`ct:${chave}`) * 19);
+    const forca = 0.55 + semeado(`cf:${chave}`) * 0.45;
+    const queda = 0.05 + semeado(`cq:${chave}`) * 0.1;
     for (let s = 0; s <= c; s++) {
-      const decaimento = s === 0 ? 1 : Math.max(0.15, 0.85 - s * 0.09);
+      const decaimento =
+        s === 0 ? forca : Math.max(0.12, forca - s * queda);
       // ativas nunca passa do total da coorte — o jitter até 1,15 na
       // semana 0 fabricava "108% de retenção"
       const ativas = Math.min(
@@ -487,6 +502,8 @@ export function dadosAdocaoCaminhosDemo(
     ["home", "materiais", "ficha_dupla", 15],
     ["agenda", "ficha_dupla", "agenda", 12],
     ["duplas", "pessoas", "ficha_dupla", 9],
+    ["ajuda", "ia", "home", 7],
+    ["assinar", "home", "duplas", 5],
   ];
   // com recorte de papel a lista demo encolhe pelo peso de presença do
   // papel — caminho de coordenador some quando o filtro é mentorado
@@ -514,19 +531,25 @@ export function dadosAdocaoCaminhosDemo(
 
 export function dadosAdocaoRecentesDemo(janela: number): EventoRecente[] {
   const agora = Date.now();
+  // mistura de ações e superfícies — o feed com pageview atrás de
+  // pageview lê como log, não como pulse do produto
   const base: [string, string, string][] = [
     ["ficha_dupla", "pageview", "mentor_dpp"],
+    ["ia", "dialog", "coordenacao"],
     ["agenda", "pageview", "mentor_dpp"],
-    ["registros", "busca", "coordenacao"],
     ["materiais", "material_aberto", "mentorado"],
+    ["registros", "busca", "coordenacao"],
+    ["formularios", "form_emitido", "coordenacao"],
     ["jovem", "pageview", "mentorado"],
     ["duplas", "sort", "coordenacao"],
     ["home", "pageview", "supervisor"],
-    ["ia", "dialog", "coordenacao"],
+    ["ficha_dupla", "lembrete_whatsapp", "coordenacao"],
     ["registros", "pageview", "mentor_dpp"],
-    ["ficha_dupla", "nudge", "coordenacao"],
     ["pessoas", "busca", "coordenacao"],
-    ["agenda", "pageview", "mentorado"],
+    ["agenda", "pageview", "mentor_especialista"],
+    ["ficha_dupla", "nudge", "coordenacao"],
+    ["ajuda", "pageview", "mentor_dpp"],
+    ["assinar", "pageview", "mentorado"],
   ];
   // janela menor = menos gesto acumulado pra exibir — o feed encolhe
   // junto em vez de repetir os mesmos 12 em qualquer recorte
@@ -534,12 +557,18 @@ export function dadosAdocaoRecentesDemo(janela: number): EventoRecente[] {
     3,
     Math.min(base.length, Math.round((base.length * janela) / 30))
   );
-  return base.slice(0, n).map(([superficie, acao, papel], i) => ({
-    superficie,
-    acao,
-    papel,
-    criado_em: new Date(agora - (i + 1) * 7 * 60000).toISOString(),
-  }));
+  // espaçamento irregular (2–95min) — intervalo fixo lia como mock;
+  // o topo fica quase sempre "há minutos", não já velho
+  let atraso = 0;
+  return base.slice(0, n).map(([superficie, acao, papel], i) => {
+    atraso += 2 + Math.round(semeado(`gap:${superficie}:${i}`) * 93);
+    return {
+      superficie,
+      acao,
+      papel,
+      criado_em: new Date(agora - atraso * 60000).toISOString(),
+    };
+  });
 }
 
 export function dadosFunilInstrumentosDemo(): FunilInstrumento[] {
@@ -576,6 +605,16 @@ export function dadosFunilInstrumentosDemo(): FunilInstrumento[] {
       tardios: 1,
       expirados: 2,
       pendentes: 2,
+    },
+    {
+      // instrumento fraco de propósito — o funil só conta história se
+      // houver contraste: este converte 1 em 5 e expira quase tudo
+      instrumento: "Guia de bolso (pulse)",
+      emitidos: 24,
+      respondidos: 5,
+      tardios: 2,
+      expirados: 14,
+      pendentes: 3,
     },
   ];
 }
