@@ -722,6 +722,97 @@ export function AssistenteBolha({
     }
   };
 
+  // puxar p/ baixo no corpo com o scroll no topo também arrasta a sheet —
+  // overscroll vira gesto de bottom-sheet, não só a alça. Pointer events
+  // não bastam: com pan-y o browser assume o gesto como scroll e emite
+  // pointercancel — então é listener de touch nativa no popup, com move
+  // não-passivo p/ preventDefault. O scrollável mais próximo do dedo manda:
+  // scrollTop>0 = scroll normal; no topo (ou área sem scroll) = puxa a sheet
+  useEffect(() => {
+    if (desktop || !aberto) return;
+    const el = popupRef.current;
+    if (!el) return;
+    let g: {
+      y0: number;
+      x0: number;
+      dy: number;
+      scroller: HTMLElement | null;
+      engatou: boolean;
+    } | null = null;
+    const inicio = (e: TouchEvent) => {
+      // arrastoRef set = a alça pegou este toque no pointerdown (vem antes
+      // do touchstart) — um gesto por vez
+      if (e.touches.length !== 1 || arrastoRef.current) return;
+      const t = e.touches[0];
+      let scroller: HTMLElement | null = null;
+      for (
+        let n = e.target as HTMLElement | null;
+        n && n !== el;
+        n = n.parentElement
+      ) {
+        if (
+          /(auto|scroll)/.test(getComputedStyle(n).overflowY) &&
+          n.scrollHeight > n.clientHeight
+        ) {
+          scroller = n;
+          break;
+        }
+      }
+      g = { y0: t.clientY, x0: t.clientX, dy: 0, scroller, engatou: false };
+    };
+    const mover = (e: TouchEvent) => {
+      if (!g || e.touches.length !== 1) {
+        g = null;
+        return;
+      }
+      const t = e.touches[0];
+      const dy = t.clientY - g.y0;
+      const dx = t.clientX - g.x0;
+      if (!g.engatou) {
+        if (dy <= 2) {
+          // subindo ou indeciso — swipe horizontal mata o gesto
+          if (Math.abs(dx) > 8 && Math.abs(dx) > Math.abs(dy)) g = null;
+          return;
+        }
+        // o scrollável desceu depois do touchstart (scroll normal pegou) —
+        // pull só engata descendo a partir do topo
+        if (g.scroller && g.scroller.scrollTop > 0) {
+          g = null;
+          return;
+        }
+        g.engatou = true;
+      }
+      e.preventDefault();
+      g.dy = Math.max(0, dy);
+      el.style.transform = `translateY(${g.dy}px)`;
+    };
+    const soltar = () => {
+      const fim = g;
+      g = null;
+      if (!fim?.engatou) return;
+      el.style.transform = "";
+      if (fim.dy > 88) {
+        mudar(false); // a saída animada do Sheet termina o gesto
+      } else {
+        el.style.transition = "transform 180ms cubic-bezier(0.2,0,0,1)";
+        setTimeout(() => {
+          if (el.isConnected) el.style.transition = "";
+        }, 200);
+      }
+    };
+    el.addEventListener("touchstart", inicio, { passive: true });
+    el.addEventListener("touchmove", mover, { passive: false });
+    el.addEventListener("touchend", soltar);
+    el.addEventListener("touchcancel", soltar);
+    return () => {
+      g = null;
+      el.removeEventListener("touchstart", inicio);
+      el.removeEventListener("touchmove", mover);
+      el.removeEventListener("touchend", soltar);
+      el.removeEventListener("touchcancel", soltar);
+    };
+  }, [desktop, aberto, mudar]);
+
   // teclado do celular (iOS Safari): a viewport visual encolhe mas a layout
   // não — visualViewport mede a diferença e a sheet sobe junto. Android já
   // cobre via interactive-widget=resizes-content no meta (kb≈0 lá).
