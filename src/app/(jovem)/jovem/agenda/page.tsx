@@ -39,6 +39,7 @@ import {
   linkSeguro,
   maxEncontros,
   passoEsp,
+  toDateStr,
   waLink,
 } from "@/lib/ciclo";
 import {
@@ -51,9 +52,11 @@ import {
   getJovemContatos,
   getJovemDuplas,
   getJovemEncontros,
+  getJovemJornada,
   getJovemPedidosEspecialista,
   getJovemPerfil,
 } from "@/lib/queries-jovem";
+import { datasOficiaisDe } from "@/lib/jornada";
 import { getSlotsLivres } from "@/lib/queries-especialista";
 import { getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
@@ -87,16 +90,27 @@ const STATUS = {
 } as const;
 
 export default async function JovemAgenda() {
-  const [encontros, avaliacoes, me, duplas, contatos, pedidosEsp, perfil] =
-    await Promise.all([
-      getJovemEncontros(),
-      getJovemAvaliacoes(),
-      getMe(),
-      getJovemDuplas(),
-      getJovemContatos(),
-      getJovemPedidosEspecialista(),
-      getJovemPerfil(),
-    ]);
+  const [
+    encontros,
+    avaliacoes,
+    me,
+    duplas,
+    contatos,
+    pedidosEsp,
+    perfil,
+    jornada,
+  ] = await Promise.all([
+    getJovemEncontros(),
+    getJovemAvaliacoes(),
+    getMe(),
+    getJovemDuplas(),
+    getJovemContatos(),
+    getJovemPedidosEspecialista(),
+    getJovemPerfil(),
+    // além dos passos vencidos do retroativo (0208), a RPC é a auto-cura
+    // da jornada — chamar na visita já dispara a emissão devida (0123)
+    getJovemJornada().catch(() => null),
+  ]);
   const agora = new Date().getTime();
   const primeiroNome = (me?.nome_social || me?.nome || "").split(" ")[0];
 
@@ -144,11 +158,21 @@ export default async function JovemAgenda() {
         .filter((n) => !ocupados.has(n))
         .map((n) => ({ numero: n }))
     : [];
-  // retroativo (0207): mesma lista de nº sem row, menos o último do ciclo —
-  // fechar a jornada segue sendo registro do mentor (a RPC recusa também)
+  // retroativo (0207+0208): mesma lista de nº sem row, menos o último do
+  // ciclo — e só passo oficial JÁ VENCIDO (a data do cronograma passou; a
+  // RPC recusa os dois casos também). O cronograma chega pela jovem_jornada
+  // — mesma cautela do acervo: vale se for desta mesma dupla.
+  const vencidosRetro = new Set(
+    (jornada != null && jornada.dupla_id === duplaDpp?.id
+      ? datasOficiaisDe(jornada.cronograma)
+      : []
+    )
+      .filter((e) => e.data <= toDateStr(new Date()))
+      .map((e) => e.numero)
+  );
   const numerosRetro = numerosLivres
     .map((x) => x.numero)
-    .filter((n) => n < maxEncontros("dpp"));
+    .filter((n) => n < maxEncontros("dpp") && vencidosRetro.has(n));
 
   // trilha especialista (111+112): a agenda real do especialista chega como
   // PROJEÇÃO de slots (especialista_slots_livres — timestamptz pronto) e

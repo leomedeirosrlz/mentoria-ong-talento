@@ -1137,6 +1137,7 @@ export default async function PessoaPerfilPage({
                         id={docId}
                         nome={perfil.fichaJovem?.nome ?? p.nome}
                         whatsapp={perfil.fichaJovem?.whatsapp ?? p.whatsapp}
+                        voluntario={"voluntario" in p ? p.voluntario : undefined}
                       />
                     </div>
                   </div>

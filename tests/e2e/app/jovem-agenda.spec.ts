@@ -976,5 +976,41 @@ test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
       `select=status&dupla_id=eq.${DUPLA_ID}&numero=eq.10`
     );
     expect(r10.status).toBe("nao_aconteceu");
+
+    // 0208: passo oficial ainda não vencido não nasce retroativo — criar
+    // antes da data do guia pularia o gating da jornada e trancaria um
+    // realizado irreversível pro mentor. O nº vem do cronograma real
+    // (dinâmico: "hoje" anda e a lista de vencidos só cresce)
+    const [{ cronograma_id: cronId }] = await buscarViaServiceRole<
+      { cronograma_id: string }[]
+    >("duplas", `select=cronograma_id&id=eq.${DUPLA_ID}`);
+    const hoje = new Date().toISOString().slice(0, 10);
+    const [naoVencido] = await buscarViaServiceRole<{ numero: number }[]>(
+      "ciclo_eventos",
+      `select=numero&cronograma_id=eq.${cronId}&tipo=eq.encontro&data=gt.${hoje}&numero=lt.16&order=numero.desc&limit=1`
+    );
+    if (naoVencido) {
+      const cedo = await rpc({
+        p_dupla: DUPLA_ID,
+        p_numero: naoVencido.numero,
+        p_data_hora: new Date(Date.now() - 86400e3).toISOString(),
+      });
+      expect((await cedo.json()).error).toContain("data oficial");
+    }
+
+    // 0208: agendado ainda futuro não vira realizado por aqui — mesmo
+    // guard da 0121 ("aconteceu" só depois da hora marcada)
+    const ag9 = await criarAgendado(9, 10);
+    const cedo9 = await rpc({
+      p_dupla: DUPLA_ID,
+      p_numero: 9,
+      p_data_hora: new Date(Date.now() - 86400e3).toISOString(),
+    });
+    expect((await cedo9.json()).error).toContain("futuro");
+    const [r9] = await buscarViaServiceRole<{ status: string }[]>(
+      "encontros",
+      `select=status&id=eq.${String(ag9.id)}`
+    );
+    expect(r9.status).toBe("agendado");
   });
 });

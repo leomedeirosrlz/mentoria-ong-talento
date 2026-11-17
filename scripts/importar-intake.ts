@@ -31,6 +31,10 @@ import {
 import { normalizaNomeSocial } from "../src/lib/forms/normaliza";
 import { nomeProprio } from "../src/lib/utils";
 import { parseDisponibilidade } from "../src/lib/ciclo";
+import {
+  emitirDocumentosMentorado,
+  templatesMentoradoAtivos,
+} from "../src/lib/documentos/emissao";
 
 const APPLY = process.argv.includes("--apply");
 const dirArg = process.argv.find((a) => a.startsWith("--dir="));
@@ -262,9 +266,42 @@ async function importaMentorados(linhas: LinhaImportada[]) {
   }
   console.log(`  ${validas.length} válidas para insert`);
   if (!APPLY || !validas.length) return;
-  const { error } = await supabase.from("mentorados").insert(validas);
+  const { data: criados, error } = await supabase
+    .from("mentorados")
+    .insert(validas)
+    .select("id, data_nascimento");
   if (error) console.error(`  FALHA insert mentorados: ${error.message}`);
-  else ok(`${validas.length} mentorados criados`);
+  else {
+    ok(`${criados.length} mentorados criados`);
+    // todo caminho de criação emite os documentos devidos (REALIZA-436):
+    // termo sempre, autorização do responsável pra menor — mesmo miolo do
+    // cadastro pelo form/CSV do app
+    const tpls = await templatesMentoradoAtivos(supabase as never);
+    let docsOk = 0;
+    let docsFalha = 0;
+    for (const m of criados) {
+      try {
+        const falhas = await emitirDocumentosMentorado(
+          supabase as never,
+          tpls,
+          {
+            mentoradoId: m.id,
+            dataNascimento: m.data_nascimento,
+            // service key não tem profile — created_by null (self)
+            createdBy: null as unknown as string,
+          }
+        );
+        if (falhas.length) docsFalha++;
+        else docsOk++;
+      } catch (e) {
+        docsFalha++;
+        console.error(`  emissão ${m.id}:`, e);
+      }
+    }
+    if (docsFalha)
+      console.error(`  ${docsFalha} mentorado(s) com emissão incompleta`);
+    if (docsOk) ok(`documentos emitidos pra ${docsOk} mentorado(s)`);
+  }
 }
 
 // ---------- 3) anexos ----------

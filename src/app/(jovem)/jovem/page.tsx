@@ -308,9 +308,20 @@ export default async function JovemHome() {
     duplaDppId != null && numeroAgendar != null
       ? { duplaId: duplaDppId, numero: numeroAgendar }
       : null;
-  // retroativo (0207): nº sem row, menos o último do ciclo — fechar a
-  // jornada segue sendo registro do mentor (a RPC recusa também)
-  const numerosRetro = livres.filter((n) => n < maxEncontros("dpp"));
+  // retroativo (0207+0208): nº sem row, menos o último do ciclo — e só
+  // passo oficial JÁ VENCIDO (a RPC recusa os dois casos também). Mesma
+  // cautela do acervo: o cronograma vale se é desta mesma dupla.
+  const vencidosRetro = new Set(
+    (jornada?.dupla_id === duplaDppId
+      ? datasOficiaisDe(jornada.cronograma)
+      : []
+    )
+      .filter((e) => e.data <= hoje)
+      .map((e) => e.numero)
+  );
+  const numerosRetro = livres.filter(
+    (n) => n < maxEncontros("dpp") && vencidosRetro.has(n)
+  );
 
   // o lápis "trocar link" do próximo encontro — mesmo recorte da agenda:
   // agendado de dupla ativa e DPP (a RPC do jovem não escreve na trilha esp)
