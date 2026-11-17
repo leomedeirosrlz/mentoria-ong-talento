@@ -64,6 +64,10 @@ import {
   sincronizarMatchingPerfilPessoa,
 } from "./ia/matching";
 import { bloqueioTrocaPapel } from "./papel-vinculo";
+import {
+  emitirDocumentosMentorado,
+  templatesMentoradoAtivos,
+} from "./documentos/emissao";
 import { AUDIENCIAS, audienciaLegada } from "./materiais";
 import { ROLES_POR_AUDIENCIA, SITE_URL } from "@/lib/email";
 import { emailChamadoUrgencia } from "@/lib/email-templates";
@@ -677,6 +681,26 @@ export async function createMentorado(formData: FormData) {
   } else {
     aviso = foto.aviso;
   }
+
+  // documentos de assinatura nascem com o cadastro (REALIZA-436) — mesma
+  // gravação da emissão manual; falha vira aviso, nunca derruba o cadastro
+  const tplsDoc = await templatesMentoradoAtivos(supabase);
+  const falhasDoc = await emitirDocumentosMentorado(supabase, tplsDoc, {
+    mentoradoId: mentorado.id,
+    dataNascimento: ficha.data_nascimento,
+    createdBy: eu.id,
+  });
+  if (falhasDoc.length) {
+    aviso = [
+      aviso,
+      falhasDoc.length > 1
+        ? "Os documentos de assinatura não foram emitidos. Emita pela ficha da pessoa."
+        : "Um documento de assinatura não foi emitido. Emita pela ficha da pessoa.",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  }
+
   depoisDe(() => sincronizarMatchingPerfilMentorado(mentorado.id));
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${mentorado.id}`);
@@ -2702,6 +2726,33 @@ export async function importMentorados(rows: LinhaImportada[]) {
         await sincronizarMatchingPerfilMentorado(id);
       }
     });
+  }
+
+  // documentos dos recém-cadastrados (REALIZA-436) — idem createMentorado:
+  // sequencial de propósito e falha agregada num aviso, nunca derruba o
+  // lote. data_nascimento vem da view coord-only (o select da coluna na
+  // tabela é revogado desde a 0034)
+  const { data: pessoais } = await supabase
+    .from("mentorados_pessoal")
+    .select("id, data_nascimento")
+    .in("id", idsNovos);
+  const nascPorId = new Map(
+    (pessoais ?? []).map((p) => [p.id, p.data_nascimento])
+  );
+  const tplsDoc = await templatesMentoradoAtivos(supabase);
+  let docsFalharam = 0;
+  for (const id of idsNovos) {
+    const falhas = await emitirDocumentosMentorado(supabase, tplsDoc, {
+      mentoradoId: id,
+      dataNascimento: nascPorId.get(id),
+      createdBy: eu.id,
+    });
+    if (falhas.length) docsFalharam++;
+  }
+  if (docsFalharam) {
+    puladas.push(
+      `Aviso: documentos de assinatura não foram emitidos pra ${docsFalharam} cadastro(s). Emita pela ficha ou pelo "Enviar termos".`
+    );
   }
   revalidatePath("/pessoas");
   return { ok: true, criados: validas.length, puladas };

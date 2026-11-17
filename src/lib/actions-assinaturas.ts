@@ -11,6 +11,7 @@ import {
   TEMPLATES_POR_TIPO,
   type TipoAlvoAssinatura,
 } from "./documentos/texto";
+import { emitirUm } from "./documentos/emissao";
 import { enviarEmailsIndividuais, SITE_URL } from "./email";
 import { emailDocumentoAssinatura } from "./email-templates";
 import { ipCliente } from "./ip";
@@ -122,9 +123,6 @@ function parseTextoAssinatura(f: FormData): string | { error: string } {
 
 type Supa = Awaited<ReturnType<typeof createClient>>;
 
-const em30d = () =>
-  new Date(Date.now() + 30 * 24 * 3600 * 1000).toISOString();
-
 /** Faltantes civis de um alvo, via views *_pessoal (coord-only — a action já
  *  passou pelo gate de papel). Devolve labels, nunca valores: vão pro
  *  client/toast sem carregar PII. Não bloqueia a emissão. */
@@ -167,81 +165,6 @@ async function faltantesDoAlvo(
     dados_civis: (data?.dados_civis ?? null) as DadosCivis | null,
     responsavel: (data?.responsavel ?? null) as ResponsavelCivis | null,
   });
-}
-
-/** Emite (ou reusa) o link de um alvo respeitando `assinaturas_viva_uk`
- *  (0053): uma row viva por alvo×template. Pendente com token vencido é
- *  link morto — em vez de reusar, regenera o token na mesma row (equivale
- *  ao "Reenviar" da ficha). "assinado" quando a viva já é a assinatura,
- *  null quando nem insert nem re-select deram link. */
-async function emitirUm(
-  supabase: Supa,
-  tplId: string,
-  tipo: TipoAlvoAssinatura,
-  alvoId: string,
-  createdBy: string
-): Promise<
-  { token: string; existente: boolean; criado_em: string | null } | "assinado" | null
-> {
-  const col = tipo === "profile" ? "profile_id" : "mentorado_id";
-  const selViva = () =>
-    supabase
-      .from("assinaturas")
-      .select("id, token, status, token_expira_em, created_at")
-      .eq(col, alvoId)
-      .eq("template_id", tplId)
-      .in("status", ["pendente", "assinado"])
-      .maybeSingle();
-
-  const { data: viva } = await selViva();
-  if (viva?.status === "assinado") return "assinado";
-  if (viva) {
-    const vencido =
-      viva.token_expira_em != null && new Date(viva.token_expira_em) < new Date();
-    if (!vencido)
-      return { token: viva.token, existente: true, criado_em: viva.created_at };
-    // pendente morta: regenera o token na mesma row (token novo, +30d)
-    const { data: novoToken, error: errRegen } = await supabase.rpc(
-      "regenerar_token_assinatura",
-      { p_id: viva.id }
-    );
-    if (errRegen || !novoToken) {
-      console.error("emitirUm: regen", errRegen);
-      return null;
-    }
-    return { token: novoToken, existente: true, criado_em: viva.created_at };
-  }
-
-  const { data, error } = await supabase
-    .from("assinaturas")
-    .insert(
-      tipo === "profile"
-        ? {
-            template_id: tplId,
-            profile_id: alvoId,
-            created_by: createdBy,
-            token_expira_em: em30d(),
-          }
-        : {
-            template_id: tplId,
-            mentorado_id: alvoId,
-            created_by: createdBy,
-            token_expira_em: em30d(),
-          }
-    )
-    .select("token, created_at")
-    .single();
-  if (!error && data)
-    return { token: data.token, existente: false, criado_em: data.created_at };
-
-  // perdeu a corrida da unique (dois cliques/emissões simultâneas) — a viva
-  // existe e é única; re-seleciona e devolve o que há. Antes, loga: sem
-  // isso um erro de RLS/FK é indistinguível de corrida e some em silêncio.
-  if (error) console.error("emitirUm: insert", error);
-  const { data: retry } = await selViva();
-  if (retry?.status === "assinado") return "assinado";
-  if (retry) return { token: retry.token, existente: true, criado_em: retry.created_at };
-  return null;
 }
 
 /** Coord emite um documento pela ficha — devolve o link tokenizado pra
@@ -672,6 +595,32 @@ export async function subirContraAssinatura(formData: FormData) {
     });
   if (error) return { error: "Não foi possível subir a imagem." };
   return { ok: true };
+}
+
+// ---------- autoemissão no login ----------
+
+/** Auto-cura do login (0206): garante emitidos — como pendente, assinado
+ *  ou revogado pela coordenação — todos os documentos devidos do papel da
+ *  pessoa logada (termo-voluntario pra staff voluntária; o pool do
+ *  mentorado pra jovem com ficha, + autorizacao-responsavel pra menor).
+ *  A RPC é idempotente e self-scoped, então rodar a cada mount do shell
+ *  é barato e cobre o 1º login e a conta antiga com documento novo —
+ *  emito no mesmo request que lê a pendência, o banner e o wizard já
+ *  sobem com o documento. Erro fica no log, nunca no caminho do login. */
+export async function garantirDocumentosDevidos() {
+  if (await demoAtivo()) return { ok: true };
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase.rpc("garantir_documentos_devidos");
+    if (error) {
+      console.error("garantirDocumentosDevidos:", error);
+      return { error: "Não foi possível garantir os documentos." };
+    }
+    return { ok: true };
+  } catch (e) {
+    console.error("garantirDocumentosDevidos:", e);
+    return { error: "Não foi possível garantir os documentos." };
+  }
 }
 
 // ---------- signatário logado (termo do voluntário) ----------

@@ -19,6 +19,10 @@ import {
   superficieDaOrigem,
 } from "../produto-eventos-server";
 import type { CorRaca, Genero, PrefGeneroPar } from "../types";
+import {
+  emitirDocumentosMentorado,
+  templatesMentoradoAtivos,
+} from "../documentos/emissao";
 
 // Actions da engine de formulários (0034).
 // · coordenação: salvar/ativar/excluir forms, gerar e revogar links
@@ -810,8 +814,8 @@ export async function promoverRespostaIntake(respostaId: string) {
  *  a segunda desfaz o insert e avisa. */
 export async function finalizarPromocaoIntake(respostaId: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
-  const { supabase, error } = await meCoord();
-  if (error) return { error };
+  const { supabase, eu, error } = await meCoord();
+  if (error || !eu) return { error: error! };
   if (!UUID_RE.test(respostaId)) return { error: "Resposta inválida." };
 
   const { data: r, error: rErr } = await supabase
@@ -991,6 +995,27 @@ export async function finalizarPromocaoIntake(respostaId: string) {
       }
     } else {
       aviso = "Cadastro feito, mas a foto não entrou. Suba na edição.";
+    }
+  }
+
+  // idem cadastro manual (REALIZA-436): documentos de assinatura nascem
+  // com a promoção — depois do carimbo, que é o ponto sem volta do mentorado
+  if (pessoaTabela === "mentorados" && pessoaId) {
+    const tplsDoc = await templatesMentoradoAtivos(supabase);
+    const falhasDoc = await emitirDocumentosMentorado(supabase, tplsDoc, {
+      mentoradoId: pessoaId,
+      dataNascimento: ficha.data_nascimento,
+      createdBy: eu.id,
+    });
+    if (falhasDoc.length) {
+      aviso = [
+        aviso,
+        falhasDoc.length > 1
+          ? "Os documentos de assinatura não foram emitidos. Emita pela ficha da pessoa."
+          : "Um documento de assinatura não foi emitido. Emita pela ficha da pessoa.",
+      ]
+        .filter(Boolean)
+        .join(" ");
     }
   }
 
