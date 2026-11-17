@@ -85,9 +85,9 @@ export async function salvarDisponibilidadeJovem(
   return { ok: true };
 }
 
-/** Ficha do programa editável pelo próprio jovem (REALIZA-420) — os 4
- *  campos auto-descritivos (objetivos, motivação, escolaridade, origem)
- *  descem pela RPC jovem_update_ficha (0200): a whitelist de colunas mora
+/** Ficha do programa editável pelo próprio jovem (REALIZA-420) — os 3
+ *  campos auto-descritivos (objetivos, motivação, escolaridade) descem
+ *  pela RPC jovem_update_ficha (0200/0202): a whitelist de colunas mora
  *  no banco, porque mentorados não tem UPDATE pro papel. A validação
  *  espelha camposFicha (trim + teto dos CHECKs da 0034) pra devolver o
  *  erro claro em vez do 23514; a RPC revalida de novo no servidor. O form
@@ -104,7 +104,6 @@ export async function salvarFichaJovem(formData: FormData) {
   for (const [k, max, rotulo] of [
     ["objetivos", 2000, "Objetivos com a mentoria"],
     ["motivacao", 2000, "Motivação"],
-    ["origem", 300, "Como você chegou ao programa"],
   ] as const) {
     const v = String(formData.get(k) ?? "").trim() || null;
     if (v && v.length > max) {
@@ -129,7 +128,6 @@ export async function salvarFichaJovem(formData: FormData) {
     p_objetivos: campos.objetivos,
     p_motivacao: campos.motivacao,
     p_escolaridade: campos.escolaridade,
-    p_origem: campos.origem,
   });
   if (error) return { error: erroAmigavel(error) };
   revalidatePath("/jovem/perfil");

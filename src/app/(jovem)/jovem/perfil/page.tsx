@@ -24,7 +24,6 @@ import {
   FotoPerfil,
 } from "./perfil-form";
 import { PrivacidadeCard } from "./privacidade-card";
-import { TokensMcp } from "@/components/tokens-mcp";
 import { demoRole } from "@/lib/demo/mode";
 import { TEMA_COOKIE, temaValido } from "@/lib/tema";
 import type { Disponibilidade } from "@/lib/types";
@@ -144,16 +143,13 @@ export default async function JovemPerfil({
               {me.bio}
             </p>
           ) : null}
-          <p className="mt-3 text-xs text-muted-foreground">
-            Sem foto, usamos a do seu e-mail.
-          </p>
         </div>
       </header>
 
       {/* mesma partição do /perfil de staff em xl: coluna principal com o
           que o jovem edita e acompanha; trilho com os cartões de conta
-          (privacidade, IA externa, sessão) — abaixo de xl empilha tudo na
-          ordem mobile que já existia */}
+          (privacidade, sessão) — abaixo de xl empilha tudo na ordem
+          mobile que já existia */}
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_340px]">
         <div className="min-w-0 space-y-6">
           <DadosSecao me={me} />
@@ -200,28 +196,6 @@ export default async function JovemPerfil({
             compartilhado={perfil?.contato_compartilhado ?? false}
             temWhatsapp={perfil?.whatsapp != null}
           />
-          {/* PAT de IA externa — a credencial pessoal do jovem mora junto da
-              Conta; demo não monta (sem sessão real a RLS derrubaria o
-              insert) */}
-          {!demo && (
-            <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
-              <h2 className="text-base font-semibold">Conectar IA externa</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Conecte uma IA externa (Claude, ChatGPT…) à sua conta com um
-                token. Ela só vê e faz o que você mesmo faria aqui no app.
-              </p>
-              <TokensMcp
-                className="mt-4"
-                textos={{
-                  gerar: "Gerar token",
-                  campoRotulo: {
-                    label: "Nome do token",
-                    placeholder: "ex.: ChatGPT",
-                  },
-                }}
-              />
-            </section>
-          )}
           <ContaSecao me={me} tema={tema} />
         </div>
       </div>

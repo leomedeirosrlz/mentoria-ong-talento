@@ -429,6 +429,17 @@ export default async function JovemAgenda() {
                       rotuloEsp={rotuloSessao(e)}
                     />
                   ))}
+                  {/* mesma orientação do rodapé de avaliações da home: o
+                      encontro que faltou entra por agendamento (o jovem
+                      marca futuro; retroativo é registro do mentor) */}
+                  {duplaDpp && (
+                    <p className="px-4 py-3 text-xs text-muted-foreground sm:px-6">
+                      Fez um encontro que não apareceu aqui? Só dá pra
+                      avaliar encontro agendado: se ele ainda vai acontecer,
+                      agende pelo botão no topo da página; se já aconteceu
+                      sem marcar, peça pro seu mentor registrar.
+                    </p>
+                  )}
                 </CardContent>
               </Card>
             </section>

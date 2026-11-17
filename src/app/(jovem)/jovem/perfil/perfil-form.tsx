@@ -69,8 +69,8 @@ import type {
 /** Perfil do jovem no desenho do /perfil de staff — mesmos primitivos
  *  (Linha, lápis→Dialog, ContaLinha): a diferença honesta é o escopo —
  *  dados de conta e apresentação descem em profiles via updateMeuPerfil
- *  (o canônico); os 4 auto-descritivos da ficha (objetivos, motivação,
- *  escolaridade, origem) vão pela RPC jovem_update_ficha porque
+ *  (o canônico); os 3 auto-descritivos da ficha (objetivos, motivação,
+ *  escolaridade) vão pela RPC jovem_update_ficha porque
  *  mentorados não tem UPDATE pro papel. */
 function DialogoDados({ me }: { me: Profile }) {
   const [open, setOpen] = useState(false);
@@ -318,7 +318,7 @@ export function FotoPerfil({
 
 /** Corpo do Dialog da ficha — estado próprio e Salvar que chama a RPC
  *  jovem_update_ficha: a escrita é em mentorados, então não usa FormSecao
- *  (que posta pro updateMeuPerfil de profiles). Os 4 campos sempre descem
+ *  (que posta pro updateMeuPerfil de profiles). Os 3 campos sempre descem
  *  juntos; vazio vira "limpar" no servidor. */
 function FormFichaJovem({
   perfil,
@@ -373,19 +373,7 @@ function FormFichaJovem({
           placeholder="O que te trouxe até aqui"
         />
       </div>
-      <div className="grid gap-4 sm:grid-cols-2">
-        <CampoEscolaridade defaultValue={perfil.escolaridade ?? ""} />
-        <div className="space-y-2">
-          <Label htmlFor="jf-origem">Como você chegou ao programa</Label>
-          <Input
-            id="jf-origem"
-            name="origem"
-            maxLength={300}
-            defaultValue={perfil.origem ?? ""}
-            placeholder="Escola, ONG, indicação…"
-          />
-        </div>
-      </div>
+      <CampoEscolaridade defaultValue={perfil.escolaridade ?? ""} />
       <DialogFooter sticky>
         <DialogClose render={<Button type="button" variant="outline" />}>
           Cancelar
@@ -422,9 +410,9 @@ function DialogoFicha({ perfil }: { perfil: JovemPerfil }) {
 /** "Sua ficha no programa" (REALIZA-420) — a gaveta no molde do staff:
  *  summary com badge de pendências + lápis que abre o Dialog (o onClick
  *  da summary segura o toggle — ver cliqueSoDoDialog). Os auto-descritivos
- *  ganharam edição própria; o que é da coordenação (ONG de origem e o
- *  que não aparece aqui) continua só leitura. Pendência = campo editável
- *  vazio; origem não conta — corrigir é bônus, não obrigação. */
+ *  ganharam edição própria; o que é da coordenação (ONG de origem, como
+ *  você chegou — dado de importação/matching, REALIZA-429 — e o que não
+ *  aparece aqui) continua só leitura. Pendência = campo editável vazio. */
 export function FichaSecao({ perfil }: { perfil: JovemPerfil | null }) {
   const escolaridadeRotulo = perfil?.escolaridade
     ? (ESCOLARIDADE_LABELS[perfil.escolaridade as Escolaridade] ??
@@ -508,8 +496,8 @@ export function FichaSecao({ perfil }: { perfil: JovemPerfil | null }) {
               />
             </dl>
             <p className="mt-4 text-xs text-muted-foreground">
-              Objetivos, motivação, escolaridade e origem você edita no
-              lápis. O resto da ficha a coordenação mantém.
+              Objetivos, motivação e escolaridade você edita no lápis. O
+              resto da ficha a coordenação mantém.
             </p>
           </>
         )}

@@ -632,9 +632,15 @@ export default async function JovemHome() {
               />
               {duplaEmCurso && (
                 <p className="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground sm:px-6">
-                  Quer avaliar um encontro que não apareceu aqui? Ele precisa
-                  estar agendado primeiro. Peça pro seu mentor registrar na
-                  agenda, mesmo que já tenha acontecido.
+                  Quer avaliar um encontro que não apareceu aqui? Só dá pra
+                  avaliar encontro agendado: se ele ainda vai acontecer,{" "}
+                  <Link
+                    href="/jovem/agenda"
+                    className="font-medium underline underline-offset-2 hover:text-foreground"
+                  >
+                    agende você na sua agenda
+                  </Link>
+                  ; se já aconteceu sem marcar, peça pro seu mentor registrar.
                 </p>
               )}
             </CardContent>
