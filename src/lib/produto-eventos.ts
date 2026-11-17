@@ -6,6 +6,7 @@
  *  migration de uma linha + esta lista. */
 export type AcaoProduto =
   | "pageview"
+  | "clique"
   | "busca"
   | "sort"
   | "dialog"

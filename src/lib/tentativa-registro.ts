@@ -9,43 +9,16 @@
 // wrapper, pra não espalhar `if demo`/try-catch pelo componente.
 
 import { demoAtivoClient } from "@/lib/demo/shared";
+import { dispositivoAtual, type ClasseDispositivo } from "@/lib/dispositivo";
 import { createClient } from "@/lib/supabase/client";
 
 /** Superfície em que o form abriu — casa com o CHECK do banco. */
 export type OrigemTentativa = "novo" | "retroativo" | "edicao";
-/** Heurística do client — casa com o CHECK do banco. */
-export type DispositivoTentativa = "mobile" | "desktop" | "tablet";
-
-/** Mede a experiência de tela, não o hardware — pura, recebe os sinais
- *  (o wrapper lê os globals): UA móvel/tablet primeiro (iPadOS 13+ se
- *  anuncia como Mac — o fator toque desempata), e uma janela desktop
- *  estreita conta como mobile porque é essa a leitura que o redesign
- *  "1 minuto no celular" precisa. */
-export function dispositivoDe(
-  ua: string,
-  touchPoints: number,
-  viewportWidth: number | null
-): DispositivoTentativa {
-  if (/tablet|ipad|playbook|silk/i.test(ua)) return "tablet";
-  const touchMac = /macintosh/i.test(ua) && touchPoints > 1;
-  if (
-    /mobi|android|iphone|ipod|blackberry|windows phone/i.test(ua) ||
-    touchMac
-  ) {
-    return "mobile";
-  }
-  if (viewportWidth != null && viewportWidth < 768) return "mobile";
-  return "desktop";
-}
-
-export function dispositivoAtual(): DispositivoTentativa {
-  if (typeof navigator === "undefined") return "desktop";
-  return dispositivoDe(
-    navigator.userAgent,
-    navigator.maxTouchPoints,
-    typeof window === "undefined" ? null : window.innerWidth
-  );
-}
+/** Heurística do client — casa com o CHECK do banco. Vive em
+ *  lib/dispositivo (o beacon de adoção classifica a mesma coisa); o
+ *  alias e o re-export mantêm o nome histórico deste módulo. */
+export type DispositivoTentativa = ClasseDispositivo;
+export { dispositivoDe, dispositivoAtual } from "@/lib/dispositivo";
 
 /** Abertura do form → uma tentativa. Devolve o id (uuid) ou null — null
  *  é "telemetria desligada" (demo, sem papel, dupla fora do escopo): as

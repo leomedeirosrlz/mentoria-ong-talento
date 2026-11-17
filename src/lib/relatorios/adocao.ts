@@ -18,6 +18,7 @@ import {
   type ResumoAdocao,
 } from "@/lib/adocao";
 import type { DemoData } from "@/lib/demo/data";
+import type { ClasseDispositivo } from "@/lib/dispositivo";
 
 type Supa = SupabaseClient;
 
@@ -640,7 +641,8 @@ const PAPEL_DEMO_ROLES: Record<string, string[]> = {
 };
 
 const ACOES_PESO: [string, number][] = [
-  ["pageview", 68],
+  ["pageview", 50],
+  ["clique", 18],
   ["busca", 10],
   ["sort", 8],
   ["dialog", 6],
@@ -649,6 +651,41 @@ const ACOES_PESO: [string, number][] = [
   ["form_emitido", 1],
   ["lembrete_whatsapp", 1],
 ];
+
+// REALIZA-433 — meta demo dos gestos ricos: os presets de viewport e
+// heatmap do explorador precisam de vw/vh/dev/x/y pra falar na demo
+// (dataset real sem eles = query vazia, que lê como quebra).
+// Viewports plausíveis do parque — celular domina, tablet é raro.
+const VIEWPORTS_DEMO: [number, number, ClasseDispositivo][] = [
+  [390, 844, "mobile"],
+  [360, 800, "mobile"],
+  [412, 915, "mobile"],
+  [768, 1024, "tablet"],
+  [1366, 768, "desktop"],
+  [1440, 900, "desktop"],
+];
+
+/** viewport determinístico por gesto — a demo repete os mesmos
+ *  números entre renders (semeado, não Math.random). */
+function viewportDemo(chave: string) {
+  const v =
+    VIEWPORTS_DEMO[
+      Math.floor(semeado(`v:${chave}`) * VIEWPORTS_DEMO.length)
+    ]!;
+  return { vw: v[0], vh: v[1], dev: v[2] };
+}
+
+/** toque dentro da própria tela do gesto — x/y menores que vw/vh pro
+ *  heatmap cair sempre na grade 10×10. */
+function cliqueDemo(chave: string) {
+  const vp = viewportDemo(chave);
+  return {
+    x: Math.round(semeado(`x:${chave}`) * vp.vw),
+    y: Math.round(semeado(`y:${chave}`) * vp.vh),
+    vw: vp.vw,
+    vh: vp.vh,
+  };
+}
 
 export function dadosAdocaoEventosDemo(
   d: DemoData,
@@ -707,8 +744,10 @@ export function dadosAdocaoEventosDemo(
           acao === "busca"
             ? { q: "exemplo" }
             : acao === "pageview"
-              ? { path: `/${c.superficie}` }
-              : {},
+              ? { path: `/${c.superficie}`, ...viewportDemo(chave) }
+              : acao === "clique"
+                ? cliqueDemo(chave)
+                : {},
         created_at: criado,
       });
     }

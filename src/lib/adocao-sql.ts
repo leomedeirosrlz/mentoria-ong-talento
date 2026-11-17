@@ -59,6 +59,71 @@ order by gestos desc
 limit 20`,
   },
   {
+    id: "jornada",
+    rotulo: "Jornada de uma pessoa",
+    // o explorador não tem parâmetro: o chip roda com a pessoa mais
+    // ativa do período e o comentário inicial (que o guard despreza na
+    // validação mas a caixa mostra) ensina a trocar pra outro id
+    sql: `-- Jornada de uma pessoa: a sequência de gestos no tempo.
+-- Roda com a pessoa mais ativa do período. Pra ver outra, troque a
+-- subconsulta do WHERE pelo profile_id dela entre aspas — o chip
+-- "Pessoas mais ativas" lista os ids.
+select created_at, superficie, acao, meta
+from ${TABELA_EVENTOS}
+where profile_id = (
+  select profile_id
+  from ${TABELA_EVENTOS}
+  group by profile_id
+  order by count(*) desc
+  limit 1
+)
+order by created_at
+limit 300`,
+  },
+  {
+    id: "heatmap",
+    rotulo: "Heatmap de cliques",
+    sql: `-- Toques normalizados pela tela de cada gesto: grade 10×10 —
+-- fx/fy de 0 a 9 dizem onde na superfície o dedo ou o mouse caiu,
+-- somando telas de tamanhos diferentes na mesma célula.
+select superficie,
+  least(greatest(floor(
+    (meta->>'x')::double / nullif((meta->>'vw')::double, 0) * 10
+  ), 0), 9)::int as fx,
+  least(greatest(floor(
+    (meta->>'y')::double / nullif((meta->>'vh')::double, 0) * 10
+  ), 0), 9)::int as fy,
+  count(*) as toques
+from ${TABELA_EVENTOS}
+where acao = 'clique'
+  and meta->>'x' is not null
+  and meta->>'vw' is not null
+group by 1, 2, 3
+order by superficie, fy, fx`,
+  },
+  {
+    id: "viewport",
+    rotulo: "Viewport dos usuários",
+    sql: `-- Largura de tela × classe de dispositivo nos pageviews.
+-- vw/vh/dev entram na coleta da fase de telemetria rica — gestos
+-- mais antigos sem meta.vw ficam de fora de propósito.
+select coalesce(meta->>'dev', 'sem classe') as dispositivo,
+  case
+    when (meta->>'vw')::int < 640 then 'até 639'
+    when (meta->>'vw')::int < 768 then '640 a 767'
+    when (meta->>'vw')::int < 1024 then '768 a 1023'
+    when (meta->>'vw')::int < 1280 then '1024 a 1279'
+    else '1280 ou mais'
+  end as faixa,
+  count(distinct profile_id) as pessoas,
+  count(*) as pageviews
+from ${TABELA_EVENTOS}
+where acao = 'pageview'
+  and meta->>'vw' is not null
+group by 1, 2
+order by min((meta->>'vw')::int), 1`,
+  },
+  {
     id: "cru",
     rotulo: "Amostra crua",
     sql: `select * from ${TABELA_EVENTOS}

@@ -27,6 +27,7 @@ type EventoVivo = EventoRecente & { novo?: boolean };
 
 const ROTULO_ACAO: Record<string, string> = {
   pageview: "visitou",
+  clique: "clicou em",
   busca: "buscou",
   sort: "ordenou",
   dialog: "abriu a Liza em",
