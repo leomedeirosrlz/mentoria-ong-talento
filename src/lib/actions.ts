@@ -65,7 +65,9 @@ import {
 } from "./ia/matching";
 import { bloqueioTrocaPapel } from "./papel-vinculo";
 import { AUDIENCIAS, audienciaLegada } from "./materiais";
-import { ROLES_POR_AUDIENCIA } from "@/lib/email";
+import { ROLES_POR_AUDIENCIA, SITE_URL } from "@/lib/email";
+import { emailChamadoUrgencia } from "@/lib/email-templates";
+import { enviaEmailChamadoDepois } from "./actions-chamados";
 import {
   dispararComunicadoEmail,
   dispararMaterialEmail,
@@ -3446,6 +3448,36 @@ export async function salvarRegistro(formData: FormData) {
   const aviso = avisos.length
     ? `${avisos.join(" ")} Confira a lista de combinados.`
     : undefined;
+
+  // flag "preciso de apoio" recém-ligada → o trigger do 0084 abriu o
+  // chamado dentro da transação, sem action no caminho: o e-mail
+  // redundante pro staff não sairia. A RPC definer devolve o chamado
+  // recém-nascido + os destinatários (o mentor não lê e-mail de profile
+  // alheio) e o envio segue o padrão dos chamados — depois da resposta,
+  // nunca bloqueando o registro.
+  if (formData.get("precisa_apoio") === "on" && !regExistente?.precisa_apoio) {
+    const { data: ch } = await supabase.rpc("chamado_do_registro", {
+      p_registro_id: registro.id,
+    });
+    const dests = ((ch?.destinatarios ?? []) as { email?: string | null }[])
+      .map((d) => d.email)
+      .filter((e): e is string => !!e);
+    if (ch?.id && dests.length) {
+      enviaEmailChamadoDepois(supabase, {
+        chamadoId: ch.id as string,
+        para: dests,
+        assunto: `Chamado ${ch.numero}: pedido de apoio no registro`,
+        html: emailChamadoUrgencia({
+          numero: String(ch.numero ?? ""),
+          assunto: String(ch.assunto ?? "Pedido de apoio no registro"),
+          categoria: "outro",
+          autorNome: eu.nome,
+          href: `${SITE_URL}/chamados?c=${ch.id}`,
+        }),
+        contexto: "salvarRegistro",
+      });
+    }
+  }
 
   // o dia ganha snapshot na hora do evento, não só no tick — after() pra
   // a promessa não morrer no flush da resposta serverless; a RPC é
