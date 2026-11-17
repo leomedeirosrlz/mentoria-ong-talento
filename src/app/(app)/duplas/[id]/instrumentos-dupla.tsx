@@ -200,6 +200,14 @@ function LinhaInstrumento({
   const temPendente =
     status === "pendente" || pendenteVisivel != null || enviado != null;
 
+  // auditoria do self-serve (0209): link vivo com origem 'jovem' foi o
+  // próprio mentorado pedindo refaçagem — a linha diz isso pro mentor em
+  // vez do "link enviado" genérico (que sugere gesto da equipe)
+  const pendenteJovem =
+    !enviado &&
+    (status === "pendente" ? entrega : pendenteVisivel)?.contexto?.origem ===
+      "jovem";
+
   // token da ação de link: pendente normal OU a que convive com o
   // respondido (re-emissão ou outra ponta) OU a recém-emitida na sessão
   const tokenVivo =
@@ -317,7 +325,7 @@ function LinhaInstrumento({
             )}
             {temPendente && (
               <Badge className="bg-[var(--warn)]/15 text-[var(--warn-text)]">
-                link enviado
+                {pendenteJovem ? "pedido pelo jovem" : "link enviado"}
               </Badge>
             )}
             {status === "expirado" && (

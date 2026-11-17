@@ -1,10 +1,14 @@
 "use client";
 
 import type { ReactElement } from "react";
+import { useState, useTransition } from "react";
 import Link from "next/link";
-import { Eye } from "@phosphor-icons/react";
+import { useRouter } from "next/navigation";
+import { ArrowCounterClockwise, CircleNotch, Eye } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { InstrumentoResultado } from "@/components/instrumento-resultado";
 import { RespostaLista } from "@/components/resposta-lista";
+import { refazerInstrumentoJovem } from "@/lib/actions-formularios";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -37,6 +41,7 @@ export function ReverRespostaDialog({
   label = "Rever resposta",
   trigger,
   acao,
+  refazerSistema,
 }: {
   titulo: string;
   respondidoEm: string | null;
@@ -53,8 +58,27 @@ export function ReverRespostaDialog({
   trigger?: ReactElement;
   /** saída contextual no rodapé ("Abrir o plano" no PDM) */
   acao?: { rotulo: string; href: string };
+  /** self-serve do jovem (0209): "Refazer" no rodapé minta link novo em
+   *  branco pra ele mesmo — a resposta lida aqui segue guardada */
+  refazerSistema?: string;
 }) {
   const estruturado = ehInstrumentoDeDupla(sistema);
+  const router = useRouter();
+  const [confirmando, setConfirmando] = useState(false);
+  const [pending, start] = useTransition();
+
+  function refazer() {
+    if (!refazerSistema) return;
+    start(async () => {
+      const r = await refazerInstrumentoJovem(refazerSistema);
+      if ("error" in r) {
+        toast.error(r.error);
+        setConfirmando(false);
+        return;
+      }
+      router.push(`/f/${r.token}`);
+    });
+  }
   return (
     <Dialog>
       <DialogTrigger
@@ -89,15 +113,53 @@ export function ReverRespostaDialog({
         ) : (
           <RespostaLista campos={campos} respostas={respostas} />
         )}
-        {acao && (
-          <div className="flex justify-end border-t border-border/60 pt-3">
-            <Button
-              variant="outline"
-              render={<Link href={acao.href} />}
-              nativeButton={false}
-            >
-              {acao.rotulo}
-            </Button>
+        {(acao || refazerSistema) && (
+          <div className="border-t border-border/60 pt-3">
+            {confirmando ? (
+              <div className="space-y-3">
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  Tem certeza? Um link novo em branco é gerado pra você
+                  responder de novo. Sua resposta anterior fica salva e seu
+                  mentor ainda consegue vê-la.
+                </p>
+                <div className="flex justify-end gap-2">
+                  <Button
+                    variant="outline"
+                    onClick={() => setConfirmando(false)}
+                    disabled={pending}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button onClick={refazer} disabled={pending}>
+                    {pending ? (
+                      <CircleNotch className="animate-spin" aria-hidden />
+                    ) : null}
+                    Sim, refazer
+                  </Button>
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap justify-end gap-2">
+                {refazerSistema && (
+                  <Button
+                    variant="outline"
+                    onClick={() => setConfirmando(true)}
+                  >
+                    <ArrowCounterClockwise aria-hidden />
+                    Refazer
+                  </Button>
+                )}
+                {acao && (
+                  <Button
+                    variant="outline"
+                    render={<Link href={acao.href} />}
+                    nativeButton={false}
+                  >
+                    {acao.rotulo}
+                  </Button>
+                )}
+              </div>
+            )}
           </div>
         )}
       </DialogContent>

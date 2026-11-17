@@ -282,3 +282,29 @@ export async function enviarInstrumentoMentorado(
   });
   return { ok: true, token, reutilizado };
 }
+
+/** "Refazer" self-serve do jovem (0209) — a RPC resolve a própria dupla
+ *  DPP viva, exige uma emissão anterior (respondida ou expirada) e
+ *  devolve link vivo do mesmo momento ou minta um novo com origem
+ *  'jovem'. A resposta anterior segue guardada como evidência; a ficha
+ *  da dupla mostra pro mentor que o pedido partiu dele. */
+export async function refazerInstrumentoJovem(
+  sistema: string
+): Promise<{ error: string } | { ok: true; token: string }> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  if (!["visao", "metas", "pdm", "roda_vida"].includes(sistema))
+    return { error: "Instrumento inválido." };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("refazer_instrumento_jovem", {
+    p_sistema: sistema,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  const token = (data as { token?: string } | null)?.token;
+  if (!token) return { error: "Link emitido, mas o token não voltou." };
+  await emitirProdutoEvento(supabase, {
+    superficie: await superficieDaOrigem(),
+    acao: "form_emitido",
+    meta: { sistema, origem: "jovem" },
+  });
+  return { ok: true, token };
+}

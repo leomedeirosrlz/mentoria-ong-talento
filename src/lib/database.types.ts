@@ -7041,6 +7041,7 @@ export type Database = {
         Args: { p_contato_id: string }
         Returns: Json
       }
+      refazer_instrumento_jovem: { Args: { p_sistema: string }; Returns: Json }
       regenerar_token_assinatura: { Args: { p_id: string }; Returns: string }
       registrar_email_apoio_avaliacao: {
         Args: {

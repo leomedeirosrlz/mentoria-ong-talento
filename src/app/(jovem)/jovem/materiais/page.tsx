@@ -896,6 +896,13 @@ function InstrumentoCard({
         respostasAnterior={respostasAnterior}
         trigger={card}
         acao={acao}
+        refazerSistema={
+          est.estado === "feito" &&
+          sistema != null &&
+          ["visao", "metas", "pdm", "roda_vida"].includes(sistema)
+            ? sistema
+            : undefined
+        }
       />
     );
   }
