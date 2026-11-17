@@ -24,13 +24,14 @@ import {
 import { Avatar } from "@/components/avatar";
 import { JovemAvaliacoes } from "@/components/jovem-avaliacoes";
 import { JovemCombinados } from "@/components/jovem-combinados";
+import { JovemRetroativoDialog } from "@/components/jovem-retroativo-dialog";
 import { JovemEspecialistas } from "@/components/jovem-especialistas";
 import { JovemParaFazer } from "@/components/jovem-para-fazer";
 import { ProximoEncontro } from "@/components/jovem-proximo-encontro";
 import { PedirAjudaLinha } from "@/components/jovem-pedir-ajuda";
 import { LembreteDisponibilidade } from "@/components/lembrete-disponibilidade";
 import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
+import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
   disponibilidadeVazia,
@@ -307,6 +308,9 @@ export default async function JovemHome() {
     duplaDppId != null && numeroAgendar != null
       ? { duplaId: duplaDppId, numero: numeroAgendar }
       : null;
+  // retroativo (0207): nº sem row, menos o último do ciclo — fechar a
+  // jornada segue sendo registro do mentor (a RPC recusa também)
+  const numerosRetro = livres.filter((n) => n < maxEncontros("dpp"));
 
   // o lápis "trocar link" do próximo encontro — mesmo recorte da agenda:
   // agendado de dupla ativa e DPP (a RPC do jovem não escreve na trilha esp)
@@ -632,15 +636,34 @@ export default async function JovemHome() {
               />
               {duplaEmCurso && (
                 <p className="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground sm:px-6">
-                  Quer avaliar um encontro que não apareceu aqui? Só dá pra
-                  avaliar encontro agendado: se ele ainda vai acontecer,{" "}
+                  Quer avaliar um encontro que não apareceu aqui? Se ele
+                  ainda vai acontecer,{" "}
                   <Link
                     href="/jovem/agenda"
                     className="font-medium underline underline-offset-2 hover:text-foreground"
                   >
                     agende você na sua agenda
                   </Link>
-                  ; se já aconteceu sem marcar, peça pro seu mentor registrar.
+                  ; se já aconteceu sem marcar,{" "}
+                  {duplaDppId && numerosRetro.length > 0 ? (
+                    <JovemRetroativoDialog
+                      duplaId={duplaDppId}
+                      numeros={numerosRetro}
+                      trigger={
+                        <Button
+                          type="button"
+                          variant="link"
+                          size="sm"
+                          className="h-auto min-h-11 px-0 text-xs font-medium underline underline-offset-2 sm:min-h-0"
+                        >
+                          registre você aqui
+                        </Button>
+                      }
+                    />
+                  ) : (
+                    "peça pro seu mentor registrar"
+                  )}
+                  .
                 </p>
               )}
             </CardContent>

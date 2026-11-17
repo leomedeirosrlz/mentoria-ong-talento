@@ -3,6 +3,7 @@ import {
   CalendarBlank,
   CalendarDots,
   CheckCircle,
+  ClockCounterClockwise,
   Sparkle,
   VideoCamera,
   WhatsappLogo,
@@ -19,9 +20,11 @@ import {
   type AvaliacaoPendente,
 } from "@/components/jovem-avaliacoes";
 import { JovemAgendarDialog } from "@/components/jovem-agendar-dialog";
+import { JovemRetroativoDialog } from "@/components/jovem-retroativo-dialog";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import {
   DesmarcarEncontroJovem,
+  DesfazerRetroativoJovem,
   AconteceuJovem,
   NaoAconteceuJovem,
 } from "@/components/jovem-encontro-acoes";
@@ -141,6 +144,11 @@ export default async function JovemAgenda() {
         .filter((n) => !ocupados.has(n))
         .map((n) => ({ numero: n }))
     : [];
+  // retroativo (0207): mesma lista de nº sem row, menos o último do ciclo —
+  // fechar a jornada segue sendo registro do mentor (a RPC recusa também)
+  const numerosRetro = numerosLivres
+    .map((x) => x.numero)
+    .filter((n) => n < maxEncontros("dpp"));
 
   // trilha especialista (111+112): a agenda real do especialista chega como
   // PROJEÇÃO de slots (especialista_slots_livres — timestamptz pronto) e
@@ -248,13 +256,27 @@ export default async function JovemAgenda() {
             Os encontros das suas mentorias. Vocês combinam as datas juntos.
           </p>
         </div>
-        {duplaDpp?.id && numerosLivres.length > 0 && (
-          <JovemAgendarDialog
-            duplaId={duplaDpp.id}
-            numeros={numerosLivres}
-            atual={null}
-          />
-        )}
+        <div className="flex flex-wrap items-center gap-2">
+          {duplaDpp?.id && numerosLivres.length > 0 && (
+            <JovemAgendarDialog
+              duplaId={duplaDpp.id}
+              numeros={numerosLivres}
+              atual={null}
+            />
+          )}
+          {duplaDpp?.id && numerosRetro.length > 0 && (
+            <JovemRetroativoDialog
+              duplaId={duplaDpp.id}
+              numeros={numerosRetro}
+              trigger={
+                <Button variant="outline" size="sm">
+                  <ClockCounterClockwise size={15} aria-hidden />
+                  Registrar encontro já realizado
+                </Button>
+              }
+            />
+          )}
+        </div>
       </header>
 
       {duplasEsp.length > 0 && (
@@ -427,17 +449,36 @@ export default async function JovemAgenda() {
                       duplaAtiva={ativaPorDupla.get(e.dupla_id) ?? false}
                       trilha={trilhaPorDupla.get(e.dupla_id) ?? "dpp"}
                       rotuloEsp={rotuloSessao(e)}
+                      meId={me?.id ?? null}
                     />
                   ))}
                   {/* mesma orientação do rodapé de avaliações da home: o
-                      encontro que faltou entra por agendamento (o jovem
-                      marca futuro; retroativo é registro do mentor) */}
-                  {duplaDpp && (
+                      encontro que faltou entra por agendamento (futuro) ou
+                      pelo retroativo do jovem (0207) — já acontecido */}
+                  {duplaDpp?.id && (
                     <p className="px-4 py-3 text-xs text-muted-foreground sm:px-6">
-                      Fez um encontro que não apareceu aqui? Só dá pra
-                      avaliar encontro agendado: se ele ainda vai acontecer,
-                      agende pelo botão no topo da página; se já aconteceu
-                      sem marcar, peça pro seu mentor registrar.
+                      Fez um encontro que não apareceu aqui? Se ele ainda vai
+                      acontecer, agende pelo botão no topo da página; se já
+                      aconteceu sem marcar,{" "}
+                      {numerosRetro.length > 0 ? (
+                        <JovemRetroativoDialog
+                          duplaId={duplaDpp.id}
+                          numeros={numerosRetro}
+                          trigger={
+                            <Button
+                              type="button"
+                              variant="link"
+                              size="sm"
+                              className="h-auto min-h-11 px-0 text-xs font-medium underline underline-offset-2 sm:min-h-0"
+                            >
+                              registre você aqui
+                            </Button>
+                          }
+                        />
+                      ) : (
+                        "peça pro seu mentor registrar"
+                      )}
+                      .
                     </p>
                   )}
                 </CardContent>
@@ -459,6 +500,7 @@ function EncontroLinha({
   duplaAtiva = false,
   trilha = "dpp",
   rotuloEsp,
+  meId,
 }: {
   e: JovemEncontro;
   futuro?: boolean;
@@ -479,6 +521,9 @@ function EncontroLinha({
    *  realizados; e.numero é tentativa). Distinção DPP×esp na listagem
    *  mista (0097: antes eram dois "3º encontro" indistinguíveis). */
   rotuloEsp?: string;
+  /** profile do jovem logado — casa com created_by pra liberar Corrigir/
+   *  Desfazer no retroativo criado por ele (0207). */
+  meId?: string | null;
 }) {
   const st = STATUS[e.status];
   const quando = e.status === "realizado" && e.realizado_em ? e.realizado_em : e.data_hora;
@@ -495,6 +540,15 @@ function EncontroLinha({
     duplaAtiva &&
     e.data_hora != null &&
     new Date(e.data_hora).getTime() <= agora;
+  // retroativo do jovem (0207): o realizado que ELE criou é editável
+  // (corrigir data) e desfazível enquanto o mentor não registra — o gate
+  // de verdade mora na RPC; aqui o affordance é por autoria
+  const retroDele =
+    e.status === "realizado" &&
+    duplaAtiva &&
+    trilha !== "especialista" &&
+    meId != null &&
+    e.created_by === meId;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3.5">
       <span
@@ -611,6 +665,20 @@ function EncontroLinha({
             avaliacao={aval.feita}
             label={<Estrelas n={aval.feita.estrelas} size={13} />}
           />
+        )}
+        {retroDele && (
+          <>
+            <JovemRetroativoDialog
+              duplaId={e.dupla_id}
+              atual={e}
+              trigger={
+                <Button variant="ghost" size="sm">
+                  Corrigir
+                </Button>
+              }
+            />
+            <DesfazerRetroativoJovem encontroId={e.id} />
+          </>
         )}
         <Badge variant="outline" className={st.cls}>
           {st.rotulo}

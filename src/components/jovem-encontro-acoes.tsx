@@ -8,6 +8,7 @@ import {
   marcarAconteceuJovem,
   marcarNaoAconteceuJovem,
 } from "@/lib/actions";
+import { desfazerRetroativoJovem } from "@/lib/actions-jovem";
 import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
@@ -145,6 +146,60 @@ export function DesmarcarEncontroJovem({ encontroId }: { encontroId: string }) {
             }
           >
             {pending ? "Salvando…" : "Desmarcar"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** "Desfazer" do retroativo do jovem (0207) — apaga o realizado que ELE
+ *  criou enquanto o mentor não registrou (o registro sela o fato). A
+ *  avaliação dele cai junto: sem encontro, ela ficava pendurada em nada. */
+export function DesfazerRetroativoJovem({ encontroId }: { encontroId: string }) {
+  const [open, setOpen] = useState(false);
+  const [pending, start] = useTransition();
+  const router = useRouter();
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger render={
+        <Button variant="ghost" size="sm">
+          Desfazer
+        </Button>
+      } />
+      <DialogContent size="sm">
+        <DialogHeader>
+          <DialogTitle>Desfazer o registro?</DialogTitle>
+        </DialogHeader>
+        <DialogDescription className="leading-relaxed">
+          O encontro sai da sua agenda e a avaliação vai junto, se você já
+          respondeu. Se aconteceu de verdade, registre de novo quando quiser.
+        </DialogDescription>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>
+            Cancelar
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={pending}
+            onClick={() =>
+              start(async () => {
+                try {
+                  const res = await desfazerRetroativoJovem(encontroId);
+                  if (res?.error) toast.error(res.error);
+                  else {
+                    toast.success("Registro desfeito.");
+                    setOpen(false);
+                    router.refresh();
+                  }
+                } catch {
+                  toast.error("Sem conexão. Tente de novo.");
+                }
+              })
+            }
+          >
+            {pending ? "Salvando…" : "Sim, desfazer"}
           </Button>
         </DialogFooter>
       </DialogContent>

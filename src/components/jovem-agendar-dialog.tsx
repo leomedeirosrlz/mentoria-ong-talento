@@ -37,10 +37,10 @@ function rotuloConflito(c: ConflitoEncontro): string {
 /**
  * Agenda livre do jovem (REALIZA-110): agenda o encontro nº `numero` da
  * própria dupla DPP — ou, sem `numero`, deixa ele escolher na lista
- * `numeros`. Sem retroativo: data passada não é atalho pra nada (o mentor
- * registra como foi), então o piso do input é sempre agora. Com `atual`
- * (remarcação), o motivo só é obrigatório quando a data muda — mesma regra
- * da RPC e do dialog do mentor.
+ * `numeros`. Agendar é sempre pra frente: o que já aconteceu sem marcar
+ * entra pelo JovemRetroativoDialog (0207), então o piso do input segue
+ * sendo agora. Com `atual` (remarcação), o motivo só é obrigatório quando
+ * a data muda — mesma regra da RPC e do dialog do mentor.
  */
 export function JovemAgendarDialog({
   duplaId,

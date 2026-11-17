@@ -6608,6 +6608,10 @@ export type Database = {
       }
       desfecho_agregado: { Args: { p_cronograma?: string }; Returns: Json }
       desfecho_elegiveis_6m: { Args: never; Returns: Json }
+      desfazer_retroativo_mentorado: {
+        Args: { p_encontro: string }
+        Returns: Json
+      }
       desmarcar_encontro: { Args: { p_encontro: string }; Returns: Json }
       devolver_chamado_fila: { Args: { p_id: string }; Returns: undefined }
       dispensar_sugestao_especialista: {
@@ -6994,6 +6998,10 @@ export type Database = {
         Returns: undefined
       }
       registrar_produto_eventos: { Args: { p_eventos: Json }; Returns: number }
+      registrar_retroativo_mentorado: {
+        Args: { p_data_hora: string; p_dupla: string; p_numero: number }
+        Returns: Json
+      }
       relatorio_link_info: { Args: { p_slug: string }; Returns: Json }
       relatorio_links_stats: { Args: never; Returns: Json }
       rematch_dupla: {

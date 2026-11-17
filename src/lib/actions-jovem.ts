@@ -7,6 +7,7 @@ import {
   parseDisponibilidade,
   SENTINEL_VAZIO,
 } from "./ciclo";
+import { parseDataHora } from "./escritas";
 import { getSlotsLivres } from "./queries-especialista";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
@@ -313,5 +314,91 @@ export async function dispensarSugestaoEspecialista(
   revalidatePath("/jovem");
   revalidatePath("/jovem/especialistas");
   revalidatePath("/");
+  return { ok: true };
+}
+
+// ---------- retroativo do jovem (REALIZA-437, migration 0207) ----------
+// As RPCs definer devolvem jsonb {error} em pt-BR pronto pro toast — a
+// action só saneia o payload e repassa. O encontro nasce realizado: é o
+// que destrava a avaliação dele, e o registro do mentor segue devido.
+
+function retornoRpc(data: unknown): {
+  error?: string;
+  ok?: boolean;
+  encontro_id?: string;
+} {
+  return (data ?? {}) as { error?: string; ok?: boolean; encontro_id?: string };
+}
+
+/** O jovem registra encontro que já aconteceu sem agendamento prévio —
+ *  a linha que faltava na lista pra avaliar. A mesma RPC cobre a correção
+ *  de data do retroativo criado por ele (upsert por (dupla,numero)
+ *  enquanto o mentor não registrou). `dataHora` chega naïve do
+ *  datetime-local; a RPC revalida tudo (dupla DPP ativa dele, teto do
+ *  cronograma sem o último, passado, piso do início da mentoria). */
+export async function registrarRetroativoJovem(
+  duplaId: string,
+  numero: number,
+  dataHora: string
+): Promise<{ error?: string; ok?: boolean; encontroId?: string }> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Essa ação é do mentorado." };
+  }
+  if (!duplaId || !numero || !dataHora) {
+    return { error: "Encontro e data são obrigatórios." };
+  }
+  const quando = parseDataHora(dataHora);
+  if (!quando) return { error: "Confira a data." };
+  const { data, error } = await supabase.rpc("registrar_retroativo_mentorado", {
+    p_dupla: duplaId,
+    p_numero: numero,
+    p_data_hora: quando.toISOString(),
+  });
+  if (error) return { error: erroAmigavel(error) };
+  const ret = retornoRpc(data);
+  if (ret.error) return { error: ret.error };
+  // realizado sem registro pende pro mentor — a home dele, a agenda e a
+  // ficha da dupla leem a mesma row que acabou de nascer (ou mudar)
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/agenda");
+  revalidatePath("/jovem/materiais");
+  revalidatePath("/");
+  revalidatePath("/agenda");
+  revalidatePath("/duplas");
+  revalidatePath(`/duplas/${duplaId}`);
+  return { ok: true, encontroId: ret.encontro_id };
+}
+
+/** Desfaz o retroativo criado pelo próprio jovem enquanto o mentor não
+ *  registrou — o "não aconteceu de verdade" do gesto dele. */
+export async function desfazerRetroativoJovem(encontroId: string) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Essa ação é do mentorado." };
+  }
+  // a dupla sai antes do delete só pra revalidar a ficha dela — a RPC não
+  // devolve o id
+  const { data: enc } = await supabase
+    .from("encontros")
+    .select("dupla_id")
+    .eq("id", encontroId)
+    .maybeSingle();
+  const { data, error } = await supabase.rpc("desfazer_retroativo_mentorado", {
+    p_encontro: encontroId,
+  });
+  if (error) return { error: erroAmigavel(error) };
+  const ret = retornoRpc(data);
+  if (ret.error) return { error: ret.error };
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/agenda");
+  revalidatePath("/");
+  revalidatePath("/agenda");
+  revalidatePath("/duplas");
+  if (enc?.dupla_id) revalidatePath(`/duplas/${enc.dupla_id}`);
   return { ok: true };
 }

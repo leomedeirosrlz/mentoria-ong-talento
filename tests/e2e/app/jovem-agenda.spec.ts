@@ -729,3 +729,252 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     expect(notif?.corpo).toContain("Motivo: Conflito de agenda");
   });
 });
+
+test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
+  test.use({ timezoneId: "America/Sao_Paulo" });
+  test.beforeEach(convergirPiso);
+  test.afterEach(convergirPiso);
+
+  // realizado criado direto no banco com autoria do jovem — piso dos
+  // fluxos de Corrigir/Desfazer sem depender do registro pela UI
+  function criarRetroativo(numero: number, emDiasAtras: number) {
+    const ms =
+      Math.floor((Date.now() + emDiasAtras * 86400e3) / 60000) * 60000;
+    const iso = new Date(ms).toISOString();
+    return inserirViaServiceRole("encontros", {
+      dupla_id: DUPLA_ID,
+      numero,
+      data_hora: iso,
+      realizado_em: iso,
+      status: "realizado",
+      origem: "externo",
+      created_by: IDS.jovemProfile,
+    });
+  }
+
+  test("encontro combinado por fora nasce realizado, avaliável e o mentor é lembrado", async ({
+    page,
+  }) => {
+    await entrarComoJovem(page);
+    await page.goto("/jovem/agenda");
+
+    await page
+      .getByRole("button", { name: "Registrar encontro já realizado" })
+      .click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByRole("heading", {
+        name: "Registrar encontro que já aconteceu",
+      })
+    ).toBeVisible();
+
+    await dialog.locator("#retro-numero-select").click();
+    await page.getByRole("option", { name: "6º encontro" }).click();
+    await dialog.locator("#data_hora").fill(emDias(-3));
+    await dialog
+      .getByRole("button", { name: "Registrar encontro" })
+      .click();
+
+    await expect(
+      page.getByText("6º encontro registrado. Já dá pra avaliar.")
+    ).toBeVisible();
+    await expect(dialog).not.toBeVisible();
+
+    // born-realizado no histórico: badge "Aconteceu", CTA Avaliar e os
+    // gestos do criador (Corrigir/Desfazer enquanto o mentor não registra)
+    const historico = page.locator(
+      'section[aria-labelledby="agenda-historico"]'
+    );
+    const linha6 = linha(historico, 6);
+    await expect(
+      linha6.getByText("Aconteceu", { exact: true })
+    ).toBeVisible();
+    await expect(
+      linha6.getByRole("button", { name: "Avaliar" })
+    ).toBeVisible();
+    await expect(
+      linha6.getByRole("button", { name: "Corrigir" })
+    ).toBeVisible();
+    await expect(
+      linha6.getByRole("button", { name: "Desfazer" })
+    ).toBeVisible();
+
+    // write real: realizado, origem externo, autoria do jovem — data e
+    // realizado_em são o instante declarado
+    const [row] = await buscarViaServiceRole<
+      {
+        id: string;
+        status: string;
+        origem: string;
+        created_by: string | null;
+        data_hora: string;
+        realizado_em: string | null;
+      }[]
+    >(
+      "encontros",
+      `select=id,status,origem,created_by,data_hora,realizado_em&dupla_id=eq.${DUPLA_ID}&numero=eq.6`
+    );
+    expect(row.status).toBe("realizado");
+    expect(row.origem).toBe("externo");
+    expect(row.created_by).toBe(IDS.jovemProfile);
+    expect(new Date(row.realizado_em!).getTime()).toBe(
+      new Date(row.data_hora).getTime()
+    );
+
+    // o trigger da 0071 minta o link — é o que destrava o "Avaliar"
+    const links = await buscarViaServiceRole<{ id: string }[]>(
+      "avaliacao_links",
+      `select=id&encontro_id=eq.${String(row.id)}`
+    );
+    expect(links).toHaveLength(1);
+
+    // o mentor recebe o lembrete apontando o registro (segue devido) —
+    // mesma peça da 0121, verbo "registrou" (ele criou, não confirmou)
+    const lembretes = (
+      await buscarViaServiceRole<Notif[]>(
+        "notificacoes",
+        `select=titulo,corpo,href&profile_id=eq.${IDS.mentorProfile}&tipo=eq.lembrete`
+      )
+    ).filter((n) => /registrou o 6º encontro$/.test(n.titulo));
+    expect(lembretes).toHaveLength(1);
+    expect(lembretes[0]!.href).toBe(
+      `/duplas/${DUPLA_ID}#registrar-${String(row.id)}`
+    );
+    await limparViaServiceRole(
+      "notificacoes",
+      `profile_id=eq.${IDS.mentorProfile}&tipo=eq.lembrete&titulo=like.*registrou*`
+    );
+  });
+
+  test("o retroativo dele corrige a data e se desfaz — enquanto o mentor não registra", async ({
+    page,
+  }) => {
+    const enc = await criarRetroativo(7, -4);
+    await entrarComoJovem(page);
+    await page.goto("/jovem/agenda");
+
+    const historico = page.locator(
+      'section[aria-labelledby="agenda-historico"]'
+    );
+    const linha7 = linha(historico, 7);
+
+    // Corrigir: dialog prefilled com a data declarada, nº fixo
+    await linha7.getByRole("button", { name: "Corrigir" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(
+      dialog.getByRole("heading", { name: "Corrigir a data do 7º encontro" })
+    ).toBeVisible();
+    await dialog.locator("#data_hora").fill(emDias(-6));
+    await dialog
+      .getByRole("button", { name: "Salvar correção" })
+      .click();
+    await expect(page.getByText("Data corrigida.")).toBeVisible();
+
+    const [corrigido] = await buscarViaServiceRole<
+      { data_hora: string; realizado_em: string | null; status: string }[]
+    >(
+      "encontros",
+      `select=data_hora,realizado_em,status&id=eq.${String(enc.id)}`
+    );
+    expect(corrigido.status).toBe("realizado");
+    // andou pra trás de verdade (-4d → -6d) nos dois carimbos
+    expect(new Date(corrigido.data_hora).getTime()).toBeLessThan(
+      Date.now() - 5 * 86400e3
+    );
+    expect(new Date(corrigido.realizado_em!).getTime()).toBe(
+      new Date(corrigido.data_hora).getTime()
+    );
+
+    // Desfazer: a row sai e a avaliação/link vão junto (filhos NO ACTION)
+    await linha7.getByRole("button", { name: "Desfazer" }).click();
+    await expect(
+      dialog.getByRole("heading", { name: "Desfazer o registro?" })
+    ).toBeVisible();
+    await dialog
+      .getByRole("button", { name: "Sim, desfazer" })
+      .click();
+    await expect(page.getByText("Registro desfeito.")).toBeVisible();
+    await expect(historico.getByText("7º encontro")).toHaveCount(0, {
+      timeout: 15_000,
+    });
+
+    const rows = await buscarViaServiceRole<{ id: string }[]>(
+      "encontros",
+      `select=id&id=eq.${String(enc.id)}`
+    );
+    expect(rows).toHaveLength(0);
+    const links = await buscarViaServiceRole<{ id: string }[]>(
+      "avaliacao_links",
+      `select=id&encontro_id=eq.${String(enc.id)}`
+    );
+    expect(links).toHaveLength(0);
+  });
+
+  test("guards do banco: futuro não entra, último é do mentor, nao_aconteceu não ressuscita", async ({
+    page,
+  }) => {
+    await inserirViaServiceRole("encontros", {
+      dupla_id: DUPLA_ID,
+      numero: 10,
+      data_hora: new Date(Date.now() - 86400e3).toISOString(),
+      status: "nao_aconteceu",
+    });
+
+    // JWT real do jovem — prova que o guard mora na RPC, não no input max
+    const grant = page.waitForResponse(
+      (r) => r.url().includes("grant_type=password"),
+      { timeout: 20_000 }
+    );
+    await loginComSenha(page, JOVEM_EMAIL, SENHA);
+    const res = await grant;
+    const apiKey = res.request().headers()["apikey"] ?? "";
+    const { access_token: token } = (await res.json()) as {
+      access_token?: string;
+    };
+    expect(token).toBeTruthy();
+
+    const rpc = (args: Record<string, unknown>) =>
+      page.request.post(
+        `${SUPA_URL}/rest/v1/rpc/registrar_retroativo_mentorado`,
+        {
+          headers: {
+            apikey: apiKey,
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          data: args,
+        }
+      );
+
+    // retroativo é só pra trás — futuro é agendamento (outra RPC)
+    const futura = await rpc({
+      p_dupla: DUPLA_ID,
+      p_numero: 6,
+      p_data_hora: new Date(Date.now() + 3600e3).toISOString(),
+    });
+    expect((await futura.json()).error).toContain("já aconteceu");
+
+    // o último do ciclo conclui a dupla (0102) — fechar a jornada segue
+    // sendo registro do mentor (mesma fronteira da 0121)
+    const ultimo = await rpc({
+      p_dupla: DUPLA_ID,
+      p_numero: 16,
+      p_data_hora: new Date(Date.now() - 3600e3).toISOString(),
+    });
+    expect((await ultimo.json()).error).toContain("último encontro");
+
+    // nao_aconteceu não ressuscita por aqui — desfazer é do mentor
+    const travado = await rpc({
+      p_dupla: DUPLA_ID,
+      p_numero: 10,
+      p_data_hora: new Date(Date.now() - 3600e3).toISOString(),
+    });
+    expect((await travado.json()).error).toContain("não realizado");
+    const [r10] = await buscarViaServiceRole<{ status: string }[]>(
+      "encontros",
+      `select=status&dupla_id=eq.${DUPLA_ID}&numero=eq.10`
+    );
+    expect(r10.status).toBe("nao_aconteceu");
+  });
+});
