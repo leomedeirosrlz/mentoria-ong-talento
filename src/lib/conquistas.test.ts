@@ -237,7 +237,7 @@ describe("conquistasDoJovem", () => {
 
     const aval = porChave.get("conta:avaliacoes")!;
     expect(aval.titulo).toBe("3 avaliações enviadas");
-    expect(aval.data).toBe(new Date("2026-03-20T12:00:00-03:00").toISOString());
+    expect(aval.data).toBe("2026-03-20T12:00:00-03:00");
 
     const comb = porChave.get("conta:combinados")!;
     expect(comb.titulo).toBe("2 combinados feitos");

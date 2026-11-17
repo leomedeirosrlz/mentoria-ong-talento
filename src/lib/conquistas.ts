@@ -141,6 +141,14 @@ const TOM_ESPECIALISTA = {
   tinta: "var(--inst-avaliacao-especialista-t)",
 };
 
+/** Rótulo do marco por trilha — o "primeiro" muda de substantivo (sessão
+ *  × encontro), os demais já são neutros. */
+function rotuloMarco(marco: MarcoJornada, dpp: boolean): string {
+  return marco === "primeiro" && !dpp
+    ? "Primeira sessão"
+    : ROTULO_MARCO[marco];
+}
+
 /** A linha narrativa do marco — por trilha (encontro com mentor × sessão
  *  com especialista, mesma distinção do resto do /jovem). */
 function detalheMarco(marco: MarcoJornada, dpp: boolean): string {
@@ -223,10 +231,7 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
         ts: ts(data),
         c: {
           chave: `marco:${marco}`,
-          titulo:
-            marco === "primeiro" && !temDpp
-              ? "Primeira sessão"
-              : ROTULO_MARCO[marco],
+          titulo: rotuloMarco(marco, temDpp),
           detalhe: detalheMarco(marco, temDpp),
           data,
           glifo: { tipo: "phosphor", nome: ICONE_MARCO[marco] },
@@ -238,10 +243,7 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
       const falta = p - feitos;
       proximoMarco = {
         marco,
-        rotulo:
-          marco === "primeiro" && !temDpp
-            ? "Primeira sessão"
-            : ROTULO_MARCO[marco],
+        rotulo: rotuloMarco(marco, temDpp),
         atual: feitos,
         alvo: p,
         texto: `${falta === 1 ? "Falta" : "Faltam"} ${unidade(falta)}`,
@@ -304,15 +306,17 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
   // do envio mais recente (created_at = quando o jovem respondeu)
   const nAval = input.avaliacoes.length;
   if (nAval > 0) {
-    const ultima = Math.max(...input.avaliacoes.map((a) => ts(a.created_at)));
+    const ultima = input.avaliacoes.reduce((a, b) =>
+      ts(a.created_at) >= ts(b.created_at) ? a : b
+    );
     estante.push({
-      ts: ultima || Number.POSITIVE_INFINITY,
+      ts: ts(ultima.created_at) || Number.POSITIVE_INFINITY,
       c: {
         chave: "conta:avaliacoes",
         titulo:
           nAval === 1 ? "1 avaliação enviada" : `${nAval} avaliações enviadas`,
         detalhe: "Sua nota e seu comentário depois de cada encontro.",
-        data: ultima ? new Date(ultima).toISOString() : null,
+        data: ultima.created_at,
         glifo: { tipo: "instrumento", chave: "avaliacao_encontro" },
         tom: INSTRUMENTO_TOM.avaliacao_encontro,
       },
