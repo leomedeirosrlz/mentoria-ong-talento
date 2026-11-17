@@ -40,9 +40,11 @@ test.describe("demo — hub /relatorios", () => {
     ).toBeVisible();
     const csv = page.getByRole("link", { name: "Baixar CSV completo" });
     expect(await csv.getAttribute("href")).toContain("tipo=interacoes");
-    // a aba Saúde mostra o estado de acumulação (demo não tem snapshots)
+    // a aba Saúde mostra a tendência — a demo deriva 30 dias do dataset
+    // evergreen (REALIZA-407), então o gráfico aparece em vez do estado
+    // "acumulando histórico" do app real recém-nascido
     await page.goto("/relatorios/operacionais?aba=visao");
-    await expect(page.getByText("Acumulando histórico")).toBeVisible();
+    await expect(page.getByText(/Último dia com dados/)).toBeVisible();
   });
 
   test("digest: disparo manual volta com DEMO_MSG", async ({ page }) => {
