@@ -77,6 +77,7 @@ export function TokensMcp({
   const [copiadoPrompt, setCopiadoPrompt] = useState<"token" | "base" | null>(
     null
   );
+  const [gerandoPrompt, setGerandoPrompt] = useState(false);
   const [gerando, setGerando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
   // browser-only values via useSyncExternalStore: SSR/hydration read the
@@ -107,32 +108,40 @@ export function TokensMcp({
     };
   }, [supabase, demo]);
 
+  /** Emissão compartilhada: o botão "Gerar" e o "Copiar prompt" (que mint
+   *  sob demanda pra já embutir o token no texto copiado) passam por aqui.
+   *  Devolve o token cru — única vida dele fora do card de criação. */
+  const emitirToken = async (): Promise<string> => {
+    const { data: u } = await supabase.auth.getUser();
+    const { data: prof } = await supabase
+      .from("profiles")
+      .select("id")
+      .eq("user_id", u.user?.id ?? "")
+      .maybeSingle();
+    if (!prof) throw new Error("sem perfil");
+    const { cru, hash } = await gerarTokenMcp();
+    const { data: row, error } = await supabase
+      .from("ia_mcp_tokens")
+      .insert({
+        profile_id: prof.id,
+        token_hash: hash,
+        rotulo: rotuloDoToken(rotulo, rotuloPadrao()),
+      })
+      .select("id, rotulo, created_at, ultimo_uso_em, expira_em")
+      .single();
+    if (error) throw error;
+    setTokenNovo(cru);
+    setRotulo("");
+    setCopiado(false);
+    setTokens((t) => [row as TokenMcp, ...(t ?? [])]);
+    return cru;
+  };
+
   const gerarNovoToken = async () => {
     setGerando(true);
     setErro(null);
     try {
-      const { data: u } = await supabase.auth.getUser();
-      const { data: prof } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("user_id", u.user?.id ?? "")
-        .maybeSingle();
-      if (!prof) throw new Error("sem perfil");
-      const { cru, hash } = await gerarTokenMcp();
-      const { data: row, error } = await supabase
-        .from("ia_mcp_tokens")
-        .insert({
-          profile_id: prof.id,
-          token_hash: hash,
-          rotulo: rotuloDoToken(rotulo, rotuloPadrao()),
-        })
-        .select("id, rotulo, created_at, ultimo_uso_em, expira_em")
-        .single();
-      if (error) throw error;
-      setTokenNovo(cru);
-      setRotulo("");
-      setCopiado(false);
-      setTokens((t) => [row as TokenMcp, ...(t ?? [])]);
+      await emitirToken();
     } catch {
       setErro("Não consegui gerar o token. Tente de novo.");
     } finally {
@@ -172,15 +181,23 @@ export function TokensMcp({
     }
   };
 
+  /** O prompt sempre sai com token real embutido: reusa o recém-criado da
+   *  sessão ou minta um na hora (o card do token aparece logo abaixo). Um
+   *  clique = cola pronta, sem passo manual de gerar-copiar-gerar-colar. */
   const copiarPrompt = async (qual: "token" | "base") => {
+    setErro(null);
+    setGerandoPrompt(true);
     try {
+      const cru = tokenNovo ?? (await emitirToken());
       await navigator.clipboard.writeText(
-        promptMcp(window.location.origin, qual === "token" ? tokenNovo : null)
+        promptMcp(window.location.origin, cru)
       );
       setCopiadoPrompt(qual);
       setTimeout(() => setCopiadoPrompt((c) => (c === qual ? null : c)), 1600);
     } catch {
-      // clipboard blocked: the card's token still has its own copy button
+      setErro("Não consegui gerar o token. Tente de novo.");
+    } finally {
+      setGerandoPrompt(false);
     }
   };
 
@@ -213,14 +230,17 @@ export function TokensMcp({
         variant="outline"
         size="sm"
         onClick={() => copiarPrompt("base")}
+        disabled={gerandoPrompt}
         className="w-full"
       >
-        {copiadoPrompt === "base" ? (
+        {gerandoPrompt ? (
+          <CircleNotch size={14} aria-hidden className="animate-spin" />
+        ) : copiadoPrompt === "base" ? (
           <Check aria-hidden className="text-[var(--ok-text)]" />
         ) : (
           <ClipboardText aria-hidden />
         )}
-        Copiar prompt de conexão
+        Copiar prompt com token
       </Button>
 
       {tokenNovo && (
