@@ -4,6 +4,7 @@ import {
   buscarViaServiceRole,
   convergirDuplaAtiva,
   expect,
+  inserirViaServiceRole,
   jwtDoUsuario,
   loginComSenha,
   relogar,
@@ -43,6 +44,14 @@ const IDS = {
   // a dupla DPP do jovem — o selo "mentoria <status>" vive dentro do link
   // do mentor na mentoria-titulo: 'concluida' muda o nome acessível dele
   duplaDpp: "e2e00000-0000-4000-8000-000000000030",
+  // a trilha esp do jovem — a mentorados_turma casa a turma por QUALQUER
+  // dupla dele: turma degradada numa das duas esvazia o diretório inteiro
+  duplaEsp: "e2e00000-0000-4000-8000-0000000000e0",
+  // mentor do colega e cronograma da Turma E2E — o seed usa o MESMO uuid
+  // pros dois (tabelas diferentes, não conflita)
+  mentorColega: "e2e00000-0000-4000-8000-0000000000e2",
+  cronogramaE2e: "e2e00000-0000-4000-8000-0000000000e2",
+  supProfile: "e2e00000-0000-4000-8000-000000000100", // supervisor das duplas fixture
   mentorProfile: "e2e00000-0000-4000-8000-000000000010",
   espProfile: "e2e00000-0000-4000-8000-000000000060",
   esp2Profile: "e2e00000-0000-4000-8000-0000000000c0", // catálogo, sem dupla com o jovem
@@ -50,6 +59,9 @@ const IDS = {
   mentorReserva: "e2e00000-0000-4000-8000-000000000050", // adulto não-relacionado
 } as const;
 const JOVEM2_WHATSAPP = "5511999000091";
+// mesma turma das fixtures do seed (TURMA_E2E lá) — a mentorados_turma
+// casa por string de turma, então o valor tem que ser verbatim
+const TURMA_E2E = "Turma E2E";
 // jovem demo do seed:demo (Ana, turma T1) — divide o staging com as
 // fixtures e serve de pin "outra turma" pro teste de escopo da 0097
 const JOVEM_DEMO_EMAIL = "jovem@realiza.test";
@@ -57,21 +69,78 @@ const SENHA_DEMO = process.env.E2E_DEMO_JOVEM_PASSWORD ?? "realiza123";
 
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
 
-/** Piso do spec: o opt-in desligado, o whatsapp da ficha e a dupla pausada
- *  no lugar — idempotente (PATCH sem row casa nada; quem cria é o seed).
- *  Um run morto com o toggle ligado vazaria "compartilhado" pro teste da
- *  contagem zero — por isso a convergência roda por spec, não só no seed. */
+/** Piso do spec: o colega converge ESTRUTURA, não só estado. PATCH numa
+ *  row ausente é no-op silencioso, então ficha e dupla renascem com os
+ *  mesmos campos do seed quando faltam — e os campos estruturais
+ *  (nome, vínculos, turma, trilha) re-convergem junto dos voláteis, que
+ *  drift manual no staging já degradou (o "Jovem E2e Sem Dpp"
+ *  title-caseado que esvaziou o diretório). O opt-in desligado e o
+ *  whatsapp voltam ao lugar a cada spec — um run morto com o toggle
+ *  ligado vazaria "compartilhado" pro teste da contagem zero. */
 async function restaurarColega() {
-  await atualizarViaServiceRole(
+  const [ficha] = await buscarViaServiceRole<{ id: string }[]>(
     "mentorados",
-    `id=eq.${IDS.mentoradoSemDpp}`,
-    { contato_compartilhado: false, whatsapp: JOVEM2_WHATSAPP }
+    `select=id&id=eq.${IDS.mentoradoSemDpp}`
   );
-  await atualizarViaServiceRole("duplas", `id=eq.${IDS.duplaColega}`, {
-    status: "pausada",
-    encerrada_em: null,
-    motivo_encerramento: null,
-  });
+  if (!ficha) {
+    await inserirViaServiceRole("mentorados", {
+      id: IDS.mentoradoSemDpp,
+      nome: "Jovem E2E Sem DPP",
+      profile_id: IDS.jovem2Profile,
+      whatsapp: JOVEM2_WHATSAPP,
+      contato_compartilhado: false,
+    });
+  } else {
+    await atualizarViaServiceRole(
+      "mentorados",
+      `id=eq.${IDS.mentoradoSemDpp}`,
+      {
+        nome: "Jovem E2E Sem DPP",
+        profile_id: IDS.jovem2Profile,
+        contato_compartilhado: false,
+        whatsapp: JOVEM2_WHATSAPP,
+      }
+    );
+  }
+  const [dupla] = await buscarViaServiceRole<{ id: string }[]>(
+    "duplas",
+    `select=id&id=eq.${IDS.duplaColega}`
+  );
+  if (!dupla) {
+    // insert espelha o seed (status pausada na Turma E2E, trilha dpp) +
+    // o supervisor_id que o bloco do supervisor costura depois — a dupla
+    // renasce já no estado final convergido. O insert dispara
+    // duplas_jornada_autoemit, mesmo efeito do seed: links do enc. 1
+    await inserirViaServiceRole("duplas", {
+      id: IDS.duplaColega,
+      mentor_id: IDS.mentorColega,
+      mentorado_id: IDS.mentoradoSemDpp,
+      supervisor_id: IDS.supProfile,
+      turma: TURMA_E2E,
+      cronograma_id: IDS.cronogramaE2e,
+      trilha: "dpp",
+      status: "pausada",
+      iniciada_em: "2026-09-08",
+    });
+  } else {
+    await atualizarViaServiceRole("duplas", `id=eq.${IDS.duplaColega}`, {
+      status: "pausada",
+      encerrada_em: null,
+      motivo_encerramento: null,
+      turma: TURMA_E2E,
+      mentor_id: IDS.mentorColega,
+      mentorado_id: IDS.mentoradoSemDpp,
+      supervisor_id: IDS.supProfile,
+      trilha: "dpp",
+    });
+  }
+  // o join da mentorados_turma casa pela turma das duplas do JOVEM —
+  // qualquer uma degradada esvazia o diretório de colegas inteiro
+  await atualizarViaServiceRole(
+    "duplas",
+    `id=in.(${IDS.duplaDpp},${IDS.duplaEsp})`,
+    { turma: TURMA_E2E }
+  );
   // a dupla do jovem tem que estar ativa — 'concluida' costura o selo
   // "mentoria concluída" no link do mentor e o nome acessível muda
   await convergirDuplaAtiva(IDS.duplaDpp);

@@ -872,7 +872,7 @@ await vincularAuth(jovem2, JOVEM2_EMAIL);
 // que liga o toggle não pode vazar opt-in pro run seguinte.
 {
   const [ficha] = await rest(
-    `mentorados?select=id,profile_id,whatsapp,contato_compartilhado&id=eq.${IDS.mentoradoSemDpp}`
+    `mentorados?select=id,profile_id,nome,whatsapp,contato_compartilhado&id=eq.${IDS.mentoradoSemDpp}`
   );
   if (!ficha) {
     await rest("mentorados", {
@@ -887,6 +887,9 @@ await vincularAuth(jovem2, JOVEM2_EMAIL);
     console.log("mentorado sem DPP criado");
   } else {
     const fixes = {};
+    // o nome é o que a mentorados_turma exibe no diretório — um rename
+    // manual no staging (title-case, abreviação) quebrava o spec inteiro
+    if (ficha.nome !== "Jovem E2E Sem DPP") fixes.nome = "Jovem E2E Sem DPP";
     if (ficha.profile_id !== jovem2.id) fixes.profile_id = jovem2.id;
     if (ficha.whatsapp !== JOVEM2_WHATSAPP) fixes.whatsapp = JOVEM2_WHATSAPP;
     if (ficha.contato_compartilhado) fixes.contato_compartilhado = false;
