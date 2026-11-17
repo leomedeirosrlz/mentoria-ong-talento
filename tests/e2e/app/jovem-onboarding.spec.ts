@@ -47,7 +47,7 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
     );
   });
 
-  test("wizard de 4 passos aparece no 1º acesso e grava a grade", async ({
+  test("wizard aparece no 1º acesso e grava a grade", async ({
     page,
   }) => {
     await loginComSenha(page, JOVEM3_EMAIL, SENHA);
@@ -82,7 +82,15 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
       .click();
     await page.getByRole("button", { name: "Continuar" }).click();
 
-    // passo 4 — contato: WhatsApp da ficha formatado + o toggle do opt-in
+    // passo 4 — o termo autoemitido no login (436): a assinatura entra no
+    // wizard quando há pendência; "Assinar depois" adia sem esconder a
+    // pendência (o fechamento lembra dela e a home carrega o card)
+    await expect(
+      page.getByRole("heading", { name: "Seu termo de participação" })
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Assinar depois" }).click();
+
+    // passo 5 — contato: WhatsApp da ficha formatado + o toggle do opt-in
     // (mesma semântica do card Privacidade do perfil)
     await expect(
       page.getByRole("heading", { name: "Seu contato tá certo?" })
@@ -133,6 +141,11 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
       page.getByRole("heading", { name: "Quando dá pra você?" })
     ).toBeVisible();
     await page.getByRole("button", { name: "Preencher depois" }).click();
+    // termo autoemitido no login (436) — entre a grade e o contato
+    await expect(
+      page.getByRole("heading", { name: "Seu termo de participação" })
+    ).toBeVisible();
+    await page.getByRole("button", { name: "Assinar depois" }).click();
     await expect(
       page.getByRole("heading", { name: "Seu contato tá certo?" })
     ).toBeVisible();
