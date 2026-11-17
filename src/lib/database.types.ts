@@ -6710,6 +6710,11 @@ export type Database = {
         Args: { p_campos: Json; p_link_id: string; p_respostas: Json }
         Returns: Json
       }
+      garantir_documento_um: {
+        Args: { p_alvo: string; p_signatario: string; p_template: string }
+        Returns: undefined
+      }
+      garantir_documentos_devidos: { Args: never; Returns: undefined }
       gerar_senha_relatorio: { Args: never; Returns: string }
       gravar_saude_snapshots: { Args: { p_rows: Json }; Returns: number }
       has_papel:

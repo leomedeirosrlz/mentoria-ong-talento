@@ -10,6 +10,7 @@ import { demoRole } from "@/lib/demo/mode";
 import { getMe, getMeuMentorProfile, getMeusDadosPessoais, getNotificacoes } from "@/lib/queries";
 import { getChamadosSemDono } from "@/lib/queries-chamados";
 import { getMeusDadosCivis, getMinhaAssinaturaTermo } from "@/lib/queries-assinaturas";
+import { garantirDocumentosDevidos } from "@/lib/actions-assinaturas";
 import { providerConfigurado } from "@/lib/ia/provider";
 import { pedirAcessoHref } from "@/lib/login-erros";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -95,6 +96,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   // — inclusive "/" — devolve ele pra home dele. O espelho mora no layout
   // do (jovem): staff pedindo /jovem volta pra cá.
   if (me.role === "mentorado") redirect("/jovem");
+
+  // auto-cura do login (0206): o termo do voluntário sai emitido antes
+  // dos reads abaixo — o wizard e o banner desta renderização já veem a
+  // pendência. Idempotente, self-scoped e nunca lança; não-voluntário
+  // não deve o documento (o flag decide aqui e dentro da RPC).
+  if (me.voluntario !== false) await garantirDocumentosDevidos();
 
   // mapa papel→primeiro nome pra DemoBar — só monta o dataset quando a demo
   // está ativa (fora dela seria leitura à toa, ainda que pura/barata).

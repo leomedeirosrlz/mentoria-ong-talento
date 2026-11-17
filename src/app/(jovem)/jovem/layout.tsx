@@ -8,6 +8,7 @@ import { papeisDe } from "@/lib/demo/queries";
 import { demoRole } from "@/lib/demo/mode";
 import { getMe, getNotificacoes } from "@/lib/queries";
 import { getJovemAssinaturas, getJovemPerfil } from "@/lib/queries-jovem";
+import { garantirDocumentosDevidos } from "@/lib/actions-assinaturas";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { gravatarUrlSeExiste } from "@/lib/gravatar";
 import { providerConfigurado } from "@/lib/ia/provider";
@@ -87,6 +88,12 @@ export default async function JovemLayout({
   // o /jovem é do mentorado — staff (demo ou real) cai na própria home; o
   // espelho mora no (app)/layout, que devolve mentorado pra cá
   if (me.role !== "mentorado") redirect("/");
+
+  // auto-cura do login (0206): termo de participação (+ autorização do
+  // responsável pra menor) saem emitidos antes dos reads — o wizard ganha
+  // o passo do termo no 1º login e a home já mostra os documentos
+  // pendentes. Idempotente e self-scoped; erro não derruba o acesso.
+  await garantirDocumentosDevidos();
 
   // mesma montagem do (app)/layout: mapa papel→primeiro nome + dock no header
   // mobile do shell + pill flutuante do desktop
