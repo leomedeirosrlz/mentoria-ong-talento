@@ -16,11 +16,14 @@ import {
 } from "@/lib/forms/resposta";
 import {
   camposPerguntas,
+  visivel,
   type FormularioCampo,
   type RespostaValor,
 } from "@/lib/forms/schema";
 
 export type RespostaApi = {
+  /** token do link — o upload de arquivo precisa dele pra action validar */
+  token: string;
   /** mapa campo_id → valor — a fonte única dos instrumentos sob medida */
   valores: Record<string, RespostaValor>;
   /** grava (ou remove, com undefined/"") a resposta de um campo, persiste
@@ -58,7 +61,11 @@ export function useResposta({
    *  lint do React Compiler */
   formEl: HTMLFormElement | null;
 }): RespostaApi {
-  const perguntas = camposPerguntas(campos);
+  // visible_if do form editado: o gatilho decide por resposta — sem o
+  // filtro um campo escondido continuaria obrigatório e travava o submit
+  const perguntas = camposPerguntas(campos).filter((c) =>
+    visivel(c, valores)
+  );
   const chaveRascunho = preview ? null : `rascunho:/f/${token}`;
 
   const [valores, setValores] = useState<Record<string, RespostaValor>>({});
@@ -98,16 +105,16 @@ export function useResposta({
       }
       return next;
     });
+    // último campo com falha corrigido → o banner global de validação sai
+    // junto (erro de servidor/rede não é afetado aqui)
+    const restamFalhas = Object.keys(erros).some((k) => k !== id);
     setErros((prev) => {
       if (!prev[id]) return prev;
       const next = { ...prev };
       delete next[id];
-      // último campo marcado corrigido → o banner global de validação
-      // sai junto (erro de servidor/rede não é afetado aqui)
-      if (!Object.keys(next).length)
-        setErro((e) => (e === ERRO_VALIDACAO ? null : e));
       return next;
     });
+    if (!restamFalhas) setErro((e) => (e === ERRO_VALIDACAO ? null : e));
   }
 
   const respondidos = perguntas.reduce(
@@ -133,12 +140,17 @@ export function useResposta({
       if (alvo) {
         alvo.scrollIntoView({ block: "center" });
         // o próprio alvo pode ser o controle (a linha role=slider da roda)
-        // — senão procura o controle dentro dele
-        const controle = alvo.matches("input, select, textarea, [role='slider']")
+        // — senão procura dentro dele. fieldset focável (tabIndex=-1)
+        // vem primeiro: o leitor anuncia a legenda + o erro do grupo em
+        // vez de pular pro primeiro input mudo
+        const controle = alvo.matches(
+          "fieldset, input, select, textarea, [role='slider']"
+        )
           ? (alvo as HTMLElement)
-          : alvo.querySelector<HTMLElement>(
-              "input, select, textarea, [role='slider']"
-            );
+          : (alvo.querySelector<HTMLElement>("fieldset") ??
+            alvo.querySelector<HTMLElement>(
+              "input:not([type='hidden']), select, textarea, [role='slider']"
+            ));
         controle?.focus({ preventScroll: true });
       }
       return;
@@ -174,6 +186,7 @@ export function useResposta({
   }
 
   return {
+    token,
     valores,
     definir,
     erros,

@@ -86,6 +86,11 @@ export function InstrumentoFlow({
 
   const Icone = INSTRUMENTO_ICON[sistema];
   const minutos = Math.max(1, Math.round((api.total * 20) / 60));
+  // mesma régua do genérico: a linha que ensina "(opcional)" só aparece
+  // quando há o que pular
+  const temOpcional = campos.some(
+    (c) => c.tipo !== "secao" && !c.obrigatorio
+  );
 
   return (
     <AnimatePresence mode="wait" initial={false}>
@@ -131,7 +136,7 @@ export function InstrumentoFlow({
           {/* cartão de título — faixa lime + selo do instrumento */}
           <div className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
             <div aria-hidden className="h-1.5 bg-[var(--brand-lime)]" />
-            <div className="p-5 sm:p-7">
+            <div className="p-5 @xl:p-7">
               {primeiroNome && (
                 <p className="text-sm font-medium text-[var(--ok-text)]">
                   Olá, {primeiroNome}!
@@ -145,10 +150,10 @@ export function InstrumentoFlow({
                   <Icone size={24} weight="duotone" />
                 </span>
                 <div className="min-w-0">
-                  <h1 className="text-xl font-semibold tracking-tight">
+                  <h1 className="text-2xl font-semibold tracking-tight">
                     {titulo}
                   </h1>
-                  <p className="mt-0.5 text-xs text-muted-foreground">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     {api.total}{" "}
                     {api.total === 1 ? "pergunta" : "perguntas"} · leva ~
                     {minutos} min
@@ -161,6 +166,11 @@ export function InstrumentoFlow({
               >
                 Instrumento oficial · {SISTEMA_LABEL[sistema]}
               </Badge>
+              {temOpcional && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Você pode pular as perguntas marcadas (opcional).
+                </p>
+              )}
               {descricao && (
                 <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
                   {descricao}
@@ -170,6 +180,8 @@ export function InstrumentoFlow({
                 Suas respostas são lidas apenas pela equipe do Realiza.vc.{" "}
                 <Link
                   href="/privacidade"
+                  target="_blank"
+                  rel="noopener"
                   className="underline underline-offset-2 transition-colors hover:text-foreground"
                 >
                   privacidade
@@ -212,31 +224,44 @@ export function InstrumentoFlow({
               </label>
             </div>
 
-            {/* região estável no DOM: o texto entra e sai sem remontar, pro
-                leitor de tela anunciar sempre */}
-            <p
-              role="alert"
-              className={cn(
-                "rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive",
-                !api.erro && "sr-only"
-              )}
-            >
-              {api.erro}
-            </p>
-
-            <div title={preview ? "Envio desligado na prévia" : undefined}>
-              <Button
-                type="submit"
-                className="h-11 w-full md:h-10"
-                disabled={api.pending || preview}
-              >
-                {api.pending ? (
-                  <CircleNotch size={16} className="animate-spin" aria-hidden />
-                ) : (
-                  <PaperPlaneRight size={16} aria-hidden />
+            {/* o fecho do instrumento respira: erro+CTA num grupo próprio,
+                afastado do último campo pelo mesmo ritmo entre-capítulo */}
+            <div className="space-y-3 pt-4">
+              {/* região estável no DOM: o texto entra e sai sem remontar, pro
+                  leitor de tela anunciar sempre */}
+              <p
+                role="alert"
+                className={cn(
+                  "rounded-lg bg-destructive/10 px-3 py-2 text-sm text-destructive",
+                  !api.erro && "sr-only"
                 )}
-                {api.pending ? "Enviando…" : CTA[sistema]}
-              </Button>
+              >
+                {api.erro}
+              </p>
+
+              <div>
+                <Button
+                  type="submit"
+                  className="h-11 w-full @xl:h-10"
+                  disabled={api.pending || preview}
+                >
+                  {api.pending ? (
+                    <CircleNotch
+                      size={16}
+                      className="animate-spin"
+                      aria-hidden
+                    />
+                  ) : (
+                    <PaperPlaneRight size={16} aria-hidden />
+                  )}
+                  {api.pending ? "Enviando…" : CTA[sistema]}
+                </Button>
+                {preview && (
+                  <p className="mt-2 text-center text-xs text-muted-foreground">
+                    Envio desligado na prévia.
+                  </p>
+                )}
+              </div>
             </div>
           </form>
         </motion.div>
@@ -273,7 +298,7 @@ function PainelSucesso({
       tabIndex={-1}
       {...fade}
       transition={T.enter}
-      className="rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] outline-none sm:p-8"
+      className="rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] outline-none @xl:p-8"
     >
       {roda ? (
         <>

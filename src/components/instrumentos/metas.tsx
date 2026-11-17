@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { FlagPennant, Plus, X } from "@phosphor-icons/react";
+import { toast } from "sonner";
 import { agrupaEmSecoes, extraiGruposMeta } from "@/lib/forms/instrumentos";
 import { campoRespondido } from "@/lib/forms/resposta";
 import { type FormularioCampo } from "@/lib/forms/schema";
@@ -18,6 +19,7 @@ import {
   EntradaTexto,
   EntradaTextoLongo,
   ErroCampo,
+  RotuloCampo,
   Segmentos,
   SimNao,
 } from "./campos";
@@ -83,10 +85,10 @@ function Capitulo({
   children: React.ReactNode;
 }) {
   return (
-    <section className={cn(!primeiro && "pt-2")}>
+    <section className={cn(!primeiro && "pt-7")}>
       {secao && (
         <header className="px-1 pb-3">
-          <h2 className="text-base font-semibold tracking-tight sm:text-lg">
+          <h2 className="text-base font-semibold tracking-tight @xl:text-lg">
             {secao.label}
           </h2>
           {secao.descricao && (
@@ -123,13 +125,13 @@ function CorpoVisao({
         <div
           data-campo={declaracao.id}
           className={cn(
-            "rounded-xl border-l-2 border-[var(--brand-lime)] bg-card p-4 shadow-[var(--shadow-border)] sm:p-5",
+            "rounded-xl border-l-2 border-[var(--brand-lime)] bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5",
             api.erros[declaracao.id] && "ring-2 ring-destructive/60"
           )}
         >
           <label
             htmlFor={campoDomId(declaracao)}
-            className="block text-[15px] font-semibold leading-snug sm:text-base"
+            className="block text-[15px] font-semibold leading-snug @xl:text-base"
           >
             {declaracao.label}
           </label>
@@ -148,22 +150,17 @@ function CorpoVisao({
       )}
 
       {precisos.length > 0 && (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-3 @xl:grid-cols-2">
           {precisos.map((c) => (
             <div
               key={c.id}
               data-campo={c.id}
               className={cn(
-                "space-y-1.5 rounded-xl bg-card p-4 shadow-[var(--shadow-border)]",
+                "space-y-1.5 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5",
                 api.erros[c.id] && "ring-2 ring-destructive/60"
               )}
             >
-              <label
-                htmlFor={campoDomId(c)}
-                className="block text-sm font-medium leading-snug"
-              >
-                {c.label}
-              </label>
+              <RotuloCampo campo={c} htmlFor={campoDomId(c)} />
               <EntradaTexto
                 campo={c}
                 valor={api.valores[c.id]}
@@ -196,6 +193,7 @@ function CorpoMetas({
   // metas abertas além das obrigatórias — deriva do conteúdo também (o
   // rascunho restaura DEPOIS do mount: meta_4 salva volta aberta sozinha)
   const [abertas, setAbertas] = useState<Set<number>>(new Set());
+  const addRef = useRef<HTMLButtonElement>(null);
 
   // conteúdo segura a ficha aberta — desdobramento/is/prazo também
   // contam (a pessoa pode ter começado pelas submetas)
@@ -228,16 +226,29 @@ function CorpoMetas({
   function remover(n: number) {
     const g = grupos.find((x) => x.n === n);
     if (!g) return;
-    api.definir(g.meta.id, undefined);
-    if (g.porque) api.definir(g.porque.id, undefined);
-    if (g.is) api.definir(g.is.id, undefined);
-    if (g.prazo) api.definir(g.prazo.id, undefined);
-    if (g.submetas) api.definir(g.submetas.id, undefined);
+    // snapshot pra Desfazer — a remoção limpa todos os campos do grupo
+    const backup = [g.meta, g.porque, g.is, g.prazo, g.submetas]
+      .filter((c): c is FormularioCampo => c != null)
+      .map((c) => [c.id, api.valores[c.id]] as const);
+    for (const c of [g.meta, g.porque, g.is, g.prazo, g.submetas]) {
+      if (c) api.definir(c.id, undefined);
+    }
     setAbertas((prev) => {
       const next = new Set(prev);
       next.delete(n);
       return next;
     });
+    toast(`Meta ${n} removida`, {
+      action: {
+        label: "Desfazer",
+        onClick: () => {
+          for (const [id, v] of backup) api.definir(id, v);
+          setAbertas((prev) => new Set(prev).add(n));
+        },
+      },
+    });
+    // foco cai no gatilho que reabre a ficha — sem ele o teclado órfão
+    requestAnimationFrame(() => addRef.current?.focus());
   }
 
   return (
@@ -264,12 +275,19 @@ function CorpoMetas({
 
       {proximaFechada && (
         <Button
+          ref={addRef}
           type="button"
           variant="outline"
           className="w-full border-dashed"
-          onClick={() =>
-            setAbertas((prev) => new Set(prev).add(proximaFechada.n))
-          }
+          onClick={() => {
+            const alvo = proximaFechada;
+            setAbertas((prev) => new Set(prev).add(alvo.n));
+            // ficha nova entra focada — o input da meta é o primeiro
+            // controle e já vem com o rascunho de volta se houver
+            requestAnimationFrame(() =>
+              document.getElementById(campoDomId(alvo.meta))?.focus()
+            );
+          }}
         >
           <Plus aria-hidden />
           Adicionar meta {proximaFechada.n}
@@ -328,7 +346,7 @@ function FichaMeta({
         (erroMeta || erroPorque) && "ring-2 ring-destructive/60"
       )}
     >
-      <div className="space-y-3 p-4 sm:p-5">
+      <div className="space-y-3 p-4 @xl:p-5">
         <div className="flex items-center gap-2.5">
           <span
             aria-hidden
@@ -369,12 +387,7 @@ function FichaMeta({
         </div>
 
         <div className="space-y-1.5" data-campo={g.meta.id}>
-          <label
-            htmlFor={campoDomId(g.meta)}
-            className="block text-sm font-medium leading-snug"
-          >
-            {g.meta.label}
-          </label>
+          <RotuloCampo campo={g.meta} htmlFor={campoDomId(g.meta)} />
           <EntradaTexto
             campo={g.meta}
             valor={api.valores[g.meta.id]}
@@ -387,17 +400,7 @@ function FichaMeta({
 
         {g.porque && (
           <div className="space-y-1.5" data-campo={g.porque.id}>
-            <label
-              htmlFor={campoDomId(g.porque)}
-              className="block text-sm font-medium leading-snug"
-            >
-              {g.porque.label}
-              {!g.porque.obrigatorio && (
-                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                  (opcional)
-                </span>
-              )}
-            </label>
+            <RotuloCampo campo={g.porque} htmlFor={campoDomId(g.porque)} />
             <EntradaTextoLongo
               campo={g.porque}
               valor={api.valores[g.porque.id]}
@@ -451,7 +454,7 @@ function CampoRevisao({
       <div
         data-campo={campo.id}
         className={cn(
-          "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5",
+          "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5",
           api.erros[campo.id] && "ring-2 ring-destructive/60"
         )}
       >
@@ -480,7 +483,7 @@ function CampoRevisao({
       <div
         data-campo={campo.id}
         className={cn(
-          "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5",
+          "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5",
           api.erros[campo.id] && "ring-2 ring-destructive/60"
         )}
       >

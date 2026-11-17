@@ -18,7 +18,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import type { RespostaApi } from "./use-resposta";
 import { RodaSvg } from "./roda-svg";
-import { CampoGenerico, campoDomId, EntradaTextoLongo, ErroCampo } from "./campos";
+import { CampoGenerico, campoDomId, EntradaTextoLongo, ErroCampo, RotuloCampo } from "./campos";
 
 // Roda da Vida interativa — a peça de destaque. O gesto principal é
 // arrastar na roda: o ângulo escolhe o eixo, a distância ao centro a nota
@@ -117,7 +117,7 @@ export function RodaVida({
       {estrutura.intro.map((s) => (
         <div
           key={s.id}
-          className="flex gap-3 rounded-xl bg-card p-5 shadow-[var(--shadow-border)]"
+          className="flex gap-3 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5"
         >
           <span
             aria-hidden
@@ -139,7 +139,7 @@ export function RodaVida({
       ))}
 
       {/* a roda + o eixo em foco — uma zona de interação só */}
-      <div className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
+      <div className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5">
         {/* linha própria de navegação EM CIMA da roda, em fundo branco —
             o título do eixo sai do cartão lime e fica legível entre as
             setas; as setas são chips lime (ações primárias, ícone ink) */}
@@ -198,7 +198,7 @@ export function RodaVida({
           {anuncio}
         </p>
 
-        <div className="mt-2 border-t border-border/60 pt-3">
+        <div className="mt-3 border-t border-border/60 pt-3">
           <div className="flex items-center justify-between gap-3">
             {/* progresso da volta — conta áreas com nota, não posição */}
             <p className="text-xs font-medium text-muted-foreground">
@@ -250,7 +250,7 @@ export function RodaVida({
               style={{ width: `${(respondidas / total) * 100}%` }}
             />
           </div>
-          <div className="mt-1.5 flex justify-between text-[11px] text-muted-foreground">
+          <div className="mt-1.5 flex justify-between text-xs text-muted-foreground">
             <span>Nada satisfeito</span>
             <span>Muito satisfeito</span>
           </div>
@@ -270,7 +270,7 @@ export function RodaVida({
 
       {/* a lista completa por quadrante — cada linha é um slider: setas
           no teclado, toque/arraste na trilha, número exato à direita */}
-      <div className="space-y-4 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
+      <div className="space-y-4 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5">
         {roda.quadrantes.map((q) => (
           <section key={q.nome || "geral"}>
             {/* sem uppercase via CSS: o nome acessível do heading segue o
@@ -305,27 +305,16 @@ export function RodaVida({
             key={c.id}
             data-campo={c.id}
             className={cn(
-              "space-y-1.5 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5",
+              "space-y-1.5 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] @xl:p-5",
               api.erros[c.id] && "ring-2 ring-destructive/60"
             )}
           >
-            <label
-              htmlFor={campoDomId(c)}
-              className="block text-[15px] font-medium leading-snug sm:text-base"
-            >
-              {c.label}
-              {!c.obrigatorio && (
-                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                  (opcional)
-                </span>
-              )}
-            </label>
+            <RotuloCampo campo={c} htmlFor={campoDomId(c)} />
             <EntradaTextoLongo
               campo={c}
               valor={api.valores[c.id]}
               definir={api.definir}
               erro={api.erros[c.id]}
-              enterKeyHint="send"
               rows={5}
             />
             <ErroCampo campo={c} msg={api.erros[c.id]} />
@@ -396,6 +385,7 @@ function AreaSlider({
         respondida ? `Nota ${area.nota} de 10` : "Sem nota ainda"
       }
       aria-invalid={erro ? true : undefined}
+      aria-describedby={erro ? `f-${area.id}-erro` : undefined}
       onFocus={onFoco}
       onKeyDown={onKeyDown}
       onClick={onFoco}
@@ -419,8 +409,11 @@ function AreaSlider({
       >
         {indice + 1}
       </span>
-      <span className="min-w-0 flex-1 truncate text-sm">{area.label}</span>
-      {/* a trilha é o alvo do arraste — a fração do toque vira a nota */}
+      <span className="min-w-0 flex-1 truncate text-sm" title={area.label}>
+        {area.label}
+      </span>
+      {/* a trilha é o alvo do arraste — a fração do toque vira a nota;
+          pan-y deixa a rolagem vertical passar e o gesto horizontal fica */}
       <span
         ref={trilhaRef}
         aria-hidden
@@ -431,7 +424,7 @@ function AreaSlider({
         onPointerMove={(e) => {
           if (e.buttons & 1) porPonteiro(e);
         }}
-        className="relative h-6 w-20 shrink-0 touch-none sm:w-28"
+        className="relative h-8 w-24 shrink-0 touch-pan-y @xl:w-28"
       >
         <span className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-muted">
           <span
@@ -460,6 +453,14 @@ function AreaSlider({
       >
         {area.nota ?? "—"}
       </span>
+      {erro && (
+        <span
+          id={`f-${area.id}-erro`}
+          className="basis-full pt-0.5 text-sm leading-snug text-destructive"
+        >
+          {erro}
+        </span>
+      )}
     </li>
   );
 }

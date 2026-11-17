@@ -41,9 +41,9 @@ export const CAMPO_FORMATO_LABEL: Record<FormularioCampoFormato, string> = {
  *  no campo só quando ele é obrigatório (opcional irreconhecível simples-
  *  mente não é gravado: a submissão só morre por vazio de obrigatório). */
 export const CAMPO_FORMATO_ERRO: Record<FormularioCampoFormato, string> = {
-  email: "Confira o e-mail — parece que faltou um pedaço (ex.: nome@dominio.com).",
-  telefone: "Confira o telefone — use DDD + número (ex.: 11 99999-8888).",
-  url: "Confira o link — escreva o endereço (ex.: linkedin.com/in/seu-nome).",
+  email: "Confira o e-mail: parece que faltou um pedaço (ex.: nome@dominio.com).",
+  telefone: "Confira o telefone: use DDD + número (ex.: 11 99999-8888).",
+  url: "Confira o link: escreva o endereço (ex.: linkedin.com/in/seu-nome).",
 };
 
 /** Condição de exibição (REALIZA-70): o campo só aparece quando a
@@ -209,11 +209,11 @@ export const INSTRUMENTO_INFO: Record<
 > = {
   visao: {
     titulo: "Construindo a sua Visão",
-    resumo: "O exercício do 1º encontro — o filme da vida ideal vira a Declaração de Visão.",
+    resumo: "O exercício do 1º encontro · o filme da vida ideal vira a Declaração de Visão.",
   },
   metas: {
     titulo: "Definindo Minhas Metas",
-    resumo: "Da visão pra 3–5 metas com o porquê de cada uma — a dupla revisa com o modelo SMART.",
+    resumo: "Da visão pra 3–5 metas com o porquê de cada uma · a dupla revisa com o modelo SMART.",
   },
   pdm: {
     titulo: "PDM",
@@ -221,7 +221,7 @@ export const INSTRUMENTO_INFO: Record<
   },
   roda_vida: {
     titulo: "Roda da Vida",
-    resumo: "Satisfação 1–10 nas 16 áreas da vida, a partir do 5º mês — o desenho vira a roda.",
+    resumo: "Satisfação 1–10 nas 16 áreas da vida, a partir do 5º mês · o desenho vira a roda.",
   },
   competencias_mentor: {
     titulo: "Checklist de competências do mentor",

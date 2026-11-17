@@ -67,7 +67,7 @@ export default async function FormularioTokenPage({
       {/* flex + m-auto (não place-items-center): forms longos não clipam o
           topo em telas baixas — centraliza só quando há espaço. flex, não
           grid: em grid o w-full do filho resolve contra o padding box */}
-      <main className="flex flex-1 flex-col px-4 py-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
+      <main className="flex flex-1 flex-col py-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
         <div className="m-auto w-full max-w-xl @container">
           <header className="mb-6">
             {/* width/height naturais reservam a proporção — sem CLS */}
@@ -93,7 +93,7 @@ export default async function FormularioTokenPage({
               icon={LinkBreak}
               titulo="Link não encontrado"
               acao={{
-                href: "mailto:mentoria@realiza.vc",
+                href: "mailto:mentoria@realiza.vc?subject=Quero%20um%20novo%20link",
                 label: "Pedir um novo link",
               }}
             >
@@ -120,7 +120,7 @@ export default async function FormularioTokenPage({
               icon={Clock}
               titulo="Este link expirou"
               acao={{
-                href: "mailto:mentoria@realiza.vc",
+                href: `mailto:mentoria@realiza.vc?subject=${encodeURIComponent(`Novo link: ${info.formulario?.titulo ?? "formulário"}`)}`,
                 label: "Pedir um novo link",
               }}
             >
@@ -135,7 +135,14 @@ export default async function FormularioTokenPage({
               </p>
             </EstadoCard>
           ) : info.status === "outra_pessoa" ? (
-            <EstadoCard icon={UserSwitch} titulo="Este link é de outra pessoa">
+            <EstadoCard
+              icon={UserSwitch}
+              titulo="Este link é de outra pessoa"
+              acao={{
+                href: `mailto:mentoria@realiza.vc?subject=${encodeURIComponent(`Quero meu link: ${info.formulario?.titulo ?? "formulário"}`)}`,
+                label: "Pedir meu link",
+              }}
+            >
               <p>
                 Você está conectado com uma conta que não é a de{" "}
                 {info.destinatario ? (
@@ -154,7 +161,7 @@ export default async function FormularioTokenPage({
               icon={PauseCircle}
               titulo="Formulário encerrado"
               acao={{
-                href: "mailto:mentoria@realiza.vc",
+                href: `mailto:mentoria@realiza.vc?subject=${encodeURIComponent(`Formulário encerrado: ${info.formulario?.titulo ?? ""}`)}`,
                 label: "Falar com a equipe",
               }}
             >

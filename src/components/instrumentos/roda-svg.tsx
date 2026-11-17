@@ -140,7 +140,7 @@ export function RodaSvg({
       onPointerCancel={interativo ? () => onFim?.() : undefined}
       className={cn(
         // o teto padrão é o do celular; cada chamador passa o seu por
-        // container — variante de viewport (`sm:`/`lg:`) brigaria com o
+        // container — variante de viewport (`@xl:`/`lg:`) brigaria com o
         // max-w que o dialog de prévia precisa (REALIZA-248)
         "mx-auto w-full max-w-[300px] shrink-0 select-none",
         interativo && "cursor-crosshair touch-none",

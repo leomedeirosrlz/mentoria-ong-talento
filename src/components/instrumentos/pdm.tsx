@@ -90,7 +90,7 @@ export function Pdm({
           ))}
         </nav>
 
-        <div className="min-w-0 space-y-4">
+        <div className="min-w-0 space-y-5">
           {capitulos.map((c) => (
             <CapituloDoc key={c.id} capitulo={c} api={api} grupos={grupos} />
           ))}
@@ -118,7 +118,7 @@ function CapituloDoc({
       id={id}
       className="scroll-mt-20 rounded-xl bg-card shadow-[var(--shadow-border)]"
     >
-      <div className="p-5 sm:p-7">
+      <div className="p-5 @xl:p-7">
         {bloco.secao && (
           <header className="flex items-start gap-3">
             <span
@@ -160,12 +160,17 @@ function CapituloDoc({
                 <div key={c.id} data-campo={c.id} className="space-y-1.5">
                   <label
                     htmlFor={campoDomId(c)}
-                    className="block text-[15px] font-medium leading-snug"
+                    className="block text-[15px] font-medium leading-snug @xl:text-base"
                   >
                     {c.label}
                     {!c.obrigatorio && (
                       <span className="ml-1.5 text-xs font-normal text-muted-foreground">
                         (opcional)
+                      </span>
+                    )}
+                    {c.descricao && (
+                      <span className="mt-0.5 block text-xs font-normal leading-relaxed text-muted-foreground">
+                        {c.descricao}
                       </span>
                     )}
                   </label>
@@ -222,7 +227,7 @@ function FichasPdm({
         <div
           data-campo={declaracao.id}
           className={cn(
-            "rounded-xl border-l-2 border-[var(--brand-lime)] bg-[var(--brand-lime)]/5 p-4 sm:p-5",
+            "rounded-xl border-l-2 border-[var(--brand-lime)] bg-[var(--brand-lime)]/5 p-4 @xl:p-5",
             api.erros[declaracao.id] && "ring-2 ring-destructive/60"
           )}
         >
@@ -259,9 +264,7 @@ function FichasPdm({
             )}
           >
             <h3 className="flex items-baseline gap-2 text-sm font-semibold">
-              <span className="tabular-nums text-muted-foreground">
-                Meta {g.n}
-              </span>
+              <span className="tabular-nums">Meta {g.n}</span>
               {!g.meta.obrigatorio && (
                 <span className="text-xs font-normal text-muted-foreground">
                   (opcional)

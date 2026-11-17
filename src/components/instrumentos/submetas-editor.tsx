@@ -87,7 +87,7 @@ export function SubmetasEditor({
       className="min-w-0 space-y-2"
     >
       <legend>
-        <RotuloCampo campo={campo} className="text-sm sm:text-sm" />
+        <RotuloCampo campo={campo} className="text-sm @xl:text-sm" />
       </legend>
       {campo.descricao && (
         <p className="text-xs leading-relaxed text-muted-foreground">

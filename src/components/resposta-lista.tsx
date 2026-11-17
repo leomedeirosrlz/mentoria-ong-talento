@@ -6,6 +6,7 @@ import {
   type RespostaValor,
 } from "@/lib/forms/schema";
 import { agrupaEmSecoes } from "@/lib/forms/instrumentos";
+import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 
 // Lista pergunta → resposta de um formulário (leitura pós-envio): as
@@ -31,6 +32,28 @@ type LinhaResposta = {
  *  com valor cru vazio. */
 function respondida(l: Pick<LinhaResposta, "valor" | "extra">): boolean {
   return l.extra != null || (l.valor !== "—" && l.valor.trim() !== "");
+}
+
+/** Órfã: a pergunta saiu do modelo e o tipo se perdeu — formata pelo
+ *  formato do valor. Objeto nunca vira "—" muda: anexo mostra o nome,
+ *  grade mostra a contagem (a linha NUNCA some — o CSV já fazia assim). */
+function valorOrfaFormatado(v: RespostaValor): string {
+  if (v == null) return "—";
+  if (v === "sim") return "Sim";
+  if (v === "nao") return "Não";
+  if (Array.isArray(v)) return v.filter((x) => x != null).join(", ");
+  if (typeof v === "object") {
+    const o = v as { nome?: string; horas?: unknown[]; celulas?: unknown[] };
+    if (typeof o.nome === "string" && o.nome) return o.nome;
+    const n = (o.horas ?? o.celulas)?.length ?? 0;
+    return n ? `${n} opções marcadas` : "resposta registrada";
+  }
+  if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v)) {
+    const d = new Date(`${v}T12:00:00-03:00`);
+    if (!isNaN(d.getTime()))
+      return d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
+  }
+  return String(v);
 }
 
 export function RespostaLista({
@@ -89,7 +112,11 @@ export function RespostaLista({
 
   // blocos na ordem da definição — a 'secao' abre o grupo (eyebrow) e
   // não espera resposta; pergunta sem resposta some da lista
-  const blocos = agrupaEmSecoes(defs)
+  const blocos: {
+    secao: FormularioCampo | null;
+    hint?: string;
+    linhas: LinhaResposta[];
+  }[] = agrupaEmSecoes(defs)
     .map((b) => ({
       secao: b.secao,
       linhas: b.campos
@@ -104,7 +131,9 @@ export function RespostaLista({
     }))
     .filter((b) => b.linhas.length > 0);
 
-  // resposta de pergunta removida da definição — órfãs por último
+  // resposta de pergunta removida da definição: o enunciado original não
+  // é guardado (a edição sobrescreve `campos`), então a evidência vai num
+  // bloco próprio com o id do campo como pista do assunto
   const orfas: LinhaResposta[] = Object.entries(respostas)
     .filter(([id, v]) => !campoPorId.has(id) && v != null)
     .map(([id, v]): LinhaResposta => {
@@ -112,16 +141,32 @@ export function RespostaLista({
       return {
         id,
         label: (
-          <span className="font-normal italic text-muted-foreground">
-            pergunta removida do formulário
-          </span>
+          <>
+            {id.replace(/_/g, " ")}
+            <Badge
+              variant="outline"
+              className="ml-1.5 align-middle font-normal text-muted-foreground"
+            >
+              pergunta removida
+            </Badge>
+          </>
         ),
-        valor: respostaFormatada(undefined, v),
+        valor: valorOrfaFormatado(v),
         extra,
       };
     })
     .filter(respondida);
-  if (orfas.length) blocos.push({ secao: null, linhas: orfas });
+  if (orfas.length)
+    blocos.push({
+      secao: {
+        id: "__removidas__",
+        tipo: "secao",
+        label: "Respondidas antes de a pergunta sair do modelo",
+        obrigatorio: false,
+      },
+      hint: "O texto original da pergunta não fica guardado. O nome do campo ajuda a identificar o assunto.",
+      linhas: orfas,
+    });
 
   if (!blocos.length) {
     return (
@@ -138,6 +183,11 @@ export function RespostaLista({
           {b.secao && (
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               {b.secao.label}
+            </p>
+          )}
+          {b.hint && (
+            <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+              {b.hint}
             </p>
           )}
           <dl className={cn("space-y-3", b.secao && "mt-2.5")}>
