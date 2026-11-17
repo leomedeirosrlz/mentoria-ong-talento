@@ -47,7 +47,7 @@ const SHOTS = {
     { arquivo: "mentor_dpp-dupla", rota: dupla(D_OK) },
     { arquivo: "mentor_dpp-duplas", rota: "/duplas" },
     { arquivo: "mentor_dpp-home", rota: "/" },
-    { arquivo: "mentor_dpp-pdm", rota: `${dupla(D_OK)}?aba=instrumentos` },
+    { arquivo: "mentor_dpp-pdm", rota: `${dupla(D_OK)}?aba=instrumentos`, foco: "#pdm" },
     { arquivo: "mentor_dpp-apoio", rota: "/chamados" },
     { arquivo: "mentor_dpp-especialista", rota: "/agenda?aba=por-mentorado", texto: "Especialista solicitado" },
     { arquivo: "mentor_dpp-materiais", rota: "/materiais" },
