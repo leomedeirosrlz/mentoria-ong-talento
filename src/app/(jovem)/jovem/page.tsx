@@ -645,7 +645,7 @@ export default async function JovemHome() {
                 feitas={avaliacoesFeitas}
                 primeiroNome={primeiroNome}
               />
-              {duplaEmCurso && (
+              {duplaEmCurso && duplaDppId && (
                 <p className="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground sm:px-6">
                   Quer avaliar um encontro que não apareceu aqui? Se ele
                   ainda vai acontecer,{" "}
@@ -656,24 +656,20 @@ export default async function JovemHome() {
                     agende você na sua agenda
                   </Link>
                   ; se já aconteceu sem marcar,{" "}
-                  {duplaDppId && numerosRetro.length > 0 ? (
-                    <JovemRetroativoDialog
-                      duplaId={duplaDppId}
-                      numeros={numerosRetro}
-                      trigger={
-                        <Button
-                          type="button"
-                          variant="link"
-                          size="sm"
-                          className="h-auto min-h-11 px-0 text-xs font-medium underline underline-offset-2 sm:min-h-0"
-                        >
-                          registre você aqui
-                        </Button>
-                      }
-                    />
-                  ) : (
-                    "peça pro seu mentor registrar"
-                  )}
+                  <JovemRetroativoDialog
+                    duplaId={duplaDppId}
+                    numeros={numerosRetro}
+                    trigger={
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="sm"
+                        className="h-auto min-h-11 px-0 text-xs font-medium underline underline-offset-2 sm:min-h-0"
+                      >
+                        registre você aqui
+                      </Button>
+                    }
+                  />
                   .
                 </p>
               )}

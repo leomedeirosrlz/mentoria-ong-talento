@@ -112,6 +112,29 @@ export function JovemRetroativoDialog({
               : "Se vocês se encontraram sem agendar por aqui (combinaram por WhatsApp, por exemplo), conte quando foi. O encontro já entra como realizado e você pode avaliar na hora. Seu mentor é avisado pra contar como foi no registro dele."}
           </DialogDescription>
         </DialogHeader>
+        {!atual && numeros && numeros.length === 0 ? (
+          /* sem passo elegível a copy não manda "pedir pro mentor" — ela
+             explica a fronteira: o que falta na lista é passo ainda não
+             vencido no guia ou o encontro de encerramento, e esses são
+             dele por desenho, não por falta de permissão do jovem */
+          <>
+          <p className="text-sm leading-relaxed text-muted-foreground">
+            Todos os encontros do guia que já venceram estão na sua agenda.
+            O que falta entrar é um passo que ainda não chegou no calendário
+            oficial ou o encontro de encerramento — esse quem registra é o
+            seu mentor, que fecha a jornada com vocês.
+          </p>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setOpen(false)}
+            >
+              Entendi
+            </Button>
+          </DialogFooter>
+          </>
+        ) : (
         <form onSubmit={submit} className="space-y-4">
           {!atual && numeros && numeros.length > 0 && (
             <div className="space-y-2">
@@ -171,6 +194,7 @@ export function JovemRetroativoDialog({
             </Button>
           </DialogFooter>
         </form>
+        )}
       </DialogContent>
     </Dialog>
   );

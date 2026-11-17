@@ -484,24 +484,20 @@ export default async function JovemAgenda() {
                       Fez um encontro que não apareceu aqui? Se ele ainda vai
                       acontecer, agende pelo botão no topo da página; se já
                       aconteceu sem marcar,{" "}
-                      {numerosRetro.length > 0 ? (
-                        <JovemRetroativoDialog
-                          duplaId={duplaDpp.id}
-                          numeros={numerosRetro}
-                          trigger={
-                            <Button
-                              type="button"
-                              variant="link"
-                              size="sm"
-                              className="h-auto min-h-11 px-0 text-xs font-medium underline underline-offset-2 sm:min-h-0"
-                            >
-                              registre você aqui
-                            </Button>
-                          }
-                        />
-                      ) : (
-                        "peça pro seu mentor registrar"
-                      )}
+                      <JovemRetroativoDialog
+                        duplaId={duplaDpp.id}
+                        numeros={numerosRetro}
+                        trigger={
+                          <Button
+                            type="button"
+                            variant="link"
+                            size="sm"
+                            className="h-auto min-h-11 px-0 text-xs font-medium underline underline-offset-2 sm:min-h-0"
+                          >
+                            registre você aqui
+                          </Button>
+                        }
+                      />
                       .
                     </p>
                   )}
