@@ -17,7 +17,7 @@ import {
 import { disponivelDesdePorId } from "@/lib/fila";
 import { getAssinaturasResumo } from "@/lib/queries-assinaturas";
 import { faltantesDocumento } from "@/lib/documentos/texto";
-import { foraDoPrograma } from "@/lib/ciclo";
+import { foraDoPrograma, idade } from "@/lib/ciclo";
 import { turmaDaDupla } from "@/lib/turma";
 import type { DocsPessoa } from "@/components/pessoas-listas";
 import {
@@ -214,6 +214,9 @@ export default async function PessoasPage() {
                       nome: m.nome,
                       email: m.email || null,
                       whatsapp: m.whatsapp,
+                      // o dialog avisa e o servidor emite: menor recebe o
+                      // par (termo + autorização) numa passada só
+                      menor: (idade(m.data_nascimento) ?? 99) < 18,
                     })),
                   docs: docsPorPessoa,
                   faltantes: faltantesPorPessoa,

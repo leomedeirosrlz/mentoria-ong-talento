@@ -12,6 +12,10 @@ import {
   type TipoAlvoAssinatura,
 } from "./documentos/texto";
 import { emitirUm } from "./documentos/emissao";
+import {
+  docsDevidosMentorado,
+  type SlugDocMentorado,
+} from "./pessoas-status";
 import { enviarEmailsIndividuais, SITE_URL } from "./email";
 import { emailDocumentoAssinatura } from "./email-templates";
 import { ipCliente } from "./ip";
@@ -202,37 +206,80 @@ export async function solicitarAssinatura({
       };
   }
 
-  const { data: tpl } = await supabase
-    .from("documento_templates")
-    .select("id")
-    .eq("slug", slug)
-    .eq("ativo", true)
-    .single();
-  if (!tpl) return { error: "Template de documento não configurado." };
+  // os documentos devidos do jovem dependem da idade: menor deve os dois —
+  // pedir um emite o conjunto inteiro (o par anda junto, nunca pela
+  // metade). Pedido fora dos devidos (ex.: autorização pra adulto) segue
+  // emitindo só o template escolhido, como antes
+  let slugs = [slug];
+  if (tipo === "mentorado") {
+    const { data: pessoal } = await supabase
+      .from("mentorados_pessoal")
+      .select("data_nascimento")
+      .eq("id", id)
+      .maybeSingle();
+    const devidos = docsDevidosMentorado({
+      data_nascimento: pessoal?.data_nascimento ?? null,
+    });
+    if (devidos.includes(slug as SlugDocMentorado))
+      slugs = [slug, ...devidos.filter((s) => s !== slug)];
+  }
 
-  const [emissao, faltantes] = await Promise.all([
-    emitirUm(supabase, tpl.id, tipo, id, eu.id),
-    faltantesDoAlvo(supabase, tipo, id, slug),
-  ]);
-  if (emissao === "assinado")
-    return { error: "Este documento já foi assinado." };
-  if (!emissao) return { error: "Não foi possível gerar o link." };
+  const { data: tpls } = await supabase
+    .from("documento_templates")
+    .select("id, slug")
+    .in("slug", slugs)
+    .eq("ativo", true);
+  const tplPorSlug = new Map(
+    ((tpls ?? []) as { id: string; slug: string }[]).map((t) => [t.slug, t.id])
+  );
+  if (slugs.some((s) => !tplPorSlug.has(s)))
+    return { error: "Template de documento não configurado." };
+
+  const links: { slug: string; link: string; existente: boolean }[] = [];
+  const faltantes = new Set<string>();
+  let assinados = 0;
+  for (const s of slugs) {
+    const emissao = await emitirUm(
+      supabase,
+      tplPorSlug.get(s)!,
+      tipo,
+      id,
+      eu.id
+    );
+    for (const f of await faltantesDoAlvo(supabase, tipo, id, s))
+      faltantes.add(f);
+    if (emissao === "assinado") assinados++;
+    else if (emissao)
+      links.push({
+        slug: s,
+        link: `${LINK_BASE}${emissao.token}`,
+        existente: emissao.existente,
+      });
+  }
+  if (!links.length)
+    return {
+      error:
+        assinados === slugs.length
+          ? slugs.length > 1
+            ? "Os documentos já foram assinados."
+            : "Este documento já foi assinado."
+          : "Não foi possível gerar o link.",
+    };
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${id}`);
-  return {
-    ok: true,
-    link: `${LINK_BASE}${emissao.token}`,
-    existente: emissao.existente,
-    faltantes,
-  };
+  return { ok: true, links, faltantes: [...faltantes] };
 }
 
 /** Item do lote de emissão — a tela de resultado do "Enviar termos" renderiza
- *  um por pessoa: nome, contato pra onde o link vai, link pronto e os
- *  faltantes do cadastro (labels; quem assina completa no ato). */
+ *  um por documento emitido: nome, contato pra onde o link vai, link pronto
+ *  e os faltantes do cadastro (labels; quem assina completa no ato). Um
+ *  mentorado menor de idade gera DUAS linhas — termo + autorização saem
+ *  juntos na mesma passada. */
 export type ItemEmissao = {
   tipo: TipoAlvoAssinatura;
   id: string;
+  /** documento emitido — distingue as duas linhas do mentorado menor */
+  slug: string;
   nome: string;
   email: string | null;
   whatsapp: string | null;
@@ -253,9 +300,11 @@ export type ItemEmissao = {
   destinatario: string | null;
 };
 
-/** Emissão em massa do dialog "Enviar termos" — uma passada por alvo sobre
- *  o mesmo template, reaproveitando pendências vivas e devolvendo contato +
- *  faltantes pra tela de resultado (copiar, WhatsApp, e-mail). */
+/** Emissão em massa do dialog "Enviar termos" — uma passada por alvo.
+ *  O documento pedido sempre sai; pro mentorado menor de idade o irmão
+ *  devido sai junto na mesma passada (termo + autorização, a régua da
+ *  ficha), reaproveitando pendências vivas e devolvendo contato +
+ *  faltantes por documento pra tela de resultado. */
 export async function emitirAssinaturasEmLote({
   slug,
   alvos,
@@ -299,12 +348,19 @@ export async function emitirAssinaturasEmLote({
   }
   if (!ids.length) return { error: "Escolha ao menos uma pessoa." };
 
-  const { data: tpl } = await supabase
+  // todos os templates que podem sair no lote: pro mentorado o pool inteiro
+  // (menor emite o par), pro profile só o pedido — um select só
+  const { data: tplRows } = await supabase
     .from("documento_templates")
-    .select("id, titulo")
-    .eq("slug", slug)
-    .eq("ativo", true)
-    .single();
+    .select("id, slug, titulo")
+    .in("slug", TEMPLATES_POR_TIPO[tipo].map((t) => t.slug))
+    .eq("ativo", true);
+  const tplPorSlug = new Map(
+    (
+      (tplRows ?? []) as { id: string; slug: string; titulo: string }[]
+    ).map((t) => [t.slug, t])
+  );
+  const tpl = tplPorSlug.get(slug);
   if (!tpl) return { error: "Template de documento não configurado." };
 
   // nomes + contatos + civis numa passada só por pool: contato de profile
@@ -317,8 +373,11 @@ export async function emitirAssinaturasEmLote({
       nome: string;
       email: string | null;
       whatsapp: string | null;
-      faltantes: string[];
-      destinatario: string | null;
+      /** documentos a emitir pro alvo — os devidos quando o pedido é um
+       *  deles (menor leva os dois); senão o pedido, como sempre */
+      emissao: string[];
+      faltantesPor: Record<string, string[]>;
+      destinatarioPor: Record<string, string | null>;
     }
   >();
   if (tipo === "profile") {
@@ -357,12 +416,15 @@ export async function emitirAssinaturasEmLote({
         nome: p.nome,
         email: c?.email ?? null,
         whatsapp: c?.whatsapp ?? null,
-        faltantes: faltantesDocumento(slug, {
-          nome: p.nome,
-          data_nascimento: d?.data_nascimento,
-          dados_civis: (d?.dados_civis ?? null) as DadosCivis | null,
-        }),
-        destinatario: null,
+        emissao: [slug],
+        faltantesPor: {
+          [slug]: faltantesDocumento(slug, {
+            nome: p.nome,
+            data_nascimento: d?.data_nascimento,
+            dados_civis: (d?.dados_civis ?? null) as DadosCivis | null,
+          }),
+        },
+        destinatarioPor: { [slug]: null },
       });
     }
   } else {
@@ -394,22 +456,39 @@ export async function emitirAssinaturasEmLote({
     }[]) {
       const d = pessoalPorId.get(m.id);
       const resp = (d?.responsavel ?? null) as ResponsavelCivis | null;
+      const ctx = {
+        nome: m.nome,
+        data_nascimento: d?.data_nascimento,
+        dados_civis: (d?.dados_civis ?? null) as DadosCivis | null,
+        responsavel: resp,
+      };
+      const devidos = docsDevidosMentorado({
+        data_nascimento: d?.data_nascimento ?? null,
+      });
+      // pedido dentro dos devidos → o conjunto inteiro sai junto (o par
+      // anda junto); pedido de fora (ex.: autorização pra adulto) respeita
+      // o template escolhido, como antes
+      const emissao = devidos.includes(slug as SlugDocMentorado)
+        ? [slug, ...devidos.filter((s) => s !== slug)]
+        : [slug];
+      const faltantesPor: Record<string, string[]> = {};
+      const destinatarioPor: Record<string, string | null> = {};
+      for (const s of emissao) {
+        faltantesPor[s] = faltantesDocumento(s, ctx);
+        // quem abre o link da autorização é o responsável — o e-mail e o
+        // WhatsApp saúdam ele, não o(a) jovem (alvo do documento)
+        destinatarioPor[s] =
+          s === "autorizacao-responsavel"
+            ? (resp?.nome_civil?.trim() || null)
+            : null;
+      }
       info.set(m.id, {
         nome: m.nome,
         email: m.email ?? null,
         whatsapp: m.whatsapp ?? null,
-        faltantes: faltantesDocumento(slug, {
-          nome: m.nome,
-          data_nascimento: d?.data_nascimento,
-          dados_civis: (d?.dados_civis ?? null) as DadosCivis | null,
-          responsavel: resp,
-        }),
-        // quem abre o link da autorização é o responsável — o e-mail e o
-        // WhatsApp saúdam ele, não o(a) jovem (alvo do documento)
-        destinatario:
-          slug === "autorizacao-responsavel"
-            ? (resp?.nome_civil?.trim() || null)
-            : null,
+        emissao,
+        faltantesPor,
+        destinatarioPor,
       });
     }
   }
@@ -418,25 +497,40 @@ export async function emitirAssinaturasEmLote({
   for (const id of ids) {
     const p = info.get(id);
     if (!p) continue; // id fora do cadastro — pula em vez de derrubar o lote
-    const emissao = await emitirUm(supabase, tpl.id, tipo, id, eu.id);
-    if (emissao === "assinado") {
-      itens.push({
-        tipo, id, ...p,
-        link: null, existente: false, assinado: true, criado_em: null,
-      });
-    } else if (!emissao) {
-      itens.push({
-        tipo, id, ...p,
-        link: null, existente: false, assinado: false, criado_em: null,
-      });
-    } else {
-      itens.push({
-        tipo, id, ...p,
-        link: `${LINK_BASE}${emissao.token}`,
-        existente: emissao.existente,
-        assinado: false,
-        criado_em: emissao.criado_em,
-      });
+    for (const s of p.emissao) {
+      const base = {
+        tipo,
+        id,
+        slug: s,
+        nome: p.nome,
+        email: p.email,
+        whatsapp: p.whatsapp,
+        faltantes: p.faltantesPor[s] ?? [],
+        destinatario: p.destinatarioPor[s] ?? null,
+      };
+      const tplDoc = tplPorSlug.get(s);
+      const emissao = tplDoc
+        ? await emitirUm(supabase, tplDoc.id, tipo, id, eu.id)
+        : null;
+      if (emissao === "assinado") {
+        itens.push({
+          ...base,
+          link: null, existente: false, assinado: true, criado_em: null,
+        });
+      } else if (!emissao) {
+        itens.push({
+          ...base,
+          link: null, existente: false, assinado: false, criado_em: null,
+        });
+      } else {
+        itens.push({
+          ...base,
+          link: `${LINK_BASE}${emissao.token}`,
+          existente: emissao.existente,
+          assinado: false,
+          criado_em: emissao.criado_em,
+        });
+      }
     }
   }
   revalidatePath("/pessoas");

@@ -27,10 +27,11 @@ import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
 import {
   PAPEL_TURMA_LABEL,
   STATUS_PESSOA_LABEL,
+  docOkMentorado,
+  docsDevidosMentorado,
+  docsOkMentorado,
   rankNaTurma,
-  slugDocMentorado,
   statusDePessoa,
-  termoOkMentorado,
   termoOkProfile,
   turmasDePessoa,
   type AlvoPessoa,
@@ -46,7 +47,6 @@ import { HighlightText } from "@/components/highlight-text";
 import {
   comparaNome,
   foraDoPrograma,
-  idade,
   SITUACAO_MENTORADO_LABEL,
 } from "@/lib/ciclo";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -188,22 +188,18 @@ function pendenciasPessoa(
   return n;
 }
 
-/** Idem pros mentorados — o documento certo depende da idade (autorização
- *  do responsável pra menor, termo de participação pra maior). */
+/** Idem pros mentorados — os documentos devidos dependem da idade
+ *  (menor deve os dois: termo de participação E autorização do
+ *  responsável; maior, só o termo). Cada devido faltando conta. */
 function pendenciasMentorado(
   m: Mentorado,
   livre: boolean,
   docs: DocsPessoa | undefined
 ): number {
   const d = docs ?? DOCS_VAZIO;
-  const anos = idade(m.data_nascimento);
-  const menor = anos != null && anos < 18;
-  const docOk = menor
-    ? Boolean(m.documento_path) ||
-      d.assinado["autorizacao-responsavel"] !== undefined
-    : d.assinado["termo-mentorando"] !== undefined;
-  let n = 0;
-  if (!docOk) n++;
+  let n = docsDevidosMentorado(m).filter(
+    (slug) => !docOkMentorado(m, slug, d)
+  ).length;
   if (livre) n++;
   return n;
 }
@@ -289,16 +285,17 @@ function statusDeProfile(
   });
 }
 
-/** Idem pro jovem — o documento devido vira "documentos pendentes" (o
- *  slug da autorização não é "termo"); acesso/onboarding via a conta
- *  vinculada (profile_id → profiles_acesso). */
+/** Idem pro jovem — os documentos devidos viram "documentos pendentes"
+ *  (menor deve os dois: termo de participação + autorização do
+ *  responsável; um só quitado segue pendente); acesso/onboarding via a
+ *  conta vinculada (profile_id → profiles_acesso). */
 function statusDeMentorado(
   m: Mentorado,
   docs: DocsPessoa | undefined,
   faltantesDoc: string[] | undefined,
   ultimoAcessoEm: string | null | undefined
 ): StatusPessoas {
-  const docOk = termoOkMentorado(m, docs);
+  const docOk = docsOkMentorado(m, docs);
   return statusDePessoa({
     ativo: !foraDoPrograma(m),
     contaVinculada: Boolean(m.profile_id),
@@ -528,7 +525,15 @@ export function PessoasListas({
     statusDeMentorado(
       m,
       assinaturas[m.id],
-      faltantes?.[m.id]?.[slugDocMentorado(m)],
+      // faltantes civis de TODOS os devidos — menor deve dois documentos;
+      // olhar só um slug esconderia a lacuna do outro
+      [
+        ...new Set(
+          docsDevidosMentorado(m).flatMap(
+            (slug) => faltantes?.[m.id]?.[slug] ?? []
+          )
+        ),
+      ],
       m.profile_id ? acesso?.[m.profile_id] : null
     );
 
@@ -640,7 +645,7 @@ export function PessoasListas({
       (d) => d.mentorado_id === m.id && d.trilha === trilhaSelEf
     );
   // "somente com pendências" segue a régua do dot warn do Detalhes (termo,
-  // formação do mentor, "ainda não entrou", documento do jovem) — inativo
+  // formação do mentor, "ainda não entrou", documentos do jovem) — inativo
   // e quem saiu do programa não têm pendência cobrável
   const pendOkPessoa = (p: Profile) => {
     if (!soPendEf) return true;
@@ -653,7 +658,7 @@ export function PessoasListas({
   };
   const pendOkMentorado = (m: Mentorado) =>
     !soPendEf ||
-    (!foraDoPrograma(m) && !termoOkMentorado(m, assinaturas[m.id]));
+    (!foraDoPrograma(m) && !docsOkMentorado(m, assinaturas[m.id]));
   const filtrosPessoa = (p: Profile) =>
     turmaOkPessoa(p) &&
     catOkPessoa(p) &&
@@ -2278,24 +2283,28 @@ function MentoradoRow({
   // LGPD: parear menor sem a autorização do responsável é pendência jurídica.
   // Vale tanto o upload manual (documento_path) quanto a assinatura por link.
   const docs = docsProp ?? DOCS_VAZIO;
-  // 0046: quem assina o termo de participação é o próprio jovem — pra menor
-  // de idade a coordenação emite a autorização do responsável NO LUGAR dele.
-  // Exigir os dois pra todos marcava adulto como "autorização pendente".
-  const anos = idade(m.data_nascimento);
-  const menor = anos != null && anos < 18;
+  // 0046: menor de idade deve os DOIS documentos — o próprio termo de
+  // participação (assinado pelo jovem) e a autorização do responsável.
+  // Um só quitado segue pendente; adulto e sem nascimento devem só o termo.
+  const devidos = docsDevidosMentorado(m);
+  const menor = devidos.length > 1;
   const autData = docs.assinado["autorizacao-responsavel"];
   const termoData = docs.assinado["termo-mentorando"];
-  const autorizacaoOk = Boolean(m.documento_path) || autData !== undefined;
-  const termoOk = termoData !== undefined;
+  const autorizacaoOk = docOkMentorado(m, "autorizacao-responsavel", docs);
+  const termoOk = docOkMentorado(m, "termo-mentorando", docs);
   const autEnviada = docs.pendente.includes("autorizacao-responsavel");
   const termoEnviado = docs.pendente.includes("termo-mentorando");
-  const docOk = menor ? autorizacaoOk : termoOk;
-  const docEnviado = menor ? autEnviada : termoEnviado;
+  const docOk = docsOkMentorado(m, docs);
+  const faltando = devidos.filter((s) => !docOkMentorado(m, s, docs));
+  // "enviado" = ao menos um devido no ar — a linha ainda acusa a pendência,
+  // mas sem a urgência de "nada foi emitido ainda"
+  const docEnviado = faltando.some((s) => docs.pendente.includes(s));
   const temPendencia = !docOk && !fora;
-  // lacuna civil do documento que vale pra essa pessoa (autorização olha a
-  // ficha do responsável; o termo olha a do jovem)
-  const faltantesDoc =
-    faltantes?.[menor ? "autorizacao-responsavel" : "termo-mentorando"] ?? [];
+  // lacunas civis dos documentos devidos — a autorização olha a ficha do
+  // responsável, o termo a do jovem; a união dedup cobre os dois
+  const faltantesDoc = [
+    ...new Set(devidos.flatMap((s) => faltantes?.[s] ?? [])),
+  ];
   const temDocs =
     temPendencia ||
     Object.keys(docs.assinado).length > 0 ||
@@ -2397,12 +2406,16 @@ function MentoradoRow({
             )}
           >
             {docEnviado
-              ? menor
-                ? "autorização enviada"
-                : "termo enviado"
-              : menor
-                ? "autorização pendente"
-                : "termo pendente"}
+              ? faltando.length > 1
+                ? "documentos enviados"
+                : faltando[0] === "autorizacao-responsavel"
+                  ? "autorização enviada"
+                  : "termo enviado"
+              : faltando.length > 1
+                ? "documentos pendentes"
+                : faltando[0] === "autorizacao-responsavel"
+                  ? "autorização pendente"
+                  : "termo pendente"}
           </Badge>
         )}
         {!status && souCoord && !fora && (m.email || m.profile_id) && (
@@ -2463,22 +2476,22 @@ function MentoradoRow({
               )}
             </ItemDetalhe>
           )}
-          {!menor && (
-            <ItemDetalhe icone={FileText} warn={!termoOk}>
-              {termoOk ? (
-                <LinkAssinatura id={termoData!.id}>
-                  {`Termo de participação assinado${termoData!.em ? ` em ${fmtDia(termoData!.em)}` : ""}`}
-                </LinkAssinatura>
-              ) : termoEnviado ? (
-                "Termo de participação enviado, aguardando assinatura"
-              ) : (
-                "Termo de participação ainda não enviado"
-              )}
-            </ItemDetalhe>
-          )}
+          {/* o termo é devido por todos — pra menor aparece AO LADO da
+              autorização, não no lugar dela */}
+          <ItemDetalhe icone={FileText} warn={!termoOk}>
+            {termoOk ? (
+              <LinkAssinatura id={termoData!.id}>
+                {`Termo de participação assinado${termoData!.em ? ` em ${fmtDia(termoData!.em)}` : ""}`}
+              </LinkAssinatura>
+            ) : termoEnviado ? (
+              "Termo de participação enviado, aguardando a assinatura do jovem"
+            ) : (
+              "Termo de participação ainda não enviado"
+            )}
+          </ItemDetalhe>
           {!docOk && faltantesDoc.length > 0 && (
             <ItemDetalhe icone={FileText} warn>
-              {`Civis incompletos pro documento (falta: ${faltantesDoc.join(" · ")}) · quem assina completa na hora`}
+              {`Civis incompletos ${devidos.length > 1 ? "pros documentos" : "pro documento"} (falta: ${faltantesDoc.join(" · ")}) · quem assina completa na hora`}
             </ItemDetalhe>
           )}
         </DetalhesRegiao>

@@ -26,6 +26,7 @@ import type {
   PrefGeneroPar,
   Trilha,
 } from "@/lib/types";
+import type { SlugDocMentorado } from "@/lib/pessoas-status";
 import { cn, normaliza } from "@/lib/utils";
 
 // Board de afinidade da coordenação (modo "Parear" do card Aguardando par
@@ -356,7 +357,7 @@ export function AfinidadePar({
   mentorado,
   temasMentor,
   temasMentorado,
-  docJovem,
+  docsJovem,
   sugeridoSemantico,
 }: {
   mentor: LadoAfinidade & {
@@ -375,10 +376,12 @@ export function AfinidadePar({
    *  prop a seção simplesmente não aparece. */
   temasMentor?: string[];
   temasMentorado?: string[];
-  /** Status real do documento do jovem (menor → autorização do
-   *  responsável; maior → termo de participação). Sem a prop, a
-   *  restrição cai no texto genérico. */
-  docJovem?: { slug: "autorizacao-responsavel" | "termo-mentorando"; status: DocJovemStatus } | null;
+  /** Status real dos documentos devidos do jovem — pro menor são os dois
+   *  (o termo dele + a autorização do responsável); pro resto só o termo.
+   *  Sem a prop, a restrição cai no texto genérico da idade. */
+  docsJovem?:
+    | { slug: SlugDocMentorado; status: DocJovemStatus }[]
+    | null;
   /** o par saiu do ranqueamento semântico (selo "sugerido") — vira a
    *  primeira linha da explicação */
   sugeridoSemantico?: boolean;
@@ -417,16 +420,21 @@ export function AfinidadePar({
   // de formar — primeiro grupo, sem competir com as evidências
   const restricoes: Restricao[] = [];
   const ehMenor = anos != null && anos < 18;
+  const docDe = (s: SlugDocMentorado) =>
+    docsJovem?.find((d) => d.slug === s);
   if (ehMenor) {
-    if (docJovem?.status === "assinado") {
+    // o gate jurídico do menor é a autorização do responsável — o termo
+    // dele é devido também, mas não trava a formação da dupla
+    const aut = docDe("autorizacao-responsavel");
+    if (aut?.status === "assinado") {
       // resolvido — não é restrição
-    } else if (docJovem?.status === "enviado") {
+    } else if (aut?.status === "enviado") {
       restricoes.push({
         nivel: "info",
         texto: `${primeiroNome(mentorado.nome)} tem ${anos} anos — o link da autorização do responsável foi enviado e aguarda a assinatura.`,
         href: mentorado.id ? `/pessoas/${mentorado.id}#assinaturas` : undefined,
       });
-    } else if (docJovem == null) {
+    } else if (docsJovem == null) {
       // chamador sem o resumo (NovaDuplaDialog) — não afirma status
       restricoes.push({
         nivel: "alerta",
@@ -440,7 +448,10 @@ export function AfinidadePar({
         href: mentorado.id ? `/pessoas/${mentorado.id}#assinaturas` : undefined,
       });
     }
-  } else if (docJovem?.slug === "termo-mentorando" && docJovem.status === "nao_emitido") {
+  }
+  // o termo é devido por todos — pro menor aparece ao lado da autorização.
+  // "não emitido" informa sem travar (a coordenação emite pela ficha)
+  if (docDe("termo-mentorando")?.status === "nao_emitido") {
     restricoes.push({
       nivel: "info",
       texto: `O termo de participação de ${primeiroNome(mentorado.nome)} ainda não foi emitido.`,
@@ -501,25 +512,39 @@ export function AfinidadePar({
   const setTemasComuns = new Set(temasComuns);
   const prefJovem = campoPref(mentorado, mentor, "mentorado");
   const prefMentor = campoPref(mentor, mentorado, "mentor");
+  // o campo "Documento" conta o conjunto inteiro: pro menor as duas linhas
+  // do par (autorização primeiro — é o gate jurídico), pro resto o termo
+  const txtDoc = (d: { slug: SlugDocMentorado; status: DocJovemStatus }) =>
+    d.slug === "autorizacao-responsavel"
+      ? d.status === "assinado"
+        ? "Autorização assinada"
+        : d.status === "enviado"
+          ? "Autorização enviada"
+          : "Autorização ainda não emitida"
+      : d.status === "assinado"
+        ? "Termo assinado"
+        : d.status === "enviado"
+          ? "Termo enviado"
+          : "Termo ainda não emitido";
   const docCampo: { estado: EstadoCampo; texto: string } | null = ehMenor
-    ? docJovem?.status === "assinado"
-      ? { estado: "ok", texto: "Autorização assinada" }
+    ? docsJovem == null
+      ? { estado: "diverge", texto: "Autorização precisa estar assinada" }
       : {
-          estado: "diverge",
-          texto:
-            docJovem?.status === "enviado"
-              ? "Autorização enviada — aguardando assinatura"
-              : docJovem
-                ? "Autorização ainda não emitida"
-                : "Autorização precisa estar assinada",
+          estado: docsJovem.every((d) => d.status === "assinado")
+            ? "ok"
+            : "diverge",
+          texto: [docDe("autorizacao-responsavel"), docDe("termo-mentorando")]
+            .filter((d): d is { slug: SlugDocMentorado; status: DocJovemStatus } => Boolean(d))
+            .map(txtDoc)
+            .join(" · "),
         }
-    : docJovem?.slug === "termo-mentorando"
-      ? docJovem.status === "assinado"
+    : docDe("termo-mentorando")
+      ? docDe("termo-mentorando")!.status === "assinado"
         ? { estado: "ok", texto: "Termo assinado" }
         : {
             estado: "diverge",
             texto:
-              docJovem.status === "enviado"
+              docDe("termo-mentorando")!.status === "enviado"
                 ? "Termo enviado — aguardando assinatura"
                 : "Termo ainda não emitido",
           }

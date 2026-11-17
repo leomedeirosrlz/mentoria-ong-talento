@@ -47,7 +47,8 @@ export type SinaisStatusPessoa = {
    *  vale "nunca acessou" (o auth não registra primeiro acesso pré-track). */
   ultimoAcessoEm: string | null;
   termoOk: boolean;
-  /** labels de civis faltantes do documento devido — vazio quando completo. */
+  /** labels de civis faltantes dos documentos devidos — vazio quando
+   *  completo. */
   docsFaltantes: string[];
   agora?: Date;
 };
@@ -125,26 +126,46 @@ export function termoOkProfile(
   );
 }
 
-/** O documento devido do jovem depende da idade (0046): menor assina via
- *  autorização do responsável (link ou upload); maior, o termo de
- *  participação. Slug do doc devido — insumo dos faltantes do status. */
-export function slugDocMentorado(
+/** Os documentos devidos do jovem dependem da idade (0046): menor assina
+ *  os DOIS — o próprio termo de participação e a autorização do
+ *  responsável (link tokenizado pro responsável ou upload do papel
+ *  assinado); maior e sem nascimento registrado, só o termo. A lista é
+ *  plural de propósito: chamador que assumir um doc só esconde a
+ *  pendência do outro. */
+export type SlugDocMentorado = "autorizacao-responsavel" | "termo-mentorando";
+
+export function docsDevidosMentorado(
   m: Pick<Mentorado, "data_nascimento">
-): "autorizacao-responsavel" | "termo-mentorando" {
+): SlugDocMentorado[] {
   const anos = idade(m.data_nascimento);
   return anos != null && anos < 18
-    ? "autorizacao-responsavel"
-    : "termo-mentorando";
+    ? ["termo-mentorando", "autorizacao-responsavel"]
+    : ["termo-mentorando"];
 }
 
-export function termoOkMentorado(
+/** Um doc devido quitado? A autorização também aceita o upload manual do
+ *  papel assinado (documento_path — quem recebeu por fora não precisa
+ *  refazer por link); o termo só fecha pela assinatura emitida. */
+export function docOkMentorado(
   m: Pick<Mentorado, "data_nascimento" | "documento_path">,
+  slug: SlugDocMentorado,
   docs: DocsResumo | undefined
 ): boolean {
-  const slug = slugDocMentorado(m);
   return slug === "autorizacao-responsavel"
     ? Boolean(m.documento_path) || docs?.assinado[slug] !== undefined
     : docs?.assinado[slug] !== undefined;
+}
+
+/** Todos os devidos quitados — a régua dos badges e do status. Menor com
+ *  só um dos dois assinados segue pendente; quem faz 18 com a autorização
+ *  já assinada passa a dever só o termo (a régua olha a idade atual). */
+export function docsOkMentorado(
+  m: Pick<Mentorado, "data_nascimento" | "documento_path">,
+  docs: DocsResumo | undefined
+): boolean {
+  return docsDevidosMentorado(m).every((slug) =>
+    docOkMentorado(m, slug, docs)
+  );
 }
 
 // ---------- filiação por turma ----------

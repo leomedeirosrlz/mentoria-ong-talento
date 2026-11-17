@@ -24,14 +24,21 @@ import {
 import { msgAguardandoPar } from "@/lib/whatsapp-msgs";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { cn } from "@/lib/utils";
-import { idade } from "@/lib/ciclo";
+import {
+  docOkMentorado,
+  docsDevidosMentorado,
+  type SlugDocMentorado,
+} from "@/lib/pessoas-status";
 import { Avatar, type PapelVisual } from "@/components/avatar";
 import { Button } from "@/components/ui/button";
 import { WhatsAppRapido } from "@/components/whatsapp-rapido";
 import { MentoradoActions } from "@/components/mentorado-actions";
 import { PessoaActions } from "@/components/pessoa-actions";
 import type { DocsPessoa } from "@/components/pessoas-listas";
-import { AfinidadePar } from "@/components/matching-afinidade";
+import {
+  AfinidadePar,
+  type DocJovemStatus,
+} from "@/components/matching-afinidade";
 import { CapacidadeMentorDialog } from "@/components/capacidade-mentor-dialog";
 import { NovaDuplaDialog } from "@/components/nova-dupla-dialog";
 
@@ -88,9 +95,9 @@ export function FilaEspera({
   mentorProfiles: Record<string, MentorProfile>;
   /** Ocupação por `${mentorId}:${trilha}` — aqui só a chave :dpp interessa. */
   ocupacao: Record<string, number>;
-  /** Resumo de assinaturas por id de pessoa — alimenta a restrição de
-   *  documento do jovem no card de afinidade (status real: emitida,
-   *  enviada, assinada). Mesmo mapa dos badges da lista. */
+  /** Resumo de assinaturas por id de pessoa — alimenta a restrição dos
+   *  documentos devidos do jovem no card de afinidade (status real:
+   *  emitida, enviada, assinada). Mesmo mapa dos badges da lista. */
   assinaturas?: Record<string, DocsPessoa>;
 }) {
   const total = mentorados.length + mentores.length;
@@ -266,31 +273,25 @@ export function FilaEspera({
   const mentorLotado =
     mentorSelObj != null && usadasDe(mentorSelObj.id) >= tetoDe(mentorSelObj.id);
 
-  // status real do documento do jovem — mesma regra dos badges da lista:
-  // menor → autorização (documento_path também vale), maior → termo.
-  // "assinado" resolve a restrição; "enviado"/"nao_emitido" viram aviso.
-  const docsJovem = mentoradoSelObj
+  // status real dos documentos devidos do jovem — mesma régua dos badges
+  // da lista: menor deve os dois (o próprio termo e a autorização do
+  // responsável, que o documento_path também quita), maior só o termo.
+  // Cada "assinado" resolve a sua ponta; o que falta vira aviso antes
+  // de formar a dupla (a autorização é o gate jurídico do menor).
+  const docsSel = mentoradoSelObj
     ? assinaturas?.[mentoradoSelObj.id]
     : undefined;
-  const docJovem = mentoradoSelObj
-    ? (() => {
-        const anos = idade(mentoradoSelObj.data_nascimento);
-        const menor = anos != null && anos < 18;
-        const slug: "autorizacao-responsavel" | "termo-mentorando" = menor
-          ? "autorizacao-responsavel"
-          : "termo-mentorando";
-        const assinado =
-          (menor && Boolean(mentoradoSelObj.documento_path)) ||
-          Boolean(docsJovem?.assinado[slug]);
-        return {
+  const docsJovem = mentoradoSelObj
+    ? docsDevidosMentorado(mentoradoSelObj).map(
+        (slug): { slug: SlugDocMentorado; status: DocJovemStatus } => ({
           slug,
-          status: assinado
-            ? ("assinado" as const)
-            : docsJovem?.pendente.includes(slug)
-              ? ("enviado" as const)
-              : ("nao_emitido" as const),
-        };
-      })()
+          status: docOkMentorado(mentoradoSelObj, slug, docsSel)
+            ? "assinado"
+            : docsSel?.pendente.includes(slug)
+              ? "enviado"
+              : "nao_emitido",
+        })
+      )
     : undefined;
 
   // o par veio de uma sugestão semântica — seja o mentor sugerido pro
@@ -541,7 +542,7 @@ export function FilaEspera({
                   <AfinidadePar
                     temasMentor={temasParEf?.mentor}
                     temasMentorado={temasParEf?.mentorado}
-                    docJovem={docJovem}
+                    docsJovem={docsJovem}
                     sugeridoSemantico={sugeridoSemantico}
                     mentor={{
                       id: mentorSelObj.id,

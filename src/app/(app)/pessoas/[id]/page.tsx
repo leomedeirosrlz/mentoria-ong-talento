@@ -819,8 +819,8 @@ export default async function PessoaPerfilPage({
                             </dl>
                             {anos != null && anos < 18 && (
                               <p className="mt-1 rounded-lg bg-[var(--warn-bg)] px-2.5 py-1.5 text-xs text-[var(--warn-text)]">
-                                Menor de idade: a autorização do responsável precisa
-                                estar assinada.
+                                Menor de idade: precisa do termo dele assinado e da
+                                autorização do responsável.
                                 {souCoord && " Confira Documentos e assinaturas no painel lateral."}
                               </p>
                             )}
