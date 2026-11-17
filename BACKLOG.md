@@ -384,6 +384,21 @@ Pedido do Thiago (perdido numa sessão anterior, resgatado em 24/out):
   "aguardando par" é do fluxo DPP (mentor-mentorado). Mentores
   especialistas não fazem parte desse fluxo e não devem aparecer em
   "aguardando par". Filtrar por trilha/papel nas queries e na UI.
+  — **recon (nov/2026)**: a fila é `turma_inscricoes.status='aguardando'`
+  (coord-gerenciada, CHECK só permite `mentor`/`mentorado` — não há trilha
+  na inscrição). Um especialista inscrito como `mentor` vira "Aguardando
+  par" nos dois consumidores (`pessoas-status.ts` e a linha "Sem dupla" do
+  relatório). Caminhos possíveis: (a) enum `papel_esperado` ganha
+  `mentor_especialista` → inscrição vira "disponível pra pedidos" sem fila
+  DPP; (b) UI suprime o papel quando a pessoa só tem `mentor_especialista`
+  em `profile_papeis`. Decide com Leo: a fila de especialista sequer
+  existe como conceito operacional? (eles pegam pedidos no mural, não
+  aguardam par).
 - [ ] **Filtros da aba Pessoas reorganizados** — os pills de filtro devem
   ficar abaixo, logo antes da lista de pessoas. Transformar "aguardando
-  par" em um dropdown e movê-lo para cima dos filtros/pesquisa.
+  par" em um dropdown e movê-lo para cima dos filtros/pesquisa. — **recon
+  (nov/2026)**: o controle hoje é a seção/pill derivado de
+  `papeisNaTurma`/`rankNaTurma` em `pessoas-status.ts` +
+  `pessoas-listas.tsx`; o reshape depende do desfecho do item anterior
+  (se "aguardando" mudar de semântica, o dropdown muda junto — fazer os
+  dois juntos).
