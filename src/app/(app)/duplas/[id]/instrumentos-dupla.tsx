@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import {
+  ArrowCounterClockwise,
   BookOpen,
   CircleNotch,
   Eye,
@@ -37,7 +38,10 @@ import {
 } from "@/components/instrumento-icone";
 import { InstrumentoResultado } from "@/components/instrumento-resultado";
 import { CopiarLink } from "@/components/forms/copiar-link";
-import { msgLinkWhatsApp } from "@/components/forms/link-shared";
+import {
+  msgLinkWhatsApp,
+  primeiroNome,
+} from "@/components/forms/link-shared";
 import { useOrigem } from "@/components/forms/use-origem";
 import { NudgeButton } from "@/components/nudge-button";
 import { Badge } from "@/components/ui/badge";
@@ -46,6 +50,7 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
+  DialogFooter,
   DialogHeader,
   DialogTitle,
   DialogTrigger,
@@ -68,9 +73,10 @@ import { cn } from "@/lib/utils";
 /** O estado que a ficha mostra: respondido ganha sempre (a resposta é o
  *  produto); depois pendente (tem link vivo pra mandar); expirado e "não
  *  enviado" pedem o botão de envio. A linha ainda assim pode precisar
- *  mostrar DOIS estados — respondido de um momento + pendente do outro
- *  (checklist início×fim, roda inicial×formal): isso é derivado à parte
- *  no `pendenteOutroMomento` da LinhaInstrumento. */
+ *  mostrar DOIS estados — respondido + pendente (a re-emissão da nova
+ *  rodada ou a entrega da outra ponta nos de 2 momentos — checklist
+ *  início×fim, roda inicial×formal): isso é derivado à parte no
+ *  `pendenteVisivel` da LinhaInstrumento. */
 function estadoAtual(entregas: InstrumentoEntrega[]): {
   status: "respondido" | "pendente" | "expirado" | "nao_enviado";
   entrega: InstrumentoEntrega | null;
@@ -129,50 +135,78 @@ function LinhaInstrumento({
   const router = useRouter();
   const [pending, start] = useTransition();
   const [enviado, setEnviado] = useState<string | null>(null);
+  // refaçagem pedida (REALIZA-435) — confirmação leve, controlada, mesmo
+  // padrão dos dialogs de editar/cancelar da seção de terceiros
+  const [refazendo, setRefazendo] = useState(false);
   const origem = useOrigem();
 
   const sistema = (item?.sistema ?? sistemaEsperado) as InstrumentoDuplaSistema;
   const info = sistema ? INSTRUMENTO_INFO[sistema] : null;
   const titulo = item?.titulo ?? info?.titulo ?? "Instrumento";
 
-  // estado local pós-envio (a RPC já gravou; o refresh traz o resto)
-  const { status, entrega } = enviado
-    ? { status: "pendente" as const, entrega: null }
-    : estadoAtual(item?.entregas ?? []);
+  // estado local pós-envio: a RPC já gravou e o refresh traz o resto.
+  // Respondido NÃO flipa pra pendente — a re-emissão ("pedir pra refazer")
+  // exibe resposta + link novo juntos, o mesmo merge que o refresh traz
+  const real = estadoAtual(item?.entregas ?? []);
+  const { status, entrega } =
+    enviado && real.status !== "respondido"
+      ? { status: "pendente" as const, entrega: null }
+      : real;
 
-  // instrumento de 2 momentos (roda inicial×formal, checklist início×
-  // fim): a linha mostrando o respondido de um momento escondia a
-  // pendente do OUTRO — o link do 2º momento ficava inalcançável.
-  // Mesma régua dos pares (jornada.ts): contexto->>'momento' marcado
-  // primeiro; sem marca, a primeira entrega é a do primeiro momento.
-  const pendenteOutroMomento = (() => {
-    if (status !== "respondido" || !entrega || !item) return null;
-    if (sistema !== "roda_vida" && sistema !== "competencias_mentor")
-      return null;
-    const entregas = item.entregas;
-    const momentoDe = (e: InstrumentoEntrega) =>
-      sistema === "roda_vida"
-        ? entregasDoMomento(entregas, "inicial").includes(e)
-          ? "inicial"
-          : "formal"
-        : entregasDoMomentoChecklist(entregas, "inicio").includes(e)
-          ? "inicio"
-          : "final";
-    const momentoResp = momentoDe(entrega);
+  // momento da entrega nos instrumentos de 2 pontas (roda inicial×formal,
+  // checklist início×fim) — mesma régua dos pares (jornada.ts): marca do
+  // contexto primeiro; sem marca, a primeira entrega é a de abertura
+  const momentoDe = (e: InstrumentoEntrega) =>
+    sistema === "roda_vida"
+      ? entregasDoMomento(item?.entregas ?? [], "inicial").includes(e)
+        ? ("inicial" as const)
+        : ("formal" as const)
+      : entregasDoMomentoChecklist(item?.entregas ?? [], "inicio").includes(e)
+        ? ("inicio" as const)
+        : ("final" as const);
+
+  // pendente ao lado do respondido — a linha mostra os dois estados
+  // juntos: a re-emissão do mesmo instrumento (a "nova rodada" da
+  // jornada — REALIZA-435) ou a entrega da outra ponta de roda/checklist
+  // (o link do 2º momento que o respondido escondia — REALIZA-18/-359).
+  // O mais recente é o que se manda
+  const pendenteVisivel = (() => {
+    if (status !== "respondido" || !item) return null;
     return (
-      entregas.find(
-        (e) => e.status === "pendente" && momentoDe(e) !== momentoResp
-      ) ?? null
+      item.entregas
+        .filter((e) => e.status === "pendente")
+        .sort((a, b) =>
+          (b.created_at ?? "").localeCompare(a.created_at ?? "")
+        )[0] ?? null
     );
   })();
 
-  // token da ação de link: pendente normal OU a do outro momento (os
-  // dois nunca coexistem — pendente pura só aparece sem respondido)
+  // já existe link vivo esperando a refaçagem da resposta exibida — o
+  // pedido foi feito (nesta sessão ou antes) e a linha já mostra o link:
+  // o botão sai pra não parecer que falta gesto
+  const refazerVivo = (() => {
+    if (status !== "respondido" || !entrega || !item) return false;
+    if (enviado) return true;
+    const duasPontas =
+      sistema === "roda_vida" || sistema === "competencias_mentor";
+    const momentoResp = duasPontas ? momentoDe(entrega) : null;
+    return item.entregas.some(
+      (e) =>
+        e.status === "pendente" &&
+        (!duasPontas || momentoDe(e) === momentoResp)
+    );
+  })();
+
+  const temPendente =
+    status === "pendente" || pendenteVisivel != null || enviado != null;
+
+  // token da ação de link: pendente normal OU a que convive com o
+  // respondido (re-emissão ou outra ponta) OU a recém-emitida na sessão
   const tokenVivo =
     enviado ??
     (status === "pendente"
       ? (entrega?.token ?? null)
-      : (pendenteOutroMomento?.token ?? null));
+      : (pendenteVisivel?.token ?? null));
 
   // o checklist vai pro mentor; os 4 de jornada, pro mentorado — destino
   // por sistema, não por linha (o whatsapp e o nome da msg acompanham)
@@ -215,6 +249,43 @@ function LinhaInstrumento({
     });
   }
 
+  /** Re-emissão do instrumento respondido (REALIZA-435): a resposta é
+   *  evidência e não se edita — a saída é a nova rodada que a RPC já
+   *  cria (link em branco do mesmo destinatário; a resposta antiga fica
+   *  guardada e segue legível no "Ver resultado"). Nos instrumentos de 2
+   *  pontas o momento vai explícito: sem ele o emitir derivaria a ponta
+   *  SEGUINTE pelas respondidas e a refaçagem da inicial sairia formal. */
+  function refazer() {
+    if (!sistema || !entrega) return;
+    const momento =
+      sistema === "roda_vida" || sistema === "competencias_mentor"
+        ? momentoDe(entrega)
+        : undefined;
+    start(async () => {
+      const r = await enviarInstrumentoMentorado(
+        duplaId,
+        sistema,
+        momento
+      ).catch(() => null);
+      if (!r) {
+        toast.error("Sem conexão. Tente de novo.");
+        return;
+      }
+      if ("error" in r) {
+        toast.error(r.error);
+        return;
+      }
+      setRefazendo(false);
+      setEnviado(r.token);
+      toast.success(
+        r.reutilizado
+          ? "Já havia um link novo em aberto. Reaproveitado."
+          : "Link novo gerado. A resposta anterior segue salva."
+      );
+      router.refresh();
+    });
+  }
+
   return (
     <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
       {/* emblema + texto na coluna, ações embaixo na largura toda — a faixa
@@ -244,7 +315,7 @@ function LinhaInstrumento({
                 respondido
               </Badge>
             )}
-            {(status === "pendente" || pendenteOutroMomento != null) && (
+            {temPendente && (
               <Badge className="bg-[var(--warn)]/15 text-[var(--warn-text)]">
                 link enviado
               </Badge>
@@ -321,7 +392,58 @@ function LinhaInstrumento({
           </Dialog>
         )}
 
-        {(status === "pendente" || pendenteOutroMomento != null) &&
+        {/* nova rodada do instrumento (REALIZA-435): quem emite pode pedir
+            a refaçagem — a resposta é evidência e segue guardada; a RPC
+            gera um link novo em branco do mesmo destinatário. Some quando
+            já há link vivo da mesma marcação (refazerVivo) */}
+        {status === "respondido" &&
+          item &&
+          podeEnviar &&
+          jornadaViva &&
+          !refazerVivo && (
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setRefazendo(true)}
+              disabled={!item.ativo}
+              title={item.ativo ? undefined : "Instrumento encerrado em Formulários"}
+            >
+              <ArrowCounterClockwise aria-hidden />
+              Pedir pra refazer
+            </Button>
+            <Dialog open={refazendo} onOpenChange={setRefazendo}>
+              <DialogContent size="sm">
+                <DialogHeader>
+                  <DialogTitle>Pedir pra refazer?</DialogTitle>
+                  <DialogDescription className="leading-relaxed">
+                    Um link novo em branco é gerado pra{" "}
+                    {primeiroNome(destNome)} responder de novo. A resposta
+                    anterior segue guardada nesta ficha.
+                  </DialogDescription>
+                </DialogHeader>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setRefazendo(false)}
+                  >
+                    Cancelar
+                  </Button>
+                  <Button type="button" onClick={refazer} disabled={pending}>
+                    {pending ? (
+                      <CircleNotch className="animate-spin" aria-hidden />
+                    ) : null}
+                    Gerar novo link
+                  </Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
+          </>
+        )}
+
+        {temPendente &&
           tokenVivo &&
           jornadaViva && (
           <motion.div
