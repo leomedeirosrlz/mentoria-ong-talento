@@ -1,9 +1,10 @@
 // Emissão self-service de PAT por papel (REALIZA-295) — o TokensMcp
-// montado em /perfil (staff) e /jovem/perfil (mentorado) minta o próprio
-// token pela UI e revoga na lista; na bolha da coord a seção segue onde
-// nasceu. O token mintado pelo spec é revogado mas a linha fica em
-// ia_mcp_tokens — o afterEach limpa pelo rótulo único (e o sweep do seed
-// varre qualquer sobra de run morto).
+// montado em /perfil (staff) minta o próprio token pela UI e revoga na
+// lista; na bolha da coord a seção segue onde nasceu. O /jovem/perfil
+// NÃO tem mais a seção (saída decidida no REALIZA-429) — o spec dele
+// agora só garante a ausência. O token mintado pelo spec é revogado mas
+// a linha fica em ia_mcp_tokens — o afterEach limpa pelo rótulo único
+// (e o sweep do seed varre qualquer sobra de run morto).
 
 import {
   appEnvOk,
@@ -54,26 +55,21 @@ test.describe("tokens MCP (emissão self-service)", () => {
     await expect(secao.getByText(ROTULO)).not.toBeVisible();
   });
 
-  test("jovem emite e revoga o próprio PAT em /jovem/perfil", async ({
+  test("jovem não vê emissão de PAT — seção removida do perfil (REALIZA-429)", async ({
     page,
   }) => {
+    // decisão de produto (REALIZA-429): mentorado não emite PAT MCP —
+    // a seção "Conectar IA externa" saiu do /jovem/perfil de vez
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
     await page.goto("/jovem/perfil");
 
-    const secao = page.locator("section", {
-      has: page.getByRole("heading", { name: "Conectar IA externa" }),
-    });
-    await expect(secao).toBeVisible();
-
-    await secao.getByLabel("Nome do token").fill(ROTULO);
-    await secao.getByRole("button", { name: "Gerar token" }).click();
-
-    await expect(secao.getByText(/rlz_mcp_[0-9a-f]{48}/)).toBeVisible();
-    await expect(secao.getByText(ROTULO)).toBeVisible();
-    await secao
-      .getByRole("button", { name: `Revogar ${ROTULO}` })
-      .click();
-    await expect(secao.getByText(ROTULO)).not.toBeVisible();
+    // âncora de que o perfil renderizou antes de checar a ausência
+    await expect(
+      page.getByRole("heading", { name: "Seus dados" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Conectar IA externa" })
+    ).toHaveCount(0);
   });
 
   test("coord segue com a seção de tokens na bolha de ajustes", async ({
