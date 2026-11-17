@@ -3514,7 +3514,7 @@ export async function salvarRegistro(formData: FormData) {
       .map((d) => d.email)
       .filter((e): e is string => !!e);
     if (ch?.id && dests.length) {
-      enviaEmailChamadoDepois(supabase, {
+      void enviaEmailChamadoDepois(supabase, {
         chamadoId: ch.id as string,
         para: dests,
         assunto: `Chamado ${ch.numero}: pedido de apoio no registro`,

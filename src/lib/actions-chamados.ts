@@ -50,7 +50,7 @@ function revalidaChamado(papel: string | null, opts?: { home?: boolean }) {
 /** E-mail redundante + log depois da resposta: o Resend (e o rpc de log)
  *  não seguram o usuário. Em server action o after() ainda enxerga os
  *  cookies, então o client de sessão segue válido pro rpc. Nunca lança. */
-export function enviaEmailChamadoDepois(
+export async function enviaEmailChamadoDepois(
   supabase: Awaited<ReturnType<typeof createClient>>,
   envio: {
     chamadoId: string | undefined;
@@ -137,7 +137,7 @@ export async function abrirChamado(
     .map((d) => d.email)
     .filter((e): e is string => !!e);
   if (emails.length) {
-    enviaEmailChamadoDepois(supabase, {
+    void enviaEmailChamadoDepois(supabase, {
       chamadoId: ret.id,
       para: emails,
       assunto: `Chamado ${ret.numero ?? ""}: ${assunto}`,
@@ -239,7 +239,7 @@ export async function publicarAtualizacaoChamado(id: string, texto: string) {
         .from("profiles").select("role").eq("id", autor.profile_id).maybeSingle();
       jovem = papel?.role === "mentorado";
     }
-    enviaEmailChamadoDepois(supabase, {
+    void enviaEmailChamadoDepois(supabase, {
       chamadoId: id,
       para: [autor.email],
       assunto: "Atualização no seu pedido de apoio",
