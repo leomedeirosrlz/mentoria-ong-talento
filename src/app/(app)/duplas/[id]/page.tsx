@@ -18,6 +18,7 @@ import {
   ClockCounterClockwise,
   HandHeart,
   VideoCamera,
+  Warning,
 } from "@phosphor-icons/react/dist/ssr";
 import { Collapsible } from "@base-ui/react/collapsible";
 import {
@@ -1662,6 +1663,26 @@ export default async function DuplaPage({
               urgência na quinzena final */}
           {ehEsp && <TrilhaPrazoBadge dupla={dupla} />}
           {!ehEsp && <SolicitacaoStatusChip solicitacao={solicitacao} />}
+          {/* papel removido com a dupla viva — residual de antes do guard
+              de setPessoaRole. Só staff vê: quem corrige é a coordenação
+              (o embed profile_papeis do mentor chega populado pela RLS) */}
+          {!souMentor &&
+            (temPapel(me, "coordenacao") || temPapel(me, "supervisor")) &&
+            !temPapel(
+              dupla.mentor,
+              ehEsp ? "mentor_especialista" : "mentor_dpp"
+            ) && (
+              <span className="inline-flex items-center gap-1.5 rounded-full border border-[var(--warn-border)] bg-[var(--warn-bg)] px-2.5 py-1 text-xs font-semibold text-[var(--warn-text)] sm:text-[11px]">
+                <Warning size={12} aria-hidden />
+                Mentor sem papel de mentor
+                <span className="font-normal">
+                  ·{" "}
+                  {temPapel(me, "coordenacao")
+                    ? "ajuste em Pessoas"
+                    : "avise a coordenação"}
+                </span>
+              </span>
+            )}
         </div>
 
         {/* linhagem do remanejo — linha discreta, quieta: é navegação de

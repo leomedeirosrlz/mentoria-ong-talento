@@ -266,14 +266,23 @@ function mentoradoPar(m: MentoradoPar): MentoradoPar {
 /** Contato em mentor/supervisor de cada dupla — idem mergeContatoDuplas.
  *  O embed real lista só colunas públicas: o strip dos sensíveis vale pra
  *  TODO papel, inclusive coordenação (a ficha dela vem pelas views). O
- *  mentorado desce pro recorte PAR desde a 0076. */
+ *  mentorado desce pro recorte PAR desde a 0076. `papeis` do mentor vem do
+ *  embed profile_papeis — a policy select exclui o mentorado, então a
+ *  linha alheia desce vazia pra ele como no banco. */
 function comContatoDuplas(
   duplas: Dupla[],
-  contatos: Map<string, Contato>
+  contatos: Map<string, Contato>,
+  role: AppRole
 ): Dupla[] {
+  const data = getDemoData();
   return duplas.map((d) => ({
     ...d,
-    mentor: d.mentor ? semPessoal(comContato(d.mentor, contatos)) : d.mentor,
+    mentor: d.mentor
+      ? semPessoal({
+          ...comContato(d.mentor, contatos),
+          papeis: role === "mentorado" ? [] : papeisDe(data, d.mentor),
+        })
+      : d.mentor,
     mentorado: d.mentorado ? mentoradoPar(d.mentorado) : d.mentorado,
     supervisor: d.supervisor ? semPessoal(comContato(d.supervisor, contatos)) : null,
   }));
@@ -480,7 +489,8 @@ export function demoDuplas(role: AppRole): Dupla[] {
       role,
       data
     ),
-    demoContatosMap(role)
+    demoContatosMap(role),
+    role
   );
 }
 
@@ -505,7 +515,8 @@ export function demoMinhasDuplas(role: AppRole): Dupla[] {
       role,
       data
     ),
-    demoContatosMap(role)
+    demoContatosMap(role),
+    role
   );
 }
 
