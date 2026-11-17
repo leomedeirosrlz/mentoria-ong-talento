@@ -386,8 +386,8 @@ export function montarLinhas(
   // escopada do chamador; quem tem dupla ativa sai pelos sets `ativos*`).
   // A fila é do pareamento DPP: quem só é especialista não espera par e a
   // linha dele sai pelo papel real, sem pendência de dupla (REALIZA-383;
-  // snapshot público sem papéis cai no rótulo de fila de sempre — a RPC
-  // abrir_relatorio não carrega role/profile_papeis ainda)
+  // a 0208 projeta role+papeis no grade da abrir_relatorio, então o
+  // /resumo público resolve pela pessoa igual ao app)
   for (const i of fila) {
     if (i.papel_esperado === "mentor") {
       const p = profs.get(i.profile_id);
