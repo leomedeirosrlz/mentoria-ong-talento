@@ -69,7 +69,6 @@ const ABAS: { id: AbaRelatorios; rotulo: string }[] = [
   { id: "adocao", rotulo: "Adoção" },
 ];
 
-const PREVIA = 8;
 
 export default async function RelatoriosOperacionaisPage({
   searchParams,
@@ -303,7 +302,7 @@ async function renderAba({
             "Emitido em",
             "Expira em",
           ]}
-          linhas={linhas.slice(0, PREVIA).map((l) => [
+          linhas={linhas.map((l) => [
             l.nome,
             l.papel,
             l.documento,
@@ -311,7 +310,6 @@ async function renderAba({
             dia(l.emitido_em) || "—",
             dia(l.expira_em) || "—",
           ])}
-          total={linhas.length}
           csvHref={csvHref("assinaturas-pendentes")}
         />
       );
@@ -326,7 +324,7 @@ async function renderAba({
           titulo="Interações"
           descricao="Log de nudges, contatos e apoios registrados pela coordenação — o rastro de acompanhamento por dupla."
           colunas={["Dupla", "Tipo", "Canal", "Autor", "Data", "Nota"]}
-          linhas={linhas.slice(0, PREVIA).map((l) => [
+          linhas={linhas.map((l) => [
             l.dupla,
             l.tipo,
             l.canal,
@@ -334,7 +332,6 @@ async function renderAba({
             dataHora(l.data) || "—",
             l.nota,
           ])}
-          total={linhas.length}
           csvHref={csvHref("interacoes")}
         />
       );
@@ -357,7 +354,7 @@ async function renderAba({
             "Latência",
             "Especialista",
           ]}
-          linhas={linhas.slice(0, PREVIA).map((l) => [
+          linhas={linhas.map((l) => [
             l.mentorado,
             l.demanda,
             l.origem,
@@ -366,7 +363,6 @@ async function renderAba({
             l.latencia == null ? "—" : `${l.latencia}d`,
             l.especialista,
           ])}
-          total={linhas.length}
           csvHref={csvHref("solicitacoes")}
         />
       );
@@ -415,7 +411,7 @@ async function renderAba({
             "Respondido",
             "Respostas",
           ]}
-          linhas={linhas.slice(0, PREVIA).map((l) => [
+          linhas={linhas.map((l) => [
             l.formulario,
             l.destinatario,
             l.origem,
@@ -423,7 +419,6 @@ async function renderAba({
             l.respondido,
             String(l.respostas),
           ])}
-          total={linhas.length}
           csvHref={csvHref("forms-taxa")}
         />
       );

@@ -271,7 +271,7 @@ export function SecaoAderencia({
               "Semáforo",
               "Motivos",
             ]}
-            linhas={linhas.slice(0, 8).map((l) => [
+            linhas={linhas.map((l) => [
               l.mentorado,
               l.mentor,
               l.turma || "—",
@@ -281,7 +281,6 @@ export function SecaoAderencia({
               l.semaforo,
               l.motivos || "—",
             ])}
-            total={linhas.length}
           />
         </Collapsible.Panel>
       </Collapsible.Root>

@@ -4,9 +4,10 @@ import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 /** Seção de /relatorios/operacionais (REALIZA-178): título + descrição +
- *  prévia tabular das MESMAS linhas do CSV (o dados.ts compartilhado
- *  garante a paridade) + link de download que carrega o recorte ativo
- *  (turma e cronograma vêm na querystring). Sem estado — server component.
+ *  tabela completa das MESMAS linhas do CSV (o dados.ts compartilhado
+ *  garante a paridade — a leitura in-app dispensou o download) + link de
+ *  download que carrega o recorte ativo (turma e cronograma vêm na
+ *  querystring). Sem estado — server component.
  *
  *  A tabela veste a mesma pele do RelatorioCanvas (grade livre, 375):
  *  faixa border-y sangrando o padding da página, scroller interno,
@@ -20,16 +21,13 @@ export function RelatorioSecao({
   descricao,
   colunas,
   linhas,
-  total,
   csvHref,
 }: {
   titulo: string;
   descricao: string;
   colunas: string[];
-  /** Células já formatadas (dd/mm/aaaa etc.) — até 8 linhas. */
+  /** Células já formatadas (dd/mm/aaaa etc.) — o recorte inteiro. */
   linhas: string[][];
-  /** Total de linhas do recorte — a prévia mostra no máximo 8. */
-  total: number;
   /** /api/export?tipo=…&turma=…&cronograma=… — mesmo recorte da prévia. */
   csvHref: string;
 }) {
@@ -40,7 +38,7 @@ export function RelatorioSecao({
         descricao={descricao}
         csvHref={csvHref}
       />
-      <RelatorioTabela colunas={colunas} linhas={linhas} total={total} />
+      <RelatorioTabela colunas={colunas} linhas={linhas} />
     </section>
   );
 }
@@ -77,11 +75,10 @@ export function RelatorioSecaoTopo({
 export function RelatorioTabela({
   colunas,
   linhas,
-  total,
 }: {
   colunas: string[];
+  /** O recorte inteiro — o scroller interno segura tabelas grandes. */
   linhas: string[][];
-  total: number;
 }) {
   // mesmas constantes de célula do canvas: borda por célula (border-separate
   // segura o sticky) e gutter fixo de número de linha
@@ -143,10 +140,9 @@ export function RelatorioTabela({
           </p>
         )}
       </div>
-      {total > linhas.length && (
+      {linhas.length > 8 && (
         <p className="mt-2 text-xs text-muted-foreground">
-          Prévia de {linhas.length} de {total} linhas. O CSV completo traz
-          todas.
+          {linhas.length} linhas no recorte.
         </p>
       )}
     </div>

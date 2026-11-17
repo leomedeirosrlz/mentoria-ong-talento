@@ -248,7 +248,7 @@ export function SecaoEncerramento({
               "Resumo",
               "Criado em",
             ]}
-            linhas={linhas.slice(0, 8).map((l) => [
+            linhas={linhas.map((l) => [
               l.mentor,
               l.mentorado,
               l.tipo,
@@ -257,7 +257,6 @@ export function SecaoEncerramento({
               l.resumo_jornada,
               formatDiaMes(l.created_at),
             ])}
-            total={linhas.length}
           />
         </Collapsible.Panel>
       </Collapsible.Root>
