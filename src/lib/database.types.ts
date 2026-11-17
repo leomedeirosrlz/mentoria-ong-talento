@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.18"
+  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -4337,6 +4342,33 @@ export type Database = {
           },
         ]
       }
+      produto_eventos_dia: {
+        Row: {
+          acao: string
+          dia: string
+          eventos: number
+          papel: string
+          pessoas: number
+          superficie: string
+        }
+        Insert: {
+          acao: string
+          dia: string
+          eventos: number
+          papel: string
+          pessoas: number
+          superficie: string
+        }
+        Update: {
+          acao?: string
+          dia?: string
+          eventos?: number
+          papel?: string
+          pessoas?: number
+          superficie?: string
+        }
+        Relationships: []
+      }
       profile_papeis: {
         Row: {
           created_at: string
@@ -6479,6 +6511,66 @@ export type Database = {
         Args: { p_id: string; p_texto: string }
         Returns: undefined
       }
+      adocao_caminhos: {
+        Args: { p_desde: string; p_papel?: string; p_top?: number }
+        Returns: {
+          de: string
+          meio: string
+          para: string
+          pessoas: number
+        }[]
+      }
+      adocao_coorte: {
+        Args: { p_semanas?: number }
+        Returns: {
+          ativas: number
+          coorte: string
+          semana: number
+          total: number
+        }[]
+      }
+      adocao_matriz: {
+        Args: { p_desde: string; p_papel?: string }
+        Returns: {
+          gestos: number
+          papel: string
+          pessoas: number
+          superficie: string
+        }[]
+      }
+      adocao_recentes: {
+        Args: { p_limite?: number }
+        Returns: {
+          acao: string
+          criado_em: string
+          papel: string
+          superficie: string
+        }[]
+      }
+      adocao_resumo: {
+        Args: { p_ate?: string; p_desde: string; p_papel?: string }
+        Returns: Json
+      }
+      adocao_serie_dia: {
+        Args: { p_desde: string; p_papel?: string }
+        Returns: {
+          dia: string
+          gestos: number
+          papel: string
+          pessoas: number
+        }[]
+      }
+      adocao_superficies: {
+        Args: { p_desde: string; p_papel?: string }
+        Returns: {
+          gestos: number
+          papeis: Json
+          pessoas: number
+          superficie: string
+          tendencia: Json
+          ultimo: string
+        }[]
+      }
       agendar_encontro_mentorado: {
         Args: {
           p_data_hora: string
@@ -6527,6 +6619,7 @@ export type Database = {
       }
       avaliacao_por_token: { Args: { p_token: string }; Returns: Json }
       cancelar_solicitacao: { Args: { p_id: string }; Returns: undefined }
+      chamado_do_registro: { Args: { p_registro_id: string }; Returns: Json }
       chamado_evento: {
         Args: { p_chamado: string; p_texto: string }
         Returns: undefined
@@ -6606,12 +6699,12 @@ export type Database = {
         Args: { p_id: string; p_visivel: boolean }
         Returns: Json
       }
-      desfecho_agregado: { Args: { p_cronograma?: string }; Returns: Json }
-      desfecho_elegiveis_6m: { Args: never; Returns: Json }
       desfazer_retroativo_mentorado: {
         Args: { p_encontro: string }
         Returns: Json
       }
+      desfecho_agregado: { Args: { p_cronograma?: string }; Returns: Json }
+      desfecho_elegiveis_6m: { Args: never; Returns: Json }
       desmarcar_encontro: { Args: { p_encontro: string }; Returns: Json }
       devolver_chamado_fila: { Args: { p_id: string }; Returns: undefined }
       dispensar_sugestao_especialista: {
@@ -6819,7 +6912,6 @@ export type Database = {
           p_escolaridade?: string
           p_motivacao?: string
           p_objetivos?: string
-          p_origem?: string
         }
         Returns: undefined
       }
@@ -6921,6 +7013,7 @@ export type Database = {
         Returns: Json
       }
       processar_lembretes_trilha: { Args: { p_hoje?: string }; Returns: Json }
+      produto_eventos_reter: { Args: { p_dias?: number }; Returns: Json }
       promover_mentorado_mentor: {
         Args: {
           p_mentorado_id: string
@@ -7284,4 +7377,3 @@ export const Constants = {
     },
   },
 } as const
-
