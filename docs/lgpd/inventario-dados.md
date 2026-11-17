@@ -1,8 +1,10 @@
 # Inventário de dados pessoais por tabela
 
-> Versão do schema: migrations `0001`–`0111` (verificação manual em
-> `supabase/migrations/`). Fonte de recon: `docs/planos/issues/_recon/schema-mapa.md`
-> + leitura direta das migrations `0106`–`0111` (posteriores ao mapa).
+> Versão do schema: migrations `0001`–`0111` (varredura integral,
+> verificação manual em `supabase/migrations/`). Fonte de recon:
+> `docs/planos/issues/_recon/schema-mapa.md` + leitura direta das
+> migrations `0106`–`0111` (posteriores ao mapa). Acréscimos pontuais de
+> migrations mais novas constam nas linhas com a migration citada.
 >
 > **Documento vivo** — toda migration que cria tabela/coluna com dado
 > pessoal deve acrescentar a linha correspondente aqui na mesma PR.
@@ -123,6 +125,9 @@ coord+supervisor.
 | `notificacoes` (0018) | sino in-app (corpo pode citar nomes) | Adulto/Jovem | baixo | destinatário | LI | sem purge — histórico morre no limit da UI |
 | `emails_enviados` (0056/0071/0084) | assunto + contagem de destinatários + **`falhas text[]` com e-mails que falharam** | Adulto/Jovem | baixo | coord-only | LI | permanente — política em `politica-retencao.md` C-5 |
 | `ia_eventos.args` (0083) | args canônicos das tools IA (pode conter texto do usuário ≤300c) | Adulto | potencial | self + coord | LI | permanente |
+| `produto_eventos` (0197/0198/0202) | telemetria de uso in-app: `superficie` (área colapsada, nunca path nem id), `acao` de interface numa whitelist fechada (pageview, busca, sort, dialog, nudge, form_emitido, material_aberto, lembrete_whatsapp), `meta` jsonb (ts e parâmetros da ação — sem corpo de texto livre) | Adulto/Jovem (quem usa o app) | baixo | self + coord (RLS `0197:42-46`); agregados via RPCs `adocao_*` security invoker | LI | **90 dias o cru** (poda diária `produto_eventos_reter`, 0201); vive como rollup agregado |
+| `produto_eventos_dia` (0201) | contagens diárias papel×superfície×ação — **sem profile_id** | — (agregado) | — | coord-only | LI | permanente (é a forma retida após a poda do cru) |
+| `registro_tentativas` (0126) | sessão de preenchimento do form semanal do mentor: `origem` (novo/retroativo/edição), `dispositivo` (classe UA+viewport), `duracao_ms`, `etapas` (tempo por passo em ms), `concluido` — sem conteúdo da resposta | Adulto | baixo | self + coord/supervisor (policy `0126:74-79`) | LI | permanente |
 
 ## 6. Superfícies públicas e storage
 
