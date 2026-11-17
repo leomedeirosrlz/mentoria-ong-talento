@@ -149,9 +149,9 @@ export function RodaComparada({
 
       {reflexao && (
         <section className="space-y-2">
-          <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             Reflexão sobre a roda
-          </h4>
+          </h3>
           <p className="text-sm leading-relaxed whitespace-pre-wrap">
             {reflexao}
           </p>

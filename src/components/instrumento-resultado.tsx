@@ -43,9 +43,9 @@ function Bloco({
 }) {
   return (
     <section className={cn("space-y-2", className)}>
-      <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+      <h3 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
         {titulo}
-      </h4>
+      </h3>
       {children}
     </section>
   );

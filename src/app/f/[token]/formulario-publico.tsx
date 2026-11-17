@@ -639,7 +639,7 @@ function FormularioGenerico({
               <h1 className="mt-1 text-2xl font-semibold tracking-tight">
                 {titulo}
               </h1>
-              <p className="mt-1 text-xs whitespace-nowrap text-muted-foreground">
+              <p className="mt-1 text-xs text-muted-foreground">
                 {total} {total === 1 ? "pergunta" : "perguntas"} · leva ~
                 {minutos} min
               </p>
@@ -665,6 +665,8 @@ function FormularioGenerico({
                 Suas respostas são lidas apenas pela equipe do Realiza.vc.{" "}
                 <Link
                   href="/privacidade"
+                  target="_blank"
+                  rel="noopener"
                   className="underline underline-offset-2 transition-colors hover:text-foreground"
                 >
                   privacidade
@@ -1011,7 +1013,7 @@ function CampoRenderer({
   // instrumento ("Antes de responder", "Mapa de submetas"…)
   if (campo.tipo === "secao") {
     return (
-      <header className="px-1 pb-1 pt-4 first:pt-1">
+      <header className="px-1 pb-3 pt-4 first:pt-3">
         <h2 className="text-base font-semibold tracking-tight @xl:text-lg">
           {campo.label}
         </h2>
