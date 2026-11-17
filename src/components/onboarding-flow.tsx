@@ -89,7 +89,7 @@ import {
   PassoRecursos,
   type RecursoTour,
 } from "@/components/onboarding-recursos";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 /** Um form por passo — o botão do footer fixo submete via atributo `form`. */
 const FORM_ID = "onboarding-passo";

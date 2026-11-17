@@ -1,7 +1,7 @@
 "use client"
 
 import { Switch as SwitchPrimitive } from "@base-ui/react/switch"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 
 // Root renderiza um <span role="switch"> + <input> oculto — o a11y vem do
 // primitive; aqui é só a casca (trilha input→primary, thumb branco).

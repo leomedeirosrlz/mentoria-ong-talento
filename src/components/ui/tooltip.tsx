@@ -1,7 +1,7 @@
 "use client"
 
 import { Tooltip as TooltipPrimitive } from "@base-ui/react/tooltip"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 
 /** Root já traz o próprio Provider — um tooltip solto funciona sem montar
  *  nada em volta. Agrupar vários num <TooltipProvider> compartilha o delay

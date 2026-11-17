@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type CSSProperties } from "react";
 import { CaretLeft, CaretRight, Check, type Icon } from "@phosphor-icons/react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import {
   celulasDe,
   COR_RACA_LABELS,

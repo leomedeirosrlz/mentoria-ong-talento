@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Plus } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 /** Teto default = CHECK profiles_areas_ok (0030). Interesses (0034,
  *  interesses_ok) permite 60 por tag — o caller passa `maxChars=60`. */

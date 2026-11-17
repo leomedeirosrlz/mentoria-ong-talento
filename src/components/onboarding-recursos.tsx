@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type CSSProperties } from "react";
 import { ImageSquare, type Icon } from "@phosphor-icons/react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 /** Um item do passo "O que você pode fazer aqui" do onboarding — a
  *  feature na linguagem do papel + o print da tela real onde ela

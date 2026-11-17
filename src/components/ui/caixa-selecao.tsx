@@ -2,7 +2,7 @@
 
 import { Checkbox as CheckboxPrimitive } from "@base-ui/react/checkbox";
 import { Check, type Icon } from "@phosphor-icons/react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 /** Caixa de seleção em card — declarações do onboarding (voluntário, LGPD).
  *  O card inteiro é o controle (clique/teclado via primitive), com tile de

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, Copy } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 const EASE = "ease-[cubic-bezier(0.2,0,0,1)]";
 

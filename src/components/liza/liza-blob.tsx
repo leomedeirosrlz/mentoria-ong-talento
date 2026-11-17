@@ -2,7 +2,7 @@
 
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { motion, useTransform, type MotionValue, type Transition } from "motion/react";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 import type { LizaEstado, LizaProps } from "./tipos";
 import {
   EASE,

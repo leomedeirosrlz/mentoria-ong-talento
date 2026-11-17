@@ -1,5 +1,5 @@
 import type { HTMLAttributes, ReactNode } from "react"
-import { cn } from "cn"
+import { cn } from "@/lib/utils"
 import { FadeX } from "@/components/fade-x"
 
 /* Chip de filtro: um idioma só pra toggles de lista. Ativo = pill escuro

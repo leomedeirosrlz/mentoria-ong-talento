@@ -41,7 +41,7 @@ import {
   PassoRecursos,
   type RecursoTour,
 } from "@/components/onboarding-recursos";
-import { cn } from "cn";
+import { cn } from "@/lib/utils";
 
 type Promessa = { icon: Icon; texto: string };
 
