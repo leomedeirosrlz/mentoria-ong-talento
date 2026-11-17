@@ -163,11 +163,11 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
 - [x] ~~**Trigger no banco**~~ — `0043`: `encontros_status_guard` barra saída de `realizado` (TOCTOU fechado).
 - [x] ~~**Supervisor em `/duplas`**~~ — usa `getMinhasDuplas()` (RLS no banco, não filtro JS).
 - [~] **`queries.ts`**: `as unknown as Dupla[]` → `supabase gen types`. `src/lib/database.types.ts` gerado do remoto (2256 linhas, schema vivo); adoção gradual nos casts — os tipos locais são hand-narrowed com embeds.
-- [ ] **Kit UI residual**: `material-actions.tsx` (1 uso) → inline. (Resto removido; `skeleton.tsx` agora usado pelo `loading.tsx`.)
+- [x] ~~**Kit UI residual**~~ — verificado nov/2026: `material-actions.tsx` tem 2 consumidores reais (`MaterialActions` na biblioteca + `MaterialMenu` no /jovem/materiais) — o inline descaracterizaria. Nada a fazer.
 - [x] ~~**`sonner` `richColors`**~~ — verificado: `sonner.tsx` já mapeia `--success/--error/--warning` pros tokens `--ok`/`--warn`/`--danger`. Nada a fazer.
 - [x] ~~**`importar-csv-dialog`**~~ — input reseta (`value=""`), leitura `arrayBuffer()` com fallback UTF-8→Win-1252 + catch pt-BR.
 - [x] ~~**`NovaDuplaDialog`/`EditarDuplaDialog`**~~ — skeleton no 1º load, erro honesto com retry, refetch falho → toast sem bloquear.
-- [ ] **Padronizar import de `cn`** (`@/lib/utils` vs `cn` direto em ui/*).
+- [x] ~~**Padronizar import de `cn`**~~ — feito nov/2026 (`e05118b5`): 24 arquivos que importavam do pacote `cn` direto passaram pro alias `@/lib/utils` (re-export da mesma função).
 - [x] ~~**Pessoas com só dupla encerrada**~~ — `temQualquerDupla` desabilita o excluir com nota explicativa; "Sem dupla ativa" com menção ao histórico.
 - [ ] **wa.me diretos na página da dupla** ("Falar com mentorado", "Enviar combinados") não passam por `/api/nudge` → não logam em `interacoes`. Decidir se contato do mentor entra no log (hoje só nudges de coord/supervisor via NudgeButton).
 - [x] ~~**`me()` em actions.ts**~~ — 58 call sites com early-return "Sessão expirada" (auditoria completa).
@@ -204,10 +204,10 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
 - [x] ~~**Janela da Roda inicial** (S1)~~ — aceito: a Roda da Vida vai na "Mensagem de preparação do mentorado" (enc. 1), que é o canal pré-encontro; a estação do enc. 1 espelha isso.
 - [x] ~~**Especialista não registra meta no PDM** (S2)~~ — **decisão out/2026: não abre.** O especialista registra na trilha (`registros`/`devolutiva_pdm`) e o mentor DPP transporta para o PDM; `pdm_pode_editar` segue recusando `trilha='especialista'`.
 - [ ] **Títulos 3 a 7 do cronograma divergem do guia** (S6) — paráfrases ("Declaração de Visão e metas SMART" no lugar de "Metas e checagem SMART"), e o mentor lê os dois lado a lado. Depende do Leo.
-- [ ] **Dataset demo com 12 materiais** (E6) — prod tem 25; quem testa a demo vê uma biblioteca que não existe.
+- [x] ~~**Dataset demo com 12 materiais**~~ (E6) — stale: o catálogo demo tem ~29 itens (2 guias + 16 roteiros + templates e links), acima dos 25 de prod. Coberto.
 - [x] ~~**Duas linhas com `ordem = 17` em produção**~~ (E7) — biblioteca reordenada 1 a 25 sem empate em out/2026.
 - [x] ~~**Anamnese Social e Autoavaliação do mentor**~~ — decidido em out/2026: a anamnese é **processo externo** (o intake é o único canal; a referência mora no campo de notas do mentorado) e a autoavaliação **saiu de vez** (0128+0132 + material apagado de prod, seed e demo).
-- [ ] **PDM do especialista e divergência "PDM fora da plataforma"** (E1/S2) — **decisão out/2026: o PDM mora dentro da plataforma.** Falta a copy: dizer isso ao mentor no onboarding (senão ele mantém duas cópias).
+- [x] ~~**PDM do especialista e divergência "PDM fora da plataforma"**~~ (E1/S2) — feito nov/2026 (`8faaa231`+`4a90e3bc`): o tour do mentor ganhou o item "PDM do mentorado: metas e plano vivem na plataforma" com print real da aba Instrumentos (PDM aberto com metas/indicadores/submetas).
 
 ## Intake e documentos (out/2026)
 
