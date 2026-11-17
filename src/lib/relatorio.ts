@@ -11,7 +11,13 @@ import {
   SITUACAO_DUPLA_LABEL,
   type DuplaDesfecho,
 } from "@/lib/dupla-desfecho";
-import type { Cronograma, EncontroStatus, Trilha } from "@/lib/types";
+import { PAPEL_TURMA_LABEL, soEspecialista } from "@/lib/pessoas-status";
+import type {
+  AppRole,
+  Cronograma,
+  EncontroStatus,
+  Trilha,
+} from "@/lib/types";
 
 // ---------- config ----------
 
@@ -121,8 +127,13 @@ export type PessoaFonte = {
   cidade: string | null;
   uf: string | null;
   /** papel primário — só o recorte 'assinaturas' carrega (rótulo "tipo" da
-   *  linha); grade/ciclo nem pedem ao banco */
-  role?: string | null;
+   *  linha) e a grade interna (régua da fila, REALIZA-383); ciclo e a RPC
+   *  pública nem pedem ao banco */
+  role?: AppRole | null;
+  /** papéis efetivos (role ∪ profile_papeis) — junto do role na grade
+   *  interna; o snapshot público não carrega e a fila cai no rótulo de
+   *  sempre */
+  papeis?: AppRole[] | null;
 };
 
 export type DuplaFonte = {
@@ -372,16 +383,22 @@ export function montarLinhas(
 
   // fila de espera: inscrito `aguardando` sem dupla ativa vira linha
   // "Sem dupla" — regra idêntica pra qualquer turma (a lista já chega
-  // escopada do chamador; quem tem dupla ativa sai pelos sets `ativos*`)
+  // escopada do chamador; quem tem dupla ativa sai pelos sets `ativos*`).
+  // A fila é do pareamento DPP: quem só é especialista não espera par e a
+  // linha dele sai pelo papel real, sem pendência de dupla (REALIZA-383;
+  // snapshot público sem papéis cai no rótulo de fila de sempre — a RPC
+  // abrir_relatorio não carrega role/profile_papeis ainda)
   for (const i of fila) {
     if (i.papel_esperado === "mentor") {
       const p = profs.get(i.profile_id);
       if (p && !ativosMentor.has(i.profile_id)) {
+        const esp = soEspecialista(p);
         const linha: LinhaRelatorio = {
-          papel: "Mentor(a)", nome: p.nome ?? "", email: p.email ?? "",
+          papel: esp ? PAPEL_TURMA_LABEL.mentor_especialista : "Mentor(a)",
+          nome: p.nome ?? "", email: p.email ?? "",
           whatsapp: p.whatsapp ?? "", cidade_uf: cidadeUf(p), par: "",
-          status_dupla: "Sem dupla", iniciada_em: "", demanda: "", auxiliar: "",
-          __status: "sem_dupla",
+          status_dupla: esp ? "" : "Sem dupla", iniciada_em: "", demanda: "", auxiliar: "",
+          __status: esp ? undefined : "sem_dupla",
           __papel: "mentor",
         };
         if (paraApp) {

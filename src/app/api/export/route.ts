@@ -24,6 +24,7 @@ import {
   TRILHA_LABEL,
 } from "@/lib/ciclo";
 import type { DadosPessoais } from "@/lib/queries";
+import { soEspecialista } from "@/lib/pessoas-status";
 import { temPapel } from "@/lib/types";
 import { turmaDaDupla } from "@/lib/turma";
 import type {
@@ -1139,7 +1140,13 @@ function linhasMatching(o: {
           pref_genero_par: prefLabel(s?.pref_genero_par),
           motivacao: s?.motivacao ?? "",
           em_dupla: o.emDuplaP.has(p.id) ? "sim" : "não",
-          fila_turmas: (o.filaPorPessoa.get(p.id) ?? []).join(" | "),
+          // a fila é do pareamento DPP — quem só é especialista não espera
+          // par: atende pedidos pelo mural e a coluna sai vazia (a inscrição
+          // segue valendo pra filiação — o recorte ?turma= inclui ela pela
+          // inscrição, só a pendência de par é omitida; REALIZA-383)
+          fila_turmas: soEspecialista(p)
+            ? ""
+            : (o.filaPorPessoa.get(p.id) ?? []).join(" | "),
         };
       }),
     ...o.mentorados

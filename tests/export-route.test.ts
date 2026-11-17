@@ -120,6 +120,18 @@ const M_JOAO = {
   situacao: "ativo",
 };
 
+// só-especialista: inscrito na turma (filiado, entra no recorte ?turma=)
+// mas sem papel DPP — não "aguarda par" (REALIZA-383)
+const P_ESP = {
+  id: "p-esp",
+  nome: "Bruna Especialista",
+  role: "mentor_especialista",
+  ativo: true,
+  cidade: null,
+  uf: null,
+  profile_papeis: [{ papel: "mentor_especialista" }],
+};
+
 const DUPLA_ATIVIDADES = {
   trilha: "dpp",
   turma: "T1 · 2026/2027",
@@ -334,6 +346,32 @@ describe("tipo=matching", () => {
       await GET(req(`tipo=matching&turma=${encodeURIComponent("Sem fila")}`))
     ).text();
     expect(linhasDe(vazio)).toHaveLength(1);
+  });
+
+  it("só-especialista exporta fila_turmas vazia — sem pendência de par (REALIZA-383)", async () => {
+    supaFake({
+      ...tabelas,
+      profiles: [...tabelas.profiles, P_ESP],
+      turma_inscricoes: [
+        ...tabelas.turma_inscricoes,
+        { profile_id: "p-esp", mentorado_id: null, turma: "T1 · 2026/2027" },
+      ],
+    });
+    const linhas = linhasDe(await (await GET(req("tipo=matching"))).text());
+    const esp = linhas.find((l) => l.includes("Bruna Especialista"))!;
+    expect(esp).toContain("Mentor especialista");
+    // a última célula (fila_turmas) sai vazia — a inscrição filia à turma
+    // mas não é espera de par; em_dupla continua honesto
+    expect(esp.endsWith('"não";""')).toBe(true);
+    // ?turma= continua casando pela inscrição — ela é da T1
+    const recorte = await (
+      await GET(
+        req(`tipo=matching&turma=${encodeURIComponent("T1 · 2026/2027")}`)
+      )
+    ).text();
+    expect(
+      linhasDe(recorte).some((l) => l.includes("Bruna Especialista"))
+    ).toBe(true);
   });
 
   it("ramo demo monta as mesmas colunas do dataset", async () => {

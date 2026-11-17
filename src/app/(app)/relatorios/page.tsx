@@ -18,6 +18,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { turmaDaDupla } from "@/lib/turma";
 import { RelatorioBuilder } from "./relatorio-builder";
 import type { DuplaFonte, PessoaFonte } from "@/lib/relatorio";
+import type { AppRole } from "@/lib/types";
 
 export const metadata: Metadata = { title: "Relatórios" };
 
@@ -115,6 +116,9 @@ async function GradeLivre({ turmaParam }: { turmaParam?: string }) {
       whatsapp?: string | null;
       cidade?: string | null;
       uf?: string | null;
+      // papéis efetivos alimentam a régua da fila "Sem dupla" (REALIZA-383)
+      role?: AppRole | null;
+      papeis?: AppRole[];
     }): PessoaFonte => ({
       id: p.id,
       user_id: p.user_id ?? null,
@@ -123,6 +127,8 @@ async function GradeLivre({ turmaParam }: { turmaParam?: string }) {
       whatsapp: p.whatsapp ?? null,
       cidade: p.cidade ?? null,
       uf: p.uf ?? null,
+      role: p.role ?? null,
+      papeis: p.papeis ?? null,
     });
     profs = [
       ...dd.map((d) => pessoaFonte(d.mentor)),
@@ -165,8 +171,12 @@ async function GradeLivre({ turmaParam }: { turmaParam?: string }) {
         .select("id, turma, cronograma_id, mentor_id, mentorado_id, supervisor_id, status, desfecho, iniciada_em, demanda")
         .order("iniciada_em"),
       // user_id alimenta o gate do e-mail editável na grade (conta
-      // vinculada → e-mail só muda pelo sync do auth, 0060)
-      supabase.from("profiles").select("id, user_id, nome, cidade, uf"),
+      // vinculada → e-mail só muda pelo sync do auth, 0060); role ∪
+      // profile_papeis alimentam a régua da fila "Sem dupla" (REALIZA-383 —
+      // especialista sem papel DPP não aguarda par)
+      supabase
+        .from("profiles")
+        .select("id, user_id, nome, cidade, uf, role, profile_papeis(papel)"),
       supabase.from("mentorados").select("id, nome, email, whatsapp, cidade, uf"),
       getContatos(),
     ]);
@@ -174,8 +184,9 @@ async function GradeLivre({ turmaParam }: { turmaParam?: string }) {
       throw new Error(dRes.error?.message ?? pRes.error?.message ?? mRes.error?.message);
     }
     duplas = dRes.data ?? [];
-    profs = (pRes.data ?? []).map((p) => ({
+    profs = (pRes.data ?? []).map(({ profile_papeis, ...p }) => ({
       ...p,
+      papeis: (profile_papeis ?? []).map((r) => r.papel),
       email: contatos.get(p.id)?.email ?? null,
       whatsapp: contatos.get(p.id)?.whatsapp ?? null,
     }));

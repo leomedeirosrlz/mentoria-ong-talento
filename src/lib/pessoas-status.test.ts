@@ -4,6 +4,7 @@ import {
   papelNaTurma,
   papeisNaTurma,
   rankNaTurma,
+  soEspecialista,
   statusDePessoa,
   turmasDePessoa,
   type MapasTurma,
@@ -210,6 +211,30 @@ describe("turmasDePessoa — evidências por ordem", () => {
         { turma: "T2 · 2026/2027", papel: "aguardando" },
       ]);
     }
+  });
+
+  it("soEspecialista distingue a fila DPP (REALIZA-383)", () => {
+    // primário ou grant — os dois caminhos marcam "só especialista"
+    expect(soEspecialista({ role: "mentor_especialista" })).toBe(true);
+    expect(
+      soEspecialista({ role: null, papeis: ["mentor_especialista"] })
+    ).toBe(true);
+    expect(
+      soEspecialista({ role: "coordenacao", papeis: ["mentor_especialista"] })
+    ).toBe(true);
+    // híbrido e DPP puro seguem na fila; staff/sem-papel também (a régua
+    // não inventa trilha — quem não é mentor cai no rótulo de sempre)
+    expect(
+      soEspecialista({
+        role: "mentor_especialista",
+        papeis: ["mentor_especialista", "mentor_dpp"],
+      })
+    ).toBe(false);
+    expect(soEspecialista({ role: "mentor_dpp" })).toBe(false);
+    expect(soEspecialista({ role: "supervisor" })).toBe(false);
+    expect(soEspecialista({})).toBe(false);
+    expect(soEspecialista(null)).toBe(false);
+    expect(soEspecialista(undefined)).toBe(false);
   });
 
   it("multi-turma e sem turma", () => {

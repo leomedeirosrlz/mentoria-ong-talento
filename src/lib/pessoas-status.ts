@@ -235,6 +235,22 @@ export type AlvoPessoa =
   | ({ tipo: "profile" } & Pick<Profile, "id" | "role" | "papeis">)
   | { tipo: "mentorado"; id: string };
 
+/** "Só especialista" — tem mentor_especialista nos papéis efetivos sem
+ *  nenhum papel DPP (nem no role primário nem nos grants). A fila de
+ *  pareamento é DPP: a inscrição `aguardando` dessa pessoa é filiação à
+ *  turma, nunca espera de par — ela atende pedidos pelo mural
+ *  (REALIZA-383). O híbrido NÃO entra aqui: segue na fila pelo lado DPP.
+ *  Profile sem papel carregado devolve false — a régua não inventa trilha
+ *  e o chamador cai no rótulo de fila de sempre. */
+export function soEspecialista(
+  p: { role?: AppRole | null; papeis?: AppRole[] | null } | null | undefined
+): boolean {
+  // normaliza o role opcional — fontes parciais (relatório, RPC) omitem a
+  // chave e o temPapel pede o null explícito
+  const q = { role: p?.role ?? null, papeis: p?.papeis };
+  return temPapel(q, "mentor_especialista") && !temPapel(q, "mentor_dpp");
+}
+
 function papelDoEscopo(papel: string): PapelTurma | null {
   if (papel === "supervisor") return "auxiliar";
   if (papel === "coordenacao") return "equipe";
@@ -284,9 +300,7 @@ export function turmasDePessoa(
     if (i.status === "aguardando")
       push(
         i.turma,
-        alvo.tipo === "profile" &&
-          temPapel(alvo, "mentor_especialista") &&
-          !temPapel(alvo, "mentor_dpp")
+        alvo.tipo === "profile" && soEspecialista(alvo)
           ? "mentor_especialista"
           : "aguardando"
       );
