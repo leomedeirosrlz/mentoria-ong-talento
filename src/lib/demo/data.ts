@@ -1750,6 +1750,13 @@ function build(): DemoData {
       mentorado_id: wendel.id, papel_esperado: "mentorado",
       status: "aguardando", nota: "Inscrição direta pelo formulário de matching",
       created_by: marina.id, created_at: haDias(4) },
+    // a fila não conhece trilha: especialista inscrito chega como "mentor"
+    // — o /pessoas resolve pelo papel efetivo (vira "Especialista" na
+    // turma, não "Aguardando par"; REALIZA-383)
+    { id: uid(0x6803), turma: "T2 · 2026/2027", profile_id: marcos.id,
+      mentorado_id: null, papel_esperado: "mentor",
+      status: "aguardando", nota: "Inscrito pra T2 — atende pedidos pelo mural de especialistas",
+      created_by: marina.id, created_at: haDias(10) },
   ];
 
   // ---------- solicitações de especialista (0074 — pedido por sessão) ----

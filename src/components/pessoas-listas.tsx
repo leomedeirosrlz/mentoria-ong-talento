@@ -33,6 +33,7 @@ import {
   termoOkMentorado,
   termoOkProfile,
   turmasDePessoa,
+  type AlvoPessoa,
   type MapasTurma,
   type PapelTurma,
   type StatusPessoa,
@@ -82,6 +83,16 @@ import {
 
 const ehMentor = (p: Profile) =>
   temPapel(p, "mentor_dpp") || temPapel(p, "mentor_especialista");
+
+/** Alvo de filiação do profile — leva os papéis efetivos pra derivação
+ *  resolver a trilha da inscrição "aguardando" (REALIZA-383: especialista
+ *  sem papel DPP não espera par). */
+const alvoProfile = (p: Profile): AlvoPessoa => ({
+  tipo: "profile",
+  id: p.id,
+  role: p.role,
+  papeis: p.papeis,
+});
 
 // o card da fila só existe pra coordenação — quase 1k linhas fora do
 // chunk de quem visita /pessoas como mentor/supervisor (SSR mantido)
@@ -530,7 +541,7 @@ export function PessoasListas({
     // chegam vazios e derrotar cedo poupa a varredura
     if (!souCoord) return { turmas: [] as string[], contagem, semTurma: 0 };
     let sem = 0;
-    const conta = (alvo: { tipo: "profile" | "mentorado"; id: string }) => {
+    const conta = (alvo: AlvoPessoa) => {
       const ts = turmasDePessoa(alvo, mapas);
       if (!ts.length) {
         sem++;
@@ -539,7 +550,7 @@ export function PessoasListas({
       for (const t of new Set(ts.map((x) => x.turma)))
         contagem.set(t, (contagem.get(t) ?? 0) + 1);
     };
-    for (const p of basePessoas) conta({ tipo: "profile", id: p.id });
+    for (const p of basePessoas) conta(alvoProfile(p));
     for (const m of mentorados) conta({ tipo: "mentorado", id: m.id });
     return {
       turmas: [...contagem.keys()].sort((a, b) =>
@@ -594,7 +605,7 @@ export function PessoasListas({
   // vocabulário fechado (primário OU pendência secundária)
   const turmaOkPessoa = (p: Profile) => {
     if (turmaSelEf == null) return true;
-    const ts = turmasDePessoa({ tipo: "profile", id: p.id }, mapas);
+    const ts = turmasDePessoa(alvoProfile(p), mapas);
     return turmaSelEf === SEM_TURMA
       ? ts.length === 0
       : ts.some((t) => t.turma === turmaSelEf);
@@ -804,7 +815,7 @@ export function PessoasListas({
     for (const p of pessoasExibidas)
       distribui(
         { tipo: "profile", p, papeis: [] },
-        turmasDePessoa({ tipo: "profile", id: p.id }, mapas)
+        turmasDePessoa(alvoProfile(p), mapas)
       );
     for (const m of mentoradosExibidos)
       distribui(

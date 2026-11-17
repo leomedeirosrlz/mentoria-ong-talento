@@ -206,6 +206,14 @@ export type MapasTurma = {
   papeisEscopo?: PapelEscopo[];
 };
 
+/** Alvo da derivação de filiação. O profile precisa dos papéis efetivos
+ *  (role + grants) porque a inscrição de fila é cega a trilha: o "mentor"
+ *  do papel_esperado resolve entre DPP e especialista pelo que a pessoa É
+ *  (REALIZA-383), não pelo que a fila DPP esperava. */
+export type AlvoPessoa =
+  | ({ tipo: "profile" } & Pick<Profile, "id" | "role" | "papeis">)
+  | { tipo: "mentorado"; id: string };
+
 function papelDoEscopo(papel: string): PapelTurma | null {
   if (papel === "supervisor") return "auxiliar";
   if (papel === "coordenacao") return "equipe";
@@ -220,7 +228,7 @@ function papelDoEscopo(papel: string): PapelTurma | null {
  *  partição: quem é mentor DPP na T1 e especialista na T2 aparece nas
  *  DUAS; quem tem dois papéis na mesma turma devolve as duas linhas. */
 export function turmasDePessoa(
-  alvo: { tipo: "profile" | "mentorado"; id: string },
+  alvo: AlvoPessoa,
   mapas: MapasTurma
 ): TurmaPapel[] {
   const out: TurmaPapel[] = [];
@@ -248,7 +256,19 @@ export function turmasDePessoa(
         ? i.profile_id === alvo.id
         : i.mentorado_id === alvo.id;
     if (!dela) continue;
-    if (i.status === "aguardando") push(i.turma, "aguardando");
+    // a fila é do pareamento DPP — quem só é especialista (sem papel DPP
+    // no role nem nos grants) não espera par: atende pedidos pelo mural.
+    // A inscrição segue filiando à turma, agora pelo papel real dela;
+    // ganhar mentor_dpp depois devolve o "aguardando" certo (REALIZA-383)
+    if (i.status === "aguardando")
+      push(
+        i.turma,
+        alvo.tipo === "profile" &&
+          temPapel(alvo, "mentor_especialista") &&
+          !temPapel(alvo, "mentor_dpp")
+          ? "mentor_especialista"
+          : "aguardando"
+      );
     else
       push(
         i.turma,
@@ -268,7 +288,7 @@ export function turmasDePessoa(
 /** Os papéis da pessoa NUMA turma — o card lista todos quando >1 (o
  *  híbrido DPP+auxiliar não escolhe um rótulo só). */
 export function papeisNaTurma(
-  alvo: { tipo: "profile" | "mentorado"; id: string },
+  alvo: AlvoPessoa,
   turma: string,
   mapas: MapasTurma
 ): PapelTurma[] {
@@ -280,7 +300,7 @@ export function papeisNaTurma(
 /** Papel principal da pessoa na turma — primeiro por ordem de evidência
  *  (participação em dupla pesa mais que escopo/fila). Null = não é da turma. */
 export function papelNaTurma(
-  alvo: { tipo: "profile" | "mentorado"; id: string },
+  alvo: AlvoPessoa,
   turma: string,
   mapas: MapasTurma
 ): PapelTurma | null {

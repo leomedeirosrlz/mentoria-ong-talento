@@ -131,6 +131,9 @@ const MAPAS: MapasTurma = {
       papel_esperado: "mentorado", status: "aguardando" },
     { turma: "T2 · 2026/2027", profile_id: "m-fila", mentorado_id: null,
       papel_esperado: "mentor", status: "aguardando" },
+    // a inscrição não conhece trilha — a especialista chega como "mentor"
+    { turma: "T2 · 2026/2027", profile_id: "m-esp", mentorado_id: null,
+      papel_esperado: "mentor", status: "aguardando" },
     // formada segue a regra da dupla — papel base no esperado
     { turma: "T1 · 2026/2027", profile_id: null, mentorado_id: "j-ana",
       papel_esperado: "mentorado", status: "formada" },
@@ -144,7 +147,10 @@ const MAPAS: MapasTurma = {
 describe("turmasDePessoa — evidências por ordem", () => {
   it("dupla + inscrição + escopo, com papel contextual por fonte", () => {
     // híbrida: DPP na T1 + especialista na T2 — aparece nas duas turmas
-    const h = turmasDePessoa({ tipo: "profile", id: "m-hibrida" }, MAPAS);
+    const h = turmasDePessoa(
+      { tipo: "profile", id: "m-hibrida", role: "mentor_dpp", papeis: ["mentor_dpp", "mentor_especialista"] },
+      MAPAS
+    );
     expect(h).toEqual([
       { turma: "T1 · 2026/2027", papel: "mentor_dpp" },
       { turma: "T2 · 2026/2027", papel: "mentor_especialista" },
@@ -158,35 +164,78 @@ describe("turmasDePessoa — evidências por ordem", () => {
     ]);
 
     // auxiliar por supervisor_id E por grant escopado — dedup por (turma,papel)
-    const s = turmasDePessoa({ tipo: "profile", id: "s-paulo" }, MAPAS);
+    const s = turmasDePessoa(
+      { tipo: "profile", id: "s-paulo", role: "supervisor", papeis: ["supervisor"] },
+      MAPAS
+    );
     expect(s).toEqual([{ turma: "T2 · 2026/2027", papel: "auxiliar" }]);
 
     // aguardando marca o papel; formada segue o esperado
     const fila = turmasDePessoa({ tipo: "mentorado", id: "j-rafael" }, MAPAS);
     expect(fila).toEqual([{ turma: "T2 · 2026/2027", papel: "aguardando" }]);
-    const mfila = turmasDePessoa({ tipo: "profile", id: "m-fila" }, MAPAS);
+    const mfila = turmasDePessoa(
+      { tipo: "profile", id: "m-fila", role: "mentor_dpp", papeis: ["mentor_dpp"] },
+      MAPAS
+    );
     expect(mfila).toEqual([{ turma: "T2 · 2026/2027", papel: "aguardando" }]);
   });
 
+  it("especialista sem papel DPP não é 'aguardando par' (REALIZA-383)", () => {
+    // só especialista nos papéis efetivos: a inscrição `aguardando` vira
+    // filiação pelo papel dela, nunca espera de par
+    const esp = turmasDePessoa(
+      { tipo: "profile", id: "m-esp", role: "mentor_especialista", papeis: ["mentor_especialista"] },
+      MAPAS
+    );
+    expect(esp).toEqual([
+      { turma: "T2 · 2026/2027", papel: "mentor_especialista" },
+    ]);
+
+    // esp só no grant (primário fora da trilha) — suprime igual
+    const soGrant = turmasDePessoa(
+      { tipo: "profile", id: "m-esp", role: null, papeis: ["mentor_especialista"] },
+      MAPAS
+    );
+    expect(soGrant).toEqual([
+      { turma: "T2 · 2026/2027", papel: "mentor_especialista" },
+    ]);
+
+    // com mentor_dpp junto (híbrida ou promoção posterior) a fila é dela
+    // mesmo — volta o "aguardando" de sempre
+    for (const alvo of [
+      { tipo: "profile" as const, id: "m-esp", role: "mentor_especialista" as const, papeis: ["mentor_especialista" as const, "mentor_dpp" as const] },
+      { tipo: "profile" as const, id: "m-esp", role: "mentor_dpp" as const, papeis: ["mentor_dpp" as const] },
+    ]) {
+      expect(turmasDePessoa(alvo, MAPAS)).toEqual([
+        { turma: "T2 · 2026/2027", papel: "aguardando" },
+      ]);
+    }
+  });
+
   it("multi-turma e sem turma", () => {
-    const m = turmasDePessoa({ tipo: "profile", id: "m-dpp" }, MAPAS);
+    const m = turmasDePessoa(
+      { tipo: "profile", id: "m-dpp", role: "mentor_dpp", papeis: ["mentor_dpp"] },
+      MAPAS
+    );
     expect(m.map((t) => t.turma).sort()).toEqual([
       "T1 · 2025/2026",
       "T2 · 2026/2027",
     ]);
-    expect(turmasDePessoa({ tipo: "profile", id: "ninguem" }, MAPAS)).toEqual([]);
+    expect(
+      turmasDePessoa({ tipo: "profile", id: "ninguem", role: null }, MAPAS)
+    ).toEqual([]);
   });
 
   it("papelNaTurma/papeisNaTurma + rank da subseção (jovens, mentores, staff)", () => {
-    const h = { tipo: "profile" as const, id: "m-hibrida" };
+    const h = { tipo: "profile" as const, id: "m-hibrida", role: "mentor_dpp" as const };
     expect(papelNaTurma(h, "T1 · 2026/2027", MAPAS)).toBe("mentor_dpp");
     expect(papelNaTurma(h, "T2 · 2026/2027", MAPAS)).toBe("mentor_especialista");
     expect(papelNaTurma(h, "T9", MAPAS)).toBeNull();
 
     expect(rankNaTurma(papeisNaTurma({ tipo: "mentorado", id: "j-ana" }, "T1 · 2026/2027", MAPAS), "mentorado")).toBe(0);
     expect(rankNaTurma(papeisNaTurma(h, "T1 · 2026/2027", MAPAS), "profile")).toBe(1);
-    expect(rankNaTurma(papeisNaTurma({ tipo: "profile", id: "m-fila" }, "T2 · 2026/2027", MAPAS), "profile")).toBe(1);
+    expect(rankNaTurma(papeisNaTurma({ tipo: "profile", id: "m-fila", role: "mentor_dpp" }, "T2 · 2026/2027", MAPAS), "profile")).toBe(1);
     expect(rankNaTurma(papeisNaTurma({ tipo: "mentorado", id: "j-rafael" }, "T2 · 2026/2027", MAPAS), "mentorado")).toBe(0);
-    expect(rankNaTurma(papeisNaTurma({ tipo: "profile", id: "s-paulo" }, "T2 · 2026/2027", MAPAS), "profile")).toBe(2);
+    expect(rankNaTurma(papeisNaTurma({ tipo: "profile", id: "s-paulo", role: "supervisor" }, "T2 · 2026/2027", MAPAS), "profile")).toBe(2);
   });
 });
