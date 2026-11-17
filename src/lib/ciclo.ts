@@ -1891,8 +1891,9 @@ export type JornadaDupla = {
 
 /** Limiares dos marcos sobre `feitos` — por posição na janela, nunca por nº
  *  oficial (a jornada pode começar no meio do ciclo). `reta_final` se
- *  auto-exclui em trilhas curtas (na de 5, total−3 ≤ metade). */
-function limiaresMarcos(total: number): [MarcoJornada, number][] {
+ *  auto-exclui em trilhas curtas (na de 5, total−3 ≤ metade). Exportada pro
+ *  card de conquistas datar o marco (o p-ésimo realizado) e achar o próximo. */
+export function limiaresMarcos(total: number): [MarcoJornada, number][] {
   const metade = Math.ceil(total / 2);
   const l: [MarcoJornada, number][] = [["primeiro", 1], ["metade", metade]];
   if (total - 3 > metade) l.push(["reta_final", total - 3]);

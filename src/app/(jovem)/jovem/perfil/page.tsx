@@ -3,11 +3,14 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
   getJovemDuplas,
+  getJovemEncaminhamentos,
   getJovemEncontros,
+  getJovemJornada,
   getJovemPerfil,
 } from "@/lib/queries-jovem";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
-import { marcosEntre, maxEncontros, papelLabel } from "@/lib/ciclo";
+import { conquistasDoJovem } from "@/lib/conquistas";
+import { papelLabel } from "@/lib/ciclo";
 import { getMe } from "@/lib/queries";
 import { getChamados, getChamadoDetalhe } from "@/lib/queries-chamados";
 import { JovemChamados } from "@/components/jovem-chamados";
@@ -42,17 +45,29 @@ export default async function JovemPerfil({
   const cSel = c && UUID_RE.test(c) ? c : null;
   // detalhe junto com a lista: getChamadoDetalhe reaproveita a linha do
   // getChamados (React.cache) em vez de esperar a lista terminar
-  const [me, perfil, meusChamados, detalhe, duplas, encontros, avaliacoes] =
-    await Promise.all([
-      getMe(),
-      getJovemPerfil(),
-      getChamados(),
-      cSel ? getChamadoDetalhe(cSel) : Promise.resolve(null),
-      // jornada/conquistas: mesmas leituras cacheadas da home
-      getJovemDuplas(),
-      getJovemEncontros(),
-      getJovemAvaliacoes(),
-    ]);
+  const [
+    me,
+    perfil,
+    meusChamados,
+    detalhe,
+    duplas,
+    encontros,
+    avaliacoes,
+    encaminhamentos,
+    jornada,
+  ] = await Promise.all([
+    getMe(),
+    getJovemPerfil(),
+    getChamados(),
+    cSel ? getChamadoDetalhe(cSel) : Promise.resolve(null),
+    // jornada/conquistas: mesmas leituras cacheadas da home
+    getJovemDuplas(),
+    getJovemEncontros(),
+    getJovemAvaliacoes(),
+    getJovemEncaminhamentos(),
+    // a RPC fora do ar devolve a estante sem os instrumentos — nunca quebra
+    getJovemJornada().catch(() => null),
+  ]);
   if (!me) redirect("/login"); // o layout já barra — convenção das páginas
   const tema = temaValido((await cookies()).get(TEMA_COOKIE)?.value);
   const demo = await demoRole();
@@ -63,33 +78,15 @@ export default async function JovemPerfil({
   const avatarUrl = perfil?.avatar_path
     ? avatarPublicUrl(perfil.avatar_path)
     : null;
-  // conquistas (REALIZA-427): mesma derivação da home — realizados por
-  // trilha, sem somar mentor e especialista no mesmo número
-  const trilhaPorDupla = new Map(duplas.map((d) => [d.id, d.trilha]));
-  const realizados = encontros.filter((e) => e.status === "realizado");
-  const feitosDpp = realizados.filter(
-    (e) => trilhaPorDupla.get(e.dupla_id) !== "especialista"
-  ).length;
-  const feitosEsp = realizados.length - feitosDpp;
-  const temDpp = duplas.some((d) => d.trilha !== "especialista");
-  const jornadaAtual = temDpp ? feitosDpp : feitosEsp;
-  const jornadaMeta = maxEncontros(temDpp ? "dpp" : "especialista");
-  const marcos = marcosEntre(0, jornadaAtual, jornadaMeta);
-  const conquistasStats = [
-    temDpp
-      ? `${feitosDpp} de ${jornadaMeta} encontros com seu mentor`
-      : null,
-    feitosEsp > 0
-      ? `${feitosEsp} ${feitosEsp === 1 ? "sessão" : "sessões"} com especialista`
-      : null,
-    avaliacoes.length > 0
-      ? `${avaliacoes.length} ${
-          avaliacoes.length === 1 ? "avaliação enviada" : "avaliações enviadas"
-        }`
-      : null,
-  ]
-    .filter(Boolean)
-    .join(" · ");
+  // conquistas v2 (REALIZA-427): toda a derivação mora na lib — marcos
+  // datados + instrumentos entregues + contagens + a faixa do próximo
+  const conq = conquistasDoJovem({
+    encontros,
+    duplas,
+    jornada,
+    avaliacoes,
+    encaminhamentos,
+  });
 
   const meta = [
     perfil?.ong_origem?.trim() || null,
@@ -167,8 +164,11 @@ export default async function JovemPerfil({
 
           {/* mesma condição da home: jornada existe quando há trilha
               DPP ou sessão de especialista já feita */}
-          {(temDpp || feitosEsp > 0) && (
-            <ConquistasCard marcos={marcos} stats={conquistasStats} />
+          {conq.temJornada && (
+            <ConquistasCard
+              conquistas={conq.conquistas}
+              proximoMarco={conq.proximoMarco}
+            />
           )}
 
           {/* 0084: "Meus pedidos" do jovem mora no perfil — trilha pública
