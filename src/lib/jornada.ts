@@ -260,7 +260,7 @@ export const ESTACOES: Record<
   avaliacao_360: {
     titulo: "Avaliação final",
     descricao:
-      "O fechamento do ciclo: você e seu mentor respondem, cada um pelo seu link. O seu chega aqui no fim da jornada.",
+      "O fechamento do ciclo: você e seu mentor respondem no fim da jornada. A sua libera aqui.",
     encIni: 16,
     encFim: 16,
     chipLabel: "Enc. 16",
