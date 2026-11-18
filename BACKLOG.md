@@ -220,6 +220,7 @@ Feito em 18/nov/2026 (nível 1 — branch `docs/regression-proof`): constitution
 
 - [ ] **Fronteiras de código**: dependency-cruiser com regras de fronteira (demo/ não importa módulo server; regra de escrita só em `escritas.ts`), knip para código morto e type-coverage com piso — definir pisos antes de virar gate.
 - [ ] **Lacunas de teste** do `docs/regression-map.md`: PII do `/resumo` (`resumo-acesso.ts`), paridade TS×SQL de vocabulários (`AcaoProduto`, `AUDIENCIAS`), `refazer` (`0209`), auth do `/api/mcp`, handoff em SQL (`0181`/`0175`/`0050`), trigger de encerramento e `rematch_dupla`.
+- [ ] **e2e vermelho latente no `staging`** (descoberto pelo PR #179, o primeiro PR desde #146 — o `e2e-app` só dispara em PR, e os pushes diretos de 16–17/11 passaram sem rodar): `demo/avaliacao-360.spec.ts:75`, `demo/instrumentos.spec.ts:74` e `:128` (elemento não encontrado — a rodada UI/UX + audit de 17/11 mudou a marcação) e `app/pdm.spec.ts:665` (Metas → árvore do PDM; pode ser drift ou regressão real do `0209`). É a "rodada-2 do audit" que faltava + prova de por que push direto em `staging` não pode ser o fluxo.
 - [ ] **Proteção de branch**: ligar required checks (`gates`, `repo-guard`, `schema-contract`, `e2e-app / e2e`) em `main` e `staging` com `enforce_admins:false` — comando pronto em `docs/convencoes/ci-e2e.md`.
 - [ ] **Decisões que travam teste**: documento revogado (0206 vs emissão manual), dupla tardia sem grace period, especialista em "Aguardando par" (com o Leo).
 
