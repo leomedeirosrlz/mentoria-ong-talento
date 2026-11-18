@@ -18,7 +18,13 @@
     "eval:ia:live": "node scripts/eval-ia.mjs --live",
     "seed:e2e": "node scripts/seed-e2e-staging.mjs",
     "ingerir:guias": "node scripts/ingerir-guias.mjs",
-    "seed:demo": "node scripts/seed-demo-staging.mjs"
+    "seed:demo": "node scripts/seed-demo-staging.mjs",
+    "typecheck": "next typegen && tsc --noEmit",
+    "guard": "node scripts/repo-guard.mjs",
+    "check": "pnpm typecheck && pnpm lint && pnpm test && pnpm guard"
+  },
+  "engines": {
+    "node": ">=24 <27"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

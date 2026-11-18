@@ -34,6 +34,24 @@ jobs:
       - run: npx eslint src/
       - run: pnpm test
 
+  # guarda anti-regressão de agente: migrations imutáveis contra a base,
+  # segredos, marcadores do AGENTS.md, links de docs, numeração, actionlint.
+  # Node puro (sem pnpm install) — ver scripts/repo-guard.mjs.
+  repo-guard:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # R1/R9 comparam o HEAD contra a base — histórico completo
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - run: node scripts/repo-guard.mjs
+        env:
+          BASE_REF: origin/${{ github.base_ref || 'main' }}
+
   # código não pode mergear pedindo coluna que o remoto não tem — a 0061/0062
   # foi exatamente esse caso. Falha até a migration ser aplicada (gate humano).
   schema-contract:
