@@ -1,10 +1,12 @@
 # Planos de evolução — índice consolidado
 
+> **Congelado (nov/2026)**: esta pasta é histórico de decisão. A fila canônica é `BACKLOG.md`, os princípios são `.specify/memory/constitution.md`, a intenção de mudanças mora em `specs/` e o contrato do agente é `AGENTS.md`. Nada aqui é editado — novo trabalho ganha spec, não plano novo.
+
 Brainstorms gerados a partir da reunião de 01/out/2026 (transcrição + ata) e dos materiais oficiais em `~/Downloads`. Cada doc tem alternativas com tradeoffs, recomendação e perguntas abertas. **Nada aqui é implementação** — é material de decisão pro Thiago escolher.
 
 Leia primeiro `_contexto.md` (estado atual do código + decisões da ata). A análise da transcrição está em `../analise-transcricao-mentor.md`.
 
-> **Backlog canônico: Jira** (site `kelyng.atlassian.net`, projeto **REALIZA**). 8 Epics = os módulos; issues dentro dos epics. Estes docs são o *porquê* — o Jira é o *o que/quando*. Regras de execução por agente em `EXECUCAO.md`. Migrado do Linear em 04/out — mapa de IDs antigos (`REA-*`) → Jira em `migracao-linear-jira.md`.
+> ~~Backlog canônico: Jira~~ → **fila canônica é `BACKLOG.md`** (o Jira, site `kelyng.atlassian.net`, projeto **REALIZA**, continua valendo como referência cruzada de IDs, mas é espelho, não fonte). 8 Epics = os módulos; issues dentro dos epics. Estes docs são o *porquê*. As regras de execução por agente vivem hoje em `AGENTS.md` + `.specify/README.md` (o `EXECUCAO.md` virou histórico).
 
 ## Os cinco planos
 
