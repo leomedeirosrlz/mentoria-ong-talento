@@ -36,7 +36,7 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     // "jornada completa"), fechando visão/metas/PDM/roda/checklist 0190
     await expect(sec.getByText("respondido", { exact: true })).toHaveCount(5);
     await expect(
-      sec.getByRole("button", { name: "Ver resultado" }).first()
+      sec.getByRole("button", { name: "Ver resposta" }).first()
     ).toBeVisible();
 
     // resultado estruturado do PDM — metas com indicador/prazo/submeta,
@@ -46,8 +46,14 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     const pdm = sec.locator("li", {
       hasText: "Plano de Desenvolvimento do Mentorado",
     });
-    await pdm.getByRole("button", { name: "Ver resultado" }).click();
     const dialog = page.getByRole("dialog");
+    // clique-resiliente: a ilha do diálogo pode ainda estar hidratando
+    // quando o botão SSR já aparece — repete até o dialog abrir (mesmo
+    // padrão do assistente.spec.ts)
+    await expect(async () => {
+      await pdm.getByRole("button", { name: "Ver resposta" }).click();
+      await expect(dialog).toBeVisible({ timeout: 1500 });
+    }).toPass();
     await expect(dialog.getByText("Declaração de Visão")).toBeVisible();
     await expect(dialog.getByText(/Indicador:/).first()).toBeVisible();
     await expect(
@@ -147,5 +153,135 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await expect(page.getByText(/17 perguntas/)).toBeVisible();
     await expect(page.getByText("Nada satisfeito").first()).toBeVisible();
     await expect(page.getByText("Muito satisfeito").first()).toBeVisible();
+  });
+
+  // REALIZA-440/441 — a página por instrumento do mentor: o seletor de
+  // mentorado filtra por ?dupla= (a régua linka a dupla em foco), a linha
+  // já resume o resultado e "Ver resposta" expande a leitura completa
+  test("página por instrumento (mentor): seletor filtra e resumo abre resposta", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentor_dpp");
+    await page.goto(`/materiais/instrumentos/roda_inicial?dupla=${DUPLA_OK}`);
+
+    // o seletor repete o padrão da régua + "Todas" — a lista inteira é o
+    // default sem filtro
+    const seletor = page.getByRole("navigation", {
+      name: "Filtrar por mentorado",
+    });
+    await expect(
+      seletor.getByRole("link", { name: "Todas", exact: true })
+    ).toBeVisible();
+    await expect(
+      seletor.getByRole("link", { name: "Bia", exact: true })
+    ).toHaveAttribute("aria-current", "page");
+    await expect(
+      seletor.getByRole("link", { name: "Matheus Gonçalves", exact: true })
+    ).toBeVisible();
+
+    // só a linha da dupla em foco renderiza
+    const sec = page.getByRole("region", {
+      name: "Duplas — Roda da Vida · leitura inicial",
+    });
+    const linha = sec.locator("li", { hasText: "Bia" });
+    await expect(linha).toBeVisible();
+    await expect(sec.locator("li", { hasText: "Matheus" })).toHaveCount(0);
+
+    // o resumo já conta o resultado antes de abrir: a mini-roda com a
+    // média (o mesmo desenho que a pessoa preencheu). O 1º "Média geral"
+    // é o do resumo — o do resultado expandido já existe no painel oculto
+    await expect(
+      linha.getByRole("img", { name: /Roda da Vida: média/ })
+    ).toBeVisible();
+    await expect(linha.getByText(/Média geral/).first()).toBeVisible();
+
+    // "Ver resposta" expande a leitura completa e vira "Fechar resposta"
+    const gatilho = linha.getByRole("button", { name: /resposta/ });
+    const painelId = await gatilho.getAttribute("aria-controls");
+    // clique-resiliente: o toggle é ilha client — repete até abrir
+    await expect(async () => {
+      await gatilho.click();
+      await expect(
+        linha.getByRole("button", { name: "Fechar resposta" })
+      ).toBeVisible({ timeout: 1500 });
+    }).toPass();
+    await expect(
+      linha.locator("ul li", { hasText: "Carreira e trabalho" })
+    ).toBeVisible();
+    await linha.getByRole("button", { name: "Fechar resposta" }).click();
+    // o painel animado colapsa — o conteúdo segue no DOM mas some da tela
+    await expect(page.locator(`[id="${painelId}"]`)).toBeHidden();
+    await expect(
+      linha.getByRole("button", { name: "Ver resposta" })
+    ).toHaveAttribute("aria-expanded", "false");
+
+    // "Todas" devolve a lista inteira
+    await seletor.getByRole("link", { name: "Todas", exact: true }).click();
+    await expect(page).toHaveURL("/materiais/instrumentos/roda_inicial");
+    await expect(sec.locator("li", { hasText: "Matheus" })).toBeVisible();
+  });
+
+  // staff: a resposta carrega sob demanda — mesmo gatilho/gramática do
+  // toggle do mentor (REALIZA-441)
+  test("página por instrumento (coord): Ver resposta carrega sob demanda", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/materiais/instrumentos/roda_inicial");
+
+    const sec = page.getByRole("region", {
+      name: "Duplas — Roda da Vida · leitura inicial",
+    });
+    const linha = sec.locator("li", { hasText: "Bia" });
+    // clique-resiliente: a ilha lazy pode ainda estar hidratando
+    await expect(async () => {
+      await linha.getByRole("button", { name: "Ver resposta" }).click();
+      await expect(
+        linha.getByRole("button", { name: "Fechar resposta" })
+      ).toBeVisible({ timeout: 1500 });
+    }).toPass();
+    await expect(
+      linha.getByRole("button", { name: "Fechar resposta" })
+    ).toBeVisible();
+    // a roda desenhada chega com o payload lazy
+    await expect(
+      linha.getByRole("img", { name: /Roda da Vida: média/ }).first()
+    ).toBeVisible();
+  });
+
+  // REALIZA-442 — a visão resume a declaração na linha e a narrativa lê
+  // com hierarquia própria (perguntas numeradas, resposta em primeiro
+  // plano)
+  test("página por instrumento (mentor): visão resume a declaração e abre a narrativa", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentor_dpp");
+    await page.goto(`/materiais/instrumentos/visao?dupla=${DUPLA_OK}`);
+
+    const sec = page.getByRole("region", {
+      name: "Duplas — Construindo a sua Visão",
+    });
+    const linha = sec.locator("li", { hasText: "Bia" });
+    // a declaração já aparece na linha (resumo) antes de abrir — o 1º
+    // blockquote é o da linha; o hero do resultado mora no painel oculto
+    await expect(linha.locator("blockquote").first()).toBeVisible();
+
+    // clique-resiliente: o toggle é ilha client — repete até abrir
+    await expect(async () => {
+      await linha.getByRole("button", { name: "Ver resposta" }).click();
+      await expect(
+        linha.getByRole("button", { name: "Fechar resposta" })
+      ).toBeVisible({ timeout: 1500 });
+    }).toPass();
+    await expect(linha.getByText("Declaração de Visão")).toBeVisible();
+    await expect(linha.getByText("O filme da vida ideal")).toBeVisible();
+    // as 5 perguntas da narrativa numeradas — a primeira do fixture da Ana
+    await expect(linha.locator("ol li").first()).toBeVisible();
+    await expect(
+      linha.getByText(/Narre as cenas desse filme/)
+    ).toBeVisible();
+    await expect(
+      linha.getByText(/No filme eu me vejo formada/)
+    ).toBeVisible();
   });
 });

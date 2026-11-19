@@ -1,18 +1,22 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { CircleNotch, Eye } from "@phosphor-icons/react";
+import { useId, useState, useTransition } from "react";
 import { detalheInstrumentoDaDupla } from "@/lib/actions-formularios";
 import { InstrumentoResultado } from "@/components/instrumento-resultado";
-import { Button } from "@/components/ui/button";
+import {
+  RespostaGatilho,
+  RespostaPainel,
+} from "@/components/resposta-toggle";
 import { formatDate } from "@/lib/ciclo";
 
 type Detalhe = Awaited<ReturnType<typeof detalheInstrumentoDaDupla>>;
 
 // Linha expansível da página por instrumento (REALIZA-331): a lista vem
-// server-rendered com o estado por dupla; "Ver respostas" carrega a
+// server-rendered com o estado por dupla; "Ver resposta" carrega a
 // resposta sob demanda — a RPC por dupla só roda pra linha aberta, não
-// pra coorte inteira.
+// pra coorte inteira. O gatilho/painel é o RespostaGatilho compartilhado
+// (REALIZA-441): mesmo chrome dos toggles estáticos + a animação de
+// altura do painel.
 
 export function DetalheInstrumentoLazy({
   duplaId,
@@ -28,6 +32,7 @@ export function DetalheInstrumentoLazy({
   const [pending, start] = useTransition();
   const [aberto, setAberto] = useState(false);
   const [dados, setDados] = useState<Detalhe | null>(null);
+  const painelId = useId();
 
   function carregar() {
     if (aberto) {
@@ -46,24 +51,15 @@ export function DetalheInstrumentoLazy({
   }
 
   return (
-    <div className="pt-1.5">
-      <Button
-        type="button"
+    <div className="mt-1.5">
+      <RespostaGatilho
+        aberto={aberto}
         onClick={carregar}
-        aria-expanded={aberto}
-        variant="ghost"
-        size="sm"
-        className="-ml-2"
-      >
-        {pending ? (
-          <CircleNotch size={13} className="animate-spin" aria-hidden />
-        ) : (
-          <Eye size={13} aria-hidden />
-        )}
-        {aberto ? "Esconder respostas" : "Ver respostas"}
-      </Button>
-      {aberto &&
-        (pending ? null : dados?.ok ? (
+        carregando={pending}
+        controls={painelId}
+      />
+      <RespostaPainel aberto={aberto} id={painelId}>
+        {dados?.ok ? (
           <div className="mt-2 border-t border-border/60 pt-3">
             <p className="sr-only">
               Resposta de {jovemNome}
@@ -73,13 +69,15 @@ export function DetalheInstrumentoLazy({
               sistema={dados.sistema}
               campos={dados.campos}
               respostas={dados.respostas}
+              respostasAnterior={dados.anterior}
             />
           </div>
         ) : dados ? (
           <p className="mt-2 border-t border-border/60 pt-3 text-xs text-muted-foreground">
             A resposta não está disponível pra sua conta.
           </p>
-        ) : null)}
+        ) : null}
+      </RespostaPainel>
     </div>
   );
 }

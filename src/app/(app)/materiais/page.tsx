@@ -7,12 +7,14 @@ import {
 import Link from "next/link";
 import {
   getCicloEventos,
+  getDupla,
   getDuplasInfo,
   getMateriais,
   getMateriaisLidos,
   getMe,
   getPainelInstrumentosJornada,
 } from "@/lib/queries";
+import { getInstrumentosDaDupla } from "@/lib/forms/queries";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import {
   eventoDaSemana,
@@ -47,9 +49,9 @@ export const metadata: Metadata = { title: "Materiais de apoio" };
 export default async function MateriaisPage({
   searchParams,
 }: {
-  searchParams: Promise<{ aba?: string }>;
+  searchParams: Promise<{ aba?: string; dupla?: string }>;
 }) {
-  const { aba: abaParam } = await searchParams;
+  const { aba: abaParam, dupla: duplaParam } = await searchParams;
   const [materiais, me, eventos, lidos] = await Promise.all([
     getMateriais(),
     getMe(),
@@ -157,8 +159,19 @@ export default async function MateriaisPage({
         .map((d) => ({
           id: d.id,
           jovemNome: d.mentorado.nome_social || d.mentorado.nome,
+          pausada: d.status === "pausada",
         }))
     : [];
+
+  // mentorado em foco (REALIZA-440): o seletor da régua escreve ?dupla=;
+  // param ausente/inválido cai na primeira dupla — os cards passam a ler
+  // o estado DELE por instrumento (sem "todas" na régua: a régua é o
+  // retrato de uma dupla por vez). O fetch por dupla só roda com a aba
+  // Instrumentos aberta — na Biblioteca (o default do mentor) é desperdício
+  const duplaSelecionada =
+    fichasMentor.find((f) => f.id === duplaParam)?.id ??
+    fichasMentor[0]?.id ??
+    null;
 
   // biblioteca do mentor/especialista (rodada dores-ux-2026-10): estrutura
   // própria, sem cobertura/filtros/selo de público — o encontro da semana
@@ -239,21 +252,42 @@ export default async function MateriaisPage({
       ? enriquecerMateriaisPorEncontro(new Map(porEncontro), eventos)
       : porEncontro;
 
-  // duas abas: Instrumentos (staff abre aqui — o estado da coorte e a fila
-  // de atrasados moram nos cards) e Biblioteca. A antiga aba Jornada saiu:
-  // o retrato fino por dupla é da ficha. Mentor e especialista abrem na
-  // Biblioteca (o acervo é o que eles mais usam)
+  // duas abas: Biblioteca (o acervo é o que mentor/especialista mais
+  // usam — primeiro item, REALIZA-440) e Instrumentos (o staff abre
+  // aqui — o estado da coorte e a fila de atrasados moram nos cards).
+  // A antiga aba Jornada saiu: o retrato fino por dupla é da ficha.
   const abas: AbaMaterialItem[] = [
+    { id: "biblioteca" as const, rotulo: "Biblioteca" },
     ...(veInstrumentos
       ? [{ id: "instrumentos" as const, rotulo: "Instrumentos" }]
       : []),
-    { id: "biblioteca" as const, rotulo: "Biblioteca" },
   ];
   const padrao: AbaMateriais =
     painel.length > 0 && veInstrumentos ? "instrumentos" : "biblioteca";
   const ativa: AbaMateriais = abas.some((a) => a.id === abaParam)
     ? (abaParam as AbaMateriais)
     : padrao;
+
+  const [instrumentosSelecionada, duplaSelecionadaFull] =
+    ativa === "instrumentos" && duplaSelecionada
+      ? await Promise.all([
+          getInstrumentosDaDupla(duplaSelecionada),
+          getDupla(duplaSelecionada),
+        ])
+      : [[], null];
+  // a avaliação do encontro é recorrente: a contagem é avaliações feitas
+  // × encontros realizados daquela dupla (a mesma conta da linha da
+  // página por instrumento)
+  const avaliacoesSelecionada = duplaSelecionadaFull
+    ? {
+        feitas: duplaSelecionadaFull.encontros.filter(
+          (e) => e.status === "realizado" && e.avaliacao_jovem
+        ).length,
+        realizados: duplaSelecionadaFull.encontros.filter(
+          (e) => e.status === "realizado"
+        ).length,
+      }
+    : null;
 
   return (
     <div className="space-y-6">
@@ -282,6 +316,9 @@ export default async function MateriaisPage({
             duplasInfo={duplasInfo}
             envioLiberado={EMAIL_ENVIO_LIBERADO}
             fichasMentor={fichasMentor}
+            duplaSelecionada={duplaSelecionada}
+            instrumentosSelecionada={instrumentosSelecionada}
+            avaliacoesSelecionada={avaliacoesSelecionada}
             nudges={nudges}
             meuNome={me?.nome_social || me?.nome || ""}
           />

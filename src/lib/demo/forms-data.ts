@@ -762,7 +762,7 @@ export function getDemoFormularios(): DemoFormularios {
     // REALIZA-18/-359 · a dupla encerrada (Luiza×Isabela, ~8 meses atrás)
     // carrega o antes × depois inteiro: a roda inicial do 1º encontro, a
     // formal do enc. 12–14 e as duas marcações do checklist — é o par que
-    // a retrospectiva e o "Ver resultado" comparam. O checklist responde
+    // a retrospectiva e o "Ver resposta" comparam. O checklist responde
     // o MENTOR (dest_profile_id), não a jovem.
     {
       id: uid(0x4232), formulario_id: fRodaVida.id, token: DEMO_TOKENS.isabelaRodaInicial,

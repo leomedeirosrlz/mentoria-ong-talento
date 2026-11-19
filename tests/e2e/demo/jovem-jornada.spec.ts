@@ -27,6 +27,9 @@ import { entrarNaDemo, expect, test } from "../helpers";
 // saudável feita na janela, T2 começando, links pendentes e um expirado
 // fora da janela, uma dupla pausada).
 
+const DUPLA_OK = "de000000-0000-4000-8000-000000001537"; // Ricardo × Ana (Bia)
+const DUPLA_MATHEUS = "de000000-0000-4000-8000-000000001549"; // Ricardo × Matheus
+
 test.describe("demo — Minha jornada do mentorado", () => {
   test("hero, trilha e estações feitas da Ana", async ({ page }) => {
     await entrarNaDemo(page, "mentorado");
@@ -576,23 +579,43 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     );
     await expect(instrumentos).toBeVisible();
 
-    // cada card linka a ficha específica (âncora #instrumentos) — a
-    // fixture do Ricardo tem 2 duplas DPP vivas (Bia e Matheus), então
-    // cada card carrega um link por jovem, rotulado pelo nome social
+    // a régua do mentor abre na dupla em foco (REALIZA-440): os nomes
+    // viram pills selecionáveis no lugar dos links miúdos por card — a
+    // fixture do Ricardo tem 2 duplas DPP vivas (Bia e Matheus), então a
+    // primeira já chega marcada
+    const seletor = instrumentos.getByRole("navigation", {
+      name: "Filtrar por mentorado",
+    });
     await expect(
-      instrumentos
-        .locator('a[href^="/duplas/"][href$="#instrumentos"]')
-        .first()
-    ).toHaveAttribute("href", /^\/duplas\/.+#instrumentos$/);
-    for (const jovem of ["Bia", "Matheus Gonçalves"]) {
-      await expect(
-        instrumentos
-          .locator("article")
-          .first()
-          .getByRole("link", { name: jovem })
-      ).toBeVisible();
-    }
-    // o rodapé lista a ficha de cada dupla dele
+      seletor.getByRole("link", { name: "Bia", exact: true })
+    ).toHaveAttribute("aria-current", "page");
+    await expect(
+      seletor.getByRole("link", { name: "Matheus Gonçalves", exact: true })
+    ).toBeVisible();
+
+    // cada card linka a página do instrumento da dupla em foco e oferece
+    // o atalho "Na ficha" dela (âncora #instrumentos)
+    const primeiroCard = instrumentos.locator("article").first();
+    await expect(
+      primeiroCard.getByRole("link", { name: "Na ficha" })
+    ).toHaveAttribute("href", `/duplas/${DUPLA_OK}?aba=instrumentos#instrumentos`);
+
+    // trocar o mentorado em foco reescreve ?dupla= e refaz a régua pra
+    // outra dupla — deep-linkável
+    await seletor
+      .getByRole("link", { name: "Matheus Gonçalves", exact: true })
+      .click();
+    await expect(page).toHaveURL(
+      `/materiais?aba=instrumentos&dupla=${DUPLA_MATHEUS}`
+    );
+    await expect(
+      instrumentos.locator("article").first().getByRole("link", { name: "Na ficha" })
+    ).toHaveAttribute(
+      "href",
+      `/duplas/${DUPLA_MATHEUS}?aba=instrumentos#instrumentos`
+    );
+
+    // o rodapé linka a ficha da dupla em foco
     await expect(
       instrumentos.getByText(/Estado e envio por dupla na ficha:/)
     ).toBeVisible();
