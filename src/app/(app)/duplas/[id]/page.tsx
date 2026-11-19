@@ -82,6 +82,7 @@ import {
   jornadaDaDupla,
   linkSeguro,
   passoEsp,
+  passosCobertosCandidatos,
   passosDaTrilha,
   saudadeDaDupla,
   SITUACAO_MENTORADO_LABEL,
@@ -990,25 +991,35 @@ export default async function DuplaPage({
             c.numero < passo.numero &&
             c.status !== "feito"
         )}
-        // pós-save chaining (REALIZA-397): o outro encontro da sessão dupla
-        // também deve registro — "registrar o Nº também?" abre o form dele
-        // com os campos compartilhados preenchidos. Menor nº devendo registro
-        // primeiro: a fila anda na ordem do guia
-        proximoRegistro={(() => {
-          if (ehEsp) return null;
-          const prox = dupla.encontros
-            .filter(
-              (e) =>
-                e.id !== enc?.id &&
-                !e.registro &&
-                (e.status === "realizado" ||
-                  ((e.status === "agendado" || e.status === "remarcado") &&
-                    e.data_hora != null &&
-                    new Date(e.data_hora) <= agora))
-            )
-            .sort((a, b) => a.numero - b.numero)[0];
-          return prox ? { encontroId: prox.id, numero: prox.numero } : null;
-        })()}
+        // pós-save chaining (REALIZA-397): a fila inteira devendo registro
+        // vai junto — o form pula os nºs que a sessão cobriu (007 US11) e
+        // oferece "registrar o Nº também?" pro primeiro pendente na ordem
+        // do guia
+        proximosRegistros={
+          ehEsp
+            ? null
+            : dupla.encontros
+                .filter(
+                  (e) =>
+                    e.id !== enc?.id &&
+                    !e.registro &&
+                    (e.status === "realizado" ||
+                      ((e.status === "agendado" || e.status === "remarcado") &&
+                        e.data_hora != null &&
+                        new Date(e.data_hora) <= agora))
+                )
+                .sort((a, b) => a.numero - b.numero)
+                .map((e) => ({ encontroId: e.id, numero: e.numero }))
+        }
+        // sessão que cobriu mais de um passo (007 US11): os candidatos saem
+        // da mesma régua que o salvarRegistro revalida — passo oficial
+        // vencido sem row, compromisso vencido ou realizado sem registro;
+        // nunca o último (fechamento é gesto próprio)
+        cobertura={
+          ehEsp || !souMentor
+            ? null
+            : passosCobertosCandidatos(passos, dupla.encontros, passo.numero, agora)
+        }
         registroAberto={passo.numero === numeroAtual}
         apoioDestinos={apoioDestinos}
         linkAvaliacao={

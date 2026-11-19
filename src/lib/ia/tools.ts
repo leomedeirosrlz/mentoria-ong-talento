@@ -50,6 +50,7 @@ import {
   getJovemDuplaIa,
   getJovemPedidosIa,
   getJovemProgressoIa,
+  getJovemRetroativoIa,
   getMinhaDuplaIa,
   getPessoasBuscaIa,
   getRegistrosDaDuplaIa,
@@ -1459,6 +1460,16 @@ export const IA_TOOLS = {
     },
   },
 
+  encontros_retroativo: {
+    nome: "encontros_retroativo",
+    descricao:
+      "Os passos do guia que o jovem pode declarar como já realizados por conta própria (encontro combinado fora da plataforma): os passos oficiais já vencidos que ainda não estão na agenda, e os retroativos que ele mesmo criou e ainda pode corrigir (mesma tool de registro) ou desfazer (jovem_desfazer_retroativo) enquanto o mentor não registra. Use antes de jovem_registrar_retroativo e pra 'nos encontramos sem agendar', 'a gente se encontrou e esqueceu de marcar'.",
+    schema: semArgs,
+    roles: ["mentorado"],
+    run: async (_args: z.infer<typeof semArgs>, ctx) =>
+      getJovemRetroativoIa(ctx.supabase),
+  },
+
   // ---------- escrita (2 passos com confirmação) ----------
   //
   // `escreve: true` muda o contrato no executarTool: a 1ª chamada NÃO roda
@@ -1786,6 +1797,60 @@ export const IA_TOOLS = {
       `Marcar o encontro ${a.encontro_id} como não realizado`,
     run: async (a: { encontro_id: string }, ctx) =>
       rpcEscreve(ctx, "marcar_nao_aconteceu_mentorado", {
+        p_encontro: a.encontro_id,
+      }),
+  },
+
+  jovem_registrar_retroativo: {
+    nome: "jovem_registrar_retroativo",
+    descricao:
+      "Declara que um encontro do guia já aconteceu sem agendamento prévio — a dupla se combinou por fora (retroativo). O passo fica realizado na hora, libera a avaliação do jovem e avisa o mentor pra contar como foi no registro dele. Também corrige a data de um retroativo que a própria pessoa criou (mesmo número, nova data). encontros_retroativo lista os passos elegíveis: só data oficial já vencida, nunca o último do ciclo (fechar a jornada segue registro do mentor) e nunca a trilha de especialista (as sessões dela são do especialista)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        dupla_id: z
+          .uuid()
+          .describe("id da dupla DPP (encontros_retroativo devolve)"),
+        numero: z
+          .number()
+          .int()
+          .min(1)
+          .max(16)
+          .describe("número do encontro do guia"),
+        data_hora: z
+          .string()
+          .describe(
+            "data/hora ISO 8601 com fuso de quando aconteceu, ex. 2026-11-10T19:00:00-03:00"
+          ),
+      })
+      .strict(),
+    roles: ["mentorado"],
+    escreve: true,
+    resumo: (a: { numero: number; data_hora: string }) =>
+      `Registrar o ${a.numero}º encontro como realizado em ${a.data_hora}`,
+    run: async (
+      a: { dupla_id: string; numero: number; data_hora: string },
+      ctx
+    ) =>
+      rpcEscreve(ctx, "registrar_retroativo_mentorado", {
+        p_dupla: a.dupla_id,
+        p_numero: a.numero,
+        p_data_hora: a.data_hora,
+      }),
+  },
+
+  jovem_desfazer_retroativo: {
+    nome: "jovem_desfazer_retroativo",
+    descricao:
+      "Desfaz um retroativo que a própria pessoa criou (encontros_retroativo lista o encontro_id). Só vale enquanto o mentor não registrou o encontro — depois disso a correção é com ele." +
+      ESCRITA_DOC,
+    schema: z.object({ encontro_id: z.uuid() }).strict(),
+    roles: ["mentorado"],
+    escreve: true,
+    resumo: (a: { encontro_id: string }) =>
+      `Desfazer o retroativo do encontro ${a.encontro_id}`,
+    run: async (a: { encontro_id: string }, ctx) =>
+      rpcEscreve(ctx, "desfazer_retroativo_mentorado", {
         p_encontro: a.encontro_id,
       }),
   },

@@ -3322,7 +3322,7 @@ export async function salvarRegistro(formData: FormData) {
     return { error: "Revise os campos: um dos valores não é válido." };
   }
 
-  const { data: d } = await supabase.from("duplas").select("status").eq("id", dupla_id).single();
+  const { data: d } = await supabase.from("duplas").select("status, trilha, cronograma_id").eq("id", dupla_id).single();
   // 'concluida' entra junto: o fechamento automático (0102) vira status no
   // instante do último encontro — trancar aqui impediria até editar o
   // registro que acabou de fechar a jornada. Pausada/encerrada seguem fora.
@@ -3498,6 +3498,150 @@ export async function salvarRegistro(formData: FormData) {
       }
     }
   }
+  // sessão que cobriu mais de um passo do guia (007 US11): o form marca os
+  // nºs e cada um ganha o PRÓPRIO par encontro-realizado + registro — nunca
+  // uma row reaproveitada. O registro principal já está salvo, então cada
+  // passo extra é best-effort com aviso próprio, na mesma régua dos
+  // combinados; a régua de quais nºs valem é a passosCobertosCandidatos
+  // (ficha e servidor leem a mesma regra, revalidada aqui)
+  const cobertos: number[] = [];
+  const cobriu = [
+    ...new Set(
+      formData.getAll("cobriu_numero").map((v) => Number(String(v)))
+    ),
+  ].filter((n) => Number.isInteger(n) && n !== encDb.numero);
+  if (cobriu.length && d?.trilha === "especialista") {
+    avisos.push(
+      "A sessão dupla não se aplica à trilha de especialista — cada sessão é registrada na própria linha."
+    );
+    cobriu.length = 0;
+  }
+  if (cobriu.length) {
+    // data do FATO — a mesma sessão do registro principal (realizado_em se
+    // já era fato, senão a data_hora que acabou de confirmar; o fallback é
+    // defensivo: realizado sem carimbo é estado que não deveria existir)
+    const quando =
+      encDb.realizado_em ?? encDb.data_hora ?? new Date().toISOString();
+    const cronId = d?.cronograma_id ?? null;
+    const { data: evs } = cronId
+      ? await supabase
+          .from("ciclo_eventos")
+          .select("numero, data")
+          .eq("tipo", "encontro")
+          .eq("cronograma_id", cronId)
+          .order("numero", { ascending: true })
+      : { data: null };
+    const oficial = new Map<number, string | null>(
+      (evs ?? [])
+        .filter((e) => e.numero != null)
+        .map((e) => [e.numero as number, e.data])
+    );
+    const maxNum = oficial.size ? Math.max(...oficial.keys()) : 16;
+    const hoje = new Date().toISOString().slice(0, 10);
+    for (const m of [...cobriu].sort((a, b) => a - b)) {
+      if (m < 1 || m >= maxNum) {
+        avisos.push(`O ${m}º encontro não está no guia da dupla.`);
+        continue;
+      }
+      const { data: enc2 } = await supabase
+        .from("encontros")
+        .select("id, status, data_hora")
+        .eq("dupla_id", dupla_id)
+        .eq("numero", m)
+        .maybeSingle();
+      let encId: string | null = null;
+      if (!enc2) {
+        // sem row: só passo oficial já vencido — criar antes pularia o
+        // gating da jornada (mesma régua da 0208)
+        const dataOficial = oficial.get(m);
+        if (!dataOficial || dataOficial > hoje) {
+          avisos.push(`O ${m}º encontro ainda não chegou na data oficial do guia.`);
+          continue;
+        }
+        const { data: novo, error: novoErr } = await supabase
+          .from("encontros")
+          .insert({
+            dupla_id,
+            numero: m,
+            data_hora: quando,
+            realizado_em: quando,
+            status: "realizado",
+            origem: "externo",
+            created_by: eu.id,
+            ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
+          })
+          .select("id")
+          .single();
+        if (novoErr || !novo) {
+          avisos.push(`Não foi possível cobrir o ${m}º encontro.`);
+          continue;
+        }
+        encId = novo.id as string;
+      } else if (enc2.status === "realizado") {
+        // o fato fica intacto (realizado_em é de quando aconteceu) — a
+        // sessão cobre com o follow-up, nunca reescreve o encontro
+        const { data: reg2 } = await supabase
+          .from("registros")
+          .select("id")
+          .eq("encontro_id", enc2.id)
+          .maybeSingle();
+        if (reg2) {
+          avisos.push(`O ${m}º encontro já tem registro.`);
+          continue;
+        }
+        encId = enc2.id;
+      } else if (enc2.status === "agendado" || enc2.status === "remarcado") {
+        // compromisso futuro não é coberto por checkbox — desmarcar é gesto
+        // próprio da dupla; o agendado vencido confirma a sessão, com a
+        // data do fato em vez da que estava marcada (régua da 0207)
+        if (enc2.data_hora != null && new Date(enc2.data_hora) > new Date()) {
+          avisos.push(
+            `O ${m}º encontro ainda está marcado pro futuro — desmarque antes de cobrir.`
+          );
+          continue;
+        }
+        const { error: upErr } = await supabase
+          .from("encontros")
+          .update({
+            status: "realizado",
+            data_hora: quando,
+            realizado_em: quando,
+            ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
+          })
+          .eq("id", enc2.id)
+          .in("status", ["agendado", "remarcado"]);
+        if (upErr) {
+          avisos.push(`Não foi possível cobrir o ${m}º encontro.`);
+          continue;
+        }
+        encId = enc2.id;
+      } else {
+        avisos.push(
+          `O ${m}º encontro está ${enc2.status === "nao_aconteceu" ? "marcado como não realizado" : "cancelado"} — desfaça na ficha antes de cobrir.`
+        );
+        continue;
+      }
+      // um registro por nº — payload da sessão inteiro, menos o pedido de
+      // apoio: a flag abre chamado por row (0084) e uma sessão não gera
+      // N chamados iguais; a urgência segue no registro principal
+      const { error: regErr } = await supabase
+        .from("registros")
+        .insert({
+          ...payload,
+          precisa_apoio: false,
+          encontro_id: encId,
+          created_by: eu.id,
+        });
+      if (regErr) {
+        avisos.push(
+          `O registro do ${m}º encontro não entrou — registre pela ficha.`
+        );
+      } else {
+        cobertos.push(m);
+      }
+    }
+  }
+
   const aviso = avisos.length
     ? `${avisos.join(" ")} Confira a lista de combinados.`
     : undefined;
@@ -3541,7 +3685,7 @@ export async function salvarRegistro(formData: FormData) {
   revalidatePath("/agenda");
   revalidatePath("/registros");
   revalidatePath(`/duplas/${dupla_id}`);
-  return { ok: true, concluidos, aviso };
+  return { ok: true, concluidos, aviso, cobertos };
 }
 
 // ---------- notas do mentor (plano de aula / lembretes pré-encontro) ----------

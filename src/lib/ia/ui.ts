@@ -311,6 +311,9 @@ export const STATUS_TOOL: Record<string, string> = {
   meu_progresso: "Olhando sua jornada…",
   meus_pedidos: "Vendo seus pedidos…",
   ajuda_faq: "Buscando na ajuda…",
+  encontros_retroativo: "Vendo o que dá pra registrar…",
+  jovem_registrar_retroativo: "Preparando o registro do encontro…",
+  jovem_desfazer_retroativo: "Preparando pra desfazer o registro…",
   // escritas do domínio (126) — a 1ª chamada só prepara a prévia, então
   // o status conta "preparando", não "executando"
   registrar_interacao: "Preparando o registro de contato…",

@@ -1,5 +1,6 @@
 import {
   appEnvOk,
+  buscarViaServiceRole,
   convergirDuplaAtiva,
   expect,
   inserirViaServiceRole,
@@ -116,5 +117,43 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
       form4.locator('input[name="avaliacao"][value="boa"]')
     ).toBeChecked();
     await expect(form4.locator("#duracao-select")).toContainText("1h30");
+  });
+
+  test("a sessão cobre outro passo do guia — um encontro + um registro por nº (REALIZA-448)", async ({
+    page,
+  }) => {
+    const e6 = await criarEncontro(6, "realizado", -4);
+    const e7 = await criarEncontro(7, "realizado", -2);
+    await page.goto(`/duplas/${DUPLA_ID}?aba=encontros`);
+
+    const linha6 = page.locator(`#registrar-${String(e6.id)}`);
+    await linha6.getByRole("link", { name: "Registrar" }).click();
+    const form6 = linha6.locator("form");
+    await expect(form6).toBeVisible();
+
+    // a sessão física cobriu o 7º também — o checkbox marca na etapa 1 e
+    // o servidor grava encontro realizado + registro próprios pro 7º
+    await expect(form6.getByText("7º encontro")).toBeVisible();
+    await form6.getByText("7º encontro").click();
+    await form6.getByText("Boa", { exact: true }).click();
+    await form6.getByRole("button", { name: "Avançar" }).click();
+    await form6.getByRole("button", { name: "Avançar" }).click();
+    await form6.getByRole("button", { name: "Salvar registro" }).click();
+
+    await expect(
+      page.getByText(/Também cobriu o 7º encontro/)
+    ).toBeVisible({ timeout: 15_000 });
+
+    // um registro por nº — os dois fatos existem, nunca uma linha só
+    const regs = await buscarViaServiceRole<{ encontro_id: string }[]>(
+      "registros",
+      `select=encontro_id&encontro_id=in.(${String(e6.id)},${String(e7.id)})`
+    );
+    expect(regs).toHaveLength(2);
+
+    // e o pós-save NÃO oferece "registrar o 7º" — a sessão já deu o dele
+    await expect(
+      linha6.getByRole("button", { name: "Registrar o 7º também" })
+    ).toHaveCount(0);
   });
 });
