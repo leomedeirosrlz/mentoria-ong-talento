@@ -1167,6 +1167,72 @@ export type Database = {
           },
         ]
       }
+      digest_config: {
+        Row: {
+          atualizado_em: string
+          atualizado_por: string | null
+          cadencia: string
+          destinatarios: Json
+          dia_semana: number
+          id: boolean
+          secoes: Json
+        }
+        Insert: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          cadencia?: string
+          destinatarios?: Json
+          dia_semana?: number
+          id?: boolean
+          secoes?: Json
+        }
+        Update: {
+          atualizado_em?: string
+          atualizado_por?: string | null
+          cadencia?: string
+          destinatarios?: Json
+          dia_semana?: number
+          id?: boolean
+          secoes?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "digest_config_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "digest_config_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "digest_config_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "digest_config_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "digest_config_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       documento_templates: {
         Row: {
           ativo: boolean

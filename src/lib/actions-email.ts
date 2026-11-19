@@ -24,7 +24,10 @@ import {
 } from "@/lib/forms/schema";
 import { erroAmigavel } from "@/lib/utils";
 import { semanaBounds } from "@/lib/ciclo";
-import { montarDigestSemanal } from "@/lib/relatorios/digest";
+import {
+  montarDigestSemanal,
+  validarDigestConfigInput,
+} from "@/lib/relatorios/digest";
 import { demoAtivo } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
 import {
@@ -895,7 +898,8 @@ export async function enviarDesfechoLote(input: {
 /** Disparo manual do digest semanal (REALIZA-178) — botão da aba Saúde
  *  de /relatorios/operacionais. Ignora a dedup do cron de propósito (o clique
  *  de uma pessoa é a intenção, não o retry cego); a mesma row de log do
- *  job grava aqui com o autor_id da coordenação. */
+ *  job grava aqui com o autor_id da coordenação. A montagem lê a
+ *  digest_config — o disparo respeita destinatários e seções ativas. */
 export async function enviarDigestSemanal(): Promise<{
   ok?: true;
   enviados?: number;
@@ -918,7 +922,7 @@ export async function enviarDigestSemanal(): Promise<{
     autor_id: eu.id,
     tipo: "digest",
     assunto: digest.assunto,
-    audiencia: ["coordenacao"],
+    audiencia: digest.audiencia,
     destinatarios: digest.mensagens.length,
     enviados: envio.enviados,
     falhas: envio.falhas,
@@ -930,4 +934,44 @@ export async function enviarDigestSemanal(): Promise<{
     enviados: envio.enviados,
     destinatarios: digest.mensagens.length,
   };
+}
+
+/** Salva a config do digest (REALIZA-451 / spec 007 US14) — card da aba
+ *  Saúde de /relatorios/operacionais. A row é singleton (id=true); a
+ *  validação rejeita input fora do contrato antes do upsert, e a policy
+ *  digest_config_coord segura a escrita no banco (mesma régua has_papel
+ *  da action — coord por papel primário ou secundário). */
+export async function salvarDigestConfig(input: {
+  diaSemana: unknown;
+  cadencia: unknown;
+  papeis: unknown;
+  profiles: unknown;
+  emails: unknown;
+  secoes: unknown;
+}): Promise<{ ok?: true; error?: string }> {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  const { data: papeis } = await supabase.rpc("my_papeis");
+  if (!eu || !temPapel({ ...eu, papeis }, "coordenacao")) {
+    return { error: "Só a coordenação pode configurar o digest." };
+  }
+  const v = validarDigestConfigInput(input);
+  if (!v.ok) return { error: v.error };
+  const { error } = await supabase.from("digest_config").upsert(
+    {
+      id: true,
+      dia_semana: v.config.diaSemana,
+      cadencia: v.config.cadencia,
+      destinatarios: v.config.destinatarios,
+      secoes: v.config.secoes,
+      atualizado_por: eu.id,
+      atualizado_em: new Date().toISOString(),
+    },
+    { onConflict: "id" }
+  );
+  if (error) {
+    console.error("salvarDigestConfig:", error.message);
+    return { error: "Não consegui salvar a configuração. Tente de novo." };
+  }
+  return { ok: true };
 }

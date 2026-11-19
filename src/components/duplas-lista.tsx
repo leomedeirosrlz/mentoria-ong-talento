@@ -12,6 +12,7 @@ import {
   Funnel,
   Lifebuoy,
   MagnifyingGlass,
+  UsersThree,
 } from "@phosphor-icons/react";
 import {
   comparaNome,
@@ -1359,6 +1360,31 @@ function VisaoCoordenacao({
           </a>
         </div>
       </header>
+
+      {/* entrada da fila de pareamento (REALIZA-446): quem espera par não
+          é dupla ainda, então não aparece na lista — a fila mora em
+          /pessoas e daqui a coord salta direto pro card, que abre com
+          gente esperando */}
+      <Link
+        href="/pessoas#aguardando-par"
+        className="group mt-4 flex items-center gap-3 rounded-xl border border-border bg-card px-4 py-3 transition-colors hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        <span className="grid size-9 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)]/15 text-foreground">
+          <UsersThree aria-hidden size={16} />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block text-sm font-medium">Aguardando par</span>
+          <span className="block text-xs text-muted-foreground">
+            Jovens e mentores esperando pareamento. A fila e o Parear
+            ficam em Pessoas.
+          </span>
+        </span>
+        <CaretRight
+          aria-hidden
+          size={15}
+          className="shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5"
+        />
+      </Link>
 
       {/* situação do programa (ou do recorte): o mesmo resumo da agenda —
           aqui a fatia não navega, ativa o chip equivalente da própria página */}
