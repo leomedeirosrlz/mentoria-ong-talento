@@ -56,6 +56,11 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
 
     const card = page.getByRole("region", { name: "Para ficar em dia" });
     await expect(card).toBeVisible();
+    // a data projetada é o número principal do card — projeção honesta,
+    // conta quem vence no caminho, não só o backlog de hoje
+    await expect(
+      card.getByText(/Em dia em|Nesse ritmo não fecha/)
+    ).toBeVisible();
     // mentor age: cada passo remarcável expõe o próprio "Remarcar" — o do
     // 3º mora na <li> com o título oficial do passo (ancora de dataset,
     // não de posição)

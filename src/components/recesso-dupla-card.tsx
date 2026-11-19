@@ -60,17 +60,7 @@ export function RecessoDuplaCard({
   podeDeclarar: boolean;
   souMentor: boolean;
 }) {
-  const [pendente, start] = useTransition();
-  const [erro, setErro] = useState<string | null>(null);
   if (recessos.length === 0) return null;
-
-  const declarar = (cicloEventoId: string, usa: boolean) => {
-    setErro(null);
-    start(async () => {
-      const r = await declararRecesso(duplaId, cicloEventoId, usa);
-      if ("error" in r) setErro(r.error);
-    });
-  };
 
   return (
     <Card>
@@ -94,58 +84,91 @@ export function RecessoDuplaCard({
           </div>
         </div>
 
-        {recessos.map((r) => (
-          <div
-            key={r.cicloEventoId}
-            className="rounded-lg bg-muted/50 px-3.5 py-3 shadow-[var(--shadow-inset)]"
-          >
-            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-              <p className="text-sm font-medium">
-                {r.titulo} · {janela(r.inicio, r.fim)}
-              </p>
-              <p className="text-xs text-muted-foreground">
-                {r.declaradoEm
-                  ? r.usa
-                    ? "vão usar o recesso"
-                    : "seguem se encontrando"
-                  : "usando o recesso (padrão)"}
-              </p>
-            </div>
-            {autoria(r) && (
-              <p className="mt-1 text-xs text-muted-foreground">{autoria(r)}</p>
-            )}
-            {podeDeclarar && (
-              <div
-                className="mt-2.5 flex flex-wrap gap-2"
-                role="group"
-                aria-label={`Decisão sobre ${r.titulo}`}
-              >
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={r.usa ? "default" : "outline"}
-                  disabled={pendente}
-                  onClick={() => declarar(r.cicloEventoId, true)}
-                >
-                  {r.usa && r.declaradoEm && <Check size={14} aria-hidden />}
-                  Vamos usar o recesso
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant={!r.usa ? "default" : "outline"}
-                  disabled={pendente}
-                  onClick={() => declarar(r.cicloEventoId, false)}
-                >
-                  {!r.usa && <Check size={14} aria-hidden />}
-                  Vamos seguir nos encontrando
-                </Button>
-              </div>
-            )}
-          </div>
-        ))}
-        {erro && <p className="text-xs text-[var(--warn-text)]">{erro}</p>}
+        <RecessoDecisao
+          duplaId={duplaId}
+          recessos={recessos}
+          podeDeclarar={podeDeclarar}
+        />
       </CardContent>
     </Card>
+  );
+}
+
+/** As linhas de decisão por período — reutilizadas dentro do card "Para
+ *  ficar em dia", onde a escolha muda a projeção na hora. */
+export function RecessoDecisao({
+  duplaId,
+  recessos,
+  podeDeclarar,
+}: {
+  duplaId: string;
+  recessos: RecessoDaFicha[];
+  podeDeclarar: boolean;
+}) {
+  const [pendente, start] = useTransition();
+  const [erro, setErro] = useState<string | null>(null);
+
+  const declarar = (cicloEventoId: string, usa: boolean) => {
+    setErro(null);
+    start(async () => {
+      const r = await declararRecesso(duplaId, cicloEventoId, usa);
+      if ("error" in r) setErro(r.error);
+    });
+  };
+
+  return (
+    <>
+      {recessos.map((r) => (
+        <div
+          key={r.cicloEventoId}
+          className="rounded-lg bg-muted/50 px-3.5 py-3 shadow-[var(--shadow-inset)]"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <p className="text-sm font-medium">
+              {r.titulo} · {janela(r.inicio, r.fim)}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              {r.declaradoEm
+                ? r.usa
+                  ? "vão usar o recesso"
+                  : "seguem se encontrando"
+                : "usando o recesso (padrão)"}
+            </p>
+          </div>
+          {autoria(r) && (
+            <p className="mt-1 text-xs text-muted-foreground">{autoria(r)}</p>
+          )}
+          {podeDeclarar && (
+            <div
+              className="mt-2.5 flex flex-wrap gap-2"
+              role="group"
+              aria-label={`Decisão sobre ${r.titulo}`}
+            >
+              <Button
+                type="button"
+                size="sm"
+                variant={r.usa ? "default" : "outline"}
+                disabled={pendente}
+                onClick={() => declarar(r.cicloEventoId, true)}
+              >
+                {r.usa && r.declaradoEm && <Check size={14} aria-hidden />}
+                Vamos usar o recesso
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={!r.usa ? "default" : "outline"}
+                disabled={pendente}
+                onClick={() => declarar(r.cicloEventoId, false)}
+              >
+                {!r.usa && <Check size={14} aria-hidden />}
+                Vamos seguir nos encontrando
+              </Button>
+            </div>
+          )}
+        </div>
+      ))}
+      {erro && <p className="text-xs text-[var(--warn-text)]">{erro}</p>}
+    </>
   );
 }

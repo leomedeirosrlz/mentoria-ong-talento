@@ -249,6 +249,7 @@ export async function responderDemoIa(
             aviso: p2.aviso ?? null,
           })),
           data_recuperacao: r.dataRecuperacao,
+          alternativa_ritmo: r.alternativaRitmo,
           encerramento: r.encerramento,
           avisos: r.avisos,
           nivel: r.nivel,

@@ -221,7 +221,7 @@ describe("montarPlanoEmDia — datas e cadência", () => {
     expect(p12.data >= "2026-01-05").toBe(true);
   });
 
-  it("dataRecuperacao = data planejada do último passo devido", () => {
+  it("1 atraso: dataRecuperacao = data planejada do passo devido", () => {
     const d = mkDupla({
       iniciada_em: "2025-10-01",
       encontros: [encRealizado(1, "2025-10-07")],
@@ -229,10 +229,12 @@ describe("montarPlanoEmDia — datas e cadência", () => {
     const r = plano(d, "2025-10-15"); // deve só o 2
     if (!r.aplicavel) throw new Error("não aplicável");
     const ultimo = r.passos.filter((p) => p.acao !== "travado").at(-1)!;
-    expect(r.dataRecuperacao).toBe(ultimo.data);
+    expect(ultimo.data).toBe("2025-10-16");
+    // os oficiais seguintes são cobertos antes de vencer — nada mais empurra
+    expect(r.dataRecuperacao).toBe("2025-10-16");
   });
 
-  it("travado já-vencido conta pro 'em dia' — recuperação na data dele", () => {
+  it("travado já-vencido conta pro 'em dia', junto com o oficial que vence no caminho", () => {
     const d = mkDupla({
       iniciada_em: "2025-10-01",
       encontros: [
@@ -243,7 +245,10 @@ describe("montarPlanoEmDia — datas e cadência", () => {
     const r = plano(d, "2025-10-20");
     if (!r.aplicavel) throw new Error("não aplicável");
     expect(r.passos.filter((p) => p.acao !== "travado")).toEqual([]);
-    expect(r.dataRecuperacao).toBe("2025-10-25");
+    // 25/10 nem de longe basta: o enc.3 só cabe em 27/10 e a corrente de
+    // semanas de prática (4–8, gap de 7d) deixa cada oficial seguinte
+    // coberto ~1 dia depois de vencer — a dupla para de dever só em 03/12
+    expect(r.dataRecuperacao).toBe("2025-12-03");
   });
 });
 
@@ -350,6 +355,123 @@ describe("montarPlanoEmDia — piso running-max (review)", () => {
     // regrida pelo travado saía 01-27 (1 dia depois do 8º, quebra o piso)
     expect(p10.data).toBe("2026-02-02");
     expect(r.avisos.join(" ")).toMatch(/antes da data sugerida/);
+  });
+});
+
+describe("montarPlanoEmDia — projeção honesta: o calendário segue cobrando", () => {
+  // Bug real (review do Thiago): "em dia" calculado só com o backlog de
+  // hoje — dupla com 10 atrasos ouvia "em dia em janeiro" quando já devia
+  // o 14º. A projeção caminha TODOS os passos oficiais restantes e fecha
+  // a data no fim do último intervalo de atraso (feitos ≥ esperado).
+  const realizadosAte = (n: number) =>
+    Array.from({ length: n }, (_, i) =>
+      encRealizado(i + 1, CICLO_16.filter((e) => e.tipo === "encontro")[i].data!)
+    );
+  const dupla10 = () =>
+    mkDupla({ iniciada_em: "2025-10-01", encontros: realizadosAte(2) });
+  const COM_FIM = (data: string) => [
+    ...CICLO_16,
+    {
+      id: "ev-fim",
+      cronograma_id: "cron-t1",
+      tipo: "evento_encerramento" as const,
+      numero: null,
+      data,
+      data_fim: null,
+      status: "pendente" as const,
+      observacao: null,
+      ordem: 170,
+      titulo: "Encerramento",
+      fase: null,
+      instrumentos: [],
+    },
+  ];
+
+  it("10 atrasos: 'em dia' vai muito além da última reposição sugerida", () => {
+    // hoje 24/12, devidos enc.3–12. A última reposição no ritmo 1 cai em
+    // 09/03 — mas os enc.13–16 (oficiais até 20/01) já venceram e só são
+    // cobertos depois: em dia de verdade é 06/04.
+    const r = plano(dupla10(), "2025-12-24", 1);
+    if (!r.aplicavel) throw new Error("não aplicável");
+    const ultimoPasso = r.passos.at(-1)!;
+    expect(ultimoPasso.numero).toBe(12);
+    expect(ultimoPasso.data).toBe("2026-03-09");
+    expect(r.dataRecuperacao).toBe("2026-04-06");
+  });
+
+  it.each([
+    [1, "2026-04-06"],
+    [2, "2026-03-04"],
+    [3, "2026-02-25"],
+    [4, "2026-02-25"],
+  ])("10 atrasos no ritmo %i/semana: em dia em %s", (ritmo, esperada) => {
+    const r = plano(dupla10(), "2025-12-24", ritmo);
+    if (!r.aplicavel) throw new Error("não aplicável");
+    expect(r.dataRecuperacao).toBe(esperada);
+  });
+
+  it("encontro no recesso: plano empurra a data e a projeção conta quem vence na janela", () => {
+    // devendo o 12 (oficial 23/12): amanhã cai no recesso 25/12→04/01, a
+    // sugestão vai pra 05/01. O enc.13 tem oficial DENTRO do recesso
+    // (30/12) e o 14 vence 06/01 — cobertos até 14/01 no ritmo 2.
+    const d = mkDupla({ iniciada_em: "2025-10-01", encontros: realizadosAte(11) });
+    const r = plano(d, "2025-12-24", 2);
+    if (!r.aplicavel) throw new Error("não aplicável");
+    expect(r.passos.find((p) => p.numero === 12)!.data).toBe("2026-01-05");
+    expect(r.dataRecuperacao).toBe("2026-01-14");
+  });
+
+  it("encontro no recesso atravessado (usa=false): cobre na janela e fecha antes", () => {
+    const rec = CICLO_16.find((e) => e.tipo === "recesso")!;
+    const d = mkDupla({
+      iniciada_em: "2025-10-01",
+      encontros: realizadosAte(11),
+      recessos: [
+        {
+          id: "dr-1",
+          dupla_id: "d-1",
+          ciclo_evento_id: rec.id,
+          usa: false,
+          declarado_por: "p-1",
+          declarado_em: "2025-12-01T12:00:00-03:00",
+        },
+      ],
+    });
+    const r = plano(d, "2025-12-24", 2);
+    if (!r.aplicavel) throw new Error("não aplicável");
+    expect(r.passos.find((p) => p.numero === 12)!.data).toBe("2025-12-25");
+    expect(r.dataRecuperacao).toBe("2025-12-25");
+  });
+
+  it("ritmo que não alcança o calendário antes do encerramento: dataRecuperacao null", () => {
+    // nem o ritmo máximo (4/sem) convergiria antes de 27/01 — o plano diz
+    // isso em vez de prometer uma data que já nasce atrasada
+    for (const ritmo of [1, 2, 3, 4]) {
+      const r = montarPlanoEmDia({
+        dupla: dupla10(),
+        eventos: COM_FIM("2026-01-27"),
+        hoje: dt("2025-12-24"),
+        ritmo,
+      });
+      if (!r.aplicavel) throw new Error("não aplicável");
+      expect(r.dataRecuperacao).toBeNull();
+      expect(r.alternativaRitmo).toBeNull();
+    }
+  });
+
+  it("sem convergência no ritmo pedido: sugere o ritmo maior que fecha", () => {
+    // encerramento 15/03: a 1/semana não alcança; a 2/semana fecha em 04/03
+    const r = montarPlanoEmDia({
+      dupla: dupla10(),
+      eventos: COM_FIM("2026-03-15"),
+      hoje: dt("2025-12-24"),
+      ritmo: 1,
+    });
+    if (!r.aplicavel) throw new Error("não aplicável");
+    expect(r.dataRecuperacao).toBeNull();
+    expect(r.alternativaRitmo).toEqual({ ritmo: 2, data: "2026-03-04" });
+    expect(r.avisos.join(" ")).toMatch(/2 encontros por semana/);
+    expect(r.avisos.join(" ")).toMatch(/04\/03\/2026/);
   });
 });
 

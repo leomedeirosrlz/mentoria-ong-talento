@@ -23,10 +23,21 @@ test.describe("demo — plano pra ficar em dia (REALIZA-397)", () => {
 
     const card = page.getByRole("region", { name: "Para ficar em dia" });
     await expect(card).toBeVisible();
+    // a projeção honesta é o número principal — a data "em dia" já conta
+    // os encontros oficiais que vencem no caminho da recuperação
+    await expect(card.getByText(/Em dia em/)).toBeVisible();
+    await expect(card.getByText(/\d+ encontros? pra repor/)).toBeVisible();
     // os passos devidos entram com data sugerida; o 5º marcado aparece como
     // tal — .first() porque em seg/ter o aviso de ordem repete a expressão
     await expect(card.getByText(/sugestão/)).toHaveCount(2);
     await expect(card.getByText(/marcado pra/).first()).toBeVisible();
+    // a decisão de recesso mora dentro do card — a coordenação declara aqui
+    await expect(card.getByText("Recesso no caminho")).toBeVisible();
+    await expect(
+      card.getByRole("button", { name: "Vamos seguir nos encontrando" })
+    ).toBeVisible();
+    // e não sobra card de recesso separado na página
+    await expect(page.getByText("Recesso do programa")).toHaveCount(0);
     // leitura de equipe: nenhum botão de agir — quem agenda é a dupla
     await expect(
       card.getByRole("button", { name: /Agendar|Remarcar/ })

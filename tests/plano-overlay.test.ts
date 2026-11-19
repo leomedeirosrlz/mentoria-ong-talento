@@ -164,13 +164,14 @@ describe("FR-011 — nível nomeado de flexibilização", () => {
   });
 
   it("atraso que só fecha com 2/semana é semana_dupla", () => {
-    // 9 devidos em 03/12: com 1/semana a cauda passa do encerramento de
-    // 27/01; com 2/semana (gap de 2d permite, prática à parte) fecha em
-    // meados de janeiro — semana dupla é o mínimo que recupera
+    // 9 devidos em 03/12: com 1/semana a projeção só alcança o calendário
+    // depois do encerramento de 15/03 (os oficiais seguem vencendo no
+    // caminho); com 2/semana convergiria em 11/02 — semana dupla é o
+    // mínimo que recupera
     const d = mkDupla({ iniciada_em: "2025-10-01", encontros: [] });
     const r = montarPlanoEmDia({
       dupla: d,
-      eventos: COM_FIM("2026-01-27"),
+      eventos: COM_FIM("2026-03-15"),
       hoje: dt("2025-12-03"), // deve os enc.1–9 (oficial do 9º é 02/12)
     });
     if (!r.aplicavel) throw new Error("não aplicável");

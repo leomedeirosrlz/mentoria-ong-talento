@@ -654,6 +654,7 @@ export const IA_TOOLS = {
           aviso: p.aviso ?? null,
         })),
         data_recuperacao: r.dataRecuperacao,
+        alternativa_ritmo: r.alternativaRitmo,
         encerramento: r.encerramento,
         avisos: r.avisos,
       };
