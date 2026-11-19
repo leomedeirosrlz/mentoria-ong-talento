@@ -89,6 +89,7 @@ import {
   PassoRecursos,
   type RecursoTour,
 } from "@/components/onboarding-recursos";
+import { STATUS_CEP, useBuscaCep } from "@/lib/use-busca-cep";
 import { cn } from "@/lib/utils";
 
 /** Um form por passo — o botão do footer fixo submete via atributo `form`. */
@@ -239,6 +240,15 @@ export function OnboardingFlow({
   const [genero, setGenero] = useState(pessoal?.genero ?? "");
   const [cidade, setCidade] = useState(me.cidade ?? "");
   const [uf, setUf] = useState(me.uf ?? "");
+  // o CEP do "Sobre você" é só alavanca do ViaCEP: profiles não guarda
+  // CEP (ele é dado civil) — o valor digitado vira prefill do termo no
+  // fim do wizard e a busca preenche cidade/UF aqui mesmo
+  const buscaCep = useBuscaCep({
+    onEndereco: (endereco) => {
+      setCidade(endereco.cidade);
+      setUf(endereco.uf);
+    },
+  });
   const [cargo, setCargo] = useState(me.cargo ?? "");
   const [empresa, setEmpresa] = useState(me.empresa ?? "");
   const [origem, setOrigem] = useState(me.origem ?? "");
@@ -426,26 +436,60 @@ export function OnboardingFlow({
           onChange={(v) => setGenero(v === SENTINEL_VAZIO ? "" : v)}
           icon={GenderIntersex}
         />
-        {/* cidade + UF na mesma linha: um conceito só (onde) e o select de
-            2 letras não precisa de uma linha inteira */}
-        <div className="grid grid-cols-[minmax(0,1fr)_6.5rem] gap-3">
-          <div className="space-y-2">
-            <Rotulo htmlFor="ob-cidade" icon={MapPin}>Cidade</Rotulo>
+      </div>
+      {/* CEP + cidade + UF na mesma linha: um conceito só (onde). O CEP
+          vem primeiro porque o ViaCEP preenche os outros dois — edição
+          manual posterior sempre vence o autofill */}
+      <div className="grid gap-3 sm:grid-cols-[8rem_minmax(0,1fr)_6.5rem]">
+        <div className="space-y-2">
+          <Rotulo htmlFor="ob-cep" icon={Signpost}>CEP</Rotulo>
+          <div className="relative">
             <Input
-              id="ob-cidade"
-              name="cidade"
-              maxLength={100}
-              autoCapitalize="words"
-              value={cidade}
-              onChange={(e) => setCidade(e.target.value)}
+              id="ob-cep"
+              name="cep"
+              inputMode="numeric"
+              autoComplete="postal-code"
+              maxLength={9}
+              placeholder="00000-000"
+              value={buscaCep.cep}
+              onChange={(e) => buscaCep.onCepChange(e.target.value)}
+              onBlur={buscaCep.onCepBlur}
+              aria-describedby="ob-cep_status"
             />
+            {buscaCep.buscando && (
+              <CircleNotch
+                size={16}
+                aria-hidden
+                className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground"
+              />
+            )}
           </div>
-          <CampoUf
-            value={uf}
-            onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
-            icon={Flag}
+          {buscaCep.status !== "idle" && (
+            <p
+              id="ob-cep_status"
+              aria-live="polite"
+              className="text-xs text-muted-foreground"
+            >
+              {STATUS_CEP[buscaCep.status]}
+            </p>
+          )}
+        </div>
+        <div className="space-y-2">
+          <Rotulo htmlFor="ob-cidade" icon={MapPin}>Cidade</Rotulo>
+          <Input
+            id="ob-cidade"
+            name="cidade"
+            maxLength={100}
+            autoCapitalize="words"
+            value={cidade}
+            onChange={(e) => setCidade(e.target.value)}
           />
         </div>
+        <CampoUf
+          value={uf}
+          onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
+          icon={Flag}
+        />
       </div>
     </div>
   );
@@ -770,8 +814,8 @@ export function OnboardingFlow({
             dados={
               civis ?? {
                 // prefill com o que o wizard já coletou — os dados civis são
-                // um silo à parte (RPC 0046), mas nascimento/cidade/UF valem
-                // nos dois mundos
+                // um silo à parte (RPC 0046), mas nascimento/cidade/UF/CEP
+                // valem nos dois mundos
                 nome_civil: null,
                 rg: null,
                 cpf: null,
@@ -783,7 +827,7 @@ export function OnboardingFlow({
                   bairro: null,
                   cidade: cidade || null,
                   uf: uf || null,
-                  cep: null,
+                  cep: buscaCep.cep.replace(/\D/g, "") || null,
                 },
               }
             }

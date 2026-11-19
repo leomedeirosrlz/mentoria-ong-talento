@@ -1,14 +1,14 @@
 "use client";
 
-import { useRef, useState, useTransition } from "react";
+import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CircleNotch, Signature } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { maskCep, maskCpf } from "@/lib/utils";
-import { buscarCep } from "@/lib/actions-endereco";
+import { maskCpf } from "@/lib/utils";
+import { STATUS_CEP, useBuscaCep } from "@/lib/use-busca-cep";
 import type { ViaCepEndereco } from "@/lib/viacep";
 import type { DadosCivis } from "@/lib/types";
 
@@ -19,21 +19,6 @@ const onInputMask = (mask: (v: string) => string) => (e: React.FormEvent<HTMLInp
   e.currentTarget.value = mask(e.currentTarget.value);
 };
 const cpfMask = maskCpf;
-const cepMask = maskCep;
-
-/** Linha de status do CEP (aria-live): em repouso não há texto fixo — a
- *  transparência sobre a consulta mora em docs/lgpd/base-legal.md, não num
- *  hint in-situ. Os estados de busca dizem o que houve sem travar a
- *  digitação — autofill é conveniência, nunca portão. */
-const STATUS_CEP: Record<
-  "buscando" | "ok" | "nao_encontrado" | "falha",
-  string
-> = {
-  buscando: "Buscando endereço no ViaCEP…",
-  ok: "Endereço preenchido. Confira e ajuste se precisar.",
-  nao_encontrado: "CEP não encontrado. Preencha o endereço manualmente.",
-  falha: "Não deu pra consultar o ViaCEP. Preencha o endereço manualmente.",
-};
 
 /** Campos civis do signatário — compartilhados pelo termo do voluntário
  *  (logado), pela autorização do responsável (token) e pela ficha de
@@ -64,8 +49,8 @@ export function DadosCivisFields({
   const e = defaults?.endereco;
   // bloco de endereço controlado: o autofill do ViaCEP (REALIZA-37) precisa
   // escrever nos inputs — defaultValue não dá. Os `name`s seguem os mesmos,
-  // então FormData e parseCivis não veem diferença nenhuma.
-  const [cep, setCep] = useState(e?.cep ? cepMask(e.cep) : "");
+  // então FormData e parseCivis não veem diferença nenhuma. A máquina da
+  // busca (máscara, race-guard, status) mora no useBuscaCep compartilhado.
   const [end, setEnd] = useState({
     logradouro: e?.logradouro ?? "",
     numero: e?.numero ?? "",
@@ -74,64 +59,24 @@ export function DadosCivisFields({
     cidade: e?.cidade ?? "",
     uf: e?.uf ?? "",
   });
-  const [status, setStatus] = useState<
-    "idle" | "buscando" | "ok" | "nao_encontrado" | "falha"
-  >("idle");
-  const [buscando, start] = useTransition();
-  // o CEP que disparou a busca em curso — resposta atrasada de CEP já
-  // editado é descartada e nunca sobrescreve o que está na tela. Inicia
-  // com o CEP salvo: blur sem mudança não dispara busca à toa.
-  const cepBuscado = useRef<string | null>(
-    e?.cep ? e.cep.replace(/\D/g, "") : null
-  );
-
-  function disparaBusca(digitos: string) {
-    cepBuscado.current = digitos;
-    setStatus("buscando");
-    start(async () => {
-      const r = await buscarCep(digitos);
-      if (cepBuscado.current !== digitos) return;
-      if (r.kind === "ok") {
-        // numero/complemento nunca vêm do ViaCEP; em compacto cidade/UF
-        // não renderizam aqui — o hospedeiro alimenta os campos simples
-        // dele via onEndereco (só CEP novo dispara: edição manual segue
-        // valendo até a próxima busca)
-        setEnd((atual) => ({
-          ...atual,
-          logradouro: r.endereco.logradouro,
-          bairro: r.endereco.bairro,
-          ...(compacto
-            ? {}
-            : { cidade: r.endereco.cidade, uf: r.endereco.uf }),
-        }));
-        onEndereco?.(r.endereco);
-        setStatus("ok");
-      } else {
-        setStatus(r.kind === "nao_encontrado" ? "nao_encontrado" : "falha");
-      }
-    });
-  }
-
-  function onCepChange(raw: string) {
-    const v = maskCep(raw);
-    setCep(v);
-    const digitos = v.replace(/\D/g, "");
-    if (digitos.length === 8) {
-      // uma busca por CEP — nunca por dígito nem repetição do mesmo
-      if (digitos !== cepBuscado.current) disparaBusca(digitos);
-    } else {
-      cepBuscado.current = null;
-      setStatus("idle");
-    }
-  }
-
-  function onCepBlur() {
-    // rede de segurança pro preenchimento por colagem/autofill do browser
-    const digitos = cep.replace(/\D/g, "");
-    if (digitos.length === 8 && digitos !== cepBuscado.current) {
-      disparaBusca(digitos);
-    }
-  }
+  const busca = useBuscaCep({
+    cepInicial: e?.cep,
+    onEndereco: (endereco) => {
+      // numero/complemento nunca vêm do ViaCEP; em compacto cidade/UF
+      // não renderizam aqui — o hospedeiro alimenta os campos simples
+      // dele via onEndereco (só CEP novo dispara: edição manual segue
+      // valendo até a próxima busca)
+      setEnd((atual) => ({
+        ...atual,
+        logradouro: endereco.logradouro,
+        bairro: endereco.bairro,
+        ...(compacto
+          ? {}
+          : { cidade: endereco.cidade, uf: endereco.uf }),
+      }));
+      onEndereco?.(endereco);
+    },
+  });
 
   return (
     <div className="grid gap-4 sm:grid-cols-2">
@@ -196,12 +141,12 @@ export function DadosCivisFields({
             autoComplete="postal-code"
             maxLength={9}
             placeholder="00000-000"
-            value={cep}
-            onChange={(ev) => onCepChange(ev.target.value)}
-            onBlur={onCepBlur}
+            value={busca.cep}
+            onChange={(ev) => busca.onCepChange(ev.target.value)}
+            onBlur={busca.onCepBlur}
             aria-describedby={n("cep_status")}
           />
-          {buscando && (
+          {busca.buscando && (
             <CircleNotch
               size={16}
               aria-hidden
@@ -209,13 +154,13 @@ export function DadosCivisFields({
             />
           )}
         </div>
-        {status !== "idle" && (
+        {busca.status !== "idle" && (
           <p
             id={n("cep_status")}
             aria-live="polite"
             className="text-xs text-muted-foreground"
           >
-            {STATUS_CEP[status]}
+            {STATUS_CEP[busca.status]}
           </p>
         )}
       </div>
