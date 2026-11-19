@@ -27,11 +27,13 @@ test.describe("demo — PDM vivo (REALIZA-181)", () => {
       secao.getByRole("heading", { name: "Plano de desenvolvimento" })
     ).toBeVisible();
 
-    // Declaração de Visão — escrita pela resposta do instrumento Visão
+    // Declaração de Visão — escrita pela resposta do instrumento Visão e
+    // reescrita à mão pela Bia: a autoria aparece honesta (0211 / US13)
     await expect(secao.getByText("Declaração de Visão")).toBeVisible();
     await expect(
       secao.getByText(/Em até 3 anos, serei uma profissional formada/)
     ).toBeVisible();
+    await expect(secao.getByText(/escrita por Bia/)).toBeVisible();
 
     // régua de progresso — nenhuma meta raiz batida ainda (o aria-label
     // da barra é o texto atômico; o <p> quebra os números em spans)
@@ -67,6 +69,12 @@ test.describe("demo — PDM vivo (REALIZA-181)", () => {
     await expect(secao.getByText(/atingida em/).first()).toBeVisible();
     await expect(
       secao.getByRole("group").getByRole("treeitem").first()
+    ).toBeVisible();
+
+    // autoria de item — o Ricardo retocou a submeta de entrevista que
+    // nasceu do instrumento: "editado por <nome>" honesto na linha
+    await expect(
+      arvore.getByText(/editado por Ricardo Tavares/)
     ).toBeVisible();
 
     // histórico — a meta que saiu do plano na revisão fica guardada
@@ -162,6 +170,13 @@ test.describe("demo — PDM vivo (REALIZA-181)", () => {
         name: 'Ações de "Subir a média de matemática pra 7,0"',
       })
     ).toBeVisible();
+
+    // a co-autoria é transparente pros dois lados (US13): ela vê a edição
+    // do mentor na submeta e a própria mão na Declaração de Visão
+    await expect(
+      secao.getByText(/editado por Ricardo Tavares/)
+    ).toBeVisible();
+    await expect(secao.getByText(/escrita por Bia/)).toBeVisible();
   });
 
   // staff lê o documento inteiro — mas sem nenhum controle de edição (o
@@ -182,6 +197,11 @@ test.describe("demo — PDM vivo (REALIZA-181)", () => {
     await expect(
       secao.getByText(/1 meta descartada · fora do plano/)
     ).toBeVisible();
+
+    // leitura sem edição — mas a autoria continua visível (é informação
+    // do documento, não controle)
+    await expect(secao.getByText(/escrita por Bia/)).toBeVisible();
+    await expect(secao.getByText(/editado por Ricardo Tavares/)).toBeVisible();
 
     await expect(secao.getByRole("checkbox")).toHaveCount(0);
     await expect(

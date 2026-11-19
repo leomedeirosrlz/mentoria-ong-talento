@@ -65,6 +65,11 @@ async function mentorJwt() {
   return (jwtMentor ??= await jwtDoUsuario(MENTOR_EMAIL, SENHA));
 }
 
+let jwtJovem: string | null = null;
+async function jovemJwt() {
+  return (jwtJovem ??= await jwtDoUsuario(JOVEM_EMAIL, SENHA));
+}
+
 /** POST /rest/v1/rpc/<fn> com o JWT do mentor — service role falharia no
  *  pdm_pode_editar de propósito (o gate lê my_profile_id do JWT). */
 async function rpcPdm<T = unknown>(
@@ -841,5 +846,258 @@ test.describe("PDM vivo (REALIZA-181)", () => {
     await expect(cardMetas.getByText("atingidas")).toBeVisible();
     await expect(resumo.getByText("Meta atingida e2e")).toBeVisible();
     await expect(resumo.getByText(/atingida em/)).toBeVisible();
+  });
+
+  // US13 (REALIZA-450 / 0211) — a fatia inteira numa prova só: papel
+  // negado no banco → instrumento projeta → mentor edita pela UI → a
+  // marca "editado por" aparece honesta pra mentor e jovem → a resposta
+  // original fica intacta → e a próxima resposta de instrumento NÃO
+  // sobrescreve o que a dupla tocou (imunidade por atualizado_por).
+  test("autoria: mentor edita o doc projetado — marca honesta, resposta e edição imunes", async ({
+    page,
+  }) => {
+    test.setTimeout(150_000); // duas rodadas de instrumento + dois papeis
+
+    // --- US13 §4: o gate segue no banco — a RPC é a única porta de
+    // escrita. Mentor de outra dupla, staff e dupla encerrada: negado.
+    const DUPLA_RESERVA = "e2e00000-0000-4000-8000-000000000070";
+    const nega = async (jwt: string, dupla: string) => {
+      const res = await restComoUsuario("rpc/pdm_salvar_item", jwt, {
+        method: "POST",
+        body: {
+          p_dupla_id: dupla,
+          p_item_id: null,
+          p_parent_id: null,
+          p_titulo: "Escrita que não pode passar e2e",
+          p_porque: null,
+          p_indicador: null,
+          p_area_vida: null,
+          p_prazo_alvo: null,
+        },
+      });
+      expect(res.ok).toBe(false);
+      expect(await res.text()).toContain("sem permissão pra editar");
+    };
+    // mentor válido, mas na dupla do mentor reserva — fora do escopo
+    await nega(await mentorJwt(), DUPLA_RESERVA);
+    // e a leitura fecha igual: o doc da dupla alheia nem abre — antes do
+    // coalesce da 0211 esse caso devolvia NULL no `if not` e passava
+    const vazada = await restComoUsuario(
+      "rpc/pdm_da_dupla",
+      await mentorJwt(),
+      { method: "POST", body: { p_dupla_id: DUPLA_RESERVA } }
+    );
+    expect(vazada.ok).toBe(false);
+    expect(await vazada.text()).toContain("sem permissão pra ver");
+    // coord lê o documento inteiro, não escreve nele
+    await nega(await jwtDoUsuario(COORD_EMAIL, COORD_SENHA), DUPLA_ID);
+    // dupla encerrada: o gate lê o status — fecha, tenta, reconverge
+    await atualizarViaServiceRole("duplas", `id=eq.${DUPLA_ID}`, {
+      status: "concluida",
+    });
+    await nega(await mentorJwt(), DUPLA_ID);
+    await convergirDuplaAtiva(DUPLA_ID);
+
+    // --- rodada 1 do instrumento: a resposta da jovem projeta visão +
+    // meta no doc vivo (mesmo fluxo do §E.34)
+    const [formMetas] = await buscarViaServiceRole<{ id: string }[]>(
+      "formularios",
+      "select=id&sistema=eq.metas&ativo=eq.true&limit=1"
+    );
+    test.skip(!formMetas, "sem instrumento oficial de metas ativo no ambiente");
+    /** Emite o link de Metas como o mentor e responde no form público —
+     *  devolve o token pra localizar a resposta depois. */
+    const responder = async (visao: string, metas: Record<string, string>) => {
+      const emissao = await restComoUsuario(
+        "rpc/emitir_link_instrumento",
+        await mentorJwt(),
+        {
+          method: "POST",
+          body: { p_dupla_id: DUPLA_ID, p_sistema: "metas" },
+        }
+      );
+      if (!emissao.ok)
+        throw new Error(`emitir_link_instrumento → ${emissao.status}`);
+      const { token } = (await emissao.json()) as { token: string };
+      await page.goto(`/f/${token}`);
+      await expect(page.locator("#f-declaracao_visao")).toBeVisible({
+        timeout: 15_000,
+      });
+      await page.locator("#f-declaracao_visao").fill(visao);
+      for (const [campo, valor] of Object.entries(metas)) {
+        await page.locator(`#f-${campo}`).fill(valor);
+      }
+      await page
+        .getByRole("button", { name: "Salvar minhas metas" })
+        .click();
+      await expect(
+        page.getByRole("heading", { name: "Resposta enviada!" })
+      ).toBeVisible({ timeout: 15_000 });
+      return token;
+    };
+
+    const token1 = await responder(
+      "Em 3 anos, serei uma profissional formada e independente.",
+      {
+        meta_1: "Conseguir um jovem aprendiz e2e",
+        porque_1: "Quero minha própria renda.",
+        meta_2: "Subir a média de matemática e2e",
+        porque_2: "É a matéria que me atrapalha.",
+        meta_3: "Fazer o simulado completo e2e",
+        porque_3: "É a porta da faculdade.",
+      }
+    );
+    // snapshot da resposta — prova de imutabilidade no fim do teste
+    const [link1] = await buscarViaServiceRole<{ id: string }[]>(
+      "formulario_links",
+      `select=id&token=eq.${token1}`
+    );
+    const [resposta1] = await buscarViaServiceRole<
+      { respostas: Record<string, string> }[]
+    >(
+      "formulario_respostas",
+      `select=respostas&link_id=eq.${link1.id}&limit=1`
+    );
+    expect(resposta1.respostas.meta_1).toBe("Conseguir um jovem aprendiz e2e");
+
+    // --- o mentor edita pela UI: título da meta projetada + a visão
+    await loginComSenha(page, MENTOR_EMAIL, SENHA);
+    await page.goto(`/duplas/${DUPLA_ID}?aba=instrumentos`);
+    const secao = page.locator(SECAO);
+    await expect(
+      secao.getByText("Conseguir um jovem aprendiz e2e")
+    ).toBeVisible({ timeout: 15_000 });
+    // a projeção não inventa autor — ainda sem marca nenhuma
+    await expect(secao.getByText(/editado por/)).toHaveCount(0);
+    await expect(secao.getByText(/escrita por/)).toHaveCount(0);
+
+    await agirComConfirma(
+      () =>
+        secao
+          .getByRole("button", {
+            name: 'Ações de "Conseguir um jovem aprendiz e2e"',
+          })
+          .click(),
+      () => page.getByRole("menuitem", { name: "Editar" }).isVisible()
+    );
+    await page.getByRole("menuitem", { name: "Editar" }).click();
+    const dialogMeta = page.getByRole("dialog");
+    await dialogMeta
+      .locator("#pdm-titulo")
+      .fill("Conseguir um jovem aprendiz até julho e2e");
+    await dialogMeta.getByRole("button", { name: "Salvar" }).click();
+    // a marca honesta: "editado por <quem editou>" na linha da meta —
+    // visível já pro mentor
+    await expect(
+      secao.getByText(/editado por Mentor E2E/)
+    ).toBeVisible({ timeout: 15_000 });
+
+    // visão projetada: "escrita em" (instrumento) → mentor reescreve →
+    // "escrita por Mentor E2E"
+    await agirComConfirma(
+      () =>
+        secao.getByRole("button", { name: "Editar" }).first().click(),
+      () => page.getByRole("dialog").isVisible()
+    );
+    const dialogVisao = page.getByRole("dialog");
+    await dialogVisao
+      .getByRole("textbox", { name: "Declaração de Visão" })
+      .fill("Em 3 anos, serei formada, empregada e ajudando em casa.");
+    await dialogVisao
+      .getByRole("button", { name: "Salvar visão" })
+      .click();
+    await expect(
+      secao.getByText(/escrita por Mentor E2E/)
+    ).toBeVisible({ timeout: 15_000 });
+
+    // --- o banco confirma os carimbos: autor = JWT do mentor, nunca um
+    // parâmetro do cliente
+    const [doc] = await buscarViaServiceRole<
+      { id: string; visao: string; visao_por: string | null }[]
+    >("pdm", `select=id,visao,visao_por&dupla_id=eq.${DUPLA_ID}`);
+    expect(doc.visao_por).toBe(IDS.mentorProfile);
+    expect(doc.visao).toBe(
+      "Em 3 anos, serei formada, empregada e ajudando em casa."
+    );
+    const [meta1] = await buscarViaServiceRole<
+      {
+        titulo: string;
+        created_by: string | null;
+        atualizado_por: string | null;
+        atualizado_em: string | null;
+        origem: string;
+        origem_campo: string;
+      }[]
+    >(
+      "pdm_itens",
+      `select=titulo,created_by,atualizado_por,atualizado_em,origem,origem_campo&pdm_id=eq.${doc.id}&origem_campo=eq.meta_1`
+    );
+    expect(meta1.titulo).toBe("Conseguir um jovem aprendiz até julho e2e");
+    expect(meta1.atualizado_por).toBe(IDS.mentorProfile);
+    expect(meta1.atualizado_em).toBeTruthy();
+    // a meta veio da resposta — criador é o instrumento, não uma pessoa
+    expect(meta1.created_by).toBeNull();
+    expect(meta1.origem).toBe("metas");
+
+    // --- o jovem lê a mesma marca no portal dele — a co-autoria é
+    // transparente pros dois lados (US13 §2)
+    await relogar(page, JOVEM_EMAIL, SENHA);
+    await page.goto("/jovem/pdm");
+    await expect(
+      secao.getByText(/editado por Mentor E2E/)
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      secao.getByText(/escrita por Mentor E2E/)
+    ).toBeVisible();
+    await expect(
+      secao.getByText("Conseguir um jovem aprendiz até julho e2e")
+    ).toBeVisible();
+
+    // --- US13 §3: rodada 2 do instrumento tenta reescrever — a edição
+    // manual é imune (meta_1 com atualizado_por não é tocada; a visão com
+    // visao_por idem); o que ninguém tocou (meta_3→novo título) segue
+    // gerenciado pela resposta
+    await responder("Visão que não deve entrar e2e", {
+      meta_1: "Título da resposta que não deve entrar e2e",
+      porque_1: "Outra razão que não deve entrar.",
+      // o form oficial exige 3 metas — meta_2 repete o título da rodada 1
+      meta_2: "Subir a média de matemática e2e",
+      porque_2: "É a matéria que me atrapalha.",
+      meta_3: "Simulado completo — título novo da rodada 2",
+      porque_3: "Porque novo.",
+    });
+
+    const [depois] = await buscarViaServiceRole<
+      { visao: string; visao_por: string | null }[]
+    >("pdm", `select=visao,visao_por&dupla_id=eq.${DUPLA_ID}`);
+    expect(depois.visao).toBe(
+      "Em 3 anos, serei formada, empregada e ajudando em casa."
+    );
+    const [meta1Depois] = await buscarViaServiceRole<
+      { titulo: string; atualizado_por: string | null }[]
+    >(
+      "pdm_itens",
+      `select=titulo,atualizado_por&pdm_id=eq.${doc.id}&origem_campo=eq.meta_1`
+    );
+    expect(meta1Depois.titulo).toBe(
+      "Conseguir um jovem aprendiz até julho e2e"
+    );
+    const [meta3Depois] = await buscarViaServiceRole<{ titulo: string }[]>(
+      "pdm_itens",
+      `select=titulo&pdm_id=eq.${doc.id}&origem_campo=eq.meta_3`
+    );
+    expect(meta3Depois.titulo).toBe(
+      "Simulado completo — título novo da rodada 2"
+    );
+
+    // --- e a resposta original continua snapshot: a edição do doc nunca
+    // reescreve formulario_respostas (decisão REALIZA-435)
+    const [resposta1Depois] = await buscarViaServiceRole<
+      { respostas: Record<string, string> }[]
+    >(
+      "formulario_respostas",
+      `select=respostas&link_id=eq.${link1.id}&limit=1`
+    );
+    expect(resposta1Depois.respostas).toEqual(resposta1.respostas);
   });
 });

@@ -7,11 +7,6 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.18"
-  }
   graphql_public: {
     Tables: {
       [_ in never]: never
@@ -3897,6 +3892,7 @@ export type Database = {
           updated_at: string
           visao: string | null
           visao_em: string | null
+          visao_por: string | null
         }
         Insert: {
           created_at?: string
@@ -3905,6 +3901,7 @@ export type Database = {
           updated_at?: string
           visao?: string | null
           visao_em?: string | null
+          visao_por?: string | null
         }
         Update: {
           created_at?: string
@@ -3913,6 +3910,7 @@ export type Database = {
           updated_at?: string
           visao?: string | null
           visao_em?: string | null
+          visao_por?: string | null
         }
         Relationships: [
           {
@@ -3929,12 +3927,49 @@ export type Database = {
             referencedRelation: "jovem_duplas"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "pdm_visao_por_fkey"
+            columns: ["visao_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdm_visao_por_fkey"
+            columns: ["visao_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdm_visao_por_fkey"
+            columns: ["visao_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdm_visao_por_fkey"
+            columns: ["visao_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdm_visao_por_fkey"
+            columns: ["visao_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
         ]
       }
       pdm_itens: {
         Row: {
           area_vida: string | null
           atingida_em: string | null
+          atualizado_em: string | null
+          atualizado_por: string | null
           created_at: string
           created_by: string | null
           id: string
@@ -3953,6 +3988,8 @@ export type Database = {
         Insert: {
           area_vida?: string | null
           atingida_em?: string | null
+          atualizado_em?: string | null
+          atualizado_por?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -3971,6 +4008,8 @@ export type Database = {
         Update: {
           area_vida?: string | null
           atingida_em?: string | null
+          atualizado_em?: string | null
+          atualizado_por?: string | null
           created_at?: string
           created_by?: string | null
           id?: string
@@ -3987,6 +4026,41 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "pdm_itens_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdm_itens_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdm_itens_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdm_itens_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdm_itens_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "pdm_itens_created_by_fkey"
             columns: ["created_by"]
@@ -7378,3 +7452,4 @@ export const Constants = {
     },
   },
 } as const
+

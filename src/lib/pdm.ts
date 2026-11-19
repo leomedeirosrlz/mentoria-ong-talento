@@ -5,6 +5,11 @@
 
 export type PdmItemStatus = "ativa" | "atingida" | "descartada";
 
+/** Autor de uma escrita no documento (0211): id + nome de exibição já
+ *  resolvidos na RPC (nome_social ?? nome). Null = veio do instrumento
+ *  (projeção) ou é escrita pré-autoria — nunca é parâmetro do cliente. */
+export type PdmAutor = { id: string; nome: string };
+
 export type PdmItem = {
   id: string;
   parentId: string | null;
@@ -19,6 +24,11 @@ export type PdmItem = {
   ordem: number;
   origem: "manual" | "metas" | "pdm" | "visao";
   origemCampo: string | null;
+  /** Quem criou o item à mão — null nas linhas projetadas de instrumento. */
+  criadoPor: PdmAutor | null;
+  /** Quem escreveu/editou o item por último — null = nunca tocado à mão. */
+  atualizadoPor: PdmAutor | null;
+  atualizadoEm: string | null;
 };
 
 /** Contrato camelCase da RPC pdm_da_dupla — a árvore se monta na lib. */
@@ -26,6 +36,8 @@ export type PdmDoc = {
   duplaId: string;
   visao: string | null;
   visaoEm: string | null;
+  /** Quem escreveu a visão atual à mão — null quando veio do instrumento. */
+  visaoPor: PdmAutor | null;
   itens: PdmItem[];
 };
 
@@ -105,6 +117,20 @@ export function metasAtivas(itens: PdmItem[]): PdmItem[] {
   return itens.filter(
     (i) => i.parentId == null && i.status !== "descartada"
   );
+}
+
+// ---------- autoria (0211 · REALIZA-450) ----------
+
+/** Quem assina a marca "editado por" do item: a última escrita humana
+ *  quando ela mudou de mãos. Criar e depois ajustar o próprio texto não
+ *  marca (atualizado_por == created_by); item só projetado e nunca
+ *  tocado também não. O jovem vê a mesma marca que a ficha — a
+ *  co-autoria do doc é pública entre os dois, não auditoria secreta. */
+export function autorEdicaoItem(item: PdmItem): PdmAutor | null {
+  if (!item.atualizadoPor) return null;
+  if (item.criadoPor && item.atualizadoPor.id === item.criadoPor.id)
+    return null;
+  return item.atualizadoPor;
 }
 
 // ---------- progresso ----------

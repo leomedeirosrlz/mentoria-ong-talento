@@ -1,5 +1,5 @@
 import type { AppRole } from "../types";
-import type { PdmDoc, PdmItem, PdmResumo } from "../pdm";
+import type { PdmAutor, PdmDoc, PdmItem, PdmResumo } from "../pdm";
 import { resumoPdm } from "../pdm";
 import { getDemoData, supervisionaDuplaDemo } from "./data";
 
@@ -8,8 +8,12 @@ import { getDemoData, supervisionaDuplaDemo } from "./data";
 // O dataset conta a mesma história das respostas de instrumento (metas +
 // pdm da Ana, visão da Dandara): o documento é o que o backfill da 0109
 // produziria, já com os retoques que a dupla faria em encontro — porque
-// revisado e uma submeta batida. A d-fim mostra o fim de jornada (metas
-// atingidas alimentando o resumo); as demais ficam sem PDM (empty state).
+// revisado e uma submeta batida. A autoria da 0211 também tem paridade:
+// a Bia reescreveu a Declaração de Visão à mão (visaoPor) e o Ricardo
+// retocou a submeta de entrevista (atualizadoPor) — quem lê a ficha vê a
+// co-autoria do documento, exatamente o caso da US13. A d-fim mostra o
+// fim de jornada (metas atingidas alimentando o resumo); as demais ficam
+// sem PDM (empty state).
 //
 // Nota: como toda escrita da demo é bloqueada nas actions, este doc é de
 // leitura — a árvore renderiza igual à real, edição devolve DEMO_MSG.
@@ -31,7 +35,15 @@ const daquiDias = (n: number): string =>
 
 type ItemSeed = Omit<
   PdmItem,
-  "id" | "parentId" | "atingidaEm" | "ordem" | "origem" | "origemCampo"
+  | "id"
+  | "parentId"
+  | "atingidaEm"
+  | "ordem"
+  | "origem"
+  | "origemCampo"
+  | "criadoPor"
+  | "atualizadoPor"
+  | "atualizadoEm"
 > & {
   id: number;
   parent?: number;
@@ -39,6 +51,9 @@ type ItemSeed = Omit<
   origem?: PdmItem["origem"];
   origemCampo?: string | null;
   atingidaEm?: string | null;
+  criadoPor?: PdmAutor | null;
+  atualizadoPor?: PdmAutor | null;
+  atualizadoEm?: string | null;
 };
 
 function montaItens(seeds: ItemSeed[]): PdmItem[] {
@@ -55,6 +70,9 @@ function montaItens(seeds: ItemSeed[]): PdmItem[] {
     ordem: s.ordem,
     origem: s.origem ?? "manual",
     origemCampo: s.origemCampo ?? null,
+    criadoPor: s.criadoPor ?? null,
+    atualizadoPor: s.atualizadoPor ?? null,
+    atualizadoEm: s.atualizadoEm ?? null,
   }));
 }
 
@@ -62,9 +80,20 @@ function docDupla(
   duplaId: string,
   visao: string | null,
   visaoEm: string | null,
+  visaoPor: PdmAutor | null,
   seeds: ItemSeed[]
 ): PdmDoc {
-  return { duplaId, visao, visaoEm, itens: montaItens(seeds) };
+  return { duplaId, visao, visaoEm, visaoPor, itens: montaItens(seeds) };
+}
+
+/** Persona como autor de escrita — o nome de exibição (nome_social ??
+ *  nome), mesmo contrato que a RPC resolve no join com profiles. */
+function autor(profile: {
+  id: string;
+  nome: string;
+  nome_social?: string | null;
+}): PdmAutor {
+  return { id: profile.id, nome: profile.nome_social ?? profile.nome };
 }
 
 /** Os PDMs da demo, por dupla_id. d-ok espelha a projeção das respostas da
@@ -79,12 +108,16 @@ function pdmPorDupla(duplaId: string): PdmDoc | null {
 
   // d-ok · Ricardo × Ana — ciclo em curso: a meta mais importante era o
   // jovem aprendiz, a revisão do PDM (enc. ~5) reordenou e detalhou IS e
-  // prazos; a meta 4 das Metas saiu do plano na revisão (descartada)
+  // prazos; a meta 4 das Metas saiu do plano na revisão (descartada).
+  // Autoria: a visão projetada do instrumento foi reescrita pela Bia no
+  // encontro (visaoPor) e o Ricardo retocou a submeta de entrevista que
+  // sugeriu — "editado por Ricardo Tavares" na linha dela.
   if (duplaId === uid(0x0601)) {
     return docDupla(
       duplaId,
       "Em até 3 anos, serei uma profissional formada e independente, sustentando meus estudos e ajudando minha família.",
       haDias(7, "19:26"),
+      autor(data.personas.mentorado),
       [
         {
           id: 1, ordem: 1, origem: "pdm", origemCampo: "meta_2",
@@ -137,6 +170,10 @@ function pdmPorDupla(duplaId: string): PdmDoc | null {
           titulo: "Treinar entrevista com o Ricardo no encontro 6",
           porque: null, indicador: null, areaVida: null, prazoAlvo: null,
           status: "ativa",
+          // o passo nasceu do instrumento e o mentor retocou o texto no
+          // encontro — a marca "editado por" exatamente como a RPC entrega
+          atualizadoPor: autor(data.personas.mentor_dpp),
+          atualizadoEm: haDias(3, "20:41"),
         },
         {
           id: 3, ordem: 3, origem: "pdm", origemCampo: "meta_3",
@@ -164,6 +201,7 @@ function pdmPorDupla(duplaId: string): PdmDoc | null {
       duplaId,
       "Em 2 anos, estarei estudando design na universidade e trabalhando na área.",
       haDias(240, "19:10"),
+      null,
       [
         {
           id: 51, ordem: 1, origem: "pdm", origemCampo: "meta_1",
@@ -199,6 +237,7 @@ function pdmPorDupla(duplaId: string): PdmDoc | null {
       duplaId,
       "Em 3 anos, serei técnica de enfermagem empregada.",
       haDias(32, "20:15"),
+      null,
       []
     );
   }
