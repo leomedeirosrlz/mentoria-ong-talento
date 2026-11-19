@@ -298,10 +298,13 @@ export function AssistenteConversa({
   onRespostaPronta?: () => void;
   /** mascote no tamanho pedido — a bolha é dona do componente e do estado
    *  ("aberto" saúda no empty state; "pronto" comemora a resposta que
-   *  acabou de fechar) */
+   *  acabou de fechar). `responsivo` liga o modo por container: o slot
+   *  (className) é medido e `tamanho` vira só o fallback do 1º frame */
   Avatar: (p: {
     tamanho: number;
     estado: EstadoConversa | "aberto" | "pronto";
+    responsivo?: boolean;
+    className?: string;
   }) => React.ReactNode;
 }) {
   const pagina = usePathname();
@@ -1170,20 +1173,22 @@ export function AssistenteConversa({
       {restaurada && msgs.length === 0 ? (
         <div className="scroll-fina flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-none px-6 py-8">
           {/* a Liza senta no canto superior esquerdo — mascote de verdade,
-              não ícone decorativo centralizado */}
+              não ícone decorativo centralizado. O tamanho vem do slot
+              medido (REALIZA-447): ~28% da largura do painel entre 64 e
+              160px — acompanha o redimensionamento e o modo expandido */}
           <div className="animate-enter flex items-start gap-4">
-            <div className="shrink-0">
-              <Avatar
-                tamanho={96}
-                estado={
-                  !configurado && !demo
-                    ? "sonolento"
-                    : aberto
-                      ? "aberto"
-                      : "parado"
-                }
-              />
-            </div>
+            <Avatar
+              responsivo
+              tamanho={96}
+              className="size-[clamp(4rem,calc(var(--painel-w,24rem)*0.28),10rem)] shrink-0"
+              estado={
+                !configurado && !demo
+                  ? "sonolento"
+                  : aberto
+                    ? "aberto"
+                    : "parado"
+              }
+            />
             <div className="min-w-0 pt-4 text-left">
               <p className="text-base font-semibold text-balance">
                 {primeiroNome(nome) ? `Oi, ${primeiroNome(nome)}! Eu sou a Liza.` : "Oi! Eu sou a Liza."}

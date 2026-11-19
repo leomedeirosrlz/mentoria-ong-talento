@@ -20,7 +20,10 @@ import { ImprimirButton } from "@/components/imprimir-button";
 import { Badge } from "@/components/ui/badge";
 import {
   BarraSegmentada,
+  COR_AVALIACAO as COR_AVALIACAO_BASE,
+  LegendaPontos,
   Sparkline,
+  type PontoLegenda,
 } from "@/components/viz";
 import {
   CompetenciasResultado,
@@ -38,14 +41,15 @@ import { cn } from "@/lib/utils";
 // `dados` já vem recortado por papel (dadosRetrospectiva): a versão da
 // jovem chega sem campos internos e o caller esconde o checklist.
 
-/** Mesma escala do SemaforoDot/TrajetoriaAvaliacoes: verde → lima → âmbar →
- *  vermelho, por avaliação do mentor. */
+/** Mesma escala do SemaforoDot/TrajetoriaAvaliacoes (a rampa compartilhada
+ *  do viz): verde → lima → âmbar → vermelho, por avaliação do mentor. Aqui
+ *  a cor pinta o bloco inteiro — o texto usa o primeiro plano da cor
+ *  (sobre o lima a tinta é a --brand-ink, nunca branco). */
 const COR_AVALIACAO: Record<string, string> = {
-  excelente: "bg-[var(--ok)] text-[var(--status-foreground)]",
-  // sobre o lima a tinta é a --brand-ink, nunca branco (regra do token)
-  boa: "bg-[var(--brand-lime)] text-[var(--brand-ink)]",
-  regular: "bg-[var(--warn)] text-[var(--status-foreground)]",
-  baixa: "bg-[var(--danger)] text-[var(--status-foreground)]",
+  excelente: cn(COR_AVALIACAO_BASE.excelente, "text-[var(--status-foreground)]"),
+  boa: cn(COR_AVALIACAO_BASE.boa, "text-[var(--brand-ink)]"),
+  regular: cn(COR_AVALIACAO_BASE.regular, "text-[var(--status-foreground)]"),
+  baixa: cn(COR_AVALIACAO_BASE.baixa, "text-[var(--status-foreground)]"),
 };
 
 /** Escala de estrelas do jovem (1–5) traduzida pra mesma gramática —
@@ -220,6 +224,73 @@ export function RetrospectivaJornada({
   const temAvaliacao = dados.encontros.some((e) => e.avaliacao != null);
   const temEstrela = dados.starSeries?.some((s) => s != null) ?? false;
 
+  // a chave da tira (REALIZA-444): as duas escalas dividem a mesma rampa
+  // de cor, então o rótulo funde quando a cor já mostrada vale pras duas
+  // ("Boa · 4 estrelas"). Só entra o que a tela mostra de fato
+  const notasUsadas = new Set(
+    dados.encontros.filter((e) => e.avaliacao != null).map((e) => e.avaliacao!)
+  );
+  const estrelasUsadas = new Set<number>();
+  for (const e of dados.encontros) {
+    const st = dados.starSeries?.[e.numero - 1];
+    if (!e.avaliacao && st != null) estrelasUsadas.add(st);
+  }
+  const temSemAvaliacao = dados.encontros.some(
+    (e) => !e.avaliacao && dados.starSeries?.[e.numero - 1] == null
+  );
+  const itensTira: PontoLegenda[] = [
+    ...([
+      { aval: "excelente", estrela: (n: number) => n >= 5, estrelaTxt: "5 estrelas" },
+      { aval: "boa", estrela: (n: number) => n === 4, estrelaTxt: "4 estrelas" },
+      { aval: "regular", estrela: (n: number) => n === 3, estrelaTxt: "3 estrelas" },
+      { aval: "baixa", estrela: (n: number) => n <= 2, estrelaTxt: "até 2 estrelas" },
+    ] as const).flatMap((r) => {
+      const partes = [
+        notasUsadas.has(r.aval) ? AVALIACAO_LABEL[r.aval] : null,
+        [...estrelasUsadas].some(r.estrela) ? r.estrelaTxt : null,
+      ].filter((x): x is string => x != null);
+      return partes.length
+        ? [
+            {
+              rotulo: partes.join(" · "),
+              swatch: (
+                <span
+                  aria-hidden
+                  className={cn("size-3 rounded-md", COR_AVALIACAO[r.aval])}
+                />
+              ),
+            } satisfies PontoLegenda,
+          ]
+        : [];
+    }),
+    ...(temSemAvaliacao
+      ? [
+          {
+            rotulo: "sem avaliação",
+            swatch: (
+              <span
+                aria-hidden
+                className="size-3 rounded-md bg-muted-foreground/45"
+              />
+            ),
+          } satisfies PontoLegenda,
+        ]
+      : []),
+    ...(dados.encontros.length < totalSlots
+      ? [
+          {
+            rotulo: "não realizado",
+            swatch: (
+              <span
+                aria-hidden
+                className="size-3 rounded-md bg-muted shadow-[inset_0_0_0_1px_var(--border)]"
+              />
+            ),
+          } satisfies PontoLegenda,
+        ]
+      : []),
+  ];
+
   return (
     <section
       aria-label="Retrospectiva da jornada"
@@ -282,10 +353,8 @@ export function RetrospectivaJornada({
                   : temEstrela
                     ? " · a cor é a estrela do jovem"
                     : ""}
-              {dados.encontros.length < totalSlots
-                ? " · contorno = não realizado"
-                : ""}
             </p>
+            <LegendaPontos itens={itensTira} className="mt-1" />
           </div>
         )}
       </div>

@@ -1,6 +1,11 @@
 import { AVALIACAO_LABEL, AVANCEI_AVALIACAO_LABEL } from "@/lib/ciclo";
 import type { ContextoAvaliacao } from "@/lib/forms/queries";
 import { EstrelasMedia } from "@/components/estrelas";
+import {
+  COR_AVALIACAO,
+  itensAvaliacao,
+  LegendaPontos,
+} from "@/components/viz";
 import { cn } from "@/lib/utils";
 
 // Card "Sua trajetória neste ciclo" (0191 · REALIZA-71) — o recorte
@@ -9,14 +14,6 @@ import { cn } from "@/lib/utils";
 // mentor recebe a série 1–4 dele + a média do jovem quantizada (só quando
 // a régua da 0071 libera); mentorado, as próprias estrelas. Sem
 // comentário/sentimento/pedir_apoio — o payload nem traz essas chaves.
-
-// mesma escala de cor do TrajetoriaAvaliacoes (verde → âmbar → vermelho)
-const COR_AVALIACAO: Record<string, string> = {
-  excelente: "bg-[var(--ok)]",
-  boa: "bg-[var(--brand-lime)]",
-  regular: "bg-[var(--warn)]",
-  baixa: "bg-[var(--danger)]",
-};
 
 const mediaTexto = (v: number) => v.toFixed(1).replace(".", ",");
 
@@ -57,6 +54,10 @@ function ContextoMentor({
               />
             ))}
           </ol>
+          <LegendaPontos
+            className="mt-1.5"
+            itens={itensAvaliacao(avaliados.map((r) => r.avaliacao!))}
+          />
         </div>
       )}
       <p className="mt-3 text-sm text-muted-foreground">
@@ -131,6 +132,23 @@ function ContextoMentorado({
           </li>
         ))}
       </ol>
+      <LegendaPontos
+        className="mt-1.5"
+        itens={[
+          {
+            rotulo: "estrelas",
+            swatch: (
+              <span
+                aria-hidden
+                className="h-3 w-1.5 rounded-sm bg-[var(--warn)]"
+              />
+            ),
+          },
+          ...(avancou > 0
+            ? [{ rotulo: "avançou", cls: "bg-[var(--ok)]" }]
+            : []),
+        ]}
+      />
       <p className="mt-3 text-sm text-muted-foreground">
         você avaliou {n} {n === 1 ? "encontro" : "encontros"} · média{" "}
         {mediaTexto(media)}

@@ -2608,7 +2608,7 @@ export function AgendaCalendario({
                   Turma
                 </Label>
                 <Select
-                  value={cronogramaSel ?? undefined}
+                  value={cronogramaSel}
                   onValueChange={(v) => setCronogramaSel(v)}
                   items={Object.fromEntries(
                     opcoesCron.map((c) => [

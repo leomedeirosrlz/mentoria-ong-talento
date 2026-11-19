@@ -3,6 +3,7 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from "react";
 import { motion, useTransform, type MotionValue, type Transition } from "motion/react";
 import { cn } from "@/lib/utils";
+import { useMedida } from "@/lib/use-medida";
 import type { LizaEstado, LizaProps } from "./tipos";
 import {
   EASE,
@@ -421,7 +422,9 @@ function movimentoDoCorpo({
   return estatico;
 }
 
-export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: LizaProps) {
+/** O SVG de fato — tamanho em px resolvido. Quem pede tamanho de
+ *  container não chama isto: chama `LizaBlob` com `responsivo`. */
+function BlobSvg({ estado, tamanho, seguirCursor = true, className }: LizaProps) {
   const ref = useRef<SVGSVGElement>(null);
   const clipId = `liza-blob-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   const reduzido = useReduzido();
@@ -681,6 +684,32 @@ export function LizaBlob({ estado, tamanho, seguirCursor = true, className }: Li
         </motion.g>
       </motion.g>
     </motion.svg>
+  );
+}
+
+/** `responsivo` (REALIZA-447) liga o modo por container: em vez de receber
+ *  `tamanho` decidido por viewport/matchMedia, o blob mede o slot que o
+ *  envolve via ResizeObserver (useMedida) e alimenta as proporções
+ *  internas (kOlho, detalhe) com o px real. `className` passa a ser do
+ *  wrapper medido — as classes de tamanho moram nele — e `tamanho` vira
+ *  o fallback do primeiro frame/SSR. */
+export function LizaBlob({
+  responsivo,
+  ...p
+}: LizaProps & { responsivo?: boolean }) {
+  if (!responsivo) return <BlobSvg {...p} />;
+  return <BlobResponsivo {...p} />;
+}
+
+function BlobResponsivo({ tamanho, className, ...p }: LizaProps) {
+  const { ref, px } = useMedida(tamanho);
+  return (
+    <span
+      ref={ref}
+      className={cn("inline-grid place-items-center", className)}
+    >
+      <BlobSvg {...p} tamanho={px} />
+    </span>
   );
 }
 

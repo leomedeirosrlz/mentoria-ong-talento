@@ -398,6 +398,7 @@ export function DashboardCoordenacao({
                       </div>
                       <BarraSegmentada
                         altura="sm"
+                        legenda
                         segmentos={[
                           { valor: resumo.comRegistro, rotulo: "com registro", cls: "bg-[var(--ok)]" },
                           { valor: resumo.aguardandoRegistro, rotulo: "aguardando registro", cls: "bg-[var(--warn)]" },

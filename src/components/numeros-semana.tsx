@@ -165,6 +165,7 @@ export function NumerosSemanaSecao({
               <BarraSegmentada
                 className="mt-1.5"
                 altura="sm"
+                legenda
                 denominador={ag.pulso.realizados}
                 segmentos={[
                   {
