@@ -134,8 +134,7 @@ jobs:
             docker pull "ghcr.io/$repo/supabase-mirror/$name:$tag"
             docker tag "ghcr.io/$repo/supabase-mirror/$name:$tag" "$img"
           done < .github/supabase-images.txt
-          pnpm exec supabase start
-          -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
+          pnpm exec supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
       - if: env.BACKEND == 'local'
         name: capturar envs do supabase local
         # status -o env emite valores COM aspas (API_URL="http://...") e
