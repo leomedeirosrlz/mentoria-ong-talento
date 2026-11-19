@@ -15,7 +15,7 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 
 ## Nome, estado e retenção
 
-- Pasta `NNN-<slug>`: 3 dígitos sequenciais, kebab-case. **Próximo número livre: 002.**
+- Pasta `NNN-<slug>`: 3 dígitos sequenciais, kebab-case. **Próximo número livre: 005** (002–003 reservados em worktrees irmãs).
 - Estado no `spec.md`: `Draft` → `Clarified` → `Approved` → `Delivered` | `Dropped`.
 - Spec `Delivered` **não é editada**. Mudança de rumo = próxima spec, citando a anterior. `Dropped` registra o motivo em uma linha.
 - O roteiro dos passos está em `.specify/README.md`; os templates, em `.specify/templates/`.
@@ -25,6 +25,7 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 | # | Slug | Tipo | Status | Origem |
 |---|---|---|---|---|
 | 001 | `proxy-e-rotas-publicas` | as-built | Delivered | regressão (18/nov/2026) |
+| 004 | `materiais-nativos` | as-built | Delivered | auditoria ws6 (19/nov/2026) |
 
 ## Fronteiras já mapeadas, ainda sem spec
 

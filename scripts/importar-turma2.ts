@@ -158,7 +158,7 @@ const EVENTOS_T2: Ev[] = [
   { tipo: "encontro", numero: 15, data: "2027-01-05", titulo: "Reflexão e reconhecimento", fase: "Encerrar e celebrar",
     instrumentos: ["PDM", "Roda da Vida"], ordem: 23 },
   { tipo: "encontro", numero: 16, data: "2027-01-12", titulo: "Encerramento e celebração", fase: "Encerrar e celebrar",
-    instrumentos: ["Avaliação 360º", "Autoavaliação do mentor"], ordem: 24 },
+    instrumentos: ["Avaliação final"], ordem: 24 },
   // seção 3 — encerramento
   { tipo: "evento_encerramento", data: "2027-01-15", titulo: "Evento de encerramento do programa", ordem: 25,
     observacao: "Evento único para as Turmas 1 e 2 — avaliação 360º e comunicação aos parceiros" },
