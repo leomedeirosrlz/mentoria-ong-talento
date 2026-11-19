@@ -200,7 +200,14 @@ export function PdmDupla({
               “{doc.visao}”
             </blockquote>
             <p className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground sm:text-[11px]">
-              {doc.visaoEm && <span>escrita em {formatDate(doc.visaoEm)}</span>}
+              {doc.visaoPor ? (
+                <span>
+                  escrita por {doc.visaoPor.nome}
+                  {doc.visaoEm ? ` em ${formatDate(doc.visaoEm)}` : ""}
+                </span>
+              ) : (
+                doc.visaoEm && <span>escrita em {formatDate(doc.visaoEm)}</span>
+              )}
               {podeEditar && (
                 <Button
                   type="button"

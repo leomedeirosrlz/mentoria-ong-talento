@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import type { PdmDoc, PdmItem } from "@/lib/pdm";
 import {
+  autorEdicaoItem,
   metasAtivas,
   montaArvorePdm,
   parseSubmetasLinhas,
@@ -11,8 +12,9 @@ import {
 } from "@/lib/pdm";
 
 // Domínio puro do PDM vivo (REALIZA-181): montagem da árvore recursiva,
-// órfãos, progresso excluindo descartadas, resumo pro encerramento e o
-// parser das linhas de submetas (espelho da função SQL).
+// órfãos, progresso excluindo descartadas, resumo pro encerramento, o
+// parser das linhas de submetas (espelho da função SQL) e a marca de
+// autoria da 0211 ("editado por" só quando a escrita muda de mãos).
 
 let seq = 0;
 function item(parcial: Partial<PdmItem>): PdmItem {
@@ -30,6 +32,9 @@ function item(parcial: Partial<PdmItem>): PdmItem {
     ordem: parcial.ordem ?? seq,
     origem: "manual",
     origemCampo: null,
+    criadoPor: null,
+    atualizadoPor: null,
+    atualizadoEm: null,
     ...parcial,
   };
 }
@@ -98,6 +103,7 @@ describe("resumoPdm", () => {
     duplaId: "d1",
     visao: "v",
     visaoEm: null,
+    visaoPor: null,
     itens,
   });
 
@@ -132,6 +138,39 @@ describe("caps", () => {
     ];
     expect(metasAtivas(itens)).toHaveLength(1);
     expect(subitensAtivos(itens)).toBe(2);
+  });
+});
+
+describe("autorEdicaoItem (autoria 0211)", () => {
+  const ana = { id: "p-ana", nome: "Bia" };
+  const ricardo = { id: "p-ric", nome: "Ricardo Tavares" };
+
+  it("item projetado editado à mão carimba quem editou", () => {
+    // o caso da US13: meta veio da resposta do instrumento (criadoPor
+    // null) e o mentor retocou — a marca é dele
+    expect(
+      autorEdicaoItem(
+        item({ origem: "metas", origemCampo: "meta_1", atualizadoPor: ricardo })
+      )
+    ).toEqual(ricardo);
+  });
+
+  it("criou e ajustou a mesma pessoa — sem marca redundante", () => {
+    expect(
+      autorEdicaoItem(item({ criadoPor: ana, atualizadoPor: ana }))
+    ).toBeNull();
+  });
+
+  it("mudou de mãos — criou o jovem, editou o mentor", () => {
+    expect(
+      autorEdicaoItem(item({ criadoPor: ana, atualizadoPor: ricardo }))
+    ).toEqual(ricardo);
+  });
+
+  it("projetado e nunca tocado à mão não marca", () => {
+    expect(
+      autorEdicaoItem(item({ origem: "pdm", origemCampo: "meta_2" }))
+    ).toBeNull();
   });
 });
 

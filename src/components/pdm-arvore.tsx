@@ -27,7 +27,7 @@ import {
 import { Button, buttonVariants } from "@/components/ui/button";
 import { formatDate } from "@/lib/ciclo";
 import type { PdmItemStatus, PdmNo } from "@/lib/pdm";
-import { PDM_STATUS_LABEL } from "@/lib/pdm";
+import { autorEdicaoItem, PDM_STATUS_LABEL } from "@/lib/pdm";
 import { cn } from "@/lib/utils";
 
 // A árvore recursiva do PDM (REALIZA-181): metas na raiz, submetas
@@ -116,6 +116,9 @@ function NoPdm({
   const descartada = no.status === "descartada";
   const atingida = no.status === "atingida";
   const profundo = nivel >= NIVEL_MAX_RECUO;
+  // autoria (0211): "editado por" só quando a última escrita mudou de
+  // mãos — o próprio autor ajustando não vira selo redundante
+  const editadoPor = autorEdicaoItem(no);
 
   return (
     <li
@@ -266,6 +269,13 @@ function NoPdm({
             )}
             {descartada && (
               <span className="italic">{PDM_STATUS_LABEL.descartada}</span>
+            )}
+            {editadoPor && (
+              <span className="inline-flex items-center gap-1 italic">
+                <PencilSimple size={12} aria-hidden className="shrink-0" />
+                editado por {editadoPor.nome}
+                {no.atualizadoEm ? ` em ${formatDate(no.atualizadoEm)}` : ""}
+              </span>
             )}
           </span>
         </div>
