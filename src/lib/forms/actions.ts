@@ -265,7 +265,7 @@ export async function gerarLinksFormulario(input: {
   )
     return {
       error:
-        "Links genéricos não são mais aceitos — escolha um destinatário. Pra divulgação aberta, use o link de inscrição do formulário oficial de intake.",
+        "Links genéricos não são mais aceitos. Escolha um destinatário. Pra divulgação aberta, use o link de inscrição do formulário oficial de intake.",
     };
   const destinos = (input.destinos ?? []).filter(
     (d): d is DestinoLink =>
@@ -503,7 +503,7 @@ export async function vincularRespostaOrfa(linkId: string, mentoradoId: string) 
   if (link.multi_uso || link.origem === "intake")
     return {
       error:
-        "Resposta de inscrição não se vincula assim — ela vira cadastro pela revisão (Revisar e cadastrar).",
+        "Resposta de inscrição não se vincula assim: ela vira cadastro pela revisão (Revisar e cadastrar).",
     };
   if (link.dest_profile_id || link.dest_mentorado_id || link.dupla_id)
     return { error: "Esse link já está vinculado." };
@@ -796,7 +796,7 @@ export async function promoverRespostaIntake(respostaId: string) {
   if (!prefill.nome || !prefill.email)
     return {
       error:
-        "A resposta não tem nome e e-mail preenchidos — cadastre pela ficha manual.",
+        "A resposta não tem nome e e-mail preenchidos. Cadastre pela ficha manual.",
     };
   // o sistema do form confirma a via de promoção — as duas vias de intake
   // (mentores e mentorados) usam o mesmo shape de resposta e prefill
@@ -848,7 +848,7 @@ export async function finalizarPromocaoIntake(respostaId: string) {
   if (!prefill.nome || !prefill.email)
     return {
       error:
-        "A resposta não tem nome e e-mail preenchidos — cadastre pela ficha manual.",
+        "A resposta não tem nome e e-mail preenchidos. Cadastre pela ficha manual.",
     };
 
   const { createAdminClient } = await import("@/lib/supabase/admin");

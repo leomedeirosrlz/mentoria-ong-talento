@@ -22,7 +22,7 @@ export function leituraSaude(tendencia: DiaSaude[]): Achado[] {
         titulo: "Histórico ainda acumulando",
         metrica: "0 dias com snapshot",
         porque:
-          "a leitura diária do semáforo começou a rodar — ainda não há base pra comparar",
+          "a leitura diária da situação começou a rodar: ainda não há base pra comparar",
         intervencao: "volte em alguns dias; o registro já está sendo gravado",
       },
     ];
@@ -38,7 +38,7 @@ export function leituraSaude(tendencia: DiaSaude[]): Achado[] {
       titulo: `${ultimo.risco} ${plural(ultimo.risco, "dupla em risco", "duplas em risco")} agora`,
       metrica: `${ultimo.risco} de ${total} ${plural(total, "dupla", "duplas")} no último dia com dados`,
       porque:
-        "risco é o degrau mais alto do semáforo — sinal aceso pedindo ação",
+        "risco é o sinal mais grave: aceso, pede ação na hora",
       intervencao:
         "abra a aba Aderência e trabalhe a fila de cima pra baixo",
       acao: { rotulo: "Ir para a fila", href: "/relatorios/operacionais?aba=aderencia" },
@@ -50,7 +50,7 @@ export function leituraSaude(tendencia: DiaSaude[]): Achado[] {
       tom: "atencao",
       titulo: `${ultimo.atencao} ${plural(ultimo.atencao, "dupla em atenção", "duplas em atenção")}`,
       metrica: `${ultimo.atencao} de ${total} ${plural(total, "dupla", "duplas")} no último dia com dados`,
-      porque: "atenção é o degrau antes do risco — agir aqui é barato",
+      porque: "atenção é o degrau antes do risco: agir aqui é barato",
       intervencao: "resolva essas antes que virem risco",
     });
   }
@@ -88,8 +88,8 @@ export function leituraSaude(tendencia: DiaSaude[]): Achado[] {
       tom: "ok",
       titulo: "Recorte em dia no último snapshot",
       metrica: `${ultimo.ok} de ${total} ${plural(total, "dupla", "duplas")} em dia`,
-      porque: "nenhum sinal aceso no semáforo",
-      intervencao: "siga a rotina — a régua avisa quando algo acender",
+      porque: "nenhum sinal aceso",
+      intervencao: "siga a rotina: a régua avisa quando algo acender",
     });
   }
 

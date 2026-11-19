@@ -118,12 +118,12 @@ export default async function DocumentoPage({
                     ? {
                         href: `/materiais/instrumentos/${chave}`,
                         rotulo: "Abrir instrumento",
-                        dica: "Instrumento oficial do programa — o estado dele em cada dupla do seu escopo.",
+                        dica: "Instrumento oficial do programa: o estado dele em cada dupla do seu escopo.",
                       }
                     : {
                         href: "/materiais?aba=instrumentos",
                         rotulo: "Ver instrumentos",
-                        dica: "Instrumento oficial do programa — liberado na ficha da dupla e o resultado volta estruturado.",
+                        dica: "Instrumento oficial do programa: liberado na ficha da dupla e o resultado volta estruturado.",
                       };
                 })()
           }

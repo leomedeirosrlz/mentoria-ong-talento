@@ -107,7 +107,7 @@ export function PerguntarLiza({
         <div>
           <h3 className="text-base font-semibold">Perguntar à Liza</h3>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            A Liza responde sobre os agregados desta seção — nunca sobre
+            A Liza responde sobre os agregados desta seção, nunca sobre
             texto livre de pessoas.
           </p>
         </div>
@@ -122,7 +122,7 @@ export function PerguntarLiza({
           {desatualizado && (
             <p className="flex items-center gap-1.5 rounded-lg bg-[var(--warn)]/12 px-3 py-2 text-xs font-medium text-[var(--warn-text,var(--warn))]">
               <SealWarning aria-hidden />
-              Desatualizado — os dados da seção mudaram depois desta resposta.
+              Desatualizado: os dados da seção mudaram depois desta resposta.
             </p>
           )}
           <blockquote className="border-l-2 border-border pl-3 text-sm text-muted-foreground">
@@ -154,7 +154,7 @@ export function PerguntarLiza({
         </div>
       ) : (
         <p className="mt-3 text-sm text-muted-foreground">
-          Ainda não há resposta para este recorte — a primeira geração já
+          Ainda não há resposta para este recorte. A primeira geração já
           fica gravada no histórico da seção.
         </p>
       )}
@@ -168,7 +168,7 @@ export function PerguntarLiza({
       <Dialog open={aberto} onOpenChange={setAberto}>
         <DialogContent size="lg">
           <DialogHeader>
-            <DialogTitle>Perguntar à Liza — {abaRotulo}</DialogTitle>
+            <DialogTitle>Perguntar à Liza: {abaRotulo}</DialogTitle>
             <DialogDescription>
               {recorteTexto}. A resposta fica gravada no histórico da seção,
               com data, modelo e o recorte usado.

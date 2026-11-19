@@ -143,14 +143,14 @@ function campoPref(
   if (!g || g === "prefiro_nao_dizer") {
     return {
       estado: "neutro",
-      texto: `Quer ${rotulo} — ${primeiroNome(outro.nome)} não informou`,
+      texto: `Quer ${rotulo} · ${primeiroNome(outro.nome)} não informou`,
     };
   }
   return g === pref
-    ? { estado: "ok", texto: `Quer ${rotulo} — atendido` }
+    ? { estado: "ok", texto: `Quer ${rotulo} · atendido` }
     : {
         estado: "diverge",
-        texto: `Quer ${rotulo} — ${primeiroNome(outro.nome)} é ${GENERO_LABELS[g].toLocaleLowerCase("pt-BR")}`,
+        texto: `Quer ${rotulo} · ${primeiroNome(outro.nome)} é ${GENERO_LABELS[g].toLocaleLowerCase("pt-BR")}`,
       };
 }
 
@@ -218,7 +218,7 @@ function GradeAgendaComum({
               return (
                 <div
                   key={dia}
-                  title={`${DIAS_SEMANA_LABELS[dia]} ${PERIODOS_LABELS[per].toLocaleLowerCase("pt-BR")} — ${
+                  title={`${DIAS_SEMANA_LABELS[dia]} ${PERIODOS_LABELS[per].toLocaleLowerCase("pt-BR")} · ${
                     ambos ? "os dois podem" : um ? "só um deles" : "nenhum informado"
                   }`}
                   className={cn(
@@ -431,20 +431,20 @@ export function AfinidadePar({
     } else if (aut?.status === "enviado") {
       restricoes.push({
         nivel: "info",
-        texto: `${primeiroNome(mentorado.nome)} tem ${anos} anos — o link da autorização do responsável foi enviado e aguarda a assinatura.`,
+        texto: `${primeiroNome(mentorado.nome)} tem ${anos} anos. O link da autorização do responsável foi enviado e aguarda a assinatura.`,
         href: mentorado.id ? `/pessoas/${mentorado.id}#assinaturas` : undefined,
       });
     } else if (docsJovem == null) {
       // chamador sem o resumo (NovaDuplaDialog) — não afirma status
       restricoes.push({
         nivel: "alerta",
-        texto: `${primeiroNome(mentorado.nome)} tem ${anos} anos — a autorização do responsável precisa estar assinada.`,
+        texto: `${primeiroNome(mentorado.nome)} tem ${anos} anos. A autorização do responsável precisa estar assinada.`,
         href: mentorado.id ? `/pessoas/${mentorado.id}#assinaturas` : undefined,
       });
     } else {
       restricoes.push({
         nivel: "alerta",
-        texto: `${primeiroNome(mentorado.nome)} tem ${anos} anos — a autorização do responsável ainda não foi emitida.`,
+        texto: `${primeiroNome(mentorado.nome)} tem ${anos} anos. A autorização do responsável ainda não foi emitida.`,
         href: mentorado.id ? `/pessoas/${mentorado.id}#assinaturas` : undefined,
       });
     }
@@ -465,7 +465,7 @@ export function AfinidadePar({
     restricoes.push({
       nivel: "alerta",
       texto:
-        "Sem janela em comum de dia e período — confirme a agenda dos dois antes de formar.",
+        "Sem dia e período em comum: confirme a agenda dos dois antes de formar.",
     });
   }
   if (temAgenda && !ambosTemAgenda) {
@@ -473,7 +473,7 @@ export function AfinidadePar({
       nivel: "info",
       texto: !agendaTxt
         ? "Agenda do mentor não informada. Confirme antes de formar."
-        : "Agenda do jovem não informada — a grade dele pode ser preenchida na ficha.",
+        : "Agenda do jovem não informada. A grade dele pode ser preenchida na ficha.",
     });
   }
   for (const a of [
@@ -545,7 +545,7 @@ export function AfinidadePar({
             estado: "diverge",
             texto:
               docDe("termo-mentorando")!.status === "enviado"
-                ? "Termo enviado — aguardando assinatura"
+                ? "Termo enviado · aguardando assinatura"
                 : "Termo ainda não emitido",
           }
       : null;
@@ -576,7 +576,7 @@ export function AfinidadePar({
   }
   if (!comuns.size && intMentor.length && intMentorado.length) {
     motivos.push(
-      "Interesses distintos — não é incompatibilidade: são repertórios diferentes pra trocar."
+      "Interesses distintos. Não é incompatibilidade: são repertórios diferentes pra trocar."
     );
   }
   if (restricoes.some((r) => r.nivel === "alerta")) {

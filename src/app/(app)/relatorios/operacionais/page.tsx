@@ -576,8 +576,8 @@ function AbaSaude({
         <div>
           <h2 className="text-base font-semibold">Saúde do programa</h2>
           <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
-            Tendência diária do semáforo nos últimos {DIAS_TENDENCIA} dias —
-            a leitura do histórico gravado, sem recálculo.
+            Situação das duplas dia a dia nos últimos {DIAS_TENDENCIA} dias:
+            leitura do histórico gravado, sem recálculo.
           </p>
         </div>
         {ultimo && (
@@ -594,7 +594,7 @@ function AbaSaude({
             <p className="text-sm font-medium">Acumulando histórico</p>
             <p className="mt-1 max-w-xl text-sm text-muted-foreground">
               A tendência aparece depois de {MIN_DIAS_GRAFICO} dias de
-              snapshots — o registro diário já está rodando; volte em
+              snapshots. O registro diário já está rodando; volte em
               alguns dias.
             </p>
           </div>

@@ -70,7 +70,7 @@ export async function rodarDigestSemanal(
       ok: true,
       pulado:
         config.cadencia === "quinzenal"
-          ? "quinzenal — último envio há menos de 14 dias"
+          ? "quinzenal: último envio há menos de 14 dias"
           : "já enviado esta semana",
     };
   }

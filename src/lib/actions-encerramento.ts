@@ -101,7 +101,7 @@ export async function registrarEncerramento(
   // a decisão que falta é registrar a conclusão
   if (duplaRow.status === "concluida" && tipo !== "concluida") {
     return {
-      error: "A jornada já concluiu com o último encontro — registre a conclusão.",
+      error: "A jornada já concluiu com o último encontro. Registre a conclusão.",
     };
   }
 
@@ -366,7 +366,7 @@ export async function encerrarTrilhaEspecialista(
         tipo: "trilha_encerrada",
         titulo,
         corpo: dest.jovem
-          ? `${eu.nome} fechou sua mentoria especializada — a devolutiva segue pro seu PDM.`
+          ? `${eu.nome} fechou sua mentoria especializada. A devolutiva segue pro seu PDM.`
           : nomeMd
             ? `${eu.nome} fechou a mentoria de ${nomeMd}. A devolutiva pro PDM está na ficha da dupla.`
             : `${eu.nome} fechou a trilha. A devolutiva pro PDM está na ficha da dupla.`,

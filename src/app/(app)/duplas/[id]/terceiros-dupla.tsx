@@ -607,7 +607,7 @@ function RegistrarRespostaDialog({
         </DialogTitle>
         <DialogDescription>
           Ela respondeu por fora da plataforma. Transcreva o que ela disse e
-          confirme que ela autorizou — a resposta não pode ser editada depois.
+          confirme que ela autorizou. A resposta não pode ser editada depois.
         </DialogDescription>
       </DialogHeader>
       <div className="space-y-3">

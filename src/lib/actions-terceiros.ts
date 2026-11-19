@@ -69,9 +69,9 @@ function traduzErro(message: string): string {
   if (/antes de publicar/.test(message))
     return "Escreva a consolidação antes de publicar.";
   if (/convite não encontrado/.test(message))
-    return "Convite não encontrado — recarregue a página.";
+    return "Convite não encontrado. Recarregue a página.";
   if (/já respondeu/.test(message))
-    return "Esta pessoa já respondeu — a resposta não pode ser alterada.";
+    return "Esta pessoa já respondeu. A resposta não pode ser alterada.";
   if (/autorizou o registro/.test(message))
     return "Confirme que a pessoa autorizou o registro da resposta.";
   if (/como a resposta foi coletada/.test(message))
@@ -95,7 +95,7 @@ export async function criarContatoTerceiro(
     return { error: "Escolha o vínculo: amigo, familiar, colega ou outro." };
   const whatsapp = saneiaWhatsapp(dados?.whatsapp);
   if (whatsapp === undefined)
-    return { error: "WhatsApp inválido — use o número com DDD." };
+    return { error: "WhatsApp inválido. Use o número com DDD." };
 
   const ctx = await meEDupla(duplaId);
   if ("error" in ctx) return { error: ctx.error };
@@ -128,7 +128,7 @@ export async function atualizarContatoTerceiro(
   }
   if (dados?.whatsapp !== undefined) {
     const w = saneiaWhatsapp(dados.whatsapp);
-    if (w === undefined) return { error: "WhatsApp inválido — use o número com DDD." };
+    if (w === undefined) return { error: "WhatsApp inválido. Use o número com DDD." };
     patch.whatsapp = w;
   }
   if (!Object.keys(patch).length) return { error: "Nada pra atualizar." };
@@ -282,7 +282,7 @@ export async function submeterRespostaTerceiro(
   if (!token || !TOKEN_RE.test(token))
     return { error: "Este link não é válido." };
   if (String(pontosFortes ?? "").length > 4000 || String(aMelhorar ?? "").length > 4000)
-    return { error: "Resposta longa demais — até 4000 caracteres por campo." };
+    return { error: "Resposta longa demais: até 4000 caracteres por campo." };
 
   const supabase = await createClient();
   const { error } = await supabase.rpc("submeter_resposta_terceiro", {

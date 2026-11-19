@@ -55,7 +55,7 @@ export function autorizarCron(request: Request): NextResponse | null {
   const secret = process.env.CRON_SECRET;
   if (!secret) {
     return NextResponse.json(
-      { error: "CRON_SECRET não configurado — job desligado, nada rodou." },
+      { error: "CRON_SECRET não configurado: job desligado, nada rodou." },
       { status: 503 }
     );
   }
@@ -81,7 +81,7 @@ export function paramsDoTick(
       return {
         ok: false,
         resposta: NextResponse.json(
-          { error: "desde inválido — use YYYY-MM-DD até hoje (BRT)." },
+          { error: "desde inválido. Use YYYY-MM-DD até hoje (BRT)." },
           { status: 400 }
         ),
       };

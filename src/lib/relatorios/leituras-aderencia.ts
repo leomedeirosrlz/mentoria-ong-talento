@@ -23,7 +23,7 @@ export function leituraAderencia(r: ResumoAderencia): Achado[] {
       titulo: `${comApoio.length} ${plural(comApoio.length, "pedido de apoio em aberto", "pedidos de apoio em aberto")}`,
       metrica: `${comApoio.length} de ${r.itens.length} ${plural(r.itens.length, "dupla", "duplas")} do recorte`,
       porque:
-        "pedido de apoio é alguém pedindo ajuda de propósito — nenhuma outra fila vem antes dele",
+        "pedido de apoio é alguém pedindo ajuda de propósito: nenhuma outra fila vem antes dele",
       intervencao:
         "responda cada pedido hoje, antes de trabalhar o resto da fila",
       acao: { rotulo: "Abrir a primeira dupla", href: `/duplas/${comApoio[0].dupla.id}` },
@@ -36,7 +36,7 @@ export function leituraAderencia(r: ResumoAderencia): Achado[] {
       titulo: `${r.atrasDoCalendario} ${plural(r.atrasDoCalendario, "dupla atrás do calendário", "duplas atrás do calendário")}`,
       metrica: `${r.atrasDoCalendario} de ${ativas} ${plural(ativas, "dupla ativa", "duplas ativas")}`,
       porque:
-        "fez menos encontros do que o cronograma já devia — a lacuna só cresce se ninguém cobrar",
+        "fez menos encontros do que o cronograma já devia: a lacuna só cresce se ninguém cobrar",
       intervencao:
         "chame cada dupla com o lembrete da fila e realinhe o próximo encontro",
     });
@@ -48,7 +48,7 @@ export function leituraAderencia(r: ResumoAderencia): Achado[] {
       titulo: `${r.registrosPendentes} ${plural(r.registrosPendentes, "dupla com registro pendente", "duplas com registro pendente")}`,
       metrica: `${r.registrosPendentes} de ${ativas} ${plural(ativas, "dupla ativa", "duplas ativas")}`,
       porque:
-        "encontro acontecido sem registro apaga a evidência do trabalho — e o semáforo cobra",
+        "encontro acontecido sem registro apaga a evidência do trabalho: a situação da dupla cobra",
       intervencao:
         "lembre o mentor de registrar; se virou rotina, veja o que está travando o formulário",
     });
@@ -60,7 +60,7 @@ export function leituraAderencia(r: ResumoAderencia): Achado[] {
       titulo: `Registro chega com ${r.atrasoMedioRegistro.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} dias de atraso médio`,
       metrica: `média de ${r.atrasoMedioRegistro.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} dias por registro`,
       porque:
-        "registro tardio distorce a leitura da semana — o painel atrasa junto",
+        "registro tardio distorce a leitura da semana: o painel atrasa junto",
       intervencao:
         "puxe o registro para perto do encontro no próximo contato com a equipe",
     });
@@ -72,7 +72,7 @@ export function leituraAderencia(r: ResumoAderencia): Achado[] {
       titulo: `${r.remarcacoes} remarcações acumuladas no ciclo`,
       metrica: `${r.remarcacoes} remarcações em ${r.itens.length} ${plural(r.itens.length, "dupla", "duplas")}`,
       porque:
-        "remarcar demais desgasta os dois lados — agenda que sempre muda tende a esfriar",
+        "remarcar demais desgasta os dois lados: agenda que sempre muda tende a esfriar",
       intervencao:
         "veja se as remarcações concentram em poucas duplas e realinhe o horário fixo",
     });
@@ -84,7 +84,7 @@ export function leituraAderencia(r: ResumoAderencia): Achado[] {
       titulo: `${r.adiantados} ${plural(r.adiantados, "encontro adiantado ou em reposição", "encontros adiantados ou em reposição")}`,
       metrica: `${r.adiantados} realizados além dos ${r.esperados} devidos`,
       porque: "parte do recorte correu na frente do calendário",
-      intervencao: "nada a fazer — é folga, não dívida",
+      intervencao: "nada a fazer: é folga, não dívida",
     });
   }
 

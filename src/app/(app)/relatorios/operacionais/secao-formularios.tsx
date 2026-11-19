@@ -48,8 +48,8 @@ export function SecaoFormularios({
   return (
     <section className="space-y-4">
       <RelatorioSecaoTopo
-        titulo="Formulários — taxa de resposta"
-        descricao="Uma linha por link emitido: respondido/não e quantas respostas chegaram — a taxa se deriva do par."
+        titulo="Taxa de resposta de formulários"
+        descricao="Uma linha por link emitido: respondido/não e quantas respostas chegaram. A taxa se deriva do par."
         csvHref={csvHref}
       />
 

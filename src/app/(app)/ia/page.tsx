@@ -115,7 +115,7 @@ const REGRAS = [
   {
     termo: "Teto do plano",
     texto:
-      "O Go limita em dólares por modelo e por mês. Em qualquer janela de 5 horas cabe 20% do teto e em uma semana, 50%. Passou do limite, o modelo para de responder até a janela liberar. A tabela de tetos é a da documentação do Go; a coordenação pode sobrescrever nos ajustes da Liza.",
+      "O Go limita em dólares por modelo e por mês. Em qualquer período de 5 horas cabe 20% do teto e em uma semana, 50%. Passou do limite, o modelo para de responder até o período liberar. A tabela de tetos é a da documentação do Go; a coordenação pode sobrescrever nos ajustes da Liza.",
   },
   {
     termo: "Ciclo e previsão",
@@ -125,7 +125,7 @@ const REGRAS = [
   {
     termo: "Situação do plano",
     texto:
-      "Com folga: projeção abaixo de 80% do teto. Atenção: projeção entre 80% e 100%, ou uma janela de 5 horas ou da semana acima de 80% do limite. Estoura: o teto acaba antes de renovar. A previsão não depende dos filtros da página.",
+      "Com folga: projeção abaixo de 80% do teto. Atenção: projeção entre 80% e 100%, ou o uso em 5 horas ou na semana acima de 80% do limite. Estoura: o teto acaba antes de renovar. A previsão não depende dos filtros da página.",
   },
   {
     termo: "Modelo",
@@ -352,7 +352,7 @@ function CardModelo({
         <LizaDormindo
           compacto
           titulo="Este modelo dormiu"
-          detalhe="Parou de responder até a janela liberar."
+          detalhe="Parou de responder até o período liberar."
           className="mt-3"
         />
       )}
@@ -896,7 +896,7 @@ export default async function IaPage({
       {truncado && (
         <p className="rounded-lg border border-[var(--warn-border)] bg-[var(--warn-bg)] px-3 py-2 text-sm text-[var(--warn-text)]">
           Período com volume alto: mostrando só os eventos mais recentes. Os
-          totais dos gráficos seguem completos — só as listas abaixo foram
+          totais dos gráficos seguem completos. Só as listas abaixo foram
           cortadas.
         </p>
       )}

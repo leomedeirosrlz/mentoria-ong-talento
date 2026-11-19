@@ -41,7 +41,7 @@ export function nadaADeclarar(motivo: string): Achado[] {
       titulo: "Nada a declarar",
       metrica: motivo,
       porque: "os agregados do recorte estão dentro do esperado",
-      intervencao: "siga a rotina — a seção avisa quando algo sair do lugar",
+      intervencao: "siga a rotina: a seção avisa quando algo sair do lugar",
     },
   ];
 }

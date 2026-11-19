@@ -225,7 +225,7 @@ export const INSTRUMENTO_INFO: Record<
   },
   competencias_mentor: {
     titulo: "Checklist de competências do mentor",
-    resumo: "As 10 competências do guia, marcadas no início do ciclo e revisitadas no fechamento — responde o mentor.",
+    resumo: "As 10 competências do guia, marcadas no início do ciclo e revisitadas no fechamento: responde o mentor.",
   },
 };
 

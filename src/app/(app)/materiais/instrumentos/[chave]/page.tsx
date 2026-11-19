@@ -641,7 +641,7 @@ export default async function InstrumentoPage({
       )}
 
       <section
-        aria-label={`Duplas — ${card.titulo}`}
+        aria-label={`Duplas: ${card.titulo}`}
         className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]"
         style={instrumentoVars(card.chave)}
       >
@@ -745,7 +745,7 @@ export default async function InstrumentoPage({
 
       {eh360 && !ehCoord && (
         <p className="text-xs text-muted-foreground">
-          As respostas dos 360º são leitura da coordenação — o que chega pra
+          As respostas dos 360º são leitura da coordenação. O que chega pra
           você é o estado de cada dupla.
         </p>
       )}

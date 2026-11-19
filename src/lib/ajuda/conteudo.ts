@@ -123,7 +123,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     tema: "encontros",
     pergunta: "O encontro aconteceu, mas ninguém tinha marcado antes. E agora?",
     resposta:
-      "Sem problema: qualquer um dos dois registra como já realizado — o mentor na ficha da dupla ou na Agenda, o jovem na agenda dele — e a plataforma já pede o registro do mentor na sequência.",
+      "Sem problema: qualquer um dos dois registra como já realizado (o mentor na ficha da dupla ou na Agenda, o jovem na agenda dele) e a plataforma já pede o registro do mentor na sequência.",
     links: [
       { rotulo: "Agenda", href: "/agenda", papeis: ["mentor_dpp"] },
       { rotulo: "Duplas", href: "/duplas", papeis: ["mentor_dpp"] },
@@ -135,7 +135,7 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     tema: "encontros",
     pergunta: "O encontro aconteceu, mas não estava marcado. E agora?",
     resposta:
-      "Você mesmo registra: na sua página inicial ou na Agenda, toca em \"registre você aqui\" e conta quando foi. O encontro já entra como realizado e você avalia na hora — seu mentor é avisado pra contar como foi no registro dele.",
+      "Você mesmo registra: na sua página inicial ou na Agenda, toca em \"registre você aqui\" e conta quando foi. O encontro já entra como realizado e você avalia na hora. Seu mentor é avisado pra contar como foi no registro dele.",
     links: [{ rotulo: "Agenda", href: "/jovem/agenda" }],
     papeis: ["mentorado"],
   },

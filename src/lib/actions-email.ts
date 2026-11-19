@@ -402,9 +402,9 @@ const MOTIVO_LOTE: Record<string, string> = {
   dupla_nao_concluida: "jornada ainda não concluiu",
   ja_respondido: "já respondeu este instrumento",
   emit_falhou: "não foi possível emitir o link",
-  sem_email: "sem e-mail do jovem nem do mentor — entregue à mão",
+  sem_email: "sem e-mail do jovem nem do mentor: entregue à mão",
   email_falhou: "o provedor não aceitou este endereço",
-  simulado: "modo demonstração — nada é emitido nem enviado",
+  simulado: "modo demonstração: nada é emitido nem enviado",
 };
 
 export async function enviarInstrumentoLote(input: {

@@ -24,7 +24,7 @@ const ERROS_RPC: Record<string, string> = {
   config_invalida: "O recorte do relatório está inválido.",
   validade_invalida: "A validade precisa ser de até 370 dias.",
   senha_invalida:
-    "Senha inválida — de 6 a 72 caracteres, ou deixe em branco pra gerar uma forte.",
+    "Senha inválida: de 6 a 72 caracteres, ou deixe em branco pra gerar uma forte.",
   nao_encontrado: "Este link não existe mais (ou já foi revogado).",
 };
 

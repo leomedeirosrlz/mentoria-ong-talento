@@ -134,7 +134,7 @@ function rascunho(
     ? datas[1] ?? null
     : null;
   if (!data)
-    avisos.push(`"${titulo.slice(0, 50)}" ficou sem data — preencha na revisão.`);
+    avisos.push(`"${titulo.slice(0, 50)}" ficou sem data: preencha na revisão.`);
 
   return {
     tipo,

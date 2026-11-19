@@ -447,7 +447,7 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
       hasText: "Avaliação Geral - 360º · mentorado(a)",
     });
     await expect(
-      cardForaDaJanela.getByText("janela não aberta")
+      cardForaDaJanela.getByText("ainda não disponível")
     ).toBeVisible();
     await expect(
       cardForaDaJanela.getByText(/abre no encontro 16/)

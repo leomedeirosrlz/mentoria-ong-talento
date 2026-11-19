@@ -135,7 +135,7 @@ function DocTabela({
                     // marcado, diferente do quadrado vazio do PDF)
                     <input
                       type="checkbox"
-                      aria-label={`${ln[0].replace(/<[^>]+>/g, "")} — ${b.cabecalho[k].replace(/<[^>]+>/g, "")}`}
+                      aria-label={`${ln[0].replace(/<[^>]+>/g, "")}, ${b.cabecalho[k].replace(/<[^>]+>/g, "")}`}
                       className="size-4 cursor-pointer accent-[var(--ring)] print:[-webkit-print-color-adjust:exact]"
                     />
                   ) : (
@@ -575,7 +575,7 @@ export function MaterialDocumento({
       ) : null}
 
       <footer className="mt-8 border-t border-border/60 pt-3 text-xs text-muted-foreground">
-        Template do guia do programa — adapte ao seu jeito de escrever.
+        Template do guia do programa: adapte ao seu jeito de escrever.
       </footer>
     </main>
   );

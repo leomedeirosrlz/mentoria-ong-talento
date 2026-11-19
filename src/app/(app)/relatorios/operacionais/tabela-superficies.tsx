@@ -120,7 +120,7 @@ export function TabelaSuperficies({
         onClick={() => clicar(col)}
         // o estado vai no nome acessível — a seta é decorativa
         aria-label={`Ordenar por ${dica}${
-          ativa ? ` — ${ord.dir === -1 ? "decrescente" : "crescente"}` : ""
+          ativa ? `: ${ord.dir === -1 ? "decrescente" : "crescente"}` : ""
         }`}
         title={`Ordenar por ${dica}`}
         className="inline-flex cursor-pointer items-center gap-1 rounded-sm transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"

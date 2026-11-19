@@ -87,7 +87,7 @@ export function normalizaNomeSocial(s: string): NormResult {
     return {
       valor: null,
       mudou: true,
-      aviso: "o rótulo da pergunta veio junto — descartado, confira a resposta",
+      aviso: "o rótulo da pergunta veio junto: descartado, confira a resposta",
     };
 
   // pronome de preferência no lugar do nome
@@ -99,7 +99,7 @@ export function normalizaNomeSocial(s: string): NormResult {
     return {
       valor: null,
       mudou: true,
-      aviso: "é pronome de preferência, não nome — descartado",
+      aviso: "é pronome de preferência, não nome: descartado",
     };
 
   // negativa / recusa / "mesmo nome"
@@ -111,7 +111,7 @@ export function normalizaNomeSocial(s: string): NormResult {
     return {
       valor: null,
       mudou: true,
-      aviso: "é negativa/recusa, não nome — descartado",
+      aviso: "é negativa/recusa, não nome: descartado",
     };
 
   return { valor: v, mudou: v !== s.trim() };
@@ -152,7 +152,7 @@ export function normalizaEmail(s: string): NormResult {
   const partes = v.split(/[;,]|\s+(?:e|ou)\s+/i).filter((p) => p.trim());
   if (partes.length > 1 && partes.every((p) => p.includes("@"))) {
     v = partes[0];
-    aviso = "tinha mais de um e-mail — ficou o primeiro";
+    aviso = "tinha mais de um e-mail: ficou o primeiro";
   }
 
   v = v
@@ -164,7 +164,7 @@ export function normalizaEmail(s: string): NormResult {
   if ((v.match(/@/g) ?? []).length === 1 && v.includes(",")) {
     // um "@" só + vírgula = vírgula no lugar do ponto do domínio
     v = v.replace(/,/g, ".");
-    aviso = "vírgula no lugar de ponto — conferir";
+    aviso = "vírgula no lugar de ponto: conferir";
   }
 
   v = v
@@ -212,7 +212,7 @@ export function normalizaTelefone(s: string): NormResult {
     .filter((p) => p.replace(/\D/g, "").length >= 8);
   if (usadas.length > 1) {
     src = usadas[0];
-    aviso = "tinha mais de um número — ficou o primeiro";
+    aviso = "tinha mais de um número: ficou o primeiro";
   }
 
   let d = src.replace(/\D/g, "");
@@ -224,7 +224,7 @@ export function normalizaTelefone(s: string): NormResult {
     const semZero = d.replace(/^0+/, "");
     if (/^[1-9]\d{9,10}$/.test(semZero) && !/^8[0]{2}/.test(semZero) && !/^9[0]{2}/.test(semZero)) {
       d = semZero;
-      aviso = "zero à esquerda desconsiderado — conferir o número";
+      aviso = "zero à esquerda desconsiderado: conferir o número";
     }
   }
 
@@ -251,13 +251,13 @@ export function normalizaUrl(s: string): NormResult {
   if (!cru) return { valor: null, mudou: false };
   if (URL_VAZIO.test(semAcento(cru))) return { valor: null, mudou: true };
 
-  const naoLink = { valor: null, mudou: true, aviso: "não parece um link — revisar" } as const;
+  const naoLink = { valor: null, mudou: true, aviso: "não parece um link: revisar" } as const;
 
   // espaço/branco dentro do valor não tem resgate honesto
   if (/\s/.test(cru)) return naoLink;
   // "marcos@gmail.com" num campo de link é e-mail, não URL
   if (emailValido(cru.toLowerCase()) || /^[^\s@]+@[^\s@]+$/.test(cru)) {
-    return { valor: null, mudou: true, aviso: "parece um e-mail, não um link — revisar" };
+    return { valor: null, mudou: true, aviso: "parece um e-mail, não um link: revisar" };
   }
 
   let v = cru
@@ -284,7 +284,7 @@ export function normalizaUrl(s: string): NormResult {
       ...(u.hostname.split(".").length === 2 &&
         !/\d/.test(u.hostname) &&
         !/^(www|linkedin|github|instagram|twitter|facebook|x|linktr|bit)\./i.test(u.hostname)
-        ? { aviso: "domínio incomum — conferir o link" }
+        ? { aviso: "domínio incomum: conferir o link" }
         : {}),
     };
   } catch {
@@ -324,7 +324,7 @@ export function normalizaData(s: string, hoje = new Date()): NormResult {
       const seculo = Math.floor(hoje.getFullYear() / 100) * 100;
       // janela do ano corrente: "26"→2026, "85"→1985 (nascimento)
       ano = String(seculo - 100 + (yy <= hoje.getFullYear() % 100 ? 100 : 0) + yy);
-      aviso = "ano com 2 dígitos — conferir";
+      aviso = "ano com 2 dígitos: conferir";
     }
     iso = `${ano}-${brM[2].padStart(2, "0")}-${brM[1].padStart(2, "0")}`;
   }

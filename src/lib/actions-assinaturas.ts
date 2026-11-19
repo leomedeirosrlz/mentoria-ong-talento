@@ -788,7 +788,7 @@ export async function assinarComToken(token: string, formData: FormData) {
   if (info.identidade === "signatario_externo")
     return {
       error:
-        "Este documento é assinado pelo responsável — encaminhe o link para ele.",
+        "Este documento é assinado pelo responsável. Encaminhe o link para ele.",
     };
 
   const dados = parseDadosCivis(formData);

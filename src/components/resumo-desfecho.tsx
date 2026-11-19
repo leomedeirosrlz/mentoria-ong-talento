@@ -80,7 +80,7 @@ export function ResumoDesfechoCard({
         Depois da mentoria
       </h2>
       <p className="mt-1 text-xs text-muted-foreground">
-        Como os jovens estão depois da jornada — só números agregados,
+        Como os jovens estão depois da jornada: só números agregados,
         nunca respostas individuais.
       </p>
       <div className="mt-3 flex flex-col gap-2.5 sm:flex-row">

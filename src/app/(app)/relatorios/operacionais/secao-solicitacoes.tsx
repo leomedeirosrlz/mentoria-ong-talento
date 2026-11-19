@@ -133,10 +133,10 @@ export function SecaoSolicitacoes({
                 {pendentes.length === 0
                   ? "nada esperando ação"
                   : maisAntigoDias === 0
-                    ? `${pendentes.length} em aberto — a mais antiga é de hoje`
+                    ? `${pendentes.length} em aberto: a mais antiga é de hoje`
                     : maisAntigoDias === 1
-                      ? `${pendentes.length} em aberto — a mais antiga espera desde ontem`
-                      : `${pendentes.length} em aberto — a mais antiga espera há ${maisAntigoDias} dias`}
+                      ? `${pendentes.length} em aberto: a mais antiga espera desde ontem`
+                      : `${pendentes.length} em aberto: a mais antiga espera há ${maisAntigoDias} dias`}
               </p>
             </div>
           </div>

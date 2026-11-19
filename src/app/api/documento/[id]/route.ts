@@ -59,7 +59,7 @@ export async function GET(
     const pdf = intake
       ? demoPdf(
           `Documento do intake · ${DOCUMENTO_PESSOA_TIPO_LABELS[intake.tipo]}`,
-          `Arquivo ${intake.nome ?? "anexado"} — o oficial sai do bucket privado documentos.`
+          `Arquivo ${intake.nome ?? "anexado"}: o oficial sai do bucket privado documentos.`
         )
       : demoPdf(
           tipo === "curriculo"

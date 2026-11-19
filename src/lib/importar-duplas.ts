@@ -243,7 +243,7 @@ function erroAmbiguo(valor: string, achados: PessoaRef[]): { erro: string } {
     .join(", ");
   const resto = achados.length > 3 ? ` e mais ${achados.length - 3}` : "";
   return {
-    erro: `"${valor}" é ambíguo (${nomes}${resto}) — use o e-mail`,
+    erro: `"${valor}" é ambíguo (${nomes}${resto}). Use o e-mail`,
   };
 }
 
@@ -303,8 +303,8 @@ function resolverCronograma(
       erro: ativos.length
         ? `sem turma na linha e ${ativos.length} cronogramas ativos (${ativos
             .map((c) => c.turma)
-            .join(", ")}) — informe a coluna turma`
-        : "sem turma na linha e nenhum cronograma ativo — informe a coluna turma",
+            .join(", ")}). Informe a coluna turma`
+        : "sem turma na linha e nenhum cronograma ativo. Informe a coluna turma",
     };
   }
   const q = chaveNome(txt);
@@ -313,7 +313,7 @@ function resolverCronograma(
     ? exatos
     : cronogramas.filter((c) => chaveNome(c.turma).includes(q));
   if (!match.length) {
-    return { erro: `turma "${txt}" não encontrada — existentes: ${rotulos || "nenhuma"}` };
+    return { erro: `turma "${txt}" não encontrada. Existentes: ${rotulos || "nenhuma"}` };
   }
   if (match.length === 1) return { cronograma: match[0] };
   // turma duplicada entre cronogramas: o ativo é a leitura óbvia do label
@@ -380,7 +380,7 @@ export function resolverPares(
     const mentor = rMentor.pessoa;
     r.mentorNome = mentor.nome;
     if (mentor.ativo === false) {
-      return falha(`${mentor.nome}: cadastro inativo — reative antes de parear`);
+      return falha(`${mentor.nome}: cadastro inativo. Reative antes de parear`);
     }
     // papel efetivo (0085): o papel mentor_* pode ser só secundário — vive
     // em profile_papeis, não no primário. Sem `papeis` na ref cai no
@@ -408,12 +408,12 @@ export function resolverPares(
           : null;
     if (trilhaTxt && !trilhaCol) {
       return falha(
-        `trilha inválida ("${linha.trilha.trim()}" — use dpp ou especialista)`
+        `trilha inválida ("${linha.trilha.trim()}": use dpp ou especialista)`
       );
     }
     if (!trilhaCol && temDpp && temEsp) {
       return falha(
-        `${mentor.nome}: mentor híbrido — informe a coluna trilha (dpp ou especialista)`
+        `${mentor.nome}: mentor híbrido. Informe a coluna trilha (dpp ou especialista)`
       );
     }
     const trilha: Trilha = trilhaCol ?? (temEsp ? "especialista" : "dpp");
@@ -513,7 +513,7 @@ export function resolverPares(
       iniciadaEm = normData(iniciadaRaw);
       if (!iniciadaEm) {
         return falha(
-          `iniciada_em inválida ("${linha.iniciada_em.trim()}" — use dd/mm/aaaa ou aaaa-mm-dd)`
+          `iniciada_em inválida ("${linha.iniciada_em.trim()}": use dd/mm/aaaa ou aaaa-mm-dd)`
         );
       }
     } else if (trilha === "especialista") {

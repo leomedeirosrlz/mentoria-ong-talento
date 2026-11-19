@@ -357,7 +357,7 @@ describe("resolverPares", () => {
   it("turma vazia com 2 cronogramas ativos falha pedindo a coluna; com 1 resolve", () => {
     const [semTurma] = resolverPares([linha("m1@realiza.vc", "j1@escola.br", { turma: "" })], dir());
     expect(semTurma.status).toBe("falha");
-    expect(semTurma.motivo).toContain("informe a coluna turma");
+    expect(semTurma.motivo).toContain("Informe a coluna turma");
     expect(semTurma.motivo).toContain("T1 · 2026/2027");
 
     const unico = dir({ cronogramas: [crono("k1", "T1 · 2026/2027")] });

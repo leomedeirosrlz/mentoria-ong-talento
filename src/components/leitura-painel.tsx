@@ -53,7 +53,7 @@ export function LeituraPainel({
             <div className="min-w-0 text-sm">
               <p>
                 <span className="font-medium">{a.titulo}</span>
-                <span className="text-muted-foreground"> — {a.metrica}</span>
+                <span className="text-muted-foreground"> · {a.metrica}</span>
               </p>
               <p className="mt-0.5 text-muted-foreground">
                 {a.porque}. {a.intervencao}.
