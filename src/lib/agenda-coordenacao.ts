@@ -864,6 +864,21 @@ export function itensSemanaProgramaMentor(
         }
       } else {
         const convidado = ev.tipo === "evento_encerramento";
+        // recesso que alguma dupla dele declarou atravessar (462): a nota
+        // nomeia os pares porque a decisão é por par — a agenda passa a
+        // tratar a janela como disponível só pra quem declarou
+        const seguemRecesso =
+          ev.tipo === "recesso"
+            ? minhas
+                .filter(
+                  (d) =>
+                    d.cronograma_id === cronId &&
+                    (d.recessos ?? []).some(
+                      (r) => r.ciclo_evento_id === ev.id && !r.usa
+                    )
+                )
+                .map((d) => primeiroNomeDaDupla(d))
+            : [];
         itens.push({
           id: `ev-${ev.id}-${cronId}`,
           diaKey: ev.data,
@@ -882,7 +897,9 @@ export function itensSemanaProgramaMentor(
               ? convidado
                 ? "você não participa"
                 : "você participa"
-              : null,
+              : seguemRecesso.length
+                ? `${seguemRecesso.join(" e ")} ${seguemRecesso.length > 1 ? "seguem" : "segue"} se encontrando durante o recesso`
+                : null,
           aviso: null,
           convidado,
           duplaId: null,

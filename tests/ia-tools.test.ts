@@ -195,20 +195,24 @@ describe("registry", () => {
         "comentar_chamado",
         "confirmar_sugestao_especialista",
         "contra_propor_solicitacao",
+        "declarar_recesso",
         "desmarcar_encontro",
         "devolver_chamado_fila",
         "duplas_do_usuario",
         "editar_campo_pessoa",
         "emitir_link_instrumento",
+        "encontros_retroativo",
         "ficha_dupla",
         "guia_consulta",
         "historico_encontros",
         "instrumentos_da_dupla",
         "jovem_agendar_encontro",
+        "jovem_desfazer_retroativo",
         "jovem_marcar_aconteceu",
         "jovem_marcar_combinado",
         "jovem_marcar_nao_aconteceu",
         "jovem_pedir_especialista",
+        "jovem_registrar_retroativo",
         "marcar_situacao_mentorado",
         "mensagem_template",
         "meu_progresso",
@@ -248,7 +252,8 @@ describe("registry", () => {
     // `duplas` (a ficha dele vem da view) e uma só dupla não pede índice
     expect(IA_TOOLS.duplas_do_usuario.roles).not.toContain("mentorado");
     expect(IA_TOOLS.agenda_do_periodo.roles).not.toContain("mentorado");
-    // tools do jovem são só dele — staff nunca as chama (pacote nov/2026)
+    // tools do jovem são só dele — staff nunca as chama (pacote nov/2026 +
+    // retroativo da 461)
     for (const n of [
       "minha_dupla",
       "minha_agenda",
@@ -256,6 +261,9 @@ describe("registry", () => {
       "meu_progresso",
       "meus_pedidos",
       "ajuda_faq",
+      "encontros_retroativo",
+      "jovem_registrar_retroativo",
+      "jovem_desfazer_retroativo",
     ] as const) {
       expect(IA_TOOLS[n].roles).toEqual(["mentorado"]);
     }
@@ -1667,5 +1675,200 @@ describe("escritas do domínio (REALIZA-126)", () => {
       op: "update",
       payload: { whatsapp: "5511987654321" },
     });
+  });
+});
+
+describe("retroativo do jovem — tools da Liza (461, RPCs 0207/0208)", () => {
+  const CID = "99999999-8888-4777-8666-555555555555";
+  const PASSADO = "2025-10-21T19:00:00-03:00";
+
+  const espiaRpc = (supabase: SupabaseClient) => {
+    const rpcCalls: { nome: string; args?: Record<string, unknown> }[] = [];
+    const orig = supabase.rpc.bind(supabase);
+    vi.spyOn(supabase, "rpc").mockImplementation(((n: string, a?: unknown) => {
+      rpcCalls.push({ nome: n, args: a as Record<string, unknown> });
+      return orig(n, a as Record<string, unknown>);
+    }) as never);
+    return rpcCalls;
+  };
+
+  // dupla DPP ativa com passos 1–4 vencidos e o 5º (último) futuro; o jovem
+  // é autor do retroativo do nº3 e o nº4 já foi registrado pelo mentor
+  const retroFake = (over: Opts = {}) =>
+    supaFake({
+      papel: "mentorado",
+      tabelas: {
+        jovem_duplas: [{ id: "d-1", trilha: "dpp", status: "ativa" }],
+        encontros: [
+          {
+            id: "e-3",
+            numero: 3,
+            status: "realizado",
+            realizado_em: "2025-10-21T22:00:00Z",
+            created_by: "profile-fake",
+          },
+          {
+            id: "e-4",
+            numero: 4,
+            status: "realizado",
+            realizado_em: "2025-10-28T22:00:00Z",
+            created_by: "mentor-1",
+          },
+        ],
+      },
+      rpcData: {
+        jovem_jornada: {
+          cronograma: [
+            { tipo: "encontro", numero: 1, data: "2025-10-07" },
+            { tipo: "encontro", numero: 2, data: "2025-10-14" },
+            { tipo: "formacao", numero: null, data: "2025-10-15" },
+            { tipo: "encontro", numero: 3, data: "2025-10-21" },
+            { tipo: "encontro", numero: 4, data: "2025-10-28" },
+            { tipo: "encontro", numero: 5, data: "2099-01-01" },
+          ],
+        },
+        ...over.rpcData,
+      },
+      ...over,
+    });
+
+  it("encontros_retroativo: vencidos sem row entram; ocupados, último e futuro ficam de fora", async () => {
+    const { supabase } = retroFake();
+    const r = await executarTool("encontros_retroativo", {}, supabase, "chat");
+    expect(r.ok).toBe(true);
+    const d = dadosDe(r) as {
+      dupla_id: string;
+      elegiveis: { numero: number }[];
+      criados_por_voce: { encontro_id: string; numero: number }[];
+    };
+    expect(d.dupla_id).toBe("d-1");
+    expect(d.elegiveis.map((e) => e.numero)).toEqual([1, 2]);
+    expect(d.criados_por_voce).toEqual([
+      { encontro_id: "e-3", numero: 3, realizado_em: "2025-10-21T22:00:00Z" },
+    ]);
+  });
+
+  it("encontros_retroativo: trilha de especialista e dupla encerrada devolvem null", async () => {
+    for (const dupla of [
+      { id: "d-1", trilha: "especialista", status: "ativa" },
+      { id: "d-1", trilha: "dpp", status: "concluida" },
+    ]) {
+      const { supabase } = supaFake({
+        papel: "mentorado",
+        tabelas: { jovem_duplas: [dupla] },
+      });
+      const r = await executarTool("encontros_retroativo", {}, supabase, "chat");
+      expect(r.ok).toBe(true);
+      expect(dadosDe(r)).toBeNull();
+    }
+  });
+
+  it("jovem_registrar_retroativo: prévia não toca a RPC; consumo chama com p_*", async () => {
+    const { supabase } = retroFake({
+      rpcData: { ia_confirmacao_criar: CID },
+    });
+    const rpcCalls = espiaRpc(supabase);
+    const args = { dupla_id: UUID, numero: 2, data_hora: PASSADO };
+
+    const r1 = await executarTool("jovem_registrar_retroativo", args, supabase, "chat");
+    expect(r1.ok).toBe(true);
+    const p = dadosDe(r1).pendente_confirmacao as Record<string, unknown>;
+    expect(p.confirmacao_id).toBe(CID);
+    expect(rpcCalls.map((c) => c.nome)).toContain("ia_confirmacao_criar");
+    expect(rpcCalls.map((c) => c.nome)).not.toContain("registrar_retroativo_mentorado");
+
+    const { supabase: s2 } = retroFake({
+      rpcData: {
+        ia_confirmacao_consumir: "Registrar",
+        registrar_retroativo_mentorado: { encontro_id: "e-2" },
+      },
+    });
+    const calls2 = espiaRpc(s2);
+    const r2 = await executarTool(
+      "jovem_registrar_retroativo",
+      { ...args, confirmacao_id: CID },
+      s2,
+      "chat"
+    );
+    expect(r2.ok).toBe(true);
+    const dom = calls2.find((c) => c.nome === "registrar_retroativo_mentorado");
+    expect(dom?.args).toEqual({
+      p_dupla: UUID,
+      p_numero: 2,
+      p_data_hora: PASSADO,
+    });
+  });
+
+  it("jovem_registrar_retroativo: schema barra nº fora do guia e campo extra", async () => {
+    const { supabase } = retroFake();
+    const rpcCalls = espiaRpc(supabase);
+    for (const args of [
+      { dupla_id: UUID, numero: 17, data_hora: PASSADO },
+      { dupla_id: UUID, numero: 2, data_hora: PASSADO, nota: "livre" },
+      { numero: 2, data_hora: PASSADO },
+    ]) {
+      const r = await executarTool(
+        "jovem_registrar_retroativo",
+        args,
+        supabase,
+        "chat"
+      );
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.erro).toContain("Argumentos inválidos");
+    }
+    expect(rpcCalls.map((c) => c.nome)).not.toContain("ia_confirmacao_criar");
+  });
+
+  it("jovem_registrar_retroativo: a recusa da RPC sobe em pt-BR", async () => {
+    const { supabase } = retroFake({
+      rpcData: {
+        ia_confirmacao_consumir: "Registrar",
+        registrar_retroativo_mentorado: {
+          error: "O último encontro fecha a jornada — quem registra é o mentor.",
+        },
+      },
+    });
+    const r = await executarTool(
+      "jovem_registrar_retroativo",
+      { dupla_id: UUID, numero: 16, data_hora: PASSADO, confirmacao_id: CID },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(false);
+    if (!r.ok)
+      expect(r.erro).toBe(
+        "O último encontro fecha a jornada — quem registra é o mentor."
+      );
+  });
+
+  it("jovem_desfazer_retroativo: consumo chama a RPC com o encontro", async () => {
+    const { supabase } = retroFake({
+      rpcData: { ia_confirmacao_consumir: "Desfazer" },
+    });
+    const rpcCalls = espiaRpc(supabase);
+    const r = await executarTool(
+      "jovem_desfazer_retroativo",
+      { encontro_id: UUID, confirmacao_id: CID },
+      supabase,
+      "chat"
+    );
+    expect(r.ok).toBe(true);
+    const dom = rpcCalls.find((c) => c.nome === "desfazer_retroativo_mentorado");
+    expect(dom?.args).toEqual({ p_encontro: UUID });
+  });
+
+  it("staff não alcança nem a prévia das tools do retroativo", async () => {
+    const { supabase } = supaFake({ papel: "mentor_dpp" });
+    const rpcCalls = espiaRpc(supabase);
+    for (const [tool, args] of [
+      ["encontros_retroativo", {}],
+      ["jovem_registrar_retroativo", { dupla_id: UUID, numero: 2, data_hora: PASSADO }],
+      ["jovem_desfazer_retroativo", { encontro_id: UUID }],
+    ] as const) {
+      const r = await executarTool(tool, args, supabase, "chat");
+      expect(r.ok).toBe(false);
+      if (!r.ok) expect(r.erro).toContain("não está disponível pro seu papel");
+    }
+    expect(rpcCalls.map((c) => c.nome)).not.toContain("ia_confirmacao_criar");
   });
 });

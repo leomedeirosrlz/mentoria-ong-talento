@@ -57,6 +57,7 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   meus_pedidos: {},
   ajuda_faq: { topico: "encontro" },
   mural_especialista: {},
+  encontros_retroativo: {},
   // escrita (MCP + confirmação) — args mínimos válidos por schema
   abrir_chamado: {
     categoria: "agenda",
@@ -81,6 +82,13 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   desmarcar_encontro: { encontro_id: UUID },
   jovem_marcar_aconteceu: { encontro_id: UUID },
   jovem_marcar_nao_aconteceu: { encontro_id: UUID },
+  jovem_registrar_retroativo: {
+    dupla_id: UUID,
+    numero: 6,
+    data_hora: "2026-11-10T19:00:00-03:00",
+  },
+  jovem_desfazer_retroativo: { encontro_id: UUID },
+  declarar_recesso: { dupla_id: UUID, usa: false },
   jovem_pedir_especialista: {},
   confirmar_sugestao_especialista: { solicitacao_id: UUID },
   aceitar_solicitacao: { solicitacao_id: UUID },

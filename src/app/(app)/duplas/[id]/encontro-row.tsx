@@ -89,7 +89,8 @@ export function EncontroRow({
   jornadaViva,
   lacunaAnterior,
   autorNome,
-  proximoRegistro,
+  proximosRegistros,
+  cobertura,
 }: {
   /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
   passo: PassoGuia;
@@ -152,9 +153,13 @@ export function EncontroRow({
   lacunaAnterior?: number | null;
   /** Nome de quem vê — assina o convite de avaliação pro jovem. */
   autorNome?: string;
-  /** Outro encontro da dupla ainda devendo registro (sessão dupla,
-   *  REALIZA-397) — o pós-save oferece "Registrar o Nº também?". */
-  proximoRegistro?: { encontroId: string; numero: number } | null;
+  /** Fila de encontros devendo registro, em ordem de nº (sessão dupla,
+   *  REALIZA-397) — o pós-save oferece "Registrar o Nº também?" pro
+   *  primeiro que a sessão não cobriu. */
+  proximosRegistros?: { encontroId: string; numero: number }[] | null;
+  /** Passos do guia que a sessão pode cobrir junto do registro (007 US11)
+   *  — a mesma régua que o salvarRegistro revalida no servidor. */
+  cobertura?: { numero: number; titulo: string }[] | null;
 }) {
   const feito = encontro?.status === "realizado";
   const naoAconteceu = encontro?.status === "nao_aconteceu";
@@ -689,7 +694,8 @@ export function EncontroRow({
               // telemetria (REALIZA-217): o encontro "externo" nasceu no
               // fluxo retroativo — a sessão do form é catch-up, não novo
               origem={encontro.origem === "externo" ? "retroativo" : "novo"}
-              proximoRegistro={proximoRegistro}
+              proximosRegistros={proximosRegistros}
+              cobertura={cobertura}
             />
           </RegistroInlinePanel>
         )}

@@ -13,6 +13,7 @@ import type {
   Dupla,
   DuplaStatus,
   Encontro,
+  EncontroStatus,
   Escolaridade,
   EspecialistaEvento,
   Genero,
@@ -96,6 +97,45 @@ export function passosDaTrilha(
       instrumentos: e.instrumentos,
       observacao: e.observacao,
     }));
+}
+
+/** Passos do guia que a MESMA sessão física pode cobrir junto do registro
+ *  atual ("cobriu mais de um encontro", 007 US11). A ficha e a action
+ *  compartilham esta régua — o checkbox nunca oferece o que o servidor
+ *  recusaria:
+ *   - nem o próprio nº nem o último do ciclo: fechar a jornada segue gesto
+ *     próprio do mentor (mesma fronteira do retroativo do jovem, 0207);
+ *   - sem row: só passo oficial já vencido — nascer realizado antes da data
+ *     do guia pularia o gating da jornada (régua da 0208);
+ *   - com row: agendado/remarcado vencido confirma a sessão (futuro fica de
+ *     fora — cobrir não é desmarcação silenciosa); realizado sem registro
+ *     recebe só o follow-up; `nao_aconteceu`/`cancelado` são fatos que só o
+ *     desfazer explícito reverte. */
+export function passosCobertosCandidatos(
+  passos: PassoGuia[],
+  encontros: readonly {
+    numero: number;
+    status: EncontroStatus;
+    data_hora: string | null;
+    registro?: unknown | null;
+  }[],
+  numeroAtual: number,
+  agora: Date
+): PassoGuia[] {
+  const maxNumero = passos.reduce((m, p) => Math.max(m, p.numero), 0);
+  const hoje = agora.toISOString().slice(0, 10);
+  return passos.filter((p) => {
+    if (p.numero === numeroAtual || p.numero >= maxNumero) return false;
+    const enc = encontros.find((e) => e.numero === p.numero);
+    if (!enc) return p.data != null && p.data <= hoje;
+    if (enc.status === "agendado" || enc.status === "remarcado") {
+      // "a combinar" (sem data) é compromisso aberto, não futuro firmado —
+      // a sessão confirma ele também; agendado futuro fica de fora porque
+      // cobrir não é desmarcação silenciosa
+      return enc.data_hora == null || new Date(enc.data_hora) <= agora;
+    }
+    return enc.status === "realizado" && enc.registro == null;
+  });
 }
 
 // opções do form "Avaliação de Encontro Semanal - Mentores"

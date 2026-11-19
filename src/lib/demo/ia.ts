@@ -319,6 +319,19 @@ export async function responderDemoIa(
         ui: ui ? [ui] : [],
       };
     }
+    // retroativo (461): "nos encontramos sem agendar" — a rota real chama
+    // encontros_retroativo e prepara o registro com o card de confirmação;
+    // a demo conta o caminho sem escrever (mutação demo é DEMO_MSG mesmo)
+    if (
+      /sem agendar|por fora|nos encontramos|a gente se encontr|encontramos sem|esquec|fora da plataforma|já rolou/.test(
+        p
+      )
+    ) {
+      return {
+        content: `Na demonstração a Liza perguntaria qual encontro do guia a sessão cobriu e prepararia o registro pra você confirmar no card — ele já nasce realizado e o seu mentor é avisado pra contar como foi. No ambiente real vale pra passo oficial que já venceu; o último encontro e os da trilha de especialista seguem com o mentor.${sugestoes(["Quando é o próximo encontro?", "O que tenho pra fazer?"])}`,
+        ui: [],
+      };
+    }
     if (/agenda|encontro|próxim|proxim|quando|tive|teve|rolou/.test(p)) {
       const agoraMs = Date.now();
       const agora = new Date(agoraMs).toISOString();

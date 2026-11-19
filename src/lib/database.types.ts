@@ -1491,6 +1491,93 @@ export type Database = {
           },
         ]
       }
+      dupla_recessos: {
+        Row: {
+          ciclo_evento_id: string
+          created_at: string
+          declarado_em: string
+          declarado_por: string | null
+          dupla_id: string
+          id: string
+          usa: boolean
+        }
+        Insert: {
+          ciclo_evento_id: string
+          created_at?: string
+          declarado_em?: string
+          declarado_por?: string | null
+          dupla_id: string
+          id?: string
+          usa: boolean
+        }
+        Update: {
+          ciclo_evento_id?: string
+          created_at?: string
+          declarado_em?: string
+          declarado_por?: string | null
+          dupla_id?: string
+          id?: string
+          usa?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dupla_recessos_ciclo_evento_id_fkey"
+            columns: ["ciclo_evento_id"]
+            isOneToOne: false
+            referencedRelation: "ciclo_eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_recessos_declarado_por_fkey"
+            columns: ["declarado_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_recessos_declarado_por_fkey"
+            columns: ["declarado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_recessos_declarado_por_fkey"
+            columns: ["declarado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_recessos_declarado_por_fkey"
+            columns: ["declarado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_recessos_declarado_por_fkey"
+            columns: ["declarado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_recessos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_recessos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dupla_saude_snapshots: {
         Row: {
           apoio_jovem: boolean
@@ -6973,6 +7060,10 @@ export type Database = {
         Args: { com_parentesco?: boolean; d: Json }
         Returns: boolean
       }
+      declarar_recesso: {
+        Args: { p_dupla: string; p_evento: string; p_usa: boolean }
+        Returns: Json
+      }
       definir_visibilidade_avaliacao: {
         Args: { p_id: string; p_visivel: boolean }
         Returns: Json
@@ -7183,6 +7274,7 @@ export type Database = {
       interesses_ok: { Args: { interesses: string[] }; Returns: boolean }
       jornada_autoemit: { Args: { p_dupla_id: string }; Returns: undefined }
       jovem_jornada: { Args: never; Returns: Json }
+      jovem_recessos: { Args: never; Returns: Json }
       jovem_relacionado: { Args: { p_profile: string }; Returns: boolean }
       jovem_set_avatar: { Args: { p_path?: string }; Returns: undefined }
       jovem_update_ficha: {

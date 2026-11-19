@@ -82,6 +82,7 @@ import {
   jornadaDaDupla,
   linkSeguro,
   passoEsp,
+  passosCobertosCandidatos,
   passosDaTrilha,
   saudadeDaDupla,
   SITUACAO_MENTORADO_LABEL,
@@ -103,6 +104,7 @@ import {
 } from "@/components/avaliacao-jovem";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { PlanoEmDiaCard } from "@/components/plano-em-dia-card";
+import { RecessoDuplaCard } from "@/components/recesso-dupla-card";
 import { montarPlanoEmDia } from "@/lib/plano-em-dia";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { EditarDuplaDialog } from "@/components/editar-dupla-dialog";
@@ -529,6 +531,35 @@ export default async function DuplaPage({
 
   const hojeStr = toDateStr(new Date());
   const podeRetroativo = souMentor && dupla.status === "ativa" && faltantes.length > 0;
+
+  // recessos vigentes/futuros do cronograma dela + a decisão declarada
+  // (462): o card vale pra dupla DPP ativa; janela já passada não rende
+  // gesto — e a decisão sobre recesso passado não teria efeito
+  const recessosDaFicha =
+    !ehEsp && dupla.status === "ativa"
+      ? eventosDaDupla
+          .filter(
+            (e) =>
+              e.tipo === "recesso" &&
+              e.data != null &&
+              (e.data_fim ?? e.data) >= hojeStr
+          )
+          .map((e) => {
+            const dec = (dupla.recessos ?? []).find(
+              (r) => r.ciclo_evento_id === e.id
+            );
+            return {
+              cicloEventoId: e.id,
+              titulo: e.titulo,
+              inicio: e.data!,
+              fim: e.data_fim ?? e.data!,
+              usa: dec?.usa ?? true,
+              declaradoEm: dec?.declarado_em ?? null,
+              autorNome:
+                dec?.autor?.nome_social ?? dec?.autor?.nome ?? null,
+            };
+          })
+      : [];
 
   // fechamento da trilha especialista: especialista dono ou coordenação,
   // enquanto a trilha está aberta (ativa/pausada e sem carimbo)
@@ -981,25 +1012,35 @@ export default async function DuplaPage({
             c.numero < passo.numero &&
             c.status !== "feito"
         )}
-        // pós-save chaining (REALIZA-397): o outro encontro da sessão dupla
-        // também deve registro — "registrar o Nº também?" abre o form dele
-        // com os campos compartilhados preenchidos. Menor nº devendo registro
-        // primeiro: a fila anda na ordem do guia
-        proximoRegistro={(() => {
-          if (ehEsp) return null;
-          const prox = dupla.encontros
-            .filter(
-              (e) =>
-                e.id !== enc?.id &&
-                !e.registro &&
-                (e.status === "realizado" ||
-                  ((e.status === "agendado" || e.status === "remarcado") &&
-                    e.data_hora != null &&
-                    new Date(e.data_hora) <= agora))
-            )
-            .sort((a, b) => a.numero - b.numero)[0];
-          return prox ? { encontroId: prox.id, numero: prox.numero } : null;
-        })()}
+        // pós-save chaining (REALIZA-397): a fila inteira devendo registro
+        // vai junto — o form pula os nºs que a sessão cobriu (007 US11) e
+        // oferece "registrar o Nº também?" pro primeiro pendente na ordem
+        // do guia
+        proximosRegistros={
+          ehEsp
+            ? null
+            : dupla.encontros
+                .filter(
+                  (e) =>
+                    e.id !== enc?.id &&
+                    !e.registro &&
+                    (e.status === "realizado" ||
+                      ((e.status === "agendado" || e.status === "remarcado") &&
+                        e.data_hora != null &&
+                        new Date(e.data_hora) <= agora))
+                )
+                .sort((a, b) => a.numero - b.numero)
+                .map((e) => ({ encontroId: e.id, numero: e.numero }))
+        }
+        // sessão que cobriu mais de um passo (007 US11): os candidatos saem
+        // da mesma régua que o salvarRegistro revalida — passo oficial
+        // vencido sem row, compromisso vencido ou realizado sem registro;
+        // nunca o último (fechamento é gesto próprio)
+        cobertura={
+          ehEsp || !souMentor
+            ? null
+            : passosCobertosCandidatos(passos, dupla.encontros, passo.numero, agora)
+        }
         registroAberto={passo.numero === numeroAtual}
         apoioDestinos={apoioDestinos}
         linkAvaliacao={
@@ -1145,6 +1186,15 @@ export default async function DuplaPage({
           dupla={dupla}
           souMentor={souMentor}
           jovemNome={primeiroNomeMentorado}
+        />
+      )}
+
+      {recessosDaFicha.length > 0 && (
+        <RecessoDuplaCard
+          duplaId={dupla.id}
+          recessos={recessosDaFicha}
+          podeDeclarar={souMentor || souCoord}
+          souMentor={souMentor}
         />
       )}
 

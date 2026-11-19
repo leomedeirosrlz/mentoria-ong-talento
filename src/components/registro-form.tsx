@@ -118,7 +118,8 @@ export function RegistroForm({
   onSaved,
   embutido = false,
   origem,
-  proximoRegistro = null,
+  proximosRegistros = null,
+  cobertura = null,
 }: {
   encontroId: string;
   duplaId: string;
@@ -142,11 +143,17 @@ export function RegistroForm({
    *  derivam de `encontro.origem` ("externo" = retroativo); sem a prop o
    *  form infere do `registro` (edição) — nunca afeta comportamento. */
   origem?: "novo" | "retroativo";
-  /** Next encounter still owing a registro (REALIZA-397): the post-save
-   *  surface offers "Registrar o Nº também?" — a click opens that row's own
-   *  form via its `#registrar-{id}` anchor with the shared fields prefilled
-   *  through the draft mechanism. Only the pair page passes this. */
-  proximoRegistro?: { encontroId: string; numero: number } | null;
+  /** Encontros ainda devendo registro, em ordem de nº (REALIZA-397): o
+   *  pós-save oferece "Registrar o Nº também?" pro primeiro que a sessão
+   *  NÃO cobriu — a cobertura já deu o registro dele. O clique abre a linha
+   *  do encontro pela âncora `#registrar-{id}` com os campos compartilhados
+   *  preenchidos pelo rascunho. Só a ficha da dupla passa. */
+  proximosRegistros?: { encontroId: string; numero: number }[] | null;
+  /** Passos do guia que esta sessão pode cobrir junto (007 US11) — o
+   *  checkbox marca nºs e cada um ganha o próprio registro com o mesmo
+   *  conteúdo no salvarRegistro. Só criação DPP recebe (edição e trilha
+   *  especialista ficam de fora). */
+  cobertura?: { numero: number; titulo: string }[] | null;
 }) {
   // edição nasce com os combinados já gravados pelo registro — o id de
   // banco viaja na linha e volta no submit (o Adicionar usa uuid local,
@@ -577,6 +584,13 @@ export function RegistroForm({
     [...concluirIds]
       .filter((id) => pendentes.has(id))
       .forEach((id) => fd.append("concluir_encaminhamento", id));
+    // a sessão já cobriu esses nºs no salvarRegistro — a fila do "registrar
+    // também" pula os cobertos e oferece o primeiro pendente de verdade
+    const cobertosForm = new Set(
+      fd.getAll("cobriu_numero").map((v) => Number(String(v)))
+    );
+    const proximoPendente =
+      proximosRegistros?.find((p) => !cobertosForm.has(p.numero)) ?? null;
     start(async () => {
       // duração da sessão até o gesto de salvar — o round-trip da action
       // não conta como tempo de preenchimento
@@ -588,12 +602,20 @@ export function RegistroForm({
           if (res?.aviso) {
             toast.warning("Registro salvo.", { description: res.aviso });
           } else {
-            toast.success("Registro salvo.", {
-              description: res?.concluidos
+            const detalhes = [
+              res?.concluidos
                 ? res.concluidos === 1
                   ? "1 combinado marcado como feito."
                   : `${res.concluidos} combinados marcados como feitos.`
-                : undefined,
+                : null,
+              res?.cobertos?.length
+                ? `Também cobriu ${res.cobertos
+                    .map((n) => `o ${n}º`)
+                    .join(" e ")} encontro.`
+                : null,
+            ].filter(Boolean);
+            toast.success("Registro salvo.", {
+              description: detalhes.length ? detalhes.join(" ") : undefined,
             });
           }
           salvoOk.current = true;
@@ -643,10 +665,10 @@ export function RegistroForm({
                 aviso: res?.aviso,
                 anexos: enviados,
                 falhas,
-                chain: proximoRegistro
+                chain: proximoPendente
                   ? {
-                      encontroId: proximoRegistro.encontroId,
-                      numero: proximoRegistro.numero,
+                      encontroId: proximoPendente.encontroId,
+                      numero: proximoPendente.numero,
                       shared: {
                         duracaoMin: String(fd.get("duracao_min") ?? "60"),
                         avaliacao: String(fd.get("avaliacao") ?? ""),
@@ -875,6 +897,41 @@ export function RegistroForm({
               defaultValue={registro?.atividades.filter((a) => !(ATIVIDADES_ENCONTRO as readonly string[]).includes(a)).join(", ") ?? ""}
             />
           </fieldset>
+
+          {/* sessão dupla (007 US11): o encontro físico valeu por mais de um
+              passo do guia — o servidor grava encontro realizado + registro
+              próprios pra cada marcado, nunca uma linha só pros dois. Só na
+              criação: editar depois não abre caminho pra cobrir retroativo */}
+          {!registro && cobertura && cobertura.length > 0 && (
+            <fieldset className="min-w-0 space-y-2">
+              <legend className="text-sm font-medium">
+                A sessão cobriu outro passo do guia?
+              </legend>
+              <p className="text-xs text-muted-foreground">
+                Marque os encontros que esta mesma sessão cobriu. Cada um fica
+                realizado e recebe o próprio registro com o mesmo conteúdo.
+              </p>
+              <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
+                {cobertura.map((c) => (
+                  <label
+                    key={c.numero}
+                    className="flex min-h-11 items-center gap-3 py-1.5 text-sm cursor-pointer md:min-h-0"
+                  >
+                    <input
+                      type="checkbox"
+                      name="cobriu_numero"
+                      value={c.numero}
+                      className="size-5 shrink-0 accent-primary"
+                    />
+                    <span className="min-w-0 truncate">
+                      {c.numero}º encontro
+                      <span className="text-muted-foreground"> · {c.titulo}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2">

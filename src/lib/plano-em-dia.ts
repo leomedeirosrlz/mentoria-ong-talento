@@ -207,8 +207,17 @@ export function montarPlanoEmDia(input: {
     }
   }
 
+  // recesso que a dupla declarou atravessar (462, usa=false) deixa de ser
+  // restrição PRA ELA — só pra ela; o calendário oficial não muda
+  const recessoOptOut = new Set(
+    (dupla.recessos ?? [])
+      .filter((r) => !r.usa)
+      .map((r) => r.ciclo_evento_id)
+  );
   const recessos = eventos
-    .filter((e) => e.tipo === "recesso" && e.data != null)
+    .filter(
+      (e) => e.tipo === "recesso" && e.data != null && !recessoOptOut.has(e.id)
+    )
     .map((e) => ({ ini: e.data!, fim: e.data_fim ?? e.data! }));
   const encerramento =
     eventos

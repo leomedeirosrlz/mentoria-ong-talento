@@ -6,9 +6,11 @@ import {
   convergirDuplaAtiva,
   expect,
   inserirViaServiceRole,
+  jwtDoUsuario,
   limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
+  restComoUsuario,
   test,
 } from "../helpers";
 
@@ -1012,5 +1014,109 @@ test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
       `select=status&id=eq.${String(ag9.id)}`
     );
     expect(r9.status).toBe("agendado");
+  });
+
+  test("pela Liza: a confirmação registra o retroativo, uso único vale e o desfazer apaga a row", async ({
+    page,
+  }) => {
+    // REALIZA-461 — o e2e não roda o provider LLM: a linha ia_confirmacoes
+    // é a mesma que a tool grava na 1ª chamada e o POST do card consume
+    // atomicamente — prova a ferramenta real de ponta a ponta
+    await entrarComoJovem(page);
+    const jwt = await jwtDoUsuario(JOVEM_EMAIL, SENHA);
+    const bypass = process.env.VERCEL_AUTOMATION_BYPASS;
+    const postConf = (data: Record<string, unknown>) =>
+      page.request.post("/api/ia/confirmacao", {
+        data,
+        headers: bypass
+          ? { "x-vercel-protection-bypass": bypass }
+          : undefined,
+      });
+    const criarPrevia = async (
+      tool: string,
+      args: Record<string, unknown>
+    ) => {
+      const res = await restComoUsuario("rpc/ia_confirmacao_criar", jwt, {
+        method: "POST",
+        body: { p_tool: tool, p_args: args, p_resumo: `e2e ${tool}` },
+      });
+      expect(res.status).toBe(200);
+      return (await res.json()) as string;
+    };
+
+    // primeiro passo elegível real — o mesmo recorte da tool
+    // encontros_retroativo (oficial vencido, sem row, nunca o último)
+    const [{ cronograma_id: cronId }] = await buscarViaServiceRole<
+      { cronograma_id: string }[]
+    >("duplas", `select=cronograma_id&id=eq.${DUPLA_ID}`);
+    const hoje = new Date().toISOString().slice(0, 10);
+    const vencidos = await buscarViaServiceRole<{ numero: number }[]>(
+      "ciclo_eventos",
+      `select=numero&cronograma_id=eq.${cronId}&tipo=eq.encontro&data=lte.${hoje}&numero=lt.16`
+    );
+    const ocupados = new Set(
+      (
+        await buscarViaServiceRole<{ numero: number }[]>(
+          "encontros",
+          `select=numero&dupla_id=eq.${DUPLA_ID}`
+        )
+      ).map((e) => e.numero)
+    );
+    const passo = vencidos.find((e) => !ocupados.has(e.numero));
+    expect(passo).toBeTruthy();
+    const numero = passo!.numero;
+    const args = {
+      dupla_id: DUPLA_ID,
+      numero,
+      data_hora: new Date(Date.now() - 3 * 86400e3).toISOString(),
+    };
+
+    // prévia → Confirmar do card → a 0207 escreve de verdade
+    const cid = await criarPrevia("jovem_registrar_retroativo", args);
+    const okRes = await postConf({
+      confirmacao_id: cid,
+      tool: "jovem_registrar_retroativo",
+      args,
+    });
+    expect(okRes.status()).toBe(200);
+    await expect(okRes.json()).resolves.toMatchObject({ ok: true });
+    const [row] = await buscarViaServiceRole<
+      { id: string; status: string; origem: string; created_by: string | null }[]
+    >(
+      "encontros",
+      `select=id,status,origem,created_by&dupla_id=eq.${DUPLA_ID}&numero=eq.${numero}`
+    );
+    expect(row.status).toBe("realizado");
+    expect(row.origem).toBe("externo");
+    expect(row.created_by).toBe(IDS.jovemProfile);
+
+    // uso único — a mesma prévia não executa de novo nem duplica a row
+    const reuse = await postConf({
+      confirmacao_id: cid,
+      tool: "jovem_registrar_retroativo",
+      args,
+    });
+    await expect(reuse.json()).resolves.toMatchObject({ ok: false });
+    const duplicados = await buscarViaServiceRole<{ id: string }[]>(
+      "encontros",
+      `select=id&dupla_id=eq.${DUPLA_ID}&numero=eq.${numero}`
+    );
+    expect(duplicados).toHaveLength(1);
+
+    // o desfazer pelo mesmo envelope — a 0208 apaga a row que o jovem criou
+    const cid2 = await criarPrevia("jovem_desfazer_retroativo", {
+      encontro_id: String(row.id),
+    });
+    const okDes = await postConf({
+      confirmacao_id: cid2,
+      tool: "jovem_desfazer_retroativo",
+      args: { encontro_id: String(row.id) },
+    });
+    await expect(okDes.json()).resolves.toMatchObject({ ok: true });
+    const depois = await buscarViaServiceRole<{ id: string }[]>(
+      "encontros",
+      `select=id&id=eq.${String(row.id)}`
+    );
+    expect(depois).toHaveLength(0);
   });
 });

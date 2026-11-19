@@ -19,6 +19,7 @@ import type {
   AppRole,
   AvaliacaoEncontro,
   CicloEvento,
+  DuplaRecesso,
   DuplaStatus,
   Encaminhamento,
   Mentorado,
@@ -68,7 +69,8 @@ export const IA_SAUDE_SELECT = `
     registro:registros(precisa_apoio, avaliacao, dificuldade),
     avaliacao_jovem:avaliacoes_encontro(pedir_apoio)
   ),
-  encaminhamentos(status, prazo)
+  encaminhamentos(status, prazo),
+  recessos:dupla_recessos(ciclo_evento_id, usa, declarado_em)
 `;
 
 /** A dupla como a tool a recebe — projeção mínima e allowlisted (sem as
@@ -103,6 +105,12 @@ export type DuplaIa = {
     avaliacao_jovem: Pick<AvaliacaoEncontro, "pedir_apoio"> | null;
   }[];
   encaminhamentos: Pick<Encaminhamento, "status" | "prazo">[];
+  /** Decisões de recesso declaradas (0218) — a linha ausente = usa o
+   *  recesso (default). O planner da tool lê daqui via cast pra Dupla. */
+  recessos?: Pick<
+    DuplaRecesso,
+    "ciclo_evento_id" | "usa" | "declarado_em"
+  >[];
 };
 
 /** Duplas vivas (ativa/pausada) no escopo do papel — coord recebe todas,
@@ -1179,6 +1187,69 @@ export async function getJovemPedidosIa(supabase: SupabaseClient, limite = 40) {
     especialista_nome_social: string | null;
     especialista_desejado_nome: string | null; created_at: string;
   }[];
+}
+
+/** O que o jovem pode declarar retroativo (461 / migration 0207-0208):
+ *  os passos do guia já vencidos na data oficial que ainda não têm row na
+ *  agenda dele (o jovem_registrar_retroativo escreve exatamente estes), e
+ *  os retroativos que ELE criou e ainda pode corrigir ou desfazer enquanto
+ *  o mentor não registra — o gate fino (autoria + registro do mentor) mora
+ *  nas RPCs definer, aqui o recorte é o das linhas da agenda do jovem. */
+export async function getJovemRetroativoIa(supabase: SupabaseClient) {
+  const d = await getMinhaDuplaIa(supabase);
+  // trilha de especialista não cobre retroativo — a RPC recusa e a agenda
+  // do jovem também não mostra o dialog lá
+  if (!d || d.trilha === "especialista" || d.status !== "ativa") return null;
+  const [jornadaRes, encRes, euRes] = await Promise.all([
+    supabase.rpc("jovem_jornada"),
+    supabase
+      .from("encontros")
+      .select("id, numero, status, realizado_em, created_by")
+      .eq("dupla_id", d.id),
+    supabase.rpc("my_profile_id"),
+  ]);
+  if (jornadaRes.error) throw jornadaRes.error;
+  if (encRes.error) throw encRes.error;
+  const cron = (
+    (
+      (jornadaRes.data as {
+        cronograma?: { numero?: number; data?: string; tipo?: string }[] | null;
+      } | null)?.cronograma ?? []
+    )
+  )
+    .filter(
+      (e): e is { numero: number; data: string; tipo: string } =>
+        e.tipo === "encontro" && e.numero != null && e.data != null
+    )
+    .sort((a, b) => a.numero - b.numero);
+  const maxNum = cron.length ? cron[cron.length - 1].numero : 0;
+  const hoje = new Date().toISOString().slice(0, 10);
+  const encs = (encRes.data ?? []) as {
+    id: string;
+    numero: number;
+    status: string;
+    realizado_em: string | null;
+    created_by: string | null;
+  }[];
+  const porNumero = new Set(encs.map((e) => e.numero));
+  const meuId = (euRes.data as string | null) ?? null;
+  return {
+    dupla_id: d.id,
+    // sem row e já vencido na data oficial — o último passo fica de fora
+    // (fechar a jornada segue registro do mentor, mesma régua da 0208)
+    elegiveis: cron
+      .filter((p) => p.numero < maxNum && p.data <= hoje && !porNumero.has(p.numero))
+      .map((p) => ({ numero: p.numero, data_oficial: p.data })),
+    criados_por_voce: encs
+      .filter(
+        (e) => e.status === "realizado" && meuId != null && e.created_by === meuId
+      )
+      .map((e) => ({
+        encontro_id: e.id,
+        numero: e.numero,
+        realizado_em: e.realizado_em,
+      })),
+  };
 }
 
 // ---------- adoção do produto (REALIZA-417, fase 2) ----------

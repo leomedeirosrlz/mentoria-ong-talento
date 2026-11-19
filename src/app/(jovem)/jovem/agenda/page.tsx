@@ -5,6 +5,7 @@ import {
   CheckCircle,
   ClockCounterClockwise,
   Sparkle,
+  SunHorizon,
   VideoCamera,
   WhatsappLogo,
   XCircle,
@@ -55,6 +56,7 @@ import {
   getJovemJornada,
   getJovemPedidosEspecialista,
   getJovemPerfil,
+  getJovemRecessos,
 } from "@/lib/queries-jovem";
 import { datasOficiaisDe } from "@/lib/jornada";
 import { getSlotsLivres } from "@/lib/queries-especialista";
@@ -99,6 +101,7 @@ export default async function JovemAgenda() {
     pedidosEsp,
     perfil,
     jornada,
+    recessosJovem,
   ] = await Promise.all([
     getJovemEncontros(),
     getJovemAvaliacoes(),
@@ -110,6 +113,7 @@ export default async function JovemAgenda() {
     // além dos passos vencidos do retroativo (0208), a RPC é a auto-cura
     // da jornada — chamar na visita já dispara a emissão devida (0123)
     getJovemJornada().catch(() => null),
+    getJovemRecessos(),
   ]);
   const agora = new Date().getTime();
   const primeiroNome = (me?.nome_social || me?.nome || "").split(" ")[0];
@@ -302,6 +306,28 @@ export default async function JovemAgenda() {
           )}
         </div>
       </header>
+
+      {/* decisão de recesso declarada pela dupla (462): o combinado aparece
+          na agenda dele sem abrir espaço pra gesto — declarar é do mentor */}
+      {recessosJovem.some((r) => !r.usa) && (
+        <Card>
+          <CardContent className="flex items-start gap-3 p-4">
+            <span
+              aria-hidden
+              className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground"
+            >
+              <SunHorizon size={16} />
+            </span>
+            <p className="text-sm text-muted-foreground">
+              <span className="font-medium text-foreground">
+                Recesso do programa:
+              </span>{" "}
+              vocês combinaram seguir se encontrando. As datas vocês marcam
+              com seu mentor, como sempre.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       {duplasEsp.length > 0 && (
         <section aria-labelledby="agenda-esp" className="space-y-2">
