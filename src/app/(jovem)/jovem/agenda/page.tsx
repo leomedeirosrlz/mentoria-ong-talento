@@ -56,13 +56,18 @@ import {
   getJovemJornada,
   getJovemPedidosEspecialista,
   getJovemPerfil,
+  getJovemPlano,
   getJovemRecessos,
 } from "@/lib/queries-jovem";
 import { datasOficiaisDe } from "@/lib/jornada";
 import { getSlotsLivres } from "@/lib/queries-especialista";
 import { getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
-import type { JovemEncontro } from "@/lib/queries-jovem";
+import type { JovemEncontro, JovemPlano } from "@/lib/queries-jovem";
+import {
+  PlanoAcordosCard,
+  type PlanoCombinado,
+} from "@/components/plano-acordos";
 import type { Disponibilidade } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -102,6 +107,7 @@ export default async function JovemAgenda() {
     perfil,
     jornada,
     recessosJovem,
+    planoJovem,
   ] = await Promise.all([
     getJovemEncontros(),
     getJovemAvaliacoes(),
@@ -114,6 +120,7 @@ export default async function JovemAgenda() {
     // da jornada — chamar na visita já dispara a emissão devida (0123)
     getJovemJornada().catch(() => null),
     getJovemRecessos(),
+    getJovemPlano().catch(() => null),
   ]);
   const agora = new Date().getTime();
   const primeiroNome = (me?.nome_social || me?.nome || "").split(" ")[0];
@@ -325,6 +332,26 @@ export default async function JovemAgenda() {
               vocês combinaram seguir se encontrando. As datas vocês marcam
               com seu mentor, como sempre.
             </p>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* o combinado do plano "ficar em dia" (459): chega pela
+          jovem_plano, o recorte definer — aceitar e confirmar datas são
+          gestos dele aqui, pela mesma RPC do mentor */}
+      {planoJovem && (
+        <Card>
+          <CardContent className="space-y-3 p-4">
+            <h2 className="text-base font-semibold">O combinado</h2>
+            <p className="text-sm text-muted-foreground">
+              O plano pra colocar vocês em dia. Aceitem e confirmem as
+              datas juntos — vale pra você e pro seu mentor.
+            </p>
+            <PlanoAcordosCard
+              plano={mapearPlanoJovem(planoJovem)}
+              podeResponder
+              podeAplicar
+            />
           </CardContent>
         </Card>
       )}
@@ -734,3 +761,27 @@ function EncontroLinha({
   );
 }
 
+
+/** Recorte da jovem_plano → a projeção que o card do combinado lê
+ *  (PlanoCombinado) — a RPC já devolve sem semáforo/motivos; aqui só
+ *  muda a forma (ritmo vem texto do jsonb, passos aplicados achatam). */
+function mapearPlanoJovem(p: JovemPlano): PlanoCombinado {
+  return {
+    id: p.id,
+    status: p.status,
+    versao: p.versao,
+    aprovado_lado: p.aprovado_lado,
+    escopo: {
+      ritmo: p.ritmo == null ? null : Number(p.ritmo) || null,
+      passos: (p.passos ?? []).map((s) => ({
+        numero: s.numero,
+        data: s.data,
+        acao: s.acao,
+      })),
+    },
+    passos: (p.passos_aplicados ?? []).map((s) => ({
+      numero: s.numero,
+      data_nova: s.data_nova,
+    })),
+  };
+}

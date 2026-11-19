@@ -471,6 +471,12 @@ export const ROTULO_ACAO: Record<string, string> = {
   lembrete_whatsapp: "lembrete WhatsApp em",
   permanencia: "ficou em",
   rolagem: "rolou em",
+  plano_proposto: "propôs plano em",
+  plano_aceito: "aceitou plano em",
+  plano_contestado: "contestou plano em",
+  plano_passo: "aplicou passo do plano em",
+  plano_intervencao: "sugeriu intervenção em",
+  plano_guia: "ajustou guia em",
 };
 
 /** Trilha de uma pessoa na janela: os gestos dela em ordem cronológica —

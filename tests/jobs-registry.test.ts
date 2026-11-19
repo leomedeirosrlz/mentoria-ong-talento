@@ -46,6 +46,10 @@ describe("rotas de cron", () => {
       "lembretes_registro",
       "digest_semanal",
       "retencao_produto",
+      // 0219/0221 (459): ciclo do plano ANTES do resumo — o consolidado
+      // do dia já reflete expirações e conclusões da virada
+      "plano_ciclo",
+      "resumo_duplas",
     ]);
   });
 });

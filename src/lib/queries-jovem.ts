@@ -434,3 +434,65 @@ export const getJovemRecessos = cache(
     return (data ?? []) as JovemRecesso[];
   }
 );
+
+/** O combinado do plano "ficar em dia" da dupla do jovem (459 — RPC
+ *  `jovem_plano`, 0219): o mentorado não lê dupla_planos, então o
+ *  recorte chega por definer no mesmo gate da jovem_jornada — sem
+ *  semáforo nem motivos internos, só status/ritmo/datas. null sem
+ *  plano. */
+export type JovemPlano = {
+  id: string;
+  status: string;
+  versao: number;
+  ritmo: string | null;
+  janela: { inicio: string; fim: string } | null;
+  passos: { numero: number; data: string; acao: string }[];
+  aprovado_lado: "mentor" | "mentorado" | null;
+  expira_em: string;
+  passos_aplicados: {
+    numero: number;
+    data_nova: string;
+    aplicado_em: string;
+  }[];
+};
+
+export const getJovemPlano = cache(
+  async (): Promise<JovemPlano | null> => {
+    const demo = await demoRole();
+    if (demo) return demoJovemPlano();
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("jovem_plano");
+    if (error) {
+      console.error("getJovemPlano:", error);
+      return null;
+    }
+    return (data ?? null) as JovemPlano | null;
+  }
+);
+
+/** Paridade demo (459): um plano aceito de exemplo, no MESMO recorte da
+ *  RPC — a agenda demo mostra o combinado como no produto. */
+function demoJovemPlano(): JovemPlano {
+  const hoje = new Date();
+  const em = (dias: number) =>
+    new Date(hoje.getTime() + dias * 86_400_000).toISOString();
+  return {
+    id: "demo-plano",
+    status: "aceito",
+    versao: 1,
+    ritmo: "2",
+    janela: {
+      inicio: em(0).slice(0, 10),
+      fim: em(28).slice(0, 10),
+    },
+    passos: [
+      { numero: 4, data: em(3).slice(0, 10), acao: "remarcar" },
+      { numero: 5, data: em(10).slice(0, 10), acao: "remarcar" },
+    ],
+    aprovado_lado: "mentor",
+    expira_em: em(14),
+    passos_aplicados: [
+      { numero: 4, data_nova: em(3), aplicado_em: hoje.toISOString() },
+    ],
+  };
+}

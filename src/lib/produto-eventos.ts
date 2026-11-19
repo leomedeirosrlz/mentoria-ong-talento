@@ -15,7 +15,15 @@ export type AcaoProduto =
   | "material_aberto"
   | "lembrete_whatsapp"
   | "permanencia"
-  | "rolagem";
+  | "rolagem"
+  // plano ficar em dia (459): gestos de adoção do combinado — proposta,
+  // resposta, passo aplicado, intervenção e ajuste de guia
+  | "plano_proposto"
+  | "plano_aceito"
+  | "plano_contestado"
+  | "plano_passo"
+  | "plano_intervencao"
+  | "plano_guia";
 
 /** Marcos de profundidade do gesto `rolagem` (REALIZA-453): o evento
  *  grava SÓ o maior marco alcançado na estadia — nunca fração contínua

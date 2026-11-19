@@ -104,6 +104,7 @@ import {
 } from "@/components/avaliacao-jovem";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { PlanoEmDiaCard } from "@/components/plano-em-dia-card";
+import { AcordosCentral } from "@/components/acordos-central";
 import { RecessoDuplaCard } from "@/components/recesso-dupla-card";
 import { montarPlanoEmDia } from "@/lib/plano-em-dia";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
@@ -1188,6 +1189,16 @@ export default async function DuplaPage({
           jovemNome={primeiroNomeMentorado}
         />
       )}
+
+      {/* central "Acordos e intervenções" (459): o combinado persistido
+          do plano, os ajustes do guia vigente e a fila de intervenções —
+          junto do próximo encontro, onde a dupla olha primeiro */}
+      <AcordosCentral
+        dupla={dupla}
+        souMentor={souMentor}
+        souStaff={souCoord || dupla.supervisor?.id === me.id}
+        numeroGuiaAtual={passoAtual?.numero ?? null}
+      />
 
       {recessosDaFicha.length > 0 && (
         <RecessoDuplaCard

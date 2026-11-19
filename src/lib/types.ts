@@ -534,6 +534,123 @@ export type DuplaRecesso = {
   autor?: { nome: string; nome_social: string | null } | null;
 };
 
+/** Plano "ficar em dia" persistido (0219): overlay sobre o calendário —
+ *  encontros/ciclo_eventos não mudam; o combinado vive aqui. `contestado`
+ *  é terminal: acordo novo = plano novo (versao+1). */
+export type DuplaPlanoStatus =
+  | "proposto"
+  | "aceito"
+  | "ativo"
+  | "concluido"
+  | "expirado"
+  | "contestado";
+
+/** Escopo gravado no plano: encontros cobertos, ritmo combinado por
+ *  semana, a janela e os passos sugeridos na proposta. */
+export type DuplaPlanoEscopo = {
+  numeros: number[];
+  ritmo?: number;
+  janela?: { inicio: string; fim: string };
+  nivel?: "ritmo_normal" | "semana_dupla" | "conversa_coord";
+  passos?: { numero: number; data: string; acao: string }[];
+};
+
+export type DuplaPlano = {
+  id: string;
+  dupla_id: string;
+  status: DuplaPlanoStatus;
+  escopo: DuplaPlanoEscopo;
+  versao: number;
+  proposto_por: string | null;
+  proposto_via: "app" | "liza";
+  aprovado_por: string | null;
+  aprovado_lado: "mentor" | "mentorado" | null;
+  aprovado_em: string | null;
+  contestado_por: string | null;
+  contestado_motivo: string | null;
+  contestado_em: string | null;
+  expira_em: string;
+  concluido_em: string | null;
+  created_at: string;
+  updated_at: string;
+  /** Passos já aplicados (embed da ficha) — data nova combinada por
+   *  encontro, com autoria e motivo. */
+  passos?: DuplaPlanoPasso[];
+  /** Linha do tempo do plano (embed da ficha) — proposto/aceito/
+   *  contestado/passo_aplicado/concluido/expirado. */
+  eventos?: DuplaPlanoEvento[];
+};
+
+export type DuplaPlanoPasso = {
+  id: string;
+  plano_id: string;
+  dupla_id: string;
+  numero: number;
+  encontro_id: string | null;
+  data_anterior: string | null;
+  data_nova: string;
+  motivo: string | null;
+  aplicado_por: string | null;
+  aplicado_via: "app" | "liza";
+  aplicado_em: string;
+};
+
+export type DuplaPlanoEvento = {
+  id: string;
+  plano_id: string;
+  dupla_id: string;
+  tipo:
+    | "proposto"
+    | "aceito"
+    | "contestado"
+    | "passo_aplicado"
+    | "concluido"
+    | "expirado";
+  de: string | null;
+  para: string | null;
+  motivo: string | null;
+  por: string | null;
+  meta: Record<string, unknown>;
+  em: string;
+};
+
+/** Intervenção estruturada sugerida pela Liza (0220) — a saída real é
+ *  humana (chamado ou mensagem); a Liza nunca executa rematch/encerrar. */
+export type DuplaIntervencao = {
+  id: string;
+  dupla_id: string;
+  plano_id: string | null;
+  tipo:
+    | "troca_mentor"
+    | "troca_mentorado"
+    | "pausa"
+    | "dpp_para_esp"
+    | "encerramento";
+  evidencias: unknown[];
+  destino: "auxiliar" | "coordenacao";
+  status: "sugerida" | "encaminhada" | "descartada";
+  saida: "chamado" | "mensagem" | null;
+  chamado_id: string | null;
+  motivo: string | null;
+  sugerida_por: string | null;
+  sugerida_via: "app" | "liza";
+  created_at: string;
+  destinada_em: string | null;
+};
+
+/** Ajuste do guia de um encontro da dupla (0220) — ancora no guia base
+ *  (cada item leva sugestão + justificativa); apagar volta ao guia. */
+export type EncontroGuiaAjuste = {
+  id: string;
+  dupla_id: string;
+  numero: number;
+  ajustes: { sugestao: string; justificativa: string }[];
+  criado_por: string | null;
+  via: "app" | "liza";
+  created_at: string;
+  updated_at: string;
+};
+
 export type Dupla = {
   id: string;
   /** Label da turma (ex-coluna `ciclo`, renomeada na 0061) — derivada do
@@ -583,6 +700,14 @@ export type Dupla = {
   /** Recessos com decisão declarada (0218) — ausência da linha = usa o
    *  recesso, como sempre foi. */
   recessos?: DuplaRecesso[];
+  /** Planos "ficar em dia" da dupla (0219) — o vivo é único por
+   *  índice parcial (proposto/aceito/ativo); o histórico convive. */
+  planos?: DuplaPlano[];
+  /** Intervenções sugeridas (0220) — visíveis pra staff + mentor. */
+  intervencoes?: DuplaIntervencao[];
+  /** Ajustes de guia por encontro (0220) — jovem fora da policy nesta
+   *  fatia, então o embed não chega a ele. */
+  guia_ajustes?: EncontroGuiaAjuste[];
 };
 
 /** Versão enxuta de Dupla — só os ids de vínculo + turma (a filiação da

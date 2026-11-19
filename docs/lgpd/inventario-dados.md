@@ -88,6 +88,10 @@ coord+supervisor.
 | `chamados` + atualizações/comentários/anexos (0084) | fila de atendimento; `categoria='urgencia'`; mensagem livre | Jovem/Adulto | potencial (saúde/conflito) | equipe + autor (supervisor não vê `plataforma`); anexos `interno` = equipe | C + C14 † | permanente |
 | `dupla_saude_snapshots` (0107) | histórico do semáforo: `motivos/sinais` = **contagens+labels de enum, sem nomes nem texto livre** (verificação LGPD do PR — `0107:23-25`) | Jovem+Adulto (derivado) | baixo | coord + supervisor das duplas | LI | permanente |
 | `trilha_lembretes` (0108) | ledger de lembretes do prazo (dupla, marco, destino) | Adulto | baixo | coord-only | LI | permanente |
+| `dupla_planos` + `dupla_plano_passos` + `dupla_plano_eventos` (0219) | combinado "ficar em dia": escopo/ritmo/janela, datas aplicadas e ledger de auditoria (`contestado_motivo` é o único texto livre, ≤300) | Jovem+Adulto | baixo | escopo dupla (mentor/coord/supervisor); jovem lê recorte via `jovem_plano` (sem autoria interna) | C + C14 † | permanente |
+| `dupla_intervencoes` (0220) | sugestão de intervenção estruturada (tipo, evidências, motivo ≤300, destino) | Jovem+Adulto (derivado) | baixo | coord + supervisor + mentor da dupla | LI | permanente |
+| `encontro_guia_ajustes` (0220) | ajustes do guia de um encontro (sugestão+justificativa, texto do mentor/Liza) | Jovem (sobre) | potencial | coord + mentor da dupla — jovem fora da policy nesta fatia | C14 † | permanente |
+| `dupla_resumo_ia` (0221) | resumo consolidado por dupla pra Liza: semáforo/motivos/sinais (labels derivados), contagens, interesses do jovem, plano vigente | Jovem+Adulto (derivado) | baixo | ninguém lê direto (sem policy) — `resumo_dupla` recorta por papel: jovem recebe sem `semaforo`/`motivos`/`sinais`/`interno` | LI | regravado a cada mudança de fonte (mantém só o vigente) |
 
 ## 3. Instrumentos e respostas (coração sensível do programa)
 

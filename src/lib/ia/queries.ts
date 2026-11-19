@@ -19,6 +19,7 @@ import type {
   AppRole,
   AvaliacaoEncontro,
   CicloEvento,
+  DuplaPlano,
   DuplaRecesso,
   DuplaStatus,
   Encaminhamento,
@@ -70,7 +71,8 @@ export const IA_SAUDE_SELECT = `
     avaliacao_jovem:avaliacoes_encontro(pedir_apoio)
   ),
   encaminhamentos(status, prazo),
-  recessos:dupla_recessos(ciclo_evento_id, usa, declarado_em)
+  recessos:dupla_recessos(ciclo_evento_id, usa, declarado_em),
+  planos:dupla_planos(id, status, escopo, versao, aprovado_lado, expira_em)
 `;
 
 /** A dupla como a tool a recebe — projeção mínima e allowlisted (sem as
@@ -110,6 +112,12 @@ export type DuplaIa = {
   recessos?: Pick<
     DuplaRecesso,
     "ciclo_evento_id" | "usa" | "declarado_em"
+  >[];
+  /** Plano vivo/histórico (0219) — o semáforo lê o escopo do acordado;
+   *  a tool plano_em_dia devolve o estado persistido. */
+  planos?: Pick<
+    DuplaPlano,
+    "id" | "status" | "escopo" | "versao" | "aprovado_lado" | "expira_em"
   >[];
 };
 

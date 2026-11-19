@@ -192,6 +192,33 @@ export type UiPlano = {
   /** limbo/registro pendente que vem antes do plano */
   pendencias: { numero: number; estado: "limbo" | "pendente_registro" }[];
   avisos: string[];
+  /** Nível nomeado de flexibilização (FR-011) + ação sugerida. */
+  nivel: "ritmo_normal" | "semana_dupla" | "conversa_coord" | null;
+  sugestao: string | null;
+  /** Plano persistido vivo (0219) — quando existe, o card mostra o
+   *  combinado (status/versão/quem aprovou) em vez de só a proposta. */
+  plano: {
+    id: string;
+    status: string;
+    versao: number;
+    aprovado_lado: "mentor" | "mentorado" | null;
+    expira_em: string;
+    ritmo: number | null;
+  } | null;
+};
+
+/** O combinado do plano como o JOVEM o vê (0219 — jovem_plano): sem
+ *  semáforo, motivo interno ou sinal — só status, ritmo, datas e passos
+ *  aplicados. Mesmo kind "plano_jovem" pro card próprio da agenda/chat. */
+export type UiPlanoJovem = {
+  kind: "plano_jovem";
+  status: string;
+  versao: number;
+  ritmo: number | null;
+  aprovado_lado: "mentor" | "mentorado" | null;
+  expira_em: string;
+  passos: { numero: number; data: string; acao: string | null }[];
+  passos_aplicados: { numero: number; data_nova: string; aplicado_em: string }[];
 };
 
 export type UiFontes = {
@@ -280,6 +307,7 @@ export type UiBloco =
   | UiJornada
   | UiPedidos
   | UiPlano
+  | UiPlanoJovem
   | UiConfirmacao;
 
 export type UiKind = UiBloco["kind"];
@@ -290,6 +318,14 @@ export const STATUS_TOOL: Record<string, string> = {
   ficha_dupla: "Abrindo a ficha da dupla…",
   registros_da_dupla: "Lendo os registros da dupla…",
   plano_em_dia: "Montando o plano pra ficar em dia…",
+  plano_propor: "Preparando a proposta do plano…",
+  plano_responder: "Preparando a resposta do plano…",
+  plano_aplicar_passo: "Preparando o passo do plano…",
+  resumo_dupla: "Lendo o resumo consolidado da dupla…",
+  meu_plano: "Vendo o combinado do plano…",
+  intervencao_sugerir: "Preparando a sugestão de intervenção…",
+  guia_ajustar: "Preparando o ajuste do guia…",
+  guia_limpar: "Preparando pra voltar ao guia…",
   aguardando_par: "Olhando a fila de pareamento…",
   capacidade_mentores: "Conferindo as vagas dos mentores…",
   adocao_por_superficie: "Lendo a adoção por superfície…",
@@ -446,6 +482,8 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
         }))
         .filter((p) => p.numero > 0);
       if (!passos.length) return null;
+      const plano = obj(d.plano);
+      const nivel = str(d.nivel);
       return {
         kind: "plano",
         dupla_id: String(d.dupla_id),
@@ -462,6 +500,56 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           .map((a) => str(a))
           .filter((a): a is string => a != null)
           .slice(0, 3),
+        nivel:
+          nivel === "ritmo_normal" ||
+          nivel === "semana_dupla" ||
+          nivel === "conversa_coord"
+            ? nivel
+            : null,
+        sugestao: str(d.sugestao),
+        plano: plano
+          ? {
+              id: String(plano.id ?? ""),
+              status: String(plano.status ?? ""),
+              versao: num(plano.versao),
+              aprovado_lado: (str(plano.aprovado_lado) ?? null) as
+                | "mentor"
+                | "mentorado"
+                | null,
+              expira_em: String(plano.expira_em ?? ""),
+              ritmo: plano.ritmo == null ? null : num(plano.ritmo),
+            }
+          : null,
+      };
+    }
+    case "meu_plano": {
+      // jovem_plano() já chega recortado (sem semáforo/motivos) — o card
+      // só repassa o combinado; null quando a dupla não tem plano
+      if (!str(d.status)) return null;
+      const passosJ = arr(d.passos)
+        .map((p) => ({
+          numero: num(p.numero),
+          data: String(p.data ?? ""),
+          acao: str(p.acao),
+        }))
+        .filter((p) => p.numero > 0);
+      return {
+        kind: "plano_jovem",
+        status: String(d.status),
+        versao: num(d.versao),
+        // a RPC devolve escopo->>'ritmo' — texto do jsonb
+        ritmo: d.ritmo == null ? null : num(Number(d.ritmo)),
+        aprovado_lado: (str(d.aprovado_lado) ?? null) as
+          | "mentor"
+          | "mentorado"
+          | null,
+        expira_em: String(d.expira_em ?? ""),
+        passos: passosJ,
+        passos_aplicados: arr(d.passos_aplicados).map((p) => ({
+          numero: num(p.numero),
+          data_nova: String(p.data_nova ?? ""),
+          aplicado_em: String(p.aplicado_em ?? ""),
+        })),
       };
     }
     case "registros_da_dupla": {
