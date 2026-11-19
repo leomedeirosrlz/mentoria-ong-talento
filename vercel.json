@@ -11,7 +11,7 @@
   "git": {
     "deploymentEnabled": {
       "main": true,
-      "staging": true,
+      "staging": false,
       "feat/**": false,
       "fix/**": false,
       "test/**": false,
