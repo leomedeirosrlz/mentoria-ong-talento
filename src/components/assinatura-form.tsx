@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CircleNotch, Signature } from "@phosphor-icons/react";
@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { maskCep, maskCpf } from "@/lib/utils";
+import { buscarCep } from "@/lib/actions-endereco";
 import type { DadosCivis } from "@/lib/types";
 
 type Resultado = { error?: string; ok?: boolean };
@@ -18,6 +19,20 @@ const onInputMask = (mask: (v: string) => string) => (e: React.FormEvent<HTMLInp
 };
 const cpfMask = maskCpf;
 const cepMask = maskCep;
+
+/** Linha de status do CEP (aria-live): repouso já explica a consulta ao
+ *  ViaCEP (transparência LGPD); os outros estados dizem o que houve sem
+ *  travar a digitação — autofill é conveniência, nunca portão. */
+const STATUS_CEP: Record<
+  "idle" | "buscando" | "ok" | "nao_encontrado" | "falha",
+  string
+> = {
+  idle: "CEP completo consulta o ViaCEP e preenche o endereço.",
+  buscando: "Buscando endereço no ViaCEP…",
+  ok: "Endereço preenchido. Confira e ajuste se precisar.",
+  nao_encontrado: "CEP não encontrado. Preencha o endereço manualmente.",
+  falha: "Não deu pra consultar o ViaCEP. Preencha o endereço manualmente.",
+};
 
 /** Campos civis do signatário — compartilhados pelo termo do voluntário
  *  (logado), pela autorização do responsável (token) e pela ficha de
@@ -42,6 +57,74 @@ export function DadosCivisFields({
   const req = opcional ? undefined : true;
   const n = (k: string) => `${prefix}${k}`;
   const e = defaults?.endereco;
+  // bloco de endereço controlado: o autofill do ViaCEP (REALIZA-37) precisa
+  // escrever nos inputs — defaultValue não dá. Os `name`s seguem os mesmos,
+  // então FormData e parseCivis não veem diferença nenhuma.
+  const [cep, setCep] = useState(e?.cep ? cepMask(e.cep) : "");
+  const [end, setEnd] = useState({
+    logradouro: e?.logradouro ?? "",
+    numero: e?.numero ?? "",
+    complemento: e?.complemento ?? "",
+    bairro: e?.bairro ?? "",
+    cidade: e?.cidade ?? "",
+    uf: e?.uf ?? "",
+  });
+  const [status, setStatus] = useState<
+    "idle" | "buscando" | "ok" | "nao_encontrado" | "falha"
+  >("idle");
+  const [buscando, start] = useTransition();
+  // o CEP que disparou a busca em curso — resposta atrasada de CEP já
+  // editado é descartada e nunca sobrescreve o que está na tela. Inicia
+  // com o CEP salvo: blur sem mudança não dispara busca à toa.
+  const cepBuscado = useRef<string | null>(
+    e?.cep ? e.cep.replace(/\D/g, "") : null
+  );
+
+  function disparaBusca(digitos: string) {
+    cepBuscado.current = digitos;
+    setStatus("buscando");
+    start(async () => {
+      const r = await buscarCep(digitos);
+      if (cepBuscado.current !== digitos) return;
+      if (r.kind === "ok") {
+        // numero/complemento nunca vêm do ViaCEP; em compacto cidade/UF
+        // não renderizam (vêm dos campos simples da ficha)
+        setEnd((atual) => ({
+          ...atual,
+          logradouro: r.endereco.logradouro,
+          bairro: r.endereco.bairro,
+          ...(compacto
+            ? {}
+            : { cidade: r.endereco.cidade, uf: r.endereco.uf }),
+        }));
+        setStatus("ok");
+      } else {
+        setStatus(r.kind === "nao_encontrado" ? "nao_encontrado" : "falha");
+      }
+    });
+  }
+
+  function onCepChange(raw: string) {
+    const v = maskCep(raw);
+    setCep(v);
+    const digitos = v.replace(/\D/g, "");
+    if (digitos.length === 8) {
+      // uma busca por CEP — nunca por dígito nem repetição do mesmo
+      if (digitos !== cepBuscado.current) disparaBusca(digitos);
+    } else {
+      cepBuscado.current = null;
+      setStatus("idle");
+    }
+  }
+
+  function onCepBlur() {
+    // rede de segurança pro preenchimento por colagem/autofill do browser
+    const digitos = cep.replace(/\D/g, "");
+    if (digitos.length === 8 && digitos !== cepBuscado.current) {
+      disparaBusca(digitos);
+    }
+  }
+
   return (
     <div className="grid gap-4 sm:grid-cols-2">
       {!compacto && (
@@ -96,17 +179,35 @@ export function DadosCivisFields({
       )}
       <div className="space-y-2">
         <Label htmlFor={n("cep")}>CEP</Label>
-        <Input
-          id={n("cep")}
-          name={n("cep")}
-          required={req}
-          inputMode="numeric"
-          autoComplete="postal-code"
-          maxLength={9}
-          placeholder="00000-000"
-          onInput={onInputMask(maskCep)}
-          defaultValue={e?.cep ? cepMask(e.cep) : ""}
-        />
+        <div className="relative">
+          <Input
+            id={n("cep")}
+            name={n("cep")}
+            required={req}
+            inputMode="numeric"
+            autoComplete="postal-code"
+            maxLength={9}
+            placeholder="00000-000"
+            value={cep}
+            onChange={(ev) => onCepChange(ev.target.value)}
+            onBlur={onCepBlur}
+            aria-describedby={n("cep_status")}
+          />
+          {buscando && (
+            <CircleNotch
+              size={16}
+              aria-hidden
+              className="absolute right-3 top-1/2 -translate-y-1/2 animate-spin text-muted-foreground"
+            />
+          )}
+        </div>
+        <p
+          id={n("cep_status")}
+          aria-live="polite"
+          className="text-xs text-muted-foreground"
+        >
+          {STATUS_CEP[status]}
+        </p>
       </div>
       {/* a 320px o grid fixo [1fr_100px] espremia o Logradouro em ~124px —
           número vira linha própria abaixo de 420px */}
@@ -120,7 +221,8 @@ export function DadosCivisFields({
             placeholder="Rua, avenida…"
             autoComplete="street-address"
             autoCapitalize="words"
-            defaultValue={e?.logradouro ?? ""}
+            value={end.logradouro}
+            onChange={(ev) => setEnd({ ...end, logradouro: ev.target.value })}
           />
         </div>
         <div className="space-y-2">
@@ -129,7 +231,8 @@ export function DadosCivisFields({
             id={n("numero")}
             name={n("numero")}
             required={req}
-            defaultValue={e?.numero ?? ""}
+            value={end.numero}
+            onChange={(ev) => setEnd({ ...end, numero: ev.target.value })}
           />
         </div>
       </div>
@@ -139,7 +242,8 @@ export function DadosCivisFields({
           id={n("complemento")}
           name={n("complemento")}
           placeholder="Opcional"
-          defaultValue={e?.complemento ?? ""}
+          value={end.complemento}
+          onChange={(ev) => setEnd({ ...end, complemento: ev.target.value })}
         />
       </div>
       <div className="space-y-2">
@@ -150,7 +254,8 @@ export function DadosCivisFields({
           required={req}
           autoComplete="address-level3"
           autoCapitalize="words"
-          defaultValue={e?.bairro ?? ""}
+          value={end.bairro}
+          onChange={(ev) => setEnd({ ...end, bairro: ev.target.value })}
         />
       </div>
       {!compacto && (
@@ -163,7 +268,8 @@ export function DadosCivisFields({
               required={req}
               autoComplete="address-level2"
               autoCapitalize="words"
-              defaultValue={e?.cidade ?? ""}
+              value={end.cidade}
+              onChange={(ev) => setEnd({ ...end, cidade: ev.target.value })}
             />
           </div>
           <div className="space-y-2">
@@ -176,10 +282,10 @@ export function DadosCivisFields({
               placeholder="SP"
               autoComplete="address-level1"
               className="uppercase"
-              onInput={(e) => {
-                e.currentTarget.value = e.currentTarget.value.toUpperCase();
-              }}
-              defaultValue={e?.uf ?? ""}
+              value={end.uf}
+              onChange={(ev) =>
+                setEnd({ ...end, uf: ev.target.value.toUpperCase() })
+              }
             />
           </div>
         </>
