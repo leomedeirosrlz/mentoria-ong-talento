@@ -442,7 +442,7 @@ const montaEventosDpp = (E1, dataE, cronId, idBase) =>
     ["encontro", 14, dataE(14), "Desdobramento e plano de continuidade", F5, ["Roda da Vida", "Modelo SMART"], null, "pendente", null],
     ["recesso", null, somaDia(dataE(14), 1), "Recesso de fim de ano", null, [], somaDia(dataE(14), 18), "pendente", "Sem encontros — retomada na semana seguinte"],
     ["encontro", 15, dataE(15), "Reflexão e reconhecimento", F6, ["PDM", "Roda da Vida"], null, "pendente", null],
-    ["encontro", 16, dataE(16), "Encerramento e celebração", F6, ["Avaliação 360º", "Autoavaliação do mentor"], null, "pendente", null],
+    ["encontro", 16, dataE(16), "Encerramento e celebração", F6, ["Avaliação final"], null, "pendente", null],
     ["evento_encerramento", null, somaDia(dataE(16), 3), "Evento de encerramento do programa", null, [], null, "pendente", null],
   ].map((v, i) => ({
     id: uid(idBase + i),
