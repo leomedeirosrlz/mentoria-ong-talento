@@ -2708,7 +2708,9 @@ export async function importMentorados(rows: LinhaImportada[]) {
       email: email || null,
       whatsapp,
       ong_origem: String(r.ong ?? "").trim() || null,
-      notas: String(r.notas ?? "").trim() || null,
+      // notas fora (mesma régua do create): coluna órfã da anamnese
+      // externa — a linha do CSV continua aceitando o cabeçalho, mas o
+      // valor não grava mais (REALIZA-384)
       ...ficha,
     });
   }

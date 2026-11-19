@@ -1627,7 +1627,7 @@ describe("escritas do domínio (REALIZA-126)", () => {
   it("editar_campo_pessoa: allowlist do domínio — 'email' morre no schema", async () => {
     const { supabase } = supaFake({ papel: "coordenacao" });
     const rpcCalls = espiaRpc(supabase);
-    for (const campo of ["email", "papel", "dados_civis", "nome"]) {
+    for (const campo of ["email", "papel", "dados_civis", "nome", "notas"]) {
       const r = await executarTool(
         "editar_campo_pessoa",
         { pessoa_id: UUID, campo, valor: "x" },
@@ -1638,27 +1638,6 @@ describe("escritas do domínio (REALIZA-126)", () => {
       if (!r.ok) expect(r.erro).toContain("Argumentos inválidos");
     }
     expect(rpcCalls).not.toContain("ia_confirmacao_criar");
-  });
-
-  it("editar_campo_pessoa: 'notas' em profiles é recusa do core após consumir", async () => {
-    const { supabase, escritas } = supaFake({
-      papel: "coordenacao",
-      tabelas: { profiles: [{ id: UUID }] },
-      rpcData: {
-        ia_confirmacao_consumir: "Editar notas",
-        my_role: "coordenacao",
-        my_profile_id: "coord-1",
-      },
-    });
-    const r = await executarTool(
-      "editar_campo_pessoa",
-      { pessoa_id: UUID, campo: "notas", valor: "obs", confirmacao_id: CID },
-      supabase,
-      "chat"
-    );
-    expect(r.ok).toBe(false);
-    if (!r.ok) expect(r.erro).toBe("Esse campo não é editável por aqui.");
-    expect(escritas).toHaveLength(0);
   });
 
   it("editar_campo_pessoa: whatsapp normaliza e grava em profiles", async () => {

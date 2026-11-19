@@ -282,11 +282,11 @@ export const CAMPOS_RELATORIO = ["nome", "email", "whatsapp", "cidade", "uf"] as
 
 /** Allowlist of the `editar_campo_pessoa` tool (REALIZA-126): field per
  *  table — "fix the easy stuff". nome/email/cidade/uf have their own flow
- *  on the grid; `notas` only exists on mentorados (the per-author private
- *  note is `pessoa_notas`, a different concept, out of here). */
+ *  on the grid. `mentorados.notas` ficou de fora: é resíduo da anamnese
+ *  externa (REALIZA-384), coluna órfã sem UI — nada mais a alimenta. */
 export const CAMPOS_PESSOA_IA: Record<TabelaPessoa, readonly string[]> = {
   profiles: ["whatsapp", "nome_social"],
-  mentorados: ["whatsapp", "nome_social", "notas"],
+  mentorados: ["whatsapp", "nome_social"],
 };
 
 /** Single normalization for editable fields — the same CHECKs/validations
@@ -372,14 +372,6 @@ async function normalizarCampoPessoa(
         return { error: "Escolha um estado (UF) válido." };
       }
       return { valor: uf };
-    }
-    case "notas": {
-      const normalizado = v || null;
-      // ceiling from the 0023 CHECK (char_length <= 10000)
-      if (normalizado && normalizado.length > 10000) {
-        return { error: 'O campo "Notas" aceita até 10.000 caracteres.' };
-      }
-      return { valor: normalizado };
     }
     default:
       return { error: "Esse campo não é editável por aqui." };
