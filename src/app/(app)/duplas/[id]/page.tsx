@@ -1187,6 +1187,8 @@ export default async function DuplaPage({
           dupla={dupla}
           souMentor={souMentor}
           jovemNome={primeiroNomeMentorado}
+          recessos={recessosDaFicha}
+          podeDeclararRecesso={souMentor || souCoord}
         />
       )}
 
@@ -1200,7 +1202,10 @@ export default async function DuplaPage({
         numeroGuiaAtual={passoAtual?.numero ?? null}
       />
 
-      {recessosDaFicha.length > 0 && (
+      {/* com plano de recuperação na tela a decisão de recesso mora dentro
+          dele — sem plano ela segue em card próprio (dupla em dia também
+          combina a janela) */}
+      {!mostrarPlanoEmDia && recessosDaFicha.length > 0 && (
         <RecessoDuplaCard
           duplaId={dupla.id}
           recessos={recessosDaFicha}

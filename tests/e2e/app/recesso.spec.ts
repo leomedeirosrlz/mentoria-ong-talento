@@ -169,7 +169,8 @@ test.describe("recesso opcional (462) — declarar_recesso", () => {
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${DUPLA}`);
 
-    await expect(page.getByText("Recesso do programa")).toBeVisible();
+    // a decisão mora no card "Para ficar em dia" quando o plano está na
+    // tela e segue em card próprio sem ele — o gesto é o mesmo
     await page
       .getByRole("button", { name: "Vamos seguir nos encontrando" })
       .click();
