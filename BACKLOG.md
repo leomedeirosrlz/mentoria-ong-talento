@@ -1,6 +1,6 @@
 # Backlog — realiza.vc
 
-Fonte única de pendências. Itens resolvidos são removidos das listas e somados ao resumo abaixo.
+Fila canônica de pendências. Intenção de mudança fica em `specs/`; histórico de decisão, em `docs/planos/`. Itens resolvidos são removidos das listas e somados ao resumo abaixo.
 
 Resolvido até aqui: fuso SP em `ciclo.ts`, datas date-only, CSV multi-linha/BOM/`normWhatsapp`/`emailValido`, enum `sem papel`→`null` + validação de papéis/status, `agendarEncontro` (data inválida, número limitado ao ciclo, não reescreve `realizado`, dupla inativa, fuso resolvido no client com ISO + server aceita naïve como SP, `origem`/`link`/`created_by` preservados), `salvarRegistro` (só encontro passado/realizado da própria dupla, dupla ativa, enums validados, `created_by` só no insert, update→realizado checado), `RegistroForm` gated por data + editável com prefill, encaminhamentos em JSON com dedup + reset pós-salvar + keys estáveis + linha clicável inteira, open redirect em `/auth/confirm`, `erroAmigavel`, RLS endurecido (`0004`), semáforo respeita `iniciada_em` e congela pausada/encerrada + motivo com número real do encontro faltante, trilha completa esconde "agendar", coordenação não agenda/registra, `mentor_profile` não zera em update parcial + sincronizado nas transições de papel, `whatsapp` vazio→`null` e inválido→erro (não apaga campo), signup pentestado, mobile-first completo, copy pt-BR acentuado em `src/` e no seed/migration `0005`.
 
@@ -213,6 +213,16 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
 
 - [x] ~~**Currículos dos mentorados como link do Drive**~~ — os 33 mentorados agora têm `curriculo_url` preenchido com o link do form de matching (ficha em `/pessoas/[id]`, confidencial coord/auxiliar). Nada foi re-uploadado: o arquivo continua no Drive e a ficha oferece o link. Os 17 currículos que já estavam no bucket privado `documentos` (import de 24/set) seguem lá como arquivo morto opcional — remover só com pedido explícito.
 - [x] ~~**Anexos do intake**~~ — os 178 arquivos dos três forms (matching mentores/mentorados + cadastro BP) já estão importados desde 24/set: 45 pessoas, 138 arquivos → 115 rows em `documentos_pessoa` (RG/CNH, comprovante de residência, comprovante bancário, CPF e currículo dos mentores e da equipe) + 23 avatares. `scripts/importar-intake.ts` é idempotente e roda de novo sem duplicar.
+
+## Anti-regressão — pendências do nível 2 (nov/2026)
+
+Feito em 18/nov/2026 (nível 1 — branch `docs/regression-proof`): constitution em `.specify/memory/`, AGENTS novo, specs + fluxo SDD, job `repo-guard` no CI, 5 specs de contrato (allowlist pública do proxy, matcher, integridade das migrations, jobs/cron, gates de deploy) e docs corrigidos (README, architecture, ci-e2e).
+
+- [ ] **Fronteiras de código**: dependency-cruiser com regras de fronteira (demo/ não importa módulo server; regra de escrita só em `escritas.ts`), knip para código morto e type-coverage com piso — definir pisos antes de virar gate.
+- [ ] **Lacunas de teste** do `docs/regression-map.md`: PII do `/resumo` (`resumo-acesso.ts`), paridade TS×SQL de vocabulários (`AcaoProduto`, `AUDIENCIAS`), `refazer` (`0209`), auth do `/api/mcp`, handoff em SQL (`0181`/`0175`/`0050`), trigger de encerramento e `rematch_dupla`.
+- [ ] **e2e vermelho latente no `staging`** (descoberto pelo PR #179, o primeiro PR desde #146 — o `e2e-app` só dispara em PR, e os pushes diretos de 16–17/11 passaram sem rodar): `demo/avaliacao-360.spec.ts:75`, `demo/instrumentos.spec.ts:74` e `:128` (elemento não encontrado — a rodada UI/UX + audit de 17/11 mudou a marcação) e `app/pdm.spec.ts:665` (Metas → árvore do PDM; pode ser drift ou regressão real do `0209`). É a "rodada-2 do audit" que faltava + prova de por que push direto em `staging` não pode ser o fluxo.
+- [ ] **Proteção de branch**: ligar required checks (`gates`, `repo-guard`, `schema-contract`, `e2e-app / e2e`) em `main` e `staging` com `enforce_admins:false` — comando pronto em `docs/convencoes/ci-e2e.md`.
+- [ ] **Decisões que travam teste**: documento revogado (0206 vs emissão manual), dupla tardia sem grace period, especialista em "Aguardando par" (com o Leo).
 
 ## Produção
 

@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/React-19.2-a2ca44?style=flat-square&logo=react&logoColor=ffffff&labelColor=262626" alt="React" />
   <img src="https://img.shields.io/badge/Supabase-RLS_%2B_storage-a2ca44?style=flat-square&logo=supabase&logoColor=ffffff&labelColor=262626" alt="Supabase" />
   <img src="https://img.shields.io/badge/Tailwind-v4-a2ca44?style=flat-square&logo=tailwindcss&logoColor=ffffff&labelColor=262626" alt="Tailwind" />
-  <img src="https://img.shields.io/badge/testes-156_pass-ffd531?style=flat-square&labelColor=262626" alt="testes" />
+  <img src="https://img.shields.io/badge/testes-vitest_pass-ffd531?style=flat-square&labelColor=262626" alt="testes" />
 </p>
 
 ## O que é
@@ -55,11 +55,13 @@ O primeiro sinal que bate define a cor:
 
 | cor | acende quando |
 |---|---|
-| `risco` | um registro marcado `precisa_apoio` com a dupla ativa ou pausada · `avaliacao` "baixa" somada a `dificuldade` no último registro · 2+ encontros atrasados |
-| `atencao` | exatamente 1 encontro atrasado · baixa ou dificuldade sozinhas · o encontro oficial da semana está a ≤5 dias e nada foi agendado (preventivo) · encontro realizado há 24h+ sem registro, ou agendado vencido sem confirmação (limbo) · combinado com prazo vencido (`encaminhamento` além do `prazo`) |
-| `ok` | nenhum sinal. Duplas pausadas, concluídas e encerradas congelam em `ok`, mas um pedido de apoio ainda fura a pausa |
+| `risco` | `avaliacao` "baixa" somada a `dificuldade` no último registro · 2+ encontros atrasados |
+| `atencao` | exatamente 1 encontro atrasado · baixa ou dificuldade sozinhas · o encontro oficial da semana está a ≤5 dias e nada foi agendado (preventivo) · encontro realizado há 24h+ sem registro, ou agendado vencido sem confirmação (limbo) · combinado com prazo vencido (`encaminhamento` além do `prazo`) · especialista ≥90 dias sem sessão nem agendamento (estagnação) |
+| `ok` | nenhum sinal. Duplas pausadas, concluídas e encerradas congelam em `ok` com rótulo próprio |
 
-A trilha de especialista não tem calendário oficial, então nunca está "atrasada": o semáforo dela lê só os sinais que a própria dupla emite. A ordem de prioridade acima é o que `tests/ciclo-semaforo.test.ts` trava (29 testes).
+O pedido de apoio **não acende o semáforo**: desde o WP2 ele é eixo próprio (`saude.apoio`), visível para a coordenação na dupla ativa ou pausada. A régua exata está em `src/lib/ciclo.ts`.
+
+A trilha de especialista não tem calendário oficial, então nunca está "atrasada": o semáforo dela lê só os sinais que a própria dupla emite. A ordem de prioridade acima é o que `tests/ciclo-semaforo.test.ts` trava (55 casos).
 
 ## Superfícies públicas
 
@@ -67,10 +69,15 @@ A trilha de especialista não tem calendário oficial, então nunca está "atras
 |---|---|
 | `/demo` | o app inteiro sobre um dataset fictício, sem conta |
 | `/f/[token]` | responde um formulário por link individual, sem login |
+| `/t/[token]` | avaliação por terceiros indicada pelo jovem, sem login |
+| `/avaliar/[token]` | avaliação do encontro feita pelo jovem, sem login |
 | `/assinar/[token]` | o responsável assina o termo por link de uso único |
+| `/resumo/[slug]` | resumo da turma por link obscuro (com senha, rate-limit e auditoria) |
 | `/privacidade` | aviso de privacidade |
 
-A forms engine deixa a coordenação montar questionários (8 tipos de campo, até 40 perguntas) e emitir links por token individuais; é o canal que alcança o mentorado. Os formulários oficiais do programa (Anamnese, Avaliação 360º, Autoavaliação) entram imutáveis como forms de sistema, e a resposta do 360º já marca o checklist de encerramento sozinha.
+A lista de rotas sem sessão é fechada em `isPublic` (`src/lib/supabase/middleware.ts`) e travada por `tests/middleware-publico.test.ts` — entrada nova é mudança de contrato (spec `001-proxy-e-rotas-publicas`).
+
+A forms engine deixa a coordenação montar questionários (12 tipos de campo, até 40 perguntas) e emitir links por token individuais; é o canal que alcança o mentorado. Os formulários oficiais do programa (Anamnese, Avaliação 360º, Autoavaliação) entram imutáveis como forms de sistema, e a resposta do 360º já marca o checklist de encerramento sozinha.
 
 Os termos são documentos versionados assinados com CPF e dígito verificador, evidência de IP + user-agent + hash SHA-256 e PDF gerado com página de evidências (pdf-lib). `termo_ok` deriva da linha de assinatura; os dados civis moram em `dados_civis` (coord-only) e sincronizam de volta pro documento ao assinar. O CSP põe `frame-ancestors 'none'` para essas rotas públicas nunca virarem iframe de phishing.
 
@@ -80,7 +87,7 @@ Os termos são documentos versionados assinados com CPF e dígito verificador, e
   <img src="./docs/demo.svg?v=2" alt="Modo demo público em /demo" width="720"/>
 </div>
 
-`/demo` roda o app sem conta. Um cookie `demo_role` escolhe uma das 4 personas, as queries reais trocam para um dataset evergreen (`src/lib/demo/data.ts`, datas derivadas de `new Date()`) que replica o escopo RLS de cada papel, um client supabase falso responde no browser (`client-stub.ts`), e toda mutação devolve `DEMO_MSG` em vez de gravar. Cada persona vê o próprio wizard de onboarding uma vez por visita.
+`/demo` roda o app sem conta. Um cookie `demo_role` escolhe uma das 5 personas, as queries reais trocam para um dataset evergreen (`src/lib/demo/data.ts`, datas derivadas de `new Date()`) que replica o escopo RLS de cada papel, um client supabase falso responde no browser (`client-stub.ts`), e toda mutação devolve `DEMO_MSG` em vez de gravar. Cada persona vê o próprio wizard de onboarding uma vez por visita.
 
 ## Autenticação
 
@@ -88,11 +95,11 @@ Magic link em fluxo implícito com handoff entre abas: o pedido gera um nonce, o
 
 ## Arquitetura
 
-- `src/lib/queries.ts`: leituras server-side com `React.cache` + `auth.getClaims()` (valida o JWT local, sem round-trip).
-- `src/lib/actions.ts`: server actions retornam `{ error }` ou `{ ok }`, nunca lançam.
+- `src/lib/queries*.ts`: leituras server-side com `React.cache` + `auth.getClaims()` (valida o JWT local, sem round-trip).
+- `src/lib/actions*.ts`: server actions retornam `{ error }` ou `{ ok }`, nunca lançam; a validação de escrita mora em `src/lib/escritas.ts` (compartilhada com as tools da Liza).
 - `src/lib/ciclo.ts`: domínio puro (semáforo, jornada, labels dos enums, datas, `waLink`), compartilhado entre app, dataset da demo e testes.
-- `src/lib/supabase/{server,client,middleware}.ts`: um client por contexto; o middleware protege tudo exceto `/login`, `/auth/*` e as rotas públicas por token.
-- 54 migrations SQL, RLS-first; escritas sensíveis passam por RPC (delete é coord-only, `realizado` é imutável, signup é allowlist).
+- `src/lib/supabase/{server,client,middleware}.ts`: um client por contexto; o **proxy** (`src/proxy.ts`, Next 16) chama `updateSession` e protege tudo que não está em `isPublic` (`/login`, `/auth/*`, rotas por token, `/api/jobs/*`, `/api/mcp`).
+- Migrations SQL `0001`–`0209`, RLS-first; escritas sensíveis passam por RPC (delete é coord-only, `realizado` é imutável, signup é allowlist). O ledger é imutável: o job `repo-guard` do CI bloqueia edição de migration já existente.
 - Buckets privados (`materiais`, `registro-anexos`) servidos por signed URLs (300s) em route handlers escopados (`/api/material/[id]`, `/api/anexo/[id]`).
 
 ## Stack
@@ -101,7 +108,7 @@ Magic link em fluxo implícito com handoff entre abas: o pedido gera um nonce, o
 |---|---|
 | app | Next.js 16.3.6 (App Router) · React 19.2.8 · TypeScript |
 | ui | Tailwind v4 · Base UI + shadcn · Phosphor Icons · motion 13 · sonner |
-| dados | Supabase (Postgres + Auth + Storage + RPC) · 54 migrations |
+| dados | Supabase (Postgres + Auth + Storage + RPC) · migrations `0001`–`0209` |
 | docs | pdf-lib · Resend (e-mail transacional) |
 | tooling | pnpm 11.3 · Vitest 5 · Vercel |
 
@@ -115,8 +122,8 @@ src/app/{demo,f,assinar,login,privacidade}/
                      superfícies públicas (sem sessão)
 src/app/api/         downloads assinados, export CSV, log de nudge
 src/lib/             queries · actions · ciclo (domínio) · demo/ · forms/ · documentos/
-supabase/migrations/ 0001-0055 · RLS-first
-tests/               156 testes unitários de funções puras
+supabase/migrations/ 0001-0209 · RLS-first · ledger imutável
+tests/               unit (vitest) · contratos de rota/CI · e2e/{demo,app}
 ```
 
 ## Setup
@@ -134,12 +141,13 @@ NEXT_PUBLIC_SITE_URL=http://localhost:3000
 RESUMO_ACESSO_SALT=<openssl rand -hex 16>
 
 pnpm dev      # http://localhost:3000 · demo público em /demo
-pnpm test     # vitest run → 156 testes, 10 arquivos
-npx tsc --noEmit && npx eslint src/
+pnpm test     # vitest run → suite completa de domínio + contratos
+pnpm exec next typegen && npx tsc --noEmit && npx eslint src/
+pnpm guard    # 10 regras de higiene: ledger de migrations, segredos, links, workflows
 ```
 
 Só entra quem está pré-cadastrado em `profiles`. Para explorar sem conta, abra `/demo` e escolha um papel na barra da demo.
 
 ## Docs
 
-`docs/README.en.md` (English) · `../AGENTS.md` (regras + estado vivo do domínio) · `../BACKLOG.md` (roadmap priorizado) · `plano-mestre.md`, `roteiro-demo.md` · `fontes/` (guias oficiais do programa).
+`docs/README.en.md` (English) · `AGENTS.md` (contrato do agente) · `.specify/README.md` (fluxo SDD) · `BACKLOG.md` (roadmap priorizado) · `docs/plano-mestre.md`, `docs/roteiro-demo.md` · `fontes/` (guias oficiais do programa).

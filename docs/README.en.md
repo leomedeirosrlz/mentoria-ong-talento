@@ -9,7 +9,7 @@
   <img src="https://img.shields.io/badge/React-19.2-a2ca44?style=flat-square&logo=react&logoColor=ffffff&labelColor=262626" alt="React" />
   <img src="https://img.shields.io/badge/Supabase-RLS_%2B_storage-a2ca44?style=flat-square&logo=supabase&logoColor=ffffff&labelColor=262626" alt="Supabase" />
   <img src="https://img.shields.io/badge/Tailwind-v4-a2ca44?style=flat-square&logo=tailwindcss&logoColor=ffffff&labelColor=262626" alt="Tailwind" />
-  <img src="https://img.shields.io/badge/tests-156_pass-ffd531?style=flat-square&labelColor=262626" alt="tests" />
+  <img src="https://img.shields.io/badge/tests-vitest_pass-ffd531?style=flat-square&labelColor=262626" alt="tests" />
 </p>
 
 ## What this is
@@ -55,11 +55,13 @@ The first matching signal sets the color:
 
 | color | fires when |
 |---|---|
-| `risco` | a follow-up flagged `precisa_apoio` while the pair is active or paused · `avaliacao` "baixa" plus a reported `dificuldade` on the latest follow-up · 2+ meetings behind |
-| `atencao` | exactly 1 meeting behind · baixa or dificuldade alone · this week's official meeting is ≤5 days away and nothing is scheduled (preventive) · a done meeting went 24h+ without its follow-up, or a scheduled date passed unconfirmed (limbo) · an overdue combinado (`encaminhamento` past `prazo`) |
-| `ok` | no signal matched. Paused, finished and closed pairs freeze at `ok`, but a support request still breaks through a pause |
+| `risco` | `avaliacao` "baixa" plus a reported `dificuldade` on the latest follow-up · 2+ meetings behind |
+| `atencao` | exactly 1 meeting behind · baixa or dificuldade alone · this week's official meeting is ≤5 days away and nothing is scheduled (preventive) · a done meeting went 24h+ without its follow-up, or a scheduled date passed unconfirmed (limbo) · an overdue combinado (`encaminhamento` past `prazo`) · specialist pair 90+ days with no session and nothing scheduled (estagnação) |
+| `ok` | no signal matched. Paused, finished and closed pairs freeze at `ok` with their own label |
 
-The specialist track has no official calendar, so it can never be "behind": its semaphore reads only the pair's own signals. The priority order above is what `tests/ciclo-semaforo.test.ts` pins down (29 tests).
+A support request **does not light the semaphore**: since WP2 it is its own axis (`saude.apoio`), visible to coordination on active or paused pairs. The exact rule lives in `src/lib/ciclo.ts`.
+
+The specialist track has no official calendar, so it can never be "behind": its semaphore reads only the pair's own signals. The priority order above is what `tests/ciclo-semaforo.test.ts` pins down (55 cases).
 
 ## Public surfaces
 
@@ -67,10 +69,15 @@ The specialist track has no official calendar, so it can never be "behind": its 
 |---|---|
 | `/demo` | the whole app on a fake dataset, no account |
 | `/f/[token]` | answer a form through a per-person link, no login |
+| `/t/[token]` | third-party assessment invited by the mentee, no login |
+| `/avaliar/[token]` | meeting rating by the mentee, no login |
 | `/assinar/[token]` | guardian signs a term through a single-use link |
+| `/resumo/[slug]` | class summary behind an obscure link (password, rate-limit, audit trail) |
 | `/privacidade` | privacy notice |
 
-The forms engine lets coordination build questionnaires (8 field types, up to 40 questions) and issue per-person token links; this is the channel that reaches the mentorado. The official program forms (Anamnese, Avaliação 360º, Autoavaliação) ship as immutable system forms, and a 360º answer ticks the closing checklist by itself.
+The session-less route list is closed in `isPublic` (`src/lib/supabase/middleware.ts`) and pinned by `tests/middleware-publico.test.ts` — adding one is a contract change (spec `001-proxy-e-rotas-publicas`).
+
+The forms engine lets coordination build questionnaires (12 field types, up to 40 questions) and issue per-person token links; this is the channel that reaches the mentorado. The official program forms (Anamnese, Avaliação 360º, Autoavaliação) ship as immutable system forms, and a 360º answer ticks the closing checklist by itself.
 
 Terms are versioned documents signed with CPF check digits, IP + user-agent + SHA-256 evidence, and a generated PDF (pdf-lib). `termo_ok` derives from the signature row; civil data lives in `dados_civis` (coord-only) and syncs back into the document when signed. CSP sets `frame-ancestors 'none'` so these public routes can't be iframed into a phishing page.
 
@@ -80,7 +87,7 @@ Terms are versioned documents signed with CPF check digits, IP + user-agent + SH
   <img src="./demo.svg?v=2" alt="Public demo mode at /demo" width="720"/>
 </div>
 
-`/demo` runs the app without an account. A `demo_role` cookie picks one of the 4 personas, the real queries switch to an evergreen dataset (`src/lib/demo/data.ts`, dates derived from `new Date()`) that replicates each role's RLS scope, a stub supabase client answers the browser (`client-stub.ts`), and every mutation returns `DEMO_MSG` instead of writing. Each persona sees its own onboarding wizard once per visit.
+`/demo` runs the app without an account. A `demo_role` cookie picks one of the 5 personas, the real queries switch to an evergreen dataset (`src/lib/demo/data.ts`, dates derived from `new Date()`) that replicates each role's RLS scope, a stub supabase client answers the browser (`client-stub.ts`), and every mutation returns `DEMO_MSG` instead of writing. Each persona sees its own onboarding wizard once per visit.
 
 ## Auth
 
@@ -88,11 +95,11 @@ Magic link on the implicit flow plus a cross-tab handoff: the request mints a no
 
 ## Architecture
 
-- `src/lib/queries.ts`: server-side reads with `React.cache` + `auth.getClaims()` (local JWT validation, no round-trip).
-- `src/lib/actions.ts`: server actions return `{ error }` or `{ ok }`, never throw.
+- `src/lib/queries*.ts`: server-side reads with `React.cache` + `auth.getClaims()` (local JWT validation, no round-trip).
+- `src/lib/actions*.ts`: server actions return `{ error }` or `{ ok }`, never throw; write validation lives in `src/lib/escritas.ts` (shared with the Liza tools).
 - `src/lib/ciclo.ts`: pure domain (semaphore, journey, enum labels, date math, `waLink`), shared by app, demo dataset and tests.
-- `src/lib/supabase/{server,client,middleware}.ts`: one client per context; middleware protects everything except `/login`, `/auth/*` and the public token routes.
-- 54 SQL migrations, RLS-first; guarded writes go through RPCs (delete is coord-only, `realizado` is immutable, signup is allowlisted).
+- `src/lib/supabase/{server,client,middleware}.ts`: one client per context; the **proxy** (`src/proxy.ts`, Next 16) calls `updateSession` and protects everything not in `isPublic` (`/login`, `/auth/*`, token routes, `/api/jobs/*`, `/api/mcp`).
+- SQL migrations `0001`–`0209`, RLS-first; guarded writes go through RPCs (delete is coord-only, `realizado` is immutable, signup is allowlisted). The ledger is immutable: the CI `repo-guard` job blocks edits to an existing migration.
 - Private buckets (`materiais`, `registro-anexos`) are served through signed URLs (300s) from scoped route handlers (`/api/material/[id]`, `/api/anexo/[id]`).
 
 ## Stack
@@ -101,7 +108,7 @@ Magic link on the implicit flow plus a cross-tab handoff: the request mints a no
 |---|---|
 | app | Next.js 16.3.6 (App Router) · React 19.2.8 · TypeScript |
 | ui | Tailwind v4 · Base UI + shadcn · Phosphor Icons · motion 13 · sonner |
-| data | Supabase (Postgres + Auth + Storage + RPC) · 54 migrations |
+| data | Supabase (Postgres + Auth + Storage + RPC) · migrations `0001`–`0209` |
 | docs | pdf-lib · Resend (transactional e-mail) |
 | tooling | pnpm 11.3 · Vitest 5 · Vercel |
 
@@ -115,8 +122,8 @@ src/app/{demo,f,assinar,login,privacidade}/
                      public surfaces (no session required)
 src/app/api/         signed downloads, CSV export, nudge log
 src/lib/             queries · actions · ciclo (domain) · demo/ · forms/ · documentos/
-supabase/migrations/ 0001-0055 · RLS-first
-tests/               156 unit tests over pure functions
+supabase/migrations/ 0001-0209 · RLS-first · immutable ledger
+tests/               unit (vitest) · route/CI contracts · e2e/{demo,app}
 ```
 
 ## Setup
@@ -131,12 +138,13 @@ SUPABASE_SERVICE_ROLE_KEY=<service-role-key>
 NEXT_PUBLIC_SITE_URL=http://localhost:3000
 
 pnpm dev      # http://localhost:3000 · public demo at /demo
-pnpm test     # vitest run → 156 tests, 10 files
-npx tsc --noEmit && npx eslint src/
+pnpm test     # vitest run → full domain + contract suite
+pnpm exec next typegen && npx tsc --noEmit && npx eslint src/
+pnpm guard    # 10 hygiene rules: migration ledger, secrets, links, workflows
 ```
 
 Only e-mails pre-registered in `profiles` can log in. To look around without an account, open `/demo` and pick a role on the demo bar.
 
 ## Docs
 
-`../README.md` (pt-BR, canonical) · `AGENTS.md` (operating rules + live domain state) · `BACKLOG.md` (prioritized roadmap) · `docs/plano-mestre.md`, `docs/roteiro-demo.md` · `docs/fontes/` (official program guides, pt-BR).
+`README.md` (pt-BR, canonical) · `AGENTS.md` (agent contract) · `.specify/README.md` (SDD workflow) · `BACKLOG.md` (prioritized roadmap) · `docs/plano-mestre.md`, `docs/roteiro-demo.md` · `docs/fontes/` (official program guides, pt-BR).

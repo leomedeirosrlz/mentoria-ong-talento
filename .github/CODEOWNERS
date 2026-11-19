@@ -1,0 +1,18 @@
+# Revisão obrigatória enquanto a proteção de branch estiver ligada (ver
+# docs/convencoes/ci-e2e.md — hoje não há proteção: este arquivo é
+# informativo e indica a intenção de revisão por superfície).
+
+*                                 @leomedeirosrlz
+
+# Toda mudança de schema/segurança passa pelo dono do programa.
+/supabase/migrations/            @leomedeirosrlz
+/src/proxy.ts                    @leomedeirosrlz
+/src/lib/supabase/               @leomedeirosrlz
+/.github/workflows/              @leomedeirosrlz
+/src/lib/database.types.ts       @leomedeirosrlz
+
+# Princípios e contrato do agente mudam em PR própria, só de constituição.
+/.specify/memory/                @leomedeirosrlz
+/.specify/templates/             @leomedeirosrlz
+/AGENTS.md                       @leomedeirosrlz
+/scripts/repo-guard.mjs          @leomedeirosrlz

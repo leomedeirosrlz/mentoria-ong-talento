@@ -8,32 +8,51 @@ This block is written and re-added by `next dev` — verify at `node_modules/nex
 
 <!-- END:nextjs-agent-rules -->
 
-# Regras do projeto (Thiago)
+# Contrato do agente — Realiza.vc
 
-- **SLC, não MVP.** Uma vertical slice completa e polida. Nada de placeholder, stub, template genérico ou "depois a gente melhora". Cada tela sai pronta.
-- **Sem gambiarras.** Não contornar infra quebrada com workarounds. Se uma integração não está pronta, faz o passo a passo correto — não inventa caminho alternativo.
-- **Integrações reais quando forem necessárias.** Resend, Supabase, Vercel, WhatsApp Cloud API: quando entrar, entra de verdade — config, keys, fluxo completo.
-- **Supabase:** usar `supabase start` oficial do CLI. Docker local quebrado (iptables) → pedir `sudo systemctl restart docker` ao Thiago; não montar stack manual.
-- **Copy em pt-BR** em toda interface.
-- Fonte da verdade do domínio: os guias do programa (PDFs). A dupla agenda os encontros; a coordenação monitora e faz nudge — não agenda por ela.
+Leia nesta ordem, só o que a tarefa toca:
 
-# Estado do projeto
+1. `.specify/memory/constitution.md` — princípios e gates (sempre).
+2. `docs/convencoes/architecture.md` — dados, auth e fronteira de código.
+3. `docs/convencoes/conventions-ui.md` — qualquer UI.
+4. `docs/convencoes/ci-e2e.md` — antes de push, merge ou deploy.
+5. `docs/regression-map.md` — invariante ↔ teste que o protege.
+6. `specs/<NNN>-<slug>/` se a tarefa tem spec; `BACKLOG.md` é a fila.
 
-Vertical slice funcionando contra o **Supabase remoto** (project ref `yhjzmxleotahijinjepl`, MCP `supabase` em `.devin/mcp_config.json`). Banco com dados reais — **não re-seedar dados demo**.
+## Regras duras
 
-- Next.js 16 (App Router) + React 19, Tailwind v4, Base UI (`src/components/ui`), Phosphor Icons.
-- `pnpm dev` · antes de dar por pronto: `npx tsc --noEmit` e `npx eslint src/` — ambos saem limpos.
-- Estrutura: leituras em `src/lib/queries.ts` (React.cache + getClaims), writes em `src/lib/actions.ts` (retornam `{error}`/`{ok}`, nunca lançam), domínio puro em `src/lib/ciclo.ts`.
+- SLC: entregue a fatia vertical completa e polida. Sem placeholder, stub ou "depois".
+- Sem workaround para infra quebrada: faça o passo correto ou pare e pergunte.
+- Autorização é RLS no banco (`my_role()`/`my_profile_id()`); nunca só na tela ou na action.
+- Server action retorna `{ ok }` ou `{ error }`, nunca lança; mensagem em pt-BR.
+- Migration: arquivo **novo**, próximo número livre (lacunas são intencionais); nunca edite ou apague uma existente — o remoto já rodou. SQL vai **verbatim** para o banco. Staging recebe na hora do push; **produção só na janela do release** (`staging → main`), nunca no meio do backlog.
+- Antes de SQL: confira o schema real (`information_schema`, `pg_policies`, `pg_enum`).
+- Rota pública nova entra em `isPublic` (`src/lib/supabase/middleware.ts`) + e2e do token inválido.
+- Nunca re-seede produção. Antes de qualquer write, confira o ref do `.env.local` (o de dev aponta para **staging**, não para prod).
+- UI: Tailwind no JSX, kit de `src/components/ui`, Phosphor `dist/ssr` em server component, copy pt-BR sem travessão.
+- Não invente número, contagem ou caminho: verifique com `ls`/`grep`/`git log`.
+- Não commite `.env*`, `.devin/`, `HANDOFF.md` nem artefatos de agente (o `.gitignore` já lista).
+- Commit conventional; `[deploy]` e `[e2e-preview]` só com autorização do Thiago.
 
-# Docs do agente — ler sob demanda
+## Quando abre spec
 
-Detalhe canônico por tema; leia **só o que a tarefa tocar**:
+Schema/RLS, auth, rota pública, integração externa ou mudança em mais de uma superfície: rode o fluxo `/speckit-specify → clarify → plan → tasks → analyze → implement` em `specs/<NNN>-<slug>/` (comandos em `.opencode/command/`, roteiro em `.specify/README.md`). Bug localizado ou copy: sem spec; fix de domínio ganha teste de regressão.
 
-| Doc | Ler quando |
-|---|---|
-| `docs/convencoes/constitution.md` | referência estendida das regras acima + stack |
-| `docs/convencoes/architecture.md` | queries/actions/RLS, domínio (semáforo, auth handoff), modo demo |
-| `docs/convencoes/conventions-ui.md` | **sempre que tocar UI** — escala tipográfica, padrões (DuplaLinha, SaudePrograma, abas por URL), copy, movimento |
-| `docs/convencoes/ci-e2e.md` | migrations, deploy, e2e local/preview, fixtures, staging — **obrigatório antes de push/merge/deploy** |
+## Definição de pronto (rode e cole a saída no PR)
 
-Backlog e pendências: **`BACKLOG.md`**.
+```bash
+pnpm exec next typegen && npx tsc --noEmit
+npx eslint src/
+pnpm test
+pnpm guard   # 10 regras: ledger de migrations, segredos, links, marcadores, workflows
+# tocou rota/fluxo? e2e local conforme docs/convencoes/ci-e2e.md
+# PR mergeia com o check "e2e-app / e2e" verde
+```
+
+## Não faça
+
+- Não rode build/e2e contra produção nem contra o Supabase de prod (`yhjzmxleotahijinjepl`).
+- Não aplique DDL de memória nem redigite SQL no MCP: passe o arquivo verbatim.
+- Não edite migration aplicada, `src/lib/database.types.ts` (gerado) nem `.specify/templates/*`.
+- Não crie segunda constituição, segunda arquitetura ou segunda convenção de UI.
+- Doc que contradiz o código: o código vence e a doc é corrigida na mesma PR.
