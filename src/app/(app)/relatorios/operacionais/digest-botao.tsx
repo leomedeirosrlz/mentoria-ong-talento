@@ -24,8 +24,8 @@ export function DigestBotao() {
       } else {
         setMsg(
           r.destinatarios
-            ? `Enviado para ${r.enviados ?? 0} de ${r.destinatarios} da coordenação.`
-            : "Nenhum e-mail de coordenação cadastrado — nada enviado."
+            ? `Enviado para ${r.enviados ?? 0} de ${r.destinatarios} destinatários.`
+            : "Nenhum destinatário com e-mail cadastrado. Nada enviado."
         );
       }
     });

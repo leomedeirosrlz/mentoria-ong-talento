@@ -177,7 +177,7 @@ function AvisoAcoes({ aviso }: { aviso: Comunicado }) {
         const total = ok.destinatarios ?? enviados + falhas;
         if (falhas) {
           toast.warning(
-            `E-mail enviado para ${enviados} de ${total}: ${falhas} ${falhas === 1 ? "falhou" : "falharam"}.`
+            `E-mail enviado para ${enviados} de ${total}. ${falhas} ${falhas === 1 ? "falhou" : "falharam"}.`
           );
         } else {
           toast.success(

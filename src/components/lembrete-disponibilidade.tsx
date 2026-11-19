@@ -18,7 +18,7 @@ export function LembreteDisponibilidade() {
         className="shrink-0 text-[var(--warn-text)]"
       />
       <span className="min-w-0 flex-1">
-        <span className="font-medium">Conta quando você pode</span>
+        <span className="font-medium">Conte quando você pode</span>
         <span className="text-muted-foreground">
           {" "}
           · seus dias e horários livres ajudam a achar um horário em comum
