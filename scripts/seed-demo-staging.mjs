@@ -129,6 +129,7 @@ async function limpar() {
   console.log("limpando range de000000-* …");
   // filhos primeiro — os filtros por FK usam o prefixo do uuid também
   const porFk = [
+    ["produto_eventos", "profile_id"],
     ["notificacoes", "profile_id"], ["notificacoes", "created_by"],
     ["presencas", "profile_id"], ["presencas", "marcado_por"],
     ["interacoes", "dupla_id"], ["interacoes", "autor_id"],
@@ -442,7 +443,7 @@ const montaEventosDpp = (E1, dataE, cronId, idBase) =>
     ["encontro", 14, dataE(14), "Desdobramento e plano de continuidade", F5, ["Roda da Vida", "Modelo SMART"], null, "pendente", null],
     ["recesso", null, somaDia(dataE(14), 1), "Recesso de fim de ano", null, [], somaDia(dataE(14), 18), "pendente", "Sem encontros — retomada na semana seguinte"],
     ["encontro", 15, dataE(15), "Reflexão e reconhecimento", F6, ["PDM", "Roda da Vida"], null, "pendente", null],
-    ["encontro", 16, dataE(16), "Encerramento e celebração", F6, ["Avaliação 360º", "Autoavaliação do mentor"], null, "pendente", null],
+    ["encontro", 16, dataE(16), "Encerramento e celebração", F6, ["Avaliação final"], null, "pendente", null],
     ["evento_encerramento", null, somaDia(dataE(16), 3), "Evento de encerramento do programa", null, [], null, "pendente", null],
   ].map((v, i) => ({
     id: uid(idBase + i),
@@ -489,6 +490,7 @@ const D = {
   d1: uid(0x300), d2: uid(0x301), d3: uid(0x302), d4: uid(0x303), d5: uid(0x304),
   d6: uid(0x305), d7: uid(0x306), d8: uid(0x307), d9: uid(0x308), d10: uid(0x309),
   d11: uid(0x30a), d12: uid(0x30b), d13: uid(0x30c), d14: uid(0x30d),
+  d15: uid(0x30e), d16: uid(0x30f), // encerradas cedo — ritos ainda pendentes
   trilha1: uid(0x320), trilha2: uid(0x321),
   dT2a: uid(0x150), dT2b: uid(0x151), // T2 demo — …0150 e …0151
 };
@@ -510,6 +512,11 @@ const duplas = [
   { id: D.d12, mentor_id: P.vanessa, mentorado_id: M.manuela, supervisor_id: P.sup1, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "encerrada", iniciada_em: encontroDate(1) },
   { id: D.d13, mentor_id: P.andre, mentorado_id: M.larissa, supervisor_id: P.sup1, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
   { id: D.d14, mentor_id: P.eduardo, mentorado_id: M.beatrizN, supervisor_id: P.sup2, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "ativa", iniciada_em: encontroDate(1) },
+  // encerradas cedo cujos ritos AINDA esperam decisão — a fila "Aguardando
+  // decisão" da 389 só existe com elas (d15: jovem parou de responder; d16:
+  // saiu pro Jovem Aprendiz e o checklist ficou completo)
+  { id: D.d15, mentor_id: P.daniel, mentorado_id: M.bruno, supervisor_id: P.sup2, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "encerrada", iniciada_em: encontroDate(1) },
+  { id: D.d16, mentor_id: P.renata, mentorado_id: M.carla, supervisor_id: P.sup2, turma: T1_TURMA, cronograma_id: CRON1, trilha: "dpp", status: "encerrada", iniciada_em: encontroDate(1) },
   // trilhas especialista
   { id: D.trilha1, mentor_id: P.luisa, mentorado_id: M.larissa, supervisor_id: P.sup1, turma: T1_TURMA, cronograma_id: CRON1, trilha: "especialista", status: "ativa", iniciada_em: encontroDate(3), demanda: "Escolha de carreira + ansiedade de desempenho" },
   { id: D.trilha2, mentor_id: P.sofia, mentorado_id: M.enzo, supervisor_id: P.sup1, turma: T1_TURMA, cronograma_id: CRON1, trilha: "especialista", status: "concluida", iniciada_em: encontroDate(1), encerrada_em: iso(new Date("2026-10-10T19:00:00-03:00")), motivo_encerramento: "Trilha concluída nos 5 encontros.", demanda: "Finanças pessoais e primeiro salário", devolutiva_pdm: "Trilha de finanças fechada: o Enzo saiu do zero pra uma planilha própria e conta aberta." },
@@ -540,6 +547,8 @@ const PLANO_ENCONTROS = {
   [D.d12]: { feitos: 3, hora: "19:00", proximo: false, duracao: 60 },        // encerrada
   [D.d13]: { feitos: 6, hora: "19:00", proximo: true, duracao: 90 },         // 2ª dupla do Otávio
   [D.d14]: { feitos: 6, hora: "19:00", proximo: true, duracao: 60 },
+  [D.d15]: { feitos: 3, hora: "19:00", proximo: false, duracao: 60 },        // encerrada — rito pendente
+  [D.d16]: { feitos: 2, hora: "18:30", proximo: false, duracao: 60 },        // encerrada — rito pendente
   // a sessão agendada ancora em HOJE: a grade visual só desenha a semana
   // corrente (seg–dom) e "próximo dia X" foge dela na maior parte da semana
   [D.trilha1]: { feitos: 3, hora: "19:30", proximo: true, duracao: 45, trilha: true, hoje: true },
@@ -1027,6 +1036,14 @@ assinaturas.push({
   token_expira_em: iso(new Date(Date.now() + 15 * DIA)), created_by: P.coord,
   created_at: iso(new Date("2026-10-05T14:30:00-03:00")),
 });
+// e um link já vencido sem assinatura — a fila "expirado" do relatório de
+// assinaturas só existe com ele (o status efetivo é derivado na leitura)
+assinaturas.push({
+  id: uid(0xe00 + ai++), template_id: TPL_RESP, mentorado_id: M.bruno, status: "pendente",
+  dados_snapshot: { nome: "Cláudia Almeida" }, token: uid(0xe81),
+  token_expira_em: iso(new Date(Date.now() - 8 * DIA)), created_by: P.coord,
+  created_at: iso(new Date(Date.now() - 40 * DIA)),
+});
 await post("assinaturas", assinaturas);
 
 // notas internas
@@ -1046,8 +1063,68 @@ try {
       checklist: { feedback_final: false, feedback_mutuo: false, revisao_pdm: false, avaliacao_360_enviada: true },
       resumo_jornada: "3 encontros realizados. A família da Manuela se mudou pra Santos — encerramento antecipado sem conflito.",
       decidido_por: P.coord, created_at: iso(new Date("2026-09-30T20:10:00-03:00")) },
+    // ritos SEM decisão — a fila "Aguardando decisão" do relatório. Um com
+    // checklist quase vazio (jovem sumiu) e um completo ("falta decidir")
+    { id: uid(0x1302), dupla_id: D.d15, tipo: "pendente",
+      checklist: { feedback_final: false, feedback_mutuo: false, revisao_pdm: false, avaliacao_360_enviada: true },
+      created_at: iso(new Date(Date.now() - 12 * DIA)) },
+    { id: uid(0x1303), dupla_id: D.d16, tipo: "pendente",
+      checklist: { feedback_final: true, feedback_mutuo: true, revisao_pdm: true, avaliacao_360_enviada: true },
+      resumo_jornada: "2 encontros realizados. Saída por incompatibilidade de horário com o Jovem Aprendiz — encerramento sem conflito.",
+      created_at: iso(new Date(Date.now() - 6 * DIA)) },
   ]);
 } catch (e) { console.log("  encerramentos skip:", e.message.slice(0, 100)); }
+
+// avaliação por terceiros da dupla âncora (Ana × Otávio) — a semana 1→2 do
+// guia DPP: 3 respostas curadas + consolidação publicada, 1 convite no ar e
+// 1 expirado. Sem isso o painel de terceiros da ficha nasce vazio
+try {
+  const tercBase = Date.now();
+  await post("terceiros_contatos", [
+    { id: uid(0x1400), dupla_id: D.d1, nome: "Rafaela Duarte", vinculo: "amigo",
+      whatsapp: WA(11, 96040001), token: `demo-terc-ana-rafaela-${tercBase}`,
+      expira_em: iso(new Date(tercBase + 20 * DIA)), status: "respondido",
+      respondido_em: iso(new Date(tercBase - 25 * DIA)), created_by: P.andre,
+      created_at: iso(new Date(tercBase - 30 * DIA)) },
+    { id: uid(0x1401), dupla_id: D.d1, nome: "Marta Souza", vinculo: "familiar",
+      whatsapp: WA(11, 96040002), token: `demo-terc-ana-marta-${tercBase}`,
+      expira_em: iso(new Date(tercBase + 20 * DIA)), status: "respondido",
+      respondido_em: iso(new Date(tercBase - 24 * DIA)), created_by: P.andre,
+      created_at: iso(new Date(tercBase - 30 * DIA)) },
+    { id: uid(0x1402), dupla_id: D.d1, nome: "Lucas Prado", vinculo: "colega",
+      whatsapp: WA(11, 96040003), token: `demo-terc-ana-lucas-${tercBase}`,
+      expira_em: iso(new Date(tercBase + 20 * DIA)), status: "respondido",
+      respondido_em: iso(new Date(tercBase - 22 * DIA)), created_by: P.andre,
+      created_at: iso(new Date(tercBase - 30 * DIA)) },
+    { id: uid(0x1403), dupla_id: D.d1, nome: "Igor Nunes", vinculo: "amigo",
+      whatsapp: WA(11, 96040004), token: `demo-terc-ana-igor-${tercBase}`,
+      expira_em: iso(new Date(tercBase + 25 * DIA)), status: "pendente",
+      created_by: P.andre, created_at: iso(new Date(tercBase - 5 * DIA)) },
+    { id: uid(0x1404), dupla_id: D.d1, nome: "Seu Joaquim", vinculo: "outro",
+      whatsapp: WA(11, 96040005), token: `demo-terc-ana-joaquim-${tercBase}`,
+      expira_em: iso(new Date(tercBase - 10 * DIA)), status: "expirado",
+      created_by: P.andre, created_at: iso(new Date(tercBase - 35 * DIA)) },
+  ]);
+  await post("terceiros_respostas", [
+    { id: uid(0x1430), contato_id: uid(0x1400),
+      pontos_fortes: "A Ana escuta de verdade — ela lembra do que a gente conta semanas depois. Também é a que organiza o grupo quando todo mundo some.",
+      a_melhorar: "Às vezes ela some quando tá ansiosa com prova. Podia pedir ajuda em vez de desaparecer.",
+      respondido_em: iso(new Date(tercBase - 25 * DIA)) },
+    { id: uid(0x1431), contato_id: uid(0x1401),
+      pontos_fortes: "Teimosa do bem: quando decide uma coisa ela vai até o fim. Aprendeu a cozinhar sozinha vendo vídeo e hoje faz o jantar de domingo.",
+      a_melhorar: "Ansiedade antes de prova. Treme a voz quando fala em público — precisa praticar apresentação.",
+      respondido_em: iso(new Date(tercBase - 24 * DIA)) },
+    { id: uid(0x1432), contato_id: uid(0x1402),
+      pontos_fortes: "Na escola era a pessoa que explicava matemática pro resto da turma. Paciente, não faz ninguém se sentir burro.",
+      a_melhorar: "Perfeccionista — trava quando a tarefa parece grande demais. Divide melhor em etapas pequenas.",
+      respondido_em: iso(new Date(tercBase - 22 * DIA)) },
+  ]);
+  await post("terceiros_consolidacao", [
+    { dupla_id: D.d1,
+      consolidado: "Três pessoas próximas apontam o mesmo núcleo: escuta rara, constância (\"vai até o fim\") e o papel de mediadora no grupo e na escola. O ponto a trabalhar também converge: a ansiedade some com ela — em prova e quando a tarefa parece grande. Sugestão pro plano: metas fatiadas e um momento de fala em cada encontro.",
+      publicado_em: iso(new Date(tercBase - 15 * DIA)), escrito_por: P.andre },
+  ]);
+} catch (e) { console.log("  terceiros skip:", e.message.slice(0, 100)); }
 
 // ---------- contas de login ----------
 console.log("criando logins demo…");

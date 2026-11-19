@@ -1301,7 +1301,9 @@ export default async function DuplaPage({
         )}
       </section>
 
-      <ArquivosDupla arquivos={arquivosDaDupla} pdm={pdm} />
+      {/* pdm_da_dupla devolve doc vazio (não null) até pra trilha esp —
+          o item PDM só faz sentido na DPP, onde o documento vive */}
+      <ArquivosDupla arquivos={arquivosDaDupla} pdm={ehEsp ? null : pdm} />
 
       {ehEsp && (devolutivasFeed.length > 0 || souMentor) && (
         <section aria-labelledby="devolutivas-trilha" className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] space-y-3">

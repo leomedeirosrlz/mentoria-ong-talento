@@ -57,6 +57,7 @@ lacuna L-7. Inventário do que atravessa cada um:
 | Vercel | hosting/edge | todo o tráfego (headers, IP, sessão) |
 | Resend | e-mail transacional | endereços de destinatários + assunto/corpo dos envios |
 | Sentry | telemetria de erro | metadados de erro com scrub (`src/lib/sentry-scrub.ts`), sem replay |
+| ViaCEP (viacep.com.br) | consulta de endereço por CEP | só o CEP digitado — vai do nosso servidor, não do usuário; nenhum outro campo sai |
 
 ## 5. Cláusulas da autorização — **EM REVISÃO JURÍDICA (Thiago)**
 

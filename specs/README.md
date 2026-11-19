@@ -15,7 +15,7 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 
 ## Nome, estado e retenção
 
-- Pasta `NNN-<slug>`: 3 dígitos sequenciais, kebab-case. **Próximo número livre: 002** (002–005 e `006-turmas-nov` reservados em worktrees paralelas — use 007 em diante).
+- Pasta `NNN-<slug>`: 3 dígitos sequenciais, kebab-case. **Próximo número livre: 007** (003 e 006 reservados a worktrees irmãs ainda não mergeadas; conferir antes de numerar).
 - Estado no `spec.md`: `Draft` → `Clarified` → `Approved` → `Delivered` | `Dropped`.
 - Spec `Delivered` **não é editada**. Mudança de rumo = próxima spec, citando a anterior. `Dropped` registra o motivo em uma linha.
 - O roteiro dos passos está em `.specify/README.md`; os templates, em `.specify/templates/`.
@@ -25,6 +25,9 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 | # | Slug | Tipo | Status | Origem |
 |---|---|---|---|---|
 | 001 | `proxy-e-rotas-publicas` | as-built | Delivered | regressão (18/nov/2026) |
+| 003 | `relatorios-nov` | feature | Delivered | REALIZA-389/407 (ws5, 19/nov/2026) |
+| 004 | `materiais-nativos` | as-built | Delivered | auditoria ws6 (19/nov/2026) |
+| 005 | `ops-nov` | mudança | Clarified | Jira REALIZA-37/98 (ws7, 18/nov/2026) — US1 implementada; US2 spec-only |
 | 006 | `turmas-nov` | feature | Approved | REALIZA-34 (18/nov/2026) |
 
 ## Fronteiras já mapeadas, ainda sem spec

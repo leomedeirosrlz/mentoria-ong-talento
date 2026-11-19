@@ -26,6 +26,12 @@ Quem mexe no repo sem contexto precisa de duas coisas: saber **qual regra não p
 | Contrato do CSV de export | `tests/relatorios-csv.test.ts`, `tests/export-route.test.ts` |
 | IA: impersonação, rate-limit, tokens MCP, prompt | `tests/ia-*.test.ts`, `src/lib/ia/*.test.ts`, `tests/tokens-mcp.test.ts` |
 | Cronograma importado nunca persiste sem revisão; parser produz `EventoRascunho` válido | `src/lib/importar-cronograma/normalizar.test.ts` + `tests/e2e/app/turmas-importar.spec.ts` |
+| PII do `/resumo` (`hashIpAcesso` por salt, null em prod sem env + aviso 1×, UA truncado) | `tests/resumo-acesso.test.ts` |
+| Paridade TS × SQL de vocabulários fechados (`AcaoProduto` × RPC vigente, `AUDIENCIAS` × check/policies da `0139`, `ROLES_POR_AUDIENCIA` × check de comunicados) | `tests/paridade-ts-sql.test.ts` |
+| Auth do `/api/mcp` (401 sem Bearer, 401 PAT inválido, 403 sem papel, `papeis[]` manda) e `PAPEIS_MCP` = 5 papéis | `tests/mcp-auth.test.ts` |
+| Semântica do handoff em SQL (registrar resgata `failed`, falhar é `do nothing`, pegar distingue expirado) | `tests/handoff-sql.test.ts` |
+| Regexes de token público consistentes com o mint (32 base64url em `/f` `/t` `/avaliar`; uuid em `/assinar` `/api/assinar-token`) | `tests/token-formato.test.ts` |
+| Janela de adoção ≤ retenção do cru; RPCs `adocao_*` e export não leem o rollup | `tests/adocao-janela.test.ts` |
 
 E2e `app` (backend real, obrigatório no PR) e `demo` cobrem os fluxos por papel — a lista de specs por subsistema está no índice do Playwright.
 
@@ -33,13 +39,9 @@ E2e `app` (backend real, obrigatório no PR) e `demo` cobrem os fluxos por papel
 
 Gap real, com teste viável já especificado — entregar como spec de regressão, não como "melhoria":
 
-1. **PII do `/resumo`** (`src/lib/resumo-acesso.ts`): `hashIpAcesso`/salt/fallback — 70 linhas de decisão LGPD sem teste.
-2. **Paridade TS × SQL de vocabulários fechados**: `AcaoProduto` × whitelist da RPC (`0203`); `AUDIENCIAS` × check da `0139`. Divergência passa em build e some com o dado.
-3. **`refazer` instrumento (`0209`)**: allowlist da action × RPC × catálogo.
-4. **Auth do `/api/mcp`** (PAT 401/403) e `PAPEIS_MCP` — só e2e hoje.
-5. **Semântica do handoff em SQL** (`0181`/`0175`/`0050`) — só e2e.
-6. **Trigger de encerramento automático** (`0102`) e RPC `rematch_dupla` — regra de banco sem harness; cobrir por asserção de texto SQL ou e2e dedicado.
-7. **251 policies RLS** — sem teste de banco; mitigação atual: policy é migration nova + caso e2e do papel negado.
+1. **`refazer` instrumento (`0209`)**: allowlist da action × RPC × catálogo.
+2. **Trigger de encerramento automático** (`0102`) e RPC `rematch_dupla` — regra de banco sem harness; cobrir por asserção de texto SQL ou e2e dedicado.
+3. **251 policies RLS** — sem teste de banco; mitigação atual: policy é migration nova + caso e2e do papel negado.
 
 ## Ambiguidades que travam teste (decisão humana, não código)
 
