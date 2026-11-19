@@ -15,7 +15,7 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 
 ## Nome, estado e retenção
 
-- Pasta `NNN-<slug>`: 3 dígitos sequenciais, kebab-case. **Próximo número livre: 007** (003 e 006 reservados a worktrees irmãs ainda não mergeadas; conferir antes de numerar).
+- Pasta `NNN-<slug>`: 3 dígitos sequenciais, kebab-case. **Próximo número livre: 008** (conferir antes de numerar).
 - Estado no `spec.md`: `Draft` → `Clarified` → `Approved` → `Delivered` | `Dropped`.
 - Spec `Delivered` **não é editada**. Mudança de rumo = próxima spec, citando a anterior. `Dropped` registra o motivo em uma linha.
 - O roteiro dos passos está em `.specify/README.md`; os templates, em `.specify/templates/`.
@@ -29,6 +29,7 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 | 004 | `materiais-nativos` | as-built | Delivered | auditoria ws6 (19/nov/2026) |
 | 005 | `ops-nov` | mudança | Clarified | Jira REALIZA-37/98 (ws7, 18/nov/2026) — US1 implementada; US2 spec-only |
 | 006 | `turmas-nov` | feature | Approved | REALIZA-34 (18/nov/2026) |
+| 007 | `ux-visual-nov` | mudança | Draft | brief ws10 (19/nov/2026) — auditoria de 14 itens de UX/visual/copy |
 
 ## Fronteiras já mapeadas, ainda sem spec
 
