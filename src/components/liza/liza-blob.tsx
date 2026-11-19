@@ -472,26 +472,15 @@ function BlobSvg({ estado, tamanho, seguirCursor = true, className }: LizaProps)
   const tagarela = useTagarelar(detalhe && pose.boca === "falando", reduzido);
   const inclina = useAlvoMola(efetivo === "atento" ? 1 : 0, reduzido);
 
-  // os olhos crescem na proporção do rosto conforme a mascote encolhe —
-  // abaixo de 64px eles interpolam até as medidas do mini (as do <28),
-  // senão o FAB do celular (44) e o header (34) liam como pontinhos.
-  // k: 0 aos 28px (medidas do mini) → 1 aos 64px+ (medidas cheias)
-  const kOlho = Math.min(1, Math.max(0, (tamanho - 28) / 36));
-  // olhos ~17% maiores que a primeira versão (feedback de design: a
-  // expressão era genérica) e mais ~15% na escala cheia: com o olho menor o
-  // disco sobrava embaixo e a Liza lia como gordinha. No mini continuam
-  // legíveis sem encostar um no outro. Nov/26: mais 15% lineares — os olhos
-  // carregam a expressão e ainda liam pequenos nos tamanhos médios.
-  // Depois do +15% ficaram grandes demais — -5% de ajuste fino; e os
-  // centros afastam +2% (dx 19→19,4): juntos liam apertados na cara
-  const olhoDims = detalhe
-    ? {
-        rx: 14 - 0.7 * kOlho,
-        ry: 17.25 - 1 * kOlho,
-        cy: 48.5 - 3 * kOlho,
-        dx: 19.4 - 0.4 * kOlho,
-      }
-    : { rx: 14, ry: 17.25, cy: 48.5, dx: 19.4 };
+  // a proporção do olho no rosto é constante em toda a escala: a
+  // interpolação por tamanho (kOlho 28→64px) encolhia o olho conforme o
+  // slot media — o px medido ainda amarrava a cara à largura da viewport e
+  // no desktop (empty state expandido) ele lia pequeno demais (26% da
+  // largura). Agora o olho é sempre 31% da largura e o par ocupa ~18% da
+  // área do rosto. O espaçamento entre os olhos (2·dx-2·rx = 11) é o mesmo
+  // de antes da mudança (~2,4px no avatar de 22px) — os olhos crescem pra
+  // margem, não um contra o outro, e não encostam nem no mini.
+  const olhoDims = { rx: 15.5, ry: 18.5, cy: 48.5, dx: 21 };
   // cílios em todas as escalas: no mini o par continua, mas mais grosso e
   // mais afastado — as mesmas duas hastes do grande fundiriam num borrão
   // nos avatares da conversa (22/24) e no header (34)
@@ -689,8 +678,8 @@ function BlobSvg({ estado, tamanho, seguirCursor = true, className }: LizaProps)
 
 /** `responsivo` (REALIZA-447) liga o modo por container: em vez de receber
  *  `tamanho` decidido por viewport/matchMedia, o blob mede o slot que o
- *  envolve via ResizeObserver (useMedida) e alimenta as proporções
- *  internas (kOlho, detalhe) com o px real. `className` passa a ser do
+ *  envolve via ResizeObserver (useMedida) e alimenta o detalhe/cílios com
+ *  o px real. `className` passa a ser do
  *  wrapper medido — as classes de tamanho moram nele — e `tamanho` vira
  *  o fallback do primeiro frame/SSR. */
 export function LizaBlob({
