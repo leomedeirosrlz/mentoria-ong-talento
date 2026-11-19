@@ -126,6 +126,7 @@ jobs:
         run: >-
           # imagens do Supabase vêm do GHCR (sem rate limit do ECR público):
           # baixa o espelho e retaga no nome original que o CLI espera
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
           repo="${GITHUB_REPOSITORY,,}"
           while read -r img; do
             case "$img" in ""|\#*) continue;; esac
