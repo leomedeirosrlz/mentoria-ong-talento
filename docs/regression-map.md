@@ -34,6 +34,7 @@ Quem mexe no repo sem contexto precisa de duas coisas: saber **qual regra não p
 | Janela de adoção ≤ retenção do cru; RPCs `adocao_*` e export não leem o rollup | `tests/adocao-janela.test.ts` |
 | Explorador DuckDB sem CDN: extensão parquet vendored por versão×plataforma do engine, repo same-origin via `custom_extension_repository`, CSP sem `duckdb.org` | `tests/adocao-duckdb-ext.test.ts` |
 | Ordenação de /duplas: `?ordem=` parse/serializa coluna+dir, radar por `pesoFila`, coluna "Situação" (apoio→risco→atenção→em dia, fora no fim nas 2 direções), desempate A→Z estável | `tests/duplas-ordem.test.ts` + `tests/e2e/demo/duplas.spec.ts` (ciclo do header) |
+| Card "Aguardando par": aberto por padrão com fila não-vazia, contagem separada dos dois lados, fila por espera, busca+chip de turma recortam, espera visível no Parear, lista fixa nunca vira esqueleto, "Formar dupla" primário e sempre visível, entrada por âncora a partir de /duplas | `tests/e2e/demo/fila-espera.spec.ts` + `tests/e2e/app/operacional.spec.ts` |
 
 E2e `app` (backend real, obrigatório no PR) e `demo` cobrem os fluxos por papel — a lista de specs por subsistema está no índice do Playwright.
 

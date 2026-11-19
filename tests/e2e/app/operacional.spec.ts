@@ -138,7 +138,7 @@ test.describe("coordenação — fluxos operacionais", () => {
     await restaurarFixtures();
   });
 
-  test("pessoas: fila 'Aguardando par' abre fechada e lista o mentorado sem par", async ({
+  test("pessoas: fila 'Aguardando par' abre aberta com a contagem separada e lista o mentorado sem par", async ({
     page,
   }) => {
     await page.goto("/pessoas");
@@ -146,10 +146,14 @@ test.describe("coordenação — fluxos operacionais", () => {
     const fila = page.locator(
       'section[aria-labelledby="fila-espera-titulo"]'
     );
-    // a tela abre com o card fechado — a coord expande se precisar
-    const gatilho = fila.getByRole("button", { name: /Aguardando par ·/ });
-    await expect(gatilho).toHaveAttribute("aria-expanded", "false");
-    await gatilho.click();
+    // REALIZA-446: com gente esperando o card já abre — a fila é a
+    // chamada de entrada, e o título separa os dois lados ("o que falta
+    // pra parear" fica legível sem expandir nada)
+    const gatilho = fila.getByRole("button", { name: /Aguardando par/ });
+    await expect(gatilho).toHaveAttribute("aria-expanded", "true");
+    await expect(
+      fila.getByText(/\d+ mentorado(s)? · \d+ mentor(es)? com vaga/)
+    ).toBeVisible();
     // a mentorada fixture nunca teve dupla — espera na coluna de mentorados
     await expect(
       fila.getByRole("link", { name: "Abrir perfil de Mentorada E2E Livre" })
@@ -486,10 +490,13 @@ test.describe("coordenação — fluxos operacionais", () => {
     const card = page.locator(
       'section[aria-labelledby="fila-espera-titulo"]'
     );
-    await expect(card.getByText(/Aguardando par · \d+/)).toBeVisible();
-    // o card abre fechado por padrão — expande antes de entrar no Parear
+    await expect(
+      card.getByText(/Aguardando par/)
+    ).toBeVisible();
+    // com espera na fila o card já abre — a guarda só cobre o caso
+    // de fila vazia (total 0 = fechado por padrão)
     const gatilho = card.getByRole("button", {
-      name: /Aguardando par ·/,
+      name: /Aguardando par/,
     });
     if ((await gatilho.getAttribute("aria-expanded")) === "false") {
       await gatilho.click();
