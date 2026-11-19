@@ -96,25 +96,33 @@ async function apagarEncontros(ids: Iterable<string>) {
     "avaliacoes_encontro",
     `select=id&encontro_id=in.(${lista.join(",")})`
   );
-  if (avals.length) {
-    await limparViaServiceRole(
+  // fase 1: chamados morrem antes das origens (a FK é SET NULL — apagar a
+  // avaliação primeiro deixaria a linha órfã); o fallback por autor pega
+  // chamados do jovem fixture criados por outros caminhos
+  await Promise.all([
+    avals.length
+      ? limparViaServiceRole(
+          "chamados",
+          `avaliacao_id=in.(${avals.map((a) => a.id).join(",")})`
+        )
+      : Promise.resolve(),
+    limparViaServiceRole(
       "chamados",
-      `avaliacao_id=in.(${avals.map((a) => a.id).join(",")})`
-    );
-  }
-  // fallback: chamados do jovem fixture criados por outros caminhos
-  await limparViaServiceRole(
-    "chamados",
-    `autor_id=eq.${IDS.jovemProfile}`
-  );
-  await limparViaServiceRole(
-    "avaliacoes_encontro",
-    `encontro_id=in.(${lista.join(",")})`
-  );
-  await limparViaServiceRole(
-    "avaliacao_links",
-    `encontro_id=in.(${lista.join(",")})`
-  );
+      `autor_id=eq.${IDS.jovemProfile}`
+    ),
+  ]);
+  // fase 2: as origens em si, tabelas independentes em paralelo — em
+  // staging cada ida serial ao PostgREST soma segundos no hook
+  await Promise.all([
+    limparViaServiceRole(
+      "avaliacoes_encontro",
+      `encontro_id=in.(${lista.join(",")})`
+    ),
+    limparViaServiceRole(
+      "avaliacao_links",
+      `encontro_id=in.(${lista.join(",")})`
+    ),
+  ]);
   await limparViaServiceRole("encontros", `id=in.(${lista.join(",")})`);
 }
 
@@ -123,19 +131,23 @@ async function apagarEncontros(ids: Iterable<string>) {
  *  por created_by (o trigger assina com o profile de quem respondeu —
  *  alcança qualquer coord real do staging que foi notificado). */
 async function limparRastros() {
-  await limparViaServiceRole(
-    "notificacoes",
-    `profile_id=eq.${IDS.jovemProfile}&tipo=eq.avaliacao_pendente`
-  );
-  await limparViaServiceRole(
-    "notificacoes",
-    `profile_id=eq.${IDS.jovemProfile}&tipo=eq.chamado_resolvido`
-  );
-  await limparViaServiceRole(
-    "notificacoes",
-    `created_by=eq.${IDS.jovemProfile}&tipo=like.chamado_*`
-  );
-  await limparViaServiceRole("emails_enviados", "tipo=eq.apoio_jovem");
+  // filtros disjuntos (e tabelas diferentes no emails_enviados) — o
+  // paralelo importa no PostgREST do staging, não a ordem
+  await Promise.all([
+    limparViaServiceRole(
+      "notificacoes",
+      `profile_id=eq.${IDS.jovemProfile}&tipo=eq.avaliacao_pendente`
+    ),
+    limparViaServiceRole(
+      "notificacoes",
+      `profile_id=eq.${IDS.jovemProfile}&tipo=eq.chamado_resolvido`
+    ),
+    limparViaServiceRole(
+      "notificacoes",
+      `created_by=eq.${IDS.jovemProfile}&tipo=like.chamado_*`
+    ),
+    limparViaServiceRole("emails_enviados", "tipo=eq.apoio_jovem"),
+  ]);
 }
 
 /** Piso entre testes (e retries): dupla do jovem com EXATAMENTE a pendência
@@ -143,18 +155,22 @@ async function limparRastros() {
  *  mentor.spec solto pode ter varrido os encontros da dupla inteira: se a
  *  fixture sumiu, recria (o insert dispara o trigger que minta o link). */
 async function convergirPiso() {
-  // leftovers de run morto no pool de números do spec — filhos primeiro
-  const restos = await buscarViaServiceRole<{ id: string }[]>(
-    "encontros",
-    `select=id&dupla_id=eq.${DUPLA_ID}&numero=in.(${POOL_NUMEROS.join(",")})`
-  );
+  // selects independentes em paralelo — em staging cada ida serial ao
+  // PostgREST soma segundos e o hook comia o teto de 60s do teste
+  const [restos, enc] = await Promise.all([
+    // leftovers de run morto no pool de números do spec — filhos primeiro
+    buscarViaServiceRole<{ id: string }[]>(
+      "encontros",
+      `select=id&dupla_id=eq.${DUPLA_ID}&numero=in.(${POOL_NUMEROS.join(",")})`
+    ),
+    buscarViaServiceRole<{ id: string }[]>(
+      "encontros",
+      `select=id&id=eq.${IDS.encontroFixture}`
+    ),
+  ]);
   await apagarEncontros(restos.map((r) => r.id));
   criados.delete(IDS.encontroFixture);
 
-  const [enc] = await buscarViaServiceRole<{ id: string }[]>(
-    "encontros",
-    `select=id&id=eq.${IDS.encontroFixture}`
-  );
   if (!enc) {
     const quando = new Date(Date.now() - 2 * 86400e3).toISOString();
     await inserirViaServiceRole("encontros", {
@@ -170,14 +186,17 @@ async function convergirPiso() {
   // pendência de verdade: nenhuma avaliação no encontro e o link de volta a
   // 'pendente' (o submit do spec consome os dois). Encontro 'realizado' não
   // volta de status (guard 0043) — o reconverso é nos filhos, não nele.
-  await limparViaServiceRole(
-    "avaliacoes_encontro",
-    `encontro_id=eq.${IDS.encontroFixture}`
-  );
-  const [link] = await buscarViaServiceRole<{ id: string }[]>(
-    "avaliacao_links",
-    `select=id&encontro_id=eq.${IDS.encontroFixture}`
-  );
+  const [, links] = await Promise.all([
+    limparViaServiceRole(
+      "avaliacoes_encontro",
+      `encontro_id=eq.${IDS.encontroFixture}`
+    ),
+    buscarViaServiceRole<{ id: string }[]>(
+      "avaliacao_links",
+      `select=id&encontro_id=eq.${IDS.encontroFixture}`
+    ),
+  ]);
+  const [link] = links;
   if (!link) {
     await inserirViaServiceRole("avaliacao_links", {
       token: crypto.randomUUID(),
@@ -192,11 +211,11 @@ async function convergirPiso() {
       { status: "pendente", respondido_em: null, respondido_por_profile_id: null }
     );
   }
-  await limparRastros();
   // a fixture é o ÚLTIMO encontro do cronograma — re-criá-la dispara a
-  // 0102 e a dupla acorda 'concluida' (PDM read-only, agenda sem CTA).
-  // Devolve o piso de sempre: status ativa, sem encerramento nem sinos.
-  await convergirDuplaAtiva(DUPLA_ID);
+  // 0102 e a dupla acorda 'concluida' (PDM read-only, agenda sem CTA):
+  // convergirDuplaAtiva devolve status ativa, sem encerramento nem sinos.
+  // Toca linhas diferentes das do limparRastros — vão juntas.
+  await Promise.all([limparRastros(), convergirDuplaAtiva(DUPLA_ID)]);
 }
 
 test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
@@ -206,17 +225,20 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await apagarEncontros(criados);
     criados.clear();
     // devolve a fixture ao "sem avaliação, link pendente" — um teste que
-    // submeteu a dela não pode vazar estado pro próximo
-    await limparViaServiceRole(
-      "avaliacoes_encontro",
-      `encontro_id=eq.${IDS.encontroFixture}`
-    );
-    await atualizarViaServiceRole(
-      "avaliacao_links",
-      `encontro_id=eq.${IDS.encontroFixture}`,
-      { status: "pendente", respondido_em: null, respondido_por_profile_id: null }
-    );
-    await limparRastros();
+    // submeteu a dela não pode vazar estado pro próximo. As três limpezas
+    // tocam linhas/tabelas diferentes — em paralelo pra caber no hook.
+    await Promise.all([
+      limparViaServiceRole(
+        "avaliacoes_encontro",
+        `encontro_id=eq.${IDS.encontroFixture}`
+      ),
+      atualizarViaServiceRole(
+        "avaliacao_links",
+        `encontro_id=eq.${IDS.encontroFixture}`,
+        { status: "pendente", respondido_em: null, respondido_por_profile_id: null }
+      ),
+      limparRastros(),
+    ]);
   });
 
   // ---------- jovem logado (/jovem) ----------
@@ -244,8 +266,11 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await pendente.getByRole("button", { name: "Avaliar" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
+    // o título usa o rótulo da sessão ("16º encontro com Mentor") — o
+    // passe de copy trocou o "Nº encontro" seco por ele; a regex tolera
+    // as duas formas
     await expect(
-      dialog.getByText("16º encontro: como foi?")
+      dialog.getByText(/16º encontro[^:]*: como foi\?/)
     ).toBeVisible();
 
     // radios/checkbox do form moram sr-only dentro do label — o clique
@@ -274,7 +299,7 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     // a pendência vira linha de histórico com a nota — o refresh re-renderiza
     // (o bloco recolhido desmonta quando zera, então a marca dela some)
     await expect(
-      secao.getByText("aguardando sua resposta")
+      secao.getByText(/esperando sua resposta/)
     ).toHaveCount(0);
     const feita = secao.locator("li", { hasText: "16º encontro" });
     await expect(
@@ -327,8 +352,10 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
       .getByRole("button", { name: "Ver resposta" })
       .click();
     const dialog = page.getByRole("dialog");
+    // "Sua avaliação: 15º encontro com Mentor" — o passe de copy trocou o
+    // "do Nº encontro" pelo rótulo da sessão; a regex tolera as duas formas
     await expect(
-      dialog.getByText("Sua avaliação do 15º encontro")
+      dialog.getByText(/Sua avaliação.{2,4}15º encontro/)
     ).toBeVisible();
     await expect(
       dialog.getByRole("img", { name: "5 de 5 estrelas" })

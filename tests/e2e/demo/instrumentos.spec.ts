@@ -90,8 +90,18 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
       hasText: "Instrumentos da jornada",
     });
     await expect(sec.getByText("Definindo Minhas Metas")).toBeVisible();
-    await sec.getByRole("button", { name: "Gerar link" }).first().click();
-    await expect(page.getByText(/Modo demonstração/)).toBeVisible();
+    // clique-resiliente: a ilha do emitir pode ainda estar hidratando
+    // quando o botão SSR já aparece — repete até o toast demo subir.
+    // O escopo é a linha do instrumento (Matheus tem vários "Gerar link")
+    await expect(async () => {
+      await sec
+        .locator("li", { hasText: "Definindo Minhas Metas" })
+        .getByRole("button", { name: "Gerar link" })
+        .click();
+      await expect(page.getByText(/Modo demonstração/)).toBeVisible({
+        timeout: 1500,
+      });
+    }).toPass();
   });
 
   test("/f/<token>: visão numera só perguntas e mostra seções", async ({
@@ -229,9 +239,11 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
       seletor.getByRole("link", { name: "Matheus Gonçalves", exact: true })
     ).toBeVisible();
 
-    // só a linha da dupla em foco renderiza
+    // só a linha da dupla em foco renderiza — o separador do aria-label
+    // ("Duplas: título") variou no passe de copy; a regex tolera a
+    // pontuação e ancora no título
     const sec = page.getByRole("region", {
-      name: "Duplas — Roda da Vida · leitura inicial",
+      name: /^Duplas\s*[:—–-]\s*Roda da Vida · leitura inicial$/,
     });
     const linha = sec.locator("li", { hasText: "Bia" });
     await expect(linha).toBeVisible();
@@ -280,7 +292,7 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await page.goto("/materiais/instrumentos/roda_inicial");
 
     const sec = page.getByRole("region", {
-      name: "Duplas — Roda da Vida · leitura inicial",
+      name: /^Duplas\s*[:—–-]\s*Roda da Vida · leitura inicial$/,
     });
     const linha = sec.locator("li", { hasText: "Bia" });
     // clique-resiliente: a ilha lazy pode ainda estar hidratando
@@ -309,7 +321,7 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await page.goto(`/materiais/instrumentos/visao?dupla=${DUPLA_OK}`);
 
     const sec = page.getByRole("region", {
-      name: "Duplas — Construindo a sua Visão",
+      name: /^Duplas\s*[:—–-]\s*Construindo a sua Visão$/,
     });
     const linha = sec.locator("li", { hasText: "Bia" });
     // a declaração já aparece na linha (resumo) antes de abrir — o 1º

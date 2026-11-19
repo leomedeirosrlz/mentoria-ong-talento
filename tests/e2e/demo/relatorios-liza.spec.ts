@@ -52,8 +52,10 @@ test.describe("demo — perguntar à Liza (456)", () => {
     await bloco
       .getByRole("button", { name: "Perguntar à Liza" })
       .click();
+    // o título do dialog segue "Perguntar à Liza: <aba>" — o separador
+    // variou no passe de copy; a regex tolera a pontuação
     await expect(
-      page.getByRole("heading", { name: /Perguntar à Liza — Aderência/ })
+      page.getByRole("heading", { name: /Perguntar à Liza\s*[:—–-]\s*Aderência/ })
     ).toBeVisible();
     await page
       .getByRole("button", { name: "Gerar resposta" })

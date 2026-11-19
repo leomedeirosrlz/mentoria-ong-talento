@@ -9,7 +9,7 @@ import { entrarNaDemo, expect, test } from "../helpers";
 //   · negociação viva (contra-proposta da Helena na mesa, com radios da
 //     grade real — os slots de ter/qui à noite "encaixam" na grade dela)
 //   · cardápio com todos os estados de card (vagas, agenda fechada,
-//     preferência) + rodapé "Falar com a coordenação (abre um chamado)"
+//     preferência) + rodapé "Falar com a coordenação"
 // A persona mentor_especialista (Sofia) cobre o mural: busca acento-
 // insensível, chips de filtro, "Direcionada a você". A persona coordenacao
 // cobre o painel somente-leitura de trilhas + "Pedidos parados" (o pedido
@@ -224,8 +224,9 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
         "Ainda não liberou horários. Seu pedido vai pro mural."
       )
     ).toBeVisible();
-    // Sofia — a especialista da Bia: variante "sua" com os dois gestos
-    await expect(catalogo.getByText("Sua especialista")).toBeVisible();
+    // Sofia — a especialista da Bia: a variante "seu/seu especialista"
+    // (neutra) vem com os dois gestos
+    await expect(catalogo.getByText("Seu especialista")).toBeVisible();
     await expect(
       catalogo.getByRole("button", { name: "Pedir próxima sessão" })
     ).toBeVisible();
@@ -273,9 +274,10 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
     await page.keyboard.press("Escape");
 
     // rodapé do catálogo — trava de agenda/método vira CHAMADO, outro
-    // sistema: o botão abre o dialog "Pedir ajuda" do jovem
+    // sistema: o botão abre o dialog "Pedir ajuda" do jovem (o passe de
+    // copy tirou o "(abre um chamado)" do rótulo)
     await page
-      .getByRole("button", { name: "Falar com a coordenação (abre um chamado)" })
+      .getByRole("button", { name: "Falar com a coordenação" })
       .click();
     const chamado = page.getByRole("dialog");
     await expect(
