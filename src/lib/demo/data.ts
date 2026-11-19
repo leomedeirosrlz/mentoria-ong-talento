@@ -2368,6 +2368,106 @@ function build(): DemoData {
         true, haDias(1, "08:40"), ricardo),
   );
 
+  // plano "ficar em dia" aceito (459): a dupla atrasou no 5º e combinou
+  // ritmo 2/semana — a central "Acordos e intervenções" mostra o
+  // combinado, os passos e a intervenção sugerida pela Liza
+  const planoDemo = {
+    id: uid(0x3000 + 1),
+    dupla_id: uid(D.ok),
+    status: "ativo" as const,
+    escopo: {
+      numeros: [5, 6],
+      ritmo: 2,
+      nivel: "semana_dupla" as const,
+      janela: {
+        inicio: addDias(HOJE, -2).toISOString().slice(0, 10),
+        fim: addDias(HOJE, 26).toISOString().slice(0, 10),
+      },
+      passos: [
+        { numero: 5, data: addDias(HOJE, 2).toISOString().slice(0, 10), acao: "remarcar" },
+        { numero: 6, data: addDias(HOJE, 9).toISOString().slice(0, 10), acao: "remarcar" },
+      ],
+    },
+    versao: 1,
+    proposto_por: ricardo.id,
+    proposto_via: "liza" as const,
+    aprovado_por: null,
+    aprovado_lado: "mentor" as const,
+    aprovado_em: haDias(1, "19:12"),
+    contestado_por: null,
+    contestado_motivo: null,
+    contestado_em: null,
+    expira_em: addDias(HOJE, 14).toISOString(),
+    concluido_em: null,
+    created_at: haDias(2, "18:40"),
+    updated_at: haDias(0, "09:05"),
+    passos: [
+      {
+        id: uid(0x3100 + 1),
+        plano_id: uid(0x3000 + 1),
+        dupla_id: uid(D.ok),
+        numero: 5,
+        encontro_id: null,
+        data_anterior: null,
+        data_nova: addDias(HOJE, 2).toISOString(),
+        motivo: null,
+        aplicado_por: ricardo.id,
+        aplicado_via: "app" as const,
+        aplicado_em: haDias(0, "09:05"),
+      },
+    ],
+    eventos: [
+      {
+        id: uid(0x3200 + 1),
+        plano_id: uid(0x3000 + 1),
+        dupla_id: uid(D.ok),
+        tipo: "proposto" as const,
+        de: null,
+        para: "proposto",
+        motivo: null,
+        por: ricardo.id,
+        meta: {},
+        em: haDias(2, "18:40"),
+      },
+    ],
+  };
+  duplaOk.planos = [planoDemo];
+  duplaOk.intervencoes = [
+    {
+      id: uid(0x3300 + 1),
+      dupla_id: uid(D.ok),
+      plano_id: planoDemo.id,
+      tipo: "pausa" as const,
+      evidencias: ["5º encontro sem data", "dois combinados vencidos"],
+      destino: "auxiliar" as const,
+      status: "sugerida" as const,
+      saida: null,
+      chamado_id: null,
+      motivo: "A agenda da Bia apertou no fim do ano — pausar agora retoma no ritmo certo em janeiro.",
+      sugerida_por: null,
+      sugerida_via: "liza" as const,
+      created_at: haDias(0, "08:02"),
+      destinada_em: null,
+    },
+  ];
+  duplaOk.guia_ajustes = [
+    {
+      id: uid(0x3400 + 1),
+      dupla_id: uid(D.ok),
+      numero: 5,
+      ajustes: [
+        {
+          sugestao: "Abrir com 10 min só de escuta sobre a rotina nova dela antes de entrar nas submetas.",
+          justificativa: "Ela voltou a trabalhar fins de semana; ir direto às metas sem escutar costuma travar a conversa.",
+        },
+      ],
+      criado_por: ricardo.id,
+      via: "liza" as const,
+      created_at: haDias(1, "18:55"),
+      updated_at: haDias(1, "18:55"),
+    },
+  ];
+
   // d-pend · Carlos × Caio — encontro 4 realizado sem registro (a pendência
   // que o semáforo cobra) + um registro tardio no histórico + o 5º oficial
   // sem row nenhuma: é a dupla do motivo "sem data" no "Para acompanhar"

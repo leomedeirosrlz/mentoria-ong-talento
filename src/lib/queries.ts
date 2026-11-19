@@ -419,7 +419,12 @@ export const DUPLA_SELECT = `
     remarcacoes:encontro_remarcacoes(id, data_anterior, data_nova, motivo, created_at)),
   encaminhamentos(*),
   notas:encontro_notas(*),
-  recessos:dupla_recessos(*, autor:profiles!dupla_recessos_declarado_por_fkey(nome, nome_social))
+  recessos:dupla_recessos(*, autor:profiles!dupla_recessos_declarado_por_fkey(nome, nome_social)),
+  planos:dupla_planos(*,
+    passos:dupla_plano_passos(*),
+    eventos:dupla_plano_eventos(*)),
+  intervencoes:dupla_intervencoes(*),
+  guia_ajustes:encontro_guia_ajustes(*)
 `;
 // avaliacao_jovem (0071): embed to-one (encontro_id é unique lá). O RLS da
 // tabela faz o recorte por papel SOZINHO — coord/sup recebem todas as

@@ -1439,11 +1439,35 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
           .map((e) => e.numero!),
         ...defasados.map((e) => e.numero!),
       ]);
+  // overlay do plano "ficar em dia" acordado (0219): encontro do escopo
+  // com data combinada no futuro já tem dono — sai da conta de atraso
+  // enquanto o plano vive. Plano só proposto ainda não é acordo; passo
+  // aplicado move a row real, então o critério é a data combinada, não
+  // o status do passo.
+  const numerosAcordados = new Set<number>();
+  for (const p of dupla.planos ?? []) {
+    if (p.status !== "aceito" && p.status !== "ativo") continue;
+    for (const n of p.escopo?.numeros ?? []) {
+      if (
+        numerosEsperados.has(n) &&
+        dupla.encontros.some(
+          (e) =>
+            e.numero === n &&
+            (e.status === "agendado" || e.status === "remarcado") &&
+            e.data_hora != null &&
+            new Date(e.data_hora).getTime() > hoje.getTime()
+        )
+      )
+        numerosAcordados.add(n);
+    }
+  }
+  for (const n of numerosAcordados) numerosEsperados.delete(n);
   const esperado = ehEspecialista
     ? feitos
     : encontroEsperado(eventos, hoje, dupla.iniciada_em) +
       defasados.length -
-      [...limbo].filter((n) => numerosEsperados.has(n)).length;
+      [...limbo].filter((n) => numerosEsperados.has(n)).length -
+      numerosAcordados.size;
   const proximo =
     dupla.encontros
       .filter(

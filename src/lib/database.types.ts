@@ -1491,6 +1491,517 @@ export type Database = {
           },
         ]
       }
+      dupla_intervencoes: {
+        Row: {
+          chamado_id: string | null
+          created_at: string
+          destinada_em: string | null
+          destino: string
+          dupla_id: string
+          evidencias: Json
+          id: string
+          motivo: string | null
+          plano_id: string | null
+          saida: string | null
+          status: string
+          sugerida_por: string | null
+          sugerida_via: string
+          tipo: string
+        }
+        Insert: {
+          chamado_id?: string | null
+          created_at?: string
+          destinada_em?: string | null
+          destino: string
+          dupla_id: string
+          evidencias?: Json
+          id?: string
+          motivo?: string | null
+          plano_id?: string | null
+          saida?: string | null
+          status?: string
+          sugerida_por?: string | null
+          sugerida_via?: string
+          tipo: string
+        }
+        Update: {
+          chamado_id?: string | null
+          created_at?: string
+          destinada_em?: string | null
+          destino?: string
+          dupla_id?: string
+          evidencias?: Json
+          id?: string
+          motivo?: string | null
+          plano_id?: string | null
+          saida?: string | null
+          status?: string
+          sugerida_por?: string | null
+          sugerida_via?: string
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dupla_intervencoes_chamado_id_fkey"
+            columns: ["chamado_id"]
+            isOneToOne: false
+            referencedRelation: "chamados"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_intervencoes_chamado_id_fkey"
+            columns: ["chamado_id"]
+            isOneToOne: false
+            referencedRelation: "chamados_contexto"
+            referencedColumns: ["chamado_id"]
+          },
+          {
+            foreignKeyName: "dupla_intervencoes_chamado_id_fkey"
+            columns: ["chamado_id"]
+            isOneToOne: false
+            referencedRelation: "chamados_fila"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_intervencoes_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_intervencoes_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_intervencoes_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "dupla_planos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_intervencoes_sugerida_por_fkey"
+            columns: ["sugerida_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_intervencoes_sugerida_por_fkey"
+            columns: ["sugerida_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_intervencoes_sugerida_por_fkey"
+            columns: ["sugerida_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_intervencoes_sugerida_por_fkey"
+            columns: ["sugerida_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_intervencoes_sugerida_por_fkey"
+            columns: ["sugerida_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dupla_plano_eventos: {
+        Row: {
+          de: string | null
+          dupla_id: string
+          em: string
+          id: string
+          meta: Json
+          motivo: string | null
+          para: string | null
+          plano_id: string
+          por: string | null
+          tipo: string
+        }
+        Insert: {
+          de?: string | null
+          dupla_id: string
+          em?: string
+          id?: string
+          meta?: Json
+          motivo?: string | null
+          para?: string | null
+          plano_id: string
+          por?: string | null
+          tipo: string
+        }
+        Update: {
+          de?: string | null
+          dupla_id?: string
+          em?: string
+          id?: string
+          meta?: Json
+          motivo?: string | null
+          para?: string | null
+          plano_id?: string
+          por?: string | null
+          tipo?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dupla_plano_eventos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_eventos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_eventos_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "dupla_planos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dupla_plano_passos: {
+        Row: {
+          aplicado_em: string
+          aplicado_por: string | null
+          aplicado_via: string
+          data_anterior: string | null
+          data_nova: string
+          dupla_id: string
+          encontro_id: string | null
+          id: string
+          motivo: string | null
+          numero: number
+          plano_id: string
+        }
+        Insert: {
+          aplicado_em?: string
+          aplicado_por?: string | null
+          aplicado_via?: string
+          data_anterior?: string | null
+          data_nova: string
+          dupla_id: string
+          encontro_id?: string | null
+          id?: string
+          motivo?: string | null
+          numero: number
+          plano_id: string
+        }
+        Update: {
+          aplicado_em?: string
+          aplicado_por?: string | null
+          aplicado_via?: string
+          data_anterior?: string | null
+          data_nova?: string
+          dupla_id?: string
+          encontro_id?: string | null
+          id?: string
+          motivo?: string | null
+          numero?: number
+          plano_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dupla_plano_passos_aplicado_por_fkey"
+            columns: ["aplicado_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_passos_aplicado_por_fkey"
+            columns: ["aplicado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_passos_aplicado_por_fkey"
+            columns: ["aplicado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_passos_aplicado_por_fkey"
+            columns: ["aplicado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_passos_aplicado_por_fkey"
+            columns: ["aplicado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_passos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_passos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_passos_encontro_id_fkey"
+            columns: ["encontro_id"]
+            isOneToOne: false
+            referencedRelation: "encontros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_passos_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "dupla_planos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dupla_planos: {
+        Row: {
+          aprovado_em: string | null
+          aprovado_lado: string | null
+          aprovado_por: string | null
+          concluido_em: string | null
+          contestado_em: string | null
+          contestado_motivo: string | null
+          contestado_por: string | null
+          created_at: string
+          dupla_id: string
+          escopo: Json
+          expira_em: string
+          id: string
+          proposto_por: string | null
+          proposto_via: string
+          status: string
+          updated_at: string
+          versao: number
+        }
+        Insert: {
+          aprovado_em?: string | null
+          aprovado_lado?: string | null
+          aprovado_por?: string | null
+          concluido_em?: string | null
+          contestado_em?: string | null
+          contestado_motivo?: string | null
+          contestado_por?: string | null
+          created_at?: string
+          dupla_id: string
+          escopo: Json
+          expira_em?: string
+          id?: string
+          proposto_por?: string | null
+          proposto_via?: string
+          status?: string
+          updated_at?: string
+          versao: number
+        }
+        Update: {
+          aprovado_em?: string | null
+          aprovado_lado?: string | null
+          aprovado_por?: string | null
+          concluido_em?: string | null
+          contestado_em?: string | null
+          contestado_motivo?: string | null
+          contestado_por?: string | null
+          created_at?: string
+          dupla_id?: string
+          escopo?: Json
+          expira_em?: string
+          id?: string
+          proposto_por?: string | null
+          proposto_via?: string
+          status?: string
+          updated_at?: string
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dupla_planos_aprovado_por_fkey"
+            columns: ["aprovado_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_aprovado_por_fkey"
+            columns: ["aprovado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_aprovado_por_fkey"
+            columns: ["aprovado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_aprovado_por_fkey"
+            columns: ["aprovado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_aprovado_por_fkey"
+            columns: ["aprovado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_contestado_por_fkey"
+            columns: ["contestado_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_contestado_por_fkey"
+            columns: ["contestado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_contestado_por_fkey"
+            columns: ["contestado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_contestado_por_fkey"
+            columns: ["contestado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_contestado_por_fkey"
+            columns: ["contestado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_proposto_por_fkey"
+            columns: ["proposto_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_proposto_por_fkey"
+            columns: ["proposto_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_proposto_por_fkey"
+            columns: ["proposto_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_proposto_por_fkey"
+            columns: ["proposto_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_proposto_por_fkey"
+            columns: ["proposto_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dupla_recessos: {
         Row: {
           ciclo_evento_id: string
@@ -1573,6 +2084,42 @@ export type Database = {
             foreignKeyName: "dupla_recessos_dupla_id_fkey"
             columns: ["dupla_id"]
             isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      dupla_resumo_ia: {
+        Row: {
+          dupla_id: string
+          fontes_hash: string
+          gerado_em: string
+          resumo: Json
+        }
+        Insert: {
+          dupla_id: string
+          fontes_hash: string
+          gerado_em?: string
+          resumo: Json
+        }
+        Update: {
+          dupla_id?: string
+          fontes_hash?: string
+          gerado_em?: string
+          resumo?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dupla_resumo_ia_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: true
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_resumo_ia_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: true
             referencedRelation: "jovem_duplas"
             referencedColumns: ["id"]
           },
@@ -2144,6 +2691,89 @@ export type Database = {
             foreignKeyName: "encerramentos_dupla_id_fkey"
             columns: ["dupla_id"]
             isOneToOne: true
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      encontro_guia_ajustes: {
+        Row: {
+          ajustes: Json
+          created_at: string
+          criado_por: string | null
+          dupla_id: string
+          id: string
+          numero: number
+          updated_at: string
+          via: string
+        }
+        Insert: {
+          ajustes?: Json
+          created_at?: string
+          criado_por?: string | null
+          dupla_id: string
+          id?: string
+          numero: number
+          updated_at?: string
+          via?: string
+        }
+        Update: {
+          ajustes?: Json
+          created_at?: string
+          criado_por?: string | null
+          dupla_id?: string
+          id?: string
+          numero?: number
+          updated_at?: string
+          via?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "encontro_guia_ajustes_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_guia_ajustes_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_guia_ajustes_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_guia_ajustes_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_guia_ajustes_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_guia_ajustes_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_guia_ajustes_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
             referencedRelation: "jovem_duplas"
             referencedColumns: ["id"]
           },
@@ -7182,7 +7812,21 @@ export type Database = {
       }
       garantir_documentos_devidos: { Args: never; Returns: undefined }
       gerar_senha_relatorio: { Args: never; Returns: string }
+      gravar_resumo_duplas: { Args: { p_rows: Json }; Returns: number }
       gravar_saude_snapshots: { Args: { p_rows: Json }; Returns: number }
+      guia_ajuste_limpar: {
+        Args: { p_dupla: string; p_numero: number }
+        Returns: Json
+      }
+      guia_ajuste_salvar: {
+        Args: {
+          p_ajustes: Json
+          p_dupla: string
+          p_numero: number
+          p_via?: string
+        }
+        Returns: Json
+      }
       has_papel:
         | {
             Args: {
@@ -7272,8 +7916,35 @@ export type Database = {
       }
       instrumentos_da_dupla: { Args: { p_dupla_id: string }; Returns: Json }
       interesses_ok: { Args: { interesses: string[] }; Returns: boolean }
+      intervencao_abrir_chamado: {
+        Args: {
+          p_assunto: string
+          p_categoria: string
+          p_descricao_outro?: string
+          p_intervencao: string
+          p_mensagem: string
+        }
+        Returns: Json
+      }
+      intervencao_fechar: {
+        Args: { p_intervencao: string; p_motivo?: string; p_saida: string }
+        Returns: Json
+      }
+      intervencao_sugerir: {
+        Args: {
+          p_destino: string
+          p_dupla: string
+          p_evidencias: Json
+          p_motivo?: string
+          p_plano?: string
+          p_tipo: string
+          p_via?: string
+        }
+        Returns: Json
+      }
       jornada_autoemit: { Args: { p_dupla_id: string }; Returns: undefined }
       jovem_jornada: { Args: never; Returns: Json }
+      jovem_plano: { Args: never; Returns: Json }
       jovem_recessos: { Args: never; Returns: Json }
       jovem_relacionado: { Args: { p_profile: string }; Returns: boolean }
       jovem_set_avatar: { Args: { p_path?: string }; Returns: undefined }
@@ -7374,6 +8045,26 @@ export type Database = {
       }
       pedir_reabertura_chamado: { Args: { p_id: string }; Returns: undefined }
       pegar_login_handoff: { Args: { p_nonce: string }; Returns: Json }
+      plano_aplicar_passo: {
+        Args: {
+          p_data_hora: string
+          p_link?: string
+          p_motivo?: string
+          p_numero: number
+          p_plano: string
+          p_via?: string
+        }
+        Returns: Json
+      }
+      plano_ciclo: { Args: never; Returns: number }
+      plano_propor: {
+        Args: { p_dupla: string; p_escopo: Json; p_via?: string }
+        Returns: Json
+      }
+      plano_responder: {
+        Args: { p_acao: string; p_motivo?: string; p_plano: string }
+        Returns: Json
+      }
       postar_devolutiva: {
         Args: { p_dupla_id: string; p_texto: string }
         Returns: string
@@ -7535,6 +8226,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      resumo_dupla: { Args: { p_dupla: string }; Returns: Json }
       resumo_log_acesso: {
         Args: {
           p_ip_hash: string

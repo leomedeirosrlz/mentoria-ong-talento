@@ -33,6 +33,7 @@ import type {
   UiJornada,
   UiPedidos,
   UiPlano,
+  UiPlanoJovem,
   UiDuplaMini,
   UiFila,
   UiFontes,
@@ -380,6 +381,8 @@ export function UiCard({ bloco, jovem }: { bloco: UiBloco; jovem?: boolean }) {
       return <CardPedidos b={bloco} />;
     case "plano":
       return <CardPlano b={bloco} r={r} />;
+    case "plano_jovem":
+      return <CardPlanoJovem b={bloco} />;
     case "confirmacao":
       return <CardConfirmacao b={bloco} />;
   }
@@ -898,11 +901,88 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
           </li>
         ))}
       </ol>
+      {b.sugestao && (
+        <p className="mt-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
+          {b.sugestao}
+        </p>
+      )}
+      {b.plano && (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Combinado gravado: {STATUS_PLANO[b.plano.status] ?? b.plano.status}
+          {b.plano.versao > 1 ? ` (v${b.plano.versao})` : ""}
+          {b.plano.aprovado_lado
+            ? ` · aceito por ${b.plano.aprovado_lado === "mentor" ? "o mentor" : "o jovem"}`
+            : ""}
+          .
+        </p>
+      )}
       {b.avisos.length > 0 && (
         <p className="mt-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
           {b.avisos[0]}
         </p>
       )}
+    </Cartao>
+  );
+}
+
+const STATUS_PLANO: Record<string, string> = {
+  proposto: "proposto",
+  aceito: "aceito",
+  ativo: "em andamento",
+  concluido: "concluído",
+  expirado: "expirado",
+  contestado: "contestado",
+};
+
+// ---------- plano do jovem ----------
+
+/** O combinado como o jovem o vê (0219 — meu_plano): status, ritmo e as
+ *  datas — sem semáforo nem motivos internos (o recorte é da RPC). */
+export function CardPlanoJovem({ b }: { b: UiPlanoJovem }) {
+  const aplicados = new Map(b.passos_aplicados.map((p) => [p.numero, p]));
+  return (
+    <Cartao
+      titulo="O combinado"
+      meta={STATUS_PLANO[b.status] ?? b.status}
+    >
+      <p className="text-xs text-muted-foreground">
+        {b.ritmo === 1
+          ? "1 encontro por semana."
+          : `Até ${b.ritmo ?? 2} encontros por semana.`}{" "}
+        Confirmem as datas juntos.
+      </p>
+      <ol className="mt-2 divide-y divide-border/60">
+        {b.passos.map((p, i) => {
+          const aplicado = aplicados.get(p.numero);
+          return (
+            <li
+              key={p.numero}
+              style={passo(i + 1)}
+              className="animate-enter flex items-center gap-2.5 py-2 first:pt-0 last:pb-0"
+            >
+              <span
+                aria-hidden
+                className={cn(
+                  "grid size-7 shrink-0 place-items-center rounded-full font-mono text-[11px] font-semibold tabular-nums",
+                  aplicado
+                    ? "bg-[var(--ok-bg)] text-[var(--ok-text)] ring-1 ring-[var(--ok-border)]"
+                    : "bg-[var(--destaque)]/25 text-foreground"
+                )}
+              >
+                {p.numero}
+              </span>
+              <span className="min-w-0 flex-1 text-sm">
+                {p.numero}º encontro —{" "}
+                <span className="text-muted-foreground">
+                  {aplicado
+                    ? `marcado pra ${valida(aplicado.data_nova) ? diaSemanaCurto(aplicado.data_nova) : "a definir"}`
+                    : `sugestão ${valida(p.data) ? diaSemanaCurto(p.data) : "a definir"}`}
+                </span>
+              </span>
+            </li>
+          );
+        })}
+      </ol>
     </Cartao>
   );
 }

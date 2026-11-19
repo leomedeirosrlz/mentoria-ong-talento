@@ -10,6 +10,10 @@ import { rodarLembretesRegistro } from "@/lib/jobs-lembretes-registro";
 import { rodarLembretesTrilha } from "@/lib/jobs-lembretes-trilha";
 import { rodarDigestSemanal } from "@/lib/jobs-digest";
 import { rodarRetencaoProduto } from "@/lib/jobs-retencao";
+import {
+  rodarPlanoCiclo,
+  rodarResumoDuplas,
+} from "@/lib/jobs-resumo-dupla";
 
 export const dynamic = "force-dynamic";
 // o diário cabe folgado; a folga é pro backfill (dias corridos × duplas)
@@ -43,6 +47,13 @@ const JOBS: Record<string, (ctx: JobContext) => Promise<JobResult>> = {
   // REALIZA-417 fase B — rollup diário + retenção 90d do cru de
   // produto_eventos (0201; idempotente, rollup antes do delete)
   retencao_produto: rodarRetencaoProduto,
+  // REALIZA-459 — ciclo do plano "ficar em dia" (0219): expira propostas
+  // vencidas e conclui escopo coberto; antes do resumo pra ele já ler o
+  // estado novo
+  plano_ciclo: rodarPlanoCiclo,
+  // REALIZA-459 — resumo consolidado por dupla (0221): só regrava quando
+  // o fontes_hash muda, então o re-run diário é inócuo
+  resumo_duplas: rodarResumoDuplas,
 };
 
 async function tick(request: NextRequest): Promise<NextResponse> {

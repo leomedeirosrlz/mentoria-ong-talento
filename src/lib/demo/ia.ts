@@ -251,6 +251,9 @@ export async function responderDemoIa(
           data_recuperacao: r.dataRecuperacao,
           encerramento: r.encerramento,
           avisos: r.avisos,
+          nivel: r.nivel,
+          sugestao: r.sugestao,
+          plano: null,
         });
         break;
       }
@@ -316,6 +319,33 @@ export async function responderDemoIa(
         content: ui
           ? `Na demonstração a resposta sai da ajuda oficial, igual ao card acima. No ambiente real a Liza também consulta os guias do programa.${sugestoes(["Como tá minha jornada?", "O que tenho pra fazer?"])}`
           : `Na demonstração a Liza responde dúvidas do programa com a ajuda oficial. No ambiente real ela também consulta os guias.${sugestoes(["Quem é meu mentor?"])}`,
+        ui: ui ? [ui] : [],
+      };
+    }
+    // o combinado do plano "ficar em dia" (459): a rota real chama
+    // meu_plano (jovem_plano, recorte sem semáforo) — a demo devolve um
+    // plano aceito de exemplo na MESMA projeção
+    // "combinado" sozinho continua caindo nos combinados/tarefas — o
+    // branch dele vem depois; aqui só plano/ficar em dia
+    if (/plano|ficar em dia/.test(p)) {
+      const hoje = Date.now();
+      const em = (dias: number) => new Date(hoje + dias * 86_400_000).toISOString();
+      const ui = uiDaTool("meu_plano", {
+        status: "aceito",
+        versao: 1,
+        ritmo: "2",
+        aprovado_lado: "mentor",
+        expira_em: em(14),
+        passos: [
+          { numero: 4, data: em(3).slice(0, 10), acao: "remarcar" },
+          { numero: 5, data: em(10).slice(0, 10), acao: "remarcar" },
+        ],
+        passos_aplicados: [
+          { numero: 4, data_nova: em(3), aplicado_em: new Date(hoje).toISOString() },
+        ],
+      });
+      return {
+        content: `Na demonstração o combinado é de exemplo. No ambiente real ele sai da RPC jovem_plano — o recorte do jovem do plano "ficar em dia", sem os detalhes internos da equipe. Aceitar e confirmar datas valem pra você e pro seu mentor.${sugestoes(["Quando é o próximo encontro?", "O que tenho pra fazer?"])}`,
         ui: ui ? [ui] : [],
       };
     }

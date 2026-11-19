@@ -109,6 +109,23 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   },
   editar_campo_pessoa: { pessoa_id: UUID, campo: "whatsapp", valor: "11987654321" },
   plano_em_dia: { dupla_id: UUID },
+  // 459 — plano persistido + intervenções + ajustes de guia
+  plano_propor: { dupla_id: UUID },
+  plano_responder: { plano_id: UUID, acao: "aceitar" },
+  plano_aplicar_passo: {
+    plano_id: UUID,
+    numero: 5,
+    data_hora: "2026-11-10T19:00:00-03:00",
+  },
+  resumo_dupla: { dupla_id: UUID },
+  meu_plano: {},
+  intervencao_sugerir: { dupla_id: UUID, tipo: "pausa", destino: "auxiliar" },
+  guia_ajustar: {
+    dupla_id: UUID,
+    numero: 5,
+    ajustes: [{ sugestao: "Trazer o lanche", justificativa: "Ele gosta" }],
+  },
+  guia_limpar: { dupla_id: UUID, numero: 5 },
 };
 
 describe("allowlist — forma do registry", () => {

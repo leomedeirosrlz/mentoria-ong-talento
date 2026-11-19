@@ -412,3 +412,11 @@ Pedido do Thiago (perdido numa sessão anterior, resgatado em 24/out):
   `pessoas-listas.tsx`; o reshape depende do desfecho do item anterior
   (se "aguardando" mudar de semântica, o dropdown muda junto — fazer os
   dois juntos).
+- [ ] **Card de disponibilidade (FR-014)** — recorte do REALIZA-459 que
+  ficou fora da fatia por decisão do orquestrador: a UI pra dupla declarar
+  os horários possíveis (o planner de "ficar em dia" já lê ritmo/janela;
+  falta a superfície que alimenta a disponibilidade semanal). Quando
+  entrar, o `plano_propor` passa a sugerir datas dentro dos slots
+  declarados em vez de só evitar colisão. Registrar junto: a policy de
+  `encontro_guia_ajustes` pro jovem também ficou fora da fatia — liberar
+  depois é migration nova de policy, não mudança de código.

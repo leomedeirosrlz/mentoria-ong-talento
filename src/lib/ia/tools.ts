@@ -614,11 +614,29 @@ export const IA_TOOLS = {
       if (!r.aplicavel) {
         return { dupla_id, trilha: d.trilha, aplicavel: false, motivo: r.motivo };
       }
+      // overlay persistido (0219): o plano vivo da dupla, quando existe —
+      // o card conta que já é combinado, não só proposta
+      const vivo =
+        (d.planos ?? []).find((p) =>
+          ["proposto", "aceito", "ativo"].includes(p.status)
+        ) ?? null;
       return {
         dupla_id,
         trilha: d.trilha,
         aplicavel: true,
         em_dia: r.emDia,
+        nivel: r.nivel,
+        sugestao: r.sugestao,
+        plano: vivo
+          ? {
+              id: vivo.id,
+              status: vivo.status,
+              versao: vivo.versao,
+              aprovado_lado: vivo.aprovado_lado,
+              expira_em: vivo.expira_em,
+              ritmo: vivo.escopo?.ritmo ?? null,
+            }
+          : null,
         pendencias_registro: r.pendenciasRegistro.map((p) => ({
           encontro_id: p.encontroId,
           numero: p.numero,
@@ -639,6 +657,317 @@ export const IA_TOOLS = {
         encerramento: r.encerramento,
         avisos: r.avisos,
       };
+    },
+  },
+
+  plano_propor: {
+    nome: "plano_propor",
+    descricao:
+      "Propõe e GRAVA o plano 'ficar em dia' de uma dupla DPP (0219): o escopo sai do mesmo planner do plano_em_dia — encontros devidos/travados, janela, ritmo combinado (1 a 4 encontros por semana) e o nível de flexibilização calculado — e a proposta fica persistida pra dupla aceitar ou contestar (o outro lado é avisado). Só um plano aberto por dupla: o banco recusa se já houver um vivo — contestado é terminal, acordo novo é versão nova. plano_em_dia mostra a prévia antes." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        dupla_id: z.uuid().describe("id da dupla (uuid — plano_em_dia mostra a prévia)"),
+        ritmo: z
+          .number()
+          .int()
+          .min(1)
+          .max(4)
+          .optional()
+          .describe("encontros por semana combinados, 1–4 (padrão 2 = semana dupla)"),
+      })
+      .strict(),
+    roles: ["coordenacao", "mentor_dpp"],
+    escreve: true,
+    resumo: (a: { dupla_id: string; ritmo?: number }) =>
+      `Propor o plano "ficar em dia" da dupla com ritmo ${a.ritmo ?? 2}/semana`,
+    run: async (a: { dupla_id: string; ritmo?: number }, ctx) => {
+      const [d, eventos] = await Promise.all([
+        getDuplaIa(ctx.supabase, a.dupla_id),
+        getCicloEventosIa(ctx.supabase),
+      ]);
+      if (!d) throw new ErroTool("Não encontrei essa dupla.");
+      const ritmo = a.ritmo ?? 2;
+      const r = montarPlanoEmDia({
+        dupla: d as unknown as Dupla,
+        eventos,
+        ritmo,
+        hoje: new Date(),
+      });
+      if (!r.aplicavel) throw new ErroTool(r.motivo);
+      const passosPlano = r.passos.filter((p) => p.acao !== "travado");
+      if (!passosPlano.length)
+        throw new ErroTool(
+          "A dupla não tem encontro devido — não há plano pra propor."
+        );
+      const datas = passosPlano.map((p) => p.data).sort();
+      const escopo = {
+        numeros: passosPlano.map((p) => p.numero),
+        ritmo,
+        nivel: r.nivel,
+        janela: {
+          inicio: toDateStr(new Date()),
+          fim: datas[datas.length - 1],
+        },
+        passos: passosPlano.map((p) => ({
+          numero: p.numero,
+          data: p.data,
+          acao: p.acao,
+        })),
+      };
+      const res = await rpcEscreve(ctx, "plano_propor", {
+        p_dupla: a.dupla_id,
+        p_escopo: escopo,
+        p_via: "liza",
+      });
+      await emitirProdutoEvento(ctx.supabase, {
+        superficie: "ia",
+        acao: "plano_proposto",
+        meta: { dupla_id: a.dupla_id, ritmo, nivel: r.nivel },
+      });
+      return res;
+    },
+  },
+
+  plano_responder: {
+    nome: "plano_responder",
+    descricao:
+      "Responde o plano 'ficar em dia' persistido: 'aceitar' marca o combinado como aceito (um lado basta; o outro é avisado), 'contestar' encerra o plano pra sempre — contestado é terminal, um novo acordo nasce como nova versão. Contestar só vale até o primeiro encontro do escopo acontecer; depois disso a conversa é com a coordenação. O plano_id vem de plano_em_dia, meu_plano ou da notificação." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        plano_id: z.uuid().describe("id do plano (uuid)"),
+        acao: z.enum(["aceitar", "contestar"]),
+        motivo: z
+          .string()
+          .max(300)
+          .optional()
+          .describe("por que contestou (opcional, recomendado)"),
+      })
+      .strict(),
+    roles: ["mentor_dpp", "mentorado"],
+    escreve: true,
+    resumo: (a: { acao: string }) =>
+      `${a.acao === "aceitar" ? "Aceitar" : "Contestar"} o plano "ficar em dia"`,
+    run: async (
+      a: { plano_id: string; acao: "aceitar" | "contestar"; motivo?: string },
+      ctx
+    ) => {
+      const res = await rpcEscreve(ctx, "plano_responder", {
+        p_plano: a.plano_id,
+        p_acao: a.acao,
+        p_motivo: a.motivo ?? null,
+      });
+      await emitirProdutoEvento(ctx.supabase, {
+        superficie: "ia",
+        acao: a.acao === "aceitar" ? "plano_aceito" : "plano_contestado",
+        meta: { plano_id: a.plano_id },
+      });
+      return res;
+    },
+  },
+
+  plano_aplicar_passo: {
+    nome: "plano_aplicar_passo",
+    descricao:
+      "Aplica um passo do plano 'ficar em dia' aceito: grava a data combinada do encontro do escopo e anota no ledger do plano — uma RPC só, atômica. Vale pro mentor e pro jovem (o combinado é dos dois). Só números do escopo, só data futura dentro da janela, remarcar pede motivo; repetir o mesmo passo devolve o que já existe (idempotente)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        plano_id: z.uuid().describe("id do plano (uuid)"),
+        numero: z.number().int().min(1).max(24).describe("encontro do escopo"),
+        data_hora: z
+          .string()
+          .describe("data/hora ISO 8601 com fuso (ex.: 2026-12-01T19:00:00-03:00)"),
+        link: z
+          .string()
+          .max(500)
+          .optional()
+          .describe("link https da chamada (opcional)"),
+        motivo: z
+          .string()
+          .max(140)
+          .optional()
+          .describe("obrigatório quando a data já existia e muda"),
+      })
+      .strict(),
+    roles: ["mentor_dpp", "mentorado"],
+    escreve: true,
+    resumo: (a: { numero: number; data_hora: string }) =>
+      `Aplicar o passo do ${a.numero}º encontro em ${a.data_hora}`,
+    run: async (
+      a: { plano_id: string; numero: number; data_hora: string; link?: string; motivo?: string },
+      ctx
+    ) => {
+      const res = await rpcEscreve(ctx, "plano_aplicar_passo", {
+        p_plano: a.plano_id,
+        p_numero: a.numero,
+        p_data_hora: a.data_hora,
+        p_link: a.link?.trim() || null,
+        p_motivo: a.motivo ?? null,
+        p_via: "liza",
+      });
+      await emitirProdutoEvento(ctx.supabase, {
+        superficie: "ia",
+        acao: "plano_passo",
+        meta: { plano_id: a.plano_id, numero: a.numero },
+      });
+      return res;
+    },
+  },
+
+  resumo_dupla: {
+    nome: "resumo_dupla",
+    descricao:
+      "Resumo consolidado da dupla, gerado pelo job diário (0221): semáforo, motivos e sinais, encontros feitos × esperados, próximos encontros, pendências de registro, perfil e interesses do jovem e o plano 'ficar em dia' vigente. A própria RPC recorta por papel — pro mentorado chega sem semáforo/motivos/sinais. null quando o job ainda não gerou. Use pra uma visão rápida e barata da dupla; ficha_dupla dá o detalhe vivo.",
+    schema: duplaIdArgs,
+    roles: TODOS_PAPEIS,
+    run: async ({ dupla_id }: z.infer<typeof duplaIdArgs>, ctx) => {
+      const data = await rpcEscreve(ctx, "resumo_dupla", { p_dupla: dupla_id });
+      const r = data as { ok?: boolean; resumo?: unknown } | null;
+      return r?.resumo ?? null;
+    },
+  },
+
+  meu_plano: {
+    nome: "meu_plano",
+    descricao:
+      "O combinado do plano 'ficar em dia' da própria dupla do jovem (0219 — jovem_plano): status, versão, ritmo combinado, os passos com datas e os passos já aplicados. Sem semáforo nem motivos internos — só o que a dupla combinou. null quando não há plano.",
+    schema: semArgs,
+    roles: ["mentorado"],
+    run: async (_args: z.infer<typeof semArgs>, ctx) => {
+      const { data, error } = await ctx.supabase.rpc("jovem_plano");
+      if (error) throw new ErroTool(error.message || "Não consegui ler o plano.");
+      return data ?? null;
+    },
+  },
+
+  intervencao_sugerir: {
+    nome: "intervencao_sugerir",
+    descricao:
+      "Sugere uma intervenção estruturada na dupla (0220): troca_mentor, troca_mentorado, pausa, dpp_para_esp (encerrar a trilha DPP seguindo com a especialista) ou encerramento — com evidências e o destino ('auxiliar' = supervisor da dupla, 'coordenacao'). A Liza SUGERE, nunca executa: quem decide é a equipe, pela fila de intervenções na ficha da dupla (chamado ou mensagem)." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        dupla_id: z.uuid().describe("id da dupla (uuid)"),
+        tipo: z.enum([
+          "troca_mentor",
+          "troca_mentorado",
+          "pausa",
+          "dpp_para_esp",
+          "encerramento",
+        ]),
+        destino: z
+          .enum(["auxiliar", "coordenacao"])
+          .describe("auxiliar = supervisor da dupla; coordenacao = fila da coordenação"),
+        motivo: z
+          .string()
+          .max(300)
+          .optional()
+          .describe("resumo do porquê, em uma linha"),
+        evidencias: z
+          .array(z.string().max(200))
+          .max(6)
+          .optional()
+          .describe("fatos que sustentam a sugestão (sinais, datas, contagens)"),
+      })
+      .strict(),
+    roles: ["coordenacao", "supervisor", "mentor_dpp"],
+    escreve: true,
+    resumo: (a: { tipo: string; destino: string }) =>
+      `Sugerir intervenção "${a.tipo}" pra ${a.destino}`,
+    run: async (
+      a: { dupla_id: string; tipo: string; destino: string; motivo?: string; evidencias?: string[] },
+      ctx
+    ) => {
+      const res = await rpcEscreve(ctx, "intervencao_sugerir", {
+        p_dupla: a.dupla_id,
+        p_tipo: a.tipo,
+        p_evidencias: a.evidencias ?? [],
+        p_destino: a.destino,
+        p_motivo: a.motivo ?? null,
+        p_via: "liza",
+      });
+      await emitirProdutoEvento(ctx.supabase, {
+        superficie: "ia",
+        acao: "plano_intervencao",
+        meta: { dupla_id: a.dupla_id, tipo: a.tipo, destino: a.destino },
+      });
+      return res;
+    },
+  },
+
+  guia_ajustar: {
+    nome: "guia_ajustar",
+    descricao:
+      "Personaliza o guia de um encontro da dupla (0220): lista de ajustes, cada um com sugestao e justificativa — o guia oficial continua sendo a base, os ajustes ficam ancorados a ele e aparecem na ficha e no preparo. Regravar o mesmo número substitui a lista inteira." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        dupla_id: z.uuid().describe("id da dupla (uuid)"),
+        numero: z.number().int().min(1).max(24).describe("encontro do guia"),
+        ajustes: z
+          .array(
+            z
+              .object({
+                sugestao: z.string().min(2).max(500),
+                justificativa: z.string().min(2).max(500),
+              })
+              .strict()
+          )
+          .min(1)
+          .max(10),
+      })
+      .strict(),
+    roles: ["coordenacao", "mentor_dpp"],
+    escreve: true,
+    resumo: (a: { numero: number; ajustes: { sugestao: string }[] }) =>
+      `Ajustar o guia do ${a.numero}º encontro (${a.ajustes.length} ajuste${a.ajustes.length > 1 ? "s" : ""})`,
+    run: async (
+      a: { dupla_id: string; numero: number; ajustes: { sugestao: string; justificativa: string }[] },
+      ctx
+    ) => {
+      const res = await rpcEscreve(ctx, "guia_ajuste_salvar", {
+        p_dupla: a.dupla_id,
+        p_numero: a.numero,
+        p_ajustes: a.ajustes,
+        p_via: "liza",
+      });
+      await emitirProdutoEvento(ctx.supabase, {
+        superficie: "ia",
+        acao: "plano_guia",
+        meta: { dupla_id: a.dupla_id, numero: a.numero },
+      });
+      return res;
+    },
+  },
+
+  guia_limpar: {
+    nome: "guia_limpar",
+    descricao:
+      "Volta um encontro da dupla ao guia oficial (0220): apaga os ajustes personalizados daquele número — a ficha e o preparo passam a mostrar só o guia base." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        dupla_id: z.uuid().describe("id da dupla (uuid)"),
+        numero: z.number().int().min(1).max(24).describe("encontro do guia"),
+      })
+      .strict(),
+    roles: ["coordenacao", "mentor_dpp"],
+    escreve: true,
+    resumo: (a: { numero: number }) =>
+      `Voltar o ${a.numero}º encontro ao guia oficial`,
+    run: async (a: { dupla_id: string; numero: number }, ctx) => {
+      const res = await rpcEscreve(ctx, "guia_ajuste_limpar", {
+        p_dupla: a.dupla_id,
+        p_numero: a.numero,
+      });
+      await emitirProdutoEvento(ctx.supabase, {
+        superficie: "ia",
+        acao: "plano_guia",
+        meta: { dupla_id: a.dupla_id, numero: a.numero, limpar: true },
+      });
+      return res;
     },
   },
 
@@ -2354,6 +2683,11 @@ const ARGS_MINIMIZADOS: Record<string, readonly string[]> = {
   marcar_situacao_mentorado: ["motivo"],
   agendar_encontro: ["motivo", "link"],
   editar_campo_pessoa: ["valor"],
+  // plano/guia/intervenção (459): motivos e textos livres, mesma régua
+  plano_responder: ["motivo"],
+  plano_aplicar_passo: ["motivo", "link"],
+  intervencao_sugerir: ["motivo", "evidencias"],
+  guia_ajustar: ["ajustes"],
 };
 
 function argsMinimizados(
