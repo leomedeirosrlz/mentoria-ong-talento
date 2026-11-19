@@ -25,6 +25,7 @@ Quem mexe no repo sem contexto precisa de duas coisas: saber **qual regra não p
 | Corpus RAG fail-closed por audiência | `tests/corpus-audiencia.test.ts` |
 | Contrato do CSV de export | `tests/relatorios-csv.test.ts`, `tests/export-route.test.ts` |
 | IA: impersonação, rate-limit, tokens MCP, prompt | `tests/ia-*.test.ts`, `src/lib/ia/*.test.ts`, `tests/tokens-mcp.test.ts` |
+| Cronograma importado nunca persiste sem revisão; parser produz `EventoRascunho` válido | `src/lib/importar-cronograma/normalizar.test.ts` + `tests/e2e/app/turmas-importar.spec.ts` |
 
 E2e `app` (backend real, obrigatório no PR) e `demo` cobrem os fluxos por papel — a lista de specs por subsistema está no índice do Playwright.
 
