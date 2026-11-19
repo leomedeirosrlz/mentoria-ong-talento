@@ -1,0 +1,17 @@
+# Imagens que o `supabase start` usa (versões pinadas pelo CLI; conferir no
+# docker ps após um start). O mirror publica cada uma no GHCR e o e2e-app
+# retaga localmente para o nome original — sem pull anônimo (ECR/Docker Hub).
+postgres:16-alpine
+public.ecr.aws/supabase/gotrue:v2.197.0
+public.ecr.aws/supabase/imgproxy:v3.8.0
+public.ecr.aws/supabase/kong:2.8.1
+public.ecr.aws/supabase/logflare:1.50.6
+public.ecr.aws/supabase/mailpit:v1.30.2
+public.ecr.aws/supabase/postgres:17.6.1.166
+public.ecr.aws/supabase/postgres:17.6.1.167
+public.ecr.aws/supabase/postgres-meta:v0.99.0
+public.ecr.aws/supabase/postgrest:v14.5
+public.ecr.aws/supabase/realtime:v2.130.0
+public.ecr.aws/supabase/storage-api:v1.77.5
+public.ecr.aws/supabase/studio:2026.08.24-sha-8ec45b2
+public.ecr.aws/supabase/vector:0.53.0-alpine
