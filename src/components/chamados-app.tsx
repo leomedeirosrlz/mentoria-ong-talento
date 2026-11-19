@@ -196,7 +196,11 @@ export function ChamadosApp({
       trigger={
         // com um chamado aberto a ação da tela é a do detalhe (Assumir,
         // Resolver): "Novo chamado" recua pra contorno — um lima por tela
-        <Button variant={sel ? "outline" : "default"} className="max-md:hidden">
+        <Button
+          variant={sel ? "outline" : "default"}
+          className="max-md:hidden"
+          data-telemetry-alvo="novo-chamado"
+        >
           <Plus aria-hidden />
           Novo chamado
         </Button>
@@ -217,7 +221,10 @@ export function ChamadosApp({
       papel={papel}
       duplas={duplas}
       trigger={
-        <Button className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-30 h-12 rounded-full px-4 shadow-[var(--shadow-overlay)] md:hidden">
+        <Button
+          className="fixed bottom-[calc(4.5rem+env(safe-area-inset-bottom))] left-[max(1rem,env(safe-area-inset-left))] z-30 h-12 rounded-full px-4 shadow-[var(--shadow-overlay)] md:hidden"
+          data-telemetry-alvo="novo-chamado"
+        >
           <Plus aria-hidden />
           Novo chamado
         </Button>

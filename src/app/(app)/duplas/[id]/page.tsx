@@ -1270,7 +1270,12 @@ export default async function DuplaPage({
               faltantes={faltantes}
               esp={ehEsp}
               trigger={
-                <Button variant="ghost" size="sm" className="-my-1 text-muted-foreground">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="-my-1 text-muted-foreground"
+                  data-telemetry-alvo="registrar-retroativo"
+                >
                   <ClockCounterClockwise size={14} />
                   {ehEsp
                     ? "Registrar sessão já realizada"

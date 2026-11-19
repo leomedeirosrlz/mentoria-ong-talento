@@ -1108,6 +1108,7 @@ export function AssistenteBolha({
             aria-label={rotuloFab}
             aria-expanded={aberto}
             aria-controls="painel-assistente"
+            data-telemetry-alvo="abrir-liza"
             onPointerEnter={() => setAtento(true)}
             onPointerLeave={() => setAtento(false)}
             // só foco-via-teclado merece a atenção do hover — o focus-restore
@@ -1173,6 +1174,7 @@ export function AssistenteBolha({
           aria-label={rotuloFab}
           aria-expanded={aberto}
           aria-controls="painel-assistente"
+          data-telemetry-alvo="abrir-liza"
           onPointerEnter={() => setAtento(true)}
           onPointerLeave={() => setAtento(false)}
           // idem braço desktop — :focus-visible só, senão o focus-restore

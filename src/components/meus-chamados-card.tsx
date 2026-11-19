@@ -46,7 +46,11 @@ export function MeusChamadosCard({
                 papel={papel}
                 duplas={duplas}
                 trigger={
-                  <Button size="sm" variant="outline">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    data-telemetry-alvo="novo-chamado"
+                  >
                     <Plus size={15} aria-hidden />
                     Novo pedido
                   </Button>

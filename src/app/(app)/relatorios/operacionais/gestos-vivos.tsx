@@ -6,6 +6,7 @@ import { demoRoleClient } from "@/lib/demo/shared";
 import { tempoRelativo } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
 import {
+  ROTULO_ACAO,
   ROTULO_PAPEL,
   ROTULO_SUPERFICIE,
   type EventoRecente,
@@ -25,17 +26,8 @@ const MAX = 12;
  *  ganha o flash de entrada. */
 type EventoVivo = EventoRecente & { novo?: boolean };
 
-const ROTULO_ACAO: Record<string, string> = {
-  pageview: "visitou",
-  clique: "clicou em",
-  busca: "buscou",
-  sort: "ordenou",
-  dialog: "abriu a Liza em",
-  nudge: "enviou lembrete em",
-  form_emitido: "emitiu formulário em",
-  material_aberto: "abriu material em",
-  lembrete_whatsapp: "lembrete WhatsApp em",
-};
+// verbos moram em lib/adocao (ROTULO_ACAO) — compartilhado com a trilha
+// dos painéis ricos (REALIZA-454)
 
 export function GestosVivos({ inicial }: { inicial: EventoRecente[] }) {
   const [eventos, setEventos] = useState<EventoVivo[]>(inicial);

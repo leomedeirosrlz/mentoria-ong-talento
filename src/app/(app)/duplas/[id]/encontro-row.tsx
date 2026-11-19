@@ -453,7 +453,11 @@ export function EncontroRow({
                 jovemNome={jovemNome}
                 rotulo={ehEsp ? "sessão de especialista" : undefined}
                 trigger={
-                  <Button variant="outline" size="sm">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    data-telemetry-alvo="agendar-encontro"
+                  >
                     <CalendarBlank size={16} />
                     Remarcar
                   </Button>
@@ -491,7 +495,11 @@ export function EncontroRow({
                   jovemNome={jovemNome}
                   rotulo={ehEsp ? "sessão de especialista" : undefined}
                   trigger={
-                    <Button variant="outline" size="sm">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      data-telemetry-alvo="agendar-encontro"
+                    >
                       <CalendarPlus size={16} />
                       Agendar
                     </Button>

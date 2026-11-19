@@ -5,12 +5,14 @@
 // reais, mas a aba precisa viver na demo pra review e e2e).
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { MARCOS_ROLAGEM } from "@/lib/produto-eventos";
 import {
   PAPEIS_ADOCAO,
   SUPERFICIES,
   type Caminho,
   type CelulaMatriz,
   type DiaSerie,
+  type EventoCru,
   type EventoRecente,
   type LinhaCoorte,
   type LinhaEventoExport,
@@ -111,6 +113,102 @@ export async function dadosAdocaoRecentes(
   });
   if (error) throw error;
   return (data ?? []) as EventoRecente[];
+}
+
+// ---------- cru paginado pros painéis ricos (REALIZA-454) ----------
+// Sem RPC nova: a policy select de produto_eventos já dá o escopo honesto
+// do caller (coord = tudo, self = próprio). A agregação fica em TS puro
+// (lib/adocao.ts) — mesma régua dos presets do explorador. PostgREST
+// corta em max_rows (1000): paginar sempre, como o /api/adocao/export.
+
+const PAGINA_CRU = 1000;
+// teto defensivo ~3x o volume esperado de 90d; truncado é declarado na
+// UI (os gestos mantidos são os mais recentes — fetch desc, sort asc)
+const TETO_CRU = 60_000;
+
+export type CruAdocao = {
+  eventos: EventoCru[];
+  /** true quando o teto cortou a cauda antiga — o painel declara. */
+  truncado: boolean;
+  /** nomes resolvidos dos profile_id — demo traz junto; no real o
+   *  fetcher de nomes cobre (select separado pra não repetir por linha) */
+  nomes?: Map<string, string>;
+};
+
+export async function dadosEventosRicos(
+  supabase: Supa,
+  desde: Date,
+  papel: string | null
+): Promise<CruAdocao> {
+  const out: EventoCru[] = [];
+  for (let i = 0; i < TETO_CRU; i += PAGINA_CRU) {
+    let q = supabase
+      .from("produto_eventos")
+      .select("profile_id, papel, superficie, acao, meta, created_at")
+      .gte("created_at", desde.toISOString())
+      .order("created_at", { ascending: false })
+      .range(i, i + PAGINA_CRU - 1);
+    if (papel) q = q.eq("papel", papel);
+    const { data, error } = await q;
+    if (error) throw error;
+    out.push(...((data ?? []) as EventoCru[]));
+    if ((data ?? []).length < PAGINA_CRU) {
+      out.sort((a, b) => a.created_at.localeCompare(b.created_at));
+      return { eventos: out, truncado: false };
+    }
+  }
+  out.sort((a, b) => a.created_at.localeCompare(b.created_at));
+  return { eventos: out, truncado: true };
+}
+
+/** Nomes das pessoas do cru pro drill da jornada — um select pontual
+ *  sobre os ids que apareceram no período (RLS de profiles já limita ao
+ *  escopo do caller). Sem nome a UI mostra o id curto, sem quebrar. */
+export async function dadosNomesPerfis(
+  supabase: Supa,
+  ids: string[]
+): Promise<Map<string, string>> {
+  if (ids.length === 0) return new Map();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, nome")
+    .in("id", ids.slice(0, 100));
+  if (error) throw error;
+  return new Map(
+    (data ?? [])
+      .filter((p): p is { id: string; nome: string } => !!p.nome)
+      .map((p) => [p.id, p.nome])
+  );
+}
+
+/** Gêmeo demo do cru rico: reaproveita o fabricante de eventos da aba
+ *  (mesmo volume/distribuição dos outros painéis), só converte a forma
+ *  LinhaEventoExport (meta unknown, created_at Date) pra EventoCru. */
+export function dadosEventosRicosDemo(
+  d: DemoData,
+  janela: number,
+  papel: string | null
+): CruAdocao {
+  const cru = dadosAdocaoEventosDemo(d, janela, 4000);
+  const eventos = cru
+    .filter((e) => !papel || e.papel === papel)
+    .map((e) => ({
+      profile_id: e.profile_id,
+      papel: e.papel,
+      superficie: e.superficie,
+      acao: e.acao,
+      meta:
+        e.meta && typeof e.meta === "object"
+          ? (e.meta as Record<string, unknown>)
+          : null,
+      created_at: e.created_at.toISOString(),
+    }));
+  const nomes = new Map(
+    d.profiles
+      .filter((p) => p.nome)
+      .map((p) => [p.id, p.nome as string])
+  );
+  return { eventos, truncado: false, nomes };
 }
 
 // ---------- funil de instrumentos (emitido → respondido) ----------
@@ -641,15 +739,37 @@ const PAPEL_DEMO_ROLES: Record<string, string[]> = {
 };
 
 const ACOES_PESO: [string, number][] = [
-  ["pageview", 50],
-  ["clique", 18],
-  ["busca", 10],
-  ["sort", 8],
-  ["dialog", 6],
-  ["material_aberto", 4],
-  ["nudge", 2],
-  ["form_emitido", 1],
-  ["lembrete_whatsapp", 1],
+  ["pageview", 30],
+  ["clique", 11],
+  // REALIZA-453 — os gestos ricos no mesmo cru demo: permanencia ≈
+  // pageview (toda estadia fecha uma), rolagem só nas estadias roláveis
+  ["permanencia", 26],
+  ["rolagem", 18],
+  ["busca", 6],
+  ["sort", 4],
+  ["dialog", 3],
+  ["material_aberto", 1],
+  ["nudge", 0.5],
+  ["form_emitido", 0.25],
+  ["lembrete_whatsapp", 0.25],
+];
+
+// o sorteio ponderado trabalha SOBRE o total — peso que soma mais que a
+// faixa sorteada deixaria os últimos itens inatingíveis em silêncio
+// (foi o que aconteceu quando rolagem entrou: a soma passou de 100 e o
+// marco nunca saía)
+const ACOES_PESO_TOTAL = ACOES_PESO.reduce((s, [, w]) => s + w, 0);
+
+/** alvos nomeados da coleta rica — espelho dos data-telemetry-alvo
+ *  marcados no JSX; ~1 em 5 cliques demo cai num alvo, como no real. */
+const ALVOS_DEMO = [
+  "agendar-encontro",
+  "nova-dupla",
+  "novo-chamado",
+  "novo-formulario",
+  "registrar-retroativo",
+  "abrir-liza",
+  "novo-link",
 ];
 
 // REALIZA-433 — meta demo dos gestos ricos: os presets de viewport e
@@ -724,7 +844,7 @@ export function dadosAdocaoEventosDemo(
       // histograma do explorador virava um bloco só
       const frac = (i + semeado(`e:${chave}`)) / n;
       const criado = new Date(agora - janelaMs * (1 - frac));
-      const a = semeado(`a:${chave}`) * 100;
+      const a = semeado(`a:${chave}`) * ACOES_PESO_TOTAL;
       let acao = "pageview";
       let acc = 0;
       for (const [nome, peso] of ACOES_PESO) {
@@ -734,20 +854,42 @@ export function dadosAdocaoEventosDemo(
           break;
         }
       }
+      const metaDemo: Record<string, unknown> =
+        acao === "busca"
+          ? { q: "exemplo" }
+          : acao === "pageview"
+            ? { path: `/${c.superficie}`, ...viewportDemo(chave) }
+            : acao === "clique"
+              ? {
+                  ...cliqueDemo(chave),
+                  // ~1 em 5 cliques cai num alvo nomeado, como no real
+                  ...(semeado(`t:${chave}`) < 0.2
+                    ? {
+                        alvo: ALVOS_DEMO[
+                          Math.floor(semeado(`tv:${chave}`) * ALVOS_DEMO.length)
+                        ],
+                      }
+                    : {}),
+                }
+              : acao === "permanencia"
+                ? // estadias plausíveis: 15s a ~7min — a mediana do painel
+                  // fica na casa do minuto, como uso real de lista/ficha
+                  { dur_ms: Math.round(15_000 + semeado(`d:${chave}`) * 400_000) }
+                : acao === "rolagem"
+                  ? // marcos válidos só (0 = rolável mas não chegou a 25%)
+                    {
+                      prof: MARCOS_ROLAGEM[
+                        Math.floor(semeado(`r:${chave}`) * MARCOS_ROLAGEM.length)
+                      ],
+                    }
+                  : {};
       out.push({
         id: `de000000-0000-4000-8000-${String(seq++).padStart(12, "0")}`,
         profile_id: pool[Math.floor(semeado(`p:${chave}`) * pool.length)]!,
         papel: c.papel,
         superficie: c.superficie,
         acao,
-        meta:
-          acao === "busca"
-            ? { q: "exemplo" }
-            : acao === "pageview"
-              ? { path: `/${c.superficie}`, ...viewportDemo(chave) }
-              : acao === "clique"
-                ? cliqueDemo(chave)
-                : {},
+        meta: metaDemo,
         created_at: criado,
       });
     }
