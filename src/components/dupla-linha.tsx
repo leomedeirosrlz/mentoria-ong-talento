@@ -41,14 +41,14 @@ export type PessoaLinha = {
  *  (sem cor de status); "pausa" cobre pausada e concluída. */
 export type TomSituacao = "risco" | "atencao" | "neutro" | "pausa";
 
-const PILL: Record<TomSituacao, string> = {
+export const PILL_SITUACAO: Record<TomSituacao, string> = {
   risco: "border-[var(--danger-border)] bg-[var(--danger-bg)] text-[var(--danger-text)]",
   atencao: "border-[var(--warn-border)] bg-[var(--warn-bg)] text-[var(--warn-text)]",
   neutro: "border-border bg-muted text-foreground",
   pausa: "border-[var(--pausa-border)] bg-[var(--pausa-bg)] text-[var(--pausa-text)]",
 };
 
-const PONTO: Record<TomSituacao, string | null> = {
+export const PONTO_SITUACAO: Record<TomSituacao, string | null> = {
   risco: "bg-[var(--danger)]",
   atencao: "bg-[var(--warn)]",
   neutro: null,
@@ -156,11 +156,11 @@ export function DuplaLinha({
           <span
             className={cn(
               "inline-flex items-center gap-1.5 whitespace-nowrap rounded-full border px-2.5 py-1 text-[11px] font-semibold leading-none",
-              PILL[situacao.tom]
+              PILL_SITUACAO[situacao.tom]
             )}
           >
-            {PONTO[situacao.tom] && (
-              <span aria-hidden className={cn("size-1.5 rounded-full", PONTO[situacao.tom])} />
+            {PONTO_SITUACAO[situacao.tom] && (
+              <span aria-hidden className={cn("size-1.5 rounded-full", PONTO_SITUACAO[situacao.tom])} />
             )}
             {situacao.rotulo}
           </span>

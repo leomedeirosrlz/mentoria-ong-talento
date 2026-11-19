@@ -249,7 +249,17 @@ type RowAssinatura = {
   documento: string;
 };
 
-export function linhasAssinaturasPendentes({
+/** A linha de uma pendência de assinatura + o alvo do drill-down — a seção
+ *  acionável (REALIZA-389) leva à ficha da pessoa, onde a reemissão mora. */
+export type ItemAssinatura = {
+  linha: LinhaAssinaturaPendente;
+  /** profile_id ?? mentorado_id — href /pessoas/<id>. */
+  pessoaId: string | null;
+  /** status efetivo já com a expiração lazy aplicada. */
+  status: "pendente" | "expirado";
+};
+
+export function itensAssinaturasPendentes({
   rows,
   nomes,
   papeis,
@@ -265,9 +275,9 @@ export function linhasAssinaturasPendentes({
   recorte: RecorteCsv;
   crons: readonly Pick<Cronograma, "id" | "turma">[];
   agora?: Date;
-}): LinhaAssinaturaPendente[] {
+}): ItemAssinatura[] {
   const alvo = agora.toISOString();
-  const out: LinhaAssinaturaPendente[] = [];
+  const out: ItemAssinatura[] = [];
   for (const a of rows) {
     if (a.status === "revogado") continue;
     // a pendência é pessoa × documento: assinado_em nulo define a anti-chave;
@@ -275,28 +285,38 @@ export function linhasAssinaturasPendentes({
     if (a.status !== "pendente" && a.status !== "expirado") continue;
     const pessoaId = a.profile_id ?? a.mentorado_id;
     if (!pessoaNoRecorte(pessoaId, porPessoa, recorte, crons)) continue;
+    const status: ItemAssinatura["status"] =
+      a.status === "expirado" ||
+      (a.token_expira_em != null && a.token_expira_em < alvo)
+        ? "expirado"
+        : "pendente";
     out.push({
-      nome: pessoaId ? (nomes.get(pessoaId) ?? "") : "",
-      papel: a.profile_id
-        ? papelLabel(papeis.get(a.profile_id) ?? null)
-        : "Mentorado",
-      documento: a.documento,
-      status:
-        a.status === "expirado" ||
-        (a.token_expira_em != null && a.token_expira_em < alvo)
-          ? "expirado"
-          : "pendente",
-      emitido_em: a.created_at,
-      expira_em: a.token_expira_em ?? "",
+      pessoaId,
+      status,
+      linha: {
+        nome: pessoaId ? (nomes.get(pessoaId) ?? "") : "",
+        papel: a.profile_id
+          ? papelLabel(papeis.get(a.profile_id) ?? null)
+          : "Mentorado",
+        documento: a.documento,
+        status,
+        emitido_em: a.created_at,
+        expira_em: a.token_expira_em ?? "",
+      },
     });
   }
   return out;
 }
 
-export async function dadosAssinaturasPendentes(
-  supabase: Supa,
-  recorte: RecorteCsv
-): Promise<LinhaAssinaturaPendente[]> {
+export function linhasAssinaturasPendentes(
+  args: Parameters<typeof itensAssinaturasPendentes>[0]
+): LinhaAssinaturaPendente[] {
+  return itensAssinaturasPendentes(args).map((i) => i.linha);
+}
+
+/** SELECT + mapas do fetch real — um fetch só alimenta a linha e o item
+ *  (a prévia do export e a fila da seção nunca divergem). */
+async function assinaturasCtx(supabase: Supa) {
   const [{ porPessoa, crons }, aRes, pRes, mRes] = await Promise.all([
     duplasMapaReal(supabase),
     supabase
@@ -332,20 +352,30 @@ export async function dadosAssinaturasPendentes(
       documento: tpl?.titulo ?? "",
     };
   });
-  return linhasAssinaturasPendentes({
-    rows,
-    nomes,
-    papeis,
-    porPessoa,
+  return { rows, nomes, papeis, porPessoa, crons };
+}
+
+export async function dadosItensAssinaturas(
+  supabase: Supa,
+  recorte: RecorteCsv
+): Promise<ItemAssinatura[]> {
+  return itensAssinaturasPendentes({
+    ...(await assinaturasCtx(supabase)),
     recorte,
-    crons,
   });
 }
 
-export function dadosAssinaturasPendentesDemo(
+export async function dadosAssinaturasPendentes(
+  supabase: Supa,
+  recorte: RecorteCsv
+): Promise<LinhaAssinaturaPendente[]> {
+  return (await dadosItensAssinaturas(supabase, recorte)).map((i) => i.linha);
+}
+
+export function dadosItensAssinaturasDemo(
   d: DemoData,
   recorte: RecorteCsv
-): LinhaAssinaturaPendente[] {
+): ItemAssinatura[] {
   const mapas = demoMapas(d);
   const rows: RowAssinatura[] = d.assinaturas.map((a) => ({
     profile_id: a.profile_id,
@@ -355,7 +385,7 @@ export function dadosAssinaturasPendentesDemo(
     created_at: a.created_at,
     documento: a.template?.titulo ?? "",
   }));
-  return linhasAssinaturasPendentes({
+  return itensAssinaturasPendentes({
     rows,
     nomes: mapas.nomes,
     papeis: mapas.papeis,
@@ -363,6 +393,13 @@ export function dadosAssinaturasPendentesDemo(
     recorte,
     crons: mapas.crons,
   });
+}
+
+export function dadosAssinaturasPendentesDemo(
+  d: DemoData,
+  recorte: RecorteCsv
+): LinhaAssinaturaPendente[] {
+  return dadosItensAssinaturasDemo(d, recorte).map((i) => i.linha);
 }
 
 // =====================================================================
@@ -384,6 +421,7 @@ const INTERACAO_CANAL_LABEL: Record<InteracaoCanal, string> = {
 };
 
 type RowInteracao = {
+  id: string;
   dupla_id: string;
   tipo: InteracaoTipo;
   canal: InteracaoCanal;
@@ -392,13 +430,25 @@ type RowInteracao = {
   autor: string;
 };
 
-export function linhasInteracoes(
+/** A linha do log + a dupla por trás — a seção acionável (REALIZA-389) leva
+ *  à ficha da dupla do gesto. */
+export type ItemInteracao = {
+  linha: LinhaInteracao;
+  interacaoId: string;
+  /** null = interação órfã de dupla removida (fato histórico, sem ficha). */
+  duplaId: string | null;
+  /** tipo/canal crus — a agregação do resumo lê daqui, não do label. */
+  tipo: InteracaoTipo;
+  canal: InteracaoCanal;
+};
+
+export function itensInteracoes(
   rows: RowInteracao[],
   porId: Map<string, DuplaMapa>,
   recorte: RecorteCsv,
   crons: readonly Pick<Cronograma, "id" | "turma">[]
-): LinhaInteracao[] {
-  const out: LinhaInteracao[] = [];
+): ItemInteracao[] {
+  const out: ItemInteracao[] = [];
   for (const i of rows) {
     const d = porId.get(i.dupla_id);
     if (d && !duplaNoRecorte(d, recorte, crons)) continue;
@@ -406,21 +456,36 @@ export function linhasInteracoes(
     // vazia (fato histórico); com recorte ela não pertence a turma nenhuma
     if (!d && (recorte.turma || recorte.cronogramaId)) continue;
     out.push({
-      dupla: duplaLabel(d),
-      tipo: INTERACAO_TIPO_LABEL[i.tipo] ?? i.tipo,
-      canal: INTERACAO_CANAL_LABEL[i.canal] ?? i.canal,
-      autor: i.autor,
-      data: i.created_at,
-      nota: i.nota ?? "",
+      interacaoId: i.id,
+      duplaId: d?.id ?? null,
+      tipo: i.tipo,
+      canal: i.canal,
+      linha: {
+        dupla: duplaLabel(d),
+        tipo: INTERACAO_TIPO_LABEL[i.tipo] ?? i.tipo,
+        canal: INTERACAO_CANAL_LABEL[i.canal] ?? i.canal,
+        autor: i.autor,
+        data: i.created_at,
+        nota: i.nota ?? "",
+      },
     });
   }
   return out;
 }
 
-export async function dadosInteracoes(
+export function linhasInteracoes(
+  rows: RowInteracao[],
+  porId: Map<string, DuplaMapa>,
+  recorte: RecorteCsv,
+  crons: readonly Pick<Cronograma, "id" | "turma">[]
+): LinhaInteracao[] {
+  return itensInteracoes(rows, porId, recorte, crons).map((i) => i.linha);
+}
+
+export async function dadosItensInteracoes(
   supabase: Supa,
   recorte: RecorteCsv
-): Promise<LinhaInteracao[]> {
+): Promise<ItemInteracao[]> {
   const [{ porId, crons }, iRes] = await Promise.all([
     duplasMapaReal(supabase),
     supabase
@@ -433,6 +498,7 @@ export async function dadosInteracoes(
   ]);
   if (iRes.error) throw iRes.error;
   const rows = (iRes.data ?? []).map((r) => ({
+    id: r.id,
     dupla_id: r.dupla_id,
     tipo: r.tipo as InteracaoTipo,
     canal: r.canal as InteracaoCanal,
@@ -442,15 +508,25 @@ export async function dadosInteracoes(
       norm(r.autor as unknown as { nome: string } | { nome: string }[] | null)
         ?.nome ?? "",
   }));
-  return linhasInteracoes(rows, porId, recorte, crons);
+  return itensInteracoes(rows, porId, recorte, crons);
 }
 
-export function dadosInteracoesDemo(
+export async function dadosInteracoes(
+  supabase: Supa,
+  recorte: RecorteCsv
+): Promise<LinhaInteracao[]> {
+  return (await dadosItensInteracoes(supabase, recorte)).map((i) => i.linha);
+}
+
+export function dadosItensInteracoesDemo(
   d: DemoData,
   recorte: RecorteCsv
-): LinhaInteracao[] {
+): ItemInteracao[] {
   const mapas = demoMapas(d);
-  const rows: RowInteracao[] = d.interacoes.map((i) => ({
+  const rows: RowInteracao[] = d.interacoes.map((i, idx) => ({
+    // o tipo Interacao do dataset não carrega id — a chave composta basta
+    // pra identidade da linha na seção (não é link, não é FK)
+    id: `${i.dupla_id}:${i.created_at}:${idx}`,
     dupla_id: i.dupla_id,
     tipo: i.tipo,
     canal: i.canal,
@@ -458,7 +534,14 @@ export function dadosInteracoesDemo(
     created_at: i.created_at,
     autor: i.autor?.nome ?? "",
   }));
-  return linhasInteracoes(rows, mapas.porId, recorte, mapas.crons);
+  return itensInteracoes(rows, mapas.porId, recorte, mapas.crons);
+}
+
+export function dadosInteracoesDemo(
+  d: DemoData,
+  recorte: RecorteCsv
+): LinhaInteracao[] {
+  return dadosItensInteracoesDemo(d, recorte).map((i) => i.linha);
 }
 
 // =====================================================================
@@ -482,13 +565,24 @@ const SOLICITACAO_ORIGEM_LABEL: Record<string, string> = {
   mentor: "mentor",
 };
 
-export function linhasSolicitacoes(
+/** A linha do pedido + os alvos do drill-down — a fila acionável (389) leva
+ *  à ficha da dupla DPP (onde a triagem/negociação mora) ou à do jovem. */
+export type ItemSolicitacao = {
+  linha: LinhaSolicitacao;
+  solicitacaoId: string;
+  mentoradoId: string | null;
+  duplaDppId: string | null;
+  /** status_efetivo ?? status — a régua que separa pendência de decidida. */
+  statusEfetivo: SolicitacaoEspecialistaStatus;
+};
+
+export function itensSolicitacoes(
   rows: SolicitacaoEspecialista[],
   porId: Map<string, DuplaMapa>,
   recorte: RecorteCsv,
   crons: readonly Pick<Cronograma, "id" | "turma">[]
-): LinhaSolicitacao[] {
-  const out: LinhaSolicitacao[] = [];
+): ItemSolicitacao[] {
+  const out: ItemSolicitacao[] = [];
   for (const s of rows) {
     const d = s.dupla_dpp_id ? porId.get(s.dupla_dpp_id) : undefined;
     if (d) {
@@ -501,29 +595,44 @@ export function linhasSolicitacoes(
     }
     const efetivo = s.status_efetivo ?? s.status;
     out.push({
-      mentorado: s.mentorado?.nome ?? "",
-      demanda: s.demanda ?? s.motivo ?? "",
-      origem: SOLICITACAO_ORIGEM_LABEL[s.origem] ?? s.origem,
-      status: SOLICITACAO_STATUS_LABEL[efetivo] ?? efetivo,
-      criada_em: s.created_at,
-      respondida_em: s.respondida_em,
-      latencia: s.respondida_em
-        ? diffDias(
-            s.respondida_em.slice(0, 10),
-            s.created_at.slice(0, 10)
-          )
-        : null,
-      especialista:
-        s.especialista?.nome ?? s.desejado?.nome ?? "",
+      solicitacaoId: s.id,
+      mentoradoId: s.mentorado_id,
+      duplaDppId: s.dupla_dpp_id,
+      statusEfetivo: efetivo,
+      linha: {
+        mentorado: s.mentorado?.nome ?? "",
+        demanda: s.demanda ?? s.motivo ?? "",
+        origem: SOLICITACAO_ORIGEM_LABEL[s.origem] ?? s.origem,
+        status: SOLICITACAO_STATUS_LABEL[efetivo] ?? efetivo,
+        criada_em: s.created_at,
+        respondida_em: s.respondida_em,
+        latencia: s.respondida_em
+          ? diffDias(
+              s.respondida_em.slice(0, 10),
+              s.created_at.slice(0, 10)
+            )
+          : null,
+        especialista:
+          s.especialista?.nome ?? s.desejado?.nome ?? "",
+      },
     });
   }
   return out;
 }
 
-export async function dadosSolicitacoes(
+export function linhasSolicitacoes(
+  rows: SolicitacaoEspecialista[],
+  porId: Map<string, DuplaMapa>,
+  recorte: RecorteCsv,
+  crons: readonly Pick<Cronograma, "id" | "turma">[]
+): LinhaSolicitacao[] {
+  return itensSolicitacoes(rows, porId, recorte, crons).map((i) => i.linha);
+}
+
+export async function dadosItensSolicitacoes(
   supabase: Supa,
   recorte: RecorteCsv
-): Promise<LinhaSolicitacao[]> {
+): Promise<ItemSolicitacao[]> {
   const [{ porId, crons }, sRes] = await Promise.all([
     duplasMapaReal(supabase),
     supabase
@@ -541,18 +650,32 @@ export async function dadosSolicitacoes(
     mentorado: r.mentorado_nome ? { nome: r.mentorado_nome } : null,
     especialista: r.especialista_nome ? { nome: r.especialista_nome } : null,
   }));
-  return linhasSolicitacoes(rows, porId, recorte, crons);
+  return itensSolicitacoes(rows, porId, recorte, crons);
+}
+
+export async function dadosSolicitacoes(
+  supabase: Supa,
+  recorte: RecorteCsv
+): Promise<LinhaSolicitacao[]> {
+  return (await dadosItensSolicitacoes(supabase, recorte)).map((i) => i.linha);
+}
+
+export function dadosItensSolicitacoesDemo(
+  d: DemoData,
+  recorte: RecorteCsv
+): ItemSolicitacao[] {
+  const mapas = demoMapas(d);
+  // comEfetivo: mesma expiração lazy do mural (status_efetivo só existe na
+  // view — no dataset a coluna não vem preenchida)
+  const rows = d.solicitacoes.map(comEfetivo);
+  return itensSolicitacoes(rows, mapas.porId, recorte, mapas.crons);
 }
 
 export function dadosSolicitacoesDemo(
   d: DemoData,
   recorte: RecorteCsv
 ): LinhaSolicitacao[] {
-  const mapas = demoMapas(d);
-  // comEfetivo: mesma expiração lazy do mural (status_efetivo só existe na
-  // view — no dataset a coluna não vem preenchida)
-  const rows = d.solicitacoes.map(comEfetivo);
-  return linhasSolicitacoes(rows, mapas.porId, recorte, mapas.crons);
+  return dadosItensSolicitacoesDemo(d, recorte).map((i) => i.linha);
 }
 
 // =====================================================================
@@ -676,6 +799,7 @@ const FORMS_ORIGEM_LABEL: Record<string, string> = {
 };
 
 type RowFormsTaxa = {
+  id: string;
   formulario_id: string;
   dest_profile_id: string | null;
   dest_mentorado_id: string | null;
@@ -687,7 +811,22 @@ type RowFormsTaxa = {
   respondido_em: string[]; // datas das respostas do link
 };
 
-export function linhasFormsTaxa({
+/** A linha do link + os alvos do drill-down — a seção acionável (389) leva
+ *  ao formulário (onde links e respostas se gerenciam). */
+export type ItemForms = {
+  linha: LinhaFormsTaxa;
+  linkId: string;
+  formularioId: string;
+  /** dest_profile_id ?? dest_mentorado_id — null no link genérico. */
+  pessoaId: string | null;
+  duplaId: string | null;
+  respondido: boolean;
+  /** "manual" | "intake" — o link de divulgação não é pendência de pessoa. */
+  origem: string;
+  multiUso: boolean;
+};
+
+export function itensFormsTaxa({
   rows,
   titulos,
   nomes,
@@ -705,8 +844,8 @@ export function linhasFormsTaxa({
   porPessoa: Map<string, DuplaMapa[]>;
   recorte: RecorteCsv;
   crons: readonly Pick<Cronograma, "id" | "turma">[];
-}): LinhaFormsTaxa[] {
-  const out: LinhaFormsTaxa[] = [];
+}): ItemForms[] {
+  const out: ItemForms[] = [];
   for (const l of rows) {
     const d = l.dupla_id ? porId.get(l.dupla_id) : undefined;
     if (d) {
@@ -721,35 +860,50 @@ export function linhasFormsTaxa({
     const respondido = l.multi_uso ? n > 0 : l.usado_em != null;
     const p = l.dest_profile_id;
     out.push({
-      formulario: titulos.get(l.formulario_id) ?? "",
-      destinatario: p
-        ? (nomes.get(p) ?? "")
-        : l.dest_mentorado_id
-          ? (nomes.get(l.dest_mentorado_id) ?? "")
-          : "Link genérico",
-      papel: p
-        ? papelLabel(papeis.get(p) ?? null)
-        : l.dest_mentorado_id
-          ? "Mentorado"
-          : "",
-      dupla: duplaLabel(d),
-      origem: FORMS_ORIGEM_LABEL[l.origem] ?? l.origem,
-      emitido_em: l.created_at,
-      respondido: respondido ? "sim" : "não",
-      respostas: n,
-      // multi_uso: a data exibida é a resposta mais recente
-      respondido_em: l.multi_uso
-        ? (l.respondido_em.sort().at(-1) ?? null)
-        : l.usado_em,
+      linkId: l.id,
+      formularioId: l.formulario_id,
+      pessoaId: p ?? l.dest_mentorado_id,
+      duplaId: d?.id ?? null,
+      respondido,
+      origem: l.origem,
+      multiUso: l.multi_uso,
+      linha: {
+        formulario: titulos.get(l.formulario_id) ?? "",
+        destinatario: p
+          ? (nomes.get(p) ?? "")
+          : l.dest_mentorado_id
+            ? (nomes.get(l.dest_mentorado_id) ?? "")
+            : "Link genérico",
+        papel: p
+          ? papelLabel(papeis.get(p) ?? null)
+          : l.dest_mentorado_id
+            ? "Mentorado"
+            : "",
+        dupla: duplaLabel(d),
+        origem: FORMS_ORIGEM_LABEL[l.origem] ?? l.origem,
+        emitido_em: l.created_at,
+        respondido: respondido ? "sim" : "não",
+        respostas: n,
+        // multi_uso: a data exibida é a resposta mais recente
+        respondido_em: l.multi_uso
+          ? (l.respondido_em.sort().at(-1) ?? null)
+          : l.usado_em,
+      },
     });
   }
   return out;
 }
 
-export async function dadosFormsTaxa(
+export function linhasFormsTaxa(
+  args: Parameters<typeof itensFormsTaxa>[0]
+): LinhaFormsTaxa[] {
+  return itensFormsTaxa(args).map((i) => i.linha);
+}
+
+export async function dadosItensForms(
   supabase: Supa,
   recorte: RecorteCsv
-): Promise<LinhaFormsTaxa[]> {
+): Promise<ItemForms[]> {
   const [{ porId, porPessoa, crons }, lRes, fRes, pRes, mRes] =
     await Promise.all([
       duplasMapaReal(supabase),
@@ -783,6 +937,7 @@ export async function dadosFormsTaxa(
   const rows: RowFormsTaxa[] = (lRes.data ?? []).map((l) => {
     const resps = (l.resposta ?? []) as { respondido_em: string }[];
     return {
+      id: l.id,
       formulario_id: l.formulario_id,
       dest_profile_id: l.dest_profile_id,
       dest_mentorado_id: l.dest_mentorado_id,
@@ -794,7 +949,7 @@ export async function dadosFormsTaxa(
       respondido_em: resps.map((r) => r.respondido_em),
     };
   });
-  return linhasFormsTaxa({
+  return itensFormsTaxa({
     rows,
     titulos,
     nomes,
@@ -806,14 +961,22 @@ export async function dadosFormsTaxa(
   });
 }
 
-export function dadosFormsTaxaDemo(
+export async function dadosFormsTaxa(
+  supabase: Supa,
+  recorte: RecorteCsv
+): Promise<LinhaFormsTaxa[]> {
+  return (await dadosItensForms(supabase, recorte)).map((i) => i.linha);
+}
+
+export function dadosItensFormsDemo(
   d: DemoData,
   recorte: RecorteCsv
-): LinhaFormsTaxa[] {
+): ItemForms[] {
   const mapas = demoMapas(d);
   const { formularios, links, respostas } = getDemoFormularios();
   const titulos = new Map(formularios.map((f) => [f.id, f.titulo] as const));
   const rows: RowFormsTaxa[] = links.map((l) => ({
+    id: l.id,
     formulario_id: l.formulario_id,
     dest_profile_id: l.dest_profile_id,
     dest_mentorado_id: l.dest_mentorado_id,
@@ -826,7 +989,7 @@ export function dadosFormsTaxaDemo(
       .filter((r) => r.link_id === l.id)
       .map((r) => r.respondido_em),
   }));
-  return linhasFormsTaxa({
+  return itensFormsTaxa({
     rows,
     titulos,
     nomes: mapas.nomes,
@@ -836,6 +999,13 @@ export function dadosFormsTaxaDemo(
     recorte,
     crons: mapas.crons,
   });
+}
+
+export function dadosFormsTaxaDemo(
+  d: DemoData,
+  recorte: RecorteCsv
+): LinhaFormsTaxa[] {
+  return dadosItensFormsDemo(d, recorte).map((i) => i.linha);
 }
 
 // =====================================================================
