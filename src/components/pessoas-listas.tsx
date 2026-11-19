@@ -23,7 +23,7 @@ import {
 import { temPapel } from "@/lib/types";
 import type { Mentorado, Profile } from "@/lib/types";
 import type { MentorProfile } from "@/lib/queries";
-import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
+import { esperaDesde, filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
 import {
   PAPEL_TURMA_LABEL,
   STATUS_PESSOA_LABEL,
@@ -724,6 +724,22 @@ export function PessoasListas({
     (m) => !emDupla.has(m.id) && !foraDoPrograma(m)
   );
 
+  // espera por id pro modo Parear (REALIZA-446): o pool lá é maior que a
+  // fila (inclui remanejo e mentor cheio), então o "há N dias" chega
+  // derivado — mesma régua do carimbo que filaMentorados/filaMentores usam
+  const esperaDesdePorId = useMemo(
+    () =>
+      souCoord
+        ? Object.fromEntries(
+            [...mentoradosLivres, ...mentoresDpp].map((p) => [
+              p.id,
+              esperaDesde(p, disponivelDesde[p.id]),
+            ])
+          )
+        : {},
+    [souCoord, mentoradosLivres, mentoresDpp, disponivelDesde]
+  );
+
   // escopo (todos os filtros, sem a busca) — denominador honesto do
   // "N de M" e a base dos grupos; o arquivo continua colapsável no fim
   const pessoasEscopo = basePessoas.filter(
@@ -1206,6 +1222,8 @@ export function PessoasListas({
           mentorProfiles={mentorProfiles}
           ocupacao={contagemPorMentor}
           assinaturas={assinaturas}
+          mapasTurma={mapas}
+          esperaDesdePorId={esperaDesdePorId}
         />
       )}
 
