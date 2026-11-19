@@ -178,4 +178,118 @@ test.describe("demo — seções acionáveis", () => {
     const csv = page.getByRole("link", { name: "Baixar CSV completo" });
     expect(await csv.getAttribute("href")).toContain("turma=T1");
   });
+
+  test("assinaturas: resumo, fila por pessoa e prévia colapsada", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/relatorios/operacionais?aba=assinaturas");
+
+    await expect(
+      page.getByRole("heading", { name: "Assinaturas pendentes" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Pendências" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Por documento" })
+    ).toBeVisible();
+
+    // a fila leva à ficha da pessoa — a reemissão do link mora lá
+    await expect(page.getByText(/A cobrar \(\d+\)/)).toBeVisible();
+    const ficha = page
+      .getByRole("link", { name: /Ver ficha de / })
+      .first();
+    expect(await ficha.getAttribute("href")).toMatch(/^\/pessoas\//);
+
+    await expect(
+      page.getByText(/Prévia do export \(\d+ linhas\)/)
+    ).toBeVisible();
+    const csv = page.getByRole("link", { name: "Baixar CSV completo" });
+    expect(await csv.getAttribute("href")).toContain(
+      "tipo=assinaturas-pendentes"
+    );
+  });
+
+  test("interações: resumo do volume e log com drill pra dupla", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/relatorios/operacionais?aba=interacoes");
+
+    await expect(
+      page.getByRole("heading", { name: "Interações" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Gestos registrados" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Por tipo" })
+    ).toBeVisible();
+    await expect(page.getByText(/por canal/)).toBeVisible();
+
+    // cada gesto leva à ficha da dupla
+    await expect(page.getByText(/Registro \(\d+\)/)).toBeVisible();
+    const ficha = page
+      .getByRole("link", { name: "Ver ficha da dupla" })
+      .first();
+    expect(await ficha.getAttribute("href")).toMatch(/^\/duplas\//);
+
+    const csv = page.getByRole("link", { name: "Baixar CSV completo" });
+    expect(await csv.getAttribute("href")).toContain("tipo=interacoes");
+  });
+
+  test("especialistas: funil + fila do que espera ação", async ({ page }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/relatorios/operacionais?aba=solicitacoes");
+
+    await expect(
+      page.getByRole("heading", { name: "Pedidos de especialista" })
+    ).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Funil" })).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Resposta" })
+    ).toBeVisible();
+    await expect(page.getByText("aguardando triagem")).toBeVisible();
+
+    // o dataset tem pedidos abertos/em negociação — a fila leva à ficha da
+    // dupla DPP (negociação) ou à ficha do jovem
+    await expect(page.getByText(/Esperando ação \(\d+\)/)).toBeVisible();
+    const hrefs = page
+      .getByRole("link", { name: /Ver pedido de / })
+      .first();
+    expect(await hrefs.getAttribute("href")).toMatch(/^\/(duplas|pessoas)\//);
+
+    // decididas ficam colapsadas no histórico
+    await expect(page.getByText(/Decididas \(\d+\)/)).toBeVisible();
+    const csv = page.getByRole("link", { name: "Baixar CSV completo" });
+    expect(await csv.getAttribute("href")).toContain("tipo=solicitacoes");
+  });
+
+  test("formulários: taxa de resposta + fila de links pendentes", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/relatorios/operacionais?aba=formularios");
+
+    await expect(
+      page.getByRole("heading", { name: /Formulários/ })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Taxa de resposta", exact: true })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Aguardando resposta" })
+    ).toBeVisible();
+
+    // links nomeados pendentes → fila "A cobrar" que abre o formulário
+    await expect(page.getByText(/A cobrar \(\d+\)/)).toBeVisible();
+    const form = page
+      .getByRole("link", { name: /Abrir .+/ })
+      .first();
+    expect(await form.getAttribute("href")).toMatch(/^\/formularios\//);
+
+    const csv = page.getByRole("link", { name: "Baixar CSV completo" });
+    expect(await csv.getAttribute("href")).toContain("tipo=forms-taxa");
+  });
 });

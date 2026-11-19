@@ -19,21 +19,19 @@ import { GraficoTempo } from "@/components/viz/grafico-tempo";
 import { turmaDaDupla } from "@/lib/turma";
 import { formatDate } from "@/lib/ciclo";
 import {
-  dataHora,
-  dia,
   filtraPorRecorte,
   recorteDeParams,
   type RecorteCsv,
 } from "@/lib/relatorios/csv-core";
 import {
-  dadosAssinaturasPendentes,
-  dadosAssinaturasPendentesDemo,
-  dadosFormsTaxa,
-  dadosFormsTaxaDemo,
-  dadosInteracoes,
-  dadosInteracoesDemo,
-  dadosSolicitacoes,
-  dadosSolicitacoesDemo,
+  dadosItensAssinaturas,
+  dadosItensAssinaturasDemo,
+  dadosItensForms,
+  dadosItensFormsDemo,
+  dadosItensInteracoes,
+  dadosItensInteracoesDemo,
+  dadosItensSolicitacoes,
+  dadosItensSolicitacoesDemo,
   dadosTendenciaSaude,
   type DiaSaude,
 } from "@/lib/relatorios/dados";
@@ -49,10 +47,13 @@ import {
   type MedidaAdocao,
 } from "@/lib/adocao";
 import { RelatoriosAbas, type AbaRelatorios } from "./relatorios-abas";
-import { RelatorioSecao } from "./relatorio-secao";
 import { SecaoAderencia } from "./secao-aderencia";
 import { SecaoAdocao } from "./secao-adocao";
+import { SecaoAssinaturas } from "./secao-assinaturas";
 import { SecaoEncerramento } from "./secao-encerramento";
+import { SecaoFormularios } from "./secao-formularios";
+import { SecaoInteracoes } from "./secao-interacoes";
+import { SecaoSolicitacoes } from "./secao-solicitacoes";
 import { RecorteTurma } from "./recorte-turma";
 import { DigestBotao } from "./digest-botao";
 
@@ -287,83 +288,44 @@ async function renderAba({
     }
 
     case "assinaturas": {
-      const linhas = d
-        ? dadosAssinaturasPendentesDemo(d, recorte)
-        : await dadosAssinaturasPendentes(supabase!, recorte);
+      // a seção acionável (REALIZA-389): resumo + fila por pessoa; a prévia
+      // do export deriva dos mesmos itens — paridade literal
+      const itens = d
+        ? dadosItensAssinaturasDemo(d, recorte)
+        : await dadosItensAssinaturas(supabase!, recorte);
       return (
-        <RelatorioSecao
-          titulo="Assinaturas pendentes"
-          descricao="Documento emitido × pessoa sem assinado_em — inclui os links expirados que ainda contam como pendência."
-          colunas={[
-            "Nome",
-            "Papel",
-            "Documento",
-            "Status",
-            "Emitido em",
-            "Expira em",
-          ]}
-          linhas={linhas.map((l) => [
-            l.nome,
-            l.papel,
-            l.documento,
-            l.status,
-            dia(l.emitido_em) || "—",
-            dia(l.expira_em) || "—",
-          ])}
+        <SecaoAssinaturas
+          itens={itens}
           csvHref={csvHref("assinaturas-pendentes")}
+          hoje={new Date()}
         />
       );
     }
 
     case "interacoes": {
-      const linhas = d
-        ? dadosInteracoesDemo(d, recorte)
-        : await dadosInteracoes(supabase!, recorte);
+      // idem: o log com drill pra ficha da dupla + resumo do volume
+      const itens = d
+        ? dadosItensInteracoesDemo(d, recorte)
+        : await dadosItensInteracoes(supabase!, recorte);
       return (
-        <RelatorioSecao
-          titulo="Interações"
-          descricao="Log de nudges, contatos e apoios registrados pela coordenação — o rastro de acompanhamento por dupla."
-          colunas={["Dupla", "Tipo", "Canal", "Autor", "Data", "Nota"]}
-          linhas={linhas.map((l) => [
-            l.dupla,
-            l.tipo,
-            l.canal,
-            l.autor,
-            dataHora(l.data) || "—",
-            l.nota,
-          ])}
+        <SecaoInteracoes
+          itens={itens}
           csvHref={csvHref("interacoes")}
+          hoje={new Date()}
         />
       );
     }
 
     case "solicitacoes": {
-      const linhas = d
-        ? dadosSolicitacoesDemo(d, recorte)
-        : await dadosSolicitacoes(supabase!, recorte);
+      // idem: o funil do mural + a fila do que espera ação
+      const itens = d
+        ? dadosItensSolicitacoesDemo(d, recorte)
+        : await dadosItensSolicitacoes(supabase!, recorte);
       return (
-        <RelatorioSecao
-          titulo="Pedidos de especialista"
-          descricao="Solicitações do jovem, do mentor e da equipe com o status efetivo (expiração aplicada) e a latência de resposta."
-          colunas={[
-            "Mentorado",
-            "Demanda",
-            "Origem",
-            "Status",
-            "Criada em",
-            "Latência",
-            "Especialista",
-          ]}
-          linhas={linhas.map((l) => [
-            l.mentorado,
-            l.demanda,
-            l.origem,
-            l.status,
-            dataHora(l.criada_em) || "—",
-            l.latencia == null ? "—" : `${l.latencia}d`,
-            l.especialista,
-          ])}
+        <SecaoSolicitacoes
+          itens={itens}
           csvHref={csvHref("solicitacoes")}
+          hoje={new Date()}
         />
       );
     }
@@ -396,30 +358,15 @@ async function renderAba({
     }
 
     case "formularios": {
-      const linhas = d
-        ? dadosFormsTaxaDemo(d, recorte)
-        : await dadosFormsTaxa(supabase!, recorte);
+      // idem: taxa de resposta + fila de links pendentes
+      const itens = d
+        ? dadosItensFormsDemo(d, recorte)
+        : await dadosItensForms(supabase!, recorte);
       return (
-        <RelatorioSecao
-          titulo="Formulários — taxa de resposta"
-          descricao="Um linha por link emitido: respondido/não e quantas respostas chegaram — a taxa se deriva do par."
-          colunas={[
-            "Formulário",
-            "Destinatário",
-            "Origem",
-            "Emitido em",
-            "Respondido",
-            "Respostas",
-          ]}
-          linhas={linhas.map((l) => [
-            l.formulario,
-            l.destinatario,
-            l.origem,
-            dataHora(l.emitido_em) || "—",
-            l.respondido,
-            String(l.respostas),
-          ])}
+        <SecaoFormularios
+          itens={itens}
           csvHref={csvHref("forms-taxa")}
+          hoje={new Date()}
         />
       );
     }
