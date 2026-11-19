@@ -77,11 +77,69 @@ test("importa CSV: leitura → prévia editável → grava e aparece em /turmas"
   await page.locator("#cb-turma").fill(TURMA);
   await expect(page.getByText(/16 encontros oficiais/)).toBeVisible();
 
+  // **/turmas/* casaria a URL atual (/turmas/novo) e a espera resolveria
+  // antes da action gravar — espera a rota do cronograma criado (uuid)
   await page.getByRole("button", { name: "Criar cronograma" }).click();
-  await page.waitForURL("**/turmas/*");
+  await page.waitForURL(/\/turmas\/[0-9a-f-]{36}/);
 
   await page.goto("/turmas");
   await expect(
     page.getByRole("link", { name: new RegExp(TURMA) })
   ).toBeVisible();
+});
+
+// Spec 009 US1, caso de borda: documento fora do padrão (datas por
+// extenso, sem "Encontro N", sem turma) sai com sinais de complexidade —
+// leitura parcial, confiança baixa — e, com provider configurado, iria à
+// IA sem clique. O e2e roda sem IA_API_* (mesma régua do assistente): o
+// que se prova aqui é o deck honesto — prévia parcial com avisos, botão
+// de IA escondido e NADA persistido sem a revisão humana. O caminho da
+// IA (tier forte, limite, auditoria) está coberto em vitest
+// (importar-cronograma-action.test.ts).
+const TXT_COMPLEXO = [
+  "Jornada de acompanhamento — ciclo do ano",
+  "Semana 1 · 06 de junho · boas-vindas e combinados",
+  "Semana 2 · 13 de junho · escuta ativa e presença",
+  "Semana 3 · 20 de junho · sonhos e planos",
+].join("\n");
+
+test("doc complexo sem provider: prévia honesta e nada grava sem revisão", async ({
+  page,
+}) => {
+  await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
+  await page.goto("/turmas/novo");
+
+  await page.getByText("Importar de arquivo").click();
+  await page.locator('input[type="file"]').setInputFiles({
+    name: "jornada.txt",
+    mimeType: "text/plain",
+    buffer: Buffer.from(TXT_COMPLEXO, "utf-8"),
+  });
+  await page.getByRole("button", { name: "Ler arquivo" }).click();
+
+  // leitura determinística honesta: eventos parciais + avisos; sem
+  // IA_API_* o botão de IA nem aparece (feature se esconde, não falha)
+  await expect(page.getByText(/3 eventos reconhecidos/)).toBeVisible();
+  await expect(
+    page
+      .locator("ul.list-disc li")
+      .filter({ hasText: "A turma não foi identificada" })
+  ).toBeVisible();
+  await expect(
+    page.getByRole("button", { name: /com IA/ })
+  ).not.toBeVisible();
+
+  // a revisão humana segue obrigatória: a prévia abre o builder editável
+  await page.getByRole("button", { name: "Revisar prévia editável" }).click();
+  await expect(
+    page.getByText(/Importado de jornada\.txt/)
+  ).toBeVisible();
+
+  // nada foi gravado: cronogramas só recebe linha via criarCronograma,
+  // que exige o clique na prévia revisada
+  const crons = await buscarViaServiceRole<{ id: string }[]>(
+    "cronogramas",
+    "select=id&turma=like.E2E*"
+  );
+  expect(crons).toHaveLength(0);
 });

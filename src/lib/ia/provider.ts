@@ -299,7 +299,11 @@ function montarBody(
   esforco: EsforcoIa | undefined,
   stream: boolean,
   papeis: AppRole[] | undefined,
-  ferramentas?: { tools: IaToolDef[]; toolChoice?: IaToolChoice }
+  ferramentas?: { tools: IaToolDef[]; toolChoice?: IaToolChoice },
+  /** override do teto de saída — o padrão por esforço cobre o chat, mas
+   *  saída estruturada grande (cronograma completo via tool_call) pede
+   *  teto explícito pra não truncar o arguments no meio */
+  maxTokens?: number
 ) {
   // tools ad-hoc ganham do payload por papel — o caller que as passa quer
   // exatamente elas no ar (a filtragem por papel é do registry do chat)
@@ -314,7 +318,7 @@ function montarBody(
       ? { tools, tool_choice: ferramentas?.toolChoice ?? ("auto" as const) }
       : {}),
     ...(esforco ? { reasoning_effort: EFFORT[esforco] } : {}),
-    max_tokens: MAX_TOKENS_POR_ESFORCO[esforco ?? "baixo"],
+    max_tokens: maxTokens ?? MAX_TOKENS_POR_ESFORCO[esforco ?? "baixo"],
     ...(stream
       ? { stream: true, stream_options: { include_usage: true } }
       : {}),
@@ -346,6 +350,10 @@ export async function chamarModelo(
      *  deadline absoluto na entrada: cada tentativa da cadeia e cada
      *  continuação consomem do MESMO orçamento. */
     timeoutMs?: number;
+    /** override do teto de saída da rodada — default é a tabela por
+     *  esforço; caller com resposta estruturada grande (ex.: cronograma
+     *  completo via tool_call) sobe aqui em vez de forçar esforço alto. */
+    maxTokens?: number;
     /** deadline absoluto (epoch ms) — set interno pela recursão da
      *  continuação pra não rearmar o cap a cada chamada. */
     prazoLimite?: number;
@@ -403,7 +411,8 @@ export async function chamarModelo(
             opts?.papeis,
             opts?.tools
               ? { tools: opts.tools, toolChoice: opts.toolChoice }
-              : undefined
+              : undefined,
+            opts?.maxTokens
           ),
           signal: AbortSignal.timeout(timeoutRestante()),
         });

@@ -214,6 +214,7 @@ const ROTULO_TOOL: Record<string, string> = {
   meu_progresso: "sua jornada",
   meus_pedidos: "seus pedidos",
   ajuda_faq: "ajuda do Realiza",
+  entregar_cronograma: "montar cronograma",
 };
 
 export function rotuloTool(nome: string): string {
