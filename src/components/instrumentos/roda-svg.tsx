@@ -245,7 +245,7 @@ export function RodaSvg({
                   className={cn(
                     "text-[10px]",
                     ehAtivo
-                      ? "fill-foreground font-bold"
+                      ? "fill-[var(--ok-text)] font-bold"
                       : "fill-muted-foreground font-medium"
                   )}
                 >
@@ -287,7 +287,9 @@ export function RodaSvg({
                   dominantBaseline="middle"
                   className={cn(
                     "text-[8px] font-semibold tabular-nums",
-                    i === ativo ? "fill-foreground" : "fill-muted-foreground"
+                    i === ativo
+                      ? "fill-[var(--ok-text)]"
+                      : "fill-muted-foreground"
                   )}
                 >
                   {i + 1}

@@ -8,6 +8,10 @@ import {
 } from "@/lib/forms/schema";
 import { CampoArquivo } from "@/components/forms/campo-arquivo";
 import { GridDisponibilidade } from "@/components/forms/grid-disponibilidade";
+import {
+  NumeroPergunta,
+  RotuloPergunta,
+} from "@/components/forms/pergunta";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -308,65 +312,21 @@ export function SegmentosEscala({
   );
 }
 
-/** Rótulo compartilhado — pergunta + (opcional), com ou sem htmlFor. */
-export function RotuloCampo({
-  campo,
-  htmlFor,
-  className,
-}: {
-  campo: FormularioCampo;
-  htmlFor?: string;
-  className?: string;
-}) {
-  const inner = (
-    <>
-      {campo.label}
-      {!campo.obrigatorio && (
-        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-          (opcional)
-        </span>
-      )}
-      {campo.descricao && (
-        <span className="mt-0.5 block text-xs font-normal leading-relaxed text-muted-foreground">
-          {campo.descricao}
-        </span>
-      )}
-    </>
-  );
-  return htmlFor ? (
-    <label
-      htmlFor={htmlFor}
-      className={cn(
-        "block text-[15px] font-medium leading-snug @xl:text-base",
-        className
-      )}
-    >
-      {inner}
-    </label>
-  ) : (
-    <span
-      className={cn(
-        "block text-[15px] font-medium leading-snug @xl:text-base",
-        className
-      )}
-    >
-      {inner}
-    </span>
-  );
-}
-
 /** Fallback completo por tipo — o instrumento sob medida nunca deixa um
  *  campo fora da convenção sem renderizar (form editado, campo novo).
  *  `sombra={false}` devolve a versão sem cartão — pra uso dentro de uma
- *  ficha que já tem moldura própria. */
+ *  ficha que já tem moldura própria. `n` é a posição da pergunta na
+ *  régua: com ela o rótulo ganha o disco destaque da gramática (442). */
 export function CampoGenerico({
   campo,
   api,
   sombra = true,
+  n,
 }: {
   campo: FormularioCampo;
   api: RespostaApi;
   sombra?: boolean;
+  n?: number;
 }) {
   const valor = api.valores[campo.id];
   const erro = api.erros[campo.id];
@@ -384,7 +344,7 @@ export function CampoGenerico({
     case "data":
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <RotuloCampo campo={campo} htmlFor={id} />
+          <RotuloPergunta campo={campo} n={n} htmlFor={id} />
           {campo.tipo === "texto" ? (
             <EntradaTexto
               campo={campo}
@@ -413,7 +373,7 @@ export function CampoGenerico({
     case "select":
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <RotuloCampo campo={campo} htmlFor={id} />
+          <RotuloPergunta campo={campo} n={n} htmlFor={id} />
           <EntradaSelect
             campo={campo}
             valor={valor}
@@ -437,7 +397,7 @@ export function CampoGenerico({
           aria-describedby={erro ? campoErroId(campo) : undefined}
         >
           <legend>
-            <RotuloCampo campo={campo} />
+            <RotuloPergunta campo={campo} n={n} />
           </legend>
           <div className="mt-1.5">
             {campo.tipo === "sim_nao" ? (
@@ -469,7 +429,7 @@ export function CampoGenerico({
           aria-describedby={erro ? campoErroId(campo) : undefined}
         >
           <legend>
-            <RotuloCampo campo={campo} />
+            <RotuloPergunta campo={campo} n={n} />
           </legend>
           <ul className="mt-1.5 space-y-1">
             {(campo.opcoes ?? []).map((o) => {
@@ -504,19 +464,28 @@ export function CampoGenerico({
       return (
         <div className={cartao} data-campo={campo.id}>
           <label className="-m-4 flex cursor-pointer items-start gap-3 rounded-xl p-4 text-[15px] leading-relaxed transition-colors select-none has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 @xl:-m-5 @xl:p-5 @xl:text-base">
+            {n != null && n > 0 && <NumeroPergunta n={n} />}
             <input
               type="checkbox"
               checked={valor === true}
               onChange={(e) => api.definir(campo.id, e.target.checked)}
               required={campo.obrigatorio}
-              className="mt-0.5 size-4 shrink-0 accent-primary"
+              className={cn(
+                "size-4 shrink-0 accent-primary",
+                n != null && n > 0 ? "mt-2" : "mt-0.5"
+              )}
               aria-invalid={erro ? true : undefined}
               aria-describedby={erro ? campoErroId(campo) : undefined}
             />
-            <span>
+            <span
+              className={cn(
+                "min-w-0 flex-1 font-semibold text-[var(--ok-text)]",
+                n != null && n > 0 && "pt-0.5"
+              )}
+            >
               {campo.label}
               {!campo.obrigatorio && (
-                <span className="ml-1.5 text-xs text-muted-foreground">
+                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
                   (opcional)
                 </span>
               )}
@@ -530,7 +499,7 @@ export function CampoGenerico({
       // componente o campo saía invisível e travava o submit
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <RotuloCampo campo={campo} />
+          <RotuloPergunta campo={campo} n={n} />
           <CampoArquivo
             campo={campo}
             token={api.token}
@@ -551,7 +520,7 @@ export function CampoGenerico({
           aria-describedby={erro ? campoErroId(campo) : undefined}
         >
           <legend>
-            <RotuloCampo campo={campo} />
+            <RotuloPergunta campo={campo} n={n} />
           </legend>
           <GridDisponibilidade
             name={campo.id}

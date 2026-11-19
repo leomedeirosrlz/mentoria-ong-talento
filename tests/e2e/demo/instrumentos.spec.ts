@@ -15,6 +15,18 @@ const DUPLA_FIM = "de000000-0000-4000-8000-000000001541";
 const DUPLA_MATHEUS = "de000000-0000-4000-8000-000000001549"; // Ricardo × Matheus
 const TOK_VISAO_EDUARDO = "demo-tok-visao-eduardo-00001";
 const TOK_RODA_EDUARDO = "demo-tok-roda-eduardo-000001";
+const TOK_360_ANA = "demo-tok-360-ana-00000001";
+// fMetas (uid 0x4008 → decimal) — a régua não tem link pendente em demo,
+// a cobertura do fill-form de Metas vai pela prévia da ficha do form
+const URL_METAS = "/formularios/de000000-0000-4000-8000-000000016392";
+
+// REALIZA-442 — gramática pergunta→resposta em TODAS as superfícies: o
+// disco amarelo (--destaque) carrega o nº da régua, o enunciado lê no
+// verde do instrumento (--ok-text) e a resposta fica em primeiro plano.
+// Seletores pelo atributo class: os tokens são utilities arbitrárias
+// (bg-[var(--destaque)]) — substring do atributo é o gancho estável
+const DISCO = 'span[class*="--destaque)"]';
+const VERDE = '[class*="--ok-text)"]';
 
 test.describe("demo — instrumentos oficiais da jornada", () => {
   test("ficha da dupla: status por instrumento + resultado estruturado", async ({
@@ -59,6 +71,11 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await expect(
       dialog.getByText(/Desdobramento da meta/).first()
     ).toBeVisible();
+    // a ficha de meta lê "Meta N" com o mesmo disco da escrita
+    const meta1 = dialog.locator("li", { hasText: "Meta 1" }).first();
+    await expect(
+      meta1.locator(DISCO, { hasText: "1" }).first()
+    ).toBeVisible();
   });
 
   test("mentor da dupla: seção visível, enviar responde toast demo", async ({
@@ -92,6 +109,23 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await expect(
       page.getByText("Sua Declaração de Visão", { exact: true })
     ).toBeVisible();
+
+    // hierarquia 442: 1ª e 5ª perguntas da régua com disco numerado e
+    // enunciado verde — a declaração (6ª) troca o disco pelo ícone
+    const filme = page.locator('[data-campo="filme"]');
+    await expect(
+      filme.locator(DISCO, { hasText: "1" }).first()
+    ).toBeVisible();
+    await expect(filme.locator("label").first()).toHaveClass(/--ok-text/);
+    const valoriza = page.locator('[data-campo="valoriza"]');
+    await expect(
+      valoriza.locator(DISCO, { hasText: "5" }).first()
+    ).toBeVisible();
+    const declaracao = page.locator('[data-campo="declaracao_visao"]');
+    await expect(declaracao.locator(DISCO)).toHaveCount(0);
+    await expect(
+      declaracao.locator("label").first()
+    ).toHaveClass(/--ok-text/);
   });
 
   // dupla fechada = jornada congelada: ninguém emite, copia ou manda link
@@ -153,6 +187,22 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await expect(page.getByText(/17 perguntas/)).toBeVisible();
     await expect(page.getByText("Nada satisfeito").first()).toBeVisible();
     await expect(page.getByText("Muito satisfeito").first()).toBeVisible();
+
+    // hierarquia 442: cada área é um slider com o disco da régua e o
+    // rótulo verde; a reflexão segue a numeração (a 17ª pergunta)
+    const saude = page.locator('[data-campo="p_saude"]');
+    await expect(saude).toHaveAttribute("aria-label", /1\. Saúde/);
+    await expect(
+      saude.locator(DISCO, { hasText: "1" }).first()
+    ).toBeVisible();
+    await expect(
+      saude.locator("span", { hasText: "Saúde e disposição" })
+    ).toHaveClass(/--ok-text/);
+    const reflexao = page.locator('[data-campo="reflexao"]');
+    await expect(
+      reflexao.locator(DISCO, { hasText: "17" }).first()
+    ).toBeVisible();
+    await expect(reflexao.locator(VERDE).first()).toBeVisible();
   });
 
   // REALIZA-440/441 — a página por instrumento do mentor: o seletor de
@@ -283,5 +333,88 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await expect(
       linha.getByText(/No filme eu me vejo formada/)
     ).toBeVisible();
+    // a leitura repete a gramática da escrita: disco destaque + enunciado
+    // verde na 1ª pergunta da régua
+    const primeira = linha.locator("ol li").first();
+    await expect(
+      primeira.locator(DISCO, { hasText: "1" })
+    ).toBeVisible();
+    await expect(primeira.locator("p").first()).toHaveClass(/--ok-text/);
+  });
+
+  // REALIZA-442 (escopo corrigido) — Metas não tem link pendente em demo:
+  // a cobertura do fill-form vai pela prévia da ficha, que renderiza o
+  // próprio InstrumentoFlow
+  test("prévia da Metas: ficha com disco Meta N e enunciados verdes", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(URL_METAS);
+    await page.getByRole("button", { name: "Pré-visualizar" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    // ficha Meta 1: o disco amarelo carrega o N da ficha, os rótulos dos
+    // campos leem no verde do instrumento
+    const ficha = dialog.locator("article", { hasText: "Meta 1" }).first();
+    await expect(ficha.locator(DISCO, { hasText: "1" })).toBeVisible();
+    const meta1 = dialog.locator('[data-campo="meta_1"]');
+    await expect(meta1.locator("label")).toHaveClass(/--ok-text/);
+    // preciso_* são perguntas soltas da régua — a 2ª vem logo depois da
+    // declaração (1ª): disco com o número da régua, não da ficha
+    const preciso = dialog.locator('[data-campo="preciso_criar"]');
+    await expect(
+      preciso.locator(DISCO, { hasText: "2" })
+    ).toBeVisible();
+    await expect(preciso.locator("label")).toHaveClass(/--ok-text/);
+  });
+
+  // o 360º é form oficial fora da régua: cai no renderer genérico —
+  // mesma gramática por campos comuns (escala, multi_select, select)
+  test("/f/<token>: 360º genérico numera perguntas e verdeia enunciados", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentorado");
+    await page.goto(`/f/${TOK_360_ANA}`);
+    await expect(
+      page.getByRole("heading", { name: /Avaliação Geral de Mentorados/ })
+    ).toBeVisible();
+    // o genérico é um wizard por seção — a régua numera só perguntas
+    // visíveis (a condicional "quais mudanças" fica oculta até o "sim")
+    await expect(
+      page.getByText("Atingimento das expectativas")
+    ).toBeVisible();
+
+    // 1ª e 2ª perguntas (escala 1–5 + multi_select): fieldset com disco
+    // + legend verde
+    const expectativa = page.locator('[data-campo="expectativa_atendida"]');
+    await expect(
+      expectativa.locator(DISCO, { hasText: "1" })
+    ).toBeVisible();
+    await expect(expectativa.locator("legend " + VERDE)).toBeVisible();
+    const expectativas = page.locator('[data-campo="expectativas"]');
+    await expect(
+      expectativas.locator(DISCO, { hasText: "2" })
+    ).toBeVisible();
+    await expect(expectativas.locator("legend " + VERDE)).toBeVisible();
+
+    // responde a etapa 1 e avança — a numeração atravessa a seção sem
+    // reiniciar: a 1ª pergunta do processo é a 3ª da régua. O radio da
+    // escala é sr-only: o clique real é no label que o embrulha
+    await expectativa
+      .locator("label", { hasText: /^4$/ })
+      .click();
+    await page
+      .getByRole("checkbox", { name: "Desenvolvimento profissional" })
+      .check();
+    await page.getByRole("button", { name: "Avançar" }).click();
+    await expect(
+      page.getByText("Avaliação do processo de mentoria")
+    ).toBeVisible();
+    const estrutura = page.locator('[data-campo="estrutura_programa"]');
+    await expect(
+      estrutura.locator(DISCO, { hasText: "3" })
+    ).toBeVisible();
+    await expect(estrutura.locator(VERDE).first()).toBeVisible();
   });
 });

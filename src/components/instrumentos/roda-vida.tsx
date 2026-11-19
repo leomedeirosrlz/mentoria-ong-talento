@@ -11,14 +11,19 @@ import {
 } from "@phosphor-icons/react";
 import { extraiEstruturaRoda } from "@/lib/forms/instrumentos";
 import {
+  camposPerguntas,
   extraiRodaDaVida,
   type FormularioCampo,
 } from "@/lib/forms/schema";
 import { Button } from "@/components/ui/button";
+import {
+  NumeroPergunta,
+  RotuloPergunta,
+} from "@/components/forms/pergunta";
 import { cn } from "@/lib/utils";
 import type { RespostaApi } from "./use-resposta";
 import { RodaSvg } from "./roda-svg";
-import { CampoGenerico, campoDomId, EntradaTextoLongo, ErroCampo, RotuloCampo } from "./campos";
+import { CampoGenerico, campoDomId, EntradaTextoLongo, ErroCampo } from "./campos";
 
 // Roda da Vida interativa — a peça de destaque. O gesto principal é
 // arrastar na roda: o ângulo escolhe o eixo, a distância ao centro a nota
@@ -56,6 +61,13 @@ export function RodaVida({
     [roda]
   );
   const total = areas.length;
+  // posição na régua do form — o "9" do slider é o "9" que a leitura
+  // mostra no resultado; campos não-escala antes/depois da roda contam
+  const numeroPorId = useMemo(() => {
+    const m = new Map<string, number>();
+    camposPerguntas(campos).forEach((c, i) => m.set(c.id, i + 1));
+    return m;
+  }, [campos]);
 
   if (!estrutura || !roda || !total) {
     // definição sem nenhuma escala_1_10 — não é uma roda; renderiza o que
@@ -64,7 +76,14 @@ export function RodaVida({
       <>
         {campos
           .filter((c) => c.tipo !== "secao")
-          .map((c) => <CampoGenerico key={c.id} campo={c} api={api} />)}
+          .map((c) => (
+            <CampoGenerico
+              key={c.id}
+              campo={c}
+              api={api}
+              n={numeroPorId.get(c.id)}
+            />
+          ))}
       </>
     );
   }
@@ -156,7 +175,7 @@ export function RodaVida({
             <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground">
               {quadAtivo ? `${quadAtivo} · ` : ""}Área {ativo + 1} de {total}
             </p>
-            <h3 className="truncate text-[15px] font-bold leading-snug">
+            <h3 className="truncate text-[15px] font-bold leading-snug text-[var(--ok-text)]">
               {areaAtiva.label}
             </h3>
           </div>
@@ -285,7 +304,7 @@ export function RodaVida({
                   <AreaSlider
                     key={a.id}
                     area={a}
-                    indice={i}
+                    numero={numeroPorId.get(a.id) ?? i + 1}
                     ativo={i === ativo}
                     erro={api.erros[a.id]}
                     onFoco={() => setAtivo(i)}
@@ -309,7 +328,11 @@ export function RodaVida({
               api.erros[c.id] && "ring-2 ring-destructive/60"
             )}
           >
-            <RotuloCampo campo={c} htmlFor={campoDomId(c)} />
+            <RotuloPergunta
+              campo={c}
+              n={numeroPorId.get(c.id)}
+              htmlFor={campoDomId(c)}
+            />
             <EntradaTextoLongo
               campo={c}
               valor={api.valores[c.id]}
@@ -320,7 +343,12 @@ export function RodaVida({
             <ErroCampo campo={c} msg={api.erros[c.id]} />
           </div>
         ) : (
-          <CampoGenerico key={c.id} campo={c} api={api} />
+          <CampoGenerico
+            key={c.id}
+            campo={c}
+            api={api}
+            n={numeroPorId.get(c.id)}
+          />
         )
       )}
     </>
@@ -331,14 +359,16 @@ export function RodaVida({
  *  setas ±1, Home/End nas pontas; a trilha aceita toque/arraste. */
 function AreaSlider({
   area,
-  indice,
+  numero,
   ativo,
   erro,
   onFoco,
   onNota,
 }: {
   area: { id: string; label: string; nota: number | null };
-  indice: number;
+  /** posição na régua do form — o disco e o aria-label mostram o mesmo
+   *  número que a pergunta tem na leitura */
+  numero: number;
   ativo: boolean;
   erro: string | undefined;
   onFoco: () => void;
@@ -377,7 +407,7 @@ function AreaSlider({
       role="slider"
       tabIndex={0}
       data-campo={area.id}
-      aria-label={`${indice + 1}. ${area.label}`}
+      aria-label={`${numero}. ${area.label}`}
       aria-valuemin={1}
       aria-valuemax={10}
       aria-valuenow={area.nota ?? 0}
@@ -398,18 +428,11 @@ function AreaSlider({
         erro && "ring-2 ring-destructive/60"
       )}
     >
+      <NumeroPergunta n={numero} compacto />
       <span
-        aria-hidden
-        className={cn(
-          "grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-bold tabular-nums",
-          respondida
-            ? "bg-[var(--brand-lime)]/20 text-[var(--ok-text)]"
-            : "bg-muted text-muted-foreground"
-        )}
+        className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--ok-text)]"
+        title={area.label}
       >
-        {indice + 1}
-      </span>
-      <span className="min-w-0 flex-1 truncate text-sm" title={area.label}>
         {area.label}
       </span>
       {/* a trilha é o alvo do arraste — a fração do toque vira a nota;

@@ -10,7 +10,6 @@ import {
   CheckCircle,
   CircleNotch,
   PaperPlaneRight,
-  X,
 } from "@phosphor-icons/react";
 import { submeterRespostaFormulario } from "@/lib/forms/actions";
 import {
@@ -35,6 +34,10 @@ import type { ContextoAvaliacao } from "@/lib/forms/queries";
 import { ContextoAvaliacaoCard } from "@/components/contexto-avaliacao";
 import { CampoArquivo } from "@/components/forms/campo-arquivo";
 import { GridDisponibilidade } from "@/components/forms/grid-disponibilidade";
+import {
+  NumeroPergunta,
+  RotuloPergunta,
+} from "@/components/forms/pergunta";
 import { fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -895,48 +898,6 @@ function FormularioGenerico({
   );
 }
 
-function Rotulo({
-  campo,
-  n,
-  htmlFor,
-}: {
-  campo: FormularioCampo;
-  n: number;
-  htmlFor?: string;
-}) {
-  const inner = (
-    <>
-      <span className="mr-1 text-muted-foreground tabular-nums">{n}.</span>
-      {campo.label}
-      {!campo.obrigatorio && (
-        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-          (opcional)
-        </span>
-      )}
-      {/* instrução da pergunta ("Responda com até 2 linhas…") mora na
-          descricao — nos cards de secao ela já renderiza no header */}
-      {campo.tipo !== "secao" && campo.descricao && (
-        <span className="mt-0.5 block text-xs font-normal leading-relaxed text-muted-foreground">
-          {campo.descricao}
-        </span>
-      )}
-    </>
-  );
-  // fora de fieldset: <label> com for; dentro de grupos o caller usa <legend>
-  return htmlFor ? (
-    <label
-      htmlFor={htmlFor}
-      className="block text-[15px] font-medium leading-snug @xl:text-base"
-    >
-      {inner}
-    </label>
-  ) : (
-    <span className="block text-[15px] font-medium leading-snug @xl:text-base">
-      {inner}
-    </span>
-  );
-}
-
 /** Mensagem inline sob o campo — montada só quando há erro; o id é o
  *  alvo do aria-describedby do controle. */
 function ErroCampo({ id, msg }: { id: string; msg: string | undefined }) {
@@ -1056,7 +1017,7 @@ function CampoRenderer({
               : {};
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <Rotulo campo={campo} n={n} htmlFor={id} />
+          <RotuloPergunta campo={campo} n={n} htmlFor={id} />
           <Input
             id={id}
             name={campo.id}
@@ -1077,7 +1038,7 @@ function CampoRenderer({
       // (default do SO) descreve o gesto de verdade, "send"/"next" mentiria
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <Rotulo campo={campo} n={n} htmlFor={id} />
+          <RotuloPergunta campo={campo} n={n} htmlFor={id} />
           <Textarea
             id={id}
             name={campo.id}
@@ -1094,7 +1055,7 @@ function CampoRenderer({
     case "data":
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <Rotulo campo={campo} n={n} htmlFor={id} />
+          <RotuloPergunta campo={campo} n={n} htmlFor={id} />
           <Input
             id={id}
             name={campo.id}
@@ -1113,7 +1074,7 @@ function CampoRenderer({
       // WhatsApp) e required/FormData de graça
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <Rotulo campo={campo} n={n} htmlFor={id} />
+          <RotuloPergunta campo={campo} n={n} htmlFor={id} />
           <div className="relative">
             <select
               id={id}
@@ -1149,7 +1110,7 @@ function CampoRenderer({
       return (
         <fieldset className={cartao} data-campo={campo.id} {...a11y}>
           <legend>
-            <Rotulo campo={campo} n={n} />
+            <RotuloPergunta campo={campo} n={n} />
           </legend>
           <div className="mt-1.5 grid grid-cols-2 gap-1 rounded-xl bg-muted p-1">
             {(
@@ -1181,7 +1142,7 @@ function CampoRenderer({
       return (
         <fieldset className={cartao} data-campo={campo.id} {...a11y}>
           <legend>
-            <Rotulo campo={campo} n={n} />
+            <RotuloPergunta campo={campo} n={n} />
           </legend>
           <div className="mt-1.5 grid grid-cols-5 gap-1 rounded-xl bg-muted p-1">
             {[1, 2, 3, 4, 5].map((num) => (
@@ -1213,7 +1174,7 @@ function CampoRenderer({
       return (
         <fieldset className={cartao} data-campo={campo.id} {...a11y}>
           <legend>
-            <Rotulo campo={campo} n={n} />
+            <RotuloPergunta campo={campo} n={n} />
           </legend>
           <div className="mt-1.5 grid grid-cols-5 gap-1 rounded-xl bg-muted p-1 @xl:grid-cols-10">
             {Array.from({ length: 10 }, (_, i) => i + 1).map((num) => (
@@ -1245,7 +1206,7 @@ function CampoRenderer({
       return (
         <fieldset className={cartao} data-campo={campo.id} {...a11y}>
           <legend>
-            <Rotulo campo={campo} n={n} />
+            <RotuloPergunta campo={campo} n={n} />
             <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
               {campo.obrigatorio
                 ? "Marque ao menos uma"
@@ -1296,20 +1257,18 @@ function CampoRenderer({
               mobile. O ErroCampo fica fora do label (clique nele não
               alternaria a caixa) */}
           <label className="-m-4 flex cursor-pointer items-start gap-3 rounded-xl p-4 text-[15px] leading-relaxed transition-colors select-none has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 @xl:-m-5 @xl:p-5 @xl:text-base">
+            {n > 0 && <NumeroPergunta n={n} />}
             <input
               type="checkbox"
               name={campo.id}
               required={campo.obrigatorio}
-              className="mt-0.5 size-4 shrink-0 accent-primary"
+              className="mt-2 size-4 shrink-0 accent-primary"
               {...a11y}
             />
-            <span>
-              <span className="mr-1 text-muted-foreground tabular-nums">
-                {n}.
-              </span>
+            <span className="min-w-0 flex-1 pt-0.5 font-semibold text-[var(--ok-text)]">
               {campo.label}
               {!campo.obrigatorio && (
-                <span className="ml-1.5 text-xs text-muted-foreground">
+                <span className="ml-1.5 text-xs font-normal text-muted-foreground">
                   (opcional)
                 </span>
               )}
@@ -1322,7 +1281,7 @@ function CampoRenderer({
     case "arquivo":
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <Rotulo campo={campo} n={n} />
+          <RotuloPergunta campo={campo} n={n} />
           <CampoArquivo
             campo={campo}
             token={token}
@@ -1339,7 +1298,7 @@ function CampoRenderer({
       // coleta/validação leem do FormData como qualquer outro campo
       return (
         <div className={cn(cartao, "space-y-1.5")} data-campo={campo.id}>
-          <Rotulo campo={campo} n={n} />
+          <RotuloPergunta campo={campo} n={n} />
           <GridDisponibilidade
             name={campo.id}
             value={valor ?? null}
