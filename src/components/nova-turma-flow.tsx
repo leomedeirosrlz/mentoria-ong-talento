@@ -8,7 +8,6 @@ import { useRef, useState, useTransition } from "react";
 import {
   CircleNotch,
   FileArrowUp,
-  ListChecks,
   Sparkle,
 } from "@phosphor-icons/react";
 import { toast } from "sonner";
@@ -25,7 +24,7 @@ import {
 import type { RascunhoImportacao } from "@/lib/importar-cronograma/normalizar";
 import type { CicloEvento, Cronograma } from "@/lib/types";
 
-type Modo = "escolha" | "montar" | "importar" | "revisar";
+type Modo = "montar" | "importar" | "revisar";
 
 export function NovaTurmaFlow({
   cronogramas,
@@ -34,7 +33,7 @@ export function NovaTurmaFlow({
   cronogramas: Cronograma[];
   eventos: CicloEvento[];
 }) {
-  const [modo, setModo] = useState<Modo>("escolha");
+  const [modo, setModo] = useState<Modo>("montar");
   const [arquivo, setArquivo] = useState<File | null>(null);
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
   const [importado, setImportado] =
@@ -69,7 +68,15 @@ export function NovaTurmaFlow({
 
   if (modo === "montar")
     return (
-      <CronogramaBuilder cronogramas={cronogramas} eventos={eventos} />
+      <div className="space-y-4">
+        <div className="flex justify-end">
+          <Button variant="outline" size="sm" onClick={() => setModo("importar")}>
+            <FileArrowUp aria-hidden />
+            Importar de arquivo
+          </Button>
+        </div>
+        <CronogramaBuilder cronogramas={cronogramas} eventos={eventos} />
+      </div>
     );
 
   if (modo === "revisar" && importado)
@@ -84,40 +91,6 @@ export function NovaTurmaFlow({
           setModo("importar");
         }}
       />
-    );
-
-  if (modo === "escolha")
-    return (
-      <div className="grid gap-4 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => setModo("montar")}
-          className="group rounded-xl bg-card p-5 text-left shadow-[var(--shadow-border)] transition-colors hover:bg-muted/40"
-        >
-          <div className="grid size-10 place-items-center rounded-full bg-muted text-muted-foreground">
-            <ListChecks size={18} aria-hidden />
-          </div>
-          <p className="mt-3 font-medium">Montar com parâmetros</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            O builder gera o calendário do guia DPP a partir do 1º encontro,
-            com intervalos, recesso e preparação configuráveis.
-          </p>
-        </button>
-        <button
-          type="button"
-          onClick={() => setModo("importar")}
-          className="group rounded-xl bg-card p-5 text-left shadow-[var(--shadow-border)] transition-colors hover:bg-muted/40"
-        >
-          <div className="grid size-10 place-items-center rounded-full bg-muted text-muted-foreground">
-            <FileArrowUp size={18} aria-hidden />
-          </div>
-          <p className="mt-3 font-medium">Importar de arquivo</p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Envie o cronograma pronto (PDF, planilha, DOCX ou TXT). O app lê,
-            normaliza e abre a prévia editável antes de gravar.
-          </p>
-        </button>
-      </div>
     );
 
   // ---------- modo importar ----------
@@ -204,7 +177,7 @@ export function NovaTurmaFlow({
         </section>
       )}
 
-      <Button variant="ghost" size="sm" onClick={() => setModo("escolha")}>
+      <Button variant="ghost" size="sm" onClick={() => setModo("montar")}>
         Voltar
       </Button>
     </div>
