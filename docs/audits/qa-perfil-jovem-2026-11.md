@@ -28,14 +28,18 @@ Auditoria dos 16 cards em "In Test" contra o código da branch
 
 | Resultado | Qtd | Issues |
 |---|---|---|
-| Cumprido | 15 | 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 430, 431, 432, 433, 434 |
-| Parcial | 1 | 429 (copy removida; mecanismo Gravatar segue ativo pro e-mail do jovem) |
+| Cumprido | 16 | 419, 420, 421, 422, 423, 424, 425, 426, 427, 428, 429, 430, 431, 432, 433, 434 |
+| Parcial | 0 | — |
 | Não | 0 | — |
 
 Defeitos: **1 corrigido** (D-1, crash de todos os `/f/<token>` de
 instrumento — regressão do commit 85056dea), **1 ambiental** (D-2,
-storage local quebrado por drift de imagem — não é código),
-**1 flag de decisão** (F-1, Gravatar × e-mail de menor — ver 429).
+storage local quebrado por drift de imagem — não é código).
+
+**Correção pós-leitura do Jira:** a 429 estava marcada como parcial porque
+o fallback Gravatar segue ativo — mas o critério de aceite do próprio card
+diz "texto do gravatar removido; **gravatar continua funcionando como
+fallback de exibição**". Logo, o comportamento atual é o esperado.
 
 ## Tabela por issue
 
@@ -51,7 +55,7 @@ storage local quebrado por drift de imagem — não é código),
 | 426 | onboarding do jovem com Liza | `onboarding-jovem.tsx:121-516`: wizard com `LizaBlob`, promessa em 3 pontos, tour de 6 superfícies reais, grade de disponibilidade, termo auto-emitido e passo de contato/privacidade; `jovem-onboarding.spec.ts` 2/2 verdes (wizard grava a grade; "Preencher depois" deixa lembrete na home) | cumprido | — | "Wizard completo verde no e2e: boas-vindas com Liza, tour, grade semanal persistida, termo e contato." |
 | 427 | badges com stats | derivação pura em `src/lib/conquistas.ts` (`conquistasDoJovem`: marcos datados + instrumentos + contagens + próximo marco); UI `conquistas-card.tsx`; `conquistas.test.ts` 11 testes; screenshot mostra "1 conquista · Primeiro encontro · 16 de nov de 2026" | cumprido | — | "Estante com estatísticas reais derivadas de encontros/instrumentos, coberta por teste unitário." |
 | 428 | CTA "avaliar encontro fora da lista" | rodapé das avaliações na home `page.tsx:648-665`: copy + link sublinhado `/jovem/agenda` + `JovemRetroativoDialog` inline; mesma orientação no histórico `agenda/page.tsx:482-496`; dirigido: copy e link presentes. Screenshot `home-desktop.png` | cumprido | — | "O texto 'quer avaliar um encontro que não apareceu?' leva pra agenda (futuro) e abre o retroativo do próprio jovem (passado) — melhor do que o pedido original, que era só orientação." |
-| 429 | remover copy gravatar/IA externa/origem editável | commit `1e5454cb`: sem seção "Conectar IA externa", sem copy "usamos a do seu e-mail" (dirigido: nenhuma das strings na página), `origem` saiu da whitelist da ficha (`0202` RPC 4→3 args; `FichaSecao` mostra como só-leitura `perfil-form.tsx:488-491`; dirigido: 0 input `origem` no dialog) — **mas** `gravatarUrlSeExiste(me.email)` ainda é chamado no perfil (`page.tsx:121`) e no shell (`layout.tsx:172`): o HEAD para `gravatar.com` com hash MD5 do e-mail do jovem segue acontecendo server-side | parcial | F-1: mecanismo Gravatar ativo pro e-mail de menor, ausente do inventário LGPD e da `/privacidade` | "Copy e edição de origem resolvidos. Pendente de decisão: o perfil/shell do jovem ainda consulta gravatar.com com o hash do e-mail dele (fallback de avatar). Se a intenção era cortar o fluxo pra terceiro — e o inventário LGPD não lista Gravatar como subprocessador — sugiro remover o `fallbackSrc` no `(jovem)` ou documentar o tratamento na base legal." |
+| 429 | remover copy gravatar/IA externa/origem editável | commit `1e5454cb`: sem seção "Conectar IA externa", sem copy "usamos a do seu e-mail" (dirigido: nenhuma das strings na página), `origem` saiu da whitelist da ficha (`0202` RPC 4→3 args; `FichaSecao` mostra como só-leitura `perfil-form.tsx:488-491`; dirigido: 0 input `origem` no dialog) — **mas** `gravatarUrlSeExiste(me.email)` ainda é chamado no perfil (`page.tsx:121`) e no shell (`layout.tsx:172`): o HEAD para `gravatar.com` com hash MD5 do e-mail do jovem segue acontecendo server-side | cumprido | — (o critério do Jira mantém o Gravatar como fallback silencioso; só registrar no inventário LGPD) | "Verificado: copy removida, seção de IA externa ausente, origem só-leitura e fora da whitelist da RPC (0202). O fallback Gravatar permanece, como o card pede. Nota: vale listar o Gravatar como subprocessador no inventário LGPD (REALIZA-33)." |
 | 430 | CTA avaliar: quem agenda + link pra agenda | `page.tsx:650-659` distingue futuro ("agende você na sua agenda" → `/jovem/agenda`) de passado (retroativo do jovem via `JovemRetroativoDialog`, migration `0207`); `agenda/page.tsx:484-488` repete a orientação; `jovem-agenda.spec.ts` 13/13 cobre agendar/remarcar/retroativo end-to-end | cumprido | — | "Copy explica quem agenda nos dois casos e linka a agenda do jovem. O retroativo próprio (437/0207) substituiu o 'peça pro mentor' do texto original." |
 | 431 | conquistas v2 (earned-only + "a caminho") | estante só com conquistas ganhas (`conquistas-card.tsx:128-136`, nenhum cadeado — docblock do card fixa a decisão); faixa "A caminho" com marco, `x de y` e progressbar `conquistas-card.tsx:140-167`; `conquistas.test.ts` cobre `proximoMarco` (vazio→marco, metade, jornada completa→null); screenshot: "A caminho: Metade do caminho · 1 de 8 · Faltam 7 encontros" | cumprido | — | "Implementado como pedido: futuro nunca vira cadeado na estante; progresso mora na faixa 'a caminho'." |
 | 432 | copy dos instrumentos voltada ao jovem | `jornada.ts:205-266` — todas as descrições na 2ª pessoa ("As 16 áreas da sua vida", "5 perguntas pra imaginar o seu futuro", "Você refaz a Roda", "A sua libera aqui"); `demo/jovem-jornada.spec.ts` e `instrumentos.spec.ts` pinam a estante | cumprido | — | "Copy revisada: instrumentos falam com o jovem, não do processo interno." |
@@ -93,16 +97,15 @@ app), mas bloqueou a verificação de 419 até o patch local.
 
 ### Flags / decisões humanas
 
-- **F-1 (429):** manter ou remover o fallback Gravatar no shell/perfil
-  do jovem — ver comentário na tabela. Recomendo remover o
-  `fallbackSrc` no grupo `(jovem)` (2 linhas) **ou** adicionar Gravatar
-  à seção de subprocessadores do inventário/base legal. A consulta hoje
-  vaza o hash MD5 do e-mail de um menor pra um terceiro sem base
-  documentada.
-- **F-2 (corpos das issues):** os títulos bastaram pra 15/16; se algum
-  corpo no Jira pede algo além do título (ex.: 429 exigindo remover o
-  mecanismo, não só a copy), preciso do texto — MCP Jira não roda neste
-  CLI.
+- **F-1 (429) — resolvida pelo card:** o critério de aceite mantém o
+  Gravatar como fallback silencioso; nada a mudar no comportamento. Fica
+  só a observação de LGPD: o HEAD para `gravatar.com` com hash MD5 do
+  e-mail de um menor não está listado no inventário como subprocessador
+  — vale registrar em `docs/lgpd/inventario-dados.md` na próxima revisão
+  do REALIZA-33.
+- **F-2 (corpos das issues):** os títulos bastaram para 16/16; os corpos
+  foram lidos depois (via MCP) e confirmaram os critérios — nenhum
+  ajuste de implementação necessário.
 
 ## Ressalvas de ambiente
 
