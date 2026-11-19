@@ -210,6 +210,18 @@ export function appEnvOk() {
   );
 }
 
+/** Fetch com retentativa curta pra 5xx — o PostgREST/GoTrue do staging tem
+ *  janelas de 503 (cold start do pooler, redeploy) que derrubavam pisos e
+ *  cleanups inteiros. 4xx volta na hora: é erro do spec, não do backend. */
+async function fetchRest(url: string, init: RequestInit): Promise<Response> {
+  let res = await fetch(url, init);
+  for (let i = 1; res.status >= 500 && i < 3; i++) {
+    await new Promise((r) => setTimeout(r, 500 * i));
+    res = await fetch(url, init);
+  }
+  return res;
+}
+
 /** DELETE via service role — limpeza do que o spec criou no backend de teste.
  *  `filtro` é a query do PostgREST (ex.: "dupla_id=eq.X&numero=eq.1"). */
 export async function limparViaServiceRole(
@@ -220,7 +232,7 @@ export async function limparViaServiceRole(
     throw new Error("E2E_SUPABASE_URL aponta pra produção — cleanup abortado");
   const url = `${supabaseUrl}/rest/v1/${tabela}?${filtro}`;
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
-  const res = await fetch(url, {
+  const res = await fetchRest(url, {
     method: "DELETE",
     headers: { apikey: key, Authorization: `Bearer ${key}` },
   });
@@ -347,7 +359,7 @@ export async function buscarViaServiceRole<T = Record<string, unknown>[]>(
     throw new Error("E2E_SUPABASE_URL aponta pra produção — leitura abortada");
   const url = `${supabaseUrl}/rest/v1/${tabela}?${filtro}`;
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
-  const res = await fetch(url, {
+  const res = await fetchRest(url, {
     headers: { apikey: key, Authorization: `Bearer ${key}` },
   });
   if (!res.ok) throw new Error(`read ${tabela} falhou: ${res.status}`);
@@ -366,7 +378,7 @@ export async function inserirViaServiceRole(
     throw new Error("E2E_SUPABASE_URL aponta pra produção — insert abortado");
   const url = `${supabaseUrl}/rest/v1/${tabela}`;
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
-  const res = await fetch(url, {
+  const res = await fetchRest(url, {
     method: "POST",
     headers: {
       apikey: key,
@@ -394,7 +406,7 @@ export async function atualizarViaServiceRole(
     throw new Error("E2E_SUPABASE_URL aponta pra produção — cleanup abortado");
   const url = `${supabaseUrl}/rest/v1/${tabela}?${filtro}`;
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
-  const res = await fetch(url, {
+  const res = await fetchRest(url, {
     method: "PATCH",
     headers: {
       apikey: key,
@@ -418,7 +430,7 @@ export async function rpcViaServiceRole<T = unknown>(
   if (supabaseUrl.includes(PROD_REF))
     throw new Error("E2E_SUPABASE_URL aponta pra produção — RPC abortada");
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
-  const res = await fetch(`${supabaseUrl}/rest/v1/rpc/${fn}`, {
+  const res = await fetchRest(`${supabaseUrl}/rest/v1/rpc/${fn}`, {
     method: "POST",
     headers: {
       apikey: key,
@@ -448,7 +460,7 @@ export async function jwtDoUsuario(
   if (supabaseUrl.includes(PROD_REF))
     throw new Error("E2E_SUPABASE_URL aponta pra produção — login abortado");
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
-  const res = await fetch(
+  const res = await fetchRest(
     `${supabaseUrl}/auth/v1/token?grant_type=password`,
     {
       method: "POST",
@@ -474,7 +486,7 @@ export async function tokensDoUsuario(
   if (supabaseUrl.includes(PROD_REF))
     throw new Error("E2E_SUPABASE_URL aponta pra produção — login abortado");
   const key = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
-  const res = await fetch(
+  const res = await fetchRest(
     `${supabaseUrl}/auth/v1/token?grant_type=password`,
     {
       method: "POST",

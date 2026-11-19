@@ -1,4 +1,5 @@
 import {
+  agirComConfirma,
   appEnvOk,
   atualizarViaServiceRole,
   buscarViaServiceRole,
@@ -127,6 +128,8 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
     // (REALIZA-176): a fila operacional "Para acompanhar" é a 1ª, depois
     // os blocos de monitoramento "Semana do programa" e "Números da
     // semana" (o conteúdo depende do staging — a moldura é o contrato)
+    // .first: outras sections levam aria-label; a checagem é da ordem,
+    // então ancora na primeira da página
     await expect(page.locator("section[aria-label]").first()).toHaveAttribute(
       "aria-label",
       "Para acompanhar"
@@ -139,6 +142,8 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
       await expect(
         page.locator(`section[aria-label="${label}"]`)
       ).toBeVisible();
+    // .first: o h1 da página é "Agenda do programa" — o h2 de abertura
+    // (o da fila) é o assert, não qualquer h2 da página
     await expect(page.locator("h2").first()).toContainText("Para acompanhar");
 
     // deep-link pro calendário: os chips da coord são Dia/Semana/Mês/Ciclo
@@ -224,121 +229,144 @@ test.describe("agenda da coordenação — monitoramento e lembrete real (WP5/D5
     }
   });
 
-  test("lembrete real pela fila — envia, registra, notifica e trava 48h", async ({
-    page,
-  }) => {
-    const dupla = await convergirDupla2ParaFila();
-    test.skip(
-      !(await vigenteDaDupla(dupla)),
-      "sem encontro vigente no cronograma da fixture — a fila não tem sinal"
-    );
-    const mentorId = dupla.mentor_id;
-    expect(mentorId).toBeTruthy();
+  test.describe("lembrete real pela fila", () => {
+    let dupla: DuplaRow;
 
-    // marca d'água do run — o cleanup só carrega o que nasceu depois daqui
-    const t0 = new Date().toISOString();
-    try {
-      await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
-      await page.goto("/agenda");
+    test.beforeEach(async () => {
+      // o piso converge no beforeEach — um run morto no meio do teste
+      // deixaria a dupla travada 48h no cap ou com encontro pendurado
+      dupla = await convergirDupla2ParaFila();
+    });
 
-      // a dupla sem data cai na fila — as linhas mostram primeiro nome
-      // ("Mentorada · Mentor"), que colide entre fixtures; o "Ver ficha ›"
-      // com o href da dupla é o discriminante estável. A fila é a 1ª
-      // seção da página (REALIZA-176)
-      const fila = page.locator('section[aria-label="Para acompanhar"]');
-      const linha = fila.locator("li", {
-        has: page.locator(`a[href="/duplas/${IDS.dupla2}"]`),
-      });
-      await expect(linha).toBeVisible({ timeout: 15_000 });
-      await expect(linha).toContainText(/sem data|atrasad|pendente/i);
-
-      // o botão da linha abre o preview da mensagem; o lembrete sai do
-      // "Lembrar pelo app" lá dentro — nunca abre wa.me (o popup-listener
-      // fica de guarda: se algum dia abrir, a aba não pendura o runner)
-      page.on("popup", (popup) => popup.close().catch(() => {}));
-
-      const lembrar = linha.getByRole("button", {
-        name: /^Lembrar( .*)?ver a mensagem/,
-      });
-      await expect(lembrar).toBeEnabled();
-      await lembrar.click();
-      const preview = page.getByRole("dialog");
-      await preview
-        .getByRole("button", { name: "Lembrar pelo app" })
-        .click();
-      await expect(page.getByText("Lembrete enviado.")).toBeVisible({
-        timeout: 15_000,
-      });
-
-      // readback no banco — a RPC loga a interação e notifica o mentor
-      const nudges = await buscarViaServiceRole<{ id: string; nota: string }[]>(
-        "interacoes",
-        `select=id,nota&dupla_id=eq.${IDS.dupla2}&tipo=eq.nudge` +
-          `&autor_id=eq.${IDS.coordProfile}&canal=eq.in_app&created_at=gte.${t0}`
+    test("envia, registra, notifica e trava 48h", async ({ page }) => {
+      test.skip(
+        !(await vigenteDaDupla(dupla)),
+        "sem encontro vigente no cronograma da fixture — a fila não tem sinal"
       );
-      expect(nudges).toHaveLength(1);
-      expect(nudges[0].nota).toBe("lembrete → mentor");
+      const mentorId = dupla.mentor_id;
+      expect(mentorId).toBeTruthy();
 
-      const notifs = await buscarViaServiceRole<
-        { id: string; titulo: string; href: string }[]
-      >(
-        "notificacoes",
-        `select=id,titulo,href&profile_id=eq.${mentorId}&tipo=eq.lembrete` +
-          `&created_by=eq.${IDS.coordProfile}&created_at=gte.${t0}`
-      );
-      expect(notifs).toHaveLength(1);
-      expect(notifs[0].titulo).toMatch(/^Lembrete: /);
-      expect(notifs[0].href).toBe(`/duplas/${IDS.dupla2}`);
+      // marca d'água do run — o cleanup só carrega o que nasceu depois
+      // daqui. -60s cobre o skew runner↔banco: o created_at grava com o
+      // relógio do PostgREST e um runner atrasado excluiria a row nova
+      const t0 = new Date(Date.now() - 60_000).toISOString();
+      try {
+        await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
+        await page.goto("/agenda");
 
-      // o cap de 48h chega na UI: refresh → reabrindo o preview da linha o
-      // Lembrar-app vem "Lembrada dd/mm" desabilitado com a razão no title
-      await page.reload();
-      const linhaDepois = fila.locator("li", {
-        has: page.locator(`a[href="/duplas/${IDS.dupla2}"]`),
-      });
-      await linhaDepois
-        .getByRole("button", { name: /ver a mensagem antes de enviar/ })
-        .click();
-      const bloqueada = page
-        .getByRole("dialog")
-        .getByRole("button", { name: /^Lembrada \d{2}\/\d{2}$/ });
-      await expect(bloqueada).toBeVisible({ timeout: 15_000 });
-      await expect(bloqueada).toBeDisabled();
-      await expect(bloqueada).toHaveAttribute(
-        "title",
-        /^1 lembrete a cada 48h por dupla\. Destrava \d{2}\/\d{2}$/
-      );
-      await page.keyboard.press("Escape");
+        // a dupla sem data cai na fila — as linhas mostram primeiro nome
+        // ("Mentorada · Mentor"), que colide entre fixtures; o "Ver ficha ›"
+        // com o href da dupla é o discriminante estável. A fila é a 1ª
+        // seção da página (REALIZA-176)
+        const fila = page.locator('section[aria-label="Para acompanhar"]');
+        const linha = fila.locator("li", {
+          has: page.locator(`a[href="/duplas/${IDS.dupla2}"]`),
+        });
+        await expect(linha).toBeVisible({ timeout: 15_000 });
+        await expect(linha).toContainText(/sem data|atrasad|pendente/i);
 
-      // e o mesmo cap barra na RPC — segundo envio como coord devolve o
-      // intervalo com o carimbo de quando libera
-      const jwtCoord = await jwtDoUsuario(COORD_EMAIL, COORD_SENHA);
-      const retry = await restComoUsuario("rpc/enviar_lembrete", jwtCoord, {
-        method: "POST",
-        body: { p_dupla_id: IDS.dupla2, p_destino: "mentor" },
-      });
-      expect(retry.status).toBe(200);
-      const corpoRetry = (await retry.json()) as {
-        ok: boolean;
-        erro?: string;
-        bloqueado_ate?: string;
-      };
-      expect(corpoRetry.ok).toBe(false);
-      expect(corpoRetry.erro).toBe("intervalo_48h");
-      expect(corpoRetry.bloqueado_ate).toBeTruthy();
-    } finally {
-      // só o que este run criou — a dupla fixture, o mentor e qualquer
-      // interação/notificação pré-existente ficam intocados
-      await limparViaServiceRole(
-        "interacoes",
-        `dupla_id=eq.${IDS.dupla2}&tipo=eq.nudge&autor_id=eq.${IDS.coordProfile}` +
-          `&created_at=gte.${t0}`
-      );
-      await limparViaServiceRole(
-        "notificacoes",
-        `profile_id=eq.${mentorId}&tipo=eq.lembrete` +
-          `&created_by=eq.${IDS.coordProfile}&created_at=gte.${t0}`
-      );
-    }
+        // o botão da linha abre o preview da mensagem; o lembrete sai do
+        // "Lembrar pelo app" lá dentro — nunca abre wa.me (o popup-listener
+        // fica de guarda: se algum dia abrir, a aba não pendura o runner)
+        page.on("popup", (popup) => popup.close().catch(() => {}));
+
+        const preview = page.getByRole("dialog");
+        await agirComConfirma(
+          () =>
+            linha
+              .getByRole("button", { name: /^Lembrar( .*)?ver a mensagem/ })
+              .click(),
+          () => preview.isVisible()
+        );
+        const enviado = page.getByText("Lembrete enviado.");
+        // click com teto: o botão desabilita ("Enviando…") enquanto a RPC
+        // roda — um click sem timeout esperaria nele em vez de pollar
+        await agirComConfirma(
+          () =>
+            preview
+              .getByRole("button", { name: "Lembrar pelo app" })
+              .click({ timeout: 5_000 }),
+          () => enviado.isVisible()
+        );
+        await expect(enviado).toBeVisible({ timeout: 15_000 });
+
+        // readback no banco — a RPC loga a interação e notifica o mentor
+        const nudges = await buscarViaServiceRole<
+          { id: string; nota: string }[]
+        >(
+          "interacoes",
+          `select=id,nota&dupla_id=eq.${IDS.dupla2}&tipo=eq.nudge` +
+            `&autor_id=eq.${IDS.coordProfile}&canal=eq.in_app&created_at=gte.${t0}`
+        );
+        expect(nudges).toHaveLength(1);
+        expect(nudges[0].nota).toBe("lembrete → mentor");
+
+        const notifs = await buscarViaServiceRole<
+          { id: string; titulo: string; href: string }[]
+        >(
+          "notificacoes",
+          `select=id,titulo,href&profile_id=eq.${mentorId}&tipo=eq.lembrete` +
+            `&created_by=eq.${IDS.coordProfile}&created_at=gte.${t0}`
+        );
+        expect(notifs).toHaveLength(1);
+        expect(notifs[0].titulo).toMatch(/^Lembrete: /);
+        expect(notifs[0].href).toBe(`/duplas/${IDS.dupla2}`);
+
+        // o cap de 48h chega na UI: refresh → reabrindo o preview da linha
+        // o Lembrar-app vem "Lembrada dd/mm" desabilitado com a razão no
+        // title
+        await page.reload();
+        const linhaDepois = fila.locator("li", {
+          has: page.locator(`a[href="/duplas/${IDS.dupla2}"]`),
+        });
+        await agirComConfirma(
+          () =>
+            linhaDepois
+              .getByRole("button", { name: /ver a mensagem antes de enviar/ })
+              .click(),
+          () => preview.isVisible()
+        );
+        const bloqueada = preview.getByRole("button", {
+          name: /^Lembrada \d{2}\/\d{2}$/,
+        });
+        await expect(bloqueada).toBeVisible({ timeout: 15_000 });
+        await expect(bloqueada).toBeDisabled();
+        await expect(bloqueada).toHaveAttribute(
+          "title",
+          /^1 lembrete a cada 48h por dupla\. Destrava \d{2}\/\d{2}$/
+        );
+        await page.keyboard.press("Escape");
+
+        // e o mesmo cap barra na RPC — segundo envio como coord devolve o
+        // intervalo com o carimbo de quando libera
+        const jwtCoord = await jwtDoUsuario(COORD_EMAIL, COORD_SENHA);
+        const retry = await restComoUsuario("rpc/enviar_lembrete", jwtCoord, {
+          method: "POST",
+          body: { p_dupla_id: IDS.dupla2, p_destino: "mentor" },
+        });
+        expect(retry.status).toBe(200);
+        const corpoRetry = (await retry.json()) as {
+          ok: boolean;
+          erro?: string;
+          bloqueado_ate?: string;
+        };
+        expect(corpoRetry.ok).toBe(false);
+        expect(corpoRetry.erro).toBe("intervalo_48h");
+        expect(corpoRetry.bloqueado_ate).toBeTruthy();
+      } finally {
+        // só o que este run criou — a dupla fixture, o mentor e qualquer
+        // interação/notificação pré-existente ficam intocados
+        await limparViaServiceRole(
+          "interacoes",
+          `dupla_id=eq.${IDS.dupla2}&tipo=eq.nudge&autor_id=eq.${IDS.coordProfile}` +
+            `&created_at=gte.${t0}`
+        );
+        await limparViaServiceRole(
+          "notificacoes",
+          `profile_id=eq.${mentorId}&tipo=eq.lembrete` +
+            `&created_by=eq.${IDS.coordProfile}&created_at=gte.${t0}`
+        );
+      }
+    });
   });
 });
