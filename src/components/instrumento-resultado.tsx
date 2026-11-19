@@ -10,7 +10,6 @@ import {
 } from "@/lib/forms/schema";
 import { parseSubmetasLinhas } from "@/lib/pdm";
 import { cn } from "@/lib/utils";
-import { RespostaLista } from "./resposta-lista";
 import { RodaSvg } from "./instrumentos/roda-svg";
 import { RodaComparada } from "./instrumentos/roda-comparada";
 
@@ -391,7 +390,35 @@ function VisaoResultado({
       <Declaracao texto={declaracao} />
       {temNarrativa && (
         <Bloco titulo="O filme da vida ideal">
-          <RespostaLista campos={narrativa} respostas={respostas} />
+          {/* hierarquia própria da narrativa da Visão (REALIZA-442): disco
+              amarelo no lugar do "n." miúdo (o mesmo número da escrita em
+              /f/<token>), pergunta no verde do instrumento, resposta no
+              primeiro plano. O nº é a posição na régua — uma opcional
+              vazia não renumera as seguintes */}
+          <ol className="space-y-4">
+            {narrativa.map((c, i) => {
+              const valor = valorDe(campos, respostas, c.id);
+              if (valor === "—") return null;
+              return (
+                <li key={c.id} className="flex items-start gap-3">
+                  <span
+                    aria-hidden
+                    className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--destaque)] text-xs font-bold tabular-nums text-[var(--destaque-foreground)]"
+                  >
+                    {i + 1}
+                  </span>
+                  <div className="min-w-0 pt-0.5">
+                    <p className="text-[15px] font-semibold leading-snug text-[var(--ok-text)]">
+                      {c.label}
+                    </p>
+                    <p className="mt-1 text-base leading-relaxed whitespace-pre-wrap">
+                      {valor}
+                    </p>
+                  </div>
+                </li>
+              );
+            })}
+          </ol>
         </Bloco>
       )}
     </div>

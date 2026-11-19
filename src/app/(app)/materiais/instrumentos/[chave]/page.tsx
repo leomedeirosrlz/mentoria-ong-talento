@@ -4,8 +4,6 @@ import { notFound, redirect } from "next/navigation";
 import {
   BookOpen,
   CaretLeft,
-  Check,
-  LockSimple,
   Warning,
 } from "@phosphor-icons/react/dist/ssr";
 import {
@@ -19,9 +17,11 @@ import { temPapel } from "@/lib/types";
 import type { Dupla } from "@/lib/types";
 import {
   ESTACOES,
+  estadoDeEntregas,
   resolveLinhasPainel,
   SISTEMA_DA_ESTACAO,
   entregasDoMomento,
+  parRoda,
   type EstacaoPainelEstado,
   type PainelJornadaLinha,
 } from "@/lib/jornada";
@@ -33,7 +33,10 @@ import {
   estrelasTexto,
 } from "@/lib/ciclo";
 import {
+  extraiMetas,
+  extraiRodaDaVida,
   INSTRUMENTOS_DUPLA_SISTEMA,
+  respostaFormatada,
   type FormularioCampo,
   type InstrumentoDuplaSistema,
   type RespostaValor,
@@ -45,15 +48,19 @@ import {
   type CorpusSecao,
 } from "@/lib/materiais/corpus-doc";
 import { DocBlocos } from "@/components/material-documento";
-import type { InstrumentoDupla, InstrumentoEntrega } from "@/lib/forms/queries";
+import type { InstrumentoDupla } from "@/lib/forms/queries";
 import { turmaCurta } from "@/lib/turma";
 import {
   InstrumentoEmblema,
   instrumentoVars,
 } from "@/components/instrumento-icone";
 import { InstrumentoResultado } from "@/components/instrumento-resultado";
+import { BadgeEstado } from "@/components/instrumento-estado";
 import { FadeX } from "@/components/fade-x";
 import { RespostaLista } from "@/components/resposta-lista";
+import { RespostaToggle } from "@/components/resposta-toggle";
+import { MentoradoSeletor } from "@/components/mentorado-seletor";
+import { RodaSvg } from "@/components/instrumentos/roda-svg";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -81,38 +88,6 @@ const ORDEM_ESTADO: Record<EstacaoPainelEstado, number> = {
   trancada: 4,
 };
 
-function BadgeEstado({ estado }: { estado: EstacaoPainelEstado }) {
-  switch (estado) {
-    case "respondido":
-      return (
-        <Badge className="bg-[var(--ok)]/15 text-[var(--ok-text)]">
-          <Check size={11} weight="bold" data-icon="inline-start" aria-hidden />
-          respondido
-        </Badge>
-      );
-    case "pendente":
-      return (
-        <Badge className="bg-[var(--warn)]/15 text-[var(--warn-text)]">
-          link enviado
-        </Badge>
-      );
-    case "expirado":
-      return <Badge variant="secondary">link expirado</Badge>;
-    case "trancada":
-      return (
-        <Badge
-          variant="outline"
-          className="bg-muted text-xs font-medium text-muted-foreground"
-        >
-          <LockSimple size={11} data-icon="inline-start" aria-hidden />
-          ainda não abriu
-        </Badge>
-      );
-    default:
-      return <Badge variant="secondary">não enviado</Badge>;
-  }
-}
-
 /** Estado do lado específico do 360º (mentor ou mentorado) — a estação do
  *  painel filtra só "mentorado", o lado do mentor resolve aqui com a
  *  mesma ordem de regras de estacoesPainelDupla. */
@@ -131,14 +106,73 @@ function estado360(
   return "nao_enviado";
 }
 
-/** Mesma régua de estado da ficha (estadoAtual): respondido vence, depois
- *  pendente, expirado e "não enviado" — usada nas linhas do mentor, que
- *  não têm painel pra resolver janela (a ficha também não trava). */
-function estadoDe(entregas: InstrumentoEntrega[]): EstacaoPainelEstado {
-  if (entregas.some((e) => e.status === "respondido")) return "respondido";
-  if (entregas.some((e) => e.status === "pendente")) return "pendente";
-  if (entregas.length) return "expirado";
-  return "nao_enviado";
+/** Resumo visual da última resposta da dupla — a linha já conta o
+ *  resultado antes do "Ver resposta" (REALIZA-440): a mini-roda com
+ *  média pra roda (fantasma da inicial na formal), a declaração pra
+ *  visão, a contagem pra metas/PDM. */
+function ResumoResposta({
+  sistema,
+  campos,
+  respostas,
+  respostasAnterior = null,
+}: {
+  sistema: InstrumentoDuplaSistema;
+  campos: FormularioCampo[];
+  respostas: Record<string, RespostaValor>;
+  respostasAnterior?: Record<string, RespostaValor> | null;
+}) {
+  if (sistema === "roda_vida") {
+    const roda = extraiRodaDaVida(campos, respostas);
+    if (!roda) return null;
+    const anterior = respostasAnterior
+      ? extraiRodaDaVida(campos, respostasAnterior)
+      : null;
+    return (
+      <div className="flex items-center gap-3">
+        <RodaSvg
+          roda={roda}
+          anterior={anterior}
+          className="size-24 shrink-0"
+        />
+        <p className="text-sm leading-snug">
+          Média geral{" "}
+          <strong className="tabular-nums">
+            {roda.media?.toLocaleString("pt-BR") ?? "—"}
+          </strong>
+          /10
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            {roda.respondidas} de {roda.total} áreas respondidas
+          </span>
+        </p>
+      </div>
+    );
+  }
+  if (sistema === "visao") {
+    const declaracao = respostaFormatada(
+      campos.find((c) => c.id === "declaracao_visao"),
+      respostas["declaracao_visao"]
+    );
+    if (!declaracao.trim() || declaracao === "—") return null;
+    return (
+      <blockquote className="border-l-2 border-[var(--ic,var(--border))] pl-2.5">
+        <p className="line-clamp-2 text-sm leading-snug">“{declaracao}”</p>
+      </blockquote>
+    );
+  }
+  if (sistema === "metas" || sistema === "pdm") {
+    const metas = extraiMetas(campos, respostas);
+    if (!metas.length) return null;
+    return (
+      <p className="text-sm leading-snug">
+        <strong className="tabular-nums">{metas.length}</strong>{" "}
+        {metas.length === 1 ? "meta definida" : "metas definidas"}
+        <span className="mt-0.5 line-clamp-1 block text-xs text-muted-foreground">
+          {metas[0]!.meta}
+        </span>
+      </p>
+    );
+  }
+  return null;
 }
 
 type LinhaSpec = {
@@ -195,10 +229,11 @@ function DetalheAvaliacoes({ dupla }: { dupla: Dupla }) {
     .sort((a, b) => a.numero - b.numero);
   if (!realizados.length) return null;
   return (
-    <details className="group/av mt-1.5">
-      <summary className="inline-flex min-h-8 cursor-pointer list-none items-center gap-1.5 rounded-md text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-        Ver avaliações
-      </summary>
+    <RespostaToggle
+      rotulo="Ver avaliações"
+      rotuloAberto="Fechar avaliações"
+      className="mt-1.5"
+    >
       <ul className="mt-2 divide-y divide-border/60 border-t border-border/60">
         {realizados.map((e) => {
           const av = e.avaliacao_jovem;
@@ -255,7 +290,7 @@ function DetalheAvaliacoes({ dupla }: { dupla: Dupla }) {
           );
         })}
       </ul>
-    </details>
+    </RespostaToggle>
   );
 }
 
@@ -289,10 +324,15 @@ export async function generateMetadata({
 
 export default async function InstrumentoPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ chave: string }>;
+  searchParams: Promise<{ dupla?: string }>;
 }) {
-  const { chave } = await params;
+  const [{ chave }, { dupla: duplaParam }] = await Promise.all([
+    params,
+    searchParams,
+  ]);
   const card = CARDS.find((c) => c.chave === chave);
   if (!card) notFound();
 
@@ -381,6 +421,20 @@ export default async function InstrumentoPage({
       )
     : [];
   const instrumentosMentor = new Map(instrumentosMentorPares);
+
+  // mentorado em foco (?dupla=<id>) — a régua linka a dupla escolhida e
+  // a página filtra as linhas; param inválido ou fora do escopo cai no
+  // "Todas". Só vale pro mentor: staff não tem seletor aqui (o filtro de
+  // coorte é a busca da ficha)
+  const selecionada =
+    duplaParam != null && duplasMentor.some((d) => d.id === duplaParam)
+      ? duplaParam
+      : null;
+  const fichasSeletor = duplasMentor.map((d) => ({
+    id: d.id,
+    jovemNome: d.mentorado.nome_social || d.mentorado.nome,
+    pausada: d.status === "pausada",
+  }));
   const respostaPorDupla = new Map<
     string,
     { respostas: Record<string, RespostaValor>; respondidoEm: string | null }
@@ -445,7 +499,7 @@ export default async function InstrumentoPage({
               chave === "roda_inicial" ? "inicial" : "formal"
             );
           }
-          estado = estadoDe(entregas);
+          estado = estadoDeEntregas(entregas);
         }
         return {
           duplaId: d.id,
@@ -472,6 +526,10 @@ export default async function InstrumentoPage({
       ORDEM_ESTADO[a.estado] - ORDEM_ESTADO[b.estado] ||
       a.jovemNome.localeCompare(b.jovemNome, "pt-BR")
   );
+  const linhasVisiveis =
+    !vePainel && selecionada
+      ? linhas.filter((l) => l.duplaId === selecionada)
+      : linhas;
 
   return (
     <div className="space-y-5">
@@ -521,7 +579,9 @@ export default async function InstrumentoPage({
           {CARDS.map((c) => (
             <li key={c.chave} className="shrink-0">
               <Link
-                href={`/materiais/instrumentos/${c.chave}`}
+                href={`/materiais/instrumentos/${c.chave}${
+                  selecionada ? `?dupla=${selecionada}` : ""
+                }`}
                 aria-current={c.chave === chave ? "page" : undefined}
                 className={cn(
                   "inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-xs font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
@@ -567,18 +627,31 @@ export default async function InstrumentoPage({
         </section>
       )}
 
+      {/* o nome do mentorado vira o controle (REALIZA-440): pills até 3
+          duplas, dropdown acima; "Todas" devolve a lista inteira. A
+          escolha chega por ?dupla= da régua e sobrevive à troca de
+          instrumento (os pills do topo carregam o param) */}
+      {!vePainel && (
+        <MentoradoSeletor
+          fichas={fichasSeletor}
+          selecionada={selecionada}
+          hrefBase={`/materiais/instrumentos/${chave}`}
+          comTodas
+        />
+      )}
+
       <section
         aria-label={`Duplas — ${card.titulo}`}
         className="overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]"
         style={instrumentoVars(card.chave)}
       >
-        {linhas.length === 0 ? (
+        {linhasVisiveis.length === 0 ? (
           <p className="px-4 py-6 text-sm text-muted-foreground sm:px-5">
             Nenhuma dupla no seu escopo pra este instrumento.
           </p>
         ) : (
           <ul className="divide-y divide-border/60">
-            {linhas.map((l) => {
+            {linhasVisiveis.map((l) => {
               // o conteúdo da linha por tipo de instrumento — o estado já
               // tá na linha; aqui mora só o detalhe sob demanda
               let detalhe: React.ReactNode = null;
@@ -589,15 +662,12 @@ export default async function InstrumentoPage({
                 const resp = respostaPorDupla.get(l.duplaId);
                 if (resp && formDetalhe) {
                   detalhe = (
-                    <details className="group/av mt-1.5">
-                      <summary className="inline-flex min-h-8 cursor-pointer list-none items-center gap-1.5 rounded-md text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                        Ver respostas
-                      </summary>
+                    <RespostaToggle className="mt-1.5">
                       <Detalhe360
                         campos={formDetalhe.formulario.campos}
                         respostas={resp.respostas}
                       />
-                    </details>
+                    </RespostaToggle>
                   );
                 }
               } else if (ehForm) {
@@ -614,36 +684,51 @@ export default async function InstrumentoPage({
                     );
                   }
                 } else {
-                  // mentor: já veio eager no carregamento da página
+                  // mentor: já veio eager no carregamento da página — a
+                  // linha resume o resultado e o "Ver resposta" abre o
+                  // estruturado completo (REALIZA-440/441)
                   const inst = (instrumentosMentor.get(l.duplaId) ?? []).find(
                     (i) => i.sistema === sistema
                   );
-                  let entregas = (inst?.entregas ?? []).filter(
+                  const mentoradoEntregas = (inst?.entregas ?? []).filter(
                     (e) => e.destino === "mentorado" && e.status === "respondido" && e.respostas
                   );
-                  if (sistema === "roda_vida") {
-                    entregas = entregasDoMomento(
-                      entregas,
-                      chave === "roda_inicial" ? "inicial" : "formal"
-                    );
-                  }
+                  const entregas =
+                    sistema === "roda_vida"
+                      ? entregasDoMomento(
+                          mentoradoEntregas,
+                          chave === "roda_inicial" ? "inicial" : "formal"
+                        )
+                      : mentoradoEntregas;
                   const ultima = [...entregas].sort((a, b) =>
                     (b.respondido_em ?? "").localeCompare(a.respondido_em ?? "")
                   )[0];
+                  // roda formal carrega o antes×depois que a ficha já
+                  // mostra (o ghost da mini-roda e a RodaComparada)
+                  const anterior =
+                    sistema === "roda_vida" && chave === "roda_formal"
+                      ? (parRoda(mentoradoEntregas).inicial?.respostas ?? null)
+                      : null;
                   if (inst && ultima?.respostas) {
                     detalhe = (
-                      <details className="group/av mt-1.5">
-                        <summary className="inline-flex min-h-8 cursor-pointer list-none items-center gap-1.5 rounded-md text-xs font-medium text-muted-foreground transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                          Ver respostas
-                        </summary>
-                        <div className="mt-2 border-t border-border/60 pt-3">
-                          <InstrumentoResultado
-                            sistema={inst.sistema}
-                            campos={inst.campos}
-                            respostas={ultima.respostas}
-                          />
-                        </div>
-                      </details>
+                      <div className="mt-2.5">
+                        <ResumoResposta
+                          sistema={inst.sistema}
+                          campos={inst.campos}
+                          respostas={ultima.respostas}
+                          respostasAnterior={anterior}
+                        />
+                        <RespostaToggle className="mt-1.5">
+                          <div className="mt-2 border-t border-border/60 pt-3">
+                            <InstrumentoResultado
+                              sistema={inst.sistema}
+                              campos={inst.campos}
+                              respostas={ultima.respostas}
+                              respostasAnterior={anterior}
+                            />
+                          </div>
+                        </RespostaToggle>
+                      </div>
                     );
                   }
                 }

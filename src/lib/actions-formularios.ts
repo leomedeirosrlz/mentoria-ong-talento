@@ -12,7 +12,7 @@ import {
   type InstrumentoSistema,
   type RespostaValor,
 } from "./forms/schema";
-import { entregasDoMomento, SISTEMA_DA_ESTACAO, type EstacaoChave } from "./jornada";
+import { entregasDoMomento, parRoda, SISTEMA_DA_ESTACAO, type EstacaoChave } from "./jornada";
 import {
   emitirProdutoEvento,
   superficieDaOrigem,
@@ -203,6 +203,9 @@ type DetalheInstrumento =
       campos: FormularioCampo[];
       respostas: Record<string, RespostaValor>;
       respondidoEm: string | null;
+      /** a leitura inicial da roda quando a página pede a formal — o
+       *  antes×depois que a ficha já mostra (REALIZA-441) */
+      anterior: Record<string, RespostaValor> | null;
     }
   | { ok: false };
 
@@ -218,10 +221,13 @@ export async function detalheInstrumentoDaDupla(
   const inst = itens.find((i) => i.sistema === sistema);
   if (!inst) return { ok: false };
 
-  let entregas = inst.entregas.filter((e) => e.destino === "mentorado");
+  const mentoradoEntregas = inst.entregas.filter(
+    (e) => e.destino === "mentorado"
+  );
+  let entregas = mentoradoEntregas;
   if (sistema === "roda_vida") {
     const alvo = chave === "roda_inicial" ? "inicial" : "formal";
-    entregas = entregasDoMomento(entregas, alvo);
+    entregas = entregasDoMomento(mentoradoEntregas, alvo);
   }
 
   const respondida = entregas
@@ -234,6 +240,10 @@ export async function detalheInstrumentoDaDupla(
     campos: inst.campos,
     respostas: respondida.respostas,
     respondidoEm: respondida.respondido_em,
+    anterior:
+      sistema === "roda_vida" && chave === "roda_formal"
+        ? (parRoda(mentoradoEntregas).inicial?.respostas ?? null)
+        : null,
   };
 }
 

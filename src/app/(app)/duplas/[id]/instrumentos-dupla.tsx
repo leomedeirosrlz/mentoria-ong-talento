@@ -61,7 +61,7 @@ import { cn } from "@/lib/utils";
 // Seção "Instrumentos" da ficha da dupla (0080) — os quatro instrumentos
 // oficiais da jornada DPP com status por entrega: não enviado → "Enviar"
 // (o mentor entrega — emitir_link_instrumento no banco), pendente → copiar
-// /mandar de novo, respondido → "Ver resultado" abre a leitura estruturada
+// /mandar de novo, respondido → "Ver resposta" abre a leitura estruturada
 // (a roda desenhada, as metas com IS/prazo, a declaração de visão).
 
 /** WP7/REALIZA-202 — chip da janela + "Como conduzir" vêm de
@@ -260,7 +260,7 @@ function LinhaInstrumento({
   /** Re-emissão do instrumento respondido (REALIZA-435): a resposta é
    *  evidência e não se edita — a saída é a nova rodada que a RPC já
    *  cria (link em branco do mesmo destinatário; a resposta antiga fica
-   *  guardada e segue legível no "Ver resultado"). Nos instrumentos de 2
+   *  guardada e segue legível no "Ver resposta"). Nos instrumentos de 2
    *  pontas o momento vai explícito: sem ele o emitir derivaria a ponta
    *  SEGUINTE pelas respondidas e a refaçagem da inicial sairia formal. */
   function refazer() {
@@ -374,7 +374,7 @@ function LinhaInstrumento({
               render={
                 <Button variant="outline" size="sm">
                   <Eye aria-hidden />
-                  Ver resultado
+                  Ver resposta
                 </Button>
               }
             />
@@ -536,7 +536,7 @@ export function InstrumentosDupla({
   const porSistema = new Map(itens.map((i) => [i.sistema, i]));
   // os pares antes × depois derivam UMA vez das entregas já carregadas —
   // a leitura inicial da roda e a marcação de início do checklist alimentam
-  // a comparação do "Ver resultado" de cada linha (REALIZA-18/-359)
+  // a comparação do "Ver resposta" de cada linha (REALIZA-18/-359)
   const rodaPar = parRoda(porSistema.get("roda_vida")?.entregas ?? []);
   const checklistPar = parChecklist(
     porSistema.get("competencias_mentor")?.entregas ?? []

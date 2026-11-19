@@ -342,6 +342,19 @@ export function entregasDoMomento<
   return ord.filter((e, i) => momentoRoda(e, i === idxSemMarca) === momento);
 }
 
+/** Estado da estação na leitura por dupla — a mesma régua do estadoAtual
+ *  da ficha: respondido vence, depois pendente, expirado e "não enviado".
+ *  Usada onde não há painel pra resolver janela (o mentor na régua de
+ *  /materiais e na página por instrumento — a ficha também não trava). */
+export function estadoDeEntregas<T extends { status: string }>(
+  entregas: T[]
+): EstacaoPainelEstado {
+  if (entregas.some((e) => e.status === "respondido")) return "respondido";
+  if (entregas.some((e) => e.status === "pendente")) return "pendente";
+  if (entregas.length) return "expirado";
+  return "nao_enviado";
+}
+
 /** A entrega corrente de um momento — a mais recente respondida (a
  *  re-emissão substitui a anterior na leitura; pendente não tem payload). */
 function ultimaRespondidaDoMomento<
