@@ -481,6 +481,28 @@ export function projetarFicha(d: DuplaIa, eventos: CicloEvento[]) {
     encaminhamentos_pendentes: d.encaminhamentos.filter(
       (t) => t.status === "pendente"
     ).length,
+    // recessos do cronograma dela com a decisão vigente (462) — o modelo
+    // lê o ciclo_evento_id daqui pra declarar_recesso
+    recessos: eventos
+      .filter(
+        (e) =>
+          e.cronograma_id === d.cronograma_id &&
+          e.tipo === "recesso" &&
+          e.data != null
+      )
+      .map((e) => {
+        const dec = (d.recessos ?? []).find(
+          (r) => r.ciclo_evento_id === e.id
+        );
+        return {
+          ciclo_evento_id: e.id,
+          titulo: e.titulo,
+          data: e.data,
+          data_fim: e.data_fim,
+          usa: dec?.usa ?? true,
+          declarado_em: dec?.declarado_em ?? null,
+        };
+      }),
     encontros: d.encontros
       .map((e) => ({
         numero: e.numero,
@@ -1853,6 +1875,66 @@ export const IA_TOOLS = {
       rpcEscreve(ctx, "desfazer_retroativo_mentorado", {
         p_encontro: a.encontro_id,
       }),
+  },
+
+  declarar_recesso: {
+    nome: "declarar_recesso",
+    descricao:
+      "Declara a decisão da dupla sobre um recesso do calendário oficial: usa=true é 'vamos usar o recesso' (também é o padrão quando nada foi declarado — o planner empurra sugestões pra depois da janela) e usa=false é 'vamos seguir nos encontrando' (aí a janela fica disponível pra dupla: o planner pode sugerir datas dentro dela e a agenda trata o período como combinado). A decisão é por dupla e por período de recesso; a última declaração vale, com a data da mudança. Sem ciclo_evento_id vale o recesso vigente ou o próximo do cronograma da dupla — ficha_dupla lista os recessos com os ids. Quem declara é o mentor da dupla (a decisão é combinada com o jovem fora da tela) ou a coordenação; o mentorado acompanha a decisão na agenda dele." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        dupla_id: z.uuid().describe("id da dupla (uuid)"),
+        ciclo_evento_id: z
+          .uuid()
+          .optional()
+          .describe(
+            "id do evento de recesso (uuid — ficha_dupla lista em recessos; sem ele vale o vigente ou o próximo)"
+          ),
+        usa: z
+          .boolean()
+          .describe(
+            "true = vamos usar o recesso (padrão); false = vamos seguir nos encontrando durante o recesso"
+          ),
+      })
+      .strict(),
+    roles: ["coordenacao", "mentor_dpp"],
+    escreve: true,
+    resumo: (a: { dupla_id: string; usa: boolean }) =>
+      `${a.usa ? "Usar" : "Atravessar"} o recesso na dupla ${a.dupla_id}`,
+    run: async (
+      a: { dupla_id: string; ciclo_evento_id?: string; usa: boolean },
+      ctx
+    ) => {
+      let evento = a.ciclo_evento_id ?? null;
+      if (!evento) {
+        const [d, evs] = await Promise.all([
+          getDuplaIa(ctx.supabase, a.dupla_id),
+          getCicloEventosIa(ctx.supabase),
+        ]);
+        if (!d) throw new ErroTool("Não encontrei essa dupla.");
+        const hoje = toDateStr(new Date());
+        const cand = evs
+          .filter(
+            (e) =>
+              e.tipo === "recesso" &&
+              e.cronograma_id === d.cronograma_id &&
+              e.data != null &&
+              (e.data_fim ?? e.data) >= hoje
+          )
+          .sort((x, y) => x.data!.localeCompare(y.data!))[0];
+        if (!cand)
+          throw new ErroTool(
+            "Não encontrei recesso vigente ou futuro no cronograma desta dupla."
+          );
+        evento = cand.id;
+      }
+      return rpcEscreve(ctx, "declarar_recesso", {
+        p_dupla: a.dupla_id,
+        p_evento: evento,
+        p_usa: a.usa,
+      });
+    },
   },
 
   jovem_pedir_especialista: {

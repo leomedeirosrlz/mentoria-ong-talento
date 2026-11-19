@@ -407,3 +407,30 @@ export const getJovemJornada = cache(
     return (data ?? null) as JovemJornadaDados | null;
   }
 );
+
+/** Recessos vigentes/futuros do cronograma da dupla do jovem + a decisão
+ *  declarada (462 — RPC `jovem_recessos`, 0218): o papel mentorado não
+ *  lê ciclo_eventos, então a janela chega por definer, no mesmo gate da
+ *  jovem_jornada. usa default true = "vamos usar o recesso". */
+export type JovemRecesso = {
+  ciclo_evento_id: string;
+  data: string;
+  data_fim: string | null;
+  usa: boolean;
+  declarado_em: string | null;
+};
+
+export const getJovemRecessos = cache(
+  async (): Promise<JovemRecesso[]> => {
+    const demo = await demoRole();
+    // demo usa o recesso (default) — a nota simplesmente não renderiza
+    if (demo) return [];
+    const supabase = await createClient();
+    const { data, error } = await supabase.rpc("jovem_recessos");
+    if (error) {
+      console.error("getJovemRecessos:", error);
+      return [];
+    }
+    return (data ?? []) as JovemRecesso[];
+  }
+);

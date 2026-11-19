@@ -518,6 +518,22 @@ export type EncontroNota = {
 /** Intenção do mentor pro encontro N (REALIZA-21) — chave (dupla_id, numero)
  *  como a nota: precede o agendamento e segue o nº do guia na remarcação.
  *  Pendente = feito=false; feito_em é carimbo de trigger, nunca do caller. */
+/** Decisão declarada da dupla sobre um recesso do cronograma (REALIZA-462,
+ *  0218): usa=true "vamos usar o recesso" (default implícito quando não há
+ *  linha pra esse evento); usa=false "vamos seguir nos encontrando" — o
+ *  planner pode sugerir datas dentro da janela. Amarrada ao ID do evento
+ *  (não à data): se a janela anda no cronograma, a decisão segue junto. */
+export type DuplaRecesso = {
+  id: string;
+  dupla_id: string;
+  ciclo_evento_id: string;
+  usa: boolean;
+  declarado_por: string | null;
+  declarado_em: string;
+  /** Autor da última declaração — só vem no embed da ficha. */
+  autor?: { nome: string; nome_social: string | null } | null;
+};
+
 export type Dupla = {
   id: string;
   /** Label da turma (ex-coluna `ciclo`, renomeada na 0061) — derivada do
@@ -564,6 +580,9 @@ export type Dupla = {
   encontros: Encontro[];
   encaminhamentos: Encaminhamento[];
   notas?: EncontroNota[];
+  /** Recessos com decisão declarada (0218) — ausência da linha = usa o
+   *  recesso, como sempre foi. */
+  recessos?: DuplaRecesso[];
 };
 
 /** Versão enxuta de Dupla — só os ids de vínculo + turma (a filiação da

@@ -195,6 +195,7 @@ describe("registry", () => {
         "comentar_chamado",
         "confirmar_sugestao_especialista",
         "contra_propor_solicitacao",
+        "declarar_recesso",
         "desmarcar_encontro",
         "devolver_chamado_fila",
         "duplas_do_usuario",

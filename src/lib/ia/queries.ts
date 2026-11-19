@@ -19,6 +19,7 @@ import type {
   AppRole,
   AvaliacaoEncontro,
   CicloEvento,
+  DuplaRecesso,
   DuplaStatus,
   Encaminhamento,
   Mentorado,
@@ -68,7 +69,8 @@ export const IA_SAUDE_SELECT = `
     registro:registros(precisa_apoio, avaliacao, dificuldade),
     avaliacao_jovem:avaliacoes_encontro(pedir_apoio)
   ),
-  encaminhamentos(status, prazo)
+  encaminhamentos(status, prazo),
+  recessos:dupla_recessos(ciclo_evento_id, usa, declarado_em)
 `;
 
 /** A dupla como a tool a recebe — projeção mínima e allowlisted (sem as
@@ -103,6 +105,12 @@ export type DuplaIa = {
     avaliacao_jovem: Pick<AvaliacaoEncontro, "pedir_apoio"> | null;
   }[];
   encaminhamentos: Pick<Encaminhamento, "status" | "prazo">[];
+  /** Decisões de recesso declaradas (0218) — a linha ausente = usa o
+   *  recesso (default). O planner da tool lê daqui via cast pra Dupla. */
+  recessos?: Pick<
+    DuplaRecesso,
+    "ciclo_evento_id" | "usa" | "declarado_em"
+  >[];
 };
 
 /** Duplas vivas (ativa/pausada) no escopo do papel — coord recebe todas,

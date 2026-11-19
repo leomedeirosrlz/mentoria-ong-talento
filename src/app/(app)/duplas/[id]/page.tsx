@@ -104,6 +104,7 @@ import {
 } from "@/components/avaliacao-jovem";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { PlanoEmDiaCard } from "@/components/plano-em-dia-card";
+import { RecessoDuplaCard } from "@/components/recesso-dupla-card";
 import { montarPlanoEmDia } from "@/lib/plano-em-dia";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { EditarDuplaDialog } from "@/components/editar-dupla-dialog";
@@ -530,6 +531,35 @@ export default async function DuplaPage({
 
   const hojeStr = toDateStr(new Date());
   const podeRetroativo = souMentor && dupla.status === "ativa" && faltantes.length > 0;
+
+  // recessos vigentes/futuros do cronograma dela + a decisão declarada
+  // (462): o card vale pra dupla DPP ativa; janela já passada não rende
+  // gesto — e a decisão sobre recesso passado não teria efeito
+  const recessosDaFicha =
+    !ehEsp && dupla.status === "ativa"
+      ? eventosDaDupla
+          .filter(
+            (e) =>
+              e.tipo === "recesso" &&
+              e.data != null &&
+              (e.data_fim ?? e.data) >= hojeStr
+          )
+          .map((e) => {
+            const dec = (dupla.recessos ?? []).find(
+              (r) => r.ciclo_evento_id === e.id
+            );
+            return {
+              cicloEventoId: e.id,
+              titulo: e.titulo,
+              inicio: e.data!,
+              fim: e.data_fim ?? e.data!,
+              usa: dec?.usa ?? true,
+              declaradoEm: dec?.declarado_em ?? null,
+              autorNome:
+                dec?.autor?.nome_social ?? dec?.autor?.nome ?? null,
+            };
+          })
+      : [];
 
   // fechamento da trilha especialista: especialista dono ou coordenação,
   // enquanto a trilha está aberta (ativa/pausada e sem carimbo)
@@ -1165,6 +1195,15 @@ export default async function DuplaPage({
           dupla={dupla}
           souMentor={souMentor}
           jovemNome={primeiroNomeMentorado}
+        />
+      )}
+
+      {recessosDaFicha.length > 0 && (
+        <RecessoDuplaCard
+          duplaId={dupla.id}
+          recessos={recessosDaFicha}
+          podeDeclarar={souMentor || souCoord}
+          souMentor={souMentor}
         />
       )}
 
