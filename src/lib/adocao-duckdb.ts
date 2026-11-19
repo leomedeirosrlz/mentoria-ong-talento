@@ -16,6 +16,14 @@ import { LIMITE_LINHAS, TABELA_EVENTOS, sqlComLimite } from "@/lib/adocao-sql";
 
 const ARQUIVO_PARQUET = "eventos.parquet";
 
+// Repositório das extensões do engine, vendored em public/: parquet_scan
+// dispara autoload de {repo}/{versão do engine}/{plataforma}/parquet
+// .duckdb_extension.wasm dentro do worker — o default é o CDN
+// extensions.duckdb.org, que o connect-src do CSP corta (REALIZA-452).
+// Same-origin resolve sem abrir o CSP; o layout espelha o CDN e o teste
+// tests/adocao-duckdb-ext trava versão × plataforma × política.
+const REPO_EXTENSAO = "/duckdb-ext";
+
 export type BancoEventos = {
   /** fecha o worker junto — o banco é só memória wasm */
   fechar: () => Promise<void>;
@@ -58,6 +66,14 @@ export async function criarBancoEventos(
   const db = new duckdb.AsyncDuckDB(new duckdb.VoidLogger(), worker);
   await db.instantiate(bundle.mainModule, bundle.pthreadWorker);
   const conn = await db.connect();
+
+  // o SET vem antes de qualquer query que autoloadeie extensão (o
+  // parquet_scan na view abaixo); absoluto porque o XHR roda no worker,
+  // onde URL relativa resolve contra o script do worker, não o da página
+  await conn.query(
+    `set custom_extension_repository = ` +
+      `'${new URL(REPO_EXTENSAO, location.origin).href}'`
+  );
 
   const registrar = async () => {
     const res = await fetch(

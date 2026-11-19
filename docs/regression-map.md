@@ -32,6 +32,7 @@ Quem mexe no repo sem contexto precisa de duas coisas: saber **qual regra não p
 | Semântica do handoff em SQL (registrar resgata `failed`, falhar é `do nothing`, pegar distingue expirado) | `tests/handoff-sql.test.ts` |
 | Regexes de token público consistentes com o mint (32 base64url em `/f` `/t` `/avaliar`; uuid em `/assinar` `/api/assinar-token`) | `tests/token-formato.test.ts` |
 | Janela de adoção ≤ retenção do cru; RPCs `adocao_*` e export não leem o rollup | `tests/adocao-janela.test.ts` |
+| Explorador DuckDB sem CDN: extensão parquet vendored por versão×plataforma do engine, repo same-origin via `custom_extension_repository`, CSP sem `duckdb.org` | `tests/adocao-duckdb-ext.test.ts` |
 
 E2e `app` (backend real, obrigatório no PR) e `demo` cobrem os fluxos por papel — a lista de specs por subsistema está no índice do Playwright.
 
