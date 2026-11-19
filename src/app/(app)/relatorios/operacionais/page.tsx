@@ -46,6 +46,7 @@ import {
   type Janela,
   type MedidaAdocao,
 } from "@/lib/adocao";
+import { temPapel } from "@/lib/types";
 import { RelatoriosAbas, type AbaRelatorios } from "./relatorios-abas";
 import { SecaoAderencia } from "./secao-aderencia";
 import { SecaoAdocao } from "./secao-adocao";
@@ -56,6 +57,12 @@ import { SecaoInteracoes } from "./secao-interacoes";
 import { SecaoSolicitacoes } from "./secao-solicitacoes";
 import { RecorteTurma } from "./recorte-turma";
 import { DigestBotao } from "./digest-botao";
+import { DigestConfigCard } from "./digest-config-card";
+import {
+  DIGEST_CONFIG_PADRAO,
+  lerDigestConfig,
+  type DigestConfig,
+} from "@/lib/relatorios/digest";
 
 export const metadata: Metadata = { title: "Outros relatórios" };
 
@@ -77,7 +84,9 @@ export default async function RelatoriosOperacionaisPage({
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
   const me = await getMe();
-  if (me?.role !== "coordenacao") redirect("/");
+  // papel efetivo: a coordenação carregada como papel secundário (híbrido)
+  // configura o digest igual — mesma régua temPapel das actions
+  if (!me || !temPapel(me, "coordenacao")) redirect("/");
 
   const sp = await searchParams;
   const abaParam = typeof sp.aba === "string" ? sp.aba : undefined;
@@ -257,7 +266,38 @@ async function renderAba({
       const tendencia = demo
         ? demoTendenciaSaude(d!, recorte)
         : await dadosTendenciaSaude(supabase!, recorte);
-      return <AbaSaude tendencia={tendencia} />;
+      // config do digest (451): demo mostra o padrão read-only; na sessão
+      // real a row vem pela RLS coord e a lista de pessoas escolhíveis é
+      // a equipe ativa (coordenação + supervisão, papel efetivo)
+      let digestConfig: DigestConfig = DIGEST_CONFIG_PADRAO;
+      let pessoasEquipe: { id: string; nome: string }[] = [];
+      if (!demo) {
+        const [cfg, pRes] = await Promise.all([
+          lerDigestConfig(supabase!),
+          supabase!
+            .from("profiles")
+            .select("id, nome, nome_social, profile_papeis!inner(papel)")
+            .in("profile_papeis.papel", ["coordenacao", "supervisor"])
+            .eq("ativo", true)
+            .order("nome"),
+        ]);
+        digestConfig = cfg;
+        const vistos = new Set<string>();
+        pessoasEquipe = (pRes.data ?? [])
+          .filter((p) => (vistos.has(p.id) ? false : (vistos.add(p.id), true)))
+          .map((p) => ({
+            id: p.id,
+            nome: p.nome_social ?? p.nome,
+          }));
+      }
+      return (
+        <AbaSaude
+          tendencia={tendencia}
+          digestConfig={digestConfig}
+          pessoasEquipe={pessoasEquipe}
+          somenteLeitura={demo}
+        />
+      );
     }
 
     case "aderencia": {
@@ -394,7 +434,17 @@ async function renderAba({
 const DIAS_TENDENCIA = 30;
 const MIN_DIAS_GRAFICO = 7;
 
-function AbaSaude({ tendencia }: { tendencia: DiaSaude[] }) {
+function AbaSaude({
+  tendencia,
+  digestConfig,
+  pessoasEquipe,
+  somenteLeitura,
+}: {
+  tendencia: DiaSaude[];
+  digestConfig: DigestConfig;
+  pessoasEquipe: { id: string; nome: string }[];
+  somenteLeitura: boolean;
+}) {
   const ultimo = tendencia.at(-1);
   return (
     <div className="space-y-5">
@@ -442,14 +492,19 @@ function AbaSaude({ tendencia }: { tendencia: DiaSaude[] }) {
         )}
       </section>
 
-      <section className="space-y-2 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
+      <section className="space-y-3 rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
         <h2 className="text-base font-semibold">Digest semanal</h2>
         <p className="max-w-2xl text-sm text-muted-foreground">
-          Toda segunda o cron envia o panorama (risco, pendências e semana)
-          pra coordenação. O botão dispara o mesmo e-mail agora — sem a
-          trava de uma vez por semana.
+          O cron envia o panorama (risco, pendências e semana) na frequência
+          configurada abaixo. O botão dispara o mesmo e-mail agora, sem a
+          trava de uma vez por período.
         </p>
         <DigestBotao />
+        <DigestConfigCard
+          inicial={digestConfig}
+          pessoas={pessoasEquipe}
+          somenteLeitura={somenteLeitura}
+        />
       </section>
     </div>
   );

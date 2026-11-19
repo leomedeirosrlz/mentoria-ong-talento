@@ -1,7 +1,11 @@
+import type { Page } from "@playwright/test";
 import {
   apiGetApp,
   appEnvOk,
+  atualizarViaServiceRole,
+  buscarViaServiceRole,
   expect,
+  limparViaServiceRole,
   loginComSenha,
   relogar,
   test,
@@ -16,6 +20,7 @@ const COORD_SENHA =
 const MENTOR_EMAIL = process.env.E2E_MENTOR_EMAIL ?? "e2e-mentor@realiza.test";
 const SUP_EMAIL = "sup-e2e@realiza.test";
 const SENHA = process.env.E2E_MENTOR_PASSWORD ?? "";
+const SUPA_URL = process.env.E2E_SUPABASE_URL ?? "";
 
 test.skip(
   !appEnvOk() || !COORD_SENHA,
@@ -168,6 +173,133 @@ test.describe("/relatorios — grade principal + hub operacional", () => {
         )
       ).toBeVisible({ timeout: 15_000 });
     }).toPass({ timeout: 45_000 });
+  });
+});
+
+// digest_config (REALIZA-451 / spec 007 US14): a policy coord-only mora no
+// banco — o teste chama o PostgREST com o JWT de cada papel (mesmo molde do
+// guard de RPC do jovem-agenda), não só pela UI. A row é singleton; o spec
+// devolve o staging ao estado em que encontrou.
+const CONFIG_COLS =
+  "dia_semana,cadencia,destinatarios,secoes,atualizado_por,atualizado_em";
+
+type ConfigRow = {
+  dia_semana: number;
+  cadencia: string;
+  destinatarios: unknown;
+  secoes: unknown;
+  atualizado_por: string | null;
+  atualizado_em: string;
+};
+
+/** JWT + apikey do papel logado — o password grant do login devolve os
+ *  dois; chamar a REST por fora da UI prova que o guard é a RLS. */
+async function credenciaisDaSessao(page: Page, email: string, senha: string) {
+  const grant = page.waitForResponse(
+    (r) => r.url().includes("grant_type=password"),
+    { timeout: 20_000 }
+  );
+  await loginComSenha(page, email, senha);
+  const res = await grant;
+  const apiKey = res.request().headers()["apikey"] ?? "";
+  const { access_token: token } = (await res.json()) as {
+    access_token?: string;
+  };
+  expect(token).toBeTruthy();
+  return { apiKey, token };
+}
+
+async function snapshotConfig(): Promise<ConfigRow | null> {
+  const rows = await buscarViaServiceRole<ConfigRow[]>(
+    "digest_config",
+    `select=${CONFIG_COLS}&id=eq.true`
+  );
+  return rows[0] ?? null;
+}
+
+async function restaurarConfig(antes: ConfigRow | null) {
+  if (antes) {
+    await atualizarViaServiceRole("digest_config", "id=eq.true", {
+      dia_semana: antes.dia_semana,
+      cadencia: antes.cadencia,
+      destinatarios: antes.destinatarios as Record<string, unknown>,
+      secoes: antes.secoes as Record<string, unknown>,
+    });
+  } else {
+    await limparViaServiceRole("digest_config", "id=eq.true");
+  }
+}
+
+test.describe("digest_config — RLS coord-only", () => {
+  test("mentor não lê nem escreve a config", async ({ page }) => {
+    const antes = await snapshotConfig();
+    const { apiKey, token } = await credenciaisDaSessao(
+      page,
+      MENTOR_EMAIL,
+      SENHA
+    );
+    const req = (method: "GET" | "POST" | "PATCH", corpo?: unknown) =>
+      page.request.fetch(`${SUPA_URL}/rest/v1/digest_config?id=eq.true`, {
+        method,
+        headers: {
+          apikey: apiKey,
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+          Prefer: "return=representation",
+        },
+        data: corpo,
+      });
+
+    // SELECT filtrado pela using(): sem coord, a tabela é invisível — []
+    const sel = await req("GET");
+    expect(sel.status()).toBe(200);
+    expect(await sel.json()).toEqual([]);
+
+    // INSERT na singleton: o with check recusa antes do conflito de PK
+    const ins = await req("POST", {
+      id: true,
+      cadencia: "desligado",
+    });
+    expect(ins.status()).not.toBe(201);
+    expect((await ins.json()).code).toBeTruthy();
+
+    // UPDATE só alcança row visível: 200 mas [] — nada tocado
+    const upd = await req("PATCH", { cadencia: "desligado" });
+    expect(upd.status()).toBe(200);
+    expect(await upd.json()).toEqual([]);
+
+    // prova final no banco: o estado é exatamente o de antes
+    expect(await snapshotConfig()).toEqual(antes);
+  });
+
+  test("coord salva pelo card e a config persiste na row", async ({ page }) => {
+    const antes = await snapshotConfig();
+    try {
+      await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
+      await page.goto("/relatorios/operacionais?aba=visao");
+      await expect(
+        page.getByRole("heading", { name: "Configuração do envio" })
+      ).toBeVisible();
+
+      // troca a frequência — #digest-cadencia é o SelectTrigger (Base UI)
+      await page.locator("#digest-cadencia").click();
+      await page
+        .getByRole("option", { name: "A cada duas semanas" })
+        .click();
+      await page
+        .getByRole("button", { name: /Salvar configuração/ })
+        .click();
+      await expect(
+        page.getByText(/Configuração salva/)
+      ).toBeVisible({ timeout: 15_000 });
+
+      const depois = await snapshotConfig();
+      expect(depois?.cadencia).toBe("quinzenal");
+      // auditoria: quem salvou foi a coord do fixture
+      expect(depois?.atualizado_por).toBeTruthy();
+    } finally {
+      await restaurarConfig(antes);
+    }
   });
 });
 

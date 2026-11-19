@@ -283,6 +283,18 @@ valendo para Popover×Sheet — isso é estrutura, não tamanho).
   e-mail válido), action `{ ok }|{ error }`.
 - Demo: card read-only com a config default.
 
+**As-built (REALIZA-451, migration `0210`):** audit cols saíram como
+`atualizado_em`/`atualizado_por` (FK `profiles`, convenção da `0148`);
+`quinzenal` implementado como janela de 14d ancorada no último envio com
+sucesso (a memória de `emails_enviados` é a régua — não calendário);
+`papeis` configuráveis limitados a `PAPEIS_DIGEST` (coordenação +
+supervisão) na validação — o normalizador aceita qualquer `AppRole`
+válida guardada; público zerado é config inválida (a action rejeita e a
+normalização cai no padrão — quem quer pausar usa `desligado`); o gate
+da página usa `temPapel` (papel efetivo), mesma régua da action e da
+policy `has_papel`; ledger ganhou `audiencia` derivada da config
+(`lista_direta` marca pessoas avulsas/e-mails explícitos).
+
 ## Matriz de autorização (write-paths novos)
 
 | Operação | coordenação | supervisor | mentor_dpp | mentor_especialista | mentorado | anon |
