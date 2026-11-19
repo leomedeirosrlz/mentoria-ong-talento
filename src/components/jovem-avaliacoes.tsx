@@ -88,7 +88,7 @@ export function AvaliarPendenteButton({
         <DialogContent size="md">
           <DialogHeader>
             <DialogTitle>
-              {pendente.numero}º encontro: como foi?
+              {pendente.rotulo ?? `${pendente.numero}º encontro`}: como foi?
             </DialogTitle>
             <DialogDescription>
               1 minuto. {privacidadeAvaliacao(pendente.trilha)}
@@ -137,9 +137,11 @@ export function VerAvaliacaoButton({
         <DialogContent size="xl">
           <DialogHeader>
             <DialogTitle>
-              {avaliacao.encontro?.numero
-                ? `Sua avaliação do ${avaliacao.encontro.numero}º encontro`
-                : "Sua avaliação"}
+              {avaliacao.rotulo
+                ? `Sua avaliação: ${avaliacao.rotulo}`
+                : avaliacao.encontro?.numero
+                  ? `Sua avaliação do ${avaliacao.encontro.numero}º encontro`
+                  : "Sua avaliação"}
             </DialogTitle>
             <DialogDescription>
               Enviada em {formatDateTime(avaliacao.created_at)}
@@ -407,10 +409,10 @@ function DetalheAvaliacao({ a }: { a: AvaliacaoFeita }) {
             />
             <span>
               <span className="font-medium">
-                Meu mentor pode ler esta avaliação
+                Meu mentor pode ler esta avaliação:
               </span>{" "}
               <span className="text-muted-foreground">
-                : normalmente ele só vê a média de vocês. Com a chave
+                normalmente ele só vê a média de vocês. Com a chave
                 ligada, ele lê esta resposta inteira.
               </span>
             </span>

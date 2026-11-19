@@ -535,8 +535,8 @@ export function RetrospectivaJornada({
                 <RodaSvg roda={rodaUnica} className="max-w-[280px]" />
                 <p className="mt-1 text-xs text-muted-foreground">
                   {rodaFormal
-                    ? "Aplicação formal — a leitura inicial não chegou a ser respondida."
-                    : "Leitura inicial — a aplicação formal ainda não aconteceu."}
+                    ? "Aplicação formal: a leitura inicial não chegou a ser respondida."
+                    : "Leitura inicial: a aplicação formal ainda não aconteceu."}
                 </p>
               </div>
             )}

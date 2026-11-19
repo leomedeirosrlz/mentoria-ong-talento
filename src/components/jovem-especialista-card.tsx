@@ -58,7 +58,7 @@ export function JovemEspecialistaCard({
   const badge: { texto: string; cls: string } | null =
     variante === "sua"
       ? {
-          texto: "Sua especialista",
+          texto: "Seu especialista",
           cls: "border-[var(--ok)]/50 text-[var(--ok-text)]",
         }
       : variante === "andamento"
