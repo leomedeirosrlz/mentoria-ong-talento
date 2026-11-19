@@ -5,6 +5,12 @@ name: supabase-images
 # o CLI do Supabase sobe de versão e semanalmente como rede de segurança.
 on:
   workflow_dispatch:
+  # roda no commit empurrado (não depende da default) quando a lista ou o
+  # próprio workflow mudam; é também como o espelho é populado num push
+  push:
+    paths:
+      - ".github/supabase-images.txt"
+      - ".github/workflows/supabase-images.yml"
   schedule:
     - cron: "0 4 * * 1"
 
