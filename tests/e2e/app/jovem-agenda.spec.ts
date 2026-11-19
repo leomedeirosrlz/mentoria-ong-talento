@@ -89,84 +89,87 @@ async function sinosDe(
 }
 
 /** Filhos da 0071 primeiro — avaliacoes_encontro e avaliacao_links têm FK
- *  NO ACTION pra encontros; apagar o pai antes dá 409. */
+ *  NO ACTION pra encontros; apagar o pai antes dá 409. Os dois filhos são
+ *  independentes entre si — em paralelo pra caber no hook em staging. */
 async function apagarEncontros(ids: Iterable<string>) {
   const lista = [...ids];
   if (!lista.length) return;
   const csv = lista.join(",");
-  await limparViaServiceRole("avaliacoes_encontro", `encontro_id=in.(${csv})`);
-  await limparViaServiceRole("avaliacao_links", `encontro_id=in.(${csv})`);
+  await Promise.all([
+    limparViaServiceRole("avaliacoes_encontro", `encontro_id=in.(${csv})`),
+    limparViaServiceRole("avaliacao_links", `encontro_id=in.(${csv})`),
+  ]);
   await limparViaServiceRole("encontros", `id=in.(${csv})`);
 }
 
 /** Devolve a dupla a EXATAMENTE as duas fixtures: encontros criados pelos
  *  testes saem (o filtro é por exclusão — cobre os feitos pela UI, sem id
  *  conhecido), a d1/d2 são re-criadas/re-carimbadas quando preciso e os
- *  sinos de agenda zeram depois de qualquer insert (os do trigger). */
+ *  sinos de agenda zeram depois de qualquer insert (os do trigger).
+ *  Os blocos independentes correm em paralelo: em staging cada chamada
+ *  PostgREST serial soma segundos e o hook comia o teto de 60s do teste. */
 async function convergirPiso() {
-  const restos = await buscarViaServiceRole<{ id: string }[]>(
-    "encontros",
-    `select=id&dupla_id=eq.${DUPLA_ID}&id=not.in.(${FIXTURES.join(",")})`
-  );
-  await apagarEncontros(restos.map((r) => r.id));
-
-  const [d1] = await buscarViaServiceRole<{ id: string }[]>(
-    "encontros",
-    `select=id&id=eq.${IDS.encontroFixture}`
-  );
-  const futura3d = new Date(Date.now() + 3 * 86400e3).toISOString();
-  if (d1) {
-    // re-carimbo do seed — agendado→agendado não esbarra no guard 0043
-    await atualizarViaServiceRole("encontros", `id=eq.${IDS.encontroFixture}`, {
-      data_hora: futura3d,
-      status: "agendado",
-    });
-  } else {
-    // a home do mentor e a seção Próximos dependem de um agendado futuro
-    await inserirViaServiceRole("encontros", {
-      id: IDS.encontroFixture,
-      dupla_id: DUPLA_ID,
-      numero: 8,
-      data_hora: futura3d,
-      status: "agendado",
-    });
-  }
-
-  const [d2] = await buscarViaServiceRole<{ id: string }[]>(
-    "encontros",
-    `select=id&id=eq.${IDS.encontroAvaliacao}`
-  );
-  const passada2d = new Date(Date.now() - 2 * 86400e3).toISOString();
-  if (d2) {
-    // update de data em realizado passa — o guard só trava mudança de status
-    await atualizarViaServiceRole(
+  const [restos, existentes] = await Promise.all([
+    buscarViaServiceRole<{ id: string }[]>(
       "encontros",
-      `id=eq.${IDS.encontroAvaliacao}`,
-      { data_hora: passada2d, realizado_em: passada2d }
-    );
-  } else {
-    // o insert dispara o trigger 0071 que minta o avaliacao_links da fixture
-    await inserirViaServiceRole("encontros", {
-      id: IDS.encontroAvaliacao,
-      dupla_id: DUPLA_ID,
-      numero: 16,
-      data_hora: passada2d,
-      realizado_em: passada2d,
-      status: "realizado",
-    });
-  }
+      `select=id&dupla_id=eq.${DUPLA_ID}&id=not.in.(${FIXTURES.join(",")})`
+    ),
+    buscarViaServiceRole<{ id: string }[]>(
+      "encontros",
+      `select=id&id=in.(${FIXTURES.join(",")})`
+    ),
+  ]);
+  const tem = new Set(existentes.map((e) => e.id));
+  const futura3d = new Date(Date.now() + 3 * 86400e3).toISOString();
+  const passada2d = new Date(Date.now() - 2 * 86400e3).toISOString();
+
+  await Promise.all([
+    apagarEncontros(restos.map((r) => r.id)),
+    tem.has(IDS.encontroFixture)
+      ? // re-carimbo do seed — agendado→agendado não esbarra no guard 0043
+        atualizarViaServiceRole("encontros", `id=eq.${IDS.encontroFixture}`, {
+          data_hora: futura3d,
+          status: "agendado",
+        })
+      : // a home do mentor e a seção Próximos dependem de um agendado futuro
+        inserirViaServiceRole("encontros", {
+          id: IDS.encontroFixture,
+          dupla_id: DUPLA_ID,
+          numero: 8,
+          data_hora: futura3d,
+          status: "agendado",
+        }),
+    tem.has(IDS.encontroAvaliacao)
+      ? // update de data em realizado passa — o guard só trava status
+        atualizarViaServiceRole(
+          "encontros",
+          `id=eq.${IDS.encontroAvaliacao}`,
+          { data_hora: passada2d, realizado_em: passada2d }
+        )
+      : // o insert dispara o trigger 0071 que minta o avaliacao_links
+        inserirViaServiceRole("encontros", {
+          id: IDS.encontroAvaliacao,
+          dupla_id: DUPLA_ID,
+          numero: 16,
+          data_hora: passada2d,
+          realizado_em: passada2d,
+          status: "realizado",
+        }),
+  ]);
 
   // DEPOIS dos inserts: eles disparam o trigger (o "marcado" das fixtures,
-  // creditado à coordenação) — o piso de sino tem que cobrir isso também
-  await limparViaServiceRole(
-    "notificacoes",
-    `profile_id=in.(${IDS.mentorProfile},${IDS.jovemProfile})&tipo=in.(${TIPOS_AGENDA.join(",")})`
-  );
-
-  // o d2 é o ÚLTIMO encontro do cronograma — re-criá-lo dispara a 0102 e
-  // a dupla acorda 'concluida' (a RPC de agenda recusa e o CTA some).
-  // Devolve o piso de sempre: status ativa, sem encerramento nem sinos.
-  await convergirDuplaAtiva(DUPLA_ID);
+  // creditado à coordenação) — o piso de sino tem que cobrir isso também.
+  // E o d2 é o ÚLTIMO encontro do cronograma — re-criá-lo dispara a 0102
+  // e a dupla acorda 'concluida' (a RPC de agenda recusa e o CTA some):
+  // convergirDuplaAtiva devolve status ativa, sem encerramento nem sinos.
+  // As duas limpezas tocam linhas diferentes de tabelas diferentes.
+  await Promise.all([
+    limparViaServiceRole(
+      "notificacoes",
+      `profile_id=in.(${IDS.mentorProfile},${IDS.jovemProfile})&tipo=in.(${TIPOS_AGENDA.join(",")})`
+    ),
+    convergirDuplaAtiva(DUPLA_ID),
+  ]);
 }
 
 /** Agendado direto no banco — piso dos fluxos que não exercitam o agendar
@@ -482,8 +485,11 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
           .click({ timeout: 5_000 }),
       () => avaliar.isVisible()
     );
+    // a confirmação durável é o badge da linha — o toast nasce antes do
+    // router.refresh() e expira nele em staging frio (por isso a convenção
+    // do spec de confirmar no estado final, não no passageiro)
     await expect(
-      page.getByText("Encontro confirmado. Conta pra gente como foi.")
+      linha(historico, 7).getByText("Aconteceu", { exact: true })
     ).toBeVisible({ timeout: 15_000 });
 
     const [row] = await buscarViaServiceRole<

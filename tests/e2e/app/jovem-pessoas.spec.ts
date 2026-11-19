@@ -78,19 +78,21 @@ test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app")
  *  whatsapp voltam ao lugar a cada spec — um run morto com o toggle
  *  ligado vazaria "compartilhado" pro teste da contagem zero. */
 async function restaurarColega() {
-  const [ficha] = await buscarViaServiceRole<{ id: string }[]>(
-    "mentorados",
-    `select=id&id=eq.${IDS.mentoradoSemDpp}`
-  );
-  if (!ficha) {
-    await inserirViaServiceRole("mentorados", {
-      id: IDS.mentoradoSemDpp,
-      nome: "Jovem E2E Sem DPP",
-      profile_id: IDS.jovem2Profile,
-      whatsapp: JOVEM2_WHATSAPP,
-      contato_compartilhado: false,
-    });
-  } else {
+  // pares independentes em paralelo — em staging cada ida serial ao
+  // PostgREST soma segundos e o hook comia o teto de 60s do teste
+  const [ficha, dupla] = await Promise.all([
+    buscarViaServiceRole<{ id: string }[]>(
+      "mentorados",
+      `select=id&id=eq.${IDS.mentoradoSemDpp}`
+    ),
+    buscarViaServiceRole<{ id: string }[]>(
+      "duplas",
+      `select=id&id=eq.${IDS.duplaColega}`
+    ),
+  ]);
+  // a ficha sai na frente SOZINHA: o insert da dupla tem FK mentorado_id
+  // — em run com estado zerado ela precisa existir antes do paralelo
+  if (ficha) {
     await atualizarViaServiceRole(
       "mentorados",
       `id=eq.${IDS.mentoradoSemDpp}`,
@@ -101,49 +103,53 @@ async function restaurarColega() {
         whatsapp: JOVEM2_WHATSAPP,
       }
     );
-  }
-  const [dupla] = await buscarViaServiceRole<{ id: string }[]>(
-    "duplas",
-    `select=id&id=eq.${IDS.duplaColega}`
-  );
-  if (!dupla) {
-    // insert espelha o seed (status pausada na Turma E2E, trilha dpp) +
-    // o supervisor_id que o bloco do supervisor costura depois — a dupla
-    // renasce já no estado final convergido. O insert dispara
-    // duplas_jornada_autoemit, mesmo efeito do seed: links do enc. 1
-    await inserirViaServiceRole("duplas", {
-      id: IDS.duplaColega,
-      mentor_id: IDS.mentorColega,
-      mentorado_id: IDS.mentoradoSemDpp,
-      supervisor_id: IDS.supProfile,
-      turma: TURMA_E2E,
-      cronograma_id: IDS.cronogramaE2e,
-      trilha: "dpp",
-      status: "pausada",
-      iniciada_em: "2026-09-08",
-    });
   } else {
-    await atualizarViaServiceRole("duplas", `id=eq.${IDS.duplaColega}`, {
-      status: "pausada",
-      encerrada_em: null,
-      motivo_encerramento: null,
-      turma: TURMA_E2E,
-      mentor_id: IDS.mentorColega,
-      mentorado_id: IDS.mentoradoSemDpp,
-      supervisor_id: IDS.supProfile,
-      trilha: "dpp",
+    await inserirViaServiceRole("mentorados", {
+      id: IDS.mentoradoSemDpp,
+      nome: "Jovem E2E Sem DPP",
+      profile_id: IDS.jovem2Profile,
+      whatsapp: JOVEM2_WHATSAPP,
+      contato_compartilhado: false,
     });
   }
-  // o join da mentorados_turma casa pela turma das duplas do JOVEM —
-  // qualquer uma degradada esvazia o diretório de colegas inteiro
-  await atualizarViaServiceRole(
-    "duplas",
-    `id=in.(${IDS.duplaDpp},${IDS.duplaEsp})`,
-    { turma: TURMA_E2E }
-  );
-  // a dupla do jovem tem que estar ativa — 'concluida' costura o selo
-  // "mentoria concluída" no link do mentor e o nome acessível muda
-  await convergirDuplaAtiva(IDS.duplaDpp);
+  await Promise.all([
+    dupla
+      ? atualizarViaServiceRole("duplas", `id=eq.${IDS.duplaColega}`, {
+          status: "pausada",
+          encerrada_em: null,
+          motivo_encerramento: null,
+          turma: TURMA_E2E,
+          mentor_id: IDS.mentorColega,
+          mentorado_id: IDS.mentoradoSemDpp,
+          supervisor_id: IDS.supProfile,
+          trilha: "dpp",
+        })
+      : // insert espelha o seed (status pausada na Turma E2E, trilha dpp) +
+        // o supervisor_id que o bloco do supervisor costura depois — a dupla
+        // renasce já no estado final convergido. O insert dispara
+        // duplas_jornada_autoemit, mesmo efeito do seed: links do enc. 1
+        inserirViaServiceRole("duplas", {
+          id: IDS.duplaColega,
+          mentor_id: IDS.mentorColega,
+          mentorado_id: IDS.mentoradoSemDpp,
+          supervisor_id: IDS.supProfile,
+          turma: TURMA_E2E,
+          cronograma_id: IDS.cronogramaE2e,
+          trilha: "dpp",
+          status: "pausada",
+          iniciada_em: "2026-09-08",
+        }),
+    // o join da mentorados_turma casa pela turma das duplas do JOVEM —
+    // qualquer uma degradada esvazia o diretório de colegas inteiro
+    atualizarViaServiceRole(
+      "duplas",
+      `id=in.(${IDS.duplaDpp},${IDS.duplaEsp})`,
+      { turma: TURMA_E2E }
+    ),
+    // a dupla do jovem tem que estar ativa — 'concluida' costura o selo
+    // "mentoria concluída" no link do mentor e o nome acessível muda
+    convergirDuplaAtiva(IDS.duplaDpp),
+  ]);
 }
 
 test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
@@ -192,7 +198,9 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
     await expect(
       page.getByRole("heading", { name: "Mentor E2E", level: 1 })
     ).toBeVisible();
-    await expect(page.getByText("Seu mentor DPP")).toBeVisible();
+    // o badge do vínculo perdeu o sufixo de trilha no passe de copy —
+    // agora é só "Seu mentor" (rotuloContato do perfil)
+    await expect(page.getByText("Seu mentor", { exact: true })).toBeVisible();
     await expect(
       page.getByRole("link", { name: /e2e-mentor@realiza\.test/ })
     ).toBeVisible();
@@ -227,9 +235,10 @@ test.describe("diretório do jovem (REALIZA-113 / 0076)", () => {
       page.getByRole("heading", { name: "Jovem E2E Sem DPP", level: 1 })
     ).toBeVisible();
     await expect(page.getByText("Colega da turma")).toBeVisible();
-    // opt-in fechado: estado honesto, nunca um wa.me vazio
+    // opt-in fechado: estado honesto, nunca um wa.me vazio (o passe de
+    // copy tirou o "Ele" do início — a frase hoje abre com maiúscula)
     await expect(
-      page.getByText(/ainda não compartilhou o contato/)
+      page.getByText(/ainda não compartilhou o contato/i)
     ).toBeVisible();
     await expect(page.getByRole("link", { name: /WhatsApp/ })).toHaveCount(0);
 

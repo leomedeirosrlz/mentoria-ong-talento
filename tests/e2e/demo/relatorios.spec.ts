@@ -272,8 +272,10 @@ test.describe("demo — seções acionáveis", () => {
     await entrarNaDemo(page, "coordenacao");
     await page.goto("/relatorios/operacionais?aba=formularios");
 
+    // o título da seção virou "Taxa de resposta de formulários" no passe
+    // de copy — o h2 inteiro, não só a palavra
     await expect(
-      page.getByRole("heading", { name: /Formulários/ })
+      page.getByRole("heading", { name: /taxa de resposta de formulários/i })
     ).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Taxa de resposta", exact: true })

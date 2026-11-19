@@ -210,15 +210,26 @@ export function appEnvOk() {
   );
 }
 
-/** Fetch com retentativa curta pra 5xx — o PostgREST/GoTrue do staging tem
- *  janelas de 503 (cold start do pooler, redeploy) que derrubavam pisos e
- *  cleanups inteiros. 4xx volta na hora: é erro do spec, não do backend. */
+/** Fetch com retentativa curta pra 5xx E erro de rede — o PostgREST/GoTrue
+ *  do staging tem janelas de 503 e quedas do pooler (aceita a conexão e
+ *  nunca responde) que derrubavam pisos e cleanups inteiros. O timeout por
+ *  tentativa é o que defende: sem ele UMA chamada pendurada comia os 60s
+ *  do hook. 4xx volta na hora: é erro do spec, não do backend. */
 async function fetchRest(url: string, init: RequestInit): Promise<Response> {
-  let res = await fetch(url, init);
-  for (let i = 1; res.status >= 500 && i < 3; i++) {
-    await new Promise((r) => setTimeout(r, 500 * i));
-    res = await fetch(url, init);
+  let res: Response | null = null;
+  for (let i = 0; i < 3; i++) {
+    if (i) await new Promise((r) => setTimeout(r, 500 * i));
+    try {
+      res = await fetch(url, {
+        ...init,
+        signal: AbortSignal.timeout(12_000),
+      });
+      if (res.status < 500) return res;
+    } catch {
+      // socket morto/timeout abortado — transitório como o 503, retenta
+    }
   }
+  if (!res) throw new Error(`fetchRest sem resposta: ${url}`);
   return res;
 }
 
@@ -250,35 +261,46 @@ export async function limparEncontrosDaDupla(duplaId: string): Promise<void> {
   if (encs.length === 0) return;
   const lista = encs.map((e) => e.id).join(",");
   // 0084: chamados apontam pra registro/avaliação com SET NULL — saem
-  // antes dos filhos pra não sobrar chamado órfão no staging
-  const regs = await buscarViaServiceRole<{ id: string }[]>(
-    "registros",
-    `select=id&encontro_id=in.(${lista})`
-  );
-  if (regs.length) {
-    await limparViaServiceRole(
-      "chamados",
-      `registro_id=in.(${regs.map((r) => r.id).join(",")})`
-    );
-  }
-  const avals = await buscarViaServiceRole<{ id: string }[]>(
-    "avaliacoes_encontro",
-    `select=id&encontro_id=in.(${lista})`
-  );
-  if (avals.length) {
-    await limparViaServiceRole(
-      "chamados",
-      `avaliacao_id=in.(${avals.map((a) => a.id).join(",")})`
-    );
-  }
-  await limparViaServiceRole(
-    "avaliacoes_encontro",
-    `encontro_id=in.(${lista})`
-  );
-  await limparViaServiceRole(
-    "avaliacao_links",
-    `encontro_id=in.(${lista})`
-  );
+  // antes dos filhos pra não sobrar chamado órfão no staging. Os selects
+  // de filhos são independentes; os deletes seguintes também — em
+  // paralelo pra caber no hook (PostgREST de staging soma por ida).
+  const [regs, avals] = await Promise.all([
+    buscarViaServiceRole<{ id: string }[]>(
+      "registros",
+      `select=id&encontro_id=in.(${lista})`
+    ),
+    buscarViaServiceRole<{ id: string }[]>(
+      "avaliacoes_encontro",
+      `select=id&encontro_id=in.(${lista})`
+    ),
+  ]);
+  // fase 1: chamados morrem antes das origens (a FK é SET NULL — apagar
+  // a avaliação/registro primeiro deixaria a linha órfã); fase 2: as
+  // origens em si, tabelas independentes em paralelo
+  await Promise.all([
+    regs.length
+      ? limparViaServiceRole(
+          "chamados",
+          `registro_id=in.(${regs.map((r) => r.id).join(",")})`
+        )
+      : Promise.resolve(),
+    avals.length
+      ? limparViaServiceRole(
+          "chamados",
+          `avaliacao_id=in.(${avals.map((a) => a.id).join(",")})`
+        )
+      : Promise.resolve(),
+  ]);
+  await Promise.all([
+    limparViaServiceRole(
+      "avaliacoes_encontro",
+      `encontro_id=in.(${lista})`
+    ),
+    limparViaServiceRole(
+      "avaliacao_links",
+      `encontro_id=in.(${lista})`
+    ),
+  ]);
   await limparViaServiceRole("encontros", `id=in.(${lista})`);
 }
 
@@ -291,19 +313,23 @@ export async function limparEncontrosDaDupla(duplaId: string): Promise<void> {
  *  Todo piso que recria a âncora — e todo spec que depende da dupla —
  *  chama isto no final: devolve o status e desfaz o que o trigger mintou. */
 export async function convergirDuplaAtiva(duplaId: string): Promise<void> {
-  await atualizarViaServiceRole("duplas", `id=eq.${duplaId}`, {
-    status: "ativa",
-    encerrada_em: null,
-    motivo_encerramento: null,
-  });
-  await limparViaServiceRole(
-    "encerramentos",
-    `dupla_id=eq.${duplaId}`
-  );
-  await limparViaServiceRole(
-    "notificacoes",
-    `tipo=in.(dupla_formada,dupla_reta_final)&href=eq./duplas/${duplaId}`
-  );
+  // as três mexem em tabelas independentes — em paralelo corta duas
+  // latências de PostgREST (staging frio somava o teto do hook nos pisos)
+  await Promise.all([
+    atualizarViaServiceRole("duplas", `id=eq.${duplaId}`, {
+      status: "ativa",
+      encerrada_em: null,
+      motivo_encerramento: null,
+    }),
+    limparViaServiceRole(
+      "encerramentos",
+      `dupla_id=eq.${duplaId}`
+    ),
+    limparViaServiceRole(
+      "notificacoes",
+      `tipo=in.(dupla_formada,dupla_reta_final)&href=eq./duplas/${duplaId}`
+    ),
+  ]);
 }
 
 /** DELETE de duplas com TODOS os filhos NO ACTION, não só encontros —
