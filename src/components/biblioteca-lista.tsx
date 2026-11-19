@@ -75,7 +75,7 @@ function Linha({
   indice: number;
   /** busca ativa — marca os trechos casados no título e na descrição */
   marca?: string;
-  /** leitura já registrada (0196) — selo discreto na meta da linha */
+  /** leitura já registrada (0196) — estado do item inteiro + selo "lido" */
   lido?: boolean;
 }) {
   const Icone = TIPO_ICONE[m.tipo];
@@ -98,11 +98,24 @@ function Linha({
 
   const corpo = (
     <>
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
+      <span
+        className={cn(
+          "grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground",
+          lido && "opacity-60"
+        )}
+      >
         <Icone size={17} aria-hidden />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium">
+      <span className={cn("min-w-0 flex-1", lido && "opacity-60")}>
+        {/* lido é estado do item inteiro (REALIZA-439): título sublinhado +
+            conteúdo com opacidade — nunca só cor nem só o selo na meta */}
+        <span
+          className={cn(
+            "block text-sm font-medium",
+            lido &&
+              "underline decoration-muted-foreground/40 underline-offset-2"
+          )}
+        >
           {marca ? <HighlightText texto={m.titulo} query={marca} /> : m.titulo}
         </span>
         {m.descricao && (

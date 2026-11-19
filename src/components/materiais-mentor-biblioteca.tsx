@@ -2,7 +2,6 @@ import type { CSSProperties } from "react";
 import {
   ArrowSquareOut,
   BookOpen,
-  CaretDown,
   Check,
   FileText,
   LinkSimple,
@@ -11,6 +10,7 @@ import {
 import { formatDiaMes, formatDiaSemana, linkSeguro } from "@/lib/ciclo";
 import { hrefMaterial, refDoMaterial } from "@/lib/materiais";
 import { LinkComLeitura } from "@/components/material-leitura";
+import { ExpandirTexto } from "@/components/expandir-texto";
 import { guiaDoEncontro, sistemaDoDoc } from "@/lib/como-conduzir";
 import type { Material } from "@/lib/types";
 import { Badge } from "@/components/ui/badge";
@@ -81,11 +81,26 @@ function LinhaMaterial({ m, lido = false }: { m: Material; lido?: boolean }) {
   const href = hrefMaterial(m);
   const conteudo = (
     <>
-      <span className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground">
+      <span
+        className={cn(
+          "grid size-9 shrink-0 place-items-center rounded-lg bg-muted/70 text-muted-foreground",
+          lido && "opacity-60"
+        )}
+      >
         <Icone size={17} aria-hidden />
       </span>
-      <span className="min-w-0 flex-1">
-        <span className="block text-sm font-medium">{m.titulo}</span>
+      <span className={cn("min-w-0 flex-1", lido && "opacity-60")}>
+        {/* lido é estado do item inteiro (REALIZA-439): título sublinhado +
+            conteúdo com opacidade — nunca só cor nem só o check do trilho */}
+        <span
+          className={cn(
+            "block text-sm font-medium",
+            lido &&
+              "underline decoration-muted-foreground/40 underline-offset-2"
+          )}
+        >
+          {m.titulo}
+        </span>
         {m.descricao && (
           <span className="mt-0.5 line-clamp-2 block text-xs text-muted-foreground">
             {m.descricao}
@@ -151,12 +166,10 @@ function LinhaMaterial({ m, lido = false }: { m: Material; lido?: boolean }) {
 /** "Encontro desta semana" — card neutro com acento de jornada na borda
  *  (o amarelo é próximo passo, não banho de fundo: REALIZA-335), o "Como
  *  conduzir" do guia e os materiais do encontro como linhas clicáveis.
- *  O texto longo vai em <details>: a prévia de 3 linhas mora no summary
- *  (única parte visível fechado) e o texto INTEIRO no corpo — antes o
- *  corpo era vazio e o texto morava todo no summary, então o "dropdown"
- *  não tinha nada dentro. Texto curto sai como parágrafo, sem um toggle
- *  que abriria pro mesmo trecho. */
-const CONDUZIR_LIMITE = 240;
+ *  O "Ler tudo" é do ExpandirTexto (REALIZA-438): gate por linhas
+ *  renderizadas, controle no fim do bloco — texto que cabe na prévia de
+ *  3 linhas não ganha toggle (antes o gate era por caracteres e em tela
+ *  larga o clique só deslocava o mesmo texto). */
 
 function CardSemana({
   turma,
@@ -202,50 +215,14 @@ function CardSemana({
           Encontro {encontro.numero}
           {encontro.titulo && ` · ${encontro.titulo}`}
         </h2>
-        {conduzir &&
-          (conduzir.length > CONDUZIR_LIMITE ? (
-            <details className="group/cc mt-1.5">
-              <summary className="cursor-pointer list-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                {/* prévia truncada — a única parte do details visível
-                    fechado; aria-hidden pra não virar nome acessível */}
-                <span
-                  aria-hidden
-                  className="line-clamp-3 text-sm leading-relaxed text-muted-foreground group-open/cc:hidden"
-                >
-                  <strong className="font-semibold text-foreground">
-                    Como conduzir:
-                  </strong>{" "}
-                  {conduzir}
-                </span>
-                <span className="mt-1 inline-flex min-h-8 items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground">
-                  <span className="group-open/cc:hidden">Ler tudo</span>
-                  <span className="hidden group-open/cc:inline">
-                    Mostrar menos
-                  </span>
-                  <CaretDown
-                    size={12}
-                    aria-hidden
-                    className="transition-transform group-open/cc:rotate-180"
-                  />
-                </span>
-              </summary>
-              {/* corpo real do dropdown — fechado o browser nem renderiza;
-                  o texto completo mora aqui, não no summary */}
-              <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-                <strong className="font-semibold text-foreground">
-                  Como conduzir:
-                </strong>{" "}
-                {conduzir}
-              </p>
-            </details>
-          ) : (
-            <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
-              <strong className="font-semibold text-foreground">
-                Como conduzir:
-              </strong>{" "}
-              {conduzir}
-            </p>
-          ))}
+        {conduzir && (
+          <ExpandirTexto className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+            <strong className="font-semibold text-foreground">
+              Como conduzir:
+            </strong>{" "}
+            {conduzir}
+          </ExpandirTexto>
+        )}
       </div>
       <div className="border-t border-border/60">
         {itens.length > 0 ? (
