@@ -350,8 +350,10 @@ describe("editarCampoPessoaCore — allowlist", () => {
     }
   );
 
-  it("'notas' só existe em mentorados — em profiles recusa", async () => {
-    const { supabase, escritas } = opts({ profiles: [{ id: UUID }] });
+  // coluna órfã da anamnese (REALIZA-384): saiu da allowlist das duas
+  // tabelas — a tool não alimenta mais um campo que nenhuma UI lê
+  it.each(["profiles", "mentorados"])("'notas' recusa em %s", async (tabela) => {
+    const { supabase, escritas } = opts({ [tabela]: [{ id: UUID }] });
     const r = await editarCampoPessoaCore(supabase, COORD, {
       pessoa_id: UUID,
       campo: "notas",
@@ -387,24 +389,18 @@ describe("editarCampoPessoaCore — allowlist", () => {
     expect(escritas).toHaveLength(0);
   });
 
-  it("nome_social e notas em mentorados editam — a tabela resolve pelo id", async () => {
+  it("nome_social em mentorados edita — a tabela resolve pelo id", async () => {
     const { supabase, escritas } = opts({
       profiles: [],
       mentorados: [{ id: UUID }],
     });
-    const r1 = await editarCampoPessoaCore(supabase, COORD, {
+    const r = await editarCampoPessoaCore(supabase, COORD, {
       pessoa_id: UUID,
       campo: "nome_social",
       valor: "maria EDUARDA",
     });
-    expect(r1).toMatchObject({ ok: true, tabela: "mentorados", valor: "Maria Eduarda" });
-    const r2 = await editarCampoPessoaCore(supabase, COORD, {
-      pessoa_id: UUID,
-      campo: "notas",
-      valor: "  prefere contato de manhã  ",
-    });
-    expect(r2).toMatchObject({ ok: true, valor: "prefere contato de manhã" });
-    expect(escritas.map((e) => e.tabela)).toEqual(["mentorados", "mentorados"]);
+    expect(r).toMatchObject({ ok: true, tabela: "mentorados", valor: "Maria Eduarda" });
+    expect(escritas.map((e) => e.tabela)).toEqual(["mentorados"]);
   });
 });
 

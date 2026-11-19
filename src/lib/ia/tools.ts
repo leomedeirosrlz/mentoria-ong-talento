@@ -2110,12 +2110,12 @@ export const IA_TOOLS = {
   editar_campo_pessoa: {
     nome: "editar_campo_pessoa",
     descricao:
-      "Corrige um campo de cadastro de uma pessoa (profiles ou mentorados): whatsapp ou nome_social em qualquer uma; notas (observação interna) só em mentorados. Email, papel, dados civis e datas NÃO entram — têm fluxo próprio. pessoas_busca lista o pessoa_id." +
+      "Corrige um campo de cadastro de uma pessoa (profiles ou mentorados): whatsapp ou nome_social em qualquer uma. Email, papel, dados civis e datas NÃO entram — têm fluxo próprio. pessoas_busca lista o pessoa_id." +
       ESCRITA_DOC,
     schema: z
       .object({
         pessoa_id: z.uuid().describe("id da pessoa (uuid — pessoas_busca devolve)"),
-        campo: z.enum(["whatsapp", "nome_social", "notas"]),
+        campo: z.enum(["whatsapp", "nome_social"]),
         valor: z.string().max(10000).describe("novo valor do campo"),
       })
       .strict(),
