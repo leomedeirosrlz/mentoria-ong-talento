@@ -32,6 +32,7 @@ import {
   CampoNascimento,
   CampoPrefGenero,
   CampoUf,
+  SENTINEL_VAZIO,
   WizardFicha,
   type PassoFicha,
 } from "@/components/campos-pessoais";
@@ -73,6 +74,10 @@ export function MentoradoActions({
   const [promoverOpen, setPromoverOpen] = useState(false);
   const [interesses, setInteresses] = useState<string[]>(mentorado.interesses ?? []);
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(mentorado.disponibilidade ?? null);
+  // cidade/UF da ficha — controlados pro autofill do CEP (modo compacto
+  // do DadosCivisFields) alcançar o passo "Onde vive e origem"
+  const [cidade, setCidade] = useState(mentorado.cidade ?? "");
+  const [uf, setUf] = useState(mentorado.uf ?? "");
   const [pending, start] = useTransition();
   const router = useRouter();
   const primeiroNome = (mentorado.nome_social || mentorado.nome).split(" ")[0];
@@ -181,9 +186,18 @@ export function MentoradoActions({
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="em_cidade">Cidade</Label>
-              <Input id="em_cidade" name="cidade" maxLength={100} defaultValue={mentorado.cidade ?? ""} />
+              <Input
+                id="em_cidade"
+                name="cidade"
+                maxLength={100}
+                value={cidade}
+                onChange={(e) => setCidade(e.target.value)}
+              />
             </div>
-            <CampoUf defaultValue={mentorado.uf ?? ""} />
+            <CampoUf
+              value={uf}
+              onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -219,6 +233,10 @@ export function MentoradoActions({
           opcional
           compacto
           defaults={mentorado.dados_civis}
+          onEndereco={(e) => {
+            setCidade(e.cidade);
+            setUf(e.uf);
+          }}
         />
       ),
     },
@@ -400,6 +418,8 @@ export function MentoradoActions({
           if (o) {
             setInteresses(mentorado.interesses ?? []);
             setDisponibilidade(mentorado.disponibilidade ?? null);
+            setCidade(mentorado.cidade ?? "");
+            setUf(mentorado.uf ?? "");
           }
         }}
       >

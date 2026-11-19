@@ -1,15 +1,17 @@
-import { entrarNaDemo, expect, test } from "../helpers";
+import { agirComConfirma, entrarNaDemo, expect, test } from "../helpers";
 
 // REALIZA-37 — autofill de endereço por CEP no bloco de dados civis,
 // exercitado na página pública de assinatura em modo demo (prova que a
 // server action funciona sem sessão). `buscarCep` devolve o fixture fixo
 // (Rua das Flores / Jardim Brasil / São Paulo·SP) pra qualquer CEP de 8
 // dígitos; 00000-000 exercita o ramo "não encontrado". Determinístico e
-// sem rede externa — ViaCEP-down é QA manual (timeout 5s + hint).
+// sem rede externa — ViaCEP-down é QA manual (timeout 5s + status).
 //
-// O bloco compacto (sem cidade/UF — cadastro/wizards) é estrutural:
-// os inputs não existem, então "autofill não os cria" não precisa de
-// spec dedicada; o que muda aqui cobre os dois modos.
+// REALIZA-443 — em repouso não há texto fixo sob o CEP (só os estados de
+// busca falam, via aria-live) e no modo compacto (cadastro/wizards) o
+// autofill alimenta também os campos simples cidade/UF da ficha, que
+// vivem fora do bloco — exercitado no dialog Nova pessoa e no passo
+// "Sobre você" do onboarding, que tem CEP próprio fora do DadosCivisFields.
 
 const TOKEN_RICARDO = "de000000-0000-4000-8000-000000013318"; // uid(0x3406)
 
@@ -22,6 +24,8 @@ test.describe("demo — ViaCEP no cadastro de endereço", () => {
 
     const cep = page.locator("#cep");
     await expect(cep).toBeVisible();
+    // repouso sem texto fixo — a linha de status só existe depois da busca
+    await expect(page.locator("#cep_status")).toHaveCount(0);
     await cep.fill("01310-100");
 
     await expect(page.locator("#logradouro")).toHaveValue("Rua das Flores");
@@ -69,5 +73,114 @@ test.describe("demo — ViaCEP no cadastro de endereço", () => {
       "Endereço preenchido. Confira e ajuste se precisar."
     );
     await expect(page.locator("#uf")).toHaveValue("SP");
+  });
+
+  test("modo compacto: autofill alimenta cidade/UF da ficha (Nova pessoa)", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/pessoas");
+
+    await page.getByRole("button", { name: /Nova pessoa/ }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    // etapa 1 pede os obrigatórios pra navegação pra frente destravar
+    await dialog.locator("#nome").fill("Pessoa Teste CEP");
+    await dialog.locator("#email").fill("cep.teste@realiza.test");
+    await dialog
+      .getByRole("button", { name: "Etapa 5 de 7: Documentos (termo de adesão)" })
+      .click();
+
+    const cep = dialog.locator("#civis_cep");
+    await expect(cep).toBeVisible();
+    await expect(dialog.locator("#civis_cep_status")).toHaveCount(0);
+    await cep.fill("01310-100");
+
+    await expect(dialog.locator("#civis_cep_status")).toHaveText(
+      "Endereço preenchido. Confira e ajuste se precisar."
+    );
+    // cidade/UF moram no último passo, fora do bloco — o autofill chega lá
+    await expect(dialog.locator("#n_cidade")).toHaveValue("São Paulo");
+    await expect(dialog.locator('input[name="uf"]')).toHaveValue("SP");
+
+    // edição manual posterior vence: o valor editado é o que fica
+    await dialog
+      .getByRole("button", { name: "Etapa 7 de 7: Localização e perfil" })
+      .click();
+    await expect(dialog.locator("#n_cidade")).toBeEditable();
+    await dialog.locator("#n_cidade").fill("Osasco");
+    await expect(dialog.locator("#n_cidade")).toHaveValue("Osasco");
+    await expect(dialog.locator('input[name="uf"]')).toHaveValue("SP");
+  });
+
+  test("onboarding 'Sobre você': CEP preenche cidade/UF e edição manual vence", async ({
+    page,
+  }) => {
+    // o wizard de 1º acesso tem CEP próprio fora do DadosCivisFields —
+    // a busca (mesma máquina, useBuscaCep) escreve direto nos campos
+    // simples cidade/UF da ficha
+    await page.goto("/demo");
+    await page.getByRole("button", { name: /Mentor DPP/ }).click();
+
+    // "Sobre você — quem você é" é o passo 8 do mentor: 7 avanços de
+    // "Continuar". Clique pré-hidratação é no-op — cada avanço só conta
+    // quando o progressbar confirma (mesmo padrão do pularOnboarding)
+    for (let passo = 1; passo <= 7; passo++) {
+      const destino = page.getByRole("progressbar", {
+        name: new RegExp(`Passo ${passo + 1} de`),
+      });
+      await agirComConfirma(
+        () =>
+          page.getByRole("button", { name: /^(Continuar|Começar)$/ }).click(),
+        () => destino.isVisible().catch(() => false)
+      );
+    }
+    await expect(
+      page.getByRole("heading", { name: "Sobre você: quem você é" })
+    ).toBeVisible();
+
+    // a importação da coordenação trouxe os dados — o form abre colapsado
+    // atrás do "Editar"
+    await page.getByRole("button", { name: "Editar" }).click();
+
+    const cep = page.locator("#ob-cep");
+    await expect(cep).toBeVisible();
+    // repouso sem texto fixo — a linha de status só existe depois da busca
+    await expect(page.locator("#ob-cep_status")).toHaveCount(0);
+
+    // esvazia o que a importação trouxe pra provar que o preenchimento
+    // veio do ViaCEP (o fixture também devolve São Paulo/SP)
+    await page.locator("#ob-cidade").fill("");
+    await agirComConfirma(
+      () => page.getByRole("combobox", { name: /^UF/ }).click(),
+      () =>
+        page
+          .getByRole("option", { name: "Selecione" })
+          .isVisible()
+          .catch(() => false)
+    );
+    await page.getByRole("option", { name: "Selecione" }).click();
+    await expect(page.locator('input[name="uf"]')).toHaveValue("__nenhum");
+
+    await cep.fill("01310-100");
+    await expect(page.locator("#ob-cep_status")).toHaveText(
+      "Endereço preenchido. Confira e ajuste se precisar."
+    );
+    await expect(page.locator("#ob-cidade")).toHaveValue("São Paulo");
+    await expect(page.locator('input[name="uf"]')).toHaveValue("SP");
+
+    // edição manual posterior vence: o valor editado é o que fica
+    await page.locator("#ob-cidade").fill("Osasco");
+    await expect(page.locator("#ob-cidade")).toHaveValue("Osasco");
+
+    // CEP inexistente: aviso neutro e os campos seguem livres — o que foi
+    // editado à mão não some
+    await cep.fill("00000-000");
+    await expect(page.locator("#ob-cep_status")).toHaveText(
+      "CEP não encontrado. Preencha o endereço manualmente."
+    );
+    await expect(page.locator("#ob-cidade")).toHaveValue("Osasco");
+    await expect(page.locator("#ob-cidade")).toBeEditable();
   });
 });
