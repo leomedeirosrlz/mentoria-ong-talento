@@ -194,7 +194,7 @@ export async function extrairConteudo(file: File): Promise<ResultadoExtracao> {
           useSystemFonts: true,
         }).promise;
         if (doc.numPages > MAX_PAGINAS_PDF)
-          return { ok: false, erro: `O PDF tem ${doc.numPages} páginas — o limite por importação é ${MAX_PAGINAS_PDF}.` };
+          return { ok: false, erro: `O PDF tem ${doc.numPages} páginas: o limite por importação é ${MAX_PAGINAS_PDF}.` };
         const paginas: string[] = [];
         for (let p = 1; p <= doc.numPages; p++) {
           const page = await doc.getPage(p);
@@ -217,7 +217,7 @@ export async function extrairConteudo(file: File): Promise<ResultadoExtracao> {
       }
     }
   } catch {
-    return { ok: false, erro: "Não consegui ler esse arquivo — ele pode estar corrompido ou protegido por senha." };
+    return { ok: false, erro: "Não consegui ler esse arquivo: ele pode estar corrompido ou protegido por senha." };
   }
   return { ok: false, erro: "Formato não suportado." };
 }

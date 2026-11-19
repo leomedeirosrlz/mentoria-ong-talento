@@ -512,7 +512,7 @@ export function EncontroRow({
                 />
                 {lacunaAnterior != null && (
                   <span className="max-w-56 text-right text-[11px] leading-snug text-muted-foreground">
-                    o {lacunaAnterior}º ainda está pendente — você pode agendar
+                    o {lacunaAnterior}º ainda está pendente, mas você pode agendar
                     este mesmo assim
                   </span>
                 )}

@@ -268,7 +268,7 @@ export function SecaoAderencia({
               "Esperados",
               "Realizados",
               "Aderência",
-              "Semáforo",
+              "Situação",
               "Motivos",
             ]}
             linhas={linhas.map((l) => [

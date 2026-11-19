@@ -83,7 +83,7 @@ export async function agendarEncontroCore(
   // DPP without a schedule is invalid data — without a calendar the number
   // ceiling would be a lie; point at the fix instead of booking blind
   if (d.trilha !== "especialista" && !d.cronograma_id) {
-    return { error: "Essa dupla está sem cronograma — a coordenação vincula um na edição da dupla." };
+    return { error: "Essa dupla está sem cronograma. A coordenação vincula um na edição da dupla." };
   }
   const quando = parseDataHora(data_hora);
   if (!quando) return { error: "Confira a data." };
@@ -102,7 +102,7 @@ export async function agendarEncontroCore(
   if (d.trilha === "especialista" && !existente) {
     return {
       error:
-        "As sessões da trilha especialista nascem dos pedidos aceitos — combine com o jovem ou a coordenação.",
+        "As sessões da trilha especialista nascem dos pedidos aceitos. Combine com o jovem ou a coordenação.",
     };
   }
 
@@ -208,7 +208,7 @@ export async function marcarSaidaMentoradoCore(
   // the reason is the "why" the card and the list display — desistente
   // without it becomes mute data; concluído is exempt (the journey speaks)
   if (situacao === "desistente" && !motivoTxt) {
-    return { error: "Conte o motivo da saída — ele aparece na ficha e na lista." };
+    return { error: "Conte o motivo da saída: ele aparece na ficha e na lista." };
   }
   if (situacao !== "ativo") {
     const { data: vivas } = await supabase
@@ -220,7 +220,7 @@ export async function marcarSaidaMentoradoCore(
     if (vivas?.length) {
       return {
         error:
-          "Tem dupla em andamento — registre o encerramento na ficha da dupla antes de marcar a saída.",
+          "Tem dupla em andamento. Registre o encerramento na ficha da dupla antes de marcar a saída.",
         duplaId: vivas[0].id,
       };
     }
@@ -329,7 +329,7 @@ async function normalizarCampoPessoa(
         if (atual?.user_id) {
           return {
             error:
-              "Essa pessoa já entrou na plataforma — o e-mail de acesso só muda pelo perfil dela.",
+              "Essa pessoa já entrou na plataforma. O e-mail de acesso só muda pelo perfil dela.",
           };
         }
       }
@@ -344,7 +344,7 @@ async function normalizarCampoPessoa(
         if (atual?.profile_id) {
           return {
             error:
-              "Essa pessoa já entrou na plataforma — o e-mail de acesso só muda pelo perfil dela.",
+              "Essa pessoa já entrou na plataforma. O e-mail de acesso só muda pelo perfil dela.",
           };
         }
       }

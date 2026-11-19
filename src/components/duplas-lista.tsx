@@ -495,7 +495,7 @@ function ColunaOrdenavel({
       onClick={() => onCiclar(col)}
       // aria-sort só é válido em columnheader/rowheader — num <button> o
       // leitor ignora. O estado vai no nome acessível (a seta é aria-hidden)
-      aria-label={`Ordenar por ${dica} — ${ativa ? ORDEM_ROTULO[col][String(ordem!.dir) as "1" | "-1"] : "por prioridade"}`}
+      aria-label={`Ordenar por ${dica}: ${ativa ? ORDEM_ROTULO[col][String(ordem!.dir) as "1" | "-1"] : "por prioridade"}`}
       title={`Ordenar por ${dica}`}
       className="inline-flex w-fit cursor-pointer items-center gap-1 rounded-sm text-left uppercase tracking-[0.08em] transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
     >

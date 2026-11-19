@@ -267,7 +267,7 @@ export async function executarImportRegistros(linhas: LinhaReg[]) {
     const colide = vistos.get(chave);
     if (colide != null) {
       puladas.push(
-        `Linha ${l.n}: mesma dupla e nº da linha ${colide} — só uma entra`
+        `Linha ${l.n}: mesma dupla e nº da linha ${colide}: só uma entra`
       );
       return;
     }

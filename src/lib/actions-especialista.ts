@@ -379,7 +379,7 @@ const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
 function erroAgenda(e: { message: string; code?: string }): string {
   // unique(profile_id, dia_semana, hora_inicio) — a janela repetida
   if (/especialista_grade_profile_id_dia_semana_hora_inicio_key/i.test(e.message)) {
-    return "Já existe uma janela começando nesse horário nesse dia.";
+    return "Já existe uma faixa começando nesse horário nesse dia.";
   }
   return erroAmigavel(e);
 }
@@ -402,10 +402,10 @@ export async function adicionarJanela(formData: FormData) {
     return { error: "Escolha o dia da semana." };
   }
   if (!HORA_RE.test(horaInicio) || !HORA_RE.test(horaFim)) {
-    return { error: "Confira os horários da janela." };
+    return { error: "Confira os horários da faixa." };
   }
   if (horaFim <= horaInicio) {
-    return { error: "O fim da janela precisa ser depois do início." };
+    return { error: "O fim da faixa precisa ser depois do início." };
   }
 
   const { error } = await supabase.from("especialista_grade").insert({
@@ -423,7 +423,7 @@ export async function removerJanela(id: string) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
   if (!eu) return { error: "Sessão expirada. Entre de novo." };
-  if (!id) return { error: "Janela não informada." };
+  if (!id) return { error: "Faixa não informada." };
 
   const { error } = await supabase
     .from("especialista_grade")

@@ -60,7 +60,7 @@ export function IaLimparEventos() {
           <DialogTitle>Limpar indicadores do painel?</DialogTitle>
           <DialogDescription>
             Zera consumo, tokens, custo, ferramentas e erros de todos os
-            gráficos e listas do Uso da Liza — inclusive o que veio de
+            gráficos e listas do Uso da Liza, inclusive o que veio de
             rodadas de eval. O histórico de runs não é afetado. Não dá pra
             desfazer.
           </DialogDescription>

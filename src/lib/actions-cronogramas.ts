@@ -339,7 +339,7 @@ export async function excluirCronograma(
   if ((duplas ?? 0) > 0)
     return {
       error:
-        "Há duplas vinculadas a este cronograma — excluir apagaria o calendário oficial delas. Remaneje as duplas ou encerre o cronograma.",
+        "Há duplas vinculadas a este cronograma. Excluir apagaria o calendário oficial delas. Remaneje as duplas ou encerre o cronograma.",
     };
 
   // presenças são histórico de chamada — cascata do delete de evento as
@@ -359,7 +359,7 @@ export async function excluirCronograma(
     if ((presencas ?? 0) > 0)
       return {
         error:
-          "Há chamadas registradas em eventos deste cronograma. A exclusão apagaria o histórico — encerre o cronograma em vez de excluir.",
+          "Há chamadas registradas em eventos deste cronograma. A exclusão apagaria o histórico: encerre o cronograma em vez de excluir.",
       };
     const { error: delEvErr } = await supabase
       .from("ciclo_eventos")
@@ -500,7 +500,7 @@ export async function excluirEvento(
   if ((presencas ?? 0) > 0)
     return {
       error:
-        "Este evento tem chamada registrada — excluir apagaria as presenças. Edite a data ou o título em vez de excluir.",
+        "Este evento tem chamada registrada. Excluir apagaria as presenças. Edite a data ou o título em vez de excluir.",
     };
 
   const { data, error: delErr } = await supabase

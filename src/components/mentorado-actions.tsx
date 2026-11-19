@@ -164,7 +164,7 @@ export function MentoradoActions({
               />
               {mentorado.profile_id && (
                 <p className="text-xs text-muted-foreground">
-                  Já entrou na plataforma — trocar aqui muda o e-mail de acesso
+                  Já entrou na plataforma. Trocar aqui muda o e-mail de acesso
                   dela.
                 </p>
               )}

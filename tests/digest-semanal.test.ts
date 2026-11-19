@@ -396,7 +396,7 @@ describe("rodarDigestSemanal", () => {
       montar: vi.fn(MONTAR_FALSO),
       lerConfig,
     });
-    expect(r.pulado).toBe("quinzenal — último envio há menos de 14 dias");
+    expect(r.pulado).toBe("quinzenal: último envio há menos de 14 dias");
     expect(gtes).toHaveLength(1);
     // bound = hoje(12:00Z) − 14d → 2025-10-13T12:00 — diferente do início
     // da semana civil que a cadência semanal usaria

@@ -295,7 +295,7 @@ export function CronogramaAcoes({
               {vinculadas > 0 && (
                 <p className="text-xs text-muted-foreground">
                   As {vinculadas} {vinculadas === 1 ? "dupla vinculada acompanha" : "duplas vinculadas acompanham"} o
-                  nome da turma — renomear aqui atualiza a ficha
+                  nome da turma. Renomear aqui atualiza a ficha
                   delas também.
                 </p>
               )}

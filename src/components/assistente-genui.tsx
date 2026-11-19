@@ -242,7 +242,7 @@ function Barras({ g }: { g: Grafico }) {
           <g key={i} className="ia-fatia">
             <title>
               {`${d.rotulo}: ${fmt(d.valor)}${
-                d.detalhe ? ` — ${d.detalhe}` : ""
+                d.detalhe ? ` · ${d.detalhe}` : ""
               }`}
             </title>
             <rect
@@ -303,7 +303,7 @@ function BarrasH({ g }: { g: Grafico }) {
           key={i}
           className="ia-fatia flex items-center gap-2"
           title={`${d.rotulo}: ${fmt(d.valor)}${
-            d.detalhe ? ` — ${d.detalhe}` : ""
+            d.detalhe ? ` · ${d.detalhe}` : ""
           }`}
         >
           <span className="w-20 shrink-0 truncate text-[11px] text-muted-foreground">
@@ -423,7 +423,7 @@ function Linha({ g, area }: { g: Grafico; area: boolean }) {
         <g key={i} className="ia-fatia">
           <title>
             {`${d.rotulo}: ${fmt(d.valor)}${
-              d.detalhe ? ` — ${d.detalhe}` : ""
+              d.detalhe ? ` · ${d.detalhe}` : ""
             }`}
           </title>
           {/* alvo de hover generoso — o dot visível é miúdo */}
@@ -526,7 +526,7 @@ function Rosca({ g }: { g: Grafico }) {
             <g key={i} className="ia-fatia">
               <title>
                 {`${f.d.rotulo}: ${fmt(f.d.valor)}${
-                  f.d.detalhe ? ` — ${f.d.detalhe}` : ""
+                  f.d.detalhe ? ` · ${f.d.detalhe}` : ""
                 }`}
               </title>
               <circle
@@ -637,7 +637,7 @@ function ProgressoHero({ d, total, titulo }: {
       {total || d.detalhe ? (
         <p className="mt-1.5 text-[11px] text-muted-foreground">
           {total ? `${fmt(d.valor)} de ${fmt(total)}` : null}
-          {d.detalhe ? `${total ? " — " : ""}${d.detalhe}` : null}
+          {d.detalhe ? `${total ? " · " : ""}${d.detalhe}` : null}
         </p>
       ) : null}
     </div>

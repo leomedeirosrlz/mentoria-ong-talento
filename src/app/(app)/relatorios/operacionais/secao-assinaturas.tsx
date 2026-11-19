@@ -54,7 +54,7 @@ export function SecaoAssinaturas({
     <section className="space-y-4">
       <RelatorioSecaoTopo
         titulo="Assinaturas pendentes"
-        descricao="Documento emitido × pessoa sem assinado_em — inclui os links expirados que ainda contam como pendência. A reemissão mora na ficha da pessoa."
+        descricao="Documento emitido × pessoa sem assinado_em: inclui os links expirados que ainda contam como pendência. A reemissão mora na ficha da pessoa."
         csvHref={csvHref}
       />
 
@@ -143,8 +143,8 @@ export function SecaoAssinaturas({
                     meta={`${item.linha.papel} · emitido ${dia(item.linha.emitido_em)}`}
                     detalhe={
                       item.status === "expirado"
-                        ? `${item.linha.documento} — link expirou ${dia(item.linha.expira_em)}; reemitir na ficha`
-                        : `${item.linha.documento} — expira ${dia(item.linha.expira_em)}`
+                        ? `${item.linha.documento} · link expirou ${dia(item.linha.expira_em)}; reemitir na ficha`
+                        : `${item.linha.documento} · expira ${dia(item.linha.expira_em)}`
                     }
                     href={
                       item.pessoaId ? `/pessoas/${item.pessoaId}` : undefined

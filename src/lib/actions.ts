@@ -945,7 +945,7 @@ export async function setPessoaRole(profileId: string, role: string | null) {
   if (role === "mentorado") {
     return {
       error:
-        "O papel de mentorado vem do vínculo com o cadastro do jovem — não é concedido por aqui.",
+        "O papel de mentorado vem do vínculo com o cadastro do jovem, então não é concedido por aqui.",
     };
   }
   // 'mentor_hibrido' é o valor composto do RoleSelect (REALIZA-262): DPP +
@@ -977,7 +977,7 @@ export async function setPessoaRole(profileId: string, role: string | null) {
   if ((ppAtuais ?? []).some((r) => r.papel === "mentorado")) {
     return {
       error:
-        "Essa pessoa é jovem do programa — a mudança de papel segue pelo fluxo de promoção a mentor.",
+        "Essa pessoa é jovem do programa. A mudança de papel segue pelo fluxo de promoção a mentor.",
     };
   }
 
@@ -1594,7 +1594,7 @@ export async function updateMentorado(id: string, formData: FormData) {
     if (!email) {
       return {
         error:
-          "Essa pessoa já entrou na plataforma — o e-mail de acesso não pode ficar vazio.",
+          "Essa pessoa já entrou na plataforma. O e-mail de acesso não pode ficar vazio.",
       };
     }
     const { data: livre, error: erroRpc } = await supabase.rpc(
@@ -1683,7 +1683,7 @@ export async function deleteMentorado(id: string) {
   if (vinculo?.profile_id) {
     return {
       error:
-        "Essa pessoa já entrou na plataforma — marque como desistente em vez de excluir.",
+        "Essa pessoa já entrou na plataforma. Marque como desistente em vez de excluir.",
     };
   }
   const [{ data: m }, { data: cv }] = await Promise.all([
@@ -1858,7 +1858,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
   )
     return {
       error:
-        "Trilha de especialista se encerra pelo botão 'Encerrar trilha' da ficha — é o rito que pede motivo e devolutiva e emite a avaliação geral.",
+        "Trilha de especialista se encerra pelo botão 'Encerrar trilha' da ficha: é o rito que pede motivo e devolutiva e emite a avaliação geral.",
     };
   // dupla de especialista não tem supervisor — null forçado, nunca confia no form
   const supervisorFinal = trilhaNova === "especialista" ? null : supervisor_id;
@@ -2048,7 +2048,7 @@ export async function updateDupla(duplaId: string, formData: FormData) {
         if (!vigente) {
           return {
             error:
-              "A dupla DPP precisa de um cronograma pra ficar ativa — cadastre um antes.",
+              "A dupla DPP precisa de um cronograma pra ficar ativa. Cadastre um antes.",
           };
         }
         patch.cronograma_id = vigente.id;
@@ -2254,7 +2254,7 @@ export async function deleteDupla(duplaId: string) {
   ].filter(Boolean);
   if (historico.length) {
     return {
-      error: `Essa dupla tem histórico que não pode ser apagado (${historico.join(", ")}). Encerre-a em vez de excluir — o histórico fica salvo.`,
+      error: `Essa dupla tem histórico que não pode ser apagado (${historico.join(", ")}). Encerre-a em vez de excluir: o histórico fica salvo.`,
     };
   }
   // a cascata leva encontros→registros→registro_anexos (rows), mas os OBJETOS
@@ -2353,7 +2353,7 @@ export async function remanejarDupla(
   ) {
     return {
       error:
-        "A devolutiva pro PDM precisa de 10 a 4.000 caracteres — é a entrega de quem sai da trilha.",
+        "A devolutiva pro PDM precisa de 10 a 4.000 caracteres: é a entrega de quem sai da trilha.",
     };
   }
   const saiId = lado === "mentor" ? atual.mentor_id : atual.mentorado_id;
@@ -2361,8 +2361,8 @@ export async function remanejarDupla(
     return {
       error:
         lado === "mentor"
-          ? "Essa pessoa já é o mentor da dupla — pra trocar, escolha outra."
-          : "Essa pessoa já é o mentorado da dupla — pra trocar, escolha outra.",
+          ? "Essa pessoa já é o mentor da dupla. Pra trocar, escolha outra."
+          : "Essa pessoa já é o mentorado da dupla. Pra trocar, escolha outra.",
     };
   }
   // quem entra do lado do mentorado precisa estar NO programa (0077) — o
@@ -3131,7 +3131,7 @@ export async function salvarLinkEncontro(encontroId: string, link: string | null
     // já passado não tem como trocar só o link por ela; a saída honesta é a
     // remarcação, que edita data e link juntos
     if (encontro.data_hora == null || new Date(encontro.data_hora).getTime() <= Date.now()) {
-      return { error: "Esse encontro já passou — pra trocar o link, remarque a data junto." };
+      return { error: "Esse encontro já passou. Pra trocar o link, remarque a data junto." };
     }
     const { data, error } = await supabase.rpc("agendar_encontro_mentorado", {
       p_dupla: encontro.dupla_id,
@@ -3193,7 +3193,7 @@ export async function registrarEncontroRetroativo(
   // DPP sem cronograma não tem calendário pra medir teto/piso — aponta a
   // correção em vez de registrar contra nada
   if (d.trilha !== "especialista" && !d.cronograma_id) {
-    return { error: "Essa dupla está sem cronograma — a coordenação vincula um na edição da dupla." };
+    return { error: "Essa dupla está sem cronograma. A coordenação vincula um na edição da dupla." };
   }
 
   const quando = parseDataHora(dataHora);
@@ -3241,7 +3241,7 @@ export async function registrarEncontroRetroativo(
     if ((realizados ?? 0) >= 5) {
       return {
         error:
-          "O guia prevê 5 sessões por trilha de especialista — essa já completou.",
+          "O guia prevê 5 sessões por trilha de especialista: essa já completou.",
       };
     }
     const { data: ultimos } = await supabase
@@ -3512,7 +3512,7 @@ export async function salvarRegistro(formData: FormData) {
   ].filter((n) => Number.isInteger(n) && n !== encDb.numero);
   if (cobriu.length && d?.trilha === "especialista") {
     avisos.push(
-      "A sessão dupla não se aplica à trilha de especialista — cada sessão é registrada na própria linha."
+      "A sessão dupla não se aplica à trilha de especialista: cada sessão é registrada na própria linha."
     );
     cobriu.length = 0;
   }
@@ -3596,7 +3596,7 @@ export async function salvarRegistro(formData: FormData) {
         // data do fato em vez da que estava marcada (régua da 0207)
         if (enc2.data_hora != null && new Date(enc2.data_hora) > new Date()) {
           avisos.push(
-            `O ${m}º encontro ainda está marcado pro futuro — desmarque antes de cobrir.`
+            `O ${m}º encontro ainda está marcado pro futuro. Desmarque antes de cobrir.`
           );
           continue;
         }
@@ -3617,7 +3617,7 @@ export async function salvarRegistro(formData: FormData) {
         encId = enc2.id;
       } else {
         avisos.push(
-          `O ${m}º encontro está ${enc2.status === "nao_aconteceu" ? "marcado como não realizado" : "cancelado"} — desfaça na ficha antes de cobrir.`
+          `O ${m}º encontro está ${enc2.status === "nao_aconteceu" ? "marcado como não realizado" : "cancelado"}. Desfaça na ficha antes de cobrir.`
         );
         continue;
       }
@@ -3634,7 +3634,7 @@ export async function salvarRegistro(formData: FormData) {
         });
       if (regErr) {
         avisos.push(
-          `O registro do ${m}º encontro não entrou — registre pela ficha.`
+          `O registro do ${m}º encontro não entrou. Registre pela ficha.`
         );
       } else {
         cobertos.push(m);
@@ -3706,7 +3706,7 @@ export async function salvarNotaEncontro(duplaId: string, numero: number, texto:
   if (!d) return { error: "Dupla não encontrada." };
   if (d.status !== "ativa") return { error: "Essa dupla não está ativa." };
   if (d.trilha !== "especialista" && !d.cronograma_id) {
-    return { error: "Essa dupla está sem cronograma — a coordenação vincula um na edição da dupla." };
+    return { error: "Essa dupla está sem cronograma. A coordenação vincula um na edição da dupla." };
   }
 
   // teto de nº por trilha — a nota segue o passo do guia (16 DPP / 5

@@ -175,7 +175,7 @@ function TagEstado({
         variant="outline"
         className="text-xs font-medium text-muted-foreground"
       >
-        janela não aberta
+        ainda não disponível
       </Badge>
     );
   }

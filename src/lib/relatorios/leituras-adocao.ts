@@ -53,7 +53,7 @@ export function leituraAdocao({
       titulo: `Uso caiu ${Math.round(-delta * 100)}% na janela`,
       metrica: `${atual} ${sujeito}, eram ${antes} na janela anterior de ${janela} dias`,
       porque:
-        "queda de um quinto ou mais entre janelas iguais merece explicação — feriado, bug ou desinteresse",
+        "queda de um quinto ou mais entre janelas iguais merece explicação: feriado, bug ou desinteresse",
       intervencao:
         "compare com o calendário e pergunte à equipe se algo mudou no período",
     });
@@ -63,7 +63,7 @@ export function leituraAdocao({
       titulo: `Uso subiu ${Math.round(delta * 100)}% na janela`,
       metrica: `${atual} ${sujeito}, eram ${antes} na janela anterior de ${janela} dias`,
       porque: "crescimento sustentado entre janelas iguais",
-      intervencao: "registre o que funcionou — a régua da semana vem daqui",
+      intervencao: "registre o que funcionou: a régua da semana vem daqui",
     });
   }
 
@@ -109,7 +109,7 @@ export function leituraAdocao({
       titulo: `Taxa de resposta dos instrumentos em ${Math.round((respondidos / emitidos) * 100)}%`,
       metrica: `${respondidos} de ${emitidos} instrumentos respondidos`,
       porque:
-        "menos da metade dos links emitidos volta — o instrumento não está entrando na rotina",
+        "menos da metade dos links emitidos volta: o instrumento não está entrando na rotina",
       intervencao:
         "veja qual instrumento concentra a espera e reenvie com contexto, não só o link",
     });

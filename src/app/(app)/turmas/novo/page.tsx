@@ -24,7 +24,7 @@ export default async function NovaTurmaPage() {
       <PageHeader
         kicker={<VoltarLink fallback="/turmas" />}
         title="Nova turma"
-        meta="Monte o calendário oficial com parâmetros ou importe de arquivo — prévia editável antes de gravar"
+        meta="Monte o calendário oficial com parâmetros ou importe de arquivo. Prévia editável antes de gravar"
       />
 
       {demo ? (

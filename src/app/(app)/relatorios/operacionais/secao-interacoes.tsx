@@ -48,7 +48,7 @@ export function SecaoInteracoes({
     <section className="space-y-4">
       <RelatorioSecaoTopo
         titulo="Interações"
-        descricao="Log de nudges, contatos e apoios registrados pela coordenação — o rastro de acompanhamento por dupla."
+        descricao="Log de nudges, contatos e apoios registrados pela coordenação: o rastro de acompanhamento por dupla."
         csvHref={csvHref}
       />
 

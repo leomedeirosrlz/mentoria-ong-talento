@@ -62,7 +62,7 @@ function EstadoAcumulando({ texto }: { texto: string }) {
     <p className="text-sm text-muted-foreground">
       {texto}{" "}
       <span className="text-muted-foreground/80">
-        O gesto que alimenta este painel chegou agora — ele enche conforme
+        O gesto que alimenta este painel chegou agora: ele enche conforme
         o uso.
       </span>
     </p>
@@ -184,7 +184,7 @@ export function PaineisRicos({
           <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
             Toques por região da tela {contexto}
             {painel
-              ? ` — ${FMT_INT.format(painel.toques)} toques de ${FMT_INT.format(painel.pessoas)} ${painel.pessoas === 1 ? "pessoa" : "pessoas"} em ${painel.rotulo}.`
+              ? `: ${FMT_INT.format(painel.toques)} toques de ${FMT_INT.format(painel.pessoas)} ${painel.pessoas === 1 ? "pessoa" : "pessoas"} em ${painel.rotulo}.`
               : "."}
           </p>
         </div>
@@ -220,7 +220,7 @@ export function PaineisRicos({
           <h3 className="text-sm font-semibold">Quanto tempo fica</h3>
           <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
             Duração das estadias por superfície {contexto}. Uma estadia é
-            uma visita contínua — a mediana aguenta a aba esquecida aberta.
+            uma visita contínua. A mediana aguenta a aba esquecida aberta.
           </p>
         </div>
         {tempos.length === 0 ? (
@@ -299,7 +299,7 @@ export function PaineisRicos({
           <h3 className="text-sm font-semibold">Até onde lê</h3>
           <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
             % das visitas em páginas roláveis que alcançou cada marca
-            {contexto}. Página que cabe na tela não entra — o denominador
+            {contexto}. Página que cabe na tela não entra: o denominador
             são só visitas onde existia fim pra alcançar.
           </p>
         </div>
@@ -447,7 +447,7 @@ export function PaineisRicos({
       {truncado && (
         <p className="text-xs text-muted-foreground">
           Volume alto no período: estes painéis leem os gestos mais
-          recentes — a cauda antiga ficou de fora.
+          recentes: a cauda antiga ficou de fora.
         </p>
       )}
     </div>
