@@ -25,7 +25,7 @@ Leia nesta ordem, só o que a tarefa toca:
 - Sem workaround para infra quebrada: faça o passo correto ou pare e pergunte.
 - Autorização é RLS no banco (`my_role()`/`my_profile_id()`); nunca só na tela ou na action.
 - Server action retorna `{ ok }` ou `{ error }`, nunca lança; mensagem em pt-BR.
-- Migration: arquivo **novo**, próximo número livre (lacunas são intencionais); nunca edite ou apague uma existente — o remoto já rodou. SQL vai **verbatim** para o banco.
+- Migration: arquivo **novo**, próximo número livre (lacunas são intencionais); nunca edite ou apague uma existente — o remoto já rodou. SQL vai **verbatim** para o banco. Staging recebe na hora do push; **produção só na janela do release** (`staging → main`), nunca no meio do backlog.
 - Antes de SQL: confira o schema real (`information_schema`, `pg_policies`, `pg_enum`).
 - Rota pública nova entra em `isPublic` (`src/lib/supabase/middleware.ts`) + e2e do token inválido.
 - Nunca re-seede produção. Antes de qualquer write, confira o ref do `.env.local` (o de dev aponta para **staging**, não para prod).
