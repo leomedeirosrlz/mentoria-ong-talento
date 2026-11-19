@@ -21,8 +21,8 @@ const MAX_BYTES = 8 * 1024 * 1024;
 const MAX_PAGINAS_PDF = 40;
 
 export type Extraido =
-  | { formato: "texto"; texto: string }
-  | { formato: "tabela"; linhas: string[][] };
+  | { formato: "texto"; texto: string; /** só PDF: nº de páginas lidas */ paginas?: number }
+  | { formato: "tabela"; linhas: string[][]; /** só xlsx: nº de abas da pasta */ abas?: number };
 
 export type ResultadoExtracao =
   | { ok: true; extraido: Extraido }
@@ -32,6 +32,44 @@ const extensao = (nome: string) => {
   const i = nome.lastIndexOf(".");
   return i >= 0 ? nome.slice(i).toLowerCase() : "";
 };
+
+/** Extensão do arquivo (".pdf"), pra auditoria com formato real — o
+ *  `formato` do Extraido é a forma ("texto"/"tabela"), não a extensão. */
+export function extensaoDoArquivo(nome: string): string {
+  return extensao(nome).replace(/^\./, "");
+}
+
+/** Texto quase vazio = PDF escaneado/imagem ou planilha em branco. O
+ *  provider de IA é texto-only — mandar um escaneado só queimaria teto;
+ *  o caminho honesto é o aviso (spec 009, caso de borda US1). Densidade
+ *  por página é a régua do PDF (<40 chars/pág: nem cabeçalho rende isso);
+ *  fora do PDF o total absoluto decide. */
+export function conteudoQuaseVazio(extraido: Extraido): boolean {
+  if (extraido.formato === "tabela")
+    return extraido.linhas.flat().join("").trim().length < 80;
+  const n = extraido.texto.trim().length;
+  if (extraido.paginas != null)
+    return n / Math.max(extraido.paginas, 1) < 40;
+  return n < 120;
+}
+
+/** Limiar que dispara a camada de IA sem clique — o mesmo 0.6 que a UI
+ *  já usava pra sugerir "Tentar com IA". */
+export const CONFIANCA_LIMIAR_IA = 0.6;
+
+/** Sinais determinísticos de complexidade (spec 009 FR-001): confiança
+ *  baixa do rascunho agrega os indícios de layout (colunas, tabelas
+ *  mescladas — o parser falha e a confiança cai); multi-sheet é indício
+ *  direto porque a extração achata as abas numa sequência só. Documento
+ *  quase vazio NÃO é complexo — é escaneado, e cai no aviso. */
+export function documentoComplexo(
+  extraido: Extraido,
+  confianca: number
+): boolean {
+  if (conteudoQuaseVazio(extraido)) return false;
+  if (extraido.formato === "tabela" && (extraido.abas ?? 0) > 1) return true;
+  return confianca < CONFIANCA_LIMIAR_IA;
+}
 
 /** CSV/TSV → grade de células. Mesmas regras do parser de pessoas
  *  (importar.ts): aspas com escape duplo, quebra de linha dentro de campo,
@@ -133,7 +171,10 @@ export async function extrairConteudo(file: File): Promise<ResultadoExtracao> {
           });
           for (const r of rows) linhas.push((r ?? []).map((c) => String(c ?? "").trim()));
         }
-        return { ok: true, extraido: { formato: "tabela", linhas } };
+        return {
+          ok: true,
+          extraido: { formato: "tabela", linhas, abas: wb.SheetNames.length },
+        };
       }
       case ".docx": {
         const mod = (await import("mammoth")) as unknown as {
@@ -165,7 +206,14 @@ export async function extrairConteudo(file: File): Promise<ResultadoExtracao> {
               .replace(/\s+/g, " ")
           );
         }
-        return { ok: true, extraido: { formato: "texto", texto: paginas.join("\n") } };
+        return {
+          ok: true,
+          extraido: {
+            formato: "texto",
+            texto: paginas.join("\n"),
+            paginas: doc.numPages,
+          },
+        };
       }
     }
   } catch {

@@ -15,6 +15,7 @@ import { CronogramaBuilder } from "@/components/cronograma-builder";
 import { Button } from "@/components/ui/button";
 import {
   ACCEPT_IMPORT,
+  CONFIANCA_LIMIAR_IA,
 } from "@/lib/importar-cronograma/extrair";
 import {
   importarCronogramaComIa,
@@ -38,6 +39,7 @@ export function NovaTurmaFlow({
   const [resultado, setResultado] = useState<ResultadoImportacao | null>(null);
   const [importado, setImportado] =
     useState<{ rascunho: RascunhoImportacao; arquivo: string } | null>(null);
+  const [verAlternativo, setVerAlternativo] = useState(false);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -58,8 +60,11 @@ export function NovaTurmaFlow({
           return;
         }
         setResultado(res.resultado);
+        setVerAlternativo(false);
         if (!res.resultado.rascunho.eventos.length)
-          toast.info("Nenhum evento reconhecido ainda — revise os avisos ou tente com a IA.");
+          toast.info("Nenhum evento reconhecido ainda. Revise os avisos ou tente com a IA.");
+        else if (res.resultado.rascunho.viaIa)
+          toast.info("A prévia foi montada pela IA. Revise cada linha antes de gravar.");
       } catch {
         toast.error("Sem conexão. Tente de novo.");
       }
@@ -94,24 +99,29 @@ export function NovaTurmaFlow({
     );
 
   // ---------- modo importar ----------
-  const rasc = resultado?.rascunho ?? null;
+  const rasc =
+    verAlternativo && resultado?.rascunhoAlternativo
+      ? resultado.rascunhoAlternativo
+      : (resultado?.rascunho ?? null);
   return (
     <div className="space-y-5">
       <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
         <h2 className="text-sm font-semibold">Arquivo do cronograma</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           PDF, planilha (xlsx, csv, tsv), DOCX ou TXT, até 8 MB. O arquivo é
-          só lido pra montar o rascunho — nada é salvo antes da sua revisão.
+          só lido pra montar o rascunho. Nada é salvo antes da sua revisão.
         </p>
         <div className="mt-4 flex flex-wrap items-center gap-3">
           <input
             ref={inputRef}
             type="file"
             accept={ACCEPT_IMPORT}
-            className="block w-full max-w-sm text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground hover:file:bg-muted/70"
+            disabled={pending}
+            className="block w-full max-w-sm text-sm text-muted-foreground file:mr-3 file:rounded-md file:border-0 file:bg-muted file:px-3 file:py-2 file:text-sm file:font-medium file:text-foreground hover:file:bg-muted/70 disabled:opacity-50"
             onChange={(e) => {
               setArquivo(e.target.files?.[0] ?? null);
               setResultado(null);
+              setVerAlternativo(false);
             }}
           />
           <Button
@@ -133,7 +143,14 @@ export function NovaTurmaFlow({
             {rasc.eventos.length === 1 ? "evento reconhecido" : "eventos reconhecidos"}
             {" · "}confiança {Math.round(rasc.confianca * 100)}%
             {rasc.turma && ` · turma “${rasc.turma}”`}
+            {rasc.viaIa && " · montado com IA"}
           </p>
+          {resultado!.rascunhoAlternativo && !verAlternativo && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              O documento tinha sinais de complexidade e a IA montou esta
+              prévia. A leitura do parser também está disponível pra comparar.
+            </p>
+          )}
           {rasc.avisos.length > 0 && (
             <ul className="mt-2 list-inside list-disc space-y-1 text-sm text-muted-foreground">
               {rasc.avisos.map((a, i) => (
@@ -152,6 +169,15 @@ export function NovaTurmaFlow({
             >
               Revisar prévia editável
             </Button>
+            {resultado!.rascunhoAlternativo && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setVerAlternativo((v) => !v)}
+              >
+                {verAlternativo ? "Ver a prévia da IA" : "Ver a leitura do parser"}
+              </Button>
+            )}
             {resultado!.iaDisponivel && (
               <Button
                 variant="outline"
@@ -164,14 +190,16 @@ export function NovaTurmaFlow({
                 ) : (
                   <Sparkle aria-hidden />
                 )}
-                {rasc.confianca < 0.6 ? "Tentar com IA" : "Reprocessar com IA"}
+                {rasc.confianca < CONFIANCA_LIMIAR_IA ? "Tentar com IA" : "Reprocessar com IA"}
               </Button>
             )}
           </div>
-          {resultado!.iaDisponivel && rasc.confianca < 0.6 && (
+          {resultado!.iaDisponivel &&
+            !resultado!.rascunhoAlternativo &&
+            rasc.confianca < CONFIANCA_LIMIAR_IA && (
             <p className="mt-2 text-xs text-muted-foreground">
-              A leitura saiu incompleta — a IA pode mapear layouts fora do
-              padrão. O resultado dela também passa pela sua revisão.
+              A leitura saiu incompleta. A IA pode mapear layouts fora do
+              padrão e o resultado dela também passa pela sua revisão.
             </p>
           )}
         </section>

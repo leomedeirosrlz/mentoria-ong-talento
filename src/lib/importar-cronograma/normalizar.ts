@@ -247,15 +247,15 @@ export function normalizarCronograma(extraido: Extraido): RascunhoImportacao {
   const encontros = eventos.filter((e) => e.tipo === "encontro");
   const semData = eventos.filter((e) => !e.data).length;
   if (eventos.length === 0)
-    avisos.push("Nenhum evento reconhecido — revise o texto extraído ou tente com a IA.");
+    avisos.push("Nenhum evento reconhecido. Revise o texto extraído ou tente com a IA.");
   if (encontros.length > 0 && encontros.length !== 16)
     avisos.push(
       `Foram reconhecidos ${encontros.length} encontros (o guia DPP prevê 16). Confira a numeração na prévia.`
     );
   if (semData > 0)
-    avisos.push(`${semData} evento(s) sem data — complete antes de gravar.`);
+    avisos.push(`${semData} evento(s) sem data. Complete antes de gravar.`);
   if (!turma)
-    avisos.push("A turma não foi identificada no arquivo — informe o nome antes de gravar.");
+    avisos.push("A turma não foi identificada no arquivo. Informe o nome antes de gravar.");
 
   const confianca = Math.max(
     0,
