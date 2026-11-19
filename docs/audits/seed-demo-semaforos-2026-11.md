@@ -3,13 +3,18 @@
 **Data:** 19/nov/2026 · **Branch:** `chore/seed-cenarios` · **Base:** `staging`
 **Método:** `db reset` + `seed:e2e` + `seed:demo` no stack local (`:54321`),
 cada dupla `de000000-*` computada por `saudadeDaDupla` + `montarPlanoEmDia`
-com os mesmos eventos do cronograma. Veredito: o dataset cobre os 5
-gatilhos pedidos e todos evergreen (datas derivadas de `new Date()`).
+com os mesmos eventos do cronograma, e conferida na UI com login
+`mentor@realiza.test`. Veredito: o dataset cobre os 5 gatilhos pedidos,
+todos evergreen (datas derivadas de `new Date()`), e o mentor@ (Otávio,
+capacidade 3) passa a ver uma dupla em atenção e uma em risco — o card
+"Para ficar em dia" abre na conta dele.
 
 ## Mapa dupla → cenário
 
 | id | dupla | dados | semáforo | sinal principal |
 |---|---|---|---|---|
+| …0300 | **Otávio × Ana** (mentor@) | 6 realizados, enc 5 sem registro, enc 7 marcado | **atenção** | `Encontro realizado sem registro` — estável a semana toda; a âncora segue completa |
+| …030c | **Otávio × Larissa** (mentor@) | 3 realizados, encs 4–6 devendo | **risco** + card | `2–3 encontros em atraso` — 2 passos agendáveis dom–seg, 3 de terça em diante |
 | …0301 | Sabrina × Pedro Lucas | 5 realizados + registro, enc 6 vencido sem row | **atenção** | `Encontro 6 ainda não aconteceu` (dom–seg lê `preventivo`) |
 | …0306 | Tiago × Lucas | 3 realizados, encs 4–6 devendo | **risco** + card | `3 encontros em atraso` — 3 passos agendáveis no "ficar em dia" |
 | …030a | Rodrigo × Kaique | enc 5 realizado >24h sem registro | **atenção** | `Encontro realizado sem registro` — estável a semana toda |
@@ -22,28 +27,47 @@ Congeladas (pausada/concluída/encerrada: …0307, 0308, 030b, 030e, 030f,
 trilha2) e a …0302 (apoio aberto — fora do semáforo) seguem `ok`, como o
 mapa no topo do `scripts/seed-demo-staging.mjs` documenta.
 
-## Por que a T3 existe
+## Por que a d13 perdeu o enc 4–6 (e não levou o combo)
 
-O `preventivo` só acende quando o oficial da semana está a ≤5 dias e a
-dupla não marcou nada. Com calendário de terça (T1/T2), depois que a
-terça passa o vazio vira `atraso`, não `preventivo`. A T3 ancora os
-encontros no sábado — então de seg a sáb a dupla …0152 mostra o sinal
-puro e dom/seg o mesmo buraco relê como atraso-1.
+O gatilho em falta era o da visão do **mentor@**: o card só abre com ≥2
+passos agendáveis (`devidos`), então o combo baixa+dificuldade — que já
+existe na …0304 e não rende passo nenhum — não resolveria. Com
+`feitos: 3` a d13 deve os encs 4–6: ≥2 atrasos em qualquer weekday (o
+esperado é 5 antes da terça, 6 depois) → risco estável e card aberto a
+semana toda. A …0300 ficou de fora disso de propósito: ela carrega a
+avaliação pendente da Ana (link do enc 6), o PDM e a jornada completa —
+um atraso removeria a row do enc 6 e derrubaria esses estados. O
+`pendente: 5` dá a atenção sem tocar em mais nada (mesma receita da
+…030a). Capacidade intacta: o Otávio segue com 2 duplas de 3.
 
 ## Verificação (19/nov/2026, quinta)
 
+`saudadeDaDupla` + `montarPlanoEmDia` sobre o stack local:
+
 ```
-ATEN   -  0150 Mônica × Davi      esp4/fei3  Encontro 4 ainda não aconteceu
-RISCO CARD 0151 Elisa × Luna      esp4/fei2  2 encontros em atraso (devidos 3,4)
-ATEN   -  0152 Diego × Arthur     esp5/fei5  preventivo — enc 6 sábado sem agendamento
-ATEN   -  0301 Sabrina × Pedro    esp6/fei5  Encontro 6 ainda não aconteceu (devido 6)
-RISCO  -  0304 Ricardo × Gabriela esp6/fei5  avaliação baixa + dificuldade (+ atraso-6, combinado vencido)
-RISCO CARD 0306 Tiago × Lucas     esp6/fei3  3 encontros em atraso (devidos 4,5,6)
-ATEN   -  030a Rodrigo × Kaique   esp6/fei6  Encontro realizado sem registro (pend: 5)
-OK     -  demais duplas DPP       esp6/fei6  sem sinais
+ATEN   -    0150 Mônica × Davi            esp4/fei3 agend:0  Encontro 4 ainda não aconteceu
+RISCO CARD 0151 Elisa × Luna              esp4/fei2 agend:2  2 encontros em atraso
+ATEN   -    0152 Diego × Arthur           esp5/fei5 agend:0  preventivo — enc 6 sábado sem agendamento
+ATEN   -    0300 Otávio × Ana             esp6/fei6 agend:0  pend:5 Encontro realizado sem registro
+ATEN   -    0301 Sabrina × Pedro          esp6/fei5 agend:1  Encontro 6 ainda não aconteceu
+RISCO  -    0304 Ricardo × Gabriela       esp6/fei5 agend:1  avaliação baixa + dificuldade (+2 sinais)
+RISCO CARD 0306 Tiago × Lucas             esp6/fei3 agend:3  3 encontros em atraso
+ATEN   -    030a Rodrigo × Kaique         esp6/fei6 agend:0  pend:5 Encontro realizado sem registro
+RISCO CARD 030c Otávio × Larissa          esp6/fei3 agend:3  3 encontros em atraso
+OK     -    demais duplas DPP                          sem sinais (pausada/concluída/encerrada congeladas)
+```
+
+UI (`next dev :3200` + login `mentor@realiza.test`):
+
+```
+OK  home lista Larissa e Ana (risco primeiro na ordenação)
+OK  d13 ficha: badge "Risco" + "3 encontros em atraso"
+OK  d13 card "Para ficar em dia" visível, 3 passos (4º→20/11, 5º→27/11, 6º→04/12)
+OK  d1 ficha: badge "Atenção" + "Encontro realizado sem registro"
+OK  d1 sem card (0 passos agendáveis — a pendência tem superfície própria)
 ```
 
 Gatilho do card "ficar em dia" (REALIZA-459): ≥2 passos agendáveis →
-…0306 (3) e …0151 (2) mostram o card; …0152/…030a/…0304 ficam fora dele
-por enquanto (1 ou 0 passos) — os sinais deles testam os outros estados
-do semáforo.
+…030c (2–3), …0306 (3) e …0151 (2) mostram o card; …0152/…030a/…0300/
+…0304 ficam fora dele por enquanto (1 ou 0 passos) — os sinais deles
+testam os outros estados do semáforo.

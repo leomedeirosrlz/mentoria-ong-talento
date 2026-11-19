@@ -14,7 +14,16 @@
 // T1 e T2 têm o encontro vigente na terça da semana corrente; a T3 ancora
 // os encontros no sábado pro preventivo acender fora de dom–seg (com
 // calendário de terça, o "não marcou" vira atraso assim que a terça passa).
-// Esperado = oficiais já vencidos; atraso = esperado − realizados.
+// Esperado = oficiais já vencidos; atraso = esperado − realizados. O
+// mentor@ (Otávio, capacidade 3) cobre os dois lados do semáforo — d1 em
+// atenção e d13 em risco — pro "ficar em dia" ter gatilho na visão dele.
+//   atenção  d1  Otávio × Ana         — registro pendente: o 5º realizado
+//               ficou >24h sem registro. A âncora segue completa (6
+//               encontros, 7º marcado) — só a entrega falta. Estável a
+//               semana toda
+//   risco    d13 Otávio × Larissa     — 2+ atrasos: encs 4–6 devendo (2
+//               passos agendáveis dom–seg, 3 de terça em diante — o card
+//               "ficar em dia" abre na conta dele a semana toda)
 //   atenção  d2  Sabrina × Pedro Lucas — 1 atraso: o enc 6 oficial venceu
 //               e não houve (ter–sáb; dom–seg o mesmo vazio lê preventivo)
 //   risco    d7  Tiago × Lucas        — 2+ atrasos (4º–6º devendo; card
@@ -596,7 +605,9 @@ const duplas = [
 // "agendado" antes disso — o gerador trata a borda. Semáforo: 6=ok,
 // 5 sem vigente=atenção/atraso, ≤4=risco (≥2 atrasos em qualquer weekday).
 const PLANO_ENCONTROS = {
-  [D.d1]: { feitos: 6, hora: "19:00", proximo: true, duracao: 90, avalPendente: 6 },
+  // registro do 5º pendente (na âncora) — a atenção do mentor@: realizado
+  // >24h sem registro, estável a semana toda como o pendente da d11
+  [D.d1]: { feitos: 6, hora: "19:00", proximo: true, duracao: 90, avalPendente: 6, pendente: 5 },
   [D.d2]: { feitos: 5, hora: "19:00", proximo: false, duracao: 60 },         // atraso/sem data: faltou o 6º e não marcou
   [D.d3]: { feitos: 6, hora: "19:30", proximo: true, duracao: 60, apoio: true }, // apoio aberto (fora do semáforo) → ok
   [D.d4]: { feitos: 6, hora: "18:00", proximo: true, duracao: 60 },
@@ -613,7 +624,9 @@ const PLANO_ENCONTROS = {
   // estável a semana toda (o pendente do 6º dependia da terça já ter passado)
   [D.d11]: { feitos: 6, hora: "19:00", proximo: true, duracao: 60, pendente: 5 },
   [D.d12]: { feitos: 3, hora: "19:00", proximo: false, duracao: 60 },        // encerrada
-  [D.d13]: { feitos: 6, hora: "19:00", proximo: true, duracao: 90 },         // 2ª dupla do Otávio
+  // 2ª dupla do Otávio — o risco dele: encs 4–6 devendo (≥2 em qualquer
+  // weekday) → 2–3 passos agendáveis e o card "ficar em dia" aberto
+  [D.d13]: { feitos: 3, hora: "19:00", proximo: false, duracao: 90 },
   [D.d14]: { feitos: 6, hora: "19:00", proximo: true, duracao: 60 },
   [D.d15]: { feitos: 3, hora: "19:00", proximo: false, duracao: 60 },        // encerrada — rito pendente
   [D.d16]: { feitos: 2, hora: "18:30", proximo: false, duracao: 60 },        // encerrada — rito pendente
