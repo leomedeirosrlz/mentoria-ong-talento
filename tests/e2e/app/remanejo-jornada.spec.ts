@@ -155,6 +155,55 @@ test.describe("remanejo — jornada de instrumentos (0178)", () => {
   test.beforeEach(limparTudo);
   test.afterAll(limparTudo);
 
+  // 0217 (REALIZA-460): o branch DPP do rematch grava o desfecho
+  // estruturado + a linha no ledger — a antiga não fecha mais "só de
+  // status" e a troca fica auditável como os outros fechamentos.
+  test("rematch DPP: a antiga fecha com desfecho remanejada + evento no ledger", async () => {
+    const antiga = await duplaBase();
+    const mentorNovo = await mentorDescartavel();
+
+    const nova = await rematch(antiga, "mentor", mentorNovo);
+
+    const [fechada] = await buscarViaServiceRole<
+      {
+        status: string;
+        desfecho: string | null;
+        desfecho_motivo: string | null;
+        desfecho_em: string | null;
+        desfecho_por: string | null;
+      }[]
+    >(
+      "duplas",
+      `id=eq.${antiga}&select=status,desfecho,desfecho_motivo,desfecho_em,desfecho_por`
+    );
+    expect(fechada.status).toBe("encerrada");
+    expect(fechada.desfecho).toBe("remanejada");
+    expect(fechada.desfecho_motivo).toContain("E2E-178");
+    expect(fechada.desfecho_em).not.toBeNull();
+    expect(fechada.desfecho_por).not.toBeNull();
+
+    // o ledger conta a troca: de ativa → encerrada com desfecho remanejada
+    const eventos = await buscarViaServiceRole<
+      { tipo: string; de: string | null; para: string | null; desfecho: string | null; por: string | null }[]
+    >(
+      "dupla_eventos",
+      `dupla_id=eq.${antiga}&select=tipo,de,para,desfecho,por`
+    );
+    const fechamento = eventos.find((e) => e.tipo === "desfecho");
+    expect(fechamento).toBeTruthy();
+    expect(fechamento!.desfecho).toBe("remanejada");
+    expect(fechamento!.de).toBe("ativa");
+    expect(fechamento!.para).toBe("encerrada");
+    expect(fechamento!.por).toBe(fechada.desfecho_por);
+
+    // a sucessora carrega a linhagem — a encerrada sabe pra onde apontar
+    const [sucessora] = await buscarViaServiceRole<
+      { remanejada_de: string | null; status: string }[]
+    >("duplas", `id=eq.${nova}&select=remanejada_de,status`);
+    expect(sucessora.remanejada_de).toBe(antiga);
+    expect(sucessora.status).toBe("ativa");
+  });
+
   test("rematch de mentor com tudo respondido: respostas migram, zero links novos", async () => {
     const antiga = await duplaBase();
     const mentorNovo = await mentorDescartavel();

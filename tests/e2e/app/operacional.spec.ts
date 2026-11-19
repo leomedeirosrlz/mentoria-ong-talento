@@ -92,7 +92,17 @@ async function restaurarFixtures() {
   await limparDuplasComLinks(`mentorado_id=eq.${IDS.mentoradoLivre}`);
   await atualizarViaServiceRole("duplas", `id=eq.${DUPLA2_ID}`, {
     status: "ativa",
+    encerrada_em: null,
+    motivo_encerramento: null,
+    // 0217: o rematch DPP carimba desfecho* na ficha e a linha 'desfecho'
+    // no ledger — a restauração apaga os dois pra devolver o seed "ativa"
+    desfecho: null,
+    desfecho_motivo: null,
+    desfecho_obs: null,
+    desfecho_em: null,
+    desfecho_por: null,
   });
+  await limparViaServiceRole("dupla_eventos", `dupla_id=eq.${DUPLA2_ID}`);
   // risco plantado pelo spec da sugestão de remanejo (encontro + registro
   // com precisa_apoio) — filhos da 0071 primeiro, igual ao seed
   await limparEncontrosDaDupla(DUPLA2_ID);

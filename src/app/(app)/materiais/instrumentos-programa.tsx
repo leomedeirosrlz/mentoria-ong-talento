@@ -38,9 +38,10 @@ import type { CicloEvento } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 // Aba "Instrumentos" de /materiais: a régua oficial da jornada DPP — os 7
-// instrumentos da régua. A avaliação por terceiros ficou fora da plataforma
-// (decisão do Leo, out/2026: dinâmica pré-encontro 1 com dados confidenciais)
-// — o consolidado segue chegando por fora e morando na ficha da dupla.
+// instrumentos da régua + a avaliação por terceiros (0103), que voltou a
+// morar na plataforma e ganhou o 9º card: fora da régua de formulários
+// (sem estacao/sistemaForm) o detalhe fica na ficha — o card linka a ficha
+// e o mentor lê a contagem de respostas da dupla em foco (449/463).
 // Pra staff cada
 // card resume a coorte em 3 estados (responderam · aguardando · atrasados)
 // e a lista abaixo é a única fila de ação: jovem com instrumento fora do
@@ -329,6 +330,7 @@ export function InstrumentosPrograma({
   duplaSelecionada = null,
   instrumentosSelecionada = [],
   avaliacoesSelecionada = null,
+  terceirosSelecionada = null,
   nudges = {},
   meuNome = "",
 }: {
@@ -359,6 +361,9 @@ export function InstrumentosPrograma({
   /** avaliações feitas × encontros realizados da dupla em foco (a conta
    *  da linha da página por instrumento) */
   avaliacoesSelecionada?: { feitas: number; realizados: number } | null;
+  /** terceiros respondidos × indicados da dupla em foco (449/463) —
+   *  fora da régua, a contagem vem direto dos contatos */
+  terceirosSelecionada?: { respondidos: number; total: number } | null;
   /** último nudge por dupla — o cap de 48h do Lembrar. */
   nudges?: Record<string, Interacao>;
   meuNome?: string;
@@ -590,6 +595,61 @@ export function InstrumentosPrograma({
             </article>
           );
         })}
+        {/* 9º card — avaliação por terceiros (0103/449/463): instrumento
+            real do programa sem página /instrumentos/<chave> nem emissão
+            em lote — o detalhe (convites, respostas, consolidação) é por
+            dupla, então o card aponta pra ficha. Sem stretched link: não
+            inventar rota; a ação explícita do rodapé faz o papel. */}
+        <article className="relative flex flex-col gap-2.5 rounded-xl bg-card p-3.5 shadow-[var(--shadow-border)] transition-shadow hover:shadow-[var(--shadow-border-hover)]">
+          <div className="flex items-start gap-2.5">
+            <InstrumentoEmblema instrumento="avaliacao_terceiros" />
+            <div className="min-w-0">
+              <h3 className="text-sm font-semibold leading-snug">
+                Avaliação por terceiros
+              </h3>
+              <p className="mt-1 flex flex-wrap items-center gap-1.5">
+                <span className="rounded-md bg-muted px-1.5 py-0.5 text-xs font-medium text-muted-foreground sm:text-[11px]">
+                  Enc. 1–2
+                </span>
+                {papel === "mentor" &&
+                  duplaSelecionada &&
+                  terceirosSelecionada &&
+                  terceirosSelecionada.total > 0 && (
+                    <Badge variant="secondary" className="tabular-nums">
+                      {terceirosSelecionada.respondidos} de{" "}
+                      {terceirosSelecionada.total} respostas
+                    </Badge>
+                  )}
+              </p>
+            </div>
+          </div>
+          <p className="text-xs leading-relaxed text-muted-foreground">
+            O jovem indica pessoas que o conhecem bem; cada uma responde 2
+            perguntas por link (ou o mentor lança a resposta colhida por
+            fora) e a consolidação anônima chega ao jovem.
+          </p>
+          {(ehCoord || papel === "supervisor" || (papel === "mentor" && duplaSelecionada)) && (
+            <div className="relative mt-auto flex flex-wrap items-center gap-2 pt-1">
+              {ehCoord || papel === "supervisor" ? (
+                <Link
+                  href="/duplas"
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  <Eye aria-hidden />
+                  Ver por dupla
+                </Link>
+              ) : (
+                <Link
+                  href={`/duplas/${duplaSelecionada}?aba=instrumentos#instrumentos`}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                >
+                  <Eye aria-hidden />
+                  Na ficha
+                </Link>
+              )}
+            </div>
+          )}
+        </article>
       </div>
       {atrasados.length > 0 && (
         <section

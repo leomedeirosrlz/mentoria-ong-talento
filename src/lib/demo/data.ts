@@ -1118,7 +1118,7 @@ function build(): DemoData {
     bio: "Empreendedor, fundou duas pequenas empresas de serviço.",
     linkedin: "https://linkedin.com/in/andrerocha",
     areas: ["empreendedorismo", "finanças", "vendas"],
-    voluntariado: "Mentor do Pedro — a dupla pausou a pedido da família; retorno combinado pro próximo mês.",
+    voluntariado: "Mentor do Pedro — a família avisou a saída dele; a dupla pausou enquanto a coordenação decide o encaminhamento.",
     onboarded_em: haDias(30),
     nome_social: null, data_nascimento: "1987-05-16", genero: "masculino",
     cidade: "Osasco", uf: "SP",
@@ -1654,6 +1654,11 @@ function build(): DemoData {
     motivacao: null, pref_genero_par: null, objetivos: null,
     escolaridade: "medio", origem: null, disponibilidade: null,
     created_at: haDias(58),
+    // a família avisou a saída na pausa (460): desistente numa dupla viva
+    // é o gatilho novo do card de remanejo — a coord decide se encerra ou
+    // se remaneja o André com quem espera na fila
+    situacao: "desistente", saiu_em: haDias(4),
+    motivo_saida: "A família avisou que ele não segue no ciclo.",
   };
 
   // ficha mínima da leva da T2: veio pela ONG parceira da turma nova e
@@ -2532,7 +2537,9 @@ function build(): DemoData {
 
   // d-pausa · André × Pedro — a dupla pausada: engatou nos 2 primeiros
   // encontros, aí a família pediu pausa (a mãe do Pedro adoeceu e ele assumiu
-  // o cuidado do irmão). O 3º ficou agendado no passado e o semáforo congela
+  // o cuidado do irmão) e na sequência avisou a saída — ele tá desistente,
+  // então o card de remanejo acende pelo gatilho novo do 460 mesmo com a
+  // jornada congelada. O 3º ficou agendado no passado e o semáforo congela
   // em "Dupla pausada" — sai das cobranças sem virar risco.
   const encDPausa: Encontro[] = [
     comRegistro(
@@ -2568,7 +2575,7 @@ function build(): DemoData {
     encontros: encDPausa,
     encaminhamentos: [
       encaminhamento(uid(D.pausa), encDPausa[1].registro!.id,
-        "Ligar pra família no dia 10 pra combinar a retomada",
+        "Confirmar a saída com a família e encaminhar o remanejo",
         "mentor", addDias(HOJE, 10), "pendente"),
     ],
     notas: [],
