@@ -1,9 +1,24 @@
 {
-  "regions": ["iad1"],
+  "regions": [
+    "iad1"
+  ],
   "crons": [
     {
       "path": "/api/jobs/tick",
       "schedule": "0 6 * * *"
     }
-  ]
+  ],
+  "git": {
+    "deploymentEnabled": {
+      "main": true,
+      "staging": true,
+      "feat/**": false,
+      "fix/**": false,
+      "test/**": false,
+      "docs/**": false,
+      "chore/**": false,
+      "batch/**": false,
+      "specs/**": false
+    }
+  }
 }
