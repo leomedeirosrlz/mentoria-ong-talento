@@ -49,6 +49,7 @@ concurrency:
 
 permissions:
   contents: read
+  packages: read
 
 jobs:
   # O modo sai UMA vez daqui; os shards leem o output. Staging exige os 3
@@ -123,6 +124,15 @@ jobs:
       - if: env.BACKEND == 'local'
         name: supabase local
         run: >-
+          # imagens do Supabase vêm do GHCR (sem rate limit do ECR público):
+          # baixa o espelho e retaga no nome original que o CLI espera
+          repo="${GITHUB_REPOSITORY,,}"
+          while read -r img; do
+            case "$img" in ""|\#*) continue;; esac
+            base="${img##*/}"; name="${base%%:*}"; tag="${base##*:}"
+            docker pull "ghcr.io/$repo/supabase-mirror/$name:$tag"
+            docker tag "ghcr.io/$repo/supabase-mirror/$name:$tag" "$img"
+          done < .github/supabase-images.txt
           pnpm exec supabase start
           -x studio,imgproxy,edge-runtime,logflare,vector,supavisor
       - if: env.BACKEND == 'local'
