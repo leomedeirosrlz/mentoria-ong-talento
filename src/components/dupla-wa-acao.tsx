@@ -217,8 +217,8 @@ export function DuplaWaAcao({
             </DialogTitle>
             <DialogDescription>
               {destinatarios
-                ? "Escolhe quem recebe e por onde a mensagem sai."
-                : "O mesmo texto pros dois canais: escolhe onde sai."}
+                ? "Escolha quem recebe e por onde a mensagem sai."
+                : "O mesmo texto pros dois canais: escolha onde sai."}
             </DialogDescription>
           </DialogHeader>
           {destinatarios && (

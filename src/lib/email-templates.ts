@@ -182,7 +182,7 @@ export function emailAviso({
     tagline: "Aviso da coordenação",
     preheader: `${tema ? `${tema.texto}: ` : ""}${titulo}: ${corpo.slice(0, 90)}`,
     rodapeExtra:
-      "Este aviso também está na plataforma, na aba inicial. Você pode conferir por lá a qualquer momento.",
+      "Este aviso também está na plataforma, na aba inicial.",
   });
 }
 
