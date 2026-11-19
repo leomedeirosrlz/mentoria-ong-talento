@@ -202,7 +202,7 @@ export async function pedirEspecialistaJovem(input: {
 
   // saneamento de forma — o domínio (gate, dedup, teto, grade) a RPC valida
   if (demanda && (demanda.length < 10 || demanda.length > 1000)) {
-    return { error: "Conta um pouco mais — entre 10 e 1.000 caracteres." };
+    return { error: "Conta um pouco mais: entre 10 e 1.000 caracteres." };
   }
   if (motivo && (motivo.length < 3 || motivo.length > 500)) {
     return { error: "O motivo precisa ter entre 3 e 500 caracteres." };

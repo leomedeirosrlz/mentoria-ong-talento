@@ -41,7 +41,7 @@ export function EquipeWaDialog({
         <DialogHeader>
           <DialogTitle>Falar com a equipe</DialogTitle>
           <DialogDescription>
-            Escolha com quem conversar no WhatsApp — a mensagem já sai com a
+            Escolha com quem conversar no WhatsApp. A mensagem já sai com a
             sua apresentação.
           </DialogDescription>
         </DialogHeader>
@@ -87,7 +87,7 @@ export function EquipeWaDialog({
         </ul>
         {!comWa.length && (
           <p className="text-sm text-muted-foreground">
-            A equipe ainda não tem WhatsApp cadastrado — registre sua dúvida
+            A equipe ainda não tem WhatsApp cadastrado. Registre sua dúvida
             em Precisa de ajuda e a coordenação responde pela plataforma.
           </p>
         )}
