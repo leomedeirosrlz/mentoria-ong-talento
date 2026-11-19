@@ -36,6 +36,7 @@ import {
   CampoNascimento,
   CampoPrefGenero,
   CampoUf,
+  SENTINEL_VAZIO,
   WizardFicha,
   type PassoFicha,
 } from "@/components/campos-pessoais";
@@ -151,6 +152,10 @@ export function NovaPessoaDialog() {
   const [role, setRole] = useState("mentor_dpp");
   const [interesses, setInteresses] = useState<string[]>([]);
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(null);
+  // cidade/UF da ficha — controlados pro autofill do CEP (modo compacto
+  // do DadosCivisFields) alcançar o passo "Localização e perfil"
+  const [cidade, setCidade] = useState("");
+  const [uf, setUf] = useState("");
   const { submit, pending } = useSubmit(createPessoa, (n) => `Cadastro de ${n} salvo.`, () => setOpen(false));
   const ehMentor = role === "mentor_dpp" || role === "mentor_especialista" || role === "mentor_hibrido";
   const hibrido = role === "mentor_hibrido";
@@ -296,7 +301,15 @@ export function NovaPessoaDialog() {
       icone: FileText,
       conteudo: (
         <>
-          <DadosCivisFields prefix="civis_" opcional compacto />
+          <DadosCivisFields
+            prefix="civis_"
+            opcional
+            compacto
+            onEndereco={(e) => {
+              setCidade(e.cidade);
+              setUf(e.uf);
+            }}
+          />
           <p className="text-xs text-muted-foreground">
             RG, CPF e endereço preenchem o termo de adesão automaticamente: a pessoa só confere e assina.
           </p>
@@ -337,9 +350,18 @@ export function NovaPessoaDialog() {
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="n_cidade">Cidade</Label>
-              <Input id="n_cidade" name="cidade" maxLength={100} />
+              <Input
+                id="n_cidade"
+                name="cidade"
+                maxLength={100}
+                value={cidade}
+                onChange={(e) => setCidade(e.target.value)}
+              />
             </div>
-            <CampoUf />
+            <CampoUf
+              value={uf}
+              onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
+            />
           </div>
           <CampoInteresses value={interesses} onChange={setInteresses} />
         </>
@@ -358,6 +380,8 @@ export function NovaPessoaDialog() {
           setRole("mentor_dpp");
           setInteresses([]);
           setDisponibilidade(null);
+          setCidade("");
+          setUf("");
         }
       }}
     >
@@ -385,6 +409,10 @@ export function NovoMentoradoDialog() {
   const [open, setOpen] = useState(false);
   const [interesses, setInteresses] = useState<string[]>([]);
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(null);
+  // cidade/UF da ficha — controlados pro autofill do CEP (modo compacto
+  // do DadosCivisFields) alcançar o passo "Onde vive e origem"
+  const [cidade, setCidade] = useState("");
+  const [uf, setUf] = useState("");
   const { submit, pending } = useSubmit(createMentorado, (n) => `Cadastro de ${n} salvo.`, () => setOpen(false));
 
   // um passo por SecaoFicha — o form tinha 9 seções seguidas de scroll.
@@ -436,9 +464,18 @@ export function NovoMentoradoDialog() {
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="m_cidade">Cidade</Label>
-              <Input id="m_cidade" name="cidade" maxLength={100} />
+              <Input
+                id="m_cidade"
+                name="cidade"
+                maxLength={100}
+                value={cidade}
+                onChange={(e) => setCidade(e.target.value)}
+              />
             </div>
-            <CampoUf />
+            <CampoUf
+              value={uf}
+              onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
+            />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -466,7 +503,15 @@ export function NovoMentoradoDialog() {
       icone: FileText,
       conteudo: (
         <>
-          <DadosCivisFields prefix="civis_" opcional compacto />
+          <DadosCivisFields
+            prefix="civis_"
+            opcional
+            compacto
+            onEndereco={(e) => {
+              setCidade(e.cidade);
+              setUf(e.uf);
+            }}
+          />
           <p className="text-xs text-muted-foreground">
             Preenchem o termo de participação: o(a) jovem assina por link, sem precisar de conta.
           </p>
@@ -520,6 +565,8 @@ export function NovoMentoradoDialog() {
         if (o) {
           setInteresses([]);
           setDisponibilidade(null);
+          setCidade("");
+          setUf("");
         }
       }}
     >

@@ -9,6 +9,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { maskCep, maskCpf } from "@/lib/utils";
 import { buscarCep } from "@/lib/actions-endereco";
+import type { ViaCepEndereco } from "@/lib/viacep";
 import type { DadosCivis } from "@/lib/types";
 
 type Resultado = { error?: string; ok?: boolean };
@@ -20,14 +21,14 @@ const onInputMask = (mask: (v: string) => string) => (e: React.FormEvent<HTMLInp
 const cpfMask = maskCpf;
 const cepMask = maskCep;
 
-/** Linha de status do CEP (aria-live): repouso já explica a consulta ao
- *  ViaCEP (transparência LGPD); os outros estados dizem o que houve sem
- *  travar a digitação — autofill é conveniência, nunca portão. */
+/** Linha de status do CEP (aria-live): em repouso não há texto fixo — a
+ *  transparência sobre a consulta mora em docs/lgpd/base-legal.md, não num
+ *  hint in-situ. Os estados de busca dizem o que houve sem travar a
+ *  digitação — autofill é conveniência, nunca portão. */
 const STATUS_CEP: Record<
-  "idle" | "buscando" | "ok" | "nao_encontrado" | "falha",
+  "buscando" | "ok" | "nao_encontrado" | "falha",
   string
 > = {
-  idle: "CEP completo consulta o ViaCEP e preenche o endereço.",
   buscando: "Buscando endereço no ViaCEP…",
   ok: "Endereço preenchido. Confira e ajuste se precisar.",
   nao_encontrado: "CEP não encontrado. Preencha o endereço manualmente.",
@@ -42,17 +43,21 @@ const STATUS_CEP: Record<
  *  — `prefix` distingue o bloco do responsável na ficha do mentorado.
  *  `defaults` preenche com o que já está na ficha (prefill de 0046).
  *  `compacto` (cadastro) omite nome civil/nascimento/cidade/UF — a ficha
- *  já pede esses, o parser do action junta tudo no jsonb. */
+ *  já pede esses, o parser do action junta tudo no jsonb. `onEndereco`
+ *  recebe o endereço resolvido pelo ViaCEP: no compacto o hospedeiro usa
+ *  pra alimentar os campos simples cidade/UF que vivem fora do bloco. */
 export function DadosCivisFields({
   defaults,
   opcional,
   prefix = "",
   compacto,
+  onEndereco,
 }: {
   defaults?: DadosCivis | null;
   opcional?: boolean;
   prefix?: string;
   compacto?: boolean;
+  onEndereco?: (endereco: ViaCepEndereco) => void;
 }) {
   const req = opcional ? undefined : true;
   const n = (k: string) => `${prefix}${k}`;
@@ -88,7 +93,9 @@ export function DadosCivisFields({
       if (cepBuscado.current !== digitos) return;
       if (r.kind === "ok") {
         // numero/complemento nunca vêm do ViaCEP; em compacto cidade/UF
-        // não renderizam (vêm dos campos simples da ficha)
+        // não renderizam aqui — o hospedeiro alimenta os campos simples
+        // dele via onEndereco (só CEP novo dispara: edição manual segue
+        // valendo até a próxima busca)
         setEnd((atual) => ({
           ...atual,
           logradouro: r.endereco.logradouro,
@@ -97,6 +104,7 @@ export function DadosCivisFields({
             ? {}
             : { cidade: r.endereco.cidade, uf: r.endereco.uf }),
         }));
+        onEndereco?.(r.endereco);
         setStatus("ok");
       } else {
         setStatus(r.kind === "nao_encontrado" ? "nao_encontrado" : "falha");
@@ -201,13 +209,15 @@ export function DadosCivisFields({
             />
           )}
         </div>
-        <p
-          id={n("cep_status")}
-          aria-live="polite"
-          className="text-xs text-muted-foreground"
-        >
-          {STATUS_CEP[status]}
-        </p>
+        {status !== "idle" && (
+          <p
+            id={n("cep_status")}
+            aria-live="polite"
+            className="text-xs text-muted-foreground"
+          >
+            {STATUS_CEP[status]}
+          </p>
+        )}
       </div>
       {/* a 320px o grid fixo [1fr_100px] espremia o Logradouro em ~124px —
           número vira linha própria abaixo de 420px */}

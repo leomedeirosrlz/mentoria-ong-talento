@@ -31,6 +31,7 @@ import {
   CampoNascimento,
   CampoPrefGenero,
   CampoUf,
+  SENTINEL_VAZIO,
   WizardFicha,
   type PassoFicha,
 } from "@/components/campos-pessoais";
@@ -84,6 +85,11 @@ export function PessoaActions({
   const [duplasEmCurso, setDuplasEmCurso] = useState(0);
   const [mp, setMp] = useState<MentorProfile | undefined>(undefined);
   const [disponibilidade, setDisponibilidade] = useState<Disponibilidade | null>(null);
+  // cidade/UF da ficha — controlados pro autofill do CEP (modo compacto
+  // do DadosCivisFields) alcançar o passo "Dados pessoais"; o reset na
+  // abertura re-lê o valor fresco da pessoa
+  const [cidade, setCidade] = useState(pessoa.cidade ?? "");
+  const [uf, setUf] = useState(pessoa.uf ?? "");
   const [pending, start] = useTransition();
   const router = useRouter();
   const ehDpp = temPapel(pessoa, "mentor_dpp");
@@ -267,6 +273,10 @@ export function PessoaActions({
             opcional
             compacto
             defaults={pessoa.dados_civis}
+            onEndereco={(e) => {
+              setCidade(e.cidade);
+              setUf(e.uf);
+            }}
           />
           <p className="text-xs text-muted-foreground">
             Preenchem o termo de adesão automaticamente: a pessoa só confere e assina.
@@ -336,9 +346,18 @@ export function PessoaActions({
           <div className="grid gap-4 sm:grid-cols-3">
             <div className="space-y-2 sm:col-span-2">
               <Label htmlFor="e_cidade">Cidade</Label>
-              <Input id="e_cidade" name="cidade" maxLength={100} defaultValue={pessoa.cidade ?? ""} />
+              <Input
+                id="e_cidade"
+                name="cidade"
+                maxLength={100}
+                value={cidade}
+                onChange={(e) => setCidade(e.target.value)}
+              />
             </div>
-            <CampoUf defaultValue={pessoa.uf ?? ""} />
+            <CampoUf
+              value={uf}
+              onChange={(v) => setUf(v === SENTINEL_VAZIO ? "" : v)}
+            />
           </div>
         </>
       ),
@@ -464,7 +483,11 @@ export function PessoaActions({
           setEditOpen(o);
           // a grade volta zerada na abertura — o fetch do mentor_profiles
           // repovoa (falha nele esconde a seção, nunca zera o banco)
-          if (o) setDisponibilidade(null);
+          if (o) {
+            setDisponibilidade(null);
+            setCidade(pessoa.cidade ?? "");
+            setUf(pessoa.uf ?? "");
+          }
         }}
       >
         <DialogContent size="2xl">
