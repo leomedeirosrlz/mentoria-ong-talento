@@ -291,9 +291,10 @@ test.describe("agenda demo da coordenação — Monitoramento (WP5)", () => {
     // lembretes nas últimas 48h (o do Dandara foi há ~20h — é ele que
     // trava o botão dela; a métrica conta enviados na janela, não "presos")
     await expect(sec.getByText(/registros entregues/)).toBeVisible();
-    // o contador do pulso — "N aguardando" (o aria-label da barra de
-    // cobertura também diz "aguardando registro"; o dígito desambigua)
-    await expect(sec.getByText(/\d+ aguardando$/)).toBeVisible();
+    // o contador do pulso — "N aguardando". O texto pode aparecer mais de
+    // uma vez (total + linha por turma e/ou par mobile/desktop), então
+    // escopamos no primeiro: o contrato é "existe um contador visível".
+    await expect(sec.getByText(/\d+ aguardando$/).first()).toBeVisible();
     await expect(
       sec.getByText(/média das avaliações dos jovens/)
     ).toBeVisible();

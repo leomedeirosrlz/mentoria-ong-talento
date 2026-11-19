@@ -4,7 +4,11 @@ import type { CSSProperties } from "react";
 import { useMemo } from "react";
 import { Quotes, Wind } from "@phosphor-icons/react";
 import { agrupaEmSecoes } from "@/lib/forms/instrumentos";
-import { type FormularioCampo } from "@/lib/forms/schema";
+import {
+  camposPerguntas,
+  type FormularioCampo,
+} from "@/lib/forms/schema";
+import { NumeroPergunta } from "@/components/forms/pergunta";
 import { cn } from "@/lib/utils";
 import type { RespostaApi } from "./use-resposta";
 import {
@@ -29,16 +33,14 @@ export function Visao({
   api: RespostaApi;
 }) {
   const blocos = useMemo(() => agrupaEmSecoes(campos), [campos]);
-  // numeração dos prompts acumulada por bloco — a pergunta 3 da seção 2
-  // continua 6, não volta a 1 (a numeração é do instrumento inteiro)
+  // numeração da régua inteira (só perguntas — 'secao' é estrutura): a
+  // pergunta 3 da seção 2 continua 3 da régua, não volta a 1; é o mesmo
+  // número que a leitura mostra no resultado (RespostaLista)
   const ordens = useMemo(() => {
     const m = new Map<string, number>();
-    let n = 0;
-    for (const b of blocos)
-      for (const c of b.campos)
-        if (c.tipo === "texto_longo") m.set(c.id, ++n);
+    camposPerguntas(campos).forEach((c, i) => m.set(c.id, i + 1));
     return m;
-  }, [blocos]);
+  }, [campos]);
 
   return (
     <>
@@ -89,7 +91,14 @@ export function Visao({
             <div className="space-y-3">
               {b.campos.map((c) => {
                 if (c.tipo !== "texto_longo")
-                  return <CampoGenerico key={c.id} campo={c} api={api} />;
+                  return (
+                    <CampoGenerico
+                      key={c.id}
+                      campo={c}
+                      api={api}
+                      n={ordens.get(c.id)}
+                    />
+                  );
                 const nPrompt = ordens.get(c.id) ?? 0;
                 const ehDeclaracao = c.id === "declaracao_visao";
                 return (
@@ -113,18 +122,13 @@ export function Visao({
                           <Quotes size={17} weight="fill" />
                         </span>
                       ) : (
-                        <span
-                          aria-hidden
-                          className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--brand-lime)]/15 text-xs font-bold tabular-nums text-[var(--ok-text)]"
-                        >
-                          {nPrompt}
-                        </span>
+                        <NumeroPergunta n={nPrompt} />
                       )}
                       {ehDeclaracao ? (
                         <h2 className="min-w-0 flex-1">
                           <label
                             htmlFor={campoDomId(c)}
-                            className="block text-xl font-semibold leading-snug tracking-tight @xl:text-2xl"
+                            className="block text-xl font-semibold leading-snug tracking-tight text-[var(--ok-text)] @xl:text-2xl"
                           >
                             {b.secao?.label ?? c.label}
                           </label>
@@ -137,7 +141,7 @@ export function Visao({
                       ) : (
                         <label
                           htmlFor={campoDomId(c)}
-                          className="text-lg font-semibold leading-snug tracking-tight @xl:text-xl"
+                          className="text-lg font-semibold leading-snug tracking-tight text-[var(--ok-text)] @xl:text-xl"
                         >
                           {c.label}
                           {!c.obrigatorio && (

@@ -7,6 +7,11 @@ import {
 } from "@/lib/forms/schema";
 import { agrupaEmSecoes } from "@/lib/forms/instrumentos";
 import { Badge } from "@/components/ui/badge";
+import {
+  NumeroPergunta,
+  PERGUNTA_TEXTO,
+  RESPOSTA_TEXTO,
+} from "@/components/forms/pergunta";
 import { cn } from "@/lib/utils";
 
 // Lista pergunta → resposta de um formulário (leitura pós-envio): as
@@ -93,10 +98,8 @@ export function RespostaLista({
       <dl className={cn("space-y-3", className)}>
         {cruas.map(([id, v]) => (
           <div key={id}>
-            <dt className="text-sm font-medium leading-snug">
-              {id.replace(/_/g, " ")}
-            </dt>
-            <dd className="mt-1 text-sm leading-relaxed whitespace-pre-wrap">
+            <dt className={PERGUNTA_TEXTO}>{id.replace(/_/g, " ")}</dt>
+            <dd className={cn("mt-1 whitespace-pre-wrap", RESPOSTA_TEXTO)}>
               {renderValor?.(undefined, v) ?? respostaFormatada(undefined, v)}
             </dd>
           </div>
@@ -193,15 +196,18 @@ export function RespostaLista({
           <dl className={cn("space-y-3", b.secao && "mt-2.5")}>
             {b.linhas.map((l) => (
               <div key={l.id}>
-                <dt className="text-sm font-medium leading-snug">
-                  {l.n != null && (
-                    <span className="mr-1 tabular-nums text-muted-foreground">
-                      {l.n}.
-                    </span>
-                  )}
-                  {l.label}
+                <dt className={cn("flex items-start gap-2.5", PERGUNTA_TEXTO)}>
+                  {l.n != null && <NumeroPergunta n={l.n} compacto />}
+                  <span className="min-w-0 flex-1 pt-0.5">{l.label}</span>
                 </dt>
-                <dd className="mt-1 text-sm leading-relaxed whitespace-pre-wrap">
+                <dd
+                  className={cn(
+                    "mt-1 whitespace-pre-wrap",
+                    RESPOSTA_TEXTO,
+                    // resposta alinha com o enunciado, não com o disco
+                    l.n != null && "pl-[34px]"
+                  )}
+                >
                   {l.extra ?? l.valor}
                 </dd>
               </div>

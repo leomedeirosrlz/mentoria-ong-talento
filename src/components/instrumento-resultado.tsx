@@ -1,4 +1,5 @@
 import {
+  camposPerguntas,
   COMPETENCIAS_MENTOR,
   COMPETENCIA_OPCOES,
   extraiMetas,
@@ -8,6 +9,11 @@ import {
   type FormularioSistema,
   type RespostaValor,
 } from "@/lib/forms/schema";
+import {
+  NumeroPergunta,
+  PERGUNTA_TEXTO,
+  RESPOSTA_TEXTO,
+} from "@/components/forms/pergunta";
 import { parseSubmetasLinhas } from "@/lib/pdm";
 import { cn } from "@/lib/utils";
 import { RodaSvg } from "./instrumentos/roda-svg";
@@ -97,6 +103,9 @@ function RodaResultado({
   const roda = extraiRodaDaVida(campos, respostas);
   if (!roda) return null;
   const reflexao = valorDe(campos, respostas, "reflexao");
+  const numeroPorId = new Map(
+    camposPerguntas(campos).map((c, i) => [c.id, i + 1])
+  );
 
   const rodaAnterior = respostasAnterior
     ? extraiRodaDaVida(campos, respostasAnterior)
@@ -145,7 +154,8 @@ function RodaResultado({
           </p>
         </div>
         {/* nota por área agrupada por quadrante — a barra repete a leitura
-            do polígono pra quem precisa do número exato */}
+            do polígono pra quem precisa do número exato. O disco repete a
+            posição na régua que a pessoa viu ao preencher (REALIZA-442) */}
         <div className="space-y-3 @[30rem]:grid @[30rem]:grid-cols-2 @[30rem]:gap-x-6 @[30rem]:gap-y-4 @[30rem]:space-y-0 @[30rem]:self-start">
           {roda.quadrantes.map((q) => (
             <div key={q.nome || "geral"}>
@@ -157,7 +167,14 @@ function RodaResultado({
               <ul className="space-y-1">
                 {q.areas.map((a) => (
                   <li key={a.id} className="flex items-center gap-2 text-sm">
-                    <span className="min-w-0 flex-1 truncate" title={a.label}>
+                    <NumeroPergunta
+                      n={numeroPorId.get(a.id) ?? 0}
+                      compacto
+                    />
+                    <span
+                      className="min-w-0 flex-1 truncate font-semibold text-[var(--ok-text)]"
+                      title={a.label}
+                    >
                       {a.label}
                     </span>
                     <span className="h-1.5 w-16 shrink-0 overflow-hidden rounded-full bg-muted sm:w-20">
@@ -279,7 +296,8 @@ function MetasResultado({
               key={m.n}
               className="rounded-lg border border-border/70 px-3 py-2.5"
             >
-              <div className="flex flex-wrap items-baseline gap-x-2">
+              <div className="flex flex-wrap items-center gap-2">
+                <NumeroPergunta n={m.n} compacto />
                 <span className="text-xs font-semibold tabular-nums text-muted-foreground">
                   Meta {m.n}
                 </span>
@@ -352,7 +370,9 @@ function MetasResultado({
                 >
                   {r.ok ? "✓" : "✗"}
                 </span>
-                <span className="min-w-0 flex-1">{r.label}</span>
+                <span className="min-w-0 flex-1 text-[var(--ok-text)]">
+                  {r.label}
+                </span>
               </li>
             ))}
           </ul>
@@ -372,6 +392,9 @@ function VisaoResultado({
   respostas: Record<string, RespostaValor>;
 }) {
   const declaracao = valorDe(campos, respostas, "declaracao_visao");
+  const numeroPorId = new Map(
+    camposPerguntas(campos).map((c, i) => [c.id, i + 1])
+  );
   const narrativa = (
     [
       "filme",
@@ -390,28 +413,26 @@ function VisaoResultado({
       <Declaracao texto={declaracao} />
       {temNarrativa && (
         <Bloco titulo="O filme da vida ideal">
-          {/* hierarquia própria da narrativa da Visão (REALIZA-442): disco
+          {/* hierarquia da gramática compartilhada (REALIZA-442): disco
               amarelo no lugar do "n." miúdo (o mesmo número da escrita em
               /f/<token>), pergunta no verde do instrumento, resposta no
               primeiro plano. O nº é a posição na régua — uma opcional
               vazia não renumera as seguintes */}
           <ol className="space-y-4">
-            {narrativa.map((c, i) => {
+            {narrativa.map((c) => {
               const valor = valorDe(campos, respostas, c.id);
               if (valor === "—") return null;
               return (
                 <li key={c.id} className="flex items-start gap-3">
-                  <span
-                    aria-hidden
-                    className="grid size-8 shrink-0 place-items-center rounded-full bg-[var(--destaque)] text-xs font-bold tabular-nums text-[var(--destaque-foreground)]"
-                  >
-                    {i + 1}
-                  </span>
+                  <NumeroPergunta n={numeroPorId.get(c.id) ?? 0} />
                   <div className="min-w-0 pt-0.5">
-                    <p className="text-[15px] font-semibold leading-snug text-[var(--ok-text)]">
-                      {c.label}
-                    </p>
-                    <p className="mt-1 text-base leading-relaxed whitespace-pre-wrap">
+                    <p className={PERGUNTA_TEXTO}>{c.label}</p>
+                    <p
+                      className={cn(
+                        "mt-1 whitespace-pre-wrap",
+                        RESPOSTA_TEXTO
+                      )}
+                    >
                       {valor}
                     </p>
                   </div>

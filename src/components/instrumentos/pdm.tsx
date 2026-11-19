@@ -8,7 +8,14 @@ import {
   type BlocoSecao,
 } from "@/lib/forms/instrumentos";
 import { campoRespondido } from "@/lib/forms/resposta";
-import { type FormularioCampo } from "@/lib/forms/schema";
+import {
+  camposPerguntas,
+  type FormularioCampo,
+} from "@/lib/forms/schema";
+import {
+  NumeroPergunta,
+  RotuloPergunta,
+} from "@/components/forms/pergunta";
 import { cn } from "@/lib/utils";
 import type { RespostaApi } from "./use-resposta";
 import { SubmetasEditor } from "./submetas-editor";
@@ -40,6 +47,13 @@ export function Pdm({
 }) {
   const blocos = useMemo(() => agrupaEmSecoes(campos), [campos]);
   const grupos = useMemo(() => extraiGruposMeta(campos), [campos]);
+  // posição na régua do form pros campos soltos — as fichas de meta têm a
+  // identidade "Meta N" própria e não repetem a régua
+  const numeroPorId = useMemo(() => {
+    const m = new Map<string, number>();
+    camposPerguntas(campos).forEach((c, i) => m.set(c.id, i + 1));
+    return m;
+  }, [campos]);
 
   // capítulo fechado = todas as perguntas obrigatórias dele respondidas
   const capitulos = blocos.map((b, i) => ({
@@ -92,7 +106,13 @@ export function Pdm({
 
         <div className="min-w-0 space-y-5">
           {capitulos.map((c) => (
-            <CapituloDoc key={c.id} capitulo={c} api={api} grupos={grupos} />
+            <CapituloDoc
+              key={c.id}
+              capitulo={c}
+              api={api}
+              grupos={grupos}
+              numeroPorId={numeroPorId}
+            />
           ))}
         </div>
       </div>
@@ -105,10 +125,12 @@ function CapituloDoc({
   capitulo,
   api,
   grupos,
+  numeroPorId,
 }: {
   capitulo: { bloco: BlocoSecao; numero: number; id: string };
   api: RespostaApi;
   grupos: ReturnType<typeof extraiGruposMeta>;
+  numeroPorId: Map<string, number>;
 }) {
   const { bloco, numero, id } = capitulo;
   const temMetas = bloco.campos.some((c) => META_RE.test(c.id));
@@ -121,12 +143,12 @@ function CapituloDoc({
       <div className="p-5 @xl:p-7">
         {bloco.secao && (
           <header className="flex items-start gap-3">
-            <span
-              aria-hidden
-              className="grid size-8 shrink-0 place-items-center rounded-lg bg-[var(--brand-lime)]/15 text-sm font-bold tabular-nums text-[var(--ok-text)]"
-            >
-              {numero}
-            </span>
+            {/* número de capítulo, não de pergunta — mesma tinta destaque
+                da gramática, canto quadrado pra ler como seção do doc */}
+            <NumeroPergunta
+              n={numero}
+              className="rounded-lg text-sm"
+            />
             <div className="min-w-0">
               <h2 className="text-lg font-semibold tracking-tight">
                 {bloco.secao.label}
@@ -142,7 +164,12 @@ function CapituloDoc({
 
         <div className={cn("space-y-4", bloco.secao && "mt-5")}>
           {temMetas ? (
-            <FichasPdm campos={bloco.campos} grupos={grupos} api={api} />
+            <FichasPdm
+              campos={bloco.campos}
+              grupos={grupos}
+              api={api}
+              numeroPorId={numeroPorId}
+            />
           ) : (
             bloco.campos.map((c) => {
               // mapa de submetas (0080): o capítulo dedicado rende o
@@ -158,22 +185,11 @@ function CapituloDoc({
                 />
               ) : c.tipo === "texto_longo" ? (
                 <div key={c.id} data-campo={c.id} className="space-y-1.5">
-                  <label
+                  <RotuloPergunta
+                    campo={c}
+                    n={numeroPorId.get(c.id)}
                     htmlFor={campoDomId(c)}
-                    className="block text-[15px] font-medium leading-snug @xl:text-base"
-                  >
-                    {c.label}
-                    {!c.obrigatorio && (
-                      <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                        (opcional)
-                      </span>
-                    )}
-                    {c.descricao && (
-                      <span className="mt-0.5 block text-xs font-normal leading-relaxed text-muted-foreground">
-                        {c.descricao}
-                      </span>
-                    )}
-                  </label>
+                  />
                   <EntradaTextoLongo
                     campo={c}
                     valor={api.valores[c.id]}
@@ -185,7 +201,13 @@ function CapituloDoc({
                   <ErroCampo campo={c} msg={api.erros[c.id]} />
                 </div>
               ) : (
-                <CampoGenerico key={c.id} campo={c} api={api} sombra={false} />
+                <CampoGenerico
+                  key={c.id}
+                  campo={c}
+                  api={api}
+                  sombra={false}
+                  n={numeroPorId.get(c.id)}
+                />
               );
             })
           )}
@@ -201,10 +223,12 @@ function FichasPdm({
   campos,
   grupos,
   api,
+  numeroPorId,
 }: {
   campos: FormularioCampo[];
   grupos: ReturnType<typeof extraiGruposMeta>;
   api: RespostaApi;
+  numeroPorId: Map<string, number>;
 }) {
   const idsDeMeta = new Set(
     grupos.flatMap((g) =>
@@ -233,7 +257,7 @@ function FichasPdm({
         >
           <label
             htmlFor={campoDomId(declaracao)}
-            className="block text-[15px] font-semibold leading-snug"
+            className="block text-[15px] font-semibold leading-snug text-[var(--ok-text)]"
           >
             {declaracao.label}
           </label>
@@ -263,7 +287,8 @@ function FichasPdm({
               errosDoGrupo && "ring-2 ring-destructive/60"
             )}
           >
-            <h3 className="flex items-baseline gap-2 text-sm font-semibold">
+            <h3 className="flex items-center gap-2.5 text-sm font-semibold">
+              <NumeroPergunta n={g.n} compacto />
               <span className="tabular-nums">Meta {g.n}</span>
               {!g.meta.obrigatorio && (
                 <span className="text-xs font-normal text-muted-foreground">
@@ -273,12 +298,11 @@ function FichasPdm({
             </h3>
             <div className="mt-2.5 space-y-3">
               <div className="space-y-1.5" data-campo={g.meta.id}>
-                <label
+                <RotuloPergunta
+                  campo={g.meta}
                   htmlFor={campoDomId(g.meta)}
-                  className="block text-sm font-medium"
-                >
-                  {g.meta.label}
-                </label>
+                  className="text-sm"
+                />
                 <EntradaTexto
                   campo={g.meta}
                   valor={api.valores[g.meta.id]}
@@ -290,17 +314,11 @@ function FichasPdm({
               <div className="grid gap-3 @[30rem]:grid-cols-[1fr_180px]">
                 {g.is && (
                   <div className="space-y-1.5" data-campo={g.is.id}>
-                    <label
+                    <RotuloPergunta
+                      campo={g.is}
                       htmlFor={campoDomId(g.is)}
-                      className="block text-sm font-medium"
-                    >
-                      {g.is.label}
-                      {!g.is.obrigatorio && (
-                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                          (opcional)
-                        </span>
-                      )}
-                    </label>
+                      className="text-sm"
+                    />
                     <EntradaTexto
                       campo={g.is}
                       valor={api.valores[g.is.id]}
@@ -313,17 +331,11 @@ function FichasPdm({
                 )}
                 {g.prazo && (
                   <div className="space-y-1.5" data-campo={g.prazo.id}>
-                    <label
+                    <RotuloPergunta
+                      campo={g.prazo}
                       htmlFor={campoDomId(g.prazo)}
-                      className="block text-sm font-medium"
-                    >
-                      {g.prazo.label}
-                      {!g.prazo.obrigatorio && (
-                        <span className="ml-1.5 text-xs font-normal text-muted-foreground">
-                          (opcional)
-                        </span>
-                      )}
-                    </label>
+                      className="text-sm"
+                    />
                     <EntradaData
                       campo={g.prazo}
                       valor={api.valores[g.prazo.id]}
@@ -365,7 +377,12 @@ function FichasPdm({
       })}
 
       {soltos.map((c) => (
-        <CampoGenerico key={c.id} campo={c} api={api} />
+        <CampoGenerico
+          key={c.id}
+          campo={c}
+          api={api}
+          n={numeroPorId.get(c.id)}
+        />
       ))}
     </>
   );
