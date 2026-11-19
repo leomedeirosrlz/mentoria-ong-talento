@@ -1,4 +1,5 @@
 import {
+  agirComConfirma,
   appEnvOk,
   atualizarViaServiceRole,
   buscarViaServiceRole,
@@ -43,16 +44,40 @@ const COMBINADO_MENTOR = "Mentor prepara material de revisão";
 
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
 
-/** Piso entre specs (e retries): combinado pendente e encontro com data
- *  futura. O combinado é PATCH (o seed garante a row); o encontro também
- *  é re-criado se ausente — este arquivo deleta a d1 no afterAll e retries
- *  do Playwright rodam depois dele, então PATCH-only morria no retry. */
-async function restaurarJovem() {
-  await atualizarViaServiceRole(
+/** Combinado do jovem volta a "pendente" — insert quando a row sumiu (a
+ *  dupla caindo em cascade de um cleanup de run morto a leva junta; PATCH
+ *  em row ausente é no-op silencioso e a home listava vazia). O prazo é
+ *  re-carimbado como no seed: vencido renderiza "passou do prazo" na home. */
+async function convergirCombinadoJovem() {
+  const [c1] = await buscarViaServiceRole<{ id: string }[]>(
     "encaminhamentos",
-    `id=eq.${IDS.combinado}`,
-    { status: "pendente" }
+    `select=id&id=eq.${IDS.combinado}`
   );
+  const prazo = new Date(Date.now() + 10 * 86400e3).toISOString().slice(0, 10);
+  if (c1) {
+    await atualizarViaServiceRole(
+      "encaminhamentos",
+      `id=eq.${IDS.combinado}`,
+      { status: "pendente", prazo }
+    );
+  } else {
+    await inserirViaServiceRole("encaminhamentos", {
+      id: IDS.combinado,
+      dupla_id: DUPLA_ID,
+      descricao: COMBINADO_JOVEM,
+      responsavel: "mentorado",
+      prazo,
+      status: "pendente",
+    });
+  }
+}
+
+/** Piso entre specs (e retries): combinado pendente e encontro com data
+ *  futura. Tudo patch-ou-insert — este arquivo deleta a d1 no afterAll e
+ *  retries do Playwright rodam depois dele, então PATCH-only morria no
+ *  retry (e um cleanup de run morto que derrubou a dupla leva o c1 junto). */
+async function restaurarJovem() {
+  await convergirCombinadoJovem();
   const futura3d = new Date(Date.now() + 3 * 86400e3).toISOString();
   const [d1] = await buscarViaServiceRole<{ id: string }[]>(
     "encontros",
@@ -103,8 +128,10 @@ test.describe("mentorado — shell /jovem", () => {
     await restaurarJovem();
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
     // o login despeja em "/" (grupo app), que devolve o mentorado pro shell
-    // dele — esperar o destino fixa o ponto de partida de cada spec
-    await page.waitForURL((u) => u.pathname === "/jovem", { timeout: 15_000 });
+    // dele — esperar o destino fixa o ponto de partida de cada spec. O
+    // redirect /→/jovem em preview frio passa dos 15s (mesma régua dos 30s
+    // do loginComSenha)
+    await page.waitForURL((u) => u.pathname === "/jovem", { timeout: 30_000 });
   });
 
   test.afterAll(async () => {
@@ -123,11 +150,7 @@ test.describe("mentorado — shell /jovem", () => {
       `encontro_id=eq.${IDS.encontro}`
     );
     await limparViaServiceRole("encontros", `id=eq.${IDS.encontro}`);
-    await atualizarViaServiceRole(
-      "encaminhamentos",
-      `id=eq.${IDS.combinado}`,
-      { status: "pendente" }
-    );
+    await convergirCombinadoJovem();
     // pedidos de ajuda do spec — cada destinatário (incl. coords reais do
     // staging) sai junto pelo created_by; o chamado aberto pelo dialog e
     // a trilha pública dele vão em cascata
@@ -207,13 +230,20 @@ test.describe("mentorado — shell /jovem", () => {
     const combinados = page.locator(
       'section[aria-labelledby="combinados-titulo"]'
     );
-    // o input é sr-only — o clique honesto é no label que o embrulha
-    await combinados
-      .locator("label", { hasText: COMBINADO_JOVEM })
-      .click();
+    // o input é sr-only — o clique honesto é no label que o embrulha.
+    // Checkbox é controlado: um clique pré-hidratação fica só no DOM e o
+    // React desfaz ao ligar — repete até a action disparar o toast. O
+    // click tem teto: o input desabilita enquanto a action roda
+    await agirComConfirma(
+      () =>
+        combinados
+          .locator("label", { hasText: COMBINADO_JOVEM })
+          .click({ timeout: 5_000 }),
+      () => page.getByText("Combinado marcado como feito.").isVisible()
+    );
     await expect(
       page.getByText("Combinado marcado como feito.")
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
     // checked vem do server (RPC + router.refresh) — preview frio leva
     // mais que os 5s default; a suite já usa 15s pra roundtrip assim.
     // Redesign: o item sai da lista de abertos e recolhe em "Ver N feitos"
@@ -221,9 +251,13 @@ test.describe("mentorado — shell /jovem", () => {
     const checkboxFeito = combinados
       .locator("label", { hasText: COMBINADO_JOVEM })
       .getByRole("checkbox");
-    await combinados
-      .getByRole("button", { name: /Ver \d+ feito/ })
-      .click({ timeout: 15_000 });
+    await agirComConfirma(
+      () =>
+        combinados
+          .getByRole("button", { name: /Ver \d+ feito/ })
+          .click({ timeout: 5_000 }),
+      () => checkboxFeito.isVisible()
+    );
     await expect(checkboxFeito).toBeChecked({ timeout: 15_000 });
     // o router.refresh re-renderizou — e o estado sobrevive a um reload de
     // verdade (write passou pelo banco, não por estado local)
@@ -231,14 +265,17 @@ test.describe("mentorado — shell /jovem", () => {
     const recarregados = page.locator(
       'section[aria-labelledby="combinados-titulo"]'
     );
-    await recarregados
-      .getByRole("button", { name: /Ver \d+ feito/ })
-      .click();
-    await expect(
-      recarregados
-        .locator("label", { hasText: COMBINADO_JOVEM })
-        .getByRole("checkbox")
-    ).toBeChecked();
+    const checkboxReload = recarregados
+      .locator("label", { hasText: COMBINADO_JOVEM })
+      .getByRole("checkbox");
+    await agirComConfirma(
+      () =>
+        recarregados
+          .getByRole("button", { name: /Ver \d+ feito/ })
+          .click({ timeout: 5_000 }),
+      () => checkboxReload.isVisible()
+    );
+    await expect(checkboxReload).toBeChecked({ timeout: 15_000 });
   });
 
   test("pedir ajuda abre chamado e avisa a equipe — nunca o mentor", async ({
@@ -247,15 +284,22 @@ test.describe("mentorado — shell /jovem", () => {
     await page.goto("/jovem");
     // o botão solto virou a linha discreta "Precisa de ajuda?" — abre o
     // mesmo diálogo de chamado (0084)
-    await page
-      .getByRole("button", { name: "Precisa de ajuda? Fale com a equipe" })
-      .click();
     const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
+    await agirComConfirma(
+      () =>
+        page
+          .getByRole("button", { name: "Precisa de ajuda? Fale com a equipe" })
+          .click(),
+      () => dialog.isVisible()
+    );
     // 0084: o canal de segurança é um chamado — opção na linguagem dele
-    await dialog
-      .getByRole("button", { name: /Com meu mentor/ })
-      .click();
+    // (o chip vira aria-pressed; o clique pode cair pré-hidratação)
+    const chipMentor = dialog.getByRole("button", { name: /Com meu mentor/ });
+    await agirComConfirma(
+      () => chipMentor.click(),
+      async () =>
+        (await chipMentor.getAttribute("aria-pressed")) === "true"
+    );
     await dialog
       .locator("#chamado-assunto")
       .fill("E2E: preciso falar com alguém da equipe");
@@ -264,8 +308,10 @@ test.describe("mentorado — shell /jovem", () => {
       .fill("E2E: preciso falar com meu mentor");
     await dialog.getByRole("button", { name: "Enviar pedido" }).click();
 
-    await expect(page.getByText(/equipe foi avisada/)).toBeVisible();
-    await expect(dialog).not.toBeVisible();
+    await expect(page.getByText(/equipe foi avisada/)).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(dialog).not.toBeVisible({ timeout: 15_000 });
 
     // write real: o chamado existe com o jovem como autor (a equipe vê
     // quem pediu — é canal de segurança, não anônimo)
@@ -341,7 +387,9 @@ test.describe("mentorado — shell /jovem", () => {
       ).toBeVisible();
     }
     // sem link emitido: o pill "A fazer" vem com quem envia — a jornada
-    // nunca empurra link que não existe (emissor mentor × coord no 360º)
+    // nunca empurra link que não existe (emissor mentor × coord no 360º).
+    // .first: a frase aparece em cada estação pendente da estante — o
+    // contrato é "existe a instrução", não a estação exata
     await expect(
       trilha
         .getByText(
@@ -351,7 +399,9 @@ test.describe("mentorado — shell /jovem", () => {
     ).toBeVisible();
     // a recorrente: a fixture deixa o enc. 16 realizado sem a estrela — a
     // pendência vira banner no topo da estante (ou "Suas avaliações" se
-    // um spec paralelo já avaliou — os dois são o estado honesto)
+    // um spec paralelo já avaliou — os dois são o estado honesto).
+    // .first: o texto pode sair no banner e no rótulo da estação — vale
+    // qualquer um dos dois visível
     await expect(
       trilha
         .getByText(/Falta a nota do encontro \d+|Suas avaliações/)
@@ -415,6 +465,8 @@ test.describe("mentorado — shell /jovem", () => {
       // honestos: âncora inteira quando não há resposta anterior, article
       // com os gestos listados quando há (re-emissão). O pill vira "Em
       // andamento" com o rascunho local deste aparelho
+      // .first: o nome aparece no título do card e pode reaparecer dentro
+      // dos gestos dele — ancora no bloco de cima, que é o card em si
       const visao = trilha
         .locator(":is(article, a)", {
           hasText: "Construindo a sua Visão",
@@ -448,6 +500,8 @@ test.describe("mentorado — shell /jovem", () => {
     ).toBeVisible();
     // o desenho é o do perfil de todo mundo: badge de papel no header,
     // ficha como gaveta (summary), dados como seção e conta no fim
+    // .first: "Mentorado" sai no badge do header e no papel da ficha —
+    // vale o badge, que é o primeiro da página
     await expect(page.getByText("Mentorado").first()).toBeVisible();
     await expect(
       page.locator("summary").getByText("Sua ficha no programa")
@@ -473,10 +527,11 @@ test.describe("mentorado — shell /jovem", () => {
     page,
   }) => {
     await page.goto("/jovem/perfil");
-    await page
-      .getByRole("button", { name: "Editar seus dados" })
-      .click();
     const dialog = page.getByRole("dialog");
+    await agirComConfirma(
+      () => page.getByRole("button", { name: "Editar seus dados" }).click(),
+      () => dialog.isVisible()
+    );
     await expect(
       dialog.getByRole("heading", { name: "Seus dados" })
     ).toBeVisible();
@@ -484,7 +539,9 @@ test.describe("mentorado — shell /jovem", () => {
       .getByLabel("Seu WhatsApp")
       .fill("(11) 98888-7777");
     await dialog.getByRole("button", { name: /Salvar/i }).click();
-    await expect(page.getByText("(11) 98888-7777")).toBeVisible();
+    await expect(page.getByText("(11) 98888-7777")).toBeVisible({
+      timeout: 15_000,
+    });
     // reverte — o spec é rerodável e o número não é fixture de ninguém
     await page.getByRole("button", { name: "Editar seus dados" }).click();
     await page.getByRole("dialog").getByLabel("Seu WhatsApp").fill("");

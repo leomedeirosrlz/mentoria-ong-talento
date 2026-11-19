@@ -1,4 +1,5 @@
 import {
+  agirComConfirma,
   appEnvOk,
   buscarViaServiceRole,
   convergirDuplaAtiva,
@@ -55,18 +56,24 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
 
     const card = page.getByRole("region", { name: "Para ficar em dia" });
     await expect(card).toBeVisible();
-    // mentor age: cada passo remarcável expõe o botão "Remarcar"
-    const remarcar = card.getByRole("button", { name: "Remarcar" });
-    await expect(remarcar.first()).toBeVisible();
-    await remarcar.first().click();
+    // mentor age: cada passo remarcável expõe o próprio "Remarcar" — o do
+    // 3º mora na <li> com o título oficial do passo (ancora de dataset,
+    // não de posição)
+    const passo3 = card.locator("li", { hasText: "Declaração de Visão" });
+    const dialog = page.getByRole("dialog");
+    await agirComConfirma(
+      () => passo3.getByRole("button", { name: "Remarcar" }).click(),
+      () => dialog.isVisible()
+    );
 
     // o dialog abre em modo remarcação com a data do plano já proposta —
-    // dataMudou nasce true, então o motivo já está sendo cobrado
-    const dialog = page.getByRole("dialog");
-    await expect(dialog).toBeVisible();
+    // dataMudou nasce true, então o motivo já está sendo cobrado (o label
+    // tem id próprio — getByText colidiria com a descrição do dialog)
     await expect(
-      dialog.getByText(/motivo/i).first()
+      dialog.getByRole("heading", { name: /3º encontro/ })
     ).toBeVisible();
+    await expect(dialog.locator("#motivo-label")).toBeVisible();
+    await expect(dialog.locator("#motivo-select")).toBeVisible();
   });
 
   test("pós-save oferece 'registrar o próximo também' e preenche o rascunho", async ({
@@ -84,23 +91,38 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     const form3 = linha3.locator("form");
     await expect(form3).toBeVisible();
     // avaliacao é o único campo com portão — fica na etapa 1 ("Como foi");
-    // o input é sr-only, clica no rótulo visível
+    // o input é sr-only, clica no rótulo visível (label → radio nativo:
+    // funciona antes da hidratação)
     await form3.getByText("Boa", { exact: true }).click();
-    // duração não-default: é o campo compartilhado que o rascunho do 4º herda
-    await form3.locator("#duracao-select").click();
-    await page.getByRole("option", { name: "1h30" }).click();
+    // duração não-default: é o campo compartilhado que o rascunho do 4º
+    // herda. O Select é client — o clique pode cair pré-hidratação (o
+    // form é lazy-loaded no hash), então repete até a option abrir
+    const opcao90 = page.getByRole("option", { name: "1h30" });
+    await agirComConfirma(
+      () => form3.locator("#duracao-select").click(),
+      () => opcao90.isVisible()
+    );
+    await opcao90.click();
 
-    await form3.getByRole("button", { name: "Avançar" }).click();
-    await form3.getByRole("button", { name: "Avançar" }).click();
-    await form3.getByRole("button", { name: "Salvar registro" }).click();
+    await agirComConfirma(
+      () => form3.getByRole("button", { name: "Avançar" }).click(),
+      () => form3.getByText(/Passo 2 de 3/).isVisible()
+    );
+    await agirComConfirma(
+      () => form3.getByRole("button", { name: "Avançar" }).click(),
+      () => form3.getByText(/Passo 3 de 3/).isVisible()
+    );
+    const proximoTambem = linha3.getByRole("button", {
+      name: "Registrar o 4º também",
+    });
+    await agirComConfirma(
+      () => form3.getByRole("button", { name: "Salvar registro" }).click(),
+      () => proximoTambem.isVisible()
+    );
 
     // pós-save: a oferta aponta o 4º (menor nº devendo registro na dupla)
-    await expect(
-      linha3.getByRole("button", { name: "Registrar o 4º também" })
-    ).toBeVisible({ timeout: 15_000 });
-    await linha3
-      .getByRole("button", { name: "Registrar o 4º também" })
-      .click();
+    await expect(proximoTambem).toBeVisible({ timeout: 15_000 });
+    await proximoTambem.click();
 
     // a âncora troca pro 4º e o form dele abre já hidratado pelo rascunho
     await expect(page).toHaveURL(new RegExp(`#registrar-${String(e4.id)}`), {
@@ -111,12 +133,14 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     await expect(form4).toBeVisible({ timeout: 15_000 });
     await expect(
       form4.getByText(/Rascunho de .* restaurado/)
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
     // campos compartilhados vieram no rascunho
     await expect(
       form4.locator('input[name="avaliacao"][value="boa"]')
-    ).toBeChecked();
-    await expect(form4.locator("#duracao-select")).toContainText("1h30");
+    ).toBeChecked({ timeout: 15_000 });
+    await expect(form4.locator("#duracao-select")).toContainText("1h30", {
+      timeout: 15_000,
+    });
   });
 
   test("a sessão cobre outro passo do guia — um encontro + um registro por nº (REALIZA-448)", async ({
