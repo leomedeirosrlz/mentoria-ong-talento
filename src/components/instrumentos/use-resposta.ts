@@ -61,11 +61,6 @@ export function useResposta({
    *  lint do React Compiler */
   formEl: HTMLFormElement | null;
 }): RespostaApi {
-  // visible_if do form editado: o gatilho decide por resposta — sem o
-  // filtro um campo escondido continuaria obrigatório e travava o submit
-  const perguntas = camposPerguntas(campos).filter((c) =>
-    visivel(c, valores)
-  );
   const chaveRascunho = preview ? null : `rascunho:/f/${token}`;
 
   const [valores, setValores] = useState<Record<string, RespostaValor>>({});
@@ -73,6 +68,14 @@ export function useResposta({
   const [erro, setErro] = useState<string | null>(null);
   const [enviado, setEnviado] = useState(false);
   const [pending, start] = useTransition();
+
+  // visible_if do form editado: o gatilho decide por resposta — sem o
+  // filtro um campo escondido continuaria obrigatório e travava o submit.
+  // Vai DEPOIS do useState: o filter executa na hora e lê `valores` do
+  // render — antes da declaração é TDZ e a página inteira quebra
+  const perguntas = camposPerguntas(campos).filter((c) =>
+    visivel(c, valores)
+  );
 
   // rascunho uma vez no mount — estado controlado, então restaurar é só
   // hidratar o mapa (nada de cutucar DOM como no renderer genérico). A
