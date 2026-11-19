@@ -257,7 +257,7 @@ function adminFake({
 }
 
 const MONTAR_FALSO = vi.fn(async () => ({
-  assunto: "Digest semanal — teste",
+  assunto: "Digest semanal: teste",
   mensagens: [{ to: "c@x.com", subject: "s", html: "<p>h</p>" }],
   audiencia: ["coordenacao"],
   nRisco: 2,

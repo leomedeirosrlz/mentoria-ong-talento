@@ -121,7 +121,7 @@ export function JovemRetroativoDialog({
           <p className="text-sm leading-relaxed text-muted-foreground">
             Todos os encontros do guia que já venceram estão na sua agenda.
             O que falta entrar é um passo que ainda não chegou no calendário
-            oficial ou o encontro de encerramento — esse quem registra é o
+            oficial ou o encontro de encerramento. Esse quem registra é o
             seu mentor, que fecha a jornada com vocês.
           </p>
           <DialogFooter>

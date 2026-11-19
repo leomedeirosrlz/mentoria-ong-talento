@@ -277,13 +277,13 @@ export function corpoDigestSemanal({
   secoes?: DigestSecoes;
 }): { assunto: string; conteudoHtml: string; nPendentes: number } {
   const faixa = `${formatDate(semana.seg)} a ${formatDate(semana.dom)}`;
-  const assunto = `Digest semanal — ${faixa}`;
+  const assunto = `Digest semanal: ${faixa}`;
   const nPendentes = nLimbo + nAssinaturas + formacoesSemChamada;
 
   const partes: string[] = [];
   partes.push(
     `<p style="margin:0 0 18px;font-size:15px;line-height:1.55;">` +
-      `Semana de <b>${esc(faixa)}</b> — o panorama do ciclo e quem precisa ` +
+      `Semana de <b>${esc(faixa)}</b>: o panorama do ciclo e quem precisa ` +
       `de atenção hoje.</p>`
   );
 
@@ -316,7 +316,7 @@ export function corpoDigestSemanal({
       partes.push(
         `<ul style="margin:0 0 6px;padding-left:20px;font-size:14px;line-height:1.6;">` +
           riscos
-            .map((r) => `<li><b>${esc(r.nome)}</b> — ${esc(r.motivo)}</li>`)
+            .map((r) => `<li><b>${esc(r.nome)}</b>: ${esc(r.motivo)}</li>`)
             .join("") +
           `</ul>`
       );

@@ -109,7 +109,7 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
       page.getByRole("heading", { name: /Olá, Jovem/ })
     ).toBeVisible();
     await expect(
-      page.getByRole("link", { name: /Conta quando você pode/ })
+      page.getByRole("link", { name: /Conte quando você pode/ })
     ).not.toBeVisible();
 
     // o que a RPC gravou na ficha — a prova de que o write foi de verdade
@@ -157,7 +157,7 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
       page.getByRole("heading", { name: /Olá, Jovem/ })
     ).toBeVisible();
     const lembrete = page.getByRole("link", {
-      name: /Conta quando você pode/,
+      name: /Conte quando você pode/,
     });
     await expect(lembrete).toBeVisible();
 
@@ -187,7 +187,7 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
     });
     await page.goto("/jovem");
     await expect(
-      page.getByRole("link", { name: /Conta quando você pode/ })
+      page.getByRole("link", { name: /Conte quando você pode/ })
     ).not.toBeVisible();
   });
 });

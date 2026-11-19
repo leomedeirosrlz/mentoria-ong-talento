@@ -150,7 +150,7 @@ export default async function JovemPessoaPerfil({
 function rotuloContato(c: JovemContato): string {
   switch (c.papel) {
     case "mentor":
-      return "Seu mentor DPP";
+      return "Seu mentor";
     case "especialista":
       return "Seu especialista";
     case "supervisor":
@@ -175,9 +175,13 @@ function SeloDupla({
   const d = duplas.find((x) => x.id === contato.dupla_id);
   if (!d?.status || d.status === "ativa") return null;
   const base = d.trilha === "especialista" ? "trilha" : "mentoria";
+  const status =
+    { pausada: "pausada", concluida: "concluída", encerrada: "encerrada" }[
+      d.status
+    ] ?? d.status;
   return (
     <Badge variant="outline" className="text-muted-foreground">
-      {`${base} ${d.status}`}
+      {`${base} ${status}`}
     </Badge>
   );
 }
@@ -280,7 +284,7 @@ function SecaoColega({
             </a>
           ) : (
             <p className="text-xs text-muted-foreground">
-              Ele ainda não compartilhou o contato. Quando compartilhar, o
+              Ainda não compartilhou o contato. Quando compartilhar, o
               WhatsApp aparece aqui.
             </p>
           )}
