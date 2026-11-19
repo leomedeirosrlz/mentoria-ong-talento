@@ -709,8 +709,8 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     }
   });
 
-  // REALIZA-390/405 — as três colunas ordenáveis (Dupla/Encontros/Nota)
-  // ciclam asc → desc → default, uma ativa por vez, persistidas em
+  // REALIZA-390/405/445 — as colunas ordenáveis (Situação/Dupla/Encontros/
+  // Nota) ciclam asc → desc → default, uma ativa por vez, persistidas em
   // ?ordem= (<col> / <col>-desc). A asserção de ordem compara o lockup
   // inteiro ("Mentor e Mentorado") na mesma collation pt-BR do
   // porNomeDupla.
@@ -829,6 +829,131 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     await btnNome.click();
     await expect(page).toHaveURL(/[?&]ordem=nome-desc/);
     await btnNome.click();
+    await expect(page).not.toHaveURL(/[?&]ordem=/);
+  });
+
+  // REALIZA-445 — a coluna "Situação" entra no mesmo ciclo das outras:
+  // asc segue a leitura do radar (apoio → risco → atenção → em dia, fora
+  // da régua no fim), desc é "em dia primeiro" com a mesma âncora de fim,
+  // e o estado persiste em ?ordem=situacao / situacao-desc.
+  test("coordenação: coluna Situação ordena pelo radar e persiste em ?ordem=", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/duplas");
+    const linhas = page.locator(LINHAS_COORD);
+    await expect(linhas.first()).toBeVisible();
+
+    // pill de situação = 1º span da célula order-1; a 2ª (quando existe)
+    // é o "Apoio pedido" — eixo próprio que toma a frente da fila
+    const pesos = async () =>
+      Promise.all(
+        (await linhas.all()).map(async (l) => {
+          const spans = l.locator("div.order-1 > span");
+          const rotulo = (await spans.first().innerText()).trim();
+          const apoio =
+            (await spans.count()) > 1 &&
+            (await spans.nth(1).innerText()).includes("Apoio pedido");
+          if (apoio) return 0;
+          return (
+            {
+              "Em risco": 1,
+              "Atenção": 2,
+              "Em dia": 3,
+            } as Record<string, number>
+          )[rotulo] ?? 9;
+        })
+      );
+
+    const btn = page.getByRole("button", {
+      name: /^Ordenar por situação/,
+    });
+    await expect(btn).toBeVisible();
+
+    // asc = a fila do radar: apoio primeiro (o do Caio no fixture),
+    // risco → atenção → em dia; fora da régua no fim
+    await btn.click();
+    await expect(page).toHaveURL(/[?&]ordem=situacao(&|$)/);
+    await expect(btn).toHaveAttribute("aria-label", /mais graves primeiro/);
+    await expect(linhas.first()).toBeVisible();
+    const asc = await pesos();
+    expect(asc).toEqual([...asc].sort((a, b) => a - b));
+    expect(asc[0]).toBe(0);
+    expect(asc[asc.length - 1]).toBe(9);
+
+    // desc = "em dia primeiro" — fora da régua continua no fim
+    await btn.click();
+    await expect(page).toHaveURL(/[?&]ordem=situacao-desc/);
+    await expect(btn).toHaveAttribute("aria-label", /em dia primeiro/);
+    await expect(linhas.first()).toBeVisible();
+    const desc = await pesos();
+    expect(desc).toEqual(
+      [...desc.filter((p) => p !== 9)]
+        .sort((a, b) => b - a)
+        .concat(desc.filter((p) => p === 9))
+    );
+    expect(desc[desc.length - 1]).toBe(9);
+
+    // 3º clique devolve o radar e o param sai da URL
+    await btn.click();
+    await expect(page).not.toHaveURL(/[?&]ordem=/);
+
+    // o param persiste na URL: reload com ?ordem=situacao aterrissa na
+    // mesma ordenação asc. toPass cobre a remontagem do stream — entre o
+    // primeiro paint e a hidratação a lista troca de nó uma vez
+    await page.goto("/duplas?ordem=situacao");
+    await expect(async () => {
+      expect(await pesos()).toEqual(asc);
+    }).toPass();
+  });
+
+  test("supervisor: coluna Situação também ordena pelo radar", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "supervisor");
+    await page.goto("/duplas");
+
+    // a ordenação vale dentro de cada grupo de turma — cada container
+    // divide-y é um grupo; o peso da pill é o da visão de coordenação
+    const grupos = page.locator(
+      'section[aria-label="Duplas supervisionadas"] [class*="@4xl:divide-y"]'
+    );
+    const pesosDe = async (grupo: ReturnType<typeof grupos.nth>) =>
+      Promise.all(
+        (await grupo.locator(":scope > div").all()).map(async (l) => {
+          const spans = l.locator("div.order-1 > span");
+          const rotulo = (await spans.first().innerText()).trim();
+          const apoio =
+            (await spans.count()) > 1 &&
+            (await spans.nth(1).innerText()).includes("Apoio pedido");
+          if (apoio) return 0;
+          return (
+            {
+              "Em risco": 1,
+              "Atenção": 2,
+              "Em dia": 3,
+            } as Record<string, number>
+          )[rotulo] ?? 9;
+        })
+      );
+
+    await expect(grupos.first()).toBeVisible();
+    const btn = page.getByRole("button", {
+      name: /^Ordenar por situação/,
+    });
+    await expect(btn).toBeVisible();
+    await btn.click();
+    await expect(page).toHaveURL(/[?&]ordem=situacao(&|$)/);
+    await expect(btn).toHaveAttribute("aria-label", /mais graves primeiro/);
+    const nG = await grupos.count();
+    expect(nG).toBeGreaterThan(0);
+    for (let gi = 0; gi < nG; gi++) {
+      const p = await pesosDe(grupos.nth(gi));
+      expect(p).toEqual([...p].sort((a, b) => a - b));
+    }
+    await btn.click();
+    await expect(page).toHaveURL(/[?&]ordem=situacao-desc/);
+    await btn.click();
     await expect(page).not.toHaveURL(/[?&]ordem=/);
   });
 });

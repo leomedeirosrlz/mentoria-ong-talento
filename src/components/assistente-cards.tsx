@@ -1443,6 +1443,7 @@ export function CardJornada({ b }: { b: UiJornada }) {
           <BarraSegmentada
             altura="md"
             animate
+            legenda
             denominador={total}
             segmentos={[
               { valor: b.total_respondidos, rotulo: "feitos", cls: "bg-[var(--ok)]" },

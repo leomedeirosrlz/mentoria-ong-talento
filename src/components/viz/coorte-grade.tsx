@@ -149,6 +149,21 @@ export function CoorteGrade({
           </tbody>
         </table>
       </div>
+      {/* idem MapaCalor: a faixa gradiente declara piso→teto da rampa —
+          aria-hidden porque o número impresso em cada célula já é o dado */}
+      <p
+        aria-hidden
+        className="mt-2 flex items-center gap-1.5 text-[10px] text-muted-foreground"
+      >
+        menos
+        <span
+          className="h-2 w-16 rounded-sm"
+          style={{
+            background: `linear-gradient(90deg, ${PREENCHIMENTO(0)}, ${PREENCHIMENTO(0.25)}, ${PREENCHIMENTO(0.5)}, ${PREENCHIMENTO(0.75)}, ${PREENCHIMENTO(1)})`,
+          }}
+        />
+        mais
+      </p>
       <p className="mt-2 text-xs text-muted-foreground">
         % de pessoas de cada coorte ativas na semana; colunas vazias são
         semanas que ainda não chegaram.

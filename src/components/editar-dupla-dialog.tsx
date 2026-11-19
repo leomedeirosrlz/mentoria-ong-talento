@@ -715,7 +715,7 @@ export function EditarDuplaDialog({
                   <Select
                     name="desfecho"
                     required
-                    value={desfechoSel || undefined}
+                    value={desfechoSel}
                     items={Object.fromEntries(
                       DESFECHOS.map((d) => [d, DESFECHO_LABEL[d]])
                     )}
@@ -751,7 +751,7 @@ export function EditarDuplaDialog({
                           key={desfechoSel}
                           name="desfecho_motivo"
                           required
-                          value={motivoSel || undefined}
+                          value={motivoSel}
                           items={Object.fromEntries(
                             (
                               DESFECHO_MOTIVOS[

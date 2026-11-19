@@ -4,6 +4,12 @@
  *  status nunca só por cor, entrada animada opcional (animate) coberta
  *  pelo guard global de prefers-reduced-motion. */
 export { BarraSegmentada, SEGMENTO_NEUTRO, type SegmentoBarra } from "./barra-segmentada";
+export {
+  LegendaPontos,
+  COR_AVALIACAO,
+  itensAvaliacao,
+  type PontoLegenda,
+} from "./legenda-pontos";
 export { Sparkline, type SerieSpark } from "./sparkline";
 export { GraficoTempo, type PontoGrafico, type FormatoEixo } from "./grafico-tempo";
 export { MetricTile, type DeltaBom } from "./metrica-tile";

@@ -51,6 +51,15 @@ import type {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { fuzzyMatch } from "@/lib/fuzzy";
+import {
+  comparadorDe,
+  escreveOrdem,
+  ORDEM_ROTULO,
+  parseOrdemDupla,
+  pesoFila,
+  type OrdemCol,
+  type OrdemDupla,
+} from "@/lib/duplas-ordem";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { DuplaLinha, GRID_DUPLA_LG, type TomSituacao } from "@/components/dupla-linha";
@@ -212,74 +221,9 @@ const APOIO_ORIGEM_LABEL = {
 } as const;
 
 // ---------- ordenação e relevância da lista ----------
-
-/** A ordenação explícita (REALIZA-390/405), na convenção do /relatorios:
- *  ausência de ?ordem= é a ordem do radar; cada coluna cicla asc → desc →
- *  default e só uma fica ativa por vez. ?ordem= carrega coluna+direção
- *  ("nome", "nome-desc", "encontros", …) — os valores legados "az"/"za"
- *  ainda resolvem pra nome. */
-type OrdemCol = "nome" | "encontros" | "nota";
-type OrdemDupla = { col: OrdemCol; dir: 1 | -1 };
-
-const parseOrdemDupla = (v: string | null): OrdemDupla | null => {
-  if (!v) return null;
-  if (v === "az") return { col: "nome", dir: 1 };
-  if (v === "za") return { col: "nome", dir: -1 };
-  const desc = v.endsWith("-desc");
-  const col = (desc ? v.slice(0, -5) : v) as OrdemCol;
-  return col === "nome" || col === "encontros" || col === "nota"
-    ? { col, dir: desc ? -1 : 1 }
-    : null;
-};
-
-const escreveOrdem = (o: OrdemDupla) =>
-  o.dir === 1 ? o.col : `${o.col}-desc`;
-
-const ORDEM_ROTULO: Record<OrdemCol, Record<"1" | "-1", string>> = {
-  nome: { "1": "nome de A a Z", "-1": "nome de Z a A" },
-  encontros: { "1": "menos encontros", "-1": "mais encontros" },
-  nota: { "1": "menor nota", "-1": "maior nota" },
-};
-
-/** O nome que a linha mostra (social primeiro) — ordenar e buscar no que
- *  se lê, não no campo civil. */
-const nomeExib = (p: { nome: string; nome_social?: string | null }) =>
-  p.nome_social ?? p.nome;
-
-/** O A→Z da coluna desempata na ordem de leitura do lockup: mentor, depois
- *  mentorado — "Ana e Bruno" vem antes de "Ana e Carla". */
-const porNomeDupla = (a: Dupla, b: Dupla) =>
-  comparaNome(nomeExib(a.mentor), nomeExib(b.mentor)) ||
-  comparaNome(nomeExib(a.mentorado), nomeExib(b.mentorado));
-
-const encontrosFeitos = (d: Dupla) =>
-  d.encontros.reduce((n, e) => n + (e.status === "realizado" ? 1 : 0), 0);
-
-const NOTA_PESO: Record<string, number> = {
-  baixa: 1,
-  regular: 2,
-  boa: 3,
-  excelente: 4,
-};
-
-/** O comparador da coluna ativa — nome e contagem de encontros têm valor
- *  em toda linha; "sem nota" vai sempre pro fim, nas duas direções, e o
- *  desempate cai no A→Z da dupla (ordem estável e previsível). */
-const comparadorDe = (o: OrdemDupla) => {
-  const dir = o.dir;
-  if (o.col === "encontros")
-    return (a: Dupla, b: Dupla) =>
-      (encontrosFeitos(a) - encontrosFeitos(b)) * dir || porNomeDupla(a, b);
-  if (o.col === "nota")
-    return (a: Dupla, b: Dupla) => {
-      const na = NOTA_PESO[ultimoRegistro(a)?.avaliacao ?? ""] ?? 0;
-      const nb = NOTA_PESO[ultimoRegistro(b)?.avaliacao ?? ""] ?? 0;
-      if (na === 0 || nb === 0)
-        return na === 0 && nb === 0 ? porNomeDupla(a, b) : na === 0 ? 1 : -1;
-      return (na - nb) * dir || porNomeDupla(a, b);
-    };
-  return (a: Dupla, b: Dupla) => porNomeDupla(a, b) * dir;
-};
+// as regras moram em @/lib/duplas-ordem (REALIZA-445): a coluna Situação
+// lê a saúde calculada — comparador puro com saudePorId injetado é
+// testável fora do React
 
 /** Relevância fuzzy da dupla: o melhor match entre os 4 nomes possíveis
  *  (social e civil de cada ponta — quem lembra do nome de batismo acha a
@@ -576,7 +520,13 @@ function CabecalhoColunas({
         GRID_DUPLA_LG
       )}
     >
-      <span aria-hidden>Situação</span>
+      <ColunaOrdenavel
+        col="situacao"
+        rotulo="Situação"
+        dica="situação"
+        ordem={ordem}
+        onCiclar={onCiclar}
+      />
       <ColunaOrdenavel
         col="nome"
         rotulo="Dupla"
@@ -1219,15 +1169,10 @@ function VisaoCoordenacao({
   const saude = saudeDoRecorte(recorte, eventos, hoje);
 
   // a ordem default é o radar: apoio (trabalho) → risco → atenção → em
-  // andamento → fora da régua (pausada/concluída/encerrada)
-  const pesoFila = (d: Dupla) => {
-    const s = saudePorId.get(d.id)!;
-    if (s.apoio.aberto) return 0;
-    if (d.status !== "ativa") return 5;
-    return ORDEM_SEMAFORO[s.semaforo] + 1;
-  };
+  // andamento → fora da régua (pausada/concluída/encerrada) — o pesoFila
+  // compartilhado de @/lib/duplas-ordem, o mesmo da coluna "Situação"
   const porPrioridade = (a: Dupla, b: Dupla) =>
-    pesoFila(a) - pesoFila(b) ||
+    pesoFila(a, saudePorId.get(a.id)!) - pesoFila(b, saudePorId.get(b.id)!) ||
     comparaNome(a.mentor.nome, b.mentor.nome) ||
     comparaNome(a.mentorado.nome, b.mentorado.nome);
 
@@ -1240,11 +1185,14 @@ function VisaoCoordenacao({
     );
   };
 
-  // o controle móvel não tem colunas — um botão só percorre os 7 estados
-  // na sequência (prioridade é a ausência de ordem)
+  // o controle móvel não tem colunas — um botão só percorre os 9 estados
+  // na sequência (prioridade é a ausência de ordem); situação abre porque
+  // é a coluna que a linha mostra primeiro
   const ciclarTodas = () => {
     trackProduto("sort", { col: "ciclo" });
     const ciclo: OrdemDupla[] = [
+      { col: "situacao", dir: 1 },
+      { col: "situacao", dir: -1 },
       { col: "nome", dir: 1 },
       { col: "nome", dir: -1 },
       { col: "encontros", dir: 1 },
@@ -1276,7 +1224,7 @@ function VisaoCoordenacao({
     .filter((d) => chipBate(filtro, d, saudePorId.get(d.id)!))
     .sort(
       ordem
-        ? comparadorDe(ordem)
+        ? comparadorDe(ordem, saudePorId)
         : qt
           ? (a, b) =>
               (scorePorId.get(b.id) ?? 0) - (scorePorId.get(a.id) ?? 0) ||
@@ -1820,14 +1768,10 @@ function VisaoSupervisor({
     }
   }, [filtro, busca, ordem]);
 
-  const pesoFila = (d: Dupla) => {
-    const s = saudePorId.get(d.id)!;
-    if (s.apoio.aberto) return 0;
-    if (d.status !== "ativa") return 5;
-    return ORDEM_SEMAFORO[s.semaforo] + 1;
-  };
+  // o pesoFila compartilhado de @/lib/duplas-ordem — a ordem do radar é
+  // a mesma da visão de coordenação e da coluna "Situação"
   const porPrioridade = (a: Dupla, b: Dupla) =>
-    pesoFila(a) - pesoFila(b) ||
+    pesoFila(a, saudePorId.get(a.id)!) - pesoFila(b, saudePorId.get(b.id)!) ||
     comparaNome(a.mentor.nome, b.mentor.nome) ||
     comparaNome(a.mentorado.nome, b.mentorado.nome);
 
@@ -1841,6 +1785,8 @@ function VisaoSupervisor({
   const ciclarTodas = () => {
     trackProduto("sort", { col: "ciclo" });
     const ciclo: OrdemDupla[] = [
+      { col: "situacao", dir: 1 },
+      { col: "situacao", dir: -1 },
       { col: "nome", dir: 1 },
       { col: "nome", dir: -1 },
       { col: "encontros", dir: 1 },
@@ -1873,7 +1819,7 @@ function VisaoSupervisor({
     .filter((d) => chipBate(filtro, d, saudePorId.get(d.id)!))
     .sort(
       ordem
-        ? comparadorDe(ordem)
+        ? comparadorDe(ordem, saudePorId)
         : qt
           ? (a, b) =>
               (scorePorId.get(b.id) ?? 0) - (scorePorId.get(a.id) ?? 0) ||

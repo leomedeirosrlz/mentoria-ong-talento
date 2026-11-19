@@ -54,6 +54,7 @@ import {
   type MemoriaFalas,
 } from "@/lib/liza-falas";
 import { LIZA_PEDIDO_EVENTO } from "@/lib/liza-pedido";
+import { cn } from "@/lib/utils";
 import { trackProduto } from "@/components/produto-telemetry";
 import type { AppRole } from "@/lib/types";
 
@@ -85,8 +86,18 @@ const TAM_PADRAO = { w: 384, h: 640 };
 // tagarela enquanto ela despeja a resposta
 const falando = (e: LizaEstado): LizaEstado =>
   e === "escrevendo" ? "falando" : e;
-const AvatarLiza = (p: { tamanho: number; estado: LizaEstado }) => (
-  <LizaBlob tamanho={p.tamanho} estado={falando(p.estado)} />
+const AvatarLiza = (p: {
+  tamanho: number;
+  estado: LizaEstado;
+  responsivo?: boolean;
+  className?: string;
+}) => (
+  <LizaBlob
+    tamanho={p.tamanho}
+    estado={falando(p.estado)}
+    responsivo={p.responsivo}
+    className={p.className}
+  />
 );
 const TAM_EXPANDIDO = { w: 640, h: 820 };
 const TAM_MIN = { w: 352, h: 440 };
@@ -1035,12 +1046,19 @@ export function AssistenteBolha({
           className={trocou ? "animate-in zoom-in-50 spin-in-45 duration-200" : undefined}
         />
       ) : (
-        // mobile enche o botão (a bolha é da mesma lima do FAB — só a
-        // cara cresce); desktop fica com o respiro de 44 dentro de 56
+        // a mascote mede o próprio slot (REALIZA-447 — o container manda,
+        // não o matchMedia de viewport): no mobile o slot enche o botão
+        // (a bolha é da mesma lima do FAB — só a cara cresce); no desktop
+        // fica o respiro de 44 dentro de 56. `tamanho` é só o fallback do
+        // primeiro frame
         <LizaBlob
-          tamanho={desktop ? 44 : 48}
+          responsivo
+          tamanho={48}
           estado={falando(estadoFab)}
-          className={trocou ? "animate-in zoom-in-50 spin-in-[-45deg] duration-200" : undefined}
+          className={cn(
+            "size-12 md:size-11",
+            trocou && "animate-in zoom-in-50 spin-in-[-45deg] duration-200"
+          )}
         />
       )}
     </span>
@@ -1179,13 +1197,18 @@ export function AssistenteBolha({
           showCloseButton={false}
           // idem PopoverContent acima — fechar não órfana o stream
           keepMounted
-          style={{
-            // teclado iOS: a sheet sobe inteira acima dele e encolhe pra
-            // não estourar o topo — bottom (offset) não briga com o
-            // transform do arrasto
-            bottom: kb || undefined,
-            maxHeight: kb ? `calc(100svh - ${kb}px)` : undefined,
-          }}
+          style={
+            {
+              // teclado iOS: a sheet sobe inteira acima dele e encolhe pra
+              // não estourar o topo — bottom (offset) não briga com o
+              // transform do arrasto
+              bottom: kb || undefined,
+              maxHeight: kb ? `calc(100svh - ${kb}px)` : undefined,
+              // a sheet é full-width: --painel-w faz a mascote do empty
+              // state medir o container real (mesma régua do popover)
+              "--painel-w": "100vw",
+            } as React.CSSProperties
+          }
           // svh (não dvh): altura estável — dvh re-resolve quando a URL bar
           // do iOS se move com o scroll-lock do dialog, e a sheet pulava
           // no fim da animação de abrir/fechar
