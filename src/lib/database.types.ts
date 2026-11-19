@@ -5004,6 +5004,97 @@ export type Database = {
           },
         ]
       }
+      relatorio_ia_cards: {
+        Row: {
+          contexto_hash: string
+          gerado_em: string
+          gerado_por: string
+          id: string
+          modelo: string | null
+          pergunta: string
+          recorte: Json
+          recorte_key: string
+          request_id: string | null
+          resposta_md: string
+          secao: string
+          superseded_by: string | null
+          tier: string | null
+        }
+        Insert: {
+          contexto_hash: string
+          gerado_em?: string
+          gerado_por: string
+          id?: string
+          modelo?: string | null
+          pergunta: string
+          recorte?: Json
+          recorte_key: string
+          request_id?: string | null
+          resposta_md: string
+          secao: string
+          superseded_by?: string | null
+          tier?: string | null
+        }
+        Update: {
+          contexto_hash?: string
+          gerado_em?: string
+          gerado_por?: string
+          id?: string
+          modelo?: string | null
+          pergunta?: string
+          recorte?: Json
+          recorte_key?: string
+          request_id?: string | null
+          resposta_md?: string
+          secao?: string
+          superseded_by?: string | null
+          tier?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "relatorio_ia_cards_gerado_por_fkey"
+            columns: ["gerado_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relatorio_ia_cards_gerado_por_fkey"
+            columns: ["gerado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relatorio_ia_cards_gerado_por_fkey"
+            columns: ["gerado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relatorio_ia_cards_gerado_por_fkey"
+            columns: ["gerado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relatorio_ia_cards_gerado_por_fkey"
+            columns: ["gerado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relatorio_ia_cards_superseded_by_fkey"
+            columns: ["superseded_by"]
+            isOneToOne: false
+            referencedRelation: "relatorio_ia_cards"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       relatorio_links: {
         Row: {
           config: Json
@@ -7235,6 +7326,40 @@ export type Database = {
       registrar_retroativo_mentorado: {
         Args: { p_data_hora: string; p_dupla: string; p_numero: number }
         Returns: Json
+      }
+      relatorio_ia_card_registrar: {
+        Args: {
+          p_contexto_hash: string
+          p_modelo?: string
+          p_pergunta: string
+          p_recorte: Json
+          p_recorte_key: string
+          p_request_id?: string
+          p_resposta_md: string
+          p_secao: string
+          p_tier?: string
+        }
+        Returns: {
+          contexto_hash: string
+          gerado_em: string
+          gerado_por: string
+          id: string
+          modelo: string | null
+          pergunta: string
+          recorte: Json
+          recorte_key: string
+          request_id: string | null
+          resposta_md: string
+          secao: string
+          superseded_by: string | null
+          tier: string | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "relatorio_ia_cards"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       relatorio_link_info: { Args: { p_slug: string }; Returns: Json }
       relatorio_links_stats: { Args: never; Returns: Json }

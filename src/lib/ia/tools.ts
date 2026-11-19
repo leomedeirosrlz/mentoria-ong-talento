@@ -84,8 +84,9 @@ import { buscarNosGuias, catalogoGuias } from "./guias";
 import { emitirProdutoEvento } from "../produto-eventos-server";
 
 /** Canais registrados em ia_eventos — o CHECK do banco fecha o vocabulário
- *  ('importacao' entrou na 0193: match semântico/revisão NL do import CSV). */
-export type CanalIa = "chat" | "mcp" | "importacao";
+ *  ('importacao' entrou na 0193: match semântico/revisão NL do import CSV;
+ *  'relatorio' na 0212: cards "Perguntar à Liza" dos relatórios). */
+export type CanalIa = "chat" | "mcp" | "importacao" | "relatorio";
 
 /** O `roles` do registry — vocabulário do banco (app_role). */
 export type Papel = AppRole;

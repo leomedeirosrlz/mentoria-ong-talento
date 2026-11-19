@@ -41,6 +41,36 @@ import {
   resumoEncerramento,
 } from "@/lib/relatorios/operacional";
 import {
+  dadosAdocaoCoorte,
+  dadosAdocaoCoorteDemo,
+  dadosAdocaoMatriz,
+  dadosAdocaoMatrizDemo,
+  dadosAdocaoResumo,
+  dadosAdocaoResumoDemo,
+  dadosFunilInstrumentos,
+  dadosFunilInstrumentosDemo,
+} from "@/lib/relatorios/adocao";
+import { LeituraPainel } from "@/components/leitura-painel";
+import { PerguntarLiza } from "@/components/perguntar-liza";
+import { leituraAderencia } from "@/lib/relatorios/leituras-aderencia";
+import { leituraAdocao } from "@/lib/relatorios/leituras-adocao";
+import { leituraSaude } from "@/lib/relatorios/leituras-saude";
+import {
+  contextoAdocao,
+  contextoAderencia,
+  contextoAssinaturas,
+  contextoEncerramento,
+  contextoFormularios,
+  contextoHash,
+  contextoInteracoes,
+  contextoSolicitacoes,
+  contextoVisao,
+  recorteTexto,
+  type RecorteLiza,
+} from "@/lib/relatorios/contexto";
+import { cardVigenteDaAba } from "@/lib/actions-relatorio-ia";
+import type { Achado } from "@/lib/relatorios/leituras";
+import {
   janelaDeParam,
   papelDeParam,
   type Janela,
@@ -261,6 +291,47 @@ async function renderAba({
 }) {
   const d = demo ? getDemoData() : null;
 
+  // recorte dos cards da Liza (456): a mesma identidade na página e na
+  // action — janela/papel/medida só contam na aba Adoção (recorteKey os
+  // ignora fora dela)
+  const recorteLiza: RecorteLiza = {
+    aba,
+    turma: recorte.turma,
+    cronogramaId: recorte.cronogramaId,
+    janela,
+    papel,
+    medida,
+  };
+  const rotuloAba = ABAS.find((a) => a.id === aba)!.rotulo;
+
+  /** "Leitura" determinística (455) + card "Perguntar à Liza" (456) no topo
+   *  da aba. O contexto/hash sai dos mesmos agregados que a action refaz
+   *  no banco — o badge "desatualizado" é a diferença entre os dois. */
+  async function blocoInteligencia({
+    achados,
+    contexto,
+  }: {
+    achados?: Achado[];
+    contexto: Record<string, unknown>;
+  }) {
+    const card = await cardVigenteDaAba(aba, recorteLiza);
+    return (
+      <>
+        {achados && (
+          <LeituraPainel achados={achados} comoLer="A mesma régua dos dados abaixo." />
+        )}
+        <PerguntarLiza
+          aba={aba}
+          abaRotulo={rotuloAba}
+          recorte={recorteLiza}
+          recorteTexto={recorteTexto(recorteLiza)}
+          contextoHash={contextoHash(contexto)}
+          card={card}
+        />
+      </>
+    );
+  }
+
   switch (aba) {
     case "visao": {
       const tendencia = demo
@@ -291,12 +362,18 @@ async function renderAba({
           }));
       }
       return (
-        <AbaSaude
-          tendencia={tendencia}
-          digestConfig={digestConfig}
-          pessoasEquipe={pessoasEquipe}
-          somenteLeitura={demo}
-        />
+        <div className="space-y-4">
+          {await blocoInteligencia({
+            achados: leituraSaude(tendencia),
+            contexto: contextoVisao(tendencia),
+          })}
+          <AbaSaude
+            tendencia={tendencia}
+            digestConfig={digestConfig}
+            pessoasEquipe={pessoasEquipe}
+            somenteLeitura={demo}
+          />
+        </div>
       );
     }
 
@@ -313,17 +390,24 @@ async function renderAba({
         recDuplas.map((x) => x.id),
         "nudge"
       );
+      const resumo = resumoAderencia(recDuplas, eventos, crons);
       return (
-        <SecaoAderencia
-          resumo={resumoAderencia(recDuplas, eventos, crons)}
-          csvHref={csvHref("aderencia")}
-          eventos={eventos}
-          crons={crons}
-          nudges={nudges}
-          meuNome={meuNome}
-          origem={origem}
-          hoje={new Date()}
-        />
+        <div className="space-y-4">
+          {await blocoInteligencia({
+            achados: leituraAderencia(resumo),
+            contexto: contextoAderencia(resumo),
+          })}
+          <SecaoAderencia
+            resumo={resumo}
+            csvHref={csvHref("aderencia")}
+            eventos={eventos}
+            crons={crons}
+            nudges={nudges}
+            meuNome={meuNome}
+            origem={origem}
+            hoje={new Date()}
+          />
+        </div>
       );
     }
 
@@ -334,11 +418,14 @@ async function renderAba({
         ? dadosItensAssinaturasDemo(d, recorte)
         : await dadosItensAssinaturas(supabase!, recorte);
       return (
-        <SecaoAssinaturas
-          itens={itens}
-          csvHref={csvHref("assinaturas-pendentes")}
-          hoje={new Date()}
-        />
+        <div className="space-y-4">
+          {await blocoInteligencia({ contexto: contextoAssinaturas(itens) })}
+          <SecaoAssinaturas
+            itens={itens}
+            csvHref={csvHref("assinaturas-pendentes")}
+            hoje={new Date()}
+          />
+        </div>
       );
     }
 
@@ -348,11 +435,14 @@ async function renderAba({
         ? dadosItensInteracoesDemo(d, recorte)
         : await dadosItensInteracoes(supabase!, recorte);
       return (
-        <SecaoInteracoes
-          itens={itens}
-          csvHref={csvHref("interacoes")}
-          hoje={new Date()}
-        />
+        <div className="space-y-4">
+          {await blocoInteligencia({ contexto: contextoInteracoes(itens) })}
+          <SecaoInteracoes
+            itens={itens}
+            csvHref={csvHref("interacoes")}
+            hoje={new Date()}
+          />
+        </div>
       );
     }
 
@@ -362,11 +452,14 @@ async function renderAba({
         ? dadosItensSolicitacoesDemo(d, recorte)
         : await dadosItensSolicitacoes(supabase!, recorte);
       return (
-        <SecaoSolicitacoes
-          itens={itens}
-          csvHref={csvHref("solicitacoes")}
-          hoje={new Date()}
-        />
+        <div className="space-y-4">
+          {await blocoInteligencia({ contexto: contextoSolicitacoes(itens) })}
+          <SecaoSolicitacoes
+            itens={itens}
+            csvHref={csvHref("solicitacoes")}
+            hoje={new Date()}
+          />
+        </div>
       );
     }
 
@@ -387,13 +480,16 @@ async function renderAba({
       );
       const resumo = resumoEncerramento(pares);
       return (
-        <SecaoEncerramento
-          resumo={resumo}
-          linhas={resumo.linhasCsv}
-          csvHref={csvHref("encerramento")}
-          eventos={eventos}
-          crons={crons}
-        />
+        <div className="space-y-4">
+          {await blocoInteligencia({ contexto: contextoEncerramento(resumo) })}
+          <SecaoEncerramento
+            resumo={resumo}
+            linhas={resumo.linhasCsv}
+            csvHref={csvHref("encerramento")}
+            eventos={eventos}
+            crons={crons}
+          />
+        </div>
       );
     }
 
@@ -403,24 +499,52 @@ async function renderAba({
         ? dadosItensFormsDemo(d, recorte)
         : await dadosItensForms(supabase!, recorte);
       return (
-        <SecaoFormularios
-          itens={itens}
-          csvHref={csvHref("forms-taxa")}
-          hoje={new Date()}
-        />
+        <div className="space-y-4">
+          {await blocoInteligencia({ contexto: contextoFormularios(itens) })}
+          <SecaoFormularios
+            itens={itens}
+            csvHref={csvHref("forms-taxa")}
+            hoje={new Date()}
+          />
+        </div>
       );
     }
 
     case "adocao": {
+      // agregados da inteligência com `desde` truncado no DIA UTC — o mesmo
+      // piso do contexto-servidor da action, senão o hash nunca bate
+      const desde = new Date(
+        new Date(Date.now() - janela * 86400000).toISOString().slice(0, 10)
+      );
+      const [resumo, celulas, coorte, funil] = d
+        ? ([
+            dadosAdocaoResumoDemo(d, janela, papel),
+            dadosAdocaoMatrizDemo(d, janela),
+            dadosAdocaoCoorteDemo(10),
+            dadosFunilInstrumentosDemo(),
+          ] as const)
+        : await Promise.all([
+            dadosAdocaoResumo(supabase!, desde, papel),
+            dadosAdocaoMatriz(supabase!, desde, null),
+            dadosAdocaoCoorte(supabase!, 10),
+            dadosFunilInstrumentos(supabase!, desde),
+          ]);
+      const ctxArgs = { resumo, celulas, coorte, funil, janela, papel, medida };
       return (
-        <SecaoAdocao
-          d={d}
-          supabase={supabase}
-          janela={janela}
-          papel={papel}
-          medida={medida}
-          extraParams={extraParams}
-        />
+        <div className="space-y-4">
+          {await blocoInteligencia({
+            achados: leituraAdocao(ctxArgs),
+            contexto: contextoAdocao(ctxArgs),
+          })}
+          <SecaoAdocao
+            d={d}
+            supabase={supabase}
+            janela={janela}
+            papel={papel}
+            medida={medida}
+            extraParams={extraParams}
+          />
+        </div>
       );
     }
   }
