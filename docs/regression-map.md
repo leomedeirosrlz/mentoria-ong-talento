@@ -25,6 +25,7 @@ Quem mexe no repo sem contexto precisa de duas coisas: saber **qual regra não p
 | Corpus RAG fail-closed por audiência | `tests/corpus-audiencia.test.ts` |
 | Contrato do CSV de export | `tests/relatorios-csv.test.ts`, `tests/export-route.test.ts` |
 | IA: impersonação, rate-limit, tokens MCP, prompt | `tests/ia-*.test.ts`, `src/lib/ia/*.test.ts`, `tests/tokens-mcp.test.ts` |
+| Cronograma importado nunca persiste sem revisão; parser produz `EventoRascunho` válido | `src/lib/importar-cronograma/normalizar.test.ts` + `tests/e2e/app/turmas-importar.spec.ts` |
 | PII do `/resumo` (`hashIpAcesso` por salt, null em prod sem env + aviso 1×, UA truncado) | `tests/resumo-acesso.test.ts` |
 | Paridade TS × SQL de vocabulários fechados (`AcaoProduto` × RPC vigente, `AUDIENCIAS` × check/policies da `0139`, `ROLES_POR_AUDIENCIA` × check de comunicados) | `tests/paridade-ts-sql.test.ts` |
 | Auth do `/api/mcp` (401 sem Bearer, 401 PAT inválido, 403 sem papel, `papeis[]` manda) e `PAPEIS_MCP` = 5 papéis | `tests/mcp-auth.test.ts` |

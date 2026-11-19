@@ -25,12 +25,10 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 | # | Slug | Tipo | Status | Origem |
 |---|---|---|---|---|
 | 001 | `proxy-e-rotas-publicas` | as-built | Delivered | regressão (18/nov/2026) |
-<<<<<<< HEAD
+| 003 | `relatorios-nov` | feature | Delivered | REALIZA-389/407 (ws5, 19/nov/2026) |
 | 004 | `materiais-nativos` | as-built | Delivered | auditoria ws6 (19/nov/2026) |
 | 005 | `ops-nov` | mudança | Clarified | Jira REALIZA-37/98 (ws7, 18/nov/2026) — US1 implementada; US2 spec-only |
-=======
-| 004 | `materiais-nativos` | as-built | Delivered | auditoria ws6 (19/nov/2026) |
->>>>>>> origin/staging
+| 006 | `turmas-nov` | feature | Approved | REALIZA-34 (18/nov/2026) |
 
 ## Fronteiras já mapeadas, ainda sem spec
 
