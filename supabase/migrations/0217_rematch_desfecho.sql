@@ -17,7 +17,8 @@
 -- em nome da coordenação que chamou).
 -- Create or replace é idempotente; grants da 0117 se preservam (mesma
 -- assinatura).
-begin
+begin;
+
 create or replace function public.rematch_dupla(
   p_dupla_id uuid, p_lado text, p_novo_id uuid,
   p_motivo text default null, p_registrar_nota boolean default true,
@@ -321,5 +322,6 @@ begin
 
   return nova;
 end;
-$function$
-commit
+$function$;
+
+commit;

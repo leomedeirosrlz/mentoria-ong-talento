@@ -254,6 +254,9 @@ const COLS_MENTORADO_PAR: (keyof MentoradoPar)[] = [
   "uf",
   "interesses",
   "disponibilidade",
+  // MENTORADO_COLS_PAR da query real inclui situacao — sem ele a demo
+  // escondia um jovem desistente do gatilho de remanejo (460)
+  "situacao",
 ];
 
 function mentoradoPar(m: MentoradoPar): MentoradoPar {

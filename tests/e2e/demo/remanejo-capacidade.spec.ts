@@ -11,6 +11,9 @@ import { agirComConfirma, entrarNaDemo, expect, test } from "../helpers";
 
 const DUPLA_RISCO = "de000000-0000-4000-8000-000000001539";
 const ANDRE_ID = "de000000-0000-4000-8000-000000000010";
+// d-pausa · André × Pedro (uid 0x0609 → 1545): o Pedro virou desistente na
+// pausa — o gatilho novo do 460 acende o card mesmo com a jornada congelada
+const DUPLA_PAUSA = "de000000-0000-4000-8000-000000001545";
 
 test.describe("demo — sugestão de remanejo e capacidade", () => {
   test("dupla em risco mostra o card com livres, cheios e a fila", async ({
@@ -99,6 +102,35 @@ test.describe("demo — sugestão de remanejo e capacidade", () => {
     await expect(dialog.getByText(/Luiza Campos/).first()).toBeVisible();
     await dialog.getByRole("button", { name: "Fechar" }).click();
     await expect(dialog).not.toBeVisible();
+  });
+
+  test("jovem desistente acende o card mesmo com a dupla pausada (460)", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(`/duplas/${DUPLA_PAUSA}`);
+
+    const card = page.locator(
+      'section[aria-labelledby="remanejo-sugerido-titulo"]'
+    );
+    await expect(card).toBeVisible();
+    const trigger = card.getByRole("button", {
+      name: /Sugerir remanejamento/,
+    });
+    await agirComConfirma(
+      () => trigger.click(),
+      async () => (await trigger.getAttribute("aria-expanded")) === "true"
+    );
+    // o motivo explica pelo estado declarado, não pela régua — a jornada
+    // pausada congela os sinais ("Dupla pausada")
+    await expect(
+      card.getByText(/Jovem marcado como desistente/).first()
+    ).toBeVisible();
+    // o pool do mentorado segue listado — o André pode seguir com quem
+    // espera par na fila
+    for (const nome of ["Rafael Nunes", "Wendel Ferreira"]) {
+      await expect(card.locator("li", { hasText: nome })).toBeVisible();
+    }
   });
 
   test("ficha do mentor mostra X/Y e o ajuste de capacidade", async ({

@@ -21,12 +21,22 @@ import {
 export type TerceiroVinculo = "amigo" | "familiar" | "colega" | "outro";
 export type TerceiroStatus = "pendente" | "respondido" | "expirado";
 
+export type TerceiroViaColeta = "telefone" | "presencial" | "papel" | "outro";
+
 export type TerceiroResposta = {
   id: string;
   contato_id: string;
   pontos_fortes: string;
   a_melhorar: string;
   respondido_em: string;
+  // 0216 (REALIZA-449/463): 'link' = respondida pelo próprio terceiro;
+  // 'manual' = lançada pelo mentor/coord com via de coleta e consentimento
+  // declarado — o selo de origem vem do embed `registrado` (nome de quem
+  // registrou; null nas respostas por link)
+  origem: "link" | "manual";
+  registrado_por: string | null;
+  coletado_via: TerceiroViaColeta | null;
+  registrado?: { nome: string } | null;
 };
 
 export type TerceiroContato = {
@@ -67,7 +77,7 @@ export const getTerceirosDaDupla = cache(
         supabase
           .from("terceiros_contatos")
           .select(
-            "id, dupla_id, nome, vinculo, whatsapp, token, expira_em, status, respondido_em, created_at, resposta:terceiros_respostas(id, contato_id, pontos_fortes, a_melhorar, respondido_em)"
+            "id, dupla_id, nome, vinculo, whatsapp, token, expira_em, status, respondido_em, created_at, resposta:terceiros_respostas(id, contato_id, pontos_fortes, a_melhorar, respondido_em, origem, registrado_por, coletado_via, registrado:profiles!terceiros_respostas_registrado_por_fkey(nome))"
           )
           .eq("dupla_id", duplaId)
           .order("created_at"),
@@ -79,16 +89,22 @@ export const getTerceirosDaDupla = cache(
       ]);
     if (eC) console.error("getTerceirosDaDupla/contatos:", eC);
     if (eS) console.error("getTerceirosDaDupla/consolidacao:", eS);
-    const lista = (contatos ?? []).map((c) => ({
-      ...(c as Omit<TerceiroContato, "resposta"> & {
-        resposta?: TerceiroResposta[] | TerceiroResposta | null;
-      }),
+    const lista = (contatos ?? []).map((c) => {
       // unique FK → o embedded vem como array de 1 (postgrest pode devolver
       // objeto ou array conforme a cardinalidade inferida — normalizo)
-      resposta: Array.isArray(c.resposta)
-        ? (c.resposta[0] ?? null)
-        : (c.resposta ?? null),
-    })) as TerceiroContato[];
+      const r = (
+        (c as Omit<TerceiroContato, "resposta"> & {
+          resposta?: (TerceiroResposta & {
+            registrado?: { nome: string }[] | { nome: string } | null;
+          })[] | TerceiroResposta | null;
+        }).resposta ?? null
+      );
+      const resposta = Array.isArray(r) ? (r[0] ?? null) : r;
+      if (resposta && Array.isArray(resposta.registrado)) {
+        resposta.registrado = resposta.registrado[0] ?? null;
+      }
+      return { ...(c as Omit<TerceiroContato, "resposta">), resposta };
+    }) as TerceiroContato[];
     return {
       contatos: lista,
       consolidacao: (consol as TerceiroConsolidacao | null) ?? null,

@@ -15,6 +15,7 @@ import type {
   TerceiroContato,
   TerceiroPublico,
   TerceirosDaDupla,
+  TerceiroViaColeta,
 } from "../terceiros/queries";
 
 const uid = (n: number): string =>
@@ -34,7 +35,15 @@ const contato = (
   vinculo: TerceiroContato["vinculo"],
   status: TerceiroContato["status"],
   diasAtras: number,
-  resposta?: { pontos_fortes: string; a_melhorar: string }
+  resposta?: {
+    pontos_fortes: string;
+    a_melhorar: string;
+    /** 449/463 — lançamento manual: quem registrou, por onde a fala veio */
+    origem?: "link" | "manual";
+    registrado_por?: string;
+    registrado_nome?: string;
+    coletado_via?: TerceiroViaColeta;
+  }
 ): TerceiroContato => ({
   id: uid(0x2400 + n),
   dupla_id: DUPLA_OK,
@@ -51,7 +60,14 @@ const contato = (
         id: uid(0x2500 + n),
         contato_id: uid(0x2400 + n),
         respondido_em: haDias(diasAtras),
-        ...resposta,
+        pontos_fortes: resposta.pontos_fortes,
+        a_melhorar: resposta.a_melhorar,
+        origem: resposta.origem ?? "link",
+        registrado_por: resposta.registrado_por ?? null,
+        coletado_via: resposta.coletado_via ?? null,
+        registrado: resposta.registrado_nome
+          ? { nome: resposta.registrado_nome }
+          : null,
       }
     : null,
 });
@@ -69,11 +85,17 @@ const CONTATOS: TerceiroContato[] = [
     a_melhorar:
       "Teimosa quando alguém aponta caminho. Poderia ouvir mais antes de decidir sozinha.",
   }),
-  contato(3, "Prof. Helena Moura", "colega", "respondido", 1, {
+  // lançada manualmente pelo mentor (449/463): a resposta chegou por
+  // telefone e o Ricardo transcreveu — o selo de origem aparece na ficha
+  contato(3, "Helena Moura", "outro", "respondido", 1, {
     pontos_fortes:
       "Curiosa e persistente: pergunta até entender. No trabalho em grupo puxa a parte difícil.",
     a_melhorar:
       "Prazo apertado deixa ela ansiosa — poderia se organizar antes em vez de correr no fim.",
+    origem: "manual",
+    registrado_por: uid(0x0003),
+    registrado_nome: "Ricardo Tavares",
+    coletado_via: "telefone",
   }),
   contato(4, "Bruno Andrade", "amigo", "pendente", -2),
   contato(5, "Vó Marta", "familiar", "pendente", -2),

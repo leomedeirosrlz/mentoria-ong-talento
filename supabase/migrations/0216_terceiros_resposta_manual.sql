@@ -13,14 +13,16 @@
 -- coordenação, trilha DPP, dupla viva), a transição atômica
 -- pendente|expirado→respondido (imutável depois, igual ao link) e
 -- notifica a coordenação — nunca o próprio autor.
-begin
+begin;
+
 alter table public.terceiros_respostas
   add column origem text not null default 'link'
     check (origem in ('link','manual')),
   add column registrado_por uuid references public.profiles(id),
   add column coletado_via text
     check (coletado_via in ('telefone','presencial','papel','outro')),
-  add column consentimento_declarado boolean not null default false
+  add column consentimento_declarado boolean not null default false;
+
 create or replace function public.registrar_resposta_terceiro_manual(
   p_contato_id uuid, p_pontos_fortes text, p_a_melhorar text,
   p_coletado_via text, p_consentimento boolean
@@ -88,7 +90,8 @@ begin
        and p.id is distinct from public.my_profile_id();
 
   return jsonb_build_object('ok', true);
-end $$
-revoke execute on function public.registrar_resposta_terceiro_manual(uuid,text,text,text,boolean) from public, anon
-grant execute on function public.registrar_resposta_terceiro_manual(uuid,text,text,text,boolean) to authenticated
-commit
+end $$;
+revoke execute on function public.registrar_resposta_terceiro_manual(uuid,text,text,text,boolean) from public, anon;
+grant execute on function public.registrar_resposta_terceiro_manual(uuid,text,text,text,boolean) to authenticated;
+
+commit;

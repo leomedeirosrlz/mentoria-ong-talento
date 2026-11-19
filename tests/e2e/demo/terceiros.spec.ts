@@ -11,6 +11,9 @@ import { entrarNaDemo, expect, test } from "../helpers";
 const TOKEN_EXPIRADO = "demo-tok-tercero-diegofontes";
 // e um convite vivo da mesma dupla — o contraste mostra o estado, não o erro
 const TOKEN_PENDENTE = "demo-tok-tercero-brunoandrade";
+// d-ok · Ricardo × Ana (uid 0x0601 → 1537) — a dupla que carrega os
+// terceiros no demo
+const DUPLA_TERCEIROS = "de000000-0000-4000-8000-000000001537";
 
 test.describe("demo — /t/[token] estados do convite de terceiros", () => {
   test("link vencido mostra o card 'Este link expirou'", async ({ page }) => {
@@ -43,5 +46,27 @@ test.describe("demo — /t/[token] estados do convite de terceiros", () => {
     await expect(
       page.getByRole("heading", { name: "Este link expirou" })
     ).toHaveCount(0);
+  });
+
+  // REALIZA-449/463 (0216): a resposta que chegou por telefone e foi
+  // transcrita pelo mentor carrega o selo de proveniência na ficha —
+  // origem, via, registrante e consentimento declarado.
+  test("resposta manual mostra o selo de proveniência na ficha", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(`/duplas/${DUPLA_TERCEIROS}?aba=instrumentos`);
+
+    const linha = page.locator("li", { hasText: "Helena Moura" });
+    await expect(linha.getByText("registro manual · telefone")).toBeVisible({
+      timeout: 15_000,
+    });
+    await linha.getByText("Ver resposta de Helena").click();
+    await expect(
+      linha.getByText(/Registrada por Ricardo Tavares/)
+    ).toBeVisible();
+    await expect(
+      linha.getByText(/consentimento declarado/)
+    ).toBeVisible();
   });
 });
