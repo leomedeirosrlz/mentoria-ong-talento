@@ -174,7 +174,11 @@ export function NovoLinkDialog({
         <DialogTrigger
           render={
             trigger ?? (
-              <Button size="sm" variant="outline">
+              <Button
+                size="sm"
+                variant="outline"
+                data-telemetry-alvo="novo-link"
+              >
                 <LinkIcon size={15} aria-hidden /> Novo link
               </Button>
             )

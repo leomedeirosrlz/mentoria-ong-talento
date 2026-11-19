@@ -52,6 +52,7 @@ export default async function FormulariosPage() {
           <Link
             href="/formularios/novo"
             className={buttonVariants({ variant: "default", size: "sm" })}
+            data-telemetry-alvo="novo-formulario"
           >
             <Plus aria-hidden />
             Novo formulário
@@ -72,6 +73,7 @@ export default async function FormulariosPage() {
           <Link
             href="/formularios/novo"
             className={buttonVariants({ variant: "outline", size: "sm" }) + " mt-4"}
+            data-telemetry-alvo="novo-formulario"
           >
             <Plus aria-hidden />
             Criar o primeiro

@@ -13,7 +13,30 @@ export type AcaoProduto =
   | "nudge"
   | "form_emitido"
   | "material_aberto"
-  | "lembrete_whatsapp";
+  | "lembrete_whatsapp"
+  | "permanencia"
+  | "rolagem";
+
+/** Marcos de profundidade do gesto `rolagem` (REALIZA-453): o evento
+ *  grava SÓ o maior marco alcançado na estadia — nunca fração contínua
+ *  nem um gesto por pixel de scroll. 0 = a página rolava e a pessoa não
+ *  passou do primeiro quarto (o denominador limpo do "quem lê o fim"). */
+export const MARCOS_ROLAGEM = [0, 25, 50, 75, 100] as const;
+export type MarcoRolagem = (typeof MARCOS_ROLAGEM)[number];
+
+/** Fração rolada (0..1) → maior marco atingido. Fora de [0,1] clampa.
+ *  Os quartos usam floor (só conta quem CRUZOU a marca); o fundo vale a
+ *  partir de 98% — scrollY fracionário (pinch, DPR) quase nunca bate
+ *  exatamente 1 no rodapé. */
+export function marcoRolagem(frac: number): MarcoRolagem {
+  const f = Number.isFinite(frac) ? Math.min(1, Math.max(0, frac)) : 0;
+  if (f >= 0.98) return 100;
+  const pct = Math.floor(f * 100);
+  if (pct >= 75) return 75;
+  if (pct >= 50) return 50;
+  if (pct >= 25) return 25;
+  return 0;
+}
 
 export interface EventoProduto {
   superficie: string;

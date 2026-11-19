@@ -7,7 +7,9 @@ import { NextResponse } from "next/server";
 // papel saem do JWT do caller, nunca do payload. 204 sempre: telemetria
 // nunca devolve erro visível nem segura a navegação.
 
-const LOTE_MAX = 20;
+// alinhado com o `limit` da RPC (0212) e o FILA_MAX do beacon — três
+// gestos por saída de superfície enchem a fila mais rápido na rajada
+const LOTE_MAX = 30;
 
 export async function POST(request: Request) {
   // demo não coleta — persona fake não tem profile e a coleta dela não

@@ -324,7 +324,11 @@ export function AgendarEncontroDialog({
       {trigger !== null && (
         <DialogTrigger render={
           trigger ?? (
-            <Button variant={atual ? "outline" : "default"} size="sm">
+            <Button
+              variant={atual ? "outline" : "default"}
+              size="sm"
+              data-telemetry-alvo="agendar-encontro"
+            >
               <CalendarPlus size={16} />
               {atual ? "Remarcar" : "Agendar encontro"}
             </Button>

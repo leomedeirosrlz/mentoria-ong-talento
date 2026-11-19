@@ -125,6 +125,18 @@ export type EventoRecente = {
   criado_em: string;
 };
 
+/** Evento cru lido direto de `produto_eventos` pros painéis ricos
+ *  (REALIZA-454): a mesma linha do export, com meta tipado como objeto —
+ *  o parser do PostgREST já devolve jsonb como objeto. */
+export type EventoCru = {
+  profile_id: string;
+  papel: string;
+  superficie: string;
+  acao: string;
+  meta: Record<string, unknown> | null;
+  created_at: string; // timestamptz
+};
+
 /** Linha do export parquet (fase B — /api/adocao/export): espelho do
  *  cru `produto_eventos`, já com created_at em Date pro TIMESTAMP do
  *  parquet. O export nunca embute profile (nome é PII a mais, não a
@@ -276,4 +288,236 @@ export function intensidades(grade: GradeMatriz): Map<string, Map<string, number
     out.set(sup, m);
   }
   return out;
+}
+
+// =====================================================================
+// REALIZA-453/454 — derivações puras dos painéis ricos da aba Adoção.
+// Mesma normalização dos presets do explorador (adocao-sql.ts): o heatmap
+// é fx/fy = floor(pos/viewport * 10) clampado 0..9; percentis e marcos
+// são derivação em TS sobre o cru — o que é conta fica em TS, não em RPC.
+// =====================================================================
+
+function num(v: unknown): number | null {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Cliques com x/y/vw/vh válidos → grade 10×10 por superfície.
+ *  `grade[fy][fx]` = toques na célula. pessoas = profile_id distintos. */
+export type HeatmapCliques = {
+  grade: number[][];
+  toques: number;
+  pessoas: number;
+};
+
+export function heatmapCliques(eventos: EventoCru[]): Map<string, HeatmapCliques> {
+  const out = new Map<string, HeatmapCliques>();
+  for (const e of eventos) {
+    if (e.acao !== "clique" || !e.meta) continue;
+    const x = num(e.meta.x);
+    const y = num(e.meta.y);
+    const vw = num(e.meta.vw);
+    const vh = num(e.meta.vh);
+    if (x == null || y == null || !vw || !vh) continue;
+    const fx = Math.min(9, Math.max(0, Math.floor((x / vw) * 10)));
+    const fy = Math.min(9, Math.max(0, Math.floor((y / vh) * 10)));
+    const h = out.get(e.superficie) ?? {
+      grade: Array.from({ length: 10 }, () => Array(10).fill(0)),
+      toques: 0,
+      pessoas: 0,
+    };
+    h.grade[fy]![fx]!++;
+    h.toques++;
+    out.set(e.superficie, h);
+  }
+  const pessoasPor = new Map<string, Set<string>>();
+  for (const e of eventos) {
+    if (e.acao !== "clique") continue;
+    const s = pessoasPor.get(e.superficie) ?? new Set<string>();
+    s.add(e.profile_id);
+    pessoasPor.set(e.superficie, s);
+  }
+  for (const [sup, h] of out) h.pessoas = pessoasPor.get(sup)?.size ?? 0;
+  return out;
+}
+
+function percentil(ordenada: number[], q: number): number {
+  if (ordenada.length === 0) return 0;
+  const i = (ordenada.length - 1) * q;
+  const lo = Math.floor(i);
+  const hi = Math.ceil(i);
+  return ordenada[lo]! + (ordenada[hi]! - ordenada[lo]!) * (i - lo);
+}
+
+/** Gestos de permanência → estatística por superfície: mediana + faixa
+ *  p25–p75 da duração das estadias. `estadias` é o denominador honesto —
+ *  uma permanencia = uma estadia (não uma sessão nem uma pessoa). */
+export type TempoTela = {
+  superficie: string;
+  mediana_ms: number;
+  p25_ms: number;
+  p75_ms: number;
+  estadias: number;
+};
+
+export function tempoPorTela(eventos: EventoCru[]): TempoTela[] {
+  const porSup = new Map<string, number[]>();
+  for (const e of eventos) {
+    if (e.acao !== "permanencia" || !e.meta) continue;
+    const dur = num(e.meta.dur_ms);
+    if (dur == null || dur <= 0) continue;
+    const arr = porSup.get(e.superficie) ?? [];
+    arr.push(dur);
+    porSup.set(e.superficie, arr);
+  }
+  return [...porSup.entries()]
+    .map(([superficie, durs]) => {
+      durs.sort((a, b) => a - b);
+      return {
+        superficie,
+        mediana_ms: Math.round(percentil(durs, 0.5)),
+        p25_ms: Math.round(percentil(durs, 0.25)),
+        p75_ms: Math.round(percentil(durs, 0.75)),
+        estadias: durs.length,
+      };
+    })
+    .sort((a, b) => b.mediana_ms - a.mediana_ms);
+}
+
+/** Gestos de rolagem → % de visitas roláveis que alcançou cada marco, por
+ *  superfície. O denominador são os eventos de rolagem — cada um marca
+ *  uma estadia em página rolável com o MAIOR marco atingido (0..100), um
+ *  por saída. prof>=M conta pro marco M (atingir 75 implica 25 e 50). */
+export type ProfundidadeSup = {
+  superficie: string;
+  visitas: number;
+  /** pct[25] = fração de visitas que chegou a pelo menos 25% da página */
+  pct: Record<25 | 50 | 75 | 100, number>;
+};
+
+export function profundidadeRolagem(eventos: EventoCru[]): ProfundidadeSup[] {
+  const porSup = new Map<string, { visitas: number; atingiu: Record<number, number> }>();
+  for (const e of eventos) {
+    if (e.acao !== "rolagem" || !e.meta) continue;
+    const prof = num(e.meta.prof);
+    if (prof == null) continue;
+    const acc = porSup.get(e.superficie) ?? {
+      visitas: 0,
+      atingiu: { 25: 0, 50: 0, 75: 0, 100: 0 },
+    };
+    acc.visitas++;
+    for (const m of [25, 50, 75, 100]) if (prof >= m) acc.atingiu[m]!++;
+    porSup.set(e.superficie, acc);
+  }
+  return [...porSup.entries()]
+    .map(([superficie, a]) => ({
+      superficie,
+      visitas: a.visitas,
+      pct: {
+        25: a.visitas ? a.atingiu[25]! / a.visitas : 0,
+        50: a.visitas ? a.atingiu[50]! / a.visitas : 0,
+        75: a.visitas ? a.atingiu[75]! / a.visitas : 0,
+        100: a.visitas ? a.atingiu[100]! / a.visitas : 0,
+      } as ProfundidadeSup["pct"],
+    }))
+    .sort((a, b) => b.visitas - a.visitas);
+}
+
+/** Pessoas distintas no cru, pra alimentar o seletor do drill — ordena
+ *  por volume de gestos e rotula com o mapa de nomes quando houver. */
+export type PessoaAtiva = {
+  profile_id: string;
+  papel: string;
+  gestos: number;
+  nome?: string;
+};
+
+export function pessoasAtivas(
+  eventos: EventoCru[],
+  nomes?: Map<string, string>,
+  limite = 20
+): PessoaAtiva[] {
+  const acc = new Map<string, PessoaAtiva>();
+  for (const e of eventos) {
+    const p = acc.get(e.profile_id) ?? {
+      profile_id: e.profile_id,
+      papel: e.papel,
+      gestos: 0,
+    };
+    p.gestos++;
+    if (p.papel === "desconhecido" && e.papel !== "desconhecido")
+      p.papel = e.papel;
+    acc.set(e.profile_id, p);
+  }
+  return [...acc.values()]
+    .sort((a, b) => b.gestos - a.gestos)
+    .slice(0, limite)
+    .map((p) => ({ ...p, nome: nomes?.get(p.profile_id) }));
+}
+
+/** Verbo da ação no feed e na trilha ("clicou em", "ficou em"). O mapa
+ *  vive aqui porque os dois consumidores (GestosVivos, PaineisRicos)
+ *  leem do mesmo conjunto — ação nova da whitelist ganha rótulo num
+ *  lugar só. */
+export const ROTULO_ACAO: Record<string, string> = {
+  pageview: "visitou",
+  clique: "clicou em",
+  busca: "buscou",
+  sort: "ordenou",
+  dialog: "abriu a Liza em",
+  nudge: "enviou lembrete em",
+  form_emitido: "emitiu formulário em",
+  material_aberto: "abriu material em",
+  lembrete_whatsapp: "lembrete WhatsApp em",
+  permanencia: "ficou em",
+  rolagem: "rolou em",
+};
+
+/** Trilha de uma pessoa na janela: os gestos dela em ordem cronológica —
+ *  o preset "jornada" do explorador, sem SQL. */
+export type GestoTrilha = {
+  superficie: string;
+  acao: string;
+  criado_em: string;
+  /** resumo da meta pra exibição: "45s", "75%", "cta: nova-dupla"… */
+  detalhe?: string;
+};
+
+function fmtDur(ms: number): string {
+  if (ms < 60_000) return `${Math.round(ms / 1000)}s`;
+  const min = Math.floor(ms / 60_000);
+  const seg = Math.round((ms % 60_000) / 1000);
+  return seg > 0 ? `${min}min ${seg}s` : `${min}min`;
+}
+
+export function fmtDuracao(ms: number): string {
+  return fmtDur(ms);
+}
+
+export function trilhaPessoa(
+  eventos: EventoCru[],
+  profileId: string
+): GestoTrilha[] {
+  return eventos
+    .filter((e) => e.profile_id === profileId)
+    .sort((a, b) => a.created_at.localeCompare(b.created_at))
+    .map((e) => {
+      let detalhe: string | undefined;
+      if (e.acao === "permanencia") {
+        const d = num(e.meta?.dur_ms);
+        if (d != null && d > 0) detalhe = fmtDur(d);
+      } else if (e.acao === "rolagem") {
+        const p = num(e.meta?.prof);
+        if (p != null) detalhe = `${p}% da página`;
+      } else if (e.acao === "clique") {
+        const a = e.meta?.alvo;
+        if (typeof a === "string" && a) detalhe = a;
+      }
+      return {
+        superficie: e.superficie,
+        acao: e.acao,
+        criado_em: e.created_at,
+        ...(detalhe ? { detalhe } : {}),
+      };
+    });
 }

@@ -409,7 +409,11 @@ export function NovaDuplaDialog({
       <DialogTrigger
         render={
           trigger ?? (
-            <Button size="sm" className="max-sm:w-full">
+            <Button
+              size="sm"
+              className="max-sm:w-full"
+              data-telemetry-alvo="nova-dupla"
+            >
               <Plus size={16} /> Nova dupla
             </Button>
           )

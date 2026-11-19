@@ -9,14 +9,21 @@ import {
   JANELAS,
   PAPEIS_ADOCAO,
   ROTULO_PAPEL,
+  ROTULO_SUPERFICIE,
   SUPERFICIES,
   coorteParaGrade,
   deltaPct,
+  heatmapCliques,
   matrizParaGrade,
+  pessoasAtivas,
+  profundidadeRolagem,
+  tempoPorTela,
+  trilhaPessoa,
   type Caminho,
   type CelulaMatriz,
   type DiaSerie,
   type EventoRecente,
+  type GestoTrilha,
   type Janela,
   type LinhaCoorte,
   type LinhaSuperficie,
@@ -39,8 +46,12 @@ import {
   dadosAdocaoSerieDiaDemo,
   dadosAdocaoSuperficies,
   dadosAdocaoSuperficiesDemo,
+  dadosEventosRicos,
+  dadosEventosRicosDemo,
   dadosFunilInstrumentos,
   dadosFunilInstrumentosDemo,
+  dadosNomesPerfis,
+  type CruAdocao,
   type FunilInstrumento,
 } from "@/lib/relatorios/adocao";
 import type { DemoData } from "@/lib/demo/data";
@@ -55,6 +66,7 @@ import {
 import { GestosVivos } from "./gestos-vivos";
 import { AdocaoExplorador } from "./adocao-explorador";
 import { MapaCalorDrill } from "./adocao-interativo";
+import { PaineisRicos } from "./adocao-ricos";
 import { TabelaSuperficies } from "./tabela-superficies";
 
 // Aba Adoção (REALIZA-417 fase 2): a 8ª do workbench, na anatomia do
@@ -78,6 +90,13 @@ const FMT_MES_ANO = new Intl.DateTimeFormat("pt-BR", {
 const SEMANAS_COORTE = 10;
 const TOP_CAMINHOS = 8;
 const MAX_RECENTES = 12;
+// painéis ricos (453/454): denominadores e seletores têm teto pra
+// superfície/pessoa — os demais ficam legíveis no explorador ad-hoc
+const TOP_HEATMAPS = 8;
+const TOP_TEMPOS = 10;
+const TOP_PROFS = 10;
+const TOP_PESSOAS = 10;
+const TRILHA_MAX = 150;
 
 const CARD = "rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5";
 
@@ -118,6 +137,10 @@ export async function SecaoAdocao({
   let caminhos: Caminho[];
   let funil: FunilInstrumento[];
   let recentes: EventoRecente[];
+  // cru paginado dos gestos ricos (453/454) — a fonte dos painéis fixos
+  // é a mesma produto_eventos; a agregação fica em TS, sem RPC nova
+  let cru: CruAdocao;
+  let nomes = new Map<string, string>();
 
   if (d) {
     resumo = dadosAdocaoResumoDemo(d, janela, papel);
@@ -129,8 +152,10 @@ export async function SecaoAdocao({
     caminhos = dadosAdocaoCaminhosDemo(papel, janela);
     funil = dadosFunilInstrumentosDemo();
     recentes = dadosAdocaoRecentesDemo(janela);
+    cru = dadosEventosRicosDemo(d, janela, papel);
+    nomes = cru.nomes ?? nomes;
   } else {
-    [resumo, celulas, serie, linhasSup, linhasCoorte, caminhos, funil, recentes] =
+    [resumo, celulas, serie, linhasSup, linhasCoorte, caminhos, funil, recentes, cru] =
       await Promise.all([
         dadosAdocaoResumo(supabase!, desde, papel),
         dadosAdocaoMatriz(supabase!, desde, null),
@@ -140,7 +165,13 @@ export async function SecaoAdocao({
         dadosAdocaoCaminhos(supabase!, desde, TOP_CAMINHOS, papel),
         dadosFunilInstrumentos(supabase!, desde),
         dadosAdocaoRecentes(supabase!, MAX_RECENTES),
+        dadosEventosRicos(supabase!, desde, papel),
       ]);
+    // nomes do drill: uma ida a mais, só pros ids que de fato aparecem
+    const ids = pessoasAtivas(cru.eventos, undefined, TOP_PESSOAS).map(
+      (p) => p.profile_id
+    );
+    if (ids.length > 0) nomes = await dadosNomesPerfis(supabase!, ids);
   }
 
   const celulasRecorte = papel
@@ -305,6 +336,36 @@ export async function SecaoAdocao({
 
   const gradeCoorte = coorteParaGrade(linhasCoorte, SEMANAS_COORTE);
 
+  // 453/454 — os painéis ricos derivam do cru paginado (mesma conta dos
+  // presets do explorador, só que fixa). Rótulo declarado na linha;
+  // superfície desconhecida (área aposentada com evento) segue com o id.
+  const rotuloSup = (id: string) => ROTULO_SUPERFICIE.get(id) ?? id;
+  const heatmaps = [...heatmapCliques(cru.eventos).entries()]
+    .map(([superficie, h]) => ({
+      superficie,
+      rotulo: rotuloSup(superficie),
+      ...h,
+    }))
+    .sort((a, b) => b.toques - a.toques)
+    .slice(0, TOP_HEATMAPS);
+  const tempos = tempoPorTela(cru.eventos)
+    .slice(0, TOP_TEMPOS)
+    .map((t) => ({ ...t, rotulo: rotuloSup(t.superficie) }));
+  const profundidades = profundidadeRolagem(cru.eventos)
+    .slice(0, TOP_PROFS)
+    .map((p) => ({ ...p, rotulo: rotuloSup(p.superficie) }));
+  const pessoas = pessoasAtivas(cru.eventos, nomes, TOP_PESSOAS);
+  // trilha pré-derivada só das pessoas do seletor — o cru inteiro não
+  // atravessa o boundary client (pode chegar a dezenas de milhares)
+  const trilhas: Record<string, GestoTrilha[]> = Object.fromEntries(
+    pessoas.map((p) => [
+      p.profile_id,
+      trilhaPessoa(cru.eventos, p.profile_id)
+        .slice(-TRILHA_MAX)
+        .map((g) => ({ ...g, superficie: rotuloSup(g.superficie) })),
+    ])
+  );
+
   const notaVivas =
     paradas.length === 0
       ? "nenhuma parada no período"
@@ -455,6 +516,33 @@ export async function SecaoAdocao({
           </section>
           {secaoInstrumentos}
         </div>
+
+        {/* L2 — os gestos ricos (453/454): onde tocam, quanto tempo
+            fica, até onde lê e a jornada de uma pessoa — o que antes
+            só saía por SQL no explorador */}
+        <section className="space-y-3">
+          <div>
+            <h2 className="text-base font-semibold">Como usam</h2>
+            <p className="mt-0.5 max-w-2xl text-sm text-muted-foreground">
+              Toque, permanência e profundidade de leitura nos últimos{" "}
+              {janela} dias{rotuloPapel ? ` · só ${rotuloPapel}` : ""}.
+            </p>
+          </div>
+          <div
+            className={cn(CARD, "animate-enter")}
+            style={{ "--i": 6 } as CSSProperties}
+          >
+            <PaineisRicos
+              heatmaps={heatmaps}
+              tempos={tempos}
+              profundidades={profundidades}
+              pessoas={pessoas}
+              trilhas={trilhas}
+              contexto={`nos últimos ${janela} dias`}
+              truncado={cru.truncado}
+            />
+          </div>
+        </section>
 
         {/* L2 — o uso fica? coorte de retorno e jornada */}
         <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
