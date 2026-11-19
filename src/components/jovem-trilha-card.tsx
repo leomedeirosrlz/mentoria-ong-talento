@@ -24,6 +24,7 @@ import type { JovemEncontro } from "@/lib/queries-jovem";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
+import { ExpandirTexto } from "@/components/expandir-texto";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -283,28 +284,16 @@ export function JovemTrilhaCard({
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
               Última devolutiva
             </p>
-            <details className="group/dev mt-1">
-              <summary className="cursor-pointer list-none rounded-md outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
-                {/* a prévia é a mesma frase do painel, truncada — aria-hidden
-                    pra leitor não anunciar o texto cortado como nome do
-                    botão */}
-                <span
-                  aria-hidden
-                  className="block line-clamp-3 text-sm leading-relaxed group-open/dev:hidden"
-                >
-                  {ultima.texto}
-                </span>
-                <span className="mt-1.5 inline-flex min-h-11 items-center gap-1 text-xs font-medium text-muted-foreground transition-colors hover:text-foreground sm:min-h-8">
-                  Ler devolutiva completa
-                  <CaretDown
-                    size={12}
-                    aria-hidden
-                    className="transition-transform group-open/dev:rotate-180"
-                  />
-                </span>
-              </summary>
-              <p className="text-sm leading-relaxed">{ultima.texto}</p>
-            </details>
+            {/* ExpandirTexto mede as linhas renderizadas (REALIZA-438) —
+                devolutiva curta não ganha um toggle que abriria pro mesmo
+                trecho; o controle fica no fim do bloco */}
+            <ExpandirTexto
+              className="mt-1 text-sm leading-relaxed"
+              rotuloMais="Ler devolutiva completa"
+              classNameBotao="mt-1.5 min-h-11 sm:min-h-8"
+            >
+              {ultima.texto}
+            </ExpandirTexto>
             <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
               <Clock size={11} aria-hidden />
               {ultima.autor?.nome ?? nome} · {formatDateTime(ultima.created_at)}
