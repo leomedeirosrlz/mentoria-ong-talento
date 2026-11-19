@@ -5724,23 +5724,35 @@ export type Database = {
       terceiros_respostas: {
         Row: {
           a_melhorar: string
+          coletado_via: string | null
+          consentimento_declarado: boolean
           contato_id: string
           id: string
+          origem: string
           pontos_fortes: string
+          registrado_por: string | null
           respondido_em: string
         }
         Insert: {
           a_melhorar: string
+          coletado_via?: string | null
+          consentimento_declarado?: boolean
           contato_id: string
           id?: string
+          origem?: string
           pontos_fortes: string
+          registrado_por?: string | null
           respondido_em?: string
         }
         Update: {
           a_melhorar?: string
+          coletado_via?: string | null
+          consentimento_declarado?: boolean
           contato_id?: string
           id?: string
+          origem?: string
           pontos_fortes?: string
+          registrado_por?: string | null
           respondido_em?: string
         }
         Relationships: [
@@ -5749,6 +5761,41 @@ export type Database = {
             columns: ["contato_id"]
             isOneToOne: true
             referencedRelation: "terceiros_contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terceiros_respostas_registrado_por_fkey"
+            columns: ["registrado_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terceiros_respostas_registrado_por_fkey"
+            columns: ["registrado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terceiros_respostas_registrado_por_fkey"
+            columns: ["registrado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terceiros_respostas_registrado_por_fkey"
+            columns: ["registrado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terceiros_respostas_registrado_por_fkey"
+            columns: ["registrado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
             referencedColumns: ["id"]
           },
         ]
@@ -7323,6 +7370,16 @@ export type Database = {
         Returns: undefined
       }
       registrar_produto_eventos: { Args: { p_eventos: Json }; Returns: number }
+      registrar_resposta_terceiro_manual: {
+        Args: {
+          p_a_melhorar: string
+          p_coletado_via: string
+          p_consentimento: boolean
+          p_contato_id: string
+          p_pontos_fortes: string
+        }
+        Returns: Json
+      }
       registrar_retroativo_mentorado: {
         Args: { p_data_hora: string; p_dupla: string; p_numero: number }
         Returns: Json

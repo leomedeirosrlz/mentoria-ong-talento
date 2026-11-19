@@ -20,12 +20,14 @@ import {
   comparaNome,
   DIAS_SEMANA_LABELS,
   GENERO_LABELS,
+  type DuplaSaude,
 } from "./ciclo";
 import { tetoMentor, type FilaItem } from "./fila";
 import { temPapel } from "./types";
 import { normaliza } from "./utils";
 import type {
   Disponibilidade,
+  Dupla,
   Genero,
   Mentorado,
   MentorProfile,
@@ -63,6 +65,47 @@ export type Pontuacao = {
 };
 
 const primeiroNome = (n?: string | null) => (n ?? "?").split(" ")[0];
+
+// ---------- gatilho da superfície (FR-018, REALIZA-460) ----------
+
+/** A ficha mostra o card de sugestão quando a troca de um lado já é
+ *  pergunta de trabalho. Antes era só semáforo em risco ou apoio aberto;
+ *  agora entram os estados que a régua não acende — mentor desativado no
+ *  programa, jovem desistente — e qualquer sinal de saúde aceso (uma
+ *  atenção já vale a conversa; remanejar cedo custa menos que tarde).
+ *  Mostrar o card não decide nada: a execução segue coord-only no rematch
+ *  auditável. */
+export function sugereRemanejo(
+  dupla: Pick<Dupla, "status" | "mentor" | "mentorado">,
+  saude: Pick<DuplaSaude, "semaforo" | "sinais" | "apoio">
+): boolean {
+  // dupla viva — encerrada/concluída é capítulo fechado (o RPC também barra)
+  if (dupla.status !== "ativa" && dupla.status !== "pausada") return false;
+  return (
+    dupla.mentor.ativo === false ||
+    dupla.mentorado.situacao === "desistente" ||
+    saude.sinais.length > 0 ||
+    saude.apoio.aberto
+  );
+}
+
+/** A frase que explica o card — mesma ordem do gatilho: o estado declarado
+ *  das pessoas é a causa raiz e vem antes dos sinais da régua. (O nome
+ *  parecido em ciclo.ts é o compositor do motivo de saída do dialog.) */
+export function motivoSugestaoRemanejo(
+  dupla: Pick<Dupla, "mentor" | "mentorado">,
+  saude: Pick<DuplaSaude, "semaforo" | "motivo" | "apoio">
+): string {
+  if (dupla.mentor.ativo === false) return "Mentor inativo no programa";
+  if (dupla.mentorado.situacao === "desistente")
+    return "Jovem marcado como desistente";
+  if (saude.semaforo !== "ok") return saude.motivo;
+  return saude.apoio.origem === "mentorado"
+    ? "Pedido de apoio aberto pelo mentorado"
+    : saude.apoio.origem === "ambos"
+      ? "Pedidos de apoio abertos nos dois lados"
+      : "Pedido de apoio aberto pelo mentor";
+}
 
 /** O lado de um mentor (profile + ficha mentor_profiles) pro cruzamento —
  *  a disponibilidade e as áreas moram na ficha, não no cadastro. */

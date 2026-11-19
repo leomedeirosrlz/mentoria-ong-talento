@@ -8,6 +8,7 @@ import {
   CircleNotch,
   Clock,
   DotsThreeVertical,
+  NotePencil,
   PaperPlaneTilt,
   PencilSimple,
   Plus,
@@ -19,12 +20,14 @@ import {
   atualizarContatoTerceiro,
   cancelarContatoTerceiro,
   criarContatoTerceiro,
+  registrarRespostaTerceiroManual,
   reemitirConviteTerceiro,
   salvarConsolidadoTerceiros,
 } from "@/lib/actions-terceiros";
 import type {
   TerceiroContato,
   TerceiroConsolidacao,
+  TerceiroViaColeta,
   TerceiroVinculo,
 } from "@/lib/terceiros/queries";
 import {
@@ -79,6 +82,13 @@ const VINCULO_LABEL: Record<TerceiroVinculo, string> = {
   amigo: "amigo(a)",
   familiar: "familiar",
   colega: "colega",
+  outro: "outro",
+};
+
+const VIA_LABEL: Record<TerceiroViaColeta, string> = {
+  telefone: "telefone",
+  presencial: "presencial",
+  papel: "papel",
   outro: "outro",
 };
 
@@ -151,6 +161,8 @@ function LinhaContato({
   const [editando, setEditando] = useState(false);
   // cancelar via item do ⋯ — o confirm é controlado, sem trigger próprio
   const [cancelando, setCancelando] = useState(false);
+  // lançamento manual da resposta (449/463) — pendente e expirado
+  const [registrando, setRegistrando] = useState(false);
   const origem = useOrigem();
   const status = statusEfetivo(contato);
   const badge = STATUS_BADGE[status];
@@ -210,6 +222,17 @@ function LinhaContato({
               Respondeu em {formatDate(contato.respondido_em)}
             </p>
           )}
+          {/* selo de origem (449/463): resposta lançada manualmente carrega
+              quem registrou + como foi coletada — fica visível sem abrir */}
+          {contato.resposta?.origem === "manual" && (
+            <Badge variant="secondary" className="mt-1 font-normal">
+              <NotePencil size={12} aria-hidden />
+              registro manual
+              {contato.resposta.coletado_via
+                ? ` · ${VIA_LABEL[contato.resposta.coletado_via]}`
+                : ""}
+            </Badge>
+          )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center gap-2">
           {/* primária por estado (REALIZA-186): copiar no pendente, reemitir
@@ -245,6 +268,27 @@ function LinhaContato({
               >
                 Editar
               </Button>
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  aria-label={`Ações do contato ${contato.nome}`}
+                  className={cn(
+                    buttonVariants({ variant: "ghost", size: "icon" }),
+                    "size-11 shrink-0 sm:size-8"
+                  )}
+                >
+                  <DotsThreeVertical size={18} weight="bold" aria-hidden />
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuItem onClick={() => setRegistrando(true)}>
+                    <NotePencil
+                      size={16}
+                      data-icon="inline-start"
+                      aria-hidden
+                    />
+                    Registrar resposta
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           )}
           {status === "pendente" && podeGerenciar && jornadaViva && (
@@ -299,6 +343,14 @@ function LinhaContato({
                   />
                   Editar contato
                 </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setRegistrando(true)}>
+                  <NotePencil
+                    size={16}
+                    data-icon="inline-start"
+                    aria-hidden
+                  />
+                  Registrar resposta
+                </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem
                   variant="destructive"
@@ -319,6 +371,16 @@ function LinhaContato({
                   <EditarContatoDialog
                     contato={contato}
                     onFechar={() => setEditando(false)}
+                  />
+                )}
+              </Dialog>
+              <Dialog open={registrando} onOpenChange={setRegistrando}>
+                {registrando && (
+                  <RegistrarRespostaDialog
+                    duplaId={duplaId}
+                    contato={contato}
+                    jovemNome={jovemNome}
+                    onFechar={() => setRegistrando(false)}
                   />
                 )}
               </Dialog>
@@ -344,6 +406,16 @@ function LinhaContato({
             Ver resposta de {primeiroNome(contato.nome)}
           </summary>
           <div className="mt-2 space-y-2 rounded-lg bg-muted/50 p-3 text-sm">
+            {contato.resposta.origem === "manual" && (
+              <p className="text-xs text-muted-foreground">
+                Registrada por{" "}
+                {contato.resposta.registrado?.nome ?? "a equipe"}
+                {contato.resposta.coletado_via
+                  ? ` · coleta por ${VIA_LABEL[contato.resposta.coletado_via]}`
+                  : ""}
+                {" · consentimento declarado"}
+              </p>
+            )}
             <div>
               <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
                 Pontos fortes
@@ -460,6 +532,194 @@ function EditarContatoDialog({
         <Button onClick={salvar} disabled={pending}>
           {pending ? <CircleNotch className="animate-spin" aria-hidden /> : null}
           Salvar
+        </Button>
+      </DialogFooter>
+    </DialogContent>
+  );
+}
+
+/** Lançamento manual (449/463): a pessoa respondeu por fora (telefone,
+ *  presencial, papel…) e o mentor/coord transcreve. As perguntas são as
+ *  mesmas do link público; a resposta nasce imutável como a do link.
+ *  `contato === null` = pessoa nova (cria a indicação sem whatsapp junto). */
+function RegistrarRespostaDialog({
+  duplaId,
+  contato,
+  jovemNome,
+  onFechar,
+}: {
+  duplaId: string;
+  contato: TerceiroContato | null;
+  jovemNome: string;
+  onFechar: () => void;
+}) {
+  const router = useRouter();
+  const [pending, start] = useTransition();
+  const pessoaNova = contato === null;
+  const [nome, setNome] = useState("");
+  const [vinculo, setVinculo] = useState<TerceiroVinculo>("amigo");
+  const [fortes, setFortes] = useState("");
+  const [melhorar, setMelhorar] = useState("");
+  const [via, setVia] = useState<TerceiroViaColeta>("telefone");
+  const [consentimento, setConsentimento] = useState(false);
+  const jovem = nomeExib(jovemNome) || "o jovem";
+
+  const pronto =
+    fortes.trim().length > 0 &&
+    melhorar.trim().length > 0 &&
+    consentimento &&
+    (!pessoaNova || nome.trim().length >= 2);
+
+  function registrar() {
+    start(async () => {
+      const r = await registrarRespostaTerceiroManual(duplaId, {
+        contatoId: contato?.id ?? null,
+        nome: pessoaNova ? nome : undefined,
+        vinculo: pessoaNova ? vinculo : undefined,
+        pontosFortes: fortes,
+        aMelhorar: melhorar,
+        coletadoVia: via,
+        consentimento,
+      }).catch(() => null);
+      if (!r) {
+        toast.error("Sem conexão. Tente de novo.");
+        return;
+      }
+      if ("error" in r) {
+        toast.error(r.error);
+        return;
+      }
+      toast.success(
+        `Resposta de ${primeiroNome(contato?.nome ?? nome)} registrada.`
+      );
+      onFechar();
+      router.refresh();
+    });
+  }
+
+  return (
+    <DialogContent size="md">
+      <DialogHeader>
+        <DialogTitle>
+          {pessoaNova
+            ? "Registrar resposta de pessoa nova"
+            : `Registrar resposta de ${primeiroNome(contato.nome)}`}
+        </DialogTitle>
+        <DialogDescription>
+          Ela respondeu por fora da plataforma. Transcreva o que ela disse e
+          confirme que ela autorizou — a resposta não pode ser editada depois.
+        </DialogDescription>
+      </DialogHeader>
+      <div className="space-y-3">
+        {pessoaNova && (
+          <>
+            <div className="space-y-1.5">
+              <Label htmlFor="manual-nome">Nome</Label>
+              <Input
+                id="manual-nome"
+                value={nome}
+                onChange={(e) => setNome(e.target.value)}
+                placeholder="Nome da pessoa que respondeu"
+                maxLength={120}
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label id="manual-vinculo-label">Vínculo</Label>
+              <Select
+                value={vinculo}
+                onValueChange={(v) => v && setVinculo(v)}
+                items={VINCULO_LABEL}
+              >
+                <SelectTrigger
+                  id="manual-vinculo"
+                  aria-labelledby="manual-vinculo-label manual-vinculo"
+                >
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(VINCULO_LABEL) as TerceiroVinculo[]).map(
+                    (v) => (
+                      <SelectItem key={v} value={v}>
+                        {VINCULO_LABEL[v]}
+                      </SelectItem>
+                    )
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          </>
+        )}
+        <div className="space-y-1.5">
+          <Label htmlFor="manual-fortes">
+            Quais são os pontos fortes de {jovem}?
+          </Label>
+          <Textarea
+            id="manual-fortes"
+            value={fortes}
+            onChange={(e) => setFortes(e.target.value)}
+            rows={3}
+            maxLength={4000}
+            autoFocus={!pessoaNova}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label htmlFor="manual-melhorar">
+            E o que {jovem} poderia melhorar?
+          </Label>
+          <Textarea
+            id="manual-melhorar"
+            value={melhorar}
+            onChange={(e) => setMelhorar(e.target.value)}
+            rows={3}
+            maxLength={4000}
+          />
+        </div>
+        <div className="space-y-1.5">
+          <Label id="manual-via-label">Como a resposta foi coletada?</Label>
+          <Select
+            value={via}
+            onValueChange={(v) => v && setVia(v)}
+            items={VIA_LABEL}
+          >
+            <SelectTrigger
+              id="manual-via"
+              aria-labelledby="manual-via-label manual-via"
+            >
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              {(Object.keys(VIA_LABEL) as TerceiroViaColeta[]).map((v) => (
+                <SelectItem key={v} value={v}>
+                  {VIA_LABEL[v]}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+        <label className="flex cursor-pointer items-start gap-2.5 rounded-lg bg-muted/40 px-3 py-2.5 text-sm transition-colors hover:bg-muted/70">
+          <input
+            type="checkbox"
+            checked={consentimento}
+            onChange={(e) => setConsentimento(e.target.checked)}
+            className="mt-0.5 accent-primary"
+          />
+          <span>
+            A pessoa autorizou o registro desta resposta na plataforma.
+          </span>
+        </label>
+      </div>
+      <DialogFooter>
+        <Button type="button" variant="outline" onClick={onFechar}>
+          Cancelar
+        </Button>
+        <Button onClick={registrar} disabled={pending || !pronto}>
+          {pending ? (
+            <CircleNotch className="animate-spin" aria-hidden />
+          ) : (
+            <NotePencil aria-hidden />
+          )}
+          Registrar resposta
         </Button>
       </DialogFooter>
     </DialogContent>
@@ -711,6 +971,7 @@ export function TerceirosDupla({
   className?: string;
 }) {
   const [dialogAberto, setDialogAberto] = useState(false);
+  const [registrandoNovo, setRegistrandoNovo] = useState(false);
   const respondidos = contatos.filter((c) => c.status === "respondido").length;
   const vagas = vagasTerceiros(contatos.length);
   const aberto = contatos.length > 0;
@@ -761,23 +1022,45 @@ export function TerceirosDupla({
       )}
 
       {podeGerenciar && jornadaViva && vagas > 0 && (
-        <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
-          <DialogTrigger
-            render={
-              <Button variant="outline" size="sm" className="mt-3">
-                <Plus aria-hidden />
-                Indicar pessoa
-              </Button>
-            }
-          />
-          {dialogAberto && (
-            <NovoContatoDialog
-              duplaId={duplaId}
-              vagas={vagas}
-              onClose={() => setDialogAberto(false)}
+        <div className="mt-3 flex flex-wrap gap-2">
+          <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
+            <DialogTrigger
+              render={
+                <Button variant="outline" size="sm">
+                  <Plus aria-hidden />
+                  Indicar pessoa
+                </Button>
+              }
             />
-          )}
-        </Dialog>
+            {dialogAberto && (
+              <NovoContatoDialog
+                duplaId={duplaId}
+                vagas={vagas}
+                onClose={() => setDialogAberto(false)}
+              />
+            )}
+          </Dialog>
+          {/* resposta coletada por fora entra direto — sem convite/link,
+              a indicação nasce junto no lançamento (449/463) */}
+          <Dialog open={registrandoNovo} onOpenChange={setRegistrandoNovo}>
+            <DialogTrigger
+              render={
+                <Button variant="ghost" size="sm" className="text-muted-foreground">
+                  <NotePencil aria-hidden />
+                  Registrar resposta
+                </Button>
+              }
+            />
+            {registrandoNovo && (
+              <RegistrarRespostaDialog
+                duplaId={duplaId}
+                contato={null}
+                jovemNome={mentoradoNome}
+                onFechar={() => setRegistrandoNovo(false)}
+              />
+            )}
+          </Dialog>
+        </div>
       )}
 
       {(aberto || consolidacao?.consolidado) && (

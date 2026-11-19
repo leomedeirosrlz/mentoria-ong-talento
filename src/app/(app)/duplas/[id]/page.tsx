@@ -136,8 +136,10 @@ import { disponivelDesdePorId, filaMentorados } from "@/lib/fila";
 import {
   ladoDeMentor,
   ladoDeMentorado,
+  motivoSugestaoRemanejo,
   ranquearMentorados,
   ranquearMentores,
+  sugereRemanejo,
 } from "@/lib/remanejo";
 import { cn } from "@/lib/utils";
 import { turmaLonga } from "@/lib/turma";
@@ -390,9 +392,7 @@ export default async function DuplaPage({
       solEmAberto ? getPropostas(solEmAberto.id) : Promise.resolve([]),
       espDaMesa ? getSlotsLivres(espDaMesa) : Promise.resolve([]),
       podeSolicitar || podeSugerir ? getEspecialistas() : Promise.resolve([]),
-      souCoord &&
-      (saude.semaforo === "risco" || saude.apoio.aberto) &&
-      (dupla.status === "ativa" || dupla.status === "pausada")
+      souCoord && sugereRemanejo(dupla, saude)
         ? montarSugestaoRemanejo(dupla)
         : Promise.resolve(null),
       !souMentor
@@ -907,18 +907,9 @@ export default async function DuplaPage({
       <RemanejoSugerido
         key="remanejo"
         dupla={dupla}
-        // semáforo aceso explica pela jornada; apoio sozinho (dupla em
-        // dia + chamado) explica pelo eixo de trabalho — "Em dia." não
-        // sustenta a frase de remanejo
-        motivo={
-          saude.semaforo !== "ok"
-            ? saude.motivo
-            : saude.apoio.origem === "mentorado"
-              ? "Pedido de apoio aberto pelo mentorado"
-              : saude.apoio.origem === "ambos"
-                ? "Pedidos de apoio abertos nos dois lados"
-                : "Pedido de apoio aberto pelo mentor"
-        }
+        // estado declarado das pessoas explica antes do semáforo; apoio
+        // sozinho (dupla em dia + chamado) explica pelo eixo de trabalho
+        motivo={motivoSugestaoRemanejo(dupla, saude)}
         mentores={sugestaoRemanejo.mentores}
         mentorados={sugestaoRemanejo.mentorados}
         agoraMs={sugestaoRemanejo.agoraMs}

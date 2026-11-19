@@ -15,6 +15,7 @@ import {
   getPainelInstrumentosJornada,
 } from "@/lib/queries";
 import { getInstrumentosDaDupla } from "@/lib/forms/queries";
+import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import {
   eventoDaSemana,
@@ -268,13 +269,20 @@ export default async function MateriaisPage({
     ? (abaParam as AbaMateriais)
     : padrao;
 
-  const [instrumentosSelecionada, duplaSelecionadaFull] =
+  const [instrumentosSelecionada, duplaSelecionadaFull, terceirosSelecionada] =
     ativa === "instrumentos" && duplaSelecionada
       ? await Promise.all([
           getInstrumentosDaDupla(duplaSelecionada),
           getDupla(duplaSelecionada),
+          // 449/463 — o 9º card conta respostas × indicações da dupla em
+          // foco direto dos contatos (não é entrega de formulário)
+          getTerceirosDaDupla(duplaSelecionada).then((t) => ({
+            respondidos: t.contatos.filter((c) => c.status === "respondido")
+              .length,
+            total: t.contatos.length,
+          })),
         ])
-      : [[], null];
+      : [[], null, null];
   // a avaliação do encontro é recorrente: a contagem é avaliações feitas
   // × encontros realizados daquela dupla (a mesma conta da linha da
   // página por instrumento)
@@ -319,6 +327,7 @@ export default async function MateriaisPage({
             duplaSelecionada={duplaSelecionada}
             instrumentosSelecionada={instrumentosSelecionada}
             avaliacoesSelecionada={avaliacoesSelecionada}
+            terceirosSelecionada={terceirosSelecionada}
             nudges={nudges}
             meuNome={me?.nome_social || me?.nome || ""}
           />
