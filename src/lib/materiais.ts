@@ -4,7 +4,7 @@ import {
   type CronogramaEncontros,
   type DocApoio,
 } from "./como-conduzir";
-import type { AppRole, Material } from "./types";
+import type { AppRole, Material, Trilha } from "./types";
 import { temPapel } from "./types";
 
 /** Audiências possíveis de um material — uma por papel, na ordem do select.
@@ -175,4 +175,43 @@ export function enriquecerMateriaisPorEncontro(
     if (extras.length) porNumero.set(n, [...lista, ...extras]);
   }
   return porNumero;
+}
+
+/** Audiências da trilha — material DPP nunca cai na trilha especialista e
+ *  vice-versa. Vale para coordenação também: o número coincide, a trilha não. */
+const AUDIENCIAS_DA_TRILHA: Record<Trilha, ReadonlySet<string>> = {
+  dpp: new Set(["todos", "mentor_dpp", "coordenacao"]),
+  especialista: new Set(["todos", "mentor_especialista", "coordenacao"]),
+};
+
+/** Material de apoio de UM número do guia: filtra o catálogo pela audiência
+ *  da trilha e completa com os docs nativos que o encontro herda
+ *  (`enriquecerMateriaisPorEncontro`, dedup por slug). A tela focada não
+ *  precisa montar o mapa dos 16. */
+export function materiaisDoNumero({
+  materiais,
+  eventosDaDupla,
+  trilha,
+  numero,
+}: {
+  materiais: Material[];
+  /** Cronograma oficial da dupla (eventosDoCronograma) — fonte dos docs do
+   *  guia. Trilha especialista não tem janelas: passa [] ou omite. */
+  eventosDaDupla?: CronogramaEncontros;
+  trilha: Trilha | null | undefined;
+  numero: number;
+}): Material[] {
+  const audiencias = AUDIENCIAS_DA_TRILHA[trilha ?? "dpp"];
+  const porNumero = new Map<number, Material[]>();
+  for (const m of materiais) {
+    if (m.encontro_num !== numero) continue;
+    if (!audienciasDe(m).some((a) => audiencias.has(a))) continue;
+    const arr = porNumero.get(numero) ?? [];
+    arr.push(m);
+    porNumero.set(numero, arr);
+  }
+  // a trilha especialista não tem janela nem roteiro do guia — os 5 passos
+  // ficam só com as linhas do catálogo
+  if (trilha === "especialista") return porNumero.get(numero) ?? [];
+  return enriquecerMateriaisPorEncontro(porNumero, eventosDaDupla).get(numero) ?? [];
 }

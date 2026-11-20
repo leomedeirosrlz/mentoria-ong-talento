@@ -1,8 +1,7 @@
 import Link from "next/link";
 import {
-  audienciasDe,
-  enriquecerMateriaisPorEncontro,
   hrefMaterial,
+  materiaisDoNumero,
 } from "@/lib/materiais";
 import { notFound } from "next/navigation";
 import { headers } from "next/headers";
@@ -82,7 +81,6 @@ import {
   jornadaDaDupla,
   linkSeguro,
   passoEsp,
-  passosCobertosCandidatos,
   passosDaTrilha,
   saudadeDaDupla,
   SITUACAO_MENTORADO_LABEL,
@@ -134,7 +132,7 @@ import { MarcoNotifier } from "@/components/marco-notifier";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { temPapel } from "@/lib/types";
-import type { Dupla, Encontro, Material } from "@/lib/types";
+import type { Dupla, Encontro } from "@/lib/types";
 import { disponivelDesdePorId, filaMentorados } from "@/lib/fila";
 import {
   ladoDeMentor,
@@ -150,6 +148,11 @@ import { parseAba } from "./ficha-abas";
 import { FichaAbas } from "./ficha-abas-tabs";
 import { AbaPorHash } from "./aba-por-hash";
 import { EncontroRow } from "./encontro-row";
+import {
+  coberturaDaSessao,
+  combinadosPendentesDaDupla,
+  filaRegistrosPendentes,
+} from "@/lib/registro-contexto";
 import { acaoWhatsAppDupla } from "@/lib/acao-lembrete";
 
 /** Pools da sugestão de remanejo (REALIZA-115): mentores do papel da
@@ -435,9 +438,7 @@ export default async function DuplaPage({
   ).split(" ")[0];
 
   // combinados ainda abertos — alimentam o form de registro e a msg de WhatsApp
-  const combinadosPendentes = (dupla.encaminhamentos ?? [])
-    .filter((e) => e.status !== "feito")
-    .sort((a, b) => (a.prazo ?? "9999").localeCompare(b.prazo ?? "9999"));
+  const combinadosPendentes = combinadosPendentesDaDupla(dupla);
   // registro_id → nº de exibição do encontro, pra lista de encaminhamentos
   // dizer de onde veio cada um. Na trilha esp o nº gravado é a TENTATIVA —
   // o que as linhas mostram é o passo do guia (0074), então mapeia pro passo
@@ -509,26 +510,15 @@ export default async function DuplaPage({
 
   // material de apoio por nº de encontro (guia/template daquele encontro) —
   // a audiência segue a trilha: material DPP nunca cai na trilha especialista
-  // (pra coordenação, que enxerga tudo, o número coincidiria errado)
-  const audienciasDaTrilha = ehEsp
-    ? new Set(["todos", "mentor_especialista", "coordenacao"])
-    : new Set(["todos", "mentor_dpp", "coordenacao"]);
-  const materiaisPorNumero = new Map<number, Material[]>();
-  for (const m of materiais) {
-    if (m.encontro_num == null) continue;
-    if (!audienciasDe(m).some((a) => audienciasDaTrilha.has(a))) continue;
-    const arr = materiaisPorNumero.get(m.encontro_num) ?? [];
-    arr.push(m);
-    materiaisPorNumero.set(m.encontro_num, arr);
-  }
-  // REALIZA-394 — cada encontro DPP herda o kit do guia oficial: roteiro da
-  // semana, docs dos instrumentos em jogo e das técnicas que o evento nomeia
-  // (mesma derivação do chip de instrumento), mesmo quando a linha do
-  // catálogo é transversal ou falta. Dedup por slug — a linha real vence.
-  // A trilha especialista fica fora: os 5 passos não têm janela nem roteiro.
-  if (!ehEsp) {
-    enriquecerMateriaisPorEncontro(materiaisPorNumero, eventosDaDupla);
-  }
+  // (pra coordenação, que enxerga tudo, o número coincidiria errado). O
+  // mesmo recorte puro da rota de registro, por número.
+  const materiaisDoPasso = (numero: number) =>
+    materiaisDoNumero({
+      materiais,
+      eventosDaDupla,
+      trilha: dupla.trilha,
+      numero,
+    });
 
   const hojeStr = toDateStr(new Date());
   const podeRetroativo = souMentor && dupla.status === "ativa" && faltantes.length > 0;
@@ -703,11 +693,6 @@ export default async function DuplaPage({
     (ev) => !futurosComPendencia.includes(ev)
   );
 
-  // o encontro atual (próximo passo da jornada) nasce com o registro
-  // expandido; os demais viram linha-resumo sob disclosure. Pendências de
-  // registro não têm corpo salvo: o form abre pelo CTA da própria linha
-  const numeroAtual = jornada.proximoNumero;
-
   // ações do cabeçalho: UMA primária, conforme o papel e o estado. Mentor:
   // registra a pendência, senão agenda o que falta, senão entra na chamada
   // de hoje. Coordenação e supervisão: Lembrar/Chamar (acaoWA)
@@ -743,34 +728,21 @@ export default async function DuplaPage({
         .sort((a, b) => a.numero - b.numero)[0] ?? null)
     : null;
   const rotuloPendente = ehEsp ? "Registrar sessão" : `Registrar ${pendenteRegistro?.numero}º encontro`;
-  // a âncora do registro: na própria aba Encontros é âncora local (dispara
-  // hashchange); fora dela leva o ?aba= junto
+  // O registro ganhou tela própria (REALIZA-473): a primária do mentor leva
+  // pra rota dedicada em uma navegação, sem aba nem rolagem pela ficha
   const hrefRegistro = pendenteRegistro
-    ? `#registrar-${pendenteRegistro.id}`
-    : null;
-  const hrefRegistroOutraAba = pendenteRegistro
-    ? `?aba=encontros#registrar-${pendenteRegistro.id}`
+    ? `/duplas/${dupla.id}/registrar/${pendenteRegistro.id}`
     : null;
 
   // a primária do mentor (o único botão preenchido do cabeçalho)
   const primarioMentor = !souMentor || dupla.status !== "ativa"
     ? null
     : pendenteRegistro && hrefRegistro
-      ? aba === "encontros"
-        ? (
-          <a href={hrefRegistro} className={buttonVariants({ size: "sm" })}>
-            {rotuloPendente}
-          </a>
-        )
-        : (
-          <Link
-            href={hrefRegistroOutraAba!}
-            scroll={false}
-            className={buttonVariants({ size: "sm" })}
-          >
-            {rotuloPendente}
-          </Link>
-        )
+      ? (
+        <Link href={hrefRegistro} className={buttonVariants({ size: "sm" })}>
+          {rotuloPendente}
+        </Link>
+      )
       : precisaAgendar && !ehEsp
         ? (
           <AgendarEncontroDialog
@@ -842,6 +814,7 @@ export default async function DuplaPage({
     ) : null;
 
   // o encontro atual da jornada — a aba Agora mostra o que fazer nele
+  const numeroAtual = jornada.proximoNumero;
   const noAtual = numeroAtual != null
     ? (jornada.nos.find((n) => n.numero === numeroAtual) ?? null)
     : null;
@@ -854,7 +827,7 @@ export default async function DuplaPage({
         : (dupla.encontros.find((e) => e.numero === passoAtual.numero) ?? null))
     : null;
   const materialAtual = passoAtual
-    ? (materiaisPorNumero.get(passoAtual.numero) ?? []).find((m) => m.path || m.url) ?? null
+    ? (materiaisDoPasso(passoAtual.numero).find((m) => m.path || m.url) ?? null)
     : null;
   // doc nativo carrega a ficha no ?dupla= — o "Abrir instrumento" do
   // documento volta pra esta dupla (REALIZA-386)
@@ -997,7 +970,7 @@ export default async function DuplaPage({
         podeAnexar={souMentor && (dupla.status === "ativa" || ritoPendente)}
         podeRemoverAnexos={souCoord || (souMentor && (dupla.status === "ativa" || ritoPendente))}
         anexos={(enc?.registro && anexosPorRegistro[enc.registro.id]) || []}
-        materiais={materiaisPorNumero.get(passo.numero) ?? []}
+        materiais={materiaisDoPasso(passo.numero)}
         combinados={dupla.encaminhamentos ?? []}
         combinadosPendentes={combinadosPendentes}
         nota={dupla.notas?.find((n) => n.numero === passo.numero)?.texto ?? null}
@@ -1020,29 +993,20 @@ export default async function DuplaPage({
         proximosRegistros={
           ehEsp
             ? null
-            : dupla.encontros
-                .filter(
-                  (e) =>
-                    e.id !== enc?.id &&
-                    !e.registro &&
-                    (e.status === "realizado" ||
-                      ((e.status === "agendado" || e.status === "remarcado") &&
-                        e.data_hora != null &&
-                        new Date(e.data_hora) <= agora))
-                )
-                .sort((a, b) => a.numero - b.numero)
-                .map((e) => ({ encontroId: e.id, numero: e.numero }))
+            : filaRegistrosPendentes(dupla, {
+                excluirEncontroId: enc?.id,
+                agora,
+              })
         }
         // sessão que cobriu mais de um passo (007 US11): os candidatos saem
         // da mesma régua que o salvarRegistro revalida — passo oficial
         // vencido sem row, compromisso vencido ou realizado sem registro;
         // nunca o último (fechamento é gesto próprio)
         cobertura={
-          ehEsp || !souMentor
-            ? null
-            : passosCobertosCandidatos(passos, dupla.encontros, passo.numero, agora)
+          souMentor
+            ? coberturaDaSessao({ dupla, numero: passo.numero, passos, agora })
+            : null
         }
-        registroAberto={passo.numero === numeroAtual}
         apoioDestinos={apoioDestinos}
         linkAvaliacao={
           enc ? (linkAvalPorEncontro.get(enc.id) ?? null) : null
