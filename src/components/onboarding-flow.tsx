@@ -208,15 +208,23 @@ export function OnboardingFlow({
     temPapel(me, "mentor_dpp") || temPapel(me, "mentor_especialista");
   // a declaração do passo 1 (não a prop) decide se o termo existe no fim:
   // desmarcar "Sou voluntário(a)" ali encolhe o wizard na hora e o termo
-  // nunca renderiza — o freeze que existia era contra o router.refresh()
-  // pós-assinatura mexendo na prop, e estado local não sofre com refresh
+  // nunca renderiza. O status da prop é congelado no mount: o revalidatePath
+  // pós-assinatura reentrega "assinado" e recalcular o total no meio da sessão
+  // deixaria o step órfão (sem fechamento, sem carinha e com header N+1/N)
   const [souVoluntario, setSouVoluntario] = useState(me.voluntario !== false);
-  const temTermo = assinaturaTermo?.status !== "assinado" && souVoluntario;
+  const [assinaturaInicial] = useState(
+    () => assinaturaTermo?.status === "assinado"
+  );
+  const temTermo = !assinaturaInicial && souVoluntario;
   // coord/supervisor: boas-vindas + declarações + recursos + ficha pessoal
   // em 3 sub-passos + fechamento (7); mentores: + foto, apresentação,
   // pareamento e disponibilidade (13); termo pendente adiciona 1 passo
   const total = (ehMentor ? 13 : 7) + (temTermo ? 1 : 0);
-  const [step, setStep] = useState(0);
+  const [stepBruto, setStep] = useState(0);
+  // o total encolhe quando a pessoa desmarca "voluntário" (e o status da prop
+  // pode chegar assinado depois): o índice lido nunca passa do último, sem
+  // setState em efeito (era o 8/7 e o valuenow > valuemax do bug)
+  const step = Math.min(stepBruto, total - 1);
   const [termoOk, setTermoOk] = useState(false);
   const [pending, start] = useTransition();
   const tituloRef = useRef<HTMLHeadingElement>(null);
@@ -288,7 +296,7 @@ export function OnboardingFlow({
   }, [step]);
 
   const primeiroNome = me.nome.trim().split(/\s+/)[0] || me.nome;
-  const ultimo = step === total - 1;
+  const ultimo = step >= total - 1;
   // passos de ficha/perfil são opcionais — ganham o ghost "Pular etapa" e a
   // saída "Pular tudo"; faixa contínua do primeiro passo de ficha
   // até a disponibilidade (mentor) ou o fim dos sub-passos (coord/superv.)

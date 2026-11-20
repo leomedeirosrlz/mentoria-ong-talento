@@ -151,13 +151,19 @@ export function OnboardingJovem({
   demo?: React.ReactNode;
 }) {
   const router = useRouter();
-  const [step, setStep] = useState(0);
+  const [stepBruto, setStep] = useState(0);
   const [pending, start] = useTransition();
   const tituloRef = useRef<HTMLHeadingElement>(null);
   const [termoOk, setTermoOk] = useState(false);
 
-  const temTermo = !!termo;
+  // congela o termo do mount: o layout reentrega `termo=null` depois de
+  // assinar, e encolher o total no meio da sessão deixaria o step órfão
+  // (sem a carinha `pronto` nem o fechamento)
+  const [temTermo] = useState(() => !!termo);
   const total = temTermo ? 5 : 4;
+  // mesmo clamp derivado do staff: o total pode encolher quando o layout
+  // reentrega termo=null, e o índice lido não pode passar do último
+  const step = Math.min(stepBruto, total - 1);
   // penúltimo, como no wizard de staff — o passo seguinte (contato) é o
   // fechamento
   const passoTermo = temTermo ? total - 2 : -1;
@@ -182,7 +188,7 @@ export function OnboardingJovem({
 
   const primeiroNome =
     (me.nome_social || me.nome).trim().split(/\s+/)[0] || me.nome;
-  const ultimo = step === total - 1;
+  const ultimo = step >= total - 1;
   const temWhatsapp = perfil?.whatsapp != null;
   // texto único do dd de contato — o truncate precisa do title com o valor
   // inteiro pra ler o que ficou de fora (mesmo padrão do resumo do staff)
