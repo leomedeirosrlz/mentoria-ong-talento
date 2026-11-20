@@ -33,7 +33,12 @@ const PASSOS_ESP = passosDaTrilha("especialista", [], ESP_5);
 const duplaCom = (over: Partial<Dupla> = {}) =>
   mkDupla({ mentor: MENTOR, ...over });
 
-const avaliar = (dupla: Dupla, encontroId: string, ritoPendente = false) =>
+const avaliar = (
+  dupla: Dupla,
+  encontroId: string,
+  ritoPendente = false,
+  recemSalvo = false
+) =>
   estadoDaRotaRegistro({
     dupla,
     encontroId,
@@ -41,6 +46,7 @@ const avaliar = (dupla: Dupla, encontroId: string, ritoPendente = false) =>
     meId: MENTOR.id,
     agora: AGORA,
     ritoPendente,
+    recemSalvo,
   });
 
 // ---------- estadoDaRotaRegistro ----------
@@ -127,6 +133,48 @@ describe("estadoDaRotaRegistro", () => {
     expect(estado.tipo).toBe("bloqueado");
     if (estado.tipo !== "bloqueado") return;
     expect(estado.motivo).toBe("ja_registrado");
+  });
+
+  it("recemSalvo segura o pós-save na rota; sem a marca o ja_registrado manda pra ficha", () => {
+    // Arrange — o registro que a action acabou de gravar já existe quando a
+    // rota re-renderiza no mesmo roundtrip (revalidatePath do salvarRegistro)
+    const enc = encRealizado(2, "2025-10-14", mkRegistro({ id: "r-2" }));
+    const dupla = duplaCom({ encontros: [enc] });
+
+    // Act
+    const posSave = avaliar(dupla, enc.id, false, true);
+    const acessoDireto = avaliar(dupla, enc.id, false, false);
+
+    // Assert — com a marca a rota segue aberta pro K1 (evidências/concluir);
+    // sem ela o acesso direto cai no redirect da ficha, como sempre
+    expect(posSave.tipo).toBe("ok");
+    if (posSave.tipo === "ok") {
+      expect(posSave.encontro.id).toBe(enc.id);
+      expect(posSave.passo?.numero).toBe(2);
+    }
+    expect(acessoDireto.tipo).toBe("bloqueado");
+    if (acessoDireto.tipo === "bloqueado") {
+      expect(acessoDireto.motivo).toBe("ja_registrado");
+    }
+  });
+
+  it("recemSalvo não abre outras portas: dupla inativa e não-mentor seguem fora", () => {
+    // Arrange
+    const enc = encRealizado(1, "2025-10-07", mkRegistro({ id: "r-1" }));
+    const pausada = duplaCom({ status: "pausada", encontros: [enc] });
+    const outroMentor = duplaCom({
+      encontros: [enc],
+      mentor: mkProfile({ id: "outro-mentor" }),
+    });
+
+    // Act
+    const inativa = avaliar(pausada, enc.id, false, true);
+    const alheio = avaliar(outroMentor, enc.id, false, true);
+
+    // Assert — a marca só existe pro ja_registrado; os demais motivos da
+    // tabela não mudam com ela
+    expect(inativa).toMatchObject({ tipo: "bloqueado", motivo: "dupla_inativa" });
+    expect(alheio).toMatchObject({ tipo: "bloqueado", motivo: "nao_e_mentor" });
   });
 
   it("dupla pausada e encerrada ficam inativas; concluída só abre com rito pendente", () => {

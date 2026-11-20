@@ -27,7 +27,7 @@ test.describe("demo — rota de registro (REALIZA-473)", () => {
     // a tarefa é a página: sem abas da ficha
     await expect(page.getByRole("tablist")).toHaveCount(0);
 
-    const form = page.locator("form");
+    const form = page.getByTestId("registro-form");
     await form.getByText("Boa", { exact: true }).click();
     await agirComConfirma(
       () => form.getByRole("button", { name: "Avançar" }).click(),
