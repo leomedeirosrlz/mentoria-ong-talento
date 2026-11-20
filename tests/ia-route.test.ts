@@ -723,6 +723,73 @@ describe("roteador — papel × tarefa e auditoria (REALIZA-299)", () => {
     expect(chamadasStream()[0][2].papeis).toEqual(["coordenacao"]);
   });
 
+  // REALIZA-465: pergunta curta de insight não é saudação. Antes ela caía
+  // no rapido, o payload saía com papeis: [] e o modelo respondia "não
+  // tenho acesso" com os dados existindo.
+  it("insight curto cai no balanceado com os papéis e as tools", async () => {
+    const casos = [
+      "e a adesão",
+      "e a saúde",
+      "e a adoção",
+      "qual o indicador de adesão?",
+    ];
+    for (const pergunta of casos) {
+      m.chamarModeloStream.mockClear();
+      await lerStream(
+        await POST(req({ messages: [{ role: "user", content: pergunta }] }))
+      );
+      expect(chamadasStream()[0][2].papeis).toEqual(["coordenacao"]);
+      const resposta = chamadasLote().at(-1)![1].p_eventos.find(
+        (e) => e.tool === "resposta"
+      )!;
+      expect(resposta.tier).toBe("balanceado");
+      expect(resposta.args).toMatchObject({
+        roteador: { tier: "balanceado", papel: "coordenacao" },
+      });
+    }
+  });
+
+  it("follow-up curto depois de resposta mantém o tier com tools", async () => {
+    await lerStream(
+      await POST(
+        req({
+          messages: [
+            { role: "user", content: "como estão as duplas?" },
+            { role: "assistant", content: "Duas em atenção e uma em risco." },
+            { role: "user", content: "e a adesão" },
+          ],
+        })
+      )
+    );
+    expect(chamadasStream()[0][2].papeis).toEqual(["coordenacao"]);
+    const resposta = chamadasLote()[0][1].p_eventos.find(
+      (e) => e.tool === "resposta"
+    )!;
+    expect(resposta.tier).toBe("balanceado");
+    expect(resposta.args).toMatchObject({
+      roteador: { tier: "balanceado", tarefa: "sintese", papel: "coordenacao" },
+    });
+  });
+
+  it("saudação pura no meio do papo continua rapido, sem tools", async () => {
+    await lerStream(
+      await POST(
+        req({
+          messages: [
+            { role: "user", content: "como estão as duplas?" },
+            { role: "assistant", content: "Duas em atenção e uma em risco." },
+            { role: "user", content: "obrigado!" },
+          ],
+        })
+      )
+    );
+    expect(chamadasStream()[0][2].papeis).toEqual([]);
+    const resposta = chamadasLote()[0][1].p_eventos.find(
+      (e) => e.tool === "resposta"
+    )!;
+    expect(resposta.tier).toBe("rapido");
+  });
+
   it("roteamento desligado na config cai no balanceado pra todos", async () => {
     m.from.mockImplementation(() =>
       queryComData([{ chave: "roteamento", valor: false }])

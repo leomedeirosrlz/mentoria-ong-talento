@@ -40,8 +40,10 @@ import {
 } from "@/lib/ia/config";
 import {
   papelDecisivo,
+  perguntaDeContinuacao,
   rotearTier,
   tarefaDaPergunta,
+  temDominioOperacional,
 } from "@/lib/ia/roteador";
 import { contextoELimiteIa } from "@/lib/ia/rate-limit";
 import type { FonteIa } from "@/lib/ia/fontes";
@@ -186,10 +188,17 @@ export async function POST(req: Request) {
   const ultimaPergunta =
     [...body.data.messages].reverse().find((m) => m.role === "user")
       ?.content ?? "";
-  const tarefa = tarefaDaPergunta(ultimaPergunta);
+  // follow-up depois de uma resposta: a conversa já teve turno do
+  // assistente, então "e a adesão" é continuação, não saudação solta. O
+  // piso vira síntese e a rodada nunca desce pro raso (REALIZA-465)
+  const temHistorico = body.data.messages
+    .slice(0, -1)
+    .some((m) => m.role === "assistant" && m.content.trim().length > 0);
+  const posTool = perguntaDeContinuacao(ultimaPergunta, { temHistorico });
+  const tarefa = tarefaDaPergunta(ultimaPergunta, { posTool });
   const papelRota = papelDecisivo(papeis);
   const tier = iaCfg.roteamento
-    ? rotearTier(ultimaPergunta, { papel: papeis, tarefa })
+    ? rotearTier(ultimaPergunta, { papel: papeis, tarefa, posTool })
     : "balanceado";
   // eval (0164): o runner do /ia manda x-ia-eval-key + modelo e mede aquele
   // slug — a cadeia de fallback sai do caminho senão a métrica mente (o
@@ -206,10 +215,12 @@ export async function POST(req: Request) {
     fallbacks: evalOverride ? [] : fallbacksDoTier(iaCfg, tier),
     // REALIZA-333: o payload de tools sai filtrado por papel — não anunciar
     // pro modelo o que ele não pode rodar (ele papagaiava a descrição das
-    // tools coord-only ao explicar a negação). Tier rapido (saudação,
-    // fora de escopo — nunca consulta dados) sai SEM tools: ~2k tokens
-    // de schema economizados por rodada
-    papeis: tier === "rapido" ? [] : papeis,
+    // tools coord-only ao explicar a negação). Tier rapido (saudação pura,
+    // nunca consulta dados) sai SEM tools: ~2k tokens de schema economizados
+    // por rodada. Pergunta com domínio operacional nunca perde os papéis,
+    // mesmo que o roteador a tenha classificado como saudação (REALIZA-465)
+    papeis:
+      tier === "rapido" && !temDominioOperacional(ultimaPergunta) ? [] : papeis,
   };
 
   // sessão estável por usuário — o provider Go exige pra rotear/cachear;

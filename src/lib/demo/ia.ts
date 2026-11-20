@@ -12,12 +12,15 @@ import type { DuplaIa } from "@/lib/ia/queries";
 import { montarPlanoEmDia } from "@/lib/plano-em-dia";
 import type { Dupla } from "@/lib/types";
 import { uiDaTool, type UiBloco } from "@/lib/ia/ui";
+import { leituraAderencia } from "@/lib/relatorios/leituras-aderencia";
+import { resumoAderencia } from "@/lib/relatorios/operacional";
 import { PERGUNTAS } from "@/lib/ajuda/conteudo";
 import { normaliza } from "@/lib/utils";
 import { demoRole } from "./mode";
 import { demoJovemJornada } from "./forms-data";
 import {
   demoCicloEventos,
+  demoCronogramas,
   demoDuplas,
   demoJovemDuplas,
   demoJovemEncaminhamentos,
@@ -515,6 +518,23 @@ export async function responderDemoIa(
         ui: ui ? [ui] : [],
       };
     }
+  }
+
+  // leitura de aderência (REALIZA-465): "e a adesão?" também na demo, com
+  // os números do dataset evergreen e o mesmo recorte de papel (as duplas
+  // que a persona enxerga). Sem card, como na tool real.
+  if (
+    role !== "mentorado" &&
+    /ades[ãa]o|m[eé]trica|indicador|insight/.test(p)
+  ) {
+    const achados = leituraAderencia(
+      resumoAderencia(duplas as unknown as Dupla[], eventos, demoCronogramas())
+    );
+    const principal = achados[0];
+    return {
+      content: `Na demonstração os números são de exemplo. **${principal.titulo}**: ${principal.metrica}. Próximo passo: ${principal.intervencao}.${sugestoes(["Quem está em risco?", "Encontros desta semana"])}`,
+      ui: [],
+    };
   }
 
   if (STAFF.includes(role) && /resumo|semana|risco|aten|como est|duplas|apoio/.test(p)) {

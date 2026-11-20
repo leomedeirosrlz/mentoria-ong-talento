@@ -21,6 +21,12 @@ import { comparaNome, saudadeDaDupla, toDateStr } from "@/lib/ciclo";
 import { montarPlanoEmDia } from "@/lib/plano-em-dia";
 import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
 import { saudeDoRecorte } from "@/lib/agenda-coordenacao";
+import type { Achado } from "@/lib/relatorios/leituras";
+import { leituraAderencia } from "@/lib/relatorios/leituras-aderencia";
+import { leituraAdocao } from "@/lib/relatorios/leituras-adocao";
+import { leituraSaude } from "@/lib/relatorios/leituras-saude";
+import { resumoAderencia } from "@/lib/relatorios/operacional";
+import { dadosTendenciaSaude } from "@/lib/relatorios/dados";
 import { temPapel } from "@/lib/types";
 import type {
   AppRole,
@@ -39,6 +45,8 @@ import {
   getDuplaIa,
   getDuplasResumoIa,
   getDuplasVivasIa,
+  getDuplasInsightsIa,
+  getCronogramasIa,
   getEncaminhamentosIa,
   getFechadasIa,
   getFilaInsumos,
@@ -61,6 +69,8 @@ import {
 import {
   dadosAdocaoCaminhos,
   dadosAdocaoCoorte,
+  dadosAdocaoMatriz,
+  dadosAdocaoResumo,
   dadosAdocaoSerieDia,
   dadosFunilInstrumentos,
   FUNIL_JANELA_DIAS,
@@ -293,6 +303,23 @@ const adocaoCoorteArgs = z
   })
   .strict();
 
+const insightsArgs = z
+  .object({
+    secao: z
+      .enum(["todas", "aderencia", "saude", "adocao"])
+      .optional()
+      .describe(
+        "qual leitura responder (padrão todas; 'aderencia' quando a pergunta é sobre calendário, registro, apoio ou remarcação)"
+      ),
+    dias: z
+      .union([z.literal(7), z.literal(30), z.literal(90)])
+      .optional()
+      .describe(
+        "janela das leituras de saúde e adoção em dias: 7, 30 ou 90 (padrão 30)"
+      ),
+  })
+  .strict();
+
 const semaforoOrd = { risco: 0, atencao: 1, ok: 2 } as const;
 
 // ---------- tools de escrita ----------
@@ -515,6 +542,29 @@ export function projetarFicha(d: DuplaIa, eventos: CicloEvento[]) {
   };
 }
 
+/** Achado da leitura operacional com a seção de origem (REALIZA-465): o
+ *  modelo cita o número e diz de onde veio. A leitura não tem card, então o
+ *  texto da resposta é a superfície dos achados. */
+export type FonteInsight = "Aderência" | "Saúde" | "Adoção";
+export type AchadoInsight = Achado & { fonte: FonteInsight };
+
+/** O link de ação de cada leitura: o achado pode trazer o dele (a dupla que
+ *  pede apoio), e o resto cai na tela que opera a seção. */
+const ACAO_INSIGHT: Record<FonteInsight, { rotulo: string; href: string }> = {
+  Aderência: { rotulo: "Abrir a lista de duplas", href: "/duplas" },
+  Saúde: {
+    rotulo: "Abrir a leitura de saúde",
+    href: "/relatorios/operacionais?aba=visao",
+  },
+  Adoção: {
+    rotulo: "Abrir a adoção",
+    href: "/relatorios/operacionais?aba=adocao",
+  },
+};
+
+const comFonte = (achados: Achado[], fonte: FonteInsight): AchadoInsight[] =>
+  achados.map((a) => ({ ...a, fonte, acao: a.acao ?? ACAO_INSIGHT[fonte] }));
+
 export const IA_TOOLS = {
   resumo_semana: {
     nome: "resumo_semana",
@@ -529,6 +579,130 @@ export const IA_TOOLS = {
         getCicloEventosIa(ctx.supabase),
       ]);
       return projetarResumo(duplas, eventos, fechadas);
+    },
+  },
+
+  operacional_insights: {
+    nome: "operacional_insights",
+    descricao:
+      "Leitura operacional pronta das seções do hub de relatórios: aderência das duplas (pedido de apoio, atraso de calendário, registro pendente, atraso médio de registro, remarcações), saúde do programa (risco, atenção e a direção dos últimos 7 dias) e adoção (pessoas ativas, gestos, superfícies e papéis sem uso, resposta dos instrumentos, retenção). Cada achado vem com título, número com denominador, por que virou achado, o que fazer, a fonte (Aderência, Saúde ou Adoção) e o link da ação. Use quando a pergunta for sobre adesão, saúde, tendência, adoção, indicadores ou métricas do programa, inclusive follow-ups curtos como 'e a adesão?', 'e a saúde?' e 'o uso caiu?'. A coordenação recebe as três leituras; supervisor e mentor recebem a aderência das duplas do próprio escopo, e o mentor só as duplas dele.",
+    schema: insightsArgs,
+    roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
+    run: async ({ secao, dias }: z.infer<typeof insightsArgs>, ctx) => {
+      const janela = dias ?? 30;
+      const papeis = ctx.papeis.length ? ctx.papeis : [ctx.papel];
+      const coordenacao = papeis.includes("coordenacao");
+      const pedidas = new Set<"aderencia" | "saude" | "adocao">(
+        !secao || secao === "todas"
+          ? ["aderencia", "saude", "adocao"]
+          : [secao]
+      );
+      // saúde e adoção são leituras do programa inteiro: fora da coordenação
+      // elas não têm recorte honesto. O papel de linha (supervisor, mentor)
+      // recebe a aderência das duplas que a RLS entrega, nunca o agregado
+      // geral. Pedir só saúde/adoção cai na aderência em vez de "sem acesso".
+      if (!coordenacao) {
+        pedidas.delete("saude");
+        pedidas.delete("adocao");
+        pedidas.add("aderencia");
+      }
+
+      const rodar = async (
+        fonte: FonteInsight,
+        ler: () => Promise<Achado[]>
+      ): Promise<{ fonte: FonteInsight; achados: Achado[] | null }> => {
+        try {
+          return { fonte, achados: await ler() };
+        } catch (e) {
+          // uma seção fora não derruba as outras: a pergunta ainda tem
+          // resposta com o que leu
+          console.error(`operacional_insights(${fonte}):`, e);
+          return { fonte, achados: null };
+        }
+      };
+
+      const tarefas: Promise<{
+        fonte: FonteInsight;
+        achados: Achado[] | null;
+      }>[] = [];
+
+      if (pedidas.has("aderencia")) {
+        tarefas.push(
+          rodar("Aderência", async () => {
+            const [duplas, eventos, crons] = await Promise.all([
+              getDuplasInsightsIa(ctx.supabase),
+              getCicloEventosIa(ctx.supabase),
+              getCronogramasIa(ctx.supabase),
+            ]);
+            // a projeção do select é um superset do que resumoAderencia lê
+            const resumo = resumoAderencia(
+              duplas as unknown as Dupla[],
+              eventos,
+              crons,
+              new Date()
+            );
+            return leituraAderencia(resumo);
+          })
+        );
+      }
+
+      if (pedidas.has("saude")) {
+        tarefas.push(
+          rodar("Saúde", async () => {
+            const tendencia = await dadosTendenciaSaude(
+              ctx.supabase,
+              {},
+              janela
+            );
+            return leituraSaude(tendencia);
+          })
+        );
+      }
+
+      if (pedidas.has("adocao")) {
+        tarefas.push(
+          rodar("Adoção", async () => {
+            const desde = new Date(Date.now() - janela * 86400_000);
+            const [resumo, celulas, coorte, funil] = await Promise.all([
+              dadosAdocaoResumo(ctx.supabase, desde, null),
+              dadosAdocaoMatriz(ctx.supabase, desde, null),
+              dadosAdocaoCoorte(ctx.supabase, 10),
+              dadosFunilInstrumentos(ctx.supabase, desde),
+            ]);
+            return leituraAdocao({
+              resumo,
+              celulas,
+              coorte,
+              funil,
+              janela,
+              papel: null,
+              medida: "pessoas",
+            });
+          })
+        );
+      }
+
+      const resultados = await Promise.all(tarefas);
+      const achados: AchadoInsight[] = [];
+      const secoes: FonteInsight[] = [];
+      const indisponiveis: FonteInsight[] = [];
+      for (const r of resultados) {
+        if (r.achados) {
+          secoes.push(r.fonte);
+          achados.push(...comFonte(r.achados, r.fonte));
+        } else {
+          indisponiveis.push(r.fonte);
+        }
+      }
+      return {
+        gerado_em: new Date().toISOString(),
+        janela_dias: janela,
+        escopo: coordenacao ? "programa" : "duplas do seu escopo",
+        secoes,
+        indisponiveis,
+        total: achados.length,
+        achados,
+      };
     },
   },
 

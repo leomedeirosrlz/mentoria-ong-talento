@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { papelDecisivo, rotearTier, tarefaDaPergunta } from "./roteador";
+import {
+  ehSaudacaoPura,
+  papelDecisivo,
+  perguntaDeContinuacao,
+  rotearTier,
+  tarefaDaPergunta,
+  temDominioOperacional,
+} from "./roteador";
 
 describe("tarefaDaPergunta", () => {
   it("saudação curta e mensagem curta fora de domínio viram saudacao", () => {
@@ -23,6 +30,66 @@ describe("tarefaDaPergunta", () => {
   it("pós-tool é sintese independente do texto", () => {
     expect(tarefaDaPergunta("ok", { posTool: true })).toBe("sintese");
     expect(tarefaDaPergunta("oi", { posTool: true })).toBe("sintese");
+  });
+
+  // REALIZA-465: "e a adesão" caía em saudacao (curta, sem "?") e a rodada
+  // saía sem tool. As palavras da leitura operacional são domínio, não papo.
+  it("recorte curto de insight é leitura, nunca saudacao", () => {
+    const casos: [string, "leitura" | "analise"][] = [
+      ["e a adesão", "leitura"],
+      ["e a adesao", "leitura"],
+      ["e a saúde", "leitura"],
+      ["e a saude?", "leitura"],
+      ["e a adoção", "leitura"],
+      ["e a metrica de adesão", "leitura"],
+      ["qual o indicador?", "leitura"],
+      ["me dá um insight", "leitura"],
+      ["e os atrasos", "leitura"],
+      ["e os números", "leitura"],
+      ["e a retenção", "leitura"],
+      ["e o engajamento", "leitura"],
+      // "tendência" já é padrão analítico: escala pra análise, não pro raso
+      ["e a tendência", "analise"],
+    ];
+    for (const [pergunta, tarefa] of casos) {
+      expect(tarefaDaPergunta(pergunta)).toBe(tarefa);
+    }
+  });
+});
+
+describe("saudação pura e continuação", () => {
+  it("ehSaudacaoPura só aceita cumprimento ou agradecimento sozinho", () => {
+    for (const p of ["oi", "bom dia", "obrigado!", "beleza", "tchau"]) {
+      expect(ehSaudacaoPura(p)).toBe(true);
+    }
+    for (const p of ["e a adesão", "tudo bem?", "como está a saúde"]) {
+      expect(ehSaudacaoPura(p)).toBe(false);
+    }
+  });
+
+  it("temDominioOperacional reconhece as leituras de insight", () => {
+    for (const p of [
+      "e a adesão",
+      "e a saúde",
+      "métrica da semana",
+      "tendência de risco",
+      "indicador de adoção",
+      "insight da turma",
+    ]) {
+      expect(temDominioOperacional(p)).toBe(true);
+    }
+    expect(temDominioOperacional("oi, tudo bem")).toBe(false);
+  });
+
+  it("continuação exige histórico e não ser saudação pura", () => {
+    expect(perguntaDeContinuacao("e a adesão", { temHistorico: true })).toBe(
+      true
+    );
+    expect(perguntaDeContinuacao("e a adesão")).toBe(false);
+    // agradecimento no fim do papo continua saudação, não síntese
+    expect(perguntaDeContinuacao("obrigado!", { temHistorico: true })).toBe(
+      false
+    );
   });
 });
 
@@ -51,6 +118,44 @@ describe("rotearTier", () => {
     for (const p of ["oi", "fala ai po", "obrigado!", "bom dia"]) {
       expect(rotearTier(p)).toBe("rapido");
     }
+  });
+
+  // REALIZA-465: a tabela de casos do tier. `rapido` só para saudação pura;
+  // qualquer recorte de insight tem que manter tools no payload.
+  it("rapido só para saudação pura", () => {
+    for (const p of ["oi", "bom dia", "obrigado!", "beleza", "tchau"]) {
+      expect(rotearTier(p, { papel: "coordenacao" })).toBe("rapido");
+    }
+    for (const p of [
+      "e a adesão",
+      "e a adesao",
+      "e a saúde",
+      "e a adoção",
+      "qual o indicador de adesão?",
+      "como está a saúde do programa?",
+      "e a tendência",
+    ]) {
+      expect(rotearTier(p, { papel: "coordenacao" })).not.toBe("rapido");
+    }
+  });
+
+  it("follow-up curto depois de tool mantém o piso de síntese", () => {
+    expect(rotearTier("e a adesão", { papel: "coordenacao", posTool: true })).toBe(
+      "balanceado"
+    );
+    expect(rotearTier("e agora", { papel: "mentor_dpp", posTool: true })).toBe(
+      "balanceado"
+    );
+    expect(rotearTier("e agora", { papel: "mentorado", posTool: true })).toBe(
+      "balanceado"
+    );
+    // pedido analítico explícito não perde a análise por ser continuação
+    expect(
+      rotearTier("e a tendência", { papel: "coordenacao", posTool: true })
+    ).toBe("forte");
+    expect(
+      rotearTier("e a tendência", { papel: "mentor_dpp", posTool: true })
+    ).toBe("balanceado");
   });
 
   it("curta com interrogação não é saudação — vai pro balanceado", () => {
