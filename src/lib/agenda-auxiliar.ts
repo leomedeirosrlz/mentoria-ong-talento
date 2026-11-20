@@ -12,6 +12,7 @@ import {
   formatDiaNum,
   linkSeguro,
   passoEsp,
+  registroTemConteudo,
   saudadeDaDupla,
   semanaBounds,
   toDateStr,
@@ -108,7 +109,7 @@ function pendenciaDeRegistro(d: Dupla, agoraMs: number): Encontro | null {
     d.encontros
       .filter(
         (e) =>
-          !e.registro &&
+          !registroTemConteudo(e.registro) &&
           (emLimbo(e, agoraMs) ||
             (e.status === "realizado" &&
               agoraMs - new Date(e.data_hora ?? 0).getTime() > 24 * 3600 * 1000))

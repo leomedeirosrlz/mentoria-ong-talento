@@ -349,6 +349,28 @@ describe("resumoAderencia — régua agregada", () => {
       resumoAderencia([dRisco], EVENTOS, CRONS, HOJE).atrasoMedioRegistro
     ).toBeNull();
   });
+  it("registro vazio legado não entra na média de atraso", () => {
+    const dVazio = mkDupla({
+      id: "dV",
+      encontros: [
+        encRealizado(
+          "dV",
+          6,
+          "2026-09-22",
+          reg({
+            created_at: "2026-10-10T22:00:00Z",
+            tema: null,
+            reflexoes: null,
+            observacoes: null,
+            atividades: [],
+          })
+        ),
+      ],
+    });
+    expect(
+      resumoAderencia([dVazio], EVENTOS, CRONS, HOJE).atrasoMedioRegistro
+    ).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------

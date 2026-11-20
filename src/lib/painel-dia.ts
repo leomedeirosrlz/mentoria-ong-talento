@@ -2,6 +2,7 @@ import {
   alvoAgendamento,
   encontrosDaSemana,
   eventosDoCronograma,
+  registroTemConteudo,
   semanaBounds,
   toDateStr,
   type ItemEncontroDupla,
@@ -97,7 +98,8 @@ export function painelDuplasDoDia({
         if (diaDoEncontro(encontro) === selecionado) continue; // já em "Neste dia"
         // realizado e registrado é história: nada a fazer na semana, e a
         // linha só disputaria atenção com o que pede gesto
-        if (encontro.status === "realizado" && encontro.registro) continue;
+        if (encontro.status === "realizado" && registroTemConteudo(encontro.registro))
+          continue;
         const dia = diaDoEncontro(encontro);
         const naSemana = dia != null && dia >= seg && dia <= dom;
         if (

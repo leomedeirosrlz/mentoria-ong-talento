@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import {
+  registroTemConteudo,
   saudadeDaDupla,
   passosDaTrilha,
   eventosDoCronograma,
@@ -105,7 +106,7 @@ export function montarResumoDupla(
       esperados: saude.esperado,
       proximos,
       pendentes_registro: dupla.encontros
-        .filter((e) => e.status === "realizado" && !e.registro)
+        .filter((e) => e.status === "realizado" && !registroTemConteudo(e.registro))
         .map((e) => e.numero!)
         .filter((n): n is number => n != null),
     },

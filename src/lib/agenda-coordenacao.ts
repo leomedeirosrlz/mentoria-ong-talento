@@ -9,6 +9,7 @@ import {
   eventoDaSemana,
   eventosDoCronograma,
   lembreteBloqueadoAte,
+  registroTemConteudo,
   resumoSemanaDe,
   saudadeDaDupla,
   semanaBounds,
@@ -121,7 +122,7 @@ function pendenciaDeRegistro(d: Dupla, agoraMs: number): Encontro | null {
     d.encontros
       .filter(
         (e) =>
-          !e.registro &&
+          !registroTemConteudo(e.registro) &&
           (emLimbo(e, agoraMs) ||
             (e.status === "realizado" &&
               agoraMs - new Date(e.data_hora ?? 0).getTime() > 24 * 3600 * 1000))
@@ -820,7 +821,7 @@ export function itensSemanaProgramaMentor(
           const row = d.encontros.find((e) => e.numero === ev.numero);
           const limbo = row != null && emLimbo(row, agoraMs);
           const faltaRegistro =
-            row?.status === "realizado" && !row.registro;
+            row?.status === "realizado" && !registroTemConteudo(row.registro);
           const detalhe = row?.data_hora
             ? `${horaCurta(row.data_hora)} · ${row.link ? "chamada de vídeo" : "local a combinar"}`
             : null;
@@ -1154,7 +1155,7 @@ function pulsoDoRecorte(
       const t = new Date(quando).getTime();
       if (t > agoraMs || t < limiteMs) continue;
       p.realizados++;
-      if (e.registro) p.registrosEntregues++;
+      if (registroTemConteudo(e.registro)) p.registrosEntregues++;
       else p.aguardandoRegistro++;
       const estrelas = e.avaliacao_jovem?.estrelas;
       if (typeof estrelas === "number" && estrelas > 0) {

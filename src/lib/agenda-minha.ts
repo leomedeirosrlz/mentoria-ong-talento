@@ -15,6 +15,7 @@ import {
   linkSeguro,
   ORDEM_SEMAFORO,
   passoEsp,
+  registroTemConteudo,
   saudadeDaDupla,
   semanaBounds,
   toDateStr,
@@ -288,7 +289,7 @@ export function limboFechado(e: Encontro, agoraMs: number): boolean {
  *  O realizado recém-terminado ainda não é cobrança — vira item do dia com
  *  a ação "Registrar como foi". */
 export function ehPendenciaRegistro(e: Encontro, agoraMs: number): boolean {
-  if (e.registro) return false;
+  if (registroTemConteudo(e.registro)) return false;
   if (limboFechado(e, agoraMs)) return true;
   if (e.status !== "realizado") return false;
   const iso = isoDoEncontro(e);
@@ -468,7 +469,7 @@ function itensDaDupla(
         // remarcar segue disponível em qualquer agendado futuro — o mesmo
         // AgendarEncontroDialog da ficha/agenda semanal, não um fluxo novo
         acoes.push("remarcar");
-      } else if (e.status === "realizado" && !e.registro) {
+      } else if (e.status === "realizado" && !registroTemConteudo(e.registro)) {
         acoes.push("registrar");
       } else if (e.status === "nao_aconteceu" || e.status === "cancelado") {
         // fechado mas com data futura (marcou não-aconteceu/cancelou antes
@@ -479,9 +480,10 @@ function itensDaDupla(
     }
 
     const meta: string[] = [];
+    const registrado = registroTemConteudo(e.registro);
     if (e.motivo_reagendamento) meta.push(`Remarcado: ${e.motivo_reagendamento}`);
-    if (e.status === "realizado" && e.registro) meta.push("registro entregue");
-    if (e.status === "realizado" && !e.registro)
+    if (e.status === "realizado" && registrado) meta.push("registro entregue");
+    if (e.status === "realizado" && !registrado)
       meta.push("registro ainda não preenchido");
 
     itens.push({
@@ -498,7 +500,7 @@ function itensDaDupla(
       meta,
       tom:
         e.status === "realizado"
-          ? e.registro
+          ? registrado
             ? "ok"
             : "warn"
           : e.status === "nao_aconteceu" || e.status === "cancelado"
@@ -626,7 +628,8 @@ function itensDaDupla(
       const meta: string[] = [];
       if (trilha.especialista_nome) meta.push(`com ${trilha.especialista_nome}`);
       if (trilha.demanda) meta.push(trilha.demanda);
-      if (s.status === "realizado" && s.registro) meta.push("registro entregue");
+      if (s.status === "realizado" && registroTemConteudo(s.registro))
+        meta.push("registro entregue");
 
       itens.push({
         id: `esp-${s.id}`,

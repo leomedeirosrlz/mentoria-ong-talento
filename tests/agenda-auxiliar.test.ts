@@ -520,6 +520,30 @@ describe("contextoDuplaAux", () => {
     expect(problema).toBe(false);
   });
 
+  it("registro vazio legado mantém a linha de registro pendente", () => {
+    const d = mkDupla({
+      encontros: [
+        mkEncontro({
+          numero: 6,
+          status: "realizado",
+          data_hora: "2026-09-22T22:00:00Z",
+          realizado_em: "2026-09-22T22:00:00Z",
+          registro: {
+            id: "rV",
+            tema: null,
+            reflexoes: null,
+            observacoes: null,
+            atividades: [],
+          } as unknown as Encontro["registro"],
+        }),
+        realizado("d1", 7, "09-29"),
+        mkEncontro({ numero: 8, data_hora: "2026-10-06T22:00:00Z" }),
+      ],
+    });
+    const { texto } = contextoDuplaAux(d, EVENTOS, AGORA_SEG);
+    expect(texto).toContain("Registro do encontro 6 pendente.");
+  });
+
   it("pausada não é problema: devolve o rótulo do status", () => {
     expect(contextoDuplaAux(dPaus, EVENTOS, AGORA)).toEqual({
       texto: "Dupla pausada",

@@ -16,7 +16,7 @@ Quem mexe no repo sem contexto precisa de duas coisas: saber **qual regra não p
 | Objeto criado em migration presente em `database.types.ts` | `scripts/repo-guard.mjs` R2 |
 | Sem `.env*` nem segredo versionado; bloco do Next no `AGENTS.md`; links de docs; JSON/scripts válidos | `scripts/repo-guard.mjs` R3–R5, R10 |
 | Semáforo (risco/atenção/ok, apoio fora) | `tests/ciclo-semaforo.test.ts` |
-| Registro entregue = conteúdo (tema/reflexões/observações/atividade): registro vazio, inclusive legado de defaults, não fecha o passo nem apaga a pendência, e `salvarRegistro` recusa sem conteúdo | `tests/ciclo-registro-conteudo.test.ts` |
+| Registro entregue = conteúdo (tema/reflexões/observações/atividade): registro vazio, inclusive legado de defaults, não fecha o passo nem apaga a pendência em nenhuma leitura (semáforo, jornada, agenda, resumos, relatórios), e `salvarRegistro` recusa sem conteúdo | `tests/ciclo-registro-conteudo.test.ts`, `tests/estado-encontro.test.ts`, `tests/agenda-minha.test.ts`, `tests/painel-dia.test.ts`, `tests/dupla-resumo.test.ts` |
 | Cron: 503 sem env, 401 bearer errado, idempotência por ledger | `tests/saude-snapshots.test.ts`, `tests/digest-semanal.test.ts`, `tests/whatsapp-lembretes.test.ts` |
 | Digest configurável: row ausente/inválida = comportamento legado; `desligado` não monta nem loga; quinzenal deduplica por janela de 14d; destinatários = união dedup papéis+pessoas+e-mails; `digest_config` RLS coord-only | `tests/digest-semanal.test.ts` + `tests/e2e/app/relatorios.spec.ts` (papel negado via REST) |
 | Handoff do login (nonce, cooldown, tombstone) | `tests/login-pedido.test.ts`, `tests/login-erros.test.ts` |

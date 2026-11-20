@@ -1,4 +1,5 @@
 import type { Encontro } from "@/lib/types";
+import { registroTemConteudo } from "@/lib/ciclo";
 import { limboAberto } from "@/lib/agenda-minha";
 
 /** Estado visual de um encontro de dupla no calendário (REALIZA-342) — um
@@ -12,7 +13,8 @@ import { limboAberto } from "@/lib/agenda-minha";
 export type EstadoEncontro = "agendado" | "pendente" | "registrado" | "nao_aconteceu";
 
 export function estadoDoEncontro(e: Encontro, agoraMs: number): EstadoEncontro {
-  if (e.status === "realizado") return e.registro ? "registrado" : "pendente";
+  if (e.status === "realizado")
+    return registroTemConteudo(e.registro) ? "registrado" : "pendente";
   if (limboAberto(e, agoraMs)) return "pendente";
   if (e.status === "agendado" || e.status === "remarcado") return "agendado";
   return "nao_aconteceu";

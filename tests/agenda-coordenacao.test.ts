@@ -413,6 +413,47 @@ describe("paraAcompanhar", () => {
     expect(combo.rotuloLembrete).toBe("Lembrar");
   });
 
+  it("registro vazio legado continua contando como pendência", () => {
+    const dVazio = mkDupla({
+      id: "dV",
+      mentor: mkProfile("Vera Luz"),
+      mentorado: mkMentorado("Ivo Nunes"),
+      encontros: [
+        mkEncontro({
+          dupla_id: "dV",
+          numero: 6,
+          status: "realizado",
+          data_hora: "2026-09-22T22:00:00Z",
+          realizado_em: "2026-09-22T22:00:00Z",
+          registro: {
+            id: "rV",
+            tema: null,
+            reflexoes: null,
+            observacoes: null,
+            atividades: [],
+          } as unknown as Encontro["registro"],
+        }),
+        mkEncontro({
+          dupla_id: "dV",
+          numero: 7,
+          status: "realizado",
+          data_hora: "2026-09-29T22:00:00Z",
+          realizado_em: "2026-09-29T22:00:00Z",
+          registro: COM_REGISTRO,
+        }),
+        mkEncontro({
+          dupla_id: "dV",
+          numero: 8,
+          data_hora: "2026-10-08T22:00:00Z",
+        }),
+      ],
+    });
+    const [item] = paraAcompanhar([dVazio], EVENTOS, {}, AGORA_SEG);
+    expect(item.motivos).toContain("registro_pendente");
+    expect(item.contexto).toContain("Registro do 6º encontro pendente");
+    expect(item.rotuloLembrete).toBe("Lembrar registro");
+  });
+
   it("trilha de especialista fala 'sessão' nos sufixos da fila", () => {
     const dEspLimbo = mkDupla({
       id: "dE1",
