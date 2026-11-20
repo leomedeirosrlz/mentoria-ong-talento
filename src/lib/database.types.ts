@@ -8089,10 +8089,6 @@ export type Database = {
         Returns: Json
       }
       reabrir_chamado: { Args: { p_id: string }; Returns: undefined }
-      reconhecer_solicitacao: {
-        Args: { p_id: string; p_turma?: string }
-        Returns: undefined
-      }
       recusar_solicitacao: {
         Args: { p_id: string; p_justificativa: string }
         Returns: undefined
