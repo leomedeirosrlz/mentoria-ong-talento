@@ -59,14 +59,16 @@ function mkMentorado(nome: string): MentoradoPar {
 }
 
 // created_at alimenta diasAtrasoRegistro (o atraso médio do CSV) — um
-// registro sem data faria a média sair NaN na fixture
+// registro sem data faria a média sair NaN na fixture; tema marca "entregue"
 const COM_REGISTRO = {
   id: "r1",
+  tema: "Escuta ativa",
   created_at: "2026-10-07T12:00:00Z",
 } as Encontro["registro"];
 const reg = (over: object): Encontro["registro"] =>
   ({
     id: `r-${Math.random().toString(36).slice(2, 8)}`,
+    tema: "Escuta ativa",
     created_at: "2026-10-07T12:00:00Z",
     ...over,
   }) as Encontro["registro"];
@@ -345,6 +347,28 @@ describe("resumoAderencia — régua agregada", () => {
     // sem registro nenhum → null (o card cai no "—")
     expect(
       resumoAderencia([dRisco], EVENTOS, CRONS, HOJE).atrasoMedioRegistro
+    ).toBeNull();
+  });
+  it("registro vazio legado não entra na média de atraso", () => {
+    const dVazio = mkDupla({
+      id: "dV",
+      encontros: [
+        encRealizado(
+          "dV",
+          6,
+          "2026-09-22",
+          reg({
+            created_at: "2026-10-10T22:00:00Z",
+            tema: null,
+            reflexoes: null,
+            observacoes: null,
+            atividades: [],
+          })
+        ),
+      ],
+    });
+    expect(
+      resumoAderencia([dVazio], EVENTOS, CRONS, HOJE).atrasoMedioRegistro
     ).toBeNull();
   });
 });

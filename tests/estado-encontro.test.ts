@@ -26,7 +26,15 @@ function mk(over: Partial<Encontro>): Encontro {
   } as Encontro;
 }
 
-const REGISTRO = { id: "r1" } as Encontro["registro"];
+const REGISTRO = { id: "r1", tema: "Escuta ativa" } as unknown as Encontro["registro"];
+/** Registro legado salvo só com os defaults do form. */
+const REGISTRO_VAZIO = {
+  id: "r0",
+  tema: null,
+  reflexoes: null,
+  observacoes: null,
+  atividades: [],
+} as unknown as Encontro["registro"];
 
 describe("estadoDoEncontro", () => {
   it("agendado no futuro é agendado", () => {
@@ -42,6 +50,14 @@ describe("estadoDoEncontro", () => {
     expect(
       estadoDoEncontro(mk({ status: "realizado", data_hora: ONTEM, registro: REGISTRO }), AGORA)
     ).toBe("registrado");
+  });
+  it("registro legado sem conteúdo não conta como registrado", () => {
+    expect(
+      estadoDoEncontro(
+        mk({ status: "realizado", data_hora: ONTEM, registro: REGISTRO_VAZIO }),
+        AGORA
+      )
+    ).toBe("pendente");
   });
   it("não aconteceu e cancelado", () => {
     expect(estadoDoEncontro(mk({ status: "nao_aconteceu" }), AGORA)).toBe("nao_aconteceu");
@@ -69,6 +85,15 @@ describe("estadoDaSemana", () => {
         AGORA
       )
     ).toBe("registrado");
+  });
+  it("realizado com registro vazio legado ainda é pendente na semana", () => {
+    expect(
+      estadoDaSemana(
+        [mk({ status: "realizado", data_hora: ONTEM, registro: REGISTRO_VAZIO })],
+        true,
+        AGORA
+      )
+    ).toBe("pendente");
   });
   it("o pior estado entre as duplas manda", () => {
     const registrado = mk({ status: "realizado", data_hora: ONTEM, registro: REGISTRO });

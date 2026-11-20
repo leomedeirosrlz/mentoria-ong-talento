@@ -303,6 +303,51 @@ describe("pendências — warnrows do topo do Hoje", () => {
     expect(a.avisos).toHaveLength(0);
   });
 
+  it("registro vazio legado não fecha a pendência: aviso de >24h continua", () => {
+    const e = mkEncontro({
+      id: "e4v",
+      numero: 4,
+      status: "realizado",
+      data_hora: "2026-10-05T19:00:00-03:00",
+      realizado_em: "2026-10-05T19:00:00-03:00",
+      registro: {
+        id: "r4",
+        tema: null,
+        reflexoes: null,
+        observacoes: null,
+        atividades: [],
+      } as unknown as Encontro["registro"],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [mkDupla({ encontros: [e] })] });
+    expect(a.avisos).toHaveLength(1);
+    expect(a.avisos[0].href).toBe("/duplas/d1#registrar-e4v");
+    expect(a.avisos[0].cta).toBe("Preencher registro");
+  });
+
+  it("registro vazio legado de hoje: item pede o registro em vez de 'entregue'", () => {
+    const e = mkEncontro({
+      id: "e-hj-vazio",
+      numero: 8,
+      status: "realizado",
+      data_hora: `${HOJE}T19:00:00-03:00`,
+      realizado_em: `${HOJE}T19:00:00-03:00`,
+      registro: {
+        id: "r8",
+        tema: null,
+        reflexoes: null,
+        observacoes: null,
+        atividades: [],
+      } as unknown as Encontro["registro"],
+    });
+    const a = deriveAgendaMinha({ ...BASE, duplas: [mkDupla({ encontros: [e] })] });
+    const item = todosOsItens(a).find((i) => i.id === "enc-e-hj-vazio");
+    expect(item).toBeDefined();
+    expect(item!.acoes).toContain("registrar");
+    expect(item!.meta).toContain("registro ainda não preenchido");
+    expect(item!.meta).not.toContain("registro entregue");
+    expect(item!.tom).toBe("warn");
+  });
+
   it("agendado vencido sem registro (limbo) vira aviso com Remarcar", () => {
     const e = mkEncontro({
       id: "e-limbo",
@@ -754,7 +799,7 @@ describe("resumo da semana e rail", () => {
     // semana de 07/10/2026 = seg 05/10 → dom 11/10
     const d = mkDupla({
       encontros: [
-        mkEncontro({ numero: 1, status: "realizado", data_hora: "2026-10-06T19:00:00-03:00", realizado_em: "2026-10-06T19:00:00-03:00", registro: { id: "r1" } as Encontro["registro"] }),
+        mkEncontro({ numero: 1, status: "realizado", data_hora: "2026-10-06T19:00:00-03:00", realizado_em: "2026-10-06T19:00:00-03:00", registro: { id: "r1", tema: "Escuta ativa" } as Encontro["registro"] }),
         mkEncontro({ numero: 2, data_hora: `${DEPOIS}T19:00:00-03:00` }),
         // semana que vem — fora da contagem
         mkEncontro({ numero: 3, data_hora: "2026-10-14T19:00:00-03:00" }),

@@ -18,6 +18,7 @@ import {
   normLinkExterno,
   parseDisponibilidade,
   podeSupervisionar,
+  registroTemConteudo,
 } from "@/lib/ciclo";
 import { capitalizar, cpfValido, erroAmigavel, nomeProprio } from "@/lib/utils";
 import { desfechoValido } from "@/lib/dupla-desfecho";
@@ -3346,16 +3347,29 @@ export async function salvarRegistro(formData: FormData) {
   const atividadeOutro = String(formData.get("atividade_outro") ?? "").trim();
   if (atividadeOutro) atividades.push(atividadeOutro);
 
+  const tema = String(formData.get("tema") ?? "").trim() || null;
+  const ferramenta = String(formData.get("ferramenta") ?? "").trim() || null;
+  const reflexoes = String(formData.get("reflexoes") ?? "").trim() || null;
+  const observacoes = String(formData.get("observacoes") ?? "").trim() || null;
+  // registro só de defaults não é entrega: sem conteúdo o encontro segue
+  // pendente (mesma régua do ciclo), então recusa antes de qualquer escrita
+  if (!registroTemConteudo({ tema, reflexoes, observacoes, atividades })) {
+    return {
+      error:
+        "Preencha ao menos um campo do registro: tema, reflexões, observações ou atividade.",
+    };
+  }
+
   // update preserva created_by de quem registrou primeiro; insert marca o autor
   const { data: regExistente } = await supabase
     .from("registros").select("id, precisa_apoio").eq("encontro_id", encontro_id).maybeSingle();
   // 0084: flag ligada abre o chamado pelo trigger registros_apoio_chamado_sync
   // (que já notifica a equipe com chamado_aberto) — nada de pedido_apoio aqui
   const payload = {
-    tema: String(formData.get("tema") ?? "").trim() || null,
-    ferramenta: String(formData.get("ferramenta") ?? "").trim() || null,
-    reflexoes: String(formData.get("reflexoes") ?? "").trim() || null,
-    observacoes: String(formData.get("observacoes") ?? "").trim() || null,
+    tema,
+    ferramenta,
+    reflexoes,
+    observacoes,
     // pedido de apoio é "sticky": editar o registro não desmarca — só a
     // coordenação resolve (resolverApoio), então update faz OR com o que já está
     precisa_apoio:

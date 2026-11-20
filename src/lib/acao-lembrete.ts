@@ -1,4 +1,4 @@
-import { lembreteBloqueadoAte, type DuplaSaude } from "@/lib/ciclo";
+import { lembreteBloqueadoAte, registroTemConteudo, type DuplaSaude } from "@/lib/ciclo";
 import { limboFechado } from "@/lib/agenda-minha";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import type { Dupla, Encontro } from "@/lib/types";
@@ -18,7 +18,7 @@ export function encontroPendente(d: Dupla, hoje: Date): Encontro | undefined {
     .sort((a, b) => a.numero - b.numero)
     .find(
       (e) =>
-        !e.registro &&
+        !registroTemConteudo(e.registro) &&
         (e.status === "realizado" || limboFechado(e, hoje.getTime()))
     );
 }

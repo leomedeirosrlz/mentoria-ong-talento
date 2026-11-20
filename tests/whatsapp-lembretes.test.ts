@@ -199,6 +199,41 @@ describe("deep-link do nudge Lembrar", () => {
     expect(acao.nudge?.destino).toBe("mentor");
   });
 
+  it("acaoWhatsAppDupla: registro vazio legado ainda é pendência para o nudge", () => {
+    const d = mkDupla({
+      encontros: [
+        mkEncontro({
+          id: "e-8",
+          numero: 8,
+          status: "realizado",
+          data_hora: "2026-10-06T22:00:00Z",
+          realizado_em: "2026-10-06T22:00:00Z",
+          registro: {
+            id: "r-8",
+            tema: null,
+            reflexoes: null,
+            observacoes: null,
+            atividades: [],
+          } as unknown as Encontro["registro"],
+        }),
+      ],
+    });
+    const saude = mkSaude({
+      sinais: [
+        { tipo: "registro_pendente", tom: "atencao", texto: "registro" },
+      ],
+    });
+    const acao = acaoWhatsAppDupla({
+      dupla: d,
+      saude,
+      hoje: HOJE,
+      ultimoNudge: null,
+      meuNome: "Joana",
+      tituloNudge: "Lembrete da coordenação",
+    });
+    expect(acao.nudge?.href).toBe("/duplas/d1#registrar-e-8");
+  });
+
   it("acaoWhatsAppDupla: sem pendência operacional fica na ficha", () => {
     const d = mkDupla();
     const saude = mkSaude({

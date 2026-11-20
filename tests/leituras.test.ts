@@ -65,6 +65,7 @@ function enc(
   // registro no mesmo dia — atraso médio não acende achado na fixture "em dia"
   registro: Encontro["registro"] = {
     id: `r-${duplaId}-${numero}`,
+    tema: "Escuta ativa",
     created_at: `${dia}T23:00:00Z`,
   } as Encontro["registro"]
 ): Encontro {

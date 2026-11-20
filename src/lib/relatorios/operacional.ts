@@ -9,6 +9,7 @@ import {
   diffDias,
   eventosDoCronograma,
   passosDaTrilha,
+  registroTemConteudo,
   toDateStr,
   type DuplaSaude,
 } from "@/lib/ciclo";
@@ -119,7 +120,7 @@ export function resumoAderencia(
     }
     if (l.atrasoMedioRegistro != null) {
       // a média da dupla pesa pelos registros que a medem
-      const n = i.dupla.encontros.filter((e) => e.registro).length;
+      const n = i.dupla.encontros.filter((e) => registroTemConteudo(e.registro)).length;
       atrasoSoma += l.atrasoMedioRegistro * n;
       atrasoN += n;
     }

@@ -14,6 +14,7 @@ import {
   encontroEsperado,
   eventosDoCronograma,
   papelLabel,
+  registroTemConteudo,
   saudadeDaDupla,
   TRILHA_LABEL,
   type DuplaSaude,
@@ -157,7 +158,7 @@ export function itemAderencia(
     (e) => e.status === "realizado"
   ).length;
   const atrasos = d.encontros
-    .filter((e) => e.registro)
+    .filter((e) => registroTemConteudo(e.registro))
     .map((e) => diasAtrasoRegistro(e.registro!, e));
   const avaliacoes = d.encontros
     .map((e) => e.registro?.avaliacao)
