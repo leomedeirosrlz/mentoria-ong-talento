@@ -1456,7 +1456,7 @@ function FonteItem({
 const PEDIDO_LABEL: Record<string, { rotulo: string; tom: Tom }> = {
   sugerida: { rotulo: "sugerida", tom: "neutro" },
   aberta: { rotulo: "esperando especialista", tom: "info" },
-  aguardando_coord: { rotulo: "com a coordenação", tom: "info" },
+  aguardando_coord: { rotulo: "no mural", tom: "info" }, // legado da triagem (0158)
   contra_proposta: { rotulo: "novo horário proposto", tom: "atencao" },
   aceita: { rotulo: "aceita", tom: "ok" },
   recusada: { rotulo: "não deu certo", tom: "neutro" },

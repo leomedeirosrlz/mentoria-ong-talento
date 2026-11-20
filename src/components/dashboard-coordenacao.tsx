@@ -19,6 +19,7 @@ import {
 import { paraAcompanhar, saudeDoRecorte } from "@/lib/agenda-coordenacao";
 import { situacaoDaDupla, SITUACAO_DUPLA_LABEL } from "@/lib/dupla-desfecho";
 import { painelTrilhasCoord, type AlertaPedido } from "@/lib/trilhas-coord";
+import { pedidosAcionaveis } from "@/lib/solicitacoes-coord";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import { lembreteDaDupla } from "@/components/agenda-partes";
 import { turmaCurta, turmaLonga } from "@/lib/turma";
@@ -200,9 +201,8 @@ export function DashboardCoordenacao({
         `${primeiroNome(dupla.mentor.nome_social || dupla.mentor.nome)} & ${primeiroNome(dupla.mentorado.nome_social || dupla.mentorado.nome)} (${motivoCurto(saude)})`
     );
 
-  const pedidosAbertos = solicitacoes.filter((s) =>
-    ["aberta", "contra_proposta", "aguardando_coord"].includes(s.status_efetivo ?? s.status)
-  ).length;
+  // mesmo helper do card: o contador é o length da lista que ele renderiza
+  const pedidosAbertos = pedidosAcionaveis(solicitacoes).length;
 
   return (
     <div className="space-y-6">

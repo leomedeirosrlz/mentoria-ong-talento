@@ -1,11 +1,12 @@
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { statusEfetivoDoPedido } from "@/lib/solicitacoes-coord";
 import type { SolicitacaoEspecialista } from "@/lib/types";
 
 /** Chip do header da ficha DPP: onde a solicitação de especialista está.
  *  Os estados pedem resposta honesta — "aberta" pede atenção (ninguém
- *  assumiu), "aguardando_coord" diz com quem a bola está, "contra_proposta"
- *  avisa que há horário na mesa, "aceita" informa quem assumiu — sem link,
+ *  assumiu, está no mural), "contra_proposta" avisa que há horário na mesa,
+ *  "aceita" informa quem assumiu — sem link,
  *  porque a dupla de especialista é do especialista e a RLS não deixa o
  *  mentor DPP abri-la. Quando a trilha fecha, o chip conta que a devolutiva
  *  chegou — o texto mora na lateral da ficha. "cancelada" (e a ausência de
@@ -17,7 +18,7 @@ export function SolicitacaoStatusChip({
   solicitacao: SolicitacaoEspecialista | null;
 }) {
   if (!solicitacao) return null;
-  const efetivo = solicitacao.status_efetivo ?? solicitacao.status;
+  const efetivo = statusEfetivoDoPedido(solicitacao);
   if (efetivo === "cancelada") return null;
 
   const quem =
@@ -47,10 +48,6 @@ export function SolicitacaoStatusChip({
         label = "Sugestão com o jovem";
         cls =
           "border-[var(--pausa-border)] bg-[var(--pausa-bg)] text-[var(--pausa-text)]";
-        break;
-      case "aguardando_coord":
-        label = "Pedido com a coordenação";
-        cls = "border-[var(--warn)]/60 text-[var(--warn-text)]";
         break;
       case "contra_proposta":
         label = `Negociando horário${quem !== "a definir" ? ` com ${quem}` : ""}`;

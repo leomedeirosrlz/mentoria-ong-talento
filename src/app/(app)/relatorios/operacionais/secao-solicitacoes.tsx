@@ -3,6 +3,7 @@ import { Collapsible } from "@base-ui/react/collapsible";
 import { diffDias } from "@/lib/ciclo";
 import { dataHora, dia } from "@/lib/relatorios/csv-core";
 import type { ItemSolicitacao } from "@/lib/relatorios/dados";
+import { statusDoPedido } from "@/lib/solicitacoes-coord";
 import type { SolicitacaoEspecialistaStatus } from "@/lib/types";
 import type { TomSituacao } from "@/components/dupla-linha";
 import {
@@ -14,20 +15,20 @@ import {
 } from "./relatorio-secao";
 
 // Seção "Especialistas" (REALIZA-389): o resumo é o funil do mural — o que
-// espera triagem da coordenação, o que espera aceite do especialista e o
-// que já decidiu. A fila leva à ficha da dupla DPP (onde a negociação mora)
-// ou à ficha do jovem. A tabela do export fica embaixo, colapsada.
+// espera aceite do especialista, o que está em negociação e o que já
+// decidiu. A fila leva à ficha da dupla DPP (onde a negociação mora) ou à
+// ficha do jovem. A tabela do export fica embaixo, colapsada.
 
 /** status que ainda pedem ação de alguém — o resto é decisão registrada. */
 const PENDENTES = new Set<SolicitacaoEspecialistaStatus>([
-  "aguardando_coord",
   "aberta",
   "contra_proposta",
   "sugerida",
 ]);
 
 const TOM_STATUS: Record<SolicitacaoEspecialistaStatus, TomSituacao> = {
-  aguardando_coord: "atencao",
+  // legado da triagem (0158): normalizado pra "aberta" antes do lookup
+  aguardando_coord: "neutro",
   contra_proposta: "atencao",
   aberta: "neutro",
   sugerida: "neutro",
@@ -48,20 +49,17 @@ export function SecaoSolicitacoes({
 }) {
   const hojeDia = hoje.toISOString().slice(0, 10);
   const pendentes = itens
-    .filter((i) => PENDENTES.has(i.statusEfetivo))
+    .filter((i) => PENDENTES.has(statusDoPedido(i.statusEfetivo)))
     .sort((a, b) => a.linha.criada_em.localeCompare(b.linha.criada_em));
   const decididas = itens
-    .filter((i) => !PENDENTES.has(i.statusEfetivo))
+    .filter((i) => !PENDENTES.has(statusDoPedido(i.statusEfetivo)))
     .sort((a, b) => b.linha.criada_em.localeCompare(a.linha.criada_em));
 
   const porStatus = new Map<SolicitacaoEspecialistaStatus, number>();
   for (const i of itens) {
-    porStatus.set(
-      i.statusEfetivo,
-      (porStatus.get(i.statusEfetivo) ?? 0) + 1
-    );
+    const status = statusDoPedido(i.statusEfetivo);
+    porStatus.set(status, (porStatus.get(status) ?? 0) + 1);
   }
-  const aguardandoTriagem = porStatus.get("aguardando_coord") ?? 0;
   const esperandoEspecialista =
     (porStatus.get("aberta") ?? 0) + (porStatus.get("sugerida") ?? 0);
   const emNegociacao = porStatus.get("contra_proposta") ?? 0;
@@ -99,7 +97,6 @@ export function SecaoSolicitacoes({
               <dl className="mt-3 space-y-1.5">
                 {(
                   [
-                    ["aguardando triagem", aguardandoTriagem],
                     ["esperando especialista", esperandoEspecialista],
                     ["em negociação", emNegociacao],
                     ["aceitas", aceitas],
@@ -248,7 +245,7 @@ function LinhaSolicitacao({
         i={i}
         situacao={{
           rotulo: item.linha.status,
-          tom: TOM_STATUS[item.statusEfetivo] ?? "neutro",
+          tom: TOM_STATUS[statusDoPedido(item.statusEfetivo)] ?? "neutro",
         }}
         titulo={item.linha.mentorado || "Sem mentorado"}
         meta={meta}

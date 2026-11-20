@@ -553,7 +553,7 @@ export function dadosInteracoesDemo(
 const SOLICITACAO_STATUS_LABEL: Record<SolicitacaoEspecialistaStatus, string> = {
   sugerida: "sugerida",
   aberta: "aberta",
-  aguardando_coord: "aguardando coordenação",
+  aguardando_coord: "aberta", // legado da triagem (0158): lê como mural
   contra_proposta: "em negociação",
   aceita: "aceita",
   recusada: "recusada",
@@ -567,7 +567,7 @@ const SOLICITACAO_ORIGEM_LABEL: Record<string, string> = {
 };
 
 /** A linha do pedido + os alvos do drill-down — a fila acionável (389) leva
- *  à ficha da dupla DPP (onde a triagem/negociação mora) ou à do jovem. */
+ *  à ficha da dupla DPP (onde a negociação mora) ou à do jovem. */
 export type ItemSolicitacao = {
   linha: LinhaSolicitacao;
   solicitacaoId: string;
@@ -589,8 +589,8 @@ export function itensSolicitacoes(
     if (d) {
       if (!duplaNoRecorte(d, recorte, crons)) continue;
     } else if (recorte.turma || recorte.cronogramaId) {
-      // pedido do jovem sem dupla DPP: a turma que a triagem carimbou no
-      // pedido é a única régua disponível — cronograma não casa
+      // pedido do jovem sem dupla DPP: a turma carimbada no próprio pedido
+      // é a única régua disponível — cronograma não casa
       if (recorte.cronogramaId) continue;
       if (recorte.turma && s.turma !== recorte.turma) continue;
     }

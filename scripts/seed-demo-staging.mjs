@@ -984,8 +984,8 @@ await post("comunicados", [
   { id: uid(0x902), titulo: "Bem-vindos à plataforma", corpo: "Esta é a casa nova do programa. Qualquer dúvida ou erro, fala com a coordenação no WhatsApp.", audiencia: "todos", prioridade: "normal", created_by: P.coord, created_at: iso(new Date("2026-09-04T09:00:00-03:00")) },
 ]);
 
-// mural de especialistas: 1 aberta (genérica), 1 aguardando triagem, 2
-// aceitas→trilhas (a view solicitacoes_mural projeta esta tabela e junta
+// mural de especialistas: 2 abertas (uma da dupla, outra do jovem sem DPP),
+// 2 aceitas→trilhas (a view solicitacoes_mural projeta esta tabela e junta
 // nomes/devolutiva — *_nome e status_efetivo não são colunas reais)
 // + 1 sugerida (WP6): a sugestão do mentor nasce fora dos tetos e do mural,
 // esperando a confirmação da Ana em /jovem/especialistas. O Otávio aponta
@@ -995,7 +995,7 @@ const SUG_ANA_DEMANDA = "A Ana mira Medicina e a ansiedade de prova derruba o si
 const SUG_ANA_QUANDO = iso(new Date(Date.now() - DIA)); // ~1 dia atrás
 await post("solicitacoes_especialista", [
   { id: uid(0x1000), mentorado_id: M.gabriela, dupla_dpp_id: D.d5, demanda: "Carreiras em tecnologia", motivo: "A Gabriela quer entender qual área de tech combina com ela antes de escolher o curso técnico.", turma: T1_TURMA, status: "aberta", origem: "staff", created_by: P.ricardo, created_at: iso(new Date("2026-10-08T10:00:00-03:00")) },
-  { id: uid(0x1001), mentorado_id: M.igor, demanda: "Orientação vocacional", motivo: "O Igor está dividido entre técnico em eletrônica e mecânica — pediu direto pelo mural do jovem.", turma: null, status: "aguardando_coord", origem: "jovem", created_by: igorProfile, created_at: iso(new Date("2026-10-12T10:00:00-03:00")) },
+  { id: uid(0x1001), mentorado_id: M.igor, demanda: "Orientação vocacional", motivo: "O Igor está dividido entre técnico em eletrônica e mecânica — pediu direto pelo mural do jovem.", turma: null, status: "aberta", origem: "jovem", created_by: igorProfile, created_at: iso(new Date("2026-10-12T10:00:00-03:00")) },
   { id: uid(0x1002), mentorado_id: M.larissa, dupla_dpp_id: D.d13, demanda: "Ansiedade de desempenho", motivo: "A Larissa trava em prova — o mentor pediu apoio de especialista.", turma: T1_TURMA, status: "aceita", origem: "staff", especialista_id: P.luisa, dupla_id: D.trilha1, created_by: P.andre, created_at: iso(new Date("2026-09-20T10:00:00-03:00")), respondida_em: iso(new Date("2026-09-22T10:00:00-03:00")) },
   { id: uid(0x1003), mentorado_id: M.enzo, dupla_dpp_id: D.d9, demanda: "Finanças pessoais", motivo: "Enzo queria aprender a cuidar do primeiro salário.", turma: T1_TURMA, status: "aceita", origem: "staff", especialista_id: P.sofia, dupla_id: D.trilha2, created_by: P.gustavo, created_at: iso(new Date("2026-09-05T10:00:00-03:00")), respondida_em: iso(new Date("2026-09-08T10:00:00-03:00")) },
   { id: uid(0x1004), mentorado_id: M.ana, dupla_dpp_id: D.d1, demanda: SUG_ANA_DEMANDA, motivo: "Quero controlar a ansiedade pra render nos simulados.", turma: T1_TURMA, status: "sugerida", origem: "mentor", especialista_desejado_id: P.luisa, created_by: P.andre, created_at: SUG_ANA_QUANDO },
