@@ -129,7 +129,7 @@ function mkCronograma(over: Partial<Cronograma> = {}): Cronograma {
   };
 }
 
-const COM_REGISTRO = { id: "r1" } as Encontro["registro"];
+const COM_REGISTRO = { id: "r1", tema: "Escuta ativa" } as Encontro["registro"];
 
 // realizado fechado (com registro) num dia dado — o "em dia" da dupla
 function realizado(duplaId: string, numero: number, dia: string): Encontro {

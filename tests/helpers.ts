@@ -163,7 +163,9 @@ export function mkRegistro(over: Partial<Registro> = {}): Registro {
   return {
     id: "r-1",
     encontro_id: "e-1",
-    tema: null,
+    // default = registro entregue: a action recusa salvar sem conteúdo, então
+    // fixture sem conteúdo precisa ser explícita (ver ciclo-registro-conteudo)
+    tema: "Escuta ativa",
     ferramenta: null,
     reflexoes: null,
     observacoes: null,

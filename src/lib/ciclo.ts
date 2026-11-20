@@ -117,7 +117,7 @@ export function passosCobertosCandidatos(
     numero: number;
     status: EncontroStatus;
     data_hora: string | null;
-    registro?: unknown | null;
+    registro?: ConteudoRegistro | null;
   }[],
   numeroAtual: number,
   agora: Date
@@ -134,7 +134,7 @@ export function passosCobertosCandidatos(
       // cobrir não é desmarcação silenciosa
       return enc.data_hora == null || new Date(enc.data_hora) <= agora;
     }
-    return enc.status === "realizado" && enc.registro == null;
+    return enc.status === "realizado" && !registroTemConteudo(enc.registro);
   });
 }
 
@@ -891,11 +891,40 @@ export function idade(iso: string | null | undefined): number | null {
   return anos >= 0 ? anos : null;
 }
 
+/** Campos que provam que o registro tem conteúdo. Ferramenta, avaliação,
+ *  dificuldade e próximos passos sozinhos não contam: um registro salvo com
+ *  todos os defaults carrega esses eixos nulos/vazios — e não é entrega. */
+export type ConteudoRegistro = {
+  tema?: string | null;
+  reflexoes?: string | null;
+  observacoes?: string | null;
+  atividades?: readonly string[] | null;
+};
+
+const temTexto = (v: string | null | undefined): boolean =>
+  typeof v === "string" && v.trim().length > 0;
+
+/** Registro entregue = ao menos um campo de conteúdo preenchido. Régua única
+ *  da leitura do domínio (jornada, semáforo, resumos) e da escrita
+ *  (salvarRegistro): registro vazio, inclusive o legado de defaults, segue
+ *  pendente. `precisa_apoio` fica de fora — apoio é eixo próprio. */
+export function registroTemConteudo(
+  registro: ConteudoRegistro | null | undefined
+): boolean {
+  if (!registro) return false;
+  return (
+    temTexto(registro.tema) ||
+    temTexto(registro.reflexoes) ||
+    temTexto(registro.observacoes) ||
+    (Array.isArray(registro.atividades) && registro.atividades.some(temTexto))
+  );
+}
+
 /** Registro mais recente da dupla (pelo número do encontro). */
 export function ultimoRegistro(dupla: Dupla): Registro | null {
   return (
     dupla.encontros
-      .filter((e) => e.registro)
+      .filter((e) => registroTemConteudo(e.registro))
       .sort((a, b) => b.numero - a.numero)[0]?.registro ?? null
   );
 }
@@ -1232,7 +1261,7 @@ export function resumoSemanaDe(
   const oficialRealizado = (d: Dupla) =>
     d.encontros.find((e) => e.numero === evento.numero && e.status === "realizado");
   const feitos = ativas.map(oficialRealizado).filter((e): e is Encontro => !!e);
-  const comRegistro = feitos.filter((e) => e.registro).length;
+  const comRegistro = feitos.filter((e) => registroTemConteudo(e.registro)).length;
   // reposição: sem `realizado` do numero oficial, mas com algum encontro
   // realizado dentro da semana calendário — ex.: a dupla pulou a semana do
   // encontro 2 e repôs na semana do 3. Ela SE encontrou; contar como
@@ -1283,7 +1312,7 @@ export type ItemEncontroDupla = { encontro: Encontro; dupla: Dupla };
 export function emLimbo(e: Encontro, agoraMs: number): boolean {
   return (
     (e.status === "agendado" || e.status === "remarcado") &&
-    !e.registro &&
+    !registroTemConteudo(e.registro) &&
     e.data_hora != null &&
     new Date(e.data_hora).getTime() < agoraMs
   );
@@ -1315,7 +1344,7 @@ export function bucketsDoEncontro(
   for (const item of itens) {
     const e = item.encontro;
     if (e.status === "realizado")
-      (e.registro ? b.realizados : b.pendentes).push(item);
+      (registroTemConteudo(e.registro) ? b.realizados : b.pendentes).push(item);
     else if (e.status === "agendado" || e.status === "remarcado")
       (emLimbo(e, agoraMs) ? b.pendentes : b.agendados).push(item);
     else b.naoAconteceram.push(item);
@@ -1371,7 +1400,7 @@ export function coberturaEncontro(
         (e) =>
           e.numero === evento.numero &&
           e.status === "realizado" &&
-          e.registro
+          registroTemConteudo(e.registro)
       )
     )
       registraram++;
@@ -1497,7 +1526,7 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
     dupla.encontros
       .filter(
         (e) =>
-          !e.registro &&
+          !registroTemConteudo(e.registro) &&
           ((e.status === "realizado" &&
             hoje.getTime() - new Date(e.data_hora ?? 0).getTime() > 24 * 3600 * 1000) ||
             emLimbo(e, hoje.getTime()))
@@ -2005,7 +2034,9 @@ export function jornadaDaDupla(
     let estado: EstadoNoJornada;
     if (!encontro) estado = "futuro";
     else if (encontro.status === "realizado")
-      estado = encontro.registro ? "realizado_completo" : "pendente_registro";
+      estado = registroTemConteudo(encontro.registro)
+        ? "realizado_completo"
+        : "pendente_registro";
     else if (emLimbo(encontro, hoje.getTime()))
       estado = "limbo";
     else if (encontro.status === "agendado" || encontro.status === "remarcado")

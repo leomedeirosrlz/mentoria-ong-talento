@@ -139,7 +139,7 @@ function mkCronograma(over: Partial<Cronograma> = {}): Cronograma {
   };
 }
 
-const COM_REGISTRO = { id: "r1" } as Encontro["registro"];
+const COM_REGISTRO = { id: "r1", tema: "Escuta ativa" } as Encontro["registro"];
 
 // ---- calendários das turmas ----
 // C1 (T1): encontros às terças — 6 em 22/09, 7 em 29/09, 8 em 06/10
@@ -575,7 +575,11 @@ describe("paraAcompanhar", () => {
 // (segunda 05/10): esperado = enc. 6 e 7, vigente = enc. 8 na semana.
 describe("dimensoesDoItem + sinteseMonitoramento", () => {
   const reg = (over: object): Encontro["registro"] =>
-    ({ id: `r-${Math.random().toString(36).slice(2, 8)}`, ...over }) as Encontro["registro"];
+    ({
+      id: `r-${Math.random().toString(36).slice(2, 8)}`,
+      tema: "Escuta ativa",
+      ...over,
+    }) as Encontro["registro"];
   const encRealizado = (
     duplaId: string,
     numero: number,

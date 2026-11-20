@@ -59,14 +59,16 @@ function mkMentorado(nome: string): MentoradoPar {
 }
 
 // created_at alimenta diasAtrasoRegistro (o atraso médio do CSV) — um
-// registro sem data faria a média sair NaN na fixture
+// registro sem data faria a média sair NaN na fixture; tema marca "entregue"
 const COM_REGISTRO = {
   id: "r1",
+  tema: "Escuta ativa",
   created_at: "2026-10-07T12:00:00Z",
 } as Encontro["registro"];
 const reg = (over: object): Encontro["registro"] =>
   ({
     id: `r-${Math.random().toString(36).slice(2, 8)}`,
+    tema: "Escuta ativa",
     created_at: "2026-10-07T12:00:00Z",
     ...over,
   }) as Encontro["registro"];
