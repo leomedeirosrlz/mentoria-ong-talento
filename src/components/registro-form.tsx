@@ -120,6 +120,9 @@ export function RegistroForm({
   origem,
   proximosRegistros = null,
   cobertura = null,
+  titulo = true,
+  irParaAposSalvar,
+  onEncadear,
 }: {
   encontroId: string;
   duplaId: string;
@@ -154,6 +157,16 @@ export function RegistroForm({
    *  conteúdo no salvarRegistro. Só criação DPP recebe (edição e trilha
    *  especialista ficam de fora). */
   cobertura?: { numero: number; titulo: string }[] | null;
+  /** Título interno "Registro do encontro" — a rota dedicada passa `false`
+   *  porque o `h1` da página já nomeia a tarefa. */
+  titulo?: boolean;
+  /** Destino do "Concluir" quando o host tem uma URL própria: `replace`
+   *  sem `refresh` (evita a corrida entre navegação e re-render). */
+  irParaAposSalvar?: string;
+  /** Encadear no próximo encontro: o rascunho compartilhado é gravado aqui e
+   *  a navegação é do host (rota) — sem ele, o form segue escrevendo o hash
+   *  da ficha (fallback do PR1). */
+  onEncadear?: (encontroId: string) => void;
 }) {
   // edição nasce com os combinados já gravados pelo registro — o id de
   // banco viaja na linha e volta no submit (o Adicionar usa uuid local,
@@ -693,6 +706,12 @@ export function RegistroForm({
   }
 
   function fecharPosSave() {
+    // host com URL própria (rota dedicada): replace e nenhum refresh — o
+    // refresh antigo podia competir com a navegação e trocar o toast
+    if (irParaAposSalvar) {
+      router.replace(irParaAposSalvar);
+      return;
+    }
     // host com onSaved (detalhe do dia) fecha o dialog; sem callback
     // (ficha) o form recolhe no "salvo" mínimo e o refresh troca o card
     if (onSaved) onSaved();
@@ -701,8 +720,9 @@ export function RegistroForm({
   }
 
   // double session (REALIZA-397): seeds the next encounter's draft with the
-  // shared fields and opens its own form through the #registrar-{id} anchor —
-  // the same surface, one save per encounter, no merged side effects
+  // shared fields and opens its own form — the hash anchor on the ficha, or
+  // the host's own navigation on the dedicated route. The draft is what
+  // carries the shared fields; each encounter is saved separately.
   function encadearProximo() {
     const chain = posSave?.chain;
     if (!chain) return;
@@ -729,6 +749,12 @@ export function RegistroForm({
       } catch {
         // storage indisponível — o próximo form abre vazio, segue o jogo
       }
+    }
+    // host com navegação própria (rota): não mexe no hash nem fecha — a
+    // página desmonta com o replace
+    if (onEncadear) {
+      onEncadear(chain.encontroId);
+      return;
     }
     window.location.hash = `registrar-${chain.encontroId}`;
     fecharPosSave();
@@ -771,7 +797,7 @@ export function RegistroForm({
       )}
     >
       <div>
-        {!embutido && (
+        {!embutido && titulo && (
           <p className="text-sm font-medium">
             {registro ? "Editar registro" : "Registro do encontro"}
           </p>

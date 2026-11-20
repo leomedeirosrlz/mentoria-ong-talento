@@ -30,7 +30,8 @@ import { CopiarChamada } from "@/components/copiar-chamada";
 import { NotaEncontro } from "@/components/nota-encontro";
 import { CombinadosEncontro } from "@/components/combinados-encontro";
 import {
-  AvaliacaoJovemCard,
+  AvaliacaoJovemResumo,
+  AvaliacaoJovemDetalhe,
   AvaliacaoPendenteLinha,
   EstrelaEspecialistaChip,
 } from "@/components/avaliacao-jovem";
@@ -38,8 +39,8 @@ import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { NaoAconteceuButton, DesfazerNaoAconteceuButton } from "@/components/nao-aconteceu-button";
 import { RegistroFormLazy } from "@/components/registro-form-lazy";
+import { EncontroDisclosure } from "@/components/encontro-disclosure";
 import {
-  RegistroDetails,
   RegistroInline,
   RegistroInlinePanel,
   RegistroInlineTrigger,
@@ -77,7 +78,6 @@ export function EncontroRow({
   nota,
   combinadosDoNumero,
   combinadosAnteriores,
-  registroAberto,
   apoioDestinos,
   linkAvaliacao,
   estrelaJovem,
@@ -124,9 +124,6 @@ export function EncontroRow({
   combinadosDoNumero: Encaminhamento[];
   /** Pendentes de nºs anteriores — carry-over taggeado "do Nº encontro". */
   combinadosAnteriores: Encaminhamento[];
-  /** Encontro atual ou pendente de registro — nasce com o registro expandido;
-   *  os demais viram linha-resumo sob disclosure (o deep link `#registrar-{id}` abre). */
-  registroAberto: boolean;
   /** Destinos do nudge do pedido de apoio (só o mentor — o pedido é dele).
    *  Vazio pro próprio mentor: WhatsAppRapido some sozinho. */
   apoioDestinos: DestinoWA[];
@@ -536,15 +533,15 @@ export function EncontroRow({
       </div>
 
       {/* registro salvo = histórico: linha-resumo (apoio, avaliação, tema) +
-          disclosure pro corpo completo. Só o encontro atual e os pendentes
-          nascem abertos; o deep link #registrar-{id} continua abrindo o bloco */}
+          disclosure pro corpo completo. Os dois blocos nascem FECHADOS: a
+          ficha é índice, o caminho de escrita é a rota dedicada, e o deep
+          link #registrar-{id} continua abrindo os dois */}
       {(reg && encontro) || (feito && (encontro?.avaliacao_jovem || (!souMentor && estrelaJovem == null))) ? (
         <div className="grid gap-3 lg:grid-cols-2">
           {reg && encontro && (
             <div className="space-y-2">
-              <RegistroDetails
+              <EncontroDisclosure
                 encontroId={encontro.id}
-                aberto={registroAberto}
                 className="border-t border-border/60 bg-muted/50 shadow-[var(--shadow-inset)]"
                 summary={
                   <>
@@ -605,18 +602,40 @@ export function EncontroRow({
                     </div>
                   )}
                 </div>
-              </RegistroDetails>
+              </EncontroDisclosure>
             </div>
           )}
           {feito && (
             <div className="space-y-2">
               {encontro?.avaliacao_jovem ? (
-                <AvaliacaoJovemCard
-                  avaliacao={encontro.avaliacao_jovem}
-                  duplaId={duplaId}
-                  souCoord={souCoord}
-                  liberadaProMentor={souMentor}
-                />
+                <EncontroDisclosure
+                  encontroId={encontro.id}
+                  className={cn(
+                    "border-t border-border/60",
+                    encontro.avaliacao_jovem.pedir_apoio
+                      ? "bg-[var(--danger)]/5"
+                      : "bg-muted/50"
+                  )}
+                  summary={
+                    <>
+                      <AvaliacaoJovemResumo avaliacao={encontro.avaliacao_jovem} />
+                      <CaretDown
+                        size={13}
+                        aria-hidden
+                        className="shrink-0 text-muted-foreground transition-transform group-data-[panel-open]:rotate-180"
+                      />
+                    </>
+                  }
+                >
+                  <div className="px-4 pb-3.5 pt-1 text-sm">
+                    <AvaliacaoJovemDetalhe
+                      avaliacao={encontro.avaliacao_jovem}
+                      duplaId={duplaId}
+                      souCoord={souCoord}
+                      liberadaProMentor={souMentor}
+                    />
+                  </div>
+                </EncontroDisclosure>
               ) : !souMentor && estrelaJovem == null ? (
                 <AvaliacaoPendenteLinha
                   link={linkAvaliacao}

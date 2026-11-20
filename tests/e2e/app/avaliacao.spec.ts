@@ -645,6 +645,12 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await expect(
       page.getByRole("img", { name: "5 de 5 estrelas" }).first()
     ).toBeVisible();
+    // o bloco do jovem nasce fechado (REALIZA-473): o comentário mora no
+    // corpo, então expande pelo resumo antes de ler
+    await page
+      .locator(`#registrar-${encontroId}`)
+      .getByRole("button", { name: /Avaliação do jovem/ })
+      .click();
     await expect(
       page.getByText("E2E: detalhe que só a equipe lê")
     ).toBeVisible();
@@ -703,7 +709,12 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     ).toHaveCount(0);
     await expect(page.getByText("pediu ajuda")).toHaveCount(0);
 
-    // e a linha que o jovem liberou chega com a nota que explica o porquê
+    // e a linha que o jovem liberou chega com a nota que explica o porquê —
+    // o bloco nasce fechado (REALIZA-473), então expande pelo resumo
+    await page
+      .locator(`#registrar-${encLiberada}`)
+      .getByRole("button", { name: /Avaliação do jovem/ })
+      .click();
     await expect(
       page.getByText("E2E: esta o jovem liberou pro mentor")
     ).toBeVisible();

@@ -414,7 +414,7 @@ export function MentorHome({
                           registrar (se sim) ou remarcar (se não) */}
                       <div className="mt-3 flex flex-wrap justify-end gap-2">
                         <Link
-                          href={`/duplas/${dupla.id}?aba=encontros#registrar-${semRegistro.id}`}
+                          href={`/duplas/${dupla.id}/registrar/${semRegistro.id}`}
                           className={buttonVariants({ size: "sm" })}
                         >
                           <ClipboardText size={16} />
@@ -506,7 +506,7 @@ export function MentorHome({
                             é o registro — o salvarRegistro corrige o status */}
                         {encontroAlvo.status !== "nao_aconteceu" && (
                             <Link
-                              href={`/duplas/${dupla.id}?aba=encontros#registrar-${encontroAlvo.id}`}
+                              href={`/duplas/${dupla.id}/registrar/${encontroAlvo.id}`}
                               className={buttonVariants({ variant: "outline", size: "sm" })}
                             >
                               <ClipboardText size={16} />
