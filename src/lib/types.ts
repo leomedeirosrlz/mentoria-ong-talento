@@ -964,7 +964,7 @@ export type SolicitacaoEspecialista = {
   id: string;
   mentorado_id: string;
   /** Dupla DPP de origem — null no pedido que o jovem abre sem dupla DPP
-   *  (entra aguardando_coord; a triagem da coordenação define a turma). */
+   *  (nasce 'aberta' no mural desde a 0158; a turma fica null). */
   dupla_dpp_id: string | null;
   /** O porquê da trilha (gate) — null nos pedidos do jovem (que trazem
    *  `motivo`) e nos pedidos de sessão seguinte de dupla já formada. */
@@ -978,7 +978,7 @@ export type SolicitacaoEspecialista = {
    *  ('mentor' nasce 'sugerida' e só vira pedido real na confirmação dele,
    *  0086). */
   origem: "staff" | "jovem" | "mentor";
-  /** Turma da sessão — a da dupla DPP ou a definida na triagem. */
+  /** Turma da sessão — a da dupla DPP; null no pedido sem dupla DPP. */
   turma: string | null;
   /** Por que o especialista recusou (0074) — obrigatória na recusa. */
   justificativa_recusa: string | null;

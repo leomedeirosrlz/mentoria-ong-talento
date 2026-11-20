@@ -10,8 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { SolicitacaoStatusChip } from "@/components/solicitacao-status-chip";
 import { rotuloSlot, tempoRelativo } from "@/lib/ciclo";
-
-
+import { pedidosAcionaveis } from "@/lib/solicitacoes-coord";
 
 function corta(texto: string, max = 110): string {
   return texto.length > max ? `${texto.slice(0, max).trimEnd()}…` : texto;
@@ -24,22 +23,13 @@ function textoDo(s: SolicitacaoEspecialista): string | null {
   return s.demanda ?? s.motivo;
 }
 
-/** Status que pedem ação ou atenção da coordenação no dashboard. */
-const ACIONAVEIS = new Set([
-  "aberta",
-  "contra_proposta",
-  "expirada",
-]);
-
-function efetivoDe(s: SolicitacaoEspecialista) {
-  return s.status_efetivo ?? s.status;
-}
-
 /** Card do dashboard da coordenação: pedidos de especialista que pedem
- *  atenção — os pedidos em aberto/em negociação (todo pedido vai direto ao
- *  mural desde a 0158, sem triagem), com estado honesto e cancelamento. A lista chega por prop com o escopo da query.
- *  Sem nada acionável o card não renderiza (empty state honesto).
- *  `className` recebe o placement do grid da home (rail, sob os avisos). */
+ *  atenção — os abertos/em negociação/expirados (todo pedido vai direto ao
+ *  mural desde a 0158), com estado honesto e cancelamento. A lista chega por
+ *  prop com o escopo da query; o contador da home vem do mesmo helper, então
+ *  "N", os itens visíveis e o "e mais N" batem. Sem nada acionável o card não
+ *  renderiza (empty state honesto). `className` recebe o placement do grid da
+ *  home (rail, sob os avisos). */
 export function SolicitacoesCoordCard({
   solicitacoes,
   className,
@@ -49,14 +39,11 @@ export function SolicitacoesCoordCard({
   className?: string;
 }) {
   const [agoraMs] = useState(() => Date.now());
-  const abertas = solicitacoes.filter((s) =>
-    ["aberta", "contra_proposta", "expirada"].includes(efetivoDe(s))
-  );
-  const acionaveis = solicitacoes.filter((s) => ACIONAVEIS.has(efetivoDe(s)));
+  const acionaveis = pedidosAcionaveis(solicitacoes);
   if (acionaveis.length === 0) return null;
 
-  const visiveisAbertas = abertas.slice(0, 3);
-  const restantes = acionaveis.length - visiveisAbertas.length;
+  const visiveis = acionaveis.slice(0, 3);
+  const restantes = acionaveis.length - visiveis.length;
 
   return (
     <Card className={className}>
@@ -67,9 +54,9 @@ export function SolicitacoesCoordCard({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {visiveisAbertas.length > 0 && (
+        {visiveis.length > 0 && (
           <ul className="divide-y divide-border/60">
-            {visiveisAbertas.map((s) => {
+            {visiveis.map((s) => {
               const texto = textoDo(s);
               return (
                 <li

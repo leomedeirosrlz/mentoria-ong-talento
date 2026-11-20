@@ -751,7 +751,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
       const ORDEM: Record<string, number> = {
         contra_proposta: 0,
         sugerida: 1,
-        aguardando_coord: 2,
+        aguardando_coord: 2, // legado da triagem (0158): mesmo lugar de aberta
         aberta: 2,
       };
       const ordenados = [...ps].sort(
