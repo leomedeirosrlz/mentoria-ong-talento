@@ -99,6 +99,9 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     // o input é sr-only, clica no rótulo visível (label → radio nativo:
     // funciona antes da hidratação)
     await form3.getByText("Boa", { exact: true }).click();
+    // 472: registro só de defaults não é entrega — o servidor recusa sem
+    // conteúdo; o tema é o campo livre da etapa 1
+    await form3.locator("#tema").fill("E2E: tema do registro");
     // duração não-default: é o campo compartilhado que o rascunho do 4º
     // herda. O Select é client — o clique pode cair pré-hidratação (o
     // form é lazy-loaded no hash), então repete até a option abrir
@@ -165,6 +168,8 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     await expect(form6.getByText("7º encontro")).toBeVisible();
     await form6.getByText("7º encontro").click();
     await form6.getByText("Boa", { exact: true }).click();
+    // 472: sem conteúdo o servidor recusa e a oferta do 7º não aparece
+    await form6.locator("#tema").fill("E2E: tema do registro");
     await form6.getByRole("button", { name: "Avançar" }).click();
     await form6.getByRole("button", { name: "Avançar" }).click();
     await form6.getByRole("button", { name: "Salvar registro" }).click();

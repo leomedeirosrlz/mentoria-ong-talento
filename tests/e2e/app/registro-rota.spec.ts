@@ -88,6 +88,10 @@ async function preencherEtapa1(
 ) {
   // o radio é sr-only: clica no rótulo visível (funciona antes da hidratação)
   await form.getByText("Boa", { exact: true }).click();
+  // 472: registro só de defaults não é entrega — o servidor recusa sem
+  // tema/reflexões/observações/atividade. O input é uncontrolled, então o
+  // fill vale antes da hidratação.
+  await form.locator("#tema").fill("E2E: tema do registro");
   const opcao90 = page.getByRole("option", { name: "1h30" });
   await agirComConfirma(
     () => form.locator("#duracao-select").click(),

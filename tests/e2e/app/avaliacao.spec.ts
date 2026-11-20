@@ -468,6 +468,9 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
       page.getByText("Apoio aberto · do mentorado")
     ).toBeVisible();
     await expect(page.getByText("pediu ajuda", { exact: true })).toBeVisible();
+    // 473: os blocos da ficha nascem fechados — o detalhe da avaliação (com
+    // o botão de atendimento) abre pelo disclosure do próprio encontro
+    await page.getByRole("button", { name: /pediu ajuda/ }).first().click();
     await page
       .getByRole("button", { name: "Marcar ajuda como atendida" })
       .click();
