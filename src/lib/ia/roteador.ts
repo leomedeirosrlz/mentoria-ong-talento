@@ -19,12 +19,40 @@ const SAUDACAO =
   /^(oi+|ol[áa]|eai|eae|fala|bom dia|boa tarde|boa noite|obrigad[oa]|valeu|tchau|at[ée]|blz|beleza|show|top|por favor|pfv?|hey|hi|hello|opa|e a[íi]|como (vai|vc|voce|você|tá|esta|está))[\s!?.🙂👍]*$/i;
 
 // domínio do programa — mensagem curta MENCIONANDO domínio não é
-// saudação mesmo sem "?" ("encontro 12", "dupla da maria")
+// saudação mesmo sem "?" ("encontro 12", "dupla da maria"). As leituras de
+// insight (REALIZA-465) entram aqui: "e a adesão" é pergunta operacional,
+// não saudação, e precisa de tool no payload.
 const DOMINIO =
-  /\b(dupla|encontro|semana|guia|program|mentor|agenda|chamad|avalia|registr|pdm|roda|meta|jovem|turma|formul|instrument|parear|fila|supervis|coord|whatsapp|relat[óo]ri)/i;
+  /\b(dupla|encontro|semana|guia|program|mentor|agenda|chamad|avalia|registr|pdm|roda|meta|jovem|turma|formul|instrument|parear|fila|supervis|coord|whatsapp|relat[óo]ri|insight|m[eé]trica|indicador|tend[eê]ncia|ades[aã]o|sa[uú]de|ado[cç][aã]o|engajamento|reten[cç][aã]o|gestos|n[uú]meros|atras|pend[eê]ncia|apoio)/i;
 
 const PADRAO_COMPLEXO =
   /(analis|compar|relat[óo]rio|explique|detalhad|por qu[êe]|porque|estrat[ée]gi|resum[ao]|consolid|plan[oe]j|avalia[çc][ãa]o|revis[ãa]o|sugest[ãa]o|recomend|diagn[óo]st|prioriz|todas as|todos os|cruza|correlac|impacto|tend[êe]ncia|evolu[çc][ãa]o)/i;
+
+/** Saudação pura: cumprimento ou agradecimento sozinho, sem "?" e sem
+ *  outro assunto. É o único caso que desce pro `rapido` (REALIZA-465). */
+export function ehSaudacaoPura(pergunta: string): boolean {
+  const p = pergunta.trim();
+  return p.length < 60 && !p.includes("?") && SAUDACAO.test(p);
+}
+
+/** A mensagem cita domínio operacional (dupla, adesão, saúde, métrica…)?
+ *  A rota usa pra nunca zerar os papéis de uma pergunta que ainda é da
+ *  operação. */
+export function temDominioOperacional(pergunta: string): boolean {
+  return DOMINIO.test(pergunta);
+}
+
+/** Rodada de continuação: a conversa já teve resposta e a mensagem curta
+ *  não é saudação pura. Um follow-up curto ("e a adesão", "e agora") ganha o
+ *  piso de síntese em vez de cair no raso pelo tamanho; pedido longo segue a
+ *  própria régua. */
+export function perguntaDeContinuacao(
+  pergunta: string,
+  opts: { temHistorico?: boolean } = {}
+): boolean {
+  const p = pergunta.trim();
+  return Boolean(opts.temHistorico) && p.length < 60 && !ehSaudacaoPura(p);
+}
 
 /** Papéis com teto `forte` — staff analítico (coordenação e supervisor).
  *  Mentor e jovem ficam capados no balanceado: o escopo deles é a própria
@@ -33,20 +61,20 @@ const PAPEIS_STAFF: readonly AppRole[] = ["coordenacao", "supervisor"];
 
 /** Tarefa da pergunta por formato — mesma régua do tier, exposta pro
  *  caller derivar uma vez e auditar (args.roteador.tarefa) sem re-rodar a
- *  classificação. `posTool` marca a rodada de síntese independente do
- *  texto: a próxima resposta fala sobre dados reais, não sobre a
- *  mensagem curta que disparou a tool. */
+ *  classificação. `posTool` marca a rodada de continuação: a resposta fala
+ *  sobre dados reais, não sobre a mensagem curta que disparou a tool. Um
+ *  pedido analítico explícito ainda ganha a tarefa de análise. */
 export function tarefaDaPergunta(
   pergunta: string,
   opts: { posTool?: boolean } = {}
 ): TarefaIa {
   const p = pergunta.trim();
-  if (opts.posTool) return "sintese";
-  if (
-    p.length < 60 &&
-    !p.includes("?") &&
-    (SAUDACAO.test(p) || (p.length < 25 && !DOMINIO.test(p)))
-  )
+  // síntese pós-tool cede pra um pedido analítico explícito: "e a tendência"
+  // é continuação E análise, e o staff não perde o forte por ser curta
+  if (opts.posTool && !PADRAO_COMPLEXO.test(p)) return "sintese";
+  if (ehSaudacaoPura(p)) return "saudacao";
+  // mensagem curta que não cita domínio também é conversa, não consulta
+  if (p.length < 25 && !p.includes("?") && !temDominioOperacional(p))
     return "saudacao";
   if (p.length > 300 || PADRAO_COMPLEXO.test(p)) return "analise";
   return "leitura";

@@ -315,6 +315,7 @@ export type UiKind = UiBloco["kind"];
 /** Rótulo da linha "Consultou: …" e do status por tool. */
 export const STATUS_TOOL: Record<string, string> = {
   resumo_semana: "Lendo o resumo da semana…",
+  operacional_insights: "Lendo adesão, saúde e adoção…",
   ficha_dupla: "Abrindo a ficha da dupla…",
   registros_da_dupla: "Lendo os registros da dupla…",
   plano_em_dia: "Montando o plano pra ficar em dia…",

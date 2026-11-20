@@ -19,9 +19,11 @@ import type {
   AppRole,
   AvaliacaoEncontro,
   CicloEvento,
+  Cronograma,
   DuplaPlano,
   DuplaRecesso,
   DuplaStatus,
+  EncontroRemarcacao,
   Encaminhamento,
   Mentorado,
   MentorProfile,
@@ -134,7 +136,63 @@ export const getDuplasVivasIa = cache(
   }
 );
 
-/** Situação mínima das duplas fechadas no escopo — o resumo da semana as
+/** Projeção da leitura operacional (REALIZA-465): a aderência precisa do
+ *  `created_at` do registro (atraso de entrega) e das remarcações do
+ *  encontro, que o semáforo não lê. Sai da mesma constante do semáforo pra
+ *  não divergir campo a campo. */
+export const IA_INSIGHTS_SELECT = IA_SAUDE_SELECT.replace(
+  "registro:registros(precisa_apoio, avaliacao, dificuldade)",
+  "registro:registros(precisa_apoio, avaliacao, dificuldade, created_at)"
+).replace(
+  "avaliacao_jovem:avaliacoes_encontro(pedir_apoio)",
+  "avaliacao_jovem:avaliacoes_encontro(pedir_apoio), remarcacoes:encontro_remarcacoes(data_anterior, data_nova, motivo, created_at)"
+);
+
+/** A dupla como a leitura operacional a recebe — o que `itemAderencia` e
+ *  `saudadeDaDupla` consomem, nada além. */
+export type DuplaIaInsight = Omit<DuplaIa, "encontros"> & {
+  encontros: (Omit<DuplaIa["encontros"][number], "registro"> & {
+    registro:
+      | (NonNullable<DuplaIa["encontros"][number]["registro"]> & {
+          created_at: string;
+        })
+      | null;
+    remarcacoes?: Pick<
+      EncontroRemarcacao,
+      "data_anterior" | "data_nova" | "motivo" | "created_at"
+    >[];
+  })[];
+};
+
+/** Duplas vivas com a projeção da leitura operacional, no escopo do papel
+ *  (RLS): coord recebe todas, supervisor as supervisionadas, mentor as suas.
+ *  É o recorte que o mentor vê na tool, nunca o programa inteiro. */
+export const getDuplasInsightsIa = cache(
+  async (supabase: SupabaseClient): Promise<DuplaIaInsight[]> => {
+    const { data, error } = await supabase
+      .from("duplas")
+      .select(IA_INSIGHTS_SELECT)
+      .in("status", ["ativa", "pausada"]);
+    if (error) throw error;
+    return (data ?? []) as unknown as DuplaIaInsight[];
+  }
+);
+
+/** Catálogo de cronogramas pro recorte (turma/nome) da aderência: leitura
+ *  aberta aos papéis adultos, a mesma das telas. */
+export const getCronogramasIa = cache(
+  async (
+    supabase: SupabaseClient
+  ): Promise<Pick<Cronograma, "id" | "nome" | "turma">[]> => {
+    const { data, error } = await supabase
+      .from("cronogramas")
+      .select("id, nome, turma");
+    if (error) throw error;
+    return (data ?? []) as Pick<Cronograma, "id" | "nome" | "turma">[];
+  }
+);
+
+/** Situação mínima das duplas fechadas no escopo: o resumo da semana as
  *  conta na partição (Concluída/Desistente/Encerrada, a mesma das telas)
  *  sem trafegar encontros nem contatos pro modelo. */
 export const getFechadasIa = cache(

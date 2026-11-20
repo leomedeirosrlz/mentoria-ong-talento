@@ -78,6 +78,17 @@ describe("guardrails", () => {
     expect(prompt).toContain("não tem acesso");
   });
 
+  it("insight operacional manda usar a tool em vez de negar acesso (REALIZA-465)", () => {
+    // adesão, saúde, tendência e adoção têm leitura pronta: o prompt não
+    // pode mandar o modelo responder "não tenho acesso" pra elas
+    expect(prompt).toContain("operacional_insights");
+    for (const termo of ["adesão", "saúde", "tendência", "adoção", "indicadores"]) {
+      expect(prompt).toContain(termo);
+    }
+    // a leitura não tem card: os números vão no texto
+    expect(prompt).toContain("não tem card");
+  });
+
   it("crise, violência e violação de direitos escalam pra humano", () => {
     expect(prompt).toContain("crise");
     // o assistente não resolve — orienta acionar gente do programa

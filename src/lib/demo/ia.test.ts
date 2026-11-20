@@ -12,6 +12,18 @@ import { responderDemoIa } from "./ia";
 const blocoJson = (content: string, tag: string) =>
   JSON.parse(content.split(`\`\`\`${tag}\n`)[1].split("\n```")[0]);
 
+describe("responderDemoIa — aderência (REALIZA-465)", () => {
+  it("responde 'e a adesão' com número e próximo passo, não o fallback", async () => {
+    const r = await responderDemoIa("e a adesão?");
+    expect(r).not.toBeNull();
+    expect(r!.content).toContain("Na demonstração");
+    expect(r!.content).toContain("**");
+    expect(r!.content).toMatch(/\d/);
+    expect(r!.content).toContain("Próximo passo:");
+    expect(r!.content).not.toContain("não tem acesso");
+  });
+});
+
 describe("responderDemoIa — templates do cap. 14 (REALIZA-388)", () => {
   it("CTA sem dupla nomeada devolve a escolha antes do texto", async () => {
     const r = await responderDemoIa(

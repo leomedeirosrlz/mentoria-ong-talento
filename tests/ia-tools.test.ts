@@ -12,14 +12,19 @@ import {
   IA_TOOL_CATALOGO,
   IA_TOOL_NOMES,
 } from "@/lib/ia/tools";
-import { IA_REGISTRO_SELECT, IA_SAUDE_SELECT } from "@/lib/ia/queries";
-import { limparCacheIaConfig } from "@/lib/ia/config";
+import {
+  IA_INSIGHTS_SELECT,
+  IA_REGISTRO_SELECT,
+  IA_SAUDE_SELECT,
+} from "@/lib/ia/queries";import { limparCacheIaConfig } from "@/lib/ia/config";
 import { limparCacheGuias } from "@/lib/ia/guias";
 import {
   CICLO_16,
+  CRON_T1,
   encRealizado,
   mkDupla,
   mkEncaminhamento,
+  mkRegistro,
 } from "./helpers";
 
 // config e guias têm cache por módulo: sem limpar, um teste herdava o
@@ -225,6 +230,7 @@ describe("registry", () => {
         "minha_agenda",
         "minha_dupla",
         "mural_especialista",
+        "operacional_insights",
         "pedir_reabertura_chamado",
         "pessoas_busca",
         "plano_aplicar_passo",
@@ -406,6 +412,23 @@ describe("executarTool — allowlist", () => {
     // a projeção do semáforo também só pede os campos estruturados
     for (const campo of ["reflexoes", "observacoes", "dificuldade_detalhe"])
       expect(IA_SAUDE_SELECT).not.toContain(campo);
+  });
+
+  it("a projeção de insights carrega o que a aderência lê, sem texto livre", () => {
+    // o .replace sobre IA_SAUDE_SELECT precisa casar: se o select do
+    // semáforo mudar de forma, o silêncio do replace zeraria o atraso de
+    // registro e as remarcações sem nenhum erro
+    expect(IA_INSIGHTS_SELECT).toContain(
+      "registro:registros(precisa_apoio, avaliacao, dificuldade, created_at)"
+    );
+    expect(IA_INSIGHTS_SELECT).toContain("encontro_remarcacoes");
+    for (const campo of [
+      "reflexoes",
+      "observacoes",
+      "dificuldade_detalhe",
+      "proximo_passo_detalhe",
+    ])
+      expect(IA_INSIGHTS_SELECT).not.toContain(campo);
   });
 
   it("registros_da_dupla devolve só os campos estruturados", async () => {
@@ -1038,6 +1061,200 @@ describe("executarTool — tools", () => {
     );
     expect(r2.ok).toBe(true);
     expect(m.fromCalls).toContain("encaminhamentos");
+  });
+});
+
+describe("operacional_insights (REALIZA-465)", () => {
+  const cronogramas = [
+    { id: CRON_T1, nome: "Ciclo 2025/2026", turma: "2025/2026" },
+  ];
+
+  /** Painel operacional com uma dupla DPP atrasada, um snapshot de risco e
+   *  adoção caindo: cada seção tem pelo menos um número pra citar. */
+  function painel(over: Opts = {}) {
+    return supaFake({
+      ...over,
+      tabelas: {
+        // uma dupla atrasada que também pede apoio: o achado de apoio aponta
+        // pra ficha dela, o que prova o recorte por dupla no link
+        duplas: [
+          mkDupla({
+            id: "d-1",
+            encontros: [
+              encRealizado(
+                1,
+                "2025-10-07",
+                mkRegistro({ precisa_apoio: true })
+              ),
+            ],
+          }),
+        ],
+        ciclo_eventos: CICLO_16,
+        cronogramas,
+        dupla_saude_snapshots: [
+          {
+            dia: new Date().toISOString().slice(0, 10),
+            dupla_id: "d-1",
+            semaforo: "risco",
+          },
+        ],
+        ...(over.tabelas ?? {}),
+      },
+      rpcData: {
+        adocao_resumo: {
+          ativas: 8,
+          ativas_prev: 10,
+          gestos: 90,
+          gestos_prev: 150,
+          sups_vivas: 4,
+          coletando_desde: null,
+        },
+        adocao_matriz: [
+          { superficie: "duplas", papel: "mentor_dpp", pessoas: 3, gestos: 20 },
+        ],
+        adocao_coorte: [
+          { coorte: "2026-01-05", semana: 1, ativas: 4, total: 10 },
+        ],
+        ...(over.rpcData ?? {}),
+      },
+    });
+  }
+
+  type Saida = {
+    escopo: string;
+    secoes: string[];
+    indisponiveis: string[];
+    total: number;
+    achados: {
+      fonte: string;
+      titulo: string;
+      metrica: string;
+      acao: { rotulo: string; href: string };
+    }[];
+  };
+
+  it("responde 'e a adesão' com número, fonte e link de ação", async () => {
+    // Arrange
+    const { supabase } = painel();
+
+    // Act
+    const r = await executarTool(
+      "operacional_insights",
+      { secao: "aderencia" },
+      supabase,
+      "chat"
+    );
+
+    // Assert
+    const d = dadosDe(r) as Saida;
+    expect(d.secoes).toEqual(["Aderência"]);
+    expect(d.total).toBeGreaterThan(0);
+    const atraso = d.achados.find((a) =>
+      a.titulo.includes("atrás do calendário")
+    );
+    expect(atraso).toMatchObject({
+      fonte: "Aderência",
+      metrica: expect.stringContaining("1 de 1"),
+      acao: { rotulo: expect.any(String), href: expect.any(String) },
+    });
+    expect(atraso!.acao.href.startsWith("/")).toBe(true);
+  });
+
+  it("coordenação recebe as três leituras e todo achado ganha fonte e ação", async () => {
+    // Arrange
+    const { supabase } = painel();
+
+    // Act
+    const r = await executarTool("operacional_insights", {}, supabase, "chat");
+
+    // Assert
+    const d = dadosDe(r) as Saida;
+    expect(d.escopo).toBe("programa");
+    expect(d.secoes).toEqual(["Aderência", "Saúde", "Adoção"]);
+    expect(new Set(d.achados.map((a) => a.fonte))).toEqual(
+      new Set(["Aderência", "Saúde", "Adoção"])
+    );
+    for (const a of d.achados) {
+      expect(a.acao.href.startsWith("/")).toBe(true);
+      expect(a.acao.rotulo.length).toBeGreaterThan(0);
+    }
+  });
+
+  it("mentor recebe só a aderência do próprio escopo, sem leitura de programa", async () => {
+    // Arrange
+    const f = painel({ papel: "mentor_dpp", papeis: ["mentor_dpp"] });
+    const chamadasRpc: string[] = [];
+    const orig = f.supabase.rpc.bind(f.supabase);
+    vi.spyOn(f.supabase, "rpc").mockImplementation(((n: string, a?: unknown) => {
+      chamadasRpc.push(n);
+      return orig(n, a as Record<string, unknown>);
+    }) as never);
+
+    // Act
+    const r = await executarTool("operacional_insights", {}, f.supabase, "chat");
+
+    // Assert
+    const d = dadosDe(r) as Saida;
+    expect(d.escopo).toBe("duplas do seu escopo");
+    expect(d.secoes).toEqual(["Aderência"]);
+    expect(d.achados.every((a) => a.fonte === "Aderência")).toBe(true);
+    // a leitura de programa inteiro não roda pra quem não é coordenação
+    expect(f.fromCalls).not.toContain("dupla_saude_snapshots");
+    expect(chamadasRpc).not.toContain("adocao_resumo");
+    expect(chamadasRpc).not.toContain("adocao_matriz");
+    // o único recorte que chega é o das duplas dele: o apoio linka a ficha
+    // que a RLS entregou, nunca uma dupla de fora
+    const apoio = d.achados.find((a) => a.titulo.includes("pedido de apoio"));
+    expect(apoio?.acao.href).toBe("/duplas/d-1");
+  });
+
+  it("mentor pedindo saúde cai na aderência em vez de 'sem acesso'", async () => {
+    // Arrange
+    const { supabase } = painel({ papel: "mentor_dpp", papeis: ["mentor_dpp"] });
+
+    // Act
+    const r = await executarTool(
+      "operacional_insights",
+      { secao: "saude" },
+      supabase,
+      "chat"
+    );
+
+    // Assert
+    const d = dadosDe(r) as Saida;
+    expect(d.secoes).toEqual(["Aderência"]);
+    expect(d.total).toBeGreaterThan(0);
+  });
+
+  it("jovem não alcança a leitura operacional — o gate fecha antes de ler", async () => {
+    // Arrange
+    expect(IA_TOOLS.operacional_insights.roles).not.toContain("mentorado");
+    const { supabase, fromCalls } = supaFake({ papel: "mentorado" });
+
+    // Act
+    const r = await executarTool("operacional_insights", {}, supabase, "chat");
+
+    // Assert
+    expect(r.ok).toBe(false);
+    expect(fromCalls).toHaveLength(0);
+  });
+
+  it("uma seção fora não derruba as outras", async () => {
+    // Arrange: a adoção falha, aderência e saúde seguem valendo
+    const { supabase } = painel({
+      rpcErro: { adocao_resumo: { message: "rpc fora" } },
+    });
+    const consoleSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+    // Act
+    const r = await executarTool("operacional_insights", {}, supabase, "chat");
+
+    // Assert
+    const d = dadosDe(r) as Saida;
+    expect(d.secoes).toEqual(["Aderência", "Saúde"]);
+    expect(d.indisponiveis).toEqual(["Adoção"]);
+    expect(d.total).toBeGreaterThan(0);
+    consoleSpy.mockRestore();
   });
 });
 
