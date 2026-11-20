@@ -205,6 +205,58 @@ test.describe("rota de registro do encontro (REALIZA-473)", () => {
     });
   });
 
+  test("a sessão cobriu o 7º também — um encontro e um registro por nº", async ({
+    page,
+  }) => {
+    // dois realizados sem registro: o 7º é o candidato de cobertura do 6º
+    const e6 = await criarEncontro(6, { dias: -4 });
+    const e7 = await criarEncontro(7, { dias: -2 });
+
+    await page.goto(`/duplas/${DUPLA_ID}/registrar/${e6}`);
+    const form = page.locator("form");
+
+    // AC-473 (007 US11): a cobertura que existia só na ficha vale na rota
+    await expect(form.getByText("7º encontro")).toBeVisible();
+    await form.getByText("7º encontro").click();
+    await preencherEtapa1(page, form);
+    await avancarAteCombinados(page, form);
+    await agirComConfirma(
+      () => form.getByRole("button", { name: "Salvar registro" }).click(),
+      () => page.getByText(/Também cobriu o 7º encontro/).isVisible()
+    );
+    await expect(
+      page.getByText(/Também cobriu o 7º encontro/)
+    ).toBeVisible({ timeout: 15_000 });
+
+    // o pós-save não oferece encadear pro nº que a sessão já cobriu
+    await expect(
+      page.getByRole("button", { name: "Registrar o 7º também" })
+    ).toHaveCount(0);
+
+    // Concluir volta pra ficha com o bloco do 6º aberto; o 7º também tem
+    // registro (cada encontro é salvo separadamente)
+    await page.getByRole("button", { name: "Concluir" }).click();
+    await expect(page).toHaveURL(
+      new RegExp(`/duplas/${DUPLA_ID}\\?aba=encontros#registrar-${e6}`)
+    );
+    await expect(
+      page.locator(`#registrar-${e7}`).getByRole("button", { name: /^Registro/ })
+    ).toBeVisible();
+
+    // os dois fatos existem: encontros realizados + um registro por nº
+    const encs = await buscarViaServiceRole<{ id: string; status: string }[]>(
+      "encontros",
+      `select=id,status&id=in.(${e6},${e7})`
+    );
+    expect(encs).toHaveLength(2);
+    expect(encs.every((e) => e.status === "realizado")).toBe(true);
+    const regs = await buscarViaServiceRole<{ encontro_id: string }[]>(
+      "registros",
+      `select=encontro_id&encontro_id=in.(${e6},${e7})`
+    );
+    expect(regs.map((r) => r.encontro_id).sort()).toEqual([e6, e7].sort());
+  });
+
   test("deep link legado #registrar- continua abrindo e salvando na ficha", async ({
     page,
   }) => {

@@ -1,4 +1,4 @@
-import { passoEsp, type PassoGuia } from "./ciclo";
+import { passoEsp, passosCobertosCandidatos, type PassoGuia } from "./ciclo";
 import type { Dupla, Encaminhamento, Encontro } from "./types";
 
 // Derivações puras da rota dedicada de registro (REALIZA-473). A ficha e a
@@ -112,4 +112,24 @@ export function filaRegistrosPendentes(
     )
     .sort((a, b) => a.numero - b.numero)
     .map((e) => ({ encontroId: e.id, numero: e.numero }));
+}
+
+/** Passos do guia que a MESMA sessão pode cobrir junto do registro (007 US11):
+ *  a régua é `passosCobertosCandidatos`, revalidada pelo `salvarRegistro` —
+ *  ficha e rota oferecem exatamente o que o servidor aceita. A trilha
+ *  especialista fica de fora: cada sessão é a própria linha, não um passo do
+ *  guia de 16. `numero` é o nº do PASSO (não a tentativa). */
+export function coberturaDaSessao(input: {
+  dupla: Dupla;
+  numero: number;
+  passos: PassoGuia[];
+  agora: Date;
+}): { numero: number; titulo: string }[] | null {
+  if (input.dupla.trilha === "especialista") return null;
+  return passosCobertosCandidatos(
+    input.passos,
+    input.dupla.encontros,
+    input.numero,
+    input.agora
+  );
 }

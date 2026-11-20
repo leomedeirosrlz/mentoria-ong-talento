@@ -22,6 +22,7 @@ import {
 import { guiaDoEncontro } from "@/lib/como-conduzir";
 import { hrefMaterial, materiaisDoNumero } from "@/lib/materiais";
 import {
+  coberturaDaSessao,
   combinadosPendentesDaDupla,
   estadoDaRotaRegistro,
   filaRegistrosPendentes,
@@ -285,6 +286,9 @@ export default async function RegistrarEncontroPage({
         excluirEncontroId: encontro.id,
         agora,
       });
+  // a sessão pode ter coberto mais de um passo do guia (007 US11) — a
+  // mesma régua da ficha, revalidada pelo salvarRegistro
+  const cobertura = coberturaDaSessao({ dupla, numero, passos, agora });
   const mentorNome = dupla.mentor.nome_social ?? dupla.mentor.nome;
   const mentoradoNome = dupla.mentorado.nome_social ?? dupla.mentorado.nome;
 
@@ -406,6 +410,7 @@ export default async function RegistrarEncontroPage({
         trilha={dupla.trilha}
         combinadosPendentes={combinadosPendentesDaDupla(dupla)}
         proximosRegistros={proximos}
+        cobertura={cobertura}
         // telemetria (REALIZA-217): encontro "externo" nasceu no fluxo
         // retroativo — a sessão do form é catch-up, não novo
         origem={encontro.origem === "externo" ? "retroativo" : "novo"}

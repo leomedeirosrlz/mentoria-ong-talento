@@ -6,6 +6,7 @@ import { describe, expect, it } from "vitest";
 import { passosDaTrilha } from "@/lib/ciclo";
 import { materiaisDoNumero } from "@/lib/materiais";
 import {
+  coberturaDaSessao,
   combinadosPendentesDaDupla,
   estadoDaRotaRegistro,
   filaRegistrosPendentes,
@@ -254,8 +255,64 @@ describe("filaRegistrosPendentes", () => {
   });
 });
 
-// ---------- combinadosPendentesDaDupla ----------
+// ---------- coberturaDaSessao ----------
 
+describe("coberturaDaSessao", () => {
+  it("DPP oferece os passos oficiais vencidos anteriores — nunca o próprio nem o último", () => {
+    // Arrange
+    // 15/11/2025: oficiais 1..6 já venceram (o 7º só em 18/11)
+    const dupla = duplaCom();
+
+    // Act
+    const cobertura = coberturaDaSessao({
+      dupla,
+      numero: 6,
+      passos: PASSOS,
+      agora: AGORA,
+    });
+
+    // Assert
+    expect(cobertura?.map((c) => c.numero)).toEqual([1, 2, 3, 4, 5]);
+    expect(cobertura?.find((c) => c.numero === 3)?.titulo).toBe("Encontro 3");
+  });
+
+  it("inclui a row realizada sem registro de outro passo (o mesmo caso da ficha)", () => {
+    // Arrange
+    // a sessão do 6º cobriu também o 7º, que já tem row realizada sem registro
+    const e7 = encRealizado(7, "2025-11-18", null);
+    const dupla = duplaCom({ encontros: [e7] });
+
+    // Act
+    const cobertura = coberturaDaSessao({
+      dupla,
+      numero: 6,
+      passos: PASSOS,
+      agora: AGORA,
+    });
+
+    // Assert
+    expect(cobertura?.map((c) => c.numero)).toContain(7);
+    expect(cobertura?.map((c) => c.numero)).not.toContain(6);
+  });
+
+  it("trilha especialista não oferece cobertura — cada sessão é a própria linha", () => {
+    // Arrange
+    const dupla = duplaCom({ trilha: "especialista" });
+
+    // Act
+    const cobertura = coberturaDaSessao({
+      dupla,
+      numero: 2,
+      passos: PASSOS_ESP,
+      agora: AGORA,
+    });
+
+    // Assert
+    expect(cobertura).toBeNull();
+  });
+});
+
+// ---------- combinadosPendentesDaDupla ----------
 describe("combinadosPendentesDaDupla", () => {
   it("exclui feito e ordena por prazo com nulos no fim", () => {
     // Arrange

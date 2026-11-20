@@ -81,7 +81,6 @@ import {
   jornadaDaDupla,
   linkSeguro,
   passoEsp,
-  passosCobertosCandidatos,
   passosDaTrilha,
   saudadeDaDupla,
   SITUACAO_MENTORADO_LABEL,
@@ -150,6 +149,7 @@ import { FichaAbas } from "./ficha-abas-tabs";
 import { AbaPorHash } from "./aba-por-hash";
 import { EncontroRow } from "./encontro-row";
 import {
+  coberturaDaSessao,
   combinadosPendentesDaDupla,
   filaRegistrosPendentes,
 } from "@/lib/registro-contexto";
@@ -1003,9 +1003,9 @@ export default async function DuplaPage({
         // vencido sem row, compromisso vencido ou realizado sem registro;
         // nunca o último (fechamento é gesto próprio)
         cobertura={
-          ehEsp || !souMentor
-            ? null
-            : passosCobertosCandidatos(passos, dupla.encontros, passo.numero, agora)
+          souMentor
+            ? coberturaDaSessao({ dupla, numero: passo.numero, passos, agora })
+            : null
         }
         apoioDestinos={apoioDestinos}
         linkAvaliacao={
