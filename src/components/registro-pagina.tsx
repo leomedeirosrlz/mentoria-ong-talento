@@ -1,9 +1,10 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { usePathname, useRouter } from "next/navigation";
 import { RegistroForm } from "@/components/registro-form";
 import type { PassoGuia } from "@/lib/ciclo";
-import type { Encaminhamento, Trilha } from "@/lib/types";
+import type { Encaminhamento, Registro, Trilha } from "@/lib/types";
 
 /** Host cliente mínimo da rota dedicada de registro (REALIZA-473): só monta o
  *  `RegistroForm` — cabeçalho, contexto e links são server. Import estático
@@ -15,6 +16,8 @@ export function RegistroPagina({
   duplaId,
   evento,
   trilha,
+  registro = null,
+  combinadosDoRegistro,
   combinadosPendentes,
   proximosRegistros,
   cobertura,
@@ -24,6 +27,11 @@ export function RegistroPagina({
   duplaId: string;
   evento: PassoGuia | null;
   trilha: Trilha | null;
+  /** Registro já gravado — só existe quando a rota abre sob `?salvo=1`
+   *  (pós-save re-renderizado pela action, ou refresh no meio dele): o
+   *  form nasce em modo edição, mesma régua da ficha. */
+  registro?: Registro | null;
+  combinadosDoRegistro?: Encaminhamento[];
   combinadosPendentes: Encaminhamento[];
   /** Fila do "Registrar o Nº também" — a página passa só os encontros que
    *  ainda devem registro (filaRegistrosPendentes). */
@@ -34,6 +42,22 @@ export function RegistroPagina({
   origem: "novo" | "retroativo";
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+
+  // `?salvo=1` é a marca explícita do fluxo "acabei de salvar": a action do
+  // salvarRegistro revalida a rota no mesmo roundtrip e a página reexecuta
+  // o guard — sem a marca, o registro novo cairia em `ja_registrado` e o
+  // redirect expulsaria o mentor pra ficha antes da etapa de evidências
+  // (K1). Setada no mount, muito antes do primeiro save possível, pro
+  // POST da action já sair da URL marcada. `location.search` (não
+  // useSearchParams) lê a URL atual sem exigir boundary de Suspense —
+  // mesmo padrão do turma-contexto-select.
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    if (params.get("salvo") === "1") return;
+    params.set("salvo", "1");
+    router.replace(`${pathname}?${params.toString()}`, { scroll: false });
+  }, [pathname, router]);
 
   return (
     <RegistroForm
@@ -41,6 +65,8 @@ export function RegistroPagina({
       duplaId={duplaId}
       evento={evento}
       trilha={trilha}
+      registro={registro}
+      combinadosDoRegistro={combinadosDoRegistro}
       combinadosPendentes={combinadosPendentes}
       proximosRegistros={proximosRegistros}
       cobertura={cobertura}

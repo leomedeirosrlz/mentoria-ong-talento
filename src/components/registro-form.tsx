@@ -395,12 +395,18 @@ export function RegistroForm({
         !draft.encaminhamentos.some((t) => t.descricao.trim()) &&
         !draft.concluirIds.length;
       // rascunho vazio não vale guardar (e evita banner fantasma na próxima abertura)
-      if (vazio) localStorage.removeItem(draftKey);
-      else localStorage.setItem(draftKey, JSON.stringify(draft));
+      if (vazio) {
+        // o replay de mount do StrictMode (dev) roda o flush de desmonte
+        // antes do restore ler o rascunho — apagar aqui sumiria um rascunho
+        // que este form nem chegou a carregar (o semeado pelo "Registrar o
+        // Nº também" é o caso real: nasce no clique anterior à navegação)
+        if (!restoredOnce.current && !registro) return;
+        localStorage.removeItem(draftKey);
+      } else localStorage.setItem(draftKey, JSON.stringify(draft));
     } catch {
       // modo privado pode negar localStorage — falha silenciosa é ok aqui
     }
-  }, [demo, draftKey, encaminhamentos, concluirIds]);
+  }, [demo, draftKey, encaminhamentos, concluirIds, registro]);
 
   const scheduleSave = useCallback(() => {
     // toda mudança no form passa por aqui — a mesma marca alimenta o
@@ -791,6 +797,8 @@ export function RegistroForm({
       ref={formRef}
       onSubmit={submit}
       onChange={scheduleSave}
+      // a página tem outro <form> no shell (a Liza) — o e2e escopa por aqui
+      data-testid="registro-form"
       className={cn(
         "space-y-5",
         !embutido && "rounded-xl bg-card p-5 shadow-[var(--shadow-border)]"
@@ -941,7 +949,9 @@ export function RegistroForm({
                 {cobertura.map((c) => (
                   <label
                     key={c.numero}
-                    className="flex min-h-11 items-center gap-3 py-1.5 text-sm cursor-pointer md:min-h-0"
+                    // min-w-0 no item do grid: sem ele o título longo força a
+                    // largura da coluna e o truncate do span nunca engata
+                    className="flex min-h-11 min-w-0 items-center gap-3 py-1.5 text-sm cursor-pointer md:min-h-0"
                   >
                     <input
                       type="checkbox"

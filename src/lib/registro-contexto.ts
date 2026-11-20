@@ -50,8 +50,15 @@ export function estadoDaRotaRegistro(input: {
    *  (0102): o mentor segue registrando o último encontro que fechou a
    *  jornada — o mesmo recorte do `podeEditar` da ficha. */
   ritoPendente: boolean;
+  /** Marca explícita do pós-save (`?salvo=1`, posta na URL pelo client ao
+   *  montar o form): a action revalida a própria rota no mesmo roundtrip e
+   *  o registro recém-gravado faria o guard cair em `ja_registrado`,
+   *  expulsando o mentor pra ficha antes da etapa de evidências (K1). Só
+   *  este motivo é afetado — acesso direto nunca carrega a marca, então o
+   *  redirect pra ficha segue valendo pra quem não veio do salvar. */
+  recemSalvo?: boolean;
 }): EstadoRotaRegistro {
-  const { dupla, encontroId, passos, meId, agora, ritoPendente } = input;
+  const { dupla, encontroId, passos, meId, agora, ritoPendente, recemSalvo } = input;
   const encontro = dupla.encontros.find((e) => e.id === encontroId);
   if (!encontro) return { tipo: "bloqueado", motivo: "sem_encontro" };
 
@@ -65,7 +72,7 @@ export function estadoDaRotaRegistro(input: {
     return { tipo: "bloqueado", motivo: "dupla_inativa", encontro };
   }
 
-  if (encontro.registro != null) {
+  if (encontro.registro != null && !recemSalvo) {
     return { tipo: "bloqueado", motivo: "ja_registrado", encontro };
   }
 

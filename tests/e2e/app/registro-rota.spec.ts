@@ -80,14 +80,16 @@ async function avancarAteCombinados(
   );
 }
 
-/** Avaliação "Boa" + duração 1h30 — os dois campos compartilhados que o
- *  encadeamento herda no rascunho. */
+/** Avaliação "Boa" + duração 1h30 + tema — os compartilhados que o
+ *  encadeamento herda no rascunho, e o conteúdo que a 472 passou a exigir
+ *  pra aceitar o registro (sem tema o salvar é recusado). */
 async function preencherEtapa1(
   page: import("@playwright/test").Page,
   form: import("@playwright/test").Locator
 ) {
   // o radio é sr-only: clica no rótulo visível (funciona antes da hidratação)
   await form.getByText("Boa", { exact: true }).click();
+  await form.locator("#tema").fill("E2E: tema do registro");
   const opcao90 = page.getByRole("option", { name: "1h30" });
   await agirComConfirma(
     () => form.locator("#duracao-select").click(),
@@ -133,7 +135,7 @@ test.describe("rota de registro do encontro (REALIZA-473)", () => {
       page.getByRole("heading", { name: /^3º ·/ })
     ).toBeVisible();
 
-    const form = page.locator("form");
+    const form = page.getByTestId("registro-form");
     await preencherEtapa1(page, form);
     await avancarAteCombinados(page, form);
     await agirComConfirma(
@@ -173,7 +175,7 @@ test.describe("rota de registro do encontro (REALIZA-473)", () => {
     const e4 = await criarEncontro(4, { dias: -1 });
 
     await page.goto(`/duplas/${DUPLA_ID}/registrar/${e3}`);
-    const form = page.locator("form");
+    const form = page.getByTestId("registro-form");
     await preencherEtapa1(page, form);
     await avancarAteCombinados(page, form);
 
@@ -192,7 +194,7 @@ test.describe("rota de registro do encontro (REALIZA-473)", () => {
       new RegExp(`/duplas/${DUPLA_ID}/registrar/${e4}`),
       { timeout: 15_000 }
     );
-    const form4 = page.locator("form");
+    const form4 = page.getByTestId("registro-form");
     await expect(form4).toBeVisible({ timeout: 15_000 });
     await expect(form4.getByText(/Rascunho de .* restaurado/)).toBeVisible({
       timeout: 15_000,
@@ -213,7 +215,7 @@ test.describe("rota de registro do encontro (REALIZA-473)", () => {
     const e7 = await criarEncontro(7, { dias: -2 });
 
     await page.goto(`/duplas/${DUPLA_ID}/registrar/${e6}`);
-    const form = page.locator("form");
+    const form = page.getByTestId("registro-form");
 
     // AC-473 (007 US11): a cobertura que existia só na ficha vale na rota
     await expect(form.getByText("7º encontro")).toBeVisible();
@@ -265,7 +267,7 @@ test.describe("rota de registro do encontro (REALIZA-473)", () => {
     // AC-473.5: o link antigo (WhatsApp/e-mail) não quebra no PR1
     await page.goto(`/duplas/${DUPLA_ID}#registrar-${enc}`);
     const linha = page.locator(`#registrar-${enc}`);
-    const form = linha.locator("form");
+    const form = linha.getByTestId("registro-form");
     await expect(form).toBeVisible({ timeout: 15_000 });
 
     await preencherEtapa1(page, form);
@@ -291,7 +293,7 @@ test.describe("rota de registro do encontro (REALIZA-473)", () => {
     await page.goto(`/duplas/${DUPLA_ID}/registrar/${futuro}`);
     await expect(page.getByText(/Marcado para .+\./)).toBeVisible();
     await expect(page.getByText("O registro abre depois do horário.")).toBeVisible();
-    await expect(page.locator("form")).toHaveCount(0);
+    await expect(page.getByTestId("registro-form")).toHaveCount(0);
     await expect(
       page.getByRole("link", { name: "Voltar para a dupla" })
     ).toBeVisible();
@@ -395,7 +397,7 @@ test.describe("rota de registro no celular (390×844)", () => {
       }));
     expect((await largura()).scroll).toBeLessThanOrEqual((await largura()).inner);
 
-    const form = page.locator("form");
+    const form = page.getByTestId("registro-form");
     await preencherEtapa1(page, form);
     await avancarAteCombinados(page, form);
 

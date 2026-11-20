@@ -158,10 +158,13 @@ function diaMesCurto(iso: string) {
 
 export default async function RegistrarEncontroPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ id: string; encontroId: string }>;
+  searchParams: Promise<{ salvo?: string }>;
 }) {
   const { id, encontroId } = await params;
+  const { salvo } = await searchParams;
   // link podre não faz round-trip: 404 antes da query (privacidade + custo)
   if (!UUID_RE.test(id) || !UUID_RE.test(encontroId)) notFound();
 
@@ -200,6 +203,7 @@ export default async function RegistrarEncontroPage({
     meId: me.id,
     agora,
     ritoPendente,
+    recemSalvo: salvo === "1",
   });
 
   if (estado.tipo === "bloqueado") {
@@ -408,6 +412,17 @@ export default async function RegistrarEncontroPage({
         duplaId={dupla.id}
         evento={passo}
         trilha={dupla.trilha}
+        // `?salvo=1` + registro = re-render do pós-save (ou um refresh no
+        // meio dele): o form recebe a row e abre em modo edição em vez de
+        // um create vazio que sobrescreveria campos com null no submit
+        registro={encontro.registro ?? null}
+        combinadosDoRegistro={
+          encontro.registro
+            ? (dupla.encaminhamentos ?? []).filter(
+                (c) => c.registro_id === encontro.registro?.id
+              )
+            : []
+        }
         combinadosPendentes={combinadosPendentesDaDupla(dupla)}
         proximosRegistros={proximos}
         cobertura={cobertura}
