@@ -3,12 +3,37 @@
 import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { cn } from "@/lib/utils"
+import { useFecharNoVoltar } from "@/lib/use-fechar-no-voltar"
 
 import { Button } from "@/components/ui/button"
 import { X } from "@phosphor-icons/react"
 
-function Dialog({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot="dialog" {...props} />
+function Dialog({
+  open,
+  defaultOpen,
+  onOpenChange,
+  actionsRef,
+  ...props
+}: DialogPrimitive.Root.Props) {
+  const [aberto, setAberto] = React.useState(defaultOpen ?? false)
+  const internas = React.useRef<DialogPrimitive.Root.Actions | null>(null)
+  const acoes = actionsRef ?? internas
+  const atual = open ?? aberto
+  // gesto/botão de voltar fecha o dialog aberto em vez de sair da rota
+  useFecharNoVoltar(atual, () => acoes.current?.close())
+
+  return (
+    <DialogPrimitive.Root
+      data-slot="dialog"
+      {...props}
+      open={atual}
+      actionsRef={acoes}
+      onOpenChange={(o, detalhes) => {
+        setAberto(o)
+        onOpenChange?.(o, detalhes)
+      }}
+    />
+  )
 }
 
 function DialogTrigger({ ...props }: DialogPrimitive.Trigger.Props) {

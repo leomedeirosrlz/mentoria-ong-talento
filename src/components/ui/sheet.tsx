@@ -3,6 +3,7 @@
 import * as React from "react"
 import { Dialog as DialogPrimitive } from "@base-ui/react/dialog"
 import { cn } from "@/lib/utils"
+import { useFecharNoVoltar } from "@/lib/use-fechar-no-voltar"
 
 import { Button } from "@/components/ui/button"
 import { X } from "@phosphor-icons/react"
@@ -12,8 +13,32 @@ import { X } from "@phosphor-icons/react"
  * em vez de centralizado. Desliza da borda; o guard global de
  * prefers-reduced-motion zera a animação. */
 
-function Sheet({ ...props }: DialogPrimitive.Root.Props) {
-  return <DialogPrimitive.Root data-slot="sheet" {...props} />
+function Sheet({
+  open,
+  defaultOpen,
+  onOpenChange,
+  actionsRef,
+  voltarFecha = true,
+  ...props
+}: DialogPrimitive.Root.Props & { voltarFecha?: boolean }) {
+  const [aberto, setAberto] = React.useState(defaultOpen ?? false)
+  const internas = React.useRef<DialogPrimitive.Root.Actions | null>(null)
+  const acoes = actionsRef ?? internas
+  const atual = open ?? aberto
+  useFecharNoVoltar(voltarFecha && atual, () => acoes.current?.close())
+
+  return (
+    <DialogPrimitive.Root
+      data-slot="sheet"
+      {...props}
+      open={atual}
+      actionsRef={acoes}
+      onOpenChange={(o, detalhes) => {
+        setAberto(o)
+        onOpenChange?.(o, detalhes)
+      }}
+    />
+  )
 }
 
 function SheetTrigger({ ...props }: DialogPrimitive.Trigger.Props) {
