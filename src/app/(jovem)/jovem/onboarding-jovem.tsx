@@ -36,7 +36,7 @@ import { Switch } from "@/components/ui/switch";
 import { formatWhatsApp } from "@/lib/ciclo";
 import type { DadosCivis, Disponibilidade, JovemPerfil, Profile } from "@/lib/types";
 import { Logo } from "@/components/logo";
-import { LizaBlob } from "@/components/liza/liza-blob";
+import { LizaOnboarding } from "@/components/liza/liza-onboarding";
 import {
   PassoRecursos,
   type RecursoTour,
@@ -519,12 +519,7 @@ export function OnboardingJovem({
                 ela; nos passos do meio ela sai pra não disputar o conteúdo
                 (mesma regra do OnboardingFlow) */}
             {(step === 0 || ultimo) && (
-              <LizaBlob
-                responsivo
-                estado={ultimo ? "pronto" : "atento"}
-                tamanho={48}
-                className="mb-1 size-12 shrink-0 sm:size-16"
-              />
+              <LizaOnboarding ultimo={ultimo} />
             )}
             <div className="min-w-0 flex-1 rounded-3xl rounded-bl-md border border-border bg-card px-5 py-4 sm:max-w-xl">
               <h1
