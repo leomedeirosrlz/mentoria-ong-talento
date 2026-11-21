@@ -141,6 +141,35 @@ describe("sugerirDatas", () => {
     expect(gapDiasParaRitmo(2)).toBe(3);
     expect(gapDiasParaRitmo(1)).toBe(7);
   });
+
+  it("data com todos os horários em choque sai da lista", () => {
+    // seg 23/11 só tem os 3 slots padrão; os três ocupados cobrem todos
+    const ocupados = [
+      "2026-11-23T19:00:00-03:00",
+      "2026-11-23T19:30:00-03:00",
+      "2026-11-23T20:00:00-03:00",
+    ];
+    const out = sugerirDatas({ agora: AGORA, perfil: VAZIO, ocupados });
+    expect(out.map((s) => s.data)).not.toContain("2026-11-23");
+    expect(out).toHaveLength(5);
+    expect(out[0].data).toBe("2026-11-24");
+  });
+
+  it("data do passo em choque total também não é forçada", () => {
+    const ocupados = [
+      "2026-11-23T19:00:00-03:00",
+      "2026-11-23T19:30:00-03:00",
+      "2026-11-23T20:00:00-03:00",
+    ];
+    const out = sugerirDatas({
+      agora: AGORA,
+      perfil: VAZIO,
+      dataSugerida: "2026-11-23",
+      ocupados,
+    });
+    expect(out.every((s) => s.data !== "2026-11-23")).toBe(true);
+    expect(out.every((s) => s.origem !== "passo_do_plano")).toBe(true);
+  });
 });
 
 describe("sugerirHorarios", () => {
@@ -198,6 +227,96 @@ describe("sugerirHorarios", () => {
 
     const sab = sugerirHorarios({ data: "2026-11-28", perfil: VAZIO });
     expect(sab.map((s) => s.hora)).toEqual(["09:00", "10:00", "11:00"]);
+  });
+
+  const perfilTer19 = () =>
+    perfilDeEncontros(
+      [enc("2026-11-10T22:00:00Z"), enc("2026-11-17T22:00:00Z")], // ter 19:00
+      AGORA
+    );
+
+  it("slot em choque ⇒ conflito: true, livres na frente, nada removido", () => {
+    const out = sugerirHorarios({
+      data: "2026-11-24", // terça
+      perfil: perfilTer19(),
+      ocupados: ["2026-11-24T19:00:00-03:00"],
+    });
+    // ocupado [19:00,20:00): 19:00 bate de cheio e 19:30 (dur 60 ⇒ até
+    // 20:30) cobre a última meia hora — só 20:00 encosta e fica livre
+    expect(out.map((s) => s.hora)).toEqual(["20:00", "19:00", "19:30"]);
+    expect(out[0].conflito).toBeUndefined();
+    expect(out[1]).toMatchObject({ hora: "19:00", conflito: true });
+    expect(out[2]).toMatchObject({ hora: "19:30", conflito: true });
+  });
+
+  it("duracaoMin 90 ⇒ o choque alcança também o slot seguinte", () => {
+    const out = sugerirHorarios({
+      data: "2026-11-24",
+      perfil: perfilTer19(),
+      duracaoMin: 90,
+      ocupados: ["2026-11-24T19:00:00-03:00"],
+    });
+    // [19:30,21:00) sobrepõe [19:00,20:00) — a janela maior do candidato
+    // pega o ocupado mesmo começando depois dele
+    expect(out.find((s) => s.hora === "19:30")?.conflito).toBe(true);
+    expect(out.find((s) => s.hora === "19:00")?.conflito).toBe(true);
+    expect(out[0]).toMatchObject({ hora: "20:00" });
+    expect(out[0].conflito).toBeUndefined();
+  });
+
+  it("ocupado em UTC (Z) compara o mesmo instante", () => {
+    const out = sugerirHorarios({
+      data: "2026-11-24",
+      perfil: perfilTer19(),
+      ocupados: ["2026-11-24T22:00:00Z"], // = 19:00 em SP
+    });
+    expect(out.find((s) => s.hora === "19:00")?.conflito).toBe(true);
+    expect(out[0].conflito).toBeUndefined();
+  });
+
+  it("ocupados null/vazio/inválido ⇒ resultado idêntico ao de hoje", () => {
+    const perfil = perfilTer19();
+    const base = sugerirHorarios({ data: "2026-11-24", perfil });
+    for (const ocupados of [
+      null,
+      [],
+      ["lixo", "", "2026-11-24"],
+      [42, null] as never,
+    ])
+      expect(
+        sugerirHorarios({ data: "2026-11-24", perfil, ocupados })
+      ).toEqual(base);
+
+    const datasBase = sugerirDatas({ agora: AGORA, perfil });
+    for (const ocupados of [null, [], ["não é iso"]])
+      expect(
+        sugerirDatas({ agora: AGORA, perfil, ocupados })
+      ).toEqual(datasBase);
+  });
+
+  it("encontro encostado (fim == início) não conflita", () => {
+    const perfil = perfilTer19();
+    // ocupado [18:00,19:00) encosta no candidato 19:00 pelo fim
+    const peloFim = sugerirHorarios({
+      data: "2026-11-24",
+      perfil,
+      ocupados: ["2026-11-24T18:00:00-03:00"],
+    });
+    expect(
+      peloFim.find((s) => s.hora === "19:00")?.conflito
+    ).toBeUndefined();
+    // candidato [19:00,20:00) encosta no ocupado [20:00,21:00) pelo início
+    const peloInicio = sugerirHorarios({
+      data: "2026-11-24",
+      perfil,
+      ocupados: ["2026-11-24T20:00:00-03:00"],
+    });
+    expect(
+      peloInicio.find((s) => s.hora === "19:00")?.conflito
+    ).toBeUndefined();
+    expect(peloInicio.find((s) => s.hora === "20:00")?.conflito).toBe(
+      true
+    );
   });
 });
 

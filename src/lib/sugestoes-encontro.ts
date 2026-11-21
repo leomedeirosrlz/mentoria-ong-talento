@@ -53,6 +53,10 @@ export type SugestaoHora = {
   hora: string;
   origem: OrigemSugestao;
   peso: number;
+  /** true = o slot bate num horário já ocupado do jovem (encontro de
+   *  outra dupla/trilha). Marcado, não removido: a 481 mostra o chip
+   *  desabilitado com o motivo. */
+  conflito?: boolean;
 };
 
 // ---------- fuso ----------
@@ -220,6 +224,39 @@ export function perfilDeEncontros(
   return perfil;
 }
 
+// ---------- choque de agenda (ocupados) ----------
+
+const MIN_MS = 60_000;
+/** Faixa assumida de um horário ocupado: quem passa a lista (481) manda
+ *  só o instante de início; encontro do programa dura ~1h. */
+const OCUPADO_DUR_MS = 60 * MIN_MS;
+const HORA_MIN_RE = /^\d{2}:\d{2}$/;
+
+type Faixa = { ini: number; fim: number };
+
+/** Instantes válidos de `ocupados` como faixas [ini, ini+60min) em ms.
+ *  Entrada torta (null, item não-string, ISO inválido) é descartada — a
+ *  sugestão nunca quebra por causa da lista. */
+function faixasOcupadas(ocupados: string[] | null | undefined): Faixa[] {
+  if (!Array.isArray(ocupados)) return [];
+  const out: Faixa[] = [];
+  for (const iso of ocupados) {
+    if (typeof iso !== "string") continue;
+    const ini = new Date(iso).getTime();
+    if (!Number.isFinite(ini)) continue;
+    out.push({ ini, fim: ini + OCUPADO_DUR_MS });
+  }
+  return out;
+}
+
+/** Instante (ms) do candidato "data HH:mm" no fuso do programa. -03:00
+ *  fixo: o Brasil não tem horário de verão desde 2019, então o civil de
+ *  America/Sao_Paulo é sempre UTC-3 — a mesma âncora do TZ do motor. */
+function instanteCandidato(data: string, hora: string): number {
+  if (!dataOk(data) || !HORA_MIN_RE.test(hora)) return Number.NaN;
+  return new Date(`${data}T${hora}:00-03:00`).getTime();
+}
+
 // ---------- datas ----------
 
 /** Peso do passo combinado do plano: fica acima de qualquer peso de
@@ -254,6 +291,16 @@ export type InputSugerirDatas = {
   limite?: number;
   /** Horizonte de varredura em dias (default 21). */
   dias?: number;
+  /** Grade combinada — o teste de viabilidade por data só enxerga os
+   *  horários que ela deixa passar quando cobre o dia. */
+  disponibilidade?: Disponibilidade | null;
+  /** Instantes ISO já ocupados do jovem (encontros de outras
+   *  duplas/trilhas) — data cujos horários sugeridos estão todos em
+   *  choque sai da lista. */
+  ocupados?: string[] | null;
+  /** Duração do encontro a marcar, em min — entra na régua de choque
+   *  (mesma do sugerirHorarios). */
+  duracaoMin?: number | null;
 };
 
 /** Sugere datas futuras pro próximo encontro. Ordem de preferência:
@@ -272,6 +319,26 @@ export function sugerirDatas(input: InputSugerirDatas): SugestaoData[] {
   const primeiro = addDias(hoje.data, 1);
   const ultimo = addDias(hoje.data, horizonte);
   const jan = janelaOk(input?.janela);
+
+  // Com ocupados válidos, "data boa" = data com ao menos um horário
+  // sugerido livre — filtro de viabilidade, não de preferência: a ordem
+  // entre as viáveis não muda. O Set cacheia: a 2ª passada do gap e o
+  // fallback sem histórico re-avaliam as mesmas datas.
+  const comOcupados = faixasOcupadas(input?.ocupados).length > 0;
+  const semHorarioLivre = new Set<string>();
+  const viavel = (iso: string): boolean => {
+    if (!comOcupados) return true;
+    if (semHorarioLivre.has(iso)) return false;
+    const livre = sugerirHorarios({
+      data: iso,
+      perfil: input?.perfil,
+      disponibilidade: input?.disponibilidade,
+      ocupados: input?.ocupados,
+      duracaoMin: input?.duracaoMin,
+    }).some((s) => !s.conflito);
+    if (!livre) semHorarioLivre.add(iso);
+    return livre;
+  };
 
   let ini = primeiro;
   let fim = ultimo;
@@ -295,7 +362,10 @@ export function sugerirDatas(input: InputSugerirDatas): SugestaoData[] {
     dataOk(input?.dataSugerida) &&
     input.dataSugerida >= hoje.data &&
     (!jan ||
-      (input.dataSugerida >= jan.inicio && input.dataSugerida <= jan.fim))
+      (input.dataSugerida >= jan.inicio && input.dataSugerida <= jan.fim)) &&
+    // data do guia sem horário livre não se força — a 481 decide o "sem
+    // horário livre" quando toda a lista vier em choque
+    viavel(input.dataSugerida)
   ) {
     out.push({
       data: input.dataSugerida,
@@ -319,6 +389,7 @@ export function sugerirDatas(input: InputSugerirDatas): SugestaoData[] {
     const espacada = (d: string) =>
       out.every((s) => Math.abs(diffDias(s.data, d)) >= gap);
     const empurra = (d: string) => {
+      if (!viavel(d)) return;
       out.push({
         data: d,
         origem: "historico",
@@ -342,7 +413,7 @@ export function sugerirDatas(input: InputSugerirDatas): SugestaoData[] {
     const uteis = candidatas.filter((d) => diaSemanaDe(d) !== "dom");
     for (const d of [...uteis, ...candidatas]) {
       if (out.length >= limite) break;
-      if (usadas.has(d)) continue;
+      if (usadas.has(d) || !viavel(d)) continue;
       out.push({ data: d, origem: "padrao", peso: 0 });
       usadas.add(d);
     }
@@ -385,7 +456,40 @@ export type InputSugerirHorarios = {
   disponibilidade?: Disponibilidade | null;
   /** Máximo de sugestões (default 3). */
   limite?: number;
+  /** Instantes ISO já ocupados do jovem (encontros de outras
+   *  duplas/trilhas) — o slot que chocar volta com `conflito: true`,
+   *  depois dos livres, em vez de sumir. */
+  ocupados?: string[] | null;
+  /** Duração do encontro a marcar, em min — a janela do candidato no
+   *  choque é [início, início+duracaoMin). Default: mediana do perfil,
+   *  depois 60. */
+  duracaoMin?: number | null;
 };
+
+/** Marca `conflito` nos candidatos que sobrepõem [ocupado, ocupado+60min)
+ *  — o teste é de intervalo semiaberto, então encontro encostado (fim ==
+ *  início do outro) não conta choque. Livres voltam primeiro, com a
+ *  ordem interna preservada; sem ocupado válido a lista sai intacta. */
+function aplicarOcupados(
+  out: SugestaoHora[],
+  input: InputSugerirHorarios
+): SugestaoHora[] {
+  const faixas = faixasOcupadas(input?.ocupados);
+  if (!faixas.length) return out;
+  const durMs =
+    inteiroPos(
+      input?.duracaoMin ?? undefined,
+      inteiroPos(input?.perfil?.duracaoMedianaMin ?? undefined, 60)
+    ) * MIN_MS;
+  for (const s of out) {
+    const ini = instanteCandidato(input?.data, s.hora);
+    if (!Number.isFinite(ini)) continue;
+    if (faixas.some((f) => ini < f.fim && f.ini < ini + durMs))
+      s.conflito = true;
+  }
+  const livres = out.filter((s) => !s.conflito);
+  return [...livres, ...out.filter((s) => s.conflito)];
+}
 
 /** Sugere horários pro dia escolhido. Grade marcada cobrindo o dia ⇒ só
  *  horários dentro das células (hábito que caia na célula primeiro, a
@@ -405,7 +509,7 @@ export function sugerirHorarios(input: InputSugerirHorarios): SugestaoHora[] {
     }));
   // data ilegível — único caso sem resposta do dia; cai no padrão de
   // semana, estatisticamente mais provável que o de fim de semana.
-  if (!dow || !limite) return padraoOut();
+  if (!dow || !limite) return aplicarOcupados(padraoOut(), input);
 
   const perfil = input?.perfil;
   const maxHora = Math.max(
@@ -436,7 +540,8 @@ export function sugerirHorarios(input: InputSugerirHorarios): SugestaoHora[] {
       out.push({ hora, origem: "disponibilidade", peso: PESO_DISP });
       usadas.add(hora);
     }
-    return out; // ≥1 garantido: período marcado sempre tem hora-âncora.
+    // ≥1 garantido: período marcado sempre tem hora-âncora.
+    return aplicarOcupados(out, input);
   }
 
   if (perfil?.porHora?.length) {
@@ -454,10 +559,10 @@ export function sugerirHorarios(input: InputSugerirHorarios): SugestaoHora[] {
       if (usadas.has(hora)) continue;
       out.push({ hora, origem: "padrao", peso: 0 });
     }
-    return out;
+    return aplicarOcupados(out, input);
   }
 
-  return padraoOut();
+  return aplicarOcupados(padraoOut(), input);
 }
 
 // ---------- rótulos ----------
