@@ -209,19 +209,20 @@ function useBichinho(ativo: boolean) {
 function poseDe(estado: LizaEstado, momento: boolean, detalhe: boolean): Pose {
   switch (estado) {
     case "atento":
-      // escuta: a atenção vem do corpo inclinado e do olhar subindo pro
-      // título, não do olho maior. sx/sy ficam em 1 (o grupo do olho tem
-      // 31% da largura do rosto; escalá-lo lia como susto). A pálpebra
-      // segue a do repouso; o sorriso discreto fecha a expressão.
+      // escuta: a atenção vem do corpo inclinado para quem fala e do olhar
+      // subindo pro título, não do olho maior. sx/sy ficam em 1 (o grupo do
+      // olho tem 31% da largura do rosto; escalá-lo lia como susto). A
+      // pálpebra desce um tico — foco, não espanto — e o sorriso é discreto.
       return {
         ...BASE,
-        alvo: { x: 0, y: -0.15 },
+        alvo: { x: 0.15, y: -0.2 },
         sx: 1,
         sy: 1,
-        palpebra: -0.35,
+        palpebra: -0.3,
         olhoTopo: 1,
-        bocaEscala: 0.95,
-        corpo: { sx: 0.98, sy: 1.03, rotate: -2 },
+        olhoBaixo: 0.95,
+        bocaEscala: 0.9,
+        corpo: { sx: 0.97, sy: 1.04, rotate: 4 },
       };
     case "aberto":
       return momento
