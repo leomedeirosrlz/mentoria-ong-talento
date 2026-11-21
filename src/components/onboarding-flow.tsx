@@ -1084,9 +1084,10 @@ export function OnboardingFlow({
                 ela; nos passos do meio ela sai pra não disputar o form */}
             {(step === 0 || ultimo) && (
               <LizaBlob
+                responsivo
                 estado={ultimo ? "pronto" : "atento"}
-                tamanho={64}
-                className="mb-1 shrink-0"
+                tamanho={48}
+                className="mb-1 size-12 shrink-0 sm:size-16"
               />
             )}
             <div className="min-w-0 flex-1 rounded-3xl rounded-bl-md border border-border bg-card px-5 py-4 sm:max-w-xl">
