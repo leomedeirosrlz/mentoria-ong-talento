@@ -207,13 +207,22 @@ export function EncontroRow({
   const tardio = reg != null && registroTardio(reg, encontro);
   // CTA e form de registro: realizado libera na hora; pros demais status
   // (agendado vencido, não-aconteceu) só depois do horário — RevelarApos cobre
-  // a aba que ficou aberta atravessando o encontro, sem depender de re-render
-  const liberadoNoHorario = (node: React.ReactNode) =>
-    encontro?.status === "realizado"
-      ? node
-      : encontro?.data_hora
-        ? <RevelarApos from={encontro.data_hora}>{node}</RevelarApos>
-        : null;
+  // a aba que ficou aberta atravessando o encontro, sem depender de re-render.
+  // O wrapper é o MESMO em todo status com data: se o save vira "realizado" e
+  // o refresh troca RevelarApos por nó cru, o subtree remonta e o posSave
+  // morre na mesma corrida do gate !reg — no realizado o from é realizado_em
+  // (sempre passado: revela na hora mesmo com data_hora futura divergente)
+  const liberadoNoHorario = (node: React.ReactNode) => {
+    const desde =
+      encontro?.status === "realizado"
+        ? (encontro.realizado_em ?? encontro.data_hora)
+        : encontro?.data_hora;
+    return desde ? (
+      <RevelarApos from={desde}>{node}</RevelarApos>
+    ) : encontro?.status === "realizado" ? (
+      node
+    ) : null;
+  };
   const podeRegistrar = !!(encontro && !reg && podeEditar);
   // remarcar e trocar o link são gestos do encontro em aberto — o servidor
   // aceita reagendar remarcado/nao_aconteceu/cancelado via `atual` (só
@@ -674,7 +683,12 @@ export function EncontroRow({
         </div>
       )}
 
-      {encontro && !reg && podeEditar &&
+      {/* o painel NÃO desmonta quando o registro chega — o refresh pós-save
+          o entrega com o posSave ainda na tela e derrubar o subtree matava
+          a oferta "registrar o próximo também". Com reg o form se recusa a
+          renderizar (o salvo é do RegistroDetails) e o empty:hidden do
+          painel colapsa a faixa */}
+      {encontro && podeEditar &&
         liberadoNoHorario(
           <RegistroInlinePanel
             encontroId={encontro.id}
@@ -690,6 +704,7 @@ export function EncontroRow({
               encontroId={encontro.id}
               duplaId={duplaId}
               evento={passo}
+              registro={reg ?? null}
               combinadosPendentes={combinadosPendentes}
               // telemetria (REALIZA-217): o encontro "externo" nasceu no
               // fluxo retroativo — a sessão do form é catch-up, não novo
@@ -703,8 +718,10 @@ export function EncontroRow({
   );
 
   // um form de registro aberto por vez: o provider lê o hash #registrar-{id}
-  // (mesma âncora do CTA da linha e dos deep-links) e fecha os irmãos
-  return encontro && !reg && podeEditar ? (
+  // (mesma âncora do CTA da linha e dos deep-links) e fecha os irmãos.
+  // Desmontar quando o registro chega no refresh pós-action derrubava o
+  // card inteiro — posSave, rascunho e foco — no meio da corrida do save
+  return encontro && podeEditar ? (
     <RegistroInline encontroId={encontro.id}>{card}</RegistroInline>
   ) : (
     card

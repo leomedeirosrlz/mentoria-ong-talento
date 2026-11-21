@@ -13,6 +13,7 @@ import { Collapsible } from "@base-ui/react/collapsible";
 import { CaretDown } from "@phosphor-icons/react";
 import { buttonVariants } from "@/components/ui/button";
 import { T } from "@/components/motion";
+import { abrirAncoraRegistro } from "@/lib/ancora-registro";
 import { cn } from "@/lib/utils";
 
 /** Assina as três formas de o hash mudar: hashchange nativo, popstate e o
@@ -119,9 +120,11 @@ function primeiroCampo(painel: HTMLElement | null): HTMLElement | null {
   );
 }
 
-/** CTA da linha — link pra âncora `#registrar-{id}` do próprio card: clicar
- *  rola até o card e abre o form; já aberto, fecha no lugar (o href só
- *  rolaria de novo). */
+/** CTA da linha — link pra âncora `#registrar-{id}` do próprio card. O clique
+ *  vai pelo pushState patcheado do Next (e não pela navegação nativa do
+ *  <a>) pra o router aprender o hash no canonicalUrl — a âncora nativa morria
+ *  no write do refresh pós-action e o painel fechava sozinho. Já aberto,
+ *  fecha no lugar (o href só rolaria de novo). */
 export function RegistroInlineTrigger({
   encontroId,
   primario = true,
@@ -139,12 +142,13 @@ export function RegistroInlineTrigger({
       aria-expanded={aberto}
       aria-controls={`registro-form-${encontroId}`}
       onClick={(e) => {
+        e.preventDefault();
         if (aberto) {
-          e.preventDefault();
           alternar(false);
         } else {
-          // hash já neste card não dispara hashchange — abre pelo estado local
-          alternar(true);
+          // a abertura segue o hash como num deep link — rola o card e foca
+          // o primeiro campo (o realiza:hash do helper acorda o painel)
+          abrirAncoraRegistro(encontroId);
         }
       }}
       className={buttonVariants({
@@ -178,7 +182,10 @@ export function RegistroInlinePanel({
       {aberto && (
         <motion.div
           id={`registro-form-${encontroId}`}
-          className={className}
+          // empty:hidden cobre o form que se recusa a renderizar (encontro
+          // já registrado — o RegistroDetails exibe o salvo): sem ele a
+          // área abriria uma faixa vazia
+          className={cn(className, "empty:hidden")}
           // continuidade espacial: o card cresce pra revelar o form em vez de
           // teleportar (spec §2)
           initial={{ height: 0, opacity: 0 }}

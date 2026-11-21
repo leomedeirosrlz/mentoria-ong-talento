@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { CaretLeft, CaretRight, Paperclip, Plus, Trash, X } from "@phosphor-icons/react";
 import { toast } from "sonner";
 import { salvarRegistro } from "@/lib/actions";
+import { abrirAncoraRegistro } from "@/lib/ancora-registro";
 import { demoAtivoClient } from "@/lib/demo/shared";
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -276,7 +277,9 @@ export function RegistroForm({
   // primeiras interações — o flush ao resolver não perde a atividade que
   // já aconteceu (telemetriaDirty cobre a janela)
   useEffect(() => {
-    if (demo || tentativaIniciada.current) return;
+    // o form recusado (registro && !onSaved → null, mais abaixo) nunca
+    // renderiza — contar tentativa poluiria a métrica com sessão fantasma
+    if (demo || tentativaIniciada.current || (registro && onSaved == null)) return;
     tentativaIniciada.current = true;
     const o = registro ? "edicao" : (origem ?? "novo");
     iniciarTentativa(duplaId, encontroId, o)
@@ -288,7 +291,7 @@ export function RegistroForm({
         }
       })
       .catch(() => {});
-  }, [demo, duplaId, encontroId, registro, origem, etapasSnapshot]);
+  }, [demo, duplaId, encontroId, registro, origem, onSaved, etapasSnapshot]);
 
   // troca de passo: fecha a fatia da etapa anterior e já manda a batida —
   // a etapa em que o mentor desiste é o dado que o redesign precisa
@@ -730,9 +733,21 @@ export function RegistroForm({
         // storage indisponível — o próximo form abre vazio, segue o jogo
       }
     }
-    window.location.hash = `registrar-${chain.encontroId}`;
+    // a âncora vai pelo pushState patcheado (location.hash = morria no
+    // write hashless do HistoryUpdater pós-action) e o realiza:hash acorda
+    // o RegistroInline da linha alvo — pushState não dispara hashchange
+    abrirAncoraRegistro(chain.encontroId);
     fecharPosSave();
   }
+
+  // o form da linha é superfície de CRIAÇÃO (o inline nunca passa onSaved —
+  // quem edita é o EditarRegistro, sempre com callback). Chegando registro
+  // — o refresh pós-save, uma âncora velha ou a gravação em outra aba —
+  // quem exibe o salvo é o RegistroDetails: null esvazia o painel e o
+  // empty:hidden colapsa a faixa. Exceção: o posSave em andamento — a
+  // oferta "registrar o próximo também" sobrevive ao refresh que entregou
+  // o registro (o form segue montado pra isso)
+  if (registro && onSaved == null && (!posSave || fechado)) return null;
 
   // K1 — criação bem-sucedida cede a tela pra etapa de evidências no
   // mesmo container (dialog da agenda ou card inline da ficha): o FK do
