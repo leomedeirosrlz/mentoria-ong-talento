@@ -1191,7 +1191,7 @@ export function AssistenteBolha({
         {pontoAviso}
         {balao}
       </div>
-      <Sheet open={aberto} onOpenChange={mudar}>
+      <Sheet open={aberto} onOpenChange={mudar} voltarFecha={false}>
         <SheetContent
           ref={popupRef}
           id="painel-assistente"
