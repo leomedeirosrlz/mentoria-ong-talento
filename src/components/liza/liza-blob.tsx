@@ -215,14 +215,14 @@ function poseDe(estado: LizaEstado, momento: boolean, detalhe: boolean): Pose {
       // pálpebra desce um tico — foco, não espanto — e o sorriso é discreto.
       return {
         ...BASE,
-        alvo: { x: 0.15, y: -0.2 },
+        alvo: { x: 0.2, y: -0.25 },
         sx: 1,
         sy: 1,
         palpebra: -0.3,
         olhoTopo: 1,
         olhoBaixo: 0.95,
         bocaEscala: 0.9,
-        corpo: { sx: 0.97, sy: 1.04, rotate: 4 },
+        corpo: { sx: 1, sy: 1, rotate: 5 },
       };
     case "aberto":
       return momento
