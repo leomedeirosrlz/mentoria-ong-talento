@@ -33,6 +33,10 @@ export type SugestoesEncontro = {
    *  entra direto em sugerirHorarios no client. null = sem grade útil. */
   disponibilidade: Disponibilidade | null;
   janela: { inicio: string; fim: string } | null;
+  /** Instantes ISO já ocupados do jovem (encontros das OUTRAS
+   *  duplas/trilhas), repassados crus do chamador — entram no motor e
+   *  voltam pro client marcar os chips em choque. */
+  ocupados: string[];
 };
 
 /** A grade que vale pros dois: ambos com células ⇒ interseção; um lado
@@ -86,6 +90,9 @@ export async function sugestoesEncontroDaDupla(input: {
   plano: PlanoParaSugestao | null;
   duplaId: string | null;
   agora?: Date;
+  /** data_hora ISO dos encontros já marcados do jovem fora desta dupla —
+   *  a 481 junta a lista; sem ela o comportamento é o de antes. */
+  ocupados?: string[];
 }): Promise<SugestoesEncontro | null> {
   if (!input?.duplaId) return null;
   const agora = input.agora ?? new Date();
@@ -101,12 +108,15 @@ export async function sugestoesEncontroDaDupla(input: {
   const ritmo =
     Number.isFinite(ritmoNum) && ritmoNum > 0 ? ritmoNum : null;
   const dataSugerida = proximoPasso(input.plano, toDateStr(agora));
+  const ocupados = input.ocupados ?? [];
   const datas = sugerirDatas({
     agora,
     perfil,
     janela,
     ritmo,
     dataSugerida,
+    disponibilidade,
+    ocupados,
   });
-  return { perfil, datas, disponibilidade, janela };
+  return { perfil, datas, disponibilidade, janela, ocupados };
 }
