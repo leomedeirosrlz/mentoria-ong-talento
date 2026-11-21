@@ -1085,7 +1085,7 @@ export function OnboardingFlow({
             {(step === 0 || ultimo) && (
               <LizaBlob
                 responsivo
-                estado={ultimo ? "pronto" : "atento"}
+                estado={ultimo ? "pronto" : "parado"}
                 tamanho={48}
                 className="mb-1 size-12 shrink-0 sm:size-16"
               />
