@@ -295,8 +295,10 @@ export default async function JovemAgenda() {
     numerosLivres[0]?.numero ??
     null;
   const ocupadosRotulados = ocupadosDoJovem(encontros, duplas);
+  // o mesmo pacote alimenta o cartão do agendar e as linhas do combinado
+  // (482): com plano vivo e sem nº livre ainda faz falta pras linhas
   const sugestoesAgendar =
-    duplaDpp?.id != null && numeroAgendar != null
+    duplaDpp?.id != null && (numeroAgendar != null || planoJovem != null)
       ? await sugestoesEncontroDaDupla({
           encontros: encontros.filter((e) => e.dupla_id === duplaDpp.id),
           plano: planoJovem,
@@ -483,12 +485,13 @@ export default async function JovemAgenda() {
             <h2 className="text-base font-semibold">O combinado</h2>
             <p className="text-sm text-muted-foreground">
               O plano pra colocar vocês em dia. Aceitem e confirmem as
-              datas juntos — vale pra você e pro seu mentor.
+              datas juntos: vale pra você e pro seu mentor.
             </p>
             <PlanoAcordosCard
               plano={mapearPlanoJovem(planoJovem)}
               podeResponder
               podeAplicar
+              sugestoes={sugestoesAgendar}
             />
           </CardContent>
         </Card>
@@ -897,6 +900,7 @@ function mapearPlanoJovem(p: JovemPlano): PlanoCombinado {
     status: p.status,
     versao: p.versao,
     aprovado_lado: p.aprovado_lado,
+    janela: p.janela,
     escopo: {
       ritmo: p.ritmo == null ? null : Number(p.ritmo) || null,
       passos: (p.passos ?? []).map((s) => ({

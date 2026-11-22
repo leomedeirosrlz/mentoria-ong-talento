@@ -1,4 +1,5 @@
 import { PlanoAcordosCard } from "@/components/plano-acordos";
+import type { SeletorSugestoes } from "@/components/seletor-dia-hora";
 import {
   IntervencaoAcoes,
   VoltarGuiaButton,
@@ -17,6 +18,7 @@ export function AcordosCentral({
   souMentor,
   souStaff,
   numeroGuiaAtual,
+  sugestoesPlano,
 }: {
   dupla: Dupla;
   souMentor: boolean;
@@ -24,6 +26,9 @@ export function AcordosCentral({
   souStaff: boolean;
   /** número do encontro do guia vigente — os ajustes ancora nele */
   numeroGuiaAtual: number | null;
+  /** pacote do motor pras linhas do combinado (482) — a ficha monta com
+   *  o mesmo adaptador da agenda do jovem */
+  sugestoesPlano?: SeletorSugestoes | null;
 }) {
   const planoVivo =
     (dupla.planos ?? []).find((p) =>
@@ -60,6 +65,7 @@ export function AcordosCentral({
             duplaId={dupla.id}
             podeResponder={souMentor}
             podeAplicar={souMentor}
+            sugestoes={sugestoesPlano}
           />
         </div>
       )}

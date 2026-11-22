@@ -69,7 +69,7 @@ import type {
   RegistroResumo,
 } from "../queries";
 import type { ResumoFormacao } from "../queries-presenca";
-import type { JovemEncontro } from "../queries-jovem";
+import type { JovemEncontro, JovemPlano } from "../queries-jovem";
 import type {
   AvaliacaoMediaDpp,
   AvaliacaoTokenInfo,
@@ -1110,6 +1110,50 @@ export function demoJovemEncontros(role: AppRole): JovemEncontro[] {
         Number(a.data_hora == null) - Number(b.data_hora == null) ||
         (a.data_hora ?? "").localeCompare(b.data_hora ?? "")
     );
+}
+
+/** jovem_plano (0219): o combinado da DPP mais recente dela — o recorte
+ *  definer espelhado sobre o dataset (plano vivo primeiro, senão o mais
+ *  recente; sem semáforo nem motivos internos). Ler a árvore em vez de
+ *  repetir números fixos é o que mantém os passos coerentes com os
+ *  encontros reais da dupla (482). */
+export function demoJovemPlano(role: AppRole): JovemPlano | null {
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  if (!m) return null;
+  const dupla = data.duplas
+    .filter((d) => d.mentorado?.id === m.id && d.trilha !== "especialista")
+    .sort(
+      (a, b) =>
+        Number(b.status === "ativa" || b.status === "pausada") -
+          Number(a.status === "ativa" || a.status === "pausada") ||
+        criadoEm(b).localeCompare(criadoEm(a))
+    )[0];
+  if (!dupla) return null;
+  const p = (dupla.planos ?? [])
+    .slice()
+    .sort(
+      (a, b) =>
+        Number(["proposto", "aceito", "ativo"].includes(b.status)) -
+          Number(["proposto", "aceito", "ativo"].includes(a.status)) ||
+        b.created_at.localeCompare(a.created_at)
+    )[0];
+  if (!p) return null;
+  return {
+    id: p.id,
+    status: p.status,
+    versao: p.versao,
+    ritmo: p.escopo?.ritmo != null ? String(p.escopo.ritmo) : null,
+    janela: p.escopo?.janela ?? null,
+    passos: p.escopo?.passos ?? [],
+    aprovado_lado: p.aprovado_lado ?? null,
+    expira_em: p.expira_em,
+    passos_aplicados: (p.passos ?? []).map((s) => ({
+      numero: s.numero,
+      data_nova: s.data_nova,
+      aplicado_em: s.aplicado_em,
+    })),
+  };
 }
 
 // ---------- /registros — conteúdo do form semanal (coord/sup) ----------

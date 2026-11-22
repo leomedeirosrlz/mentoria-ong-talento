@@ -106,6 +106,7 @@ import { PlanoEmDiaCard } from "@/components/plano-em-dia-card";
 import { AcordosCentral } from "@/components/acordos-central";
 import { RecessoDuplaCard } from "@/components/recesso-dupla-card";
 import { montarPlanoEmDia } from "@/lib/plano-em-dia";
+import { sugestoesEncontroDaDupla } from "@/lib/sugestoes-encontro-server";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { EditarDuplaDialog } from "@/components/editar-dupla-dialog";
 import { RemanejoSugerido } from "@/components/remanejo-sugerido";
@@ -435,6 +436,40 @@ export default async function DuplaPage({
     !planoEmDia.emDia &&
     passosAgendaveis.length >= 2 &&
     dupla.status === "ativa";
+
+  // 482: o pacote do motor pras linhas do combinado na ficha — a mesma
+  // régua da agenda do jovem (sugestão pré-preenchida + chips do "Outra
+  // data"); a leitura da equipe não paga: só roda com plano vivo
+  const planoVivoFicha =
+    (dupla.planos ?? []).find((p) =>
+      ["proposto", "aceito", "ativo"].includes(p.status)
+    ) ?? null;
+  const sugestoesPlano = planoVivoFicha
+    ? await sugestoesEncontroDaDupla({
+        encontros: dupla.encontros,
+        plano: {
+          ritmo: planoVivoFicha.escopo?.ritmo,
+          janela: planoVivoFicha.escopo?.janela,
+          passos: planoVivoFicha.escopo?.passos,
+          passos_aplicados: planoVivoFicha.passos,
+        },
+        duplaId: dupla.id,
+        agora,
+        // staff não alcança as outras duplas do jovem — o choque aqui é só
+        // com os encontros marcados da própria ficha
+        ocupados: dupla.encontros
+          .filter(
+            (e) =>
+              (e.status === "agendado" || e.status === "remarcado") &&
+              e.data_hora != null
+          )
+          .map((e) => ({
+            inicio: e.data_hora!,
+            rotulo: `${e.numero}º encontro`,
+            rotuloArtigo: `o ${e.numero}º encontro`,
+          })),
+      }).catch(() => null)
+    : null;
 
   const primeiroNomeMentor = (
     dupla.mentor.nome_social ?? dupla.mentor.nome
@@ -1194,6 +1229,7 @@ export default async function DuplaPage({
         souMentor={souMentor}
         souStaff={souCoord || dupla.supervisor?.id === me.id}
         numeroGuiaAtual={passoAtual?.numero ?? null}
+        sugestoesPlano={sugestoesPlano}
       />
 
       {/* com plano de recuperação na tela a decisão de recesso mora dentro
