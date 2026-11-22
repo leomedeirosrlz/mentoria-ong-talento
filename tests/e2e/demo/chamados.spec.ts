@@ -8,6 +8,7 @@ const CH_REGISTRO = "de000000-0000-4000-8000-000000022569"; // CHA-000141
 const CH_JOVEM = "de000000-0000-4000-8000-000000022570"; // CHA-000142
 const CH_AGENDA = "de000000-0000-4000-8000-000000022571"; // CHA-000143
 const CH_PLATAFORMA = "de000000-0000-4000-8000-000000022572"; // CHA-000144
+const CH_FERIADO = "de000000-0000-4000-8000-000000022575"; // CHA-000147
 const CH_RESOLVIDO = "de000000-0000-4000-8000-000000022557"; // CHA-000129
 
 test.describe("demo — chamados (WP1)", () => {
@@ -316,6 +317,103 @@ test.describe("demo — chamados (WP1)", () => {
       page.getByText("Chamado aberto por Ana Beatriz Silva.")
     ).toBeVisible();
     await expect(page.getByText(/comentário interno/i)).toHaveCount(0);
+  });
+
+  test("resposta da equipe vira pendência na home; aberto sem dono não (489)", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentorado");
+    await page.goto("/jovem");
+
+    const fazer = page.getByRole("region", { name: "Para fazer agora" });
+    // a lista mostra 3 à vista e o resto em "e mais N" — a pendência do
+    // chamado (prioridade 50 do motor) fica no painel recolhido
+    await fazer.getByRole("button", { name: /e mais \d+/ }).click();
+    // CHA-000147 em atendimento com a Marina → "Marina respondeu seu
+    // pedido", assunto de contexto e a ação "Ver resposta"
+    await expect(
+      fazer.getByText("Marina respondeu seu pedido")
+    ).toBeVisible();
+    await expect(
+      fazer.getByText("O encontro pode cair no feriado?")
+    ).toBeVisible();
+    const verResposta = fazer.getByRole("link", { name: "Ver resposta" });
+    await expect(verResposta).toHaveAttribute(
+      "href",
+      `/jovem/perfil?c=${CH_FERIADO}`
+    );
+    // CHA-000144 segue aberto sem dono — espera não é tarefa, não aparece
+    await expect(
+      fazer.getByText("Não consigo anexar a foto do combinado")
+    ).toHaveCount(0);
+
+    // o gesto é link de verdade: foco de teclado cai nele
+    await verResposta.focus();
+    await expect(verResposta).toBeFocused();
+
+    // 390px sem overflow horizontal (re-navega → recolhe → expande de novo)
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto("/jovem");
+    await fazer.getByRole("button", { name: /e mais \d+/ }).click();
+    await expect(
+      fazer.getByText("Marina respondeu seu pedido")
+    ).toBeVisible();
+    const scrollW = await page.evaluate(
+      () => document.documentElement.scrollWidth
+    );
+    expect(scrollW).toBeLessThanOrEqual(390);
+
+    // a ação abre a conversa no perfil — a resposta pública está lá
+    await verResposta.click();
+    await expect(page).toHaveURL(new RegExp(`/jovem/perfil\\?c=${CH_FERIADO}`));
+    await expect(page.getByText(/aproveitem o feriado/)).toBeVisible();
+    // e a pill do autor é neutra: "Marina está cuidando" é informação,
+    // não alerta — nada de âmbar de fila (QW8)
+    const pillCuidando = page.getByText("Marina está cuidando");
+    await expect(pillCuidando).toHaveClass(/text-muted-foreground/);
+    await expect(pillCuidando).not.toHaveClass(/warn-text/);
+  });
+
+  test("pills do jovem são neutras; as do staff seguem na escala da fila (QW8)", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentorado");
+    await page.goto("/jovem/perfil");
+
+    // aberto → "Aguardando a equipe" e em atendimento → "Marina está
+    // cuidando", ambos neutros pro autor (o texto e o ícone seguem — só a
+    // cor muda)
+    const linhaAberto = page.getByRole("link", {
+      name: /Não consigo anexar a foto do combinado/,
+    });
+    const pillAberto = linhaAberto.getByText("Aguardando a equipe");
+    await expect(pillAberto).toHaveClass(/text-muted-foreground/);
+    await expect(pillAberto).not.toHaveClass(/text-destructive/);
+    const linhaAtend = page.getByRole("link", {
+      name: /O encontro pode cair no feriado/,
+    });
+    const pillAtend = linhaAtend.getByText("Marina está cuidando");
+    await expect(pillAtend).toHaveClass(/text-muted-foreground/);
+    await expect(pillAtend).not.toHaveClass(/warn-text/);
+
+    // staff inalterado: "Sem dono" vermelho e "Com você" âmbar na fila —
+    // o texto também vira tab de filtro, então a pill é lida dentro da
+    // linha do chamado (link pelo assunto)
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto("/chamados");
+    const fila = page.getByRole("region", { name: "Fila de chamados" });
+    const linhaSemDono = fila.getByRole("link", {
+      name: /Não consigo anexar a foto do combinado/,
+    });
+    await expect(linhaSemDono.getByText("Sem dono")).toHaveClass(
+      /text-destructive/
+    );
+    const linhaComVoce = fila.getByRole("link", {
+      name: /O encontro pode cair no feriado/,
+    });
+    await expect(linhaComVoce.getByText("Com você")).toHaveClass(
+      /text-\[var\(--warn-text\)\]/
+    );
   });
 
   test("resolvido mostra a resposta final uma vez — a trilha não repete", async ({

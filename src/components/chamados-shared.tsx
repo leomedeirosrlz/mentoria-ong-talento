@@ -51,6 +51,16 @@ const STATUS_TOM: Record<ChamadoStatus, string> = {
   resolvido: "border-[var(--ok)]/50 bg-[var(--ok)]/10 text-[var(--ok-text)]",
 };
 
+// pro autor "aberto" e "em atendimento" são informação ("a equipe recebeu",
+// "alguém cuida"), não alerta — vermelho/âmbar medem a urgência da FILA do
+// staff ("Sem dono" em vermelho faz sentido pra ela). O resolvido segue
+// verde: é boa notícia dos dois lados. Ícone + texto carregam o sentido.
+const STATUS_TOM_AUTOR: Record<ChamadoStatus, string> = {
+  aberto: "border-border text-muted-foreground",
+  em_atendimento: "border-border text-muted-foreground",
+  resolvido: STATUS_TOM.resolvido,
+};
+
 const primeiroNome = (n: string) => n.split(" ")[0];
 
 /** Pill de status do chamado. `visao` muda a fala: pra equipe o aberto sem
@@ -101,7 +111,11 @@ export function ChamadoStatusBadge({
   return (
     <Badge
       variant="outline"
-      className={cn("font-normal", STATUS_TOM[status], className)}
+      className={cn(
+        "font-normal",
+        (visao === "autor" ? STATUS_TOM_AUTOR : STATUS_TOM)[status],
+        className
+      )}
     >
       <Icone size={11} aria-hidden />
       {texto}
