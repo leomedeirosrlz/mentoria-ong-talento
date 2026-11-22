@@ -32,6 +32,8 @@ marcados sem evidência são rejeitados na revisão.
 
 - [ ] Copy pt-BR, sem travessão em texto exibido, sem jargão interno
 - [ ] Estados vazio/erro/carregando resolvidos; sem placeholder
+- [ ] Fluxo/copy mudou? Ajuda atualizada em `src/lib/ajuda/conteudo.ts`
+      conforme `docs/convencoes/ajuda-faq.md`
 - [ ] Paridade `/demo` mantida (`DEMO_MSG` nas mutações)
 
 ## Deploy
