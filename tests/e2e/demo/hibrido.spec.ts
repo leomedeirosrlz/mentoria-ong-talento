@@ -61,12 +61,17 @@ test("agenda do híbrido sem trilha: sem aba Especialista, horários no perfil",
       .getByRole("tablist", { name: "Modos da agenda" })
       .getByRole("tab", { name: "Especialista" })
   ).toHaveCount(0);
-  await expect(page.getByRole("heading", { name: "Minha agenda" })).toBeVisible();
+  // a âncora do modo é a aba selecionada (a faixa "Minha agenda" saiu na
+  // 488 — as seções da agenda são Hoje/Amanhã/Próximos)
+  const minhaAgenda = page
+    .getByRole("tablist", { name: "Modos da agenda" })
+    .getByRole("tab", { name: "Minha agenda" });
+  await expect(minhaAgenda).toHaveAttribute("aria-selected", "true");
 
   // ?visao=especialista cai mudo na visão DPP (sem banner de erro: ele é
   // especialista, só não tem o que mostrar ali)
   await page.goto("/agenda?visao=especialista");
-  await expect(page.getByRole("heading", { name: "Minha agenda" })).toBeVisible();
+  await expect(minhaAgenda).toHaveAttribute("aria-selected", "true");
   await expect(page.getByText(/não se aplica ao seu papel/)).toHaveCount(0);
 
   // os horários de especialista seguem editáveis: moram no perfil
@@ -86,7 +91,11 @@ test("agenda do híbrido: ?visao= fora do vocabulário vale como ausente", async
 
   // valor inválido cai no default do papel primário (DPP), não numa visão
   // quebrada nem num redirect
-  await expect(page.getByRole("heading", { name: "Minha agenda" })).toBeVisible();
+  await expect(
+    page
+      .getByRole("tablist", { name: "Modos da agenda" })
+      .getByRole("tab", { name: "Minha agenda" })
+  ).toHaveAttribute("aria-selected", "true");
 });
 
 test("duplas do híbrido: seção DPP presente (esp aparece quando houver trilha)", async ({

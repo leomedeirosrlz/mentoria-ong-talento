@@ -58,6 +58,23 @@ export type AgendaAcaoTipo =
 
 export type AgendaTom = "ok" | "warn" | "danger" | "info" | "muted";
 
+/** Carimbo do item que veio do calendário oficial — alimenta o merge da
+ *  visão "tudo": o MESMO evento (mesmo título/data/observação) aparece uma
+ *  vez por dupla/turma porque a agenda é por par; o chip Tudo funde num
+ *  item só ("Turmas 1 e 2", "agenda de Bia e Caio"). `chave` é o que liga
+ *  os irmãos — eventos distintos com local/hora própria não fundem. */
+export type OficialRef = {
+  chave: string;
+  /** Rótulo sem turma — "Evento oficial do ciclo", "Formação de mentores". */
+  base: string;
+  /** Turma no rótulo (evento do ciclo, recesso) ou na meta (formação). */
+  turmaNoRotulo: boolean;
+  turmas: string[];
+  jovens: string[];
+  /** Sufixo da tag convidado — "evento oficial"; null quando não é dela. */
+  notaTipo: string | null;
+};
+
 export type AgendaItem = {
   id: string;
   escopo: EscopoId;
@@ -94,6 +111,8 @@ export type AgendaItem = {
   /** Link da chamada já validado por linkSeguro; null quando não há/inseguro. */
   link: string | null;
   acoes: AgendaAcaoTipo[];
+  /** Programa oficial — só itens do calendário do ciclo o carregam. */
+  oficial: OficialRef | null;
 };
 
 // ---------- aviso (warnrow do topo do "Hoje") ----------
@@ -170,6 +189,10 @@ export type AgendaMinhaDerivada = {
   secoes: AgendaSecao[];
   semana: ResumoSemana;
   duplasRail: DuplaResumo[];
+  /** Itens de dias já fechados DESTA semana (seg até ontem) — fora da
+   *  lista, serve só pra faixa "Sua semana" não chamar de "livre" um dia
+   *  que teve compromisso. */
+  passadosSemana: AgendaItem[];
 };
 
 // ---------- constantes internas ----------
@@ -441,6 +464,7 @@ function itensDaDupla(
         eventoId: null,
         link: null,
         acoes: ["remarcar"],
+        oficial: null,
       });
       continue;
     }
@@ -515,6 +539,7 @@ function itensDaDupla(
       eventoId: null,
       link,
       acoes,
+      oficial: null,
     });
   }
 
@@ -608,6 +633,7 @@ function itensDaDupla(
         eventoId: null,
         link: null,
         acoes: p.encontro ? ["remarcar"] : ["agendar"],
+        oficial: null,
       });
     }
   }
@@ -657,6 +683,7 @@ function itensDaDupla(
         eventoId: null,
         link: null,
         acoes: [],
+        oficial: null,
       });
     }
   }
@@ -664,14 +691,25 @@ function itensDaDupla(
   return itens;
 }
 
+/** Chave de identidade de um evento oficial pra merge — título+data+obs
+ *  é o que faz dois eventos serem "o mesmo" mesmo em cronogramas
+ *  diferentes; local/hora distintos (na observação) não fundem. */
+function chaveOficial(ev: CicloEvento): string {
+  return `${ev.titulo}|${ev.data ?? ""}|${ev.observacao ?? ""}`;
+}
+
 /** Eventos oficiais fora do eixo encontro-a-encontro: formação é do mentor
- *  ("eu"); encerramento/roda entra na agenda de cada jovem do cronograma —
- *  a turma é deles, o mentor acompanha por ali. */
+ *  ("eu"); encerramento/roda e recesso entram na agenda de cada jovem do
+ *  cronograma — a turma é deles, o mentor acompanha por ali.
+ *  `janela` abre o recorte só-pra-frente: a faixa "Sua semana" precisa
+ *  também dos eventos de dias já fechados DESTA semana (`desde`/`ateExcl`),
+ *  senão ela marca "livre" um dia que teve programa. */
 function itensPrograma(
   duplas: Dupla[],
   eventos: CicloEvento[],
   cronogramas: Cronograma[],
-  hoje: string
+  hoje: string,
+  janela?: { desde: string; ateExcl: string }
 ): AgendaItem[] {
   const turmaDo = new Map(cronogramas.map((c) => [c.id, c.turma]));
   const duplasPorCronograma = new Map<string, Dupla[]>();
@@ -684,7 +722,8 @@ function itensPrograma(
 
   const itens: AgendaItem[] = [];
   for (const ev of eventos) {
-    if (!ev.data || ev.data < hoje) continue;
+    if (!ev.data || ev.data < (janela?.desde ?? hoje)) continue;
+    if (janela && ev.data >= janela.ateExcl) continue;
     const turma = turmaDo.get(ev.cronograma_id) ?? null;
     const comum = {
       dia: ev.data,
@@ -706,33 +745,186 @@ function itensPrograma(
       // só a formação de turma do próprio mentor interessa — a de outra
       // turma não é compromisso dele
       if (!duplasPorCronograma.has(ev.cronograma_id)) continue;
+      const t = turma ? turmaLonga(turma) : null;
       itens.push({
         ...comum,
         id: `prog-${ev.id}`,
         escopo: "eu",
         tipo: "programa",
         rotulo: "Formação de mentores",
-        meta: turma ? [turmaLonga(turma)] : [],
+        meta: t ? [t] : [],
         convidado: false,
         notaConvidado: null,
+        oficial: {
+          chave: chaveOficial(ev),
+          base: "Formação de mentores",
+          turmaNoRotulo: false,
+          turmas: t ? [t] : [],
+          jovens: [],
+          notaTipo: null,
+        },
       });
     } else if (ev.tipo === "evento_encerramento") {
       for (const d of duplasPorCronograma.get(ev.cronograma_id) ?? []) {
         const nome1 = primeiroNomeDaDupla(d) || "Jovem";
+        const t = turmaLonga(d.turma);
         itens.push({
           ...comum,
           id: `prog-${ev.id}-${d.id}`,
           escopo: `dupla:${d.id}`,
           tipo: "programa",
-          rotulo: `Evento oficial do ciclo · ${turmaLonga(d.turma)}`,
+          rotulo: `Evento oficial do ciclo · ${t}`,
           meta: [],
           convidado: true,
           notaConvidado: `agenda de ${nome1} · evento oficial`,
           duplaId: d.id,
+          oficial: {
+            chave: chaveOficial(ev),
+            base: "Evento oficial do ciclo",
+            turmaNoRotulo: true,
+            turmas: [t],
+            jovens: [nome1],
+            notaTipo: "evento oficial",
+          },
+        });
+      }
+    } else if (ev.tipo === "recesso") {
+      // o recesso é do cronograma, não da dupla — mas a NOTA é por par:
+      // quem declarou "seguir se encontrando" ganha a linha que lembra isso
+      for (const d of duplasPorCronograma.get(ev.cronograma_id) ?? []) {
+        const nome1 = primeiroNomeDaDupla(d) || "Jovem";
+        const segue = (d.recessos ?? []).some(
+          (r) => r.ciclo_evento_id === ev.id && !r.usa
+        );
+        const t = turmaLonga(d.turma);
+        itens.push({
+          ...comum,
+          id: `prog-${ev.id}-${d.id}`,
+          escopo: `dupla:${d.id}`,
+          tipo: "programa",
+          rotulo: `Recesso do programa · ${t}`,
+          meta: segue ? [`${nome1} segue se encontrando durante o recesso`] : [],
+          convidado: false,
+          notaConvidado: null,
+          duplaId: d.id,
+          oficial: {
+            chave: chaveOficial(ev),
+            base: "Recesso do programa",
+            turmaNoRotulo: true,
+            turmas: [t],
+            jovens: [nome1],
+            notaTipo: null,
+          },
         });
       }
     }
   }
+  return itens;
+}
+
+/** Encontros/sessões de dias já fechados DESTA semana — a lista é
+ *  só-pra-frente (a ficha conta essa história), mas a faixa "Sua semana"
+ *  monta as 7 células de seg–dom: sem este recorte ela chamava de "livre"
+ *  um dia que já passou com encontro. Sem ações — nada a fazer num dia
+ *  fechado; limbo/cobrança já vivem nos warnrows. */
+function itensPassadosDaDupla(
+  d: Dupla,
+  trilhasJovem: TrilhaJovem[],
+  eventos: CicloEvento[],
+  desde: string,
+  hoje: string
+): AgendaItem[] {
+  const itens: AgendaItem[] = [];
+  const nome1 = primeiroNomeDaDupla(d) || "Jovem";
+  const nomeCompleto = d.mentorado?.nome ?? nome1;
+  const escopo: EscopoId = `dupla:${d.id}`;
+  const total = eventosDoCronograma(eventos, d.cronograma_id).filter(
+    (e) => e.tipo === "encontro" && e.numero != null
+  ).length || TRILHA_LEN.dpp;
+
+  for (const e of d.encontros) {
+    if (e.status === "cancelado") continue;
+    const iso = isoDoEncontro(e);
+    const dia = diaDoIso(iso);
+    if (dia == null || dia < desde || dia >= hoje) continue;
+    const inicio = iso ? new Date(iso).getTime() : null;
+    const fim =
+      inicio != null && e.duracao_min > 0
+        ? new Date(inicio + e.duracao_min * 60_000)
+        : null;
+    itens.push({
+      id: `enc-${e.id}`,
+      escopo,
+      tipo: "encontro",
+      dia,
+      ts: inicio,
+      hora: inicio != null ? fmtHora.format(new Date(inicio)) : null,
+      fim: fim ? fmtHora.format(fim) : null,
+      rotulo: `Encontro ${e.numero} · ${turmaLonga(d.turma)}`,
+      titulo: `Encontro ${e.numero} de ${total} com ${nomeCompleto}`,
+      estado: STATUS_ENCONTRO_LABEL[e.status],
+      meta: [],
+      tom:
+        e.status === "realizado"
+          ? "ok"
+          : e.status === "nao_aconteceu"
+            ? "muted"
+            : null,
+      convidado: false,
+      notaConvidado: null,
+      duplaId: d.id,
+      encontro: e,
+      numero: e.numero,
+      sugeridoDia: null,
+      eventoId: null,
+      link: null,
+      acoes: [],
+      oficial: null,
+    });
+  }
+
+  for (const trilha of trilhasJovem) {
+    for (const s of trilha.sessoes ?? []) {
+      if (s.status === "cancelado") continue;
+      const iso =
+        s.status === "realizado" && s.realizado_em ? s.realizado_em : s.data_hora;
+      const dia = diaDoIso(iso);
+      if (dia == null || dia < desde || dia >= hoje) continue;
+      const inicio = iso ? new Date(iso).getTime() : null;
+      const fim =
+        inicio != null && s.duracao_min != null && s.duracao_min > 0
+          ? new Date(inicio + s.duracao_min * 60_000)
+          : null;
+      const passo = passoEsp(s, trilha.sessoes);
+      itens.push({
+        id: `esp-${s.id}`,
+        escopo,
+        tipo: "sessao_esp",
+        dia,
+        ts: inicio,
+        hora: inicio != null ? fmtHora.format(new Date(inicio)) : null,
+        fim: fim ? fmtHora.format(fim) : null,
+        rotulo: `Trilha de especialista · sessão ${passo} de ${TRILHA_LEN.especialista} · ${turmaLonga(d.turma)}`,
+        titulo: trilha.especialista_nome
+          ? `Sessão com ${trilha.especialista_nome}`
+          : "Sessão de especialista",
+        estado: STATUS_ENCONTRO_LABEL[s.status],
+        meta: [],
+        tom: s.status === "realizado" ? "ok" : "muted",
+        convidado: true,
+        notaConvidado: `agenda de ${nome1}: você não participa`,
+        duplaId: d.id,
+        encontro: null,
+        numero: s.numero,
+        sugeridoDia: null,
+        eventoId: null,
+        link: null,
+        acoes: [],
+        oficial: null,
+      });
+    }
+  }
+
   return itens;
 }
 
@@ -871,14 +1063,21 @@ function resumoDaSemana(
         })
         .join(", ") || null,
     // eventos oficiais da semana nos cronogramas das próprias duplas —
-    // formacao + evento_encerramento são os tipos que a agenda lista; a
-    // conta é de eventos (um encerramento cobrindo 2 duplas conta 1)
-    programas: eventos.filter(
-      (ev) =>
-        (ev.tipo === "formacao" || ev.tipo === "evento_encerramento") &&
-        naSemana(ev.data) &&
-        cronogramasDasDuplas.has(ev.cronograma_id)
-    ).length,
+    // são os tipos que a agenda lista (formação, encerramento, recesso).
+    // Conta pela MESMA chave do merge da lista: um encerramento cobrindo
+    // as turmas 1 e 2 é um evento só aqui e um item só no "tudo".
+    programas: new Set(
+      eventos
+        .filter(
+          (ev) =>
+            (ev.tipo === "formacao" ||
+              ev.tipo === "evento_encerramento" ||
+              ev.tipo === "recesso") &&
+            naSemana(ev.data) &&
+            cronogramasDasDuplas.has(ev.cronograma_id)
+        )
+        .map(chaveOficial)
+    ).size,
     pendencias: avisos.length,
   };
 }
@@ -924,6 +1123,7 @@ export function deriveAgendaMinha({
 }): AgendaMinhaDerivada {
   const agoraMs = agora ?? Date.now();
   const hojeData = parseDia(hoje);
+  const { seg } = semanaBounds(hojeData);
 
   const avisos = duplas.flatMap((d) => avisosDaDupla(d, hoje, agoraMs));
   const programaItens = itensPrograma(duplas, eventos, cronogramas, hoje);
@@ -933,6 +1133,15 @@ export function deriveAgendaMinha({
     ),
     ...programaItens,
   ];
+  const passadosSemana: AgendaItem[] = [
+    ...duplas.flatMap((d) =>
+      itensPassadosDaDupla(d, trilhas[d.id] ?? [], eventos, seg, hoje)
+    ),
+    ...itensPrograma(duplas, eventos, cronogramas, hoje, {
+      desde: seg,
+      ateExcl: hoje,
+    }),
+  ];
 
   return {
     chips: chipsDaAgenda(duplas),
@@ -941,6 +1150,7 @@ export function deriveAgendaMinha({
     semana: resumoDaSemana(
       duplas, trilhas, eventos, cronogramas, avisos, hoje
     ),
+    passadosSemana,
     // rail na mesma régua do Por mentorado: risco → atenção → ok
     duplasRail: duplas
       .map((d) => resumoDupla(d, eventos, hojeData))
@@ -958,71 +1168,80 @@ export function itemNoEscopo(item: { escopo: EscopoId }, escopo: EscopoAgenda): 
   return escopo === "tudo" || item.escopo === escopo;
 }
 
-/** Identidade `duplaId:numero` dos encontros que a agenda já apresenta —
- *  como item da lista (encontro real ou "a agendar", com as ações da
- *  dupla) ou como aviso de pendência no topo. A faixa "Minha agenda"
- *  (`itensSemanaProgramaMentor`) usa o conjunto pra não repetir o card
- *  do mesmo encontro: o gesto mora na lista, então a cópia da faixa é
- *  que sai — dedup no sentido inverso do `repeteFaixa`, que esvazia a
- *  lista do que a faixa já mostra (programa sem ação).
- *  `numero`, não `encontro.id`: o "a agendar" sem row e o aviso de
- *  registro identificam o mesmo compromisso oficial. */
-export function encontrosCobertos(agenda: AgendaMinhaDerivada): Set<string> {
-  const ids = new Set<string>();
-  for (const s of agenda.secoes)
-    for (const g of s.grupos)
-      for (const i of g.itens)
-        if (
-          (i.tipo === "encontro" || i.tipo === "a_agendar") &&
-          i.duplaId != null &&
-          i.numero != null
-        )
-          ids.add(`${i.duplaId}:${i.numero}`);
-  for (const a of agenda.avisos)
-    if (a.encontro != null) ids.add(`${a.duplaId}:${a.encontro.numero}`);
-  return ids;
+/** "Turma 1" fica assim; ["Turma 1","Turma 2"] vira "Turmas 1 e 2" — a
+ *  forma plural é o que o review pede pra um evento oficial cobrindo
+ *  turmas diferentes ("Turmas 1, 2 e 3" no máximo visto). */
+export function rotuloTurmas(turmas: string[]): string {
+  if (turmas.length <= 1) return turmas[0] ?? "";
+  const nums = turmas.map((t) => t.replace(/^Turma\s+/, ""));
+  return `Turmas ${nums.join(", ").replace(/, ([^,]+)$/, " e $1")}`;
+}
+
+/** Funde dois itens do MESMO evento oficial (chave idêntica): turmas e
+ *  jovens somam, e o rótulo/tag refletem a união — o encerramento das
+ *  turmas 1 e 2 é um item só, não dois cards iguais. */
+function fundirPrograma(a: AgendaItem, b: AgendaItem): AgendaItem {
+  const oa = a.oficial!;
+  const ob = b.oficial!;
+  const oficial: OficialRef = {
+    ...oa,
+    turmas: [...new Set([...oa.turmas, ...ob.turmas])],
+    jovens: [...new Set([...oa.jovens, ...ob.jovens])],
+  };
+  const rotulo =
+    oficial.turmaNoRotulo && oficial.turmas.length
+      ? `${oficial.base} · ${rotuloTurmas(oficial.turmas)}`
+      : oficial.base;
+  // formação carrega a turma na meta, não no rótulo — o merge reescreve a
+  // 1ª linha e preserva o resto; recesso une as notas "X segue se
+  // encontrando" das duplas que declararam
+  const meta = oficial.turmaNoRotulo
+    ? [...new Set([...a.meta, ...b.meta])]
+    : [rotuloTurmas(oficial.turmas), ...a.meta.slice(1), ...b.meta.slice(1)].filter(
+        Boolean
+      );
+  const notaConvidado =
+    oficial.notaTipo != null && oficial.jovens.length > 1
+      ? `agenda de ${oficial.jovens.join(" e ")} · ${oficial.notaTipo}`
+      : a.notaConvidado;
+  return { ...a, rotulo, meta, notaConvidado, oficial };
 }
 
 /** Recorte da agenda por chip — itens E avisos são do escopo (o warnrow do
- *  Caio some no chip da Ana, mas não no "Tudo"). Estrutura preservada:
- *  seções e grupos vazios saem pra a tela não desenhar cabeçalho órfão. */
+ *  Caio some no chip da Ana, mas não no "Tudo"). Em "tudo" o MESMO evento
+ *  oficial de duplas/turmas diferentes funde num item só ("Turmas 1 e 2");
+ *  nos chips de dupla cada escopo segue vendo o item da própria agenda.
+ *  Estrutura preservada: seções e grupos vazios saem pra a tela não
+ *  desenhar cabeçalho órfão. */
 export function filtraAgenda(
   agenda: AgendaMinhaDerivada,
   escopo: EscopoAgenda
 ): { avisos: AvisoAgenda[]; secoes: AgendaSecao[] } {
   const avisos = agenda.avisos.filter((a) => itemNoEscopo(a, escopo));
-  // "tudo" com 2 duplas na mesma turma lista o evento oficial duplicado
-  // (ele é por cronograma, renderizado por dupla) — dedup por eventoId;
-  // nos chips de dupla cada escopo segue vendo o item da própria dupla.
-  const vistos = new Set<string>();
-  const dedupTudo = (i: AgendaItem) => {
-    if (escopo !== "tudo" || i.eventoId == null) return true;
-    if (vistos.has(i.eventoId)) return false;
-    vistos.add(i.eventoId);
-    return true;
-  };
-  // em "tudo" a faixa "Minha agenda" já mostra a semana do programa —
-  // evento oficial desta semana, sem ação, seria o mesmo
-  // card duas vezes. A lista fica com o que pede gesto e com o resto do
-  // calendário (encontros sempre ficam: carregam hora e ações da dupla —
-  // o dedup deles é na faixa, via `encontrosCobertos`)
-  const { seg, dom } = agenda.semana;
-  const repeteFaixa = (i: AgendaItem) =>
-    escopo === "tudo" &&
-    i.tipo === "programa" &&
-    i.acoes.length === 0 &&
-    i.dia != null &&
-    i.dia >= seg &&
-    i.dia <= dom;
   const secoes = agenda.secoes.map((s) => ({
     ...s,
     grupos: s.grupos
-      .map((g) => ({
-        ...g,
-        itens: g.itens.filter(
-          (i) => itemNoEscopo(i, escopo) && dedupTudo(i) && !repeteFaixa(i)
-        ),
-      }))
+      .map((g) => {
+        // merge por chave dentro do grupo (a chave inclui a data — irmãos
+        // do mesmo evento sempre sentam no mesmo dia)
+        const posicoes = new Map<string, number>();
+        const itens: AgendaItem[] = [];
+        for (const i of g.itens) {
+          if (!itemNoEscopo(i, escopo)) continue;
+          if (escopo === "tudo" && i.oficial != null) {
+            const idx = posicoes.get(i.oficial.chave);
+            if (idx == null) {
+              posicoes.set(i.oficial.chave, itens.length);
+              itens.push(i);
+            } else {
+              itens[idx] = fundirPrograma(itens[idx]!, i);
+            }
+            continue;
+          }
+          itens.push(i);
+        }
+        return { ...g, itens };
+      })
       .filter((g) => g.itens.length > 0),
   }));
   return { avisos, secoes };

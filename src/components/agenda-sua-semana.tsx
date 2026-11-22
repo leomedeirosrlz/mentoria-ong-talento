@@ -7,9 +7,9 @@ import { cn } from "@/lib/utils";
  *  "Por mentorado" — a mesma leitura da Minha agenda condensada por dia:
  *  contador lime = compromisso seu (só quando 2+, senão o rótulo já diz),
  *  âmbar tracejado = item que você só acompanha (sessão esp / evento do
- *  jovem). Datas passadas não têm fonte aqui — o derive da agenda é pra
- *  frente, então dias anteriores a hoje aparecem "livre" (o strip é um
- *  planejador, não um histórico).
+ *  jovem). Dias já fechados recebem os itens de `passadosSemana` — "livre"
+ *  só sai quando o dia é livre de verdade; o badge passado fica muted
+ *  (lima/âmbar pedem ação, e dia fechado não a pede).
  *  Cada célula é um Link pro dia no calendário (?aba=calendario&dia= — o
  *  deep-link que a coordenação já usa) com aria-label que verbaliza os
  *  contadores. */
@@ -24,7 +24,11 @@ function rotuloStrip(i: AgendaItem): string {
     case "sessao_esp":
       return "sessão esp";
     case "programa":
-      return i.rotulo.startsWith("Formação") ? "formação" : "evento";
+      return i.rotulo.startsWith("Formação")
+        ? "formação"
+        : i.rotulo.startsWith("Recesso")
+          ? "recesso"
+          : "evento";
     case "a_agendar":
       return "a agendar";
   }
@@ -51,15 +55,17 @@ export function AgendaSuaSemana({
   const dias = Array.from({ length: 7 }, (_, i) => {
     const d = new Date(Date.parse(`${seg}T12:00:00Z`) + i * 86_400_000);
     const iso = toDateStr(d);
-    // um evento oficial rende um item por dupla — no strip é o MESMO
-    // evento, então a contagem e os rótulos veem uma linha só (mesmo
-    // dedup por eventoId do escopo "tudo" da agenda)
+    // um evento oficial rende um item por dupla/turma — no strip é o
+    // MESMO evento, então a contagem e os rótulos veem uma linha só
+    // (mesma régua de merge do escopo "tudo": chave oficial, com o
+    // eventoId de fallback pra item sem carimbo)
     const vistos = new Set<string>();
     const doDia = itens.filter((it) => {
       if (it.dia !== iso) return false;
-      if (it.eventoId == null) return true;
-      if (vistos.has(it.eventoId)) return false;
-      vistos.add(it.eventoId);
+      const chave = it.oficial?.chave ?? it.eventoId;
+      if (chave == null) return true;
+      if (vistos.has(chave)) return false;
+      vistos.add(chave);
       return true;
     });
     return {
@@ -67,6 +73,7 @@ export function AgendaSuaSemana({
       dow: DOW[i],
       diaNum: Number(iso.slice(8, 10)),
       ehHoje: iso === hoje,
+      passado: iso < hoje,
       itens: doDia,
     };
   });
@@ -142,12 +149,26 @@ export function AgendaSuaSemana({
                   {labels}
                 </span>
                 {proprios > 0 && (
-                  <span className="mt-1 grid min-w-[22px] place-items-center rounded-full bg-[var(--brand-lime)] px-1 py-0.5 text-[11px] font-bold tabular-nums text-[var(--brand-ink)]">
+                  <span
+                    className={cn(
+                      "mt-1 grid min-w-[22px] place-items-center rounded-full px-1 py-0.5 text-[11px] font-bold tabular-nums",
+                      d.passado
+                        ? "bg-muted text-muted-foreground"
+                        : "bg-[var(--brand-lime)] text-[var(--brand-ink)]"
+                    )}
+                  >
                     {badgeProprios}
                   </span>
                 )}
                 {convidados > 1 && (
-                  <span className="mt-1 grid min-w-[22px] place-items-center rounded-full border border-dashed border-[var(--warn)]/70 bg-[var(--warn)]/15 px-1 py-0.5 text-[11px] font-bold tabular-nums text-[var(--warn-text)]">
+                  <span
+                    className={cn(
+                      "mt-1 grid min-w-[22px] place-items-center rounded-full border border-dashed px-1 py-0.5 text-[11px] font-bold tabular-nums",
+                      d.passado
+                        ? "border-border bg-muted text-muted-foreground"
+                        : "border-[var(--warn)]/70 bg-[var(--warn)]/15 text-[var(--warn-text)]"
+                    )}
+                  >
                     {convidados}
                   </span>
                 )}

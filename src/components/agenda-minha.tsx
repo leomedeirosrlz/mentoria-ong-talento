@@ -24,7 +24,6 @@ import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
 import { avatarPublicUrl } from "@/lib/avatar";
 import {
   deriveAgendaMinha,
-  encontrosCobertos,
   filtraAgenda,
   primeiroNomeDaDupla,
   type AgendaItem,
@@ -33,9 +32,7 @@ import {
   type EscopoAgenda,
   type AgendaSecao,
 } from "@/lib/agenda-minha";
-import { itensSemanaProgramaMentor } from "@/lib/agenda-coordenacao";
 import { turmaCurta } from "@/lib/turma";
-import { SemanaDoPrograma } from "@/components/semana-do-programa";
 import type {
   CicloEvento,
   Cronograma,
@@ -529,8 +526,6 @@ export type AgendaMinhaProps = {
    *  usaria Date.now() no cliente e SSR×hidratação podiam discordar na
    *  janela de 15min do "Entrar" (hydration mismatch). */
   agora: number;
-  /** usuário híbrido — os links da faixa precisam preservar `&visao=dpp`. */
-  hibrido?: boolean;
 };
 
 export function AgendaMinha({
@@ -540,7 +535,6 @@ export function AgendaMinha({
   cronogramas,
   hoje,
   agora,
-  hibrido = false,
 }: AgendaMinhaProps) {
   const [escopo, setEscopo] = useState<EscopoAgenda>("tudo");
   const agenda = useMemo(
@@ -562,22 +556,6 @@ export function AgendaMinha({
   const duplasPorId = useMemo(
     () => new Map(duplas.map((d) => [d.id, d])),
     [duplas]
-  );
-  // a faixa e a lista apresentam o MESMO encontro: o dedup é na faixa —
-  // a lista detém as ações (entrar/remarcar/agendar/registrar), então o
-  // card coberto por `encontrosCobertos` sai. Sem item restante a seção
-  // inteira some: "Nada marcado" mentiria (o encontro está na lista)
-  const itensFaixa = useMemo(
-    () =>
-      itensSemanaProgramaMentor(
-        duplas,
-        eventos,
-        cronogramas,
-        new Date(hoje + "T12:00:00"),
-        agora,
-        encontrosCobertos(agenda)
-      ),
-    [duplas, eventos, cronogramas, hoje, agora, agenda]
   );
   // o CTA preenchido (lima) é um por agenda: o 1º warnrow do "Hoje" leva —
   // sem warnrow, o destaque cai na 1ª ação decisiva da lista (registrar ou
@@ -606,23 +584,6 @@ export function AgendaMinha({
 
   return (
     <div className="space-y-4">
-      {/* faixa "Minha agenda" (v8b): a semana do programa recortada na
-          agenda dele — formações e eventos oficiais
-          e o encontro oficial ainda fora da lista (o coberto por item
-          ou aviso já aparece uma vez lá embaixo). Some quando um chip de
-          escopo filtra uma dupla só — a faixa é a leitura da agenda
-          inteira, não do recorte */}
-      {escopo === "tudo" && itensFaixa.length > 0 && (
-        <SemanaDoPrograma
-          itens={itensFaixa}
-          hoje={hoje}
-          modo="mentor"
-          titulo="Minha agenda"
-          ariaLabel="Minha agenda · semana do programa"
-          sufixoVisao={hibrido ? "&visao=dpp" : ""}
-        />
-      )}
-
       {/* escopo interno — estado local, nunca URL: é um recorte de leitura,
           não um endereço compartilhável. O "você não participa" dos itens
           convidados já explica o recorte — sem parágrafo de legenda */}

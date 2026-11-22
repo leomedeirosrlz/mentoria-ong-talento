@@ -354,17 +354,26 @@ export default async function AgendaPage({
       ]);
     // o strip "Sua semana" do Por mentorado mostra os MESMOS itens da Minha
     // agenda — a derivação é pura (sem query nova), reusa o que a página já
-    // buscou pra esta aba
+    // buscou pra esta aba. `passadosSemana` entra junto: sem ele a célula
+    // de um dia já fechado dizia "livre" mesmo com encontro ocorrido.
     const itensSemana =
       aba === "por-mentorado"
-        ? deriveAgendaMinha({
-            duplas: duplasDpp,
-            trilhas,
-            eventos,
-            cronogramas,
-            hoje,
-            agora: agora.getTime(),
-          }).secoes.flatMap((s) => s.grupos.flatMap((g) => g.itens))
+        ? (() => {
+            const derivada = deriveAgendaMinha({
+              duplas: duplasDpp,
+              trilhas,
+              eventos,
+              cronogramas,
+              hoje,
+              agora: agora.getTime(),
+            });
+            return [
+              ...derivada.passadosSemana,
+              ...derivada.secoes.flatMap((s) =>
+                s.grupos.flatMap((g) => g.itens)
+              ),
+            ];
+          })()
         : [];
     return (
       <div className="space-y-6">
@@ -396,10 +405,6 @@ export default async function AgendaPage({
               cronogramas={cronogramas}
               hoje={hoje}
               agora={agora.getTime()}
-              // staff+mentor híbrido: os cards da faixa linkam pro dia no
-              // calendário — precisam carregar a visão certa (regra do
-              // hibrido do PorMentorado)
-              hibrido={duasVisoes || (papelStaff ?? false)}
             />
           ) : (
             <AgendaPorMentorado
