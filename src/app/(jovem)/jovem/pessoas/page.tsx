@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import {
+  ArrowRight,
   EnvelopeSimple,
   Handshake,
   Sparkle,
@@ -67,6 +68,9 @@ export default async function JovemPessoas() {
     icon: typeof Handshake;
     itens: JovemContato[];
     vazio: string;
+    /** Atalho pro destino do grupo — o diretório mostra a rede do jovem,
+     *  nunca um segundo catálogo (484). */
+    cta?: { href: string; rotulo: string };
   }[] = [
     {
       id: "mentoria",
@@ -82,6 +86,7 @@ export default async function JovemPessoas() {
       itens: porPapel("especialista"),
       vazio:
         "O especialista da sua trilha aparece aqui quando ela começar.",
+      cta: { href: "/jovem/especialistas", rotulo: "Conhecer especialistas" },
     },
     {
       id: "supervisao",
@@ -113,17 +118,32 @@ export default async function JovemPessoas() {
           especialistas das trilhas e a coordenação */}
       {grupos.map((g) => (
         <section key={g.id} aria-labelledby={`${g.id}-titulo`}>
-          <h2
-            id={`${g.id}-titulo`}
-            className="mb-3 flex items-center gap-2 text-base font-semibold"
-          >
-            <g.icon
-              size={18}
-              className="text-muted-foreground"
-              aria-hidden
-            />
-            {g.titulo}
-          </h2>
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <h2
+              id={`${g.id}-titulo`}
+              className="flex items-center gap-2 text-base font-semibold"
+            >
+              <g.icon
+                size={18}
+                className="text-muted-foreground"
+                aria-hidden
+              />
+              {g.titulo}
+            </h2>
+            {g.cta && (
+              <Link
+                href={g.cta.href}
+                className="group inline-flex min-h-11 items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                {g.cta.rotulo}
+                <ArrowRight
+                  size={14}
+                  aria-hidden
+                  className="transition-transform group-hover:translate-x-0.5"
+                />
+              </Link>
+            )}
+          </div>
           <Card className="animate-enter">
             <CardContent>
               {g.itens.length === 0 ? (

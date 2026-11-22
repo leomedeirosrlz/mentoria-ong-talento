@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   demoJovemColegas,
   demoJovemContatos,
+  demoJovemEspecialistas,
   demoJovemPerfil,
   demoPessoas,
   demoPropostas,
@@ -79,6 +80,62 @@ describe("demoJovemContatos — papel deriva da trilha (0076)", () => {
       (c) => c.papel === "supervisor" && (c.nome ?? "").includes("Paulo")
     );
     expect(paulo.length).toBeGreaterThanOrEqual(2);
+  });
+
+  it("a linha traz só a projeção da view — contato direto e nada mais", () => {
+    // 484: a ficha do adulto enriquece pelo catálogo; a linha segue sendo
+    // nome, foto e os 2 canais que a jovem_contatos já libera — sem bio,
+    // linkedin ou qualquer campo coord-only de profiles
+    for (const c of contatos) {
+      expect(Object.keys(c).sort()).toEqual([
+        "avatar_path",
+        "dupla_id",
+        "email",
+        "id",
+        "nome",
+        "nome_social",
+        "papel",
+        "role",
+        "whatsapp",
+      ]);
+    }
+  });
+});
+
+describe("demoJovemEspecialistas — jovem_especialistas (0075/0086/0101)", () => {
+  const catalogo = demoJovemEspecialistas("mentorado");
+
+  it("a projeção pública nunca carrega contato direto nem dado coord", () => {
+    // 484: a ficha do especialista enriquece com ESTE recorte — trava a
+    // fronteira: sem e-mail, whatsapp, linkedin, notas ou documento
+    for (const e of catalogo) {
+      expect(Object.keys(e).sort()).toEqual([
+        "areas",
+        "avatar_path",
+        "bio",
+        "cargo",
+        "cidade",
+        "empresa",
+        "experiencia_previa",
+        "formacao_externa",
+        "grade_resumo",
+        "id",
+        "nome",
+        "nome_social",
+        "uf",
+        "vagas",
+        "voluntariado",
+      ]);
+    }
+  });
+
+  it("grade_resumo é período por dia, nunca slot exato", () => {
+    for (const e of catalogo) {
+      for (const janela of e.grade_resumo ?? []) {
+        expect(janela).toMatch(/de manhã|à tarde|à noite/);
+        expect(janela).not.toMatch(/\d{2}:\d{2}/);
+      }
+    }
   });
 });
 
