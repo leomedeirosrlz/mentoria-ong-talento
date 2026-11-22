@@ -669,7 +669,7 @@ export function OnboardingFlow({
     if (ehPassoTermo) return "Termo de adesão ao trabalho voluntário";
     switch (step) {
       case 0:
-        return `Bem-vindo(a) ao Realiza.vc, ${primeiroNome}!`;
+        return `Boas-vindas ao Realiza.vc, ${primeiroNome}!`;
       case 1:
         return "Antes de tudo: duas confirmações";
       case 2:

@@ -254,7 +254,7 @@ export function OnboardingJovem({
     if (ehPassoTermo) return "Seu termo de participação";
     switch (step) {
       case 0:
-        return `Bem-vindo(a) ao Realiza, ${primeiroNome}!`;
+        return `Boas-vindas ao Realiza.vc, ${primeiroNome}!`;
       case PASSO_TOUR:
         return "O que você pode fazer aqui";
       case PASSO_GRADE:
@@ -447,34 +447,41 @@ export function OnboardingJovem({
           pt safe-area tira o header de sob o notch em standalone */}
       <header className="fixed inset-x-0 top-0 z-40 border-b border-border/60 bg-background/85 pt-[env(safe-area-inset-top)] backdrop-blur">
         <div className="mx-auto flex h-14 w-full max-w-xl items-center gap-3 px-4 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
-          <Button
-            type="button"
-            variant="outline"
-            size="icon"
-            onClick={() => {
-              // demo no passo 0: voltar sai da demo e devolve a seleção de
-              // papel — troca de visão sem precisar abrir a pill
-              if (step === 0) {
-                start(async () => {
-                  await recomecarDemo();
-                });
-                return;
+          {/* passo 0 fora da demo não tem pra onde voltar — o espaço fica
+              reservado pra progressbar não andar de lugar entre passos. Na
+              demo o botão fica: é a saída "Escolher outro papel" */}
+          {step === 0 && !demo ? (
+            <span aria-hidden className="size-11 shrink-0 md:size-8" />
+          ) : (
+            <Button
+              type="button"
+              variant="outline"
+              size="icon"
+              onClick={() => {
+                // demo no passo 0: voltar sai da demo e devolve a seleção de
+                // papel — troca de visão sem precisar abrir a pill
+                if (step === 0) {
+                  start(async () => {
+                    await recomecarDemo();
+                  });
+                  return;
+                }
+                setStep((s) => s - 1);
+              }}
+              disabled={pending}
+              aria-label={
+                step === 0 && demo ? "Escolher outro papel" : "Voltar um passo"
               }
-              setStep((s) => s - 1);
-            }}
-            disabled={(step === 0 && !demo) || pending}
-            aria-label={
-              step === 0 && demo ? "Escolher outro papel" : "Voltar um passo"
-            }
-            title={step === 0 && demo ? "Escolher outro papel" : undefined}
-            className="shrink-0 rounded-full"
-          >
-            {pending && step === 0 ? (
-              <CircleNotch className="animate-spin" aria-hidden />
-            ) : (
-              <ArrowLeft aria-hidden />
-            )}
-          </Button>
+              title={step === 0 && demo ? "Escolher outro papel" : undefined}
+              className="shrink-0 rounded-full"
+            >
+              {pending && step === 0 ? (
+                <CircleNotch className="animate-spin" aria-hidden />
+              ) : (
+                <ArrowLeft aria-hidden />
+              )}
+            </Button>
+          )}
           <div
             role="progressbar"
             aria-valuenow={step + 1}

@@ -37,24 +37,26 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/jovem", label: "Início", icon: House },
   { href: "/jovem/agenda", label: "Agenda", icon: CalendarDots },
+  // a rota segue /materiais; o rótulo veste o hub "Minha jornada" que a
+  // página abre (a biblioteca de sempre continua lá dentro, no Acervo)
+  { href: "/jovem/materiais", label: "Jornada", icon: Path },
   { href: "/jovem/especialistas", label: "Especialistas", icon: Sparkle },
   { href: "/jovem/pessoas", label: "Pessoas", icon: Users },
-  // o rótulo segue o destino (/materiais, como no staff); "jornada" fica pro progresso dentro da página
-  { href: "/jovem/materiais", label: "Materiais", icon: Path },
   { href: "/jovem/perfil", label: "Perfil", icon: UserCircle },
   // REALIZA-345: a Ajuda do jovem — fora do MOBILE_PRIMEIRO, mora no Menu
   { href: "/jovem/ajuda", label: "Ajuda", icon: Question },
 ] as const;
 
-/** Bottom nav: 4 destinos fixos + Menu (REALIZA-221). Primárias = o que
- *  ela mais usa: home, o catálogo de especialistas, a jornada (é onde
- *  moram os links dos forms e o acervo) e a agenda. Pessoas e Perfil
- *  ficam no menu lateral, que tem a navegação inteira. */
+/** Bottom nav: 4 destinos fixos + Menu (REALIZA-221), na mesma prioridade
+ *  da sidebar. Primárias = o que ela mais usa: home, a agenda, a jornada
+ *  (é onde moram os links dos forms e o acervo) e o catálogo de
+ *  especialistas. Pessoas e Perfil ficam no menu lateral, que tem a
+ *  navegação inteira. */
 const MOBILE_PRIMEIRO = [
   "/jovem",
-  "/jovem/especialistas",
-  "/jovem/materiais",
   "/jovem/agenda",
+  "/jovem/materiais",
+  "/jovem/especialistas",
 ] as const;
 
 function ativo(pathname: string, href: string) {

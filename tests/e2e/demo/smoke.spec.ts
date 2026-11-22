@@ -66,7 +66,7 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
   // staff — boas-vindas → tour das telas → grade semanal → termo (a Bia
   // tem o termo-mentorando pendente na fixture) → contato
   await expect(
-    page.getByRole("heading", { name: /Bem-vindo\(a\) ao Realiza, Bia/i })
+    page.getByRole("heading", { name: /Boas-vindas ao Realiza\.vc, Bia/i })
   ).toBeVisible();
 
   // passo do tour (REALIZA-426): os itens são botões que trocam o print da

@@ -391,9 +391,9 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     tema: "materiais",
     pergunta: "Onde estão meus materiais de apoio?",
     resposta:
-      "Em Materiais, em Acervo. É lá que ficam os conteúdos pra ler e consultar quando quiser.",
+      "Em Jornada, em Acervo. É lá que ficam os conteúdos pra ler e consultar quando quiser.",
     prioridade: 20,
-    links: [{ rotulo: "Materiais", href: "/jovem/materiais" }],
+    links: [{ rotulo: "Jornada", href: "/jovem/materiais" }],
     papeis: ["mentorado"],
   },
   {
@@ -414,9 +414,9 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     tema: "materiais",
     pergunta: "Onde ficam meus instrumentos?",
     resposta:
-      "Em Materiais, em Meus instrumentos. Cada um abre na hora certa: o seu plano de desenvolvimento no começo da mentoria e a Roda da Vida perto do fim.",
+      "Em Jornada, em Meus instrumentos. Cada um abre na hora certa: o seu plano de desenvolvimento no começo da mentoria e a Roda da Vida perto do fim.",
     prioridade: 30,
-    links: [{ rotulo: "Materiais", href: "/jovem/materiais" }],
+    links: [{ rotulo: "Jornada", href: "/jovem/materiais" }],
     papeis: ["mentorado"],
   },
   {
@@ -453,8 +453,8 @@ export const PERGUNTAS: PerguntaAjuda[] = [
     tema: "materiais",
     pergunta: "Onde eu respondo a avaliação final?",
     resposta:
-      "No último encontro abre a Avaliação Geral 360º em Materiais. É a sua chance de contar como foi a mentoria pra você.",
-    links: [{ rotulo: "Materiais", href: "/jovem/materiais" }],
+      "No último encontro abre a Avaliação Geral 360º em Jornada. É a sua chance de contar como foi a mentoria pra você.",
+    links: [{ rotulo: "Jornada", href: "/jovem/materiais" }],
     papeis: ["mentorado"],
   },
 
@@ -909,6 +909,10 @@ export const MENU_DO_PAPEL: { papel: AppRole; itens: ItemComoFunciona[] }[] = [
           "Seus encontros marcados, o que já rolou e os horários de especialista.",
       },
       {
+        rotulo: "Jornada",
+        texto: "Seus instrumentos e o acervo de materiais de apoio.",
+      },
+      {
         rotulo: "Especialistas",
         texto:
           "O catálogo de mentores de temas específicos pra pedir uma sessão.",
@@ -916,10 +920,6 @@ export const MENU_DO_PAPEL: { papel: AppRole; itens: ItemComoFunciona[] }[] = [
       {
         rotulo: "Pessoas",
         texto: "Seu mentor, a coordenação e seus contatos.",
-      },
-      {
-        rotulo: "Materiais",
-        texto: "Seus instrumentos e o acervo de materiais de apoio.",
       },
       {
         rotulo: "Perfil",
