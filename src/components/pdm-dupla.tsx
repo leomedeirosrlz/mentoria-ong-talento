@@ -139,6 +139,22 @@ export function PdmDupla({
             : `"${item.titulo}" voltou a ficar em andamento.`
       ),
     onEditar: (item: PdmNo) => setItemDialog({ modo: "editar", item }),
+    // renomeação inline da árvore: só o título muda, o resto do item
+    // volta intacto pra RPC (a edição completa segue no dialog do ⋯)
+    onRenomear: (item: PdmNo, titulo: string) =>
+      executar(
+        () =>
+          pdmSalvarItem(duplaId, {
+            itemId: item.id,
+            parentId: item.parentId,
+            titulo,
+            porque: item.porque,
+            indicador: item.indicador,
+            areaVida: item.areaVida,
+            prazoAlvo: item.prazoAlvo,
+          }),
+        `Título atualizado: "${titulo}".`
+      ),
     onNovaSubmeta: (pai: PdmNo) =>
       setItemDialog({ modo: "nova-submeta", pai }),
     onMover: (item: PdmNo, direcao: -1 | 1, irmaos: PdmNo[]) => {
