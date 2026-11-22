@@ -15,6 +15,7 @@ import {
   montarDocCorpus,
   refsDeEntradas,
   tomSemantico,
+  totalSumario,
 } from "@/lib/materiais/corpus-doc";
 import type { CorpusDocRef } from "@/lib/materiais/corpus-doc";
 import { CorpusDocBody } from "@/components/corpus-documento";
@@ -877,5 +878,72 @@ describe("CorpusDocBody (render)", () => {
     expect(html).toContain("Neste documento");
     expect(html).toContain("9 seções");
     expect(html).toContain('href="#capitulo-5"');
+  });
+});
+
+// REALIZA-490 — o sumário expõe o 2º nível: cada ### vira item clicável sob
+// o ## do grupo (no guia DPP são os 16 encontros que o H2 escondia em 6
+// grupos). A contagem "N seções" é a dos itens renderizados, não de
+// doc.secoes (divergem quando um ## não tem intro — o h2 ancora sem virar
+// seção, como no guia do especialista).
+describe("sumário de 2 níveis (REALIZA-490)", () => {
+  // nav region do sumário (rail xl e a pill compartilham a mesma lista —
+  // basta conferir a primeira ocorrência do markup)
+  const sumarioHtml = (html: string) =>
+    html.match(/<nav aria-label="Sumário do documento"[^>]*>([\s\S]*?)<\/nav>/)![
+      1
+    ];
+
+  it("### viram itens clicáveis sob o grupo; contagem = links do sumário", () => {
+    const raw = `---\nfonte: sum2\ntitulo: Sum Dois\nmaterial: sum2\n---\n\n# Sum Dois\n\n${Array.from(
+      { length: 8 },
+      (_, i) => `## Capítulo ${i + 1}\n\nTexto ${i + 1}.`
+    ).join("\n\n")}\n\n## Com subs\n\n### Sub Alfa\n\nTexto alfa.\n\n### 3º encontro · Prática\n\nTexto do encontro.\n`;
+    const doc = montarDocCorpus("sum2", raw)!;
+    const grupos = gruposCorpus(doc.secoes);
+    // "Com subs" não tem intro → 10 seções, mas o sumário clica o h2 do
+    // grupo também: 9 grupos + 2 subs = 11 itens
+    expect(doc.secoes).toHaveLength(10);
+    expect(totalSumario(grupos)).toBe(11);
+    const html = renderToStaticMarkup(createElement(CorpusDocBody, { doc }));
+    expect(html).toContain("11 seções");
+    const rail = sumarioHtml(html);
+    // a sub linka a âncora "grupo › sub" — a mesma do heading na página
+    expect(rail).toContain('href="#com-subs-sub-alfa"');
+    expect(rail).toContain('href="#com-subs-3-encontro-pratica"');
+    // só o grupo com subs abre lista aninhada (raiz + 1 aninhada)
+    expect(rail.match(/<ol/g)).toHaveLength(2);
+  });
+
+  it("## sem intro (grupo implícito) conta no total — o h2 ancora igual", () => {
+    // FIXTURE_FASES: "Encontros 5 e 6" não tem intro — 4 grupos + 4 subs,
+    // enquanto doc.secoes só conta 7 (o ## vazio não vira seção)
+    const doc = montarDocCorpus("fases", FIXTURE_FASES)!;
+    expect(doc.secoes).toHaveLength(7);
+    expect(totalSumario(gruposCorpus(doc.secoes))).toBe(8);
+  });
+
+  it("guia DPP: os 16 encontros viram itens clicáveis do sumário", async () => {
+    const doc = await carregarDocCorpus("guia-mentor-dpp");
+    const grupos = gruposCorpus(doc!.secoes);
+    // 35 capítulos + 26 subs = 61 itens — a contagem casa com os links
+    expect(totalSumario(grupos)).toBe(61);
+    const html = renderToStaticMarkup(
+      createElement(CorpusDocBody, { doc: doc! })
+    );
+    expect(html).toContain("61 seções");
+    const rail = sumarioHtml(html);
+    // um item por encontro (### "Nº encontro · T") — onde o review só via
+    // os 6 grupos de mês. Cada item aponta a âncora que o card usa.
+    const encs = doc!.secoes.filter(
+      (s) => s.blocos[0]?.kind === "encontro"
+    );
+    expect(encs).toHaveLength(16);
+    expect(rail.match(/º encontro ·/g)).toHaveLength(16);
+    for (const s of encs) {
+      expect(rail).toContain(`href="#${s.anchor}"`);
+      // e a âncora existe na página (o card ancorado)
+      expect(html).toContain(`id="${s.anchor}"`);
+    }
   });
 });

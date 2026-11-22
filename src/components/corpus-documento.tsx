@@ -40,6 +40,7 @@ import {
   normTitulo,
   tomDeFase,
   tomSemantico,
+  totalSumario,
 } from "@/lib/materiais/corpus-doc";
 import { sistemaDoDoc } from "@/lib/como-conduzir";
 import { INSTRUMENTO_INFO } from "@/lib/forms/schema";
@@ -63,10 +64,11 @@ import { PedirLizaPersonalizar } from "./pedir-liza-personalizar";
 // visual grammar: ink hero, keyword icons and the full-width lime rule on
 // h2, rotating phase bands for the journey's month groups, the clickable
 // 16-dot journey strip, encounter cards, callouts, charcoal tables and a
-// TOC with tone markers + dotted leader (sticky collapsible pill below xl,
-// sticky rail at xl on long guides). The per-section anchor (id = secaoAnchor)
-// is the same slug the assistant uses to cite the source — headings link
-// to their own anchor, no JS.
+// two-level TOC with tone markers + dotted leader (sticky collapsible pill
+// below xl, sticky rail at xl on long guides): um item por ## e os ### sob
+// ele — no guia DPP é o que torna os 16 encontros navegáveis um a um. The
+// per-section anchor (id = secaoAnchor) is the same slug the assistant uses
+// to cite the source — headings link to their own anchor, no JS.
 
 const TOC_MINIMO = 8; // above 8 sections the TOC shows at the top
 
@@ -303,24 +305,34 @@ function rotuloDe(titulo: string, docTitulo?: string): string {
 }
 
 /** TOC item: tone marker (the phase's own color on bands, lime elsewhere)
- *  + title + dotted leader — the guide's printed TOC rite. */
+ *  + title + dotted leader — the guide's printed TOC rite. `sub` é a linha
+ *  de ### sob o grupo: recuada, menor e apagada, sem número de capítulo. */
 function SumarioItem({
   anchor,
   titulo,
   tom,
   num,
   docTitulo,
+  sub = false,
 }: {
   anchor: string;
   titulo: string;
   tom?: DocTom;
   num?: number;
   docTitulo?: string;
+  /** item de 2º nível (### do grupo) — rótulo já diz o número quando é
+   *  encontro/momento ("1º encontro · …") */
+  sub?: boolean;
 }) {
   return (
     <a
       href={`#${anchor}`}
-      className="flex items-baseline gap-2.5 rounded-md px-3 py-2.5 text-sm hover:bg-muted/60"
+      className={cn(
+        "flex items-baseline gap-2.5 rounded-md hover:bg-muted/60",
+        sub
+          ? "py-1.5 pl-4 pr-3 text-[13px] leading-snug text-muted-foreground hover:text-foreground"
+          : "px-3 py-2.5 text-sm"
+      )}
     >
       {num != null ? (
         // capítulo: número no lugar do marcador
@@ -337,7 +349,8 @@ function SumarioItem({
         <span
           aria-hidden
           className={cn(
-            "size-1.5 shrink-0 self-center rounded-full",
+            "shrink-0 self-center rounded-full",
+            sub ? "size-1" : "size-1.5",
             tom ? TOM_DOC[tom].barra : "bg-[var(--brand-lime)]"
           )}
         />
@@ -369,6 +382,23 @@ function SumarioLista({
             tom={g.fase != null ? tomDeFase(g.fase) : undefined}
             docTitulo={docTitulo}
           />
+          {/* 2º nível: cada ### vira item clicável sob o capítulo — nos
+              guias são os encontros/momentos que o H2 escondia; o trilho
+              lateral guia o olho de volta ao grupo na lista longa */}
+          {g.subs.length > 0 ? (
+            <ol className="mb-1 ml-4 mt-0.5 space-y-0.5 border-l border-border/50 pl-2.5">
+              {g.subs.map((s) => (
+                <li key={s.anchor}>
+                  <SumarioItem
+                    anchor={s.anchor}
+                    titulo={s.titulo}
+                    sub
+                    docTitulo={docTitulo}
+                  />
+                </li>
+              ))}
+            </ol>
+          ) : null}
         </li>
       ))}
     </ol>
@@ -499,12 +529,15 @@ export function CorpusDocBody({ doc }: { doc: CorpusDoc }) {
   const grupos = gruposCorpus(doc.secoes);
   const jornada = jornadaCorpus(grupos);
   const longo = doc.secoes.length > TOC_MINIMO;
+  // contagem do sumário = itens clicáveis dele (grupos + subs) — difere de
+  // doc.secoes quando um ## não tem intro (o h2 ancora sem virar seção)
+  const total = totalSumario(grupos);
   return (
     <div className={cn("mt-5", longo && "xl:grid xl:grid-cols-[15rem_minmax(0,1fr)] xl:gap-10")}>
       {longo ? (
         <SumarioRail
           grupos={grupos}
-          total={doc.secoes.length}
+          total={total}
           docTitulo={doc.titulo}
         />
       ) : null}
@@ -522,7 +555,7 @@ export function CorpusDocBody({ doc }: { doc: CorpusDoc }) {
         {longo ? (
           <Sumario
             grupos={grupos}
-            total={doc.secoes.length}
+            total={total}
             docTitulo={doc.titulo}
           />
         ) : null}
@@ -575,13 +608,13 @@ export function CorpusDocumento({
     // ("documento nativo em /materiais/...") — meta shows only the status
     doc.versao ? capitalizar(doc.versao.replace(/\s*\([^)]*\)/g, "").trim()) : null,
     doc.natureza ? (NATUREZA_ROTULO[doc.natureza] ?? null) : null,
-    `${doc.secoes.length} seções`,
+    `${totalSumario(gruposCorpus(doc.secoes))} seções`,
   ]
     .filter(Boolean)
     .join(" · ");
 
   return (
-    <main
+    <div
       className={cn(
         "mx-auto max-w-3xl px-4 py-6 print:px-0",
         // wider reading surface on desktop — long docs also carry a 15rem
@@ -641,6 +674,6 @@ export function CorpusDocumento({
       <footer className="mt-8 border-t border-border/60 pt-3 text-xs text-muted-foreground">
         Fonte: {doc.fonte}.
       </footer>
-    </main>
+    </div>
   );
 }
