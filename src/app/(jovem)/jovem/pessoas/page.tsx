@@ -59,7 +59,9 @@ export default async function JovemPessoas() {
     const d = c.dupla_id ? porDupla.get(c.dupla_id) : undefined;
     if (!d?.status || d.status === "ativa") return null;
     const base = d.trilha === "especialista" ? "trilha" : "mentoria";
-    return `${base} ${d.status}`;
+    const status =
+      d.status === "concluida" ? "concluída" : d.status;
+    return `${base} ${status}`;
   }
 
   const grupos: {

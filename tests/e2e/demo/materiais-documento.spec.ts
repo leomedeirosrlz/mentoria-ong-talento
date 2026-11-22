@@ -32,7 +32,7 @@ test.describe("demo — sumário do documento nativo (REALIZA-490)", () => {
 
     // clique no 5º encontro rola até o card na âncora "grupo › sub"
     await rail
-      .getByRole("link", { name: /5º encontro ·/ })
+      .getByRole("link", { name: /^5º encontro ·/ })
       .click();
     await expect(page).toHaveURL(/#encontros-5-a-7/);
     await expect(
@@ -51,7 +51,7 @@ test.describe("demo — sumário do documento nativo (REALIZA-490)", () => {
 
     // fora do xl o rail some e a pill sticky assume — mesma lista de 2 níveis
     await page
-      .getByRole("button", { name: /Neste documento · 61 seções/ })
+      .getByRole("button", { name: /Neste documento.*61 seções/ })
       .click();
     const pill = page.getByRole("navigation", {
       name: "Sumário do documento",

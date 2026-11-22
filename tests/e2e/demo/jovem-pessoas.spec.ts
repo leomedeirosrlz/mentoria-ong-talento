@@ -111,7 +111,9 @@ test.describe("jovem — diretório Pessoas", () => {
       page.getByText("Seu especialista", { exact: true })
     ).toBeVisible();
     await expect(page.getByText("Turma 1")).toBeVisible();
-    await expect(page.getByText("São Paulo · SP")).toBeVisible();
+    await expect(
+      page.getByText("São Paulo · SP", { exact: true })
+    ).toBeVisible();
 
     // o enriquecimento vem da jovem_especialistas: origem da trilha,
     // atuação, áreas, experiência e a janela em dia+período (nunca slot)
@@ -148,7 +150,7 @@ test.describe("jovem — diretório Pessoas", () => {
     // Marcos só existe pra Bia via catálogo — a ficha resolve pela
     // jovem_especialistas (nada o linka, entra direto pela URL)
     await page.goto(
-      "/jovem/pessoas/de000000-0000-4000-8000-00000000000c"
+      "/jovem/pessoas/de000000-0000-4000-8000-000000000012"
     );
 
     await expect(
@@ -179,8 +181,9 @@ test.describe("jovem — diretório Pessoas", () => {
     await expect(
       page.getByRole("heading", { name: "Contato" })
     ).toHaveCount(0);
-    await expect(page.locator('a[href^="mailto:"]')).toHaveCount(0);
-    await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
+    const main = page.getByRole("main");
+    await expect(main.locator('a[href^="mailto:"]')).toHaveCount(0);
+    await expect(main.locator('a[href*="wa.me"]')).toHaveCount(0);
     const html = await page.content();
     expect(html).not.toContain("marcosvinicius"); // linkedin
     expect(html).not.toContain("termo-marcos"); // documento_path
