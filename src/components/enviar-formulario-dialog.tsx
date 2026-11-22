@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useId, useMemo, useState, useTransition } from "react";
 import type { ReactElement } from "react";
 import { CircleNotch, PaperPlaneTilt } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { AnimatePresence, motion } from "motion/react";
 import {
   gerarLinksParaDupla,

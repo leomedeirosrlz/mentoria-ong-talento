@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { DotsThreeVertical, Flag, Megaphone, Siren, Trash, CaretDown } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { ExitItem, ExitList } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";

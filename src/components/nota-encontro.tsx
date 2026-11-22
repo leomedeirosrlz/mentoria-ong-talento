@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { CaretDown } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { salvarNotaEncontro } from "@/lib/actions";
 import { demoAtivoClient } from "@/lib/demo/shared";
 import { Textarea } from "@/components/ui/textarea";

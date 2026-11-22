@@ -2,7 +2,7 @@
 
 import { useState, useTransition, type KeyboardEvent } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { CircleNotch, Plus, X } from "@phosphor-icons/react";
 import {
   adicionarExcecao,

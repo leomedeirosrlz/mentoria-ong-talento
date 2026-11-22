@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { FlagCheckered } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { registrarEncerramento } from "@/lib/actions-encerramento";
 import { CHECKLIST_ENCERRAMENTO } from "@/lib/encerramento";
 import { Button } from "@/components/ui/button";

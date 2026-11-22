@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
 import { promoverMentorado, type PapelMentorAlvo } from "@/lib/actions-promocao";
 import type { Cronograma, Mentorado } from "@/lib/types";

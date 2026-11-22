@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { PencilSimple } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { salvarLinkEncontro } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import {

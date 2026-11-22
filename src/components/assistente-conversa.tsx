@@ -27,7 +27,7 @@ import {
   ThumbsUp,
   Trash,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { extrairAcoes, montarEnvioChat, msgAmigavel } from "@/lib/ia/mensagens";
 import { deveMostrarFeedback, temLinkMarkdown } from "@/lib/ia/feedback";
 import { metaFonte, rotuloTool, type FonteIa } from "@/lib/ia/fontes";

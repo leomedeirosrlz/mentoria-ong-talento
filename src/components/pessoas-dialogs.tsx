@@ -21,7 +21,7 @@ import {
   UserPlus,
   Users,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { createMentorado, createPessoa } from "@/lib/actions";
 import { DadosCivisFields } from "@/components/assinatura-form";
 import { FotoField } from "@/components/foto-field";

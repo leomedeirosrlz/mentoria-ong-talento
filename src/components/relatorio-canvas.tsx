@@ -11,7 +11,7 @@ import {
   useSyncExternalStore,
 } from "react";
 import { Minus, Plus, WhatsappLogo } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { waLink } from "@/lib/ciclo";
 import {
   textoCelula,

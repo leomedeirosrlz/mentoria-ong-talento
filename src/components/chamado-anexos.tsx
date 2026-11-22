@@ -8,7 +8,7 @@ import {
   WarningCircle,
   X,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
 import { descartarChamadoAnexo } from "@/lib/actions-chamados";
 import { formatTamanho } from "@/lib/ciclo";

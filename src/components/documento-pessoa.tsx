@@ -9,7 +9,7 @@ import {
   Paperclip,
   Trash,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { definirDocumentoPessoa, removerDocumentoPessoa } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
 import { Button, buttonVariants } from "@/components/ui/button";

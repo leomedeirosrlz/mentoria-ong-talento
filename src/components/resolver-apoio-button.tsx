@@ -3,7 +3,7 @@
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { HandHeart } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { resolverApoio } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 

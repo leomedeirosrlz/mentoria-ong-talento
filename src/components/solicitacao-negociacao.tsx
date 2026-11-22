@@ -9,7 +9,7 @@ import {
   WhatsappLogo,
   XCircle,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 /** corrida de aceite → copy humana (o erro cru da RPC virava toast técnico;
  *  onErro segue recebendo a mensagem original — marcarTomada testa nela) */

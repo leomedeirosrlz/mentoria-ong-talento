@@ -9,7 +9,7 @@ import {
   Monitor,
   Tag,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { abrirChamado } from "@/lib/actions-chamados";
 import { CHAMADO_CATEGORIA_LABEL } from "@/lib/ciclo";
 import type { ChamadoCategoria } from "@/lib/types";

@@ -18,7 +18,7 @@ import {
   Users,
   UserSwitch,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { deleteMentorado, marcarSaidaMentorado, updateMentorado } from "@/lib/actions";
 import { convidarAcesso } from "@/lib/actions-convite";
 import { avatarPublicUrl } from "@/lib/avatar";

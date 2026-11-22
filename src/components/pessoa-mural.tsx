@@ -9,7 +9,7 @@ import {
 } from "react";
 import { useRouter } from "next/navigation";
 import { CircleNotch, Trash } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { addPessoaNota, deletePessoaNota } from "@/lib/actions";
 import { demoAtivoClient } from "@/lib/demo/shared";
 import { Button } from "@/components/ui/button";

@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { FlagPennant, Plus, X } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { agrupaEmSecoes, extraiGruposMeta } from "@/lib/forms/instrumentos";
 import { campoRespondido } from "@/lib/forms/resposta";
 import {

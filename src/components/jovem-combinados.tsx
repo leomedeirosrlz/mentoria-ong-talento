@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { CaretDown, ListChecks } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { marcarCombinadoFeito } from "@/lib/actions";
 import { formatDate } from "@/lib/ciclo";
 import type { JovemEncaminhamento } from "@/lib/types";

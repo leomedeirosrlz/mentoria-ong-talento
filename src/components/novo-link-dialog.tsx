@@ -8,7 +8,7 @@ import {
   Link as LinkIcon,
   Warning,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { criarLinkRelatorio } from "@/lib/actions-relatorio-links";
 import {
   catalogoDe,

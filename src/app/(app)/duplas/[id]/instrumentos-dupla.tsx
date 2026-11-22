@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   ArrowCounterClockwise,
   BookOpen,

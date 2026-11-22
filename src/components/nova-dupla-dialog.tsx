@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Plus } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
 import { createDupla } from "@/lib/actions";
 import { cronogramaVigente, foraDoPrograma, podeSupervisionar, rotuloCronograma } from "@/lib/ciclo";

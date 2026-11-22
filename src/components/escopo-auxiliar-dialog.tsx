@@ -3,7 +3,7 @@
 import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CircleNotch } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { setEscopoAuxiliar, setPessoaRole } from "@/lib/actions";
 import { createClient } from "@/lib/supabase/client";
 import {

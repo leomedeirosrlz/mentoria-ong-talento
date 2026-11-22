@@ -2,7 +2,7 @@
 
 import { useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { CircleNotch, Pause, Play, Trash } from "@phosphor-icons/react";
 import { excluirFormulario, setFormularioAtivo } from "@/lib/forms/actions";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";

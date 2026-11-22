@@ -36,7 +36,7 @@ import {
   UsersThree,
   XCircle,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   listarNotificacoes,
   marcarNotificacaoLida,

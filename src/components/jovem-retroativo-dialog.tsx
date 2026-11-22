@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { ClockCounterClockwise } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { registrarRetroativoJovem } from "@/lib/actions-jovem";
 import type { JovemEncontro } from "@/lib/queries-jovem";
 import { Button } from "@/components/ui/button";

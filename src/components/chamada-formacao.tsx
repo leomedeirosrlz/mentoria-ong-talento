@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CheckSquare, Users } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { marcarPresenca, marcarPresencas } from "@/lib/actions-presenca";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";

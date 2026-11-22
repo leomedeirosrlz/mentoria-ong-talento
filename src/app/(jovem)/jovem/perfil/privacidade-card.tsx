@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Switch } from "@/components/ui/switch";
 import { setContatoCompartilhado } from "@/lib/actions-jovem";
 import { cn } from "@/lib/utils";

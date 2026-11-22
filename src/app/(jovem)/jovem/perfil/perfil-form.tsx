@@ -56,7 +56,7 @@ import {
 } from "@/app/(app)/perfil/perfil-form";
 import { useRouter } from "next/navigation";
 import { useMemo, useRef, useState, useTransition } from "react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { TemaToggle } from "@/components/tema-toggle";
 import type { Tema } from "@/lib/tema";
 import type {

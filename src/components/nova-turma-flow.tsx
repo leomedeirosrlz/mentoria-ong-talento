@@ -10,7 +10,7 @@ import {
   FileArrowUp,
   Sparkle,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { CronogramaBuilder } from "@/components/cronograma-builder";
 import { Button } from "@/components/ui/button";
 import {

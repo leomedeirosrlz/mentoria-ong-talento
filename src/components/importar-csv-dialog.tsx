@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CaretDown, FileArrowDown, FileArrowUp, UploadSimple, Warning } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { importDuplas, importMentorados, importPessoas, previewDuplas } from "@/lib/actions";
 import {
   emailValido,
