@@ -351,7 +351,8 @@ test.describe("mentorado — shell /jovem", () => {
   // WP7 (REALIZA-140) — /jovem/materiais é o hub "Minha jornada": as 7
   // estações canônicas do guia com datas da turma dela (RPC jovem_jornada,
   // 0096) + a biblioteca de sempre como "Acervo". Sem dupla/cronograma a
-  // página cai no fallback "Materiais" — a fixture …0030 tem os dois.
+  // página cai no fallback da biblioteca (mesma h1 "Minha jornada") — a
+  // fixture …0030 tem os dois.
   test("materiais é o hub Minha jornada — estante dos instrumentos + acervo", async ({
     page,
   }) => {

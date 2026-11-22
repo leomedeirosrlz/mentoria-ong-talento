@@ -56,16 +56,23 @@ test.describe("mentorado — onboarding do 1º acesso (REALIZA-114)", () => {
     await page.waitForURL((u) => u.pathname === "/jovem", { timeout: 15_000 });
 
     // passo 1 — boas-vindas com a promessa do programa (e a Liza abrindo a
-    // jornada, REALIZA-426)
+    // jornada, REALIZA-426). Sem "Voltar": não há passo anterior (o botão
+    // só existe na demo, onde vira "Escolher outro papel")
     await expect(
-      page.getByRole("heading", { name: /Bem-vindo\(a\) ao Realiza/ })
+      page.getByRole("heading", { name: /Boas-vindas ao Realiza\.vc/ })
     ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Voltar um passo" })
+    ).toHaveCount(0);
     await page.getByRole("button", { name: "Continuar" }).click();
 
     // passo 2 — o tour das telas reais: os itens são botões que trocam o
-    // print (a grade vem logo depois)
+    // print (a grade vem logo depois); o voltar volta a existir
     await expect(
       page.getByRole("heading", { name: "O que você pode fazer aqui" })
+    ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Voltar um passo" })
     ).toBeVisible();
     await expect(
       page.getByRole("button", { name: /Sua página inicial/ })
