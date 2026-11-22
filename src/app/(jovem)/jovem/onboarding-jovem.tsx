@@ -162,8 +162,11 @@ export function OnboardingJovem({
 
   // congela o termo do mount: o layout reentrega `termo=null` depois de
   // assinar, e encolher o total no meio da sessão deixaria o step órfão
-  // (sem a carinha `pronto` nem o fechamento)
-  const [temTermo] = useState(() => !!termo);
+  // (sem a carinha `pronto` nem o fechamento). O token congela junto —
+  // sem ele o "Voltar" pós-assinatura achava termo=null e o passo do
+  // termo montava o corpo de contato com os botões mortos do termo
+  const [termoIni] = useState(() => termo ?? null);
+  const temTermo = termoIni != null;
   const total = temTermo ? 5 : 4;
   // mesmo clamp derivado do staff: o total pode encolher quando o layout
   // reentrega termo=null, e o índice lido não pode passar do último
@@ -300,7 +303,7 @@ export function OnboardingJovem({
     // intercepta antes do switch; na demo a gravação é simulada (cookie
     // demo_termo) e os espelhos leem como "assinado". O documento interpola
     // o que o jovem digita e o primário fica no rodapé fixo (497)
-    if (ehPassoTermo && termo) {
+    if (ehPassoTermo && termoIni) {
       return (
         <PassoTermo
           doc="mentorando"
@@ -309,7 +312,7 @@ export function OnboardingJovem({
           acao={
             demo
               ? (fd) => assinarTermoDemo("mentorado", fd)
-              : assinarComToken.bind(null, termo.token)
+              : assinarComToken.bind(null, termoIni.token)
           }
           demo={!!demo}
           formId={TERMO_FORM_ID}
@@ -457,7 +460,9 @@ export function OnboardingJovem({
                 }
                 setStep((s) => s - 1);
               }}
-              disabled={pending}
+              // pendingTermo trava o Voltar no meio do submit do termo —
+              // sair do passo desmontava o form com a action voando
+              disabled={pending || pendingTermo}
               aria-label={
                 step === 0 && demo ? "Escolher outro papel" : "Voltar um passo"
               }
@@ -567,6 +572,7 @@ export function OnboardingJovem({
             <Button
               type="submit"
               form={TERMO_FORM_ID}
+              formNoValidate
               disabled={pending || pendingTermo}
               className="h-11 flex-1 font-semibold"
             >

@@ -78,8 +78,13 @@ export function useBuscaCep({
     }
   }
 
-  function onCepBlur() {
-    const digitos = cep.replace(/\D/g, "");
+  /** `raw` é o valor do input no blur — o autofill do browser escreve
+   *  no campo sem disparar change; adotar o DOM antes de avaliar a
+   *  busca é o que faz a rede de segurança cobrir esse caso de fato. */
+  function onCepBlur(raw?: string) {
+    const valor = raw === undefined ? cep : maskCep(raw);
+    if (valor !== cep) setCep(valor);
+    const digitos = valor.replace(/\D/g, "");
     if (digitos.length === 8 && digitos !== cepBuscado.current) {
       dispara(digitos);
     }

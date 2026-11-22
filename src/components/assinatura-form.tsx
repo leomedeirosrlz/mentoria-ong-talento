@@ -90,8 +90,48 @@ export function DadosCivisFields({
     },
   });
 
+  const blocoRef = useRef<HTMLDivElement>(null);
+
+  /** Autofill do browser/gerenciador escreve nos inputs sem disparar
+   *  change — e num campo controlado o estado reporia o valor velho na
+   *  render seguinte. Foco ou blur em qualquer campo do bloco adota o
+   *  que está no DOM; o CEP adotado segue a régua normal de busca. */
+  function adotarAutofill() {
+    const root = blocoRef.current;
+    if (!root) return;
+    const valor = (k: string) =>
+      root.querySelector<HTMLInputElement>(`[name="${n(k)}"]`)?.value;
+    const cepDom = valor("cep");
+    if (cepDom !== undefined) busca.onCepBlur(cepDom);
+    setEnd((atual) => {
+      const prox = {
+        ...atual,
+        logradouro: valor("logradouro") ?? atual.logradouro,
+        numero: valor("numero") ?? atual.numero,
+        complemento: valor("complemento") ?? atual.complemento,
+        bairro: valor("bairro") ?? atual.bairro,
+        ...(compacto
+          ? {}
+          : {
+              cidade: valor("cidade") ?? atual.cidade,
+              uf: valor("uf")?.toUpperCase() ?? atual.uf,
+            }),
+      };
+      return (Object.keys(prox) as (keyof typeof prox)[]).every(
+        (k) => prox[k] === atual[k]
+      )
+        ? atual
+        : prox;
+    });
+  }
+
   return (
-    <div className="grid gap-4 sm:grid-cols-2">
+    <div
+      ref={blocoRef}
+      onFocusCapture={adotarAutofill}
+      onBlurCapture={adotarAutofill}
+      className="grid gap-4 sm:grid-cols-2"
+    >
       {!compacto && (
         <div className="space-y-2 sm:col-span-2">
           <Label htmlFor={n("nome_civil")}>Nome civil completo</Label>
@@ -155,7 +195,7 @@ export function DadosCivisFields({
             placeholder="00000-000"
             value={busca.cep}
             onChange={(ev) => busca.onCepChange(ev.target.value)}
-            onBlur={busca.onCepBlur}
+            onBlur={(ev) => busca.onCepBlur(ev.currentTarget.value)}
             aria-describedby={n("cep_status")}
           />
           {busca.buscando && (
@@ -310,6 +350,9 @@ export function AssinaturaForm({
 
   useEffect(() => {
     onPendingChange?.(pending);
+    // o cleanup solta o pending do rodapé fixo quando o passo desmonta
+    // no meio do submit — sem ele "Assinar depois" ficava morto
+    return () => onPendingChange?.(false);
   }, [pending, onPendingChange]);
 
   /** FormData → retrato dos civis — mesmos `name`s do parseDadosCivis, só
@@ -356,14 +399,20 @@ export function AssinaturaForm({
     const fd = new FormData(e.currentTarget);
     start(async () => {
       setErro(null);
-      const res = await acao(fd);
-      if (res?.error) {
-        setErro(res.error);
-        return;
+      try {
+        const res = await acao(fd);
+        if (res?.error) {
+          setErro(res.error);
+          return;
+        }
+        toast.success("Documento assinado.");
+        router.refresh();
+        onSucesso?.();
+      } catch {
+        // action rejeitada (rede, sessão) sem catch deixava o pending
+        // preso — o primário externo nunca destravava
+        setErro("Sem conexão. Tente de novo.");
       }
-      toast.success("Documento assinado.");
-      router.refresh();
-      onSucesso?.();
     });
   }
 
@@ -373,6 +422,13 @@ export function AssinaturaForm({
       id={id}
       onSubmit={onSubmit}
       onChange={() => onMudanca?.(retrato())}
+      // autofill do browser/gerenciador não dispara change — foco/blur
+      // reemitem o retrato e o documento vivo interpola (REALIZA-503)
+      onFocusCapture={() => onMudanca?.(retrato())}
+      onBlurCapture={() => onMudanca?.(retrato())}
+      // validação é a da action (mensagens pt-BR no card): o submit
+      // externo (form=id) mostraria a bolha nativa em inglês
+      noValidate
       className="grid gap-6"
     >
       {modo === "autorizacao" && (
