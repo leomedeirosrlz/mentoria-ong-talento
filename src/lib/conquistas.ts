@@ -61,10 +61,15 @@ export type Conquista = {
 export type ProximoMarco = {
   marco: MarcoJornada;
   rotulo: string;
-  /** realizados até agora — o numerador da barra */
+  /** realizados até agora — o numerador da barra e da frase de progresso */
   atual: number;
-  /** limiar do próximo marco — o denominador */
+  /** limiar do próximo marco — a distância sai em `texto`, nunca como
+   *  denominador exibido (a régua única é `atual`/`total`, REALIZA-498) */
   alvo: number;
+  /** tamanho da trilha — o denominador da frase e da barra */
+  total: number;
+  /** trilha de especialista — a frase fala de sessão, não de encontro */
+  sessao: boolean;
   /** a frase do que falta — "Faltam 3 encontros com seu mentor" */
   texto: string;
 };
@@ -290,6 +295,8 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
         rotulo: rotuloMarco(marco, temDpp),
         atual: feitos,
         alvo: p,
+        total,
+        sessao: !temDpp,
         texto: `${falta === 1 ? "Falta" : "Faltam"} ${unidade(falta)}`,
       };
       break;

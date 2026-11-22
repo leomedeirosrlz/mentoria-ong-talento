@@ -6,6 +6,7 @@ import { Flag, FlagCheckered, Medal, Trophy } from "@phosphor-icons/react";
 import {
   formatDate,
   formatDateTime,
+  progressoTrilha,
   rotuloPasso,
   type EstadoNoJornada,
   type JornadaDupla,
@@ -184,7 +185,7 @@ export function TrilhaJornada({
         : statusDupla === "encerrada"
           ? "Dupla encerrada. A jornada guarda o que aconteceu."
           : jornada.completa
-            ? `Jornada concluída: ${jornada.total} ${sessao ? "sessões" : "encontros"} realizad${sessao ? "as" : "os"}.`
+            ? `Jornada concluída: ${progressoTrilha({ esp: sessao, feitos: jornada.total, total: jornada.total })}.`
             : null;
 
   return (
@@ -192,7 +193,11 @@ export function TrilhaJornada({
       <div className="flex items-center justify-between gap-2">
         <h2 className="text-base font-semibold">Jornada</h2>
         <p className="text-xs font-medium text-muted-foreground tabular-nums">
-          {jornada.feitos} de {jornada.total}
+          {progressoTrilha({
+            esp: sessao,
+            feitos: jornada.feitos,
+            total: jornada.total,
+          })}
         </p>
       </div>
 

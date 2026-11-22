@@ -150,9 +150,12 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
       await expect(
         linha.getByRole("link", { name: /Ver ficha/ })
       ).toHaveCount(1);
-      // progresso em segmentos, com aria-label "N de M encontros"
+      // progresso em segmentos, aria na régua única: "N de M encontros
+      // feitos" (DPP) ou "N de M sessões feitas" (esp) — REALIZA-498
       await expect(
-        linha.locator('[role="img"][aria-label*="encontros realizados"]')
+        linha.locator(
+          '[role="img"][aria-label*="encontros feitos"], [role="img"][aria-label*="sessões feitas"]'
+        )
       ).toHaveCount(1);
     }
 
@@ -774,15 +777,17 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     const linhas = page.locator(LINHAS_COORD);
     await expect(linhas.first()).toBeVisible();
 
-    // a contagem de encontros realizados de cada linha, lida do
-    // aria-label dos quadrados ("N de M encontros realizados…")
+    // a contagem de passos feitos de cada linha, lida do aria-label dos
+    // quadrados ("N de M encontros feitos" / "N de M sessões feitas…")
     const encontrosFeitos = async () =>
       (
         await linhas
-          .locator("[aria-label*='encontros realizados']")
+          .locator(
+            "[aria-label*='encontros feitos'], [aria-label*='sessões feitas']"
+          )
           .evaluateAll((els) => els.map((e) => e.getAttribute("aria-label")))
       ).map((s) => {
-        const m = /(\d+) de \d+ encontros/.exec(s ?? "");
+        const m = /(\d+) de \d+/.exec(s ?? "");
         return m ? Number(m[1]) : -1;
       });
 

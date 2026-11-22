@@ -45,7 +45,10 @@ test.describe("agenda demo do especialista (REALIZA-207)", () => {
       els.map((el) => el.getAttribute("href"))
     ))
       expect(href).toMatch(/^\/duplas\/de000000-/);
-    await expect(trilhas.getByText(/\d de 5 sessões/).first()).toBeVisible();
+    // régua única REALIZA-498: a contagem lê "N de 5 sessões feitas"
+    await expect(
+      trilhas.getByText(/\d de 5 sessões feitas/).first()
+    ).toBeVisible();
 
     // horários em frase, sem grade; a edição mora no perfil
     const atende = page.locator('section[aria-label="Quando você atende"]');

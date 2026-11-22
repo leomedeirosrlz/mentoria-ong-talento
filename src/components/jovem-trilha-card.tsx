@@ -13,6 +13,7 @@ import {
   formatDateTime,
   linkSeguro,
   podeEntrarAgora,
+  progressoTrilha,
   rotuloSlot,
 } from "@/lib/ciclo";
 import {
@@ -267,11 +268,19 @@ export function JovemTrilhaCard({
 
         <div>
           <p className="text-sm font-medium">
-            {feitos} de {passos.length} sessões
+            {progressoTrilha({
+              esp: true,
+              feitos,
+              total: passos.length,
+            })}
           </p>
           <div
             role="progressbar"
-            aria-label={`${feitos} de ${passos.length} sessões realizadas`}
+            aria-label={progressoTrilha({
+              esp: true,
+              feitos,
+              total: passos.length,
+            })}
             aria-valuemin={0}
             aria-valuemax={passos.length}
             aria-valuenow={feitos}
