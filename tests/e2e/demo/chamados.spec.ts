@@ -9,6 +9,8 @@ const CH_JOVEM = "de000000-0000-4000-8000-000000022570"; // CHA-000142
 const CH_AGENDA = "de000000-0000-4000-8000-000000022571"; // CHA-000143
 const CH_PLATAFORMA = "de000000-0000-4000-8000-000000022572"; // CHA-000144
 const CH_FERIADO = "de000000-0000-4000-8000-000000022575"; // CHA-000147
+const CH_CUIDANDO = "de000000-0000-4000-8000-000000022576"; // CHA-000148
+const CH_ENCERRADO = "de000000-0000-4000-8000-000000022577"; // CHA-000149
 const CH_RESOLVIDO = "de000000-0000-4000-8000-000000022557"; // CHA-000129
 
 test.describe("demo — chamados (WP1)", () => {
@@ -319,18 +321,18 @@ test.describe("demo — chamados (WP1)", () => {
     await expect(page.getByText(/comentário interno/i)).toHaveCount(0);
   });
 
-  test("resposta da equipe vira pendência na home; aberto sem dono não (489)", async ({
+  test("resposta da equipe vira pendência; cuidando é neutro; resolvido sai (504)", async ({
     page,
   }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem");
 
     const fazer = page.getByRole("region", { name: "Para fazer agora" });
-    // a lista mostra 3 à vista e o resto em "e mais N" — a pendência do
-    // chamado (prioridade 50 do motor) fica no painel recolhido
+    // a lista mostra 3 à vista e o resto em "e mais N" — as pendências de
+    // chamado (prioridade 50 do motor) ficam no painel recolhido
     await fazer.getByRole("button", { name: /e mais \d+/ }).click();
-    // CHA-000147 em atendimento com a Marina → "Marina respondeu seu
-    // pedido", assunto de contexto e a ação "Ver resposta"
+    // CHA-000147 em atendimento com a Marina E com resposta pública →
+    // "Marina respondeu seu pedido", assunto de contexto e "Ver resposta"
     await expect(
       fazer.getByText("Marina respondeu seu pedido")
     ).toBeVisible();
@@ -342,9 +344,31 @@ test.describe("demo — chamados (WP1)", () => {
       "href",
       `/jovem/perfil?c=${CH_FERIADO}`
     );
+    // CHA-000148 tem dono mas a trilha pública ainda não tem fala da
+    // equipe — a pendência informa, não promete: "está cuidando" neutro
+    // e a ação honesta "Ver andamento" (não "Ver resposta")
+    await expect(
+      fazer.getByText("A equipe está cuidando do seu pedido")
+    ).toBeVisible();
+    await expect(
+      fazer.getByText("O guia do 5º encontro não abre no celular")
+    ).toBeVisible();
+    const verAndamento = fazer.getByRole("link", { name: "Ver andamento" });
+    await expect(verAndamento).toHaveAttribute(
+      "href",
+      `/jovem/perfil?c=${CH_CUIDANDO}`
+    );
     // CHA-000144 segue aberto sem dono — espera não é tarefa, não aparece
     await expect(
       fazer.getByText("Não consigo anexar a foto do combinado")
+    ).toHaveCount(0);
+    // CHA-000149 já foi resolvido (e tem resposta pública na trilha) — o
+    // desfecho chegou pela notificação; a pendência não eterniza
+    await expect(
+      fazer.getByText("Não achei onde avaliar o encontro")
+    ).toHaveCount(0);
+    await expect(
+      fazer.locator(`a[href="/jovem/perfil?c=${CH_ENCERRADO}"]`)
     ).toHaveCount(0);
 
     // o gesto é link de verdade: foco de teclado cai nele

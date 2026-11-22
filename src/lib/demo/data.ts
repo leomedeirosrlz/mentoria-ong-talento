@@ -4159,6 +4159,29 @@ function build(): DemoData {
       status: "em_atendimento", atribuido_a: marina.id,
       created_at: haDias(1, "08:20"), updated_at: haDias(1, "09:45"),
     }),
+    // pedido assumido mas sem resposta pública ainda — a home da Ana
+    // mostra o estado neutro "a equipe está cuidando" (504), não a
+    // promessa "respondeu" que atribuição sozinha sugeria
+    ch({
+      numero: "CHA-000148", categoria: "metodologia",
+      assunto: "O guia do 5º encontro não abre no celular",
+      mensagem: "Toco no link do material e a tela fica branca.",
+      autor_id: anaLogin.id, autor_mentorado_id: ana.id, dupla_id: duplaOk.id,
+      status: "em_atendimento", atribuido_a: marina.id,
+      created_at: haDias(1, "07:50"), updated_at: haDias(1, "08:10"),
+    }),
+    // pedido já resolvido — mesmo com resposta pública na trilha, o
+    // desfecho mora na notificação e não ocupa "Para fazer agora" (504)
+    ch({
+      numero: "CHA-000149", categoria: "metodologia",
+      assunto: "Não achei onde avaliar o encontro",
+      mensagem: "Procurei a estrela na home e não vi onde clicar.",
+      autor_id: anaLogin.id, autor_mentorado_id: ana.id, dupla_id: duplaOk.id,
+      status: "resolvido", atribuido_a: marina.id,
+      resolvido_em: haDias(3, "15:00"), resolvido_por: marina.id,
+      resolucao_resumo: "A avaliação mora no card do encontro — apontei o caminho e confirmei com ela.",
+      created_at: haDias(4, "09:00"), updated_at: haDias(3, "15:00"),
+    }),
     // coordenação abrindo em nome de — trilha metodologia com o Paulo
     ch({
       numero: "CHA-000145", categoria: "metodologia",
@@ -4225,6 +4248,18 @@ function build(): DemoData {
     { id: uid(0x600c), chamado_id: uid(0x582f), autor_id: marina.id, tipo: "publica",
       texto: "Oi, Ana! Pode manter a sexta sim — aproveitem o feriado. Só não esquece de registrar depois.",
       created_at: haDias(1, "09:45") },
+    { id: uid(0x600d), chamado_id: uid(0x5830), autor_id: null, tipo: "sistema",
+      texto: "Chamado aberto por Ana Beatriz Silva.", created_at: haDias(1, "07:50") },
+    { id: uid(0x600e), chamado_id: uid(0x5830), autor_id: null, tipo: "sistema",
+      texto: "Chamado assumido por Marina Duarte.", created_at: haDias(1, "08:10") },
+    { id: uid(0x600f), chamado_id: uid(0x5831), autor_id: null, tipo: "sistema",
+      texto: "Chamado aberto por Ana Beatriz Silva.", created_at: haDias(4, "09:00") },
+    { id: uid(0x6010), chamado_id: uid(0x5831), autor_id: marina.id, tipo: "publica",
+      texto: "Oi, Ana! A estrela fica no card do encontro, embaixo do tema. Qualquer coisa me chama.",
+      created_at: haDias(3, "14:40") },
+    { id: uid(0x6011), chamado_id: uid(0x5831), autor_id: null, tipo: "sistema",
+      texto: "Chamado resolvido — A avaliação mora no card do encontro — apontei o caminho e confirmei com ela.",
+      created_at: haDias(3, "15:00") },
     { id: uid(0x6007), chamado_id: uid(0x5824), autor_id: null, tipo: "sistema",
       texto: "Chamado resolvido — Roteado certo — a devolutiva era da trilha DPP e seguiu pro Ricardo.",
       created_at: haDias(4, "16:20") },

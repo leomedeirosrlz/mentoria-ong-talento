@@ -2473,6 +2473,19 @@ export function demoChamadosFila(role: AppRole): ChamadoFilaItem[] {
         atribuido_nome: restrito ? null : nome(c.atribuido_a),
         contexto,
         mentorado_nome: restrito ? null : mNome,
+        // mesma régua do ramo autor do getChamados: pública de alguém que
+        // não é o autor conta como resposta da equipe (a própria fala do
+        // autor não responde o pedido dele). O recorte da equipe não
+        // deriva a flag — a fila real também não preenche
+        tem_resposta_equipe: staff
+          ? undefined
+          : data.chamadoAtualizacoes.some(
+              (u) =>
+                u.chamado_id === c.id &&
+                u.tipo === "publica" &&
+                u.autor_id != null &&
+                u.autor_id !== eu.id
+            ),
       } as ChamadoFilaItem;
     })
     .sort((a, b) => {
