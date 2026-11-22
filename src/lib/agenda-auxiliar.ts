@@ -12,6 +12,7 @@ import {
   formatDiaNum,
   linkSeguro,
   passoEsp,
+  progressoTrilha,
   registroTemConteudo,
   saudadeDaDupla,
   semanaBounds,
@@ -517,12 +518,12 @@ function contextoEspecialistaAux(
 
   if (feitas >= teto)
     return {
-      texto: `Trilha completa: ${feitas} de ${teto} sessões.`,
+      texto: `Trilha completa: ${progressoTrilha({ esp: true, feitos: feitas, total: teto })}.`,
       problema: false,
     };
   if (prazo?.estado === "passou")
     return {
-      texto: `Prazo de 3 meses encerrado com ${feitas} de ${teto} sessões. Levar à coordenação.`,
+      texto: `Prazo de 3 meses encerrado com ${progressoTrilha({ esp: true, feitos: feitas, total: teto })}. Levar à coordenação.`,
       problema: true,
     };
   if (pend)
@@ -539,7 +540,7 @@ function contextoEspecialistaAux(
       problema: false,
     };
   return {
-    texto: `Sessões ${feitas} de ${teto}. Próxima a agendar${prazo ? ` (prazo: ${formatDiaNum(prazo.fim)})` : ""}.`,
+    texto: `${progressoTrilha({ esp: true, feitos: feitas, total: teto })}. Próxima a agendar${prazo ? ` (prazo: ${formatDiaNum(prazo.fim)})` : ""}.`,
     problema: false,
   };
 }

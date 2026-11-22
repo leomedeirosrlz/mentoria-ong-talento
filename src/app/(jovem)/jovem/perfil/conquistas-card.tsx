@@ -9,7 +9,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import { formatDate } from "@/lib/ciclo";
+import { formatDate, progressoTrilha } from "@/lib/ciclo";
 import type { Conquista, ProximoMarco } from "@/lib/conquistas";
 
 /** "Suas conquistas" v2 (REALIZA-427) — estante estilo GitHub: só o que foi
@@ -63,7 +63,7 @@ export function ConquistasCard({
   proximoMarco: ProximoMarco | null;
 }) {
   const pct = proximoMarco
-    ? Math.min(100, (proximoMarco.atual / proximoMarco.alvo) * 100)
+    ? Math.min(100, (proximoMarco.atual / proximoMarco.total) * 100)
     : 0;
   return (
     <section
@@ -90,7 +90,10 @@ export function ConquistasCard({
       )}
 
       {/* faixa "a caminho" — o futuro da jornada vive aqui, nunca como
-          cadeado na estante: próximo marco + barra + o que falta */}
+          cadeado na estante: próximo marco + barra + o que falta. A régua
+          é a da trilha toda (atual/total, a mesma das outras barras): a
+          escala do limiar sai na frase "Faltam N", não como denominador
+          solto (REALIZA-498) */}
       {proximoMarco && (
         <div className="mt-4 rounded-lg border border-border/60 p-3.5 sm:p-4">
           <div className="flex items-baseline justify-between gap-3">
@@ -98,14 +101,18 @@ export function ConquistasCard({
               A caminho: {proximoMarco.rotulo}
             </p>
             <span className="text-xs text-muted-foreground">
-              {proximoMarco.atual} de {proximoMarco.alvo}
+              {progressoTrilha({
+                esp: proximoMarco.sessao,
+                feitos: proximoMarco.atual,
+                total: proximoMarco.total,
+              })}
             </span>
           </div>
           <div
             role="progressbar"
-            aria-label={`${proximoMarco.atual} de ${proximoMarco.alvo} · ${proximoMarco.rotulo}`}
+            aria-label={`${progressoTrilha({ esp: proximoMarco.sessao, feitos: proximoMarco.atual, total: proximoMarco.total })} · ${proximoMarco.rotulo}`}
             aria-valuemin={0}
-            aria-valuemax={proximoMarco.alvo}
+            aria-valuemax={proximoMarco.total}
             aria-valuenow={proximoMarco.atual}
             className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
           >

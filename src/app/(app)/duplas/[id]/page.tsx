@@ -83,6 +83,7 @@ import {
   passoEsp,
   passosDaTrilha,
   podeEntrarAgora,
+  progressoTrilha,
   saudadeDaDupla,
   SITUACAO_MENTORADO_LABEL,
   toDateStr,
@@ -465,8 +466,14 @@ export default async function DuplaPage({
           )
           .map((e) => ({
             inicio: e.data_hora!,
-            rotulo: `${e.numero}º encontro`,
-            rotuloArtigo: `o ${e.numero}º encontro`,
+            // na trilha esp o numero é a tentativa — o rótulo de choque
+            // também lê o passo do guia, como o resto da ficha (REALIZA-498)
+            rotulo: ehEsp
+              ? `sessão ${passoEsp(e, dupla.encontros)}`
+              : `${e.numero}º encontro`,
+            rotuloArtigo: ehEsp
+              ? `a sessão ${passoEsp(e, dupla.encontros)}`
+              : `o ${e.numero}º encontro`,
           })),
       }).catch(() => null)
     : null;
@@ -1715,9 +1722,11 @@ export default async function DuplaPage({
         <p className="mt-1.5 text-sm text-muted-foreground">
           {[
             turmaLonga(dupla.turma),
-            ehEsp
-              ? `Sessão ${jornada.proximoNumero ?? jornada.feitos} de ${total}`
-              : `Encontro ${jornada.proximoNumero ?? jornada.feitos} de ${total}`,
+            progressoTrilha({
+              esp: ehEsp,
+              feitos: jornada.feitos,
+              total,
+            }),
             dupla.supervisor &&
               `auxiliar executivo ${dupla.supervisor.nome_social ?? dupla.supervisor.nome}`,
           ]

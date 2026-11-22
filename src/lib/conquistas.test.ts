@@ -121,6 +121,8 @@ describe("conquistasDoJovem", () => {
       rotulo: "Primeiro encontro",
       atual: 0,
       alvo: 1,
+      total: 16,
+      sessao: false,
       texto: "Falta 1 encontro com seu mentor",
     });
   });

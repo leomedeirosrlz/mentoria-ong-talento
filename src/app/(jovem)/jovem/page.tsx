@@ -44,6 +44,7 @@ import {
   formatDiaMes,
   maxEncontros,
   passoEsp,
+  progressoTrilha,
   rotuloEncontro as rotuloDoEncontro,
   toDateStr,
   waLink,
@@ -551,9 +552,11 @@ export default async function JovemHome() {
   const jornadaMeta = temDpp ? jornadaTotal : jornadaTotalEsp;
   const jornadaPct = Math.min(100, Math.round((jornadaAtual / jornadaMeta) * 100));
   const jornadaTexto = [
-    temDpp ? `${feitosDpp} de ${jornadaTotal} com seu mentor` : null,
+    temDpp
+      ? `${progressoTrilha({ esp: false, feitos: feitosDpp, total: jornadaTotal })} com seu mentor`
+      : null,
     feitosEsp > 0
-      ? `${feitosEsp} ${feitosEsp === 1 ? "sessão" : "sessões"} com especialista`
+      ? `${progressoTrilha({ esp: true, feitos: feitosEsp, total: jornadaTotalEsp })} com especialista`
       : null,
   ]
     .filter(Boolean)

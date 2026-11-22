@@ -4,6 +4,7 @@ import { DotsThree, Lifebuoy } from "@phosphor-icons/react/dist/ssr";
 import { DuplaAvatares } from "@/components/dupla-avatares";
 import { DuplaNomes } from "@/components/dupla-nomes";
 import { buttonVariants } from "@/components/ui/button";
+import { progressoTrilha } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
 
 // ============================================================
@@ -66,7 +67,12 @@ const QUADRADO_ON: Record<TomSituacao, string> = {
  *  realizados; o traço mostra o esperado até hoje (só em dupla ativa). */
 export type ProgressoDupla = {
   total: number;
+  /** passos do guia cobertos — vem de `passosRealizadosDe` (na trilha de
+   *  especialista é o rank, nunca o `numero` cru da tentativa) */
   realizados: readonly number[];
+  /** trilha de especialista: o contador e o aria falam de sessão, não de
+   *  encontro (a régua é a mesma — feitos/total, REALIZA-498) */
+  sessao?: boolean;
   esperado?: number | null;
   /** texto à direita do "n de N": "esperado 4", "em pausa", "sessões" */
   legenda?: string;
@@ -210,13 +216,18 @@ export function DuplaLinha({
             <>
               <p className="text-xs">
                 <b className="font-semibold tabular-nums whitespace-nowrap text-foreground">
-                  {feitos} de {total}
+                  {progressoTrilha({
+                    esp: progresso.sessao === true,
+                    feitos,
+                    total,
+                    curta: true,
+                  })}
                 </b>
               </p>
               <div className="relative mt-1">
                 <div
                   role="img"
-                  aria-label={`${feitos} de ${total} encontros realizados${
+                  aria-label={`${progressoTrilha({ esp: progresso.sessao === true, feitos, total })}${
                     esperadoPct != null ? `, esperados ${progresso.esperado} até hoje` : ""
                   }`}
                   className="flex h-2 gap-px"

@@ -33,6 +33,7 @@ import {
   ORDEM_SEMAFORO,
   passoEsp,
   passosDaTrilha,
+  progressoTrilha,
   PROXIMO_PASSO_LABEL,
   rotuloSlot,
   saudadeDaDupla,
@@ -404,14 +405,13 @@ function CardMentorado({
         <SemaforoBadge nivel={saude.semaforo} motivo={saude.motivo} />
       </div>
 
-      {/* progresso DPP: "encontro N de 16" é o passo corrente; a barra
-          mede o que já aconteceu de verdade (realizados) */}
+      {/* progresso DPP na régua única: "N de M encontros feitos" é a mesma
+          frase da home, da jornada e da ficha (REALIZA-498) — o passo
+          corrente fica no PróximoEncontro logo abaixo */}
       <div className="min-w-0">
         <div className="flex items-baseline justify-between gap-2 text-sm">
           <p className="font-medium">
-            {jornadaFechada
-              ? `${total} de ${total} encontros`
-              : `Encontro ${alvo.proximoNumero} de ${total}`}
+            {progressoTrilha({ esp: false, feitos, total })}
             <span className="text-muted-foreground">
               {" "}
               · {turmaCurta(dupla.turma)}
@@ -424,7 +424,7 @@ function CardMentorado({
           aria-valuenow={feitos}
           aria-valuemin={0}
           aria-valuemax={total}
-          aria-label={`${feitos} de ${total} encontros realizados`}
+          aria-label={progressoTrilha({ esp: false, feitos, total })}
           className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted"
         >
           <div
@@ -662,10 +662,10 @@ function ProximoEncontro({
     titulo = "Dupla pausada · encontros congelados por ora";
   } else if (dupla.status === "concluida") {
     titulo = "Jornada concluída";
-    detalhe = `${feitos} de ${total} encontros realizados`;
+    detalhe = progressoTrilha({ esp: false, feitos, total });
   } else if (dupla.status === "encerrada") {
     titulo = "Dupla encerrada";
-    detalhe = `${feitos} de ${total} encontros realizados`;
+    detalhe = progressoTrilha({ esp: false, feitos, total });
   } else if (limbo) {
     // limbo é honesto: a plataforma não sabe se rolou — então pergunta, e
     // cada resposta tem a sua saída: aconteceu → registra (o deep link já
@@ -720,7 +720,7 @@ function ProximoEncontro({
         .join(" · ") || null;
   } else if (jornadaCompleta || alvo.cicloCompleto) {
     titulo = "Jornada completa";
-    detalhe = `${feitos} de ${total} encontros realizados`;
+    detalhe = progressoTrilha({ esp: false, feitos, total });
   } else {
     // ninguém agendou — a sugestão é a data oficial do PDF; quem marca é a
     // dupla na ficha, nunca este card (por isso texto, não botão)
@@ -830,9 +830,7 @@ function TrilhaBlock({
             variant="outline"
             className="border-[var(--warn)]/60 text-[var(--warn-text)]"
           >
-            {feitos >= totalEsp
-              ? "5 de 5 sessões"
-              : `sessão ${passoAtual} de ${totalEsp}`}
+            {progressoTrilha({ esp: true, feitos, total: totalEsp })}
           </Badge>
           {trilha.status === "pausada" && (
             <Badge variant="outline" className="text-muted-foreground">
@@ -1147,7 +1145,11 @@ function TrilhasAnteriores({ trilhas }: { trilhas: TrilhaJovem[] }) {
                 )}
               </p>
               <p className="text-xs text-muted-foreground">
-                {feitas} de {TRILHA_LEN.especialista} sessões
+                {progressoTrilha({
+                  esp: true,
+                  feitos: feitas,
+                  total: TRILHA_LEN.especialista,
+                })}
                 {t.iniciada_em && ` · iniciada ${formatDate(t.iniciada_em)}`}
                 {/* a RPC trilha_do_jovem não traz desfecho — sem ela a
                     regra canônica não separa desistente × encerrada, e o

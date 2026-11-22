@@ -1844,6 +1844,47 @@ export function rotuloEncontro(
   });
 }
 
+/** Passos do guia já cobertos pelos realizados da dupla — o que alimenta
+ *  contador, quadrados e aria-label de progresso. No DPP o nº oficial já é
+ *  o passo; na trilha de especialista a tentativa vira rank entre os
+ *  realizados via `passoEsp` (a 4ª tentativa pode ser a 3ª sessão) —
+ *  `numero` cru nunca entra aqui (REALIZA-498). */
+export function passosRealizadosDe(dupla: {
+  trilha?: "dpp" | "especialista" | null;
+  encontros: Pick<Encontro, "numero" | "status">[];
+}): number[] {
+  const ehEsp = dupla.trilha === "especialista";
+  return dupla.encontros
+    .filter((e) => e.status === "realizado")
+    .map((e) => (ehEsp ? passoEsp(e, dupla.encontros) : e.numero));
+}
+
+/** "4 de 16 encontros feitos" (DPP) / "2 de 5 sessões feitas" (trilha de
+ *  especialista) — a frase canônica de progresso de trilha (REALIZA-498).
+ *  Uma régua só: o que já aconteceu de verdade sobre o total dela; quem
+ *  quer a posição corrente usa "você está no N", não esta frase. `curta` é
+ *  a forma apertada dos contadores densos ("4 de 16 feitos" / "2 de 5
+ *  feitas"). Os números são capados no [0, total] — a frase não mente com
+ *  realizados extras nem negativo. */
+export function progressoTrilha({
+  esp,
+  feitos,
+  total,
+  curta = false,
+}: {
+  esp: boolean;
+  feitos: number;
+  total: number;
+  curta?: boolean;
+}): string {
+  const t = Math.max(total, 0);
+  const n = Math.min(Math.max(feitos, 0), t);
+  const feita = esp ? "feitas" : "feitos";
+  return curta
+    ? `${n} de ${t} ${feita}`
+    : `${n} de ${t} ${esp ? "sessões" : "encontros"} ${feita}`;
+}
+
 /** O que a superfície de agendamento precisa saber da dupla — derivação única
  *  usada pela ficha, pela home do mentor e pela agenda (era copiada em cada). */
 export type AlvoAgendamento = {

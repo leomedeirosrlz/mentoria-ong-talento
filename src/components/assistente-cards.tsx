@@ -53,6 +53,8 @@ import {
   formatDate,
   maxEncontros,
   papelLabel,
+  passoEsp,
+  progressoTrilha,
   tempoRelativo,
   toDateStr,
   type Semaforo,
@@ -612,10 +614,30 @@ function Quadrado({ estado, tom }: { estado: EstadoQuadrado; tom: TomSituacao })
  *  Pro jovem "registro" é conceito interno do mentor — o quadrado cheio
  *  lê "aconteceu" e os anéis nunca aparecem (a tool nem devolve o dado). */
 function EncontrosDupla({ b, tom, jovem = false }: { b: UiDupla; tom: TomSituacao; jovem?: boolean }) {
+  const ehEsp = b.trilha === "especialista";
+  // um quadrado por passo do guia: no DPP o nº oficial já é o passo; na
+  // trilha esp a tentativa que mira o passo (realizado preferido, senão a
+  // mais recente) — a régua é passoEsp, o numero cru de tentativa não vaza
+  // nem estufa o total (REALIZA-498, mesma regra do encontroDoPassoEsp)
+  const representanteEsp = (passo: number) => {
+    let alvo: (typeof b.encontros)[number] | undefined;
+    for (const e of b.encontros) {
+      if (passoEsp(e, b.encontros) !== passo) continue;
+      if (
+        !alvo ||
+        e.status === "realizado" ||
+        (alvo.status !== "realizado" && e.numero > alvo.numero)
+      )
+        alvo = e;
+    }
+    return alvo;
+  };
   const por = new Map(b.encontros.map((e) => [e.numero, e]));
-  const total = Math.max(maxEncontros(b.trilha), ...b.encontros.map((e) => e.numero), 0);
+  const total = ehEsp
+    ? maxEncontros(b.trilha)
+    : Math.max(maxEncontros(b.trilha), ...b.encontros.map((e) => e.numero), 0);
   const estados = Array.from({ length: total }, (_, k) => {
-    const e = por.get(k + 1);
+    const e = ehEsp ? representanteEsp(k + 1) : por.get(k + 1);
     if (jovem && e?.status === "realizado") return "registro" as EstadoQuadrado;
     return estadoEncontro(e);
   });
@@ -638,12 +660,11 @@ function EncontrosDupla({ b, tom, jovem = false }: { b: UiDupla; tom: TomSituaca
   return (
     <div className="mt-3">
       <div className="flex items-baseline justify-between gap-2">
-        <p className={EYEBROW}>Encontros</p>
+        <p className={EYEBROW}>{ehEsp ? "Sessões" : "Encontros"}</p>
         <p className="text-xs">
           <b className="font-semibold tabular-nums">
-            {feitos} de {total}
+            {progressoTrilha({ esp: ehEsp, feitos, total, curta: true })}
           </b>
-          <span className="text-muted-foreground"> realizados</span>
         </p>
       </div>
       {/* a leitura acessível é a legenda em texto; os quadrados são o desenho */}

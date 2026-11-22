@@ -4,6 +4,7 @@ import { Collapsible } from "@base-ui/react/collapsible";
 import {
   eventosDoCronograma,
   formatDiaMes,
+  passosRealizadosDe,
   totalDaTrilha,
 } from "@/lib/ciclo";
 import { situacaoDaDupla, SITUACAO_DUPLA_LABEL } from "@/lib/dupla-desfecho";
@@ -326,9 +327,8 @@ function LinhaRito({
           d.trilha,
           eventosDoCronograma(eventos, d.cronograma_id)
         ),
-        realizados: d.encontros
-          .filter((e) => e.status === "realizado")
-          .map((e) => e.numero),
+        realizados: passosRealizadosDe(d),
+        sessao: d.trilha === "especialista",
         esperado: null,
         legenda: SITUACAO_DUPLA_LABEL[situacaoDaDupla(d)].toLowerCase(),
       }}

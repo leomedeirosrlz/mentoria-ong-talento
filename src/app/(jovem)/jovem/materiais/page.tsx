@@ -465,7 +465,7 @@ export default async function JovemMateriais() {
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 {dupla.turma ? `${turmaLonga(dupla.turma)} · ` : ""}
-                encontro {encontroCorrente} de {TRILHA_LEN.dpp}
+                você está no encontro {encontroCorrente} de {TRILHA_LEN.dpp}
               </p>
               {fase && (
                 <p className="mt-1.5">

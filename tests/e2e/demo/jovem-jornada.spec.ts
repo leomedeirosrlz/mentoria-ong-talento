@@ -39,9 +39,15 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await expect(
       page.getByRole("heading", { name: "Minha jornada", level: 1 })
     ).toBeVisible();
-    await expect(page.getByText(/encontro 5 de 16/)).toBeVisible();
+    // posição corrente lê "você está no N" — a contagem de feitos ("N de
+    // M encontros feitos") é a régua das outras superfícies (REALIZA-498)
+    await expect(
+      page.getByText(/você está no encontro 5 de 16/)
+    ).toBeVisible();
     // a turma entra na forma narrativa ("Turma 1"), nunca o cru "T1 · 2026/2027"
-    await expect(page.getByText(/Turma 1 · encontro 5 de 16/)).toBeVisible();
+    await expect(
+      page.getByText(/Turma 1 · você está no encontro 5 de 16/)
+    ).toBeVisible();
     await expect(page.getByText(/Fase · /)).toBeVisible();
     await expect(
       page.getByRole("img", { name: "5 de 7 entregas feitas" })

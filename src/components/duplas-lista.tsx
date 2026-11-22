@@ -23,6 +23,8 @@ import {
   formatDiaMes,
   formatDiaSemanaMes,
   ORDEM_SEMAFORO,
+  passosRealizadosDe,
+  progressoTrilha,
   saudadeDaDupla,
   toDateStr,
   totalDaTrilha,
@@ -274,9 +276,7 @@ function LinhaDupla({
   const estado = estadoDaDupla(d, saude);
   const ehEsp = d.trilha === "especialista";
   const total = totalDaTrilha(d.trilha, eventosDoCronograma(eventos, d.cronograma_id));
-  const realizados = d.encontros
-    .filter((e) => e.status === "realizado")
-    .map((e) => e.numero);
+  const realizados = passosRealizadosDe(d);
   const ultimoReg = ultimoRegistro(d);
   const encontroDoReg = ultimoReg
     ? d.encontros.find((e) => e.registro?.id === ultimoReg.id)
@@ -317,6 +317,7 @@ function LinhaDupla({
       progresso={{
         total,
         realizados,
+        sessao: ehEsp,
         esperado: !ehEsp && d.status === "ativa" ? saude.esperado : null,
         legenda,
       }}
@@ -414,7 +415,7 @@ function LinhaMini({
             solto (mock: .m-prog); o número fica no texto ao lado */}
         <span
           role="img"
-          aria-label={`${feitos} de ${total} encontros realizados`}
+          aria-label={progressoTrilha({ esp: ehEsp, feitos, total })}
           className="relative h-1.5 w-14 rounded-full bg-muted"
         >
           <span
@@ -437,7 +438,7 @@ function LinhaMini({
           )}
         </span>
         <span className="whitespace-nowrap text-xs font-semibold text-foreground">
-          {feitos}/{total}
+          {progressoTrilha({ esp: ehEsp, feitos, total, curta: true })}
           {/* sem cronograma não há esperado pra comparar — "esp. 0"
               mentia a mesma coisa que o tick escondido acima */}
           {saude.esperado > 0 && ` · esp. ${saude.esperado}`}
@@ -2137,6 +2138,7 @@ function VisaoMentor({
               d.trilha,
               eventosDoCronograma(eventos, d.cronograma_id)
             );
+            const ehEsp = d.trilha === "especialista";
             const feitos = d.encontros.filter(
               (e) => e.status === "realizado"
             ).length;
@@ -2217,9 +2219,9 @@ function VisaoMentor({
                 <div
                   role="img"
                   aria-label={
-                    s.esperado > 0
+                    s.esperado > 0 && !ehEsp
                       ? `${feitos} encontros feitos de ${s.esperado} esperados até hoje, de ${total}`
-                      : `${feitos} encontros feitos de ${total}`
+                      : progressoTrilha({ esp: ehEsp, feitos, total })
                   }
                 >
                   <div className="relative h-2 rounded-full border border-border bg-muted">
@@ -2383,11 +2385,9 @@ function VisaoEspecialista({
         <div className="mt-5 grid gap-4 sm:grid-cols-2">
           {ordenadas.map((d, idx) => {
             const s = saudePorId.get(d.id)!;
-            const realizados = new Set(
-              d.encontros
-                .filter((e) => e.status === "realizado")
-                .map((e) => e.numero)
-            );
+            // passos do guia cobertos — o numero da row é a tentativa, a
+            // régua é o rank entre realizados (passoEsp via helper)
+            const realizados = new Set(passosRealizadosDe(d));
             const total = espEventos.length || 5;
             const atual = Array.from(
               { length: total },
@@ -2475,10 +2475,12 @@ function VisaoEspecialista({
                   </ol>
                   <p className="text-xs text-muted-foreground">
                     <b className="text-foreground">
-                      Sessão {atual ?? total} de {total}
-                    </b>{" "}
-                    · {realizados.size} concluída
-                    {realizados.size === 1 ? "" : "s"}
+                      {progressoTrilha({
+                        esp: true,
+                        feitos: realizados.size,
+                        total,
+                      })}
+                    </b>
                     {atual ? ` · a ${atual}ª ${s.proximo ? "agendada" : "a marcar"}` : ""}
                   </p>
                 </div>

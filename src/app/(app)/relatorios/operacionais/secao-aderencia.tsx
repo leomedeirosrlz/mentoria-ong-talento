@@ -2,6 +2,7 @@ import { CaretDown } from "@phosphor-icons/react/dist/ssr";
 import { Collapsible } from "@base-ui/react/collapsible";
 import {
   eventosDoCronograma,
+  passosRealizadosDe,
   totalDaTrilha,
 } from "@/lib/ciclo";
 import { situacaoDaDupla, SITUACAO_DUPLA_LABEL } from "@/lib/dupla-desfecho";
@@ -368,9 +369,7 @@ function LinhaAderencia({
     d.trilha,
     eventosDoCronograma(eventos, d.cronograma_id)
   );
-  const realizados = d.encontros
-    .filter((e) => e.status === "realizado")
-    .map((e) => e.numero);
+  const realizados = passosRealizadosDe(d);
   const turma = turmaDaDupla(d, crons);
   const meta = [
     ehEsp ? "Trilha de especialista" : null,
@@ -401,6 +400,7 @@ function LinhaAderencia({
       progresso={{
         total,
         realizados,
+        sessao: ehEsp,
         esperado: !ehEsp && ativa ? saude.esperado : null,
         legenda:
           d.status === "pausada"

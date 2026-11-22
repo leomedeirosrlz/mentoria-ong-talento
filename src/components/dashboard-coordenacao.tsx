@@ -7,6 +7,7 @@ import {
   cronogramaVigente,
   eventoDaSemana,
   eventosDoCronograma,
+  passosRealizadosDe,
   resumoSemanaDe,
   rotuloCronograma,
   saudadeDaDupla,
@@ -584,10 +585,11 @@ function montarPrecisa({
 
     const rank = pedeApoio ? 0 : encerra ? 4 : saude.semaforo === "risco" ? 1 : 3;
     const total = totalDaTrilha(d.trilha, eventosDoCronograma(eventos, d.cronograma_id));
-    const realizados = d.encontros.filter((e) => e.status === "realizado").map((e) => e.numero);
+    const realizados = passosRealizadosDe(d);
     const progresso: ProgressoDupla = {
       total,
       realizados,
+      sessao: d.trilha === "especialista",
       esperado: d.status === "ativa" && !encerra ? saude.esperado : null,
       legenda: encerra
         ? "jornada fechada"

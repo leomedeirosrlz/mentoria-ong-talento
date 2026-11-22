@@ -11,6 +11,7 @@ import {
 } from "@/lib/agenda-coordenacao";
 import {
   eventosDoCronograma,
+  passosRealizadosDe,
   semanaBounds,
   totalDaTrilha,
 } from "@/lib/ciclo";
@@ -209,9 +210,8 @@ export function AgendaCoordenacao({
           dupla.trilha,
           eventosDoCronograma(eventos, dupla.cronograma_id)
         ),
-        realizados: dupla.encontros
-          .filter((e) => e.status === "realizado")
-          .map((e) => e.numero),
+        realizados: passosRealizadosDe(dupla),
+        sessao: dupla.trilha === "especialista",
         esperado: acaoFicha ? null : item.saude.esperado,
         legenda: acaoFicha ? "jornada fechada" : `esperado ${item.saude.esperado}`,
       },
