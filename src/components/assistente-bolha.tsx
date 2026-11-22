@@ -8,6 +8,15 @@
 // sessionStorage (a aba lembra; outra aba, outro painel) — leitura em
 // useEffect pós-hidratação pra não divergir do SSR. Guard global de
 // prefers-reduced-motion já zera as animações — nada por componente.
+//
+// REALIZA-505 — a Liza mora dentro da zona de ação, não por cima dela:
+// no celular o FAB encaixa na faixa direita que a bottom-nav reserva (ver
+// app-shell/jovem-shell), então o círculo nunca sobrepuja CTA, aba, aviso
+// ou rodapé sticky — em nenhuma posição de scroll (antes ele flutuava
+// acima da nav e interceptava toque). O balão de fala não abre sozinho
+// no mobile: apresentação/dica viram o ponto de atenção no FAB e o
+// "Respondi" vira ponto + status sr-only. No desktop nada muda — o balão
+// segue abrindo ancorado no FAB, que continua no canto livre.
 
 import {
   useCallback,
@@ -58,14 +67,20 @@ import { cn } from "@/lib/utils";
 import { trackProduto } from "@/components/produto-telemetry";
 import type { AppRole } from "@/lib/types";
 
-// acima da bottom-nav (~57px + safe-area): o toaster usa 4.5rem, a pill da
-// demo 4.75rem — mesma faixa. z-40: fica sob sheet/dialog/popover (z-50) e
-// infinitamente sob o toaster (o sonner não dá pra superar — e não deve)
+// mobile: dentro da faixa da bottom-nav — a nav reserva o canto direito
+// (pe condicional nos shells) e a bolha encosta ali, inteira abaixo do
+// topo da barra (~57px + safe-area): fora da banda de conteúdo, o FAB não
+// intersecta nenhum elemento interativo em nenhum scroll (505). No
+// desktop segue no canto, acima do rodapé da página. z-40: fica sob
+// sheet/dialog/popover (z-50) e infinitamente sob o toaster
 const FAB_POS =
-  "fixed z-40 right-[max(1rem,env(safe-area-inset-right))] bottom-[calc(4.5rem+env(safe-area-inset-bottom))] md:bottom-6";
+  "fixed z-40 right-[max(1rem,env(safe-area-inset-right))] bottom-[calc(0.375rem+env(safe-area-inset-bottom))] md:bottom-6 print:hidden";
 
+// size-11 no celular: 44px cabem folgados na barra (~57px) e seguem alvo
+// de toque confortável; o disco enche o espaço reservado sem invadir a
+// banda de conteúdo. md:size-14 = o FAB generoso de sempre no desktop
 const FAB_CLS =
-  "group/fab grid size-12 md:size-14 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)] outline-none transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:scale-105 hover:shadow-[var(--shadow-modal)] active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-offset-2";
+  "group/fab grid size-11 md:size-14 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)] shadow-[var(--shadow-overlay)] outline-none transition-[transform,box-shadow] duration-200 ease-[cubic-bezier(0.2,0,0,1)] hover:scale-105 hover:shadow-[var(--shadow-modal)] active:scale-95 focus-visible:ring-3 focus-visible:ring-ring/50 focus-visible:ring-offset-2";
 
 // tamanho vem de --painel-w/--painel-h (inline, redimensionável); o min()
 // segura viewport estreita e o --available-height do positioner segura
@@ -521,18 +536,23 @@ export function AssistenteBolha({
 
   // balão de fala com o painel fechado (apresentação, dica da página,
   // "respondi") — `falandoBoca` é o instante em que o balão sai e a boca
-  // mexe; `pausada` segura o relógio enquanto o ponteiro/foco está nele
+  // mexe; `pausada` segura o relógio enquanto o ponteiro/foco está nele.
+  // `cutucada`: no celular o balão não abre sozinho (505) — a mesma fala
+  // vira o ponto de atenção no FAB dentro da bottom-nav. É a própria
+  // FalaLiza guardada — precisa do tipo pra limpar no mesmo compasso do
+  // balão (apresentação ~12s, dica ~9s)
   const pagina = usePathname();
   const [fala, setFala] = useState<FalaLiza | null>(null);
   const [falandoBoca, setFalandoBoca] = useState(false);
   const [pausada, setPausada] = useState(false);
+  const [cutucada, setCutucada] = useState<FalaLiza | null>(null);
 
   // a Liza só dorme quieta: painel fechado, sem rodada, sem aviso e sem o
   // dedo/foco em cima. Mudou qualquer condição → acorda; a flag limpa na
   // própria render (padrão "estado derivado da anterior") sem setState
   // em effect
   const ociosa =
-    !aberto && !atento && !respostaPronta && !fala && estadoLiza === "parado";
+    !aberto && !atento && !respostaPronta && !fala && !cutucada && estadoLiza === "parado";
   const [eraOciosa, setEraOciosa] = useState(ociosa);
   if (eraOciosa !== ociosa) {
     setEraOciosa(ociosa);
@@ -617,6 +637,7 @@ export function AssistenteBolha({
     if (v) {
       setRespostaPronta(false);
       setAviso(false);
+      setCutucada(null);
       // abriu uma vez: ela já se apresentou de verdade
       setFala(null);
       gravarMemoria((m) => ({ ...m, abriu: true }));
@@ -663,11 +684,19 @@ export function AssistenteBolha({
       } catch {}
       if (nova.tipo === "apresentacao")
         gravarMemoria((m) => ({ ...m, apresentacoes: m.apresentacoes + 1 }));
+      // no celular o balão aberto sozinho cobria CTA/aba/aviso (505) — a
+      // fala vira o ponto de atenção no FAB; a memória conta igual, a
+      // cadência ("uma por aba", apresentação até abrir) se mantém
+      if (!desktop) {
+        setCutucada(nova);
+        setFalandoBoca(true);
+        return;
+      }
       setFala((atual) => atual ?? nova);
       setFalandoBoca(true);
     }, FALA_ATRASO_MS);
     return () => clearTimeout(t);
-  }, [pronto, aberto, pagina, papeis, nome]);
+  }, [pronto, aberto, pagina, papeis, nome, desktop, configurado, demo]);
 
   // a boca mexe só na saída do balão (liga junto com a fala, em
   // mostrarFala; aqui só o relógio que desliga)
@@ -684,6 +713,15 @@ export function AssistenteBolha({
     const t = setTimeout(() => setFala(null), ms);
     return () => clearTimeout(t);
   }, [fala, pausada]);
+
+  // a cutucada some no mesmo compasso do balão que substitui (505) —
+  // sem relógio, a apresentação virava notificação permanente na bottom-nav
+  useEffect(() => {
+    const ms = cutucada ? DURACAO_FALA[cutucada.tipo] : null;
+    if (!ms) return;
+    const t = setTimeout(() => setCutucada(null), ms);
+    return () => clearTimeout(t);
+  }, [cutucada]);
 
   const dispensarFala = () => {
     if (fala?.tipo === "apresentacao")
@@ -1026,7 +1064,7 @@ export function AssistenteBolha({
       : estadoLiza
     : respostaPronta
       ? "pronto"
-      : fala && falandoBoca
+      : (fala || cutucada) && falandoBoca
         ? "falando"
         : atento
         ? "atento"
@@ -1056,7 +1094,7 @@ export function AssistenteBolha({
           tamanho={48}
           estado={falando(estadoFab)}
           className={cn(
-            "size-12 md:size-11",
+            "size-11",
             trocou && "animate-in zoom-in-50 spin-in-[-45deg] duration-200"
           )}
         />
@@ -1070,8 +1108,10 @@ export function AssistenteBolha({
   const estadoCab: LizaEstado = recemAberto ? "aberto" : estadoLiza;
 
   // ponto de resposta pronta no canto do FAB: halo ping-once na chegada,
-  // depois o sólido espera a abertura (amarelo da marca = próximo passo)
-  const pontoAviso = aviso && (
+  // depois o sólido espera a abertura (amarelo da marca = próximo passo).
+  // No celular o mesmo dot carrega a `cutucada` — a apresentação/dica que
+  // o balão cobriria a página vira o ponto dentro da bottom-nav (505)
+  const pontoAviso = (aviso || cutucada) && (
     <span
       aria-hidden
       className="pointer-events-none absolute -right-0.5 -top-0.5"
@@ -1080,8 +1120,11 @@ export function AssistenteBolha({
       <span className="block size-3 animate-in zoom-in-50 rounded-full bg-[var(--destaque)] shadow-[0_0_0_2px_var(--background)] duration-150" />
     </span>
   );
-  // balão de fala e rótulo do hover moram no container fixo do FAB
-  const balao = !aberto && fala ? (
+  // balão de fala e rótulo do hover moram no container fixo do FAB — só
+  // no desktop: no celular não existe canto que o torne seguro, ele
+  // sempre paira sobre conteúdo. A apresentação/dica viram `cutucada`
+  // acima e o "Respondi" vira `aviso` + o status sr-only abaixo (505)
+  const balao = !aberto && fala && desktop ? (
     <LizaFala
       key={fala.tipo}
       fala={fala}
@@ -1091,6 +1134,15 @@ export function AssistenteBolha({
       onPausar={setPausada}
     />
   ) : null;
+
+  // o "Respondi" do balão tem role=status e chega falado no desktop — no
+  // celular ele não tem balão, então a mesma fala sai por uma região
+  // status estável ao lado do FAB (a região sempre existe; só o texto muda)
+  const falaStatus = (
+    <span role="status" className="sr-only">
+      {!desktop && !aberto && fala?.tipo === "pronto" ? fala.texto : ""}
+    </span>
+  );
   const rotuloHover = desktop && atento && !aberto && !fala ? <LizaRotulo /> : null;
   const rotuloFab = aberto
     ? "Fechar assistente"
@@ -1124,6 +1176,7 @@ export function AssistenteBolha({
           </PopoverTrigger>
           {pontoAviso}
           {balao}
+          {falaStatus}
           {rotuloHover}
         </div>
         <PopoverContent
@@ -1190,6 +1243,7 @@ export function AssistenteBolha({
         </Button>
         {pontoAviso}
         {balao}
+        {falaStatus}
       </div>
       <Sheet open={aberto} onOpenChange={mudar} voltarFecha={false}>
         <SheetContent
