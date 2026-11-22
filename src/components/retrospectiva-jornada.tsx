@@ -128,10 +128,12 @@ function TiraEncontros({
   encontros,
   total,
   starSeries,
+  sessao = false,
 }: {
   encontros: RetroEncontro[];
   total: number;
   starSeries: (number | null)[] | null;
+  sessao?: boolean;
 }) {
   const porNumero = new Map(encontros.map((e) => [e.numero, e]));
   const a11y = encontros
@@ -148,8 +150,8 @@ function TiraEncontros({
   return (
     <ol
       role="img"
-      aria-label={`Encontros realizados: ${a11y || "nenhum"}`}
-      title={`Encontros realizados: ${a11y || "nenhum"}`}
+      aria-label={`${sessao ? "Sessões realizadas" : "Encontros realizados"}: ${a11y || "nenhum"}`}
+      title={`${sessao ? "Sessões realizadas" : "Encontros realizados"}: ${a11y || "nenhum"}`}
       className="flex flex-wrap gap-1"
     >
       {Array.from({ length: total }, (_, i) => {
@@ -160,7 +162,7 @@ function TiraEncontros({
           <li
             key={numero}
             title={
-              `Encontro ${numero}` +
+              `${sessao ? "Sessão" : "Encontro"} ${numero}` +
               (e
                 ? `${e.data ? ` · ${formatDate(e.data)}` : ""}` +
                   (e.avaliacao
@@ -199,6 +201,7 @@ export function RetrospectivaJornada({
 }) {
   if (!dados.desbloqueada) return null;
   const { resumo } = dados;
+  const sessao = resumo.trilha === "especialista";
   const combinadosFeitos = dados.combinados.filter(
     (c) => c.status === "feito"
   ).length;
@@ -331,7 +334,13 @@ export function RetrospectivaJornada({
           </span>
           <span className="ml-1.5 text-sm font-semibold text-muted-foreground">
             de {totalSlots}{" "}
-            {totalSlots === 1 ? "encontro realizado" : "encontros realizados"}
+            {sessao
+              ? totalSlots === 1
+                ? "sessão realizada"
+                : "sessões realizadas"
+              : totalSlots === 1
+                ? "encontro realizado"
+                : "encontros realizados"}
             {resumo.esperados != null &&
               resumo.esperados !== resumo.realizados &&
               ` · ${resumo.esperados} esperados até hoje`}
@@ -343,9 +352,10 @@ export function RetrospectivaJornada({
               encontros={dados.encontros}
               total={totalSlots}
               starSeries={dados.starSeries}
+              sessao={sessao}
             />
             <p className="mt-1.5 text-xs text-muted-foreground">
-              Um bloco por encontro
+              {sessao ? "Um bloco por sessão" : "Um bloco por encontro"}
               {temAvaliacao && temEstrela
                 ? " · a cor é a avaliação do mentor ou a estrela do jovem"
                 : temAvaliacao
@@ -451,7 +461,7 @@ export function RetrospectivaJornada({
             (data, tema, avaliação) fica sob disclosure */}
         {dados.encontros.length > 0 && (
           <SecaoRecolhida
-            titulo="Encontro a encontro"
+            titulo={sessao ? "Sessão a sessão" : "Encontro a encontro"}
             contagem={dados.encontros.length}
           >
             <ol className="divide-y divide-border/60">
@@ -464,7 +474,7 @@ export function RetrospectivaJornada({
                     {e.numero}º
                   </span>
                   <span className="min-w-0 flex-1">
-                    {e.tema ?? "Encontro"}
+                    {e.tema ?? (sessao ? "Sessão" : "Encontro")}
                     <span className="block text-xs tabular-nums text-muted-foreground">
                       {formatDate(e.data)}
                     </span>
@@ -504,7 +514,9 @@ export function RetrospectivaJornada({
                       {c.responsavel
                         ? `${c.responsavel === "mentor" ? "Mentor" : "Mentorado(a)"} · `
                         : ""}
-                      {c.numero != null ? `encontro ${c.numero} · ` : ""}
+                      {c.numero != null
+                        ? `${sessao ? "sessão" : "encontro"} ${c.numero} · `
+                        : ""}
                       {c.status === "feito"
                         ? c.feitoEm
                           ? `feito em ${formatDate(c.feitoEm)}`
@@ -595,7 +607,7 @@ export function RetrospectivaJornada({
               {encontrosComTrecho.map((e) => (
                 <div key={e.numero}>
                   <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                    {e.numero}º encontro
+                    {sessao ? `sessão ${e.numero}` : `${e.numero}º encontro`}
                   </p>
                   <dl className="mt-1 space-y-1.5">
                     {e.trechos.map((t) => (

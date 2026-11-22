@@ -11,6 +11,7 @@ import {
   jornadaDaDupla,
   linkSeguro,
   passosDaTrilha,
+  rotuloEncontro,
   saudadeDaDupla,
   toDateStr,
   totalDaTrilha,
@@ -133,7 +134,9 @@ export function MentorHome({
           )}
           {algumSemRegistro && (
             <p className="mt-1 text-sm text-muted-foreground">
-              Vocês marcam o encontro; depois registram aqui como foi.
+              {soEspecialista
+                ? "Vocês marcam a sessão; depois registram aqui como foi."
+                : "Vocês marcam o encontro; depois registram aqui como foi."}
             </p>
           )}
         </header>
@@ -209,6 +212,16 @@ export function MentorHome({
             (a.prazo ?? "9999").localeCompare(b.prazo ?? "9999")
           );
         const hojeStr = toDateStr(hoje);
+        const jovemNome = dupla.mentorado.nome_social ?? dupla.mentorado.nome;
+        // "Sessão 3 com Bia" / "5º encontro com Bia" — o rótulo canônico
+        // (na trilha esp o nº é o passo do guia, nunca a tentativa da row)
+        const rotuloDe = (e: Encontro) =>
+          rotuloEncontro(e, dupla.encontros, { esp: ehEsp, com: jovemNome });
+        // "A sessão 3 com Bia…" / "O 5º encontro com Bia…" — sujeito com
+        // artigo: a flexão do participio (`agendada`/`atrasada`) decide
+        // em cada frase, o substantivo sai do helper
+        const comArtigo = (e: Encontro) =>
+          `${ehEsp ? "A" : "O"} ${rotuloDe(e).charAt(0).toLowerCase()}${rotuloDe(e).slice(1)}`;
 
         // máquina de estados do painel "O que fazer agora" — um primário por
         // dupla: pendência de registro vem antes de qualquer agendamento (a
@@ -319,7 +332,7 @@ export function MentorHome({
                 <div className="flex flex-col items-end gap-0.5 text-right">
                   <span className="text-sm text-white">
                     <span className="font-mono tabular-nums">{feitos}/{totalDupla}</span>{" "}
-                    encontros
+                    {ehEsp ? "sessões" : "encontros"}
                   </span>
                   {ehEsp && (
                     <span className="text-xs uppercase tracking-wider text-white/50 sm:text-[11px]">
@@ -372,6 +385,7 @@ export function MentorHome({
                 jornada={jornada}
                 statusDupla={dupla.status}
                 duplaId={dupla.id}
+                sessao={ehEsp}
               />
               <MarcoNotifier duplaId={dupla.id} feitos={jornada.feitos} total={jornada.total} />
 
@@ -400,8 +414,8 @@ export function MentorHome({
                     <>
                       <p className="font-medium">
                         {semRegistro.status !== "realizado"
-                          ? `O ${semRegistro.numero}º encontro estava agendado e já passou.`
-                          : `O ${semRegistro.numero}º encontro aconteceu.`}
+                          ? `${comArtigo(semRegistro)} estava agendad${ehEsp ? "a" : "o"} e já passou.`
+                          : `${comArtigo(semRegistro)} aconteceu.`}
                       </p>
                       <p className="text-sm text-muted-foreground mt-0.5">
                         {semRegistro.status !== "realizado"
@@ -433,12 +447,14 @@ export function MentorHome({
                     </>
                   ) : cicloCompleto ? (
                     <p className="font-medium">
-                      {totalDupla} encontros concluídos.
+                      {ehEsp
+                        ? `${totalDupla} sessões concluídas.`
+                        : `${totalDupla} encontros concluídos.`}
                     </p>
                   ) : agendado ? (
                     <>
                       <p className="font-medium">
-                        {agendado.numero}º encontro agendado
+                        {rotuloDe(agendado)} agendad{ehEsp ? "a" : "o"}
                       </p>
                       <p className="text-sm text-muted-foreground mt-0.5">
                         {formatDateTime(agendado.data_hora)}
@@ -487,7 +503,7 @@ export function MentorHome({
                     // de alguém (até do jovem) — o texto aponta o desfazer
                     <>
                       <p className="font-medium">
-                        {encontroAlvo.numero}º encontro{" "}
+                        {rotuloDe(encontroAlvo)}{" "}
                         {encontroAlvo.status === "nao_aconteceu" ||
                         encontroAlvo.status === "cancelado"
                           ? "não aconteceu."
@@ -658,7 +674,7 @@ export function MentorHome({
                       <span className="tabular-nums">
                         {saude.feitos}/{totalDupla}
                       </span>{" "}
-                      encontros
+                      {dupla.trilha === "especialista" ? "sessões" : "encontros"}
                     </p>
                   </div>
                   <Link

@@ -11,12 +11,16 @@ export function EditarRegistro({
   encontroId,
   duplaId,
   evento,
+  trilha,
   registro,
   combinados = [],
 }: {
   encontroId: string;
   duplaId: string;
   evento: PassoGuia | null;
+  /** Vocabulário dos rótulos do form — sem ela ele descobre sozinho pelo
+   *  fetch, mas o host que já sabe repassa (o 1º paint já sai certo). */
+  trilha?: "dpp" | "especialista";
   registro: Registro;
   /** Combinados gravados por este registro — hidratam a etapa 3 do form de
    *  edição (o id do banco é o que o salvarRegistro casa por id). */
@@ -31,6 +35,7 @@ export function EditarRegistro({
           encontroId={encontroId}
           duplaId={duplaId}
           evento={evento}
+          trilha={trilha}
           registro={registro}
           combinadosDoRegistro={combinados}
           onSaved={() => setAberto(false)}

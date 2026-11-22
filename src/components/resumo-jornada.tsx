@@ -35,6 +35,7 @@ export function ResumoJornadaSection({
   /** modo enxuto pra quando a retrospectiva ocupa o papel de destaque */
   compacta?: boolean;
 }) {
+  const sessao = resumo.trilha === "especialista";
   const cabecalho = (
     <>
       <p className="mt-2 text-sm font-medium">
@@ -57,7 +58,7 @@ export function ResumoJornadaSection({
       <dl className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4 xl:grid-cols-5">
         <div className="rounded-lg bg-muted/40 px-3 py-2.5">
           <dt className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-            Encontros
+            {sessao ? "Sessões" : "Encontros"}
           </dt>
           <dd className="mt-0.5 font-mono text-sm tabular-nums">
             {resumo.realizados} de {resumo.total}
@@ -172,7 +173,10 @@ export function ResumoJornadaSection({
         <ul className="mt-3 space-y-1 border-t pt-3 text-xs text-muted-foreground">
           {resumo.ultimosRegistros.map((u) => (
             <li key={u.numero} className="flex flex-wrap items-baseline gap-x-2">
-              <span className="font-mono tabular-nums">{u.numero}º</span>
+              <span className="font-mono tabular-nums">
+                {u.numero}
+                {sessao ? "ª" : "º"}
+              </span>
               <span>{formatDate(u.data)}</span>
               {u.tema && <span className="min-w-0 flex-1">· {u.tema}</span>}
               {u.avaliacao && (

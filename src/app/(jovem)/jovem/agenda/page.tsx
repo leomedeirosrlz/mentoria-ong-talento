@@ -314,6 +314,7 @@ export default async function JovemAgenda() {
       id: p.encontroId,
       rotulo: p.rotulo,
       realizadoEm: p.realizado_em,
+      sessao: p.trilha === "especialista",
     })),
     documentos: [],
     combinados: [],

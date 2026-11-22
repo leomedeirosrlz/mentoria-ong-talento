@@ -48,6 +48,7 @@ type Responsavel = "mentor" | "mentorado";
 export function CombinadosEncontro({
   duplaId,
   numero,
+  sessao = false,
   itens,
   pendentesAnteriores = [],
   jovemNome,
@@ -57,6 +58,8 @@ export function CombinadosEncontro({
   duplaId: string;
   /** nº do passo do guia — a âncora da lista (não o encontro físico). */
   numero: number;
+  /** Trilha esp: o carry-over taggeia "da sessão N", não "do Nº encontro". */
+  sessao?: boolean;
   /** Combinados deste nº (feitos e pendentes). */
   itens: Encaminhamento[];
   /** Pendentes de nºs anteriores — carry-over marcável aqui mesmo. */
@@ -313,7 +316,7 @@ export function CombinadosEncontro({
       >
         {carryOver && c.numero != null && (
           <span className="text-muted-foreground">
-            do {c.numero}º encontro ·{" "}
+            {sessao ? `da sessão ${c.numero}` : `do ${c.numero}º encontro`} ·{" "}
           </span>
         )}
         {c.descricao}
@@ -468,7 +471,7 @@ export function CombinadosEncontro({
                   onChange={(e) => setNovo(e.target.value)}
                   maxLength={500}
                   placeholder="Adicionar combinado…"
-                  aria-label={`Novo combinado do ${numero}º encontro`}
+                  aria-label={`Novo combinado ${sessao ? `da sessão ${numero}` : `do ${numero}º encontro`}`}
                   disabled={pending}
                   className="h-9 min-w-0 flex-1 basis-48 border-0 bg-muted/40 px-3 shadow-none focus-visible:ring-1"
                 />

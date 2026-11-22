@@ -252,6 +252,8 @@ export function RegistroForm({
   const [fechado, setFechado] = useState(false);
   // trilha pra linha de privacidade (K6) — quando o host não repassa
   const [trilhaForm, setTrilhaForm] = useState<Trilha | null>(trilha);
+  // substantivo dos rótulos: "sessão" na trilha esp, "encontro" na DPP
+  const sessao = trilhaForm === "especialista";
 
   // ---------- telemetria do preenchimento (REALIZA-217, fase 1) ----------
   // Uma linha por abertura do form; fire-and-forget — a RPC pode falhar ou
@@ -632,8 +634,8 @@ export function RegistroForm({
                 : null,
               res?.cobertos?.length
                 ? `Também cobriu ${res.cobertos
-                    .map((n) => `o ${n}º`)
-                    .join(" e ")} encontro.`
+                    .map((n) => (sessao ? `a ${n}ª sessão` : `o ${n}º encontro`))
+                    .join(" e ")}.`
                 : null,
             ].filter(Boolean);
             toast.success("Registro salvo.", {
@@ -801,6 +803,7 @@ export function RegistroForm({
         onEncadear={posSave.chain ? encadearProximo : undefined}
         onFechar={fecharPosSave}
         embutido={embutido}
+        sessao={sessao}
       />
     );
   }
@@ -820,7 +823,11 @@ export function RegistroForm({
       <div>
         {!embutido && titulo && (
           <p className="text-sm font-medium">
-            {registro ? "Editar registro" : "Registro do encontro"}
+            {registro
+              ? "Editar registro"
+              : sessao
+                ? "Registro da sessão"
+                : "Registro do encontro"}
           </p>
         )}
         {evento && (
@@ -921,7 +928,11 @@ export function RegistroForm({
           )}
 
           <fieldset className="min-w-0 space-y-2">
-            <legend className="text-sm font-medium">O que foi realizado neste encontro</legend>
+            <legend className="text-sm font-medium">
+              {sessao
+                ? "O que foi realizado nesta sessão"
+                : "O que foi realizado neste encontro"}
+            </legend>
             <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
               {ATIVIDADES_ENCONTRO.map((a) => (
                 <label key={a} className="flex min-h-11 items-center gap-2 py-2 text-sm cursor-pointer md:min-h-0 md:py-0">
@@ -973,7 +984,7 @@ export function RegistroForm({
                       className="size-5 shrink-0 accent-primary"
                     />
                     <span className="min-w-0 truncate">
-                      {c.numero}º encontro
+                      {sessao ? `sessão ${c.numero}` : `${c.numero}º encontro`}
                       <span className="text-muted-foreground"> · {c.titulo}</span>
                     </span>
                   </label>
@@ -1018,7 +1029,9 @@ export function RegistroForm({
               </Select>
             </div>
             <div className="space-y-2">
-              <Label id="duracao-label">Duração do encontro</Label>
+              <Label id="duracao-label">
+                {sessao ? "Duração da sessão" : "Duração do encontro"}
+              </Label>
               <Select
                 name="duracao_min"
                 value={duracaoMin}
@@ -1044,7 +1057,11 @@ export function RegistroForm({
               name="reflexoes"
               rows={3}
               defaultValue={registro?.reflexoes ?? ""}
-              placeholder="Suas observações sobre o encontro, combinados e próximos passos."
+              placeholder={
+                sessao
+                  ? "Suas observações sobre a sessão, combinados e próximos passos."
+                  : "Suas observações sobre o encontro, combinados e próximos passos."
+              }
             />
           </div>
 
@@ -1165,7 +1182,9 @@ export function RegistroForm({
               <div>
                 <p className="text-sm font-medium">Novos combinados</p>
                 <p className="text-xs text-muted-foreground">
-                  O que a dupla combinou de fazer até o próximo encontro.
+                  {sessao
+                    ? "O que a dupla combinou de fazer até a próxima sessão."
+                    : "O que a dupla combinou de fazer até o próximo encontro."}
                 </p>
               </div>
               <Button
@@ -1243,9 +1262,9 @@ export function RegistroForm({
                 <div>
                   <p className="text-sm font-medium">Evidências</p>
                   <p className="text-xs text-muted-foreground">
-                    Foto do encontro, print ou atividade feita: PDF ou imagem
-                    até 50&nbsp;MB. Fotos são comprimidas automaticamente.
-                    Opcional.
+                    {sessao ? "Foto da sessão" : "Foto do encontro"}, print ou
+                    atividade feita: PDF ou imagem até 50&nbsp;MB. Fotos são
+                    comprimidas automaticamente. Opcional.
                   </p>
                 </div>
                 <Button
@@ -1385,6 +1404,7 @@ function PosSaveRegistro({
   onEncadear,
   onFechar,
   embutido = false,
+  sessao = false,
 }: {
   registroId: string;
   duplaId: string;
@@ -1394,6 +1414,8 @@ function PosSaveRegistro({
   anexos: RegistroAnexo[];
   /** quantas do passo 3 não subiram */
   falhas: number;
+  /** trilha esp — a dica de evidência fala "foto da sessão" */
+  sessao?: boolean;
   /** double session (REALIZA-397): outro encontro da dupla ainda deve
    *  registro — o botão encadeado abre o form dele já preenchido */
   proximoNumero?: number | null;
@@ -1421,8 +1443,9 @@ function PosSaveRegistro({
           </p>
         ) : (
           <p className="text-xs text-muted-foreground">
-            Foto do encontro, print, atividade feita: PDF ou imagem até
-            10&nbsp;MB. Dá pra anexar depois na ficha da dupla também.
+            {sessao ? "Foto da sessão" : "Foto do encontro"}, print, atividade
+            feita: PDF ou imagem até 10&nbsp;MB. Dá pra anexar depois na ficha
+            da dupla também.
           </p>
         )}
         {aviso && <p className="text-xs text-muted-foreground">{aviso}</p>}

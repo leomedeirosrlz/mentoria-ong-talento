@@ -208,6 +208,7 @@ export function AvaliacaoPendenteLinha({
   jovemNome,
   jovemWhatsapp,
   numero,
+  sessao = false,
   souCoord,
   duplaId,
   jornadaViva = true,
@@ -218,6 +219,8 @@ export function AvaliacaoPendenteLinha({
   jovemNome: string;
   jovemWhatsapp: string | null;
   numero: number;
+  /** Trilha esp: o convite fala da sessão (o nº já é o passo do guia). */
+  sessao?: boolean;
   souCoord: boolean;
   /** o ping da avaliação passa por /api/nudge — loga o contato em
    *  interacoes como os demais canais (t=contato) */
@@ -233,7 +236,7 @@ export function AvaliacaoPendenteLinha({
   const wa =
     url && waLink(
       jovemWhatsapp,
-      `Oi ${jovemNome.split(" ")[0]}! ${autoria(autorNome)}. Como foi o ${numero}º encontro de vocês? Conta aqui rapidinho (1 min): ${url}`
+      `Oi ${jovemNome.split(" ")[0]}! ${autoria(autorNome)}. Como foi ${sessao ? `a sessão ${numero}` : `o ${numero}º encontro`} de vocês? Conta aqui rapidinho (1 min): ${url}`
     );
 
   return (
@@ -384,11 +387,15 @@ export function VozDoJovemCard({
 }
 
 /** Lista das estrelas por sessão no rail do especialista — mesmo recorte
- *  do chip: número e data do encontro (que ele mesmo conduziu), nada mais. */
+ *  do chip: o passo do guia (não a tentativa) e a data, nada mais. */
 export function VozDoJovemEspecialista({
   itens,
+  passoPorEncontro,
 }: {
   itens: EspecialistaAvaliacao[];
+  /** encontro_id → passo do guia (passoEsp na página) — a.numero é a
+   *  tentativa física e mostraria o passo errado na trilha esp. */
+  passoPorEncontro?: Map<string, number>;
 }) {
   if (!itens.length) return null;
   return (
@@ -404,7 +411,7 @@ export function VozDoJovemEspecialista({
             className="flex items-center justify-between gap-2 text-sm"
           >
             <span className="text-muted-foreground">
-              {a.numero}º encontro
+              sessão {passoPorEncontro?.get(a.encontro_id) ?? a.numero}
               {a.realizado_em ? ` · ${formatDate(a.realizado_em)}` : ""}
             </span>
             <Estrelas n={a.estrelas} size={13} />
