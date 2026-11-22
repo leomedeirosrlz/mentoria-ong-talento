@@ -3,6 +3,7 @@ import {
   atrasadasPainel,
   estacoesJornada,
   estacoesPainelDupla,
+  momentoRefazerRoda,
   resumoJornada,
   type PainelJornadaLinha,
   type Entrega360,
@@ -595,6 +596,52 @@ describe("estacoesJornada — roda inicial × formal", () => {
     );
     expect(por(est, "roda_formal").estado).toBe("feito");
     expect(por(est, "roda_inicial").estado).toBe("a_fazer");
+  });
+});
+
+// ---------- momentoRefazerRoda (486): a estante só oferece "Refazer"
+// quando o link que a RPC minta é o da estação — a régua é a da 0209:
+// momento do último link usado; sem marca, o emitir deriva 'formal' ----------
+
+describe("momentoRefazerRoda", () => {
+  it("sem link usado → null (a RPC recusa: não houve emissão anterior)", () => {
+    expect(momentoRefazerRoda([entrega(), entrega()])).toBeNull();
+  });
+
+  it("último usado marcado 'inicial' → 'inicial'", () => {
+    expect(
+      momentoRefazerRoda([
+        entrega({
+          contexto: { momento: "inicial" },
+          usado_em: "2026-03-05T20:00:00-03:00",
+        }),
+        // pendente emitida não entra na conta — só usado conta
+        entrega({ contexto: { momento: "formal" }, usado_em: null }),
+      ])
+    ).toBe("inicial");
+  });
+
+  it("formal usada por último → 'formal' (refazer da inicial mintaria a formal)", () => {
+    expect(
+      momentoRefazerRoda([
+        entrega({
+          contexto: { momento: "inicial" },
+          usado_em: "2026-03-05T20:00:00-03:00",
+        }),
+        entrega({
+          contexto: { momento: "formal" },
+          usado_em: "2026-06-10T19:00:00-03:00",
+        }),
+      ])
+    ).toBe("formal");
+  });
+
+  it("usado sem marca → 'formal' (a régua automática do emitir: ≥1 usada)", () => {
+    expect(
+      momentoRefazerRoda([
+        entrega({ contexto: {}, usado_em: "2026-03-05T20:00:00-03:00" }),
+      ])
+    ).toBe("formal");
   });
 });
 
