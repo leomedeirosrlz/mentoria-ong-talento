@@ -8,12 +8,23 @@ import { NovoChamadoDialog } from "@/components/novo-chamado-dialog";
 export function PedirApoioDialog({
   duplaId,
   trigger,
+  open,
+  onOpenChange,
 }: {
   duplaId: string;
-  /** Elemento do trigger — cada ponto da UI escolhe a aparência. */
-  trigger: React.ReactElement;
+  /** Elemento do trigger — cada ponto da UI escolhe a aparência. `null`
+   *  suprime: o host abre de forma controlada (item do ⋯ da ficha). */
+  trigger: React.ReactElement | null;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
   return (
-    <NovoChamadoDialog papel="mentor_dpp" duplaId={duplaId} trigger={trigger} />
+    <NovoChamadoDialog
+      papel="mentor_dpp"
+      duplaId={duplaId}
+      trigger={trigger}
+      open={open}
+      onOpenChange={onOpenChange}
+    />
   );
 }

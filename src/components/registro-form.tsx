@@ -73,7 +73,7 @@ const DURACAO_OPCOES: Record<string, string> = {
   "120": "2h",
 };
 
-const ETAPAS = ["Como foi", "Sinais de atenção", "Combinados"] as const;
+const ETAPAS = ["Como foi", "Atividades e desempenho", "Combinados"] as const;
 
 /** Rascunho local do form — autosave no localStorage pra refresh não perder tudo. */
 type RegistroDraft = {
@@ -893,40 +893,96 @@ export function RegistroForm({
         style={{ "--dir": `${direcao * 8}px` } as CSSProperties}
       >
         <div className="space-y-5">
-          {combinadosPendentes && combinadosPendentes.length > 0 && (
-            <fieldset className="min-w-0 space-y-2">
-              <legend className="text-sm font-medium">Da última vez: marcar como feito?</legend>
-              {combinadosPendentes.map((c) => {
-                const vencido = c.prazo != null && c.prazo < hojeStr;
-                return (
-                  <label key={c.id} className="flex min-h-11 cursor-pointer items-start gap-3 py-2 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={concluirIds.has(c.id)}
-                      onChange={(e) =>
-                        setConcluirIds((prev) => {
-                          const next = new Set(prev);
-                          if (e.target.checked) next.add(c.id);
-                          else next.delete(c.id);
-                          return next;
-                        })
-                      }
-                      className="mt-0.5 size-5 shrink-0 accent-primary"
-                    />
-                    <span className="min-w-0">
-                      {c.descricao}
-                      <span className="text-muted-foreground">
-                        {" "}· {c.responsavel === "mentor" ? "Mentor" : "Mentorado"}
-                        {c.prazo && ` · até ${formatDiaMes(c.prazo)}`}
-                      </span>
-                      {vencido && <span className="text-[var(--warn-text)]"> (vencido)</span>}
-                    </span>
-                  </label>
-                );
-              })}
-            </fieldset>
-          )}
+          {/* "Aconteceu como planejado?" pergunta na linguagem do mentor e
+              grava no mesmo `avaliacao` de 4 pontos que alimenta trajetória
+              e semáforo: melhor que o planejado = excelente, sim = boa,
+              em parte = regular, não = baixa. Fica no passo 1 porque é a
+              única resposta obrigatória — o portão do Avançar cobre aqui */}
+          <fieldset className="min-w-0 space-y-2">
+            <legend className="text-sm font-medium">Aconteceu como planejado?</legend>
+            <div
+              role="radiogroup"
+              aria-invalid={erroAvaliacao || undefined}
+              aria-describedby={erroAvaliacao ? `avaliacao-erro-${encontroId}` : undefined}
+              onChange={() => setErroAvaliacao(false)}
+              className="flex flex-wrap gap-2"
+            >
+              {(["excelente", "boa", "regular", "baixa"] as const).map((v) => (
+                <label key={v} className="cursor-pointer">
+                  <input
+                    type="radio"
+                    name="avaliacao"
+                    value={v}
+                    defaultChecked={registro?.avaliacao === v}
+                    className="peer sr-only"
+                  />
+                  <span className="inline-flex min-h-11 items-center rounded-lg border border-border px-3.5 py-2.5 text-sm font-medium transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-ring md:min-h-9 md:py-1.5">
+                    {v === "excelente"
+                      ? "Melhor que o planejado"
+                      : v === "boa"
+                        ? "Sim"
+                        : v === "regular"
+                          ? "Em parte"
+                          : "Não"}
+                  </span>
+                </label>
+              ))}
+            </div>
+            {erroAvaliacao && (
+              <p
+                id={`avaliacao-erro-${encontroId}`}
+                role="alert"
+                className="text-sm font-medium text-[var(--danger)]"
+              >
+                Diga se aconteceu como planejado pra continuar.
+              </p>
+            )}
+          </fieldset>
 
+          <div className="space-y-2 sm:max-w-xs">
+            <Label id="duracao-label">
+              {sessao ? "Duração da sessão" : "Duração do encontro"}
+            </Label>
+            <Select
+              name="duracao_min"
+              value={duracaoMin}
+              items={DURACAO_OPCOES}
+              onValueChange={(v) => setDuracaoMin(v ?? "60")}
+            >
+              <SelectTrigger id="duracao-select" aria-labelledby="duracao-label duracao-select"><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="30">30 min</SelectItem>
+                <SelectItem value="45">45 min</SelectItem>
+                <SelectItem value="60">1h</SelectItem>
+                <SelectItem value="90">1h30</SelectItem>
+                <SelectItem value="120">2h</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="reflexoes">Principais reflexões</Label>
+            <Textarea
+              id="reflexoes"
+              name="reflexoes"
+              rows={3}
+              defaultValue={registro?.reflexoes ?? ""}
+              placeholder={
+                sessao
+                  ? "Suas observações sobre a sessão, combinados e próximos passos."
+                  : "Suas observações sobre o encontro, combinados e próximos passos."
+              }
+            />
+          </div>
+        </div>
+      </div>
+
+      <div
+        hidden={etapa !== 1}
+        className="animate-enter-x"
+        style={{ "--dir": `${direcao * 8}px` } as CSSProperties}
+      >
+        <div className="space-y-5">
           <fieldset className="min-w-0 space-y-2">
             <legend className="text-sm font-medium">
               {sessao
@@ -993,7 +1049,7 @@ export function RegistroForm({
             </fieldset>
           )}
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="tema">Tema trabalhado</Label>
               <Input
@@ -1028,86 +1084,8 @@ export function RegistroForm({
                 </SelectContent>
               </Select>
             </div>
-            <div className="space-y-2">
-              <Label id="duracao-label">
-                {sessao ? "Duração da sessão" : "Duração do encontro"}
-              </Label>
-              <Select
-                name="duracao_min"
-                value={duracaoMin}
-                items={DURACAO_OPCOES}
-                onValueChange={(v) => setDuracaoMin(v ?? "60")}
-              >
-                <SelectTrigger id="duracao-select" aria-labelledby="duracao-label duracao-select"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="30">30 min</SelectItem>
-                  <SelectItem value="45">45 min</SelectItem>
-                  <SelectItem value="60">1h</SelectItem>
-                  <SelectItem value="90">1h30</SelectItem>
-                  <SelectItem value="120">2h</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="reflexoes">Principais reflexões</Label>
-            <Textarea
-              id="reflexoes"
-              name="reflexoes"
-              rows={3}
-              defaultValue={registro?.reflexoes ?? ""}
-              placeholder={
-                sessao
-                  ? "Suas observações sobre a sessão, combinados e próximos passos."
-                  : "Suas observações sobre o encontro, combinados e próximos passos."
-              }
-            />
-          </div>
-
-          <fieldset className="min-w-0 space-y-2">
-            <legend className="text-sm font-medium">Desempenho e participação do mentorado</legend>
-            <div
-              role="radiogroup"
-              aria-invalid={erroAvaliacao || undefined}
-              aria-describedby={erroAvaliacao ? `avaliacao-erro-${encontroId}` : undefined}
-              onChange={() => setErroAvaliacao(false)}
-              className="flex flex-wrap gap-2"
-            >
-              {(["excelente", "boa", "regular", "baixa"] as const).map((v) => (
-                <label key={v} className="cursor-pointer">
-                  <input
-                    type="radio"
-                    name="avaliacao"
-                    value={v}
-                    defaultChecked={registro?.avaliacao === v}
-                    className="peer sr-only"
-                  />
-                  <span className="inline-flex min-h-11 items-center rounded-lg border border-border px-3.5 py-2.5 text-sm font-medium transition-colors peer-checked:border-primary peer-checked:bg-primary peer-checked:text-primary-foreground peer-focus-visible:ring-2 peer-focus-visible:ring-ring md:min-h-9 md:py-1.5">
-                    {v === "boa" ? "Boa" : v === "baixa" ? "Baixa" : v === "regular" ? "Regular" : "Excelente"}
-                  </span>
-                </label>
-              ))}
-            </div>
-            {erroAvaliacao && (
-              <p
-                id={`avaliacao-erro-${encontroId}`}
-                role="alert"
-                className="text-sm font-medium text-[var(--danger)]"
-              >
-                Escolha uma avaliação pra continuar.
-              </p>
-            )}
-          </fieldset>
-        </div>
-      </div>
-
-      <div
-        hidden={etapa !== 1}
-        className="animate-enter-x"
-        style={{ "--dir": `${direcao * 8}px` } as CSSProperties}
-      >
-        <div className="space-y-4">
           <div className="space-y-2 sm:max-w-sm">
             <Label id="dificuldade-label">Dificuldade que precisa de atenção</Label>
             <Select name="dificuldade" value={dificuldade} items={DIFICULDADE_OPCOES} onValueChange={(v) => setDificuldade(v ?? "nenhuma")}>
@@ -1153,7 +1131,41 @@ export function RegistroForm({
         className="animate-enter-x"
         style={{ "--dir": `${direcao * 8}px` } as CSSProperties}
       >
-        <div className="space-y-4">
+        <div className="space-y-5">
+          {combinadosPendentes && combinadosPendentes.length > 0 && (
+            <fieldset className="min-w-0 space-y-2">
+              <legend className="text-sm font-medium">Da última vez: marcar como feito?</legend>
+              {combinadosPendentes.map((c) => {
+                const vencido = c.prazo != null && c.prazo < hojeStr;
+                return (
+                  <label key={c.id} className="flex min-h-11 cursor-pointer items-start gap-3 py-2 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={concluirIds.has(c.id)}
+                      onChange={(e) =>
+                        setConcluirIds((prev) => {
+                          const next = new Set(prev);
+                          if (e.target.checked) next.add(c.id);
+                          else next.delete(c.id);
+                          return next;
+                        })
+                      }
+                      className="mt-0.5 size-5 shrink-0 accent-primary"
+                    />
+                    <span className="min-w-0">
+                      {c.descricao}
+                      <span className="text-muted-foreground">
+                        {" "}· {c.responsavel === "mentor" ? "Mentor" : "Mentorado"}
+                        {c.prazo && ` · até ${formatDiaMes(c.prazo)}`}
+                      </span>
+                      {vencido && <span className="text-[var(--warn-text)]"> (vencido)</span>}
+                    </span>
+                  </label>
+                );
+              })}
+            </fieldset>
+          )}
+
           <div className="space-y-2 sm:max-w-sm">
             <Label id="proximo-passo-label">Próximo passo do acompanhamento</Label>
             <Select name="proximo_passo" value={proximoPasso} items={PROXIMO_PASSO_LABEL} onValueChange={(v) => setProximoPasso(v ?? "continuar")}>
@@ -1322,7 +1334,7 @@ export function RegistroForm({
                         size="icon"
                         aria-label={`Tirar ${f.name}`}
                         disabled={pending}
-                        className="size-8 shrink-0 text-muted-foreground"
+                        className="size-11 shrink-0 text-muted-foreground md:size-8"
                         onClick={() =>
                           setArquivos((l) => l.filter((_, j) => j !== i))
                         }

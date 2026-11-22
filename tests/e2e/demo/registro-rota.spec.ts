@@ -27,8 +27,30 @@ test.describe("demo — rota de registro (REALIZA-473)", () => {
     // a tarefa é a página: sem abas da ficha
     await expect(page.getByRole("tablist")).toHaveCount(0);
 
+    // review #9: o form é a tarefa — primeiro bloco da página; o roteiro
+    // do encontro virou um <details> fechado de uma linha, abaixo dele
     const form = page.getByTestId("registro-form");
-    await form.getByText("Boa", { exact: true }).click();
+    await expect(form).toBeVisible();
+    const roteiro = page.locator("details", {
+      has: page.locator("summary", { hasText: /Roteiro do 2º encontro/ }),
+    });
+    await expect(roteiro).toBeVisible();
+    await expect(roteiro).not.toHaveAttribute("open", "");
+    const [boxForm, boxRoteiro] = await Promise.all([
+      form.boundingBox(),
+      roteiro.boundingBox(),
+    ]);
+    expect(boxForm!.y).toBeLessThan(boxRoteiro!.y);
+    // encontro passado não vende "Entrar na chamada" — o link neutro
+    // mora dentro do roteiro fechado
+    await expect(page.getByRole("link", { name: /Entrar na chamada/ })).toHaveCount(0);
+
+    // passo 1 enxuto (review #9): "Aconteceu como planejado?" é o portão
+    // — atividades e desempenho desceram pro passo 2
+    await expect(
+      form.getByText("Aconteceu como planejado?")
+    ).toBeVisible();
+    await form.getByText("Sim", { exact: true }).click();
     await agirComConfirma(
       () => form.getByRole("button", { name: "Avançar" }).click(),
       () => form.getByRole("heading", { name: /Passo 2 de 3/ }).isVisible()

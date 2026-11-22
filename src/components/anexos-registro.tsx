@@ -185,7 +185,10 @@ export function AnexosRegistro({
                   target="_blank"
                   rel="noopener noreferrer"
                   title={a.nome}
-                  className="min-w-0 flex-1 truncate underline underline-offset-2 hover:text-foreground"
+                  // min-h-11: o link é o alvo de toque do anexo no celular
+                  // (o texto-xs sozinho batia ~16px); no desktop a linha
+                  // volta à densidade normal
+                  className="flex min-h-11 min-w-0 flex-1 items-center truncate underline underline-offset-2 hover:text-foreground md:min-h-0 md:inline"
                 >
                   {a.nome}
                 </a>

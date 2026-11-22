@@ -95,13 +95,10 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
 
     const form3 = linha3.locator("form");
     await expect(form3).toBeVisible();
-    // avaliacao é o único campo com portão — fica na etapa 1 ("Como foi");
-    // o input é sr-only, clica no rótulo visível (label → radio nativo:
-    // funciona antes da hidratação)
-    await form3.getByText("Boa", { exact: true }).click();
-    // 472: registro só de defaults não é entrega — o servidor recusa sem
-    // conteúdo; o tema é o campo livre da etapa 1
-    await form3.locator("#tema").fill("E2E: tema do registro");
+    // avaliacao é o único campo com portão — fica na etapa 1 ("Como foi")
+    // com o rótulo novo do review #9; o input é sr-only, clica no rótulo
+    // visível (label → radio nativo: funciona antes da hidratação)
+    await form3.getByText("Sim", { exact: true }).click();
     // duração não-default: é o campo compartilhado que o rascunho do 4º
     // herda. O Select é client — o clique pode cair pré-hidratação (o
     // form é lazy-loaded no hash), então repete até a option abrir
@@ -116,6 +113,9 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
       () => form3.getByRole("button", { name: "Avançar" }).click(),
       () => form3.getByText(/Passo 2 de 3/).isVisible()
     );
+    // 472: registro só de defaults não é entrega — o servidor recusa sem
+    // conteúdo; o tema é o campo livre da etapa 2 desde o review #9
+    await form3.locator("#tema").fill("E2E: tema do registro");
     await agirComConfirma(
       () => form3.getByRole("button", { name: "Avançar" }).click(),
       () => form3.getByText(/Passo 3 de 3/).isVisible()
@@ -163,14 +163,16 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     const form6 = linha6.locator("form");
     await expect(form6).toBeVisible();
 
-    // a sessão física cobriu o 7º também — o checkbox marca na etapa 1 e
-    // o servidor grava encontro realizado + registro próprios pro 7º
+    // etapa 1 enxuta (review #9): só o portão da avaliação e a duração
+    await form6.getByText("Sim", { exact: true }).click();
+    await form6.getByRole("button", { name: "Avançar" }).click();
+    // a sessão física cobriu o 7º também — o checkbox marcou na etapa 1
+    // e desceu pra 2 junto das atividades; o servidor grava encontro
+    // realizado + registro próprios pro 7º
     await expect(form6.getByText("7º encontro")).toBeVisible();
     await form6.getByText("7º encontro").click();
-    await form6.getByText("Boa", { exact: true }).click();
     // 472: sem conteúdo o servidor recusa e a oferta do 7º não aparece
     await form6.locator("#tema").fill("E2E: tema do registro");
-    await form6.getByRole("button", { name: "Avançar" }).click();
     await form6.getByRole("button", { name: "Avançar" }).click();
     await form6.getByRole("button", { name: "Salvar registro" }).click();
 

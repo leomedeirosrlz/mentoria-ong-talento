@@ -32,12 +32,17 @@ test.describe("guarda — Enviar formulário não oferece instrumentos da jornad
     await loginComSenha(page, COORD_EMAIL, COORD_SENHA);
     await page.goto(`/duplas/${DUPLA_ID}`);
 
-    // o Enviar formulário é botão em linha no header da ficha no desktop
-    // (REALIZA-343; no celular segue no "Mais") e abre o dialog controlado
-    const item = page.getByRole("button", { name: "Enviar formulário", exact: true });
+    // o Enviar formulário virou item do ⋯ em todo viewport (review 21/11,
+    // #9 — a 343 punha em linha no desktop) e abre o dialog controlado.
+    // O gesto composto é seguro de repetir
+    const mais = page.getByRole("button", { name: "Mais ações da dupla" });
+    const item = page.getByRole("menuitem", { name: "Enviar formulário", exact: true });
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
-      () => item.click(),
+      async () => {
+        await mais.click();
+        await item.click();
+      },
       () => dialog.isVisible()
     );
     await expect(
