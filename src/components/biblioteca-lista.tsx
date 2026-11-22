@@ -59,6 +59,19 @@ function ordena(a: Material, b: Material): number {
   return ea - eb || a.ordem - b.ordem || a.titulo.localeCompare(b.titulo, "pt-BR");
 }
 
+/** Contagem ao lado do título da seção: o dígito é decorativo (aria-hidden)
+ *  e o leitor de tela ouve "N itens" — sem o sr-only o número colava no
+ *  rótulo ("Guias2", "Todos os materiais de apoio33"). O espaço dentro do
+ *  sr-only é o separador do nome acessível. */
+function ContagemTitulo({ n }: { n: number }) {
+  return (
+    <span className="ml-1.5 font-normal tabular-nums text-muted-foreground">
+      <span aria-hidden>{n}</span>
+      <span className="sr-only"> {n === 1 ? "1 item" : `${n} itens`}</span>
+    </span>
+  );
+}
+
 function Linha({
   m,
   ehCoord,
@@ -248,9 +261,7 @@ export function BibliotecaLista({
       <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
         <h2 id="biblioteca-titulo" className="text-base font-semibold">
           {titulo}
-          <span className="ml-1.5 font-normal text-muted-foreground tabular-nums">
-            {materiais.length}
-          </span>
+          <ContagemTitulo n={materiais.length} />
         </h2>
         {materiais.length > 6 && (
           <label className="relative w-full sm:w-72">
@@ -288,9 +299,7 @@ export function BibliotecaLista({
                   className="mb-2 text-sm font-semibold"
                 >
                   {rotulo}
-                  <span className="ml-1.5 font-normal tabular-nums text-muted-foreground">
-                    {itens.length}
-                  </span>
+                  <ContagemTitulo n={itens.length} />
                 </h3>
                 <ul className="divide-y divide-border/60 overflow-hidden rounded-xl bg-card py-1 shadow-[var(--shadow-border)]">
                   {itens.map((m, i) => (

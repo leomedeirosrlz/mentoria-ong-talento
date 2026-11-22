@@ -543,7 +543,9 @@ export function MaterialDocumento({
   if (!doc) return null;
 
   return (
-    <main className="mx-auto max-w-3xl px-4 py-6 print:px-0 lg:max-w-4xl xl:max-w-5xl">
+    // div, não <main>: o landmark vem do shell (AppShell/JovemShell já dão
+    // <main id="conteudo">) — <main> aninhado era landmark duplicado
+    <div className="mx-auto max-w-3xl px-4 py-6 print:px-0 lg:max-w-4xl xl:max-w-5xl">
       <Link
         href={voltar.href}
         className="mb-4 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground print:hidden"
@@ -577,6 +579,6 @@ export function MaterialDocumento({
       <footer className="mt-8 border-t border-border/60 pt-3 text-xs text-muted-foreground">
         Template do guia do programa: adapte ao seu jeito de escrever.
       </footer>
-    </main>
+    </div>
   );
 }
