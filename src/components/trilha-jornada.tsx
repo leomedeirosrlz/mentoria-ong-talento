@@ -6,6 +6,7 @@ import { Flag, FlagCheckered, Medal, Trophy } from "@phosphor-icons/react";
 import {
   formatDate,
   formatDateTime,
+  rotuloPasso,
   type EstadoNoJornada,
   type JornadaDupla,
   type MarcoJornada,
@@ -27,6 +28,13 @@ const MARCO_SR: Record<MarcoJornada, string> = {
   metade: "metade do caminho",
   reta_final: "reta final",
   completo: "último encontro",
+};
+
+const MARCO_SR_SESSAO: Record<MarcoJornada, string> = {
+  primeiro: "primeira sessão",
+  metade: "metade do caminho",
+  reta_final: "reta final",
+  completo: "última sessão",
 };
 
 /** Disco do passo — mesma gramática dos dots da agenda: fill = aconteceu,
@@ -57,23 +65,25 @@ function chaveDot(estado: "realizado_completo" | "pendente_registro" | "proximo"
   }
 }
 
-/** Label falado do passo — o número sozinho não carrega a situação. */
-function rotuloNo(no: NoJornada, atual: boolean): string {
-  const n = `${no.numero}º encontro`;
+/** Label falado do passo — o número sozinho não carrega a situação. O
+ *  substantivo segue a trilha: "3º encontro" (DPP) ou "Sessão 3" (esp). */
+function rotuloNo(no: NoJornada, atual: boolean, sessao: boolean): string {
+  const n = rotuloPasso({ esp: sessao, numero: no.numero });
+  const oa = sessao ? "a" : "o";
   const quandoReal = no.encontro?.realizado_em ?? no.encontro?.data_hora;
   let base: string;
   switch (no.estado) {
     case "realizado_completo":
-      base = `${n}, realizado em ${formatDate(quandoReal)}, registro entregue`;
+      base = `${n}, realizad${oa} em ${formatDate(quandoReal)}, registro entregue`;
       break;
     case "pendente_registro":
-      base = `${n}, realizado em ${formatDate(quandoReal)}, registro pendente`;
+      base = `${n}, realizad${oa} em ${formatDate(quandoReal)}, registro pendente`;
       break;
     case "limbo":
-      base = `${n}, agendado para ${formatDate(no.encontro?.data_hora)}, já passou, falta confirmar`;
+      base = `${n}, agendad${oa} para ${formatDate(no.encontro?.data_hora)}, já passou, falta confirmar`;
       break;
     case "agendado":
-      base = `${n}, agendado para ${formatDate(no.encontro?.data_hora)}`;
+      base = `${n}, agendad${oa} para ${formatDate(no.encontro?.data_hora)}`;
       break;
     case "nao_aconteceu":
       base = `${n}, não aconteceu`;
@@ -85,25 +95,28 @@ function rotuloNo(no: NoJornada, atual: boolean): string {
       break;
   }
   if (atual) base += " · próximo passo";
-  if (no.marco) base += ` · marco: ${MARCO_SR[no.marco]}`;
+  if (no.marco) base += ` · marco: ${(sessao ? MARCO_SR_SESSAO : MARCO_SR)[no.marco]}`;
   return base;
 }
 
 /** Caption do passo atual: o que falta fazer, em texto — cor nunca é o único
  *  canal, e a legenda pequena não carrega ação. */
-function textoProximo(no: NoJornada | undefined): string | null {
+function textoProximo(no: NoJornada | undefined, sessao: boolean): string | null {
   if (!no) return null;
+  const proxim = sessao ? "Próxima" : "Próximo";
+  const passo = sessao ? `sessão ${no.numero}` : `${no.numero}º`;
+  const oa = sessao ? "a" : "o";
   if (no.estado === "limbo")
-    return `Próximo: ${no.numero}º · agendado ${formatDate(no.encontro?.data_hora)}, falta confirmar`;
+    return `${proxim}: ${passo} · agendad${oa} ${formatDate(no.encontro?.data_hora)}, falta confirmar`;
   if (no.estado === "agendado")
-    return `Próximo: ${no.numero}º · agendado ${formatDateTime(no.encontro?.data_hora)}`;
+    return `${proxim}: ${passo} · agendad${oa} ${formatDateTime(no.encontro?.data_hora)}`;
   if (no.estado === "nao_aconteceu")
     // o "não aconteceu" é sempre marcação de alguém (mentor, jovem ou
     // coord) — se foi engano, o caminho de volta é o Desfazer na linha
-    return `Próximo: ${no.numero}º · não aconteceu · remarcar ou desfazer`;
+    return `${proxim}: ${passo} · não aconteceu · remarcar ou desfazer`;
   return no.evento.data
-    ? `Próximo: ${no.numero}º · sugerido ${formatDate(no.evento.data)}`
-    : `Próximo: ${no.numero}º · data a combinar`;
+    ? `${proxim}: ${passo} · sugerido ${formatDate(no.evento.data)}`
+    : `${proxim}: ${passo} · data a combinar`;
 }
 
 /** Mapa do ciclo da dupla: os encontros oficiais da janela como trilha de
@@ -114,10 +127,13 @@ export function TrilhaJornada({
   jornada,
   statusDupla,
   duplaId,
+  sessao = false,
 }: {
   jornada: JornadaDupla;
   statusDupla: DuplaStatus;
   duplaId: string;
+  /** Trilha de especialista: os nós são sessões ("Sessão 3"), não encontros. */
+  sessao?: boolean;
 }) {
   const refAtual = useRef<HTMLLIElement | null>(null);
   const { ref: refStrip, maskStyle } = useFadeX<HTMLOListElement>();
@@ -168,7 +184,7 @@ export function TrilhaJornada({
         : statusDupla === "encerrada"
           ? "Dupla encerrada. A jornada guarda o que aconteceu."
           : jornada.completa
-            ? `Jornada concluída: ${jornada.total} encontros realizados.`
+            ? `Jornada concluída: ${jornada.total} ${sessao ? "sessões" : "encontros"} realizad${sessao ? "as" : "os"}.`
             : null;
 
   return (
@@ -191,7 +207,7 @@ export function TrilhaJornada({
         {jornada.nos.map((no, i) => {
           const atual = no.numero === jornada.proximoNumero;
           const viradaFase = i > 0 && no.evento.fase !== jornada.nos[i - 1].evento.fase;
-          const rotulo = rotuloNo(no, atual);
+          const rotulo = rotuloNo(no, atual, sessao);
           const IconeMarco = no.marco ? ICONE_MARCO[no.marco] : null;
           return (
             <li
@@ -279,7 +295,7 @@ export function TrilhaJornada({
                 {jornada.faseAtual.nome} ·{" "}
               </>
             )}
-            {textoProximo(noAtual)}
+            {textoProximo(noAtual, sessao)}
           </>
         )}
       </p>

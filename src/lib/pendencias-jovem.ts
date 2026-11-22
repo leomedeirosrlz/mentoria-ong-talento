@@ -113,6 +113,8 @@ export type AvaliacaoPendencia = {
   id: string;
   rotulo?: string | null;
   realizadoEm?: string | null;
+  /** Trilha de especialista — "sessão" na contagem agrupada. */
+  sessao?: boolean;
 };
 
 /** Solicitação 'sugerida': o mentor indicou um especialista e o jovem decide. */
@@ -367,12 +369,24 @@ function avaliacoes(lista: AvaliacaoPendencia[]): PendenciaJovem[] {
       (instanteDe(a.realizadoEm) ?? Number.NEGATIVE_INFINITY)
   )[0];
   const n = validas.length;
+  const algumaSessao = validas.some((a) => a.sessao);
+  const todasSessao = validas.every((a) => a.sessao);
+  const sujeito =
+    n === 1
+      ? todasSessao
+        ? "sessão esperando"
+        : "encontro esperando"
+      : todasSessao
+        ? "sessões esperando"
+        : algumaSessao
+          ? "encontros e sessões esperando"
+          : "encontros esperando";
   return [
     {
       id: "avaliacoes",
       tipo: "avaliacao",
       prioridade: 70,
-      titulo: `${n} ${n === 1 ? "encontro esperando" : "encontros esperando"} sua avaliação`,
+      titulo: `${n} ${sujeito} sua avaliação`,
       contexto: "1 min cada",
       quando: maisRecente.realizadoEm ?? null,
       acao: {

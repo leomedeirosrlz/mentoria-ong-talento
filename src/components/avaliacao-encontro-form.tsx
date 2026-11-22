@@ -160,7 +160,9 @@ export function AvaliacaoEncontroForm({
                   </p>
                 )}
                 <h1 className="mt-1 text-xl font-semibold tracking-tight">
-                  Como foi o encontro?
+                  {trilha === "especialista"
+                    ? "Como foi a sessão?"
+                    : "Como foi o encontro?"}
                 </h1>
                 <p className="mt-1 text-xs text-muted-foreground">
                   1 minuto · só a nota é obrigatória
@@ -191,7 +193,7 @@ export function AvaliacaoEncontroForm({
               </legend>
               <div
                 role="radiogroup"
-                aria-label="Nota do encontro de 1 a 5 estrelas"
+                aria-label={`Nota ${trilha === "especialista" ? "da sessão" : "do encontro"} de 1 a 5 estrelas`}
                 className="mt-2 flex gap-1"
               >
                 {[1, 2, 3, 4, 5].map((n) => (
@@ -384,8 +386,10 @@ export function AvaliacaoEncontroForm({
               <span>
                 <span className="font-medium">Preciso de ajuda</span> · a
                 coordenação e o auxiliar executivo são avisados na hora e falam com
-                você. Pode ser sobre qualquer coisa, inclusive sobre o
-                encontro ou o mentor.
+                você. Pode ser sobre qualquer coisa,{" "}
+                {trilha === "especialista"
+                  ? "inclusive sobre a sessão ou a especialista."
+                  : "inclusive sobre o encontro ou o mentor."}
               </span>
             </label>
 

@@ -363,6 +363,11 @@ export default async function DuplaPage({
   const estrelaEspPorEncontro = new Map(
     espAvaliacoes.map((a) => [a.encontro_id, a.estrelas])
   );
+  // encontro_id → passo do guia: na trilha esp o e.numero é a tentativa
+  // física, e a linha "sessão N" mostra o passo (mesma régua do helper)
+  const passoPorEncontroEsp = new Map(
+    dupla.encontros.map((e) => [e.id, passoEsp(e, dupla.encontros)])
+  );
   const realizadosCount = dupla.encontros.filter(
     (e) => e.status === "realizado"
   ).length;
@@ -462,7 +467,7 @@ export default async function DuplaPage({
     .sort((a, b) => b.created_at.localeCompare(a.created_at));
 
   const msgCombinados =
-    `Olá ${primeiroNomeMentorado}! Combinados do nosso último encontro: ` +
+    `Olá ${primeiroNomeMentorado}! Combinados ${ehEsp ? "da nossa última sessão" : "do nosso último encontro"}: ` +
     combinadosPendentes
       .map((t, i) => `${i + 1}) ${t.descricao}${t.prazo ? ` (até ${formatDate(t.prazo)})` : ""}`)
       .join(" ") +
@@ -655,7 +660,7 @@ export default async function DuplaPage({
     : dupla.encontros.map((enc) => ({
         id: `leg-${enc.numero}`,
         numero: enc.numero,
-        titulo: `Encontro ${enc.numero}`,
+        titulo: ehEsp ? `Sessão ${enc.numero}` : `Encontro ${enc.numero}`,
         data: null,
         fase: null,
         instrumentos: [],
@@ -1047,6 +1052,7 @@ export default async function DuplaPage({
           jornada={jornada}
           statusDupla={dupla.status}
           duplaId={dupla.id}
+          sessao={ehEsp}
         />
       </section>
       {souMentor && <MarcoNotifier duplaId={dupla.id} feitos={jornada.feitos} total={jornada.total} />}
@@ -1075,7 +1081,7 @@ export default async function DuplaPage({
         className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
       >
         <h2 id="proximo-encontro" className="text-base font-semibold">
-          Próximo encontro
+          {ehEsp ? "Próxima sessão" : "Próximo encontro"}
         </h2>
         {passoAtual && noAtual ? (
           <div className="mt-3 space-y-3">
@@ -1109,7 +1115,7 @@ export default async function DuplaPage({
             {notaAtual && (
               <div className="rounded-lg bg-muted/50 px-3.5 py-3 text-sm shadow-[var(--shadow-inset)]">
                 <p className="text-xs font-semibold text-foreground">
-                  Plano do encontro
+                  {ehEsp ? "Plano da sessão" : "Plano do encontro"}
                 </p>
                 <p className="mt-1 whitespace-pre-line break-words">{notaAtual}</p>
               </div>
@@ -1155,10 +1161,16 @@ export default async function DuplaPage({
         ) : (
           <p className="mt-2 text-sm text-muted-foreground">
             {dupla.status === "ativa"
-              ? "Todos os encontros desta jornada já foram realizados."
+              ? ehEsp
+                ? "Todas as sessões desta jornada já foram realizadas."
+                : "Todos os encontros desta jornada já foram realizados."
               : dupla.status === "pausada"
-                ? "Jornada pausada. Nenhum encontro está pendente."
-                : "Jornada encerrada. Nenhum encontro está pendente."}
+                ? ehEsp
+                  ? "Jornada pausada. Nenhuma sessão está pendente."
+                  : "Jornada pausada. Nenhum encontro está pendente."
+                : ehEsp
+                  ? "Jornada encerrada. Nenhuma sessão está pendente."
+                  : "Jornada encerrada. Nenhum encontro está pendente."}
           </p>
         )}
       </section>
@@ -1227,7 +1239,7 @@ export default async function DuplaPage({
             )}
           </div>
           <p className="mb-2 mt-1 text-xs text-muted-foreground">
-            Tarefas que a dupla combinou nos encontros
+            Tarefas que a dupla combinou {ehEsp ? "nas sessões" : "nos encontros"}
             {(souMentor || souCoord) &&
               (dupla.status === "ativa" || dupla.status === "pausada") &&
               ". Marque quando forem feitas"}.
@@ -1245,6 +1257,7 @@ export default async function DuplaPage({
             }
             hoje={hojeStr}
             encontroNumeroPorRegistroId={encontroNumeroPorRegistroId}
+            sessao={ehEsp}
           />
         </section>
       )}
@@ -1293,7 +1306,7 @@ export default async function DuplaPage({
         <div className="flex flex-wrap items-start justify-between gap-2">
           <div className="min-w-0">
             <h2 id="lista-encontros" className="text-base font-semibold">
-              Encontros
+              {ehEsp ? "Sessões" : "Encontros"}
             </h2>
             {/* as datas das linhas são as do guia do ciclo — a dupla confirma
                 ou remarca (a real aparece como "agendado {data}" na linha) */}
@@ -1464,7 +1477,10 @@ export default async function DuplaPage({
       </Suspense>
       {vozVisivel &&
         (ehEsp ? (
-          <VozDoJovemEspecialista itens={espAvaliacoes} />
+          <VozDoJovemEspecialista
+            itens={espAvaliacoes}
+            passoPorEncontro={passoPorEncontroEsp}
+          />
         ) : (
           <VozDoJovemCard
             avaliacoes={dupla.encontros.flatMap((e) =>
@@ -1663,7 +1679,9 @@ export default async function DuplaPage({
         <p className="mt-1.5 text-sm text-muted-foreground">
           {[
             turmaLonga(dupla.turma),
-            `Encontro ${jornada.proximoNumero ?? jornada.feitos} de ${total}`,
+            ehEsp
+              ? `Sessão ${jornada.proximoNumero ?? jornada.feitos} de ${total}`
+              : `Encontro ${jornada.proximoNumero ?? jornada.feitos} de ${total}`,
             dupla.supervisor &&
               `auxiliar executivo ${dupla.supervisor.nome_social ?? dupla.supervisor.nome}`,
           ]
@@ -1697,7 +1715,11 @@ export default async function DuplaPage({
                   : ""}
             </span>
           )}
-          <TrajetoriaAvaliacoes encontros={dupla.encontros} total={total} />
+          <TrajetoriaAvaliacoes
+            encontros={dupla.encontros}
+            total={total}
+            sessao={ehEsp}
+          />
           {/* trilha fora do padrão DPP é fato da dupla — aparece como badge
               quieto pra ninguém ler o contador /5 como bug */}
           {ehEsp && (
@@ -1757,7 +1779,10 @@ export default async function DuplaPage({
                 >
                   {nomeVinculo(sucessora)}
                 </Link>
-                . Os encontros e registros desta dupla continuam aqui.
+                .{" "}
+                {ehEsp
+                  ? "As sessões e os registros desta dupla continuam aqui."
+                  : "Os encontros e registros desta dupla continuam aqui."}
               </>
             )}
           </p>

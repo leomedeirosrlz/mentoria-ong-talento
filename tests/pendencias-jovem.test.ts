@@ -234,6 +234,31 @@ describe("derivarPendencias — avaliações, sugestão, aviso, chamado", () => 
     });
   });
 
+  it("avaliações de sessão esp contam 'sessões' no título agrupado", () => {
+    const avaliacoes: AvaliacaoPendencia[] = [1, 2].map((i) => ({
+      id: `e-${i}`,
+      realizadoEm: `2026-11-${10 + i}T19:00:00-03:00`,
+      sessao: true,
+    }));
+    const lista = derivarPendencias(entrada({ avaliacoes }));
+    expect(lista[0].titulo).toBe("2 sessões esperando sua avaliação");
+  });
+
+  it("avaliações mistas (encontro + sessão) nomeiam os dois", () => {
+    const avaliacoes: AvaliacaoPendencia[] = [
+      { id: "e-1", realizadoEm: "2026-11-11T19:00:00-03:00" },
+      {
+        id: "e-2",
+        realizadoEm: "2026-11-12T19:00:00-03:00",
+        sessao: true,
+      },
+    ];
+    const lista = derivarPendencias(entrada({ avaliacoes }));
+    expect(lista[0].titulo).toBe(
+      "2 encontros e sessões esperando sua avaliação"
+    );
+  });
+
   it("sugestão, aviso urgente e chamado com resposta entram; aviso normal não", () => {
     const sugestao: SugestaoPendencia = {
       id: "s1",

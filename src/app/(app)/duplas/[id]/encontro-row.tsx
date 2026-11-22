@@ -602,6 +602,7 @@ export function EncontroRow({
                         encontroId={encontro.id}
                         duplaId={duplaId}
                         evento={passo}
+                        trilha={ehEsp ? "especialista" : "dpp"}
                         registro={reg}
                         combinados={combinadosDoRegistro}
                       />
@@ -649,6 +650,7 @@ export function EncontroRow({
                   jovemNome={jovemNome}
                   jovemWhatsapp={jovemWhatsapp}
                   numero={passo.numero}
+                  sessao={ehEsp}
                   souCoord={souCoord}
                   duplaId={duplaId}
                   jornadaViva={jornadaViva}
@@ -656,7 +658,9 @@ export function EncontroRow({
                 />
               ) : (
                 <div className="rounded-xl border border-dashed border-border/60 bg-muted/20 px-4 py-3 text-xs text-muted-foreground">
-                  Sem avaliação do jovem para este encontro.
+                  {ehEsp
+                    ? "Sem avaliação do jovem para esta sessão."
+                    : "Sem avaliação do jovem para este encontro."}
                 </div>
               )}
             </div>
@@ -670,6 +674,7 @@ export function EncontroRow({
         <CombinadosEncontro
           duplaId={duplaId}
           numero={passo.numero}
+          sessao={ehEsp}
           itens={combinadosDoNumero}
           pendentesAnteriores={combinadosAnteriores}
           jovemNome={jovemNome.split(" ")[0] || "Mentorado"}
@@ -686,6 +691,7 @@ export function EncontroRow({
           <NotaEncontro
             duplaId={duplaId}
             numero={passo.numero}
+            sessao={ehEsp}
             nota={nota}
             somenteLeitura={!podeEditar}
           />
@@ -720,6 +726,7 @@ export function EncontroRow({
               encontroId={encontro.id}
               duplaId={duplaId}
               evento={passo}
+              trilha={ehEsp ? "especialista" : "dpp"}
               registro={reg ?? null}
               combinadosPendentes={combinadosPendentes}
               // telemetria (REALIZA-217): o encontro "externo" nasceu no

@@ -29,7 +29,10 @@ export async function generateMetadata({
   const { token } = await params;
   const r = TOKEN_RE.test(token) ? await avaliacaoPorToken(token) : null;
   const jovem = r?.kind === "ok" ? r.info.alvo?.jovem_nome : null;
-  const titulo = "Como foi o encontro?";
+  const trilha =
+    r?.kind === "ok" ? (await linkAvaliacaoMeta(token))?.trilha : null;
+  const titulo =
+    trilha === "especialista" ? "Como foi a sessão?" : "Como foi o encontro?";
   const descricao =
     "Sua avaliação ajuda a mentoria a melhorar. Leva menos de 1 minuto.";
   return {
@@ -125,8 +128,12 @@ export default async function AvaliarTokenPage({
               acao={{ href: MAILTO, label: "Pedir um novo link" }}
             >
               <p>
-                O prazo pra avaliar este encontro terminou. Peça um novo
-                link à equipe Realiza.vc. Sua opinião continua valendo.
+                O prazo pra avaliar{" "}
+                {meta?.trilha === "especialista"
+                  ? "esta sessão"
+                  : "este encontro"}{" "}
+                terminou. Peça um novo link à equipe Realiza.vc. Sua
+                opinião continua valendo.
               </p>
             </EstadoCard>
           ) : (
@@ -144,7 +151,9 @@ export default async function AvaliarTokenPage({
               }
               contexto={
                 info.encontro && quando
-                  ? `Encontro ${info.encontro.numero}${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDateTime(quando)}`
+                  ? meta?.trilha === "especialista"
+                    ? `Sessão${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDateTime(quando)}`
+                    : `Encontro ${info.encontro.numero}${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDateTime(quando)}`
                   : null
               }
               demo={!!demo}

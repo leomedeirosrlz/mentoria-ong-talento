@@ -1810,6 +1810,40 @@ export function encontroDoPassoEsp(
   return alvo;
 }
 
+/** "5º encontro com Ricardo" (DPP) / "Sessão 3 com Sofia" (trilha de
+ *  especialista) — o rótulo canônico do passo, com o nome de quem conduz
+ *  quando existe. `numero` é o nº de EXIBIÇÃO: no DPP é o próprio
+ *  `encontro.numero`; na trilha esp é o passo do guia (`passoEsp`), nunca
+ *  a tentativa da row. `com` aceita nome completo — entra o primeiro. */
+export function rotuloPasso({
+  esp,
+  numero,
+  com,
+}: {
+  esp: boolean;
+  numero: number;
+  com?: string | null;
+}): string {
+  const primeiro = com?.trim().split(/\s+/)[0];
+  const base = esp ? `Sessão ${numero}` : `${numero}º encontro`;
+  return primeiro ? `${base} com ${primeiro}` : base;
+}
+
+/** O mesmo rótulo a partir da row: na trilha esp o `passoEsp` sobre os
+ *  encontros da MESMA dupla resolve o nº de exibição — a tentativa nunca
+ *  vira rótulo ("4º encontro" onde a régua diz "Sessão 3" era o bug). */
+export function rotuloEncontro(
+  encontro: Pick<Encontro, "numero" | "status">,
+  encontros: Pick<Encontro, "numero" | "status">[],
+  { esp, com }: { esp: boolean; com?: string | null }
+): string {
+  return rotuloPasso({
+    esp,
+    numero: esp ? passoEsp(encontro, encontros) : encontro.numero,
+    com,
+  });
+}
+
 /** O que a superfície de agendamento precisa saber da dupla — derivação única
  *  usada pela ficha, pela home do mentor e pela agenda (era copiada em cada). */
 export type AlvoAgendamento = {

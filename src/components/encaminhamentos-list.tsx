@@ -27,6 +27,7 @@ export function EncaminhamentosList({
   podeMarcar,
   hoje,
   encontroNumeroPorRegistroId,
+  sessao = false,
 }: {
   itens: Encaminhamento[];
   duplaId: string;
@@ -38,6 +39,8 @@ export function EncaminhamentosList({
   hoje: string;
   /** registro_id → número do encontro; itens criados à mão não têm registro_id. */
   encontroNumeroPorRegistroId?: Record<string, number>;
+  /** Trilha esp: a tag de origem fala "na sessão N", não "no Nº encontro". */
+  sessao?: boolean;
 }) {
   const [pending, start] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
@@ -57,7 +60,9 @@ export function EncaminhamentosList({
         <span className="grid size-11 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground">
           <ListChecks size={18} aria-hidden />
         </span>
-        Nenhum combinado por aqui ainda: eles saem do registro de cada encontro.
+        {sessao
+          ? "Nenhum combinado por aqui ainda: eles saem do registro de cada sessão."
+          : "Nenhum combinado por aqui ainda: eles saem do registro de cada encontro."}
       </p>
     );
 
@@ -99,7 +104,11 @@ export function EncaminhamentosList({
                   </span>
                 )}
                 {criadoNo != null && (
-                  <span className="text-[11px] text-muted-foreground"> · criado no {criadoNo}º encontro</span>
+                  <span className="text-[11px] text-muted-foreground">
+                    {sessao
+                      ? ` · criado na sessão ${criadoNo}`
+                      : ` · criado no ${criadoNo}º encontro`}
+                  </span>
                 )}
               </span>
             </span>

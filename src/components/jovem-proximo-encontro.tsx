@@ -24,6 +24,7 @@ import { cn } from "@/lib/utils";
 export function ProximoEncontro({
   proximo,
   rotulo,
+  sessao = false,
   hoje,
   agendar,
   linkEditavel,
@@ -33,8 +34,11 @@ export function ProximoEncontro({
 }: {
   /** Próximo encontro agendado/remarcado com data futura; null = nenhum. */
   proximo: JovemEncontro | null;
-  /** "6º encontro com Ricardo" ou "3ª sessão com Sofia", montado na página. */
+  /** "6º encontro com Ricardo" ou "Sessão 3 com Sofia", montado na página. */
   rotulo: string | null;
+  /** O próximo é sessão de especialista (ou a única trilha viva é a esp) —
+   *  o título e o vazio falam "sessão", não "encontro". */
+  sessao?: boolean;
   /** "YYYY-MM-DD" no fuso do programa. */
   hoje: string;
   /** DPP ativa com um nº livre: o cartão sugere o dia/hora (481); sem
@@ -65,9 +69,12 @@ export function ProximoEncontro({
     const quando = quandoCurto(proximo.data_hora!, eHoje);
     const remarcado = proximo.status === "remarcado" ? " · remarcado" : "";
     return (
-      <Casca {...cabecalho} titulo="Seu próximo encontro">
+      <Casca
+        {...cabecalho}
+        titulo={sessao ? "Sua próxima sessão" : "Seu próximo encontro"}
+      >
         <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
-          {rotulo ?? `${proximo.numero}º encontro`}
+          {rotulo ?? (sessao ? `Sessão ${proximo.numero}` : `${proximo.numero}º encontro`)}
         </p>
         <p className="mt-1 text-sm">
           {quando}
@@ -183,9 +190,12 @@ export function ProximoEncontro({
 
   if (emCurso) {
     return (
-      <Casca {...cabecalho} titulo="Seu próximo encontro">
+      <Casca
+        {...cabecalho}
+        titulo={sessao ? "Sua próxima sessão" : "Seu próximo encontro"}
+      >
         <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
-          Nenhum encontro marcado
+          {sessao ? "Nenhuma sessão marcada" : "Nenhum encontro marcado"}
         </p>
         <p className="mt-1 text-sm">
           Combinem o próximo pelo papo ou pelo WhatsApp.

@@ -1,4 +1,4 @@
-import { AVALIACAO_LABEL } from "@/lib/ciclo";
+import { AVALIACAO_LABEL, passoEsp } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
 import type { Encontro } from "@/lib/types";
 import {
@@ -17,9 +17,13 @@ import {
 export function TrajetoriaAvaliacoes({
   encontros,
   total,
+  sessao = false,
 }: {
   encontros: Encontro[];
   total: number;
+  /** Trilha esp: o dot ancora no passo do guia (rank), não na tentativa —
+   *  e o title fala "Sessão N", não "Encontro N". */
+  sessao?: boolean;
 }) {
   const avaliados = encontros
     .filter((e) => e.status === "realizado" && e.registro?.avaliacao)
@@ -27,7 +31,9 @@ export function TrajetoriaAvaliacoes({
   // com menos de 2 avaliações não há trajetória pra ler
   if (avaliados.length < 2) return null;
 
-  const porNumero = new Map(encontros.map((e) => [e.numero, e]));
+  const porNumero = new Map(
+    encontros.map((e) => [sessao ? passoEsp(e, encontros) : e.numero, e])
+  );
   const rotulos = avaliados.map(
     (e) => AVALIACAO_LABEL[e.registro!.avaliacao!]?.toLowerCase() ?? e.registro!.avaliacao!
   );
@@ -90,7 +96,7 @@ export function TrajetoriaAvaliacoes({
               <span
                 key={numero}
                 title={
-                  `Encontro ${numero}` +
+                  `${sessao ? "Sessão" : "Encontro"} ${numero}` +
                   (avaliacao
                     ? ` · ${AVALIACAO_LABEL[avaliacao] ?? avaliacao}`
                     : realizado

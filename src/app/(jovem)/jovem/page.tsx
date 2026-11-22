@@ -44,6 +44,7 @@ import {
   formatDiaMes,
   maxEncontros,
   passoEsp,
+  rotuloEncontro as rotuloDoEncontro,
   toDateStr,
   waLink,
 } from "@/lib/ciclo";
@@ -234,19 +235,17 @@ export default async function JovemHome() {
     return nome.split(" ")[0] || (esp ? "seu especialista" : "seu mentor");
   };
 
-  // DPP: "5º encontro com Ricardo". Especialista: "3ª sessão com Sofia" — o
-  // passo do guia (rank entre os realizados), não a tentativa.
+  // DPP: "5º encontro com Ricardo". Especialista: "Sessão 3 com Sofia" — o
+  // número é o passo do guia (rank entre as tentativas), nunca e.numero.
   const rotuloEncontro = (e: JovemEncontro): string => {
     const esp = trilhaPorDupla.get(e.dupla_id) === "especialista";
     const nome = nomeDaDupla(e.dupla_id, esp);
-    if (esp) {
-      const passo = passoEsp(
-        e,
-        encontros.filter((x) => x.dupla_id === e.dupla_id)
-      );
-      return `${passo}ª sessão com ${nome}`;
-    }
-    return `${e.numero}º encontro com ${nome}`;
+    const base = rotuloDoEncontro(
+      e,
+      encontros.filter((x) => x.dupla_id === e.dupla_id),
+      { esp }
+    );
+    return `${base} com ${nome}`;
   };
 
   // progresso da jornada: encontros realizados por trilha (a contagem não
@@ -271,14 +270,17 @@ export default async function JovemHome() {
     }));
   const avaliacoesFeitas = avaliacoes.map((a) => {
     const enc = encPorId.get(a.encontro_id);
+    const trilha = trilhaPorDupla.get(a.dupla_id) ?? "dpp";
     return {
       ...a,
-      trilha: trilhaPorDupla.get(a.dupla_id) ?? "dpp",
+      trilha,
       rotulo: enc
         ? rotuloEncontro(enc)
-        : a.encontro?.numero
-          ? `${a.encontro.numero}º encontro`
-          : undefined,
+        : trilha === "especialista"
+          ? "Sessão de especialista"
+          : a.encontro?.numero
+            ? `${a.encontro.numero}º encontro`
+            : undefined,
     };
   });
 
@@ -377,6 +379,7 @@ export default async function JovemHome() {
       id: p.encontroId,
       rotulo: p.rotulo,
       realizadoEm: p.realizado_em,
+      sessao: p.trilha === "especialista",
     })),
     documentos: assinaturas
       .filter((a): a is typeof a & { id: string } => a.id != null)
@@ -572,6 +575,11 @@ export default async function JovemHome() {
       <ProximoEncontro
         proximo={proximo}
         rotulo={proximo ? rotuloEncontro(proximo) : null}
+        sessao={
+          proximo != null
+            ? trilhaPorDupla.get(proximo.dupla_id) === "especialista"
+            : !temDpp
+        }
         hoje={hoje}
         agendar={agendar}
         linkEditavel={linkEditavelProximo}
