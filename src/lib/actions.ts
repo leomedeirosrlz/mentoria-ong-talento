@@ -2317,7 +2317,8 @@ export async function remanejarDupla(
   novoId: string,
   motivo: string,
   registrarNota: boolean,
-  devolutiva?: string
+  devolutiva?: string,
+  redirecionar = false
 ) {
   if (await demoAtivo()) return { error: DEMO_MSG };
   const { supabase, me: eu } = await me();
@@ -2514,6 +2515,10 @@ export async function remanejarDupla(
   revalidatePath(`/duplas/${novaDuplaId}`);
   revalidatePath("/pessoas");
   revalidatePath(`/pessoas/${saiId}`);
+  // a ficha antiga vira "encerrada" na mesma revalidation; navegar daqui
+  // evita o router.push do cliente ser descartado quando o menu/dialog
+  // desmonta (496/QW do remanejo)
+  if (redirecionar) redirect(`/duplas/${novaDuplaId}`);
   return { ok: true, novaDuplaId };
 }
 

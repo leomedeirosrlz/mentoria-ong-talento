@@ -310,7 +310,8 @@ export function RemanejarDuplaDialog({
           novoId,
           motivo,
           registrarNota,
-          devolutiva
+          devolutiva,
+          true
         );
         if (res?.error) {
           setErro(res.error);
@@ -322,9 +323,17 @@ export function RemanejarDuplaDialog({
             : "Dupla remanejada."
         );
         setOpen(false);
-        if (res?.novaDuplaId) router.push(`/duplas/${res.novaDuplaId}`);
-        else router.refresh();
-      } catch {
+        if (!res?.novaDuplaId) router.refresh();
+      } catch (err) {
+        // o redirect da action chega como NEXT_REDIRECT: deixa o Next navegar
+        if (
+          typeof err === "object" &&
+          err !== null &&
+          "digest" in err &&
+          String((err as { digest?: unknown }).digest).startsWith("NEXT_REDIRECT")
+        ) {
+          return;
+        }
         toast.error("Sem conexão. Tente de novo.");
       }
     });
