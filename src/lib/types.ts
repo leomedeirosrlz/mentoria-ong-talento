@@ -894,6 +894,10 @@ export type ChamadoFilaItem = ChamadoFila & {
   /** Nome do mentorado da dupla vinculada (chamados.dupla_id) — null sem
    *  dupla, quando restrito, ou quando a RLS não entrega a dupla. */
   mentorado_nome: string | null;
+  /** Só o recorte do autor preenche (504): existe atualização pública da
+   *  equipe na trilha — a prova real de "respondeu" (atribuição e status
+   *  não são resposta). Staff e a leitura avulsa deixam undefined. */
+  tem_resposta_equipe?: boolean;
 };
 
 export type ChamadoAtualizacao = {

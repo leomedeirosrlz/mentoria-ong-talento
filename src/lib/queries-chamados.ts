@@ -97,14 +97,34 @@ export const getChamados = cache(
     // sob o escopo do autor; ler profiles/duplas direto devolvia vazio pra
     // jovem porque a RLS dessas tabelas não alcança a equipe nem a ficha
     const ids = (data ?? []).map((c) => c.id);
-    const { data: ctx } = ids.length
-      ? await supabase
-          .from("chamados_contexto")
-          .select("chamado_id, atribuido_nome, mentorado_nome")
-          .in("chamado_id", ids)
-      : { data: [] };
+    const [ctxRes, pubRes] = await Promise.all([
+      ids.length
+        ? supabase
+            .from("chamados_contexto")
+            .select("chamado_id, atribuido_nome, mentorado_nome")
+            .in("chamado_id", ids)
+        : Promise.resolve({ data: [] }),
+      ids.length
+        ? supabase
+            .from("chamado_atualizacoes")
+            .select("chamado_id, autor_id")
+            .eq("tipo", "publica")
+            .in("chamado_id", ids)
+        : Promise.resolve({ data: [] }),
+    ]);
+    const ctx = ctxRes.data;
     const ctxPorId = new Map(
       (ctx ?? []).map((x) => [x.chamado_id, x])
+    );
+    // "a equipe respondeu" = trilha pública escrita por alguém que não o
+    // autor — publica só sai por duas RPCs (publicar_atualizacao, da
+    // equipe, e acrescentar_info, do próprio autor). Checar o papel do
+    // autor da entrada seria impossível pro jovem: a RLS de profiles não
+    // alcança a equipe (é por isso que a view acima existe)
+    const respondidos = new Set(
+      (pubRes.data ?? [])
+        .filter((u) => u.autor_id != null && u.autor_id !== me.id)
+        .map((u) => u.chamado_id)
     );
     const itens = (data ?? []).map((c) => {
       const x = ctxPorId.get(c.id);
@@ -116,6 +136,7 @@ export const getChamados = cache(
         atribuido_nome: c.atribuido_a ? (x?.atribuido_nome ?? null) : null,
         contexto: null,
         mentorado_nome: c.dupla_id ? (x?.mentorado_nome ?? null) : null,
+        tem_resposta_equipe: respondidos.has(c.id),
       };
     }) as ChamadoFilaItem[];
     return { papel: me.role, itens };

@@ -134,38 +134,55 @@ export type AvisoPendencia = {
   criadoEm?: string | null;
 };
 
-/** Chamado do jovem — entra só quando a equipe respondeu (o chamador sabe
- *  pela timeline; a row sozinha não diz se a resposta é nova). */
+/** Chamado do jovem — entra quando a equipe respondeu na trilha pública
+ *  ou já está cuidando (o chamador sabe pela projeção; a row sozinha não
+ *  diz se a resposta é nova). */
 export type ChamadoPendencia = {
   id: string;
   assunto?: string | null;
-  temRespostaEquipe: boolean;
-  /** Nome de quem respondeu ("Marina") — o primeiro nome entra no título. */
+  /** "resposta": existe atualização pública da equipe na trilha — a única
+   *  prova honesta de "respondeu". "cuidando": tem dono ou está em
+   *  atendimento sem resposta pública ainda — estado neutro, não promessa.
+   *  null: espera (aberto sem dono) ou desfecho (resolvido/cancelado) —
+   *  não entra na lista. */
+  andamento?: "resposta" | "cuidando" | null;
+  /** Nome de quem respondeu ("Marina") — só preenchido com resposta; o
+   *  primeiro nome entra no título. */
   respondeuNome?: string | null;
   atualizadoEm?: string | null;
 };
 
-/** Projeção linha do chamado → entrada de pendência (489). "A equipe
- *  respondeu" = o status saiu de 'aberto' OU já tem dono (atribuido_a) —
- *  os dois dizem "alguém olhou". Aberto esperando dono segue espera, não
- *  tarefa; status fora do enum conhecido (ex.: um futuro 'cancelado')
- *  também não acorda o jovem. Qualquer ChamadoFilaItem satisfaz a forma. */
+/** Projeção linha do chamado → entrada de pendência (489/504). "A equipe
+ *  respondeu" só quando `tem_resposta_equipe` marca uma atualização
+ *  pública de quem não é o autor — atribuição e status provam interesse,
+ *  não resposta. Atribuído/em atendimento sem resposta vira "cuidando".
+ *  Resolvido nunca entra: a notificação chamado_resolvido já carrega o
+ *  desfecho, e uma pendência sem gesto novo só eternizaria a linha.
+ *  Status fora do enum conhecido (ex.: um futuro 'cancelado') também não
+ *  acorda o jovem. Qualquer ChamadoFilaItem satisfaz a forma. */
 export function chamadoPendencia(c: {
   id: string;
   assunto?: string | null;
   status?: string | null;
   atribuido_a?: string | null;
   atribuido_nome?: string | null;
+  tem_resposta_equipe?: boolean | null;
   updated_at?: string | null;
 }): ChamadoPendencia {
+  const andamento =
+    c.status !== "aberto" && c.status !== "em_atendimento"
+      ? null
+      : c.tem_resposta_equipe
+        ? "resposta"
+        : c.status === "em_atendimento" || c.atribuido_a != null
+          ? "cuidando"
+          : null;
   return {
     id: c.id,
     assunto: c.assunto ?? null,
-    temRespostaEquipe:
-      c.status === "em_atendimento" ||
-      c.status === "resolvido" ||
-      c.atribuido_a != null,
-    respondeuNome: c.atribuido_nome ?? null,
+    andamento,
+    respondeuNome:
+      andamento === "resposta" ? (c.atribuido_nome ?? null) : null,
     atualizadoEm: c.updated_at ?? null,
   };
 }
@@ -472,21 +489,26 @@ function avisos(lista: AvisoPendencia[]): PendenciaJovem[] {
   return out;
 }
 
-/** 50 — a equipe respondeu o pedido de ajuda; a conversa mora no perfil. */
+/** 50 — o pedido de ajuda andou: resposta pública da equipe ("X respondeu
+ *  seu pedido") ou alguém cuidando sem resposta ainda (estado neutro — a
+ *  linha informa, não promete). A conversa mora no perfil. */
 function chamados(lista: ChamadoPendencia[]): PendenciaJovem[] {
   const out: PendenciaJovem[] = [];
   for (const c of lista) {
-    if (c.id == null || !c.temRespostaEquipe) continue;
+    if (c.id == null || c.andamento == null) continue;
+    const respondeu = c.andamento === "resposta";
     out.push({
       id: `chamado:${c.id}`,
       tipo: "chamado",
       prioridade: 50,
-      titulo: `${primeiroNome(c.respondeuNome) || "A equipe"} respondeu seu pedido`,
+      titulo: respondeu
+        ? `${primeiroNome(c.respondeuNome) || "A equipe"} respondeu seu pedido`
+        : "A equipe está cuidando do seu pedido",
       contexto: c.assunto?.trim() || undefined,
       quando: c.atualizadoEm ?? null,
       acao: {
         tipo: "abrir_chamado",
-        rotulo: "Ver resposta",
+        rotulo: respondeu ? "Ver resposta" : "Ver andamento",
         href: `/jovem/perfil?c=${c.id}`,
         alvoId: c.id,
       },

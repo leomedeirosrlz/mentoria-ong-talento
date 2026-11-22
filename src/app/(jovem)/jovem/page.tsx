@@ -424,8 +424,9 @@ export default async function JovemHome() {
       duplaId: duplaDppId,
       dataOficial: oficialPorNumero.get(numero) ?? null,
     })),
-    // a pendência "respondeu seu pedido" só nasce quando a equipe olhou —
-    // aberto sem dono é espera dele, não tarefa (a régua mora no mapper)
+    // a pendência de chamado nasce da trilha pública: "respondeu" só com
+    // atualização da equipe; com dono sem resposta vira "cuidando"; aberto
+    // sem dono e resolvido são espera/desfecho, não tarefa (régua no mapper)
     chamados: meusChamados.itens.map(chamadoPendencia),
   });
 

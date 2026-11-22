@@ -282,14 +282,14 @@ describe("derivarPendencias — avaliações, sugestão, aviso, chamado", () => 
     const chamado: ChamadoPendencia = {
       id: "ch1",
       assunto: "Falta material do encontro",
-      temRespostaEquipe: true,
+      andamento: "resposta",
       respondeuNome: "Marina Duarte",
       atualizadoEm: "2026-11-21T09:00:00-03:00",
     };
     const semResposta: ChamadoPendencia = {
       id: "ch2",
       assunto: "Outro pedido",
-      temRespostaEquipe: false,
+      andamento: null,
       atualizadoEm: "2026-11-21T09:00:00-03:00",
     };
     const lista = derivarPendencias(
@@ -319,8 +319,8 @@ describe("derivarPendencias — avaliações, sugestão, aviso, chamado", () => 
   });
 });
 
-describe("chamadoPendencia — projeção linha do chamado (489)", () => {
-  it("aberto sem dono não conta como resposta da equipe", () => {
+describe("chamadoPendencia — projeção linha do chamado (504)", () => {
+  it("aberto sem dono não vira pendência — espera, não tarefa", () => {
     const p = chamadoPendencia({
       id: "c1",
       assunto: "Não consigo anexar a foto",
@@ -332,63 +332,95 @@ describe("chamadoPendencia — projeção linha do chamado (489)", () => {
     expect(p).toEqual({
       id: "c1",
       assunto: "Não consigo anexar a foto",
-      temRespostaEquipe: false,
+      andamento: null,
       respondeuNome: null,
       atualizadoEm: "2026-11-20T14:40:00-03:00",
     });
-    // e não vira pendência na lista
     expect(derivarPendencias(entrada({ chamados: [p] }))).toEqual([]);
   });
 
-  it.each(["em_atendimento", "resolvido"] as const)(
-    "status %s conta como resposta — com o primeiro nome de quem cuida",
-    (status) => {
-      const p = chamadoPendencia({
-        id: "c2",
-        assunto: "O encontro pode cair no feriado?",
-        status,
-        atribuido_a: "marina-id",
-        atribuido_nome: "Marina Duarte",
-        updated_at: "2026-11-21T09:45:00-03:00",
-      });
-      expect(p.temRespostaEquipe).toBe(true);
-      expect(p.respondeuNome).toBe("Marina Duarte");
-      const lista = derivarPendencias(entrada({ chamados: [p] }));
-      expect(lista).toHaveLength(1);
-      expect(lista[0].titulo).toBe("Marina respondeu seu pedido");
-      expect(lista[0].acao.href).toBe("/jovem/perfil?c=c2");
-    }
-  );
+  it("em atendimento com dono e SEM resposta pública é 'cuidando' — nunca promete resposta", () => {
+    const p = chamadoPendencia({
+      id: "c2",
+      assunto: "O guia não abre no celular",
+      status: "em_atendimento",
+      atribuido_a: "marina-id",
+      atribuido_nome: "Marina Duarte",
+      tem_resposta_equipe: false,
+      updated_at: "2026-11-21T08:10:00-03:00",
+    });
+    expect(p.andamento).toBe("cuidando");
+    // sem resposta não há "quem respondeu" — o nome não migra pro título
+    expect(p.respondeuNome).toBeNull();
+    const lista = derivarPendencias(entrada({ chamados: [p] }));
+    expect(lista).toHaveLength(1);
+    expect(lista[0].titulo).toBe("A equipe está cuidando do seu pedido");
+    expect(lista[0].acao).toMatchObject({
+      tipo: "abrir_chamado",
+      rotulo: "Ver andamento",
+      href: "/jovem/perfil?c=c2",
+    });
+  });
 
-  it("aberto já com dono também conta — alguém olhou mesmo antes do status virar", () => {
+  it("aberto já com dono sem resposta também é 'cuidando'", () => {
     const p = chamadoPendencia({
       id: "c3",
       status: "aberto",
       atribuido_a: "marina-id",
       atribuido_nome: "Marina Duarte",
+      tem_resposta_equipe: false,
     });
-    expect(p.temRespostaEquipe).toBe(true);
+    expect(p.andamento).toBe("cuidando");
   });
 
-  it("sem nome de responsável o título cai pra 'A equipe' — nunca inventa nome", () => {
+  it("resposta pública da equipe vira 'resposta' — com o primeiro nome de quem cuida", () => {
     const p = chamadoPendencia({
       id: "c4",
+      assunto: "O encontro pode cair no feriado?",
+      status: "em_atendimento",
+      atribuido_a: "marina-id",
+      atribuido_nome: "Marina Duarte",
+      tem_resposta_equipe: true,
+      updated_at: "2026-11-21T09:45:00-03:00",
+    });
+    expect(p.andamento).toBe("resposta");
+    expect(p.respondeuNome).toBe("Marina Duarte");
+    const lista = derivarPendencias(entrada({ chamados: [p] }));
+    expect(lista).toHaveLength(1);
+    expect(lista[0].titulo).toBe("Marina respondeu seu pedido");
+    expect(lista[0].acao).toMatchObject({
+      rotulo: "Ver resposta",
+      href: "/jovem/perfil?c=c4",
+    });
+  });
+
+  it.each(["resolvido", "cancelado"] as const)(
+    "status %s nunca vira pendência — nem com resposta pública nem dono",
+    (status) => {
+      const p = chamadoPendencia({
+        id: "c5",
+        status,
+        atribuido_a: "marina-id",
+        atribuido_nome: "Marina Duarte",
+        tem_resposta_equipe: true,
+      });
+      expect(p.andamento).toBeNull();
+      expect(p.respondeuNome).toBeNull();
+      expect(derivarPendencias(entrada({ chamados: [p] }))).toEqual([]);
+    }
+  );
+
+  it("resposta sem nome de responsável cai pra 'A equipe' — nunca inventa nome", () => {
+    const p = chamadoPendencia({
+      id: "c6",
       status: "em_atendimento",
       atribuido_a: "alguem-id",
       atribuido_nome: null,
+      tem_resposta_equipe: true,
     });
     expect(p.respondeuNome).toBeNull();
     const [item] = derivarPendencias(entrada({ chamados: [p] }));
     expect(item.titulo).toBe("A equipe respondeu seu pedido");
-  });
-
-  it("status fora do enum conhecido não acorda o jovem", () => {
-    const p = chamadoPendencia({
-      id: "c5",
-      status: "cancelado",
-      atribuido_a: null,
-    });
-    expect(p.temRespostaEquipe).toBe(false);
   });
 });
 

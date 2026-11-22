@@ -24,6 +24,8 @@ const NUM = {
   agenda: "CHA-000143", // do Ricardo, em atendimento com a Marina
   plataforma: "CHA-000144", // da Ana (autora jovem logada)
   jovemFeriado: "CHA-000147", // da Ana, em atendimento com a Marina (489)
+  jovemGuia: "CHA-000148", // da Ana, com dono e sem resposta pública (504)
+  jovemResolvido: "CHA-000149", // da Ana, resolvido com resposta pública (504)
   metodo: "CHA-000145", // aberto pela coord, atribuído ao Paulo
   devolutiva: "CHA-000136", // da Sofia, resolvido
   urgenciaAntiga: "CHA-000129", // do João Pedro, resolvido
@@ -70,11 +72,26 @@ describe("demoChamadosFila — escopo por papel", () => {
 
   it("mentorado vê só os da própria ficha", () => {
     const fila = demoChamadosFila("mentorado");
-    // ordem da fila: aberto antes de em atendimento
+    // ordem da fila: aberto → em atendimento (recente em cima) → resolvido
     expect(fila.map((c) => c.numero)).toEqual([
       NUM.plataforma,
       NUM.jovemFeriado,
+      NUM.jovemGuia,
+      NUM.jovemResolvido,
     ]);
+  });
+
+  it("tem_resposta_equipe marca só a pública de quem não é o autor (504)", () => {
+    // a Marina escreveu na trilha do feriado e do resolvido; no do guia
+    // só há eventos de sistema, e no de plataforma nada ainda
+    expect(item("mentorado", NUM.jovemFeriado)!.tem_resposta_equipe).toBe(true);
+    expect(item("mentorado", NUM.jovemResolvido)!.tem_resposta_equipe).toBe(true);
+    expect(item("mentorado", NUM.jovemGuia)!.tem_resposta_equipe).toBe(false);
+    expect(item("mentorado", NUM.plataforma)!.tem_resposta_equipe).toBe(false);
+    // o recorte da equipe não deriva a flag — a fila real também não
+    // preenche (pendência de chamado é peça do autor)
+    expect(item("coordenacao", NUM.jovemFeriado)!.tem_resposta_equipe).toBeUndefined();
+    expect(item("supervisor", NUM.jovemFeriado)!.tem_resposta_equipe).toBeUndefined();
   });
 
   it("a fila ordena aberto → em atendimento → resolvido, recente em cima", () => {
