@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { ArrowSquareOut } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 
 import { toggleEncaminhamento } from "@/lib/actions";
 import { cn } from "@/lib/utils";

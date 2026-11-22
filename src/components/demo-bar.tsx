@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useState, useTransition, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   ArrowsCounterClockwise,
   Binoculars,

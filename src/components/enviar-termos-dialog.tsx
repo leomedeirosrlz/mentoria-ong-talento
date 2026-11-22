@@ -10,7 +10,7 @@ import {
   PaperPlaneTilt,
   Signature,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { AnimatePresence, motion } from "motion/react";
 import {
   emitirAssinaturasEmLote,

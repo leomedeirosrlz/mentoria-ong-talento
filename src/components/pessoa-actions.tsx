@@ -15,7 +15,7 @@ import {
   User,
   UserSwitch,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { deletePessoa, setPessoaAtivo, updatePessoa } from "@/lib/actions";
 import { convidarAcesso } from "@/lib/actions-convite";
 import { createClient } from "@/lib/supabase/client";

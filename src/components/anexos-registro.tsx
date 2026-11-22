@@ -3,7 +3,7 @@
 import { useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CircleNotch, Paperclip, Trash } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
 import { formatDiaMes, formatTamanho } from "@/lib/ciclo";
 import type { RegistroAnexo } from "@/lib/types";

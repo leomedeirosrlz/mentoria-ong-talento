@@ -3,7 +3,7 @@
 import { type CSSProperties, useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CaretLeft, CaretRight, Paperclip, Plus, Trash, X } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { salvarRegistro } from "@/lib/actions";
 import { abrirAncoraRegistro } from "@/lib/ancora-registro";
 import { demoAtivoClient } from "@/lib/demo/shared";

@@ -8,7 +8,7 @@ import {
   Copy,
   WhatsappLogo,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { enviarLembrete, type LembreteDestino } from "@/lib/actions-lembrete";
 import { formatDiaMes, LEMBRETE_INTERVALO_MS, waLink } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";

@@ -9,7 +9,7 @@ import {
   HandHeart,
   Star,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { definirVisibilidadeAvaliacao } from "@/lib/actions-avaliacao";
 import type { JovemAvaliacao } from "@/lib/queries-avaliacao";
 import {

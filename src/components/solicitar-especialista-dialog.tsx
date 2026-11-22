@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { UserPlus } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { criarSolicitacao } from "@/lib/actions-especialista";
 import { Button } from "@/components/ui/button";
 import {

@@ -7,7 +7,7 @@ import {
   AVATAR_MAX_BYTES,
   avisoImagemGrande,
 } from "@/lib/avatar";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 
 /** Campo opcional de foto nos dialogs de cadastro — preview circular local

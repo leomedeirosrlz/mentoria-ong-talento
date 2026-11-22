@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { Collapsible } from "@base-ui/react/collapsible";
 import { CaretDown, Plus, X } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   criarCombinadoEncontro,
   editarEncaminhamento,

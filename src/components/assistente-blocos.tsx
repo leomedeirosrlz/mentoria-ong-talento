@@ -42,7 +42,7 @@ import {
   WhatsappLogo,
   type Icon,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type {
   BlocoDestaque,
   BlocoEscolha,

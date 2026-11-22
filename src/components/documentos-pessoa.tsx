@@ -14,7 +14,7 @@ import {
   Plus,
   Trash,
 } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import {
   excluirDocumentoPessoa,
   registrarDocumentoPessoa,

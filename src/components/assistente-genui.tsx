@@ -28,7 +28,7 @@ import {
   type CSSProperties,
 } from "react";
 import { Check, Copy } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import type { Grafico, GraficoDado, GraficoTom } from "@/lib/ia/render";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";

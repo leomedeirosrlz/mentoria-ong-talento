@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Check, CopySimple } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { DialogClose, DialogFooter } from "@/components/ui/dialog";
 import { NudgeButton } from "@/components/nudge-button";

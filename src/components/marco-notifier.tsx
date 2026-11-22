@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { Flag, FlagCheckered, Medal, Trophy } from "@phosphor-icons/react";
-import { toast } from "sonner";
+import { toast } from "@/lib/toast";
 import { marcosEntre, progressoTrilha, type MarcoJornada } from "@/lib/ciclo";
 import { demoAtivoClient } from "@/lib/demo/shared";
 
