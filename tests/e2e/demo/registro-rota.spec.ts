@@ -6,7 +6,7 @@ import { agirComConfirma, entrarNaDemo, expect, test } from "../helpers";
 //
 // Fixture d-T2c (Ricardo × Matheus, uid 0x060d): o 2º encontro está
 // realizado sem registro — é a pendência que a home e a ficha cobram.
-const DUPLA_T2C = "de000000-0000-4000-8000-00000000060d";
+const DUPLA_T2C = "de000000-0000-4000-8000-000000001549";
 const DEMO_MSG = "Modo demonstração. Nada é gravado de verdade.";
 
 test.describe("demo — rota de registro (REALIZA-473)", () => {
