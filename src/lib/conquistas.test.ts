@@ -295,3 +295,153 @@ describe("conquistasDoJovem", () => {
     expect(r.proximoMarco).toMatchObject({ marco: "metade" });
   });
 });
+
+// ---------- marcos de ação (485 — a faixa "a caminho" do topo da
+// jornada): 1º encontro, avaliação, PDM, jornada completa. Estado
+// ganho/não ganho sempre em texto; o próximo é o primeiro não ganho.
+describe("marcos de ação", () => {
+  it("sem dupla: marcos vazio — a faixa não renderiza", () => {
+    const r = conquistasDoJovem(base());
+    expect(r.temJornada).toBe(false);
+    expect(r.marcos).toEqual([]);
+  });
+
+  it("jovem novo sem RPC: 3 marcos (sem PDM), o 1º encontro é o próximo", () => {
+    const r = conquistasDoJovem(base({ duplas: [DUPLA_DPP] }));
+    expect(r.marcos.map((m) => m.chave)).toEqual([
+      "primeiro",
+      "avaliou",
+      "completo",
+    ]);
+    expect(r.marcos[0]).toMatchObject({
+      titulo: "Primeiro encontro",
+      ganho: false,
+      proximo: true,
+      linha: "Falta 1 encontro com seu mentor",
+      progresso: { atual: 0, alvo: 1 },
+    });
+    expect(r.marcos[1]).toMatchObject({
+      ganho: false,
+      linha: "Depois do 1º encontro",
+    });
+    expect(r.marcos[2]).toMatchObject({
+      titulo: "Jornada completa",
+      ganho: false,
+      proximo: false,
+      linha: "Faltam 16 encontros com seu mentor",
+      progresso: { atual: 0, alvo: 16 },
+    });
+  });
+
+  it("avaliação pendente: 'Falta avaliar o encontro N' e é o próximo", () => {
+    const r = conquistasDoJovem(
+      base({ duplas: [DUPLA_DPP], encontros: [enc(1), enc(2)] })
+    );
+    const aval = r.marcos.find((m) => m.chave === "avaliou")!;
+    expect(aval).toMatchObject({
+      ganho: false,
+      proximo: true,
+      linha: "Falta avaliar o encontro 1",
+    });
+  });
+
+  it("ganhos datados, contagem de avaliação e 'Faltam N' no próximo", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [DUPLA_DPP],
+        encontros: Array.from({ length: 4 }, (_, i) => enc(i + 1)),
+        avaliacoes: [
+          { encontro_id: "e1", dupla_id: "d1", created_at: "2026-03-05T12:00:00-03:00" },
+          { encontro_id: "e2", dupla_id: "d1", created_at: "2026-03-12T12:00:00-03:00" },
+        ],
+        jornada: jornada([instrumento("pdm", [entrega()])]),
+      })
+    );
+    expect(r.marcos.map((m) => m.chave)).toEqual([
+      "primeiro",
+      "avaliou",
+      "pdm",
+      "completo",
+    ]);
+    expect(r.marcos[0]).toMatchObject({
+      ganho: true,
+      proximo: false,
+      data: `${dia(1)}T19:00:00-03:00`,
+    });
+    expect(r.marcos[1]).toMatchObject({
+      ganho: true,
+      linha: "Avaliou 2 encontros com seu mentor",
+    });
+    expect(r.marcos[2]).toMatchObject({
+      titulo: "Plano de Desenvolvimento",
+      ganho: true,
+      data: "2026-03-04T10:00:00-03:00",
+    });
+    expect(r.marcos[3]).toMatchObject({
+      ganho: false,
+      proximo: true,
+      linha: "Faltam 12 encontros com seu mentor",
+      progresso: { atual: 4, alvo: 16 },
+    });
+  });
+
+  it("PDM com link vivo não ganho é o próximo e diz o que falta", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [DUPLA_DPP],
+        encontros: [enc(1)],
+        avaliacoes: [
+          { encontro_id: "e1", dupla_id: "d1", created_at: "2026-03-05T12:00:00-03:00" },
+        ],
+        jornada: jornada([
+          instrumento("pdm", [
+            entrega({ status: "pendente", respondido_em: null, respostas: null }),
+          ]),
+        ]),
+      })
+    );
+    const pdm = r.marcos.find((m) => m.chave === "pdm")!;
+    expect(pdm).toMatchObject({
+      ganho: false,
+      proximo: true,
+      linha: "Esperando sua resposta",
+      progresso: null,
+    });
+  });
+
+  it("só especialista: 3 marcos falam de sessão, régua de 5", () => {
+    const r = conquistasDoJovem(
+      base({ duplas: [DUPLA_ESP], encontros: [encEsp(1), encEsp(2)] })
+    );
+    expect(r.marcos.map((m) => m.chave)).toEqual([
+      "primeiro",
+      "avaliou",
+      "completo",
+    ]);
+    expect(r.marcos[0].titulo).toBe("Primeira sessão");
+    expect(r.marcos[0].ganho).toBe(true);
+    // sem avaliação, ela é o próximo gesto — o "completo" ainda não chegou
+    expect(r.marcos[1]).toMatchObject({ ganho: false, proximo: true });
+    expect(r.marcos[2]).toMatchObject({
+      ganho: false,
+      proximo: false,
+      linha: "Faltam 3 sessões com especialista",
+      progresso: { atual: 2, alvo: 5 },
+    });
+  });
+
+  it("jornada completa: marco completo datado; avaliação pendente segue como próximo", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [DUPLA_DPP],
+        encontros: Array.from({ length: 16 }, (_, i) => enc(i + 1)),
+      })
+    );
+    const completo = r.marcos.find((m) => m.chave === "completo")!;
+    expect(completo.ganho).toBe(true);
+    expect(completo.data).toBe(`${dia(16)}T19:00:00-03:00`);
+    // a jornada fechou, mas as 16 sessões ainda não foram avaliadas:
+    // "Avaliação do encontro" é o próximo gesto da faixa
+    expect(r.marcos[1]).toMatchObject({ ganho: false, proximo: true });
+  });
+});
