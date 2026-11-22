@@ -13,6 +13,7 @@ import {
   demoJovemEncontros,
   demoJovemEspecialistas,
   demoJovemPerfil,
+  demoJovemPlano,
 } from "./demo/queries";
 import { demoJovemJornada } from "./demo/forms-data";
 import type { JovemJornadaDados } from "./jornada";
@@ -459,7 +460,7 @@ export type JovemPlano = {
 export const getJovemPlano = cache(
   async (): Promise<JovemPlano | null> => {
     const demo = await demoRole();
-    if (demo) return demoJovemPlano();
+    if (demo) return demoJovemPlano(demo);
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("jovem_plano");
     if (error) {
@@ -469,30 +470,3 @@ export const getJovemPlano = cache(
     return (data ?? null) as JovemPlano | null;
   }
 );
-
-/** Paridade demo (459): um plano aceito de exemplo, no MESMO recorte da
- *  RPC — a agenda demo mostra o combinado como no produto. */
-function demoJovemPlano(): JovemPlano {
-  const hoje = new Date();
-  const em = (dias: number) =>
-    new Date(hoje.getTime() + dias * 86_400_000).toISOString();
-  return {
-    id: "demo-plano",
-    status: "aceito",
-    versao: 1,
-    ritmo: "2",
-    janela: {
-      inicio: em(0).slice(0, 10),
-      fim: em(28).slice(0, 10),
-    },
-    passos: [
-      { numero: 4, data: em(3).slice(0, 10), acao: "remarcar" },
-      { numero: 5, data: em(10).slice(0, 10), acao: "remarcar" },
-    ],
-    aprovado_lado: "mentor",
-    expira_em: em(14),
-    passos_aplicados: [
-      { numero: 4, data_nova: em(3), aplicado_em: hoje.toISOString() },
-    ],
-  };
-}
