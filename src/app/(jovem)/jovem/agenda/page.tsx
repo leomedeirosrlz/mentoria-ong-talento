@@ -15,19 +15,20 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Avatar } from "@/components/avatar";
 import {
-  AvaliarPendenteButton,
   VerAvaliacaoButton,
   type AvaliacaoFeita,
   type AvaliacaoPendente,
 } from "@/components/jovem-avaliacoes";
+import {
+  JovemParaFazer,
+  type EncontroCtx,
+} from "@/components/jovem-para-fazer";
 import { JovemAgendarDialog } from "@/components/jovem-agendar-dialog";
 import { JovemRetroativoDialog } from "@/components/jovem-retroativo-dialog";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import {
   DesmarcarEncontroJovem,
   DesfazerRetroativoJovem,
-  AconteceuJovem,
-  NaoAconteceuJovem,
 } from "@/components/jovem-encontro-acoes";
 import { PedidoJovemMesa } from "@/components/jovem-pedido-item";
 import {
@@ -40,6 +41,7 @@ import {
   linkSeguro,
   maxEncontros,
   passoEsp,
+  podeEntrarAgora,
   toDateStr,
   waLink,
 } from "@/lib/ciclo";
@@ -60,6 +62,7 @@ import {
   getJovemRecessos,
 } from "@/lib/queries-jovem";
 import { datasOficiaisDe } from "@/lib/jornada";
+import { derivarPendencias } from "@/lib/pendencias-jovem";
 import { getSlotsLivres } from "@/lib/queries-especialista";
 import { getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
@@ -125,32 +128,19 @@ export default async function JovemAgenda() {
   const agora = new Date().getTime();
   const primeiroNome = (me?.nome_social || me?.nome || "").split(" ")[0];
 
-  // avaliação estrela (0071) por encontro — a linha realizado ganha o CTA
-  // "Avaliar" (pendente) ou a estrela que já foi dada (ver resposta). A
-  // trilha vem da view jovem_duplas — a tabela `duplas` não é legível pro
-  // papel mentorado.
+  // avaliação estrela (0071) por encontro — a linha realizado mostra a
+  // estrela já dada ("Ver resposta"); a que falta é pendência da seção
+  // "Precisa de você". A trilha vem da view jovem_duplas — a tabela
+  // `duplas` não é legível pro papel mentorado.
   const trilhaPorDupla = new Map(duplas.map((d) => [d.id, d.trilha ?? "dpp"]));
   const ativaPorDupla = new Map(duplas.map((d) => [d.id, d.status === "ativa"]));
   const avalPorEncontro = new Map(avaliacoes.map((a) => [a.encontro_id, a]));
-  const avalDe = (
-    e: JovemEncontro
-  ): { pendente: AvaliacaoPendente | null; feita: AvaliacaoFeita | null } => {
-    if (e.status !== "realizado") return { pendente: null, feita: null };
+  const avalDe = (e: JovemEncontro): AvaliacaoFeita | null => {
+    if (e.status !== "realizado") return null;
     const a = avalPorEncontro.get(e.id);
-    if (a)
-      return {
-        pendente: null,
-        feita: { ...a, trilha: trilhaPorDupla.get(a.dupla_id) ?? "dpp" },
-      };
-    return {
-      pendente: {
-        encontroId: e.id,
-        numero: e.numero,
-        realizado_em: e.realizado_em,
-        trilha: trilhaPorDupla.get(e.dupla_id) ?? "dpp",
-      },
-      feita: null,
-    };
+    return a
+      ? { ...a, trilha: trilhaPorDupla.get(a.dupla_id) ?? "dpp" }
+      : null;
   };
 
   // CTA "Agendar encontro" — só a dupla DPP ativa entra (a RPC recusa a
@@ -173,11 +163,12 @@ export default async function JovemAgenda() {
   // ciclo — e só passo oficial JÁ VENCIDO (a data do cronograma passou; a
   // RPC recusa os dois casos também). O cronograma chega pela jovem_jornada
   // — mesma cautela do acervo: vale se for desta mesma dupla.
-  const vencidosRetro = new Set(
-    (jornada != null && jornada.dupla_id === duplaDpp?.id
+  const oficiaisRetro =
+    jornada != null && jornada.dupla_id === duplaDpp?.id
       ? datasOficiaisDe(jornada.cronograma)
-      : []
-    )
+      : [];
+  const vencidosRetro = new Set(
+    oficiaisRetro
       .filter((e) => e.data <= toDateStr(new Date()))
       .map((e) => e.numero)
   );
@@ -259,6 +250,82 @@ export default async function JovemAgenda() {
   const rotuloSessao = (e: JovemEncontro) =>
     `Sessão ${passoPorEncontroEsp.get(e.id) ?? e.numero} com ${espPorDupla.get(e.dupla_id)?.primeiro ?? "seu especialista"}`;
 
+  // "Precisa de você" (REALIZA-493): a mesma régua da home — o motor puro
+  // ordena e a agenda só apresenta, com o recorte do que é da agenda
+  // (encontro sem desfecho, retroativo e avaliação). Documentos/
+  // combinados/avisos não entram aqui: a página não os busca.
+  const nomeDaDupla = (duplaId: string, esp: boolean): string => {
+    const contato = contatos.find(
+      (c) =>
+        c.dupla_id === duplaId &&
+        (c.papel === "especialista" || c.papel === "mentor")
+    );
+    const dupla = duplas.find((d) => d.id === duplaId);
+    const nome =
+      contato?.nome_social ||
+      contato?.nome ||
+      dupla?.mentor_nome_social ||
+      dupla?.mentor_nome ||
+      "";
+    return nome.split(" ")[0] || (esp ? "seu especialista" : "seu mentor");
+  };
+  const avaliacoesPendentes: AvaliacaoPendente[] = encontros
+    .filter((e) => e.status === "realizado" && !avalPorEncontro.has(e.id))
+    .map((e) => ({
+      encontroId: e.id,
+      numero: e.numero,
+      realizado_em: e.realizado_em,
+      trilha: trilhaPorDupla.get(e.dupla_id) ?? "dpp",
+      rotulo:
+        trilhaPorDupla.get(e.dupla_id) === "especialista"
+          ? rotuloSessao(e)
+          : `${e.numero}º encontro`,
+    }));
+  const ctxPorEncontro: Record<string, EncontroCtx> = Object.fromEntries(
+    encontros.map((e) => [
+      e.id,
+      {
+        e,
+        ativa: ativaPorDupla.get(e.dupla_id) ?? false,
+        esp: trilhaPorDupla.get(e.dupla_id) === "especialista",
+      },
+    ])
+  );
+  const oficialPorNumero = new Map(
+    oficiaisRetro.map((e) => [e.numero, e.data])
+  );
+  const pendencias = derivarPendencias({
+    hoje: toDateStr(new Date()),
+    agora: new Date(agora).toISOString(),
+    encontros: encontros.map((e) => {
+      const sessao = trilhaPorDupla.get(e.dupla_id) === "especialista";
+      return {
+        id: e.id,
+        numero: sessao
+          ? (passoPorEncontroEsp.get(e.id) ?? e.numero)
+          : e.numero,
+        status: e.status,
+        dataHora: e.data_hora,
+        sessao,
+        comNome: nomeDaDupla(e.dupla_id, sessao),
+      };
+    }),
+    avaliacoes: avaliacoesPendentes.map((p) => ({
+      id: p.encontroId,
+      rotulo: p.rotulo,
+      realizadoEm: p.realizado_em,
+    })),
+    documentos: [],
+    combinados: [],
+    sugestoes: [],
+    avisos: [],
+    retro: numerosRetro.map((numero) => ({
+      numero,
+      duplaId: duplaDpp?.id ?? null,
+      dataOficial: oficialPorNumero.get(numero) ?? null,
+    })),
+    chamados: [],
+  });
 
   // futuros = agendado/remarcado com data pra frente; o resto é histórico
   // (inclui agendado já passado — "estava marcado e não rolou" é histórico,
@@ -313,6 +380,21 @@ export default async function JovemAgenda() {
           )}
         </div>
       </header>
+
+      {/* o que a agenda pede do jovem — a mesma lista da home, no recorte
+          daqui (sem desfecho, retroativo, avaliação). Some quando não há
+          pedido: a agenda segue sendo consulta */}
+      {pendencias.length > 0 && (
+        <JovemParaFazer
+          titulo="Precisa de você"
+          id="precisa-titulo"
+          pendencias={pendencias}
+          encontros={ctxPorEncontro}
+          pendentes={avaliacoesPendentes}
+          retro={{ duplaId: duplaDpp?.id ?? null, numeros: numerosRetro }}
+          primeiroNome={primeiroNome}
+        />
+      )}
 
       {/* decisão de recesso declarada pela dupla (462): o combinado aparece
           na agenda dele sem abrir espaço pra gesto — declarar é do mentor */}
@@ -521,7 +603,6 @@ export default async function JovemAgenda() {
                       key={e.id}
                       e={e}
                       aval={avalDe(e)}
-                      primeiroNome={primeiroNome}
                       agora={agora}
                       duplaAtiva={ativaPorDupla.get(e.dupla_id) ?? false}
                       trilha={trilhaPorDupla.get(e.dupla_id) ?? "dpp"}
@@ -529,30 +610,25 @@ export default async function JovemAgenda() {
                       meId={me?.id ?? null}
                     />
                   ))}
-                  {/* mesma orientação do rodapé de avaliações da home: o
-                      encontro que faltou entra por agendamento (futuro) ou
-                      pelo retroativo do jovem (0207) — já acontecido */}
-                  {duplaDpp?.id && (
-                    <p className="px-4 py-3 text-xs text-muted-foreground sm:px-6">
-                      Fez um encontro que não apareceu aqui? Se ele ainda vai
-                      acontecer, agende pelo botão no topo da página; se já
-                      aconteceu sem marcar,{" "}
+                  {/* retroativo só com passo elegível (QW1): sem candidato
+                      o link prometia um gesto que a RPC recusaria */}
+                  {duplaDpp?.id && numerosRetro.length > 0 && (
+                    <div className="px-4 py-1.5 sm:px-6">
                       <JovemRetroativoDialog
                         duplaId={duplaDpp.id}
                         numeros={numerosRetro}
                         trigger={
                           <Button
-                            type="button"
-                            variant="link"
+                            variant="ghost"
                             size="sm"
-                            className="h-auto min-h-11 px-0 text-xs font-medium underline underline-offset-2 sm:min-h-0"
+                            className="-ml-2.5"
                           >
-                            registre você aqui
+                            <ClockCounterClockwise size={15} aria-hidden />
+                            Encontro que não aparece aqui?
                           </Button>
                         }
                       />
-                      .
-                    </p>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -568,7 +644,6 @@ function EncontroLinha({
   e,
   futuro = false,
   aval,
-  primeiroNome,
   agora,
   duplaAtiva = false,
   trilha = "dpp",
@@ -577,8 +652,10 @@ function EncontroLinha({
 }: {
   e: JovemEncontro;
   futuro?: boolean;
-  aval?: { pendente: AvaliacaoPendente | null; feita: AvaliacaoFeita | null };
-  primeiroNome?: string;
+  /** A avaliação que já saiu — "Ver resposta" com as estrelas. A pendente
+   *  não entra: pedir avaliação é da lista "Precisa de você" (REALIZA-493),
+   *  sem duplicar o gesto na linha. */
+  aval?: AvaliacaoFeita | null;
   /** ms do render da página — o "futuro" do gesto é o da listagem, não o do
    *  clique; a RPC reavalia o instante real de qualquer jeito */
   agora: number;
@@ -600,17 +677,19 @@ function EncontroLinha({
 }) {
   const st = STATUS[e.status];
   const quando = e.status === "realizado" && e.realizado_em ? e.realizado_em : e.data_hora;
-  // agendado futuro = remarcar/desmarcar (0072); já passado = "não aconteceu".
-  // Só status 'agendado' — é o único que as RPCs movem (remarcado/legado não
-  // ganha botão: a RPC recusaria de qualquer jeito)
+  // agendado futuro = remarcar/desmarcar (0072). O agendado já passado não
+  // ganha gesto aqui — virou pendência da lista "Precisa de você"; na linha
+  // fica só a pergunta honesta do badge. Só status 'agendado' — é o único
+  // que as RPCs movem (remarcado/legado não ganha botão: recusariam)
   const agendadoFuturo =
     e.status === "agendado" &&
     duplaAtiva &&
     e.data_hora != null &&
     new Date(e.data_hora).getTime() > agora;
-  const agendadoPassado =
+  // QW4: "agendado" com o horário vencido não é mais um plano — é uma
+  // pendência. A badge pergunta, a ação mora na seção do topo.
+  const passadoSemDesfecho =
     e.status === "agendado" &&
-    duplaAtiva &&
     e.data_hora != null &&
     new Date(e.data_hora).getTime() <= agora;
   // retroativo do jovem (0207): o realizado que ELE criou é editável
@@ -659,27 +738,38 @@ function EncontroLinha({
         )}
       </div>
       <div className="ms-auto flex flex-wrap items-center justify-end gap-2">
-        {/* Entrar é a ação decisiva na hora da chamada — por isso fica
-            em default enquanto Remarcar/Desmarcar ficam em outline/ghost.
-            (Overflow-menu pro Desmarcar ficou de fora: por estado só há um
-            ghost por vez e os Dialogs moram em jovem-encontro-acoes —
-            menu de item único só adicionaria um toque.) */}
-        {futuro && linkSeguro(e.link) && (
-          <a
-            href={linkSeguro(e.link)!}
-            target="_blank"
-            rel="noopener noreferrer"
-            className={buttonVariants({ variant: "default", size: "sm" })}
-          >
-            <VideoCamera size={15} aria-hidden />
-            Entrar
-            <span className="sr-only"> na chamada (abre em nova aba)</span>
-          </a>
-        )}
-        {/* o lápis troca só o link (a action roteia o jovem pela RPC da
-            0072, DPP-only). Em agendado já passado a RPC não escreve — o
-            erro dela aponta o Remarcar ao lado, que edita data e link */}
-        {(agendadoFuturo || agendadoPassado) && trilha !== "especialista" && (
+        {/* Entrar é a ação decisiva só na janela da chamada (QW5: 30 min
+            antes até 2 h depois — mesma régua da home e da ficha). Fora
+            dela o link segue acessível, mas discreto. */}
+        {futuro &&
+          linkSeguro(e.link) &&
+          (podeEntrarAgora(e.data_hora, agora) ? (
+            <a
+              href={linkSeguro(e.link)!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonVariants({ variant: "default", size: "sm" })}
+            >
+              <VideoCamera size={15} aria-hidden />
+              Entrar
+              <span className="sr-only"> na chamada (abre em nova aba)</span>
+            </a>
+          ) : (
+            <a
+              href={linkSeguro(e.link)!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonVariants({ variant: "outline", size: "sm" })}
+            >
+              <VideoCamera size={15} aria-hidden />
+              Link da chamada
+              <span className="sr-only"> (abre em nova aba)</span>
+            </a>
+          ))}
+        {/* o lápis troca só o link e só em agendado futuro (a action roteia
+            o jovem pela RPC da 0072, DPP-only — ela recusa a linha já
+            vencida) */}
+        {agendadoFuturo && trilha !== "especialista" && (
           <EditarLinkDialog encontroId={e.id} linkAtual={e.link} />
         )}
         {agendadoFuturo && (
@@ -700,43 +790,10 @@ function EncontroLinha({
             <DesmarcarEncontroJovem encontroId={e.id} />
           </>
         )}
-        {/* agendado vencido também remarca (a RPC aceita fonte passada →
-            alvo futuro) — "não aconteceu" não é a única saída do limbo */}
-        {agendadoPassado && (
-          <>
-            {/* "Aconteceu" libera a avaliação e a jornada sem esperar o
-                registro do mentor (0121) — menos o último encontro, que
-                conclui a dupla e segue sendo registro dele */}
-            {e.numero < (trilha === "especialista" ? 5 : 16) && (
-              <AconteceuJovem encontroId={e.id} />
-            )}
-            {trilha !== "especialista" && (
-              <JovemAgendarDialog
-                duplaId={e.dupla_id}
-                numero={e.numero}
-                atual={e}
-                trigger={
-                  <Button variant="outline" size="sm">
-                    <CalendarDots size={15} aria-hidden />
-                    Remarcar
-                  </Button>
-                }
-              />
-            )}
-            <NaoAconteceuJovem encontroId={e.id} />
-          </>
-        )}
-        {aval?.pendente && (
-          <AvaliarPendenteButton
-            pendente={aval.pendente}
-            primeiroNome={primeiroNome ?? ""}
-            variant="outline"
-          />
-        )}
-        {aval?.feita && (
+        {aval && (
           <VerAvaliacaoButton
-            avaliacao={aval.feita}
-            label={<Estrelas n={aval.feita.estrelas} size={13} />}
+            avaliacao={aval}
+            label={<Estrelas n={aval.estrelas} size={13} />}
           />
         )}
         {retroDele && (
@@ -753,9 +810,21 @@ function EncontroLinha({
             <DesfazerRetroativoJovem encontroId={e.id} />
           </>
         )}
-        <Badge variant="outline" className={st.cls}>
-          {st.rotulo}
-        </Badge>
+        {/* QW4: o vencido pergunta "Aconteceu?" (warn — é pendência, não
+            estado), o realizado não carimba "Aconteceu" de novo (ser o que
+            é já basta) e os demais seguem a tabela de status */}
+        {e.status === "realizado" ? null : passadoSemDesfecho ? (
+          <Badge
+            variant="outline"
+            className="border-[var(--warn)]/50 text-[var(--warn-text)]"
+          >
+            Aconteceu?
+          </Badge>
+        ) : (
+          <Badge variant="outline" className={st.cls}>
+            {st.rotulo}
+          </Badge>
+        )}
       </div>
     </div>
   );

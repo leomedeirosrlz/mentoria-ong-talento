@@ -18,6 +18,7 @@ import {
   formatDate,
   formatDateTime,
   linkSeguro,
+  podeEntrarAgora,
   registroTardio,
   semanaBounds,
   type PassoGuia,
@@ -190,16 +191,12 @@ export function EncontroRow({
     return h && ehDoc(m) ? `${h}?dupla=${duplaId}` : h;
   };
   const materialHref = material ? hrefDoMaterial(material) : null;
-  // a chamada é a ação nº1 na janela do encontro (15 min antes a 2h depois do
-  // início) — vira CTA primário; fora da janela fica chip de apoio comum
-  const msAteInicio = encontro?.data_hora
-    ? new Date(encontro.data_hora).getTime() - new Date().getTime()
-    : null;
+  // a chamada é a ação nº1 na janela do encontro (QW5: 30 min antes a 2h
+  // depois — mesma régua da home/agenda do jovem) — vira CTA primário;
+  // fora da janela fica link de apoio comum
   const chamadaAgora =
     (encontro?.status === "agendado" || encontro?.status === "remarcado") &&
-    msAteInicio != null &&
-    msAteInicio <= 15 * 60000 &&
-    msAteInicio >= -2 * 3600000;
+    podeEntrarAgora(encontro.data_hora);
   // registro feito mais de 3 dias depois do encontro → "registro tardio"
   const tardio = reg != null && registroTardio(reg, encontro);
   // CTA e form de registro: realizado libera na hora; pros demais status
@@ -379,7 +376,7 @@ export function EncontroRow({
                       })}
                     >
                       <VideoCamera />
-                      Entrar na chamada
+                      {chamadaAgora ? "Entrar na chamada" : "Link da chamada"}
                     </a>
                   ) : (
                     <CopiarChamada url={linkSeguro(encontro?.link)!} />

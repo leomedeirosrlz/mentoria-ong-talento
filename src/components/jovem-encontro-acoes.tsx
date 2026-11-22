@@ -18,12 +18,20 @@ import {
  *  pela ponta dele: a avaliação abre na hora e o próximo passo da jornada
  *  libera sem esperar o registro do mentor (que é avisado). Um toque, sem
  *  dialog: confirmar um fato bom não pede fricção. */
-export function AconteceuJovem({ encontroId }: { encontroId: string }) {
+export function AconteceuJovem({
+  encontroId,
+  variant = "default",
+}: {
+  encontroId: string;
+  /** Preenchido só no gesto-âncora da tela; nas demais linhas vai outline. */
+  variant?: "default" | "outline";
+}) {
   const [pending, start] = useTransition();
   const router = useRouter();
   return (
     <Button
       size="sm"
+      variant={variant}
       disabled={pending}
       onClick={() =>
         start(async () => {

@@ -158,25 +158,22 @@ function instante(iso: string | null | undefined): number {
   return iso ? Date.parse(iso) || 0 : 0;
 }
 
-/** Suas avaliações do /jovem (REALIZA-109): o histórico. As pendentes ficam
- *  recolhidas (a ação delas já está em "Para fazer agora"), as duas respostas
- *  mais recentes à vista, as demais em "Ver todas as avaliações" e a
- *  privacidade em "Quem vê suas respostas?". O toggle "meu mentor pode ler"
- *  mora no detalhe de cada uma. */
+/** Suas avaliações do /jovem (REALIZA-109): só o histórico — as pendentes
+ *  moram na lista única "Para fazer agora" (REALIZA-493), sem repetir o
+ *  pedido em duas seções. As duas respostas mais recentes ficam à vista,
+ *  as demais em "Ver todas as avaliações" e a privacidade em "Quem vê
+ *  suas respostas?". O toggle "meu mentor pode ler" mora no detalhe. */
 export function JovemAvaliacoes({
   pendentes,
   feitas,
-  primeiroNome,
 }: {
+  /** Só alimenta a frase de privacidade — o gesto "Avaliar" é da lista
+   *  única "Para fazer agora" (REALIZA-493). */
   pendentes: AvaliacaoPendente[];
   feitas: AvaliacaoFeita[];
-  primeiroNome: string;
 }) {
   if (!pendentes.length && !feitas.length) return null;
 
-  const pendentesOrdenadas = [...pendentes].sort(
-    (a, b) => instante(b.realizado_em) - instante(a.realizado_em)
-  );
   const feitasOrdenadas = [...feitas].sort(
     (a, b) =>
       instante(b.encontro?.realizado_em ?? b.created_at) -
@@ -189,27 +186,6 @@ export function JovemAvaliacoes({
     ...pendentes.map((p) => p.trilha),
     ...feitas.map((a) => a.trilha),
   ]);
-
-  function renderPendente(p: AvaliacaoPendente) {
-    return (
-      <li key={`p-${p.encontroId}`} className="flex items-center gap-3 py-2">
-        <div className="min-w-0 flex-1">
-          <p className="text-sm font-medium">
-            {p.rotulo ?? `${p.numero}º encontro`}
-          </p>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            {p.realizado_em ? formatDiaMes(p.realizado_em) + " · " : ""}
-            aguardando sua resposta
-          </p>
-        </div>
-        <AvaliarPendenteButton
-          pendente={p}
-          primeiroNome={primeiroNome}
-          variant="outline"
-        />
-      </li>
-    );
-  }
 
   function renderFeita(a: AvaliacaoFeita) {
     return (
@@ -238,31 +214,11 @@ export function JovemAvaliacoes({
     );
   }
 
-  // as pendentes já moram em "Para fazer agora" (com "e mais N"): aqui ficam
-  // recolhidas, pra seção ser o histórico e não repetir seis botões
   const trigger =
     "flex min-h-11 w-full items-center justify-between gap-2 px-4 text-left text-sm font-medium text-muted-foreground outline-none transition-colors hover:text-foreground focus-visible:ring-3 focus-visible:ring-inset focus-visible:ring-ring/50 [&[aria-expanded=true]>svg]:rotate-180";
 
   return (
     <div>
-      {pendentesOrdenadas.length > 0 && (
-        <Collapsible.Root className="border-b border-border/60">
-          <Collapsible.Trigger className={trigger}>
-            <span className="text-foreground">
-              {pendentesOrdenadas.length === 1
-                ? "1 esperando sua resposta"
-                : `${pendentesOrdenadas.length} esperando sua resposta`}
-            </span>
-            <CaretDown size={16} aria-hidden className="ms-auto shrink-0 transition-transform" />
-          </Collapsible.Trigger>
-          <Collapsible.Panel>
-            <ul className="divide-y divide-border/60 px-4 pb-1">
-              {pendentesOrdenadas.map(renderPendente)}
-            </ul>
-          </Collapsible.Panel>
-        </Collapsible.Root>
-      )}
-
       {recentes.length > 0 && (
         <ul className="divide-y divide-border/60 px-4 pt-1">
           {recentes.map(renderFeita)}

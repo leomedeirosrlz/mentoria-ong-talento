@@ -24,6 +24,7 @@ import {
   linkSeguro,
   papelLabel,
   parseDisponibilidade,
+  podeEntrarAgora,
   podeSupervisionar,
   registroTardio,
   slotCompativel,
@@ -552,5 +553,33 @@ describe("podeSupervisionar", () => {
     expect(podeSupervisionar("mentor_especialista")).toBe(false);
     expect(podeSupervisionar(null)).toBe(false);
     expect(podeSupervisionar(undefined)).toBe(false);
+  });
+});
+
+describe("podeEntrarAgora (QW5)", () => {
+  const inicio = "2025-11-17T19:00:00-03:00";
+
+  it("abre 30 min antes do horário e fecha 2 h depois", () => {
+    // dentro da janela
+    expect(podeEntrarAgora(inicio, new Date("2025-11-17T18:30:00-03:00"))).toBe(true);
+    expect(podeEntrarAgora(inicio, new Date("2025-11-17T19:00:00-03:00"))).toBe(true);
+    expect(podeEntrarAgora(inicio, new Date("2025-11-17T21:00:00-03:00"))).toBe(true);
+    // fora dos dois lados
+    expect(podeEntrarAgora(inicio, new Date("2025-11-17T18:29:59-03:00"))).toBe(false);
+    expect(podeEntrarAgora(inicio, new Date("2025-11-17T21:00:01-03:00"))).toBe(false);
+    expect(podeEntrarAgora(inicio, new Date("2025-11-17T09:00:00-03:00"))).toBe(false);
+  });
+
+  it("aceita epoch (a agenda passa o ms do render)", () => {
+    const inicioMs = new Date(inicio).getTime();
+    expect(podeEntrarAgora(inicio, inicioMs - 30 * 60 * 1000)).toBe(true);
+    expect(podeEntrarAgora(inicio, inicioMs + 2 * 3600 * 1000)).toBe(true);
+    expect(podeEntrarAgora(inicio, inicioMs + 2 * 3600 * 1000 + 1)).toBe(false);
+  });
+
+  it("sem data válida nunca libera o botão preenchido", () => {
+    expect(podeEntrarAgora(null)).toBe(false);
+    expect(podeEntrarAgora(undefined)).toBe(false);
+    expect(podeEntrarAgora("não é data")).toBe(false);
   });
 });

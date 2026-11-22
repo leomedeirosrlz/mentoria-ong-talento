@@ -2428,6 +2428,24 @@ export function linkSeguro(url: string | null | undefined): string | null {
   return url != null && /^https?:\/\//i.test(url) ? url : null;
 }
 
+/** Janela do "Entrar" na chamada (493/QW5): de 30 min antes a 2 h depois do
+ *  horário marcado. Dentro dela a chamada é a ação primária; fora, o link
+ *  segue acessível mas discreto — um "Entrar" preenchido o dia inteiro
+ *  ensinava a ignorar o botão. Uma régua só pra home, agenda e ficha. */
+const ENTRAR_ANTES_MS = 30 * 60 * 1000;
+const ENTRAR_DEPOIS_MS = 2 * 3600 * 1000;
+
+export function podeEntrarAgora(
+  dataHora: string | null | undefined,
+  agora: number | Date = Date.now()
+): boolean {
+  if (!dataHora) return false;
+  const inicio = new Date(dataHora).getTime();
+  if (Number.isNaN(inicio)) return false;
+  const a = typeof agora === "number" ? agora : agora.getTime();
+  return inicio - ENTRAR_ANTES_MS <= a && a <= inicio + ENTRAR_DEPOIS_MS;
+}
+
 /** Link externo digitado/colado → URL http(s), teto de 300 chars. Sem
  *  scheme ganha https://; o que não virar URL com domínio volta null —
  *  mesma régua do normLinkedin do import (aqui sem acoplar ao módulo de
