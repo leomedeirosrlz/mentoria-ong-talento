@@ -55,6 +55,8 @@ import type {
 } from "@/lib/forms/schema";
 import { INSTRUMENTOS_DUPLA_SISTEMA } from "@/lib/forms/schema";
 import { docDoSistema } from "@/lib/como-conduzir";
+import { conquistasDoJovem } from "@/lib/conquistas";
+import { MarcosACaminho } from "./marcos-a-caminho";
 import {
   corpusServeJovem,
   listarDocsCorpus,
@@ -150,18 +152,29 @@ function diaMesCurto(iso: string | null | undefined): string {
 }
 
 export default async function JovemMateriais() {
-  const [me, jornada, encontros, avaliacoes, duplas, materiais, consolidadoTerc] =
-    await Promise.all([
-      getMe(),
-      // a RPC fora do ar devolve a página ao formato anterior — nunca quebra
-      getJovemJornada().catch(() => null),
-      getJovemEncontros(),
-      getJovemAvaliacoes(),
-      getJovemDuplas(),
-      getMateriais(),
-      // o consolidado de terceiros publicado — cache()ada, a home já chama
-      getConsolidadoTerceirosJovem().catch(() => null),
-    ]);
+  const [
+    me,
+    jornada,
+    encontros,
+    avaliacoes,
+    duplas,
+    materiais,
+    consolidadoTerc,
+    // os combinados dela — a faixa "a caminho" e a retrospectiva leem do
+    // mesmo cache() sem query a mais
+    encaminhamentos,
+  ] = await Promise.all([
+    getMe(),
+    // a RPC fora do ar devolve a página ao formato anterior — nunca quebra
+    getJovemJornada().catch(() => null),
+    getJovemEncontros(),
+    getJovemAvaliacoes(),
+    getJovemDuplas(),
+    getMateriais(),
+    // o consolidado de terceiros publicado — cache()ada, a home já chama
+    getConsolidadoTerceirosJovem().catch(() => null),
+    getJovemEncaminhamentos(),
+  ]);
   if (!me) return null; // o layout já barra — convenção das páginas
 
   // Régua do acervo progressivo (REALIZA-160): fallback pra quando a RPC
@@ -196,9 +209,23 @@ export default async function JovemMateriais() {
     jornada != null
       ? (duplas.find((d) => d.id === jornada.dupla_id) ?? null)
       : null;
+  // a faixa "a caminho" (485) nasce da mesma derivação do perfil — mesmos
+  // dados já lidos; sem dupla `marcos` vem vazio e a faixa não renderiza.
+  // Derivação antes dos fallbacks: sem RPC/estação ela sobrevive do mesmo
+  // jeito que a estante sobrevive no perfil
+  const conq = conquistasDoJovem({
+    encontros,
+    duplas,
+    jornada,
+    avaliacoes,
+    encaminhamentos,
+  });
   if (!jornada || !dupla || !(jornada.cronograma?.length ?? 0)) {
     return (
-      <BibliotecaJovem materiais={materiais} encCorrente={encAcervo} />
+      <div className="space-y-6">
+        <MarcosACaminho marcos={conq.marcos} />
+        <BibliotecaJovem materiais={materiais} encCorrente={encAcervo} />
+      </div>
     );
   }
 
@@ -228,7 +255,10 @@ export default async function JovemMateriais() {
   }
   if (!estacoes.length)
     return (
-      <BibliotecaJovem materiais={materiais} encCorrente={encAcervo} />
+      <div className="space-y-6">
+        <MarcosACaminho marcos={conq.marcos} />
+        <BibliotecaJovem materiais={materiais} encCorrente={encAcervo} />
+      </div>
     );
 
   // "encontro corrente" — a âncora compartilhada (lib): o maior nº de
@@ -380,12 +410,9 @@ export default async function JovemMateriais() {
   // views dela e o PDM (a RPC dele também escopa por papel). O checklist
   // do mentor nem chega no payload — a autoavaliação é recorte de staff.
   const retroAberto = jornada.retrospectiva?.desbloqueada === true;
-  const [combinadosJovem, pdmResumo] = retroAberto
-    ? await Promise.all([
-        getJovemEncaminhamentos(),
-        getPdmResumo(jornada.dupla_id).catch(() => null),
-      ])
-    : [null, null];
+  const pdmResumo = retroAberto
+    ? await getPdmResumo(jornada.dupla_id).catch(() => null)
+    : null;
   const retroJovem = retroAberto
     ? dadosRetrospectivaJovem({
         dupla: {
@@ -413,7 +440,7 @@ export default async function JovemMateriais() {
               ]
             : []
         ),
-        combinados: (combinadosJovem ?? []).filter(
+        combinados: encaminhamentos.filter(
           (c) => c.dupla_id === jornada.dupla_id
         ),
         instrumentos: (jornada.instrumentos ?? []).map((i) => ({
@@ -502,6 +529,12 @@ export default async function JovemMateriais() {
           )}
         </CardContent>
       </Card>
+
+      {/* ---------- "A caminho" (485) — os marcos de AÇÃO dela, no topo
+          da jornada. Resumo aqui; a estante completa mora no perfil e a
+          faixa só aponta pra ela. Sem gesto próprio: não compete com o
+          agendar/registrar da home. ---------- */}
+      <MarcosACaminho marcos={conq.marcos} />
 
       {/* ---------- sub-nav de página ---------- */}
       <nav

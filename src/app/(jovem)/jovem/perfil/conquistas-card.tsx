@@ -1,14 +1,6 @@
 "use client";
 
-import {
-  Flag,
-  FlagCheckered,
-  ListChecks,
-  Medal,
-  Trophy,
-  UsersThree,
-} from "@phosphor-icons/react";
-import { InstrumentoIcone } from "@/components/instrumento-icone";
+import { ConquistaEmblema } from "@/components/conquista-emblema";
 import {
   Dialog,
   DialogContent,
@@ -18,11 +10,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { formatDate } from "@/lib/ciclo";
-import type {
-  Conquista,
-  ConquistaPhosphor,
-  ProximoMarco,
-} from "@/lib/conquistas";
+import type { Conquista, ProximoMarco } from "@/lib/conquistas";
 
 /** "Suas conquistas" v2 (REALIZA-427) — estante estilo GitHub: só o que foi
  *  conquistado, em ordem cronológica, cada peça num emblema squircle (a
@@ -32,47 +20,10 @@ import type {
  *  barra do próximo marco e o que falta pra chegar lá. Cliente: os
  *  emblemas são triggers de Dialog. */
 
-const PHOSPHOR: Record<
-  ConquistaPhosphor,
-  typeof Flag
-> = {
-  flag: Flag,
-  medal: Medal,
-  flagCheckered: FlagCheckered,
-  trophy: Trophy,
-  listChecks: ListChecks,
-  usersThree: UsersThree,
-};
-
-/** O squircle do emblema — mesma razão do InstrumentoEmblema (glifo a
- *  ~57% do lado); o glifo de instrumento vem `neutro` pra herdar a cor do
- *  par (é o mesmo cor/tinta de INSTRUMENTO_TOM, só que generalizado pros
- *  Phosphor dos marcos e contagens). */
+/** O squircle do emblema — `ConquistaEmblema` compartilhado com a faixa
+ *  "a caminho" da /jovem/materiais (485). */
 function Emblema({ c, size = 44 }: { c: Conquista; size?: number }) {
-  const glifo = Math.round(size * 0.575);
-  const Phos = c.glifo.tipo === "phosphor" ? PHOSPHOR[c.glifo.nome] : null;
-  return (
-    <span
-      aria-hidden
-      className="grid shrink-0 place-items-center rounded-[28%]"
-      style={{
-        width: size,
-        height: size,
-        background: c.tom.tinta,
-        color: c.tom.cor,
-      }}
-    >
-      {c.glifo.tipo === "instrumento" ? (
-        <InstrumentoIcone
-          instrumento={c.glifo.chave}
-          size={glifo}
-          neutro
-        />
-      ) : (
-        Phos && <Phos size={glifo} />
-      )}
-    </span>
-  );
+  return <ConquistaEmblema glifo={c.glifo} tom={c.tom} size={size} />;
 }
 
 /** Uma peça da estante — o tile inteiro é o gatilho do detalhe (mesma
@@ -115,7 +66,10 @@ export function ConquistasCard({
     ? Math.min(100, (proximoMarco.atual / proximoMarco.alvo) * 100)
     : 0;
   return (
-    <section className="rounded-xl bg-card p-5 shadow-[var(--shadow-border)] sm:p-6">
+    <section
+      id="conquistas"
+      className="scroll-mt-20 rounded-xl bg-card p-5 shadow-[var(--shadow-border)] sm:p-6"
+    >
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-base font-semibold">Suas conquistas</h2>
         {conquistas.length > 0 && (

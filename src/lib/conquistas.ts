@@ -2,6 +2,7 @@ import { limiaresMarcos, maxEncontros } from "./ciclo";
 import type { MarcoJornada } from "./ciclo";
 import { estacoesJornada } from "./jornada";
 import type {
+  Estacao,
   EstacaoChave,
   JovemJornadaDados,
 } from "./jornada";
@@ -68,6 +69,35 @@ export type ProximoMarco = {
   texto: string;
 };
 
+/** Marco de AÇÃO da faixa "a caminho" no topo da jornada (485): o que o
+ *  jovem faz, não níveis por tempo — 1º encontro, 1ª avaliação, PDM
+ *  entregue, jornada concluída. Na trilha de especialista (sem PDM)
+ *  ficam 3. Estado ganho/não ganho sempre em texto — marco futuro nunca
+ *  vira cadeado, a linha diz o que falta. */
+export type MarcoAcao = {
+  /** chave estável — "primeiro", "avaliou", "pdm", "completo" */
+  chave: string;
+  /** nome do marco na faixa */
+  titulo: string;
+  /** carimbo ISO do feito — a linha do ganho é "Feito · <data>" na UI.
+   *  Null quando a fonte não expõe a data. */
+  data: string | null;
+  /** estado em texto quando "Feito · data" não basta: a contagem do
+   *  ganho ("Avaliou 4 encontros") ou o que falta ("Faltam 12 encontros",
+   *  "Libera no encontro 6"). Null no ganho datado. */
+  linha: string | null;
+  glifo: ConquistaGlifo;
+  /** par cor/tinta do emblema ganho — tons da casa, mesma gramática da
+   *  estante (o não ganho é apagado na UI, sem consumir o tom) */
+  tom: { cor: string; tinta: string };
+  /** progresso quantificável do marco — vira barra na faixa (marco
+   *  binário, como avaliar ou entregar o PDM, não tem) */
+  progresso: { atual: number; alvo: number } | null;
+  ganho: boolean;
+  /** o primeiro marco não ganho — o "a caminho" que a faixa destaca */
+  proximo: boolean;
+};
+
 export type ConquistasJovem = {
   /** estante em ordem cronológica; sem data vai pro fim (a contagem de
    *  combinados acumula — não é um instante) */
@@ -75,6 +105,9 @@ export type ConquistasJovem = {
   /** o próximo limiar a cruzar — null quando a jornada está completa ou
    *  não existe */
   proximoMarco: ProximoMarco | null;
+  /** os marcos de ação da faixa "a caminho" no topo da jornada (485) —
+   *  vazio quando não há jornada */
+  marcos: MarcoAcao[];
   /** a jornada existe pro jovem (tem dupla DPP ou sessão de especialista
    *  já feita) — a página não renderiza o card sem ela */
   temJornada: boolean;
@@ -187,6 +220,17 @@ const DETALHE_ESTACAO: Partial<Record<EstacaoChave, string>> = {
 const ts = (iso: string | null | undefined): number =>
   iso ? Date.parse(iso) || 0 : 0;
 
+/** A linha do PDM não ganho — herda o texto honesto da estação (a
+ *  liberação do guia ou o detalhe da re-emissão) com inicial maiúscula;
+ *  a_fazer sem detalhe é a espera pela resposta dela. */
+function linhaPdmPendente(est: Estacao): string {
+  const t =
+    est.estado === "a_fazer"
+      ? (est.detalhe ?? "Esperando sua resposta")
+      : (est.detalhe ?? est.janela.label);
+  return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
 export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
   const trilhaPorDupla = new Map(
     input.duplas.map((d) => [d.id, d.trilha ?? "dpp"] as const)
@@ -256,6 +300,9 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
   // respondido_em; a recorrente (avaliação do encontro) não entra, a
   // contagem de avaliações abaixo já a representa
   const jornada = input.jornada;
+  // o estado da estação PDM alimenta o marco "pdm" da faixa — capturado
+  // na mesma passada dos instrumentos (sem segunda derivação)
+  let estPdm: Estacao | null = null;
   if (jornada && (jornada.cronograma?.length ?? 0) > 0) {
     const dupla =
       input.duplas.find((d) => d.id === jornada.dupla_id) ?? null;
@@ -282,6 +329,7 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
         inicio: dupla?.iniciada_em,
         agora: input.agora,
       })) {
+        if (est.chave === "pdm") estPdm = est;
         if (est.estado !== "feito" || est.chave === "avaliacao_encontro")
           continue;
         estante.push({
@@ -373,6 +421,109 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
     });
   }
 
+  // ---------- marcos de ação (485 — a faixa "a caminho" no topo da
+  // jornada): o que a jovem faz, não o tempo que ela fica. Sem jornada
+  // a faixa não renderiza (mesmo gate da estante). O PRÓXIMO é sempre o
+  // primeiro não ganho — é o que a faixa destaca com o anel --destaque;
+  // marco de contagem traz a barra. ----------
+  const marcos: MarcoAcao[] = [];
+  if (temJornada) {
+    const primeiroEnc = porData[0] ?? null;
+    const ultimoEnc = porData[porData.length - 1] ?? null;
+
+    marcos.push({
+      chave: "primeiro",
+      titulo: rotuloMarco("primeiro", temDpp),
+      data: primeiroEnc?.realizado_em ?? primeiroEnc?.data_hora ?? null,
+      linha: feitos >= 1 ? null : `Falta ${unidade(1)}`,
+      glifo: { tipo: "phosphor", nome: "flag" },
+      tom: TOM_MARCO,
+      progresso: { atual: Math.min(feitos, 1), alvo: 1 },
+      ganho: feitos >= 1,
+      proximo: false,
+    });
+
+    // avaliou — as estrelas dela só na trilha da régua: sessão de
+    // especialista não infla a régua DPP (a partição de sempre)
+    const avalTrilha = input.avaliacoes.filter((a) =>
+      temDpp
+        ? trilhaPorDupla.get(a.dupla_id) !== "especialista"
+        : a.dupla_id != null &&
+          trilhaPorDupla.get(a.dupla_id) === "especialista"
+    );
+    const avaliadosTrilha = new Set(
+      avalTrilha
+        .map((a) => a.encontro_id)
+        .filter((id): id is string => id != null)
+    );
+    const faltaAvaliar = [...daTrilha]
+      .filter((e) => !avaliadosTrilha.has(e.id))
+      .sort((a, b) => a.numero - b.numero)[0];
+    const nAvalTrilha = avalTrilha.length;
+    marcos.push({
+      chave: "avaliou",
+      titulo: temDpp ? "Avaliação do encontro" : "Avaliação da sessão",
+      data: null,
+      linha:
+        nAvalTrilha > 0
+          ? `Avaliou ${unidade(nAvalTrilha)}`
+          : faltaAvaliar
+            ? temDpp
+              ? `Falta avaliar o encontro ${faltaAvaliar.numero}`
+              : `Falta avaliar a sessão ${faltaAvaliar.numero}`
+            : temDpp
+              ? "Depois do 1º encontro"
+              : "Depois da 1ª sessão",
+      glifo: { tipo: "instrumento", chave: "avaliacao_encontro" },
+      tom: INSTRUMENTO_TOM.avaliacao_encontro,
+      progresso: null,
+      ganho: nAvalTrilha > 0,
+      proximo: false,
+    });
+
+    // pdm — só existe na jornada DPP (a trilha de especialista não tem
+    // instrumento); estPdm veio do bloco dos instrumentos acima
+    if (estPdm) {
+      marcos.push({
+        chave: "pdm",
+        titulo: "Plano de Desenvolvimento",
+        data: estPdm.respondidoEm,
+        linha: estPdm.estado === "feito" ? null : linhaPdmPendente(estPdm),
+        glifo: { tipo: "instrumento", chave: "pdm" },
+        tom: INSTRUMENTO_TOM.pdm,
+        progresso: null,
+        ganho: estPdm.estado === "feito",
+        proximo: false,
+      });
+    }
+
+    marcos.push({
+      chave: "completo",
+      titulo: ROTULO_MARCO.completo,
+      data:
+        feitos >= total
+          ? (ultimoEnc?.realizado_em ?? ultimoEnc?.data_hora ?? null)
+          : null,
+      linha:
+        feitos >= total
+          ? null
+          : `${total - feitos === 1 ? "Falta" : "Faltam"} ${unidade(total - feitos)}`,
+      glifo: { tipo: "phosphor", nome: "trophy" },
+      tom: TOM_MARCO,
+      progresso: { atual: feitos, alvo: total },
+      ganho: feitos >= total,
+      proximo: false,
+    });
+
+    const prox = marcos.find((m) => !m.ganho);
+    if (prox) prox.proximo = true;
+  }
+
   estante.sort((a, b) => a.ts - b.ts);
-  return { conquistas: estante.map((x) => x.c), proximoMarco, temJornada };
+  return {
+    conquistas: estante.map((x) => x.c),
+    proximoMarco,
+    marcos,
+    temJornada,
+  };
 }
