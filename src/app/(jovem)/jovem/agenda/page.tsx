@@ -24,6 +24,7 @@ import {
   type EncontroCtx,
 } from "@/components/jovem-para-fazer";
 import { JovemAgendarDialog } from "@/components/jovem-agendar-dialog";
+import { JovemAgendarSugestao } from "@/components/jovem-agendar-sugestao";
 import { JovemRetroativoDialog } from "@/components/jovem-retroativo-dialog";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import {
@@ -63,6 +64,10 @@ import {
 } from "@/lib/queries-jovem";
 import { datasOficiaisDe } from "@/lib/jornada";
 import { derivarPendencias } from "@/lib/pendencias-jovem";
+import {
+  ocupadosDoJovem,
+  sugestoesEncontroDaDupla,
+} from "@/lib/sugestoes-encontro-server";
 import { getSlotsLivres } from "@/lib/queries-especialista";
 import { getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
@@ -269,6 +274,37 @@ export default async function JovemAgenda() {
       "";
     return nome.split(" ")[0] || (esp ? "seu especialista" : "seu mentor");
   };
+
+  // 481: o cartão "Próximo passo" troca o CTA de formulário vazio pela
+  // recomendação do motor — o nº segue o critério da home (primeiro livre
+  // depois do último realizado) e a régua de choque cobre TODAS as duplas,
+  // incluindo a mesa de especialista no aceite
+  const numeroAgendar =
+    numerosLivres.find(
+      (x) =>
+        x.numero >
+        Math.max(
+          0,
+          ...encontros
+            .filter(
+              (e) => e.dupla_id === duplaDpp?.id && e.status === "realizado"
+            )
+            .map((e) => e.numero)
+        )
+    )?.numero ??
+    numerosLivres[0]?.numero ??
+    null;
+  const ocupadosRotulados = ocupadosDoJovem(encontros, duplas);
+  const sugestoesAgendar =
+    duplaDpp?.id != null && numeroAgendar != null
+      ? await sugestoesEncontroDaDupla({
+          encontros: encontros.filter((e) => e.dupla_id === duplaDpp.id),
+          plano: planoJovem,
+          duplaId: duplaDpp.id,
+          agora: new Date(agora),
+          ocupados: ocupadosRotulados,
+        }).catch(() => null)
+      : null;
   const avaliacoesPendentes: AvaliacaoPendente[] = encontros
     .filter((e) => e.status === "realizado" && !avalPorEncontro.has(e.id))
     .map((e) => ({
@@ -359,13 +395,18 @@ export default async function JovemAgenda() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {duplaDpp?.id && numerosLivres.length > 0 && (
-            <JovemAgendarDialog
-              duplaId={duplaDpp.id}
-              numeros={numerosLivres}
-              atual={null}
-            />
-          )}
+          {/* o formulário vazio só sobra de rede de segurança: quando o
+              motor não acha dia viável o cartão não promete e o diálogo
+              antigo cobre o caminho raro */}
+          {duplaDpp?.id &&
+            numerosLivres.length > 0 &&
+            !sugestoesAgendar?.principal && (
+              <JovemAgendarDialog
+                duplaId={duplaDpp.id}
+                numeros={numerosLivres}
+                atual={null}
+              />
+            )}
           {duplaDpp?.id && numerosRetro.length > 0 && (
             <JovemRetroativoDialog
               duplaId={duplaDpp.id}
@@ -380,6 +421,20 @@ export default async function JovemAgenda() {
           )}
         </div>
       </header>
+
+      {/* 481: a sugestão concreta é o próximo passo da página — um toque
+          marca; "Escolher outro dia" abre o seletor de chips */}
+      {duplaDpp?.id != null &&
+        numeroAgendar != null &&
+        sugestoesAgendar?.principal && (
+          <JovemAgendarSugestao
+            duplaId={duplaDpp.id}
+            numero={numeroAgendar}
+            numeros={numerosLivres.map((x) => x.numero)}
+            comQuem={nomeDaDupla(duplaDpp.id, false)}
+            sugestoes={sugestoesAgendar}
+          />
+        )}
 
       {/* o que a agenda pede do jovem — a mesma lista da home, no recorte
           daqui (sem desfecho, retroativo, avaliação). Some quando não há
@@ -509,6 +564,7 @@ export default async function JovemAgenda() {
                           equipe={equipeCoord}
                           nomeJovem={nomeTela}
                           disponibilidade={dispJovem}
+                          ocupados={ocupadosRotulados}
                         />
                       </div>
                     ) : slots.length === 0 ? (

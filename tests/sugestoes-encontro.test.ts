@@ -2,13 +2,18 @@ import { describe, expect, it } from "vitest";
 import { diaSemanaDe, diffDias } from "../src/lib/ciclo";
 import {
   gapDiasParaRitmo,
+  ocupadoEmChoque,
   partesSP,
   perfilDeEncontros,
+  principalDe,
   rotuloOrigem,
   sugerirDatas,
   sugerirHorarios,
   type EncontroHistorico,
 } from "../src/lib/sugestoes-encontro";
+import { ocupadosDoJovem } from "../src/lib/sugestoes-encontro-server";
+import type { JovemEncontro } from "../src/lib/queries-jovem";
+import type { JovemDupla } from "../src/lib/types";
 
 // Âncora fixa: sábado 21/11/2026 meio-dia em SP — o vitest já roda com
 // TZ=America/Sao_Paulo, mas o motor não depende disso: toda derivação é
@@ -388,5 +393,181 @@ describe("robustez", () => {
     expect(rotuloOrigem("disponibilidade")).toBe("Baseado na disponibilidade");
     expect(rotuloOrigem("passo_do_plano")).toBe("Data do guia");
     expect(rotuloOrigem("padrao")).toBe("Sugestão do programa");
+  });
+});
+
+// ---------- 481: choque rotulado, sugestão principal e ocupados do jovem ----------
+
+describe("ocupadoEmChoque", () => {
+  const OCUP = {
+    inicio: "2026-11-24T22:00:00Z", // ter 24/11 19:00 em SP
+    rotulo: "6º encontro com Ricardo",
+    rotuloArtigo: "o 6º encontro com Ricardo",
+  };
+
+  it("bate de cheio ⇒ devolve o ocupado com o rótulo pra mensagem", () => {
+    expect(ocupadoEmChoque(new Date("2026-11-24T22:00:00Z"), [OCUP])).toEqual(
+      OCUP
+    );
+  });
+
+  it("sobreposição parcial conta; encostado (fim == início) não", () => {
+    // 19:30 (dur 60 ⇒ até 20:30) cobre a última meia hora do ocupado
+    expect(
+      ocupadoEmChoque(new Date("2026-11-24T22:30:00Z"), [OCUP])
+    ).not.toBeNull();
+    // 20:00 encosta pelo fim do ocupado [19:00,20:00)
+    expect(
+      ocupadoEmChoque(new Date("2026-11-24T23:00:00Z"), [OCUP])
+    ).toBeNull();
+    // 18:00 encosta pelo início do candidato
+    expect(
+      ocupadoEmChoque(new Date("2026-11-24T21:00:00Z"), [OCUP])
+    ).toBeNull();
+  });
+
+  it("entrada torta ⇒ null; string cru volta com rótulos vazios", () => {
+    expect(ocupadoEmChoque(new Date("lixo"), [OCUP])).toBeNull();
+    expect(
+      ocupadoEmChoque(new Date("2026-11-24T22:00:00Z"), null)
+    ).toBeNull();
+    expect(
+      ocupadoEmChoque(new Date("2026-11-24T22:00:00Z"), ["não-iso"])
+    ).toBeNull();
+    expect(
+      ocupadoEmChoque(new Date("2026-11-24T22:00:00Z"), [
+        "2026-11-24T22:00:00Z",
+      ])
+    ).toMatchObject({ rotulo: "", rotuloArtigo: "" });
+  });
+});
+
+describe("principalDe", () => {
+  const perfilTer19 = () =>
+    perfilDeEncontros(
+      [enc("2026-11-10T22:00:00Z"), enc("2026-11-17T22:00:00Z")], // ter 19:00
+      AGORA
+    );
+
+  it("primeira data + primeiro horário livre, origem da evidência", () => {
+    const perfil = perfilTer19();
+    const datas = sugerirDatas({ agora: AGORA, perfil });
+    expect(principalDe({ datas, perfil })).toMatchObject({
+      data: "2026-11-24",
+      hora: "19:00",
+      origem: "historico",
+    });
+  });
+
+  it("a data do guia fala mais alto na origem", () => {
+    const perfil = perfilTer19();
+    const datas = sugerirDatas({
+      agora: AGORA,
+      perfil,
+      dataSugerida: "2026-12-01",
+    });
+    expect(principalDe({ datas, perfil })).toMatchObject({
+      data: "2026-12-01",
+      origem: "passo_do_plano",
+    });
+  });
+
+  it("primeiro horário em choque ⇒ o par salta pro próximo livre", () => {
+    const perfil = perfilTer19();
+    const datas = sugerirDatas({ agora: AGORA, perfil });
+    expect(
+      principalDe({
+        datas,
+        perfil,
+        ocupados: ["2026-11-24T19:00:00-03:00"],
+      })
+    ).toMatchObject({ data: "2026-11-24", hora: "20:00" });
+  });
+
+  it("sem datas ⇒ null (o cartão não promete gesto impossível)", () => {
+    expect(principalDe({ datas: [], perfil: perfilTer19() })).toBeNull();
+  });
+});
+
+describe("ocupadosDoJovem", () => {
+  const dupla = (
+    id: string,
+    trilha: string | null,
+    mentor: string,
+    social: string | null = null
+  ) =>
+    ({
+      id,
+      trilha,
+      mentor_nome: mentor,
+      mentor_nome_social: social,
+    }) as unknown as JovemDupla;
+  const enc = (
+    dupla_id: string,
+    numero: number,
+    data_hora: string | null,
+    status: JovemEncontro["status"] = "agendado"
+  ): JovemEncontro => ({
+    id: `${dupla_id}-${numero}`,
+    dupla_id,
+    numero,
+    data_hora,
+    realizado_em: null,
+    duracao_min: 60,
+    status,
+    link: null,
+    motivo_reagendamento: null,
+  });
+
+  it("rótulo por trilha: DPP 'Nº encontro com', esp 'sessão com' + artigo", () => {
+    const out = ocupadosDoJovem(
+      [
+        enc("d-dpp", 6, "2026-11-24T22:00:00Z"),
+        enc("d-esp", 3, "2026-11-25T13:00:00Z"),
+      ],
+      [
+        dupla("d-dpp", "dpp", "Ricardo Santos", "Ricardo"),
+        dupla("d-esp", "especialista", "Helena Prado"),
+      ]
+    );
+    expect(out).toEqual([
+      {
+        inicio: "2026-11-24T22:00:00Z",
+        rotulo: "6º encontro com Ricardo",
+        rotuloArtigo: "o 6º encontro com Ricardo",
+      },
+      {
+        inicio: "2026-11-25T13:00:00Z",
+        rotulo: "sessão com Helena",
+        rotuloArtigo: "uma sessão com Helena",
+      },
+    ]);
+  });
+
+  it("só agendado/remarcado com data entra; a trilha vem da dupla, não do encontro", () => {
+    const out = ocupadosDoJovem(
+      [
+        enc("d-dpp", 5, "2026-11-17T22:00:00Z", "realizado"), // fora
+        enc("d-dpp", 6, null), // sem data: fora
+        enc("d-esp", 2, "2026-11-25T13:00:00Z", "remarcado"),
+      ],
+      [
+        dupla("d-dpp", "dpp", "Ricardo"),
+        dupla("d-esp", "especialista", "Helena"),
+      ]
+    );
+    expect(out).toHaveLength(1);
+    expect(out[0].rotulo).toBe("sessão com Helena");
+  });
+
+  it("encontro de dupla fora do mapa cai no rótulo genérico", () => {
+    const out = ocupadosDoJovem(
+      [enc("d-x", 4, "2026-11-24T22:00:00Z")],
+      []
+    );
+    expect(out[0]).toMatchObject({
+      rotulo: "4º encontro com seu mentor",
+      rotuloArtigo: "o 4º encontro com seu mentor",
+    });
   });
 });

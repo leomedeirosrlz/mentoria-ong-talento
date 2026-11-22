@@ -16,6 +16,7 @@ import {
   nomeEspDoPedido,
   pedidoEmAberto,
 } from "@/lib/jovem-especialista";
+import { ocupadosDoJovem } from "@/lib/sugestoes-encontro-server";
 import { CatalogoJovem } from "@/components/catalogo-jovem";
 import { JovemTrilhaCard } from "@/components/jovem-trilha-card";
 import { SugestaoEspecialistaCard } from "@/components/jovem-sugestao-card";
@@ -122,6 +123,9 @@ export default async function JovemEspecialistasPage() {
   const lotado = abertos.length >= 3;
   // a grade do jovem pinta o "encaixa com você" na mesa de negociação
   const dispJovem = (perfil?.disponibilidade ?? null) as Disponibilidade | null;
+  // 481: os compromissos dele em todas as duplas — o aceite de proposta em
+  // choque avisa inline em vez de gravar
+  const ocupadosRotulados = ocupadosDoJovem(encontros, duplas);
 
   /** A solicitação que originou a trilha — o aceite grava `dupla_id` nela,
    *  mas o follow-up de sessão seguinte também nasce com `dupla_id` (e
@@ -249,6 +253,7 @@ export default async function JovemEspecialistasPage() {
                       nomeJovem={nomeTela}
                       alvo={alvo}
                       disponibilidade={dispJovem}
+                      ocupados={ocupadosRotulados}
                     />
                   );
                 })}

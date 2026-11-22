@@ -3,6 +3,8 @@ import Link from "next/link";
 import { PencilSimple, Sparkle, VideoCamera } from "@phosphor-icons/react/dist/ssr";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { JovemAgendarDialog } from "@/components/jovem-agendar-dialog";
+import { JovemAgendarSugestao } from "@/components/jovem-agendar-sugestao";
+import type { SugestoesEncontro } from "@/lib/sugestoes-encontro-server";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   formatDiaHora,
@@ -35,8 +37,15 @@ export function ProximoEncontro({
   rotulo: string | null;
   /** "YYYY-MM-DD" no fuso do programa. */
   hoje: string;
-  /** DPP ativa com um nº livre: o botão abre o agendamento desse número. */
-  agendar: { duplaId: string; numero: number } | null;
+  /** DPP ativa com um nº livre: o cartão sugere o dia/hora (481); sem
+   *  sugestão viável, cai no formulário antigo. */
+  agendar: {
+    duplaId: string;
+    numero: number;
+    numeros: number[];
+    comQuem: string;
+    sugestoes: SugestoesEncontro | null;
+  } | null;
   /** Mesma regra da agenda: agendado de dupla ativa e DPP pode trocar o link. */
   linkEditavel: boolean;
   /** Dupla em curso (ativa ou pausada). */
@@ -136,6 +145,20 @@ export function ProximoEncontro({
   }
 
   if (agendar) {
+    // o cartão da 481 substitui o formulário vazio: a recomendação concreta
+    // confirma num toque e "Escolher outro dia" abre o seletor
+    if (agendar.sugestoes?.principal) {
+      return (
+        <JovemAgendarSugestao
+          duplaId={agendar.duplaId}
+          numero={agendar.numero}
+          numeros={agendar.numeros}
+          comQuem={agendar.comQuem}
+          sugestoes={agendar.sugestoes}
+          titulo="Seu próximo encontro"
+        />
+      );
+    }
     return (
       <Casca {...cabecalho} titulo="Seu próximo encontro">
         <p className="mt-2 text-xl font-semibold tracking-tight text-balance">

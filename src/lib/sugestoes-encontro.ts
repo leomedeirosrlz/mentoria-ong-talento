@@ -237,7 +237,9 @@ type Faixa = { ini: number; fim: number };
 /** Instantes válidos de `ocupados` como faixas [ini, ini+60min) em ms.
  *  Entrada torta (null, item não-string, ISO inválido) é descartada — a
  *  sugestão nunca quebra por causa da lista. */
-function faixasOcupadas(ocupados: string[] | null | undefined): Faixa[] {
+function faixasOcupadas(
+  ocupados: readonly string[] | null | undefined
+): Faixa[] {
   if (!Array.isArray(ocupados)) return [];
   const out: Faixa[] = [];
   for (const iso of ocupados) {
@@ -297,7 +299,7 @@ export type InputSugerirDatas = {
   /** Instantes ISO já ocupados do jovem (encontros de outras
    *  duplas/trilhas) — data cujos horários sugeridos estão todos em
    *  choque sai da lista. */
-  ocupados?: string[] | null;
+  ocupados?: readonly string[] | null;
   /** Duração do encontro a marcar, em min — entra na régua de choque
    *  (mesma do sugerirHorarios). */
   duracaoMin?: number | null;
@@ -459,7 +461,7 @@ export type InputSugerirHorarios = {
   /** Instantes ISO já ocupados do jovem (encontros de outras
    *  duplas/trilhas) — o slot que chocar volta com `conflito: true`,
    *  depois dos livres, em vez de sumir. */
-  ocupados?: string[] | null;
+  ocupados?: readonly string[] | null;
   /** Duração do encontro a marcar, em min — a janela do candidato no
    *  choque é [início, início+duracaoMin). Default: mediana do perfil,
    *  depois 60. */
@@ -578,4 +580,84 @@ const ROTULO_ORIGEM: Record<OrigemSugestao, string> = {
  *  produto, sem expor mecânica (nunca "algoritmo" ou "score"). */
 export function rotuloOrigem(o: OrigemSugestao): string {
   return ROTULO_ORIGEM[o] ?? o;
+}
+
+// ---------- sugestão principal e choque rotulado (481) ----------
+
+/** Um instante ocupado com o rótulo que o chip/mensagem mostra — a camada
+ *  server monta a partir dos encontros de origem ("6º encontro com
+ *  Ricardo", "sessão com Helena"). `rotulo` é a forma curta pra chip;
+ *  `rotuloArtigo` cabe numa frase ("o 6º encontro…", "uma sessão…").
+ *  O contrato 480b (`ocupados: string[]`) segue aceito — string vira
+ *  entrada com rótulos vazios. */
+export type OcupadoRotulado = {
+  inicio: string;
+  rotulo: string;
+  rotuloArtigo: string;
+};
+
+const inicioDo = (o: string | OcupadoRotulado): string =>
+  typeof o === "string" ? o : o.inicio;
+
+/** Ocupado que bate com o candidato `[instante, instante+durMin)` — a janela
+ *  do ocupado é `durOcupadoMin` (60 min, mesma régua do motor e da RPC
+ *  conflito_encontro). Devolve o ocupado rotulado pra mensagem/chip;
+ *  null = livre. */
+export function ocupadoEmChoque(
+  instante: number | Date,
+  ocupados: readonly (string | OcupadoRotulado)[] | null | undefined,
+  durMin = OCUPADO_DUR_MS / MIN_MS,
+  durOcupadoMin = OCUPADO_DUR_MS / MIN_MS
+): OcupadoRotulado | null {
+  const ms = typeof instante === "number" ? instante : instante.getTime();
+  if (!Number.isFinite(ms)) return null;
+  const fim = ms + durMin * MIN_MS;
+  for (const o of ocupados ?? []) {
+    const inicio = inicioDo(o);
+    const ini = new Date(inicio).getTime();
+    if (!Number.isFinite(ini)) continue;
+    if (ms < ini + durOcupadoMin * MIN_MS && ini < fim) {
+      return typeof o === "string"
+        ? { inicio: o, rotulo: "", rotuloArtigo: "" }
+        : o;
+    }
+  }
+  return null;
+}
+
+/** Sugestão principal = primeira data viável + primeiro horário livre dela
+ *  (o que o cartão propõe e o seletor pré-seleciona). A origem do par pro
+ *  rótulo "Baseado em…": a data do guia fala mais alto; depois a evidência
+ *  do horário (hábito/grade), senão a da data. */
+export function principalDe({
+  datas,
+  perfil,
+  disponibilidade,
+  ocupados,
+  duracaoMin,
+}: {
+  datas: SugestaoData[];
+  perfil: PerfilEncontros;
+  disponibilidade?: Disponibilidade | null;
+  ocupados?: readonly string[] | null;
+  duracaoMin?: number;
+}): { data: string; hora: string; origem: OrigemSugestao } | null {
+  const dia = datas[0];
+  if (!dia) return null;
+  const horas = sugerirHorarios({
+    data: dia.data,
+    perfil,
+    disponibilidade,
+    ocupados,
+    duracaoMin,
+  });
+  const livre = horas.find((h) => !h.conflito) ?? horas[0];
+  if (!livre) return null;
+  const origem =
+    dia.origem === "passo_do_plano"
+      ? "passo_do_plano"
+      : livre.origem !== "padrao"
+        ? livre.origem
+        : dia.origem;
+  return { data: dia.data, hora: livre.hora, origem };
 }

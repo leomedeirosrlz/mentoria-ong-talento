@@ -1,10 +1,14 @@
 import { celulasComuns, celulasDe, toDateStr } from "./ciclo";
 import { disponibilidadesDaDupla } from "./actions";
-import type { Disponibilidade } from "./types";
+import type { Disponibilidade, JovemDupla } from "./types";
+import type { JovemEncontro } from "./queries-jovem";
 import {
   perfilDeEncontros,
+  principalDe,
   sugerirDatas,
   type EncontroHistorico,
+  type OcupadoRotulado,
+  type OrigemSugestao,
   type PerfilEncontros,
   type SugestaoData,
 } from "./sugestoes-encontro";
@@ -26,6 +30,12 @@ export type PlanoParaSugestao = {
   passos_aplicados?: { numero: number }[] | null;
 };
 
+/** Ocupado na entrada: instante cru (contrato 480b) ou já rotulado — a
+ *  481 monta o rótulo a partir dos encontros de origem. */
+export type OcupadoInput =
+  | string
+  | { inicio: string; rotulo?: string; rotuloArtigo?: string };
+
 export type SugestoesEncontro = {
   perfil: PerfilEncontros;
   datas: SugestaoData[];
@@ -33,10 +43,18 @@ export type SugestoesEncontro = {
    *  entra direto em sugerirHorarios no client. null = sem grade útil. */
   disponibilidade: Disponibilidade | null;
   janela: { inicio: string; fim: string } | null;
-  /** Instantes ISO já ocupados do jovem (encontros das OUTRAS
-   *  duplas/trilhas), repassados crus do chamador — entram no motor e
-   *  voltam pro client marcar os chips em choque. */
-  ocupados: string[];
+  /** Instantes ocupados do jovem em TODAS as duplas/trilhas com o rótulo
+   *  do chip ("6º encontro com Ricardo", "sessão com Helena") — entram no
+   *  motor pelo `inicio` e voltam pro client marcar chips e mensagens. */
+  ocupados: OcupadoRotulado[];
+  /** Sugestão principal: o CTA do cartão e o par pré-selecionado do
+   *  seletor. null = sem data viável na janela. */
+  principal: { data: string; hora: string; origem: OrigemSugestao } | null;
+  /** Mediana do histórico ou 60 — a faixa "das 19:00 às 20:00" do cartão
+   *  e a janela do choque no seletor. */
+  duracaoMin: number;
+  /** Hoje civil no fuso do programa — o "Outro dia" abre em amanhã. */
+  hoje: string;
 };
 
 /** A grade que vale pros dois: ambos com células ⇒ interseção; um lado
@@ -90,9 +108,10 @@ export async function sugestoesEncontroDaDupla(input: {
   plano: PlanoParaSugestao | null;
   duplaId: string | null;
   agora?: Date;
-  /** data_hora ISO dos encontros já marcados do jovem fora desta dupla —
-   *  a 481 junta a lista; sem ela o comportamento é o de antes. */
-  ocupados?: string[];
+  /** Instantes já marcados do jovem em TODAS as duplas/trilhas (a 481 junta
+   *  via `ocupadosDoJovem` com rótulo; string crua segue aceita). Sem a
+   *  lista o comportamento é o de antes. */
+  ocupados?: OcupadoInput[];
 }): Promise<SugestoesEncontro | null> {
   if (!input?.duplaId) return null;
   const agora = input.agora ?? new Date();
@@ -107,8 +126,20 @@ export async function sugestoesEncontroDaDupla(input: {
   const ritmoNum = Number(input.plano?.ritmo);
   const ritmo =
     Number.isFinite(ritmoNum) && ritmoNum > 0 ? ritmoNum : null;
-  const dataSugerida = proximoPasso(input.plano, toDateStr(agora));
-  const ocupados = input.ocupados ?? [];
+  const hoje = toDateStr(agora);
+  const dataSugerida = proximoPasso(input.plano, hoje);
+  const ocupados: OcupadoRotulado[] = (input.ocupados ?? [])
+    .map((o) =>
+      typeof o === "string"
+        ? { inicio: o, rotulo: "", rotuloArtigo: "" }
+        : {
+            inicio: o.inicio,
+            rotulo: o.rotulo ?? "",
+            rotuloArtigo: o.rotuloArtigo ?? o.rotulo ?? "",
+          }
+    )
+    .filter((o) => typeof o.inicio === "string" && o.inicio);
+  const ocupadosIso = ocupados.map((o) => o.inicio);
   const datas = sugerirDatas({
     agora,
     perfil,
@@ -116,7 +147,71 @@ export async function sugestoesEncontroDaDupla(input: {
     ritmo,
     dataSugerida,
     disponibilidade,
-    ocupados,
+    ocupados: ocupadosIso,
   });
-  return { perfil, datas, disponibilidade, janela, ocupados };
+  const duracaoMin = perfil.duracaoMedianaMin ?? 60;
+  const principal = principalDe({
+    datas,
+    perfil,
+    disponibilidade,
+    ocupados: ocupadosIso,
+    duracaoMin,
+  });
+  return {
+    perfil,
+    datas,
+    disponibilidade,
+    janela,
+    ocupados,
+    principal,
+    duracaoMin,
+    hoje,
+  };
+}
+
+/** Primeiro nome do par — social quando existe (mesma régua da ficha). */
+const primeiroNome = (n: string | null | undefined) =>
+  (n ?? "").trim().split(/\s+/)[0] || null;
+
+/** Encontros agendados do jovem em TODAS as duplas/trilhas, com o rótulo
+ *  que o chip/mensagem lê ("6º encontro com Ricardo" — forma com artigo:
+ *  "o 6º encontro com Ricardo"; "sessão com Helena" — "uma sessão com
+ *  Helena"). Inclui a própria dupla DPP: o 7º não pode cair em cima do
+ *  6º. O nome sai do mentor da dupla no catálogo `jovem_duplas` — o
+ *  especialista da trilha usa o mesmo campo. */
+export function ocupadosDoJovem(
+  encontros: JovemEncontro[],
+  duplas: JovemDupla[]
+): OcupadoRotulado[] {
+  const infoPorDupla = new Map(
+    duplas
+      .filter((d) => d.id != null)
+      .map((d) => [
+        d.id!,
+        {
+          quem: primeiroNome(d.mentor_nome_social ?? d.mentor_nome),
+          esp: (d.trilha ?? "dpp") === "especialista",
+        },
+      ] as const)
+  );
+  return encontros
+    .filter(
+      (e) =>
+        (e.status === "agendado" || e.status === "remarcado") &&
+        e.data_hora != null
+    )
+    .map((e) => {
+      const info = infoPorDupla.get(e.dupla_id);
+      return info?.esp
+        ? {
+            inicio: e.data_hora!,
+            rotulo: `sessão com ${info.quem ?? "especialista"}`,
+            rotuloArtigo: `uma sessão com ${info.quem ?? "especialista"}`,
+          }
+        : {
+            inicio: e.data_hora!,
+            rotulo: `${e.numero}º encontro com ${info?.quem ?? "seu mentor"}`,
+            rotuloArtigo: `o ${e.numero}º encontro com ${info?.quem ?? "seu mentor"}`,
+          };
+    });
 }
