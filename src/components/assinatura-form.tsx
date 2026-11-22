@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { CircleNotch, Signature } from "@phosphor-icons/react";
@@ -10,9 +10,21 @@ import { Label } from "@/components/ui/label";
 import { maskCpf } from "@/lib/utils";
 import { STATUS_CEP, useBuscaCep } from "@/lib/use-busca-cep";
 import type { ViaCepEndereco } from "@/lib/viacep";
-import type { DadosCivis } from "@/lib/types";
+import type { DadosCivis, Endereco } from "@/lib/types";
 
 type Resultado = { error?: string; ok?: boolean };
+
+/** Retrato dos dados civis conforme digitados no form — alimenta o preview
+ *  vivo do documento (o que falta volta a virar blank sublinhado, como no
+ *  papel). `parentesco` só existe no modo autorização. */
+export type CivisDigitados = {
+  nome_civil: string | null;
+  rg: string | null;
+  cpf: string | null;
+  data_nascimento: string | null;
+  endereco: Endereco;
+  parentesco: string | null;
+};
 
 /** máscara live no input uncontrolled — reformat a cada tecla */
 const onInputMask = (mask: (v: string) => string) => (e: React.FormEvent<HTMLInputElement>) => {
@@ -260,6 +272,10 @@ export function AssinaturaForm({
   parentesco,
   etapas,
   onSucesso,
+  id,
+  semBotao,
+  onMudanca,
+  onPendingChange,
 }: {
   modo: "termo" | "autorizacao";
   /** nome do jovem (autorização) — read-only, vem do servidor */
@@ -277,10 +293,63 @@ export function AssinaturaForm({
    *  pra avançar pro fechamento (o router.refresh() interno continua; a
    *  instância do wizard sobrevive ao refresh e preserva o step) */
   onSucesso?: () => void;
+  /** id do <form> — o botão externo do rodapé fixo submete via `form=` */
+  id?: string;
+  /** o primário mora no rodapé fixo do wizard — sem submit interno */
+  semBotao?: boolean;
+  /** cada tecla/autocomplete reemite o retrato dos civis — o preview do
+   *  documento interpola o que já foi digitado (REALIZA-497) */
+  onMudanca?: (d: CivisDigitados) => void;
+  /** espelha `pending` pro rodapé fixo (desabilita/subtitui o primário) */
+  onPendingChange?: (p: boolean) => void;
 }) {
   const [pending, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
   const router = useRouter();
+  const formRef = useRef<HTMLFormElement>(null);
+
+  useEffect(() => {
+    onPendingChange?.(pending);
+  }, [pending, onPendingChange]);
+
+  /** FormData → retrato dos civis — mesmos `name`s do parseDadosCivis, só
+   *  que tolerante: vazio vira null e o preview repõe o blank sublinhado. */
+  function retrato(): CivisDigitados {
+    const f = formRef.current;
+    const s = (k: string) => String(f ? new FormData(f).get(k) ?? "" : "").trim();
+    return {
+      nome_civil: s("nome_civil") || null,
+      rg: s("rg") || null,
+      cpf: s("cpf").replace(/\D/g, "") || null,
+      data_nascimento: s("data_nascimento") || null,
+      endereco: {
+        logradouro: s("logradouro") || null,
+        numero: s("numero") || null,
+        complemento: s("complemento") || null,
+        bairro: s("bairro") || null,
+        cidade: s("cidade") || null,
+        uf: s("uf") || null,
+        cep: s("cep").replace(/\D/g, "") || null,
+      },
+      parentesco: s("parentesco") || null,
+    };
+  }
+
+  /** O autofill do ViaCEP escreve nos inputs controlados fora do ciclo de
+   *  change — junta o endereço resolvido ao retrato atual e reemite. */
+  function reportarAutofill(endereco: ViaCepEndereco) {
+    const atual = retrato();
+    onMudanca?.({
+      ...atual,
+      endereco: {
+        ...atual.endereco,
+        logradouro: endereco.logradouro,
+        bairro: endereco.bairro,
+        cidade: endereco.cidade,
+        uf: endereco.uf,
+      },
+    });
+  }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -299,7 +368,13 @@ export function AssinaturaForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="grid gap-6">
+    <form
+      ref={formRef}
+      id={id}
+      onSubmit={onSubmit}
+      onChange={() => onMudanca?.(retrato())}
+      className="grid gap-6"
+    >
       {modo === "autorizacao" && (
         <>
           <div className="space-y-2">
@@ -323,7 +398,7 @@ export function AssinaturaForm({
         </>
       )}
 
-      <DadosCivisFields defaults={dados} />
+      <DadosCivisFields defaults={dados} onEndereco={reportarAutofill} />
 
       {etapas && (
         <h3
@@ -368,15 +443,18 @@ export function AssinaturaForm({
       )}
 
       {/* w-full no mobile como todo CTA público — no desktop volta ao
-          tamanho natural alinhado à esquerda do form */}
-      <Button type="submit" disabled={pending} className="w-full justify-center sm:w-auto sm:px-8">
-        {pending ? (
-          <CircleNotch size={16} className="animate-spin" aria-hidden />
-        ) : (
-          <Signature size={16} aria-hidden />
-        )}
-        {pending ? "Assinando…" : "Assinar eletronicamente"}
-      </Button>
+          tamanho natural alinhado à esquerda do form. `semBotao`: no
+          wizard o primário mora no rodapé fixo (submit via form=id) */}
+      {!semBotao && (
+        <Button type="submit" disabled={pending} className="w-full justify-center sm:w-auto sm:px-8">
+          {pending ? (
+            <CircleNotch size={16} className="animate-spin" aria-hidden />
+          ) : (
+            <Signature size={16} aria-hidden />
+          )}
+          {pending ? "Assinando…" : "Assinar eletronicamente"}
+        </Button>
+      )}
     </form>
   );
 }

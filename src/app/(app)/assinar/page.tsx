@@ -12,8 +12,7 @@ import {
   getMinhaAssinaturaTermo,
 } from "@/lib/queries-assinaturas";
 import { formatDateTime } from "@/lib/ciclo";
-import { AssinaturaForm } from "@/components/assinatura-form";
-import { TermoVoluntarioDoc } from "@/components/termo-doc";
+import { TermoVivo } from "@/components/termo-vivo";
 import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -147,15 +146,19 @@ export default async function AssinarPage() {
       )}
 
       {/* texto integral do termo — mesma fonte (documentos/texto) que o PDF
-          renderiza, então o que se lê é exatamente o que se assina */}
-      <TermoVoluntarioDoc
+          renderiza, e o preview interpola o que a pessoa digita (497):
+          o que se lê é exatamente o que se assina */}
+      <TermoVivo
+        doc="voluntario"
         civis={civis}
-        id="termo"
-        continuar={{ href: "#dados", rotulo: "Continuar para seus dados ↓" }}
-      />
-
-      <Card id="dados" className="animate-enter scroll-mt-4">
-        <CardContent className="space-y-5">
+        acao={assinarTermo}
+        etapas
+        docId="termo"
+        secaoId="dados"
+        className="space-y-6"
+        secaoClasse="animate-enter scroll-mt-4 rounded-xl bg-card p-4 text-sm text-card-foreground shadow-[var(--shadow-border)]"
+        formClasse="mt-5"
+        cabecalho={
           <div>
             <h2 className="text-base font-semibold">2 · Confira seus dados</h2>
             <p className="mt-1 text-sm text-muted-foreground">
@@ -164,9 +167,8 @@ export default async function AssinarPage() {
                 : "Preencha como no seu documento de identidade. Os dados entram no termo exatamente como digitados."}
             </p>
           </div>
-          <AssinaturaForm modo="termo" acao={assinarTermo} dados={civis} etapas />
-        </CardContent>
-      </Card>
+        }
+      />
     </div>
   );
 }

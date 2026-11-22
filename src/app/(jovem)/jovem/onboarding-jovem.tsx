@@ -14,6 +14,7 @@ import {
   Handshake,
   House,
   ListChecks,
+  Signature,
   Star,
   UserCircle,
   WhatsappLogo,
@@ -27,10 +28,9 @@ import {
 } from "@/lib/actions-jovem";
 import { recomecarDemo } from "@/lib/demo/actions";
 import { assinarTermoDemo } from "@/lib/demo/shared";
-import { AssinaturaForm } from "@/components/assinatura-form";
 import { CampoDisponibilidade } from "@/components/campos-pessoais";
 import { SignOutButton } from "@/components/signout-button";
-import { TermoMentorandoDoc } from "@/components/termo-doc";
+import { PassoTermo } from "@/components/termo-vivo";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { formatWhatsApp } from "@/lib/ciclo";
@@ -117,6 +117,9 @@ const TOUR: RecursoTour[] = [
 
 const PASSO_TOUR = 1;
 const PASSO_GRADE = 2;
+/** O passo do termo tem form próprio (AssinaturaForm): o primário do rodapé
+ *  fixo submete via `form` mesmo estando fora dele (REALIZA-497). */
+const TERMO_FORM_ID = "ob-termo-form";
 
 /** Wizard de primeiro acesso do mentorado (REALIZA-114; tour e Liza na
  *  REALIZA-426): boas-vindas com a Liza e a promessa do programa, o tour
@@ -155,6 +158,7 @@ export function OnboardingJovem({
   const [pending, start] = useTransition();
   const tituloRef = useRef<HTMLHeadingElement>(null);
   const [termoOk, setTermoOk] = useState(false);
+  const [pendingTermo, setPendingTermo] = useState(false);
 
   // congela o termo do mount: o layout reentrega `termo=null` depois de
   // assinar, e encolher o total no meio da sessão deixaria o step órfão
@@ -292,44 +296,29 @@ export function OnboardingJovem({
     ) : null;
 
   const corpo = (() => {
-    // o termo tem form próprio (AssinaturaForm) — intercepta antes do
-    // switch; na demo a gravação é simulada (cookie demo_termo) e os
-    // espelhos leem como "assinado", como no wizard de staff
+    // o termo tem form próprio (AssinaturaForm dentro do PassoTermo) —
+    // intercepta antes do switch; na demo a gravação é simulada (cookie
+    // demo_termo) e os espelhos leem como "assinado". O documento interpola
+    // o que o jovem digita e o primário fica no rodapé fixo (497)
     if (ehPassoTermo && termo) {
       return (
-        <div className="space-y-4">
-          <TermoMentorandoDoc
-            civis={civis}
-            continuar={{
-              href: "#ob-termo-dados",
-              rotulo: "Continuar para seus dados ↓",
-            }}
-          />
-          <div id="ob-termo-dados" className="scroll-mt-[calc(6rem+env(safe-area-inset-top))] space-y-2">
-            <h2 className="text-base font-semibold">Seus dados para assinar</h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {civis
-                ? "Já temos seus dados do cadastro: confira, corrija se preciso e assine."
-                : "Pra assinar precisamos dos seus dados civis: preencha como no documento de identidade. Eles entram no termo exatamente como digitados."}{" "}
-              {demo
-                ? "Na demonstração a assinatura é simulada: nada sai do seu navegador."
-                : "Eles ficam restritos à coordenação e ao termo."}
-            </p>
-          </div>
-          <AssinaturaForm
-            modo="termo"
-            acao={
-              demo
-                ? (fd) => assinarTermoDemo("mentorado", fd)
-                : assinarComToken.bind(null, termo.token)
-            }
-            dados={civis}
-            onSucesso={() => {
-              setTermoOk(true);
-              avancar();
-            }}
-          />
-        </div>
+        <PassoTermo
+          doc="mentorando"
+          civis={civis}
+          dados={civis}
+          acao={
+            demo
+              ? (fd) => assinarTermoDemo("mentorado", fd)
+              : assinarComToken.bind(null, termo.token)
+          }
+          demo={!!demo}
+          formId={TERMO_FORM_ID}
+          onSucesso={() => {
+            setTermoOk(true);
+            avancar();
+          }}
+          onPendingChange={setPendingTermo}
+        />
       );
     }
     switch (step) {
@@ -546,11 +535,12 @@ export function OnboardingJovem({
       </main>
 
       {/* footer fixo: "Preencher depois" no passo da grade, "Assinar
-          depois" no do termo + primário. requestSubmit não se usa aqui —
-          o passo não tem <form>, o gesto chama a action direto; no termo
-          o submit mora dentro do AssinaturaForm e o primário some (um
-          "Continuar" ao lado de "Assinar depois" seria ambíguo — paridade
-          com o OnboardingFlow) */}
+          depois" no do termo + primário. requestSubmit não se usa nos
+          passos comuns — eles não têm <form>, o gesto chama a action
+          direto; no termo o primário é o submit do AssinaturaForm via
+          form=id, então o "Assinar" fica sempre à vista e "Assinar
+          depois" segue como saída secundária (497 — paridade com o
+          OnboardingFlow) */}
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-border bg-background/85 backdrop-blur">
         <div className="mx-auto flex w-full max-w-xl items-center gap-3 px-4 pb-[calc(0.75rem+env(safe-area-inset-bottom))] pt-3 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:px-6">
           {step === PASSO_GRADE && perfil && (
@@ -568,36 +558,50 @@ export function OnboardingJovem({
               type="button"
               variant="ghost"
               onClick={avancar}
-              disabled={pending}
+              disabled={pending || pendingTermo}
             >
               Assinar depois
             </Button>
           )}
-          {!ehPassoTermo && (
-          <Button
-            type="button"
-            onClick={() => {
-              if (ultimo) entrar();
-              else if (step === PASSO_GRADE) salvarGrade();
-              else avancar();
-            }}
-            disabled={pending}
-            className="h-11 flex-1 font-semibold"
-          >
-            {pending
-              ? ultimo
-                ? "Entrando…"
-                : "Salvando…"
-              : ultimo
-                ? "Entrar"
-                : "Continuar"}
-            {!pending &&
-              (ultimo ? (
-                <Check weight="bold" aria-hidden />
+          {ehPassoTermo ? (
+            <Button
+              type="submit"
+              form={TERMO_FORM_ID}
+              disabled={pending || pendingTermo}
+              className="h-11 flex-1 font-semibold"
+            >
+              {pendingTermo ? (
+                <CircleNotch className="animate-spin" aria-hidden />
               ) : (
-                <ArrowRight aria-hidden />
-              ))}
-          </Button>
+                <Signature aria-hidden />
+              )}
+              {pendingTermo ? "Assinando…" : "Assinar eletronicamente"}
+            </Button>
+          ) : (
+            <Button
+              type="button"
+              onClick={() => {
+                if (ultimo) entrar();
+                else if (step === PASSO_GRADE) salvarGrade();
+                else avancar();
+              }}
+              disabled={pending}
+              className="h-11 flex-1 font-semibold"
+            >
+              {pending
+                ? ultimo
+                  ? "Entrando…"
+                  : "Salvando…"
+                : ultimo
+                  ? "Entrar"
+                  : "Continuar"}
+              {!pending &&
+                (ultimo ? (
+                  <Check weight="bold" aria-hidden />
+                ) : (
+                  <ArrowRight aria-hidden />
+                ))}
+            </Button>
           )}
         </div>
       </footer>

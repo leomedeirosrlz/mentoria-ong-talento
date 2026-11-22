@@ -34,6 +34,7 @@ import {
   PencilLine,
   SealCheck,
   ShieldCheck,
+  Signature,
   Signpost,
   Tag,
   Target,
@@ -56,10 +57,9 @@ import {
   AVATAR_MAX_BYTES,
   avisoImagemGrande,
 } from "@/lib/avatar";
-import { AssinaturaForm } from "@/components/assinatura-form";
 import { CaixaSelecao } from "@/components/ui/caixa-selecao";
 import { TagInput } from "@/components/tag-input";
-import { TermoVoluntarioDoc } from "@/components/termo-doc";
+import { PassoTermo } from "@/components/termo-vivo";
 import {
   CampoDisponibilidade,
   CampoGenero,
@@ -94,6 +94,9 @@ import { cn } from "@/lib/utils";
 
 /** Um form por passo — o botão do footer fixo submete via atributo `form`. */
 const FORM_ID = "onboarding-passo";
+/** O passo do termo tem form próprio (AssinaturaForm): o primário do rodapé
+ *  fixo submete via `form` mesmo estando fora dele (REALIZA-497). */
+const TERMO_FORM_ID = "onboarding-termo";
 
 /** "O que você pode fazer aqui" — os pontos que mudam a rotina de cada papel,
  *  cada um com a tela real onde ele acontece. */
@@ -148,9 +151,11 @@ const RECURSOS: Record<AppRole, RecursoTour[]> = {
 // qualquer papel
 const PASSO_DECLARACOES = 1;
 const PASSO_SOBRE = (ehMentor: boolean) => (ehMentor ? 7 : 3);
-const SUBPASSOS_SOBRE = 3;
-const PASSO_PAREAMENTO = 10;
-const PASSO_DISPONIBILIDADE = 11;
+// review 21/11 (REALIZA-497): pro mentor os 4 passos da ficha/pareamento
+// viraram 2 telas de confirmação — o dado que a importação já trouxe fecha
+// em resumo com Editar próprio e o pareamento se junta à motivação; os
+// outros papéis seguem com os 3 sub-passos
+const SUBPASSOS_SOBRE = (ehMentor: boolean) => (ehMentor ? 2 : 3);
 
 /** Label com micro-ícone do assunto — no primeiro acesso o ícone ancora o
  *  campo antes da leitura (os forms densos do app seguem com label puro). */
@@ -217,15 +222,17 @@ export function OnboardingFlow({
   );
   const temTermo = !assinaturaInicial && souVoluntario;
   // coord/supervisor: boas-vindas + declarações + recursos + ficha pessoal
-  // em 3 sub-passos + fechamento (7); mentores: + foto, apresentação,
-  // pareamento e disponibilidade (13); termo pendente adiciona 1 passo
-  const total = (ehMentor ? 13 : 7) + (temTermo ? 1 : 0);
+  // em 3 sub-passos + fechamento (7); mentores: + foto, apresentação, os 2
+  // passos "Sobre você" fundidos (497) e a disponibilidade (11); termo
+  // pendente adiciona 1 passo
+  const total = (ehMentor ? 11 : 7) + (temTermo ? 1 : 0);
   const [stepBruto, setStep] = useState(0);
   // o total encolhe quando a pessoa desmarca "voluntário" (e o status da prop
   // pode chegar assinado depois): o índice lido nunca passa do último, sem
   // setState em efeito (era o 8/7 e o valuenow > valuemax do bug)
   const step = Math.min(stepBruto, total - 1);
   const [termoOk, setTermoOk] = useState(false);
+  const [pendingTermo, setPendingTermo] = useState(false);
   const [pending, start] = useTransition();
   const tituloRef = useRef<HTMLHeadingElement>(null);
 
@@ -301,9 +308,13 @@ export function OnboardingFlow({
   // saída "Pular tudo"; faixa contínua do primeiro passo de ficha
   // até a disponibilidade (mentor) ou o fim dos sub-passos (coord/superv.)
   const passoSobre = PASSO_SOBRE(ehMentor);
+  const subpassosSobre = SUBPASSOS_SOBRE(ehMentor);
+  // grade do mentor fica logo depois dos sub-passos — era um índice fixo
+  // quando o "Sobre você" tinha 4 telas
+  const passoDisponibilidadeIdx = passoSobre + subpassosSobre;
   const ultimoComCampos = ehMentor
-    ? PASSO_DISPONIBILIDADE
-    : passoSobre + SUBPASSOS_SOBRE - 1;
+    ? passoDisponibilidadeIdx
+    : passoSobre + subpassosSobre - 1;
   const passoComCampos = step >= 3 && step <= ultimoComCampos;
   // o termo é penúltimo (antes do "Tudo certo") e fica FORA do <form>
   // compartilhado: o AssinaturaForm tem form e submit próprios. -1 quando a
@@ -587,12 +598,12 @@ export function OnboardingFlow({
     ],
     [],
   ];
-  const resumoSobre = (sub: number) => (
+  const resumoSobre = (sub: number, rotulo = "Já temos esses dados do cadastro") => (
     <div className="rounded-2xl border border-border bg-card px-4 py-3.5">
       <div className="flex items-center justify-between gap-3">
         <p className="flex items-center gap-1.5 text-sm font-medium">
           <ClipboardText size={15} className="text-muted-foreground" aria-hidden />
-          Já temos esses dados do cadastro
+          {rotulo}
         </p>
         <Button
           type="button"
@@ -618,8 +629,40 @@ export function OnboardingFlow({
     </div>
   );
 
-  /** Passo "Pareamento" (mentor, 0034) — o que ajuda a coordenação a escolher
-   *  a dupla: preferência de gênero do par + a bagagem que entra na ficha. */
+  // mentor (497): a 1ª tela "Sobre você" confirma os dois blocos que a
+  // importação costuma trazer — cada um fecha num resumo com Editar
+  // próprio; sem importação (ou com buraco) o bloco abre os campos. Todos
+  // os `name`s seguem no FormData do passo — o patch salvo é o mesmo dos
+  // dois envios anteriores, num só
+  const passoSobreDados = (
+    <div className="space-y-6">
+      {[
+        { rotulo: "Quem você é", sub: 0, campos: passoSobreIdentidade },
+        { rotulo: "Seu trabalho", sub: 1, campos: passoSobreProfissional },
+      ].map((grupo) => (
+        <section
+          key={grupo.rotulo}
+          aria-label={grupo.rotulo}
+          className="space-y-3"
+        >
+          {sobrePreenchido[grupo.sub] && !editarSobre[grupo.sub] ? (
+            resumoSobre(grupo.sub, grupo.rotulo)
+          ) : (
+            <>
+              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                {grupo.rotulo}
+              </p>
+              {grupo.campos}
+            </>
+          )}
+        </section>
+      ))}
+    </div>
+  );
+
+  /** Blocos do "Pareamento" (mentor, 0034) — preferência de gênero do par +
+   *  a bagagem que entra na ficha. Na 497 a tela própria foi fundida no
+   *  2º "Sobre você" do mentor, mas os campos e os nomes são os mesmos. */
   const passoPareamento = (
     <div className="space-y-4">
       <CampoPrefGenero
@@ -660,12 +703,37 @@ export function OnboardingFlow({
     <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
   );
 
+  // mentor (497): a 2ª tela "Sobre você" junta o que a coordenação cruza
+  // pra formar a dupla — interesses/motivação (sempre abertos) + a
+  // preferência de par e a bagagem que antes tinham tela própria
+  const passoSobreDupla = (
+    <div className="space-y-6">
+      <section aria-label="O que te move" className="space-y-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          O que te move
+        </p>
+        {passoSobreMotivacao}
+      </section>
+      <section aria-label="Pra formar sua dupla" className="space-y-4">
+        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+          Pra formar sua dupla
+        </p>
+        {passoPareamento}
+      </section>
+    </div>
+  );
+
   const titulo = (() => {
-    if (step === passoSobre) return "Sobre você: quem você é";
-    if (step === passoSobre + 1) return "Sobre você: seu trabalho";
-    if (step === passoSobre + 2) return "Sobre você: o que te move";
-    if (ehMentor && step === PASSO_PAREAMENTO) return "O que ajuda a formar sua dupla";
-    if (ehMentor && step === PASSO_DISPONIBILIDADE) return "Quando você pode encontrar sua dupla";
+    if (step === passoSobre)
+      return ehMentor
+        ? "Sobre você: confira seus dados"
+        : "Sobre você: quem você é";
+    if (step === passoSobre + 1)
+      return ehMentor
+        ? "Sobre você: o que ajuda a formar sua dupla"
+        : "Sobre você: seu trabalho";
+    if (!ehMentor && step === passoSobre + 2) return "Sobre você: o que te move";
+    if (ehMentor && step === passoDisponibilidadeIdx) return "Quando você pode encontrar sua dupla";
     if (ehPassoTermo) return "Termo de adesão ao trabalho voluntário";
     switch (step) {
       case 0:
@@ -691,16 +759,16 @@ export function OnboardingFlow({
 
   const hint = (() => {
     if (step === passoSobre)
-      return "Como você se apresenta e onde vive. Nascimento e gênero ficam visíveis só pra coordenação.";
-    if (step === passoSobre + 1)
-      return "Cargo, empresa e como você chegou: contexto rápido pra equipe te conhecer.";
-    if (step === passoSobre + 2)
       return ehMentor
-        ? "Interesses e motivação ajudam a formar a sua dupla; a motivação fica só com a coordenação."
-        : "Interesses e motivação ajudam a equipe a te conhecer; a motivação fica só com a coordenação.";
-    if (ehMentor && step === PASSO_PAREAMENTO)
-      return "A coordenação usa isso pra escolher a dupla: tudo opcional, dá pra completar depois no Perfil.";
-    if (ehMentor && step === PASSO_DISPONIBILIDADE)
+        ? "O cadastro já trouxe estes dados: confira os dois blocos e corrija o que precisar. Nascimento e gênero ficam visíveis só pra coordenação."
+        : "Como você se apresenta e onde vive. Nascimento e gênero ficam visíveis só pra coordenação.";
+    if (step === passoSobre + 1)
+      return ehMentor
+        ? "Interesses, motivação e a sua bagagem ajudam a coordenação a formar a sua dupla. Tudo opcional, dá pra completar depois no Perfil; a motivação fica só com a coordenação."
+        : "Cargo, empresa e como você chegou: contexto rápido pra equipe te conhecer.";
+    if (!ehMentor && step === passoSobre + 2)
+      return "Interesses e motivação ajudam a equipe a te conhecer; a motivação fica só com a coordenação.";
+    if (ehMentor && step === passoDisponibilidadeIdx)
       return "Toque nos dias e períodos em que você costuma ter agenda livre. A coordenação cruza com a do mentorado.";
     if (ehPassoTermo)
       return demo
@@ -753,98 +821,59 @@ export function OnboardingFlow({
     ) : null;
 
   const corpo = (() => {
-    if (step >= passoSobre && step < passoSobre + SUBPASSOS_SOBRE) {
+    if (step >= passoSobre && step < passoSobre + subpassosSobre) {
       const sub = step - passoSobre;
+      if (ehMentor) return sub === 0 ? passoSobreDados : passoSobreDupla;
       return sobrePreenchido[sub] && !editarSobre[sub]
         ? resumoSobre(sub)
         : PASSOS_SOBRE[sub];
     }
-    if (ehMentor && step === PASSO_PAREAMENTO) return passoPareamento;
-    if (ehMentor && step === PASSO_DISPONIBILIDADE) return passoDisponibilidade;
-    // o termo tem form próprio (AssinaturaForm) — intercepta antes do switch
-    // porque o índice colide com o case 6 (linkedin) pra coord/supervisor
+    if (ehMentor && step === passoDisponibilidadeIdx) return passoDisponibilidade;
+    // o termo tem form próprio (AssinaturaForm dentro do PassoTermo) —
+    // intercepta antes do switch porque o índice colide com o case 6
+    // (linkedin) pra coord/supervisor. Na demo o fluxo é o real inteiro —
+    // documento, dados civis da persona e o form — só a gravação é simulada
+    // (cookie demo_termo; os espelhos leem como "assinado" e a via em PDF
+    // sai com o que foi digitado). O documento interpola o que a pessoa
+    // digita e o primário fica no rodapé fixo (497)
     if (ehPassoTermo) {
-      // demo: o fluxo real inteiro — documento, dados civis da persona e o
-      // form — só a gravação é simulada (cookie demo_termo; os espelhos
-      // leem como "assinado" e a via em PDF sai com o que foi digitado)
-      if (demo) {
-        return (
-          <div className="space-y-4">
-            <TermoVoluntarioDoc
-              civis={civis}
-              continuar={{
-                href: "#ob-termo-dados",
-                rotulo: "Continuar para seus dados ↓",
-              }}
-            />
-            <div id="ob-termo-dados" className="scroll-mt-[calc(6rem+env(safe-area-inset-top))] space-y-2">
-              <h2 className="text-base font-semibold">Seus dados para assinar</h2>
-              <p className="text-sm leading-relaxed text-muted-foreground">
-                {civis
-                  ? "Já temos seus dados do cadastro: confira, corrija se preciso e assine."
-                  : "Pra assinar precisamos dos seus dados civis: preencha como no documento de identidade. Eles entram no termo exatamente como digitados."}{" "}
-                Na demonstração a assinatura é simulada: nada sai do seu navegador.
-              </p>
-            </div>
-            <AssinaturaForm
-              modo="termo"
-              acao={(fd) => assinarTermoDemo(me.role ?? "mentor_dpp", fd)}
-              dados={civis}
-              onSucesso={() => {
-                setTermoOk(true);
-                avancar();
-              }}
-            />
-          </div>
-        );
-      }
       return (
-        <div className="space-y-4">
-          <TermoVoluntarioDoc
-            civis={civis}
-            continuar={{
-              href: "#ob-termo-dados",
-              rotulo: "Continuar para seus dados ↓",
-            }}
-          />
-          <div id="ob-termo-dados" className="scroll-mt-[calc(6rem+env(safe-area-inset-top))] space-y-2">
-            <h2 className="text-base font-semibold">Seus dados para assinar</h2>
-            <p className="text-sm leading-relaxed text-muted-foreground">
-              {civis
-                ? "Já temos seus dados do cadastro: confira, corrija se preciso e assine."
-                : "Pra assinar precisamos dos seus dados civis: preencha como no documento de identidade. Eles entram no termo exatamente como digitados."}{" "}
-              Eles ficam restritos à coordenação e ao termo, não aparecem no seu perfil.
-            </p>
-          </div>
-          <AssinaturaForm
-            modo="termo"
-            acao={assinarTermo}
-            dados={
-              civis ?? {
-                // prefill com o que o wizard já coletou — os dados civis são
-                // um silo à parte (RPC 0046), mas nascimento/cidade/UF/CEP
-                // valem nos dois mundos
-                nome_civil: null,
-                rg: null,
-                cpf: null,
-                data_nascimento: nascimento || null,
-                endereco: {
-                  logradouro: null,
-                  numero: null,
-                  complemento: null,
-                  bairro: null,
-                  cidade: cidade || null,
-                  uf: uf || null,
-                  cep: buscaCep.cep.replace(/\D/g, "") || null,
-                },
-              }
+        <PassoTermo
+          doc="voluntario"
+          civis={civis}
+          dados={
+            civis ?? {
+              // prefill com o que o wizard já coletou — os dados civis são
+              // um silo à parte (RPC 0046), mas nascimento/cidade/UF/CEP
+              // valem nos dois mundos
+              nome_civil: null,
+              rg: null,
+              cpf: null,
+              data_nascimento: nascimento || null,
+              endereco: {
+                logradouro: null,
+                numero: null,
+                complemento: null,
+                bairro: null,
+                cidade: cidade || null,
+                uf: uf || null,
+                cep: buscaCep.cep.replace(/\D/g, "") || null,
+              },
             }
-            onSucesso={() => {
-              setTermoOk(true);
-              avancar();
-            }}
-          />
-        </div>
+          }
+          acao={
+            demo
+              ? (fd) => assinarTermoDemo(me.role ?? "mentor_dpp", fd)
+              : assinarTermo
+          }
+          demo={!!demo}
+          formId={TERMO_FORM_ID}
+          onSucesso={() => {
+            setTermoOk(true);
+            avancar();
+          }}
+          onPendingChange={setPendingTermo}
+        />
       );
     }
     switch (step) {
@@ -1115,16 +1144,16 @@ export function OnboardingFlow({
           {(passoComCampos || ehPassoTermo) && (
             <div className="flex shrink-0 flex-wrap items-center justify-center gap-x-3">
               {/* no termo o ghost é "Assinar depois": avança sem gravar —
-                  a pendência segue como ausência de assinatura. Nos demais
+                  a pendência segue como ausência de assinatura, agora ao
+                  lado do primário real que submete o form (497). Nos demais
                   passos da demo sem form o primário cobre o pulo; no termo
-                  demo ele aparece porque o primário some (paridade com o
-                  fluxo real: quem decide é o botão dentro do form) */}
+                  demo ele aparece também (paridade com o fluxo real) */}
               {(passoComCampos || ehPassoTermo || !demo) && (
                 <Button
                   type="button"
                   variant="ghost"
                   onClick={pularEtapa}
-                  disabled={pending}
+                  disabled={pending || pendingTermo}
                 >
                   {ehPassoTermo ? "Assinar depois" : "Pular etapa"}
                 </Button>
@@ -1151,11 +1180,25 @@ export function OnboardingFlow({
               submit no MESMO clique dispara o form do passo seguinte — o
               default action do clique é avaliado depois do re-render, então
               "Continuar" avançava 2 passos (pulava a foto).
-              No passo do termo o primário some: o submit mora dentro do
-              AssinaturaForm e um "Continuar" ao lado de "Assinar depois"
-              seria ambíguo — na demo vale o mesmo, o form simulado é que
-              conduz */}
-          {!ehPassoTermo && (
+              No passo do termo o primário vira o submit do AssinaturaForm
+              (form=id, sem botão interno): o "Assinar" fica sempre à vista
+              no rodapé e "Assinar depois" segue como a saída secundária
+              (497) — na demo vale o mesmo, o form simulado é que conduz */}
+          {ehPassoTermo ? (
+            <Button
+              type="submit"
+              form={TERMO_FORM_ID}
+              disabled={pending || pendingTermo}
+              className="h-11 w-full font-semibold sm:flex-1"
+            >
+              {pendingTermo ? (
+                <CircleNotch className="animate-spin" aria-hidden />
+              ) : (
+                <Signature aria-hidden />
+              )}
+              {pendingTermo ? "Assinando…" : "Assinar eletronicamente"}
+            </Button>
+          ) : (
             <Button
               type="button"
               onClick={() => {
@@ -1175,7 +1218,7 @@ export function OnboardingFlow({
               className="h-11 w-full font-semibold sm:flex-1"
             >
               {pending
-                ? ultimo || ehPassoTermo
+                ? ultimo
                   ? "Entrando…"
                   : "Salvando…"
                 : ultimo

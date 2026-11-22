@@ -123,9 +123,10 @@ test.describe("demo — ViaCEP no cadastro de endereço", () => {
     await page.goto("/demo");
     await page.getByRole("button", { name: /Mentor DPP/ }).click();
 
-    // "Sobre você — quem você é" é o passo 8 do mentor: 7 avanços de
-    // "Continuar". Clique pré-hidratação é no-op — cada avanço só conta
-    // quando o progressbar confirma (mesmo padrão do pularOnboarding)
+    // "Sobre você — confira seus dados" é o passo 8 do mentor (497 fundiu
+    // as 4 telas da ficha em 2): 7 avanços de "Continuar". Clique
+    // pré-hidratação é no-op — cada avanço só conta quando o progressbar
+    // confirma (mesmo padrão do pularOnboarding)
     for (let passo = 1; passo <= 7; passo++) {
       const destino = page.getByRole("progressbar", {
         name: new RegExp(`Passo ${passo + 1} de`),
@@ -137,12 +138,15 @@ test.describe("demo — ViaCEP no cadastro de endereço", () => {
       );
     }
     await expect(
-      page.getByRole("heading", { name: "Sobre você: quem você é" })
+      page.getByRole("heading", { name: "Sobre você: confira seus dados" })
     ).toBeVisible();
 
-    // a importação da coordenação trouxe os dados — o form abre colapsado
-    // atrás do "Editar"
-    await page.getByRole("button", { name: "Editar" }).click();
+    // a importação da coordenação trouxe os dados — cada bloco abre
+    // colapsado atrás do próprio "Editar" (o CEP mora em "Quem você é")
+    await page
+      .locator('section[aria-label="Quem você é"]')
+      .getByRole("button", { name: "Editar" })
+      .click();
 
     const cep = page.locator("#ob-cep");
     await expect(cep).toBeVisible();

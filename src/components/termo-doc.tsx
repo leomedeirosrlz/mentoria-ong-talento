@@ -2,18 +2,22 @@ import { CaretDown } from "@phosphor-icons/react/dist/ssr";
 import {
   ANEXO_I_PARAGRAFOS,
   ANEXO_I_TITULO,
+  AUTORIZACAO_TITULO,
   civisPreview,
+  CLAUSULAS_AUTORIZACAO,
   CLAUSULAS_MENTORANDO,
   CLAUSULAS_TERMO,
   dataPorExtenso,
+  FECHO_AUTORIZACAO,
   FECHO_MENTORANDO,
   FECHO_TERMO,
   MENTORANDO_TITULO,
+  preambuloAutorizacao,
   preambuloMentorando,
   preambuloTermo,
   TERMO_TITULO,
 } from "@/lib/documentos/texto";
-import type { DadosCivis } from "@/lib/types";
+import type { DadosAutorizacao, DadosCivis } from "@/lib/types";
 
 /** Documento integral do termo de adesão ao trabalho voluntário — extraído
  *  da página /assinar pra reutilizar no passo de termo do onboarding. O que
@@ -100,6 +104,61 @@ export function TermoVoluntarioDoc({
           </p>
         )}
       </div>
+    </section>
+  );
+}
+
+/** Documento integral da autorização do responsável (0070) — assinada pelo
+ *  responsável legal no link público. Gramática própria (sans, mais leve
+ *  que o serif dos termos): morava inline na página /assinar/[token] e
+ *  veio pra cá pra o preview vivo interpolar parentesco e civis enquanto
+ *  a pessoa digita (REALIZA-497) — mesma fonte única documentos/texto. */
+export function AutorizacaoDoc({
+  dados,
+  id,
+  continuar,
+}: {
+  /** dados do preview — mentorado pelo nome + responsável com blanks
+   *  sublinhados onde a digitação ainda não chegou */
+  dados: DadosAutorizacao;
+  id?: string;
+  continuar?: { href: string; rotulo: string };
+}) {
+  return (
+    <section
+      id={id}
+      className="scroll-mt-4 rounded-xl bg-card p-6 shadow-[var(--shadow-border)] sm:p-8"
+    >
+      <h2 className="text-center text-sm font-semibold uppercase tracking-[0.06em]">
+        {AUTORIZACAO_TITULO}
+      </h2>
+      <div className="mt-5 space-y-3 text-sm leading-relaxed">
+        {preambuloAutorizacao(dados).map((p, i) => (
+          <p key={i}>{p}</p>
+        ))}
+        {CLAUSULAS_AUTORIZACAO.map(([titulo, paragrafos]) => (
+          <div key={titulo} className="pt-1">
+            <h3 className="font-semibold">{titulo}</h3>
+            {paragrafos.map((p) => (
+              <p key={p} className="mt-1.5">
+                {p}
+              </p>
+            ))}
+          </div>
+        ))}
+        <p>{FECHO_AUTORIZACAO}</p>
+        <p>{dataPorExtenso(new Date())}</p>
+      </div>
+      {continuar && (
+        <p className="mt-6 border-t border-border pt-5 text-center">
+          <a
+            href={continuar.href}
+            className="inline-flex min-h-11 items-center rounded-lg px-3 text-sm font-medium text-primary underline-offset-4 transition-colors hover:underline"
+          >
+            {continuar.rotulo}
+          </a>
+        </p>
+      )}
     </section>
   );
 }
