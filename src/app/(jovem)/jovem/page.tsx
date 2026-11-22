@@ -64,8 +64,13 @@ import {
   getJovemJornada,
   getJovemPedidosEspecialista,
   getJovemPerfil,
+  getJovemPlano,
   type JovemEncontro,
 } from "@/lib/queries-jovem";
+import {
+  ocupadosDoJovem,
+  sugestoesEncontroDaDupla,
+} from "@/lib/sugestoes-encontro-server";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import { derivarPendencias } from "@/lib/pendencias-jovem";
 import { getComunicados, getMateriais, getMe } from "@/lib/queries";
@@ -102,7 +107,7 @@ const TIPO_ICONE_MATERIAL = {
 // os adultos, e por fim o que é consulta (especialistas só com ação,
 // avaliações, combinados, documentos, avisos e materiais).
 export default async function JovemHome() {
-  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes, pedidosEsp, jornada] =
+  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes, pedidosEsp, planoJovem, jornada] =
     await Promise.all([
       getMe(),
       getJovemPerfil(),
@@ -115,6 +120,8 @@ export default async function JovemHome() {
       getMateriais(),
       getJovemAvaliacoes(),
       getJovemPedidosEspecialista(),
+      // o plano ancora a janela/o ritmo das sugestões de data (481)
+      getJovemPlano().catch(() => null),
       // além do cronograma oficial (a régua do acervo embaixo), a RPC é a
       // auto-cura da jornada — chamar na visita da home já dispara a
       // emissão do que a data oficial abriu (0123)
@@ -295,9 +302,27 @@ export default async function JovemHome() {
       .map((e) => e.numero)
   );
   const numeroAgendar = livres.find((n) => n > maxRealizado) ?? livres[0] ?? null;
+  // a sugestão da 481 nasce do mesmo motor da agenda: histórico da dupla +
+  // janela do plano + tudo o que já ocupa o jovem nas outras duplas
+  const sugestoesAgendar =
+    duplaDppId != null
+      ? await sugestoesEncontroDaDupla({
+          encontros: encontros.filter((e) => e.dupla_id === duplaDppId),
+          plano: planoJovem,
+          duplaId: duplaDppId,
+          agora,
+          ocupados: ocupadosDoJovem(encontros, duplas),
+        }).catch(() => null)
+      : null;
   const agendar =
     duplaDppId != null && numeroAgendar != null
-      ? { duplaId: duplaDppId, numero: numeroAgendar }
+      ? {
+          duplaId: duplaDppId,
+          numero: numeroAgendar,
+          numeros: livres,
+          comQuem: nomeDaDupla(duplaDppId, false),
+          sugestoes: sugestoesAgendar,
+        }
       : null;
   // retroativo (0207+0208): nº sem row, menos o último do ciclo — e só
   // passo oficial JÁ VENCIDO (a RPC recusa os dois casos também). Mesma

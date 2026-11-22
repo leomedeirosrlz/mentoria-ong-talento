@@ -62,11 +62,15 @@ function SheetContent({
   children,
   side = "left",
   showCloseButton = true,
+  closeLabel = "Fechar menu",
   keepMounted,
   ...props
 }: DialogPrimitive.Popup.Props & {
   side?: keyof typeof LADO
   showCloseButton?: boolean
+  /** Nome acessível do X — "menu" é o caso do kit (nav); sheets de conteúdo
+   *  passam "Fechar". */
+  closeLabel?: string
 } & Pick<DialogPrimitive.Portal.Props, "keepMounted">) {
   return (
     <DialogPrimitive.Portal keepMounted={keepMounted}>
@@ -102,7 +106,7 @@ function SheetContent({
             }
           >
             <X />
-            <span className="sr-only">Fechar menu</span>
+            <span className="sr-only">{closeLabel}</span>
           </DialogPrimitive.Close>
         )}
       </DialogPrimitive.Popup>

@@ -60,6 +60,10 @@ import {
   tempoRelativo,
   toDateStr,
 } from "@/lib/ciclo";
+import {
+  ocupadoEmChoque,
+  type OcupadoRotulado,
+} from "@/lib/sugestoes-encontro";
 import { cn, ERRO_JA_ACEITA } from "@/lib/utils";
 
 /** "19:00" da grade do especialista — derivado do formatDiaHora pra ficar
@@ -376,6 +380,7 @@ export function SolicitacaoNegociacao({
   equipe,
   nomeJovem,
   disponibilidade,
+  ocupados,
   mentoradosProprios,
   onAceito,
   onErro,
@@ -400,6 +405,10 @@ export function SolicitacaoNegociacao({
    *  é a dele (jovem_perfil.disponibilidade); pinta "encaixa com você" nos
    *  slots da grade de dias da contra-proposta. Null/ausente = sem destaque. */
   disponibilidade?: Disponibilidade | null;
+  /** Compromissos já marcados de quem aceita — só o jovem alimenta (a mesa
+   *  dele recebe ocupadosDoJovem com rótulo). Uma proposta em choque não
+   *  grava: o aviso inline aponta o encontro antes do aceite (481). */
+  ocupados?: OcupadoRotulado[];
   /** opcional — chamado com a dupla criada/efetivada quando o aceite fecha
    *  (o mural navega pra ficha da nova dupla). */
   onAceito?: (duplaId?: string) => void;
@@ -417,6 +426,12 @@ export function SolicitacaoNegociacao({
   const [slotAceite, setSlotAceite] = useState<string | null>(null);
   // cancelar via item do ⋯ (REALIZA-186) — o confirm é controlado
   const [cancelando, setCancelando] = useState(false);
+  // o choque que o último "Aceitar" barrou — ligado ao slot na mesa, some
+  // sozinho quando a proposta na mesa troca
+  const [avisoChoque, setAvisoChoque] = useState<{
+    slot: string;
+    rotulo: string;
+  } | null>(null);
 
   const efetivo = s.status_efetivo ?? s.status;
   const emNegociacao = efetivo === "aberta" || efetivo === "contra_proposta";
@@ -694,7 +709,25 @@ export function SolicitacaoNegociacao({
                 <Button
                   size="sm"
                   disabled={pendente}
-                  onClick={() =>
+                  onClick={() => {
+                    // 481: o aceite que colide com a agenda dele não grava —
+                    // o aviso inline nomeia o choque e a contra-proposta é
+                    // a saída (a RPC segue como rede de segurança)
+                    const choque = ocupadoEmChoque(
+                      new Date(s.slot_proposto!),
+                      ocupados
+                    );
+                    if (choque) {
+                      setAvisoChoque({
+                        slot: s.slot_proposto!,
+                        rotulo:
+                          choque.rotuloArtigo ||
+                          choque.rotulo ||
+                          "outro compromisso",
+                      });
+                      return;
+                    }
+                    setAvisoChoque(null);
                     start(async () => {
                       const r = await aceitarProposta(s.id);
                       if (r.error) {
@@ -704,8 +737,8 @@ export function SolicitacaoNegociacao({
                         toast.success("Horário aceito. Sessão marcada.");
                         onAceito?.(r.duplaId);
                       }
-                    })
-                  }
+                    });
+                  }}
                 >
                   <CheckCircle size={15} />
                   Aceitar {rotuloSlot(s.slot_proposto)}
@@ -779,6 +812,12 @@ export function SolicitacaoNegociacao({
                 onConfirm={() => cancelarSolicitacao(s.id)}
               />
             </div>
+          )}
+          {avisoChoque && avisoChoque.slot === s.slot_proposto && (
+            <p role="status" className="text-sm text-destructive">
+              Nesse horário você tem {avisoChoque.rotulo}. Propõe outro
+              horário.
+            </p>
           )}
           {abrindo === "proposta" && (
             <ContraPropostaForm
