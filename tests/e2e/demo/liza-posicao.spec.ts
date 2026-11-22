@@ -35,10 +35,22 @@ function colisoesDoFab(page: Page) {
         "footer a[href], footer button",
       ].join(",")
     );
+    // O FAB mora dentro da bottom-nav: alvo que já nasce abaixo do topo da
+    // nav está coberto pela nav (e só aparece ao rolar), não pelo FAB.
+    const nav = document.querySelector<HTMLElement>(
+      'nav[aria-label="Navegação principal"]'
+    );
+    const navTop = nav?.getBoundingClientRect().top ?? Infinity;
     return [...alvos]
       .filter((el) => !fab.contains(el) && !el.contains(fab))
       .map((el) => ({ el, r: el.getBoundingClientRect() }))
-      .filter(({ r }) => r.width > 0 && r.height > 0 && toca(r))
+      .filter(
+        ({ r }) =>
+          r.width > 0 &&
+          r.height > 0 &&
+          r.top < navTop &&
+          toca(r)
+      )
       .map(({ el }) =>
         (el.getAttribute("aria-label") ?? el.textContent ?? el.tagName)
           .trim()
