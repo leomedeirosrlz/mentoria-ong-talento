@@ -442,6 +442,7 @@ export default async function JovemAgenda() {
             !sugestoesAgendar?.principal && (
               <JovemAgendarDialog
                 duplaId={duplaDpp.id}
+                numeroPadrao={numeroAgendar ?? undefined}
                 numeros={numerosLivres}
                 atual={null}
               />

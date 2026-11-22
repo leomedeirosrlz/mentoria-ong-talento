@@ -45,6 +45,7 @@ function rotuloConflito(c: ConflitoEncontro): string {
 export function JovemAgendarDialog({
   duplaId,
   numero,
+  numeroPadrao,
   numeros,
   atual,
   trigger,
@@ -53,6 +54,9 @@ export function JovemAgendarDialog({
   /** Fixo quando a linha já diz qual encontro é (remarcação); undefined
    *  abre o modo "escolher qual encontro agendar" (Select de `numeros`). */
   numero?: number;
+  /** Nº sugerido no modo de escolha (QW7) — o select abre já apontando
+   *  pro próximo encontro, sem travar a troca. */
+  numeroPadrao?: number;
   /** Candidatos do Select — nº + data oficial quando o calendário é legível. */
   numeros?: { numero: number; data?: string | null }[];
   /** Edição de um agendado existente — habilita o motivo da remarcação. */
@@ -68,7 +72,7 @@ export function JovemAgendarDialog({
   // modo "escolher encontro": o nº escolhido dirige o submit e o hint de
   // data oficial (troca o valor do campo pela data do guia)
   const [numeroSel, setNumeroSel] = useState<number | null>(
-    numero ?? atual?.numero ?? null
+    numero ?? atual?.numero ?? numeroPadrao ?? null
   );
   // resultado guardado com a data consultada — um retorno atrasado de uma
   // data que já mudou (ou de um dialog fechado) não vira aviso mentiroso
@@ -149,7 +153,7 @@ export function JovemAgendarDialog({
           setMotivo("");
           setMotivoLen(0);
           setDataMudou(false);
-          setNumeroSel(numero ?? atual?.numero ?? null);
+          setNumeroSel(numero ?? atual?.numero ?? numeroPadrao ?? null);
           setValorData(inicial);
         }
       }}
@@ -168,7 +172,9 @@ export function JovemAgendarDialog({
             {atual || numero ? `${numeroFinal ?? numero}º encontro` : "Agendar encontro"}
           </DialogTitle>
           <DialogDescription>
-            Escolha o encontro e marque a data e o horário com seu mentor.
+            {atual
+              ? "Escolha a nova data e o horário com seu mentor."
+              : "Escolha o encontro e marque a data e o horário com seu mentor."}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={submit} className="space-y-4">
