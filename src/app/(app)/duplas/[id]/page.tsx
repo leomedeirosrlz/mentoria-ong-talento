@@ -82,6 +82,7 @@ import {
   linkSeguro,
   passoEsp,
   passosDaTrilha,
+  podeEntrarAgora,
   saudadeDaDupla,
   SITUACAO_MENTORADO_LABEL,
   toDateStr,
@@ -763,10 +764,20 @@ export default async function DuplaPage({
               href={linkSeguro(chamadaHoje.link)!}
               target="_blank"
               rel="noopener noreferrer"
-              className={buttonVariants({ size: "sm" })}
+              className={buttonVariants({
+                // QW5: preenchida só na janela da chamada (30 min antes →
+                // 2 h depois); fora dela o link segue discreto — mesma
+                // régua do `podeEntrarAgora` usada pela linha do encontro
+                variant: podeEntrarAgora(chamadaHoje.data_hora, agora)
+                  ? "default"
+                  : "outline",
+                size: "sm",
+              })}
             >
               <VideoCamera aria-hidden />
-              Entrar na chamada
+              {podeEntrarAgora(chamadaHoje.data_hora, agora)
+                ? "Entrar na chamada"
+                : "Link da chamada"}
             </a>
           )
           : null;
@@ -1111,10 +1122,17 @@ export default async function DuplaPage({
                       href={chamadaAtual}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={buttonVariants({ variant: "outline", size: "sm" })}
+                      className={buttonVariants({
+                        variant: podeEntrarAgora(encontroAtual?.data_hora, agora)
+                          ? "default"
+                          : "outline",
+                        size: "sm",
+                      })}
                     >
                       <VideoCamera aria-hidden />
-                      Entrar na chamada
+                      {podeEntrarAgora(encontroAtual?.data_hora, agora)
+                        ? "Entrar na chamada"
+                        : "Link da chamada"}
                     </a>
                   ) : (
                     <CopiarChamada url={chamadaAtual} />

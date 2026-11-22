@@ -286,7 +286,7 @@ function Item({
 }) {
   const conteudo = (
     <>
-      <b className={cn("font-semibold tabular-nums", texto)}>{n}</b>
+      <b className={cn("font-semibold tabular-nums", texto)}>{n}</b>{" "}
       <span className={texto}>{rotulo}</span>
     </>
   );

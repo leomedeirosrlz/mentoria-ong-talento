@@ -17,6 +17,7 @@ import {
   formatDateTime,
   linkSeguro,
   passosDaTrilha,
+  podeEntrarAgora,
   semanaBounds,
 } from "@/lib/ciclo";
 import { guiaDoEncontro } from "@/lib/como-conduzir";
@@ -372,10 +373,17 @@ export default async function RegistrarEncontroPage({
                   href={chamada}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={buttonVariants({ variant: "outline", size: "sm" })}
+                  className={buttonVariants({
+                    variant: podeEntrarAgora(encontro.data_hora, agora)
+                      ? "default"
+                      : "outline",
+                    size: "sm",
+                  })}
                 >
                   <VideoCamera aria-hidden size={16} />
-                  Entrar na chamada
+                  {podeEntrarAgora(encontro.data_hora, agora)
+                    ? "Entrar na chamada"
+                    : "Link da chamada"}
                   <span className="sr-only"> (abre em nova aba)</span>
                 </a>
               )}

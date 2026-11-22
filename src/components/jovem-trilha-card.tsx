@@ -8,7 +8,13 @@ import {
   Quotes,
   VideoCamera,
 } from "@phosphor-icons/react/dist/ssr";
-import { formatDate, formatDateTime, linkSeguro, rotuloSlot } from "@/lib/ciclo";
+import {
+  formatDate,
+  formatDateTime,
+  linkSeguro,
+  podeEntrarAgora,
+  rotuloSlot,
+} from "@/lib/ciclo";
 import {
   efetivoDe,
   resumoPedidoJovem,
@@ -156,7 +162,9 @@ export function JovemTrilhaCard({
   } else if (passoVivo?.estado === "marcado" && linkChamada) {
     const quando = passoVivo.encontro?.data_hora;
     frase = `Sessão ${proximoPasso} marcada${quando ? ` pra ${rotuloSlot(quando)}` : ""}.`;
-    acao = (
+    // QW5: "Entrar" preenchido só na janela da chamada (30 min antes →
+    // 2 h depois) — mesma régua da home/agenda; fora, o link discreto
+    acao = podeEntrarAgora(quando, agoraMs) ? (
       <a
         href={linkChamada}
         target="_blank"
@@ -166,6 +174,17 @@ export function JovemTrilhaCard({
         <VideoCamera size={15} aria-hidden />
         Entrar
         <span className="sr-only"> na chamada (abre em nova aba)</span>
+      </a>
+    ) : (
+      <a
+        href={linkChamada}
+        target="_blank"
+        rel="noopener noreferrer"
+        className={buttonVariants({ variant: "outline", size: "sm" })}
+      >
+        <VideoCamera size={15} aria-hidden />
+        Link da chamada
+        <span className="sr-only"> (abre em nova aba)</span>
       </a>
     );
   } else if (pedidoAberto) {

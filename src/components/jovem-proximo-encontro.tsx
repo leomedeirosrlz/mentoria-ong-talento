@@ -9,6 +9,7 @@ import {
   formatDiaMes,
   formatDiaSemana,
   linkSeguro,
+  podeEntrarAgora,
   toDateStr,
 } from "@/lib/ciclo";
 import type { JovemEncontro } from "@/lib/queries-jovem";
@@ -64,7 +65,10 @@ export function ProximoEncontro({
           {remarcado}
         </p>
         <Acoes>
-          {eHoje && link ? (
+          {/* QW5: "Entrar" preenchido só na janela da chamada (30 min
+              antes → 2 h depois). Fora dela o link segue à mão, discreto;
+              sem link, a saída honesta é a agenda */}
+          {link && podeEntrarAgora(proximo.data_hora) ? (
             <a
               href={link}
               target="_blank"
@@ -73,6 +77,20 @@ export function ProximoEncontro({
             >
               <VideoCamera size={18} aria-hidden />
               Entrar na chamada
+              <span className="sr-only"> (abre em nova aba)</span>
+            </a>
+          ) : link ? (
+            <a
+              href={link}
+              target="_blank"
+              rel="noopener noreferrer"
+              className={cn(
+                buttonVariants({ variant: "outline", size: "lg" }),
+                "w-full bg-background sm:w-auto"
+              )}
+            >
+              <VideoCamera size={18} aria-hidden />
+              Link da chamada
               <span className="sr-only"> (abre em nova aba)</span>
             </a>
           ) : (

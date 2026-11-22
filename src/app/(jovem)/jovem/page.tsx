@@ -6,6 +6,7 @@ import {
   ArrowSquareOut,
   CaretDown,
   BookOpen,
+  ClockCounterClockwise,
   FileArrowDown,
   Flag,
   FolderOpen,
@@ -26,7 +27,10 @@ import { JovemAvaliacoes } from "@/components/jovem-avaliacoes";
 import { JovemCombinados } from "@/components/jovem-combinados";
 import { JovemRetroativoDialog } from "@/components/jovem-retroativo-dialog";
 import { JovemEspecialistas } from "@/components/jovem-especialistas";
-import { JovemParaFazer } from "@/components/jovem-para-fazer";
+import {
+  JovemParaFazer,
+  type EncontroCtx,
+} from "@/components/jovem-para-fazer";
 import { ProximoEncontro } from "@/components/jovem-proximo-encontro";
 import { PedirAjudaLinha } from "@/components/jovem-pedir-ajuda";
 import { LembreteDisponibilidade } from "@/components/lembrete-disponibilidade";
@@ -63,6 +67,7 @@ import {
   type JovemEncontro,
 } from "@/lib/queries-jovem";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
+import { derivarPendencias } from "@/lib/pendencias-jovem";
 import { getComunicados, getMateriais, getMe } from "@/lib/queries";
 import type { Disponibilidade, JovemContato } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -270,20 +275,6 @@ export default async function JovemHome() {
     };
   });
 
-  // combinado aberto com o prazo mais próximo (sem prazo vai por último)
-  const combinadoProximo = encaminhamentos
-    .filter((c) => c.status === "pendente" && c.id != null && c.descricao != null)
-    .sort((a, b) =>
-      (a.prazo ?? "9999-12-31").localeCompare(b.prazo ?? "9999-12-31")
-    )[0];
-  const combinado = combinadoProximo
-    ? {
-        id: combinadoProximo.id!,
-        descricao: combinadoProximo.descricao!,
-        prazo: combinadoProximo.prazo ?? null,
-      }
-    : null;
-
   // agendar: só a DPP ativa agenda (a RPC recusa a trilha esp). O nº é o
   // primeiro livre depois do último realizado — o mesmo critério da agenda.
   const duplaDppId =
@@ -311,17 +302,99 @@ export default async function JovemHome() {
   // retroativo (0207+0208): nº sem row, menos o último do ciclo — e só
   // passo oficial JÁ VENCIDO (a RPC recusa os dois casos também). Mesma
   // cautela do acervo: o cronograma vale se é desta mesma dupla.
-  const vencidosRetro = new Set(
-    (jornada?.dupla_id === duplaDppId
+  const oficiaisRetro =
+    jornada?.dupla_id === duplaDppId
       ? datasOficiaisDe(jornada.cronograma)
-      : []
-    )
-      .filter((e) => e.data <= hoje)
-      .map((e) => e.numero)
+      : [];
+  const vencidosRetro = new Set(
+    oficiaisRetro.filter((e) => e.data <= hoje).map((e) => e.numero)
   );
   const numerosRetro = livres.filter(
     (n) => n < maxEncontros("dpp") && vencidosRetro.has(n)
   );
+
+  // a lista única de pendências (REALIZA-493): o motor puro ordena e a
+  // home só apresenta — a agenda lê da mesma régua. A entrada estrutural
+  // vem das views que a página já buscou; o motor decide o que entra.
+  const oficialPorNumero = new Map(
+    oficiaisRetro.map((e) => [e.numero, e.data])
+  );
+  const ctxPorEncontro: Record<string, EncontroCtx> = Object.fromEntries(
+    encontros.map((e) => [
+      e.id,
+      {
+        e,
+        ativa: porDupla.get(e.dupla_id)?.status === "ativa",
+        esp: trilhaPorDupla.get(e.dupla_id) === "especialista",
+      },
+    ])
+  );
+  const pendencias = derivarPendencias({
+    hoje,
+    agora: agora.toISOString(),
+    encontros: encontros.map((e) => {
+      const sessao = trilhaPorDupla.get(e.dupla_id) === "especialista";
+      return {
+        id: e.id,
+        numero: sessao
+          ? passoEsp(
+              e,
+              encontros.filter((x) => x.dupla_id === e.dupla_id)
+            )
+          : e.numero,
+        status: e.status,
+        dataHora: e.data_hora,
+        sessao,
+        comNome: nomeDaDupla(e.dupla_id, sessao),
+      };
+    }),
+    avaliacoes: avaliacoesPendentes.map((p) => ({
+      id: p.encontroId,
+      rotulo: p.rotulo,
+      realizadoEm: p.realizado_em,
+    })),
+    documentos: assinaturas
+      .filter((a): a is typeof a & { id: string } => a.id != null)
+      .map((a) => ({
+        id: a.id,
+        slug: a.slug,
+        titulo: a.titulo,
+        status: a.status,
+        token: a.token,
+        tokenExpiraEm: a.token_expira_em,
+      })),
+    combinados: encaminhamentos
+      .filter((c): c is typeof c & { id: string } => c.id != null)
+      .map((c) => ({
+        id: c.id,
+        descricao: c.descricao,
+        prazo: c.prazo,
+        status: c.status,
+      })),
+    sugestoes: pedidosEsp.solicitacoes
+      .filter((s) => s.status === "sugerida")
+      .map((s) => ({
+        id: s.id,
+        sugeridoPor: s.solicitante?.nome_social ?? s.solicitante?.nome,
+        especialistaNome:
+          s.desejado?.nome_social ?? s.desejado?.nome ?? s.especialista_nome,
+        criadoEm: s.created_at,
+      })),
+    avisos: avisos.map((a) => ({
+      id: a.id,
+      titulo: a.titulo,
+      prioridade: a.prioridade,
+      criadoEm: a.created_at,
+    })),
+    retro: numerosRetro.map((numero) => ({
+      numero,
+      duplaId: duplaDppId,
+      dataOficial: oficialPorNumero.get(numero) ?? null,
+    })),
+    // TODO(481): a home ainda não busca chamados — ligar o fetch aqui
+    // quando a tela do chamado existir, sem quebrar o tipo opcional.
+    chamados: [],
+  });
 
   // o lápis "trocar link" do próximo encontro — mesmo recorte da agenda:
   // agendado de dupla ativa e DPP (a RPC do jovem não escreve na trilha esp)
@@ -487,9 +560,10 @@ export default async function JovemHome() {
       {gradeVazia && <LembreteDisponibilidade />}
 
       <JovemParaFazer
+        pendencias={pendencias}
+        encontros={ctxPorEncontro}
         pendentes={avaliacoesPendentes}
-        combinado={combinado}
-        hoje={hoje}
+        retro={{ duplaId: duplaDppId, numeros: numerosRetro }}
         primeiroNome={primeiroNome}
       />
 
@@ -643,35 +717,23 @@ export default async function JovemHome() {
               <JovemAvaliacoes
                 pendentes={avaliacoesPendentes}
                 feitas={avaliacoesFeitas}
-                primeiroNome={primeiroNome}
               />
-              {duplaEmCurso && duplaDppId && (
-                <p className="border-t border-border/60 px-4 py-3 text-xs text-muted-foreground sm:px-6">
-                  Quer avaliar um encontro que não apareceu aqui? Se ele
-                  ainda vai acontecer,{" "}
-                  <Link
-                    href="/jovem/agenda"
-                    className="font-medium underline underline-offset-2 hover:text-foreground"
-                  >
-                    agende você na sua agenda
-                  </Link>
-                  ; se já aconteceu sem marcar,{" "}
+              {/* retroativo só quando há passo elegível (QW1): o parágrafo
+                  que prometia "registre você aqui" sem candidato ensinava
+                  um gesto que a RPC recusaria */}
+              {duplaEmCurso && duplaDppId && numerosRetro.length > 0 && (
+                <div className="border-t border-border/60 px-4 py-1.5 sm:px-6">
                   <JovemRetroativoDialog
                     duplaId={duplaDppId}
                     numeros={numerosRetro}
                     trigger={
-                      <Button
-                        type="button"
-                        variant="link"
-                        size="sm"
-                        className="h-auto min-h-11 px-0 text-xs font-medium underline underline-offset-2 sm:min-h-0"
-                      >
-                        registre você aqui
+                      <Button variant="ghost" size="sm" className="-ml-2.5">
+                        <ClockCounterClockwise size={15} aria-hidden />
+                        Encontro que não aparece aqui?
                       </Button>
                     }
                   />
-                  .
-                </p>
+                </div>
               )}
             </CardContent>
           </Card>
