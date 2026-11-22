@@ -97,6 +97,13 @@ const FORM_ID = "onboarding-passo";
 /** O passo do termo tem form próprio (AssinaturaForm): o primário do rodapé
  *  fixo submete via `form` mesmo estando fora dele (REALIZA-497). */
 const TERMO_FORM_ID = "onboarding-termo";
+/** Primeiro campo de cada bloco "Sobre você" que fecha em resumo — o
+ *  Editar devolve o foco pra ele ao expandir (o botão desmonta junto
+ *  com o resumo). */
+const PRIMEIRO_CAMPO_SOBRE: Record<number, string> = {
+  0: "ob-social",
+  1: "ob-cargo",
+};
 
 /** "O que você pode fazer aqui" — os pontos que mudam a rotina de cada papel,
  *  cada um com a tela real onde ele acontece. */
@@ -273,6 +280,16 @@ export function OnboardingFlow({
   // sub-passos do "Sobre você" colapsam quando a importação da coordenação já
   // preencheu — "Corrigir" expande o form de volta pra editar
   const [editarSobre, setEditarSobre] = useState<Record<number, boolean>>({});
+  // bloco cujo resumo acabou de expandir — o efeito devolve o foco pro
+  // primeiro campo dele depois do commit (o botão Editar desmonta junto)
+  const focoEditarRef = useRef<number | null>(null);
+  useEffect(() => {
+    const sub = focoEditarRef.current;
+    if (sub == null) return;
+    focoEditarRef.current = null;
+    const id = PRIMEIRO_CAMPO_SOBRE[sub];
+    if (id) document.getElementById(id)?.focus();
+  }, [editarSobre]);
 
   // ficha de mentor (0034) — pareamento + grade semanal, já preenchidos se
   // a coordenação importou (mentor_profiles é legível pelo dono)
@@ -472,7 +489,7 @@ export function OnboardingFlow({
               placeholder="00000-000"
               value={buscaCep.cep}
               onChange={(e) => buscaCep.onCepChange(e.target.value)}
-              onBlur={buscaCep.onCepBlur}
+              onBlur={(e) => buscaCep.onCepBlur(e.currentTarget.value)}
               aria-describedby="ob-cep_status"
             />
             {buscaCep.buscando && (
@@ -573,12 +590,15 @@ export function OnboardingFlow({
 
   // sub-passos burocráticos já preenchidos pela importação da coordenação
   // viram resumo compacto com "Corrigir" — "o que te move" fica sempre
-  // aberto porque interesses/motivação são o dado que alimenta o matching
-  const sobrePreenchido = [
+  // aberto porque interesses/motivação são o dado que alimenta o matching.
+  // Congelado no mount (padrão assinaturaInicial): recalcular por render
+  // trocava campos↔resumo na tecla que completava o bloco e derrubava o
+  // input focado — parcial abre campos, completo abre resumo (503)
+  const [sobrePreenchido] = useState(() => [
     !!(nascimento && genero && cidade && uf),
     !!(cargo && empresa),
     false,
-  ];
+  ]);
   const resumoItensSobre: [string, string][][] = [
     [
       ["Nome social", nomeSocial],
@@ -609,7 +629,10 @@ export function OnboardingFlow({
           type="button"
           variant="ghost"
           size="sm"
-          onClick={() => setEditarSobre((s) => ({ ...s, [sub]: true }))}
+          onClick={() => {
+            focoEditarRef.current = sub;
+            setEditarSobre((s) => ({ ...s, [sub]: true }));
+          }}
         >
           Editar
         </Button>
@@ -1059,7 +1082,9 @@ export function OnboardingFlow({
               }
               setStep((s) => s - 1);
             }}
-            disabled={(step === 0 && !demo) || pending}
+            // pendingTermo trava o Voltar no meio do submit do termo —
+            // sair do passo desmontava o form com a action voando
+            disabled={(step === 0 && !demo) || pending || pendingTermo}
             aria-label={
               step === 0 && demo ? "Escolher outro papel" : "Voltar um passo"
             }
@@ -1126,7 +1151,15 @@ export function OnboardingFlow({
             </div>
           </div>
           {passoComCampos ? (
-            <form id={FORM_ID} onSubmit={salvarPasso} className="mt-5">
+            // noValidate: a validação é a da action (mensagens pt-BR);
+            // campos opcionais com formato (o type=url do LinkedIn) não
+            // podem travar Continuar nem Pular etapa na bolha nativa
+            <form
+              id={FORM_ID}
+              onSubmit={salvarPasso}
+              noValidate
+              className="mt-5"
+            >
               {corpo}
             </form>
           ) : (
@@ -1188,6 +1221,7 @@ export function OnboardingFlow({
             <Button
               type="submit"
               form={TERMO_FORM_ID}
+              formNoValidate
               disabled={pending || pendingTermo}
               className="h-11 w-full font-semibold sm:flex-1"
             >
