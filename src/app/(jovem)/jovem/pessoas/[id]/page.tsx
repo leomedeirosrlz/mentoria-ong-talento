@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   EnvelopeSimple,
   MapPin,
+  Sparkle,
   WhatsappLogo,
 } from "@phosphor-icons/react/dist/ssr";
 import { Avatar } from "@/components/avatar";
@@ -15,9 +16,14 @@ import { Linha } from "@/app/(app)/perfil/perfil-form";
 import { ChipsTags } from "@/app/(app)/perfil/perfil-form";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { papelLabel, waLink } from "@/lib/ciclo";
-import { getJovemDuplas, getJovemPessoa } from "@/lib/queries-jovem";
+import { turmaLonga } from "@/lib/turma";
+import {
+  getJovemDuplas,
+  getJovemEspecialistas,
+  getJovemPessoa,
+} from "@/lib/queries-jovem";
 import { getMe } from "@/lib/queries";
-import type { JovemContato } from "@/lib/types";
+import type { JovemContato, JovemEspecialista } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Perfil · Pessoas" };
@@ -32,13 +38,39 @@ export default async function JovemPessoaPerfil({
   params: Promise<{ id: string }>;
 }) {
   const { id } = await params;
-  const [me, pessoa, duplas] = await Promise.all([
+  const [me, pessoa, duplas, catalogo] = await Promise.all([
     getMe(),
     getJovemPessoa(id),
     getJovemDuplas(),
+    getJovemEspecialistas(),
   ]);
   if (!me || !pessoa) notFound();
   const nomeJovem = me.nome_social || me.nome;
+
+  /** A projeção pública do especialista, quando a pessoa é uma — vem da
+   *  mesma view do catálogo (jovem_especialistas), nunca de profiles.
+   *  No contato de trilha o registro casa pelo mesmo profile_id. */
+  const esp: JovemEspecialista | null =
+    pessoa.tipo === "especialista"
+      ? pessoa.especialista
+      : pessoa.tipo === "contato" && pessoa.contato.papel === "especialista"
+        ? (catalogo.find((e) => e.id === pessoa.contato.id) ?? null)
+        : null;
+
+  /** A dupla que amarra o contato — origem do vínculo (trilha, turma,
+   *  a demanda que abriu a trilha de especialista). */
+  const dupla =
+    pessoa.tipo === "contato" && pessoa.contato.dupla_id
+      ? (duplas.find((d) => d.id === pessoa.contato.dupla_id) ?? null)
+      : null;
+
+  // a turma só é nomeável pro colega quando o jovem tem uma — com duas
+  // turmas (ex.: DPP numa, trilha noutra) a origem segue "da turma" genérica
+  const turmaColega =
+    pessoa.tipo === "colega" &&
+    new Set(duplas.map((d) => d.turma).filter(Boolean)).size === 1
+      ? duplas.find((d) => d.turma)?.turma
+      : null;
 
   const nome =
     pessoa.tipo === "contato"
@@ -55,16 +87,20 @@ export default async function JovemPessoaPerfil({
         : "mentor_especialista";
 
   const areas =
-    (pessoa.tipo === "colega"
-      ? pessoa.colega.interesses
-      : pessoa.tipo === "especialista"
-        ? pessoa.especialista.areas
-        : null) ?? undefined;
+    (pessoa.tipo === "colega" ? pessoa.colega.interesses : esp?.areas) ??
+    undefined;
 
-  const meta =
+  const lugar =
     pessoa.tipo === "colega"
       ? [pessoa.colega.cidade, pessoa.colega.uf].filter(Boolean).join(" · ")
-      : "";
+      : [esp?.cidade, esp?.uf].filter(Boolean).join(" · ");
+
+  const turmaMeta =
+    dupla?.turma != null
+      ? turmaLonga(dupla.turma)
+      : turmaColega != null
+        ? turmaLonga(turmaColega)
+        : null;
 
   // foto só pra adulto (contato/catálogo) — colega menor fica nas
   // iniciais amarelas, a mesma decisão do diretório e do próprio perfil
@@ -90,8 +126,10 @@ export default async function JovemPessoaPerfil({
         <PessoaBanner
           papel={papel}
           nome={nome}
-          cidade={pessoa.tipo === "colega" ? pessoa.colega.cidade : null}
-          uf={pessoa.tipo === "colega" ? pessoa.colega.uf : null}
+          cidade={
+            pessoa.tipo === "colega" ? pessoa.colega.cidade : (esp?.cidade ?? null)
+          }
+          uf={pessoa.tipo === "colega" ? pessoa.colega.uf : (esp?.uf ?? null)}
           areas={areas}
           seed={id}
         />
@@ -118,28 +156,35 @@ export default async function JovemPessoaPerfil({
                   ? "Colega da turma"
                   : "Mentor especialista"}
             </Badge>
-            <SeloDupla
-              contato={pessoa.tipo === "contato" ? pessoa.contato : null}
-              duplas={duplas}
-            />
-            {meta ? (
+            <SeloDupla dupla={dupla} />
+            {turmaMeta && <span>{turmaMeta}</span>}
+            {lugar ? (
               <span className="flex items-center gap-1.5">
                 <MapPin size={14} className="shrink-0" aria-hidden />
-                {meta}
+                {lugar}
               </span>
             ) : null}
           </div>
         </div>
       </header>
 
+      {/* A projeção pública do especialista — bio/áreas/experiência/janela,
+          quando a pessoa é uma (trilha dele ou catálogo). Sem bio, o bloco
+          some com a linha — nunca um card de "—" atrás de "—". */}
+      {esp && (
+        <SecaoEspecialista
+          e={esp}
+          daPropriaTrilha={pessoa.tipo === "contato"}
+          demandaTrilha={
+            dupla?.trilha === "especialista" ? (dupla.demanda ?? null) : null
+          }
+        />
+      )}
       {pessoa.tipo === "contato" && (
         <SecaoContato c={pessoa.contato} nomeJovem={nomeJovem} />
       )}
       {pessoa.tipo === "colega" && (
         <SecaoColega c={pessoa.colega} nomeJovem={nomeJovem} />
-      )}
-      {pessoa.tipo === "especialista" && (
-        <SecaoEspecialista e={pessoa.especialista} />
       )}
     </div>
   );
@@ -165,20 +210,16 @@ function rotuloContato(c: JovemContato): string {
 /** Etiqueta honesta de dupla que não está mais em curso — o mesmo selo
  *  da linha do diretório ("trilha concluída", "mentoria pausada"). */
 function SeloDupla({
-  contato,
-  duplas,
+  dupla,
 }: {
-  contato: JovemContato | null;
-  duplas: { id: string | null; status: string | null; trilha: string | null }[];
+  dupla: { status: string | null; trilha: string | null } | null;
 }) {
-  if (!contato?.dupla_id) return null;
-  const d = duplas.find((x) => x.id === contato.dupla_id);
-  if (!d?.status || d.status === "ativa") return null;
-  const base = d.trilha === "especialista" ? "trilha" : "mentoria";
+  if (!dupla?.status || dupla.status === "ativa") return null;
+  const base = dupla.trilha === "especialista" ? "trilha" : "mentoria";
   const status =
     { pausada: "pausada", concluida: "concluída", encerrada: "encerrada" }[
-      d.status
-    ] ?? d.status;
+      dupla.status
+    ] ?? dupla.status;
   return (
     <Badge variant="outline" className="text-muted-foreground">
       {`${base} ${status}`}
@@ -294,28 +335,68 @@ function SecaoColega({
   );
 }
 
-/** Especialista do catálogo — o jovem o conhece pra direcionar o pedido,
- *  mas o canal direto só abre quando a trilha nasce. */
+/** A projeção pública do especialista — o recorte que a view
+ *  `jovem_especialistas` já libera pro jovem (bio, atuação, áreas,
+ *  experiência, formação, voluntariado e a janela em "dia + período",
+ *  nunca slot exato). Dois contextos: `daPropriaTrilha` quando a pessoa é
+ *  o especialista de uma dupla dele (aí o canal direto mora no card de
+ *  Contato ao lado); sem trilha é catálogo — a ficha aponta pra página
+ *  onde o pedido acontece. */
 function SecaoEspecialista({
   e,
+  daPropriaTrilha,
+  demandaTrilha,
 }: {
-  e: { nome: string; areas: string[] | null };
+  e: JovemEspecialista;
+  daPropriaTrilha: boolean;
+  /** `duplas.demanda` da trilha dela com o jovem — o motivo pelo qual a
+   *  dupla existe, do mesmo recorte que a agenda já mostra. */
+  demandaTrilha: string | null;
 }) {
+  const atuacao = [e.cargo, e.empresa].filter(Boolean).join(" · ");
   return (
     <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
       <h2 className="text-base font-semibold">
-        Especialista do programa
+        {daPropriaTrilha ? "Sobre" : "Especialista do programa"}
       </h2>
+      {e.bio && <p className="mt-3 text-sm leading-relaxed">{e.bio}</p>}
       <dl className="mt-4 space-y-4">
-        <Linha
-          rotulo="Áreas"
-          valor={e.areas?.length ? <ChipsTags itens={e.areas} /> : "—"}
-        />
-        <p className="text-xs leading-relaxed text-muted-foreground">
-          O contato direto abre quando a sua trilha de especialista começar.
-          Até lá, o pedido passa pela coordenação.
-        </p>
+        {demandaTrilha && <Linha rotulo="Sua trilha" valor={demandaTrilha} />}
+        {atuacao && <Linha rotulo="Atuação" valor={atuacao} />}
+        {e.areas?.length ? (
+          <Linha rotulo="Áreas" valor={<ChipsTags itens={e.areas} />} />
+        ) : null}
+        {e.experiencia_previa && (
+          <Linha rotulo="Experiência" valor={e.experiencia_previa} />
+        )}
+        {e.formacao_externa && (
+          <Linha rotulo="Formação" valor={e.formacao_externa} />
+        )}
+        {e.voluntariado && (
+          <Linha rotulo="Voluntariado" valor={e.voluntariado} />
+        )}
+        {e.grade_resumo?.length ? (
+          <Linha rotulo="Atende" valor={e.grade_resumo.join(" · ")} />
+        ) : null}
       </dl>
+      {!daPropriaTrilha && (
+        <>
+          <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+            O contato direto abre quando a sua trilha de especialista
+            começar.
+          </p>
+          <Link
+            href="/jovem/especialistas"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "mt-3 gap-1.5"
+            )}
+          >
+            <Sparkle size={15} aria-hidden />
+            Ver no catálogo de especialistas
+          </Link>
+        </>
+      )}
     </section>
   );
 }
