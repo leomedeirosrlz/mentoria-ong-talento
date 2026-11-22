@@ -178,7 +178,7 @@ const PRIO_AVISO: Record<string, { prioridade: number; contexto: string }> = {
 function instanteDe(iso: string | null | undefined): number | null {
   if (!iso) return null;
   const t = /^\d{4}-\d{2}-\d{2}$/.test(iso)
-    ? new Date(`${iso}T12:00:00`).getTime()
+    ? new Date(`${iso}T12:00:00-03:00`).getTime()
     : Date.parse(iso);
   return Number.isNaN(t) ? null : t;
 }
@@ -263,7 +263,7 @@ function retroativos(retro: RetroPendencia[]): PendenciaJovem[] {
     // pela semana oficial inteira
     const dia = diaDe(r.dataOficial);
     const seg = dia
-      ? ddmm(semanaBounds(new Date(`${dia}T12:00:00`)).seg)
+      ? ddmm(semanaBounds(new Date(`${dia}T12:00:00-03:00`)).seg)
       : null;
     out.push({
       id: `retro:${r.duplaId ?? "dpp"}:${r.numero}`,
