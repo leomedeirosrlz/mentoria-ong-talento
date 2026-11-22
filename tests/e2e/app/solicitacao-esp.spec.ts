@@ -234,8 +234,8 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     await relogar(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.dupla}`);
     await expect(page.getByText("Horário expirado")).toBeVisible();
-    // exact: o botão "Solicitar mentor especialista" do cabeçalho fica
-    // sempre montado — a assert é sobre o rail de negociação, não o CTA
+    // exact: o item "Solicitar mentor especialista" do ⋯ contém a frase —
+    // a assert é sobre o rail de negociação, não o CTA
     await expect(
       page.getByText("Mentor especialista", { exact: true })
     ).toHaveCount(0);
@@ -254,13 +254,19 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
     // ---- lado staff: o pedido nasce pela UI da ficha (a superfície real)
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${IDS.dupla}`);
-    // desktop: as ações da ficha são botões inline — o "Mais" é sm:hidden
-    const item = page.getByRole("button", {
+    // review 21/11 (#9): uma primária + ⋯ — "Solicitar" virou menuitem que
+    // abre o dialog irmão (REALIZA-157). O gesto composto é seguro de
+    // repetir: menu fechado → mais.click() abre; item ausente → catch
+    const mais = page.getByRole("button", { name: "Mais ações da dupla" });
+    const item = page.getByRole("menuitem", {
       name: "Solicitar mentor especialista",
     });
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
-      () => item.click(),
+      async () => {
+        await mais.click();
+        await item.click();
+      },
       () => dialog.isVisible()
     );
     await dialog.locator("#demanda").fill(DEMANDA_ACEITE);

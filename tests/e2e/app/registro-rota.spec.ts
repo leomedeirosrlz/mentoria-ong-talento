@@ -65,31 +65,41 @@ async function inserirRegistro(encontroId: string) {
   });
 }
 
-/** Etapa 1 → 2 → 3 do wizard, sem pressupor pré-hidratação. */
-async function avancarAteCombinados(
-  page: import("@playwright/test").Page,
+/** Gate 1 → 2 isolado — o teste de cobertura marca o encontro coberto no
+ *  passo 2, entre os dois gates. */
+async function avancarParaEtapa2(
   form: import("@playwright/test").Locator
 ) {
   await agirComConfirma(
     () => form.getByRole("button", { name: "Avançar" }).click(),
     () => form.getByRole("heading", { name: /Passo 2 de 3/ }).isVisible()
   );
+}
+
+/** Etapa 1 → 2 → 3 do wizard, sem pressupor pré-hidratação. O tema ficou
+ *  no passo 2 junto das atividades (review 21/11, #9) — o preenchimento
+ *  da 472 acontece entre os gates. */
+async function avancarAteCombinados(
+  page: import("@playwright/test").Page,
+  form: import("@playwright/test").Locator
+) {
+  await avancarParaEtapa2(form);
+  await form.locator("#tema").fill("E2E: tema do registro");
   await agirComConfirma(
     () => form.getByRole("button", { name: "Avançar" }).click(),
     () => form.getByRole("heading", { name: /Passo 3 de 3/ }).isVisible()
   );
 }
 
-/** Avaliação "Boa" + duração 1h30 + tema — os compartilhados que o
- *  encadeamento herda no rascunho, e o conteúdo que a 472 passou a exigir
- *  pra aceitar o registro (sem tema o salvar é recusado). */
+/** "Sim" + duração 1h30 — o passo 1 enxuto (review #9): "Aconteceu como
+ *  planejado?" grava no mesmo `avaliacao` de sempre, e os compartilhados
+ *  que o encadeamento herda no rascunho. */
 async function preencherEtapa1(
   page: import("@playwright/test").Page,
   form: import("@playwright/test").Locator
 ) {
   // o radio é sr-only: clica no rótulo visível (funciona antes da hidratação)
-  await form.getByText("Boa", { exact: true }).click();
-  await form.locator("#tema").fill("E2E: tema do registro");
+  await form.getByText("Sim", { exact: true }).click();
   const opcao90 = page.getByRole("option", { name: "1h30" });
   await agirComConfirma(
     () => form.locator("#duracao-select").click(),
@@ -130,12 +140,24 @@ test.describe("rota de registro do encontro (REALIZA-473)", () => {
     ).toBeVisible();
     // a tela da tarefa não é a ficha: nenhuma árvore de abas
     await expect(page.getByRole("tablist")).toHaveCount(0);
-    // o contexto do encontro vem antes do form
-    await expect(
-      page.getByRole("heading", { name: /^3º ·/ })
-    ).toBeVisible();
-
+    // o form é a tarefa e vem primeiro; o contexto virou um <details>
+    // fechado de uma linha abaixo dele (review #9) — e um encontro que
+    // já passou não vende "Entrar na chamada"
     const form = page.getByTestId("registro-form");
+    await expect(form).toBeVisible();
+    const roteiro = page.locator("details", {
+      has: page.locator("summary", { hasText: /Roteiro do 3º encontro/ }),
+    });
+    await expect(roteiro).toBeVisible();
+    await expect(roteiro).not.toHaveAttribute("open", "");
+    const [yForm, yRoteiro] = await Promise.all([
+      form.boundingBox().then((b) => b!.y),
+      roteiro.boundingBox().then((b) => b!.y),
+    ]);
+    expect(yForm).toBeLessThan(yRoteiro);
+    await expect(
+      page.getByRole("link", { name: /Entrar na chamada/ })
+    ).toHaveCount(0);
     await preencherEtapa1(page, form);
     await avancarAteCombinados(page, form);
     await agirComConfirma(
@@ -216,12 +238,18 @@ test.describe("rota de registro do encontro (REALIZA-473)", () => {
 
     await page.goto(`/duplas/${DUPLA_ID}/registrar/${e6}`);
     const form = page.getByTestId("registro-form");
+    await preencherEtapa1(page, form);
 
-    // AC-473 (007 US11): a cobertura que existia só na ficha vale na rota
+    // AC-473 (007 US11): a cobertura que existia só na ficha vale na rota.
+    // O checklist desceu pro passo 2 junto das atividades (review #9)
+    await avancarParaEtapa2(form);
     await expect(form.getByText("7º encontro")).toBeVisible();
     await form.getByText("7º encontro").click();
-    await preencherEtapa1(page, form);
-    await avancarAteCombinados(page, form);
+    await form.locator("#tema").fill("E2E: tema do registro");
+    await agirComConfirma(
+      () => form.getByRole("button", { name: "Avançar" }).click(),
+      () => form.getByRole("heading", { name: /Passo 3 de 3/ }).isVisible()
+    );
     await agirComConfirma(
       () => form.getByRole("button", { name: "Salvar registro" }).click(),
       () => page.getByText(/Também cobriu o 7º encontro/).isVisible()

@@ -11,8 +11,6 @@ import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   BookOpen,
-  CalendarBlank,
-  CalendarPlus,
   CaretDown,
   ClockCounterClockwise,
   HandHeart,
@@ -109,10 +107,8 @@ import { RecessoDuplaCard } from "@/components/recesso-dupla-card";
 import { montarPlanoEmDia } from "@/lib/plano-em-dia";
 import { sugestoesEncontroDaDupla } from "@/lib/sugestoes-encontro-server";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
-import { EditarDuplaDialog } from "@/components/editar-dupla-dialog";
 import { RemanejoSugerido } from "@/components/remanejo-sugerido";
 import { ArquivosDupla } from "@/components/arquivos-dupla";
-import { PedirApoioDialog } from "@/components/pedir-apoio-dialog";
 import { TrajetoriaAvaliacoes } from "@/components/trajetoria-avaliacoes";
 import { SolicitacaoStatusChip } from "@/components/solicitacao-status-chip";
 import { DevolutivaComposer } from "@/components/devolutivas-card";
@@ -355,6 +351,14 @@ export default async function DuplaPage({
     solicitacoes.find((s) =>
       STATUS_SOL_ABERTA.has(s.status_efetivo ?? s.status)
     ) ?? null;
+  // o estado do pedido EM ABERTO mora num lugar só: o card "Pedidos em
+  // aberto" (review 21/11, #9). O chip do cabeçalho segue valendo pros
+  // estados terminais que o card não cobre (aceita, recusada, expirada,
+  // trilha encerrada)
+  const solEstadoNoCard =
+    solicitacao != null &&
+    (solicitacao.status === "sugerida" ||
+      STATUS_SOL_ABERTA.has(solicitacao.status_efetivo ?? solicitacao.status));
   // a negociação precisa da thread e dos slots livres do especialista da
   // mesa — o contra da equipe também sai da grade dele (regra da RPC)
   const espDaMesa =
@@ -829,47 +833,11 @@ export default async function DuplaPage({
           )
           : null;
 
-  // agendar nunca se esconde no "⋯": quando a pendência de registro já é a
-  // primária, ele fica ao lado em outline — ação de primeira classe em todo
-  // estado em que vale (REALIZA-97). O encontro pode ser o mesmo da
-  // pendência (agendado vencido): aí o dialog abre em modo remarcação
-  const agendarMentor =
-    souMentor && pendenteRegistro && precisaAgendar ? (
-      <AgendarEncontroDialog
-        duplaId={dupla.id}
-        numero={proximoNumero}
-        atual={encontroAlvo}
-        sugerido={sugeridoProximo}
-        piso={dupla.iniciada_em ?? undefined}
-        jovemNome={primeiroNomeMentorado}
-        trigger={
-          <Button variant="outline" size="sm">
-            <CalendarPlus aria-hidden />
-            Agendar {proximoNumero}º encontro
-          </Button>
-        }
-      />
-    ) : null;
-
-  // o próximo já marcado: o lugar do "Agendar" vira "Remarcar" com a data —
-  // as duas duplas do mentor mostram o mesmo botão, cada uma no seu estado
-  // (feedback da mentora: "a Larissa tem mais botões que a Ana")
-  const remarcarMentor =
-    souMentor && podeAgendar && proximoJaAgendado && encontroAlvo?.data_hora ? (
-      <AgendarEncontroDialog
-        duplaId={dupla.id}
-        numero={proximoNumero}
-        atual={encontroAlvo}
-        piso={dupla.iniciada_em ?? undefined}
-        jovemNome={primeiroNomeMentorado}
-        trigger={
-          <Button variant="outline" size="sm">
-            <CalendarBlank aria-hidden />
-            Remarcar {proximoNumero}º · {rotuloSlot(encontroAlvo.data_hora)}
-          </Button>
-        }
-      />
-    ) : null;
+  // "Agendar" e "Remarcar" moram no ⋯ do DuplaMaisMenu (review 21/11, #9):
+  // ação de primeira classe continua a um clique quando a primária já é o
+  // registrar — antes ficavam em outline na linha (REALIZA-97). O encontro
+  // pode ser o mesmo da pendência (agendado vencido): aí o dialog abre em
+  // modo remarcação
 
   // o encontro atual da jornada — a aba Agora mostra o que fazer nele
   const numeroAtual = jornada.proximoNumero;
@@ -980,8 +948,8 @@ export default async function DuplaPage({
     );
   }
 
-  // botões do cabeçalho secundários: pedido de apoio do mentor; Editar
-  // (coordenação) — o resto vai pro Mais
+  // Editar dupla é da coordenação — entra como item do ⋯ junto com o
+  // resto (review 21/11, #9: uma primária + menu, nada em linha)
   const podeEditarDupla = souCoord;
 
   const renderEncontro = (passo: PassoGuia) => {
@@ -1734,7 +1702,13 @@ export default async function DuplaPage({
             .join(" · ")}
         </p>
 
+        {/* linha "Situação" — texto e sinais, sem chip de botão (o estado
+            do pedido de especialista saiu daqui: mora no card "Pedidos em
+            aberto", review 21/11 #9) */}
         <div className="mt-2.5 flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+          <span className="text-xs font-medium text-muted-foreground">
+            Situação
+          </span>
           <SemaforoBadge nivel={saude.semaforo} motivo={saude.motivo} />
           {/* pro mentor o próprio pedido de apoio é eixo separado (WP2):
               um chamado já recebido ao lado do semáforo real — o tom é
@@ -1775,7 +1749,11 @@ export default async function DuplaPage({
           {/* prazo da trilha curta — 3 meses do aceite (iniciada_em), com
               urgência na quinzena final */}
           {ehEsp && <TrilhaPrazoBadge dupla={dupla} />}
-          {!ehEsp && <SolicitacaoStatusChip solicitacao={solicitacao} />}
+          {!ehEsp && (
+            <SolicitacaoStatusChip
+              solicitacao={solEstadoNoCard ? null : solicitacao}
+            />
+          )}
           {/* papel removido com a dupla viva — residual de antes do guard
               de setPessoaRole. Só staff vê: quem corrige é a coordenação
               (o embed profile_papeis do mentor chega populado pela RLS) */}
@@ -1833,51 +1811,53 @@ export default async function DuplaPage({
           </p>
         )}
 
+        {/* UMA ação primária por papel + ⋯ com todo o resto (review 21/11,
+            #9): cada prop-grupo presente vira um item; os dialogs moram
+            dentro do componente, fora do popup (REALIZA-157). O menu some
+            sozinho quando nenhuma ação se aplica */}
         <div className="mt-4 flex flex-wrap items-center gap-2">
           {souMentor && primarioMentor}
-          {souMentor && agendarMentor}
-          {remarcarMentor}
           {!souMentor && acaoWA && <DuplaWaAcao {...acaoWA} />}
 
-          {/* secundárias em outline: o pedido de apoio do mentor; a
-              coordenação edita a dupla. As de segunda ordem vêm do
-              DuplaMaisMenu: em linha no desktop, no Mais só no celular */}
-          {souMentor && (dupla.status === "ativa" || dupla.status === "pausada") && (
-            <PedirApoioDialog
-              duplaId={dupla.id}
-              trigger={
-                <Button variant="outline" size="sm">
-                  <HandHeart aria-hidden /> Pedir apoio
-                </Button>
-              }
-            />
-          )}
-          {souMentor && ehEsp && dupla.status === "ativa" && tentativaAgendada && (
-            // a sessão nasce do pedido aceito — aqui só se move a tentativa
-            // que já existe (numero = tentativa, não passo)
-            <AgendarEncontroDialog
-              duplaId={dupla.id}
-              numero={tentativaAgendada.numero}
-              atual={tentativaAgendada}
-              piso={dupla.iniciada_em ?? undefined}
-              jovemNome={primeiroNomeMentorado}
-              rotulo="sessão de especialista"
-              trigger={
-                <Button variant="outline" size="sm">
-                  <CalendarBlank aria-hidden /> Remarcar sessão
-                </Button>
-              }
-            />
-          )}
-          {podeEditarDupla && <EditarDuplaDialog dupla={dupla} />}
-
-          {/* overflow de segunda ordem — cada prop-grupo presente vira um
-              item; os dialogs moram dentro do componente, fora do popup
-              (REALIZA-157). Some sozinho quando nenhuma ação se aplica.
-              "Agendar" não mora aqui: é ação de primeira classe do mentor
-              (REALIZA-97) — fica na primária ou na outline ao lado */}
           <DuplaMaisMenu
             duplaId={dupla.id}
+            agendar={
+              souMentor && pendenteRegistro && precisaAgendar
+                ? {
+                    numero: proximoNumero,
+                    atual: encontroAlvo,
+                    sugerido: sugeridoProximo,
+                    piso: dupla.iniciada_em ?? undefined,
+                    jovemNome: primeiroNomeMentorado,
+                    item: `Agendar ${proximoNumero}º encontro`,
+                  }
+                : null
+            }
+            remarcar={
+              souMentor && podeAgendar && proximoJaAgendado && encontroAlvo?.data_hora
+                ? {
+                    numero: proximoNumero,
+                    atual: encontroAlvo,
+                    piso: dupla.iniciada_em ?? undefined,
+                    jovemNome: primeiroNomeMentorado,
+                    item: `Remarcar ${proximoNumero}º · ${rotuloSlot(encontroAlvo.data_hora)}`,
+                  }
+                : // a sessão nasce do pedido aceito — aqui só se move a
+                  // tentativa que já existe (numero = tentativa, não passo)
+                  souMentor && ehEsp && dupla.status === "ativa" && tentativaAgendada
+                  ? {
+                      numero: tentativaAgendada.numero,
+                      atual: tentativaAgendada,
+                      piso: dupla.iniciada_em ?? undefined,
+                      jovemNome: primeiroNomeMentorado,
+                      rotulo: "sessão de especialista",
+                      item: "Remarcar sessão",
+                    }
+                  : null
+            }
+            pedirApoio={
+              souMentor && (dupla.status === "ativa" || dupla.status === "pausada")
+            }
             formulario={
               souCoord &&
               (dupla.status === "ativa" || dupla.status === "pausada")
@@ -1897,19 +1877,6 @@ export default async function DuplaPage({
                 : null
             }
             solicitar={podeSolicitar ? { especialistas } : null}
-            solicitarEstado={
-              !ehEsp &&
-              dupla.status === "ativa" &&
-              (souMentor || souCoord) &&
-              solEmAberto
-                ? "Pedido de especialista em andamento"
-                : null
-            }
-            sugerirEstado={
-              !ehEsp && dupla.status === "ativa" && souMentor && sugestaoPendente
-                ? `Sugestão enviada, aguardando ${primeiroNomeMentorado}`
-                : null
-            }
             sugerir={
               podeSugerir
                 ? {
@@ -1919,6 +1886,7 @@ export default async function DuplaPage({
                   }
                 : null
             }
+            editar={podeEditarDupla ? dupla : null}
             encerrar={podeEncerrarTrilha}
             remanejar={
               souCoord && (dupla.status === "ativa" || dupla.status === "pausada")

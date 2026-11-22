@@ -1,7 +1,7 @@
 import { notFound, redirect } from "next/navigation";
 import type { Metadata } from "next";
 import Link from "next/link";
-import { BookOpen, VideoCamera } from "@phosphor-icons/react/dist/ssr";
+import { BookOpen, CaretDown, VideoCamera } from "@phosphor-icons/react/dist/ssr";
 import {
   getCicloEventos,
   getDupla,
@@ -17,7 +17,6 @@ import {
   formatDateTime,
   linkSeguro,
   passosDaTrilha,
-  podeEntrarAgora,
   semanaBounds,
 } from "@/lib/ciclo";
 import { guiaDoEncontro } from "@/lib/como-conduzir";
@@ -323,20 +322,52 @@ export default async function RegistrarEncontroPage({
         )}
       </PageHeader>
 
-      <section
-        aria-labelledby="contexto-encontro"
-        className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
-      >
-        <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-          Encontro
-        </p>
-        <h2
-          id="contexto-encontro"
-          className="mt-1 text-base font-semibold text-pretty"
-        >
-          {passo ? `${passo.numero}º · ${passo.titulo}` : `Encontro ${numero}`}
-        </h2>
-        <div className="mt-2 space-y-1.5 text-sm">
+      {/* formulário primeiro: a tarefa da rota é registrar — o roteiro
+          passa a apoio, fechado numa linha só (review 21/11, #9) */}
+      <RegistroPagina
+        encontroId={encontro.id}
+        duplaId={dupla.id}
+        evento={passo}
+        trilha={dupla.trilha}
+        // `?salvo=1` + registro = re-render do pós-save (ou um refresh no
+        // meio dele): o form recebe a row e abre em modo edição em vez de
+        // um create vazio que sobrescreveria campos com null no submit
+        registro={encontro.registro ?? null}
+        combinadosDoRegistro={
+          encontro.registro
+            ? (dupla.encaminhamentos ?? []).filter(
+                (c) => c.registro_id === encontro.registro?.id
+              )
+            : []
+        }
+        combinadosPendentes={combinadosPendentesDaDupla(dupla)}
+        proximosRegistros={proximos}
+        cobertura={cobertura}
+        // telemetria (REALIZA-217): encontro "externo" nasceu no fluxo
+        // retroativo — a sessão do form é catch-up, não novo
+        origem={encontro.origem === "externo" ? "retroativo" : "novo"}
+      />
+
+      {/* <details> nativo, fechado por padrão: o contexto do encontro vira
+          uma linha — quem precisa do roteiro abre, quem veio só registrar
+          não paga ~450px de leitura antes do form */}
+      <details className="group rounded-xl bg-card shadow-[var(--shadow-border)]">
+        <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-2 px-4 py-3 text-sm font-medium marker:hidden focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+          <span className="min-w-0 truncate">
+            {dupla.trilha === "especialista"
+              ? "Contexto da sessão · foco e materiais"
+              : `Roteiro do ${numero}º encontro · como conduzir`}
+          </span>
+          <CaretDown
+            aria-hidden
+            size={16}
+            className="shrink-0 text-muted-foreground transition-transform group-open:rotate-180"
+          />
+        </summary>
+        <div className="space-y-1.5 border-t border-border/60 px-4 pb-4 pt-3 text-sm">
+          <h2 className="text-base font-semibold text-pretty">
+            {passo ? `${passo.numero}º · ${passo.titulo}` : `Encontro ${numero}`}
+          </h2>
           {semana && (
             <p className="text-xs text-muted-foreground">
               Semana sugerida {diaMesCurto(semana.seg)} a {diaMesCurto(semana.dom)}
@@ -368,22 +399,17 @@ export default async function RegistrarEncontroPage({
                   Material de apoio
                 </a>
               )}
+              {/* "Entrar na chamada" não existe nesta rota: ela só abre pra
+                  encontro que já passou — sobra o link neutro, secundário */}
               {chamada && (
                 <a
                   href={chamada}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={buttonVariants({
-                    variant: podeEntrarAgora(encontro.data_hora, agora)
-                      ? "default"
-                      : "outline",
-                    size: "sm",
-                  })}
+                  className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
                   <VideoCamera aria-hidden size={16} />
-                  {podeEntrarAgora(encontro.data_hora, agora)
-                    ? "Entrar na chamada"
-                    : "Link da chamada"}
+                  Link da chamada
                   <span className="sr-only"> (abre em nova aba)</span>
                 </a>
               )}
@@ -413,31 +439,7 @@ export default async function RegistrarEncontroPage({
             </div>
           )}
         </div>
-      </section>
-
-      <RegistroPagina
-        encontroId={encontro.id}
-        duplaId={dupla.id}
-        evento={passo}
-        trilha={dupla.trilha}
-        // `?salvo=1` + registro = re-render do pós-save (ou um refresh no
-        // meio dele): o form recebe a row e abre em modo edição em vez de
-        // um create vazio que sobrescreveria campos com null no submit
-        registro={encontro.registro ?? null}
-        combinadosDoRegistro={
-          encontro.registro
-            ? (dupla.encaminhamentos ?? []).filter(
-                (c) => c.registro_id === encontro.registro?.id
-              )
-            : []
-        }
-        combinadosPendentes={combinadosPendentesDaDupla(dupla)}
-        proximosRegistros={proximos}
-        cobertura={cobertura}
-        // telemetria (REALIZA-217): encontro "externo" nasceu no fluxo
-        // retroativo — a sessão do form é catch-up, não novo
-        origem={encontro.origem === "externo" ? "retroativo" : "novo"}
-      />
+      </details>
     </div>
   );
 }

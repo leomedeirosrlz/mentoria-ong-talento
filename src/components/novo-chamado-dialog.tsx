@@ -80,15 +80,27 @@ export function NovoChamadoDialog({
   duplaId,
   duplas,
   onAberto,
+  open: openProp,
+  onOpenChange,
 }: {
   papel: string;
+  /** `null` suprime o trigger embutido — o host abre de forma controlada
+   *  (item do ⋯ do cabeçalho da ficha). */
   trigger: React.ReactNode;
   /** Dupla travada (ficha da dupla) ou select quando vier lista. */
   duplaId?: string;
   duplas?: { id: string; label: string }[];
   onAberto?: (r: { id?: string; numero?: string }) => void;
+  /** Modo controlado (opcional) — mesmo padrão do AgendarEncontroDialog. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
+  const [openInterno, setOpenInterno] = useState(false);
+  const open = openProp ?? openInterno;
+  function setOpen(o: boolean) {
+    setOpenInterno(o);
+    onOpenChange?.(o);
+  }
   const [pending, start] = useTransition();
   const jovem = papel === "mentorado";
   const [cat, setCat] = useState<ChamadoCategoria | "">("");
@@ -166,7 +178,7 @@ export function NovoChamadoDialog({
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={trigger as never} />
+      {trigger !== null && <DialogTrigger render={trigger as never} />}
       <DialogContent
         size="lg"
         className={cn(
