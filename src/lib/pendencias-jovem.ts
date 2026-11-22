@@ -145,6 +145,31 @@ export type ChamadoPendencia = {
   atualizadoEm?: string | null;
 };
 
+/** Projeção linha do chamado → entrada de pendência (489). "A equipe
+ *  respondeu" = o status saiu de 'aberto' OU já tem dono (atribuido_a) —
+ *  os dois dizem "alguém olhou". Aberto esperando dono segue espera, não
+ *  tarefa; status fora do enum conhecido (ex.: um futuro 'cancelado')
+ *  também não acorda o jovem. Qualquer ChamadoFilaItem satisfaz a forma. */
+export function chamadoPendencia(c: {
+  id: string;
+  assunto?: string | null;
+  status?: string | null;
+  atribuido_a?: string | null;
+  atribuido_nome?: string | null;
+  updated_at?: string | null;
+}): ChamadoPendencia {
+  return {
+    id: c.id,
+    assunto: c.assunto ?? null,
+    temRespostaEquipe:
+      c.status === "em_atendimento" ||
+      c.status === "resolvido" ||
+      c.atribuido_a != null,
+    respondeuNome: c.atribuido_nome ?? null,
+    atualizadoEm: c.updated_at ?? null,
+  };
+}
+
 export type EntradaPendencias = {
   /** "YYYY-MM-DD" no fuso do programa — sem Date.now() interno. */
   hoje: string;

@@ -4088,7 +4088,7 @@ function build(): DemoData {
   );
 
   // ---------- chamados unificados (0084) ----------
-  // 8 casos cobrindo origem, categoria e estado — a fila da coordenação e
+  // 9 casos cobrindo origem, categoria e estado — a fila da coordenação e
   // os "meus chamados" de mentor e jovem saem do mesmo dataset. Os dois
   // nascidos de flag têm a flag ainda acesa na origem (dual-run coerente).
   const ch = (o: Partial<Chamado> & Pick<Chamado, "numero" | "categoria" | "assunto" | "created_at">): Chamado => ({
@@ -4146,6 +4146,18 @@ function build(): DemoData {
       mensagem: "Quando escolho a foto no celular a tela fecha sozinha.",
       autor_id: anaLogin.id, autor_mentorado_id: ana.id, dupla_id: duplaOk.id,
       created_at: haDias(2, "14:40"),
+    }),
+    // a Ana também tem um pedido já respondido — a pendência "respondeu
+    // seu pedido" da home dela (489) e a conversa pública do perfil saem
+    // daqui. Agenda, não plataforma: o auxiliar executivo lê a linha
+    // inteira (a máscara é só da categoria plataforma)
+    ch({
+      numero: "CHA-000147", categoria: "agenda",
+      assunto: "O encontro pode cair no feriado?",
+      mensagem: "Sexta que vem é feriado e a gente tinha marcado 19h. Posso confirmar com o Ricardo ou é melhor remarcar?",
+      autor_id: anaLogin.id, autor_mentorado_id: ana.id, dupla_id: duplaOk.id,
+      status: "em_atendimento", atribuido_a: marina.id,
+      created_at: haDias(1, "08:20"), updated_at: haDias(1, "09:45"),
     }),
     // coordenação abrindo em nome de — trilha metodologia com o Paulo
     ch({
@@ -4206,6 +4218,13 @@ function build(): DemoData {
       created_at: haDias(1, "10:05") },
     { id: uid(0x6006), chamado_id: uid(0x582c), autor_id: null, tipo: "sistema",
       texto: "Chamado aberto por Ana Beatriz Silva.", created_at: haDias(2, "14:40") },
+    { id: uid(0x600a), chamado_id: uid(0x582f), autor_id: null, tipo: "sistema",
+      texto: "Chamado aberto por Ana Beatriz Silva.", created_at: haDias(1, "08:20") },
+    { id: uid(0x600b), chamado_id: uid(0x582f), autor_id: null, tipo: "sistema",
+      texto: "Chamado assumido por Marina Duarte.", created_at: haDias(1, "09:38") },
+    { id: uid(0x600c), chamado_id: uid(0x582f), autor_id: marina.id, tipo: "publica",
+      texto: "Oi, Ana! Pode manter a sexta sim — aproveitem o feriado. Só não esquece de registrar depois.",
+      created_at: haDias(1, "09:45") },
     { id: uid(0x6007), chamado_id: uid(0x5824), autor_id: null, tipo: "sistema",
       texto: "Chamado resolvido — Roteado certo — a devolutiva era da trilha DPP e seguiu pro Ricardo.",
       created_at: haDias(4, "16:20") },

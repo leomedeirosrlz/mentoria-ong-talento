@@ -23,6 +23,7 @@ const NUM = {
   jovem: "CHA-000142", // pedido do Caio pela avaliação (urgencia)
   agenda: "CHA-000143", // do Ricardo, em atendimento com a Marina
   plataforma: "CHA-000144", // da Ana (autora jovem logada)
+  jovemFeriado: "CHA-000147", // da Ana, em atendimento com a Marina (489)
   metodo: "CHA-000145", // aberto pela coord, atribuído ao Paulo
   devolutiva: "CHA-000136", // da Sofia, resolvido
   urgenciaAntiga: "CHA-000129", // do João Pedro, resolvido
@@ -69,7 +70,11 @@ describe("demoChamadosFila — escopo por papel", () => {
 
   it("mentorado vê só os da própria ficha", () => {
     const fila = demoChamadosFila("mentorado");
-    expect(fila.map((c) => c.numero)).toEqual([NUM.plataforma]);
+    // ordem da fila: aberto antes de em atendimento
+    expect(fila.map((c) => c.numero)).toEqual([
+      NUM.plataforma,
+      NUM.jovemFeriado,
+    ]);
   });
 
   it("a fila ordena aberto → em atendimento → resolvido, recente em cima", () => {

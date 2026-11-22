@@ -73,7 +73,8 @@ import {
   sugestoesEncontroDaDupla,
 } from "@/lib/sugestoes-encontro-server";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
-import { derivarPendencias } from "@/lib/pendencias-jovem";
+import { getChamados } from "@/lib/queries-chamados";
+import { chamadoPendencia, derivarPendencias } from "@/lib/pendencias-jovem";
 import { getComunicados, getMateriais, getMe } from "@/lib/queries";
 import type { Disponibilidade, JovemContato } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -108,7 +109,7 @@ const TIPO_ICONE_MATERIAL = {
 // os adultos, e por fim o que é consulta (especialistas só com ação,
 // avaliações, combinados, documentos, avisos e materiais).
 export default async function JovemHome() {
-  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes, pedidosEsp, planoJovem, jornada] =
+  const [me, perfil, duplas, contatos, encaminhamentos, assinaturas, encontros, avisos, materiais, avaliacoes, pedidosEsp, planoJovem, jornada, meusChamados] =
     await Promise.all([
       getMe(),
       getJovemPerfil(),
@@ -127,6 +128,9 @@ export default async function JovemHome() {
       // auto-cura da jornada — chamar na visita da home já dispara a
       // emissão do que a data oficial abriu (0123)
       getJovemJornada().catch(() => null),
+      // os chamados dele (489) — mesma leitura cacheada do perfil; pro
+      // mentorado a RLS entrega só os próprios
+      getChamados(),
     ]);
   if (!me) return null; // o layout já barra — convenção das páginas
 
@@ -419,9 +423,9 @@ export default async function JovemHome() {
       duplaId: duplaDppId,
       dataOficial: oficialPorNumero.get(numero) ?? null,
     })),
-    // TODO(481): a home ainda não busca chamados — ligar o fetch aqui
-    // quando a tela do chamado existir, sem quebrar o tipo opcional.
-    chamados: [],
+    // a pendência "respondeu seu pedido" só nasce quando a equipe olhou —
+    // aberto sem dono é espera dele, não tarefa (a régua mora no mapper)
+    chamados: meusChamados.itens.map(chamadoPendencia),
   });
 
   // o lápis "trocar link" do próximo encontro — mesmo recorte da agenda:
