@@ -417,6 +417,9 @@ test.describe("coordenação — fluxos operacionais", () => {
       avaliacao: "baixa",
       dificuldade: "participacao",
       precisa_apoio: true,
+      // registroTemConteudo ignora row só com os enums; sem texto ele não
+      // vira o "último registro" e o card lê o atraso no lugar do combo
+      reflexoes: "Risco plantado pelo e2e: avaliação baixa e dificuldade.",
     });
 
     await page.goto(`/duplas/${DUPLA2_ID}`);
@@ -440,15 +443,22 @@ test.describe("coordenação — fluxos operacionais", () => {
       card.getByText(/Avaliação baixa e dificuldade de participação.*Se a conversa não destravar/)
     ).toBeVisible();
 
-    // pool de mentores: o import (sem dupla) tem vaga e leva Remanejar;
-    // o colega (dupla PAUSADA, cap implícita 1) aparece cheio — a saída
-    // dele é ajustar a capacidade, não desaparecer
+    // pool de mentores: o import (sem dupla) tem vaga e leva Remanejar.
+    // O card corta a lista de cheios em 3; o "colega" da dupla pausada pode
+    // ficar no "…e mais" conforme o ranking, então o fluxo de capacidade
+    // usa o primeiro cheio visível (mesma régua 1/1 · sem vaga).
     const linhaImport = card.locator("li", { hasText: "Mentor E2E Import" });
     await expect(linhaImport).toBeVisible();
-    const linhaColega = card.locator("li", { hasText: "Mentor E2E Colega" });
-    await expect(linhaColega.getByText(/1\/1 · sem vaga/)).toBeVisible();
+    const linhaCheia = card
+      .locator("li")
+      .filter({ hasText: /1\/1 · sem vaga/ })
+      .first();
+    await expect(linhaCheia).toBeVisible();
+    const nomeCheio = (await linhaCheia.locator("p").first().innerText())
+      .split(" 1/1")[0]
+      .trim();
     await expect(
-      linhaColega.getByRole("button", { name: /aumentar capacidade/ })
+      linhaCheia.getByRole("button", { name: /aumentar capacidade/ })
     ).toBeVisible();
 
     // lado do mentorado: a fila "Aguardando par" ranqueada — a Mentorada
@@ -475,7 +485,7 @@ test.describe("coordenação — fluxos operacionais", () => {
 
     // a saída do cheio: o ajuste sobe a capacidade e o nome dele sai de
     // "sem vaga" pra candidato — o card re-renderiza pelo refresh
-    await linhaColega
+    await linhaCheia
       .getByRole("button", { name: /aumentar capacidade/ })
       .click();
     // accessible name vem do título do dialog ("Capacidade de Mentor…")
@@ -486,15 +496,16 @@ test.describe("coordenação — fluxos operacionais", () => {
     // dev server compila a action no 1º hit — a janela de write em staging
     // pede folga maior que a dos cliques read-only
     await expect(capDialog).not.toBeVisible({ timeout: 30_000 });
+    const linhaCheiaAgora = card.locator("li", { hasText: nomeCheio });
     await expect(
-      card.locator("li", { hasText: "Mentor E2E Colega" }).getByRole("button", {
+      linhaCheiaAgora.getByRole("button", {
         name: "Remanejar",
         exact: true,
       })
     ).toBeVisible({ timeout: 30_000 });
-    // o colega saiu de 1/1 cheio pra 1/2 — outros mentores seguem sem vaga
-    await expect(linhaColega.getByText(/sem vaga/)).not.toBeVisible();
-    await expect(linhaColega.getByText(/1\/2/)).toBeVisible();
+    // o mentor saiu de 1/1 cheio pra 1/2 — outros seguem sem vaga
+    await expect(linhaCheiaAgora.getByText(/sem vaga/)).not.toBeVisible();
+    await expect(linhaCheiaAgora.getByText(/1\/2/)).toBeVisible();
   });
 
   // REALIZA-116 + rodada fev/2026 — o matching virou um estado do card
