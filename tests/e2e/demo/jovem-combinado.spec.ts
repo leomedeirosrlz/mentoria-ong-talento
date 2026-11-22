@@ -11,7 +11,7 @@ const card = (page: Parameters<typeof entrarNaDemo>[0]) =>
     has: page.getByRole("heading", { name: "O combinado" }),
   });
 
-const D_OK = "11111111-2222-4333-8444-555555555555";
+const D_OK = "de000000-0000-4000-8000-000000001537";
 
 test.describe("o combinado — jovem confirma a sugestão", () => {
   test("janela, ritmo e linhas por passo; confirmar em um toque", async ({
@@ -32,9 +32,8 @@ test.describe("o combinado — jovem confirma a sugestão", () => {
       c.getByText(/marcado pra \w{3} \d{2}\/\d{2} às \d{2}:\d{2}/)
     ).toBeVisible();
     // passo pendente: sugestão pré-preenchida (a Bia se encontra às 19:00)
-    await expect(
-      c.getByText(/6º encontro · sugestão \w{3} \d{2}\/\d{2} às 19:00/)
-    ).toBeVisible();
+    const linha6 = c.locator("li").filter({ hasText: "6º encontro" });
+    await expect(linha6).toContainText(/sugestão.*01\/12.*19:00/);
     // um toque: Confirma sem digitar nada → a linha vira "Marcado pra…"
     await c.getByRole("button", { name: "Confirmar" }).click();
     await expect(
@@ -60,8 +59,11 @@ test.describe("o combinado — jovem confirma a sugestão", () => {
     await expect(
       dialog.locator('input[type="datetime-local"]')
     ).toHaveCount(0);
-    // troca só a hora pelo chip e confirma — a linha lê a nova hora
-    await dialog.getByRole("radio", { name: "19:30" }).click();
+    // a grade só oferece 19:00; troca pela saída rara "Outro horário"
+    await dialog
+      .getByRole("radio", { name: /Outro horário/ })
+      .click();
+    await dialog.getByLabel("Escolher outro horário").fill("19:30");
     await expect(
       dialog.getByRole("button", { name: "Confirmar data" })
     ).toBeEnabled();

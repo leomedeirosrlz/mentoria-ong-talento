@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { rotuloIntervencao } from "@/lib/intervencoes";
 import {
   abrirChamadoIntervencao,
   fecharIntervencao,
@@ -73,7 +74,7 @@ export function IntervencaoAcoes({
               intervencaoId,
               duplaId,
               "metodologia",
-              `Intervenção sugerida: ${ROTULO[tipo] ?? tipo}`,
+              `Intervenção sugerida: ${rotuloIntervencao(tipo)}`,
               motivo ?? undefined
             )
           )
@@ -102,14 +103,4 @@ export function IntervencaoAcoes({
   );
 }
 
-const ROTULO: Record<string, string> = {
-  troca_mentor: "trocar o mentor",
-  troca_mentorado: "trocar o mentorado",
-  pausa: "pausar a dupla",
-  dpp_para_esp: "encerrar a trilha DPP e seguir com especialista",
-  encerramento: "encerrar a dupla",
-};
 
-export function rotuloIntervencao(tipo: string): string {
-  return ROTULO[tipo] ?? tipo;
-}

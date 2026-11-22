@@ -3,8 +3,8 @@ import type { SeletorSugestoes } from "@/components/seletor-dia-hora";
 import {
   IntervencaoAcoes,
   VoltarGuiaButton,
-  rotuloIntervencao,
 } from "@/components/acordos-acoes";
+import { rotuloIntervencao } from "@/lib/intervencoes";
 import type { Dupla } from "@/lib/types";
 
 /** Central "Acordos e intervenções" (REALIZA-459, sugestão 7 da auditoria
