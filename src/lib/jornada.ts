@@ -396,6 +396,22 @@ export function parRoda<
   };
 }
 
+/** O momento que `refazer_instrumento_jovem` (0209) minta pra roda_vida
+ *  agora: a RPC lê o `contexto.momento` do último link USADO e, quando a
+ *  marca não existe, cai na régua automática do emitir — com ≥1 usada a
+ *  derivação é 'formal'. A estante usa pra não oferecer "Refazer" na
+ *  ponta errada (486): na leitura inicial o botão só é honesto quando o
+ *  link gerado é mesmo o 'inicial'. Null = nenhuma usada, a RPC recusa. */
+export function momentoRefazerRoda<
+  T extends { contexto?: Record<string, unknown> | null; usado_em?: string | null },
+>(entregas: T[]): "inicial" | "formal" | null {
+  const ultima = [...entregas]
+    .filter((e) => e.usado_em != null)
+    .sort((a, b) => (b.usado_em ?? "").localeCompare(a.usado_em ?? ""))[0];
+  if (!ultima) return null;
+  return ultima.contexto?.["momento"] === "inicial" ? "inicial" : "formal";
+}
+
 // ---------- checklist de competências do mentor (0190) ----------
 
 /** Separa as duas marcações do checklist de competências: `inicio`

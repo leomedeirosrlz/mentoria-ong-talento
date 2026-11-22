@@ -39,6 +39,7 @@ import {
   encCorrenteDe,
   estacoesJornada,
   materialLiberadoParaJovem,
+  momentoRefazerRoda,
   parRoda,
   resumoJornada,
   SISTEMA_DA_ESTACAO,
@@ -341,10 +342,14 @@ export default async function JovemMateriais() {
   // REALIZA-18 — o par inicial × formal das entregas dela: o Rever da
   // estação roda_formal vira o antes × depois (o ghost da leitura inicial
   // por baixo do polígono, como na ficha)
-  const rodaPar = parRoda(
+  const rodaEntregas =
     (jornada.instrumentos ?? []).find((i) => i.sistema === "roda_vida")
-      ?.entregas ?? []
-  );
+      ?.entregas ?? [];
+  const rodaPar = parRoda(rodaEntregas);
+  // o momento que o "Refazer" mintaria agora (0209 → 486): a RPC herda o
+  // momento do último link usado — na inicial o botão só aparece quando
+  // o link gerado é mesmo o 'inicial'
+  const momentoRefazer = momentoRefazerRoda(rodaEntregas);
 
   const propsEstacao = (chave: EstacaoChave) => ({
     sistema:
@@ -362,6 +367,11 @@ export default async function JovemMateriais() {
             RespostaValor
           > | null)
         : null,
+    guiaHref: guiaPorEstacao.get(chave) ?? null,
+    rodaMomentoRefazer:
+      chave === "roda_inicial" || chave === "roda_formal"
+        ? momentoRefazer
+        : undefined,
   });
 
   // ---------- retrospectiva (REALIZA-359) ----------
@@ -573,28 +583,16 @@ export default async function JovemMateriais() {
         <div className="grid grid-cols-1 items-start gap-2 sm:grid-cols-2 sm:gap-3 lg:grid-cols-4">
           {/* ordem do guia: as 4 de construção e as duas de fechamento —
               a recorrente mora no banner/histórico, não aqui. O "Ler o
-              guia" fica fora do card — UM gesto por card (a ação
-              secundária mora no destino do card; o guia é leitura, não
-              gesto de entrega) */}
+              guia" é a tira de rodapé dentro da borda do card (486) —
+              leitura em hierarquia secundária, um gesto por card segue */}
           {estacoes
             .filter((est) => est.chave !== "avaliacao_encontro")
             .map((est) => (
-              <div key={est.chave}>
-                <InstrumentoCard
-                  est={est}
-                  {...propsEstacao(est.chave)}
-                />
-                {guiaPorEstacao.has(est.chave) && (
-                  <Link
-                    href={guiaPorEstacao.get(est.chave)!}
-                    prefetch={false}
-                    className="mt-1 inline-flex min-h-8 items-center gap-1.5 px-1 text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <BookOpen size={12} aria-hidden />
-                    Ler o guia
-                  </Link>
-                )}
-              </div>
+              <InstrumentoCard
+                key={est.chave}
+                est={est}
+                {...propsEstacao(est.chave)}
+              />
             ))}
         </div>
         {/* a bandeira terminal — o encontro 16 da turma dela */}
@@ -687,6 +685,17 @@ const SUB_ESTACAO: Record<EstacaoChave, string> = {
   avaliacao_360: "mentor e mentorado",
 };
 
+/** Consequência do "Refazer" por estação (486) — qual leitura a resposta
+ *  nova substitui. Nas rodas a frase nomeia a ponta da comparação que o
+ *  link novo reescreve; nos outros instrumentos entra a linha padrão do
+ *  dialog ("passa a valer no lugar desta"). */
+const REFAZER_NOTA: Partial<Record<EstacaoChave, string>> = {
+  roda_inicial:
+    "Ela vira a sua leitura inicial, a roda 'antes' da comparação com a aplicação formal.",
+  roda_formal:
+    "Ela vira a sua aplicação formal, a roda 'depois' da comparação com a leitura inicial.",
+};
+
 /** Props compartilhadas dos cards — o que a página resolve por chave
  *  (360º × instrumentos) e passa pra estante. */
 type EstacaoProps = {
@@ -696,6 +705,12 @@ type EstacaoProps = {
   /** aplicação anterior do mesmo instrumento (REALIZA-18 — roda inicial
    *  alimenta a comparação do Rever da formal) */
   respostasAnterior?: Record<string, RespostaValor> | null;
+  /** doc nativo do instrumento quando serve o jovem — a tira "Ler o
+   *  guia" do rodapé do card */
+  guiaHref?: string | null;
+  /** momento que a RPC de refazer mintaria agora (0209) — o "Refazer" da
+   *  estação só aparece quando é o momento DELA */
+  rodaMomentoRefazer?: "inicial" | "formal" | null;
 };
 
 function TagAFazer() {
@@ -750,14 +765,17 @@ function EstadoLinha({ est }: { est: Estacao }) {
  *  UM gesto por card — nunca dois botões: a_fazer limpo vira link pro
  *  /f/<token>; feito (ou re-emissão) com resposta abre o dialog Rever —
  *  e é lá dentro que mora a ação secundária ("Abrir o plano" no PDM,
- *  "Continuar" na re-emissão). No mobile cada card é uma linha: lombada
- *  na cor + marca + título + estado + chevron. Trancada mantém a tinta
- *  em sussurro e a liberação em texto, nunca laje cinza nem cadeado. */
+ *  "Responder a nova rodada" na re-emissão). No mobile cada card é uma
+ *  linha: lombada na cor + marca + título + estado + chevron. Trancada
+ *  mantém a tinta em sussurro e a liberação em texto, nunca laje cinza
+ *  nem cadeado. */
 function InstrumentoCard({
   est,
   sistema,
   campos,
   respostasAnterior = null,
+  guiaHref = null,
+  rodaMomentoRefazer,
 }: EstacaoProps) {
   const trancada = est.estado === "trancada";
   const linkavel =
@@ -822,7 +840,7 @@ function InstrumentoCard({
           {gesto && (
             <CaretRight
               size={16}
-              className="ml-auto shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground"
+              className="ml-auto shrink-0 text-muted-foreground transition-transform group-hover/gesto:translate-x-0.5 group-hover/gesto:text-foreground"
             />
           )}
         </span>
@@ -830,86 +848,95 @@ function InstrumentoCard({
     </>
   );
 
+  // a borda mora no container; dentro, a área do gesto (link ou o
+  // trigger do Rever) cobre o corpo e o "Ler o guia" fecha como tira de
+  // rodapé — dois alvos separados, sem botão dentro de link (486)
   const shell = cn(
-    "group relative flex min-w-0 overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)] sm:flex-col",
+    "relative flex min-w-0 flex-col overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]",
     trancada && "border border-dashed border-border/70"
   );
+  const gestoCls = cn(
+    "group/gesto flex min-w-0 outline-none transition-shadow sm:flex-col",
+    "hover:ring-2 hover:ring-inset hover:ring-[var(--ic)]/50",
+    "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+  );
+  const guia = guiaHref ? (
+    <Link
+      href={guiaHref}
+      prefetch={false}
+      className="flex min-h-11 items-center gap-1.5 border-t border-border/60 px-3 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-3.5"
+    >
+      <BookOpen size={13} aria-hidden />
+      Ler o guia
+    </Link>
+  ) : null;
 
-  if (linkavel) {
+  if (linkavel || pdmSolto) {
     return (
-      <Link
-        href={`/f/${est.token}`}
-        prefetch={false}
-        style={instrumentoVars(est.chave)}
-        className={cn(
-          shell,
-          "outline-none transition-shadow hover:ring-2 hover:ring-[var(--ic)]/50 focus-visible:ring-2 focus-visible:ring-ring"
-        )}
-      >
-        {conteudo}
-      </Link>
-    );
-  }
-  if (pdmSolto) {
-    return (
-      <Link
-        href="/jovem/pdm"
-        prefetch={false}
-        style={instrumentoVars(est.chave)}
-        className={cn(
-          shell,
-          "outline-none transition-shadow hover:ring-2 hover:ring-[var(--ic)]/50 focus-visible:ring-2 focus-visible:ring-ring"
-        )}
-      >
-        {conteudo}
-      </Link>
+      <div style={instrumentoVars(est.chave)} className={shell}>
+        <Link
+          href={linkavel ? `/f/${est.token}` : "/jovem/pdm"}
+          prefetch={false}
+          className={gestoCls}
+        >
+          {conteudo}
+        </Link>
+        {guia}
+      </div>
     );
   }
   if (reveravel) {
-    // a secundária mora no rodapé do dialog, não no card — é assim que a
-    // estante fica uniforme: todo card é um gesto só pra um destino
+    // a secundária do instrumento mora no rodapé do dialog, não no card —
+    // é assim que a estante fica uniforme: todo card é um gesto só pra
+    // um destino
     const acao =
       est.chave === "pdm" && est.estado === "feito"
         ? { rotulo: "Abrir o plano", href: "/jovem/pdm" }
         : est.estado === "a_fazer" && est.token
-          ? { rotulo: "Continuar", href: `/f/${est.token}` }
+          ? { rotulo: "Responder a nova rodada", href: `/f/${est.token}` }
           : undefined;
     const card = (
       <article
-        style={instrumentoVars(est.chave)}
         aria-label={`Rever resposta: ${est.titulo}`}
-        className={cn(
-          shell,
-          "w-full cursor-pointer text-left outline-none transition-shadow hover:ring-2 hover:ring-[var(--ic)]/50 focus-visible:ring-2 focus-visible:ring-ring"
-        )}
+        className={cn(gestoCls, "w-full cursor-pointer text-left")}
       >
         {conteudo}
       </article>
     );
     return (
-      <ReverRespostaDialog
-        titulo={est.titulo}
-        respondidoEm={est.respondidoEm}
-        sistema={sistema}
-        campos={campos}
-        respostas={est.respostas as Record<string, RespostaValor>}
-        respostasAnterior={respostasAnterior}
-        trigger={card}
-        acao={acao}
-        refazerSistema={
-          est.estado === "feito" &&
-          sistema != null &&
-          ["visao", "metas", "pdm", "roda_vida"].includes(sistema)
-            ? sistema
-            : undefined
-        }
-      />
+      <div style={instrumentoVars(est.chave)} className={shell}>
+        <ReverRespostaDialog
+          titulo={est.titulo}
+          respondidoEm={est.respondidoEm}
+          sistema={sistema}
+          campos={campos}
+          respostas={est.respostas as Record<string, RespostaValor>}
+          respostasAnterior={respostasAnterior}
+          trigger={card}
+          acao={acao}
+          refazerSistema={
+            est.estado === "feito" &&
+            sistema != null &&
+            ["visao", "metas", "pdm", "roda_vida"].includes(sistema) &&
+            // a RPC minta o momento do último link usado (0209) — o
+            // "Refazer" só é honesto quando o link gerado é o da estação
+            (sistema !== "roda_vida" ||
+              rodaMomentoRefazer ===
+                (est.chave === "roda_inicial" ? "inicial" : "formal"))
+              ? sistema
+              : undefined
+          }
+          refazerNota={REFAZER_NOTA[est.chave]}
+        />
+        {guia}
+      </div>
     );
   }
   return (
-    <article style={instrumentoVars(est.chave)} className={shell}>
-      {conteudo}
-    </article>
+    <div style={instrumentoVars(est.chave)} className={shell}>
+      <article className="flex min-w-0 sm:flex-col">{conteudo}</article>
+      {guia}
+    </div>
   );
 }
 

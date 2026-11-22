@@ -42,6 +42,7 @@ export function ReverRespostaDialog({
   trigger,
   acao,
   refazerSistema,
+  refazerNota,
 }: {
   titulo: string;
   respondidoEm: string | null;
@@ -61,6 +62,10 @@ export function ReverRespostaDialog({
   /** self-serve do jovem (0209): "Refazer" no rodapé minta link novo em
    *  branco pra ele mesmo — a resposta lida aqui segue guardada */
   refazerSistema?: string;
+  /** o que a resposta nova substitui (486) — a frase da confirmação que
+   *  diz qual leitura o link novo reescreve (a inicial é o "antes" da
+   *  comparação; a formal, o "depois") */
+  refazerNota?: string;
 }) {
   const estruturado = ehInstrumentoDeDupla(sistema);
   const router = useRouter();
@@ -118,9 +123,11 @@ export function ReverRespostaDialog({
             {confirmando ? (
               <div className="space-y-3">
                 <p className="text-sm leading-relaxed text-muted-foreground">
-                  Tem certeza? Um link novo em branco é gerado pra você
-                  responder de novo. Sua resposta anterior fica salva e seu
-                  mentor ainda consegue vê-la.
+                  Um link novo em branco é gerado pra você responder de
+                  novo.{" "}
+                  {refazerNota ??
+                    "A resposta nova passa a valer no lugar desta."}{" "}
+                  A anterior fica salva e seu mentor ainda consegue vê-la.
                 </p>
                 <div className="flex justify-end gap-2">
                   <Button
