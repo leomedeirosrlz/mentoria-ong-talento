@@ -37,12 +37,16 @@ import {
   PedirEspecialistaDialog,
 } from "@/components/pedir-especialista-dialog";
 import { Estrelas } from "@/components/estrelas";
+import { JovemHistorico } from "@/components/jovem-historico";
 import {
+  formatDate,
   formatDateTime,
+  formatMesAnoLongo,
   linkSeguro,
   maxEncontros,
   passoEsp,
   podeEntrarAgora,
+  rotuloPasso,
   toDateStr,
   waLink,
 } from "@/lib/ciclo";
@@ -252,8 +256,43 @@ export default async function JovemAgenda() {
         ),
       ])
   );
-  const rotuloSessao = (e: JovemEncontro) =>
-    `Sessão ${passoPorEncontroEsp.get(e.id) ?? e.numero} com ${espPorDupla.get(e.dupla_id)?.primeiro ?? "seu especialista"}`;
+  // o passo realizado por passo do guia — a tentativa falha que foi
+  // remarcada e rolou mostra "a sessão rolou em…" na linha (o "Não
+  // aconteceu" sozinho leria como buraco na trilha)
+  const realizadoPorPassoEsp = new Map<string, string>();
+  for (const e of encontros) {
+    if (
+      trilhaPorDupla.get(e.dupla_id) !== "especialista" ||
+      e.status !== "realizado" ||
+      e.realizado_em == null
+    )
+      continue;
+    const passo = passoPorEncontroEsp.get(e.id);
+    if (passo != null)
+      realizadoPorPassoEsp.set(`${e.dupla_id}:${passo}`, e.realizado_em);
+  }
+  const notaSessaoCoberta = (e: JovemEncontro): string | null => {
+    if (trilhaPorDupla.get(e.dupla_id) !== "especialista") return null;
+    if (e.status !== "nao_aconteceu" && e.status !== "cancelado") return null;
+    const quando = realizadoPorPassoEsp.get(
+      `${e.dupla_id}:${passoPorEncontroEsp.get(e.id) ?? -1}`
+    );
+    return quando ? `a sessão rolou em ${formatDate(quando)}` : null;
+  };
+  // rótulo canônico da linha (492): "Sessão N com Sofia" na trilha de
+  // especialista (passo do guia, nunca a tentativa), "Nº encontro" no DPP
+  const rotuloDaLinha = (e: JovemEncontro): string =>
+    rotuloPasso({
+      esp: trilhaPorDupla.get(e.dupla_id) === "especialista",
+      numero:
+        trilhaPorDupla.get(e.dupla_id) === "especialista"
+          ? (passoPorEncontroEsp.get(e.id) ?? e.numero)
+          : e.numero,
+      com:
+        trilhaPorDupla.get(e.dupla_id) === "especialista"
+          ? (espPorDupla.get(e.dupla_id)?.nome ?? "seu especialista")
+          : null,
+    });
 
   // "Precisa de você" (REALIZA-493): a mesma régua da home — o motor puro
   // ordena e a agenda só apresenta, com o recorte do que é da agenda
@@ -314,10 +353,7 @@ export default async function JovemAgenda() {
       numero: e.numero,
       realizado_em: e.realizado_em,
       trilha: trilhaPorDupla.get(e.dupla_id) ?? "dpp",
-      rotulo:
-        trilhaPorDupla.get(e.dupla_id) === "especialista"
-          ? rotuloSessao(e)
-          : `${e.numero}º encontro`,
+      rotulo: rotuloDaLinha(e),
     }));
   const ctxPorEncontro: Record<string, EncontroCtx> = Object.fromEntries(
     encontros.map((e) => [
@@ -641,7 +677,7 @@ export default async function JovemAgenda() {
                       agora={agora}
                       duplaAtiva={ativaPorDupla.get(e.dupla_id) ?? false}
                       trilha={trilhaPorDupla.get(e.dupla_id) ?? "dpp"}
-                      rotuloEsp={rotuloSessao(e)}
+                      rotulo={rotuloDaLinha(e)}
                     />
                   ))}
                 </CardContent>
@@ -656,24 +692,42 @@ export default async function JovemAgenda() {
               >
                 Histórico
               </h2>
-              <Card>
-                <CardContent className="divide-y divide-border/60 p-0">
-                  {passados.map((e) => (
-                    <EncontroLinha
-                      key={e.id}
-                      e={e}
-                      aval={avalDe(e)}
-                      agora={agora}
-                      duplaAtiva={ativaPorDupla.get(e.dupla_id) ?? false}
-                      trilha={trilhaPorDupla.get(e.dupla_id) ?? "dpp"}
-                      rotuloEsp={rotuloSessao(e)}
-                      meId={me?.id ?? null}
-                    />
-                  ))}
-                  {/* retroativo só com passo elegível (QW1): sem candidato
-                      o link prometia um gesto que a RPC recusaria */}
-                  {duplaDpp?.id && numerosRetro.length > 0 && (
-                    <div className="px-4 py-1.5 sm:px-6">
+              {/* 488: denso e por mês — os 5 mais recentes + "ver
+                  histórico completo"; chips de origem só quando as duas
+                  trilhas convivem na lista */}
+              <JovemHistorico
+                itens={passados.map((e) => {
+                  const quando =
+                    e.status === "realizado" && e.realizado_em
+                      ? e.realizado_em
+                      : e.data_hora;
+                  return {
+                    id: e.id,
+                    trilha: trilhaPorDupla.get(e.dupla_id) ?? "dpp",
+                    mes: quando
+                      ? formatMesAnoLongo(quando)
+                      : "Sem data",
+                    node: (
+                      <EncontroLinha
+                        e={e}
+                        aval={avalDe(e)}
+                        agora={agora}
+                        duplaAtiva={
+                          ativaPorDupla.get(e.dupla_id) ?? false
+                        }
+                        trilha={trilhaPorDupla.get(e.dupla_id) ?? "dpp"}
+                        rotulo={rotuloDaLinha(e)}
+                        nota={notaSessaoCoberta(e)}
+                        meId={me?.id ?? null}
+                      />
+                    ),
+                  };
+                })}
+                rodape={
+                  /* retroativo só com passo elegível (QW1): sem candidato
+                     o link prometia um gesto que a RPC recusaria */
+                  duplaDpp?.id && numerosRetro.length > 0 ? (
+                    <div className="px-4 py-1.5 sm:px-5">
                       <JovemRetroativoDialog
                         duplaId={duplaDpp.id}
                         numeros={numerosRetro}
@@ -689,9 +743,9 @@ export default async function JovemAgenda() {
                         }
                       />
                     </div>
-                  )}
-                </CardContent>
-              </Card>
+                  ) : null
+                }
+              />
             </section>
           )}
         </>
@@ -707,14 +761,15 @@ function EncontroLinha({
   agora,
   duplaAtiva = false,
   trilha = "dpp",
-  rotuloEsp,
+  rotulo,
+  nota,
   meId,
 }: {
   e: JovemEncontro;
   futuro?: boolean;
-  /** A avaliação que já saiu — "Ver resposta" com as estrelas. A pendente
-   *  não entra: pedir avaliação é da lista "Precisa de você" (REALIZA-493),
-   *  sem duplicar o gesto na linha. */
+  /** A avaliação que já saiu — as estrelas quietas abrem "Ver resposta".
+   *  A pendente não entra: pedir avaliação é da lista "Precisa de você"
+   *  (REALIZA-493), sem duplicar o gesto na linha. */
   aval?: AvaliacaoFeita | null;
   /** ms do render da página — o "futuro" do gesto é o da listagem, não o do
    *  clique; a RPC reavalia o instante real de qualquer jeito */
@@ -724,13 +779,16 @@ function EncontroLinha({
   duplaAtiva?: boolean;
   /** agendar_encontro_mentorado é DPP-only (0072): na trilha de especialista
    *  quem marca é o especialista — o botão de remarcar não renderiza pra não
-   *  prometer um gesto que a RPC recusaria. Desmarcar/"não aconteceu" valem
+   *   prometer um gesto que a RPC recusaria. Desmarcar/"não aconteceu" valem
    *  em qualquer trilha e seguem aparecendo. */
   trilha?: string;
-  /** rótulo "Sessão N com Fulana" — o passo vem do caller (rank entre
-   *  realizados; e.numero é tentativa). Distinção DPP×esp na listagem
-   *  mista (0097: antes eram dois "3º encontro" indistinguíveis). */
-  rotuloEsp?: string;
+  /** rótulo canônico da linha — "Sessão N com Fulana" na trilha de
+   *  especialista (passo do guia, nunca a tentativa), "Nº encontro" no DPP.
+   *  Distinção DPP×esp na listagem mista (0097). */
+  rotulo: string;
+  /** linha extra de contexto ("a sessão rolou em…") — a tentativa falha de
+   *  trilha esp que a remarcação cobriu não lê como buraco no histórico. */
+  nota?: string | null;
   /** profile do jovem logado — casa com created_by pra liberar Corrigir/
    *  Desfazer no retroativo criado por ele (0207). */
   meId?: string | null;
@@ -762,7 +820,7 @@ function EncontroLinha({
     meId != null &&
     e.created_by === meId;
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3.5">
+    <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 sm:px-5">
       <span
         aria-hidden
         className={cn(
@@ -783,11 +841,7 @@ function EncontroLinha({
         )}
       </span>
       <div className="min-w-0 flex-1 basis-48">
-        <p className="text-sm font-medium">
-          {trilha === "especialista" && rotuloEsp
-            ? rotuloEsp
-            : `${e.numero}º encontro`}
-        </p>
+        <p className="text-sm font-medium">{rotulo}</p>
         <p className="mt-0.5 text-xs text-muted-foreground">
           {quando ? formatDateTime(quando) : "data a combinar"}
         </p>
@@ -796,8 +850,15 @@ function EncontroLinha({
             Por que mudou: {e.motivo_reagendamento}
           </p>
         )}
+        {nota && (
+          <p className="mt-0.5 text-xs text-muted-foreground">{nota}</p>
+        )}
       </div>
-      <div className="ms-auto flex flex-wrap items-center justify-end gap-2">
+      {/* no celular as ações que não cabem caem numa linha própria
+          alinhada no texto (ps-12 = ícone + gap) — o ms-auto sozinho
+          empurrava pro canto e deixava o buraco à esquerda; badge/strela
+          que ainda cabe segue na mesma linha. Em sm+ volta pra direita */}
+      <div className="flex flex-wrap items-center justify-start gap-2 ps-12 sm:ms-auto sm:justify-end sm:ps-0">
         {/* Entrar é a ação decisiva só na janela da chamada (QW5: 30 min
             antes até 2 h depois — mesma régua da home e da ficha). Fora
             dela o link segue acessível, mas discreto. */}
@@ -852,6 +913,7 @@ function EncontroLinha({
         )}
         {aval && (
           <VerAvaliacaoButton
+            quiet
             avaliacao={aval}
             label={<Estrelas n={aval.estrelas} size={13} />}
           />

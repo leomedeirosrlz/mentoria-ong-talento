@@ -114,45 +114,50 @@ test.describe("agenda demo do mentor DPP — Minha agenda / Por mentorado / Cale
     );
   });
 
-  test("o encontro aparece uma vez — a faixa cede à lista que tem as ações", async ({
+  test("evento oficial das turmas entra uma vez — 'Turmas 1 e 2' (REALIZA-488)", async ({
     page,
   }) => {
     await entrarNaDemo(page, "mentor_dpp");
     await page.goto("/agenda");
 
     const lista = page.locator('section[aria-label^="Agenda de"]');
-    // âncora: o 5º oficial da T1 é a terça da semana corrente e a Bia já
-    // tem row — na lista ele é item (ainda por vir) ou warnrow (vencido
-    // sem registro). "Encontro 5 · Turma 1" / "encontro 5 · Bia · Turma 1"
+    // a faixa "Minha agenda · semana do programa" morreu — formações e
+    // eventos oficiais viram itens tipados nas seções. O encerramento das
+    // duas turmas no mesmo dia é UM item fundido, com as turmas somadas
+    // no rótulo (era o card duplicado do review)
     await expect(
-      lista
-        .getByText(/encontro 5 · (?:[^·]+ · )?Turma 1/i)
-        .first()
+      lista.getByText("Evento de encerramento do programa")
+    ).toHaveCount(1);
+    await expect(
+      lista.getByText("Evento oficial do ciclo · Turmas 1 e 2")
+    ).toBeVisible();
+    await expect(
+      lista.getByText("agenda de Bia e Matheus · evento oficial")
     ).toBeVisible();
 
-    // …então a faixa não pode repetir o card do mesmo encontro — o dedup
-    // por (dupla, nº) tira da faixa o que a lista já apresenta; se sobrar
-    // faixa, ficam só os oficiais fora do radar e os compromissos do
-    // programa
-    const faixa = page.locator(
-      'section[aria-label="Minha agenda · semana do programa"]'
-    );
+    // o recesso compartilhado segue a mesma régua de merge
     await expect(
-      faixa.getByText(/Encontro 5 · Turma 1/)
-    ).toHaveCount(0);
+      lista.getByText("Recesso do programa · Turmas 1 e 2")
+    ).toBeVisible();
+    // e a formação do mentor é item tipado da seção (a Roda de casos de
+    // hoje) — programa dentro da lista, sem a faixa que contradizia o
+    // "Nada para amanhã" da seção abaixo
+    await expect(
+      lista.getByText("Formação de mentores").first()
+    ).toBeVisible();
 
-    // invariante geral: nenhum "Encontro N · <turma>" da faixa coexiste
-    // com item ou warnrow do mesmo encontro na lista
-    const esc = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    for (const t of await faixa.locator("li h3").allTextContents()) {
-      const m = t.match(/^Encontro (\d+)(?: · ([^,]+))?/);
-      if (!m?.[2]) continue;
-      await expect(
-        lista.getByText(
-          new RegExp(`encontro ${m[1]} · (?:[^·]+ · )?${esc(m[2].trim())}`, "i")
-        )
-      ).toHaveCount(0);
-    }
+    // no chip da dupla o item segue sendo o da própria agenda — turma dela,
+    // sem a fusão do "tudo"
+    await page
+      .getByRole("group", { name: "Escopo da agenda" })
+      .getByRole("button", { name: "Bia · Turma 1" })
+      .click();
+    await expect(
+      lista.getByText("Evento oficial do ciclo · Turma 1")
+    ).toBeVisible();
+    await expect(
+      lista.getByText("agenda de Bia · evento oficial")
+    ).toBeVisible();
   });
 
   test("Por mentorado: card da Ana com as trilhas e card do Matheus com o pedido no mural", async ({

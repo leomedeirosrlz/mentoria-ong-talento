@@ -2272,6 +2272,20 @@ export function formatMesAno(iso: string | null | undefined): string {
     .replace(/\./, "");
 }
 
+/** "novembro de 2025" — mês por extenso + ano: o cabeçalho de grupo do
+ *  histórico da agenda do jovem (o abreviado ler como etiqueta; o grupo
+ *  de mês é título de seção e pede a forma cheia). */
+export function formatMesAnoLongo(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = paraData(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric",
+    timeZone: TZ,
+  });
+}
+
 const TRES_DIAS_MS = 3 * 86400000;
 
 /** Registro tardio: entregue mais de 3 dias depois de o encontro acontecer.

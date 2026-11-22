@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { montarPlanoEmDia } from "@/lib/plano-em-dia";
 import { saudadeDaDupla } from "@/lib/ciclo";
-import { itensSemanaProgramaMentor } from "@/lib/agenda-coordenacao";
+import {
+  deriveAgendaMinha,
+  filtraAgenda,
+} from "@/lib/agenda-minha";
 import {
   CICLO_16,
   CRON_T1,
@@ -130,21 +133,28 @@ describe("recesso opcional (462) — semáforo (declarado ≠ atraso)", () => {
 });
 
 describe("recesso opcional (462) — agenda do mentor", () => {
-  // semana 22→28/dez cobre o início do recesso (25/dez)
-  const SEMANA = dt("2025-12-24");
+  // hoje 2025-12-24 → o recesso do CICLO_16 (25/dez) é item do programa
+  // em Próximos; a nota "segue se encontrando" é por par, na meta do item
+  const HOJE = "2025-12-24";
   const cron = mkCronograma({ id: CRON_T1, turma: "T1", status: "ativo" });
   const evRecesso = CICLO_16.find((e) => e.id === REC_ID)!;
 
-  it("recesso sem declaração não nomeia ninguém", () => {
-    const itens = itensSemanaProgramaMentor(
-      [mkDupla()],
-      [evRecesso],
-      [cron],
-      SEMANA,
-      SEMANA.getTime()
-    );
-    const item = itens.find((i) => i.id === `ev-${REC_ID}-${CRON_T1}`);
-    expect(item?.nota).toBeNull();
+  const itensRecesso = (duplas: Dupla[]) =>
+    deriveAgendaMinha({
+      duplas,
+      trilhas: {},
+      eventos: [evRecesso],
+      cronogramas: [cron],
+      hoje: HOJE,
+      agora: dt(HOJE).getTime(),
+    }).secoes
+      .flatMap((s) => s.grupos.flatMap((g) => g.itens))
+      .filter((i) => i.rotulo.startsWith("Recesso"));
+
+  it("o recesso vira item tipado do programa, sem nota sem declaração", () => {
+    const [item] = itensRecesso([mkDupla()]);
+    expect(item?.tipo).toBe("programa");
+    expect(item?.meta).toEqual([]);
   });
 
   it("recesso atravessado nomeia o par que segue se encontrando", () => {
@@ -156,18 +166,12 @@ describe("recesso opcional (462) — agenda do mentor", () => {
       },
       recessos: [dec(false)],
     });
-    const itens = itensSemanaProgramaMentor(
-      [d],
-      [evRecesso],
-      [cron],
-      SEMANA,
-      SEMANA.getTime()
-    );
-    const item = itens.find((i) => i.id === `ev-${REC_ID}-${CRON_T1}`);
-    expect(item?.nota).toBe("Ana segue se encontrando durante o recesso");
+    expect(itensRecesso([d])[0]?.meta).toEqual([
+      "Ana segue se encontrando durante o recesso",
+    ]);
   });
 
-  it("só o par que declarou aparece — a outra dupla fica no padrão", () => {
+  it("só o par que declarou ganha a nota — a outra dupla fica no padrão", () => {
     const atravessou = mkDupla({
       id: "d-2",
       mentorado: {
@@ -188,14 +192,27 @@ describe("recesso opcional (462) — agenda do mentor", () => {
       },
       recessos: [dec(true, "d-3")],
     });
-    const itens = itensSemanaProgramaMentor(
-      [atravessou, noPadrao],
-      [evRecesso],
-      [cron],
-      SEMANA,
-      SEMANA.getTime()
-    );
-    const item = itens.find((i) => i.id === `ev-${REC_ID}-${CRON_T1}`);
-    expect(item?.nota).toBe("Ana segue se encontrando durante o recesso");
+    const itens = itensRecesso([atravessou, noPadrao]);
+    expect(
+      itens.find((i) => i.escopo === "dupla:d-2")?.meta
+    ).toEqual(["Ana segue se encontrando durante o recesso"]);
+    expect(itens.find((i) => i.escopo === "dupla:d-3")?.meta).toEqual([]);
+
+    // no "tudo" o MESMO recesso funde num item só, com as notas somadas
+    const agenda = deriveAgendaMinha({
+      duplas: [atravessou, noPadrao],
+      trilhas: {},
+      eventos: [evRecesso],
+      cronogramas: [cron],
+      hoje: HOJE,
+      agora: dt(HOJE).getTime(),
+    });
+    const fundidos = filtraAgenda(agenda, "tudo")
+      .secoes.flatMap((s) => s.grupos.flatMap((g) => g.itens))
+      .filter((i) => i.rotulo.startsWith("Recesso"));
+    expect(fundidos).toHaveLength(1);
+    expect(fundidos[0]!.meta).toEqual([
+      "Ana segue se encontrando durante o recesso",
+    ]);
   });
 });

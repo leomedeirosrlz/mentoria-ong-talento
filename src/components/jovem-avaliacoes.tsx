@@ -116,21 +116,37 @@ export function AvaliarPendenteButton({
 }
 
 /** Botão "ver resposta" + dialog do que o jovem escreveu — com o toggle
- *  de visibilidade do mentor (DPP) dentro. */
+ *  de visibilidade do mentor (DPP) dentro. `quiet` é a versão sem moldura
+ *  da linha de histórico: as estrelas já dizem o resultado, o clique só
+ *  abre o detalhe (aria-label carrega a affordance que a borda carregava). */
 export function VerAvaliacaoButton({
   avaliacao,
   label = "Ver resposta",
+  quiet = false,
 }: {
   avaliacao: AvaliacaoFeita;
   label?: React.ReactNode;
+  quiet?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
     <>
-      <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
-        <Eye size={15} aria-hidden />
-        {label}
-      </Button>
+      {quiet ? (
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          aria-label="Ver sua avaliação"
+          title="Ver sua avaliação"
+          className="inline-flex min-h-8 items-center rounded-md px-1.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          {label}
+        </button>
+      ) : (
+        <Button size="sm" variant="outline" onClick={() => setOpen(true)}>
+          <Eye size={15} aria-hidden />
+          {label}
+        </Button>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         {/* xl: leitura da resposta (resumo + comentário em largura cheia);
             o md fica pro FORM de avaliar, coluna única com menos ar */}

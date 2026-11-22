@@ -13,7 +13,12 @@ import {
   buscarSlotsEspecialista,
   pedirEspecialistaJovem,
 } from "@/lib/actions-jovem";
-import { rotuloSlot, slotCompativel } from "@/lib/ciclo";
+import {
+  formatDiaSemana,
+  rotuloSlot,
+  slotCompativel,
+  toDateStr,
+} from "@/lib/ciclo";
 import { pedidoPrecisaDemanda } from "@/lib/jovem-especialista";
 import type { Disponibilidade, JovemEspecialista } from "@/lib/types";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -461,10 +466,174 @@ export function PedirEspecialistaDialog({
   );
 }
 
-/** Os chips de horário do especialista viram "pedir esse horário" — cada
- *  clique abre o dialog já com o especialista e o slot preenchidos. Com a
- *  `disponibilidade` do jovem à mão, o chip que encaixa na grade dele ganha
- *  o destaque âmbar "encaixa com você" (mesmo sinal da mesa de negociação). */
+// ---------- slot direto na agenda do jovem ----------
+
+const fmtDiaSlot = new Intl.DateTimeFormat("pt-BR", {
+  day: "2-digit",
+  month: "2-digit",
+  timeZone: "America/Sao_Paulo",
+});
+const fmtHoraSlot = new Intl.DateTimeFormat("pt-BR", {
+  hour: "2-digit",
+  minute: "2-digit",
+  timeZone: "America/Sao_Paulo",
+});
+
+/** "sáb 28/11" — o cabeçalho do grupo de dia (mesma gramática do
+ *  rotuloSlot, sem a hora). */
+function rotuloDiaSlot(iso: string): string {
+  const sem = formatDiaSemana(iso).replace("-feira", "");
+  return `${sem} ${fmtDiaSlot.format(new Date(iso))}`;
+}
+
+/** Confirmação curta do toque num slot: o horário escolhido, o contexto
+ *  opcional e pronto — o formulário inteiro (catálogo + mural) só abre se
+ *  a pessoa quiser mudar especialista/horário. O submit usa a mesma action
+ *  e o mesmo gate do dialog completo (demanda rica num primeiro pedido,
+ *  motivo curto com trilha viva). */
+function ConfirmarSlotDialog({
+  espId,
+  espNome,
+  slot,
+  precisaDemanda,
+  open,
+  onOpenChange,
+  onExpandir,
+  onEnviado,
+}: {
+  espId: string;
+  espNome: string;
+  slot: string;
+  precisaDemanda: boolean;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  /** "Mudar especialista ou horário" — troca pro dialog completo. */
+  onExpandir: () => void;
+  onEnviado?: () => void;
+}) {
+  const [texto, setTexto] = useState("");
+  const [pending, start] = useTransition();
+  const router = useRouter();
+  const nome1 = primeiro(espNome);
+  const [estavaAberto, setEstavaAberto] = useState(open);
+  if (open !== estavaAberto) {
+    setEstavaAberto(open);
+    if (open) setTexto("");
+  }
+
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    start(async () => {
+      try {
+        const res = await pedirEspecialistaJovem({
+          especialistaId: espId,
+          slot,
+          demanda: precisaDemanda ? texto.trim() : null,
+          motivo: precisaDemanda ? null : texto.trim() || null,
+        });
+        if (res?.error) {
+          toast.error(res.error);
+          return;
+        }
+        toast.success(`Pedido enviado pra ${nome1}!`);
+        onOpenChange(false);
+        onEnviado?.();
+        router.refresh();
+      } catch {
+        toast.error("Sem conexão. Tente de novo.");
+      }
+    });
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent size="md">
+        <DialogHeader>
+          <DialogTitle>Pedir sessão com {nome1}</DialogTitle>
+          <DialogDescription className="leading-relaxed">
+            {rotuloSlot(slot)} · 1h. {nome1} recebe o pedido e confirma com
+            você.
+          </DialogDescription>
+        </DialogHeader>
+        <form onSubmit={submit} className="space-y-3">
+          <div className="space-y-2">
+            {precisaDemanda ? (
+              <>
+                <Label htmlFor="slot-texto">
+                  Por que você quer esse apoio?
+                </Label>
+                <Textarea
+                  id="slot-texto"
+                  required
+                  minLength={10}
+                  maxLength={1000}
+                  rows={3}
+                  value={texto}
+                  onChange={(e) => setTexto(e.target.value)}
+                  placeholder="Conta por que você quer esse apoio. O especialista lê isso antes de aceitar."
+                />
+                <p className="text-xs text-muted-foreground">
+                  Mínimo de 10 caracteres.
+                </p>
+              </>
+            ) : (
+              <>
+                <Label htmlFor="slot-texto">
+                  Pra que é a sessão?{" "}
+                  <span className="font-normal text-muted-foreground">
+                    (opcional)
+                  </span>
+                </Label>
+                <Textarea
+                  id="slot-texto"
+                  minLength={3}
+                  maxLength={500}
+                  rows={2}
+                  value={texto}
+                  onChange={(e) => setTexto(e.target.value)}
+                  placeholder="Ex.: próxima sessão da trilha."
+                />
+              </>
+            )}
+          </div>
+          <DialogFooter sticky>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => {
+                onOpenChange(false);
+                onExpandir();
+              }}
+            >
+              Mudar especialista ou horário
+            </Button>
+            <Button
+              type="submit"
+              disabled={
+                pending || (precisaDemanda && texto.trim().length < 10)
+              }
+              aria-busy={pending}
+            >
+              {pending ? (
+                <CircleNotch size={16} className="animate-spin" aria-hidden />
+              ) : (
+                <CheckCircle size={16} aria-hidden />
+              )}
+              {pending ? "Enviando…" : "Pedir esse horário"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Os chips de horário do especialista viram "pedir esse horário",
+ *  agrupados por dia — um clique abre a confirmação curta (não o pedido
+ *  inteiro). Com a `disponibilidade` do jovem à mão, o slot que encaixa na
+ *  grade dele ganha o destaque lima `--ok` (a régua da mesa de negociação:
+ *  âmbar sugeria cautela onde o sinal é positivo) e a legenda visível
+ *  explica o destaque. */
 export function JovemEspSlots({
   espId,
   slots,
@@ -476,44 +645,99 @@ export function JovemEspSlots({
 > & {
   espId: string;
   slots: string[];
-  /** Grade do jovem — slots que encaixam ganham a borda/fundo âmbar. */
+  /** Grade do jovem — slots que encaixam ganham o destaque lima. */
   disponibilidade?: Disponibilidade | null;
 }) {
-  const [open, setOpen] = useState(false);
   const [slotSel, setSlotSel] = useState<string | null>(null);
+  const [fullOpen, setFullOpen] = useState(false);
+  const compat = (s: string) =>
+    disponibilidade != null && slotCompativel(disponibilidade, s);
+  // um grupo por dia do slot (fuso SP via toDateStr) — a leitura "sáb 10h"
+  // é mais rápida que "sáb 28/11 às 10:00" repetida em cada chip
+  const grupos = new Map<string, string[]>();
+  for (const s of slots.slice(0, 12)) {
+    const dia = toDateStr(new Date(s));
+    const l = grupos.get(dia) ?? [];
+    l.push(s);
+    grupos.set(dia, l);
+  }
+  const algumCompat = slots.some(compat);
+  const espNome =
+    dialogProps.especialistas.find((e) => e.id === espId)?.nome_social ||
+    dialogProps.especialistas.find((e) => e.id === espId)?.nome ||
+    "o especialista";
+  const precisaDemanda = pedidoPrecisaDemanda(
+    dialogProps.trilhasAtivas,
+    espId
+  );
   return (
     <>
-      <ul className="flex flex-wrap gap-1.5">
-        {slots.slice(0, 10).map((s) => {
-          const compat = disponibilidade
-            ? slotCompativel(disponibilidade, s)
-            : false;
-          return (
-            <li key={s}>
-              <button
-                type="button"
-                title={`Pedir sessão ${rotuloSlot(s)}${compat ? " · encaixa com você" : ""}`}
-                onClick={() => {
-                  setSlotSel(s);
-                  setOpen(true);
-                }}
-                className={cn(
-                  "inline-flex min-h-11 items-center rounded-md border px-2.5 text-xs tabular-nums transition-colors",
-                  compat
-                    ? "border-[var(--warn)]/70 bg-[var(--role-mentorado)]/15 font-medium text-[var(--warn-text)] hover:bg-[var(--role-mentorado)]/25"
-                    : "border-border hover:border-primary hover:bg-primary/10"
-                )}
-              >
-                {rotuloSlot(s)}
-              </button>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="space-y-2.5">
+        {[...grupos.entries()].map(([dia, ss]) => (
+          <div
+            key={dia}
+            className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3"
+          >
+            <span className="shrink-0 text-xs font-medium text-muted-foreground sm:w-18">
+              {rotuloDiaSlot(ss[0]!)}
+            </span>
+            <ul className="flex flex-wrap gap-1.5">
+              {ss.map((s) => (
+                <li key={s}>
+                  <button
+                    type="button"
+                    title={`Pedir sessão ${rotuloSlot(s)}${
+                      compat(s) ? " · encaixa com você" : ""
+                    }`}
+                    onClick={() => setSlotSel(s)}
+                    className={cn(
+                      "inline-flex min-h-11 items-center rounded-md border px-2.5 text-xs tabular-nums transition-colors",
+                      compat(s)
+                        ? "border-[var(--ok)]/60 bg-[var(--ok)]/10 font-medium text-[var(--ok-text)] hover:bg-[var(--ok)]/20"
+                        : "border-border hover:border-primary hover:bg-primary/10"
+                    )}
+                  >
+                    {fmtHoraSlot.format(new Date(s))}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </div>
+        ))}
+        {algumCompat && (
+          <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+            <span
+              aria-hidden
+              className="inline-block size-2 shrink-0 rounded-full bg-[var(--ok)]"
+            />
+            Em lima: encaixam na sua disponibilidade
+          </p>
+        )}
+      </div>
+      {slotSel != null && (
+        <ConfirmarSlotDialog
+          espId={espId}
+          espNome={espNome}
+          slot={slotSel}
+          precisaDemanda={precisaDemanda}
+          // fechando pro dialog completo o slot fica — ele é o prefill
+          open={!fullOpen}
+          onOpenChange={(o) => {
+            if (!o) setSlotSel(null);
+          }}
+          onExpandir={() => setFullOpen(true)}
+          onEnviado={dialogProps.onEnviado}
+        />
+      )}
       <PedirEspecialistaDialog
         {...dialogProps}
-        open={open}
-        onOpenChange={setOpen}
+        open={fullOpen}
+        onOpenChange={(o) => {
+          setFullOpen(o);
+          // fechou o completo: a seleção do chip também encerra, senão a
+          // confirmação curta reabria sozinha por cima
+          if (!o) setSlotSel(null);
+        }}
         preEspId={espId}
         preSlot={slotSel}
       />
