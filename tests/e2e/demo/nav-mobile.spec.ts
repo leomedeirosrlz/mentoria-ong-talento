@@ -45,18 +45,18 @@ test.describe("navegação do celular", () => {
     await expect(menu).toBeHidden();
   });
 
-  test("jovem: barra e menu na mesma ordem — Jornada, não Materiais", async ({
+  test("jovem: barra e menu na mesma ordem — o hub se chama Materiais", async ({
     page,
   }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem");
     const barra = page.getByRole("navigation", { name: "Navegação principal" }).last();
     // as primárias seguem a prioridade da sidebar (o rótulo do hub
-    // /jovem/materiais é Jornada, o destino não mudou)
+    // /jovem/materiais é Materiais — FR-007 da 010)
     await expect(barra.getByRole("link")).toHaveText([
       "Início",
       "Agenda",
-      "Jornada",
+      "Materiais",
       "Especialistas",
     ]);
     await barra.getByRole("button", { name: /^Menu/ }).click();
@@ -65,7 +65,7 @@ test.describe("navegação do celular", () => {
     await expect(menu.getByRole("link")).toHaveText([
       "Início",
       "Agenda",
-      "Jornada",
+      "Materiais",
       "Especialistas",
       "Pessoas",
       "Perfil",

@@ -304,7 +304,7 @@ function LinhaAtrasado({
             telefone={info.jovemWhatsapp}
             mensagem={`Oi ${primeiro}, tudo bem? ${autoria(eu || undefined)}. ${
               nomes.length === 1 ? "Uma atividade" : "Algumas atividades"
-            } da sua jornada ${nomes.length === 1 ? "está" : "estão"} esperando por você: ${lista}. É só abrir Minha jornada no app.`}
+            } da sua jornada ${nomes.length === 1 ? "está" : "estão"} esperando por você: ${lista}. É só abrir Materiais no app.`}
             nudge={{
               destino: "mentorado",
               titulo: "Sua jornada tem atividade esperando",

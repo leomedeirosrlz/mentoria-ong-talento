@@ -196,16 +196,16 @@ export function RespostaLista({
           <dl className={cn("space-y-3", b.secao && "mt-2.5")}>
             {b.linhas.map((l) => (
               <div key={l.id}>
-                <dt className={cn("flex items-start gap-2.5", PERGUNTA_TEXTO)}>
+                <dt className={cn("flex items-baseline gap-2", PERGUNTA_TEXTO)}>
                   {l.n != null && <NumeroPergunta n={l.n} compacto />}
-                  <span className="min-w-0 flex-1 pt-0.5">{l.label}</span>
+                  <span className="min-w-0 flex-1">{l.label}</span>
                 </dt>
                 <dd
                   className={cn(
                     "mt-1 whitespace-pre-wrap",
                     RESPOSTA_TEXTO,
-                    // resposta alinha com o enunciado, não com o disco
-                    l.n != null && "pl-[34px]"
+                    // resposta alinha com o enunciado, não com o número
+                    l.n != null && "pl-6"
                   )}
                 >
                   {l.extra ?? l.valor}

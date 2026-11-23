@@ -2,22 +2,24 @@ import type { FormularioCampo } from "@/lib/forms/schema";
 import { cn } from "@/lib/utils";
 
 // Gramática pergunta→resposta dos instrumentos e formulários
-// (REALIZA-442, estendida a todas as superfícies): o número mora no
-// disco amarelo da marca, a pergunta lê no verde do instrumento e a
-// resposta fica em primeiro plano. A mesma hierarquia vale na escrita
-// (/f/<token> e prévias) e na leitura (resultado estruturado, lista de
-// respostas) — o "3" que a pessoa preencheu é o "3" que a equipe lê.
-// Sem "use client": componente puro, serve aos dois lados.
+// (REALIZA-442, reescrita na 010/REALIZA-511): o número lê como texto no
+// verde da marca — sem disco —, o enunciado veste o primeiro plano e a
+// resposta fica em primeiro plano na leitura. A mesma hierarquia vale
+// na escrita (/f/<token> e prévias) e na leitura (resultado
+// estruturado, lista de respostas) — o "3" que a pessoa preencheu é o
+// "3" que a equipe lê. Sem "use client": componente puro, serve aos
+// dois lados.
 
-/** Pergunta — o enunciado no verde do instrumento. */
+/** Pergunta — o enunciado em primeiro plano (o verde ficou pro número). */
 export const PERGUNTA_TEXTO =
-  "text-[15px] font-semibold leading-snug text-[var(--ok-text)]";
+  "text-[15px] font-semibold leading-snug text-foreground";
 
 /** Resposta na leitura — primeiro plano, ritmo de texto corrido. */
 export const RESPOSTA_TEXTO = "text-base leading-relaxed";
 
-/** O número da pergunta no disco destaque — a posição na régua do form
- *  (1-base). `compacto` cabe em listas densas (as 16 áreas da roda). */
+/** O número da pergunta como texto no verde da marca — a posição na
+ *  régua do form (1-base), alinhado pela linha de base do enunciado.
+ *  `compacto` cabe em listas densas (as 16 áreas da roda). */
 export function NumeroPergunta({
   n,
   compacto = false,
@@ -30,21 +32,22 @@ export function NumeroPergunta({
   return (
     <span
       aria-hidden
+      data-numero-pergunta
       className={cn(
-        "grid shrink-0 place-items-center rounded-full bg-[var(--destaque)] font-bold tabular-nums text-[var(--destaque-foreground)]",
-        compacto ? "size-6 text-[11px]" : "size-8 text-xs",
+        "shrink-0 font-bold tabular-nums text-[var(--ok-text)]",
+        compacto ? "text-[13px]" : "text-[15px]",
         className
       )}
     >
-      {n}
+      {n}.
     </span>
   );
 }
 
-/** Rótulo compartilhado da pergunta na escrita — enunciado verde +
- *  "(opcional)" + descricao, com o disco quando a posição é conhecida
- *  (n > 0). Com htmlFor vira <label>; dentro de grupos o caller usa
- *  <legend> e recebe <span>. */
+/** Rótulo compartilhado da pergunta na escrita — enunciado em primeiro
+ *  plano + "(opcional)" + descricao, com o número verde quando a posição
+ *  é conhecida (n > 0). Com htmlFor vira <label>; dentro de grupos o
+ *  caller usa <legend> e recebe <span>. */
 export function RotuloPergunta({
   campo,
   n,
@@ -76,9 +79,9 @@ export function RotuloPergunta({
   const classes = cn("block", PERGUNTA_TEXTO, "@xl:text-base", className);
   const corpo =
     n != null && n > 0 ? (
-      <span className="flex items-start gap-3">
+      <span className="flex items-baseline gap-2">
         <NumeroPergunta n={n} />
-        <span className="min-w-0 flex-1 pt-0.5">{inner}</span>
+        <span className="min-w-0 flex-1">{inner}</span>
       </span>
     ) : (
       inner

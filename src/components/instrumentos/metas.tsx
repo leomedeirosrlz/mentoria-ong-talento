@@ -13,10 +13,7 @@ import {
 import { T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import {
-  NumeroPergunta,
-  RotuloPergunta,
-} from "@/components/forms/pergunta";
+import { RotuloPergunta } from "@/components/forms/pergunta";
 import { cn } from "@/lib/utils";
 import type { RespostaApi } from "./use-resposta";
 import { SubmetasEditor } from "./submetas-editor";
@@ -50,7 +47,7 @@ export function Metas({
 }) {
   const blocos = useMemo(() => agrupaEmSecoes(campos), [campos]);
   // posição na régua do form — os campos soltos fora das fichas de meta
-  // carregam o mesmo disco numerado do form genérico (a Meta N da ficha
+  // carregam o mesmo número em texto do form genérico (a Meta N da ficha
   // já é a identidade numerada do grupo, não repete a régua)
   const numeroPorId = useMemo(() => {
     const m = new Map<string, number>();
@@ -160,7 +157,7 @@ function CorpoVisao({
         >
           <label
             htmlFor={campoDomId(declaracao)}
-            className="block text-[15px] font-semibold leading-snug text-[var(--ok-text)] @xl:text-base"
+            className="block text-[15px] font-semibold leading-snug text-foreground @xl:text-base"
           >
             {declaracao.label}
           </label>
@@ -393,9 +390,9 @@ function FichaMeta({
     >
       <div className="space-y-3 p-4 @xl:p-5">
         <div className="flex items-center gap-2.5">
-          {/* o nº da ficha é a Meta N da gramática — o "pronta" do badge
-              carrega o estado que o chip colorido sinalizava antes */}
-          <NumeroPergunta n={g.n} />
+          {/* "Meta N" já carrega o N — não vira número da régua (o campo
+              meta_N tem posição própria na régua, exibida no rótulo dele
+              quando a ficha não é a dona daquele número) */}
           <h3 className="flex-1 text-[15px] font-semibold">
             Meta {g.n}
             {!g.meta.obrigatorio && (
@@ -497,7 +494,7 @@ function CampoRevisao({
           api.erros[campo.id] && "ring-2 ring-destructive/60"
         )}
       >
-        <p className="text-[15px] font-semibold leading-snug text-[var(--ok-text)]">
+        <p className="text-[15px] font-semibold leading-snug text-foreground">
           {campo.label}
         </p>
         <div className="mt-2">
@@ -535,7 +532,7 @@ function CampoRevisao({
           >
             <FlagPennant size={15} />
           </span>
-          <p className="flex-1 text-[15px] font-semibold leading-snug text-[var(--ok-text)]">
+          <p className="flex-1 text-[15px] font-semibold leading-snug text-foreground">
             {campo.label}
           </p>
         </div>

@@ -147,11 +147,11 @@ test.describe("demo — ponte instrumento ↔ documento (REALIZA-386)", () => {
       "href",
       "/materiais/documento/instrumento-construindo-visao"
     );
-    const guia = page.getByRole("link", { name: "Ler o guia", exact: true });
-    await expect(guia).toHaveAttribute(
-      "href",
-      "/materiais/documento/instrumento-construindo-visao"
-    );
+    // o CTA do guia é único e proeminente na sinopse (010) — nada de um
+    // segundo "Ler o guia" solto no cabeçalho da página
+    await expect(
+      page.getByRole("link", { name: "Ler o guia", exact: true })
+    ).toHaveCount(0);
     // instrumento sem doc nativo (avaliação recorrente) não ganha o link
     await page.goto("/materiais/instrumentos/avaliacao_encontro");
     await expect(
@@ -178,7 +178,7 @@ test.describe("demo — ponte instrumento ↔ documento (REALIZA-386)", () => {
 });
 
 test.describe("demo — jornada do mentorado (REALIZA-386)", () => {
-  test("'Ler o guia' nas estações e o doc devolve a jornada", async ({
+  test("'Ler o guia' nas estações e o doc devolve a estante", async ({
     page,
   }) => {
     await entrarNaDemo(page, "mentorado");
@@ -208,7 +208,7 @@ test.describe("demo — jornada do mentorado (REALIZA-386)", () => {
     await expect(page).toHaveURL(
       "/jovem/materiais/documento/instrumento-roda-da-vida"
     );
-    const voltar = page.getByRole("link", { name: "Abrir na jornada" });
+    const voltar = page.getByRole("link", { name: "Ver meus instrumentos" });
     await expect(voltar).toHaveAttribute("href", "/jovem/materiais#jornada");
     await voltar.click();
     await expect(page).toHaveURL("/jovem/materiais#jornada");

@@ -181,7 +181,7 @@ describe("UiCard: conteúdo", () => {
     const out = html(jovem);
     expect(out).not.toContain("Atenção");
     expect(out).toContain('href="/jovem"');
-    expect(out).toContain("Ver minha jornada");
+    expect(out).toContain("Ver meu início");
   });
 
   it("dupla encerrada do jovem lê 'Encerrada', nunca 'Desistente'", () => {

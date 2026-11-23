@@ -63,6 +63,7 @@ import { MentoradoSeletor } from "@/components/mentorado-seletor";
 import { RodaSvg } from "@/components/instrumentos/roda-svg";
 import { PageHeader } from "@/components/page-header";
 import { Badge } from "@/components/ui/badge";
+import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { CARDS } from "../../instrumentos-programa";
 import { DetalheInstrumentoLazy } from "./detalhe-instrumento-lazy";
@@ -128,11 +129,19 @@ function ResumoResposta({
       ? extraiRodaDaVida(campos, respostasAnterior)
       : null;
     return (
-      <div className="flex items-center gap-3">
+      <div className="@container flex items-center gap-3">
+        {/* mini-roda no estreito; em linha larga a moldura cresce e
+            ganha a coroa de nomes dos eixos (010 — altura de leitura) */}
         <RodaSvg
           roda={roda}
           anterior={anterior}
-          className="size-24 shrink-0"
+          className="size-24 shrink-0 @[34rem]:hidden"
+        />
+        <RodaSvg
+          roda={roda}
+          anterior={anterior}
+          rotuloEixos
+          className="hidden w-full max-w-[340px] shrink-0 @[34rem]:block"
         />
         <p className="text-sm leading-snug">
           Média geral{" "}
@@ -554,16 +563,6 @@ export default async function InstrumentoPage({
               </span>
             ))}
             <span>{card.descricao}</span>
-            {docGuia && (
-              <Link
-                href={`/materiais/documento/${docGuia}`}
-                prefetch={false}
-                className="inline-flex min-h-8 items-center gap-1 rounded-md text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <BookOpen size={12} aria-hidden />
-                Ler o guia
-              </Link>
-            )}
           </span>
         }
       />
@@ -598,30 +597,42 @@ export default async function InstrumentoPage({
         </ul>
       </FadeX>
 
-      {/* síntese do instrumento: pra que serve e quando entra na jornada,
-          direto do guia nativo — o doc completo fica a um clique */}
+      {/* sinopse do instrumento (010): até 3 parágrafos curtos — 2 do
+          "O que é" + 1 do "quando na jornada" — e o CTA do guia em
+          ação de primeira leitura, não um link perdido no cabeçalho */}
       {secoesSintese.length > 0 && docGuia && (
         <section
           aria-label="Sobre o instrumento"
           className="rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5"
           style={instrumentoVars(card.chave)}
         >
-          {secoesSintese.map((s, i) => (
-            <div key={s.anchor} className={i > 0 ? "mt-4" : undefined}>
-              <h2 className="text-sm font-semibold">
-                {s.titulo.split("·").pop()!.trim()}
-              </h2>
-              <div className="mt-2 space-y-3">
-                <DocBlocos blocos={s.blocos} />
+          {secoesSintese.map((s, i) => {
+            // só parágrafos — listas e callouts ficam pro guia completo;
+            // a 1ª seção rende 2 parágrafos, a 2ª um (teto de 3 no todo)
+            const blocos = s.blocos
+              .filter((b) => b.kind === "par")
+              .slice(0, i === 0 ? 2 : 1);
+            if (!blocos.length) return null;
+            return (
+              <div key={s.anchor} className={i > 0 ? "mt-4" : undefined}>
+                <h2 className="text-sm font-semibold">
+                  {s.titulo.split("·").pop()!.trim()}
+                </h2>
+                <div className="mt-2 space-y-3">
+                  <DocBlocos blocos={blocos} />
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
           <Link
             href={`/materiais/documento/${docGuia}`}
             prefetch={false}
-            className="mt-3 inline-flex min-h-8 items-center gap-1 rounded-md text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "mt-4"
+            )}
           >
-            <BookOpen size={12} aria-hidden />
+            <BookOpen size={15} aria-hidden />
             Ler o guia completo
           </Link>
         </section>
@@ -730,6 +741,32 @@ export default async function InstrumentoPage({
                         </RespostaToggle>
                       </div>
                     );
+                  } else if (inst?.sistema === "roda_vida") {
+                    // FR-003: instrumento enviado e ainda sem resposta —
+                    // o mentor lê a moldura vazia (eixos + pontos mudos)
+                    // em vez de uma linha que parece vazia por acidente
+                    const rodaVazia = extraiRodaDaVida(inst.campos, {});
+                    if (rodaVazia) {
+                      detalhe = (
+                        <div className="@container mt-2.5 flex items-center gap-3">
+                          <RodaSvg
+                            roda={rodaVazia}
+                            className="size-24 shrink-0 @[34rem]:hidden"
+                          />
+                          <RodaSvg
+                            roda={rodaVazia}
+                            rotuloEixos
+                            className="hidden w-full max-w-[340px] shrink-0 @[34rem]:block"
+                          />
+                          <p className="text-sm leading-snug text-muted-foreground">
+                            <strong className="font-medium text-foreground">
+                              Ainda sem resposta.
+                            </strong>{" "}
+                            A moldura mostra os eixos que a nota preenche.
+                          </p>
+                        </div>
+                      );
+                    }
                   }
                 }
               }

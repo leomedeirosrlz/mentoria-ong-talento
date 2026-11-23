@@ -83,9 +83,9 @@ export function AvaliarPendenteButton({
         Avaliar
       </Button>
       <Dialog open={open} onOpenChange={setOpen}>
-        {/* md: form de coluna única (estrelas, chips, cartões empilhados) —
-            acima disso sobrava fundo ocioso lateral */}
-        <DialogContent size="md">
+        {/* xl: 576px no desktop — largura de leitura pro form (010);
+            confirmações curtas seguem nos tamanhos menores */}
+        <DialogContent size="xl">
           <DialogHeader>
             <DialogTitle>
               {pendente.rotulo ?? `${pendente.numero}º encontro`}: como foi?

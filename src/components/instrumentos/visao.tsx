@@ -122,13 +122,13 @@ export function Visao({
                           <Quotes size={17} weight="fill" />
                         </span>
                       ) : (
-                        <NumeroPergunta n={nPrompt} />
+                        <NumeroPergunta n={nPrompt} className="mt-1" />
                       )}
                       {ehDeclaracao ? (
                         <h2 className="min-w-0 flex-1">
                           <label
                             htmlFor={campoDomId(c)}
-                            className="block text-xl font-semibold leading-snug tracking-tight text-[var(--ok-text)] @xl:text-2xl"
+                            className="block text-xl font-semibold leading-snug tracking-tight text-foreground @xl:text-2xl"
                           >
                             {b.secao?.label ?? c.label}
                           </label>
@@ -141,7 +141,7 @@ export function Visao({
                       ) : (
                         <label
                           htmlFor={campoDomId(c)}
-                          className="text-lg font-semibold leading-snug tracking-tight text-[var(--ok-text)] @xl:text-xl"
+                          className="text-lg font-semibold leading-snug tracking-tight text-foreground @xl:text-xl"
                         >
                           {c.label}
                           {!c.obrigatorio && (

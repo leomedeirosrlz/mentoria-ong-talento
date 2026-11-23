@@ -48,11 +48,12 @@ export default async function DocumentoJovemPage({
       doc={corpus}
       voltar={{ href: "/jovem/materiais#acervo", rotulo: "Acervo de materiais" }}
       // ponte doc → instrumento (REALIZA-386): nos docs de instrumento
-      // que servem o jovem, o destino ao vivo dele é a estante da jornada
+      // que servem o jovem, o destino ao vivo dele é a estante de
+      // instrumentos em Materiais
       ponte={{
         href: "/jovem/materiais#jornada",
-        rotulo: "Abrir na jornada",
-        dica: "O instrumento mora na sua jornada e abre no encontro certo.",
+        rotulo: "Ver meus instrumentos",
+        dica: "O instrumento mora nos seus materiais e abre no encontro certo.",
       }}
     />
   );

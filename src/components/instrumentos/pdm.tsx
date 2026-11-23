@@ -142,13 +142,10 @@ function CapituloDoc({
     >
       <div className="p-5 @xl:p-7">
         {bloco.secao && (
-          <header className="flex items-start gap-3">
-            {/* número de capítulo, não de pergunta — mesma tinta destaque
-                da gramática, canto quadrado pra ler como seção do doc */}
-            <NumeroPergunta
-              n={numero}
-              className="rounded-lg text-sm"
-            />
+          <header className="flex items-baseline gap-2">
+            {/* número de capítulo, não de pergunta — mesmo verde da
+                gramática, em texto */}
+            <NumeroPergunta n={numero} />
             <div className="min-w-0">
               <h2 className="text-lg font-semibold tracking-tight">
                 {bloco.secao.label}
@@ -257,7 +254,7 @@ function FichasPdm({
         >
           <label
             htmlFor={campoDomId(declaracao)}
-            className="block text-[15px] font-semibold leading-snug text-[var(--ok-text)]"
+            className="block text-[15px] font-semibold leading-snug text-foreground"
           >
             {declaracao.label}
           </label>
@@ -288,7 +285,6 @@ function FichasPdm({
             )}
           >
             <h3 className="flex items-center gap-2.5 text-sm font-semibold">
-              <NumeroPergunta n={g.n} compacto />
               <span className="tabular-nums">Meta {g.n}</span>
               {!g.meta.obrigatorio && (
                 <span className="text-xs font-normal text-muted-foreground">

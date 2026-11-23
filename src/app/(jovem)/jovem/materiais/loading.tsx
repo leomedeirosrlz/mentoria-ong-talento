@@ -1,7 +1,7 @@
 import { Skeleton } from "@/components/ui/skeleton";
 
-// Espelho do hub "Minha jornada" (v6a): hero slim (título + meta + badge
-// + N/16 + barra + "próxima parada"), sub-nav sticky (Jornada | Acervo),
+// Espelho do hub "Materiais" (v6a): hero slim (título + meta + badge
+// + N/16 + barra + "próxima parada"), sub-nav sticky (Instrumentos | Acervo),
 // "Meus instrumentos" (heading + grade de cards — linha no mobile, card
 // com capa h-24 no desktop) e o acervo agrupado (overline + grade de
 // cards-linha: ícone size-9 + título/descrição + ícone à direita).
@@ -22,7 +22,7 @@ export default function Loading() {
         <Skeleton className="mt-3 h-4 w-3/4" />
       </div>
 
-      {/* sub-nav sticky — dois links-pill "Jornada | Acervo" */}
+      {/* sub-nav sticky — dois links-pill "Meus instrumentos | Acervo" */}
       <div className="flex gap-1 border-b border-border pb-0">
         <Skeleton className="h-11 w-24 rounded-full" />
         <Skeleton className="h-11 w-24 rounded-full" />
