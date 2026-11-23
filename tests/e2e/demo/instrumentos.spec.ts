@@ -20,13 +20,13 @@ const TOK_360_ANA = "demo-tok-360-ana-00000001";
 // a cobertura do fill-form de Metas vai pela prévia da ficha do form
 const URL_METAS = "/formularios/de000000-0000-4000-8000-000000016392";
 
-// REALIZA-442 — gramática pergunta→resposta em TODAS as superfícies: o
-// disco amarelo (--destaque) carrega o nº da régua, o enunciado lê no
-// verde do instrumento (--ok-text) e a resposta fica em primeiro plano.
-// Seletores pelo atributo class: os tokens são utilities arbitrárias
-// (bg-[var(--destaque)]) — substring do atributo é o gancho estável
-const DISCO = 'span[class*="--destaque)"]';
-const VERDE = '[class*="--ok-text)"]';
+// REALIZA-442, reescrita na 010 — gramática pergunta→resposta em TODAS
+// as superfícies: o nº da régua é texto no verde da marca (--ok-text),
+// sem disco; o enunciado lê em primeiro plano e a resposta idem.
+// Seletores estáveis: data-numero-pergunta pro número e a substring do
+// atributo class pro primeiro plano
+const NUMERO = "[data-numero-pergunta]";
+const FG = '[class*="text-foreground"]';
 
 test.describe("demo — instrumentos oficiais da jornada", () => {
   test("ficha da dupla: status por instrumento + resultado estruturado", async ({
@@ -71,10 +71,11 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await expect(
       dialog.getByText(/Desdobramento da meta/).first()
     ).toBeVisible();
-    // a ficha de meta lê "Meta N" com o mesmo disco da escrita
+    // a ficha de meta lê "Meta N" em texto — o número da régua fica nas
+    // perguntas, não duplicado no rótulo da ficha
     const meta1 = dialog.locator("li", { hasText: "Meta 1" }).first();
     await expect(
-      meta1.locator(DISCO, { hasText: "1" }).first()
+      meta1.getByText("Meta 1", { exact: true })
     ).toBeVisible();
   });
 
@@ -120,22 +121,25 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
       page.getByText("Sua Declaração de Visão", { exact: true })
     ).toBeVisible();
 
-    // hierarquia 442: 1ª e 5ª perguntas da régua com disco numerado e
-    // enunciado verde — a declaração (6ª) troca o disco pelo ícone
+    // hierarquia 010: 1ª e 5ª perguntas da régua com o nº verde em texto
+    // e enunciado em primeiro plano — a declaração (6ª) troca o nº pelo
+    // ícone, mas veste a mesma cor de texto
     const filme = page.locator('[data-campo="filme"]');
     await expect(
-      filme.locator(DISCO, { hasText: "1" }).first()
+      filme.locator(NUMERO, { hasText: "1" }).first()
     ).toBeVisible();
-    await expect(filme.locator("label").first()).toHaveClass(/--ok-text/);
+    await expect(filme.locator("label").first()).toHaveClass(
+      /text-foreground/
+    );
     const valoriza = page.locator('[data-campo="valoriza"]');
     await expect(
-      valoriza.locator(DISCO, { hasText: "5" }).first()
+      valoriza.locator(NUMERO, { hasText: "5" }).first()
     ).toBeVisible();
     const declaracao = page.locator('[data-campo="declaracao_visao"]');
-    await expect(declaracao.locator(DISCO)).toHaveCount(0);
+    await expect(declaracao.locator(NUMERO)).toHaveCount(0);
     await expect(
       declaracao.locator("label").first()
-    ).toHaveClass(/--ok-text/);
+    ).toHaveClass(/text-foreground/);
   });
 
   // dupla fechada = jornada congelada: ninguém emite, copia ou manda link
@@ -198,21 +202,21 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await expect(page.getByText("Nada satisfeito").first()).toBeVisible();
     await expect(page.getByText("Muito satisfeito").first()).toBeVisible();
 
-    // hierarquia 442: cada área é um slider com o disco da régua e o
-    // rótulo verde; a reflexão segue a numeração (a 17ª pergunta)
+    // hierarquia 010: cada área é um slider com o nº verde da régua e o
+    // rótulo em primeiro plano; a reflexão segue a numeração (a 17ª)
     const saude = page.locator('[data-campo="p_saude"]');
     await expect(saude).toHaveAttribute("aria-label", /1\. Saúde/);
     await expect(
-      saude.locator(DISCO, { hasText: "1" }).first()
+      saude.locator(NUMERO, { hasText: "1" }).first()
     ).toBeVisible();
     await expect(
       saude.locator("span", { hasText: "Saúde e disposição" })
-    ).toHaveClass(/--ok-text/);
+    ).toHaveClass(/text-foreground/);
     const reflexao = page.locator('[data-campo="reflexao"]');
     await expect(
-      reflexao.locator(DISCO, { hasText: "17" }).first()
+      reflexao.locator(NUMERO, { hasText: "17" }).first()
     ).toBeVisible();
-    await expect(reflexao.locator(VERDE).first()).toBeVisible();
+    await expect(reflexao.locator(FG).first()).toBeVisible();
   });
 
   // REALIZA-440/441 — a página por instrumento do mentor: o seletor de
@@ -345,19 +349,21 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await expect(
       linha.getByText(/No filme eu me vejo formada/)
     ).toBeVisible();
-    // a leitura repete a gramática da escrita: disco destaque + enunciado
-    // verde na 1ª pergunta da régua
+    // a leitura repete a gramática da escrita: nº verde em texto +
+    // enunciado em primeiro plano na 1ª pergunta da régua
     const primeira = linha.locator("ol li").first();
     await expect(
-      primeira.locator(DISCO, { hasText: "1" })
+      primeira.locator(NUMERO, { hasText: "1" })
     ).toBeVisible();
-    await expect(primeira.locator("p").first()).toHaveClass(/--ok-text/);
+    await expect(primeira.locator("p").first()).toHaveClass(
+      /text-foreground/
+    );
   });
 
   // REALIZA-442 (escopo corrigido) — Metas não tem link pendente em demo:
   // a cobertura do fill-form vai pela prévia da ficha, que renderiza o
   // próprio InstrumentoFlow
-  test("prévia da Metas: ficha com disco Meta N e enunciados verdes", async ({
+  test("prévia da Metas: ficha Meta N e enunciados em primeiro plano", async ({
     page,
   }) => {
     await entrarNaDemo(page, "coordenacao");
@@ -366,24 +372,26 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
 
-    // ficha Meta 1: o disco amarelo carrega o N da ficha, os rótulos dos
-    // campos leem no verde do instrumento
+    // ficha Meta 1: o N mora no título "Meta 1" (sem número duplicado),
+    // os rótulos dos campos leem em primeiro plano
     const ficha = dialog.locator("article", { hasText: "Meta 1" }).first();
-    await expect(ficha.locator(DISCO, { hasText: "1" })).toBeVisible();
+    await expect(
+      ficha.getByRole("heading", { name: "Meta 1" })
+    ).toBeVisible();
     const meta1 = dialog.locator('[data-campo="meta_1"]');
-    await expect(meta1.locator("label")).toHaveClass(/--ok-text/);
+    await expect(meta1.locator("label")).toHaveClass(/text-foreground/);
     // preciso_* são perguntas soltas da régua — a 2ª vem logo depois da
-    // declaração (1ª): disco com o número da régua, não da ficha
+    // declaração (1ª): nº verde em texto com o número da régua
     const preciso = dialog.locator('[data-campo="preciso_criar"]');
     await expect(
-      preciso.locator(DISCO, { hasText: "2" })
+      preciso.locator(NUMERO, { hasText: "2" })
     ).toBeVisible();
-    await expect(preciso.locator("label")).toHaveClass(/--ok-text/);
+    await expect(preciso.locator("label")).toHaveClass(/text-foreground/);
   });
 
   // o 360º é form oficial fora da régua: cai no renderer genérico —
   // mesma gramática por campos comuns (escala, multi_select, select)
-  test("/f/<token>: 360º genérico numera perguntas e verdeia enunciados", async ({
+  test("/f/<token>: 360º genérico numera perguntas em verde e enunciados em primeiro plano", async ({
     page,
   }) => {
     await entrarNaDemo(page, "mentorado");
@@ -397,18 +405,18 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
       page.getByText("Atingimento das expectativas")
     ).toBeVisible();
 
-    // 1ª e 2ª perguntas (escala 1–5 + multi_select): fieldset com disco
-    // + legend verde
+    // 1ª e 2ª perguntas (escala 1–5 + multi_select): fieldset com o nº
+    // verde + legend em primeiro plano
     const expectativa = page.locator('[data-campo="expectativa_atendida"]');
     await expect(
-      expectativa.locator(DISCO, { hasText: "1" })
+      expectativa.locator(NUMERO, { hasText: "1" })
     ).toBeVisible();
-    await expect(expectativa.locator("legend " + VERDE)).toBeVisible();
+    await expect(expectativa.locator("legend " + FG)).toBeVisible();
     const expectativas = page.locator('[data-campo="expectativas"]');
     await expect(
-      expectativas.locator(DISCO, { hasText: "2" })
+      expectativas.locator(NUMERO, { hasText: "2" })
     ).toBeVisible();
-    await expect(expectativas.locator("legend " + VERDE)).toBeVisible();
+    await expect(expectativas.locator("legend " + FG)).toBeVisible();
 
     // responde a etapa 1 e avança — a numeração atravessa a seção sem
     // reiniciar: a 1ª pergunta do processo é a 3ª da régua. O radio da
@@ -425,8 +433,8 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     ).toBeVisible();
     const estrutura = page.locator('[data-campo="estrutura_programa"]');
     await expect(
-      estrutura.locator(DISCO, { hasText: "3" })
+      estrutura.locator(NUMERO, { hasText: "3" })
     ).toBeVisible();
-    await expect(estrutura.locator(VERDE).first()).toBeVisible();
+    await expect(estrutura.locator(FG).first()).toBeVisible();
   });
 });

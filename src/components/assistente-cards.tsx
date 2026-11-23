@@ -762,7 +762,7 @@ export function CardDupla({
         href={r.ficha(b.id)}
         className={cn(buttonVariants({ size: "sm" }), "mt-3 w-full @sm:w-auto")}
       >
-        {jovem ? "Ver minha jornada" : "Abrir ficha"}
+        {jovem ? "Ver meu início" : "Abrir ficha"}
       </Link>
     </Cartao>
   );

@@ -626,7 +626,7 @@ export default async function JovemHome() {
               href="/jovem/materiais"
               className="group inline-flex min-h-11 items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
             >
-              Ver jornada
+              Ver materiais
               <ArrowRight
                 size={14}
                 aria-hidden

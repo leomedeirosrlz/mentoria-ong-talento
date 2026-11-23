@@ -316,7 +316,7 @@ export function SegmentosEscala({
  *  campo fora da convenção sem renderizar (form editado, campo novo).
  *  `sombra={false}` devolve a versão sem cartão — pra uso dentro de uma
  *  ficha que já tem moldura própria. `n` é a posição da pergunta na
- *  régua: com ela o rótulo ganha o disco destaque da gramática (442). */
+ *  régua: com ela o rótulo ganha o número verde da gramática (442/010). */
 export function CampoGenerico({
   campo,
   api,
@@ -470,19 +470,11 @@ export function CampoGenerico({
               checked={valor === true}
               onChange={(e) => api.definir(campo.id, e.target.checked)}
               required={campo.obrigatorio}
-              className={cn(
-                "size-4 shrink-0 accent-primary",
-                n != null && n > 0 ? "mt-2" : "mt-0.5"
-              )}
+              className="mt-0.5 size-4 shrink-0 accent-primary"
               aria-invalid={erro ? true : undefined}
               aria-describedby={erro ? campoErroId(campo) : undefined}
             />
-            <span
-              className={cn(
-                "min-w-0 flex-1 font-semibold text-[var(--ok-text)]",
-                n != null && n > 0 && "pt-0.5"
-              )}
-            >
+            <span className="min-w-0 flex-1 font-semibold text-foreground">
               {campo.label}
               {!campo.obrigatorio && (
                 <span className="ml-1.5 text-xs font-normal text-muted-foreground">

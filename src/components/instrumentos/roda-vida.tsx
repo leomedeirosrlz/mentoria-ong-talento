@@ -175,7 +175,7 @@ export function RodaVida({
             <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground">
               {quadAtivo ? `${quadAtivo} · ` : ""}Área {ativo + 1} de {total}
             </p>
-            <h3 className="truncate text-[15px] font-bold leading-snug text-[var(--ok-text)]">
+            <h3 className="truncate text-[15px] font-bold leading-snug text-foreground">
               {areaAtiva.label}
             </h3>
           </div>
@@ -366,8 +366,8 @@ function AreaSlider({
   onNota,
 }: {
   area: { id: string; label: string; nota: number | null };
-  /** posição na régua do form — o disco e o aria-label mostram o mesmo
-   *  número que a pergunta tem na leitura */
+  /** posição na régua do form — o número e o aria-label mostram o
+   *  mesmo número que a pergunta tem na leitura */
   numero: number;
   ativo: boolean;
   erro: string | undefined;
@@ -430,7 +430,7 @@ function AreaSlider({
     >
       <NumeroPergunta n={numero} compacto />
       <span
-        className="min-w-0 flex-1 truncate text-sm font-semibold text-[var(--ok-text)]"
+        className="min-w-0 flex-1 truncate text-sm font-semibold text-foreground"
         title={area.label}
       >
         {area.label}

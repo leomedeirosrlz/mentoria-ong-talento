@@ -1262,10 +1262,10 @@ function CampoRenderer({
               type="checkbox"
               name={campo.id}
               required={campo.obrigatorio}
-              className="mt-2 size-4 shrink-0 accent-primary"
+              className="mt-0.5 size-4 shrink-0 accent-primary"
               {...a11y}
             />
-            <span className="min-w-0 flex-1 pt-0.5 font-semibold text-[var(--ok-text)]">
+            <span className="min-w-0 flex-1 font-semibold text-foreground">
               {campo.label}
               {!campo.obrigatorio && (
                 <span className="ml-1.5 text-xs font-normal text-muted-foreground">

@@ -1,6 +1,6 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
-// WP7 (REALIZA-140) — "Minha jornada" em /jovem/materiais, espelhada no
+// WP7 (REALIZA-140) — o hub de materiais em /jovem/materiais, espelhado no
 // modo demo (specs demo não escrevem em backend nenhum). REALIZA-194
 // (v5c→v6a): a trilha é a estante "Meus instrumentos" — um card-produto
 // por instrumento da régua (capa desenhada, uma linha de estado, UM gesto
@@ -30,14 +30,14 @@ import { entrarNaDemo, expect, test } from "../helpers";
 const DUPLA_OK = "de000000-0000-4000-8000-000000001537"; // Ricardo × Ana (Bia)
 const DUPLA_MATHEUS = "de000000-0000-4000-8000-000000001549"; // Ricardo × Matheus
 
-test.describe("demo — Minha jornada do mentorado", () => {
+test.describe("demo — Materiais do mentorado", () => {
   test("hero, trilha e estações feitas da Ana", async ({ page }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/materiais");
 
     // hero slim — título, posição no ciclo e progresso de entregas
     await expect(
-      page.getByRole("heading", { name: "Minha jornada", level: 1 })
+      page.getByRole("heading", { name: "Materiais", level: 1 })
     ).toBeVisible();
     // posição corrente lê "você está no N" — a contagem de feitos ("N de
     // M encontros feitos") é a régua das outras superfícies (REALIZA-498)
@@ -162,14 +162,14 @@ test.describe("demo — Minha jornada do mentorado", () => {
     await expect(rodaFormal.getByRole("link")).toHaveCount(0);
   });
 
-  test("sub-nav Jornada → Acervo e o acervo com 'em breve'", async ({
+  test("sub-nav Meus instrumentos → Acervo e o acervo com 'em breve'", async ({
     page,
   }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/materiais");
 
     const nav = page.getByRole("navigation", { name: "Nesta página" });
-    await expect(nav.getByRole("link", { name: "Jornada" })).toHaveAttribute(
+    await expect(nav.getByRole("link", { name: "Meus instrumentos" })).toHaveAttribute(
       "href",
       "#jornada"
     );
@@ -230,7 +230,7 @@ test.describe("demo — Minha jornada do mentorado", () => {
     const acervo = page.locator("section#acervo");
     const yHero = (
       await page
-        .getByRole("heading", { name: "Minha jornada", level: 1 })
+        .getByRole("heading", { name: "Materiais", level: 1 })
         .boundingBox()
     )?.y;
     const yNav = (await nav.boundingBox())?.y;
@@ -337,7 +337,7 @@ test.describe("demo — Minha jornada do mentorado", () => {
     expect(parseFloat(dur)).toBeLessThan(0.05);
     expect(parseFloat(delay)).toBeLessThan(0.05);
     await expect(
-      page.getByRole("heading", { name: "Minha jornada", level: 1 })
+      page.getByRole("heading", { name: "Materiais", level: 1 })
     ).toBeVisible();
     await expect(
       page.locator("section#acervo").getByRole("heading", { name: "Links" })

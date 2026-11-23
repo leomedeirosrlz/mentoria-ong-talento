@@ -6,9 +6,9 @@ import { useState } from "react";
 import { motion } from "motion/react";
 import {
   CalendarDots,
+  FolderOpen,
   House,
   List,
-  Path,
   Question,
   Sparkle,
   UserCircle,
@@ -37,9 +37,9 @@ import { cn } from "@/lib/utils";
 const NAV = [
   { href: "/jovem", label: "Início", icon: House },
   { href: "/jovem/agenda", label: "Agenda", icon: CalendarDots },
-  // a rota segue /materiais; o rótulo veste o hub "Minha jornada" que a
-  // página abre (a biblioteca de sempre continua lá dentro, no Acervo)
-  { href: "/jovem/materiais", label: "Jornada", icon: Path },
+  // FR-007 (010): o destino se chama Materiais — rótulo e ícone vestem
+  // o que a página entrega (a estante de instrumentos + o Acervo)
+  { href: "/jovem/materiais", label: "Materiais", icon: FolderOpen },
   { href: "/jovem/especialistas", label: "Especialistas", icon: Sparkle },
   { href: "/jovem/pessoas", label: "Pessoas", icon: Users },
   { href: "/jovem/perfil", label: "Perfil", icon: UserCircle },

@@ -1,5 +1,26 @@
 import { withSentryConfig } from "@sentry/nextjs/config";
 import type { NextConfig } from "next";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// Worktrees locais compartilham o node_modules por symlink (o .pnpm real
+// mora no worktree-mãe). O Turbopack recusa symlink que sai do filesystem
+// root — quando o realpath escapa do diretório do projeto, o root sobe
+// pro ancestral comum dos dois; checkout normal não muda nada
+// (root === diretório do projeto, o default).
+const DIR = path.dirname(fileURLToPath(import.meta.url));
+const nmPath = path.join(DIR, "node_modules");
+const nmReal = fs.existsSync(nmPath) ? fs.realpathSync(nmPath) : nmPath;
+const turboRoot = nmReal.startsWith(DIR + path.sep)
+  ? DIR
+  : (() => {
+      const a = DIR.split(path.sep);
+      const b = nmReal.split(path.sep);
+      let i = 0;
+      while (i < a.length && i < b.length && a[i] === b[i]) i++;
+      return a.slice(0, i).join(path.sep) || path.sep;
+    })();
 
 // Segunda barreira contra XSS (hoje não há sink de markup) + clickjacking:
 // /assinar/<token> e /f/<token> são públicas por token e nunca podem virar
@@ -75,6 +96,7 @@ const nextConfig: NextConfig = {
   // thread) são emitidos como assets — o import devolve a URL e o
   // download só acontece quando o explorador abre, num chunk lazy.
   turbopack: {
+    root: turboRoot,
     rules: {
       "duckdb-{mvp,eh}.wasm": { type: "asset" },
       "duckdb-browser-{mvp,eh}.worker.js": { type: "asset" },

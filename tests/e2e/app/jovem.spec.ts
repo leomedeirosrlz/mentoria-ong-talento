@@ -348,17 +348,18 @@ test.describe("mentorado — shell /jovem", () => {
     await expect(proximos.getByText("Agendado").first()).toBeVisible();
   });
 
-  // WP7 (REALIZA-140) — /jovem/materiais é o hub "Minha jornada": as 7
+  // WP7 (REALIZA-140) + FR-007 (010) — /jovem/materiais é o hub de
+  // Materiais: as 7
   // estações canônicas do guia com datas da turma dela (RPC jovem_jornada,
   // 0096) + a biblioteca de sempre como "Acervo". Sem dupla/cronograma a
-  // página cai no fallback da biblioteca (mesma h1 "Minha jornada") — a
+  // página cai no fallback da biblioteca (mesma h1 "Materiais") — a
   // fixture …0030 tem os dois.
-  test("materiais é o hub Minha jornada — estante dos instrumentos + acervo", async ({
+  test("materiais é o hub de materiais — estante dos instrumentos + acervo", async ({
     page,
   }) => {
     await page.goto("/jovem/materiais");
     await expect(
-      page.getByRole("heading", { name: "Minha jornada", level: 1 })
+      page.getByRole("heading", { name: "Materiais", level: 1 })
     ).toBeVisible();
     // hero — posição no ciclo + progresso de entregas. O d2 convergido no
     // piso dá "encontro 16 de 16"; a regex tolera um sweep paralelo que
@@ -412,7 +413,7 @@ test.describe("mentorado — shell /jovem", () => {
     // sub-nav de página + o acervo — a biblioteca de sempre continua embaixo
     const nav = page.getByRole("navigation", { name: "Nesta página" });
     await expect(
-      nav.getByRole("link", { name: "Jornada" })
+      nav.getByRole("link", { name: "Meus instrumentos" })
     ).toBeVisible();
     await expect(
       page.locator("section#acervo").getByRole("heading", { name: "Acervo" })

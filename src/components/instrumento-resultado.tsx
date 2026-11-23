@@ -154,8 +154,8 @@ function RodaResultado({
           </p>
         </div>
         {/* nota por área agrupada por quadrante — a barra repete a leitura
-            do polígono pra quem precisa do número exato. O disco repete a
-            posição na régua que a pessoa viu ao preencher (REALIZA-442) */}
+            do polígono pra quem precisa do número exato. O nº verde repete
+            a posição na régua que a pessoa viu ao preencher (442/010) */}
         <div className="space-y-3 @[30rem]:grid @[30rem]:grid-cols-2 @[30rem]:gap-x-6 @[30rem]:gap-y-4 @[30rem]:space-y-0 @[30rem]:self-start">
           {roda.quadrantes.map((q) => (
             <div key={q.nome || "geral"}>
@@ -172,7 +172,7 @@ function RodaResultado({
                       compacto
                     />
                     <span
-                      className="min-w-0 flex-1 truncate font-semibold text-[var(--ok-text)]"
+                      className="min-w-0 flex-1 truncate font-semibold text-foreground"
                       title={a.label}
                     >
                       {a.label}
@@ -297,7 +297,6 @@ function MetasResultado({
               className="rounded-lg border border-border/70 px-3 py-2.5"
             >
               <div className="flex flex-wrap items-center gap-2">
-                <NumeroPergunta n={m.n} compacto />
                 <span className="text-xs font-semibold tabular-nums text-muted-foreground">
                   Meta {m.n}
                 </span>
@@ -370,7 +369,7 @@ function MetasResultado({
                 >
                   {r.ok ? "✓" : "✗"}
                 </span>
-                <span className="min-w-0 flex-1 text-[var(--ok-text)]">
+                <span className="min-w-0 flex-1 text-foreground">
                   {r.label}
                 </span>
               </li>
@@ -413,19 +412,18 @@ function VisaoResultado({
       <Declaracao texto={declaracao} />
       {temNarrativa && (
         <Bloco titulo="O filme da vida ideal">
-          {/* hierarquia da gramática compartilhada (REALIZA-442): disco
-              amarelo no lugar do "n." miúdo (o mesmo número da escrita em
-              /f/<token>), pergunta no verde do instrumento, resposta no
-              primeiro plano. O nº é a posição na régua — uma opcional
-              vazia não renumera as seguintes */}
+          {/* hierarquia da gramática compartilhada (REALIZA-442): o nº
+              verde em texto é a posição na régua — uma opcional vazia
+              não renumera as seguintes —, pergunta em primeiro plano,
+              resposta em primeiro plano */}
           <ol className="space-y-4">
             {narrativa.map((c) => {
               const valor = valorDe(campos, respostas, c.id);
               if (valor === "—") return null;
               return (
-                <li key={c.id} className="flex items-start gap-3">
+                <li key={c.id} className="flex items-baseline gap-2">
                   <NumeroPergunta n={numeroPorId.get(c.id) ?? 0} />
-                  <div className="min-w-0 pt-0.5">
+                  <div className="min-w-0">
                     <p className={PERGUNTA_TEXTO}>{c.label}</p>
                     <p
                       className={cn(

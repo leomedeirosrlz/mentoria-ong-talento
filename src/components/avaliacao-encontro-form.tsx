@@ -186,7 +186,7 @@ export function AvaliacaoEncontroForm({
               {...a11yEstrelas}
             >
               <legend className="block text-[15px] font-medium leading-snug sm:text-base">
-                <span className="mr-1 text-muted-foreground tabular-nums">
+                <span className="mr-1 font-bold text-[var(--ok-text)] tabular-nums">
                   1.
                 </span>
                 De 1 a 5 estrelas, como foi?
@@ -244,7 +244,7 @@ export function AvaliacaoEncontroForm({
                 "bem" */}
             <fieldset className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
               <legend className="block text-[15px] font-medium leading-snug sm:text-base">
-                <span className="mr-1 text-muted-foreground tabular-nums">
+                <span className="mr-1 font-bold text-[var(--ok-text)] tabular-nums">
                   2.
                 </span>
                 Como você se sentiu?
@@ -274,7 +274,7 @@ export function AvaliacaoEncontroForm({
                 do banco */}
             <fieldset className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
               <legend className="block text-[15px] font-medium leading-snug sm:text-base">
-                <span className="mr-1 text-muted-foreground tabular-nums">
+                <span className="mr-1 font-bold text-[var(--ok-text)] tabular-nums">
                   3.
                 </span>
                 Você sente que avançou no que combinou?
@@ -304,7 +304,7 @@ export function AvaliacaoEncontroForm({
                 que a lista não prevê */}
             <fieldset className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
               <legend className="block text-[15px] font-medium leading-snug sm:text-base">
-                <span className="mr-1 text-muted-foreground tabular-nums">
+                <span className="mr-1 font-bold text-[var(--ok-text)] tabular-nums">
                   4.
                 </span>
                 Sobre o que vocês conversaram?
@@ -336,7 +336,7 @@ export function AvaliacaoEncontroForm({
                 htmlFor="aval-comentario"
                 className="block text-[15px] font-medium leading-snug sm:text-base"
               >
-                <span className="mr-1 text-muted-foreground tabular-nums">
+                <span className="mr-1 font-bold text-[var(--ok-text)] tabular-nums">
                   5.
                 </span>
                 Quer contar mais alguma coisa?

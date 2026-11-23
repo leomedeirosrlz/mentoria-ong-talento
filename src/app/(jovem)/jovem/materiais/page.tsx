@@ -80,10 +80,11 @@ import { MaterialThumb } from "@/components/material-thumb";
 import type { Material, Trilha } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-export const metadata: Metadata = { title: "Minha jornada" };
+export const metadata: Metadata = { title: "Materiais" };
 
-// WP7 (REALIZA-140) + REALIZA-194 (spec v5c): /jovem/materiais é o hub
-// "Minha jornada" — os 7 instrumentos oficiais da régua do guia viram a
+// WP7 (REALIZA-140) + REALIZA-194 (spec v5c) + FR-007 (010): o hub do
+// jovem se chama Materiais — os 7 instrumentos oficiais da régua do
+// guia viram a
 // estante de cards-produto (capa símbolo + janela + estado honesto, o
 // card inteiro = gesto), e a
 // biblioteca de sempre continua embaixo como "Acervo". As datas saem do
@@ -461,7 +462,7 @@ export default async function JovemMateriais() {
           <div className="flex flex-wrap items-start justify-between gap-x-6 gap-y-3">
             <div className="min-w-0">
               <h1 className="text-2xl font-semibold tracking-tight">
-                Minha jornada
+                Materiais
               </h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 {dupla.turma ? `${turmaLonga(dupla.turma)} · ` : ""}
@@ -545,7 +546,7 @@ export default async function JovemMateriais() {
           href="#jornada"
           className="inline-flex min-h-11 items-center rounded-full px-4 text-sm font-semibold text-muted-foreground transition-colors outline-none hover:bg-muted hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
         >
-          Jornada
+          Meus instrumentos
         </a>
         <a
           href="#acervo"
@@ -883,15 +884,18 @@ function InstrumentoCard({
 
   // a borda mora no container; dentro, a área do gesto (link ou o
   // trigger do Rever) cobre o corpo e o "Ler o guia" fecha como tira de
-  // rodapé — dois alvos separados, sem botão dentro de link (486)
+  // rodapé — dois alvos separados, sem botão dentro de link (486). O
+  // hover/focus contorna o card INTEIRO (010): o anel vive no shell e
+  // o foco do gesto acende ele via has-[:focus-visible]; trancada não
+  // promete ação, então não ganha anel nenhum
   const shell = cn(
     "relative flex min-w-0 flex-col overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]",
-    trancada && "border border-dashed border-border/70"
+    trancada && "border border-dashed border-border/70",
+    gesto &&
+      "transition-shadow hover:ring-2 hover:ring-inset hover:ring-[var(--ic)]/50 has-[.gesto:focus-visible]:ring-2 has-[.gesto:focus-visible]:ring-inset has-[.gesto:focus-visible]:ring-ring"
   );
   const gestoCls = cn(
-    "group/gesto flex min-w-0 outline-none transition-shadow sm:flex-col",
-    "hover:ring-2 hover:ring-inset hover:ring-[var(--ic)]/50",
-    "focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+    "gesto group/gesto flex min-w-0 outline-none sm:flex-col"
   );
   const guia = guiaHref ? (
     <Link
@@ -1261,7 +1265,7 @@ function MateriaisLista({
   );
 }
 
-/** Fallback §WP7 — biblioteca sem trilha: header "Minha jornada" + o
+/** Fallback §WP7 — biblioteca sem trilha: header "Materiais" + o
  *  acervo em grade (a trilha só existe com dupla + cronograma). Renderiza
  *  quando a RPC falha/vem vazia, quando o jovem não tem dupla ou quando a
  *  turma não tem cronograma. `encCorrente` segue valendo aqui — a régua do
@@ -1276,7 +1280,7 @@ function BibliotecaJovem({
   return (
     <div className="space-y-6">
       <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Minha jornada</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Materiais</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           Os guias e conteúdos oficiais do programa.
         </p>
