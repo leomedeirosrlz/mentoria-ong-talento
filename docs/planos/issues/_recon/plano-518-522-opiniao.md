@@ -7,7 +7,7 @@
 1. **A direção é a certa.** O plano atual é um oráculo: o sistema calcula, a dupla obedece. Perguntar ritmo, recesso e deixar quatro papéis abrirem transforma o plano em instrumento da dupla — e a base técnica aguenta: o planner já é puro, já recebe `ritmo` opcional, já calcula alternativas honestas (`alternativaRitmo`, `alternativaRecesso`). A maior parte da mudança é **input novo + semântica**, não reescrita.
 2. **Fusão sem cópia é uma correção de dívida real.** O clone atual ("sessão dupla") é copiar/colar institucionalizado: N registros idênticos, N avaliações pela mesma sessão. Resolver isso direito (cobertura nativa) vale a migration.
 3. **Docs lazy é a decisão madura.** Gerar roteiro 1 no agendamento e N+1 na conclusão evita o cemitério de 16 roteiros desatualizados — problema real de sistemas que geram lote.
-4. **Aproveitamento da infra de Liza.** Registry, 2 fases, auditoria, evals declarativos, `DocBloco` + Zod já existem — a 022 é quase toda composição, não invenção.
+4. **Aproveitamento da infra de Liza.** Registry, 2 fases, auditoria e evals declarativos já existem; `DocBloco` existe como tipo TS e o schema Zod é a peça nova — a 021 é quase toda composição, não invenção.
 
 ## O que está arriscado (em ordem de perigo)
 

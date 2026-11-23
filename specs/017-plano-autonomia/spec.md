@@ -5,7 +5,7 @@
 
 ## Problema e resultado
 
-- **Dor hoje:** o planner escolhe o ritmo sozinho (sonda 1→2→3→1/dia) e a dupla só descobre o custo na proposta pronta; a grade de disponibilidade declarada por mentor e jovem nunca entra na conta; o recesso é tratado como fato assumido (`usa=true` implícito) em vez de decisão da dupla; e o aceite bilateral empaca o plano quando um lado demora, enquanto auxiliar e coordenação não podem destravar.
+- **Dor hoje:** o planner escolhe o ritmo sozinho (sonda 1→2→3→1/dia) e a dupla só descobre o custo na proposta pronta; a grade de disponibilidade declarada por mentor e jovem nunca entra na conta; o recesso é tratado como fato assumido (`usa=true` implícito) em vez de decisão da dupla; e o aceite bilateral empaca o plano quando um lado demora, enquanto o auxiliar de turma e a coordenação não veem o gesto na ficha (a RPC já aceita o auxiliar via `supervisiona_dupla`).
 - **Resultado observável:** as decisões do plano (ritmo, recesso e — quando falta — a grade) são respondidas uma vez por versão numa superfície própria ("Combinar o plano"), uma pergunta por tela, e o card volta a ser leitura; qualquer um dos quatro papéis (mentor, jovem, auxiliar, coordenação) propõe; um aceite da dupla ativa o plano e o outro lado é notificado com caminho de contestação.
 - **Como saberemos que funcionou:** a dupla escolhe o ritmo (inclusive um número livre) e a projeção mostra o efeito real sem trocar o número; grade vazia é respondida dentro do fluxo, não ejeta pro perfil; recesso sem resposta trava só a simulação, não a tela; plano proposto pelo auxiliar ativa no primeiro aceite de quem é da dupla — e o outro lado lê "Fulano combinou um plano", nunca "vocês combinaram".
 
