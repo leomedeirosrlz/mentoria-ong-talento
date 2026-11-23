@@ -20,17 +20,19 @@ Agentes **não criam, editam nem aplicam migrations**. Eles podem apenas **suger
 
 O Thiago autorizou **manter** o que já foi produzido, mas tudo entra na revisão do lead antes de integração:
 
-| Migration | Origem | Estado | Revisão pendente |
+| Migration | Origem | Estado | Revisão |
 |---|---|---|---|
-| `0223_pdm_metas_extras.sql` | agente 011 (PDM) | arquivo no worktree `wpdm3`; aplicada **só no Supabase local** | revisar template/campos, RLS, projeção `meta_1..10`, rollback e numeração |
-| `0224_plano_aceite_bilateral.sql` | agente 013 (ficar em dia) | arquivo no worktree `wemdia3`; **não aplicada** no local | revisar aceite bilateral, ritmo 1..7, supervisor, expiração e policies |
+| `0223_pdm_metas_extras.sql` | agente 011 (PDM) | integrada; aplicada **só no Supabase local**; ledger `0223` | revisada em `docs/reviews/2026-11-23-migrations-0223-0224.md`; sem bloqueio P0/P1 |
+| `0224_plano_aceite_bilateral.sql` | agente 013 (ficar em dia) | integrada; aplicada **só no Supabase local**; ledger `0224` | revisada no mesmo doc; sem bloqueio P0/P1 |
 
-- Hashes registrados em 23/11/2026:
+- Hashes de origem em 23/11/2026:
   - `0223`: `440e4e5d36d0f04525ee1e885592e17d053f9e2de35baeeb02c4abb65d68ca61`
   - `0224`: `4b2b77a4b67ed6da26354670feca763ff9cd1128ef5c1ca50acbca444588cf9f`
-- `0223` aparece no ledger local; `0224` ainda não.
-- Nenhuma das duas foi para staging/produção.
-- A integração só começa depois de o lead revisar e assumir os arquivos.
+- Os dois aparecem no ledger local. O `0223` foi corrigido de "plano" para "pdm" depois da
+  colisão de numeração; o `0224` foi registrado com o conteúdo do plano.
+- Nenhuma das duas foi para staging/produção. Staging só depois do gate final e da
+  autorização explícita do Thiago.
+- A integração revisou e assumiu os dois arquivos; riscos P2/P3 estão no doc de review.
 
 ## Brief futuro
 
