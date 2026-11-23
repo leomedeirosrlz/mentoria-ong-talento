@@ -1,7 +1,9 @@
 # Spec — Ficar em dia até o encerramento
 
-**Feature:** `specs/013-ficar-em-dia` · **Status:** Clarified
+**Feature:** `specs/013-ficar-em-dia` · **Status:** Clarified — parcialmente substituída pela 017
 **Fila:** `REALIZA-513` · **Dono:** Thiago · **Data:** 23/11/2026
+
+> **Nota de supersessão (23/11/2026):** a spec 017 (`plano-autonomia`) substitui duas regras desta spec: **FR-002** (ritmo máximo de 1 encontro/dia) — o ritmo passa a ser escolha livre da dupla, qualquer inteiro positivo, sem teto de produto — e **FR-005** (aceite dos dois lados) — um aceite de membro da dupla ativa o plano e o outro lado é notificado, com contestação até o primeiro encontro do escopo. O restante (projeção honesta, deadline do encerramento, passos que vencem no caminho, custo do plano visível) segue normativo. Histórico preservado: onde este texto divergir da 017, a 017 manda.
 
 ## Problema e resultado
 
@@ -55,10 +57,10 @@
 ## Requisitos funcionais
 
 - **FR-001:** a projeção DEVE usar o encerramento oficial (15/01/2027 quando for o evento do ciclo) como limite duro.
-- **FR-002:** o planner DEVE simular até 1 encontro/dia (7/semana), respeitando gaps de prática e recessos.
+- **FR-002:** o planner DEVE simular até 1 encontro/dia (7/semana), respeitando gaps de prática e recessos. — **substituído pela spec 017:** o ritmo é escolha da dupla (qualquer inteiro positivo, sem teto); ritmo que implica >1/dia vira aviso, nunca bloqueio.
 - **FR-003:** a projeção DEVE contabilizar os passos que vencem durante a recuperação, não só o backlog do dia.
 - **FR-004:** o card DEVE distinguir “em dia” de “recuperação possível” e “conversa com a coordenação”.
-- **FR-005:** o plano DEVE ser proposto, aceito pelos dois lados e acompanhado nas duas homes.
+- **FR-005:** o plano DEVE ser proposto, aceito pelos dois lados e acompanhado nas duas homes. — **substituído pela spec 017:** um aceite de membro da dupla ativa; o outro lado é notificado e pode contestar até o primeiro encontro do escopo.
 - **FR-006:** nenhuma data sugerida pode ser anterior a hoje nem cair em recesso ativo.
 - **FR-007:** o card DEVE mostrar o custo do plano (encontros/semana, janela) e não prometer o impossível.
 

@@ -31,7 +31,7 @@
 - **Por que P1:** gerar 16 roteiros de uma vez cria lixo desatualizado na primeira mudança de plano.
 - **Teste independente:** plano aceito → agenda o 1º encontro → roteiro 1 existe; conclui → roteiro 2 existe.
 - **Cenários:**
-  1. **Dado** plano aceito e primeiro encontro do escopo agendado **quando** o gatilho roda **então** o roteiro da semana 1 nasce publicado (ou rascunho auto-publicado — decidir default) a partir do corpus + ajustes da dupla.
+  1. **Dado** plano aceito e primeiro encontro do escopo agendado **quando** o gatilho roda **então** o roteiro da semana 1 nasce **publicado** a partir do corpus + ajustes da dupla (conteúdo determinístico — decisão tomada; rascunho é só da geração sob demanda e, depois, da Liza).
   2. **Dado** encontro N concluído **quando** o gatilho roda **então** o roteiro N+1 nasce; nunca mais de um passo à frente.
   3. **Dado** dupla sem plano **quando** a semana anda **então** o roteiro semanal não se aplica (o corpus estático segue a fonte).
 
@@ -63,13 +63,13 @@
 - **FR-004:** geração sob demanda: coordenação e auxiliar (`supervisiona_dupla`) escolhem a semana, veem preview, salvam rascunho, publicam; validação do conteúdo antes de persistir.
 - **FR-005:** mudança de `plano.versao` invalida roteiros derivados (marca visual + caminho de regeneração); versão nova marca a anterior como `substituido`, nunca apaga nem reescreve — o índice único do vigente é parcial (`where status='publicado'`), a unique completa é `(plano_id, numero, versao)`.
 - **FR-006:** leitura: dupla lê roteiros publicados do próprio plano; staff no escopo lê rascunho/publicado/substituido; jovem só o publicado, via recorte definer; o disclosure do card "Sua semana" (spec 019) prefere o roteiro semanal vigente ao corpus estático.
-- **FR-007:** montagem do roteiro é determinística nesta fatia: corpus `roteiro-encontro-NN` + `encontro_guia_ajustes` da dupla + contexto do plano (ritmo, fusão, recesso) — a montagem é função pura testável. Avaliar primeiro a derivação pura na leitura (roteiro como projeção de corpus+ajustes+contexto, sem persistir); persistir só o que a trilha/versionamento exige — o que se decide fica registrado no recon/PR.
+- **FR-007:** montagem do roteiro é determinística nesta fatia: corpus `roteiro-encontro-NN` + `encontro_guia_ajustes` da dupla + contexto do plano (ritmo, fusão, recesso) — a montagem é função pura testável e o resultado é **persistido de forma idempotente** em `dupla_plano_roteiros` (decisão tomada). Não há modo "só projeção": a trilha, o versionamento por `plano_versao`, o rascunho/publicado e a leitura do jovem via recorte definer exigem a tabela — a função pura monta o conteúdo, a tabela segura o ciclo de vida.
 
 ## Requisitos não funcionais
 
 - **RLS/RPC:** `dupla_plano_roteiros` (nome a confirmar pelo lead) com `enable row level security`, `grant select` ao `authenticated`, policy de select por escopo-dupla (membro da dupla ou staff via `supervisiona_dupla`/`has_papel`) e recorte definer do jovem que devolve só `publicado`; **nenhum** insert/update/delete grant direto — escrita só por RPCs definer (`roteiro_gerar`, `roteiro_publicar`, `roteiro_regenerar`) com grants explícitos a `authenticated`, no molde das RPCs de plano. DDL sugerido completo no recon §5.3.
 - **Gatilho lazy:** via tick `plano_ciclo`-adjacente (job service-role novo, ex. `roteiros_lazy`) — recomendado — ou dentro de `plano_aplicar_passo`/trigger de `encontros`; decidir na implementação (recon §5.3).
-- **Conteúdo:** `DocBloco[]` (tipo existente em `src/lib/materiais-documentos.ts`) validado por Zod antes de persistir e de renderizar — schema a criar na spec 021 e reutilizado aqui.
+- **Conteúdo:** `DocBloco[]` (tipo existente em `src/lib/materiais-documentos.ts`) validado por Zod antes de persistir e de renderizar — o schema Zod discriminado é **criado nesta spec** (módulo compartilhado em `src/lib/materiais-documentos.ts` ou vizinho, sem `html` cru em conteúdo gerado) e a spec 021 o reutiliza, não recria.
 - **LGPD:** roteiro por dupla contém nome da dupla/contexto do plano — entra no inventário como artefato derivado de dados já cobertos.
 - **Idempotência:** unique `(plano_id, numero, versao)` + índice único parcial do vigente `on (plano_id, numero) where status='publicado'`; regerar = nova versão com a anterior `substituido`, nunca UPDATE destrutivo. Não usar `(dupla_id, numero, versao)`: a âncora é o plano.
 - **Demo:** dupla com roteiros publicados e uma semana em rascunho.
@@ -100,10 +100,11 @@
 - Mais um artefato disputando com corpus + ajustes + doc do combinado: a hierarquia é fixa — "O combinado" (por versão), "Roteiro do encontro N" (operacional, absorve os ajustes), "Biblioteca" (corpus); copy e navegação deixam isso claro, sem quarto documento.
 - Lazy por job tem latência do tick: o primeiro roteiro pode atrasar — mitigação: gerar também na leitura (on-demand silencioso no primeiro acesso à semana) se o tick for diário demais. Decidir.
 - Conteúdo estruturado no banco exige validação rigorosa: bloco inválido nunca renderiza (fallback = roteiro do corpus).
-- Derivação pura vs persistência: se o roteiro puder ser projetado sem gravar, a tabela só segura o que a trilha exige — avaliar antes de pagar o custo de versionamento.
+- Persistência decidida (montagem pura + gravação idempotente em `dupla_plano_roteiros`): o risco que fica é o custo de versionamento — mitigado pelo lazy (nunca lote) e pelo `substituido` que segue legível.
 
 ## Premissas
 
 - "Semana" do roteiro = o passo do plano (encontro N), não semana civil — a dupla pensa em "roteiro do encontro 7".
 - O doc do combinado não é assinado/baixado — é leitura na tela do aceite, um por versão, e sai junto com a spec 017.
-- Default do lazy: roteiro nasce **publicado** (conteúdo determinístico do corpus oficial, sem risco editorial); rascunho é para geração sob demanda e depois para a Liza (spec 021). Validar com Thiago.
+- Default do lazy (decisão tomada): o roteiro nasce **publicado** — conteúdo determinístico do corpus oficial, sem risco editorial; rascunho é para geração sob demanda e, depois, para a Liza (spec 021).
+- O schema Zod do `DocBloco` nasce nesta spec (módulo compartilhado): a 021 reutiliza — backlog dela não bloqueia a validação aqui.

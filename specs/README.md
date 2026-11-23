@@ -35,7 +35,7 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 | 010 | `instrumentos-visual` | mudança | Clarified | REALIZA-511 (23/nov/2026) — modais, roda, gramática, hover, nav |
 | 011 | `pdm-cascata` | mudança | Clarified | REALIZA-512 (23/nov/2026) — PDM aninhado + seletor |
 | 012 | `conquistas-especialista` | mudança | Clarified | REALIZA-515 (23/nov/2026) — próximo marco, nova rodada, preview |
-| 013 | `ficar-em-dia` | feature | Clarified | REALIZA-513 (23/nov/2026) — 1/dia até o encerramento |
+| 013 | `ficar-em-dia` | feature | Clarified | REALIZA-513 (23/nov/2026) — 1/dia até o encerramento; parcialmente substituída pela 017 (ritmo livre, aceite único) |
 | 014 | `liza-evals` | mudança | Clarified | REALIZA-514 (23/nov/2026) — evals das tools novas |
 | 015 | `e2e-especialista-uiux` | revisão | Clarified | REALIZA-510 (23/nov/2026) — roteiro e2e UI/UX |
 | 016 | `badges` | feature | Clarified | REALIZA-516 (23/nov/2026) — badges isométricas/níveis |

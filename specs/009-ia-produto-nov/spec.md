@@ -279,6 +279,12 @@ Cenários:
 
 ### US6 — Recesso decidido pela dupla (P2)
 
+> **Parcialmente substituída pela spec 017 (23/11):** "sem row = pendente"
+> substitui o default `usa=true` desta spec; e qualquer um dos quatro
+> papéis (mentor, mentorado, auxiliar, coordenação) registra a decisão em
+> nome da dupla — não só o mentor. O restante (uma decisão por recesso,
+> última declaração vale, planner respeita a escolha) segue valendo.
+
 - **Por que P2:** é domínio novo (decisão por dupla sobre evento da
   turma) com efeito no planner — pequeno, mas toca trilha, plano e copy.
 - **Teste independente:** marcar "vamos seguir" numa dupla demo e ver o
@@ -290,7 +296,8 @@ Cenários:
    dupla declara "vamos seguir nos encontrando" **então** o planner pode
    sugerir datas dentro da janela e a agenda mostra o período como
    disponível pra dupla.
-2. **Dado** a decisão "vamos usar o recesso" (o default) **quando**
+2. **Dado** a decisão "vamos usar o recesso" (o default desta spec — a
+   017 trata ausência de row como pendente) **quando**
    qualquer superfície calcula **então** nada muda — o comportamento
    atual é o caminho padrão.
 3. **Dado** a decisão registrada **quando** a coordenação lê a ficha
@@ -425,7 +432,8 @@ Cenários:
   `desfazer_retroativo_mentorado`, allowlist `mentorado`, espelhando a
   régua das RPCs — com devolução das mensagens de domínio.
 - **FR-022 (US6):** a decisão de recesso é por dupla e por período de
-  recesso do cronograma; default = usa o recesso (comportamento atual);
+  recesso do cronograma; default = usa o recesso (comportamento atual —
+  **substituído pela spec 017**: sem row = pendente);
   última declaração vale, com data de quando mudou.
 - **FR-023 (US6):** o planner respeita a escolha — opt-out permite
   sugestão dentro da janela; uso mantém o empurrão para o fim.
@@ -525,7 +533,9 @@ Cenários:
   clarify sem mudar o restante.
 - "A dupla decide o recesso" = o mentor declara na plataforma (a decisão
   é combinada entre os dois fora da tela); o mentorado enxerga e pode
-  pedir mudança pela Liza — a gravação final é do mentor.
+  pedir mudança pela Liza — a gravação final é do mentor. **Substituído
+  pela spec 017:** qualquer um dos quatro papéis registra a decisão em
+  nome da dupla, com autoria.
 - Retrospectiva gera por job no encerramento (custo previsível), com
   geração sob demanda para duplas já encerradas — nunca por pageview.
 - O consentimento de divulgação de depoimento da avaliação 360 reaproveita

@@ -3,6 +3,8 @@
 **Feature:** `specs/017-plano-autonomia` · **Status:** Clarified
 **Fila:** `REALIZA-518` · **Dono:** Thiago · **Data:** 23/11/2026
 
+> **Substitui a spec 013 onde diverge:** o "ritmo máximo de 1/dia" (FR-002 da 013) e o "aceite dos dois lados" (FR-005 da 013) são substituídos por esta spec — o ritmo é escolha livre da dupla (qualquer inteiro positivo) e um aceite de membro da dupla ativa o plano, com o outro lado notificado e contestação até o primeiro encontro do escopo. O resto da 013 (projeção honesta, deadline do encerramento, passos que vencem no caminho) segue valendo.
+
 ## Problema e resultado
 
 - **Dor hoje:** o planner escolhe o ritmo sozinho (sonda 1→2→3→1/dia) e a dupla só descobre o custo na proposta pronta; a grade de disponibilidade declarada por mentor e jovem nunca entra na conta; o recesso é tratado como fato assumido (`usa=true` implícito) em vez de decisão da dupla; e o aceite bilateral empaca o plano quando um lado demora, enquanto o auxiliar de turma e a coordenação não veem o gesto na ficha (a RPC já aceita o auxiliar via `supervisiona_dupla`).
@@ -13,7 +15,7 @@
 
 - Agendar os encontros dentro das janelas comuns (a disponibilidade calibra o **ritmo sugerido**; a escolha de datas segue o fluxo atual de confirmar passo a passo).
 - Qualquer teto de produto no ritmo: o planner e as RPCs aceitam qualquer inteiro positivo; a UI sugere até 5 e abre campo "outro" livre; escolha que implica mais de um encontro por dia gera aviso honesto do efeito nos gaps — nunca bloqueio nem troca silenciosa. Limite técnico (payload do `escopo`), se necessário, é declarado como técnico, não de produto.
-- Mudar quem declara recesso além do necessário para a dupla decidir (decisão de papel no item US3).
+- Ampliar quem **edita** a grade de disponibilidade: só o próprio lado e a coordenação editam; o auxiliar vê a grade e pede ajuste, não edita (item US2). Já a decisão de recesso pode ser registrada pelos quatro papéis em nome da dupla (item US3).
 - Fusão de encontros (spec 018) e card "Sua semana" (spec 019).
 - Trilha de especialista (sem calendário oficial; o planner já devolve não aplicável).
 
@@ -24,7 +26,7 @@
 - **Por que P1:** é a primeira pergunta do fluxo e o que torna o plano da dupla, não do sistema.
 - **Teste independente:** abrir o fluxo com grades de 1, 3 e 0 dias em comum.
 - **Cenários:**
-  1. **Dado** uma dupla com células em comum em 3 dias **quando** a pergunta de ritmo abre **então** "Quantos encontros por semana vocês conseguem?" mostra pills (`OpcaoPilula`: 1, 2, 3, 4, 5, outro) + a sugestão honesta "Vocês marcaram períodos livres em comum em 3 dias — períodos livres não são horários marcados". A sugestão informa a contagem de **dias** com célula comum, não promete slot nem fecha o plano.
+  1. **Dado** uma dupla com células em comum em 3 dias **quando** a pergunta de ritmo abre **então** "Quantos encontros por semana vocês conseguem?" mostra pills (`OpcaoPilula`: 1, 2, 3, 4, 5, outro) + a sugestão honesta "Vocês marcaram períodos livres em comum em 3 dias — períodos livres não são horários marcados". A sugestão informa a contagem de **dias** com período livre em comum, não promete slot nem fecha o plano.
   2. **Dado** que quem responde escolhe um ritmo — pill ou número livre no "outro" (qualquer inteiro positivo) **quando** a simulação roda **então** a projeção usa exatamente esse ritmo e mostra o efeito real (data de recuperação, recesso no caminho) — sem o sistema trocar o número por baixo.
   3. **Dado** um ritmo que não fecha antes do encerramento **quando** a projeção renderiza **então** aparece o primeiro inteiro acima do pedido que fecharia como alternativa honesta (não o próximo da escada fixa), sem recusar a escolha nem prometer o impossível.
   4. **Dado** um ritmo que implica mais de um encontro por dia **quando** a projeção renderiza **então** a UI representa a escolha como está (ex.: "8 encontros por semana") e avisa o efeito pedagógico: os passos de prática pedem 7 dias entre si — a régua do calendário vira aviso e estado, nunca recusa.
@@ -34,8 +36,8 @@
 - **Por que P1:** sugerir ritmo sem olhar a grade repete o erro de projetar o impossível.
 - **Teste independente:** duplas com os dois lados sem grade, um lado sem grade, e interseção vazia.
 - **Cenários:**
-  1. **Dado** um lado (ou os dois) sem grade declarada **quando** a pergunta de ritmo abre **então** o estado é "falta confirmar a disponibilidade", respondível dentro do fluxo: preencher a grade ali mesmo (edição inline, sem sair da superfície) ou responder explicitamente "vamos combinar sem a grade" — nunca ejeta pro perfil nem perde o que já foi respondido.
-  2. **Dado** interseção vazia entre as grades **quando** a pergunta abre **então** o fluxo sugere ajustar a disponibilidade (inline) ou falar com o auxiliar, sem simular ritmo nenhum — e também oferece a saída explícita "combinar sem a grade", com aviso.
+  1. **Dado** um lado (ou os dois) sem grade declarada **quando** a pergunta de ritmo abre **então** o estado é "falta confirmar a disponibilidade", respondível dentro do fluxo: preencher a grade ali mesmo (edição inline da própria grade — cada lado edita a sua, a coordenação edita qualquer uma; o auxiliar não edita grade, vê a pendência e pede o ajuste) ou responder explicitamente "vamos combinar sem a grade" — nunca ejeta pro perfil nem perde o que já foi respondido.
+  2. **Dado** interseção vazia entre as grades **quando** a pergunta abre **então** o fluxo sugere ajustar a disponibilidade (inline para quem edita a própria grade; o auxiliar aponta e combina sem editar) ou falar com o auxiliar, sem simular ritmo nenhum — e também oferece a saída explícita "combinar sem a grade", com aviso.
   3. **Dado** uma grade com cobertura suspeita (célula em todo período de todo dia — caso detectável; não existe timestamp de declaração) **quando** a pergunta abre **então** o fluxo pede confirmação "a grade ainda vale?", em vez de tratar como verdade cega.
 
 ### US3 — Recesso decidido antes da simulação (P1)
@@ -47,6 +49,7 @@
   2. **Dado** a resposta "Vamos usar o recesso" **quando** ela é gravada **então** persiste `dupla_recessos.usa=true` e o recesso segue restrição (pausa) — igual ao default de hoje, agora com decisão explícita e autoria.
   3. **Dado** "Vamos seguir nos encontrando" **quando** gravada **então** persiste `usa=false` e a projeção pode sugerir datas dentro da janela — com o efeito (`alternativaRecesso`) visível antes de decidir.
   4. **Dado** que o jovem abre o plano primeiro **quando** a pergunta aparece **então** ele também pode responder (a decisão é da dupla), com a autoria registrada.
+  5. **Dado** auxiliar ou coordenação **quando** a dupla combinou a resposta com eles **então** podem registrá-la em nome da dupla — a mesma row, com autoria (`declarado_por`); a decisão continua sendo da dupla e pode ser revista (a última declaração vale).
 
 ### US4 — Quatro papéis, um aceite (P1)
 
@@ -57,7 +60,7 @@
   2. **Dado** o mentor (ou o jovem) propõe **quando** a proposta nasce **então** o lado dele já conta como aceite e o plano ativa na hora; o outro lado é notificado com "Ver o combinado" e "Não serve pra mim".
   3. **Dado** o plano ativo com um aceite **quando** o outro lado abre **então** ele lê "{Fulano} combinou um plano pra vocês — você foi avisado em {data}", pode registrar a própria ciência (aceite informativo) e pode contestar ("Não serve pra mim") até o primeiro encontro do escopo realizado após a proposta — mesma régua atual (`realizado_em >= aprovado_em/created_at`); em plano ativo não se fala em "aceitar".
   4. **Dado** alguém fora da dupla ou sem papel **quando** tenta propor/responder **então** a RPC recusa (e2e do papel negado).
-  5. **Dado** o auxiliar com escopo de turma **quando** abre a ficha da dupla **então** vê e usa os mesmos CTAs de propor/declarar — a permissão é calculada por `supervisiona_dupla` no servidor, não por `supervisor_id` na tela.
+  5. **Dado** o auxiliar com escopo de turma **quando** abre a ficha da dupla **então** vê e usa os mesmos CTAs de propor plano e de registrar a decisão de recesso (não a edição da grade, que é do próprio lado e da coordenação) — a permissão é calculada por `supervisiona_dupla` no servidor, não por `supervisor_id` na tela.
 
 ### US5 — Decisões numa superfície própria, uma vez por versão (P1)
 
@@ -85,12 +88,12 @@
 - **FR-001:** a decisão do plano acontece na superfície "Combinar o plano" (sheet no mobile, dialog no desktop), uma pergunta por tela — ritmo → recesso por recesso → confirmar — respondida uma vez por versão. O card permanece leitura, com a linha "Falta 1 decisão" + CTA quando há pendência.
 - **FR-002:** a pergunta de ritmo usa `OpcaoPilula` (radio nativo sr-only, `has-checked`, foco visível, hit ≥44px, grid no 320 sem scroll horizontal) com opções 1–5 + "outro" (número livre, qualquer inteiro positivo) + sugestão honesta por `celulasComuns` — a sugestão informa a contagem de **dias** com período livre em comum e diz que "períodos livres não são horários marcados"; nunca "5+" nem a palavra "ritmo" na copy da UI.
 - **FR-003:** o planner e as RPCs DEVEM aceitar qualquer inteiro positivo sem clamp nem recusa; ritmo que implica >1 encontro/dia é representado como escolhido e gera aviso explícito do efeito nos gaps pedagógicos — a régua do calendário/gaps gera aviso e estado, nunca bloqueio. A alternativa honesta procura o primeiro inteiro acima do pedido que fecha.
-- **FR-004:** a simulação DEVE exigir grade respondida ou explicitamente pulada: lado sem grade → preencher inline ou "combinar sem a grade"; interseção vazia → ajustar inline ou falar com o auxiliar; nunca "impossível" por falta de dado nem ejeção pro perfil.
-- **FR-005:** cada recesso oficial na janela DEVE ter decisão persistida (`dupla_recessos.usa`) antes da simulação; ausência de declaração = pendente, não default — a pendência não esconde passos nem datas.
+- **FR-004:** a simulação DEVE exigir grade respondida ou explicitamente pulada: lado sem grade → preencher inline (a grade é do próprio lado — cada um edita a sua e a coordenação edita qualquer uma; o auxiliar não edita grade, vê e pede) ou "combinar sem a grade"; interseção vazia → ajustar inline ou falar com o auxiliar; nunca "impossível" por falta de dado nem ejeção pro perfil.
+- **FR-005:** cada recesso oficial que cruza a janela DEVE ter decisão persistida (`dupla_recessos.usa`) antes da simulação e da proposta: sem row, a simulação e a `plano_propor` recusam com "falta confirmar o recesso" (nunca assumem `usa=true`); `usa=true` mantém bloqueadas as datas dentro do recesso; `usa=false` libera. Ausência de declaração = pendente — a pendência não esconde passos nem datas. Qualquer um dos quatro papéis registra a resposta em nome da dupla (mentor, mentorado, auxiliar via `supervisiona_dupla`, coordenação via `has_papel('coordenacao')`), com autoria; a decisão é da dupla e a última declaração vale — pode ser revista.
 - **FR-006:** `plano_propor` DEVE aceitar mentor, mentorado, auxiliar (`supervisiona_dupla`, incluindo escopo de turma) e coordenação (`has_papel('coordenacao')`); proposta de membro da dupla carimba o próprio lado e nasce `aceito`; proposta de staff nasce `proposto` sem carimbo.
 - **FR-007:** o plano DEVE ativar no primeiro aceite de membro da dupla (`proposto → aceito`), notificar o outro lado ("{Fulano} combinou um plano pra vocês") e manter a contestação até o primeiro encontro do escopo realizado após a proposta.
 - **FR-008:** a máquina de estados do plano para quem lê é uma união discriminada num módulo puro — `proposto_staff_falta_meu` | `proposto_staff_falta_outro` | `ativo_sem_minha_ciencia` | `ativo` | `contestado` — e pill, frase e CTA derivam dela (nada de `falta: "os_dois"` nem copy "os dois aceitarem" no `fraseDoCombinado`, `AceitesPlano` ou toast do `ProporPlanoButton`).
-- **FR-009:** quem pode propor/responder é calculado no servidor por `supervisiona_dupla`/`has_papel` — a ficha não decide CTA por `dupla.supervisor?.id`; auxiliar com escopo de turma vê e usa as mesmas superfícies de decisão.
+- **FR-009:** quem pode propor/responder é calculado no servidor por `supervisiona_dupla`/`has_papel` — a ficha não decide CTA por `dupla.supervisor?.id`; auxiliar com escopo de turma vê e usa as mesmas superfícies de decisão. O mesmo predicado vale para registrar a decisão de recesso — não para a grade: editar disponibilidade é só do próprio lado e da coordenação.
 - **FR-010:** a copy da UI usa **auxiliar** (nunca `supervisor`) e os carimbos/autoria identificam quem propôs e de que lado.
 - **FR-011:** a sugestão de ritmo, o estado das perguntas e a máquina de aceite DEVEM ser determinísticos e testáveis no módulo puro — nada de cálculo divergente entre cliente e servidor.
 
@@ -109,12 +112,12 @@
 - `dupla_recessos.usa`: bool persistido; **ausência de row = pergunta pendente** (semântica nova, sem DDL). `usa=true` = "vamos usar o recesso" (pausa); `usa=false` = "vamos seguir nos encontrando".
 - `mentor_profiles.disponibilidade` / `mentorados.disponibilidade`: lidas, não alteradas — sem timestamp (staleness indetectável; a confirmação "ainda vale?" vale só pro caso de cobertura total).
 - Estado de leitura do plano (união discriminada, módulo puro): `proposto_staff_falta_meu` | `proposto_staff_falta_outro` | `ativo_sem_minha_ciencia` | `ativo` | `contestado`.
-- Sugestão de SQL para o lead: re-emissão de `plano_propor` (gate + carimbo por lado + status no nascimento + ritmo sem teto), `plano_responder` (ativação no primeiro aceite), `jovem_plano` (proponente/papel + flag de pendência), e — se produto confirmar — `declarar_recesso` com gate do mentorado/auxiliar. Detalhes no recon `docs/planos/issues/_recon/plano-518-522-2026-11-23.md` §5.1.
+- Sugestão de SQL para o lead: re-emissão de `plano_propor` (gate dos quatro papéis + carimbo por lado + status no nascimento + ritmo sem teto + recesso sem decisão recusando a proposta), `plano_responder` (ativação no primeiro aceite), `jovem_plano` (proponente/papel + flag de pendência) e `declarar_recesso` (gate dos quatro papéis — mentor, mentorado, `supervisiona_dupla`, `has_papel('coordenacao')` — sempre com autoria); `jovem_recessos` é re-emitida sem o `coalesce(usa, true)` para o jovem ver o pendente como pendente. Detalhes no recon `docs/planos/issues/_recon/plano-518-522-2026-11-23.md` §5.1.
 
 ## Critérios de sucesso
 
 - **SC-001:** testes puros do planner com relógio fixo: ritmo escolhido (1, 3, 7, e livre >7), ritmo que não fecha + alternativa do primeiro inteiro que fecha, aviso de gaps quando implica >1/dia, recesso pendente, grade ausente.
-- **SC-002:** e2e app: mentor propõe → plano ativo imediato → jovem notificado ("seu mentor combinou") → contesta; auxiliar propõe → jovem aceita → ativa; auxiliar com escopo de turma vê e usa o CTA.
+- **SC-002:** e2e app: mentor propõe → plano ativo imediato → jovem notificado ("{Fulano} combinou") → contesta; auxiliar propõe → jovem aceita → ativa; auxiliar com escopo de turma vê e usa o CTA.
 - **SC-003:** prints 1440×900 e 390×844 da superfície "Combinar o plano" (pergunta de ritmo, recesso, confirmar) e do card nos estados "falta 1 decisão" e "ativo sem minha ciência".
 - **SC-004:** caso e2e do papel negado para cada gate novo.
 
@@ -128,7 +131,7 @@
 ## Riscos
 
 - "Um aceite basta" pode ativar plano que o outro lado nunca viu — mitigado por notificação forte ("{Fulano} combinou"), CTA "Não serve pra mim" visível e pelo ledger `dupla_plano_eventos`; monitorar contestações.
-- A contagem de dias por célula é aproximada (período ≠ hora) — a sugestão declara isso em texto ("períodos livres não são horários marcados") e nunca trava a escolha.
+- A contagem de dias com período em comum é aproximada (período ≠ hora) — a sugestão declara isso em texto ("períodos livres não são horários marcados") e nunca trava a escolha.
 - Ritmo livre alto pode gerar projeção absurda (mais encontros que dias) — a honestidade é mostrar o efeito e o aviso, não esconder; se surgir necessidade de limite técnico, declarar como técnico.
 - Tri-estado de recesso pode deixar planos parados esperando resposta — a pendência é visível e a conversa com o auxiliar é a saída.
 - RPC re-emitida com gate novo do mentorado precisa do caso negado no e2e e de espelho no demo.
@@ -136,6 +139,6 @@
 ## Premissas
 
 - "Sem teto" é decisão tomada: qualquer inteiro positivo vale; o sistema avisa o efeito nos gaps e registra a escolha — não bloqueia nem troca o número.
-- A decisão de recesso é da dupla: mentor e mentorado respondem; staff registra igual (coord já pode hoje; auxiliar fica como leitura/ponte, salvo decisão em contrário do Thiago).
+- A decisão de recesso é da dupla e **qualquer um dos quatro papéis registra a resposta em nome dela** (decisão tomada): mentor e mentorado respondem por si; auxiliar e coordenação registram o que a dupla combinou — sempre com autoria (`declarado_por`), e a última declaração vale. `declarar_recesso` é re-emitida com esse gate. A grade de disponibilidade é outra história: só o próprio lado e a coordenação editam; o auxiliar vê, pede e combina — não edita.
 - A disponibilidade calibra a **sugestão** de ritmo nesta fatia; agendar dentro das janelas vem depois se o Thiago quiser.
 - "O outro ainda não viu" como regra de UX depende de evento de leitura persistido — decidido na spec 019.

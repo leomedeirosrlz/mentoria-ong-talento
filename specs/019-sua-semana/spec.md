@@ -6,7 +6,7 @@
 ## Problema e resultado
 
 - **Dor hoje:** a informação da semana da dupla está fatiada — o próximo encontro mora no hero `ProximoEncontro`, o plano mora no `PlanoBanner` (frase + quadrados + um CTA), a agenda da semana só existe como strip dentro de `/agenda`, e o auxiliar/coordenador não tem onde ver "quais planos estão em risco" sem entrar ficha a ficha.
-- **Resultado observável:** cada home responde "o que acontece na sua semana e o que falta fazer" na superfície que já existe: no jovem, "Sua semana" é extensão do `ProximoEncontro` (mesma seção, com disclosure de roteiro/materiais) e carrega o vínculo "este é o Nº encontro do plano que {mentor} combinou"; no mentor, entra no card da dupla substituindo `PlanoBanner` e absorvendo "O que fazer agora"; para coordenação e auxiliar, uma seção "O que precisa de você" lista o motivo antes do risco — auxiliar não é gestor: vê onde agir (incluindo propor plano), não um mini-dashboard.
+- **Resultado observável:** cada home responde "o que acontece na sua semana e o que falta fazer" na superfície que já existe: no jovem, "Sua semana" é extensão do `ProximoEncontro` (mesma seção, com disclosure de roteiro/materiais) e carrega o vínculo "este é o Nº encontro do plano que {Fulano} combinou"; no mentor, entra no card da dupla substituindo `PlanoBanner` e absorvendo "O que fazer agora"; para coordenação e auxiliar, uma seção "O que precisa de você" lista o motivo antes do risco — auxiliar não é gestor: vê onde agir (incluindo propor plano), não um mini-dashboard.
 - **Como saberemos que funcionou:** o jovem vê o plano do mentor no mesmo lugar onde vê o próximo encontro e pode contestar dali; o mentor age por dupla sem dois banners; a equipe vê "por que" antes de "quanto risco"; e o auxiliar de turma propõe plano pelo mesmo caminho da ficha.
 
 ## Fora de escopo
@@ -23,7 +23,7 @@
 - **Por que P1:** a home do jovem é a única superfície dele — e hoje um plano que o mentor combinou pode ativar sem ele nunca ver.
 - **Teste independente:** jovem com plano ativo combinado pelo mentor, jovem com encontro marcado fora de plano, jovem sem nada.
 - **Cenários:**
-  1. **Dado** o jovem com plano ativo e encontro marcado **quando** a home abre **então** o próximo encontro carrega o vínculo no mesmo lugar: "este é o 5º encontro do plano que {mentor} combinou" + CTAs "Ver o combinado" e "Não serve pra mim" — nunca "vocês combinaram" nem um "aceitar" sobre plano já ativo.
+  1. **Dado** o jovem com plano ativo e encontro marcado **quando** a home abre **então** o próximo encontro carrega o vínculo no mesmo lugar: "este é o 5º encontro do plano que {Fulano} combinou" + CTAs "Ver o combinado" e "Não serve pra mim" — nunca "vocês combinaram" nem um "aceitar" sobre plano já ativo.
   2. **Dado** o jovem com plano ativo **quando** a home abre **então** "Sua semana" (extensão da seção do próximo encontro, não card novo nem dropdown de navegação) mostra status do plano em texto, ritmo ("2 encontros por semana"), progresso ("6 de 16 feitos") e o disclosure de roteiro/materiais do próximo passo.
   3. **Dado** encontro futuro sem plano **quando** a home abre **então** a seção mostra a sessão da semana com os materiais do encontro — sem forçar plano onde não há.
   4. **Dado** nada marcado **quando** a home abre **então** o convite a marcar (o CTA do hero atual) segue; "Sua semana" não inventa conteúdo nem vira segundo hero.
@@ -57,13 +57,13 @@
 
 ## Requisitos funcionais
 
-- **FR-001:** jovem — "Sua semana" é extensão da seção do `ProximoEncontro`: data/hora do próximo, o vínculo "este é o Nº encontro do plano que {mentor} combinou", status do plano em texto, ritmo, progresso, CTAs "Ver o combinado" (âncora `#plano` da agenda do jovem) e "Não serve pra mim" enquanto contestável + disclosure de roteiro/materiais do próximo passo.
+- **FR-001:** jovem — "Sua semana" é extensão da seção do `ProximoEncontro`: data/hora do próximo, o vínculo "este é o Nº encontro do plano que {Fulano} combinou", status do plano em texto, ritmo, progresso, CTAs "Ver o combinado" (âncora `#plano` da agenda do jovem) e "Não serve pra mim" enquanto contestável + disclosure de roteiro/materiais do próximo passo.
 - **FR-002:** mentor — a semana entra no card da dupla substituindo `PlanoBanner` e absorvendo "O que fazer agora": próximo encontro, status, ritmo, progresso, CTA "Agendar data"/"Confirmar data", "Ver o combinado" (`/duplas/[id]#plano-em-dia`), roteiro/materiais do próximo passo. Sem hero novo.
 - **FR-003:** staff — seção "O que precisa de você": item = dupla + motivo (expirando, passo sem data, contestado, decisão de recesso/decisão do plano pendente) + link pra ficha; para o auxiliar, cada item leva o caminho de ação (propor/responder conforme `supervisiona_dupla`).
 - **FR-004:** a derivação do resumo é pura e compartilhada (estende `resumoCombinado`/`combinadoDoJovem` — `resumoPlanoJovem` é variável da página, não função) e a máquina de aceite é a união discriminada da spec 017 — nada de conta divergente por superfície.
 - **FR-005:** "pedindo atenção" é régua explícita e testável: proposto perto de `expira_em`, ativo com passo pendente vencido, contestado recente, decisão do plano/recesso pendente — definida no módulo puro com os mesmos dados do plano; motivo antes do rótulo de risco.
 - **FR-006:** o roteiro/materiais do passo lê o roteiro vigente (guia semanal quando existir — spec 020 — senão o roteiro oficial do corpus) + materiais da biblioteca do `encontro_num`; disclosure dentro da mesma seção, não dropdown de navegação.
-- **FR-007:** notificação do plano proposto/ativo carrega copy "seu {mentor/auxiliar} combinou um plano pra vocês" com destino direto ao combinado; nunca "vocês combinaram".
+- **FR-007:** notificação do plano proposto/ativo carrega copy "{Fulano} combinou um plano pra vocês" com destino direto ao combinado — nome e papel derivados de `proposto_por`/`proposta_via` (a `jovem_plano` devolve os dois), nunca "seu mentor" quando quem combinou foi o próprio jovem, o auxiliar ou a coordenação; nunca "vocês combinaram".
 - **FR-008:** copy em pt-BR sem jargão; status sempre em texto (pill com rótulo, nunca só cor).
 
 ## Requisitos não funcionais
@@ -83,8 +83,8 @@
 ## Critérios de sucesso
 
 - **SC-001:** unit do resumo por papel (jovem/mentor/staff), da régua "pedindo atenção" com datas fixas e da máquina de aceite nos 5 estados.
-- **SC-002:** e2e app: jovem abre home → vínculo "Nº encontro do plano que {mentor} combinou" + "Ver o combinado"/"Não serve pra mim" no mesmo lugar; mentor abre home → card da dupla com a semana dentro (sem `PlanoBanner` nem segundo banner); coordenação e auxiliar veem "O que precisa de você" com o motivo certo.
-- **SC-003:** e2e da notificação: plano combinado pelo mentor → jovem recebe "seu mentor combinou" → abre → contesta/recusa após o 1º encontro do escopo.
+- **SC-002:** e2e app: jovem abre home → vínculo "Nº encontro do plano que {Fulano} combinou" + "Ver o combinado"/"Não serve pra mim" no mesmo lugar; mentor abre home → card da dupla com a semana dentro (sem `PlanoBanner` nem segundo banner); coordenação e auxiliar veem "O que precisa de você" com o motivo certo.
+- **SC-003:** e2e da notificação: plano combinado pelo mentor → jovem recebe "{Fulano} combinou" (nome derivado de `proposto_por`/`proposta_via`) → abre → contesta/recusa após o 1º encontro do escopo.
 - **SC-004:** prints 1440×900 e 390×844 dos três recortes.
 - **SC-005:** paridade demo dos estados.
 
@@ -96,7 +96,7 @@
 
 ## Riscos
 
-- Vínculo "o plano que {mentor} combinou" sem `visto_em` persistido não pode afirmar que o outro viu — ou a UI usa "combinou/avisado em" (fato) ou se grava leitura; decidir antes da implementação.
+- Vínculo "o plano que {Fulano} combinou" sem `visto_em` persistido não pode afirmar que o outro viu — ou a UI usa "combinou/avisado em" (fato) ou se grava leitura; decidir antes da implementação.
 - N+1 na home do mentor com muitas duplas: medir e agregar numa query única se doer.
 - "Pedindo atenção" vira alarme falso se a régua for sensível demais — começar conservadora (só os sinais claros) e o motivo sempre antes do rótulo.
 

@@ -1,6 +1,8 @@
 # Plano — Ficar em dia até o encerramento
 
-**Spec:** `specs/013-ficar-em-dia/spec.md` · **Status:** Draft
+**Spec:** `specs/013-ficar-em-dia/spec.md` · **Status:** Draft — parcialmente substituído pela spec 017
+
+> **Nota de supersessão (23/11/2026):** o modelo abaixo é da primeira rodada e foi parcialmente substituído pela spec 017 (`plano-autonomia`): "ritmo até 7/semana" vira escolha livre da dupla (qualquer inteiro positivo, sem teto) e o "aceite bilateral" (incluindo o desenho da migration 0224 descrito aqui) vira um aceite de membro da dupla + notificação do outro lado. Este plano fica como histórico; implementar pela 017, não por este texto.
 
 ## Resumo técnico
 

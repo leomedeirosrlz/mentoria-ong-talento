@@ -21,7 +21,7 @@
 
 ### US1 — Material estruturado com schema fechado (P1)
 
-- **Por que P1:** sem corpo estruturado não há o que gerar — e `DocBloco` hoje é só uma união TS em `src/lib/materiais-documentos.ts`: o schema Zod discriminado precisa ser **criado** a partir dela.
+- **Por que P1:** sem corpo estruturado não há o que gerar — e `DocBloco` hoje é só uma união TS em `src/lib/materiais-documentos.ts`: o schema Zod discriminado é **criado na spec 020** (módulo compartilhado) e esta spec o **reutiliza**, estendendo a validação para a escrita gerada (sem `html` cru).
 - **Teste independente:** material novo com `conteudo` de blocos renderiza; bloco fora do schema é recusado; bloco com `html` cru da Liza é recusado.
 - **Cenários:**
   1. **Dado** material com `conteudo` `DocBloco[]` válido **quando** abre **então** renderiza com o mesmo renderer do corpus, com status rascunho/publicado visível para staff.
@@ -59,17 +59,17 @@
 
 ## Requisitos funcionais
 
-- **FR-001:** `materiais` ganha `conteudo` (DocBloco[] jsonb), `status` (rascunho/publicado, default publicado para legado), `via` (manual/liza), e vínculos opcionais (`dupla_id`, `plano_id`, `semana`) — sugestão de DDL no recon §5.4.
-- **FR-002:** validação Zod do `conteudo` na escrita e na renderização — schema Zod **novo**, discriminado a partir da união `DocBloco` de `src/lib/materiais-documentos.ts` (hoje é só tipo TS); bloco inválido é erro, não fallback silencioso; variante gerada nunca aceita `html` cru — texto/dados validados, HTML derivado pelo renderer.
+- **FR-001:** `materiais` ganha `conteudo` (DocBloco[] jsonb), `status` (rascunho/publicado/substituido, default publicado para legado), `via` (manual/liza), `versao` e vínculos opcionais (`dupla_id`, `plano_id`, `semana`) — sugestão de DDL no recon §5.4.
+- **FR-002:** validação Zod do `conteudo` na escrita e na renderização — o schema Zod **criado na spec 020** (discriminado a partir da união `DocBloco` de `src/lib/materiais-documentos.ts`) é reutilizado aqui; bloco inválido é erro, não fallback silencioso; variante gerada nunca aceita `html` cru — texto/dados validados, HTML derivado pelo renderer.
 - **FR-003:** tool(s) Liza de escopo coordenação: gerar material por semana/encontro/dupla, com resolução de dupla no escopo, confirmação em 2 fases, `via='liza'`, auditoria `ia_eventos` — seguindo o padrão `IA_TOOLS`.
 - **FR-004:** "Gerar com Liza" no `NovoMaterialDialog` (coord-only) levando ao mesmo caminho da tool — um gesto, um fluxo.
-- **FR-005:** publicação: rascunho só visível para coordenação (e auxiliar no escopo se decidido); publicado entra na biblioteca e no disclosure do passo; um material gerado por semana/plano (regenerar > duplicar) — se a régua for confirmada, índice único parcial acompanha (recon §5.4).
+- **FR-005:** publicação: rascunho visível para coordenação e para o auxiliar no escopo da dupla do material (`supervisiona_dupla`) — rascunho global (sem `dupla_id`) só coordenação (decisão tomada); publicado entra na biblioteca e no disclosure do passo; um material gerado **vigente** por semana/plano, com versões como nos roteiros: regenerar cria rascunho/versão nova sem derrubar o publicado — unique `(plano_id, semana, versao)` + índice único parcial do vigente `where status='publicado' and via='liza'` (recon §5.4).
 - **FR-006:** modelos/componentes existentes: renderer `DocBloco` do corpus, dialog e queries de `materiais`, protocolo `rpcEscreve`+confirmação — nada de renderer novo nem HTML livre.
 - **FR-007:** a policy `materiais_select` é reescrita para conhecer `status` e `dupla_id`: rascunho só staff no escopo; publicado com `dupla_id is null` (global) ou `dupla_id` da dupla do leitor/escopo staff — hoje a policy só olha `audiencias` e vazaria rascunho e material de dupla.
 
 ## Requisitos não funcionais
 
-- **RLS/RPC:** `materiais_select` reescrita (FR-007) com grants explícitos; write segue coord-only; Liza escreve via RPC definer/tool com grants (precedente das tools de escrita); leitura por escopo (global ou `dupla_id` da dupla); jovem nunca vê rascunho; storage do bucket segue a mesma régua do catálogo (paridade de escopo — arquivo de rascunho não pode ser mais aberto que o registro).
+- **RLS/RPC:** `materiais_select` reescrita (FR-007) com grants explícitos **e `materiais_storage_select` reescrita junto** (recon §5.4 — arquivo de rascunho ou de dupla não pode ser mais aberto que o registro: mesma régua `has_papel`/`my_role` + `status`/`dupla_id`); write segue coord-only; Liza escreve via RPC definer/tool com grants (precedente das tools de escrita); leitura por escopo (global ou `dupla_id` da dupla); jovem nunca vê rascunho.
 - **Feature flag:** geração atrás de flag/`IA_ESCRITAS`-equivalente — o backlog não bloqueia o resto.
 - **Evals:** casos novos em `tests/evals/casos.json` (gerar material válido, recusar escopo inválido, bloco inválido não renderiza) nos modos contract/live.
 - **LGPD:** material por dupla deriva de dados já cobertos; inventário atualiza com o artefato.
@@ -104,6 +104,7 @@
 
 ## Premissas
 
-- Esta spec é backlog: entra depois de 017–020; a modelagem de `materiais` pode sair cedo se o lead preferir destravar o schema — e a reescrita da `materiais_select` é pré-requisito de qualquer `status`/`dupla_id` novo.
+- Esta spec é backlog: entra depois de 017–020; a modelagem de `materiais` pode sair cedo se o lead preferir destravar o schema — e a reescrita da `materiais_select` + `materiais_storage_select` é pré-requisito de qualquer `status`/`dupla_id` novo.
+- O schema Zod do `DocBloco` é criado na spec 020 (módulo compartilhado) e reutilizado aqui; a régua de versão/rascunho/vigente segue a dos roteiros (020).
 - A Liza **não** escreve os roteiros semanais nesta spec — materiais somente.
 - O schema de blocos nasce da união `DocBloco` existente; se a geração pedir um tipo novo, é mudança explícita de schema, não duck-typing — e `html` cru gerado é sempre recusado.
