@@ -5,10 +5,12 @@ import {
   buscarViaServiceRole,
   expect,
   inserirViaServiceRole,
+  jwtDoUsuario,
   limparDuplas,
   limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
+  restComoUsuario,
   test,
 } from "../helpers";
 
@@ -24,6 +26,9 @@ const COORD_EMAIL = process.env.E2E_COORD_EMAIL ?? "e2e-coord@realiza.test";
 const COORD_SENHA = process.env.E2E_COORD_PASSWORD ?? "";
 const DUPLA2_ID =
   process.env.E2E_DUPLA2_ID ?? "e2e00000-0000-4000-8000-000000000070";
+// capacidade que o spec de risco pode subir — restaurada via coordenação
+// (o guard de mentor_profiles bloqueia PATCH da service role)
+let capacidadeMentorTocada: string | null = null;
 
 const IDS = {
   mentor: "e2e00000-0000-4000-8000-000000000010",
@@ -86,6 +91,24 @@ async function limparDuplasComLinks(filtro: string) {
 /** Devolve o staging ao estado do seed — idempotente, vale tanto pro
  *  afterEach quanto pro pre-clean de um staging que sobrou de run quebrado. */
 async function restaurarFixtures() {
+  // o card de risco pode subir a capacidade do primeiro mentor cheio; o
+  // guard de mentor_profiles recusa service role, então restaura como coord
+  if (capacidadeMentorTocada) {
+    const nome = capacidadeMentorTocada;
+    capacidadeMentorTocada = null;
+    const [perfil] = await buscarViaServiceRole<{ id: string }[]>(
+      "profiles",
+      `select=id&nome=eq.${encodeURIComponent(nome)}`
+    );
+    if (perfil) {
+      const jwt = await jwtDoUsuario(COORD_EMAIL, COORD_SENHA);
+      await restComoUsuario(
+        `mentor_profiles?profile_id=eq.${perfil.id}`,
+        jwt,
+        { method: "PATCH", body: { capacidade: 1 } }
+      );
+    }
+  }
   // sucessora criada pelo remanejo (carrega remanejada_de=dupla2) e qualquer
   // vínculo do mentorado livre — depois a dupla2 volta a "ativa"
   await limparDuplasComLinks(`remanejada_de=eq.${DUPLA2_ID}`);
@@ -502,6 +525,7 @@ test.describe("coordenação — fluxos operacionais", () => {
 
     // a saída do cheio: o ajuste sobe a capacidade e o nome dele sai de
     // "sem vaga" pra candidato — o card re-renderiza pelo refresh
+    capacidadeMentorTocada = nomeCheio;
     await linhaCheia
       .getByRole("button", { name: /aumentar capacidade/ })
       .click();
@@ -513,7 +537,9 @@ test.describe("coordenação — fluxos operacionais", () => {
     // dev server compila a action no 1º hit — a janela de write em staging
     // pede folga maior que a dos cliques read-only
     await expect(capDialog).not.toBeVisible({ timeout: 30_000 });
-    const linhaCheiaAgora = card.locator("li", { hasText: nomeCheio });
+    const linhaCheiaAgora = card.locator("li", {
+      hasText: `${nomeCheio} 1/2`,
+    });
     await expect(
       linhaCheiaAgora.getByRole("button", {
         name: "Remanejar",
