@@ -1814,7 +1814,9 @@ export function encontroDoPassoEsp(
  *  especialista) — o rótulo canônico do passo, com o nome de quem conduz
  *  quando existe. `numero` é o nº de EXIBIÇÃO: no DPP é o próprio
  *  `encontro.numero`; na trilha esp é o passo do guia (`passoEsp`), nunca
- *  a tentativa da row. `com` aceita nome completo — entra o primeiro. */
+ *  a tentativa da row. `com` entra INTEIRO depois de "com" — quem chama
+ *  resolve o corte: primeiro nome de pessoa real ou a frase de fallback
+ *  inteira ("seu especialista"); truncar aqui virava "com seu". */
 export function rotuloPasso({
   esp,
   numero,
@@ -1824,9 +1826,9 @@ export function rotuloPasso({
   numero: number;
   com?: string | null;
 }): string {
-  const primeiro = com?.trim().split(/\s+/)[0];
+  const quem = com?.trim();
   const base = esp ? `Sessão ${numero}` : `${numero}º encontro`;
-  return primeiro ? `${base} com ${primeiro}` : base;
+  return quem ? `${base} com ${quem}` : base;
 }
 
 /** O mesmo rótulo a partir da row: na trilha esp o `passoEsp` sobre os
@@ -1863,9 +1865,10 @@ export function passosRealizadosDe(dupla: {
  *  especialista) — a frase canônica de progresso de trilha (REALIZA-498).
  *  Uma régua só: o que já aconteceu de verdade sobre o total dela; quem
  *  quer a posição corrente usa "você está no N", não esta frase. `curta` é
- *  a forma apertada dos contadores densos ("4 de 16 feitos" / "2 de 5
- *  feitas"). Os números são capados no [0, total] — a frase não mente com
- *  realizados extras nem negativo. */
+ *  a forma apertada dos contadores densos ("4 de 16 encontros" / "2 de 5
+ *  sessões") — o particípio sai, a unidade fica: "N de M" sem dizer DE QUÊ
+ *  lia como contagem solta. Os números são capados no [0, total] — a frase
+ *  não mente com realizados extras nem negativo. */
 export function progressoTrilha({
   esp,
   feitos,
@@ -1879,10 +1882,10 @@ export function progressoTrilha({
 }): string {
   const t = Math.max(total, 0);
   const n = Math.min(Math.max(feitos, 0), t);
-  const feita = esp ? "feitas" : "feitos";
+  const unidade = esp ? "sessões" : "encontros";
   return curta
-    ? `${n} de ${t} ${feita}`
-    : `${n} de ${t} ${esp ? "sessões" : "encontros"} ${feita}`;
+    ? `${n} de ${t} ${unidade}`
+    : `${n} de ${t} ${unidade} ${esp ? "feitas" : "feitos"}`;
 }
 
 /** O que a superfície de agendamento precisa saber da dupla — derivação única

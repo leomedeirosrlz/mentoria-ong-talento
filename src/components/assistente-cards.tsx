@@ -1536,7 +1536,7 @@ export function CardJornada({ b }: { b: UiJornada }) {
   return (
     <Cartao
       titulo="Sua jornada"
-      meta={`${b.total_respondidos} de ${total} feitos`}
+      meta={`${b.total_respondidos} de ${total} instrumentos`}
       rodape={<Rodape href="/jovem">Abrir sua jornada</Rodape>}
     >
       {total > 0 && (

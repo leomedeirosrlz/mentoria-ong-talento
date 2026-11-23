@@ -50,4 +50,53 @@ describe("datas do dataset demo", () => {
     for (const ev of data.cicloEventos)
       if (ev.data != null) expect(ev.data).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
+
+  it("passo aplicado do plano bate com a row do encontro (R6)", () => {
+    // A 0219 aplica os dois lados juntos: dupla_plano_passos.encontro_id
+    // aponta a row e data_nova === data_hora dela (com data_anterior sendo
+    // o instante anterior e motivo quando a data mudou). O fixture antigo
+    // tinha o passo aplicado e a row na data oficial — estado impossível.
+    for (const d of data.duplas) {
+      for (const plano of d.planos ?? []) {
+        for (const passo of plano.passos ?? []) {
+          if (passo.encontro_id == null) continue;
+          const enc = d.encontros.find((e) => e.id === passo.encontro_id);
+          expect(
+            enc,
+            `passo ${passo.numero} do plano ${plano.id} aponta encontro inexistente`
+          ).toBeDefined();
+          expect(passo.data_nova).toBe(enc!.data_hora);
+          if (passo.data_anterior != null) {
+            expect(passo.data_anterior).not.toBe(passo.data_nova);
+            // a RPC exige motivo quando uma row existente muda de data
+            expect(passo.motivo?.trim().length ?? 0).toBeGreaterThanOrEqual(2);
+            // e o trigger carimba a remarcação no ledger do encontro
+            expect(
+              enc!.remarcacoes?.some(
+                (r) =>
+                  r.data_anterior === passo.data_anterior &&
+                  r.data_nova === passo.data_nova
+              )
+            ).toBe(true);
+          }
+        }
+      }
+    }
+  });
+
+  it("nenhuma dupla tem dois agendados no mesmo instante (R6)", () => {
+    // Dois encontros agendados na mesma hora é a encavalação que o apply
+    // do plano produzia quando a row ficava na data oficial.
+    for (const d of data.duplas) {
+      const vistos = new Set<string>();
+      for (const e of d.encontros) {
+        if (e.status !== "agendado" || e.data_hora == null) continue;
+        expect(
+          vistos.has(e.data_hora),
+          `dupla ${d.id} encavala dois agendados em ${e.data_hora}`
+        ).toBe(false);
+        vistos.add(e.data_hora);
+      }
+    }
+  });
 });

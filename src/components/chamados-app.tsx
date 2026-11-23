@@ -43,6 +43,7 @@ import {
   ChamadoStatusBadge,
   UrgenciaMarca,
   relTempo,
+  rotuloAberturaChamado,
   type Equipe,
 } from "@/components/chamados-shared";
 
@@ -195,14 +196,14 @@ export function ChamadosApp({
       duplas={duplas}
       trigger={
         // com um chamado aberto a ação da tela é a do detalhe (Assumir,
-        // Resolver): "Novo chamado" recua pra contorno — um lima por tela
+        // Resolver): a de abertura recua pra contorno — um lima por tela
         <Button
           variant={sel ? "outline" : "default"}
           className="max-md:hidden"
           data-telemetry-alvo="novo-chamado"
         >
           <Plus aria-hidden />
-          Novo chamado
+          {rotuloAberturaChamado(papel)}
         </Button>
       }
     />
@@ -226,7 +227,7 @@ export function ChamadosApp({
           data-telemetry-alvo="novo-chamado"
         >
           <Plus aria-hidden />
-          Novo chamado
+          {rotuloAberturaChamado(papel)}
         </Button>
       }
     />,

@@ -189,6 +189,7 @@ Spec em **`.devin/formularios-ux-v2.md`** (3 críticos com skills: público resp
   - A `0158` tirou a triagem: demanda e motivo escritos pelo jovem vão direto ao mural de todo `mentor_especialista` ativo.
   - `ia_confirmacoes` (`0163`) guarda os args completos (mensagem de até 4000 chars) e só é limpa pelo próprio dono na próxima prévia. Um usuário inativo retém esses dados para sempre. Falta um job de limpeza global.
 - [ ] **Contra-assinatura do presidente**: subir o PNG em qualquer ficha → seção Assinaturas → engrenagem (ou `documentos/sistema/contra-assinatura.png` no storage). Os PDFs do termo já saem assinados pelo instituto quando a imagem existe.
+- [ ] **"Aconteceu como planejado?" × avaliação do encontro** (R19 do recon da REALIZA-508): a pergunta do registro mede aderência ao plano, mas grava no `registros.avaliacao` de 4 pontos ("Não" → `baixa`) que alimenta trajetória e semáforo como QUALIDADE. Um encontro fora do planejado pode ter sido ótimo — são duas leituras que hoje dividem um enum só. Espera decisão de produto (pergunta muda, ou o mapeamento deixa de conflar); até lá pergunta e mapeamento ficam como estão.
 
 ## REALIZA-238 — auditoria dos guias vs catálogo (out/2026)
 

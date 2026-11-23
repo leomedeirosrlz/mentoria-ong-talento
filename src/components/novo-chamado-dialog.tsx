@@ -33,7 +33,11 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { CAT_ICON } from "@/components/chamados-shared";
+import {
+  CAT_ICON,
+  rotuloAberturaChamado,
+  rotuloEnvioChamado,
+} from "@/components/chamados-shared";
 
 // Dialog de abertura de chamado — mesmo canal pros 4 papéis. O jovem vê
 // opções na linguagem dele; mentor/equipe veem as 5 categorias. No celular
@@ -188,7 +192,7 @@ export function NovoChamadoDialog({
       >
         <DialogHeader>
           <DialogTitle className="text-lg font-semibold">
-            {jovem ? "Pedir ajuda" : "Novo chamado"}
+            {rotuloAberturaChamado(papel)}
           </DialogTitle>
         </DialogHeader>
 
@@ -346,7 +350,7 @@ export function NovoChamadoDialog({
             disabled={pending || !pronto}
           >
             {pending && <CircleNotch className="animate-spin" aria-hidden />}
-            {jovem ? "Enviar pedido" : "Abrir chamado"}
+            {rotuloEnvioChamado(papel)}
           </Button>
         </DialogFooter>
       </DialogContent>

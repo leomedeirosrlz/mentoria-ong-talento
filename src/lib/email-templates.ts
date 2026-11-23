@@ -1,5 +1,6 @@
 import { SITE_URL } from "@/lib/email";
 import type { ComunicadoPrioridade } from "@/lib/types";
+import { vozChamado } from "@/lib/types";
 
 // hex equivalentes das CSS vars da marca (globals.css) — e-mail não herda
 // tokens, e cliente de e-mail só garante inline CSS
@@ -539,7 +540,7 @@ export function emailChamadoUrgencia({
 }): string {
   return emailLayout({
     titulo: `Chamado ${esc(numero)} precisa de resposta`,
-    tagline: categoria === "urgencia" ? "Pedido urgente" : "Novo pedido de apoio",
+    tagline: categoria === "urgencia" ? "Chamado urgente" : "Novo chamado",
     conteudoHtml:
       `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};"><strong>${esc(autorNome)}</strong> abriu o chamado <strong>${esc(numero)}</strong>${categoria === "urgencia" ? ' marcado como <strong>urgente</strong>' : ""}.</p>` +
       `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;background:${categoria === "urgencia" ? DANGER_BG : CARD_SUAVE};border-radius:10px;"><tr><td style="padding:14px 16px;font-size:15px;line-height:1.55;color:${INK};">“${esc(assunto)}”</td></tr></table>` +
@@ -552,25 +553,43 @@ export function emailChamadoUrgencia({
   });
 }
 
+/** O nome do ticket na voz de quem abriu (R15) — o mesmo do app: o jovem
+ *  tem um "pedido de ajuda", o mentor um "pedido de apoio" e a equipe um
+ *  "chamado". Assunto e corpo do e-mail de atualização dividem o termo. */
+export function rotuloPedidoAutor(
+  papel: string | null | undefined
+): string {
+  const v = vozChamado(papel);
+  return v === "jovem"
+    ? "pedido de ajuda"
+    : v === "mentor"
+      ? "pedido de apoio"
+      : "chamado";
+}
+
 export function emailChamadoAtualizacao({
   autorNome,
   texto,
   href,
+  papel,
 }: {
   autorNome: string;
   texto: string;
   href: string;
+  /** role do autor — decide o substantivo ("pedido de ajuda" no jovem,
+   *  "pedido de apoio" no mentor, "chamado" na equipe). */
+  papel?: string | null;
 }): string {
+  const pedido = rotuloPedidoAutor(papel);
   return emailLayout({
-    titulo: "Atualização no seu pedido",
+    titulo: `Atualização no seu ${pedido}`,
     tagline: "Chamados · Mentoria Social",
     conteudoHtml:
-      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${autorNome ? `, ${esc(autorNome.split(" ")[0])}` : ""}! A equipe respondeu no seu pedido de apoio:</p>` +
+      `<p style="margin:0 0 14px;font-size:15px;line-height:1.55;color:${INK};">Oi${autorNome ? `, ${esc(autorNome.split(" ")[0])}` : ""}! A equipe respondeu no seu ${pedido}:</p>` +
       `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 14px;background:${CARD_SUAVE};border-radius:10px;"><tr><td style="padding:14px 16px;font-size:15px;line-height:1.55;color:${INK};">${paragrafos(texto)}</td></tr></table>`,
     ctaLabel: "Ver a conversa",
     ctaHref: href,
-    preheader: `A equipe respondeu no seu pedido de apoio.`,
-    rodapeExtra:
-      "Você está recebendo este e-mail porque abriu um pedido de apoio na Mentoria Social.",
+    preheader: `A equipe respondeu no seu ${pedido}.`,
+    rodapeExtra: `Você está recebendo este e-mail porque abriu um ${pedido} na Mentoria Social.`,
   });
 }

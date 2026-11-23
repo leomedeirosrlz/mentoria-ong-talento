@@ -12,6 +12,7 @@ import {
   passosRealizadosDe,
   progressoTrilha,
   resumoSemana,
+  rotuloPasso,
   textoResumoSemana,
   totalEncontros,
 } from "@/lib/ciclo";
@@ -338,6 +339,37 @@ describe("especialista — numero = tentativa, passo = rank (0074)", () => {
   });
 });
 
+describe("rotuloPasso — o 'com quem' entra inteiro (R14)", () => {
+  it("frase de fallback não trunca no primeiro token", () => {
+    expect(
+      rotuloPasso({ esp: true, numero: 5, com: "seu especialista" })
+    ).toBe("Sessão 5 com seu especialista");
+    expect(rotuloPasso({ esp: false, numero: 5, com: "seu mentor" })).toBe(
+      "5º encontro com seu mentor"
+    );
+  });
+
+  it("nome próprio entra como veio — o corte é do chamador", () => {
+    expect(rotuloPasso({ esp: true, numero: 5, com: "Sofia" })).toBe(
+      "Sessão 5 com Sofia"
+    );
+    expect(rotuloPasso({ esp: false, numero: 3, com: "Ricardo" })).toBe(
+      "3º encontro com Ricardo"
+    );
+    // quem chama decide o corte: um nome composto passa inteiro
+    expect(rotuloPasso({ esp: true, numero: 2, com: "Ana Beatriz" })).toBe(
+      "Sessão 2 com Ana Beatriz"
+    );
+  });
+
+  it("sem 'com' sai o rótulo limpo", () => {
+    expect(rotuloPasso({ esp: true, numero: 1 })).toBe("Sessão 1");
+    expect(rotuloPasso({ esp: false, numero: 1, com: "  " })).toBe(
+      "1º encontro"
+    );
+  });
+});
+
 describe("progressoTrilha + passosRealizadosDe — régua única (REALIZA-498)", () => {
   it("a frase conta feitos sobre o total da trilha, com a unidade certa", () => {
     expect(progressoTrilha({ esp: false, feitos: 4, total: 16 })).toBe(
@@ -355,13 +387,13 @@ describe("progressoTrilha + passosRealizadosDe — régua única (REALIZA-498)",
     );
   });
 
-  it("curta é a forma apertada dos contadores densos", () => {
+  it("curta é a forma apertada — o particípio sai, a unidade fica", () => {
     expect(
       progressoTrilha({ esp: false, feitos: 4, total: 16, curta: true })
-    ).toBe("4 de 16 feitos");
+    ).toBe("4 de 16 encontros");
     expect(
       progressoTrilha({ esp: true, feitos: 2, total: 5, curta: true })
-    ).toBe("2 de 5 feitas");
+    ).toBe("2 de 5 sessões");
   });
 
   it("capa os números no [0, total] — sem mentir com extra nem negativo", () => {

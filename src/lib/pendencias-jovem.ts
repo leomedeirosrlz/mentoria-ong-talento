@@ -73,8 +73,9 @@ export type EncontroPendencia = {
   dataHora: string | null;
   /** Trilha de especialista: "sessão" em vez de "encontro" no título. */
   sessao?: boolean;
-  /** Nome de quem conduz (mentor ou especialista) — vira o contexto. */
-  comNome?: string | null;
+  /** Quem conduz, já no formato do "com …" — primeiro nome OU a frase de
+   *  fallback inteira ("seu mentor"); não truncar aqui. */
+  comQuem?: string | null;
 };
 
 /** Passo oficial vencido e sem row — o retroativo elegível (0207/0208). O
@@ -278,13 +279,13 @@ function encontrosSemDesfecho(
     const sujeito = e.sessao
       ? `A ${e.numero}ª sessão`
       : `O ${e.numero}º encontro`;
-    const nome = primeiroNome(e.comNome);
+    const quem = e.comQuem?.trim();
     out.push({
       id: `encontro:${e.id}`,
       tipo: "encontro_sem_desfecho",
       prioridade: 100,
       titulo: `${sujeito} era em ${ddmm(e.dataHora)}. Aconteceu?`,
-      contexto: nome ? `com ${nome}` : undefined,
+      contexto: quem ? `com ${quem}` : undefined,
       quando: e.dataHora,
       acao: { tipo: "responder_encontro", rotulo: "Aconteceu", alvoId: e.id },
       acaoSecundaria: {

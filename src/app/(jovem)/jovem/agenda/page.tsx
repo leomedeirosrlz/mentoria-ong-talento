@@ -196,16 +196,21 @@ export default async function JovemAgenda() {
         contato?.nome ||
         d.mentor_nome_social ||
         d.mentor_nome ||
-        "seu especialista";
+        null;
+      const primeiro = nome?.split(" ")[0] ?? null;
       return [
         d.id!,
         {
-          nome,
-          primeiro: nome.split(" ")[0],
+          // `quem` entra inteiro depois de "com"/"de" — primeiro nome ou a
+          // frase de fallback, nunca os dois truncados igual ("com seu")
+          nome: nome ?? "seu especialista",
+          primeiro,
+          quem: primeiro ?? "seu especialista",
+          deQuem: primeiro ? `de ${primeiro}` : "do seu especialista",
           avatar_path: contato?.avatar_path ?? d.mentor_avatar_path,
           wa: waLink(
             contato?.whatsapp,
-            `Olá, ${nome.split(" ")[0]}! Sou ${primeiroNome}, seu/sua mentorado(a). Quero combinar nosso próximo encontro.`
+            `Olá${primeiro ? `, ${primeiro}` : ""}! Sou ${primeiroNome}, seu/sua mentorado(a). Quero combinar nosso próximo encontro.`
           ),
         },
       ] as const;
@@ -259,7 +264,7 @@ export default async function JovemAgenda() {
           : e.numero,
       com:
         trilhaPorDupla.get(e.dupla_id) === "especialista"
-          ? (espPorDupla.get(e.dupla_id)?.nome ?? "seu especialista")
+          ? (espPorDupla.get(e.dupla_id)?.quem ?? "seu especialista")
           : null,
     });
 
@@ -350,7 +355,7 @@ export default async function JovemAgenda() {
         status: e.status,
         dataHora: e.data_hora,
         sessao,
-        comNome: nomeDaDupla(e.dupla_id, sessao),
+        comQuem: nomeDaDupla(e.dupla_id, sessao),
       };
     }),
     avaliacoes: avaliacoesPendentes.map((p) => ({
@@ -536,11 +541,11 @@ export default async function JovemAgenda() {
                       />
                       <div className="min-w-0 flex-1 basis-40">
                         <p className="truncate text-sm font-medium">
-                          Horários de {esp.primeiro}
+                          Horários {esp.deQuem}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           Sessões de 1h · escolhe um horário e manda o pedido.
-                          Quando {esp.primeiro} aceitar, a sessão aparece
+                          Quando {esp.quem} aceitar, a sessão aparece
                           aqui na agenda.
                         </p>
                       </div>
@@ -580,8 +585,9 @@ export default async function JovemAgenda() {
                     ) : slots.length === 0 ? (
                       <div className="space-y-2">
                         <p className="text-sm text-muted-foreground">
-                          {esp.primeiro} ainda não abriu horários livres.
-                          Pede por aqui que quem aceita propõe um com você
+                          {esp.primeiro ?? "Seu especialista"} ainda não
+                          abriu horários livres. Pede por aqui que quem
+                          aceita propõe um com você
                           {esp.wa ? ", ou chama no WhatsApp" : ""}.
                         </p>
                         <PedirEspecialistaDialog
@@ -592,7 +598,7 @@ export default async function JovemAgenda() {
                           trigger={
                             <Button variant="outline" size="sm">
                               <Sparkle size={15} aria-hidden />
-                              Pedir sessão com {esp.primeiro}
+                              Pedir sessão com {esp.quem}
                             </Button>
                           }
                         />

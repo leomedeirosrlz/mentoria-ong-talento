@@ -377,7 +377,7 @@ export default async function JovemHome() {
         status: e.status,
         dataHora: e.data_hora,
         sessao,
-        comNome: nomeDaDupla(e.dupla_id, sessao),
+        comQuem: nomeDaDupla(e.dupla_id, sessao),
       };
     }),
     avaliacoes: avaliacoesPendentes.map((p) => ({

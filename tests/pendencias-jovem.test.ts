@@ -40,7 +40,7 @@ function enc(over: Partial<EncontroPendencia>): EncontroPendencia {
     numero: 5,
     status: "agendado",
     dataHora: `${PASSADO}T19:00:00-03:00`,
-    comNome: "Ricardo",
+    comQuem: "Ricardo",
     ...over,
   };
 }
@@ -109,6 +109,19 @@ describe("derivarPendencias — encontro sem desfecho", () => {
       entrada({ encontros: [enc({ numero: 3, sessao: true })] })
     );
     expect(lista[0].titulo).toBe("A 3ª sessão era em 17/11. Aconteceu?");
+  });
+
+  it("o 'com quem' entra inteiro no contexto — a frase de fallback não vira 'com seu'", () => {
+    const lista = derivarPendencias(
+      entrada({ encontros: [enc({ comQuem: "seu mentor" })] })
+    );
+    expect(lista[0].contexto).toBe("com seu mentor");
+    const esp = derivarPendencias(
+      entrada({
+        encontros: [enc({ sessao: true, comQuem: "seu especialista" })],
+      })
+    );
+    expect(esp[0].contexto).toBe("com seu especialista");
   });
 
   it.each(["realizado", "nao_aconteceu", "cancelado", "remarcado"])(

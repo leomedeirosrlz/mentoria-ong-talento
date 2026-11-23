@@ -20,6 +20,7 @@ import type {
   ChamadoStatus,
   Profile,
 } from "@/lib/types";
+import { vozChamado } from "@/lib/types";
 import {
   CHAMADO_CATEGORIA_LABEL,
   CHAMADO_STATUS_LABEL,
@@ -62,6 +63,26 @@ const STATUS_TOM_AUTOR: Record<ChamadoStatus, string> = {
 };
 
 const primeiroNome = (n: string) => n.split(" ")[0];
+
+// ---------- vocabulário por papel (R15) ----------
+// O jovem "pede ajuda", o mentor "pede apoio" e a equipe abre "chamado" —
+// entrada (trigger/menu/card) e título do dialog dividem o mesmo verbo.
+
+/** O verbo do gesto de abrir — entrada, trigger e título do dialog. */
+export function rotuloAberturaChamado(papel: string): string {
+  const v = vozChamado(papel);
+  return v === "jovem"
+    ? "Pedir ajuda"
+    : v === "mentor"
+      ? "Pedir apoio"
+      : "Novo chamado";
+}
+
+/** O botão de envio dentro do dialog — o pedido é do autor, o chamado é
+ *  da equipe. */
+export function rotuloEnvioChamado(papel: string): string {
+  return vozChamado(papel) === "equipe" ? "Abrir chamado" : "Enviar pedido";
+}
 
 /** Pill de status do chamado. `visao` muda a fala: pra equipe o aberto sem
  *  dono é "Sem dono" (a fila é o trabalho dela); pro autor é "Aguardando a
