@@ -269,6 +269,60 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     expect(notif?.href).toBe(`/duplas/${DUPLA_ID}`);
   });
 
+  test("agendar grava o numeroAgendar pré-selecionado sem tocar o nº (QW7)", async ({
+    page,
+  }) => {
+    await entrarComoJovem(page);
+    await page.goto("/jovem/agenda");
+
+    // REALIZA-509 (R22): numeroAgendar é o primeiro livre DEPOIS do último
+    // realizado; a fixture tem o 16º realizado (o último do ciclo), então
+    // nenhum livre passa dele e a regra cai no fallback livres[0] = 1.
+    // O nº chega pré-selecionado na superfície que a página oferecer — o
+    // cartão de sugestão (caminho principal da 481) ou o dialog de rede
+    // de segurança (#numero-select), um dos dois sempre monta.
+    const marcar = page.getByRole("button", { name: /^Marcar para / });
+    const cta = page.getByRole("button", { name: "Agendar encontro" });
+    await expect(marcar.or(cta)).toBeVisible();
+
+    if (await marcar.isVisible()) {
+      // o título do cartão já é a promessa do nº — o toque único marca
+      // numeroAgendar + slot do motor sem passar por select algum
+      await expect(
+        page.getByText("1º encontro com Mentor")
+      ).toBeVisible();
+      await marcar.click();
+    } else {
+      const dialog = page.getByRole("dialog");
+      await agirComConfirma(
+        () => cta.click(),
+        () => dialog.isVisible()
+      );
+      await expect(dialog.locator("#numero-select")).toContainText(
+        "1º encontro"
+      );
+      await dialog.locator("#data_hora").fill(emDias(7));
+      await dialog
+        .getByRole("button", { name: "Confirmar agendamento" })
+        .click();
+    }
+
+    // a prova forte: o submit sem escolha de nº gravou exatamente o
+    // numeroAgendar — não o próximo da agenda (que seria o 9º)
+    await expect(page.getByText("1º encontro agendado.")).toBeVisible({
+      timeout: 15_000,
+    });
+
+    const rows = await buscarViaServiceRole<
+      { numero: number; status: string }[]
+    >(
+      "encontros",
+      `select=numero,status&dupla_id=eq.${DUPLA_ID}&numero=eq.1`
+    );
+    expect(rows).toHaveLength(1);
+    expect(rows[0].status).toBe("agendado");
+  });
+
   test("remarcar mudando a data exige motivo e o mentor lê o motivo", async ({
     page,
   }) => {
@@ -1191,5 +1245,61 @@ test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
       `select=id&id=eq.${String(row.id)}`
     );
     expect(depois).toHaveLength(0);
+  });
+});
+
+// REALIZA-509 (R24) — o item "Agendar Nº" do ⋯ só existe quando a
+// primária do mentor já é o registrar (pendência aberta) E o próximo
+// passo não tem data. O demo não reproduz o recorte (toda dupla DPP da
+// persona tem agendado futuro garantido — nunca falta data); aqui a d1
+// vira limbo e o estado nasce sozinho. convergirPiso devolve as fixtures.
+test.describe("mentor — 'Agendar Nº' no ⋯ da ficha (R24)", () => {
+  test.use({ timezoneId: "America/Sao_Paulo" });
+  test.beforeEach(convergirPiso);
+  test.afterEach(convergirPiso);
+
+  test("pendência + próximo sem data → ⋯ vende 'Agendar Nº encontro' e o dialog abre no nº", async ({
+    page,
+  }) => {
+    // d1 (nº 8 agendado futuro) vai pro limbo: vira a pendência que toma a
+    // primária e ao mesmo tempo some o "já tem data" — o próximo alvo
+    // volta pro primeiro faltante do ciclo (o 16º é o único realizado)
+    await atualizarViaServiceRole(
+      "encontros",
+      `id=eq.${IDS.encontroFixture}`,
+      { data_hora: new Date(Date.now() - 86400e3).toISOString() }
+    );
+
+    await loginComSenha(page, MENTOR_EMAIL, SENHA);
+    await page.goto(`/duplas/${DUPLA_ID}`);
+
+    // a primária ficou com a pendência de menor nº — o 8º em limbo
+    await expect(
+      page.getByRole("link", { name: "Registrar 8º encontro" })
+    ).toBeVisible();
+
+    const mais = page.getByRole("button", { name: "Mais ações da dupla" });
+    await expect(mais).toBeVisible();
+    await mais.click();
+    const popup = page.locator('[data-slot="dropdown-menu-content"]');
+    await expect(popup).toBeVisible();
+    const item = popup.getByRole("menuitem", {
+      name: /^Agendar \d+º encontro$/,
+    });
+    await expect(item).toBeVisible();
+    const numero = (await item.innerText()).match(/(\d+)º/)?.[1];
+    expect(numero).toBeTruthy();
+
+    // o dialog mora fora do popup e já abre no nº que o item anunciava.
+    // Como o slot oficial do 1º já venceu, ele abre em modo retroativo
+    // ("entra como realizado") — o gesto certo pro passo perdido
+    await item.click();
+    const dialog = page.getByRole("dialog");
+    await expect(
+      dialog.getByRole("heading", { name: `${numero}º encontro` })
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: "Registrar encontro" })
+    ).toBeVisible();
   });
 });

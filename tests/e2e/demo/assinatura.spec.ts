@@ -91,3 +91,69 @@ test.describe("demo — /assinar/[token] (REALIZA-172)", () => {
     await expect(page.getByText(FAIXA)).toHaveCount(0);
   });
 });
+
+// REALIZA-509 (R23) — os quatro cartões terminais do link. O status
+// precede a checagem de identidade na página, então qualquer papel demo
+// serve pra ver o card. Fixtures do dataset:
+//   · uid(0x3403) — autorização da Ana, já assinada pela mãe via link
+//   · uid(0x3405) — termo da Patrícia, revogado quando ela saiu do programa
+//   · uid(0x3408) — autorização da Laura pendente com prazo vencido: o
+//     stub espelha a RPC e faz o flip lazy pra 'expirado' no primeiro acesso
+const TOKEN_ASSINADO = "de000000-0000-4000-8000-000000013315"; // uid(0x3403)
+const TOKEN_REVOGADO = "de000000-0000-4000-8000-000000013317"; // uid(0x3405)
+const TOKEN_EXPIRADO = "de000000-0000-4000-8000-000000013320"; // uid(0x3408)
+
+test.describe("demo — /assinar/[token] cards terminais (REALIZA-509)", () => {
+  test("assinado: 'Documento assinado' com a via pra baixar", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(`/assinar/${TOKEN_ASSINADO}`);
+    await expect(
+      page.getByRole("heading", { name: "Documento assinado" })
+    ).toBeVisible();
+    await expect(page.getByText(/já foi assinado/)).toBeVisible();
+    await expect(page.getByText(FAIXA)).toBeVisible();
+    await expect(
+      page.getByRole("link", { name: /^Baixar a via do documento/ })
+    ).toHaveAttribute("href", `/api/assinar-token/${TOKEN_ASSINADO}`);
+    // card terminal: nada de form por baixo
+    await expect(page.getByRole("button", { name: /Assinar/ })).toHaveCount(0);
+  });
+
+  test("revogado: 'Documento cancelado'", async ({ page }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(`/assinar/${TOKEN_REVOGADO}`);
+    await expect(
+      page.getByRole("heading", { name: "Documento cancelado" })
+    ).toBeVisible();
+    await expect(
+      page.getByText(/cancelado pela coordenação/)
+    ).toBeVisible();
+    await expect(page.getByText(FAIXA)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Assinar/ })).toHaveCount(0);
+  });
+
+  test("pendente vencido: 'Link expirado' (flip lazy)", async ({ page }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(`/assinar/${TOKEN_EXPIRADO}`);
+    await expect(
+      page.getByRole("heading", { name: "Link expirado" })
+    ).toBeVisible();
+    await expect(
+      page.getByText(/prazo deste link de assinatura terminou/)
+    ).toBeVisible();
+    await expect(page.getByText(FAIXA)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Assinar/ })).toHaveCount(0);
+  });
+
+  test("token malformado: 'Link inválido'", async ({ page }) => {
+    await entrarNaDemo(page, "coordenacao");
+    // charset válido mas tamanho errado — a página nem consulta o stub
+    await page.goto("/assinar/abc123");
+    await expect(
+      page.getByRole("heading", { name: "Link inválido" })
+    ).toBeVisible();
+    await expect(page.getByText(FAIXA)).toBeVisible();
+  });
+});
