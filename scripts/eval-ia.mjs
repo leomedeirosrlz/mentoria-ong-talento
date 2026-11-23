@@ -92,8 +92,10 @@ async function roteador() {
 
 /** Entra por senha e devolve o header Cookie no formato do app: o
  *  createServerClient do @supabase/ssr escreve os mesmos cookies
- *  (nome sb-<ref>-auth-token, chunks, base64-) que o middleware lê. O
- *  token só vive neste processo. */
+ *  (nome sb-<ref>-auth-token, chunks, base64-) que o middleware lê. No
+ *  modo proxy local o nome fixo é realiza-auth (lib/supabase/config.ts);
+ *  sem ele o middleware responde 307 pra todo POST. O token só vive
+ *  neste processo. */
 async function cookieDeSessao(papel) {
   // conta por papel: EVAL_PAPEL=mentorado usa EVAL_EMAIL_JOVEM/_SENHA_JOVEM
   // (sem fallback cruzado — papel errado testa o toolset errado)
@@ -112,6 +114,12 @@ async function cookieDeSessao(papel) {
   const { createServerClient } = await import("@supabase/ssr");
   const jar = new Map();
   const sb = createServerClient(url, anon, {
+    cookieOptions: {
+      name:
+        process.env.NEXT_PUBLIC_SUPABASE_PROXY === "1"
+          ? "realiza-auth"
+          : undefined,
+    },
     cookies: {
       getAll: () => [...jar].map(([name, value]) => ({ name, value })),
       setAll: (lista) =>
