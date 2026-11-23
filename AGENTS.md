@@ -21,6 +21,7 @@ Leia nesta ordem, só o que a tarefa toca:
 
 ## Regras duras
 
+- **Migrations são alçada do lead/orquestrador.** Agentes (Devin, Claude, subagents) não criam, editam nem aplicam arquivo em `supabase/migrations/`, não rodam `supabase db push/migration up`, `psql` de schema ou escrita no ledger. Só sugerem SQL em comentário/spec/relatório. O lead revisa, numera, escreve e aplica. Exceções já produzidas nesta rodada ficam em `docs/convencoes/agents-migrations.md` e passam por revisão antes de integrar.
 - SLC: entregue a fatia vertical completa e polida. Sem placeholder, stub ou "depois".
 - Sem workaround para infra quebrada: faça o passo correto ou pare e pergunte.
 - Autorização é RLS no banco (`my_role()`/`my_profile_id()`); nunca só na tela ou na action.
