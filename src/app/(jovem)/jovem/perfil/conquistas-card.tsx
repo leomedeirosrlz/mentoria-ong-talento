@@ -16,12 +16,12 @@ import type { Conquista, ProximoMarco } from "@/lib/conquistas";
  *  conquistado, em ordem cronológica, cada peça num emblema squircle (a
  *  gramática do InstrumentoEmblema: rounded-[28%], tinta de fundo, glifo
  *  na cor). Toque abre o detalhe de uma linha. O que ainda falta NUNCA
- *  vira cadeado na estante — mora só na faixa "a caminho" embaixo, com a
- *  barra do próximo marco e o que falta pra chegar lá. Cliente: os
+ *  vira cadeado na estante — mora só na faixa "próximo marco" embaixo,
+ *  com a barra do próximo marco e o que falta pra chegar lá. Cliente: os
  *  emblemas são triggers de Dialog. */
 
 /** O squircle do emblema — `ConquistaEmblema` compartilhado com a faixa
- *  "a caminho" da /jovem/materiais (485). */
+ *  "Próximo marco" da /jovem/materiais (485). */
 function Emblema({ c, size = 44 }: { c: Conquista; size?: number }) {
   return <ConquistaEmblema glifo={c.glifo} tom={c.tom} size={size} />;
 }
@@ -89,8 +89,8 @@ export function ConquistasCard({
         </ul>
       )}
 
-      {/* faixa "a caminho" — o futuro da jornada vive aqui, nunca como
-          cadeado na estante: próximo marco + barra + o que falta. A régua
+      {/* faixa do próximo marco — o futuro da jornada vive aqui, nunca
+          como cadeado na estante: próximo marco + barra + o que falta. A régua
           é a da trilha toda (atual/total, a mesma das outras barras): a
           escala do limiar sai na frase "Faltam N", não como denominador
           solto (REALIZA-498) */}
@@ -98,7 +98,7 @@ export function ConquistasCard({
         <div className="mt-4 rounded-lg border border-border/60 p-3.5 sm:p-4">
           <div className="flex items-baseline justify-between gap-3">
             <p className="text-sm font-medium">
-              A caminho: {proximoMarco.rotulo}
+              Próximo marco: {proximoMarco.rotulo}
             </p>
             <span className="text-xs text-muted-foreground">
               {progressoTrilha({

@@ -1,8 +1,9 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, Sparkle, X } from "@phosphor-icons/react";
+import { CaretRight, Check, Sparkle, X } from "@phosphor-icons/react";
 import { toast } from "@/lib/toast";
 import {
   confirmarSugestaoEspecialista,
@@ -11,6 +12,7 @@ import {
 import { avatarPublicUrl } from "@/lib/avatar";
 import type { JovemEspecialista, SolicitacaoEspecialista } from "@/lib/types";
 import { Avatar } from "@/components/avatar";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -32,6 +34,64 @@ import {
 
 const QUALQUER = "qualquer";
 
+/** Prévia do especialista indicado (REALIZA-515) — foto, profissão/áreas e
+ *  experiência, o mesmo recorte público da view `jovem_especialistas` (sem
+ *  documentos nem contato: isso só abre depois que a trilha começa). O
+ *  bloco inteiro leva ao perfil em /jovem/pessoas — decidir sem ver quem
+ *  é era apostar às cegas. */
+function EspecialistaPreview({ e }: { e: JovemEspecialista }) {
+  const nome = e.nome_social || e.nome;
+  const atuacao = [e.cargo, e.empresa].filter(Boolean).join(" · ");
+  const experiencia = e.experiencia_previa ?? e.bio;
+  return (
+    <Link
+      href={`/jovem/pessoas/${e.id}`}
+      aria-label={`Ver perfil de ${nome}`}
+      className="flex items-start gap-3 rounded-lg border border-border/60 bg-card/60 p-3 outline-none transition-colors hover:bg-muted/50 focus-visible:ring-2 focus-visible:ring-ring"
+    >
+      <Avatar
+        nome={nome}
+        src={e.avatar_path ? avatarPublicUrl(e.avatar_path) : null}
+        size={40}
+      />
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium leading-tight">
+          {nome}
+        </span>
+        {atuacao && (
+          <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+            {atuacao}
+          </span>
+        )}
+        {!!e.areas?.length && (
+          <span className="mt-1.5 flex flex-wrap gap-1">
+            {e.areas.slice(0, 3).map((a) => (
+              <Badge key={a} variant="secondary" className="font-normal">
+                {a}
+              </Badge>
+            ))}
+            {e.areas.length > 3 && (
+              <Badge variant="secondary" className="font-normal">
+                +{e.areas.length - 3}
+              </Badge>
+            )}
+          </span>
+        )}
+        {experiencia && (
+          <span className="mt-1.5 line-clamp-2 block text-xs leading-relaxed text-muted-foreground">
+            {experiencia}
+          </span>
+        )}
+      </span>
+      <CaretRight
+        size={15}
+        aria-hidden
+        className="mt-0.5 shrink-0 text-muted-foreground"
+      />
+    </Link>
+  );
+}
+
 /** Card da sugestão registrada pelo mentor DPP (WP6): a demanda é do jovem —
  *  confirmar vira pedido de verdade ('aberta', entra nos tetos e no mural);
  *  dispensar cancela e some. Antes de confirmar ele pode ajustar tema,
@@ -52,6 +112,9 @@ export function SugestaoEspecialistaCard({
 
   const autor = s.solicitante?.nome ?? "Seu mentor";
   const escolhido = catalogo.find((e) => e.id === esp);
+  const sugerido = s.especialista_desejado_id
+    ? catalogo.find((e) => e.id === s.especialista_desejado_id)
+    : undefined;
 
   function confirmar() {
     start(async () => {
@@ -112,10 +175,24 @@ export function SugestaoEspecialistaCard({
               <span className="font-medium">Objetivo:</span> {s.motivo}
             </p>
           )}
-          {s.desejado?.nome && (
+          {sugerido ? (
+            <div className="mt-1.5">
+              <p className="text-sm font-medium">Pensando em:</p>
+              <div className="mt-1.5">
+                <EspecialistaPreview e={sugerido} />
+              </div>
+            </div>
+          ) : s.desejado?.nome ? (
+            // indicado fora do catálogo (inativo/removido): nome sem ficha
+            // inventada — o resto o diálogo resolve na seleção
             <p className="mt-1.5 text-sm">
               <span className="font-medium">Pensando em:</span>{" "}
               {s.desejado.nome}
+            </p>
+          ) : (
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Sem nome ainda: a coordenação conecta você com quem faz
+              sentido pro tema.
             </p>
           )}
           <div className="mt-3 flex flex-wrap gap-2">
@@ -206,9 +283,12 @@ export function SugestaoEspecialistaCard({
                   ))}
                 </SelectContent>
               </Select>
-              {escolhido && (
+              {escolhido ? (
+                <EspecialistaPreview e={escolhido} />
+              ) : (
                 <p className="text-xs text-muted-foreground">
-                  O pedido vai direto pra {escolhido.nome_social || escolhido.nome}.
+                  Sem nome ainda: a coordenação conecta você com quem faz
+                  sentido pro tema.
                 </p>
               )}
             </div>

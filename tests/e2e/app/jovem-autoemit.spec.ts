@@ -111,6 +111,11 @@ test.describe("jornada — auto-emissão de instrumentos (REALIZA-152)", () => {
     expect(links.find((l) => l.formularios.sistema === "roda_vida")?.contexto
       ?.momento).toBe("inicial");
 
+    // 515 — a Roda inicial autoemitida nunca sugere "nova rodada": a copy
+    // de re-emissão é privilégio do gesto decidido, não do mecanismo
+    await expect(page.getByText(/nova rodada/i)).toHaveCount(0);
+    await expect(page.getByText(/o mentor enviou/i)).toHaveCount(0);
+
     // o registro do mentor é a fonte: encontro 1 realizado → janela do
     // enc. 2 abre e o link de metas é mintado — a jovem não pede nada.
     const quando = new Date(Date.now() - 86400e3).toISOString();

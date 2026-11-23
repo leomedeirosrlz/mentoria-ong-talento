@@ -69,6 +69,11 @@ export type Estacao = {
    *  "libera no enc. 12 (4 nov)", "em dia · 5 de 6", "falta avaliar o
    *  encontro 7". Null quando o pill+CTA já dizem tudo. */
   detalhe: string | null;
+  /** REALIZA-515 — true só quando o `a_fazer` é uma nova rodada DECIDIDA
+   *  (alguém mandou refazer depois de uma resposta): a emissão automática
+   *  que minta link após resposta migrada (rematch, auto-cura) não é
+   *  decisão de ninguém e nunca vira "nova rodada". */
+  reemissao: boolean;
   /** Respostas brutas da entrega corrente (pro dialog "Rever resposta"
    *  reusar InstrumentoResultado). Null fora de `feito`. */
   respostas: Record<string, unknown> | null;
@@ -278,7 +283,13 @@ const SUBMETAS_TETO = 20;
 type StatusEntrega = EntregaJornada["status"];
 type ResolucaoEstacao = Pick<
   Estacao,
-  "estado" | "respondidoEm" | "token" | "snippet" | "detalhe" | "respostas"
+  | "estado"
+  | "respondidoEm"
+  | "token"
+  | "snippet"
+  | "detalhe"
+  | "reemissao"
+  | "respostas"
 >;
 
 /** 'yyyy-mm-dd' → 'dd/mm' por substring — a data do evento é dia de
@@ -555,6 +566,7 @@ function resolveEstacao<
     respondido_em: string | null;
     respostas: Record<string, unknown> | null;
     created_at: string;
+    contexto?: Record<string, unknown> | null;
     usado_em?: string | null;
     expira_em?: string | null;
   },
@@ -594,6 +606,17 @@ function resolveEstacao<
   // CTA — cai no `feito` da resposta anterior (paridade com a estação
   // trancada e com o painel, que usa a mesma régua min(vigente, dupla))
   if (reemissao && ctx.encCorrente >= ESTACOES[chave].encIni) {
+    // REALIZA-515 — "nova rodada" só existe quando a emissão foi DECISÃO
+    // de alguém: mentor/coord refazendo pela ficha ou a própria jovem no
+    // self-serve (0209). A origem 'auto' minta link por calendário ou
+    // rematch sem ninguém pedir refazer — a estação abre o link, mas não
+    // conta a história de "nova rodada" (e a 1ª roda autoemitida, sem
+    // respondida antes, nem chega aqui).
+    const origem =
+      typeof reemissao.contexto?.origem === "string"
+        ? reemissao.contexto.origem
+        : null;
+    const decidida = origem !== "auto" && origem !== "autoemit";
     return {
       estado: "a_fazer",
       // Rever sobrevive à re-emissão: respondidoEm/respostas da última
@@ -601,7 +624,12 @@ function resolveEstacao<
       respondidoEm: ultima!.respondido_em ?? ultima!.usado_em ?? null,
       token: reemissao.token,
       snippet: null,
-      detalhe: "o mentor enviou uma nova rodada: a resposta anterior segue salva",
+      reemissao: decidida,
+      detalhe: decidida
+        ? origem === "jovem"
+          ? "você pediu pra refazer: a resposta anterior segue salva"
+          : "a dupla decidiu refazer: a resposta anterior segue salva"
+        : null,
       respostas: ultima!.respostas,
     };
   }
@@ -613,6 +641,7 @@ function resolveEstacao<
       token: null,
       snippet: texto ? { tag: ESTACOES[chave].tagSnippet, texto: truncaSnippet(texto) } : null,
       detalhe: chave === "pdm" ? texto : null,
+      reemissao: false,
       respostas: ultima.respostas,
     };
   }
@@ -628,6 +657,7 @@ function resolveEstacao<
       token: null,
       snippet: null,
       detalhe: `libera no encontro ${ESTACOES[chave].encIni}${dm ? ` (${dm})` : ""}`,
+      reemissao: false,
       respostas: null,
     };
   }
@@ -644,6 +674,7 @@ function resolveEstacao<
       token: pendente.token,
       snippet: null,
       detalhe: null,
+      reemissao: false,
       respostas: null,
     };
   }
@@ -670,6 +701,7 @@ function resolveEstacao<
     token: null,
     snippet: null,
     detalhe,
+    reemissao: false,
     respostas: null,
   };
 }
@@ -858,6 +890,7 @@ export function estacoesJornada(input: {
           token: null,
           snippet: null,
           detalhe: `em dia · ${emDia} de ${realizados.length}`,
+          reemissao: false,
           respostas: null,
         }
       : {
@@ -868,6 +901,7 @@ export function estacoesJornada(input: {
           detalhe: faltantes.length
             ? `falta avaliar o encontro ${faltantes[0]}`
             : "a primeira sai depois do encontro 1",
+          reemissao: false,
           respostas: null,
         };
 

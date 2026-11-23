@@ -160,7 +160,7 @@ export default async function JovemMateriais() {
     duplas,
     materiais,
     consolidadoTerc,
-    // os combinados dela — a faixa "a caminho" e a retrospectiva leem do
+    // os combinados dela — a faixa "Próximo marco" e a retrospectiva leem do
     // mesmo cache() sem query a mais
     encaminhamentos,
   ] = await Promise.all([
@@ -209,7 +209,7 @@ export default async function JovemMateriais() {
     jornada != null
       ? (duplas.find((d) => d.id === jornada.dupla_id) ?? null)
       : null;
-  // a faixa "a caminho" (485) nasce da mesma derivação do perfil — mesmos
+  // a faixa "Próximo marco" (485/515) nasce da mesma derivação do perfil — mesmos
   // dados já lidos; sem dupla `marcos` vem vazio e a faixa não renderiza.
   // Derivação antes dos fallbacks: sem RPC/estação ela sobrevive do mesmo
   // jeito que a estante sobrevive no perfil
@@ -530,10 +530,10 @@ export default async function JovemMateriais() {
         </CardContent>
       </Card>
 
-      {/* ---------- "A caminho" (485) — os marcos de AÇÃO dela, no topo
-          da jornada. Resumo aqui; a estante completa mora no perfil e a
-          faixa só aponta pra ela. Sem gesto próprio: não compete com o
-          agendar/registrar da home. ---------- */}
+      {/* ---------- "Próximo marco" (485/515) — só o próximo marco de
+          ação ainda não ganho, no topo da jornada. Os ganhos moram na
+          estante do perfil e a faixa só aponta pra ela. Sem gesto
+          próprio: não compete com o agendar/registrar da home. ---------- */}
       <MarcosACaminho marcos={conq.marcos} />
 
       {/* ---------- sub-nav de página ---------- */}
@@ -926,7 +926,13 @@ function InstrumentoCard({
       est.chave === "pdm" && est.estado === "feito"
         ? { rotulo: "Abrir o plano", href: "/jovem/pdm" }
         : est.estado === "a_fazer" && est.token
-          ? { rotulo: "Responder a nova rodada", href: `/f/${est.token}` }
+          ? // 515 — "nova rodada" só quando a re-emissão foi decidida de
+            // verdade; um link mintado sem decisão (rematch, auto-cura)
+            // abre com o CTA neutro
+            {
+              rotulo: est.reemissao ? "Responder a nova rodada" : "Responder",
+              href: `/f/${est.token}`,
+            }
           : undefined;
     const card = (
       <article

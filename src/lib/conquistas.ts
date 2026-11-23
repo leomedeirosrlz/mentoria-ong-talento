@@ -9,7 +9,7 @@ import type {
 import { INSTRUMENTO_TOM } from "@/components/instrumento-icone";
 
 // "Suas conquistas" do perfil do jovem (v2 — estante estilo GitHub + faixa
-// "a caminho" estilo Duolingo). Derivação pura: recebe os arrays já lidos
+// "Próximo marco" estilo Duolingo). Derivação pura: recebe os arrays já lidos
 // pelas queries do perfil e devolve a estrutura — nada persiste, nada
 // compete: é a régua individual da própria jornada, sem streak nem ranking.
 //
@@ -23,7 +23,7 @@ import { INSTRUMENTO_TOM } from "@/components/instrumento-icone";
 //     especialista
 //
 // O que NUNCA aparece: cadeado/locked — marco futuro não vira falta (regra
-// de ciclo.ts); o futuro vive só na faixa "a caminho".
+// de ciclo.ts); o futuro vive só na faixa "Próximo marco".
 
 /** Glifo do emblema: o símbolo SVG do instrumento (mesma gramática do
  *  InstrumentoEmblema) ou um Phosphor canonizado — marcos mantêm
@@ -74,7 +74,7 @@ export type ProximoMarco = {
   texto: string;
 };
 
-/** Marco de AÇÃO da faixa "a caminho" no topo da jornada (485): o que o
+/** Marco de AÇÃO da faixa "Próximo marco" no topo da jornada (485/515): o que o
  *  jovem faz, não níveis por tempo — 1º encontro, 1ª avaliação, PDM
  *  entregue, jornada concluída. Na trilha de especialista (sem PDM)
  *  ficam 3. Estado ganho/não ganho sempre em texto — marco futuro nunca
@@ -99,7 +99,7 @@ export type MarcoAcao = {
    *  binário, como avaliar ou entregar o PDM, não tem) */
   progresso: { atual: number; alvo: number } | null;
   ganho: boolean;
-  /** o primeiro marco não ganho — o "a caminho" que a faixa destaca */
+  /** o primeiro marco não ganho — o único que a faixa mostra (515) */
   proximo: boolean;
 };
 
@@ -110,7 +110,7 @@ export type ConquistasJovem = {
   /** o próximo limiar a cruzar — null quando a jornada está completa ou
    *  não existe */
   proximoMarco: ProximoMarco | null;
-  /** os marcos de ação da faixa "a caminho" no topo da jornada (485) —
+  /** os marcos de ação da faixa "Próximo marco" no topo da jornada (485) —
    *  vazio quando não há jornada */
   marcos: MarcoAcao[];
   /** a jornada existe pro jovem (tem dupla DPP ou sessão de especialista
@@ -271,7 +271,7 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
   let proximoMarco: ProximoMarco | null = null;
 
   // sem jornada (nem dupla DPP nem sessão esp) não há régua — nada de
-  // marco nem de "a caminho": a página nem renderiza o card
+  // marco nem de "próximo": a página nem renderiza o card
   for (const [marco, p] of temJornada ? limiaresMarcos(total) : []) {
     if (feitos >= p) {
       const enc = porData[p - 1];
@@ -428,11 +428,11 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
     });
   }
 
-  // ---------- marcos de ação (485 — a faixa "a caminho" no topo da
-  // jornada): o que a jovem faz, não o tempo que ela fica. Sem jornada
+  // ---------- marcos de ação (485/515 — a faixa "Próximo marco" no topo
+  // da jornada): o que a jovem faz, não o tempo que ela fica. Sem jornada
   // a faixa não renderiza (mesmo gate da estante). O PRÓXIMO é sempre o
-  // primeiro não ganho — é o que a faixa destaca com o anel --destaque;
-  // marco de contagem traz a barra. ----------
+  // primeiro não ganho — é o único que a faixa mostra; os ganhos ficam
+  // na estante do perfil. Marco de contagem traz a barra. ----------
   const marcos: MarcoAcao[] = [];
   if (temJornada) {
     const primeiroEnc = porData[0] ?? null;

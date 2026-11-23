@@ -298,8 +298,8 @@ describe("conquistasDoJovem", () => {
   });
 });
 
-// ---------- marcos de ação (485 — a faixa "a caminho" do topo da
-// jornada): 1º encontro, avaliação, PDM, jornada completa. Estado
+// ---------- marcos de ação (485 — a faixa "Próximo marco" do topo
+// da jornada): 1º encontro, avaliação, PDM, jornada completa. Estado
 // ganho/não ganho sempre em texto; o próximo é o primeiro não ganho.
 describe("marcos de ação", () => {
   it("sem dupla: marcos vazio — a faixa não renderiza", () => {
@@ -445,5 +445,51 @@ describe("marcos de ação", () => {
     // a jornada fechou, mas as 16 sessões ainda não foram avaliadas:
     // "Avaliação do encontro" é o próximo gesto da faixa
     expect(r.marcos[1]).toMatchObject({ ganho: false, proximo: true });
+  });
+});
+
+// ---------- a faixa "Próximo marco" (515): ela mostra SÓ o primeiro
+// marco ainda não ganho — os ganhos ficam na estante do perfil; quando
+// nada falta, a faixa vira o estado de conclusão ----------
+describe("seleção do próximo marco (faixa da jornada, 515)", () => {
+  const proximo = (r: ReturnType<typeof conquistasDoJovem>) =>
+    r.marcos.find((m) => m.proximo) ?? null;
+
+  it("jovem novo: o próximo é o 1º encontro — nenhum ganho renderiza", () => {
+    const r = conquistasDoJovem(base({ duplas: [DUPLA_DPP] }));
+    expect(proximo(r)?.chave).toBe("primeiro");
+    // os demais são futuros, nunca "ganhos a caminho"
+    expect(r.marcos.filter((m) => m.ganho)).toHaveLength(0);
+  });
+
+  it("1º encontro feito: o próximo salta pra avaliação, não pro ganho", () => {
+    const r = conquistasDoJovem(
+      base({ duplas: [DUPLA_DPP], encontros: [enc(1)] })
+    );
+    const p = proximo(r);
+    expect(p?.chave).toBe("avaliou");
+    expect(p?.ganho).toBe(false);
+    // o marco ganho continua no array (alimenta a estante), mas não é o próximo
+    expect(r.marcos.filter((m) => m.ganho).map((m) => m.chave)).toEqual([
+      "primeiro",
+    ]);
+  });
+
+  it("todos os marcos ganhos: sem próximo — a faixa vira conclusão", () => {
+    const encontros = Array.from({ length: 16 }, (_, i) => enc(i + 1));
+    const r = conquistasDoJovem(
+      base({
+        duplas: [DUPLA_DPP],
+        encontros,
+        avaliacoes: encontros.map((e, i) => ({
+          encontro_id: e.id,
+          dupla_id: "d1",
+          created_at: `${dia(i + 1)}T20:00:00-03:00`,
+        })),
+        jornada: jornada([instrumento("pdm", [entrega()])]),
+      })
+    );
+    expect(r.marcos.every((m) => m.ganho)).toBe(true);
+    expect(proximo(r)).toBeNull();
   });
 });

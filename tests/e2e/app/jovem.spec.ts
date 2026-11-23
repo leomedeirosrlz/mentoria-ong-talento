@@ -492,6 +492,90 @@ test.describe("mentorado — shell /jovem", () => {
     }
   });
 
+  test("re-emissão decidida lê 'a dupla decidiu refazer' — nunca 'o mentor enviou' (515)", async ({
+    page,
+  }) => {
+    // REALIZA-515 — só a emissão DEPOIS de uma resposta e fora do origem
+    // 'auto' é re-emissão real: o detalhe vira "a dupla decidiu refazer"
+    // e o Rever ganha o CTA "Responder a nova rodada"
+    const [form] = await buscarViaServiceRole<{ id: string }[]>(
+      "formularios",
+      "select=id&sistema=eq.roda_vida&ativo=eq.true&limit=1"
+    );
+    test.skip(!form, "sem instrumento oficial de roda_vida ativo");
+    const tokenVelho = crypto.randomUUID().replaceAll("-", "");
+    const tokenNovo = crypto.randomUUID().replaceAll("-", "");
+    try {
+      // piso cirúrgico: links roda_vida↔mentorada da dupla são leftover
+      // de run morto — a fixture não semeia entrega de instrumento
+      await limparViaServiceRole(
+        "formulario_links",
+        `dupla_id=eq.${DUPLA_ID}&formulario_id=eq.${form.id}&dest_mentorado_id=eq.${IDS.mentorado}`
+      );
+      // a 1ª rodada respondida (a que a auto-emissão minta na criação da
+      // dupla) e a emitida depois pela dupla — origem 'instrumentos' é o
+      // gesto decidido de refazer
+      const respondida = await inserirViaServiceRole("formulario_links", {
+        formulario_id: form.id,
+        token: tokenVelho,
+        dest_mentorado_id: IDS.mentorado,
+        dupla_id: DUPLA_ID,
+        contexto: { origem: "auto", momento: "inicial" },
+        created_at: new Date(Date.now() - 6 * 86400e3).toISOString(),
+        usado_em: new Date(Date.now() - 5 * 86400e3).toISOString(),
+      });
+      await inserirViaServiceRole("formulario_respostas", {
+        link_id: respondida.id,
+        respostas: { reflexao: "resposta da primeira roda" },
+        respondido_em: new Date(Date.now() - 5 * 86400e3).toISOString(),
+      });
+      await inserirViaServiceRole("formulario_links", {
+        formulario_id: form.id,
+        token: tokenNovo,
+        dest_mentorado_id: IDS.mentorado,
+        dupla_id: DUPLA_ID,
+        contexto: { origem: "instrumentos", momento: "inicial" },
+        created_by: IDS.mentorProfile,
+      });
+
+      await page.goto("/jovem/materiais");
+      const trilha = page.locator(
+        'section[aria-labelledby="meus-instrumentos-titulo"]'
+      );
+      const card = trilha.locator("article", {
+        hasText: "Roda da Vida · leitura inicial",
+      });
+      await expect(
+        card.getByText(
+          "a dupla decidiu refazer: a resposta anterior segue salva"
+        )
+      ).toBeVisible();
+      // a copy antiga fingia certeza que o gesto não tinha
+      await expect(
+        page.getByText(/o mentor enviou uma nova rodada/)
+      ).toHaveCount(0);
+
+      // o gesto abre o Rever — a ação secundária aponta pro link novo
+      // (Button render={<Link/>} da kit: na árvore lê button, no DOM é <a>)
+      await card.click();
+      const dialog = page.getByRole("dialog");
+      await expect(
+        dialog.getByRole("button", { name: "Responder a nova rodada" })
+      ).toBeVisible();
+      await expect(
+        dialog.locator(`a[href="/f/${tokenNovo}"]`)
+      ).toBeAttached();
+      await page.keyboard.press("Escape");
+    } finally {
+      // as respostas caem em cascata com os links — a fixture volta a
+      // "sem entregas"
+      await limparViaServiceRole(
+        "formulario_links",
+        `token=in.(${tokenVelho},${tokenNovo})`
+      );
+    }
+  });
+
   test("perfil mostra a ficha do programa e os dados de contato", async ({
     page,
   }) => {

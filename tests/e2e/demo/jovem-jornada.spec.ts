@@ -60,6 +60,29 @@ test.describe("demo — Minha jornada do mentorado", () => {
       )
     ).toBeVisible();
 
+    // REALIZA-515 — a faixa virou "Próximo marco": SÓ o primeiro marco
+    // ainda não ganho aparece. A Ana tem 1º encontro + avaliações + PDM
+    // ganhos — eles não repetem aqui, moram na estante do perfil
+    const faixa = page.locator(
+      'section[aria-labelledby="proximo-marco-titulo"]'
+    );
+    await expect(
+      faixa.getByRole("heading", { name: "Próximo marco" })
+    ).toBeVisible();
+    await expect(faixa.getByText("Jornada completa")).toBeVisible();
+    await expect(
+      faixa.getByText("Faltam 12 encontros com seu mentor")
+    ).toBeVisible();
+    await expect(faixa.getByRole("progressbar")).toHaveCount(1);
+    await expect(faixa.getByText("Primeiro encontro")).toHaveCount(0);
+    await expect(faixa.getByText(/Avaliou/)).toHaveCount(0);
+    await expect(
+      faixa.getByRole("link", { name: "Ver conquistas" })
+    ).toHaveAttribute("href", "/jovem/perfil#conquistas");
+    // e nada inventa "nova rodada" — toda entrega da janela dela é a 1ª
+    await expect(page.getByText(/nova rodada/)).toHaveCount(0);
+    await expect(page.getByText(/o mentor enviou/)).toHaveCount(0);
+
     // a estante — os 4 instrumentos de entrega única da janela como
     // cards-produto, todos com a tag "Feito · <data>" na linha de estado
     const trilha = page.locator(
