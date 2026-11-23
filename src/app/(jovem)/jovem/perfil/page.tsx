@@ -78,8 +78,8 @@ export default async function JovemPerfil({
   const avatarUrl = perfil?.avatar_path
     ? avatarPublicUrl(perfil.avatar_path)
     : null;
-  // conquistas v2 (REALIZA-427): toda a derivação mora na lib — marcos
-  // datados + instrumentos entregues + contagens + a faixa do próximo
+  // conquistas v3 (016): toda a derivação mora na lib — estante (marcos
+  // datados + instrumentos entregues + contagens), futuras e nível
   const conq = conquistasDoJovem({
     encontros,
     duplas,
@@ -167,7 +167,8 @@ export default async function JovemPerfil({
           {conq.temJornada && (
             <ConquistasCard
               conquistas={conq.conquistas}
-              proximoMarco={conq.proximoMarco}
+              futuras={conq.futuras}
+              nivel={conq.nivel}
             />
           )}
 
