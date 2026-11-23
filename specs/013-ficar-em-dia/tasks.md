@@ -1,5 +1,10 @@
 # Tasks — Ficar em dia até o encerramento
 
+> **Nota de supersessão (23/11/2026):** T002 (ritmo até 7/semana), T007 (jovem não
+> propõe) e T008 (aceite bilateral) foram substituídos pela spec 017: ritmo livre
+> sem teto, quatro papéis propõem e um aceite da dupla ativa. O restante segue
+> como histórico da primeira rodada.
+
 ## Fase 1 — Recon de dados e testes puros
 
 - [ ] T001 conferir schema real de plano/aceite/versão (`information_schema`, migrations 0170/0219); decidir se há migration.
