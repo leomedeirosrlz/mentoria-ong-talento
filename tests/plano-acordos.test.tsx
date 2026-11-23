@@ -14,7 +14,9 @@ vi.mock("next/navigation", () => ({
 vi.mock("@/lib/toast", () => ({
   toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
-const aplicarPassoPlano = vi.fn(async () => ({ ok: true as const }));
+const aplicarPassoPlano = vi.fn(async (..._args: unknown[]) => ({
+  ok: true as const,
+}));
 vi.mock("@/lib/actions-plano", () => ({
   aplicarPassoPlano: (...args: unknown[]) => aplicarPassoPlano(...args),
   responderPlano: vi.fn(async () => ({ ok: true })),
