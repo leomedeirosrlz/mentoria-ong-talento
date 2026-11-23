@@ -88,6 +88,26 @@ function dataBr(iso: string): string {
     : d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" });
 }
 
+/** As linhas do desdobramento numeradas — mesma leitura sob a meta e no
+ *  bloco solto das órfãs. */
+function SubmetasLidas({ linhas }: { linhas: string[] }) {
+  return (
+    <ol className="mt-1 space-y-1">
+      {linhas.map((l, i) => (
+        <li key={i} className="flex gap-2 text-sm leading-relaxed">
+          <span
+            aria-hidden
+            className="w-5 shrink-0 text-right text-xs font-semibold tabular-nums text-muted-foreground"
+          >
+            {i + 1}.
+          </span>
+          <span className="min-w-0">{l}</span>
+        </li>
+      ))}
+    </ol>
+  );
+}
+
 function RodaResultado({
   campos,
   respostas,
@@ -253,22 +273,22 @@ function MetasResultado({
   }).filter((r): r is { label: string; ok: boolean } => r != null);
 
   // desdobramento por meta — Metas (0118) e PDM: cada submetas_N respondido
-  // vira uma lista lida pelo mesmo parser que projeta pdm_itens
-  const desdobramentos = campos
-    .map((c) => ({
-      n: /^submetas_(\d+)$/.exec(c.id)?.[1],
-      valor: respostas[c.id],
-    }))
-    .filter(
-      (x): x is { n: string; valor: RespostaValor } =>
-        x.n != null && typeof x.valor === "string" && x.valor.trim() !== ""
-    )
-    .map((x) => ({
-      n: Number(x.n),
-      linhas: parseSubmetasLinhas(String(x.valor)),
-    }))
-    .filter((x) => x.linhas.length > 0)
-    .sort((a, b) => a.n - b.n);
+  // vira uma lista lida pelo mesmo parser que projeta pdm_itens. A leitura
+  // aninha sob a meta N (REALIZA-512: o "Mapa de submetas" solto saía do
+  // contexto); submetas órfãs de meta (resposta/edit que trouxe submetas_M
+  // sem meta_M respondida) seguem lidas em bloco próprio — nunca somem.
+  const desdobramentosPorN = new Map<number, string[]>();
+  for (const c of campos) {
+    const n = /^submetas_(\d+)$/.exec(c.id)?.[1];
+    const v = respostas[c.id];
+    if (!n || typeof v !== "string" || !v.trim()) continue;
+    const linhas = parseSubmetasLinhas(v);
+    if (linhas.length) desdobramentosPorN.set(Number(n), linhas);
+  }
+  const metasN = new Set(metas.map((m) => m.n));
+  const desdobramentosOrfaos = [...desdobramentosPorN.entries()]
+    .filter(([n]) => !metasN.has(n))
+    .sort(([a], [b]) => a - b);
 
   return (
     <div className="space-y-4">
@@ -332,26 +352,22 @@ function MetasResultado({
                   Prazo: {dataBr(m.prazo)}
                 </p>
               )}
+              {desdobramentosPorN.has(m.n) && (
+                <div className="mt-2 border-t border-border/60 pt-2">
+                  <p className="text-xs font-medium text-muted-foreground">
+                    Desdobramento da meta {m.n}
+                  </p>
+                  <SubmetasLidas linhas={desdobramentosPorN.get(m.n)!} />
+                </div>
+              )}
             </li>
           ))}
         </ol>
       </Bloco>
 
-      {desdobramentos.map((d) => (
-        <Bloco key={d.n} titulo={`Desdobramento da meta ${d.n}`}>
-          <ol className="space-y-1">
-            {d.linhas.map((l, i) => (
-              <li key={i} className="flex gap-2 text-sm leading-relaxed">
-                <span
-                  aria-hidden
-                  className="w-5 shrink-0 text-right text-xs font-semibold tabular-nums text-muted-foreground"
-                >
-                  {i + 1}.
-                </span>
-                <span className="min-w-0">{l}</span>
-              </li>
-            ))}
-          </ol>
+      {desdobramentosOrfaos.map(([n, linhas]) => (
+        <Bloco key={n} titulo={`Desdobramento da meta ${n}`}>
+          <SubmetasLidas linhas={linhas} />
         </Bloco>
       ))}
 

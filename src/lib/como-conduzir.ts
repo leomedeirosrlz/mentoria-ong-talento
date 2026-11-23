@@ -103,9 +103,9 @@ export const GUIA_ENCONTRO: Record<InstrumentoDuplaSistema, GuiaInstrumento> = {
   pdm: {
     chip: "Construir 1–4 · revisão enc. 9",
     conduzir:
-      "Documento vivo construído nos enc. 1–4: Visão no topo, metas com indicador de sucesso (IS) e prazo (P), depois o mapa de submetas: pra cada meta, “o que preciso fazer pra conseguir isso?”. Volta à mesa na revisão de meio de percurso (enc. 9).",
+      "Documento vivo construído nos enc. 1–4: Visão no topo e de 3 a 8 metas — cada uma com indicador de sucesso (IS), prazo (P) e o desdobramento em submetas sob ela (“o que preciso fazer pra conseguir isso?”). Volta à mesa na revisão de meio de percurso (enc. 9).",
     cobre:
-      "O documento central: construído nos encontros 1–4 (visão, metas com IS e prazo, mapa de submetas), acompanha a execução até o fim do ciclo e tem revisão formal de meio de percurso no encontro 9.",
+      "O documento central: construído nos encontros 1–4 (visão, metas com IS, prazo e desdobramento sob cada uma), acompanha a execução até o fim do ciclo e tem revisão formal de meio de percurso no encontro 9.",
   },
   roda_vida: {
     chip: "Leitura enc. 1 · aplicação enc. 12–14",

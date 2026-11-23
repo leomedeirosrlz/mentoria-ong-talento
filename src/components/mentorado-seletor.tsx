@@ -12,11 +12,13 @@ import {
 } from "@/components/ui/select";
 import { cn } from "@/lib/utils";
 
-// Seletor de mentorado (REALIZA-440): o nome do jovem vira o controle que
-// filtra os instrumentos — pills-Link até o limiar (o mesmo padrão do
+// Seletor de mentorado (REALIZA-440/512): o nome do jovem vira o controle
+// que filtra os instrumentos — pills-Link até o limiar (o mesmo padrão do
 // seletor de instrumentos), dropdown do kit acima dele. A escolha mora em
 // `?dupla=` — deep-linkável, e ela atravessa a navegação régua → página
-// por instrumento. Com uma dupla só não há o que escolher: some (regra de
+// por instrumento. `comTodas` acrescenta a opção que devolve o catálogo
+// inteiro (a régua usa — a escolha de dupla não fica mais escondida num
+// botão "Ficha"). Com uma dupla só não há o que escolher: some (regra de
 // silêncio do seletor de turma).
 
 export type FichaMentor = {
@@ -51,8 +53,9 @@ export function MentoradoSeletor({
   /** a rota sem o param `dupla` — ex.: "/materiais?aba=instrumentos" ou
    *  "/materiais/instrumentos/roda_inicial" */
   hrefBase: string;
-  /** inclui a opção "Todas as duplas" (na régua a escolha é sempre de
-   *  uma dupla — sem "todas") */
+  /** inclui a opção "Todas" (pills) / "Todas as duplas" (dropdown) que
+   *  aponta pra hrefBase sem o param — régua e página por instrumento
+   *  usam; listas onde a leitura é sempre de uma dupla não pedem */
   comTodas?: boolean;
   className?: string;
 }) {

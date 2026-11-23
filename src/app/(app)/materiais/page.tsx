@@ -164,15 +164,16 @@ export default async function MateriaisPage({
         }))
     : [];
 
-  // mentorado em foco (REALIZA-440): o seletor da régua escreve ?dupla=;
-  // param ausente/inválido cai na primeira dupla — os cards passam a ler
-  // o estado DELE por instrumento (sem "todas" na régua: a régua é o
-  // retrato de uma dupla por vez). O fetch por dupla só roda com a aba
-  // Instrumentos aberta — na Biblioteca (o default do mentor) é desperdício
+  // mentorado em foco (REALIZA-440 + 512): o seletor da régua escreve
+  // ?dupla=; com 2+ duplas o param ausente/inválido cai no "Todas" — os
+  // cards leem o catálogo até a pessoa escolher um nome. Com uma dupla só
+  // não há o que escolher (o seletor some) e a régua já é a dela.
+  // O fetch por dupla só roda com a aba Instrumentos aberta — na
+  // Biblioteca (o default do mentor) é desperdício
   const duplaSelecionada =
-    fichasMentor.find((f) => f.id === duplaParam)?.id ??
-    fichasMentor[0]?.id ??
-    null;
+    fichasMentor.length > 1
+      ? fichasMentor.find((f) => f.id === duplaParam)?.id ?? null
+      : fichasMentor[0]?.id ?? null;
 
   // biblioteca do mentor/especialista (rodada dores-ux-2026-10): estrutura
   // própria, sem cobertura/filtros/selo de público — o encontro da semana

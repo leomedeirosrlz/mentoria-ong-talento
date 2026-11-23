@@ -585,26 +585,36 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
     );
     await expect(instrumentos).toBeVisible();
 
-    // a régua do mentor abre na dupla em foco (REALIZA-440): os nomes
-    // viram pills selecionáveis no lugar dos links miúdos por card — a
-    // fixture do Ricardo tem 2 duplas DPP vivas (Bia e Matheus), então a
-    // primeira já chega marcada
+    // a régua do mentor abre no catálogo (REALIZA-512): com 2+ duplas o
+    // default é "Todas" — os nomes viram pills selecionáveis no lugar dos
+    // links miúdos por card; a fixture do Ricardo tem 2 duplas DPP vivas
+    // (Bia e Matheus)
     const seletor = instrumentos.getByRole("navigation", {
       name: "Filtrar por mentorado",
     });
     await expect(
-      seletor.getByRole("link", { name: "Bia", exact: true })
+      seletor.getByRole("link", { name: "Todas", exact: true })
     ).toHaveAttribute("aria-current", "page");
+    const bia = seletor.getByRole("link", { name: "Bia", exact: true });
+    await expect(bia).toBeVisible();
     await expect(
       seletor.getByRole("link", { name: "Matheus Gonçalves", exact: true })
     ).toBeVisible();
 
-    // cada card linka a página do instrumento da dupla em foco e oferece
-    // o atalho "Na ficha" dela (âncora #instrumentos)
+    // escolher o nome foca a dupla: os cards linkam a página do
+    // instrumento dela e a "Ficha" secundária aponta a ficha dela
+    // (âncora #instrumentos)
+    await bia.click();
+    await expect(page).toHaveURL(
+      `/materiais?aba=instrumentos&dupla=${DUPLA_OK}`
+    );
     const primeiroCard = instrumentos.locator("article").first();
     await expect(
-      primeiroCard.getByRole("link", { name: "Na ficha" })
-    ).toHaveAttribute("href", `/duplas/${DUPLA_OK}?aba=instrumentos#instrumentos`);
+      primeiroCard.getByRole("link", { name: "Ficha", exact: true })
+    ).toHaveAttribute(
+      "href",
+      `/duplas/${DUPLA_OK}?aba=instrumentos#instrumentos`
+    );
 
     // trocar o mentorado em foco reescreve ?dupla= e refaz a régua pra
     // outra dupla — deep-linkável
@@ -615,7 +625,10 @@ test.describe("demo — instrumentos da jornada (staff)", () => {
       `/materiais?aba=instrumentos&dupla=${DUPLA_MATHEUS}`
     );
     await expect(
-      instrumentos.locator("article").first().getByRole("link", { name: "Na ficha" })
+      instrumentos
+        .locator("article")
+        .first()
+        .getByRole("link", { name: "Ficha", exact: true })
     ).toHaveAttribute(
       "href",
       `/duplas/${DUPLA_MATHEUS}?aba=instrumentos#instrumentos`

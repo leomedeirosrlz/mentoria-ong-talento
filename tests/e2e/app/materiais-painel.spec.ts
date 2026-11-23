@@ -270,11 +270,12 @@ test.describe("coordenação — instrumentos da jornada em /materiais", () => {
     });
     await expect(instrumentos).toBeVisible();
 
-    // a ficha do mentor é 1 (dupla e2e …0030) → o card traz o botão "Na
-    // ficha" apontando pra âncora de instrumentos; o rodapé repete o
-    // mapa com o nome social do jovem
+    // a ficha do mentor é 1 (dupla e2e …0030) → sem o que escolher, o
+    // seletor some; o card traz a ação secundária "Ficha" apontando pra
+    // âncora de instrumentos; o rodapé repete o mapa com o nome social
+    // do jovem
     const naFicha = instrumentos
-      .getByRole("link", { name: "Na ficha" })
+      .getByRole("link", { name: "Ficha", exact: true })
       .first();
     await expect(naFicha).toBeVisible();
     await expect(naFicha).toHaveAttribute(

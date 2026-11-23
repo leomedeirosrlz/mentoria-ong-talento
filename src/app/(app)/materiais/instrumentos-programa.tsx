@@ -100,7 +100,7 @@ export const CARDS: CardSpec[] = [
     chave: "pdm",
     titulo: ESTACOES.pdm.titulo,
     descricao:
-      "Documento vivo: Visão no topo, metas com indicador de sucesso e prazo, mapa de submetas.",
+      "Documento vivo: Visão no topo e de 3 a 8 metas, cada uma com indicador, prazo e desdobramento sob ela.",
     chips: ["Construir 1–4", "Revisar enc. 9"],
     estacao: "pdm",
     sistemaForm: "pdm",
@@ -353,8 +353,8 @@ export function InstrumentosPrograma({
   /** mentor: as duplas DPP vivas dele — o seletor filtra por mentorado e
    *  o rodapé linka a ficha da dupla em foco. */
   fichasMentor?: FichaMentor[];
-  /** a dupla em foco do mentor (?dupla=, default a primeira) — null sem
-   *  ficha ou fora da aba de instrumentos */
+  /** a dupla em foco do mentor (?dupla=, null = "Todas" — catálogo) —
+   *  sem ficha ou fora da aba de instrumentos também é null */
   duplaSelecionada?: string | null;
   /** os instrumentos da dupla em foco — o estado por card sai daqui */
   instrumentosSelecionada?: InstrumentoDupla[];
@@ -385,14 +385,16 @@ export function InstrumentosPrograma({
       <h2 id="instrumentos-titulo" className="text-base font-semibold">
         Instrumentos do programa
       </h2>
-      {/* REALIZA-440 — o nome do mentorado vira o controle: pills até 3
-          duplas, dropdown acima; a escolha mora em ?dupla= e relê os
-          cards com o estado daquela dupla (o rodapé de links miúdos saiu) */}
+      {/* REALIZA-440/512 — o nome do mentorado vira o controle: pills até
+          3 duplas, dropdown acima; "Todas" devolve a régua ao catálogo. A
+          escolha mora em ?dupla= e relê os cards com o estado daquela
+          dupla (o rodapé de links miúdos saiu) */}
       {papel === "mentor" && (
         <MentoradoSeletor
           fichas={fichasMentor}
           selecionada={duplaSelecionada}
           hrefBase="/materiais?aba=instrumentos"
+          comTodas
         />
       )}
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -587,7 +589,7 @@ export function InstrumentosPrograma({
                       })}
                     >
                       <Eye aria-hidden />
-                      Na ficha
+                      Ficha
                     </Link>
                   )}
                 </div>
@@ -644,7 +646,7 @@ export function InstrumentosPrograma({
                   className={buttonVariants({ variant: "outline", size: "sm" })}
                 >
                   <Eye aria-hidden />
-                  Na ficha
+                  Ficha
                 </Link>
               )}
             </div>
