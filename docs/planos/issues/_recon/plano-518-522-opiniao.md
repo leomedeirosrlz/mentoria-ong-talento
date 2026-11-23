@@ -15,7 +15,7 @@
 2. **Fusão no registro: o clone histórico e a régua de leitura.** A mudança não é a coluna — é que ~6 leitores hoje assumem `registros.encontro_id = encontro` 1:1 (`jornadaDaDupla`, `registroTemConteudo`, agenda, semáforo, relatórios). Se um leitor escapar, um passo coberto aparece "sem registro". A régua "registro **ou cobertura**" precisa morar em UMA função do `ciclo.ts` e os testes do invariante 448 mudam na mesma PR. Também: clones históricos continuam válidos — não migrar dado, só ler direito.
 3. **Disponibilidade por célula mente precisão.** `celulas` = dia × período (manhã/tarde/noite). "3 janelas" pode ser "manhãs de seg/qua/sex" — nada garante 1h livre. Sugerir ritmo por contagem de células é honesto **se a copy não prometer slot** ("horários em que os dois costumam poder"), mas as datas do plano seguirão ignorando a grade nesta fatia — a dupla ainda bate cabeça na hora de marcar. Eu aceitaria como MVP e mediria.
 4. **Recesso pendente pode travar planos.** Se a decisão é pré-requisito da simulação e ninguém responde, o plano morre em "falta confirmar". Mitigação: a pendência não bloqueia a leitura do resto do card, e mentor + jovem respondem (hoje só mentor/coord — ampliar `declarar_recesso` para o mentorado é quase obrigatório, senão o jovem abre o plano e fica refém do mentor).
-5. **"Sem teto" precisa de um piso de honestidade.** Fisicamente o máximo é 1/dia — a RPC valida `between 1 and 7` e o planner clampa [1,7]. Manter o 7 como limite físico é correto; o erro seria a UI sugerir que 4–6 é "arriscado" ou esconder. Copy: o máximo é um encontro por dia — nunca "o sistema não permite".
+5. **"Sem teto" está decidido — o risco é a projeção ficar mentirosa.** Thiago foi explícito: sem máximo de produto. Qualquer inteiro positivo vale; RPC e planner aceitam sem clamp; acima de 1/dia o sistema representa e avisa o efeito nos gaps do guia, nunca bloqueia nem troca o número. O que continua real: (a) `alternativaRitmo` só sonda `[1,2,3,7]` e mente para 4–6 — a alternativa honesta tem que ser o primeiro inteiro que fecha; (b) ritmo alto gera projeção estranha — a resposta é mostrar o efeito e o aviso, não esconder; (c) se surgir limite técnico (coluna, payload), declarar como técnico, nunca como regra de produto.
 
 ## Ordem de implementação recomendada
 
@@ -27,7 +27,7 @@ MVP (esta onda, em sequência):
      de leitura; quanto antes, menos clone novo se acumula.
   3. REALIZA-520 (spec 019) — card "Sua semana". Depende do plano
      (017) e ganha vida com o roteiro (021), mas já entrega valor com
-     o corpus estático como fonte do dropdown.
+     o corpus estático como fonte do disclosure.
 Depois:
   4. REALIZA-521 (spec 020) — docs: doc do combinado sai cedo (é
      render do escopo, barato); roteiros lazy esperam o 018 fechar
@@ -41,15 +41,15 @@ Mudaria a ordem em um ponto: **o doc do combinado (parte da 021) deveria sair ju
 
 ## Simplificações que eu faria
 
-- **UX:** o card do plano já está carregado (decisão de recesso embutida, proposta, projeção, régua). Adicionar pills de ritmo + confirmação de grade + recesso pode virar um formulário. Sugestão: um fluxo em 3 perguntas (ritmo → recesso se houver → confirmar/simular) só quando algo está pendente; quando tudo está respondido, o card volta a ser leitura.
+- **UX:** o card do plano já está carregado (431 linhas: recesso embutido, proposta, projeção, régua). Empilhar pills de ritmo + grade + recesso dentro dele vira formulário. A spec 017 formaliza isso: as decisões moram numa superfície própria ("Combinar o plano", sheet/dialog, uma pergunta por tela, uma vez por versão) e o card volta a ser leitura + "Falta 1 decisão". É a simplificação mais barata com mais retorno de clareza.
 - **Cobertura:** Opção A (coluna `cobertura` no registro/avaliação) + `encontros.sessao_id` opcional. Não criar tabela de join: o benefício (FK) não paga o custo (policies + joins em todos os leitores). `sessao_id` resolve o mint de avaliação sem inferir por `data_hora` igual.
-- **Roteiros:** `plano_versao` para invalidar, e o dropdown da home preferir o roteiro vigente — mas **não** esconder o corpus estático: ele segue a referência completa na biblioteca.
+- **Roteiros:** `plano_versao` para invalidar, e o disclosure da home preferir o roteiro vigente — mas **não** esconder o corpus estático: ele segue a referência completa na biblioteca.
 - **"Em risco" do staff:** começar com 3 sinais (proposto expirando, passo vencido, contestado recente). Régua mais fina só com dados.
 
 ## Riscos específicos dos quatro pilares
 
 - **Um aceite basta:** já coberto — notificação + copy + métrica de contestação. Se contestações dispararem, a regra vira bilateral de novo com dado, não com opinião.
-- **Sem teto:** o 7 físico pode ficar; o problema é cultural — o planner hoje "decide" e a dupla confirma. Inverter (dupla decide, planner informa) é a mudança de produto real.
+- **Sem teto:** decidido — qualquer inteiro positivo. O problema que fica é cultural: o planner hoje "decide" e a dupla confirma. Inverter (dupla decide, planner informa o efeito) é a mudança de produto real — incluindo aceitar que a projeção honesta de ritmo alto pode ser "não fecha" com aviso, nunca substituição silenciosa.
 - **Célula:** granularidade fixa é a limitação aceita; se "as datas do plano caírem nas janelas" virar exigência depois, é trabalho novo no planner (preferência de dia), não extensão barata.
 - **Fusão:** o aviso de gap de prática precisa ser registrado como decisão consciente (no `escopo`/`dupla_plano_eventos`) — senão vira aviso decorativo e ninguém audita "a dupla sabia".
 
@@ -68,8 +68,8 @@ Mudaria a ordem em um ponto: **o doc do combinado (parte da 021) deveria sair ju
 
 ## Perguntas para o Thiago (5)
 
-1. "Um aceite basta": a notificação do outro lado sai só no app ou precisa de canal externo (WhatsApp/e-mail) no MVP? E medimos contestações para revisar a regra?
-2. Recesso pendente: o jovem pode responder a decisão do recesso (ampliar `declarar_recesso`)? E se ninguém responder, o plano fica aberto esperando ou a coordenação é cutucada?
-3. Ritmo: mantemos o check `1..7` na RPC como limite físico documentado, ou sai de vez? (Eu manteria com a justificativa "1/dia é o físico".)
-4. Roteiro lazy: o primeiro roteiro deve nascer no tick do job (pode atrasar um dia) ou gerar também no primeiro acesso à semana?
-5. Cobertura: `encontros.sessao_id` entra na mesma migration da `cobertura`, ou preferem começar só com a coluna no registro/avaliação?
+1. "Um aceite basta": a notificação do outro lado sai só no app ou precisa de canal externo (WhatsApp/e-mail) no MVP? E "o outro ainda não viu" vira regra de UI — exige carimbo de leitura persistido (`visto_em`) — ou fica só o aviso factual "Fulano combinou, você foi avisado em X"? Medimos contestações para revisar a regra?
+2. Recesso pendente: o jovem pode responder a decisão do recesso (ampliar `declarar_recesso` para mentorado/auxiliar)? E a pendência bloqueia só a simulação (passos e datas continuam legíveis) ou também trava outra coisa?
+3. Disponibilidade: a grade calibra só a **sugestão** de ritmo nesta rodada — as datas do plano devem cair dentro das células comuns (trabalho novo no planner) ou a dupla continua marcando a hora na conversa? Se for a segunda, a copy precisa dizer que período livre não é horário marcado.
+4. Roteiro lazy: o primeiro roteiro nasce no tick do job (pode atrasar um dia) ou também no primeiro acesso à semana? E nasce publicado (determinístico do corpus) ou rascunho?
+5. Fusão/sessão: `plano_aplicar_passo` re-emitido com `sessao_id`+`duracao_min`, ou uma RPC de sessão separada? E a duração da sessão fundida é sempre 120, ou a dupla escolhe dentro do catálogo fechado `(30,45,60,90,120)`?

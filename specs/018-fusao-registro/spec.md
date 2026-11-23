@@ -24,9 +24,9 @@
 - **Por que P1:** a sessão combinada nasce no combinado, não na hora do registro.
 - **Teste independente:** propor plano com dois passos adjacentes fundidos e conferir o escopo gravado.
 - **Cenários:**
-  1. **Dado** dois passos adjacentes do plano **quando** quem propõe os funde **então** o escopo marca a sessão (mesma data, duração sugerida 2h) e os dois passos mostram "na mesma sessão".
-  2. **Dado** a fusão tocando passo de prática (4–8) **quando** a UI renderiza **então** o aviso "esse encontro pede uma semana de prática até o próximo" aparece junto à decisão, sem bloquear.
-  3. **Dado** a dupla que quer fundir passos não adjacentes ou mais de dois **quando** ela insiste **então** o sistema deixa com aviso explícito do efeito pedagógico — a flexibilização é decisão da dupla/coordenação, nunca silenciosa.
+  1. **Dado** dois passos adjacentes do plano **quando** quem propõe os funde **então** o escopo marca a sessão (`passos[].sessao`, mesma data, duração sugerida 2h) e os dois passos mostram "na mesma sessão" — a marca é explícita, porque o planner não funde sozinho (`ocupados` impõe um passo por dia).
+  2. **Dado** a fusão tocando passo de prática (4–8) **quando** a UI renderiza **então** o aviso aparece em duas partes: "os passos 5 e 6 pedem prática antes do próximo; numa sessão só essa semana não acontece" + "Continuar mesmo assim" — a decisão consciente é persistida em `dupla_plano_eventos.meta`, nunca bloqueada.
+  3. **Dado** a dupla que quer fundir passos não adjacentes ou mais de dois **quando** ela insiste **então** o sistema deixa com aviso explícito do efeito pedagógico e do que cabe em 2h — a flexibilização é decisão da dupla/coordenação, nunca silenciosa.
 
 ### US2 — Registro combinado (P1)
 
@@ -59,14 +59,15 @@
 
 ## Requisitos funcionais
 
-- **FR-001:** o plano DEVE oferecer "fundir encontros" para passos adjacentes por padrão; a sessão combinada grava marca no `escopo` (mesma data + duração) — sem máximo rígido e com aviso de prática.
-- **FR-002:** o registro DEVE permitir selecionar os encontros cobertos na mesma régua `passosCobertosCandidatos` e salvar **um** registro que declara a cobertura — nunca clonar o payload.
-- **FR-003:** cada encontro coberto DEVE virar `realizado` na row dele com a data/hora do fato (régua atual de criação/atualização de rows), sem `registros` próprio.
-- **FR-004:** a jornada, o semáforo, a agenda e os relatórios DEVEM contar encontro coberto como feito e tratar "registro ou cobertura" como conteúdo entregue — a régua de leitura única mora no módulo puro.
-- **FR-005:** o mint de link de avaliação DEVE gerar um link por sessão fusionada (grupo), não por encontro; a avaliação grava a cobertura do grupo.
-- **FR-006:** o aviso de gap pedagógico (prática = 7 dias, 4–8) DEVE aparecer no plano e no registro quando a fusão o ignora — avisar sempre, bloquear nunca.
-- **FR-007:** a cobertura DEVE ser legível na UI: o registro mostra "cobriu também o 6º encontro" e a ficha/jornada marca os passos como sessão combinada.
+- **FR-001:** o plano DEVE oferecer "fundir encontros" para passos adjacentes por padrão; a sessão combinada grava marca explícita no `escopo` (`passos[].sessao`, mesma data + duração) — sem máximo rígido e com aviso de prática. A fusão não emerge do planner: exige a marca.
+- **FR-002:** o registro DEVE permitir selecionar os encontros cobertos na mesma régua `passosCobertosCandidatos` e salvar **um** registro que declara a cobertura — nunca clonar o payload. A régua de fusão é **idêntica** no plano e no registro (uma função, não duas interpretações).
+- **FR-003:** cada encontro coberto DEVE virar `realizado` na row dele com a data/hora do fato, a `duracao_min` da sessão e o `sessao_id` do grupo — `sessao_id` é preenchido **antes** de a row virar `realizado` (`plano_aplicar_passo` re-emitido com parâmetro de sessão/duração, ou RPC de sessão); sem `sessao_id` não há fusão.
+- **FR-004:** "o passo tem conteúdo?" vira `registro próprio com conteúdo OU encontro coberto por registro com conteúdo`, centralizado numa função única do `ciclo.ts`. Leitores que passam a usar a régua: `jornadaDaDupla`, o embed `encontros(*, registro:registros(…))` de `queries.ts`, `filaRegistrosPendentes`, `saudadeDaDupla.avaliacaoJovemPendente`, `resumoSemanaDe`, `emLimbo`, `bucketsDoEncontro`, `coberturaEncontro`, `estado-encontro`, `painel-dia`, `dupla-resumo`, `agenda-minha`, `agenda-coordenacao`, relatórios/jobs/tools da Liza e o espelho demo — nenhum leitor calcula por conta própria.
+- **FR-005:** o mint de link de avaliação DEVE gerar um link por sessão fundida: o trigger `encontros_avaliacao_prompt` minta + notifica **só na âncora** (row com `sessao_id` não-âncora pula; `sessao_id is null` = comportamento atual) e o link cobre o grupo (`avaliacao_links.cobertura` ou o token da âncora valendo pela sessão); `submeter_avaliacao` grava a cobertura do grupo.
+- **FR-006:** o aviso de gap pedagógico (prática = 7 dias, 4–8) DEVE aparecer no plano e no registro quando a fusão o ignora — em duas partes (o efeito + "Continuar mesmo assim") — e a decisão consciente persiste em `dupla_plano_eventos.meta`. Avisar sempre, bloquear nunca.
+- **FR-007:** a cobertura DEVE ser legível na UI: o registro mostra "cobriu também o 6º encontro" e a ficha/jornada marca os passos como sessão combinada (o `sessao_id` é a fonte, não inferência por `data_hora` igual).
 - **FR-008:** quem pode fundir no plano segue a regra do plano (quatro papéis propõem, dupla confirma no aceite); quem registra é o mentor da dupla (régua atual do `salvarRegistro`).
+- **FR-009:** a duração da sessão é gravada na aplicação: `plano_aplicar_passo` (re-emitido) ou a RPC de sessão recebe `duracao_min` (120 no padrão 2 passos) e aplica no grupo; fusão de 3+ passos segue possível, com a UI explicando o que cabe em 2h.
 
 ## Requisitos não funcionais
 
@@ -79,31 +80,34 @@
 
 ## Entidades e dados
 
-- Opção recomendada (recon §4, Opção A): `registros.cobertura smallint[]` + `avaliacoes_encontro.cobertura smallint[]` — números cobertos além do próprio `encontro_id`; `encontros` intacto com uma row por passo.
-- Opcional e recomendado: `encontros.sessao_id uuid` agrupando as rows da mesma sessão — resolve o mint de link e a leitura "é uma sessão só" sem inferir por `data_hora` igual.
-- `escopo.passos[].sessao`/`grupo` no jsonb do plano (sem DDL) para a marca da fusão no combinado.
+- Opção recomendada (recon §4, Opção A): `registros.cobertura smallint[]` + `avaliacoes_encontro.cobertura smallint[]` — números cobertos além do próprio `encontro_id`; `encontros` intacto com uma row por passo. CHECKs válidos (literal `'{1,…,24}'::smallint[]`; duplicados/âncora via trigger guard ou função immutable) no recon §5.2.
+- Obrigatório nesta fatia: `encontros.sessao_id uuid` — a marca de sessão não é opcional: sem ela o mint de avaliação não sabe a âncora e a UI não sabe que é uma sessão só.
+- `avaliacao_links.cobertura smallint[]` — o link mintado na âncora cobre o grupo.
+- `escopo.passos[].sessao`/`grupo` no jsonb do plano (sem DDL) para a marca da fusão no combinado + `dupla_plano_eventos.meta` para o aviso aceito.
 - SQL sugerido e alternativas (join table, stub `coberto_por`) com prós/contras: recon `docs/planos/issues/_recon/plano-518-522-2026-11-23.md` §4–§5.
 
 ## Critérios de sucesso
 
-- **SC-001:** unit de cobertura: sessão cobre 2 passos → 2 encontros realizados, 1 registro, jornada marca os dois como feitos, semáforo inalterado na contagem.
-- **SC-002:** e2e app: plano com fusão → aplica sessão → registra cobrindo 2 → jovem recebe 1 link e avalia o grupo.
+- **SC-001:** unit de cobertura: sessão cobre 2 passos → 2 encontros realizados com `sessao_id`, 1 registro, jornada marca os dois como feitos, semáforo inalterado na contagem.
+- **SC-002:** e2e app: plano com fusão → aplica sessão (duracao 120 + sessao_id) → registra cobrindo 2 → jovem recebe 1 link e avalia o grupo.
 - **SC-003:** invariante "registro ou cobertura = conteúdo" verde em `ciclo-cobertura`, `estado-encontro`, `agenda-minha`, `dupla-resumo`; teste da régua antiga atualizado na mesma PR.
-- **SC-004:** prints do plano com fusão e do registro combinado (1440 e 390).
+- **SC-004:** mint de avaliação em transação com 2 cobertos → 1 link + 1 notificação (âncora); clone histórico (sessão dupla legada) segue legível como registro próprio.
+- **SC-005:** prints do plano com fusão e do registro combinado (1440 e 390).
 
 ## Plano de testes
 
-- **Unit:** `passosCobertosCandidatos` inalterada na elegibilidade; nova régua de leitura "conteúdo por cobertura" nos estados da jornada; aviso de prática na fusão; avaliação 1×grupo.
-- **E2E app:** fusão no plano (adjacentes e insistência não adjacente), registro combinado, link único de avaliação, papel negado.
+- **Unit:** `passosCobertosCandidatos` inalterada na elegibilidade; nova régua de leitura "conteúdo por cobertura" nos estados da jornada; mesma régua de fusão no plano e no registro; aviso de prática na fusão; avaliação 1×grupo; `sessao_id` antes do realizado.
+- **E2E app:** fusão no plano (adjacentes e insistência não adjacente), registro combinado, link único de avaliação, mint em transação com 2 cobertos, clone histórico legível, papel negado.
 - **E2E demo:** sessão combinada no dataset.
 - **Regressão a reescrever:** `tests/ciclo-cobertura.test.ts` (o "um registro por nº" vira "registro ou cobertura"), e2e `plano-em-dia.spec.ts`/`registro-rota.spec.ts` onde a sessão dupla clonava.
 
 ## Riscos
 
 - O clone atual "parecia" cobertura e era lido por relatórios como N registros: métricas de "registros entregues" mudam de sentido — revisar consumidores (relatórios, `registro_tentativas`, resumos).
-- `duracao_min` 120 com CHECK fechado `(30,45,60,90,120)` já cobre 2h; fusão de 3+ passos na mesma sessão excede o catálogo de durações — decisão: duração livre na fusão ou manter o catálogo (sugiro manter 120 como teto de fato e deixar a dupla agendar duas sessões).
-- Cobertura + `encontro_id` unique preservados evitam migração destrutiva; stubs/clones antigos continuam legíveis — decidir se a sessão dupla histórica vira "cobertura legada" na leitura (sugiro deixar como está: clones históricos são registros válidos).
+- `duracao_min` 120 com CHECK fechado `(30,45,60,90,120)` já cobre 2h; fusão de 3+ passos na mesma sessão segue dentro do catálogo (120 é o máximo) — sem máximo de produto no número de passos, mas a UI explica o que cabe em 2h; mais do que isso é a dupla agendar duas sessões.
+- Cobertura + `encontro_id` unique preservados evitam migração destrutiva; stubs/clones antigos continuam legíveis — clones históricos seguem sendo registros válidos (não migrar dado, só ler direito).
 - Jovem avaliando "a sessão" e não "os dois encontros": a copy do link precisa dizer que a resposta vale pelo grupo.
+- `sessao_id` não preenchido antes do `realizado` deixa a sessão sem fusão (cada encontro minta o seu) — quem agenda a fusão carimba o grupo no mesmo gesto.
 
 ## Premissas
 

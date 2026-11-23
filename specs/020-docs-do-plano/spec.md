@@ -6,8 +6,8 @@
 ## Problema e resultado
 
 - **Dor hoje:** o combinado é um card operacional (lista de passos + aceites) mas não há um documento legível do "o que foi combinado" que a dupla possa ler antes de aceitar; e o roteiro é o `roteiro-encontro-NN` estático do corpus — nenhum roteiro semanal por dupla derivado do plano vigente.
-- **Resultado observável:** antes do aceite, o doc do combinado está disponível e determinístico (planner, nunca a Liza); depois do aceite, roteiros semanais nascem lazy — o primeiro quando o primeiro encontro é agendado, o N+1 quando o N é concluído, nunca os 16 de uma vez; auxiliar/coordenação geram uma semana sob demanda com preview, validação, rascunho/publicado, idempotência e invalidação por versão do plano.
-- **Como saberemos que funcionou:** o jovem lê "o combinado" antes de aceitar; cada semana tem seu roteiro na hora certa; coordenação gera a semana 7 sob demanda, revisa o rascunho e publica; quando o plano muda de versão, os roteiros derivados marcam-se desatualizados.
+- **Resultado observável:** a hierarquia de documentos fica clara e sem quarto documento — **"O combinado"** (um por versão do plano, leitura do aceite, sai junto com a spec 017), **"Roteiro do encontro N"** (operacional da semana, absorve os `encontro_guia_ajustes`) e **"Biblioteca"** (o corpus de referência). O combinado é determinístico (planner, nunca a Liza); os roteiros nascem lazy — o primeiro quando o primeiro encontro é agendado, o N+1 quando o N é concluído, nunca os 16 de uma vez; auxiliar/coordenação geram uma semana sob demanda com preview, validação, rascunho/publicado, idempotência e invalidação por versão do plano.
+- **Como saberemos que funcionou:** o jovem lê "o combinado" antes de aceitar; cada semana tem seu roteiro na hora certa; coordenação gera a semana 7 sob demanda, revisa o rascunho e publica; quando o plano muda de versão, os roteiros derivados marcam-se desatualizados e as versões publicadas anteriores seguem legíveis.
 
 ## Fora de escopo
 
@@ -20,11 +20,11 @@
 
 ### US1 — Doc do combinado antes do aceite (P1)
 
-- **Por que P1:** aceitar o que não se lê é aceite cego.
+- **Por que P1:** aceitar o que não se lê é aceite cego. O doc sai junto com a spec 017: é nele que "Ver o combinado" aterrissa.
 - **Teste independente:** proposta ativa → doc disponível para os quatro papéis com o mesmo conteúdo.
 - **Cenários:**
   1. **Dado** uma proposta no ar **quando** qualquer um dos quatro papéis abre o plano **então** o doc do combinado lista: quem propôs, o ritmo, a janela, cada passo com data e ação (encontro/conversa), recessos no caminho e a regra do aceite/contestação — tudo derivado do `escopo` persistido.
-  2. **Dado** plano em versão 2 **quando** o doc abre **então** ele corresponde à versão vigente, não a um snapshot solto.
+  2. **Dado** plano em versão 2 **quando** o doc abre **então** ele corresponde à versão vigente — um doc por versão, não um snapshot solto.
 
 ### US2 — Roteiros semanais lazy (P1)
 
@@ -47,60 +47,63 @@
 ## Casos de borda
 
 - Semana sem encontro do escopo (recesso, gap): o lazy não gera roteiro para semana vazia.
-- Regenerar semana já publicada: cria versão nova; a publicada anterior fica legível (trilha), não some.
+- Regenerar semana já publicada: cria versão nova; a publicada anterior vira `substituido` e segue legível (trilha), não some nem é reescrita.
 - Plano `contestado`/`expirado`: roteiros vigentes marcam-se inválidos e a próxima proposta recria da versão nova.
-- Fusão (spec 018): sessão cobrindo 2 passos — um roteiro combinado da sessão ou dois roteiros de passo? Decisão: o roteiro segue a **semana/passo**; a fusão aparece como nota "esta sessão cobre os passos N e N+1" no roteiro da âncora.
+- Fusão (spec 018): sessão cobrindo 2 passos — o roteiro segue a **semana/passo**; a fusão aparece como nota "esta sessão cobre os passos N e N+1" no roteiro da âncora (`sessao_id` no encontro).
 - `escopo` sem `passos` (plano legado da 0219): roteiros lazy não geram — o doc lê o que existe.
-- Jovem nunca publica/edita: só lê o publicado via recorte definer.
+- Jovem nunca publica/edita: só lê o publicado via recorte definer — nunca rascunho nem `substituido` de outra dupla.
 - Roteiro gerado por "job" vs "coordenação": `gerado_via` registra a origem.
+- Versão publicada mais antiga que a vigente: continua endereçável/legível para staff e para a trilha da dupla (`substituido`), só deixa de ser "a vigente".
 
 ## Requisitos funcionais
 
-- **FR-001:** o doc do combinado é renderização determinística de `dupla_planos.escopo` + metadados (proponente, versão, janela, aceites) — sem tabela nova, sem IA.
-- **FR-002:** roteiros semanais persistidos por dupla/plano/número com `conteudo` estruturado (blocos), `status`, `versao`, `plano_versao`, `gerado_por/via`, `gerado_em`, `publicado_em`.
-- **FR-003:** geração lazy: primeiro encontro agendado → roteiro 1; encontro N concluído → roteiro N+1; idempotente por (plano, número); nunca o lote inteiro.
+- **FR-001:** o doc do combinado é renderização determinística de `dupla_planos.escopo` + metadados (proponente, versão, janela, decisões de ritmo/recesso) — um doc por versão do plano, sem tabela nova, sem IA; introduzido junto com a spec 017.
+- **FR-002:** roteiros semanais persistidos por plano/número/versão em `dupla_plano_roteiros` com `conteudo` estruturado (blocos), `status` (`rascunho`/`publicado`/`substituido`), `plano_versao`, `gerado_por/via`, `gerado_em`, `publicado_em` — DDL completo (RLS, grants, índices) no recon §5.3.
+- **FR-003:** geração lazy: primeiro encontro agendado → roteiro 1; encontro N concluído → roteiro N+1; idempotente por (plano, número); nunca o lote inteiro e nunca N+2.
 - **FR-004:** geração sob demanda: coordenação e auxiliar (`supervisiona_dupla`) escolhem a semana, veem preview, salvam rascunho, publicam; validação do conteúdo antes de persistir.
-- **FR-005:** mudança de `plano.versao` invalida roteiros derivados (marca visual + caminho de regeneração); versão nova nunca apaga a anterior.
-- **FR-006:** leitura: dupla lê roteiros publicados do próprio plano; staff no escopo; jovem via recorte definer; o dropdown do card "Sua semana" (spec 019) prefere o roteiro semanal vigente ao corpus estático.
-- **FR-007:** montagem do roteiro é determinística nesta fatia: corpus `roteiro-encontro-NN` + `encontro_guia_ajustes` da dupla + contexto do plano (ritmo, fusão, recesso) — a montagem é função pura testável.
+- **FR-005:** mudança de `plano.versao` invalida roteiros derivados (marca visual + caminho de regeneração); versão nova marca a anterior como `substituido`, nunca apaga nem reescreve — o índice único do vigente é parcial (`where status='publicado'`), a unique completa é `(plano_id, numero, versao)`.
+- **FR-006:** leitura: dupla lê roteiros publicados do próprio plano; staff no escopo lê rascunho/publicado/substituido; jovem só o publicado, via recorte definer; o disclosure do card "Sua semana" (spec 019) prefere o roteiro semanal vigente ao corpus estático.
+- **FR-007:** montagem do roteiro é determinística nesta fatia: corpus `roteiro-encontro-NN` + `encontro_guia_ajustes` da dupla + contexto do plano (ritmo, fusão, recesso) — a montagem é função pura testável. Avaliar primeiro a derivação pura na leitura (roteiro como projeção de corpus+ajustes+contexto, sem persistir); persistir só o que a trilha/versionamento exige — o que se decide fica registrado no recon/PR.
 
 ## Requisitos não funcionais
 
-- **RLS/RPC:** `dupla_plano_roteiros` (nome a confirmar pelo lead) com select por escopo-dupla + recorte definer do jovem; escrita só por RPCs definer (`roteiro_gerar`, `roteiro_publicar`, `roteiro_regenerar`) com grants explícitos — molde das RPCs de plano.
+- **RLS/RPC:** `dupla_plano_roteiros` (nome a confirmar pelo lead) com `enable row level security`, `grant select` ao `authenticated`, policy de select por escopo-dupla (membro da dupla ou staff via `supervisiona_dupla`/`has_papel`) e recorte definer do jovem que devolve só `publicado`; **nenhum** insert/update/delete grant direto — escrita só por RPCs definer (`roteiro_gerar`, `roteiro_publicar`, `roteiro_regenerar`) com grants explícitos a `authenticated`, no molde das RPCs de plano. DDL sugerido completo no recon §5.3.
 - **Gatilho lazy:** via tick `plano_ciclo`-adjacente (job service-role novo, ex. `roteiros_lazy`) — recomendado — ou dentro de `plano_aplicar_passo`/trigger de `encontros`; decidir na implementação (recon §5.3).
-- **Conteúdo:** `DocBloco[]` (schema já existente em `materiais-documentos.ts`) validado por Zod antes de persistir e de renderizar.
+- **Conteúdo:** `DocBloco[]` (tipo existente em `src/lib/materiais-documentos.ts`) validado por Zod antes de persistir e de renderizar — schema a criar na spec 021 e reutilizado aqui.
 - **LGPD:** roteiro por dupla contém nome da dupla/contexto do plano — entra no inventário como artefato derivado de dados já cobertos.
-- **Idempotência:** unique (plano_id, numero, versao) + índice único parcial do vigente; regerar = nova versão, nunca UPDATE destrutivo.
+- **Idempotência:** unique `(plano_id, numero, versao)` + índice único parcial do vigente `on (plano_id, numero) where status='publicado'`; regerar = nova versão com a anterior `substituido`, nunca UPDATE destrutivo. Não usar `(dupla_id, numero, versao)`: a âncora é o plano.
 - **Demo:** dupla com roteiros publicados e uma semana em rascunho.
 
 ## Entidades e dados
 
-- Nova: `dupla_plano_roteiros` (sugestão de DDL no recon §5.3): dupla_id, plano_id, numero, versao, plano_versao, conteudo jsonb, status, gerado_por, gerado_via, gerado_em, publicado_em.
-- Reuso: `dupla_planos.escopo` (doc do combinado), `encontro_guia_ajustes` (ajustes por dupla), `docs/rag/roteiro-encontro-*.md` (fonte), `dupla_plano_eventos` (audit do ciclo de vida, se couber).
+- Nova: `dupla_plano_roteiros` (DDL sugerida completa no recon §5.3 — colunas, RLS, grants, policies, índices): id, dupla_id, plano_id, numero, versao, plano_versao, conteudo jsonb, status (`rascunho`/`publicado`/`substituido`), gerado_por, gerado_via, gerado_em, publicado_em.
+- Reuso: `dupla_planos.escopo` (doc do combinado), `encontro_guia_ajustes` (ajustes por dupla — absorvidos pelo roteiro vigente), `docs/rag/roteiro-encontro-*.md` (fonte), `dupla_plano_eventos` (audit do ciclo de vida, se couber).
 - Jobs: novo passo no tick ou RPC `roteiros_lazy_tick` service-role (espelho do `plano_ciclo`).
 
 ## Critérios de sucesso
 
-- **SC-001:** unit da montagem determinística do roteiro (corpus + ajustes + contexto → blocos válidos) e do doc do combinado.
-- **SC-002:** e2e: aceita plano → agenda 1º → roteiro 1 publicado; conclui → roteiro 2; coordenação gera semana 5 sob demanda (preview→rascunho→publicar→regerar idempotente).
-- **SC-003:** prints do doc do combinado e do roteiro semanal (1440/390).
-- **SC-004:** caso negado de escrita (mentor/jovem não publicam) no e2e + policy negada.
+- **SC-001:** unit da montagem determinística do roteiro (corpus + ajustes + contexto → blocos válidos) e do doc do combinado (um por versão).
+- **SC-002:** e2e: aceita plano → agenda 1º → roteiro 1 publicado; conclui → roteiro 2 — e nunca N+2 no mesmo tick; coordenação gera semana 5 sob demanda (preview→rascunho→publicar→regerar idempotente).
+- **SC-003:** jovem lê só o publicado: rascunho e `substituido` invisíveis no recorte definer; `substituido` legível pra staff/trilha.
+- **SC-004:** prints do doc do combinado e do roteiro semanal (1440/390).
+- **SC-005:** caso negado de escrita (mentor/jovem não publicam) no e2e + policy negada.
 
 ## Plano de testes
 
-- **Unit:** montagem do roteiro, validação de blocos, transição de status, invalidação por versão de plano, régua lazy (nunca N+2).
-- **E2E app:** fluxos lazy e sob demanda por papel; leitura do jovem só do publicado.
+- **Unit:** montagem do roteiro, validação de blocos, transição de status (`rascunho`→`publicado`, `publicado`→`substituido`), invalidação por versão de plano, régua lazy (nunca N+2), um doc do combinado por versão.
+- **E2E app:** fluxos lazy e sob demanda por papel; leitura do jovem só do publicado; `substituido` legível pra staff; regerar preserva a anterior.
 - **E2E demo:** roteiros publicados + rascunho.
 - **Regressão:** o roteiro estático do corpus segue acessível onde já era (biblioteca/agenda) — não é substituído globalmente.
 
 ## Riscos
 
-- Mais um artefato disputando com corpus + ajustes + doc do combinado: o roteiro semanal deve ser **a leitura operacional** dentro do plano; o corpus segue a biblioteca de referência — copy e navegação deixam a hierarquia clara.
+- Mais um artefato disputando com corpus + ajustes + doc do combinado: a hierarquia é fixa — "O combinado" (por versão), "Roteiro do encontro N" (operacional, absorve os ajustes), "Biblioteca" (corpus); copy e navegação deixam isso claro, sem quarto documento.
 - Lazy por job tem latência do tick: o primeiro roteiro pode atrasar — mitigação: gerar também na leitura (on-demand silencioso no primeiro acesso à semana) se o tick for diário demais. Decidir.
 - Conteúdo estruturado no banco exige validação rigorosa: bloco inválido nunca renderiza (fallback = roteiro do corpus).
+- Derivação pura vs persistência: se o roteiro puder ser projetado sem gravar, a tabela só segura o que a trilha exige — avaliar antes de pagar o custo de versionamento.
 
 ## Premissas
 
 - "Semana" do roteiro = o passo do plano (encontro N), não semana civil — a dupla pensa em "roteiro do encontro 7".
-- O doc do combinado não é assinado/baixado — é leitura na tela do aceite.
+- O doc do combinado não é assinado/baixado — é leitura na tela do aceite, um por versão, e sai junto com a spec 017.
 - Default do lazy: roteiro nasce **publicado** (conteúdo determinístico do corpus oficial, sem risco editorial); rascunho é para geração sob demanda e depois para a Liza (spec 021). Validar com Thiago.
