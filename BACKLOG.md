@@ -451,3 +451,7 @@ Recon + opinião: `docs/planos/issues/_recon/plano-518-522-2026-11-23.md` e `pla
 ## Backlog — relatórios (nov/2026)
 
 - [ ] **REALIZA-523** — Relatórios: filtros por papel/tipo de mentor e mais granularidade. Manter a tabela default como está e acrescentar pills extras; default não mostra staff nem especialistas. Pills: mentor DPP, mentor especialista, coordenação, auxiliar, todos; combinar com trilha/turma/status/período; URL + limpar + exportação/contagens coerentes.
+
+## Backlog — avaliação do jovem (nov/2026)
+
+- [ ] **REALIZA-524** — Modal de avaliação: mostrar data e dia da semana além do número/nome do encontro; fallback para data nula; cobrir também o fluxo por token.

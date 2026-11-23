@@ -96,6 +96,7 @@
 - **FR-009:** quem pode propor/responder é calculado no servidor por `supervisiona_dupla`/`has_papel` — a ficha não decide CTA por `dupla.supervisor?.id`; auxiliar com escopo de turma vê e usa as mesmas superfícies de decisão. O mesmo predicado vale para registrar a decisão de recesso — não para a grade: editar disponibilidade é só do próprio lado e da coordenação.
 - **FR-010:** a copy da UI usa **auxiliar** (nunca `supervisor`) e os carimbos/autoria identificam quem propôs e de que lado.
 - **FR-011:** a sugestão de ritmo, o estado das perguntas e a máquina de aceite DEVEM ser determinísticos e testáveis no módulo puro — nada de cálculo divergente entre cliente e servidor.
+- **FR-012:** proposta, ativação e contestação DEVEM notificar o outro lado no sino e, quando houver contato e opt-in, também por WhatsApp/e-mail — com deep link para o combinado e sem dados sensíveis no corpo. Registrar canal e entrega para auditoria; a ausência de canal externo não bloqueia o aceite.
 
 ## Requisitos não funcionais
 
