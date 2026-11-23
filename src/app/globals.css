@@ -488,6 +488,77 @@
   animation-delay: calc(var(--i, 0) * 35ms + 150ms);
 }
 
+/* salto da conquista (016) — o preset `hop` do kit fun-isometric tecla a
+   tecla (94 quadros a 60fps): sobe inclinando 9°, bate passando do
+   repouso e quica duas vezes. Posição e rotação são propriedades
+   separadas (translate/rotate), cada uma com as curvas de influência do
+   After Effects. O guard global de prefers-reduced-motion zera — o
+   arquivo SVG é estático, então nada escapa dele. */
+@keyframes badge-salto-p {
+  0% {
+    translate: 0 0;
+    animation-timing-function: cubic-bezier(0.64, 0, 0.47, 1);
+  }
+  38.3% {
+    translate: 1.4% -4.85%;
+    animation-timing-function: cubic-bezier(0.59, 0, 0.52, 1);
+  }
+  57.45% {
+    translate: -1.45% 4.65%;
+    animation-timing-function: cubic-bezier(0.24, 0, 0.16, 1);
+  }
+  93.62%,
+  100% {
+    translate: 0 0;
+  }
+}
+@keyframes badge-salto-r {
+  0% {
+    rotate: 0deg;
+    animation-timing-function: cubic-bezier(0.44, 0, 0.42, 1);
+  }
+  38.3% {
+    rotate: 9deg;
+    animation-timing-function: cubic-bezier(0.42, 0, 0.44, 1);
+  }
+  57.45% {
+    rotate: -4deg;
+    animation-timing-function: cubic-bezier(0.59, 0, 0.66, 1);
+  }
+  76.6% {
+    rotate: 2deg;
+    animation-timing-function: cubic-bezier(0.37, 0, 0.51, 1);
+  }
+  100% {
+    rotate: 0deg;
+  }
+}
+@utility badge-salta {
+  transform-origin: 50% 62%;
+  animation:
+    badge-salto-p 1567ms both,
+    badge-salto-r 1567ms both;
+}
+/* brilho no quadro da batida (54 = 900ms): o `twinkle` do kit — estoura
+   em escala, nunca em opacidade */
+@keyframes badge-brilho {
+  0% {
+    scale: 0;
+    animation-timing-function: cubic-bezier(0.75, 0, 0.25, 1);
+  }
+  30% {
+    scale: 1;
+    animation-timing-function: cubic-bezier(0.75, 0, 0.25, 1);
+  }
+  100% {
+    scale: 0;
+  }
+}
+@utility badge-brilho {
+  scale: 0;
+  animation: badge-brilho 500ms 900ms both;
+}
+
 /* entrada do "balão de pergunta" do onboarding — um rise por passo (o wrapper
    remonta com key={step}). Coberta pelo guard global de prefers-reduced-motion. */
 @keyframes rise {

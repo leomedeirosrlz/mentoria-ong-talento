@@ -1,5 +1,6 @@
 import { limiaresMarcos, maxEncontros } from "./ciclo";
 import type { MarcoJornada } from "./ciclo";
+import type { Trilha } from "./types";
 import { estacoesJornada } from "./jornada";
 import type {
   Estacao,
@@ -31,7 +32,8 @@ import { INSTRUMENTO_TOM } from "@/components/instrumento-icone";
  *  casa. */
 export type ConquistaGlifo =
   | { tipo: "instrumento"; chave: EstacaoChave }
-  | { tipo: "phosphor"; nome: ConquistaPhosphor };
+  | { tipo: "phosphor"; nome: ConquistaPhosphor }
+  | { tipo: "nivel"; chave: NivelChave };
 
 export type ConquistaPhosphor =
   | "flag"
@@ -52,6 +54,8 @@ export type Conquista = {
    *  a da ocorrência mais recente). Null quando a fonte não expõe a data
    *  do feito — a view jovem_encaminhamentos não tem feito_em. */
   data: string | null;
+  /** o que conquista a peça, em texto — o "como se conquista" do detalhe */
+  criterio: string;
   glifo: ConquistaGlifo;
   /** par cor/tinta do emblema — var()s do globals, mesma gramática de
    *  INSTRUMENTO_TOM (os tons de instrumento vêm direto dele) */
@@ -103,10 +107,78 @@ export type MarcoAcao = {
   proximo: boolean;
 };
 
+/** Peça que ainda vem (016) — mora numa área separada da estante, apagada
+ *  e NUNCA cadeado: o critério em texto e, quando a fonte permite contar,
+ *  o progresso. Não tem data: o futuro não se carimba. */
+export type ConquistaFutura = {
+  /** a mesma chave que a peça terá na estante quando chegar */
+  chave: string;
+  titulo: string;
+  criterio: string;
+  /** o que falta, em texto ("Faltam 4 encontros com seu mentor", "Libera
+   *  no encontro 6"). Null quando não há contagem honesta. */
+  linha: string | null;
+  progresso: { atual: number; alvo: number } | null;
+  /** o próximo marco da régua — o anel --destaque da casa */
+  proximo: boolean;
+  glifo: ConquistaGlifo;
+  tom: { cor: string; tinta: string };
+};
+
+/** As 4 faixas de nível por tempo de programa (016): a permanência é o
+ *  eixo e a participação é piso — ninguém chega à Veterania só esperando. */
+export type NivelChave = "inicio" | "constancia" | "veterania" | "completa";
+
+export type NivelJornada = {
+  chave: NivelChave;
+  titulo: string;
+  /** a régua da faixa em texto — "3 meses de programa e 8 encontros com
+   *  seu mentor" */
+  criterio: string;
+  /** o que a faixa reconhece — a linha do detalhe */
+  detalhe: string;
+  /** ganho = critério cumprido; superado = uma faixa acima já chegou sem
+   *  esta ter cumprido o tempo (a trilha fechou antes); futuro = ainda não */
+  estado: "ganho" | "superado" | "futuro";
+  /** quando o critério se cumpriu — o mais tarde entre o dia de programa
+   *  e o encontro-limiar, ambos reais. Null fora do ganho. */
+  data: string | null;
+  glifo: ConquistaGlifo;
+  tom: { cor: string; tinta: string };
+};
+
+export type NiveisJornada = {
+  /** as 4 faixas em ordem, sempre — a régua inteira é visível */
+  faixas: NivelJornada[];
+  /** a faixa mais alta alcançada — null antes de a jornada começar */
+  atual: NivelChave | null;
+  /** a próxima faixa e quanto falta — null quando a jornada completou */
+  proximo: {
+    chave: NivelChave;
+    /** contagem do que falta, nunca data projetada. Null quando a dupla
+     *  parou (pausada/encerrada): a contagem não anda sem encontro */
+    falta: string | null;
+    encontros: { atual: number; alvo: number };
+    /** null quando a faixa não pede tempo (início e jornada completa) */
+    dias: { atual: number; alvo: number } | null;
+  } | null;
+  /** dias somados dentro de dupla da régua — null sem data de início */
+  diasDePrograma: number | null;
+  /** nenhuma dupla da régua ativa: a pausa congela a contagem */
+  parada: "pausada" | "encerrada" | null;
+  /** trilha de especialista — a UI fala de sessão, não de encontro */
+  sessao: boolean;
+};
+
 export type ConquistasJovem = {
   /** estante em ordem cronológica; sem data vai pro fim (a contagem de
    *  combinados acumula — não é um instante) */
   conquistas: Conquista[];
+  /** área separada das que ainda vêm (016) — vazia quando tudo foi
+   *  conquistado ou não há jornada */
+  futuras: ConquistaFutura[];
+  /** níveis por tempo de programa (016) — null sem jornada */
+  nivel: NiveisJornada | null;
   /** o próximo limiar a cruzar — null quando a jornada está completa ou
    *  não existe */
   proximoMarco: ProximoMarco | null;
@@ -134,6 +206,9 @@ export type ConquistasInput = {
     trilha: string | null;
     status: string | null;
     iniciada_em: string | null;
+    /** fecha o relógio do nível — sem ela, dupla encerrada continuaria
+     *  envelhecendo até a Veterania */
+    encerrada_em?: string | null;
   }[];
   /** getJovemJornada() — null quando a RPC falha ou não há dupla DPP */
   jornada: JovemJornadaDados | null;
@@ -222,8 +297,89 @@ const DETALHE_ESTACAO: Partial<Record<EstacaoChave, string>> = {
   avaliacao_360: "Você enviou a sua avaliação final do ciclo.",
 };
 
+/** Critério das conquistas de instrumento — infinitivo, o que conquista a
+ *  peça (estante e área das futuras falam a mesma frase). */
+const CRITERIO_ESTACAO: Partial<Record<EstacaoChave, string>> = {
+  roda_inicial: "Fazer a leitura inicial da Roda da Vida",
+  visao: "Escrever a sua Declaração de Visão",
+  metas: "Definir as suas metas",
+  pdm: "Montar o seu Plano de Desenvolvimento",
+  roda_formal: "Refazer a Roda da Vida no fim do ciclo",
+  avaliacao_360: "Enviar a sua avaliação final do ciclo",
+};
+
+const criterioEstacao = (est: Estacao): string =>
+  CRITERIO_ESTACAO[est.chave] ?? `Responder: ${est.titulo}`;
+
+// tom das faixas de nível: o amarelo --destaque é a cor da jornada e da
+// celebração na casa (nunca alerta)
+const TOM_NIVEL = { cor: "var(--brand-ink)", tinta: "var(--destaque)" };
+
+/** Régua das faixas por trilha. Tempo é dia corrido DENTRO de dupla da
+ *  trilha (lacuna entre duplas não conta); encontros são os realizados.
+ *  A especialista dura ~3 meses inteira, então a régua dela encurta —
+ *  "3 meses" lá seria o fim da trilha, não a permanência. */
+const REGUA_NIVEL: Record<
+  Trilha,
+  Record<"constancia" | "veterania", { dias: number; encontros: number }>
+> = {
+  dpp: {
+    constancia: { dias: 30, encontros: 4 },
+    veterania: { dias: 90, encontros: 8 },
+  },
+  especialista: {
+    constancia: { dias: 30, encontros: 2 },
+    veterania: { dias: 60, encontros: 3 },
+  },
+};
+
+const TITULO_NIVEL: Record<NivelChave, string> = {
+  inicio: "Início",
+  constancia: "Constância",
+  veterania: "Veterania",
+  completa: "Jornada completa",
+};
+
+const DIA_MS = 86_400_000;
+
 const ts = (iso: string | null | undefined): number =>
   iso ? Date.parse(iso) || 0 : 0;
+
+/** Data-only (iniciada_em) vira o meio-dia de São Paulo — a mesma leitura
+ *  do formatDate; instante completo passa direto. */
+const tsDia = (iso: string | null | undefined): number =>
+  iso && /^\d{4}-\d{2}-\d{2}$/.test(iso)
+    ? Date.parse(`${iso}T12:00:00-03:00`)
+    : ts(iso);
+
+/** O meio-dia (São Paulo) do dia do instante — os dias de programa são de
+ *  calendário: encontro às 19h de 12 dias atrás conta 12, não 11. */
+const meioDia = (ms: number): number =>
+  Date.parse(
+    `${new Date(ms - 3 * 3_600_000).toISOString().slice(0, 10)}T12:00:00-03:00`
+  );
+
+const meses = (dias: number) => {
+  const m = Math.round(dias / 30);
+  return m === 1 ? "1 mês" : `${m} meses`;
+};
+
+/** "Faltam 4 encontros e 56 dias" — concorda com o primeiro termo; a
+ *  unidade longa ("com seu mentor") só quando o encontro vem sozinho. */
+function textoFalta(
+  enc: number,
+  dias: number,
+  unidade: (n: number) => string,
+  curta: (n: number) => string
+): string | null {
+  if (enc <= 0 && dias <= 0) return null;
+  const n = enc > 0 ? enc : dias;
+  const verbo = n === 1 ? "Falta" : "Faltam";
+  const ds = `${dias} ${dias === 1 ? "dia" : "dias"}`;
+  if (enc > 0 && dias > 0) return `${verbo} ${curta(enc)} e ${ds}`;
+  if (enc > 0) return `${verbo} ${unidade(enc)}`;
+  return `${verbo} ${ds} de programa`;
+}
 
 /** A linha do PDM não ganho — herda o texto honesto da estação (a
  *  liberação do guia ou o detalhe da re-emissão) com inicial maiúscula;
@@ -234,6 +390,159 @@ function linhaPdmPendente(est: Estacao): string {
       ? (est.detalhe ?? "Esperando sua resposta")
       : (est.detalhe ?? est.janela.label);
   return t.charAt(0).toUpperCase() + t.slice(1);
+}
+
+/** Níveis por tempo de programa (016). Tempo é a soma dos dias dentro de
+ *  dupla da trilha da régua — de iniciada_em (ou do 1º encontro, quando a
+ *  dupla não tem data) até hoje, ou até encerrada_em na dupla fechada;
+ *  lacuna entre uma dupla e outra não conta. Toda data sai de carimbo
+ *  real: o dia em que a soma cruzou o limiar ou o encontro que cruzou o
+ *  piso, o que veio por último. Nada se projeta pro futuro. */
+function niveisDaJornada(a: {
+  trilha: Trilha;
+  duplas: ConquistasInput["duplas"];
+  /** realizados da trilha, por ordem de realizado_em */
+  porData: ConquistasInput["encontros"];
+  total: number;
+  agora: number;
+  curta: (n: number) => string;
+  unidade: (n: number) => string;
+  criterioCompleta: string;
+}): NiveisJornada {
+  const { trilha, porData, total, agora } = a;
+  const quando = (e: ConquistasInput["encontros"][number] | undefined) =>
+    e ? ts(e.realizado_em ?? e.data_hora) || null : null;
+  const daRegua = a.duplas.filter(
+    (d) => ((d.trilha ?? "dpp") === "especialista") === (trilha === "especialista")
+  );
+
+  const intervalos: [number, number][] = [];
+  for (const d of daRegua) {
+    const dela = porData.filter((e) => e.dupla_id === d.id);
+    const t0 = tsDia(d.iniciada_em) || quando(dela[0]);
+    if (!t0 || t0 > agora) continue;
+    const ini = meioDia(t0);
+    const fechada = d.status === "encerrada" || d.status === "concluida";
+    const fim = meioDia(
+      fechada
+        ? tsDia(d.encerrada_em) || quando(dela[dela.length - 1]) || t0
+        : agora
+    );
+    intervalos.push([ini, Math.min(Math.max(fim, ini), meioDia(agora))]);
+  }
+  // remanejo pode encavalar a dupla nova na antiga: o dia conta uma vez
+  intervalos.sort((x, y) => x[0] - y[0]);
+  const unidos: [number, number][] = [];
+  for (const [i, f] of intervalos) {
+    const u = unidos[unidos.length - 1];
+    if (u && i <= u[1]) u[1] = Math.max(u[1], f);
+    else unidos.push([i, f]);
+  }
+  const diasDePrograma = unidos.length
+    ? Math.floor(unidos.reduce((s, [i, f]) => s + f - i, 0) / DIA_MS)
+    : null;
+  /** o instante em que a soma de dias cruzou `n` — null se não cruzou */
+  const cruzouDias = (n: number): number | null => {
+    let acc = 0;
+    for (const [i, f] of unidos) {
+      if (acc + (f - i) >= n * DIA_MS) return i + (n * DIA_MS - acc);
+      acc += f - i;
+    }
+    return null;
+  };
+
+  const feitos = porData.length;
+  const regua = REGUA_NIVEL[trilha];
+  const comeco = [unidos[0]?.[0], quando(porData[0])].filter(
+    (t): t is number => t != null && t <= agora
+  );
+  const dataDe = (chave: NivelChave): number | null => {
+    switch (chave) {
+      case "inicio":
+        return comeco.length ? Math.min(...comeco) : null;
+      case "completa":
+        return feitos >= total ? quando(porData[total - 1]) : null;
+      default: {
+        const r = regua[chave];
+        const t = cruzouDias(r.dias);
+        const e = quando(porData[r.encontros - 1]);
+        return t != null && e != null ? Math.max(t, e) : null;
+      }
+    }
+  };
+
+  const esp = trilha === "especialista";
+  const CRITERIO: Record<NivelChave, string> = {
+    inicio: esp
+      ? "Começar a trilha com especialista"
+      : "Começar a jornada com seu mentor",
+    constancia: `${meses(regua.constancia.dias)} de programa e ${a.unidade(regua.constancia.encontros)}`,
+    veterania: `${meses(regua.veterania.dias)} de programa e ${a.unidade(regua.veterania.encontros)}`,
+    completa: a.criterioCompleta,
+  };
+  const DETALHE: Record<NivelChave, string> = {
+    inicio: "Toda jornada começa num primeiro passo. A sua já começou.",
+    constancia: `Você seguiu firme no seu primeiro mês de programa, ${esp ? "sessão após sessão" : "encontro após encontro"}.`,
+    veterania: `${meses(regua.veterania.dias)} de programa: você já tem história para contar aqui.`,
+    completa: esp
+      ? "Você completou as sessões com especialista."
+      : "Você completou os encontros com seu mentor.",
+  };
+
+  const ordem: NivelChave[] = ["inicio", "constancia", "veterania", "completa"];
+  const datas = ordem.map(dataDe);
+  const topo = datas.reduce<number>((m, d, i) => (d != null ? i : m), -1);
+  const faixas: NivelJornada[] = ordem.map((chave, i) => ({
+    chave,
+    titulo: TITULO_NIVEL[chave],
+    criterio: CRITERIO[chave],
+    detalhe: DETALHE[chave],
+    estado: datas[i] != null ? "ganho" : i < topo ? "superado" : "futuro",
+    data: datas[i] != null ? new Date(datas[i]!).toISOString() : null,
+    glifo: { tipo: "nivel", chave },
+    tom: TOM_NIVEL,
+  }));
+
+  const ativa = daRegua.some((d) => d.status === "ativa");
+  const parada = ativa
+    ? null
+    : daRegua.some((d) => d.status === "pausada")
+      ? "pausada"
+      : daRegua.length
+        ? "encerrada"
+        : null;
+
+  const prox = ordem[topo + 1] ?? null;
+  let proximo: NiveisJornada["proximo"] = null;
+  if (prox) {
+    const piso =
+      prox === "inicio" ? 1 : prox === "completa" ? total : regua[prox].encontros;
+    const alvoDias =
+      prox === "constancia" || prox === "veterania" ? regua[prox].dias : null;
+    const dias = diasDePrograma ?? 0;
+    proximo = {
+      chave: prox,
+      falta: parada
+        ? null
+        : textoFalta(
+            Math.max(0, piso - feitos),
+            alvoDias == null ? 0 : Math.max(0, alvoDias - dias),
+            a.unidade,
+            a.curta
+          ),
+      encontros: { atual: Math.min(feitos, piso), alvo: piso },
+      dias: alvoDias == null ? null : { atual: Math.min(dias, alvoDias), alvo: alvoDias },
+    };
+  }
+
+  return {
+    faixas,
+    atual: topo >= 0 ? ordem[topo] : null,
+    proximo,
+    diasDePrograma,
+    parada,
+    sessao: esp,
+  };
 }
 
 export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
@@ -255,10 +564,22 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
   const daTrilha = temDpp ? realizadosDpp : realizadosEsp;
   const total = maxEncontros(temDpp ? "dpp" : "especialista");
   const feitos = daTrilha.length;
-  const unidade = (n: number) =>
+  const curta = (n: number) =>
     temDpp
-      ? `${n} ${n === 1 ? "encontro" : "encontros"} com seu mentor`
-      : `${n} ${n === 1 ? "sessão" : "sessões"} com especialista`;
+      ? `${n} ${n === 1 ? "encontro" : "encontros"}`
+      : `${n} ${n === 1 ? "sessão" : "sessões"}`;
+  const unidade = (n: number) =>
+    `${curta(n)} ${temDpp ? "com seu mentor" : "com especialista"}`;
+  const criterioMarco = (marco: MarcoJornada, p: number): string =>
+    marco === "primeiro"
+      ? temDpp
+        ? "Ter o 1º encontro com seu mentor"
+        : "Ter a 1ª sessão com especialista"
+      : marco === "completo"
+        ? temDpp
+          ? `Completar os ${total} encontros com seu mentor`
+          : `Completar as ${total} sessões com especialista`
+        : `Chegar a ${unidade(p)}`;
 
   // o marco é datado pelo encontro que cruzou o limiar — o p-ésimo
   // realizado por ordem de realizado_em (não por numero: a jornada pode
@@ -268,6 +589,7 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
   );
 
   const estante: { c: Conquista; ts: number }[] = [];
+  const futuras: ConquistaFutura[] = [];
   let proximoMarco: ProximoMarco | null = null;
 
   // sem jornada (nem dupla DPP nem sessão esp) não há régua — nada de
@@ -283,13 +605,18 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
           titulo: rotuloMarco(marco, temDpp),
           detalhe: detalheMarco(marco, temDpp),
           data,
+          criterio: criterioMarco(marco, p),
           glifo: { tipo: "phosphor", nome: ICONE_MARCO[marco] },
           tom: TOM_MARCO,
         },
       });
-    } else {
-      // os limiares vêm em ordem — o primeiro não cruzado é o próximo
-      const falta = p - feitos;
+      continue;
+    }
+    // os limiares vêm em ordem — o primeiro não cruzado é o próximo; os
+    // de depois vão pra área das futuras com a mesma contagem
+    const falta = p - feitos;
+    const texto = `${falta === 1 ? "Falta" : "Faltam"} ${unidade(falta)}`;
+    if (!proximoMarco)
       proximoMarco = {
         marco,
         rotulo: rotuloMarco(marco, temDpp),
@@ -297,10 +624,18 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
         alvo: p,
         total,
         sessao: !temDpp,
-        texto: `${falta === 1 ? "Falta" : "Faltam"} ${unidade(falta)}`,
+        texto,
       };
-      break;
-    }
+    futuras.push({
+      chave: `marco:${marco}`,
+      titulo: rotuloMarco(marco, temDpp),
+      criterio: criterioMarco(marco, p),
+      linha: texto,
+      progresso: { atual: feitos, alvo: p },
+      proximo: proximoMarco.marco === marco,
+      glifo: { tipo: "phosphor", nome: ICONE_MARCO[marco] },
+      tom: TOM_MARCO,
+    });
   }
 
   // instrumentos entregues — a estação feita vira conquista com a data do
@@ -337,8 +672,22 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
         agora: input.agora,
       })) {
         if (est.chave === "pdm") estPdm = est;
-        if (est.estado !== "feito" || est.chave === "avaliacao_encontro")
+        if (est.chave === "avaliacao_encontro") continue;
+        if (est.estado !== "feito") {
+          // o texto honesto da estação (liberação, espera) é a linha da
+          // futura — mesma fonte do marco PDM da faixa
+          futuras.push({
+            chave: `inst:${est.chave}`,
+            titulo: est.titulo,
+            criterio: criterioEstacao(est),
+            linha: linhaPdmPendente(est),
+            progresso: null,
+            proximo: false,
+            glifo: { tipo: "instrumento", chave: est.chave },
+            tom: INSTRUMENTO_TOM[est.chave],
+          });
           continue;
+        }
         estante.push({
           ts: ts(est.respondidoEm),
           c: {
@@ -346,6 +695,7 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
             titulo: est.titulo,
             detalhe: DETALHE_ESTACAO[est.chave] ?? est.descricao,
             data: est.respondidoEm,
+            criterio: criterioEstacao(est),
             glifo: { tipo: "instrumento", chave: est.chave },
             tom: INSTRUMENTO_TOM[est.chave],
           },
@@ -372,6 +722,9 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
           nAval === 1 ? "1 avaliação enviada" : `${nAval} avaliações enviadas`,
         detalhe: "Sua nota e seu comentário depois de cada encontro.",
         data: ultima.created_at,
+        criterio: temDpp
+          ? "Avaliar um encontro depois que ele acontece"
+          : "Avaliar uma sessão depois que ela acontece",
         glifo: { tipo: "instrumento", chave: "avaliacao_encontro" },
         tom: INSTRUMENTO_TOM.avaliacao_encontro,
       },
@@ -397,6 +750,7 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
         detalhe:
           "Tarefas que você se comprometeu a fazer entre um encontro e outro.",
         data: null,
+        criterio: "Concluir um combinado com seu mentor",
         glifo: { tipo: "phosphor", nome: "listChecks" },
         tom: TOM_COMBINADOS,
       },
@@ -422,6 +776,7 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
             : `${realizadosEsp.length} sessões com especialista`,
         detalhe: "Sessões da sua trilha com o especialista.",
         data,
+        criterio: "Fazer uma sessão com especialista",
         glifo: { tipo: "phosphor", nome: "usersThree" },
         tom: TOM_ESPECIALISTA,
       },
@@ -430,6 +785,63 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
 
   // ---------- marcos de ação (485/515 — a faixa "Próximo marco" no topo
   // da jornada): o que a jovem faz, não o tempo que ela fica. Sem jornada
+  // contas que ainda não começaram — só as que a jornada sempre traz: a
+  // avaliação vem depois de todo encontro; o combinado, na trilha do
+  // mentor ou quando já existe um em aberto. Sessão com especialista é
+  // caminho opcional: não vira promessa na área das futuras
+  if (temJornada && nAval === 0) {
+    const semAval = [...daTrilha].sort((a, b) => a.numero - b.numero)[0];
+    futuras.push({
+      chave: "conta:avaliacoes",
+      titulo: "Primeira avaliação",
+      criterio: temDpp
+        ? "Avaliar um encontro depois que ele acontece"
+        : "Avaliar uma sessão depois que ela acontece",
+      linha: semAval
+        ? temDpp
+          ? `Falta avaliar o encontro ${semAval.numero}`
+          : `Falta avaliar a sessão ${semAval.numero}`
+        : temDpp
+          ? "Depois do 1º encontro"
+          : "Depois da 1ª sessão",
+      progresso: null,
+      proximo: false,
+      glifo: { tipo: "instrumento", chave: "avaliacao_encontro" },
+      tom: INSTRUMENTO_TOM.avaliacao_encontro,
+    });
+  }
+  const abertos = input.encaminhamentos.filter(
+    (e) => e.status === "pendente" || e.status === "atrasado"
+  ).length;
+  if (temJornada && feitosComb.length === 0 && (temDpp || abertos > 0)) {
+    futuras.push({
+      chave: "conta:combinados",
+      titulo: "Primeiro combinado feito",
+      criterio: "Concluir um combinado com seu mentor",
+      linha:
+        abertos > 0
+          ? `${abertos} ${abertos === 1 ? "combinado em aberto" : "combinados em aberto"}`
+          : null,
+      progresso: null,
+      proximo: false,
+      glifo: { tipo: "phosphor", nome: "listChecks" },
+      tom: TOM_COMBINADOS,
+    });
+  }
+
+  const nivel = temJornada
+    ? niveisDaJornada({
+        trilha: temDpp ? "dpp" : "especialista",
+        duplas: input.duplas,
+        porData,
+        total,
+        agora: (input.agora ?? new Date()).getTime(),
+        curta,
+        unidade,
+        criterioCompleta: criterioMarco("completo", total),
+      })
+    : null;
+
   // a faixa não renderiza (mesmo gate da estante). O PRÓXIMO é sempre o
   // primeiro não ganho — é o único que a faixa mostra; os ganhos ficam
   // na estante do perfil. Marco de contagem traz a barra. ----------
@@ -529,6 +941,8 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
   estante.sort((a, b) => a.ts - b.ts);
   return {
     conquistas: estante.map((x) => x.c),
+    futuras,
+    nivel,
     proximoMarco,
     marcos,
     temJornada,

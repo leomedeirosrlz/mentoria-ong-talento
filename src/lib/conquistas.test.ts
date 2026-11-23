@@ -493,3 +493,358 @@ describe("seleção do próximo marco (faixa da jornada, 515)", () => {
     expect(proximo(r)).toBeNull();
   });
 });
+
+// ---------- níveis por tempo de programa (016): tempo dentro de dupla
+// é o eixo, encontros realizados são o piso; toda data sai de carimbo
+// real e o que falta é contagem, nunca data projetada.
+const antes = (n: number): string => {
+  const d = new Date(AGORA.getTime() - n * 86_400_000);
+  return d.toISOString().slice(0, 10);
+};
+/** encontro realizado `n` dias antes do AGORA */
+const encAntes = (num: number, n: number, over: Partial<Enc> = {}): Enc =>
+  enc(num, {
+    realizado_em: `${antes(n)}T19:00:00-03:00`,
+    data_hora: `${antes(n)}T19:00:00-03:00`,
+    ...over,
+  });
+type Dupla = ConquistasInput["duplas"][number];
+const dppDesde = (n: number, over: Partial<Dupla> = {}): Dupla => ({
+  ...DUPLA_DPP,
+  iniciada_em: antes(n),
+  ...over,
+});
+const estados = (r: ReturnType<typeof conquistasDoJovem>) =>
+  r.nivel!.faixas.map((f) => `${f.chave}:${f.estado}`);
+
+describe("níveis da jornada", () => {
+  it("sem jornada não tem nível", () => {
+    expect(conquistasDoJovem(base()).nivel).toBeNull();
+  });
+
+  it("1 semana: Início, e Constância diz quanto falta em contagem", () => {
+    const r = conquistasDoJovem(
+      base({ duplas: [dppDesde(7)], encontros: [encAntes(1, 2)] })
+    );
+    expect(r.nivel!.atual).toBe("inicio");
+    expect(r.nivel!.diasDePrograma).toBe(7);
+    expect(estados(r)).toEqual([
+      "inicio:ganho",
+      "constancia:futuro",
+      "veterania:futuro",
+      "completa:futuro",
+    ]);
+    // o início é o dia em que a dupla começou
+    expect(r.nivel!.faixas[0].data?.slice(0, 10)).toBe(antes(7));
+    expect(r.nivel!.proximo).toEqual({
+      chave: "constancia",
+      falta: "Faltam 3 encontros e 23 dias",
+      encontros: { atual: 1, alvo: 4 },
+      dias: { atual: 7, alvo: 30 },
+    });
+    expect(r.nivel!.faixas[1].criterio).toBe(
+      "1 mês de programa e 4 encontros com seu mentor"
+    );
+  });
+
+  it("1 mês com 4 encontros: Constância datada pelo que veio por último", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [dppDesde(35)],
+        encontros: [
+          encAntes(1, 28),
+          encAntes(2, 21),
+          encAntes(3, 14),
+          encAntes(4, 2),
+        ],
+      })
+    );
+    expect(r.nivel!.atual).toBe("constancia");
+    // os 30 dias cruzaram 5 dias atrás; o 4º encontro, 2 dias atrás
+    expect(r.nivel!.faixas[1].data).toBe(
+      new Date(`${antes(2)}T19:00:00-03:00`).toISOString()
+    );
+    expect(r.nivel!.proximo).toMatchObject({
+      chave: "veterania",
+      falta: "Faltam 4 encontros e 55 dias",
+    });
+  });
+
+  it("tempo sozinho não sobe de nível: 3 meses com 2 encontros é Início", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [dppDesde(95)],
+        encontros: [encAntes(1, 80), encAntes(2, 60)],
+      })
+    );
+    expect(r.nivel!.atual).toBe("inicio");
+    expect(r.nivel!.proximo).toMatchObject({
+      chave: "constancia",
+      falta: "Faltam 2 encontros com seu mentor",
+    });
+  });
+
+  it("3 meses com 8 encontros: Veterania; a próxima é a jornada completa", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [dppDesde(95)],
+        encontros: Array.from({ length: 8 }, (_, i) =>
+          encAntes(i + 1, 88 - i * 7)
+        ),
+      })
+    );
+    expect(r.nivel!.atual).toBe("veterania");
+    expect(r.nivel!.faixas[2].titulo).toBe("Veterania");
+    // 90 dias cruzaram 5 dias atrás — depois do 8º encontro (39 dias)
+    expect(r.nivel!.faixas[2].data?.slice(0, 10)).toBe(antes(5));
+    expect(r.nivel!.proximo).toEqual({
+      chave: "completa",
+      falta: "Faltam 8 encontros com seu mentor",
+      encontros: { atual: 8, alvo: 16 },
+      dias: null,
+    });
+  });
+
+  it("programa completo: as 4 faixas ganhas e nada de próximo", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [dppDesde(130)],
+        encontros: Array.from({ length: 16 }, (_, i) =>
+          encAntes(i + 1, 120 - i * 7)
+        ),
+      })
+    );
+    expect(r.nivel!.atual).toBe("completa");
+    expect(estados(r).every((e) => e.endsWith(":ganho"))).toBe(true);
+    expect(r.nivel!.faixas[3].data).toBe(
+      new Date(`${antes(15)}T19:00:00-03:00`).toISOString()
+    );
+    expect(r.nivel!.proximo).toBeNull();
+  });
+
+  it("cada faixa diz o que reconhece, por trilha", () => {
+    const dpp = conquistasDoJovem(base({ duplas: [dppDesde(7)] }));
+    expect(dpp.nivel!.faixas.map((f) => [f.titulo, f.detalhe])).toEqual([
+      ["Início", "Toda jornada começa num primeiro passo. A sua já começou."],
+      [
+        "Constância",
+        "Você seguiu firme no seu primeiro mês de programa, encontro após encontro.",
+      ],
+      [
+        "Veterania",
+        "3 meses de programa: você já tem história para contar aqui.",
+      ],
+      ["Jornada completa", "Você completou os encontros com seu mentor."],
+    ]);
+    const esp = conquistasDoJovem(
+      base({ duplas: [DUPLA_ESP], encontros: [encEsp(1)] })
+    );
+    expect(esp.nivel!.faixas.map((f) => f.detalhe).slice(1)).toEqual([
+      "Você seguiu firme no seu primeiro mês de programa, sessão após sessão.",
+      "2 meses de programa: você já tem história para contar aqui.",
+      "Você completou as sessões com especialista.",
+    ]);
+  });
+
+  it("trilha de especialista usa a régua dela, não a DPP", () => {
+    const esp = { ...DUPLA_ESP, iniciada_em: antes(40) };
+    const r = conquistasDoJovem(
+      base({
+        duplas: [esp],
+        encontros: [
+          encAntes(1, 35, { id: "es1", dupla_id: "d2" }),
+          encAntes(2, 20, { id: "es2", dupla_id: "d2" }),
+        ],
+      })
+    );
+    expect(r.nivel!.atual).toBe("constancia");
+    expect(r.nivel!.faixas.map((f) => f.criterio)).toEqual([
+      "Começar a trilha com especialista",
+      "1 mês de programa e 2 sessões com especialista",
+      "2 meses de programa e 3 sessões com especialista",
+      "Completar as 5 sessões com especialista",
+    ]);
+    expect(r.nivel!.proximo).toMatchObject({
+      chave: "veterania",
+      falta: "Falta 1 sessão e 20 dias",
+    });
+  });
+
+  it("trilha que fecha antes do tempo: faixas puladas ficam superadas, sem data", () => {
+    const esp = {
+      ...DUPLA_ESP,
+      status: "concluida",
+      iniciada_em: antes(30),
+      encerrada_em: antes(6),
+    };
+    const r = conquistasDoJovem(
+      base({
+        duplas: [esp],
+        encontros: [28, 23, 18, 12, 7].map((d, i) =>
+          encAntes(i + 1, d, { id: `es${i + 1}`, dupla_id: "d2" })
+        ),
+      })
+    );
+    expect(r.nivel!.atual).toBe("completa");
+    expect(estados(r)).toEqual([
+      "inicio:ganho",
+      "constancia:superado",
+      "veterania:superado",
+      "completa:ganho",
+    ]);
+    expect(r.nivel!.faixas[1].data).toBeNull();
+    expect(r.nivel!.diasDePrograma).toBe(24);
+  });
+
+  it("sem data de início nem encontro: nenhuma faixa e nenhuma data", () => {
+    const r = conquistasDoJovem(
+      base({ duplas: [dppDesde(0, { iniciada_em: null })] })
+    );
+    expect(r.nivel!.atual).toBeNull();
+    expect(r.nivel!.diasDePrograma).toBeNull();
+    expect(r.nivel!.faixas.every((f) => f.data === null)).toBe(true);
+    expect(r.nivel!.proximo).toMatchObject({
+      chave: "inicio",
+      falta: "Falta 1 encontro com seu mentor",
+      dias: null,
+    });
+  });
+
+  it("sem iniciada_em, o 1º encontro abre a contagem", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [dppDesde(0, { iniciada_em: null })],
+        encontros: [encAntes(1, 12)],
+      })
+    );
+    expect(r.nivel!.atual).toBe("inicio");
+    expect(r.nivel!.diasDePrograma).toBe(12);
+  });
+
+  it("dupla encerrada para o relógio no encerramento e some a contagem", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [
+          dppDesde(240, { status: "encerrada", encerrada_em: antes(200) }),
+        ],
+        encontros: [230, 225, 218, 210].map((d, i) => encAntes(i + 1, d)),
+      })
+    );
+    expect(r.nivel!.diasDePrograma).toBe(40);
+    expect(r.nivel!.atual).toBe("constancia");
+    expect(r.nivel!.parada).toBe("encerrada");
+    expect(r.nivel!.proximo).toMatchObject({ chave: "veterania", falta: null });
+  });
+
+  it("dupla pausada: o nível fica, a contagem do próximo não anda", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [dppDesde(20, { status: "pausada" })],
+        encontros: [encAntes(1, 14)],
+      })
+    );
+    expect(r.nivel!.parada).toBe("pausada");
+    expect(r.nivel!.atual).toBe("inicio");
+    expect(r.nivel!.proximo?.falta).toBeNull();
+  });
+
+  it("remanejo: dias somam dentro de dupla, a lacuna entre elas não conta", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [
+          dppDesde(100, {
+            id: "d0",
+            status: "encerrada",
+            encerrada_em: antes(80),
+          }),
+          dppDesde(15),
+        ],
+        encontros: [encAntes(1, 95, { dupla_id: "d0", id: "x1" }), encAntes(2, 10)],
+      })
+    );
+    expect(r.nivel!.diasDePrograma).toBe(35);
+    expect(r.nivel!.parada).toBeNull();
+  });
+});
+
+describe("conquistas futuras", () => {
+  it("nunca carregam data — o futuro não se carimba", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [DUPLA_DPP],
+        encontros: [enc(1)],
+        jornada: jornada([
+          instrumento("metas", [
+            entrega({ status: "pendente", respondido_em: null, respostas: null }),
+          ]),
+        ]),
+        encaminhamentos: [{ status: "pendente", created_at: "2026-03-05T12:00:00-03:00" }],
+      })
+    );
+    expect(r.futuras.length).toBeGreaterThan(0);
+    for (const f of r.futuras) expect("data" in f).toBe(false);
+  });
+
+  it("marcos restantes, instrumento pendente e contas que faltam, com critério", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [DUPLA_DPP],
+        encontros: Array.from({ length: 4 }, (_, i) => enc(i + 1)),
+        jornada: jornada([
+          instrumento("metas", [
+            entrega({ status: "pendente", respondido_em: null, respostas: null }),
+          ]),
+        ]),
+        encaminhamentos: [
+          { status: "pendente", created_at: "2026-03-05T12:00:00-03:00" },
+          { status: "atrasado", created_at: "2026-03-06T12:00:00-03:00" },
+        ],
+      })
+    );
+    const porChave = new Map(r.futuras.map((f) => [f.chave, f]));
+    expect(porChave.get("marco:metade")).toMatchObject({
+      criterio: "Chegar a 8 encontros com seu mentor",
+      linha: "Faltam 4 encontros com seu mentor",
+      progresso: { atual: 4, alvo: 8 },
+      proximo: true,
+    });
+    expect(porChave.get("marco:completo")).toMatchObject({
+      criterio: "Completar os 16 encontros com seu mentor",
+      proximo: false,
+    });
+    expect(porChave.get("inst:metas")).toMatchObject({
+      criterio: "Definir as suas metas",
+      progresso: null,
+    });
+    expect(porChave.get("conta:avaliacoes")).toMatchObject({
+      linha: "Falta avaliar o encontro 1",
+    });
+    expect(porChave.get("conta:combinados")).toMatchObject({
+      linha: "2 combinados em aberto",
+    });
+    // a estante segue earned-only: nada futuro vazou pra lá
+    expect(chaves(r)).toEqual(["marco:primeiro"]);
+    expect(r.conquistas[0].criterio).toBe("Ter o 1º encontro com seu mentor");
+  });
+
+  it("especialista sem combinado em aberto não ganha promessa de combinado", () => {
+    const r = conquistasDoJovem(
+      base({ duplas: [DUPLA_ESP], encontros: [encEsp(1)] })
+    );
+    expect(r.futuras.map((f) => f.chave)).not.toContain("conta:combinados");
+  });
+
+  it("tudo conquistado: área de futuras vazia", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [DUPLA_DPP],
+        encontros: Array.from({ length: 16 }, (_, i) => enc(i + 1)),
+        avaliacoes: [
+          { encontro_id: "e1", dupla_id: "d1", created_at: "2026-03-04T12:00:00-03:00" },
+        ],
+        encaminhamentos: [{ status: "feito", created_at: "2026-03-05T12:00:00-03:00" }],
+      })
+    );
+    expect(r.futuras).toEqual([]);
+  });
+});
