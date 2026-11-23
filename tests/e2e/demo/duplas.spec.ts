@@ -109,13 +109,19 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     const n = await linhas.count();
     expect(n).toBeGreaterThan(3);
 
-    // o chip filtra de verdade: "Em risco N" reduz a lista às duplas em
-    // risco do recorte (o dataset tem 1 — a Fernanda × Dandara)
-    await chips.getByRole("button", { name: /Em risco \d+/ }).click();
-    await expect(page.locator(LINHAS_COORD)).toHaveCount(1);
+    // o chip filtra de verdade: "Em risco N" reduz a lista às N duplas em
+    // risco do recorte (o dataset pode ganhar novas duplas em risco; o
+    // número do chip é a fonte da verdade, não um 1 fixo)
+    const chipRisco = chips.getByRole("button", { name: /Em risco \d+/ });
+    const riscoN = Number((await chipRisco.innerText()).match(/\d+/)?.[0]);
+    await chipRisco.click();
+    await expect(page.locator(LINHAS_COORD)).toHaveCount(riscoN);
     await expect(
-      page.locator(LINHAS_COORD).first()
-    ).toContainText("Dandara");
+      page
+        .locator(LINHAS_COORD)
+        .filter({ hasText: "Fernanda" })
+        .filter({ hasText: "Dandara" })
+    ).toHaveCount(1);
     await chips.getByRole("button", { name: /Todas \d+/ }).click();
     await expect(linhas).toHaveCount(n);
 
