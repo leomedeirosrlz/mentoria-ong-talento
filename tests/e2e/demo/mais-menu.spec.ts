@@ -23,6 +23,12 @@ const DUPLA_SEM_PEDIDO = "de000000-0000-4000-8000-000000001548"; // Luiza × Lau
 // Ricardo × Matheus: pendência de registro + pedido 'aberta' — prova a
 // primária do mentor e o estado do pedido contido no card
 const DUPLA_T2C = "de000000-0000-4000-8000-000000001549";
+// d-ok (Ricardo × Ana): sempre sobra um agendado no futuro — o 5º na terça
+// da semana ou o 6º na seguinte — então a remarcação do DPP mora no ⋯
+const DUPLA_OK = "de000000-0000-4000-8000-000000001537";
+// d-esp1 (Sofia × Ana): trilha de especialista ativa com a tentativa nº4
+// já agendada — a remarcação dela é "sessão", não "encontro"
+const DUPLA_ESP1 = "de000000-0000-4000-8000-000000001542";
 
 // coordenação em dupla ativa: quatro itens, nesta ordem no popup
 const ITENS = [
@@ -147,6 +153,64 @@ test.describe("demo — ações de segunda ordem da ficha", () => {
     ).toBeVisible();
     await expect(
       popup.getByRole("menuitem", { name: /especialista pro jovem/ })
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+  });
+
+  test("mentor DPP: próximo já marcado → ⋯ vende 'Remarcar Nº · data' e abre o dialog (REALIZA-509)", async ({
+    page,
+  }) => {
+    // d-ok (Ricardo × Ana): o 5º agendado é na terça da semana (limbo a
+    // partir de quarta) e o 6º na seguinte — sempre sobra um no futuro,
+    // então a primária nunca é o agendar e o ⋯ carrega a remarcação já
+    // rotulada com o slot ("Remarcar 6º · terça 24/11 às 19:00")
+    await entrarNaDemo(page, "mentor_dpp");
+    await page.goto(`/duplas/${DUPLA_OK}`);
+
+    const mais = page.getByRole("button", { name: "Mais ações da dupla" });
+    await expect(mais).toBeVisible();
+    await mais.click();
+    const popup = page.locator('[data-slot="dropdown-menu-content"]');
+    await expect(popup).toBeVisible();
+    // nº e data variam com o dia do run (5º ou 6º) — o que não muda é a
+    // gramática "Remarcar Nº · <dia> <dd/mm> às <hh:mm>"
+    const item = popup.getByRole("menuitem", {
+      name: /^Remarcar \d+º · \S+ \d{2}\/\d{2} às \d{2}:\d{2}$/,
+    });
+    await expect(item).toBeVisible();
+
+    await item.click();
+    // o dialog mora fora do popup e já abre em modo remarcação
+    const dialog = page.getByRole("dialog");
+    await expect(
+      dialog.getByRole("heading", { name: /º encontro/ })
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("button", { name: /Confirmar remarcação/ })
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
+  });
+
+  test("especialista: trilha com tentativa marcada → ⋯ vende 'Remarcar sessão' (REALIZA-509)", async ({
+    page,
+  }) => {
+    // d-esp1 (Sofia × Ana): a tentativa nº4 tá agendada — a trilha não
+    // cria row por aqui, só move a que existe; o rótulo é "sessão"
+    await entrarNaDemo(page, "mentor_especialista");
+    await page.goto(`/duplas/${DUPLA_ESP1}`);
+
+    const mais = page.getByRole("button", { name: "Mais ações da dupla" });
+    await expect(mais).toBeVisible();
+    await mais.click();
+    const popup = page.locator('[data-slot="dropdown-menu-content"]');
+    await expect(popup).toBeVisible();
+    const item = popup.getByRole("menuitem", { name: "Remarcar sessão" });
+    await expect(item).toBeVisible();
+
+    await item.click();
+    const dialog = page.getByRole("dialog");
+    await expect(
+      dialog.getByRole("heading", { name: "sessão de especialista" })
     ).toBeVisible();
     await page.keyboard.press("Escape");
   });
