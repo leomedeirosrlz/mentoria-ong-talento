@@ -435,3 +435,15 @@ Pipeline em andamento (feedback → recon → spec → issues → implementaçã
 - [ ] **REALIZA-516** — Badges isométricas e níveis de jornada. Spec `specs/016-badges/`.
 
 Recon consolidado: `docs/planos/issues/_recon/rodada-2026-11-23.md`.
+
+## Rodada plano "ficar em dia" 2.0 — 23/nov/2026
+
+Pipeline em andamento (recon + specs + opinião entregues; implementação aguarda aprovação):
+
+- [ ] **REALIZA-518** — Autonomia do plano: ritmo em pills, disponibilidade cruzada, recesso antes de simular, 4 papéis propondo, um aceite basta. Spec `specs/017-plano-autonomia/`.
+- [ ] **REALIZA-519** — Fusão de encontros no plano e registro combinado sem cópia (cobertura nativa + avaliação única). Spec `specs/018-fusao-registro/`.
+- [ ] **REALIZA-520** — Card "Sua semana" nas homes (jovem 1 card, mentor por dupla, staff lista de risco). Spec `specs/019-sua-semana/`.
+- [ ] **REALIZA-521** — Doc do combinado determinístico + roteiros semanais lazy + geração sob demanda. Spec `specs/020-docs-do-plano/`.
+- [ ] **REALIZA-522** — Materiais estruturados gerados pela Liza (backlog, schema fechado, coordenação publica). Spec `specs/021-materiais-liza/`.
+
+Recon + opinião: `docs/planos/issues/_recon/plano-518-522-2026-11-23.md` e `plano-518-522-opiniao.md` (SQL sugerido em texto; próximo número de migration livre: 0225). O item "Card de disponibilidade (FR-014)" acima tem a parte do planner coberta pela spec 017; a superfície de edição da grade segue pendente.
