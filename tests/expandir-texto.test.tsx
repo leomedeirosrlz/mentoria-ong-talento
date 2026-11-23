@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
 import { ExpandirTexto } from "@/components/expandir-texto";
 
@@ -10,10 +9,7 @@ import { ExpandirTexto } from "@/components/expandir-texto";
 describe("ExpandirTexto — contrato SSR", () => {
   it("renderiza o texto clampado e nenhum botão", () => {
     const html = renderToStaticMarkup(
-      createElement(ExpandirTexto, {
-        className: "text-sm",
-        children: "um texto",
-      })
+      <ExpandirTexto className="text-sm">um texto</ExpandirTexto>
     );
     expect(html).toContain("um texto");
     expect(html).toContain("line-clamp-3");
