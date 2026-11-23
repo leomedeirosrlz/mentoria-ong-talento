@@ -32,6 +32,13 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 | 007 | `ux-visual-nov` | mudança | Draft | brief ws10 (19/nov/2026) — auditoria de 14 itens de UX/visual/copy |
 | 008 | `telemetria-nov` | feature | Clarified | brief ws11 (19/nov/2026) — spec-only, aguardando implementação |
 | 009 | `ia-produto-nov` | feature | Draft | brief ws12 (19/nov/2026) — 7 histórias spec-only |
+| 010 | `instrumentos-visual` | mudança | Clarified | REALIZA-511 (23/nov/2026) — modais, roda, gramática, hover, nav |
+| 011 | `pdm-cascata` | mudança | Clarified | REALIZA-512 (23/nov/2026) — PDM aninhado + seletor |
+| 012 | `conquistas-especialista` | mudança | Clarified | REALIZA-515 (23/nov/2026) — próximo marco, nova rodada, preview |
+| 013 | `ficar-em-dia` | feature | Clarified | REALIZA-513 (23/nov/2026) — 1/dia até o encerramento |
+| 014 | `liza-evals` | mudança | Clarified | REALIZA-514 (23/nov/2026) — evals das tools novas |
+| 015 | `e2e-especialista-uiux` | revisão | Clarified | REALIZA-510 (23/nov/2026) — roteiro e2e UI/UX |
+| 016 | `badges` | feature | Clarified | REALIZA-516 (23/nov/2026) — badges isométricas/níveis |
 
 ## Fronteiras já mapeadas, ainda sem spec
 

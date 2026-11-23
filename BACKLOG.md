@@ -421,3 +421,17 @@ Pedido do Thiago (perdido numa sessão anterior, resgatado em 24/out):
   declarados em vez de só evitar colisão. Registrar junto: a policy de
   `encontro_guia_ajustes` pro jovem também ficou fora da fatia — liberar
   depois é migration nova de policy, não mudança de código.
+
+## Rodada UI/UX — 23/nov/2026
+
+Pipeline em andamento (feedback → recon → spec → issues → implementação → review → aprovação manual):
+
+- [ ] **REALIZA-511** — Instrumentos, modais e Roda da Vida. Spec `specs/010-instrumentos-visual/`.
+- [ ] **REALIZA-512** — PDM cascateado e seletor de mentorado. Spec `specs/011-pdm-cascata/`.
+- [ ] **REALIZA-515** — Conquistas, nova rodada e preview de especialista. Spec `specs/012-conquistas-especialista/`.
+- [ ] **REALIZA-513** — “Ficar em dia” até o encerramento (1 encontro/dia). Spec `specs/013-ficar-em-dia/`.
+- [ ] **REALIZA-514** — Evals das novas tools da Liza. Spec `specs/014-liza-evals/`.
+- [ ] **REALIZA-510** — Revisão e2e UI/UX das trilhas de especialista. Spec `specs/015-e2e-especialista-uiux/`.
+- [ ] **REALIZA-516** — Badges isométricas e níveis de jornada. Spec `specs/016-badges/`.
+
+Recon consolidado: `docs/planos/issues/_recon/rodada-2026-11-23.md`.
