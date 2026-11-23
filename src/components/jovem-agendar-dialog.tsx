@@ -85,7 +85,6 @@ export function JovemAgendarDialog({
 
   const valorAtual = atual?.data_hora ? paraInputLocal(new Date(atual.data_hora)) : null;
   const agora = paraInputLocal(new Date());
-  const inicial = valorAtual ?? "";
   const numeroFinal = numero ?? numeroSel;
 
   // warning de overlap: debounce na data — a RPC olha as outras duplas do
@@ -154,7 +153,12 @@ export function JovemAgendarDialog({
           setMotivoLen(0);
           setDataMudou(false);
           setNumeroSel(numero ?? atual?.numero ?? numeroPadrao ?? null);
-          setValorData(inicial);
+          // recomputa na abertura (o render pode ser velho — o dialog fica
+          // montado fechado): um encontro já vencido não pode abrir com a
+          // data velha — ela ficaria abaixo do min e inválida. Abre vazio
+          // pedindo a nova, com a antiga na linha de contexto embaixo
+          const agoraFresco = paraInputLocal(new Date());
+          setValorData(valorAtual && valorAtual > agoraFresco ? valorAtual : "");
         }
       }}
     >
@@ -229,6 +233,14 @@ export function JovemAgendarDialog({
                 setDataMudou(valorAtual != null && e.target.value !== valorAtual);
               }}
             />
+            {/* o campo abre vazio no vencido — a linha devolve a data
+                original e pede a nova (o rótulo do campo segue genérico) */}
+            {atual?.data_hora && valorAtual && valorAtual <= agora && (
+              <p className="text-xs text-muted-foreground">
+                Estava marcado pra {formatDiaHora(atual.data_hora)}.{" "}
+                Escolha a nova data.
+              </p>
+            )}
             <p className="text-xs text-muted-foreground">
               Combinem a data juntos. Seu mentor é avisado da marcação.
             </p>

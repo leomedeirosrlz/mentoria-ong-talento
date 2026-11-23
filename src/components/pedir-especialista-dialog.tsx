@@ -19,6 +19,10 @@ import {
   slotCompativel,
   toDateStr,
 } from "@/lib/ciclo";
+import {
+  ocupadoEmChoque,
+  type OcupadoRotulado,
+} from "@/lib/sugestoes-encontro";
 import { pedidoPrecisaDemanda } from "@/lib/jovem-especialista";
 import type { Disponibilidade, JovemEspecialista } from "@/lib/types";
 import { avatarPublicUrl } from "@/lib/avatar";
@@ -638,6 +642,7 @@ export function JovemEspSlots({
   espId,
   slots,
   disponibilidade,
+  ocupados,
   ...dialogProps
 }: Omit<
   React.ComponentProps<typeof PedirEspecialistaDialog>,
@@ -647,11 +652,19 @@ export function JovemEspSlots({
   slots: string[];
   /** Grade do jovem — slots que encaixam ganham o destaque lima. */
   disponibilidade?: Disponibilidade | null;
+  /** Agenda do jovem — o slot que encaixa na grade mas choca com um
+   *  compromisso dele não pode prometer "encaixa" (507, mesma régua da
+   *  mesa de negociação); fica neutro e o title diz o choque. */
+  ocupados?: OcupadoRotulado[] | null;
 }) {
   const [slotSel, setSlotSel] = useState<string | null>(null);
   const [fullOpen, setFullOpen] = useState(false);
+  const choqueEm = (s: string) =>
+    ocupados?.length ? ocupadoEmChoque(new Date(s), ocupados) : null;
   const compat = (s: string) =>
-    disponibilidade != null && slotCompativel(disponibilidade, s);
+    disponibilidade != null &&
+    slotCompativel(disponibilidade, s) &&
+    !choqueEm(s);
   // um grupo por dia do slot (fuso SP via toDateStr) — a leitura "sáb 10h"
   // é mais rápida que "sáb 28/11 às 10:00" repetida em cada chip
   const grupos = new Map<string, string[]>();
@@ -687,7 +700,11 @@ export function JovemEspSlots({
                   <button
                     type="button"
                     title={`Pedir sessão ${rotuloSlot(s)}${
-                      compat(s) ? " · encaixa com você" : ""
+                      compat(s)
+                        ? " · encaixa com você"
+                        : choqueEm(s)
+                          ? " · você já tem algo nesse horário"
+                          : ""
                     }`}
                     onClick={() => setSlotSel(s)}
                     className={cn(

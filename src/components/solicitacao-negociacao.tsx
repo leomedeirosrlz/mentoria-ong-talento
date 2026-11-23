@@ -170,10 +170,11 @@ function Thread({ propostas, s, meuId, agoraMs }: {
  *  Seleção em grade por dia (mock v6 .days): cada horário livre é um radio;
  *  quando o caller passa a `disponibilidade` de quem escolhe, o slot que
  *  encaixa na grade dele ganha o destaque âmbar "encaixa com você". */
-function ContraPropostaForm({
+export function ContraPropostaForm({
   solicitacaoId,
   slots,
   disponibilidade,
+  ocupados,
   onFechar,
   onErro,
 }: {
@@ -182,6 +183,10 @@ function ContraPropostaForm({
   /** Grade de quem escolhe (o jovem na mesa dele) — pinta os encaixes;
    *  sem a prop os slots renderizam neutros. */
   disponibilidade?: Disponibilidade | null;
+  /** Agenda de quem escolhe — o slot que encaixa na grade mas choca com
+   *  um compromisso não pode prometer "encaixa" (507: o aceite dele já
+   *  seria barrado pelo choque); fica neutro e avisa "ocupado". */
+  ocupados?: OcupadoRotulado[] | null;
   onFechar: () => void;
   /** opcional — o chamador observa erros de domínio (ex.: aceite em corrida). */
   onErro?: (mensagem: string) => void;
@@ -195,9 +200,14 @@ function ContraPropostaForm({
     const dia = toDateStr(new Date(sl));
     (porDia.get(dia) ?? porDia.set(dia, []).get(dia)!).push(sl);
   }
-  const algumCompat =
+  const choqueEm = (sl: string) =>
+    ocupados?.length ? ocupadoEmChoque(new Date(sl), ocupados) : null;
+  // encaixa = grade + agenda livre — um choque não pode herdar o âmbar
+  const encaixa = (sl: string) =>
     disponibilidade != null &&
-    slots.some((sl) => slotCompativel(disponibilidade, sl));
+    slotCompativel(disponibilidade, sl) &&
+    !choqueEm(sl);
+  const algumCompat = slots.some(encaixa);
 
   if (slots.length === 0) {
     return (
@@ -225,9 +235,8 @@ function ContraPropostaForm({
               </span>
             </span>
             {slotsDia.map((sl) => {
-              const compat = disponibilidade
-                ? slotCompativel(disponibilidade, sl)
-                : false;
+              const compat = encaixa(sl);
+              const choque = choqueEm(sl);
               return (
                 <label key={sl} className="inline-flex flex-col items-center">
                   <input
@@ -237,10 +246,16 @@ function ContraPropostaForm({
                     checked={slot === sl}
                     onChange={() => setSlot(sl)}
                     className="peer sr-only"
-                    aria-label={`${rotuloSlot(sl)}${compat ? " · encaixa com você" : ""}`}
+                    aria-label={`${rotuloSlot(sl)}${compat ? " · encaixa com você" : choque ? " · você já tem algo nesse horário" : ""}`}
                   />
                   <span
-                    title={compat ? "encaixa com você" : undefined}
+                    title={
+                      compat
+                        ? "encaixa com você"
+                        : choque
+                          ? "Você já tem algo nesse horário"
+                          : undefined
+                    }
                     className={cn(
                       "inline-flex min-h-11 min-w-14 cursor-pointer items-center justify-center rounded-lg border border-input bg-card px-2 text-sm font-semibold tabular-nums transition-colors",
                       "peer-checked:border-foreground peer-checked:bg-foreground peer-checked:text-background peer-hover:bg-muted peer-focus-visible:ring-2 peer-focus-visible:ring-ring/50",
@@ -256,6 +271,14 @@ function ContraPropostaForm({
                       className="mt-0.5 text-[10px] leading-none font-medium text-[var(--warn-text)]"
                     >
                       encaixa
+                    </span>
+                  )}
+                  {choque && (
+                    <span
+                      aria-hidden
+                      className="mt-0.5 text-[10px] leading-none font-medium text-muted-foreground"
+                    >
+                      ocupado
                     </span>
                   )}
                 </label>
@@ -679,6 +702,7 @@ export function SolicitacaoNegociacao({
               solicitacaoId={s.id}
               slots={slots}
               disponibilidade={disponibilidade}
+              ocupados={ocupados}
               onFechar={() => setAbrindo(null)}
               onErro={onErro}
             />
@@ -824,6 +848,7 @@ export function SolicitacaoNegociacao({
               solicitacaoId={s.id}
               slots={slots}
               disponibilidade={disponibilidade}
+              ocupados={ocupados}
               onFechar={() => setAbrindo(null)}
               onErro={onErro}
             />

@@ -134,14 +134,11 @@ export function AgendarEncontroDialog({
     propostaLocal != null && propostaLocal !== valorAtual
   );
   const agora = paraInputLocal(new Date());
-  // com remarcação o piso segue valendo (ou a data original, se já vencida —
-  // salvar sem mudar a data não pode virar inválido). Encontro novo aceita
-  // passado: vira registro retroativo no submit.
-  const minimo = !atual
-    ? undefined
-    : dataMudou || !valorAtual || valorAtual > agora
-      ? agora
-      : valorAtual;
+  // remarcação é sempre pra frente — a action recusa alvo <= agora (o
+  // encontro passado tem fluxo próprio: "aconteceu"/"não aconteceu"). Então
+  // o min é sempre agora: um encontro já vencido abre pedindo a data nova,
+  // nunca com o valor velho inválido no campo
+  const minimo = !atual ? undefined : agora;
   // a grade de horários passa o slot completo ("…T19:30"); o clique no mês/
   // no dia continua chegando só com a data — entra às 19h, o horário típico
   const sugeridoLocal = sugerido
@@ -152,10 +149,20 @@ export function AgendarEncontroDialog({
   // encontro novo: o dia sugerido vale mesmo já passado — cai no ramo
   // retroativo; mas nunca antes do início da dupla (a action rejeitaria)
   const pisoLocal = piso ? `${piso}T19:00` : "";
+  const sugeridoAjustado =
+    sugeridoLocal && pisoLocal && sugeridoLocal < pisoLocal
+      ? pisoLocal
+      : sugeridoLocal;
+  // na remarcação o prefill só vale se futuro — um valor <= agora ficaria
+  // abaixo do min e nasceria inválido; o encontro vencido abre vazio com o
+  // aviso "estava marcado pra…" pedindo a data nova
+  const viavel = (v: string | null): string | null =>
+    v != null && (!atual || v > agora) ? v : null;
   const defaultValue =
-    propostaLocal ??
-    valorAtual ??
-    (sugeridoLocal && pisoLocal && sugeridoLocal < pisoLocal ? pisoLocal : sugeridoLocal);
+    viavel(propostaLocal) ??
+    viavel(valorAtual) ??
+    viavel(sugeridoAjustado) ??
+    "";
   // valor vivo do campo — decide se o submit agenda ou registra (modo dual).
   // Nasce com a sugestão: o mount já-aberto do modo controlado não passa
   // pelo reset da transição de open
@@ -376,6 +383,16 @@ export function AgendarEncontroDialog({
             {!atual && (
               <p className="text-xs text-muted-foreground">
                 Se o encontro já aconteceu, escolha a data real. Ele entra como realizado.
+              </p>
+            )}
+            {/* o campo abre vazio (o valor velho seria inválido) — a linha
+                devolve o contexto: data original + pedido da nova */}
+            {atual?.data_hora && valorAtual && valorAtual <= agora && (
+              <p className="text-xs text-muted-foreground">
+                Estava marcado pra {formatDiaHora(atual.data_hora)}.{" "}
+                {propostaLocal
+                  ? "Confirme a sugestão ou escolha outra data."
+                  : "Escolha a nova data e horário."}
               </p>
             )}
             {propostaLocal && (

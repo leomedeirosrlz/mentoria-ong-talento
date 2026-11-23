@@ -1,0 +1,156 @@
+// @vitest-environment jsdom
+
+// REALIZA-507 — R9: remarcar um encontro já vencido não pode abrir com o
+// valor velho abaixo do min (o input nascia inválido e a action recusa o
+// passado de qualquer jeito). Os dois dialogs — staff e jovem — abrem
+// vazio pedindo a data nova e o min cobre "agora".
+
+import { act } from "react";
+import { describe, expect, it, vi } from "vitest";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ refresh: vi.fn(), push: vi.fn() }),
+}));
+vi.mock("@/lib/toast", () => ({
+  toast: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+}));
+vi.mock("@/lib/actions", () => ({
+  agendarEncontro: vi.fn(async () => ({ ok: true })),
+  agendarEncontroJovem: vi.fn(async () => ({ ok: true })),
+  conflitoEncontro: vi.fn(async () => ({ conflitos: [] })),
+  desmarcarEncontro: vi.fn(async () => ({ ok: true })),
+  disponibilidadesDaDupla: vi.fn(async () => ({
+    mentor: null,
+    jovem: null,
+    jovemNome: null,
+  })),
+  registrarEncontroRetroativo: vi.fn(async () => ({ ok: true })),
+}));
+
+import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
+import { JovemAgendarDialog } from "@/components/jovem-agendar-dialog";
+import type { Encontro } from "@/lib/types";
+import type { JovemEncontro } from "@/lib/queries-jovem";
+import { assentar, botao, clicar, digitar, montar } from "./dom";
+
+// uma semana atrás / daqui a uma semana — âncoras independentes do relógio
+const VENCIDO_ISO = new Date(Date.now() - 7 * 86_400_000).toISOString();
+const FUTURO_LOCAL = (() => {
+  const d = new Date(Date.now() + 7 * 86_400_000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+})();
+const PASSADO_LOCAL = (() => {
+  const d = new Date(Date.now() - 7 * 86_400_000);
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+})();
+
+const ENCONTRO_VENCIDO: Encontro = {
+  id: "e1",
+  dupla_id: "d1",
+  numero: 3,
+  data_hora: VENCIDO_ISO,
+  realizado_em: null,
+  duracao_min: 60,
+  status: "agendado",
+  origem: "plataforma",
+  link: null,
+  motivo_reagendamento: null,
+};
+
+const JOVEM_VENCIDO: JovemEncontro = {
+  id: "e1",
+  dupla_id: "d1",
+  numero: 3,
+  data_hora: VENCIDO_ISO,
+  realizado_em: null,
+  duracao_min: 60,
+  status: "agendado",
+  link: null,
+  motivo_reagendamento: null,
+};
+
+const campoData = () =>
+  document.querySelector<HTMLInputElement>("#data_hora")!;
+
+describe("dialog do staff (507)", () => {
+  it("remarcar o vencido abre sem valor inválido e com min = agora", async () => {
+    const { desmontar } = montar(
+      <AgendarEncontroDialog
+        duplaId="d1"
+        numero={3}
+        atual={ENCONTRO_VENCIDO}
+        open
+        onOpenChange={() => {}}
+        trigger={null}
+      />
+    );
+    await assentar();
+    const input = campoData();
+    // antes do 507 o campo nascia com a data vencida — abaixo do min
+    expect(input.value).toBe("");
+    expect(input.min).toBeTruthy();
+    // o min é "agora": carimbo fresco, não a data velha do encontro
+    expect(Math.abs(new Date(input.min).getTime() - Date.now())).toBeLessThan(
+      120_000
+    );
+    // a linha de contexto devolve a data original e pede a nova
+    expect(document.body.textContent).toContain("Estava marcado pra");
+    expect(document.body.textContent).toContain("Escolha a nova data");
+    desmontar();
+  });
+
+  it("data passada não passa pela validação nativa; futura passa", async () => {
+    const { desmontar } = montar(
+      <AgendarEncontroDialog
+        duplaId="d1"
+        numero={3}
+        atual={ENCONTRO_VENCIDO}
+        open
+        onOpenChange={() => {}}
+        trigger={null}
+      />
+    );
+    await assentar();
+    const input = campoData();
+    act(() => digitar(input, PASSADO_LOCAL));
+    expect(input.checkValidity()).toBe(false);
+    act(() => digitar(input, FUTURO_LOCAL));
+    expect(input.checkValidity()).toBe(true);
+    desmontar();
+  });
+});
+
+describe("dialog do jovem (507)", () => {
+  it("remarcar o vencido abre pedindo a nova data, sem valor inválido", async () => {
+    const { alvo, desmontar } = montar(
+      <JovemAgendarDialog duplaId="d1" numero={3} atual={JOVEM_VENCIDO} />
+    );
+    act(() => clicar(botao(alvo, "Remarcar")));
+    await assentar();
+    const input = campoData();
+    expect(input.value).toBe("");
+    expect(input.min).toBeTruthy();
+    expect(Math.abs(new Date(input.min).getTime() - Date.now())).toBeLessThan(
+      120_000
+    );
+    expect(document.body.textContent).toContain("Estava marcado pra");
+    expect(document.body.textContent).toContain("Escolha a nova data");
+    desmontar();
+  });
+
+  it("data passada não passa pela validação nativa; futura passa", async () => {
+    const { alvo, desmontar } = montar(
+      <JovemAgendarDialog duplaId="d1" numero={3} atual={JOVEM_VENCIDO} />
+    );
+    act(() => clicar(botao(alvo, "Remarcar")));
+    await assentar();
+    const input = campoData();
+    act(() => digitar(input, PASSADO_LOCAL));
+    expect(input.checkValidity()).toBe(false);
+    act(() => digitar(input, FUTURO_LOCAL));
+    expect(input.checkValidity()).toBe(true);
+    desmontar();
+  });
+});
