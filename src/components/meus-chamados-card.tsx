@@ -6,7 +6,10 @@ import type { ChamadoFilaItem } from "@/lib/types";
 import { CHAMADO_CATEGORIA_LABEL } from "@/lib/ciclo";
 import { Card, CardContent } from "@/components/ui/card";
 import { buttonVariants } from "@/components/ui/button";
-import { ChamadoStatusBadge } from "@/components/chamados-shared";
+import {
+  ChamadoStatusBadge,
+  rotuloAberturaChamado,
+} from "@/components/chamados-shared";
 import { NovoChamadoDialog } from "@/components/novo-chamado-dialog";
 import { Button } from "@/components/ui/button";
 import { Plus } from "@phosphor-icons/react";
@@ -52,7 +55,7 @@ export function MeusChamadosCard({
                     data-telemetry-alvo="novo-chamado"
                   >
                     <Plus size={15} aria-hidden />
-                    Novo pedido
+                    {rotuloAberturaChamado(papel)}
                   </Button>
                 }
               />

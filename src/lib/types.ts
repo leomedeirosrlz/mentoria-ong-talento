@@ -16,6 +16,16 @@ export function temPapel(
   if (!p) return false;
   return p.role === papel || (p.papeis?.includes(papel) ?? false);
 }
+
+/** A voz do módulo de chamados por papel (R15): o jovem "pede ajuda", o
+ *  mentor "pede apoio" e a equipe fala "chamado". Recebe o role cru (as
+ *  superfícies de chamado passam a string direta) — "mentorado" precisa
+ *  sair antes do prefixo "mentor" que ele mesmo carrega. */
+export type VozChamado = "jovem" | "mentor" | "equipe";
+export function vozChamado(papel: string | null | undefined): VozChamado {
+  if (papel === "mentorado") return "jovem";
+  return papel?.startsWith("mentor") ? "mentor" : "equipe";
+}
 /** 'concluida' (0037) = jornada percorrida até o fim; 'encerrada' = fechamento
  *  antecipado. Ambas liberam a vaga e congelam a trilha como a encerrada. */
 export type DuplaStatus = "ativa" | "pausada" | "concluida" | "encerrada";

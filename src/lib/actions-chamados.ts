@@ -7,6 +7,7 @@ import { enviarEmailsLote, SITE_URL } from "@/lib/email";
 import {
   emailChamadoAtualizacao,
   emailChamadoUrgencia,
+  rotuloPedidoAutor,
 } from "@/lib/email-templates";
 import { demoRole } from "./demo/mode";
 import { DEMO_MSG } from "./demo/shared";
@@ -231,21 +232,24 @@ export async function publicarAtualizacaoChamado(id: string, texto: string) {
   if (autor?.email) {
     // jovem não alcança /chamados (o layout manda pra /jovem e o pedido se
     // perde) — os pedidos dele vivem em /jovem/perfil. Admin client: quem
-    // atende nem sempre lê o profile do jovem pelo RLS
-    let jovem = false;
+    // atende nem sempre lê o profile do jovem pelo RLS. O papel também
+    // decide o substantivo do e-mail (ajuda/apoio/chamado, R15)
+    let papelAutor: string | null = null;
     if (autor.profile_id) {
       const { createAdminClient } = await import("./supabase/admin");
       const { data: papel } = await createAdminClient()
         .from("profiles").select("role").eq("id", autor.profile_id).maybeSingle();
-      jovem = papel?.role === "mentorado";
+      papelAutor = papel?.role ?? null;
     }
+    const jovem = papelAutor === "mentorado";
     void enviaEmailChamadoDepois(supabase, {
       chamadoId: id,
       para: [autor.email],
-      assunto: "Atualização no seu pedido de apoio",
+      assunto: `Atualização no seu ${rotuloPedidoAutor(papelAutor)}`,
       html: emailChamadoAtualizacao({
         autorNome: autor.nome ?? "",
         texto: texto.trim(),
+        papel: papelAutor,
         href: jovem
           ? `${SITE_URL}/jovem/perfil?c=${id}`
           : `${SITE_URL}/chamados?c=${id}`,

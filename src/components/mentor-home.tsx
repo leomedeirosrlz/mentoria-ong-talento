@@ -216,7 +216,10 @@ export function MentorHome({
         // "Sessão 3 com Bia" / "5º encontro com Bia" — o rótulo canônico
         // (na trilha esp o nº é o passo do guia, nunca a tentativa da row)
         const rotuloDe = (e: Encontro) =>
-          rotuloEncontro(e, dupla.encontros, { esp: ehEsp, com: jovemNome });
+          rotuloEncontro(e, dupla.encontros, {
+            esp: ehEsp,
+            com: jovemNome?.split(" ")[0] ?? null,
+          });
         // "A sessão 3 com Bia…" / "O 5º encontro com Bia…" — sujeito com
         // artigo: a flexão do participio (`agendada`/`atrasada`) decide
         // em cada frase, o substantivo sai do helper

@@ -2275,10 +2275,21 @@ function build(): DemoData {
   const diaE1T2 = diaEncontroT2(1);
   const e1T2Passou = diaE1T2.getTime() < HOJE.getTime();
 
+  // O motivo do passo 5 aplicado pelo plano — a RPC 0219 grava o mesmo
+  // texto no passo, no evento, na row (motivo_reagendamento) e na
+  // remarcação do trigger; aqui a const segura a mesma amarra
+  const MOTIVO_PASSO_5 =
+    "A terça encavalou de novo, a quinta fecha o ritmo do combinado";
+  // E o mesmo instante vai na row (data_hora = em(dia, "19:00") do
+  // `agendado`), no passo (data_nova) e no evento (meta.data_nova)
+  const DATA_NOVA_5 = em(addDias(diaEncontro(5), 9), "19:00");
+
   // d-ok · Ricardo × Ana Beatriz — a dupla saudável: 4 encontros no calendário
-  // oficial com registro bom, 5º agendado pra terça corrente e o 6º já
-  // marcado pra semana seguinte (agenda livre: sempre há um agendado futuro
-  // DPP na mão da persona jovem — remarcar/desmarcar renderizam na /jovem)
+  // oficial com registro bom. O 5º oficial passou sem acontecer e o plano
+  // "ficar em dia" (abaixo) o remarcou pra quinta da semana que vem — o 6º
+  // segue na terça, então os dois fecham a semana dupla do combinado. O
+  // agendado futuro DPP fica sempre na mão da persona jovem (agenda livre:
+  // remarcar/desmarcar renderizam na /jovem)
   const encD1: Encontro[] = [
     comRegistro(
       realizado(uid(D.ok), 1, diaEncontro(1), { duracao: 75, origem: "externo" }),
@@ -2296,20 +2307,26 @@ function build(): DemoData {
       realizado(uid(D.ok), 4, diaEncontro(4), { duracao: 75 }),
       ricardo, "Ana", "dpp"
     ),
-    agendado(uid(D.ok), 5, diaEncontro(5), { link: MEET }),
+    agendado(uid(D.ok), 5, addDias(diaEncontro(5), 9), {
+      link: MEET,
+      motivo: MOTIVO_PASSO_5,
+    }),
     agendado(uid(D.ok), 6, diaEncontro(6), { link: MEET }),
   ];
 
-  // REALIZA-341: o 5º encontro andou duas vezes e voltou pra terça oficial —
-  // a Ana moveu pro sábado por causa de uma prova e a dupla desfez quando a
-  // prova foi adiada. O vaivém é o que a coordenação e o calendário do
+  // REALIZA-341: o 5º encontro andou três vezes — a Ana moveu pro sábado por
+  // causa de uma prova, a dupla desfez quando a prova foi adiada e o passo
+  // do plano levou da terça oficial pra quinta (a mesma data_nova do
+  // passo_aplicado: mover a data sem o encontro junto era o estado
+  // impossível do R6). O vaivém é o que a coordenação e o calendário do
   // mentor leem; o motivo que fica na row é o da ÚLTIMA remarcação.
-  encD1[4].motivo_reagendamento = "A prova da escola foi adiada, dá pra manter a terça";
   encD1[4].remarcacoes = [
     remarcacao(encD1[4], em(diaEncontro(5), "19:00"), em(addDias(diaEncontro(5), 4), "10:00"),
       "Conflito de agenda", haDias(4, "21:15"), anaLogin),
     remarcacao(encD1[4], em(addDias(diaEncontro(5), 4), "10:00"), em(diaEncontro(5), "19:00"),
       "A prova da escola foi adiada, dá pra manter a terça", haDias(1, "18:40"), ricardo),
+    remarcacao(encD1[4], em(diaEncontro(5), "19:00"), DATA_NOVA_5,
+      MOTIVO_PASSO_5, haDias(0, "09:05"), ricardo),
   ];
 
   const regD1E1 = encD1[0].registro!;
@@ -2384,7 +2401,7 @@ function build(): DemoData {
         fim: addDias(HOJE, 26).toISOString().slice(0, 10),
       },
       passos: [
-        { numero: 5, data: addDias(HOJE, 2).toISOString().slice(0, 10), acao: "remarcar" },
+        { numero: 5, data: ymd(addDias(diaEncontro(5), 9)), acao: "remarcar" },
         { numero: 6, data: addDias(HOJE, 9).toISOString().slice(0, 10), acao: "remarcar" },
       ],
     },
@@ -2407,12 +2424,16 @@ function build(): DemoData {
         plano_id: uid(0x3000 + 1),
         dupla_id: uid(D.ok),
         numero: 5,
-        encontro_id: null,
-        data_anterior: null,
-        data_nova: addDias(HOJE, 2).toISOString(),
-        motivo: null,
+        // o mesmo estado que a 0219 grava: o passo remarcou a row existente
+        // (encontro_id + data_anterior dela), a data_nova é a data_hora
+        // atual e a via é "liza" — o card do app não envia motivo e mover
+        // uma row sem motivo é o que a RPC recusa
+        encontro_id: encD1[4].id,
+        data_anterior: em(diaEncontro(5), "19:00"),
+        data_nova: DATA_NOVA_5,
+        motivo: MOTIVO_PASSO_5,
         aplicado_por: ricardo.id,
-        aplicado_via: "app" as const,
+        aplicado_via: "liza" as const,
         aplicado_em: haDias(0, "09:05"),
       },
     ],
@@ -2428,6 +2449,35 @@ function build(): DemoData {
         por: ricardo.id,
         meta: {},
         em: haDias(2, "18:40"),
+      },
+      {
+        id: uid(0x3200 + 2),
+        plano_id: uid(0x3000 + 1),
+        dupla_id: uid(D.ok),
+        tipo: "aceito" as const,
+        de: "proposto",
+        para: "aceito",
+        motivo: null,
+        por: ricardo.id,
+        meta: { lado: "mentor" },
+        em: haDias(1, "19:12"),
+      },
+      {
+        id: uid(0x3200 + 3),
+        plano_id: uid(0x3000 + 1),
+        dupla_id: uid(D.ok),
+        tipo: "passo_aplicado" as const,
+        de: null,
+        para: "ativo",
+        motivo: MOTIVO_PASSO_5,
+        por: ricardo.id,
+        meta: {
+          numero: 5,
+          data_anterior: em(diaEncontro(5), "19:00"),
+          data_nova: DATA_NOVA_5,
+          via: "liza",
+        },
+        em: haDias(0, "09:05"),
       },
     ],
   };
