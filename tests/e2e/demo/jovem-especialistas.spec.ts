@@ -188,7 +188,16 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
     const encaixados = grupo.getByRole("radio", {
       name: /· encaixa com você/,
     });
-    expect(await encaixados.count()).toBe(await radios.count());
+    // 507: slot na grade mas em choque com a agenda da Bia deixa de dizer
+    // "encaixa" e passa a dizer "você já tem algo nesse horário" — a soma
+    // dos dois estados cobre todos os slots oferecidos.
+    const ocupados = grupo.getByRole("radio", {
+      name: /· você já tem algo nesse horário/,
+    });
+    expect(await encaixados.count()).toBeGreaterThan(0);
+    expect(
+      (await encaixados.count()) + (await ocupados.count())
+    ).toBe(await radios.count());
     // selecionar um ativa o botão Propor — estado da escolha fica no radio
     await radios.first().locator("xpath=..").click();
     await expect(radios.first()).toBeChecked();
