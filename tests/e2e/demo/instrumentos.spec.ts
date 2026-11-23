@@ -16,9 +16,11 @@ const DUPLA_MATHEUS = "de000000-0000-4000-8000-000000001549"; // Ricardo × Math
 const TOK_VISAO_EDUARDO = "demo-tok-visao-eduardo-00001";
 const TOK_RODA_EDUARDO = "demo-tok-roda-eduardo-000001";
 const TOK_360_ANA = "demo-tok-360-ana-00000001";
-// fMetas (uid 0x4008 → decimal) — a régua não tem link pendente em demo,
-// a cobertura do fill-form de Metas vai pela prévia da ficha do form
+// fMetas/fPdm (uid 0x4008/0x4009 → decimal) — a régua não tem link
+// pendente em demo, a cobertura do fill-form vai pela prévia da ficha do
+// form (o mesmo InstrumentoFlow que o /f/<token> renderiza)
 const URL_METAS = "/formularios/de000000-0000-4000-8000-000000016392";
+const URL_PDM = "/formularios/de000000-0000-4000-8000-000000016393";
 
 // REALIZA-442 — gramática pergunta→resposta em TODAS as superfícies: o
 // disco amarelo (--destaque) carrega o nº da régua, o enunciado lê no
@@ -75,6 +77,17 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     const meta1 = dialog.locator("li", { hasText: "Meta 1" }).first();
     await expect(
       meta1.locator(DISCO, { hasText: "1" }).first()
+    ).toBeVisible();
+
+    // REALIZA-512 — a resposta da Ana tem meta_4 (a extra): a leitura
+    // aninha o desdobramento sob a meta dela, não num bloco à parte
+    const meta4 = dialog.locator("li", { hasText: "Meta 4" }).first();
+    await expect(meta4).toBeVisible();
+    await expect(
+      meta4.getByText("Desdobramento da meta 4")
+    ).toBeVisible();
+    await expect(
+      meta4.getByText(/Ensaiar a apresentação em casa/)
     ).toBeVisible();
   });
 
@@ -428,5 +441,134 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
       estrutura.locator(DISCO, { hasText: "3" })
     ).toBeVisible();
     await expect(estrutura.locator(VERDE).first()).toBeVisible();
+  });
+
+  // REALIZA-512 — o documento na ordem em que a dupla o lê: cada
+  // submetas_N dentro da ficha da meta N (o capítulo "Mapa de submetas"
+  // da 0080 não existe mais no template e, mesmo nele, não duplicava) e
+  // "Nova meta" abre as opcionais 4–8 até o teto escrito do form
+  test("prévia do PDM: submeta sob a meta, Nova meta até o limite de 8", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(URL_PDM);
+    await page.getByRole("button", { name: "Pré-visualizar" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+
+    // o capítulo legado não existe mais — e não há nenhum título "Mapa"
+    await expect(dialog.getByText("Mapa de submetas")).toHaveCount(0);
+
+    // desdobramento dentro da ficha da meta: o h3 "Meta 1" e o editor de
+    // linhas moram no mesmo cartão
+    const ficha1 = dialog
+      .locator("h3", { hasText: "Meta 1" })
+      .locator("..");
+    await expect(
+      ficha1.getByText(/Desdobramento da meta 1/)
+    ).toBeVisible();
+    // metas 2 e 3 agora são obrigatórias como a 1 — o cabeçalho de
+    // capítulo explica a ordem nova
+    await expect(dialog.getByText(/3 primeiras metas/)).toBeVisible();
+
+    // as opcionais nascem fechadas: "Nova meta" abre a próxima vazia —
+    // cinco cliques abrem as fichas 4–8 e o teto aparece escrito
+    const nova = dialog.getByRole("button", { name: "Nova meta" });
+    await nova.click();
+    await expect(
+      dialog.locator("h3", { hasText: "Meta 4" })
+    ).toBeVisible();
+    await expect(dialog.getByText("(opcional)").first()).toBeVisible();
+    for (let i = 0; i < 4; i++) await nova.click();
+    await expect(
+      dialog.locator("h3", { hasText: "Meta 8" })
+    ).toBeVisible();
+    // o limite não esconde as metas nem o botão some sem explicar — o
+    // teto do template fica escrito no lugar do CTA
+    await expect(dialog.getByText("Limite de 8 metas no PDM.")).toBeVisible();
+    await expect(nova).toHaveCount(0);
+    await expect(
+      dialog.locator("h3", { hasText: "Meta 4" })
+    ).toBeVisible();
+  });
+
+  // REALIZA-512 (FR-004/006) — a régua do mentor usa o nome como
+  // controle: pills com "Todas" (o default do catálogo), a escolha
+  // escreve ?dupla= e o param atravessa a troca de instrumento e o
+  // refresh. "Ficha" segue como ação secundária, não a única via.
+  test("régua (mentor): pills com nome + Todas; ?dupla= atravessa e persiste", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentor_dpp");
+    await page.goto("/materiais?aba=instrumentos");
+
+    const seletor = page.getByRole("navigation", {
+      name: "Filtrar por mentorado",
+    });
+    // Ricardo tem 2 duplas vivas → pills + "Todas" como o estado do
+    // catálogo (sem ?dupla= o foco é o conjunto)
+    await expect(
+      seletor.getByRole("link", { name: "Todas", exact: true })
+    ).toHaveAttribute("aria-current", "page");
+    const bia = seletor.getByRole("link", { name: "Bia", exact: true });
+    const matheus = seletor.getByRole("link", {
+      name: "Matheus Gonçalves",
+      exact: true,
+    });
+    await expect(bia).toBeVisible();
+    await expect(matheus).toBeVisible();
+
+    // a escolha escreve ?dupla= — a pill ativa e a régua relê o estado
+    // da dupla dela (Matheus tem a roda "aguardando", a Bia fechou a
+    // jornada de instrumentos)
+    await matheus.click();
+    await expect(page).toHaveURL(
+      `/materiais?aba=instrumentos&dupla=${DUPLA_MATHEUS}`
+    );
+    await expect(matheus).toHaveAttribute("aria-current", "page");
+    await expect(
+      page.getByRole("region", { name: /Instrumentos do programa/ })
+    ).toBeVisible();
+
+    // FR-006: a troca de instrumento preserva a dupla em foco — o card
+    // linka a página por instrumento com o param
+    await page
+      .getByRole("link", { name: /Abrir Roda da Vida/ })
+      .first()
+      .click();
+    await expect(page).toHaveURL(/instrumentos\/roda_inicial\?dupla=/);
+    await expect(page.url()).toContain(DUPLA_MATHEUS);
+    // a página por instrumento abre já filtrada na mesma dupla
+    const seletorInstrumento = page.getByRole("navigation", {
+      name: "Filtrar por mentorado",
+    });
+    await expect(
+      seletorInstrumento.getByRole("link", {
+        name: "Matheus Gonçalves",
+        exact: true,
+      })
+    ).toHaveAttribute("aria-current", "page");
+
+    // e o refresh mantém — ?dupla= é a fonte da escolha
+    await page.reload();
+    await expect(
+      seletorInstrumento.getByRole("link", {
+        name: "Matheus Gonçalves",
+        exact: true,
+      })
+    ).toHaveAttribute("aria-current", "page");
+
+    // de volta à régua, "Todas" devolve o catálogo — e a ação
+    // secundária "Ficha" também some sem dupla em foco
+    await page.goto("/materiais?aba=instrumentos");
+    await expect(
+      seletor.getByRole("link", { name: "Todas", exact: true })
+    ).toHaveAttribute("aria-current", "page");
+    const sec = page.getByRole("region", {
+      name: /Instrumentos do programa/,
+    });
+    await expect(
+      sec.getByRole("link", { name: "Ficha", exact: true })
+    ).toHaveCount(0);
   });
 });

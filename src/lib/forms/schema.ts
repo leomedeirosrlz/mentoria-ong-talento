@@ -217,7 +217,7 @@ export const INSTRUMENTO_INFO: Record<
   },
   pdm: {
     titulo: "PDM",
-    resumo: "O documento central: visão, metas com indicador de sucesso e prazo, mapa de submetas.",
+    resumo: "O documento central: visão e de 3 a 8 metas, cada uma com indicador, prazo e desdobramento sob ela.",
   },
   roda_vida: {
     titulo: "Roda da Vida",

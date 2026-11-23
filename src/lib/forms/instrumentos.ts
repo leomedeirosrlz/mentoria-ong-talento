@@ -263,3 +263,18 @@ export function extraiGruposMeta(campos: FormularioCampo[]): GrupoMetaCampos[] {
     )
     .sort((a, b) => a.n - b.n);
 }
+
+/** Ids que as fichas de meta consomem do template inteiro (meta_N +
+ *  subcampos). O renderer resolve o grupo pelo N, não pelo capítulo —
+ *  um submetas_N declarado no capítulo legado "Mapa de submetas" (0080)
+ *  renderiza dentro da ficha da meta N e some do capítulo, que vira
+ *  fallback só do que sobrou órfão (submetas_M sem meta_M). */
+export function idsEmGruposMeta(grupos: GrupoMetaCampos[]): Set<string> {
+  return new Set(
+    grupos.flatMap((g) =>
+      [g.meta, g.is, g.prazo, g.porque, g.submetas]
+        .filter((c): c is FormularioCampo => c != null)
+        .map((c) => c.id)
+    )
+  );
+}
