@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useRef, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
 import { ArrowsLeftRight } from "@phosphor-icons/react";
 import { toast } from "@/lib/toast";
 import { createClient } from "@/lib/supabase/client";
@@ -103,7 +102,6 @@ export function RemanejarDuplaDialog({
   // ser outra escolha no próprio form, então a mensagem não pode sumir
   const [erro, setErro] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const router = useRouter();
   // estado fresco por abertura — um remanejo abortado não pode vazar
   // seleção pra próxima vez; com preseleção a sugestão já chega com lado
   // e par escolhidos. Ajuste durante o render na borda de subida do `open`
@@ -313,17 +311,10 @@ export function RemanejarDuplaDialog({
           devolutiva,
           true
         );
-        if (res?.error) {
-          setErro(res.error);
-          return;
-        }
-        toast.success(
-          resumo
-            ? `Nova dupla formada: ${resumo.depois.replace(" + ", " e ")}.`
-            : "Dupla remanejada."
-        );
-        setOpen(false);
-        if (!res?.novaDuplaId) router.refresh();
+        // sucesso não retorna: a action redireciona pra ficha sucessora e o
+        // NEXT_REDIRECT cai no catch — a confirmação é o banner da ficha
+        // nova. O que volta por aqui é só erro pra mostrar inline
+        if (res?.error) setErro(res.error);
       } catch (err) {
         // o redirect da action chega como NEXT_REDIRECT: deixa o Next navegar
         if (

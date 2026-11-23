@@ -2517,8 +2517,10 @@ export async function remanejarDupla(
   revalidatePath(`/pessoas/${saiId}`);
   // a ficha antiga vira "encerrada" na mesma revalidation; navegar daqui
   // evita o router.push do cliente ser descartado quando o menu/dialog
-  // desmonta (496/QW do remanejo)
-  if (redirecionar) redirect(`/duplas/${novaDuplaId}`);
+  // desmonta (496/QW do remanejo). O `?remanejada=1` é o flash one-shot:
+  // o NEXT_REDIRECT corta o cliente antes de qualquer toast, então a
+  // confirmação mora na ficha de destino (RemanejoFlash)
+  if (redirecionar) redirect(`/duplas/${novaDuplaId}?remanejada=1`);
   return { ok: true, novaDuplaId };
 }
 
