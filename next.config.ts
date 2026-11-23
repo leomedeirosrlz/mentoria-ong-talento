@@ -61,6 +61,11 @@ const remotePatterns: NonNullable<NextConfig["images"]>["remotePatterns"] = [
     : []),
 ];
 
+// Proxy same-origin pro Supabase local: o browser chama /supabase no host da
+// aplicação e o Next repassa pro 127.0.0.1:54321. Evita o CORS inválido do
+// Kong (`*` + `Allow-Credentials: true`) sem expor a porta 54321 ao celular.
+const supabaseProxyTarget = process.env.SUPABASE_PROXY_TARGET;
+
 const nextConfig: NextConfig = {
   // sem "X-Powered-By: Next.js" — banner de stack não ajuda ninguém
   poweredByHeader: false,
@@ -110,6 +115,15 @@ const nextConfig: NextConfig = {
     "127.0.0.1",
     "localhost",
   ],
+  async rewrites() {
+    if (!supabaseProxyTarget) return [];
+    return [
+      {
+        source: "/supabase/:path*",
+        destination: `${supabaseProxyTarget}/:path*`,
+      },
+    ];
+  },
   async headers() {
     return [
       {

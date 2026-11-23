@@ -2,6 +2,7 @@ import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { pathInterno } from "@/lib/utils";
 import { DEMO_ROLE_COOKIE, papelDemoValido } from "@/lib/demo/shared";
+import { AUTH_COOKIE_NAME } from "@/lib/supabase/config";
 
 export async function updateSession(request: NextRequest) {
   // modo demo: o cookie demo_role dispensa sessão de verdade — a navegação
@@ -25,6 +26,7 @@ export async function updateSession(request: NextRequest) {
       // mesmo em http. Cookie sem Secure funciona em https também, então
       // errar pro lado do scheme só degrada a flag, nunca o transporte.
       cookieOptions: {
+        name: AUTH_COOKIE_NAME,
         secure: request.nextUrl.protocol === "https:",
         sameSite: "lax",
       },
