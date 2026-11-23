@@ -447,3 +447,7 @@ Pipeline em andamento (recon + specs + opinião entregues; implementação aguar
 - [ ] **REALIZA-522** — Materiais estruturados gerados pela Liza (backlog, schema fechado, coordenação publica). Spec `specs/021-materiais-liza/`.
 
 Recon + opinião: `docs/planos/issues/_recon/plano-518-522-2026-11-23.md` e `plano-518-522-opiniao.md` (SQL sugerido em texto; próximo número de migration livre: 0225). O item "Card de disponibilidade (FR-014)" acima tem a parte do planner coberta pela spec 017; a superfície de edição da grade segue pendente.
+
+## Backlog — relatórios (nov/2026)
+
+- [ ] **REALIZA-523** — Relatórios: filtros por papel/tipo de mentor e mais granularidade. Manter a tabela default como está e acrescentar pills extras; default não mostra staff nem especialistas. Pills: mentor DPP, mentor especialista, coordenação, auxiliar, todos; combinar com trilha/turma/status/período; URL + limpar + exportação/contagens coerentes.
