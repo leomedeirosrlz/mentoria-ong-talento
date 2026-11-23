@@ -76,6 +76,11 @@ import {
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import { getChamados } from "@/lib/queries-chamados";
 import { chamadoPendencia, derivarPendencias } from "@/lib/pendencias-jovem";
+import {
+  combinadoDoJovem,
+  resumoCombinado,
+} from "@/lib/plano-combinado";
+import { PlanoBanner } from "@/components/plano-em-dia-pecas";
 import { getComunicados, getMateriais, getMe } from "@/lib/queries";
 import type { Disponibilidade, JovemContato } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -153,6 +158,19 @@ export default async function JovemHome() {
     duplas[0] ??
     null;
   const duplaEmCurso = duplaAtual?.status === "ativa" || duplaAtual?.status === "pausada";
+
+  // o combinado "ficar em dia" (513): a jovem_plano é da mesma dupla DPP
+  // viva que ancora a home — o resumo alimenta o banner abaixo do "pra fazer"
+  const resumoPlanoJovem = planoJovem
+    ? resumoCombinado(
+        combinadoDoJovem(planoJovem),
+        encontros
+          .filter(
+            (e) => e.dupla_id === duplaAtual?.id && e.status === "realizado"
+          )
+          .map((e) => e.numero)
+      )
+    : null;
 
   // régua do acervo progressivo (REALIZA-160): a vitrine da home só mostra
   // o que já liberou — material marcado pra encontro futuro não vaza na
@@ -607,6 +625,19 @@ export default async function JovemHome() {
         retro={{ duplaId: duplaDppId, numeros: numerosRetro }}
         primeiroNome={primeiroNome}
       />
+
+      {/* o combinado "ficar em dia" (513): plano proposto esperando o
+          aceite dele ou em andamento — o banner vai direto ao que falta
+          sem repetir o card da agenda */}
+      {resumoPlanoJovem?.aberto && (
+        <PlanoBanner
+          resumo={resumoPlanoJovem}
+          perspectiva="jovem"
+          outro={mentores[0]?.nome?.split(" ")[0] ?? "seu mentor"}
+          href="/jovem/agenda#plano"
+          titulo="O combinado pra ficar em dia"
+        />
+      )}
 
       {/* canal de segurança sempre à mão, sem competir com o encontro: uma
           linha discreta logo abaixo do que fazer agora */}

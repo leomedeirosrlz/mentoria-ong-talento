@@ -160,7 +160,7 @@ describe("FR-011 — nível nomeado de flexibilização", () => {
     });
     if (!r.aplicavel) throw new Error("não aplicável");
     expect(r.nivel).toBe("ritmo_normal");
-    expect(r.sugestao).toMatch(/um encontro por semana/i);
+    expect(r.sugestao).toMatch(/Com 1 encontro por semana/);
   });
 
   it("atraso que só fecha com 2/semana é semana_dupla", () => {
@@ -176,7 +176,7 @@ describe("FR-011 — nível nomeado de flexibilização", () => {
     });
     if (!r.aplicavel) throw new Error("não aplicável");
     expect(r.nivel).toBe("semana_dupla");
-    expect(r.sugestao).toMatch(/dois encontros/i);
+    expect(r.sugestao).toMatch(/até 2 encontros por semana/);
   });
 
   it("atraso que nem 2/semana fecha é conversa_coord", () => {

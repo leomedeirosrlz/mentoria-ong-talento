@@ -1191,6 +1191,8 @@ export default async function DuplaPage({
           plano={planoEmDia}
           dupla={dupla}
           souMentor={souMentor}
+          souStaff={souCoord || dupla.supervisor?.id === me.id}
+          planoVivo={planoVivoFicha != null}
           jovemNome={primeiroNomeMentorado}
           recessos={recessosDaFicha}
           podeDeclararRecesso={souMentor || souCoord}

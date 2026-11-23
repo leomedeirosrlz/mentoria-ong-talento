@@ -449,7 +449,12 @@ export type JovemPlano = {
   janela: { inicio: string; fim: string } | null;
   passos: { numero: number; data: string; acao: string }[];
   aprovado_lado: "mentor" | "mentorado" | null;
+  /** Os dois aceites (0224) — ausentes num banco sem a migration. */
+  aceito_mentor?: boolean;
+  aceito_mentorado?: boolean;
+  proposto_em?: string;
   expira_em: string;
+  concluido_em?: string | null;
   passos_aplicados: {
     numero: number;
     data_nova: string;

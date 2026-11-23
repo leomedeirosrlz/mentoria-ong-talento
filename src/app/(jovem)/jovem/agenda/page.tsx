@@ -61,11 +61,9 @@ import {
 import { getSlotsLivres } from "@/lib/queries-especialista";
 import { getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
-import type { JovemEncontro, JovemPlano } from "@/lib/queries-jovem";
-import {
-  PlanoAcordosCard,
-  type PlanoCombinado,
-} from "@/components/plano-acordos";
+import type { JovemEncontro } from "@/lib/queries-jovem";
+import { combinadoDoJovem } from "@/lib/plano-combinado";
+import { PlanoAcordosCard } from "@/components/plano-acordos";
 import type { Disponibilidade } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -491,17 +489,34 @@ export default async function JovemAgenda() {
           jovem_plano, o recorte definer — aceitar e confirmar datas são
           gestos dele aqui, pela mesma RPC do mentor */}
       {planoJovem && (
-        <Card>
+        <Card id="plano" className="scroll-mt-20">
           <CardContent className="space-y-3 p-4">
             <h2 className="text-base font-semibold">O combinado</h2>
             <p className="text-sm text-muted-foreground">
-              O plano pra colocar vocês em dia. Aceitem e confirmem as
-              datas juntos: vale pra você e pro seu mentor.
+              O plano pra colocar vocês em dia. Ele começa a valer quando
+              você e seu mentor aceitarem; depois é confirmar as datas
+              juntos.
             </p>
             <PlanoAcordosCard
-              plano={mapearPlanoJovem(planoJovem)}
+              plano={combinadoDoJovem(planoJovem)}
               podeResponder
               podeAplicar
+              meuLado="mentorado"
+              nomes={{
+                mentor:
+                  contatos.find(
+                    (c) =>
+                      c.papel === "mentor" &&
+                      (c.dupla_id === duplaDpp?.id || c.dupla_id == null)
+                  )?.nome?.split(" ")[0] ?? "Seu mentor",
+                mentorado: primeiroNome || "Você",
+              }}
+              realizados={encontros
+                .filter(
+                  (e) =>
+                    e.dupla_id === duplaDpp?.id && e.status === "realizado"
+                )
+                .map((e) => e.numero)}
               sugestoes={sugestoesAgendar}
             />
           </CardContent>
@@ -731,27 +746,4 @@ export default async function JovemAgenda() {
   );
 }
 
-/** Recorte da jovem_plano → a projeção que o card do combinado lê
- *  (PlanoCombinado) — a RPC já devolve sem semáforo/motivos; aqui só
- *  muda a forma (ritmo vem texto do jsonb, passos aplicados achatam). */
-function mapearPlanoJovem(p: JovemPlano): PlanoCombinado {
-  return {
-    id: p.id,
-    status: p.status,
-    versao: p.versao,
-    aprovado_lado: p.aprovado_lado,
-    janela: p.janela,
-    escopo: {
-      ritmo: p.ritmo == null ? null : Number(p.ritmo) || null,
-      passos: (p.passos ?? []).map((s) => ({
-        numero: s.numero,
-        data: s.data,
-        acao: s.acao,
-      })),
-    },
-    passos: (p.passos_aplicados ?? []).map((s) => ({
-      numero: s.numero,
-      data_nova: s.data_nova,
-    })),
-  };
-}
+

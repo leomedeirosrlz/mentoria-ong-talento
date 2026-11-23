@@ -68,3 +68,17 @@ export const GAP_DIAS_EXIGE: Record<
 /** Floor between any two encounters of the same pair — the "terça + quinta"
  *  spacing the official double weeks use. */
 export const GAP_MINIMO_DIAS = 2;
+
+/** Ritmos que o plano sonda, do mais leve ao mais pesado (encontros por
+ *  semana): o de sempre, a semana dupla, a semana tripla e, no topo, 1 por
+ *  dia. O 4 fica de fora: com o piso de 2 dias ele cabe no mesmo calendário
+ *  do 3 e não muda nenhuma data. */
+export const RITMOS_PLANO = [1, 2, 3, 7] as const;
+
+/** "1 encontro por dia" = até 7 na semana (REALIZA-513). */
+export const RITMO_UM_POR_DIA = 7;
+
+/** Piso entre dois encontros no ritmo de 1 por dia: dias seguidos. Só cai o
+ *  piso genérico da semana dupla; prática (7d) e tarefa (2d) seguem valendo,
+ *  porque são conteúdo do guia, não cadência. */
+export const GAP_UM_POR_DIA = 1;

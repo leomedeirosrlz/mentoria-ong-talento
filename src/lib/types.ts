@@ -561,7 +561,12 @@ export type DuplaPlanoEscopo = {
   numeros: number[];
   ritmo?: number;
   janela?: { inicio: string; fim: string };
-  nivel?: "ritmo_normal" | "semana_dupla" | "conversa_coord";
+  nivel?:
+    | "ritmo_normal"
+    | "semana_dupla"
+    | "semana_tripla"
+    | "um_por_dia"
+    | "conversa_coord";
   passos?: { numero: number; data: string; acao: string }[];
 };
 
@@ -576,6 +581,10 @@ export type DuplaPlano = {
   aprovado_por: string | null;
   aprovado_lado: "mentor" | "mentorado" | null;
   aprovado_em: string | null;
+  /** Aceite de cada lado (0224): o plano só sai de `proposto` com os dois.
+   *  `aprovado_*` segue gravando o primeiro lado que aceitou. */
+  aceito_mentor_em?: string | null;
+  aceito_mentorado_em?: string | null;
   contestado_por: string | null;
   contestado_motivo: string | null;
   contestado_em: string | null;

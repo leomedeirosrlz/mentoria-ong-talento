@@ -1,6 +1,7 @@
 import Link from "next/link";
 import {
   CalendarPlus,
+  ChatsCircle,
   Flag,
   Info,
   SunHorizon,
@@ -8,10 +9,16 @@ import {
   Warning,
 } from "@phosphor-icons/react/dist/ssr";
 import { formatDate, formatDateTime } from "@/lib/ciclo";
-import type { PlanoEmDia } from "@/lib/plano-em-dia";
+import { META_PASSOS_PLANO } from "@/lib/plano-em-dia.data";
+import {
+  rotuloRitmo,
+  type PlanoEmDia,
+} from "@/lib/plano-em-dia";
 import type { Dupla } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
+import { NovoChamadoDialog } from "@/components/novo-chamado-dialog";
+import { ProporPlanoButton } from "@/components/propor-plano-button";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
   Popover,
@@ -19,26 +26,33 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
+  PillPlano,
+  QuadradosPlano,
+  type EstadoQuadrado,
+} from "@/components/plano-em-dia-pecas";
+import {
   RecessoDecisao,
   type RecessoDaFicha,
 } from "@/components/recesso-dupla-card";
 
-// "Para ficar em dia" (REALIZA-397/459) — o plano de recuperação na aba
-// Agora: projeção honesta (o "em dia" conta os encontros oficiais que
-// vencem no caminho), um passo por linha com a data sugerida e a decisão
-// de recesso morando aqui dentro, onde ela muda a conta na hora.
-// Mentor agenda/remarca inline; coordenação e supervisão leem sem CTA.
+// "Para ficar em dia" (REALIZA-397/459/513) — a projeção honesta da
+// dupla: quando uma escada de ritmos fecha antes do encerramento o card
+// mostra o custo e propõe o combinado; quando nem 1 por dia fecha, ele
+// diz isso e aponta a conversa com a coordenação — nunca promete o que
+// o calendário não comporta. A decisão de recesso mora aqui dentro,
+// onde ela muda a conta na hora. Mentor agenda/remarca inline; a
+// proposta é dele, do supervisor ou da coordenação — a RPC revalida.
 
 const REGRAS: { termo: string; texto: string }[] = [
   {
     termo: "Ritmo do plano",
     texto:
-      "Dois encontros podem cair na mesma semana, sempre com pelo menos 2 dias entre eles.",
+      "Dois encontros podem cair na mesma semana, sempre com pelo menos 2 dias entre eles. No limite, 1 encontro por dia.",
   },
   {
     termo: "Semana de prática",
     texto:
-      "Encontros que pedem prática real no meio do guia seguram uma semana antes do próximo.",
+      "Encontros que pedem prática real no meio do guia seguram uma semana antes do próximo, mesmo a 1 por dia.",
   },
   {
     termo: "Data 'em dia'",
@@ -52,10 +66,14 @@ const REGRAS: { termo: string; texto: string }[] = [
   },
 ];
 
+const TOTAL_TRILHA = Object.keys(META_PASSOS_PLANO).length;
+
 export function PlanoEmDiaCard({
   plano,
   dupla,
   souMentor,
+  souStaff = false,
+  planoVivo = false,
   jovemNome,
   recessos = [],
   podeDeclararRecesso = false,
@@ -63,14 +81,52 @@ export function PlanoEmDiaCard({
   plano: Extract<PlanoEmDia, { aplicavel: true }>;
   dupla: Dupla;
   souMentor: boolean;
+  /** coordenação ou supervisor da dupla — podem propor como o mentor
+   *  (a RPC revalida) e enxergam o plano sem agendar inline. */
+  souStaff?: boolean;
+  /** Já existe combinado aberto — a RPC recusa proposta dupla, então o
+   *  card não oferece o gesto. */
+  planoVivo?: boolean;
   jovemNome: string;
   /** Recessos vigentes/futuros do cronograma — a decisão mora aqui dentro. */
   recessos?: RecessoDaFicha[];
   /** mentor da dupla ou coordenação — a RPC revalida na gravação. */
   podeDeclararRecesso?: boolean;
 }) {
+  const conversa = plano.estado === "conversa";
   const podeAgendar = souMentor && dupla.status === "ativa";
+  const podePropor = (souMentor || souStaff) && dupla.status === "ativa";
   const agendaveis = plano.passos.filter((p) => p.acao !== "travado");
+
+  // a régua inteira da trilha: feito, com data, no plano, fora do limite
+  // ou quieto na data oficial — o progresso que o combinado promete
+  const feitos = new Set(
+    dupla.encontros.filter((e) => e.status === "realizado").map((e) => e.numero)
+  );
+  const comData = new Set(
+    dupla.encontros
+      .filter(
+        (e) =>
+          e.data_hora != null &&
+          (e.status === "agendado" || e.status === "remarcado")
+      )
+      .map((e) => e.numero)
+  );
+  const passoPorNumero = new Map(plano.passos.map((p) => [p.numero, p]));
+  const quadrados = Array.from({ length: TOTAL_TRILHA }, (_, i) => {
+    const numero = i + 1;
+    const passo = passoPorNumero.get(numero);
+    const estado: EstadoQuadrado = feitos.has(numero)
+      ? "feito"
+      : passo?.acao === "travado" || comData.has(numero)
+        ? "marcado"
+        : passo
+          ? plano.encerramento && passo.data > plano.encerramento
+            ? "fora"
+            : "plano"
+          : "vazio";
+    return { numero, estado };
+  });
 
   return (
     <section
@@ -85,9 +141,16 @@ export function PlanoEmDiaCard({
           <TrendUp size={18} />
         </span>
         <div className="min-w-0 flex-1">
-          <h2 id="plano-em-dia" className="text-base font-semibold">
-            Para ficar em dia
-          </h2>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
+            <h2 id="plano-em-dia" className="text-base font-semibold">
+              Para ficar em dia
+            </h2>
+            {conversa ? (
+              <PillPlano tom="risco">Não fecha até o encerramento</PillPlano>
+            ) : (
+              <PillPlano tom="atencao">{rotuloRitmo(plano.ritmo)}</PillPlano>
+            )}
+          </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {agendaveis.length}{" "}
             {agendaveis.length === 1
@@ -98,7 +161,53 @@ export function PlanoEmDiaCard({
         <ComoCalcula />
       </div>
 
-      {plano.dataRecuperacao ? (
+      {conversa ? (
+        <div className="mt-4">
+          <p className="text-2xl font-semibold tracking-tight">
+            Nem com 1 encontro por dia fecha
+          </p>
+          {plano.cabemAteEncerramento && (
+            <p className="mt-1 text-sm tabular-nums text-muted-foreground">
+              Nesse ritmo cabem {plano.cabemAteEncerramento.cabem} dos{" "}
+              {plano.cabemAteEncerramento.faltam} encontros que faltam
+              {plano.encerramento
+                ? ` até o encerramento (${formatDate(plano.encerramento)})`
+                : ""}
+              .
+            </p>
+          )}
+          <p className="mt-1 text-sm text-muted-foreground">
+            {plano.sugestao}
+          </p>
+          {plano.alternativaRecesso && (
+            <p className="mt-2 flex items-start gap-1.5 text-sm text-muted-foreground">
+              <SunHorizon size={14} aria-hidden className="mt-0.5 shrink-0" />
+              Se vocês seguirem se encontrando no recesso,{" "}
+              {rotuloRitmo(plano.alternativaRecesso.ritmo)} fecha o plano em{" "}
+              {formatDate(plano.alternativaRecesso.data)}.
+            </p>
+          )}
+          {podePropor && (
+            <div className="mt-3">
+              <NovoChamadoDialog
+                papel={souMentor ? "mentor_dpp" : "coordenacao"}
+                duplaId={dupla.id}
+                inicial={{
+                  categoria: "metodologia",
+                  assunto: `Plano "ficar em dia" não fecha até o encerramento`,
+                  mensagem: plano.sugestao,
+                }}
+                trigger={
+                  <Button variant="outline" size="sm">
+                    <ChatsCircle aria-hidden />
+                    Falar com a coordenação
+                  </Button>
+                }
+              />
+            </div>
+          )}
+        </div>
+      ) : plano.dataRecuperacao ? (
         <div className="mt-4">
           <p className="text-2xl font-semibold tracking-tight">
             Em dia em{" "}
@@ -109,6 +218,19 @@ export function PlanoEmDiaCard({
           <p className="mt-1 text-sm text-muted-foreground">
             {plano.sugestao}
           </p>
+          {plano.alternativaRecesso && (
+            <p className="mt-2 flex items-start gap-1.5 text-sm text-muted-foreground">
+              <SunHorizon size={14} aria-hidden className="mt-0.5 shrink-0" />
+              Se vocês seguirem se encontrando no recesso,{" "}
+              {rotuloRitmo(plano.alternativaRecesso.ritmo)} já basta: em dia
+              em {formatDate(plano.alternativaRecesso.data)}.
+            </p>
+          )}
+          {podePropor && !planoVivo && (
+            <div className="mt-3">
+              <ProporPlanoButton duplaId={dupla.id} ritmo={plano.ritmo} />
+            </div>
+          )}
         </div>
       ) : (
         <div className="mt-4">
@@ -117,11 +239,18 @@ export function PlanoEmDiaCard({
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             {plano.alternativaRitmo
-              ? `Com ${plano.alternativaRitmo.ritmo} encontros por semana ficariam em dia em ${formatDate(plano.alternativaRitmo.data)}.`
+              ? `Com ${rotuloRitmo(plano.alternativaRitmo.ritmo)} ficariam em dia em ${formatDate(plano.alternativaRitmo.data)}.`
               : plano.sugestao}
           </p>
         </div>
       )}
+
+      <div className="mt-4">
+        <QuadradosPlano
+          itens={quadrados}
+          rotulo={`${feitos.size} de ${TOTAL_TRILHA} encontros feitos`}
+        />
+      </div>
 
       {plano.pendenciasRegistro.length > 0 && (
         <div className="mt-4 rounded-lg bg-muted/50 px-3.5 py-3 shadow-[var(--shadow-inset)]">
@@ -188,6 +317,7 @@ export function PlanoEmDiaCard({
                         {p.dataOficial !== p.data && (
                           <> · oficial era {formatDate(p.dataOficial)}</>
                         )}
+                        {p.venceNoCaminho && <> · vence no caminho</>}
                       </>
                     )}
                   </p>

@@ -18,6 +18,11 @@ import {
 } from "@/lib/ciclo";
 import { limboFechado } from "@/lib/agenda-minha";
 import {
+  aceitesDoPlano,
+  resumoCombinado,
+} from "@/lib/plano-combinado";
+import { PlanoBanner } from "@/components/plano-em-dia-pecas";
+import {
   situacaoDaDupla,
   SITUACAO_DUPLA_LABEL,
 } from "@/lib/dupla-desfecho";
@@ -213,6 +218,22 @@ export function MentorHome({
           );
         const hojeStr = toDateStr(hoje);
         const jovemNome = dupla.mentorado.nome_social ?? dupla.mentorado.nome;
+        // o combinado "ficar em dia" (513): proposta pendente de aceite ou
+        // plano em andamento — o banner resume o próximo passo sem repetir
+        // o card inteiro da ficha
+        const planoVivo = !ehEsp
+          ? ((dupla.planos ?? []).find((p) =>
+              ["proposto", "aceito", "ativo"].includes(p.status)
+            ) ?? null)
+          : null;
+        const resumoPlano = planoVivo
+          ? resumoCombinado(
+              { ...planoVivo, aceites: aceitesDoPlano(planoVivo) },
+              dupla.encontros
+                .filter((e) => e.status === "realizado")
+                .map((e) => e.numero)
+            )
+          : null;
         // "Sessão 3 com Bia" / "5º encontro com Bia" — o rótulo canônico
         // (na trilha esp o nº é o passo do guia, nunca a tentativa da row)
         const rotuloDe = (e: Encontro) =>
@@ -391,6 +412,15 @@ export function MentorHome({
                 sessao={ehEsp}
               />
               <MarcoNotifier duplaId={dupla.id} feitos={jornada.feitos} total={jornada.total} />
+
+              {resumoPlano && (
+                <PlanoBanner
+                  resumo={resumoPlano}
+                  perspectiva="mentor"
+                  outro={jovemNome.split(" ")[0] ?? "seu jovem"}
+                  href={`/duplas/${dupla.id}#plano-em-dia`}
+                />
+              )}
 
               {/* o que fazer agora: o próximo passo é o destaque da marca
                   (amarelo), não alerta. Mesmo cartão, separado por divisória */}

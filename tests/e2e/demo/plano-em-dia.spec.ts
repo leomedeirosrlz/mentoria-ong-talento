@@ -1,10 +1,14 @@
-// Card "Para ficar em dia" (REALIZA-397) na aba Agora da ficha — a leitura
-// de equipe (coordenação/supervisão) é sem CTA: quem agenda é a dupla, a
-// equipe usa o plano como contexto pra lembrar e chamar. d-risco (Fernanda
-// × Dandara) deve os encontros 3 e 4 e tem o 5º marcado; d-atraso traz um
-// "não aconteceu" cuja remarcação entra no plano. No dataset da demo nenhuma
-// dupla supervisionada pelo Paulo está atrasada o suficiente pro card — a
-// d-pend só carrega pendência de registro, que a superfície própria já cobre.
+// Card "Para ficar em dia" (REALIZA-397+513) na aba Agora da ficha — a
+// leitura de equipe não agenda/remarca (quem agenda é a dupla), mas pode
+// PROPOR o combinado: o 0224 deixa coord, supervisor da dupla e mentor
+// abrirem a proposta bilateral. d-risco (Fernanda × Dandara) deve os
+// encontros 3 e 4 e tem o 5º marcado; d-atraso (513) tem três devidos —
+// 3º e 4º "não aconteceram" e o 5º venceu em limbo — e acende a
+// recuperação com proposta. No dataset da demo nenhuma dupla
+// supervisionada pelo Paulo está atrasada o suficiente pro card — a
+// d-pend só carrega pendência de registro, que a superfície própria já
+// cobre (e o combinado dela, proposto pelo Paulo, aparece no card de
+// acordos, não aqui).
 
 import { expect, test } from "../helpers";
 import { entrarNaDemo } from "../helpers";
@@ -27,33 +31,53 @@ test.describe("demo — plano pra ficar em dia (REALIZA-397)", () => {
     // os encontros oficiais que vencem no caminho da recuperação
     await expect(card.getByText(/Em dia em/)).toBeVisible();
     await expect(card.getByText(/\d+ encontros? pra repor/)).toBeVisible();
-    // os passos devidos entram com data sugerida; o 5º marcado aparece como
-    // tal — .first() porque em seg/ter o aviso de ordem repete a expressão
-    await expect(card.getByText(/sugestão/)).toHaveCount(2);
+    // os passos devidos abrem a lista: sugestão com a oficial passada ao
+    // lado ("oficial era …"); os oficiais que vencem no caminho entram em
+    // sequência (a jornada inteira aparece); o 5º marcado lê "marcado pra"
+    const itens = card.locator("ol li");
+    await expect(itens.nth(0)).toContainText(/sugestão.*oficial era/);
+    await expect(itens.nth(1)).toContainText(/sugestão.*oficial era/);
+    await expect(
+      itens.filter({ hasText: /vence no caminho/ }).first()
+    ).toBeVisible();
     await expect(card.getByText(/marcado pra/).first()).toBeVisible();
     // a decisão de recesso mora dentro do card — a coordenação declara aqui
     await expect(card.getByText("Recesso no caminho")).toBeVisible();
     await expect(
       card.getByRole("button", { name: "Vamos seguir nos encontrando" })
     ).toBeVisible();
-    // e não sobra card de recesso separado na página
-    await expect(page.getByText("Recesso do programa")).toHaveCount(0);
-    // leitura de equipe: nenhum botão de agir — quem agenda é a dupla
+    // e não sobra card de recesso separado na página (exact: o aviso dos
+    // passos empurrados menciona "recesso do programa" como substring)
+    await expect(
+      page.getByText("Recesso do programa", { exact: true })
+    ).toHaveCount(0);
+    // leitura de equipe: não agenda nem remarca — quem agenda é a dupla.
+    // Mas o 0224 deixa a coordenação PROPOR o combinado
     await expect(
       card.getByRole("button", { name: /Agendar|Remarcar/ })
     ).toHaveCount(0);
+    await expect(
+      card.getByRole("button", { name: /Propor o plano/i })
+    ).toBeVisible();
   });
 
-  test("coordenação na d-atraso (1 remarcação + limbo): sem card", async ({
+  test("coordenação na d-atraso (3 devidos): recuperação com proposta", async ({
     page,
   }) => {
     await entrarNaDemo(page, "coordenacao");
     await page.goto(`/duplas/${D_ATRASO}?aba=agora`);
 
-    // o 4º virou 'não aconteceu' (1 passo de remarcação) e o 5º vencido caiu
-    // em limbo — com menos de 2 passos agendáveis as pendências já cobrem o caso
+    // 513: 3º e 4º "não aconteceram" e o 5º venceu em limbo — os três
+    // devidos acendem a recuperação possível, com CTA de proposta
+    const card = page.getByRole("region", { name: "Para ficar em dia" });
+    await expect(card).toBeVisible();
+    await expect(card.getByText(/Em dia em/)).toBeVisible();
+    await expect(card.getByText(/\d+ encontros? pra repor/)).toBeVisible();
     await expect(
-      page.getByRole("region", { name: "Para ficar em dia" })
+      card.getByRole("button", { name: /Propor o plano/i })
+    ).toBeVisible();
+    await expect(
+      card.getByRole("button", { name: /Agendar|Remarcar/ })
     ).toHaveCount(0);
   });
 

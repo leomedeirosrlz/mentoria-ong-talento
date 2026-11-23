@@ -13,11 +13,10 @@ const DIR = path.join(process.cwd(), "supabase", "migrations");
 const arquivos = readdirSync(DIR).filter((f) => f.endsWith(".sql")).sort();
 
 // lacunas de numeração conhecidas e intencionais — não existem 0039, 0113,
-// 0184 nem 0189. A 0210 (digest) e a 0211 (PDM) existem no repo; se alguma
-// chegar por outro worktree e ainda não estiver aqui, entra como lacuna
-// repo quando aquele PR mergear — ao integrar, sair da lista. Se este set
+// 0184 nem 0189. A 0223 (pdm_metas_extras) está em voo no fix/pdm-cascata-3:
+// quando aquele PR mergear, ela existe aqui e sai da lista. Se este set
 // mudar, a mensagem diz exatamente o que fazer.
-const LACUNAS_CONHECIDAS = [39, 113, 184, 189];
+const LACUNAS_CONHECIDAS = [39, 113, 184, 189, 223];
 
 function semComentarios(sql: string): string {
   return sql.replace(/--[^\n]*/g, " ").replace(/\/\*[\s\S]*?\*\//g, " ");

@@ -1824,6 +1824,8 @@ export type Database = {
       }
       dupla_planos: {
         Row: {
+          aceito_mentor_em: string | null
+          aceito_mentorado_em: string | null
           aprovado_em: string | null
           aprovado_lado: string | null
           aprovado_por: string | null
@@ -1843,6 +1845,8 @@ export type Database = {
           versao: number
         }
         Insert: {
+          aceito_mentor_em?: string | null
+          aceito_mentorado_em?: string | null
           aprovado_em?: string | null
           aprovado_lado?: string | null
           aprovado_por?: string | null
@@ -1862,6 +1866,8 @@ export type Database = {
           versao: number
         }
         Update: {
+          aceito_mentor_em?: string | null
+          aceito_mentorado_em?: string | null
           aprovado_em?: string | null
           aprovado_lado?: string | null
           aprovado_por?: string | null

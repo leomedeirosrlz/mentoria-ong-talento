@@ -18,7 +18,11 @@ import { createHash } from "crypto";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { comparaNome, saudadeDaDupla, toDateStr } from "@/lib/ciclo";
-import { montarPlanoEmDia } from "@/lib/plano-em-dia";
+import {
+  escopoDaProposta,
+  montarPlanoEmDia,
+  rotuloRitmo,
+} from "@/lib/plano-em-dia";
 import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
 import { saudeDoRecorte } from "@/lib/agenda-coordenacao";
 import type { Achado } from "@/lib/relatorios/leituras";
@@ -768,7 +772,7 @@ export const IA_TOOLS = {
   plano_em_dia: {
     nome: "plano_em_dia",
     descricao:
-      "Plano de recuperação de uma dupla DPP atrasada ('ficar em dia'): passo a passo determinístico com data sugerida por encontro — dois por semana quando couber, respeitando os intervalos de prática/tarefa do guia, os recessos e o encerramento do ciclo. Devolve cada passo com a ação (agendar, remarcar ou já marcado), pendências de registro que vêm antes de qualquer plano, e a data em que a dupla volta pro calendário oficial. Use pra 'como a dupla X fica em dia?', 'ela começou atrasada, o que fazer?', 'monta um plano de recuperação', 'dá pra adiantar encontro?'. null quando a dupla não existe ou está fora do alcance do papel.",
+      "Plano de recuperação de uma dupla DPP atrasada ('ficar em dia'): passo a passo determinístico com data sugerida por encontro, no ritmo mais leve que fecha antes do encerramento (1 por semana, até 2, até 3 ou até 1 por dia), respeitando os intervalos de prática/tarefa do guia, os recessos, os feriados nacionais e o encerramento do ciclo. Devolve o estado (em_dia, recuperacao ou conversa: nem 1 por dia fecha, o caminho é a coordenação), cada passo com a ação (agendar, remarcar ou já marcado; vence_no_caminho = oficial que vence enquanto a dupla recupera), pendências de registro que vêm antes de qualquer plano, a data em que a dupla volta pro calendário oficial, quantos encontros cabem até o encerramento e o efeito de seguir no recesso. Use pra 'como a dupla X fica em dia?', 'ela começou atrasada, o que fazer?', 'monta um plano de recuperação', 'dá pra adiantar encontro?'. null quando a dupla não existe ou está fora do alcance do papel.",
     schema: duplaIdArgs,
     // DPP-only tool: especialista track has no official calendar to catch
     // up to (the planner itself returns aplicavel:false) and the youth
@@ -799,6 +803,7 @@ export const IA_TOOLS = {
         trilha: d.trilha,
         aplicavel: true,
         em_dia: r.emDia,
+        estado: r.estado,
         nivel: r.nivel,
         sugestao: r.sugestao,
         plano: vivo
@@ -807,6 +812,8 @@ export const IA_TOOLS = {
               status: vivo.status,
               versao: vivo.versao,
               aprovado_lado: vivo.aprovado_lado,
+              aceito_mentor: vivo.aceito_mentor_em != null,
+              aceito_mentorado: vivo.aceito_mentorado_em != null,
               expira_em: vivo.expira_em,
               ritmo: vivo.escopo?.ritmo ?? null,
             }
@@ -824,11 +831,15 @@ export const IA_TOOLS = {
           encontro_id: p.encontroId,
           data_sugerida: p.data,
           data_oficial: p.dataOficial,
+          vence_no_caminho: p.venceNoCaminho === true,
           precondicao: p.precondicao ?? null,
           aviso: p.aviso ?? null,
         })),
         data_recuperacao: r.dataRecuperacao,
+        data_projetada: r.dataProjetada,
+        cabem_ate_encerramento: r.cabemAteEncerramento,
         alternativa_ritmo: r.alternativaRitmo,
+        alternativa_recesso: r.alternativaRecesso,
         encerramento: r.encerramento,
         avisos: r.avisos,
       };
@@ -838,7 +849,7 @@ export const IA_TOOLS = {
   plano_propor: {
     nome: "plano_propor",
     descricao:
-      "Propõe e GRAVA o plano 'ficar em dia' de uma dupla DPP (0219): o escopo sai do mesmo planner do plano_em_dia — encontros devidos/travados, janela, ritmo combinado (1 a 4 encontros por semana) e o nível de flexibilização calculado — e a proposta fica persistida pra dupla aceitar ou contestar (o outro lado é avisado). Só um plano aberto por dupla: o banco recusa se já houver um vivo — contestado é terminal, acordo novo é versão nova. plano_em_dia mostra a prévia antes." +
+      "Propõe e GRAVA o plano 'ficar em dia' de uma dupla DPP (0219/0224): o escopo sai do mesmo planner do plano_em_dia — encontros devidos e os que vencem no caminho, janela até o encerramento, ritmo combinado e o nível calculado — e a proposta fica persistida pra dupla aceitar ou contestar. O plano só vale quando os DOIS lados aceitam (mentor que propõe já conta como o aceite dele). Sem ritmo, usa o mais leve que fecha; o banco recusa ritmo fora de 1 a 7. Dupla em dia ou em 'conversa' (nem 1 por dia fecha) não tem proposta: aí o caminho é a coordenação. Só um plano aberto por dupla — contestado é terminal, acordo novo é versão nova. plano_em_dia mostra a prévia antes." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -847,58 +858,42 @@ export const IA_TOOLS = {
           .number()
           .int()
           .min(1)
-          .max(4)
+          .max(7)
           .optional()
-          .describe("encontros por semana combinados, 1–4 (padrão 2 = semana dupla)"),
+          .describe("encontros por semana, 1 a 7 (7 = até 1 por dia); omita pra usar o mais leve que fecha"),
       })
       .strict(),
-    roles: ["coordenacao", "mentor_dpp"],
+    roles: ["coordenacao", "supervisor", "mentor_dpp"],
     escreve: true,
     resumo: (a: { dupla_id: string; ritmo?: number }) =>
-      `Propor o plano "ficar em dia" da dupla com ritmo ${a.ritmo ?? 2}/semana`,
+      a.ritmo
+        ? `Propor o plano "ficar em dia" da dupla com ${rotuloRitmo(a.ritmo)}`
+        : 'Propor o plano "ficar em dia" da dupla no ritmo mais leve que fecha',
     run: async (a: { dupla_id: string; ritmo?: number }, ctx) => {
       const [d, eventos] = await Promise.all([
         getDuplaIa(ctx.supabase, a.dupla_id),
         getCicloEventosIa(ctx.supabase),
       ]);
       if (!d) throw new ErroTool("Não encontrei essa dupla.");
-      const ritmo = a.ritmo ?? 2;
+      const agora = new Date();
       const r = montarPlanoEmDia({
         dupla: d as unknown as Dupla,
         eventos,
-        ritmo,
-        hoje: new Date(),
+        ritmo: a.ritmo,
+        hoje: agora,
       });
       if (!r.aplicavel) throw new ErroTool(r.motivo);
-      const passosPlano = r.passos.filter((p) => p.acao !== "travado");
-      if (!passosPlano.length)
-        throw new ErroTool(
-          "A dupla não tem encontro devido — não há plano pra propor."
-        );
-      const datas = passosPlano.map((p) => p.data).sort();
-      const escopo = {
-        numeros: passosPlano.map((p) => p.numero),
-        ritmo,
-        nivel: r.nivel,
-        janela: {
-          inicio: toDateStr(new Date()),
-          fim: datas[datas.length - 1],
-        },
-        passos: passosPlano.map((p) => ({
-          numero: p.numero,
-          data: p.data,
-          acao: p.acao,
-        })),
-      };
+      const e = escopoDaProposta(r, toDateStr(agora));
+      if ("erro" in e) throw new ErroTool(e.erro);
       const res = await rpcEscreve(ctx, "plano_propor", {
         p_dupla: a.dupla_id,
-        p_escopo: escopo,
+        p_escopo: e.escopo,
         p_via: "liza",
       });
       await emitirProdutoEvento(ctx.supabase, {
         superficie: "ia",
         acao: "plano_proposto",
-        meta: { dupla_id: a.dupla_id, ritmo, nivel: r.nivel },
+        meta: { dupla_id: a.dupla_id, ritmo: e.escopo.ritmo, nivel: r.nivel },
       });
       return res;
     },
@@ -907,7 +902,7 @@ export const IA_TOOLS = {
   plano_responder: {
     nome: "plano_responder",
     descricao:
-      "Responde o plano 'ficar em dia' persistido: 'aceitar' marca o combinado como aceito (um lado basta; o outro é avisado), 'contestar' encerra o plano pra sempre — contestado é terminal, um novo acordo nasce como nova versão. Contestar só vale até o primeiro encontro do escopo acontecer; depois disso a conversa é com a coordenação. O plano_id vem de plano_em_dia, meu_plano ou da notificação." +
+      "Responde o plano 'ficar em dia' persistido: 'aceitar' carimba o aceite de quem responde (o plano só vale quando os dois lados aceitam; o outro é avisado), 'contestar' encerra o plano pra sempre — contestado é terminal, um novo acordo nasce como nova versão. Contestar só vale até o primeiro encontro do escopo acontecer; depois disso a conversa é com a coordenação. O plano_id vem de plano_em_dia, meu_plano ou da notificação." +
       ESCRITA_DOC,
     schema: z
       .object({

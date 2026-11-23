@@ -2411,6 +2411,10 @@ function build(): DemoData {
     aprovado_por: null,
     aprovado_lado: "mentor" as const,
     aprovado_em: haDias(1, "19:12"),
+    // 0224: mentor que propõe já carrega o aceite dele; o da jovem chegou
+    // no dia seguinte — os dois carimbos são o que reabre o plano
+    aceito_mentor_em: haDias(2, "18:40"),
+    aceito_mentorado_em: haDias(1, "19:12"),
     contestado_por: null,
     contestado_motivo: null,
     contestado_em: null,
@@ -2460,6 +2464,18 @@ function build(): DemoData {
         motivo: null,
         por: ricardo.id,
         meta: { lado: "mentor" },
+        em: haDias(2, "18:40"),
+      },
+      {
+        id: uid(0x3200 + 5),
+        plano_id: uid(0x3000 + 1),
+        dupla_id: uid(D.ok),
+        tipo: "aceito" as const,
+        de: "proposto",
+        para: "aceito",
+        motivo: null,
+        por: anaLogin.id,
+        meta: { lado: "mentorado" },
         em: haDias(1, "19:12"),
       },
       {
@@ -2567,6 +2583,62 @@ function build(): DemoData {
     mentorado: caio,
     supervisor: paulo,
     encontros: encD2,
+    // 513: o combinado proposto pelo supervisor (Paulo) esperando os dois
+    // aceites — é a vitrine do estado "proposto" bilateral: ninguém de lado
+    // aceitou ainda, então staff lê "aguardando aceite" na ficha
+    planos: [
+      {
+        id: uid(0x3000 + 2),
+        dupla_id: uid(D.pend),
+        status: "proposto" as const,
+        escopo: {
+          numeros: [5],
+          ritmo: 2,
+          nivel: "semana_dupla" as const,
+          janela: {
+            inicio: ymd(HOJE),
+            fim: ymd(addDias(HOJE, 21)),
+          },
+          passos: [
+            {
+              numero: 5,
+              data: ymd(addDias(HOJE, 5)),
+              acao: "agendar",
+            },
+          ],
+        },
+        versao: 1,
+        proposto_por: paulo.id,
+        proposto_via: "app" as const,
+        aprovado_por: null,
+        aprovado_lado: null,
+        aprovado_em: null,
+        aceito_mentor_em: null,
+        aceito_mentorado_em: null,
+        contestado_por: null,
+        contestado_motivo: null,
+        contestado_em: null,
+        expira_em: addDias(HOJE, 13).toISOString(),
+        concluido_em: null,
+        created_at: haDias(1, "10:20"),
+        updated_at: haDias(1, "10:20"),
+        passos: [],
+        eventos: [
+          {
+            id: uid(0x3200 + 4),
+            plano_id: uid(0x3000 + 2),
+            dupla_id: uid(D.pend),
+            tipo: "proposto" as const,
+            de: null,
+            para: "proposto",
+            motivo: null,
+            por: paulo.id,
+            meta: {},
+            em: haDias(1, "10:20"),
+          },
+        ],
+      },
+    ],
     encaminhamentos: [
       encaminhamento(uid(D.pend), regD2E1.id,
         "Separar o histórico escolar pra comparar com as metas do PDM",
@@ -2655,10 +2727,10 @@ function build(): DemoData {
         proximo_passo: "novo_feedback",
       }
     ),
-    comRegistro(
-      realizado(uid(D.atraso), 3, diaEncontro(3), { duracao: 60 }),
-      joaoPedro, "Eduardo", "dpp"
-    ),
+    // 513: o 3º também furou — três passos devidos (3, 4 e o 5º vencido
+    // sem registro) é o que acende o "Para ficar em dia" com proposta
+    // possível na ficha, não só o limbo de um agendado murchado
+    naoAconteceu(uid(D.atraso), 3, diaEncontro(3), {}),
     naoAconteceu(uid(D.atraso), 4, diaEncontro(4), {}),
     // agendado que já passou sem registro — pendência ("limbo"), não atraso
     agendado(uid(D.atraso), 5, addDias(diaEncontro(5), -7), {}),

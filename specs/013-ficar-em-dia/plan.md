@@ -50,6 +50,14 @@ tests/e2e/{demo,app}/...                 # fluxo
 - Nenhuma alteração em migration aplicada; schema real conferido antes.
 - Retroativo: planos antigos sem versão continuam legíveis como versão 1.
 
+**Decisão T001 (23/11, schema local conferido em `information_schema` + `pg_get_functiondef`):** `dupla_planos` guarda `versao`, mas o aceite é de um lado só (`aprovado_lado`/`aprovado_por`), e a `plano_responder` da 0219 passa o status para `aceito` no primeiro aceite. Também: `plano_propor` trava o ritmo em 1..4 (1/dia = 7 é recusado) e não aceita supervisor; `expira_em` nasce com 28 dias e o `plano_ciclo` expira plano **ativo** (um plano de 23/11 até 15/01 morreria em 21/12). Por isso entra a migration **0224** (`0224_plano_aceite_bilateral.sql`):
+
+- colunas `aceito_mentor_em` e `aceito_mentorado_em` (timestamptz, sem FK nova: o autor já fica em `dupla_plano_eventos.por`); backfill só do lado que de fato aceitou;
+- `plano_propor`: supervisor da dupla propõe; ritmo 1..7; mentor que propõe já conta como o aceite do lado dele; prazo de aceite de 14 dias;
+- `plano_responder`: status fica `proposto` até os dois lados aceitarem; o aceite final vira `aceito` e estende `expira_em` para o fim da janela + 7 dias;
+- `jovem_plano`: devolve os dois flags de aceite;
+- `plano_aplicar_passo` e as policies de leitura não mudam.
+
 ## Autorização (matriz)
 
 | Operação | coordenação | supervisor | mentor_dpp | mentor_especialista | mentorado | anon |
@@ -89,4 +97,5 @@ Manter a matriz real; negado testado.
 
 | Violação | Por que | Alternativa simples rejeitada |
 |---|---|---|
-| Possível migration de aceite | paridade real do fluxo | guardar estado só na UI |
+| Migration 0224 (aceite por lado, ritmo 1..7, supervisor propõe, prazo) | o schema real só guarda um lado do aceite e a RPC recusa 1/dia | guardar estado só na UI; derivar o aceite de `dupla_plano_eventos` (o jovem não lê a tabela de eventos) |
+| Aplicar passo continua só da dupla | a matriz acima marca coord/supervisor, mas a RPC real (0219) é da dupla e a spec pede "não ampliar papéis" | ampliar `plano_aplicar_passo` para staff |

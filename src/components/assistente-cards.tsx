@@ -874,9 +874,11 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
     <Cartao
       titulo="Para ficar em dia"
       meta={
-        b.data_recuperacao && valida(b.data_recuperacao)
-          ? `em dia ${quandoTexto(b.data_recuperacao, agora)}`
-          : undefined
+        b.estado === "conversa"
+          ? "não fecha antes do encerramento"
+          : b.data_recuperacao && valida(b.data_recuperacao)
+            ? `em dia ${quandoTexto(b.data_recuperacao, agora)}`
+            : undefined
       }
       rodape={<Rodape href={r.encontros(b.dupla_id)}>Ver encontros na ficha</Rodape>}
     >
@@ -931,8 +933,12 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         <p className="mt-1.5 text-xs text-muted-foreground">
           Combinado gravado: {STATUS_PLANO[b.plano.status] ?? b.plano.status}
           {b.plano.versao > 1 ? ` (v${b.plano.versao})` : ""}
-          {b.plano.aprovado_lado
-            ? ` · aceito por ${b.plano.aprovado_lado === "mentor" ? "o mentor" : "o jovem"}`
+          {b.plano.status === "proposto"
+            ? b.plano.aceito_mentor && !b.plano.aceito_mentorado
+              ? " · falta o aceite do jovem"
+              : b.plano.aceito_mentorado && !b.plano.aceito_mentor
+                ? " · falta o aceite do mentor"
+                : " · falta o aceite dos dois"
             : ""}
           .
         </p>

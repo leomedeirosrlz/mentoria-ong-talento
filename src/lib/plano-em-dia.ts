@@ -12,14 +12,18 @@
  *  - `nao_aconteceu` is never skipped: the same row is rescheduled
  *  - a past scheduled row without a registro is a limbo — a step-0
  *    pendência (registrar ou marcar "não aconteceu"), not a date slot
- *  - double weeks ("semana dupla") are the primary compression: ≥2 days
- *    between the pair's encounters, pace bounded by `ritmo`/week
+ *  - double weeks ("semana dupla") are the first compression: ≥2 days
+ *    between the pair's encounters, pace bounded by `ritmo`/week; the top
+ *    of the ladder is 1 per day (REALIZA-513), where only the generic
+ *    2-day floor drops — practice/task spacing still holds
  *  - exige_pratica/exige_tarefa add the guide's spacing between contents;
  *    recesses and the closure event are hard calendar constraints
  *  - "em dia" is a moving target: the projection schedules every official
  *    step still ahead (not just today's backlog) and finds the first date
  *    where covered ≥ due — today's leftovers alone lie, because the
- *    calendar keeps charging while the pair catches up */
+ *    calendar keeps charging while the pair catches up; the steps that
+ *    come due during the recovery join the plan list too, otherwise the
+ *    persisted plan would leave them without an owner */
 
 import {
   eventosDoCronograma,
@@ -27,11 +31,15 @@ import {
   passosDaTrilha,
   toDateStr,
 } from "./ciclo";
+import { feriadoNacional } from "./feriados";
 import type { CicloEvento, Dupla } from "./types";
 import {
   GAP_DIAS_EXIGE,
   GAP_MINIMO_DIAS,
+  GAP_UM_POR_DIA,
   META_PASSOS_PLANO,
+  RITMO_UM_POR_DIA,
+  RITMOS_PLANO,
 } from "./plano-em-dia.data";
 
 export type PendenciaRegistro = {
@@ -60,40 +68,64 @@ export type PassoPlano = {
   precondicao?: string;
   /** Why this date isn't sooner — practice gap, recess, weekly pace… */
   aviso?: string;
+  /** Not due today, but comes due during the recovery: the projection only
+   *  covers it after the official date, so it belongs to the plan. */
+  venceNoCaminho?: boolean;
 };
 
-/** Nível nomeado de flexibilização (FR-011, 0219) — o mais leve que
- *  recupera a dupla antes do encerramento:
+/** Nível nomeado de flexibilização (FR-011, 0219; degraus 3/semana e
+ *  1/dia na 513) — o mais leve que recupera a dupla antes do encerramento:
  *  - ritmo_normal: cabe 1 encontro por semana
  *  - semana_dupla: precisa de 2 por semana (a compressão clássica)
- *  - conversa_coord: nem semana dupla fecha antes do fim — o plano vira
+ *  - semana_tripla: precisa de 3 por semana
+ *  - um_por_dia: só fecha com até 1 por dia
+ *  - conversa_coord: nem 1 por dia fecha antes do fim — o plano vira
  *    conversa estruturada com a coordenação, não promessa de agenda. */
 export type NivelFlexibilizacao =
   | "ritmo_normal"
   | "semana_dupla"
+  | "semana_tripla"
+  | "um_por_dia"
   | "conversa_coord";
 
-export const SUGESTAO_NIVEL: Record<NivelFlexibilizacao, string> = {
-  ritmo_normal:
-    "Um encontro por semana já recupera. Combinem as datas nos horários de sempre.",
-  semana_dupla:
-    "Pra ficar em dia antes do fim do ciclo, precisam de duas semanas com dois encontros. Combinem os dias juntos.",
-  conversa_coord:
-    "No ritmo máximo o plano não fecha antes do encerramento. Vale conversar com a coordenação sobre os caminhos: continuar no ritmo possível, rever o pareamento ou encerrar a trilha DPP seguindo com a trilha de especialista.",
+/** Os três estados que o card, o banner e a Liza contam (REALIZA-513). */
+export type EstadoPlano = "em_dia" | "recuperacao" | "conversa";
+
+const NIVEL_DO_RITMO: Record<number, NivelFlexibilizacao> = {
+  1: "ritmo_normal",
+  2: "semana_dupla",
+  3: "semana_tripla",
+  [RITMO_UM_POR_DIA]: "um_por_dia",
 };
+
+/** O custo do plano em palavras: "1 encontro por semana", "até 3
+ *  encontros por semana", "até 1 encontro por dia". */
+export function rotuloRitmo(ritmo: number): string {
+  if (ritmo >= RITMO_UM_POR_DIA) return "até 1 encontro por dia";
+  return ritmo <= 1
+    ? "1 encontro por semana"
+    : `até ${ritmo} encontros por semana`;
+}
+
+const CAMINHOS_COORD =
+  "Vale conversar com a coordenação sobre os caminhos: seguir no ritmo possível, rever o pareamento ou encerrar a trilha DPP seguindo com a trilha de especialista.";
+
 
 export type PlanoEmDia =
   | { aplicavel: false; motivo: string }
   | {
       aplicavel: true;
-      /** Nothing owed: every due step is done or already scheduled —
-       *  the card hides, the tool still explains. */
+      /** Nothing owed: every due step is done or already scheduled. */
       emDia: boolean;
+      /** em_dia · recuperacao (some pace of the ladder closes before the
+       *  closure) · conversa (not even 1 per day closes). */
+      estado: EstadoPlano;
       /** Limbo/pending-registro steps — resolve before planning ahead. */
       pendenciasRegistro: PendenciaRegistro[];
-      /** Owed + locked steps in encounter order, each with its date. */
+      /** Owed, locked and come-due-on-the-way steps in encounter order,
+       *  each with its date. */
       passos: PassoPlano[];
-      /** Ritmo usado na simulação devolvida (encontros/semana). */
+      /** Ritmo usado na simulação devolvida (encontros/semana; 7 = 1/dia). */
       ritmo: number;
       /** Date the compressed sequence is back on the official calendar —
        *  the first day where everything the calendar already charged has
@@ -101,20 +133,34 @@ export type PlanoEmDia =
        *  come due DURING the recovery, not just today's backlog. Null when
        *  the plan cannot converge before the closure event. */
       dataRecuperacao: string | null;
+      /** The same "em dia" date even when it lands after the closure: what
+       *  the conversa state tells the team. Null when nothing is owed or
+       *  the walk never converges. */
+      dataProjetada: string | null;
       /** Closure-event date the plan was checked against, if the calendar
        *  has one. */
       encerramento: string | null;
+      /** At the returned pace, how many of the encounters still ahead fit
+       *  until the closure. Null without a closure event. */
+      cabemAteEncerramento: { cabem: number; faltam: number } | null;
       /** Nível nomeado de flexibilização (FR-011) — deriva de ritmo ×
        *  atraso × encerramento, não do ritmo pedido na chamada. */
       nivel: NivelFlexibilizacao;
-      /** Ação sugerida pro nível — o que fazer com o plano. */
+      /** O que fazer, com os números do plano (ritmo, data, encerramento). */
       sugestao: string;
       /** Quando o ritmo pedido não fecha antes do encerramento: o ritmo
        *  maior mais leve que fecharia, com a data. Null quando o ritmo
-       *  pedido já converge (ou quando nenhum até 4/semana fecha). */
+       *  pedido já converge (ou quando nem 1 por dia fecha). */
       alternativaRitmo: { ritmo: number; data: string } | null;
+      /** Recesso no caminho: o ritmo mais leve que fecharia se a dupla
+       *  seguisse se encontrando nele, quando isso alivia o plano (ou
+       *  quando sem isso nada fecha). A decisão é da dupla; o plano só
+       *  mostra o efeito. */
+      alternativaRecesso: { ritmo: number; data: string } | null;
       avisos: string[];
     };
+
+export type PlanoAplicavel = Extract<PlanoEmDia, { aplicavel: true }>;
 
 const DIA_MS = 86_400_000;
 
@@ -131,15 +177,18 @@ function segundaDaSemana(iso: string): string {
 export function montarPlanoEmDia(input: {
   dupla: Dupla;
   eventos: CicloEvento[];
-  /** Encounters per calendar week — default 2 ("semana dupla"). The guide's
-   *  own accelerated pace (~2.5) is the derived ceiling, not a hardcoded
-   *  pair whitelist: any adjacent steps may share a week when the spacing
-   *  rules allow. */
+  /** Encounters per calendar week to simulate (7 = 1 per day). Omitted:
+   *  the lightest pace of `RITMOS_PLANO` that closes before the closure,
+   *  i.e. the plan the card shows and proposes; with nothing closing, the
+   *  top of the ladder, so the team sees the best case. */
   ritmo?: number;
   hoje?: Date;
 }): PlanoEmDia {
   const { dupla } = input;
-  const ritmo = Math.max(1, Math.floor(input.ritmo ?? 2));
+  const ritmoPedido =
+    input.ritmo == null
+      ? null
+      : Math.min(RITMO_UM_POR_DIA, Math.max(1, Math.floor(input.ritmo)));
   const hoje = input.hoje ?? new Date();
   const hojeStr = toDateStr(hoje);
 
@@ -184,7 +233,11 @@ export function montarPlanoEmDia(input: {
     data: string;
     oficialData: string;
   }[] = [];
-  const futuros: { numero: number; oficialData: string }[] = [];
+  const futuros: {
+    numero: number;
+    encontroId: string | null;
+    oficialData: string;
+  }[] = [];
 
   for (const no of jornada.nos) {
     const oficialData = no.evento.data;
@@ -233,8 +286,7 @@ export function montarPlanoEmDia(input: {
       });
       continue;
     }
-    // "futuro" sem row: devido quando a data oficial já passou — passos ainda
-    // não vencidos ficam fora do plano (a agenda normal cobre na hora)
+    // "futuro" sem row: devido quando a data oficial já passou
     if (no.estado === "futuro" && oficialData && oficialData <= hojeStr) {
       devidos.push({
         numero: no.numero,
@@ -244,16 +296,21 @@ export function montarPlanoEmDia(input: {
       });
       continue;
     }
-    // passo ainda não vencido: fora da LISTA do plano, mas dentro da
-    // projeção — o cronograma segue cobrando enquanto a dupla recupera e
-    // cada um deles disputa o mesmo ritmo semanal
+    // passo ainda não vencido: entra na projeção — o cronograma segue
+    // cobrando enquanto a dupla recupera e cada um deles disputa o mesmo
+    // ritmo semanal. Só vira item do plano se a caminhada o cobrir depois
+    // da data oficial (vence no caminho)
     if (
       (no.estado === "futuro" ||
         (no.estado === "agendado" && !no.encontro?.data_hora)) &&
       oficialData &&
       oficialData > hojeStr
     ) {
-      futuros.push({ numero: no.numero, oficialData });
+      futuros.push({
+        numero: no.numero,
+        encontroId: no.encontro?.id ?? null,
+        oficialData,
+      });
     }
   }
 
@@ -275,43 +332,47 @@ export function montarPlanoEmDia(input: {
       .sort((a, b) => a.data!.localeCompare(b.data!))
       .at(-1)?.data ?? null;
 
-  const dentroRecesso = (d: string) =>
-    recessos.find((r) => d >= r.ini && d <= r.fim);
-
-  const gapApos = (numero: number | null): number => {
-    if (numero == null) return 0;
-    const exige = META_PASSOS_PLANO[numero]?.exige;
-    return exige ? GAP_DIAS_EXIGE[exige] : GAP_MINIMO_DIAS;
-  };
-
   const passoPorNumero = new Map(passos.map((p) => [p.numero, p]));
 
   // sequence anchors: locked rows interleave with owed steps by número —
   // the walk consumes them in order so a locked step 9 also pins the gap
-  // after it for step 10. `futuros` entra na mesma caminhada: só alimenta
-  // a projeção de convergência (não vira passo do plano)
+  // after it for step 10; future steps join the same walk
   const sequencia = [
     ...devidos.map((d) => ({ ...d, travado: null as null })),
     ...travados.map((t) => ({
       numero: t.numero,
       acao: "travado" as const,
-      encontroId: t.encontroId,
+      encontroId: t.encontroId as string | null,
       oficialData: t.oficialData,
       travado: t,
     })),
     ...futuros.map((f) => ({
       numero: f.numero,
       acao: "futuro" as const,
-      encontroId: null as string | null,
+      encontroId: f.encontroId,
       oficialData: f.oficialData,
       travado: null as null,
     })),
   ].sort((a, b) => a.numero - b.numero);
 
-  // A caminhada de datas é pura e roda mais de uma vez: o nível FR-011
-  // sonda ritmo 1 e 2 pra nomear o mínimo que fecha, e só depois o plano
-  // devolvido usa o ritmo pedido. Estado local por simulação.
-  const rodar = (r: number) => {
+  // A caminhada de datas é pura e roda mais de uma vez: o nível sonda a
+  // escada de ritmos (e, com recesso no caminho, a mesma escada sem ele)
+  // e só depois o plano devolvido usa o ritmo escolhido. Estado local por
+  // simulação.
+  const rodar = (r: number, semRecesso: boolean) => {
+    const recs = semRecesso ? [] : recessos;
+    const dentroRecesso = (d: string) =>
+      recs.find((x) => d >= x.ini && d <= x.fim);
+    // 1 por dia: só o piso genérico da semana dupla cai; prática e tarefa
+    // são conteúdo do guia e seguem valendo
+    const pisoGenerico =
+      r >= RITMO_UM_POR_DIA ? GAP_UM_POR_DIA : GAP_MINIMO_DIAS;
+    const gapApos = (numero: number | null): number => {
+      if (numero == null) return 0;
+      const exige = META_PASSOS_PLANO[numero]?.exige;
+      return exige ? GAP_DIAS_EXIGE[exige] : pisoGenerico;
+    };
+
     // locked rows pin their week before the walk starts — the pace cap
     // counts them, and no planned step may reuse their date
     const ocupados = new Set(travados.map((t) => t.data));
@@ -323,7 +384,8 @@ export function montarPlanoEmDia(input: {
     for (const t of travados) somarSemana(t.data);
 
     const avisos: string[] = [];
-    const passosPlano: PassoPlano[] = [];
+    type Item = PassoPlano & { origem: "devido" | "travado" | "futuro" };
+    const itens: Item[] = [];
 
     // gap floor: a step can't come sooner than every earlier item's
     // required spacing — a running max (item.data + gapApos(item.numero)),
@@ -397,8 +459,9 @@ export function montarPlanoEmDia(input: {
         cobertura.set(passo.numero, dataTravado);
         prevNumero = passo.numero;
         prevData = dataTravado;
-        passosPlano.push({
+        itens.push({
           ...base,
+          origem: "travado",
           acao: "travado",
           encontroId: passo.encontroId,
           data: dataTravado,
@@ -409,7 +472,7 @@ export function montarPlanoEmDia(input: {
       }
 
       // earliest slot: tomorrow's cursor, the running gap floor, recess
-      // bounds, weekly pace and occupied dates — in that order
+      // bounds, national holidays, weekly pace and occupied dates
       let data = cursor;
       if (pisoGap && pisoGap > data) data = pisoGap;
       let motivoAviso: string | undefined;
@@ -425,6 +488,14 @@ export function montarPlanoEmDia(input: {
         if (r2) {
           data = addDias(r2.fim, 1);
           motivoAviso = motivoAviso ?? "A data cairia no recesso do programa, foi empurrada pro fim dele.";
+          continue;
+        }
+        const feriado = feriadoNacional(data);
+        if (feriado) {
+          motivoAviso =
+            motivoAviso ??
+            `${fmtData(data).slice(0, 5)} é feriado (${feriado}), a data foi pro dia seguinte.`;
+          data = addDias(data, 1);
           continue;
         }
         const semana = segundaDaSemana(data);
@@ -448,11 +519,15 @@ export function montarPlanoEmDia(input: {
       prevNumero = passo.numero;
       prevData = data;
       cursor = addDias(data, 1);
-      // passo futuro só alimenta a projeção — não vira item do plano
-      if (passo.acao === "futuro") continue;
-      passosPlano.push({
+      itens.push({
         ...base,
-        acao: passo.acao,
+        origem: passo.acao === "futuro" ? "futuro" : "devido",
+        acao:
+          passo.acao === "futuro"
+            ? passo.encontroId
+              ? "remarcar"
+              : "agendar"
+            : passo.acao,
         encontroId: passo.encontroId,
         data,
         dataOficial: passo.oficialData,
@@ -481,11 +556,27 @@ export function montarPlanoEmDia(input: {
       if (coberto > oficial && coberto > alvo) alvo = coberto;
     }
 
+    // o plano lista o devido, o travado e o futuro que vence no caminho —
+    // até o último passo coberto atrasado; depois dele a agenda normal
+    // cobre cada um na data oficial
+    const ultimoAtrasado = itens.reduce(
+      (m, i) =>
+        i.origem !== "travado" && i.data > i.dataOficial
+          ? Math.max(m, i.numero)
+          : m,
+      0
+    );
+    const passosPlano: PassoPlano[] = itens
+      .filter((i) => i.origem !== "futuro" || i.numero <= ultimoAtrasado)
+      .map(({ origem, ...p }) =>
+        origem === "futuro" ? { ...p, venceNoCaminho: true } : p
+      );
+
     let dataRecuperacao: string | null = null;
     if (convergiu && alvo > hojeStr) {
       if (encerramento && alvo > encerramento) {
         avisos.push(
-          `Nesse ritmo vocês só ficam em dia em ${fmtData(alvo)}, depois do encerramento (${fmtData(encerramento)}). Vale combinar datas mais próximas ou rever o plano com a coordenação.`
+          `Nesse ritmo vocês só ficam em dia em ${fmtData(alvo)}, depois do encerramento (${fmtData(encerramento)}).`
         );
         for (const p of passosPlano) {
           if (p.data > encerramento)
@@ -499,7 +590,19 @@ export function montarPlanoEmDia(input: {
         "Com esse ritmo o plano não fecha: sempre sobra encontro devido no caminho."
       );
     }
-    return { passosPlano, avisos, dataRecuperacao, alvo };
+    const cabemAteEncerramento = encerramento
+      ? {
+          cabem: itens.filter((i) => i.data <= encerramento).length,
+          faltam: itens.length,
+        }
+      : null;
+    return {
+      passosPlano,
+      avisos,
+      dataRecuperacao,
+      dataProjetada: convergiu && alvo > hojeStr ? alvo : null,
+      cabemAteEncerramento,
+    };
   };
 
   const emDia =
@@ -507,58 +610,150 @@ export function montarPlanoEmDia(input: {
     !pendenciasRegistro.length &&
     !travados.some((t) => t.oficialData <= hojeStr);
 
-  // FR-011: sonda do ritmo mais leve ao mais pesado — "em dia" já é
-  // ritmo_normal (nada a flexibilizar); atraso que fecha com 1/semana
-  // não pede semana dupla; atraso que nem 2/semana fecha vira conversa.
-  // A caminhada é pura — cache por ritmo pras sondas não re-fazerem conta.
-  const cacheRodar = new Map<number, ReturnType<typeof rodar>>();
-  const simular = (r: number) => {
-    let s = cacheRodar.get(r);
+  // A caminhada é pura: cache por (ritmo, recesso) pras sondas não
+  // re-fazerem conta
+  const cacheRodar = new Map<string, ReturnType<typeof rodar>>();
+  const simular = (r: number, semRecesso = false) => {
+    const k = `${r}:${semRecesso}`;
+    let s = cacheRodar.get(k);
     if (!s) {
-      s = rodar(r);
-      cacheRodar.set(r, s);
+      s = rodar(r, semRecesso);
+      cacheRodar.set(k, s);
     }
     return s;
   };
-  const nivel: NivelFlexibilizacao = emDia
-    ? "ritmo_normal"
-    : simular(1).dataRecuperacao != null
+  // escada do mais leve ao mais pesado: "em dia" já é ritmo_normal (nada
+  // a flexibilizar); o primeiro degrau que fecha nomeia o nível; nenhum
+  // degrau fechando vira conversa com a coordenação
+  const ritmoQueFecha = (semRecesso: boolean) =>
+    RITMOS_PLANO.find((r) => simular(r, semRecesso).dataRecuperacao != null) ??
+    null;
+  const ritmoLeve = emDia ? null : ritmoQueFecha(false);
+  const estado: EstadoPlano = emDia
+    ? "em_dia"
+    : ritmoLeve != null
+      ? "recuperacao"
+      : "conversa";
+  const nivel: NivelFlexibilizacao =
+    estado === "em_dia"
       ? "ritmo_normal"
-      : simular(2).dataRecuperacao != null
-        ? "semana_dupla"
+      : ritmoLeve != null
+        ? NIVEL_DO_RITMO[ritmoLeve]
         : "conversa_coord";
 
-  const { passosPlano, dataRecuperacao } = simular(ritmo);
-  const avisos = [...simular(ritmo).avisos];
+  const ritmo =
+    ritmoPedido ?? (emDia ? RITMOS_PLANO[0] : (ritmoLeve ?? RITMO_UM_POR_DIA));
+  const s = simular(ritmo);
+  const avisos = [...s.avisos];
 
   // o ritmo pedido não fecha: procura o mais leve ACIMA dele que fecharia
   // antes do encerramento — a sugestão honesta é "acelera", não só "avisa"
   let alternativaRitmo: { ritmo: number; data: string } | null = null;
-  if (!emDia && dataRecuperacao == null) {
-    for (let r = ritmo + 1; r <= 4; r++) {
-      const s = simular(r);
-      if (s.dataRecuperacao != null) {
-        alternativaRitmo = { ritmo: r, data: s.dataRecuperacao };
+  if (!emDia && s.dataRecuperacao == null) {
+    for (const r of RITMOS_PLANO) {
+      if (r <= ritmo) continue;
+      const alt = simular(r);
+      if (alt.dataRecuperacao != null) {
+        alternativaRitmo = { ritmo: r, data: alt.dataRecuperacao };
         avisos.push(
-          `Com ${r} encontros por semana daria pra ficar em dia em ${fmtData(s.dataRecuperacao)}.`
+          `Com ${rotuloRitmo(r)} daria pra ficar em dia em ${fmtData(alt.dataRecuperacao)}.`
         );
         break;
       }
     }
   }
 
+  // recesso que fica entre a dupla e a recuperação: o efeito de ela seguir
+  // se encontrando nele, só quando isso alivia o plano (degrau mais leve)
+  // ou salva o que não fecha. Plano que já fecha antes do recesso não
+  // ganha a sugestão. A decisão é da dupla, no card
+  const dataLeve = ritmoLeve != null ? simular(ritmoLeve).dataRecuperacao : null;
+  let alternativaRecesso: { ritmo: number; data: string } | null = null;
+  const recessoNoCaminho = recessos.some(
+    (r) =>
+      r.fim > hojeStr &&
+      (!encerramento || r.ini <= encerramento) &&
+      (dataLeve == null || dataLeve >= r.ini)
+  );
+  if (!emDia && recessoNoCaminho) {
+    const r = ritmoQueFecha(true);
+    if (r != null && (ritmoLeve == null || r < ritmoLeve)) {
+      alternativaRecesso = { ritmo: r, data: simular(r, true).dataRecuperacao! };
+    }
+  }
+
+  const sugestao =
+    estado === "em_dia"
+      ? "A dupla está em dia: tudo o que o calendário oficial já cobrou está feito ou marcado. Não há recuperação a fazer."
+      : estado === "recuperacao"
+        ? `Com ${rotuloRitmo(ritmoLeve!)}, a dupla fica em dia em ${fmtData(dataLeve!)}${encerramento ? `, antes do encerramento (${fmtData(encerramento)})` : ""}. Combinem as datas juntos.`
+        : `Nem com 1 encontro por dia o plano fecha antes do encerramento${encerramento ? ` (${fmtData(encerramento)})` : ""}. ${CAMINHOS_COORD}`;
+
   return {
     aplicavel: true,
     emDia,
+    estado,
     pendenciasRegistro,
-    passos: passosPlano,
+    passos: s.passosPlano,
     ritmo,
-    dataRecuperacao,
+    dataRecuperacao: s.dataRecuperacao,
+    dataProjetada: s.dataProjetada,
     encerramento,
+    cabemAteEncerramento: s.cabemAteEncerramento,
     nivel,
-    sugestao: SUGESTAO_NIVEL[nivel],
+    sugestao,
     alternativaRitmo,
+    alternativaRecesso,
     avisos,
+  };
+}
+
+/** O escopo que `plano_propor` grava (0219/0224). Só "recuperação
+ *  possível" vira proposta: dupla em dia não tem o que propor e a conversa
+ *  com a coordenação não promete agenda. A janela vai de hoje ao
+ *  encerramento (o limite duro), pra dupla poder trocar uma data sem sair
+ *  do combinado. Mesma régua pra ficha e pra Liza. */
+export type EscopoProposta = {
+  numeros: number[];
+  ritmo: number;
+  nivel: NivelFlexibilizacao;
+  janela: { inicio: string; fim: string };
+  passos: { numero: number; data: string; acao: "agendar" | "remarcar" }[];
+};
+
+export function escopoDaProposta(
+  plano: PlanoAplicavel,
+  hoje: string
+): { escopo: EscopoProposta } | { erro: string } {
+  if (plano.estado === "em_dia")
+    return { erro: "A dupla está em dia, não há plano pra propor." };
+  if (plano.estado === "conversa" || plano.dataRecuperacao == null)
+    return {
+      erro: "Nesse ritmo o plano não fecha antes do encerramento. O caminho é conversar com a coordenação.",
+    };
+  const passos = plano.passos.filter(
+    (p): p is PassoPlano & { acao: "agendar" | "remarcar" } =>
+      p.acao !== "travado"
+  );
+  if (!passos.length)
+    return { erro: "A dupla não tem encontro devido, não há plano pra propor." };
+  const ultima = passos.map((p) => p.data).sort().at(-1)!;
+  const fim =
+    plano.encerramento && plano.encerramento >= ultima
+      ? plano.encerramento
+      : ultima;
+  return {
+    escopo: {
+      numeros: passos.map((p) => p.numero),
+      ritmo: plano.ritmo,
+      nivel: plano.nivel,
+      janela: { inicio: hoje, fim },
+      passos: passos.map((p) => ({
+        numero: p.numero,
+        data: p.data,
+        acao: p.acao,
+      })),
+    },
   };
 }
 

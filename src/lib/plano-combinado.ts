@@ -125,3 +125,191 @@ export function datasDoPasso(
     limite: input.limite ?? 5,
   });
 }
+
+// ---------- o combinado persistido, do jeito que as telas leem (513) ----------
+// Uma régua só pra ficha, agenda do jovem e os banners das duas homes:
+// quem ainda falta aceitar, quantos passos já têm data e qual é o próximo.
+
+/** O que as superfícies precisam do plano persistido: a projeção mínima
+ *  comum ao embed da ficha (DuplaPlano) e ao recorte do jovem
+ *  (jovem_plano). */
+export type PlanoCombinado = {
+  id: string;
+  status: string;
+  versao: number;
+  aprovado_lado: "mentor" | "mentorado" | null;
+  /** Os dois aceites (0224). Ausente = leitura antiga: vale o
+   *  `aprovado_lado`. */
+  aceites?: { mentor: boolean; mentorado: boolean } | null;
+  /** Janela do combinado: no topo no recorte do jovem; na ficha chega
+   *  via escopo.janela (os dois formatos valem). */
+  janela?: { inicio: string; fim: string } | null;
+  escopo?: {
+    ritmo?: number | null;
+    janela?: { inicio: string; fim: string } | null;
+    passos?: { numero: number; data: string; acao?: string }[];
+  } | null;
+  passos?: { numero: number; data_nova: string }[];
+  proposto_em?: string | null;
+  expira_em?: string | null;
+  concluido_em?: string | null;
+};
+
+export const PLANO_ABERTO = ["proposto", "aceito", "ativo"] as const;
+
+export const planoAberto = (status: string) =>
+  (PLANO_ABERTO as readonly string[]).includes(status);
+
+/** Recorte da RPC jovem_plano → a projeção que os cards e os banners
+ *  leem. A RPC já devolve sem semáforo/motivos; aqui só muda a forma
+ *  (ritmo vem texto do jsonb, passos aplicados achatam, os aceites
+ *  viram o par). Parâmetro estrutural: a lib não conhece queries. */
+export function combinadoDoJovem(p: {
+  id: string;
+  status: string;
+  versao: number;
+  ritmo?: string | number | null;
+  janela?: { inicio: string; fim: string } | null;
+  passos?: { numero: number; data: string; acao?: string }[] | null;
+  aprovado_lado: "mentor" | "mentorado" | null;
+  aceito_mentor?: boolean;
+  aceito_mentorado?: boolean;
+  proposto_em?: string;
+  expira_em?: string;
+  concluido_em?: string | null;
+  passos_aplicados?: { numero: number; data_nova: string }[] | null;
+}): PlanoCombinado {
+  return {
+    id: p.id,
+    status: p.status,
+    versao: p.versao,
+    aprovado_lado: p.aprovado_lado,
+    aceites:
+      p.aceito_mentor != null || p.aceito_mentorado != null
+        ? {
+            mentor: p.aceito_mentor === true,
+            mentorado: p.aceito_mentorado === true,
+          }
+        : undefined,
+    janela: p.janela ?? null,
+    escopo: {
+      ritmo: p.ritmo == null ? null : Number(p.ritmo) || null,
+      passos: (p.passos ?? []).map((s) => ({
+        numero: s.numero,
+        data: s.data,
+        acao: s.acao,
+      })),
+    },
+    passos: (p.passos_aplicados ?? []).map((s) => ({
+      numero: s.numero,
+      data_nova: s.data_nova,
+    })),
+    proposto_em: p.proposto_em ?? null,
+    expira_em: p.expira_em ?? null,
+    concluido_em: p.concluido_em ?? null,
+  };
+}
+
+/** Deriva os dois aceites de uma row de dupla_planos (embed da ficha ou
+ *  projeção equivalente): os carimbos da 0224 quando existem; num banco
+ *  sem a migration vale o `aprovado_lado` da 0219. */
+export function aceitesDoPlano(p: {
+  aprovado_lado: "mentor" | "mentorado" | null;
+  aceito_mentor_em?: string | null;
+  aceito_mentorado_em?: string | null;
+}): { mentor: boolean; mentorado: boolean } {
+  return {
+    mentor: p.aceito_mentor_em != null || p.aprovado_lado === "mentor",
+    mentorado: p.aceito_mentorado_em != null || p.aprovado_lado === "mentorado",
+  };
+}
+
+export type PassoCombinado = {
+  numero: number;
+  /** data combinada na proposta */
+  data: string;
+  /** feito = encontro realizado; marcado = a dupla já confirmou a data */
+  estado: "feito" | "marcado" | "pendente";
+  /** ISO da data confirmada (passo aplicado) */
+  marcadoEm: string | null;
+};
+
+export type ResumoCombinado = {
+  aberto: boolean;
+  aceites: { mentor: boolean; mentorado: boolean };
+  /** Quem ainda precisa aceitar. Só existe em `proposto`. */
+  falta: "mentor" | "mentorado" | "os_dois" | null;
+  passos: PassoCombinado[];
+  total: number;
+  /** passos com data confirmada ou já feitos */
+  marcados: number;
+  feitos: number;
+  /** o primeiro passo ainda sem data confirmada */
+  proximo: PassoCombinado | null;
+  /** a última data combinada: é quando a dupla volta pro calendário */
+  ate: string | null;
+};
+
+export function resumoCombinado(
+  plano: PlanoCombinado,
+  /** números de encontro já realizados da dupla (a ficha tem; o jovem
+   *  passa os dele) */
+  realizados: readonly number[] = []
+): ResumoCombinado {
+  const aceites = plano.aceites ?? {
+    mentor: plano.aprovado_lado === "mentor",
+    mentorado: plano.aprovado_lado === "mentorado",
+  };
+  const falta =
+    plano.status !== "proposto"
+      ? null
+      : !aceites.mentor && !aceites.mentorado
+        ? "os_dois"
+        : !aceites.mentor
+          ? "mentor"
+          : !aceites.mentorado
+            ? "mentorado"
+            : null;
+  const aplicados = new Map(
+    (plano.passos ?? []).map((p) => [p.numero, p.data_nova])
+  );
+  const feitosSet = new Set(realizados);
+  const passos: PassoCombinado[] = [...(plano.escopo?.passos ?? [])]
+    .sort((a, b) => a.numero - b.numero)
+    .map((p) => ({
+      numero: p.numero,
+      data: p.data,
+      estado: feitosSet.has(p.numero)
+        ? "feito"
+        : aplicados.has(p.numero)
+          ? "marcado"
+          : "pendente",
+      marcadoEm: aplicados.get(p.numero) ?? null,
+    }));
+  const datas = passos.map((p) => p.data).filter(dataOk).sort();
+  return {
+    aberto: planoAberto(plano.status),
+    aceites,
+    falta,
+    passos,
+    total: passos.length,
+    marcados: passos.filter((p) => p.estado !== "pendente").length,
+    feitos: passos.filter((p) => p.estado === "feito").length,
+    proximo: passos.find((p) => p.estado === "pendente") ?? null,
+    ate: datas.at(-1) ?? null,
+  };
+}
+
+const DOW_CURTO = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"] as const;
+
+/** "2026-11-24" → "ter 24/11": a data curta das linhas do plano (âncora
+ *  de meio-dia UTC, não vira de fuso). */
+export function diaCurto(iso: string): string {
+  if (!dataOk(iso)) return iso;
+  const dow = DOW_CURTO[new Date(`${iso}T12:00:00Z`).getUTCDay()];
+  return `${dow} ${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+}
+
+/** "2026-11-24" → "24/11". */
+export const diaMes = (iso: string) =>
+  dataOk(iso) ? `${iso.slice(8, 10)}/${iso.slice(5, 7)}` : iso;
