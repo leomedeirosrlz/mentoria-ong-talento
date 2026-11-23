@@ -754,7 +754,8 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
       secao.getByText("Seu pedido tá no mural dos especialistas.")
     ).toBeVisible();
 
-    // broadcast avisa o pool de especialistas e segue no radar da coord
+    // broadcast avisa o pool de especialistas; a coord fica fora do sino
+    // (REALIZA-468: sol_coords vazio — o radar dela é o mural, não o sino)
     const notifsPool = await buscarViaServiceRole(
       "notificacoes",
       `select=id&profile_id=eq.${IDS.espProfile}&tipo=eq.demanda_especialista`
@@ -764,7 +765,7 @@ test.describe("pedido de especialista pelo jovem (REALIZA-112 PR2)", () => {
       "notificacoes",
       `select=id&profile_id=eq.${IDS.coordProfile}&tipo=eq.solicitacao_registrada`
     );
-    expect(notifsCoord.length).toBeGreaterThanOrEqual(1);
+    expect(notifsCoord).toHaveLength(0);
   });
 
   test("jovem cancela o próprio pedido — o alvo é avisado", async ({
