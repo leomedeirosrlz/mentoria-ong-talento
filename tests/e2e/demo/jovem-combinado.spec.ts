@@ -32,8 +32,11 @@ test.describe("o combinado — jovem confirma a sugestão", () => {
       c.getByText(/marcado pra \w{3} \d{2}\/\d{2} às \d{2}:\d{2}/)
     ).toBeVisible();
     // passo pendente: sugestão pré-preenchida (a Bia se encontra às 19:00)
+    // — a data é evergreen (HOJE+9), então o recorte é o formato civil
     const linha6 = c.locator("li").filter({ hasText: "6º encontro" });
-    await expect(linha6).toContainText(/sugestão.*01\/12.*19:00/);
+    await expect(linha6).toContainText(
+      /sugestão \w{3} \d{2}\/\d{2} às 19:00/
+    );
     // um toque: Confirma sem digitar nada → a linha vira "Marcado pra…"
     await c.getByRole("button", { name: "Confirmar" }).click();
     await expect(

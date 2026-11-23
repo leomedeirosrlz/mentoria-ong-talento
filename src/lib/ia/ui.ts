@@ -193,7 +193,16 @@ export type UiPlano = {
   pendencias: { numero: number; estado: "limbo" | "pendente_registro" }[];
   avisos: string[];
   /** Nível nomeado de flexibilização (FR-011) + ação sugerida. */
-  nivel: "ritmo_normal" | "semana_dupla" | "conversa_coord" | null;
+  nivel:
+    | "ritmo_normal"
+    | "semana_dupla"
+    | "semana_tripla"
+    | "um_por_dia"
+    | "conversa_coord"
+    | null;
+  /** em_dia · recuperacao · conversa (513): conversa = nem 1 por dia
+   *  fecha antes do encerramento, o card não promete a data. */
+  estado: "em_dia" | "recuperacao" | "conversa" | null;
   sugestao: string | null;
   /** Plano persistido vivo (0219) — quando existe, o card mostra o
    *  combinado (status/versão/quem aprovou) em vez de só a proposta. */
@@ -202,6 +211,9 @@ export type UiPlano = {
     status: string;
     versao: number;
     aprovado_lado: "mentor" | "mentorado" | null;
+    /** os dois aceites (0224) */
+    aceito_mentor: boolean;
+    aceito_mentorado: boolean;
     expira_em: string;
     ritmo: number | null;
   } | null;
@@ -504,8 +516,16 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
         nivel:
           nivel === "ritmo_normal" ||
           nivel === "semana_dupla" ||
+          nivel === "semana_tripla" ||
+          nivel === "um_por_dia" ||
           nivel === "conversa_coord"
             ? nivel
+            : null,
+        estado:
+          d.estado === "em_dia" ||
+          d.estado === "recuperacao" ||
+          d.estado === "conversa"
+            ? d.estado
             : null,
         sugestao: str(d.sugestao),
         plano: plano
@@ -517,6 +537,8 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
                 | "mentor"
                 | "mentorado"
                 | null,
+              aceito_mentor: plano.aceito_mentor === true,
+              aceito_mentorado: plano.aceito_mentorado === true,
               expira_em: String(plano.expira_em ?? ""),
               ritmo: plano.ritmo == null ? null : num(plano.ritmo),
             }

@@ -72,8 +72,10 @@ describe("recesso opcional (462) — planner", () => {
     const p12 = r.passos.find((p) => p.numero === 12)!;
     expect(p12.data >= "2025-12-25").toBe(true);
     expect(p12.data <= "2026-01-04").toBe(true);
-    // dentro da janela por escolha declarada — sem aviso de "empurrada"
-    expect(p12.aviso).toBeUndefined();
+    // dentro da janela por escolha declarada: nada de "empurrada pro fim
+    // do recesso"; só o Natal (25/12) segue fora
+    expect(p12.data).toBe("2025-12-26");
+    expect(p12.aviso).not.toMatch(/recesso/);
   });
 
   it("opt-out de OUTRO evento não abre esta janela", () => {

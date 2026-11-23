@@ -86,6 +86,7 @@ export function NovoChamadoDialog({
   onAberto,
   open: openProp,
   onOpenChange,
+  inicial,
 }: {
   papel: string;
   /** `null` suprime o trigger embutido — o host abre de forma controlada
@@ -98,6 +99,9 @@ export function NovoChamadoDialog({
   /** Modo controlado (opcional) — mesmo padrão do AgendarEncontroDialog. */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Rascunho pré-preenchido (staff): quem abre de um contexto pronto,
+   *  como a conversa do plano "ficar em dia", só revisa e envia. */
+  inicial?: { categoria: ChamadoCategoria; assunto: string; mensagem?: string };
 }) {
   const [openInterno, setOpenInterno] = useState(false);
   const open = openProp ?? openInterno;
@@ -107,10 +111,10 @@ export function NovoChamadoDialog({
   }
   const [pending, start] = useTransition();
   const jovem = papel === "mentorado";
-  const [cat, setCat] = useState<ChamadoCategoria | "">("");
+  const [cat, setCat] = useState<ChamadoCategoria | "">(inicial?.categoria ?? "");
   const [opcaoJovem, setOpcaoJovem] = useState<OpcaoJovem | "">("");
-  const [assunto, setAssunto] = useState("");
-  const [mensagem, setMensagem] = useState("");
+  const [assunto, setAssunto] = useState(inicial?.assunto ?? "");
+  const [mensagem, setMensagem] = useState(inicial?.mensagem ?? "");
   const [dupla, setDupla] = useState(duplaId ?? "");
   const [maisOpcoes, setMaisOpcoes] = useState(false);
   const temDuplas = !jovem && !duplaId && !!duplas && duplas.length > 0;
@@ -138,10 +142,10 @@ export function NovoChamadoDialog({
   const pronto = !!categoriaFinal && assunto.trim().length >= 2;
 
   function limpar() {
-    setCat("");
+    setCat(inicial?.categoria ?? "");
     setOpcaoJovem("");
-    setAssunto("");
-    setMensagem("");
+    setAssunto(inicial?.assunto ?? "");
+    setMensagem(inicial?.mensagem ?? "");
     setMaisOpcoes(false);
     if (!duplaId) setDupla("");
   }

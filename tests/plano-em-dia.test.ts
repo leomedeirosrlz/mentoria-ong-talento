@@ -16,7 +16,7 @@ import type { Dupla } from "@/lib/types";
 // (entre enc.12 e enc.13) e uma formação. O plano sempre agenda a partir de
 // "amanhã" — hoje via parâmetro, nunca o relógio.
 
-const plano = (dupla: Dupla, hoje: string, ritmo?: number) =>
+const plano = (dupla: Dupla, hoje: string, ritmo = 2) =>
   montarPlanoEmDia({ dupla, eventos: CICLO_16, hoje: dt(hoje), ritmo });
 
 describe("montarPlanoEmDia — aplicabilidade", () => {
@@ -53,7 +53,9 @@ describe("montarPlanoEmDia — passos devidos", () => {
     });
     const r = plano(d, "2025-11-03"); // enc.2,3,4 vencidos (5 vence em 11-04)
     if (!r.aplicavel) throw new Error("não aplicável");
-    const agendar = r.passos.filter((p) => p.acao === "agendar");
+    const agendar = r.passos.filter(
+      (p) => p.acao === "agendar" && !p.venceNoCaminho
+    );
     expect(agendar.map((p) => p.numero)).toEqual([2, 3, 4]);
     expect(agendar.every((p) => p.encontroId === null)).toBe(true);
   });
@@ -65,7 +67,14 @@ describe("montarPlanoEmDia — passos devidos", () => {
     });
     const r = plano(d, "2025-11-03"); // deve 2 e 3 (enc.5 vence em 11-04)
     if (!r.aplicavel) throw new Error("não aplicável");
-    expect(r.passos.map((p) => p.numero)).toEqual([2, 3]);
+    expect(
+      r.passos.filter((p) => !p.venceNoCaminho).map((p) => p.numero)
+    ).toEqual([2, 3]);
+    // os oficiais que vencem enquanto a dupla repõe entram como passos do
+    // plano (cobertos depois da data oficial), sempre depois do 4º feito
+    expect(
+      r.passos.filter((p) => p.venceNoCaminho).every((p) => p.numero > 4)
+    ).toBe(true);
   });
 
   it("nao_aconteceu vira 'remarcar' na mesma row, nunca pulado", () => {
@@ -244,7 +253,12 @@ describe("montarPlanoEmDia — datas e cadência", () => {
     });
     const r = plano(d, "2025-10-20");
     if (!r.aplicavel) throw new Error("não aplicável");
-    expect(r.passos.filter((p) => p.acao !== "travado")).toEqual([]);
+    expect(
+      r.passos.filter((p) => p.acao !== "travado" && !p.venceNoCaminho)
+    ).toEqual([]);
+    // nada devido hoje, mas o 3º em diante só cabe depois da data oficial:
+    // viram passos do plano, senão a projeção ficaria sem dono
+    expect(r.passos.find((p) => p.venceNoCaminho)?.numero).toBe(3);
     // 25/10 nem de longe basta: o enc.3 só cabe em 27/10 e a corrente de
     // semanas de prática (4–8, gap de 7d) deixa cada oficial seguinte
     // coberto ~1 dia depois de vencer — a dupla para de dever só em 03/12
@@ -393,17 +407,21 @@ describe("montarPlanoEmDia — projeção honesta: o calendário segue cobrando"
     // cobertos depois: em dia de verdade é 06/04.
     const r = plano(dupla10(), "2025-12-24", 1);
     if (!r.aplicavel) throw new Error("não aplicável");
-    const ultimoPasso = r.passos.at(-1)!;
-    expect(ultimoPasso.numero).toBe(12);
-    expect(ultimoPasso.data).toBe("2026-03-09");
+    const ultimoDevido = r.passos.filter((p) => !p.venceNoCaminho).at(-1)!;
+    expect(ultimoDevido.numero).toBe(12);
+    expect(ultimoDevido.data).toBe("2026-03-09");
+    // os 13–16 vencem no caminho e entram no plano com a data projetada
+    expect(r.passos.at(-1)!.numero).toBe(16);
+    expect(r.passos.at(-1)!.venceNoCaminho).toBe(true);
     expect(r.dataRecuperacao).toBe("2026-04-06");
   });
 
   it.each([
     [1, "2026-04-06"],
     [2, "2026-03-04"],
-    [3, "2026-02-25"],
-    [4, "2026-02-25"],
+    // 3 e 4: o 16º cairia na terça de Carnaval (17/02/2026) e anda um dia
+    [3, "2026-02-26"],
+    [4, "2026-02-26"],
   ])("10 atrasos no ritmo %i/semana: em dia em %s", (ritmo, esperada) => {
     const r = plano(dupla10(), "2025-12-24", ritmo);
     if (!r.aplicavel) throw new Error("não aplicável");
@@ -439,8 +457,11 @@ describe("montarPlanoEmDia — projeção honesta: o calendário segue cobrando"
     });
     const r = plano(d, "2025-12-24", 2);
     if (!r.aplicavel) throw new Error("não aplicável");
-    expect(r.passos.find((p) => p.numero === 12)!.data).toBe("2025-12-25");
-    expect(r.dataRecuperacao).toBe("2025-12-25");
+    // atravessar o recesso não atravessa o Natal: o 12º vai pro dia 26
+    const p12 = r.passos.find((p) => p.numero === 12)!;
+    expect(p12.data).toBe("2025-12-26");
+    expect(p12.aviso).toMatch(/feriado \(Natal\)/);
+    expect(r.dataRecuperacao).toBe("2025-12-26");
   });
 
   it("ritmo que não alcança o calendário antes do encerramento: dataRecuperacao null", () => {

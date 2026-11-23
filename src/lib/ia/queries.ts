@@ -74,7 +74,7 @@ export const IA_SAUDE_SELECT = `
   ),
   encaminhamentos(status, prazo),
   recessos:dupla_recessos(ciclo_evento_id, usa, declarado_em),
-  planos:dupla_planos(id, status, escopo, versao, aprovado_lado, expira_em)
+  planos:dupla_planos(*)
 `;
 
 /** A dupla como a tool a recebe — projeção mínima e allowlisted (sem as
@@ -119,7 +119,7 @@ export type DuplaIa = {
    *  a tool plano_em_dia devolve o estado persistido. */
   planos?: Pick<
     DuplaPlano,
-    "id" | "status" | "escopo" | "versao" | "aprovado_lado" | "expira_em"
+    "id" | "status" | "escopo" | "versao" | "aprovado_lado" | "aceito_mentor_em" | "aceito_mentorado_em" | "expira_em"
   >[];
 };
 

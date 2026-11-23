@@ -1,4 +1,5 @@
 import { PlanoAcordosCard } from "@/components/plano-acordos";
+import { aceitesDoPlano } from "@/lib/plano-combinado";
 import type { SeletorSugestoes } from "@/components/seletor-dia-hora";
 import {
   IntervencaoAcoes,
@@ -61,10 +62,20 @@ export function AcordosCentral({
       {planoVivo && (
         <div className="mt-3">
           <PlanoAcordosCard
-            plano={planoVivo}
+            plano={{ ...planoVivo, aceites: aceitesDoPlano(planoVivo) }}
             duplaId={dupla.id}
             podeResponder={souMentor}
             podeAplicar={souMentor}
+            meuLado={souMentor ? "mentor" : null}
+            nomes={{
+              mentor: (dupla.mentor.nome_social ?? dupla.mentor.nome).split(" ")[0],
+              mentorado: (
+                dupla.mentorado.nome_social ?? dupla.mentorado.nome
+              ).split(" ")[0],
+            }}
+            realizados={dupla.encontros
+              .filter((e) => e.status === "realizado")
+              .map((e) => e.numero)}
             sugestoes={sugestoesPlano}
           />
         </div>

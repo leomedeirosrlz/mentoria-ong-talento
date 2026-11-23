@@ -55,7 +55,9 @@ const planoCom = (
   passos: [],
 });
 
-const linhas = (alvo: ParentNode) => [...alvo.querySelectorAll("li")];
+// os passos moram no <ol> do card — a régua de progresso e os chips de
+// aceite (513) também usam lista, então o recorte é por elemento
+const linhas = (alvo: ParentNode) => [...alvo.querySelectorAll("ol li")];
 
 describe("sugestões dos passos pendentes (507)", () => {
   it("duas datas combinadas no mesmo dia não saem com o mesmo instante", () => {

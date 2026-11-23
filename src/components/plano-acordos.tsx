@@ -10,7 +10,9 @@ import {
 import { diaSemanaDe } from "@/lib/ciclo";
 import {
   datasDoPasso,
+  resumoCombinado,
   sugestaoPasso,
+  type PlanoCombinado,
   type SugestaoPasso,
 } from "@/lib/plano-combinado";
 import {
@@ -24,24 +26,15 @@ import {
   ddmm,
   type SeletorSugestoes,
 } from "@/components/seletor-dia-hora";
+import {
+  AceitesPlano,
+  QuadradosCombinado,
+} from "@/components/plano-em-dia-pecas";
 
 /** O que o card precisa do plano — a projeção mínima comum ao embed da
- *  ficha (DuplaPlano) e ao recorte do jovem (jovem_plano). */
-export type PlanoCombinado = {
-  id: string;
-  status: string;
-  versao: number;
-  aprovado_lado: "mentor" | "mentorado" | null;
-  /** Janela do combinado — no topo no recorte do jovem; na ficha chega
-   *  via escopo.janela (os dois formatos o card aceita). */
-  janela?: { inicio: string; fim: string } | null;
-  escopo?: {
-    ritmo?: number | null;
-    janela?: { inicio: string; fim: string } | null;
-    passos?: { numero: number; data: string; acao?: string }[];
-  } | null;
-  passos?: { numero: number; data_nova: string }[];
-};
+ *  ficha (DuplaPlano) e ao recorte do jovem (jovem_plano), compartilhada
+ *  com os banners das homes em plano-combinado. */
+export type { PlanoCombinado };
 
 /** "ter 01/12 às 19:00" de um par civil — a gramática da linha e do
  *  sucesso ("Marcado pra…"). */
@@ -65,6 +58,9 @@ export function PlanoAcordosCard({
   duplaId,
   podeResponder,
   podeAplicar,
+  meuLado = null,
+  nomes,
+  realizados = [],
   sugestoes,
 }: {
   plano: PlanoCombinado;
@@ -75,6 +71,16 @@ export function PlanoAcordosCard({
   podeResponder: boolean;
   /** aplicar passo = agendar data combinada — mentor e jovem */
   podeAplicar: boolean;
+  /** Lado de quem lê (513): com o aceite bilateral, "falta o seu aceite"
+   *  é diferente de "falta o aceite do outro". Sem ele o card não
+   *  oferece responder (só lê). */
+  meuLado?: "mentor" | "mentorado" | null;
+  /** Primeiros nomes dos dois lados — os chips de aceite nomeiam quem
+   *  já disse sim. */
+  nomes?: { mentor: string; mentorado: string };
+  /** Números já realizados da dupla — a régua separa "feito" de
+   *  "só tem data". */
+  realizados?: readonly number[];
   /** Pacote do motor (perfil/grade/ocupados) — alimenta a sugestão da
    *  linha e os chips do "Outra data". Sem ele, date+time de step 900. */
   sugestoes?: SeletorSugestoes | null;
@@ -97,14 +103,24 @@ export function PlanoAcordosCard({
   const [marcados, setMarcados] = useState<
     Record<number, { data: string; hora: string }>
   >({});
-  const aberto = ["proposto", "aceito", "ativo"].includes(plano.status);
+  const resumo = resumoCombinado(plano, realizados);
+  const aberto = resumo.aberto;
   const aplicados = new Map(
     (plano.passos ?? []).map((p) => [p.numero, p])
   );
   const janela = plano.janela ?? plano.escopo?.janela ?? null;
   const hoje = sugestoes?.hoje ?? partesSP(new Date())?.data ?? "";
+  // aceite bilateral (513): "falta eu" abre os botões; "falta o outro"
+  // é leitura — a RPC recusa responder de novo e a tela não oferece
+  const faltaEu =
+    meuLado != null && plano.status === "proposto" && !resumo.aceites[meuLado];
   const statusTexto: Record<string, string> = {
-    proposto: "Proposto, esperando aceitar",
+    proposto:
+      resumo.falta === "os_dois"
+        ? "Proposto, esperando os dois aceitarem"
+        : resumo.falta === "mentor" || resumo.falta === "mentorado"
+          ? `Proposto, falta o aceite ${resumo.falta === "mentor" ? "do mentor" : "do jovem"}`
+          : "Proposto, esperando aceitar",
     aceito: "Aceito, combinando as datas",
     ativo: "Em andamento",
     concluido: "Concluído",
@@ -220,6 +236,18 @@ export function PlanoAcordosCard({
           </span>
         )}
       </div>
+
+      {plano.status === "proposto" && (
+        <AceitesPlano
+          resumo={resumo}
+          mentor={nomes?.mentor ?? "Mentor"}
+          jovem={nomes?.mentorado ?? "Jovem"}
+        />
+      )}
+
+      {aberto && resumo.total > 0 && (
+        <QuadradosCombinado resumo={resumo} />
+      )}
 
       <ol className="space-y-2">
         {(plano.escopo?.passos ?? []).map((p) => {
@@ -361,7 +389,7 @@ export function PlanoAcordosCard({
 
       {erro && <p className="text-sm text-destructive">{erro}</p>}
 
-      {aberto && podeResponder && plano.status === "proposto" && (
+      {aberto && podeResponder && faltaEu && (
         <div className="flex flex-wrap gap-2 pt-1">
           <Button size="sm" disabled={pendente} onClick={() => responder("aceitar")}>
             <Check aria-hidden />
@@ -378,10 +406,26 @@ export function PlanoAcordosCard({
           </Button>
         </div>
       )}
+      {aberto &&
+        podeResponder &&
+        plano.status === "proposto" &&
+        meuLado != null &&
+        !faltaEu && (
+          <p className="text-xs text-muted-foreground">
+            Você já aceitou. O plano começa a valer quando{" "}
+            {resumo.falta === "mentor"
+              ? nomes?.mentor ?? "o mentor"
+              : nomes?.mentorado ?? "o jovem"}{" "}
+            aceitar também.
+          </p>
+        )}
       {aberto && podeResponder && plano.status !== "proposto" && (
         <p className="text-xs text-muted-foreground">
-          Aceito por{" "}
-          {plano.aprovado_lado === "mentorado" ? "você" : "seu mentor"}.
+          {resumo.aceites.mentor && resumo.aceites.mentorado
+            ? "Os dois lados aceitaram."
+            : `Aceito por ${
+                plano.aprovado_lado === "mentorado" ? "você" : "seu mentor"
+              }.`}
           Se algo mudou, ainda dá pra contestar antes do próximo encontro.
         </p>
       )}
