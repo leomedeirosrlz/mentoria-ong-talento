@@ -745,5 +745,3 @@ export default async function JovemAgenda() {
     </div>
   );
 }
-
-
