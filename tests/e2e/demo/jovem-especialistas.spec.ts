@@ -67,6 +67,56 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
     await expect(
       sugestoes.getByRole("button", { name: "Agora não" })
     ).toBeVisible();
+
+    // REALIZA-515 — a prévia do indicado: foto, cargo, áreas e
+    // experiência. O bloco inteiro leva ao perfil público — decidir sem
+    // ver quem é era apostar às cegas
+    const preview = sugestoes.getByRole("link", {
+      name: "Ver perfil de Marcos Vinícius",
+    });
+    await expect(preview).toBeVisible();
+    await expect(
+      sugestoes.getByText("Engenheiro de dados · Consultoria")
+    ).toBeVisible();
+    await expect(
+      sugestoes.getByText("tecnologia", { exact: true })
+    ).toBeVisible();
+    await expect(
+      sugestoes.getByText(/Professor de curso técnico aos sábados/)
+    ).toBeVisible();
+    // o recorte público nunca vaza documento nem contato
+    await expect(sugestoes.getByText(/marcos\.vinicius@/)).toHaveCount(0);
+    await expect(sugestoes.getByText(/5511987654012/)).toHaveCount(0);
+
+    // a prévia abre o perfil completo e dá pra voltar ao aceite
+    await preview.click();
+    await page.waitForURL("**/jovem/pessoas/*");
+    await expect(
+      page.getByRole("heading", { name: "Marcos Vinícius" })
+    ).toBeVisible();
+    await page
+      .getByRole("link", { name: /catálogo de especialistas/ })
+      .click();
+    await page.waitForURL("**/jovem/especialistas");
+
+    // a mesma prévia dentro do dialog de confirmação — e "qualquer" não
+    // inventa perfil: diz que a coordenação conecta
+    await sugestoes.getByRole("button", { name: "Quero seguir" }).click();
+    const dialog = page.getByRole("dialog");
+    await expect(
+      dialog.getByRole("link", { name: "Ver perfil de Marcos Vinícius" })
+    ).toBeVisible();
+    await expect(
+      dialog.getByText(/Professor de curso técnico aos sábados/)
+    ).toBeVisible();
+    await dialog.locator("#sug-esp").click();
+    await page
+      .getByRole("option", { name: /Qualquer especialista/ })
+      .click();
+    await expect(
+      dialog.getByText(/a coordenação conecta você/)
+    ).toBeVisible();
+    await page.keyboard.press("Escape");
   });
 
   test("a página abre direto no trabalho — sem bloco explicativo", async ({
