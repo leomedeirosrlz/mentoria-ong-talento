@@ -146,6 +146,7 @@ import { turmaLonga } from "@/lib/turma";
 import { parseAba } from "./ficha-abas";
 import { FichaAbas } from "./ficha-abas-tabs";
 import { AbaPorHash } from "./aba-por-hash";
+import { RemanejoFlash } from "./remanejo-flash";
 import { EncontroRow } from "./encontro-row";
 import {
   coberturaDaSessao,
@@ -260,10 +261,10 @@ export default async function DuplaPage({
   searchParams,
 }: {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ aba?: string }>;
+  searchParams: Promise<{ aba?: string; remanejada?: string }>;
 }) {
   const { id } = await params;
-  const { aba: abaParam } = await searchParams;
+  const { aba: abaParam, remanejada } = await searchParams;
   const aba = parseAba(abaParam);
   const [dupla, eventos, me, materiais, anexosPorRegistro, encerramento, instrumentos, terceiros, pdm] =
     await Promise.all([
@@ -1663,6 +1664,10 @@ export default async function DuplaPage({
             própria agora); vindo de dentro do app retorna à origem real */}
         <VoltarLink fallback="/duplas" />
       </div>
+
+      {/* flash one-shot do remanejo (?remanejada=1): a confirmação que o
+          redirect server-side não deixa o dialog dar */}
+      {remanejada === "1" && <RemanejoFlash origemId={origem?.id ?? null} />}
 
       {/* cabeçalho: identidade da dupla, estado com o motivo e uma ação */}
       <header className="relative overflow-hidden rounded-xl bg-card px-4 py-4 shadow-[var(--shadow-border)] sm:px-5">

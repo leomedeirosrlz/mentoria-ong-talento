@@ -211,8 +211,8 @@ test.describe("coordenação — fluxos operacionais", () => {
     // confirmar
     await expect(dialog.getByText(/será encerrada/)).toBeVisible();
     // clique pré-hidratação é no-op silencioso — repete até o botão entrar
-    // em pending ("Remanejando…") ou a página já ter virado (a action
-    // também fecha o dialog no sucesso). Rematch é idempotente do ponto de
+    // em pending ("Remanejando…") ou a página já ter virado (o redirect da
+    // action desmonta o dialog no sucesso). Rematch é idempotente do ponto de
     // vista do spec: se o 1º clique submeteu, o botão desabilita e um 2º
     // nem dispara; se errou, o alert embaixo explica em vez de estourar
     // cego no waitForURL.
@@ -228,14 +228,17 @@ test.describe("coordenação — fluxos operacionais", () => {
         !page.url().includes(`/duplas/${DUPLA2_ID}`)
     );
 
-    // a action empurra pra ficha da dupla nova (URL ≠ da antiga). Se a RPC
+    // a action empurra pra ficha da dupla nova (URL ≠ da antiga) com o
+    // flash do remanejo (506) — o predicado lê a URL no instante da
+    // navegação, antes do replaceState que limpa o parâmetro. Se a RPC
     // recusou, o alert inline do dialog é a resposta — a corrida falha com
     // a mensagem real em vez de um timeout de navegação que não diz nada.
     const alvo = page.waitForURL(
       (url) =>
         /^\/duplas\/[0-9a-f-]{36}$/.test(url.pathname) &&
-        !url.pathname.includes(DUPLA2_ID),
-      // action pesada (RPC + sinos + revalidate) + router.push em preview frio
+        !url.pathname.includes(DUPLA2_ID) &&
+        url.searchParams.get("remanejada") === "1",
+      // action pesada (RPC + sinos + revalidate) + redirect em preview frio
       { timeout: 45_000 }
     );
     const recusa = dialog
@@ -254,6 +257,20 @@ test.describe("coordenação — fluxos operacionais", () => {
       alvo.catch(() => {});
       recusa.catch(() => {});
     }
+    // 506: a confirmação do remanejo é o banner da ficha sucessora — o
+    // NEXT_REDIRECT corta o cliente do dialog antes de qualquer toast
+    const flash = page.getByRole("status").filter({ hasText: "Dupla remanejada" });
+    await expect(flash).toBeVisible({ timeout: 15_000 });
+    await expect(
+      flash.getByRole("link", { name: "Ver a ficha de origem" })
+    ).toHaveAttribute("href", `/duplas/${DUPLA2_ID}`);
+    // one-shot: o parâmetro sai da URL via replaceState e um refresh não
+    // repete o aviso
+    await expect(async () => {
+      expect(page.url()).not.toContain("remanejada=");
+    }).toPass({ timeout: 10_000 });
+    await page.reload();
+    await expect(page.getByText("Dupla remanejada")).toHaveCount(0);
     await expect(
       page.getByRole("heading", { name: /Mentorada E2E Livre/ })
     ).toBeVisible({ timeout: 15_000 });
