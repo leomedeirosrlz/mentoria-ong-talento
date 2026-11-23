@@ -42,7 +42,7 @@
 - **Teste independente:** coordenação e auxiliar (incluindo escopo de turma) com planos nos três motivos.
 - **Cenários:**
   1. **Dado** planos propostos a caminho de expirar, ativos com passo vencido sem data, ou contestados **quando** a home abre **então** a lista mostra dupla + **o motivo antes do risco** ("plano expira em 3 dias", "passo 5 sem data", "contestado ontem") + link pra ficha.
-  2. **Dado** o auxiliar (incluindo escopo de turma) **quando** a home abre **então** ele vê a mesma lista no escopo dele e, por dupla, o caminho de ação — propor/retomar o plano pelo mesmo fluxo da ficha (`supervisiona_dupla` no servidor). Auxiliar não é gestor: a superfície dele é ação, não mini-dashboard.
+  2. **Dado** o auxiliar (incluindo escopo de turma) **quando** a home abre **então** ele vê a mesma lista no escopo dele e, por dupla, o caminho de ação — propor/retomar o plano pelo mesmo fluxo da ficha (`supervisiona_dupla` no servidor) e registrar a decisão de recesso; aceitar/contestar é só da dupla. Auxiliar não é gestor: a superfície dele é ação, não mini-dashboard.
   3. **Dado** nenhum plano pedindo atenção **quando** a home abre **então** a seção some ou diz "nada pedindo você" — sem card vazio ocupando a dobra.
 
 ## Casos de borda
@@ -63,7 +63,7 @@
 - **FR-004:** a derivação do resumo é pura e compartilhada (estende `resumoCombinado`/`combinadoDoJovem` — `resumoPlanoJovem` é variável da página, não função) e a máquina de aceite é a união discriminada da spec 017 — nada de conta divergente por superfície.
 - **FR-005:** "pedindo atenção" é régua explícita e testável: proposto perto de `expira_em`, ativo com passo pendente vencido, contestado recente, decisão do plano/recesso pendente — definida no módulo puro com os mesmos dados do plano; motivo antes do rótulo de risco.
 - **FR-006:** o roteiro/materiais do passo lê o roteiro vigente (guia semanal quando existir — spec 020 — senão o roteiro oficial do corpus) + materiais da biblioteca do `encontro_num`; disclosure dentro da mesma seção, não dropdown de navegação.
-- **FR-007:** notificação do plano proposto/ativo carrega copy "{Fulano} combinou um plano pra vocês" com destino direto ao combinado — nome e papel derivados de `proposto_por`/`proposta_via` (a `jovem_plano` devolve os dois), nunca "seu mentor" quando quem combinou foi o próprio jovem, o auxiliar ou a coordenação; nunca "vocês combinaram".
+- **FR-007:** notificação do plano proposto/ativo carrega copy "{Fulano} combinou um plano pra vocês" com destino direto ao combinado — nome e papel derivados de `proposto_por`/`proposto_via` (a `jovem_plano` devolve os dois), nunca "seu mentor" quando quem combinou foi o próprio jovem, o auxiliar ou a coordenação; nunca "vocês combinaram".
 - **FR-008:** copy em pt-BR sem jargão; status sempre em texto (pill com rótulo, nunca só cor).
 
 ## Requisitos não funcionais
@@ -84,7 +84,7 @@
 
 - **SC-001:** unit do resumo por papel (jovem/mentor/staff), da régua "pedindo atenção" com datas fixas e da máquina de aceite nos 5 estados.
 - **SC-002:** e2e app: jovem abre home → vínculo "Nº encontro do plano que {Fulano} combinou" + "Ver o combinado"/"Não serve pra mim" no mesmo lugar; mentor abre home → card da dupla com a semana dentro (sem `PlanoBanner` nem segundo banner); coordenação e auxiliar veem "O que precisa de você" com o motivo certo.
-- **SC-003:** e2e da notificação: plano combinado pelo mentor → jovem recebe "{Fulano} combinou" (nome derivado de `proposto_por`/`proposta_via`) → abre → contesta/recusa após o 1º encontro do escopo.
+- **SC-003:** e2e da notificação: plano combinado pelo mentor → jovem recebe "{Fulano} combinou" (nome derivado de `proposto_por`/`proposto_via`) → abre → contesta/recusa após o 1º encontro do escopo.
 - **SC-004:** prints 1440×900 e 390×844 dos três recortes.
 - **SC-005:** paridade demo dos estados.
 
