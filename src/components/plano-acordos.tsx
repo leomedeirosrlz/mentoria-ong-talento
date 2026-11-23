@@ -8,8 +8,15 @@ import {
   responderPlano,
 } from "@/lib/actions-plano";
 import { diaSemanaDe } from "@/lib/ciclo";
-import { datasDoPasso, sugestaoPasso } from "@/lib/plano-combinado";
-import { partesSP } from "@/lib/sugestoes-encontro";
+import {
+  datasDoPasso,
+  sugestaoPasso,
+  type SugestaoPasso,
+} from "@/lib/plano-combinado";
+import {
+  partesSP,
+  type OcupadoRotulado,
+} from "@/lib/sugestoes-encontro";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -135,21 +142,59 @@ export function PlanoAcordosCard({
     });
   };
 
-  const sugestaoDo = (dataPasso: string) =>
-    sugestaoPasso({
-      dataPasso,
-      hoje,
-      janela,
-      perfil: sugestoes?.perfil,
-      disponibilidade: sugestoes?.disponibilidade,
-      ocupados: sugestoes?.ocupados.map((o) => o.inicio),
-      duracaoMin: sugestoes?.duracaoMin,
-    });
+  // instantes já comprometidos: ocupados do motor + passos aplicados +
+  // os confirmados nesta sessão (que o refresh ainda não devolveu) — um
+  // passo pendente nunca reoferece um instante desses (507)
+  const ocupadosBase = [
+    ...(sugestoes?.ocupados.map((o) => o.inicio) ?? []),
+    ...(plano.passos ?? []).map((p) => p.data_nova),
+    ...Object.values(marcados).map((m) => `${m.data}T${m.hora}:00-03:00`),
+  ];
+  // dedup entre pendentes: percorridos na ordem da lista, cada sugestão
+  // entregue entra como ocupada pro seguinte — dois passos com a mesma
+  // data combinada (o clamp os iguala no min) não propõem o mesmo instante
+  const sugs = new Map<number, SugestaoPasso | null>();
+  {
+    const sugeridos: string[] = [];
+    for (const p of plano.escopo?.passos ?? []) {
+      if (aplicados.has(p.numero) || marcados[p.numero]) {
+        sugs.set(p.numero, null);
+        continue;
+      }
+      const sug = sugestaoPasso({
+        dataPasso: p.data,
+        hoje,
+        janela,
+        perfil: sugestoes?.perfil,
+        disponibilidade: sugestoes?.disponibilidade,
+        ocupados: [...ocupadosBase, ...sugeridos],
+        duracaoMin: sugestoes?.duracaoMin,
+      });
+      sugs.set(p.numero, sug);
+      if (sug) sugeridos.push(`${sug.data}T${sug.hora}:00-03:00`);
+    }
+  }
+  // os mesmos instantes pro choque do seletor, já com o rótulo do chip
+  const ocupadosRotulados: OcupadoRotulado[] = [
+    ...(sugestoes?.ocupados ?? []),
+    ...(plano.passos ?? []).map((p) => ({
+      inicio: p.data_nova,
+      rotulo: `${p.numero}º encontro`,
+      rotuloArtigo: `o ${p.numero}º encontro`,
+    })),
+    ...Object.entries(marcados).map(([numero, m]) => ({
+      inicio: `${m.data}T${m.hora}:00-03:00`,
+      rotulo: `${numero}º encontro`,
+      rotuloArtigo: `o ${numero}º encontro`,
+    })),
+  ];
 
   const passoSeletor = seletor
     ? (plano.escopo?.passos ?? []).find((p) => p.numero === seletor.numero)
     : null;
-  const sugSeletor = passoSeletor ? sugestaoDo(passoSeletor.data) : null;
+  const sugSeletor = passoSeletor
+    ? (sugs.get(passoSeletor.numero) ?? null)
+    : null;
 
   return (
     <div className="space-y-3">
@@ -180,7 +225,7 @@ export function PlanoAcordosCard({
         {(plano.escopo?.passos ?? []).map((p) => {
           const aplicado = aplicados.get(p.numero);
           const confirmado = marcados[p.numero];
-          const sug = sugestaoDo(p.data);
+          const sug = sugs.get(p.numero) ?? null;
           return (
             <li key={p.numero} className="text-sm">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
@@ -365,9 +410,10 @@ export function PlanoAcordosCard({
               ritmo: plano.escopo?.ritmo,
               perfil: sugestoes.perfil,
               disponibilidade: sugestoes.disponibilidade,
-              ocupados: sugestoes.ocupados.map((o) => o.inicio),
+              ocupados: ocupadosBase,
               duracaoMin: sugestoes.duracaoMin,
             }),
+            ocupados: ocupadosRotulados,
             janela,
           }}
           pending={pendente}

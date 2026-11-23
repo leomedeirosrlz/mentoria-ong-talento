@@ -28,6 +28,16 @@ const DATA_RE = /^\d{4}-\d{2}-\d{2}$/;
 const dataOk = (s: string | null | undefined): s is string =>
   typeof s === "string" && DATA_RE.test(s);
 
+const DIA_MS = 86_400_000;
+/** +N dias civis pela âncora de meio-dia UTC — nunca muda por fuso. */
+const addDia = (iso: string, dias = 1): string =>
+  new Date(new Date(`${iso}T12:00:00Z`).getTime() + dias * DIA_MS)
+    .toISOString()
+    .slice(0, 10);
+/** Teto da varredura por horário livre quando não há janela — a mesma
+ *  régua do motor (120 dias bastam pra qualquer lista de ocupados real). */
+const HORIZONTE_SEM_JANELA = 120;
+
 /** Sem histórico carregado (ficha staff sem sugestões, por exemplo) —
  *  o motor cai no padrão: dias úteis, 19:00/19:30/20:00. */
 const perfilVazio = (): PerfilEncontros => ({
@@ -68,23 +78,32 @@ export function sugestaoPasso(input: InputPasso): SugestaoPasso | null {
   const max = jan ? jan.fim : null;
   if (max && min > max) return null;
 
-  const data = !dataOk(input.dataPasso)
+  const perfil = input.perfil ?? perfilVazio();
+  // dia cheio não pode prometer o instante que os ocupados desmentem: a
+  // varredura anda até achar um dia com horário livre — o que dois passos
+  // clampados no mesmo `min` precisam pra não sugerir o mesmo instante
+  let data = !dataOk(input.dataPasso)
     ? min
     : input.dataPasso < min
       ? min
       : max && input.dataPasso > max
         ? max
         : input.dataPasso;
-
-  const livre = sugerirHorarios({
-    data,
-    perfil: input.perfil ?? perfilVazio(),
-    disponibilidade: input.disponibilidade,
-    ocupados: input.ocupados,
-    duracaoMin: input.duracaoMin,
-  }).find((h) => !h.conflito);
-
-  return { data, hora: livre?.hora ?? "19:00", min, max };
+  const teto = max ?? addDia(data, HORIZONTE_SEM_JANELA);
+  while (data <= teto) {
+    const livre = sugerirHorarios({
+      data,
+      perfil,
+      disponibilidade: input.disponibilidade,
+      ocupados: input.ocupados,
+      duracaoMin: input.duracaoMin,
+    }).find((h) => !h.conflito);
+    if (livre) return { data, hora: livre.hora, min, max };
+    data = addDia(data);
+  }
+  // janela inteira sem horário livre — o null vale "não promete gesto",
+  // como a janela fechada
+  return null;
 }
 
 /** Os chips de dia do "Outra data" de um passo — a data combinada dele

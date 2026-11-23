@@ -102,6 +102,40 @@ describe("sugestaoPasso", () => {
     expect(s?.data).toBe("2026-11-21");
     expect(s?.hora).not.toBe("19:00");
   });
+
+  // 507 — dois passos clampados no mesmo dia não podem sair com o mesmo
+  // instante: sem horário livre o dia anda até achar um
+  it("dia sem horário livre anda pro seguinte com vaga", () => {
+    const ocupados = ["19:00", "19:30", "20:00"].map(
+      (h) => `2026-12-01T${h}:00-03:00`
+    );
+    const s = sugestaoPasso({
+      dataPasso: "2026-12-01",
+      hoje: HOJE,
+      janela: JANELA,
+      ocupados,
+    });
+    expect(s?.data).toBe("2026-12-02");
+    expect(s?.hora).toBe("19:00");
+  });
+
+  it("janela inteira ocupada devolve null — não promete instante que choca", () => {
+    const ocupados: string[] = [];
+    // cobre os dois pools de candidatos (semana 19-20h, fds 09-11h) —
+    // cada um num intervalo de 60 min pra frente do início
+    const horas = ["09:00", "10:00", "11:00", "19:00", "19:30", "20:00"];
+    for (let d = 1; d <= 19; d++) {
+      const dia = `2026-12-${String(d).padStart(2, "0")}`;
+      for (const h of horas) ocupados.push(`${dia}T${h}:00-03:00`);
+    }
+    const s = sugestaoPasso({
+      dataPasso: "2026-12-01",
+      hoje: HOJE,
+      janela: JANELA,
+      ocupados,
+    });
+    expect(s).toBeNull();
+  });
 });
 
 describe("datasDoPasso", () => {
