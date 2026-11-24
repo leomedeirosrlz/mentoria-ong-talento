@@ -8,6 +8,7 @@ import {
   demoJovemAssinaturas,
   demoJovemColegas,
   demoJovemContatos,
+  demoJovemDiretorio,
   demoJovemDuplas,
   demoJovemEncaminhamentos,
   demoJovemEncontros,
@@ -30,6 +31,8 @@ import type {
   EncontroStatus,
   JovemAssinatura,
   JovemContato,
+  JovemDiretorioEntry,
+  JovemDiretorioTipo,
   JovemDupla,
   JovemEncaminhamento,
   JovemEspecialista,
@@ -47,6 +50,9 @@ import type {
 // exists(jovem_duplas) da 0068), materiais/comunicados audiencia='todos' e
 // notificacoes (self). O ramo demo delega às demoJovem* — que projetam as
 // mesmas colunas das views sobre o dataset em memória.
+// 0239 estende o contrato: `jovem_diretorio` (o programa inteiro sem
+// contato) e `mentorados_turma`/`jovem_contatos`/`jovem_especialistas`
+// seguem as fontes da rede — "Sua rede" é a faceta marcada do diretório.
 
 /** Ficha do próprio jovem (view jovem_perfil) — null quando o vínculo
  *  profiles↔mentorados ainda não foi feito pela coordenação. */
@@ -116,24 +122,71 @@ export const getJovemColegas = cache(async (): Promise<ColegaTurma[]> => {
   );
 });
 
-/** A pessoa por trás de um card de /jovem/pessoas — resolvida SÓ nas
- *  três fontes já seguras (contatos adultos → colegas de turma → catálogo
- *  de especialistas). id de fora desses conjuntos cai no mesmo null de
- *  quem não existe: a página 404 não vaza nem a existência do profile. */
+/** O diretório do programa pro jovem (view `jovem_diretorio`, 0239 —
+ *  definer, escopada a my_role()='mentorado'): adultos ativos com papel,
+ *  todos os jovens com conta (exceto o próprio) e o catálogo de
+ *  especialistas, dedup por id com a linha de catálogo vencendo. Sem
+ *  contato direto — whatsapp/e-mail continuam saindo da jovem_contatos.
+ *  A página repara o minha_rede pela rede resolvida (lib/jovem-diretorio). */
+export const getJovemDiretorio = cache(
+  async (): Promise<JovemDiretorioEntry[]> => {
+    const demo = await demoRole();
+    if (demo) return demoJovemDiretorio(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("jovem_diretorio")
+      .select("*");
+    if (error) {
+      console.error("getJovemDiretorio:", error);
+      return [];
+    }
+    type Row = Omit<JovemDiretorioEntry, "id" | "nome" | "tipo" | "minha_rede" | "minha_turma"> & {
+      id: string | null;
+      nome: string | null;
+      tipo: string | null;
+      minha_rede: boolean | null;
+      minha_turma: boolean | null;
+    };
+    // pt-BR no app — a collation do banco ordena acentos depois de Z
+    return ((data ?? []) as Row[])
+      .filter(
+        (e): e is Row & { id: string; nome: string } =>
+          e.id != null && e.nome != null
+      )
+      .map((e) => ({
+        ...e,
+        tipo: (e.tipo ?? "adulto") as JovemDiretorioTipo,
+        minha_rede: e.minha_rede ?? false,
+        minha_turma: e.minha_turma ?? false,
+      }))
+      .sort((a, b) =>
+        comparaNome(a.nome_social || a.nome, b.nome_social || b.nome)
+      );
+  }
+);
+
+/** A pessoa por trás de um card de /jovem/pessoas — primeiro a existência
+ *  no diretório (o recorte seguro da 0239; fora dele cai no mesmo null de
+ *  quem não existe e a página 404 não vaza nem a existência do profile),
+ *  depois o detalhe pela fonte mais rica: contato de dupla/coord → colega
+ *  de turma → catálogo de especialista → projeção pública do diretório. */
 export const getJovemPessoa = cache(
   async (id: string): Promise<JovemPessoa | null> => {
-    const [contatos, colegas, especialistas] = await Promise.all([
+    const [diretorio, contatos, colegas, especialistas] = await Promise.all([
+      getJovemDiretorio(),
       getJovemContatos(),
       getJovemColegas(),
       getJovemEspecialistas(),
     ]);
+    const entrada = diretorio.find((e) => e.id === id);
+    if (!entrada) return null;
     const contato = contatos.find((c) => c.id === id);
     if (contato) return { tipo: "contato", contato };
     const colega = colegas.find((c) => c.id === id);
     if (colega) return { tipo: "colega", colega };
     const especialista = especialistas.find((e) => e.id === id);
     if (especialista) return { tipo: "especialista", especialista };
-    return null;
+    return { tipo: "diretorio", entrada };
   }
 );
 

@@ -41,6 +41,7 @@ import type {
   GradeJanela,
   JovemAssinatura,
   JovemContato,
+  JovemDiretorioEntry,
   JovemDupla,
   JovemEncaminhamento,
   JovemEspecialista,
@@ -1555,24 +1556,22 @@ export function demoEspecialistas(): {
     .sort(porNome);
 }
 
-/** O catálogo da view jovem_especialistas (0075) — os especialistas ativos,
- *  projetados no que o jovem pode ver (nome/social/avatar/áreas, sem contato).
- *  Só faz sentido pro papel mentorado. Filtra por profile_papeis (o híbrido
- *  aparece); a decisão D9 do guia tira o próprio DPP do jovem do catálogo. */
-export function demoJovemEspecialistas(role: AppRole): JovemEspecialista[] {
-  if (role !== "mentorado") return [];
-  const data = getDemoData();
-  const m = mentoradoDaPersona(data, role);
-  const meuDppId = data.duplas.find(
-    (d) =>
-      d.mentorado?.id === m?.id && d.trilha === "dpp" && d.status === "ativa"
-  )?.mentor?.id;
+/** A projeção rica de especialista compartilhada pelas três views de
+ *  catálogo (jovem_especialistas 0075/0086 e especialistas_catalogo 0239):
+ *  os ativos com papel mentor_especialista, projetados no que a pessoa
+ *  pode ver (nome/social/avatar/áreas/currículo/janela por período,
+ *  sem contato). `excludeId` é o recorte específico do jovem — a decisão
+ *  D9 do guia tira o próprio DPP dele do catálogo. */
+function catalogoEspRows(
+  data: DemoData,
+  excludeId?: string | null
+): JovemEspecialista[] {
   return data.profiles
     .filter(
       (p) =>
         temPapel(data, p, "mentor_especialista") &&
         p.ativo &&
-        p.id !== meuDppId
+        p.id !== excludeId
     )
     .map((p) => {
       const mp = data.mentorProfiles.find((x) => x.profile_id === p.id);
@@ -1617,6 +1616,159 @@ export function demoJovemEspecialistas(role: AppRole): JovemEspecialista[] {
       };
     })
     .sort(porNome);
+}
+
+/** O catálogo da view jovem_especialistas (0075) — os especialistas ativos,
+ *  projetados no que o jovem pode ver (nome/social/avatar/áreas, sem contato).
+ *  Só faz sentido pro papel mentorado. Filtra por profile_papeis (o híbrido
+ *  aparece); a decisão D9 do guia tira o próprio DPP do jovem do catálogo. */
+export function demoJovemEspecialistas(role: AppRole): JovemEspecialista[] {
+  if (role !== "mentorado") return [];
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  const meuDppId = data.duplas.find(
+    (d) =>
+      d.mentorado?.id === m?.id && d.trilha === "dpp" && d.status === "ativa"
+  )?.mentor?.id;
+  return catalogoEspRows(data, meuDppId);
+}
+
+/** O catálogo staff `especialistas_catalogo` (0239) — a MESMA projeção da
+ *  jovem_especialistas trocando só o predicado de papel: todo staff lê
+ *  (coordenacao/mentor_dpp/mentor_especialista/supervisor), o mentorado
+ *  não. Sem o recorte D9 — pro staff o DPP do jovem é um especialista
+ *  listável como qualquer outro. */
+export function demoEspecialistasCatalogo(
+  role: AppRole
+): JovemEspecialista[] {
+  if (
+    role !== "coordenacao" &&
+    role !== "mentor_dpp" &&
+    role !== "mentor_especialista" &&
+    role !== "supervisor"
+  )
+    return [];
+  return catalogoEspRows(getDemoData());
+}
+
+/** jovem_diretorio (0239): os três braços deduplicados por id com a
+ *  prioridade da view (catálogo vence adulto, adulto vence jovem) —
+ *  adultos ativos com papel no programa, TODOS os jovens com conta
+ *  (exceto o próprio, inclusive menores com foto — decisão do lead) e o
+ *  catálogo. minha_rede/minha_turma saem dos mesmos conjuntos que as
+ *  views de rede usam — inclusive o quirk fiel: o braço catálogo traz
+ *  minha_rede=false mesmo pro especialista da própria trilha (a página
+ *  repara pela rede resolvida, como o app real faz). */
+export function demoJovemDiretorio(role: AppRole): JovemDiretorioEntry[] {
+  if (role !== "mentorado") return [];
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  if (!m) return [];
+  const redeAdultos = new Set(
+    demoJovemContatos(role)
+      .map((c) => c.id)
+      .filter((id): id is string => id != null)
+  );
+  const redeJovens = new Set(
+    demoJovemColegas(role)
+      .map((c) => c.id)
+      .filter((id): id is string => id != null)
+  );
+  const linhas: (JovemDiretorioEntry & { prioridade: number })[] = [
+    // catálogo primeiro (prioridade 0 vence o distinct on (id))
+    ...demoJovemEspecialistas(role).map((e) => ({
+      id: e.id,
+      tipo: "especialista" as const,
+      nome: e.nome,
+      nome_social: e.nome_social,
+      avatar_path: e.avatar_path,
+      papel: "mentor_especialista",
+      cidade: e.cidade,
+      uf: e.uf,
+      interesses: null,
+      areas: e.areas,
+      bio: e.bio,
+      cargo: e.cargo,
+      empresa: e.empresa,
+      experiencia_previa: e.experiencia_previa,
+      formacao_externa: e.formacao_externa,
+      voluntariado: e.voluntariado,
+      grade_resumo: e.grade_resumo,
+      vagas: e.vagas,
+      minha_rede: false,
+      minha_turma: false,
+      prioridade: 0,
+    })),
+    ...data.profiles
+      .filter(
+        (p) =>
+          p.ativo &&
+          (temPapel(data, p, "mentor_dpp") ||
+            temPapel(data, p, "mentor_especialista") ||
+            temPapel(data, p, "supervisor") ||
+            temPapel(data, p, "coordenacao"))
+      )
+      .map((p) => ({
+        id: p.id,
+        tipo: "adulto" as const,
+        nome: p.nome,
+        nome_social: p.nome_social ?? null,
+        avatar_path: p.avatar_path ?? null,
+        papel: p.role,
+        cidade: p.cidade ?? null,
+        uf: p.uf ?? null,
+        interesses: p.interesses ?? null,
+        areas: p.areas ?? null,
+        bio: p.bio ?? null,
+        cargo: p.cargo ?? null,
+        empresa: p.empresa ?? null,
+        experiencia_previa: null,
+        formacao_externa: null,
+        voluntariado: p.voluntariado ?? null,
+        grade_resumo: null,
+        vagas: null,
+        minha_rede: redeAdultos.has(p.id),
+        minha_turma: false,
+        prioridade: 1,
+      })),
+    ...data.mentorados
+      .filter((c) => c.id !== m.id && c.profile_id != null)
+      .map((c) => ({
+        id: c.id,
+        tipo: "jovem" as const,
+        nome: c.nome,
+        nome_social: c.nome_social ?? null,
+        avatar_path: c.avatar_path ?? null,
+        papel: "mentorado",
+        cidade: c.cidade ?? null,
+        uf: c.uf ?? null,
+        interesses: c.interesses ?? null,
+        areas: null,
+        bio: null,
+        cargo: null,
+        empresa: null,
+        experiencia_previa: null,
+        formacao_externa: null,
+        voluntariado: null,
+        grade_resumo: null,
+        vagas: null,
+        minha_rede: redeJovens.has(c.id),
+        minha_turma: redeJovens.has(c.id),
+        prioridade: 2,
+      })),
+  ];
+  const dedup = new Map<string, JovemDiretorioEntry>();
+  for (const { prioridade: _p, ...linha } of linhas.sort(
+    (a, b) => a.prioridade - b.prioridade
+  )) {
+    if (!dedup.has(linha.id)) dedup.set(linha.id, linha);
+  }
+  return [...dedup.values()].sort((a, b) =>
+    (a.nome_social || a.nome).localeCompare(
+      b.nome_social || b.nome,
+      "pt-BR"
+    )
+  );
 }
 
 /** Feed datado por trilha (0086) — o jovem lê as das duplas dele; o
