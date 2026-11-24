@@ -51,6 +51,7 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 | 026 | `liza-genui-pills` | mudança | Clarified | rodada UI/UX (24/nov/2026) — cards ricos, colapsável, IDs, pills rotativas, falso negativo |
 | 027 | `privacidade-staging-notificacoes` | mudança | Clarified | rodada UI/UX (24/nov/2026) — visibilidade de avaliações, seed de atraso, notificações longas |
 | 028 | `motion-forms-wizards` | mudança | Clarified | rodada UI/UX (24/nov/2026) — sistema de slide/etapas e adoção priorizada |
+| 029 | `biblioteca-views-preview` | mudança | Draft | rodada UI/UX (24/nov/2026) — alternar cards com preview × lista, defaults por viewport |
 
 ## Fronteiras já mapeadas, ainda sem spec
 
