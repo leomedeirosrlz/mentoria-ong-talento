@@ -1,17 +1,22 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { motion } from "motion/react";
 import { toast } from "@/lib/toast";
 import {
   ArrowCounterClockwise,
   BookOpen,
+  Check,
   CircleNotch,
+  Compass,
+  CopySimple,
+  DotsThreeVertical,
   Eye,
   ListChecks,
   PaperPlaneTilt,
+  WhatsappLogo,
 } from "@phosphor-icons/react";
 import { enviarInstrumentoMentorado } from "@/lib/actions-formularios";
 import {
@@ -30,20 +35,20 @@ import {
   parChecklist,
   parRoda,
 } from "@/lib/jornada";
-import { formatDate } from "@/lib/ciclo";
+import { formatDate, waLink } from "@/lib/ciclo";
 import { docDoSistema, GUIA_ENCONTRO } from "@/lib/como-conduzir";
 import {
   ehInstrumentoChave,
   InstrumentoEmblema,
 } from "@/components/instrumento-icone";
 import { InstrumentoResultado } from "@/components/instrumento-resultado";
-import { CopiarLink } from "@/components/forms/copiar-link";
 import {
   msgLinkWhatsApp,
   primeiroNome,
+  urlPublica,
 } from "@/components/forms/link-shared";
 import { useOrigem } from "@/components/forms/use-origem";
-import { NudgeButton } from "@/components/nudge-button";
+import { superficieDoPath } from "@/lib/produto-eventos";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -55,14 +60,23 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { fade, T } from "@/components/motion";
 import { cn } from "@/lib/utils";
 
 // Seção "Instrumentos" da ficha da dupla (0080) — os quatro instrumentos
-// oficiais da jornada DPP com status por entrega: não enviado → "Enviar"
-// (o mentor entrega — emitir_link_instrumento no banco), pendente → copiar
-// /mandar de novo, respondido → "Ver resposta" abre a leitura estruturada
-// (a roda desenhada, as metas com IS/prazo, a declaração de visão).
+// oficiais da jornada DPP com status por entrega: não enviado/expirado →
+// "Gerar (novo) link" (o mentor entrega — emitir_link_instrumento no
+// banco), pendente → "Copiar link" + mandar no WhatsApp pelo ⋯,
+// respondido → "Ver resposta" abre a leitura estruturada (a roda
+// desenhada, as metas com IS/prazo, a declaração de visão). Desde a
+// 022 cada linha tem 1 badge + 1 primária + ⋯ — FR-005/006/007.
 
 /** WP7/REALIZA-202 — chip da janela + "Como conduzir" vêm de
  *  `@/lib/como-conduzir` (módulo único compartilhado com a agenda do
@@ -76,7 +90,8 @@ import { cn } from "@/lib/utils";
  *  mostrar DOIS estados — respondido + pendente (a re-emissão da nova
  *  rodada ou a entrega da outra ponta nos de 2 momentos — checklist
  *  início×fim, roda inicial×formal): isso é derivado à parte no
- *  `pendenteVisivel` da LinhaInstrumento. */
+ *  `pendenteVisivel` da LinhaInstrumento, que desde a 022 vira metadado
+ *  de texto + itens do ⋯ (a linha carrega 1 badge só). */
 function estadoAtual(entregas: InstrumentoEntrega[]): {
   status: "respondido" | "pendente" | "expirado" | "nao_enviado";
   entrega: InstrumentoEntrega | null;
@@ -138,7 +153,20 @@ function LinhaInstrumento({
   // refaçagem pedida (REALIZA-435) — confirmação leve, controlada, mesmo
   // padrão dos dialogs de editar/cancelar da seção de terceiros
   const [refazendo, setRefazendo] = useState(false);
+  // "Como conduzir" — era um <details> na linha; desde a 022 abre do ⋯
+  const [conduzindo, setConduzindo] = useState(false);
+  // o "Copiar link" da linha vira "Copiado" por 2s — mesma UX do
+  // CopiarLink; no ⋯ a confirmação sai em toast (o item fecha)
+  const [copiado, setCopiado] = useState(false);
+  const copiarTimer = useRef<ReturnType<typeof setTimeout>>(null);
+  useEffect(
+    () => () => {
+      if (copiarTimer.current) clearTimeout(copiarTimer.current);
+    },
+    []
+  );
   const origem = useOrigem();
+  const sup = superficieDoPath(usePathname());
 
   const sistema = (item?.sistema ?? sistemaEsperado) as InstrumentoDuplaSistema;
   const info = sistema ? INSTRUMENTO_INFO[sistema] : null;
@@ -233,6 +261,78 @@ function LinhaInstrumento({
         ? (checklistPar.inicio?.respostas ?? null)
         : null;
 
+  // a âncora do "Enviar no WhatsApp" do ⋯ — o mesmo /api/nudge?d=…&to=…
+  // &t=…&s=… que o NudgeButton montava na fileira de ações (o GET loga a
+  // interação antes do redirect pro wa.me); a mensagem do link segue
+  // idêntica, destinatário por sistema (o checklist vai pro mentor)
+  const hrefNudge = (() => {
+    if (!tokenVivo) return null;
+    const wa = waLink(
+      destWhatsapp,
+      msgLinkWhatsApp(
+        titulo,
+        destNome,
+        tokenVivo,
+        origem,
+        // "your mentor" voice only fits the mentee — the checklist
+        // goes to the mentor himself, institutional voice is right
+        sistema === "competencias_mentor" ? undefined : remetenteMentorNome
+      )
+    );
+    if (!wa) return null;
+    return `/api/nudge?d=${encodeURIComponent(duplaId)}&to=${encodeURIComponent(wa)}&t=${encodeURIComponent("nudge")}&s=${encodeURIComponent(sup)}`;
+  })();
+
+  /** Copia a URL pública do link vivo (/f/<token>). Na linha o botão vira
+   *  "Copiado" por 2s (a UX do CopiarLink); chamado do ⋯ a confirmação
+   *  sai em toast, porque o item fecha junto com o menu. */
+  async function copiarLink(noMenu = false) {
+    if (!tokenVivo) return;
+    try {
+      await navigator.clipboard.writeText(urlPublica(tokenVivo));
+    } catch {
+      toast.error("Não consegui copiar. Selecione o link manualmente.");
+      return;
+    }
+    if (noMenu) {
+      toast.success("Link copiado.");
+      return;
+    }
+    setCopiado(true);
+    if (copiarTimer.current) clearTimeout(copiarTimer.current);
+    copiarTimer.current = setTimeout(() => setCopiado(false), 2000);
+  }
+
+  // 1 badge de estado dominante (022/US4), na precedência respondido >
+  // link vivo > link expirado > não enviado: com respondido + link vivo o
+  // badge é o respondido e a pendência sai como metadado de texto +
+  // ações no ⋯ — info preservada, chrome de badge removido
+  const badgeEstado =
+    status === "respondido" ? (
+      <Badge className="bg-[var(--ok)]/15 text-[var(--ok-text)]">
+        respondido
+      </Badge>
+    ) : temPendente ? (
+      <Badge className="bg-[var(--warn)]/15 text-[var(--warn-text)]">
+        {pendenteJovem ? "pedido pelo jovem" : "link enviado"}
+      </Badge>
+    ) : status === "expirado" ? (
+      <Badge variant="secondary">link expirado</Badge>
+    ) : (
+      <Badge variant="secondary">não enviado</Badge>
+    );
+
+  // os gestos secundários do ⋯ — os MESMOS gates da fileira de ações de
+  // antes da 022, item a item (nada abre nem fecha gesto novo)
+  const linkNoMenu = temPendente && tokenVivo != null && jornadaViva;
+  const refazerNoMenu =
+    status === "respondido" &&
+    item != null &&
+    podeEnviar &&
+    jornadaViva &&
+    !refazerVivo;
+  const temSecundarias = linkNoMenu || refazerNoMenu;
+
   function enviar() {
     if (!sistema) return;
     start(async () => {
@@ -295,11 +395,11 @@ function LinhaInstrumento({
   }
 
   return (
-    <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0">
-      {/* emblema + texto na coluna, ações embaixo na largura toda — a faixa
-          sm–lg como linha deixava os botões roubando metade do texto e um
-          vazio sob eles (REALIZA-253). O símbolo do instrumento
-          (formularios.md item 2) é o mesmo da régua e da prateleira */}
+    // 022/US4 — a linha enxuta: emblema + [título · 1 badge de estado] +
+    // resumo + metadados, UMA ação primária por estado e o ⋯ com as
+    // secundárias. No estreito a linha empilha (ações alinhadas sob o
+    // texto, pl-12 = emblema 36 + gap-3)
+    <li className="flex flex-col gap-2 py-3 first:pt-0 last:pb-0 sm:flex-row sm:items-start sm:gap-3">
       <div className="flex min-w-0 flex-1 items-start gap-3">
         {sistema && ehInstrumentoChave(sistema) ? (
           <InstrumentoEmblema instrumento={sistema} size={36} />
@@ -311,26 +411,9 @@ function LinhaInstrumento({
           </span>
         )}
         <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
             <p className="text-sm font-medium">{titulo}</p>
-            {sistema && (
-              <Badge variant="outline" className="font-normal">
-                {GUIA_ENCONTRO[sistema].chip}
-              </Badge>
-            )}
-            {status === "respondido" && (
-              <Badge className="bg-[var(--ok)]/15 text-[var(--ok-text)]">
-                respondido
-              </Badge>
-            )}
-            {temPendente && (
-              <Badge className="bg-[var(--warn)]/15 text-[var(--warn-text)]">
-                {pendenteJovem ? "pedido pelo jovem" : "link enviado"}
-              </Badge>
-            )}
-            {status === "expirado" && (
-              <Badge variant="secondary">link expirado</Badge>
-            )}
+            {badgeEstado}
           </div>
           {info && (
             <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">
@@ -338,36 +421,28 @@ function LinhaInstrumento({
             </p>
           )}
           {sistema && (
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-4 gap-y-1">
-              <details className="group">
-                <summary className="cursor-pointer select-none text-xs font-medium text-muted-foreground underline-offset-2 outline-none transition-colors hover:text-foreground hover:underline focus-visible:ring-2 focus-visible:ring-ring">
-                  Como conduzir
-                </summary>
-                <p className="mt-1 max-w-prose text-xs leading-relaxed text-muted-foreground">
-                  {GUIA_ENCONTRO[sistema].conduzir}
-                </p>
-              </details>
-              {/* ponte instrumento → doc (REALIZA-386): o guia nativo; o
-                  ?dupla= faz o "Abrir instrumento" do doc voltar pra cá */}
-              <Link
-                href={`/materiais/documento/${docDoSistema(sistema)}?dupla=${duplaId}`}
-                prefetch={false}
-                className="inline-flex min-h-8 items-center gap-1 rounded-md text-xs font-medium text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                <BookOpen size={12} aria-hidden />
-                Ler o guia
-              </Link>
-            </div>
-          )}
-          {status === "respondido" && entrega?.respondido_em && (
-            <p className="mt-1 text-xs tabular-nums text-muted-foreground">
-              Respondido em {formatDate(entrega.respondido_em)}
+            <p className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+              {/* a janela do guia era um segundo badge — virou metadado
+                  (a informação fica, o chrome de badge sai) */}
+              <span>{GUIA_ENCONTRO[sistema].chip}</span>
+              {status === "respondido" && entrega?.respondido_em && (
+                <span className="tabular-nums">
+                  Respondido em {formatDate(entrega.respondido_em)}
+                </span>
+              )}
+              {/* o link vivo do respondido não é mais badge: o estado
+                  segue legível como metadado e as ações dele estão no ⋯ */}
+              {status === "respondido" && temPendente && (
+                <span>{pendenteJovem ? "pedido pelo jovem" : "link enviado"}</span>
+              )}
             </p>
           )}
         </div>
       </div>
 
-      <div className="flex shrink-0 flex-wrap items-center gap-2">
+      <div className="flex shrink-0 items-center gap-1.5 pl-12 sm:pl-0">
+        {/* 1 ação primária por estado — a mesma ação de antes, os mesmos
+            gates; o que não é o próximo passo mora no ⋯ */}
         {status === "respondido" && item && entrega?.respostas && (
           <Dialog>
             <DialogTrigger
@@ -400,89 +475,33 @@ function LinhaInstrumento({
           </Dialog>
         )}
 
-        {/* nova rodada do instrumento (REALIZA-435): quem emite pode pedir
-            a refaçagem — a resposta é evidência e segue guardada; a RPC
-            gera um link novo em branco do mesmo destinatário. Some quando
-            já há link vivo da mesma marcação (refazerVivo) */}
-        {status === "respondido" &&
-          item &&
-          podeEnviar &&
-          jornadaViva &&
-          !refazerVivo && (
-          <>
+        {status === "pendente" && tokenVivo && jornadaViva && (
+          <motion.span
+            {...fade}
+            transition={T.enter}
+            className="inline-flex"
+          >
             <Button
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setRefazendo(true)}
-              disabled={!item.ativo}
-              title={item.ativo ? undefined : "Instrumento encerrado em Formulários"}
+              onClick={() => copiarLink()}
             >
-              <ArrowCounterClockwise aria-hidden />
-              Pedir pra refazer
-            </Button>
-            <Dialog open={refazendo} onOpenChange={setRefazendo}>
-              <DialogContent size="sm">
-                <DialogHeader>
-                  <DialogTitle>Pedir pra refazer?</DialogTitle>
-                  <DialogDescription className="leading-relaxed">
-                    Um link novo em branco é gerado pra{" "}
-                    {primeiroNome(destNome)} responder de novo. A resposta
-                    anterior segue guardada nesta ficha.
-                  </DialogDescription>
-                </DialogHeader>
-                <DialogFooter>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setRefazendo(false)}
-                  >
-                    Cancelar
-                  </Button>
-                  <Button type="button" onClick={refazer} disabled={pending}>
-                    {pending ? (
-                      <CircleNotch className="animate-spin" aria-hidden />
-                    ) : null}
-                    Gerar novo link
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
-          </>
-        )}
-
-        {temPendente &&
-          tokenVivo &&
-          jornadaViva && (
-          <motion.div
-            {...fade}
-            transition={T.enter}
-            className="flex flex-wrap items-center gap-2"
-          >
-            <CopiarLink token={tokenVivo} />
-            <NudgeButton
-              telefone={destWhatsapp}
-              mensagem={msgLinkWhatsApp(
-                titulo,
-                destNome,
-                tokenVivo,
-                origem,
-                // "your mentor" voice only fits the mentee — the checklist
-                // goes to the mentor himself, institutional voice is right
-                sistema === "competencias_mentor"
-                  ? undefined
-                  : remetenteMentorNome
+              {copiado ? (
+                <Check aria-hidden className="text-[var(--ok)]" />
+              ) : (
+                <CopySimple aria-hidden />
               )}
-              duplaId={duplaId}
-              label="Enviar no WhatsApp"
-            />
-          </motion.div>
+              {copiado ? "Copiado" : "Copiar link"}
+            </Button>
+          </motion.span>
         )}
 
         {(status === "nao_enviado" || status === "expirado") &&
           podeEnviar &&
           jornadaViva &&
           item && (
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
             <Button
               type="button"
               variant="outline"
@@ -498,8 +517,144 @@ function LinhaInstrumento({
               )}
               {status === "expirado" ? "Gerar novo link" : "Gerar link"}
             </Button>
-          )}
+            {/* desabilitado explica por quê inline — no toque não existe
+                hover/tooltip (o title fica como redundância desktop) */}
+            {!item.ativo && (
+              <span className="text-xs text-muted-foreground">
+                encerrado em Formulários
+              </span>
+            )}
+          </span>
+        )}
+
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                aria-label={`Ações de ${titulo}`}
+              >
+                <DotsThreeVertical size={18} weight="bold" aria-hidden />
+              </Button>
+            }
+          />
+          <DropdownMenuContent align="end" className="w-56">
+            {/* o link vivo do respondido não disputa com a primária "Ver
+                resposta": copiar e mandar no WhatsApp ficam aqui no ⋯ */}
+            {status === "respondido" && linkNoMenu && (
+              <DropdownMenuItem onClick={() => copiarLink(true)}>
+                <CopySimple aria-hidden data-icon="inline-start" />
+                Copiar link
+              </DropdownMenuItem>
+            )}
+            {linkNoMenu && (
+              <DropdownMenuItem
+                disabled={!hrefNudge}
+                render={
+                  hrefNudge ? (
+                    <a
+                      href={hrefNudge}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    />
+                  ) : undefined
+                }
+              >
+                <WhatsappLogo aria-hidden data-icon="inline-start" />
+                Enviar no WhatsApp
+                {/* número ausente fica visível — esconder a opção deixaria
+                    a equipe procurando um contato que não existe cadastrado */}
+                {!hrefNudge && (
+                  <span className="ml-auto pl-3 text-xs text-muted-foreground">
+                    sem WhatsApp cadastrado
+                  </span>
+                )}
+              </DropdownMenuItem>
+            )}
+            {/* nova rodada do instrumento (REALIZA-435): a resposta é
+                evidência e segue guardada; a RPC gera um link novo em
+                branco do mesmo destinatário. Some quando já há link vivo
+                da mesma marcação (refazerVivo) */}
+            {refazerNoMenu && item && (
+              <DropdownMenuItem
+                disabled={!item.ativo}
+                onClick={() => setRefazendo(true)}
+              >
+                <ArrowCounterClockwise aria-hidden data-icon="inline-start" />
+                Pedir pra refazer
+                {!item.ativo && (
+                  <span className="ml-auto pl-3 text-xs text-muted-foreground">
+                    encerrado em Formulários
+                  </span>
+                )}
+              </DropdownMenuItem>
+            )}
+            {temSecundarias && <DropdownMenuSeparator />}
+            <DropdownMenuItem onClick={() => setConduzindo(true)}>
+              <Compass aria-hidden data-icon="inline-start" />
+              Como conduzir
+            </DropdownMenuItem>
+            {/* ponte instrumento → doc (REALIZA-386): o guia nativo; o
+                ?dupla= faz o "Abrir instrumento" do doc voltar pra cá */}
+            <DropdownMenuItem
+              render={
+                <Link
+                  href={`/materiais/documento/${docDoSistema(sistema)}?dupla=${duplaId}`}
+                  prefetch={false}
+                />
+              }
+            >
+              <BookOpen aria-hidden data-icon="inline-start" />
+              Ler o guia
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
+
+      <Dialog open={refazendo} onOpenChange={setRefazendo}>
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>Pedir pra refazer?</DialogTitle>
+            <DialogDescription className="leading-relaxed">
+              Um link novo em branco é gerado pra {primeiroNome(destNome)}{" "}
+              responder de novo. A resposta anterior segue guardada nesta
+              ficha.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setRefazendo(false)}
+            >
+              Cancelar
+            </Button>
+            <Button type="button" onClick={refazer} disabled={pending}>
+              {pending ? (
+                <CircleNotch className="animate-spin" aria-hidden />
+              ) : null}
+              Gerar novo link
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* o <details> "Como conduzir" da linha virou item do ⋯ que abre
+          este dialog — a prosa de condução não compete mais com os
+          metadados da linha */}
+      {sistema && (
+        <Dialog open={conduzindo} onOpenChange={setConduzindo}>
+          <DialogContent size="sm">
+            <DialogHeader>
+              <DialogTitle>Como conduzir · {titulo}</DialogTitle>
+            </DialogHeader>
+            <DialogDescription className="leading-relaxed">
+              {GUIA_ENCONTRO[sistema].conduzir}
+            </DialogDescription>
+          </DialogContent>
+        </Dialog>
+      )}
     </li>
   );
 }

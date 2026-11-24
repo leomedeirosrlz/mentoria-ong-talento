@@ -1529,70 +1529,102 @@ export default async function DuplaPage({
 
   // ---------- aba Instrumentos ----------
   const temInstrumentosDPP = !ehEsp && (instrumentos.length > 0 || !!pdm || !!terceiros);
+  // 022/FR-008 — a aba separa a operação (a lista de instrumentos, links
+  // e envios) dos documentos vivos (PDM, terceiros, voz do jovem) com um
+  // rótulo de grupo por bloco; cada card segue com o h2 próprio. Na
+  // trilha de especialista a aba tem só a voz — um grupo de um card não
+  // agrupa nada, então ela fica sem rótulo, como antes.
+  const temDocumentos = !!pdm || !!terceiros || vozVisivel;
   const painelInstrumentos = (
     <>
-      {!ehEsp && (
-        <InstrumentosDupla
-          duplaId={dupla.id}
-          itens={instrumentos}
-          mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
-          mentoradoWhatsapp={dupla.mentorado.whatsapp}
-          mentorNome={dupla.mentor.nome_social ?? dupla.mentor.nome}
-          mentorWhatsapp={dupla.mentor.whatsapp}
-          podeEnviar={souCoord || souMentor}
-          jornadaViva={
-            dupla.status === "ativa" || dupla.status === "pausada"
-          }
-          remetenteMentorNome={souMentor ? (me.nome_social ?? me.nome) : undefined}
-        />
-      )}
-      <Suspense fallback={<Skeleton className="h-24 w-full" />}>
-        {!ehEsp && pdm && (
-          <PdmDupla
+      {!ehEsp && instrumentos.length > 0 && (
+        <section
+          aria-labelledby="aba-instrumentos-links"
+          className="space-y-2"
+        >
+          <p
+            id="aba-instrumentos-links"
+            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
+            Links e envio
+          </p>
+          <InstrumentosDupla
             duplaId={dupla.id}
-            doc={pdm}
+            itens={instrumentos}
             mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
-            podeEditar={
-              souMentor &&
-              (dupla.status === "ativa" || dupla.status === "pausada")
-            }
-          />
-        )}
-        {!ehEsp && terceiros && (
-          <TerceirosDupla
-            duplaId={dupla.id}
-            contatos={terceiros.contatos}
-            consolidacao={terceiros.consolidacao}
-            mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
-            podeGerenciar={souCoord || souMentor}
-            remetenteNome={souMentor ? (me.nome_social ?? me.nome) : undefined}
+            mentoradoWhatsapp={dupla.mentorado.whatsapp}
+            mentorNome={dupla.mentor.nome_social ?? dupla.mentor.nome}
+            mentorWhatsapp={dupla.mentor.whatsapp}
+            podeEnviar={souCoord || souMentor}
             jornadaViva={
               dupla.status === "ativa" || dupla.status === "pausada"
             }
+            remetenteMentorNome={souMentor ? (me.nome_social ?? me.nome) : undefined}
           />
-        )}
-      </Suspense>
-      {vozVisivel &&
-        (ehEsp ? (
-          <VozDoJovemEspecialista
-            itens={espAvaliacoes}
-            passoPorEncontro={passoPorEncontroEsp}
-          />
-        ) : (
-          <VozDoJovemCard
-            avaliacoes={dupla.encontros.flatMap((e) =>
-              e.avaliacao_jovem ? [e.avaliacao_jovem] : []
+        </section>
+      )}
+      {!ehEsp && temDocumentos && (
+        <section
+          aria-labelledby="aba-instrumentos-docs"
+          className="space-y-2"
+        >
+          <p
+            id="aba-instrumentos-docs"
+            className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground"
+          >
+            Documentos da jornada
+          </p>
+          <div className="space-y-4">
+            <Suspense fallback={<Skeleton className="h-24 w-full" />}>
+              {pdm && (
+                <PdmDupla
+                  duplaId={dupla.id}
+                  doc={pdm}
+                  mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+                  podeEditar={
+                    souMentor &&
+                    (dupla.status === "ativa" || dupla.status === "pausada")
+                  }
+                />
+              )}
+              {terceiros && (
+                <TerceirosDupla
+                  duplaId={dupla.id}
+                  contatos={terceiros.contatos}
+                  consolidacao={terceiros.consolidacao}
+                  mentoradoNome={dupla.mentorado.nome_social ?? dupla.mentorado.nome}
+                  podeGerenciar={souCoord || souMentor}
+                  remetenteNome={souMentor ? (me.nome_social ?? me.nome) : undefined}
+                  jornadaViva={
+                    dupla.status === "ativa" || dupla.status === "pausada"
+                  }
+                />
+              )}
+            </Suspense>
+            {vozVisivel && (
+              <VozDoJovemCard
+                avaliacoes={dupla.encontros.flatMap((e) =>
+                  e.avaliacao_jovem ? [e.avaliacao_jovem] : []
+                )}
+                pendentes={
+                  souCoord || me.role === "supervisor"
+                    ? saude.avaliacaoJovemPendente
+                    : 0
+                }
+                media={souMentor ? mediaJovem : null}
+                papel={souMentor ? "mentor" : (me.role as "coordenacao" | "supervisor")}
+                realizados={realizadosCount}
+              />
             )}
-            pendentes={
-              souCoord || me.role === "supervisor"
-                ? saude.avaliacaoJovemPendente
-                : 0
-            }
-            media={souMentor ? mediaJovem : null}
-            papel={souMentor ? "mentor" : (me.role as "coordenacao" | "supervisor")}
-            realizados={realizadosCount}
-          />
-        ))}
+          </div>
+        </section>
+      )}
+      {ehEsp && vozVisivel && (
+        <VozDoJovemEspecialista
+          itens={espAvaliacoes}
+          passoPorEncontro={passoPorEncontroEsp}
+        />
+      )}
       {!temInstrumentosDPP && !vozVisivel && (
         <p className="rounded-xl bg-card p-4 text-sm text-muted-foreground shadow-[var(--shadow-border)]">
           Esta trilha não tem instrumentos da jornada DPP.
