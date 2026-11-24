@@ -2,7 +2,8 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { Check, X, CalendarPlus } from "@phosphor-icons/react";
+import Link from "next/link";
+import { BookOpenText, Check, X, CalendarPlus } from "@phosphor-icons/react";
 import {
   aplicarPassoPlano,
   aplicarSessaoPlano,
@@ -78,6 +79,7 @@ export function PlanoAcordosCard({
   realizados = [],
   recessos = [],
   sugestoes,
+  combinadoHref,
 }: {
   plano: PlanoCombinado;
   /** id da dupla pra revalidar a ficha — o jovem não tem, e não
@@ -104,6 +106,8 @@ export function PlanoAcordosCard({
   /** Pacote do motor (perfil/grade/ocupados) — alimenta a sugestão da
    *  linha e os chips do "Outra data". Sem ele, date+time de step 900. */
   sugestoes?: SeletorSugestoes | null;
+  /** Rota do documento do combinado (020) — "Ler o combinado" no card */
+  combinadoHref?: string;
 }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
@@ -353,6 +357,15 @@ export function PlanoAcordosCard({
           <span className="text-xs text-muted-foreground">
             De {ddmm(janela.inicio)} a {ddmm(janela.fim)}
           </span>
+        )}
+        {combinadoHref && (
+          <Link
+            href={combinadoHref}
+            className="inline-flex items-center gap-1 rounded-sm text-xs font-medium underline underline-offset-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            <BookOpenText size={13} aria-hidden />
+            Ler o combinado
+          </Link>
         )}
       </div>
 

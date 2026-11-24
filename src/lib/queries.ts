@@ -45,6 +45,7 @@ import {
   demoPessoas,
   demoRegistros,
   demoRelatorioLinks,
+  demoRoteirosResumo,
   demoTurmaInscricoesAguardando,
   demoTurmaInscricoesPessoas,
 } from "./demo/queries";
@@ -65,7 +66,7 @@ import {
 } from "./registros";
 import { temPapel } from "./types";
 import { gravatarMapa, gravatarUrlDo } from "./gravatar";
-import type { AppRole, AvaliacaoEncontro, AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, DocumentoTemplate, Dupla, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
+import type { AppRole, AvaliacaoEncontro, AvaliacaoJovem, CicloEvento, Comunicado, CorRaca, Cronograma, DadosCivis, DocumentoPessoa, DocumentoTemplate, Dupla, DuplaPlanoRoteiro, DuplaResumo, DuplaStatus, Encontro, EncontroStatus, EspecialistaEvento, Genero, Material, Mentorado, MentorProfile, Notificacao, PessoaNota, PrefGeneroPar, Profile, Registro, ResponsavelCivis, Trilha } from "./types";
 
 /** mentor_profiles — re-export do tipo canônico (types.ts): os callers da
  *  página de pessoas/board importam daqui historicamente. */
@@ -384,6 +385,33 @@ export const getCicloEventos = cache(async (): Promise<CicloEvento[]> => {
   if (process.env.SUPABASE_SERVICE_ROLE_KEY) return cicloEventosDb();
   return buscaCicloEventos(await createClient());
 });
+
+/** Metas dos roteiros do plano num batch por plano (020): as homes trocam
+ *  o link do roteiro do corpus pelo vigente da dupla na disclosure da
+ *  SuaSemana — só leitura, nunca lazy (o nascimento mora na ficha/agenda
+ *  e na rota da semana). `conteudo` não vem — a home só precisa de status. */
+export const getRoteirosPlanos = cache(
+  async (planoIds: string[]): Promise<DuplaPlanoRoteiro[]> => {
+    const demo = await demoRole();
+    if (demo) return demoRoteirosResumo(demo, planoIds);
+    if (!planoIds.length) return [];
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("dupla_plano_roteiros")
+      .select(
+        "id, dupla_id, plano_id, numero, versao, plano_versao, status, gerado_por, gerado_via, gerado_em, editado_por, publicado_por, publicado_em, updated_at"
+      )
+      .in("plano_id", planoIds);
+    if (error) {
+      console.error("getRoteirosPlanos:", error);
+      return [];
+    }
+    return (data ?? []).map((r) => ({
+      ...(r as Omit<DuplaPlanoRoteiro, "conteudo">),
+      conteudo: null,
+    }));
+  }
+);
 
 /** Todos os cronogramas (0061) — papéis adultos leem o catálogo inteiro; o
  *  seletor de turma/calendário é a régua que escopa o recorte. */

@@ -26,6 +26,8 @@ import {
 } from "@/lib/sua-semana";
 import { propostoEmDoPlano } from "@/lib/plano-combinado";
 import { hrefMaterial, materiaisDoNumero } from "@/lib/materiais";
+import { getRoteirosPlanos } from "@/lib/queries";
+import { materiaisComRoteiroPlano } from "@/lib/plano-roteiros";
 import { PlanoContestarButton } from "@/components/plano-contestar";
 import { SuaSemanaPlano } from "@/components/sua-semana-plano";
 import {
@@ -37,6 +39,7 @@ import type {
   CicloEvento,
   Cronograma,
   Dupla,
+  DuplaPlanoRoteiro,
   Encontro,
   EspecialistaEvento,
   Material,
@@ -56,7 +59,7 @@ import { MarcoNotifier } from "@/components/marco-notifier";
 /** Ciclo que já não pede ação: sai da lista de ativas e vai pro bloco final. */
 const finalizada = (d: Dupla) => d.status === "concluida" || d.status === "encerrada";
 
-export function MentorHome({
+export async function MentorHome({
   duplas,
   eventos,
   espEventos = [],
@@ -124,6 +127,23 @@ export function MentorHome({
   const algumSemRegistro = ativas.some(
     (d) => d.status === "ativa" && d.encontros.every((e) => !e.registro)
   );
+
+  // roteiros do plano (020): um batch por plano troca o link do corpus
+  // pelo vigente da dupla na disclosure da SuaSemana — só leitura
+  const planoIds = duplas
+    .map(
+      (d) =>
+        (d.planos ?? []).find(
+          (p) => p.status === "aceito" || p.status === "ativo"
+        )?.id
+    )
+    .filter((x): x is string => x != null);
+  const roteirosPorPlano = new Map<string, DuplaPlanoRoteiro[]>();
+  for (const r of await getRoteirosPlanos(planoIds)) {
+    const l = roteirosPorPlano.get(r.plano_id) ?? [];
+    l.push(r);
+    roteirosPorPlano.set(r.plano_id, l);
+  }
 
   return (
     // >1 dupla: em xl os cards abrem 2 colunas — a 1280px o card cheio deixa
@@ -369,7 +389,16 @@ export function MentorHome({
         // herda; com guia de ajustes vigente a ficha já avisa
         const numeroDisclosure =
           semanaPlano?.vinculo ?? semanaPlano?.resumo.proximo?.numero ?? null;
-        const materiaisDoPasso =
+        const roteiroVigente =
+          planoVivo && numeroDisclosure != null
+            ? ((roteirosPorPlano.get(planoVivo.id) ?? []).find(
+                (r) =>
+                  r.numero === numeroDisclosure &&
+                  r.status === "publicado" &&
+                  r.plano_versao === planoVivo.versao
+              ) ?? null)
+            : null;
+        const materiaisDoPasso = materiaisComRoteiroPlano(
           numeroDisclosure != null
             ? materiaisDoNumero({
                 materiais,
@@ -384,7 +413,14 @@ export function MentorHome({
                 .filter(
                   (m): m is { href: string; titulo: string } => m.href != null
                 )
-            : [];
+            : [],
+          roteiroVigente
+            ? {
+                numero: roteiroVigente.numero,
+                href: `/duplas/${dupla.id}/roteiro/${roteiroVigente.numero}`,
+              }
+            : null
+        );
 
         // --card-spacing=5 no sm+: padding uniforme p-4→sm:p-5 no card
         // inteiro via a var (header, content e gap vertical seguem juntos)
@@ -705,7 +741,7 @@ export function MentorHome({
                     perspectiva="mentor"
                     outro={jovemNome.split(" ")[0] ?? "seu jovem"}
                     quem={quemPlano}
-                    combinadoHref={`/duplas/${dupla.id}#plano-em-dia`}
+                    combinadoHref={`/duplas/${dupla.id}/combinado`}
                     confirmarHref={
                       semanaPlano.resumo.proximo
                         ? `/duplas/${dupla.id}#acordos`

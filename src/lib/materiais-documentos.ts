@@ -16,6 +16,10 @@ export type DocTom = "lima" | "destaque" | "info";
 
 export type DocBloco =
   | { kind: "par"; html: string }
+  // título de seção do documento gerado (roteiros do plano, 020/021):
+  // nivel 2 = cabeçalho de "##" (regra lime), nivel 3 = sub "###" —
+  // os docs do corpus mantêm o heading próprio e não usam este bloco
+  | { kind: "subtitulo"; texto: string; nivel?: 2 | 3 }
   // ordenada=false → <ul> (listas "-" do corpus); ausente/true → <ol>
   // check: itens de marcação (seções "Antes do encontro", checklist) —
   // o renderer desenha checkbox real em vez de bullet

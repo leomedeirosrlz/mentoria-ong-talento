@@ -10,6 +10,11 @@ import { comparaNome, registroTardio, saudadeDaDupla, semanaBounds, toDateStr } 
 import type { DiaSaude } from "../relatorios/dados";
 import type { RecorteCsv } from "../relatorios/csv-core";
 import { slotsLivresEspecialista } from "./agenda";
+import {
+  numerosMarcadosDe,
+  numerosRealizadosDe,
+  roteirosDevidos,
+} from "../plano-roteiros";
 import { normaliza } from "../utils";
 import type {
   AppRole,
@@ -27,6 +32,7 @@ import type {
   DocumentoPessoa,
   Devolutiva,
   Dupla,
+  DuplaPlanoRoteiro,
   DuplaResumo,
   Encontro,
   EspecialistaAvaliacao,
@@ -500,6 +506,25 @@ export function demoDuplas(role: AppRole): Dupla[] {
 /** null fora do escopo — a página real cai em notFound() igual. */
 export function demoDupla(role: AppRole, id: string): Dupla | null {
   return demoDuplas(role).find((d) => d.id === id) ?? null;
+}
+
+/** A dupla DO jovem — `duplasDoPapel` é por mentor/supervisão, então a
+ *  persona mentorado resolve a dela pelo vínculo mentorado (mesmo escopo
+ *  da RLS: jovem_relacionado). Reaplica a mesma pipeline de mascaramento. */
+export function demoDuplaJovem(role: AppRole, id: string): Dupla | null {
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  const d = data.duplas.find(
+    (x) => x.id === id && m != null && x.mentorado?.id === m.id
+  );
+  if (!d) return null;
+  return (
+    comContatoDuplas(
+      comAvaliacaoJovem([d], role, data),
+      demoContatosMap(role),
+      role
+    )[0] ?? null
+  );
 }
 
 /** mentor_id = eu OR supervisiona_dupla — a real não filtra em TS: a RLS
@@ -2813,4 +2838,59 @@ export function demoTendenciaSaude(
     porDia.set(cur.dia, cur);
   }
   return [...porDia.values()];
+}
+
+/** Metas dos roteiros do plano na demo (020): as semanas devidas nascem
+ *  publicadas e a seguinte fica rascunho — o conteúdo fica vazio aqui
+ *  (a home só troca o link; a rota da semana monta de verdade). */
+export function demoRoteirosResumo(
+  role: AppRole,
+  planoIds?: string[]
+): DuplaPlanoRoteiro[] {
+  const agora = new Date().toISOString();
+  const rows: DuplaPlanoRoteiro[] = [];
+  const data = getDemoData();
+  const meuMentorado = mentoradoDaPersona(data, role);
+  const duplas =
+    role === "mentorado"
+      ? data.duplas.filter((d) => d.mentorado?.id === meuMentorado?.id)
+      : demoDuplas(role);
+  for (const dupla of duplas) {
+    const plano =
+      (dupla.planos ?? [])
+        .filter((p) => p.status === "aceito" || p.status === "ativo")
+        .sort((a, b) => b.versao - a.versao)[0] ?? null;
+    if (!plano || (planoIds && !planoIds.includes(plano.id))) continue;
+    const devidos = roteirosDevidos({
+      numeros: plano.escopo?.numeros ?? [],
+      marcados: numerosMarcadosDe(dupla.encontros ?? []),
+      realizados: numerosRealizadosDe(dupla.encontros ?? []),
+    });
+    const rascunho = (plano.escopo?.numeros ?? []).find(
+      (n) => !devidos.includes(n)
+    );
+    for (const [status, numero] of [
+      ...devidos.map((n) => ["publicado", n] as const),
+      ...(rascunho != null ? [["rascunho", rascunho] as const] : []),
+    ]) {
+      rows.push({
+        id: `roteiro-demo-${plano.id}-${numero}`,
+        dupla_id: dupla.id,
+        plano_id: plano.id,
+        numero,
+        versao: 1,
+        plano_versao: plano.versao,
+        conteudo: null,
+        status,
+        gerado_por: null,
+        gerado_via: "app",
+        gerado_em: agora,
+        editado_por: null,
+        publicado_por: null,
+        publicado_em: status === "publicado" ? agora : null,
+        updated_at: agora,
+      });
+    }
+  }
+  return rows;
 }

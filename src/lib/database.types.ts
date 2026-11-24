@@ -1828,6 +1828,187 @@ export type Database = {
           },
         ]
       }
+      dupla_plano_roteiros: {
+        Row: {
+          conteudo: Json
+          dupla_id: string
+          editado_por: string | null
+          gerado_em: string
+          gerado_por: string | null
+          gerado_via: string
+          id: string
+          numero: number
+          plano_id: string
+          plano_versao: number
+          publicado_em: string | null
+          publicado_por: string | null
+          status: string
+          updated_at: string
+          versao: number
+        }
+        Insert: {
+          conteudo?: Json
+          dupla_id: string
+          editado_por?: string | null
+          gerado_em?: string
+          gerado_por?: string | null
+          gerado_via?: string
+          id?: string
+          numero: number
+          plano_id: string
+          plano_versao: number
+          publicado_em?: string | null
+          publicado_por?: string | null
+          status?: string
+          updated_at?: string
+          versao?: number
+        }
+        Update: {
+          conteudo?: Json
+          dupla_id?: string
+          editado_por?: string | null
+          gerado_em?: string
+          gerado_por?: string | null
+          gerado_via?: string
+          id?: string
+          numero?: number
+          plano_id?: string
+          plano_versao?: number
+          publicado_em?: string | null
+          publicado_por?: string | null
+          status?: string
+          updated_at?: string
+          versao?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dupla_plano_roteiros_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_dupla_id_fkey"
+            columns: ["dupla_id"]
+            isOneToOne: false
+            referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_editado_por_fkey"
+            columns: ["editado_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_editado_por_fkey"
+            columns: ["editado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_editado_por_fkey"
+            columns: ["editado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_editado_por_fkey"
+            columns: ["editado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_editado_por_fkey"
+            columns: ["editado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_gerado_por_fkey"
+            columns: ["gerado_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_gerado_por_fkey"
+            columns: ["gerado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_gerado_por_fkey"
+            columns: ["gerado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_gerado_por_fkey"
+            columns: ["gerado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_gerado_por_fkey"
+            columns: ["gerado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_plano_id_fkey"
+            columns: ["plano_id"]
+            isOneToOne: false
+            referencedRelation: "dupla_planos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_publicado_por_fkey"
+            columns: ["publicado_por"]
+            isOneToOne: false
+            referencedRelation: "jovem_especialistas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_publicado_por_fkey"
+            columns: ["publicado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_publicado_por_fkey"
+            columns: ["publicado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_acesso"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_publicado_por_fkey"
+            columns: ["publicado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_contato"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_publicado_por_fkey"
+            columns: ["publicado_por"]
+            isOneToOne: false
+            referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dupla_planos: {
         Row: {
           aceito_mentor_em: string | null
@@ -8095,6 +8276,7 @@ export type Database = {
         Args: { p_acao: string; p_motivo?: string; p_plano: string }
         Returns: Json
       }
+      pode_roteiro_plano: { Args: { p_plano: string }; Returns: boolean }
       postar_devolutiva: {
         Args: { p_dupla_id: string; p_texto: string }
         Returns: string
@@ -8267,6 +8449,16 @@ export type Database = {
       }
       revogar_assinatura: { Args: { p_id: string }; Returns: undefined }
       revogar_relatorio_link: { Args: { p_id: string }; Returns: Json }
+      roteiro_publicar: { Args: { p_id: string }; Returns: Json }
+      roteiro_salvar: {
+        Args: {
+          p_conteudo: Json
+          p_numero: number
+          p_plano: string
+          p_via?: string
+        }
+        Returns: Json
+      }
       salvar_consolidado_terceiros: {
         Args: {
           p_consolidado: string
