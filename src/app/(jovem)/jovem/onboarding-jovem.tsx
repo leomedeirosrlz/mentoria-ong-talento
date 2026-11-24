@@ -32,6 +32,7 @@ import { CampoDisponibilidade } from "@/components/campos-pessoais";
 import { SignOutButton } from "@/components/signout-button";
 import { PassoTermo } from "@/components/termo-vivo";
 import { Button } from "@/components/ui/button";
+import { Etapa, useTrocaDeEtapa } from "@/components/ui/etapa";
 import { Switch } from "@/components/ui/switch";
 import { formatWhatsApp } from "@/lib/ciclo";
 import type { DadosCivis, Disponibilidade, JovemPerfil, Profile } from "@/lib/types";
@@ -154,7 +155,6 @@ export function OnboardingJovem({
   demo?: React.ReactNode;
 }) {
   const router = useRouter();
-  const [stepBruto, setStep] = useState(0);
   const [pending, start] = useTransition();
   const tituloRef = useRef<HTMLHeadingElement>(null);
   const [termoOk, setTermoOk] = useState(false);
@@ -168,9 +168,11 @@ export function OnboardingJovem({
   const [termoIni] = useState(() => termo ?? null);
   const temTermo = termoIni != null;
   const total = temTermo ? 5 : 4;
-  // mesmo clamp derivado do staff: o total pode encolher quando o layout
-  // reentrega termo=null, e o índice lido não pode passar do último
-  const step = Math.min(stepBruto, total - 1);
+  // wizard pelo kit (ui/etapa) — mesmo clamp derivado do staff: o total
+  // pode encolher quando o layout reentrega termo=null, e o índice lido
+  // não pode passar do último. A direção alimenta o slide da Etapa; o
+  // foco segue no efeito próprio (scroll + título do balão)
+  const { etapa: step, direcao, irPara } = useTrocaDeEtapa(total);
   // penúltimo, como no wizard de staff — o passo seguinte (contato) é o
   // fechamento
   const passoTermo = temTermo ? total - 2 : -1;
@@ -205,7 +207,9 @@ export function OnboardingJovem({
   const emailTxt = perfil?.email ?? me.email;
 
   function avancar() {
-    setStep((s) => Math.min(s + 1, total - 1));
+    // foco fica no efeito [step] da superfície (scroll + título) — irPara
+    // com alvo null marca só a direção do slide
+    irPara(step + 1, null);
   }
 
   /** Continuar do passo da grade — grava o que estiver marcado (a RPC
@@ -458,7 +462,7 @@ export function OnboardingJovem({
                   });
                   return;
                 }
-                setStep((s) => s - 1);
+                irPara(step - 1, null);
               }}
               // pendingTermo trava o Voltar no meio do submit do termo —
               // sair do passo desmontava o form com a action voando
@@ -485,8 +489,8 @@ export function OnboardingJovem({
             className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
           >
             <div
-              className="h-full rounded-full bg-[var(--role-mentorado)] transition-all duration-500"
-              style={{ width: `${((step + 1) / total) * 100}%` }}
+              className="h-full origin-left rounded-full bg-[var(--role-mentorado)] transition-transform duration-500"
+              style={{ transform: `scaleX(${(step + 1) / total})` }}
             />
           </div>
           {/* aria-hidden: o progressbar já anuncia "Passo X de Y" — o
@@ -509,12 +513,16 @@ export function OnboardingJovem({
           de sm, mesmo desenho do OnboardingFlow de staff */}
       <main
         className={cn(
-          "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col pb-32 pt-[calc(5rem+env(safe-area-inset-top))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] transition-[max-width] duration-500 sm:justify-center sm:px-6",
+          "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col pb-32 pt-[calc(5rem+env(safe-area-inset-top))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:justify-center sm:px-6",
+          // sem transition-[max-width]: spec 028 — a largura muda seca
+          // junto do slide da etapa (max-width em transição é layout por frame)
           step === PASSO_TOUR && "sm:max-w-6xl"
         )}
       >
         <Logo size="sm" className="mb-6 self-start" />
-        <div key={step} className="animate-rise">
+        {/* remount por passo é deliberado (FormData por passo) — a Etapa
+            com key mantém o remount e traz o slide direcional */}
+        <Etapa key={step} direcao={direcao}>
           <div className="flex items-end gap-3">
             {/* a Liza abre e fecha a jornada — a cauda do balão aponta pra
                 ela; nos passos do meio ela sai pra não disputar o conteúdo
@@ -536,7 +544,7 @@ export function OnboardingJovem({
             </div>
           </div>
           <div className="mt-5">{corpo}</div>
-        </div>
+        </Etapa>
       </main>
 
       {/* footer fixo: "Preencher depois" no passo da grade, "Assinar

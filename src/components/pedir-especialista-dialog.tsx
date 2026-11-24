@@ -287,8 +287,11 @@ export function PedirEspecialistaDialog({
             />
           </div>
 
+          {/* revelação progressiva = cascata do kit (.animate-enter + --i
+              pela ordem do documento) — não é troca de etapa, é conteúdo
+              que aparece conforme a escolha avança */}
           {modo === "dirigido" && (
-            <div className="space-y-2">
+            <div className="animate-enter space-y-2" style={{ "--i": 0 } as React.CSSProperties}>
               <p className="text-sm font-medium">Quem você quer procurar?</p>
               <ul className="max-h-[40dvh] space-y-1.5 overflow-y-auto pr-1">
                 {especialistas.map((e) => {
@@ -342,7 +345,7 @@ export function PedirEspecialistaDialog({
           )}
 
           {modo === "dirigido" && esp && (
-            <div className="space-y-2">
+            <div className="animate-enter space-y-2" style={{ "--i": 1 } as React.CSSProperties}>
               <p className="text-sm font-medium">
                 Horário pra sessão{" "}
                 <span className="font-normal text-muted-foreground">
@@ -384,14 +387,14 @@ export function PedirEspecialistaDialog({
           )}
 
           {modo === "qualquer" && (
-            <p className="rounded-lg border border-dashed border-border px-3 py-2 text-xs leading-relaxed text-muted-foreground">
+            <p className="animate-enter rounded-lg border border-dashed border-border px-3 py-2 text-xs leading-relaxed text-muted-foreground" style={{ "--i": 1 } as React.CSSProperties}>
               Seu nome e o pedido aparecem no mural de todos os especialistas.
               Quem puder te atender aceita e propõe um horário.
             </p>
           )}
 
           {modo && (
-            <div className="space-y-2">
+            <div className="animate-enter space-y-2" style={{ "--i": 2 } as React.CSSProperties}>
               {precisaDemanda ? (
                 <>
                   <div className="flex items-baseline justify-between gap-2">

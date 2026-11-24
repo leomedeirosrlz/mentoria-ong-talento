@@ -11,7 +11,7 @@ import {
   Signature,
 } from "@phosphor-icons/react";
 import { toast } from "@/lib/toast";
-import { AnimatePresence, motion } from "motion/react";
+import { FadeTroca } from "@/components/ui/etapa";
 import {
   emitirAssinaturasEmLote,
   enviarLinksAssinatura,
@@ -26,7 +26,7 @@ import type { DocsPessoa } from "@/components/pessoas-listas";
 import { useOrigem } from "@/components/forms/use-origem";
 import { CopiarLink } from "@/components/forms/copiar-link";
 import { NudgeButton } from "@/components/nudge-button";
-import { fade, T } from "@/components/motion";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -445,14 +445,20 @@ export function EnviarTermosDialog({
           </DialogDescription>
         </DialogHeader>
 
-        <AnimatePresence mode="wait" initial={false}>
+        {/* troca de estado do kit: o painel entrante recebe o foco — o
+            botão que emitiu os links desmonta junto */}
+        <FadeTroca
+          chave={
+            resultado
+              ? "prontos"
+              : docsDisponiveis.length === 0
+                ? "vazio"
+                : "form"
+          }
+          foco
+        >
           {resultado ? (
-            <motion.div
-              key="prontos"
-              {...fade}
-              transition={T.enter}
-              className="min-w-0 space-y-3"
-            >
+            <div className="min-w-0 space-y-3">
               <p className="text-sm font-medium">
                 {slugsUnicos.size > 1
                   ? "Documentos do jovem · links prontos"
@@ -574,24 +580,14 @@ export function EnviarTermosDialog({
                   {copiouTodos ? "Copiados" : "Copiar todos"}
                 </Button>
               </DialogFooter>
-            </motion.div>
+            </div>
           ) : docsDisponiveis.length === 0 ? (
-            <motion.p
-              key="vazio"
-              {...fade}
-              transition={T.enter}
-              className="text-sm text-muted-foreground"
-            >
+            <p className="text-sm text-muted-foreground">
               Ninguém cadastrado ainda. Cadastre pessoas e jovens primeiro e
               volte pra enviar daqui.
-            </motion.p>
+            </p>
           ) : (
-            <motion.div
-              key="form"
-              {...fade}
-              transition={T.enter}
-              className="min-w-0 space-y-4"
-            >
+            <div className="min-w-0 space-y-4">
               <div className="space-y-1.5">
                 <Label id={docLabelId}>Documento</Label>
                 <Select
@@ -681,9 +677,9 @@ export function EnviarTermosDialog({
                     : "Escolha as pessoas"}
                 </Button>
               </DialogFooter>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </FadeTroca>
       </DialogContent>
     </Dialog>
   );

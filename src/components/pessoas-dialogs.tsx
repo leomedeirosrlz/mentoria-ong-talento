@@ -37,9 +37,8 @@ import {
   CampoPrefGenero,
   CampoUf,
   SENTINEL_VAZIO,
-  WizardFicha,
-  type PassoFicha,
 } from "@/components/campos-pessoais";
+import { WizardPassos, type PassoWizard } from "@/components/ui/etapa";
 import type { Disponibilidade } from "@/lib/types";
 import { maskWhatsApp } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -163,7 +162,7 @@ export function NovaPessoaDialog() {
   // "Ficha de mentor" entra/sai com o papel escolhido no passo 1. Ordem:
   // identidade/contato → operacional/papel → dados pessoais por último
   // (localização e interesses fecham o wizard — REALIZA-384)
-  const passos: PassoFicha[] = [
+  const passos: PassoWizard[] = [
     {
       titulo: "Identificação",
       icone: IdentificationCard,
@@ -394,7 +393,7 @@ export function NovaPessoaDialog() {
             disponibilidade.
           </DialogDescription>
         </DialogHeader>
-        <WizardFicha
+        <WizardPassos
           passos={passos}
           pending={pending}
           submitLabel="Cadastrar"
@@ -419,7 +418,7 @@ export function NovoMentoradoDialog() {
   // Ordem: identidade/contato → operacional → dados pessoais por último
   // (interesses e objetivos fecham o wizard — REALIZA-384). Anamnese é
   // instrumento externo ao programa: o campo de notas saiu da UI.
-  const passos: PassoFicha[] = [
+  const passos: PassoWizard[] = [
     {
       titulo: "Identificação",
       icone: IdentificationCard,
@@ -579,7 +578,7 @@ export function NovoMentoradoDialog() {
             interesses e disponibilidade.
           </DialogDescription>
         </DialogHeader>
-        <WizardFicha
+        <WizardPassos
           passos={passos}
           pending={pending}
           submitLabel="Cadastrar"

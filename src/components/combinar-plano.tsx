@@ -54,6 +54,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
+import { Etapa, useTrocaDeEtapa } from "@/components/ui/etapa";
 
 // "Combinar o plano" (518): a superfície que leva a dupla a UM gesto de
 // proposta — uma pergunta por tela (ritmo livre, recesso, grade) e a
@@ -166,7 +167,6 @@ export function CombinarPlano({
   const chamada = useRef(0);
   const deb = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const [passo, setPasso] = useState(0);
   const [ritmoSel, setRitmoSel] = useState<number | "outro" | null>(null);
   const [outroTxt, setOutroTxt] = useState("");
   const [decisoes, setDecisoes] = useState<Record<string, boolean>>({});
@@ -186,9 +186,6 @@ export function CombinarPlano({
   const [avisoReconhecido, setAvisoReconhecido] = useState<string | null>(
     null
   );
-
-  const tituloRef = useRef<HTMLHeadingElement>(null);
-  const montou = useRef(false);
 
   const ritmoNum = useMemo(() => {
     if (ritmoSel === "outro") {
@@ -234,6 +231,26 @@ export function CombinarPlano({
   );
   const assinaturaFusao = JSON.stringify(gruposFusao);
   const precisaAvisoPratica = fusaoPedeAvisoPratica(gruposFusao);
+
+  const passos = useMemo<PassoId[]>(() => {
+    const p: PassoId[] = ["ritmo"];
+    if (sim && sim.recessos.length > 0) p.push("recesso");
+    if (
+      sim &&
+      (!sim.grade.mentor || !sim.grade.jovem || sim.grade.diasComuns === 0)
+    )
+      p.push("grade");
+    // 018: a pergunta da sessão só existe quando há vizinho fundível
+    if (arestasFusao.length > 0) p.push("sessao");
+    p.push("confirmar");
+    return p;
+  }, [sim, arestasFusao]);
+  // wizard pelo kit (ui/etapa): slide direcional + foco no título da
+  // pergunta nova — o índice já vem clampado (a lista pode encolher entre
+  // simulações)
+  const { etapa: passo, direcao, irPara, reiniciar, tituloEtapaRef } =
+    useTrocaDeEtapa<HTMLHeadingElement>(passos.length);
+  const passoId = passos[passo];
 
   const simular = (p: {
     ritmo?: number | null;
@@ -283,7 +300,7 @@ export function CombinarPlano({
   if (open !== openAnterior) {
     setOpenAnterior(open);
     if (open) {
-      setPasso(0);
+      reiniciar();
       setErroSim(null);
       setGradeSalva(false);
       setFusaoSel({});
@@ -304,31 +321,6 @@ export function CombinarPlano({
       );
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, duplaId]);
-
-  const passos = useMemo<PassoId[]>(() => {
-    const p: PassoId[] = ["ritmo"];
-    if (sim && sim.recessos.length > 0) p.push("recesso");
-    if (
-      sim &&
-      (!sim.grade.mentor || !sim.grade.jovem || sim.grade.diasComuns === 0)
-    )
-      p.push("grade");
-    // 018: a pergunta da sessão só existe quando há vizinho fundível
-    if (arestasFusao.length > 0) p.push("sessao");
-    p.push("confirmar");
-    return p;
-  }, [sim, arestasFusao]);
-  const passoId = passos[Math.min(passo, passos.length - 1)];
-
-  // pergunta por tela: o foco acompanha a mudança de pergunta (quem usa
-  // teclado/leitor não fica procurando onde a conversa continuou)
-  useEffect(() => {
-    if (!montou.current) {
-      montou.current = true;
-      return;
-    }
-    tituloRef.current?.focus();
-  }, [passoId]);
 
   const recessoUsa = (r: RecessoSim) => decisoes[r.cicloEventoId] ?? r.usa;
   const pendentes =
@@ -423,7 +415,7 @@ export function CombinarPlano({
   const perguntaRitmo = (
     <div>
       <h3
-        ref={passoId === "ritmo" ? tituloRef : undefined}
+        ref={passoId === "ritmo" ? tituloEtapaRef : undefined}
         tabIndex={-1}
         className="text-sm font-semibold outline-none"
       >
@@ -509,7 +501,7 @@ export function CombinarPlano({
     lado === "staff" ? (
       <div>
         <h3
-          ref={passoId === "recesso" ? tituloRef : undefined}
+          ref={passoId === "recesso" ? tituloEtapaRef : undefined}
           tabIndex={-1}
           className="text-sm font-semibold outline-none"
         >
@@ -544,7 +536,7 @@ export function CombinarPlano({
     ) : (
       <div>
         <h3
-          ref={passoId === "recesso" ? tituloRef : undefined}
+          ref={passoId === "recesso" ? tituloEtapaRef : undefined}
           tabIndex={-1}
           className="text-sm font-semibold outline-none"
         >
@@ -625,7 +617,7 @@ export function CombinarPlano({
   const perguntaGrade = sim ? (
     <div>
       <h3
-        ref={passoId === "grade" ? tituloRef : undefined}
+        ref={passoId === "grade" ? tituloEtapaRef : undefined}
         tabIndex={-1}
         className="text-sm font-semibold outline-none"
       >
@@ -767,7 +759,7 @@ export function CombinarPlano({
   const perguntaSessao = sim ? (
     <div>
       <h3
-        ref={passoId === "sessao" ? tituloRef : undefined}
+        ref={passoId === "sessao" ? tituloEtapaRef : undefined}
         tabIndex={-1}
         className="text-sm font-semibold outline-none"
       >
@@ -848,7 +840,7 @@ export function CombinarPlano({
   const perguntaConfirmar = sim ? (
     <div>
       <h3
-        ref={passoId === "confirmar" ? tituloRef : undefined}
+        ref={passoId === "confirmar" ? tituloEtapaRef : undefined}
         tabIndex={-1}
         className="text-sm font-semibold outline-none"
       >
@@ -1113,11 +1105,25 @@ export function CombinarPlano({
             <p className="text-xs font-medium text-muted-foreground">
               Pergunta {idx + 1} de {passos.length}
             </p>
-            {passoId === "ritmo" && perguntaRitmo}
-            {passoId === "recesso" && perguntaRecesso}
-            {passoId === "grade" && perguntaGrade}
-            {passoId === "sessao" && perguntaSessao}
-            {passoId === "confirmar" && perguntaConfirmar}
+            {/* perguntas montadas: a inativa leva `hidden` — voltar não
+                perde estado do DOM (a <details> do aviso, a grade editada).
+                Um passo fora da lista fica inativo pra sempre: `ativa` é
+                quem filtra, o conteúdo não é recondicionado */}
+            <Etapa ativa={passoId === "ritmo"} direcao={direcao}>
+              {perguntaRitmo}
+            </Etapa>
+            <Etapa ativa={passoId === "recesso"} direcao={direcao}>
+              {perguntaRecesso}
+            </Etapa>
+            <Etapa ativa={passoId === "grade"} direcao={direcao}>
+              {perguntaGrade}
+            </Etapa>
+            <Etapa ativa={passoId === "sessao"} direcao={direcao}>
+              {perguntaSessao}
+            </Etapa>
+            <Etapa ativa={passoId === "confirmar"} direcao={direcao}>
+              {perguntaConfirmar}
+            </Etapa>
             {painel}
             {erroEnvio && (
               <p role="status" className="text-sm text-destructive">
@@ -1136,7 +1142,7 @@ export function CombinarPlano({
           type="button"
           variant="outline"
           disabled={enviando}
-          onClick={() => setPasso(idx - 1)}
+          onClick={() => irPara(idx - 1)}
         >
           <ArrowLeft aria-hidden />
           Voltar
@@ -1156,7 +1162,7 @@ export function CombinarPlano({
           type="button"
           className="ml-auto"
           disabled={!podeAvancar}
-          onClick={() => setPasso(idx + 1)}
+          onClick={() => irPara(idx + 1)}
         >
           Avançar
           <ArrowRight aria-hidden />

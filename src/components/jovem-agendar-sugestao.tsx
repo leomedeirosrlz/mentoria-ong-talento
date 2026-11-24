@@ -14,6 +14,7 @@ import { diaSemanaDe, formatDiaHora } from "@/lib/ciclo";
 import { ocupadoEmChoque, rotuloOrigem } from "@/lib/sugestoes-encontro";
 import type { SugestoesEncontro } from "@/lib/sugestoes-encontro-server";
 import { Button } from "@/components/ui/button";
+import { FadeTroca } from "@/components/ui/etapa";
 import {
   SeletorDiaHora,
   ddmm,
@@ -114,125 +115,127 @@ export function JovemAgendarSugestao({
 
   if (!principal) return null; // sem data viável na janela — não prometer gesto impossível
 
-  if (marcado) {
-    return (
-      <section
-        aria-labelledby="agendar-sugestao-titulo"
-        className="animate-enter rounded-xl border border-[var(--destaque-borda)] bg-[var(--destaque-suave)] p-5 sm:p-6"
-      >
-        <h2
-          id="agendar-sugestao-titulo"
-          className="text-xs font-semibold uppercase tracking-[0.08em]"
-        >
-          {titulo}
-        </h2>
-        <p className="mt-2 flex items-center gap-2 text-xl font-semibold tracking-tight">
-          <CheckCircle
-            size={22}
-            weight="fill"
-            aria-hidden
-            className="text-[var(--ok-text)]"
-          />
-          {marcado.numero}º encontro com {comQuem}
-        </p>
-        <p className="mt-1 text-sm" role="status">
-          Marcado para {diaSemanaDe(marcado.data)} {ddmm(marcado.data)} às{" "}
-          {marcado.hora}
-        </p>
-        {numeros.length > 0 && (
-          <div className="mt-4">
-            <Button
-              variant="ghost"
-              size="sm"
-              className="text-muted-foreground"
-              onClick={() => setMarcado(null)}
-            >
-              Agendar outro encontro
-            </Button>
-          </div>
-        )}
-        {plano}
-      </section>
-    );
-  }
-
   const dow = diaSemanaDe(principal.data);
   const dataCurta = ddmm(principal.data);
 
+  // troca de estado do kit: a seção "marcado" recebe o foco — o botão que
+  // confirmou desmonta junto com a sugestão (crossfade, não cascata)
   return (
-    <section
-      aria-labelledby="agendar-sugestao-titulo"
-      className="animate-enter rounded-xl border border-[var(--destaque-borda)] bg-[var(--destaque-suave)] p-5 sm:p-6"
-    >
-      <h2
-        id="agendar-sugestao-titulo"
-        className="text-xs font-semibold uppercase tracking-[0.08em]"
-      >
-        {titulo}
-      </h2>
-      <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
-        {numero}º encontro com {comQuem}
-      </p>
-      <p className="mt-1 text-sm text-muted-foreground">Sem data ainda</p>
+    <FadeTroca chave={marcado ? "ok" : "sugestao"} foco>
+      {marcado ? (
+        <section
+          aria-labelledby="agendar-sugestao-titulo"
+          className="rounded-xl border border-[var(--destaque-borda)] bg-[var(--destaque-suave)] p-5 sm:p-6"
+        >
+          <h2
+            id="agendar-sugestao-titulo"
+            className="text-xs font-semibold uppercase tracking-[0.08em]"
+          >
+            {titulo}
+          </h2>
+          <p className="mt-2 flex items-center gap-2 text-xl font-semibold tracking-tight">
+            <CheckCircle
+              size={22}
+              weight="fill"
+              aria-hidden
+              className="text-[var(--ok-text)]"
+            />
+            {marcado.numero}º encontro com {comQuem}
+          </p>
+          <p className="mt-1 text-sm">
+            Marcado para {diaSemanaDe(marcado.data)} {ddmm(marcado.data)} às{" "}
+            {marcado.hora}
+          </p>
+          {numeros.length > 0 && (
+            <div className="mt-4">
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={() => setMarcado(null)}
+              >
+                Agendar outro encontro
+              </Button>
+            </div>
+          )}
+          {plano}
+        </section>
+      ) : (
+        <section
+          aria-labelledby="agendar-sugestao-titulo"
+          className="rounded-xl border border-[var(--destaque-borda)] bg-[var(--destaque-suave)] p-5 sm:p-6"
+        >
+          <h2
+            id="agendar-sugestao-titulo"
+            className="text-xs font-semibold uppercase tracking-[0.08em]"
+          >
+            {titulo}
+          </h2>
+          <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
+            {numero}º encontro com {comQuem}
+          </p>
+          <p className="mt-1 text-sm text-muted-foreground">Sem data ainda</p>
 
-      <div className="mt-3 space-y-1.5">
-        <p className="flex items-center gap-2 text-sm font-medium">
-          <CalendarCheck
-            size={16}
-            aria-hidden
-            className="shrink-0 text-muted-foreground"
+          <div className="mt-3 space-y-1.5">
+            <p className="flex items-center gap-2 text-sm font-medium">
+              <CalendarCheck
+                size={16}
+                aria-hidden
+                className="shrink-0 text-muted-foreground"
+              />
+              {dowLongo(principal.data).replace("-feira", "")}, {dataCurta}, das{" "}
+              {principal.hora} às {fimDe(principal.hora, sugestoes.duracaoMin)}
+            </p>
+            <p className="flex items-center gap-2 text-xs text-muted-foreground">
+              <ClockCounterClockwise size={14} aria-hidden className="shrink-0" />
+              {rotuloOrigem(principal.origem)}
+            </p>
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <Button
+              disabled={pending}
+              onClick={() => marcar(principal.data, principal.hora, numero)}
+            >
+              {pending ? "Marcando…" : `Marcar para ${dow} ${dataCurta} às ${principal.hora}`}
+            </Button>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                setAviso(null);
+                setSessao((s) => s + 1);
+                setAberto(true);
+              }}
+            >
+              Escolher outro dia
+            </Button>
+          </div>
+          {aviso && (
+            <p role="status" className="mt-2 text-sm text-destructive">
+              {aviso}
+            </p>
+          )}
+          <p className="mt-3 text-xs text-muted-foreground">
+            {comQuem} recebe um aviso na hora.
+          </p>
+          {plano}
+
+          <SeletorDiaHora
+            key={sessao}
+            aberto={aberto}
+            onAberto={setAberto}
+            numero={numero}
+            numeros={numeros}
+            comQuem={comQuem}
+            inicial={principal}
+            sugestoes={sugestoes}
+            pending={pending}
+            aviso={aviso}
+            onAviso={setAviso}
+            onConfirmar={marcar}
           />
-          {dowLongo(principal.data).replace("-feira", "")}, {dataCurta}, das{" "}
-          {principal.hora} às {fimDe(principal.hora, sugestoes.duracaoMin)}
-        </p>
-        <p className="flex items-center gap-2 text-xs text-muted-foreground">
-          <ClockCounterClockwise size={14} aria-hidden className="shrink-0" />
-          {rotuloOrigem(principal.origem)}
-        </p>
-      </div>
-
-      <div className="mt-4 flex flex-wrap items-center gap-2">
-        <Button
-          disabled={pending}
-          onClick={() => marcar(principal.data, principal.hora, numero)}
-        >
-          {pending ? "Marcando…" : `Marcar para ${dow} ${dataCurta} às ${principal.hora}`}
-        </Button>
-        <Button
-          variant="ghost"
-          onClick={() => {
-            setAviso(null);
-            setSessao((s) => s + 1);
-            setAberto(true);
-          }}
-        >
-          Escolher outro dia
-        </Button>
-      </div>
-      {aviso && (
-        <p role="status" className="mt-2 text-sm text-destructive">
-          {aviso}
-        </p>
+        </section>
       )}
-      <p className="mt-3 text-xs text-muted-foreground">
-        {comQuem} recebe um aviso na hora.
-      </p>
-      {plano}
-
-      <SeletorDiaHora
-        key={sessao}
-        aberto={aberto}
-        onAberto={setAberto}
-        numero={numero}
-        numeros={numeros}
-        comQuem={comQuem}
-        inicial={principal}
-        sugestoes={sugestoes}
-        pending={pending}
-        aviso={aviso}
-        onAviso={setAviso}
-        onConfirmar={marcar}
-      />
-    </section>
+    </FadeTroca>
   );
 }

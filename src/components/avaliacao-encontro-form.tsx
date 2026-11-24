@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useState, useTransition } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { useState, useTransition } from "react";
 import {
   CheckCircle,
   CircleNotch,
@@ -17,8 +16,8 @@ import {
   TEMAS_AVALIACAO,
   estrelasTexto,
 } from "@/lib/ciclo";
-import { fade, T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
+import { FadeTroca } from "@/components/ui/etapa";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
@@ -62,12 +61,6 @@ export function AvaliacaoEncontroForm({
   const [erroEstrelas, setErroEstrelas] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [pending, start] = useTransition();
-
-  const focoSucesso = useCallback((el: HTMLDivElement | null) => {
-    if (!el) return;
-    el.scrollIntoView({ block: "center" });
-    el.focus({ preventScroll: true });
-  }, []);
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -114,16 +107,12 @@ export function AvaliacaoEncontroForm({
   };
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    // troca de estado do kit: o painel entrante recebe o foco — o submit
+    // que disparou desmonta junto com o form (centralizar = página pública
+    // rolável, o envio acontece lá embaixo)
+    <FadeTroca chave={enviado ? "ok" : "form"} foco centralizar>
       {enviado ? (
-        <motion.div
-          key="ok"
-          ref={focoSucesso}
-          tabIndex={-1}
-          {...fade}
-          transition={T.enter}
-          className="rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] outline-none sm:p-8"
-        >
+        <div className="rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] outline-none sm:p-8">
           <div className="mx-auto grid size-12 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
             {pedidoAjuda ? (
               <HandHeart size={24} weight="bold" aria-hidden />
@@ -139,14 +128,9 @@ export function AvaliacaoEncontroForm({
               ? `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""} por contar. A coordenação foi avisada na hora e fala com você. O combinado do programa é responder em 1 dia útil.`
               : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. ${privacidadeAvaliacao(trilha)} Pode fechar esta página.`}
           </p>
-        </motion.div>
+        </div>
       ) : (
-        <motion.div
-          key="form"
-          {...fade}
-          transition={T.enter}
-          className="space-y-3"
-        >
+        <div className="space-y-3">
           {/* card de contexto — a linha de privacidade É o argumento que
               faz o jovem responder de verdade (D4). Dentro do diálogo o
               título e a privacidade já estão no cabeçalho dele */}
@@ -435,8 +419,8 @@ export function AvaliacaoEncontroForm({
               {pending ? "Enviando…" : "Enviar avaliação"}
             </Button>
           </form>
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
+    </FadeTroca>
   );
 }

@@ -13,6 +13,7 @@ import {
 import { toast } from "@/lib/toast";
 import { CronogramaBuilder } from "@/components/cronograma-builder";
 import { Button } from "@/components/ui/button";
+import { Etapa, useTrocaDeEtapa } from "@/components/ui/etapa";
 import {
   ACCEPT_IMPORT,
   CONFIANCA_LIMIAR_IA,
@@ -42,6 +43,12 @@ export function NovaTurmaFlow({
   const [verAlternativo, setVerAlternativo] = useState(false);
   const [pending, start] = useTransition();
   const inputRef = useRef<HTMLInputElement>(null);
+  // troca de modo (montar ↔ importar ↔ revisar): o painel "importar" é a
+  // Etapa local; "montar"/"revisar" são o próprio builder — a Etapa INTERNA
+  // dele já desliza (embrulhar aqui dobraria pra 16px), então a direção do
+  // gesto desce via direcaoInicial e o foco cai no painel pelo tituloEtapaRef
+  const { direcao, assinalar, tituloEtapaRef } =
+    useTrocaDeEtapa<HTMLDivElement>(1);
 
   function enviar(viaIa: boolean) {
     if (!arquivo) {
@@ -73,29 +80,44 @@ export function NovaTurmaFlow({
 
   if (modo === "montar")
     return (
-      <div className="space-y-4">
+      <div ref={tituloEtapaRef} tabIndex={-1} className="space-y-4 outline-none">
         <div className="flex justify-end">
-          <Button variant="outline" size="sm" onClick={() => setModo("importar")}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              assinalar(1);
+              setModo("importar");
+            }}
+          >
             <FileArrowUp aria-hidden />
             Importar de arquivo
           </Button>
         </div>
-        <CronogramaBuilder cronogramas={cronogramas} eventos={eventos} />
+        <CronogramaBuilder
+          cronogramas={cronogramas}
+          eventos={eventos}
+          direcaoInicial={direcao}
+        />
       </div>
     );
 
   if (modo === "revisar" && importado)
     return (
-      <CronogramaBuilder
-        cronogramas={cronogramas}
-        eventos={eventos}
-        importado={importado}
-        onVoltar={() => {
-          setImportado(null);
-          setResultado(null);
-          setModo("importar");
-        }}
-      />
+      <div ref={tituloEtapaRef} tabIndex={-1} className="outline-none">
+        <CronogramaBuilder
+          cronogramas={cronogramas}
+          eventos={eventos}
+          importado={importado}
+          direcaoInicial={direcao}
+          onVoltar={() => {
+            assinalar(-1);
+            setImportado(null);
+            setResultado(null);
+            setModo("importar");
+          }}
+        />
+      </div>
     );
 
   // ---------- modo importar ----------
@@ -104,7 +126,7 @@ export function NovaTurmaFlow({
       ? resultado.rascunhoAlternativo
       : (resultado?.rascunho ?? null);
   return (
-    <div className="space-y-5">
+    <Etapa ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-5 outline-none">
       <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
         <h2 className="text-sm font-semibold">Arquivo do cronograma</h2>
         <p className="mt-1 text-sm text-muted-foreground">
@@ -163,6 +185,7 @@ export function NovaTurmaFlow({
               size="sm"
               disabled={!rasc.eventos.length}
               onClick={() => {
+                assinalar(1);
                 setImportado({ rascunho: rasc, arquivo: arquivo!.name });
                 setModo("revisar");
               }}
@@ -205,9 +228,16 @@ export function NovaTurmaFlow({
         </section>
       )}
 
-      <Button variant="ghost" size="sm" onClick={() => setModo("montar")}>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={() => {
+          assinalar(-1);
+          setModo("montar");
+        }}
+      >
         Voltar
       </Button>
-    </div>
+    </Etapa>
   );
 }

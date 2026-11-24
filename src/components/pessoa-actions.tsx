@@ -32,9 +32,8 @@ import {
   CampoPrefGenero,
   CampoUf,
   SENTINEL_VAZIO,
-  WizardFicha,
-  type PassoFicha,
 } from "@/components/campos-pessoais";
+import { WizardPassos, type PassoWizard } from "@/components/ui/etapa";
 import { formatWhatsApp } from "@/lib/ciclo";
 import { cn, maskWhatsApp } from "@/lib/utils";
 import { temPapel } from "@/lib/types";
@@ -141,7 +140,7 @@ export function PessoaActions({
   // antes disso não zera nada: a action só toca o que veio no FormData).
   // Ordem: identidade/contato → operacional/papel → dados pessoais por
   // último (REALIZA-384)
-  const passos: PassoFicha[] = [
+  const passos: PassoWizard[] = [
     {
       titulo: "Identificação e contato",
       icone: IdentificationCard,
@@ -497,7 +496,7 @@ export function PessoaActions({
               Os dados do cadastro em etapas. Salve de qualquer uma.
             </DialogDescription>
           </DialogHeader>
-          <WizardFicha
+          <WizardPassos
             passos={passos}
             pending={pending}
             submitLabel="Salvar"

@@ -1,7 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import {
   CheckCircle,
   CircleNotch,
@@ -10,9 +9,9 @@ import {
 import { submeterRespostaTerceiro } from "@/lib/actions-terceiros";
 import { primeiroNome } from "@/components/forms/link-shared";
 import { Button } from "@/components/ui/button";
+import { FadeTroca } from "@/components/ui/etapa";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { fade, T } from "@/components/motion";
 import { cn } from "@/lib/utils";
 
 // O form do respondente externo (0103): 2 perguntas abertas do guia —
@@ -46,13 +45,6 @@ export function TerceiroPublico({
   // (molde rascunho:/f/<token>: inputs não-controlados, o DOM guarda o
   // valor e o rascunho restaura via ref); some quando a resposta sai
   const chaveRascunho = `rascunho:/t/${token}`;
-
-  // foco migra pro painel de sucesso quando ele monta — molde /f
-  const focoSucesso = useCallback((el: HTMLDivElement | null) => {
-    if (!el) return;
-    el.scrollIntoView({ block: "center" });
-    el.focus({ preventScroll: true });
-  }, []);
 
   // restaura o rascunho depois do mount — localStorage nunca é lido no
   // render (SSR/abas privadas)
@@ -123,16 +115,11 @@ export function TerceiroPublico({
   }
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    // troca de estado do kit: o painel entrante recebe o foco — o botão
+    // de envio desmonta junto (centralizar = página pública rolável)
+    <FadeTroca chave={enviado ? "ok" : "form"} foco centralizar>
       {enviado ? (
-        <motion.div
-          key="ok"
-          {...fade}
-          transition={T.enter}
-          ref={focoSucesso}
-          tabIndex={-1}
-          className="rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] outline-none sm:p-8"
-        >
+        <div className="rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] outline-none sm:p-8">
           <div className="mx-auto grid size-12 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
             <CheckCircle size={24} weight="bold" aria-hidden />
           </div>
@@ -142,12 +129,9 @@ export function TerceiroPublico({
             {jovem} a construir o plano de desenvolvimento e chega ao
             mentor sem te expor.
           </p>
-        </motion.div>
+        </div>
       ) : (
-        <motion.form
-          key="form"
-          {...fade}
-          transition={T.enter}
+        <form
           ref={formRef}
           onSubmit={submit}
           onChange={onFormChange}
@@ -232,8 +216,8 @@ export function TerceiroPublico({
             )}
             {pending ? "Enviando…" : "Enviar resposta"}
           </Button>
-        </motion.form>
+        </form>
       )}
-    </AnimatePresence>
+    </FadeTroca>
   );
 }

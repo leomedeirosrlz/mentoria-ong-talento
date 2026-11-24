@@ -8,8 +8,9 @@ import { CircleNotch, EnvelopeSimple, Key, WarningCircle } from "@phosphor-icons
 import { createAuthClient, createOtpClient } from "@/lib/supabase/client";
 import { limparCookiesDemo } from "@/lib/demo/shared";
 import { SiteFooter } from "@/components/site-footer";
-import { fade, T, EASE } from "@/components/motion";
+import { T, EASE } from "@/components/motion";
 import { Button } from "@/components/ui/button";
+import { FadeTroca } from "@/components/ui/etapa";
 import { Input } from "@/components/ui/input";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
@@ -63,12 +64,6 @@ export function LoginForm() {
   // null) ou deadline errado; o em régua janela do link e o cooldown.
   // Espelhado na sessionStorage (login-pedido) pra sobreviver a reload.
   const pedidoRef = useRef<PedidoLogin | null>(null);
-  // o painel "enviado" monta só depois do exit do form (mode="wait") — um
-  // useEffect([enviado]) dispararia com o ref ainda null e perderia o foco;
-  // ref callback foca quando o nó existe de verdade
-  const focoEnviado = useCallback((el: HTMLDivElement | null) => {
-    el?.focus();
-  }, []);
 
   // destino pós-login: ?next= do middleware (link protegido) + o #registrar-{id}
   // que o browser manteve na barra durante o redirect — o #error= do verify
@@ -455,6 +450,7 @@ export function LoginForm() {
   // link expirado/usado chega como ?erro=link-invalido (de /auth/confirm ou
   // do normalizador de #error=) — merece tela própria, não o form com um aviso
   const erroLink = params.get("erro") != null;
+  const painel = erroLink ? "erro-link" : enviado ? "enviado" : "form";
 
   return (
     // flex + m-auto (não place-items-center): com o teclado virtual
@@ -510,18 +506,12 @@ export function LoginForm() {
         </div>
 
         {/* feedback: crossfade form ↔ confirmação — o painel sucede o form no
-            mesmo espaço em vez de corte seco (§2); ref/tabIndex de foco migram
-            pro motion.div entrante */}
-        <AnimatePresence mode="wait" initial={false}>
-          {erroLink ? (
-            <motion.div
-              key="erro-link"
-              ref={focoEnviado}
-              tabIndex={-1}
-              {...fade}
-              transition={T.enter}
-              className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6 outline-none"
-            >
+            mesmo espaço em vez de corte seco (§2). Troca de estado do kit:
+            o painel entrante recebe o foco — menos o form, que tem autoFocus
+            próprio no campo de e-mail */}
+        <FadeTroca chave={painel} foco={painel !== "form"}>
+          {painel === "erro-link" ? (
+            <div className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6 outline-none">
               <div className="grid size-10 place-items-center rounded-full bg-destructive/10 text-destructive">
                 <WarningCircle size={20} weight="bold" aria-hidden="true" />
               </div>
@@ -544,16 +534,9 @@ export function LoginForm() {
               >
                 Pedir novo link
               </Button>
-            </motion.div>
-          ) : enviado ? (
-            <motion.div
-              key="enviado"
-              ref={focoEnviado}
-              tabIndex={-1}
-              {...fade}
-              transition={T.enter}
-              className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6 outline-none"
-            >
+            </div>
+          ) : painel === "enviado" ? (
+            <div className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6 outline-none">
               <div className="grid size-10 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
                 <EnvelopeSimple size={20} weight="bold" aria-hidden="true" />
               </div>
@@ -622,14 +605,9 @@ export function LoginForm() {
                   Usar outro e-mail
                 </Button>
               </div>
-            </motion.div>
+            </div>
           ) : (
-            <motion.div
-              key="form"
-              {...fade}
-              transition={T.enter}
-              className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6"
-            >
+            <div className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6">
               {/* segmento concêntrico: raio externo = interno + padding (8+4=12).
                   escolha excludente → radio com legend (não tablist): setas e
                   estado "selecionado" vêm de graça, sem tabpanel nem roving tabindex */}
@@ -788,9 +766,9 @@ export function LoginForm() {
                     </div>
                   ))}
               </form>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </FadeTroca>
         <SiteFooter className="mt-10" />
       </div>
     </div>

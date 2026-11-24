@@ -43,6 +43,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Etapa,
+  useTrocaDeEtapa,
+  type DirecaoEtapa,
+} from "@/components/ui/etapa";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
@@ -92,6 +97,7 @@ export function CronogramaBuilder({
   eventos,
   importado,
   onVoltar,
+  direcaoInicial,
 }: {
   cronogramas: Cronograma[];
   /** todos os eventos — o modo "copiar" recorta o conteúdo do cronograma fonte */
@@ -102,6 +108,9 @@ export function CronogramaBuilder({
   importado?: { rascunho: RascunhoImportacao; arquivo: string };
   /** volta pro fluxo de importação (a etapa "config" não existe nesse modo) */
   onVoltar?: () => void;
+  /** direção do slide no MOUNT — o flow pai dita (Voltar remonta o builder
+   *  deslizando da esquerda); interno à fase a assinalar toma conta */
+  direcaoInicial?: DirecaoEtapa;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -142,6 +151,11 @@ export function CronogramaBuilder({
   const [editando, setEditando] = useState<string | null>(null);
   const [novoAberto, setNovoAberto] = useState(false);
   const [novo, setNovo] = useState<EventoRascunho>(rascunhoVazio);
+  // duas fases por remount (config ↔ prévia): o kit entrega o slide
+  // direcional e o foco no painel que entra — o botão que disparou a
+  // troca (Gerar/Voltar) desmonta junto e o foco não fica órfão
+  const { direcao, assinalar, tituloEtapaRef } =
+    useTrocaDeEtapa<HTMLDivElement>(1, direcaoInicial);
 
   const erroLista = useMemo(
     () => (linhas.length ? validaEventos(linhas) : null),
@@ -196,6 +210,7 @@ export function CronogramaBuilder({
       toast.error(r.error);
       return;
     }
+    assinalar(1);
     setLinhas(r.eventos.map((e) => ({ ...e, key: novaChave() })));
     setEtapa("previa");
   }
@@ -246,7 +261,7 @@ export function CronogramaBuilder({
   if (etapa === "previa") {
     const editandoLinha = linhas.find((l) => l.key === editando) ?? null;
     return (
-      <div className="space-y-5">
+      <Etapa key="previa" ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-5 outline-none">
         {importado && (
           <>
             {/* origem + avisos do parse — a revisão humana é obrigatória por
@@ -445,7 +460,11 @@ export function CronogramaBuilder({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => (onVoltar ? onVoltar() : setEtapa("config"))}
+              onClick={() =>
+                onVoltar
+                  ? onVoltar()
+                  : (assinalar(-1), setEtapa("config"))
+              }
             >
               <ArrowLeft aria-hidden />
               {importado ? "Importar outro arquivo" : "Voltar aos parâmetros"}
@@ -480,13 +499,13 @@ export function CronogramaBuilder({
             setNovoAberto(false);
           }}
         />
-      </div>
+      </Etapa>
     );
   }
 
   // ---------- passo 1: parâmetros ----------
   return (
-    <div className="space-y-5">
+    <Etapa key="config" ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-5 outline-none">
       <section className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)] sm:p-5">
         <h2 className="text-sm font-semibold">A turma</h2>
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
@@ -807,7 +826,7 @@ export function CronogramaBuilder({
           Gerar prévia do calendário
         </Button>
       </div>
-    </div>
+    </Etapa>
   );
 }
 

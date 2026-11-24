@@ -70,6 +70,7 @@ import {
   SENTINEL_VAZIO,
 } from "@/components/campos-pessoais";
 import { Button } from "@/components/ui/button";
+import { Etapa, useTrocaDeEtapa } from "@/components/ui/etapa";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -233,11 +234,11 @@ export function OnboardingFlow({
   // passos "Sobre você" fundidos (497) e a disponibilidade (11); termo
   // pendente adiciona 1 passo
   const total = (ehMentor ? 11 : 7) + (temTermo ? 1 : 0);
-  const [stepBruto, setStep] = useState(0);
-  // o total encolhe quando a pessoa desmarca "voluntário" (e o status da prop
-  // pode chegar assinado depois): o índice lido nunca passa do último, sem
-  // setState em efeito (era o 8/7 e o valuenow > valuemax do bug)
-  const step = Math.min(stepBruto, total - 1);
+  // wizard pelo kit (ui/etapa): o índice já vem clampado — o total encolhe
+  // quando a pessoa desmarca "voluntário" (e o status da prop pode chegar
+  // assinado depois), sem o valuenow > valuemax do bug. A direção alimenta
+  // o slide da Etapa; o foco segue no efeito próprio (scroll + título)
+  const { etapa: step, direcao, irPara } = useTrocaDeEtapa(total);
   const [termoOk, setTermoOk] = useState(false);
   const [pendingTermo, setPendingTermo] = useState(false);
   const [pending, start] = useTransition();
@@ -340,7 +341,9 @@ export function OnboardingFlow({
   const ehPassoTermo = step === passoTermo;
 
   function avancar() {
-    setStep((s) => Math.min(s + 1, total - 1));
+    // foco fica no efeito [step] da superfície (scroll + título) — irPara
+    // com alvo null marca só a direção do slide
+    irPara(step + 1, null);
   }
 
   /** "Pular etapa" com campo preenchido: o que a pessoa digitou é dela —
@@ -1080,7 +1083,7 @@ export function OnboardingFlow({
                 });
                 return;
               }
-              setStep((s) => s - 1);
+              irPara(step - 1, null);
             }}
             // pendingTermo trava o Voltar no meio do submit do termo —
             // sair do passo desmontava o form com a action voando
@@ -1107,8 +1110,8 @@ export function OnboardingFlow({
             className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
           >
             <div
-              className="h-full rounded-full bg-[var(--brand-lime)] transition-all duration-500"
-              style={{ width: `${((step + 1) / total) * 100}%` }}
+              className="h-full origin-left rounded-full bg-[var(--brand-lime)] transition-transform duration-500"
+              style={{ transform: `scaleX(${(step + 1) / total})` }}
             />
           </div>
           <span aria-hidden className="shrink-0 text-xs font-medium tabular-nums text-muted-foreground">
@@ -1127,12 +1130,17 @@ export function OnboardingFlow({
           pb-40 no mobile cobre o footer empilhado (~154px com safe-area) */}
       <main
         className={cn(
-          "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col pb-40 pt-[calc(5rem+env(safe-area-inset-top))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] transition-[max-width] duration-500 sm:justify-center sm:px-6 sm:pb-32",
+          "mx-auto flex min-h-[100dvh] w-full max-w-xl flex-col pb-40 pt-[calc(5rem+env(safe-area-inset-top))] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] sm:justify-center sm:px-6 sm:pb-32",
+          // sem transition-[max-width]: a spec 028 bane max-width em
+          // transição (layout por frame) — a largura muda seca junto do
+          // slide da etapa, que já sinaliza a mudança
           step === 2 && "sm:max-w-6xl"
         )}
       >
         <Logo size="sm" className="mb-6 self-start" />
-        <div key={step} className="animate-rise">
+        {/* remount por passo é deliberado (FormData por passo) — a Etapa
+            com key mantém o remount e traz o slide direcional */}
+        <Etapa key={step} direcao={direcao}>
           <div className="flex items-end gap-3">
             {/* a Liza abre e fecha a jornada — a cauda do balão aponta pra
                 ela; nos passos do meio ela sai pra não disputar o form */}
@@ -1165,7 +1173,7 @@ export function OnboardingFlow({
           ) : (
             corpo && <div className="mt-5">{corpo}</div>
           )}
-        </div>
+        </Etapa>
       </main>
 
       {/* footer fixo: "Pular etapa" nos passos opcionais + primário.

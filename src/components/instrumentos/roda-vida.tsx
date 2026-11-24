@@ -265,8 +265,8 @@ export function RodaVida({
             className="mt-2 h-1.5 overflow-hidden rounded-full bg-muted"
           >
             <div
-              className="h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-300"
-              style={{ width: `${(respondidas / total) * 100}%` }}
+              className="h-full origin-left rounded-full bg-[var(--brand-lime)] transition-transform duration-300 will-change-transform"
+              style={{ transform: `scaleX(${respondidas / total})` }}
             />
           </div>
           <div className="mt-1.5 flex justify-between text-xs text-muted-foreground">
@@ -451,13 +451,16 @@ function AreaSlider({
       >
         <span className="absolute inset-x-0 top-1/2 h-1.5 -translate-y-1/2 overflow-hidden rounded-full bg-muted">
           <span
-            className="block h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-150"
-            style={{ width: `${((area.nota ?? 0) / 10) * 100}%` }}
+            className="block h-full origin-left rounded-full bg-[var(--brand-lime)] transition-transform duration-150 will-change-transform"
+            style={{ transform: `scaleX(${(area.nota ?? 0) / 10})` }}
           />
         </span>
         {respondida && (
           <span
-            className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--ok-text)] transition-[left] duration-150"
+            // sem transition-[left]: o polegar segue o ponteiro 1:1 no
+            // arraste — uma transição de posição seria layout por frame E
+            // deixaria a bolinha atrás do dedo (spec 028, FR-106)
+            className="absolute top-1/2 size-3 -translate-x-1/2 -translate-y-1/2 rounded-full bg-[var(--ok-text)]"
             style={{ left: `${((area.nota ?? 0) / 10) * 100}%` }}
           />
         )}

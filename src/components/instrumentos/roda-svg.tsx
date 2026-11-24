@@ -189,7 +189,7 @@ export function RodaSvg({
         )}
         <polygon
           points={dados}
-          className="fill-[var(--brand-lime)]/25 stroke-[var(--ok-text)] transition-all duration-150"
+          className="fill-[var(--brand-lime)]/25 stroke-[var(--ok-text)] transition-colors duration-150"
           strokeWidth={1.8}
           strokeLinejoin="round"
         />
