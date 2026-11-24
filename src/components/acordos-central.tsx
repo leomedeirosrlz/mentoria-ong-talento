@@ -10,6 +10,9 @@ import {
 } from "@/components/acordos-acoes";
 import { rotuloIntervencao } from "@/lib/intervencoes";
 import type { Dupla, DuplaPlanoRoteiro } from "@/lib/types";
+import { SITE_URL } from "@/lib/site";
+import { waLink } from "@/lib/ciclo";
+import { msgPlanoCombinado } from "@/lib/whatsapp-msgs";
 
 /** Central "Acordos e intervenções" (REALIZA-459, sugestão 7 da auditoria
  *  de design): o que a dupla combinou e o que a equipe sugeriu, no mesmo
@@ -96,6 +99,18 @@ export function AcordosCentral({
             recessos={recessos}
             sugestoes={sugestoesPlano}
             combinadoHref={`/duplas/${dupla.id}/combinado`}
+            whatsappHref={
+              souMentor || souStaff
+                ? waLink(
+                    dupla.mentorado.whatsapp,
+                    msgPlanoCombinado({
+                      paraNome: dupla.mentorado.nome,
+                      quem: "A equipe",
+                      href: `${SITE_URL}/jovem/combinado`,
+                    })
+                  )
+                : null
+            }
           />
           {(planoVivo.status === "aceito" || planoVivo.status === "ativo") && (
             <div className="mt-3">

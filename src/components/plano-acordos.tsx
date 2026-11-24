@@ -80,6 +80,7 @@ export function PlanoAcordosCard({
   recessos = [],
   sugestoes,
   combinadoHref,
+  whatsappHref,
 }: {
   plano: PlanoCombinado;
   /** id da dupla pra revalidar a ficha — o jovem não tem, e não
@@ -108,6 +109,8 @@ export function PlanoAcordosCard({
   sugestoes?: SeletorSugestoes | null;
   /** Rota do documento do combinado (020) — "Ler o combinado" no card */
   combinadoHref?: string;
+  /** deep link wa.me com template dinâmico (518) — sem provider */
+  whatsappHref?: string | null;
 }) {
   const router = useRouter();
   const [pendente, iniciar] = useTransition();
@@ -366,6 +369,16 @@ export function PlanoAcordosCard({
             <BookOpenText size={13} aria-hidden />
             Ler o combinado
           </Link>
+        )}
+        {whatsappHref && (
+          <a
+            href={whatsappHref}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex min-h-11 items-center gap-1 rounded-sm text-xs font-medium text-muted-foreground underline underline-offset-2 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:min-h-8"
+          >
+            Avisar por WhatsApp
+          </a>
         )}
       </div>
 
