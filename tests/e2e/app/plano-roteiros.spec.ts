@@ -207,10 +207,7 @@ test.describe("roteiros do plano + doc do combinado (521)", () => {
     );
   });
 
-  // BLOQUEADO: roteiro_salvar da 0231 nunca grava — o `into v_p` não traz
-  // `escopo` mas o guard lê `v_p.escopo` → 42703 em toda chamada válida.
-  // O SQL sugerido está no relatório; des-fixme quando a correção cair.
-  test.fixme(
+  test(
     "roteiro_salvar grava rascunho e o segundo save atualiza updated_at",
     async () => {
       const jwtMentor = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
@@ -238,8 +235,7 @@ test.describe("roteiros do plano + doc do combinado (521)", () => {
     const prop = await propor(jwtMentor);
     const planoId = prop.id!;
 
-    // rascunho na mesa (service role — a escrita da 0231 está quebrada,
-    // ver fixme acima); o jovem publica — a RPC carimba quem publicou
+    // rascunho na mesa; o jovem publica — a RPC carimba quem publicou
     const v1 = (await inserirViaServiceRole("dupla_plano_roteiros", {
       dupla_id: DUPLA,
       plano_id: planoId,
@@ -377,10 +373,7 @@ test.describe("roteiros do plano + doc do combinado (521)", () => {
     expect(velho.status).toBe("publicado");
   });
 
-  // BLOQUEADO: o lazy grava via roteiro_salvar (a mesma RPC do fixme
-  // acima) — enquanto a 0231 não ganha a correção, a ficha abre normal
-  // mas a semana não nasce. Des-fixme junto.
-  test.fixme(
+  test(
     "lazy na superfície: encontro agendado + ficha aberta → a semana nasce publicada",
     async ({ page }) => {
       const jwtMentor = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
