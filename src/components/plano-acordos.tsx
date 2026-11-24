@@ -6,10 +6,14 @@ import { Check, X, CalendarPlus } from "@phosphor-icons/react";
 import {
   aplicarPassoPlano,
   responderPlano,
+  responderPlanoComRecesso,
+  type DecisaoRecesso,
 } from "@/lib/actions-plano";
 import { diaSemanaDe } from "@/lib/ciclo";
 import {
   datasDoPasso,
+  diaMes,
+  estadoLeituraPlano,
   resumoCombinado,
   sugestaoPasso,
   type PlanoCombinado,
@@ -19,6 +23,7 @@ import {
   partesSP,
   type OcupadoRotulado,
 } from "@/lib/sugestoes-encontro";
+import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -30,6 +35,10 @@ import {
   AceitesPlano,
   QuadradosCombinado,
 } from "@/components/plano-em-dia-pecas";
+import {
+  RecessoDecisao,
+  type RecessoDaFicha,
+} from "@/components/recesso-dupla-card";
 
 /** O que o card precisa do plano — a projeção mínima comum ao embed da
  *  ficha (DuplaPlano) e ao recorte do jovem (jovem_plano), compartilhada
@@ -61,6 +70,7 @@ export function PlanoAcordosCard({
   meuLado = null,
   nomes,
   realizados = [],
+  recessos = [],
   sugestoes,
 }: {
   plano: PlanoCombinado;
@@ -71,16 +81,20 @@ export function PlanoAcordosCard({
   podeResponder: boolean;
   /** aplicar passo = agendar data combinada — mentor e jovem */
   podeAplicar: boolean;
-  /** Lado de quem lê (513): com o aceite bilateral, "falta o seu aceite"
-   *  é diferente de "falta o aceite do outro". Sem ele o card não
-   *  oferece responder (só lê). */
+  /** Lado de quem lê (518): um aceite da dupla ativa o combinado, então
+   *  "falta o seu" vs "você foi avisado" são estados diferentes. Sem ele
+   *  o card não oferece responder (só lê). */
   meuLado?: "mentor" | "mentorado" | null;
-  /** Primeiros nomes dos dois lados — os chips de aceite nomeiam quem
-   *  já disse sim. */
+  /** Primeiros nomes dos dois lados — os chips nomeiam quem respondeu
+   *  e quem foi avisado. */
   nomes?: { mentor: string; mentorado: string };
   /** Números já realizados da dupla — a régua separa "feito" de
    *  "só tem data". */
   realizados?: readonly number[];
+  /** Recessos no caminho do combinado (518, US3.5): na proposta a dupla
+   *  pode repensar a resposta aqui — o aceite leva as decisões novas e
+   *  recalcula se as datas mudarem. */
+  recessos?: RecessoDaFicha[];
   /** Pacote do motor (perfil/grade/ocupados) — alimenta a sugestão da
    *  linha e os chips do "Outra data". Sem ele, date+time de step 900. */
   sugestoes?: SeletorSugestoes | null;
@@ -103,6 +117,11 @@ export function PlanoAcordosCard({
   const [marcados, setMarcados] = useState<
     Record<number, { data: string; hora: string }>
   >({});
+  // respostas de recesso dadas nesta sessão — ganham da prop no aceite
+  // (o revalidate demora um tiquinho e o gesto não pode viajar velho)
+  const [decisaoLocal, setDecisaoLocal] = useState<Record<string, boolean>>(
+    {}
+  );
   const resumo = resumoCombinado(plano, realizados);
   const aberto = resumo.aberto;
   const aplicados = new Map(
@@ -110,18 +129,23 @@ export function PlanoAcordosCard({
   );
   const janela = plano.janela ?? plano.escopo?.janela ?? null;
   const hoje = sugestoes?.hoje ?? partesSP(new Date())?.data ?? "";
-  // aceite bilateral (513): "falta eu" abre os botões; "falta o outro"
-  // é leitura — a RPC recusa responder de novo e a tela não oferece
-  const faltaEu =
-    meuLado != null && plano.status === "proposto" && !resumo.aceites[meuLado];
+  // leitura 518 do plano por quem abre: proposta da equipe esperando a
+  // dupla ("falta o seu"), combinado em vigor sem o seu carimbo ("você
+  // foi avisado") ou seguindo — um aceite ativa, nunca "faltam os dois"
+  const estado = estadoLeituraPlano({
+    status: plano.status,
+    meuLado,
+    aceites: resumo.aceites,
+  });
+  const nomeOutro =
+    meuLado === "mentor"
+      ? (nomes?.mentorado ?? "seu jovem")
+      : (nomes?.mentor ?? "seu mentor");
+  const propostaPor =
+    plano.proposto_via === "liza" ? "A Liza" : "A equipe";
   const statusTexto: Record<string, string> = {
-    proposto:
-      resumo.falta === "os_dois"
-        ? "Proposto, esperando os dois aceitarem"
-        : resumo.falta === "mentor" || resumo.falta === "mentorado"
-          ? `Proposto, falta o aceite ${resumo.falta === "mentor" ? "do mentor" : "do jovem"}`
-          : "Proposto, esperando aceitar",
-    aceito: "Aceito, combinando as datas",
+    proposto: "Proposto, falta um aceite da dupla",
+    aceito: "Em vigor",
     ativo: "Em andamento",
     concluido: "Concluído",
     expirado: "Expirado",
@@ -130,9 +154,32 @@ export function PlanoAcordosCard({
 
   const responder = (acao: "aceitar" | "contestar") => {
     setErro(null);
+    // o aceite leva as decisões de recesso vigentes (prop + o que a
+    // pessoa repensou aqui) — se a data muda, a action recalcula e
+    // devolve novaVersao
+    const decisoes: DecisaoRecesso[] = recessos
+      .map((r) => ({
+        cicloEventoId: r.cicloEventoId,
+        usa: decisaoLocal[r.cicloEventoId] ?? r.usa,
+      }))
+      .filter((d): d is DecisaoRecesso => d.usa != null);
     iniciar(async () => {
-      const r = await responderPlano(plano.id, acao, undefined, duplaId);
-      if ("error" in r) setErro(r.error);
+      const r =
+        acao === "aceitar" && decisoes.length > 0 && duplaId
+          ? await responderPlanoComRecesso(
+              plano.id,
+              acao,
+              decisoes,
+              duplaId
+            )
+          : await responderPlano(plano.id, acao, undefined, duplaId);
+      if ("error" in r) {
+        setErro(r.error);
+        return;
+      }
+      if (r.novaVersao)
+        toast.success("Versão recalculada já está em vigor.");
+      router.refresh();
     });
   };
 
@@ -232,10 +279,32 @@ export function PlanoAcordosCard({
         )}
         {janela && (
           <span className="text-xs text-muted-foreground">
-            Janela: {ddmm(janela.inicio)} a {ddmm(janela.fim)}
+            De {ddmm(janela.inicio)} a {ddmm(janela.fim)}
           </span>
         )}
       </div>
+
+      {/* a leitura da proposta muda por lado: quem ainda não respondeu
+          vê o pedido; quem já carimbou vê que um aceite da dupla basta */}
+      {estado === "proposto_staff_falta_meu" && (
+        <p className="text-sm text-muted-foreground">
+          {propostaPor} propôs esse plano. Um aceite da dupla já coloca o
+          combinado em vigor; o outro lado é avisado.
+        </p>
+      )}
+      {estado === "proposto_staff_falta_outro" && meuLado != null && (
+        <p className="text-sm text-muted-foreground">
+          Você já respondeu. Um aceite da dupla já coloca o combinado em
+          vigor.
+        </p>
+      )}
+      {estado === "ativo_sem_minha_ciencia" && (
+        <p className="text-sm text-muted-foreground">
+          {nomeOutro} combinou o plano pra vocês.
+          {resumo.propostoEm &&
+            ` Você foi avisado em ${diaMes(resumo.propostoEm.slice(0, 10))}.`}
+        </p>
+      )}
 
       {plano.status === "proposto" && (
         <AceitesPlano
@@ -387,13 +456,47 @@ export function PlanoAcordosCard({
         })}
       </ol>
 
-      {erro && <p className="text-sm text-destructive">{erro}</p>}
+      {/* repensar o recesso antes do aceite (518, US3.5): a decisão é
+          da dupla, e se a resposta nova mudar as datas o combinado
+          recalcula no mesmo gesto */}
+      {aberto &&
+        podeResponder &&
+        meuLado != null &&
+        duplaId &&
+        recessos.length > 0 &&
+        plano.status === "proposto" && (
+          <div className="space-y-1.5 rounded-lg bg-muted/50 px-3.5 py-3 shadow-[var(--shadow-inset)]">
+            <p className="text-xs font-semibold text-foreground">
+              {recessos.length > 1
+                ? "Os recessos no caminho"
+                : "O recesso no caminho"}
+            </p>
+            <p className="text-xs text-muted-foreground">
+              Podem repensar a resposta antes de aceitar. Se as datas
+              mudarem, o combinado recalcula junto.
+            </p>
+            <RecessoDecisao
+              duplaId={duplaId}
+              recessos={recessos}
+              podeDeclarar
+              onDecisao={(cicloEventoId, usa) =>
+                setDecisaoLocal((d) => ({ ...d, [cicloEventoId]: usa }))
+              }
+            />
+          </div>
+        )}
 
-      {aberto && podeResponder && faltaEu && (
+      {erro && (
+        <p role="status" className="text-sm text-destructive">
+          {erro}
+        </p>
+      )}
+
+      {aberto && podeResponder && estado === "proposto_staff_falta_meu" && (
         <div className="flex flex-wrap gap-2 pt-1">
           <Button size="sm" disabled={pendente} onClick={() => responder("aceitar")}>
             <Check aria-hidden />
-            Aceitar o combinado
+            Aceitar
           </Button>
           <Button
             size="sm"
@@ -402,33 +505,35 @@ export function PlanoAcordosCard({
             onClick={() => responder("contestar")}
           >
             <X aria-hidden />
-            Não combina
+            Não serve pra mim
+          </Button>
+        </div>
+      )}
+      {aberto && podeResponder && estado === "ativo_sem_minha_ciencia" && (
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button size="sm" disabled={pendente} onClick={() => responder("aceitar")}>
+            <Check aria-hidden />
+            Estou ciente
+          </Button>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={pendente}
+            onClick={() => responder("contestar")}
+          >
+            <X aria-hidden />
+            Não serve pra mim
           </Button>
         </div>
       )}
       {aberto &&
         podeResponder &&
-        plano.status === "proposto" &&
-        meuLado != null &&
-        !faltaEu && (
+        estado === "ativo" && (
           <p className="text-xs text-muted-foreground">
-            Você já aceitou. O plano começa a valer quando{" "}
-            {resumo.falta === "mentor"
-              ? nomes?.mentor ?? "o mentor"
-              : nomes?.mentorado ?? "o jovem"}{" "}
-            aceitar também.
+            O combinado está em vigor. Se algo mudou, ainda dá pra
+            contestar antes do próximo encontro.
           </p>
         )}
-      {aberto && podeResponder && plano.status !== "proposto" && (
-        <p className="text-xs text-muted-foreground">
-          {resumo.aceites.mentor && resumo.aceites.mentorado
-            ? "Os dois lados aceitaram."
-            : `Aceito por ${
-                plano.aprovado_lado === "mentorado" ? "você" : "seu mentor"
-              }.`}
-          Se algo mudou, ainda dá pra contestar antes do próximo encontro.
-        </p>
-      )}
 
       {seletor && passoSeletor && sugSeletor && sugestoes && (
         <SeletorDiaHora

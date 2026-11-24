@@ -69,13 +69,18 @@ export const GAP_DIAS_EXIGE: Record<
  *  spacing the official double weeks use. */
 export const GAP_MINIMO_DIAS = 2;
 
-/** Ritmos que o plano sonda, do mais leve ao mais pesado (encontros por
- *  semana): o de sempre, a semana dupla, a semana tripla e, no topo, 1 por
- *  dia. O 4 fica de fora: com o piso de 2 dias ele cabe no mesmo calendário
- *  do 3 e não muda nenhuma data. */
+/** Ritmos que o plano sonda pra NOMEAR o nível de flexibilização, do mais
+ *  leve ao mais pesado (encontros por semana): o de sempre, a semana dupla,
+ *  a semana tripla e, no topo, 1 por dia. É a escada de nomeação, não o
+ *  conjunto permitido — a 518 torna o ritmo escolha livre da dupla e a
+ *  alternativa honesta procura o primeiro inteiro acima que fecha. */
 export const RITMOS_PLANO = [1, 2, 3, 7] as const;
 
-/** "1 encontro por dia" = até 7 na semana (REALIZA-513). */
+/** "1 encontro por dia" = até 7 na semana (REALIZA-513). Acima de 7 o
+ *  teto semanal deixa de limitar: uma semana só tem 7 dias e o piso de
+ *  1 dia já impede dois encontros na mesma data — por isso 7 é também o
+ *  teto da sondagem de alternativa (r>7 nunca desloca uma data que r=7
+ *  não deslocaria). */
 export const RITMO_UM_POR_DIA = 7;
 
 /** Piso entre dois encontros no ritmo de 1 por dia: dias seguidos. Só cai o

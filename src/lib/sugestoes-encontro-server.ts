@@ -61,8 +61,9 @@ export type SugestoesEncontro = {
  *  só ⇒ a grade dele (filtra o que dá pra filtrar); nenhum ⇒ null e o
  *  motor cai no histórico/padrão. Interseção vazia também vira null:
  *  "sem horário em comum" quem avisa é o avisoDisponibilidade, a
- *  sugestão não finge grade onde não há. */
-function gradesDaDupla(
+ *  sugestão não finge grade onde não há. Exportada pra ficha alimentar a
+ *  projeção do "ficar em dia" com a mesma grade (518). */
+export function gradesDaDupla(
   mentor: Disponibilidade | null,
   jovem: Disponibilidade | null
 ): Disponibilidade | null {

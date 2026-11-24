@@ -6,19 +6,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { declararRecesso } from "@/lib/actions-recesso";
 
-// REALIZA-462 — a decisão de recesso é da dupla e por período: "vamos
-// usar o recesso" (default, igual ao comportamento de sempre) ou "vamos
-// seguir nos encontrando". O calendário oficial não muda; o que muda é
-// como planner e agendas tratam a janela pra esta dupla.
+// REALIZA-462/518 — a decisão de recesso é da dupla e por período:
+// "vamos usar o recesso" ou "vamos seguir nos encontrando". Tri-estado
+// da 518: sem row em dupla_recessos = PENDENTE ("a dupla ainda não
+// decidiu"), nunca default silencioso. Só mentor e mentorado declaram
+// (a RPC 0225 revalida no banco); staff acompanha e cobra — "a decisão
+// é da dupla". O calendário oficial não muda; o que muda é como planner
+// e agendas tratam a janela pra esta dupla.
 
 export type RecessoDaFicha = {
   cicloEventoId: string;
   titulo: string;
-  /** "YYYY-MM-DD" — janela oficial do cronograma. */
+  /** "YYYY-MM-DD" — período oficial do cronograma. */
   inicio: string;
   fim: string;
-  /** Decisão vigente; default true (ausência de declaração = usa o recesso). */
-  usa: boolean;
+  /** Decisão vigente; null = a dupla ainda não decidiu (sem row). */
+  usa: boolean | null;
   declaradoEm: string | null;
   autorNome: string | null;
 };
@@ -56,7 +59,8 @@ export function RecessoDuplaCard({
 }: {
   duplaId: string;
   recessos: RecessoDaFicha[];
-  /** mentor da dupla ou coordenação — a RPC revalida na gravação. */
+  /** lado da dupla (mentor/jovem) — a RPC revalida na gravação; staff
+   *  lê o estado sem botão */
   podeDeclarar: boolean;
   souMentor: boolean;
 }) {
@@ -78,8 +82,8 @@ export function RecessoDuplaCard({
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {souMentor
-                ? "Vocês combinam juntos se param ou seguem se encontrando."
-                : "A dupla combina se para ou segue se encontrando."}
+                ? "Vocês combinam juntos se param ou seguem se encontrando. Qualquer um dos dois pode responder pela dupla."
+                : "A decisão é da dupla. A equipe acompanha e cobra, não responde por eles."}
             </p>
           </div>
         </div>
@@ -95,15 +99,20 @@ export function RecessoDuplaCard({
 }
 
 /** As linhas de decisão por período — reutilizadas dentro do card "Para
- *  ficar em dia", onde a escolha muda a projeção na hora. */
+ *  ficar em dia" (lá só leitura: a resposta mora no Combinar o plano) e
+ *  na central de acordos, onde a decisão muda a proposta. `onDecisao`
+ *  avisa o pai quando uma resposta nova grava — o aceite com recesso
+ *  repensado precisa das decisões frescas, não das props (518, US3.5). */
 export function RecessoDecisao({
   duplaId,
   recessos,
   podeDeclarar,
+  onDecisao,
 }: {
   duplaId: string;
   recessos: RecessoDaFicha[];
   podeDeclarar: boolean;
+  onDecisao?: (cicloEventoId: string, usa: boolean) => void;
 }) {
   const [pendente, start] = useTransition();
   const [erro, setErro] = useState<string | null>(null);
@@ -112,63 +121,78 @@ export function RecessoDecisao({
     setErro(null);
     start(async () => {
       const r = await declararRecesso(duplaId, cicloEventoId, usa);
-      if ("error" in r) setErro(r.error);
+      if ("error" in r) {
+        setErro(r.error);
+        return;
+      }
+      onDecisao?.(cicloEventoId, usa);
     });
   };
 
   return (
     <>
-      {recessos.map((r) => (
-        <div
-          key={r.cicloEventoId}
-          className="rounded-lg bg-muted/50 px-3.5 py-3 shadow-[var(--shadow-inset)]"
-        >
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <p className="text-sm font-medium">
-              {r.titulo} · {janela(r.inicio, r.fim)}
-            </p>
-            <p className="text-xs text-muted-foreground">
-              {r.declaradoEm
-                ? r.usa
-                  ? "vão usar o recesso"
-                  : "seguem se encontrando"
-                : "usando o recesso (padrão)"}
-            </p>
-          </div>
-          {autoria(r) && (
-            <p className="mt-1 text-xs text-muted-foreground">{autoria(r)}</p>
-          )}
-          {podeDeclarar && (
-            <div
-              className="mt-2.5 flex flex-wrap gap-2"
-              role="group"
-              aria-label={`Decisão sobre ${r.titulo}`}
-            >
-              <Button
-                type="button"
-                size="sm"
-                variant={r.usa ? "default" : "outline"}
-                disabled={pendente}
-                onClick={() => declarar(r.cicloEventoId, true)}
-              >
-                {r.usa && r.declaradoEm && <Check size={14} aria-hidden />}
-                Vamos usar o recesso
-              </Button>
-              <Button
-                type="button"
-                size="sm"
-                variant={!r.usa ? "default" : "outline"}
-                disabled={pendente}
-                onClick={() => declarar(r.cicloEventoId, false)}
-              >
-                {!r.usa && <Check size={14} aria-hidden />}
-                Vamos seguir nos encontrando
-              </Button>
+      {recessos.map((r) => {
+        const decidido = r.declaradoEm != null && r.usa != null;
+        return (
+          <div
+            key={r.cicloEventoId}
+            className="rounded-lg bg-muted/50 px-3.5 py-3 shadow-[var(--shadow-inset)]"
+          >
+            <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+              <p className="text-sm font-medium">
+                {r.titulo} · {janela(r.inicio, r.fim)}
+              </p>
+              <p className="text-xs text-muted-foreground">
+                {decidido
+                  ? r.usa
+                    ? "vão usar o recesso"
+                    : "seguem se encontrando"
+                  : "a dupla ainda não decidiu"}
+              </p>
             </div>
-          )}
-        </div>
-      ))}
-      {erro && <p className="text-xs text-[var(--warn-text)]">{erro}</p>}
+            {autoria(r) && (
+              <p className="mt-1 text-xs text-muted-foreground">{autoria(r)}</p>
+            )}
+            {podeDeclarar && (
+              <div
+                className="mt-2.5 flex flex-wrap gap-2"
+                role="group"
+                aria-label={`Decisão sobre ${r.titulo}`}
+              >
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={decidido && r.usa === true ? "default" : "outline"}
+                  disabled={pendente}
+                  onClick={() => declarar(r.cicloEventoId, true)}
+                >
+                  {decidido && r.usa === true && (
+                    <Check size={14} aria-hidden />
+                  )}
+                  Vamos usar o recesso
+                </Button>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant={decidido && r.usa === false ? "default" : "outline"}
+                  disabled={pendente}
+                  onClick={() => declarar(r.cicloEventoId, false)}
+                >
+                  {decidido && r.usa === false && (
+                    <Check size={14} aria-hidden />
+                  )}
+                  Vamos seguir nos encontrando
+                </Button>
+              </div>
+            )}
+          </div>
+        );
+      })}
+      {erro && (
+        <p role="status" className="text-xs text-[var(--warn-text)]">
+          {erro}
+        </p>
+      )}
     </>
   );
 }

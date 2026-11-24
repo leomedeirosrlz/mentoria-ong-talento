@@ -105,7 +105,14 @@ import { PlanoEmDiaCard } from "@/components/plano-em-dia-card";
 import { AcordosCentral } from "@/components/acordos-central";
 import { RecessoDuplaCard } from "@/components/recesso-dupla-card";
 import { montarPlanoEmDia } from "@/lib/plano-em-dia";
-import { sugestoesEncontroDaDupla } from "@/lib/sugestoes-encontro-server";
+import {
+  gradesDaDupla,
+  sugestoesEncontroDaDupla,
+} from "@/lib/sugestoes-encontro-server";
+import { disponibilidadesDaDupla } from "@/lib/actions";
+import { createClient } from "@/lib/supabase/server";
+import { demoAtivo } from "@/lib/demo/mode";
+import { getDemoData, supervisionaDuplaDemo } from "@/lib/demo/data";
 import { RegistrarRetroativoDialog } from "@/components/registrar-retroativo-dialog";
 import { RemanejoSugerido } from "@/components/remanejo-sugerido";
 import { ArquivosDupla } from "@/components/arquivos-dupla";
@@ -298,6 +305,20 @@ export default async function DuplaPage({
 
   const souMentor = dupla.mentor.id === me.id;
   const souCoord = me.role === "coordenacao";
+  // "staff" do plano (518): coordenação OU quem supervisiona a dupla —
+  // auxiliar de turma incluso. A régua é a RPC supervisiona_dupla, a
+  // mesma que a plano_propor aplica no banco: o supervisor_id da tela
+  // deixava a supervisão por turma de fora. O mentor nunca é staff da
+  // própria dupla.
+  const supervisionaDupla =
+    !souMentor &&
+    !souCoord &&
+    ((await demoAtivo())
+      ? supervisionaDuplaDemo(getDemoData(), me.id, dupla)
+      : (await (await createClient()).rpc("supervisiona_dupla", {
+          p_dupla: id,
+        })).data === true);
+  const souStaff = souCoord || supervisionaDupla;
   // linhagem do remanejo (0063): a ficha nova aponta a origem, a encerrada
   // aponta a sucessora. As queries voltam null quando a outra ponta está
   // fora do escopo do papel (RLS — quem saiu não enxerga a ficha nova) e a
@@ -432,8 +453,18 @@ export default async function DuplaPage({
   const jornada = jornadaDaDupla(dupla, passos);
   // catch-up plan (REALIZA-397): same journey derivation — the card only
   // shows at 2+ due steps; a single delay stays on the usual "Agendar Nº" CTA.
-  // Everything already scheduled or done = nothing to plan.
-  const planoEmDia = montarPlanoEmDia({ dupla, eventos, hoje: agora });
+  // Everything already scheduled or done = nothing to plan. A grade
+  // combinada entra como preferência forte (518): mesma régua da
+  // simulação da superfície — os dois lados marcam períodos livres e as
+  // datas preferem os dias em comum, sem nunca bloquear.
+  const { mentor: gradeMentor, jovem: gradeJovem } =
+    await disponibilidadesDaDupla(id);
+  const planoEmDia = montarPlanoEmDia({
+    dupla,
+    eventos,
+    hoje: agora,
+    disponibilidade: gradesDaDupla(gradeMentor, gradeJovem),
+  });
   const passosAgendaveis = planoEmDia.aplicavel
     ? planoEmDia.passos.filter((p) => p.acao !== "travado")
     : [];
@@ -597,7 +628,9 @@ export default async function DuplaPage({
               titulo: e.titulo,
               inicio: e.data!,
               fim: e.data_fim ?? e.data!,
-              usa: dec?.usa ?? true,
+              // tri-estado 518: sem row = a dupla ainda não decidiu —
+              // pendente vira pergunta, nunca "usa" silencioso
+              usa: dec?.usa ?? null,
               declaradoEm: dec?.declarado_em ?? null,
               autorNome:
                 dec?.autor?.nome_social ?? dec?.autor?.nome ?? null,
@@ -1191,11 +1224,9 @@ export default async function DuplaPage({
           plano={planoEmDia}
           dupla={dupla}
           souMentor={souMentor}
-          souStaff={souCoord || dupla.supervisor?.id === me.id}
+          souStaff={souStaff}
           planoVivo={planoVivoFicha != null}
-          jovemNome={primeiroNomeMentorado}
           recessos={recessosDaFicha}
-          podeDeclararRecesso={souMentor || souCoord}
         />
       )}
 
@@ -1205,19 +1236,21 @@ export default async function DuplaPage({
       <AcordosCentral
         dupla={dupla}
         souMentor={souMentor}
-        souStaff={souCoord || dupla.supervisor?.id === me.id}
+        souStaff={souStaff}
         numeroGuiaAtual={passoAtual?.numero ?? null}
+        recessos={recessosDaFicha}
         sugestoesPlano={sugestoesPlano}
       />
 
       {/* com plano de recuperação na tela a decisão de recesso mora dentro
           dele — sem plano ela segue em card próprio (dupla em dia também
-          combina a janela) */}
+          combina a janela). A decisão é da dupla (518): só o mentor
+          declara aqui; staff acompanha e cobra */}
       {!mostrarPlanoEmDia && recessosDaFicha.length > 0 && (
         <RecessoDuplaCard
           duplaId={dupla.id}
           recessos={recessosDaFicha}
-          podeDeclarar={souMentor || souCoord}
+          podeDeclarar={souMentor}
           souMentor={souMentor}
         />
       )}

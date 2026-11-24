@@ -1,25 +1,24 @@
-// Card "Para ficar em dia" (REALIZA-397+513) na aba Agora da ficha — a
-// leitura de equipe não agenda/remarca (quem agenda é a dupla), mas pode
-// PROPOR o combinado: o 0224 deixa coord, supervisor da dupla e mentor
-// abrirem a proposta bilateral. d-risco (Fernanda × Dandara) deve os
-// encontros 3 e 4 e tem o 5º marcado; d-atraso (513) tem três devidos —
-// 3º e 4º "não aconteceram" e o 5º venceu em limbo — e acende a
-// recuperação com proposta. No dataset da demo nenhuma dupla
-// supervisionada pelo Paulo está atrasada o suficiente pro card — a
-// d-pend só carrega pendência de registro, que a superfície própria já
-// cobre (e o combinado dela, proposto pelo Paulo, aparece no card de
-// acordos, não aqui).
+// Card "Para ficar em dia" (REALIZA-397/513/518) na aba Agora da ficha.
+// 518: o card é LEITURA pra todo mundo — o gesto inteiro (ritmo, recesso,
+// grade, confirmar) mora na superfície "Combinar o plano", uma pergunta
+// por tela. Staff abre a superfície mas o recesso lá dentro é só leitura:
+// a decisão é da dupla. No dataset demo de hoje a d-risco (Fernanda ×
+// Dandara) já acumula devidos demais — nem 1 por dia fecha antes do
+// encerramento e o recesso segue pendente ("a dupla ainda não decidiu"),
+// então o card cai no estado "conversa" com a saída honesta: seguir se
+// encontrando no recesso fecha o plano. A d-ok é a paridade do recesso
+// DECIDIDO: a dupla marcou "vamos usar o recesso" e os oficiais dentro
+// da janela viram devidos — o card aparece mesmo na dupla saudável.
 
-import { expect, test } from "../helpers";
-import { entrarNaDemo } from "../helpers";
+import { agirComConfirma, entrarNaDemo, expect, test } from "../helpers";
 
 const D_RISCO = "de000000-0000-4000-8000-000000001539"; // Fernanda × Dandara
 const D_ATRASO = "de000000-0000-4000-8000-000000001540"; // João Pedro × Eduardo
-const D_OK = "de000000-0000-4000-8000-000000001537"; // Ricardo × Ana (em dia)
-const D_PEND = "de000000-0000-4000-8000-000000001538"; // Carlos × Caio (só pendência)
+const D_OK = "de000000-0000-4000-8000-000000001537"; // Ricardo × Ana
+const D_PEND = "de000000-0000-4000-8000-000000001538"; // Carlos × Caio
 
 test.describe("demo — plano pra ficar em dia (REALIZA-397)", () => {
-  test("coordenação na d-risco: card com os passos e sem CTA de agendar", async ({
+  test("coordenação na d-risco: conversa honesta, recesso pendente e CTA", async ({
     page,
   }) => {
     await entrarNaDemo(page, "coordenacao");
@@ -27,38 +26,96 @@ test.describe("demo — plano pra ficar em dia (REALIZA-397)", () => {
 
     const card = page.getByRole("region", { name: "Para ficar em dia" });
     await expect(card).toBeVisible();
-    // a projeção honesta é o número principal — a data "em dia" já conta
-    // os encontros oficiais que vencem no caminho da recuperação
-    await expect(card.getByText(/Em dia em/)).toBeVisible();
+    // a projeção honesta quando nem o teto diário fecha: o card diz que
+    // não fecha em vez de prometer data, e aponta a conversa com a coord
+    await expect(
+      card.getByText("Não fecha até o encerramento", { exact: true })
+    ).toBeVisible();
+    await expect(
+      card.getByText("Nem com 1 encontro por dia fecha", { exact: true })
+    ).toBeVisible();
     await expect(card.getByText(/\d+ encontros? pra repor/)).toBeVisible();
+    // seguir no recesso é a alavanca que fecha — sugestão, nunca decisão
+    await expect(
+      card.getByText(/Se a dupla seguir se encontrando no recesso/)
+    ).toBeVisible();
     // os passos devidos abrem a lista: sugestão com a oficial passada ao
     // lado ("oficial era …"); os oficiais que vencem no caminho entram em
-    // sequência (a jornada inteira aparece); o 5º marcado lê "marcado pra"
+    // sequência (a jornada inteira aparece); o marcado lê "marcado pra"
     const itens = card.locator("ol li");
     await expect(itens.nth(0)).toContainText(/sugestão.*oficial era/);
-    await expect(itens.nth(1)).toContainText(/sugestão.*oficial era/);
     await expect(
       itens.filter({ hasText: /vence no caminho/ }).first()
     ).toBeVisible();
     await expect(card.getByText(/marcado pra/).first()).toBeVisible();
-    // a decisão de recesso mora dentro do card — a coordenação declara aqui
+    // 518: o recesso no caminho aparece no card só leitura — pendente
+    // é "a dupla ainda não decidiu"; a decisão mora na superfície e é
+    // só da dupla (a coordenação acompanha e cobra, não responde)
     await expect(card.getByText("Recesso no caminho")).toBeVisible();
+    await expect(card.getByText("A decisão é da dupla.")).toBeVisible();
+    await expect(card.getByText("a dupla ainda não decidiu")).toBeVisible();
     await expect(
-      card.getByRole("button", { name: "Vamos seguir nos encontrando" })
+      card.getByText("Falta 1 decisão da dupla pra fechar a proposta.")
     ).toBeVisible();
+    await expect(
+      card.getByRole("button", { name: /Vamos (usar|seguir)/ })
+    ).toHaveCount(0);
     // e não sobra card de recesso separado na página (exact: o aviso dos
     // passos empurrados menciona "recesso do programa" como substring)
     await expect(
       page.getByText("Recesso do programa", { exact: true })
     ).toHaveCount(0);
-    // leitura de equipe: não agenda nem remarca — quem agenda é a dupla.
-    // Mas o 0224 deixa a coordenação PROPOR o combinado
+    // o gesto é um só: "Combinar o plano" abre a superfície; no estado
+    // conversa a saída é falar com a coordenação
     await expect(
       card.getByRole("button", { name: /Agendar|Remarcar/ })
     ).toHaveCount(0);
     await expect(
-      card.getByRole("button", { name: /Propor o plano/i })
+      card.getByRole("button", { name: "Combinar o plano" })
     ).toBeVisible();
+    await expect(
+      card.getByRole("button", { name: "Falar com a coordenação" })
+    ).toBeVisible();
+  });
+
+  test("staff abre a superfície mas o recesso lá dentro é só leitura", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(`/duplas/${D_RISCO}?aba=agora`);
+
+    const card = page.getByRole("region", { name: "Para ficar em dia" });
+    // desktop → dialog; a superfície pode demorar a hidratar — repete o
+    // gesto até o dialog abrir (mesmo padrão do agendar)
+    const dialog = page.getByRole("dialog", { name: "Combinar o plano" });
+    await agirComConfirma(
+      () => card.getByRole("button", { name: "Combinar o plano" }).click(),
+      () => dialog.isVisible()
+    );
+    await expect(
+      dialog.getByText("Quantos encontros por semana")
+    ).toBeVisible({ timeout: 15_000 });
+    // o input é sr-only — clica o label pai (padrão do login por senha)
+    await dialog
+      .locator("label", {
+        has: page.locator('input[name="ritmo"][value="2"]'),
+      })
+      .click();
+    const avancar = dialog.getByRole("button", { name: "Avançar" });
+    await expect(avancar).toBeEnabled({ timeout: 15_000 });
+    await avancar.click();
+
+    // recesso no caminho: staff lê o estado e a régua "a decisão é da
+    // dupla" — sem radio pra responder por eles
+    await expect(dialog.getByText(/recesso no caminho/i)).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(
+      dialog.getByText(/A decisão é da dupla/)
+    ).toBeVisible();
+    await expect(
+      dialog.getByRole("radio", { name: /Vamos (usar|seguir)/ })
+    ).toHaveCount(0);
   });
 
   test("coordenação na d-atraso (3 devidos): recuperação com proposta", async ({
@@ -68,36 +125,55 @@ test.describe("demo — plano pra ficar em dia (REALIZA-397)", () => {
     await page.goto(`/duplas/${D_ATRASO}?aba=agora`);
 
     // 513: 3º e 4º "não aconteceram" e o 5º venceu em limbo — os três
-    // devidos acendem a recuperação possível, com CTA de proposta
+    // devidos acendem a recuperação possível, com CTA do combinado
     const card = page.getByRole("region", { name: "Para ficar em dia" });
     await expect(card).toBeVisible();
     await expect(card.getByText(/Em dia em/)).toBeVisible();
     await expect(card.getByText(/\d+ encontros? pra repor/)).toBeVisible();
     await expect(
-      card.getByRole("button", { name: /Propor o plano/i })
+      card.getByRole("button", { name: "Combinar o plano" })
     ).toBeVisible();
     await expect(
       card.getByRole("button", { name: /Agendar|Remarcar/ })
     ).toHaveCount(0);
   });
 
-  test("supervisão na d-pend (só pendência): sem card", async ({ page }) => {
+  test("supervisão na d-pend: staff lê o card inteiro com o mesmo CTA", async ({
+    page,
+  }) => {
     await entrarNaDemo(page, "supervisor");
     await page.goto(`/duplas/${D_PEND}?aba=agora`);
 
-    // a pendência de registro já tem superfície própria — o plano só aparece
-    // quando há 2+ encontros devidos pra agendar
+    // 518: auxiliar de turma é staff da dupla (supervisiona_dupla) — lê a
+    // projeção inteira. A d-pend já tem combinado aberto (proposto pelo
+    // Paulo): o CTA cede lugar ao "Ver o combinado" da central
+    const card = page.getByRole("region", { name: "Para ficar em dia" });
+    await expect(card).toBeVisible();
+    await expect(card.getByText(/\d+ encontros? pra repor/)).toBeVisible();
     await expect(
-      page.getByRole("region", { name: "Para ficar em dia" })
+      card.getByRole("link", { name: "Ver o combinado" })
+    ).toBeVisible();
+    await expect(
+      card.getByRole("button", { name: /Vamos (usar|seguir)/ })
     ).toHaveCount(0);
   });
 
-  test("mentor na d-ok (em dia): sem card", async ({ page }) => {
+  test("mentor na d-ok: recesso decidido vira devido — 'vão usar' lê autoria", async ({
+    page,
+  }) => {
     await entrarNaDemo(page, "mentor_dpp");
     await page.goto(`/duplas/${D_OK}?aba=agora`);
 
-    await expect(
-      page.getByRole("region", { name: "Para ficar em dia" })
-    ).toHaveCount(0);
+    // paridade demo do tri-estado: a dupla decidiu "vamos usar o recesso"
+    // — os oficiais dentro da janela viram devidos e o card aparece até
+    // na dupla que estava em dia. A decisão mostra quem e quando
+    const card = page.getByRole("region", { name: "Para ficar em dia" });
+    await expect(card).toBeVisible();
+    await expect(card.getByText(/\d+ encontros? pra repor/)).toBeVisible();
+    await expect(card.getByText("Recesso no caminho")).toBeVisible();
+    await expect(card.getByText("vão usar o recesso")).toBeVisible();
+    await expect(card.getByText(/decidido por .+ em /)).toBeVisible();
+    // decidido não é pendência: nada de "falta decisão" no card
+    await expect(card.getByText(/Falta \d+ decis/)).toHaveCount(0);
   });
 });

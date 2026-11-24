@@ -14,6 +14,7 @@ import {
   demoJovemEspecialistas,
   demoJovemPerfil,
   demoJovemPlano,
+  demoJovemRecessos,
 } from "./demo/queries";
 import { demoJovemJornada } from "./demo/forms-data";
 import type { JovemJornadaDados } from "./jornada";
@@ -410,22 +411,23 @@ export const getJovemJornada = cache(
 );
 
 /** Recessos vigentes/futuros do cronograma da dupla do jovem + a decisão
- *  declarada (462 — RPC `jovem_recessos`, 0218): o papel mentorado não
- *  lê ciclo_eventos, então a janela chega por definer, no mesmo gate da
- *  jovem_jornada. usa default true = "vamos usar o recesso". */
+ *  declarada (462 — RPC `jovem_recessos`, 0218/0225): o papel mentorado
+ *  não lê ciclo_eventos, então a janela chega por definer, no mesmo gate
+ *  da jovem_jornada. A 0225 abriu o tri-estado: `usa` null = pendente
+ *  (a dupla ainda não respondeu — left join sem row), true = "vamos
+ *  usar o recesso", false = "vamos seguir nos encontrando". */
 export type JovemRecesso = {
   ciclo_evento_id: string;
   data: string;
   data_fim: string | null;
-  usa: boolean;
+  usa: boolean | null;
   declarado_em: string | null;
 };
 
 export const getJovemRecessos = cache(
   async (): Promise<JovemRecesso[]> => {
     const demo = await demoRole();
-    // demo usa o recesso (default) — a nota simplesmente não renderiza
-    if (demo) return [];
+    if (demo) return demoJovemRecessos(demo);
     const supabase = await createClient();
     const { data, error } = await supabase.rpc("jovem_recessos");
     if (error) {
@@ -453,6 +455,8 @@ export type JovemPlano = {
   aceito_mentor?: boolean;
   aceito_mentorado?: boolean;
   proposto_em?: string;
+  /** "app" | "liza" — quem pediu a proposta da equipe (0225). */
+  proposto_via?: string | null;
   expira_em: string;
   concluido_em?: string | null;
   passos_aplicados: {

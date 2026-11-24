@@ -228,7 +228,13 @@ export function MentorHome({
           : null;
         const resumoPlano = planoVivo
           ? resumoCombinado(
-              { ...planoVivo, aceites: aceitesDoPlano(planoVivo) },
+              {
+                ...planoVivo,
+                aceites: aceitesDoPlano(planoVivo),
+                // "você foi avisado em" do 518 ancora no carimbo que
+                // ativou — a coluna não existe na tabela
+                proposto_em: planoVivo.aprovado_em ?? planoVivo.created_at,
+              },
               dupla.encontros
                 .filter((e) => e.status === "realizado")
                 .map((e) => e.numero)

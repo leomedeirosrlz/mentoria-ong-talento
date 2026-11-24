@@ -64,6 +64,8 @@ import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import type { JovemEncontro } from "@/lib/queries-jovem";
 import { combinadoDoJovem } from "@/lib/plano-combinado";
 import { PlanoAcordosCard } from "@/components/plano-acordos";
+import { CombinarPlano } from "@/components/combinar-plano";
+import { RecessoDecisao } from "@/components/recesso-dupla-card";
 import type { Disponibilidade } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -340,6 +342,35 @@ export default async function JovemAgenda() {
   const oficialPorNumero = new Map(
     oficiaisRetro.map((e) => [e.numero, e.data])
   );
+
+  // o combinado e os recessos do jovem, em forma pro card compartilhado
+  // (518): o aceite único e a decisão de recesso são gestos DELE também
+  // — a mesma peça da ficha, com o lado "mentorado"
+  const combinadoPlano = planoJovem ? combinadoDoJovem(planoJovem) : null;
+  const realizadosDpp = encontros
+    .filter((e) => e.dupla_id === duplaDpp?.id && e.status === "realizado")
+    .map((e) => e.numero);
+  const mentorNome =
+    contatos
+      .find(
+        (c) =>
+          c.papel === "mentor" &&
+          (c.dupla_id === duplaDpp?.id || c.dupla_id == null)
+      )
+      ?.nome?.split(" ")[0] ?? "Seu mentor";
+  const recessosDaAgenda = recessosJovem.map((r) => ({
+    cicloEventoId: r.ciclo_evento_id,
+    titulo: "Recesso do programa",
+    inicio: r.data,
+    fim: r.data_fim ?? r.data,
+    // tri-estado 518: null = a dupla ainda não decidiu — pergunta aberta
+    usa: r.usa,
+    declaradoEm: r.declarado_em,
+    autorNome: null,
+  }));
+  // id da dupla DPP estreito — o recorte do jovem pode vir sem ele
+  const duplaDppId = duplaDpp?.id ?? null;
+
   const pendencias = derivarPendencias({
     hoje: toDateStr(new Date()),
     agora: new Date(agora).toISOString(),
@@ -463,62 +494,93 @@ export default async function JovemAgenda() {
         />
       )}
 
-      {/* decisão de recesso declarada pela dupla (462): o combinado aparece
-          na agenda dele sem abrir espaço pra gesto — declarar é do mentor */}
-      {recessosJovem.some((r) => !r.usa) && (
+      {/* decisão de recesso da dupla (518 tri-estado): pendente vira
+          pergunta na agenda dele — o jovem também é lado e responde pela
+          dupla (a RPC é a mesma do mentor) */}
+      {recessosDaAgenda.length > 0 && duplaDpp?.id != null && (
         <Card>
-          <CardContent className="flex items-start gap-3 p-4">
-            <span
-              aria-hidden
-              className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground"
-            >
-              <SunHorizon size={16} />
-            </span>
-            <p className="text-sm text-muted-foreground">
-              <span className="font-medium text-foreground">
-                Recesso do programa:
-              </span>{" "}
-              vocês combinaram seguir se encontrando. As datas vocês marcam
-              com seu mentor, como sempre.
-            </p>
+          <CardContent className="space-y-3 p-4">
+            <div className="flex items-start gap-3">
+              <span
+                aria-hidden
+                className="grid size-8 shrink-0 place-items-center rounded-full bg-muted text-muted-foreground"
+              >
+                <SunHorizon size={16} />
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold">
+                  {recessosDaAgenda.length > 1
+                    ? "Recessos do programa"
+                    : "Recesso do programa"}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Vocês decidem juntos se param ou seguem se encontrando.
+                  Qualquer um dos dois pode responder pela dupla.
+                </p>
+              </div>
+            </div>
+            <RecessoDecisao
+              duplaId={duplaDpp.id}
+              recessos={recessosDaAgenda}
+              podeDeclarar
+            />
           </CardContent>
         </Card>
       )}
 
-      {/* o combinado do plano "ficar em dia" (459): chega pela
+      {/* o combinado do plano "ficar em dia" (459/518): chega pela
           jovem_plano, o recorte definer — aceitar e confirmar datas são
-          gestos dele aqui, pela mesma RPC do mentor */}
-      {planoJovem && (
+          gestos dele aqui, pela mesma RPC do mentor. Sem combinado
+          aberto e a dupla devendo (oficiais vencidos sem row, o mesmo
+          portão da ficha), o jovem também abre o "Combinar o plano" —
+          qualquer um dos quatro papéis propõe (US4) */}
+      {(combinadoPlano != null ||
+        (duplaDppId != null && numerosRetro.length >= 2)) && (
         <Card id="plano" className="scroll-mt-20">
           <CardContent className="space-y-3 p-4">
             <h2 className="text-base font-semibold">O combinado</h2>
-            <p className="text-sm text-muted-foreground">
-              O plano pra colocar vocês em dia. Ele começa a valer quando
-              você e seu mentor aceitarem; depois é confirmar as datas
-              juntos.
-            </p>
-            <PlanoAcordosCard
-              plano={combinadoDoJovem(planoJovem)}
-              podeResponder
-              podeAplicar
-              meuLado="mentorado"
-              nomes={{
-                mentor:
-                  contatos.find(
-                    (c) =>
-                      c.papel === "mentor" &&
-                      (c.dupla_id === duplaDpp?.id || c.dupla_id == null)
-                  )?.nome?.split(" ")[0] ?? "Seu mentor",
-                mentorado: primeiroNome || "Você",
-              }}
-              realizados={encontros
-                .filter(
-                  (e) =>
-                    e.dupla_id === duplaDpp?.id && e.status === "realizado"
-                )
-                .map((e) => e.numero)}
-              sugestoes={sugestoesAgendar}
-            />
+            {combinadoPlano ? (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  {combinadoPlano.status === "contestado"
+                    ? "O plano anterior não serviu. Uma nova versão pode ser combinada."
+                    : "O plano pra colocar vocês em dia."}
+                </p>
+                <PlanoAcordosCard
+                  plano={combinadoPlano}
+                  duplaId={duplaDpp?.id ?? undefined}
+                  podeResponder
+                  podeAplicar
+                  meuLado="mentorado"
+                  nomes={{
+                    mentor: mentorNome,
+                    mentorado: primeiroNome || "Você",
+                  }}
+                  realizados={realizadosDpp}
+                  recessos={recessosDaAgenda}
+                  sugestoes={sugestoesAgendar}
+                />
+                {combinadoPlano.status === "contestado" &&
+                  duplaDppId != null && (
+                    <CombinarPlano
+                      duplaId={duplaDppId}
+                      lado="mentorado"
+                      variante="outline"
+                    />
+                  )}
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground">
+                  Atrasaram? Vocês podem combinar um plano pra ficar em
+                  dia. Ritmo, recesso e dias livres viram uma pergunta
+                  por vez.
+                </p>
+                {duplaDppId != null && (
+                  <CombinarPlano duplaId={duplaDppId} lado="mentorado" />
+                )}
+              </>
+            )}
           </CardContent>
         </Card>
       )}

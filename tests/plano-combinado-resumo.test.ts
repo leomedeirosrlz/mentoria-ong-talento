@@ -20,9 +20,9 @@ const base: PlanoCombinado = {
 };
 
 describe("resumoCombinado", () => {
-  it("proposta sem aceite: falta os dois, passos em ordem e o último dia", () => {
+  it("proposta sem aceite: falta a dupla, passos em ordem e o último dia", () => {
     const r = resumoCombinado(base);
-    expect(r.falta).toBe("os_dois");
+    expect(r.falta).toBe("dupla");
     expect(r.passos.map((p) => p.numero)).toEqual([8, 9, 10]);
     expect(r.ate).toBe("2026-11-28");
     expect(r.proximo?.numero).toBe(8);

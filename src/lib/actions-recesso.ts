@@ -4,10 +4,11 @@ import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "./demo/mode";
 
-/** Declara a decisão da dupla sobre um recesso do cronograma (REALIZA-462,
- *  0218): usa=true "vamos usar o recesso" (default de sempre), usa=false
+/** Declara a decisão da dupla sobre um recesso do cronograma (REALIZA-462/518,
+ *  0218/0225): usa=true "vamos usar o recesso" (default de sempre), usa=false
  *  "vamos seguir nos encontrando". A RPC `declarar_recesso` é a única
- *  porta de escrita — valida papel (coord ou o mentor da dupla), dupla
+ *  porta de escrita — a 0225 restringiu a decisão aos dois lados da dupla
+ *  (mentor e mentorado; a equipe vê e cobra, não responde por eles), dupla
  *  DPP ativa e o evento sendo recesso do cronograma dela. Redeclarar
  *  atualiza a mesma linha: a última decisão vale, com a data da mudança. */
 export async function declararRecesso(
@@ -30,5 +31,9 @@ export async function declararRecesso(
   const r = data as { ok?: boolean; error?: string } | null;
   if (r?.error) return { error: r.error };
   revalidatePath(`/duplas/${duplaId}`);
+  // a decisão também mora na agenda do jovem — o recorte do
+  // jovem_recessos/jovem_plano precisa revalidar junto
+  revalidatePath("/jovem");
+  revalidatePath("/jovem/agenda");
   return { ok: true };
 }
