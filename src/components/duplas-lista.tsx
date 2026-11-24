@@ -1293,8 +1293,8 @@ function VisaoCoordenacao({
         dupla: d,
         saude: s,
         hoje,
-        // o cap de 48h conta só interações tipo nudge — um "contato" manual
-        // (Chamar) nunca bloqueia o Lembrar
+        // o cap de 48h conta interações tipo nudge — Lembrar e Chamar da
+        // linha alimentam a mesma régua (o wa.me loga nudge também)
         ultimoNudge: nudges[d.id]?.tipo === "nudge" ? nudges[d.id] : null,
         meuNome,
         tituloNudge: "Lembrete da coordenação",

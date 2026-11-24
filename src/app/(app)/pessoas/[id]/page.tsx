@@ -61,7 +61,7 @@ import {
   papelLabelComposto,
   PREF_GENERO_LABELS,
   SITUACAO_MENTORADO_LABEL,
-  waLink,
+  waChatLink,
 } from "@/lib/ciclo";
 import { temPapel } from "@/lib/types";
 import type { DadosCivis } from "@/lib/types";
@@ -251,7 +251,7 @@ export default async function PessoaPerfilPage({
     !demo && !ehMentorado && "email" in p && p.email
       ? await gravatarUrlSeExiste(p.email)
       : null;
-  const wa = p.whatsapp ? waLink(p.whatsapp, "") : null;
+  const wa = waChatLink(p.whatsapp);
 
   // apresentação profissional (0030) — só profiles têm; o card some quando
   // nada foi preenchido (perfil vazio não é um estado a exibir)

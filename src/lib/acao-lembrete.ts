@@ -61,7 +61,8 @@ function casoLembrete(
 
 /** Props do DuplaWaAcao pra linha de dupla. "Lembrar" quando há pendência
  *  apontável em dupla ativa (notificação + wa.me, cap de 48h); "Chamar" nas
- *  demais. Pendência operacional vai pro mentor (a operação é dever dele: o
+ *  demais — o wa.me é capado igual (o clique loga nudge). Pendência
+ *  operacional vai pro mentor (a operação é dever dele: o
  *  mentorado nunca é cobrado por agendar ou registrar); o pedido de apoio do
  *  JOVEM troca a ponta inteira e fala com ele. */
 export function acaoWhatsAppDupla({
@@ -90,6 +91,10 @@ export function acaoWhatsAppDupla({
   telefone: string | null | undefined;
   mensagem: string;
   nudge: NudgeWA | undefined;
+  /** `lembreteBloqueadoAte(ultimoNudge)` — chega solto porque o "Chamar"
+   *  (contato livre, sem nudge) também loga nudge e entra no cap de 48h:
+   *  sem pendência o `nudge.bloqueadoAte` nem existiria. */
+  bloqueadoAte: Date | null;
   /** As duas pontas com texto próprio — o preview do DuplaWaAcao vira
    *  seletor "Quem recebe". A ponta default é a mesma de `mensagem`. */
   destinatarios: DestinatariosWA;
@@ -130,6 +135,7 @@ export function acaoWhatsAppDupla({
     : (livres.mentorado ?? "");
   const mensagem = apoioJovem ? msgMentorado : msgMentor;
 
+  const capAte = lembreteBloqueadoAte(ultimoNudge, hoje);
   const nudge: NudgeWA | undefined = temPendencia
     ? {
         destino: apoioJovem ? "mentorado" : "mentor",
@@ -141,7 +147,7 @@ export function acaoWhatsAppDupla({
             : `/duplas/${dupla.id}`,
         // responder um pedido do jovem é "Chamar", nunca cobrança
         rotulo: apoioJovem ? "Chamar" : undefined,
-        bloqueadoAte: lembreteBloqueadoAte(ultimoNudge, hoje),
+        bloqueadoAte: capAte,
       }
     : undefined;
 
@@ -151,6 +157,7 @@ export function acaoWhatsAppDupla({
     telefone: apoioJovem ? dupla.mentorado.whatsapp : dupla.mentor.whatsapp,
     mensagem,
     nudge,
+    bloqueadoAte: capAte,
     destinatarios: {
       padrao: apoioJovem ? "mentorado" : "mentor",
       mentor: {

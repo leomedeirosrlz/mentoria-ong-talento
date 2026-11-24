@@ -166,8 +166,8 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     }
 
     // o botão muda com o estado: "Lembrar" nas ativas com pendência,
-    // "Chamar" (contato livre, sem cap) nas fora da régua. O "Lembrada
-    // dd/mm" do cap de 48h mora no dialog da dupla bloqueada (abaixo).
+    // "Chamar" (contato livre) nas fora da régua. O "Lembrada dd/mm" do
+    // cap de 48h mora no dialog da dupla bloqueada (abaixo).
     await expect(
       page.locator(LINHAS_COORD).getByText(/^Lembrar/).first()
     ).toBeVisible();
@@ -175,12 +175,13 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
       page.locator(LINHAS_COORD).getByText(/^Chamar/).first()
     ).toBeVisible();
 
-    // o "Chamar" abre o preview — o wa.me com `t=contato` (fora do cap de
-    // 48h) está no "Abrir WhatsApp" lá dentro. O rótulo cobre DOIS estados
-    // (ele diz a intenção, não a presença de pendência): contato livre de
-    // dupla em dia, sem nudge → sem lembrete in-app; e a resposta ao pedido
-    // de apoio do jovem, que TEM nudge (destino mentorado) e mostra o
-    // Lembrar in-app no preview. Aqui interessa o contato livre.
+    // o "Chamar" abre o preview — o wa.me com `t=nudge` está no "Abrir
+    // WhatsApp" lá dentro: o cap de 48h cobre o contato manual também.
+    // O rótulo cobre DOIS estados (ele diz a intenção, não a presença de
+    // pendência): contato livre de dupla em dia, sem nudge → sem lembrete
+    // in-app; e a resposta ao pedido de apoio do jovem, que TEM nudge
+    // (destino mentorado) e mostra o Lembrar in-app no preview. Aqui
+    // interessa o contato livre.
     const linhaChamar = page
       .locator(LINHAS_COORD)
       .filter({ has: page.getByRole("button", { name: /Chamar .+ ver a mensagem/ }) })
@@ -192,7 +193,7 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     const dlgChamar = page.getByRole("dialog");
     await expect(
       dlgChamar.getByRole("link", { name: "Abrir WhatsApp" })
-    ).toHaveAttribute("href", /t=contato/);
+    ).toHaveAttribute("href", /t=nudge/);
     // sem pendência apontável não há lembrete in-app no preview
     await expect(
       dlgChamar.getByRole("button", { name: /Lembrar pelo app/ })
@@ -214,9 +215,17 @@ test.describe("demo — /duplas (REALIZA-197 · v6a)", () => {
     await expect(
       dlgBloq.getByRole("button", { name: /Lembrada \d{2}\/\d{2}/ })
     ).toBeDisabled();
+    // o cap cobre o wa.me também: "Abrir WhatsApp" vira botão
+    // desabilitado com a data, nunca a página de bloqueio do redirect
+    await expect(
+      dlgBloq.getByRole("link", { name: "Abrir WhatsApp" })
+    ).toHaveCount(0);
+    await expect(
+      dlgBloq.getByRole("button", { name: /Destrava \d{2}\/\d{2}/ })
+    ).toBeDisabled();
     await page.keyboard.press("Escape");
 
-    // fora da régua nunca vira nudge: pausada e concluída só têm "Chamar"
+    // fora da régua nunca tem Lembrar: pausada e concluída só têm "Chamar"
     // — nem "Lembrar" nem "Lembrada" — e a pill repete o rótulo do status
     // ("Pausada"), nunca um "em dia" que mentisse
     const pausada = page.locator(LINHAS_COORD).filter({ hasText: "Pausada" });

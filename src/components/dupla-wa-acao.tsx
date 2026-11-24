@@ -1,7 +1,7 @@
 "use client";
 
 import { useId, useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import {
   ChatsCircle,
   CircleNotch,
@@ -10,6 +10,7 @@ import {
 } from "@phosphor-icons/react";
 import { toast } from "@/lib/toast";
 import { enviarLembrete, type LembreteDestino } from "@/lib/actions-lembrete";
+import { superficieDoPath } from "@/lib/produto-eventos";
 import { formatDiaMes, LEMBRETE_INTERVALO_MS, waLink } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
 import { Button, buttonVariants } from "@/components/ui/button";
@@ -62,8 +63,10 @@ export type DestinatariosWA = {
  *    · "Lembrar pelo app" = só a notificação in-app (`enviar_lembrete`,
  *      cap de 48h por dupla → vira "Lembrada dd/mm" desabilitado), nunca
  *      abre WhatsApp;
- *    · "Abrir WhatsApp" = contato direto wa.me com o mesmo texto (toda
- *      dupla, sem cap — o clique só loga `contato` via /api/nudge).
+ *    · "Abrir WhatsApp" = contato direto wa.me com o mesmo texto — o
+ *      clique loga `nudge` via /api/nudge e entra no MESMO cap de 48h:
+ *      capada, a âncora vira botão desabilitado "Destrava dd/mm" em vez
+ *      de cair na página de bloqueio do redirect.
  *  Sem telefone o wa.me fica desabilitado com o motivo visível; o lembrete
  *  in-app segue (a notificação sai mesmo sem número). */
 export function DuplaWaAcao({
@@ -72,6 +75,7 @@ export function DuplaWaAcao({
   telefone,
   mensagem,
   nudge,
+  bloqueadoAte,
   destinatarios,
 }: {
   duplaId: string;
@@ -84,6 +88,11 @@ export function DuplaWaAcao({
   /** Presente = há pendência apontável (libera o Lembrar in-app); ausente =
    *  contato livre — só WhatsApp/copiar. */
   nudge?: NudgeWA;
+  /** Cap de 48h pra linha SEM nudge (contato livre): o "Chamar" também
+   *  loga nudge, então a dupla pode estar capada mesmo sem pendência —
+   *  `acaoWhatsAppDupla` manda a data solta por aqui. Com nudge, vale o
+   *  `nudge.bloqueadoAte` (mesma fonte). */
+  bloqueadoAte?: Date | string | null;
   /** As duas pontas com texto próprio — o preview vira seletor de quem
    *  recebe. O Lembrar in-app continua fixo no `nudge.destino`: escolhida
    *  a outra ponta, o dialog vira contato direto (só WhatsApp/copiar). */
@@ -96,6 +105,7 @@ export function DuplaWaAcao({
   );
   const uid = useId();
   const router = useRouter();
+  const pathname = usePathname();
   // "agora" congelado na montagem — mesmo contrato do LembreteButton
   const [agoraMs] = useState(() => Date.now());
 
@@ -119,13 +129,17 @@ export function DuplaWaAcao({
   const mostraLembrar =
     nudge != null && (destinatarios == null || quem === nudge.destino);
   const wa = waLink(dest.telefone, dest.mensagem);
-  // "Abrir WhatsApp" loga `contato` — tipo fora do cap de 48h (o cap é dos
-  // nudges); sem telefone cai pra null e o item exibe o motivo
-  const waContato = wa
-    ? `/api/nudge?d=${encodeURIComponent(duplaId)}&to=${encodeURIComponent(wa)}&t=contato`
+  // "Abrir WhatsApp" loga `nudge` — mesmo tipo do Lembrar: o cap de 48h
+  // cobre o contato manual também (o clique passa por /api/nudge; sem
+  // telefone cai pra null e o item exibe o motivo). `s` anota a
+  // superfície do gesto pra telemetria — noreferrer tira o referer
+  const sup = superficieDoPath(pathname);
+  const waNudge = wa
+    ? `/api/nudge?d=${encodeURIComponent(duplaId)}&to=${encodeURIComponent(wa)}&t=nudge&s=${encodeURIComponent(sup)}`
     : null;
 
-  const ate = nudge?.bloqueadoAte != null ? new Date(nudge.bloqueadoAte) : null;
+  const capAte = nudge?.bloqueadoAte ?? bloqueadoAte ?? null;
+  const ate = capAte != null ? new Date(capAte) : null;
   const bloqueado = ate != null && ate.getTime() > agoraMs;
   const diaMes = (d: Date) =>
     formatDiaMes(d.toISOString()).replace(/\/\d{4}$/, "");
@@ -192,13 +206,13 @@ export function DuplaWaAcao({
         onClick={() => setAberto(true)}
         aria-label={`${rotulo} ${destNome.split(" ")[0]}: ver a mensagem antes de enviar`}
         title={
-          waContato
+          waNudge
             ? `${rotulo} ${destNome.split(" ")[0]}`
             : `${rotulo} ${destNome.split(" ")[0]} (sem WhatsApp cadastrado)`
         }
         className={cn(
           "md:w-auto md:px-3",
-          !waContato && !nudge && "opacity-50"
+          !waNudge && !nudge && "opacity-50"
         )}
       >
         {icone}
@@ -294,16 +308,30 @@ export function DuplaWaAcao({
                   {pending ? "Enviando…" : "Lembrar pelo app"}
                 </Button>
               ))}
-            {waContato ? (
-              <a
-                href={waContato}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={buttonVariants()}
-              >
-                <WhatsappLogo weight="fill" aria-hidden />
-                Abrir WhatsApp
-              </a>
+            {/* o cap cobre o wa.me também (t=nudge): capada, a âncora vira
+                botão desabilitado com a data — a rota continuaria servindo
+                a página de bloqueio, mas chegar nela por engano é surpresa */}
+            {waNudge ? (
+              bloqueado ? (
+                <Button
+                  variant="outline"
+                  disabled
+                  title={`1 lembrete a cada 48h por dupla, WhatsApp incluso. ${rotuloPassado} ${enviadoEm}`}
+                >
+                  <WhatsappLogo aria-hidden />
+                  Destrava {destravaEm}
+                </Button>
+              ) : (
+                <a
+                  href={waNudge}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className={buttonVariants()}
+                >
+                  <WhatsappLogo weight="fill" aria-hidden />
+                  Abrir WhatsApp
+                </a>
+              )
             ) : (
               <Button variant="outline" disabled title="Sem WhatsApp cadastrado">
                 <WhatsappLogo aria-hidden />
