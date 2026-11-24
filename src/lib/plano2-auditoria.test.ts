@@ -488,7 +488,7 @@ describe("relerPlanoPropostoDeMembro — 'Fulano combinou' (P1-6)", () => {
       { id: "j-1", role: "mentorado" },
       [notif({ created_by: "m-1" })]
     );
-    expect(out[0].titulo).toBe('Plano "ficar em dia" em vigor');
+    expect(out[0].titulo).toBe('Plano "ficar em dia" valendo');
     expect(out[0].corpo).toContain("Ana combinou o plano");
   });
 
@@ -514,7 +514,7 @@ describe("relerPlanoPropostoDeMembro — 'Fulano combinou' (P1-6)", () => {
         { id: "m-1", role: "mentor_dpp" },
         [notif({ created_by: "j-1" })]
       );
-      expect(out[0].titulo).toBe('Plano "ficar em dia" em vigor');
+      expect(out[0].titulo).toBe('Plano "ficar em dia" valendo');
       expect(out[0].corpo).toMatch(/João|JP combinou o plano/);
     }
   });

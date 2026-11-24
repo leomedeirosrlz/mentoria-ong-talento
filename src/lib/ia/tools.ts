@@ -851,7 +851,7 @@ export const IA_TOOLS = {
   plano_propor: {
     nome: "plano_propor",
     descricao:
-      "Propõe e GRAVA o plano 'ficar em dia' de uma dupla DPP (0219/0224): o escopo sai do mesmo planner do plano_em_dia — encontros devidos e os que vencem no caminho, janela até o encerramento, ritmo combinado e o nível calculado — e a proposta fica persistida pra dupla aceitar ou contestar. O aceite é ÚNICO: o primeiro lado da dupla que aceita já coloca o plano em vigor (mentor que propõe já conta como o aceite dele) e o outro é avisado. Sem ritmo, usa o mais leve que fecha; o banco só exige ritmo >= 1 encontro por semana. Dupla em dia ou em 'conversa' (nem 1 por dia fecha) não tem proposta: aí o caminho é a coordenação. Só um plano aberto por dupla — contestado é terminal, acordo novo é versão nova. plano_em_dia mostra a prévia antes." +
+      "Propõe e GRAVA o plano 'ficar em dia' de uma dupla DPP (0219/0224): o escopo sai do mesmo planner do plano_em_dia — encontros devidos e os que vencem no caminho, janela até o encerramento, ritmo combinado e o nível calculado — e a proposta fica persistida pra dupla aceitar ou contestar. O aceite é ÚNICO: o primeiro lado da dupla que aceita já põe o plano pra valer (mentor que propõe já conta como o aceite dele) e o outro é avisado. Sem ritmo, usa o mais leve que fecha; o banco só exige ritmo >= 1 encontro por semana. Dupla em dia ou em 'conversa' (nem 1 por dia fecha) não tem proposta: aí o caminho é a coordenação. Só um plano aberto por dupla — contestado é terminal, acordo novo é versão nova. plano_em_dia mostra a prévia antes." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -903,7 +903,7 @@ export const IA_TOOLS = {
   plano_responder: {
     nome: "plano_responder",
     descricao:
-      "Responde o plano 'ficar em dia' persistido: 'aceitar' carimba o aceite de quem responde — o aceite é ÚNICO, o primeiro lado que aceita já coloca o plano em vigor e o outro é avisado; 'contestar' encerra o plano pra sempre — contestado é terminal, um novo acordo nasce como nova versão. Contestar só vale até o primeiro encontro do escopo acontecer; depois disso a conversa é com a coordenação. O plano_id vem de plano_em_dia, meu_plano ou da notificação." +
+      "Responde o plano 'ficar em dia' persistido: 'aceitar' carimba o aceite de quem responde — o aceite é ÚNICO, o primeiro lado que aceita já põe o plano pra valer e o outro é avisado; 'contestar' encerra o plano pra sempre — contestado é terminal, um novo acordo nasce como nova versão. Contestar só vale até o primeiro encontro do escopo acontecer; depois disso a conversa é com a coordenação. O plano_id vem de plano_em_dia, meu_plano ou da notificação." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -2380,7 +2380,7 @@ export const IA_TOOLS = {
   declarar_recesso: {
     nome: "declarar_recesso",
     descricao:
-      "Declara a decisão da dupla sobre um recesso do calendário oficial: usa=true é 'vamos usar o recesso' (também é o padrão quando nada foi declarado — o planner empurra sugestões pra depois da janela) e usa=false é 'vamos seguir nos encontrando' (aí a janela fica disponível pra dupla: o planner pode sugerir datas dentro dela e a agenda trata o período como combinado). A decisão é por dupla e por período de recesso; a última declaração vale, com a data da mudança. Sem ciclo_evento_id vale o recesso vigente ou o próximo do cronograma da dupla — ficha_dupla lista os recessos com os ids. Quem declara é o mentor da dupla (a decisão é combinada com o jovem fora da tela) ou a coordenação; o mentorado acompanha a decisão na agenda dele." +
+      "Declara a decisão da dupla sobre um recesso do calendário oficial: usa=true é 'vamos pausar os encontros' (também é o padrão quando nada foi declarado — o planner empurra sugestões pra depois da janela) e usa=false é 'vamos seguir nos encontrando' (aí a janela fica disponível pra dupla: o planner pode sugerir datas dentro dela e a agenda trata o período como combinado). A decisão é por dupla e por período de recesso; a última declaração vale, com a data da mudança. Sem ciclo_evento_id vale o recesso vigente ou o próximo do cronograma da dupla — ficha_dupla lista os recessos com os ids. Quem declara é o mentor da dupla (a decisão é combinada com o jovem fora da tela) ou a coordenação; o mentorado acompanha a decisão na agenda dele." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -2394,14 +2394,14 @@ export const IA_TOOLS = {
         usa: z
           .boolean()
           .describe(
-            "true = vamos usar o recesso (padrão); false = vamos seguir nos encontrando durante o recesso"
+            "true = vamos pausar os encontros (padrão); false = vamos seguir nos encontrando durante o recesso"
           ),
       })
       .strict(),
     roles: ["coordenacao", "mentor_dpp"],
     escreve: true,
     resumo: (a: { dupla_id: string; usa: boolean }) =>
-      `${a.usa ? "Usar" : "Atravessar"} o recesso na dupla ${a.dupla_id}`,
+      `${a.usa ? "Pausar os encontros" : "Seguir nos encontrando"} no recesso da dupla ${a.dupla_id}`,
     run: async (
       a: { dupla_id: string; ciclo_evento_id?: string; usa: boolean },
       ctx

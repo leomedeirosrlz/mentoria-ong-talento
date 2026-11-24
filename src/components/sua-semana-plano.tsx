@@ -79,7 +79,7 @@ export function SuaSemanaPlano({
           // proposta esperando o MEU aceite: o primário vai direto pro
           // responder — o #acordos da ficha (mentor) ou o #plano da
           // agenda (jovem), nunca "Confirmar data" antes do combinado
-          // estar em vigor
+          // valer
           <Link
             href={responderHref ?? confirmarHref ?? combinadoHref}
             className={cn(

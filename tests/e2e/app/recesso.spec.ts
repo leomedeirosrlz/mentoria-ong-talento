@@ -1,8 +1,10 @@
 import {
   appEnvOk,
   buscarViaServiceRole,
+  convergirDuplaEmDia,
   expect,
   jwtDoUsuario,
+  limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
   restComoUsuario,
@@ -66,6 +68,9 @@ test.describe("recesso opcional (462) — declarar_recesso", () => {
 
   test.afterEach(async () => {
     await limparViaServiceRole("dupla_recessos", `dupla_id=eq.${DUPLA}`);
+    // o piso da UI cobre os passos pra chegar a "em dia" — devolve a
+    // dupla ao estado de dívida que o resto da suíte espera achar
+    await limparEncontrosDaDupla(DUPLA);
   });
 
   test("mentor da dupla declara; última vale com autoria e data", async () => {
@@ -177,17 +182,24 @@ test.describe("recesso opcional (462) — declarar_recesso", () => {
 
   test("na ficha, o mentor declara e a decisão aparece", async ({ page }) => {
     const ev = await recessoDoCronograma();
+    // os botões da decisão moram no RecessoDuplaCard standalone, que só
+    // monta quando o plano "ficar em dia" não está na tela (518) — com a
+    // dupla devendo, a ficha mostra o recesso só leitura e aponta o
+    // "Combinar o plano". Cobrir os passos vencidos traz a dupla a "em
+    // dia" e o card próprio de volta, sem depender de sobra de outro spec.
+    await convergirDuplaEmDia(DUPLA, MENTOR_PROFILE);
     await loginComSenha(page, MENTOR_EMAIL, SENHA);
     await page.goto(`/duplas/${DUPLA}`);
 
-    // a decisão mora no card "Para ficar em dia" quando o plano está na
-    // tela e segue em card próprio sem ele — o gesto é o mesmo
     await page
       .getByRole("button", { name: "Vamos seguir nos encontrando" })
       .click();
+    // o texto ambiente do card já traz "seguem se encontrando" — a
+    // confirmação honesta é a linha de estado sair de "ainda não decidiu",
+    // que só some depois da gravação revalidar
     await expect(
-      page.getByText("seguem se encontrando")
-    ).toBeVisible({ timeout: 15_000 });
+      page.getByText("a dupla ainda não decidiu")
+    ).toHaveCount(0, { timeout: 15_000 });
 
     const rows = await buscarViaServiceRole<RecessoRow[]>(
       "dupla_recessos",

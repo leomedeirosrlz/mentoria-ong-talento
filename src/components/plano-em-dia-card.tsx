@@ -43,6 +43,12 @@ import {
 // passo e declarar recesso aqui dentro saíram; o gesto inteiro (ritmo,
 // recesso, grade, combinado) mora na superfície dedicada, e o card só
 // mostra onde a decisão da dupla ainda falta.
+// 025 (FR-006): com combinado valendo (planoVivo) o card vira FAIXA — a
+// projeção que o combinado já carrega não se repete (headline feliz,
+// quadrados, passos, avisos não montam); ficam os alertas que o
+// combinado não tem (conversa, "não fecha"), as pendências exclusivas
+// (recessos, "Antes de seguir o plano") e a saída "Ver o combinado". As
+// âncoras #plano-em-dia (e-mail) e #recesso-dupla (fila) seguem vivas.
 
 const REGRAS: { termo: string; texto: string }[] = [
   {
@@ -134,8 +140,11 @@ export function PlanoEmDiaCard({
 
   return (
     <section
-      aria-labelledby="plano-em-dia"
-      className="rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
+      // a âncora é o card inteiro (link do e-mail #plano-em-dia); o h2 só
+      // rotula — id próprio pra não dividir o alvo do deep link
+      id="plano-em-dia"
+      aria-labelledby="plano-em-dia-titulo"
+      className="scroll-mt-20 rounded-xl bg-card p-4 shadow-[var(--shadow-border)]"
     >
       <div className="flex items-start gap-3">
         <span
@@ -146,7 +155,7 @@ export function PlanoEmDiaCard({
         </span>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-            <h2 id="plano-em-dia" className="text-base font-semibold">
+            <h2 id="plano-em-dia-titulo" className="text-base font-semibold">
               Para ficar em dia
             </h2>
             {conversa ? (
@@ -195,27 +204,32 @@ export function PlanoEmDiaCard({
           )}
         </div>
       ) : plano.dataRecuperacao ? (
-        <div className="mt-4">
-          <p className="text-2xl font-semibold tracking-tight">
-            Em dia em{" "}
-            <span className="tabular-nums">
-              {formatDate(plano.dataRecuperacao)}
-            </span>
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            {plano.sugestao}
-          </p>
-          {plano.alternativaRecesso && (
-            <p className="mt-2 flex items-start gap-1.5 text-sm text-muted-foreground">
-              <SunHorizon size={14} aria-hidden className="mt-0.5 shrink-0" />
-              {souMentor
-                ? "Se vocês seguirem se encontrando no recesso, "
-                : "Se a dupla seguir se encontrando no recesso, "}
-              {rotuloRitmo(plano.alternativaRecesso.ritmo)} já basta: em dia
-              em {formatDate(plano.alternativaRecesso.data)}.
+        // a data real é a do combinado — a faixa não repete a headline
+        // feliz; os estados de alerta (conversa acima, "não fecha"
+        // abaixo) ficam porque o combinado não os carrega (025, FR-006)
+        !planoVivo && (
+          <div className="mt-4">
+            <p className="text-2xl font-semibold tracking-tight">
+              Em dia em{" "}
+              <span className="tabular-nums">
+                {formatDate(plano.dataRecuperacao)}
+              </span>
             </p>
-          )}
-        </div>
+            <p className="mt-1 text-sm text-muted-foreground">
+              {plano.sugestao}
+            </p>
+            {plano.alternativaRecesso && (
+              <p className="mt-2 flex items-start gap-1.5 text-sm text-muted-foreground">
+                <SunHorizon size={14} aria-hidden className="mt-0.5 shrink-0" />
+                {souMentor
+                  ? "Se vocês seguirem se encontrando no recesso, "
+                  : "Se a dupla seguir se encontrando no recesso, "}
+                {rotuloRitmo(plano.alternativaRecesso.ritmo)} já basta: em dia
+                em {formatDate(plano.alternativaRecesso.data)}.
+              </p>
+            )}
+          </div>
+        )
       ) : (
         <div className="mt-4">
           <p className="text-2xl font-semibold tracking-tight">
@@ -242,7 +256,9 @@ export function PlanoEmDiaCard({
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {planoVivo ? (
           <Link
-            href="#acordos"
+            // caminho da ficha + âncora: cai na aba certa e rola pro
+            // combinado mesmo com a aba errada na query
+            href={`/duplas/${dupla.id}#acordos`}
             className={buttonVariants({ variant: "outline", size: "sm" })}
           >
             Ver o combinado
@@ -272,12 +288,14 @@ export function PlanoEmDiaCard({
         )}
       </div>
 
-      <div className="mt-4">
-        <QuadradosPlano
-          itens={quadrados}
-          rotulo={`${feitos.size} de ${TOTAL_TRILHA} encontros feitos`}
-        />
-      </div>
+      {!planoVivo && (
+        <div className="mt-4">
+          <QuadradosPlano
+            itens={quadrados}
+            rotulo={`${feitos.size} de ${TOTAL_TRILHA} encontros feitos`}
+          />
+        </div>
+      )}
 
       {plano.pendenciasRegistro.length > 0 && (
         <div className="mt-4 rounded-lg bg-muted/50 px-3.5 py-3 shadow-[var(--shadow-inset)]">
@@ -311,60 +329,62 @@ export function PlanoEmDiaCard({
         </div>
       )}
 
-      <ol className="mt-4 space-y-3">
-        {plano.passos.map((p) => (
-          <li key={p.numero} className="flex items-center gap-3">
-            <span
-              aria-hidden
-              className={cn(
-                "grid size-8 shrink-0 place-items-center rounded-full font-mono text-xs font-semibold tabular-nums",
-                p.acao === "travado"
-                  ? "bg-muted text-muted-foreground"
-                  : "bg-[var(--destaque)]/15 text-foreground"
-              )}
-            >
-              {p.numero}
-            </span>
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-baseline gap-x-2">
-                <p className="text-sm font-semibold">{p.titulo}</p>
-                <p className="text-xs text-muted-foreground">
-                  {p.acao === "travado" ? (
-                    <>marcado pra {formatDate(p.data)}</>
-                  ) : (
-                    <>
-                      sugestão{" "}
-                      <b className="font-semibold text-foreground">
-                        {formatDate(p.data)}
-                      </b>
-                      {p.dataOficial !== p.data && (
-                        <> · oficial era {formatDate(p.dataOficial)}</>
-                      )}
-                      {p.venceNoCaminho && <> · vence no caminho</>}
-                      {p.foraDaGrade && <> · fora dos dias livres</>}
-                      {sessaoTxt.has(p.numero) && (
-                        <> · {sessaoTxt.get(p.numero)}</>
-                      )}
-                    </>
-                  )}
-                </p>
+      {!planoVivo && (
+        <ol className="mt-4 space-y-3">
+          {plano.passos.map((p) => (
+            <li key={p.numero} className="flex items-center gap-3">
+              <span
+                aria-hidden
+                className={cn(
+                  "grid size-8 shrink-0 place-items-center rounded-full font-mono text-xs font-semibold tabular-nums",
+                  p.acao === "travado"
+                    ? "bg-muted text-muted-foreground"
+                    : "bg-[var(--destaque)]/15 text-foreground"
+                )}
+              >
+                {p.numero}
+              </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-baseline gap-x-2">
+                  <p className="text-sm font-semibold">{p.titulo}</p>
+                  <p className="text-xs text-muted-foreground">
+                    {p.acao === "travado" ? (
+                      <>marcado pra {formatDate(p.data)}</>
+                    ) : (
+                      <>
+                        sugestão{" "}
+                        <b className="font-semibold text-foreground">
+                          {formatDate(p.data)}
+                        </b>
+                        {p.dataOficial !== p.data && (
+                          <> · oficial era {formatDate(p.dataOficial)}</>
+                        )}
+                        {p.venceNoCaminho && <> · vence no caminho</>}
+                        {p.foraDaGrade && <> · fora dos dias livres</>}
+                        {sessaoTxt.has(p.numero) && (
+                          <> · {sessaoTxt.get(p.numero)}</>
+                        )}
+                      </>
+                    )}
+                  </p>
+                </div>
+                {p.precondicao && (
+                  <p className="mt-0.5 flex items-start gap-1 text-xs text-muted-foreground">
+                    <Flag size={12} aria-hidden className="mt-0.5 shrink-0" />
+                    Precisa antes: {p.precondicao}
+                  </p>
+                )}
+                {p.aviso && (
+                  <p className="mt-0.5 flex items-start gap-1 text-xs text-muted-foreground">
+                    <Warning size={12} aria-hidden className="mt-0.5 shrink-0" />
+                    {p.aviso}
+                  </p>
+                )}
               </div>
-              {p.precondicao && (
-                <p className="mt-0.5 flex items-start gap-1 text-xs text-muted-foreground">
-                  <Flag size={12} aria-hidden className="mt-0.5 shrink-0" />
-                  Precisa antes: {p.precondicao}
-                </p>
-              )}
-              {p.aviso && (
-                <p className="mt-0.5 flex items-start gap-1 text-xs text-muted-foreground">
-                  <Warning size={12} aria-hidden className="mt-0.5 shrink-0" />
-                  {p.aviso}
-                </p>
-              )}
-            </div>
-          </li>
-        ))}
-      </ol>
+            </li>
+          ))}
+        </ol>
+      )}
 
       {recessos.length > 0 && (
         // a âncora do recesso é a mesma do card standalone — a fila do
@@ -377,7 +397,7 @@ export function PlanoEmDiaCard({
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {souMentor
-              ? "Vocês decidem se param ou seguem se encontrando. A resposta entra no Combinar o plano."
+              ? "Vocês decidem se pausam os encontros ou seguem se encontrando. A resposta entra no Combinar o plano."
               : "A decisão é da dupla."}
           </p>
           <div className="mt-2.5 space-y-2">
@@ -392,7 +412,7 @@ export function PlanoEmDiaCard({
         </div>
       )}
 
-      {plano.avisos.length > 0 && (
+      {!planoVivo && plano.avisos.length > 0 && (
         <ul className="mt-3 space-y-1 border-t border-border pt-3 text-sm text-muted-foreground">
           {plano.avisos.map((a) => (
             <li key={a} className="flex items-start gap-1.5">

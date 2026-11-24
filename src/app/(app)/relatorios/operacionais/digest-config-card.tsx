@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { FloppyDisk } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -160,13 +161,11 @@ export function DigestConfigCard({
               key={p.v}
               className="flex items-center gap-2 text-sm cursor-pointer"
             >
-              <input
-                type="checkbox"
-                className="accent-primary"
+              <Checkbox
                 checked={papeis.includes(p.v)}
                 disabled={travado}
-                onChange={(e) =>
-                  setPapeis(alterna(papeis, p.v, e.target.checked))
+                onCheckedChange={(v) =>
+                  setPapeis(alterna(papeis, p.v, v))
                 }
               />
               Todo(a) {p.l.toLowerCase()}
@@ -177,13 +176,11 @@ export function DigestConfigCard({
               key={p.id}
               className="flex items-center gap-2 text-sm cursor-pointer"
             >
-              <input
-                type="checkbox"
-                className="accent-primary"
+              <Checkbox
                 checked={profiles.includes(p.id)}
                 disabled={travado}
-                onChange={(e) =>
-                  setProfiles(alterna(profiles, p.id, e.target.checked))
+                onCheckedChange={(v) =>
+                  setProfiles(alterna(profiles, p.id, v))
                 }
               />
               {p.nome}
@@ -216,13 +213,11 @@ export function DigestConfigCard({
               key={s.k}
               className="flex items-center gap-2 text-sm cursor-pointer"
             >
-              <input
-                type="checkbox"
-                className="accent-primary"
+              <Checkbox
                 checked={secoes[s.k]}
                 disabled={travado}
-                onChange={(e) =>
-                  setSecoes({ ...secoes, [s.k]: e.target.checked })
+                onCheckedChange={(v) =>
+                  setSecoes({ ...secoes, [s.k]: v })
                 }
               />
               {s.l}

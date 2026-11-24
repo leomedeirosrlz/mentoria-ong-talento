@@ -12,6 +12,7 @@ import {
   NumeroPergunta,
   RotuloPergunta,
 } from "@/components/forms/pergunta";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -436,20 +437,18 @@ export function CampoGenerico({
               const marcado = Array.isArray(valor) && valor.includes(o);
               return (
                 <li key={o}>
-                  <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted active:bg-muted has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
-                    <input
-                      type="checkbox"
+                  <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted active:bg-muted">
+                    <Checkbox
                       checked={marcado}
-                      onChange={(e) => {
+                      onCheckedChange={(m) => {
                         const atual = Array.isArray(valor) ? valor : [];
                         api.definir(
                           campo.id,
-                          e.target.checked
+                          m
                             ? [...atual, o]
                             : atual.filter((x) => x !== o)
                         );
                       }}
-                      className="size-5 shrink-0 rounded accent-primary"
                     />
                     {o}
                   </label>
@@ -463,14 +462,13 @@ export function CampoGenerico({
     case "checkbox":
       return (
         <div className={cartao} data-campo={campo.id}>
-          <label className="-m-4 flex cursor-pointer items-start gap-3 rounded-xl p-4 text-[15px] leading-relaxed transition-colors select-none has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 @xl:-m-5 @xl:p-5 @xl:text-base">
+          <label className="-m-4 flex cursor-pointer items-start gap-3 rounded-xl p-4 text-[15px] leading-relaxed transition-colors select-none has-checked:bg-primary/5 @xl:-m-5 @xl:p-5 @xl:text-base">
             {n != null && n > 0 && <NumeroPergunta n={n} />}
-            <input
-              type="checkbox"
+            <Checkbox
               checked={valor === true}
-              onChange={(e) => api.definir(campo.id, e.target.checked)}
+              onCheckedChange={(v) => api.definir(campo.id, v)}
               required={campo.obrigatorio}
-              className="mt-0.5 size-4 shrink-0 accent-primary"
+              className="mt-0.5"
               aria-invalid={erro ? true : undefined}
               aria-describedby={erro ? campoErroId(campo) : undefined}
             />

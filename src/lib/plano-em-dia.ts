@@ -171,7 +171,7 @@ export type PlanoEmDia =
       alternativaRecesso: { ritmo: number; data: string } | null;
       /** Recessos do cronograma no caminho SEM decisão da dupla (518):
        *  sem row em dupla_recessos = pendente. A projeção segue
-       *  conservadora (trata como "vamos usar") e a pendência vira
+       *  conservadora (trata como "encontros pausam") e a pendência vira
        *  pergunta na superfície — a plano_propor recusa sem a resposta. */
       recessosPendentes: RecessoPendente[];
       avisos: string[];
@@ -369,7 +369,7 @@ export function montarPlanoEmDia(input: {
     )
     .map((e) => ({ ini: e.data!, fim: e.data_fim ?? e.data! }));
   // 518 tri-estado: sem row = pendente (a simulação segue conservadora e o
-  // recesso conta como "vamos usar" até a dupla decidir; a superfície
+  // recesso conta como "encontros pausam" até a dupla decidir; a superfície
   // pergunta e a plano_propor recusa proposta sem a resposta)
   const recessosPendentes: RecessoPendente[] = eventos
     .filter(
@@ -885,6 +885,45 @@ export function fusaoDeArestas(arestas: readonly number[]): number[][] {
     if (g.length >= 2) grupos.push(g);
   }
   return grupos;
+}
+
+/** Estado derivado de uma aresta de fusão (025): "ótima" só quando
+ *  juntar não custa nada escondido — o n não pede semana de prática,
+ *  o n+1 não carrega pré-condição e a seleção corrente + a aresta não
+ *  fecha sessão de 3+. Neutra nos demais casos, sempre com o motivo em
+ *  texto (avisar sempre, bloquear nunca — a linha segue clicável). */
+export type EstadoArestaFusao =
+  | { tom: "otima"; motivo: null }
+  | { tom: "neutra"; motivo: string };
+
+export function estadoArestaFusao(
+  n: number,
+  passos: readonly Pick<PassoPlano, "numero" | "precondicao">[],
+  selecionadas: readonly number[]
+): EstadoArestaFusao {
+  if (META_PASSOS_PLANO[n]?.exige === "pratica") {
+    return { tom: "neutra", motivo: `pula a semana de prática do ${n}º` };
+  }
+  const precondicao = passos.find((p) => p.numero === n + 1)?.precondicao;
+  if (precondicao) {
+    return {
+      tom: "neutra",
+      motivo: `o ${n + 1}º pede "${precondicao}" antes`,
+    };
+  }
+  const marcada = selecionadas.includes(n);
+  const grupo = fusaoDeArestas([...selecionadas, n]).find((g) =>
+    g.includes(n)
+  );
+  if (grupo && grupo.length >= 3) {
+    return {
+      tom: "neutra",
+      motivo: marcada
+        ? `sessão com ${grupo.length} encontros`
+        : `forma uma sessão com ${grupo.length} encontros`,
+    };
+  }
+  return { tom: "otima", motivo: null };
 }
 
 /** Carimba `sessao` ("a", "b"…) nos passos dos grupos válidos — marca

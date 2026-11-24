@@ -471,8 +471,8 @@ export const getJovemJornada = cache(
  *  declarada (462 — RPC `jovem_recessos`, 0218/0225): o papel mentorado
  *  não lê ciclo_eventos, então a janela chega por definer, no mesmo gate
  *  da jovem_jornada. A 0225 abriu o tri-estado: `usa` null = pendente
- *  (a dupla ainda não respondeu — left join sem row), true = "vamos
- *  usar o recesso", false = "vamos seguir nos encontrando". */
+ *  (a dupla ainda não respondeu — left join sem row), true = os
+ *  encontros pausam no período, false = a dupla segue se encontrando. */
 export type JovemRecesso = {
   ciclo_evento_id: string;
   data: string;

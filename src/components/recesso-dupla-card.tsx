@@ -7,7 +7,8 @@ import { Button } from "@/components/ui/button";
 import { declararRecesso } from "@/lib/actions-recesso";
 
 // REALIZA-462/518 — a decisão de recesso é da dupla e por período:
-// "vamos usar o recesso" ou "vamos seguir nos encontrando". Tri-estado
+// usa=true = os encontros pausam no período; usa=false = a dupla segue
+// se encontrando. Tri-estado
 // da 518: sem row em dupla_recessos = PENDENTE ("a dupla ainda não
 // decidiu"), nunca default silencioso. Só mentor e mentorado declaram
 // (a RPC 0225 revalida no banco); staff acompanha e cobra — "a decisão
@@ -85,7 +86,7 @@ export function RecessoDuplaCard({
             </p>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {souMentor
-                ? "Vocês combinam juntos se param ou seguem se encontrando. Qualquer um dos dois pode responder pela dupla."
+                ? "Vocês combinam juntos se pausam os encontros ou seguem se encontrando. Qualquer um dos dois pode responder pela dupla."
                 : "A decisão é da dupla. A equipe acompanha e cobra, não responde por eles."}
             </p>
           </div>
@@ -148,7 +149,7 @@ export function RecessoDecisao({
               <p className="text-xs text-muted-foreground">
                 {decidido
                   ? r.usa
-                    ? "vão usar o recesso"
+                    ? "vão pausar os encontros"
                     : "seguem se encontrando"
                   : "a dupla ainda não decidiu"}
               </p>
@@ -172,7 +173,7 @@ export function RecessoDecisao({
                   {decidido && r.usa === true && (
                     <Check size={14} aria-hidden />
                   )}
-                  Vamos usar o recesso
+                  Vamos pausar os encontros
                 </Button>
                 <Button
                   type="button"

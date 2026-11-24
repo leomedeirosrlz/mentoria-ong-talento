@@ -7,7 +7,7 @@
 // encerramento e o recesso segue pendente ("a dupla ainda não decidiu"),
 // então o card cai no estado "conversa" com a saída honesta: seguir se
 // encontrando no recesso fecha o plano. A d-ok é a paridade do recesso
-// DECIDIDO: a dupla marcou "vamos usar o recesso" e os oficiais dentro
+// DECIDIDO: a dupla marcou "vamos pausar os encontros" e os oficiais dentro
 // da janela viram devidos — o card aparece mesmo na dupla saudável.
 
 import { agirComConfirma, entrarNaDemo, expect, test } from "../helpers";
@@ -58,7 +58,7 @@ test.describe("demo — plano pra ficar em dia (REALIZA-397)", () => {
       card.getByText("Falta 1 decisão da dupla pra fechar a proposta.")
     ).toBeVisible();
     await expect(
-      card.getByRole("button", { name: /Vamos (usar|seguir)/ })
+      card.getByRole("button", { name: /Vamos (pausar|seguir)/ })
     ).toHaveCount(0);
     // e não sobra card de recesso separado na página (exact: o aviso dos
     // passos empurrados menciona "recesso do programa" como substring)
@@ -154,24 +154,24 @@ test.describe("demo — plano pra ficar em dia (REALIZA-397)", () => {
       card.getByRole("link", { name: "Ver o combinado" })
     ).toBeVisible();
     await expect(
-      card.getByRole("button", { name: /Vamos (usar|seguir)/ })
+      card.getByRole("button", { name: /Vamos (pausar|seguir)/ })
     ).toHaveCount(0);
   });
 
-  test("mentor na d-ok: recesso decidido vira devido — 'vão usar' lê autoria", async ({
+  test("mentor na d-ok: recesso decidido vira devido — 'vão pausar' lê autoria", async ({
     page,
   }) => {
     await entrarNaDemo(page, "mentor_dpp");
     await page.goto(`/duplas/${D_OK}?aba=agora`);
 
-    // paridade demo do tri-estado: a dupla decidiu "vamos usar o recesso"
+    // paridade demo do tri-estado: a dupla decidiu "vamos pausar os encontros"
     // — os oficiais dentro da janela viram devidos e o card aparece até
     // na dupla que estava em dia. A decisão mostra quem e quando
     const card = page.getByRole("region", { name: "Para ficar em dia" });
     await expect(card).toBeVisible();
     await expect(card.getByText(/\d+ encontros? pra repor/)).toBeVisible();
     await expect(card.getByText("Recesso no caminho")).toBeVisible();
-    await expect(card.getByText("vão usar o recesso")).toBeVisible();
+    await expect(card.getByText("vão pausar os encontros")).toBeVisible();
     await expect(card.getByText(/decidido por .+ em /)).toBeVisible();
     // decidido não é pendência: nada de "falta decisão" no card
     await expect(card.getByText(/Falta \d+ decis/)).toHaveCount(0);

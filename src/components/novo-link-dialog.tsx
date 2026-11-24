@@ -25,6 +25,7 @@ import { turmaLonga } from "@/lib/turma";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { FadeTroca } from "@/components/ui/etapa";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,

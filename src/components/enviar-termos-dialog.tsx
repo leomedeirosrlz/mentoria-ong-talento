@@ -29,6 +29,7 @@ import { NudgeButton } from "@/components/nudge-button";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogClose,
@@ -139,12 +140,10 @@ function TermoCheckRow({
     >
       <div className="flex items-center gap-3">
         <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-3 data-[disabled]:cursor-default">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={checked}
             disabled={disabled}
-            onChange={onToggle}
-            className="size-4 shrink-0 accent-primary"
+            onCheckedChange={onToggle}
           />
           <span className="min-w-0 flex-1 truncate">{nome}</span>
         </label>

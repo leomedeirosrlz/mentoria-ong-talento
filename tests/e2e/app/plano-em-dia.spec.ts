@@ -3,6 +3,7 @@ import {
   appEnvOk,
   buscarViaServiceRole,
   convergirDuplaAtiva,
+  convergirDuplaEmDia,
   expect,
   inserirViaServiceRole,
   limparEncontrosDaDupla,
@@ -18,6 +19,7 @@ import {
 const EMAIL = process.env.E2E_MENTOR_EMAIL ?? "";
 const SENHA = process.env.E2E_MENTOR_PASSWORD ?? "";
 const DUPLA_ID = process.env.E2E_DUPLA_ID ?? "";
+const MENTOR_PROFILE = "e2e00000-0000-4000-8000-000000000010";
 
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
 
@@ -49,7 +51,12 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
   test("mentor combina o plano na superfície — uma pergunta por tela até o gesto", async ({
     page,
   }) => {
-    // 2 'não aconteceu' = 2 passos remarcáveis → o card cruza a régua de 2+
+    // o plano precisa FECHAR pra superfície abrir o gesto — "conversa"
+    // (nenhum ritmo fecha) não tem "Combinar". O calendário fixo deixa
+    // todo passo vencido devendo: cobrir o resto e segurar só os dois
+    // 'não aconteceu' deixa a dupla em recuperação, como o spec sempre
+    // assumiu — 2 passos remarcáveis, não a trilha inteira
+    await convergirDuplaEmDia(DUPLA_ID, MENTOR_PROFILE, { exceto: [3, 4] });
     await criarEncontro(3, "nao_aconteceu", -7);
     await criarEncontro(4, "nao_aconteceu", -5);
     await page.goto(`/duplas/${DUPLA_ID}?aba=agora`);
@@ -120,10 +127,10 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     await expect(combinar).toBeEnabled({ timeout: 15_000 });
     await combinar.click();
 
-    // mentor é lado: o combinado nasce em vigor (aceito) e o jovem é
+    // mentor é lado: o combinado nasce valendo (aceito) e o jovem é
     // avisado — aceite único do 0225, não sobra pendência bilateral
     await expect(
-      page.getByText("Combinado em vigor", { exact: false })
+      page.getByText("Combinado valendo", { exact: false })
     ).toBeVisible({ timeout: 15_000 });
     const [vivo] = await buscarViaServiceRole<{ status: string }[]>(
       "dupla_planos",

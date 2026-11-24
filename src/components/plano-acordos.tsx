@@ -156,7 +156,7 @@ export function PlanoAcordosCard({
   const janela = plano.janela ?? plano.escopo?.janela ?? null;
   const hoje = sugestoes?.hoje ?? partesSP(new Date())?.data ?? "";
   // leitura 518 do plano por quem abre: proposta da equipe esperando a
-  // dupla ("falta o seu"), combinado em vigor sem o seu carimbo ("você
+  // dupla ("falta o seu"), combinado valendo sem o seu carimbo ("você
   // foi avisado") ou seguindo — um aceite ativa, nunca "faltam os dois"
   const estado = estadoLeituraPlano({
     status: plano.status,
@@ -175,7 +175,7 @@ export function PlanoAcordosCard({
     plano.proposto_via === "liza" ? "A Liza" : "A equipe";
   const statusTexto: Record<string, string> = {
     proposto: "Proposto, falta um aceite da dupla",
-    aceito: "Em vigor",
+    aceito: "Valendo",
     ativo: "Em andamento",
     concluido: "Concluído",
     expirado: "Expirado",
@@ -212,7 +212,7 @@ export function PlanoAcordosCard({
         return;
       }
       if (r.novaVersao)
-        toast.success("Versão recalculada já está em vigor.");
+        toast.success("Versão recalculada já vale.");
       router.refresh();
     });
   };
@@ -386,14 +386,14 @@ export function PlanoAcordosCard({
           vê o pedido; quem já carimbou vê que um aceite da dupla basta */}
       {estado === "proposto_staff_falta_meu" && (
         <p className="text-sm text-muted-foreground">
-          {propostaPor} propôs esse plano. Um aceite da dupla já coloca o
-          combinado em vigor; o outro lado é avisado.
+          {propostaPor} propôs esse plano. Um aceite da dupla põe o
+          combinado pra valer. O outro lado recebe o aviso.
         </p>
       )}
       {estado === "proposto_staff_falta_outro" && meuLado != null && (
         <p className="text-sm text-muted-foreground">
-          Você já respondeu. Um aceite da dupla já coloca o combinado em
-          vigor.
+          Você já respondeu. Um aceite da dupla põe o combinado pra
+          valer.
         </p>
       )}
       {estado === "ativo_sem_minha_ciencia" && (
@@ -666,7 +666,7 @@ export function PlanoAcordosCard({
             Não serve pra mim
           </Button>
           <p className="text-xs text-muted-foreground">
-            O combinado está em vigor. Se algo mudou, ainda dá pra
+            O combinado vale. Se algo mudou, ainda dá pra
             contestar antes do próximo encontro.
           </p>
         </div>

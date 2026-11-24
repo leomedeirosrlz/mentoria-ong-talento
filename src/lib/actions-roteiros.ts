@@ -72,7 +72,7 @@ export async function gerarRoteiroSemana(
   if (ctx.lado !== "staff")
     return { error: "Quem gera a semana sob demanda é a equipe." };
   const plano = planoVigente(ctx.dupla);
-  if (!plano) return { error: "Essa dupla não tem um combinado em vigor." };
+  if (!plano) return { error: "Essa dupla não tem um combinado valendo." };
   if (!(plano.escopo?.numeros ?? []).includes(numero))
     return { error: "Esse encontro não faz parte do combinado." };
 

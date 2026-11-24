@@ -92,7 +92,7 @@ describe("suaSemana", () => {
     ).toBeNull();
   });
 
-  it("em vigor sem o meu carimbo: ativo_sem_minha_ciencia", () => {
+  it("valendo sem o meu carimbo: ativo_sem_minha_ciencia", () => {
     const s = suaSemana({
       plano: {
         ...base,

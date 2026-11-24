@@ -545,9 +545,10 @@ export type EncontroNota = {
  *  como a nota: precede o agendamento e segue o nº do guia na remarcação.
  *  Pendente = feito=false; feito_em é carimbo de trigger, nunca do caller. */
 /** Decisão declarada da dupla sobre um recesso do cronograma (REALIZA-462,
- *  0218): usa=true "vamos usar o recesso" (default implícito quando não há
- *  linha pra esse evento); usa=false "vamos seguir nos encontrando" — o
- *  planner pode sugerir datas dentro da janela. Amarrada ao ID do evento
+ *  0218): usa=true = os encontros pausam no período (default implícito
+ *  quando não há linha pra esse evento); usa=false = a dupla segue se
+ *  encontrando — o planner pode sugerir datas dentro da janela. Amarrada
+ *  ao ID do evento
  *  (não à data): se a janela anda no cronograma, a decisão segue junto. */
 export type DuplaRecesso = {
   id: string;
@@ -783,8 +784,8 @@ export type Dupla = {
   notas?: EncontroNota[];
   /** Recessos com decisão declarada (0218/0225) — tri-estado da 518:
    *  ausência da linha = pendente (a simulação conta conservador como
-   *  "vamos usar" até a dupla responder); usa=true bloqueia a janela,
-   *  usa=false libera datas dentro dela. */
+   *  "pausa no período" até a dupla responder); usa=true bloqueia a
+   *  janela, usa=false libera datas dentro dela. */
   recessos?: DuplaRecesso[];
   /** Planos "ficar em dia" da dupla (0219) — o vivo é único por
    *  índice parcial (proposto/aceito/ativo); o histórico convive. */

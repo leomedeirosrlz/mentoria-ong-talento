@@ -3,7 +3,7 @@
 // REALIZA-520 — o bloco "Sua semana" por estado de leitura: CTA por
 // estado (Ver e responder quando falta o meu aceite), vínculo "este é o
 // Nº", disclosure de materiais e a ausência de "aceitar" num combinado
-// em vigor. E a regressão do P0: sem encontro futuro, o ProximoEncontro
+// valendo. E a regressão do P0: sem encontro futuro, o ProximoEncontro
 // caía no JovemAgendarSugestao SEM a prop plano — a jovem com plano
 // proposto/ativo não via aceite, vínculo nem "Não serve pra mim".
 
@@ -140,7 +140,7 @@ describe("SuaSemanaPlano — CTA e pill por estado", () => {
     desmontar();
   });
 
-  it("em vigor sem o meu carimbo: 'Ver o combinado', sem pedir aceite nem data", () => {
+  it("valendo sem o meu carimbo: 'Ver o combinado', sem pedir aceite nem data", () => {
     const semana = suaSemana({
       plano: planoCom({
         status: "aceito",
@@ -158,7 +158,7 @@ describe("SuaSemanaPlano — CTA e pill por estado", () => {
         semana={semana}
       />
     );
-    expect(alvo.textContent).toContain("Plano em vigor");
+    expect(alvo.textContent).toContain("Plano valendo");
     const ls = links(alvo);
     // "Ver e responder" não aparece — quem não carimbou foi avisado
     expect(ls.some((l) => l.texto.startsWith("Ver e responder"))).toBe(false);
@@ -181,7 +181,7 @@ describe("SuaSemanaPlano — CTA e pill por estado", () => {
     expect(alvo.textContent).toContain(
       "Este é o 5º encontro do plano que Ricardo combinou."
     );
-    // nada pede aceite num combinado já em vigor
+    // nada pede aceite num combinado já valendo
     expect(alvo.textContent).not.toMatch(/aceit/i);
     const ls = links(alvo);
     expect(ls.find((l) => l.texto === "Confirmar data")?.href).toBe(

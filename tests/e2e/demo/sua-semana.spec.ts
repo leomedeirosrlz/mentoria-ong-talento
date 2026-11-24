@@ -115,7 +115,7 @@ test.describe("O que precisa de você — staff", () => {
     // staff acompanha e cobra — os botões de decidir são da dupla (0225)
     await expect(recesso).toContainText(/a decisão é da dupla/i);
     await expect(
-      recesso.getByRole("button", { name: /Vamos usar o recesso/ })
+      recesso.getByRole("button", { name: /Vamos pausar os encontros/ })
     ).toHaveCount(0);
   });
 

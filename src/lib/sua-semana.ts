@@ -332,7 +332,7 @@ export type ItemPrecisaDeVoce = {
 };
 
 const primeiro = (nome: string | null | undefined) =>
-  (nome ?? "").split(" ")[0] || "—";
+  (nome ?? "").split(" ")[0];
 
 /** Corte da fila (019): a seção fica curta, o panorama cobre o resto. */
 const LIMITE_FILA = 5;
@@ -432,7 +432,16 @@ export function precisaDeVoce(input: {
 
     itens.push({
       duplaId: d.id,
-      nomes: `${primeiro(d.mentor?.nome_social ?? d.mentor?.nome)} × ${primeiro(d.mentorado?.nome_social ?? d.mentorado?.nome)}`,
+      // "—" nunca vira nome de pessoa: a linha junta só os lados que
+      // têm nome (dupla sem lado algum não existe na prática, mas se
+      // chegar vazio o link lê "a dupla", não um travessão)
+      nomes:
+        [
+          primeiro(d.mentor?.nome_social ?? d.mentor?.nome),
+          primeiro(d.mentorado?.nome_social ?? d.mentorado?.nome),
+        ]
+          .filter(Boolean)
+          .join(" × ") || "a dupla",
       motivo: atencao,
       ...destino,
     });

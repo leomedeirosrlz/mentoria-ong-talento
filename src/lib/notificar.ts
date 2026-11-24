@@ -33,7 +33,7 @@ export async function notificar(
 
 /** 519: a 0225 minta a mesma notificação "…responda" pra proposta da equipe
  *  (o plano nasce `proposto`, esperando aceite) e pra proposta da própria
- *  dupla (nasce `aceito`, já em vigor pelo aceite único). A row fica
+ *  dupla (nasce `aceito`, já valendo pelo aceite único). A row fica
  *  imutável depois de criada — a guarda da 0019 só deixa mexer em lida_em —
  *  então a leitura reescreve a copy quando o autor é o outro lado da dupla.
  *  Detecção sem consultar o plano: quem recebe esse tipo é sempre o par,
@@ -88,8 +88,8 @@ export async function relerPlanoPropostoDeMembro(
     if (!nome) return n;
     return {
       ...n,
-      titulo: 'Plano "ficar em dia" em vigor',
-      corpo: `${nome} combinou o plano. Ele já está em vigor; veja as datas combinadas.`,
+      titulo: 'Plano "ficar em dia" valendo',
+      corpo: `${nome} combinou o plano. Já vale; veja as datas combinadas.`,
     };
   });
 }

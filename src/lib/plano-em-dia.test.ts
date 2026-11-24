@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   escopoDaProposta,
+  estadoArestaFusao,
   fusaoDeArestas,
   fusaoPedeAvisoPratica,
   gruposDeSessao,
@@ -230,7 +231,7 @@ describe("montarPlanoEmDia — recesso tri-estado (518/0225)", () => {
     return { rec, eventos };
   };
 
-  it("sem row = pendente: lista a pergunta e a simulação conta como 'vamos usar'", () => {
+  it("sem row = pendente: lista a pergunta e a simulação conta como 'pausa no período'", () => {
     const { rec, eventos } = montar();
     const p = montarPlanoEmDia({
       dupla: dupla(),
@@ -379,6 +380,50 @@ describe("fusaoPedeAvisoPratica — a prática pulada (018)", () => {
     expect(fusaoPedeAvisoPratica([[16, 17]])).toBe(false);
     expect(fusaoPedeAvisoPratica([[4, 6]])).toBe(false);
     expect(fusaoPedeAvisoPratica([])).toBe(false);
+  });
+});
+
+describe("estadoArestaFusao — a aresta diz o custo de juntar (025)", () => {
+  it("aresta limpa é ótima: sem prática pulada, sem pré-condição, sem sessão 3+", () => {
+    expect(estadoArestaFusao(9, [{ numero: 10 }], [])).toEqual({
+      tom: "otima",
+      motivo: null,
+    });
+  });
+  it("passo que exige prática fica neutro — a fusão pula a semana dele", () => {
+    expect(estadoArestaFusao(6, [{ numero: 7 }], [])).toEqual({
+      tom: "neutra",
+      motivo: "pula a semana de prática do 6º",
+    });
+  });
+  it("seguinte com pré-condição fica neutro e nomeia o que ele pede", () => {
+    const motivo =
+      'o 2º pede "Visão/Declaração consolidada e avaliação de terceiros respondida" antes';
+    expect(
+      estadoArestaFusao(
+        1,
+        [
+          {
+            numero: 2,
+            precondicao:
+              "Visão/Declaração consolidada e avaliação de terceiros respondida",
+          },
+        ],
+        []
+      )
+    ).toEqual({ tom: "neutra", motivo });
+  });
+  it("a seleção fecha sessão de 3+: 'forma' antes de marcar, 'sessão' depois", () => {
+    // aresta 10 ainda não marcada, 9 já está → [9, 10, 11]
+    expect(estadoArestaFusao(10, [{ numero: 11 }], [9])).toEqual({
+      tom: "neutra",
+      motivo: "forma uma sessão com 3 encontros",
+    });
+    // aresta 9 já marcada junto com a 10 → a sessão existe
+    expect(estadoArestaFusao(9, [{ numero: 10 }], [9, 10])).toEqual({
+      tom: "neutra",
+      motivo: "sessão com 3 encontros",
+    });
   });
 });
 

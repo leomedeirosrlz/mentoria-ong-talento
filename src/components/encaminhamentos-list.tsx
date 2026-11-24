@@ -18,6 +18,7 @@ import {
   ExcluirCombinadoConfirm,
 } from "@/components/combinado-acoes";
 import { T } from "@/components/motion";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
 export function EncaminhamentosList({
@@ -44,9 +45,6 @@ export function EncaminhamentosList({
 }) {
   const [pending, start] = useTransition();
   const [pendingId, setPendingId] = useState<string | null>(null);
-  // ids marcados "feito" nesta sessão — só eles ganham o check animado;
-  // itens que já chegam feitos do server não celebram de novo a cada mount
-  const [feitosAgora, setFeitosAgora] = useState<ReadonlySet<string>>(new Set());
   // um dialog compartilhado pros dois fluxos — o item alvo fica em estado
   const [editando, setEditando] = useState<Encaminhamento | null>(null);
   const [excluindo, setExcluindo] = useState<Encaminhamento | null>(null);
@@ -137,23 +135,17 @@ export function EncaminhamentosList({
               className="flex scroll-mt-20 items-start gap-1"
             >
               {podeEditar || podeMarcar ? (
-                // checkbox nativo + label: teclado, estado e o clique no texto
-                // funcionam sem ARIA manual; o quadrado é só a representação
                 <label
                   className={cn(
                     "group flex min-w-0 flex-1 cursor-pointer items-start gap-3 py-3 transition-colors",
                     pending && pendingId === t.id && "opacity-60"
                   )}
                 >
-                  <input
-                    type="checkbox"
-                    className="peer sr-only"
+                  <Checkbox
                     checked={t.status === "feito"}
                     disabled={pending && pendingId === t.id}
-                    onChange={() => {
+                    onCheckedChange={() => {
                       setPendingId(t.id);
-                      if (t.status !== "feito")
-                        setFeitosAgora((s) => new Set(s).add(t.id));
                       start(async () => {
                         try {
                           const res = await toggleEncaminhamento(t.id, t.status !== "feito", duplaId);
@@ -166,35 +158,8 @@ export function EncaminhamentosList({
                         }
                       });
                     }}
+                    className="mt-0.5 group-hover:border-foreground"
                   />
-                  <span
-                    aria-hidden="true"
-                    className={cn(
-                      "mt-0.5 grid size-4.5 shrink-0 place-items-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card",
-                      t.status === "feito"
-                        ? "border-[var(--ok)] bg-[var(--ok)] text-[var(--status-foreground)]"
-                        : "border-muted-foreground/40 group-hover:border-foreground"
-                    )}
-                  >
-                    {t.status === "feito" && (
-                      // mesma coreografia do /auth/confirmado: o check entra
-                      // com pop (svg) e se desenha (path) — keyframes
-                      // confirm-pop/confirm-draw do globals, só no clique
-                      // desta sessão (feitosAgora)
-                      <svg
-                        viewBox="0 0 10 8"
-                        className={cn(
-                          "size-2.5 fill-none stroke-current stroke-2",
-                          feitosAgora.has(t.id) && "confirm-pop"
-                        )}
-                      >
-                        <path
-                          d="M1 4l2.5 2.5L9 1"
-                          className={cn(feitosAgora.has(t.id) && "confirm-draw")}
-                        />
-                      </svg>
-                    )}
-                  </span>
                   {texto}
                 </label>
               ) : (

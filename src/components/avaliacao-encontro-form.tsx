@@ -18,6 +18,7 @@ import {
 } from "@/lib/ciclo";
 import { Button } from "@/components/ui/button";
 import { FadeTroca } from "@/components/ui/etapa";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
 
@@ -302,8 +303,9 @@ export function AvaliacaoEncontroForm({
                     key={o.value}
                     className="flex h-11 cursor-pointer items-center rounded-full bg-muted px-3.5 text-sm font-medium text-muted-foreground transition-colors select-none has-checked:bg-primary has-checked:text-primary-foreground has-focus-visible:ring-3 has-focus-visible:ring-ring/50 md:h-10"
                   >
-                    <input
-                      type="checkbox"
+                    {/* chip pill: a caixa fica sr-only como o input antigo —
+                        o pill inteiro é a representação (has-checked) */}
+                    <Checkbox
                       name="temas"
                       value={o.value}
                       className="sr-only"
@@ -342,11 +344,10 @@ export function AvaliacaoEncontroForm({
                 liberar". Na especialista nem média existe — renderizar o
                 controle seria copy desonesta */}
             {trilha === "dpp" && (
-              <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-card px-4 py-3 text-sm shadow-[var(--shadow-border)] transition-colors select-none has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 sm:px-5">
-                <input
-                  type="checkbox"
+              <label className="flex cursor-pointer items-start gap-3 rounded-xl bg-card px-4 py-3 text-sm shadow-[var(--shadow-border)] transition-colors select-none has-checked:bg-primary/5 sm:px-5">
+                <Checkbox
                   name="visivel_mentor"
-                  className="mt-0.5 size-4 shrink-0 accent-primary"
+                  className="mt-0.5"
                 />
                 <span>
                   <span className="font-medium">
@@ -361,11 +362,11 @@ export function AvaliacaoEncontroForm({
             {/* pedido de ajuda — canal de segurança distinto do "preciso
                 de apoio" do mentor: avisa coord + supervisor na hora, e
                 o sucesso já diz quem responde e quando */}
-            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--warn)]/40 bg-[var(--warn)]/8 px-4 py-3 text-sm transition-colors select-none has-checked:bg-[var(--warn)]/15 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 sm:px-5">
-              <input
-                type="checkbox"
+            <label className="flex cursor-pointer items-start gap-3 rounded-xl border border-[var(--warn)]/40 bg-[var(--warn)]/8 px-4 py-3 text-sm transition-colors select-none has-checked:bg-[var(--warn)]/15 sm:px-5">
+              <Checkbox
                 name="pedir_apoio"
-                className="mt-0.5 size-4 shrink-0 accent-[var(--warn)]"
+                tom="warn"
+                className="mt-0.5"
               />
               <span>
                 <span className="font-medium">Preciso de ajuda</span> · a

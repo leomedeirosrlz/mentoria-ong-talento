@@ -2427,7 +2427,7 @@ function build(): DemoData {
     aprovado_em: haDias(1, "19:12"),
     // 0225: proposta de lado nasce aceita — o carimbo do mentor vem no
     // mesmo instante da proposta; o da jovem é a "ciência" do dia
-    // seguinte (aceite idempotente num plano já em vigor)
+    // seguinte (aceite idempotente num plano já valendo)
     aceito_mentor_em: haDias(2, "18:40"),
     aceito_mentorado_em: haDias(1, "19:12"),
     contestado_por: null,
@@ -2487,7 +2487,7 @@ function build(): DemoData {
         plano_id: uid(0x3000 + 1),
         dupla_id: uid(D.ok),
         tipo: "aceito" as const,
-        // 0225: aceitar num plano já em vigor é a "ciência" — o status
+        // 0225: aceitar num plano já valendo é a "ciência" — o status
         // não anda, só o carimbo do lado que faltava
         de: "aceito",
         para: "aceito",
@@ -2516,8 +2516,8 @@ function build(): DemoData {
     ],
   };
   duplaOk.planos = [planoDemo];
-  // 0225 tri-estado: a dupla saudável já decidiu o recesso ("vamos usar",
-  // declarado pelo mentor) — a d-pend segue sem row = pendente, que é o
+  // 0225 tri-estado: a dupla saudável já decidiu o recesso ("vamos pausar
+  // os encontros", declarado pelo mentor) — a d-pend segue sem row = pendente, que é o
   // estado que a superfície "Combinar o plano" pergunta
   const recessoT1 = cicloEventos.find(
     (e) => e.cronograma_id === cronogramaT1 && e.tipo === "recesso"
@@ -2624,7 +2624,7 @@ function build(): DemoData {
     encontros: encD2,
     // 518: o combinado proposto pelo supervisor (Paulo) esperando UM
     // aceite da dupla — é a vitrine do "proposto_staff" da 0225: ninguém
-    // de lado carimbou ainda, o primeiro aceite já coloca em vigor
+    // de lado carimbou ainda, o primeiro aceite já põe pra valer
     planos: [
       {
         id: uid(0x3000 + 2),

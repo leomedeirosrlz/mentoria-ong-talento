@@ -10,7 +10,7 @@ import { fraseDoCombinado } from "@/components/plano-em-dia-pecas";
 
 // ---------- estadoLeituraPlano — a leitura única do combinado (518) ----------
 // 0225: proposta de lado nasce `aceito`; a da equipe nasce `proposto` e o
-// primeiro aceite da dupla a coloca em vigor. Não existe "faltam os dois".
+// primeiro aceite da dupla a põe pra valer. Não existe "faltam os dois".
 
 describe("estadoLeituraPlano", () => {
   const aceitesNinguem = { mentor: false, mentorado: false };
@@ -52,7 +52,7 @@ describe("estadoLeituraPlano", () => {
     ).toBe("proposto_staff_falta_outro");
   });
 
-  it("combinado em vigor sem o meu carimbo: fui avisado, não devo aceite", () => {
+  it("combinado valendo sem o meu carimbo: fui avisado, não devo aceite", () => {
     const aceites = { mentor: true, mentorado: false };
     expect(
       estadoLeituraPlano({ status: "aceito", meuLado: "mentorado", aceites })
@@ -62,7 +62,7 @@ describe("estadoLeituraPlano", () => {
     ).toBe("ativo_sem_minha_ciencia");
   });
 
-  it("combinado em vigor com o meu carimbo — e pra equipe", () => {
+  it("combinado valendo com o meu carimbo — e pra equipe", () => {
     const aceites = { mentor: true, mentorado: false };
     expect(
       estadoLeituraPlano({ status: "aceito", meuLado: "mentor", aceites })
@@ -132,7 +132,7 @@ describe("resumoCombinado", () => {
     expect(r.falta).toBe("mentorado");
   });
 
-  it("em vigor não tem 'falta' — o outro lado foi avisado", () => {
+  it("valendo não tem 'falta' — o outro lado foi avisado", () => {
     const r = resumoCombinado({
       ...planoBase,
       status: "aceito",
@@ -264,7 +264,7 @@ describe("fraseDoCombinado", () => {
     expect(f.cta).toBe("Ver e responder");
   });
 
-  it("em vigor sem o meu carimbo: 'Fulano combinou', avisado em data — sem pedir aceite", () => {
+  it("valendo sem o meu carimbo: 'Fulano combinou', avisado em data — sem pedir aceite", () => {
     const f = fraseDoCombinado(
       {
         ...resumoBase,
@@ -274,7 +274,7 @@ describe("fraseDoCombinado", () => {
       "jovem",
       "Paulo"
     );
-    expect(f.pill).toBe("Plano em vigor");
+    expect(f.pill).toBe("Plano valendo");
     expect(f.texto).toMatch(/Paulo combinou/);
     expect(f.texto).toMatch(/avisado em/);
     expect(f.texto).toMatch(/contestar/);
@@ -282,7 +282,7 @@ describe("fraseDoCombinado", () => {
     expect(f.cta).toBe("Ver o combinado");
   });
 
-  it("em vigor com o meu carimbo: segue o plano, sem falar de aceite", () => {
+  it("valendo com o meu carimbo: segue o plano, sem falar de aceite", () => {
     const f = fraseDoCombinado(
       {
         ...resumoBase,

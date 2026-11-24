@@ -17,8 +17,8 @@ import {
 import type { Dupla, DuplaRecesso } from "@/lib/types";
 
 // REALIZA-462 (0218) — recesso opcional por dupla. A decisão é por par e
-// por período: usa=true "vamos usar o recesso" (default implícito, igual
-// a sempre); usa=false "vamos seguir nos encontrando" — só pra dupla que
+// por período: usa=true = os encontros pausam no período (default
+// implícito, igual a sempre); usa=false = a dupla segue se encontrando — só pra dupla que
 // declarou, o calendário oficial não muda. Amarrada ao ID do evento:
 // se a janela anda no cronograma, a decisão segue junto.
 

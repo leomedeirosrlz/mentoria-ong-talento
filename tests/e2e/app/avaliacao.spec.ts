@@ -38,12 +38,10 @@ const IDS = {
   encontroFixture: "e2e00000-0000-4000-8000-0000000000d2",
 } as const;
 const NUMERO_FIXTURE = 16;
-// números reservados aos encontros que os testes criam: os baixos (≤ a
+// números que os testes usam pros encontros que criam: os baixos (≤ a
 // semana corrente do ciclo) pra quando a linha do encontro precisa render
 // fora do <details> da ficha, os altos pra quando só a pendência importa.
 // O 8 é a fixture de encontro futuro do jovem; o 16 é a fixture daqui.
-const POOL_NUMEROS = [1, 2, 3, 4, 5, 11, 12, 13, 14, 15];
-
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
 
 // ids de encontro que o run criou — o afterEach devolve tudo
@@ -159,10 +157,12 @@ async function convergirPiso() {
   // selects independentes em paralelo — em staging cada ida serial ao
   // PostgREST soma segundos e o hook comia o teto de 60s do teste
   const [restos, enc] = await Promise.all([
-    // leftovers de run morto no pool de números do spec — filhos primeiro
+    // qualquer encontro que não a fixture — o pool do spec E leftovers de
+    // outros specs (o helper convergirDuplaEmDia cobre números fora do
+    // pool e cada 'realizado' minta um link que vira pendência extra)
     buscarViaServiceRole<{ id: string }[]>(
       "encontros",
-      `select=id&dupla_id=eq.${DUPLA_ID}&numero=in.(${POOL_NUMEROS.join(",")})`
+      `select=id&dupla_id=eq.${DUPLA_ID}&id=neq.${IDS.encontroFixture}`
     ),
     buscarViaServiceRole<{ id: string }[]>(
       "encontros",
@@ -283,10 +283,16 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await expect(
       secao.getByRole("heading", { name: "Suas avaliações" })
     ).toBeVisible();
-    // REALIZA-493: a pendência única mora na lista "Para fazer agora" (a
-    // seção Suas avaliações virou só histórico); a fixture 16 é a única
-    // aberta — o botão abre o dialog dela
-    await abrirAvaliarPendente(page);
+    // a pendência mora na lista única "Para fazer agora" (493): UMA linha
+    // agrupada ("1 encontro esperando sua avaliação") com o gesto Avaliar
+    // no mais recente. Passa do 3º à vista cai no "e mais N" — abre antes
+    const fazer = page.locator('section[aria-labelledby="fazer-titulo"]');
+    const itemAval = fazer.locator("li", {
+      hasText: /esperando sua avaliação/,
+    });
+    if ((await itemAval.count()) === 0)
+      await fazer.getByText(/e mais \d+/).click();
+    await itemAval.getByRole("button", { name: "Avaliar" }).click();
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     // o título usa o rótulo da sessão ("16º encontro com Mentor") — o
@@ -320,9 +326,9 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     ).toBeVisible();
 
     // a pendência vira linha de histórico com a nota — o refresh re-renderiza
-    // (o item agregado sai da lista única quando zera a fila dela)
+    // e a linha agrupada some da lista única
     await expect(
-      page.getByText(/esperando sua avaliação/)
+      fazer.getByText(/esperando sua avaliação/)
     ).toHaveCount(0);
     const feita = secao.locator("li", { hasText: "16º encontro" });
     await expect(
@@ -427,11 +433,17 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
     await page.waitForURL((u) => u.pathname === "/jovem", { timeout: 15_000 });
 
-    // a pendência agregada na lista única — o "Avaliar" abre a mais
-    // recente, que é o encontro 14 criado agora (a fixture 16 também está
-    // aberta mas é mais antiga)
-    await abrirAvaliarPendente(page);
+    // mesma linha agrupada do spec acima, agora com 2 pendências — o
+    // Avaliar abre a mais recente (o 14, criado depois da fixture)
+    const fazer = page.locator('section[aria-labelledby="fazer-titulo"]');
+    const itemAval = fazer.locator("li", {
+      hasText: /esperando sua avaliação/,
+    });
+    if ((await itemAval.count()) === 0)
+      await fazer.getByText(/e mais \d+/).click();
+    await itemAval.getByRole("button", { name: "Avaliar" }).click();
     const dialog = page.getByRole("dialog");
+    await expect(dialog.getByText(/14º encontro/)).toBeVisible();
     await dialog
       .locator("label", {
         has: page.locator('input[name="estrelas"][value="2"]'),
