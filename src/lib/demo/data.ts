@@ -2404,7 +2404,10 @@ function build(): DemoData {
     dupla_id: uid(D.ok),
     status: "ativo" as const,
     escopo: {
-      numeros: [5, 6],
+      // 7º entra só como próxima semana do combinado: sem `passos`, o
+      // card "O combinado" (que itera passos) não ganha outra linha; o
+      // roteiro nasce como RASCUNHO na lista e na rota da semana.
+      numeros: [5, 6, 7],
       ritmo: 2,
       nivel: "semana_dupla" as const,
       janela: {

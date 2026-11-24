@@ -320,13 +320,17 @@ async function roteirosDemo(
   plano: DuplaPlano
 ): Promise<DuplaPlanoRoteiro[]> {
   const eventos = await getCicloEventos().catch(() => [] as CicloEvento[]);
+  const realizados = numerosRealizadosDe(dupla.encontros ?? []);
   const devidos = roteirosDevidos({
     numeros: plano.escopo?.numeros ?? [],
     marcados: numerosMarcadosDe(dupla.encontros ?? []),
-    realizados: numerosRealizadosDe(dupla.encontros ?? []),
+    realizados,
   });
+  // rascunho é a PRÓXIMA semana do combinado: futura e ainda não
+  // realizada. Um número já realizado nunca vira rascunho (a semana
+  // passou), mesmo que não esteja na régua de devidos.
   const rascunho = (plano.escopo?.numeros ?? []).find(
-    (n) => !devidos.includes(n)
+    (n) => !devidos.includes(n) && !realizados.includes(n)
   );
   const agora = new Date().toISOString();
   const rows: DuplaPlanoRoteiro[] = [];

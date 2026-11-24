@@ -27,13 +27,16 @@ test.describe("o combinado — jovem confirma a sugestão", () => {
     ).toBeVisible();
     await expect(c.getByText("até 2 encontros por semana")).toBeVisible();
     // passo aplicado lê a data marcada e não volta a formulário
-    await expect(c.getByText("5º encontro")).toBeVisible();
+    await expect(c.getByText("5º encontro", { exact: true })).toBeVisible();
     await expect(
       c.getByText(/marcado pra \w{3} \d{2}\/\d{2} às \d{2}:\d{2}/)
     ).toBeVisible();
     // passo pendente: sugestão pré-preenchida (a Bia se encontra às 19:00)
     // — a data é evergreen (HOJE+9), então o recorte é o formato civil
-    const linha6 = c.locator("li").filter({ hasText: "6º encontro" });
+    const linha6 = c
+      .locator("li")
+      .filter({ hasText: "6º encontro" })
+      .filter({ hasText: "sugestão" });
     await expect(linha6).toContainText(
       /sugestão \w{3} \d{2}\/\d{2} às 19:00/
     );
@@ -89,7 +92,7 @@ test.describe("o combinado — staff", () => {
     await expect(
       regiao.getByText(/De \d{2}\/\d{2} a \d{2}\/\d{2}/)
     ).toBeVisible();
-    await expect(regiao.getByText("6º encontro")).toBeVisible();
+    await expect(regiao.getByText("6º encontro", { exact: true })).toBeVisible();
     await expect(
       regiao.getByRole("button", { name: "Confirmar" })
     ).toBeVisible();
@@ -103,7 +106,7 @@ test.describe("o combinado — staff", () => {
     const regiao = page.getByRole("region", {
       name: "Acordos e intervenções",
     });
-    await expect(regiao.getByText("6º encontro")).toBeVisible();
+    await expect(regiao.getByText("6º encontro", { exact: true })).toBeVisible();
     await expect(
       regiao.getByText(/sugestão \w{3} \d{2}\/\d{2} às \d{2}:\d{2}/)
     ).toBeVisible();
