@@ -10,8 +10,10 @@ import {
 } from "@phosphor-icons/react/dist/ssr";
 import { demoRole } from "@/lib/demo/mode";
 import { formularioPorToken } from "@/lib/forms/queries";
+import { larguraPublicaForm } from "@/lib/forms/instrumentos";
 import { formatDateTime } from "@/lib/ciclo";
 import { sharedOg } from "@/lib/og";
+import { cn } from "@/lib/utils";
 import { SiteFooter } from "@/components/site-footer";
 import { EstadoCard } from "@/components/estado-card";
 import { FormularioPublico } from "./formulario-publico";
@@ -68,7 +70,15 @@ export default async function FormularioTokenPage({
           topo em telas baixas — centraliza só quando há espaço. flex, não
           grid: em grid o w-full do filho resolve contra o padding box */}
       <main className="flex flex-1 flex-col py-10 pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
-        <div className="m-auto w-full max-w-xl @container">
+        {/* a largura é por sistema (022/US3): instrumento sob medida
+            recebe a coluna de documento no desktop; form genérico segue
+            na estreita — em mobile nada muda (a base é sempre max-w-xl) */}
+        <div
+          className={cn(
+            "m-auto w-full @container",
+            larguraPublicaForm(info?.formulario?.sistema)
+          )}
+        >
           <header className="mb-6">
             {/* width/height naturais reservam a proporção — sem CLS */}
             <Logo size="lg" />

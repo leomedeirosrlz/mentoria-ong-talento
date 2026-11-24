@@ -12,13 +12,7 @@ import {
   OpcaoPilula,
   OVERLINE,
 } from "@/components/ui/filtro-opcoes";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { FormSurface } from "@/components/form-surface";
 import {
   Select,
   SelectContent,
@@ -340,15 +334,41 @@ export function RegistrosFiltros({
         )}
       </div>
 
-      <Dialog open={aberto} onOpenChange={setAberto}>
-        {/* md, não lg: o corpo são pílulas, checks e um select em coluna —
-            acima de md sobrava fundo ocioso; o scroll interno já vem do
-            DialogContent */}
-        <DialogContent size="md">
-          <DialogHeader>
-            <DialogTitle>Filtros</DialogTitle>
-          </DialogHeader>
-
+      {/* superfície única por viewport (spec 022, US6): o painel de
+          filtros é denso — 4 grupos + select — então vira Sheet de rodapé
+          no celular e Dialog lg no desktop */}
+      <FormSurface
+        open={aberto}
+        onOpenChange={setAberto}
+        titulo="Filtros"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              className="sm:me-auto"
+              disabled={draftAtivos === 0}
+              onClick={() =>
+                setDraft((d) => ({
+                  encontro: TODAS,
+                  avaliacao: TODAS,
+                  dificuldade: TODAS,
+                  dupla: TODAS,
+                  apoio: false,
+                  tardio: false,
+                  // ordenar não é filtro — o Limpar preserva a escolha
+                  ordem: d.ordem,
+                }))
+              }
+            >
+              Limpar
+            </Button>
+            <Button type="button" onClick={aplicarDraft}>
+              Aplicar{draftAtivos > 0 ? ` (${draftAtivos})` : ""}
+            </Button>
+          </>
+        }
+      >
           <div className="space-y-4">
             <fieldset>
               <legend className={OVERLINE}>Sinal</legend>
@@ -537,36 +557,7 @@ export function RegistrosFiltros({
               </div>
             </fieldset>
           </div>
-
-          {/* sticky no pé da área rolante do DialogContent — em tela
-              baixa o "Aplicar" não fica escondido abaixo da lista */}
-          <DialogFooter sticky>
-            <Button
-              type="button"
-              variant="ghost"
-              className="sm:me-auto"
-              disabled={draftAtivos === 0}
-              onClick={() =>
-                setDraft((d) => ({
-                  encontro: TODAS,
-                  avaliacao: TODAS,
-                  dificuldade: TODAS,
-                  dupla: TODAS,
-                  apoio: false,
-                  tardio: false,
-                  // ordenar não é filtro — o Limpar preserva a escolha
-                  ordem: d.ordem,
-                }))
-              }
-            >
-              Limpar
-            </Button>
-            <Button type="button" onClick={aplicarDraft}>
-              Aplicar{draftAtivos > 0 ? ` (${draftAtivos})` : ""}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </FormSurface>
     </>
   );
 }

@@ -885,14 +885,17 @@ function InstrumentoCard({
   // a borda mora no container; dentro, a área do gesto (link ou o
   // trigger do Rever) cobre o corpo e o "Ler o guia" fecha como tira de
   // rodapé — dois alvos separados, sem botão dentro de link (486). O
-  // hover/focus contorna o card INTEIRO (010): o anel vive no shell e
+  // hover/focus contorna o card INTEIRO (010): o contorno vive no shell e
   // o foco do gesto acende ele via has-[:focus-visible]; trancada não
-  // promete ação, então não ganha anel nenhum
+  // promete ação, então não ganha anel nenhum. O mecanismo é outline com
+  // offset negativo (022/US1): sombra ring-inset pinta ABAIXO dos filhos
+  // opacos e a capa/lombada cobriam o anel — outline sai por cima deles e
+  // segue o radius
   const shell = cn(
     "relative flex min-w-0 flex-col overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]",
     trancada && "border border-dashed border-border/70",
     gesto &&
-      "transition-shadow hover:ring-2 hover:ring-inset hover:ring-[var(--ic)]/50 has-[.gesto:focus-visible]:ring-2 has-[.gesto:focus-visible]:ring-inset has-[.gesto:focus-visible]:ring-ring"
+      "hover:outline-2 hover:-outline-offset-2 hover:outline-[var(--ic)]/50 has-[.gesto:focus-visible]:outline-2 has-[.gesto:focus-visible]:-outline-offset-2 has-[.gesto:focus-visible]:outline-ring"
   );
   const gestoCls = cn(
     "gesto group/gesto flex min-w-0 outline-none sm:flex-col"
@@ -901,7 +904,7 @@ function InstrumentoCard({
     <Link
       href={guiaHref}
       prefetch={false}
-      className="flex min-h-11 items-center gap-1.5 border-t border-border/60 px-3 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring sm:px-3.5"
+      className="flex min-h-11 items-center gap-1.5 border-t border-border/60 px-3 text-xs font-medium text-muted-foreground outline-none transition-colors hover:bg-muted/50 hover:text-foreground focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring sm:px-3.5"
     >
       <BookOpen size={13} aria-hidden />
       Ler o guia
@@ -1071,7 +1074,7 @@ function MaterialCard({ m }: { m: Material }) {
         <a
           href={href}
           {...(ehDoc ? {} : { target: "_blank", rel: "noopener noreferrer" })}
-          className="group flex h-full flex-col outline-none transition-colors hover:bg-muted/50 active:bg-muted focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
+          className="group flex h-full flex-col outline-none transition-colors hover:bg-muted/50 active:bg-muted focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-ring"
         >
           {capa}
           <div className="flex flex-1 items-center gap-x-4 px-5 py-3.5">

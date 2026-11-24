@@ -4,6 +4,10 @@ import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Desktop, DeviceMobile, Eye } from "@phosphor-icons/react";
 import type { FormularioCampo, FormularioSistema } from "@/lib/forms/schema";
+import {
+  ehInstrumento,
+  larguraPublicaForm,
+} from "@/lib/forms/instrumentos";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -52,7 +56,10 @@ export function FormularioPreview({
           </Button>
         }
       />
-      <DialogContent size="2xl">
+      {/* instrumento sob medida (022/US3): a moldura "Computador" pede
+          768px de documento — só cabe num popup quase-viewport; form
+          genérico segue no 2xl de sempre */}
+      <DialogContent size={ehInstrumento(sistema) ? "full" : "2xl"}>
         <DialogHeader>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -81,11 +88,11 @@ export function FormularioPreview({
                   aria-pressed={celular === (modo === "celular")}
                   onClick={() => setCelular(modo === "celular")}
                   className={cn(
-                    "flex min-h-8 items-center gap-1.5 rounded-full px-3 text-xs font-medium transition-colors",
-                    celular === (modo === "celular")
-                      ? "bg-card text-foreground shadow-[var(--shadow-border)]"
-                      : "text-muted-foreground hover:text-foreground"
-                  )}
+              // sem transition-[max-width]: spec 028 — o preview estreita
+              // seco, como um viewport real trocando de largura
+              "mx-auto w-full",
+              celular ? "max-w-[390px]" : larguraPublicaForm(sistema)
+            )}
                 >
                   <Icone size={14} aria-hidden />
                   {rotulo}
@@ -104,7 +111,7 @@ export function FormularioPreview({
               // sem transition-[max-width]: spec 028 — o preview estreita
               // seco, como um viewport real trocando de largura
               "mx-auto w-full",
-              celular && "max-w-[390px]"
+              celular ? "max-w-[390px]" : larguraPublicaForm(sistema)
             )}
           >
             {/* o chrome da página real — o link abre com a marca no topo */}

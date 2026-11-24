@@ -1,3 +1,4 @@
+import type { Page } from "@playwright/test";
 import {
   appEnvOk,
   atualizarViaServiceRole,
@@ -171,7 +172,7 @@ async function convergirPiso() {
   await apagarEncontros(restos.map((r) => r.id));
   criados.delete(IDS.encontroFixture);
 
-  if (!enc) {
+  if (enc.length === 0) {
     const quando = new Date(Date.now() - 2 * 86400e3).toISOString();
     await inserirViaServiceRole("encontros", {
       id: IDS.encontroFixture,
@@ -218,6 +219,35 @@ async function convergirPiso() {
   await Promise.all([limparRastros(), convergirDuplaAtiva(DUPLA_ID)]);
 }
 
+/** Lista única de pendências do /jovem (REALIZA-493): o item de avaliação
+ *  é agregado — "N encontro(s) esperando sua avaliação" — e o "Avaliar"
+ *  abre a mais recente (alvoId do motor). Pode cair no "e mais N" quando a
+ *  fila passa de 3 — expande antes de ler. */
+async function abrirAvaliarPendente(page: Page) {
+  const fazer = page.locator('section[aria-labelledby="fazer-titulo"]');
+  const item = fazer.locator("li", {
+    hasText: /esperando sua avaliação/,
+  });
+  if (!(await item.isVisible().catch(() => false))) {
+    await fazer.getByText(/e mais \d+/).click();
+  }
+  await expect(item).toBeVisible();
+  // clique pré-hidratação é no-op silencioso (o botão SSR já é visível) —
+  // o waitFor é polling porque um isVisible seco corre o mount do portal
+  const dialog = page.getByRole("dialog");
+  for (let i = 0; i < 3; i++) {
+    await item
+      .getByRole("button", { name: "Avaliar" })
+      .click({ timeout: 5_000 })
+      .catch(() => {});
+    try {
+      await dialog.waitFor({ state: "visible", timeout: 2_000 });
+      return;
+    } catch {}
+  }
+  await expect(dialog).toBeVisible();
+}
+
 test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
   test.beforeEach(convergirPiso);
 
@@ -253,17 +283,10 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await expect(
       secao.getByRole("heading", { name: "Suas avaliações" })
     ).toBeVisible();
-    // as pendências moram recolhidas na seção — o trigger "N esperando sua
-    // resposta" abre a lista (a ação primária delas vive em "Para fazer
-    // agora"; aqui fica o atalho que não repete os botões)
-    await secao.getByText(/esperando sua resposta/).click();
-    const pendente = secao.locator("li", {
-      hasText: "16º encontro",
-      has: page.getByRole("button", { name: "Avaliar" }),
-    });
-    await expect(pendente).toBeVisible();
-
-    await pendente.getByRole("button", { name: "Avaliar" }).click();
+    // REALIZA-493: a pendência única mora na lista "Para fazer agora" (a
+    // seção Suas avaliações virou só histórico); a fixture 16 é a única
+    // aberta — o botão abre o dialog dela
+    await abrirAvaliarPendente(page);
     const dialog = page.getByRole("dialog");
     await expect(dialog).toBeVisible();
     // o título usa o rótulo da sessão ("16º encontro com Mentor") — o
@@ -297,9 +320,9 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     ).toBeVisible();
 
     // a pendência vira linha de histórico com a nota — o refresh re-renderiza
-    // (o bloco recolhido desmonta quando zera, então a marca dela some)
+    // (o item agregado sai da lista única quando zera a fila dela)
     await expect(
-      secao.getByText(/esperando sua resposta/)
+      page.getByText(/esperando sua avaliação/)
     ).toHaveCount(0);
     const feita = secao.locator("li", { hasText: "16º encontro" });
     await expect(
@@ -404,16 +427,10 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await loginComSenha(page, JOVEM_EMAIL, SENHA);
     await page.waitForURL((u) => u.pathname === "/jovem", { timeout: 15_000 });
 
-    const secao = page.locator('section[aria-labelledby="avaliacoes-titulo"]');
-    // mesma pendência recolhida do spec acima — abre antes de achar a linha
-    await secao.getByText(/esperando sua resposta/).click();
-    await secao
-      .locator("li", {
-        hasText: "14º encontro",
-        has: page.getByRole("button", { name: "Avaliar" }),
-      })
-      .getByRole("button", { name: "Avaliar" })
-      .click();
+    // a pendência agregada na lista única — o "Avaliar" abre a mais
+    // recente, que é o encontro 14 criado agora (a fixture 16 também está
+    // aberta mas é mais antiga)
+    await abrirAvaliarPendente(page);
     const dialog = page.getByRole("dialog");
     await dialog
       .locator("label", {

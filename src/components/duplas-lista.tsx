@@ -71,13 +71,7 @@ import { SaudePrograma } from "@/components/saude-programa";
 import { AvaliacaoBadge } from "@/components/semaforo";
 import { DuplaWaAcao } from "@/components/dupla-wa-acao";
 import { Button, buttonVariants } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { FormSurface } from "@/components/form-surface";
 import { FiltrosButton } from "@/components/ui/filtros-button";
 import { OVERLINE } from "@/components/ui/filtro-opcoes";
 import { FilterChipRow, filterChipCls } from "@/components/ui/filter-chip";
@@ -1489,11 +1483,39 @@ function VisaoCoordenacao({
         </div>
       )}
 
-      <Dialog open={painelAberto} onOpenChange={setPainelAberto}>
-        <DialogContent size="md">
-          <DialogHeader>
-            <DialogTitle>Filtros</DialogTitle>
-          </DialogHeader>
+      {/* superfície única por viewport (spec 022, US6): Sheet de rodapé
+          no celular, Dialog lg no desktop */}
+      <FormSurface
+        open={painelAberto}
+        onOpenChange={setPainelAberto}
+        titulo="Filtros"
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="ghost"
+              className="sm:me-auto"
+              disabled={draftAtivos === 0}
+              onClick={() => {
+                setDraftSup("todas");
+                setDraftMentor("todos");
+              }}
+            >
+              Limpar
+            </Button>
+            <Button
+              type="button"
+              onClick={() => {
+                setSupSel(draftSup);
+                setMentorSel(draftMentor === "todos" ? null : draftMentor);
+                setPainelAberto(false);
+              }}
+            >
+              Aplicar{draftAtivos > 0 ? ` (${draftAtivos})` : ""}
+            </Button>
+          </>
+        }
+      >
           <div className="space-y-4">
             {supShow && (
               <fieldset>
@@ -1558,32 +1580,7 @@ function VisaoCoordenacao({
               </fieldset>
             )}
           </div>
-          <DialogFooter sticky>
-            <Button
-              type="button"
-              variant="ghost"
-              className="sm:me-auto"
-              disabled={draftAtivos === 0}
-              onClick={() => {
-                setDraftSup("todas");
-                setDraftMentor("todos");
-              }}
-            >
-              Limpar
-            </Button>
-            <Button
-              type="button"
-              onClick={() => {
-                setSupSel(draftSup);
-                setMentorSel(draftMentor === "todos" ? null : draftMentor);
-                setPainelAberto(false);
-              }}
-            >
-              Aplicar{draftAtivos > 0 ? ` (${draftAtivos})` : ""}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
+      </FormSurface>
 
       {/* barra da lista: contagem viva + legenda dos dots. Fechadas cedo
           não inflam o número principal — a mancha vai no sufixo discreto

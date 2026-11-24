@@ -94,13 +94,17 @@ export function Pdm({
 
   return (
     <div className="@container">
-      <div className="@[34rem]:grid @[34rem]:grid-cols-[180px_1fr] @[34rem]:items-start @[34rem]:gap-5">
+      {/* 47.5rem (760px), não 34rem: o split só existe quando a coluna
+          do documento sai com ≥ ~560px (760 − 180 nav − 20 gap). No
+          container antigo de 576px a nav roubava 1/3 e o doc ficava com
+          ~376px — abaixo do piso ele fica em fluxo único (022/US3) */}
+      <div className="@[47.5rem]:grid @[47.5rem]:grid-cols-[180px_1fr] @[47.5rem]:items-start @[47.5rem]:gap-5">
         {/* sumário lateral — só quando o container é largo: abaixo disso o
             documento fica em fluxo único (é assim que o preview do form
             cabe inteiro no dialog). Container, não viewport (REALIZA-248) */}
         <nav
           aria-label="Capítulos do PDM"
-          className="sticky top-16 hidden self-start space-y-1 @[34rem]:block"
+          className="sticky top-16 hidden self-start space-y-1 @[47.5rem]:block"
         >
           <p className="px-2 pb-1 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
             Seu PDM
@@ -481,7 +485,10 @@ function FichaMetaPdm({
           />
           <ErroCampo campo={g.meta} msg={api.erros[g.meta.id]} />
         </div>
-        <div className="grid gap-3 @[30rem]:grid-cols-[1fr_180px]">
+        {/* 200px de prazo (022/US3): a ficha mede o @container — com a
+            coluna real garantida, "Meta" e "Prazo" nunca caem abaixo de
+            ~200px (era ~176px com a coluna de 180px) */}
+        <div className="grid gap-3 @[30rem]:grid-cols-[1fr_200px]">
           {g.is && (
             <div className="space-y-1.5" data-campo={g.is.id}>
               <RotuloPergunta
