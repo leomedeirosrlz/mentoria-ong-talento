@@ -142,11 +142,26 @@ export async function submeterAvaliacao(input: EnvioAvaliacao) {
     // nesse caso a RPC barra o submit e a trilha não importa.
     const { data: enc } = await supabase
       .from("encontros")
-      .select("dupla_id")
+      .select("dupla_id, sessao_id")
       .eq("id", encontroId)
       .maybeSingle();
     if (enc) {
       duplaId = enc.dupla_id;
+      // sessão combinada (018): a resposta cai sempre na âncora — menor
+      // nº realizado do grupo, onde moram link e cobertura. Um submit em
+      // row coberta (link velho, rascunho) resolve pro âncora em vez de
+      // avaliar um passo que a sessão já agrupa
+      if (enc.sessao_id) {
+        const { data: grupo } = await supabase
+          .from("encontros")
+          .select("id, numero, status")
+          .eq("dupla_id", duplaId)
+          .eq("sessao_id", enc.sessao_id);
+        const ancora = (grupo ?? [])
+          .filter((g) => g.status === "realizado")
+          .sort((a, b) => a.numero - b.numero)[0];
+        if (ancora && ancora.id !== encontroId) encontroId = ancora.id;
+      }
       const { data: jd } = await supabase
         .from("jovem_duplas")
         .select("trilha")

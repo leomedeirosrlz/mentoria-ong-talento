@@ -330,6 +330,9 @@ export function CombinarPlano({
     sim?.recessos.filter((r) => recessoUsa(r) == null) ?? [];
   const faltaDecisao = pendentes.length > 0;
   const algumaGrade = Boolean(sim?.grade.mentor || sim?.grade.jovem);
+  // 519: "usar a grade" só existe quando os DOIS lados marcaram — com um
+  // lado só não há "em comum" e a simulação já roda sem grade no servidor
+  const ambasGrades = Boolean(sim?.grade.mentor && sim?.grade.jovem);
   // a pergunta de grade existe quando falta grade de um lado ou quando a
   // interseção é vazia — perguntada, exige resposta antes de combinar
   const gradePerguntada =
@@ -663,7 +666,7 @@ export function CombinarPlano({
       <fieldset className="mt-3">
         <legend className="sr-only">Usar a grade ou combinar sem ela</legend>
         <div className="grid gap-2">
-          {algumaGrade && (
+          {ambasGrades && (
             <OpcaoPilula
               nome="grade"
               valor="com"
@@ -849,9 +852,15 @@ export function CombinarPlano({
             livres.
           </li>
         )}
-        {semGrade === false && algumaGrade && (
+        {semGrade === false && ambasGrades && (
           <li className="text-muted-foreground">
             Usa a grade marcada. As datas preferem os dias livres em comum.
+          </li>
+        )}
+        {algumaGrade && !ambasGrades && (
+          <li className="text-muted-foreground">
+            Só um lado marcou os períodos livres, então as datas não
+            preferem dia nenhum até a outra grade chegar.
           </li>
         )}
         {gruposFusao.map((g) => (

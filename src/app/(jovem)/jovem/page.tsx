@@ -38,6 +38,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
+  avaliacoesPendentesPorSessao,
   disponibilidadeVazia,
   formatDate,
   formatDateTime,
@@ -338,17 +339,20 @@ export default async function JovemHome() {
   const feitosEsp = realizados.length - feitosDpp;
   const temDpp = duplas.some((d) => d.trilha !== "especialista");
 
-  // avaliação estrela (0071): pendente = realizado sem linha dele
-  const avaliados = new Set(avaliacoes.map((a) => a.encontro_id));
-  const avaliacoesPendentes = encontros
-    .filter((e) => e.status === "realizado" && !avaliados.has(e.id))
-    .map((e) => ({
-      encontroId: e.id,
-      numero: e.numero,
-      realizado_em: e.realizado_em,
-      trilha: trilhaPorDupla.get(e.dupla_id) ?? "dpp",
-      rotulo: rotuloEncontro(e),
-    }));
+  // avaliação estrela (0071/018): pendente = sessão realizado sem
+  // resposta — o grupo inteiro é uma unidade (sessao_id) e a resposta
+  // cai na âncora; `sessao` carrega os nºs pra UI dizer "cobre N passos"
+  const avaliacoesPendentes = avaliacoesPendentesPorSessao(
+    encontros,
+    avaliacoes
+  ).map(({ encontro: e, sessao }) => ({
+    encontroId: e.id,
+    numero: e.numero,
+    realizado_em: e.realizado_em,
+    trilha: trilhaPorDupla.get(e.dupla_id) ?? "dpp",
+    rotulo: rotuloEncontro(e),
+    sessao: sessao.length > 1 ? sessao : undefined,
+  }));
   const avaliacoesFeitas = avaliacoes.map((a) => {
     const enc = encPorId.get(a.encontro_id);
     const trilha = trilhaPorDupla.get(a.dupla_id) ?? "dpp";
@@ -461,6 +465,7 @@ export default async function JovemHome() {
       rotulo: p.rotulo,
       realizadoEm: p.realizado_em,
       sessao: p.trilha === "especialista",
+      cobre: p.sessao?.length,
     })),
     documentos: assinaturas
       .filter((a): a is typeof a & { id: string } => a.id != null)

@@ -1064,6 +1064,24 @@ export function AgendaCalendario({
       ? (passosEspPorNumero.get(numero) ?? null)
       : (passosDppPorCron.get(dupla.cronograma_id ?? "")?.get(numero) ?? null);
 
+  /** Demais membros do grupo sessao_id deste encontro (sessão planejada,
+   *  018) com o título do guia — o form de registro do detalhe do dia os
+   *  trava na cobertura (mesma régua da `sessaoGrupoDaSessao`, só que sem
+   *  a lista de passos da ficha na mão). */
+  const sessaoGrupoDe = (dupla: Dupla, encontro: Encontro) => {
+    if (dupla.trilha === "especialista" || !encontro.sessao_id) return null;
+    const grupo = dupla.encontros
+      .filter(
+        (e) => e.sessao_id === encontro.sessao_id && e.id !== encontro.id
+      )
+      .sort((a, b) => a.numero - b.numero)
+      .map((e) => ({
+        numero: e.numero,
+        titulo: passoDe(dupla, e.numero)?.titulo ?? "",
+      }));
+    return grupo.length ? grupo : null;
+  };
+
   // nºs oficiais por cronograma — o selo "fora do dia oficial" de um encontro
   // compara contra o calendário DA DUPLA dele, não o da tela (mentor com
   // dupla em outra turma não ganharia selo errado)
@@ -1886,6 +1904,7 @@ export function AgendaCalendario({
       souCoord={ehCoord}
       indice={i}
       evento={passoDe(item.dupla, item.encontro.numero)}
+      sessaoGrupo={sessaoGrupoDe(item.dupla, item.encontro)}
       aberto={registroAberto === item.encontro.id}
       onAlternarRegistro={(abrir) =>
         setRegistroAberto(abrir ? item.encontro.id : null)
@@ -4028,6 +4047,7 @@ function EncontroDuplaRow({
   souCoord,
   indice,
   evento,
+  sessaoGrupo,
   aberto,
   onAlternarRegistro,
   onRegistroSalvo,
@@ -4044,6 +4064,9 @@ function EncontroDuplaRow({
   indice: number;
   /** Passo do guia do nº na trilha da dupla — sugestão de tema/foco do form. */
   evento: PassoGuia | null;
+  /** Demais membros do grupo sessao_id (sessão planejada, 018) — o form
+   *  os trava na cobertura; null fora de sessão combinada. */
+  sessaoGrupo?: { numero: number; titulo: string }[] | null;
   /** O form de registro desta linha está aberto (um por vez no painel). */
   aberto: boolean;
   onAlternarRegistro: (abrir: boolean) => void;
@@ -4324,6 +4347,9 @@ function EncontroDuplaRow({
               evento={evento}
               trilha={dupla.trilha}
               combinadosPendentes={combinadosPendentes}
+              // sessão planejada (018): o grupo sessao_id entra travado na
+              // cobertura — o registro é da sessão, não só desta row
+              sessaoGrupo={sessaoGrupo}
               onSaved={onRegistroSalvo}
               // telemetria (REALIZA-217): encontro "externo" é o catch-up
               // retroativo (criado já realizado), não um follow-up novo

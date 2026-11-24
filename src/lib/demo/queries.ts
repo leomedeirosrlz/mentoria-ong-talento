@@ -1104,6 +1104,7 @@ export function demoJovemEncontros(role: AppRole): JovemEncontro[] {
       status: e.status,
       link: e.link,
       motivo_reagendamento: e.motivo_reagendamento,
+      sessao_id: e.sessao_id ?? null,
     }))
     .sort(
       (a, b) =>

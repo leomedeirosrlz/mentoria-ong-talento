@@ -143,12 +143,40 @@ export function coberturaDaSessao(input: {
   numero: number;
   passos: PassoGuia[];
   agora: Date;
+  /** sessao_id do encontro alvo — membro de outro grupo fechado (018)
+   *  não é candidato nem na tela. */
+  sessaoId?: string | null;
 }): { numero: number; titulo: string }[] | null {
   if (input.dupla.trilha === "especialista") return null;
   return passosCobertosCandidatos(
     input.passos,
     input.dupla.encontros,
     input.numero,
-    input.agora
+    input.agora,
+    input.sessaoId
   );
+}
+
+/** Demais membros do MESMO grupo `sessao_id` do encontro alvo, em ordem de
+ *  nº — a sessão planejada (018) é grupo fechado: o registro é da sessão,
+ *  o form mostra o grupo travado e o servidor une mesmo sem o checkbox.
+ *  `titulo` vem do guia quando o passo existe; null fora de sessão e na
+ *  trilha especialista (lá cada sessão é a própria linha). */
+export function sessaoGrupoDaSessao(input: {
+  dupla: Dupla;
+  encontroId: string;
+  passos: PassoGuia[];
+}): { numero: number; titulo: string }[] | null {
+  if (input.dupla.trilha === "especialista") return null;
+  const enc = input.dupla.encontros.find((e) => e.id === input.encontroId);
+  if (!enc?.sessao_id) return null;
+  const grupo = input.dupla.encontros
+    .filter((e) => e.sessao_id === enc.sessao_id && e.id !== enc.id)
+    .sort((a, b) => a.numero - b.numero)
+    .map((e) => ({
+      numero: e.numero,
+      titulo:
+        input.passos.find((p) => p.numero === e.numero)?.titulo ?? "",
+    }));
+  return grupo.length ? grupo : null;
 }

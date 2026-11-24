@@ -28,6 +28,7 @@ import {
 } from "@/components/pedir-especialista-dialog";
 import { JovemHistorico } from "@/components/jovem-historico";
 import {
+  avaliacoesPendentesPorSessao,
   formatDate,
   formatMesAnoLongo,
   maxEncontros,
@@ -63,10 +64,11 @@ import { getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import type { JovemEncontro } from "@/lib/queries-jovem";
 import { combinadoDoJovem } from "@/lib/plano-combinado";
+import { montarPlanoEmDia } from "@/lib/plano-em-dia";
 import { PlanoAcordosCard } from "@/components/plano-acordos";
 import { CombinarPlano } from "@/components/combinar-plano";
 import { RecessoDecisao } from "@/components/recesso-dupla-card";
-import type { Disponibilidade } from "@/lib/types";
+import type { CicloEvento, Disponibilidade, Dupla } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Agenda" };
@@ -113,9 +115,26 @@ export default async function JovemAgenda() {
   const trilhaPorDupla = new Map(duplas.map((d) => [d.id, d.trilha ?? "dpp"]));
   const ativaPorDupla = new Map(duplas.map((d) => [d.id, d.status === "ativa"]));
   const avalPorEncontro = new Map(avaliacoes.map((a) => [a.encontro_id, a]));
+  const encPorId = new Map(encontros.map((e) => [e.id, e]));
+  // a avaliação é da SESSÃO (018): a linha de um encontro coberto mostra
+  // a resposta da âncora — a estrela vale pelo grupo, não pela row
+  const avalDaSessao = new Map<string, (typeof avaliacoes)[number]>();
+  const avalPorNumeroCoberto = new Map<string, (typeof avaliacoes)[number]>();
+  for (const a of avaliacoes) {
+    const enc = encPorId.get(a.encontro_id);
+    if (enc?.sessao_id)
+      avalDaSessao.set(`${enc.dupla_id}:${enc.sessao_id}`, a);
+    for (const n of a.cobertura ?? [])
+      avalPorNumeroCoberto.set(`${a.dupla_id}:${n}`, a);
+  }
   const avalDe = (e: JovemEncontro): AvaliacaoFeita | null => {
     if (e.status !== "realizado") return null;
-    const a = avalPorEncontro.get(e.id);
+    const a =
+      avalPorEncontro.get(e.id) ??
+      (e.sessao_id
+        ? avalDaSessao.get(`${e.dupla_id}:${e.sessao_id}`)
+        : undefined) ??
+      avalPorNumeroCoberto.get(`${e.dupla_id}:${e.numero}`);
     return a
       ? { ...a, trilha: trilhaPorDupla.get(a.dupla_id) ?? "dpp" }
       : null;
@@ -320,15 +339,20 @@ export default async function JovemAgenda() {
           ocupados: ocupadosRotulados,
         }).catch(() => null)
       : null;
-  const avaliacoesPendentes: AvaliacaoPendente[] = encontros
-    .filter((e) => e.status === "realizado" && !avalPorEncontro.has(e.id))
-    .map((e) => ({
-      encontroId: e.id,
-      numero: e.numero,
-      realizado_em: e.realizado_em,
-      trilha: trilhaPorDupla.get(e.dupla_id) ?? "dpp",
-      rotulo: rotuloDaLinha(e),
-    }));
+  // pendente de avaliação por SESSÃO (018/0230): o grupo realizado sem
+  // resposta rende um pedido só, sempre apontando a âncora — `sessao`
+  // carrega os nºs pro "a sessão cobre N passos" do dialog
+  const avaliacoesPendentes: AvaliacaoPendente[] =
+    avaliacoesPendentesPorSessao(encontros, avaliacoes).map(
+      ({ encontro: e, sessao }) => ({
+        encontroId: e.id,
+        numero: e.numero,
+        realizado_em: e.realizado_em,
+        trilha: trilhaPorDupla.get(e.dupla_id) ?? "dpp",
+        rotulo: rotuloDaLinha(e),
+        sessao: sessao.length > 1 ? sessao : undefined,
+      })
+    );
   const ctxPorEncontro: Record<string, EncontroCtx> = Object.fromEntries(
     encontros.map((e) => [
       e.id,
@@ -371,6 +395,89 @@ export default async function JovemAgenda() {
   // id da dupla DPP estreito — o recorte do jovem pode vir sem ele
   const duplaDppId = duplaDpp?.id ?? null;
 
+  // portão do "Combinar o plano" (519): a MESMA régua da ficha — o
+  // montarPlanoEmDia decide se a dupla deve, não o numerosRetro (que só
+  // conta passo sem row: limbo e nao_aconteceu ficavam invisíveis pro
+  // CTA). O jovem não lê ciclo_eventos nem registros, então o recorte
+  // dele é projetado na forma do planner: passos oficiais chegam do
+  // cronograma definer da jornada, recessos da jovem_recessos (id e
+  // janela reais) e todo realizado conta como coberto — o registro é
+  // do mentor; pro jovem, encontro rolado vale.
+  const planoGateJovem = (() => {
+    if (!duplaDpp?.cronograma_id || jornada?.dupla_id !== duplaDpp.id)
+      return null;
+    const eventos: CicloEvento[] = [
+      ...jornada.cronograma
+        .filter((e) => e.tipo !== "recesso")
+        .map((e, i) => ({
+          id: `jornada-${i}`,
+          cronograma_id: duplaDpp.cronograma_id!,
+          tipo: e.tipo,
+          numero: e.numero,
+          data: e.data,
+          data_fim: null,
+          status: "pendente" as const,
+          observacao: null,
+          ordem: i,
+          titulo: e.numero != null ? `${e.numero}º encontro` : "",
+          fase: e.fase,
+          instrumentos: e.instrumentos,
+        })),
+      ...recessosJovem.map((r, i) => ({
+        id: r.ciclo_evento_id,
+        cronograma_id: duplaDpp.cronograma_id!,
+        tipo: "recesso" as const,
+        numero: null,
+        data: r.data,
+        data_fim: r.data_fim,
+        status: "pendente" as const,
+        observacao: null,
+        ordem: 10_000 + i,
+        titulo: "Recesso do programa",
+        fase: null,
+        instrumentos: [] as string[],
+      })),
+    ];
+    const duplaPlano = {
+      trilha: "dpp",
+      status: duplaDpp.status,
+      cronograma_id: duplaDpp.cronograma_id,
+      iniciada_em: duplaDpp.iniciada_em,
+      encontros: encontros
+        .filter((e) => e.dupla_id === duplaDpp.id)
+        .map((e) => ({
+          id: e.id,
+          numero: e.numero,
+          status: e.status,
+          data_hora: e.data_hora,
+          realizado_em: e.realizado_em,
+          sessao_id: e.sessao_id ?? null,
+          registro: e.status === "realizado" ? { tema: "sessão" } : null,
+        })),
+      recessos: recessosJovem
+        .filter((r) => r.usa != null)
+        .map((r) => ({
+          id: r.ciclo_evento_id,
+          dupla_id: duplaDpp.id!,
+          ciclo_evento_id: r.ciclo_evento_id,
+          usa: r.usa!,
+          declarado_por: null,
+          declarado_em: r.declarado_em ?? "",
+        })),
+    } as unknown as Dupla;
+    return montarPlanoEmDia({
+      dupla: duplaPlano,
+      eventos,
+      hoje: new Date(agora),
+    });
+  })();
+  // mesmo portão da ficha: planner aplicável, algo devendo e pelo menos
+  // dois passos agendáveis na recuperação
+  const mostrarCombinarPlano =
+    planoGateJovem?.aplicavel === true &&
+    !planoGateJovem.emDia &&
+    planoGateJovem.passos.filter((p) => p.acao !== "travado").length >= 2;
+
   const pendencias = derivarPendencias({
     hoje: toDateStr(new Date()),
     agora: new Date(agora).toISOString(),
@@ -392,6 +499,7 @@ export default async function JovemAgenda() {
       rotulo: p.rotulo,
       realizadoEm: p.realizado_em,
       sessao: p.trilha === "especialista",
+      cobre: p.sessao?.length,
     })),
     documentos: [],
     combinados: [],
@@ -531,11 +639,11 @@ export default async function JovemAgenda() {
       {/* o combinado do plano "ficar em dia" (459/518): chega pela
           jovem_plano, o recorte definer — aceitar e confirmar datas são
           gestos dele aqui, pela mesma RPC do mentor. Sem combinado
-          aberto e a dupla devendo (oficiais vencidos sem row, o mesmo
-          portão da ficha), o jovem também abre o "Combinar o plano" —
-          qualquer um dos quatro papéis propõe (US4) */}
-      {(combinadoPlano != null ||
-        (duplaDppId != null && numerosRetro.length >= 2)) && (
+          aberto e a dupla devendo (mesmo portão do planner da ficha:
+          devido, limbo ou não-acontecido no caminho), o jovem também
+          abre o "Combinar o plano" — qualquer um dos quatro papéis
+          propõe (US4) */}
+      {(combinadoPlano != null || mostrarCombinarPlano) && (
         <Card id="plano" className="scroll-mt-20">
           <CardContent className="space-y-3 p-4">
             <h2 className="text-base font-semibold">O combinado</h2>

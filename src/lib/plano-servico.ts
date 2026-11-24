@@ -10,7 +10,7 @@ import "server-only";
 
 import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
-import { celulasComuns, celulasDe } from "./ciclo";
+import { gradeCombinada } from "./ciclo";
 import { DUPLA_SELECT } from "./queries";
 import type {
   CicloEvento,
@@ -32,8 +32,9 @@ export type ContextoPlano =
       eventos: CicloEvento[];
       gradeMentor: Disponibilidade | null;
       gradeJovem: Disponibilidade | null;
-      /** Interseção quando os dois marcaram, a grade do único lado que
-       *  marcou quando só um tem — a mesma régua das sugestões. */
+      /** Interseção real — só existe quando os DOIS lados marcaram. Um
+       *  lado só não é "em comum": a simulação roda sem grade até a
+       *  outra grade aparecer (519). */
       combinada: Disponibilidade | null;
       /** Dias da semana com ao menos uma célula em comum — a sugestão de
        *  ritmo honesta da superfície. */
@@ -108,14 +109,9 @@ export async function contextoPlano(
   ]);
   const gradeMentor = (mp?.disponibilidade ?? null) as Disponibilidade | null;
   const gradeJovem = (jv?.disponibilidade ?? null) as Disponibilidade | null;
-  const celM = celulasDe(gradeMentor);
-  const celJ = celulasDe(gradeJovem);
-  const comuns =
-    celM.length && celJ.length
-      ? celulasComuns(gradeMentor, gradeJovem)
-      : celM.length
-        ? celM
-        : celJ;
+  // 519: interseção só quando os DOIS lados marcaram — usar a grade de
+  // um fingia "em comum" e sugeria dias sem o outro lado ter opinado
+  const comuns = gradeCombinada(gradeMentor, gradeJovem)?.celulas ?? [];
   return {
     ok: true,
     lado,

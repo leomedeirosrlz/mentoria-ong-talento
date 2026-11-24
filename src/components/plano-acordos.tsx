@@ -16,6 +16,7 @@ import {
   diaMes,
   estadoLeituraPlano,
   listaEncontros,
+  planoContestavel,
   resumoCombinado,
   rotuloSessao,
   sessoesDoEscopo,
@@ -159,6 +160,10 @@ export function PlanoAcordosCard({
     meuLado === "mentor"
       ? (nomes?.mentorado ?? "seu jovem")
       : (nomes?.mentor ?? "seu mentor");
+  // 519: a contestação vale até um encontro do escopo acontecer de fato —
+  // o botão some junto com a janela real em vez de prometer o que o
+  // banco recusa
+  const contestavel = planoContestavel(plano.escopo?.passos, realizados);
   const propostaPor =
     plano.proposto_via === "liza" ? "A Liza" : "A equipe";
   const statusTexto: Record<string, string> = {
@@ -172,15 +177,19 @@ export function PlanoAcordosCard({
 
   const responder = (acao: "aceitar" | "contestar") => {
     setErro(null);
-    // o aceite leva as decisões de recesso vigentes (prop + o que a
-    // pessoa repensou aqui) — se a data muda, a action recalcula e
-    // devolve novaVersao
+    // o aceite leva só o que a pessoa repensou aqui — reenviar a resposta
+    // vigente regravaria declarado_por/em no banco e roubaria a autoria
+    // de quem decidiu antes (519)
     const decisoes: DecisaoRecesso[] = recessos
+      .filter(
+        (r) =>
+          decisaoLocal[r.cicloEventoId] != null &&
+          decisaoLocal[r.cicloEventoId] !== r.usa
+      )
       .map((r) => ({
         cicloEventoId: r.cicloEventoId,
-        usa: decisaoLocal[r.cicloEventoId] ?? r.usa,
-      }))
-      .filter((d): d is DecisaoRecesso => d.usa != null);
+        usa: decisaoLocal[r.cicloEventoId]!,
+      }));
     iniciar(async () => {
       const r =
         acao === "aceitar" && decisoes.length > 0 && duplaId
@@ -587,15 +596,17 @@ export function PlanoAcordosCard({
             <Check aria-hidden />
             Aceitar
           </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            disabled={pendente}
-            onClick={() => responder("contestar")}
-          >
-            <X aria-hidden />
-            Não serve pra mim
-          </Button>
+          {contestavel && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pendente}
+              onClick={() => responder("contestar")}
+            >
+              <X aria-hidden />
+              Não serve pra mim
+            </Button>
+          )}
         </div>
       )}
       {aberto && podeResponder && estado === "ativo_sem_minha_ciencia" && (
@@ -604,6 +615,21 @@ export function PlanoAcordosCard({
             <Check aria-hidden />
             Estou ciente
           </Button>
+          {contestavel && (
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={pendente}
+              onClick={() => responder("contestar")}
+            >
+              <X aria-hidden />
+              Não serve pra mim
+            </Button>
+          )}
+        </div>
+      )}
+      {aberto && podeResponder && estado === "ativo" && contestavel && (
+        <div className="space-y-2 pt-1">
           <Button
             size="sm"
             variant="outline"
@@ -613,16 +639,12 @@ export function PlanoAcordosCard({
             <X aria-hidden />
             Não serve pra mim
           </Button>
-        </div>
-      )}
-      {aberto &&
-        podeResponder &&
-        estado === "ativo" && (
           <p className="text-xs text-muted-foreground">
             O combinado está em vigor. Se algo mudou, ainda dá pra
             contestar antes do próximo encontro.
           </p>
-        )}
+        </div>
+      )}
 
       {seletor && passoSeletor && sugSeletor && sugestoes && (
         <SeletorDiaHora

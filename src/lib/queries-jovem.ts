@@ -197,10 +197,14 @@ export type JovemEncontro = {
    *  retroativo editável enquanto o mentor não registra. Opcional: o
    *  dataset demo não carrega a coluna (vem undefined → sem affordance). */
   created_by?: string | null;
+  /** Sessão combinada (0226): uuid compartilhado por todos os encontros
+   *  que rolaram numa sessão física só — a avaliação é por grupo, não
+   *  por row. null = encontro de sessão própria. */
+  sessao_id?: string | null;
 };
 
 const JOVEM_ENCONTRO_COLS =
-  "id, dupla_id, numero, data_hora, realizado_em, duracao_min, status, link, motivo_reagendamento, created_by";
+  "id, dupla_id, numero, data_hora, realizado_em, duracao_min, status, link, motivo_reagendamento, created_by, sessao_id";
 
 /** Todos os encontros das duplas do jovem — a RLS (0068) já escopa às duplas
  *  dele via exists(jovem_duplas). Ordenação cronológica pra home e agenda. */

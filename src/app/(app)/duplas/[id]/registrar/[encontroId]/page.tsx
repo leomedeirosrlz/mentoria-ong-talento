@@ -26,6 +26,7 @@ import {
   combinadosPendentesDaDupla,
   estadoDaRotaRegistro,
   filaRegistrosPendentes,
+  sessaoGrupoDaSessao,
 } from "@/lib/registro-contexto";
 import type { Encontro, Material } from "@/lib/types";
 import { turmaLonga } from "@/lib/turma";
@@ -291,8 +292,20 @@ export default async function RegistrarEncontroPage({
         agora,
       });
   // a sessão pode ter coberto mais de um passo do guia (007 US11) — a
-  // mesma régua da ficha, revalidada pelo salvarRegistro
-  const cobertura = coberturaDaSessao({ dupla, numero, passos, agora });
+  // mesma régua da ficha, revalidada pelo salvarRegistro. Com grupo
+  // planejado (sessao_id) os demais membros entram travados no form
+  const cobertura = coberturaDaSessao({
+    dupla,
+    numero,
+    passos,
+    agora,
+    sessaoId: encontro.sessao_id,
+  });
+  const sessaoGrupo = sessaoGrupoDaSessao({
+    dupla,
+    encontroId: encontro.id,
+    passos,
+  });
   const mentorNome = dupla.mentor.nome_social ?? dupla.mentor.nome;
   const mentoradoNome = dupla.mentorado.nome_social ?? dupla.mentorado.nome;
 
@@ -343,6 +356,7 @@ export default async function RegistrarEncontroPage({
         combinadosPendentes={combinadosPendentesDaDupla(dupla)}
         proximosRegistros={proximos}
         cobertura={cobertura}
+        sessaoGrupo={sessaoGrupo}
         // telemetria (REALIZA-217): encontro "externo" nasceu no fluxo
         // retroativo — a sessão do form é catch-up, não novo
         origem={encontro.origem === "externo" ? "retroativo" : "novo"}

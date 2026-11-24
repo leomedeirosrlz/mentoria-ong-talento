@@ -21,6 +21,7 @@ export function RegistroPagina({
   combinadosPendentes,
   proximosRegistros,
   cobertura,
+  sessaoGrupo,
   origem,
 }: {
   encontroId: string;
@@ -39,6 +40,9 @@ export function RegistroPagina({
   /** Passos que a mesma sessão pode cobrir (007 US11) — a página deriva com
    *  `coberturaDaSessao`; null na trilha especialista. */
   cobertura: { numero: number; titulo: string }[] | null;
+  /** Membros do grupo sessao_id do encontro (sessão planejada, 018) — a
+   *  página deriva com `sessaoGrupoDaSessao`; travados no form. */
+  sessaoGrupo?: { numero: number; titulo: string }[] | null;
   origem: "novo" | "retroativo";
 }) {
   const router = useRouter();
@@ -70,6 +74,7 @@ export function RegistroPagina({
       combinadosPendentes={combinadosPendentes}
       proximosRegistros={proximosRegistros}
       cobertura={cobertura}
+      sessaoGrupo={sessaoGrupo}
       // o h1 da página nomeia a tarefa — o form não repete o título
       titulo={false}
       origem={origem}

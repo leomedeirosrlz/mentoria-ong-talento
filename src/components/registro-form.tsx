@@ -42,6 +42,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { novoUuid } from "@/lib/uuid";
+import { listaEncontros } from "@/lib/plano-combinado";
 import { META_PASSOS_PLANO } from "@/lib/plano-em-dia.data";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -122,6 +123,7 @@ export function RegistroForm({
   origem,
   proximosRegistros = null,
   cobertura = null,
+  sessaoGrupo = null,
   titulo = true,
   irParaAposSalvar,
   onEncadear,
@@ -159,6 +161,10 @@ export function RegistroForm({
    *  conteúdo no salvarRegistro. Só criação DPP recebe (edição e trilha
    *  especialista ficam de fora). */
   cobertura?: { numero: number; titulo: string }[] | null;
+  /** Demais membros do grupo sessao_id DESTE encontro (sessão planejada,
+   *  018): entram travados na cobertura — grupo fechado, o servidor une
+   *  mesmo sem checkbox, então a tela nasce marcada e não desmarca. */
+  sessaoGrupo?: { numero: number; titulo: string }[] | null;
   /** Título interno "Registro do encontro" — a rota dedicada passa `false`
    *  porque o `h1` da página já nomeia a tarefa. */
   titulo?: boolean;
@@ -188,8 +194,11 @@ export function RegistroForm({
   // encontro, então o default é o padrão do guia (60). O salvarRegistro grava.
   const [duracaoMin, setDuracaoMin] = useState("60");
   // sessão combinada (018): nºs marcados como cobertos — controlado pra o
-  // aviso de prática reagir na hora e a duração sugerir 2h no primeiro check
-  const [cobertosSel, setCobertosSel] = useState<Set<number>>(new Set());
+  // aviso de prática reagir na hora e a duração sugerir 2h no primeiro check.
+  // O grupo planejado nasce dentro: a sessão dele já está decidida no plano
+  const [cobertosSel, setCobertosSel] = useState<Set<number>>(
+    () => new Set((sessaoGrupo ?? []).map((g) => g.numero))
+  );
   // par de passos adjacentes onde o de baixo pede prática (META 4–8): a
   // fusão na mesma sessão apaga a semana de exercício entre eles — aviso
   // pedagógico em duas partes, a marcação é a decisão consciente
@@ -1035,19 +1044,55 @@ export function RegistroForm({
               passo do guia — UM registro fica na âncora cobrindo os demais,
               que viram realizado na mesma sessão (sem registro próprio).
               Só na criação: editar depois não abre caminho pra cobrir
-              retroativo */}
-          {!registro && cobertura && cobertura.length > 0 && (
+              retroativo. Com sessão PLANEJADA (sessaoGrupo) os membros do
+              grupo entram travados — fechados no plano, não se desmarcam */}
+          {!registro &&
+            ((cobertura?.length ?? 0) > 0 || (sessaoGrupo?.length ?? 0) > 0) && (
             <fieldset className="min-w-0 space-y-2">
               <legend className="text-sm font-medium">
                 A sessão cobriu outro encontro do guia?
               </legend>
               <p className="text-xs text-muted-foreground">
-                Marque os encontros que esta mesma sessão cobriu. Todos ficam
-                realizados e este registro vale pelos dois — o conteúdo
-                aparece uma vez só, no primeiro deles.
+                {sessaoGrupo && sessaoGrupo.length > 0
+                  ? `Os encontros ${listaEncontros(sessaoGrupo.map((g) => g.numero))} fazem parte da mesma sessão combinada. Todos ficam realizados e este registro vale pelo grupo.${
+                      (cobertura ?? []).filter(
+                        (c) => !sessaoGrupo.some((g) => g.numero === c.numero)
+                      ).length > 0
+                        ? " Marque se a mesma sessão cobriu mais passos do guia."
+                        : ""
+                    }`
+                  : "Marque os encontros que esta mesma sessão cobriu. Todos ficam realizados e este registro vale pelos dois — o conteúdo aparece uma vez só, no primeiro deles."}
               </p>
               <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
-                {cobertura.map((c) => (
+                {(sessaoGrupo ?? []).map((g) => (
+                  <label
+                    key={`grupo-${g.numero}`}
+                    className="flex min-h-11 min-w-0 items-center gap-3 py-1.5 text-sm md:min-h-0"
+                  >
+                    <input
+                      type="checkbox"
+                      checked
+                      disabled
+                      className="size-5 shrink-0 accent-primary"
+                    />
+                    {/* checkbox travado não posta — o hidden carrega o nº
+                        pro salvarRegistro (que uniria o grupo de qualquer
+                        jeito; aqui ele também aparece no payload) */}
+                    <input type="hidden" name="cobriu_numero" value={g.numero} />
+                    <span className="min-w-0 truncate">
+                      {g.numero}º encontro
+                      {g.titulo && (
+                        <span className="text-muted-foreground"> · {g.titulo}</span>
+                      )}
+                    </span>
+                  </label>
+                ))}
+                {(cobertura ?? [])
+                  .filter(
+                    (c) =>
+                      !(sessaoGrupo ?? []).some((g) => g.numero === c.numero)
+                  )
+                  .map((c) => (
                   <label
                     key={c.numero}
                     // min-w-0 no item do grid: sem ele o título longo força a

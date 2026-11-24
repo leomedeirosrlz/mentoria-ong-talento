@@ -335,6 +335,19 @@ export function estadoLeituraPlano(input: {
   return null;
 }
 
+/** Contestação ainda vale? (519) A RPC mede `realizado_em >= aprovado_em`
+ *  no escopo; a tela aproxima por "nenhum nº do escopo realizado" — passo
+ *  já realizado não entra no escopo da proposta (a RPC recusa), então
+ *  qualquer realizado aí aconteceu depois do combinado. O botão de
+ *  contestar some junto com a janela real em vez de prometer o que o
+ *  banco recusa. */
+export function planoContestavel(
+  escopoPassos: readonly { numero: number }[] | null | undefined,
+  realizados: readonly number[]
+): boolean {
+  return !(escopoPassos ?? []).some((p) => realizados.includes(p.numero));
+}
+
 export type ResumoCombinado = {
   aberto: boolean;
   /** status cru do plano — a máquina de leitura (estadoLeituraPlano)

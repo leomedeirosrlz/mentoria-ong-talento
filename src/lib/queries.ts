@@ -4,6 +4,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { comparaNome, registroTardio } from "./ciclo";
+import { relerPlanoPropostoDeMembro } from "./notificar";
 import type { DuplaDesfecho } from "./dupla-desfecho";
 import {
   audienciasDe,
@@ -1008,7 +1009,7 @@ export const getNotificacoes = cache(
     const [{ data, error }, { count, error: e2 }] = await Promise.all([
       supabase
         .from("notificacoes")
-        .select("id, tipo, titulo, corpo, href, lida_em, created_at")
+        .select("id, tipo, titulo, corpo, href, lida_em, created_at, created_by")
         .order("created_at", { ascending: false })
         .limit(15),
       supabase
@@ -1022,7 +1023,15 @@ export const getNotificacoes = cache(
       console.error("getNotificacoes:", error ?? e2);
       return { itens: [], naoLidas: 0 };
     }
-    return { itens: (data ?? []) as Notificacao[], naoLidas: count ?? 0 };
+    const me = await getMe();
+    const itens = me
+      ? await relerPlanoPropostoDeMembro(
+          supabase,
+          me,
+          (data ?? []) as Notificacao[]
+        )
+      : ((data ?? []) as Notificacao[]);
+    return { itens, naoLidas: count ?? 0 };
   }
 );
 

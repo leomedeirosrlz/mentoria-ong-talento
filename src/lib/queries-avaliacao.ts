@@ -139,7 +139,7 @@ export type JovemAvaliacao = AvaliacaoEncontro & {
 const JOVEM_AVALIACAO_COLS = `
   id, dupla_id, encontro_id, estrelas, sentimento, avancei, temas,
   comentario, pedir_apoio, avaliacao_visivel_mentor,
-  respondido_por_profile_id, created_at,
+  respondido_por_profile_id, created_at, cobertura,
   encontro:encontros(numero, realizado_em)
 `;
 
