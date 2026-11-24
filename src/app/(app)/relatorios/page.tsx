@@ -112,6 +112,7 @@ async function GradeLivre({ turmaParam }: { turmaParam?: string }) {
       id: string;
       user_id?: string | null;
       nome: string | null;
+      nome_social?: string | null;
       email?: string | null;
       whatsapp?: string | null;
       cidade?: string | null;
@@ -123,6 +124,7 @@ async function GradeLivre({ turmaParam }: { turmaParam?: string }) {
       id: p.id,
       user_id: p.user_id ?? null,
       nome: p.nome,
+      nome_social: p.nome_social ?? null,
       email: p.email ?? null,
       whatsapp: p.whatsapp ?? null,
       cidade: p.cidade ?? null,
@@ -137,6 +139,7 @@ async function GradeLivre({ turmaParam }: { turmaParam?: string }) {
     mentorados = dd.map((d) => ({
       id: d.mentorado.id,
       nome: d.mentorado.nome,
+      nome_social: d.mentorado.nome_social ?? null,
       email: d.mentorado.email ?? null,
       whatsapp: d.mentorado.whatsapp ?? null,
       cidade: d.mentorado.cidade ?? null,
@@ -176,8 +179,8 @@ async function GradeLivre({ turmaParam }: { turmaParam?: string }) {
       // especialista sem papel DPP não aguarda par)
       supabase
         .from("profiles")
-        .select("id, user_id, nome, cidade, uf, role, profile_papeis(papel)"),
-      supabase.from("mentorados").select("id, nome, email, whatsapp, cidade, uf"),
+        .select("id, user_id, nome, nome_social, cidade, uf, role, profile_papeis(papel)"),
+      supabase.from("mentorados").select("id, nome, nome_social, email, whatsapp, cidade, uf"),
       getContatos(),
     ]);
     if (dRes.error || pRes.error || mRes.error) {

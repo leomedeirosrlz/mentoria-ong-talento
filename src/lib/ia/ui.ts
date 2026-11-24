@@ -626,7 +626,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           .slice(0, 10)
           .map((m) => ({
             id: String(m.mentor_id),
-            nome: String(m.nome ?? ""),
+            nome: String(m.nome_social ?? m.nome ?? ""),
             trilha: m.trilha === "especialista" ? "especialista" : "dpp",
             em_uso: num(m.em_uso),
             capacidade: num(m.capacidade),
@@ -640,7 +640,7 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
         kind: "pessoas",
         pessoas: ps.slice(0, 8).map((p) => ({
           id: String(p.profile_id),
-          nome: String(p.nome ?? ""),
+          nome: String(p.nome_social ?? p.nome ?? ""),
           papel: (str(p.papel) as AppRole | null) ?? null,
         })),
       };

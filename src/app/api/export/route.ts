@@ -156,7 +156,9 @@ export async function GET(request: NextRequest) {
     }
     if (tipo === "assinaturas") {
       const nomes = new Map(
-        [...d.profiles, ...d.mentorados].map((p) => [p.id, p.nome] as const)
+        [...d.profiles, ...d.mentorados].map(
+          (p) => [p.id, p.nome_social || p.nome] as const
+        )
       );
       const papeis = new Map(d.profiles.map((p) => [p.id, p.role] as const));
       return csvResponse(
@@ -353,9 +355,9 @@ export async function GET(request: NextRequest) {
     .from("duplas")
     .select(
       `trilha, turma, cronograma_id,
-      mentor:profiles!duplas_mentor_id_fkey(nome),
-      mentorado:mentorados(nome),
-      supervisor:profiles!duplas_supervisor_id_fkey(nome),
+      mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+      mentorado:mentorados(nome, nome_social),
+      supervisor:profiles!duplas_supervisor_id_fkey(nome, nome_social),
       encontros(*, registro:registros(*))`
     );
   if (error) {
@@ -397,11 +399,11 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
     { data: pessoalP, error: ePP },
     { data: pessoalM, error: ePM },
   ] = await Promise.all([
-    supabase.from("profiles").select("id,nome,role,ativo,profile_papeis(papel)"),
+    supabase.from("profiles").select("id,nome,nome_social,role,ativo,profile_papeis(papel)"),
     supabase.from("profiles_contato").select("id,email,whatsapp"),
     supabase
       .from("mentorados")
-      .select("id,nome,email,whatsapp,ong_origem,situacao,saiu_em,motivo_saida,profile_id"),
+      .select("id,nome,nome_social,email,whatsapp,ong_origem,situacao,saiu_em,motivo_saida,profile_id"),
     supabase
       .from("mentor_profiles")
       .select("profile_id,capacidade,capacidade_especialista"),
@@ -434,7 +436,7 @@ async function exportPessoas(supabase: Awaited<ReturnType<typeof createClient>>)
 
   return csvResponse(
     csvPessoas(
-      ((pessoas ?? []) as (Pick<Profile, "id" | "nome" | "role" | "ativo"> & {
+      ((pessoas ?? []) as (Pick<Profile, "id" | "nome" | "nome_social" | "role" | "ativo"> & {
         profile_papeis?: { papel: AppRole }[];
       })[])
         .filter((p) => !(p.role === "mentorado" && vinculados.has(p.id)))
@@ -470,8 +472,8 @@ async function exportAtividades(
       .from("duplas")
       .select(
         `trilha, turma, cronograma_id,
-        mentor:profiles!duplas_mentor_id_fkey(nome),
-        mentorado:mentorados(nome),
+        mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+        mentorado:mentorados(nome, nome_social),
         encontros(numero, realizado_em, status,
           registro:registros(atividades, avaliacao, created_at))`
       ),
@@ -513,12 +515,12 @@ async function exportMatching(
   ] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id,nome,role,ativo,cidade,uf,profile_papeis(papel)")
+      .select("id,nome,nome_social,role,ativo,cidade,uf,profile_papeis(papel)")
       .eq("ativo", true),
     supabase.from("profiles_contato").select("id,email,whatsapp"),
     supabase
       .from("mentorados")
-      .select("id,nome,email,whatsapp,cidade,uf,disponibilidade,situacao")
+      .select("id,nome,nome_social,email,whatsapp,cidade,uf,disponibilidade,situacao")
       .eq("situacao", "ativo"),
     supabase
       .from("mentor_profiles")
@@ -591,7 +593,7 @@ async function exportPresencas(
       .eq("tipo", "formacao")
       .order("data"),
     supabase.from("cronogramas").select("id,nome,turma"),
-    supabase.from("profiles").select("id,nome,role"),
+    supabase.from("profiles").select("id,nome,nome_social,role"),
     supabase.from("mentor_profiles").select("profile_id,formacao_ok"),
   ]);
   if (eE || eC || eP || eMP) {
@@ -601,7 +603,9 @@ async function exportPresencas(
     );
   }
   const pessoasPorId = new Map(
-    (pessoas ?? []).map((p) => [p.id, p] as const)
+    (pessoas ?? []).map(
+      (p) => [p.id, { nome: p.nome_social || p.nome, role: p.role }] as const
+    )
   );
   const formacaoOk = new Map(
     (mps ?? []).map((m) => [m.profile_id, m.formacao_ok] as const)
@@ -678,7 +682,9 @@ function exportPresencasDemo(
   const linhas = linhasPresencas(
     filtraEventosFormacao(eventos, params, d.cronogramas),
     new Map(
-      d.profiles.map((p) => [p.id, { nome: p.nome, role: p.role }] as const)
+      d.profiles.map(
+        (p) => [p.id, { nome: p.nome_social || p.nome, role: p.role }] as const
+      )
     ),
     new Map(d.mentorProfiles.map((m) => [m.profile_id, m.formacao_ok] as const)),
     d.cronogramas
@@ -717,8 +723,8 @@ async function exportAssinaturas(
     { data: jovens, error: eM },
   ] = await Promise.all([
     q,
-    supabase.from("profiles").select("id, nome, role"),
-    supabase.from("mentorados").select("id, nome"),
+    supabase.from("profiles").select("id, nome, nome_social, role"),
+    supabase.from("mentorados").select("id, nome, nome_social"),
   ]);
   if (eA || eP || eM) {
     return NextResponse.json(
@@ -727,7 +733,9 @@ async function exportAssinaturas(
     );
   }
   const nomes = new Map(
-    [...(pessoas ?? []), ...(jovens ?? [])].map((p) => [p.id, p.nome] as const)
+    [...(pessoas ?? []), ...(jovens ?? [])].map(
+      (p) => [p.id, p.nome_social || p.nome] as const
+    )
   );
   const papeis = new Map(
     (pessoas ?? []).map((p) => [p.id, p.role] as const)
@@ -784,11 +792,11 @@ async function exportRespostas(
     .select(
       `id,
       resposta:formulario_respostas(respostas, respondido_em),
-      dest_profile:profiles!formulario_links_dest_profile_id_fkey(nome, role),
-      dest_mentorado:mentorados!formulario_links_dest_mentorado_id_fkey(nome),
+      dest_profile:profiles!formulario_links_dest_profile_id_fkey(nome, nome_social, role),
+      dest_mentorado:mentorados!formulario_links_dest_mentorado_id_fkey(nome, nome_social),
       dupla:duplas!formulario_links_dupla_id_fkey(
-        mentor:profiles!duplas_mentor_id_fkey(nome),
-        mentorado:mentorados!duplas_mentorado_id_fkey(nome)
+        mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+        mentorado:mentorados!duplas_mentorado_id_fkey(nome, nome_social)
       )`
     )
     .eq("formulario_id", id);
@@ -800,18 +808,33 @@ async function exportRespostas(
       | { respostas: Record<string, RespostaValor>; respondido_em: string }[]
       | null;
     dest_profile:
-      | { nome: string; role: string | null }
-      | { nome: string; role: string | null }[]
+      | { nome: string; nome_social?: string | null; role: string | null }
+      | { nome: string; nome_social?: string | null; role: string | null }[]
       | null;
-    dest_mentorado: { nome: string } | { nome: string }[] | null;
+    dest_mentorado:
+      | { nome: string; nome_social?: string | null }
+      | { nome: string; nome_social?: string | null }[]
+      | null;
     dupla:
       | {
-          mentor: { nome: string } | { nome: string }[] | null;
-          mentorado: { nome: string } | { nome: string }[] | null;
+          mentor:
+            | { nome: string; nome_social?: string | null }
+            | { nome: string; nome_social?: string | null }[]
+            | null;
+          mentorado:
+            | { nome: string; nome_social?: string | null }
+            | { nome: string; nome_social?: string | null }[]
+            | null;
         }
       | {
-          mentor: { nome: string } | { nome: string }[] | null;
-          mentorado: { nome: string } | { nome: string }[] | null;
+          mentor:
+            | { nome: string; nome_social?: string | null }
+            | { nome: string; nome_social?: string | null }[]
+            | null;
+          mentorado:
+            | { nome: string; nome_social?: string | null }
+            | { nome: string; nome_social?: string | null }[]
+            | null;
         }[]
       | null;
   };
@@ -832,14 +855,16 @@ async function exportRespostas(
       return todas.map((r) => ({
         // no link anônimo a identidade vem do conteúdo da resposta
         destinatario:
+          p?.nome_social ??
           p?.nome ??
+          m?.nome_social ??
           m?.nome ??
           (typeof r.respostas?.nome_civil === "string"
             ? (r.respostas.nome_civil as string)
             : "Link genérico"),
         tipo: p ? papelLabel(p.role) : m ? "Mentorado" : "Link genérico",
         dupla: dupla
-          ? `${norm(dupla.mentor)?.nome ?? ""} ↔ ${norm(dupla.mentorado)?.nome ?? ""}`
+          ? `${norm(dupla.mentor)?.nome_social ?? norm(dupla.mentor)?.nome ?? ""} ↔ ${norm(dupla.mentorado)?.nome_social ?? norm(dupla.mentorado)?.nome ?? ""}`
           : "",
         respondido_em: r.respondido_em,
         respostas: r.respostas ?? {},
@@ -882,14 +907,16 @@ function exportRespostasDemo(
     for (const r of doLink) {
       linhas.push({
         destinatario:
+          p?.nome_social ??
           p?.nome ??
+          m?.nome_social ??
           m?.nome ??
           (typeof r.respostas.nome_civil === "string"
             ? r.respostas.nome_civil
             : "Link genérico"),
         tipo: p ? papelLabel(p.role) : m ? "Mentorado" : "Link genérico",
         dupla: dupla
-          ? `${dupla.mentor?.nome ?? ""} ↔ ${dupla.mentorado?.nome ?? ""}`
+          ? `${dupla.mentor?.nome_social ?? dupla.mentor?.nome ?? ""} ↔ ${dupla.mentorado?.nome_social ?? dupla.mentorado?.nome ?? ""}`
           : "",
         respondido_em: r.respondido_em,
         respostas: r.respostas,
@@ -908,7 +935,12 @@ function exportRespostasDemo(
  *  `cronogramas` resolve id → nome pra coluna que desambigua o nº (0061). */
 function csvCiclo(duplas: Dupla[], cronogramas: Map<string, string>): string {
   const linhas = duplas
-    .sort((a, b) => a.mentor.nome.localeCompare(b.mentor.nome, "pt-BR"))
+    .sort((a, b) =>
+      (a.mentor.nome_social || a.mentor.nome).localeCompare(
+        b.mentor.nome_social || b.mentor.nome,
+        "pt-BR"
+      )
+    )
     .flatMap((d) => {
       // sessão combinada (018): a linha do coberto exporta as colunas do
       // registro da sessão — é o mesmo row, e a prestação de contas não
@@ -924,9 +956,9 @@ function csvCiclo(duplas: Dupla[], cronogramas: Map<string, string>): string {
                   ?.registro ?? null)
               : null);
           return [
-            d.mentor.nome,
-            d.mentorado.nome,
-            d.supervisor?.nome ?? "",
+            d.mentor.nome_social || d.mentor.nome,
+            d.mentorado.nome_social || d.mentorado.nome,
+            (d.supervisor?.nome_social || d.supervisor?.nome) ?? "",
             // sem a trilha, encontro de dupla de especialista (5 passos)
             // lê como DPP — "Especialista" desambigua na planilha
             TRILHA_LABEL[d.trilha] ?? d.trilha,
@@ -979,7 +1011,12 @@ function csvAtividades(
   const cronogramas = new Map(crons.map((c) => [c.id, c.nome] as const));
   const catalogo = new Set<string>(ATIVIDADES_ENCONTRO);
   const linhas = duplas
-    .sort((a, b) => a.mentor.nome.localeCompare(b.mentor.nome, "pt-BR"))
+    .sort((a, b) =>
+      (a.mentor.nome_social || a.mentor.nome).localeCompare(
+        b.mentor.nome_social || b.mentor.nome,
+        "pt-BR"
+      )
+    )
     .flatMap((d) =>
       [...(d.encontros ?? [])]
         .sort((a, b) => a.numero - b.numero)
@@ -992,8 +1029,8 @@ function csvAtividades(
             turmaDaDupla(d, crons) ?? "",
             d.cronograma_id ? (cronogramas.get(d.cronograma_id) ?? "") : "",
             TRILHA_LABEL[d.trilha] ?? d.trilha,
-            d.mentor.nome,
-            d.mentorado.nome,
+            d.mentor.nome_social || d.mentor.nome,
+            d.mentorado.nome_social || d.mentorado.nome,
             String(e.numero),
             dia(e.realizado_em),
           ];
@@ -1041,12 +1078,12 @@ function filaMatchingPorPessoa(
 
 type PessoaMatching = Pick<
   Profile,
-  "id" | "nome" | "role" | "ativo" | "cidade" | "uf"
+  "id" | "nome" | "nome_social" | "role" | "ativo" | "cidade" | "uf"
 > & { papeis: AppRole[] };
 
 type MentoradoMatching = Pick<
   Mentorado,
-  "id" | "nome" | "email" | "whatsapp" | "cidade" | "uf" | "disponibilidade" | "situacao"
+  "id" | "nome" | "nome_social" | "email" | "whatsapp" | "cidade" | "uf" | "disponibilidade" | "situacao"
 >;
 
 type MpMatching = Pick<
@@ -1134,7 +1171,7 @@ function linhasMatching(o: {
         const mp = o.mps.get(p.id);
         const s = o.pessoalP.get(p.id);
         return {
-          nome: p.nome,
+          nome: p.nome_social || p.nome,
           tipo_pessoa: tipoPessoa(p),
           trilhas: trilhasMentoria(p),
           email: o.contatos.get(p.id)?.email ?? "",
@@ -1164,7 +1201,7 @@ function linhasMatching(o: {
       .map((m): LinhaMatching => {
         const s = o.pessoalM.get(m.id);
         return {
-          nome: m.nome,
+          nome: m.nome_social || m.nome,
           tipo_pessoa: "Mentorado",
           trilhas: "",
           email: m.email ?? "",
@@ -1343,12 +1380,13 @@ const tipoPessoa = (p: Pick<Profile, "role" | "papeis">): string => {
 };
 
 function csvPessoas(
-  pessoas: Pick<Profile, "id" | "nome" | "role" | "papeis" | "ativo">[],
+  pessoas: Pick<Profile, "id" | "nome" | "nome_social" | "role" | "papeis" | "ativo">[],
   contatos: Map<string, { email: string | null; whatsapp: string | null }>,
   mentorados: Pick<
     Mentorado,
     | "id"
     | "nome"
+    | "nome_social"
     | "email"
     | "whatsapp"
     | "ong_origem"
@@ -1375,7 +1413,7 @@ function csvPessoas(
   type Linha = { nome: string; resto: string[] };
   const linhas: Linha[] = [
     ...pessoas.map((p) => ({
-      nome: p.nome,
+      nome: p.nome_social || p.nome,
       resto: [
         tipoPessoa(p),
         contatos.get(p.id)?.email ?? "",
@@ -1401,7 +1439,7 @@ function csvPessoas(
       ],
     })),
     ...mentorados.map((m) => ({
-      nome: m.nome,
+      nome: m.nome_social || m.nome,
       resto: [
         "Mentorado",
         m.email ?? "",

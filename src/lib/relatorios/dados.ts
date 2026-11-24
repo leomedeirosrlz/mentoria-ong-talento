@@ -71,18 +71,20 @@ export type DuplaMapa = {
   cronograma_id: string | null;
   mentor_id: string | null;
   mentorado_id: string | null;
-  mentor?: { nome: string } | null;
-  mentorado?: { nome: string } | null;
+  mentor?: { nome: string; nome_social?: string | null } | null;
+  mentorado?: { nome: string; nome_social?: string | null } | null;
 };
 
 const DUPLA_MAPA_SELECT = `
   id, turma, cronograma_id, mentor_id, mentorado_id,
-  mentor:profiles!duplas_mentor_id_fkey(nome),
-  mentorado:mentorados(nome)
+  mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+  mentorado:mentorados(nome, nome_social)
 `;
 
 const duplaLabel = (d: DuplaMapa | undefined) =>
-  d ? `${d.mentor?.nome ?? ""} ↔ ${d.mentorado?.nome ?? ""}` : "";
+  d
+    ? `${d.mentor?.nome_social || d.mentor?.nome || ""} ↔ ${d.mentorado?.nome_social || d.mentorado?.nome || ""}`
+    : "";
 
 /** person_id (profile ou mentorado) → duplas onde a pessoa figura — base
  *  do recorte ?turma= pra linhas que não carregam dupla direta. */
@@ -176,8 +178,8 @@ export function itemAderencia(
         ? (crons.find((c) => c.id === d.cronograma_id)?.nome ?? "")
         : "",
       trilha: TRILHA_LABEL[d.trilha] ?? d.trilha,
-      mentor: d.mentor?.nome ?? "",
-      mentorado: d.mentorado?.nome ?? "",
+      mentor: d.mentor?.nome_social || d.mentor?.nome || "",
+      mentorado: d.mentorado?.nome_social || d.mentorado?.nome || "",
       esperados,
       realizados,
       // % inteira da aderência — aderência >100 (reposição) aparece honesto
@@ -329,15 +331,15 @@ async function assinaturasCtx(supabase: Supa) {
         `profile_id, mentorado_id, status, token_expira_em, created_at,
          template:documento_templates(titulo)`
       ),
-    supabase.from("profiles").select("id, nome, role"),
-    supabase.from("mentorados").select("id, nome"),
+    supabase.from("profiles").select("id, nome, nome_social, role"),
+    supabase.from("mentorados").select("id, nome, nome_social"),
   ]);
   if (aRes.error) throw aRes.error;
   if (pRes.error) throw pRes.error;
   if (mRes.error) throw mRes.error;
   const nomes = new Map(
     [...(pRes.data ?? []), ...(mRes.data ?? [])].map(
-      (p) => [p.id, p.nome] as const
+      (p) => [p.id, p.nome_social || p.nome] as const
     )
   );
   const papeis = new Map(
@@ -496,22 +498,28 @@ export async function dadosItensInteracoes(
       .from("interacoes")
       .select(
         `id, dupla_id, tipo, canal, nota, created_at,
-         autor:profiles!interacoes_autor_id_fkey(nome)`
+         autor:profiles!interacoes_autor_id_fkey(nome, nome_social)`
       )
       .order("created_at", { ascending: false }),
   ]);
   if (iRes.error) throw iRes.error;
-  const rows = (iRes.data ?? []).map((r) => ({
-    id: r.id,
-    dupla_id: r.dupla_id,
-    tipo: r.tipo as InteracaoTipo,
-    canal: r.canal as InteracaoCanal,
-    nota: r.nota,
-    created_at: r.created_at,
-    autor:
-      norm(r.autor as unknown as { nome: string } | { nome: string }[] | null)
-        ?.nome ?? "",
-  }));
+  const rows = (iRes.data ?? []).map((r) => {
+    const autor = norm(
+      r.autor as unknown as
+        | { nome: string; nome_social?: string | null }
+        | { nome: string; nome_social?: string | null }[]
+        | null
+    );
+    return {
+      id: r.id,
+      dupla_id: r.dupla_id,
+      tipo: r.tipo as InteracaoTipo,
+      canal: r.canal as InteracaoCanal,
+      nota: r.nota,
+      created_at: r.created_at,
+      autor: autor?.nome_social || autor?.nome || "",
+    };
+  });
   return itensInteracoes(rows, porId, recorte, crons);
 }
 
@@ -536,7 +544,7 @@ export function dadosItensInteracoesDemo(
     canal: i.canal,
     nota: null, // o dataset demo não carrega nota — a coluna sai vazia
     created_at: i.created_at,
-    autor: i.autor?.nome ?? "",
+    autor: i.autor?.nome_social || i.autor?.nome || "",
   }));
   return itensInteracoes(rows, mapas.porId, recorte, mapas.crons);
 }
@@ -604,7 +612,7 @@ export function itensSolicitacoes(
       duplaDppId: s.dupla_dpp_id,
       statusEfetivo: efetivo,
       linha: {
-        mentorado: s.mentorado?.nome ?? "",
+        mentorado: s.mentorado?.nome_social || s.mentorado?.nome || "",
         demanda: s.demanda ?? s.motivo ?? "",
         origem: SOLICITACAO_ORIGEM_LABEL[s.origem] ?? s.origem,
         status: SOLICITACAO_STATUS_LABEL[efetivo] ?? efetivo,
@@ -617,7 +625,11 @@ export function itensSolicitacoes(
             )
           : null,
         especialista:
-          s.especialista?.nome ?? s.desejado?.nome ?? "",
+          s.especialista?.nome_social ||
+          s.especialista?.nome ||
+          s.desejado?.nome_social ||
+          s.desejado?.nome ||
+          "",
       },
     });
   }
@@ -644,15 +656,20 @@ export async function dadosItensSolicitacoes(
       .select(
         `id, mentorado_id, dupla_dpp_id, demanda, motivo, origem, turma,
          status, status_efetivo, created_at, respondida_em,
-         mentorado_nome, especialista_nome`
+         mentorado_nome, mentorado_nome_social,
+         especialista_nome, especialista_nome_social`
       )
       .order("created_at", { ascending: false }),
   ]);
   if (sRes.error) throw sRes.error;
   const rows = (sRes.data ?? []).map((r) => ({
     ...(r as unknown as SolicitacaoEspecialista),
-    mentorado: r.mentorado_nome ? { nome: r.mentorado_nome } : null,
-    especialista: r.especialista_nome ? { nome: r.especialista_nome } : null,
+    mentorado: r.mentorado_nome
+      ? { nome: r.mentorado_nome_social || r.mentorado_nome }
+      : null,
+    especialista: r.especialista_nome
+      ? { nome: r.especialista_nome_social || r.especialista_nome }
+      : null,
   }));
   return itensSolicitacoes(rows, porId, recorte, crons);
 }
@@ -719,8 +736,8 @@ export function linhaEncerramento(
     feitos,
     total: CHECKLIST_CHAVES.length,
     linha: {
-      mentor: d?.mentor?.nome ?? "",
-      mentorado: d?.mentorado?.nome ?? "",
+      mentor: d?.mentor?.nome_social || d?.mentor?.nome || "",
+      mentorado: d?.mentorado?.nome_social || d?.mentorado?.nome || "",
       tipo: ENCERRAMENTO_TIPO_LABEL[e.tipo] ?? e.tipo,
       checklist: `${feitos} de ${CHECKLIST_CHAVES.length}`,
       decidido_por: e.decidido,
@@ -756,21 +773,26 @@ export async function dadosEncerramento(
       .from("encerramentos")
       .select(
         `id, dupla_id, tipo, checklist, resumo_jornada, created_at,
-         decidido:profiles!encerramentos_decidido_por_fkey(nome)`
+         decidido:profiles!encerramentos_decidido_por_fkey(nome, nome_social)`
       ),
   ]);
   if (eRes.error) throw eRes.error;
-  const rows = (eRes.data ?? []).map((r) => ({
-    dupla_id: r.dupla_id,
-    tipo: r.tipo,
-    checklist: (r.checklist ?? {}) as EncerramentoChecklist,
-    resumo_jornada: r.resumo_jornada,
-    created_at: r.created_at,
-    decidido:
-      norm(
-        r.decidido as unknown as { nome: string } | { nome: string }[] | null
-      )?.nome ?? "",
-  }));
+  const rows = (eRes.data ?? []).map((r) => {
+    const dec = norm(
+      r.decidido as unknown as
+        | { nome: string; nome_social?: string | null }
+        | { nome: string; nome_social?: string | null }[]
+        | null
+    );
+    return {
+      dupla_id: r.dupla_id,
+      tipo: r.tipo,
+      checklist: (r.checklist ?? {}) as EncerramentoChecklist,
+      resumo_jornada: r.resumo_jornada,
+      created_at: r.created_at,
+      decidido: dec?.nome_social || dec?.nome || "",
+    };
+  });
   return linhasEncerramento(rows, porId, recorte, crons);
 }
 
@@ -786,7 +808,7 @@ export function dadosEncerramentoDemo(
     checklist: e.checklist,
     resumo_jornada: e.resumo_jornada,
     created_at: e.created_at,
-    decidido: e.decidido?.nome ?? "",
+    decidido: e.decidido?.nome_social ?? e.decidido?.nome ?? "",
   }));
   return linhasEncerramento(rows, mapas.porId, recorte, mapas.crons);
 }
@@ -920,8 +942,8 @@ export async function dadosItensForms(
         )
         .order("created_at", { ascending: false }),
       supabase.from("formularios").select("id, titulo"),
-      supabase.from("profiles").select("id, nome, role"),
-      supabase.from("mentorados").select("id, nome"),
+      supabase.from("profiles").select("id, nome, nome_social, role"),
+      supabase.from("mentorados").select("id, nome, nome_social"),
     ]);
   if (lRes.error) throw lRes.error;
   if (fRes.error) throw fRes.error;
@@ -929,7 +951,7 @@ export async function dadosItensForms(
   if (mRes.error) throw mRes.error;
   const nomes = new Map(
     [...(pRes.data ?? []), ...(mRes.data ?? [])].map(
-      (p) => [p.id, p.nome] as const
+      (p) => [p.id, p.nome_social || p.nome] as const
     )
   );
   const papeis = new Map(
@@ -1074,11 +1096,17 @@ function demoMapas(d: DemoData) {
     cronograma_id: x.cronograma_id,
     mentor_id: x.mentor?.id ?? null,
     mentorado_id: x.mentorado?.id ?? null,
-    mentor: x.mentor ? { nome: x.mentor.nome } : null,
-    mentorado: x.mentorado ? { nome: x.mentorado.nome } : null,
+    mentor: x.mentor
+      ? { nome: x.mentor.nome, nome_social: x.mentor.nome_social }
+      : null,
+    mentorado: x.mentorado
+      ? { nome: x.mentorado.nome, nome_social: x.mentorado.nome_social }
+      : null,
   }));
   const nomes = new Map(
-    [...d.profiles, ...d.mentorados].map((p) => [p.id, p.nome] as const)
+    [...d.profiles, ...d.mentorados].map(
+      (p) => [p.id, p.nome_social || p.nome] as const
+    )
   );
   const papeis = new Map(d.profiles.map((p) => [p.id, p.role] as const));
   return {

@@ -2340,8 +2340,8 @@ export async function remanejarDupla(
     .from("duplas")
     .select(
       `id, mentor_id, mentorado_id, supervisor_id, status, trilha,
-       mentor:profiles!duplas_mentor_id_fkey(nome),
-       mentorado:mentorados!duplas_mentorado_id_fkey(nome, profile_id)`
+       mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+       mentorado:mentorados!duplas_mentorado_id_fkey(nome, nome_social, profile_id)`
     )
     .eq("id", duplaId)
     .maybeSingle();
@@ -2413,20 +2413,21 @@ export async function remanejarDupla(
   // leitura literal do updateDupla mandaria.
   const norm = <T,>(v: T | T[] | null | undefined): T | null =>
     Array.isArray(v) ? (v[0] ?? null) : (v ?? null);
-  const nomeMentor = norm(atual.mentor)?.nome ?? null;
+  const mtAtual = norm(atual.mentor);
+  const nomeMentor = mtAtual?.nome_social ?? mtAtual?.nome ?? null;
   const mdAtual = norm(atual.mentorado);
-  const nomeMd = mdAtual?.nome ?? null;
+  const nomeMd = mdAtual?.nome_social ?? mdAtual?.nome ?? null;
   const jovemAtualProfileId = mdAtual?.profile_id ?? null;
   let nomeNovo: string | null = null;
   let jovemNovoProfileId: string | null = null;
   if (lado === "mentor") {
     const { data: p } = await supabase
-      .from("profiles").select("nome").eq("id", novoId).single();
-    nomeNovo = p?.nome ?? null;
+      .from("profiles").select("nome, nome_social").eq("id", novoId).single();
+    nomeNovo = p?.nome_social ?? p?.nome ?? null;
   } else {
     const { data: m } = await supabase
-      .from("mentorados").select("nome, profile_id").eq("id", novoId).single();
-    nomeNovo = m?.nome ?? null;
+      .from("mentorados").select("nome, nome_social, profile_id").eq("id", novoId).single();
+    nomeNovo = m?.nome_social ?? m?.nome ?? null;
     jovemNovoProfileId = m?.profile_id ?? null;
   }
   await notificar(

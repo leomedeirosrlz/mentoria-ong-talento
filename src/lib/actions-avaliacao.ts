@@ -218,10 +218,10 @@ export async function submeterAvaliacao(input: EnvioAvaliacao) {
         numero = enc?.numero ?? numero;
         const { data: prof } = await supabase
           .from("profiles")
-          .select("nome")
+          .select("nome, nome_social")
           .eq("user_id", (claims?.claims?.sub as string) ?? "")
           .maybeSingle();
-        jovemNome = prof?.nome ?? jovemNome;
+        jovemNome = prof?.nome_social ?? prof?.nome ?? jovemNome;
       }
 
       const emails = ret.destinatarios

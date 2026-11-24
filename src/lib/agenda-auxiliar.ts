@@ -197,8 +197,14 @@ export function duplasPorTurma(
         ORDEM_SEMAFORO[saudeDe.get(a.id)!.semaforo] -
           ORDEM_SEMAFORO[saudeDe.get(b.id)!.semaforo] ||
         comparaNome(
-          primeiroNomeDaDupla(a) || a.mentorado?.nome || "",
-          primeiroNomeDaDupla(b) || b.mentorado?.nome || ""
+          primeiroNomeDaDupla(a) ||
+            a.mentorado?.nome_social ||
+            a.mentorado?.nome ||
+            "",
+          primeiroNomeDaDupla(b) ||
+            b.mentorado?.nome_social ||
+            b.mentorado?.nome ||
+            ""
         )
     );
 
@@ -277,7 +283,7 @@ export function itensConsolidados(
 
   for (const d of duplas) {
     const nomeJovem = primeiroNomeDaDupla(d) || "Jovem";
-    const mentorNome = d.mentor?.nome ?? "mentor";
+    const mentorNome = d.mentor?.nome_social ?? d.mentor?.nome ?? "mentor";
     const mentor1 = (
       d.mentor?.nome_social ??
       d.mentor?.nome ??
@@ -360,7 +366,7 @@ export function itensConsolidados(
         inicio: vig.data,
         tipo: "a_agendar",
         titulo: nova ? `Encontro ${vig.numero}: dupla nova, a agendar` : `Encontro ${vig.numero} a agendar`,
-        detalhe: `${nome1} com ${d.mentor?.nome ?? "mentor"} · ${turmaLonga(d.turma)}`,
+        detalhe: `${nome1} com ${d.mentor?.nome_social ?? d.mentor?.nome ?? "mentor"} · ${turmaLonga(d.turma)}`,
         convidado: false,
         duplaId: d.id,
         pill: turmaCurta(d.turma),

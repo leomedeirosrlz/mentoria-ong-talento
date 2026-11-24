@@ -92,7 +92,7 @@ async function universoRegistros(supabase: Supa): Promise<{
       supabase
         .from("duplas")
         .select(
-          "id, mentor_id, mentorado_id, status, trilha, cronograma_id, iniciada_em, mentor:profiles!duplas_mentor_id_fkey(nome), mentorado:mentorados!duplas_mentorado_id_fkey(nome)"
+          "id, mentor_id, mentorado_id, status, trilha, cronograma_id, iniciada_em, mentor:profiles!duplas_mentor_id_fkey(nome, nome_social), mentorado:mentorados!duplas_mentorado_id_fkey(nome, nome_social)"
         ),
       supabase.from("encontros").select("dupla_id, numero, status, data_hora, registros(id)"),
       supabase
@@ -116,8 +116,14 @@ async function universoRegistros(supabase: Supa): Promise<{
   const mentores = [...(mentoresRole ?? []), ...(mentoresExtra ?? [])];
   const norm = (v: unknown) => (Array.isArray(v) ? (v[0] ?? null) : v);
   const duplasRef: DuplaCandidata[] = (duplas ?? []).map((d) => {
-    const mentor = norm(d.mentor) as { nome: string } | null;
-    const mentorado = norm(d.mentorado) as { nome: string } | null;
+    const mentor = norm(d.mentor) as {
+      nome: string;
+      nome_social?: string | null;
+    } | null;
+    const mentorado = norm(d.mentorado) as {
+      nome: string;
+      nome_social?: string | null;
+    } | null;
     return {
       id: d.id,
       mentor_id: d.mentor_id,
@@ -126,8 +132,8 @@ async function universoRegistros(supabase: Supa): Promise<{
       trilha: d.trilha,
       cronograma_id: d.cronograma_id,
       iniciada_em: d.iniciada_em,
-      mentorNome: mentor?.nome ?? "?",
-      mentoradoNome: mentorado?.nome ?? "?",
+      mentorNome: mentor?.nome_social ?? mentor?.nome ?? "?",
+      mentoradoNome: mentorado?.nome_social ?? mentorado?.nome ?? "?",
     };
   });
   const encPorDuplaNumero = new Map<string, EncontroInfo>();
