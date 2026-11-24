@@ -15,7 +15,7 @@ import { getMentoresChamada, getPresencas } from "@/lib/queries-presenca";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import { getEncerramentosPendentes } from "@/lib/queries-encerramento";
 import {
-  getEspecialistas,
+  getEspecialistasCatalogo,
   getMinhaGrade,
   getMinhasExcecoes,
   getSolicitacoesDasDuplas,
@@ -341,7 +341,10 @@ export default async function AgendaPage({
         aba === "por-mentorado"
           ? getSolicitacoesDasDuplas(idsDpp)
           : Promise.resolve({} as Record<string, SolicitacaoEspecialista[]>),
-        aba === "por-mentorado" ? getEspecialistas() : Promise.resolve([]),
+        // a sugestão escolhe por cards do catálogo rico (023)
+        aba === "por-mentorado"
+          ? getEspecialistasCatalogo()
+          : Promise.resolve([]),
         // cap de 48h do "Lembrar o jovem" — só o Por mentorado renderiza
         aba === "por-mentorado"
           ? getUltimasInteracoes(idsDpp, "nudge")
@@ -411,10 +414,7 @@ export default async function AgendaPage({
               duplas={duplasDpp}
               trilhas={trilhas}
               solicitacoes={solicitacoes}
-              especialistas={especialistas.map((e) => ({
-                id: e.id,
-                nome: e.nome,
-              }))}
+              especialistas={especialistas}
               eventos={eventos}
               cronogramas={cronogramas}
               nudges={nudges}

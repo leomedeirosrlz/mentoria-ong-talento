@@ -16,6 +16,7 @@ import {
 } from "@/lib/queries";
 import { disponivelDesdePorId } from "@/lib/fila";
 import { getAssinaturasResumo } from "@/lib/queries-assinaturas";
+import { getEspecialistasCatalogo } from "@/lib/queries-especialista";
 import { faltantesDocumento } from "@/lib/documentos/texto";
 import { foraDoPrograma, idade } from "@/lib/ciclo";
 import { turmaDaDupla } from "@/lib/turma";
@@ -58,6 +59,7 @@ export default async function PessoasPage() {
     acesso,
     cronogramas,
     encerramentosResumo,
+    catalogo,
   ] = await Promise.all([
     getPessoas(),
     getMentorados(),
@@ -70,6 +72,10 @@ export default async function PessoasPage() {
     souCoord ? getMapaAcesso() : Promise.resolve({}),
     souCoord ? getCronogramas() : Promise.resolve([]),
     souCoord ? getEncerramentosResumo() : Promise.resolve([]),
+    // a view já gateia por papel (staff lê, mentorado recebe 0 rows) —
+    // busca pra todo staff: é barata e a faceta "Especialistas" do
+    // diretório consome; a coord não a usa (a faceta dela vem do modal)
+    getEspecialistasCatalogo(),
   ]);
 
   // "voltou a ficar disponível" por pessoa — o "há N dias" da fila mede a
@@ -233,6 +239,7 @@ export default async function PessoasPage() {
       <PessoasListas
         pessoas={souCoord ? pessoas : pessoas.filter((p) => p.role != null)}
         mentorados={mentorados}
+        catalogo={catalogo}
         comDupla={[...comDupla]}
         comQualquerDupla={[...comQualquerDupla]}
         duplaVivaPorMentorado={duplaVivaPorMentorado}

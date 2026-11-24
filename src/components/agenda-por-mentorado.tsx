@@ -54,6 +54,7 @@ import type {
   Dificuldade,
   Dupla,
   Encontro,
+  JovemEspecialista,
   SolicitacaoEspecialista,
   SolicitacaoEspecialistaStatus,
   TrilhaJovem,
@@ -85,7 +86,7 @@ export type AgendaPorMentoradoProps = {
   duplas: Dupla[];
   trilhas: Record<string, TrilhaJovem[]>;
   solicitacoes: Record<string, SolicitacaoEspecialista[]>;
-  especialistas: { id: string; nome: string }[];
+  especialistas: JovemEspecialista[];
   eventos: CicloEvento[];
   cronogramas: Cronograma[];
   /** Último contato por dupla — o "Lembrar o jovem" só conta tipo nudge. */
@@ -141,12 +142,6 @@ export function AgendaPorMentorado({
   agora: agoraMs,
 }: AgendaPorMentoradoProps) {
   const agora = new Date(agoraMs);
-  // o dialog pede areas:string[]|null — a página projeta só {id,nome}; o
-  // select dele já cai no ramo sem áreas quando null
-  const especialistasDialog = especialistas.map((e) => ({
-    ...e,
-    areas: null as string[] | null,
-  }));
 
   const saudePorDupla = new Map(
     duplas.map((d) => [d.id, saudadeDaDupla(d, eventos, agora)])
@@ -197,7 +192,7 @@ export function AgendaPorMentorado({
             saude={saudePorDupla.get(dupla.id)!}
             trilhas={trilhas[dupla.id] ?? []}
             solicitacoes={solicitacoes[dupla.id] ?? []}
-            especialistas={especialistasDialog}
+            especialistas={especialistas}
             eventos={eventos}
             cronogramas={cronogramas}
             nudge={
@@ -244,7 +239,7 @@ function CardMentorado({
   saude: ReturnType<typeof saudadeDaDupla>;
   trilhas: TrilhaJovem[];
   solicitacoes: SolicitacaoEspecialista[];
-  especialistas: { id: string; nome: string; areas: string[] | null }[];
+  especialistas: JovemEspecialista[];
   eventos: CicloEvento[];
   cronogramas: Cronograma[];
   /** Último `interacoes` tipo nudge da dupla — alimenta o cap de 48h. */
@@ -1340,7 +1335,7 @@ function SemTrilhaBlock({
   tinhaHistorico,
 }: {
   dupla: Dupla;
-  especialistas: { id: string; nome: string; areas: string[] | null }[];
+  especialistas: JovemEspecialista[];
   primeiroNome: string;
   tinhaHistorico: boolean;
 }) {

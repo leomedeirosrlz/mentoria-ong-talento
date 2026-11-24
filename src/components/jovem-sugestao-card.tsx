@@ -24,13 +24,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { EspecialistaSeletor } from "@/components/especialista-seletor";
 
 const QUALQUER = "qualquer";
 
@@ -111,7 +105,6 @@ export function SugestaoEspecialistaCard({
   const router = useRouter();
 
   const autor = s.solicitante?.nome ?? "Seu mentor";
-  const escolhido = catalogo.find((e) => e.id === esp);
   const sugerido = s.especialista_desejado_id
     ? catalogo.find((e) => e.id === s.especialista_desejado_id)
     : undefined;
@@ -245,53 +238,21 @@ export function SugestaoEspecialistaCard({
                 placeholder="O que você quer destravar com essa trilha?"
               />
             </div>
-            <div className="space-y-2">
-              <Label id="sug-esp-label">Especialista (opcional)</Label>
-              <Select
-                value={esp}
-                onValueChange={(v) => setEsp(v ?? QUALQUER)}
-                items={{
-                  [QUALQUER]: "Qualquer especialista disponível",
-                  ...Object.fromEntries(
-                    catalogo.map((e) => [e.id, e.nome_social || e.nome])
-                  ),
-                }}
-              >
-                <SelectTrigger
-                  id="sug-esp"
-                  aria-labelledby="sug-esp-label sug-esp"
-                >
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={QUALQUER}>
-                    Qualquer especialista disponível
-                  </SelectItem>
-                  {catalogo.map((e) => (
-                    <SelectItem key={e.id} value={e.id}>
-                      <span className="flex items-center gap-2">
-                        <Avatar
-                          nome={e.nome_social || e.nome}
-                          src={
-                            e.avatar_path ? avatarPublicUrl(e.avatar_path) : null
-                          }
-                          size={20}
-                        />
-                        {e.nome_social || e.nome}
-                      </span>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {escolhido ? (
-                <EspecialistaPreview e={escolhido} />
-              ) : (
-                <p className="text-xs text-muted-foreground">
-                  Sem nome ainda: a coordenação conecta você com quem faz
-                  sentido pro tema.
-                </p>
-              )}
-            </div>
+            <EspecialistaSeletor
+              idBase="sug-esp"
+              label="Especialista (opcional)"
+              rotuloQualquer="Qualquer especialista disponível"
+              catalogo={catalogo}
+              selecionado={esp === QUALQUER ? null : esp}
+              onSelecionar={(id) => setEsp(id ?? QUALQUER)}
+              linkPerfil={(e) => `/jovem/pessoas/${e.id}`}
+            />
+            {esp === QUALQUER && (
+              <p className="text-xs text-muted-foreground">
+                Sem nome ainda: a coordenação conecta você com quem faz
+                sentido pro tema.
+              </p>
+            )}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setOpen(false)}>

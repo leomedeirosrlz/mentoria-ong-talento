@@ -145,8 +145,23 @@ test.describe("WP6 — especialista do lado do jovem", () => {
     await page
       .locator("#sug-mentor-objetivo")
       .fill("Destravar a entrega do projeto");
-    await page.locator("#sug-mentor-esp").click();
-    await page.getByRole("option", { name: /Esp Dois E2E/ }).click();
+    // a escolha é por card (023): o trigger abre o pool do catálogo e o
+    // card selecionado fica como resumo completo com "Trocar"
+    await agirComConfirma(
+      () =>
+        dialogSug
+          .getByRole("button", { name: "Deixar a coordenação direcionar" })
+          .click(),
+      () => dialogSug.locator("#sug-mentor-esp-pool").isVisible()
+    );
+    await agirComConfirma(
+      () =>
+        dialogSug
+          .locator("#sug-mentor-esp-pool li", { hasText: "Esp Dois E2E" })
+          .getByRole("button", { name: "Selecionar", exact: true })
+          .click(),
+      () => dialogSug.getByRole("button", { name: "Trocar" }).isVisible()
+    );
     await page
       .getByRole("button", { name: /Registrar sugestão/ })
       .click();

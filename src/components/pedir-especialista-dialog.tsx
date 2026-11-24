@@ -495,7 +495,7 @@ function rotuloDiaSlot(iso: string): string {
  *  a pessoa quiser mudar especialista/horário. O submit usa a mesma action
  *  e o mesmo gate do dialog completo (demanda rica num primeiro pedido,
  *  motivo curto com trilha viva). */
-function ConfirmarSlotDialog({
+export function ConfirmarSlotDialog({
   espId,
   espNome,
   slot,

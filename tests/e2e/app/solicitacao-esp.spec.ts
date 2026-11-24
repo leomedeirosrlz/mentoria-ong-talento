@@ -270,18 +270,22 @@ test.describe("solicitação de especialista v2 — fluxo staff (REALIZA-112)", 
       () => dialog.isVisible()
     );
     await dialog.locator("#demanda").fill(DEMANDA_ACEITE);
+    // a direção é por card (023): o trigger abre o pool do catálogo, o
+    // card "Selecionar" fecha e deixa o resumo completo com "Trocar"
     await agirComConfirma(
-      () => dialog.locator("#especialista-select").click(),
       () =>
-        page.getByRole("option", { name: "Esp E2E", exact: true }).isVisible()
+        dialog
+          .getByRole("button", { name: "Qualquer especialista disponível" })
+          .click(),
+      () => dialog.locator("#especialista-seletor-pool").isVisible()
     );
     await agirComConfirma(
       () =>
-        page.getByRole("option", { name: "Esp E2E", exact: true }).click(),
-      async () =>
-        (await dialog.locator("#especialista-select").textContent())?.includes(
-          "Esp E2E"
-        ) ?? false
+        dialog
+          .locator("#especialista-seletor-pool li", { hasText: "Esp E2E" })
+          .getByRole("button", { name: "Selecionar", exact: true })
+          .click(),
+      () => dialog.getByRole("button", { name: "Trocar" }).isVisible()
     );
     await agirComConfirma(
       () =>

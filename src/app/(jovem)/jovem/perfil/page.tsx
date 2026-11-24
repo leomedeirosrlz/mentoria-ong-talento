@@ -1,7 +1,10 @@
-import { MapPin } from "@phosphor-icons/react/dist/ssr";
+import { MapPin, ArrowRight } from "@phosphor-icons/react/dist/ssr";
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
+  getJovemColegas,
+  getJovemContatos,
   getJovemDuplas,
   getJovemEncaminhamentos,
   getJovemEncontros,
@@ -27,6 +30,9 @@ import {
   FotoPerfil,
 } from "./perfil-form";
 import { PrivacidadeCard } from "./privacidade-card";
+import { ContatoLinha, ColegaLinha } from "@/components/jovem-rede";
+import { agrupaContatosPorPessoa } from "@/lib/jovem-contatos";
+import { seloDuplaLabel, vinculoDeContato } from "@/lib/jovem-diretorio";
 import { demoRole } from "@/lib/demo/mode";
 import { TEMA_COOKIE, temaValido } from "@/lib/tema";
 import type { Disponibilidade } from "@/lib/types";
@@ -35,6 +41,15 @@ export const metadata = { title: "Meu perfil" };
 
 const UUID_RE =
   /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+// ordem de leitura da rede — o mentor primeiro, depois o especialista da
+// trilha; mesma régua dos grupos da página /pessoas que a seção herdou
+const ORDEM_VINCULO: Record<string, number> = {
+  mentor: 0,
+  especialista: 1,
+  supervisor: 2,
+  coordenacao: 3,
+};
 
 export default async function JovemPerfil({
   searchParams,
@@ -51,6 +66,8 @@ export default async function JovemPerfil({
     meusChamados,
     detalhe,
     duplas,
+    contatosRede,
+    colegas,
     encontros,
     avaliacoes,
     encaminhamentos,
@@ -62,6 +79,10 @@ export default async function JovemPerfil({
     cSel ? getChamadoDetalhe(cSel) : Promise.resolve(null),
     // jornada/conquistas: mesmas leituras cacheadas da home
     getJovemDuplas(),
+    // "Sua rede" (023): os adultos das duplas + os colegas de turma —
+    // mesmas fontes que alimentavam a página /pessoas antiga
+    getJovemContatos(),
+    getJovemColegas(),
     getJovemEncontros(),
     getJovemAvaliacoes(),
     getJovemEncaminhamentos(),
@@ -96,6 +117,17 @@ export default async function JovemPerfil({
   ]
     .filter(Boolean)
     .join(" · ");
+
+  // "Sua rede" (023): os adultos das duplas dedup por pessoa (mesma régua
+  // do merge do diretório) + os colegas de turma — as mesmas linhas e os
+  // mesmos canais da página /pessoas que a seção substituiu
+  const porDupla = new Map(
+    duplas.map((d) => [d.id, { status: d.status, trilha: d.trilha }])
+  );
+  const rede = agrupaContatosPorPessoa(contatosRede, porDupla).sort(
+    (a, b) =>
+      (ORDEM_VINCULO[a.papel ?? ""] ?? 9) - (ORDEM_VINCULO[b.papel ?? ""] ?? 9)
+  );
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6">
@@ -161,6 +193,62 @@ export default async function JovemPerfil({
           )}
 
           <FichaSecao perfil={perfil} />
+
+          {/* 023: a rede sai do corpo de /jovem/pessoas (virou diretório)
+              e ganha seção própria — as mesmas linhas compartilhadas
+              (jovem-rede): avatar, vínculo na voz dele, selo de dupla
+              não-ativa e os canais de sempre (WhatsApp do colega atrás do
+              opt-in dele). O catálogo não se duplica: um link discreto
+              aponta pra ele */}
+          <section
+            aria-labelledby="sua-rede-titulo"
+            className="animate-enter rounded-xl bg-card p-6 shadow-[var(--shadow-border)]"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 id="sua-rede-titulo" className="text-base font-semibold">
+                  Sua rede
+                </h2>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Mentor, especialista, equipe e os colegas da sua turma.
+                </p>
+              </div>
+              <Link
+                href="/jovem/especialistas"
+                className="group inline-flex min-h-11 shrink-0 items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
+              >
+                Conhecer especialistas
+                <ArrowRight
+                  size={14}
+                  aria-hidden
+                  className="transition-transform group-hover:translate-x-0.5"
+                />
+              </Link>
+            </div>
+            {rede.length === 0 && colegas.length === 0 ? (
+              <p className="mt-4 text-sm text-muted-foreground">
+                Quando a sua rede se formar, as pessoas aparecem aqui.
+              </p>
+            ) : (
+              <ul className="mt-2 divide-y divide-border/60">
+                {rede.map((c) => (
+                  <ContatoLinha
+                    key={`${c.papel}-${c.id}`}
+                    c={c}
+                    selo={seloDuplaLabel(
+                      c.dupla_id ? porDupla.get(c.dupla_id)?.status : null,
+                      c.dupla_id ? porDupla.get(c.dupla_id)?.trilha : null
+                    )}
+                    vinculo={vinculoDeContato(c)}
+                    nomeJovem={nomeTela}
+                  />
+                ))}
+                {colegas.map((c) => (
+                  <ColegaLinha key={c.id} c={c} nomeJovem={nomeTela} />
+                ))}
+              </ul>
+            )}
+          </section>
 
           {/* mesma condição da home: jornada existe quando há trilha
               DPP ou sessão de especialista já feita */}
