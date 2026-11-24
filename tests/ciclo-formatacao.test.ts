@@ -31,6 +31,7 @@ import {
   slotCompativel,
   toDateStr,
   ultimoRegistro,
+  waChatLink,
   waLink,
 } from "@/lib/ciclo";
 import type { DiaSemana, Disponibilidade, Periodo } from "@/lib/types";
@@ -519,7 +520,7 @@ describe("slotCompativel — o slot do especialista × a grade do jovem (WP6)", 
   });
 });
 
-describe("waLink / linkSeguro", () => {
+describe("waLink / waChatLink / linkSeguro", () => {
   it("waLink limpa o telefone e encoda a mensagem", () => {
     expect(waLink("(11) 98765-4321", "Oi, tudo bem?")).toBe(
       "https://wa.me/11987654321?text=Oi%2C%20tudo%20bem%3F"
@@ -533,6 +534,26 @@ describe("waLink / linkSeguro", () => {
     expect(waLink(null, "oi")).toBeNull();
     expect(waLink("-", "oi")).toBeNull();
     expect(waLink("abc", "oi")).toBeNull();
+  });
+
+  it("waLink com mensagem vazia devolve null — rascunho em branco é caso do waChatLink", () => {
+    expect(waLink("11987654321", "")).toBeNull();
+    expect(waLink("11987654321", "   ")).toBeNull();
+    expect(waLink(null, "")).toBeNull();
+  });
+
+  it("waChatLink abre a conversa sem ?text=", () => {
+    expect(waChatLink("(11) 98765-4321")).toBe("https://wa.me/11987654321");
+    expect(waChatLink("55 11 9 8765-4321")).toBe(
+      "https://wa.me/5511987654321"
+    );
+  });
+
+  it("waChatLink sem dígito nenhum devolve null", () => {
+    expect(waChatLink(null)).toBeNull();
+    expect(waChatLink(undefined)).toBeNull();
+    expect(waChatLink("-")).toBeNull();
+    expect(waChatLink("abc")).toBeNull();
   });
 
   it("linkSeguro só passa http(s)", () => {

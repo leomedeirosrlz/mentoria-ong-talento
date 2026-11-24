@@ -2,7 +2,7 @@
 
 import { WhatsappLogo } from "@phosphor-icons/react";
 import { avatarPublicUrl } from "@/lib/avatar";
-import { waLink } from "@/lib/ciclo";
+import { waChatLink, waLink } from "@/lib/ciclo";
 import { msgApresentacaoJovem } from "@/lib/whatsapp-msgs";
 import type { JovemContato } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -34,7 +34,9 @@ export function EquipeWaDialog({
   /** Primeiro nome do mentorado — assina a mensagem pré-preenchida. */
   nomeJovem: string;
 }) {
-  const comWa = equipe.filter((c) => waLink(c.whatsapp, ""));
+  // "tem WhatsApp" = wa.me/<dígitos> saindo — sem texto aqui (a mensagem
+  // pronta é do botão de cada linha)
+  const comWa = equipe.filter((c) => waChatLink(c.whatsapp));
   return (
     <Dialog>
       <DialogTrigger render={trigger} />

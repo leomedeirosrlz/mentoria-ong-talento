@@ -2753,13 +2753,28 @@ export function lembreteBloqueadoAte(
   return fim > +agora ? new Date(fim) : null;
 }
 
+/** Dígitos do telefone ou null — dado legado/edição manual pode ter
+ *  caractere mas zero dígito ("-", "abc") e wa.me/ vazio abre a página de
+ *  erro do WhatsApp, então falha aqui em vez de lá. */
+function waDigitos(phone: string | null | undefined): string | null {
+  const digits = phone?.replace(/\D/g, "") ?? "";
+  return digits || null;
+}
+
 export function waLink(phone: string | null | undefined, mensagem: string): string | null {
-  if (!phone) return null;
-  const digits = phone.replace(/\D/g, "");
-  // dado legado/edição manual pode ter caractere mas zero dígito ("-", "abc")
-  // — wa.me/ vazio abre a página de erro do WhatsApp, então falha aqui
-  if (!digits.length) return null;
+  const digits = waDigitos(phone);
+  // mensagem vazia emitia `?text=` (rascunho em branco — pra "só abrir a
+  // conversa" existe o waChatLink, que não manda texto nenhum)
+  if (!digits || !mensagem.trim()) return null;
   return `https://wa.me/${digits}?text=${encodeURIComponent(mensagem)}`;
+}
+
+/** wa.me/<dígitos> puro — abre a conversa SEM texto pré-preenchido (o
+ *  "só chamar": ícone da grade, ficha da pessoa, filtro de quem tem
+ *  WhatsApp). Mensagem pronta é caso do waLink; mesma régua de dígitos. */
+export function waChatLink(phone: string | null | undefined): string | null {
+  const digits = waDigitos(phone);
+  return digits ? `https://wa.me/${digits}` : null;
 }
 
 /** WhatsApp cru (`5511987654003`) → exibição `(11) 98765-4003`. Só mascara
