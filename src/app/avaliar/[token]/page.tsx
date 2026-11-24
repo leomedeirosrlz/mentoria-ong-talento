@@ -10,7 +10,7 @@ import {
   avaliacaoPorToken,
   linkAvaliacaoMeta,
 } from "@/lib/queries-avaliacao";
-import { formatDateTime } from "@/lib/ciclo";
+import { formatDiaSemanaHora } from "@/lib/ciclo";
 import { sharedOg } from "@/lib/og";
 import { SiteFooter } from "@/components/site-footer";
 import { EstadoCard } from "@/components/estado-card";
@@ -67,7 +67,7 @@ export default async function AvaliarTokenPage({
   const meta =
     info && TOKEN_RE.test(token) ? await linkAvaliacaoMeta(token) : null;
 
-  // data do encontro pra contextualizar — "o encontro 4 de dd/mm"
+  // data+dia do encontro pra contextualizar — "terça-feira, 14/10 às 19:00"
   const quando =
     info?.encontro?.realizado_em ?? info?.encontro?.data_hora ?? null;
 
@@ -150,10 +150,10 @@ export default async function AvaliarTokenPage({
                 info.alvo?.jovem_nome?.trim().split(/\s+/)[0] ?? null
               }
               contexto={
-                info.encontro && quando
+                info.encontro
                   ? meta?.trilha === "especialista"
-                    ? `Sessão${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDateTime(quando)}`
-                    : `Encontro ${info.encontro.numero}${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDateTime(quando)}`
+                    ? `Sessão${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDiaSemanaHora(quando)}`
+                    : `Encontro ${info.encontro.numero}${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDiaSemanaHora(quando)}`
                   : null
               }
               demo={!!demo}
