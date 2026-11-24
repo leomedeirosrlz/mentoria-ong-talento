@@ -20,10 +20,13 @@ import {
 } from "@/lib/ciclo";
 import { limboFechado } from "@/lib/agenda-minha";
 import {
-  aceitesDoPlano,
-  resumoCombinado,
-} from "@/lib/plano-combinado";
-import { PlanoBanner } from "@/components/plano-em-dia-pecas";
+  combinadoDaDupla,
+  quemCombinou,
+  suaSemana,
+} from "@/lib/sua-semana";
+import { hrefMaterial, materiaisDoNumero } from "@/lib/materiais";
+import { PlanoContestarButton } from "@/components/plano-contestar";
+import { SuaSemanaPlano } from "@/components/sua-semana-plano";
 import {
   situacaoDaDupla,
   SITUACAO_DUPLA_LABEL,
@@ -35,6 +38,7 @@ import type {
   Dupla,
   Encontro,
   EspecialistaEvento,
+  Material,
   Profile,
 } from "@/lib/types";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -56,6 +60,7 @@ export function MentorHome({
   eventos,
   espEventos = [],
   cronogramas = [],
+  materiais = [],
   me,
   termo,
 }: {
@@ -67,6 +72,9 @@ export function MentorHome({
   /** Cronogramas ativos/encerrados — resolve o vigente quando o mentor ainda
    *  não tem dupla DPP (o banner da semana continua fazendo sentido pra ele). */
   cronogramas?: Cronograma[];
+  /** Catálogo do papel (RLS) — o disclosure do próximo passo lista roteiro
+   *  e materiais do encontro sem nova query por dupla. */
+  materiais?: Material[];
   me: Profile;
   /** Faixa de pendência (ex.: termo de adesão) em largura total — entra logo
    *  abaixo do cabeçalho, antes dos cards de dupla, nunca dentro da grade. */
@@ -223,27 +231,14 @@ export function MentorHome({
           );
         const hojeStr = toDateStr(hoje);
         const jovemNome = dupla.mentorado.nome_social ?? dupla.mentorado.nome;
-        // o combinado "ficar em dia" (513): proposta pendente de aceite ou
-        // plano em andamento — o banner resume o próximo passo sem repetir
-        // o card inteiro da ficha
+        // "Sua semana" (520): o plano vivo entra na seção da semana do
+        // card junto com o que fazer agora — mesma derivação do hero do
+        // jovem e da fila do staff (plano-combinado nunca mais é um
+        // banner separado)
         const planoVivo = !ehEsp
           ? ((dupla.planos ?? []).find((p) =>
               ["proposto", "aceito", "ativo"].includes(p.status)
             ) ?? null)
-          : null;
-        const resumoPlano = planoVivo
-          ? resumoCombinado(
-              {
-                ...planoVivo,
-                aceites: aceitesDoPlano(planoVivo),
-                // "você foi avisado em" do 518 ancora no carimbo que
-                // ativou — a coluna não existe na tabela
-                proposto_em: planoVivo.aprovado_em ?? planoVivo.created_at,
-              },
-              dupla.encontros
-                .filter((e) => e.status === "realizado")
-                .map((e) => e.numero)
-            )
           : null;
         // "Sessão 3 com Bia" / "5º encontro com Bia" — o rótulo canônico
         // (na trilha esp o nº é o passo do guia, nunca a tentativa da row)
@@ -318,6 +313,77 @@ export function MentorHome({
             ? ev.data
             : undefined;
         })();
+
+        // "Sua semana" (520): o combinado e a agenda na mesma seção — a
+        // derivação é a mesma do hero do jovem e da fila do staff
+        const realizadosNums = dupla.encontros
+          .filter((e) => e.status === "realizado")
+          .map((e) => e.numero);
+        const propostoEmPlano = planoVivo
+          ? (planoVivo.aprovado_em ?? planoVivo.created_at)
+          : null;
+        const semanaPlano = planoVivo
+          ? suaSemana({
+              plano: combinadoDaDupla(planoVivo),
+              meuLado: "mentor",
+              realizados: realizadosNums,
+              realizadosAposProposta: propostoEmPlano
+                ? dupla.encontros
+                    .filter(
+                      (e) =>
+                        e.status === "realizado" &&
+                        e.realizado_em != null &&
+                        e.realizado_em > propostoEmPlano
+                    )
+                    .map((e) => e.numero)
+                : realizadosNums,
+              proximoNumero: agendado?.numero ?? null,
+            })
+          : null;
+        // "que Fulano combinou": mentor é "você"; supervisor e o próprio
+        // jovem resolvem por id; o resto é "a equipe"
+        const quemPlano = planoVivo
+          ? quemCombinou({
+              propostoPor: planoVivo.proposto_por,
+              propostoVia: planoVivo.proposto_via,
+              euId: me.id,
+              nomesPorId: new Map(
+                dupla.supervisor
+                  ? [
+                      [
+                        dupla.supervisor.id,
+                        (dupla.supervisor.nome_social ??
+                          dupla.supervisor.nome).split(" ")[0],
+                      ],
+                    ]
+                  : []
+              ),
+              nomesPorOutroId: new Map([
+                [dupla.mentorado.id, jovemNome.split(" ")[0]],
+              ]),
+            })
+          : "a equipe";
+        // disclosure do próximo passo: roteiro do encontro + materiais do
+        // número — o roteiro oficial do corpus vem dos docs que o encontro
+        // herda; com guia de ajustes vigente a ficha já avisa
+        const numeroDisclosure =
+          semanaPlano?.vinculo ?? semanaPlano?.resumo.proximo?.numero ?? null;
+        const materiaisDoPasso =
+          numeroDisclosure != null
+            ? materiaisDoNumero({
+                materiais,
+                eventosDaDupla,
+                trilha: dupla.trilha,
+                numero: numeroDisclosure,
+              })
+                .map((m) => ({
+                  href: hrefMaterial(m, "/materiais/documento"),
+                  titulo: m.titulo,
+                }))
+                .filter(
+                  (m): m is { href: string; titulo: string } => m.href != null
+                )
+            : [];
 
         // --card-spacing=5 no sm+: padding uniforme p-4→sm:p-5 no card
         // inteiro via a var (header, content e gap vertical seguem juntos)
@@ -424,19 +490,12 @@ export function MentorHome({
               />
               <MarcoNotifier duplaId={dupla.id} feitos={jornada.feitos} total={jornada.total} />
 
-              {resumoPlano && (
-                <PlanoBanner
-                  resumo={resumoPlano}
-                  perspectiva="mentor"
-                  outro={jovemNome.split(" ")[0] ?? "seu jovem"}
-                  href={`/duplas/${dupla.id}#plano-em-dia`}
-                />
-              )}
-
-              {/* o que fazer agora: o próximo passo é o destaque da marca
-                  (amarelo), não alerta. Mesmo cartão, separado por divisória */}
+              {/* "Sua semana" (520): próximo encontro, combinado e o que
+                  fazer agora na MESMA seção — o PlanoBanner separado virou
+                  o bloco do plano aqui dentro. O destaque da marca
+                  (amarelo) segue sendo o próximo passo, não alerta */}
               <section
-                aria-labelledby={`fazer-${dupla.id}`}
+                aria-labelledby={`semana-${dupla.id}`}
                 className={cn(
                   "rounded-lg p-4",
                   ativa
@@ -444,8 +503,8 @@ export function MentorHome({
                     : "bg-muted/50"
                 )}
               >
-                <h3 id={`fazer-${dupla.id}`} className="text-sm font-semibold">
-                  O que fazer agora
+                <h3 id={`semana-${dupla.id}`} className="text-sm font-semibold">
+                  Sua semana
                 </h3>
                 <div className="mt-2">
                   {!ativa ? (
@@ -639,6 +698,29 @@ export function MentorHome({
                     </p>
                   )}
                 </div>
+                {semanaPlano && planoVivo && (
+                  <SuaSemanaPlano
+                    semana={semanaPlano}
+                    perspectiva="mentor"
+                    outro={jovemNome.split(" ")[0] ?? "seu jovem"}
+                    quem={quemPlano}
+                    combinadoHref={`/duplas/${dupla.id}#plano-em-dia`}
+                    confirmarHref={
+                      semanaPlano.resumo.proximo
+                        ? `/duplas/${dupla.id}#acordos`
+                        : null
+                    }
+                    contestar={
+                      semanaPlano.contestavel ? (
+                        <PlanoContestarButton
+                          planoId={planoVivo.id}
+                          duplaId={dupla.id}
+                        />
+                      ) : null
+                    }
+                    materiais={materiaisDoPasso}
+                  />
+                )}
               </section>
 
               {/* combinados: mesma superfície, separados por divisória —

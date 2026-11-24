@@ -1151,6 +1151,8 @@ export function demoJovemPlano(role: AppRole): JovemPlano | null {
     aceito_mentorado:
       p.aceito_mentorado_em != null || p.aprovado_lado === "mentorado",
     proposto_em: p.created_at,
+    proposto_por: p.proposto_por,
+    proposto_via: p.proposto_via,
     expira_em: p.expira_em,
     passos_aplicados: (p.passos ?? []).map((s) => ({
       numero: s.numero,

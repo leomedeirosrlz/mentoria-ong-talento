@@ -76,11 +76,11 @@ import {
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import { getChamados } from "@/lib/queries-chamados";
 import { chamadoPendencia, derivarPendencias } from "@/lib/pendencias-jovem";
-import {
-  combinadoDoJovem,
-  resumoCombinado,
-} from "@/lib/plano-combinado";
-import { PlanoBanner } from "@/components/plano-em-dia-pecas";
+import { combinadoDoJovem } from "@/lib/plano-combinado";
+import { quemCombinou, suaSemana } from "@/lib/sua-semana";
+import { materiaisDoNumero } from "@/lib/materiais";
+import { PlanoContestarButton } from "@/components/plano-contestar";
+import { SuaSemanaPlano } from "@/components/sua-semana-plano";
 import { getComunicados, getMateriais, getMe } from "@/lib/queries";
 import type { Disponibilidade, JovemContato } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -159,19 +159,6 @@ export default async function JovemHome() {
     null;
   const duplaEmCurso = duplaAtual?.status === "ativa" || duplaAtual?.status === "pausada";
 
-  // o combinado "ficar em dia" (513): a jovem_plano é da mesma dupla DPP
-  // viva que ancora a home — o resumo alimenta o banner abaixo do "pra fazer"
-  const resumoPlanoJovem = planoJovem
-    ? resumoCombinado(
-        combinadoDoJovem(planoJovem),
-        encontros
-          .filter(
-            (e) => e.dupla_id === duplaAtual?.id && e.status === "realizado"
-          )
-          .map((e) => e.numero)
-      )
-    : null;
-
   // régua do acervo progressivo (REALIZA-160): a vitrine da home só mostra
   // o que já liberou — material marcado pra encontro futuro não vaza na
   // prévia. Só a dupla DPP ancora (trilha esp tem outra escala, 5 sessões);
@@ -239,6 +226,77 @@ export default async function JovemHome() {
   // legível pro papel mentorado e o join acontece com o que ele já pode ver)
   const trilhaPorDupla = new Map(duplas.map((d) => [d.id, d.trilha ?? "dpp"]));
   const encPorId = new Map(encontros.map((e) => [e.id, e]));
+
+  // "Sua semana" (520): o combinado "ficar em dia" entra como extensão
+  // do hero — a jovem_plano é da mesma dupla DPP viva que ancora a home
+  // e a derivação é a MESMA do card do mentor e da fila do staff.
+  const realizadosDpp = encontros
+    .filter((e) => e.dupla_id === duplaAtual?.id && e.status === "realizado")
+    .map((e) => e.numero);
+  const combinadoJovem = planoJovem ? combinadoDoJovem(planoJovem) : null;
+  // a janela de contestação é a guarda da RPC: um passo do plano feito
+  // depois da proposta fecha a contestação. Sem carimbo de proposta não
+  // dá pra medir — nesse caso o botão não aparece (não prometer gesto)
+  const propostoEm = planoJovem?.proposto_em ?? null;
+  const realizadosAposProposta = propostoEm
+    ? encontros
+        .filter(
+          (e) =>
+            e.dupla_id === duplaAtual?.id &&
+            e.status === "realizado" &&
+            e.realizado_em != null &&
+            e.realizado_em > propostoEm
+        )
+        .map((e) => e.numero)
+    : realizadosDpp;
+  const proximoNumeroDpp =
+    proximo != null &&
+    proximo.dupla_id === duplaAtual?.id &&
+    trilhaPorDupla.get(proximo.dupla_id) !== "especialista"
+      ? proximo.numero
+      : null;
+  const semanaJovem = combinadoJovem
+    ? suaSemana({
+        plano: combinadoJovem,
+        meuLado: "mentorado",
+        realizados: realizadosDpp,
+        realizadosAposProposta,
+        proximoNumero: proximoNumeroDpp,
+      })
+    : null;
+  // "que Fulano combinou": proposto_por é uuid de profiles — resolve
+  // pelos contatos que o jovem já enxerga; não achou = "a equipe"
+  const nomesContato = new Map(
+    contatosAtuais
+      .filter((c): c is JovemContato & { id: string } => c.id != null)
+      .map((c) => [
+        c.id,
+        (c.nome_social || c.nome || "").split(" ")[0],
+      ])
+  );
+  const quemPlano = quemCombinou({
+    propostoPor: planoJovem?.proposto_por,
+    propostoVia: planoJovem?.proposto_via,
+    euId: me.id,
+    nomesPorId: nomesContato,
+  });
+  // disclosure do próximo passo: os materiais do número que vem agora,
+  // na mesma régua do acervo da home (o que não liberou não aparece)
+  const numeroDisclosureJovem =
+    semanaJovem?.vinculo ?? semanaJovem?.resumo.proximo?.numero ?? null;
+  const materiaisDoPasso =
+    numeroDisclosureJovem != null
+      ? materiaisDoNumero({
+          materiais: materiaisVisiveis,
+          trilha: "dpp",
+          numero: numeroDisclosureJovem,
+        })
+          .map((m) => ({
+            href: hrefMaterial(m, "/jovem/materiais/documento"),
+            titulo: m.titulo,
+          }))
+          .filter((m): m is { href: string; titulo: string } => m.href != null)
+      : [];
 
   // quem aparece no rótulo do encontro: o mentor DPP ou o especialista da
   // trilha (contato com papel 'especialista'; 'mentor' é o legado da DPP)
@@ -612,6 +670,31 @@ export default async function JovemHome() {
         emCurso={duplaEmCurso}
         concluida={concluida}
         primeiroNome={primeiroNome}
+        plano={
+          // "Sua semana" (520): o combinado no MESMO cartão do próximo
+          // encontro — nunca um segundo hero
+          semanaJovem && duplaAtual ? (
+            <SuaSemanaPlano
+              semana={semanaJovem}
+              perspectiva="jovem"
+              outro={
+                (duplaAtual.mentor_nome_social ?? duplaAtual.mentor_nome ?? "")
+                  .split(" ")[0] || "seu mentor"
+              }
+              quem={quemPlano}
+              combinadoHref="/jovem/agenda#plano"
+              contestar={
+                semanaJovem.contestavel && planoJovem ? (
+                  <PlanoContestarButton
+                    planoId={planoJovem.id}
+                    duplaId={duplaAtual.id}
+                  />
+                ) : null
+              }
+              materiais={materiaisDoPasso}
+            />
+          ) : undefined
+        }
       />
 
       {/* pendência da grade — some quando a pessoa preenche (sem ficha não
@@ -625,19 +708,6 @@ export default async function JovemHome() {
         retro={{ duplaId: duplaDppId, numeros: numerosRetro }}
         primeiroNome={primeiroNome}
       />
-
-      {/* o combinado "ficar em dia" (513): plano proposto esperando o
-          aceite dele ou em andamento — o banner vai direto ao que falta
-          sem repetir o card da agenda */}
-      {resumoPlanoJovem?.aberto && (
-        <PlanoBanner
-          resumo={resumoPlanoJovem}
-          perspectiva="jovem"
-          outro={mentores[0]?.nome?.split(" ")[0] ?? "seu mentor"}
-          href="/jovem/agenda#plano"
-          titulo="O combinado pra ficar em dia"
-        />
-      )}
 
       {/* canal de segurança sempre à mão, sem competir com o encontro: uma
           linha discreta logo abaixo do que fazer agora */}

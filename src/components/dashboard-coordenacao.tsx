@@ -13,11 +13,14 @@ import {
   saudadeDaDupla,
   semanaBounds,
   textoResumoSemana,
+  toDateStr,
   totalDaTrilha,
   TRILHA_LABEL,
   type DuplaSaude,
 } from "@/lib/ciclo";
 import { paraAcompanhar, saudeDoRecorte } from "@/lib/agenda-coordenacao";
+import { precisaDeVoce } from "@/lib/sua-semana";
+import { PrecisaDeVoce } from "@/components/precisa-de-voce";
 import { situacaoDaDupla, SITUACAO_DUPLA_LABEL } from "@/lib/dupla-desfecho";
 import { painelTrilhasCoord, type AlertaPedido } from "@/lib/trilhas-coord";
 import { pedidosAcionaveis } from "@/lib/solicitacoes-coord";
@@ -167,6 +170,15 @@ export function DashboardCoordenacao({
           limiteDiasAlerta: LIMITE_PEDIDO_DIAS,
         })
       : null;
+
+  // "O que precisa de você" (520): a fila plano+recesso — uma linha por
+  // dupla com o motivo na frente; o recorte já é o que a query entregou
+  // (coordenação tudo, auxiliar o escopo dele)
+  const precisaVoce = precisaDeVoce({
+    duplas,
+    eventos,
+    hoje: toDateStr(hoje),
+  });
 
   const precisa = montarPrecisa({
     duplas,
@@ -329,6 +341,11 @@ export function DashboardCoordenacao({
               )}
             </section>
           )}
+
+          {/* "O que precisa de você" (520): plano e recesso pedindo
+              atenção — motivo antes do rótulo, saída na ficha. Logo
+              depois da fila de situação, antes do termo */}
+          <PrecisaDeVoce itens={precisaVoce.itens} total={precisaVoce.total} />
 
           {termo}
 

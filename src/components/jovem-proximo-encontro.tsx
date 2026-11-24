@@ -31,6 +31,7 @@ export function ProximoEncontro({
   emCurso,
   concluida,
   primeiroNome,
+  plano,
 }: {
   /** Próximo encontro agendado/remarcado com data futura; null = nenhum. */
   proximo: JovemEncontro | null;
@@ -57,6 +58,10 @@ export function ProximoEncontro({
   /** Jornada DPP concluída. */
   concluida: boolean;
   primeiroNome: string;
+  /** "Sua semana" (520): o combinado como extensão do hero — a página
+   *  monta o SuaSemanaPlano e ele entra no mesmo cartão, depois das
+   *  ações. Nunca um segundo hero. */
+  plano?: React.ReactNode;
 }) {
   const link = proximo ? linkSeguro(proximo.link) : null;
   const eHoje =
@@ -72,6 +77,7 @@ export function ProximoEncontro({
       <Casca
         {...cabecalho}
         titulo={sessao ? "Sua próxima sessão" : "Seu próximo encontro"}
+        plano={plano}
       >
         <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
           {rotulo ?? (sessao ? `Sessão ${proximo.numero}` : `${proximo.numero}º encontro`)}
@@ -167,7 +173,7 @@ export function ProximoEncontro({
       );
     }
     return (
-      <Casca {...cabecalho} titulo="Seu próximo encontro">
+      <Casca {...cabecalho} titulo="Seu próximo encontro" plano={plano}>
         <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
           O {agendar.numero}º encontro ainda não tem data
         </p>
@@ -193,6 +199,7 @@ export function ProximoEncontro({
       <Casca
         {...cabecalho}
         titulo={sessao ? "Sua próxima sessão" : "Seu próximo encontro"}
+        plano={plano}
       >
         <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
           {sessao ? "Nenhuma sessão marcada" : "Nenhum encontro marcado"}
@@ -230,10 +237,13 @@ export function ProximoEncontro({
 function Casca({
   titulo,
   style,
+  plano,
   children,
 }: {
   titulo: string;
   style: CSSProperties;
+  /** o combinado como extensão do hero (520) — mesmo cartão */
+  plano?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
@@ -249,6 +259,7 @@ function Casca({
         {titulo}
       </h2>
       {children}
+      {plano}
     </section>
   );
 }
