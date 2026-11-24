@@ -44,6 +44,7 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 | 019 | `sua-semana` | feature | Clarified | REALIZA-520 (23/nov/2026) — card "Sua semana" nas homes |
 | 020 | `docs-do-plano` | feature | Clarified | REALIZA-521 (23/nov/2026) — doc do combinado + roteiros lazy |
 | 021 | `materiais-liza` | feature | Clarified | REALIZA-522 (23/nov/2026) — materiais estruturados via Liza (backlog) |
+| 026 | `liza-genui-pills` | mudança | Clarified | relato Thiago + recon `liza-2026-11-24` (24/nov/2026) — GenUI com estado, card colapsável, anti-id, rotação de pills, fix do falso "nem 1 por dia" |
 
 ## Fronteiras já mapeadas, ainda sem spec
 
