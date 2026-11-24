@@ -30,6 +30,7 @@ import {
 import { disponibilidadesDaDupla } from "@/lib/actions";
 import {
   escopoDaProposta,
+  estadoArestaFusao,
   fusaoDeArestas,
   fusaoPedeAvisoPratica,
   rotuloRitmo,
@@ -44,6 +45,7 @@ import type { Disponibilidade, DuplaPlanoEscopo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { CampoDisponibilidade } from "@/components/campos-pessoais";
 import { Button } from "@/components/ui/button";
+import { CheckboxLinha } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import {
   Dialog,
@@ -60,7 +62,7 @@ import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 // projeção reage a cada resposta (simularPlano, sem gravar). Nada é
 // commit antes do "Combinar" final: as respostas viajam juntas pra
 // combinarPlano, que declara os recessos e propõe na mesma chamada.
-// Proposta de lado da dupla nasce em vigor; a da equipe espera um
+// Proposta de lado da dupla já nasce valendo; a da equipe espera um
 // aceite. A decisão de recesso é só da dupla — staff vê o estado e o
 // "Combinar" espera a resposta deles (a RPC recusa com o motivo honesto).
 
@@ -410,7 +412,7 @@ export function CombinarPlano({
           ? "Modo demo: nada é gravado de verdade."
           : r.status === "proposto"
             ? "Proposto. Falta um aceite da dupla."
-            : "Combinado em vigor. O outro lado foi avisado."
+            : "Combinado valendo. O outro lado foi avisado."
       );
       setOpen(false);
       onDone?.();
@@ -534,7 +536,7 @@ export function CombinarPlano({
                 {recessoUsa(r) == null
                   ? "a dupla ainda não decidiu"
                   : recessoUsa(r)
-                    ? "vão usar o recesso"
+                    ? "vão pausar os encontros"
                     : "seguem se encontrando"}
               </p>
             </li>
@@ -553,8 +555,9 @@ export function CombinarPlano({
             : "O recesso no caminho"}
         </h3>
         <p className="mt-1 text-sm text-muted-foreground">
-          Vocês decidem se param ou seguem se encontrando em cada período.
-          Qualquer um dos dois pode responder pela dupla.
+          Vocês decidem se pausam os encontros ou seguem se encontrando
+          em cada período. Qualquer um dos dois pode responder pela
+          dupla.
         </p>
         <div className="mt-3 space-y-3">
           {sim.recessos.map((r) => (
@@ -576,7 +579,12 @@ export function CombinarPlano({
                     simular({ decisoes: d });
                   }}
                 >
-                  Vamos usar o recesso
+                  <span className="flex flex-col items-center gap-0.5">
+                    Vamos pausar os encontros
+                    <span className="text-xs font-normal opacity-75">
+                      nenhuma data cai no período
+                    </span>
+                  </span>
                 </OpcaoPilula>
                 <OpcaoPilula
                   nome={`recesso-${r.cicloEventoId}`}
@@ -588,7 +596,12 @@ export function CombinarPlano({
                     simular({ decisoes: d });
                   }}
                 >
-                  Vamos seguir nos encontrando
+                  <span className="flex flex-col items-center gap-0.5">
+                    Vamos seguir nos encontrando
+                    <span className="text-xs font-normal opacity-75">
+                      as datas podem cair no período
+                    </span>
+                  </span>
                 </OpcaoPilula>
               </div>
             </fieldset>
@@ -774,33 +787,51 @@ export function CombinarPlano({
         Querem juntar encontros numa sessão só?
       </h3>
       <p className="mt-1 text-sm text-muted-foreground">
-        Encontros vizinhos podem sair juntos numa sessão de 2h — um dia
-        a menos no calendário. É escolha de vocês: sem juntar, cada
-        encontro segue no seu dia.
+        Encontros vizinhos podem sair juntos numa sessão de 2h, um dia
+        a menos no calendário. Sem juntar, cada encontro segue no seu
+        dia.
       </p>
       <fieldset className="mt-3">
         <legend className="sr-only">
           Encontros pra juntar na mesma sessão
         </legend>
         <div className="space-y-2">
-          {arestasFusao.map((n) => (
-            <label
-              key={n}
-              className={cn(
-                "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-card px-3.5 py-2.5 text-sm font-medium transition-colors hover:bg-muted",
-                "has-checked:border-foreground has-checked:bg-muted",
-                "has-focus-visible:border-ring has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
-              )}
-            >
-              <input
-                type="checkbox"
+          {arestasFusao.map((n) => {
+            // 025: a aresta diz o que juntar custa — ótima vira verde
+            // com chip; neutra fica neutra com o motivo em texto. Nada
+            // nasce marcado e o estado nunca depende só de cor
+            const estado = estadoArestaFusao(
+              n,
+              passosComData,
+              arestasFusao.filter((a) => fusaoSel[a] === true)
+            );
+            return (
+              <CheckboxLinha
+                key={n}
                 checked={fusaoSel[n] === true}
-                onChange={() => alternarAresta(n)}
-                className="size-4 shrink-0 accent-foreground"
-              />
-              Juntar o {n}º e o {n + 1}º na mesma sessão
-            </label>
-          ))}
+                onCheckedChange={() => alternarAresta(n)}
+                className={cn(
+                  "items-center gap-2.5 rounded-lg border px-3.5 py-2.5 text-sm font-medium transition-colors hover:bg-muted",
+                  estado.tom === "otima"
+                    ? "border-[var(--ok)] bg-[var(--ok-bg)]"
+                    : "border-border bg-card has-data-checked:bg-muted"
+                )}
+              >
+                <span className="flex min-w-0 flex-1 flex-wrap items-baseline gap-x-2 gap-y-0.5">
+                  Juntar o {n}º e o {n + 1}º na mesma sessão
+                  {estado.tom === "otima" ? (
+                    <span className="ml-auto rounded-full border border-[var(--ok-border)] bg-[var(--ok-bg)] px-1.5 py-0.5 text-[10px] font-semibold leading-none text-[var(--ok-text)]">
+                      boa pra juntar
+                    </span>
+                  ) : (
+                    <span className="ml-auto text-xs font-normal text-muted-foreground">
+                      {estado.motivo}
+                    </span>
+                  )}
+                </span>
+              </CheckboxLinha>
+            );
+          })}
         </div>
       </fieldset>
       {gruposFusao.length > 0 && (
@@ -871,7 +902,7 @@ export function CombinarPlano({
             {recessoUsa(r) == null
               ? "a dupla ainda não decidiu"
               : recessoUsa(r)
-                ? "vão usar o recesso"
+                ? "vão pausar os encontros"
                 : "seguem se encontrando"}
           </li>
         ))}
@@ -1049,7 +1080,7 @@ export function CombinarPlano({
         </span>
         <div>
           <p className="text-sm font-semibold">
-            Já existe um combinado em vigor pra essa dupla.
+            Já existe um combinado valendo pra essa dupla.
           </p>
           <p className="mt-0.5 text-sm text-muted-foreground">
             O plano novo entra como versão só quando o atual for

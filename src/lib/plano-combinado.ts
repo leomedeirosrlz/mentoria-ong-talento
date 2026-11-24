@@ -322,7 +322,7 @@ export type EstadoLeituraPlano =
   /** proposta esperando a dupla, do lado de quem não responde (staff ou
    *  o lado que já carimbou num legado bilateral) */
   | "proposto_staff_falta_outro"
-  /** combinado em vigor sem o seu carimbo — você foi avisado */
+  /** combinado valendo sem o seu carimbo — você foi avisado */
   | "ativo_sem_minha_ciencia"
   | "ativo"
   | "contestado";

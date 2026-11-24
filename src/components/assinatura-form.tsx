@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
 import { CircleNotch, Signature } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { maskCpf } from "@/lib/utils";
@@ -466,12 +467,7 @@ export function AssinaturaForm({
       )}
 
       <label className="flex items-start gap-3 rounded-xl border border-input bg-muted/40 p-4 text-sm leading-relaxed">
-        <input
-          type="checkbox"
-          name="aceite"
-          required
-          className="mt-0.5 size-4 shrink-0 accent-primary"
-        />
+        <Checkbox name="aceite" required className="mt-0.5" />
         <span>
           Li o documento acima e declaro que as informações são verdadeiras.
           Entendo que esta assinatura eletrônica tem a mesma validade de uma

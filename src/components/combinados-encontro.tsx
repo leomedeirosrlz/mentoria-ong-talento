@@ -20,6 +20,7 @@ import {
   ExcluirCombinadoConfirm,
 } from "@/components/combinado-acoes";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { novoUuid } from "@/lib/uuid";
@@ -328,8 +329,8 @@ export function CombinadosEncontro({
     </span>
   );
 
-  // checkbox nativo + label — teclado e clique no texto de graça; o quadrado
-  // estilizado é só a representação (mesmo padrão da aba Combinados)
+  // checkbox do kit dentro da label — clique no texto e teclado de graça
+  // (mesmo padrão da aba Combinados)
   const itemMarcavel = (c: Encaminhamento, carryOver: boolean) => (
     <li key={c.id} className="flex items-start gap-1">
       <label
@@ -338,31 +339,12 @@ export function CombinadosEncontro({
           pending && pendingId === c.id && "opacity-60"
         )}
       >
-        <input
-          type="checkbox"
-          className="peer sr-only"
+        <Checkbox
           checked={feito(c)}
           disabled={pending && pendingId === c.id}
-          onChange={() => toggle(c, carryOver)}
+          onCheckedChange={() => toggle(c, carryOver)}
+          className="mt-0.5 group-hover:border-foreground"
         />
-        <span
-          aria-hidden="true"
-          className={cn(
-            "mt-0.5 grid size-4.5 shrink-0 place-items-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card",
-            feito(c)
-              ? "border-[var(--ok)] bg-[var(--ok)] text-[var(--status-foreground)]"
-              : "border-muted-foreground/40 group-hover:border-foreground"
-          )}
-        >
-          {feito(c) && (
-            <svg
-              viewBox="0 0 10 8"
-              className="size-2.5 fill-none stroke-current stroke-2"
-            >
-              <path d="M1 4l2.5 2.5L9 1" />
-            </svg>
-          )}
-        </span>
         {texto(c, carryOver)}
       </label>
       {podeEditar && (

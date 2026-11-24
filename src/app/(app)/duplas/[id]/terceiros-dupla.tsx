@@ -42,6 +42,7 @@ import { useOrigem } from "@/components/forms/use-origem";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -698,11 +699,10 @@ function RegistrarRespostaDialog({
           </Select>
         </div>
         <label className="flex cursor-pointer items-start gap-2.5 rounded-lg bg-muted/40 px-3 py-2.5 text-sm transition-colors hover:bg-muted/70">
-          <input
-            type="checkbox"
+          <Checkbox
             checked={consentimento}
-            onChange={(e) => setConsentimento(e.target.checked)}
-            className="mt-0.5 accent-primary"
+            onCheckedChange={(v) => setConsentimento(v)}
+            className="mt-0.5"
           />
           <span>
             A pessoa autorizou o registro desta resposta na plataforma.

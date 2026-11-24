@@ -4,7 +4,6 @@ import { useState, useTransition } from "react";
 import {
   Binoculars,
   BookOpen,
-  Check,
   CircleNotch,
   EnvelopeSimple,
   FileText,
@@ -20,6 +19,7 @@ import {
   reenviarComunicadoEmail,
 } from "@/lib/actions-email";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -28,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils";
 
 // mesmas audiências dos materiais — cada uma vira um grupo de papéis lá no
 // action (ROLES_POR_AUDIENCIA, @/lib/email). Ícones = os das personas da
@@ -175,19 +176,16 @@ export function EnviarEmailDialog({
                 return (
                   <label
                     key={g.valor}
-                    className="flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors hover:bg-muted has-checked:border-[var(--brand-lime)]/70 has-checked:bg-[var(--brand-lime)]/10 has-focus-visible:ring-2 has-focus-visible:ring-ring has-focus-visible:ring-offset-2 has-focus-visible:ring-offset-background"
+                    className="flex cursor-pointer items-center gap-3 rounded-xl border px-3 py-2.5 transition-colors hover:bg-muted has-checked:border-[var(--brand-lime)]/70 has-checked:bg-[var(--brand-lime)]/10"
                   >
-                    <input
-                      type="checkbox"
-                      name="audiencia"
-                      value={g.valor}
-                      checked={marcado}
-                      onChange={(e) => onToggle(g.valor, e.target.checked)}
-                      className="peer sr-only"
-                    />
                     <span
                       aria-hidden
-                      className="grid size-9 shrink-0 place-items-center rounded-lg bg-muted text-muted-foreground transition-colors peer-checked:bg-[var(--brand-lime)]/25 peer-checked:text-foreground"
+                      className={cn(
+                        "grid size-9 shrink-0 place-items-center rounded-lg transition-colors",
+                        marcado
+                          ? "bg-[var(--brand-lime)]/25 text-foreground"
+                          : "bg-muted text-muted-foreground"
+                      )}
                     >
                       <g.Icone size={17} />
                     </span>
@@ -197,12 +195,13 @@ export function EnviarEmailDialog({
                         {g.detalhe}
                       </span>
                     </span>
-                    <span
-                      aria-hidden
-                      className="grid size-5 shrink-0 place-items-center rounded-full border border-border text-transparent transition-colors peer-checked:border-[var(--brand-lime)] peer-checked:bg-[var(--brand-lime)] peer-checked:text-foreground"
-                    >
-                      <Check size={12} weight="bold" />
-                    </span>
+                    <Checkbox
+                      name="audiencia"
+                      value={g.valor}
+                      checked={marcado}
+                      onCheckedChange={(v) => onToggle(g.valor, v)}
+                      className="data-checked:border-[var(--brand-lime)] data-checked:bg-[var(--brand-lime)]"
+                    />
                   </label>
                 );
               })}

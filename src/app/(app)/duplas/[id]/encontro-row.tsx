@@ -40,7 +40,10 @@ import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { NaoAconteceuButton, DesfazerNaoAconteceuButton } from "@/components/nao-aconteceu-button";
 import { RegistroFormLazy } from "@/components/registro-form-lazy";
-import { EncontroDisclosure } from "@/components/encontro-disclosure";
+import {
+  EncontroDisclosure,
+  EncontroDisclosurePar,
+} from "@/components/encontro-disclosure";
 import {
   RegistroInline,
   RegistroInlinePanel,
@@ -560,9 +563,16 @@ export function EncontroRow({
 
       {/* registro salvo = histórico: linha-resumo (apoio, avaliação, tema) +
           disclosure pro corpo completo. Os dois blocos nascem FECHADOS: a
-          ficha é índice, o caminho de escrita é a rota dedicada, e o deep
-          link #registrar-{id} continua abrindo os dois */}
-      {(reg && encontro) || (feito && (avaliacaoJovem || (!souMentor && estrelaJovem == null))) ? (
+          ficha é índice, o caminho de escrita é a rota dedicada. O par
+          segura UM estado pros dois lados — um clique abre registro e
+          avaliação juntos (FR-007), e o deep link #registrar-{id} segue
+          abrindo os dois */}
+      {encontro &&
+      (reg != null ||
+        (feito &&
+          (avaliacaoJovem != null ||
+            (!souMentor && estrelaJovem == null)))) ? (
+        <EncontroDisclosurePar encontroId={encontro.id}>
         <div className="grid gap-3 lg:grid-cols-2">
           {reg && encontro && (
             <div className="space-y-2">
@@ -689,6 +699,7 @@ export function EncontroRow({
             </div>
           )}
         </div>
+        </EncontroDisclosurePar>
       ) : null}
       {/* combinados logo abaixo do registro (0157): uma lista só, a do
           registro e a do preparo, marcável aqui mesmo — quem acabou de ler

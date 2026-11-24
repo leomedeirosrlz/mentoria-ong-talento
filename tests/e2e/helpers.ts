@@ -332,6 +332,57 @@ export async function convergirDuplaAtiva(duplaId: string): Promise<void> {
   ]);
 }
 
+/** A ficha só mostra o card próprio do recesso (RecessoDuplaCard, onde os
+ *  botões da decisão moram) quando o plano "ficar em dia" NÃO está na
+ *  tela (518) — e ele aparece pra qualquer dupla devendo 2+ passos
+ *  agendáveis. Os fixtures de dívida cobrem quase toda a suíte; o spec
+ *  que precisa do card standalone chama isto: cada passo oficial já
+ *  vencido ganha um encontro realizado + registro, o planner lê zero
+ *  devidos e a ficha cai no caminho "em dia". Dinâmico de propósito — a
+ *  cobertura segue as datas oficiais, então o drift do calendário fixo
+ *  não quebra o piso de novo. `exceto` segura os nºs que o spec cria
+ *  por conta (dívida de propósito, sessão a cobrir) — eles ficam sem
+ *  row pra entrarem no plano/cobertura do teste. */
+export async function convergirDuplaEmDia(
+  duplaId: string,
+  criadoPor: string,
+  opts?: { exceto?: number[] }
+): Promise<void> {
+  await limparEncontrosDaDupla(duplaId);
+  const [dupla] = await buscarViaServiceRole<{ cronograma_id: string }[]>(
+    "duplas",
+    `select=cronograma_id&id=eq.${duplaId}&limit=1`
+  );
+  const hoje = new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/Sao_Paulo",
+  });
+  const passos = await buscarViaServiceRole<
+    { numero: number; data: string }[]
+  >(
+    "ciclo_eventos",
+    `select=numero,data&cronograma_id=eq.${dupla.cronograma_id}&tipo=eq.encontro&data=lte.${hoje}&numero=not.is.null&order=numero`
+  );
+  const exceto = new Set(opts?.exceto ?? []);
+  for (const p of passos) {
+    if (exceto.has(p.numero)) continue;
+    const quando = `${p.data}T19:00:00-03:00`;
+    const enc = await inserirViaServiceRole("encontros", {
+      dupla_id: duplaId,
+      numero: p.numero,
+      data_hora: quando,
+      realizado_em: quando,
+      status: "realizado",
+      created_by: criadoPor,
+    });
+    // realizado sem registro cai como pendência e segue fora do "em dia"
+    await inserirViaServiceRole("registros", {
+      encontro_id: enc.id,
+      avaliacao: "boa",
+      tema: "E2E: cobertura do passo",
+    });
+  }
+}
+
 /** DELETE de duplas com TODOS os filhos NO ACTION, não só encontros —
  *  solicitações (thread de propostas + aresta duplas.solicitacao_id),
  *  formulario_links (0099), encerramentos (0037/0102), os

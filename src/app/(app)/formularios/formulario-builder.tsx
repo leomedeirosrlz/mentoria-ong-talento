@@ -61,6 +61,7 @@ import {
 import { FormularioPublico } from "@/app/f/[token]/formulario-publico";
 import { fade, T } from "@/components/motion";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -1281,11 +1282,7 @@ function MockTipo({ tipo }: { tipo: FormularioCampoTipo }) {
       )}
       {tipo === "checkbox" && (
         <span className="flex items-center gap-2.5 text-sm text-muted-foreground">
-          <input
-            type="checkbox"
-            disabled
-            className="size-4 shrink-0 accent-primary"
-          />
+          <Checkbox disabled />
           A pessoa marca a caixa pra confirmar
         </span>
       )}

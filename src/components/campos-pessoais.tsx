@@ -21,6 +21,7 @@ import {
 import type { DiaSemana, Disponibilidade, Periodo } from "@/lib/types";
 import { TagInput } from "@/components/tag-input";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -486,11 +487,10 @@ export function CampoConsentimento({
   }
   return (
     <label className="flex items-start gap-2 text-sm cursor-pointer">
-      <input
-        type="checkbox"
+      <Checkbox
         name="consent_lgpd"
         defaultChecked={defaultChecked}
-        className="mt-0.5 accent-primary"
+        className="mt-0.5"
       />
       <span>
         A pessoa consentiu com o uso dos dados do cadastro no programa (LGPD):

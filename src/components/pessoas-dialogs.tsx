@@ -43,6 +43,7 @@ import {
 import type { Disponibilidade } from "@/lib/types";
 import { maskWhatsApp } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
@@ -325,12 +326,7 @@ export function NovaPessoaDialog() {
           <label className="flex items-center gap-2 text-sm cursor-pointer">
             {/* voluntário é o caso comum (mentores/equipe) — não-voluntário
                 é a exceção que a coord desmarca; desmarcado pula o termo */}
-            <input
-              type="checkbox"
-              name="voluntario"
-              defaultChecked
-              className="accent-primary"
-            />
+            <Checkbox name="voluntario" defaultChecked />
             Sou voluntário(a)
           </label>
           <CampoConsentimento />

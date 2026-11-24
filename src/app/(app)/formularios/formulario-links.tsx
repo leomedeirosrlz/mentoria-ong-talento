@@ -56,6 +56,7 @@ import { demoAtivoClient } from "@/lib/demo/shared";
 import { ExitItem, ExitList, fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -641,15 +642,10 @@ export function FormularioLinks({
                         <fieldset key={g.key}>
                           <legend className="sr-only">{g.titulo}</legend>
                           <label className="flex min-h-9 cursor-pointer flex-wrap items-center gap-x-3 rounded-lg px-2 transition-colors hover:bg-muted">
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={todos}
-                              ref={(el) => {
-                                if (el) el.indeterminate = alguns;
-                              }}
-                              onChange={() => toggleGrupo(g.itens, !todos)}
-                              aria-label={`Selecionar todos: ${g.titulo}`}
-                              className="size-4 shrink-0 accent-primary"
+                              indeterminate={alguns}
+                              onCheckedChange={() => toggleGrupo(g.itens, !todos)}
                             />
                             <span className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
                               {g.titulo}

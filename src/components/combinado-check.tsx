@@ -7,12 +7,13 @@ import { ArrowSquareOut } from "@phosphor-icons/react";
 import { toast } from "@/lib/toast";
 
 import { toggleEncaminhamento } from "@/lib/actions";
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
 /** Item "combinado aberto" da home do mentor: marca feito na hora (o mesmo
  *  toggleEncaminhamento da ficha) e ainda oferece o link direto pro item —
  *  o checkbox cobre o gesto comum, a ficha cobre o contexto. Gramática do
- *  EncaminhamentosList: checkbox nativo dentro do label. */
+ *  EncaminhamentosList: checkbox do kit dentro do label. */
 export function CombinadoCheck({
   id,
   duplaId,
@@ -39,13 +40,10 @@ export function CombinadoCheck({
           pending && "opacity-60"
         )}
       >
-        <input
-          type="checkbox"
-          className="peer sr-only"
+        <Checkbox
           checked={feito}
           disabled={pending}
-          aria-label={`marcar combinado como feito: ${descricao}`}
-          onChange={() => {
+          onCheckedChange={() => {
             if (feito) return; // já fechado — o refresh remove da lista
             setFeito(true);
             start(async () => {
@@ -61,22 +59,8 @@ export function CombinadoCheck({
               }
             });
           }}
+          className="mt-0.5 group-hover:border-foreground"
         />
-        <span
-          aria-hidden="true"
-          className={cn(
-            "mt-0.5 grid size-4.5 shrink-0 place-items-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card",
-            feito
-              ? "border-[var(--ok)] bg-[var(--ok)] text-[var(--status-foreground)]"
-              : "border-muted-foreground/40 group-hover:border-foreground"
-          )}
-        >
-          {feito && (
-            <svg viewBox="0 0 10 8" className="size-2.5 fill-none stroke-current stroke-2">
-              <path d="M1 4l2.5 2.5L9 1" />
-            </svg>
-          )}
-        </span>
         <span className="min-w-0 text-sm">
           {descricao}
           {prazoLabel && (

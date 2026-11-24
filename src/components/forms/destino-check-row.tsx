@@ -1,5 +1,6 @@
 "use client";
 
+import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 
 /** Linha de destinatário com checkbox — mesma gramática nos dois dialogs de
@@ -28,12 +29,10 @@ export function DestinoCheckRow({
           : "cursor-pointer hover:bg-muted"
       )}
     >
-      <input
-        type="checkbox"
+      <Checkbox
         checked={checked}
         disabled={disabled}
-        onChange={onToggle}
-        className="size-4 shrink-0 accent-primary"
+        onCheckedChange={onToggle}
       />
       <span className="min-w-0 flex-1 truncate">{nome}</span>
       {detalhe && (

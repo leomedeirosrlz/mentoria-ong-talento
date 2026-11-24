@@ -216,6 +216,30 @@ regra("R10 scripts/json válidos", () => {
   return { detalhe: `${mjs.length} scripts, ${jsons.length} json` };
 });
 
+// ── R11 · checkbox só veste o kit (025) ──
+regra("R11 checkbox só no kit", () => {
+  // exceções declaradas na spec 025: doc/impressão, card de onboarding,
+  // chip de filtro — e o próprio kit
+  const LIVRES = new Set([
+    "src/components/ui/checkbox.tsx",
+    "src/components/material-documento.tsx",
+    "src/components/ui/caixa-selecao.tsx",
+    "src/components/ui/filtro-opcoes.tsx",
+  ]);
+  const arquivos = lista("git", ["ls-files", "src/**/*.tsx"]);
+  const hits = [];
+  for (const f of arquivos) {
+    if (LIVRES.has(f)) continue;
+    const linhas = readFileSync(f, "utf8").split("\n");
+    linhas.forEach((l, i) => {
+      if (/type="checkbox"/.test(l)) hits.push(`${f}:${i + 1}`);
+    });
+  }
+  if (hits.length)
+    falha(`type="checkbox" fora do kit (use @/components/ui/checkbox):\n${hits.join("\n")}`);
+  return { detalhe: `${arquivos.length} tsx varridos` };
+});
+
 // ── relatório ──
 const largura = Math.max(...resultados.map((r) => r.nome.length));
 for (const r of resultados) {

@@ -5,8 +5,9 @@ import { createClient } from "@/lib/supabase/server";
 import { demoAtivo } from "./demo/mode";
 
 /** Declara a decisão da dupla sobre um recesso do cronograma (REALIZA-462/518,
- *  0218/0225): usa=true "vamos usar o recesso" (default de sempre), usa=false
- *  "vamos seguir nos encontrando". A RPC `declarar_recesso` é a única
+ *  0218/0225): usa=true = os encontros pausam no período (default de
+ *  sempre), usa=false = a dupla segue se encontrando. A RPC
+ *  `declarar_recesso` é a única
  *  porta de escrita — a 0225 restringiu a decisão aos dois lados da dupla
  *  (mentor e mentorado; a equipe vê e cobra, não responde por eles), dupla
  *  DPP ativa e o evento sendo recesso do cronograma dela. Redeclarar

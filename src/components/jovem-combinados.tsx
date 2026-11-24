@@ -7,6 +7,7 @@ import { CaretDown, ListChecks } from "@phosphor-icons/react";
 import { toast } from "@/lib/toast";
 import { marcarCombinadoFeito } from "@/lib/actions";
 import { formatDate } from "@/lib/ciclo";
+import { Checkbox } from "@/components/ui/checkbox";
 import type { JovemEncaminhamento } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -62,15 +63,12 @@ export function JovemCombinados({
             pending && pendingId === t.id && "opacity-60"
           )}
         >
-          {/* checkbox nativo + label — teclado e clique no texto de graça;
-              o quadrado estilizado é só a representação (mesmo padrão da
-              lista de staff) */}
-          <input
-            type="checkbox"
-            className="peer sr-only"
+          {/* checkbox do kit dentro da label — teclado e clique no texto de
+              graça (mesmo padrão da lista de staff) */}
+          <Checkbox
             checked={feito}
             disabled={pending && pendingId === t.id}
-            onChange={() => {
+            onCheckedChange={() => {
               setPendingId(t.id);
               start(async () => {
                 try {
@@ -87,22 +85,8 @@ export function JovemCombinados({
                 }
               });
             }}
+            className="mt-0.5 group-hover:border-foreground"
           />
-          <span
-            aria-hidden="true"
-            className={cn(
-              "mt-0.5 grid size-4.5 shrink-0 place-items-center rounded-md border transition-colors peer-focus-visible:ring-2 peer-focus-visible:ring-ring peer-focus-visible:ring-offset-2 peer-focus-visible:ring-offset-card",
-              feito
-                ? "border-[var(--ok-text)] bg-[var(--ok-text)] text-[var(--status-foreground)]"
-                : "border-muted-foreground/40 group-hover:border-foreground"
-            )}
-          >
-            {feito && (
-              <svg viewBox="0 0 10 8" className="size-2.5 fill-none stroke-current stroke-2">
-                <path d="M1 4l2.5 2.5L9 1" />
-              </svg>
-            )}
-          </span>
           <span className="block min-w-0 flex-1">
             <span
               className={cn(

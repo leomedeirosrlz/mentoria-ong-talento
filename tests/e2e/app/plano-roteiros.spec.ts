@@ -168,7 +168,7 @@ test.describe("roteiros do plano + doc do combinado (521)", () => {
     const jwtReserva = await jwtDoUsuario(MENTOR_RESERVA, SENHA);
 
     // proposta da coordenação nasce "proposto" — o aceite da dupla é que
-    // a coloca em vigor, e sem vigor não tem roteiro
+    // a põe pra valer, e sem valer não tem roteiro
     const jwtCoord = await jwtDoUsuario(COORD_EMAIL, COORD_SENHA);
     const prop = await propor(jwtCoord);
     expect(prop).toMatchObject({ ok: true, status: "proposto" });

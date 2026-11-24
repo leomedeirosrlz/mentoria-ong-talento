@@ -24,6 +24,7 @@ import type {
 import { turmaLonga } from "@/lib/turma";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -519,17 +520,16 @@ function NovoLinkForm({
                         }
                         className="flex min-h-6 items-center gap-2 py-1 text-sm has-[:disabled]:opacity-60"
                       >
-                        <input
-                          type="checkbox"
+                        <Checkbox
                           checked={colunasEfetivas.has(c.id)}
                           disabled={ultima}
-                          onChange={(e) => {
+                          onCheckedChange={(marcado) => {
                             const n = new Set(colunasEfetivas);
-                            if (e.target.checked) n.add(c.id);
+                            if (marcado) n.add(c.id);
                             else n.delete(c.id);
                             setColSel(n);
                           }}
-                          className="size-4 rounded border-border accent-[var(--brand-ink)] disabled:cursor-not-allowed"
+                          className="data-checked:border-[var(--brand-ink)] data-checked:bg-[var(--brand-ink)]"
                         />
                         {c.label}
                       </label>

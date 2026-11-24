@@ -634,7 +634,8 @@ export default async function JovemAgenda() {
                     : "Recesso do programa"}
                 </p>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  Vocês decidem juntos se param ou seguem se encontrando.
+                  Vocês decidem juntos se pausam os encontros ou seguem
+                  se encontrando.
                   Qualquer um dos dois pode responder pela dupla.
                 </p>
               </div>
@@ -705,8 +706,7 @@ export default async function JovemAgenda() {
               <>
                 <p className="text-sm text-muted-foreground">
                   Atrasaram? Vocês podem combinar um plano pra ficar em
-                  dia. Ritmo, recesso e dias livres viram uma pergunta
-                  por vez.
+                  dia. A proposta sai respondendo uma pergunta por vez.
                 </p>
                 {duplaDppId != null && (
                   <CombinarPlano duplaId={duplaDppId} lado="mentorado" />

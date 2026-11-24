@@ -108,7 +108,7 @@ export function AcordosCentral({
               aceites: aceitesDoPlano(planoVivo),
               // a coluna não existe na tabela: "avisado em" ancora no
               // carimbo que ativou (ou na criação, proposta de lado nasce
-              // em vigor) — a mesma régua do recorte do jovem
+              // valendo) — a mesma régua do recorte do jovem
               proposto_em: propostoEmDoPlano(planoVivo),
             }}
             duplaId={dupla.id}

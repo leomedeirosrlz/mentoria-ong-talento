@@ -67,7 +67,8 @@ export type RoteiroContexto = {
   /** números que dividem a mesma sessão (fusão 018) — null/≤1 sem fusão */
   sessaoGrupo?: readonly number[] | null;
   ajustes?: readonly { sugestao: string; justificativa: string }[] | null;
-  /** recesso que cobre a data do passo (usa === true) — null fora de recesso */
+  /** recesso que cobre a data do passo (usa === false — a dupla decidiu
+   *  seguir se encontrando nele) — null fora de recesso ou pausado */
   recesso?: { titulo: string } | null;
 };
 
@@ -158,7 +159,7 @@ export function materiaisComRoteiroPlano(
 }
 
 const STATUS_DOC: Record<string, string> = {
-  proposto: "a proposta espera um aceite da dupla pra entrar em vigor",
+  proposto: "a proposta espera um aceite da dupla pra valer",
   aceito: "a proposta foi aceita: vale como combinado",
   ativo: "o combinado está em prática",
   contestado: "a proposta foi contestada e esta versão encerrou",
@@ -257,9 +258,9 @@ export function montarDocCombinado(input: {
         (r) =>
           `${escapeDocHtml(r.titulo)}: de ${escapeDocHtml(diaCurto(r.inicio))} a ${escapeDocHtml(diaCurto(r.fim))} · ` +
           (r.usa === true
-            ? "vocês seguem se encontrando"
+            ? "pausa combinada"
             : r.usa === false
-              ? "pausa combinada"
+              ? "vocês seguem se encontrando"
               : "decisão pendente")
       ),
     });
@@ -270,19 +271,19 @@ export function montarDocCombinado(input: {
   const regras: string[] = [];
   if (input.status === "proposto") {
     regras.push(
-      "Um aceite da dupla coloca o combinado em vigor e avisa o outro lado.",
-      "Se não servir, a contestação encerra esta versão. Um acordo novo nasce como versão nova.",
-      "O combinado só vale depois do aceite, mesmo com encontro já marcado."
+      "Um aceite da dupla põe o combinado pra valer e avisa o outro lado.",
+      "Se não servir, contestar encerra esta versão. Um combinado novo pode nascer como versão nova.",
+      "Mesmo com encontro marcado, o combinado só vale depois do aceite."
     );
   } else if (input.status === "aceito" || input.status === "ativo") {
     regras.push(
-      "O combinado vale enquanto a dupla seguir nele. Pra mudar, nasce uma versão nova.",
-      "Os roteiros das semanas nascem a partir deste combinado.",
+      "O combinado vale enquanto vocês seguem nele. Pra mudar, vocês combinam uma versão nova.",
+      "Os roteiros das semanas saem deste combinado.",
       "Encontro feito é feito: versão nova não desmarca o que já aconteceu."
     );
   } else {
     regras.push(
-      "Esta versão não está mais em vigor. Um acordo novo nasce como versão nova."
+      "Esta versão não vale mais. Um combinado novo pode nascer como versão nova."
     );
   }
   if (input.aceites && input.nomes) {
@@ -316,7 +317,7 @@ export function contextoRoteiro(
   const recesso =
     passo?.data && extras.recessos
       ? (extras.recessos.find(
-          (r) => r.usa === true && r.inicio <= passo.data! && passo.data! <= r.fim
+          (r) => r.usa === false && r.inicio <= passo.data! && passo.data! <= r.fim
         ) ?? null)
       : null;
   return {

@@ -14,6 +14,7 @@ import {
 } from "@/lib/ciclo";
 import type { AppRole, Dupla, SituacaoMentorado } from "@/lib/types";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -564,11 +565,10 @@ export function RemanejarDuplaDialog({
               )}
 
               <label className="flex cursor-pointer items-start gap-2.5 rounded-lg bg-muted/40 px-3 py-2.5 text-sm transition-colors hover:bg-muted/70">
-                <input
-                  type="checkbox"
+                <Checkbox
                   name="registrar_nota"
                   defaultChecked
-                  className="mt-0.5 accent-primary"
+                  className="mt-0.5"
                 />
                 <span>
                   Registrar saída na ficha de quem está saindo

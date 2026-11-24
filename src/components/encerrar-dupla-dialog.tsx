@@ -7,6 +7,7 @@ import { toast } from "@/lib/toast";
 import { registrarEncerramento } from "@/lib/actions-encerramento";
 import { CHECKLIST_ENCERRAMENTO } from "@/lib/encerramento";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -95,13 +96,12 @@ export function EncerrarDuplaDialog({
                 key={item.key}
                 className="flex cursor-pointer items-start gap-2.5 rounded-lg bg-muted/40 px-3 py-2.5 text-sm transition-colors hover:bg-muted/70"
               >
-                <input
-                  type="checkbox"
+                <Checkbox
                   name={item.key}
                   // o que já chegou volta marcado — uma resposta 360º que
                   // entrou pela RPC não pode sumir num resave silencioso
                   defaultChecked={!!encerramento?.checklist?.[item.key]}
-                  className="mt-0.5 accent-primary"
+                  className="mt-0.5"
                 />
                 {item.label}
               </label>

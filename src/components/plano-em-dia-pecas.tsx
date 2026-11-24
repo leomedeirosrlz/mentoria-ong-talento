@@ -113,8 +113,8 @@ export function QuadradosPlano({
 }
 
 /** Os carimbos da dupla lado a lado (518 — aceite único): quem já
- *  respondeu e quem ainda não. Um aceite da dupla já coloca o combinado
- *  em vigor — o outro lado é avisado, não "fica devendo". Os chips só
+ *  respondeu e quem ainda não. Um aceite da dupla põe o combinado pra
+ *  valer — o outro lado é avisado, não "fica devendo". Os chips só
  *  aparecem na proposta; no vigente quem combinou aparece na frase. */
 export function AceitesPlano({
   resumo,
@@ -179,7 +179,7 @@ export function QuadradosCombinado({ resumo }: { resumo: ResumoCombinado }) {
 export type PerspectivaPlano = "mentor" | "jovem";
 
 /** A frase do banner: o que falta agora, do ponto de vista de quem lê.
- *  518: um aceite da dupla coloca o combinado em vigor — "falta o seu"
+ *  518: um aceite da dupla põe o combinado pra valer — "falta o seu"
  *  só existe na proposta da equipe; no ativo, quem não carimbou foi
  *  avisado ("Fulano combinou"), nunca "faltam os dois". */
 export function fraseDoCombinado(
@@ -199,7 +199,7 @@ export function fraseDoCombinado(
       // é o de quem lê (019); a equipe lê a mesma espera como "da dupla"
       // na fila (textoDoMotivo), não aqui
       pill: "Falta o seu aceite",
-      texto: `A equipe propôs um plano pra vocês ficarem em dia até ${diaMes(r.ate ?? "")}. Um aceite da dupla já coloca o combinado em vigor; o outro lado é avisado.`,
+      texto: `A equipe propôs um plano pra vocês ficarem em dia até ${diaMes(r.ate ?? "")}. Um aceite da dupla põe o combinado pra valer; o outro lado é avisado.`,
       cta: "Ver e responder",
     };
   }
@@ -207,14 +207,14 @@ export function fraseDoCombinado(
     return {
       tom: "neutro",
       pill: `Falta ${outro} responder`,
-      texto: `Você já respondeu. Um aceite da dupla já coloca o combinado em vigor; ${outro} foi avisado.`,
+      texto: `Você já respondeu. Um aceite da dupla põe o combinado pra valer; ${outro} foi avisado.`,
       cta: "Ver o plano",
     };
   }
   if (estado === "ativo_sem_minha_ciencia") {
     return {
       tom: "atencao",
-      pill: "Plano em vigor",
+      pill: "Plano valendo",
       texto: `${outro} combinou um plano pra vocês ficarem em dia até ${diaMes(r.ate ?? "")}${r.propostoEm ? `. Você foi avisado em ${diaMes(r.propostoEm.slice(0, 10))}` : ""} Se não servir pra você, dá pra contestar.`,
       cta: "Ver o combinado",
     };

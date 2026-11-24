@@ -41,6 +41,7 @@ import {
 import { fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { cn } from "@/lib/utils";
@@ -1216,26 +1217,16 @@ function CampoRenderer({
           <ul className="mt-1.5 space-y-1">
             {(campo.opcoes ?? []).map((o) => (
               <li key={o}>
-                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted active:bg-muted has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
-                  <input
-                    type="checkbox"
-                    name={campo.id}
-                    value={o}
-                    className="size-5 shrink-0 rounded accent-primary"
-                  />
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted active:bg-muted">
+                  <Checkbox name={campo.id} value={o} />
                   {o}
                 </label>
               </li>
             ))}
             {campo.permite_outro && (
               <li>
-                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted active:bg-muted has-focus-visible:ring-3 has-focus-visible:ring-ring/50">
-                  <input
-                    type="checkbox"
-                    name={campo.id}
-                    value="Outro"
-                    className="size-5 shrink-0 rounded accent-primary"
-                  />
+                <label className="flex min-h-11 cursor-pointer items-center gap-3 rounded-lg px-2 text-sm transition-colors select-none hover:bg-muted active:bg-muted">
+                  <Checkbox name={campo.id} value="Outro" />
                   Outro
                 </label>
               </li>
@@ -1256,13 +1247,12 @@ function CampoRenderer({
               clique sobre o padding do card — área de toque máxima no
               mobile. O ErroCampo fica fora do label (clique nele não
               alternaria a caixa) */}
-          <label className="-m-4 flex cursor-pointer items-start gap-3 rounded-xl p-4 text-[15px] leading-relaxed transition-colors select-none has-checked:bg-primary/5 has-focus-visible:ring-3 has-focus-visible:ring-ring/50 @xl:-m-5 @xl:p-5 @xl:text-base">
+          <label className="-m-4 flex cursor-pointer items-start gap-3 rounded-xl p-4 text-[15px] leading-relaxed transition-colors select-none has-checked:bg-primary/5 @xl:-m-5 @xl:p-5 @xl:text-base">
             {n > 0 && <NumeroPergunta n={n} />}
-            <input
-              type="checkbox"
+            <Checkbox
               name={campo.id}
               required={campo.obrigatorio}
-              className="mt-0.5 size-4 shrink-0 accent-primary"
+              className="mt-0.5"
               {...a11y}
             />
             <span className="min-w-0 flex-1 font-semibold text-foreground">

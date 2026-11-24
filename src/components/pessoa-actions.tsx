@@ -40,6 +40,7 @@ import { cn, maskWhatsApp } from "@/lib/utils";
 import { temPapel } from "@/lib/types";
 import type { Disponibilidade, Profile } from "@/lib/types";
 import { buttonVariants } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from "@/components/ui/dialog";
@@ -251,11 +252,11 @@ export function PessoaActions({
               <CampoDisponibilidade value={disponibilidade} onChange={setDisponibilidade} />
               <div className="flex gap-6">
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" name="termo_ok" defaultChecked={mp?.termo_ok} className="accent-primary" />
+                  <Checkbox name="termo_ok" defaultChecked={mp?.termo_ok} />
                   Termo assinado
                 </label>
                 <label className="flex items-center gap-2 text-sm cursor-pointer">
-                  <input type="checkbox" name="formacao_ok" defaultChecked={mp?.formacao_ok} className="accent-primary" />
+                  <Checkbox name="formacao_ok" defaultChecked={mp?.formacao_ok} />
                   Formação concluída
                 </label>
               </div>
@@ -314,11 +315,9 @@ export function PessoaActions({
               {/* checkbox desmarcado não posta — a sentinela diz que o campo
                   estava na tela, senão a desmarcação nunca chega ao banco */}
               <input type="hidden" name="decl_voluntario" value="1" />
-              <input
-                type="checkbox"
+              <Checkbox
                 name="voluntario"
                 defaultChecked={pessoa.voluntario !== false}
-                className="accent-primary"
               />
               Sou voluntário(a)
             </label>

@@ -172,7 +172,7 @@ describe("montarDocCombinado — o documento antes do aceite", () => {
     expect(texto).toContain("remarcação");
     expect(texto).toContain("mesma sessão");
     expect(texto).toContain("marcado pra");
-    expect(texto).toContain("seguem se encontrando");
+    expect(texto).toContain("pausa combinada");
     expect(texto).toContain("Ricardo aceitou");
     expect(texto).toContain("Ana ainda não respondeu");
     // todas as seções previstas
@@ -258,17 +258,18 @@ describe("contextoRoteiro — o que o plano injeta no roteiro", () => {
     } as never;
     const ctx = contextoRoteiro(plano, 7, {
       recessos: [
-        { titulo: "Férias", inicio: "2026-12-01", fim: "2026-12-31", usa: true },
+        { titulo: "Férias", inicio: "2026-12-01", fim: "2026-12-31", usa: false },
         { titulo: "Outro", inicio: "2027-01-01", fim: "2027-01-31", usa: null },
       ],
     });
     expect(ctx.passo?.data).toBe("2026-12-03");
     expect(ctx.sessaoGrupo).toEqual([6, 7]);
     expect(ctx.recesso?.titulo).toBe("Férias");
-    // recesso sem decisão não vira contexto
+    // recesso pausado não cobre data de encontro — só o que a dupla
+    // decidiu atravessar (usa=false) vira contexto de roteiro
     const ctx2 = contextoRoteiro(plano, 7, {
       recessos: [
-        { titulo: "Outro", inicio: "2026-12-01", fim: "2026-12-31", usa: false },
+        { titulo: "Outro", inicio: "2026-12-01", fim: "2026-12-31", usa: true },
       ],
     });
     expect(ctx2.recesso).toBeNull();

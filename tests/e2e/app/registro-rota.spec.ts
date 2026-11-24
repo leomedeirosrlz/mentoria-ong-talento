@@ -396,9 +396,12 @@ test.describe("rota de registro do encontro (REALIZA-473)", () => {
     await expect(mentor).toContainText("E2E: tema do registro");
     await expect(jovem).toContainText(/pela conta do jovem/);
 
-    // clicar num trigger abre só o acionado (não é acordeão)
+    // um clique abre os dois lados juntos (025/US6) — e o segundo fecha
     await mentor.click();
     await expect(mentor).toHaveAttribute("aria-expanded", "true");
+    await expect(jovem).toHaveAttribute("aria-expanded", "true");
+    await jovem.click();
+    await expect(mentor).toHaveAttribute("aria-expanded", "false");
     await expect(jovem).toHaveAttribute("aria-expanded", "false");
 
     // o hash abre os dois: o link antigo revela o encontro inteiro

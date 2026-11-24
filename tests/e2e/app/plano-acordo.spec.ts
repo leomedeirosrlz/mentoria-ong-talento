@@ -22,7 +22,7 @@ import {
 //     guia é que limita as datas);
 //   · aceite é ÚNICO (0225): proposta de lado nasce "aceito" com o
 //     carimbo do proponente; a da equipe nasce "proposto" e o primeiro
-//     aceite da dupla a coloca em vigor — o outro lado é avisado, não
+//     aceite da dupla a põe pra valer — o outro lado é avisado, não
 //     fica devendo aceite;
 //   · contestar é terminal — plano novo nasce versão+1, nunca reabre;
 //   · plano_aplicar_passo é definer com guard de membro: só escopo, só
@@ -152,7 +152,7 @@ test.describe("plano ficar em dia persistido (459)", () => {
     // o calendário e2e tem recesso (dez–jan) que cruza a janela hoje+30 boa
     // parte do ano: sem a decisão da dupla, plano_propor devolve 'falta a
     // dupla confirmar o recesso' — flake sazonal, mesmo defeito do hoje()
-    // em UTC. O piso registra "não vamos usar" (usa=false libera a data na
+    // em UTC. O piso registra "vamos seguir nos encontrando" (usa=false libera a data na
     // RPC); a cobertura do recesso em si é do recesso.spec, mesma dupla
     await limparViaServiceRole("dupla_recessos", `dupla_id=eq.${DUPLA}`);
     const evs = await buscarViaServiceRole<{ id: string }[]>(
@@ -188,7 +188,7 @@ test.describe("plano ficar em dia persistido (459)", () => {
     expect(dup.error).toMatch(/plano aberto/i);
 
     // o carimbo do proponente nasce junto; o do outro lado segue vazio
-    // até ele dar ciência (aceite idempotente num plano em vigor)
+    // até ele dar ciência (aceite idempotente num plano valendo)
     let vivo = (await planoVivo())!;
     expect(vivo.status).toBe("aceito");
     const [carimbos] = await buscarViaServiceRole<
@@ -275,7 +275,7 @@ test.describe("plano ficar em dia persistido (459)", () => {
 
     // acima de 7 é decisão da dupla — a RPC aceita (o espaçamento do guia
     // é que separa as datas, não o teto semanal); proposta de lado já
-    // nasce em vigor
+    // nasce valendo
     const prop = await propor(jwtMentor, DUPLA, escopo([3, 4], 8));
     expect(prop).toMatchObject({ ok: true, versao: 1, status: "aceito" });
   });
@@ -333,7 +333,7 @@ test.describe("plano ficar em dia persistido (459)", () => {
     expect(nova.status).toBe("aceito");
 
     // escopo inválido não pode deixar a dupla sem plano: o fechamento da
-    // versão nova desfaz junto e a antiga continua em vigor
+    // versão nova desfaz junto e a antiga continua valendo
     const falha = await substituir(jwtMentor, sub.id!, escopo([99]));
     expect(falha.error).toMatch(/fora da trilha|encontro/i);
     const [viva] = await buscarViaServiceRole<{ status: string }[]>(
@@ -353,6 +353,10 @@ test.describe("plano ficar em dia persistido (459)", () => {
       "notificacoes",
       "tipo=eq.plano_proposto&order=created_at.desc&limit=1&select=titulo,corpo"
     );
+    // a row do banco segue com a copy da RPC (migrations são do lead) —
+    // a família "valer" é a reescrita de leitura do notificar.ts pro
+    // membro da dupla, coberta no unit. Aqui o que interessa é a autoria
+    // e a copy nova da 0237 no lugar da da 0225
     expect(n.titulo).toContain("em vigor");
     expect(n.corpo).toMatch(/combinou o plano/i);
     expect(n.corpo).not.toMatch(/Tem um plano pra vocês/);
@@ -402,7 +406,7 @@ test.describe("plano ficar em dia persistido (459)", () => {
     const jwtCoord = await jwtDoUsuario(COORD_EMAIL, COORD_SENHA);
 
     // 0225: o jovem também propõe — proposta de lado nasce "aceito" já
-    // em vigor, com o carimbo do lado dele
+    // valendo, com o carimbo do lado dele
     const propJovem = await propor(jwtJovem);
     expect(propJovem).toMatchObject({ ok: true, status: "aceito" });
     const [carimboJovem] = await buscarViaServiceRole<
@@ -419,7 +423,7 @@ test.describe("plano ficar em dia persistido (459)", () => {
 
     // coordenação PODE propor — o combinado nasce "proposto" sem
     // nenhum aceite de lado (ela não é mentor nem mentorado): o primeiro
-    // aceite da dupla é o que coloca em vigor
+    // aceite da dupla é o que põe pra valer
     const prop = await propor(jwtCoord);
     expect(prop).toMatchObject({ ok: true, status: "proposto" });
     const [carimbos] = await buscarViaServiceRole<

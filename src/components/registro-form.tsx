@@ -37,6 +37,7 @@ import {
   recusaDoAnexo,
 } from "@/components/anexos-registro";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -1020,12 +1021,10 @@ export function RegistroForm({
             <div className="grid gap-x-4 gap-y-2 sm:grid-cols-2">
               {ATIVIDADES_ENCONTRO.map((a) => (
                 <label key={a} className="flex min-h-11 items-center gap-2 py-2 text-sm cursor-pointer md:min-h-0 md:py-0">
-                  <input
-                    type="checkbox"
+                  <Checkbox
                     name="atividade"
                     value={a}
                     defaultChecked={registro?.atividades.includes(a)}
-                    className="size-5 shrink-0 accent-primary"
                   />
                   {a}
                 </label>
@@ -1069,12 +1068,7 @@ export function RegistroForm({
                     key={`grupo-${g.numero}`}
                     className="flex min-h-11 min-w-0 items-center gap-3 py-1.5 text-sm md:min-h-0"
                   >
-                    <input
-                      type="checkbox"
-                      checked
-                      disabled
-                      className="size-5 shrink-0 accent-primary"
-                    />
+                    <Checkbox checked disabled />
                     {/* checkbox travado não posta — o hidden carrega o nº
                         pro salvarRegistro (que uniria o grupo de qualquer
                         jeito; aqui ele também aparece no payload) */}
@@ -1099,13 +1093,11 @@ export function RegistroForm({
                     // largura da coluna e o truncate do span nunca engata
                     className="flex min-h-11 min-w-0 items-center gap-3 py-1.5 text-sm cursor-pointer md:min-h-0"
                   >
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       name="cobriu_numero"
-                      value={c.numero}
+                      value={String(c.numero)}
                       checked={cobertosSel.has(c.numero)}
-                      onChange={(e) => {
-                        const marcado = e.target.checked;
+                      onCheckedChange={(marcado) => {
                         setCobertosSel((prev) => {
                           const next = new Set(prev);
                           if (marcado) next.add(c.numero);
@@ -1118,7 +1110,6 @@ export function RegistroForm({
                           setDuracaoMin("120");
                         }
                       }}
-                      className="size-5 shrink-0 accent-primary"
                     />
                     <span className="min-w-0 truncate">
                       {sessao ? `sessão ${c.numero}` : `${c.numero}º encontro`}
@@ -1205,11 +1196,11 @@ export function RegistroForm({
           </div>
 
           <label className="flex items-start gap-3 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/8 px-4 py-3 text-sm cursor-pointer">
-            <input
-              type="checkbox"
+            <Checkbox
               name="precisa_apoio"
               defaultChecked={registro?.precisa_apoio}
-              className="mt-0.5 accent-[var(--warn)]"
+              tom="warn"
+              className="mt-0.5"
             />
             <span>
               <span className="font-medium">Preciso de apoio</span> · sinalizar a coordenação ou o
@@ -1232,18 +1223,17 @@ export function RegistroForm({
                 const vencido = c.prazo != null && c.prazo < hojeStr;
                 return (
                   <label key={c.id} className="flex min-h-11 cursor-pointer items-start gap-3 py-2 text-sm">
-                    <input
-                      type="checkbox"
+                    <Checkbox
                       checked={concluirIds.has(c.id)}
-                      onChange={(e) =>
+                      onCheckedChange={(marcado) =>
                         setConcluirIds((prev) => {
                           const next = new Set(prev);
-                          if (e.target.checked) next.add(c.id);
+                          if (marcado) next.add(c.id);
                           else next.delete(c.id);
                           return next;
                         })
                       }
-                      className="mt-0.5 size-5 shrink-0 accent-primary"
+                      className="mt-0.5"
                     />
                     <span className="min-w-0">
                       {c.descricao}
