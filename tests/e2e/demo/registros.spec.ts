@@ -127,16 +127,17 @@ test("switcher de grupo preserva filtros ativos no href", async ({ page }) => {
   await expect(porAvaliacao).toHaveAttribute("href", /grupo=avaliacao/);
 });
 
-test("dialog Filtros é right-sized (~max-w-md)", async ({ page }) => {
+test("dialog Filtros é right-sized (~max-w-lg)", async ({ page }) => {
   await abreRegistros(page);
   await page.getByRole("button", { name: /Filtros/ }).click();
   const dialog = page.getByRole("dialog");
   await expect(dialog).toBeVisible();
   const box = await dialog.boundingBox();
   expect(box).not.toBeNull();
-  // max-w-md = 448px — lg (512) falharia; folga pra subpixel/margins
-  expect(box!.width).toBeLessThanOrEqual(464);
-  expect(box!.width).toBeGreaterThanOrEqual(384);
+  // spec 022/US6: filtro denso (4 grupos + select) usa lg (512) no
+  // desktop, com folga pra subpixel/margins
+  expect(box!.width).toBeLessThanOrEqual(528);
+  expect(box!.width).toBeGreaterThanOrEqual(448);
 });
 
 test.describe("mobile", () => {

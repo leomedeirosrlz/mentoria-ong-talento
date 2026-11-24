@@ -154,6 +154,7 @@ export function useTrocaDeEtapa<T extends HTMLElement = HTMLElement>(
 export function Etapa({
   ativa = true,
   direcao,
+  as = "div",
   className,
   style,
   ref,
@@ -163,10 +164,14 @@ export function Etapa({
   /** false = a etapa segue montada sob `hidden` */
   ativa?: boolean;
   direcao: DirecaoEtapa;
+  /** `section` no wizard por seções (022/144) — preserva o landmark e o
+   *  seletor de contrato; o resto continua div. */
+  as?: "div" | "section";
   ref?: Ref<HTMLDivElement>;
 }) {
+  const Tag = as as "div";
   return (
-    <div
+    <Tag
       ref={ref}
       hidden={!ativa}
       className={cn("animate-enter-x", className)}
@@ -174,7 +179,7 @@ export function Etapa({
       {...rest}
     >
       {children}
-    </div>
+    </Tag>
   );
 }
 

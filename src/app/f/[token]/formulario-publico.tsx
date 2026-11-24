@@ -703,6 +703,7 @@ function FormularioGenerico({
                   return (
                     <Etapa
                       key={b.secao?.id ?? `bloco-${i}`}
+                      as="section"
                       ativa={ativa}
                       direcao={direcao}
                       data-secao={i}
