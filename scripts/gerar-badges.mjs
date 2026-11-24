@@ -157,21 +157,6 @@ function estrela(cx, cy, r, inner = 0.48, n = 5, round = 4) {
   );
 }
 
-/** Folha: lente entre dois arcos, ponta em `ang` graus a partir da base. */
-function folha(x, y, comp, larg, ang) {
-  const a = (ang * Math.PI) / 180;
-  const ux = Math.cos(a);
-  const uy = Math.sin(a);
-  const nx = -uy;
-  const ny = ux;
-  const ponta = [x + ux * comp, y + uy * comp];
-  const lado = (from, to, ctrl) => [from, [from[0] + (ctrl[0] - from[0]) * 0.9, from[1] + (ctrl[1] - from[1]) * 0.9], [to[0] + (ctrl[0] - to[0]) * 0.9, to[1] + (ctrl[1] - to[1]) * 0.9], to];
-  const base = [x, y];
-  const c1 = [x + ux * comp * 0.5 + nx * larg * 1.25, y + uy * comp * 0.5 + ny * larg * 1.25];
-  const c2 = [x + ux * comp * 0.5 - nx * larg * 1.25, y + uy * comp * 0.5 - ny * larg * 1.25];
-  return { subs: [[lado(base, ponta, c1), lado(ponta, base, c2)]], cantos: [] };
-}
-
 /** Linha aberta (polilinha) — só tinta, centrada. */
 const linha = (...pts) => ({
   subs: [pts.slice(1).map((p, i) => reta(pts[i], p))],
@@ -367,64 +352,84 @@ const ehReta = ([a, c1, c2, b]) =>
 
 const D = {};
 
-/** Canteiro da família de níveis: placa amarela deitada + terra. */
-function canteiro(d, y = 330) {
+/** A base da família de nível (024): o "dínamo" — disco escuro deitado +
+ *  bobina, a mesa neutra de onde os raios saem. O canteiro+árvore da 016
+ *  saíram de cena: a permanência agora é energia que cresce por faixa. */
+function dinamo(d, y = 352) {
   const m = em(250, y, CHAO);
-  d.slab(rect(-118, -118, 236, 236, 34), m, "amarelo", { prof: 1.3 });
-  d.chapa(elipse(0, 0, 70, 70), m, "tinta");
+  d.slab(elipse(0, 0, 112), m, "marinho", { prof: 1.15 });
+  d.chapa(elipse(0, 0, 72), m, "ameixa");
+  d.traco({ subs: [elipseSub(0, 0, 92)], cantos: [] }, m);
   return y;
+}
+
+/** O raio do kit: zigue-zague em pé na face — ponta em (0,-h), pé em
+ *  (0,0). Gira pelo próprio pé (o pivô é a origem local), então o leque
+ *  do burst é só mul(m, gira(a)) por raio. */
+function raio(h, w) {
+  return poly(
+    [
+      [w * 0.4, -h],
+      [-w * 0.58, -h * 0.44],
+      [-w * 0.07, -h * 0.4],
+      [-w * 0.4, 0],
+      [w * 0.58, -h * 0.57],
+      [w * 0.07, -h * 0.62],
+    ],
+    5
+  );
 }
 
 D["nivel-inicio"] = (() => {
   const d = new Desenho();
-  const y = canteiro(d);
+  const y = dinamo(d);
   const m = em(250, y - 4, FACE);
-  d.slab(rect(-9, -112, 18, 112, 6), m, "verde", { prof: 0.4 });
-  d.slab(folha(0, -100, 92, 30, -150), m, "lima", { prof: 0.5 });
-  d.slab(folha(0, -112, 88, 28, -30), m, "lima", { prof: 0.5 });
+  d.slab(raio(236, 78), m, "amarelo", { prof: 0.55 });
   return d.fim();
 })();
 
 D["nivel-constancia"] = (() => {
   const d = new Desenho();
-  const y = canteiro(d, 345);
+  const y = dinamo(d, 358);
   const m = em(250, y - 4, FACE);
-  d.slab(rect(-10, -196, 20, 196, 7), m, "verde", { prof: 0.4 });
-  d.slab(folha(0, -70, 100, 32, -165), m, "lima", { prof: 0.5 });
-  d.slab(folha(0, -110, 100, 32, -18), m, "lima", { prof: 0.5 });
-  d.slab(folha(0, -158, 92, 30, -150), m, "lima", { prof: 0.5 });
-  d.slab(folha(0, -192, 88, 28, -42), m, "lima", { prof: 0.5 });
+  // dois raios cruzados — a energia já tem ritmo
+  d.slab(raio(212, 66), mul(m, gira(15)), "laranja", { prof: 0.5 });
+  d.slab(raio(246, 76), mul(m, gira(-8)), "amarelo", { prof: 0.55 });
   return d.fim();
 })();
 
-function arvore(d, y, { estrela: comEstrela = false } = {}) {
-  const m = em(250, y - 4, FACE);
-  d.slab(poly([[-22, 0], [-16, -150], [16, -150], [22, 0]], 8), m, "ameixa", { prof: 0.6 });
-  d.slab(poly([[0, -96], [-58, -150], [-46, -164], [6, -118]], 6), m, "ameixa", { prof: 0.5 });
-  d.slab(elipse(-62, -178, 66), m, "verde", { prof: 0.5 });
-  d.slab(elipse(58, -196, 70), m, "verde", { prof: 0.5 });
-  d.slab(elipse(-4, -236, 88), m, "lima", { prof: 0.5 });
-  if (comEstrela) {
-    d.slab(estrela(0, -350, 66, 0.46, 5, 6), m, "amarelo", { prof: 0.7 });
-  } else {
-    d.chapa(elipse(30, -226, 16), m, "laranja");
-    d.chapa(elipse(-34, -262, 14), m, "laranja");
-    d.chapa(elipse(66, -186, 13), m, "laranja");
-  }
-  return d;
-}
-
 D["nivel-veterania"] = (() => {
   const d = new Desenho();
-  const y = canteiro(d, 372);
-  arvore(d, y);
+  const y = dinamo(d, 366);
+  // o anel de energia: faixa deitada orbitando a base (a gramática do 360)
+  d.slab(
+    arco(124, 148, Math.PI * 0.02, Math.PI * 1.98, 36),
+    em(250, y, CHAO),
+    "laranja",
+    { prof: 0.4 }
+  );
+  const m = em(250, y - 4, FACE);
+  d.slab(raio(196, 60), mul(m, gira(17)), "laranja", { prof: 0.5 });
+  d.slab(raio(196, 60), mul(m, gira(-16)), "laranja", { prof: 0.5 });
+  d.slab(raio(252, 78), m, "amarelo", { prof: 0.55 });
   return d.fim();
 })();
 
 D["nivel-completa"] = (() => {
   const d = new Desenho();
-  const y = canteiro(d, 392);
-  arvore(d, y, { estrela: true });
+  const y = dinamo(d, 376);
+  const m = em(250, y - 4, FACE);
+  // a coroa do ciclo fechado: leque de raios saindo do núcleo — o burst
+  // dela; o miolo amarelo tampa a junção dos pés
+  for (const [a, h, w, cor] of [
+    [-48, 168, 54, "laranja"],
+    [-24, 208, 62, "amarelo"],
+    [0, 246, 74, "amarelo"],
+    [24, 208, 62, "amarelo"],
+    [48, 168, 54, "laranja"],
+  ])
+    d.slab(raio(h, w), mul(m, gira(a)), cor, { prof: 0.5 });
+  d.slab(elipse(0, 0, 48), m, "amarelo", { prof: 0.55 });
   return d.fim();
 })();
 
@@ -616,6 +621,186 @@ D["inst-360"] = (() => {
   d.chapa(elipse(-20, -56, 15), centro, "papel");
   return d.fim();
 })();
+
+// ---------- famílias com tiers (024): a mesma medalha por família — o
+// metal do aro sobe com o degrau e a coroa de raios chega no 3º. O glifo
+// é sempre o mesmo: quem evolui é a moldura, como nas conquistas do
+// Duolingo. Os números de tier espelham FAMILIA_TIERS (conquistas.ts)
+const METAL_TIER = { 1: "lima", 2: "laranja", 3: "amarelo", 4: "ameixa" };
+
+/** Medalha em pé na face: aro do metal do tier + face de papel; a partir
+ *  do 3º degrau os raios curtos coroam a peça — a energia dos níveis
+ *  escorrendo pra estante. Os raios são chapa (marca de luz, sem
+ *  espessura): ficam atrás do aro e mantêm o arquivo leve. */
+function medalha(d, tier, y = 256) {
+  const m = em(250, y, FACE);
+  if (tier >= 3) {
+    const n = tier >= 4 ? 11 : 7;
+    const rr = tier >= 4 ? 212 : 190;
+    for (let i = 0; i < n; i++) {
+      const a = (i / n) * Math.PI * 2 - Math.PI / 2;
+      const c = Math.cos(a);
+      const s = Math.sin(a);
+      d.chapa(
+        poly(
+          [
+            [c * 138 - s * 11, s * 138 + c * 11],
+            [c * rr, s * rr],
+            [c * 138 + s * 11, s * 138 - c * 11],
+          ],
+          3
+        ),
+        m,
+        "amarelo"
+      );
+    }
+  }
+  d.slab(elipse(0, 0, 150), m, METAL_TIER[Math.min(tier, 4)], { prof: 1 });
+  if (tier >= 2) d.traco({ subs: [elipseSub(0, 0, 124)], cantos: [] }, m);
+  d.chapa(elipse(0, 0, 106), m, "papel");
+  return m;
+}
+
+/** O glifo de cada família, desenhado na face de papel da medalha — o
+ *  mesmo motivo do Phosphor do squircle (Handshake → aperto, Clock →
+ *  relógio, Target → alvo…). */
+const GLIFO_FAM = {
+  combinados(d, m) {
+    // dois braços se encontram no aperto — o nó lima tampa a junção
+    d.slab(
+      poly(
+        [
+          [-116, 44],
+          [-38, -42],
+          [-12, -18],
+          [-88, 68],
+        ],
+        12
+      ),
+      m,
+      "ameixa",
+      { prof: 0.5 }
+    );
+    d.slab(
+      poly(
+        [
+          [116, 44],
+          [38, -42],
+          [12, -18],
+          [88, 68],
+        ],
+        12
+      ),
+      m,
+      "marinho",
+      { prof: 0.5 }
+    );
+    d.slab(
+      poly(
+        [
+          [-32, -46],
+          [2, -58],
+          [36, -38],
+          [16, 0],
+          [-18, -6],
+        ],
+        8
+      ),
+      m,
+      "lima",
+      { prof: 0.5 }
+    );
+  },
+  horas(d, m) {
+    // relógio na face: marcas nos pontos cardeais, ponteiros e o pino
+    d.traco({ subs: [elipseSub(0, 0, 78)], cantos: [] }, m);
+    for (let i = 0; i < 4; i++) {
+      const a = (i / 4) * Math.PI * 2;
+      d.traco(
+        linha(
+          [Math.cos(a) * 62, Math.sin(a) * 62],
+          [Math.cos(a) * 74, Math.sin(a) * 74]
+        ),
+        m
+      );
+    }
+    d.traco(linha([0, 0], [0, -54]), m, { w: W * 1.1 });
+    d.traco(linha([0, 0], [36, 20]), m, { w: W * 1.1 });
+    d.chapa(elipse(0, 0, 11), m, "tinta");
+  },
+  metas(d, m) {
+    // alvo: anéis concêntricos na face — o mesmo alvo do inst-metas
+    d.chapa(elipse(0, 0, 78), m, "laranja");
+    d.chapa(elipse(0, 0, 52), m, "papel");
+    d.chapa(elipse(0, 0, 27), m, "laranja");
+    d.chapa(elipse(0, 0, 10), m, "tinta");
+  },
+  submetas(d, m) {
+    // escada de passos subindo + o check do topo — cada submeta é um degrau
+    const degraus = [
+      [-86, 34, "lima"],
+      [-28, 6, "amarelo"],
+      [30, -22, "laranja"],
+    ];
+    for (const [x, y, cor] of degraus)
+      d.slab(rect(x, y, 58, 26, 7), m, cor, { prof: 0.5 });
+    d.traco(linha([42, -62], [58, -48], [86, -76]), m, { w: W * 1.15 });
+  },
+  avaliacoes(d, m) {
+    // a estrela da nota — a mesma do conta:avaliacoes, dentro da medalha
+    d.slab(estrela(0, 2, 84, 0.48, 5, 10), m, "amarelo", { prof: 0.5 });
+    d.chapa(estrela(0, 6, 40, 0.5, 5, 6), m, "papel");
+  },
+  presenca(d, m) {
+    // o calendário da sequência: folha com argolas e o check grande
+    d.slab(rect(-64, -72, 128, 140, 14), m, "papel", { prof: 0.5 });
+    d.chapa(rect(-64, -72, 128, 36, 14), m, "marinho");
+    d.chapa(rect(-36, -84, 16, 26, 7), m, "amarelo");
+    d.chapa(rect(20, -84, 16, 26, 7), m, "amarelo");
+    d.traco(linha([-28, 10], [-6, 32], [44, -26]), m, { w: W * 1.2 });
+  },
+  perfil(d, m) {
+    // o cartão do jovem: foto e os campos da ficha
+    d.slab(rect(-86, -58, 172, 118, 16), m, "azul", { prof: 0.5 });
+    d.chapa(elipse(-42, 2, 30), m, "papel");
+    d.chapa(elipse(-42, -7, 11), m, "marinho");
+    d.chapa(elipse(-42, 20, 18, 12), m, "marinho");
+    d.traco(linha([2, -24], [56, -24]), m);
+    d.traco(linha([2, -2], [56, -2]), m);
+    d.traco(linha([2, 20], [38, 20]), m);
+  },
+  termo(d, m) {
+    // o documento assinado: linhas, o garrancho e o selo
+    d.slab(rect(-58, -80, 116, 162, 10), m, "papel", { prof: 0.5 });
+    d.traco(linha([-38, -50], [38, -50]), m);
+    d.traco(linha([-38, -28], [38, -28]), m);
+    d.traco(linha([-38, -6], [14, -6]), m);
+    d.traco(
+      linha([-40, 52], [-22, 22], [-6, 56], [12, 28], [30, 52], [44, 36]),
+      m,
+      { w: W * 0.9 }
+    );
+    d.chapa(elipse(38, 54, 15), m, "laranja");
+  },
+};
+
+for (const [fam, n] of Object.entries({
+  combinados: 4,
+  horas: 4,
+  metas: 3,
+  submetas: 3,
+  avaliacoes: 3,
+  presenca: 3,
+  perfil: 1,
+  termo: 1,
+}))
+  for (let t = 1; t <= n; t++)
+    D[`fam-${fam}-${t}`] = (() => {
+      const d = new Desenho();
+      const m = medalha(d, t);
+      GLIFO_FAM[fam](d, m);
+      return d.fim();
+    })();
 
 // ---------- escrita ----------
 // a paleta é de constantes da marca (não muda no tema escuro): tinta e

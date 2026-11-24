@@ -1,4 +1,9 @@
-import type { ConquistaGlifo, ConquistaPhosphor, NivelChave } from "./conquistas";
+import { FAMILIA_TIERS } from "./conquistas";
+import type {
+  ConquistaGlifo,
+  ConquistaPhosphor,
+  NivelChave,
+} from "./conquistas";
 import type { EstacaoChave } from "./jornada";
 
 // Ilustração isométrica de cada glifo de conquista (016): o slug do
@@ -41,14 +46,23 @@ export function arteDoGlifo(glifo: ConquistaGlifo): string | null {
       ? PHOSPHOR[glifo.nome]
       : glifo.tipo === "nivel"
         ? NIVEL[glifo.chave]
-        : ESTACAO[glifo.chave];
+        : glifo.tipo === "familia"
+          ? `fam-${glifo.familia}-${glifo.tier}`
+          : ESTACAO[glifo.chave];
   return slug ? `/badges/${slug}.svg` : null;
 }
 
 /** Todos os caminhos registrados — o teste confere que cada um existe. */
 export const ARTES_REGISTRADAS: readonly string[] = [
   ...new Set(
-    [...Object.values(PHOSPHOR), ...Object.values(ESTACAO), ...Object.values(NIVEL)]
+    [
+      ...Object.values(PHOSPHOR),
+      ...Object.values(ESTACAO),
+      ...Object.values(NIVEL),
+      ...Object.entries(FAMILIA_TIERS).flatMap(([fam, n]) =>
+        Array.from({ length: n }, (_, i) => `fam-${fam}-${i + 1}`)
+      ),
+    ]
       .filter((s): s is string => !!s)
       .map((s) => `/badges/${s}.svg`)
   ),

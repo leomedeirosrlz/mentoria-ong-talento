@@ -29,11 +29,13 @@ import { INSTRUMENTO_TOM } from "@/components/instrumento-icone";
 /** Glifo do emblema: o símbolo SVG do instrumento (mesma gramática do
  *  InstrumentoEmblema) ou um Phosphor canonizado — marcos mantêm
  *  Flag/Medal/FlagCheckered/Trophy da trilha, contagens usam os ícones da
- *  casa. */
+ *  casa. O `familia` (024) carrega família + tier: a arte evolui por
+ *  degrau (`fam-<familia>-<tier>`) e o squircle usa o Phosphor da família. */
 export type ConquistaGlifo =
   | { tipo: "instrumento"; chave: EstacaoChave }
   | { tipo: "phosphor"; nome: ConquistaPhosphor }
-  | { tipo: "nivel"; chave: NivelChave };
+  | { tipo: "nivel"; chave: NivelChave }
+  | { tipo: "familia"; familia: FamiliaChave; tier: number };
 
 export type ConquistaPhosphor =
   | "flag"
@@ -43,8 +45,59 @@ export type ConquistaPhosphor =
   | "listChecks"
   | "usersThree";
 
+/** Famílias com tiers (024) — uma peça evolutiva por contagem, estilo
+ *  Duolingo: o glifo é o mesmo, o metal e os raios sobem por degrau. */
+export type FamiliaChave =
+  | "combinados"
+  | "horas"
+  | "metas"
+  | "submetas"
+  | "avaliacoes"
+  | "presenca"
+  | "perfil"
+  | "termo";
+
+/** Raridade por posição na escada — inicial → constancia → marco_grande →
+ *  lendaria no topo. Família de 3 degraus para no marco_grande. */
+export type RaridadeConquista =
+  | "inicial"
+  | "constancia"
+  | "marco_grande"
+  | "lendaria";
+
+/** Nº de degraus por família — o gerador de arte (badges.ts +
+ *  scripts/gerar-badges.mjs) itera 1..N pra montar `fam-<fam>-<tier>.svg`. */
+export const FAMILIA_TIERS: Record<FamiliaChave, number> = {
+  combinados: 4,
+  horas: 4,
+  metas: 3,
+  submetas: 3,
+  avaliacoes: 3,
+  presenca: 3,
+  perfil: 1,
+  termo: 1,
+};
+
+/** Um degrau da escada da família — o que o detalhe mostra inteiro. */
+export type TierConquista = {
+  /** 1-based — a posição na escada (compõe a chave `familia:tier`) */
+  n: number;
+  /** o nome deste degrau — "Palavra cumprida", "Voz constante" */
+  titulo: string;
+  /** infinitivo, o que conquista o degrau — "Concluir 15 combinados…" */
+  criterio: string;
+  /** passado, uma frase — a linha narrativa quando está ganho */
+  detalhe: string;
+  raridade: RaridadeConquista;
+  ganho: boolean;
+  /** o carimbo do limiar — null quando a fonte não expõe data do feito */
+  data: string | null;
+};
+
 export type Conquista = {
-  /** chave estável — "marco:primeiro", "inst:visao", "conta:avaliacoes" */
+  /** chave estável — "marco:primeiro", "inst:visao", "conta:avaliacoes";
+   *  nas famílias é `familia:tier` ("conta:combinados-2") e troca quando
+   *  a contagem cruza o próximo degrau */
   chave: string;
   /** nome do emblema na estante */
   titulo: string;
@@ -60,6 +113,23 @@ export type Conquista = {
   /** par cor/tinta do emblema — var()s do globals, mesma gramática de
    *  INSTRUMENTO_TOM (os tons de instrumento vêm direto dele) */
   tom: { cor: string; tinta: string };
+  /** família evolutiva (024) — ausente em marco, instrumento e contador */
+  familia?: FamiliaChave;
+  /** o tier desta peça na estante — o MAIOR degrau ganho da família */
+  tier?: number;
+  /** a escada inteira da família, pro detalhe */
+  tiers?: TierConquista[];
+  /** o próximo degrau — null no topo da escada */
+  proximo?: {
+    n: number;
+    titulo: string;
+    criterio: string;
+    /** a linha honesta do que falta — "Faltam 3 combinados com seu mentor" */
+    linha: string | null;
+    progresso: { atual: number; alvo: number } | null;
+  } | null;
+  /** a raridade do tier em exibição — label só no detalhe */
+  raridade?: RaridadeConquista;
 };
 
 export type ProximoMarco = {
@@ -123,6 +193,14 @@ export type ConquistaFutura = {
   proximo: boolean;
   glifo: ConquistaGlifo;
   tom: { cor: string; tinta: string };
+  /** família evolutiva (024) — a futura de família mostra o PRÓXIMO tier
+   *  (título e glifo do degrau que vem) com o progresso honesto */
+  familia?: FamiliaChave;
+  /** o degrau que esta futura representa — 1-based */
+  tier?: number;
+  /** a escada inteira da família, pro detalhe */
+  tiers?: TierConquista[];
+  raridade?: RaridadeConquista;
 };
 
 /** As 4 faixas de nível por tempo de programa (016): a permanência é o
@@ -199,6 +277,12 @@ export type ConquistasInput = {
     status: string;
     realizado_em: string | null;
     data_hora: string | null;
+    /** a família de horas (024): só o minutado registrado conta — encontro
+     *  sem duracao_min não soma nada (nunca assume 60min) */
+    duracao_min?: number | null;
+    /** sessão combinada (0226): as rows do grupo dividem UMA hora física —
+     *  a família de horas deduplica por ela */
+    sessao_id?: string | null;
   }[];
   /** getJovemDuplas() — trilha/status/início por dupla */
   duplas: {
@@ -223,6 +307,28 @@ export type ConquistasInput = {
     status: string | null;
     created_at: string | null;
   }[];
+  /** getJovemAssinaturas() (024) — a família "termo" lê o slug
+   *  termo-mentorando; sem a leitura a peça só não aparece */
+  assinaturas?: {
+    slug: string | null;
+    status: string | null;
+    assinado_em: string | null;
+  }[];
+  /** itens do PDM das duplas DPP (024) — getPdmDaDupla por dupla,
+   *  já achatados; as famílias metas/submetas contam os "atingida" */
+  pdmItens?: {
+    parentId: string | null;
+    status: string;
+    atingidaEm: string | null;
+  }[];
+  /** a ficha do jovem (024) — a família "perfil" pede WhatsApp +
+   *  disponibilidade + bio ou interesses; a página resolve o booleano
+   *  bio/interesses entre me.bio e perfil.interesses */
+  perfil?: {
+    whatsapp: string | null;
+    disponibilidade: unknown;
+    bioOuInteresses: boolean;
+  } | null;
   /** relógio injetável — os testes fixam a vigência dos links da jornada */
   agora?: Date;
 };
@@ -782,6 +888,462 @@ export function conquistasDoJovem(input: ConquistasInput): ConquistasJovem {
       },
     });
   }
+
+  // ---------- famílias com tiers (024): uma peça evolutiva por contagem,
+  // estilo Duolingo. O glifo é o mesmo a família inteira — o metal e os
+  // raios da arte sobem por degrau; a estante guarda só o MAIOR tier
+  // ganho; a escada inteira abre no detalhe; a futura mostra o próximo
+  // tier com o progresso honesto. Derivação pura nos dois sentidos: a
+  // contagem caiu, o tier desce junto (um combinado desfeito volta a
+  // família pra área das futuras)
+
+  /** a raridade segue a posição na escada — família de 3 degraus para no
+   *  marco_grande; só a de 4 toca a lendaria */
+  const RARIDADE_TIER: RaridadeConquista[] = [
+    "inicial",
+    "constancia",
+    "marco_grande",
+    "lendaria",
+  ];
+
+  type FamiliaSpec = {
+    familia: FamiliaChave;
+    /** prefixo da chave estável — `conta:combinados` vira `…-2` no tier 2 */
+    prefixo: string;
+    tom: { cor: string; tinta: string };
+    tiers: { limiar: number; titulo: string; detalhe: string }[];
+    criterio: (limiar: number) => string;
+    /** a linha honesta do que falta — recebe a distância pro limiar */
+    linha: (falta: number) => string | null;
+  };
+
+  function emiteFamilia(
+    spec: FamiliaSpec,
+    /** a contagem atual da família — minutos nas horas, inteira no resto */
+    n: number,
+    /** o carimbo do limiar — a data do evento que o cruzou; null quando a
+     *  fonte não expõe data do feito (combinados não têm feito_em) */
+    dataNo: (limiar: number) => string | null,
+    /** a barra do próximo degrau, na unidade de exibição da família —
+     *  recebe o limiar pra montar o denominador (horas mostra "5 de 7",
+     *  não "300 de 420"); null na peça binária */
+    progFn: ((limiarProx: number) => { atual: number; alvo: number }) | null
+  ): void {
+    const tiers: TierConquista[] = spec.tiers.map((t, i) => ({
+      n: i + 1,
+      titulo: t.titulo,
+      detalhe: t.detalhe,
+      criterio: spec.criterio(t.limiar),
+      raridade: RARIDADE_TIER[Math.min(i, RARIDADE_TIER.length - 1)],
+      ganho: n >= t.limiar,
+      data: n >= t.limiar ? dataNo(t.limiar) : null,
+    }));
+    const ganhoAte = tiers.reduce<number>((m, t) => (t.ganho ? t.n : m), 0);
+    const proxT = ganhoAte < tiers.length ? tiers[ganhoAte] : null;
+    const proximo = proxT
+      ? {
+          n: proxT.n,
+          titulo: proxT.titulo,
+          criterio: proxT.criterio,
+          linha: spec.linha(Math.max(0, spec.tiers[ganhoAte].limiar - n)),
+          progresso: progFn
+            ? (() => {
+                const p = progFn(spec.tiers[ganhoAte].limiar);
+                return { atual: Math.min(p.atual, p.alvo), alvo: p.alvo };
+              })()
+            : null,
+        }
+      : null;
+    if (ganhoAte > 0) {
+      const t = tiers[ganhoAte - 1];
+      estante.push({
+        ts: t.data ? ts(t.data) : Number.POSITIVE_INFINITY,
+        c: {
+          chave: `${spec.prefixo}-${t.n}`,
+          titulo: t.titulo,
+          detalhe: t.detalhe,
+          data: t.data,
+          criterio: t.criterio,
+          glifo: { tipo: "familia", familia: spec.familia, tier: t.n },
+          tom: spec.tom,
+          familia: spec.familia,
+          tier: t.n,
+          tiers,
+          proximo,
+          raridade: t.raridade,
+        },
+      });
+    }
+    if (proxT) {
+      futuras.push({
+        chave: `${spec.prefixo}-${proxT.n}`,
+        titulo: proxT.titulo,
+        criterio: proxT.criterio,
+        linha: proximo!.linha,
+        progresso: proximo!.progresso,
+        proximo: false,
+        glifo: { tipo: "familia", familia: spec.familia, tier: proxT.n },
+        tom: spec.tom,
+        familia: spec.familia,
+        tier: proxT.n,
+        tiers,
+        raridade: proxT.raridade,
+      });
+    }
+  }
+
+  const plural = (n: number, um: string, muitos: string) =>
+    n === 1 ? um : muitos;
+
+  // combinados feitos — 4 degraus; a view não expõe feito_em, então os
+  // tiers não carimbam data e a peça ordena no fim da estante. Mesma
+  // régua de não-promessa do contador: a futura só nasce na trilha do
+  // mentor ou quando já existe combinado feito
+  if (temDpp || feitosComb.length > 0) {
+    emiteFamilia(
+      {
+        familia: "combinados",
+        prefixo: "conta:combinados",
+        tom: TOM_COMBINADOS,
+        tiers: [
+          {
+            limiar: 5,
+            titulo: "Palavra cumprida",
+            detalhe:
+              "Cinco tarefas ditas e feitas. Aqui, combinado é compromisso.",
+          },
+          {
+            limiar: 15,
+            titulo: "De palavra",
+            detalhe:
+              "Quinze combinados concluídos: o que você diz, acontece.",
+          },
+          {
+            limiar: 30,
+            titulo: "Compromisso em série",
+            detalhe: "Trinta combinados fechados, um depois do outro.",
+          },
+          {
+            limiar: 50,
+            titulo: "Lenda da palavra",
+            detalhe: "Cinquenta combinados. Pouca gente chega aqui.",
+          },
+        ],
+        criterio: (l) =>
+          `Concluir ${l} ${plural(l, "combinado", "combinados")}${temDpp ? " com seu mentor" : ""}`,
+        linha: (f) =>
+          `${f === 1 ? "Falta" : "Faltam"} ${f} ${plural(f, "combinado", "combinados")}${temDpp ? " com seu mentor" : ""}`,
+      },
+      feitosComb.length,
+      () => null,
+      (l) => ({ atual: feitosComb.length, alvo: l })
+    );
+  }
+
+  // horas de encontro — só o duracao_min registrado conta; a sessão
+  // combinada (0226) é UMA hora física, então deduplica por sessao_id
+  // (a row coberta tem o mesmo min da âncora). O carimbo do tier é o
+  // realizado_em do encontro que cruzou o limiar
+  const sessoes = new Map<string, { min: number; quando: string | null }>();
+  for (const e of daTrilha) {
+    const min = e.duracao_min;
+    if (min == null || min <= 0) continue;
+    const k = e.sessao_id ?? e.id;
+    const quando = e.realizado_em ?? e.data_hora;
+    const s = sessoes.get(k);
+    if (s) {
+      if (ts(quando) < ts(s.quando)) s.quando = quando;
+      continue;
+    }
+    sessoes.set(k, { min, quando });
+  }
+  const ordemHoras = [...sessoes.values()].sort(
+    (a, b) => ts(a.quando) - ts(b.quando)
+  );
+  const minTotal = ordemHoras.reduce((s, x) => s + x.min, 0);
+  const fmtHoras = (min: number): string => {
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    if (h <= 0) return `${m}min`;
+    return m ? `${h}h${String(m).padStart(2, "0")}` : `${h}h`;
+  };
+  if (temJornada) {
+    emiteFamilia(
+      {
+        familia: "horas",
+        prefixo: "conta:horas",
+        tom: TOM_MARCO,
+        tiers: [
+          {
+            limiar: 420,
+            titulo: "Sete horas",
+            detalhe:
+              "Sete horas cara a cara: a conversa já vira repertório.",
+          },
+          {
+            limiar: 900,
+            titulo: "Mês de conversas",
+            detalhe: "Quinze horas de escuta compartilhada.",
+          },
+          {
+            limiar: 1800,
+            titulo: "Semestre de escuta",
+            detalhe: "Trinta horas juntos: um semestre inteiro de conversa.",
+          },
+          {
+            limiar: 3000,
+            titulo: "Horas de casa",
+            detalhe: "Cinquenta horas de programa: tempo de casa.",
+          },
+        ],
+        criterio: (l) =>
+          `Acumular ${l / 60} ${plural(l / 60, "hora", "horas")} de ${temDpp ? "encontro" : "sessão"} registradas`,
+        linha: (f) =>
+          `${f === 1 ? "Falta" : "Faltam"} ${fmtHoras(f)} para o próximo nível`,
+      },
+      minTotal,
+      (limiar) => {
+        let acc = 0;
+        for (const s of ordemHoras) {
+          acc += s.min;
+          if (acc >= limiar) return s.quando;
+        }
+        return null;
+      },
+      (l) => ({
+        atual: Math.floor(Math.min(minTotal, l) / 60),
+        alvo: l / 60,
+      })
+    );
+  }
+
+  // metas e submetas do PDM — só na trilha do mentor (o especialista não
+  // tem PDM); a régua de não-promessa é a mesma do conta:combinados
+  if (temDpp) {
+    const atingidas = (raiz: boolean) =>
+      (input.pdmItens ?? [])
+        .filter((i) => i.status === "atingida" && (i.parentId == null) === raiz)
+        .sort((a, b) => ts(a.atingidaEm) - ts(b.atingidaEm));
+    const metasAt = atingidas(true);
+    const subsAt = atingidas(false);
+    emiteFamilia(
+      {
+        familia: "metas",
+        prefixo: "pdm:metas",
+        tom: INSTRUMENTO_TOM.pdm,
+        tiers: [
+          {
+            limiar: 1,
+            titulo: "Primeira meta",
+            detalhe: "A primeira meta do seu plano saiu do papel.",
+          },
+          {
+            limiar: 3,
+            titulo: "No rumo",
+            detalhe: "Três metas cumpridas: o plano deixou de ser intenção.",
+          },
+          {
+            limiar: 5,
+            titulo: "Plano em movimento",
+            detalhe: "Cinco metas atingidas: o plano anda.",
+          },
+        ],
+        criterio: (l) =>
+          `Marcar ${l} ${plural(l, "meta", "metas")} do PDM como ${plural(l, "atingida", "atingidas")}`,
+        linha: (f) =>
+          `${f === 1 ? "Falta" : "Faltam"} ${f} ${plural(f, "meta", "metas")} ${plural(f, "atingida", "atingidas")}`,
+      },
+      metasAt.length,
+      (l) => metasAt[l - 1]?.atingidaEm ?? null,
+      (l) => ({ atual: metasAt.length, alvo: l })
+    );
+    emiteFamilia(
+      {
+        familia: "submetas",
+        prefixo: "pdm:submetas",
+        tom: INSTRUMENTO_TOM.pdm,
+        tiers: [
+          {
+            limiar: 3,
+            titulo: "Passo a passo",
+            detalhe: "Três passos do plano já ficaram pra trás.",
+          },
+          {
+            limiar: 10,
+            titulo: "Tijolo a tijolo",
+            detalhe: "Dez submetas atingidas: a obra cresce por dentro.",
+          },
+          {
+            limiar: 25,
+            titulo: "Obra aberta",
+            detalhe: "Vinte e cinco passos concluídos do seu plano.",
+          },
+        ],
+        criterio: (l) =>
+          `Marcar ${l} ${plural(l, "submeta", "submetas")} do PDM como ${plural(l, "atingida", "atingidas")}`,
+        linha: (f) =>
+          `${f === 1 ? "Falta" : "Faltam"} ${f} ${plural(f, "submeta", "submetas")} ${plural(f, "atingida", "atingidas")}`,
+      },
+      subsAt.length,
+      (l) => subsAt[l - 1]?.atingidaEm ?? null,
+      (l) => ({ atual: subsAt.length, alvo: l })
+    );
+  }
+
+  // avaliações enviadas — a mesma fonte do contador (a estante guarda os
+  // dois: a conta viva e a família nomeada); o carimbo do tier é o
+  // created_at da avaliação que cruzou o limiar
+  if (temJornada) {
+    const avalOrdem = [...input.avaliacoes].sort(
+      (a, b) => ts(a.created_at) - ts(b.created_at)
+    );
+    emiteFamilia(
+      {
+        familia: "avaliacoes",
+        prefixo: "conta:avaliacoes",
+        tom: INSTRUMENTO_TOM.avaliacao_encontro,
+        tiers: [
+          {
+            limiar: 5,
+            titulo: "Voz treinada",
+            detalhe: "Cinco avaliações enviadas: a sua opinião guia a dupla.",
+          },
+          {
+            limiar: 15,
+            titulo: "Voz constante",
+            detalhe: "Quinze avaliações: você avalia toda vez.",
+          },
+          {
+            limiar: 30,
+            titulo: "Voz do programa",
+            detalhe: "Trinta avaliações: a sua leitura faz parte do ciclo.",
+          },
+        ],
+        criterio: (l) =>
+          `Enviar ${l} ${plural(l, "avaliação", "avaliações")} de ${temDpp ? "encontro" : "sessão"}`,
+        linha: (f) =>
+          `${f === 1 ? "Falta" : "Faltam"} ${f} ${plural(f, "avaliação", "avaliações")} enviadas`,
+      },
+      nAval,
+      (l) => avalOrdem[l - 1]?.created_at ?? null,
+      (l) => ({ atual: nAval, alvo: l })
+    );
+  }
+
+  // presença — o run de realizado sem nao_aconteceu intercalado na trilha
+  // da régua (agendado não quebra); o carimbo é o último da sequência
+  if (temJornada) {
+    const ordemTrilha = input.encontros
+      .filter((e) => (temDpp ? !ehEsp(e) : ehEsp(e)))
+      .sort(
+        (a, b) =>
+          ts(a.data_hora ?? a.realizado_em) - ts(b.data_hora ?? b.realizado_em)
+      );
+    let run = 0;
+    const marcoRun = new Map<number, string | null>();
+    for (const e of ordemTrilha) {
+      if (e.status === "realizado") {
+        run += 1;
+        marcoRun.set(run, e.realizado_em ?? e.data_hora);
+      } else if (e.status === "nao_aconteceu") {
+        run = 0;
+      }
+    }
+    const seguidos = run;
+    emiteFamilia(
+      {
+        familia: "presenca",
+        prefixo: "conta:presenca",
+        tom: TOM_MARCO,
+        tiers: [
+          {
+            limiar: 4,
+            titulo: "Não faltou",
+            detalhe: `Quatro ${temDpp ? "encontros" : "sessões"} seguidos, nenhuma falta: presença é rotina.`,
+          },
+          {
+            limiar: 8,
+            titulo: "Presença limpa",
+            detalhe: "Oito seguidos sem faltar: ninguém precisou te lembrar.",
+          },
+          {
+            limiar: 16,
+            titulo: "Ciclo inteiro",
+            detalhe: "O ciclo inteiro de presença limpa.",
+          },
+        ],
+        criterio: (l) =>
+          `Realizar ${l} ${temDpp ? "encontros" : "sessões"} seguidos sem faltar`,
+        linha: (f) =>
+          `${f === 1 ? "Falta" : "Faltam"} ${f} ${temDpp ? "encontros" : "sessões"} seguidos sem faltar`,
+      },
+      seguidos,
+      (l) => marcoRun.get(l) ?? null,
+      (l) => ({ atual: seguidos, alvo: l })
+    );
+  }
+
+  // ---------- peças gerais (024): chegam sem jornada — são as primeiras
+  // da estante de quem ainda não tem dupla; binárias, então a futura
+  // traz a linha do que falta em vez de barra
+
+  // perfil completo — WhatsApp + disponibilidade + (bio ou interesses)
+  const perfil = input.perfil ?? null;
+  const faltamFicha: string[] = [];
+  if (perfil) {
+    if (!perfil.whatsapp?.trim()) faltamFicha.push("WhatsApp");
+    if (perfil.disponibilidade == null) faltamFicha.push("disponibilidade");
+    if (!perfil.bioOuInteresses) faltamFicha.push("bio ou interesses");
+  }
+  emiteFamilia(
+    {
+      familia: "perfil",
+      prefixo: "perfil:completo",
+      tom: INSTRUMENTO_TOM.intake_mentorado,
+      tiers: [
+        {
+          limiar: 1,
+          titulo: "Cara do lugar",
+          detalhe: "Ficha completa: quem te acompanha sabe quem você é.",
+        },
+      ],
+      criterio: () =>
+        "Completar a ficha: WhatsApp, disponibilidade e bio ou interesses",
+      linha: () =>
+        perfil == null
+          ? "Completar a ficha do perfil"
+          : faltamFicha.length === 1
+            ? `Falta preencher: ${faltamFicha[0]}`
+            : `Faltam preencher: ${faltamFicha.join(", ").replace(/, ([^,]*)$/, " e $1")}`,
+    },
+    perfil != null && faltamFicha.length === 0 ? 1 : 0,
+    () => null,
+    null
+  );
+
+  // termo assinado — o Termo de Adesão e Participação do onboarding
+  const termo = (input.assinaturas ?? []).find(
+    (a) => a.slug === "termo-mentorando"
+  );
+  emiteFamilia(
+    {
+      familia: "termo",
+      prefixo: "doc:termo",
+      tom: INSTRUMENTO_TOM.intake_mentorado,
+      tiers: [
+        {
+          limiar: 1,
+          titulo: "Termo assinado",
+          detalhe: "O documento que abre a sua jornada, assinado.",
+        },
+      ],
+      criterio: () => "Assinar o Termo de Adesão e Participação",
+      linha: () => "O seu termo está esperando a assinatura",
+    },
+    termo?.status === "assinado" ? 1 : 0,
+    () => termo?.assinado_em ?? null,
+    null
+  );
 
   // ---------- marcos de ação (485/515 — a faixa "Próximo marco" no topo
   // da jornada): o que a jovem faz, não o tempo que ela fica. Sem jornada

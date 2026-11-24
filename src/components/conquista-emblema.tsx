@@ -1,11 +1,18 @@
 import {
   CalendarCheck,
+  Checks,
+  ClockCountdown,
   Flag,
   FlagCheckered,
+  Handshake,
+  IdentificationCard,
+  Lightning,
   ListChecks,
   Medal,
-  Plant,
-  Tree,
+  Signature,
+  Sparkle,
+  Star,
+  Target,
   Trophy,
   UsersThree,
 } from "@phosphor-icons/react/dist/ssr";
@@ -15,6 +22,7 @@ import { arteDoGlifo } from "@/lib/badges";
 import type {
   ConquistaGlifo,
   ConquistaPhosphor,
+  FamiliaChave,
   NivelChave,
 } from "@/lib/conquistas";
 import { cn } from "@/lib/utils";
@@ -80,12 +88,22 @@ function Squircle({
   className?: string;
 }) {
   const glifoSize = Math.round(size * 0.575);
+  const nivel = glifo.tipo === "nivel" ? NIVEL[glifo.chave] : null;
   const Phos =
     glifo.tipo === "phosphor"
       ? PHOSPHOR[glifo.nome]
-      : glifo.tipo === "nivel"
-        ? NIVEL[glifo.chave]
-        : null;
+      : glifo.tipo === "familia"
+        ? FAMILIA[glifo.familia]
+        : (nivel?.I ?? null);
+  // o peso sobe com o tier — regular → bold → fill (a arte evolui igual)
+  const weight =
+    glifo.tipo === "familia"
+      ? glifo.tier >= 3
+        ? "fill"
+        : glifo.tier === 2
+          ? "bold"
+          : "regular"
+      : (nivel?.weight ?? "regular");
   return (
     <span
       aria-hidden
@@ -103,7 +121,7 @@ function Squircle({
       {glifo.tipo === "instrumento" ? (
         <InstrumentoIcone instrumento={glifo.chave} size={glifoSize} neutro />
       ) : (
-        Phos && <Phos size={glifoSize} />
+        Phos && <Phos size={glifoSize} weight={weight} />
       )}
     </span>
   );
@@ -118,9 +136,27 @@ const PHOSPHOR: Record<ConquistaPhosphor, typeof Flag> = {
   usersThree: UsersThree,
 };
 
-const NIVEL: Record<NivelChave, typeof Flag> = {
-  inicio: Plant,
-  constancia: CalendarCheck,
-  veterania: Tree,
-  completa: Trophy,
+/** O raio da família de nível (024) — Lightning com progressão por peso:
+ *  regular → bold → fill, e o Sparkle fill na jornada completa. */
+const NIVEL: Record<
+  NivelChave,
+  { I: typeof Lightning; weight: "regular" | "bold" | "fill" }
+> = {
+  inicio: { I: Lightning, weight: "regular" },
+  constancia: { I: Lightning, weight: "bold" },
+  veterania: { I: Lightning, weight: "fill" },
+  completa: { I: Sparkle, weight: "fill" },
+};
+
+/** O Phosphor de cada família com tiers (024) — o mesmo glifo a escada
+ *  inteira; o que evolui por degrau é o peso (e a arte isométrica). */
+const FAMILIA: Record<FamiliaChave, typeof Handshake> = {
+  combinados: Handshake,
+  horas: ClockCountdown,
+  metas: Target,
+  submetas: Checks,
+  avaliacoes: Star,
+  presenca: CalendarCheck,
+  perfil: IdentificationCard,
+  termo: Signature,
 };

@@ -3,6 +3,16 @@
 import type { CSSProperties, ReactNode } from "react";
 import { ConquistaEmblema } from "@/components/conquista-emblema";
 import {
+  Barra,
+  Brilho,
+  classeMotionPeca,
+  estadoFaixa,
+  FaixaDetalhe,
+  Ficha,
+  PecaDetalhe,
+  ProximoNivel,
+} from "@/components/faixa-detalhe";
+import {
   Dialog,
   DialogContent,
   DialogDescription,
@@ -15,118 +25,84 @@ import type {
   Conquista,
   ConquistaFutura,
   ConquistaGlifo,
+  FamiliaChave,
   NiveisJornada,
-  NivelJornada,
+  RaridadeConquista,
+  TierConquista,
 } from "@/lib/conquistas";
 import { cn } from "@/lib/utils";
 
-/** "Suas conquistas" v3 (016) — três andares no mesmo card: o nível por
+/** "Suas conquistas" v4 (024) — três andares no mesmo card: o nível por
  *  tempo de programa (a peça da faixa atual + a régua das 4 faixas + o
  *  que falta pra próxima), a estante earned-only em ordem cronológica e,
  *  separada dela, a área "Ainda por vir" com as peças apagadas e o
  *  critério em texto — nunca cadeado. Toda peça abre o detalhe (critério,
- *  data, estado). As ilustrações são public/badges; a animação é o salto
- *  do globals.css, no hover/foco e ao abrir o detalhe. Cliente: as peças
- *  são triggers de Dialog. */
+ *  data, estado); nas famílias com tiers o detalhe mostra a escada
+ *  inteira. As ilustrações são public/badges; a animação é o salto do
+ *  globals.css e, nas faixas de nível, a assinatura de cada faixa. O
+ *  detalhe das faixas mora em components/faixa-detalhe — o mesmo que o
+ *  selo do header usa. Cliente: as peças são triggers de Dialog. */
 
-/** O brilho do kit (spark de 4 pontas) — estoura na batida do salto. */
-function Brilho({ className }: { className?: string }) {
-  return (
-    <svg
-      viewBox="-12 -12 24 24"
-      aria-hidden
-      className={cn("pointer-events-none absolute overflow-visible", className)}
-    >
-      <path
-        d="M0 -10Q2.8 -2.8 10 0Q2.8 2.8 0 10Q-2.8 2.8 -10 0Q-2.8 -2.8 0 -10Z"
-        fill="white"
-        stroke="var(--brand-ink)"
-        strokeWidth="1.8"
-        strokeLinejoin="round"
-      />
-    </svg>
-  );
-}
+/** O rótulo da raridade no detalhe — a posição do degrau na escada. */
+const ROTULO_RARIDADE: Record<RaridadeConquista, string> = {
+  inicial: "Degrau inicial",
+  constancia: "Degrau de constância",
+  marco_grande: "Marco grande",
+  lendaria: "Lendária",
+};
 
-/** A peça grande do detalhe: salta ao abrir; o que já é dela estoura
- *  dois brilhos na batida. */
-function PecaDetalhe({
-  glifo,
+/** A escada da família no detalhe (024): todos os degraus em ordem, cada
+ *  um com a arte do próprio tier e o estado em texto — ganho com a data,
+ *  o próximo com a linha honesta do que falta e os futuros com o
+ *  critério. Regressão honesta: a contagem caiu, o degrau apaga junto. */
+function EscadaFamilia({
+  familia,
   tom,
-  estado,
+  tiers,
+  linhaProximo,
 }: {
-  glifo: ConquistaGlifo;
+  familia: FamiliaChave;
   tom: { cor: string; tinta: string };
-  estado: "ganho" | "proximo" | "futuro";
+  tiers: TierConquista[];
+  /** a linha do que falta no degrau seguinte — a mesma da futura */
+  linhaProximo: string | null;
 }) {
+  const nProx = tiers.find((t) => !t.ganho)?.n ?? null;
   return (
-    <div className="relative mx-auto grid size-28 place-items-center">
-      <ConquistaEmblema
-        glifo={glifo}
-        tom={tom}
-        size={112}
-        estado={estado}
-        className="badge-salta"
-      />
-      {estado === "ganho" && (
-        <>
-          <Brilho className="badge-brilho -top-1 right-0 size-6" />
-          <Brilho className="badge-brilho bottom-4 -left-1 size-4 [animation-delay:980ms]" />
-        </>
-      )}
-    </div>
-  );
-}
-
-/** Ficha do detalhe — "rótulo sobre valor" (dt da convenção). */
-function Ficha({ itens }: { itens: [string, ReactNode][] }) {
-  return (
-    <dl className="space-y-3 rounded-lg bg-muted/50 p-3.5">
-      {itens.map(([rotulo, valor]) => (
-        <div key={rotulo}>
-          <dt className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-            {rotulo}
-          </dt>
-          <dd className="mt-0.5 text-sm text-pretty">{valor}</dd>
-        </div>
+    <ol
+      aria-label="Degraus da conquista"
+      className="space-y-1.5 rounded-lg bg-muted/50 p-2"
+    >
+      {tiers.map((t) => (
+        <li key={t.n} className="flex items-center gap-3 px-1.5 py-1">
+          <ConquistaEmblema
+            glifo={{ tipo: "familia", familia, tier: t.n }}
+            tom={tom}
+            size={36}
+            estado={t.ganho ? "ganho" : "futuro"}
+          />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm leading-tight font-medium">
+              {t.titulo}
+            </span>
+            <span className="block text-xs text-muted-foreground">
+              {t.ganho
+                ? t.data
+                  ? `Conquistado em ${formatDate(t.data)}`
+                  : "Conquistado"
+                : t.n === nProx && linhaProximo
+                  ? linhaProximo
+                  : t.criterio}
+            </span>
+          </span>
+          {t.ganho && (
+            <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+              {ROTULO_RARIDADE[t.raridade]}
+            </span>
+          )}
+        </li>
       ))}
-    </dl>
-  );
-}
-
-function Barra({
-  rotulo,
-  atual,
-  alvo,
-  unidade,
-}: {
-  rotulo: string;
-  atual: number;
-  alvo: number;
-  /** "4 de 8" vira "4 de 8 dias" quando a unidade não está no rótulo */
-  unidade?: string;
-}) {
-  const valor = `${atual} de ${alvo}${unidade ? ` ${unidade}` : ""}`;
-  return (
-    <div className="min-w-0">
-      <div className="flex items-baseline justify-between gap-2 text-xs">
-        <span className="text-muted-foreground">{rotulo}</span>
-        <span className="font-medium tabular-nums">{valor}</span>
-      </div>
-      <div
-        role="progressbar"
-        aria-label={`${rotulo}: ${valor}`}
-        aria-valuemin={0}
-        aria-valuemax={alvo}
-        aria-valuenow={atual}
-        className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted"
-      >
-        <div
-          className="fill-grow h-full rounded-full bg-[var(--destaque)]"
-          style={{ width: `${Math.min(100, (atual / Math.max(1, alvo)) * 100)}%` }}
-        />
-      </div>
-    </div>
+    </ol>
   );
 }
 
@@ -156,9 +132,9 @@ function Tile({
           tom={tom}
           size={56}
           estado={estado}
-          className="group-hover:badge-salta group-focus-visible:badge-salta"
+          className={classeMotionPeca(glifo, "passa")}
         />
-        <span className="text-xs font-medium leading-tight">{titulo}</span>
+        <span className="text-xs leading-tight font-medium">{titulo}</span>
         {linha}
       </DialogTrigger>
       <DialogContent size="sm">{children}</DialogContent>
@@ -191,8 +167,36 @@ function ConquistaItem({ c }: { c: Conquista }) {
         itens={[
           ["O que ela marca", c.detalhe],
           ["Como se conquista", c.criterio],
+          ...(c.raridade
+            ? ([["Raridade", ROTULO_RARIDADE[c.raridade]]] as [
+                string,
+                ReactNode,
+              ][])
+            : []),
         ]}
       />
+      {c.familia && c.tiers && (
+        <div>
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+            A escada desta conquista
+          </p>
+          <EscadaFamilia
+            familia={c.familia}
+            tom={c.tom}
+            tiers={c.tiers}
+            linhaProximo={c.proximo?.linha ?? null}
+          />
+          {c.proximo?.progresso && (
+            <div className="mt-3">
+              <Barra
+                rotulo="Progresso para o próximo degrau"
+                atual={c.proximo.progresso.atual}
+                alvo={c.proximo.progresso.alvo}
+              />
+            </div>
+          )}
+        </div>
+      )}
     </Tile>
   );
 }
@@ -243,99 +247,20 @@ function FuturaItem({ f }: { f: ConquistaFutura }) {
             : []),
         ]}
       />
-    </Tile>
-  );
-}
-
-const PARADA = {
-  pausada: "Sua dupla está pausada: a contagem volta com os encontros.",
-  encerrada: "Sua dupla foi encerrada: o nível alcançado fica com você.",
-} as const;
-
-/** O que falta pra próxima faixa: critério, barras e a contagem — nunca
- *  uma data projetada. */
-function ProximoNivel({
-  nivel,
-  faixa,
-}: {
-  nivel: NiveisJornada;
-  faixa: NivelJornada;
-}) {
-  const p = nivel.proximo!;
-  return (
-    <>
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        <Barra
-          rotulo={nivel.sessao ? "Sessões" : "Encontros"}
-          atual={p.encontros.atual}
-          alvo={p.encontros.alvo}
-        />
-        {p.dias && (
-          <Barra
-            rotulo="Tempo de programa"
-            atual={p.dias.atual}
-            alvo={p.dias.alvo}
-            unidade="dias"
-          />
-        )}
-      </div>
-      <p className="mt-2.5 text-xs text-muted-foreground">
-        {p.falta ?? (nivel.parada ? PARADA[nivel.parada] : faixa.criterio)}
-      </p>
-    </>
-  );
-}
-
-/** Estado da faixa em texto — a régua nunca diz só por cor. */
-function estadoFaixa(f: NivelJornada, nivel: NiveisJornada): string {
-  if (f.chave === nivel.atual) return "Seu nível";
-  if (f.estado === "ganho") return "Alcançada";
-  if (f.estado === "superado") return "Superada";
-  return f.chave === nivel.proximo?.chave ? "Próxima" : "Ainda por vir";
-}
-
-function FaixaDetalhe({
-  f,
-  nivel,
-}: {
-  f: NivelJornada;
-  nivel: NiveisJornada;
-}) {
-  const atual = nivel.faixas.find((x) => x.chave === nivel.atual);
-  const descricao =
-    f.estado === "ganho"
-      ? `${f.chave === nivel.atual ? "Seu nível desde" : "Alcançada em"} ${formatDate(f.data)}`
-      : f.estado === "superado"
-        ? `Superada: você chegou a ${atual?.titulo ?? "uma faixa acima"} antes do tempo desta`
-        : f.chave === nivel.proximo?.chave
-          ? "O seu próximo nível"
-          : "Ainda por vir";
-  return (
-    <>
-      <DialogHeader className="items-center px-8 text-center">
-        <PecaDetalhe
-          glifo={f.glifo}
-          tom={f.tom}
-          estado={f.estado === "futuro" ? "futuro" : "ganho"}
-        />
-        <DialogTitle>{f.titulo}</DialogTitle>
-        <DialogDescription>{descricao}</DialogDescription>
-      </DialogHeader>
-      <Ficha
-        itens={[
-          ["O que reconhece", f.detalhe],
-          ["Critério", f.criterio],
-        ]}
-      />
-      {f.chave === nivel.proximo?.chave && (
+      {f.familia && f.tiers && (
         <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
-            O que falta
+          <p className="mb-1.5 text-[11px] font-medium uppercase tracking-[0.08em] text-muted-foreground">
+            A escada desta conquista
           </p>
-          <ProximoNivel nivel={nivel} faixa={f} />
+          <EscadaFamilia
+            familia={f.familia}
+            tom={f.tom}
+            tiers={f.tiers}
+            linhaProximo={f.linha}
+          />
         </div>
       )}
-    </>
+    </Tile>
   );
 }
 
@@ -361,13 +286,17 @@ function NivelBloco({ nivel }: { nivel: NiveisJornada }) {
   return (
     <div className="mt-4 rounded-lg border border-border/60 p-4 sm:p-5">
       <Dialog>
-        <DialogTrigger className="group flex w-full items-center gap-4 rounded-lg text-left outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <DialogTrigger className="group flex w-full items-center gap-4 rounded-lg p-2 -m-2 text-left outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring">
           <ConquistaEmblema
             glifo={vitrine.glifo}
             tom={vitrine.tom}
             size={80}
             estado={atual ? "ganho" : "futuro"}
-            className="group-hover:badge-salta group-focus-visible:badge-salta"
+            className={classeMotionPeca(
+              vitrine.glifo,
+              "abre",
+              atual ? "ganho" : "futuro"
+            )}
           />
           <span className="min-w-0">
             <span className="block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
@@ -405,7 +334,7 @@ function NivelBloco({ nivel }: { nivel: NiveisJornada }) {
           return (
             <li key={f.chave} className="relative min-w-0">
               <Dialog>
-                <DialogTrigger className="group flex w-full flex-col items-center gap-1.5 rounded-lg px-1 pb-1 text-center outline-none focus-visible:ring-2 focus-visible:ring-ring">
+                <DialogTrigger className="group flex w-full flex-col items-center gap-1.5 rounded-lg px-1 pb-1 text-center outline-none transition-colors hover:bg-muted/60 focus-visible:ring-2 focus-visible:ring-ring">
                   <span
                     className={cn(
                       "rounded-[28%]",
@@ -418,7 +347,7 @@ function NivelBloco({ nivel }: { nivel: NiveisJornada }) {
                       tom={f.tom}
                       size={40}
                       estado={f.estado === "futuro" ? "futuro" : "ganho"}
-                      className="group-hover:badge-salta group-focus-visible:badge-salta"
+                      className={classeMotionPeca(f.glifo, "passa")}
                     />
                   </span>
                   <span className="text-xs leading-tight font-medium">

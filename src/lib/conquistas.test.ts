@@ -1,5 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { conquistasDoJovem, type ConquistasInput } from "./conquistas";
+import {
+  demoJovemAssinaturas,
+  demoJovemAvaliacoes,
+  demoJovemDuplas,
+  demoJovemEncaminhamentos,
+  demoJovemEncontros,
+  demoJovemPerfil,
+  demoMe,
+} from "./demo/queries";
+import { demoJovemJornada } from "./demo/forms-data";
+import { demoPdmDaDupla } from "./demo/pdm-data";
 import type {
   EntregaJornada,
   EventoJornada,
@@ -134,7 +145,12 @@ describe("conquistasDoJovem", () => {
         encontros: Array.from({ length: 8 }, (_, i) => enc(i + 1)),
       })
     );
-    expect(chaves(r)).toEqual(["marco:primeiro", "marco:metade"]);
+    // 8 seguidos: a família presença (024) carimba o tier 2 na mesma data
+    expect(chaves(r)).toEqual([
+      "marco:primeiro",
+      "marco:metade",
+      "conta:presenca-2",
+    ]);
     expect(r.conquistas[0].data).toBe(`${dia(1)}T19:00:00-03:00`);
     expect(r.conquistas[1].data).toBe(`${dia(8)}T19:00:00-03:00`);
     expect(r.conquistas[0].titulo).toBe("Primeiro encontro");
@@ -173,6 +189,7 @@ describe("conquistasDoJovem", () => {
       "marco:metade",
       "marco:reta_final",
       "marco:completo",
+      "conta:presenca-3",
     ]);
     expect(r.proximoMarco).toBeNull();
   });
@@ -822,8 +839,9 @@ describe("conquistas futuras", () => {
     expect(porChave.get("conta:combinados")).toMatchObject({
       linha: "2 combinados em aberto",
     });
-    // a estante segue earned-only: nada futuro vazou pra lá
-    expect(chaves(r)).toEqual(["marco:primeiro"]);
+    // a estante segue earned-only: nada futuro vazou pra lá (o run de 4
+    // seguidos já carimbou o tier 1 da presença)
+    expect(chaves(r)).toEqual(["marco:primeiro", "conta:presenca-1"]);
     expect(r.conquistas[0].criterio).toBe("Ter o 1º encontro com seu mentor");
   });
 
@@ -838,13 +856,355 @@ describe("conquistas futuras", () => {
     const r = conquistasDoJovem(
       base({
         duplas: [DUPLA_DPP],
-        encontros: Array.from({ length: 16 }, (_, i) => enc(i + 1)),
-        avaliacoes: [
-          { encontro_id: "e1", dupla_id: "d1", created_at: "2026-03-04T12:00:00-03:00" },
+        // 16 seguidos com 200min cada: presença e horas fecham a escada
+        encontros: Array.from({ length: 16 }, (_, i) =>
+          enc(i + 1, { duracao_min: 200 })
+        ),
+        avaliacoes: Array.from({ length: 30 }, (_, i) => ({
+          encontro_id: `e${(i % 16) + 1}`,
+          dupla_id: "d1",
+          created_at: `${dia(1)}T2${i % 10}:00:00-03:00`,
+        })),
+        encaminhamentos: Array.from({ length: 50 }, (_, i) => ({
+          status: "feito",
+          created_at: `2026-03-${String(1 + (i % 28)).padStart(2, "0")}T12:00:00-03:00`,
+        })),
+        pdmItens: [
+          ...Array.from({ length: 5 }, (_, i) => ({
+            parentId: null,
+            status: "atingida",
+            atingidaEm: `2026-03-0${i + 1}T12:00:00-03:00`,
+          })),
+          ...Array.from({ length: 25 }, (_, i) => ({
+            parentId: `m${1 + (i % 5)}`,
+            status: "atingida",
+            atingidaEm: `2026-04-0${(i % 9) + 1}T12:00:00-03:00`,
+          })),
         ],
-        encaminhamentos: [{ status: "feito", created_at: "2026-03-05T12:00:00-03:00" }],
+        perfil: {
+          whatsapp: "5511999990000",
+          disponibilidade: { ter: ["noite"] },
+          bioOuInteresses: true,
+        },
+        assinaturas: [
+          {
+            slug: "termo-mentorando",
+            status: "assinado",
+            assinado_em: "2026-02-20T12:00:00-03:00",
+          },
+        ],
       })
     );
     expect(r.futuras).toEqual([]);
+  });
+});
+
+// ---------- famílias com tiers (024): uma peça evolutiva por contagem —
+// a estante guarda só o maior degrau, a futura mostra o próximo, e a
+// derivação é pura nos dois sentidos (contagem caiu, degrau desce junto)
+describe("famílias com tiers", () => {
+  const feitos = (n: number): ConquistasInput["encaminhamentos"] =>
+    Array.from({ length: n }, (_, i) => ({
+      status: "feito",
+      created_at: `2026-03-${String(1 + (i % 28)).padStart(2, "0")}T12:00:00-03:00`,
+    }));
+
+  it("sem jornada, as peças gerais ainda chegam como futuras", () => {
+    const r = conquistasDoJovem(base());
+    expect(r.temJornada).toBe(false);
+    expect(r.conquistas).toEqual([]);
+    expect(r.futuras.map((f) => f.familia).sort()).toEqual([
+      "perfil",
+      "termo",
+    ]);
+  });
+
+  it("a estante guarda só o MAIOR tier e a futura mostra o próximo degrau", () => {
+    const r = conquistasDoJovem(
+      base({ duplas: [DUPLA_DPP], encaminhamentos: feitos(6) })
+    );
+    const comb = r.conquistas.filter((c) => c.familia === "combinados");
+    expect(comb.map((c) => c.chave)).toEqual(["conta:combinados-1"]);
+    expect(comb[0]).toMatchObject({
+      tier: 1,
+      raridade: "inicial",
+      data: null, // a view não expõe feito_em — data honesta
+      titulo: "Palavra cumprida",
+    });
+    expect(comb[0].tiers!.map((t) => [t.n, t.ganho])).toEqual([
+      [1, true],
+      [2, false],
+      [3, false],
+      [4, false],
+    ]);
+    expect(comb[0].proximo).toMatchObject({
+      n: 2,
+      titulo: "De palavra",
+      progresso: { atual: 6, alvo: 15 },
+    });
+    const fut = r.futuras.find((f) => f.chave === "conta:combinados-2")!;
+    expect(fut.linha).toBe("Faltam 9 combinados com seu mentor");
+    expect(fut.glifo).toEqual({
+      tipo: "familia",
+      familia: "combinados",
+      tier: 2,
+    });
+  });
+
+  it("regressão honesta: a contagem cai e a peça desce de degrau", () => {
+    const antes = conquistasDoJovem(
+      base({ duplas: [DUPLA_DPP], encaminhamentos: feitos(16) })
+    );
+    expect(chaves(antes)).toContain("conta:combinados-2");
+    const depois = conquistasDoJovem(
+      base({ duplas: [DUPLA_DPP], encaminhamentos: feitos(14) })
+    );
+    expect(chaves(depois)).not.toContain("conta:combinados-2");
+    expect(chaves(depois)).toContain("conta:combinados-1");
+    expect(depois.futuras.map((f) => f.chave)).toContain(
+      "conta:combinados-2"
+    );
+  });
+
+  it("horas deduplicam por sessao_id e carimbam o cruzamento do limiar", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [DUPLA_DPP],
+        encontros: [
+          enc(1, { duracao_min: 60 }),
+          enc(2, { duracao_min: 90 }),
+          enc(3, { duracao_min: 60, sessao_id: "s1" }),
+          enc(4, { duracao_min: 60, sessao_id: "s1" }), // a mesma hora física
+          enc(5, { duracao_min: 75 }),
+          enc(6, { duracao_min: 90 }),
+          enc(7, { duracao_min: null }), // sem minuto não soma nada
+          enc(8, { duracao_min: 75 }),
+        ],
+      })
+    );
+    // 60+90+60+75+90+75 = 450min → o tier 1 (7h=420) cruzou no 8º encontro
+    const h = r.conquistas.find((c) => c.familia === "horas")!;
+    expect(h.chave).toBe("conta:horas-1");
+    expect(h.titulo).toBe("Sete horas");
+    expect(h.data).toBe(`${dia(8)}T19:00:00-03:00`);
+    const fut = r.futuras.find((f) => f.familia === "horas")!;
+    expect(fut.chave).toBe("conta:horas-2");
+    // a barra mostra horas de verdade, não minutos
+    expect(fut.progresso).toEqual({ atual: 7, alvo: 15 });
+  });
+
+  it("metas e submetas contam os 'atingida' do PDM por parentId, só na DPP", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [DUPLA_DPP],
+        pdmItens: [
+          {
+            parentId: null,
+            status: "atingida",
+            atingidaEm: "2026-03-10T12:00:00-03:00",
+          },
+          { parentId: null, status: "ativa", atingidaEm: null },
+          // descartada não infla nenhuma das duas contagens
+          {
+            parentId: null,
+            status: "descartada",
+            atingidaEm: "2026-03-01T12:00:00-03:00",
+          },
+          {
+            parentId: "a",
+            status: "atingida",
+            atingidaEm: "2026-03-12T12:00:00-03:00",
+          },
+          {
+            parentId: "a",
+            status: "atingida",
+            atingidaEm: "2026-03-13T12:00:00-03:00",
+          },
+          {
+            parentId: "b",
+            status: "atingida",
+            atingidaEm: "2026-03-14T12:00:00-03:00",
+          },
+        ],
+      })
+    );
+    const metas = r.conquistas.find((c) => c.familia === "metas")!;
+    expect(metas.chave).toBe("pdm:metas-1");
+    expect(metas.data).toBe("2026-03-10T12:00:00-03:00");
+    const subs = r.conquistas.find((c) => c.familia === "submetas")!;
+    expect(subs.chave).toBe("pdm:submetas-1"); // 3 submetas atingidas
+    // a trilha de especialista não tem PDM: a família não nasce
+    const esp = conquistasDoJovem(
+      base({
+        duplas: [DUPLA_ESP],
+        encontros: [encEsp(1)],
+        pdmItens: [
+          {
+            parentId: null,
+            status: "atingida",
+            atingidaEm: "2026-03-10T12:00:00-03:00",
+          },
+        ],
+      })
+    );
+    expect(esp.conquistas.some((c) => c.familia === "metas")).toBe(false);
+    expect(esp.futuras.some((f) => f.familia === "metas")).toBe(false);
+  });
+
+  it("avaliações carimbam o created_at da avaliação do limiar", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [DUPLA_DPP],
+        avaliacoes: Array.from({ length: 5 }, (_, i) => ({
+          encontro_id: `e${i + 1}`,
+          dupla_id: "d1",
+          created_at: `2026-03-0${i + 1}T12:00:00-03:00`,
+        })),
+      })
+    );
+    const a = r.conquistas.find((c) => c.familia === "avaliacoes")!;
+    expect(a.chave).toBe("conta:avaliacoes-1");
+    expect(a.titulo).toBe("Voz treinada");
+    expect(a.data).toBe("2026-03-05T12:00:00-03:00"); // a 5ª, não a 1ª
+    expect(a.raridade).toBe("inicial");
+  });
+
+  it("presença: nao_aconteceu quebra a sequência, agendado não", () => {
+    const r = conquistasDoJovem(
+      base({
+        duplas: [DUPLA_DPP],
+        encontros: [
+          enc(1),
+          enc(2),
+          enc(3),
+          enc(4, { status: "nao_aconteceu", realizado_em: null }),
+          enc(5, { status: "agendado", realizado_em: null }),
+          enc(6),
+          enc(7),
+          enc(8),
+          enc(9),
+        ],
+      })
+    );
+    // o run atual é 4 (encontros 6–9): só o tier 1, carimbado no último
+    expect(chaves(r)).toContain("conta:presenca-1");
+    expect(chaves(r)).not.toContain("conta:presenca-2");
+    expect(r.conquistas.find((c) => c.familia === "presenca")!.data).toBe(
+      `${dia(9)}T19:00:00-03:00`
+    );
+  });
+
+  it("perfil completo ganha 'Cara do lugar'; a falta vira linha honesta", () => {
+    const r = conquistasDoJovem(
+      base({
+        perfil: {
+          whatsapp: "5511999990000",
+          disponibilidade: { ter: ["noite"] },
+          bioOuInteresses: true,
+        },
+      })
+    );
+    const p = r.conquistas.find((c) => c.familia === "perfil")!;
+    expect(p.chave).toBe("perfil:completo-1");
+    expect(p.titulo).toBe("Cara do lugar");
+    const semZap = conquistasDoJovem(
+      base({
+        perfil: {
+          whatsapp: null,
+          disponibilidade: { ter: ["noite"] },
+          bioOuInteresses: true,
+        },
+      })
+    );
+    expect(semZap.futuras.find((f) => f.familia === "perfil")!.linha).toBe(
+      "Falta preencher: WhatsApp"
+    );
+    const faltandoDuas = conquistasDoJovem(
+      base({
+        perfil: {
+          whatsapp: null,
+          disponibilidade: null,
+          bioOuInteresses: true,
+        },
+      })
+    );
+    expect(
+      faltandoDuas.futuras.find((f) => f.familia === "perfil")!.linha
+    ).toBe("Faltam preencher: WhatsApp e disponibilidade");
+  });
+
+  it("o termo assinado carimba assinado_em; pendente ou ausente vira futura", () => {
+    const r = conquistasDoJovem(
+      base({
+        assinaturas: [
+          {
+            slug: "termo-mentorando",
+            status: "assinado",
+            assinado_em: "2026-02-20T12:00:00-03:00",
+          },
+        ],
+      })
+    );
+    const t = r.conquistas.find((c) => c.familia === "termo")!;
+    expect(t.chave).toBe("doc:termo-1");
+    expect(t.data).toBe("2026-02-20T12:00:00-03:00");
+    // outro documento assinado não vale: o slug certo é o termo-mentorando
+    const outro = conquistasDoJovem(
+      base({
+        assinaturas: [
+          {
+            slug: "autorizacao-responsavel",
+            status: "assinado",
+            assinado_em: "2026-02-20T12:00:00-03:00",
+          },
+        ],
+      })
+    );
+    expect(outro.futuras.some((f) => f.familia === "termo")).toBe(true);
+  });
+});
+
+// ---------- paridade demo (024): a persona mentorado precisa ter uma
+// família em tier ganho, uma futura com progresso e nível pro selo
+describe("paridade demo (persona mentorado)", () => {
+  it("a Ana tem tier ganho, futura com progresso e nível pro selo", () => {
+    const duplas = demoJovemDuplas("mentorado");
+    const perfil = demoJovemPerfil("mentorado")!;
+    const me = demoMe("mentorado", true);
+    const pdmItens = duplas
+      .filter((d) => d.id != null && (d.trilha ?? "dpp") !== "especialista")
+      .flatMap(
+        (d) =>
+          (demoPdmDaDupla("mentorado", d.id!)?.itens ?? []).map((i) => ({
+            parentId: i.parentId,
+            status: i.status,
+            atingidaEm: i.atingidaEm,
+          }))
+      );
+    const r = conquistasDoJovem({
+      encontros: demoJovemEncontros("mentorado"),
+      duplas,
+      jornada: demoJovemJornada("mentorado"),
+      avaliacoes: demoJovemAvaliacoes("mentorado"),
+      encaminhamentos: demoJovemEncaminhamentos("mentorado"),
+      assinaturas: demoJovemAssinaturas("mentorado", null),
+      pdmItens,
+      perfil: {
+        whatsapp: perfil.whatsapp,
+        disponibilidade: perfil.disponibilidade,
+        bioOuInteresses:
+          !!me.bio?.trim() || (me.interesses?.length ?? 0) > 0,
+      },
+    });
+    // o selo "Seu nível" do header renderiza
+    expect(r.nivel).not.toBeNull();
+    expect(r.nivel!.atual).not.toBeNull();
+    // pelo menos uma família em tier ganho (presença e perfil, na conta)
+    expect(r.conquistas.some((c) => c.familia === "presenca")).toBe(true);
+    expect(r.conquistas.some((c) => c.familia === "perfil")).toBe(true);
+    // e pelo menos uma futura já com progresso honesto
+    expect(
+      r.futuras.some((f) => f.progresso != null && f.progresso.atual > 0)
+    ).toBe(true);
   });
 });
