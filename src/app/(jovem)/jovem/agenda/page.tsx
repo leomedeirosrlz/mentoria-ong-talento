@@ -231,7 +231,7 @@ export default async function JovemAgenda() {
           avatar_path: contato?.avatar_path ?? d.mentor_avatar_path,
           wa: waLink(
             contato?.whatsapp,
-            `Olá${primeiro ? `, ${primeiro}` : ""}! Sou ${primeiroNome}, seu/sua mentorado(a). Quero combinar nosso próximo encontro.`
+            `Olá${primeiro ? `, ${primeiro}` : ""}! Sou ${primeiroNome}, seu mentorado(a). Quero combinar nosso próximo encontro.`
           ),
         },
       ] as const;

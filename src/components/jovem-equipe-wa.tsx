@@ -3,6 +3,7 @@
 import { WhatsappLogo } from "@phosphor-icons/react";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { waLink } from "@/lib/ciclo";
+import { msgApresentacaoJovem } from "@/lib/whatsapp-msgs";
 import type { JovemContato } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Avatar } from "@/components/avatar";
@@ -48,10 +49,7 @@ export function EquipeWaDialog({
         <ul className="divide-y divide-border/60">
           {equipe.map((c) => {
             const nome = c.nome_social || c.nome || "Equipe";
-            const wa = waLink(
-              c.whatsapp,
-              `Olá! Sou ${nomeJovem}, mentorado(a) do programa Realiza.vc.`
-            );
+            const wa = waLink(c.whatsapp, msgApresentacaoJovem(nomeJovem));
             return (
               <li key={c.id ?? nome} className="flex items-center gap-2 py-2">
                 <Avatar
