@@ -5958,6 +5958,7 @@ export type Database = {
           pref_genero_par: string | null
           role: Database["public"]["Enums"]["app_role"] | null
           uf: string | null
+          ultimo_acesso_em: string | null
           user_id: string | null
           voluntariado: string | null
           voluntario: boolean
@@ -5991,6 +5992,7 @@ export type Database = {
           pref_genero_par?: string | null
           role?: Database["public"]["Enums"]["app_role"] | null
           uf?: string | null
+          ultimo_acesso_em?: string | null
           user_id?: string | null
           voluntariado?: string | null
           voluntario?: boolean
@@ -6024,6 +6026,7 @@ export type Database = {
           pref_genero_par?: string | null
           role?: Database["public"]["Enums"]["app_role"] | null
           uf?: string | null
+          ultimo_acesso_em?: string | null
           user_id?: string | null
           voluntariado?: string | null
           voluntario?: boolean
@@ -8022,6 +8025,14 @@ export type Database = {
         Row: {
           id: string | null
           ultimo_acesso_em: string | null
+        }
+        Insert: {
+          id?: string | null
+          ultimo_acesso_em?: string | null
+        }
+        Update: {
+          id?: string | null
+          ultimo_acesso_em?: string | null
         }
         Relationships: []
       }
