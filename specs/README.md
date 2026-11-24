@@ -45,6 +45,12 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 | 020 | `docs-do-plano` | feature | Clarified | REALIZA-521 (23/nov/2026) — doc do combinado + roteiros lazy |
 | 021 | `materiais-liza` | feature | Clarified | REALIZA-522 (23/nov/2026) — materiais estruturados via Liza (backlog) |
 | 022 | `instrumentos-pdm-avaliacao` | mudança | Clarified | rodada UI/UX (24/nov/2026) — anel do card, header da avaliação, PDM desktop, aba Instrumentos, Nova meta SMART |
+| 023 | `pessoas-especialistas` | mudança | Clarified | rodada UI/UX (24/nov/2026) — acesso do jovem, Ver todos, filtros, catálogo rico, solicitação não-modal |
+| 024 | `gamificacao-nivel-conquistas` | feature | Clarified | rodada UI/UX (24/nov/2026) — nível/raios, conquistas gerais e motion por faixa |
+| 025 | `plano-recesso-fusao-copy` | mudança | Clarified | rodada UI/UX (24/nov/2026) — copy do recesso, fusão verde, checkbox custom, card duplicado |
+| 026 | `liza-genui-pills` | mudança | Clarified | rodada UI/UX (24/nov/2026) — cards ricos, colapsável, IDs, pills rotativas, falso negativo |
+| 027 | `privacidade-staging-notificacoes` | mudança | Clarified | rodada UI/UX (24/nov/2026) — visibilidade de avaliações, seed de atraso, notificações longas |
+| 028 | `motion-forms-wizards` | mudança | Clarified | rodada UI/UX (24/nov/2026) — sistema de slide/etapas e adoção priorizada |
 
 ## Fronteiras já mapeadas, ainda sem spec
 
