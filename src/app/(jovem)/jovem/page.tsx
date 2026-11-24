@@ -715,6 +715,7 @@ export default async function JovemHome() {
               }
               quem={quemPlano}
               combinadoHref="/jovem/combinado"
+              responderHref="/jovem/agenda#plano"
               contestar={
                 semanaJovem.contestavel && planoJovem ? (
                   <PlanoContestarButton

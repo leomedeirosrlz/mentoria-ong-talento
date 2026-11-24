@@ -45,7 +45,9 @@ export async function RoteiroSemana({
   voltarHref: string;
   tituloDoc: string;
 }) {
-  const rows = roteiros.filter((x) => x.numero === numero);
+  const rows = roteiros.filter(
+    (x) => x.numero === numero && (!plano || x.plano_id === plano.id)
+  );
   const doCombinado = plano?.escopo?.numeros?.includes(numero) === true;
   if (!rows.length && !doCombinado) notFound();
 

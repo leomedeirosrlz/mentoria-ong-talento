@@ -59,8 +59,8 @@ async function buscarRoteiro(
 }
 
 /** "Gerar a semana" (equipe): monta determinístico e salva como
- *  rascunho — revisão humana antes de publicar. Não cobre roteiro já
- *  publicado: a RPC da 0231 não versiona (relato no relatório). */
+ *  rascunho — revisão humana antes de publicar. Se já existe publicado,
+ *  a RPC cria uma versão nova e preserva a anterior. */
 export async function gerarRoteiroSemana(
   duplaId: string,
   numero: number
@@ -77,18 +77,6 @@ export async function gerarRoteiroSemana(
     return { error: "Esse encontro não faz parte do combinado." };
 
   const supabase = await createClient();
-  const { data: existentes } = await supabase
-    .from("dupla_plano_roteiros")
-    .select("*")
-    .eq("plano_id", plano.id)
-    .eq("numero", numero);
-  const lista = (existentes ?? []) as DuplaPlanoRoteiro[];
-  if (lista.some((r) => r.status === "publicado"))
-    return {
-      error:
-        "Essa semana já tem roteiro publicado — gerar uma versão nova por cima depende de um ajuste no banco que ainda não foi aplicado.",
-    };
-
   const conteudo = await montarRoteiroDoPlano(
     ctx.dupla,
     plano,

@@ -22,6 +22,7 @@ export function SuaSemanaPlano({
   quem,
   combinadoHref,
   confirmarHref,
+  responderHref,
   contestar,
   materiais,
 }: {
@@ -36,6 +37,9 @@ export function SuaSemanaPlano({
   /** onde o passo pendente se confirma (ficha do mentor #acordos); sem
    *  passo pendente ou sem gesto aqui, null — o jovem confirma na agenda */
   confirmarHref?: string | null;
+  /** onde o "Ver e responder" abre o aceite/contestação; no jovem é a
+   *  agenda (#plano), no mentor a ficha (#acordos) */
+  responderHref?: string | null;
   /** "Não serve pra mim" — botão client que o caller passa quando a
    *  janela de contestação está aberta (semana.contestavel) */
   contestar?: ReactNode;
@@ -77,7 +81,7 @@ export function SuaSemanaPlano({
           // agenda (jovem), nunca "Confirmar data" antes do combinado
           // estar em vigor
           <Link
-            href={confirmarHref ?? combinadoHref}
+            href={responderHref ?? confirmarHref ?? combinadoHref}
             className={cn(
               buttonVariants({ size: "sm" }),
               "group min-h-11 sm:min-h-8"

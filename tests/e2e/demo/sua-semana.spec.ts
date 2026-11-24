@@ -28,7 +28,7 @@ test.describe("Sua semana — jovem", () => {
       page.getByText(/Próximo: \d+º encontro, sugestão/)
     ).toBeVisible();
     const ver = page.getByRole("link", { name: "Ver o combinado" });
-    await expect(ver).toHaveAttribute("href", "/jovem/agenda#plano");
+    await expect(ver).toHaveAttribute("href", "/jovem/combinado");
     // janela de contestação aberta (nenhum passo feito depois da proposta)
     await expect(
       page.getByRole("button", { name: "Não serve pra mim" })
@@ -56,7 +56,7 @@ test.describe("Sua semana — mentor", () => {
     ).toBeVisible();
     await expect(
       semana.getByRole("link", { name: "Ver o combinado" })
-    ).toHaveAttribute("href", `/duplas/${D_OK}#plano-em-dia`);
+    ).toHaveAttribute("href", `/duplas/${D_OK}/combinado`);
     // passo pendente → o CTA leva direto pro lugar de confirmar
     await expect(
       semana.getByRole("link", { name: "Confirmar data" })
