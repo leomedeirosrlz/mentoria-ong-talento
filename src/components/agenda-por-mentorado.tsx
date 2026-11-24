@@ -27,6 +27,7 @@ import {
   formatDiaHora,
   formatDiaMes,
   formatDiaSemanaMes,
+  cobertosDaDupla,
   jornadaDaDupla,
   lembreteBloqueadoAte,
   linkSeguro,
@@ -297,16 +298,19 @@ function CardMentorado({
         (a, b) =>
           new Date(a.data_hora!).getTime() - new Date(b.data_hora!).getTime()
       )[0] ?? null;
+  // sessão combinada (018): o coberto já tem conteúdo via âncora — sem o
+  // mapa ele leria como limbo/pendência pra sempre
+  const cobertos = cobertosDaDupla(dupla.encontros);
   const limbo =
     dupla.encontros
-      .filter((e) => limboAberto(e, agoraMs))
+      .filter((e) => limboAberto(e, agoraMs, cobertos))
       .sort((a, b) => a.numero - b.numero)[0] ?? null;
 
   // pendências do MENTOR nesta dupla: registro por entregar — MESMO
   // predicado da Minha agenda (limbo fechado ou realizado >24h sem
   // registro, cobrindo "remarcado" legado) — e combinados com prazo vencido
   const registrosPendentes = dupla.encontros
-    .filter((e) => ehPendenciaRegistro(e, agoraMs))
+    .filter((e) => ehPendenciaRegistro(e, agoraMs, cobertos))
     .sort((a, b) => a.numero - b.numero);
   const combinadosVencidos = dupla.encaminhamentos
     .filter((t) => t.status === "pendente" && t.prazo != null && t.prazo < hoje)
@@ -496,7 +500,7 @@ function CardMentorado({
         ) : (
           <ul className="space-y-1.5">
             {registrosPendentes.map((e) => {
-              const noLimbo = limboAberto(e, agoraMs);
+              const noLimbo = limboAberto(e, agoraMs, cobertos);
               return (
                 <li
                   key={e.id}

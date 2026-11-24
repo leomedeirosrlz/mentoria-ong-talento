@@ -27,8 +27,12 @@ import {
   type SimulacaoPlano,
 } from "@/lib/actions-plano";
 import { disponibilidadesDaDupla } from "@/lib/actions";
-import { rotuloRitmo } from "@/lib/plano-em-dia";
-import { diaCurto } from "@/lib/plano-combinado";
+import {
+  fusaoDeArestas,
+  fusaoPedeAvisoPratica,
+  rotuloRitmo,
+} from "@/lib/plano-em-dia";
+import { diaCurto, listaEncontros } from "@/lib/plano-combinado";
 import { toast } from "@/lib/toast";
 import type { LadoPlano } from "@/lib/plano-servico";
 import type { Disponibilidade } from "@/lib/types";
@@ -63,7 +67,7 @@ const assinaDesktop = (cb: () => void) => {
 };
 const medeDesktop = () => window.matchMedia(MQ_DESKTOP).matches;
 
-type PassoId = "ritmo" | "recesso" | "grade" | "confirmar";
+type PassoId = "ritmo" | "recesso" | "grade" | "sessao" | "confirmar";
 type Sim = Extract<SimulacaoPlano, { ok: true }>;
 type RecessoSim = Sim["recessos"][number];
 
@@ -170,6 +174,13 @@ export function CombinarPlano({
     jovemNome: string | null;
   } | null>(null);
   const [lado, setLado] = useState<LadoPlano | null>(ladoInicial ?? null);
+  // 018 — arestas de fusão escolhidas: fusaoSel[n] = "junta o nº com o
+  // n+1º na mesma sessão de 2h". O aviso de prática exige um gesto
+  // consciente: a assinatura dos grupos reconhecida viaja no aceite
+  const [fusaoSel, setFusaoSel] = useState<Record<number, boolean>>({});
+  const [avisoReconhecido, setAvisoReconhecido] = useState<string | null>(
+    null
+  );
 
   const tituloRef = useRef<HTMLHeadingElement>(null);
   const montou = useRef(false);
@@ -188,10 +199,42 @@ export function CombinarPlano({
       usa,
     }));
 
+  const plano = sim?.plano;
+  const aplicavel = plano?.aplicavel === true ? plano : null;
+  // 018: os passos que o plano controla podem fundir (travado não —
+  // a sessão move a data da row). Aresta = vizinhos n e n+1, os dois
+  // fundíveis; a seleção vira grupos por corrente de arestas.
+  const fundiveis = useMemo(
+    () =>
+      new Set(
+        (aplicavel?.passos ?? [])
+          .filter((p) => p.acao !== "travado")
+          .map((p) => p.numero)
+      ),
+    [aplicavel]
+  );
+  const arestasFusao = useMemo(
+    () =>
+      [...fundiveis]
+        .filter((n) => fundiveis.has(n + 1))
+        .sort((a, b) => a - b),
+    [fundiveis]
+  );
+  const gruposFusao = useMemo(
+    () =>
+      fusaoDeArestas(
+        arestasFusao.filter((n) => fusaoSel[n] === true)
+      ),
+    [arestasFusao, fusaoSel]
+  );
+  const assinaturaFusao = JSON.stringify(gruposFusao);
+  const precisaAvisoPratica = fusaoPedeAvisoPratica(gruposFusao);
+
   const simular = (p: {
     ritmo?: number | null;
     decisoes?: Record<string, boolean>;
     semGrade?: boolean | null;
+    fusao?: number[][] | null;
   } = {}) => {
     const n = ++chamada.current;
     iniciarSim(async () => {
@@ -201,6 +244,12 @@ export function CombinarPlano({
         decisoes: decisoesArr(p.decisoes ?? decisoes),
         semGrade:
           (p.semGrade !== undefined ? p.semGrade : semGrade) ?? undefined,
+        fusao:
+          p.fusao !== undefined
+            ? (p.fusao ?? undefined)
+            : gruposFusao.length
+              ? gruposFusao
+              : undefined,
       });
       if (n !== chamada.current) return;
       if ("error" in r) {
@@ -232,6 +281,8 @@ export function CombinarPlano({
       setPasso(0);
       setErroSim(null);
       setGradeSalva(false);
+      setFusaoSel({});
+      setAvisoReconhecido(null);
     }
   }
 
@@ -257,9 +308,11 @@ export function CombinarPlano({
       (!sim.grade.mentor || !sim.grade.jovem || sim.grade.diasComuns === 0)
     )
       p.push("grade");
+    // 018: a pergunta da sessão só existe quando há vizinho fundível
+    if (arestasFusao.length > 0) p.push("sessao");
     p.push("confirmar");
     return p;
-  }, [sim]);
+  }, [sim, arestasFusao]);
   const passoId = passos[Math.min(passo, passos.length - 1)];
 
   // pergunta por tela: o foco acompanha a mudança de pergunta (quem usa
@@ -272,8 +325,6 @@ export function CombinarPlano({
     tituloRef.current?.focus();
   }, [passoId]);
 
-  const plano = sim?.plano;
-  const aplicavel = plano?.aplicavel === true ? plano : null;
   const recessoUsa = (r: RecessoSim) => decisoes[r.cicloEventoId] ?? r.usa;
   const pendentes =
     sim?.recessos.filter((r) => recessoUsa(r) == null) ?? [];
@@ -303,7 +354,9 @@ export function CombinarPlano({
         ? lado === "staff" || !faltaDecisao
         : passoId === "grade"
           ? semGrade != null
-          : true);
+          : passoId === "sessao"
+            ? !precisaAvisoPratica || avisoReconhecido === assinaturaFusao
+            : true);
   const podeCombinar =
     sim != null &&
     !simulando &&
@@ -338,6 +391,7 @@ export function CombinarPlano({
         ritmo: ritmoNum,
         decisoes: decisoesArr(),
         semGrade: semGrade ?? undefined,
+        fusao: gruposFusao.length ? gruposFusao : undefined,
       });
       if ("error" in r) {
         setErroEnvio(r.error);
@@ -651,6 +705,114 @@ export function CombinarPlano({
   const primeiroPasso = passosComData[0] ?? null;
   const ultimoPasso = passosComData.at(-1) ?? null;
 
+  // 018: a data da sessão é a mais cedo do grupo — a mesma régua do
+  // escopo, então a prévia aqui é a data que o combinado grava
+  const dataDoGrupo = (g: readonly number[]) =>
+    g
+      .map(
+        (n) =>
+          passosComData.find((p) => p.numero === n)?.data ?? ""
+      )
+      .filter(Boolean)
+      .sort()[0] ?? "";
+  const alternarAresta = (n: number) => {
+    const prox = { ...fusaoSel, [n]: !fusaoSel[n] };
+    setFusaoSel(prox);
+    const grupos = fusaoDeArestas(
+      arestasFusao.filter((a) => prox[a] === true)
+    );
+    simular({ fusao: grupos });
+  };
+
+  // um gesto, duas partes: o aviso diz o que se perde (a semana de
+  // prática entre os encontros) e o que fazer (a prática migra pras
+  // reflexões do registro). Só some com o "Continuar mesmo assim".
+  const avisoPratica = precisaAvisoPratica &&
+    avisoReconhecido !== assinaturaFusao && (
+      <div className="mt-3 space-y-2 rounded-lg border border-[var(--warn-border)] bg-[var(--warn-bg)] px-3.5 py-3">
+        <p className="flex items-start gap-1.5 text-sm text-[var(--warn-text)]">
+          <Warning size={14} aria-hidden className="mt-0.5 shrink-0" />
+          <span>
+            <strong className="font-semibold">
+              A semana de prática entre esses encontros não vai
+              acontecer.
+            </strong>{" "}
+            O encontro seguinte já começa pela devolutiva de uma
+            prática que ninguém fez.
+          </span>
+        </p>
+        <p className="text-sm text-muted-foreground">
+          Dá pra compensar: a prática entra nas reflexões do registro e
+          do próprio combinado, na semana que sobrar.
+        </p>
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          onClick={() => setAvisoReconhecido(assinaturaFusao)}
+        >
+          Continuar mesmo assim
+        </Button>
+      </div>
+    );
+
+  const perguntaSessao = sim ? (
+    <div>
+      <h3
+        ref={passoId === "sessao" ? tituloRef : undefined}
+        tabIndex={-1}
+        className="text-sm font-semibold outline-none"
+      >
+        Querem juntar encontros numa sessão só?
+      </h3>
+      <p className="mt-1 text-sm text-muted-foreground">
+        Encontros vizinhos podem sair juntos numa sessão de 2h — um dia
+        a menos no calendário. É escolha de vocês: sem juntar, cada
+        encontro segue no seu dia.
+      </p>
+      <fieldset className="mt-3">
+        <legend className="sr-only">
+          Encontros pra juntar na mesma sessão
+        </legend>
+        <div className="space-y-2">
+          {arestasFusao.map((n) => (
+            <label
+              key={n}
+              className={cn(
+                "flex min-h-11 cursor-pointer items-center gap-2.5 rounded-lg border border-border bg-card px-3.5 py-2.5 text-sm font-medium transition-colors hover:bg-muted",
+                "has-checked:border-foreground has-checked:bg-muted",
+                "has-focus-visible:border-ring has-focus-visible:ring-3 has-focus-visible:ring-ring/50"
+              )}
+            >
+              <input
+                type="checkbox"
+                checked={fusaoSel[n] === true}
+                onChange={() => alternarAresta(n)}
+                className="size-4 shrink-0 accent-foreground"
+              />
+              Juntar o {n}º e o {n + 1}º na mesma sessão
+            </label>
+          ))}
+        </div>
+      </fieldset>
+      {gruposFusao.length > 0 && (
+        <ul className="mt-2 space-y-1">
+          {gruposFusao.map((g) => (
+            <li
+              key={g.join("-")}
+              className="text-xs text-muted-foreground"
+            >
+              {listaEncontros(g)} saem juntos
+              {dataDoGrupo(g) ? ` em ${diaCurto(dataDoGrupo(g))}` : ""} ·
+              sessão de 2h
+            </li>
+          ))}
+        </ul>
+      )}
+      {avisoPratica}
+    </div>
+  ) : null;
+
   const perguntaConfirmar = sim ? (
     <div>
       <h3
@@ -692,7 +854,14 @@ export function CombinarPlano({
             Usa a grade marcada. As datas preferem os dias livres em comum.
           </li>
         )}
+        {gruposFusao.map((g) => (
+          <li key={`fusao-${g.join("-")}`} className="text-muted-foreground">
+            {listaEncontros(g)} encontros na mesma sessão de 2h
+            {dataDoGrupo(g) ? `, em ${diaCurto(dataDoGrupo(g))}` : ""}.
+          </li>
+        ))}
       </ul>
+      {avisoPratica}
       {faltaDecisao && (
         <p role="status" className="mt-2 text-sm text-[var(--warn-text)]">
           Falta a dupla confirmar o recesso.
@@ -892,6 +1061,7 @@ export function CombinarPlano({
             {passoId === "ritmo" && perguntaRitmo}
             {passoId === "recesso" && perguntaRecesso}
             {passoId === "grade" && perguntaGrade}
+            {passoId === "sessao" && perguntaSessao}
             {passoId === "confirmar" && perguntaConfirmar}
             {painel}
             {erroEnvio && (

@@ -449,7 +449,14 @@ export type JovemPlano = {
   versao: number;
   ritmo: string | null;
   janela: { inicio: string; fim: string } | null;
-  passos: { numero: number; data: string; acao: string }[];
+  passos: {
+    numero: number;
+    data: string;
+    acao: string;
+    /** Marca de sessão combinada (018) — vem verbatim do escopo. */
+    sessao?: string;
+    duracao_min?: number;
+  }[];
   aprovado_lado: "mentor" | "mentorado" | null;
   /** Os dois aceites (0224) — ausentes num banco sem a migration. */
   aceito_mentor?: boolean;

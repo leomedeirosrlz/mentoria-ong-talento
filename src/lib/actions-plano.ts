@@ -8,10 +8,13 @@ import { demoAtivo, demoRole } from "./demo/mode";
 import { enviarEmailsIndividuais, SITE_URL } from "./email";
 import {
   escopoDaProposta,
+  fusaoPedeAvisoPratica,
+  gruposDeSessao,
   montarPlanoEmDia,
   type EscopoProposta,
   type PlanoEmDia,
 } from "./plano-em-dia";
+import { sessoesDoEscopo } from "./plano-combinado";
 import {
   comDecisoesRecesso,
   contextoPlano,
@@ -126,6 +129,9 @@ export async function simularPlano(
     decisoes?: DecisaoRecesso[];
     /** "combinar sem a grade" — a dupla respondeu explicitamente */
     semGrade?: boolean;
+    /** Sessões combinadas (018): grupos de números a marcar na
+     *  simulação — a prévia já mostra "na mesma sessão". */
+    fusao?: number[][];
   }
 ): Promise<SimulacaoPlano> {
   const eventos = await getCicloEventos();
@@ -161,6 +167,7 @@ export async function simularPlano(
         : comuns.length
           ? { celulas: comuns }
           : null,
+      fusao: input?.fusao,
       hoje: new Date(),
     });
     const pendentes = plano.aplicavel ? plano.recessosPendentes : [];
@@ -217,6 +224,7 @@ export async function simularPlano(
     eventos,
     ritmo: input?.ritmo,
     disponibilidade: input?.semGrade ? null : ctx.combinada,
+    fusao: input?.fusao,
     hoje: new Date(),
   });
   const pendentes = plano.aplicavel ? plano.recessosPendentes : [];
@@ -279,6 +287,10 @@ export async function combinarPlano(
     ritmo: number;
     decisoes?: DecisaoRecesso[];
     semGrade?: boolean;
+    /** Sessões combinadas (018): grupos de números adjacentes que a
+     *  dupla decidiu juntar — a marca viaja no escopo e o aceite do
+     *  aviso de prática grava em `decisoes.fusao`. */
+    fusao?: number[][];
   }
 ): Promise<Resultado> {
   if (await demoAtivo()) return { ok: true, demo: true };
@@ -307,11 +319,20 @@ export async function combinarPlano(
     eventos,
     ritmo: input.ritmo,
     disponibilidade: input.semGrade ? null : ctx.combinada,
+    fusao: input.fusao,
     hoje: agora,
   });
   if (!plano.aplicavel) return { error: plano.motivo };
   if (plano.recessosPendentes.length)
     return { error: "Falta a dupla confirmar o recesso." };
+  // 018: a fusão só vale nos passos que o combinado controla (travado
+  // não entra) — a marca é decisão da dupla e o aceite do aviso de
+  // prática grava junto no escopo
+  const gs = gruposDeSessao(
+    input.fusao,
+    plano.passos.filter((p) => p.acao !== "travado").map((p) => p.numero)
+  );
+  if ("erro" in gs) return { error: gs.erro };
   const e = escopoDaProposta(plano, toDateStr(agora));
   if ("erro" in e) return { error: e.erro };
   const escopo: EscopoProposta = {
@@ -321,6 +342,15 @@ export async function combinarPlano(
     decisoes: {
       recessos: input.decisoes ?? [],
       sem_grade: input.semGrade === true,
+      ...(gs.grupos.length
+        ? {
+            fusao: {
+              aceita: true,
+              aviso_pratica: fusaoPedeAvisoPratica(gs.grupos),
+              pares: gs.grupos,
+            },
+          }
+        : {}),
     },
   };
   const { data, error } = await supabase.rpc("plano_propor", {
@@ -399,6 +429,11 @@ export async function responderPlanoComRecesso(
   if (!planoAtual?.escopo)
     return responderPlano(planoId, acao, undefined, duplaId);
   const agora = new Date();
+  // 018: a recalculada herda as sessões combinadas do escopo vigente —
+  // a fusão é decisão da dupla e não se perde numa versão nova
+  const fusaoAnterior = [
+    ...sessoesDoEscopo(planoAtual.escopo.passos ?? []).values(),
+  ];
   // re-simula com o MESMO ritmo do combinado — o que muda é só a decisão
   // de recesso nova; se as datas recalculadas forem as mesmas, é aceite
   const plano = montarPlanoEmDia({
@@ -406,6 +441,7 @@ export async function responderPlanoComRecesso(
     eventos,
     ritmo: Number(planoAtual.escopo.ritmo) || undefined,
     disponibilidade: ctx.combinada,
+    fusao: fusaoAnterior.length ? fusaoAnterior : undefined,
     hoje: agora,
   });
   if (!plano.aplicavel || plano.dataRecuperacao == null)
@@ -432,6 +468,15 @@ export async function responderPlanoComRecesso(
     decisoes: {
       recessos: decisoes,
       ajuste_no_aceite: true,
+      ...(fusaoAnterior.length
+        ? {
+            fusao: {
+              aceita: true,
+              aviso_pratica: fusaoPedeAvisoPratica(fusaoAnterior),
+              pares: fusaoAnterior,
+            },
+          }
+        : {}),
     },
   };
   const { data, error } = await supabase.rpc("plano_propor", {
@@ -520,6 +565,52 @@ export async function aplicarPassoPlano(
     superficie: "ficha_dupla",
     acao: "plano_passo",
     meta: { plano_id: planoId, dupla_id: duplaId ?? null, numero },
+  });
+  revalidarPlano(duplaId);
+  return r;
+}
+
+/** Marca a sessão combinada de uma vez (018): todos os passos do grupo
+ *  ganham a mesma data_hora/duracao e o mesmo `sessao_id` na RPC — um
+ *  gesto só, porque a decisão foi da sessão, não de cada passo. O
+ *  padrão do combinado é 2h; a RPC revalida números, janela e motivo
+ *  (a data nova de um grupo já marcado pede o porquê). Idempotente:
+ *  reaplicar o mesmo grupo na mesma data não duplica ledger. */
+export async function aplicarSessaoPlano(
+  planoId: string,
+  numeros: number[],
+  dataHora: string,
+  duracaoMin?: number,
+  link?: string,
+  motivo?: string,
+  duplaId?: string
+): Promise<Resultado> {
+  if (await demoAtivo()) return { ok: true, demo: true };
+  const supabase = await createClient();
+  const { data, error } = await supabase.rpc("plano_aplicar_sessao", {
+    p_plano: planoId,
+    p_numeros: numeros,
+    p_data_hora: dataHora,
+    p_duracao_min: duracaoMin ?? 120,
+    p_link: link?.trim() || null,
+    p_motivo: motivo ?? null,
+    p_via: "app",
+  });
+  const r = lerRpc(data, error);
+  if ("error" in r) return r;
+  const sessaoId =
+    (data as { sessao_id?: string } | null)?.sessao_id ?? null;
+  await emitirProdutoEvento(supabase, {
+    superficie: "ficha_dupla",
+    acao: "plano_passo",
+    meta: {
+      plano_id: planoId,
+      dupla_id: duplaId ?? null,
+      numeros,
+      sessao: true,
+      sessao_id: sessaoId,
+      duracao_min: duracaoMin ?? 120,
+    },
   });
   revalidarPlano(duplaId);
   return r;

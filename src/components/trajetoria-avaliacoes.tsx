@@ -1,4 +1,4 @@
-import { AVALIACAO_LABEL, passoEsp } from "@/lib/ciclo";
+import { AVALIACAO_LABEL, cobertosDaDupla, passoEsp } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
 import type { Encontro } from "@/lib/types";
 import {
@@ -25,8 +25,18 @@ export function TrajetoriaAvaliacoes({
    *  e o title fala "Sessão N", não "Encontro N". */
   sessao?: boolean;
 }) {
+  // sessão combinada (018): a avaliação é do registro, e o registro cobre a
+  // sessão inteira — o dot do coberto pinta com a nota da âncora, não
+  // "sem avaliação"
+  const cobertos = cobertosDaDupla(encontros);
+  const registroDe = (e: Encontro) =>
+    e.registro ??
+    (cobertos.has(e.numero)
+      ? (encontros.find((x) => x.numero === cobertos.get(e.numero))
+          ?.registro ?? null)
+      : null);
   const avaliados = encontros
-    .filter((e) => e.status === "realizado" && e.registro?.avaliacao)
+    .filter((e) => e.status === "realizado" && registroDe(e)?.avaliacao)
     .sort((a, b) => a.numero - b.numero);
   // com menos de 2 avaliações não há trajetória pra ler
   if (avaliados.length < 2) return null;
@@ -35,18 +45,18 @@ export function TrajetoriaAvaliacoes({
     encontros.map((e) => [sessao ? passoEsp(e, encontros) : e.numero, e])
   );
   const rotulos = avaliados.map(
-    (e) => AVALIACAO_LABEL[e.registro!.avaliacao!]?.toLowerCase() ?? e.registro!.avaliacao!
+    (e) => AVALIACAO_LABEL[registroDe(e)!.avaliacao!]?.toLowerCase() ?? registroDe(e)!.avaliacao!
   );
   const a11y = `avaliações: ${rotulos.join(", ")}`;
 
   const temSemAvaliacao = encontros.some(
-    (e) => e.status === "realizado" && !e.registro?.avaliacao
+    (e) => e.status === "realizado" && !registroDe(e)?.avaliacao
   );
   const temARealizar = Array.from({ length: total }, (_, i) => i + 1).some(
     (n) => porNumero.get(n)?.status !== "realizado"
   );
   const itens: PontoLegenda[] = [
-    ...itensAvaliacao(avaliados.map((e) => e.registro!.avaliacao!)),
+    ...itensAvaliacao(avaliados.map((e) => registroDe(e)!.avaliacao!)),
     ...(temSemAvaliacao
       ? [
           {
@@ -91,7 +101,7 @@ export function TrajetoriaAvaliacoes({
             const numero = i + 1;
             const enc = porNumero.get(numero);
             const realizado = enc?.status === "realizado";
-            const avaliacao = realizado ? (enc.registro?.avaliacao ?? null) : null;
+            const avaliacao = realizado ? (registroDe(enc)?.avaliacao ?? null) : null;
             return (
               <span
                 key={numero}

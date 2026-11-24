@@ -56,21 +56,26 @@ export const papeisDoUsuario = cache(
 // ---------- semáforo por dupla ----------
 
 /** Projeção com EXATAMENTE os campos que saudadeDaDupla consome
- *  (dupla.status/trilha/cronograma_id/iniciada_em; encontros→numero/status/
- *  datas; registro→precisa_apoio/avaliacao/dificuldade; avaliacao_jovem→
- *  pedir_apoio; encaminhamentos→status/prazo) + os nomes pra montar a
- *  resposta. reflexoes/observacoes/dificuldade_detalhe/proximo_passo_detalhe/
- *  tema ficam fora por construção — se o semáforo passar a ler outro campo,
- *  ampliar aqui junto (o type DuplaIa mostra o que a tool enxerga). */
+ *  (dupla.status/trilha/cronograma_id/iniciada_em; encontros→id/numero/
+ *  status/datas/sessao_id; registro→precisa_apoio/avaliacao/dificuldade +
+ *  tema/reflexoes/observacoes/atividades/cobertura, que a régua
+ *  `registroTemConteudo`/`cobertosDaDupla` lê pra decidir "tem conteúdo";
+ *  avaliacao_jovem→encontro_id/pedir_apoio/cobertura, que a régua
+ *  `avaliacaoCobreNumero` lê; encaminhamentos→status/prazo) + os nomes pra
+ *  montar a resposta. Os campos de conteúdo entram SÓ pro booleano — a
+ *  tool nunca os serializa pro modelo (ficha/resumo projetam campo a
+ *  campo). dificuldade_detalhe/proximo_passo_detalhe seguem fora por
+ *  construção — se o semáforo passar a ler outro campo, ampliar aqui junto
+ *  (o type DuplaIa mostra o que a tool enxerga). */
 export const IA_SAUDE_SELECT = `
   id, turma, trilha, status, desfecho, cronograma_id, iniciada_em, demanda,
   mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
   mentorado:mentorados(nome, nome_social),
   supervisor:profiles!duplas_supervisor_id_fkey(nome, nome_social),
   encontros(
-    id, numero, status, data_hora, realizado_em,
-    registro:registros(precisa_apoio, avaliacao, dificuldade),
-    avaliacao_jovem:avaliacoes_encontro(pedir_apoio)
+    id, numero, status, data_hora, realizado_em, sessao_id,
+    registro:registros(precisa_apoio, avaliacao, dificuldade, tema, reflexoes, observacoes, atividades, cobertura),
+    avaliacao_jovem:avaliacoes_encontro(encontro_id, pedir_apoio, cobertura)
   ),
   encaminhamentos(status, prazo),
   recessos:dupla_recessos(ciclo_evento_id, usa, declarado_em),
@@ -102,11 +107,23 @@ export type DuplaIa = {
     status: string;
     data_hora: string | null;
     realizado_em: string | null;
+    /** Sessão combinada (018): marca o grupo — a régua lê via cobertosDaDupla. */
+    sessao_id: string | null;
     registro: Pick<
       Registro,
-      "precisa_apoio" | "avaliacao" | "dificuldade"
+      | "precisa_apoio"
+      | "avaliacao"
+      | "dificuldade"
+      | "tema"
+      | "reflexoes"
+      | "observacoes"
+      | "atividades"
+      | "cobertura"
     > | null;
-    avaliacao_jovem: Pick<AvaliacaoEncontro, "pedir_apoio"> | null;
+    avaliacao_jovem: Pick<
+      AvaliacaoEncontro,
+      "encontro_id" | "pedir_apoio" | "cobertura"
+    > | null;
   }[];
   encaminhamentos: Pick<Encaminhamento, "status" | "prazo">[];
   /** Decisões de recesso declaradas (0218) — a linha ausente = usa o
@@ -141,11 +158,11 @@ export const getDuplasVivasIa = cache(
  *  encontro, que o semáforo não lê. Sai da mesma constante do semáforo pra
  *  não divergir campo a campo. */
 export const IA_INSIGHTS_SELECT = IA_SAUDE_SELECT.replace(
-  "registro:registros(precisa_apoio, avaliacao, dificuldade)",
-  "registro:registros(precisa_apoio, avaliacao, dificuldade, created_at)"
+  "registro:registros(precisa_apoio, avaliacao, dificuldade, tema, reflexoes, observacoes, atividades, cobertura)",
+  "registro:registros(precisa_apoio, avaliacao, dificuldade, tema, reflexoes, observacoes, atividades, cobertura, created_at)"
 ).replace(
-  "avaliacao_jovem:avaliacoes_encontro(pedir_apoio)",
-  "avaliacao_jovem:avaliacoes_encontro(pedir_apoio), remarcacoes:encontro_remarcacoes(data_anterior, data_nova, motivo, created_at)"
+  "avaliacao_jovem:avaliacoes_encontro(encontro_id, pedir_apoio, cobertura)",
+  "avaliacao_jovem:avaliacoes_encontro(encontro_id, pedir_apoio, cobertura), remarcacoes:encontro_remarcacoes(data_anterior, data_nova, motivo, created_at)"
 );
 
 /** A dupla como a leitura operacional a recebe — o que `itemAderencia` e

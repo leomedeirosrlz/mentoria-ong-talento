@@ -1,4 +1,4 @@
-import { lembreteBloqueadoAte, registroTemConteudo, type DuplaSaude } from "@/lib/ciclo";
+import { cobertosDaDupla, encontroTemConteudo, lembreteBloqueadoAte, type DuplaSaude } from "@/lib/ciclo";
 import { limboFechado } from "@/lib/agenda-minha";
 import { msgsContato } from "@/lib/whatsapp-msgs";
 import type { Dupla, Encontro } from "@/lib/types";
@@ -14,12 +14,15 @@ import type { DestinatariosWA, NudgeWA } from "@/components/dupla-wa-acao";
  *  mesma régua `limboFechado` da agenda: enquanto a chamada rola o
  *  encontro ainda não é cobrança. É o destino do "Registrar encontro N". */
 export function encontroPendente(d: Dupla, hoje: Date): Encontro | undefined {
+  // sessão combinada (018): o coberto já tem conteúdo via âncora — sem o
+  // mapa o lembrete cobraria "Registrar encontro N" de um passo entregue
+  const cobertos = cobertosDaDupla(d.encontros);
   return [...d.encontros]
     .sort((a, b) => a.numero - b.numero)
     .find(
       (e) =>
-        !registroTemConteudo(e.registro) &&
-        (e.status === "realizado" || limboFechado(e, hoje.getTime()))
+        !encontroTemConteudo(e, cobertos) &&
+        (e.status === "realizado" || limboFechado(e, hoje.getTime(), cobertos))
     );
 }
 

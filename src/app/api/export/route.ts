@@ -15,6 +15,7 @@ import {
   ATIVIDADES_ENCONTRO,
   AVALIACAO_LABEL,
   celulasDe,
+  cobertosDaDupla,
   COR_RACA_LABELS,
   DIAS_SEMANA_CURTOS,
   GENERO_LABELS,
@@ -908,11 +909,20 @@ function exportRespostasDemo(
 function csvCiclo(duplas: Dupla[], cronogramas: Map<string, string>): string {
   const linhas = duplas
     .sort((a, b) => a.mentor.nome.localeCompare(b.mentor.nome, "pt-BR"))
-    .flatMap((d) =>
-      [...d.encontros]
+    .flatMap((d) => {
+      // sessão combinada (018): a linha do coberto exporta as colunas do
+      // registro da sessão — é o mesmo row, e a prestação de contas não
+      // pode ler "realizado sem registro" onde a âncora já cobriu
+      const cobertos = cobertosDaDupla(d.encontros);
+      return [...d.encontros]
         .sort((a, b) => a.numero - b.numero)
         .map((e) => {
-          const r = e.registro;
+          const r =
+            e.registro ??
+            (cobertos.has(e.numero)
+              ? (d.encontros.find((x) => x.numero === cobertos.get(e.numero))
+                  ?.registro ?? null)
+              : null);
           return [
             d.mentor.nome,
             d.mentorado.nome,
@@ -934,8 +944,8 @@ function csvCiclo(duplas: Dupla[], cronogramas: Map<string, string>): string {
             r?.atividades?.join(" | ") ?? "",
             r ? (r.precisa_apoio ? "sim" : "não") : "",
           ];
-        })
-    );
+        });
+    });
 
   return csvDoc(
     [

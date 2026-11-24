@@ -24,6 +24,7 @@ import { ResolverApoioButton } from "@/components/resolver-apoio-button";
 import { formatTamanho } from "@/lib/ciclo";
 import { createClient } from "@/lib/supabase/client";
 import {
+  encontroAncoraDaCobertura,
   formatDate,
   formatDateTime,
   formatDiaMes,
@@ -66,7 +67,20 @@ export function EncontroDetalheDialog({
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }) {
-  const reg = encontro.registro ?? null;
+  // sessão combinada (018): o coberto não tem row própria — o registro da
+  // sessão mora na âncora e vale por este encontro. Mostramos esse registro
+  // (com a nota de qual nº ele veio); sem isso o passo coberto leria "Sem
+  // registro" pra sempre
+  const ancoraNumero = encontroAncoraDaCobertura(
+    encontro,
+    dupla.encontros
+  )?.numero;
+  const reg =
+    encontro.registro ??
+    (ancoraNumero != null
+      ? (dupla.encontros.find((x) => x.numero === ancoraNumero)?.registro ??
+        null)
+      : null);
   // "vencido" congela na abertura — um prazo vencendo durante a leitura não
   // muda o item sob o olhar
   const [agora] = useState(() => Date.now());
@@ -203,6 +217,12 @@ export function EncontroDetalheDialog({
 
           {reg ? (
             <div className="space-y-2 rounded-lg border p-3.5">
+              {encontro.registro == null && ancoraNumero != null && (
+                <p className="text-xs text-muted-foreground">
+                  Registro da sessão combinada, lançado no encontro{" "}
+                  {ancoraNumero}º — vale por este também.
+                </p>
+              )}
               <RegistroView reg={reg} tardio={tardio} />
               {erroAnexos && (
                 <p className="pt-1 text-xs text-muted-foreground">

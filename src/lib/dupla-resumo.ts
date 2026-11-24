@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import {
-  registroTemConteudo,
+  cobertosDaDupla,
+  encontroTemConteudo,
   saudadeDaDupla,
   passosDaTrilha,
   eventosDoCronograma,
@@ -74,6 +75,9 @@ export function montarResumoDupla(
   const passos = passosDaTrilha(dupla.trilha, cronograma);
   const tituloPorNumero = new Map(passos.map((p) => [p.numero, p.titulo]));
   const plano = planoVivo(dupla);
+  // sessão combinada (018): coberto já tem conteúdo via âncora — não entra
+  // na lista de quem deve registro
+  const cobertos = cobertosDaDupla(dupla.encontros);
 
   const proximos = dupla.encontros
     .filter(
@@ -106,7 +110,7 @@ export function montarResumoDupla(
       esperados: saude.esperado,
       proximos,
       pendentes_registro: dupla.encontros
-        .filter((e) => e.status === "realizado" && !registroTemConteudo(e.registro))
+        .filter((e) => e.status === "realizado" && !encontroTemConteudo(e, cobertos))
         .map((e) => e.numero!)
         .filter((n): n is number => n != null),
     },

@@ -1,19 +1,20 @@
 import {
   ORDEM_SEMAFORO,
   TRILHA_LEN,
+  cobertosDaDupla,
   comparaNome,
   cronogramasOpcoes,
   defasadosVencidos,
   diaSemanaDe,
   duplasSemEncontroDoNumero,
   emLimbo,
+  encontroTemConteudo,
   eventoDaSemana,
   eventosDoCronograma,
   formatDiaNum,
   linkSeguro,
   passoEsp,
   progressoTrilha,
-  registroTemConteudo,
   saudadeDaDupla,
   semanaBounds,
   toDateStr,
@@ -106,12 +107,15 @@ function metaTurma(duplasAtivas: Dupla[], vig: EventoDatado | null): string {
 /** A pendência de registro da dupla — MESMO critério do semáforo (agendado
  *  em limbo ou realizado há >24h sem registro, menor número primeiro). */
 function pendenciaDeRegistro(d: Dupla, agoraMs: number): Encontro | null {
+  // sessão combinada (018): o coberto já tem conteúdo via âncora — mesma
+  // régua da agenda da coordenação, sem a qual ele leria como pendente
+  const cobertos = cobertosDaDupla(d.encontros);
   return (
     d.encontros
       .filter(
         (e) =>
-          !registroTemConteudo(e.registro) &&
-          (emLimbo(e, agoraMs) ||
+          !encontroTemConteudo(e, cobertos) &&
+          (emLimbo(e, agoraMs, cobertos) ||
             (e.status === "realizado" &&
               agoraMs - new Date(e.data_hora ?? 0).getTime() > 24 * 3600 * 1000))
       )

@@ -13,6 +13,7 @@ import {
   rotuloRitmo,
   type PlanoEmDia,
 } from "@/lib/plano-em-dia";
+import { rotuloSessao, sessoesDoEscopo } from "@/lib/plano-combinado";
 import type { LadoPlano } from "@/lib/plano-servico";
 import type { Dupla } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -111,6 +112,11 @@ export function PlanoEmDiaCard({
       .map((e) => e.numero)
   );
   const passoPorNumero = new Map(plano.passos.map((p) => [p.numero, p]));
+  // 018: a marca de sessão combinada vira o rótulo da linha — a projeção
+  // mostra a decisão do mesmo jeito que o combinado lê depois
+  const sessaoTxt = new Map<number, string>();
+  for (const nums of sessoesDoEscopo(plano.passos).values())
+    for (const n of nums) sessaoTxt.set(n, rotuloSessao(n, nums));
   const quadrados = Array.from({ length: TOTAL_TRILHA }, (_, i) => {
     const numero = i + 1;
     const passo = passoPorNumero.get(numero);
@@ -336,6 +342,9 @@ export function PlanoEmDiaCard({
                       )}
                       {p.venceNoCaminho && <> · vence no caminho</>}
                       {p.foraDaGrade && <> · fora dos dias livres</>}
+                      {sessaoTxt.has(p.numero) && (
+                        <> · {sessaoTxt.get(p.numero)}</>
+                      )}
                     </>
                   )}
                 </p>

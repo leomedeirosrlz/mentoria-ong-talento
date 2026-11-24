@@ -3341,13 +3341,27 @@ export async function salvarRegistro(formData: FormData) {
   // só registra encontro da própria dupla que já aconteceu (ou foi marcado realizado)
   const { data: encDb } = await supabase
     .from("encontros")
-    .select("dupla_id, numero, status, data_hora, realizado_em")
+    .select("dupla_id, numero, status, data_hora, realizado_em, sessao_id")
     .eq("id", encontro_id)
     .single();
   if (!encDb || encDb.dupla_id !== dupla_id) return { error: "Não foi possível identificar o encontro. Recarregue a página." };
   const jaPassou = encDb.data_hora != null && new Date(encDb.data_hora) <= new Date();
   if (encDb.status !== "realizado" && !jaPassou) {
     return { error: "Esse encontro ainda não aconteceu." };
+  }
+  // encontro coberto pela sessão de outro não recebe registro próprio — o
+  // conteúdo dele mora no registro da âncora (018)
+  const { data: cobertor } = await supabase
+    .from("encontros")
+    .select("id, numero, registro:registros!inner(cobertura)")
+    .eq("dupla_id", dupla_id)
+    .filter("registro.cobertura", "cs", `{${encDb.numero}}`)
+    .neq("id", encontro_id)
+    .maybeSingle();
+  if (cobertor) {
+    return {
+      error: `Esse encontro já foi coberto pelo registro do ${cobertor.numero}º encontro.`,
+    };
   }
 
   const atividades = formData.getAll("atividade").map(String);
@@ -3367,9 +3381,206 @@ export async function salvarRegistro(formData: FormData) {
     };
   }
 
-  // update preserva created_by de quem registrou primeiro; insert marca o autor
+  // ---- sessão combinada (018): preparação ANTES de qualquer flip pra
+  // realizado — o trigger de avaliação só minta na âncora quando as rows
+  // cobertas já carregam o sessao_id do grupo ----
+  // avisos acumulam falhas de best-effort pós-gravação (declarado aqui: a
+  // preparação da sessão também avisa)
+  const avisos: string[] = [];
+  // sessão que cobriu mais de um passo do guia: UM registro fica na âncora
+  // (menor nº do grupo) com os demais em `registros.cobertura` — os cobertos
+  // viram realizado na MESMA sessão (sessao_id, data_hora e duração iguais),
+  // nunca um clone do payload. A régua de quais nºs valem é a
+  // passosCobertosCandidatos, revalidada aqui (ficha e rota oferecem só o
+  // que o servidor aceita).
+  const cobertos: number[] = [];
+  const cobriu = [
+    ...new Set(formData.getAll("cobriu_numero").map((v) => Number(String(v)))),
+  ].filter((n) => Number.isInteger(n) && n !== encDb.numero);
+  if (cobriu.length && d?.trilha === "especialista") {
+    avisos.push(
+      "A sessão combinada não se aplica à trilha de especialista: cada sessão é registrada na própria linha."
+    );
+    cobriu.length = 0;
+  }
+  // âncora = menor nº da sessão: a row que carrega o registro e minta o
+  // link de avaliação (trigger 0226). Default = o encontro postado.
+  let ancoraId = encontro_id;
+  let ancoraNumero = encDb.numero;
+  let cobertura: number[] = [];
+  // rows cobertas: existentes esperam o flip; faltantes são criadas já na
+  // sessão. `quando` é a data do FATO — a mesma pra todo o grupo (mesma
+  // sessão física); o fallback é defensivo.
+  const quando = encDb.realizado_em ?? encDb.data_hora ?? new Date().toISOString();
+  type Coberta = {
+    id: string | null;
+    numero: number;
+    status: string | null;
+    sessaoId: string | null;
+  };
+  const cobertas: Coberta[] = [];
+  let sessaoId: string | null = encDb.sessao_id ?? null;
+  if (cobriu.length) {
+    const cronId = d?.cronograma_id ?? null;
+    const { data: evs } = cronId
+      ? await supabase
+          .from("ciclo_eventos")
+          .select("numero, data")
+          .eq("tipo", "encontro")
+          .eq("cronograma_id", cronId)
+          .order("numero", { ascending: true })
+      : { data: null };
+    const oficial = new Map<number, string | null>(
+      (evs ?? [])
+        .filter((e) => e.numero != null)
+        .map((e) => [e.numero as number, e.data])
+    );
+    const maxNum = oficial.size ? Math.max(...oficial.keys()) : 16;
+    const hoje = new Date().toISOString().slice(0, 10);
+    for (const m of [...cobriu].sort((a, b) => a - b)) {
+      if (m < 1 || m >= maxNum) {
+        avisos.push(`O ${m}º encontro não está no guia da dupla.`);
+        continue;
+      }
+      const { data: enc2 } = await supabase
+        .from("encontros")
+        .select("id, status, data_hora, sessao_id")
+        .eq("dupla_id", dupla_id)
+        .eq("numero", m)
+        .maybeSingle();
+      if (!enc2) {
+        // sem row: só passo oficial já vencido — criar antes pularia o
+        // gating da jornada (mesma régua da 0208)
+        const dataOficial = oficial.get(m);
+        if (!dataOficial || dataOficial > hoje) {
+          avisos.push(`O ${m}º encontro ainda não chegou na data oficial do guia.`);
+          continue;
+        }
+        cobertas.push({ id: null, numero: m, status: null, sessaoId: null });
+        continue;
+      }
+      if (enc2.status === "realizado") {
+        // realizado com registro tem conteúdo próprio — a sessão não cobre
+        // quem já contou a história (o fato e o registro ficam intactos)
+        const { data: reg2 } = await supabase
+          .from("registros")
+          .select("id")
+          .eq("encontro_id", enc2.id)
+          .maybeSingle();
+        if (reg2) {
+          avisos.push(`O ${m}º encontro já tem registro.`);
+          continue;
+        }
+      } else if (enc2.status === "agendado" || enc2.status === "remarcado") {
+        // compromisso futuro não é coberto por checkbox — desmarcar é gesto
+        // próprio da dupla (régua da 0207)
+        if (enc2.data_hora != null && new Date(enc2.data_hora) > new Date()) {
+          avisos.push(
+            `O ${m}º encontro ainda está marcado pro futuro. Desmarque antes de cobrir.`
+          );
+          continue;
+        }
+      } else {
+        avisos.push(
+          `O ${m}º encontro está ${enc2.status === "nao_aconteceu" ? "marcado como não realizado" : "cancelado"}. Desfaça na ficha antes de cobrir.`
+        );
+        continue;
+      }
+      // row que já pertence a OUTRA sessão não migra — a sessão planejada
+      // (plano_aplicar_sessao) é um grupo fechado
+      if (enc2.sessao_id && sessaoId && enc2.sessao_id !== sessaoId) {
+        avisos.push(`O ${m}º encontro já faz parte de outra sessão combinada.`);
+        continue;
+      }
+      cobertas.push({
+        id: enc2.id,
+        numero: m,
+        status: enc2.status,
+        sessaoId: enc2.sessao_id ?? null,
+      });
+    }
+    if (cobertas.length) {
+      // grupo fechado: o sessao_id que já existe em alguma row manda —
+      // planejado pela RPC do plano ou gerado agora
+      sessaoId =
+        sessaoId ??
+        cobertas.find((c) => c.sessaoId)?.sessaoId ??
+        crypto.randomUUID();
+      const numeros = [encDb.numero, ...cobertas.map((c) => c.numero)];
+      ancoraNumero = Math.min(...numeros);
+      cobertura = numeros.filter((n) => n !== ancoraNumero).sort((a, b) => a - b);
+      const ancoraCoberta =
+        ancoraNumero === encDb.numero
+          ? null
+          : cobertas.find((c) => c.numero === ancoraNumero) ?? null;
+      if (ancoraCoberta) ancoraId = ancoraCoberta.id ?? ancoraId;
+      // FASE 1 — linka sessao_id/data_hora/duração em TODAS as rows antes de
+      // qualquer status virar realizado (o trigger lê sessao_id no flip:
+      // coberta com número menor no grupo não minta link próprio). O update
+      // sem `status` não dispara o trigger — mexer em row já realizado é
+      // seguro aqui.
+      const sessaoUpdate = {
+        sessao_id: sessaoId,
+        data_hora: quando,
+        ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
+      };
+      // encDb primeiro: quando ele é a âncora, o sessao_id dele precisa
+      // estar gravado antes das rows cobertas já-realizadas receberem o
+      // update — nenhuma delas pode parecer âncora em tempo nenhum
+      const { error: linkEncErr } = await supabase
+        .from("encontros")
+        .update({ sessao_id: sessaoId, ...(duracaoRaw ? { duracao_min: duracaoMin } : {}) })
+        .eq("id", encontro_id);
+      if (linkEncErr) {
+        return { error: erroAmigavel(linkEncErr) };
+      }
+      for (const c of cobertas) {
+        if (c.id == null) continue;
+        const { error: linkErr } = await supabase
+          .from("encontros")
+          .update(sessaoUpdate)
+          .eq("id", c.id);
+        if (linkErr) {
+          avisos.push(`Não foi possível ligar o ${c.numero}º encontro à sessão.`);
+          continue;
+        }
+        c.sessaoId = sessaoId;
+      }
+      // faltante entra já na sessão, ainda agendado — o flip pra realizado
+      // vem na fase 2, junto das demais cobertas
+      for (const c of cobertas) {
+        if (c.id != null) continue;
+        const { data: novo, error: novoErr } = await supabase
+          .from("encontros")
+          .insert({
+            dupla_id,
+            numero: c.numero,
+            data_hora: quando,
+            status: "agendado",
+            origem: "externo",
+            sessao_id: sessaoId,
+            created_by: eu.id,
+            ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
+          })
+          .select("id")
+          .single();
+        if (novoErr || !novo) {
+          avisos.push(`Não foi possível cobrir o ${c.numero}º encontro.`);
+          continue;
+        }
+        c.id = novo.id as string;
+        c.sessaoId = sessaoId;
+      }
+      // a âncora pode ser uma row que acabou de nascer — resolve o id agora
+      if (ancoraCoberta && ancoraCoberta.id) ancoraId = ancoraCoberta.id;
+    }
+  }
+
+  // update preserva created_by de quem registrou primeiro; insert marca o
+  // autor. Com sessão combinada o registro mora na ÂNCORA — o existente a
+  // conferir é o dela, não o do encontro postado.
   const { data: regExistente } = await supabase
-    .from("registros").select("id, precisa_apoio").eq("encontro_id", encontro_id).maybeSingle();
+    .from("registros").select("id, precisa_apoio").eq("encontro_id", ancoraId).maybeSingle();
   // 0084: flag ligada abre o chamado pelo trigger registros_apoio_chamado_sync
   // (que já notifica a equipe com chamado_aberto) — nada de pedido_apoio aqui
   const payload = {
@@ -3400,6 +3611,9 @@ export async function salvarRegistro(formData: FormData) {
       status: "realizado",
       realizado_em: encDb.realizado_em ?? encDb.data_hora,
       ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
+      // com sessão combinada o sessao_id entra JUNTO do flip — o trigger de
+      // avaliação lê o grupo na mesma transição e minta só na âncora
+      ...(sessaoId ? { sessao_id: sessaoId } : {}),
     })
     .eq("id", encontro_id).select("id");
   if (encErr) return { error: erroAmigavel(encErr) };
@@ -3407,10 +3621,67 @@ export async function salvarRegistro(formData: FormData) {
     return { error: "Não foi possível concluir. Recarregue a página e tente de novo." };
   }
 
+  // FASE 2 — as rows cobertas viram realizado na mesma sessão (sessao_id já
+  // gravado em todas na fase 1: o trigger não minta link nelas). Cada uma
+  // fica realizado com a data_hora, a duração e o realizado_em da sessão.
+  for (const c of cobertas) {
+    if (c.id == null || c.sessaoId !== sessaoId) continue;
+    if (c.status === "realizado") {
+      // já realizado sem registro: a sessão cobre com o follow-up — o fato
+      // (realizado_em de quando aconteceu) fica intacto
+      cobertos.push(c.numero);
+      continue;
+    }
+    const { error: upErr } = await supabase
+      .from("encontros")
+      .update({
+        status: "realizado",
+        data_hora: quando,
+        realizado_em: quando,
+        sessao_id: sessaoId,
+        ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
+      })
+      .eq("id", c.id)
+      .in("status", ["agendado", "remarcado"]);
+    if (upErr) {
+      avisos.push(`Não foi possível cobrir o ${c.numero}º encontro.`);
+    } else {
+      cobertos.push(c.numero);
+    }
+  }
+  // a âncora pode ser uma coberta que ainda não virou realizado — o flip
+  // dela é o que minta o link de avaliação da sessão inteira
+  const ancoraCobertaRow = cobertas.find((c) => c.numero === ancoraNumero);
+  if (ancoraCobertaRow?.id && ancoraCobertaRow.status !== "realizado") {
+    const { error: ancErr } = await supabase
+      .from("encontros")
+      .update({
+        status: "realizado",
+        data_hora: quando,
+        realizado_em: quando,
+        sessao_id: sessaoId,
+        ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
+      })
+      .eq("id", ancoraCobertaRow.id)
+      .in("status", ["agendado", "remarcado"]);
+    if (ancErr) {
+      return { error: "A sessão foi ligada, mas o encontro âncora não virou realizado. Tente de novo." };
+    }
+    cobertos.push(ancoraCobertaRow.numero);
+  }
+
   const { data: registro, error } = regExistente
     ? await supabase.from("registros").update(payload).eq("id", regExistente.id).select("id").single()
     : await supabase
-        .from("registros").insert({ ...payload, encontro_id, created_by: eu.id }).select("id").single();
+        .from("registros")
+        .insert({
+          ...payload,
+          encontro_id: ancoraId,
+          cobertura,
+          created_by: eu.id,
+        })
+        .select("id")
+        .single();
   if (error) return { error: erroAmigavel(error) };
 
   // encaminhamentos vêm como JSON por linha (descrição pode ter qualquer
@@ -3450,8 +3721,7 @@ export async function salvarRegistro(formData: FormData) {
   // o registro e o status do encontro já estão gravados — daqui em diante
   // uma falha NÃO é "o registro falhou": vira aviso no toast do ok (mesmo
   // padrão do bloco `concluir` abaixo), nunca { error } sobre estado
-  // parcialmente reconciliado
-  const avisos: string[] = [];
+  // parcialmente reconciliado (avisos já vem acumulando da preparação)
   let reconcileFalhou = false;
   // status nunca entra — feito/pendente é preservado; dupla+registro no
   // where impedem cruzar pra combinado de outra dupla ou outro registro
@@ -3483,7 +3753,7 @@ export async function salvarRegistro(formData: FormData) {
       .insert(plano.inserir.map((t) => ({
         dupla_id,
         registro_id: registro.id,
-        numero: encDb.numero,
+        numero: ancoraNumero,
         created_by: eu.id,
         ...t,
       })));
@@ -3516,149 +3786,6 @@ export async function salvarRegistro(formData: FormData) {
       concluidos = feitos?.length ?? 0;
       if (concluidos < concluirIds.length) {
         avisos.push(`Só ${concluidos} de ${concluirIds.length} combinados foram marcados como feitos.`);
-      }
-    }
-  }
-  // sessão que cobriu mais de um passo do guia (007 US11): o form marca os
-  // nºs e cada um ganha o PRÓPRIO par encontro-realizado + registro — nunca
-  // uma row reaproveitada. O registro principal já está salvo, então cada
-  // passo extra é best-effort com aviso próprio, na mesma régua dos
-  // combinados; a régua de quais nºs valem é a passosCobertosCandidatos
-  // (ficha e servidor leem a mesma regra, revalidada aqui)
-  const cobertos: number[] = [];
-  const cobriu = [
-    ...new Set(
-      formData.getAll("cobriu_numero").map((v) => Number(String(v)))
-    ),
-  ].filter((n) => Number.isInteger(n) && n !== encDb.numero);
-  if (cobriu.length && d?.trilha === "especialista") {
-    avisos.push(
-      "A sessão dupla não se aplica à trilha de especialista: cada sessão é registrada na própria linha."
-    );
-    cobriu.length = 0;
-  }
-  if (cobriu.length) {
-    // data do FATO — a mesma sessão do registro principal (realizado_em se
-    // já era fato, senão a data_hora que acabou de confirmar; o fallback é
-    // defensivo: realizado sem carimbo é estado que não deveria existir)
-    const quando =
-      encDb.realizado_em ?? encDb.data_hora ?? new Date().toISOString();
-    const cronId = d?.cronograma_id ?? null;
-    const { data: evs } = cronId
-      ? await supabase
-          .from("ciclo_eventos")
-          .select("numero, data")
-          .eq("tipo", "encontro")
-          .eq("cronograma_id", cronId)
-          .order("numero", { ascending: true })
-      : { data: null };
-    const oficial = new Map<number, string | null>(
-      (evs ?? [])
-        .filter((e) => e.numero != null)
-        .map((e) => [e.numero as number, e.data])
-    );
-    const maxNum = oficial.size ? Math.max(...oficial.keys()) : 16;
-    const hoje = new Date().toISOString().slice(0, 10);
-    for (const m of [...cobriu].sort((a, b) => a - b)) {
-      if (m < 1 || m >= maxNum) {
-        avisos.push(`O ${m}º encontro não está no guia da dupla.`);
-        continue;
-      }
-      const { data: enc2 } = await supabase
-        .from("encontros")
-        .select("id, status, data_hora")
-        .eq("dupla_id", dupla_id)
-        .eq("numero", m)
-        .maybeSingle();
-      let encId: string | null = null;
-      if (!enc2) {
-        // sem row: só passo oficial já vencido — criar antes pularia o
-        // gating da jornada (mesma régua da 0208)
-        const dataOficial = oficial.get(m);
-        if (!dataOficial || dataOficial > hoje) {
-          avisos.push(`O ${m}º encontro ainda não chegou na data oficial do guia.`);
-          continue;
-        }
-        const { data: novo, error: novoErr } = await supabase
-          .from("encontros")
-          .insert({
-            dupla_id,
-            numero: m,
-            data_hora: quando,
-            realizado_em: quando,
-            status: "realizado",
-            origem: "externo",
-            created_by: eu.id,
-            ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
-          })
-          .select("id")
-          .single();
-        if (novoErr || !novo) {
-          avisos.push(`Não foi possível cobrir o ${m}º encontro.`);
-          continue;
-        }
-        encId = novo.id as string;
-      } else if (enc2.status === "realizado") {
-        // o fato fica intacto (realizado_em é de quando aconteceu) — a
-        // sessão cobre com o follow-up, nunca reescreve o encontro
-        const { data: reg2 } = await supabase
-          .from("registros")
-          .select("id")
-          .eq("encontro_id", enc2.id)
-          .maybeSingle();
-        if (reg2) {
-          avisos.push(`O ${m}º encontro já tem registro.`);
-          continue;
-        }
-        encId = enc2.id;
-      } else if (enc2.status === "agendado" || enc2.status === "remarcado") {
-        // compromisso futuro não é coberto por checkbox — desmarcar é gesto
-        // próprio da dupla; o agendado vencido confirma a sessão, com a
-        // data do fato em vez da que estava marcada (régua da 0207)
-        if (enc2.data_hora != null && new Date(enc2.data_hora) > new Date()) {
-          avisos.push(
-            `O ${m}º encontro ainda está marcado pro futuro. Desmarque antes de cobrir.`
-          );
-          continue;
-        }
-        const { error: upErr } = await supabase
-          .from("encontros")
-          .update({
-            status: "realizado",
-            data_hora: quando,
-            realizado_em: quando,
-            ...(duracaoRaw ? { duracao_min: duracaoMin } : {}),
-          })
-          .eq("id", enc2.id)
-          .in("status", ["agendado", "remarcado"]);
-        if (upErr) {
-          avisos.push(`Não foi possível cobrir o ${m}º encontro.`);
-          continue;
-        }
-        encId = enc2.id;
-      } else {
-        avisos.push(
-          `O ${m}º encontro está ${enc2.status === "nao_aconteceu" ? "marcado como não realizado" : "cancelado"}. Desfaça na ficha antes de cobrir.`
-        );
-        continue;
-      }
-      // um registro por nº — payload da sessão inteiro, menos o pedido de
-      // apoio: a flag abre chamado por row (0084) e uma sessão não gera
-      // N chamados iguais; a urgência segue no registro principal
-      const { error: regErr } = await supabase
-        .from("registros")
-        .insert({
-          ...payload,
-          precisa_apoio: false,
-          encontro_id: encId,
-          created_by: eu.id,
-        });
-      if (regErr) {
-        avisos.push(
-          `O registro do ${m}º encontro não entrou. Registre pela ficha.`
-        );
-      } else {
-        cobertos.push(m);
       }
     }
   }
@@ -3706,7 +3833,17 @@ export async function salvarRegistro(formData: FormData) {
   revalidatePath("/agenda");
   revalidatePath("/registros");
   revalidatePath(`/duplas/${dupla_id}`);
-  return { ok: true, concluidos, aviso, cobertos };
+  // registroEncontroId = a âncora (018): em sessão combinada o form foi
+  // aberto numa coberta mas a row do registro mora na âncora — o posSave
+  // precisa dela pra consulta de evidências e o encadeamento
+  return {
+    ok: true,
+    concluidos,
+    aviso,
+    cobertos,
+    registroId: registro.id as string,
+    registroEncontroId: ancoraId,
+  };
 }
 
 // ---------- notas do mentor (plano de aula / lembretes pré-encontro) ----------

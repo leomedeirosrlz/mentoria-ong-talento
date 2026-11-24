@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { estadoDaSemana, estadoDoEncontro } from "@/lib/estado-encontro";
+import { cobertosDaDupla } from "@/lib/ciclo";
 import type { Encontro } from "@/lib/types";
 
 // quarta 07/10/2026, 20h (instantes com offset explícito)
@@ -99,5 +100,44 @@ describe("estadoDaSemana", () => {
     const registrado = mk({ status: "realizado", data_hora: ONTEM, registro: REGISTRO });
     expect(estadoDaSemana([registrado, mk({})], true, AGORA)).toBe("agendado");
     expect(estadoDaSemana([registrado, null], true, AGORA)).toBe("pendente");
+  });
+});
+
+describe("sessão combinada (018) — encontro coberto pela âncora", () => {
+  // âncora 5 realizado com o registro da sessão cobrindo o 6; o 6
+  // realizado sem row própria — o conteúdo chega via cobertosDaDupla
+  const ANCORA = mk({
+    id: "e5",
+    numero: 5,
+    status: "realizado",
+    data_hora: ONTEM,
+    registro: { ...REGISTRO, cobertura: [5, 6] } as Encontro["registro"],
+  });
+  const COBERTO = mk({
+    id: "e6",
+    numero: 6,
+    status: "realizado",
+    data_hora: ONTEM,
+  });
+  const MAPA = cobertosDaDupla([ANCORA, COBERTO]);
+
+  it("o mapa liga o coberto na âncora", () => {
+    expect(MAPA.get(6)).toBe(5);
+    expect(MAPA.has(5)).toBe(false); // âncora não entra como coberta
+  });
+
+  it("o coberto lê 'registrado'; sem o mapa ele lê 'pendente' (a falha)", () => {
+    expect(estadoDoEncontro(COBERTO, AGORA, MAPA)).toBe("registrado");
+    expect(estadoDoEncontro(COBERTO, AGORA)).toBe("pendente");
+  });
+
+  it("estadoDaSemana recebe um mapa por posição de dupla", () => {
+    expect(estadoDaSemana([COBERTO], true, AGORA, [MAPA])).toBe("registrado");
+    expect(estadoDaSemana([COBERTO], true, AGORA)).toBe("pendente");
+  });
+
+  it("encontro fora da cobertura segue pendente", () => {
+    const fora = mk({ id: "e7", numero: 7, status: "realizado", data_hora: ONTEM });
+    expect(estadoDoEncontro(fora, AGORA, MAPA)).toBe("pendente");
   });
 });

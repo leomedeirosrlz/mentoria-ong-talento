@@ -229,7 +229,7 @@ test.describe("rota de registro do encontro (REALIZA-473)", () => {
     });
   });
 
-  test("a sessão cobriu o 7º também — um encontro e um registro por nº", async ({
+  test("a sessão cobriu o 7º também — UM registro na âncora, o coberto realizado na mesma sessão", async ({
     page,
   }) => {
     // dois realizados sem registro: o 7º é o candidato de cobertura do 6º
@@ -263,28 +263,42 @@ test.describe("rota de registro do encontro (REALIZA-473)", () => {
       page.getByRole("button", { name: "Registrar o 7º também" })
     ).toHaveCount(0);
 
-    // Concluir volta pra ficha com o bloco do 6º aberto; o 7º também tem
-    // registro (cada encontro é salvo separadamente)
+    // Concluir volta pra ficha com o bloco do 6º aberto. 018: o registro
+    // mora só na âncora — a linha do 7º lê a sessão (texto + disclosure
+    // do registro herdado), nunca um "Registrar" de pendência fantasma
     await page.getByRole("button", { name: "Concluir" }).click();
     await expect(page).toHaveURL(
       new RegExp(`/duplas/${DUPLA_ID}\\?aba=encontros#registrar-${e6}`)
     );
+    const linha7 = page.locator(`#registrar-${e7}`);
     await expect(
-      page.locator(`#registrar-${e7}`).getByRole("button", { name: /^Registro/ })
+      linha7.getByText(/sessão combinada com o 6º encontro/)
     ).toBeVisible();
+    await expect(
+      linha7.getByRole("button", { name: /^Registro/ })
+    ).toBeVisible();
+    await expect(
+      linha7.getByRole("link", { name: "Registrar" })
+    ).toHaveCount(0);
 
-    // os dois fatos existem: encontros realizados + um registro por nº
-    const encs = await buscarViaServiceRole<{ id: string; status: string }[]>(
-      "encontros",
-      `select=id,status&id=in.(${e6},${e7})`
-    );
+    // os dois fatos existem — realizado NA mesma sessão — mas o registro
+    // é um só, na âncora, com o 7º na cobertura (clone por nº, nunca)
+    const encs = await buscarViaServiceRole<
+      { id: string; status: string; sessao_id: string | null }[]
+    >("encontros", `select=id,status,sessao_id&id=in.(${e6},${e7})`);
     expect(encs).toHaveLength(2);
     expect(encs.every((e) => e.status === "realizado")).toBe(true);
-    const regs = await buscarViaServiceRole<{ encontro_id: string }[]>(
+    expect(encs[0].sessao_id).toBeTruthy();
+    expect(encs[0].sessao_id).toBe(encs[1].sessao_id);
+    const regs = await buscarViaServiceRole<
+      { encontro_id: string; cobertura: number[] | null }[]
+    >(
       "registros",
-      `select=encontro_id&encontro_id=in.(${e6},${e7})`
+      `select=encontro_id,cobertura&encontro_id=in.(${e6},${e7})`
     );
-    expect(regs.map((r) => r.encontro_id).sort()).toEqual([e6, e7].sort());
+    expect(regs).toHaveLength(1);
+    expect(regs[0].encontro_id).toBe(e6);
+    expect(regs[0].cobertura).toEqual([7]);
   });
 
   test("deep link legado #registrar- continua abrindo e salvando na ficha", async ({

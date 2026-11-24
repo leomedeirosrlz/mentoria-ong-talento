@@ -90,13 +90,20 @@ export const avaliacaoPorToken = cache(
 export const linkAvaliacaoMeta = cache(
   async (
     token: string
-  ): Promise<{ encontro_id: string; dupla_id: string; trilha: string } | null> => {
+  ): Promise<{
+    encontro_id: string;
+    dupla_id: string;
+    trilha: string;
+    /** Números da sessão combinada que o link cobre, âncora inclusa (0228)
+     *  — >1 = "sessão dos encontros 5 e 6" no contexto do form público. */
+    cobertura?: number[] | null;
+  } | null> => {
     const demo = await demoRole();
     if (demo) return demoAvaliacaoLinkMeta(token);
     const admin = createAdminClient();
     const { data, error } = await admin
       .from("avaliacao_links")
-      .select("encontro_id, dupla_id, dupla:duplas(trilha)")
+      .select("encontro_id, dupla_id, cobertura, dupla:duplas(trilha)")
       .eq("token", token)
       .maybeSingle();
     if (error) {
@@ -107,10 +114,16 @@ export const linkAvaliacaoMeta = cache(
     const d = data as {
       encontro_id: string;
       dupla_id: string;
+      cobertura: number[] | null;
       dupla: { trilha: string } | { trilha: string }[] | null;
     };
     const dupla = Array.isArray(d.dupla) ? (d.dupla[0] ?? null) : d.dupla;
-    return { encontro_id: d.encontro_id, dupla_id: d.dupla_id, trilha: dupla?.trilha ?? "dpp" };
+    return {
+      encontro_id: d.encontro_id,
+      dupla_id: d.dupla_id,
+      trilha: dupla?.trilha ?? "dpp",
+      cobertura: d.cobertura ?? null,
+    };
   }
 );
 
@@ -162,7 +175,7 @@ export const getAvaliacaoLinks = cache(
     const supabase = await createClient();
     const { data, error } = await supabase
       .from("avaliacao_links")
-      .select("id, token, encontro_id, dupla_id, status, expira_em, respondido_em, respondido_por_profile_id, created_at")
+      .select("id, token, encontro_id, dupla_id, status, cobertura, expira_em, respondido_em, respondido_por_profile_id, created_at")
       .eq("dupla_id", duplaId)
       .order("created_at", { ascending: true });
     if (error) {

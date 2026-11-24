@@ -92,6 +92,7 @@ export function EncontroRow({
   autorNome,
   proximosRegistros,
   cobertura,
+  ancora,
 }: {
   /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
   passo: PassoGuia;
@@ -158,6 +159,10 @@ export function EncontroRow({
   /** Passos do guia que a sessão pode cobrir junto do registro (007 US11)
    *  — a mesma régua que o salvarRegistro revalida no servidor. */
   cobertura?: { numero: number; titulo: string }[] | null;
+  /** Âncora da sessão combinada que cobre ESTE encontro (018): o registro
+   *  e a avaliação do jovem moram nela — a linha mostra os da sessão, não
+   *  "pendente" fantasma. Só chega quando o próprio não tem registro. */
+  ancora?: Encontro | null;
 }) {
   const feito = encontro?.status === "realizado";
   const naoAconteceu = encontro?.status === "nao_aconteceu";
@@ -166,7 +171,16 @@ export function EncontroRow({
   const marcado =
     (encontro?.status === "agendado" || encontro?.status === "remarcado") &&
     !!encontro.data_hora;
-  const reg = encontro?.registro;
+  // sessão combinada (018): coberto = a âncora carrega o registro da sessão
+  // e ele vale por este nº — mesma régua do cobertosDaDupla, já resolvida
+  // na página
+  const ancoraDaSessao = encontro?.registro == null ? (ancora ?? null) : null;
+  const coberto = ancoraDaSessao?.registro != null;
+  const reg = encontro?.registro ?? ancoraDaSessao?.registro ?? null;
+  // avaliação do jovem: uma por sessão, na âncora (0228) — o coberto lê a
+  // da sessão
+  const avaliacaoJovem =
+    encontro?.avaliacao_jovem ?? ancoraDaSessao?.avaliacao_jovem ?? null;
   // combinados gravados por ESTE registro — alimentam a view do card e o
   // form de edição (que devolve os ids de banco pro salvarRegistro casar)
   const combinadosDoRegistro = reg
@@ -271,6 +285,8 @@ export function EncontroRow({
     diverge && `de fato em ${formatDate(encontro?.realizado_em)}`,
     encontro?.origem === "externo" && "marcado fora da plataforma",
     encontro?.motivo_reagendamento && `remarcado: ${encontro.motivo_reagendamento}`,
+    coberto &&
+      `sessão combinada com o ${ancoraDaSessao!.numero}º encontro`,
     tentativasFalhas > 0 &&
       `${tentativasFalhas === 1 ? "1 tentativa anterior não aconteceu" : `${tentativasFalhas} tentativas anteriores não aconteceram`}`,
     !materialHref &&
@@ -542,7 +558,7 @@ export function EncontroRow({
           disclosure pro corpo completo. Os dois blocos nascem FECHADOS: a
           ficha é índice, o caminho de escrita é a rota dedicada, e o deep
           link #registrar-{id} continua abrindo os dois */}
-      {(reg && encontro) || (feito && (encontro?.avaliacao_jovem || (!souMentor && estrelaJovem == null))) ? (
+      {(reg && encontro) || (feito && (avaliacaoJovem || (!souMentor && estrelaJovem == null))) ? (
         <div className="grid gap-3 lg:grid-cols-2">
           {reg && encontro && (
             <div className="space-y-2">
@@ -596,7 +612,10 @@ export function EncontroRow({
                       />
                     }
                   />
-                  {podeEditar && (
+                  {/* a edição mora na linha da âncora — o registro é dela;
+                      duplicar o gesto aqui abriria o form com o encontro
+                      errado como contexto */}
+                  {podeEditar && !coberto && (
                     <div className="pt-1">
                       <EditarRegistro
                         encontroId={encontro.id}
@@ -614,18 +633,18 @@ export function EncontroRow({
           )}
           {feito && (
             <div className="space-y-2">
-              {encontro?.avaliacao_jovem ? (
+              {avaliacaoJovem ? (
                 <EncontroDisclosure
                   encontroId={encontro.id}
                   className={cn(
                     "border-t border-border/60",
-                    encontro.avaliacao_jovem.pedir_apoio
+                    avaliacaoJovem.pedir_apoio
                       ? "bg-[var(--danger)]/5"
                       : "bg-muted/50"
                   )}
                   summary={
                     <>
-                      <AvaliacaoJovemResumo avaliacao={encontro.avaliacao_jovem} />
+                      <AvaliacaoJovemResumo avaliacao={avaliacaoJovem} />
                       <CaretDown
                         size={13}
                         aria-hidden
@@ -636,7 +655,7 @@ export function EncontroRow({
                 >
                   <div className="px-4 pb-3.5 pt-1 text-sm">
                     <AvaliacaoJovemDetalhe
-                      avaliacao={encontro.avaliacao_jovem}
+                      avaliacao={avaliacaoJovem}
                       duplaId={duplaId}
                       souCoord={souCoord}
                       liberadaProMentor={souMentor}
@@ -710,7 +729,9 @@ export function EncontroRow({
           a oferta "registrar o próximo também". Com reg o form se recusa a
           renderizar (o salvo é do RegistroDetails) e o empty:hidden do
           painel colapsa a faixa */}
-      {encontro && podeEditar &&
+      {/* coberto já tem o registro da sessão — o form dele não existe;
+          quem registra é a linha da âncora */}
+      {encontro && podeEditar && !coberto &&
         liberadoNoHorario(
           <RegistroInlinePanel
             encontroId={encontro.id}

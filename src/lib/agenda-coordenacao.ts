@@ -1,11 +1,13 @@
 import {
   ORDEM_SEMAFORO,
   bucketsDoEncontro,
+  cobertosDaDupla,
   comparaNome,
   cronogramasOpcoes,
   diaSemanaDe,
   duplasSemEncontroDoNumero,
   emLimbo,
+  encontroTemConteudo,
   eventoDaSemana,
   eventosDoCronograma,
   lembreteBloqueadoAte,
@@ -118,12 +120,15 @@ function metaTurma(duplasAtivas: Dupla[], vig: EventoDatado | null): string {
  *  em limbo ou realizado há >24h sem registro, menor número primeiro). O
  *  DuplaSaude expõe o sinal, não a row — o contexto precisa do número. */
 function pendenciaDeRegistro(d: Dupla, agoraMs: number): Encontro | null {
+  // sessão combinada (018): o coberto já tem conteúdo via âncora — sem o
+  // mapa a coordenação cobraria registro de um passo entregue
+  const cobertos = cobertosDaDupla(d.encontros);
   return (
     d.encontros
       .filter(
         (e) =>
-          !registroTemConteudo(e.registro) &&
-          (emLimbo(e, agoraMs) ||
+          !encontroTemConteudo(e, cobertos) &&
+          (emLimbo(e, agoraMs, cobertos) ||
             (e.status === "realizado" &&
               agoraMs - new Date(e.data_hora ?? 0).getTime() > 24 * 3600 * 1000))
       )
@@ -999,6 +1004,10 @@ function pulsoDoRecorte(
   let soma = 0;
   for (const d of duplas) {
     if (!idsRecorte.has(d.id)) continue;
+    // sessão combinada (018): "entregues" conta a entrega real (1 por
+    // sessão, na âncora); "aguardando" não pode contar o coberto — a
+    // sessão dele já tem conteúdo
+    const cobertos = cobertosDaDupla(d.encontros);
     for (const e of d.encontros) {
       if (e.status !== "realizado") continue;
       const quando = e.realizado_em ?? e.data_hora;
@@ -1007,7 +1016,7 @@ function pulsoDoRecorte(
       if (t > agoraMs || t < limiteMs) continue;
       p.realizados++;
       if (registroTemConteudo(e.registro)) p.registrosEntregues++;
-      else p.aguardandoRegistro++;
+      else if (!encontroTemConteudo(e, cobertos)) p.aguardandoRegistro++;
       const estrelas = e.avaliacao_jovem?.estrelas;
       if (typeof estrelas === "number" && estrelas > 0) {
         soma += estrelas;

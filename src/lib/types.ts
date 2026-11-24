@@ -392,6 +392,11 @@ export type Registro = {
   dificuldade_detalhe: string | null;
   proximo_passo: ProximoPasso | null;
   proximo_passo_detalhe: string | null;
+  /** Números dos outros encontros da MESMA sessão que este registro cobre
+   *  (0226): sessão combinada grava um registro só na âncora e os números
+   *  cobertos ficam aqui — a âncora em si não aparece. [] = sessão simples.
+   *  Opcional: embeds que não pedem a coluna devolvem undefined. */
+  cobertura?: number[];
   created_by: string | null;
   created_at: string;
   /** Autor do registro — só vem no embed `autor:profiles!registros_created_by_fkey(nome)` da dupla. */
@@ -424,6 +429,10 @@ export type AvaliacaoEncontro = {
   pedir_apoio: boolean;
   /** O jovem liberou o mentor DPP ler esta avaliação específica. */
   avaliacao_visivel_mentor: boolean;
+  /** Sessão combinada: números de TODOS os encontros do grupo (inclui o da
+   *  avaliação) — copiada do link pelo trigger 0228. null/[] = sessão
+   *  simples (a coluna é jsonb, pode vir null). */
+  cobertura?: number[] | null;
   /** null = resposta anônima por token (jovem sem login). */
   respondido_por_profile_id: string | null;
   created_at: string;
@@ -442,6 +451,9 @@ export type AvaliacaoLink = {
   /** Profile que respondeu por este link (null = jovem sem login — o
    *  token sozinho é a identidade). Trilha de auditoria da RPC. */
   respondido_por_profile_id: string | null;
+  /** Sessão combinada: números de TODOS os encontros que este link cobre
+   *  (inclui o âncora) — um link por sessão, mint só na âncora (0226). */
+  cobertura?: number[];
   created_at: string;
 };
 
@@ -485,6 +497,10 @@ export type Encontro = {
   link: string | null;
   /** Por que a dupla remarcou (label do preset ou texto livre) — só escrito quando a data muda. */
   motivo_reagendamento: string | null;
+  /** Sessão combinada (0226): uuid compartilhado por todos os encontros que
+   *  aconteceram numa sessão só — mesmo sessao_id = mesma sessão física.
+   *  null = encontro de sessão própria (o comum). */
+  sessao_id?: string | null;
   registro?: Registro | null;
   /** Estrela do JOVEM sobre este encontro (0071) — embed to-one no select da
    *  dupla. O RLS decide quem a vê: coord/sup sempre, mentor DPP só quando o
@@ -567,7 +583,32 @@ export type DuplaPlanoEscopo = {
     | "semana_tripla"
     | "um_por_dia"
     | "conversa_coord";
-  passos?: { numero: number; data: string; acao: string }[];
+  passos?: {
+    numero: number;
+    data: string;
+    acao: string;
+    /** Marca da sessão combinada (018): passos com o mesmo valor foram
+     *  fundidos pela dupla numa sessão só — a plano_aplicar_sessao
+     *  carimba data_hora/duracao/sessao_id do grupo de uma vez. */
+    sessao?: string;
+    /** Duração da sessão combinada em min — 120 (2h) é o padrão. */
+    duracao_min?: number;
+  }[];
+  /** Snapshot das decisões do gesto (518: recessos e grade; 018:
+   *  fusão) — viaja no jsonb do escopo sem DDL. `fusao` registra o
+   *  aceite consciente do aviso de prática (avisa sempre, bloqueia
+   *  nunca). */
+  decisoes?: {
+    recessos?: { cicloEventoId: string; usa: boolean }[];
+    sem_grade?: boolean;
+    ajuste_no_aceite?: boolean;
+    fusao?: {
+      aceita?: boolean;
+      aviso_pratica?: boolean;
+      pares?: number[][];
+    };
+    [k: string]: unknown;
+  };
 };
 
 export type DuplaPlano = {

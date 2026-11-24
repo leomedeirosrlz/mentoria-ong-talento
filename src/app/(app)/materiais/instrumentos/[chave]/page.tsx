@@ -26,6 +26,7 @@ import {
   type PainelJornadaLinha,
 } from "@/lib/jornada";
 import {
+  avaliacaoCobreNumero,
   AVANCEI_AVALIACAO_LABEL,
   formatDate,
   SENTIMENTO_AVALIACAO_LABEL,
@@ -245,7 +246,15 @@ function DetalheAvaliacoes({ dupla }: { dupla: Dupla }) {
     >
       <ul className="mt-2 divide-y divide-border/60 border-t border-border/60">
         {realizados.map((e) => {
-          const av = e.avaliacao_jovem;
+          // sessão combinada (018/0228): a avaliação do jovem é uma por
+          // sessão, na âncora — `cobertura` dela traz todos os números, e
+          // o coberto mostra a da sessão
+          const av =
+            e.avaliacao_jovem ??
+            realizados.find((x) =>
+              avaliacaoCobreNumero(x.avaliacao_jovem, e)
+            )?.avaliacao_jovem ??
+            null;
           return (
             <li key={e.id} className="py-2.5">
               <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
@@ -520,8 +529,14 @@ export default async function InstrumentoPage({
           atrasada: false,
           contagem: ehAvaliacaoEncontro
             ? {
+                // sessão combinada (0228): a avaliação mora na âncora e a
+                // `cobertura` dela cobre todos os números da sessão
                 feitas: (d.encontros ?? []).filter(
-                  (e) => e.status === "realizado" && e.avaliacao_jovem
+                  (e) =>
+                    e.status === "realizado" &&
+                    (d.encontros ?? []).some((x) =>
+                      avaliacaoCobreNumero(x.avaliacao_jovem, e)
+                    )
                 ).length,
                 realizados: (d.encontros ?? []).filter(
                   (e) => e.status === "realizado"

@@ -35,6 +35,7 @@ import {
 import { feriadoNacional } from "./feriados";
 import type { CicloEvento, Disponibilidade, Dupla } from "./types";
 import {
+  DURACAO_SESSAO_MIN,
   GAP_DIAS_EXIGE,
   GAP_MINIMO_DIAS,
   GAP_UM_POR_DIA,
@@ -75,6 +76,10 @@ export type PassoPlano = {
   /** A data caiu fora dos dias com período livre em comum (518): a grade
    *  é preferência forte, não restrição — o passo marca e o plano avisa. */
   foraDaGrade?: boolean;
+  /** Sessão combinada (018): a letra marca os passos que a dupla decidiu
+   *  juntar numa sessão só — mesmo valor = mesma sessão. A marca nunca
+   *  emerge do planner: só existe quando a escolha viaja na entrada. */
+  sessao?: string;
 };
 
 /** Nível nomeado de flexibilização (FR-011, 0219; degraus 3/semana e
@@ -210,6 +215,11 @@ export function montarPlanoEmDia(input: {
    *  restrição: sem encaixe na semana o passo fica onde couber e marca
    *  `foraDaGrade`. Null = simula sem a grade (decisão da dupla). */
   disponibilidade?: Disponibilidade | null;
+  /** Sessões combinadas (018): grupos de números que a dupla decidiu
+   *  juntar numa sessão só — cada grupo ganha a marca `sessao` nos
+   *  passos. O planner não funde sozinho: sem a entrada, nenhum passo
+   *  carrega a marca. */
+  fusao?: number[][];
   hoje?: Date;
 }): PlanoEmDia {
   const { dupla } = input;
@@ -726,6 +736,13 @@ export function montarPlanoEmDia(input: {
   const s = simular(ritmo);
   const avisos = [...s.avisos];
 
+  // 018 — fusão no plano: a marca `sessao` etiqueta os passos que a
+  // dupla decidiu juntar numa sessão só, sem mexer na matemática (a
+  // caminhada já rodou). A cópia protege o cache de `rodar`.
+  const passosPlano = input.fusao?.length
+    ? marcarSessoes(s.passosPlano, input.fusao)
+    : s.passosPlano;
+
   // 518: ritmo acima de 1 por dia — o espaçamento do guia segue valendo,
   // então a copy não promete densidade que o calendário não comporta
   if (ritmo > RITMO_UM_POR_DIA) {
@@ -784,7 +801,7 @@ export function montarPlanoEmDia(input: {
     emDia,
     estado,
     pendenciasRegistro,
-    passos: s.passosPlano,
+    passos: passosPlano,
     ritmo,
     dataRecuperacao: s.dataRecuperacao,
     dataProjetada: s.dataProjetada,
@@ -799,6 +816,105 @@ export function montarPlanoEmDia(input: {
   };
 }
 
+// ---------- sessão combinada no plano (018) ----------
+// A fusão é decisão da dupla: nunca emerge do planner (o `ocupados` da
+// caminhada segue impondo um passo por dia), então a marca chega pela
+// entrada e viaja nos passos pro escopo. Uma régua só alimenta a
+// simulação, a proposta e o aviso de prática — mesma interpretação.
+
+/** Normaliza os grupos de fusão contra os números que o plano pode
+ *  agendar (passo travado não entra — a sessão move a data da row).
+ *  Um grupo precisa de 2+ encontros, todos no plano e sem repetir
+ *  passo entre grupos — a RPC `plano_aplicar_sessao` repete a mesma
+ *  fronteira no banco. */
+export function gruposDeSessao(
+  fusao: number[][] | null | undefined,
+  numeros: readonly number[]
+): { grupos: number[][] } | { erro: string } {
+  if (!fusao?.length) return { grupos: [] };
+  const pool = new Set(numeros);
+  const vistos = new Set<number>();
+  const grupos: number[][] = [];
+  for (const g of fusao) {
+    const nums = [...new Set((g ?? []).map(Number))].sort((a, b) => a - b);
+    if (nums.length < 2)
+      return {
+        erro: "Uma sessão combinada junta pelo menos dois encontros.",
+      };
+    for (const n of nums) {
+      if (!pool.has(n))
+        return { erro: `O ${n}º encontro não está no plano pra entrar na sessão.` };
+      if (vistos.has(n))
+        return {
+          erro: `O ${n}º encontro está em duas sessões combinadas — escolha uma.`,
+        };
+      vistos.add(n);
+    }
+    grupos.push(nums);
+  }
+  return { grupos };
+}
+
+/** A fusão pula a semana de prática quando um passo que `exige` prática
+ *  tem o seguinte no mesmo grupo (4–8, META_PASSOS_PLANO): o encontro
+ *  seguinte devolutiva uma prática que não aconteceu. Avisar sempre,
+ *  bloquear nunca — a decisão consciente grava em `decisoes.fusao`. */
+export function fusaoPedeAvisoPratica(grupos: readonly number[][]): boolean {
+  return grupos.some((g) => {
+    const s = new Set(g);
+    return g.some(
+      (n) => META_PASSOS_PLANO[n]?.exige === "pratica" && s.has(n + 1)
+    );
+  });
+}
+
+/** As arestas escolhidas na superfície ("juntar o n com o n+1") viram
+ *  os grupos da fusão: arestas em corrente formam um grupo só — juntar
+ *  5–6 e 6–7 põe o 5º, o 6º e o 7º na mesma sessão. */
+export function fusaoDeArestas(arestas: readonly number[]): number[][] {
+  const s = new Set(arestas);
+  const grupos: number[][] = [];
+  for (const n of [...s].sort((a, b) => a - b)) {
+    if (s.has(n - 1)) continue; // meio de corrente — a âncora abre o grupo
+    const g = [n];
+    let m = n;
+    while (s.has(m)) {
+      g.push(m + 1);
+      m++;
+    }
+    if (g.length >= 2) grupos.push(g);
+  }
+  return grupos;
+}
+
+/** Carimba `sessao` ("a", "b"…) nos passos dos grupos válidos — marca
+ *  permissiva de simulação, por grupo: o que a régua recusa (membro
+ *  fora do plano, grupo de 1, passo repetido) some da prévia sem
+ *  derrubar os grupos bons; a action valida de verdade antes de
+ *  propor e devolve o motivo. */
+function marcarSessoes(passos: PassoPlano[], fusao: number[][]): PassoPlano[] {
+  const pool = new Set(
+    passos.filter((p) => p.acao !== "travado").map((p) => p.numero)
+  );
+  const vistos = new Set<number>();
+  const marca = new Map<number, string>();
+  let i = 0;
+  for (const g of fusao) {
+    const nums = [...new Set(g.map(Number))].filter((n) => pool.has(n));
+    if (nums.length < 2 || nums.some((n) => vistos.has(n))) continue;
+    const letra = String.fromCharCode(97 + i++);
+    for (const n of nums) {
+      marca.set(n, letra);
+      vistos.add(n);
+    }
+  }
+  if (!marca.size) return passos;
+  return passos.map((p) => {
+    const s = marca.get(p.numero);
+    return s ? { ...p, sessao: s } : p;
+  });
+}
+
 /** O escopo que `plano_propor` grava (0219/0224). Só "recuperação
  *  possível" vira proposta: dupla em dia não tem o que propor e a conversa
  *  com a coordenação não promete agenda. A janela vai de hoje ao
@@ -809,7 +925,15 @@ export type EscopoProposta = {
   ritmo: number;
   nivel: NivelFlexibilizacao;
   janela: { inicio: string; fim: string };
-  passos: { numero: number; data: string; acao: "agendar" | "remarcar" }[];
+  passos: {
+    numero: number;
+    data: string;
+    acao: "agendar" | "remarcar";
+    /** Marca da sessão combinada (018): mesmo valor = mesma sessão. */
+    sessao?: string;
+    /** Duração da sessão combinada em min — 120 (2h) é o padrão. */
+    duracao_min?: number;
+  }[];
   /** Snapshot das decisões do gesto (518): recessos respondidos,
    *  "combinar sem a grade", ajuste recalculado no aceite. Viaja no
    *  jsonb do escopo sem DDL — o aceite compara pra ver se a resposta
@@ -833,6 +957,22 @@ export function escopoDaProposta(
   );
   if (!passos.length)
     return { erro: "A dupla não tem encontro devido, não há plano pra propor." };
+  // 018: passos com a mesma `sessao` viram UMA sessão no combinado — o
+  // escopo grava a marca, a mesma data (a mais cedo do grupo) e a
+  // duração padrão de 2h. Marca solitária (grupo de 1) não é sessão e
+  // some daqui — a régua de grupo mora em gruposDeSessao.
+  const sessaoData = new Map<string, string>();
+  const sessaoTam = new Map<string, number>();
+  for (const p of passos) {
+    if (!p.sessao) continue;
+    sessaoTam.set(p.sessao, (sessaoTam.get(p.sessao) ?? 0) + 1);
+    const d = sessaoData.get(p.sessao);
+    if (!d || p.data < d) sessaoData.set(p.sessao, p.data);
+  }
+  const deSessao = (p: PassoPlano) =>
+    p.sessao != null && (sessaoTam.get(p.sessao) ?? 0) >= 2
+      ? p.sessao
+      : null;
   const ultima = passos.map((p) => p.data).sort().at(-1)!;
   const fim =
     plano.encerramento && plano.encerramento >= ultima
@@ -844,11 +984,17 @@ export function escopoDaProposta(
       ritmo: plano.ritmo,
       nivel: plano.nivel,
       janela: { inicio: hoje, fim },
-      passos: passos.map((p) => ({
-        numero: p.numero,
-        data: p.data,
-        acao: p.acao,
-      })),
+      passos: passos.map((p) => {
+        const sessao = deSessao(p);
+        return {
+          numero: p.numero,
+          data: sessao ? (sessaoData.get(sessao) ?? p.data) : p.data,
+          acao: p.acao,
+          ...(sessao
+            ? { sessao, duracao_min: DURACAO_SESSAO_MIN }
+            : {}),
+        };
+      }),
     },
   };
 }

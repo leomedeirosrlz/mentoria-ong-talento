@@ -17,7 +17,7 @@
 import { createHash } from "crypto";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { comparaNome, saudadeDaDupla, toDateStr } from "@/lib/ciclo";
+import { comparaNome, encontroTemConteudo, saudadeDaDupla, toDateStr } from "@/lib/ciclo";
 import {
   escopoDaProposta,
   montarPlanoEmDia,
@@ -540,7 +540,9 @@ export function projetarFicha(d: DuplaIa, eventos: CicloEvento[]) {
         status: e.status,
         data_hora: e.data_hora,
         realizado_em: e.realizado_em,
-        tem_registro: e.registro != null,
+        // sessão combinada (018): o coberto tem conteúdo via âncora —
+        // tem_registro na régua do domínio, não no row nulo
+        tem_registro: encontroTemConteudo(e, d.encontros),
       }))
       .sort((a, b) => a.numero - b.numero),
   };

@@ -7,7 +7,9 @@
 
 import {
   alvoAgendamento,
+  cobertosDaDupla,
   emLimbo,
+  encontroTemConteudo,
   eventosDoCronograma,
   formatDiaHora,
   formatDiaSemana,
@@ -294,15 +296,25 @@ function diaDoIso(iso: string | null): string | null {
  *  o semáforo foi unificado (antes um remarcado vencido virava "atraso" no
  *  semáforo enquanto a agenda já o tratava como limbo). Alias mantida: o
  *  nome aberto/fechado é o vocabulário da agenda. */
-export function limboAberto(e: Encontro, agoraMs: number): boolean {
-  return emLimbo(e, agoraMs);
+export function limboAberto(
+  e: Encontro,
+  agoraMs: number,
+  /** Sessão combinada (018): o coberto já tem conteúdo via âncora — sem o
+   *  mapa ele entraria como limbo pra sempre. */
+  cobertos?: Map<number, number>
+): boolean {
+  return emLimbo(e, agoraMs, cobertos);
 }
 
 /** Limbo "fechado": vencido E o horário previsto já acabou. Enquanto
  *  a chamada está rolando o encontro segue ITEM na agenda — é ali que o
  *  botão "Entrar" mora; a cobrança ("rolou?") só aparece depois do fim. */
-export function limboFechado(e: Encontro, agoraMs: number): boolean {
-  if (!limboAberto(e, agoraMs)) return false;
+export function limboFechado(
+  e: Encontro,
+  agoraMs: number,
+  cobertos?: Map<number, number>
+): boolean {
+  if (!limboAberto(e, agoraMs, cobertos)) return false;
   const inicio = new Date(e.data_hora!).getTime();
   return inicio + Math.max(e.duracao_min, 0) * 60_000 < agoraMs;
 }
@@ -310,10 +322,15 @@ export function limboFechado(e: Encontro, agoraMs: number): boolean {
 /** Pendência de registro na régua do semáforo: agendado em limbo fechado
  *  (passou de vez, nada registrado) ou realizado há mais de 24h sem registro.
  *  O realizado recém-terminado ainda não é cobrança — vira item do dia com
- *  a ação "Registrar como foi". */
-export function ehPendenciaRegistro(e: Encontro, agoraMs: number): boolean {
-  if (registroTemConteudo(e.registro)) return false;
-  if (limboFechado(e, agoraMs)) return true;
+ *  a ação "Registrar como foi". `cobertos` (018) é o mapa da dupla — o
+ *  encontro coberto pela sessão combinada já tem conteúdo, nunca é pendência. */
+export function ehPendenciaRegistro(
+  e: Encontro,
+  agoraMs: number,
+  cobertos?: Map<number, number>
+): boolean {
+  if (encontroTemConteudo(e, cobertos)) return false;
+  if (limboFechado(e, agoraMs, cobertos)) return true;
   if (e.status !== "realizado") return false;
   const iso = isoDoEncontro(e);
   return iso != null && agoraMs - new Date(iso).getTime() > DIA_MS;
@@ -326,12 +343,15 @@ function avisosDaDupla(d: Dupla, hoje: string, agoraMs: number): AvisoAgenda[] {
   const nome1 = primeiroNomeDaDupla(d) || "Jovem";
   const escopo: EscopoId = `dupla:${d.id}`;
   const avisos: AvisoAgenda[] = [];
+  // sessão combinada (018): um mapa por dupla alimenta a régua — o coberto
+  // já tem conteúdo via âncora e não pode aparecer como "falta registrar"
+  const cobertos = cobertosDaDupla(d.encontros);
 
   for (const e of [...d.encontros].sort((a, b) => a.numero - b.numero)) {
-    if (!ehPendenciaRegistro(e, agoraMs)) continue;
+    if (!ehPendenciaRegistro(e, agoraMs, cobertos)) continue;
     const limbo =
       (e.status === "agendado" || e.status === "remarcado") &&
-      limboAberto(e, agoraMs);
+      limboAberto(e, agoraMs, cobertos);
     avisos.push({
       id: `reg-${e.id}`,
       escopo,
@@ -427,13 +447,16 @@ function itensDaDupla(
   const evCronograma = eventosDoCronograma(eventos, d.cronograma_id);
   const total = evCronograma.filter((e) => e.tipo === "encontro" && e.numero != null)
     .length || TRILHA_LEN.dpp;
+  // sessão combinada (018): o mapa da dupla decide "tem conteúdo?" uma vez —
+  // coberto não vira "registrar" nem "ainda não preenchido"
+  const cobertos = cobertosDaDupla(d.encontros);
 
   // --- encontros reais da dupla ---
   for (const e of d.encontros) {
     const iso = isoDoEncontro(e);
     const dia = diaDoIso(iso);
     // pendência mora no aviso do topo — listar aqui duplicaria o sinal
-    if (ehPendenciaRegistro(e, agoraMs)) continue;
+    if (ehPendenciaRegistro(e, agoraMs, cobertos)) continue;
     // agendado/remarcado SEM data_hora (dado legado/importado): não pode
     // virar item de dia nem sumir — cai no grupo "a agendar" com remarcar,
     // que é a ação correta pra uma row que precisa de nova data
@@ -493,7 +516,7 @@ function itensDaDupla(
         // remarcar segue disponível em qualquer agendado futuro — o mesmo
         // AgendarEncontroDialog da ficha/agenda semanal, não um fluxo novo
         acoes.push("remarcar");
-      } else if (e.status === "realizado" && !registroTemConteudo(e.registro)) {
+      } else if (e.status === "realizado" && !encontroTemConteudo(e, cobertos)) {
         acoes.push("registrar");
       } else if (e.status === "nao_aconteceu" || e.status === "cancelado") {
         // fechado mas com data futura (marcou não-aconteceu/cancelou antes
@@ -504,7 +527,7 @@ function itensDaDupla(
     }
 
     const meta: string[] = [];
-    const registrado = registroTemConteudo(e.registro);
+    const registrado = encontroTemConteudo(e, cobertos);
     if (e.motivo_reagendamento) meta.push(`Remarcado: ${e.motivo_reagendamento}`);
     if (e.status === "realizado" && registrado) meta.push("registro entregue");
     if (e.status === "realizado" && !registrado)

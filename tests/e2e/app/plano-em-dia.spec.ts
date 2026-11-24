@@ -202,7 +202,7 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     });
   });
 
-  test("a sessão cobre outro passo do guia — um encontro + um registro por nº (REALIZA-448)", async ({
+  test("a sessão cobre outro passo do guia — UM registro na âncora cobre o grupo (018)", async ({
     page,
   }) => {
     const e6 = await criarEncontro(6, "realizado", -4);
@@ -217,9 +217,9 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     // etapa 1 enxuta (review #9): só o portão da avaliação e a duração
     await form6.getByText("Sim", { exact: true }).click();
     await form6.getByRole("button", { name: "Avançar" }).click();
-    // a sessão física cobriu o 7º também — o checkbox marcou na etapa 1
-    // e desceu pra 2 junto das atividades; o servidor grava encontro
-    // realizado + registro próprios pro 7º
+    // a sessão física cobriu o 7º também — o checkbox desceu pro passo 2
+    // junto das atividades. 018: UM registro fica na âncora com o 7º na
+    // cobertura; a row do 7º só linka o mesmo sessao_id — clone nunca
     await expect(form6.getByText("7º encontro")).toBeVisible();
     await form6.getByText("7º encontro").click();
     // 472: sem conteúdo o servidor recusa e a oferta do 7º não aparece
@@ -231,12 +231,29 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
       page.getByText(/Também cobriu o 7º encontro/)
     ).toBeVisible({ timeout: 15_000 });
 
-    // um registro por nº — os dois fatos existem, nunca uma linha só
-    const regs = await buscarViaServiceRole<{ encontro_id: string }[]>(
+    // UMA sessão = UM registro, na âncora — os demais nºs moram na
+    // cobertura dele, nunca num segundo registro
+    const regs = await buscarViaServiceRole<
+      { encontro_id: string; cobertura: number[] | null }[]
+    >(
       "registros",
-      `select=encontro_id&encontro_id=in.(${String(e6.id)},${String(e7.id)})`
+      `select=encontro_id,cobertura&encontro_id=in.(${String(e6.id)},${String(e7.id)})`
     );
-    expect(regs).toHaveLength(2);
+    expect(regs).toHaveLength(1);
+    expect(regs[0].encontro_id).toBe(String(e6.id));
+    expect(regs[0].cobertura).toEqual([7]);
+
+    // as duas rows são realizado NA mesma sessão — sessao_id carimba o grupo
+    const encs = await buscarViaServiceRole<
+      { id: string; status: string; sessao_id: string | null }[]
+    >(
+      "encontros",
+      `select=id,status,sessao_id&id=in.(${String(e6.id)},${String(e7.id)})`
+    );
+    expect(encs).toHaveLength(2);
+    expect(encs.every((e) => e.status === "realizado")).toBe(true);
+    expect(encs[0].sessao_id).toBeTruthy();
+    expect(encs[0].sessao_id).toBe(encs[1].sessao_id);
 
     // e o pós-save NÃO oferece "registrar o 7º" — a sessão já deu o dele
     await expect(
