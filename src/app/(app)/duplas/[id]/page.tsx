@@ -161,6 +161,7 @@ import {
   coberturaDaSessao,
   combinadosPendentesDaDupla,
   filaRegistrosPendentes,
+  sessaoGrupoDaSessao,
 } from "@/lib/registro-contexto";
 import { acaoWhatsAppDupla } from "@/lib/acao-lembrete";
 
@@ -1080,7 +1081,20 @@ export default async function DuplaPage({
         // nunca o último (fechamento é gesto próprio)
         cobertura={
           souMentor
-            ? coberturaDaSessao({ dupla, numero: passo.numero, passos, agora })
+            ? coberturaDaSessao({
+                dupla,
+                numero: passo.numero,
+                passos,
+                agora,
+                sessaoId: enc?.sessao_id,
+              })
+            : null
+        }
+        // sessão planejada (018): os demais membros do grupo entram
+        // travados na cobertura do form — fechados no plano
+        sessaoGrupo={
+          souMentor && enc
+            ? sessaoGrupoDaSessao({ dupla, encontroId: enc.id, passos })
             : null
         }
         apoioDestinos={apoioDestinos}

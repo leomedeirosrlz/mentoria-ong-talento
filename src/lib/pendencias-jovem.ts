@@ -110,12 +110,16 @@ export type CombinadoPendencia = {
 
 /** Encontro realizado ainda sem a estrela do jovem. */
 export type AvaliacaoPendencia = {
-  /** id do encontro — alvoId da sequência de avaliação. */
+  /** id do encontro — alvoId da sequência de avaliação (a âncora da
+   *  sessão quando ela cobre um grupo, 018). */
   id: string;
   rotulo?: string | null;
   realizadoEm?: string | null;
   /** Trilha de especialista — "sessão" na contagem agrupada. */
   sessao?: boolean;
+  /** Sessão combinada DPP: nº de passos que a resposta única cobre
+   *  (>1 vira "a sessão cobre N passos" no contexto). */
+  cobre?: number;
 };
 
 /** Solicitação 'sugerida': o mentor indicou um especialista e o jovem decide. */
@@ -414,9 +418,12 @@ function avaliacoes(lista: AvaliacaoPendencia[]): PendenciaJovem[] {
   const n = validas.length;
   const algumaSessao = validas.some((a) => a.sessao);
   const todasSessao = validas.every((a) => a.sessao);
+  // sessão combinada DPP (018): a resposta única cobre um grupo — o
+  // contexto conta o alcance em vez de repetir "1 min"
+  const coberturaUnica = n === 1 ? (validas[0].cobre ?? 0) : 0;
   const sujeito =
     n === 1
-      ? todasSessao
+      ? todasSessao || coberturaUnica > 1
         ? "sessão esperando"
         : "encontro esperando"
       : todasSessao
@@ -430,7 +437,10 @@ function avaliacoes(lista: AvaliacaoPendencia[]): PendenciaJovem[] {
       tipo: "avaliacao",
       prioridade: 70,
       titulo: `${n} ${sujeito} sua avaliação`,
-      contexto: "1 min cada",
+      contexto:
+        coberturaUnica > 1
+          ? `a sessão cobre ${coberturaUnica} passos · 1 min`
+          : "1 min cada",
       quando: maisRecente.realizadoEm ?? null,
       acao: {
         tipo: "avaliar",

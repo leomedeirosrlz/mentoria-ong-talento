@@ -121,7 +121,11 @@ export function passosCobertosCandidatos(
     registro?: ConteudoRegistro | null;
   }[],
   numeroAtual: number,
-  agora: Date
+  agora: Date,
+  /** sessao_id do encontro do registro (sessão planejada, 018): a sessão
+   *  combinada é grupo fechado — row de OUTRO grupo não migra (o servidor
+   *  recusa com aviso), então nem candidato ela é. */
+  sessaoIdAtual?: string | null
 ): PassoGuia[] {
   const maxNumero = passos.reduce((m, p) => Math.max(m, p.numero), 0);
   const hoje = agora.toISOString().slice(0, 10);
@@ -133,6 +137,8 @@ export function passosCobertosCandidatos(
     if (cobertos.has(p.numero)) return false;
     const enc = encontros.find((e) => e.numero === p.numero);
     if (!enc) return p.data != null && p.data <= hoje;
+    if (enc.sessao_id && enc.sessao_id !== (sessaoIdAtual ?? null))
+      return false;
     if (enc.status === "agendado" || enc.status === "remarcado") {
       // "a combinar" (sem data) é compromisso aberto, não futuro firmado —
       // a sessão confirma ele também; agendado futuro fica de fora porque
@@ -141,6 +147,47 @@ export function passosCobertosCandidatos(
     }
     return enc.status === "realizado" && !encontroTemConteudo(enc, cobertos);
   });
+}
+
+/** Decisões de recesso que de fato MUDAM o vigente (519). A RPC
+ *  `declarar_recesso` é upsert cego: regravar a mesma resposta
+ *  sobrescreveria `declarado_por`/`declarado_em` e roubaria a autoria de
+ *  quem decidiu antes. Ausente no vigente = nunca declarado → viaja. */
+export function recessosAlterados<
+  T extends { cicloEventoId: string; usa: boolean },
+>(
+  vigentes: readonly { ciclo_evento_id: string; usa: boolean }[],
+  decisoes: readonly T[]
+): T[] {
+  const mapa = new Map(vigentes.map((r) => [r.ciclo_evento_id, r.usa]));
+  return decisoes.filter((d) => mapa.get(d.cicloEventoId) !== d.usa);
+}
+
+/** A sessão do grupo já saiu marcada? (519 — guarda da aplicação
+ *  idempotente por grupo): "mesma" = todos os números com um sessao_id
+ *  só e a MESMA data pedida (retry puro, devolve a existente);
+ *  "outra_data" = o grupo existe mas a data pedida difere (a RPC
+ *  remintaria o sessao_id — remarcar é pela linha do encontro); null =
+ *  ainda não aplicada ou aplicação parcial/inconsistente. */
+export function sessaoJaAplicada(
+  encontros: readonly {
+    numero: number;
+    sessao_id?: string | null;
+    data_hora?: string | null;
+  }[],
+  numeros: readonly number[],
+  dataHora: string
+): "mesma" | "outra_data" | null {
+  const membros = encontros.filter((e) => numeros.includes(e.numero));
+  const comSessao = membros.filter((e) => e.sessao_id != null);
+  const sessoes = new Set(comSessao.map((e) => e.sessao_id));
+  if (sessoes.size !== 1 || comSessao.length !== numeros.length) return null;
+  const pedida = new Date(dataHora).getTime();
+  return comSessao.every(
+    (e) => e.data_hora != null && new Date(e.data_hora).getTime() === pedida
+  )
+    ? "mesma"
+    : "outra_data";
 }
 
 // opções do form "Avaliação de Encontro Semanal - Mentores"
@@ -729,6 +776,21 @@ export function celulasComuns(
   return comuns;
 }
 
+/** Grade de preferência do plano (519): a interseção REAL — só existe
+ *  quando os DOIS lados marcaram períodos livres. Um lado só não é "em
+ *  comum": devolve null e a simulação roda sem grade até a outra chegar,
+ *  em vez de sugerir dias sem o outro lado ter opinado. */
+export function gradeCombinada(
+  mentor: Disponibilidade | null | undefined,
+  jovem: Disponibilidade | null | undefined
+): Disponibilidade | null {
+  const celM = celulasDe(mentor);
+  const celJ = celulasDe(jovem);
+  if (!celM.length || !celJ.length) return null;
+  const comuns = celulasComuns(mentor, jovem);
+  return comuns.length ? { celulas: comuns } : null;
+}
+
 /** As duas grades têm alguma célula em comum? — a régua do score de
  *  afinidade do remanejo sugerido (REALIZA-115), mesma do overlay da
  *  agenda. */
@@ -969,6 +1031,21 @@ export function encontroTemConteudo(
   return mapa?.get(e.numero) != null;
 }
 
+/** Cobertura que o registro grava (519): deriva só das rows que a sessão
+ *  efetivamente cobriu — o próprio encontro postado entra quando não é a
+ *  âncora — deduplicada, ordenada e sem o nº da âncora, que é quem
+ *  CARREGA o registro. Nunca do pedido: passo que falhou na preparação
+ *  não vira promessa fantasma na cobertura. */
+export function coberturaDoRegistro(
+  ancoraNumero: number,
+  numeroProprio: number,
+  cobertos: readonly number[]
+): number[] {
+  return [...new Set([numeroProprio, ...cobertos])]
+    .filter((n) => n !== ancoraNumero)
+    .sort((a, b) => a - b);
+}
+
 /** Encontro âncora que cobre `e` pela sessão combinada (registro com
  *  cobertura contendo o número) — null quando `e` é âncora, sessão simples
  *  ou ainda sem registro. Serve pra UI dizer "o registro do encontro 5
@@ -1004,6 +1081,69 @@ export function avaliacaoCobreNumero(
   if (!avaliacao) return false;
   if (avaliacao.encontro_id === e.id) return true;
   return (avaliacao.cobertura ?? []).includes(e.numero);
+}
+
+/** Pendência de avaliação do jovem por SESSÃO (018/0230): uma avaliação
+ *  cobre o grupo inteiro — nenhum membro da sessão volta a pedir resposta,
+ *  e a pendência aponta sempre a ÂNCORA (menor nº do grupo), onde mora o
+ *  link mintado pelo trigger. As provas de "já avaliado" são três: a row
+ *  avaliada, o `sessao_id` do grupo dela e os números que a `cobertura`
+ *  diz cobrir. `sessao` na saída é a lista de nºs do grupo (>1 = sessão
+ *  combinada — a UI mostra "a sessão cobre N passos"). */
+export function avaliacoesPendentesPorSessao<
+  T extends {
+    id: string;
+    dupla_id: string;
+    numero: number;
+    status: EncontroStatus;
+    realizado_em: string | null;
+    sessao_id?: string | null;
+  },
+>(
+  encontros: readonly T[],
+  avaliacoes: readonly {
+    encontro_id: string;
+    dupla_id: string;
+    cobertura?: number[] | null;
+  }[]
+): { encontro: T; sessao: number[] }[] {
+  const encPorId = new Map(encontros.map((e) => [e.id, e]));
+  const avaliados = new Set<string>();
+  const sessaoAvaliada = new Set<string>();
+  const numeroCoberto = new Set<string>();
+  for (const a of avaliacoes) {
+    avaliados.add(a.encontro_id);
+    const enc = encPorId.get(a.encontro_id);
+    if (enc?.sessao_id)
+      sessaoAvaliada.add(`${enc.dupla_id}:${enc.sessao_id}`);
+    if (enc) numeroCoberto.add(`${a.dupla_id}:${enc.numero}`);
+    for (const n of a.cobertura ?? [])
+      numeroCoberto.add(`${a.dupla_id}:${n}`);
+  }
+  // a sessão é a unidade: agrupa por sessao_id (row avulsa é grupo de 1)
+  const grupos = new Map<string, T[]>();
+  for (const e of encontros) {
+    const key = `${e.dupla_id}:${e.sessao_id ?? e.id}`;
+    const g = grupos.get(key) ?? [];
+    g.push(e);
+    grupos.set(key, g);
+  }
+  const out: { encontro: T; sessao: number[] }[] = [];
+  for (const [key, membros] of grupos) {
+    const ordenados = [...membros].sort((a, b) => a.numero - b.numero);
+    const alvo = ordenados.find((m) => m.status === "realizado");
+    if (!alvo) continue;
+    const feito =
+      sessaoAvaliada.has(key) ||
+      membros.some(
+        (m) =>
+          avaliados.has(m.id) ||
+          numeroCoberto.has(`${m.dupla_id}:${m.numero}`)
+      );
+    if (feito) continue;
+    out.push({ encontro: alvo, sessao: ordenados.map((m) => m.numero) });
+  }
+  return out;
 }
 
 /** Registro mais recente da dupla (pelo número do encontro). */

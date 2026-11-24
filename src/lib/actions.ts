@@ -13,6 +13,7 @@ import {
   PREF_GENEROS,
   UFS,
   cronogramaVigente,
+  coberturaDoRegistro,
   inicioDefaultDupla,
   maxEncontros,
   normLinkExterno,
@@ -50,7 +51,7 @@ import {
   type LinhaPar,
   type ResolucaoPar,
 } from "@/lib/importar-duplas";
-import { notificar } from "./notificar";
+import { notificar, relerPlanoPropostoDeMembro } from "./notificar";
 import {
   agendarEncontroCore,
   marcarSaidaMentoradoCore,
@@ -3341,7 +3342,7 @@ export async function salvarRegistro(formData: FormData) {
   // só registra encontro da própria dupla que já aconteceu (ou foi marcado realizado)
   const { data: encDb } = await supabase
     .from("encontros")
-    .select("dupla_id, numero, status, data_hora, realizado_em, sessao_id")
+    .select("dupla_id, numero, status, data_hora, realizado_em, sessao_id, duracao_min")
     .eq("id", encontro_id)
     .single();
   if (!encDb || encDb.dupla_id !== dupla_id) return { error: "Não foi possível identificar o encontro. Recarregue a página." };
@@ -3403,6 +3404,36 @@ export async function salvarRegistro(formData: FormData) {
     );
     cobriu.length = 0;
   }
+  // sessão planejada (018/519): a row já pertence a um grupo — o registro
+  // é DA SESSÃO. Os demais membros entram na cobertura mesmo sem o
+  // checkbox marcado (grupo fechado), e um segundo registro no grupo é
+  // recusado: o conteúdo mora na âncora, uma vez só.
+  if (encDb.sessao_id) {
+    const { data: grupo } = await supabase
+      .from("encontros")
+      .select("id, numero")
+      .eq("dupla_id", dupla_id)
+      .eq("sessao_id", encDb.sessao_id);
+    const outros = (grupo ?? []).filter((g) => g.id !== encontro_id);
+    if (outros.length) {
+      const { data: regGrupo } = await supabase
+        .from("registros")
+        .select("encontro_id")
+        .in("encontro_id", outros.map((g) => g.id))
+        .limit(1)
+        .maybeSingle();
+      if (regGrupo) {
+        const ancoraOutro = outros.find(
+          (g) => g.id === regGrupo.encontro_id
+        );
+        return {
+          error: `Essa sessão já foi registrada. O registro mora no ${ancoraOutro?.numero ?? "primeiro"}º encontro do grupo.`,
+        };
+      }
+      for (const g of outros)
+        if (!cobriu.includes(g.numero)) cobriu.push(g.numero);
+    }
+  }
   // âncora = menor nº da sessão: a row que carrega o registro e minta o
   // link de avaliação (trigger 0226). Default = o encontro postado.
   let ancoraId = encontro_id;
@@ -3417,6 +3448,9 @@ export async function salvarRegistro(formData: FormData) {
     numero: number;
     status: string | null;
     sessaoId: string | null;
+    // estado anterior da row — insumo do rollback da fase 1
+    dataHora: string | null;
+    duracaoMin: number | null;
   };
   const cobertas: Coberta[] = [];
   let sessaoId: string | null = encDb.sessao_id ?? null;
@@ -3444,7 +3478,7 @@ export async function salvarRegistro(formData: FormData) {
       }
       const { data: enc2 } = await supabase
         .from("encontros")
-        .select("id, status, data_hora, sessao_id")
+        .select("id, status, data_hora, sessao_id, duracao_min")
         .eq("dupla_id", dupla_id)
         .eq("numero", m)
         .maybeSingle();
@@ -3456,7 +3490,14 @@ export async function salvarRegistro(formData: FormData) {
           avisos.push(`O ${m}º encontro ainda não chegou na data oficial do guia.`);
           continue;
         }
-        cobertas.push({ id: null, numero: m, status: null, sessaoId: null });
+        cobertas.push({
+          id: null,
+          numero: m,
+          status: null,
+          sessaoId: null,
+          dataHora: null,
+          duracaoMin: null,
+        });
         continue;
       }
       if (enc2.status === "realizado") {
@@ -3497,6 +3538,8 @@ export async function salvarRegistro(formData: FormData) {
         numero: m,
         status: enc2.status,
         sessaoId: enc2.sessao_id ?? null,
+        dataHora: enc2.data_hora,
+        duracaoMin: enc2.duracao_min,
       });
     }
     if (cobertas.length) {
@@ -3508,7 +3551,6 @@ export async function salvarRegistro(formData: FormData) {
         crypto.randomUUID();
       const numeros = [encDb.numero, ...cobertas.map((c) => c.numero)];
       ancoraNumero = Math.min(...numeros);
-      cobertura = numeros.filter((n) => n !== ancoraNumero).sort((a, b) => a - b);
       const ancoraCoberta =
         ancoraNumero === encDb.numero
           ? null
@@ -3519,6 +3561,51 @@ export async function salvarRegistro(formData: FormData) {
       // coberta com número menor no grupo não minta link próprio). O update
       // sem `status` não dispara o trigger — mexer em row já realizado é
       // seguro aqui.
+      // A fase é atômica (P1): falha de link/insert reverte o que já foi
+      // escrito e apaga rows criadas — a sessão não pode nascer pela
+      // metade, senão a cobertura gravada prometeria passos que nunca
+      // viraram realizado (cobertura fantasma).
+      type Original = {
+        sessao_id: string | null;
+        data_hora: string | null;
+        duracao_min: number | null;
+      };
+      const originais = new Map<string, Original>([
+        [
+          encontro_id,
+          {
+            sessao_id: encDb.sessao_id ?? null,
+            data_hora: encDb.data_hora ?? null,
+            duracao_min: encDb.duracao_min ?? null,
+          },
+        ],
+      ]);
+      for (const c of cobertas) {
+        if (c.id)
+          originais.set(c.id, {
+            sessao_id: c.sessaoId,
+            data_hora: c.dataHora,
+            duracao_min: c.duracaoMin,
+          });
+      }
+      const inseridos: string[] = [];
+      const desfazerSessao = async () => {
+        // rollback best-effort no caminho de erro: uma row restaurada vale
+        // mais que nenhuma, e linha criada sai do mapa de qualquer jeito
+        for (const [id, o] of originais) {
+          if (inseridos.includes(id)) continue;
+          await supabase
+            .from("encontros")
+            .update({
+              sessao_id: o.sessao_id,
+              data_hora: o.data_hora,
+              duracao_min: o.duracao_min,
+            })
+            .eq("id", id);
+        }
+        if (inseridos.length)
+          await supabase.from("encontros").delete().in("id", inseridos);
+      };
       const sessaoUpdate = {
         sessao_id: sessaoId,
         data_hora: quando,
@@ -3532,6 +3619,7 @@ export async function salvarRegistro(formData: FormData) {
         .update({ sessao_id: sessaoId, ...(duracaoRaw ? { duracao_min: duracaoMin } : {}) })
         .eq("id", encontro_id);
       if (linkEncErr) {
+        await desfazerSessao();
         return { error: erroAmigavel(linkEncErr) };
       }
       for (const c of cobertas) {
@@ -3541,8 +3629,10 @@ export async function salvarRegistro(formData: FormData) {
           .update(sessaoUpdate)
           .eq("id", c.id);
         if (linkErr) {
-          avisos.push(`Não foi possível ligar o ${c.numero}º encontro à sessão.`);
-          continue;
+          await desfazerSessao();
+          return {
+            error: `Não foi possível ligar o ${c.numero}º encontro à sessão. Tente de novo.`,
+          };
         }
         c.sessaoId = sessaoId;
       }
@@ -3565,10 +3655,13 @@ export async function salvarRegistro(formData: FormData) {
           .select("id")
           .single();
         if (novoErr || !novo) {
-          avisos.push(`Não foi possível cobrir o ${c.numero}º encontro.`);
-          continue;
+          await desfazerSessao();
+          return {
+            error: `Não foi possível cobrir o ${c.numero}º encontro. Tente de novo.`,
+          };
         }
         c.id = novo.id as string;
+        inseridos.push(novo.id as string);
         c.sessaoId = sessaoId;
       }
       // a âncora pode ser uma row que acabou de nascer — resolve o id agora
@@ -3670,8 +3763,13 @@ export async function salvarRegistro(formData: FormData) {
     cobertos.push(ancoraCobertaRow.numero);
   }
 
+  // a cobertura gravada sai das rows que a sessão de fato cobriu (P1),
+  // nunca do pedido — falha de preparação já virou erro acima e falha de
+  // flip virou aviso com o nº de fora, sem promessa fantasma
+  cobertura = coberturaDoRegistro(ancoraNumero, encDb.numero, cobertos);
+
   const { data: registro, error } = regExistente
-    ? await supabase.from("registros").update(payload).eq("id", regExistente.id).select("id").single()
+    ? await supabase.from("registros").update({ ...payload, cobertura }).eq("id", regExistente.id).select("id").single()
     : await supabase
         .from("registros")
         .insert({
@@ -5209,7 +5307,7 @@ export async function listarNotificacoes() {
   const [{ data, error: errItens }, { count, error: errCount }] = await Promise.all([
     supabase
       .from("notificacoes")
-      .select("id, tipo, titulo, corpo, href, lida_em, created_at")
+      .select("id, tipo, titulo, corpo, href, lida_em, created_at, created_by")
       .eq("profile_id", eu.id)
       .order("created_at", { ascending: false })
       .limit(15),
@@ -5223,7 +5321,11 @@ export async function listarNotificacoes() {
     console.error("listarNotificacoes:", errItens ?? errCount);
     return { error: "Não foi possível carregar as notificações." };
   }
-  return { ok: true, itens: data ?? [], naoLidas: count ?? 0 };
+  return {
+    ok: true,
+    itens: await relerPlanoPropostoDeMembro(supabase, eu, data ?? []),
+    naoLidas: count ?? 0,
+  };
 }
 
 export async function marcarNotificacaoLida(id: string) {

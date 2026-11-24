@@ -880,12 +880,20 @@ export type Notificacao = {
     // trilha_prazo → especialista (15d/7d/vencida); trilha_prazo_coord →
     // coordenação no escopo da turma (só vencida)
     | "trilha_prazo"
-    | "trilha_prazo_coord";
+    | "trilha_prazo_coord"
+    // 0225 — plano "ficar em dia": mintados dentro das RPCs definer
+    // (plano_propor/plano_responder), a leitura reescreve a copy do
+    // plano_proposto de membro (ver relerPlanoPropostoDeMembro)
+    | "plano_proposto"
+    | "plano_aceito"
+    | "plano_contestado";
   titulo: string;
   corpo: string | null;
   href: string | null;
   lida_em: string | null;
   created_at: string;
+  // profile do autor — a leitura usa pra reconhecer proposta de membro
+  created_by?: string | null;
 };
 
 // ---------- chamados unificados (0084, WP1 telas finais) ----------

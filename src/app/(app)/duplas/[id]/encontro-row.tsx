@@ -92,6 +92,7 @@ export function EncontroRow({
   autorNome,
   proximosRegistros,
   cobertura,
+  sessaoGrupo,
   ancora,
 }: {
   /** Passo do guia da trilha (data sugerida no DPP; sem data no especialista). */
@@ -159,6 +160,9 @@ export function EncontroRow({
   /** Passos do guia que a sessão pode cobrir junto do registro (007 US11)
    *  — a mesma régua que o salvarRegistro revalida no servidor. */
   cobertura?: { numero: number; titulo: string }[] | null;
+  /** Demais membros do grupo sessao_id deste encontro (sessão planejada,
+   *  018): o form os mostra travados na cobertura. */
+  sessaoGrupo?: { numero: number; titulo: string }[] | null;
   /** Âncora da sessão combinada que cobre ESTE encontro (018): o registro
    *  e a avaliação do jovem moram nela — a linha mostra os da sessão, não
    *  "pendente" fantasma. Só chega quando o próprio não tem registro. */
@@ -755,6 +759,7 @@ export function EncontroRow({
               origem={encontro.origem === "externo" ? "retroativo" : "novo"}
               proximosRegistros={proximosRegistros}
               cobertura={cobertura}
+              sessaoGrupo={sessaoGrupo}
             />
           </RegistroInlinePanel>
         )}

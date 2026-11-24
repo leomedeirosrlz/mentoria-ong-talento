@@ -21,6 +21,7 @@ import {
   formatDateTime,
 } from "@/lib/ciclo";
 import { privacidadeAvaliacao, privacidadeAvaliacoes } from "@/lib/avaliacao-privacidade";
+import { listaEncontros } from "@/lib/plano-combinado";
 import { AvaliacaoEncontroForm } from "@/components/avaliacao-encontro-form";
 import { Estrelas } from "@/components/estrelas";
 import { Badge } from "@/components/ui/badge";
@@ -50,6 +51,9 @@ export type AvaliacaoPendente = {
   trilha: string;
   /** "5º encontro com Ricardo" ou "3ª sessão com Sofia", montado na página. */
   rotulo?: string;
+  /** Sessão combinada (018): nºs do grupo que esta resposta cobre, âncora
+   *  inclusa — >1 vira "a sessão cobre os encontros …" no dialog. */
+  sessao?: number[];
 };
 
 /** Avaliação enviada + a trilha da dupla (resolvida na página — a tabela
@@ -96,6 +100,14 @@ export function AvaliarPendenteButton({
             </DialogTitle>
             <DialogDescription>
               1 minuto. {privacidadeAvaliacao(pendente.trilha)}
+              {pendente.sessao && pendente.sessao.length > 1 && (
+                <>
+                  {" "}
+                  A sessão cobre os encontros{" "}
+                  {listaEncontros(pendente.sessao)}. Uma resposta vale
+                  pelos {pendente.sessao.length}.
+                </>
+              )}
             </DialogDescription>
           </DialogHeader>
           <AvaliacaoEncontroForm

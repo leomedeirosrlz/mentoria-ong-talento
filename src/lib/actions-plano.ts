@@ -2,7 +2,14 @@
 
 import { revalidatePath } from "next/cache";
 import { createClient } from "@/lib/supabase/server";
-import { celulasComuns, celulasDe, parseDisponibilidade, toDateStr } from "./ciclo";
+import {
+  celulasDe,
+  gradeCombinada,
+  parseDisponibilidade,
+  recessosAlterados,
+  sessaoJaAplicada,
+  toDateStr,
+} from "./ciclo";
 import { disponibilidadesDaDupla } from "./actions";
 import { demoAtivo, demoRole } from "./demo/mode";
 import { enviarEmailsIndividuais, SITE_URL } from "./email";
@@ -152,12 +159,9 @@ export async function simularPlano(
       await disponibilidadesDaDupla(duplaId);
     const celM = celulasDe(gradeMentor);
     const celJ = celulasDe(gradeJovem);
-    const comuns =
-      celM.length && celJ.length
-        ? celulasComuns(gradeMentor, gradeJovem)
-        : celM.length
-          ? celM
-          : celJ;
+    // mesma régua do contextoPlano (519): um lado só não é "em comum" —
+    // a simulação demo também roda sem grade nesse caso
+    const comuns = gradeCombinada(gradeMentor, gradeJovem)?.celulas ?? [];
     const plano = montarPlanoEmDia({
       dupla: comDecisoesRecesso(dupla, input?.decisoes),
       eventos,
@@ -295,10 +299,19 @@ export async function combinarPlano(
 ): Promise<Resultado> {
   if (await demoAtivo()) return { ok: true, demo: true };
   const supabase = await createClient();
+  const eventos = await getCicloEventos();
+  const ctx = await contextoPlano(duplaId, eventos);
+  if ("error" in ctx) return ctx;
   // a decisão de recesso é só da dupla — declarar antes da proposta, na
   // mesma RPC que a 0225 restringiu a mentor/mentorado; staff que tenta
-  // declarar recebe o erro honesto do banco
-  for (const d of input.decisoes ?? []) {
+  // declarar recebe o erro honesto do banco. 519: só o que MUDOU viaja —
+  // a RPC é upsert cego e regravar a mesma resposta sobrescreveria
+  // declarado_por/em, roubando a autoria original
+  const mudaram = recessosAlterados(
+    ctx.dupla.recessos ?? [],
+    input.decisoes ?? []
+  );
+  for (const d of mudaram) {
     const { data: rd, error: re } = await supabase.rpc("declarar_recesso", {
       p_dupla: duplaId,
       p_evento: d.cicloEventoId,
@@ -307,9 +320,6 @@ export async function combinarPlano(
     const r = lerRpc(rd, re);
     if ("error" in r) return r;
   }
-  const eventos = await getCicloEventos();
-  const ctx = await contextoPlano(duplaId, eventos);
-  if ("error" in ctx) return ctx;
   // depois das declarações a leitura já reflete o banco — comDecisoes
   // cobre a janela de consistência do re-read
   const dupla = comDecisoesRecesso(ctx.dupla, input.decisoes);
@@ -409,22 +419,28 @@ export async function responderPlanoComRecesso(
 ): Promise<Resultado> {
   if (await demoAtivo()) return { ok: true, demo: true };
   const supabase = await createClient();
-  for (const d of decisoes ?? []) {
+  // 519: contestar não declara recesso nenhum — a recusa do combinado não
+  // pode escrever decisão autoral no ledger da dupla
+  if (acao === "contestar")
+    return responderPlano(planoId, acao, undefined, duplaId);
+  if (!duplaId || !decisoes?.length)
+    return responderPlano(planoId, acao, undefined, duplaId);
+
+  const eventos = await getCicloEventos();
+  const ctx = await contextoPlano(duplaId, eventos);
+  if ("error" in ctx) return ctx;
+  // 519: só a decisão que MUDOU é declarada — regravar a mesma resposta
+  // sobrescreveria declarado_por/em e roubaria a autoria original
+  const mudaram = recessosAlterados(ctx.dupla.recessos ?? [], decisoes);
+  for (const d of mudaram) {
     const { data: rd, error: re } = await supabase.rpc("declarar_recesso", {
-      p_dupla: duplaId!,
+      p_dupla: duplaId,
       p_evento: d.cicloEventoId,
       p_usa: d.usa,
     });
     const r = lerRpc(rd, re);
     if ("error" in r) return r;
   }
-  if (acao === "contestar") return responderPlano(planoId, acao, undefined, duplaId);
-  if (!duplaId || !(decisoes ?? []).length)
-    return responderPlano(planoId, acao, undefined, duplaId);
-
-  const eventos = await getCicloEventos();
-  const ctx = await contextoPlano(duplaId, eventos);
-  if ("error" in ctx) return ctx;
   const planoAtual = (ctx.dupla.planos ?? []).find((p) => p.id === planoId);
   if (!planoAtual?.escopo)
     return responderPlano(planoId, acao, undefined, duplaId);
@@ -434,13 +450,17 @@ export async function responderPlanoComRecesso(
   const fusaoAnterior = [
     ...sessoesDoEscopo(planoAtual.escopo.passos ?? []).values(),
   ];
+  // 518: o "combinar sem a grade" também é decisão do escopo vigente —
+  // viaja na recalculada em vez de voltar a grade que a dupla desligou
+  const semGradeAnterior =
+    planoAtual.escopo.decisoes?.sem_grade === true;
   // re-simula com o MESMO ritmo do combinado — o que muda é só a decisão
   // de recesso nova; se as datas recalculadas forem as mesmas, é aceite
   const plano = montarPlanoEmDia({
     dupla: ctx.dupla,
     eventos,
     ritmo: Number(planoAtual.escopo.ritmo) || undefined,
-    disponibilidade: ctx.combinada,
+    disponibilidade: semGradeAnterior ? null : ctx.combinada,
     fusao: fusaoAnterior.length ? fusaoAnterior : undefined,
     hoje: agora,
   });
@@ -453,20 +473,11 @@ export async function responderPlanoComRecesso(
   if (mesmaDatas(planoAtual.escopo, e.escopo))
     return responderPlano(planoId, acao, undefined, duplaId);
 
-  // mudou: fecha a versão antiga com o motivo do ajuste e propõe a
-  // recalculada — proposta de lado nasce aceita, é o "aprovar no mesmo
-  // gesto" da spec
-  const rc = await supabase.rpc("plano_responder", {
-    p_plano: planoId,
-    p_acao: "contestar",
-    p_motivo: "A decisão de recesso mudou no aceite — versão recalculada.",
-  });
-  const rcLido = lerRpc(rc.data, rc.error);
-  if ("error" in rcLido) return rcLido;
   const escopo: EscopoProposta = {
     ...e.escopo,
     decisoes: {
       recessos: decisoes,
+      sem_grade: semGradeAnterior,
       ajuste_no_aceite: true,
       ...(fusaoAnterior.length
         ? {
@@ -479,13 +490,46 @@ export async function responderPlanoComRecesso(
         : {}),
     },
   };
+
+  // a 0225 só admite UM plano aberto por dupla — fechar a antiga é a
+  // única porta pra versão nova. Então TODA recusa que a RPC daria é
+  // provada antes de contestar: se qualquer uma falha, cai no aceite
+  // normal e a vigente continua de pé (antes desta revisão a dupla
+  // podia ficar sem plano nenhum quando a proposta quebrava)
+  if (plano.recessosPendentes.length)
+    return responderPlano(planoId, acao, undefined, duplaId);
+  const numerosNovos = new Set(e.escopo.numeros);
+  if (
+    (ctx.dupla.encontros ?? []).some(
+      (enc) => enc.status === "realizado" && numerosNovos.has(enc.numero)
+    )
+  )
+    return responderPlano(planoId, acao, undefined, duplaId);
+
+  // mudou: fecha a versão antiga com o motivo do ajuste e propõe a
+  // recalculada — proposta de lado nasce aceita, é o "aprovar no mesmo
+  // gesto" da spec
+  const rc = await supabase.rpc("plano_responder", {
+    p_plano: planoId,
+    p_acao: "contestar",
+    p_motivo: "A decisão de recesso mudou no aceite — versão recalculada.",
+  });
+  const rcLido = lerRpc(rc.data, rc.error);
+  if ("error" in rcLido) return rcLido;
   const { data, error } = await supabase.rpc("plano_propor", {
     p_dupla: duplaId,
     p_escopo: escopo,
     p_via: "app",
   });
   const r = lerRpc(data, error);
-  if ("error" in r) return r;
+  if ("error" in r) {
+    // janela residual (corrida ou infra): a antiga já é terminal e não
+    // há revive — a saída limpa é um plano_substituir definer (contestar
+    // + propor na mesma transação), sugestão anotada no relatório
+    return {
+      error: `${r.error} A versão anterior já foi encerrada. Fale com a coordenação se a nova não apareceu.`,
+    };
+  }
   const aviso = await avisoPlanoEmail(ctx, duplaId);
   await emitirProdutoEvento(supabase, {
     superficie: "ficha_dupla",
@@ -574,8 +618,9 @@ export async function aplicarPassoPlano(
  *  ganham a mesma data_hora/duracao e o mesmo `sessao_id` na RPC — um
  *  gesto só, porque a decisão foi da sessão, não de cada passo. O
  *  padrão do combinado é 2h; a RPC revalida números, janela e motivo
- *  (a data nova de um grupo já marcado pede o porquê). Idempotente:
- *  reaplicar o mesmo grupo na mesma data não duplica ledger. */
+ *  (a data nova de um grupo já marcado pede o porquê). Idempotente por
+ *  grupo no app: reaplicar na mesma data devolve a sessão existente em
+ *  vez de remintar o sessao_id (519). */
 export async function aplicarSessaoPlano(
   planoId: string,
   numeros: number[],
@@ -587,6 +632,32 @@ export async function aplicarSessaoPlano(
 ): Promise<Resultado> {
   if (await demoAtivo()) return { ok: true, demo: true };
   const supabase = await createClient();
+  // 519: idempotência por grupo. A 0227 minta um sessao_id novo em TODA
+  // chamada — reaplicar (retry, duplo clique, duas abas) trocava o id e
+  // deixava a sessão velha órfã. Antes de chamar a RPC, se os números já
+  // saíram marcados com um sessao_id só, a sessão existe: devolve ela.
+  // Remarcar a sessão é pelo encontro (mantém o id), nunca por aqui.
+  const { data: planoRow } = await supabase
+    .from("dupla_planos")
+    .select("dupla_id")
+    .eq("id", planoId)
+    .maybeSingle();
+  if (planoRow?.dupla_id) {
+    const { data: encs } = await supabase
+      .from("encontros")
+      .select("numero, sessao_id, data_hora")
+      .eq("dupla_id", planoRow.dupla_id)
+      .in("numero", numeros);
+    const ja = sessaoJaAplicada(encs ?? [], numeros, dataHora);
+    if (ja === "mesma")
+      // retry puro: a sessão existe e já é a pedida
+      return { ok: true, status: "ativo" };
+    if (ja === "outra_data")
+      return {
+        error:
+          "Essa sessão já está marcada. Pra mudar a data, remarque pelo encontro.",
+      };
+  }
   const { data, error } = await supabase.rpc("plano_aplicar_sessao", {
     p_plano: planoId,
     p_numeros: numeros,

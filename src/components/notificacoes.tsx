@@ -257,6 +257,10 @@ const ICONE: Record<Notificacao["tipo"], typeof Bell> = {
   // calendário marca a tarefa (agendar o encerramento/§13)
   trilha_prazo: HourglassMedium,
   trilha_prazo_coord: CalendarCheck,
+  // 0225 — plano "ficar em dia": proposta/aceite/contestação
+  plano_proposto: ArrowsClockwise,
+  plano_aceito: CalendarCheck,
+  plano_contestado: ThumbsDown,
 };
 
 export function NotificacoesBell({
