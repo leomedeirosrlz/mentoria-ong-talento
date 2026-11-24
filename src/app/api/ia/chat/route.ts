@@ -106,6 +106,11 @@ const Body = z
       .max(80)
       .regex(/^[\w.\-/:]+$/)
       .optional(),
+    // origem do gesto que enviou a mensagem (spec 026, FR-014): "pill" =
+    // chip do empty state. Viaja FORA de messages — nunca entra no
+    // histórico nem no prompt — e sai no args do evento 'resposta' pra
+    // ia_eventos distinguir sugestão clicada de texto digitado
+    origem: z.literal("pill").optional(),
   })
   .strict();
 
@@ -565,6 +570,9 @@ export async function POST(req: Request) {
           // (REALIZA-299): por que essa mensagem caiu nesse tier
           roteador: { tier, tarefa, papel: papelRota },
           truncado: truncouFinal || undefined,
+          // "pill" = clique numa sugestão do empty state; ausente =
+          // digitado — entra só quando definida pra não sujar o jsonb
+          ...(body.data.origem ? { origem: body.data.origem } : {}),
         },
         ok: concluido,
         erro: erroEmitido ? "erro" : null,

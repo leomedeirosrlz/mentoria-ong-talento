@@ -804,3 +804,58 @@ describe("roteador — papel × tarefa e auditoria (REALIZA-299)", () => {
     expect(resposta.tier).toBe("balanceado");
   });
 });
+
+describe("origem 'pill' no Body (spec 026, FR-014)", () => {
+  beforeEach(() => {
+    vi.resetAllMocks();
+    vi.stubEnv("IA_BOLHA", "1");
+    autenticado();
+    m.chamarModeloStream.mockResolvedValue({
+      ok: true,
+      content: "ok",
+      toolCalls: [],
+    });
+  });
+  afterEach(() => vi.unstubAllEnvs());
+
+  it("origem:'pill' passa no strict e sai no args do evento 'resposta'", async () => {
+    await lerStream(
+      await POST(
+        req({
+          messages: [{ role: "user", content: "Quem está em risco?" }],
+          origem: "pill",
+        })
+      )
+    );
+    const resposta = chamadasLote()[0][1].p_eventos.find(
+      (e) => e.tool === "resposta"
+    )!;
+    expect(resposta.args).toMatchObject({ origem: "pill" });
+    // e nunca vira prompt: o histórico do modelo leva só a pergunta
+    const hist = chamadasStream()[0][0];
+    expect(JSON.stringify(hist)).not.toContain("pill");
+  });
+
+  it("outro valor de origem é rejeitado pelo strict", async () => {
+    const res = await POST(
+      req({
+        messages: [{ role: "user", content: "oi" }],
+        origem: "digitado",
+      })
+    );
+    expect(res.status).toBe(400);
+    // malformado não gasta slot nem telemetria
+    expect(m.contextoELimiteIa).not.toHaveBeenCalled();
+    expect(m.rpc).not.toHaveBeenCalled();
+  });
+
+  it("sem origem o args do 'resposta' não carrega a chave", async () => {
+    await lerStream(await POST(req()));
+    const resposta = chamadasLote()[0][1].p_eventos.find(
+      (e) => e.tool === "resposta"
+    )!;
+    // o envio digitado não suja o jsonb com "origem": null — a chave só
+    // existe quando a pill mandou
+    expect(resposta.args).not.toHaveProperty("origem");
+  });
+});

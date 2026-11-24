@@ -76,7 +76,10 @@
       { "id": "gate-jovem-intervencao", "papeis": ["mentorado"], "tool": "intervencao_sugerir", "espera": "negada" },
       { "id": "gate-jovem-mensagem-template", "papeis": ["mentorado"], "tool": "mensagem_template", "espera": "negada" },
       { "id": "gate-mentor-mensagem-template", "papeis": ["mentor_dpp"], "tool": "mensagem_template", "espera": "permitida" },
-      { "id": "gate-jovem-adocao-funil", "papeis": ["mentorado"], "tool": "adocao_funil", "espera": "negada" }
+      { "id": "gate-jovem-adocao-funil", "papeis": ["mentorado"], "tool": "adocao_funil", "espera": "negada" },
+      { "id": "gate-coord-panorama", "papeis": ["coordenacao"], "tool": "duplas_panorama", "espera": "permitida" },
+      { "id": "gate-mentor-panorama", "papeis": ["mentor_dpp"], "tool": "duplas_panorama", "espera": "permitida" },
+      { "id": "gate-jovem-panorama", "papeis": ["mentorado"], "tool": "duplas_panorama", "espera": "negada" }
     ],
     "prompt": [
       {
@@ -114,6 +117,12 @@
         "papeis": [],
         "contem": ["papel ainda não definido", "NUNCA invente dados"],
         "nao_contem": ["/jovem/agenda"]
+      },
+      {
+        "id": "prompt-anti-id",
+        "papeis": ["coordenacao"],
+        "contem": ["são bastidor", "nunca em prosa", "`href` de link e em args de tool"],
+        "nao_contem": ["dupla_id 7f3e", "dupla_id E o dupla_id"]
       }
     ]
   },
@@ -507,6 +516,22 @@
       "tools_nao_pode": ["instrumentos_da_dupla", "ficha_dupla", "duplas_do_usuario", "registros_da_dupla", "pessoas_busca", "resumo_semana"],
       "resposta_contem": ["não|só vejo|só consigo|só posso|coordena|equipe|auxiliar|acesso|encontr|fora"],
       "resposta_nao_contem": ["semáforo", "e2e00000"]
+    },
+    {
+      "id": "live-anti-id-escolha",
+      "papel_esperado": "staff",
+      "msg": "monta a mensagem de preparação do encontro",
+      "tools_esperadas": ["mensagem_template"],
+      "resposta_contem": ["dupla|qual|pra qual"],
+      "resposta_nao_contem": ["[0-9a-f]{8}-[0-9a-f]{4}", "dupla_id"]
+    },
+    {
+      "id": "live-ficar-em-dia-nomeada",
+      "papel_esperado": "staff",
+      "msg": "e a dupla do Caio, como fica em dia?",
+      "tools_esperadas": ["duplas_do_usuario|ficha_dupla|plano_em_dia|duplas_panorama"],
+      "resposta_contem": ["Caio"],
+      "resposta_nao_contem": ["[0-9a-f]{8}-[0-9a-f]{4}", "sem acesso"]
     }
   ]
 }

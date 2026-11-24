@@ -139,3 +139,32 @@ describe("guardrails", () => {
     expect(prompt).toContain("```nota");
   });
 });
+
+
+// ---------- anti-id (026/FR-009) ----------
+// A regra explícita: ids só em `href` e args de tool — nunca em prosa,
+// `rotulo`, `detalhe` ou `valor`. O exemplo do ```escolha do template
+// ensinava o dupla_id no valor (e o valor vira a mensagem visível do
+// usuário ao clicar) — o teste trava a regra nova e o exemplo corrigido.
+
+describe("anti-id — ids são bastidor (026/FR-009)", () => {
+  const prompt = systemPromptIa(["coordenacao"]);
+
+  it("fixa a regra: id só em href e args, nunca em texto visível", () => {
+    expect(prompt).toContain("nunca em prosa, `rotulo`, `detalhe` ou `valor`");
+    expect(prompt).toContain("`href` de link e em args de tool");
+  });
+
+  it("o exemplo da escolha do template é valor-só-nome", () => {
+    // o exemplo antigo interpolava o dupla_id no valor — regex de uuid no
+    // exemplo da escolha não pode voltar
+    expect(prompt).toContain("mensagem de preparação pra dupla da Ana");
+    expect(prompt).not.toMatch(/dupla_id\s+[0-9a-f]{4}/);
+    expect(prompt).not.toContain("dupla_id E o dupla_id");
+  });
+
+  it("a instrução do detalhe pede fato de ferramenta, não texto livre", () => {
+    expect(prompt).toContain("`detalhe` (≤60)");
+    expect(prompt).toContain("fato vindo de ferramenta");
+  });
+});

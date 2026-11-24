@@ -44,6 +44,19 @@ export type UiDuplaMini = {
   apoio: boolean;
   feitos: number;
   esperado: number;
+  /** próximo encontro marcado (026) — a fonte já calculava e o
+   *  projetor descartava; alimenta a linha "quando é o próximo?" */
+  proximo?: { numero: number; data_hora: string | null } | null;
+};
+
+/** Panorama "como estão minhas duplas?" (026): as mesmas linhas-mini do
+ *  destaque do resumo, com o total do escopo e truncado honestos. */
+export type UiDuplas = {
+  kind: "duplas";
+  /** até 6, na ordem da tool (apoio → risco → atenção → ok) */
+  itens: UiDuplaMini[];
+  total: number;
+  truncado: boolean;
 };
 
 export type UiSaude = {
@@ -179,13 +192,33 @@ export type UiInstrumentos = {
 export type UiPlano = {
   kind: "plano";
   dupla_id: string;
+  /** a dupla nomeada (026) — o card diz de quem é o plano e linka a ficha */
+  mentor: string | null;
+  mentorado: string | null;
   em_dia: boolean;
   data_recuperacao: string | null;
+  /** a data "em dia" mesmo depois do encerramento — a evidência do
+   *  conversa: o card diz quando o plano fecha, nunca só que não fecha */
+  data_projetada: string | null;
+  /** no ritmo devolvido, quantos dos encontros que faltam cabem até o
+   *  encerramento — null quando o calendário não tem encerramento */
+  cabem_ate_encerramento: { cabem: number; faltam: number } | null;
+  encerramento: string | null;
+  /** encontros/semana da simulação devolvida — o card fala em palavras
+   *  (rotuloRitmo); deriva do nivel quando a tool não serializa o número */
+  ritmo: number | null;
   passos: {
     numero: number;
     titulo: string;
     acao: "agendar" | "remarcar" | "travado";
+    /** encontro a editar no remarcar/travado — viaja pro deep-link da
+     *  ficha, nunca vira texto do card */
+    encontro_id: string | null;
     data: string;
+    /** data oficial do passo — o "oficial era" que mostra a divergência */
+    data_oficial: string;
+    /** oficial que vence durante a recuperação — a conta honesta do plano */
+    vence_no_caminho: boolean;
     precondicao: string | null;
     aviso: string | null;
   }[];
@@ -315,6 +348,7 @@ export type UiBloco =
   | UiChamados
   | UiInstrumentos
   | UiFontes
+  | UiDuplas
   | UiCombinados
   | UiJornada
   | UiPedidos
@@ -347,6 +381,7 @@ export const STATUS_TOOL: Record<string, string> = {
   adocao_coorte: "Lendo a retenção por coorte…",
   adocao_funil: "Lendo o funil de instrumentos…",
   duplas_do_usuario: "Procurando a dupla…",
+  duplas_panorama: "Lendo o panorama das duplas…",
   agenda_do_periodo: "Abrindo a agenda…",
   guia_consulta: "Buscando nos guias…",
   chamados_resumo: "Lendo os chamados…",
@@ -385,6 +420,39 @@ const arr = (v: unknown): Obj[] =>
 const str = (v: unknown): string | null => (typeof v === "string" ? v : null);
 const num = (v: unknown): number => (typeof v === "number" && Number.isFinite(v) ? v : 0);
 
+/** Linha-mini de dupla — os destaques do resumo e os itens do panorama
+ *  leem o mesmo recorte do projetarResumo (mesmo shape, mesma ordem). */
+function duplaMini(x: Obj): UiDuplaMini {
+  const prox = obj(x.proximo_encontro);
+  return {
+    id: String(x.dupla_id),
+    mentor: str(x.mentor),
+    mentorado: str(x.mentorado),
+    trilha: x.trilha as Trilha,
+    status: x.status as DuplaStatus,
+    desfecho: (str(x.desfecho) as DuplaDesfecho | null) ?? null,
+    semaforo: x.semaforo as Semaforo,
+    motivo: corta(str(x.motivo), 120),
+    apoio: obj(x.apoio)?.aberto === true,
+    feitos: num(x.feitos),
+    esperado: num(x.esperado),
+    proximo: prox
+      ? { numero: num(prox.numero), data_hora: str(prox.data_hora) }
+      : null,
+  };
+}
+
+/** Ritmo (encontros/semana) por trás de cada nível nomeado — o inverso
+ *  do NIVEL_DO_RITMO do planner; cobre payload sem o `ritmo` serializado. */
+const RITMO_DO_NIVEL: Record<NonNullable<UiPlano["nivel"]>, number> = {
+  ritmo_normal: 1,
+  semana_dupla: 2,
+  semana_tripla: 3,
+  um_por_dia: 7,
+  // o conversa mostra a melhor simulação — o degrau de 1 por dia
+  conversa_coord: 7,
+};
+
 /** Tool que respondeu → bloco do card, ou null quando não há o que
  *  mostrar (lista vazia, lookup intermediário, tool sem card). Recebe o
  *  `dados` do envelope ok da executarTool. */
@@ -412,19 +480,19 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           encerradas: num(s.encerradas),
         },
         pedem_acao: pedem.length,
-        destaques: pedem.slice(0, 5).map((x) => ({
-          id: String(x.dupla_id),
-          mentor: str(x.mentor),
-          mentorado: str(x.mentorado),
-          trilha: x.trilha as Trilha,
-          status: x.status as DuplaStatus,
-          desfecho: (str(x.desfecho) as DuplaDesfecho | null) ?? null,
-          semaforo: x.semaforo as Semaforo,
-          motivo: corta(str(x.motivo), 120),
-          apoio: obj(x.apoio)?.aberto === true,
-          feitos: num(x.feitos),
-          esperado: num(x.esperado),
-        })),
+        destaques: pedem.slice(0, 5).map(duplaMini),
+      };
+    }
+    case "duplas_panorama": {
+      const itens = arr(d.duplas);
+      if (!itens.length) return null;
+      const total = num(d.total) || itens.length;
+      return {
+        kind: "duplas",
+        // a tool já capa em 6 — o slice é defesa pra payload maior
+        itens: itens.slice(0, 6).map(duplaMini),
+        total,
+        truncado: d.truncado === true || total > Math.min(itens.length, 6),
       };
     }
     case "ficha_dupla": {
@@ -489,38 +557,64 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           numero: num(p.numero),
           titulo: String(p.titulo ?? ""),
           acao: p.acao as UiPlano["passos"][number]["acao"],
+          encontro_id: str(p.encontro_id),
           data: String(p.data_sugerida ?? ""),
+          data_oficial: String(p.data_oficial ?? ""),
+          vence_no_caminho: p.vence_no_caminho === true,
           precondicao: str(p.precondicao),
           aviso: str(p.aviso),
         }))
         .filter((p) => p.numero > 0);
-      if (!passos.length) return null;
+      const pendencias = arr(d.pendencias_registro).map((p) => ({
+        numero: num(p.numero),
+        estado: (str(p.estado) === "limbo" ? "limbo" : "pendente_registro") as
+          | "limbo"
+          | "pendente_registro",
+      }));
+      // em dia sem passos nem pendência (convergência trivial, só
+      // travados): o veredito positivo ainda vira card — o silêncio lia
+      // como card quebrado (026)
+      if (
+        !passos.length &&
+        !pendencias.length &&
+        d.em_dia !== true &&
+        d.estado !== "em_dia"
+      )
+        return null;
       const plano = obj(d.plano);
-      const nivel = str(d.nivel);
+      const nivelStr = str(d.nivel);
+      const nivel =
+        nivelStr === "ritmo_normal" ||
+        nivelStr === "semana_dupla" ||
+        nivelStr === "semana_tripla" ||
+        nivelStr === "um_por_dia" ||
+        nivelStr === "conversa_coord"
+          ? nivelStr
+          : null;
+      const cabem = obj(d.cabem_ate_encerramento);
       return {
         kind: "plano",
         dupla_id: String(d.dupla_id),
+        mentor: str(d.mentor),
+        mentorado: str(d.mentorado),
         em_dia: d.em_dia === true,
         data_recuperacao: str(d.data_recuperacao),
+        data_projetada: str(d.data_projetada),
+        cabem_ate_encerramento: cabem
+          ? { cabem: num(cabem.cabem), faltam: num(cabem.faltam) }
+          : null,
+        encerramento: str(d.encerramento),
+        ritmo:
+          num(d.ritmo) ||
+          (nivel ? RITMO_DO_NIVEL[nivel] : 0) ||
+          (plano ? num(plano.ritmo) : 0) ||
+          null,
         passos,
-        pendencias: arr(d.pendencias_registro).map((p) => ({
-          numero: num(p.numero),
-          estado: (str(p.estado) === "limbo" ? "limbo" : "pendente_registro") as
-            | "limbo"
-            | "pendente_registro",
-        })),
-        avisos: arr(d.avisos)
+        pendencias,
+        avisos: (Array.isArray(d.avisos) ? d.avisos : [])
           .map((a) => str(a))
-          .filter((a): a is string => a != null)
-          .slice(0, 3),
-        nivel:
-          nivel === "ritmo_normal" ||
-          nivel === "semana_dupla" ||
-          nivel === "semana_tripla" ||
-          nivel === "um_por_dia" ||
-          nivel === "conversa_coord"
-            ? nivel
-            : null,
+          .filter((a): a is string => a != null),
+        nivel,
         estado:
           d.estado === "em_dia" ||
           d.estado === "recuperacao" ||

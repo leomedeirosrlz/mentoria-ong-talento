@@ -42,6 +42,7 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   adocao_coorte: {},
   adocao_funil: {},
   duplas_do_usuario: {},
+  duplas_panorama: {},
   mensagem_template: { slug: "mensagem-preparacao" },
   agenda_do_periodo: {},
   historico_encontros: {},

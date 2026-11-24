@@ -9,7 +9,7 @@
 
 import { projetarFicha, projetarResumo } from "@/lib/ia/tools";
 import type { DuplaIa } from "@/lib/ia/queries";
-import { montarPlanoEmDia } from "@/lib/plano-em-dia";
+import { montarPlanoEmDia, type PlanoAplicavel } from "@/lib/plano-em-dia";
 import type { Dupla } from "@/lib/types";
 import { uiDaTool, type UiBloco } from "@/lib/ia/ui";
 import { leituraAderencia } from "@/lib/relatorios/leituras-aderencia";
@@ -82,6 +82,31 @@ function uiAjuda(pergunta: string): UiBloco | null {
   });
 }
 
+// primeiro nome normalizado pra casar com o texto da pergunta — "Kauã" e
+// "kaua" viram a mesma chave; o length>1 nos callers evita inicial solta
+const primeiroNome = (nome: string | null | undefined) =>
+  normaliza((nome ?? "").split(" ")[0]);
+
+/** "a dupla da Bia" / "a do Ricardo" → a dupla cujo primeiro nome do
+ *  mentorado (nome_social primeiro) ou do mentor aparece no pedido. O
+ *  mentorado desempata (é como a equipe nomeia a dupla); null quando
+ *  nenhum nome casa — o chamador decide o fallback. */
+function resolverDuplaNomeada(
+  pergunta: string,
+  duplas: DuplaIa[]
+): DuplaIa | null {
+  const pn = normaliza(pergunta);
+  const nomeia = (nome: string | null | undefined) => {
+    const n = primeiroNome(nome);
+    return n.length > 1 && pn.includes(n);
+  };
+  return (
+    duplas.find((d) => nomeia(d.mentorado?.nome_social ?? d.mentorado?.nome)) ??
+    duplas.find((d) => nomeia(d.mentor?.nome_social ?? d.mentor?.nome)) ??
+    null
+  );
+}
+
 export async function responderDemoIa(
   pergunta: string
 ): Promise<RespostaDemo | null> {
@@ -110,14 +135,9 @@ export async function responderDemoIa(
     slugDemo &&
     /template|personaliz|modelo|pedido|pede/.test(p)
   ) {
-    const pn = normaliza(pergunta);
-    const primeiro = (nome: string | null | undefined) =>
-      normaliza((nome ?? "").split(" ")[0]);
-    const marcada = duplas.find((x) => {
-      const n = primeiro(x.mentorado?.nome_social ?? x.mentorado?.nome);
-      return n.length > 1 && pn.includes(n);
-    });
-    const d = marcada ?? (duplas.length === 1 ? duplas[0] : null);
+    const d =
+      resolverDuplaNomeada(pergunta, duplas) ??
+      (duplas.length === 1 ? duplas[0] : null);
     const rotuloTemplate =
       slugDemo === "mensagem-preparacao"
         ? "mensagem de preparação"
@@ -132,11 +152,12 @@ export async function responderDemoIa(
             pergunta: `Pra qual dupla eu monto a ${rotuloTemplate}?`,
             opcoes: duplas.slice(0, 5).map((x) => ({
               rotulo: `${x.mentorado?.nome_social ?? x.mentorado?.nome ?? "dupla"} · ${x.mentor?.nome_social ?? x.mentor?.nome ?? "mentor"}`,
+              detalhe: x.turma,
               valor: `pedido: personaliza a ${rotuloTemplate} pra dupla d${
-                primeiro(x.mentorado?.nome_social ?? x.mentorado?.nome).endsWith("a")
+                primeiroNome(x.mentorado?.nome_social ?? x.mentorado?.nome).endsWith("a")
                   ? "a"
                   : "o"
-              } ${primeiro(x.mentorado?.nome_social ?? x.mentorado?.nome)}`,
+              } ${primeiroNome(x.mentorado?.nome_social ?? x.mentorado?.nome)}`,
             })),
           })}\n\`\`\`${sugestoes(["Como está minha dupla?", "Resumo da semana"])}`,
         ui: [],
@@ -217,57 +238,103 @@ export async function responderDemoIa(
   }
 
   // catch-up (REALIZA-397): o plano sai do mesmo planner da ficha — roda
-  // antes do branch de agenda, que casaria com "adiantar encontros"
+  // antes do branch de agenda, que casaria com "adiantar encontros". A
+  // dupla nomeada no pedido ("e a dupla do Caio?") resolve antes de
+  // iterar: mostrar a primeira atrasada de outra seria atribuição errada,
+  // e quem já está em dia ou fora do "ficar em dia" ganha resposta honesta
+  // em vez do plano emprestado
   if (
     role !== "mentorado" &&
     /ficar em dia|atrasad|recupera|adiant|plano d[ae] recupera|plano pra ficar/.test(p)
   ) {
-    let ui = null;
-    for (const d of duplas) {
+    // mesmo payload da tool plano_em_dia (src/lib/ia/tools.ts): o
+    // projetor fica com o que conhece e o resto já viaja pra quando a
+    // projeção ganhar os campos novos
+    const uiPlano = (d: DuplaIa, r: PlanoAplicavel) =>
+      uiDaTool("plano_em_dia", {
+        dupla_id: d.id,
+        mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
+        mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
+        trilha: d.trilha,
+        aplicavel: true,
+        em_dia: r.emDia,
+        estado: r.estado,
+        nivel: r.nivel,
+        sugestao: r.sugestao,
+        plano: null,
+        pendencias_registro: r.pendenciasRegistro.map((p2) => ({
+          encontro_id: p2.encontroId,
+          numero: p2.numero,
+          estado: p2.estado,
+          data_hora: p2.dataHora,
+        })),
+        passos: r.passos.map((p2) => ({
+          numero: p2.numero,
+          titulo: p2.titulo,
+          acao: p2.acao,
+          encontro_id: p2.encontroId,
+          data_sugerida: p2.data,
+          data_oficial: p2.dataOficial,
+          vence_no_caminho: p2.venceNoCaminho === true,
+          precondicao: p2.precondicao ?? null,
+          aviso: p2.aviso ?? null,
+        })),
+        data_recuperacao: r.dataRecuperacao,
+        data_projetada: r.dataProjetada,
+        cabem_ate_encerramento: r.cabemAteEncerramento,
+        alternativa_ritmo: r.alternativaRitmo,
+        alternativa_recesso: r.alternativaRecesso,
+        encerramento: r.encerramento,
+        avisos: r.avisos,
+      });
+    const textoPlano = `Na demonstração o plano é de exemplo, calculado pelo mesmo motor da ficha da dupla. A sequência com as datas sugeridas tá acima: dois encontros por semana quando couber, respeitando os intervalos do guia. Quem agenda é a dupla, na ficha.${sugestoes(["Resumo da semana", "Escreva um lembrete pra dupla"])}`;
+    let ui: UiBloco | null = null;
+    let content: string;
+    const nomeada = resolverDuplaNomeada(pergunta, duplas);
+    if (nomeada) {
       const r = montarPlanoEmDia({
-        dupla: d as unknown as Dupla,
+        dupla: nomeada as unknown as Dupla,
         eventos,
         hoje: new Date(),
       });
-      if (r.aplicavel && !r.emDia && r.passos.length) {
-        ui = uiDaTool("plano_em_dia", {
-          dupla_id: d.id,
-          trilha: d.trilha,
-          aplicavel: true,
-          em_dia: r.emDia,
-          pendencias_registro: r.pendenciasRegistro.map((p2) => ({
-            encontro_id: p2.encontroId,
-            numero: p2.numero,
-            estado: p2.estado,
-            data_hora: p2.dataHora,
-          })),
-          passos: r.passos.map((p2) => ({
-            numero: p2.numero,
-            titulo: p2.titulo,
-            acao: p2.acao,
-            encontro_id: p2.encontroId,
-            data_sugerida: p2.data,
-            data_oficial: p2.dataOficial,
-            precondicao: p2.precondicao ?? null,
-            aviso: p2.aviso ?? null,
-          })),
-          data_recuperacao: r.dataRecuperacao,
-          alternativa_ritmo: r.alternativaRitmo,
-          encerramento: r.encerramento,
-          avisos: r.avisos,
-          nivel: r.nivel,
-          sugestao: r.sugestao,
-          plano: null,
-        });
-        break;
+      if (!r.aplicavel) {
+        // trilha de especialista, pausa ou falta de calendário: o motivo
+        // do planner já é a resposta honesta da rota real
+        content = `Na demonstração a resposta é a mesma da rota real: ${r.motivo}${sugestoes(["Resumo da semana"])}`;
+      } else {
+        ui = uiPlano(nomeada, r);
+        const jovem = (
+          nomeada.mentorado?.nome_social ??
+          nomeada.mentorado?.nome ??
+          "a dupla"
+        ).split(" ")[0];
+        const rotulo =
+          jovem === "a dupla"
+            ? jovem
+            : `d${jovem.endsWith("a") ? "a" : "o"} ${jovem}`;
+        content = r.emDia
+          ? `Na demonstração a dupla ${rotulo} já está em dia, então não existe plano de recuperação pra ela.${ui ? " O card acima sai do mesmo motor da ficha e mostra os encontros marcados." : " No ambiente real o mesmo motor da ficha faz essa conta."}${sugestoes(["Resumo da semana"])}`
+          : ui
+            ? textoPlano
+            : `Na demonstração a conta da dupla ${rotulo} não fecha antes do encerramento. ${r.sugestao ?? "Nem com 1 encontro por dia o plano fecha."}${sugestoes(["Resumo da semana"])}`;
       }
+    } else {
+      for (const d of duplas) {
+        const r = montarPlanoEmDia({
+          dupla: d as unknown as Dupla,
+          eventos,
+          hoje: new Date(),
+        });
+        if (r.aplicavel && !r.emDia && r.passos.length) {
+          ui = uiPlano(d, r);
+          break;
+        }
+      }
+      content = ui
+        ? textoPlano
+        : `Na demonstração nenhuma dupla está atrasada o bastante pra um plano de recuperação. No ambiente real a Liza monta o plano com o mesmo motor do card "Para ficar em dia".${sugestoes(["Resumo da semana"])}`;
     }
-    return {
-      content: ui
-        ? `Na demonstração o plano é de exemplo, calculado pelo mesmo motor da ficha da dupla. A sequência com as datas sugeridas tá acima: dois encontros por semana quando couber, respeitando os intervalos do guia. Quem agenda é a dupla, na ficha.${sugestoes(["Resumo da semana", "Escreva um lembrete pra dupla"])}`
-        : `Na demonstração nenhuma dupla está atrasada o bastante pra um plano de recuperação. No ambiente real a Liza monta o plano com o mesmo motor do card "Para ficar em dia".${sugestoes(["Resumo da semana"])}`,
-      ui: ui ? [ui] : [],
-    };
+    return { content, ui: ui ? [ui] : [] };
   }
 
   if (/agenda|encontro|próxim|proxim/.test(p) && role !== "mentorado") {
