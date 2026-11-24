@@ -18,6 +18,7 @@ import {
   formatDiaMes,
   formatDiaNum,
   formatDiaSemana,
+  formatDiaSemanaHora,
   formatDiaSemanaMes,
   formatMesAbrev,
   idade,
@@ -82,6 +83,14 @@ describe("format* (pt-BR, fuso America/Sao_Paulo)", () => {
     expect(formatDiaSemanaMes("2025-10-14")).toBe("terça-feira (14/10/2025)");
     expect(formatDiaSemanaMes("lixo")).toBe("a definir");
     expect(formatDiaSemana(null)).toBe("");
+  });
+
+  it("formatDiaSemanaHora: dia da semana + data/hora; 'data a confirmar' sem data legível", () => {
+    expect(formatDiaSemanaHora("2025-10-14T19:00:00-03:00")).toBe(
+      "terça-feira, 14/10 às 19:00"
+    );
+    expect(formatDiaSemanaHora(null)).toBe("data a confirmar");
+    expect(formatDiaSemanaHora("lixo")).toBe("data a confirmar");
   });
 });
 

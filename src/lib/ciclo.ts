@@ -2383,6 +2383,14 @@ export function rotuloSlot(iso: string): string {
   return `${formatDiaSemana(iso).replace("-feira", "")} ${formatDiaHora(iso)}`;
 }
 
+/** "terça-feira, 06/10 às 19:00" — dia da semana por extenso + data e hora:
+ *  a linha de contexto do modal de avaliação (REALIZA-524) e do link
+ *  público. Sem data legível devolve "data a confirmar", nunca inventa dia. */
+export function formatDiaSemanaHora(iso: string | null | undefined): string {
+  const dia = formatDiaSemana(iso);
+  return dia ? `${dia}, ${formatDiaHora(iso)}` : "data a confirmar";
+}
+
 /** O slot proposto cai dentro da grade de disponibilidade? Recebe um
  *  timestamptz (o `inicio` da RPC slots_livres / slot_proposto da mesa) e
  *  cruza com as `celulas` da Disponibilidade — a régua pra destacar os

@@ -17,6 +17,7 @@ import {
   SENTIMENTO_AVALIACAO_LABEL,
   TEMA_AVALIACAO_LABEL,
   formatDiaMes,
+  formatDiaSemanaHora,
   formatDateTime,
 } from "@/lib/ciclo";
 import { privacidadeAvaliacao, privacidadeAvaliacoes } from "@/lib/avaliacao-privacidade";
@@ -87,7 +88,10 @@ export function AvaliarPendenteButton({
             confirmações curtas seguem nos tamanhos menores */}
         <DialogContent size="xl">
           <DialogHeader>
+            {/* data+dia primeiro: com várias pendentes na fila, é o que
+                distingue qual encontro está sendo avaliado (REALIZA-524) */}
             <DialogTitle>
+              {formatDiaSemanaHora(pendente.realizado_em)} ·{" "}
               {pendente.rotulo ?? `${pendente.numero}º encontro`}: como foi?
             </DialogTitle>
             <DialogDescription>

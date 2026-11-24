@@ -29,7 +29,8 @@ export function AvaliarTokenFlow({
    *  desta render — distinto do pós-submit, que é `submeteu`. */
   jaRegistrada: boolean;
   primeiroNome: string | null;
-  /** "Encontro N com Fulano · dd/mm/aaaa hh:mm" — montado no servidor. */
+  /** "Encontro N com Fulano · terça-feira, 24/11 às 19:00" — montado no
+   *  servidor ("data a confirmar" quando a data não resolveu). */
   contexto: string | null;
   demo: boolean;
   retryHref: string;
