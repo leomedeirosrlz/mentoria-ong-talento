@@ -2,6 +2,7 @@ import { MapPin } from "@phosphor-icons/react/dist/ssr";
 import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
+  getJovemAssinaturas,
   getJovemDuplas,
   getJovemEncaminhamentos,
   getJovemEncontros,
@@ -9,12 +10,15 @@ import {
   getJovemPerfil,
 } from "@/lib/queries-jovem";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
+import { getPdmDaDupla } from "@/lib/queries-pdm";
 import { conquistasDoJovem } from "@/lib/conquistas";
 import { papelLabel } from "@/lib/ciclo";
 import { getMe } from "@/lib/queries";
 import { getChamados, getChamadoDetalhe } from "@/lib/queries-chamados";
 import { JovemChamados } from "@/components/jovem-chamados";
 import { ConquistasCard } from "./conquistas-card";
+import { SeloNivel } from "./selo-nivel";
+import { NivelNotifier } from "@/components/nivel-notifier";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { gravatarUrlSeExiste } from "@/lib/gravatar";
 import { Badge } from "@/components/ui/badge";
@@ -55,6 +59,7 @@ export default async function JovemPerfil({
     avaliacoes,
     encaminhamentos,
     jornada,
+    assinaturas,
   ] = await Promise.all([
     getMe(),
     getJovemPerfil(),
@@ -67,10 +72,27 @@ export default async function JovemPerfil({
     getJovemEncaminhamentos(),
     // a RPC fora do ar devolve a estante sem os instrumentos — nunca quebra
     getJovemJornada().catch(() => null),
+    // a família "termo" das conquistas (024) lê o slug termo-mentorando
+    getJovemAssinaturas(),
   ]);
   if (!me) redirect("/login"); // o layout já barra — convenção das páginas
   const tema = temaValido((await cookies()).get(TEMA_COOKIE)?.value);
   const demo = await demoRole();
+  // itens do PDM das duplas DPP (024) — um getPdmDaDupla por dupla da
+  // régua (React.cache reaproveita a leitura de quem já abriu o PDM);
+  // RPC fora do ar devolve null e a família metas/submetas só não nasce
+  const pdmDocs = await Promise.all(
+    duplas
+      .filter((d) => d.id != null && (d.trilha ?? "dpp") !== "especialista")
+      .map((d) => getPdmDaDupla(d.id!))
+  );
+  const pdmItens = pdmDocs.flatMap((doc) =>
+    (doc?.itens ?? []).map((i) => ({
+      parentId: i.parentId,
+      status: i.status,
+      atingidaEm: i.atingidaEm,
+    }))
+  );
 
   const nomeTela = me.nome_social || me.nome;
   // a foto do jovem mora em mentorados.avatar_path (é o que jovem_perfil
@@ -78,14 +100,25 @@ export default async function JovemPerfil({
   const avatarUrl = perfil?.avatar_path
     ? avatarPublicUrl(perfil.avatar_path)
     : null;
-  // conquistas v3 (016): toda a derivação mora na lib — estante (marcos
-  // datados + instrumentos entregues + contagens), futuras e nível
+  // conquistas v4 (024): toda a derivação mora na lib — estante (marcos
+  // datados + instrumentos entregues + famílias com tiers), futuras e
+  // nível; as peças gerais (perfil, termo) chegam sem jornada
   const conq = conquistasDoJovem({
     encontros,
     duplas,
     jornada,
     avaliacoes,
     encaminhamentos,
+    assinaturas,
+    pdmItens,
+    perfil: perfil
+      ? {
+          whatsapp: perfil.whatsapp,
+          disponibilidade: perfil.disponibilidade,
+          bioOuInteresses:
+            !!me.bio?.trim() || (me.interesses?.length ?? 0) > 0,
+        }
+      : null,
   });
 
   const meta = [
@@ -120,6 +153,9 @@ export default async function JovemPerfil({
               src={avatarUrl}
               fallbackSrc={demo ? null : await gravatarUrlSeExiste(me.email)}
             />
+            {/* o selo "Seu nível" (024) — a faixa atual na mão do avatar;
+                abre o mesmo detalhe da régua do card de conquistas */}
+            {conq.nivel && <SeloNivel nivel={conq.nivel} />}
           </div>
           <h1 className="mt-3 text-xl font-semibold tracking-tight sm:text-2xl">
             {nomeTela}
@@ -162,9 +198,12 @@ export default async function JovemPerfil({
 
           <FichaSecao perfil={perfil} />
 
-          {/* mesma condição da home: jornada existe quando há trilha
-              DPP ou sessão de especialista já feita */}
-          {conq.temJornada && (
+          {/* jornada (DPP ou especialista) OU as peças gerais da 024 —
+              perfil e termo chegam antes da primeira dupla, então o card
+              renderiza com qualquer peça, jornada ou não */}
+          {(conq.temJornada ||
+            conq.conquistas.length > 0 ||
+            conq.futuras.length > 0) && (
             <ConquistasCard
               conquistas={conq.conquistas}
               futuras={conq.futuras}
@@ -200,6 +239,21 @@ export default async function JovemPerfil({
           <ContaSecao me={me} tema={tema} />
         </div>
       </div>
+
+      {/* o toast da subida de faixa (024): baseline em localStorage,
+          dispara uma vez por nível novo cruzado */}
+      <NivelNotifier
+        mentoradoId={perfil?.id ?? me.id}
+        atual={conq.nivel?.atual ?? null}
+        titulo={
+          conq.nivel?.faixas.find((f) => f.chave === conq.nivel?.atual)
+            ?.titulo ?? null
+        }
+        criterio={
+          conq.nivel?.faixas.find((f) => f.chave === conq.nivel?.atual)
+            ?.criterio ?? null
+        }
+      />
     </div>
   );
 }
