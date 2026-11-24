@@ -1,353 +1,71 @@
 import type { Metadata } from "next";
-import Link from "next/link";
-import {
-  ArrowRight,
-  EnvelopeSimple,
-  Handshake,
-  Sparkle,
-  UserCheck,
-  Users,
-  UsersFour,
-  WhatsappLogo,
-} from "@phosphor-icons/react/dist/ssr";
-import { Avatar } from "@/components/avatar";
-import { Badge } from "@/components/ui/badge";
-import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { avatarPublicUrl } from "@/lib/avatar";
-import { waLink } from "@/lib/ciclo";
-import { msgApresentacaoJovem } from "@/lib/whatsapp-msgs";
-import { agrupaContatosPorPessoa } from "@/lib/jovem-contatos";
+import { JovemDiretorio } from "@/components/jovem-diretorio";
+import { enriqueceDiretorio } from "@/lib/jovem-diretorio";
 import {
   getJovemColegas,
   getJovemContatos,
+  getJovemDiretorio,
   getJovemDuplas,
+  getJovemPerfil,
 } from "@/lib/queries-jovem";
 import { getMe } from "@/lib/queries";
-import type { ColegaTurma, JovemContato } from "@/lib/types";
-import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Pessoas" };
 
-/** O diretório do jovem (0076), agrupado por cargo: mentoria, especialistas,
- *  supervisão e coordenação vêm da `jovem_contatos` (adultos das duplas
- *  dele — contato direto por default); os colegas da turma vêm da
- *  `mentorados_turma` (só quem tem conta; WhatsApp só com opt-in do
- *  próprio colega — o do jovem ele controla no Perfil). */
+/** /jovem/pessoas (023) — o diretório do programa inteiro: adultos com
+ *  papel, TODOS os jovens com conta (menores com foto, decisão do lead) e
+ *  o catálogo de especialistas. A rede do jovem é uma LENTE sobre a
+ *  lista (marca "Sua rede" + faceta "Minha rede"), resolvida no client
+ *  por jovem_contatos ∪ mentorados_turma — a view marca minha_rede, o
+ *  merge repara o quirk do distinct on (id). Nenhum card abre canal: o
+ *  contato direto mora na ficha e só pra quem já tem vínculo. */
 export default async function JovemPessoas() {
-  const [me, contatos, colegas, duplas] = await Promise.all([
-    getMe(),
-    getJovemContatos(),
-    getJovemColegas(),
-    getJovemDuplas(),
-  ]);
+  const [me, perfil, entradas, contatos, colegas, duplas] =
+    await Promise.all([
+      getMe(),
+      getJovemPerfil(),
+      getJovemDiretorio(),
+      getJovemContatos(),
+      getJovemColegas(),
+      getJovemDuplas(),
+    ]);
   if (!me) return null; // o layout já barra — convenção das páginas
   const nomeTela = me.nome_social || me.nome;
 
-  // status/trilha por dupla — a etiqueta "trilha concluída / mentoria
-  // pausada" marca contato de dupla que não está mais em curso
-  const porDupla = new Map(
-    duplas.map((d) => [d.id, { status: d.status, trilha: d.trilha }])
-  );
-  const agrupaPorPessoa = (lista: JovemContato[]): JovemContato[] =>
-    agrupaContatosPorPessoa(lista, porDupla);
-
-  const porPapel = (papel: string): JovemContato[] =>
-    agrupaPorPessoa(contatos.filter((c) => c.papel === papel));
-
-  /** Etiqueta de estado da dupla do contato — só quando não está ativa. */
-  function seloDe(c: JovemContato): string | null {
-    const d = c.dupla_id ? porDupla.get(c.dupla_id) : undefined;
-    if (!d?.status || d.status === "ativa") return null;
-    const base = d.trilha === "especialista" ? "trilha" : "mentoria";
-    const status =
-      d.status === "concluida" ? "concluída" : d.status;
-    return `${base} ${status}`;
-  }
-
-  const grupos: {
-    id: string;
-    titulo: string;
-    icon: typeof Handshake;
-    itens: JovemContato[];
-    vazio: string;
-    /** Atalho pro destino do grupo — o diretório mostra a rede do jovem,
-     *  nunca um segundo catálogo (484). */
-    cta?: { href: string; rotulo: string };
-  }[] = [
-    {
-      id: "mentoria",
-      titulo: "Mentoria",
-      icon: Handshake,
-      itens: porPapel("mentor"),
-      vazio: "Quando a sua dupla for formada, o seu mentor aparece aqui.",
-    },
-    {
-      id: "especialistas",
-      titulo: "Especialistas",
-      icon: Sparkle,
-      itens: porPapel("especialista"),
-      vazio:
-        "O especialista da sua trilha aparece aqui quando ela começar.",
-      cta: { href: "/jovem/especialistas", rotulo: "Conhecer especialistas" },
-    },
-    {
-      id: "supervisao",
-      titulo: "Auxiliar executivo",
-      icon: UserCheck,
-      itens: porPapel("supervisor"),
-      vazio: "O auxiliar executivo da sua dupla aparece aqui.",
-    },
-    {
-      id: "coordenacao",
-      titulo: "Coordenação",
-      icon: UsersFour,
-      itens: porPapel("coordenacao"),
-      vazio: "A equipe da coordenação aparece aqui.",
-    },
-  ];
-
-  return (
-    <div className="grid gap-8">
-      <header>
-        <h1 className="text-2xl font-semibold tracking-tight">Pessoas</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Mentoria, especialistas, coordenação e os colegas da sua turma.
-        </p>
-      </header>
-
-      {/* Os adultos, um grupo por cargo — contato direto por default
-          (jovem_contatos): mentor e supervisor de CADA dupla,
-          especialistas das trilhas e a coordenação */}
-      {grupos.map((g) => (
-        <section key={g.id} aria-labelledby={`${g.id}-titulo`}>
-          <div className="mb-3 flex items-center justify-between gap-3">
-            <h2
-              id={`${g.id}-titulo`}
-              className="flex items-center gap-2 text-base font-semibold"
-            >
-              <g.icon
-                size={18}
-                className="text-muted-foreground"
-                aria-hidden
-              />
-              {g.titulo}
-            </h2>
-            {g.cta && (
-              <Link
-                href={g.cta.href}
-                className="group inline-flex min-h-11 items-center gap-1 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground"
-              >
-                {g.cta.rotulo}
-                <ArrowRight
-                  size={14}
-                  aria-hidden
-                  className="transition-transform group-hover:translate-x-0.5"
-                />
-              </Link>
-            )}
-          </div>
-          <Card className="animate-enter">
-            <CardContent>
-              {g.itens.length === 0 ? (
-                <p className="py-4 text-sm text-muted-foreground">
-                  {g.vazio}
-                </p>
-              ) : (
-                <ul className="divide-y divide-border/60">
-                  {g.itens.map((c) => (
-                    <ContatoLinha
-                      key={`${g.id}-${c.id}`}
-                      c={c}
-                      selo={seloDe(c)}
-                      nomeJovem={nomeTela}
-                    />
-                  ))}
-                </ul>
-              )}
-            </CardContent>
-          </Card>
-        </section>
-      ))}
-
-      {/* Colegas de turma — a view mentorados_turma: só quem tem conta e
-          divide turma de dupla; o WhatsApp chega null pra quem não ligou
-          o compartilhamento, então o CTA nunca abre quebrado */}
-      <section aria-labelledby="colegas-titulo">
-        <h2
-          id="colegas-titulo"
-          className="mb-3 flex items-center gap-2 text-base font-semibold"
-        >
-          <Users size={18} className="text-muted-foreground" aria-hidden />
-          Colegas da turma
-        </h2>
-        <Card className="animate-enter">
-          <CardContent>
-            {colegas.length === 0 ? (
-              <p className="py-4 text-sm text-muted-foreground">
-                Quando colegas da sua turma entrarem na plataforma, eles
-                aparecem aqui.
-              </p>
-            ) : (
-              <ul className="divide-y divide-border/60">
-                {colegas.map((c) => (
-                  <ColegaLinha key={c.id} c={c} nomeJovem={nomeTela} />
-                ))}
-              </ul>
-            )}
+  if (perfil == null) {
+    // sem ficha de mentorado a view já vem vazia — a página diz por que
+    // em vez de mostrar uma grade muda (mesma régua de /jovem/especialistas)
+    return (
+      <div className="grid gap-6">
+        <header>
+          <h1 className="text-xl font-semibold">Pessoas</h1>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Todo mundo do programa, com a sua rede marcada.
+          </p>
+        </header>
+        <Card>
+          <CardContent className="py-5 text-sm text-muted-foreground">
+            Seu cadastro ainda não está completo. Quando a equipe vincular
+            sua ficha, as pessoas do programa aparecem por aqui.
           </CardContent>
         </Card>
-        <p className="mt-3 text-xs leading-relaxed text-muted-foreground">
-          Um colega só aparece aqui quando tem conta na plataforma, e o
-          WhatsApp dele só aparece se ele escolher compartilhar. O seu você
-          controla em{" "}
-          <Link
-            href="/jovem/perfil"
-            className="font-medium underline underline-offset-2"
-          >
-            Perfil
-          </Link>
-          .
-        </p>
-      </section>
-    </div>
-  );
-}
-
-/** Adulto do diretório — avatar + nome (com o estado da dupla quando não
- *  é ativa) + WhatsApp/e-mail diretos. O cargo é a seção onde a linha
- *  mora — não repete em cada linha. */
-function ContatoLinha({
-  c,
-  selo,
-  nomeJovem,
-}: {
-  c: JovemContato;
-  /** "trilha concluída", "mentoria pausada"… — null quando a dupla vive */
-  selo?: string | null;
-  nomeJovem: string;
-}) {
-  const nome = c.nome_social || c.nome || "?";
-  const wa = waLink(c.whatsapp, msgApresentacaoJovem(nomeJovem));
-  return (
-    <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-      <Link
-        href={`/jovem/pessoas/${c.id}`}
-        prefetch={false}
-        className="flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
-      >
-        <Avatar
-          nome={nome}
-          src={c.avatar_path ? avatarPublicUrl(c.avatar_path) : null}
-          size={40}
-        />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{nome}</p>
-          {selo && <p className="text-xs text-muted-foreground">{selo}</p>}
-        </div>
-      </Link>
-      <div className="flex shrink-0 items-center gap-1.5">
-        {c.email && (
-          <a
-            href={`mailto:${c.email}`}
-            aria-label={`Enviar e-mail para ${nome}`}
-            className={cn(
-              buttonVariants({ variant: "outline", size: "sm" }),
-              "px-2.5"
-            )}
-          >
-            <EnvelopeSimple size={15} aria-hidden />
-            <span className="sr-only sm:not-sr-only sm:inline">E-mail</span>
-          </a>
-        )}
-        {wa && (
-          <a
-            href={wa}
-            target="_blank"
-            rel="noopener noreferrer"
-            aria-label={`Conversar com ${nome} no WhatsApp`}
-            className={buttonVariants({ variant: "outline", size: "sm" })}
-          >
-            <WhatsappLogo size={15} aria-hidden />
-            <span className="sr-only sm:not-sr-only sm:inline">WhatsApp</span>
-            <span className="sr-only"> (abre em nova aba)</span>
-          </a>
-        )}
       </div>
-    </li>
-  );
-}
+    );
+  }
 
-/** Colega de turma — iniciais, não foto (menor sem cláusula de imagem, a
- *  mesma decisão do avatar do próprio jovem); cidade/UF e interesses pra
- *  ter ideia de quem é; WhatsApp só quando o colega compartilhou. */
-function ColegaLinha({
-  c,
-  nomeJovem,
-}: {
-  c: ColegaTurma;
-  nomeJovem: string;
-}) {
-  const nome = c.nome_social || c.nome || "?";
-  const local = [c.cidade, c.uf].filter(Boolean).join(" · ");
-  const interesses = c.interesses ?? [];
-  const wa = waLink(
-    c.whatsapp,
-    `Olá! Sou ${nomeJovem}, da sua turma no programa Realiza.vc.`
-  );
+  const pessoas = enriqueceDiretorio(entradas, contatos, colegas, duplas);
+
   return (
-    <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-      <Link
-        href={`/jovem/pessoas/${c.id}`}
-        prefetch={false}
-        className="flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
-      >
-        <Avatar nome={nome} papel="mentorado" size={40} />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{nome}</p>
-          {local && (
-            <p className="truncate text-xs text-muted-foreground">{local}</p>
-          )}
-          {interesses.length > 0 && (
-            <span className="mt-1 flex flex-wrap gap-1">
-              {interesses.slice(0, 4).map((i) => (
-                <Badge
-                  key={i}
-                  variant="outline"
-                  className="bg-muted font-normal text-muted-foreground"
-                >
-                  {i}
-                </Badge>
-              ))}
-              {interesses.length > 4 && (
-                <span className="self-center text-[11px] text-muted-foreground">
-                  +{interesses.length - 4}
-                </span>
-              )}
-            </span>
-          )}
-        </div>
-      </Link>
-      {wa ? (
-        <a
-          href={wa}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Conversar com ${nome} no WhatsApp`}
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            "shrink-0"
-          )}
-        >
-          <WhatsappLogo size={15} aria-hidden />
-          <span className="sr-only sm:not-sr-only sm:inline">WhatsApp</span>
-          <span className="sr-only"> (abre em nova aba)</span>
-        </a>
-      ) : (
-        <span className="shrink-0 text-xs text-muted-foreground">
-          não compartilhou o contato
-        </span>
-      )}
-    </li>
+    <div className="grid gap-6">
+      <header>
+        <h1 className="text-xl font-semibold">Pessoas</h1>
+        <p className="mt-1 max-w-lg text-sm leading-relaxed text-muted-foreground">
+          Todo mundo do programa, com a sua rede marcada. Toca numa pessoa
+          pra abrir o perfil dela.
+        </p>
+      </header>
+      <JovemDiretorio pessoas={pessoas} nomeJovem={nomeTela} />
+    </div>
   );
 }

@@ -1376,13 +1376,53 @@ export type Devolutiva = {
   created_at: string;
 };
 
+/** Linha da view `jovem_diretorio` (0239) — o diretório do programa que o
+ *  jovem navega: adultos ativos com papel no programa, TODOS os jovens
+ *  com conta (inclusive menores, com foto — decisão do lead 24/11) e o
+ *  catálogo de especialistas. Contato direto não entra: whatsapp/e-mail
+ *  seguem vindo das views de rede (`jovem_contatos`). Tipo local
+ *  normalizado (o Row gerado é todo nullable). */
+export type JovemDiretorioTipo = "adulto" | "jovem" | "especialista";
+
+export type JovemDiretorioEntry = {
+  id: string;
+  tipo: JovemDiretorioTipo;
+  nome: string;
+  nome_social: string | null;
+  avatar_path: string | null;
+  /** Rótulo de papel que a view projeta — 'mentorado' pros jovens,
+   *  role/app_role pros adultos, 'mentor_especialista' no braço catálogo. */
+  papel: string | null;
+  cidade: string | null;
+  uf: string | null;
+  interesses: string[] | null;
+  areas: string[] | null;
+  bio: string | null;
+  cargo: string | null;
+  empresa: string | null;
+  experiencia_previa: string | null;
+  formacao_externa: string | null;
+  voluntariado: string | null;
+  /** Rótulos "dia + período" da grade — só no braço catálogo. */
+  grade_resumo: string[] | null;
+  vagas: number | null;
+  /** Marca da view — a página ainda repara pela rede resolvida (o
+   *  distinct on (id) prefere a linha de catálogo e perde o true do
+   *  braço adulto; ver lib/jovem-diretorio.ts). */
+  minha_rede: boolean;
+  minha_turma: boolean;
+};
+
 /** A pessoa que /jovem/pessoas/[id] resolve — sempre de uma fonte já
- *  autorizada (contato de dupla/coord, colega da turma ou catálogo de
- *  especialista); cada ramo carrega a projeção segura da view dele. */
+ *  autorizada: primeiro a existência no diretório (senão 404 sem vazar),
+ *  depois o detalhe pela fonte mais rica (contato de dupla/coord →
+ *  colega da turma → catálogo de especialista → projeção pública do
+ *  diretório). Cada ramo carrega a projeção segura da view dele. */
 export type JovemPessoa =
   | { tipo: "contato"; contato: JovemContato }
   | { tipo: "colega"; colega: ColegaTurma }
-  | { tipo: "especialista"; especialista: JovemEspecialista };
+  | { tipo: "especialista"; especialista: JovemEspecialista }
+  | { tipo: "diretorio"; entrada: JovemDiretorioEntry };
 
 /** Projeção da trilha de especialista do mentorado pro mentor DPP — saída da
  *  RPC `trilha_do_jovem` (0092). Visibilidade COMPLETA (decisão out/2026):

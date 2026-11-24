@@ -28,7 +28,7 @@ import {
   Sparkle,
   UserPlus,
 } from "@phosphor-icons/react";
-import type { Dupla, Encontro } from "@/lib/types";
+import type { Dupla, Encontro, JovemEspecialista } from "@/lib/types";
 import {
   EnviarFormularioDialog,
   type FormularioOpcao,
@@ -64,12 +64,8 @@ type DialogId =
 // com o da linha (REALIZA-157); sem o size-4 o svg herdava o tamanho do texto
 const ICONE = "size-4 shrink-0 text-muted-foreground";
 
-type EspecialistaOpcao = {
-  id: string;
-  nome: string;
-  nome_social?: string | null;
-  areas: string[] | null;
-};
+// a seleção de especialista dos dialogs é por cards do catálogo rico (023)
+type EspecialistaOpcao = JovemEspecialista;
 
 export function DuplaMaisMenu({
   duplaId,

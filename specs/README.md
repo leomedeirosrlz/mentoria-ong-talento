@@ -45,7 +45,7 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 | 020 | `docs-do-plano` | feature | Clarified | REALIZA-521 (23/nov/2026) — doc do combinado + roteiros lazy |
 | 021 | `materiais-liza` | feature | Clarified | REALIZA-522 (23/nov/2026) — materiais estruturados via Liza (backlog) |
 | 022 | `instrumentos-pdm-avaliacao` | mudança | Clarified | rodada UI/UX (24/nov/2026) — anel do card, header da avaliação, PDM desktop, aba Instrumentos, Nova meta SMART |
-| 023 | `pessoas-especialistas` | mudança | Clarified | rodada UI/UX (24/nov/2026) — acesso do jovem, Ver todos, filtros, catálogo rico, solicitação não-modal |
+| 023 | `pessoas-especialistas` | mudança | Clarified | rodada UI/UX (24/nov/2026) — acesso do jovem, Ver todos, filtros, catálogo rico, solicitação não-modal; implementação em `impl/pessoas-023` |
 | 024 | `gamificacao-nivel-conquistas` | feature | Clarified | rodada UI/UX (24/nov/2026) — nível/raios, conquistas gerais e motion por faixa |
 | 025 | `plano-recesso-fusao-copy` | mudança | Clarified | rodada UI/UX (24/nov/2026) — copy do recesso, fusão verde, checkbox custom, card duplicado |
 | 026 | `liza-genui-pills` | mudança | Clarified | rodada UI/UX (24/nov/2026) — cards ricos, colapsável, IDs, pills rotativas, falso negativo |

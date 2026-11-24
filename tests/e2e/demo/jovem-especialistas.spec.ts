@@ -99,19 +99,25 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
       .click();
     await page.waitForURL("**/jovem/especialistas");
 
-    // a mesma prévia dentro do dialog de confirmação — e "qualquer" não
-    // inventa perfil: diz que a coordenação conecta
+    // o mesmo catálogo dentro do dialog de confirmação (023: a escolha é
+    // por card, não Select) — o sugerido vem selecionado e o resumo é o
+    // card completo, com link à ficha
     await sugestoes.getByRole("button", { name: "Quero seguir" }).click();
     const dialog = page.getByRole("dialog");
     await expect(
-      dialog.getByRole("link", { name: "Ver perfil de Marcos Vinícius" })
+      dialog.getByRole("link", { name: "Abrir perfil de Marcos Vinícius" })
     ).toBeVisible();
+    await dialog.getByText("Experiência e formação").click();
     await expect(
       dialog.getByText(/Professor de curso técnico aos sábados/)
     ).toBeVisible();
-    await dialog.locator("#sug-esp").click();
-    await page
-      .getByRole("option", { name: /Qualquer especialista/ })
+    // "qualquer" não inventa perfil: troca pelo primeiro card do pool (o
+    // card do mural) e a nota explica que a coordenação conecta
+    await dialog.getByRole("button", { name: "Trocar" }).click();
+    await dialog
+      .locator("#sug-esp-pool li")
+      .first()
+      .getByRole("button", { name: "Selecionar", exact: true })
       .click();
     await expect(
       dialog.getByText(/a coordenação conecta você/)
@@ -298,39 +304,43 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
       catalogo.getByRole("button", { name: "Pedir pro mural" }).first()
     ).toBeVisible();
 
-    // o gesto da Sofia abre o dialog compartilhado de pedido — a escolha de
-    // alvo é o primeiro passo
-    await catalogo.getByRole("button", { name: "Pedir trilha" }).click();
-    const dialog = page.getByRole("dialog");
-    await expect(
-      dialog.getByRole("heading", { name: "Pedir apoio de um especialista" })
-    ).toBeVisible();
-    await expect(
-      dialog.getByRole("button", { name: /Um especialista específico/ })
-    ).toBeVisible();
-    await expect(
-      dialog.getByRole("button", { name: /Qualquer especialista/ })
-    ).toBeVisible();
-    // caminho dirigido: escolhe a Sofia — o passo de horário oferece
-    // "Deixar Sofia propor" + chips dos slots reais da grade dela
-    await dialog
-      .getByRole("button", { name: /Um especialista específico/ })
+    // o gesto da Sofia seleciona o card dela na grade (023: o pedido saiu
+    // do modal) — o painel de horário+texto monta embaixo, com âncora
+    // #pedir, e o card fica marcado com selo + aria-pressed
+    await catalogo
+      .getByRole("button", { name: "Pedir próxima sessão" })
       .click();
-    await dialog
-      .getByRole("button", { name: /Sofia Nogueira/ })
-      .click();
+    const painel = page.locator("section#pedir");
     await expect(
-      dialog.getByRole("button", { name: "Deixar Sofia propor" })
+      painel.getByText("Pedido para Sofia Nogueira")
     ).toBeVisible();
+    const cardSofia = catalogo
+      .locator("[data-slot='card']")
+      .filter({ hasText: "Sofia Nogueira" });
+    await expect(cardSofia.getByText("Selecionado")).toBeVisible();
     await expect(
-      dialog
-        .getByRole("button", { name: /(terça|quinta|sábado|domingo) \d{2}\/\d{2} às \d{2}:\d{2}/ })
+      catalogo.getByRole("button", { name: "Pedir próxima sessão" })
+    ).toHaveAttribute("aria-pressed", "true");
+    // os chips são os horários livres reais da grade dela; sem escolha o
+    // pedido sai igual e quem aceita propõe — o "deixar propor" virou
+    // legenda, não opção
+    await expect(
+      painel
+        .getByRole("button", {
+          name: /(terça|quinta|sábado|domingo) \d{2}\/\d{2} às \d{2}:\d{2}/,
+        })
         .first()
     ).toBeVisible();
     await expect(
-      dialog.getByRole("button", { name: "Enviar pedido" })
+      painel.getByText(/manda o pedido e Sofia propõe um com você/)
     ).toBeVisible();
+    await expect(
+      painel.getByRole("button", { name: "Enviar pedido" })
+    ).toBeVisible();
+    // o mural também é um card da grade — "Qualquer especialista" no fim
+    await expect(page.locator("#cta-pedir-mural")).toBeVisible();
     await page.keyboard.press("Escape");
+    await expect(painel).toHaveCount(0);
 
     // rodapé do catálogo — trava de agenda/método vira CHAMADO, outro
     // sistema: o botão abre o dialog "Pedir ajuda" do jovem (o passe de

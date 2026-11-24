@@ -38,7 +38,7 @@ import {
 import {
   getAvaliacaoEspDaDupla,
   getDevolutivasDupla,
-  getEspecialistas,
+  getEspecialistasCatalogo,
   getPropostas,
   getSlotsLivres,
   getSolicitacoesDaDupla,
@@ -448,7 +448,10 @@ export default async function DuplaPage({
     await Promise.all([
       solEmAberto ? getPropostas(solEmAberto.id) : Promise.resolve([]),
       espDaMesa ? getSlotsLivres(espDaMesa) : Promise.resolve([]),
-      podeSolicitar || podeSugerir ? getEspecialistas() : Promise.resolve([]),
+      // a escolha do especialista é por cards do catálogo rico (023)
+      podeSolicitar || podeSugerir
+        ? getEspecialistasCatalogo()
+        : Promise.resolve([]),
       souCoord && sugereRemanejo(dupla, saude)
         ? montarSugestaoRemanejo(dupla)
         : Promise.resolve(null),

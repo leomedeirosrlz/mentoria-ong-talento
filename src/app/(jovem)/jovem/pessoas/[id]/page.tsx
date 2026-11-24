@@ -18,21 +18,27 @@ import { avatarPublicUrl } from "@/lib/avatar";
 import { papelLabel, waLink } from "@/lib/ciclo";
 import { msgApresentacaoJovem } from "@/lib/whatsapp-msgs";
 import { turmaLonga } from "@/lib/turma";
+import { rotuloTipo } from "@/lib/jovem-diretorio";
 import {
   getJovemDuplas,
   getJovemEspecialistas,
   getJovemPessoa,
 } from "@/lib/queries-jovem";
 import { getMe } from "@/lib/queries";
-import type { JovemContato, JovemEspecialista } from "@/lib/types";
+import type {
+  JovemContato,
+  JovemDiretorioEntry,
+  JovemEspecialista,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 
 export const metadata: Metadata = { title: "Perfil · Pessoas" };
 
 /** O perfil de quem o jovem enxerga — mesmo cartão-banner do perfil de
  *  todo mundo, dados SÓ das projeções seguras (jovem_contatos /
- *  mentorados_turma / jovem_especialistas). id fora dessas fontes cai no
- *  mesmo 404 de quem não existe. */
+ *  mentorados_turma / jovem_especialistas / jovem_diretorio). id fora
+ *  dessas fontes cai no mesmo 404 de quem não existe — o diretório é
+ *  quem delimita o conjunto. */
 export default async function JovemPessoaPerfil({
   params,
 }: {
@@ -56,7 +62,10 @@ export default async function JovemPessoaPerfil({
       ? pessoa.especialista
       : pessoa.tipo === "contato" && pessoa.contato.papel === "especialista"
         ? (catalogo.find((e) => e.id === pessoa.contato.id) ?? null)
-        : null;
+        : pessoa.tipo === "diretorio" &&
+            pessoa.entrada.tipo === "especialista"
+          ? especialistaDaEntrada(pessoa.entrada)
+          : null;
 
   /** A dupla que amarra o contato — origem do vínculo (trilha, turma,
    *  a demanda que abriu a trilha de especialista). */
@@ -78,23 +87,35 @@ export default async function JovemPessoaPerfil({
       ? pessoa.contato.nome_social || pessoa.contato.nome || "?"
       : pessoa.tipo === "colega"
         ? pessoa.colega.nome_social || pessoa.colega.nome || "?"
-        : pessoa.especialista.nome_social || pessoa.especialista.nome;
+        : pessoa.tipo === "diretorio"
+          ? pessoa.entrada.nome_social || pessoa.entrada.nome
+          : pessoa.especialista.nome_social || pessoa.especialista.nome;
 
   const papel: PapelBanner =
-    pessoa.tipo === "colega"
+    pessoa.tipo === "colega" ||
+    (pessoa.tipo === "diretorio" && pessoa.entrada.tipo === "jovem")
       ? "mentorado"
       : pessoa.tipo === "contato"
         ? (pessoa.contato.role ?? null)
-        : "mentor_especialista";
+        : pessoa.tipo === "diretorio"
+          ? (pessoa.entrada.papel as PapelBanner)
+          : "mentor_especialista";
 
   const areas =
-    (pessoa.tipo === "colega" ? pessoa.colega.interesses : esp?.areas) ??
-    undefined;
+    (pessoa.tipo === "colega"
+      ? pessoa.colega.interesses
+      : pessoa.tipo === "diretorio"
+        ? (pessoa.entrada.areas ?? pessoa.entrada.interesses)
+        : esp?.areas) ?? undefined;
 
   const lugar =
     pessoa.tipo === "colega"
       ? [pessoa.colega.cidade, pessoa.colega.uf].filter(Boolean).join(" · ")
-      : [esp?.cidade, esp?.uf].filter(Boolean).join(" · ");
+      : pessoa.tipo === "diretorio"
+        ? [pessoa.entrada.cidade, pessoa.entrada.uf]
+            .filter(Boolean)
+            .join(" · ")
+        : [esp?.cidade, esp?.uf].filter(Boolean).join(" · ");
 
   const turmaMeta =
     dupla?.turma != null
@@ -103,15 +124,20 @@ export default async function JovemPessoaPerfil({
         ? turmaLonga(turmaColega)
         : null;
 
-  // foto só pra adulto (contato/catálogo) — colega menor fica nas
-  // iniciais amarelas, a mesma decisão do diretório e do próprio perfil
+  // foto pra todo mundo que a view libera — jovem com conta aparece com
+  // imagem no diretório (decisão do lead 24/11), sem foto cai nas
+  // iniciais amarelas de sempre
   const avatarSrc =
     pessoa.tipo === "contato"
       ? pessoa.contato.avatar_path && avatarPublicUrl(pessoa.contato.avatar_path)
       : pessoa.tipo === "especialista"
         ? pessoa.especialista.avatar_path &&
           avatarPublicUrl(pessoa.especialista.avatar_path)
-        : null;
+        : pessoa.tipo === "colega"
+          ? pessoa.colega.avatar_path &&
+            avatarPublicUrl(pessoa.colega.avatar_path)
+          : pessoa.entrada.avatar_path &&
+            avatarPublicUrl(pessoa.entrada.avatar_path);
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -128,9 +154,19 @@ export default async function JovemPessoaPerfil({
           papel={papel}
           nome={nome}
           cidade={
-            pessoa.tipo === "colega" ? pessoa.colega.cidade : (esp?.cidade ?? null)
+            pessoa.tipo === "colega"
+              ? pessoa.colega.cidade
+              : pessoa.tipo === "diretorio"
+                ? pessoa.entrada.cidade
+                : (esp?.cidade ?? null)
           }
-          uf={pessoa.tipo === "colega" ? pessoa.colega.uf : (esp?.uf ?? null)}
+          uf={
+            pessoa.tipo === "colega"
+              ? pessoa.colega.uf
+              : pessoa.tipo === "diretorio"
+                ? pessoa.entrada.uf
+                : (esp?.uf ?? null)
+          }
           areas={areas}
           seed={id}
         />
@@ -139,7 +175,13 @@ export default async function JovemPessoaPerfil({
             <div className="relative z-10 -mt-10 shrink-0 sm:-mt-12">
               <Avatar
                 nome={nome}
-                papel={pessoa.tipo === "colega" ? "mentorado" : undefined}
+                papel={
+                  pessoa.tipo === "colega" ||
+                  (pessoa.tipo === "diretorio" &&
+                    pessoa.entrada.tipo === "jovem")
+                    ? "mentorado"
+                    : undefined
+                }
                 src={avatarSrc}
                 size={80}
                 className="size-20! ring-4 ring-card outline outline-1 outline-[var(--brand-ink)]/15 sm:size-24!"
@@ -155,7 +197,9 @@ export default async function JovemPessoaPerfil({
                 ? rotuloContato(pessoa.contato)
                 : pessoa.tipo === "colega"
                   ? "Colega da turma"
-                  : "Mentor especialista"}
+                  : pessoa.tipo === "diretorio"
+                    ? rotuloTipo(pessoa.entrada.tipo, pessoa.entrada.papel)
+                    : "Mentor especialista"}
             </Badge>
             <SeloDupla dupla={dupla} />
             {turmaMeta && <span>{turmaMeta}</span>}
@@ -187,7 +231,64 @@ export default async function JovemPessoaPerfil({
       {pessoa.tipo === "colega" && (
         <SecaoColega c={pessoa.colega} nomeJovem={nomeJovem} />
       )}
+      {pessoa.tipo === "diretorio" && pessoa.entrada.tipo !== "especialista" && (
+        <SecaoDiretorio e={pessoa.entrada} />
+      )}
     </div>
+  );
+}
+
+/** A linha de catálogo do diretório na forma da ficha do especialista —
+ *  caminho defensivo (o tipo "especialista" resolve antes pelo catálogo;
+ *  aqui cobre a janela de dados em que a linha ainda não casou). */
+function especialistaDaEntrada(e: JovemDiretorioEntry): JovemEspecialista {
+  return {
+    id: e.id,
+    nome: e.nome,
+    nome_social: e.nome_social,
+    avatar_path: e.avatar_path,
+    areas: e.areas,
+    bio: e.bio,
+    cargo: e.cargo,
+    empresa: e.empresa,
+    cidade: e.cidade,
+    uf: e.uf,
+    voluntariado: e.voluntariado,
+    experiencia_previa: e.experiencia_previa,
+    formacao_externa: e.formacao_externa,
+    grade_resumo: e.grade_resumo,
+    vagas: e.vagas ?? 0,
+  };
+}
+
+/** Pessoa do diretório fora da rede — a projeção pública da
+ *  `jovem_diretorio` (bio/atuação e áreas do adulto; cidade/UF e
+ *  interesses do jovem do programa). Contato nunca aqui: o canal direto
+ *  é da rede (jovem_contatos) e abre quando o vínculo nasce. */
+function SecaoDiretorio({ e }: { e: JovemDiretorioEntry }) {
+  const atuacao = [e.cargo, e.empresa].filter(Boolean).join(" · ");
+  const tags = e.tipo === "jovem" ? e.interesses : e.areas;
+  const rotuloTags = e.tipo === "jovem" ? "Interesses" : "Áreas";
+  return (
+    <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
+      <h2 className="text-base font-semibold">
+        {e.tipo === "jovem" ? "Jovem do programa" : "Pessoa do programa"}
+      </h2>
+      {e.bio && <p className="mt-3 text-sm leading-relaxed">{e.bio}</p>}
+      <dl className="mt-4 space-y-4">
+        {atuacao && <Linha rotulo="Atuação" valor={atuacao} />}
+        <Linha rotulo="Cidade" valor={e.cidade?.trim() || "—"} />
+        <Linha rotulo="UF" valor={e.uf?.trim() || "—"} />
+        {tags?.length ? (
+          <Linha rotulo={rotuloTags} valor={<ChipsTags itens={tags} />} />
+        ) : null}
+      </dl>
+      <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+        {e.tipo === "jovem"
+          ? "O contato de um colega abre quando ele escolhe compartilhar com a turma dele."
+          : "O contato direto abre quando a pessoa entra na sua rede."}
+      </p>
+    </section>
   );
 }
 

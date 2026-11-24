@@ -1,69 +1,99 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
-// REALIZA-484 — Pessoas é a REDE do jovem (mentor, especialista das
-// trilhas, supervisão, coordenação, colegas), nunca um segundo catálogo:
-// a seção de especialistas aponta pra /jovem/especialistas em vez de
-// repetir os cards. A ficha enriquece com a projeção pública que as views
-// já liberam — bio/áreas/experiência/janela do especialista e a origem
-// do vínculo — sem abrir leitura em profiles. A persona mentorado (Bia)
-// cobre os quatro cenários: contato com canal aberto, especialista da
-// própria trilha, especialista que ela só conhece do catálogo e colega.
+// REALIZA-484 + spec 023 — /jovem/pessoas virou o DIRETÓRIO do programa:
+// default "Todos" (adultos com papel, jovens com conta e o catálogo de
+// especialistas), pills de vínculo, chips de tema, busca e a rede dela
+// marcada com selo — nunca um segundo catálogo: nenhum card abre canal
+// nem carrega CTA de pedido. A ficha enriquece com a projeção pública
+// que as views já liberam sem abrir leitura em profiles. A persona
+// mentorado (Bia) cobre os cenários: rede marcada, gente de fora da
+// rede, especialista da trilha, especialista de catálogo e colega.
 
-const secao = (page: import("@playwright/test").Page, id: string) =>
-  page.locator(`section[aria-labelledby="${id}-titulo"]`);
+// o card do diretório navega por UM link nomeado (aria-label "Abrir
+// perfil de …") — o nome acessível não se mistura com os chips
+const cardDe = (page: import("@playwright/test").Page, nome: string) =>
+  page.getByRole("link", { name: `Abrir perfil de ${nome}` });
 
-// a linha da pessoa leva à ficha — o hasText a isola dos botões de
-// e-mail/WhatsApp da mesma linha (aria-label também carrega o nome)
-const fichaDe = (
-  page: import("@playwright/test").Page,
-  secaoId: string,
-  nome: string
-) =>
-  secao(page, secaoId)
-    .locator('a[href^="/jovem/pessoas/"]')
-    .filter({ hasText: nome });
+const pill = (page: import("@playwright/test").Page, nome: string) =>
+  page
+    .getByRole("group", { name: "Filtrar por vínculo" })
+    .getByRole("button", { name: nome, exact: true });
 
 test.describe("jovem — diretório Pessoas", () => {
-  test("a rede agrupada por vínculo + Conhecer especialistas pro catálogo", async ({
+  test("o diretório abre em Todos — a rede marcada e o programa inteiro", async ({
     page,
   }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/pessoas");
 
-    // a rede dela, um grupo por vínculo — nenhum card de catálogo
-    const mentoria = secao(page, "mentoria");
-    await expect(mentoria.getByText("Ricardo Tavares")).toBeVisible();
-    const especialistas = secao(page, "especialistas");
-    await expect(especialistas.getByText("Sofia Nogueira")).toBeVisible();
-    await expect(especialistas.getByText("Helena Prado")).toBeVisible();
+    // default "Todos": as pills de vínculo, a contagem anunciada e a
+    // rede dela marcada no meio do programa inteiro
+    await expect(pill(page, "Todos")).toHaveAttribute(
+      "aria-pressed",
+      "true"
+    );
     await expect(
-      especialistas.getByText("trilha concluída")
+      page.getByRole("status").filter({ hasText: /\d+ pessoas/ })
     ).toBeVisible();
-    const supervisao = secao(page, "supervisao");
-    // o Paulo supervisiona as 3 duplas — o diretório deduplica por pessoa
-    await expect(supervisao.getByText("Paulo Serra")).toHaveCount(1);
-    await expect(
-      secao(page, "coordenacao").getByText("Marina Duarte")
-    ).toBeVisible();
-    const colegas = secao(page, "colegas");
-    await expect(colegas.getByText("Caio Henrique Oliveira")).toBeVisible();
-    await expect(colegas.getByText("Dandara Souza")).toBeVisible();
 
-    // o catálogo rico NÃO se duplica aqui: sem CTA de pedido nem a
-    // linha "Atende:" dos cards — só o link pro destino
+    // a rede dela, dedup por pessoa (o Paulo supervisiona as 3 duplas) —
+    // selo "Sua rede" + vínculo na voz dela
+    await expect(cardDe(page, "Ricardo Tavares")).toBeVisible();
+    await expect(cardDe(page, "Paulo Serra")).toHaveCount(1);
+    await expect(cardDe(page, "Marina Duarte")).toBeVisible();
     await expect(
-      page.getByRole("button", { name: "Pedir trilha" })
-    ).toHaveCount(0);
-    await expect(page.getByText(/Atende:/)).toHaveCount(0);
-    const link = especialistas.getByRole("link", {
-      name: "Conhecer especialistas",
-    });
-    await expect(link).toHaveAttribute("href", "/jovem/especialistas");
-    await link.click();
-    await page.waitForURL("**/jovem/especialistas");
-    await expect(
-      page.getByRole("heading", { name: "Especialistas", level: 1 })
+      cardDe(page, "Caio Henrique Oliveira")
     ).toBeVisible();
+    await expect(cardDe(page, "Dandara Souza")).toBeVisible();
+    await expect(page.getByText("Seu mentor")).toBeVisible();
+    await expect(page.getByText("Sua rede").first()).toBeVisible();
+
+    // programa inteiro por decisão (023): gente de fora da rede dela —
+    // mentora de outra dupla e o catálogo completo, sem selo de rede
+    await expect(cardDe(page, "Beatriz Lins")).toBeVisible();
+    await expect(cardDe(page, "Marcos Vinícius")).toBeVisible();
+    const beatriz = cardDe(page, "Beatriz Lins").locator(
+      "xpath=ancestor::*[@data-slot='card']"
+    );
+    await expect(beatriz.getByText("Sua rede")).toHaveCount(0);
+
+    // nenhum card abre canal — wa.me/mailto nunca viajam no diretório
+    const main = page.getByRole("main");
+    await expect(main.locator('a[href^="mailto:"]')).toHaveCount(0);
+    await expect(main.locator('a[href*="wa.me"]')).toHaveCount(0);
+
+    // "Minha rede" recorta sem recarregar — a URL registra o estado
+    await pill(page, "Minha rede").click();
+    await expect(page).toHaveURL(/\?papel=rede/);
+    await expect(cardDe(page, "Ricardo Tavares")).toBeVisible();
+    await expect(cardDe(page, "Sofia Nogueira")).toBeVisible();
+    await expect(cardDe(page, "Helena Prado")).toBeVisible();
+    await expect(cardDe(page, "Caio Henrique Oliveira")).toBeVisible();
+    await expect(cardDe(page, "Beatriz Lins")).toHaveCount(0);
+    await expect(cardDe(page, "Marcos Vinícius")).toHaveCount(0);
+
+    // "Especialistas" abre o catálogo rico — a linha "Atende:" mora aqui
+    await pill(page, "Especialistas").click();
+    await expect(page).toHaveURL(/papel=especialistas/);
+    await expect(cardDe(page, "Sofia Nogueira")).toBeVisible();
+    await expect(cardDe(page, "Marcos Vinícius")).toBeVisible();
+    await expect(cardDe(page, "Camila Ferraz")).toBeVisible();
+    await expect(page.getByText(/Atende:/).first()).toBeVisible();
+    await expect(cardDe(page, "Ricardo Tavares")).toHaveCount(0);
+    // a especialista da trilha dela segue marcada mesmo na faceta
+    const sofia = cardDe(page, "Sofia Nogueira").locator(
+      "xpath=ancestor::*[@data-slot='card']"
+    );
+    await expect(sofia.getByText("Seu especialista")).toBeVisible();
+
+    // busca dentro do recorte — contagem e URL acompanham
+    await page.getByLabel("Buscar pessoa").fill("Sofia");
+    await expect(cardDe(page, "Sofia Nogueira")).toBeVisible();
+    await expect(cardDe(page, "Marcos Vinícius")).toHaveCount(0);
+    await expect(
+      page.getByRole("status").filter({ hasText: /1 de \d+/ })
+    ).toBeVisible();
+    await expect(page).toHaveURL(/busca=Sofia/);
   });
 
   test("ficha do mentor — origem do vínculo e os canais que a view já dá", async ({
@@ -71,7 +101,7 @@ test.describe("jovem — diretório Pessoas", () => {
   }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/pessoas");
-    await fichaDe(page, "mentoria", "Ricardo Tavares").click();
+    await cardDe(page, "Ricardo Tavares").click();
     await page.waitForURL("**/jovem/pessoas/*");
 
     await expect(
@@ -101,7 +131,7 @@ test.describe("jovem — diretório Pessoas", () => {
   }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/pessoas");
-    await fichaDe(page, "especialistas", "Sofia Nogueira").click();
+    await cardDe(page, "Sofia Nogueira").click();
     await page.waitForURL("**/jovem/pessoas/*");
 
     await expect(
@@ -198,7 +228,7 @@ test.describe("jovem — diretório Pessoas", () => {
     await page.goto("/jovem/pessoas");
 
     // Caio compartilhou — o link de WhatsApp aparece na ficha dele
-    await fichaDe(page, "colegas", "Caio Henrique Oliveira").click();
+    await cardDe(page, "Caio Henrique Oliveira").click();
     await page.waitForURL("**/jovem/pessoas/*");
     await expect(
       page.getByRole("heading", {
@@ -218,7 +248,7 @@ test.describe("jovem — diretório Pessoas", () => {
 
     // Dandara não compartilhou — a ficha mostra a explicação, sem botão
     await page.goto("/jovem/pessoas");
-    await fichaDe(page, "colegas", "Dandara Souza").click();
+    await cardDe(page, "Dandara Souza").click();
     await page.waitForURL("**/jovem/pessoas/*");
     await expect(page.locator('a[href*="wa.me"]')).toHaveCount(0);
     await expect(

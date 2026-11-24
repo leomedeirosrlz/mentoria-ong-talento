@@ -5,6 +5,7 @@ import { demoRole } from "./demo/mode";
 import {
   demoDevolutivas,
   demoEspecialistas,
+  demoEspecialistasCatalogo,
   demoMinhaGrade,
   demoMinhasExcecoes,
   demoPropostas,
@@ -20,6 +21,7 @@ import type {
   Devolutiva,
   ExcecaoEspecialista,
   GradeJanela,
+  JovemEspecialista,
   SolicitacaoEspecialista,
   SolicitacaoProposta,
   TrilhaJovem,
@@ -308,6 +310,40 @@ export const getEspecialistas = cache(
     return [...unicos.values()].sort((a, b) =>
       a.nome.localeCompare(b.nome, "pt-BR")
     );
+  }
+);
+
+/** O catálogo staff de especialistas (view `especialistas_catalogo`, 0239 —
+ *  definer com gate my_role() staff): a MESMA projeção da jovem_especialistas
+ *  (bio/atuação/áreas/grade_resumo/vagas) pra que a seleção do mentor e da
+ *  coordenação mostre os cards completos em vez do Select de 3 campos —
+ *  e alimenta a faceta "Especialistas" da /pessoas. Sem contato direto. */
+export const getEspecialistasCatalogo = cache(
+  async (): Promise<JovemEspecialista[]> => {
+    const demo = await demoRole();
+    if (demo) return demoEspecialistasCatalogo(demo);
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("especialistas_catalogo")
+      .select("*")
+      .order("nome");
+    if (error) {
+      console.error("getEspecialistasCatalogo:", error);
+      return [];
+    }
+    type Row = Omit<JovemEspecialista, "id" | "nome" | "vagas"> & {
+      id: string | null;
+      nome: string | null;
+      vagas: number | null;
+    };
+    // a collation do banco ordena acentos depois de Z — pt-BR no app
+    return ((data ?? []) as Row[])
+      .filter(
+        (e): e is Row & { id: string; nome: string } =>
+          e.id != null && e.nome != null
+      )
+      .map((e) => ({ ...e, vagas: e.vagas ?? 0 }))
+      .sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
   }
 );
 

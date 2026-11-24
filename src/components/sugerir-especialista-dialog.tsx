@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Sparkle } from "@phosphor-icons/react";
 import { toast } from "@/lib/toast";
 import { sugerirEspecialistaMentor } from "@/lib/actions-especialista";
+import { EspecialistaSeletor } from "@/components/especialista-seletor";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,13 +18,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import type { JovemEspecialista } from "@/lib/types";
 
 const QUALQUER = "qualquer";
 
@@ -43,12 +38,8 @@ export function SugerirEspecialistaDialog({
 }: {
   mentoradoId: string;
   duplaDppId: string;
-  especialistas: {
-    id: string;
-    nome: string;
-    nome_social?: string | null;
-    areas: string[] | null;
-  }[];
+  // catálogo rico (especialistas_catalogo, 0239) — a escolha é por cards
+  especialistas: JovemEspecialista[];
   nomeJovem: string;
   /** Elemento do trigger — default é o botão padrão da casa. `null` suprime:
    *  o menu "Mais" da ficha abre o dialog controlado (REALIZA-157). */
@@ -165,45 +156,15 @@ export function SugerirEspecialistaDialog({
               placeholder="ex.: passar na entrevista do jovem aprendiz"
             />
           </div>
-          <div className="space-y-2">
-            <Label id="sug-mentor-esp-label">
-              Pensando em alguém? (opcional)
-            </Label>
-            <Select
-              value={esp}
-              onValueChange={(v) => setEsp(v ?? QUALQUER)}
-              items={{
-                [QUALQUER]: "Deixar a coordenação direcionar",
-                ...Object.fromEntries(
-                  especialistas.map((e) => [
-                    e.id,
-                    e.areas?.length
-                      ? `${e.nome_social ?? e.nome} · ${e.areas.join(", ")}`
-                      : (e.nome_social ?? e.nome),
-                  ])
-                ),
-              }}
-            >
-              <SelectTrigger
-                id="sug-mentor-esp"
-                aria-labelledby="sug-mentor-esp-label sug-mentor-esp"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={QUALQUER}>
-                  Deixar a coordenação direcionar
-                </SelectItem>
-                {especialistas.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {e.areas?.length
-                      ? `${e.nome_social ?? e.nome} · ${e.areas.join(", ")}`
-                      : (e.nome_social ?? e.nome)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <EspecialistaSeletor
+            idBase="sug-mentor-esp"
+            label="Pensando em alguém? (opcional)"
+            rotuloQualquer="Deixar a coordenação direcionar"
+            descricaoQualquer="A sugestão chega sem nome e a coordenação aponta quem encaixa."
+            catalogo={especialistas}
+            selecionado={esp === QUALQUER ? null : esp}
+            onSelecionar={(id) => setEsp(id ?? QUALQUER)}
+          />
           <DialogFooter>
             <Button
               type="button"

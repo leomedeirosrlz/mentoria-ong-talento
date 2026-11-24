@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { UserPlus } from "@phosphor-icons/react";
 import { toast } from "@/lib/toast";
 import { criarSolicitacao } from "@/lib/actions-especialista";
+import { EspecialistaSeletor } from "@/components/especialista-seletor";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -17,26 +18,9 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import type { JovemEspecialista } from "@/lib/types";
 
 const QUALQUER = "qualquer";
-
-/** "Ana Souza — finanças, carreira": as áreas (0030) ajudam a escolher pra
- *  quem direcionar — sem áreas cadastradas fica só o nome. */
-function rotuloEspecialista(e: {
-  nome: string;
-  nome_social?: string | null;
-  areas: string[] | null;
-}) {
-  const nome = e.nome_social ?? e.nome;
-  return e.areas?.length ? `${nome} · ${e.areas.join(", ")}` : nome;
-}
 
 /** Botão + dialog "Solicitar mentor especialista" — fica na ficha da dupla
  *  DPP. A demanda é o briefing pro especialista decidir aceitar; o select
@@ -49,12 +33,8 @@ export function SolicitarEspecialistaDialog({
   onOpenChange: onOpenChangeProp,
 }: {
   duplaId: string;
-  especialistas: {
-    id: string;
-    nome: string;
-    nome_social?: string | null;
-    areas: string[] | null;
-  }[];
+  // catálogo rico (especialistas_catalogo, 0239) — a escolha é por cards
+  especialistas: JovemEspecialista[];
   /** Elemento do trigger — default é o botão padrão da casa. `null` suprime:
    *  o menu "Mais" da ficha abre o dialog controlado (REALIZA-157). */
   trigger?: React.ReactElement | null;
@@ -152,38 +132,15 @@ export function SolicitarEspecialistaDialog({
               10 caracteres.
             </p>
           </div>
-          <div className="space-y-2">
-            <Label id="especialista-label">
-              Direcionar a um especialista específico (opcional)
-            </Label>
-            <Select
-              value={esp}
-              onValueChange={(v) => setEsp(v ?? QUALQUER)}
-              items={{
-                [QUALQUER]: "Qualquer especialista disponível",
-                ...Object.fromEntries(
-                  especialistas.map((e) => [e.id, rotuloEspecialista(e)])
-                ),
-              }}
-            >
-              <SelectTrigger
-                id="especialista-select"
-                aria-labelledby="especialista-label especialista-select"
-              >
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={QUALQUER}>
-                  Qualquer especialista disponível
-                </SelectItem>
-                {especialistas.map((e) => (
-                  <SelectItem key={e.id} value={e.id}>
-                    {rotuloEspecialista(e)}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
+          <EspecialistaSeletor
+            idBase="especialista-seletor"
+            label="Direcionar a um especialista específico (opcional)"
+            rotuloQualquer="Qualquer especialista disponível"
+            descricaoQualquer="O pedido aparece na lista de todos os especialistas."
+            catalogo={especialistas}
+            selecionado={esp === QUALQUER ? null : esp}
+            onSelecionar={(id) => setEsp(id ?? QUALQUER)}
+          />
           <DialogFooter>
             <Button
               type="button"

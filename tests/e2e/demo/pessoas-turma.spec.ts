@@ -278,28 +278,133 @@ test.describe("demo — /pessoas por cargo + pills de turma", () => {
     await expect(page.getByText(/selecionadas?/)).toHaveCount(0);
   });
 
-  test("fora da coordenação: diretório limpo, sem gestão", async ({
+  test("fora da coordenação: diretório com facetas próprias, sem gestão", async ({
     page,
   }) => {
     await entrarNaDemo(page, "supervisor");
     await page.goto("/pessoas");
 
-    // sem pills de turma/trilha, sem botão do modal nem seleção em lote
+    // gestão segue coord-only: sem pills de turma, sem botão do modal,
+    // sem seleção em lote nem status operacional
     await expect(
       page.getByRole("group", { name: "Filtrar por turma" })
-    ).toHaveCount(0);
-    await expect(
-      page.getByRole("group", { name: "Filtrar por trilha de mentor" })
     ).toHaveCount(0);
     await expect(
       page.getByRole("button", { name: /^Filtros/ })
     ).toHaveCount(0);
     await expect(page.locator('input[type="checkbox"]')).toHaveCount(0);
-    // nem status operacional — os badges de gestão são coord-only
     await expect(page.getByText("não acessou", { exact: true })).toHaveCount(0);
-    // o recorte que o diretório tem é a categoria, em select
+
+    // a categoria virou linha de pills (023) — o Select saiu e as facetas
+    // do diretório ganharam contagem própria; o híbrido conta nos dois
+    // lados de mentor
+    const cats = page.getByRole("group", { name: "Filtrar por categoria" });
     await expect(
-      page.getByRole("combobox", { name: "Filtrar por categoria" })
+      cats.getByRole("button", { name: "Todos", exact: true })
+    ).toHaveAttribute("aria-pressed", "true");
+    for (const rotulo of [
+      /Coordenação e equipe/,
+      /Auxiliares executivos/,
+      /Mentores DPP/,
+      /Especialistas/,
+      /Mentorados/,
+    ]) {
+      await expect(
+        cats.getByRole("button", { name: rotulo })
+      ).toBeVisible();
+    }
+
+    // trilha e tema são facetas do staff todo — trilha distingue mentor
+    // DPP de especialista e os chips vêm do que as linhas já exibem
+    await expect(
+      page.getByRole("group", { name: "Filtrar por trilha de mentor" })
     ).toBeVisible();
+    await expect(
+      page.getByRole("group", { name: "Filtrar por área" })
+    ).toBeVisible();
+  });
+
+  test("faceta Especialistas do diretório abre o catálogo rico", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "supervisor");
+    // deep-link já abre na faceta (SC-004)
+    await page.goto("/pessoas?cat=especialistas");
+
+    const cats = page.getByRole("group", { name: "Filtrar por categoria" });
+    await expect(
+      cats.getByRole("button", { name: /Especialistas/ })
+    ).toHaveAttribute("aria-pressed", "true");
+
+    // cards completos no lugar das linhas — as 4 especialistas puras e
+    // os 2 híbridos (Ricardo, André) da projeção staff
+    const sec = page.locator("section", {
+      has: page.getByRole("heading", { name: /Especialistas/ }),
+    });
+    for (const nome of [
+      "Sofia Nogueira",
+      "Helena Prado",
+      "Marcos Vinícius",
+      "Camila Ferraz",
+      "Ricardo Tavares",
+      "André Rocha",
+    ]) {
+      await expect(
+        sec.getByRole("link", { name: `Abrir perfil de ${nome}` })
+      ).toBeVisible();
+    }
+    // a projeção rica traz o "Atende:" que a linha não tem
+    await expect(sec.getByText(/Atende:/).first()).toBeVisible();
+    // Camila tem a capacidade zerada no ciclo — o selo honesto aparece
+    // nela (Helena e Sofia também estão sem vaga na fixture — escopo no card)
+    await expect(
+      sec
+        .getByRole("link", { name: "Abrir perfil de Camila Ferraz" })
+        .getByText("Sem vagas")
+    ).toBeVisible();
+    // quem não é especialista some da faceta
+    await expect(
+      page.getByRole("link", { name: "Abrir perfil de Fernanda Alves" })
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("link", {
+        name: "Abrir perfil de Caio Henrique Oliveira",
+      })
+    ).toHaveCount(0);
+  });
+
+  test("facetas do diretório compõem: tema e trilha recortam o catálogo", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "supervisor");
+    await page.goto("/pessoas?cat=especialistas&trilha=dpp");
+
+    const sec = page.locator("section", {
+      has: page.getByRole("heading", { name: /Especialistas/ }),
+    });
+    // trilha=dpp dentro da faceta deixa só os híbridos
+    await expect(
+      sec.getByRole("link", { name: "Abrir perfil de Ricardo Tavares" })
+    ).toBeVisible();
+    await expect(
+      sec.getByRole("link", { name: "Abrir perfil de André Rocha" })
+    ).toBeVisible();
+    await expect(
+      sec.getByRole("link", { name: "Abrir perfil de Sofia Nogueira" })
+    ).toHaveCount(0);
+
+    // o chip de tema recorta pelo que o card oferece — Ricardo não tem
+    // areas cadastradas e sai do recorte de "finanças"
+    await page
+      .getByRole("group", { name: "Filtrar por área" })
+      .getByRole("button", { name: /finanças/ })
+      .click();
+    await expect(page).toHaveURL(/area=finan/);
+    await expect(
+      sec.getByRole("link", { name: "Abrir perfil de André Rocha" })
+    ).toBeVisible();
+    await expect(
+      sec.getByRole("link", { name: "Abrir perfil de Ricardo Tavares" })
+    ).toHaveCount(0);
   });
 });
