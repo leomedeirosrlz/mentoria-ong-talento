@@ -46,7 +46,7 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     if (DUPLA_ID) await limparEncontrosDaDupla(DUPLA_ID);
   });
 
-  test("mentor vê o card com CTA e a remarcação abre com a data proposta", async ({
+  test("mentor combina o plano na superfície — uma pergunta por tela até o gesto", async ({
     page,
   }) => {
     // 2 'não aconteceu' = 2 passos remarcáveis → o card cruza a régua de 2+
@@ -61,24 +61,75 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
     await expect(
       card.getByText(/Em dia em|Nesse ritmo não fecha/)
     ).toBeVisible();
-    // mentor age: cada passo remarcável expõe o próprio "Remarcar" — o do
-    // 3º mora na <li> com o título oficial do passo (ancora de dataset,
-    // não de posição)
-    const passo3 = card.locator("li", { hasText: "Declaração de Visão" });
-    const dialog = page.getByRole("dialog");
+    // 518: o card é leitura — nada de Agendar/Remarcar por passo; o gesto
+    // inteiro (ritmo, recesso, grade) mora no "Combinar o plano"
+    await expect(
+      card.getByRole("button", { name: /Agendar|Remarcar/ })
+    ).toHaveCount(0);
+
+    // a superfície pode demorar a hidratar — repete o gesto até o
+    // dialog abrir (mesmo padrão do agendar)
+    const dialog = page.getByRole("dialog", { name: "Combinar o plano" });
     await agirComConfirma(
-      () => passo3.getByRole("button", { name: "Remarcar" }).click(),
+      () => card.getByRole("button", { name: "Combinar o plano" }).click(),
       () => dialog.isVisible()
     );
-
-    // o dialog abre em modo remarcação com a data do plano já proposta —
-    // dataMudou nasce true, então o motivo já está sendo cobrado (o label
-    // tem id próprio — getByText colidiria com a descrição do dialog)
     await expect(
-      dialog.getByRole("heading", { name: /3º encontro/ })
-    ).toBeVisible();
-    await expect(dialog.locator("#motivo-label")).toBeVisible();
-    await expect(dialog.locator("#motivo-select")).toBeVisible();
+      dialog.getByText("Quantos encontros por semana")
+    ).toBeVisible({ timeout: 15_000 });
+
+    // ritmo livre: "outro" aceita qualquer inteiro — 7 = até 1 por dia,
+    // o ritmo que sempre fecha quando o card diz que fecha. O input é
+    // sr-only — clica o label pai (padrão do login por senha)
+    await dialog
+      .locator("label", {
+        has: page.locator('input[name="ritmo"][value="outro"]'),
+      })
+      .click();
+    await dialog
+      .getByLabel("Outro número de encontros por semana")
+      .fill("7");
+
+    // as perguntas seguintes dependem do cronograma: recesso pendente
+    // exige resposta da dupla; grade em falta vira pergunta — responde o
+    // que aparecer até o gesto final
+    const combinar = dialog.getByRole("button", {
+      name: "Combinar",
+      exact: true,
+    });
+    for (let i = 0; i < 4 && !(await combinar.isVisible()); i++) {
+      for (const r of await dialog
+        .locator("label", { hasText: "Vamos seguir nos encontrando" })
+        .all()) {
+        if (
+          !(await r
+            .locator('input[type="radio"]')
+            .isChecked()
+            .catch(() => false))
+        )
+          await r.click();
+      }
+      const semGrade = dialog.locator("label", {
+        hasText: "Combinar sem a grade",
+      });
+      if (await semGrade.isVisible()) await semGrade.click();
+      const avancar = dialog.getByRole("button", { name: "Avançar" });
+      await expect(avancar).toBeEnabled({ timeout: 15_000 });
+      await avancar.click();
+    }
+    await expect(combinar).toBeEnabled({ timeout: 15_000 });
+    await combinar.click();
+
+    // mentor é lado: o combinado nasce em vigor (aceito) e o jovem é
+    // avisado — aceite único do 0225, não sobra pendência bilateral
+    await expect(
+      page.getByText("Combinado em vigor", { exact: false })
+    ).toBeVisible({ timeout: 15_000 });
+    const [vivo] = await buscarViaServiceRole<{ status: string }[]>(
+      "dupla_planos",
+      `dupla_id=eq.${DUPLA_ID}&status=in.(proposto,aceito,ativo)&order=created_at.desc&limit=1`
+    );
+    expect(vivo.status).toBe("aceito");
   });
 
   test("pós-save oferece 'registrar o próximo também' e preenche o rascunho", async ({

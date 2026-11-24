@@ -23,7 +23,7 @@ test.describe("o combinado — jovem confirma a sugestão", () => {
     await expect(c).toBeVisible();
     // a janela do plano e o ritmo no cabeçalho do card
     await expect(
-      c.getByText(/Janela: \d{2}\/\d{2} a \d{2}\/\d{2}/)
+      c.getByText(/De \d{2}\/\d{2} a \d{2}\/\d{2}/)
     ).toBeVisible();
     await expect(c.getByText("até 2 encontros por semana")).toBeVisible();
     // passo aplicado lê a data marcada e não volta a formulário
@@ -87,7 +87,7 @@ test.describe("o combinado — staff", () => {
       name: "Acordos e intervenções",
     });
     await expect(
-      regiao.getByText(/Janela: \d{2}\/\d{2} a \d{2}\/\d{2}/)
+      regiao.getByText(/De \d{2}\/\d{2} a \d{2}\/\d{2}/)
     ).toBeVisible();
     await expect(regiao.getByText("6º encontro")).toBeVisible();
     await expect(
@@ -121,7 +121,7 @@ test.describe("o combinado — 390px", () => {
     await page.goto("/jovem/agenda");
     const c = card(page);
     await expect(c).toBeVisible();
-    await expect(c.getByText(/Janela:/)).toBeVisible();
+    await expect(c.getByText(/De \d{2}\/\d{2} a/)).toBeVisible();
     await expect(
       c.getByRole("button", { name: "Confirmar" })
     ).toBeVisible();
