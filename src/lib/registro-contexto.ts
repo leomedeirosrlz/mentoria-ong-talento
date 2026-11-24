@@ -1,4 +1,10 @@
-import { passoEsp, passosCobertosCandidatos, type PassoGuia } from "./ciclo";
+import {
+  cobertosDaDupla,
+  encontroTemConteudo,
+  passoEsp,
+  passosCobertosCandidatos,
+  type PassoGuia,
+} from "./ciclo";
 import type { Dupla, Encaminhamento, Encontro } from "./types";
 
 // Derivações puras da rota dedicada de registro (REALIZA-473). A ficha e a
@@ -72,7 +78,10 @@ export function estadoDaRotaRegistro(input: {
     return { tipo: "bloqueado", motivo: "dupla_inativa", encontro };
   }
 
-  if (encontro.registro != null && !recemSalvo) {
+  // registro próprio OU cobertura de sessão combinada (018): o coberto já
+  // tem conteúdo no registro da âncora — reabrir o form aqui duplicaria a
+  // entrega; a edição mora na ficha, na linha da âncora
+  if (!recemSalvo && encontroTemConteudo(encontro, dupla.encontros)) {
     return { tipo: "bloqueado", motivo: "ja_registrado", encontro };
   }
 
@@ -107,11 +116,14 @@ export function filaRegistrosPendentes(
   dupla: Dupla,
   opts: { excluirEncontroId?: string; agora: Date }
 ): { encontroId: string; numero: number }[] {
+  // coberto pela sessão combinada já tem conteúdo (o da âncora) — fora da
+  // fila, senão o "registrar também" ofereceria um passo já entregue (018)
+  const cobertos = cobertosDaDupla(dupla.encontros);
   return dupla.encontros
     .filter(
       (e) =>
         e.id !== opts.excluirEncontroId &&
-        !e.registro &&
+        !encontroTemConteudo(e, cobertos) &&
         (e.status === "realizado" ||
           ((e.status === "agendado" || e.status === "remarcado") &&
             e.data_hora != null &&

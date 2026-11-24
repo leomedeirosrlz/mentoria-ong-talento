@@ -42,6 +42,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { novoUuid } from "@/lib/uuid";
+import { META_PASSOS_PLANO } from "@/lib/plano-em-dia.data";
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from "@/components/ui/select";
@@ -186,6 +187,24 @@ export function RegistroForm({
   // duracao_min mora em `encontros`, não em `registros` — o form não recebe o
   // encontro, então o default é o padrão do guia (60). O salvarRegistro grava.
   const [duracaoMin, setDuracaoMin] = useState("60");
+  // sessão combinada (018): nºs marcados como cobertos — controlado pra o
+  // aviso de prática reagir na hora e a duração sugerir 2h no primeiro check
+  const [cobertosSel, setCobertosSel] = useState<Set<number>>(new Set());
+  // par de passos adjacentes onde o de baixo pede prática (META 4–8): a
+  // fusão na mesma sessão apaga a semana de exercício entre eles — aviso
+  // pedagógico em duas partes, a marcação é a decisão consciente
+  const sessaoCortaPratica = (() => {
+    if (evento?.numero == null || cobertosSel.size === 0) return null;
+    const grupo = new Set([evento.numero, ...cobertosSel]);
+    const pares = [...grupo]
+      .filter(
+        (n) =>
+          META_PASSOS_PLANO[n]?.exige === "pratica" && grupo.has(n + 1)
+      )
+      .sort((a, b) => a - b)
+      .map((n) => `${n} e ${n + 1}`);
+    return pares.length ? pares.join("; ") : null;
+  })();
   const [restored, setRestored] = useState<RegistroDraft | null>(null);
   // avaliacao é o único obrigatório não-textual — erro inline pt-BR em vez do
   // balão nativo do browser (que nem indica qual campo faltou)
@@ -667,7 +686,7 @@ export function RegistroForm({
             const { data: reg } = await createClient()
               .from("registros")
               .select("id, created_by")
-              .eq("encontro_id", encontroId)
+              .eq("id", res?.registroId ?? "")
               .maybeSingle();
             // fecha a sessão de preenchimento mesmo sem a row à mão — a
             // duração vale mais que o link pro registro
@@ -1012,18 +1031,20 @@ export function RegistroForm({
             />
           </fieldset>
 
-          {/* sessão dupla (007 US11): o encontro físico valeu por mais de um
-              passo do guia — o servidor grava encontro realizado + registro
-              próprios pra cada marcado, nunca uma linha só pros dois. Só na
-              criação: editar depois não abre caminho pra cobrir retroativo */}
+          {/* sessão combinada (018): o encontro físico valeu por mais de um
+              passo do guia — UM registro fica na âncora cobrindo os demais,
+              que viram realizado na mesma sessão (sem registro próprio).
+              Só na criação: editar depois não abre caminho pra cobrir
+              retroativo */}
           {!registro && cobertura && cobertura.length > 0 && (
             <fieldset className="min-w-0 space-y-2">
               <legend className="text-sm font-medium">
-                A sessão cobriu outro passo do guia?
+                A sessão cobriu outro encontro do guia?
               </legend>
               <p className="text-xs text-muted-foreground">
-                Marque os encontros que esta mesma sessão cobriu. Cada um fica
-                realizado e recebe o próprio registro com o mesmo conteúdo.
+                Marque os encontros que esta mesma sessão cobriu. Todos ficam
+                realizados e este registro vale pelos dois — o conteúdo
+                aparece uma vez só, no primeiro deles.
               </p>
               <div className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
                 {cobertura.map((c) => (
@@ -1037,6 +1058,21 @@ export function RegistroForm({
                       type="checkbox"
                       name="cobriu_numero"
                       value={c.numero}
+                      checked={cobertosSel.has(c.numero)}
+                      onChange={(e) => {
+                        const marcado = e.target.checked;
+                        setCobertosSel((prev) => {
+                          const next = new Set(prev);
+                          if (marcado) next.add(c.numero);
+                          else next.delete(c.numero);
+                          return next;
+                        });
+                        // sessão que cobre dois passos costuma durar 2h —
+                        // sugere sem tirar a escolha (só no primeiro check)
+                        if (marcado && cobertosSel.size === 0 && duracaoMin === "60") {
+                          setDuracaoMin("120");
+                        }
+                      }}
                       className="size-5 shrink-0 accent-primary"
                     />
                     <span className="min-w-0 truncate">
@@ -1046,6 +1082,18 @@ export function RegistroForm({
                   </label>
                 ))}
               </div>
+              {/* aviso pedagógico (018): fundir um passo de prática com o
+                  seguinte apaga a semana de exercício que a trilha pede
+                  entre eles — o registro cobre mesmo assim, mas a dupla
+                  decide sabendo o custo */}
+              {sessaoCortaPratica && (
+                <p className="text-xs text-[var(--warn-text)]">
+                  Os passos {sessaoCortaPratica} pedem uma semana de prática
+                  entre eles — numa sessão só essa semana não acontece. Se a
+                  dupla combinou assim, vale cobrir mesmo assim; a prática
+                  pode entrar nas reflexões ou num combinado.
+                </p>
+              )}
             </fieldset>
           )}
 

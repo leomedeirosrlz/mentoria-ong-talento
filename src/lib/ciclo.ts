@@ -117,6 +117,7 @@ export function passosCobertosCandidatos(
     numero: number;
     status: EncontroStatus;
     data_hora: string | null;
+    sessao_id?: string | null;
     registro?: ConteudoRegistro | null;
   }[],
   numeroAtual: number,
@@ -124,8 +125,12 @@ export function passosCobertosCandidatos(
 ): PassoGuia[] {
   const maxNumero = passos.reduce((m, p) => Math.max(m, p.numero), 0);
   const hoje = agora.toISOString().slice(0, 10);
+  // passo já coberto pelo registro de uma sessão anterior está FEITO — não
+  // volta como candidato de uma sessão nova
+  const cobertos = cobertosDaDupla(encontros);
   return passos.filter((p) => {
     if (p.numero === numeroAtual || p.numero >= maxNumero) return false;
+    if (cobertos.has(p.numero)) return false;
     const enc = encontros.find((e) => e.numero === p.numero);
     if (!enc) return p.data != null && p.data <= hoje;
     if (enc.status === "agendado" || enc.status === "remarcado") {
@@ -134,7 +139,7 @@ export function passosCobertosCandidatos(
       // cobrir não é desmarcação silenciosa
       return enc.data_hora == null || new Date(enc.data_hora) <= agora;
     }
-    return enc.status === "realizado" && !registroTemConteudo(enc.registro);
+    return enc.status === "realizado" && !encontroTemConteudo(enc, cobertos);
   });
 }
 
@@ -920,6 +925,87 @@ export function registroTemConteudo(
   );
 }
 
+/** Encontro cujo registro pode carregar `cobertura` — qualquer embed que
+ *  ainda não traga a coluna trata como ausência (undefined → [] ). */
+export type RegistroComCobertura = ConteudoRegistro & {
+  cobertura?: number[] | null;
+};
+
+type EncontroCobertura = {
+  numero: number;
+  sessao_id?: string | null;
+  registro?: RegistroComCobertura | null;
+};
+
+/** Mapa numero coberto → numero âncora, derivado uma vez da lista de
+ *  encontros da dupla (018). A sessão combinada grava um registro só na
+ *  âncora com os demais números na `cobertura` — o coberto não tem registro
+ *  próprio, então todo leitor que perguntaria "tem registro com conteúdo?"
+ *  precisa consultar este mapa, senão o passo coberto fica "falta registrar"
+ *  pra sempre. */
+export function cobertosDaDupla(
+  encontros: readonly EncontroCobertura[]
+): Map<number, number> {
+  const mapa = new Map<number, number>();
+  for (const e of encontros) {
+    if (!registroTemConteudo(e.registro)) continue;
+    for (const n of e.registro?.cobertura ?? []) {
+      if (typeof n === "number" && n !== e.numero) mapa.set(n, e.numero);
+    }
+  }
+  return mapa;
+}
+
+/** O encontro tem registro com conteúdo PRÓPRIO ou é coberto pela sessão
+ *  combinada de outro encontro. A régua central do 018: passa a lista de
+ *  encontros da dupla (ou o mapa de `cobertosDaDupla` quando ela já foi
+ *  montada uma vez — loop de sinais, jornada, relatórios). */
+export function encontroTemConteudo(
+  e: EncontroCobertura,
+  fonte?: readonly EncontroCobertura[] | Map<number, number>
+): boolean {
+  if (registroTemConteudo(e.registro)) return true;
+  const mapa = fonte instanceof Map ? fonte : fonte ? cobertosDaDupla(fonte) : null;
+  return mapa?.get(e.numero) != null;
+}
+
+/** Encontro âncora que cobre `e` pela sessão combinada (registro com
+ *  cobertura contendo o número) — null quando `e` é âncora, sessão simples
+ *  ou ainda sem registro. Serve pra UI dizer "o registro do encontro 5
+ *  também vale por este". */
+export function encontroAncoraDaCobertura(
+  e: EncontroCobertura,
+  encontros: readonly EncontroCobertura[]
+): { numero: number; sessao_id?: string | null } | null {
+  const anc = cobertosDaDupla(encontros).get(e.numero);
+  if (anc == null) return null;
+  return encontros.find((x) => x.numero === anc) ?? null;
+}
+
+/** Encontros que compõem a mesma sessão física (`sessao_id` compartilhado,
+ *  0226). Sessão simples retorna só o próprio. Ordenado por número — o
+ *  primeiro é a âncora, onde mora o registro e o link de avaliação. */
+export function encontrosDaSessao<T extends EncontroCobertura>(
+  e: T,
+  encontros: readonly T[]
+): T[] {
+  if (!e.sessao_id) return [e];
+  return encontros
+    .filter((x) => x.sessao_id === e.sessao_id)
+    .sort((a, b) => a.numero - b.numero);
+}
+
+/** Números cobertos pela avaliação do jovem — `avaliacoes_encontro.
+ *  cobertura` (0228) traz TODOS os números da sessão, âncora inclusa. */
+export function avaliacaoCobreNumero(
+  avaliacao: { encontro_id: string; cobertura?: number[] | null } | null | undefined,
+  e: { id: string; numero: number }
+): boolean {
+  if (!avaliacao) return false;
+  if (avaliacao.encontro_id === e.id) return true;
+  return (avaliacao.cobertura ?? []).includes(e.numero);
+}
+
 /** Registro mais recente da dupla (pelo número do encontro). */
 export function ultimoRegistro(dupla: Dupla): Registro | null {
   return (
@@ -1260,8 +1346,12 @@ export function resumoSemanaDe(
   );
   const oficialRealizado = (d: Dupla) =>
     d.encontros.find((e) => e.numero === evento.numero && e.status === "realizado");
-  const feitos = ativas.map(oficialRealizado).filter((e): e is Encontro => !!e);
-  const comRegistro = feitos.filter((e) => registroTemConteudo(e.registro)).length;
+  const feitos = ativas
+    .map((d) => ({ d, e: oficialRealizado(d) }))
+    .filter((x): x is { d: Dupla; e: Encontro } => !!x.e);
+  // sessão combinada: o coberto conta como registrado — o conteúdo vive na
+  // âncora e a cobertura liga os dois (018)
+  const comRegistro = feitos.filter((x) => encontroTemConteudo(x.e, x.d.encontros)).length;
   // reposição: sem `realizado` do numero oficial, mas com algum encontro
   // realizado dentro da semana calendário — ex.: a dupla pulou a semana do
   // encontro 2 e repôs na semana do 3. Ela SE encontrou; contar como
@@ -1309,10 +1399,14 @@ export type ItemEncontroDupla = { encontro: Encontro; dupla: Dupla };
  *  do mentor (registrar, remarcar ou marcar não-aconteceu), então conta como
  *  pendência de registro, não atraso. Única definição — semáforo, trilha,
  *  agenda e ficha liam a mesma regra. */
-export function emLimbo(e: Encontro, agoraMs: number): boolean {
+export function emLimbo(
+  e: Encontro,
+  agoraMs: number,
+  cobertos?: Map<number, number>
+): boolean {
   return (
     (e.status === "agendado" || e.status === "remarcado") &&
-    !registroTemConteudo(e.registro) &&
+    !encontroTemConteudo(e, cobertos) &&
     e.data_hora != null &&
     new Date(e.data_hora).getTime() < agoraMs
   );
@@ -1341,12 +1435,21 @@ export function bucketsDoEncontro(
     realizados: [],
     naoAconteceram: [],
   };
+  // um mapa de cobertura por dupla — montado na primeira vez que um encontro
+  // dela aparece (a lista do board mistura duplas)
+  const mapas = new Map<string, Map<number, number>>();
+  const mapaDe = (d: Dupla) => {
+    let m = mapas.get(d.id);
+    if (!m) mapas.set(d.id, (m = cobertosDaDupla(d.encontros)));
+    return m;
+  };
   for (const item of itens) {
     const e = item.encontro;
+    const cobertos = mapaDe(item.dupla);
     if (e.status === "realizado")
-      (registroTemConteudo(e.registro) ? b.realizados : b.pendentes).push(item);
+      (encontroTemConteudo(e, cobertos) ? b.realizados : b.pendentes).push(item);
     else if (e.status === "agendado" || e.status === "remarcado")
-      (emLimbo(e, agoraMs) ? b.pendentes : b.agendados).push(item);
+      (emLimbo(e, agoraMs, cobertos) ? b.pendentes : b.agendados).push(item);
     else b.naoAconteceram.push(item);
   }
   return b;
@@ -1394,16 +1497,18 @@ export function coberturaEncontro(
       d.cronograma_id === evento.cronograma_id
   );
   let registraram = 0;
-  for (const d of elegiveis)
+  for (const d of elegiveis) {
+    const cobertos = cobertosDaDupla(d.encontros);
     if (
       d.encontros.some(
         (e) =>
           e.numero === evento.numero &&
           e.status === "realizado" &&
-          registroTemConteudo(e.registro)
+          encontroTemConteudo(e, cobertos)
       )
     )
       registraram++;
+  }
   return { registraram, total: elegiveis.length };
 }
 
@@ -1439,10 +1544,13 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
   // combinado vencido, estagnação de 90 dias). "Esperado = feitos" mantém o
   // atraso zerado.
   const ehEspecialista = dupla.trilha === "especialista";
+  // cobertura de sessão combinada (018) — um mapa por chamada alimenta todos
+  // os sinais que perguntam "tem registro?" (limbo, pendência, jornada)
+  const cobertos = cobertosDaDupla(dupla.encontros);
   // limbo (agendado vencido sem registro) cobre o evento esperado do seu
   // número — sai da conta de atraso enquanto a pendência estiver aberta
   const limbo = new Set(
-    dupla.encontros.filter((e) => emLimbo(e, hoje.getTime())).map((e) => e.numero)
+    dupla.encontros.filter((e) => emLimbo(e, hoje.getTime(), cobertos)).map((e) => e.numero)
   );
   const feitos = dupla.encontros.filter((e) => e.status === "realizado").length;
   // um encontro em limbo cobre o evento esperado do seu número — sai da conta
@@ -1516,20 +1624,26 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
     (e) => e.avaliacao_jovem?.pedir_apoio
   );
   // realizado sem a estrela do jovem — o link já nasce mintado pelo
-  // trigger; a pendência é dele, não do mentor (não é registro pendente)
+  // trigger; a pendência é dele, não do mentor (não é registro pendente).
+  // Sessão combinada (018): uma avaliação cobre o grupo — o coberto não tem
+  // avaliacao_jovem própria e não conta como pendente
   const avaliacaoJovemPendente = dupla.encontros.filter(
-    (e) => e.status === "realizado" && !e.avaliacao_jovem
+    (e) =>
+      e.status === "realizado" &&
+      !dupla.encontros.some((x) => avaliacaoCobreNumero(x.avaliacao_jovem, e))
   ).length;
   // pendência de registro: realizado há >24h sem registro, ou agendado em
-  // limbo — a de menor número vira o motivo e o alvo dos deep links
+  // limbo — a de menor número vira o motivo e o alvo dos deep links.
+  // Coberto pela sessão combinada já tem conteúdo (o da âncora) — não é
+  // pendência nunca
   const pendencia =
     dupla.encontros
       .filter(
         (e) =>
-          !registroTemConteudo(e.registro) &&
+          !encontroTemConteudo(e, cobertos) &&
           ((e.status === "realizado" &&
             hoje.getTime() - new Date(e.data_hora ?? 0).getTime() > 24 * 3600 * 1000) ||
-            emLimbo(e, hoje.getTime()))
+            emLimbo(e, hoje.getTime(), cobertos))
       )
       .sort((a, b) => a.numero - b.numero)[0] ?? null;
   const registroPendente = pendencia != null;
@@ -2102,6 +2216,7 @@ export function jornadaDaDupla(
   // mesmo passo e o nó mostra a última (o realizado sempre vence).
   const ehEsp = dupla.trilha === "especialista";
   const porNumero = new Map(dupla.encontros.map((e) => [e.numero, e]));
+  const cobertos = cobertosDaDupla(dupla.encontros);
   const encontroDoPasso = (numero: number): Encontro | null =>
     ehEsp
       ? encontroDoPassoEsp(dupla.encontros, numero)
@@ -2112,10 +2227,10 @@ export function jornadaDaDupla(
     let estado: EstadoNoJornada;
     if (!encontro) estado = "futuro";
     else if (encontro.status === "realizado")
-      estado = registroTemConteudo(encontro.registro)
+      estado = encontroTemConteudo(encontro, cobertos)
         ? "realizado_completo"
         : "pendente_registro";
-    else if (emLimbo(encontro, hoje.getTime()))
+    else if (emLimbo(encontro, hoje.getTime(), cobertos))
       estado = "limbo";
     else if (encontro.status === "agendado" || encontro.status === "remarcado")
       estado = "agendado";

@@ -203,6 +203,7 @@ export type Database = {
       }
       avaliacao_links: {
         Row: {
+          cobertura: number[]
           created_at: string
           dupla_id: string
           encontro_id: string
@@ -214,6 +215,7 @@ export type Database = {
           token: string
         }
         Insert: {
+          cobertura?: number[]
           created_at?: string
           dupla_id: string
           encontro_id: string
@@ -225,6 +227,7 @@ export type Database = {
           token: string
         }
         Update: {
+          cobertura?: number[]
           created_at?: string
           dupla_id?: string
           encontro_id?: string
@@ -298,6 +301,7 @@ export type Database = {
         Row: {
           avaliacao_visivel_mentor: boolean
           avancei: string | null
+          cobertura: number[]
           comentario: string | null
           created_at: string
           dupla_id: string
@@ -312,6 +316,7 @@ export type Database = {
         Insert: {
           avaliacao_visivel_mentor?: boolean
           avancei?: string | null
+          cobertura?: number[]
           comentario?: string | null
           created_at?: string
           dupla_id: string
@@ -326,6 +331,7 @@ export type Database = {
         Update: {
           avaliacao_visivel_mentor?: boolean
           avancei?: string | null
+          cobertura?: number[]
           comentario?: string | null
           created_at?: string
           dupla_id?: string
@@ -2971,6 +2977,7 @@ export type Database = {
           numero: number
           origem: string
           realizado_em: string | null
+          sessao_id: string | null
           status: Database["public"]["Enums"]["encontro_status"]
         }
         Insert: {
@@ -2985,6 +2992,7 @@ export type Database = {
           numero: number
           origem?: string
           realizado_em?: string | null
+          sessao_id?: string | null
           status?: Database["public"]["Enums"]["encontro_status"]
         }
         Update: {
@@ -2999,6 +3007,7 @@ export type Database = {
           numero?: number
           origem?: string
           realizado_em?: string | null
+          sessao_id?: string | null
           status?: Database["public"]["Enums"]["encontro_status"]
         }
         Relationships: [
@@ -5631,6 +5640,7 @@ export type Database = {
         Row: {
           atividades: string[]
           avaliacao: string | null
+          cobertura: number[]
           created_at: string
           created_by: string | null
           dificuldade: string | null
@@ -5649,6 +5659,7 @@ export type Database = {
         Insert: {
           atividades?: string[]
           avaliacao?: string | null
+          cobertura?: number[]
           created_at?: string
           created_by?: string | null
           dificuldade?: string | null
@@ -5667,6 +5678,7 @@ export type Database = {
         Update: {
           atividades?: string[]
           avaliacao?: string | null
+          cobertura?: number[]
           created_at?: string
           created_by?: string | null
           dificuldade?: string | null
@@ -8057,6 +8069,18 @@ export type Database = {
           p_link?: string
           p_motivo?: string
           p_numero: number
+          p_plano: string
+          p_via?: string
+        }
+        Returns: Json
+      }
+      plano_aplicar_sessao: {
+        Args: {
+          p_data_hora: string
+          p_duracao_min?: number
+          p_link?: string
+          p_motivo?: string
+          p_numeros: number[]
           p_plano: string
           p_via?: string
         }

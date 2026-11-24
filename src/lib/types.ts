@@ -392,6 +392,11 @@ export type Registro = {
   dificuldade_detalhe: string | null;
   proximo_passo: ProximoPasso | null;
   proximo_passo_detalhe: string | null;
+  /** Números dos outros encontros da MESMA sessão que este registro cobre
+   *  (0226): sessão combinada grava um registro só na âncora e os números
+   *  cobertos ficam aqui — a âncora em si não aparece. [] = sessão simples.
+   *  Opcional: embeds que não pedem a coluna devolvem undefined. */
+  cobertura?: number[];
   created_by: string | null;
   created_at: string;
   /** Autor do registro — só vem no embed `autor:profiles!registros_created_by_fkey(nome)` da dupla. */
@@ -424,6 +429,9 @@ export type AvaliacaoEncontro = {
   pedir_apoio: boolean;
   /** O jovem liberou o mentor DPP ler esta avaliação específica. */
   avaliacao_visivel_mentor: boolean;
+  /** Sessão combinada: números de TODOS os encontros do grupo (inclui o da
+   *  avaliação) — copiada do link pelo trigger 0228. [] = sessão simples. */
+  cobertura?: number[];
   /** null = resposta anônima por token (jovem sem login). */
   respondido_por_profile_id: string | null;
   created_at: string;
@@ -442,6 +450,9 @@ export type AvaliacaoLink = {
   /** Profile que respondeu por este link (null = jovem sem login — o
    *  token sozinho é a identidade). Trilha de auditoria da RPC. */
   respondido_por_profile_id: string | null;
+  /** Sessão combinada: números de TODOS os encontros que este link cobre
+   *  (inclui o âncora) — um link por sessão, mint só na âncora (0226). */
+  cobertura?: number[];
   created_at: string;
 };
 
@@ -485,6 +496,10 @@ export type Encontro = {
   link: string | null;
   /** Por que a dupla remarcou (label do preset ou texto livre) — só escrito quando a data muda. */
   motivo_reagendamento: string | null;
+  /** Sessão combinada (0226): uuid compartilhado por todos os encontros que
+   *  aconteceram numa sessão só — mesmo sessao_id = mesma sessão física.
+   *  null = encontro de sessão própria (o comum). */
+  sessao_id?: string | null;
   registro?: Registro | null;
   /** Estrela do JOVEM sobre este encontro (0071) — embed to-one no select da
    *  dupla. O RLS decide quem a vê: coord/sup sempre, mentor DPP só quando o
