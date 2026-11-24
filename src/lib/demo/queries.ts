@@ -2861,13 +2861,15 @@ export function demoRoteirosResumo(
         .filter((p) => p.status === "aceito" || p.status === "ativo")
         .sort((a, b) => b.versao - a.versao)[0] ?? null;
     if (!plano || (planoIds && !planoIds.includes(plano.id))) continue;
+    const realizados = numerosRealizadosDe(dupla.encontros ?? []);
     const devidos = roteirosDevidos({
       numeros: plano.escopo?.numeros ?? [],
       marcados: numerosMarcadosDe(dupla.encontros ?? []),
-      realizados: numerosRealizadosDe(dupla.encontros ?? []),
+      realizados,
     });
+    // rascunho = próxima semana futura do combinado; nunca uma realizada
     const rascunho = (plano.escopo?.numeros ?? []).find(
-      (n) => !devidos.includes(n)
+      (n) => !devidos.includes(n) && !realizados.includes(n)
     );
     for (const [status, numero] of [
       ...devidos.map((n) => ["publicado", n] as const),

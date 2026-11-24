@@ -68,9 +68,11 @@ test.describe("Sua semana — mentor", () => {
     });
     await expect(disclosure).toBeVisible();
     await disclosure.locator("summary").click();
+    // o roteiro do plano substitui o link do corpus quando existe —
+    // nesta dupla, o 6º é o vigente publicado
     await expect(
-      disclosure.getByRole("link", { name: /Roteiro Semana/ })
-    ).toBeVisible();
+      disclosure.getByRole("link", { name: /Roteiro do 6º encontro/ })
+    ).toHaveAttribute("href", `/duplas/${D_OK}/roteiro/6`);
   });
 });
 

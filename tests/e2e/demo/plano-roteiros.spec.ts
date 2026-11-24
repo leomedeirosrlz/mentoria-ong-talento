@@ -8,8 +8,8 @@ import { entrarNaDemo, expect, test } from "../helpers";
 //     como vale) — a mesma peça que o aceite assina;
 //   · a agenda lista "Roteiros do plano" com o status de cada semana;
 //   · /jovem/roteiro/N abre a leitura do vigente;
-//   · o plano demo da Bia/Ana (d-ok) tem numeros [5,6]: o 5º realizado
-//     e o 6º marcado — a régua dá as duas semanas.
+//   · o plano demo da Bia/Ana (d-ok) tem numeros [5,6,7]: 5 e 6 já
+//     marcados (devidos) e o 7º vira a próxima semana em RASCUNHO.
 
 const D_OK = "de000000-0000-4000-8000-000000001537";
 
@@ -42,6 +42,15 @@ test.describe("documentos do plano na demo (521)", () => {
       name: "Roteiro do 6º encontro",
     });
     await expect(link6).toBeVisible();
+    // a próxima semana do combinado está materializada como rascunho —
+    // não é semana realizada, é o 7º encontro ainda por vir
+    const link7 = lista.getByRole("link", {
+      name: "Roteiro do 7º encontro",
+    });
+    await expect(link7).toBeVisible();
+    await expect(
+      lista.locator("li").filter({ hasText: "Roteiro do 7º encontro" })
+    ).toContainText("Rascunho");
 
     // a rota da semana abre a leitura — conteúdo montado do corpus +
     // o contexto do plano ("Do plano de vocês")
@@ -54,6 +63,16 @@ test.describe("documentos do plano na demo (521)", () => {
     await expect(
       page.getByRole("button", { name: /Salvar|Publicar/ })
     ).toHaveCount(0);
+
+    // o rascunho do 7º tem conteúdo montado de verdade (corpus + plano)
+    // e abre no editor — é a próxima semana, não uma realizada
+    await page.goto("/jovem/roteiro/7");
+    await expect(
+      page.getByRole("heading", { name: /Roteiro do 7º encontro/ })
+    ).toBeVisible({ timeout: 15_000 });
+    await expect(
+      page.getByRole("button", { name: "Editar rascunho" })
+    ).toBeVisible();
   });
 
   test("equipe lê o combinado e a lista de roteiros na ficha da dupla", async ({
@@ -68,6 +87,13 @@ test.describe("documentos do plano na demo (521)", () => {
     await expect(
       lista.getByRole("link", { name: /Roteiro do \d+º encontro/ }).first()
     ).toBeVisible();
+    const link7 = lista.getByRole("link", {
+      name: "Roteiro do 7º encontro",
+    });
+    await expect(link7).toBeVisible();
+    await expect(
+      lista.locator("li").filter({ hasText: "Roteiro do 7º encontro" })
+    ).toContainText("Rascunho");
 
     await page.goto(`/duplas/${D_OK}/combinado`);
     await expect(
