@@ -91,6 +91,13 @@ export type Database = {
             foreignKeyName: "assinaturas_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assinaturas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -155,6 +162,13 @@ export type Database = {
             columns: ["mentorado_id"]
             isOneToOne: false
             referencedRelation: "mentorados_turma"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assinaturas_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -258,6 +272,13 @@ export type Database = {
             columns: ["encontro_id"]
             isOneToOne: true
             referencedRelation: "encontros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacao_links_respondido_por_profile_id_fkey"
+            columns: ["respondido_por_profile_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -369,6 +390,13 @@ export type Database = {
             foreignKeyName: "avaliacoes_encontro_respondido_por_profile_id_fkey"
             columns: ["respondido_por_profile_id"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "avaliacoes_encontro_respondido_por_profile_id_fkey"
+            columns: ["respondido_por_profile_id"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -462,6 +490,13 @@ export type Database = {
             foreignKeyName: "chamado_anexos_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chamado_anexos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -521,6 +556,13 @@ export type Database = {
           tipo?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "chamado_atualizacoes_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "chamado_atualizacoes_autor_id_fkey"
             columns: ["autor_id"]
@@ -602,6 +644,13 @@ export type Database = {
           texto?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "chamado_comentarios_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "chamado_comentarios_autor_id_fkey"
             columns: ["autor_id"]
@@ -729,6 +778,13 @@ export type Database = {
             foreignKeyName: "chamados_atribuido_a_fkey"
             columns: ["atribuido_a"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chamados_atribuido_a_fkey"
+            columns: ["atribuido_a"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -758,6 +814,13 @@ export type Database = {
             columns: ["atribuido_a"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chamados_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -863,6 +926,13 @@ export type Database = {
             columns: ["registro_id"]
             isOneToOne: false
             referencedRelation: "registros"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "chamados_resolvido_por_fkey"
+            columns: ["resolvido_por"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -991,6 +1061,13 @@ export type Database = {
             foreignKeyName: "comunicados_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comunicados_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -1066,6 +1143,13 @@ export type Database = {
             foreignKeyName: "cronogramas_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "cronogramas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -1122,6 +1206,13 @@ export type Database = {
           texto?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "devolutivas_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "devolutivas_autor_id_fkey"
             columns: ["autor_id"]
@@ -1202,6 +1293,13 @@ export type Database = {
           secoes?: Json
         }
         Relationships: [
+          {
+            foreignKeyName: "digest_config_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "digest_config_atualizado_por_fkey"
             columns: ["atualizado_por"]
@@ -1305,6 +1403,13 @@ export type Database = {
             foreignKeyName: "documentos_pessoa_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_pessoa_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -1369,6 +1474,13 @@ export type Database = {
             columns: ["mentorado_id"]
             isOneToOne: false
             referencedRelation: "mentorados_turma"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documentos_pessoa_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -1458,6 +1570,13 @@ export type Database = {
             columns: ["dupla_id"]
             isOneToOne: false
             referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -1593,6 +1712,13 @@ export type Database = {
             foreignKeyName: "dupla_intervencoes_sugerida_por_fkey"
             columns: ["sugerida_por"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_intervencoes_sugerida_por_fkey"
+            columns: ["sugerida_por"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -1689,6 +1815,13 @@ export type Database = {
             foreignKeyName: "dupla_plano_eventos_por_fkey"
             columns: ["por"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_eventos_por_fkey"
+            columns: ["por"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -1763,6 +1896,13 @@ export type Database = {
           plano_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "dupla_plano_passos_aplicado_por_fkey"
+            columns: ["aplicado_por"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "dupla_plano_passos_aplicado_por_fkey"
             columns: ["aplicado_por"]
@@ -1899,6 +2039,13 @@ export type Database = {
             foreignKeyName: "dupla_plano_roteiros_editado_por_fkey"
             columns: ["editado_por"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_editado_por_fkey"
+            columns: ["editado_por"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -1928,6 +2075,13 @@ export type Database = {
             columns: ["editado_por"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_gerado_por_fkey"
+            columns: ["gerado_por"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -1970,6 +2124,13 @@ export type Database = {
             columns: ["plano_id"]
             isOneToOne: false
             referencedRelation: "dupla_planos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_plano_roteiros_publicado_por_fkey"
+            columns: ["publicado_por"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -2078,6 +2239,13 @@ export type Database = {
             foreignKeyName: "dupla_planos_aprovado_por_fkey"
             columns: ["aprovado_por"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_aprovado_por_fkey"
+            columns: ["aprovado_por"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -2107,6 +2275,13 @@ export type Database = {
             columns: ["aprovado_por"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_contestado_por_fkey"
+            columns: ["contestado_por"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -2156,6 +2331,13 @@ export type Database = {
             columns: ["dupla_id"]
             isOneToOne: false
             referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_planos_proposto_por_fkey"
+            columns: ["proposto_por"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -2229,6 +2411,13 @@ export type Database = {
             columns: ["ciclo_evento_id"]
             isOneToOne: false
             referencedRelation: "ciclo_eventos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dupla_recessos_declarado_por_fkey"
+            columns: ["declarado_por"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -2469,6 +2658,13 @@ export type Database = {
             foreignKeyName: "duplas_desfecho_por_fkey"
             columns: ["desfecho_por"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_desfecho_por_fkey"
+            columns: ["desfecho_por"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -2498,6 +2694,13 @@ export type Database = {
             columns: ["desfecho_por"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -2602,6 +2805,13 @@ export type Database = {
             foreignKeyName: "duplas_supervisor_id_fkey"
             columns: ["supervisor_id"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -2673,6 +2883,13 @@ export type Database = {
           tipo?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "emails_enviados_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "emails_enviados_autor_id_fkey"
             columns: ["autor_id"]
@@ -2751,6 +2968,13 @@ export type Database = {
           status?: Database["public"]["Enums"]["encaminhamento_status"]
         }
         Relationships: [
+          {
+            foreignKeyName: "encaminhamentos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "encaminhamentos_created_by_fkey"
             columns: ["created_by"]
@@ -2842,6 +3066,13 @@ export type Database = {
             foreignKeyName: "encerramentos_decidido_por_fkey"
             columns: ["decidido_por"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encerramentos_decidido_por_fkey"
+            columns: ["decidido_por"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -2925,6 +3156,13 @@ export type Database = {
             foreignKeyName: "encontro_guia_ajustes_criado_por_fkey"
             columns: ["criado_por"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontro_guia_ajustes_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -3001,6 +3239,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "encontro_notas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "encontro_notas_created_by_fkey"
             columns: ["created_by"]
@@ -3087,6 +3332,13 @@ export type Database = {
           numero?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "encontro_remarcacoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "encontro_remarcacoes_created_by_fkey"
             columns: ["created_by"]
@@ -3196,6 +3448,13 @@ export type Database = {
             foreignKeyName: "encontros_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "encontros_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -3294,6 +3553,13 @@ export type Database = {
             foreignKeyName: "especialista_excecoes_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "especialista_excecoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -3353,6 +3619,13 @@ export type Database = {
           profile_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "especialista_grade_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "especialista_grade_profile_id_fkey"
             columns: ["profile_id"]
@@ -3482,6 +3755,13 @@ export type Database = {
             foreignKeyName: "formulario_links_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_links_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -3552,6 +3832,13 @@ export type Database = {
             foreignKeyName: "formulario_links_dest_profile_id_fkey"
             columns: ["dest_profile_id"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_links_dest_profile_id_fkey"
+            columns: ["dest_profile_id"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -3602,6 +3889,13 @@ export type Database = {
             columns: ["formulario_id"]
             isOneToOne: false
             referencedRelation: "formularios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_links_respondido_por_profile_id_fkey"
+            columns: ["respondido_por_profile_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -3713,6 +4007,13 @@ export type Database = {
             foreignKeyName: "formulario_respostas_promovido_profile_id_fkey"
             columns: ["promovido_profile_id"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "formulario_respostas_promovido_profile_id_fkey"
+            columns: ["promovido_profile_id"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -3784,6 +4085,13 @@ export type Database = {
           versao?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "formularios_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "formularios_created_by_fkey"
             columns: ["created_by"]
@@ -3941,6 +4249,13 @@ export type Database = {
             foreignKeyName: "ia_confirmacoes_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_confirmacoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -4093,6 +4408,13 @@ export type Database = {
             foreignKeyName: "ia_eval_runs_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_eval_runs_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -4198,6 +4520,13 @@ export type Database = {
             foreignKeyName: "ia_eventos_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_eventos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -4267,6 +4596,13 @@ export type Database = {
             foreignKeyName: "ia_mcp_tokens_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ia_mcp_tokens_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -4329,6 +4665,13 @@ export type Database = {
           tipo?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "interacoes_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "interacoes_autor_id_fkey"
             columns: ["autor_id"]
@@ -4497,6 +4840,13 @@ export type Database = {
             foreignKeyName: "material_leituras_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "material_leituras_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -4568,6 +4918,13 @@ export type Database = {
           tipo?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "mentor_profiles_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "mentor_profiles_profile_id_fkey"
             columns: ["profile_id"]
@@ -4713,6 +5070,13 @@ export type Database = {
             foreignKeyName: "mentorados_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: true
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "mentorados_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -4795,6 +5159,13 @@ export type Database = {
             foreignKeyName: "notificacoes_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -4824,6 +5195,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notificacoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -4904,6 +5282,13 @@ export type Database = {
             columns: ["dupla_id"]
             isOneToOne: true
             referencedRelation: "jovem_duplas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdm_visao_por_fkey"
+            columns: ["visao_por"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -5009,6 +5394,13 @@ export type Database = {
             foreignKeyName: "pdm_itens_atualizado_por_fkey"
             columns: ["atualizado_por"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdm_itens_atualizado_por_fkey"
+            columns: ["atualizado_por"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -5038,6 +5430,13 @@ export type Database = {
             columns: ["atualizado_por"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pdm_itens_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -5121,6 +5520,13 @@ export type Database = {
             foreignKeyName: "pessoa_notas_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoa_notas_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -5185,6 +5591,13 @@ export type Database = {
             columns: ["mentorado_id"]
             isOneToOne: false
             referencedRelation: "mentorados_turma"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pessoa_notas_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -5261,6 +5674,13 @@ export type Database = {
             foreignKeyName: "presencas_marcado_por_fkey"
             columns: ["marcado_por"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_marcado_por_fkey"
+            columns: ["marcado_por"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -5290,6 +5710,13 @@ export type Database = {
             columns: ["marcado_por"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "presencas_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -5358,6 +5785,13 @@ export type Database = {
           superficie?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "produto_eventos_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "produto_eventos_profile_id_fkey"
             columns: ["profile_id"]
@@ -5451,6 +5885,13 @@ export type Database = {
           profile_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "profile_papeis_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "profile_papeis_profile_id_fkey"
             columns: ["profile_id"]
@@ -5626,6 +6067,13 @@ export type Database = {
             foreignKeyName: "registro_anexos_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registro_anexos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -5777,6 +6225,13 @@ export type Database = {
             foreignKeyName: "registro_tentativas_profile_id_fkey"
             columns: ["profile_id"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registro_tentativas_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -5880,6 +6335,13 @@ export type Database = {
             foreignKeyName: "registros_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "registros_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -5971,6 +6433,13 @@ export type Database = {
             foreignKeyName: "relatorio_ia_cards_gerado_por_fkey"
             columns: ["gerado_por"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relatorio_ia_cards_gerado_por_fkey"
+            columns: ["gerado_por"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -6056,6 +6525,13 @@ export type Database = {
             foreignKeyName: "relatorio_links_criado_por_fkey"
             columns: ["criado_por"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relatorio_links_criado_por_fkey"
+            columns: ["criado_por"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -6085,6 +6561,13 @@ export type Database = {
             columns: ["criado_por"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "relatorio_links_revogado_por_fkey"
+            columns: ["revogado_por"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -6198,6 +6681,13 @@ export type Database = {
             foreignKeyName: "solicitacao_propostas_autor_id_fkey"
             columns: ["autor_id"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacao_propostas_autor_id_fkey"
+            columns: ["autor_id"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -6305,6 +6795,13 @@ export type Database = {
             foreignKeyName: "solicitacoes_especialista_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_especialista_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -6368,6 +6865,13 @@ export type Database = {
             foreignKeyName: "solicitacoes_especialista_especialista_desejado_id_fkey"
             columns: ["especialista_desejado_id"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_especialista_especialista_desejado_id_fkey"
+            columns: ["especialista_desejado_id"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -6397,6 +6901,13 @@ export type Database = {
             columns: ["especialista_desejado_id"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_especialista_especialista_id_fkey"
+            columns: ["especialista_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -6512,6 +7023,13 @@ export type Database = {
             foreignKeyName: "terceiros_consolidacao_escrito_por_fkey"
             columns: ["escrito_por"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terceiros_consolidacao_escrito_por_fkey"
+            columns: ["escrito_por"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -6586,6 +7104,13 @@ export type Database = {
           whatsapp?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "terceiros_contatos_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "terceiros_contatos_created_by_fkey"
             columns: ["created_by"]
@@ -6677,6 +7202,13 @@ export type Database = {
             columns: ["contato_id"]
             isOneToOne: true
             referencedRelation: "terceiros_contatos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "terceiros_respostas_registrado_por_fkey"
+            columns: ["registrado_por"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -6804,6 +7336,13 @@ export type Database = {
             foreignKeyName: "turma_inscricoes_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turma_inscricoes_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -6868,6 +7407,13 @@ export type Database = {
             columns: ["mentorado_id"]
             isOneToOne: false
             referencedRelation: "mentorados_turma"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "turma_inscricoes_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -7017,6 +7563,26 @@ export type Database = {
           },
         ]
       }
+      especialistas_catalogo: {
+        Row: {
+          areas: string[] | null
+          avatar_path: string | null
+          bio: string | null
+          cargo: string | null
+          cidade: string | null
+          empresa: string | null
+          experiencia_previa: string | null
+          formacao_externa: string | null
+          grade_resumo: string[] | null
+          id: string | null
+          nome: string | null
+          nome_social: string | null
+          uf: string | null
+          vagas: number | null
+          voluntariado: string | null
+        }
+        Relationships: []
+      }
       ia_guias_catalogo: {
         Row: {
           guia: string | null
@@ -7059,6 +7625,31 @@ export type Database = {
         }
         Relationships: []
       }
+      jovem_diretorio: {
+        Row: {
+          areas: string[] | null
+          avatar_path: string | null
+          bio: string | null
+          cargo: string | null
+          cidade: string | null
+          empresa: string | null
+          experiencia_previa: string | null
+          formacao_externa: string | null
+          grade_resumo: string[] | null
+          id: string | null
+          interesses: string[] | null
+          minha_rede: boolean | null
+          minha_turma: boolean | null
+          nome: string | null
+          nome_social: string | null
+          papel: string | null
+          tipo: string | null
+          uf: string | null
+          vagas: number | null
+          voluntariado: string | null
+        }
+        Relationships: []
+      }
       jovem_duplas: {
         Row: {
           cronograma_id: string | null
@@ -7085,6 +7676,13 @@ export type Database = {
             columns: ["cronograma_id"]
             isOneToOne: false
             referencedRelation: "cronogramas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_mentor_id_fkey"
+            columns: ["mentor_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -7120,6 +7718,13 @@ export type Database = {
             columns: ["mentor_id"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "duplas_supervisor_id_fkey"
+            columns: ["supervisor_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
@@ -7509,6 +8114,13 @@ export type Database = {
             foreignKeyName: "solicitacoes_especialista_created_by_fkey"
             columns: ["created_by"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_especialista_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -7572,6 +8184,13 @@ export type Database = {
             foreignKeyName: "solicitacoes_especialista_especialista_desejado_id_fkey"
             columns: ["especialista_desejado_id"]
             isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_especialista_especialista_desejado_id_fkey"
+            columns: ["especialista_desejado_id"]
+            isOneToOne: false
             referencedRelation: "jovem_especialistas"
             referencedColumns: ["id"]
           },
@@ -7601,6 +8220,13 @@ export type Database = {
             columns: ["especialista_desejado_id"]
             isOneToOne: false
             referencedRelation: "profiles_pessoal"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "solicitacoes_especialista_especialista_id_fkey"
+            columns: ["especialista_id"]
+            isOneToOne: false
+            referencedRelation: "especialistas_catalogo"
             referencedColumns: ["id"]
           },
           {
