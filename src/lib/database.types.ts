@@ -8276,6 +8276,16 @@ export type Database = {
         Args: { p_acao: string; p_motivo?: string; p_plano: string }
         Returns: Json
       }
+      plano_substituir: {
+        Args: {
+          p_dupla: string
+          p_escopo: Json
+          p_motivo?: string
+          p_plano: string
+          p_via?: string
+        }
+        Returns: Json
+      }
       pode_roteiro_plano: { Args: { p_plano: string }; Returns: boolean }
       postar_devolutiva: {
         Args: { p_dupla_id: string; p_texto: string }
