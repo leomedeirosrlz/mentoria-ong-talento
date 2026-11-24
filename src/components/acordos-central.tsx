@@ -1,5 +1,6 @@
 import { PlanoAcordosCard } from "@/components/plano-acordos";
 import { CombinarPlano } from "@/components/combinar-plano";
+import { RoteirosPlano } from "@/components/roteiros-plano";
 import { aceitesDoPlano } from "@/lib/plano-combinado";
 import type { RecessoDaFicha } from "@/components/recesso-dupla-card";
 import type { SeletorSugestoes } from "@/components/seletor-dia-hora";
@@ -8,7 +9,7 @@ import {
   VoltarGuiaButton,
 } from "@/components/acordos-acoes";
 import { rotuloIntervencao } from "@/lib/intervencoes";
-import type { Dupla } from "@/lib/types";
+import type { Dupla, DuplaPlanoRoteiro } from "@/lib/types";
 
 /** Central "Acordos e intervenções" (REALIZA-459, sugestão 7 da auditoria
  *  de design): o que a dupla combinou e o que a equipe sugeriu, no mesmo
@@ -23,6 +24,7 @@ export function AcordosCentral({
   numeroGuiaAtual,
   recessos = [],
   sugestoesPlano,
+  roteiros = [],
 }: {
   dupla: Dupla;
   souMentor: boolean;
@@ -36,6 +38,8 @@ export function AcordosCentral({
   /** pacote do motor pras linhas do combinado (482) — a ficha monta com
    *  o mesmo adaptador da agenda do jovem */
   sugestoesPlano?: SeletorSugestoes | null;
+  /** roteiros do plano da dupla (020) — a ficha carrega com lazy */
+  roteiros?: readonly DuplaPlanoRoteiro[];
 }) {
   const planoVivo =
     (dupla.planos ?? []).find((p) =>
@@ -91,7 +95,21 @@ export function AcordosCentral({
               .map((e) => e.numero)}
             recessos={recessos}
             sugestoes={sugestoesPlano}
+            combinadoHref={`/duplas/${dupla.id}/combinado`}
           />
+          {(planoVivo.status === "aceito" || planoVivo.status === "ativo") && (
+            <div className="mt-3">
+              <RoteirosPlano
+                roteiros={roteiros.filter((r) => r.plano_id === planoVivo.id)}
+                planoVersao={planoVivo.versao}
+                hrefDe={(n) => `/duplas/${dupla.id}/roteiro/${n}`}
+                podeGerar={souStaff}
+                faltantes={(planoVivo.escopo?.numeros ?? []).filter(
+                  (n) => !roteiros.some((r) => r.plano_id === planoVivo.id && r.numero === n)
+                )}
+              />
+            </div>
+          )}
         </div>
       )}
 

@@ -108,6 +108,10 @@ import { AcordosCentral } from "@/components/acordos-central";
 import { RecessoDuplaCard } from "@/components/recesso-dupla-card";
 import { montarPlanoEmDia } from "@/lib/plano-em-dia";
 import {
+  carregarRoteirosDaDupla,
+  planoVigente,
+} from "@/lib/plano-roteiros-servico";
+import {
   gradesDaDupla,
   sugestoesEncontroDaDupla,
 } from "@/lib/sugestoes-encontro-server";
@@ -360,6 +364,16 @@ export default async function DuplaPage({
     !ehEsp ? getPdmResumo(id) : null,
   ]);
   const solicitacao = solicitacoes[0] ?? null;
+
+  // roteiros do plano (020): a ficha é a superfície que nasce o lazy —
+  // semanas devidas viram rows publicadas na leitura (idempotente via RPC)
+  const roteirosInfo = planoVigente(dupla)
+    ? await carregarRoteirosDaDupla({
+        duplaId: id,
+        dupla,
+        lado: souMentor ? "mentor" : "staff",
+      })
+    : null;
   // o pedido que ocupa a vaga agora (0074 — "em aberto" inclui triagem e
   // negociação; o status_efetivo já desconta o slot vencido, então um
   // expirado NÃO bloqueia — bate com o dedup do criarSolicitacao).
@@ -1261,6 +1275,7 @@ export default async function DuplaPage({
         numeroGuiaAtual={passoAtual?.numero ?? null}
         recessos={recessosDaFicha}
         sugestoesPlano={sugestoesPlano}
+        roteiros={roteirosInfo && "ok" in roteirosInfo ? roteirosInfo.roteiros : []}
       />
 
       {/* com plano de recuperação na tela a decisão de recesso mora dentro

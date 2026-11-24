@@ -341,6 +341,19 @@ function NumeroCard({
 
 function DocBlocoView({ b, tom }: { b: DocBloco; tom: DocTom }) {
   switch (b.kind) {
+    case "subtitulo":
+      // cabeçalhos dos documentos gerados (roteiro do plano): a mesma
+      // gramática dos h2/h3 do corpus — nivel 2 com a régua lime, nivel
+      // 3 só negrito (o h1 fica no hero do documento)
+      return b.nivel === 3 ? (
+        <h4 className="pt-1 text-[15px] font-semibold tracking-tight sm:text-base">
+          {b.texto}
+        </h4>
+      ) : (
+        <h3 className="border-b-2 border-[var(--brand-lime)] pb-2 pt-2 text-lg font-semibold tracking-tight sm:text-xl">
+          {b.texto}
+        </h3>
+      );
     case "subj":
       // stray subject outside a card (linhasDoc wraps every subj — fallback)
       return (

@@ -64,6 +64,8 @@ function itemTexto(b: DocBloco): string {
         .join("\n");
     case "encontro":
       return `${b.numero}º encontro — ${b.titulo}`;
+    case "subtitulo":
+      return b.texto;
     case "subj":
     case "callout":
       return "";

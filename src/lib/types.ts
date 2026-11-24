@@ -711,6 +711,30 @@ export type EncontroGuiaAjuste = {
   updated_at: string;
 };
 
+/** Roteiro semanal persistido do plano (0231 — REALIZA-521): montagem
+ *  determinística do corpus + ajustes da dupla, um por (plano, numero,
+ *  versao); o vigente publicado é único por (plano, numero). `substituido`
+ *  segue legível pra trilha. */
+export type DuplaPlanoRoteiro = {
+  id: string;
+  dupla_id: string;
+  plano_id: string;
+  numero: number;
+  versao: number;
+  /** versao do dupla_planos quando o conteúdo foi gerado — divergência
+   *  marca "versão anterior do plano" (o UPDATE da RPC não a recarimba). */
+  plano_versao: number;
+  conteudo: unknown;
+  status: "rascunho" | "publicado" | "substituido";
+  gerado_por: string | null;
+  gerado_via: "app" | "liza" | "job";
+  gerado_em: string;
+  editado_por: string | null;
+  publicado_por: string | null;
+  publicado_em: string | null;
+  updated_at: string;
+};
+
 export type Dupla = {
   id: string;
   /** Label da turma (ex-coluna `ciclo`, renomeada na 0061) — derivada do

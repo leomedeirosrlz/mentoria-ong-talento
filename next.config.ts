@@ -120,6 +120,12 @@ const nextConfig: NextConfig = {
   outputFileTracingIncludes: {
     "/materiais/documento/*": ["./docs/rag/**/*.md"],
     "/jovem/materiais/documento/*": ["./docs/rag/**/*.md"],
+    // roteiros do plano (020): as rotas da semana e as superfícies de
+    // lazy (ficha, agenda do jovem) leem docs/rag no server
+    "/duplas/*/roteiro/*": ["./docs/rag/**/*.md"],
+    "/jovem/roteiro/*": ["./docs/rag/**/*.md"],
+    "/duplas/*": ["./docs/rag/**/*.md"],
+    "/jovem/agenda": ["./docs/rag/**/*.md"],
   },
   // acesso ao dev server a partir de outros dispositivos (celular via LAN
   // ou Tailscale): sem a origem aqui o Next bloqueia os endpoints de dev —

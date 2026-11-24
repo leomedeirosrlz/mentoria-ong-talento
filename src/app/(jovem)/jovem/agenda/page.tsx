@@ -63,8 +63,10 @@ import { getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import type { JovemEncontro } from "@/lib/queries-jovem";
 import { combinadoDoJovem } from "@/lib/plano-combinado";
+import { carregarRoteirosDaDupla } from "@/lib/plano-roteiros-servico";
 import { PlanoAcordosCard } from "@/components/plano-acordos";
 import { CombinarPlano } from "@/components/combinar-plano";
+import { RoteirosPlano } from "@/components/roteiros-plano";
 import { RecessoDecisao } from "@/components/recesso-dupla-card";
 import type { Disponibilidade } from "@/lib/types";
 import { cn } from "@/lib/utils";
@@ -347,6 +349,16 @@ export default async function JovemAgenda() {
   // (518): o aceite único e a decisão de recesso são gestos DELE também
   // — a mesma peça da ficha, com o lado "mentorado"
   const combinadoPlano = planoJovem ? combinadoDoJovem(planoJovem) : null;
+
+  // roteiros do plano (020): a agenda é superfície de lazy — a semana
+  // devida nasce publicada na leitura (idempotente via RPC)
+  const roteirosJovem =
+    duplaDpp?.id != null &&
+    (planoJovem?.status === "aceito" || planoJovem?.status === "ativo")
+      ? await carregarRoteirosDaDupla({ duplaId: duplaDpp.id }).then((r) =>
+          "ok" in r ? r : null
+        )
+      : null;
   const realizadosDpp = encontros
     .filter((e) => e.dupla_id === duplaDpp?.id && e.status === "realizado")
     .map((e) => e.numero);
@@ -559,7 +571,19 @@ export default async function JovemAgenda() {
                   realizados={realizadosDpp}
                   recessos={recessosDaAgenda}
                   sugestoes={sugestoesAgendar}
+                  combinadoHref="/jovem/combinado"
                 />
+                {(combinadoPlano.status === "aceito" ||
+                  combinadoPlano.status === "ativo") &&
+                  roteirosJovem && (
+                    <RoteirosPlano
+                      roteiros={roteirosJovem.roteiros.filter(
+                        (r) => r.plano_id === combinadoPlano.id
+                      )}
+                      planoVersao={combinadoPlano.versao}
+                      hrefDe={(n) => `/jovem/roteiro/${n}`}
+                    />
+                  )}
                 {combinadoPlano.status === "contestado" &&
                   duplaDppId != null && (
                     <CombinarPlano

@@ -77,6 +77,8 @@ import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import { getChamados } from "@/lib/queries-chamados";
 import { chamadoPendencia, derivarPendencias } from "@/lib/pendencias-jovem";
 import { combinadoDoJovem } from "@/lib/plano-combinado";
+import { getRoteirosPlanos } from "@/lib/queries";
+import { materiaisComRoteiroPlano } from "@/lib/plano-roteiros";
 import { quemCombinou, suaSemana } from "@/lib/sua-semana";
 import { materiaisDoNumero } from "@/lib/materiais";
 import { PlanoContestarButton } from "@/components/plano-contestar";
@@ -284,7 +286,22 @@ export default async function JovemHome() {
   // na mesma régua do acervo da home (o que não liberou não aparece)
   const numeroDisclosureJovem =
     semanaJovem?.vinculo ?? semanaJovem?.resumo.proximo?.numero ?? null;
-  const materiaisDoPasso =
+  // roteiro vigente da dupla troca o link do corpus (020) — leitura só,
+  // o lazy nasce na agenda e na rota da semana
+  const roteirosJovem = planoJovem
+    ? await getRoteirosPlanos([planoJovem.id])
+    : [];
+  const roteiroVigenteJovem =
+    numeroDisclosureJovem != null
+      ? (roteirosJovem.find(
+          (r) =>
+            r.plano_id === planoJovem?.id &&
+            r.numero === numeroDisclosureJovem &&
+            r.status === "publicado" &&
+            r.plano_versao === planoJovem?.versao
+        ) ?? null)
+      : null;
+  const materiaisDoPasso = materiaisComRoteiroPlano(
     numeroDisclosureJovem != null
       ? materiaisDoNumero({
           materiais: materiaisVisiveis,
@@ -296,7 +313,14 @@ export default async function JovemHome() {
             titulo: m.titulo,
           }))
           .filter((m): m is { href: string; titulo: string } => m.href != null)
-      : [];
+      : [],
+    roteiroVigenteJovem
+      ? {
+          numero: roteiroVigenteJovem.numero,
+          href: `/jovem/roteiro/${roteiroVigenteJovem.numero}`,
+        }
+      : null
+  );
 
   // quem aparece no rótulo do encontro: o mentor DPP ou o especialista da
   // trilha (contato com papel 'especialista'; 'mentor' é o legado da DPP)
@@ -682,7 +706,7 @@ export default async function JovemHome() {
                   .split(" ")[0] || "seu mentor"
               }
               quem={quemPlano}
-              combinadoHref="/jovem/agenda#plano"
+              combinadoHref="/jovem/combinado"
               contestar={
                 semanaJovem.contestavel && planoJovem ? (
                   <PlanoContestarButton

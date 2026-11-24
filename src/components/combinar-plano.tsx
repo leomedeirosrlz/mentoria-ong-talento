@@ -13,6 +13,7 @@ import { useRouter } from "next/navigation";
 import {
   ArrowLeft,
   ArrowRight,
+  CaretDown,
   Check,
   Handshake,
   SpinnerGap,
@@ -28,14 +29,18 @@ import {
 } from "@/lib/actions-plano";
 import { disponibilidadesDaDupla } from "@/lib/actions";
 import {
+  escopoDaProposta,
   fusaoDeArestas,
   fusaoPedeAvisoPratica,
   rotuloRitmo,
 } from "@/lib/plano-em-dia";
+import { toDateStr } from "@/lib/ciclo";
+import { montarDocCombinado } from "@/lib/plano-roteiros";
+import { DocBlocos } from "@/components/material-documento";
 import { diaCurto, listaEncontros } from "@/lib/plano-combinado";
 import { toast } from "@/lib/toast";
 import type { LadoPlano } from "@/lib/plano-servico";
-import type { Disponibilidade } from "@/lib/types";
+import type { Disponibilidade, DuplaPlanoEscopo } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { CampoDisponibilidade } from "@/components/campos-pessoais";
 import { Button } from "@/components/ui/button";
@@ -813,6 +818,30 @@ export function CombinarPlano({
     </div>
   ) : null;
 
+  // o documento projetado (020): montagem determinística do escopo que o
+  // gesto vai gravar — preview pra dupla ler antes de combinar
+  const docPreview = useMemo(() => {
+    if (!aplicavel) return null;
+    const e = escopoDaProposta(aplicavel, toDateStr(new Date()));
+    if ("erro" in e) return null;
+    return montarDocCombinado({
+      status: "proposto",
+      versao: sim?.planoVivo ? 2 : 1,
+      quemPropos:
+        (ladoInicial ?? sim?.lado) === "staff" ? "A equipe" : "Vocês",
+      escopo: e.escopo as DuplaPlanoEscopo,
+      recessos:
+        sim?.recessos.map((r) => ({
+          titulo: r.titulo,
+          inicio: r.inicio,
+          fim: r.fim,
+          usa: recessoUsa(r),
+        })) ?? null,
+    });
+    // recessoUsa lê `decisoes` — o doc acompanha as respostas do wizard
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aplicavel, sim, decisoes, ladoInicial]);
+
   const perguntaConfirmar = sim ? (
     <div>
       <h3
@@ -861,6 +890,23 @@ export function CombinarPlano({
           </li>
         ))}
       </ul>
+      {/* o documento do combinado (020): a dupla lê por escrito o que
+          vai propor — a mesma montagem do doc persistido, com o escopo
+          projetado do wizard */}
+      {docPreview && (
+        <details className="group/doc mt-3 rounded-lg border border-border/60 px-3.5 py-2.5">
+          <summary className="flex cursor-pointer list-none items-center justify-between gap-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+            Ler o documento do combinado
+            <CaretDown
+              aria-hidden
+              className="size-3.5 transition-transform group-open/doc:rotate-180"
+            />
+          </summary>
+          <div className="mt-3">
+            <DocBlocos blocos={docPreview} tom="lima" />
+          </div>
+        </details>
+      )}
       {avisoPratica}
       {faltaDecisao && (
         <p role="status" className="mt-2 text-sm text-[var(--warn-text)]">
