@@ -77,6 +77,12 @@
   1. **Dado** que a faixa derivada subiu desde a última visita **quando** o perfil carrega **então** um toast único celebra a faixa nova (a mais alta da leva), com o ícone da família energia — copy: título "Subiu de nível: {faixa}", descrição com o critério cumprido ("1 mês de programa e 4 encontros com seu mentor. Segue firme.") — cobre retroativo, remanejo e correção passiva, que é quando o número realmente muda.
   2. **Dado** demo ativa ou localStorage indisponível **quando** o perfil carrega **então** nenhum toast dispara (baseline fixo na demo, storage falho = sem festa, sem erro).
 
+**Cenários de família (tiers):**
+
+- **Dado** uma família com o tier 1 ganho **quando** a estante renderiza **então** aparece uma peça só (tier 1), e o detalhe mostra a escada com o tier 2 como próximo.
+- **Dado** que o jovem cruza o tier 2 **quando** o perfil recarrega **então** a MESMA peça evolui (metal/raios) e substitui a tier 1 na estante — nunca duas peças irmãs ou um tile duplicado.
+- **Dado** que uma ação é desfeita e a contagem cai **quando** a derivação roda **então** a família regride ao tier anterior/futura, sem manter um troféu que não é verdade.
+
 ## Casos de borda
 
 - **Jovem sem jornada:** o selo do header não renderiza; o card de conquistas passa a nascer se houver peças gerais ganhas ou a caminho (termo, perfil) — antes disso a página não mostrava nada.
@@ -97,11 +103,11 @@
 - **FR-004:** o fallback squircle de nível DEVE usar a família energia (`Lightning` com progressão por peso: regular → bold → fill, e `Sparkle` fill na completa); `Plant`, `CalendarCheck` e `Tree` saem do mapa.
 - **FR-005:** cada faixa DEVE ter keyframes próprios `nivel-<faixa>-*` em `transform`/`opacity` (pontualmente `stroke-dashoffset` no detalhe), < 800ms, uma vez por gatilho: vitrine no mount, detalhe ganho na abertura, selo e régua só com settle curto — `badge-salta` nunca aplica em peça de nível.
 - **FR-006:** o vocabulário de motion DEVE respeitar a separação de camadas: identidade (nível → assinatura por faixa), feedback de conquista (estante → `badge-salta` + `badge-brilho`, inclusive as peças novas de US4), entrada de superfície (`animate-enter`, `fill-grow`), microinteração (hover/focus do tile, `scale 0.96` de press). Identidade nunca reusa feedback e nenhuma superfície fora de nível muda de animação.
-- **FR-007:** o catálogo DEVE ganhar as conquistas da tabela em "Entidades e dados" — cada uma com chave estável, título, critério em infinitivo, detalhe em passado, fonte nomeada, raridade e glifo; peça nova entra também na gramática isométrica do gerador (mesma paleta), com squircle Phosphor coerente de fallback.
+- **FR-007:** o catálogo DEVE ganhar as **famílias com tiers** da tabela em "Entidades e dados" — uma família por comportamento, tiers com chave estável `familia:tier`, mesmo glifo evoluindo em metal/raios, raridade por tier e copy em infinitivo/passado; a peça entra também na gramática isométrica do gerador (mesma paleta), com squircle Phosphor coerente de fallback.
 - **FR-008:** "horas de mentoria" DEVE somar `duracao_min` dos `realizado` da trilha da régua, deduplicado por `COALESCE(sessao_id, id)`, ignorando null; `ConquistasInput.encontros` passa a carregar `duracao_min` e `sessao_id` (as colunas já vêm em `JOVEM_ENCONTRO_COLS`).
 - **FR-009:** metas e submetas DEVEM derivar de `getPdmDaDupla` para cada dupla DPP do jovem (fetch em paralelo, bounded, dentro do fluxo de dados do perfil — nunca waterfall por dupla em série); meta = `parentId == null`, submeta = `parentId != null`, só `status === "atingida"` conta.
-- **FR-010:** as futuras correspondentes DEVEM aparecer automaticamente com `progresso {atual, alvo}` onde há contagem honesta — combinados `n/5`, horas em minutos renderizados como "Faltam 2h05 de encontro registradas" (piso, nunca arredonda pra cima); peças de PDM nunca aparecem nas futuras de quem não tem dupla DPP; peças gerais (termo, perfil) aparecem com linha do que falta quando binárias ("Falta preencher a disponibilidade").
-- **FR-011:** `Conquista` DEVE aceitar o metadado `raridade` (`inicial` | `constancia` | `marco_grande`) — rótulo de catálogo exibido no detalhe (chip/linha "Marco grande"), sem alterar ordenação cronológica, sem pontos, sem schema.
+- **FR-010:** as futuras correspondentes DEVEM mostrar o **próximo tier** da família com `progresso {atual, alvo}` — combinados `12/15` para o tier 2, horas em minutos renderizados como "Faltam 2h05 para o próximo nível" (piso, nunca arredonda pra cima), metas/submetas no próximo limiar; peças de PDM nunca aparecem nas futuras de quem não tem dupla DPP; peças gerais (termo, perfil) aparecem com linha do que falta quando binárias.
+- **FR-011:** `Conquista` DEVE aceitar `familia`, `tier`, `tiers`, `proximo` e `raridade` (`inicial` | `constancia` | `marco_grande` | `lendaria`) — a estante renderiza o maior tier ganho, o detalhe mostra a escada, sem alterar ordenação cronológica, sem pontos, sem schema.
 - **FR-012:** o cruzamento de faixa DEVE disparar um toast único por visita (baseline `realiza:nivel:<mentoradoId>` em localStorage, mais alto da leva, storage indisponível ou demo = sem toast) — mesmo padrão do `MarcoNotifier`, lado do jovem.
 - **FR-013:** o `ConquistasCard` DEVE renderizar quando houver peças gerais ganhas ou a caminho mesmo sem jornada — o gate deixa de ser só `temJornada`; `NivelBloco` e a faixa "Próximo marco" seguem gated como hoje.
 - **FR-014:** o e2e `tests/e2e/demo/jovem-conquistas.spec.ts` DEVE continuar válido onde o comportamento não muda e ser atualizado onde muda: nomes de keyframes novos (o assert `badge-salto-p` vale para peças de estante; faixas ganham assert próprio), as novas conquistas do dataset demo e o selo do header (visível, abre detalhe, ausente sem jornada).
@@ -120,22 +126,27 @@
 
 **Faixas de nível (régua inalterada da 016):** `inicio` (começar a jornada) → `constancia` (30d + 4 encontros DPP; 30d + 2 sessões esp) → `veterania` (90d + 8; 60d + 3) → `completa` (total da trilha: 16 encontros / sessões). Estados `ganho`/`superado`/`futuro`, `parada` congela, sem data projetada — tudo como já é.
 
-**Catálogo novo de conquistas (limiares e gerais):**
+**Catálogo novo de conquistas — famílias com tiers (modelo Duolingo):**
 
-| Chave | Título | Critério | Fonte de verdade | Data | Raridade | Detalhe (copy) |
-|---|---|---|---|---|---|---|
-| `conta:combinados-5` | Palavra cumprida | Concluir 5 combinados com seu mentor | `jovem_encaminhamentos` `status='feito'` ≥ 5 | null (sem `feito_em`) | constancia | "Cinco tarefas ditas e feitas. Combinado aqui é compromisso." |
-| `conta:combinados-15` | De palavra | Concluir 15 combinados com seu mentor | idem ≥ 15 | null | marco_grande | "Quinze combinados fechados: o que você diz, acontece." |
-| `conta:horas-7` | Sete horas de conversa | Somar 7 horas de encontro registradas | `encontros.duracao_min` `realizado` da trilha da régua, dedup `sessao_id` ≥ 420 min | `realizado_em` da sessão que cruzou | constancia | "Sete horas cara a cara com seu mentor, tempo que vira repertório." |
-| `conta:horas-15` | Mês de conversas | Somar 15 horas de encontro registradas | idem ≥ 900 min | idem | marco_grande | "Quinze horas de mentoria somadas. Isso é um turno inteiro de troca." |
-| `pdm:meta-1` | Primeira meta fechada | Marcar 1 meta do seu plano como atingida | `pdm_itens` `atingida` + `parentId == null` ≥ 1 (todas as duplas DPP) | `atingidaEm` da 1ª | constancia | "A primeira meta do seu plano saiu do papel." |
-| `pdm:metas-3` | No rumo | Marcar 3 metas do seu plano como atingidas | idem ≥ 3 | `atingidaEm` da 3ª | marco_grande | "Três metas cumpridas: o plano deixou de ser intenção." |
-| `pdm:submetas-3` | Passo a passo | Concluir 3 submetas do seu plano | `pdm_itens` `atingida` + `parentId != null` ≥ 3 (qualquer profundidade) | `atingidaEm` da 3ª | inicial | "Três passos concluídos: passo é como a meta grande se divide." |
-| `pdm:submetas-10` | Tijolo a tijolo | Concluir 10 submetas do seu plano | idem ≥ 10 | `atingidaEm` da 10ª | marco_grande | "Dez passos fechados. Obra se faz assim." |
-| `conta:avaliacoes-5` | Voz treinada | Enviar 5 avaliações de encontro | `avaliacoes` ≥ 5 (mesma fonte do contador) | `created_at` da 5ª | constancia | "Cinco notas enviadas: sua opinião guia a dupla." |
-| `perfil:completo` | Cara do lugar | Completar a ficha: contato, disponibilidade e um "sobre você" | `jovem_perfil` whatsapp + disponibilidade + (`me.bio` ou `me.interesses`) | null | inicial | "Perfil completo: quem te acompanha sabe quem você é." |
-| `doc:termo` | Termo assinado | Assinar o termo de participação | `jovem_assinaturas` `slug='termo-mentorando'` + `status='assinado'` | `assinado_em` | inicial | "O documento que abre a jornada, assinado." |
-| `presenca:sem-falta` | Não faltou | Fazer 4 encontros seguidos sem nenhum "não aconteceu" no meio | `encontros` da trilha: run de 4 `realizado` sem `nao_aconteceu` intercalado (agendado não quebra) | `realizado_em` do 4º da sequência | marco_grande | "Presença limpa: cada encontro marcado, cada encontro feito." |
+Cada linha é **uma família evolutiva**, não uma conquista solta. O mesmo emblema cresce em metal/raios e a estante mostra **somente o maior tier ganho**; os anteriores ficam no detalhe como escada, e o próximo aparece como progresso. A chave estável é `familia:tier` (`conta:combinados-2`, `pdm:submetas-3`).
+
+| Família | Tiers (limiar → nome) | Critério / fonte de verdade | Data | Glifo |
+|---|---|---|---|---|
+| Combinados | 5 “Palavra cumprida” · 15 “De palavra” · 30 “Compromisso em série” · 50 “Lenda da palavra” | `jovem_encaminhamentos` `status='feito'` ≥ limiar | null (sem `feito_em`) | `Handshake` |
+| Horas de conversa | 7h “Sete horas” · 15h “Mês de conversas” · 30h “Semestre de escuta” · 50h “Horas de casa” | `encontros.duracao_min` `realizado`, dedup `sessao_id`, ≥ limiar | `realizado_em` do encontro que cruzou | `ClockCountdown` |
+| Metas fechadas | 1 “Primeira meta” · 3 “No rumo” · 5 “Plano em movimento” | `pdm_itens` `atingida` + `parentId == null`, todas as duplas DPP | `atingidaEm` do tier | `Target` |
+| Submetas concluídas | 3 “Passo a passo” · 10 “Tijolo a tijolo” · 25 “Obra aberta” | `pdm_itens` `atingida` + `parentId != null`, qualquer profundidade | `atingidaEm` do tier | `Checks` |
+| Avaliações enviadas | 5 “Voz treinada” · 15 “Voz constante” · 30 “Voz do programa” | `avaliacoes` ≥ limiar (mesma fonte do contador) | `created_at` da avaliação do tier | `Star` |
+| Presença | 4 “Não faltou” · 8 “Presença limpa” · 16 “Ciclo inteiro” | run de `realizado` sem `nao_aconteceu` intercalado; agendado não quebra | `realizado_em` do último da sequência | `CalendarCheck` |
+| Perfil | único “Cara do lugar” | `jovem_perfil` whatsapp + disponibilidade + (`bio` ou `interesses`) | null | `IdentificationCard` |
+| Termo | único “Termo assinado” | `jovem_assinaturas` `slug='termo-mentorando'` + `assinado` | `assinado_em` | `Signature` |
+
+Regras da família:
+- **Um emblema, vários tiers.** O glifo é o mesmo; o tier muda o metal, a quantidade de raios/anel e a raridade (`inicial` → `constancia` → `marco_grande` → `lendaria` no topo). Não nascem 20 peças visuais independentes.
+- **Estante = maior tier ganho.** `conta:combinados-2` substitui visualmente a `-1`; a `-1` continua no detalhe (“você já cumpriu 5, 15…”), nunca duplica o tile.
+- **Futuro = próximo tier.** O card “Ainda por vir” mostra o próximo limite e o progresso; ao cruzar, a mesma família evolui e dispara o feedback de conquista (`badge-salta` + `badge-brilho`).
+- **Honestidade:** se um combinado for desfeito e a contagem cair abaixo do tier, a família regride ao tier anterior (ou à futura) — a derivação não “trava” conquista.
+- **Sem DDL:** tudo deriva do que já existe; `encaminhamentos.feito_em` segue opcional e só melhora a data.
 
 Notas do catálogo:
 - Glifos Phosphor (fallback e tom): combinados → `Handshake`/`--inst-checklist`; horas → `ClockCountdown`/`TOM_MARCO` (lime "aconteceu"); metas → `Target`/`--inst-pdm`; submetas → `Checks`/`--inst-pdm`; avaliações → `Star`/`avaliacao_encontro`; perfil e termo → `IdentificationCard`/`Signature` sob `--inst-intake-mentorado` (o tom de "chegada"); presença → `CalendarCheck`/`TOM_MARCO`.
@@ -163,7 +174,7 @@ Regra de ouro: identidade (nível) nunca reusa feedback (`badge-salta`); feedbac
 - **SC-001:** prints 390×844 e 1440×900 do header com o selo "Seu nível", com e sem foto, e do estado "Primeiro nível" apagado — avatar, nome, badges e "Remover foto" intactos.
 - **SC-002:** prints das 4 faixas novas em 40px/80px/112px + uma futura em grayscale: distinguíveis sem texto, dentro da gramática isométrica.
 - **SC-003:** gravação (ou frames em 4 tempos) da assinatura de cada faixa disparando uma vez, e a versão reduced-motion (fades ≤ 200ms, sem flicker/burst).
-- **SC-004:** `conquistas.test.ts` cobrindo: limiares cruzados e não cruzados, dedup `sessao_id` nas horas, `duracao_min` null ignorado, meta/submeta `atingida`/`descartada`, jovem só-especialista sem peças de PDM, regressão honesta (combinado desfeito), futuras com progresso.
+- **SC-004:** `conquistas.test.ts` cobrindo: cada tier cruzado/não cruzado, estante só com o maior tier, detalhe com a escada, `proximo` correto, dedup `sessao_id` nas horas, `duracao_min` null ignorado, meta/submeta `atingida`/`descartada`, jovem só-especialista sem peças de PDM, regressão honesta (combinado desfeito) e futuras com progresso do próximo tier.
 - **SC-005:** e2e demo verde: selo do header (role/nome, abre detalhe, some sem jornada), assert de keyframe por camada (estante `badge-salto-p`, nível `nivel-*`), `src` das imagens `^/badges/[a-z0-9-]+\.svg$`, `grayscale` nas futuras e o par motion/reduced-motion.
 - **SC-006:** toast de level-up comprovado em teste (baseline de localStorage manipulada) e ausente na demo.
 

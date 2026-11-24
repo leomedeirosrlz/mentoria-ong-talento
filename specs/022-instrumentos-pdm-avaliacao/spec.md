@@ -106,6 +106,28 @@
   7. **Dado** a superfície aberta **quando** auditada **então** tem `DialogTitle`/`SheetTitle`, foco inicial no primeiro campo (o `autoFocus` atual se mantém ou migra pro equivalente), `useFecharNoVoltar` preservado (Dialog e Sheet já o trazem) e form inteiro navegável por teclado.
   8. **Dado** 390px com teclado virtual **quando** o campo de data/título foca **então** o campo ativo não fica escondido sob a borda do Sheet — a área rolante acompanha o foco.
 
+### US6 — Auditoria dos outros modais densos (P1/P2)
+
+**Por que:** o problema do "Nova meta" (form denso em `md` de 448px) não é exclusivo do PDM. A revisão encontrou outros modais pequenos com 3+ campos ou select longo; a correção vira convenção, não caso isolado.
+
+**Teste independente:** abrir cada superfície em 1440px e 390px, com teclado e select aberto, e medir se o form respira.
+
+| Superfície | Arquivo | Conteúdo | Hoje | Decisão |
+|---|---|---|---|---|
+| Dados do cronograma | `src/components/cronograma-editor.tsx:244` | nome, turma, status | `md` | **P1** — `lg`+ no desktop / Sheet no mobile |
+| Editar contato de terceiro | `src/app/(app)/duplas/[id]/terceiros-dupla.tsx:477` | nome, vínculo, WhatsApp | `md` | **P1** — `lg`+ |
+| Indicar pessoa | `src/app/(app)/duplas/[id]/terceiros-dupla.tsx:772` | nome, vínculo, WhatsApp | `md` | **P1** — `lg`+ |
+| Registrar resposta de terceiro | `src/app/(app)/duplas/[id]/terceiros-dupla.tsx:601` | nome/vínculo + resposta transcrita | `md` | **P1** — `lg`+ / Sheet |
+| Filtros de registros | `src/components/registros-filtros.tsx:347` | vários selects + campos de data | `md` | **P2** — filtro denso; Sheet se passar de 1 rolagem |
+| Filtros de duplas | `src/components/duplas-lista.tsx:1493` | supervisão + mentor | `md` | **P2** — `lg` ou Sheet |
+| Retroativo do jovem | `src/components/jovem-retroativo-dialog.tsx:102` | encontro + datetime | `md` | **P3** — 2 campos cabem; Sheet mobile é desejável |
+| Retroativo do mentor | `src/components/registrar-retroativo-dialog.tsx:171` | passo + datetime | `md` | **P3** — idem |
+| Declaração de Visão | `src/components/pdm-dupla.tsx:467` | textarea única | default | **sem mudança** — campo único |
+| Excluir meta | `src/components/pdm-dupla.tsx:665` | confirmação | default | **sem mudança** |
+| Vincular resposta | `src/app/(app)/formularios/vincular-resposta.tsx:88` | select de jovem | `md` | **sem mudança** — campo único |
+
+**Regra:** form com **3+ campos** ou select com **8+ itens** não usa o default/`md`; vai para `lg`+ no desktop e Sheet no mobile. `md`/`sm` ficam para confirmação, um campo ou escolha curta. A auditoria é viva: qualquer modal novo que fure a regra deve ser pego no review ou no teste de convenção.
+
 ## Casos de borda
 
 - Card **trancado** (estado `trancada`) e card **sem guia** (`guiaHref` null): sem anel, sem tira — a anatomia varia e o contorno acompanha só o que existe. Card "em breve" do acervo não é clicável e não promete ação.
@@ -128,6 +150,7 @@
 - **FR-008:** a aba DEVE separar visualmente a operação (lista/ações) dos documentos vivos (PDM, terceiros, voz) com hierarquia de `h2` consistente; estados, gates de papel, ordem dos instrumentos, `?aba=` e âncoras preservados.
 - **FR-009:** o `ItemDialog` DEVE virar superfície única por viewport (Dialog `lg`+ desktop / Sheet mobile) compartilhada pela ficha e por `/jovem/pdm`; o Select "Área da vida" usa `alignItemWithTrigger={false}` no call site e nunca cobre a superfície; validação com `aria-invalid` + mensagem + foco.
 - **FR-010:** nenhum arquivo de contrato é tocado — RPCs, actions, `src/lib/forms/schema.ts`, `database.types.ts`, ordem dos campos e payloads seguem iguais.
+- **FR-011:** os modais densos da tabela US6 DEVEM seguir a mesma convenção do "Nova meta": `lg`+ no desktop e Sheet no mobile quando houver 3+ campos ou select de 8+ itens; `md`/`sm` ficam reservados a confirmação/um campo. A tabela é o inventário mínimo da rodada; P2/P3 podem ser cortados se a onda esticar, mas o P1 não.
 
 ## Requisitos não funcionais
 
@@ -150,7 +173,8 @@ Nenhuma entidade nova, nenhum campo novo, nenhuma migration. A rodada é inteira
 - **SC-003:** `/f/<token>` de PDM em 1440px: coluna do documento ≥ ~560px (ou coluna única), campos "Meta"/"Prazo" ≥ ~200px; em 390px layout idêntico ao atual; forms não-instrumento seguem em 576px; prévia celular/desktop íntegra.
 - **SC-004:** ficha, aba Instrumentos: cada linha ≤ 1 badge de estado + 1 ação primária + menu `⋯`; todas as ações de hoje alcançáveis pelo menu; separação visual operação × documentos; sem overflow-x em 390px; alvos ≥44px.
 - **SC-005:** "Nova meta": select nunca cobre título/campos/rodapé em nenhuma largura; Esc fecha select→superfície na ordem; título vazio gera `aria-invalid` + mensagem + foco; foco retorna ao trigger certo; superfície é Dialog `lg`+ no desktop e Sheet no mobile.
-- **SC-006:** gates verdes (`pnpm exec next typegen && npx tsc --noEmit`, `npx eslint src/`, `pnpm test`, `pnpm guard`) + testes novos/atualizados do plano; prints anexados no PR.
+- **SC-006:** Os P1 da US6 (cronograma, editar contato, indicar pessoa, registrar resposta) não usam `md`; 1440px mostra form com respiro e 390px usa Sheet; select longo não cobre título/rodapé.
+- **SC-007:** gates verdes (`pnpm exec next typegen && npx tsc --noEmit`, `npx eslint src/`, `pnpm test`, `pnpm guard`) + testes novos/atualizados do plano; prints anexados no PR.
 
 ## Plano de testes
 
@@ -158,6 +182,7 @@ Nenhuma entidade nova, nenhum campo novo, nenhuma migration. A rodada é inteira
 - **E2E app (Playwright, `tests/e2e/app/`):** anel completo do card e da tira guia por teclado e hover + bounding box sem interseção com a capa (estende `materiais-painel.spec.ts` ou spec nova `instrumentos-ui.spec.ts`); `/avaliar/<token>` com h1/subtítulo/h3 na ordem e 1 h1 por estado (estende `avaliacao.spec.ts`, que já cobre link público e `outra_pessoa`); `/f/` PDM com coluna ≥560px em 1440 e coluna única em 390 (estende `formularios.spec.ts`); linha da aba com primária+menu e teclado abrindo/fechando (estende `dupla-menu.spec.ts` ou `materiais-painel.spec.ts`); ItemDialog: select não intersecta DialogTitle/footer, Esc na ordem, Sheet no projeto mobile (estende `pdm.spec.ts`, que já cobre "mentor cria meta completa" e co-edição).
 - **E2E demo:** `/avaliar/<token>?demo` renderiza o cabeçalho novo; a ficha demo mostra a linha enxuta; o fixture demo já cobre os 5 estados de instrumento.
 - **Regressão a reescrever:** expectativas que citam o `contexto` `text-xs`, o `ring-inset` do card e o `DialogContent` `md` da nova meta; o e2e de cap de metas (`pdm.spec.ts:641`) e o de criação na ficha (`:192`) devem seguir verdes com a superfície nova.
+**Convenção US6:** teste de render/`size` para os P1 (cronograma, terceiros) e um teste de regressão que falhe se um form com 3+ campos voltar a usar `md`; screenshots 1440/390 no PR.
 
 ## Riscos
 
