@@ -378,9 +378,19 @@ export default async function JovemHome() {
     numero: e.numero,
     realizado_em: e.realizado_em,
     trilha: trilhaPorDupla.get(e.dupla_id) ?? "dpp",
+    duplaId: e.dupla_id,
     rotulo: rotuloEncontro(e),
     sessao: sessao.length > 1 ? sessao : undefined,
   }));
+  // lote da média por dupla (≥3 respostas, FR-003): a copy de privacidade
+  // promete média só quando ela existe de fato
+  const contagemDpp = new Map<string, number>();
+  for (const a of avaliacoes)
+    if (trilhaPorDupla.get(a.dupla_id) !== "especialista")
+      contagemDpp.set(a.dupla_id, (contagemDpp.get(a.dupla_id) ?? 0) + 1);
+  const mediaPorDupla = new Map<string, boolean>(
+    [...contagemDpp].map(([d, n]) => [d, n >= 3])
+  );
   const avaliacoesFeitas = avaliacoes.map((a) => {
     const enc = encPorId.get(a.encontro_id);
     const trilha = trilhaPorDupla.get(a.dupla_id) ?? "dpp";
@@ -741,6 +751,7 @@ export default async function JovemHome() {
         pendentes={avaliacoesPendentes}
         retro={{ duplaId: duplaDppId, numeros: numerosRetro }}
         primeiroNome={primeiroNome}
+        mediaPorDupla={mediaPorDupla}
       />
 
       {/* canal de segurança sempre à mão, sem competir com o encontro: uma

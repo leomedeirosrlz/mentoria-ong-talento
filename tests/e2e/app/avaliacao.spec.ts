@@ -5,8 +5,10 @@ import {
   convergirDuplaAtiva,
   expect,
   inserirViaServiceRole,
+  jwtDoUsuario,
   limparViaServiceRole,
   loginComSenha,
+  restComoUsuario,
   test,
 } from "../helpers";
 
@@ -724,5 +726,42 @@ test.describe("avaliação estrela do jovem (REALIZA-109)", () => {
     await expect(
       page.getByText(/O jovem ligou “meu mentor pode ler esta”/)
     ).toBeVisible();
+  });
+
+  test("o toggle recusa qualquer conta que não é a dona da avaliação", async () => {
+    // 027 (FR-004 + cenário negado da matriz): definir_visibilidade_avaliacao
+    // é escopada a my_mentorado_id() — chamada na pele de mentor ou coord
+    // bate no raise 'avaliação não encontrada' (PostgREST → 4xx) e a flag
+    // não mexe. Contraponto: a dona da avaliação liga normal.
+    const { encontroId } = await criarEncontroRealizado(15);
+    const aval = await inserirAvaliacao(encontroId, { estrelas: 4 });
+    const chamada = (jwt: string) =>
+      restComoUsuario("rpc/definir_visibilidade_avaliacao", jwt, {
+        method: "POST",
+        body: { p_id: aval.id, p_visivel: true },
+      });
+
+    const jwtMentor = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
+    expect((await chamada(jwtMentor)).ok).toBe(false);
+    const jwtCoord = await jwtDoUsuario(COORD_EMAIL, COORD_SENHA);
+    expect((await chamada(jwtCoord)).ok).toBe(false);
+
+    let [row] = await buscarViaServiceRole<
+      { avaliacao_visivel_mentor: boolean }[]
+    >(
+      "avaliacoes_encontro",
+      `select=avaliacao_visivel_mentor&id=eq.${String(aval.id)}`
+    );
+    expect(row.avaliacao_visivel_mentor).toBe(false);
+
+    const jwtJovem = await jwtDoUsuario(JOVEM_EMAIL, SENHA);
+    expect((await chamada(jwtJovem)).ok).toBe(true);
+    [row] = await buscarViaServiceRole<
+      { avaliacao_visivel_mentor: boolean }[]
+    >(
+      "avaliacoes_encontro",
+      `select=avaliacao_visivel_mentor&id=eq.${String(aval.id)}`
+    );
+    expect(row.avaliacao_visivel_mentor).toBe(true);
   });
 });

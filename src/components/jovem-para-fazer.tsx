@@ -80,6 +80,7 @@ export function JovemParaFazer({
   titulo = "Para fazer agora",
   id = "fazer-titulo",
   maxVisiveis = 3,
+  mediaPorDupla,
 }: {
   pendencias: PendenciaJovem[];
   /** alvoId → row + régua da dupla (só encontros viram gesto na tela). */
@@ -94,10 +95,13 @@ export function JovemParaFazer({
   id?: string;
   /** Itens à vista antes do "e mais N" (o motor já ordenou). */
   maxVisiveis?: number;
+  /** dupla_id → lote da média já existe (≥3 respostas) — a copy do
+   *  dialog de avaliar não promete média que não existe (027/FR-003). */
+  mediaPorDupla?: ReadonlyMap<string, boolean>;
 }) {
   const visiveis = pendencias.slice(0, maxVisiveis);
   const resto = pendencias.slice(maxVisiveis);
-  const ctxItem = { encontros, pendentes, retro, primeiroNome };
+  const ctxItem = { encontros, pendentes, retro, primeiroNome, mediaPorDupla };
 
   return (
     <section aria-labelledby={id} className="space-y-3">
@@ -156,15 +160,17 @@ function PendenciaItem({
   pendentes,
   retro,
   primeiroNome,
+  mediaPorDupla,
 }: {
   p: PendenciaJovem;
   encontros: Record<string, EncontroCtx>;
   pendentes: AvaliacaoPendente[];
   retro: { duplaId: string | null; numeros: number[] };
   primeiroNome: string;
+  mediaPorDupla?: ReadonlyMap<string, boolean>;
 }) {
   const { Icone, cls } = ICONE[p.tipo];
-  const acoes = acoesPendencia({ p, encontros, pendentes, retro, primeiroNome });
+  const acoes = acoesPendencia({ p, encontros, pendentes, retro, primeiroNome, mediaPorDupla });
   return (
     <li className="flex flex-wrap items-center gap-x-3 gap-y-2 px-5 py-3">
       <span
@@ -199,12 +205,14 @@ function acoesPendencia({
   pendentes,
   retro,
   primeiroNome,
+  mediaPorDupla,
 }: {
   p: PendenciaJovem;
   encontros: Record<string, EncontroCtx>;
   pendentes: AvaliacaoPendente[];
   retro: { duplaId: string | null; numeros: number[] };
   primeiroNome: string;
+  mediaPorDupla?: ReadonlyMap<string, boolean>;
 }) {
   const cheio = p.destaque ? "default" : "outline";
 
@@ -292,6 +300,11 @@ function acoesPendencia({
           pendente={alvo}
           primeiroNome={primeiroNome}
           variant={cheio}
+          temMedia={
+            // dupla conhecida fora do mapa = zero respostas → sem lote,
+            // a copy não promete média; sem duplaId o default otimista vale
+            alvo.duplaId ? (mediaPorDupla?.get(alvo.duplaId) ?? false) : undefined
+          }
         />
       );
     }

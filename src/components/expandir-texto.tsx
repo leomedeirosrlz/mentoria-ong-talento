@@ -19,12 +19,18 @@ export function ExpandirTexto({
   rotuloMais = "Ler tudo",
   rotuloMenos = "Mostrar menos",
   classNameBotao,
+  linhas = 3,
+  title,
 }: {
   children: ReactNode;
   className?: string;
   rotuloMais?: string;
   rotuloMenos?: string;
   classNameBotao?: string;
+  /** clamp do fechado — 3 é o default histórico; a notificação pede 2 (027) */
+  linhas?: 2 | 3;
+  /** piso de acesso quando não há hover/toggle — texto completo no title (027) */
+  title?: string;
 }) {
   const ref = useRef<HTMLParagraphElement>(null);
   const [transborda, setTransborda] = useState(false);
@@ -61,7 +67,8 @@ export function ExpandirTexto({
       <p
         ref={ref}
         id={id}
-        className={cn(className, !aberto && "line-clamp-3")}
+        title={title}
+        className={cn(className, !aberto && (linhas === 2 ? "line-clamp-2" : "line-clamp-3"))}
       >
         {children}
       </p>

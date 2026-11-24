@@ -20,6 +20,7 @@ export function AvaliarTokenFlow({
   contexto,
   demo,
   retryHref,
+  temMedia = true,
 }: {
   token: string;
   /** null = a leitura service-side do link falhou (rede) — o card de
@@ -34,6 +35,9 @@ export function AvaliarTokenFlow({
   contexto: string | null;
   demo: boolean;
   retryHref: string;
+  /** A dupla já tem o lote da média (≥3) — a copy de privacidade não
+   *  promete média que não existe (027/FR-003). */
+  temMedia?: boolean;
 }) {
   const [submeteu, setSubmeteu] = useState(false);
 
@@ -79,6 +83,7 @@ export function AvaliarTokenFlow({
       <AvaliacaoEncontroForm
         token={token}
         trilha={trilha}
+        temMedia={temMedia}
         primeiroNome={primeiroNome}
         onEnviado={() => setSubmeteu(true)}
       />

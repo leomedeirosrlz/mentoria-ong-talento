@@ -49,6 +49,9 @@ export type AvaliacaoPendente = {
   realizado_em: string | null;
   /** 'dpp' | 'especialista' — decide o toggle de visibilidade do mentor. */
   trilha: string;
+  /** dupla da pendência — decide se a média (lote ≥3) já existe na copy
+   *  de privacidade (027). */
+  duplaId?: string;
   /** "5º encontro com Ricardo" ou "3ª sessão com Sofia", montado na página. */
   rotulo?: string;
   /** Sessão combinada (018): nºs do grupo que esta resposta cobre, âncora
@@ -73,11 +76,15 @@ export function AvaliarPendenteButton({
   primeiroNome,
   variant = "default",
   size = "sm",
+  temMedia = true,
 }: {
   pendente: AvaliacaoPendente;
   primeiroNome: string;
   variant?: "default" | "outline";
   size?: "sm" | "xs";
+  /** A dupla já tem ≥3 avaliações (lote da média) — a copy promete média
+   *  só quando ela existe (027/FR-003). */
+  temMedia?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
@@ -99,7 +106,7 @@ export function AvaliarPendenteButton({
               {pendente.rotulo ?? `${pendente.numero}º encontro`}: como foi?
             </DialogTitle>
             <DialogDescription>
-              1 minuto. {privacidadeAvaliacao(pendente.trilha)}
+              1 minuto. {privacidadeAvaliacao(pendente.trilha, temMedia)}
               {pendente.sessao && pendente.sessao.length > 1 && (
                 <>
                   {" "}
@@ -114,6 +121,7 @@ export function AvaliarPendenteButton({
             embutido
             encontroId={pendente.encontroId}
             trilha={pendente.trilha}
+            temMedia={temMedia}
             primeiroNome={primeiroNome}
             onEnviado={({ pedirApoio }) => {
               setOpen(false);
@@ -139,10 +147,14 @@ export function VerAvaliacaoButton({
   avaliacao,
   label = "Ver resposta",
   quiet = false,
+  temMedia = true,
 }: {
   avaliacao: AvaliacaoFeita;
   label?: React.ReactNode;
   quiet?: boolean;
+  /** a dupla da avaliação já tem o lote da média (≥3 respostas) — a copy
+   *  do toggle e os toasts não prometem média que não existe (027/FR-003). */
+  temMedia?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   return (
@@ -179,7 +191,7 @@ export function VerAvaliacaoButton({
               Enviada em {formatDateTime(avaliacao.created_at)}
             </DialogDescription>
           </DialogHeader>
-          <DetalheAvaliacao a={avaliacao} />
+          <DetalheAvaliacao a={avaliacao} temMedia={temMedia} />
         </DialogContent>
       </Dialog>
     </>
@@ -213,11 +225,18 @@ export function JovemAvaliacoes({
   );
   const recentes = feitasOrdenadas.slice(0, RECENTES);
   const anteriores = feitasOrdenadas.slice(RECENTES);
+  // a média é por dupla e só existe no lote de ≥3 (FR-003): a copy do
+  // toggle e o texto de privacidade prometem média só quando ela existe
+  const dppPorDupla = new Map<string, number>();
+  for (const a of feitas)
+    if (a.trilha !== "especialista")
+      dppPorDupla.set(a.dupla_id, (dppPorDupla.get(a.dupla_id) ?? 0) + 1);
+  const temMediaDe = (duplaId: string) => (dppPorDupla.get(duplaId) ?? 0) >= 3;
   // uma frase só: a da trilha única, ou a combinada quando há as duas
-  const privacidade = privacidadeAvaliacoes([
-    ...pendentes.map((p) => p.trilha),
-    ...feitas.map((a) => a.trilha),
-  ]);
+  const privacidade = privacidadeAvaliacoes(
+    [...pendentes.map((p) => p.trilha), ...feitas.map((a) => a.trilha)],
+    [...dppPorDupla.values()].some((n) => n >= 3)
+  );
 
   function renderFeita(a: AvaliacaoFeita) {
     return (
@@ -241,7 +260,7 @@ export function JovemAvaliacoes({
             )}
           </p>
         </div>
-        <VerAvaliacaoButton avaliacao={a} />
+        <VerAvaliacaoButton avaliacao={a} temMedia={temMediaDe(a.dupla_id)} />
       </li>
     );
   }
@@ -291,7 +310,15 @@ export function JovemAvaliacoes({
   );
 }
 
-function DetalheAvaliacao({ a }: { a: AvaliacaoFeita }) {
+function DetalheAvaliacao({
+  a,
+  temMedia = true,
+}: {
+  a: AvaliacaoFeita;
+  /** a dupla já tem o lote da média (≥3) — sem ele, "valer só na média"
+   *  é promessa vazia (027/FR-003). */
+  temMedia?: boolean;
+}) {
   const [visivel, setVisivel] = useState(a.avaliacao_visivel_mentor);
   const [pending, start] = useTransition();
   const router = useRouter();
@@ -308,7 +335,9 @@ function DetalheAvaliacao({ a }: { a: AvaliacaoFeita }) {
         toast.success(
           v
             ? "Seu mentor agora lê esta avaliação."
-            : "Voltou a valer só na média."
+            : temMedia
+              ? "Voltou a valer só na média."
+              : "Seu mentor deixa de ver esta avaliação. Ainda não há média para ele ver."
         );
         router.refresh();
       }
@@ -400,8 +429,9 @@ function DetalheAvaliacao({ a }: { a: AvaliacaoFeita }) {
                 Meu mentor pode ler esta avaliação:
               </span>{" "}
               <span className="text-muted-foreground">
-                normalmente ele só vê a média de vocês. Com a chave
-                ligada, ele lê esta resposta inteira.
+                {temMedia
+                  ? "normalmente ele só vê a média de vocês. Com a chave ligada, ele lê esta resposta inteira."
+                  : "ele não vê suas avaliações; a média só aparece a partir de 3 respostas. Com a chave ligada, ele lê esta resposta inteira."}
               </span>
             </span>
           </label>

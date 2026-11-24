@@ -310,6 +310,7 @@ export default async function JovemMateriais() {
         numero: maisAntigoSemAvaliacao.numero,
         realizado_em: maisAntigoSemAvaliacao.realizado_em,
         trilha: "dpp",
+        duplaId: jornada.dupla_id,
       }
     : null;
   // o histórico da recorrente alimenta o dialog "Suas avaliações" —
@@ -610,6 +611,7 @@ export default async function JovemMateriais() {
               <AvaliarPendenteButton
                 pendente={pendenteAvaliacao}
                 primeiroNome={primeiroNome}
+                temMedia={avaliacoesDpp.length >= 3}
               />
             </span>
           </div>

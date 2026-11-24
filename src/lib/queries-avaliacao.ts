@@ -9,6 +9,7 @@ import {
   demoEspecialistaAvaliacoes,
   demoJovemAvaliacoes,
   demoMediaDpp,
+  demoTemMediaDpp,
 } from "./demo/queries";
 import type {
   AvaliacaoEncontro,
@@ -124,6 +125,28 @@ export const linkAvaliacaoMeta = cache(
       trilha: dupla?.trilha ?? "dpp",
       cobertura: d.cobertura ?? null,
     };
+  }
+);
+
+/** O lote da média já existe na dupla? (≥3 respostas — o mesmo k da RPC
+ *  avaliacao_media_dpp, que também conta as linhas ocultas pelo toggle).
+ *  Leitura service role porque quem chama é a página pública do token —
+ *  a copy de privacidade do form promete média só quando ela existe
+ *  (027/FR-003). null em falha = copy assume o lote (default antigo). */
+export const temMediaDpp = cache(
+  async (duplaId: string): Promise<boolean | null> => {
+    const demo = await demoRole();
+    if (demo) return demoTemMediaDpp(duplaId);
+    const admin = createAdminClient();
+    const { count, error } = await admin
+      .from("avaliacoes_encontro")
+      .select("*", { count: "exact", head: true })
+      .eq("dupla_id", duplaId);
+    if (error) {
+      console.error("temMediaDpp:", error);
+      return null;
+    }
+    return (count ?? 0) >= 3;
   }
 );
 

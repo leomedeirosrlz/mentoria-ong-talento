@@ -3869,6 +3869,20 @@ function build(): DemoData {
         created_at: haDias(3, "10:00"),
       },
       {
+        // 027 — a mint real (0086) salva "quem confirmou e o quê" no corpo e
+        // o título fica genérico; a releitura promove a frase pro título na
+        // lista. A confirmação da Bia (~16d) precede a trilha formada (14d):
+        // a matemática com a Sofia nasceu de uma sugestão do Ricardo
+        id: uid(0x3024),
+        tipo: "solicitacao_registrada",
+        titulo: "Sugestão confirmada",
+        corpo:
+          "Ana Beatriz Silva confirmou a sua sugestão de especialista — o pedido seguiu.",
+        href: `/duplas/${uid(D.ok)}`,
+        lida_em: haDias(15, "08:00"),
+        created_at: haDias(16, "20:00"),
+      },
+      {
         id: uid(0x3021),
         tipo: "dupla_formada",
         titulo: "Dupla de especialista formada · Sofia & Ana Beatriz",
@@ -3953,6 +3967,28 @@ function build(): DemoData {
         href: "/#avisos",
         lida_em: null,
         created_at: haDias(2, "18:00"),
+      },
+      {
+        // 027 — corpo acima do clamp de 2 linhas: exercita o "Ler mais"/
+        // "Ler menos" do popover de notificações
+        id: uid(0x3044),
+        tipo: "comunicado",
+        titulo: "Semana da avaliação por terceiros",
+        corpo:
+          "Turma: chegou a semana de convidar as 3 pessoas do seu círculo pra avaliação por terceiros. Escolhe quem te conhece de verdade: família, amiga de infância, professor, colega de time. O convite sai por aqui, a pessoa responde em 5 minutos pelo celular e você acompanha pela sua página. Se faltar resposta, a gente lembra na quinta.",
+        href: "/#avisos",
+        lida_em: null,
+        created_at: haDias(0, "08:00"),
+      },
+      {
+        // 027 — corpo curto (cabe no clamp): nenhum toggle renderiza
+        id: uid(0x3045),
+        tipo: "comunicado",
+        titulo: "Formação confirmada",
+        corpo: "Sábado às 10h, Meet de sempre.",
+        href: "/#avisos",
+        lida_em: null,
+        created_at: haDias(0, "07:30"),
       },
       {
         // o trigger que minta o link avisa o jovem logado (0071) — o href

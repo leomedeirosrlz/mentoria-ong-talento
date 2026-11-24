@@ -63,6 +63,7 @@ export function EncontroLinha({
   rotulo,
   nota,
   meId,
+  temMedia = true,
 }: {
   e: JovemEncontro;
   futuro?: boolean;
@@ -91,6 +92,9 @@ export function EncontroLinha({
   /** profile do jovem logado — casa com created_by pra liberar Corrigir/
    *  Desfazer no retroativo criado por ele (0207). */
   meId?: string | null;
+  /** a dupla já tem o lote da média (≥3 respostas) — a copy do toggle no
+   *  detalhe da avaliação não promete média que não existe (027/FR-003). */
+  temMedia?: boolean;
 }) {
   const st = STATUS[e.status];
   const quando = e.status === "realizado" && e.realizado_em ? e.realizado_em : e.data_hora;
@@ -213,6 +217,7 @@ export function EncontroLinha({
           <VerAvaliacaoButton
             quiet
             avaliacao={aval}
+            temMedia={temMedia}
             label={<Estrelas n={aval.estrelas} size={13} />}
           />
         )}
