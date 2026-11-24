@@ -8,6 +8,7 @@ import {
   getCronogramas,
   getDuplas,
   getEspecialistaEventos,
+  getMateriais,
   getMe,
   getMinhasDuplas,
 } from "@/lib/queries";
@@ -271,7 +272,7 @@ export default async function HomePage({
   // especialista encadeiam na promise das duplas (React.cache deduplica) e
   // só disparam quando há dupla dela — mentor DPP puro não paga o RTT
   const duplasPromise = getMinhasDuplas();
-  const [duplas, espEventos, solicitacoes, meusChamados] = await Promise.all([
+  const [duplas, espEventos, solicitacoes, meusChamados, materiais] = await Promise.all([
     duplasPromise,
     duplasPromise.then((ds) =>
       ds.some((d) => d.trilha === "especialista")
@@ -284,6 +285,9 @@ export default async function HomePage({
       ? getSolicitacoesVisiveis()
       : Promise.resolve([]),
     getChamados(),
+    // roteiro/materiais do próximo passo no card "Sua semana" (520) — uma
+    // query só, a derivação por número acontece dentro do card
+    getMateriais(),
   ]);
   // a negociação precisa da thread de propostas e da agenda do especialista
   // (o slot sempre sai da grade dele — os picks de aceite/contra vêm daqui)
@@ -313,6 +317,7 @@ export default async function HomePage({
         eventos={eventos}
         espEventos={espEventos}
         cronogramas={cronogramas}
+        materiais={materiais}
         me={me!}
         termo={termoPendente ? <TermoBanner /> : null}
       />

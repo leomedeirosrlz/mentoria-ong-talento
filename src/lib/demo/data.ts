@@ -2654,7 +2654,9 @@ function build(): DemoData {
         contestado_por: null,
         contestado_motivo: null,
         contestado_em: null,
-        expira_em: addDias(HOJE, 13).toISOString(),
+        // 520: expira em 3 dias — a proposta da equipe sem aceite é o
+        // motivo "proposta expirando" da fila "O que precisa de você"
+        expira_em: addDias(HOJE, 3).toISOString(),
         concluido_em: null,
         created_at: haDias(1, "10:20"),
         updated_at: haDias(1, "10:20"),
@@ -2726,6 +2728,74 @@ function build(): DemoData {
     mentorado: dandara,
     supervisor: beatriz,
     encontros: encD3,
+    // 520: a equipe propôs um plano pra repor os devidos e a Fernanda
+    // contestou ontem — é o motivo "contestado recente" da fila "O que
+    // precisa de você" (a retomada nasce por um acordo novo, nunca por
+    // reabrir este)
+    planos: [
+      {
+        id: uid(0x3000 + 3),
+        dupla_id: uid(D.risco),
+        status: "contestado" as const,
+        escopo: {
+          numeros: [3, 4],
+          ritmo: 2,
+          nivel: "semana_dupla" as const,
+          janela: {
+            inicio: ymd(addDias(HOJE, -9)),
+            fim: ymd(addDias(HOJE, 12)),
+          },
+          passos: [
+            { numero: 3, data: ymd(addDias(HOJE, -4)), acao: "agendar" },
+            { numero: 4, data: ymd(addDias(HOJE, 2)), acao: "agendar" },
+          ],
+        },
+        versao: 1,
+        proposto_por: beatriz.id,
+        proposto_via: "app" as const,
+        aprovado_por: null,
+        aprovado_lado: null,
+        aprovado_em: null,
+        aceito_mentor_em: null,
+        aceito_mentorado_em: null,
+        contestado_por: fernanda.id,
+        contestado_motivo:
+          "A Dandara faltou duas vezes — repor dois por semana agora afasta ela de vez.",
+        contestado_em: haDias(1, "18:40"),
+        expira_em: addDias(HOJE, 5).toISOString(),
+        concluido_em: null,
+        created_at: haDias(9, "09:10"),
+        updated_at: haDias(1, "18:40"),
+        passos: [],
+        eventos: [
+          {
+            id: uid(0x3200 + 5),
+            plano_id: uid(0x3000 + 3),
+            dupla_id: uid(D.risco),
+            tipo: "proposto" as const,
+            de: null,
+            para: "proposto",
+            motivo: null,
+            por: beatriz.id,
+            meta: { versao: 1, via: "app" },
+            em: haDias(9, "09:10"),
+          },
+          {
+            id: uid(0x3200 + 6),
+            plano_id: uid(0x3000 + 3),
+            dupla_id: uid(D.risco),
+            tipo: "contestado" as const,
+            de: "proposto",
+            para: "contestado",
+            motivo:
+              "A Dandara faltou duas vezes — repor dois por semana agora afasta ela de vez.",
+            por: fernanda.id,
+            meta: {},
+            em: haDias(1, "18:40"),
+          },
+        ],
+      },
+    ],
     encaminhamentos: [
       encaminhamento(uid(D.risco), regD3E2.id,
         "Confirmar com a escola o retorno às aulas presenciais",

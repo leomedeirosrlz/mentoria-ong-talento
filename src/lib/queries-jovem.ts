@@ -462,6 +462,9 @@ export type JovemPlano = {
   aceito_mentor?: boolean;
   aceito_mentorado?: boolean;
   proposto_em?: string;
+  /** profile id de quem propôs — a copy "Fulano combinou" resolve ele
+   *  pelos contatos; ausente num banco sem a 0225 reemitida. */
+  proposto_por?: string | null;
   /** "app" | "liza" — quem pediu a proposta da equipe (0225). */
   proposto_via?: string | null;
   expira_em: string;
