@@ -169,6 +169,7 @@ export function ProximoEncontro({
           comQuem={agendar.comQuem}
           sugestoes={agendar.sugestoes}
           titulo="Seu próximo encontro"
+          plano={plano}
         />
       );
     }

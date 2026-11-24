@@ -24,6 +24,7 @@ import {
   quemCombinou,
   suaSemana,
 } from "@/lib/sua-semana";
+import { propostoEmDoPlano } from "@/lib/plano-combinado";
 import { hrefMaterial, materiaisDoNumero } from "@/lib/materiais";
 import { PlanoContestarButton } from "@/components/plano-contestar";
 import { SuaSemanaPlano } from "@/components/sua-semana-plano";
@@ -320,7 +321,7 @@ export function MentorHome({
           .filter((e) => e.status === "realizado")
           .map((e) => e.numero);
         const propostoEmPlano = planoVivo
-          ? (planoVivo.aprovado_em ?? planoVivo.created_at)
+          ? propostoEmDoPlano(planoVivo)
           : null;
         const semanaPlano = planoVivo
           ? suaSemana({

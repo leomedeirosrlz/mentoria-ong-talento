@@ -85,19 +85,36 @@ test.describe("O que precisa de você — staff", () => {
     });
     const linhas = secao.locator("li");
     await expect(linhas).toHaveCount(2);
-    // expirando ordena antes de contestado
+    // expirando ordena antes de contestado — os dias são relativos à
+    // data de build do dataset (cache 6h), então a virada do dia não
+    // pode derrubar o assert: vale o prefixo, não a contagem
     await expect(linhas.first()).toContainText("Carlos × Caio");
-    await expect(linhas.first()).toContainText(
-      "proposta expira em 3 dias"
-    );
+    await expect(linhas.first()).toContainText(/proposta expira/);
     await expect(
       linhas.first().getByRole("link", { name: "Ver a proposta" })
     ).toHaveAttribute("href", `/duplas/${D_PEND}#acordos`);
     await expect(linhas.last()).toContainText("Fernanda × Dandara");
-    await expect(linhas.last()).toContainText("plano contestado ontem");
+    await expect(linhas.last()).toContainText(/plano contestado/);
     await expect(
       linhas.last().getByRole("link", { name: "Retomar o plano" })
     ).toHaveAttribute("href", `/duplas/${D_RISCO}#acordos`);
+  });
+
+  test("âncora do recesso existe na ficha e staff não ganha gesto da dupla", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    // a d-pend (T1) tem recesso sem decisão — a âncora monta nos dois
+    // mundos: o card standalone ou o bloco dentro do "ficar em dia"
+    await page.goto(`/duplas/${D_PEND}#recesso-dupla`);
+    const recesso = page.locator("#recesso-dupla");
+    await expect(recesso).toBeVisible();
+    await expect(recesso).toContainText(/recesso(s)? (do programa|no caminho)/i);
+    // staff acompanha e cobra — os botões de decidir são da dupla (0225)
+    await expect(recesso).toContainText(/a decisão é da dupla/i);
+    await expect(
+      recesso.getByRole("button", { name: /Vamos usar o recesso/ })
+    ).toHaveCount(0);
   });
 
   test("auxiliar vê a mesma lista no escopo dele — só a d-pend", async ({

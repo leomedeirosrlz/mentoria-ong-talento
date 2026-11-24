@@ -465,7 +465,11 @@ export type JovemPlano = {
   /** Os dois aceites (0224) — ausentes num banco sem a migration. */
   aceito_mentor?: boolean;
   aceito_mentorado?: boolean;
+  /** created_at da row (o banco não guarda "proposto_em" separado). */
   proposto_em?: string;
+  /** Carimbo de ativação (0232) — a âncora real da janela de
+   *  contestação: `aprovado_em ?? created_at`, a régua da RPC. */
+  aprovado_em?: string | null;
   /** profile id de quem propôs — a copy "Fulano combinou" resolve ele
    *  pelos contatos; ausente num banco sem a 0225 reemitida. */
   proposto_por?: string | null;

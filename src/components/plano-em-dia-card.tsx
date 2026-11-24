@@ -367,7 +367,10 @@ export function PlanoEmDiaCard({
       </ol>
 
       {recessos.length > 0 && (
-        <div className="mt-4 border-t border-border pt-3">
+        // a âncora do recesso é a mesma do card standalone — a fila do
+        // staff aponta pra #recesso-dupla e cai aqui quando o plano está
+        // na tela (RecessoDuplaCard nunca monta junto)
+        <div id="recesso-dupla" className="mt-4 scroll-mt-20 border-t border-border pt-3">
           <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
             <SunHorizon size={14} aria-hidden />
             {recessos.length > 1 ? "Recessos no caminho" : "Recesso no caminho"}

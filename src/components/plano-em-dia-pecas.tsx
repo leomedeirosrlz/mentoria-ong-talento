@@ -156,11 +156,13 @@ export function AceitesPlano({
   );
 }
 
-/** A régua do combinado em quadrados: feito, com data ou pendente. */
+/** A régua do combinado em quadrados: feito, com data ou pendente — o
+ *  rótulo conta o que a dupla já cumpriu (o "com data" dos pendentes
+ *  segue na legenda). */
 export function QuadradosCombinado({ resumo }: { resumo: ResumoCombinado }) {
   return (
     <QuadradosPlano
-      rotulo={`${resumo.marcados} de ${resumo.total} encontros do plano com data`}
+      rotulo={`${resumo.feitos} de ${resumo.total} encontros do plano feitos`}
       itens={resumo.passos.map((p) => ({
         numero: p.numero,
         estado:
@@ -193,7 +195,10 @@ export function fraseDoCombinado(
   if (estado === "proposto_staff_falta_meu") {
     return {
       tom: "atencao",
-      pill: "Falta um aceite da dupla",
+      // a máquina devolve "falta_meu" só pra membro — o aceite que falta
+      // é o de quem lê (019); a equipe lê a mesma espera como "da dupla"
+      // na fila (textoDoMotivo), não aqui
+      pill: "Falta o seu aceite",
       texto: `A equipe propôs um plano pra vocês ficarem em dia até ${diaMes(r.ate ?? "")}. Um aceite da dupla já coloca o combinado em vigor; o outro lado é avisado.`,
       cta: "Ver e responder",
     };

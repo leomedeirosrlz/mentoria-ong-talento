@@ -3,6 +3,7 @@ import {
   aceitesDoPlano,
   combinadoDoJovem,
   estadoLeituraPlano,
+  propostoEmDoPlano,
   resumoCombinado,
 } from "./plano-combinado";
 import { fraseDoCombinado } from "@/components/plano-em-dia-pecas";
@@ -194,6 +195,46 @@ describe("combinadoDoJovem", () => {
   });
 });
 
+// ---------- propostoEmDoPlano — a régua única da janela (0232) ----------
+// O banco mede contestação por coalesce(aprovado_em, created_at); cada
+// superfície media de um jeito (jovem por created_at, mentor por
+// aprovado_em). Um helper só, um teste só.
+
+describe("propostoEmDoPlano", () => {
+  it("aprovado_em manda; created_at e proposto_em são o fallback do banco", () => {
+    expect(
+      propostoEmDoPlano({
+        aprovado_em: "2026-01-12T19:00:00Z",
+        created_at: "2026-01-11T10:00:00Z",
+      })
+    ).toBe("2026-01-12T19:00:00Z");
+    // recorte do jovem: proposto_em = created_at, sem a coluna na RPC
+    expect(
+      propostoEmDoPlano({
+        proposto_em: "2026-01-11T10:00:00Z",
+        aprovado_em: "2026-01-12T19:00:00Z",
+      })
+    ).toBe("2026-01-12T19:00:00Z");
+    expect(
+      propostoEmDoPlano({ created_at: "2026-01-11T10:00:00Z" })
+    ).toBe("2026-01-11T10:00:00Z");
+    expect(propostoEmDoPlano(null)).toBeNull();
+    expect(propostoEmDoPlano({})).toBeNull();
+  });
+
+  it("combinadoDoJovem ancora proposto_em no aprovado_em da 0232", () => {
+    const p = combinadoDoJovem({
+      id: "p-1",
+      status: "ativo",
+      versao: 1,
+      aprovado_lado: "mentor",
+      proposto_em: "2026-01-11T10:00:00Z",
+      aprovado_em: "2026-01-12T19:00:00Z",
+    });
+    expect(p.proposto_em).toBe("2026-01-12T19:00:00Z");
+  });
+});
+
 // ---------- fraseDoCombinado — a copy que sai da máquina (518) ----------
 // FR-008: nada de "os dois aceitarem"; no ativo não se fala "aceitar" —
 // quem não carimbou foi avisado e pode contestar.
@@ -212,13 +253,13 @@ describe("fraseDoCombinado", () => {
     propostoEm: "2026-01-11T10:00:00Z",
   };
 
-  it("proposta da equipe: 'um aceite da dupla', nunca 'os dois'", () => {
+  it("proposta da equipe: falta o meu aceite, nunca 'os dois'", () => {
     const f = fraseDoCombinado(
       { ...resumoBase, status: "proposto", falta: "dupla" },
       "jovem",
       "Paulo"
     );
-    expect(f.pill).toMatch(/aceite da dupla/i);
+    expect(f.pill).toBe("Falta o seu aceite");
     expect(f.texto).not.toMatch(/os dois/i);
     expect(f.cta).toBe("Ver e responder");
   });

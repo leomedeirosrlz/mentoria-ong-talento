@@ -3,6 +3,7 @@ import {
   buscarViaServiceRole,
   convergirDuplaAtiva,
   expect,
+  inserirViaServiceRole,
   jwtDoUsuario,
   limparEncontrosDaDupla,
   limparViaServiceRole,
@@ -33,6 +34,7 @@ import {
 
 const DUPLA = "e2e00000-0000-4000-8000-000000000030";
 const DUPLA_OUTRA = "e2e00000-0000-4000-8000-000000000070"; // mentor reserva
+const CRON = "e2e00000-0000-4000-8000-0000000000e2"; // cronograma da dupla
 const MENTOR_EMAIL = process.env.E2E_MENTOR_EMAIL ?? "";
 const JOVEM_EMAIL = process.env.E2E_JOVEM_EMAIL ?? "jovem-e2e@realiza.test";
 const COORD_EMAIL = process.env.E2E_COORD_EMAIL ?? "e2e-coord@realiza.test";
@@ -40,7 +42,14 @@ const SENHA = process.env.E2E_MENTOR_PASSWORD ?? "";
 const COORD_SENHA = process.env.E2E_COORD_PASSWORD ?? "";
 
 const hoje = (maisDias = 0) => {
-  const d = new Date(Date.now() + maisDias * 86400e3);
+  // mesma régua do servidor: dia civil em America/Sao_Paulo (toDateStr).
+  // toISOString lê em UTC — entre 21h e 23h59 em SP a data UTC já é
+  // amanhã e toda a janela/passo desloca um dia na virada
+  const spYmd = new Date().toLocaleDateString("en-CA", {
+    timeZone: "America/Sao_Paulo",
+  });
+  const d = new Date(`${spYmd}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + maisDias);
   return d.toISOString().slice(0, 10);
 };
 
@@ -107,10 +116,27 @@ test.describe("plano ficar em dia persistido (459)", () => {
     await limparViaServiceRole("dupla_planos", `dupla_id=eq.${DUPLA}`);
     await limparEncontrosDaDupla(DUPLA);
     await convergirDuplaAtiva(DUPLA);
+    // o calendário e2e tem recesso (dez–jan) que cruza a janela hoje+30 boa
+    // parte do ano: sem a decisão da dupla, plano_propor devolve 'falta a
+    // dupla confirmar o recesso' — flake sazonal, mesmo defeito do hoje()
+    // em UTC. O piso registra "não vamos usar" (usa=false libera a data na
+    // RPC); a cobertura do recesso em si é do recesso.spec, mesma dupla
+    await limparViaServiceRole("dupla_recessos", `dupla_id=eq.${DUPLA}`);
+    const evs = await buscarViaServiceRole<{ id: string }[]>(
+      "ciclo_eventos",
+      `cronograma_id=eq.${CRON}&tipo=eq.recesso&select=id`
+    );
+    for (const ev of evs)
+      await inserirViaServiceRole("dupla_recessos", {
+        dupla_id: DUPLA,
+        ciclo_evento_id: ev.id,
+        usa: false,
+      });
   });
 
   test.afterEach(async () => {
     await limparViaServiceRole("dupla_planos", `dupla_id=eq.${DUPLA}`);
+    await limparViaServiceRole("dupla_recessos", `dupla_id=eq.${DUPLA}`);
     await limparEncontrosDaDupla(DUPLA);
   });
 
@@ -232,7 +258,7 @@ test.describe("plano ficar em dia persistido (459)", () => {
       "contestar",
       "essas datas não dão pra mim"
     );
-    expect(contesta).toEqual({ ok: true });
+    expect(contesta).toMatchObject({ ok: true, status: "contestado" });
 
     // terminal: nem aceitar nem contestar reabre
     expect(

@@ -210,6 +210,21 @@ export function rotuloSessao(
   return `na mesma sessão dos ${listaEncontros(outros)}`;
 }
 
+/** O "avisado em" / âncora da janela de contestação — a mesma régua do
+ *  banco (`coalesce(aprovado_em, created_at)` da plano_responder) em
+ *  todas as superfícies. Aceita a row da ficha (created_at) e o recorte
+ *  do jovem (a RPC entrega created_at como proposto_em + aprovado_em da
+ *  0232); num banco sem a coluna nova vale o campo que existir. */
+export function propostoEmDoPlano(
+  p: {
+    aprovado_em?: string | null;
+    created_at?: string | null;
+    proposto_em?: string | null;
+  } | null
+): string | null {
+  return p?.aprovado_em ?? p?.created_at ?? p?.proposto_em ?? null;
+}
+
 /** Recorte da RPC jovem_plano → a projeção que os cards e os banners
  *  leem. A RPC já devolve sem semáforo/motivos; aqui só muda a forma
  *  (ritmo vem texto do jsonb, passos aplicados achatam, os aceites
@@ -233,6 +248,7 @@ export function combinadoDoJovem(p: {
   aceito_mentor?: boolean;
   aceito_mentorado?: boolean;
   proposto_em?: string;
+  aprovado_em?: string | null;
   proposto_via?: string | null;
   expira_em?: string;
   concluido_em?: string | null;
@@ -265,7 +281,7 @@ export function combinadoDoJovem(p: {
       numero: s.numero,
       data_nova: s.data_nova,
     })),
-    proposto_em: p.proposto_em ?? null,
+    proposto_em: propostoEmDoPlano(p),
     proposto_via: p.proposto_via ?? null,
     expira_em: p.expira_em ?? null,
     concluido_em: p.concluido_em ?? null,

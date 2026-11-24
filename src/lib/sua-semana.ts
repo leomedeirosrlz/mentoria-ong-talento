@@ -2,6 +2,7 @@ import {
   aceitesDoPlano,
   estadoLeituraPlano,
   planoAberto,
+  propostoEmDoPlano,
   resumoCombinado,
   type EstadoLeituraPlano,
   type PlanoCombinado,
@@ -45,8 +46,8 @@ export function combinadoDaDupla(p: {
       data_nova: s.data_nova,
     })),
     // "você foi avisado em" ancora no carimbo que ativou — a coluna
-    // proposto_em não existe na tabela
-    proposto_em: p.aprovado_em ?? p.created_at ?? null,
+    // proposto_em não existe na tabela (a régua é a do banco)
+    proposto_em: propostoEmDoPlano(p),
     proposto_via: p.proposto_via ?? null,
     expira_em: p.expira_em ?? null,
     concluido_em: p.concluido_em ?? null,
@@ -419,7 +420,10 @@ export function precisaDeVoce(input: {
     const ficha = `/duplas/${d.id}`;
     const destino =
       atencao.motivo.tipo === "decisao" && atencao.motivo.detalhe === "recesso"
-        ? { href: `${ficha}#plano-em-dia`, acao: "Ver o recesso" }
+        ? // #recesso-dupla existe nos dois mundos (card standalone e o
+          // bloco dentro do plano); staff só acompanha — a ação é ver,
+          // nunca declarar (a RPC de recesso é da dupla, 0225)
+          { href: `${ficha}#recesso-dupla`, acao: "Ver o recesso" }
         : atencao.motivo.tipo === "contestado"
           ? { href: `${ficha}#acordos`, acao: "Retomar o plano" }
           : atencao.motivo.tipo === "passo_vencido"
