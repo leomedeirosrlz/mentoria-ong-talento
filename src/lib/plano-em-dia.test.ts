@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import {
   escopoDaProposta,
+  fusaoDeArestas,
+  fusaoPedeAvisoPratica,
+  gruposDeSessao,
   montarPlanoEmDia,
   rotuloRitmo,
 } from "./plano-em-dia";
@@ -313,5 +316,146 @@ describe("escopoDaProposta — as decisões viajam no jsonb (518)", () => {
     };
     expect(comDecisoes.decisoes).toEqual({ recessos: [], sem_grade: false });
     expect(e.escopo.ritmo).toBe(2);
+  });
+});
+
+// ---------- sessão combinada no plano (018) ----------
+
+describe("fusaoDeArestas — arestas viram grupos (018)", () => {
+  it("uma aresta junta os dois vizinhos", () => {
+    expect(fusaoDeArestas([5])).toEqual([[5, 6]]);
+  });
+  it("arestas em corrente formam um grupo só", () => {
+    expect(fusaoDeArestas([5, 6])).toEqual([[5, 6, 7]]);
+  });
+  it("arestas separadas viram grupos separados", () => {
+    expect(fusaoDeArestas([9, 5])).toEqual([
+      [5, 6],
+      [9, 10],
+    ]);
+  });
+  it("vazio não é sessão", () => {
+    expect(fusaoDeArestas([])).toEqual([]);
+  });
+});
+
+describe("gruposDeSessao — a régua do grupo (018)", () => {
+  const numeros = [16, 17, 18];
+  it("grupo de passos do plano passa", () => {
+    expect(gruposDeSessao([[16, 17]], numeros)).toEqual({
+      grupos: [[16, 17]],
+    });
+  });
+  it("grupo de um não é sessão", () => {
+    const r = gruposDeSessao([[16]], numeros);
+    expect("erro" in r).toBe(true);
+  });
+  it("número fora do plano não entra", () => {
+    const r = gruposDeSessao([[16, 19]], numeros);
+    expect("erro" in r).toBe(true);
+  });
+  it("o mesmo passo não pode estar em duas sessões", () => {
+    const r = gruposDeSessao(
+      [
+        [16, 17],
+        [17, 18],
+      ],
+      numeros
+    );
+    expect("erro" in r).toBe(true);
+  });
+  it("sem fusão, sem grupos — e sem erro", () => {
+    expect(gruposDeSessao(undefined, numeros)).toEqual({ grupos: [] });
+    expect(gruposDeSessao([], numeros)).toEqual({ grupos: [] });
+  });
+});
+
+describe("fusaoPedeAvisoPratica — a prática pulada (018)", () => {
+  it("passo que exige prática com o seguinte no mesmo grupo pede aviso", () => {
+    expect(fusaoPedeAvisoPratica([[4, 5]])).toBe(true);
+    expect(fusaoPedeAvisoPratica([[5, 6, 7]])).toBe(true);
+  });
+  it("sem par prática→seguinte no grupo, sem aviso", () => {
+    expect(fusaoPedeAvisoPratica([[16, 17]])).toBe(false);
+    expect(fusaoPedeAvisoPratica([[4, 6]])).toBe(false);
+    expect(fusaoPedeAvisoPratica([])).toBe(false);
+  });
+});
+
+describe("montarPlanoEmDia + escopoDaProposta — a marca sessao (018)", () => {
+  // três devidos já vencidos — os três entram no plano
+  const eventos3 = () => [
+    ev("encontro", "2026-01-06", { numero: 16 }),
+    ev("encontro", "2026-01-07", { numero: 17 }),
+    ev("encontro", "2026-01-08", { numero: 18 }),
+    ev("evento_encerramento", "2026-04-30"),
+  ];
+
+  it("a fusão nunca emerge do planner: sem a entrada nenhum passo carrega marca", () => {
+    const p = montarPlanoEmDia({
+      dupla: dupla(),
+      eventos: eventos3(),
+      ritmo: 2,
+      hoje: HOJE,
+    });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    expect(p.passos.every((x) => x.sessao == null)).toBe(true);
+  });
+
+  it("a entrada fusao marca os passos do grupo sem mexer nas datas", () => {
+    const sem = montarPlanoEmDia({
+      dupla: dupla(),
+      eventos: eventos3(),
+      ritmo: 2,
+      hoje: HOJE,
+    });
+    const com = montarPlanoEmDia({
+      dupla: dupla(),
+      eventos: eventos3(),
+      ritmo: 2,
+      fusao: [
+        [16, 17],
+        [18],
+      ],
+      hoje: HOJE,
+    });
+    expect(com.aplicavel && sem.aplicavel).toBe(true);
+    if (!com.aplicavel || !sem.aplicavel) return;
+    // grupo de 1 ([18]) não é sessão — a régua recusa e nada marca
+    expect(com.passos.map((x) => x.sessao ?? null)).toEqual([
+      "a",
+      "a",
+      null,
+    ]);
+    // a caminhada não muda: cada passo segue na sua data
+    expect(com.passos.map((x) => x.data)).toEqual(
+      sem.passos.map((x) => x.data)
+    );
+  });
+
+  it("o escopo grava a marca, a data da sessão (a mais cedo) e 2h", () => {
+    const p = montarPlanoEmDia({
+      dupla: dupla(),
+      eventos: eventos3(),
+      ritmo: 2,
+      fusao: [[16, 17]],
+      hoje: HOJE,
+    });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    const e = escopoDaProposta(p, HOJE_STR);
+    expect("erro" in e).toBe(false);
+    if ("erro" in e) return;
+    const [a, b, c] = e.escopo.passos;
+    expect(a.sessao).toBe("a");
+    expect(b.sessao).toBe("a");
+    expect(c.sessao).toBeUndefined();
+    expect(a.duracao_min).toBe(120);
+    expect(b.duracao_min).toBe(120);
+    expect(c.duracao_min).toBeUndefined();
+    // a sessão sai na data mais cedo do grupo — os dois carimbam o mesmo dia
+    expect(a.data).toBe(b.data);
+    expect(a.data <= c.data).toBe(true);
   });
 });

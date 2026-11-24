@@ -69,7 +69,9 @@ import { DuplaNomes } from "@/components/dupla-nomes";
 import { VoltarLink } from "@/components/voltar-link";
 import {
   alvoAgendamento,
+  cobertosDaDupla,
   encontroDoPassoEsp,
+  encontroTemConteudo,
   eventoDaSemana,
   eventosDoCronograma,
   formatDate,
@@ -755,10 +757,13 @@ export default async function DuplaPage({
   );
   // pendência de registro (realizado sem registro ou agendado/remarcado já
   // vencido — mesma régua do `limboAberto` da agenda) — nunca entra no
-  // collapsible: o deep link #registrar-{id} precisa sempre existir
+  // collapsible: o deep link #registrar-{id} precisa sempre existir.
+  // Sessão combinada (018): o coberto já tem conteúdo via âncora — sem o
+  // mapa a ficha cobraria um registro que a sessão já entregou
+  const cobertos = cobertosDaDupla(dupla.encontros);
   const temPendencia = (enc: Encontro | undefined) =>
     !!enc &&
-    !enc.registro &&
+    !encontroTemConteudo(enc, cobertos) &&
     (enc.status === "realizado" ||
       ((enc.status === "agendado" || enc.status === "remarcado") &&
         enc.data_hora != null &&
@@ -1003,11 +1008,22 @@ export default async function DuplaPage({
             (enc == null || e.numero !== enc.numero)
         ).length
       : 0;
+    // sessão combinada (018): o registro, a avaliação do jovem e o link de
+    // avaliação moram na âncora — a linha do coberto mostra os da sessão,
+    // não "pendente" fantasma nem "Sem avaliação" inventado
+    const ancoraDaSessao =
+      enc != null && !ehEsp && enc.registro == null && cobertos.has(enc.numero)
+        ? (dupla.encontros.find(
+            (x) => x.numero === cobertos.get(enc.numero)
+          ) ?? null)
+        : null;
+    const regLinha = enc?.registro ?? ancoraDaSessao?.registro ?? null;
     return (
       <EncontroRow
         key={passo.id}
         passo={passo}
         encontro={enc ?? null}
+        ancora={ancoraDaSessao}
         tentativasFalhas={tentativasFalhas}
         duplaId={dupla.id}
         souMentor={souMentor}
@@ -1029,7 +1045,7 @@ export default async function DuplaPage({
         // evidência é do mentor — coord só remove (moderação), sup só lê
         podeAnexar={souMentor && (dupla.status === "ativa" || ritoPendente)}
         podeRemoverAnexos={souCoord || (souMentor && (dupla.status === "ativa" || ritoPendente))}
-        anexos={(enc?.registro && anexosPorRegistro[enc.registro.id]) || []}
+        anexos={(regLinha && anexosPorRegistro[regLinha.id]) || []}
         materiais={materiaisDoPasso(passo.numero)}
         combinados={dupla.encaminhamentos ?? []}
         combinadosPendentes={combinadosPendentes}
@@ -1069,7 +1085,12 @@ export default async function DuplaPage({
         }
         apoioDestinos={apoioDestinos}
         linkAvaliacao={
-          enc ? (linkAvalPorEncontro.get(enc.id) ?? null) : null
+          enc
+            ? (linkAvalPorEncontro.get(enc.id) ??
+              (ancoraDaSessao
+                ? (linkAvalPorEncontro.get(ancoraDaSessao.id) ?? null)
+                : null))
+            : null
         }
         estrelaJovem={
           enc ? (estrelaEspPorEncontro.get(enc.id) ?? null) : null

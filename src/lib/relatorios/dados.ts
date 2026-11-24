@@ -157,6 +157,9 @@ export function itemAderencia(
   const realizados = d.encontros.filter(
     (e) => e.status === "realizado"
   ).length;
+  // atraso de entrega e avaliação do mentor são medidos no row real — a
+  // sessão combinada (018) tem UMA entrega (a da âncora): contar o coberto
+  // duplicaria a amostra e enviesaria as médias
   const atrasos = d.encontros
     .filter((e) => registroTemConteudo(e.registro))
     .map((e) => diasAtrasoRegistro(e.registro!, e));

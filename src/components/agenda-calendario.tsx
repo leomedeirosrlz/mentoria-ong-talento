@@ -90,6 +90,8 @@ import {
   JANELA_PERIODO,
   linkSeguro,
   coberturaEncontro,
+  cobertosDaDupla,
+  encontroTemConteudo,
   periodosNoDia,
   passosDaTrilha,
   resumoSemanaDe,
@@ -287,9 +289,20 @@ const DOT_ESTADO: Record<EstadoEncontro, string> = {
   nao_aconteceu: "bg-muted-foreground",
 };
 
-function corDotEncontro(e: Encontro, agoraMs: number): string {
-  return DOT_ESTADO[estadoDoEncontro(e, agoraMs)];
+function corDotEncontro(
+  e: Encontro,
+  agoraMs: number,
+  cobertos?: Map<number, number>
+): string {
+  return DOT_ESTADO[estadoDoEncontro(e, agoraMs, cobertos)];
 }
+
+// Sessão combinada (018): o mapa coberto→âncora é por dupla e deriva da
+// lista de encontros — custo trivial (≤ o nº de passos da trilha), sem
+// memo pra não virar side-effect no meio do render (o React Compiler
+// bloqueia mutação de cache global dentro de componente).
+const cobertosDe = (dupla: Dupla): Map<number, number> =>
+  cobertosDaDupla(dupla.encontros);
 
 /** Disco numerado do encontro de dupla na célula do mês — mesma gramática do
  *  dot, agora com o nº dentro (antes era preciso abrir o dia pra saber qual
@@ -462,11 +475,14 @@ function MarcadorTipo({ tipo, nome }: { tipo: CicloEvento["tipo"]; nome: string 
  *  legenda nomear exatamente os números que a barra pinta. */
 function contagemEncontros(itens: ItemDupla[], agora: number) {
   const cont = { ok: 0, warn: 0, agendado: 0, apagado: 0 };
-  for (const { encontro } of itens) {
+  for (const { encontro, dupla } of itens) {
+    const cobertos = cobertosDe(dupla);
     if (encontro.status === "realizado")
-      cont[encontro.registro ? "ok" : "warn"]++;
+      // sessão combinada: o coberto conta "ok" — o registro da âncora vale
+      // por ele (018); sem o mapa o segmento pintava warn pra sempre
+      cont[encontroTemConteudo(encontro, cobertos) ? "ok" : "warn"]++;
     else if (encontro.status === "agendado" || encontro.status === "remarcado")
-      cont[limboAberto(encontro, agora) ? "warn" : "agendado"]++;
+      cont[limboAberto(encontro, agora, cobertos) ? "warn" : "agendado"]++;
     else cont.apagado++;
   }
   return cont;
@@ -643,7 +659,10 @@ function IndicadorSemanaMes({
           ? estadoDaSemana(
               duplas.map((d) => d.encontros.find((x) => x.numero === e.numero) ?? null),
               semanaComecou,
-              agoraMs
+              agoraMs,
+              // sessão combinada (018): mapa paralelo, um por dupla —
+              // encontro coberto lê "registrado" quando a âncora entrega
+              duplas.map((d) => cobertosDe(d))
             )
           : null;
         // neutro = gramática do rail: lime passada, lime com anel na semana
@@ -1968,7 +1987,8 @@ export function AgendaCalendario({
         <ul>
           {rowDupla({ encontro: linha.encontro, dupla: d }, indice, selecionado)}
         </ul>
-        {linha.tipo === "remarcar" && !limboAberto(linha.encontro, agoraMs) && (
+        {linha.tipo === "remarcar" &&
+          !limboAberto(linha.encontro, agoraMs, cobertosDe(d)) && (
           <div className="flex flex-wrap items-center gap-2 pb-1.5 pl-[1.625rem] pr-2">
             <AgendarEncontroDialog
               duplaId={d.id}
@@ -2064,7 +2084,7 @@ export function AgendaCalendario({
                       const remarcavel =
                         item.dupla.status === "ativa" &&
                         (((e.status === "agendado" || e.status === "remarcado") &&
-                          !limboAberto(e, agoraMs)) ||
+                          !limboAberto(e, agoraMs, cobertosDe(item.dupla))) ||
                           e.status === "nao_aconteceu");
                       return (
                         <div key={e.id}>
@@ -3116,12 +3136,12 @@ export function AgendaCalendario({
                               realizado sem registro OU limbo; o detalhe vive
                               no painel e no board) */}
                           {duplasDoDia.length <= 2 ? (
-                            duplasDoDia.map(({ encontro }) => (
+                            duplasDoDia.map(({ encontro, dupla }) => (
                               <span
                                 key={encontro.id}
                                 className={cn(
                                   "grid size-4 shrink-0 place-items-center rounded-full text-[10px] font-semibold leading-none tabular-nums",
-                                  DISCO_ESTADO[estadoDoEncontro(encontro, agoraMs)]
+                                  DISCO_ESTADO[estadoDoEncontro(encontro, agoraMs, cobertosDe(dupla))]
                                 )}
                               >
                                 {encontro.numero}
@@ -3149,10 +3169,17 @@ export function AgendaCalendario({
                               className={cn(
                                 "ms-auto text-[11px] font-medium leading-none tabular-nums",
                                 duplasDoDia.some(
-                                  ({ encontro }) =>
+                                  ({ encontro, dupla }) =>
                                     (encontro.status === "realizado" &&
-                                      !encontro.registro) ||
-                                    limboAberto(encontro, agoraMs)
+                                      !encontroTemConteudo(
+                                        encontro,
+                                        cobertosDe(dupla)
+                                      )) ||
+                                    limboAberto(
+                                      encontro,
+                                      agoraMs,
+                                      cobertosDe(dupla)
+                                    )
                                 )
                                   ? "text-[var(--warn-text)]"
                                   : "text-muted-foreground"
@@ -3886,7 +3913,7 @@ export function AgendaCalendario({
               })}
               {itensDaSemana.map(({ encontro, dupla }) => {
                 const iso = diaDoEncontro(encontro)!;
-                const estado = estadoDoEncontro(encontro, agoraMs);
+                const estado = estadoDoEncontro(encontro, agoraMs, cobertosDe(dupla));
                 const tema = passoDe(dupla, encontro.numero)?.titulo;
                 return (
                   <button
@@ -4033,15 +4060,22 @@ function EncontroDuplaRow({
   const iso = isoDoEncontro(encontro);
   // numero-match do mentor pode trazer encontro de outro dia — aí a data aparece completa
   const mesmoDia = diaDoEncontro(encontro) === selecionado;
+  // sessão combinada (018): o coberto tem conteúdo via âncora — sem o mapa
+  // a linha cobraria registro de um passo que a sessão já entregou
+  const cobertos = cobertosDe(dupla);
+  const temConteudo = encontroTemConteudo(encontro, cobertos);
   // agendado cuja hora já passou sem virar realizado nem não-aconteceu — a
   // mesma leitura de "limbo" da trilha (jornadaDaDupla) e da ficha
-  const limbo = limboAberto(encontro, agora);
+  const limbo = limboAberto(encontro, agora, cobertos);
   const registroPendente =
-    !encontro.registro && (encontro.status === "realizado" || limbo);
+    !temConteudo && (encontro.status === "realizado" || limbo);
   // nudge da coord/sup sobre a pendência — os dois lados da dupla; limbo
   // pergunta "rolou?", realizado cobra o registro (tipos nudge/contato
-  // coexistem no dedupe de 60s do /api/nudge)
-  const waPendentes = useMemo<DestinoWA[]>(() => {
+  // coexistem no dedupe de 60s do /api/nudge). Sem useMemo manual: o
+  // compilador não preservava a memo com o Map de cobertos na vizinhança
+  // ("dependency may be modified later") e a conta é barata pra rodar a
+  // cada render — memoização automática cobre
+  const waPendentes: DestinoWA[] = (() => {
     if (!registroPendente) return [];
     const msgs = msgsContato(limbo ? "limbo" : "registro_pendente", {
       mentorNome: dupla.mentor.nome,
@@ -4063,7 +4097,7 @@ function EncontroDuplaRow({
         t: "contato",
       },
     ];
-  }, [registroPendente, limbo, dupla, encontro.numero, autorNome]);
+  })();
   // mentor com registro pendente cai direto no card do encontro na página da
   // dupla — lá a âncora abre o RegistroInline; aqui o caminho curto é o CTA.
   // (só usado no ramo ehMentor — coord/sup abrem o detalhe em modal)
@@ -4085,7 +4119,7 @@ function EncontroDuplaRow({
   // o "já passou?" no tempo enquanto a hora não chega)
   const podeTerRegistro =
     ehMentor &&
-    !encontro.registro &&
+    !temConteudo &&
     (encontro.status === "realizado" ||
       encontro.data_hora != null);
 
@@ -4180,7 +4214,7 @@ function EncontroDuplaRow({
         >
           <span
             aria-hidden
-            className={cn("size-2 shrink-0 rounded-full", corDotEncontro(encontro, agora))}
+            className={cn("size-2 shrink-0 rounded-full", corDotEncontro(encontro, agora, cobertos))}
           />
           <span className="min-w-0 flex-1">
             {/* o mentor já sabe que é ele — a linha nomeia o outro lado */}
@@ -4193,7 +4227,7 @@ function EncontroDuplaRow({
                 ? `, ${mesmoDia ? `às ${fmtHora.format(new Date(iso))}` : formatDateTime(iso)}`
                 : ", data a definir"}
               {encontro.status === "realizado" &&
-                (encontro.registro ? (
+                (temConteudo ? (
                   <span className="text-[var(--ok-text)]">, registro entregue</span>
                 ) : (
                   <span className="text-[var(--warn-text)]">, registro pendente</span>
@@ -4220,7 +4254,7 @@ function EncontroDuplaRow({
           >
             <span
               aria-hidden
-              className={cn("size-2 shrink-0 rounded-full", corDotEncontro(encontro, agora))}
+              className={cn("size-2 shrink-0 rounded-full", corDotEncontro(encontro, agora, cobertos))}
             />
             <span className="min-w-0 flex-1">
               <span className="block break-words text-sm font-medium">
@@ -4232,7 +4266,7 @@ function EncontroDuplaRow({
                   ? `, ${mesmoDia ? `às ${fmtHora.format(new Date(iso))}` : formatDateTime(iso)}`
                   : ", data a definir"}
                 {encontro.status === "realizado" &&
-                  (encontro.registro ? (
+                  (temConteudo ? (
                     <span className="text-[var(--ok-text)]">, registro entregue</span>
                   ) : (
                     <span className="text-[var(--warn-text)]">, registro pendente</span>
@@ -4722,9 +4756,10 @@ function minutosDoDia(d: Date): number {
  *  detalhe do dia. */
 function hrefEncontroMentor(item: ItemDupla, agora: number): string {
   const { encontro, dupla } = item;
+  const cobertos = cobertosDe(dupla);
   const pendente =
-    !encontro.registro &&
-    (encontro.status === "realizado" || limboAberto(encontro, agora));
+    !encontroTemConteudo(encontro, cobertos) &&
+    (encontro.status === "realizado" || limboAberto(encontro, agora, cobertos));
   return pendente
     ? `/duplas/${dupla.id}#registrar-${encontro.id}`
     : `/duplas/${dupla.id}`;
@@ -4837,7 +4872,7 @@ function BlocoEncontro({
     >
       <span
         aria-hidden
-        className={cn("mt-[0.3em] size-1.5 shrink-0 rounded-full", corDotEncontro(encontro, agora))}
+        className={cn("mt-[0.3em] size-1.5 shrink-0 rounded-full", corDotEncontro(encontro, agora, cobertosDe(dupla)))}
       />
       {/* quebra em vez de cortar: no celular não tem hover pro title
           (feedback da mentora) — o nome do mentorado desce pra 2ª linha */}

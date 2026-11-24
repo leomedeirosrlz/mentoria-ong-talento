@@ -5,6 +5,9 @@
 
 import {
   AVALIACAO_LABEL,
+  avaliacaoCobreNumero,
+  cobertosDaDupla,
+  encontroTemConteudo,
   eventosDoCronograma,
   formatDiaMes,
   semanaBounds,
@@ -349,9 +352,20 @@ export function panoramaRegistros({
       for (const d of elegiveis) {
         const enc = (d.encontros ?? []).find((e) => e.numero === numero);
         if (enc?.status === "realizado") realizados++;
-        if (enc?.registro) {
+        // sessão combinada (018): a entrega mora na âncora e cobre os demais
+        // números — o coberto conta como entregue e a nota da sessão vale
+        // pra ele (o registro é um só, mas cobre o slot deste nº)
+        const cobertos = cobertosDaDupla(d.encontros ?? []);
+        const registroDoNumero =
+          enc?.registro ??
+          (enc && cobertos.has(numero)
+            ? ((d.encontros ?? []).find(
+                (x) => x.numero === cobertos.get(numero)
+              )?.registro ?? null)
+            : null);
+        if (enc != null && encontroTemConteudo(enc, cobertos)) {
           entregues++;
-          const nota = NOTA_MENTOR[enc.registro.avaliacao ?? ""];
+          const nota = NOTA_MENTOR[registroDoNumero?.avaliacao ?? ""];
           if (nota != null) notasMentor.push(nota);
         } else if (
           estado === "vencido" &&
@@ -368,10 +382,17 @@ export function panoramaRegistros({
             `${nomeCurto(d.mentor?.nome)} × ${nomeCurto(d.mentorado?.nome)}`
           );
         }
-        if (enc?.avaliacao_jovem) {
+        // avaliação do jovem: uma por sessão, na âncora — `cobertura` dela
+        // traz TODOS os números do grupo (âncora inclusa), então o coberto
+        // conta como avaliado com a estrela da sessão (0228/018)
+        const avJovem = enc
+          ? ((d.encontros ?? []).find((x) =>
+              avaliacaoCobreNumero(x.avaliacao_jovem, enc)
+            )?.avaliacao_jovem ?? null)
+          : null;
+        if (avJovem) {
           avaliados++;
-          if (enc.avaliacao_jovem.estrelas >= 1)
-            estrelas.push(enc.avaliacao_jovem.estrelas);
+          if (avJovem.estrelas >= 1) estrelas.push(avJovem.estrelas);
         }
       }
       // célula sem ninguém cobrado (turma sem duplas naquele ponto) não

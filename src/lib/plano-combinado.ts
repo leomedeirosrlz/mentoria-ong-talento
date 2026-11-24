@@ -147,7 +147,15 @@ export type PlanoCombinado = {
   escopo?: {
     ritmo?: number | null;
     janela?: { inicio: string; fim: string } | null;
-    passos?: { numero: number; data: string; acao?: string }[];
+    passos?: {
+      numero: number;
+      data: string;
+      acao?: string;
+      /** Marca de sessão combinada (018) — mesmo valor = mesma sessão. */
+      sessao?: string;
+      /** Duração da sessão combinada em min (120 = 2h, o padrão). */
+      duracao_min?: number;
+    }[];
   } | null;
   passos?: { numero: number; data_nova: string }[];
   proposto_em?: string | null;
@@ -162,6 +170,46 @@ export const PLANO_ABERTO = ["proposto", "aceito", "ativo"] as const;
 export const planoAberto = (status: string) =>
   (PLANO_ABERTO as readonly string[]).includes(status);
 
+/** Grupos de sessão combinada marcados no escopo (018): passos com a
+ *  mesma letra `sessao` dividem uma sessão só. Devolve só grupos com
+ *  2+ membros, ordenados por número — o primeiro é a âncora, onde a
+ *  aplicação carimba o gesto e o registro mora. */
+export function sessoesDoEscopo(
+  passos: readonly { numero: number; sessao?: string | null }[]
+): Map<string, number[]> {
+  const g = new Map<string, number[]>();
+  for (const p of passos) {
+    if (!p.sessao) continue;
+    const l = g.get(p.sessao) ?? [];
+    l.push(p.numero);
+    g.set(p.sessao, l);
+  }
+  for (const [k, nums] of g) {
+    if (nums.length < 2) g.delete(k);
+    else nums.sort((a, b) => a - b);
+  }
+  return g;
+}
+
+/** "6º e 7º" / "6º, 7º e 8º" — a lista curta dos encontros de um grupo
+ *  nas linhas e nas descrições. */
+export function listaEncontros(numeros: readonly number[]): string {
+  const l = numeros.map((n) => `${n}º`);
+  if (l.length <= 2) return l.join(" e ");
+  return `${l.slice(0, -1).join(", ")} e ${l.at(-1)}`;
+}
+
+/** "na mesma sessão do 6º" / "na mesma sessão dos 6º e 7º" — a leitura
+ *  da marca na linha do passo, no combinado e na projeção. */
+export function rotuloSessao(
+  numero: number,
+  grupo: readonly number[]
+): string {
+  const outros = grupo.filter((n) => n !== numero);
+  if (outros.length === 1) return `na mesma sessão do ${outros[0]}º`;
+  return `na mesma sessão dos ${listaEncontros(outros)}`;
+}
+
 /** Recorte da RPC jovem_plano → a projeção que os cards e os banners
  *  leem. A RPC já devolve sem semáforo/motivos; aqui só muda a forma
  *  (ritmo vem texto do jsonb, passos aplicados achatam, os aceites
@@ -172,7 +220,15 @@ export function combinadoDoJovem(p: {
   versao: number;
   ritmo?: string | number | null;
   janela?: { inicio: string; fim: string } | null;
-  passos?: { numero: number; data: string; acao?: string }[] | null;
+  passos?:
+    | {
+        numero: number;
+        data: string;
+        acao?: string;
+        sessao?: string;
+        duracao_min?: number;
+      }[]
+    | null;
   aprovado_lado: "mentor" | "mentorado" | null;
   aceito_mentor?: boolean;
   aceito_mentorado?: boolean;
@@ -201,6 +257,8 @@ export function combinadoDoJovem(p: {
         numero: s.numero,
         data: s.data,
         acao: s.acao,
+        sessao: s.sessao,
+        duracao_min: s.duracao_min,
       })),
     },
     passos: (p.passos_aplicados ?? []).map((s) => ({

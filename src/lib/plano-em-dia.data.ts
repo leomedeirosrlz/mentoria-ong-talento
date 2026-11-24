@@ -87,3 +87,8 @@ export const RITMO_UM_POR_DIA = 7;
  *  piso genérico da semana dupla; prática (7d) e tarefa (2d) seguem valendo,
  *  porque são conteúdo do guia, não cadência. */
 export const GAP_UM_POR_DIA = 1;
+
+/** Duração padrão da sessão combinada (018): 2h cobrindo os passos do
+ *  grupo. A marca do escopo já nasce com ela; o catálogo da agenda
+ *  (30–120) segue valendo pra quando a dupla ajustar na aplicação. */
+export const DURACAO_SESSAO_MIN = 120;

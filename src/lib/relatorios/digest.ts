@@ -16,6 +16,7 @@
 
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
+  cobertosDaDupla,
   emLimbo,
   encontrosDaSemana,
   formatDate,
@@ -437,8 +438,12 @@ export async function montarDigestSemanal(
   }
   const nLimbo = duplas
     .filter((d) => d.status === "ativa")
-    .flatMap((d) => d.encontros)
-    .filter((e) => emLimbo(e, agoraMs)).length;
+    // a régua do limbo é por dupla (018): o mapa de cobertos só existe
+    // dentro da lista da própria dupla — o flat não pode misturar
+    .flatMap((d) => {
+      const cobertos = cobertosDaDupla(d.encontros);
+      return d.encontros.filter((e) => emLimbo(e, agoraMs, cobertos));
+    }).length;
 
   const formacoesSemChamada = (fRes.data ?? []).filter(
     (f) =>

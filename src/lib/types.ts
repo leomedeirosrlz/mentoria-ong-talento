@@ -430,8 +430,9 @@ export type AvaliacaoEncontro = {
   /** O jovem liberou o mentor DPP ler esta avaliação específica. */
   avaliacao_visivel_mentor: boolean;
   /** Sessão combinada: números de TODOS os encontros do grupo (inclui o da
-   *  avaliação) — copiada do link pelo trigger 0228. [] = sessão simples. */
-  cobertura?: number[];
+   *  avaliação) — copiada do link pelo trigger 0228. null/[] = sessão
+   *  simples (a coluna é jsonb, pode vir null). */
+  cobertura?: number[] | null;
   /** null = resposta anônima por token (jovem sem login). */
   respondido_por_profile_id: string | null;
   created_at: string;
@@ -582,7 +583,32 @@ export type DuplaPlanoEscopo = {
     | "semana_tripla"
     | "um_por_dia"
     | "conversa_coord";
-  passos?: { numero: number; data: string; acao: string }[];
+  passos?: {
+    numero: number;
+    data: string;
+    acao: string;
+    /** Marca da sessão combinada (018): passos com o mesmo valor foram
+     *  fundidos pela dupla numa sessão só — a plano_aplicar_sessao
+     *  carimba data_hora/duracao/sessao_id do grupo de uma vez. */
+    sessao?: string;
+    /** Duração da sessão combinada em min — 120 (2h) é o padrão. */
+    duracao_min?: number;
+  }[];
+  /** Snapshot das decisões do gesto (518: recessos e grade; 018:
+   *  fusão) — viaja no jsonb do escopo sem DDL. `fusao` registra o
+   *  aceite consciente do aviso de prática (avisa sempre, bloqueia
+   *  nunca). */
+  decisoes?: {
+    recessos?: { cicloEventoId: string; usa: boolean }[];
+    sem_grade?: boolean;
+    ajuste_no_aceite?: boolean;
+    fusao?: {
+      aceita?: boolean;
+      aviso_pratica?: boolean;
+      pares?: number[][];
+    };
+    [k: string]: unknown;
+  };
 };
 
 export type DuplaPlano = {

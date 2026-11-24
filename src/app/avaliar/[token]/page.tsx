@@ -153,7 +153,12 @@ export default async function AvaliarTokenPage({
                 info.encontro
                   ? meta?.trilha === "especialista"
                     ? `Sessão${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDiaSemanaHora(quando)}`
-                    : `Encontro ${info.encontro.numero}${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDiaSemanaHora(quando)}`
+                    : // sessão combinada (018): o link cobre todos os números
+                      // do grupo — o contexto nomeia a sessão inteira, não só
+                      // a âncora que carrega o token
+                      (meta?.cobertura ?? []).length > 1
+                      ? `Sessão combinada dos encontros ${(meta!.cobertura!).join(" e ")}${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDiaSemanaHora(quando)}`
+                      : `Encontro ${info.encontro.numero}${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDiaSemanaHora(quando)}`
                   : null
               }
               demo={!!demo}

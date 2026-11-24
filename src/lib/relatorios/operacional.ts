@@ -119,7 +119,9 @@ export function resumoAderencia(
         pendReg++;
     }
     if (l.atrasoMedioRegistro != null) {
-      // a média da dupla pesa pelos registros que a medem
+      // a média da dupla pesa pelas entregas que a medem — mesma régua do
+      // itemAderencia: a sessão combinada (018) tem UMA entrega (a da
+      // âncora); pesar o coberto duplicaria a amostra
       const n = i.dupla.encontros.filter((e) => registroTemConteudo(e.registro)).length;
       atrasoSoma += l.atrasoMedioRegistro * n;
       atrasoN += n;

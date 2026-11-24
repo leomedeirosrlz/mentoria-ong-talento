@@ -18,6 +18,7 @@ import { getInstrumentosDaDupla } from "@/lib/forms/queries";
 import { getTerceirosDaDupla } from "@/lib/terceiros/queries";
 import { getUltimasInteracoes } from "@/lib/interacoes";
 import {
+  avaliacaoCobreNumero,
   eventoDaSemana,
   eventosDoCronograma,
   maxNumeroEncontro,
@@ -289,8 +290,15 @@ export default async function MateriaisPage({
   // página por instrumento)
   const avaliacoesSelecionada = duplaSelecionadaFull
     ? {
+        // sessão combinada (018/0228): a avaliação do jovem é uma por
+        // sessão, na âncora — `cobertura` dela traz todos os números, e o
+        // coberto conta como avaliado
         feitas: duplaSelecionadaFull.encontros.filter(
-          (e) => e.status === "realizado" && e.avaliacao_jovem
+          (e) =>
+            e.status === "realizado" &&
+            duplaSelecionadaFull.encontros.some((x) =>
+              avaliacaoCobreNumero(x.avaliacao_jovem, e)
+            )
         ).length,
         realizados: duplaSelecionadaFull.encontros.filter(
           (e) => e.status === "realizado"

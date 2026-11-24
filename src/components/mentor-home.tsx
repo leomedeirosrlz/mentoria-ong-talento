@@ -5,6 +5,8 @@ import {
   alvoAgendamento,
   cronogramaVigente,
   eventoDaSemana,
+  cobertosDaDupla,
+  encontroTemConteudo,
   eventosDoCronograma,
   formatDate,
   formatDateTime,
@@ -190,6 +192,9 @@ export function MentorHome({
           passosDaTrilha(dupla.trilha, eventosDaDupla, espEventos),
           hoje
         );
+        // sessão combinada (018): o coberto já tem conteúdo via âncora —
+        // sem o mapa o card cobraria registro de um passo entregue
+        const cobertos = cobertosDaDupla(dupla.encontros);
         // pendência de registro mais antiga — realizado sem registro ou
         // limbo fechado: agendado/remarcado cujo horário previsto (início
         // + duração) já passou. Enquanto a chamada rola o encontro ainda
@@ -198,9 +203,9 @@ export function MentorHome({
           .sort((a, b) => a.numero - b.numero)
           .find(
             (e) =>
-              !e.registro &&
+              !encontroTemConteudo(e, cobertos) &&
               (e.status === "realizado" ||
-                limboFechado(e, hoje.getTime()))
+                limboFechado(e, hoje.getTime(), cobertos))
           );
         // chamada no ar: começou mas o fim previsto ainda não passou —
         // conta como "agendado agora" (Entrar), não como limbo
@@ -208,7 +213,7 @@ export function MentorHome({
           !!e &&
           e.data_hora != null &&
           new Date(e.data_hora) <= hoje &&
-          !limboFechado(e, hoje.getTime());
+          !limboFechado(e, hoje.getTime(), cobertos);
         const pendentes = dupla.encaminhamentos
           .filter((t) => t.status === "pendente")
           // vencido primeiro, depois o prazo mais próximo — a mesma ordem

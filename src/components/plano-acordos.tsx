@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Check, X, CalendarPlus } from "@phosphor-icons/react";
 import {
   aplicarPassoPlano,
+  aplicarSessaoPlano,
   responderPlano,
   responderPlanoComRecesso,
   type DecisaoRecesso,
@@ -14,11 +15,15 @@ import {
   datasDoPasso,
   diaMes,
   estadoLeituraPlano,
+  listaEncontros,
   resumoCombinado,
+  rotuloSessao,
+  sessoesDoEscopo,
   sugestaoPasso,
   type PlanoCombinado,
   type SugestaoPasso,
 } from "@/lib/plano-combinado";
+import { DURACAO_SESSAO_MIN } from "@/lib/plano-em-dia.data";
 import {
   partesSP,
   type OcupadoRotulado,
@@ -113,6 +118,9 @@ export function PlanoAcordosCard({
   const [seletor, setSeletor] = useState<{
     numero: number;
     sessao: number;
+    /** números da sessão combinada (018) — quando existe, o gesto
+     *  carimba o grupo inteiro de uma vez */
+    grupo?: number[];
   } | null>(null);
   const [marcados, setMarcados] = useState<
     Record<number, { data: string; hora: string }>
@@ -127,6 +135,16 @@ export function PlanoAcordosCard({
   const aplicados = new Map(
     (plano.passos ?? []).map((p) => [p.numero, p])
   );
+  // 018: os grupos de sessão combinada marcados no escopo — número →
+  // números do grupo. O primeiro é a âncora, que carrega o gesto.
+  const grupoPorNumero = new Map<number, number[]>();
+  for (const nums of sessoesDoEscopo(plano.escopo?.passos ?? []).values())
+    for (const n of nums) grupoPorNumero.set(n, nums);
+  /** o grupo inteiro ainda sem data — só aí o gesto é da sessão; com um
+   *  membro já marcado (não devia acontecer: a RPC carimba junto), cada
+   *  pendente volta ao caminho individual */
+  const grupoLivre = (g: readonly number[] | undefined): g is number[] =>
+    g != null && g.every((n) => !aplicados.has(n) && !marcados[n]);
   const janela = plano.janela ?? plano.escopo?.janela ?? null;
   const hoje = sugestoes?.hoje ?? partesSP(new Date())?.data ?? "";
   // leitura 518 do plano por quem abre: proposta da equipe esperando a
@@ -205,6 +223,41 @@ export function PlanoAcordosCard({
     });
   };
 
+  // 018: a sessão combinada é um gesto só — todos os passos do grupo
+  // ganham a mesma data/hora e o mesmo sessao_id numa RPC
+  const aplicarSessao = (numeros: number[], data: string, hora: string) => {
+    setErroPasso(null);
+    iniciar(async () => {
+      const r = await aplicarSessaoPlano(
+        plano.id,
+        numeros,
+        `${data}T${hora}:00-03:00`,
+        DURACAO_SESSAO_MIN,
+        undefined,
+        undefined,
+        duplaId
+      );
+      if ("error" in r) {
+        setErroPasso({ numero: numeros[0], texto: r.error });
+        return;
+      }
+      setMarcados((m) => {
+        const n = { ...m };
+        for (const x of numeros) n[x] = { data, hora };
+        return n;
+      });
+      setEditando(null);
+      setSeletor(null);
+      router.refresh();
+    });
+  };
+
+  const aplicarOuSessao = (numero: number, data: string, hora: string) => {
+    const g = grupoPorNumero.get(numero);
+    if (grupoLivre(g)) aplicarSessao(g, data, hora);
+    else aplicar(numero, data, hora);
+  };
+
   // instantes já comprometidos: ocupados do motor + passos aplicados +
   // os confirmados nesta sessão (que o refresh ainda não devolveu) — um
   // passo pendente nunca reoferece um instante desses (507)
@@ -224,6 +277,14 @@ export function PlanoAcordosCard({
         sugs.set(p.numero, null);
         continue;
       }
+      const g = grupoPorNumero.get(p.numero);
+      const sessao = grupoLivre(g);
+      // o grupo é um instante só: a âncora carrega a sugestão de 2h, os
+      // outros membros esperam por ela (sem CTA nem horário próprio)
+      if (sessao && g[0] !== p.numero) {
+        sugs.set(p.numero, null);
+        continue;
+      }
       const sug = sugestaoPasso({
         dataPasso: p.data,
         hoje,
@@ -231,7 +292,9 @@ export function PlanoAcordosCard({
         perfil: sugestoes?.perfil,
         disponibilidade: sugestoes?.disponibilidade,
         ocupados: [...ocupadosBase, ...sugeridos],
-        duracaoMin: sugestoes?.duracaoMin,
+        duracaoMin: sessao
+          ? (p.duracao_min ?? DURACAO_SESSAO_MIN)
+          : sugestoes?.duracaoMin,
       });
       sugs.set(p.numero, sug);
       if (sug) sugeridos.push(`${sug.data}T${sug.hora}:00-03:00`);
@@ -323,13 +386,26 @@ export function PlanoAcordosCard({
           const aplicado = aplicados.get(p.numero);
           const confirmado = marcados[p.numero];
           const sug = sugs.get(p.numero) ?? null;
+          // 018: membro de sessão combinada carrega o rótulo do grupo;
+          // a âncora (o 1º do grupo) cobre todos numa linha só com o
+          // gesto "Marcar sessão"
+          const grupo = grupoPorNumero.get(p.numero);
+          const sessaoLivre = grupoLivre(grupo);
+          const ehAncora = sessaoLivre && grupo[0] === p.numero;
+          const tagSessao = grupo ? rotuloSessao(p.numero, grupo) : null;
+          const durSessao = p.duracao_min ?? DURACAO_SESSAO_MIN;
           return (
             <li key={p.numero} className="text-sm">
               <div className="flex flex-wrap items-center gap-x-2 gap-y-1.5">
-                <span className="font-medium">{p.numero}º encontro</span>
+                <span className="font-medium">
+                  {ehAncora
+                    ? `${listaEncontros(grupo)} encontros`
+                    : `${p.numero}º encontro`}
+                </span>
                 {aplicado ? (
                   <span className="text-muted-foreground">
-                    · marcado pra {rotuloAplicado(aplicado.data_nova)}
+                    · {tagSessao ? `${tagSessao} · ` : ""}marcado pra{" "}
+                    {rotuloAplicado(aplicado.data_nova)}
                   </span>
                 ) : confirmado ? (
                   <span
@@ -337,12 +413,23 @@ export function PlanoAcordosCard({
                     className="inline-flex items-center gap-1 text-[var(--ok-text)]"
                   >
                     <Check size={14} weight="bold" aria-hidden />
-                    Marcado pra {rotuloPasso(confirmado.data, confirmado.hora)}
+                    {tagSessao ? `${tagSessao} · ` : ""}Marcado pra{" "}
+                    {rotuloPasso(confirmado.data, confirmado.hora)}
+                  </span>
+                ) : sessaoLivre && !ehAncora ? (
+                  <span className="text-muted-foreground">
+                    · {tagSessao}
                   </span>
                 ) : (
                   <>
                     <span className="text-muted-foreground">
-                      · sugestão{" "}
+                      ·{" "}
+                      {ehAncora
+                        ? `sessão de ${rotuloDuracao(durSessao)} · `
+                        : tagSessao
+                          ? `${tagSessao} · `
+                          : ""}
+                      sugestão{" "}
                       {sug ? rotuloPasso(sug.data, sug.hora) : ddmm(p.data)}
                     </span>
                     {aberto &&
@@ -355,11 +442,11 @@ export function PlanoAcordosCard({
                             size="sm"
                             disabled={pendente}
                             onClick={() =>
-                              aplicar(p.numero, sug.data, sug.hora)
+                              aplicarOuSessao(p.numero, sug.data, sug.hora)
                             }
                           >
                             <CalendarPlus aria-hidden />
-                            Confirmar
+                            {ehAncora ? "Marcar sessão" : "Confirmar"}
                           </Button>
                           <Button
                             variant="ghost"
@@ -372,6 +459,7 @@ export function PlanoAcordosCard({
                                 setSeletor((s) => ({
                                   numero: p.numero,
                                   sessao: (s?.sessao ?? 0) + 1,
+                                  grupo: ehAncora ? grupo : undefined,
                                 }));
                               } else {
                                 setDatas((d) => ({
@@ -439,7 +527,8 @@ export function PlanoAcordosCard({
                     }
                     onClick={() => {
                       const v = datas[p.numero];
-                      if (v?.dia && v?.hora) aplicar(p.numero, v.dia, v.hora);
+                      if (v?.dia && v?.hora)
+                        aplicarOuSessao(p.numero, v.dia, v.hora);
                     }}
                   >
                     Confirmar
@@ -543,8 +632,12 @@ export function PlanoAcordosCard({
             if (!o) setSeletor(null);
           }}
           numero={passoSeletor.numero}
-          descricao={`${passoSeletor.numero}º encontro · passo do combinado`}
-          rotuloConfirmar="Confirmar data"
+          descricao={
+            seletor.grupo
+              ? `${listaEncontros(seletor.grupo)} encontros · sessão combinada de ${rotuloDuracao(passoSeletor.duracao_min ?? DURACAO_SESSAO_MIN)}`
+              : `${passoSeletor.numero}º encontro · passo do combinado`
+          }
+          rotuloConfirmar={seletor.grupo ? "Marcar sessão" : "Confirmar data"}
           inicial={{
             data: sugSeletor.data,
             hora: sugSeletor.hora,
@@ -552,6 +645,9 @@ export function PlanoAcordosCard({
           }}
           sugestoes={{
             ...sugestoes,
+            duracaoMin: seletor.grupo
+              ? (passoSeletor.duracao_min ?? DURACAO_SESSAO_MIN)
+              : sugestoes.duracaoMin,
             datas: datasDoPasso({
               dataPasso: passoSeletor.data,
               hoje,
@@ -560,7 +656,9 @@ export function PlanoAcordosCard({
               perfil: sugestoes.perfil,
               disponibilidade: sugestoes.disponibilidade,
               ocupados: ocupadosBase,
-              duracaoMin: sugestoes.duracaoMin,
+              duracaoMin: seletor.grupo
+                ? (passoSeletor.duracao_min ?? DURACAO_SESSAO_MIN)
+                : sugestoes.duracaoMin,
             }),
             ocupados: ocupadosRotulados,
             janela,
@@ -570,11 +668,23 @@ export function PlanoAcordosCard({
           onAviso={(a) =>
             setErroPasso(a ? { numero: passoSeletor.numero, texto: a } : null)
           }
-          onConfirmar={(data, hora) => aplicar(passoSeletor.numero, data, hora)}
+          onConfirmar={(data, hora) =>
+            seletor.grupo
+              ? aplicarSessao(seletor.grupo, data, hora)
+              : aplicar(passoSeletor.numero, data, hora)
+          }
         />
       )}
     </div>
   );
+}
+
+/** "2h" / "1h30" / "45min" — a duração da sessão combinada na linha e na
+ *  descrição do seletor. */
+function rotuloDuracao(min: number): string {
+  if (min % 60 === 0) return `${min / 60}h`;
+  if (min > 60) return `${Math.floor(min / 60)}h${min % 60}`;
+  return `${min}min`;
 }
 
 /** "ter 24/11 às 19:00" de um ISO aplicado — as partes civis do fuso do
