@@ -4,6 +4,10 @@ import dynamic from "next/dynamic";
 import { useState } from "react";
 import { Desktop, DeviceMobile, Eye } from "@phosphor-icons/react";
 import type { FormularioCampo, FormularioSistema } from "@/lib/forms/schema";
+import {
+  ehInstrumento,
+  larguraPublicaForm,
+} from "@/lib/forms/instrumentos";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -52,7 +56,10 @@ export function FormularioPreview({
           </Button>
         }
       />
-      <DialogContent size="2xl">
+      {/* instrumento sob medida (022/US3): a moldura "Computador" pede
+          768px de documento — só cabe num popup quase-viewport; form
+          genérico segue no 2xl de sempre */}
+      <DialogContent size={ehInstrumento(sistema) ? "full" : "2xl"}>
         <DialogHeader>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0">
@@ -102,7 +109,10 @@ export function FormularioPreview({
           <div
             className={cn(
               "mx-auto w-full transition-[max-width] duration-200",
-              celular && "max-w-[390px]"
+              // mesma régua do /f/ real (022/US3): a moldura "Computador"
+              // replica a largura pública por sistema; a "Celular" segue
+              // fixada em ~390px pra qualquer form
+              celular ? "max-w-[390px]" : larguraPublicaForm(sistema)
             )}
           >
             {/* o chrome da página real — o link abre com a marca no topo */}

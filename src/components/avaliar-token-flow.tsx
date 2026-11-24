@@ -4,6 +4,7 @@ import { useState } from "react";
 import { CheckCircle, Flask, WifiSlash } from "@phosphor-icons/react";
 import { EstadoCard } from "@/components/estado-card";
 import { AvaliacaoEncontroForm } from "@/components/avaliacao-encontro-form";
+import { privacidadeAvaliacao } from "@/lib/avaliacao-privacidade";
 
 /** Tronco do /avaliar/[token] que decide entre o form e o "já registrada"
  *  NO CLIENT — o submit bem-sucedido revalida a rota e a próxima render
@@ -18,6 +19,7 @@ export function AvaliarTokenFlow({
   jaRegistrada,
   primeiroNome,
   contexto,
+  sessao = [],
   demo,
   retryHref,
 }: {
@@ -30,8 +32,13 @@ export function AvaliarTokenFlow({
   jaRegistrada: boolean;
   primeiroNome: string | null;
   /** "Encontro N com Fulano · terça-feira, 24/11 às 19:00" — montado no
-   *  servidor ("data a confirmar" quando a data não resolveu). */
+   *  servidor ("data a confirmar" quando a data não resolveu). Sobe pro
+   *  subtítulo do cabeçalho (022/US2). */
   contexto: string | null;
+  /** Números de encontro que o link cobre (`cobertura` da row — [5,6] é
+   *  sessão combinada da 018): com mais de um número o gesto é "a
+   *  sessão", não "o encontro". */
+  sessao?: number[];
   demo: boolean;
   retryHref: string;
 }) {
@@ -71,15 +78,45 @@ export function AvaliarTokenFlow({
           Modo demonstração: respostas não são gravadas.
         </p>
       )}
-      {contexto && (
-        <p className="mb-4 text-center text-xs text-muted-foreground">
-          {contexto}
-        </p>
+      {/* 022/US2 — o cabeçalho da página, antes do form e na gramática
+          do cartão de título do /f/: saudação → h1 do gesto → subtítulo
+          com a linha `contexto` do servidor (data + dia da semana + hora)
+          → h3 com a descrição + a linha de privacidade. Some quando
+          `submeteu` — o h1 único da página passa a ser o do cartão de
+          sucesso. O form entra embutido pra não duplicar saudação/h1. */}
+      {!submeteu && (
+        <div className="mb-3 overflow-hidden rounded-xl bg-card shadow-[var(--shadow-border)]">
+          <div aria-hidden className="h-1.5 bg-[var(--brand-lime)]" />
+          <div className="p-5 sm:p-7">
+            {primeiroNome && (
+              <p className="text-sm font-medium text-[var(--ok-text)]">
+                Olá, {primeiroNome}!
+              </p>
+            )}
+            <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+              {trilha === "especialista" || sessao.length > 1
+                ? "Como foi a sessão?"
+                : "Como foi o encontro?"}
+            </h1>
+            {contexto && (
+              <p className="mt-1 text-sm text-muted-foreground">
+                {contexto}
+              </p>
+            )}
+            <h3 className="mt-3 text-sm font-normal leading-relaxed text-muted-foreground">
+              <span className="font-medium text-foreground">
+                1 minuto · só a nota é obrigatória.
+              </span>{" "}
+              {privacidadeAvaliacao(trilha)}
+            </h3>
+          </div>
+        </div>
       )}
       <AvaliacaoEncontroForm
         token={token}
         trilha={trilha}
         primeiroNome={primeiroNome}
+        embutido
         onEnviado={() => setSubmeteu(true)}
       />
     </>

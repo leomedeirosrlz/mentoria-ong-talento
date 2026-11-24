@@ -1,6 +1,7 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+import type { FormEvent } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
 import {
@@ -28,6 +29,7 @@ import {
   progressoPdm,
   subitensAtivos,
 } from "@/lib/pdm";
+import { FormSurface } from "@/components/form-surface";
 import { PdmArvore } from "@/components/pdm-arvore";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -526,6 +528,10 @@ function ItemDialog({
   const [indicador, setIndicador] = useState(item?.indicador ?? "");
   const [areaVida, setAreaVida] = useState<string | null>(item?.areaVida ?? null);
   const [prazo, setPrazo] = useState(item?.prazoAlvo ?? "");
+  // submit sem título: aria-invalid + mensagem inline + foco no campo —
+  // um botão disabled sozinho não explica nada (SC-005 da spec 022)
+  const [erroTitulo, setErroTitulo] = useState<string | null>(null);
+  const tituloRef = useRef<HTMLInputElement>(null);
 
   const tituloDialog =
     estado.modo === "nova-meta"
@@ -536,115 +542,151 @@ function ItemDialog({
           ? "Editar meta"
           : "Editar submeta";
 
+  function salvar(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const t = titulo.trim();
+    if (!t) {
+      setErroTitulo(
+        ehMeta ? "Dê um nome pra meta." : "Dê um nome pra submeta."
+      );
+      tituloRef.current?.focus();
+      return;
+    }
+    onSalvar({
+      titulo: t,
+      porque: porque.trim() || null,
+      indicador: indicador.trim() || null,
+      areaVida: ehMeta ? areaVida : null,
+      prazoAlvo: prazo || null,
+    });
+    onFechar();
+  }
+
   return (
-    <Dialog open onOpenChange={(v) => !v && onFechar()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{tituloDialog}</DialogTitle>
-          <DialogDescription>
-            {estado.modo === "nova-submeta"
-              ? `Dentro de "${estado.pai.titulo}": o que precisa acontecer pra essa meta sair do papel?`
-              : ehMeta
-                ? "Meta SMART: específica, com indicador de sucesso e prazo. A ordem da lista é a prioridade."
-                : "O passo concreto dentro da meta: realizável de imediato, com prazo quando fizer sentido."}
-          </DialogDescription>
-        </DialogHeader>
-        <div className="space-y-3">
-          <div>
-            <Label htmlFor="pdm-titulo">{ehMeta ? "Meta" : "Submeta"}</Label>
-            <Input
-              id="pdm-titulo"
-              value={titulo}
-              onChange={(e) => setTitulo(e.target.value)}
-              maxLength={500}
-              placeholder={
-                ehMeta
-                  ? "Ex.: Conseguir um jovem aprendiz até dezembro"
-                  : "Ex.: Montar o currículo com a Luana da ONG"
-              }
-              autoFocus
-            />
-          </div>
-          {ehMeta && (
-            <div>
-              <Label htmlFor="pdm-porque">
-                Por que é importante (o porquê do jovem)
-              </Label>
-              <Textarea
-                id="pdm-porque"
-                value={porque}
-                onChange={(e) => setPorque(e.target.value)}
-                rows={2}
-                maxLength={2000}
-              />
-            </div>
-          )}
-          <div>
-            <Label htmlFor="pdm-indicador">
-              Indicador de sucesso (como saber que cumpriu)
-            </Label>
-            <Input
-              id="pdm-indicador"
-              value={indicador}
-              onChange={(e) => setIndicador(e.target.value)}
-              maxLength={500}
-              placeholder="Ex.: Média 7,0 no boletim do 3º bimestre"
-            />
-          </div>
-          <div className="grid gap-3 sm:grid-cols-2">
-            {ehMeta && (
-              <div>
-                <Label htmlFor="pdm-area">Área da vida</Label>
-                <Select
-                  value={areaVida}
-                  onValueChange={(v) => setAreaVida(v as string | null)}
-                >
-                  <SelectTrigger id="pdm-area">
-                    <SelectValue placeholder="Escolher…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {PDM_AREAS_VIDA.map((a) => (
-                      <SelectItem key={a} value={a}>
-                        {a}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <div>
-              <Label htmlFor="pdm-prazo">Prazo-alvo</Label>
-              <Input
-                id="pdm-prazo"
-                type="date"
-                value={prazo}
-                onChange={(e) => setPrazo(e.target.value)}
-              />
-            </div>
-          </div>
-        </div>
-        <DialogFooter>
+    <FormSurface
+      open
+      onOpenChange={(v) => !v && onFechar()}
+      titulo={tituloDialog}
+      descricao={
+        estado.modo === "nova-submeta"
+          ? `Dentro de "${estado.pai.titulo}": o que precisa acontecer pra essa meta sair do papel?`
+          : ehMeta
+            ? "Meta SMART: específica, com indicador de sucesso e prazo. A ordem da lista é a prioridade."
+            : "O passo concreto dentro da meta: realizável de imediato, com prazo quando fizer sentido."
+      }
+      footer={
+        <>
           <Button variant="outline" onClick={onFechar}>
             Cancelar
           </Button>
-          <Button
-            disabled={!titulo.trim()}
-            onClick={() => {
-              onSalvar({
-                titulo: titulo.trim(),
-                porque: porque.trim() || null,
-                indicador: indicador.trim() || null,
-                areaVida: ehMeta ? areaVida : null,
-                prazoAlvo: prazo || null,
-              });
-              onFechar();
-            }}
-          >
+          <Button type="submit" form="pdm-item-form">
             {estado.modo === "editar" ? "Salvar" : "Adicionar"}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </>
+      }
+    >
+      {/* o <form> fica no corpo e o submit do rodapé associa via `form` —
+          Enter em qualquer campo submete; noValidate porque a validação
+          honesta é a nossa (foco + mensagem inline), não a bolha nativa */}
+      <form
+        id="pdm-item-form"
+        className="space-y-3"
+        noValidate
+        onSubmit={salvar}
+      >
+        <div>
+          <Label htmlFor="pdm-titulo">{ehMeta ? "Meta" : "Submeta"}</Label>
+          <Input
+            ref={tituloRef}
+            id="pdm-titulo"
+            required
+            value={titulo}
+            onChange={(e) => {
+              setTitulo(e.target.value);
+              if (erroTitulo) setErroTitulo(null);
+            }}
+            aria-invalid={erroTitulo ? true : undefined}
+            aria-describedby={erroTitulo ? "pdm-titulo-erro" : undefined}
+            maxLength={500}
+            placeholder={
+              ehMeta
+                ? "Ex.: Conseguir um jovem aprendiz até dezembro"
+                : "Ex.: Montar o currículo com a Luana da ONG"
+            }
+            autoFocus
+          />
+          {erroTitulo && (
+            <p
+              id="pdm-titulo-erro"
+              className="mt-1.5 text-sm leading-snug text-destructive"
+            >
+              {erroTitulo}
+            </p>
+          )}
+        </div>
+        {ehMeta && (
+          <div>
+            <Label htmlFor="pdm-porque">
+              Por que é importante (o porquê do jovem)
+            </Label>
+            <Textarea
+              id="pdm-porque"
+              value={porque}
+              onChange={(e) => setPorque(e.target.value)}
+              rows={2}
+              maxLength={2000}
+            />
+          </div>
+        )}
+        <div>
+          <Label htmlFor="pdm-indicador">
+            Indicador de sucesso (como saber que cumpriu)
+          </Label>
+          <Input
+            id="pdm-indicador"
+            value={indicador}
+            onChange={(e) => setIndicador(e.target.value)}
+            maxLength={500}
+            placeholder="Ex.: Média 7,0 no boletim do 3º bimestre"
+          />
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          {ehMeta && (
+            <div>
+              <Label htmlFor="pdm-area">Área da vida</Label>
+              <Select
+                value={areaVida}
+                onValueChange={(v) => setAreaVida(v as string | null)}
+              >
+                <SelectTrigger id="pdm-area">
+                  <SelectValue placeholder="Escolher…" />
+                </SelectTrigger>
+                {/* 16 áreas: ancora junto ao trigger em vez de alinhar o
+                    item marcado por cima — o popup nunca cobre a
+                    superfície (override só deste call site; o default
+                    alignItemWithTrigger do kit segue intacto) */}
+                <SelectContent alignItemWithTrigger={false}>
+                  {PDM_AREAS_VIDA.map((a) => (
+                    <SelectItem key={a} value={a}>
+                      {a}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+          <div>
+            <Label htmlFor="pdm-prazo">Prazo-alvo</Label>
+            <Input
+              id="pdm-prazo"
+              type="date"
+              value={prazo}
+              onChange={(e) => setPrazo(e.target.value)}
+            />
+          </div>
+        </div>
+      </form>
+    </FormSurface>
   );
 }
 

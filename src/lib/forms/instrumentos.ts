@@ -35,6 +35,19 @@ export function ehInstrumentoDeDupla(
   return !!s && (INSTRUMENTOS_DUPLA_SISTEMA as readonly string[]).includes(s);
 }
 
+/** Largura do container de /f/<token> por sistema (022/US3): os 4
+ *  instrumentos sob medida ganham a coluna de documento no desktop —
+ *  `sm:max-w-3xl` (768px) é o mínimo em que a nav de 180px do PDM sobra
+ *  com coluna de documento ≥ ~560px (o split interno dispara a 47.5rem).
+ *  Todo o resto (360, intakes, desfecho, forms genéricos, link sem
+ *  sistema) segue na coluna estreita de leitura. A base sem prefixo é
+ *  sempre `max-w-xl` — o mobile não muda nunca. */
+export function larguraPublicaForm(
+  s: FormularioSistema | null | undefined
+): string {
+  return ehInstrumento(s) ? "max-w-xl sm:max-w-3xl" : "max-w-xl";
+}
+
 // ---------- agrupamento por seções ----------
 
 export type BlocoSecao = {

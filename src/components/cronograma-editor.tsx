@@ -51,6 +51,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { ConfirmDeleteButton } from "@/components/confirm-delete-button";
 import { EventoCronogramaDialog } from "@/components/evento-cronograma-dialog";
+import { FormSurface } from "@/components/form-surface";
 import {
   Dialog,
   DialogContent,
@@ -225,116 +226,113 @@ export function CronogramaAcoes({
         />
       )}
 
-      {/* metadados */}
-      <Dialog
+      {/* metadados — superfície única por viewport (spec 022): 3 campos
+          com select = form denso, nunca `md` */}
+      <FormSurface
         open={metaOpen}
         onOpenChange={(o) => {
           setMetaOpen(o);
           if (o) setStatusSel(cronograma.status);
         }}
-      >
-        <DialogTrigger
-          render={
-            <Button size="sm" variant="outline" aria-label="Editar dados do cronograma">
-              <PencilSimple aria-hidden />
-              Editar dados
+        trigger={
+          <Button size="sm" variant="outline" aria-label="Editar dados do cronograma">
+            <PencilSimple aria-hidden />
+            Editar dados
+          </Button>
+        }
+        titulo="Dados do cronograma"
+        descricao="Nome, turma e status. A agenda de encontros muda no editor abaixo."
+        footer={
+          <>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setMetaOpen(false)}
+            >
+              Cancelar
             </Button>
-          }
-        />
-        <DialogContent size="md">
-          <DialogHeader>
-            <DialogTitle>Dados do cronograma</DialogTitle>
-            <DialogDescription>
-              Nome, turma e status. A agenda de encontros muda no editor
-              abaixo.
-            </DialogDescription>
-          </DialogHeader>
-          <form
-            className="space-y-4"
-            onSubmit={(e) => {
-              e.preventDefault();
-              const fd = new FormData(e.currentTarget);
-              start(async () => {
-                try {
-                  const res = await atualizarCronograma(cronograma.id, {
-                    nome: String(fd.get("nome") ?? ""),
-                    turma: String(fd.get("turma") ?? ""),
-                    status: statusSel,
-                  });
-                  if ("error" in res && res.error) toast.error(res.error);
-                  else {
-                    toast.success("Cronograma atualizado.");
-                    setMetaOpen(false);
-                    router.refresh();
-                  }
-                } catch {
-                  toast.error("Sem conexão. Tente de novo.");
+            <Button type="submit" form="cg-dados-form" disabled={pending}>
+              {pending && <CircleNotch className="animate-spin" />}
+              {pending ? "Salvando…" : "Salvar"}
+            </Button>
+          </>
+        }
+      >
+        {/* o submit mora no rodapé da superfície — a associação é pelo
+            atributo `form`, então o <form> fica só com os campos */}
+        <form
+          id="cg-dados-form"
+          className="space-y-4"
+          onSubmit={(e) => {
+            e.preventDefault();
+            const fd = new FormData(e.currentTarget);
+            start(async () => {
+              try {
+                const res = await atualizarCronograma(cronograma.id, {
+                  nome: String(fd.get("nome") ?? ""),
+                  turma: String(fd.get("turma") ?? ""),
+                  status: statusSel,
+                });
+                if ("error" in res && res.error) toast.error(res.error);
+                else {
+                  toast.success("Cronograma atualizado.");
+                  setMetaOpen(false);
+                  router.refresh();
                 }
-              });
-            }}
-          >
-            <div className="space-y-2">
-              <Label htmlFor="cg-nome">Nome do cronograma</Label>
-              <Input
-                id="cg-nome"
-                name="nome"
-                required
-                maxLength={120}
-                defaultValue={cronograma.nome}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="cg-turma">Turma</Label>
-              <Input
-                id="cg-turma"
-                name="turma"
-                required
-                maxLength={80}
-                defaultValue={cronograma.turma}
-              />
-              {vinculadas > 0 && (
-                <p className="text-xs text-muted-foreground">
-                  As {vinculadas} {vinculadas === 1 ? "dupla vinculada acompanha" : "duplas vinculadas acompanham"} o
-                  nome da turma. Renomear aqui atualiza a ficha
-                  delas também.
-                </p>
-              )}
-            </div>
-            <div className="space-y-2">
-              <Label id="cg-status-label">Status</Label>
-              <Select
-                value={statusSel}
-                items={CRONOGRAMA_STATUS_LABEL}
-                onValueChange={(v) => setStatusSel(v as Cronograma["status"])}
-              >
-                <SelectTrigger aria-labelledby="cg-status-label">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {Object.entries(CRONOGRAMA_STATUS_LABEL).map(([v, l]) => (
-                    <SelectItem key={v} value={v}>
-                      {l}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setMetaOpen(false)}
-              >
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={pending}>
-                {pending && <CircleNotch className="animate-spin" />}
-                {pending ? "Salvando…" : "Salvar"}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
+              } catch {
+                toast.error("Sem conexão. Tente de novo.");
+              }
+            });
+          }}
+        >
+          <div className="space-y-2">
+            <Label htmlFor="cg-nome">Nome do cronograma</Label>
+            <Input
+              id="cg-nome"
+              name="nome"
+              required
+              maxLength={120}
+              defaultValue={cronograma.nome}
+            />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="cg-turma">Turma</Label>
+            <Input
+              id="cg-turma"
+              name="turma"
+              required
+              maxLength={80}
+              defaultValue={cronograma.turma}
+            />
+            {vinculadas > 0 && (
+              <p className="text-xs text-muted-foreground">
+                As {vinculadas} {vinculadas === 1 ? "dupla vinculada acompanha" : "duplas vinculadas acompanham"} o
+                nome da turma. Renomear aqui atualiza a ficha
+                delas também.
+              </p>
+            )}
+          </div>
+          <div className="space-y-2">
+            <Label id="cg-status-label">Status</Label>
+            <Select
+              value={statusSel}
+              items={CRONOGRAMA_STATUS_LABEL}
+              onValueChange={(v) => setStatusSel(v as Cronograma["status"])}
+            >
+              <SelectTrigger aria-labelledby="cg-status-label">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {Object.entries(CRONOGRAMA_STATUS_LABEL).map(([v, l]) => (
+                  <SelectItem key={v} value={v}>
+                    {l}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </form>
+      </FormSurface>
 
       <ConfirmDeleteButton
         dica="Excluir cronograma"

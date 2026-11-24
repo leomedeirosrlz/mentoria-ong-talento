@@ -87,15 +87,22 @@ test.describe("demo — ponte instrumento ↔ documento (REALIZA-386)", () => {
     await page.goto(`/duplas/${DUPLA_OK}?aba=instrumentos`);
 
     const sec = page.locator("section", { hasText: "Instrumentos da jornada" });
-    // os 5 da régua da dupla — inclusive o não-semeado recebe o guia
+    // os 5 da régua da dupla — inclusive o não-semeado. Com a hierarquia
+    // da 022 (1 ação primária por estado + ⋯ pras secundárias) o guia
+    // mora no menu de cada linha: um trigger "Ações de …" por li
     await expect(
-      sec.getByRole("link", { name: "Ler o guia" })
+      sec.getByRole("button", { name: /^Ações de / })
     ).toHaveCount(5);
 
     const pdm = sec.locator("li", {
       hasText: "Plano de Desenvolvimento do Mentorado",
     });
-    const guia = pdm.getByRole("link", { name: "Ler o guia" });
+    await pdm
+      .getByRole("button", {
+        name: "Ações de Plano de Desenvolvimento do Mentorado",
+      })
+      .click();
+    const guia = page.getByRole("menuitem", { name: "Ler o guia" });
     await expect(guia).toHaveAttribute(
       "href",
       `/materiais/documento/instrumento-pdm?dupla=${DUPLA_OK}`

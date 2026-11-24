@@ -49,15 +49,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
+import { FormSurface } from "@/components/form-surface";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -366,24 +358,23 @@ function LinhaContato({
             podeGerenciar &&
             jornadaViva && (
             <>
-              <Dialog open={editando} onOpenChange={setEditando}>
-                {editando && (
-                  <EditarContatoDialog
-                    contato={contato}
-                    onFechar={() => setEditando(false)}
-                  />
-                )}
-              </Dialog>
-              <Dialog open={registrando} onOpenChange={setRegistrando}>
-                {registrando && (
-                  <RegistrarRespostaDialog
-                    duplaId={duplaId}
-                    contato={contato}
-                    jovemNome={jovemNome}
-                    onFechar={() => setRegistrando(false)}
-                  />
-                )}
-              </Dialog>
+              {/* montagem condicional (como o ItemDialog do PDM): a
+                  superfície remonta a cada abertura e os campos nascem
+                  limpos — sem reset manual de estado */}
+              {editando && (
+                <EditarContatoDialog
+                  contato={contato}
+                  onFechar={() => setEditando(false)}
+                />
+              )}
+              {registrando && (
+                <RegistrarRespostaDialog
+                  duplaId={duplaId}
+                  contato={contato}
+                  jovemNome={jovemNome}
+                  onFechar={() => setRegistrando(false)}
+                />
+              )}
               {status === "pendente" && (
                 <ConfirmDeleteButton
                   open={cancelando}
@@ -473,14 +464,28 @@ function EditarContatoDialog({
     });
   }
 
+  // 022/US6 — 3 campos = form denso: superfície única por viewport
+  // (Dialog lg no desktop, Sheet de rodapé no celular)
   return (
-    <DialogContent size="md">
-      <DialogHeader>
-        <DialogTitle>Editar contato</DialogTitle>
-        <DialogDescription>
-          O link continua o mesmo. Só o cadastro muda.
-        </DialogDescription>
-      </DialogHeader>
+    <FormSurface
+      open
+      onOpenChange={(v) => !v && onFechar()}
+      titulo="Editar contato"
+      descricao="O link continua o mesmo. Só o cadastro muda."
+      footer={
+        <>
+          <Button type="button" variant="outline" onClick={onFechar}>
+            Cancelar
+          </Button>
+          <Button onClick={salvar} disabled={pending}>
+            {pending ? (
+              <CircleNotch className="animate-spin" aria-hidden />
+            ) : null}
+            Salvar
+          </Button>
+        </>
+      }
+    >
       <div className="space-y-3">
         <div className="space-y-1.5">
           <Label htmlFor={`nome-${contato.id}`}>Nome</Label>
@@ -525,16 +530,7 @@ function EditarContatoDialog({
           />
         </div>
       </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onFechar}>
-          Cancelar
-        </Button>
-        <Button onClick={salvar} disabled={pending}>
-          {pending ? <CircleNotch className="animate-spin" aria-hidden /> : null}
-          Salvar
-        </Button>
-      </DialogFooter>
-    </DialogContent>
+    </FormSurface>
   );
 }
 
@@ -597,19 +593,35 @@ function RegistrarRespostaDialog({
     });
   }
 
+  // 022/US6 — o mais denso dos três (até 6 campos + consentimento):
+  // xl no desktop, Sheet de rodapé no celular
   return (
-    <DialogContent size="md">
-      <DialogHeader>
-        <DialogTitle>
-          {pessoaNova
-            ? "Registrar resposta de pessoa nova"
-            : `Registrar resposta de ${primeiroNome(contato.nome)}`}
-        </DialogTitle>
-        <DialogDescription>
-          Ela respondeu por fora da plataforma. Transcreva o que ela disse e
-          confirme que ela autorizou. A resposta não pode ser editada depois.
-        </DialogDescription>
-      </DialogHeader>
+    <FormSurface
+      open
+      onOpenChange={(v) => !v && onFechar()}
+      titulo={
+        pessoaNova
+          ? "Registrar resposta de pessoa nova"
+          : `Registrar resposta de ${primeiroNome(contato.nome)}`
+      }
+      descricao="Ela respondeu por fora da plataforma. Transcreva o que ela disse e confirme que ela autorizou. A resposta não pode ser editada depois."
+      size="xl"
+      footer={
+        <>
+          <Button type="button" variant="outline" onClick={onFechar}>
+            Cancelar
+          </Button>
+          <Button onClick={registrar} disabled={pending || !pronto}>
+            {pending ? (
+              <CircleNotch className="animate-spin" aria-hidden />
+            ) : (
+              <NotePencil aria-hidden />
+            )}
+            Registrar resposta
+          </Button>
+        </>
+      }
+    >
       <div className="space-y-3">
         {pessoaNova && (
           <>
@@ -709,20 +721,7 @@ function RegistrarRespostaDialog({
           </span>
         </label>
       </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onFechar}>
-          Cancelar
-        </Button>
-        <Button onClick={registrar} disabled={pending || !pronto}>
-          {pending ? (
-            <CircleNotch className="animate-spin" aria-hidden />
-          ) : (
-            <NotePencil aria-hidden />
-          )}
-          Registrar resposta
-        </Button>
-      </DialogFooter>
-    </DialogContent>
+    </FormSurface>
   );
 }
 
@@ -769,11 +768,30 @@ function NovoContatoDialog({
   }
 
   return (
-    <DialogContent size="md">
-      <DialogHeader>
-        <DialogTitle>Indicar pessoa</DialogTitle>
-        <DialogDescription>{descricaoIndicacao(vagas)}</DialogDescription>
-      </DialogHeader>
+    <FormSurface
+      open
+      onOpenChange={(v) => !v && onClose()}
+      titulo="Indicar pessoa"
+      descricao={descricaoIndicacao(vagas)}
+      footer={
+        <>
+          <Button type="button" variant="outline" onClick={onClose}>
+            Cancelar
+          </Button>
+          <Button
+            onClick={criar}
+            disabled={pending || nome.trim().length < 2}
+          >
+            {pending ? (
+              <CircleNotch className="animate-spin" aria-hidden />
+            ) : (
+              <UserPlus aria-hidden />
+            )}
+            Criar convite
+          </Button>
+        </>
+      }
+    >
       <div className="space-y-3">
         <div className="space-y-1.5">
           <Label htmlFor="novo-nome">Nome</Label>
@@ -820,20 +838,7 @@ function NovoContatoDialog({
           />
         </div>
       </div>
-      <DialogFooter>
-        <Button type="button" variant="outline" onClick={onClose}>
-          Cancelar
-        </Button>
-        <Button onClick={criar} disabled={pending || nome.trim().length < 2}>
-          {pending ? (
-            <CircleNotch className="animate-spin" aria-hidden />
-          ) : (
-            <UserPlus aria-hidden />
-          )}
-          Criar convite
-        </Button>
-      </DialogFooter>
-    </DialogContent>
+    </FormSurface>
   );
 }
 
@@ -1023,43 +1028,45 @@ export function TerceirosDupla({
 
       {podeGerenciar && jornadaViva && vagas > 0 && (
         <div className="mt-3 flex flex-wrap gap-2">
-          <Dialog open={dialogAberto} onOpenChange={setDialogAberto}>
-            <DialogTrigger
-              render={
-                <Button variant="outline" size="sm">
-                  <Plus aria-hidden />
-                  Indicar pessoa
-                </Button>
-              }
-            />
-            {dialogAberto && (
-              <NovoContatoDialog
-                duplaId={duplaId}
-                vagas={vagas}
-                onClose={() => setDialogAberto(false)}
-              />
-            )}
-          </Dialog>
+          {/* os dois forms abrem em FormSurface (Dialog no desktop, Sheet
+              de rodapé no celular) e montam sob demanda — os campos
+              nascem limpos a cada abertura */}
+          <Button
+            variant="outline"
+            size="sm"
+            aria-haspopup="dialog"
+            onClick={() => setDialogAberto(true)}
+          >
+            <Plus aria-hidden />
+            Indicar pessoa
+          </Button>
           {/* resposta coletada por fora entra direto — sem convite/link,
               a indicação nasce junto no lançamento (449/463) */}
-          <Dialog open={registrandoNovo} onOpenChange={setRegistrandoNovo}>
-            <DialogTrigger
-              render={
-                <Button variant="ghost" size="sm" className="text-muted-foreground">
-                  <NotePencil aria-hidden />
-                  Registrar resposta
-                </Button>
-              }
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-muted-foreground"
+            aria-haspopup="dialog"
+            onClick={() => setRegistrandoNovo(true)}
+          >
+            <NotePencil aria-hidden />
+            Registrar resposta
+          </Button>
+          {dialogAberto && (
+            <NovoContatoDialog
+              duplaId={duplaId}
+              vagas={vagas}
+              onClose={() => setDialogAberto(false)}
             />
-            {registrandoNovo && (
-              <RegistrarRespostaDialog
-                duplaId={duplaId}
-                contato={null}
-                jovemNome={mentoradoNome}
-                onFechar={() => setRegistrandoNovo(false)}
-              />
-            )}
-          </Dialog>
+          )}
+          {registrandoNovo && (
+            <RegistrarRespostaDialog
+              duplaId={duplaId}
+              contato={null}
+              jovemNome={mentoradoNome}
+              onFechar={() => setRegistrandoNovo(false)}
+            />
+          )}
         </div>
       )}
 

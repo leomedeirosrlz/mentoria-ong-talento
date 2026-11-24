@@ -161,6 +161,7 @@ export default async function AvaliarTokenPage({
                       : `Encontro ${info.encontro.numero}${info.mentor?.nome ? ` com ${info.mentor.nome}` : ""} · ${formatDiaSemanaHora(quando)}`
                   : null
               }
+              sessao={meta?.cobertura ?? []}
               demo={!!demo}
               retryHref={`/avaliar/${token}`}
             />
