@@ -18,11 +18,12 @@ vi.mock("@/app/f/[token]/formulario-publico", () => ({
 import { FormularioPreview } from "@/app/(app)/formularios/formulario-preview";
 import { assentar, botao, clicar, montar } from "./dom";
 
-/** A moldura interna da prévia — o único div com transition de max-width. */
+/** A moldura interna da prévia — marcada explicitamente pra não depender
+ *  de uma classe de transição (spec 028 removeu o tween de max-width). */
 const moldura = () =>
-  [...document.querySelectorAll("div")].find((d) =>
-    d.className.includes("transition-[max-width]")
-  ) as HTMLElement | undefined;
+  document.querySelector("[data-preview-moldura]") as
+    | HTMLElement
+    | undefined;
 
 const popup = () =>
   document.querySelector('[data-slot="dialog-content"]') as

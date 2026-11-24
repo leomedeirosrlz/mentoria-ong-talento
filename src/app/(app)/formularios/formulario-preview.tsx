@@ -107,6 +107,7 @@ export function FormularioPreview({
             O form público é o mesmo do /f, que também é container. */}
         <div className="@container min-w-0">
           <div
+            data-preview-moldura
             className={cn(
               // sem transition-[max-width]: spec 028 — o preview estreita
               // seco, como um viewport real trocando de largura

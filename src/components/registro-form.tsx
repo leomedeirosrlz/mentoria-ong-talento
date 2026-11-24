@@ -292,14 +292,22 @@ export function RegistroForm({
   const tentativaIniciada = useRef(false);
   // marco zero da duração: o cliente mede (o server só carimba `inicio`) —
   // "quanto tempo o form ficou aberto até o salvar", o número da issue
-  const inicioMs = useRef(Date.now());
+  const inicioMs = useRef<number>(0);
   // tempo acumulado por passo do wizard — o estado `etapa` é 0-based, mas
   // no payload a chave casa com o "Passo N de 3" da interface
   const etapasMs = useRef<Record<number, number>>({});
-  const etapaDesde = useRef(Date.now());
+  const etapaDesde = useRef<number>(0);
   const etapaMedida = useRef(0);
   // atividade desde a última batida — o heartbeat só sai se algo mudou
   const telemetriaDirty = useRef(false);
+  // relógios de duração: inicializados no efeito (não no render) pra não
+  // violar a pureza do React Compiler; o efeito roda antes de qualquer
+  // interação que possa salvar
+  useEffect(() => {
+    const agora = Date.now();
+    inicioMs.current = agora;
+    etapaDesde.current = agora;
+  }, []);
 
   /** {1..3: ms} das etapas — inclui o parcial da etapa corrente, pra última
    *  batida antes do abandono já contar o passo em andamento. */

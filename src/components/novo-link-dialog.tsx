@@ -521,17 +521,15 @@ function NovoLinkForm({
                             }
                             className="flex min-h-6 items-center gap-2 py-1 text-sm has-[:disabled]:opacity-60"
                           >
-                            <input
-                              type="checkbox"
+                            <Checkbox
                               checked={colunasEfetivas.has(c.id)}
                               disabled={ultima}
-                              onChange={(e) => {
+                              onCheckedChange={(marcado) => {
                                 const n = new Set(colunasEfetivas);
-                                if (e.target.checked) n.add(c.id);
+                                if (marcado) n.add(c.id);
                                 else n.delete(c.id);
                                 setColSel(n);
                               }}
-                              className="size-4 rounded border-border accent-[var(--brand-ink)] disabled:cursor-not-allowed"
                             />
                             {c.label}
                           </label>
