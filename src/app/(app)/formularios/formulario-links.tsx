@@ -9,7 +9,7 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
-import { AnimatePresence, motion } from "motion/react";
+import { FadeTroca } from "@/components/ui/etapa";
 import {
   ArrowClockwise,
   CircleNotch,
@@ -53,7 +53,7 @@ import {
 } from "@/components/forms/link-shared";
 import { useOrigem } from "@/components/forms/use-origem";
 import { demoAtivoClient } from "@/lib/demo/shared";
-import { ExitItem, ExitList, fade, T } from "@/components/motion";
+import { ExitItem, ExitList } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button, buttonVariants } from "@/components/ui/button";
 import {
@@ -586,21 +586,16 @@ export function FormularioLinks({
               </DialogDescription>
             </DialogHeader>
 
-            <AnimatePresence mode="wait" initial={false}>
+            {/* troca de estado do kit: o painel entrante recebe o foco —
+                o botão que gerou os links desmonta junto */}
+            <FadeTroca chave={prontos ? "prontos" : "form"} foco>
               {prontos ? (
-                <motion.div key="prontos" {...fade} transition={T.enter}>
-                  <LinksProntos
-                    itens={itensProntos}
-                    onOutros={() => setProntos(null)}
-                  />
-                </motion.div>
+                <LinksProntos
+                  itens={itensProntos}
+                  onOutros={() => setProntos(null)}
+                />
               ) : (
-                <motion.div
-                  key="form"
-                  {...fade}
-                  transition={T.enter}
-                  className="space-y-4"
-                >
+                <div className="space-y-4">
                   {!formularioAtivo && (
                     <p className="rounded-lg bg-[var(--warn)]/10 px-3 py-2 text-xs text-[var(--warn-text)]">
                       O formulário está encerrado: os links gerados só
@@ -739,9 +734,9 @@ export function FormularioLinks({
                         : "Escolha os destinatários"}
                     </Button>
                   </DialogFooter>
-                </motion.div>
+                </div>
               )}
-            </AnimatePresence>
+            </FadeTroca>
           </DialogContent>
         </Dialog>
         )}

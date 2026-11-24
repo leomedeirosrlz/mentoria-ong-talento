@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState, useTransition } from "react";
-import { AnimatePresence, motion } from "motion/react";
+import { Etapa, FadeTroca, useTrocaDeEtapa } from "@/components/ui/etapa";
 import {
   ArrowLeft,
   ArrowRight,
@@ -38,7 +38,6 @@ import {
   NumeroPergunta,
   RotuloPergunta,
 } from "@/components/forms/pergunta";
-import { fade, T } from "@/components/motion";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -141,12 +140,12 @@ function FormularioGenerico({
     (b) => b.campos.length > 0
   );
   const wizard = blocosWizard.length >= 2;
-  const [etapa, setEtapa] = useState(0);
-  // campos é estável na prática, mas a prévia da coordenação reedita a
-  // definição — o clamp garante uma seção visível mesmo encolhendo
-  const etapaAtiva = wizard
-    ? Math.min(etapa, blocosWizard.length - 1)
-    : 0;
+  // wizard pelo kit (ui/etapa): índice já vem clampado — a prévia da
+  // coordenação reedita a definição e a seção visível não fica órfã. O foco
+  // não é o do hook: a seção rola+foca pelo efeito próprio (scroll + h2 +
+  // rascunho), então toda navegação passa alvo null
+  const { etapa: etapaAtiva, direcao, irPara, reiniciar } =
+    useTrocaDeEtapa(blocosWizard.length);
   const ultimaEtapa = etapaAtiva === blocosWizard.length - 1;
   // o efeito de troca rola/foca — a pintura inicial não (o rascunho
   // restaurado muda a etapa e aí sim leva a pessoa de volta). Comparar
@@ -162,13 +161,8 @@ function FormularioGenerico({
   // por token cujo mapa interno é por campo — some quando a resposta sai.
   const chaveRascunho = preview ? null : `rascunho:/f/${token}`;
 
-  // foco migra pro painel de sucesso quando ele monta (o form sai do DOM) —
-  // scrollIntoView antes: a página pode estar rolada lá embaixo no submit
-  const focoSucesso = useCallback((el: HTMLDivElement | null) => {
-    if (!el) return;
-    el.scrollIntoView({ block: "center" });
-    el.focus({ preventScroll: true });
-  }, []);
+  // o foco do painel de sucesso é o contrato do FadeTroca (centraliza +
+  // focus) — não sobra ref callback local
 
   // troca de seção do wizard: rola a seção nova pro topo (abaixo da pill
   // fixa, por isso scroll-mt) e entrega o foco no título — o botão que
@@ -288,7 +282,7 @@ function FormularioGenerico({
         // vocabulário fechado dos oficiais — nunca colide). Rascunho
         // antigo, de antes do wizard, não tem a chave e cai na seção 1
         if (wizard && typeof rascunho.etapa === "number") {
-          setEtapa(
+          reiniciar(
             Math.min(
               Math.max(0, Math.floor(rascunho.etapa)),
               blocosWizard.length - 1
@@ -431,13 +425,13 @@ function FormularioGenerico({
     // banner global de validação (do submit anterior) também sai
     if (!Object.keys(next).length)
       setErro((prev) => (prev === ERRO_VALIDACAO ? null : prev));
-    setEtapa((e) => Math.min(e + 1, blocosWizard.length - 1));
+    irPara(etapaAtiva + 1, null);
   }
 
   /** Voltar nunca valida nem bloqueia — as seções seguem montadas com a
    *  digitação no DOM (e a etapa nova entra no rascunho pelo efeito). */
   function voltar() {
-    setEtapa((e) => Math.max(e - 1, 0));
+    irPara(etapaAtiva - 1, null);
   }
 
   function onSubmit(e: React.FormEvent<HTMLFormElement>) {
@@ -472,7 +466,7 @@ function FormularioGenerico({
         );
         if (i >= 0 && i !== etapaAtiva) {
           focoPendente.current = primeiro.id;
-          setEtapa(i);
+          irPara(i, null);
           return;
         }
       }
@@ -562,16 +556,21 @@ function FormularioGenerico({
   }
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
+    // troca de estado (form → sucesso) por crossfade do kit — o painel novo
+    // recebe o foco já centralizado (o submit desmonta junto e a página pode
+    // estar rolada lá embaixo)
+    <FadeTroca
+      chave={enviado ? "ok" : "form"}
+      foco
+      centralizar
+      className={
+        enviado
+          ? "rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] @xl:p-8"
+          : "space-y-3"
+      }
+    >
       {enviado ? (
-        <motion.div
-          key="ok"
-          ref={focoSucesso}
-          tabIndex={-1}
-          {...fade}
-          transition={T.enter}
-          className="rounded-xl bg-card p-6 text-center shadow-[var(--shadow-border)] outline-none @xl:p-8"
-        >
+        <>
           <div className="mx-auto grid size-12 place-items-center rounded-full bg-[var(--brand-lime)] text-[var(--brand-ink)]">
             <CheckCircle size={24} weight="bold" aria-hidden />
           </div>
@@ -588,14 +587,9 @@ function FormularioGenerico({
             pra “${titulo}” foi registrada e já está com a equipe do
             Realiza.vc. Pode fechar esta página.`}
           </p>
-        </motion.div>
+        </>
       ) : (
-        <motion.div
-          key="form"
-          {...fade}
-          transition={T.enter}
-          className="space-y-3"
-        >
+        <>
           {/* progresso fora dos cards: pill sticky que acompanha o scroll de
               forms longos (safe-area no top, padrão do onboarding). No
               wizard a régua conta seções, não perguntas — "Seção N de M" */}
@@ -614,11 +608,11 @@ function FormularioGenerico({
               className="h-1 flex-1 overflow-hidden rounded-full bg-muted"
             >
               <div
-                className="h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-500"
+                className="h-full origin-left rounded-full bg-[var(--brand-lime)] transition-transform duration-500"
                 style={{
-                  width: wizard
-                    ? `${((etapaAtiva + 1) / blocosWizard.length) * 100}%`
-                    : `${(respondidos / Math.max(total, 1)) * 100}%`,
+                  transform: wizard
+                    ? `scaleX(${(etapaAtiva + 1) / blocosWizard.length})`
+                    : `scaleX(${respondidos / Math.max(total, 1)})`,
                 }}
               />
             </div>
@@ -695,28 +689,23 @@ function FormularioGenerico({
           >
             {wizard
               ? /* uma seção por vez, mas TODAS montadas: só a corrente sai
-                   do `hidden`. É o que mantém o FormData byte-a-byte igual
-                   ao da página única (coleta/leDeFormData sem mudança), o
-                   rascunho no mesmo formato e o Voltar sem perda — os inputs
-                   não são controlados, remontar seria perder a digitação.
-                   Por isso sem AnimatePresence aqui: a seção que sai some
-                   de vez e a que entra anima pelo `animate` (o mesmo recorte
-                   visual do mode="wait": saída instantânea + entrada suave) */
+                   do `hidden` da <Etapa>. É o que mantém o FormData
+                   byte-a-byte igual ao da página única (coleta/leDeFormData
+                   sem mudança), o rascunho no mesmo formato e o Voltar sem
+                   perda — os inputs não são controlados, remontar seria
+                   perder a digitação */
                 blocosWizard.map((b, i) => {
                   const ativa = i === etapaAtiva;
                   const temErro = b.campos.some(
                     (c) => erros[c.id] && visivel(c, atuais)
                   );
                   return (
-                    <motion.section
+                    <Etapa
                       key={b.secao?.id ?? `bloco-${i}`}
+                      ativa={ativa}
+                      direcao={direcao}
                       data-secao={i}
-                      hidden={!ativa}
-                      initial={false}
-                      animate={
-                        ativa ? { opacity: 1, y: 0 } : { opacity: 0, y: -3 }
-                      }
-                      transition={T.enter}
+                      role="region"
                       aria-labelledby={`f-sec-titulo-${i}`}
                       className="scroll-mt-20 space-y-3"
                     >
@@ -760,7 +749,7 @@ function FormularioGenerico({
                         </p>
                       )}
                       {b.campos.map(renderCampo)}
-                    </motion.section>
+                    </Etapa>
                   );
                 })
               : campos.map(renderCampo)}
@@ -892,9 +881,9 @@ function FormularioGenerico({
               </div>
             )}
           </form>
-        </motion.div>
+        </>
       )}
-    </AnimatePresence>
+    </FadeTroca>
   );
 }
 

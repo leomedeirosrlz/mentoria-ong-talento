@@ -33,9 +33,8 @@ import {
   CampoPrefGenero,
   CampoUf,
   SENTINEL_VAZIO,
-  WizardFicha,
-  type PassoFicha,
 } from "@/components/campos-pessoais";
+import { WizardPassos, type PassoWizard } from "@/components/ui/etapa";
 import { formatWhatsApp, foraDoPrograma } from "@/lib/ciclo";
 import { cn, maskWhatsApp } from "@/lib/utils";
 import type { Disponibilidade, Mentorado } from "@/lib/types";
@@ -124,7 +123,7 @@ export function MentoradoActions({
   // de campos. Ordem: identidade/contato → operacional → dados pessoais
   // por último (interesses e objetivos fecham o wizard — REALIZA-384).
   // Anamnese é instrumento externo ao programa: o campo de notas saiu da UI.
-  const passos: PassoFicha[] = [
+  const passos: PassoWizard[] = [
     {
       titulo: "Identificação e contato",
       icone: IdentificationCard,
@@ -430,7 +429,7 @@ export function MentoradoActions({
               Os dados do cadastro em etapas. Salve de qualquer uma.
             </DialogDescription>
           </DialogHeader>
-          <WizardFicha
+          <WizardPassos
             passos={passos}
             pending={pending}
             submitLabel="Salvar"

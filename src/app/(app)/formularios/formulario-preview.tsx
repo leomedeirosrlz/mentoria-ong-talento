@@ -101,7 +101,9 @@ export function FormularioPreview({
         <div className="@container min-w-0">
           <div
             className={cn(
-              "mx-auto w-full transition-[max-width] duration-200",
+              // sem transition-[max-width]: spec 028 — o preview estreita
+              // seco, como um viewport real trocando de largura
+              "mx-auto w-full",
               celular && "max-w-[390px]"
             )}
           >

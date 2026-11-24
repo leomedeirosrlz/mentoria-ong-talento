@@ -21,6 +21,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import { Etapa, useTrocaDeEtapa } from "@/components/ui/etapa";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -126,8 +127,15 @@ export function ImportarCsvDialog({
   const [resultado, setResultado] = useState<Resultado | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
+  // fluxo por fase (entrada → prévia → resultado), sem índice de etapa:
+  // assinalar marca direção + agenda o foco no MESMO tick do setState que
+  // monta a fase — um tick antes e um commit intermediário consome o
+  // pendente com o ref ainda na fase velha
+  const { direcao, assinalar, reiniciar, tituloEtapaRef } =
+    useTrocaDeEtapa<HTMLDivElement>(1);
 
   function reset() {
+    reiniciar();
     setTexto("");
     setLinhas(null);
     setDiffs(null);
@@ -193,6 +201,7 @@ export function ImportarCsvDialog({
           toast.error(res.error);
           return;
         }
+        assinalar(1);
         setLinhasPar(pares);
         setPrevia(res.resolucoes ?? []);
       });
@@ -202,6 +211,7 @@ export function ImportarCsvDialog({
     // a linha que entra na prévia (e que o importar manda pro server) já é
     // a normalizada — a action re-normaliza idempotente, mesma régua
     const norm = cruas.map(normalizaLinha);
+    assinalar(1);
     setLinhas(norm.map((n) => n.linha));
     const mapa = new Map<number, DiffNormalizacao[]>();
     norm.forEach((n, i) => {
@@ -223,6 +233,7 @@ export function ImportarCsvDialog({
         if ("error" in res && res.error) toast.error(res.error);
         else {
           const r = res as { ok: boolean; criadas: number; puladas: string[] };
+          assinalar(1);
           setResultado({ criados: r.criadas, puladas: r.puladas ?? [] });
           toast.success(
             `${r.criadas} ${r.criadas === 1 ? "dupla criada" : "duplas criadas"}.` +
@@ -247,6 +258,7 @@ export function ImportarCsvDialog({
       else {
         const r = res as Resultado & { ok: boolean };
         const puladas = [...invalidas, ...(r.puladas ?? [])];
+        assinalar(1);
         setResultado({ criados: r.criados, puladas });
         toast.success(
           `${r.criados} ${r.criados === 1 ? "cadastro importado" : "cadastros importados"}.` +
@@ -291,7 +303,7 @@ export function ImportarCsvDialog({
         </DialogHeader>
 
         {resultado ? (
-          <div ref={(el) => el?.focus()} tabIndex={-1} className="space-y-3 outline-none">
+          <Etapa key="resultado" ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-3 outline-none">
             <p className="text-sm">
               <span className="font-medium">{resultado.criados}</span>{" "}
               {resultado.criados === 1 ? rotuloCriados.s : rotuloCriados.p}.
@@ -310,11 +322,11 @@ export function ImportarCsvDialog({
             <DialogFooter>
               <Button variant="outline" onClick={() => aoMudar(false)}>Fechar</Button>
             </DialogFooter>
-          </div>
+          </Etapa>
         ) : previa && linhasPar ? (
           // prévia do pareamento — quem é quem, o que já existe e o que vai
           // falhar, tudo antes de escrever. A gravação re-resolve no server.
-          <div ref={(el) => el?.focus()} tabIndex={-1} className="space-y-3 min-w-0 outline-none">
+          <Etapa key="previa" ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-3 min-w-0 outline-none">
             <p className="text-sm text-muted-foreground">
               <span className="text-foreground font-medium">{prontas.length}</span>{" "}
               {prontas.length === 1 ? "dupla pronta" : "duplas prontas"}
@@ -385,17 +397,17 @@ export function ImportarCsvDialog({
               mesmo se houver puladas. Mentores e auxiliares executivos são avisados.
             </p>
             <DialogFooter sticky>
-              <Button variant="outline" onClick={() => { setPrevia(null); setLinhasPar(null); }}>Voltar</Button>
+              <Button variant="outline" onClick={() => { assinalar(-1); setPrevia(null); setLinhasPar(null); }}>Voltar</Button>
               <Button disabled={pending || prontas.length === 0} onClick={importar}>
                 <UploadSimple size={15} />
                 {pending ? "Importando…" : `Criar ${prontas.length} ${prontas.length === 1 ? "dupla" : "duplas"}`}
               </Button>
             </DialogFooter>
-          </div>
+          </Etapa>
         ) : linhas ? (
-          // ref callback leva o foco pra nova etapa — o botão que disparou
+          // o Etapa do kit leva o foco pra fase nova — o botão que disparou
           // desmontou e o foco cairia no body do modal
-          <div ref={(el) => el?.focus()} tabIndex={-1} className="space-y-3 min-w-0 outline-none">
+          <Etapa key="linhas" ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-3 min-w-0 outline-none">
             <p className="text-sm text-muted-foreground">
               <span className="text-foreground font-medium">{validas}</span>{" "}
               {validas === 1 ? "linha pronta" : "linhas prontas"}
@@ -503,15 +515,15 @@ export function ImportarCsvDialog({
               pede revisão sai sinalizado.
             </p>
             <DialogFooter sticky>
-              <Button variant="outline" onClick={() => { setLinhas(null); setDiffs(null); }}>Voltar</Button>
+              <Button variant="outline" onClick={() => { assinalar(-1); setLinhas(null); setDiffs(null); }}>Voltar</Button>
               <Button disabled={pending || validas === 0} onClick={importar}>
                 <UploadSimple size={15} />
                 {pending ? "Importando…" : `Importar ${validas} ${validas === 1 ? "cadastro" : "cadastros"}`}
               </Button>
             </DialogFooter>
-          </div>
+          </Etapa>
         ) : (
-          <div className="space-y-4">
+          <Etapa key="entrada" ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-4 outline-none">
             <div className="space-y-2">
               <Label id="importar-tipo-label">Importar como</Label>
               <Select value={tipo} items={TIPO_LABEL} onValueChange={(v) => setTipo((v as Tipo) ?? "equipe")}>
@@ -585,7 +597,7 @@ export function ImportarCsvDialog({
                 {pending && tipo === "duplas" ? "Resolvendo pareamento…" : "Pré-visualizar"}
               </Button>
             </DialogFooter>
-          </div>
+          </Etapa>
         )}
       </DialogContent>
     </Dialog>

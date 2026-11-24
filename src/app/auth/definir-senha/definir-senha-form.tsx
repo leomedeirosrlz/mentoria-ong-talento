@@ -2,14 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { motion, AnimatePresence } from "motion/react";
 import { CircleNotch, WarningCircle } from "@phosphor-icons/react";
 import { createAuthClient } from "@/lib/supabase/client";
 import { limparCookiesDemo } from "@/lib/demo/shared";
 import { avisarSenhaAlterada } from "@/lib/actions-conta";
 import { pathInterno, sessaoFresca } from "@/lib/utils";
-import { fade, T } from "@/components/motion";
 import { Button } from "@/components/ui/button";
+import { FadeTroca } from "@/components/ui/etapa";
 import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Logo } from "@/components/logo";
@@ -153,14 +152,11 @@ export function DefinirSenhaForm() {
           </h1>
         </div>
 
-        <AnimatePresence mode="wait" initial={false}>
+        {/* troca de estado do kit: o painel entrante recebe o foco — menos o
+            form, que já tem autoFocus próprio no campo de senha */}
+        <FadeTroca chave={fase} foco={fase !== "ok"}>
           {fase === "expirada" ? (
-            <motion.div
-              key="expirada"
-              {...fade}
-              transition={T.enter}
-              className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6"
-            >
+            <div className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6">
               <div className="grid size-10 place-items-center rounded-full bg-destructive/10 text-destructive">
                 <WarningCircle size={20} weight="bold" aria-hidden="true" />
               </div>
@@ -179,13 +175,10 @@ export function DefinirSenhaForm() {
               >
                 Ir para o login
               </Button>
-            </motion.div>
+            </div>
           ) : fase === "ok" ? (
-            <motion.form
-              key="form"
+            <form
               onSubmit={salvar}
-              {...fade}
-              transition={T.enter}
               className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6 space-y-4"
             >
               <div className="space-y-2">
@@ -239,21 +232,16 @@ export function DefinirSenhaForm() {
                   Prefiro entrar só pelo link
                 </Button>
               )}
-            </motion.form>
+            </form>
           ) : (
-            <motion.div
-              key="loading"
-              {...fade}
-              transition={T.enter}
-              className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6"
-            >
+            <div className="rounded-xl bg-card shadow-[var(--shadow-border)] p-6">
               <p role="status" className="flex items-center gap-2 text-sm text-muted-foreground">
                 <CircleNotch size={14} className="animate-spin shrink-0" aria-hidden="true" />
                 Confirmando acesso…
               </p>
-            </motion.div>
+            </div>
           )}
-        </AnimatePresence>
+        </FadeTroca>
       </div>
     </div>
   );

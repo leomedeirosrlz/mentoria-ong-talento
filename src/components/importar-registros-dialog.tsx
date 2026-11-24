@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button";
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
 } from "@/components/ui/dialog";
+import { Etapa, useTrocaDeEtapa } from "@/components/ui/etapa";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -140,8 +141,14 @@ export function ImportarRegistrosDialog() {
   const [pending, start] = useTransition();
   const [pendingIa, startIa] = useTransition();
   const router = useRouter();
+  // fluxo por fase sem índice de etapa: assinalar marca direção + agenda o
+  // foco no MESMO tick do setState que monta a fase nova — um tick antes e
+  // um commit intermediário consome o pendente com o ref na fase velha
+  const { direcao, assinalar, reiniciar, tituloEtapaRef } =
+    useTrocaDeEtapa<HTMLDivElement>(1);
 
   function reset() {
+    reiniciar();
     setTexto("");
     setArquivo(null);
     setLinhas(null);
@@ -199,6 +206,7 @@ export function ImportarRegistrosDialog() {
         );
         return;
       }
+      assinalar(1);
       setLinhas(res.linhas);
       setDuplas(res.duplas ?? []);
       setEncPorDupla(res.encPorDupla ?? {});
@@ -306,6 +314,7 @@ export function ImportarRegistrosDialog() {
         toast.error(res.error);
         return;
       }
+      assinalar(1);
       setResultado({
         criados: res.criados ?? 0,
         atualizados: res.atualizados ?? 0,
@@ -554,7 +563,7 @@ export function ImportarRegistrosDialog() {
         </DialogHeader>
 
         {resultado ? (
-          <div ref={(el) => el?.focus()} tabIndex={-1} className="space-y-3 outline-none">
+          <Etapa key="resultado" ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-3 outline-none">
             <p className="text-sm">
               <span className="font-medium">{resultado.criados}</span>{" "}
               {resultado.criados === 1 ? "registro criado" : "registros criados"}
@@ -577,9 +586,9 @@ export function ImportarRegistrosDialog() {
             <DialogFooter>
               <Button variant="outline" onClick={() => aoMudar(false)}>Fechar</Button>
             </DialogFooter>
-          </div>
+          </Etapa>
         ) : linhas ? (
-          <div ref={(el) => el?.focus()} tabIndex={-1} className="space-y-3 min-w-0 outline-none">
+          <Etapa key="linhas" ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-3 min-w-0 outline-none">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <p className="text-sm text-muted-foreground">
                 <span className="text-foreground font-medium">{importaveis}</span>{" "}
@@ -673,7 +682,7 @@ export function ImportarRegistrosDialog() {
             {/* sticky: a lista de revisão é alta (max-h-58vh) — Voltar e
                 Importar ficam visíveis sem rolar até o fim */}
             <DialogFooter sticky>
-              <Button variant="outline" onClick={() => { setLinhas(null); setEscolhas(new Map()); setBusca(""); setIaOff(null); setIaRestantes(0); }}>
+              <Button variant="outline" onClick={() => { assinalar(-1); setLinhas(null); setEscolhas(new Map()); setBusca(""); setIaOff(null); setIaRestantes(0); }}>
                 Voltar
               </Button>
               <Button disabled={pending || importaveis === 0} onClick={importar}>
@@ -683,9 +692,9 @@ export function ImportarRegistrosDialog() {
                   : `Importar ${importaveis} ${importaveis === 1 ? "resposta" : "respostas"}`}
               </Button>
             </DialogFooter>
-          </div>
+          </Etapa>
         ) : (
-          <div className="space-y-4">
+          <Etapa key="entrada" ref={tituloEtapaRef} direcao={direcao} tabIndex={-1} className="space-y-4 outline-none">
             {erroParse && (
               <p role="alert" className="flex items-start gap-2 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn)]/10 px-3 py-2.5 text-sm text-[var(--warn-text)]">
                 <Warning size={16} aria-hidden className="mt-0.5 shrink-0" />
@@ -732,7 +741,7 @@ export function ImportarRegistrosDialog() {
                 {pending ? "Resolvendo duplas…" : "Pré-visualizar"}
               </Button>
             </DialogFooter>
-          </div>
+          </Etapa>
         )}
       </DialogContent>
     </Dialog>

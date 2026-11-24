@@ -1,6 +1,6 @@
 "use client";
 
-import { type CSSProperties, useCallback, useEffect, useRef, useState, useTransition } from "react";
+import { useCallback, useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { CaretLeft, CaretRight, Paperclip, Plus, Trash, X } from "@phosphor-icons/react";
 import { toast } from "@/lib/toast";
@@ -38,6 +38,7 @@ import {
 } from "@/components/anexos-registro";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
+import { Etapa, FadeTroca, useTrocaDeEtapa } from "@/components/ui/etapa";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -218,17 +219,14 @@ export function RegistroForm({
   // avaliacao é o único obrigatório não-textual — erro inline pt-BR em vez do
   // balão nativo do browser (que nem indica qual campo faltou)
   const [erroAvaliacao, setErroAvaliacao] = useState(false);
-  const [etapa, setEtapa] = useState(0);
-  // direção da última troca de etapa — alimenta o --dir do .animate-enter-x
-  const [direcao, setDirecao] = useState<1 | -1>(1);
+  // wizard de 3 etapas pelo kit (ui/etapa): slide direcional + foco no
+  // heading novo pós-commit — as etapas seguem montadas sob `hidden`
+  const { etapa, direcao, irPara, tituloEtapaRef } =
+    useTrocaDeEtapa<HTMLHeadingElement>(ETAPAS.length);
   const [pending, start] = useTransition();
   const router = useRouter();
   const formRef = useRef<HTMLFormElement>(null);
-  const tituloEtapaRef = useRef<HTMLHeadingElement>(null);
   const addEncRef = useRef<HTMLButtonElement>(null);
-  // foco pedido junto com a troca de etapa — o efeito roda depois do commit,
-  // quando o `hidden` da seção alvo já saiu da árvore renderizada
-  const focoPendente = useRef<"titulo" | "avaliacao" | null>(null);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const restoredOnce = useRef(false);
   // num desmonte o formRef já foi zerado quando o cleanup passivo roda — o
@@ -559,38 +557,19 @@ export function RegistroForm({
     setRestored(null);
   }
 
-  // foco pedido junto com a troca de etapa: o heading novo anuncia onde o
-  // mentor está; quando a troca foi o portão da avaliação, o foco cai no campo
-  useEffect(() => {
-    const alvo = focoPendente.current;
-    if (!alvo) return;
-    focoPendente.current = null;
-    if (alvo === "avaliacao") focarAvaliacao();
-    else tituloEtapaRef.current?.focus();
-  });
-
+  // o portão da avaliação foca o campo que faltou — a agenda de foco do hook
+  // entrega depois do commit, com a etapa 1 já fora do `hidden`
   function focarAvaliacao() {
     formRef.current
       ?.querySelector<HTMLElement>('input[name="avaliacao"]')
       ?.focus();
   }
 
-  function irPara(proxima: number) {
-    focoPendente.current = "titulo";
-    setDirecao(proxima > etapa ? 1 : -1);
-    setEtapa(proxima);
-  }
-
   function cobrarAvaliacao() {
     setErroAvaliacao(true);
-    if (etapa === 0) {
-      focarAvaliacao();
-    } else {
-      // Enter/submit fora da etapa 1 devolve o mentor pra lá e foca o campo
-      focoPendente.current = "avaliacao";
-      setDirecao(-1);
-      setEtapa(0);
-    }
+    // Enter/submit fora da etapa 1 devolve o mentor pra lá — na própria
+    // etapa 1 o mesmo irPara resolve o pendente na hora, sem navegar
+    irPara(0, focarAvaliacao);
   }
 
   function avancar() {
@@ -809,34 +788,7 @@ export function RegistroForm({
   // o registro (o form segue montado pra isso)
   if (registro && onSaved == null && (!posSave || fechado)) return null;
 
-  // K1 — criação bem-sucedida cede a tela pra etapa de evidências no
-  // mesmo container (dialog da agenda ou card inline da ficha): o FK do
-  // anexo exige a row gravada, por isso a etapa existe só depois do save
-  if (posSave) {
-    if (fechado)
-      return (
-        <p className="py-2 text-sm text-muted-foreground">
-          Registro salvo. As evidências ficam na ficha da dupla.
-        </p>
-      );
-    return (
-      <PosSaveRegistro
-        registroId={posSave.registroId}
-        duplaId={duplaId}
-        autorId={posSave.autorId}
-        aviso={posSave.aviso}
-        anexos={posSave.anexos}
-        falhas={posSave.falhas}
-        proximoNumero={posSave.chain?.numero ?? null}
-        onEncadear={posSave.chain ? encadearProximo : undefined}
-        onFechar={fecharPosSave}
-        embutido={embutido}
-        sessao={sessao}
-      />
-    );
-  }
-
-  return (
+  const corpoForm = (
     <form
       ref={formRef}
       onSubmit={submit}
@@ -915,11 +867,7 @@ export function RegistroForm({
         </ol>
       </div>
 
-      <div
-        hidden={etapa !== 0}
-        className="animate-enter-x"
-        style={{ "--dir": `${direcao * 8}px` } as CSSProperties}
-      >
+      <Etapa ativa={etapa === 0} direcao={direcao}>
         <div className="space-y-5">
           {/* "Aconteceu como planejado?" pergunta na linguagem do mentor e
               grava no mesmo `avaliacao` de 4 pontos que alimenta trajetória
@@ -1003,13 +951,9 @@ export function RegistroForm({
             />
           </div>
         </div>
-      </div>
+      </Etapa>
 
-      <div
-        hidden={etapa !== 1}
-        className="animate-enter-x"
-        style={{ "--dir": `${direcao * 8}px` } as CSSProperties}
-      >
+      <Etapa ativa={etapa === 1} direcao={direcao}>
         <div className="space-y-5">
           <fieldset className="min-w-0 space-y-2">
             <legend className="text-sm font-medium">
@@ -1217,13 +1161,9 @@ export function RegistroForm({
             </span>
           </label>
         </div>
-      </div>
+      </Etapa>
 
-      <div
-        hidden={etapa !== 2}
-        className="animate-enter-x"
-        style={{ "--dir": `${direcao * 8}px` } as CSSProperties}
-      >
+      <Etapa ativa={etapa === 2} direcao={direcao}>
         <div className="space-y-5">
           {combinadosPendentes && combinadosPendentes.length > 0 && (
             <fieldset className="min-w-0 space-y-2">
@@ -1441,7 +1381,7 @@ export function RegistroForm({
             </div>
           )}
         </div>
-      </div>
+      </Etapa>
 
       {/* rodapé do wizard — sticky pra Avançar/Salvar ficarem à mão no mobile
           (o painel inline usa overflow:clip — sem scrollport, o sticky segue
@@ -1490,6 +1430,42 @@ export function RegistroForm({
         );
       })()}
     </form>
+  );
+
+  // K1 — criação bem-sucedida cede a tela pra etapa de evidências no mesmo
+  // container (dialog da agenda ou card inline da ficha): o FK do anexo
+  // exige a row gravada, por isso a etapa existe só depois do save. Troca de
+  // estado por crossfade — e o painel novo recebe o foco, senão ele caía no
+  // <body> quando o form (com o Salvar clicado) desmontava
+  return (
+    <FadeTroca
+      chave={posSave ? (fechado ? "fechado" : "pos-save") : "form"}
+      foco
+    >
+      {posSave ? (
+        fechado ? (
+          <p className="py-2 text-sm text-muted-foreground">
+            Registro salvo. As evidências ficam na ficha da dupla.
+          </p>
+        ) : (
+          <PosSaveRegistro
+            registroId={posSave.registroId}
+            duplaId={duplaId}
+            autorId={posSave.autorId}
+            aviso={posSave.aviso}
+            anexos={posSave.anexos}
+            falhas={posSave.falhas}
+            proximoNumero={posSave.chain?.numero ?? null}
+            onEncadear={posSave.chain ? encadearProximo : undefined}
+            onFechar={fecharPosSave}
+            embutido={embutido}
+            sessao={sessao}
+          />
+        )
+      ) : (
+        corpoForm
+      )}
+    </FadeTroca>
   );
 }
 
