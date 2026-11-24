@@ -250,7 +250,7 @@ test.describe("demo — seções acionáveis", () => {
     await expect(
       page.getByRole("heading", { name: "Resposta" })
     ).toBeVisible();
-    await expect(page.getByText("aguardando triagem")).toBeVisible();
+    await expect(page.getByText("esperando especialista")).toBeVisible();
 
     // o dataset tem pedidos abertos/em negociação — a fila leva à ficha da
     // dupla DPP (negociação) ou à ficha do jovem
