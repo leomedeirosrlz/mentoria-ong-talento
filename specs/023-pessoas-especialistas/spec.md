@@ -26,11 +26,11 @@
 - **Por que P1:** é o pedido central — hoje o papel `mentorado` não tem como "fuçar perfis": as três views `jovem_*` só cobrem a rede dele.
 - **Teste independente:** jovem com rede pequena abre `/jovem/pessoas`, filtra por vínculo, por tema e por texto.
 - **Cenários:**
-  1. **Dado** o jovem com dupla e colegas **quando** abre `/jovem/pessoas` **então** vê o diretório inteiro do recorte dele (rede + adultos do programa + colegas da turma + catálogo de especialistas) com a faceta "Todos" ativa e a contagem "N de M pessoas" — a rede dele marcada com selo "Sua rede" e o vínculo ("Seu mentor", "Colega da turma", "Seu especialista"), nunca a mesma pessoa duplicada.
+  1. **Dado** o jovem com dupla e colegas **quando** abre `/jovem/pessoas` **então** vê o diretório inteiro do recorte dele (rede + adultos do programa + jovens do programa + catálogo de especialistas) com a faceta "Todos" ativa e a contagem "N de M pessoas" — a rede dele marcada com selo "Sua rede" e o vínculo ("Seu mentor", "Colega da turma", "Seu especialista"), nunca a mesma pessoa duplicada.
   2. **Dado** o diretório carregado **quando** o jovem toca uma pill de vínculo (Todos · Minha rede · Colegas · Mentores · Especialistas · Equipe) ou um chip de tema **então** a lista recorta sem recarregar, a URL registra o estado (`?papel`/`?area`/`?busca`) pra deep-link e a contagem anuncia o novo total.
   3. **Dado** uma busca sem resultado **quando** a lista esvazia **então** o estado vazio nomeia a busca e oferece "Limpar filtros" — a mesma gramática do `/pessoas` de staff.
   4. **Dado** um card do diretório **quando** o jovem toca **então** navega à ficha `/jovem/pessoas/[id]` — card de pessoa nunca carrega ação de contato; o contato direto mora na ficha e só pra quem já tem o canal aberto.
-  5. **Dado** qualquer pessoa do diretório **quando** a ficha abre **então** ela mostra só a projeção segura da matriz: fora da rede não tem WhatsApp nem e-mail, colega não tem foto, especialista não tem contato antes da trilha.
+  5. **Dado** qualquer pessoa do diretório **quando** a ficha abre **então** ela mostra só a projeção segura da matriz: fora da rede não tem WhatsApp nem e-mail; jovem do programa tem foto, mas nunca dados civis; especialista não tem contato antes da trilha.
 
 ### US2 — Ficha da pessoa no recorte do diretório (P1)
 
@@ -41,7 +41,7 @@
   2. **Dado** o id de um especialista do catálogo **quando** a ficha abre **então** mostra a `SecaoEspecialista` atual com o apontador pro catálogo — o contato segue fechado até a trilha nascer.
   3. **Dado** o id de alguém da rede **quando** a ficha abre **então** é a ficha de hoje: contato direto, vínculo e selo de dupla.
   4. **Dado** um id fora do diretório **quando** a ficha resolve **então** 404 — sem vazar nem a existência do profile.
-  5. **Dado** o id de um colega **quando** a ficha abre **então** mostra a projeção de colega (sem foto; WhatsApp só se ele compartilhou), com ou sem selo de turma conforme o escopo decidido.
+  5. **Dado** o id de um colega **quando** a ficha abre **então** mostra a projeção de jovem do programa (com foto; WhatsApp só se ele compartilhou; dados civis nunca), com ou sem selo de turma.
 
 ### US3 — "Sua rede" no perfil do jovem (P1)
 
@@ -107,7 +107,7 @@ A fronteira que a `jovem_diretorio`, a `especialistas_catalogo` e as telas não 
 | Dado | Colega de turma | Adulto da sua rede | Adulto do diretório | Especialista (catálogo) |
 |---|---|---|---|---|
 | Nome / nome social | ✓ | ✓ | ✓ | ✓ |
-| Foto (avatar) | — (menor sem cláusula de imagem — `null` na projeção, não só na tela) | ✓ | ✓ | ✓ |
+| Foto (avatar) | ✓ (decisão do lead 24/11, inclusive menor) | ✓ | ✓ | ✓ |
 | Papel / vínculo com ele | "Colega da turma" | "Seu mentor" / "Seu especialista" / "Auxiliar" / "Coordenação" | papel público, sem vínculo | "Seu especialista" se há trilha |
 | Cidade / UF | ✓ | ✓ | ✓ | ✓ |
 | Interesses | ✓ | — | — | — |
@@ -140,7 +140,7 @@ A fronteira que a `jovem_diretorio`, a `especialistas_catalogo` e as telas não 
 
 ## Requisitos funcionais
 
-- **FR-001:** `/jovem/pessoas` passa a ser o diretório do jovem, servido por projeção de banco nova (sugestão: view definer `jovem_diretorio`, `where my_role()='mentorado'`, revoke public/anon + grant select authenticated, a disciplina das irmãs `jovem_*`). A projeção traz `id`, `tipo` (`colega` | `adulto` | `especialista`), `nome`, `nome_social`, `papel`, `avatar_path` (sempre `null` pra colega — a fronteira da foto de menor mora no SQL), `cidade`, `uf`, `interesses`/`areas`, `bio`, `cargo`, `empresa`, `experiencia_previa`, `formacao_externa`, `voluntariado`, `grade_resumo`, `vagas`, `minha_rede` (bool), `minha_turma` (bool). Escopo default: adultos ativos com papel do programa + colegas com conta da mesma turma + o catálogo de especialistas. **WhatsApp e e-mail nunca entram na projeção** — o contato da rede segue chegando pela `jovem_contatos` e a ficha costura as duas fontes.
+- **FR-001:** `/jovem/pessoas` passa a ser o diretório do jovem, servido por projeção de banco nova (sugestão: view definer `jovem_diretorio`, `where my_role()='mentorado'`, revoke public/anon + grant select authenticated, a disciplina das irmãs `jovem_*`). A projeção traz `id`, `tipo` (`colega` | `adulto` | `especialista`), `nome`, `nome_social`, `papel`, `avatar_path` (visível também pra jovem do programa; dados civis nunca entram), `cidade`, `uf`, `interesses`/`areas`, `bio`, `cargo`, `empresa`, `experiencia_previa`, `formacao_externa`, `voluntariado`, `grade_resumo`, `vagas`, `minha_rede` (bool), `minha_turma` (bool). Escopo default: adultos ativos com papel do programa + **todos os jovens com conta no programa** + o catálogo de especialistas — decisão do lead em 24/11, inclusive menores e foto. **WhatsApp e e-mail nunca entram na projeção** — o contato da rede segue chegando pela `jovem_contatos` e a ficha costura as duas fontes.
 - **FR-002:** o diretório abre na faceta "Todos"; pills de vínculo (Todos · Minha rede · Colegas · Mentores · Especialistas · Equipe) + chips de tema/área + busca fuzzy com `HighlightText`; estado persistido na URL (`?busca`/`?papel`/`?area`) por `history.replaceState`; contagem "N de M pessoas" anunciada; sem refetch por letra (filtro client-side sobre o payload SSR, como `/pessoas` já faz).
 - **FR-003:** cards do diretório navegáveis à ficha com Link único de nome acessível (`aria-label="Abrir perfil de {nome}"`, `prefetch={false}`); selo "Sua rede" + vínculo quando `minha_rede`; o card de especialista é o rico (`JovemEspecialistaCard`) adaptado pra navegar — hoje ele não linka, lacuna confirmada no recon; nenhuma ação de contato no card.
 - **FR-004:** `getJovemPessoa` resolve id primeiro no diretório, depois mantém o detalhe pelas fontes atuais (contato → colega → especialista) — id fora do diretório cai no mesmo 404 de quem não existe.
@@ -158,18 +158,18 @@ A fronteira que a `jovem_diretorio`, a `especialistas_catalogo` e as telas não 
 - **RLS/RPC:** as views novas seguem a disciplina das irmãs (definer, `search_path` fixo, gate `my_role()` no WHERE externo, revoke public/anon, grant select authenticated); nenhuma policy de tabela base muda e nenhum grant novo em `profiles`/`mentorados`/`duplas` — o papel `mentorado` continua lendo 0 rows nelas. Embeds PostgREST seguem voltando null pro jovem; nomes se resolvem pelo diretório, como hoje. Caso e2e "papel negado via REST" pra cada objeto novo.
 - **A11y:** pills com `role="group"` + `aria-label` + `aria-pressed` por chip; busca dentro de `role="search"` (fecha a lacuna atual de `/pessoas`); contagem "N de M" dentro de `role="status"`/`aria-live="polite"` (hoje não anuncia); card de pessoa com Link único e nome acessível completo — nada de `<div onClick>`; estado selecionado com texto visível além do indicador; painel inline move o foco ao abrir, `aria-expanded` no trigger, Escape/fechar devolve foco ao card; todos os alvos com hit ≥44px (`min-h-11`) e `focus-visible` visível; teclado completo em chips, pills, cards e painel; `prefers-reduced-motion` respeitado nas entradas e expansões; sem scroll horizontal no 320.
 - **Copy:** pt-BR, sem travessão em texto exibido, sem jargão interno; "Sua rede" e "Minha rede" com a voz da casa; erro diz como recuperar; estado vazio nomeia a busca; "não compartilhou o contato" segue a formulação atual.
-- **LGPD (A5):** nenhum dado pessoal novo é criado — as views projetam colunas existentes; a exposição nova (adultos do programa visíveis a todos os jovens; a projeção rica de especialista visível a todo staff) entra como linha em `docs/lgpd/inventario-dados.md` na mesma PR; foto de menor fica `null` na projeção da view, não só na tela.
+- **LGPD (A5):** nenhum dado pessoal novo é criado — as views projetam colunas existentes; a exposição nova (adultos do programa visíveis a todos os jovens; a projeção rica de especialista visível a todo staff) entra como linha em `docs/lgpd/inventario-dados.md` na mesma PR; a foto de menor segue visível por decisão do lead (24/11), mas os dados civis e contatos continuam fora da projeção.
 - **Demo (A7):** `demoJovemDiretorio` e `demoEspecialistasCatalogo` espelham as views com o mesmo contrato de chaves — teste de paridade junto do `diretorio-jovem.test.ts`, senão a demo ensina errado.
 - **Perf:** projeção segura sem join em dados civis; N esperado pequeno (dezenas) — filtro client-side sobre payload SSR; `prefetch={false}` nos links de ficha; avatar via `avatarPublicUrl` com `<img>` lazy default; busca debounced 300ms; `history.replaceState`, nunca `router.replace`; sem `dynamic()` novo — `JovemEspecialistaCard`/`FilterChipRow` já estão no bundle.
 - **Docs na mesma PR:** a linha 52 do `docs/regression-map.md` ("o diretório do jovem é a rede dele") muda de invariante — reescrita na mesma PR; `specs/README.md` ganha a linha da 023; comentário do contrato D2 em `queries-jovem.ts` menciona a view nova.
 
 ## Entidades e dados
 
-- **`jovem_diretorio` (view definer nova — sugestão de SQL pro lead):** `union all` de três braços — (a) adultos ativos com papel do programa (`has_papel` em `mentor_dpp`/`mentor_especialista`/`supervisor`/`coordenacao`, dedup por profile), (b) colegas com conta da mesma turma (o recorte da `mentorados_turma`), (c) o catálogo `jovem_especialistas` — com `tipo`, `minha_rede` (exists em `jovem_contatos` ∪ `mentorados_turma`) e `minha_turma` derivados no select; `avatar_path` `null` no braço colega; `whatsapp`/`email` ausentes do select inteiro.
+- **`jovem_diretorio` (view definer nova — sugestão de SQL pro lead):** `union all` de três braços — (a) adultos ativos com papel do programa (`has_papel` em `mentor_dpp`/`mentor_especialista`/`supervisor`/`coordenacao`, dedup por profile), (b) **todos os jovens com conta no programa** (não só a mesma turma; `minha_turma` vira selo), (c) o catálogo `jovem_especialistas` — com `tipo`, `minha_rede` (exists em `jovem_contatos` ∪ `mentorados_turma`) e `minha_turma` derivados no select; `avatar_path` visível também no braço jovem; `whatsapp`/`email` e dados civis ausentes do select inteiro.
 - **`especialistas_catalogo` (view definer nova):** verbatim do select da `jovem_especialistas`, gate `my_role()` em `('coordenacao','mentor_dpp','mentor_especialista','supervisor')` — decidir no plano se ela também carrega `ativo` pra fila da coordenação.
 - **`JovemPessoa` (`src/lib/types`):** novo `tipo: "diretorio"` com a projeção segura — a ficha resolve diretório → contato → colega → especialista nessa ordem.
 - **`JovemEspecialista`:** vira o shape canônico do catálogo nos dois lados — o getter staff devolve o mesmo tipo.
-- **`mentorados.contato_compartilhado`:** sem mudança — governa WhatsApp de colega, não presença no diretório. Um opt-in `visivel_diretorio` só nasce se a decisão de escopo for programa-inteiro pra menores (ver Decisões abertas).
+- **`mentorados.contato_compartilhado`:** sem mudança — governa WhatsApp de colega, não presença no diretório. A decisão de 24/11 é programa inteiro para jovens com conta; não nasce opt-in novo nesta rodada.
 - **`jovem_contatos` / `mentorados_turma` / `jovem_especialistas`:** seguem como estão — o diretório compõe; absorver `mentorados_turma` na view nova é opção de schema do lead, não exigência.
 
 ## Critérios de sucesso
@@ -185,7 +185,7 @@ A fronteira que a `jovem_diretorio`, a `especialistas_catalogo` e as telas não 
 
 ## Plano de testes
 
-- **A estender:** `tests/diretorio-jovem.test.ts` (contrato de chaves e fronteira das projeções novas, espelho demo); `tests/e2e/app/jovem-pessoas.spec.ts` + `tests/e2e/demo/jovem-pessoas.spec.ts` (default "Todos", facetas, selo "Sua rede", colega sem foto, 404 fora do diretório); `tests/e2e/app/jovem-especialista*.spec.ts` (seleção por card, fluxo não-modal, lotado/mural); `tests/jovem-especialista.test.ts` (variantes seguem).
+- **A estender:** `tests/diretorio-jovem.test.ts` (contrato de chaves e fronteira das projeções novas, espelho demo); `tests/e2e/app/jovem-pessoas.spec.ts` + `tests/e2e/demo/jovem-pessoas.spec.ts` (default "Todos", facetas, selo "Sua rede", jovem com foto e sem dados civis, 404 fora do diretório); `tests/e2e/app/jovem-especialista*.spec.ts` (seleção por card, fluxo não-modal, lotado/mural); `tests/jovem-especialista.test.ts` (variantes seguem).
 - **A criar:** spec e2e REST da `jovem_diretorio` (papel mentorado → projeção segura; anon/negado → 0) e da `especialistas_catalogo` (staff lê, mentorado não) — padrão `relatorios.spec.ts`; unit do merge do diretório e do estado "Selecionado"; e2e do fluxo staff completo (sugestão por card → confirmação do jovem).
 - **A11y:** tab-order no diretório e no painel inline; `aria-pressed`, `role="group"`, `role="status"` e `role="search"` assertivos nos specs de página.
 - **Reescrever na mesma PR:** a linha do invariante no `docs/regression-map.md` e as expectativas que dizem "o diretório do jovem é a rede dele" — o invariante novo é "o diretório do jovem é o recorte seguro da `jovem_diretorio`; a rede dele é a faceta marcada".
@@ -193,7 +193,7 @@ A fronteira que a `jovem_diretorio`, a `especialistas_catalogo` e as telas não 
 ## Riscos
 
 - View definer com `OR` solto no WHERE abre o catálogo inteiro — mitigação: gate único `my_role()='mentorado'` no WHERE externo da view, revisão do lead e e2e REST do papel negado (precedente `relatorios.spec.ts`).
-- Diretório vira vitrine de menores — mitigado pelo recorte (colega só mesma turma + com conta) e pela foto `null` na projeção; ampliar exige o opt-in novo da seção de decisões.
+- Diretório vira vitrine de menores — decisão do lead (24/11): programa inteiro, com foto, limitado a quem tem conta; dados civis, documentos, contatos e avaliações seguem fora da projeção. A mitigação é a matriz, não o recorte de turma.
 - Marcar "Sua rede" em tela compartilhada revela os vínculos dele a quem olha por cima — aceitável (é a visão dele); o risco real seria projetar vínculo de terceiros, que a view não faz (`minha_rede` é sempre do caller).
 - Dedup errado duplica a pessoa ou some o próprio mentor — coberto por unit do merge + e2e.
 - Preferência marcada no fluxo inline se perde no refresh — `onEnviado` limpa explicitamente, como o `CatalogoJovem` já faz.
@@ -204,8 +204,8 @@ A fronteira que a `jovem_diretorio`, a `especialistas_catalogo` e as telas não 
 
 Decisões que só o lead/produto fecha — a spec está escrita com o **default recomendado** de cada uma; mudar qualquer uma altera só o predicado da view e os testes, não as superfícies.
 
-1. **Escopo do diretório pra menores:** mesma turma com conta (recomendado — é o recorte atual, sem colega novo) × programa inteiro × programa inteiro atrás de opt-in novo `visivel_diretorio`. Se ampliar, o opt-in é quase obrigatório (menor + LGPD) e nasce por migration própria.
-2. **Foto de menor no diretório:** hoje `mentorados_turma.avatar_path` chega ao client e a decisão "não renderiza" mora só na tela, com o bucket público — recomendado `null` direto na projeção da view (fronteira no banco).
+1. **Escopo do diretório pra menores — decidido em 24/11:** programa inteiro, incluindo menores, limitado a quem tem conta. Sem opt-in `visivel_diretorio` nesta rodada.
+2. **Foto de menor no diretório — decidido em 24/11:** visível, inclusive para menores; dados civis/documentos nunca entram. O contato segue opt-in como hoje.
 3. **Adultos no diretório do jovem:** todo adulto ativo com papel (recomendado — mentores, auxiliares e equipe já têm projeção pública no programa) × escopo reduzido.
 4. **Coordenação no diretório:** hoje entra escopada na turma da DPP viva via `jovem_contatos`; no diretório amplo ela aparece por papel, sem vínculo — ok se a projeção é a mesma dos demais adultos (recomendado).
 5. **`mentorados_turma` continua?** absorver como braço da `jovem_diretorio` (recomendado — uma fonte, zero drift) × manter as duas (menos churn nos testes).

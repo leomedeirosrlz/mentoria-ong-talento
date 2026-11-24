@@ -3,44 +3,48 @@
 **Feature:** `specs/027-privacidade-staging-notificacoes` · **Status:** Clarified
 **Recon:** `docs/planos/issues/_recon/privacidade-staging-2026-11-24.md` · **Fila:** a numerar no `BACKLOG.md` · **Dono:** Thiago · **Data:** 24/11/2026
 
+> **Decisão do lead (24/11/2026):** o mentor DPP vê **somente a média agregada** das avaliações. Nenhuma avaliação individual — estrelas, texto, sentimento, temas ou `pedir_apoio` — é exposta a ele, independentemente da flag da linha. O toggle "Meu mentor pode ler esta avaliação" sai da UI; a coluna `avaliacao_visivel_mentor` permanece por compatibilidade, sem uso no ramo mentor. Coordenação e auxiliar com supervisão seguem como hoje. Esta decisão substitui o veredito anterior da spec.
+
 ## Problema e resultado
 
 Três frentes pequenas e ortogonais que saíram do mesmo recon:
 
-**Dor hoje.** (a) Em staging, `mentor@realiza.test` abre a ficha e vê todas as avaliações da dupla — sem uma resposta registrada sobre se isso é bug ou intencional, e o dataset (100% opt-in) esconde o estado real da feature. (b) Nenhum login jovem em staging mostra o semáforo em atraso: `jovem@realiza.test` (Ana × Otávio, d1) só cobre "registro pendente"; o estado atraso já existe nas duplas d2/d7/d13, mas nenhuma delas tem conta de jovem. (c) O corpo da notificação trunca em uma linha e o item inteiro é um link — não existe gesto para ler a notificação completa; e "Sugestão confirmada" (título sem contexto) fica indecifrável exatamente por causa disso.
+**Dor hoje.** (a) Em staging, `mentor@realiza.test` abre a ficha e vê todas as avaliações da dupla; o produto decidiu que o mentor deve ver **apenas a média**, não as respostas individuais. (b) Nenhum login jovem em staging mostra o semáforo em atraso: `jovem@realiza.test` (Ana × Otávio, d1) só cobre "registro pendente"; o estado atraso já existe nas duplas d2/d7/d13, mas nenhuma delas tem conta de jovem. (c) O corpo da notificação trunca em uma linha e o item inteiro é um link — não existe gesto para ler a notificação completa; e "Sugestão confirmada" (título sem contexto) fica indecifrável exatamente por causa disso.
 
-**Resultado observável.** A matriz de visibilidade das avaliações fica escrita como contrato, com o veredito sobre "ver todas"; a seed demo representa os dois estados do toggle do jovem; `jovem@realiza.test` mostra um atraso testável na semana corrente; e qualquer notificação longa se lê inteira dentro do popover, por mouse, toque, teclado e leitor de tela — incluindo entender "sugestão de quê" pelo título.
+**Resultado observável.** O mentor DPP vê a média quantizada e nenhuma linha individual; a UI do jovem não promete mais um toggle que não controla a leitura do mentor; a seed demo deixa de esconder o estado real; `jovem@realiza.test` mostra um atraso testável na semana corrente; e qualquer notificação longa se lê inteira dentro do popover, por mouse, toque, teclado e leitor de tela — incluindo entender "sugestão de quê" pelo título.
 
-**Como saberemos que funcionou.** A ficha do Otávio mostra avaliação visível e avaliação oculta na mesma dupla, a média agregada segue aparecendo mesmo com a flag desligada, e nenhum papel fora do jovem consegue mover o toggle (caso negado coberto). `jovem@realiza.test` exibe a pendência de retroativo pelo encontro oficial vencido e a equipe vê a d1 em atenção por atraso. Uma notificação com corpo longo expande "Ler mais"/"Ler menos" sem navegar nem marcar como lida, e o título das notificações mintadas pela confirmação de sugestão identifica quem confirmou e o quê.
+**Como saberemos que funcionou.** A ficha do Otávio mostra a média agregada e nenhuma avaliação individual; coordenação e auxiliar seguem com o recorte atual; a seed de staging tem uma avaliação oculta e uma visível para provar que a média cobre as duas; `jovem@realiza.test` exibe a pendência de retroativo pelo encontro oficial vencido e a equipe vê a d1 em atenção por atraso. Uma notificação com corpo longo expande "Ler mais"/"Ler menos" sem navegar nem marcar como lida, e o título das notificações mintadas pela confirmação de sugestão identifica quem confirmou e o quê.
 
-## Veredito — "ver todas" não é bug
+## Decisão e contrato
 
-Leitura definitiva do código (migrations 0071/0090/0092/0125 + `src/lib`): o modelo de privacidade **já existe e é granular por linha**. O que se observa em staging é a combinação de dois comportamentos esperados e um dataset pouco representativo:
+A leitura de código (0071/0090/0092/0125 + `src/lib`) encontrou um modelo granular por linha: coordenação e auxiliar com supervisão leem tudo; o mentor DPP lia a linha integral quando `avaliacao_visivel_mentor = true`; a seed marcava `true` em 100% das linhas. **O produto agora fecha outra direção:** o mentor não lê nenhuma avaliação individual. Ele recebe apenas a média quantizada, com lote mínimo de 3 e todas as linhas da dupla (inclusive as que estavam ocultas), preservando o anti-differencing.
 
-1. **Coordenação e auxiliar com supervisão da dupla leem tudo por desenho** — o filtro da flag não se aplica a esses ramos da policy `avaliacoes_select` (`0125:92-106`). Se o observador que reportou era `coord@`/`auxiliar@`, o comportamento é o correto.
-2. **O mentor DPP lê a avaliação integral só quando a linha tem `avaliacao_visivel_mentor = true`** — e a seed demo marca `true` em 100% das linhas (`scripts/seed-demo-staging.mjs:734`). Se o observador era `mentor@`, o que ele viu foi o estado "on" do toggle aplicado a todas as linhas — escolha de fixture, não vazamento.
-3. **O que seria bug real** — mentor lendo linha com flag `false`, ou integral de avaliação de trilha especialista — não tem evidência hoje e passa a ter guarda explícita (FR-004).
+Consequências:
+- a policy/consulta do mentor deixa de projetar a linha de `avaliacoes_encontro` (estrelas, sentimento, avancei, temas, comentário, `pedir_apoio`);
+- o toggle do jovem sai da UI; a coluna `avaliacao_visivel_mentor` fica como legado sem efeito no ramo mentor;
+- coordenação e auxiliar com supervisão mantêm o comportamento atual;
+- a média continua existindo só com `n >= 3`; com menos, a ficha não mostra média nem avaliação individual.
 
-### Matriz de visibilidade (contrato)
+## Matriz de visibilidade (contrato)
 
 | Dado | Jovem (autor) | Mentor DPP da dupla | Coordenação | Auxiliar/supervisor da dupla | Especialista |
 |---|---|---|---|---|---|
-| Avaliação integral — estrelas, sentimento, avancei, temas, comentário, `pedir_apoio` | sempre (as próprias) | só linha com flag `true` ∧ dupla dele ∧ trilha ≠ especialista | tudo | só duplas supervisionadas | nunca |
-| Estrelas de sessão especialista | sim | só `av.estrelas` (via `trilha_do_jovem`, `0125:631+`) | sim | sim | só da própria trilha e só estrelas (view `especialista_avaliacoes`, `0090:123-131`) |
+| Avaliação integral — estrelas, sentimento, avancei, temas, comentário, `pedir_apoio` | sempre (as próprias) | **nunca** (só a média agregada) | tudo | só duplas supervisionadas | nunca |
+| Estrelas de sessão especialista | sim | **nunca** | sim | sim | só da própria trilha e só estrelas (view `especialista_avaliacoes`, `0090:123-131`) |
 | Média agregada `avaliacao_media_dpp` | lê as próprias | quantizada em 0,5, lote ≥ 3 contando **todas** as linhas da dupla — inclusive as ocultas (`0191:32-50`) | sim | sim | — |
 | `avaliacao_links` (convite pendente) | o próprio | não | distribui | não | não |
 | `avaliacao_pulses` | o próprio | não | sim | não | não |
-| `pedir_apoio` | marca | se a linha está visível | sim, com notificação `apoio_jovem` | sim | não |
-| Resumo na retrospectiva (`resumoAvaliacaoJovem`, `starSeries`) | própria | só o que a RLS devolve — linhas invisíveis não entram no agregado client-side | sim | sim | — |
+| `pedir_apoio` | marca | **nunca** | sim, com notificação `apoio_jovem` | sim | não |
+| Resumo na retrospectiva (`resumoAvaliacaoJovem`, `starSeries`) | própria | só a média agregada, nunca a linha | sim | sim | — |
 | `/resumo` público (relatório) | — | — | — | — | não entra — só `registros.avaliacao` do mentor (`0110`) |
 
-**O toggle do jovem existe.** Switch "Meu mentor pode ler esta avaliação" no detalhe da avaliação DPP (`jovem-avaliacoes.tsx:295-310`), via `definirVisibilidadeAvaliacao` → RPC `definir_visibilidade_avaliacao` (`0071:379-393`), escopada a `my_mentorado_id()` — só o próprio jovem liga/desliga; coordenação não pode coagir nem herdar. Otimista na UI com rollback no erro; o jovem pode responder sem decidir (flag default `false`).
+**O toggle do jovem sai.** O switch "Meu mentor pode ler esta avaliação" (`jovem-avaliacoes.tsx:295-310`) e a RPC `definir_visibilidade_avaliacao` deixam de ser oferecidos na avaliação DPP. A coluna `avaliacoes_encontro.avaliacao_visivel_mentor` permanece por compatibilidade, mas o ramo mentor não a usa mais. O jovem continua sendo o único dono da própria avaliação; coordenação/auxiliar seguem o recorte já existente.
 
-**O que "invisível" esconde — e o que não esconde.** Com a flag desligada, a linha inteira some da visão do mentor: `avaliacao_jovem` volta `null` no embed da ficha (estrelas, sentimento, avancei, temas, comentário, `pedir_apoio`), e a avaliação não entra na trajetória nem em `temasTop` do que ele vê (`actions.ts:1057-1119`). **Mas as estrelas da linha oculta continuam alimentando a média** — `avaliacao_media_quantizada` (`0191:32-50`) conta `count(*)` e tira `avg` sobre todas as linhas da dupla, sem filtro de flag. Isso é desenho, não descuido: excluir a oculta do lote faria o toggle reabrir a janela do lote e derrotaria o anti-differencing (k = n/3·3 + quantização a 0,5). Ou seja, "só na média" é literalmente verdade — inclusive quando a oculta é uma das ≥3 do lote. Para jovem, coordenação, supervisor e especialista nada muda — a flag filtra apenas o ramo mentor DPP da policy. Duas ressalvas de copy: com menos de 3 avaliações não existe média alguma — "voltou a valer só na média" é mentira nesse caso; e o jovem pode ler "invisível" como "some de tudo", quando as estrelas seguem no agregado (FR-003 cobre as duas).
+**O que a média esconde e o que ela mostra.** A média é quantizada em 0,5 e só aparece com lote mínimo de 3 avaliações da dupla; todas as linhas entram, inclusive as que antes estavam ocultas. O mentor nunca recebe a linha individual, nem para "dar contexto" — qualquer texto, estrela ou tema individual é cortado na projeção/RLS. Com menos de 3, a ficha não promete média: mostra o estado honesto de "sem média ainda".
 
 ## Fora de escopo
 
-- **Mudança no modelo de privacidade** — a regra existe e esta spec a trava como contrato; nenhuma policy, coluna ou RPC de autorização muda.
+- **Mudança no recorte de coordenação/auxiliar** — eles seguem lendo as linhas que a policy atual permite; esta spec só retira o integral do mentor DPP.
 - **Página `/notificacoes` ou "carregar mais"** — hoje só as 15 mais recentes são alcançáveis (`listarNotificacoes`, top-15 desc); o resto fica inacessível. Gap registrado, merece issue própria — a expansão desta spec não finge resolver isso.
 - **Backfill de notificações já mintadas** — rows de `notificacoes` são imutáveis pelo guard da 0019 (só `lida_em` atualiza); o texto antigo segue como está, legível via expansão.
 - **Notificações do jovem por outros canais** (push, e-mail, WhatsApp) — fora do produto hoje.
@@ -49,17 +53,18 @@ Leitura definitiva do código (migrations 0071/0090/0092/0125 + `src/lib`): o mo
 
 ## Histórias de usuário
 
-### US1 — Dataset honesto e guarda da privacidade (jovem / mentor / QA)
+### US1 — Mentor vê média, não respostas (jovem / mentor / QA)
 
-**Por que P1:** sem resposta registrada, "o mentor vê tudo" vira bug eterno; e com 100% opt-in na seed, ninguém — dev, QA ou demo — vê o estado que é o padrão real (flag `false`).
+**Por que P1:** é a decisão de privacidade que o produto fechou; sem ela o mentor continua lendo texto individual e o jovem não tem controle real sobre o que compartilha.
 
-**Teste independente:** rodar a seed em staging e abrir a ficha de Ana como `mentor@realiza.test`: aparecem avaliações visíveis e pelo menos uma oculta (só a média agregada cobre os números); a média quantizada segue liberada com ≥ 3 avaliações.
+**Teste independente:** rodar a seed em staging e abrir a ficha de Ana como `mentor@realiza.test`: aparece a média agregada (lote ≥ 3) e nenhuma linha individual; como coordenação/auxiliar, o recorte atual continua.
 
 **Cenários:**
 
-- **Dado** que a seed roda, **quando** o Otávio abre a ficha da Ana, **então** vê avaliações com flag `true` integralmente e as com flag `false` não aparecem — mas a média agregada aparece igual.
-- **Dado** a Ana com menos de 3 avaliações respondidas, **quando** ela desliga o toggle, **então** a copy não promete "só na média" — diz que o mentor deixa de ver a avaliação (e a média ainda nem existe).
-- **Dado** uma conta que não é o próprio jovem (outra jovem, mentor, coord), **quando** chama `definir_visibilidade_avaliacao`, **então** a RPC recusa — caso negado testado.
+- **Dado** que a seed roda, **quando** o Otávio abre a ficha da Ana, **então** vê somente a média quantizada — nenhum card/linha de avaliação individual, nenhuma estrela, texto, tema ou pedido de apoio.
+- **Dado** uma avaliação com flag `false` ou `true`, **quando** a média é calculada, **então** as duas entram no lote (se houver ≥ 3) e a média é a mesma; o mentor não distingue quais linhas existem.
+- **Dado** a Ana com menos de 3 avaliações respondidas, **quando** a ficha do mentor renderiza, **então** não há média e a copy diz que ainda não há média — nunca uma média inventada nem uma linha individual.
+- **Dado** uma conta que não é o próprio jovem (outra jovem, mentor, coord), **quando** tenta alterar a visibilidade, **então** a RPC/action recusa — caso negado coberto; a UI do jovem não oferece mais o toggle.
 
 ### US2 — Jovem com atraso testável em staging (QA / demo / coordenação)
 
@@ -104,16 +109,16 @@ Leitura definitiva do código (migrations 0071/0090/0092/0125 + `src/lib`): o mo
 - **Estado de expansão não persiste** — é visual/local, não vira coluna nem preferência; reabrir o popover volta clampado.
 - **Leitor de tela hoje já lê o corpo inteiro** — o texto clampado segue no DOM; o que falta é o gesto visual. Requisito é não piorar: o corpo expandido segue em fluxo de leitura e o toggle anuncia estado.
 - **Jovem com < 3 avaliações** — não existe média para "valer só na média"; copy precisa ser honesta nos dois lados do lote.
-- **Mentor híbrido (dpp + especialista)** — autocensura já implementada: a integral das sessões de trilha especialista dele nunca aparece; o mix da seed não altera isso.
+- **Mentor híbrido (dpp + especialista)** — o corte do mentor vale para as duas trilhas: nenhuma linha individual, só a média quando houver lote; a flag legada não altera isso.
 - **Fixture degrada sem reseed** — com atraso intencional na d1, o contador cresce a cada terça oficial vencida (atraso-1 → -2 → risco). Aceito: o reseed recalibra, e a degradação é o próprio comportamento real do semáforo.
 - **Reseed durante e2e do preview** — ranges separados (`e2e00000-*` intocado); sem conflito.
 
 ## Requisitos funcionais
 
-- **FR-001:** A matriz da seção "Veredito" é o contrato. Qualquer divergência observada entre ela e o comportamento do app é bug — e passa a existir resposta única para "é bug ou intencional".
-- **FR-002:** A seed demo gera mix `avaliacao_visivel_mentor`: toda dupla DPP demo com ≥ 3 avaliações respondidas tem ao menos uma linha `false`, e a d1 (Ana × Otávio) mostra os dois estados na ficha do Otávio. Regra determinística por número do encontro (ex.: oculta a avaliação mais recente respondida, ou `i % 3 === 0`) — o importante é reprodutível e coberto.
-- **FR-003:** Copy de privacidade honesta nos dois lados do lote — `PRIVACIDADE_AVALIACAO.dpp`, o texto do toggle e os toasts ("Seu mentor agora lê esta avaliação." / "Voltou a valer só na média.") não prometem média quando `n < 3`. Versão sugerida para o caso "sem média ainda": "Seu mentor deixa de ver esta avaliação. Ainda não há média para ele ver."
-- **FR-004:** O toggle segue exclusivo do jovem — `definir_visibilidade_avaliacao` escopada a `my_mentorado_id()`; caso negado (outra jovem, mentor ou coord chamando a RPC) recusado e coberto por teste.
+- **FR-001:** A matriz desta spec é o contrato. O mentor DPP NUNCA recebe linha individual de avaliação (estrelas, sentimento, avancei, temas, comentário, `pedir_apoio`); recebe somente a média agregada `avaliacao_media_dpp`, quantizada em 0,5 e com lote mínimo de 3, contando todas as linhas da dupla.
+- **FR-002:** A projeção/RLS do ramo mentor deixa de expor `avaliacoes_encontro`; a média continua vindo da RPC/agregado existente. Nenhuma tela do mentor pode receber a linha integral por embed, action ou view — teste negativo cobre `select` direto e a ficha.
+- **FR-003:** O toggle "Meu mentor pode ler esta avaliação" sai da UI do jovem e a action `definirVisibilidadeAvaliacao` deixa de ser oferecida para DPP. A coluna `avaliacao_visivel_mentor` permanece por compatibilidade, sem efeito no ramo mentor; coordenação/auxiliar seguem o recorte atual.
+- **FR-004:** Com menos de 3 avaliações não existe média; a ficha do mentor mostra o estado "sem média ainda" e nunca uma linha individual. A copy do jovem explica que a resposta individual não é exibida ao mentor e que a média só aparece com 3 ou mais avaliações.
 - **FR-005:** `PLANO_ENCONTROS[D.d1]` passa a gerar atraso testável na semana corrente. Mudança sugerida (opção B′): `{ feitos: 5, hora: "19:00", proximo: true, duracao: 90, pendente: 5, avalPendente: 5 }` e repontar a exceção do patch de `avaliacao_links` do enc. 6 para o enc. 5 (`uid((0x300 << 8) + 5)` em `:874-876`). Resultado: enc. 6 oficial da semana vence sem row → **atraso-1 de terça em diante** + `registro_retroativo` na home da Ana ("O 6º encontro era na semana de dd/mm… Vocês se encontraram?") + registro pendente no enc. 5 + avaliação pendente viva no enc. 5. Duas correções ao recon: **(a)** a opção A literal (`proximo: false` apenas, 1 linha) **só produz atraso a partir da terça da semana seguinte** — o vigente que fica sem row é o enc. 7, cujo oficial é a próxima terça (`dataT1(7)`); "de quarta em diante" está uma semana adiantado; **(b)** com `proximo: true` o preventivo **não** dispara — o enc. 7 agendado satisfaz o gate `!proximo` (`ciclo.ts:1936`), que lê "a dupla já marcou algo" sem olhar o número. Se o preventivo na d1 também for desejado, usar `proximo: false` (ritmo idêntico ao d2: preventivo dom–seg + atraso ter–sáb) — custo: a ficha fica sem próximo agendado, o que também é a história ("vigente sem data"). A opção A (âncora 100% intacta) fica como fallback se a d1 não puder perder o enc. 6.
 - **FR-006:** Reseed idempotente e seguro — mantém o range `de000000-*`, o `limpar()` prévio e a guarda de produção (aborta se o ref for o de prod); o mapa de cenários do cabeçalho do script (`:13-48`) é atualizado para descrever a d1 nova. Se adotada, a opção C (login `larissa.campos@realiza.test` para a d13, já em risco hoje) é uma linha em `garantirAuthUser` — entrega um segundo jovem em atraso real desde já, sem custo de fixture.
 - **FR-007:** Notificação com corpo que excede o clamp se lê completa dentro do popover — `line-clamp-2` no corpo + toggle "Ler mais"/"Ler menos", ou `<details>` nativo equivalente. O gesto de expandir é distinto do de navegar: nem navega, nem marca como lida, nem fecha o popover.
@@ -140,18 +145,18 @@ perform sol_notificar(
 
 ## Requisitos não funcionais
 
-- **RLS/RPC:** nenhuma policy muda; o toggle continua RPC escopada a `my_mentorado_id()`; a autorização segue no banco (constitution A2) — e passa a ter o caso negado que o regression-map cobra (`docs/regression-map.md`, gap das 251 policies).
+- **RLS/RPC:** a policy do ramo mentor muda para não expor `avaliacoes_encontro`; a média segue em RPC definer. A autorização continua no banco (constitution A2); o caso negativo do antigo toggle vira teste de regressão da nova matriz.
 - **A11y:** gestos distintos para expandir e navegar; toggle alcançável por teclado com foco visível e `aria-expanded`/`aria-controls`; área de toque ≥ 24px/44px; expansão sem animação obrigatória (respeita reduced-motion); nada depende só de cor. `conventions-ui.md`: metadado trunca, texto importante não — o corpo da notificação é texto importante.
 - **Copy:** pt-BR, sem travessão em texto exibido; "Ler mais"/"Ler menos" (ou equivalente); títulos de notificação respondem "o quê, de quem" sozinhos.
-- **LGPD:** nenhum dado novo — flag, seed e expansão usam o que já existe; o toggle reforça o princípio do mínimo (padrão `false`).
-- **Demo (`/demo`):** paridade obrigatória (A7) — `comAvaliacaoJovem` já replica os cortes da RLS; o dataset em memória ganha o mix on/off nas avaliações e ao menos uma notificação de corpo longo + a "Sugestão confirmada" para o toggle ser demonstrável.
+- **LGPD:** nenhum dado novo; a exposição ao mentor diminui (média em vez de linha). A flag existente permanece como legado sem uso no ramo mentor.
+- **Demo (`/demo`):** paridade obrigatória (A7) — `comAvaliacaoJovem` replica o corte do mentor (sem linha individual, só média); o dataset em memória mantém pelo menos uma avaliação oculta para provar que a média a cobre e uma notificação de corpo longo + a "Sugestão confirmada".
 - **Perf:** expansão é estado local por item — sem request, sem N+1; a lista segue renderizando as 15 sem custo extra.
 - **Seed:** nunca produção — guarda de ref mantida; critérios de reset e idempotência documentados no cabeçalho do script.
 
 ## Entidades e dados
 
-- `avaliacoes_encontro.avaliacao_visivel_mentor` — bool, default `false`, existente (0071). Per-row opt-in do jovem. Nenhuma mudança de schema.
-- `avaliacoes_encontro` (linha integral) — cortada pela policy `avaliacoes_select` conforme a matriz; agregado `avaliacao_media_dpp` independente da flag.
+- `avaliacoes_encontro.avaliacao_visivel_mentor` — bool, default `false`, existente (0071). Legado sem efeito no ramo mentor; nenhuma mudança de schema nesta rodada.
+- `avaliacoes_encontro` (linha integral) — cortada da projeção do mentor; coordenação/auxiliar conforme a matriz; agregado `avaliacao_media_dpp` independente da flag.
 - `avaliacao_links` — o patch de exceção `pendente → expirado` da seed (`:874-876`) precisa apontar para um encontro que exista na d1 nova (enc. 5), senão a avaliação pendente vira `expirado`.
 - `notificacoes` — `corpo` ≤ 1000 chars (`sol_notificar`); rows imutáveis exceto `lida_em` (guard da 0019). Nenhuma coluna nova.
 - `PLANO_ENCONTROS` / `D.d1` — fixture da seed; cenário passa de "registro pendente" para "registro pendente + atraso + avaliação pendente", documentado no mapa do cabeçalho.
@@ -159,37 +164,37 @@ perform sol_notificar(
 
 ## Critérios de sucesso
 
-- **SC-001:** Em staging, `mentor@` vê na ficha da Ana ao menos uma avaliação integral e ao menos uma ausente pela flag — e a média agregada aparece mesmo com a oculta.
-- **SC-002:** Resposta única registrada para "ver todas": intencional por RLS (coord/supervisor) + dataset 100% opt-in (mentor); a seed deixa de esconder o estado real.
+- **SC-001:** Em staging, `mentor@` vê na ficha da Ana somente a média agregada — nenhuma avaliação individual; a média cobre a linha oculta e a visível.
+- **SC-002:** A matriz é contrato; um teste REST negativo prova que o mentor não seleciona `avaliacoes_encontro` e que coordenação/auxiliar mantêm o recorte atual.
 - **SC-003:** `jovem@realiza.test` mostra `registro_retroativo` do encontro oficial vencido a partir de terça (e, com `proximo: false`, o preventivo dom–seg antes disso) e mantém avaliação pendente + registro pendente — tudo reseedável com `node scripts/seed-demo-staging.mjs`.
 - **SC-004:** Dois reruns seguidos da seed produzem estado idêntico no range `de000000-*`; nada fora do range muda; a guarda aborta com ref de produção.
 - **SC-005:** Qualquer notificação com corpo truncável expande e recolhe in-place por mouse, toque e teclado, com `aria-expanded` correto — sem navegar nem marcar lida.
 - **SC-006:** O título da notificação de confirmação de sugestão responde sozinho "quem confirmou o quê".
-- **SC-007:** Caso negado coberto: `definir_visibilidade_avaliacao` chamada por papel que não é o próprio jovem é recusada — em e2e e/ou teste DB-level (piloto do gap do regression-map).
+- **SC-007:** Caso negado coberto: nenhuma outra conta consegue mudar a visibilidade/avaliação do jovem; a UI não oferece mais o toggle. Teste DB-level/e2e.
 
 ## Plano de testes
 
-**Unit (Vitest):** regra do mix da seed (determinismo do on/off por número); heurística "corpo excede o clamp" se for função pura; formatação do novo título da notificação.
+**Unit (Vitest):** agregação da média (lote ≥ 3, linha oculta incluída); heurística "corpo excede o clamp" se for função pura; formatação do novo título da notificação.
 
-**E2E app (Playwright):** estender `tests/e2e/app/avaliacao.spec.ts:370-397` — mentor na ficha com linha flag-off ausente + média visível; caso negado do toggle por papel errado; notificação longa expande por teclado, `aria-expanded` alterna, link do item ainda navega, expansão não marca lida.
+**E2E app (Playwright):** estender `tests/e2e/app/avaliacao.spec.ts:370-397` — mentor na ficha vê a média e nenhuma linha individual; coordenação/auxiliar mantêm o recorte; caso negado de leitura direta; notificação longa expande por teclado, `aria-expanded` alterna, link do item ainda navega, expansão não marca lida.
 
-**E2E demo (paridade):** dataset demo com mix on/off (a oculta some da ficha), notificação longa e a "Sugestão confirmada" novas — mesmo caminho feliz do app.
+**E2E demo (paridade):** dataset demo com média e nenhuma linha individual no mentor, notificação longa e a "Sugestão confirmada" novas — mesmo caminho feliz do app.
 
 **Regressão:** semáforo (atraso/preventivo por `proximo`, `pendente`, `feitos`), home do jovem (`registro_retroativo`, `encontro_sem_desfecho`), popover de notificações (lida, navegação, Esc), RPC `definir_visibilidade_avaliacao`, view `especialista_avaliacoes`.
 
 ## Riscos
 
-- **Mix "off" lido como dado sumido** — quem assiste a demo pode achar que a avaliação desapareceu; é o comportamento real, e a ficha do mentor passa a ensiná-lo. Mitigação: SC-001 verificado na mesma tela que mostra a média.
+- **Média sozinha parece pouco** — o mentor pode sentir falta do texto; é a decisão de privacidade. Mitigação: a ficha mostra a média com o rótulo do lote e o caminho para conversar com a coordenação, sem prometer acesso individual.
 - **Exceção do patch esquecida** — repontar `encAna6 → enc. 5` é o passo que mantém a avaliação pendente viva; se esquecido, ela vira `expirado` silenciosamente. Coberto por FR-005 + SC-003.
 - **Opção A adotada por economia** — produz atraso só na semana seguinte (correção registrada em FR-005); se a âncora da d1 for intocável, aceitar o atraso diferido + a opção C cobre o "testável hoje".
 - **Toggle dentro do link** — aninhamento interativo é inválido (HTML + a11y); FR-008/FR-009 exigem a reestruturação como irmão. Custo: o item inteiro deixa de ser uma parada única de teclado — aceito, é o preço do gesto distinto.
-- **Copy "<3 avaliações" esquecida** — o toast atual mente nesse caso; FR-003 lista os quatro pontos de texto a revisar.
+- **Copy "<3 avaliações" esquecida** — sem média, a tela precisa dizer isso; FR-004 cobre.
 - **Fixture degrada** — o atraso intencional cresce a cada terça sem reseed (atenção → risco). É o comportamento real; o reseed recalibra.
 
 ## Premissas
 
-- **"Ver todas" é comportamento esperado + dataset pouco representativo** (veredito acima). Se surgir evidência de mentor lendo linha flag-off, vira bug — e a guarda do FR-004 passa a detectá-lo.
-- **Mix on/off adotado** em vez de "tudo opt-in" — decisão de produto assumida para a seed demo; alternativa seria manter 100% e documentar a resposta.
+- **Decisão do lead 24/11:** o mentor vê só a média. A flag antiga fica como legado; se surgir evidência de linha individual chegando ao mentor, é bug da nova matriz (FR-002).
+- **A seed mantém uma linha oculta e uma visível** só para provar que a média cobre as duas; não há mais mix de leitura do mentor.
 - **Opção B′ adotada para a d1** (atraso já nesta semana, âncora de registro pendente preservada no enc. 5) — o enc. 6 integral sai do dataset, o que muda a âncora originalmente desenhada; se isso for inaceitável, cair para A + C.
 - **Expansão in-place adotada** (toggle/details) em vez de página dedicada — o gap do top-15 segue registrado para issue própria.
 - **"Sugestão confirmada" corrigida na mint e/ou na leitura** — não basta `title` attribute; o texto exibido precisa carregar o contexto.
