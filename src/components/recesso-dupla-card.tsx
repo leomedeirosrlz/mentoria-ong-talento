@@ -67,7 +67,10 @@ export function RecessoDuplaCard({
   if (recessos.length === 0) return null;
 
   return (
-    <Card>
+    // âncora estável da fila do staff (019): sem card de plano na tela é
+    // este quem existe — o mesmo id vai no bloco dentro do PlanoEmDiaCard
+    // (as duas superfícies nunca montam juntas)
+    <Card id="recesso-dupla" className="scroll-mt-20">
       <CardContent className="space-y-3 p-5">
         <div className="flex items-start gap-3">
           <span

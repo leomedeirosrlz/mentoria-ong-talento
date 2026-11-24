@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, type ReactNode } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "@/lib/toast";
 import {
@@ -41,6 +41,7 @@ export function JovemAgendarSugestao({
   comQuem,
   sugestoes,
   titulo = "Próximo passo",
+  plano,
 }: {
   duplaId: string;
   /** Nº pré-selecionado — o próximo livre depois do último realizado. */
@@ -51,6 +52,9 @@ export function JovemAgendarSugestao({
   comQuem: string;
   sugestoes: SugestoesEncontro;
   titulo?: string;
+  /** "Sua semana" (combinado da dupla) — extensão do hero, como a
+   *  `plano` da Casca dos demais ramos do ProximoEncontro. */
+  plano?: ReactNode;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -147,6 +151,7 @@ export function JovemAgendarSugestao({
             </Button>
           </div>
         )}
+        {plano}
       </section>
     );
   }
@@ -212,6 +217,7 @@ export function JovemAgendarSugestao({
       <p className="mt-3 text-xs text-muted-foreground">
         {comQuem} recebe um aviso na hora.
       </p>
+      {plano}
 
       <SeletorDiaHora
         key={sessao}

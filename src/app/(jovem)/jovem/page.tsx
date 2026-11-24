@@ -77,7 +77,10 @@ import {
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import { getChamados } from "@/lib/queries-chamados";
 import { chamadoPendencia, derivarPendencias } from "@/lib/pendencias-jovem";
-import { combinadoDoJovem } from "@/lib/plano-combinado";
+import {
+  combinadoDoJovem,
+  propostoEmDoPlano,
+} from "@/lib/plano-combinado";
 import { quemCombinou, suaSemana } from "@/lib/sua-semana";
 import { materiaisDoNumero } from "@/lib/materiais";
 import { PlanoContestarButton } from "@/components/plano-contestar";
@@ -238,7 +241,7 @@ export default async function JovemHome() {
   // a janela de contestação é a guarda da RPC: um passo do plano feito
   // depois da proposta fecha a contestação. Sem carimbo de proposta não
   // dá pra medir — nesse caso o botão não aparece (não prometer gesto)
-  const propostoEm = planoJovem?.proposto_em ?? null;
+  const propostoEm = propostoEmDoPlano(planoJovem);
   const realizadosAposProposta = propostoEm
     ? encontros
         .filter(

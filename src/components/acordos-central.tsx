@@ -1,6 +1,6 @@
 import { PlanoAcordosCard } from "@/components/plano-acordos";
 import { CombinarPlano } from "@/components/combinar-plano";
-import { aceitesDoPlano } from "@/lib/plano-combinado";
+import { aceitesDoPlano, propostoEmDoPlano } from "@/lib/plano-combinado";
 import type { RecessoDaFicha } from "@/components/recesso-dupla-card";
 import type { SeletorSugestoes } from "@/components/seletor-dia-hora";
 import {
@@ -74,7 +74,7 @@ export function AcordosCentral({
               // a coluna não existe na tabela: "avisado em" ancora no
               // carimbo que ativou (ou na criação, proposta de lado nasce
               // em vigor) — a mesma régua do recorte do jovem
-              proposto_em: planoVivo.aprovado_em ?? planoVivo.created_at,
+              proposto_em: propostoEmDoPlano(planoVivo),
             }}
             duplaId={dupla.id}
             podeResponder={souMentor}

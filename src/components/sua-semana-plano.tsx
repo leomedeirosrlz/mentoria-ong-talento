@@ -71,30 +71,58 @@ export function SuaSemanaPlano({
       <QuadradosCombinado resumo={semana.resumo} />
 
       <div className="flex flex-wrap items-center gap-2">
-        {confirmarHref && proximoPasso && (
+        {f.cta === "Ver e responder" ? (
+          // proposta esperando o MEU aceite: o primário vai direto pro
+          // responder — o #acordos da ficha (mentor) ou o #plano da
+          // agenda (jovem), nunca "Confirmar data" antes do combinado
+          // estar em vigor
           <Link
-            href={confirmarHref}
-            className={cn(buttonVariants({ size: "sm" }), "min-h-11 sm:min-h-8")}
+            href={confirmarHref ?? combinadoHref}
+            className={cn(
+              buttonVariants({ size: "sm" }),
+              "group min-h-11 sm:min-h-8"
+            )}
           >
-            Confirmar data
+            {f.cta}
+            <CaretRight
+              aria-hidden
+              className="transition-transform group-hover:translate-x-0.5"
+            />
           </Link>
+        ) : (
+          <>
+            {semana.estado === "ativo" && confirmarHref && proximoPasso && (
+              <Link
+                href={confirmarHref}
+                className={cn(
+                  buttonVariants({ size: "sm" }),
+                  "min-h-11 sm:min-h-8"
+                )}
+              >
+                Confirmar data
+              </Link>
+            )}
+            <Link
+              href={combinadoHref}
+              className={cn(
+                buttonVariants({
+                  variant:
+                    semana.estado === "ativo" && confirmarHref && proximoPasso
+                      ? "outline"
+                      : "default",
+                  size: "sm",
+                }),
+                "group min-h-11 sm:min-h-8"
+              )}
+            >
+              Ver o combinado
+              <CaretRight
+                aria-hidden
+                className="transition-transform group-hover:translate-x-0.5"
+              />
+            </Link>
+          </>
         )}
-        <Link
-          href={combinadoHref}
-          className={cn(
-            buttonVariants({
-              variant: confirmarHref && proximoPasso ? "outline" : "default",
-              size: "sm",
-            }),
-            "group min-h-11 sm:min-h-8"
-          )}
-        >
-          Ver o combinado
-          <CaretRight
-            aria-hidden
-            className="transition-transform group-hover:translate-x-0.5"
-          />
-        </Link>
         {contestar}
       </div>
 

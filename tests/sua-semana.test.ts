@@ -92,6 +92,32 @@ describe("suaSemana", () => {
     ).toBeNull();
   });
 
+  it("em vigor sem o meu carimbo: ativo_sem_minha_ciencia", () => {
+    const s = suaSemana({
+      plano: {
+        ...base,
+        status: "aceito",
+        aceites: { mentor: true, mentorado: false },
+      },
+      meuLado: "mentorado",
+    });
+    expect(s?.estado).toBe("ativo_sem_minha_ciencia");
+    // fui avisado, não devo aceite — mas a contestação segue aberta
+    expect(s?.contestavel).toBe(true);
+  });
+
+  it("ativo_sem_minha_ciencia também vale pra status ativo legado", () => {
+    const s = suaSemana({
+      plano: {
+        ...base,
+        status: "ativo",
+        aceites: { mentor: true, mentorado: false },
+      },
+      meuLado: "mentorado",
+    });
+    expect(s?.estado).toBe("ativo_sem_minha_ciencia");
+  });
+
   it("aceite unilateral lê 'falta o outro' pro lado que já carimbou", () => {
     const s = suaSemana({
       plano: { ...base, status: "proposto", aceites: { mentor: true, mentorado: false } },
@@ -369,6 +395,8 @@ describe("precisaDeVoce — a fila do staff", () => {
     expect(itens).toHaveLength(1);
     expect(itens[0].motivo.texto).toBe("recesso sem decisão da dupla");
     expect(itens[0].acao).toBe("Ver o recesso");
+    // âncora estável: existe no card standalone e no bloco do plano
+    expect(itens[0].href).toBe("/duplas/d-1#recesso-dupla");
   });
 
   it("o plano vivo é o mais recente — um expirado mais novo não esconde o ativo antigo", () => {
@@ -394,5 +422,58 @@ describe("precisaDeVoce — a fila do staff", () => {
       ],
     });
     expect(itens[0].motivo.texto).toBe("o 4º encontro passou da data combinada");
+  });
+
+  it("corta em 5 e devolve o total real pro 'mais N'", () => {
+    const duplas = Array.from({ length: 7 }, (_, i) =>
+      d({
+        id: `d-${i}`,
+        planos: [
+          {
+            id: `p-${i}`,
+            status: "proposto",
+            expira_em: "2026-12-20",
+            created_at: "2026-11-20T10:00:00Z",
+          },
+        ],
+      })
+    );
+    const { itens, total } = precisaDeVoce({ hoje, eventos: [], duplas });
+    expect(itens).toHaveLength(5);
+    expect(total).toBe(7);
+  });
+
+  it("o urgente ordena na frente — expirando antes de aceite pendente", () => {
+    const { itens } = precisaDeVoce({
+      hoje,
+      eventos: [],
+      duplas: [
+        // aceite pendente criado antes — a ordem de entrada não manda
+        d({
+          id: "d-aceite",
+          planos: [
+            {
+              id: "p-a",
+              status: "proposto",
+              expira_em: "2026-12-20",
+              created_at: "2026-11-20T10:00:00Z",
+            },
+          ],
+        }),
+        d({
+          id: "d-expira",
+          planos: [
+            {
+              id: "p-e",
+              status: "proposto",
+              expira_em: "2026-11-24",
+              created_at: "2026-11-19T10:00:00Z",
+            },
+          ],
+        }),
+      ],
+    });
+    expect(itens[0].motivo.motivo.tipo).toBe("expira");
+    expect(itens[1].motivo.motivo.tipo).toBe("decisao");
   });
 });
