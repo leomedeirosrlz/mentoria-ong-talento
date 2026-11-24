@@ -1,6 +1,5 @@
 import Link from "next/link";
 import {
-  CalendarPlus,
   ChatsCircle,
   Flag,
   Info,
@@ -14,12 +13,12 @@ import {
   rotuloRitmo,
   type PlanoEmDia,
 } from "@/lib/plano-em-dia";
+import type { LadoPlano } from "@/lib/plano-servico";
 import type { Dupla } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AgendarEncontroDialog } from "@/components/agendar-encontro-dialog";
 import { NovoChamadoDialog } from "@/components/novo-chamado-dialog";
-import { ProporPlanoButton } from "@/components/propor-plano-button";
-import { Button, buttonVariants } from "@/components/ui/button";
+import { CombinarPlano } from "@/components/combinar-plano";
+import { buttonVariants } from "@/components/ui/button";
 import {
   Popover,
   PopoverContent,
@@ -35,17 +34,18 @@ import {
   type RecessoDaFicha,
 } from "@/components/recesso-dupla-card";
 
-// "Para ficar em dia" (REALIZA-397/459/513) — a projeção honesta da
-// dupla: quando uma escada de ritmos fecha antes do encerramento o card
-// mostra o custo e propõe o combinado; quando nem 1 por dia fecha, ele
-// diz isso e aponta a conversa com a coordenação — nunca promete o que
-// o calendário não comporta. A decisão de recesso mora aqui dentro,
-// onde ela muda a conta na hora. Mentor agenda/remarca inline; a
-// proposta é dele, do supervisor ou da coordenação — a RPC revalida.
+// "Para ficar em dia" (REALIZA-397/459/513/518) — a projeção honesta da
+// dupla: quando o ritmo fecha antes do encerramento o card mostra o
+// custo e abre o "Combinar o plano"; quando nem 1 por dia fecha, ele diz
+// isso e aponta a conversa com a coordenação — nunca promete o que o
+// calendário não comporta. 518: o card virou leitura — agendar passo a
+// passo e declarar recesso aqui dentro saíram; o gesto inteiro (ritmo,
+// recesso, grade, combinado) mora na superfície dedicada, e o card só
+// mostra onde a decisão da dupla ainda falta.
 
 const REGRAS: { termo: string; texto: string }[] = [
   {
-    termo: "Ritmo do plano",
+    termo: "Encontros por semana",
     texto:
       "Dois encontros podem cair na mesma semana, sempre com pelo menos 2 dias entre eles. No limite, 1 encontro por dia.",
   },
@@ -74,28 +74,26 @@ export function PlanoEmDiaCard({
   souMentor,
   souStaff = false,
   planoVivo = false,
-  jovemNome,
   recessos = [],
-  podeDeclararRecesso = false,
 }: {
   plano: Extract<PlanoEmDia, { aplicavel: true }>;
   dupla: Dupla;
   souMentor: boolean;
-  /** coordenação ou supervisor da dupla — podem propor como o mentor
-   *  (a RPC revalida) e enxergam o plano sem agendar inline. */
+  /** coordenação ou supervisor da dupla — leem o plano inteiro e também
+   *  podem propor pela superfície (a RPC revalida). */
   souStaff?: boolean;
-  /** Já existe combinado aberto — a RPC recusa proposta dupla, então o
-   *  card não oferece o gesto. */
+  /** Já existe combinado aberto — a proposta dupla não cabe; o card
+   *  aponta pra ele. */
   planoVivo?: boolean;
-  jovemNome: string;
-  /** Recessos vigentes/futuros do cronograma — a decisão mora aqui dentro. */
+  /** Recessos vigentes/futuros do cronograma — estado tri-estado. */
   recessos?: RecessoDaFicha[];
-  /** mentor da dupla ou coordenação — a RPC revalida na gravação. */
-  podeDeclararRecesso?: boolean;
 }) {
   const conversa = plano.estado === "conversa";
-  const podeAgendar = souMentor && dupla.status === "ativa";
-  const podePropor = (souMentor || souStaff) && dupla.status === "ativa";
+  // 518: o card é leitura pra todo mundo — "mentor vs staff" só sobra na
+  // copy ("vocês" vs "a dupla") e no registro de pendências, que segue
+  // do lado do mentor
+  const lado: LadoPlano = souMentor ? "mentor" : "staff";
+  const podeChamar = (souMentor || souStaff) && dupla.status === "ativa";
   const agendaveis = plano.passos.filter((p) => p.acao !== "travado");
 
   // a régua inteira da trilha: feito, com data, no plano, fora do limite
@@ -168,7 +166,7 @@ export function PlanoEmDiaCard({
           </p>
           {plano.cabemAteEncerramento && (
             <p className="mt-1 text-sm tabular-nums text-muted-foreground">
-              Nesse ritmo cabem {plano.cabemAteEncerramento.cabem} dos{" "}
+              Cabem {plano.cabemAteEncerramento.cabem} dos{" "}
               {plano.cabemAteEncerramento.faltam} encontros que faltam
               {plano.encerramento
                 ? ` até o encerramento (${formatDate(plano.encerramento)})`
@@ -182,29 +180,12 @@ export function PlanoEmDiaCard({
           {plano.alternativaRecesso && (
             <p className="mt-2 flex items-start gap-1.5 text-sm text-muted-foreground">
               <SunHorizon size={14} aria-hidden className="mt-0.5 shrink-0" />
-              Se vocês seguirem se encontrando no recesso,{" "}
+              {souMentor
+                ? "Se vocês seguirem se encontrando no recesso, "
+                : "Se a dupla seguir se encontrando no recesso, "}
               {rotuloRitmo(plano.alternativaRecesso.ritmo)} fecha o plano em{" "}
               {formatDate(plano.alternativaRecesso.data)}.
             </p>
-          )}
-          {podePropor && (
-            <div className="mt-3">
-              <NovoChamadoDialog
-                papel={souMentor ? "mentor_dpp" : "coordenacao"}
-                duplaId={dupla.id}
-                inicial={{
-                  categoria: "metodologia",
-                  assunto: `Plano "ficar em dia" não fecha até o encerramento`,
-                  mensagem: plano.sugestao,
-                }}
-                trigger={
-                  <Button variant="outline" size="sm">
-                    <ChatsCircle aria-hidden />
-                    Falar com a coordenação
-                  </Button>
-                }
-              />
-            </div>
           )}
         </div>
       ) : plano.dataRecuperacao ? (
@@ -221,21 +202,18 @@ export function PlanoEmDiaCard({
           {plano.alternativaRecesso && (
             <p className="mt-2 flex items-start gap-1.5 text-sm text-muted-foreground">
               <SunHorizon size={14} aria-hidden className="mt-0.5 shrink-0" />
-              Se vocês seguirem se encontrando no recesso,{" "}
+              {souMentor
+                ? "Se vocês seguirem se encontrando no recesso, "
+                : "Se a dupla seguir se encontrando no recesso, "}
               {rotuloRitmo(plano.alternativaRecesso.ritmo)} já basta: em dia
               em {formatDate(plano.alternativaRecesso.data)}.
             </p>
-          )}
-          {podePropor && !planoVivo && (
-            <div className="mt-3">
-              <ProporPlanoButton duplaId={dupla.id} ritmo={plano.ritmo} />
-            </div>
           )}
         </div>
       ) : (
         <div className="mt-4">
           <p className="text-2xl font-semibold tracking-tight">
-            Nesse ritmo não fecha
+            Não fecha até o encerramento
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
             {plano.alternativaRitmo
@@ -244,6 +222,49 @@ export function PlanoEmDiaCard({
           </p>
         </div>
       )}
+
+      {plano.recessosPendentes.length > 0 && (
+        <p className="mt-3 text-xs text-muted-foreground">
+          {plano.recessosPendentes.length === 1
+            ? "Falta 1 decisão da dupla pra fechar a proposta."
+            : `Faltam ${plano.recessosPendentes.length} decisões da dupla pra fechar a proposta.`}
+        </p>
+      )}
+
+      {/* um gatilho só: ritmo, recesso e grade viram pergunta por tela na
+          superfície; com combinado aberto a saída é ver o que está valendo */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {planoVivo ? (
+          <Link
+            href="#acordos"
+            className={buttonVariants({ variant: "outline", size: "sm" })}
+          >
+            Ver o combinado
+          </Link>
+        ) : (
+          <CombinarPlano duplaId={dupla.id} lado={lado} />
+        )}
+        {conversa && podeChamar && (
+          <NovoChamadoDialog
+            papel={souMentor ? "mentor_dpp" : "coordenacao"}
+            duplaId={dupla.id}
+            inicial={{
+              categoria: "metodologia",
+              assunto: `Plano "ficar em dia" não fecha até o encerramento`,
+              mensagem: plano.sugestao,
+            }}
+            trigger={
+              <button
+                type="button"
+                className={buttonVariants({ variant: "outline", size: "sm" })}
+              >
+                <ChatsCircle aria-hidden />
+                Falar com a coordenação
+              </button>
+            }
+          />
+        )}
+      </div>
 
       <div className="mt-4">
         <QuadradosPlano
@@ -270,7 +291,7 @@ export function PlanoEmDiaCard({
                     : "realizado, ainda sem registro"}
                   .
                 </span>
-                {podeAgendar && (
+                {souMentor && (
                   <Link
                     href={`?aba=encontros#registrar-${p.encontroId}`}
                     className={buttonVariants({ variant: "outline", size: "sm" })}
@@ -285,90 +306,55 @@ export function PlanoEmDiaCard({
       )}
 
       <ol className="mt-4 space-y-3">
-        {plano.passos.map((p) => {
-          const encontro = p.encontroId
-            ? (dupla.encontros.find((e) => e.id === p.encontroId) ?? null)
-            : null;
-          return (
-            <li key={p.numero} className="flex items-center gap-3">
-              <span
-                aria-hidden
-                className={cn(
-                  "grid size-8 shrink-0 place-items-center rounded-full font-mono text-xs font-semibold tabular-nums",
-                  p.acao === "travado"
-                    ? "bg-muted text-muted-foreground"
-                    : "bg-[var(--destaque)]/15 text-foreground"
-                )}
-              >
-                {p.numero}
-              </span>
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-baseline gap-x-2">
-                  <p className="text-sm font-semibold">{p.titulo}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {p.acao === "travado" ? (
-                      <>marcado pra {formatDate(p.data)}</>
-                    ) : (
-                      <>
-                        sugestão{" "}
-                        <b className="font-semibold text-foreground">
-                          {formatDate(p.data)}
-                        </b>
-                        {p.dataOficial !== p.data && (
-                          <> · oficial era {formatDate(p.dataOficial)}</>
-                        )}
-                        {p.venceNoCaminho && <> · vence no caminho</>}
-                      </>
-                    )}
-                  </p>
-                </div>
-                {p.precondicao && (
-                  <p className="mt-0.5 flex items-start gap-1 text-xs text-muted-foreground">
-                    <Flag size={12} aria-hidden className="mt-0.5 shrink-0" />
-                    Precisa antes: {p.precondicao}
-                  </p>
-                )}
-                {p.aviso && (
-                  <p className="mt-0.5 flex items-start gap-1 text-xs text-muted-foreground">
-                    <Warning size={12} aria-hidden className="mt-0.5 shrink-0" />
-                    {p.aviso}
-                  </p>
-                )}
-              </div>
-              {p.acao !== "travado" && podeAgendar && (
-                <AgendarEncontroDialog
-                  duplaId={dupla.id}
-                  numero={p.numero}
-                  atual={encontro}
-                  // a "remarcar" sem data atual é um "a combinar" vencido:
-                  // sugerido preenche sem cobrar motivo de remarcação
-                  sugerido={
-                    p.acao === "agendar" || !encontro?.data_hora
-                      ? p.data
-                      : undefined
-                  }
-                  proposta={
-                    p.acao === "remarcar" && encontro?.data_hora
-                      ? p.data
-                      : undefined
-                  }
-                  piso={dupla.iniciada_em ?? undefined}
-                  jovemNome={jovemNome}
-                  trigger={
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="min-h-11 sm:min-h-0"
-                    >
-                      <CalendarPlus aria-hidden />
-                      {p.acao === "remarcar" ? "Remarcar" : "Agendar"}
-                    </Button>
-                  }
-                />
+        {plano.passos.map((p) => (
+          <li key={p.numero} className="flex items-center gap-3">
+            <span
+              aria-hidden
+              className={cn(
+                "grid size-8 shrink-0 place-items-center rounded-full font-mono text-xs font-semibold tabular-nums",
+                p.acao === "travado"
+                  ? "bg-muted text-muted-foreground"
+                  : "bg-[var(--destaque)]/15 text-foreground"
               )}
-            </li>
-          );
-        })}
+            >
+              {p.numero}
+            </span>
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline gap-x-2">
+                <p className="text-sm font-semibold">{p.titulo}</p>
+                <p className="text-xs text-muted-foreground">
+                  {p.acao === "travado" ? (
+                    <>marcado pra {formatDate(p.data)}</>
+                  ) : (
+                    <>
+                      sugestão{" "}
+                      <b className="font-semibold text-foreground">
+                        {formatDate(p.data)}
+                      </b>
+                      {p.dataOficial !== p.data && (
+                        <> · oficial era {formatDate(p.dataOficial)}</>
+                      )}
+                      {p.venceNoCaminho && <> · vence no caminho</>}
+                      {p.foraDaGrade && <> · fora dos dias livres</>}
+                    </>
+                  )}
+                </p>
+              </div>
+              {p.precondicao && (
+                <p className="mt-0.5 flex items-start gap-1 text-xs text-muted-foreground">
+                  <Flag size={12} aria-hidden className="mt-0.5 shrink-0" />
+                  Precisa antes: {p.precondicao}
+                </p>
+              )}
+              {p.aviso && (
+                <p className="mt-0.5 flex items-start gap-1 text-xs text-muted-foreground">
+                  <Warning size={12} aria-hidden className="mt-0.5 shrink-0" />
+                  {p.aviso}
+                </p>
+              )}
+            </div>
+          </li>
+        ))}
       </ol>
 
       {recessos.length > 0 && (
@@ -379,14 +365,16 @@ export function PlanoEmDiaCard({
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {souMentor
-              ? "Vocês decidem se param ou seguem se encontrando. A projeção acompanha a decisão."
-              : "A dupla decide se para ou segue se encontrando."}
+              ? "Vocês decidem se param ou seguem se encontrando. A resposta entra no Combinar o plano."
+              : "A decisão é da dupla."}
           </p>
           <div className="mt-2.5 space-y-2">
+            {/* tri-estado, só leitura: a decisão mora na superfície e no
+                card próprio quando o plano não está na tela */}
             <RecessoDecisao
               duplaId={dupla.id}
               recessos={recessos}
-              podeDeclarar={podeDeclararRecesso}
+              podeDeclarar={false}
             />
           </div>
         </div>

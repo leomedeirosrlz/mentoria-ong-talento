@@ -11,6 +11,7 @@ import { buttonVariants } from "@/components/ui/button";
 import {
   diaCurto,
   diaMes,
+  estadoLeituraPlano,
   type ResumoCombinado,
 } from "@/lib/plano-combinado";
 import { cn } from "@/lib/utils";
@@ -111,7 +112,10 @@ export function QuadradosPlano({
   );
 }
 
-/** Os dois aceites lado a lado: quem já disse sim e quem falta. */
+/** Os carimbos da dupla lado a lado (518 — aceite único): quem já
+ *  respondeu e quem ainda não. Um aceite da dupla já coloca o combinado
+ *  em vigor — o outro lado é avisado, não "fica devendo". Os chips só
+ *  aparecem na proposta; no vigente quem combinou aparece na frase. */
 export function AceitesPlano({
   resumo,
   mentor,
@@ -126,7 +130,7 @@ export function AceitesPlano({
     { nome: jovem, papel: "jovem", ok: resumo.aceites.mentorado },
   ];
   return (
-    <ul className="flex flex-wrap gap-2" aria-label="Aceites do plano">
+    <ul className="flex flex-wrap gap-2" aria-label="Respostas da dupla">
       {lados.map((l) => (
         <li
           key={l.papel}
@@ -144,7 +148,7 @@ export function AceitesPlano({
           )}
           <span>
             <b className="font-semibold">{l.nome}</b>{" "}
-            {l.ok ? "aceitou" : "ainda não aceitou"}
+            {l.ok ? "respondeu" : "ainda não respondeu"}
           </span>
         </li>
       ))}
@@ -172,32 +176,43 @@ export function QuadradosCombinado({ resumo }: { resumo: ResumoCombinado }) {
 
 export type PerspectivaPlano = "mentor" | "jovem";
 
-/** A frase do banner: o que falta agora, do ponto de vista de quem lê. */
+/** A frase do banner: o que falta agora, do ponto de vista de quem lê.
+ *  518: um aceite da dupla coloca o combinado em vigor — "falta o seu"
+ *  só existe na proposta da equipe; no ativo, quem não carimbou foi
+ *  avisado ("Fulano combinou"), nunca "faltam os dois". */
 export function fraseDoCombinado(
   r: ResumoCombinado,
   p: PerspectivaPlano,
   outro: string
 ): { tom: TomSituacao; pill: string; texto: string; cta: string } {
-  if (r.falta) {
-    const euFalto =
-      r.falta === "os_dois" ||
-      (p === "mentor" ? r.falta === "mentor" : r.falta === "mentorado");
-    return euFalto
-      ? {
-          tom: "atencao",
-          pill: "Falta o seu aceite",
-          texto:
-            r.falta === "os_dois"
-              ? `A equipe propôs um plano pra vocês ficarem em dia até ${diaMes(r.ate ?? "")}. Ele começa a valer quando os dois aceitarem.`
-              : `${outro} já aceitou o plano pra vocês ficarem em dia até ${diaMes(r.ate ?? "")}. Falta você.`,
-          cta: "Ver e responder",
-        }
-      : {
-          tom: "neutro",
-          pill: `Falta ${outro} aceitar`,
-          texto: `Você já aceitou. O plano começa a valer quando ${outro} aceitar também.`,
-          cta: "Ver o plano",
-        };
+  const estado = estadoLeituraPlano({
+    status: r.status,
+    meuLado: p === "mentor" ? "mentor" : "mentorado",
+    aceites: r.aceites,
+  });
+  if (estado === "proposto_staff_falta_meu") {
+    return {
+      tom: "atencao",
+      pill: "Falta um aceite da dupla",
+      texto: `A equipe propôs um plano pra vocês ficarem em dia até ${diaMes(r.ate ?? "")}. Um aceite da dupla já coloca o combinado em vigor; o outro lado é avisado.`,
+      cta: "Ver e responder",
+    };
+  }
+  if (estado === "proposto_staff_falta_outro") {
+    return {
+      tom: "neutro",
+      pill: `Falta ${outro} responder`,
+      texto: `Você já respondeu. Um aceite da dupla já coloca o combinado em vigor; ${outro} foi avisado.`,
+      cta: "Ver o plano",
+    };
+  }
+  if (estado === "ativo_sem_minha_ciencia") {
+    return {
+      tom: "atencao",
+      pill: "Plano em vigor",
+      texto: `${outro} combinou um plano pra vocês ficarem em dia até ${diaMes(r.ate ?? "")}${r.propostoEm ? `. Você foi avisado em ${diaMes(r.propostoEm.slice(0, 10))}` : ""} Se não servir pra você, dá pra contestar.`,
+      cta: "Ver o combinado",
+    };
   }
   if (r.proximo) {
     return {

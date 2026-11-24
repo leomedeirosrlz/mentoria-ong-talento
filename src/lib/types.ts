@@ -716,8 +716,10 @@ export type Dupla = {
   encontros: Encontro[];
   encaminhamentos: Encaminhamento[];
   notas?: EncontroNota[];
-  /** Recessos com decisão declarada (0218) — ausência da linha = usa o
-   *  recesso, como sempre foi. */
+  /** Recessos com decisão declarada (0218/0225) — tri-estado da 518:
+   *  ausência da linha = pendente (a simulação conta conservador como
+   *  "vamos usar" até a dupla responder); usa=true bloqueia a janela,
+   *  usa=false libera datas dentro dela. */
   recessos?: DuplaRecesso[];
   /** Planos "ficar em dia" da dupla (0219) — o vivo é único por
    *  índice parcial (proposto/aceito/ativo); o histórico convive. */

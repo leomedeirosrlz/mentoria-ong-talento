@@ -9,14 +9,16 @@ import {
   test,
 } from "../helpers";
 
-// REALIZA-462 — recesso opcional por dupla (migration 0218). O e2e cobre
-// a fronteira real em staging:
-//   · a RPC declarar_recesso é a ÚNICA porta de escrita — o mentor da
-//     dupla e a coordenação escrevem; jovem e mentor de outra dupla levam
-//     a recusa de domínio; insert direto na tabela morre no RLS;
+// REALIZA-462/518 — recesso opcional por dupla (migrations 0218/0225). O
+// e2e cobre a fronteira real em staging:
+//   · a RPC declarar_recesso é a ÚNICA porta de escrita — a 0225
+//     restringiu a decisão aos DOIS lados da dupla: mentor e mentorado
+//     declaram; coordenação, mentor de outra dupla e insert direto
+//     levam a recusa de domínio;
 //   · (dupla, evento) é único — a última declaração vale, com autoria;
 //   · a leitura é escopada: o jovem lê a decisão da própria dupla pela
-//     tabela (RLS) e as janelas pela jovem_recessos;
+//     tabela (RLS) e as janelas pela jovem_recessos — usa null é o
+//     tri-estado "pendente" (sem row = a dupla ainda não decidiu);
 //   · na ficha, o mentor declara pela UI e a decisão aparece.
 // Domínio puro (planner/semáforo/agenda) está em tests/recesso-dupla.test.ts.
 
@@ -93,7 +95,7 @@ test.describe("recesso opcional (462) — declarar_recesso", () => {
     expect(rows[0].usa).toBe(true);
   });
 
-  test("recusas de domínio: jovem, mentor de outra dupla, evento errado", async () => {
+  test("tri-estado: o jovem também decide; equipe e estranho recusam", async () => {
     const ev = await recessoDoCronograma();
     const [encontro] = await buscarViaServiceRole<{ id: string }[]>(
       "ciclo_eventos",
@@ -101,14 +103,20 @@ test.describe("recesso opcional (462) — declarar_recesso", () => {
     );
     const jwtMentor = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
     const jwtJovem = await jwtDoUsuario(JOVEM_EMAIL, SENHA);
+    const jwtCoord = await jwtDoUsuario(COORD_EMAIL, COORD_SENHA);
 
-    // o jovem acompanha a decisão, mas quem declara é o mentor/coord
-    expect(await declarar(jwtJovem, DUPLA, ev.id, false)).toMatchObject({
-      error: expect.stringMatching(/permiss/),
+    // 0225: a decisão é SÓ da dupla — o mentorado declara igual o mentor
+    expect(await declarar(jwtJovem, DUPLA, ev.id, false)).toEqual({
+      ok: true,
+    });
+
+    // a equipe vê e cobra, não decide: coord leva a recusa do banco
+    expect(await declarar(jwtCoord, DUPLA, ev.id, true)).toMatchObject({
+      error: expect.stringMatching(/só a dupla/i),
     });
     // mentor DPP logado, mas a dupla não é dele
     expect(await declarar(jwtMentor, DUPLA_OUTRA, ev.id, false)).toMatchObject(
-      { error: expect.stringMatching(/permiss/) }
+      { error: expect.stringMatching(/só a dupla/i) }
     );
     // o evento precisa ser recesso do cronograma dela
     expect(await declarar(jwtMentor, DUPLA, encontro.id, false)).toMatchObject(
@@ -133,8 +141,11 @@ test.describe("recesso opcional (462) — declarar_recesso", () => {
 
   test("leitura escopada: o jovem vê a decisão da própria dupla e a janela", async () => {
     const ev = await recessoDoCronograma();
-    const jwtCoord = await jwtDoUsuario(COORD_EMAIL, COORD_SENHA);
-    expect(await declarar(jwtCoord, DUPLA, ev.id, false)).toEqual({ ok: true });
+    // 0225: quem declara é a dupla — o mentor grava a decisão que o jovem lê
+    const jwtMentor = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
+    expect(await declarar(jwtMentor, DUPLA, ev.id, false)).toEqual({
+      ok: true,
+    });
 
     const jwtJovem = await jwtDoUsuario(JOVEM_EMAIL, SENHA);
     const res = await restComoUsuario(

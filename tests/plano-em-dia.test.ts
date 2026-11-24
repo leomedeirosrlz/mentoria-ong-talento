@@ -465,8 +465,8 @@ describe("montarPlanoEmDia — projeção honesta: o calendário segue cobrando"
   });
 
   it("ritmo que não alcança o calendário antes do encerramento: dataRecuperacao null", () => {
-    // nem o ritmo máximo (4/sem) convergiria antes de 27/01 — o plano diz
-    // isso em vez de prometer uma data que já nasce atrasada
+    // nem o teto diário (1 encontro por dia) convergiria antes de 27/01 —
+    // o plano diz isso em vez de prometer uma data que já nasce atrasada
     for (const ritmo of [1, 2, 3, 4]) {
       const r = montarPlanoEmDia({
         dupla: dupla10(),

@@ -1,5 +1,7 @@
 import { PlanoAcordosCard } from "@/components/plano-acordos";
+import { CombinarPlano } from "@/components/combinar-plano";
 import { aceitesDoPlano } from "@/lib/plano-combinado";
+import type { RecessoDaFicha } from "@/components/recesso-dupla-card";
 import type { SeletorSugestoes } from "@/components/seletor-dia-hora";
 import {
   IntervencaoAcoes,
@@ -19,6 +21,7 @@ export function AcordosCentral({
   souMentor,
   souStaff,
   numeroGuiaAtual,
+  recessos = [],
   sugestoesPlano,
 }: {
   dupla: Dupla;
@@ -27,6 +30,9 @@ export function AcordosCentral({
   souStaff: boolean;
   /** número do encontro do guia vigente — os ajustes ancora nele */
   numeroGuiaAtual: number | null;
+  /** recessos vigentes do cronograma (518) — a dupla repensa a decisão
+   *  no aceite da proposta */
+  recessos?: RecessoDaFicha[];
   /** pacote do motor pras linhas do combinado (482) — a ficha monta com
    *  o mesmo adaptador da agenda do jovem */
   sugestoesPlano?: SeletorSugestoes | null;
@@ -62,7 +68,14 @@ export function AcordosCentral({
       {planoVivo && (
         <div className="mt-3">
           <PlanoAcordosCard
-            plano={{ ...planoVivo, aceites: aceitesDoPlano(planoVivo) }}
+            plano={{
+              ...planoVivo,
+              aceites: aceitesDoPlano(planoVivo),
+              // a coluna não existe na tabela: "avisado em" ancora no
+              // carimbo que ativou (ou na criação, proposta de lado nasce
+              // em vigor) — a mesma régua do recorte do jovem
+              proposto_em: planoVivo.aprovado_em ?? planoVivo.created_at,
+            }}
             duplaId={dupla.id}
             podeResponder={souMentor}
             podeAplicar={souMentor}
@@ -76,19 +89,32 @@ export function AcordosCentral({
             realizados={dupla.encontros
               .filter((e) => e.status === "realizado")
               .map((e) => e.numero)}
+            recessos={recessos}
             sugestoes={sugestoesPlano}
           />
         </div>
       )}
 
       {!planoVivo && ultimoFechado && (
-        <p className="mt-2 text-sm text-muted-foreground">
-          Último plano: {rotuloStatus(ultimoFechado.status)}
-          {ultimoFechado.contestado_motivo
-            ? ` — ${ultimoFechado.contestado_motivo}`
-            : ""}
-          . Um novo acordo pode ser proposto a qualquer momento.
-        </p>
+        <div className="mt-2 space-y-2">
+          <p className="text-sm text-muted-foreground">
+            Último plano: {rotuloStatus(ultimoFechado.status)}
+            {ultimoFechado.contestado_motivo
+              ? `. ${ultimoFechado.contestado_motivo}`
+              : ""}
+            {ultimoFechado.status === "contestado"
+              ? " Uma nova versão pode ser combinada."
+              : " Um novo acordo pode ser proposto a qualquer momento."}
+          </p>
+          {ultimoFechado.status === "contestado" &&
+            dupla.status === "ativa" && (
+              <CombinarPlano
+                duplaId={dupla.id}
+                lado={souMentor ? "mentor" : "staff"}
+                variante="outline"
+              />
+            )}
+        </div>
       )}
 
       {ajustesGuia && (

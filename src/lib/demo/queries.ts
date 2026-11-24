@@ -6,7 +6,7 @@ import {
 import type { TermoSimulado } from "./shared";
 import { audienciasDe, veMaterial, veMaterialDaTurma } from "../materiais";
 import { turmaDaDupla, turmaNumero } from "../turma";
-import { comparaNome, registroTardio, saudadeDaDupla, semanaBounds } from "../ciclo";
+import { comparaNome, registroTardio, saudadeDaDupla, semanaBounds, toDateStr } from "../ciclo";
 import type { DiaSaude } from "../relatorios/dados";
 import type { RecorteCsv } from "../relatorios/csv-core";
 import { slotsLivresEspecialista } from "./agenda";
@@ -69,7 +69,7 @@ import type {
   RegistroResumo,
 } from "../queries";
 import type { ResumoFormacao } from "../queries-presenca";
-import type { JovemEncontro, JovemPlano } from "../queries-jovem";
+import type { JovemEncontro, JovemPlano, JovemRecesso } from "../queries-jovem";
 import type {
   AvaliacaoMediaDpp,
   AvaliacaoTokenInfo,
@@ -1158,6 +1158,48 @@ export function demoJovemPlano(role: AppRole): JovemPlano | null {
       aplicado_em: s.aplicado_em,
     })),
   };
+}
+
+/** jovem_recessos (0218/0225): os recessos vigentes do cronograma da DPP
+ *  dela com a decisão da dupla — left join do banco espelhado aqui:
+ *  evento sem row em dupla_recessos volta `usa: null` (pendente), nunca
+ *  o default silencioso que a 0225 aposentou. */
+export function demoJovemRecessos(role: AppRole): JovemRecesso[] {
+  const data = getDemoData();
+  const m = mentoradoDaPersona(data, role);
+  if (!m) return [];
+  const dupla = data.duplas
+    .filter((d) => d.mentorado?.id === m.id && d.trilha !== "especialista")
+    .sort(
+      (a, b) =>
+        Number(b.status === "ativa" || b.status === "pausada") -
+          Number(a.status === "ativa" || a.status === "pausada") ||
+        criadoEm(b).localeCompare(criadoEm(a))
+    )[0];
+  if (!dupla?.cronograma_id) return [];
+  const hoje = toDateStr(new Date());
+  const porEvento = new Map(
+    (dupla.recessos ?? []).map((r) => [r.ciclo_evento_id, r])
+  );
+  return data.cicloEventos
+    .filter(
+      (e) =>
+        e.cronograma_id === dupla.cronograma_id &&
+        e.tipo === "recesso" &&
+        e.data != null &&
+        (e.data_fim ?? e.data) >= hoje
+    )
+    .sort((a, b) => (a.data ?? "").localeCompare(b.data ?? ""))
+    .map((e) => {
+      const r = porEvento.get(e.id);
+      return {
+        ciclo_evento_id: e.id,
+        data: e.data!,
+        data_fim: e.data_fim,
+        usa: r?.usa ?? null,
+        declarado_em: r?.declarado_em ?? null,
+      };
+    });
 }
 
 // ---------- /registros — conteúdo do form semanal (coord/sup) ----------

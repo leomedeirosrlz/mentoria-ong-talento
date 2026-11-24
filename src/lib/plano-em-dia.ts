@@ -26,13 +26,14 @@
  *    persisted plan would leave them without an owner */
 
 import {
+  diaSemanaDe,
   eventosDoCronograma,
   jornadaDaDupla,
   passosDaTrilha,
   toDateStr,
 } from "./ciclo";
 import { feriadoNacional } from "./feriados";
-import type { CicloEvento, Dupla } from "./types";
+import type { CicloEvento, Disponibilidade, Dupla } from "./types";
 import {
   GAP_DIAS_EXIGE,
   GAP_MINIMO_DIAS,
@@ -71,6 +72,9 @@ export type PassoPlano = {
   /** Not due today, but comes due during the recovery: the projection only
    *  covers it after the official date, so it belongs to the plan. */
   venceNoCaminho?: boolean;
+  /** A data caiu fora dos dias com período livre em comum (518): a grade
+   *  é preferência forte, não restrição — o passo marca e o plano avisa. */
+  foraDaGrade?: boolean;
 };
 
 /** Nível nomeado de flexibilização (FR-011, 0219; degraus 3/semana e
@@ -99,9 +103,12 @@ const NIVEL_DO_RITMO: Record<number, NivelFlexibilizacao> = {
 };
 
 /** O custo do plano em palavras: "1 encontro por semana", "até 3
- *  encontros por semana", "até 1 encontro por dia". */
+ *  encontros por semana", "até 1 encontro por dia". Acima de 7 o rótulo
+ *  fica literal — "8 encontros por semana" (518: o ritmo é escolha livre
+ *  e a copy nunca arredonda a decisão da dupla). */
 export function rotuloRitmo(ritmo: number): string {
-  if (ritmo >= RITMO_UM_POR_DIA) return "até 1 encontro por dia";
+  if (ritmo === RITMO_UM_POR_DIA) return "até 1 encontro por dia";
+  if (ritmo > RITMO_UM_POR_DIA) return `${ritmo} encontros por semana`;
   return ritmo <= 1
     ? "1 encontro por semana"
     : `até ${ritmo} encontros por semana`;
@@ -157,8 +164,22 @@ export type PlanoEmDia =
        *  quando sem isso nada fecha). A decisão é da dupla; o plano só
        *  mostra o efeito. */
       alternativaRecesso: { ritmo: number; data: string } | null;
+      /** Recessos do cronograma no caminho SEM decisão da dupla (518):
+       *  sem row em dupla_recessos = pendente. A projeção segue
+       *  conservadora (trata como "vamos usar") e a pendência vira
+       *  pergunta na superfície — a plano_propor recusa sem a resposta. */
+      recessosPendentes: RecessoPendente[];
       avisos: string[];
     };
+
+/** Recesso oficial sem decisão declarada — a pendência que a superfície
+ *  "Combinar o plano" pergunta antes da proposta. */
+export type RecessoPendente = {
+  cicloEventoId: string;
+  titulo: string;
+  inicio: string;
+  fim: string;
+};
 
 export type PlanoAplicavel = Extract<PlanoEmDia, { aplicavel: true }>;
 
@@ -180,15 +201,20 @@ export function montarPlanoEmDia(input: {
   /** Encounters per calendar week to simulate (7 = 1 per day). Omitted:
    *  the lightest pace of `RITMOS_PLANO` that closes before the closure,
    *  i.e. the plan the card shows and proposes; with nothing closing, the
-   *  top of the ladder, so the team sees the best case. */
+   *  top of the ladder, so the team sees the best case. Qualquer inteiro
+   *  positivo é ritmo válido (518) — o produto não impõe teto; a RPC
+   *  revalida só o piso. */
   ritmo?: number;
+  /** Grade combinada da dupla (interseção ou o único lado que marcou) —
+   *  preferência forte por datas em dia com célula comum, nunca
+   *  restrição: sem encaixe na semana o passo fica onde couber e marca
+   *  `foraDaGrade`. Null = simula sem a grade (decisão da dupla). */
+  disponibilidade?: Disponibilidade | null;
   hoje?: Date;
 }): PlanoEmDia {
   const { dupla } = input;
   const ritmoPedido =
-    input.ritmo == null
-      ? null
-      : Math.min(RITMO_UM_POR_DIA, Math.max(1, Math.floor(input.ritmo)));
+    input.ritmo == null ? null : Math.max(1, Math.floor(input.ritmo));
   const hoje = input.hoje ?? new Date();
   const hojeStr = toDateStr(hoje);
 
@@ -314,6 +340,12 @@ export function montarPlanoEmDia(input: {
     }
   }
 
+  const encerramento =
+    eventos
+      .filter((e) => e.tipo === "evento_encerramento" && e.data != null)
+      .sort((a, b) => a.data!.localeCompare(b.data!))
+      .at(-1)?.data ?? null;
+
   // recesso que a dupla declarou atravessar (462, usa=false) deixa de ser
   // restrição PRA ELA — só pra ela; o calendário oficial não muda
   const recessoOptOut = new Set(
@@ -326,11 +358,30 @@ export function montarPlanoEmDia(input: {
       (e) => e.tipo === "recesso" && e.data != null && !recessoOptOut.has(e.id)
     )
     .map((e) => ({ ini: e.data!, fim: e.data_fim ?? e.data! }));
-  const encerramento =
-    eventos
-      .filter((e) => e.tipo === "evento_encerramento" && e.data != null)
-      .sort((a, b) => a.data!.localeCompare(b.data!))
-      .at(-1)?.data ?? null;
+  // 518 tri-estado: sem row = pendente (a simulação segue conservadora e o
+  // recesso conta como "vamos usar" até a dupla decidir; a superfície
+  // pergunta e a plano_propor recusa proposta sem a resposta)
+  const recessosPendentes: RecessoPendente[] = eventos
+    .filter(
+      (e) =>
+        e.tipo === "recesso" &&
+        e.data != null &&
+        !(dupla.recessos ?? []).some((r) => r.ciclo_evento_id === e.id) &&
+        (e.data_fim ?? e.data) >= hojeStr &&
+        (!encerramento || e.data <= encerramento)
+    )
+    .map((e) => ({
+      cicloEventoId: e.id,
+      titulo: e.titulo,
+      inicio: e.data!,
+      fim: e.data_fim ?? e.data!,
+    }));
+
+  // dias da semana com célula em comum na grade combinada — preferência
+  // forte da 518, carregada na caminhada (nunca restrição dura)
+  const diasComuns = new Set(
+    (input.disponibilidade?.celulas ?? []).map((c) => c.dia)
+  );
 
   const passoPorNumero = new Map(passos.map((p) => [p.numero, p]));
 
@@ -511,6 +562,23 @@ export function montarPlanoEmDia(input: {
         }
         break;
       }
+      // 518: grade em comum como preferência forte — até uma semana à
+      // frente procurando um dia que passe nas MESMAS restrições duras;
+      // sem encaixe, a data fica onde coube e o passo marca foraDaGrade
+      if (diasComuns.size && !diasComuns.has(diaSemanaDe(data))) {
+        let cand = data;
+        for (let k = 0; k < 7; k++) {
+          cand = addDias(cand, 1);
+          if (!diasComuns.has(diaSemanaDe(cand))) continue;
+          if (dentroRecesso(cand) || feriadoNacional(cand) || ocupados.has(cand))
+            continue;
+          if ((porSemana.get(segundaDaSemana(cand)) ?? 0) >= r) continue;
+          data = cand;
+          break;
+        }
+      }
+      const foraDaGrade =
+        diasComuns.size > 0 && !diasComuns.has(diaSemanaDe(data));
       ocupados.add(data);
       somarSemana(data);
 
@@ -532,6 +600,7 @@ export function montarPlanoEmDia(input: {
         data,
         dataOficial: passo.oficialData,
         aviso: motivoAviso,
+        foraDaGrade: foraDaGrade || undefined,
       });
     }
 
@@ -571,6 +640,17 @@ export function montarPlanoEmDia(input: {
       .map(({ origem, ...p }) =>
         origem === "futuro" ? { ...p, venceNoCaminho: true } : p
       );
+
+    // aviso honesto da preferência não atendida — uma linha pro plano,
+    // a marca fina fica em cada passo (foraDaGrade)
+    const foraGrade = passosPlano.filter((p) => p.foraDaGrade).length;
+    if (foraGrade) {
+      avisos.push(
+        foraGrade === 1
+          ? "Uma data caiu fora dos dias em que vocês dois marcaram período livre — a grade é preferência, não bloqueio."
+          : `${foraGrade} datas caíram fora dos dias em que vocês dois marcaram período livre — a grade é preferência, não bloqueio.`
+      );
+    }
 
     let dataRecuperacao: string | null = null;
     if (convergiu && alvo > hojeStr) {
@@ -646,12 +726,22 @@ export function montarPlanoEmDia(input: {
   const s = simular(ritmo);
   const avisos = [...s.avisos];
 
-  // o ritmo pedido não fecha: procura o mais leve ACIMA dele que fecharia
-  // antes do encerramento — a sugestão honesta é "acelera", não só "avisa"
+  // 518: ritmo acima de 1 por dia — o espaçamento do guia segue valendo,
+  // então a copy não promete densidade que o calendário não comporta
+  if (ritmo > RITMO_UM_POR_DIA) {
+    avisos.push(
+      `Pedir ${rotuloRitmo(ritmo)} implica mais de um encontro por dia; os espaçamentos do guia seguem valendo (prática pede 7 dias, tarefa 2), então as datas continuam espaçadas.`
+    );
+  }
+
+  // o ritmo pedido não fecha: procura o PRIMEIRO inteiro acima dele que
+  // fecharia antes do encerramento — a sugestão honesta é "acelera", não
+  // só "avisa". A sondagem para em 7: acima disso o teto semanal já não
+  // limita (o piso de 1 dia impede dois encontros na mesma data), então
+  // nenhum ritmo maior deslocaria data que o 7 não deslocou
   let alternativaRitmo: { ritmo: number; data: string } | null = null;
   if (!emDia && s.dataRecuperacao == null) {
-    for (const r of RITMOS_PLANO) {
-      if (r <= ritmo) continue;
+    for (let r = ritmo + 1; r <= RITMO_UM_POR_DIA; r++) {
       const alt = simular(r);
       if (alt.dataRecuperacao != null) {
         alternativaRitmo = { ritmo: r, data: alt.dataRecuperacao };
@@ -704,6 +794,7 @@ export function montarPlanoEmDia(input: {
     sugestao,
     alternativaRitmo,
     alternativaRecesso,
+    recessosPendentes,
     avisos,
   };
 }
@@ -719,6 +810,11 @@ export type EscopoProposta = {
   nivel: NivelFlexibilizacao;
   janela: { inicio: string; fim: string };
   passos: { numero: number; data: string; acao: "agendar" | "remarcar" }[];
+  /** Snapshot das decisões do gesto (518): recessos respondidos,
+   *  "combinar sem a grade", ajuste recalculado no aceite. Viaja no
+   *  jsonb do escopo sem DDL — o aceite compara pra ver se a resposta
+   *  mudou depois da proposta. */
+  decisoes?: Record<string, unknown>;
 };
 
 export function escopoDaProposta(

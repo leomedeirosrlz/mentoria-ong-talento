@@ -151,6 +151,8 @@ export type PlanoCombinado = {
   } | null;
   passos?: { numero: number; data_nova: string }[];
   proposto_em?: string | null;
+  /** "app" | "liza" — a copy da proposta da equipe diz quem pediu. */
+  proposto_via?: string | null;
   expira_em?: string | null;
   concluido_em?: string | null;
 };
@@ -175,6 +177,7 @@ export function combinadoDoJovem(p: {
   aceito_mentor?: boolean;
   aceito_mentorado?: boolean;
   proposto_em?: string;
+  proposto_via?: string | null;
   expira_em?: string;
   concluido_em?: string | null;
   passos_aplicados?: { numero: number; data_nova: string }[] | null;
@@ -205,6 +208,7 @@ export function combinadoDoJovem(p: {
       data_nova: s.data_nova,
     })),
     proposto_em: p.proposto_em ?? null,
+    proposto_via: p.proposto_via ?? null,
     expira_em: p.expira_em ?? null,
     concluido_em: p.concluido_em ?? null,
   };
@@ -234,11 +238,56 @@ export type PassoCombinado = {
   marcadoEm: string | null;
 };
 
+/** A leitura do plano por quem abre a tela (518 — REALIZA-518, copy da
+ *  spec): um aceite da dupla ativa, então "falta o seu" só existe pra
+ *  proposta que ainda espera a dupla; o outro lado de um plano ativo foi
+ *  avisado, não "ficou devendo aceite". */
+export type EstadoLeituraPlano =
+  /** equipe propôs e falta um aceite da dupla — o seu pode ser o único */
+  | "proposto_staff_falta_meu"
+  /** proposta esperando a dupla, do lado de quem não responde (staff ou
+   *  o lado que já carimbou num legado bilateral) */
+  | "proposto_staff_falta_outro"
+  /** combinado em vigor sem o seu carimbo — você foi avisado */
+  | "ativo_sem_minha_ciencia"
+  | "ativo"
+  | "contestado";
+
+/** Deriva a leitura do plano persistido pra quem abre a superfície —
+ *  régua única da ficha, das homes e da agenda do jovem. `meuLado` null =
+ *  equipe (staff não assina aceite). Status fora do aberto (concluido,
+ *  expirado) devolve null — o combinado não pede nada. */
+export function estadoLeituraPlano(input: {
+  status: string;
+  meuLado: "mentor" | "mentorado" | null;
+  aceites: { mentor: boolean; mentorado: boolean };
+}): EstadoLeituraPlano | null {
+  if (input.status === "contestado") return "contestado";
+  if (input.status === "proposto") {
+    if (input.meuLado == null) return "proposto_staff_falta_outro";
+    return input.aceites[input.meuLado]
+      ? "proposto_staff_falta_outro"
+      : "proposto_staff_falta_meu";
+  }
+  if (input.status === "aceito" || input.status === "ativo") {
+    if (input.meuLado != null && !input.aceites[input.meuLado])
+      return "ativo_sem_minha_ciencia";
+    return "ativo";
+  }
+  return null;
+}
+
 export type ResumoCombinado = {
   aberto: boolean;
+  /** status cru do plano — a máquina de leitura (estadoLeituraPlano)
+   *  precisa dele com o lado de quem lê */
+  status: string;
+  /** quando a proposta nasceu — "você foi avisado em X" do plano ativo */
+  propostoEm: string | null;
   aceites: { mentor: boolean; mentorado: boolean };
-  /** Quem ainda precisa aceitar. Só existe em `proposto`. */
-  falta: "mentor" | "mentorado" | "os_dois" | null;
+  /** Quem ainda precisa aceitar. Só existe em `proposto`; "dupla" =
+   *  nenhum lado carimbou (proposta da equipe esperando a dupla). */
+  falta: "mentor" | "mentorado" | "dupla" | null;
   passos: PassoCombinado[];
   total: number;
   /** passos com data confirmada ou já feitos */
@@ -264,7 +313,7 @@ export function resumoCombinado(
     plano.status !== "proposto"
       ? null
       : !aceites.mentor && !aceites.mentorado
-        ? "os_dois"
+        ? "dupla"
         : !aceites.mentor
           ? "mentor"
           : !aceites.mentorado
@@ -289,6 +338,8 @@ export function resumoCombinado(
   const datas = passos.map((p) => p.data).filter(dataOk).sort();
   return {
     aberto: planoAberto(plano.status),
+    status: plano.status,
+    propostoEm: plano.proposto_em ?? null,
     aceites,
     falta,
     passos,

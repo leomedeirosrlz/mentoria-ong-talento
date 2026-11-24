@@ -10,16 +10,19 @@ import {
   test,
 } from "../helpers";
 
-// REALIZA-459/513 (0219+0224) — o plano "ficar em dia" persistido. O e2e
-// cobre a fronteira real em staging, não a UI (o card é projeção das
-// mesmas RPCs):
-//   · plano_propor fala coord, supervisor da dupla ou o mentor dela —
-//     jovem, mentor de outra dupla e insert direto morrem na fronteira;
+// REALIZA-459/513/518 (0219+0224+0225) — o plano "ficar em dia"
+// persistido. O e2e cobre a fronteira real em staging, não a UI (o card é
+// projeção das mesmas RPCs):
+//   · plano_propor fala os dois lados da dupla, a coordenação e quem
+//     supervisiona (auxiliar de turma entra pela RPC, não pelo campo
+//     supervisor) — estranho e insert direto morrem na fronteira;
 //   · a proposta é única por dupla (segundo plano aberto é recusado) e o
-//     ritmo vale 1–7 (0224 — até 1 encontro por dia);
-//   · aceite é BILATERAL (0224): o mentor que propõe já carrega o aceite
-//     dele (aceito_mentor_em), mas o plano só sai de "proposto" quando o
-//     outro lado responde — um lado sozinho não abre o plano;
+//     ritmo é escolha livre ≥1 (0225 — 8+ é válido, o espaçamento do
+//     guia é que limita as datas);
+//   · aceite é ÚNICO (0225): proposta de lado nasce "aceito" com o
+//     carimbo do proponente; a da equipe nasce "proposto" e o primeiro
+//     aceite da dupla a coloca em vigor — o outro lado é avisado, não
+//     fica devendo aceite;
 //   · contestar é terminal — plano novo nasce versão+1, nunca reabre;
 //   · plano_aplicar_passo é definer com guard de membro: só escopo, só
 //     futuro dentro da janela, idempotente no par (plano, numero) e
@@ -116,17 +119,19 @@ test.describe("plano ficar em dia persistido (459)", () => {
     const jwtJovem = await jwtDoUsuario(JOVEM_EMAIL, SENHA);
 
     const prop = await propor(jwtMentor);
-    expect(prop).toMatchObject({ ok: true, versao: 1 });
+    // 0225: proposta de lado nasce "aceito" — o combinado já está em
+    // vigor; o outro lado é avisado, não fica devendo aceite
+    expect(prop).toMatchObject({ ok: true, versao: 1, status: "aceito" });
     const planoId = prop.id!;
 
     // um plano aberto por dupla — a segunda proposta morre na RPC
     const dup = await propor(jwtMentor);
     expect(dup.error).toMatch(/plano aberto/i);
 
-    // 0224: quem propõe sendo mentor já carrega o aceite dele — mas o
-    // plano SEGUE "proposto" até o outro lado responder
+    // o carimbo do proponente nasce junto; o do outro lado segue vazio
+    // até ele dar ciência (aceite idempotente num plano em vigor)
     let vivo = (await planoVivo())!;
-    expect(vivo.status).toBe("proposto");
+    expect(vivo.status).toBe("aceito");
     const [carimbos] = await buscarViaServiceRole<
       { aceito_mentor_em: string | null; aceito_mentorado_em: string | null }[]
     >("dupla_planos", `id=eq.${planoId}&select=aceito_mentor_em,aceito_mentorado_em`);
@@ -140,7 +145,7 @@ test.describe("plano ficar em dia persistido (459)", () => {
     >;
     expect(jp).toMatchObject({
       id: planoId,
-      status: "proposto",
+      status: "aceito",
       versao: 1,
       aceito_mentor: true,
       aceito_mentorado: false,
@@ -149,9 +154,9 @@ test.describe("plano ficar em dia persistido (459)", () => {
       expect(jp).not.toHaveProperty(k);
     }
 
-    // o lado que falta é o do jovem — o aceite dele abre o plano
+    // o jovem dá ciência — carimbo dele, o status não anda
     const ace = await responder(jwtJovem, planoId, "aceitar");
-    expect(ace).toEqual({ ok: true });
+    expect(ace).toMatchObject({ ok: true });
     vivo = (await planoVivo())!;
     expect(vivo.status).toBe("aceito");
 
@@ -201,20 +206,19 @@ test.describe("plano ficar em dia persistido (459)", () => {
     ).toMatch(/data futura|pra frente/i);
   });
 
-  test("ritmo vale 1–7 (0224): 7 = um encontro por dia, 0 e 8 recusam", async () => {
+  test("ritmo é escolha livre ≥1 (0225): 0 recusa, 8+ é válido", async () => {
     const jwtMentor = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
 
-    // fora da faixa morre na proposta
+    // abaixo de 1 morre na proposta
     expect(
       (await propor(jwtMentor, DUPLA, escopo([3], 0))).error
     ).toBeTruthy();
-    expect(
-      (await propor(jwtMentor, DUPLA, escopo([3], 8))).error
-    ).toBeTruthy();
 
-    // ritmo 7 — o teto honesto do 513 — é aceito e segue proposto
-    const prop = await propor(jwtMentor, DUPLA, escopo([3, 4], 7));
-    expect(prop).toMatchObject({ ok: true, versao: 1 });
+    // acima de 7 é decisão da dupla — a RPC aceita (o espaçamento do guia
+    // é que separa as datas, não o teto semanal); proposta de lado já
+    // nasce em vigor
+    const prop = await propor(jwtMentor, DUPLA, escopo([3, 4], 8));
+    expect(prop).toMatchObject({ ok: true, versao: 1, status: "aceito" });
   });
 
   test("contestado é terminal — acordo novo é versão nova, nunca reabre", async () => {
@@ -243,21 +247,32 @@ test.describe("plano ficar em dia persistido (459)", () => {
     expect(v2).toMatchObject({ ok: true, versao: 2 });
   });
 
-  test("fronteira de papel: jovem não propõe, estranho não responde, RLS trava", async () => {
+  test("fronteira de papel: lado propõe, estranho não responde, RLS trava", async () => {
     const jwtMentor = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
     const jwtJovem = await jwtDoUsuario(JOVEM_EMAIL, SENHA);
     const jwtCoord = await jwtDoUsuario(COORD_EMAIL, COORD_SENHA);
 
-    // jovem não propõe plano (0224: coord, supervisor da dupla ou mentor)
-    expect((await propor(jwtJovem)).error).toBeTruthy();
+    // 0225: o jovem também propõe — proposta de lado nasce "aceito" já
+    // em vigor, com o carimbo do lado dele
+    const propJovem = await propor(jwtJovem);
+    expect(propJovem).toMatchObject({ ok: true, status: "aceito" });
+    const [carimboJovem] = await buscarViaServiceRole<
+      { aceito_mentor_em: string | null; aceito_mentorado_em: string | null }[]
+    >("dupla_planos", `id=eq.${propJovem.id!}&select=aceito_mentor_em,aceito_mentorado_em`);
+    expect(carimboJovem.aceito_mentor_em).toBeNull();
+    expect(carimboJovem.aceito_mentorado_em).toBeTruthy();
+    // o jovem tira o plano dele da frente pros cenários seguintes
+    await responder(jwtJovem, propJovem.id!, "contestar");
+
     // mentor de outra dupla não propõe aqui — DUPLA_OUTRA é do mentor
     // reserva, não dele: o guard de membro recusa
     expect((await propor(jwtMentor, DUPLA_OUTRA)).error).toBeTruthy();
 
-    // 0224: coordenação PODE propor — o combinado nasce "proposto" sem
-    // nenhum aceite de lado (ela não é mentor nem mentorado)
+    // coordenação PODE propor — o combinado nasce "proposto" sem
+    // nenhum aceite de lado (ela não é mentor nem mentorado): o primeiro
+    // aceite da dupla é o que coloca em vigor
     const prop = await propor(jwtCoord);
-    expect(prop).toMatchObject({ ok: true });
+    expect(prop).toMatchObject({ ok: true, status: "proposto" });
     const [carimbos] = await buscarViaServiceRole<
       { aceito_mentor_em: string | null; aceito_mentorado_em: string | null }[]
     >("dupla_planos", `id=eq.${prop.id!}&select=aceito_mentor_em,aceito_mentorado_em`);

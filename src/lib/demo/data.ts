@@ -2411,8 +2411,9 @@ function build(): DemoData {
     aprovado_por: null,
     aprovado_lado: "mentor" as const,
     aprovado_em: haDias(1, "19:12"),
-    // 0224: mentor que propõe já carrega o aceite dele; o da jovem chegou
-    // no dia seguinte — os dois carimbos são o que reabre o plano
+    // 0225: proposta de lado nasce aceita — o carimbo do mentor vem no
+    // mesmo instante da proposta; o da jovem é a "ciência" do dia
+    // seguinte (aceite idempotente num plano já em vigor)
     aceito_mentor_em: haDias(2, "18:40"),
     aceito_mentorado_em: haDias(1, "19:12"),
     contestado_por: null,
@@ -2463,7 +2464,8 @@ function build(): DemoData {
         para: "aceito",
         motivo: null,
         por: ricardo.id,
-        meta: { lado: "mentor" },
+        // 0225: o aceite do lado que propõe nasce junto — a RPC marca
+        meta: { lado: "mentor", na_proposta: true },
         em: haDias(2, "18:40"),
       },
       {
@@ -2471,11 +2473,13 @@ function build(): DemoData {
         plano_id: uid(0x3000 + 1),
         dupla_id: uid(D.ok),
         tipo: "aceito" as const,
-        de: "proposto",
+        // 0225: aceitar num plano já em vigor é a "ciência" — o status
+        // não anda, só o carimbo do lado que faltava
+        de: "aceito",
         para: "aceito",
         motivo: null,
         por: anaLogin.id,
-        meta: { lado: "mentorado" },
+        meta: { lado: "mentorado", final: true },
         em: haDias(1, "19:12"),
       },
       {
@@ -2498,6 +2502,27 @@ function build(): DemoData {
     ],
   };
   duplaOk.planos = [planoDemo];
+  // 0225 tri-estado: a dupla saudável já decidiu o recesso ("vamos usar",
+  // declarado pelo mentor) — a d-pend segue sem row = pendente, que é o
+  // estado que a superfície "Combinar o plano" pergunta
+  const recessoT1 = cicloEventos.find(
+    (e) => e.cronograma_id === cronogramaT1 && e.tipo === "recesso"
+  );
+  if (recessoT1)
+    duplaOk.recessos = [
+      {
+        id: uid(0x3500 + 1),
+        dupla_id: uid(D.ok),
+        ciclo_evento_id: recessoT1.id,
+        usa: true,
+        declarado_por: ricardo.id,
+        declarado_em: haDias(3, "20:15"),
+        autor: {
+          nome: ricardo.nome,
+          nome_social: ricardo.nome_social ?? null,
+        },
+      },
+    ];
   duplaOk.intervencoes = [
     {
       id: uid(0x3300 + 1),
@@ -2583,9 +2608,9 @@ function build(): DemoData {
     mentorado: caio,
     supervisor: paulo,
     encontros: encD2,
-    // 513: o combinado proposto pelo supervisor (Paulo) esperando os dois
-    // aceites — é a vitrine do estado "proposto" bilateral: ninguém de lado
-    // aceitou ainda, então staff lê "aguardando aceite" na ficha
+    // 518: o combinado proposto pelo supervisor (Paulo) esperando UM
+    // aceite da dupla — é a vitrine do "proposto_staff" da 0225: ninguém
+    // de lado carimbou ainda, o primeiro aceite já coloca em vigor
     planos: [
       {
         id: uid(0x3000 + 2),
@@ -2633,7 +2658,7 @@ function build(): DemoData {
             para: "proposto",
             motivo: null,
             por: paulo.id,
-            meta: {},
+            meta: { versao: 1, via: "app" },
             em: haDias(1, "10:20"),
           },
         ],

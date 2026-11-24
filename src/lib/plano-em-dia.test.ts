@@ -1,0 +1,317 @@
+import { describe, expect, it } from "vitest";
+import {
+  escopoDaProposta,
+  montarPlanoEmDia,
+  rotuloRitmo,
+} from "./plano-em-dia";
+import type {
+  CicloEvento,
+  Disponibilidade,
+  Dupla,
+  DuplaRecesso,
+  Encontro,
+} from "./types";
+
+// Relógio fixo: segunda-feira 12/01/2026 — todas as datas derivam dela.
+const HOJE = new Date("2026-01-12T12:00:00Z");
+const HOJE_STR = "2026-01-12";
+const CRON = "cron-t1";
+
+let seq = 0;
+const ev = (
+  tipo: CicloEvento["tipo"],
+  data: string | null,
+  extra: Partial<CicloEvento> = {}
+): CicloEvento => ({
+  id: `ev-${tipo}-${extra.numero ?? "x"}-${++seq}`,
+  cronograma_id: CRON,
+  tipo,
+  numero: tipo === "encontro" ? (extra.numero ?? null) : null,
+  data,
+  data_fim: extra.data_fim ?? null,
+  status: "pendente",
+  observacao: null,
+  ordem: seq,
+  titulo: extra.titulo ?? `Evento ${extra.numero ?? seq}`,
+  fase: null,
+  instrumentos: [],
+  ...extra,
+});
+
+const dupla = (over: Partial<Dupla> = {}): Dupla =>
+  ({
+    id: "d-1",
+    turma: "T1",
+    cronograma_id: CRON,
+    status: "ativa",
+    iniciada_em: "2025-12-01",
+    trilha: "dpp",
+    demanda: null,
+    solicitacao_id: null,
+    mentor: { id: "m-1" },
+    mentorado: { id: "j-1" },
+    supervisor: null,
+    encontros: [],
+    encaminhamentos: [],
+    recessos: [],
+    ...over,
+  }) as Dupla;
+
+const encontroAgendado = (numero: number, dataHora: string): Encontro =>
+  ({
+    id: `enc-${numero}`,
+    dupla_id: "d-1",
+    numero,
+    data_hora: dataHora,
+    realizado_em: null,
+    duracao_min: 60,
+    status: "agendado",
+    origem: "plataforma",
+    link: null,
+    motivo_reagendamento: null,
+  }) as Encontro;
+
+const decisaoRecesso = (eventoId: string, usa: boolean): DuplaRecesso => ({
+  id: `dr-${eventoId}`,
+  dupla_id: "d-1",
+  ciclo_evento_id: eventoId,
+  usa,
+  declarado_por: "m-1",
+  declarado_em: "2026-01-10T00:00:00Z",
+});
+
+const grid = (dia: Disponibilidade["celulas"][number]["dia"]): Disponibilidade => ({
+  celulas: [{ dia, periodo: "noite" }],
+});
+
+describe("rotuloRitmo — rótulo honesto do ritmo livre (518)", () => {
+  it("escada de nomeação", () => {
+    expect(rotuloRitmo(1)).toBe("1 encontro por semana");
+    expect(rotuloRitmo(4)).toBe("até 4 encontros por semana");
+    expect(rotuloRitmo(7)).toBe("até 1 encontro por dia");
+  });
+  it("acima de 7 fica literal — nunca arredonda a decisão da dupla", () => {
+    expect(rotuloRitmo(10)).toBe("10 encontros por semana");
+    expect(rotuloRitmo(8)).toBe("8 encontros por semana");
+  });
+});
+
+describe("montarPlanoEmDia — ritmo livre (518)", () => {
+  // 3 devidos com piso genérico de 2 dias; encerramento apertado pra
+  // diferenciar ritmo 1 (falha) de ritmo 2 (fecha)
+  const eventos = () => [
+    ev("encontro", "2026-01-05", { numero: 14 }),
+    ev("encontro", "2026-01-06", { numero: 15 }),
+    ev("encontro", "2026-01-07", { numero: 16 }),
+    ev("evento_encerramento", "2026-01-25"),
+  ];
+
+  it("ritmo fora da escada de nomeação não arredonda: 5 fica 5, 4 fica 4", () => {
+    const p5 = montarPlanoEmDia({ dupla: dupla(), eventos: eventos(), ritmo: 5, hoje: HOJE });
+    const p4 = montarPlanoEmDia({ dupla: dupla(), eventos: eventos(), ritmo: 4, hoje: HOJE });
+    expect(p5.aplicavel && p5.ritmo).toBe(5);
+    expect(p4.aplicavel && p4.ritmo).toBe(4);
+  });
+
+  it("ritmo > 7 respeita a escolha e avisa que o espaçamento segue valendo", () => {
+    const p = montarPlanoEmDia({ dupla: dupla(), eventos: eventos(), ritmo: 10, hoje: HOJE });
+    expect(p.aplicavel && p.ritmo).toBe(10);
+    if (!p.aplicavel) return;
+    expect(p.avisos.some((a) => a.includes("mais de um encontro por dia"))).toBe(true);
+  });
+
+  it("alternativa é o PRIMEIRO inteiro acima que fecha, não o próximo degrau", () => {
+    // ritmo 1: 3 devidos a 1/semana → último em 26/01, depois do
+    // encerramento (25/01) → não fecha. ritmo 2: fecha em 19/01.
+    const p = montarPlanoEmDia({ dupla: dupla(), eventos: eventos(), ritmo: 1, hoje: HOJE });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    expect(p.dataRecuperacao).toBeNull();
+    expect(p.alternativaRitmo).toEqual({ ritmo: 2, data: "2026-01-19" });
+    expect(
+      p.avisos.some((a) => a.includes("ficar em dia em 19/01/2026"))
+    ).toBe(true);
+  });
+
+  it("ritmo que não fecha sem alternativa honesta: acima dele nada desloca mais", () => {
+    // com piso de 2 dias uma semana comporta no máx. ~4 encontros: pedir
+    // 5+ muda o rótulo, não a densidade — se 5 não fecha, 6 e 7 também não
+    const eventos6 = [
+      ...[9, 10, 14, 15, 16, 19].map((n, i) =>
+        ev("encontro", `2026-01-0${i + 1}`, { numero: n })
+      ),
+      ev("evento_encerramento", "2026-01-26"),
+    ];
+    const p = montarPlanoEmDia({
+      dupla: dupla(),
+      eventos: eventos6,
+      ritmo: 5,
+      hoje: HOJE,
+    });
+    expect(p.aplicavel && p.ritmo).toBe(5);
+    if (!p.aplicavel) return;
+    expect(p.alternativaRitmo).toBeNull();
+  });
+});
+
+describe("montarPlanoEmDia — grade como preferência forte (518)", () => {
+  const eventos = () => [
+    ev("encontro", "2026-01-07", { numero: 16 }),
+    ev("evento_encerramento", "2026-02-10"),
+  ];
+
+  it("prefere o dia com período livre em comum dentro da semana", () => {
+    // sem grade o passo cairia na terça 13; com {qui} comum ele anda pra
+    // quinta 15 — a preferência desloca dentro das restrições duras
+    const p = montarPlanoEmDia({
+      dupla: dupla(),
+      eventos: eventos(),
+      ritmo: 2,
+      disponibilidade: grid("qui"),
+      hoje: HOJE,
+    });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    expect(p.passos[0].data).toBe("2026-01-15");
+    expect(p.passos[0].foraDaGrade).toBeUndefined();
+    expect(p.avisos.some((a) => a.includes("período livre"))).toBe(false);
+  });
+
+  it("sem encaixe na semana o passo fica onde coube, marca e o plano avisa", () => {
+    // o único dia comum na varredura (quarta 14) está ocupado por um
+    // encontro travado DE NÚMERO MAIOR — ele bloqueia a data sem puxar o
+    // piso de gap do passo 15, que fica na terça 13 foraDaGrade
+    const p = montarPlanoEmDia({
+      dupla: dupla({ encontros: [encontroAgendado(16, "2026-01-14T19:00:00")] }),
+      eventos: [ev("encontro", "2026-01-07", { numero: 15 }), ev("encontro", "2026-01-14", { numero: 16 }), ev("evento_encerramento", "2026-02-10")],
+      ritmo: 2,
+      disponibilidade: grid("qua"),
+      hoje: HOJE,
+    });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    const passo15 = p.passos.find((x) => x.numero === 15);
+    expect(passo15?.data).toBe("2026-01-13");
+    expect(passo15?.foraDaGrade).toBe(true);
+    expect(
+      p.avisos.some((a) => a.includes("a grade é preferência, não bloqueio"))
+    ).toBe(true);
+  });
+
+  it("sem grade nenhuma a simulação segue normal (combinar sem a grade)", () => {
+    const p = montarPlanoEmDia({
+      dupla: dupla(),
+      eventos: eventos(),
+      ritmo: 2,
+      disponibilidade: null,
+      hoje: HOJE,
+    });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    expect(p.passos[0].data).toBe("2026-01-13");
+    expect(p.passos.every((x) => !x.foraDaGrade)).toBe(true);
+  });
+});
+
+describe("montarPlanoEmDia — recesso tri-estado (518/0225)", () => {
+  const montar = () => {
+    const rec = ev("recesso", "2026-01-13", {
+      titulo: "Recesso de verão",
+      data_fim: "2026-01-18",
+    });
+    const eventos = [
+      ev("encontro", "2026-01-07", { numero: 16 }),
+      rec,
+      ev("evento_encerramento", "2026-02-10"),
+    ];
+    return { rec, eventos };
+  };
+
+  it("sem row = pendente: lista a pergunta e a simulação conta como 'vamos usar'", () => {
+    const { rec, eventos } = montar();
+    const p = montarPlanoEmDia({
+      dupla: dupla(),
+      eventos,
+      ritmo: 2,
+      hoje: HOJE,
+    });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    expect(p.recessosPendentes).toEqual([
+      {
+        cicloEventoId: rec.id,
+        titulo: "Recesso de verão",
+        inicio: "2026-01-13",
+        fim: "2026-01-18",
+      },
+    ]);
+    // conservador: o passo sai depois do fim do recesso
+    expect(p.passos[0].data >= "2026-01-19").toBe(true);
+  });
+
+  it("usa=false libera datas dentro do recesso e apaga a pendência", () => {
+    const { rec, eventos } = montar();
+    const p = montarPlanoEmDia({
+      dupla: dupla({ recessos: [decisaoRecesso(rec.id, false)] }),
+      eventos,
+      ritmo: 2,
+      hoje: HOJE,
+    });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    expect(p.recessosPendentes).toEqual([]);
+    expect(p.passos[0].data).toBe("2026-01-13");
+  });
+
+  it("usa=true bloqueia dentro do recesso e apaga a pendência", () => {
+    const { rec, eventos } = montar();
+    const p = montarPlanoEmDia({
+      dupla: dupla({ recessos: [decisaoRecesso(rec.id, true)] }),
+      eventos,
+      ritmo: 2,
+      hoje: HOJE,
+    });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    expect(p.recessosPendentes).toEqual([]);
+    expect(p.passos[0].data >= "2026-01-19").toBe(true);
+  });
+
+  it("recesso já encerrado não é pergunta — o tri-estado olha o que ainda vale", () => {
+    const rec = ev("recesso", "2026-01-01", { data_fim: "2026-01-05" });
+    const p = montarPlanoEmDia({
+      dupla: dupla(),
+      eventos: [ev("encontro", "2026-01-07", { numero: 16 }), rec],
+      ritmo: 2,
+      hoje: HOJE,
+    });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    expect(p.recessosPendentes).toEqual([]);
+  });
+});
+
+describe("escopoDaProposta — as decisões viajam no jsonb (518)", () => {
+  it("carrega o snapshot das decisões sem mudar o contrato da RPC", () => {
+    const p = montarPlanoEmDia({
+      dupla: dupla(),
+      eventos: [
+        ev("encontro", "2026-01-07", { numero: 16 }),
+        ev("evento_encerramento", "2026-02-10"),
+      ],
+      ritmo: 2,
+      hoje: HOJE,
+    });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    const e = escopoDaProposta(p, HOJE_STR);
+    expect("erro" in e).toBe(false);
+    if ("erro" in e) return;
+    const comDecisoes = {
+      ...e.escopo,
+      decisoes: { recessos: [], sem_grade: false },
+    };
+    expect(comDecisoes.decisoes).toEqual({ recessos: [], sem_grade: false });
+    expect(e.escopo.ritmo).toBe(2);
+  });
+});
