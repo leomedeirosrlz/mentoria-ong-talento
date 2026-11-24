@@ -176,6 +176,9 @@ export function mkRegistro(over: Partial<Registro> = {}): Registro {
     dificuldade_detalhe: null,
     proximo_passo: null,
     proximo_passo_detalhe: null,
+    // sessão combinada (018): nºs cobertos ALÉM da âncora — [] = sessão
+    // simples, o comum
+    cobertura: [],
     created_by: null,
     created_at: "2025-10-08T10:00:00-03:00",
     ...over,
@@ -194,6 +197,8 @@ export function mkEncontro(numero: number, over: Partial<Encontro> = {}): Encont
     origem: "plataforma",
     link: null,
     motivo_reagendamento: null,
+    // uuid compartilhado da sessão combinada (018) — null = sessão própria
+    sessao_id: null,
     registro: null,
     ...over,
   };
@@ -252,6 +257,9 @@ export function mkAvaliacao(over: Partial<AvaliacaoEncontro> = {}): AvaliacaoEnc
     pedir_apoio: false,
     avaliacao_visivel_mentor: false,
     respondido_por_profile_id: null,
+    // TODOS os nºs que a resposta cobre, âncora inclusa (018) — null = só
+    // o encontro da row
+    cobertura: null,
     created_at: "2025-10-08T10:00:00-03:00",
     ...over,
   };

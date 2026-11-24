@@ -107,10 +107,11 @@ test.describe("demo — 360º com contexto da trajetória", () => {
       .click();
     // the mentor tile keeps its own scale — renamed to disambiguate
     await expect(resumo.getByText("Avaliação do mentor")).toBeVisible();
-    // 16 evals [3,3,4,3,2,4,4,4,4,5,4,4,5,5,5,5] → mean 4.0, 3★→5★
+    // 15 evals [3,3,4,3,2,4,4,4,5,4,4,5,5,5,5] → mean 4.0, 3★→5★ — o par
+    // 5/6 foi sessão combinada (018): UMA resposta na âncora cobre os dois
     const tile = resumo.locator("div", { hasText: "Avaliação do jovem" }).first();
     await expect(tile.getByText("4.0/5")).toBeVisible();
-    await expect(tile.getByText("média de 16 avaliações")).toBeVisible();
+    await expect(tile.getByText("média de 15 avaliações")).toBeVisible();
     await expect(tile.getByText(/1º→último: 3★ → 5★/)).toBeVisible();
     await expect(tile.getByText("Carreira e futuro")).toBeVisible();
   });
@@ -124,7 +125,34 @@ test.describe("demo — 360º com contexto da trajetória", () => {
     // d-fim's checklist has avaliacao_360_enviada checked — the line
     // carries the same aggregate the resumo tile shows
     await expect(
-      page.getByText(/a jornada avaliada pelo jovem: média 4,0\/5 · 16 avaliações · 1º→último 3★→5★/)
+      page.getByText(/a jornada avaliada pelo jovem: média 4,0\/5 · 15 avaliações · 1º→último 3★→5★/)
     ).toBeVisible();
+  });
+
+  test("sessão combinada 5/6: o coberto lê o registro e a avaliação da âncora", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(`/duplas/${DUPLA_FIM}?aba=encontros`);
+
+    // 018: a sentada de 2h cobriu os dois passos — o 6º nasceu realizado
+    // sem registro nem link próprios; a linha dele lê os da âncora (5º)
+    const linha6 = page.locator('div[id^="registrar-"]', {
+      hasText: "sessão combinada com o 5º encontro",
+    });
+    await expect(linha6).toBeVisible();
+    // feito de verdade — a sessão aconteceu, o nº conta na jornada
+    await expect(linha6.getByText(/realizado /)).toBeVisible();
+    // o registro da sessão abre da linha do coberto — é o da âncora, não
+    // um clone: nada de CTA "Registrar" nem pendência fantasma nela
+    await expect(
+      linha6.getByRole("button", { name: /^Registro/ })
+    ).toBeVisible();
+    // a avaliação da Isabela responde pelo grupo: a linha herda a resposta
+    // (com o pedido de apoio resolvido), nunca o "Sem avaliação" nem a
+    // linha de link pendente
+    await expect(
+      linha6.getByText("Sem avaliação do jovem para este encontro.")
+    ).toHaveCount(0);
   });
 });

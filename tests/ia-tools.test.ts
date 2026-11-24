@@ -409,25 +409,33 @@ describe("executarTool — allowlist", () => {
     ]) {
       expect(IA_REGISTRO_SELECT).not.toContain(campo);
     }
-    // a projeção do semáforo também só pede os campos estruturados
-    for (const campo of ["reflexoes", "observacoes", "dificuldade_detalhe"])
+    // 018: a projeção do semáforo pede os campos de conteúdo porque a
+    // régua registroTemConteudo/cobertosDaDupla lê eles pro booleano
+    // "tem registro?" — a tool nunca os serializa pro modelo (a saída
+    // projetada campo a campo é o que os testes abaixo garantem)
+    for (const campo of [
+      "tema",
+      "reflexoes",
+      "observacoes",
+      "atividades",
+      "cobertura",
+    ])
+      expect(IA_SAUDE_SELECT).toContain(campo);
+    // os detalhes livres seguem fora — a régua não os lê
+    for (const campo of ["dificuldade_detalhe", "proximo_passo_detalhe"])
       expect(IA_SAUDE_SELECT).not.toContain(campo);
   });
 
-  it("a projeção de insights carrega o que a aderência lê, sem texto livre", () => {
+  it("a projeção de insights carrega o que a aderência lê", () => {
     // o .replace sobre IA_SAUDE_SELECT precisa casar: se o select do
     // semáforo mudar de forma, o silêncio do replace zeraria o atraso de
     // registro e as remarcações sem nenhum erro
     expect(IA_INSIGHTS_SELECT).toContain(
-      "registro:registros(precisa_apoio, avaliacao, dificuldade, created_at)"
+      "registro:registros(precisa_apoio, avaliacao, dificuldade, tema, reflexoes, observacoes, atividades, cobertura, created_at)"
     );
     expect(IA_INSIGHTS_SELECT).toContain("encontro_remarcacoes");
-    for (const campo of [
-      "reflexoes",
-      "observacoes",
-      "dificuldade_detalhe",
-      "proximo_passo_detalhe",
-    ])
+    // mesma fronteira do semáforo: conteúdo pro booleano, detalhes fora
+    for (const campo of ["dificuldade_detalhe", "proximo_passo_detalhe"])
       expect(IA_INSIGHTS_SELECT).not.toContain(campo);
   });
 

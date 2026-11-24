@@ -2,7 +2,7 @@ import type { Page } from "@playwright/test";
 import { entrarNaDemo, expect, test } from "../helpers";
 
 // /registros agrupado por ?grupo=dupla|semana|avaliacao (REALIZA-175).
-// Demo como coordenação vê todas as 16 duplas — ~94 registros com
+// Demo como coordenação vê todas as 16 duplas — ~93 registros com
 // avaliações variadas (baixa/regular/boa/excelente no dataset).
 // O default é `grupo=dupla` implícito (param ausente == dupla).
 // Layout: lista compacta + registro (seleção em ?r=) — no lg+ o registro

@@ -63,7 +63,11 @@ import type {
   TurmaInscricao,
 } from "@/lib/types";
 import type { Interacao } from "@/lib/interacoes";
-import { disponibilidadeDeConjuntos, toDateStr } from "../ciclo";
+import {
+  cobertosDaDupla,
+  disponibilidadeDeConjuntos,
+  toDateStr,
+} from "../ciclo";
 import { audienciasDe } from "../materiais";
 
 // ---------- tabelas da rodada de telas finais (ainda sem migration) ----------
@@ -747,6 +751,7 @@ type RegOverride = Partial<
     | "dificuldade_detalhe"
     | "proximo_passo"
     | "proximo_passo_detalhe"
+    | "cobertura"
     | "created_at"
   >
 >;
@@ -767,6 +772,9 @@ function build(): DemoData {
     origem?: "plataforma" | "externo";
     link?: string | null;
     motivo?: string | null;
+    /** sessao_id compartilhado — sessão combinada (018): um encontro físico
+     *  cobre mais de um nº do guia. */
+    sessaoId?: string | null;
   };
 
   const agendado = (dupla: string, numero: number, dia: Date, o: EncOpts = {}): Encontro => ({
@@ -780,6 +788,7 @@ function build(): DemoData {
     origem: o.origem ?? "plataforma",
     link: o.link ?? MEET,
     motivo_reagendamento: o.motivo ?? null,
+    sessao_id: o.sessaoId ?? null,
     registro: null,
   });
 
@@ -794,6 +803,7 @@ function build(): DemoData {
     origem: o.origem ?? "plataforma",
     link: o.link ?? (o.origem === "externo" ? null : MEET),
     motivo_reagendamento: o.motivo ?? null,
+    sessao_id: o.sessaoId ?? null,
     registro: null,
   });
 
@@ -808,6 +818,7 @@ function build(): DemoData {
     origem: o.origem ?? "plataforma",
     link: o.link ?? MEET,
     motivo_reagendamento: o.motivo ?? null,
+    sessao_id: o.sessaoId ?? null,
     registro: null,
   });
 
@@ -2828,22 +2839,42 @@ function build(): DemoData {
     notas: [],
   };
 
-  // d-fim · Luiza × Isabela — ciclo anterior completo: 16 encontros semanais
-  // com registro, avaliação subindo ao longo da jornada. Serve pra trajetória
-  // completa na ficha e pro export CSV.
+  // d-fim · Luiza × Isabela — ciclo anterior completo: 16 encontros com
+  // avaliação subindo ao longo da jornada. Serve pra trajetória completa na
+  // ficha e pro export CSV. O par 5/6 é a sessão combinada da 018: uma
+  // sentada de 2h cobriu os dois passos — o registro mora só na âncora
+  // (enc 5) com cobertura [6], o 6º nasceu realizado pelo mesmo carimbo,
+  // sem registro nem link próprios (a avaliação da Isabela cobre o grupo
+  // inteiro [5,6] — ver o map dela mais abaixo e o filtro do avaliacaoLinks).
   const FIM_CICLO_ANTERIOR = addDias(HOJE, -240); // encontro 16 ~8 meses atrás
   const AVAL_FIM: AvaliacaoJovem[] = [
     "regular", "regular", "boa", "boa", "boa", "boa", "regular", "boa",
     "boa", "excelente", "boa", "boa", "excelente", "excelente", "excelente", "excelente",
   ];
+  // sessao_id compartilhado do par — a action grava o mesmo uuid nas duas
+  // rows quando a cobertura marca "a sessão também cobriu o 6º"
+  const SESSAO_FIM_56 = uid(0x4a01);
   const encD5: Encontro[] = Array.from({ length: 16 }, (_, i) => {
     const n = i + 1;
     const dia = addDias(FIM_CICLO_ANTERIOR, (n - 16) * 7);
+    // coberto pela sessão do 5º: mesmo sessao_id, mesmo instante (a action
+    // carimba data_hora/realizado_em/duração da âncora em todos os cobertos)
+    // e nenhum registro — o conteúdo dele vive no registro da âncora
+    if (n === 6)
+      return realizado(
+        uid(D.fim),
+        6,
+        addDias(FIM_CICLO_ANTERIOR, (5 - 16) * 7),
+        { duracao: 120, sessaoId: SESSAO_FIM_56 }
+      );
     const enc = realizado(uid(D.fim), n, dia, {
-      duracao: n % 3 === 0 ? 60 : 75,
+      duracao: n === 5 ? 120 : n % 3 === 0 ? 60 : 75,
       origem: n % 4 === 0 ? "externo" : "plataforma",
+      sessaoId: n === 5 ? SESSAO_FIM_56 : null,
     });
     const over: RegOverride = { avaliacao: AVAL_FIM[i] };
+    // âncora: o registro único da sessão lista os nºs cobertos ALÉM dela
+    if (n === 5) over.cobertura = [6];
     // uma dificuldade de rotina no meio da jornada — o gráfico de trajetória
     // conta a retomada depois dela
     if (n === 7) {
@@ -4129,11 +4160,12 @@ function build(): DemoData {
       respondido_por_profile_id: null, // Caio não tem login — veio pelo token
       created_at: depoisDe(encD2[3].realizado_em!, 6),
     },
-    // série completa do fim de ciclo (REALIZA-71): os 16 encontros da
-    // d-fim avaliados pela Isabela — o 360º dela e da Luiza abrem com a
-    // trajetória inteira (estrelas subindo junto com a série do mentor;
-    // o pedido de apoio do enc 5 já foi resolvido na época — hoje é só
-    // histórico e exercita a régua de nunca vazar pro mentor)
+    // série quase completa do fim de ciclo (REALIZA-71): 15 avaliações
+    // cobrindo os 16 encontros da d-fim — o par 5/6 foi sessão combinada
+    // (018), então a Isabela respondeu UMA vez pelo grupo: a row fica na
+    // âncora (enc 5) com cobertura [5,6] — a âncora inclusa, como a action
+    // grava. O pedido de apoio é justamente dessa sessão: já foi resolvido
+    // na época e hoje exercita a régua de nunca vazar pro mentor.
     ...[
       [3, "mais_ou_menos", "um_pouco", ["pdm", "estudos"], false, false],
       [3, "mais_ou_menos", "um_pouco", ["pdm"], false, false],
@@ -4151,25 +4183,35 @@ function build(): DemoData {
       [5, "muito_bem", "sim", ["carreira"], false, false],
       [5, "muito_bem", "sim", ["pdm", "carreira"], false, false],
       [5, "muito_bem", "sim", ["carreira"], false, false],
-    ].map(([estrelas, sentimento, avancei, temas, apoio, visivel], i) => ({
-      id: uid(0x4407 + i), dupla_id: duplaFim.id,
-      encontro_id: encD5[i].id,
-      estrelas: estrelas as number,
-      sentimento: sentimento as string,
-      avancei: avancei as AvaliacaoEncontro["avancei"],
-      temas: temas as string[],
-      comentario:
-        i === 4
-          ? "Semana ruim em casa, não consegui focar. A Luiza ajudou a reorganizar e a coordenação entrou em contato depois."
-          : i === 15
-            ? "Fecho do ciclo — saio com o plano pronto e muita saudade dessas terças."
-            : null,
-      pedir_apoio: Boolean(apoio),
-      avaliacao_visivel_mentor: Boolean(visivel),
-      // a Isabela nunca teve login — as respostas dela vieram pelo token
-      respondido_por_profile_id: null,
-      created_at: depoisDe(encD5[i].realizado_em!, 3 + (i % 4)),
-    })),
+    ].flatMap(([estrelas, sentimento, avancei, temas, apoio, visivel], i) =>
+      // sem avaliação no encontro coberto — sem link, sem resposta
+      i === 5
+        ? []
+        : [
+            {
+              id: uid(0x4407 + i), dupla_id: duplaFim.id,
+              encontro_id: encD5[i].id,
+              estrelas: estrelas as number,
+              sentimento: sentimento as string,
+              avancei: avancei as AvaliacaoEncontro["avancei"],
+              temas: temas as string[],
+              comentario:
+                i === 4
+                  ? "Semana ruim em casa, não consegui focar. A Luiza ajudou a reorganizar e a coordenação entrou em contato depois."
+                  : i === 15
+                    ? "Fecho do ciclo — saio com o plano pronto e muita saudade dessas terças."
+                    : null,
+              pedir_apoio: Boolean(apoio),
+              avaliacao_visivel_mentor: Boolean(visivel),
+              // a Isabela nunca teve login — as respostas dela vieram pelo token
+              respondido_por_profile_id: null,
+              created_at: depoisDe(encD5[i].realizado_em!, 3 + (i % 4)),
+              // TODOS os nºs da sessão, âncora inclusa — a régua que o
+              // avaliacaoCobreNumero lê (a row responde pelo grupo)
+              ...(i === 4 ? { cobertura: [5, 6] } : {}),
+            },
+          ]
+    ),
     // three on d-rito: the minimum batch that releases the quantized media,
     // so Ricardo's pending 360 link there opens the mentor card with
     // Gustavo's aggregate visible
@@ -4204,11 +4246,15 @@ function build(): DemoData {
   // respondido onde existe avaliação, pendente enquanto válido (o link do
   // enc 2 da trilha da Sofia é o que a coord manda pra Ana) e expirado
   // nos realizados antigos sem resposta (a dupla concluída do ciclo
-  // passado mostra o estado natural do funil).
+  // passado mostra o estado natural do funil). Sessão combinada (018): a
+  // migration do trigger passou a mintar UM link na âncora com a cobertura
+  // inteira do grupo — o coberto não tem link nem forma de responder.
   let seqLink = 0;
-  const avaliacaoLinks: AvaliacaoLink[] = duplas.flatMap((d) =>
-    (d.encontros ?? [])
-      .filter((e) => e.status === "realizado")
+  const avaliacaoLinks: AvaliacaoLink[] = duplas.flatMap((d) => {
+    // nº coberto → nº âncora (o registro da âncora lista os cobertos)
+    const cobertos = cobertosDaDupla(d.encontros ?? []);
+    return (d.encontros ?? [])
+      .filter((e) => e.status === "realizado" && !cobertos.has(e.numero))
       .map((e) => {
         const aval = avaliacoes.find((a) => a.encontro_id === e.id);
         const mintado = e.realizado_em ?? e.data_hora ?? "";
@@ -4230,9 +4276,14 @@ function build(): DemoData {
           respondido_por_profile_id:
             (aval && aval.respondido_por_profile_id) ?? null,
           created_at: mintado,
+          // âncora de sessão combinada: o link cobre TODOS os nºs do grupo,
+          // ela inclusa — mesma convenção da avaliacoes_encontro.cobertura
+          ...(e.registro?.cobertura?.length
+            ? { cobertura: [e.numero, ...e.registro.cobertura] }
+            : {}),
         };
-      })
-  );
+      });
+  });
 
   // ---------- chamados unificados (0084) ----------
   // 9 casos cobrindo origem, categoria e estado — a fila da coordenação e

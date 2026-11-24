@@ -287,6 +287,67 @@ describe("pendências — warnrows do topo do Hoje", () => {
     expect(todosOsItens(a).some((i) => i.encontro?.id === "e4")).toBe(false);
   });
 
+  it("sessão combinada (018): o coberto não vira pendência nem pede registrar", () => {
+    // âncora 5 realizado com o registro da sessão cobrindo o 6; o 6
+    // realizado sem row própria — a régua lê o conteúdo via âncora
+    const ancora = mkEncontro({
+      id: "e5",
+      numero: 5,
+      status: "realizado",
+      data_hora: "2026-10-05T19:00:00-03:00",
+      realizado_em: "2026-10-05T19:00:00-03:00",
+      registro: {
+        id: "r5",
+        encontro_id: "e5",
+        tema: "Escuta ativa",
+        cobertura: [5, 6],
+      } as unknown as Encontro["registro"],
+    });
+    const coberto = mkEncontro({
+      id: "e6",
+      numero: 6,
+      status: "realizado",
+      data_hora: "2026-10-05T19:00:00-03:00",
+      realizado_em: "2026-10-05T19:00:00-03:00",
+    });
+    const a = deriveAgendaMinha({
+      ...BASE,
+      duplas: [mkDupla({ encontros: [ancora, coberto] })],
+    });
+    expect(a.avisos).toHaveLength(0);
+    const item = todosOsItens(a).find((i) => i.encontro?.id === "e6");
+    expect(item?.acoes ?? []).not.toContain("registrar");
+  });
+
+  it("sessão combinada: encontro realizado FORA da cobertura segue pendente", () => {
+    const ancora = mkEncontro({
+      id: "e5",
+      numero: 5,
+      status: "realizado",
+      data_hora: "2026-10-05T19:00:00-03:00",
+      realizado_em: "2026-10-05T19:00:00-03:00",
+      registro: {
+        id: "r5",
+        encontro_id: "e5",
+        tema: "Escuta ativa",
+        cobertura: [5, 6],
+      } as unknown as Encontro["registro"],
+    });
+    const fora = mkEncontro({
+      id: "e7",
+      numero: 7,
+      status: "realizado",
+      data_hora: "2026-10-05T19:00:00-03:00",
+      realizado_em: "2026-10-05T19:00:00-03:00",
+    });
+    const a = deriveAgendaMinha({
+      ...BASE,
+      duplas: [mkDupla({ encontros: [ancora, fora] })],
+    });
+    expect(a.avisos).toHaveLength(1);
+    expect(a.avisos[0].href).toBe("/duplas/d1#registrar-e7");
+  });
+
   it("realizado de hoje sem registro ainda é item, com 'Registrar como foi'", () => {
     const e = mkEncontro({
       id: "e-hj",

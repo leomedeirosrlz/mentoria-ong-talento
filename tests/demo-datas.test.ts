@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { getDemoData } from "../src/lib/demo/data";
-import { semanaBounds, toDateStr } from "../src/lib/ciclo";
+import {
+  cobertosDaDupla,
+  semanaBounds,
+  toDateStr,
+} from "../src/lib/ciclo";
 
 // Âncoras do dataset evergreen — a invariante é "hoje" e a semana corrente
 // no fuso do PROGRAMA (America/Sao_Paulo), não no fuso da máquina. Rode com
@@ -98,5 +102,56 @@ describe("datas do dataset demo", () => {
         vistos.add(e.data_hora);
       }
     }
+  });
+
+  it("sessão combinada (018): o dataset espelha o que o salvarRegistro grava", () => {
+    // A d-fim guarda o par 5/6 — a invariante vale pra QUALQUER sessão
+    // que o dataset venha a ganhar, então a guarda corre sobre tudo:
+    // coberto sem registro/link próprios, mesmo sessao_id e mesmo
+    // instante da âncora, e a avaliação cobrindo o grupo inteiro.
+    for (const d of data.duplas) {
+      const cobertos = cobertosDaDupla(d.encontros);
+      for (const [nCoberto, nAncora] of cobertos) {
+        const ancora = d.encontros.find((e) => e.numero === nAncora)!;
+        const enc = d.encontros.find((e) => e.numero === nCoberto)!;
+        expect(
+          ancora.registro?.cobertura,
+          `âncora ${nAncora} da dupla ${d.id} lista ${nCoberto}`
+        ).toContain(nCoberto);
+        expect(
+          enc.registro,
+          `coberto ${nCoberto} da dupla ${d.id} tem registro próprio`
+        ).toBeNull();
+        expect(enc.sessao_id, "sessao_id do coberto").toBe(
+          ancora.sessao_id
+        );
+        expect(enc.sessao_id).toBeTruthy();
+        expect(enc.status).toBe("realizado");
+        expect(enc.data_hora).toBe(ancora.data_hora);
+        // link e resposta são UM por sessão, na âncora, cobrindo o grupo
+        const linkAnc = data.avaliacaoLinks.find(
+          (l) => l.encontro_id === ancora.id
+        );
+        expect(linkAnc?.cobertura).toContain(nAncora);
+        expect(linkAnc?.cobertura).toContain(nCoberto);
+        expect(
+          data.avaliacaoLinks.some((l) => l.encontro_id === enc.id),
+          `coberto ${nCoberto} mintou link próprio`
+        ).toBe(false);
+        const avalAnc = data.avaliacoes.find(
+          (a) => a.encontro_id === ancora.id
+        );
+        expect(avalAnc?.cobertura).toContain(nAncora);
+        expect(avalAnc?.cobertura).toContain(nCoberto);
+        expect(
+          data.avaliacoes.some((a) => a.encontro_id === enc.id),
+          `coberto ${nCoberto} tem avaliação própria`
+        ).toBe(false);
+      }
+    }
+    // a história âncora existe de fato: a d-fim tem o par 5/6 coberto
+    const fim = data.duplas.find((d) => d.id.endsWith("1541"))!;
+    expect(fim).toBeDefined();
+    expect(cobertosDaDupla(fim.encontros).get(6)).toBe(5);
   });
 });
