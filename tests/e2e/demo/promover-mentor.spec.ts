@@ -90,6 +90,7 @@ test.describe("demo — promover ex-mentorado a mentor", () => {
       dialog.getByRole("button", { name: /Promover pra/ })
     ).toBeDisabled();
     await page.keyboard.press("Escape");
+    await expect(dialog).toHaveCount(0);
 
     // mentorado ativo: promoção não existe no menu — só saída
     await page.goto(`/pessoas/${KAUA}`);
