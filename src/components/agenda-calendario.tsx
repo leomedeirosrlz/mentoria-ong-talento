@@ -1968,7 +1968,7 @@ export function AgendaCalendario({
                   atual={null}
                   sugerido={hoje}
                   piso={d.iniciada_em ?? undefined}
-                  jovemNome={d.mentorado.nome.split(" ")[0]}
+                  jovemNome={primeiroNomeMentorado(d.mentorado)}
                   onCreated={(id, dia) => encontroCriado(d.id, id, dia)}
                   trigger={
                     <Button variant="outline" size="sm">
@@ -1985,7 +1985,7 @@ export function AgendaCalendario({
                 atual={null}
                 sugerido={selecionado}
                 piso={d.iniciada_em ?? undefined}
-                jovemNome={d.mentorado.nome.split(" ")[0]}
+                jovemNome={primeiroNomeMentorado(d.mentorado)}
                 onCreated={(id, dia) => encontroCriado(d.id, id, dia)}
                 trigger={
                   <Button size="sm">
@@ -2014,7 +2014,7 @@ export function AgendaCalendario({
               numero={linha.encontro.numero}
               atual={linha.encontro}
               piso={d.iniciada_em ?? undefined}
-              jovemNome={d.mentorado.nome.split(" ")[0]}
+              jovemNome={primeiroNomeMentorado(d.mentorado)}
               rotulo={
                 d.trilha === "especialista" ? "sessão de especialista" : undefined
               }
@@ -2115,7 +2115,7 @@ export function AgendaCalendario({
                                 numero={e.numero}
                                 atual={e}
                                 piso={item.dupla.iniciada_em ?? undefined}
-                                jovemNome={item.dupla.mentorado.nome.split(" ")[0]}
+                                jovemNome={primeiroNomeMentorado(item.dupla.mentorado)}
                                 rotulo={
                                   item.dupla.trilha === "especialista"
                                     ? "sessão de especialista"
@@ -2259,8 +2259,8 @@ export function AgendaCalendario({
                   <span className="block">
                     {encontro.numero}º encontro
                     {ehMentorUi
-                      ? ` com ${dupla.mentorado.nome}`
-                      : ` de ${dupla.mentor.nome} e ${dupla.mentorado.nome}`}
+                      ? ` com ${dupla.mentorado.nome_social || dupla.mentorado.nome}`
+                      : ` de ${dupla.mentor.nome_social || dupla.mentor.nome} e ${dupla.mentorado.nome_social || dupla.mentorado.nome}`}
                   </span>
                   <span className="block text-xs text-muted-foreground">
                     Remarcado para {formatDateTime(rem.data_nova)}
@@ -2468,7 +2468,9 @@ export function AgendaCalendario({
                       d.notas?.find((n) => n.numero === e.numero)?.texto ?? null
                     }
                     rotulo={
-                      duplasAtivasDpp.length > 1 ? d.mentorado.nome : undefined
+                      duplasAtivasDpp.length > 1
+                        ? d.mentorado.nome_social || d.mentorado.nome
+                        : undefined
                     }
                   />
                 ))}
@@ -3954,7 +3956,7 @@ export function AgendaCalendario({
                         {tema ? ` · ${tema}` : ""}
                       </span>
                       <span className="mt-0.5 block break-words text-xs text-muted-foreground">
-                        {multiDuplaLista ? dupla.mentorado.nome : "Seu encontro"} ·{" "}
+                        {multiDuplaLista ? dupla.mentorado.nome_social || dupla.mentorado.nome : "Seu encontro"} ·{" "}
                         {ROTULO_ESTADO_ENCONTRO[estado]}
                       </span>
                     </span>
@@ -4019,7 +4021,7 @@ function DuplaSemEncontroLinha({
       />
       <span className="min-w-0 flex-1">
         <span className="block break-words text-sm font-medium">
-          {dupla.mentorado.nome}
+          {dupla.mentorado.nome_social || dupla.mentorado.nome}
         </span>
         <span className="block break-words text-xs text-muted-foreground">
           {previsto != null
@@ -4207,7 +4209,7 @@ function EncontroDuplaRow({
           numero={encontro.numero}
           atual={encontro}
           piso={dupla.iniciada_em ?? undefined}
-          jovemNome={dupla.mentorado.nome.split(" ")[0]}
+          jovemNome={primeiroNomeMentorado(dupla.mentorado)}
           rotulo={
             dupla.trilha === "especialista"
               ? "sessão de especialista"
@@ -4242,7 +4244,7 @@ function EncontroDuplaRow({
           <span className="min-w-0 flex-1">
             {/* o mentor já sabe que é ele — a linha nomeia o outro lado */}
             <span className="block break-words text-sm font-medium">
-              {dupla.mentorado.nome}
+              {dupla.mentorado.nome_social || dupla.mentorado.nome}
             </span>
             <span className="block break-words text-xs text-muted-foreground">
               {encontro.numero}º encontro · {STATUS_ENCONTRO_LABEL[encontro.status].toLowerCase()}
@@ -4281,7 +4283,10 @@ function EncontroDuplaRow({
             />
             <span className="min-w-0 flex-1">
               <span className="block break-words text-sm font-medium">
-                <DuplaNomes mentor={dupla.mentor.nome} mentorado={dupla.mentorado.nome} />
+                <DuplaNomes
+                  mentor={dupla.mentor.nome_social || dupla.mentor.nome}
+                  mentorado={dupla.mentorado.nome_social || dupla.mentorado.nome}
+                />
               </span>
               <span className="block break-words text-xs text-muted-foreground">
                 {encontro.numero}º encontro · {STATUS_ENCONTRO_LABEL[encontro.status].toLowerCase()}
@@ -4596,8 +4601,8 @@ function LinhaSemEncontro({
         className="flex min-h-11 min-w-0 flex-1 items-center rounded-sm text-sm font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
       >
         <DuplaNomes
-          mentor={dupla.mentor.nome}
-          mentorado={dupla.mentorado.nome}
+          mentor={dupla.mentor.nome_social || dupla.mentor.nome}
+          mentorado={dupla.mentorado.nome_social || dupla.mentorado.nome}
           truncar
         />
       </Link>
@@ -5415,7 +5420,7 @@ function HorariosMentor({
           atual={alvoSlot.encontroAlvo}
           sugerido={slotAgendar.sugerido}
           piso={duplaSlot.iniciada_em ?? undefined}
-          jovemNome={duplaSlot.mentorado.nome.split(" ")[0]}
+          jovemNome={primeiroNomeMentorado(duplaSlot.mentorado)}
           rotulo={
             duplaSlot.trilha === "especialista"
               ? "sessão de especialista"

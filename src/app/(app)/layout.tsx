@@ -113,7 +113,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
     ? (Object.fromEntries(
         Object.values(demoData.personas).map((p) => [
           p.role,
-          p.nome.split(" ")[0],
+          (p.nome_social ?? p.nome).split(" ")[0],
         ])
       ) as Record<AppRole, string>)
     : null;

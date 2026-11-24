@@ -278,7 +278,7 @@ export function MentoradoActions({
           <AssinaturasPessoa
             tipo="mentorado"
             id={mentorado.id}
-            nome={mentorado.nome}
+            nome={mentorado.nome_social || mentorado.nome}
             whatsapp={mentorado.whatsapp}
           />
         </>
@@ -319,7 +319,7 @@ export function MentoradoActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          aria-label={`Ações de "${mentorado.nome}"`}
+          aria-label={`Ações de "${mentorado.nome_social || mentorado.nome}"`}
           className={cn(
             buttonVariants({ variant: "ghost", size: "icon" }),
             "size-11 shrink-0 sm:size-8"
@@ -458,9 +458,9 @@ export function MentoradoActions({
       <ConfirmDeleteButton
         open={delOpen}
         onOpenChange={setDelOpen}
-        titulo={`Excluir ${mentorado.nome}?`}
+        titulo={`Excluir ${mentorado.nome_social || mentorado.nome}?`}
         descricao="Remove o cadastro do mentorado. Só é possível excluir quem nunca teve dupla: o vínculo fica no histórico mesmo depois de encerrada."
-        sucesso={`Cadastro de ${mentorado.nome} excluído.`}
+        sucesso={`Cadastro de ${mentorado.nome_social || mentorado.nome} excluído.`}
         onConfirm={() => deleteMentorado(mentorado.id)}
       />
     </>

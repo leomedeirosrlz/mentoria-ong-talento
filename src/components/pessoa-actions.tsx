@@ -305,7 +305,7 @@ export function PessoaActions({
           <AssinaturasPessoa
             tipo="profile"
             id={pessoa.id}
-            nome={pessoa.nome}
+            nome={pessoa.nome_social || pessoa.nome}
             whatsapp={pessoa.whatsapp}
             voluntario={pessoa.voluntario}
           />
@@ -368,7 +368,7 @@ export function PessoaActions({
     <>
       <DropdownMenu>
         <DropdownMenuTrigger
-          aria-label={`Ações de "${pessoa.nome}"`}
+          aria-label={`Ações de "${pessoa.nome_social || pessoa.nome}"`}
           className={cn(
             buttonVariants({ variant: "ghost", size: "icon" }),
             "size-11 shrink-0 sm:size-8"
@@ -519,14 +519,14 @@ export function PessoaActions({
             profileId={pessoa.id}
             role={pessoa.role}
             papeis={pessoa.papeis}
-            nome={pessoa.nome}
+            nome={pessoa.nome_social || pessoa.nome}
           />
         </DialogContent>
       </Dialog>
 
       <EscopoAuxiliarDialog
         profileId={pessoa.id}
-        nome={pessoa.nome}
+        nome={pessoa.nome_social || pessoa.nome}
         open={escopoOpen}
         onOpenChange={setEscopoOpen}
       />
@@ -534,9 +534,9 @@ export function PessoaActions({
       <ConfirmDeleteButton
         open={delOpen}
         onOpenChange={setDelOpen}
-        titulo={`Excluir ${pessoa.nome}?`}
+        titulo={`Excluir ${pessoa.nome_social || pessoa.nome}?`}
         descricao="Remove o cadastro da plataforma. Só é possível excluir quem nunca entrou e não tem dupla; nos demais casos, desative."
-        sucesso={`Cadastro de ${pessoa.nome} excluído.`}
+        sucesso={`Cadastro de ${pessoa.nome_social || pessoa.nome} excluído.`}
         onConfirm={() => deletePessoa(pessoa.id)}
       />
 
@@ -545,7 +545,7 @@ export function PessoaActions({
       <ConfirmDeleteButton
         open={duplasEmCurso > 0}
         onOpenChange={(o) => !o && setDuplasEmCurso(0)}
-        titulo={`Desativar ${pessoa.nome}?`}
+        titulo={`Desativar ${pessoa.nome_social || pessoa.nome}?`}
         descricao={`${primeiroNome} está em ${duplasEmCurso} ${duplasEmCurso === 1 ? "dupla" : "duplas"} em andamento. Desativar corta o acesso e a dupla fica sem o responsável até o remanejo. O histórico e os encontros ficam salvos.`}
         sucesso={`Cadastro de ${primeiroNome} desativado.`}
         acao="Desativar"

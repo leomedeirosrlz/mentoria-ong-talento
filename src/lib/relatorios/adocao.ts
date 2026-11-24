@@ -171,13 +171,16 @@ export async function dadosNomesPerfis(
   if (ids.length === 0) return new Map();
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, nome")
+    .select("id, nome, nome_social")
     .in("id", ids.slice(0, 100));
   if (error) throw error;
   return new Map(
     (data ?? [])
-      .filter((p): p is { id: string; nome: string } => !!p.nome)
-      .map((p) => [p.id, p.nome])
+      .filter(
+        (p): p is { id: string; nome: string; nome_social: string | null } =>
+          !!p.nome
+      )
+      .map((p) => [p.id, p.nome_social || p.nome])
   );
 }
 
@@ -205,8 +208,8 @@ export function dadosEventosRicosDemo(
     }));
   const nomes = new Map(
     d.profiles
-      .filter((p) => p.nome)
-      .map((p) => [p.id, p.nome as string])
+      .filter((p) => p.nome_social || p.nome)
+      .map((p) => [p.id, (p.nome_social || p.nome) as string])
   );
   return { eventos, truncado: false, nomes };
 }

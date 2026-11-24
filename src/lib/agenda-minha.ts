@@ -442,7 +442,8 @@ function itensDaDupla(
 ): AgendaItem[] {
   const itens: AgendaItem[] = [];
   const nome1 = primeiroNomeDaDupla(d) || "Jovem";
-  const nomeCompleto = d.mentorado?.nome ?? nome1;
+  const nomeCompleto =
+    d.mentorado?.nome_social ?? d.mentorado?.nome ?? nome1;
   const escopo: EscopoId = `dupla:${d.id}`;
   const evCronograma = eventosDoCronograma(eventos, d.cronograma_id);
   const total = evCronograma.filter((e) => e.tipo === "encontro" && e.numero != null)
@@ -859,7 +860,8 @@ function itensPassadosDaDupla(
 ): AgendaItem[] {
   const itens: AgendaItem[] = [];
   const nome1 = primeiroNomeDaDupla(d) || "Jovem";
-  const nomeCompleto = d.mentorado?.nome ?? nome1;
+  const nomeCompleto =
+    d.mentorado?.nome_social ?? d.mentorado?.nome ?? nome1;
   const escopo: EscopoId = `dupla:${d.id}`;
   const total = eventosDoCronograma(eventos, d.cronograma_id).filter(
     (e) => e.tipo === "encontro" && e.numero != null
@@ -1110,7 +1112,7 @@ function resumoDupla(d: Dupla, eventos: CicloEvento[], hojeData: Date): DuplaRes
   const prox = saude.proximo;
   return {
     id: d.id,
-    nome: d.mentorado?.nome ?? "Jovem",
+    nome: d.mentorado?.nome_social ?? d.mentorado?.nome ?? "Jovem",
     primeiroNome: primeiroNomeDaDupla(d) || "Jovem",
     turma: d.turma,
     status: d.status,

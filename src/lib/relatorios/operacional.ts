@@ -153,17 +153,25 @@ export function resumoAderencia(
       (a, b) =>
         peso(a) - peso(b) ||
         deficit(b) - deficit(a) ||
-        comparaNome(a.dupla.mentor?.nome ?? "", b.dupla.mentor?.nome ?? "")
+        comparaNome(
+          (a.dupla.mentor?.nome_social ?? "") || (a.dupla.mentor?.nome ?? ""),
+          (b.dupla.mentor?.nome_social ?? "") || (b.dupla.mentor?.nome ?? "")
+        )
     );
   const filaIds = new Set(fila.map((i) => i.dupla.id));
   const demais = itens
     .filter((i) => !filaIds.has(i.dupla.id))
     .sort(
       (a, b) =>
-        comparaNome(a.dupla.mentor?.nome ?? "", b.dupla.mentor?.nome ?? "") ||
         comparaNome(
-          a.dupla.mentorado?.nome ?? "",
-          b.dupla.mentorado?.nome ?? ""
+          (a.dupla.mentor?.nome_social ?? "") || (a.dupla.mentor?.nome ?? ""),
+          (b.dupla.mentor?.nome_social ?? "") || (b.dupla.mentor?.nome ?? "")
+        ) ||
+        comparaNome(
+          (a.dupla.mentorado?.nome_social ?? "") ||
+            (a.dupla.mentorado?.nome ?? ""),
+          (b.dupla.mentorado?.nome_social ?? "") ||
+            (b.dupla.mentorado?.nome ?? "")
         )
     );
   // a prévia mostra as primeiras linhas do CSV — mesma ordem do export
@@ -263,7 +271,7 @@ export function resumoEncerramento(
   const hojeStr = toDateStr(hoje);
   const itens = pares.map(({ enc, dupla }): ItemEncerramento => {
     const { feitos, total, linha } = linhaEncerramento(
-      { ...enc, decidido: enc.decidido?.nome ?? "" },
+      { ...enc, decidido: enc.decidido?.nome_social ?? enc.decidido?.nome ?? "" },
       dupla ? duplaParaMapa(dupla) : undefined
     );
     return {
@@ -348,7 +356,11 @@ function duplaParaMapa(d: Dupla): DuplaMapa {
     cronograma_id: d.cronograma_id,
     mentor_id: d.mentor?.id ?? null,
     mentorado_id: d.mentorado?.id ?? null,
-    mentor: d.mentor ? { nome: d.mentor.nome } : null,
-    mentorado: d.mentorado ? { nome: d.mentorado.nome } : null,
+    mentor: d.mentor
+      ? { nome: d.mentor.nome, nome_social: d.mentor.nome_social }
+      : null,
+    mentorado: d.mentorado
+      ? { nome: d.mentorado.nome, nome_social: d.mentorado.nome_social }
+      : null,
   };
 }
