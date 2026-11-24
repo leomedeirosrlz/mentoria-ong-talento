@@ -15,7 +15,7 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 
 ## Nome, estado e retenção
 
-- Pasta `NNN-<slug>`: 3 dígitos sequenciais, kebab-case. **Próximo número livre: 022**
+- Pasta `NNN-<slug>`: 3 dígitos sequenciais, kebab-case. **Próximo número livre: 023**
 - Estado no `spec.md`: `Draft` → `Clarified` → `Approved` → `Delivered` | `Dropped`.
 - Spec `Delivered` **não é editada**. Mudança de rumo = próxima spec, citando a anterior. `Dropped` registra o motivo em uma linha.
 - O roteiro dos passos está em `.specify/README.md`; os templates, em `.specify/templates/`.
@@ -44,6 +44,7 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 | 019 | `sua-semana` | feature | Clarified | REALIZA-520 (23/nov/2026) — card "Sua semana" nas homes |
 | 020 | `docs-do-plano` | feature | Clarified | REALIZA-521 (23/nov/2026) — doc do combinado + roteiros lazy |
 | 021 | `materiais-liza` | feature | Clarified | REALIZA-522 (23/nov/2026) — materiais estruturados via Liza (backlog) |
+| 022 | `instrumentos-pdm-avaliacao` | mudança | Clarified | rodada UI/UX (24/nov/2026) — anel do card, header da avaliação, PDM desktop, aba Instrumentos, Nova meta SMART |
 
 ## Fronteiras já mapeadas, ainda sem spec
 
