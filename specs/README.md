@@ -44,6 +44,7 @@ Bug que revelou regra de domínio errada **vira spec** — não vale só patch.
 | 019 | `sua-semana` | feature | Clarified | REALIZA-520 (23/nov/2026) — card "Sua semana" nas homes |
 | 020 | `docs-do-plano` | feature | Clarified | REALIZA-521 (23/nov/2026) — doc do combinado + roteiros lazy |
 | 021 | `materiais-liza` | feature | Clarified | REALIZA-522 (23/nov/2026) — materiais estruturados via Liza (backlog) |
+| 028 | `motion-forms-wizards` | mudança | Clarified | pedido Thiago + recon `motion-forms-2026-11-24` (24/nov/2026) — um idioma de transição de etapa, gramática por camada, adoção P0/P1/P2 |
 
 ## Fronteiras já mapeadas, ainda sem spec
 
