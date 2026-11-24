@@ -84,6 +84,7 @@ import {
 import { getRoteirosPlanos } from "@/lib/queries";
 import { materiaisComRoteiroPlano } from "@/lib/plano-roteiros";
 import { quemCombinou, suaSemana } from "@/lib/sua-semana";
+import { msgApresentacaoJovem } from "@/lib/whatsapp-msgs";
 import { materiaisDoNumero } from "@/lib/materiais";
 import { PlanoContestarButton } from "@/components/plano-contestar";
 import { SuaSemanaPlano } from "@/components/sua-semana-plano";
@@ -1195,10 +1196,7 @@ function ContatoLinha({
   papel: string;
   nomeJovem: string;
 }) {
-  const wa = waLink(
-    c.whatsapp,
-    `Olá! Sou ${nomeJovem}, mentorado(a) do programa Realiza.vc.`
-  );
+  const wa = waLink(c.whatsapp, msgApresentacaoJovem(nomeJovem));
   return (
     <li className="flex items-center gap-2 py-0.5">
       <Link

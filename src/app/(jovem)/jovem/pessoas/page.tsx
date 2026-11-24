@@ -16,6 +16,7 @@ import { buttonVariants } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { waLink } from "@/lib/ciclo";
+import { msgApresentacaoJovem } from "@/lib/whatsapp-msgs";
 import { agrupaContatosPorPessoa } from "@/lib/jovem-contatos";
 import {
   getJovemColegas,
@@ -227,10 +228,7 @@ function ContatoLinha({
   nomeJovem: string;
 }) {
   const nome = c.nome_social || c.nome || "?";
-  const wa = waLink(
-    c.whatsapp,
-    `Olá! Sou ${nomeJovem}, mentorado(a) do programa Realiza.vc.`
-  );
+  const wa = waLink(c.whatsapp, msgApresentacaoJovem(nomeJovem));
   return (
     <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
       <Link

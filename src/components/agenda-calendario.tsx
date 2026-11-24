@@ -4101,8 +4101,8 @@ function EncontroDuplaRow({
   const waPendentes: DestinoWA[] = (() => {
     if (!registroPendente) return [];
     const msgs = msgsContato(limbo ? "limbo" : "registro_pendente", {
-      mentorNome: dupla.mentor.nome,
-      mentoradoNome: dupla.mentorado.nome,
+      mentorNome: dupla.mentor.nome_social || dupla.mentor.nome,
+      mentoradoNome: dupla.mentorado.nome_social || dupla.mentorado.nome,
       autorNome,
       extra: `${encontro.numero}º`,
     });
@@ -4567,8 +4567,8 @@ function LinhaSemEncontro({
   autorNome?: string;
 }) {
   const msgs = msgsContato("sem_encontro", {
-    mentorNome: dupla.mentor.nome,
-    mentoradoNome: dupla.mentorado.nome,
+    mentorNome: dupla.mentor.nome_social || dupla.mentor.nome,
+    mentoradoNome: dupla.mentorado.nome_social || dupla.mentorado.nome,
     autorNome,
     extra: `${numero}º`,
   });

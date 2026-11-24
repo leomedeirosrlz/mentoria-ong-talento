@@ -383,7 +383,7 @@ function CardDuplaAux({
             <PillTurma turma={d.turma} />
           </p>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            mentor: {d.mentor?.nome}
+            mentor: {d.mentor?.nome_social || d.mentor?.nome}
           </p>
         </div>
         <Tag tom={tag.tom}>{tag.rotulo}</Tag>
@@ -404,14 +404,14 @@ function CardDuplaAux({
         {lembrete && (
           <DuplaWaAcao
             duplaId={d.id}
-            destNome={d.mentor?.nome ?? "mentor"}
+            destNome={d.mentor?.nome_social || d.mentor?.nome || "mentor"}
             telefone={d.mentor?.whatsapp ?? null}
             mensagem={lembrete.corpo}
             destinatarios={{
               // a pendência é do mentor; o jovem recebe o check-in neutro
               padrao: "mentor",
               mentor: {
-                nome: d.mentor?.nome ?? "mentor",
+                nome: d.mentor?.nome_social || d.mentor?.nome || "mentor",
                 telefone: d.mentor?.whatsapp ?? null,
                 mensagem: lembrete.corpo,
               },
@@ -421,7 +421,11 @@ function CardDuplaAux({
                 mensagem:
                   msgsContato({
                     eu: meuNome,
-                    mentorNome: (d.mentor?.nome ?? "").split(" ")[0],
+                    mentorNome: (
+                      d.mentor?.nome_social ||
+                      d.mentor?.nome ||
+                      ""
+                    ).split(" ")[0],
                     mentoradoNome: nome,
                   }).mentorado ?? "",
               },
@@ -610,7 +614,11 @@ function LinhaConsolidada({
                 {lembrete && item.duplaId && dupla && (
                   <DuplaWaAcao
                     duplaId={item.duplaId}
-                    destNome={dupla.mentor?.nome ?? "mentor"}
+                    destNome={
+                      dupla.mentor?.nome_social ||
+                      dupla.mentor?.nome ||
+                      "mentor"
+                    }
                     telefone={dupla.mentor?.whatsapp ?? null}
                     mensagem={lembrete.corpo}
                     destinatarios={{
@@ -618,7 +626,10 @@ function LinhaConsolidada({
                       // neutro, nunca a cobrança operacional
                       padrao: "mentor",
                       mentor: {
-                        nome: dupla.mentor?.nome ?? "mentor",
+                        nome:
+                          dupla.mentor?.nome_social ||
+                          dupla.mentor?.nome ||
+                          "mentor",
                         telefone: dupla.mentor?.whatsapp ?? null,
                         mensagem: lembrete.corpo,
                       },
@@ -631,7 +642,11 @@ function LinhaConsolidada({
                         mensagem:
                           msgsContato({
                             eu: meuNome,
-                            mentorNome: (dupla.mentor?.nome ?? "").split(" ")[0],
+                            mentorNome: (
+                              dupla.mentor?.nome_social ||
+                              dupla.mentor?.nome ||
+                              ""
+                            ).split(" ")[0],
                             mentoradoNome:
                               dupla.mentorado?.nome_social ||
                               dupla.mentorado?.nome ||

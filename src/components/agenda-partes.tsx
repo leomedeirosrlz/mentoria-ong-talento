@@ -118,7 +118,11 @@ export function lembreteDaDupla(
   // sessão combinada (018): o coberto já tem conteúdo via âncora — o lembrete
   // não pode apontar "registrar o Nº" de um passo que a sessão já cobriu
   const cobertos = cobertosDaDupla(d.encontros);
-  const mentorNome = (d.mentor?.nome ?? "").split(" ")[0];
+  const mentorNome = (
+    d.mentor?.nome_social ||
+    d.mentor?.nome ||
+    ""
+  ).split(" ")[0];
   const mentoradoNome = (
     d.mentorado?.nome_social ||
     d.mentorado?.nome ||

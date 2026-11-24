@@ -508,7 +508,7 @@ export function RelatorioCanvas({
               href={wa}
               target="_blank"
               rel="noopener noreferrer"
-              aria-label={`Chamar ${texto} no WhatsApp`}
+              aria-label={`Chamar ${textoCelula(l, "nome") || texto} no WhatsApp`}
               onClick={(e) => e.stopPropagation()}
               className="shrink-0 rounded-sm p-0.5 text-muted-foreground/60 transition-colors hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >

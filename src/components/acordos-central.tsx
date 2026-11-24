@@ -12,6 +12,7 @@ import { rotuloIntervencao } from "@/lib/intervencoes";
 import type { Dupla, DuplaPlanoRoteiro } from "@/lib/types";
 import { SITE_URL } from "@/lib/site";
 import { waLink } from "@/lib/ciclo";
+import { quemCombinou } from "@/lib/sua-semana";
 import { msgPlanoCombinado } from "@/lib/whatsapp-msgs";
 
 /** Central "Acordos e intervenções" (REALIZA-459, sugestão 7 da auditoria
@@ -60,6 +61,33 @@ export function AcordosCentral({
       ? (dupla.guia_ajustes ?? []).find((g) => g.numero === numeroGuiaAtual)
       : null;
 
+  // autoria do plano pro texto do WhatsApp — a mesma régua do doc do
+  // combinado: primeiro nome quando resolve (mentor, supervisor), "A Liza"
+  // pela via, "A equipe" no resto. Sem ela o mentor mandava aviso do
+  // próprio plano assinado "a equipe" (review wa-links)
+  const nomesPorId = new Map<string, string>();
+  nomesPorId.set(
+    dupla.mentor.id,
+    (dupla.mentor.nome_social ?? dupla.mentor.nome).split(" ")[0]
+  );
+  if (dupla.supervisor) {
+    nomesPorId.set(
+      dupla.supervisor.id,
+      (dupla.supervisor.nome_social ?? dupla.supervisor.nome).split(" ")[0]
+    );
+  }
+  const quemPlano =
+    planoVivo?.proposto_via === "liza"
+      ? "A Liza"
+      : (() => {
+          const q = quemCombinou({
+            propostoPor: planoVivo?.proposto_por,
+            propostoVia: planoVivo?.proposto_via,
+            nomesPorId,
+          });
+          return q.charAt(0).toUpperCase() + q.slice(1);
+        })();
+
   if (!planoVivo && !ultimoFechado && !intervencoesAbertas.length && !ajustesGuia)
     return null;
 
@@ -104,8 +132,9 @@ export function AcordosCentral({
                 ? waLink(
                     dupla.mentorado.whatsapp,
                     msgPlanoCombinado({
-                      paraNome: dupla.mentorado.nome,
-                      quem: "A equipe",
+                      paraNome:
+                        dupla.mentorado.nome_social ?? dupla.mentorado.nome,
+                      quem: quemPlano,
                       href: `${SITE_URL}/jovem/combinado`,
                     })
                   )

@@ -98,6 +98,7 @@ export function acaoWhatsAppDupla({
     saude.apoio.aberto &&
     (saude.apoio.origem === "mentorado" || saude.apoio.origem === "ambos");
   const nomeMentorado = dupla.mentorado.nome_social || dupla.mentorado.nome;
+  const nomeMentor = dupla.mentor.nome_social || dupla.mentor.nome;
   // apoio aberto é pendência apontável (trabalho a fazer, não falha da dupla)
   const temPendencia =
     dupla.status === "ativa" && (saude.sinais.length > 0 || saude.apoio.aberto);
@@ -114,7 +115,7 @@ export function acaoWhatsAppDupla({
   const livres = msgsContato(
     {
       eu: meuNome,
-      mentorNome: dupla.mentor.nome.split(" ")[0],
+      mentorNome: nomeMentor.split(" ")[0],
       mentoradoNome: nomeMentorado,
     },
     // sem caso: o fecho neutro "Como estão as coisas?" (contato livre)
@@ -146,14 +147,14 @@ export function acaoWhatsAppDupla({
 
   return {
     duplaId: dupla.id,
-    destNome: apoioJovem ? nomeMentorado : dupla.mentor.nome,
+    destNome: apoioJovem ? nomeMentorado : nomeMentor,
     telefone: apoioJovem ? dupla.mentorado.whatsapp : dupla.mentor.whatsapp,
     mensagem,
     nudge,
     destinatarios: {
       padrao: apoioJovem ? "mentorado" : "mentor",
       mentor: {
-        nome: dupla.mentor.nome,
+        nome: nomeMentor,
         telefone: dupla.mentor.whatsapp,
         mensagem: msgMentor,
       },

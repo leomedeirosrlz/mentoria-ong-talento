@@ -16,6 +16,7 @@ import { Linha } from "@/app/(app)/perfil/perfil-form";
 import { ChipsTags } from "@/app/(app)/perfil/perfil-form";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { papelLabel, waLink } from "@/lib/ciclo";
+import { msgApresentacaoJovem } from "@/lib/whatsapp-msgs";
 import { turmaLonga } from "@/lib/turma";
 import {
   getJovemDuplas,
@@ -231,10 +232,7 @@ function SeloDupla({
  *  entrega (e-mail e WhatsApp são por default pro adulto). */
 function SecaoContato({ c, nomeJovem }: { c: JovemContato; nomeJovem: string }) {
   const nome = c.nome_social || c.nome || "?";
-  const wa = waLink(
-    c.whatsapp,
-    `Olá! Sou ${nomeJovem}, mentorado(a) do programa Realiza.vc.`
-  );
+  const wa = waLink(c.whatsapp, msgApresentacaoJovem(nomeJovem));
   return (
     <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
       <h2 className="text-base font-semibold">
@@ -292,10 +290,7 @@ function SecaoColega({
   };
   nomeJovem: string;
 }) {
-  const wa = waLink(
-    c.whatsapp,
-    `Olá! Sou ${nomeJovem}, da sua turma no programa Realiza.vc.`
-  );
+  const wa = waLink(c.whatsapp, msgApresentacaoJovem(nomeJovem, true));
   return (
     <section className="rounded-xl bg-card p-6 shadow-[var(--shadow-border)]">
       <h2 className="text-base font-semibold">
