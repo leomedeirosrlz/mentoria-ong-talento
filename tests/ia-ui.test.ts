@@ -5,7 +5,15 @@
 // payload pequeno.
 
 import { describe, expect, it } from "vitest";
-import { juntarUi, uiDaTool, uiDosInstrumentos, type UiBloco } from "@/lib/ia/ui";
+import {
+  juntarUi,
+  uiDaTool,
+  uiDosInstrumentos,
+  type UiBloco,
+  type UiDuplas,
+  type UiPlano,
+  type UiSaude,
+} from "@/lib/ia/ui";
 import { systemPromptIa } from "@/lib/ia/prompts";
 
 const dupla = (i: number, extra: Record<string, unknown> = {}) => ({
@@ -340,5 +348,159 @@ describe("tools do mentorado → cards", () => {
     expect(uiDaTool("minha_dupla", null)).toBeNull();
     expect(uiDaTool("minha_agenda", { proximos: [] })).toBeNull();
     expect(uiDaTool("meus_combinados", { pendentes: [], feitos_recentes: [] })).toBeNull();
+  });
+});
+
+// ---------- genUI rica (026) ----------
+// O UiPlano carrega a evidência que o card precisa pra nomear a dupla e
+// explicar o "conversa" (FR-004), a linha-mini de dupla ganha o próximo
+// encontro e o panorama vira o card "duplas" (FR-006/007).
+
+const ITEM_DUPLA_026 = {
+  dupla_id: "d-1",
+  mentor: "Ricardo Alves",
+  mentorado: "Ana Beatriz",
+  trilha: "dpp",
+  status: "ativa",
+  desfecho: null,
+  semaforo: "risco",
+  motivo: "2 encontros atrasados",
+  apoio: { aberto: true },
+  esperado: 5,
+  feitos: 3,
+  registro_pendente: false,
+  proximo_encontro: { numero: 6, data_hora: "2026-12-01T19:00:00.000Z" },
+};
+
+describe("uiDaTool — plano_em_dia (026/FR-004)", () => {
+  const payload = {
+    dupla_id: "d-1",
+    trilha: "dpp",
+    mentor: "Ricardo Alves",
+    mentorado: "Ana Beatriz",
+    aplicavel: true,
+    em_dia: false,
+    estado: "conversa",
+    nivel: "conversa_coord",
+    sugestao: "Em dia só em 20 de mar. de 2027…",
+    plano: null,
+    pendencias_registro: [
+      { encontro_id: "e-1", numero: 3, estado: "pendente_registro", data_hora: null },
+    ],
+    passos: [
+      {
+        numero: 5,
+        titulo: "Escolhas",
+        acao: "agendar",
+        encontro_id: null,
+        data_sugerida: "2026-11-28",
+        data_oficial: "2026-11-24",
+        vence_no_caminho: false,
+        precondicao: "Roda da Vida respondida",
+        aviso: null,
+      },
+      {
+        numero: 7,
+        titulo: "Metas em ação",
+        acao: "travado",
+        encontro_id: "e-7",
+        data_sugerida: "2026-12-10",
+        data_oficial: "2026-12-08",
+        vence_no_caminho: true,
+        precondicao: null,
+        aviso: "A data sugerida passa do encerramento do ciclo.",
+      },
+    ],
+    data_recuperacao: null,
+    data_projetada: "2027-03-20",
+    cabem_ate_encerramento: { cabem: 12, faltam: 16 },
+    encerramento: "2027-03-05",
+    avisos: ["a1", "a2", "a3", "a4"],
+  };
+
+  it("carrega nomes, evidência do conversa e os campos novos por passo", () => {
+    const b = uiDaTool("plano_em_dia", payload) as UiPlano;
+    expect(b.kind).toBe("plano");
+    expect(b.mentor).toBe("Ricardo Alves");
+    expect(b.mentorado).toBe("Ana Beatriz");
+    expect(b.data_projetada).toBe("2027-03-20");
+    expect(b.cabem_ate_encerramento).toEqual({ cabem: 12, faltam: 16 });
+    expect(b.encerramento).toBe("2027-03-05");
+    expect(b.avisos).toHaveLength(4); // sem o cap de 3
+    const p = b.passos[1];
+    expect(p.encontro_id).toBe("e-7");
+    expect(p.data_oficial).toBe("2026-12-08");
+    expect(p.vence_no_caminho).toBe(true);
+  });
+
+  it("ritmo deriva do nível quando a tool não serializa", () => {
+    const b = uiDaTool("plano_em_dia", payload) as UiPlano;
+    expect(b.ritmo).toBe(7); // conversa_coord → melhor simulação (1/dia)
+    const duplaRec = { ...payload, nivel: "semana_dupla", estado: "recuperacao" };
+    expect((uiDaTool("plano_em_dia", duplaRec) as UiPlano).ritmo).toBe(2);
+  });
+
+  it("em_dia sem passos ainda vira card — o veredito positivo é explícito", () => {
+    const b = uiDaTool("plano_em_dia", {
+      ...payload,
+      em_dia: true,
+      estado: "em_dia",
+      nivel: "ritmo_normal",
+      passos: [],
+      pendencias_registro: [],
+      avisos: [],
+    }) as UiPlano;
+    expect(b).not.toBeNull();
+    expect(b.estado).toBe("em_dia");
+    expect(b.passos).toHaveLength(0);
+  });
+});
+
+describe("uiDaTool — resumo_semana e duplas_panorama (026/FR-007)", () => {
+  it("destaques do resumo copiam o proximo_encontro", () => {
+    const b = uiDaTool("resumo_semana", {
+      saude: { em_andamento: 4, risco: 1, atencao: 1, em_dia: 2, apoio: 1, pausadas: 0, concluidas: 0, encerradas: 0 },
+      duplas: [ITEM_DUPLA_026, { ...ITEM_DUPLA_026, dupla_id: "d-2", semaforo: "ok", apoio: { aberto: false }, proximo_encontro: null }],
+    }) as UiSaude;
+    expect(b.destaques[0].proximo).toEqual({
+      numero: 6,
+      data_hora: "2026-12-01T19:00:00.000Z",
+    });
+  });
+
+  it("duplas_panorama vira kind duplas com itens, total e truncado", () => {
+    const b = uiDaTool("duplas_panorama", {
+      total: 40,
+      truncado: true,
+      duplas: Array.from({ length: 6 }, (_, i) => ({
+        ...ITEM_DUPLA_026,
+        dupla_id: `d-${i}`,
+      })),
+    }) as UiDuplas;
+    expect(b.kind).toBe("duplas");
+    expect(b.itens).toHaveLength(6);
+    expect(b.total).toBe(40);
+    expect(b.truncado).toBe(true);
+    expect(b.itens[0].proximo?.numero).toBe(6);
+    expect(b.itens[0].apoio).toBe(true);
+  });
+
+  it("cap defensivo: mais de 6 itens recorta e marca truncado", () => {
+    const b = uiDaTool("duplas_panorama", {
+      total: 8,
+      truncado: false,
+      duplas: Array.from({ length: 8 }, (_, i) => ({
+        ...ITEM_DUPLA_026,
+        dupla_id: `d-${i}`,
+      })),
+    }) as UiDuplas;
+    expect(b.itens).toHaveLength(6);
+    expect(b.truncado).toBe(true);
+  });
+
+  it("lista vazia não vira card", () => {
+    expect(
+      uiDaTool("duplas_panorama", { total: 0, truncado: false, duplas: [] })
+    ).toBeNull();
   });
 });

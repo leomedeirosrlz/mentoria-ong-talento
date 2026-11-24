@@ -382,6 +382,111 @@ describe("fusaoPedeAvisoPratica — a prática pulada (018)", () => {
   });
 });
 
+// ---------- falso "nem 1 por dia" (026) ----------
+// O bug: travado com oficial já vencido contava como devido mesmo quando a
+// data marcada respeitava (ou antecipava) o oficial — e uma pendência de
+// registro (limbo) também afundava a dupla em "conversa", porque nenhum
+// degrau da escada "fecha" quando a caminhada já converge em alvo ≤ hoje.
+
+describe("montarPlanoEmDia — em_dia de verdade (026)", () => {
+  it("travado na data oficial com oficial hoje não é atraso", () => {
+    // o 16º oficial é hoje e a sessão está marcada pra hoje à noite:
+    // data marcada ≤ oficial = em dia, não "conversa"
+    const p = montarPlanoEmDia({
+      dupla: dupla({
+        encontros: [encontroAgendado(16, "2026-01-12T19:00:00")],
+      }),
+      eventos: [
+        ev("encontro", "2026-01-12", { numero: 16 }),
+        ev("encontro", "2026-01-19", { numero: 17 }),
+        ev("evento_encerramento", "2026-03-01"),
+      ],
+      hoje: HOJE,
+    });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    expect(p.emDia).toBe(true);
+    expect(p.estado).toBe("em_dia");
+  });
+
+  it("travado DEPOIS do oficial segue sendo atraso", () => {
+    // oficial venceu dia 6 e a sessão ficou pro dia 13: desvio real —
+    // o plano propõe recuperação, não conversa nem em_dia
+    const p = montarPlanoEmDia({
+      dupla: dupla({
+        encontros: [encontroAgendado(16, "2026-01-13T19:00:00")],
+      }),
+      eventos: [
+        ev("encontro", "2026-01-06", { numero: 16 }),
+        ev("encontro", "2026-01-19", { numero: 17 }),
+        ev("evento_encerramento", "2026-03-01"),
+      ],
+      hoje: HOJE,
+    });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    expect(p.emDia).toBe(false);
+    expect(p.estado).toBe("recuperacao");
+  });
+
+  it("limbo sem dívida de agenda converge trivialmente: em_dia, não conversa", () => {
+    // o 15º ficou agendado no passado sem registro (limbo — confirmação
+    // pendente, não atraso) e o resto do calendário cobre no tempo:
+    // alvo ≤ hoje implica em_dia mesmo com a pendência listada
+    const p = montarPlanoEmDia({
+      dupla: dupla({
+        encontros: [encontroAgendado(15, "2026-01-08T19:00:00")],
+      }),
+      eventos: [
+        ev("encontro", "2026-01-08", { numero: 15 }),
+        ev("encontro", "2026-01-19", { numero: 16 }),
+        ev("evento_encerramento", "2026-03-01"),
+      ],
+      hoje: HOJE,
+    });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    expect(p.emDia).toBe(true);
+    expect(p.estado).toBe("em_dia");
+    expect(p.pendenciasRegistro.map((x) => x.numero)).toEqual([15]);
+  });
+
+  it("conversa real mostra a data projetada, quantos cabem e os passos que estouram", () => {
+    // 5 devidos + 2 oficiais futuros: nem a 1 por dia fecha antes do
+    // encerramento (16/01) — o veredito é conversa COM evidência
+    const p = montarPlanoEmDia({
+      dupla: dupla(),
+      eventos: [
+        ...[17, 18, 19, 20, 21].map((n, i) =>
+          ev("encontro", `2026-01-0${5 + i}`, { numero: n })
+        ),
+        ev("encontro", "2026-01-15", { numero: 22 }),
+        ev("encontro", "2026-01-16", { numero: 23 }),
+        ev("evento_encerramento", "2026-01-16"),
+      ],
+      hoje: HOJE,
+    });
+    expect(p.aplicavel).toBe(true);
+    if (!p.aplicavel) return;
+    expect(p.estado).toBe("conversa");
+    expect(p.nivel).toBe("conversa_coord");
+    expect(p.dataRecuperacao).toBeNull();
+    // a caminhada a 1/dia cobre o 17º em 13/01 … o 23º em 19/01: o plano
+    // diz QUANDO ficaria em dia, nunca decreta impossível sem a data
+    expect(p.dataProjetada).toBe("2026-01-19");
+    expect(p.cabemAteEncerramento).toEqual({ cabem: 4, faltam: 7 });
+    // os futuros que estouram o encerramento entram na lista, marcados
+    const estouram = p.passos.filter((x) => x.numero >= 22);
+    expect(estouram.map((x) => x.numero)).toEqual([22, 23]);
+    expect(
+      estouram.every((x) => x.aviso?.includes("encerramento"))
+    ).toBe(true);
+    // e a sugestão nomeia a data projetada + os caminhos, não "impossível"
+    expect(p.sugestao).toContain("19/01/2026");
+    expect(p.sugestao).toContain("coordenação");
+  });
+});
+
 describe("montarPlanoEmDia + escopoDaProposta — a marca sessao (018)", () => {
   // três devidos já vencidos — os três entram no plano
   const eventos3 = () => [

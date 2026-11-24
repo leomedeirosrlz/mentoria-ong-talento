@@ -645,8 +645,18 @@ export function montarPlanoEmDia(input: {
           : m,
       0
     );
+    // não fecha antes do encerramento (ou nunca converge): o plano vira
+    // conversa com a coordenação — a lista ganha os futuros que estouram
+    // o limite pra evidência mostrar onde a conta quebra, não só travados
+    const naoFecha =
+      !convergiu || (encerramento != null && alvo > encerramento);
     const passosPlano: PassoPlano[] = itens
-      .filter((i) => i.origem !== "futuro" || i.numero <= ultimoAtrasado)
+      .filter(
+        (i) =>
+          i.origem !== "futuro" ||
+          i.numero <= ultimoAtrasado ||
+          (naoFecha && encerramento != null && i.data > encerramento)
+      )
       .map(({ origem, ...p }) =>
         origem === "futuro" ? { ...p, venceNoCaminho: true } : p
       );
@@ -679,6 +689,13 @@ export function montarPlanoEmDia(input: {
       avisos.push(
         "Com esse ritmo o plano não fecha: sempre sobra encontro devido no caminho."
       );
+      if (encerramento) {
+        for (const p of passosPlano) {
+          if (p.data > encerramento)
+            p.aviso =
+              p.aviso ?? "A data sugerida passa do encerramento do ciclo.";
+        }
+      }
     }
     const cabemAteEncerramento = encerramento
       ? {
@@ -690,15 +707,11 @@ export function montarPlanoEmDia(input: {
       passosPlano,
       avisos,
       dataRecuperacao,
+      convergiu,
       dataProjetada: convergiu && alvo > hojeStr ? alvo : null,
       cabemAteEncerramento,
     };
   };
-
-  const emDia =
-    !devidos.length &&
-    !pendenciasRegistro.length &&
-    !travados.some((t) => t.oficialData <= hojeStr);
 
   // A caminhada é pura: cache por (ritmo, recesso) pras sondas não
   // re-fazerem conta
@@ -712,6 +725,20 @@ export function montarPlanoEmDia(input: {
     }
     return s;
   };
+
+  // devido de verdade (026): travado só conta quando marcado DEPOIS do
+  // oficial — oficial vencido com data ≤ oficial não é atraso, a mesma
+  // régua `coberto > oficial` do alvo. E a convergência trivial vence a
+  // heurística: se nem a caminhada mais apertada (1 por dia) projeta
+  // passo coberto depois do oficial, não existe dívida de agenda — nem
+  // um limbo de registro (confirmação pendente, não atraso) a manda
+  // conversar com a coordenação
+  const emDia =
+    (!devidos.length &&
+      !pendenciasRegistro.length &&
+      !travados.some((t) => t.data > t.oficialData)) ||
+    (simular(RITMO_UM_POR_DIA).convergiu &&
+      simular(RITMO_UM_POR_DIA).dataProjetada == null);
   // escada do mais leve ao mais pesado: "em dia" já é ritmo_normal (nada
   // a flexibilizar); o primeiro degrau que fecha nomeia o nível; nenhum
   // degrau fechando vira conversa com a coordenação
@@ -794,7 +821,9 @@ export function montarPlanoEmDia(input: {
       ? "A dupla está em dia: tudo o que o calendário oficial já cobrou está feito ou marcado. Não há recuperação a fazer."
       : estado === "recuperacao"
         ? `Com ${rotuloRitmo(ritmoLeve!)}, a dupla fica em dia em ${fmtData(dataLeve!)}${encerramento ? `, antes do encerramento (${fmtData(encerramento)})` : ""}. Combinem as datas juntos.`
-        : `Nem com 1 encontro por dia o plano fecha antes do encerramento${encerramento ? ` (${fmtData(encerramento)})` : ""}. ${CAMINHOS_COORD}`;
+        : s.dataProjetada != null
+          ? `Em dia só em ${fmtData(s.dataProjetada)}${encerramento ? `, depois do encerramento (${fmtData(encerramento)})` : ""}. Nem 1 encontro por dia fecha antes. ${CAMINHOS_COORD}`
+          : `Nem com 1 encontro por dia o plano fecha${encerramento ? ` antes do encerramento (${fmtData(encerramento)})` : ""}. ${CAMINHOS_COORD}`;
 
   return {
     aplicavel: true,
@@ -804,7 +833,9 @@ export function montarPlanoEmDia(input: {
     passos: passosPlano,
     ritmo,
     dataRecuperacao: s.dataRecuperacao,
-    dataProjetada: s.dataProjetada,
+    // "só em X" é evidência do conversa — pra quem já está em dia a
+    // data honesta é hoje, não a projeção dos futuros no caminho
+    dataProjetada: emDia ? null : s.dataProjetada,
     encerramento,
     cabemAteEncerramento: s.cabemAteEncerramento,
     nivel,

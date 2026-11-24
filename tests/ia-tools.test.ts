@@ -204,6 +204,7 @@ describe("registry", () => {
         "desmarcar_encontro",
         "devolver_chamado_fila",
         "duplas_do_usuario",
+        "duplas_panorama",
         "editar_campo_pessoa",
         "emitir_link_instrumento",
         "encontros_retroativo",
@@ -1534,7 +1535,10 @@ describe("tools de escrita — canal e confirmação (0163)", () => {
     const d = dadosDe(r).pendente_confirmacao as Record<string, unknown>;
     expect(d.confirmacao_id).toBe(CID);
     expect(d.tool).toBe("resolver_chamado");
-    expect(String(d.resumo)).toContain(UUID);
+    // o resumo nomeia por nome, nunca por id (026/FR-010) — chamado
+    // invisível pro fake degrada pro genérico, também sem uuid
+    expect(String(d.resumo)).toContain("chamado");
+    expect(String(d.resumo)).not.toContain(UUID);
     // gravou a prévia; NUNCA chamou a RPC que muta
     expect(rpcCalls).toContain("ia_confirmacao_criar");
     expect(rpcCalls).not.toContain("resolver_chamado");
@@ -2103,5 +2107,188 @@ describe("retroativo do jovem — tools da Liza (461, RPCs 0207/0208)", () => {
       if (!r.ok) expect(r.erro).toContain("não está disponível pro seu papel");
     }
     expect(rpcCalls.map((c) => c.nome)).not.toContain("ia_confirmacao_criar");
+  });
+});
+
+// ---------- resumos de confirmação nomeiam por nomes (026/FR-010) ----------
+// O card de confirmação mostra o `resumo` — uuid interpolado virava
+// texto visível. Agora o resumo é async e recebe o supabase: nomeia por
+// nomes e número de encontro ("o 5º encontro de Ana e Ricardo"), e um
+// lookup invisível pra RLS cai no genérico sem id. Aqui se prova as duas
+// pontas: zero uuid em TODOS os resumos de escrita e os nomes de fato.
+
+const UUID_RE =
+  /[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/i;
+
+// um valor pra cada campo que algum resumo lê — cada resumo ignora o resto
+const ARGS_RESUMO = {
+  dupla_id: UUID,
+  plano_id: UUID,
+  chamado_id: UUID,
+  encontro_id: UUID,
+  combinado_id: UUID,
+  solicitacao_id: UUID,
+  mentorado_id: UUID,
+  pessoa_id: UUID,
+  para: UUID,
+  numero: 5,
+  data_hora: "2026-12-01T19:00:00-03:00",
+  ritmo: 2,
+  acao: "aceitar",
+  tipo: "contato",
+  destino: "a coordenação",
+  ajustes: [{ sugestao: "chegar 10 min antes" }],
+  categoria: "agenda",
+  assunto: "app não abre",
+  usa: true,
+  feito: true,
+  situacao: "desistente",
+  sistema: "metas",
+  campo: "whatsapp",
+  valor: "11999990000",
+  slot: "2026-12-02T19:00:00-03:00",
+  nota: "falou com o mentor",
+};
+
+type ResumoFn = (
+  a: never,
+  s: SupabaseClient
+) => string | Promise<string>;
+
+const resumoDe = (nome: (typeof IA_TOOL_NOMES)[number]) =>
+  (IA_TOOLS[nome] as unknown as { resumo?: ResumoFn }).resumo;
+
+const TABELAS_NOMES = {
+  duplas: [
+    {
+      id: UUID,
+      mentor_id: null,
+      supervisor_id: null,
+      mentor: { nome: "Ricardo Alves", nome_social: null },
+      mentorado: { nome: "Ana Beatriz", nome_social: null },
+    },
+  ],
+  encontros: [
+    {
+      numero: 5,
+      dupla: {
+        id: UUID,
+        mentor: { nome: "Ricardo Alves", nome_social: null },
+        mentorado: { nome: "Ana Beatriz", nome_social: null },
+      },
+    },
+  ],
+  chamados: [{ numero: 7, assunto: "app não abre" }],
+  dupla_planos: [{ dupla_id: UUID }],
+  solicitacoes_mural: [
+    {
+      id: UUID,
+      mentorado_nome: "Caio Silva",
+      mentorado_nome_social: null,
+      especialista_nome: null,
+      especialista_nome_social: null,
+    },
+  ],
+  jovem_encaminhamentos: [{ texto: "levar o RG" }],
+  profiles: [{ nome: "Sara Lima", nome_social: null }],
+  mentorados: [{ nome: "Caio Silva", nome_social: null }],
+};
+
+describe("resumo de confirmação — zero uuid em texto visível (FR-010)", () => {
+  it("todo resumo de tool escreve sai sem id cru", async () => {
+    const { supabase } = supaFake({ tabelas: TABELAS_NOMES });
+    const semResumo: string[] = [];
+    for (const nome of IA_TOOL_NOMES) {
+      const t = IA_TOOLS[nome] as unknown as {
+        escreve?: boolean;
+        resumo?: ResumoFn;
+      };
+      if (!t.escreve) continue;
+      if (!t.resumo) {
+        semResumo.push(nome);
+        continue;
+      }
+      const r = await t.resumo(ARGS_RESUMO as never, supabase);
+      expect(r, `resumo de ${nome}`).not.toMatch(UUID_RE);
+    }
+    // o contrato é todas as escritas terem resumo próprio — a contagem
+    // trava ferramenta nova sem ele
+    expect(semResumo).toEqual([]);
+  });
+
+  it("nomeia dupla, encontro, chamado e pessoa pelos nomes", async () => {
+    const { supabase } = supaFake({ tabelas: TABELAS_NOMES });
+    expect(
+      await resumoDe("desmarcar_encontro")!(
+        { encontro_id: UUID } as never,
+        supabase
+      )
+    ).toBe("Desmarcar o 5º encontro de Ana Beatriz e Ricardo Alves");
+    expect(
+      await resumoDe("resolver_chamado")!(
+        { chamado_id: UUID } as never,
+        supabase
+      )
+    ).toBe('Resolver o chamado #7 (app não abre)');
+    expect(
+      await resumoDe("declarar_recesso")!(
+        { dupla_id: UUID, usa: false } as never,
+        supabase
+      )
+    ).toBe("Atravessar o recesso na dupla de Ana Beatriz e Ricardo Alves");
+    expect(
+      await resumoDe("plano_propor")!(
+        { dupla_id: UUID } as never,
+        supabase
+      )
+    ).toBe(
+      'Propor o plano "ficar em dia" de Ana Beatriz e Ricardo Alves no ritmo mais leve que fecha'
+    );
+    expect(
+      await resumoDe("atribuir_chamado")!(
+        { chamado_id: UUID, para: UUID } as never,
+        supabase
+      )
+    ).toBe("Atribuir o chamado #7 (app não abre) para Sara Lima");
+    expect(
+      await resumoDe("marcar_situacao_mentorado")!(
+        { mentorado_id: UUID, situacao: "desistente" } as never,
+        supabase
+      )
+    ).toBe('Marcar situação "desistente" de Sara Lima');
+    expect(
+      await resumoDe("aceitar_solicitacao")!(
+        { solicitacao_id: UUID } as never,
+        supabase
+      )
+    ).toBe("Aceitar o pedido de especialista de Caio Silva");
+    expect(
+      await resumoDe("jovem_marcar_combinado")!(
+        { combinado_id: UUID, feito: true } as never,
+        supabase
+      )
+    ).toBe('Marcar feito o combinado "levar o RG"');
+  });
+
+  it("lookup invisível pra RLS degrada pro genérico sem id", async () => {
+    const { supabase } = supaFake({ tabelas: {} });
+    expect(
+      await resumoDe("desmarcar_encontro")!(
+        { encontro_id: UUID } as never,
+        supabase
+      )
+    ).toBe("Desmarcar o encontro");
+    expect(
+      await resumoDe("resolver_chamado")!(
+        { chamado_id: UUID } as never,
+        supabase
+      )
+    ).toBe("Resolver o chamado");
+    expect(
+      await resumoDe("declarar_recesso")!(
+        { dupla_id: UUID, usa: true } as never,
+        supabase
+      )
+    ).toBe("Usar o recesso na dupla");
   });
 });

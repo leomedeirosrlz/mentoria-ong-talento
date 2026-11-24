@@ -44,6 +44,7 @@ import {
   getAdocaoSuperficiesIa,
   getAgendaPeriodoIa,
   getCapacidadeInsumos,
+  getChamadoIa,
   getChamadosIa,
   getCicloEventosIa,
   getDuplaIa,
@@ -51,7 +52,9 @@ import {
   getDuplasVivasIa,
   getDuplasInsightsIa,
   getCronogramasIa,
+  getCombinadoJovemIa,
   getEncaminhamentosIa,
+  getEncontroIa,
   getFechadasIa,
   getFilaInsumos,
   getHistoricoEncontrosIa,
@@ -64,7 +67,10 @@ import {
   getJovemProgressoIa,
   getJovemRetroativoIa,
   getMinhaDuplaIa,
+  getSolicitacaoMuralIa,
   getPessoasBuscaIa,
+  getPessoaNomeIa,
+  getPlanoDuplaIa,
   getRegistrosDaDuplaIa,
   getTerceirosIa,
   papeisDoUsuario,
@@ -400,6 +406,77 @@ function canonico(v: unknown): string {
   );
 }
 
+// ---------- rótulos dos resumos de confirmação (026/FR-010) ----------
+// O card de confirmação nomeia por nomes e número de encontro ("o 5º
+// encontro de Ana e Ricardo") — nunca uuid. Lookup que falha ou que a
+// RLS esconde cai no rótulo genérico SEM id: o que não pode acontecer é
+// o identificador cru vazar pro texto visível.
+
+const nomeExibicao = (
+  p: { nome: string; nome_social: string | null } | null | undefined
+): string | null => p?.nome_social ?? p?.nome ?? null;
+
+const juntaNomes = (
+  ...pessoas: ({ nome: string; nome_social: string | null } | null | undefined)[]
+): string | null => {
+  const nomes = pessoas
+    .map(nomeExibicao)
+    .filter((n): n is string => Boolean(n));
+  return nomes.length ? nomes.join(" e ") : null;
+};
+
+/** "Ana e Ricardo" — mentorado e mentor da dupla, ou null quando a dupla
+ *  não é visível. */
+async function rotuloDupla(
+  supabase: SupabaseClient,
+  duplaId: string | null | undefined
+): Promise<string | null> {
+  if (!duplaId) return null;
+  const d = await getDuplaIa(supabase, duplaId).catch(() => null);
+  return juntaNomes(d?.mentorado, d?.mentor);
+}
+
+/** Dupla dona do plano "ficar em dia", pelo plano_id. */
+async function rotuloPlano(
+  supabase: SupabaseClient,
+  planoId: string
+): Promise<string | null> {
+  const p = await getPlanoDuplaIa(supabase, planoId).catch(() => null);
+  return p ? rotuloDupla(supabase, p.dupla_id) : null;
+}
+
+/** "5º encontro de Ana e Ricardo" — sem o artigo, pra compor "o/do". */
+async function rotuloEncontro(
+  supabase: SupabaseClient,
+  encontroId: string
+): Promise<string> {
+  const e = await getEncontroIa(supabase, encontroId).catch(() => null);
+  if (!e) return "encontro";
+  const nomes = juntaNomes(e.dupla?.mentorado, e.dupla?.mentor);
+  return `${e.numero}º encontro${nomes ? ` de ${nomes}` : ""}`;
+}
+
+/** "chamado #7 (app não abre)" — ou só "chamado". */
+async function rotuloChamado(
+  supabase: SupabaseClient,
+  chamadoId: string
+): Promise<string> {
+  const c = await getChamadoIa(supabase, chamadoId).catch(() => null);
+  if (!c) return "chamado";
+  return `chamado #${c.numero}${c.assunto ? ` (${c.assunto.slice(0, 60)})` : ""}`;
+}
+
+/** Nome do mentorado do pedido de especialista (visão da equipe). */
+async function rotuloSolicitacao(
+  supabase: SupabaseClient,
+  solicitacaoId: string
+): Promise<string | null> {
+  const s = await getSolicitacaoMuralIa(supabase, solicitacaoId).catch(
+    () => null
+  );
+  return s?.mentorado_nome_social ?? s?.mentorado_nome ?? null;
+}
+
 /** Saída do resumo_semana a partir das duplas vivas — pura, pra a demo
  *  (/demo, dataset em memória) responder pelo MESMO caminho da tool. */
 export function projetarResumo(
@@ -467,6 +544,24 @@ export function projetarResumo(
       encerradas: saude.encerradas,
     },
     duplas: itens,
+  };
+}
+
+/** Saída do duplas_panorama (026): o recorte "como estão?" das duplas
+ *  vivas — os mesmos itens do resumo_semana na mesma ordem (apoio →
+ *  risco → atenção → ok), capados em `limite` linhas com `total` do
+ *  escopo e `truncado` honestos. Pura, pra a demo responder pelo mesmo
+ *  caminho da tool. */
+export function projetarPanorama(
+  duplas: DuplaIa[],
+  eventos: CicloEvento[],
+  limite = 6
+) {
+  const itens = projetarResumo(duplas, eventos).duplas;
+  return {
+    total: itens.length,
+    truncado: itens.length > limite,
+    duplas: itens.slice(0, limite),
   };
 }
 
@@ -803,6 +898,9 @@ export const IA_TOOLS = {
       return {
         dupla_id,
         trilha: d.trilha,
+        // a dupla já vem carregada — o card nomeia sem nova query (026)
+        mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
+        mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
         aplicavel: true,
         em_dia: r.emDia,
         estado: r.estado,
@@ -866,10 +964,13 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["coordenacao", "supervisor", "mentor_dpp"],
     escreve: true,
-    resumo: (a: { dupla_id: string; ritmo?: number }) =>
-      a.ritmo
-        ? `Propor o plano "ficar em dia" da dupla com ${rotuloRitmo(a.ritmo)}`
-        : 'Propor o plano "ficar em dia" da dupla no ritmo mais leve que fecha',
+    resumo: async (a: { dupla_id: string; ritmo?: number }, supabase) => {
+      const dupla = await rotuloDupla(supabase, a.dupla_id);
+      const base = `Propor o plano "ficar em dia"${dupla ? ` de ${dupla}` : " da dupla"}`;
+      return a.ritmo
+        ? `${base} com ${rotuloRitmo(a.ritmo)}`
+        : `${base} no ritmo mais leve que fecha`;
+    },
     run: async (a: { dupla_id: string; ritmo?: number }, ctx) => {
       const [d, eventos] = await Promise.all([
         getDuplaIa(ctx.supabase, a.dupla_id),
@@ -918,8 +1019,10 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["mentor_dpp", "mentorado"],
     escreve: true,
-    resumo: (a: { acao: string }) =>
-      `${a.acao === "aceitar" ? "Aceitar" : "Contestar"} o plano "ficar em dia"`,
+    resumo: async (a: { plano_id: string; acao: string }, supabase) => {
+      const dupla = await rotuloPlano(supabase, a.plano_id);
+      return `${a.acao === "aceitar" ? "Aceitar" : "Contestar"} o plano "ficar em dia"${dupla ? ` de ${dupla}` : ""}`;
+    },
     run: async (
       a: { plano_id: string; acao: "aceitar" | "contestar"; motivo?: string },
       ctx
@@ -964,8 +1067,13 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["mentor_dpp", "mentorado"],
     escreve: true,
-    resumo: (a: { numero: number; data_hora: string }) =>
-      `Aplicar o passo do ${a.numero}º encontro em ${a.data_hora}`,
+    resumo: async (
+      a: { plano_id: string; numero: number; data_hora: string },
+      supabase
+    ) => {
+      const dupla = await rotuloPlano(supabase, a.plano_id);
+      return `Aplicar o passo do ${a.numero}º encontro${dupla ? ` de ${dupla}` : ""} em ${a.data_hora}`;
+    },
     run: async (
       a: { plano_id: string; numero: number; data_hora: string; link?: string; motivo?: string },
       ctx
@@ -1045,8 +1153,13 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["coordenacao", "supervisor", "mentor_dpp"],
     escreve: true,
-    resumo: (a: { tipo: string; destino: string }) =>
-      `Sugerir intervenção "${a.tipo}" pra ${a.destino}`,
+    resumo: async (
+      a: { dupla_id: string; tipo: string; destino: string },
+      supabase
+    ) => {
+      const dupla = await rotuloDupla(supabase, a.dupla_id);
+      return `Sugerir intervenção "${a.tipo}" pra ${a.destino}${dupla ? ` (dupla ${dupla})` : ""}`;
+    },
     run: async (
       a: { dupla_id: string; tipo: string; destino: string; motivo?: string; evidencias?: string[] },
       ctx
@@ -1092,8 +1205,17 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["coordenacao", "mentor_dpp"],
     escreve: true,
-    resumo: (a: { numero: number; ajustes: { sugestao: string }[] }) =>
-      `Ajustar o guia do ${a.numero}º encontro (${a.ajustes.length} ajuste${a.ajustes.length > 1 ? "s" : ""})`,
+    resumo: async (
+      a: {
+        dupla_id: string;
+        numero: number;
+        ajustes: { sugestao: string }[];
+      },
+      supabase
+    ) => {
+      const dupla = await rotuloDupla(supabase, a.dupla_id);
+      return `Ajustar o guia do ${a.numero}º encontro${dupla ? ` de ${dupla}` : ""} (${a.ajustes.length} ajuste${a.ajustes.length > 1 ? "s" : ""})`;
+    },
     run: async (
       a: { dupla_id: string; numero: number; ajustes: { sugestao: string; justificativa: string }[] },
       ctx
@@ -1126,8 +1248,10 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["coordenacao", "mentor_dpp"],
     escreve: true,
-    resumo: (a: { numero: number }) =>
-      `Voltar o ${a.numero}º encontro ao guia oficial`,
+    resumo: async (a: { dupla_id: string; numero: number }, supabase) => {
+      const dupla = await rotuloDupla(supabase, a.dupla_id);
+      return `Voltar o ${a.numero}º encontro${dupla ? ` de ${dupla}` : ""} ao guia oficial`;
+    },
     run: async (a: { dupla_id: string; numero: number }, ctx) => {
       const res = await rpcEscreve(ctx, "guia_ajuste_limpar", {
         p_dupla: a.dupla_id,
@@ -1345,7 +1469,7 @@ export const IA_TOOLS = {
   duplas_do_usuario: {
     nome: "duplas_do_usuario",
     descricao:
-      "Índice das duplas que o usuário enxerga: o mentor vê as dele, o supervisor as supervisionadas, a coordenação todas. Devolve o dupla_id + nomes, trilha, status e turma de cada uma — chame antes de ficha_dupla/registros_da_dupla quando a pergunta vier sem id ('minha dupla', 'com quem eu trabalho'). `total` é o universo no escopo; quando `truncado` vier true a lista é parcial (máx 60) — avise que há mais duplas além das listadas.",
+      "Índice das duplas que o usuário enxerga: o mentor vê as dele, o supervisor as supervisionadas, a coordenação todas. Devolve nomes, trilha, status e turma de cada uma + o dupla_id pra chamar ficha_dupla/registros_da_dupla quando a pergunta vier sem id ('minha dupla', 'com quem eu trabalho') — o id é bastidor, vai só em args de tool e nunca no texto. `total` é o universo no escopo; quando `truncado` vier true a lista é parcial (máx 60) — avise que há mais duplas além das listadas.",
     schema: semArgs,
     // mentorado fica fora: ele não tem grant na tabela duplas (a ficha dele
     // vem da view jovem_duplas em ficha_dupla) — e o índice não serve pra
@@ -1367,6 +1491,23 @@ export const IA_TOOLS = {
           turma: d.turma,
         })),
       };
+    },
+  },
+
+  duplas_panorama: {
+    nome: "duplas_panorama",
+    descricao:
+      "Panorama das duplas com estado: cada linha traz nomes, trilha, status, o semáforo (ok, atenção ou risco) com o motivo, apoio aberto, quantos encontros eram esperados × realizados, registro pendente e o próximo encontro marcado — até 6, ordenadas pelo que pede ação primeiro (apoio aberto → risco → atenção → ok), com `total` do escopo e `truncado` quando a lista é parcial. Use pra 'como estão minhas duplas?', 'quais são minhas duplas?', 'panorama das duplas', 'tem alguma precisando de atenção?'. Pra resolver o id de uma dupla use duplas_do_usuario; pro detalhe de uma só use ficha_dupla.",
+    schema: semArgs,
+    // mesmos papéis do índice: quem não enxerga dupla nenhuma não tem
+    // panorama — a recusa honesta se mantém
+    roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
+    run: async (_args: z.infer<typeof semArgs>, ctx) => {
+      const [duplas, eventos] = await Promise.all([
+        getDuplasVivasIa(ctx.supabase),
+        getCicloEventosIa(ctx.supabase),
+      ]);
+      return projetarPanorama(duplas, eventos);
     },
   },
 
@@ -1699,7 +1840,7 @@ export const IA_TOOLS = {
   pessoas_busca: {
     nome: "pessoas_busca",
     descricao:
-      "Busca pessoas do programa por nome (staff): devolve profile_id, nome, nome social e papel — use pra achar a pessoa antes de perguntar pela ficha dela, ou pra responder 'quem é X'. Contatos e dados sensíveis não saem pela tool.",
+      "Busca pessoas do programa por nome (staff): devolve nome, nome social e papel + o profile_id que as tools de pessoa consomem (bastidor, nunca no texto) — use pra achar a pessoa antes de perguntar pela ficha dela, ou pra responder 'quem é X'. Contatos e dados sensíveis não saem pela tool.",
     schema: z
       .object({
         nome: z
@@ -1756,7 +1897,7 @@ export const IA_TOOLS = {
   minha_dupla: {
     nome: "minha_dupla",
     descricao:
-      "A dupla do jovem que está falando: mentor, supervisor, trilha, turma e status — sem precisar de id, a view jovem_duplas já é escopada. Use pra 'quem é meu mentor?', 'minha dupla', 'com quem eu converso' e antes de abrir instrumentos da própria dupla (devolve o dupla_id).",
+      "A dupla do jovem que está falando: mentor, supervisor, trilha, turma e status — sem precisar de id, a view jovem_duplas já é escopada. Use pra 'quem é meu mentor?', 'minha dupla', 'com quem eu converso' e antes de abrir instrumentos da própria dupla (o dupla_id que ela devolve é bastidor: só em args de tool, nunca no texto).",
     schema: semArgs,
     roles: ["mentorado"],
     run: async (_args: z.infer<typeof semArgs>, ctx) => {
@@ -1956,7 +2097,7 @@ export const IA_TOOLS = {
   mural_especialista: {
     nome: "mural_especialista",
     descricao:
-      "Mural de pedidos de especialista no escopo do papel (a view solicitacoes_mural escopa sozinha: coord tudo, especialista os abertos + os dele, mentor DPP os das duplas dele). Devolve o id de cada pedido — é o id que as tools de escrita de especialista consomem. Use pra 'quais pedidos chegaram?', 'o que tá esperando especialista'.",
+      "Mural de pedidos de especialista no escopo do papel (a view solicitacoes_mural escopa sozinha: coord tudo, especialista os abertos + os dele, mentor DPP os das duplas dele). O id de cada pedido é bastidor pras tools de escrita de especialista — nunca no texto. Use pra 'quais pedidos chegaram?', 'o que tá esperando especialista'.",
     schema: semArgs,
     roles: ["coordenacao", "supervisor", "mentor_especialista", "mentor_dpp"],
     run: async (_args: z.infer<typeof semArgs>, ctx) => {
@@ -2067,8 +2208,8 @@ export const IA_TOOLS = {
       .strict(),
     roles: TODOS_PAPEIS,
     escreve: true,
-    resumo: (a: { chamado_id: string }) =>
-      `Comentar no chamado ${a.chamado_id}`,
+    resumo: async (a: { chamado_id: string }, supabase) =>
+      `Comentar no ${await rotuloChamado(supabase, a.chamado_id)}`,
     run: async (a: { chamado_id: string; texto: string }, ctx) =>
       rpcEscreve(ctx, "comentar_chamado", {
         p_id: a.chamado_id,
@@ -2089,8 +2230,8 @@ export const IA_TOOLS = {
       .strict(),
     roles: TODOS_PAPEIS,
     escreve: true,
-    resumo: (a: { chamado_id: string }) =>
-      `Acrescentar informação ao chamado ${a.chamado_id}`,
+    resumo: async (a: { chamado_id: string }, supabase) =>
+      `Acrescentar informação ao ${await rotuloChamado(supabase, a.chamado_id)}`,
     run: async (a: { chamado_id: string; texto: string }, ctx) =>
       rpcEscreve(ctx, "acrescentar_info_chamado", {
         p_id: a.chamado_id,
@@ -2106,8 +2247,8 @@ export const IA_TOOLS = {
     schema: z.object({ chamado_id: z.uuid() }).strict(),
     roles: TODOS_PAPEIS,
     escreve: true,
-    resumo: (a: { chamado_id: string }) =>
-      `Pedir reabertura do chamado ${a.chamado_id}`,
+    resumo: async (a: { chamado_id: string }, supabase) =>
+      `Pedir reabertura do ${await rotuloChamado(supabase, a.chamado_id)}`,
     run: async (a: { chamado_id: string }, ctx) =>
       rpcEscreve(ctx, "pedir_reabertura_chamado", { p_id: a.chamado_id }),
   },
@@ -2119,7 +2260,8 @@ export const IA_TOOLS = {
     schema: z.object({ chamado_id: z.uuid() }).strict(),
     roles: ["coordenacao", "supervisor"],
     escreve: true,
-    resumo: (a: { chamado_id: string }) => `Assumir o chamado ${a.chamado_id}`,
+    resumo: async (a: { chamado_id: string }, supabase) =>
+      `Assumir o ${await rotuloChamado(supabase, a.chamado_id)}`,
     run: async (a: { chamado_id: string }, ctx) =>
       rpcEscreve(ctx, "assumir_chamado", { p_id: a.chamado_id }),
   },
@@ -2137,8 +2279,18 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["coordenacao", "supervisor"],
     escreve: true,
-    resumo: (a: { chamado_id: string; para: string }) =>
-      `Atribuir o chamado ${a.chamado_id} para ${a.para}`,
+    resumo: async (
+      a: { chamado_id: string; para: string },
+      supabase
+    ) => {
+      const [chamado, nome] = await Promise.all([
+        rotuloChamado(supabase, a.chamado_id),
+        getPessoaNomeIa(supabase, a.para)
+          .then(nomeExibicao)
+          .catch(() => null),
+      ]);
+      return `Atribuir o ${chamado} para ${nome ?? "a pessoa escolhida"}`;
+    },
     run: async (a: { chamado_id: string; para: string }, ctx) =>
       rpcEscreve(ctx, "atribuir_chamado", {
         p_id: a.chamado_id,
@@ -2152,8 +2304,8 @@ export const IA_TOOLS = {
     schema: z.object({ chamado_id: z.uuid() }).strict(),
     roles: ["coordenacao", "supervisor"],
     escreve: true,
-    resumo: (a: { chamado_id: string }) =>
-      `Devolver o chamado ${a.chamado_id} à fila`,
+    resumo: async (a: { chamado_id: string }, supabase) =>
+      `Devolver o ${await rotuloChamado(supabase, a.chamado_id)} à fila`,
     run: async (a: { chamado_id: string }, ctx) =>
       rpcEscreve(ctx, "devolver_chamado_fila", { p_id: a.chamado_id }),
   },
@@ -2171,7 +2323,8 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["coordenacao", "supervisor"],
     escreve: true,
-    resumo: (a: { chamado_id: string }) => `Resolver o chamado ${a.chamado_id}`,
+    resumo: async (a: { chamado_id: string }, supabase) =>
+      `Resolver o ${await rotuloChamado(supabase, a.chamado_id)}`,
     run: async (a: { chamado_id: string; resumo: string }, ctx) =>
       rpcEscreve(ctx, "resolver_chamado", {
         p_id: a.chamado_id,
@@ -2185,7 +2338,8 @@ export const IA_TOOLS = {
     schema: z.object({ chamado_id: z.uuid() }).strict(),
     roles: ["coordenacao", "supervisor"],
     escreve: true,
-    resumo: (a: { chamado_id: string }) => `Reabrir o chamado ${a.chamado_id}`,
+    resumo: async (a: { chamado_id: string }, supabase) =>
+      `Reabrir o ${await rotuloChamado(supabase, a.chamado_id)}`,
     run: async (a: { chamado_id: string }, ctx) =>
       rpcEscreve(ctx, "reabrir_chamado", { p_id: a.chamado_id }),
   },
@@ -2203,8 +2357,8 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["coordenacao", "supervisor"],
     escreve: true,
-    resumo: (a: { chamado_id: string }) =>
-      `Publicar atualização no chamado ${a.chamado_id}`,
+    resumo: async (a: { chamado_id: string }, supabase) =>
+      `Publicar atualização no ${await rotuloChamado(supabase, a.chamado_id)}`,
     run: async (a: { chamado_id: string; texto: string }, ctx) =>
       rpcEscreve(ctx, "publicar_atualizacao_chamado", {
         p_id: a.chamado_id,
@@ -2225,8 +2379,15 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["mentorado"],
     escreve: true,
-    resumo: (a: { combinado_id: string; feito: boolean }) =>
-      `${a.feito ? "Marcar feito" : "Desmarcar"} o combinado ${a.combinado_id}`,
+    resumo: async (
+      a: { combinado_id: string; feito: boolean },
+      supabase
+    ) => {
+      const c = await getCombinadoJovemIa(supabase, a.combinado_id).catch(
+        () => null
+      );
+      return `${a.feito ? "Marcar feito" : "Desmarcar"} o combinado${c?.texto ? ` "${c.texto.slice(0, 60)}"` : ""}`;
+    },
     run: async (a: { combinado_id: string; feito: boolean }, ctx) =>
       rpcEscreve(ctx, "marcar_combinado", {
         p_id: a.combinado_id,
@@ -2256,8 +2417,13 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["mentorado"],
     escreve: true,
-    resumo: (a: { numero: number; data_hora: string }) =>
-      `Agendar o ${a.numero}º encontro em ${a.data_hora}`,
+    resumo: async (
+      a: { dupla_id: string; numero: number; data_hora: string },
+      supabase
+    ) => {
+      const dupla = await rotuloDupla(supabase, a.dupla_id);
+      return `Agendar o ${a.numero}º encontro${dupla ? ` de ${dupla}` : ""} em ${a.data_hora}`;
+    },
     run: async (
       a: {
         dupla_id: string;
@@ -2285,8 +2451,8 @@ export const IA_TOOLS = {
     schema: z.object({ encontro_id: z.uuid() }).strict(),
     roles: ["mentor_dpp", "mentorado", "coordenacao"],
     escreve: true,
-    resumo: (a: { encontro_id: string }) =>
-      `Desmarcar o encontro ${a.encontro_id}`,
+    resumo: async (a: { encontro_id: string }, supabase) =>
+      `Desmarcar o ${await rotuloEncontro(supabase, a.encontro_id)}`,
     run: async (a: { encontro_id: string }, ctx) =>
       rpcEscreve(ctx, "desmarcar_encontro", { p_encontro: a.encontro_id }),
   },
@@ -2299,8 +2465,8 @@ export const IA_TOOLS = {
     schema: z.object({ encontro_id: z.uuid() }).strict(),
     roles: ["mentorado"],
     escreve: true,
-    resumo: (a: { encontro_id: string }) =>
-      `Confirmar que o encontro ${a.encontro_id} aconteceu`,
+    resumo: async (a: { encontro_id: string }, supabase) =>
+      `Confirmar que o ${await rotuloEncontro(supabase, a.encontro_id)} aconteceu`,
     run: async (a: { encontro_id: string }, ctx) =>
       rpcEscreve(ctx, "marcar_aconteceu_mentorado", {
         p_encontro: a.encontro_id,
@@ -2315,8 +2481,8 @@ export const IA_TOOLS = {
     schema: z.object({ encontro_id: z.uuid() }).strict(),
     roles: ["mentorado"],
     escreve: true,
-    resumo: (a: { encontro_id: string }) =>
-      `Marcar o encontro ${a.encontro_id} como não realizado`,
+    resumo: async (a: { encontro_id: string }, supabase) =>
+      `Marcar o ${await rotuloEncontro(supabase, a.encontro_id)} como não realizado`,
     run: async (a: { encontro_id: string }, ctx) =>
       rpcEscreve(ctx, "marcar_nao_aconteceu_mentorado", {
         p_encontro: a.encontro_id,
@@ -2348,8 +2514,13 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["mentorado"],
     escreve: true,
-    resumo: (a: { numero: number; data_hora: string }) =>
-      `Registrar o ${a.numero}º encontro como realizado em ${a.data_hora}`,
+    resumo: async (
+      a: { dupla_id: string; numero: number; data_hora: string },
+      supabase
+    ) => {
+      const dupla = await rotuloDupla(supabase, a.dupla_id);
+      return `Registrar o ${a.numero}º encontro${dupla ? ` de ${dupla}` : ""} como realizado em ${a.data_hora}`;
+    },
     run: async (
       a: { dupla_id: string; numero: number; data_hora: string },
       ctx
@@ -2369,8 +2540,8 @@ export const IA_TOOLS = {
     schema: z.object({ encontro_id: z.uuid() }).strict(),
     roles: ["mentorado"],
     escreve: true,
-    resumo: (a: { encontro_id: string }) =>
-      `Desfazer o retroativo do encontro ${a.encontro_id}`,
+    resumo: async (a: { encontro_id: string }, supabase) =>
+      `Desfazer o retroativo do ${await rotuloEncontro(supabase, a.encontro_id)}`,
     run: async (a: { encontro_id: string }, ctx) =>
       rpcEscreve(ctx, "desfazer_retroativo_mentorado", {
         p_encontro: a.encontro_id,
@@ -2400,8 +2571,10 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["coordenacao", "mentor_dpp"],
     escreve: true,
-    resumo: (a: { dupla_id: string; usa: boolean }) =>
-      `${a.usa ? "Usar" : "Atravessar"} o recesso na dupla ${a.dupla_id}`,
+    resumo: async (a: { dupla_id: string; usa: boolean }, supabase) => {
+      const dupla = await rotuloDupla(supabase, a.dupla_id);
+      return `${a.usa ? "Usar" : "Atravessar"} o recesso na dupla${dupla ? ` de ${dupla}` : ""}`;
+    },
     run: async (
       a: { dupla_id: string; ciclo_evento_id?: string; usa: boolean },
       ctx
@@ -2529,8 +2702,10 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["mentor_especialista"],
     escreve: true,
-    resumo: (a: { solicitacao_id: string }) =>
-      `Aceitar o pedido de especialista ${a.solicitacao_id}`,
+    resumo: async (a: { solicitacao_id: string }, supabase) => {
+      const nome = await rotuloSolicitacao(supabase, a.solicitacao_id);
+      return `Aceitar o pedido de especialista${nome ? ` de ${nome}` : ""}`;
+    },
     run: async (a: { solicitacao_id: string; slot?: string }, ctx) =>
       rpcEscreve(ctx, "aceitar_solicitacao", {
         p_id: a.solicitacao_id,
@@ -2554,7 +2729,13 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["mentor_especialista"],
     escreve: true,
-    resumo: (a: { slot: string }) => `Contra-propor horário ${a.slot}`,
+    resumo: async (
+      a: { solicitacao_id: string; slot: string },
+      supabase
+    ) => {
+      const nome = await rotuloSolicitacao(supabase, a.solicitacao_id);
+      return `Contra-propor o horário ${a.slot}${nome ? ` pro pedido de ${nome}` : ""}`;
+    },
     run: async (
       a: { solicitacao_id: string; slot: string; mensagem?: string },
       ctx
@@ -2579,8 +2760,10 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["mentor_especialista"],
     escreve: true,
-    resumo: (a: { solicitacao_id: string }) =>
-      `Recusar o pedido de especialista ${a.solicitacao_id}`,
+    resumo: async (a: { solicitacao_id: string }, supabase) => {
+      const nome = await rotuloSolicitacao(supabase, a.solicitacao_id);
+      return `Recusar o pedido de especialista${nome ? ` de ${nome}` : ""}`;
+    },
     run: async (
       a: { solicitacao_id: string; justificativa: string },
       ctx
@@ -2618,8 +2801,13 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["coordenacao", "supervisor", "mentor_dpp", "mentor_especialista"],
     escreve: true,
-    resumo: (a: { tipo: string; nota?: string }) =>
-      `Registrar ${a.tipo} na dupla${a.nota ? `: ${a.nota}` : ""}`,
+    resumo: async (
+      a: { dupla_id: string; tipo: string; nota?: string },
+      supabase
+    ) => {
+      const dupla = await rotuloDupla(supabase, a.dupla_id);
+      return `Registrar ${a.tipo} na dupla${dupla ? ` de ${dupla}` : ""}${a.nota ? `: ${a.nota}` : ""}`;
+    },
     run: async (a: { dupla_id: string; tipo: "contato" | "apoio"; nota?: string }, ctx) =>
       rodarCore(registrarInteracaoCore(ctx.supabase, await atorDoCanal(ctx), a)),
   },
@@ -2642,8 +2830,15 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["coordenacao"],
     escreve: true,
-    resumo: (a: { situacao: string; mentorado_id: string }) =>
-      `Marcar situação "${a.situacao}" do mentorado ${a.mentorado_id}`,
+    resumo: async (
+      a: { situacao: string; mentorado_id: string },
+      supabase
+    ) => {
+      const nome = await getPessoaNomeIa(supabase, a.mentorado_id)
+        .then(nomeExibicao)
+        .catch(() => null);
+      return `Marcar situação "${a.situacao}"${nome ? ` de ${nome}` : " do mentorado"}`;
+    },
     run: async (
       a: { mentorado_id: string; situacao: "ativo" | "desistente" | "concluido"; motivo?: string },
       ctx
@@ -2672,8 +2867,10 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["coordenacao", "mentor_dpp"],
     escreve: true,
-    resumo: (a: { sistema: string }) =>
-      `Emitir o link do instrumento ${a.sistema} pra dupla`,
+    resumo: async (a: { dupla_id: string; sistema: string }, supabase) => {
+      const dupla = await rotuloDupla(supabase, a.dupla_id);
+      return `Emitir o link do instrumento ${a.sistema}${dupla ? ` pra dupla de ${dupla}` : " pra dupla"}`;
+    },
     run: async (a: { dupla_id: string; sistema: string }, ctx) => {
       const d = (await rpcEscreve(ctx, "emitir_link_instrumento", {
         p_dupla_id: a.dupla_id,
@@ -2728,8 +2925,13 @@ export const IA_TOOLS = {
     // the generic role denial — the refusal is the teaching moment
     roles: ["mentor_dpp", "mentor_especialista", "coordenacao"],
     escreve: true,
-    resumo: (a: { numero: number; data_hora: string }) =>
-      `Agendar o ${a.numero}º encontro da dupla em ${a.data_hora}`,
+    resumo: async (
+      a: { dupla_id: string; numero: number; data_hora: string },
+      supabase
+    ) => {
+      const dupla = await rotuloDupla(supabase, a.dupla_id);
+      return `Agendar o ${a.numero}º encontro${dupla ? ` de ${dupla}` : " da dupla"} em ${a.data_hora}`;
+    },
     run: async (
       a: { dupla_id: string; numero: number; data_hora: string; link?: string; motivo?: string },
       ctx
@@ -2769,8 +2971,15 @@ export const IA_TOOLS = {
       .strict(),
     roles: ["coordenacao"],
     escreve: true,
-    resumo: (a: { campo: string; valor: string }) =>
-      `Editar ${a.campo} da pessoa pra "${a.valor.slice(0, 80)}"`,
+    resumo: async (
+      a: { pessoa_id: string; campo: string; valor: string },
+      supabase
+    ) => {
+      const nome = await getPessoaNomeIa(supabase, a.pessoa_id)
+        .then(nomeExibicao)
+        .catch(() => null);
+      return `Editar ${a.campo}${nome ? ` de ${nome}` : " da pessoa"} pra "${a.valor.slice(0, 80)}"`;
+    },
     run: async (a: { pessoa_id: string; campo: string; valor: string }, ctx) =>
       rodarCore(
         editarCampoPessoaCore(ctx.supabase, await atorDoCanal(ctx), {
@@ -2790,7 +2999,10 @@ export const IA_TOOLS = {
     escreve?: boolean;
     // `args: never` é o supertipo universal de qualquer run/resumo — o
     // satisfies confere a forma sem apagar o tipo preciso de cada schema
-    resumo?: (args: never) => string;
+    resumo?: (
+      args: never,
+      supabase: SupabaseClient
+    ) => string | Promise<string>;
     run: (args: never, ctx: ContextoIa) => Promise<unknown>;
   }
 >;
@@ -3029,10 +3241,17 @@ export async function executarTool(
       // 2 passos: sem confirmacao_id grava a prévia e devolve o envelope
       // (ok=true, sem efeito); com ele consome atomicamente (dono, mesma
       // tool, mesmo hash, uso único, não expirado) e só então executa
+      // o resumo nomeia por nomes (026/FR-010) — args serializados com
+      // uuid nunca viram texto visível; sem resumo próprio o fallback é
+      // a descrição da tool, também sem args
       const resumo =
-        (tool as { resumo?: (a: never) => string }).resumo?.(
-          parsed.data as never
-        ) ?? `${tool.nome} ${canonico(parsed.data)}`.slice(0, 300);
+        (await (tool as {
+          resumo?: (
+            a: never,
+            supabase: SupabaseClient
+          ) => string | Promise<string>;
+        }).resumo?.(parsed.data as never, supabase)) ??
+        `${tool.descricao.split(/[.;]/)[0]}`.slice(0, 300);
       if (typeof confirmacaoId !== "string" || !confirmacaoId) {
         const { data: cid, error: eCriar } = await supabase.rpc(
           "ia_confirmacao_criar",

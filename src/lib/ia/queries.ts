@@ -276,6 +276,121 @@ export const getDuplaIa = cache(
   }
 );
 
+/** Encontro solto com a dupla nomeada (026/FR-010) — o resumo de
+ *  confirmação diz "o 5º encontro de Ana e Ricardo", nunca o uuid. */
+export const getEncontroIa = cache(
+  async (supabase: SupabaseClient, id: string) => {
+    const { data, error } = await supabase
+      .from("encontros")
+      .select(
+        `numero,
+         dupla:duplas!inner(
+           id,
+           mentor:profiles!duplas_mentor_id_fkey(nome, nome_social),
+           mentorado:mentorados(nome, nome_social)
+         )`
+      )
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return data as unknown as {
+      numero: number;
+      dupla: {
+        id: string;
+        mentor: { nome: string; nome_social: string | null } | null;
+        mentorado: { nome: string; nome_social: string | null } | null;
+      };
+    } | null;
+  }
+);
+
+/** Chamado solto pro resumo de confirmação (026/FR-010) — "o chamado #7
+ *  (app não abre)" em vez do uuid. */
+export const getChamadoIa = cache(
+  async (supabase: SupabaseClient, id: string) => {
+    const { data, error } = await supabase
+      .from("chamados")
+      .select("numero, assunto")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return (data ?? null) as {
+      numero: number;
+      assunto: string | null;
+    } | null;
+  }
+);
+
+/** Nome de uma pessoa qualquer pro resumo de confirmação (026/FR-010) —
+ *  pessoa_id/para/mentorado_id abrangem profiles e mentorados; a primeira
+ *  tabela que conhece o id responde. */
+export async function getPessoaNomeIa(supabase: SupabaseClient, id: string) {
+  const { data: p, error: ep } = await supabase
+    .from("profiles")
+    .select("nome, nome_social")
+    .eq("id", id)
+    .maybeSingle();
+  if (ep) throw ep;
+  if (p) return p as { nome: string; nome_social: string | null };
+  const { data: m, error: em } = await supabase
+    .from("mentorados")
+    .select("nome, nome_social")
+    .eq("id", id)
+    .maybeSingle();
+  if (em) throw em;
+  return (m ?? null) as { nome: string; nome_social: string | null } | null;
+}
+
+/** Pedido de especialista solto na view escopada (026/FR-010) — o nome
+ *  do mentorado (ou do especialista, pro jovem) nomeia o resumo. */
+export const getSolicitacaoMuralIa = cache(
+  async (supabase: SupabaseClient, id: string) => {
+    const { data, error } = await supabase
+      .from("solicitacoes_mural")
+      .select(
+        "id, mentorado_nome, mentorado_nome_social, especialista_nome, especialista_nome_social"
+      )
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return (data ?? null) as {
+      id: string;
+      mentorado_nome: string | null;
+      mentorado_nome_social: string | null;
+      especialista_nome: string | null;
+      especialista_nome_social: string | null;
+    } | null;
+  }
+);
+
+/** Combinado do jovem solto na view dele (026/FR-010) — o texto do
+ *  combinado nomeia o resumo de confirmação. */
+export const getCombinadoJovemIa = cache(
+  async (supabase: SupabaseClient, id: string) => {
+    const { data, error } = await supabase
+      .from("jovem_encaminhamentos")
+      .select("texto:descricao")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return (data ?? null) as { texto: string | null } | null;
+  }
+);
+
+/** Plano "ficar em dia" → dupla dona (026/FR-010) — responder ou aplicar
+ *  passo nomeia a dupla no resumo de confirmação. */
+export const getPlanoDuplaIa = cache(
+  async (supabase: SupabaseClient, id: string) => {
+    const { data, error } = await supabase
+      .from("dupla_planos")
+      .select("dupla_id")
+      .eq("id", id)
+      .maybeSingle();
+    if (error) throw error;
+    return (data ?? null) as { dupla_id: string } | null;
+  }
+);
+
 /** WhatsApp of the jovem's dupla adults (jovem_contatos view, 0067 —
  *  definer scoped by my_mentorado_id): mentor and supervisor. The "text my
  *  mentor" draft picks the number from here. */

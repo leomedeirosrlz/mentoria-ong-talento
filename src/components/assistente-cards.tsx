@@ -30,6 +30,7 @@ import type {
   UiCombinados,
   UiConfirmacao,
   UiDupla,
+  UiDuplas,
   UiJornada,
   UiPedidos,
   UiPlano,
@@ -72,6 +73,7 @@ import {
   SITUACAO_DUPLA_LABEL,
   type DuplaDesfecho,
 } from "@/lib/dupla-desfecho";
+import { rotuloRitmo } from "@/lib/plano-em-dia";
 import type {
   AppRole,
   ChamadoStatus,
@@ -359,6 +361,8 @@ export function UiCard({ bloco, jovem }: { bloco: UiBloco; jovem?: boolean }) {
       return <CardSaude b={bloco} />;
     case "dupla":
       return <CardDupla b={bloco} jovem={ehJovem} r={r} />;
+    case "duplas":
+      return <CardDuplas b={bloco} />;
     case "agenda":
       return <CardAgenda b={bloco} r={r} />;
     case "registros":
@@ -537,8 +541,10 @@ function Contagem({
 }
 
 /** DuplaLinha de bolso: situação + apoio, nomes que não truncam, motivo
- *  em até duas linhas, n de esperados. O card inteiro abre a ficha. */
+ *  em até duas linhas, n de esperados e o próximo encontro. O card
+ *  inteiro abre a ficha. */
 function DestaqueLinha({ d, i }: { d: UiDuplaMini; i: number }) {
+  const agora = useAgora();
   const sit = situacao(d, d.semaforo);
   return (
     <li
@@ -573,7 +579,46 @@ function DestaqueLinha({ d, i }: { d: UiDuplaMini; i: number }) {
           ? ` de ${plural(d.esperado, "encontro esperado", "encontros esperados")}`
           : ` ${d.feitos === 1 ? "encontro realizado" : "encontros realizados"}`}
       </p>
+      {d.proximo && (
+        <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+          <Clock size={12} aria-hidden className="shrink-0" />
+          Próximo: {d.proximo.numero}º encontro
+          {valida(d.proximo.data_hora)
+            ? ` · ${quandoTexto(d.proximo.data_hora!, agora)}`
+            : " · data a combinar"}
+        </p>
+      )}
     </li>
+  );
+}
+
+// ---------- duplas (panorama) ----------
+
+/** "Como estão minhas duplas?" — as linhas-mini com situação, progresso
+ *  e próximo encontro; o radar completo segue em /duplas. */
+export function CardDuplas({ b }: { b: UiDuplas }) {
+  return (
+    <Cartao
+      titulo="Suas duplas"
+      meta={
+        b.truncado
+          ? `${b.itens.length} de ${b.total}`
+          : plural(b.total, "dupla", "duplas")
+      }
+      rodape={
+        b.truncado ? (
+          <Rodape href="/duplas">Ver todas as {b.total} duplas</Rodape>
+        ) : (
+          <Rodape href="/duplas">Abrir duplas</Rodape>
+        )
+      }
+    >
+      <ul className="space-y-1.5">
+        {b.itens.map((d, i) => (
+          <DestaqueLinha key={d.id} d={d} i={i + 1} />
+        ))}
+      </ul>
+    </Cartao>
   );
 }
 
@@ -865,65 +910,218 @@ const ACAO_PLANO: Record<UiPlano["passos"][number]["acao"], string> = {
   travado: "marcado pra",
 };
 
-/** O plano de recuperação sai pronto do planner — o card só mostra a
- *  sequência com datas; quem agenda é a dupla, por isso o rodapé leva à
- *  ficha (a Liza propõe, nunca grava cronograma). */
+/** Dobra inicial do card (026): o resto dos passos mora sob o toggle. */
+const PASSOS_DOBRA = 4;
+
+/** O custo do plano em pill — o nível nomeado vira o rótulo em palavras
+ *  (rotuloRitmo, o mesmo do card da ficha); conversa_coord nomeia o
+ *  caminho, não o ritmo. */
+const NIVEL_PLANO: Record<
+  NonNullable<UiPlano["nivel"]>,
+  { rotulo: (ritmo: number | null) => string; tom: Tom }
+> = {
+  ritmo_normal: { rotulo: (r) => rotuloRitmo(r ?? 1), tom: "neutro" },
+  semana_dupla: { rotulo: (r) => rotuloRitmo(r ?? 2), tom: "atencao" },
+  semana_tripla: { rotulo: (r) => rotuloRitmo(r ?? 3), tom: "atencao" },
+  um_por_dia: { rotulo: (r) => rotuloRitmo(r ?? 7), tom: "atencao" },
+  conversa_coord: { rotulo: () => "Conversa com a coordenação", tom: "risco" },
+};
+
+/** O plano de recuperação sai pronto do planner — o card nomeia a dupla,
+ *  resume o custo numa dobra e guarda o detalhe a um toque; quem agenda
+ *  é a dupla, por isso o rodapé leva à ficha (a Liza propõe, nunca grava
+ *  cronograma). */
 export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
   const agora = useAgora();
+  const [aberto, setAberto] = useState(false);
+  const passosId = useId();
+  const estado = b.estado ?? (b.em_dia ? "em_dia" : "recuperacao");
+  const conversa = estado === "conversa";
+  const marcados = b.passos.filter((p) => p.acao === "travado").length;
+  const aMarcar = b.passos.length - marcados;
+  const resto = b.passos.slice(PASSOS_DOBRA);
+
+  const meta =
+    estado === "em_dia"
+      ? "em dia"
+      : conversa
+        ? "não fecha até o encerramento"
+        : b.data_recuperacao && valida(b.data_recuperacao)
+          ? `em dia ${quandoTexto(b.data_recuperacao, agora)}`
+          : undefined;
+
+  const resumo = [
+    aMarcar > 0 && plural(aMarcar, "passo a marcar", "passos a marcar"),
+    marcados > 0 && `${marcados} já ${marcados === 1 ? "marcado" : "marcados"}`,
+    b.pendencias.length > 0 &&
+      plural(
+        b.pendencias.length,
+        "pendência pra resolver antes",
+        "pendências pra resolver antes"
+      ),
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
+  const passoLi = (p: UiPlano["passos"][number], i: number) => (
+    <li
+      key={p.numero}
+      style={passo(i + 1)}
+      className="animate-enter flex items-start gap-2.5 py-2 first:pt-0 last:pb-0"
+    >
+      <span
+        aria-hidden
+        className={cn(
+          "grid size-7 shrink-0 place-items-center rounded-full font-mono text-[11px] font-semibold tabular-nums",
+          p.acao === "travado"
+            ? "bg-[var(--ok-bg)] text-[var(--ok-text)] ring-1 ring-[var(--ok-border)]"
+            : "bg-[var(--destaque)]/25 text-foreground"
+        )}
+      >
+        {p.numero}
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-sm font-medium leading-snug">
+          {p.titulo}
+        </span>
+        <span className="mt-0.5 block text-xs text-muted-foreground">
+          {ACAO_PLANO[p.acao]}{" "}
+          {valida(p.data) ? diaSemanaCurto(p.data) : "a definir"}
+          {valida(p.data_oficial) && p.data_oficial !== p.data
+            ? ` · oficial era ${diaMesCurto(p.data_oficial)}`
+            : ""}
+          {p.vence_no_caminho ? " · vence no caminho" : ""}
+        </span>
+        {(p.precondicao || p.aviso) && (
+          <span className="mt-0.5 block text-xs text-muted-foreground">
+            {p.precondicao ? `Precisa antes: ${p.precondicao}` : p.aviso}
+          </span>
+        )}
+      </span>
+    </li>
+  );
+
   return (
     <Cartao
       titulo="Para ficar em dia"
-      meta={
-        b.estado === "conversa"
-          ? "não fecha antes do encerramento"
-          : b.data_recuperacao && valida(b.data_recuperacao)
-            ? `em dia ${quandoTexto(b.data_recuperacao, agora)}`
-            : undefined
+      meta={meta}
+      rodape={
+        <Rodape href={`${r.encontros(b.dupla_id)}#plano-em-dia`}>
+          Ver encontros na ficha
+        </Rodape>
       }
-      rodape={<Rodape href={r.encontros(b.dupla_id)}>Ver encontros na ficha</Rodape>}
     >
+      {/* a dupla do plano — o card diz de quem é e leva à ficha (026) */}
+      <Link
+        href={r.ficha(b.dupla_id)}
+        className={cn(
+          "-mx-1.5 block rounded-md px-1.5 py-1 text-sm font-semibold leading-snug transition-colors hover:bg-muted/60",
+          FOCO
+        )}
+      >
+        <DuplaNomes
+          mentor={b.mentor ?? "Mentor a definir"}
+          mentorado={b.mentorado ?? "Mentorado a definir"}
+        />
+      </Link>
+
+      {/* resumo do custo sempre visível: nível em pill, conta dos passos
+          e das pendências — ninguém descobre pré-requisito só ao abrir */}
+      {(b.nivel || resumo) && (
+        <div className="mt-1.5 flex flex-wrap items-center gap-x-2 gap-y-1">
+          {b.nivel && (
+            <Pill tom={NIVEL_PLANO[b.nivel].tom}>
+              {NIVEL_PLANO[b.nivel].rotulo(b.ritmo)}
+            </Pill>
+          )}
+          {resumo && (
+            <p className="text-xs text-muted-foreground tabular-nums">{resumo}</p>
+          )}
+        </div>
+      )}
+
+      {conversa && (
+        <div className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2">
+          <p className="text-sm font-semibold leading-snug">
+            {b.data_projetada && valida(b.data_projetada)
+              ? `Em dia só em ${formatDate(b.data_projetada)}`
+              : "Nem com 1 encontro por dia fecha"}
+            {b.encerramento && valida(b.encerramento)
+              ? `, depois do encerramento (${formatDate(b.encerramento)})`
+              : ""}
+            .
+          </p>
+          {b.cabem_ate_encerramento && (
+            <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+              Cabem {b.cabem_ate_encerramento.cabem} dos{" "}
+              {b.cabem_ate_encerramento.faltam} encontros que faltam
+              {b.encerramento && valida(b.encerramento)
+                ? " até o encerramento"
+                : ""}
+              .
+            </p>
+          )}
+        </div>
+      )}
+
       {b.pendencias.length > 0 && (
-        <p className="mb-2 rounded-lg bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground">
+        <p className="mt-2 rounded-lg bg-muted/50 px-2.5 py-2 text-xs text-muted-foreground">
           Antes do plano: {b.pendencias.map((p) => (
             `${p.numero}º ${p.estado === "limbo" ? "(confirmar se aconteceu)" : "(falta o registro)"}`
           )).join(", ")}.
         </p>
       )}
-      <ol className="divide-y divide-border/60">
-        {b.passos.map((p, i) => (
-          <li
-            key={p.numero}
-            style={passo(i + 1)}
-            className="animate-enter flex items-start gap-2.5 py-2 first:pt-0 last:pb-0"
+
+      {b.passos.length > 0 && (
+        <ol className="mt-1 divide-y divide-border/60">
+          {b.passos.slice(0, PASSOS_DOBRA).map(passoLi)}
+        </ol>
+      )}
+      {resto.length > 0 && (
+        <>
+          {/* o molde do FonteItem: botão real com aria e o painel em
+              height auto — reduced-motion sai pelo guard global */}
+          <AnimatePresence initial={false}>
+            {aberto && (
+              <motion.ol
+                id={passosId}
+                key="resto"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={T.panel}
+                style={{ overflow: "clip" }}
+                className="divide-y divide-border/60"
+              >
+                {resto.map(passoLi)}
+              </motion.ol>
+            )}
+          </AnimatePresence>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-expanded={aberto}
+            aria-controls={aberto ? passosId : undefined}
+            onClick={() => setAberto((v) => !v)}
+            className="h-auto min-h-11 w-full items-center justify-between gap-2 px-2.5 py-2 text-left text-xs font-semibold hover:bg-muted/50 active:not-aria-[haspopup]:scale-100 md:min-h-11"
           >
-            <span
+            {aberto ? "Ver menos" : `Ver os ${b.passos.length} passos`}
+            <CaretDown
+              size={14}
+              weight="bold"
               aria-hidden
               className={cn(
-                "grid size-7 shrink-0 place-items-center rounded-full font-mono text-[11px] font-semibold tabular-nums",
-                p.acao === "travado"
-                  ? "bg-[var(--ok-bg)] text-[var(--ok-text)] ring-1 ring-[var(--ok-border)]"
-                  : "bg-[var(--destaque)]/25 text-foreground"
+                "shrink-0 text-muted-foreground transition-transform duration-200 ease-snappy",
+                aberto && "rotate-180"
               )}
-            >
-              {p.numero}
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block text-sm font-medium leading-snug">
-                {p.titulo}
-              </span>
-              <span className="mt-0.5 block text-xs text-muted-foreground">
-                {ACAO_PLANO[p.acao]}{" "}
-                {valida(p.data) ? diaSemanaCurto(p.data) : "a definir"}
-              </span>
-              {(p.precondicao || p.aviso) && (
-                <span className="mt-0.5 block text-xs text-muted-foreground">
-                  {p.precondicao ? `Precisa antes: ${p.precondicao}` : p.aviso}
-                </span>
-              )}
-            </span>
-          </li>
-        ))}
-      </ol>
+            />
+          </Button>
+        </>
+      )}
+      {b.passos.length === 0 && (
+        <Vazio>Nada a marcar: a dupla segue o calendário</Vazio>
+      )}
+
       {b.sugestao && (
         <p className="mt-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
           {b.sugestao}
@@ -944,9 +1142,17 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         </p>
       )}
       {b.avisos.length > 0 && (
-        <p className="mt-2 border-t border-border/60 pt-2 text-xs text-muted-foreground">
-          {b.avisos[0]}
-        </p>
+        <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">
+          {b.avisos.map((a) => (
+            <li
+              key={a}
+              className="flex items-start gap-1.5 text-xs text-muted-foreground"
+            >
+              <WarningCircle size={13} aria-hidden className="mt-0.5 shrink-0" />
+              {a}
+            </li>
+          ))}
+        </ul>
       )}
     </Cartao>
   );

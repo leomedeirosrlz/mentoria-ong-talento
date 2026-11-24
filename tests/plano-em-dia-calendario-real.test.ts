@@ -108,7 +108,10 @@ describe("513 — 10 atrasos em 23/11 no calendário real", () => {
     expect(r.dataProjetada! > ENCERRAMENTO).toBe(true);
     expect(r.cabemAteEncerramento!.faltam).toBe(16);
     expect(r.cabemAteEncerramento!.cabem).toBeLessThan(16);
-    expect(r.sugestao).toMatch(/Nem com 1 encontro por dia/);
+    // a resposta nomeia quando seria "em dia" (depois do encerramento) —
+    // a evidência do falso negativo corrigido — e diz que nem 1 por dia fecha
+    expect(r.sugestao).toMatch(/Em dia só em .*depois do encerramento/);
+    expect(r.sugestao).toMatch(/Nem 1 encontro por dia/);
     expect(r.sugestao).toMatch(/coordenação/);
     datasValidas(r, true);
   });

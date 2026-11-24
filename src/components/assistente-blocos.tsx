@@ -208,7 +208,14 @@ export function Escolha({
                   className="shrink-0 animate-in zoom-in-50 duration-150"
                 />
               )}
-              <span className="min-w-0">{o.rotulo}</span>
+              <span className="min-w-0">
+                {o.rotulo}
+                {o.detalhe && (
+                  <span className="mt-0.5 block text-xs font-normal text-muted-foreground">
+                    {o.detalhe}
+                  </span>
+                )}
+              </span>
             </Button>
           );
         })}

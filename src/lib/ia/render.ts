@@ -133,8 +133,9 @@ export const MARCA_GRAFICO = /^\u0000grafico:(\d+)\u0000$/;
 //
 //   ```sugestoes   ["Pergunta curta", …]               1–3, cada ≤60
 //                  → chips de continuação no FIM da resposta (tocar envia)
-//   ```escolha     {"pergunta","opcoes":[{"rotulo","valor"?}]}  2–5 opções
-//                  → botões inline; tocar envia `valor ?? rotulo`
+//   ```escolha     {"pergunta","opcoes":[{"rotulo","valor"?,"detalhe"?}]}  2–5
+//                  opções → botões inline (`detalhe` ≤60 vira a segunda
+//                  linha); tocar envia `valor ?? rotulo`
 //   ```rascunho    {"canal","para"?,"assunto"?,"texto"}
 //                  → mensagem pronta editável + Copiar / Abrir no WhatsApp
 //   ```passos      {"titulo"?,"itens":[{"texto","detalhe"?}]}  2–8
@@ -157,6 +158,9 @@ const escolhaSchema = z.object({
       z.object({
         rotulo: z.string().trim().min(1).max(40),
         valor: z.string().trim().min(1).max(120).optional(),
+        // segunda linha do botão (026/FR-008): fato vindo de tool que
+        // ajuda a escolher — situação, turma, próximo encontro
+        detalhe: z.string().trim().min(1).max(60).optional(),
       })
     )
     .min(2)
