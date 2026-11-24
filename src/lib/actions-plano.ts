@@ -506,30 +506,19 @@ export async function responderPlanoComRecesso(
   )
     return responderPlano(planoId, acao, undefined, duplaId);
 
-  // mudou: fecha a versão antiga com o motivo do ajuste e propõe a
-  // recalculada — proposta de lado nasce aceita, é o "aprovar no mesmo
-  // gesto" da spec
-  const rc = await supabase.rpc("plano_responder", {
+  // mudou: fecha a versão antiga e propõe a recalculada na MESMA
+  // transação (0236) — se a proposta falhar, o fechamento desfaz e a
+  // versão vigente continua de pé. Proposta de lado nasce aceita: é o
+  // "aprovar no mesmo gesto" da spec.
+  const { data, error } = await supabase.rpc("plano_substituir", {
     p_plano: planoId,
-    p_acao: "contestar",
-    p_motivo: "A decisão de recesso mudou no aceite — versão recalculada.",
-  });
-  const rcLido = lerRpc(rc.data, rc.error);
-  if ("error" in rcLido) return rcLido;
-  const { data, error } = await supabase.rpc("plano_propor", {
     p_dupla: duplaId,
     p_escopo: escopo,
+    p_motivo: "A decisão de recesso mudou no aceite — versão recalculada.",
     p_via: "app",
   });
   const r = lerRpc(data, error);
-  if ("error" in r) {
-    // janela residual (corrida ou infra): a antiga já é terminal e não
-    // há revive — a saída limpa é um plano_substituir definer (contestar
-    // + propor na mesma transação), sugestão anotada no relatório
-    return {
-      error: `${r.error} A versão anterior já foi encerrada. Fale com a coordenação se a nova não apareceu.`,
-    };
-  }
+  if ("error" in r) return r;
   const aviso = await avisoPlanoEmail(ctx, duplaId);
   await emitirProdutoEvento(supabase, {
     superficie: "ficha_dupla",

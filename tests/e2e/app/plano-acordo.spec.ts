@@ -72,7 +72,16 @@ function escopo(numeros: number[], ritmo = 2) {
 const rpc = (jwt: string, fn: string, body: unknown) =>
   restComoUsuario(`rpc/${fn}`, jwt, { method: "POST", body }).then((r) =>
     r.json()
-  ) as Promise<{ ok?: boolean; error?: string; id?: string; versao?: number }>;
+  ) as Promise<{
+    ok?: boolean;
+    error?: string;
+    id?: string;
+    versao?: number;
+    status?: string;
+    sessao_id?: string;
+    idempotente?: boolean;
+    substituido?: boolean;
+  }>;
 
 const propor = (jwt: string, dupla = DUPLA, esc = escopo([3, 4])) =>
   rpc(jwt, "plano_propor", { p_dupla: dupla, p_escopo: esc, p_via: "app" });
@@ -99,6 +108,29 @@ const aplicar = (
     ...extra,
   });
 
+const substituir = (
+  jwt: string,
+  plano: string,
+  esc = escopo([3, 4]),
+  motivo = "A decisão de recesso mudou no aceite — versão recalculada."
+) =>
+  rpc(jwt, "plano_substituir", {
+    p_plano: plano,
+    p_dupla: DUPLA,
+    p_escopo: esc,
+    p_motivo: motivo,
+    p_via: "app",
+  });
+
+const aplicarSessao = (jwt: string, plano: string, dataHora: string) =>
+  rpc(jwt, "plano_aplicar_sessao", {
+    p_plano: plano,
+    p_numeros: [3, 4],
+    p_data_hora: dataHora,
+    p_duracao_min: 120,
+    p_via: "app",
+  });
+
 async function planoVivo() {
   const [p] = await buscarViaServiceRole<
     { id: string; status: string; versao: number }[]
@@ -114,6 +146,7 @@ test.describe("plano ficar em dia persistido (459)", () => {
 
   test.beforeEach(async () => {
     await limparViaServiceRole("dupla_planos", `dupla_id=eq.${DUPLA}`);
+    await limparViaServiceRole("notificacoes", "tipo=eq.plano_proposto");
     await limparEncontrosDaDupla(DUPLA);
     await convergirDuplaAtiva(DUPLA);
     // o calendário e2e tem recesso (dez–jan) que cruza a janela hoje+30 boa
@@ -271,6 +304,96 @@ test.describe("plano ficar em dia persistido (459)", () => {
     // novo acordo nasce como versão 2
     const v2 = await propor(jwtMentor);
     expect(v2).toMatchObject({ ok: true, versao: 2 });
+  });
+
+  test("substituição no aceite é atômica: fecha a antiga e propõe a nova na mesma transação", async () => {
+    const jwtMentor = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
+
+    const prop = await propor(jwtMentor);
+    expect(prop).toMatchObject({ ok: true, versao: 1, status: "aceito" });
+
+    const sub = await substituir(jwtMentor, prop.id!);
+    expect(sub).toMatchObject({
+      ok: true,
+      versao: 2,
+      status: "aceito",
+      substituido: true,
+    });
+    expect(sub.id).toBeTruthy();
+
+    const [antiga] = await buscarViaServiceRole<{ status: string }[]>(
+      "dupla_planos",
+      `id=eq.${prop.id!}&select=status`
+    );
+    expect(antiga.status).toBe("contestado");
+    const [nova] = await buscarViaServiceRole<{ status: string }[]>(
+      "dupla_planos",
+      `id=eq.${sub.id!}&select=status`
+    );
+    expect(nova.status).toBe("aceito");
+
+    // escopo inválido não pode deixar a dupla sem plano: o fechamento da
+    // versão nova desfaz junto e a antiga continua em vigor
+    const falha = await substituir(jwtMentor, sub.id!, escopo([99]));
+    expect(falha.error).toMatch(/fora da trilha|encontro/i);
+    const [viva] = await buscarViaServiceRole<{ status: string }[]>(
+      "dupla_planos",
+      `id=eq.${sub.id!}&select=status`
+    );
+    expect(viva.status).toBe("aceito");
+  });
+
+  test("a notificação de proposta já nasce com autoria no banco", async () => {
+    const jwtMentor = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
+
+    await propor(jwtMentor);
+    const [n] = await buscarViaServiceRole<
+      { titulo: string; corpo: string }[]
+    >(
+      "notificacoes",
+      "tipo=eq.plano_proposto&order=created_at.desc&limit=1&select=titulo,corpo"
+    );
+    expect(n.titulo).toContain("em vigor");
+    expect(n.corpo).toMatch(/combinou o plano/i);
+    expect(n.corpo).not.toMatch(/Tem um plano pra vocês/);
+  });
+
+  test("plano_aplicar_sessao é idempotente no banco e recusa data diferente", async () => {
+    const jwtMentor = await jwtDoUsuario(MENTOR_EMAIL, SENHA);
+    const jwtJovem = await jwtDoUsuario(JOVEM_EMAIL, SENHA);
+
+    const prop = await propor(jwtMentor);
+    await responder(jwtJovem, prop.id!, "aceitar");
+    const quando = `${hoje(3)}T19:00:00-03:00`;
+
+    const s1 = await aplicarSessao(jwtMentor, prop.id!, quando);
+    expect(s1).toMatchObject({ ok: true });
+    expect(s1.sessao_id).toBeTruthy();
+
+    const s2 = await aplicarSessao(jwtMentor, prop.id!, quando);
+    expect(s2).toMatchObject({
+      ok: true,
+      idempotente: true,
+      sessao_id: s1.sessao_id,
+    });
+
+    const rows = await buscarViaServiceRole<
+      { numero: number; sessao_id: string | null }[]
+    >(
+      "encontros",
+      `dupla_id=eq.${DUPLA}&numero=in.(3,4)&select=numero,sessao_id`
+    );
+    expect(rows).toHaveLength(2);
+    expect(new Set(rows.map((r) => r.sessao_id))).toEqual(
+      new Set([s1.sessao_id])
+    );
+
+    const outraData = await aplicarSessao(
+      jwtMentor,
+      prop.id!,
+      `${hoje(4)}T19:00:00-03:00`
+    );
+    expect(outraData.error).toMatch(/já está marcada/i);
   });
 
   test("fronteira de papel: lado propõe, estranho não responde, RLS trava", async () => {
