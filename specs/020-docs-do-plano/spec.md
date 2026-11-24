@@ -48,6 +48,7 @@
 
 - Semana sem encontro do escopo (recesso, gap): o lazy não gera roteiro para semana vazia.
 - Regenerar semana já publicada: cria versão nova; a publicada anterior vira `substituido` e segue legível (trilha), não some nem é reescrita.
+- Edição concorrente: o rascunho carrega `versao`/`updated_at`; salvar exige a versão lida e conflito recarrega/mostra a diferença — nunca last-write-wins silencioso. `editado_por`/`publicado_por` registram autoria.
 - Plano `contestado`/`expirado`: roteiros vigentes marcam-se inválidos e a próxima proposta recria da versão nova.
 - Fusão (spec 018): sessão cobrindo 2 passos — o roteiro segue a **semana/passo**; a fusão aparece como nota "esta sessão cobre os passos N e N+1" no roteiro da âncora (`sessao_id` no encontro).
 - `escopo` sem `passos` (plano legado da 0219): roteiros lazy não geram — o doc lê o que existe.
@@ -58,7 +59,7 @@
 ## Requisitos funcionais
 
 - **FR-001:** o doc do combinado é renderização determinística de `dupla_planos.escopo` + metadados (proponente, versão, janela, decisões de ritmo/recesso) — um doc por versão do plano, sem tabela nova, sem IA; introduzido junto com a spec 017.
-- **FR-002:** roteiros semanais persistidos por plano/número/versão em `dupla_plano_roteiros` com `conteudo` estruturado (blocos), `status` (`rascunho`/`publicado`/`substituido`), `plano_versao`, `gerado_por/via`, `gerado_em`, `publicado_em` — DDL completo (RLS, grants, índices) no recon §5.3.
+- **FR-002:** roteiros semanais persistidos por plano/número/versão em `dupla_plano_roteiros` com `conteudo` estruturado (blocos), `status` (`rascunho`/`publicado`/`substituido`), `plano_versao`, `gerado_por/via`, `gerado_em`, `editado_por`, `publicado_por`, `publicado_em` — DDL completo (RLS, grants, índices) no recon §5.3.
 - **FR-003:** geração lazy: primeiro encontro agendado → roteiro 1; encontro N concluído → roteiro N+1; idempotente por (plano, número); nunca o lote inteiro e nunca N+2.
 - **FR-004:** geração sob demanda: coordenação e auxiliar (`supervisiona_dupla`) escolhem a semana e geram; **qualquer um dos quatro com acesso ao plano** (mentor, jovem, auxiliar, coordenação) vê o preview, revisa/edita o rascunho e publica, com autoria e validação do conteúdo antes de persistir. Publicar não é exclusivo da coordenação.
 - **FR-005:** mudança de `plano.versao` invalida roteiros derivados (marca visual + caminho de regeneração); versão nova marca a anterior como `substituido`, nunca apaga nem reescreve — o índice único do vigente é parcial (`where status='publicado'`), a unique completa é `(plano_id, numero, versao)`.
@@ -76,7 +77,7 @@
 
 ## Entidades e dados
 
-- Nova: `dupla_plano_roteiros` (DDL sugerida completa no recon §5.3 — colunas, RLS, grants, policies, índices): id, dupla_id, plano_id, numero, versao, plano_versao, conteudo jsonb, status (`rascunho`/`publicado`/`substituido`), gerado_por, gerado_via, gerado_em, publicado_em.
+- Nova: `dupla_plano_roteiros` (DDL sugerida completa no recon §5.3 — colunas, RLS, grants, policies, índices): id, dupla_id, plano_id, numero, versao, plano_versao, conteudo jsonb, status (`rascunho`/`publicado`/`substituido`), gerado_por, gerado_via, gerado_em, editado_por, publicado_por, publicado_em.
 - Reuso: `dupla_planos.escopo` (doc do combinado), `encontro_guia_ajustes` (ajustes por dupla — absorvidos pelo roteiro vigente), `docs/rag/roteiro-encontro-*.md` (fonte), `dupla_plano_eventos` (audit do ciclo de vida, se couber).
 - Jobs: novo passo no tick ou RPC `roteiros_lazy_tick` service-role (espelho do `plano_ciclo`).
 
