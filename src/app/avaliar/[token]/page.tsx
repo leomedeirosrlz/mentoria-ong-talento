@@ -9,6 +9,7 @@ import { demoRole } from "@/lib/demo/mode";
 import {
   avaliacaoPorToken,
   linkAvaliacaoMeta,
+  temMediaDpp,
 } from "@/lib/queries-avaliacao";
 import { formatDiaSemanaHora } from "@/lib/ciclo";
 import { sharedOg } from "@/lib/og";
@@ -63,9 +64,14 @@ export default async function AvaliarTokenPage({
 
   // a trilha decide se o toggle "mentor pode ler" aparece — a RPC pública
   // não a devolve de propósito (nem encontro_id); leitura coord-scope no
-  // servidor, fora do payload do client
+  // servidor, fora do payload do client. E o lote da média decide a copy
+  // de privacidade (027/FR-003): sem ≥3 respostas não há média a prometer
   const meta =
     info && TOKEN_RE.test(token) ? await linkAvaliacaoMeta(token) : null;
+  const temMedia =
+    meta?.trilha === "especialista"
+      ? false
+      : ((meta && (await temMediaDpp(meta.dupla_id))) ?? true);
 
   // data+dia do encontro pra contextualizar — "terça-feira, 14/10 às 19:00"
   const quando =
@@ -145,6 +151,7 @@ export default async function AvaliarTokenPage({
             <AvaliarTokenFlow
               token={token}
               trilha={meta?.trilha ?? null}
+              temMedia={temMedia}
               jaRegistrada={info.status === "respondido" || !!info.respondida}
               primeiroNome={
                 info.alvo?.jovem_nome?.trim().split(/\s+/)[0] ?? null

@@ -911,7 +911,10 @@ export type Notificacao = {
     // plano_proposto de membro (ver relerPlanoPropostoDeMembro)
     | "plano_proposto"
     | "plano_aceito"
-    | "plano_contestado";
+    | "plano_contestado"
+    // 0219/0220 — lembrete do plano + intervenção sugerida pela Liza
+    | "plano_lembrete"
+    | "plano_intervencao";
   titulo: string;
   corpo: string | null;
   href: string | null;

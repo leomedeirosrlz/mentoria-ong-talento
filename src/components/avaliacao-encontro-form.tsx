@@ -40,6 +40,7 @@ export function AvaliacaoEncontroForm({
   trilha,
   primeiroNome,
   embutido = false,
+  temMedia = true,
   onEnviado,
 }: {
   /** Caminho público /avaliar/<token>. */
@@ -49,6 +50,9 @@ export function AvaliacaoEncontroForm({
   /** 'dpp' | 'especialista' — decide o toggle de visibilidade do mentor. */
   trilha: string;
   primeiroNome?: string | null;
+  /** A dupla já tem o lote da média (≥3 respostas) — sem ele a copy não
+   *  promete média que não existe (027/FR-003). */
+  temMedia?: boolean;
   /** Dentro de diálogo, o título já diz o encontro e a privacidade: o cabeçalho
    *  de contexto (saudação, título, privacidade) some e a pergunta 1 vem primeiro. */
   embutido?: boolean;
@@ -127,7 +131,7 @@ export function AvaliacaoEncontroForm({
           <p className="mx-auto mt-2 max-w-sm text-sm leading-relaxed text-muted-foreground">
             {pedidoAjuda
               ? `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""} por contar. A coordenação foi avisada na hora e fala com você. O combinado do programa é responder em 1 dia útil.`
-              : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. ${privacidadeAvaliacao(trilha)} Pode fechar esta página.`}
+              : `Obrigado${primeiroNome ? `, ${primeiroNome}` : ""}. ${privacidadeAvaliacao(trilha, temMedia)} Pode fechar esta página.`}
           </p>
         </div>
       ) : (
@@ -153,7 +157,7 @@ export function AvaliacaoEncontroForm({
                   1 minuto · só a nota é obrigatória
                 </p>
                 <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
-                  {privacidadeAvaliacao(trilha)}
+                  {privacidadeAvaliacao(trilha, temMedia)}
                 </p>
               </div>
             </div>
@@ -353,8 +357,10 @@ export function AvaliacaoEncontroForm({
                   <span className="font-medium">
                     Quero que meu mentor leia esta avaliação
                   </span>{" "}
-                  · normalmente ele só vê a média. Marque pra mostrar esta
-                  resposta inteira a ele.
+                  ·{" "}
+                  {temMedia
+                    ? "normalmente ele só vê a média. Marque pra mostrar esta resposta inteira a ele."
+                    : "ele não lê suas avaliações; a média só aparece a partir de 3 respostas. Marque pra mostrar esta resposta inteira a ele."}
                 </span>
               </label>
             )}

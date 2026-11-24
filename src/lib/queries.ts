@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { comparaNome, registroTardio } from "./ciclo";
 import { relerPlanoPropostoDeMembro } from "./notificar";
+import { relerTitulosNotificacao } from "./notificacao-releitura";
 import type { DuplaDesfecho } from "./dupla-desfecho";
 import {
   audienciasDe,
@@ -1059,7 +1060,7 @@ export const getNotificacoes = cache(
           (data ?? []) as Notificacao[]
         )
       : ((data ?? []) as Notificacao[]);
-    return { itens, naoLidas: count ?? 0 };
+    return { itens: relerTitulosNotificacao(itens), naoLidas: count ?? 0 };
   }
 );
 

@@ -10,6 +10,7 @@ import { comparaNome, registroTardio, saudadeDaDupla, semanaBounds, toDateStr } 
 import type { DiaSaude } from "../relatorios/dados";
 import type { RecorteCsv } from "../relatorios/csv-core";
 import { slotsLivresEspecialista } from "./agenda";
+import { relerTitulosNotificacao } from "../notificacao-releitura";
 import {
   numerosMarcadosDe,
   numerosRealizadosDe,
@@ -839,11 +840,13 @@ export function demoNotificacoes(
   naoLidas: number;
 } {
   const agora = new Date().toISOString();
-  const lista = [...(getDemoData().notificacoes[role] ?? [])]
-    .map((n) =>
-      n.lida_em == null && lidas.has(n.id) ? { ...n, lida_em: agora } : n
-    )
-    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+  const lista = relerTitulosNotificacao(
+    [...(getDemoData().notificacoes[role] ?? [])]
+      .map((n) =>
+        n.lida_em == null && lidas.has(n.id) ? { ...n, lida_em: agora } : n
+      )
+      .sort((a, b) => b.created_at.localeCompare(a.created_at))
+  );
   return {
     itens: lista.slice(0, 15),
     naoLidas: lista.filter((n) => n.lida_em == null).length,
@@ -2530,6 +2533,15 @@ export function demoAvaliacaoLinkMeta(
     dupla_id: l.dupla_id,
     trilha: d?.trilha ?? "dpp",
   };
+}
+
+/** Lote da média da dupla (≥3 respostas) — mesmo critério da RPC
+ *  avaliacao_media_dpp; a copy de privacidade do form público usa pra não
+ *  prometer média que não existe (027/FR-003). */
+export function demoTemMediaDpp(duplaId: string): boolean {
+  return (
+    getDemoData().avaliacoes.filter((a) => a.dupla_id === duplaId).length >= 3
+  );
 }
 
 /** As avaliações que a persona mentorada enviou — branch exists(jovem_duplas)

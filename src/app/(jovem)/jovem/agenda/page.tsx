@@ -351,10 +351,20 @@ export default async function JovemAgenda() {
         numero: e.numero,
         realizado_em: e.realizado_em,
         trilha: trilhaPorDupla.get(e.dupla_id) ?? "dpp",
+        duplaId: e.dupla_id,
         rotulo: rotuloDaLinha(e),
         sessao: sessao.length > 1 ? sessao : undefined,
       })
     );
+  // lote da média por dupla (≥3 respostas, FR-003): a copy do toggle e do
+  // form de avaliar promete média só quando ela existe de fato
+  const contagemDpp = new Map<string, number>();
+  for (const a of avaliacoes)
+    if (trilhaPorDupla.get(a.dupla_id) !== "especialista")
+      contagemDpp.set(a.dupla_id, (contagemDpp.get(a.dupla_id) ?? 0) + 1);
+  const mediaPorDupla = new Map<string, boolean>(
+    [...contagemDpp].map(([d, n]) => [d, n >= 3])
+  );
   const ctxPorEncontro: Record<string, EncontroCtx> = Object.fromEntries(
     encontros.map((e) => [
       e.id,
@@ -611,6 +621,7 @@ export default async function JovemAgenda() {
           pendentes={avaliacoesPendentes}
           retro={{ duplaId: duplaDpp?.id ?? null, numeros: numerosRetro }}
           primeiroNome={primeiroNome}
+          mediaPorDupla={mediaPorDupla}
         />
       )}
 
@@ -905,6 +916,7 @@ export default async function JovemAgenda() {
                         rotulo={rotuloDaLinha(e)}
                         nota={notaSessaoCoberta(e)}
                         meId={me?.id ?? null}
+                        temMedia={mediaPorDupla.get(e.dupla_id) ?? false}
                       />
                     ),
                   };

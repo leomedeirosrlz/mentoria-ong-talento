@@ -52,6 +52,7 @@ import {
   type ResolucaoPar,
 } from "@/lib/importar-duplas";
 import { notificar, relerPlanoPropostoDeMembro } from "./notificar";
+import { relerTitulosNotificacao } from "./notificacao-releitura";
 import {
   agendarEncontroCore,
   marcarSaidaMentoradoCore,
@@ -5324,7 +5325,9 @@ export async function listarNotificacoes() {
   }
   return {
     ok: true,
-    itens: await relerPlanoPropostoDeMembro(supabase, eu, data ?? []),
+    itens: relerTitulosNotificacao(
+      await relerPlanoPropostoDeMembro(supabase, eu, data ?? [])
+    ),
     naoLidas: count ?? 0,
   };
 }

@@ -17,10 +17,14 @@
 // Esperado = oficiais já vencidos; atraso = esperado − realizados. O
 // mentor@ (Otávio, capacidade 3) cobre os dois lados do semáforo — d1 em
 // atenção e d13 em risco — pro "ficar em dia" ter gatilho na visão dele.
-//   atenção  d1  Otávio × Ana         — registro pendente: o 5º realizado
-//               ficou >24h sem registro. A âncora segue completa (6
-//               encontros, 7º marcado) — só a entrega falta. Estável a
-//               semana toda
+//   atenção  d1  Otávio × Ana         — atraso + registro pendente +
+//               avaliação pendente: o enc 6 oficial (terça desta semana)
+//               vence sem row — atraso-1 de terça em diante e a Ana vê o
+//               retroativo ("o 6º era na semana de dd/mm… vocês se
+//               encontraram?"). O enc 7 já está marcado, então o
+//               preventivo não dispara. O 5º realizado ficou >24h sem
+//               registro e sem a estrela dela — o link /avaliar do enc 5
+//               segue vivo. É o login jovem@realiza.test
 //   risco    d13 Otávio × Larissa     — 2+ atrasos: encs 4–6 devendo (2
 //               passos agendáveis dom–seg, 3 de terça em diante — o card
 //               "ficar em dia" abre na conta dele a semana toda)
@@ -55,6 +59,7 @@
 // Senha das contas de login: DEMO_PASSWORD (default de staging, ver código).
 
 import { createHash } from "node:crypto";
+import { visivelMentor } from "./seed-visibilidade.mjs";
 
 const URL_ = process.env.E2E_SUPABASE_URL;
 const KEY = process.env.E2E_SUPABASE_SERVICE_ROLE_KEY;
@@ -605,9 +610,12 @@ const duplas = [
 // "agendado" antes disso — o gerador trata a borda. Semáforo: 6=ok,
 // 5 sem vigente=atenção/atraso, ≤4=risco (≥2 atrasos em qualquer weekday).
 const PLANO_ENCONTROS = {
-  // registro do 5º pendente (na âncora) — a atenção do mentor@: realizado
-  // >24h sem registro, estável a semana toda como o pendente da d11
-  [D.d1]: { feitos: 6, hora: "19:00", proximo: true, duracao: 90, avalPendente: 6, pendente: 5 },
+  // opção B′ da spec 027: o enc 6 integral sai — a terça oficial desta
+  // semana vence sem row → atraso-1 a partir de terça + registro_retroativo
+  // na home da Ana. A âncora de pendências recalcula pro enc 5: registro
+  // do mentor (>24h, como a d11) e a estrela dela — link /avaliar vivo.
+  // O enc 7 agendado suprime o preventivo (gate !proximo lê "já marcou").
+  [D.d1]: { feitos: 5, hora: "19:00", proximo: true, duracao: 90, avalPendente: 5, pendente: 5 },
   [D.d2]: { feitos: 5, hora: "19:00", proximo: false, duracao: 60 },         // atraso/sem data: faltou o 6º e não marcou
   [D.d3]: { feitos: 6, hora: "19:30", proximo: true, duracao: 60, apoio: true }, // apoio aberto (fora do semáforo) → ok
   [D.d4]: { feitos: 6, hora: "18:00", proximo: true, duracao: 60 },
@@ -731,7 +739,7 @@ function registrosDaDupla(duplaId, mentorId, plano,
           sentimento: marcado ? "mais_ou_menos" : i % 2 ? "muito_bem" : "bem",
           avancei: "sim", temas: ["vinculo", "clareza"],
           comentario: i === 1 ? "Primeira vez que contei minha história toda pra alguém de fora." : null,
-          avaliacao_visivel_mentor: true,
+          avaliacao_visivel_mentor: visivelMentor(i),
           created_at: cal.iso(i, "22:30"),
         });
       }
@@ -867,15 +875,14 @@ const avaliados = avl.map((a) => a.encontro_id);
 if (avaliados.length)
   await patch(`avaliacao_links?encontro_id=in.(${avaliados.join(",")})`,
     { status: "respondido", respondido_em: iso(new Date(Date.now() - 12 * 36e5)) });
-// Ana (jovem com login): encontro 6 fica pendente e válido — aparece nas
-// "Suas avaliações" do /jovem. Só existe link quando o enc 6 saiu
-// "realizado" (terça 19h passada); antes disso o patch é no-op e a Ana
-// simplesmente não tem avaliação pendente na semana
-const encAna6 = uid((0x300 << 8) + 6);
-await patch(`avaliacao_links?encontro_id=eq.${encAna6}`,
+// Ana (jovem com login): o link do encontro 5 fica pendente e válido —
+// aparece nas "Suas avaliações" do /jovem. Na d1 B′ (spec 027) a âncora é
+// o enc 5, sem o qual a avaliação pendente virava `expirado` silencioso
+const encAna5 = uid((0x300 << 8) + 5);
+await patch(`avaliacao_links?encontro_id=eq.${encAna5}`,
   { status: "pendente", expira_em: iso(new Date(Date.now() + 14 * DIA)) });
 // links mintados sem avaliação nos encontros passados → expirado
-await patch(`avaliacao_links?status=eq.pendente&dupla_id=gte.de000000-0000-4000-8000-000000000000&dupla_id=lt.de000000-0000-4000-8001-000000000000&encontro_id=not.eq.${encAna6}`,
+await patch(`avaliacao_links?status=eq.pendente&dupla_id=gte.de000000-0000-4000-8000-000000000000&dupla_id=lt.de000000-0000-4000-8001-000000000000&encontro_id=not.eq.${encAna5}`,
   { status: "expirado" });
 
 console.log("instrumentos (links + respostas)…");
@@ -1058,6 +1065,10 @@ await post("notificacoes", [
   // Larissa é avisada da devolutiva mais recente da trilha dela
   { id: uid(0xf10), profile_id: jovemProfile, tipo: "sugestao_especialista", titulo: "Seu mentor sugeriu um especialista", corpo: "Ele registrou um tema pra você — confirme ou ajuste na página de especialistas.", href: "/jovem/especialistas", created_at: SUG_ANA_QUANDO },
   { id: uid(0xf11), profile_id: larissaProfile, tipo: "devolutiva_especialista", titulo: "Nova devolutiva da trilha", corpo: "Luísa Camargo registrou uma devolutiva pra você.", href: "/jovem/especialistas", created_at: iso(new Date(Date.now() - 3 * DIA)) },
+  // 027 — corpo longo: o "Ler mais"/"Ler menos" do popover fica demonstrável
+  // nas contas de staging (o aviso chega ao mentor e à jovem, como o real)
+  { id: uid(0xf20), profile_id: P.andre, tipo: "comunicado", titulo: "Semana da avaliação por terceiros", corpo: "Pessoal: a partir desta semana cada dupla convida 3 pessoas do círculo do jovem pra avaliação por terceiros — família, amigo, professor, colega. O convite sai pela ficha da dupla, a pessoa responde em 5 minutos pelo celular e a consolidação aparece pra vocês assim que fechar. Quem ainda não emitiu, aproveita o encontro da semana.", href: "/#avisos", created_by: P.coord, created_at: iso(new Date(Date.now() - 2 * DIA)) },
+  { id: uid(0xf21), profile_id: jovemProfile, tipo: "comunicado", titulo: "Semana da avaliação por terceiros", corpo: "Turma: chegou a semana de convidar as 3 pessoas do seu círculo pra avaliação por terceiros — família, amiga de infância, professor, colega de time. O convite sai por aqui, a pessoa responde em 5 minutos pelo celular e você acompanha na sua página. Se faltar resposta, a gente lembra na quinta.", href: "/#avisos", created_by: P.coord, created_at: iso(new Date(Date.now() - 2 * DIA)) },
 ]);
 
 // especialista_grade: agendas dos especialistas pra projeção de slots
