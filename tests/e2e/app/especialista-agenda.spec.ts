@@ -358,7 +358,7 @@ test.describe("mentor especialista — agenda (REALIZA-111)", () => {
       esp.getByText("Horários de Esp", { exact: true })
     ).toBeVisible();
     await expect(
-      esp.getByText(/Sessões de 1h · escolhe um horário/)
+      esp.getByText(/Sessões de 1h\. Escolha um horário/)
     ).toBeVisible();
     // desde a 507 os chips agrupam por dia ("terça 24/11" + hora solta); o
     // rótulo completo "terça 24/11 às 20:00" vive no title do botão
