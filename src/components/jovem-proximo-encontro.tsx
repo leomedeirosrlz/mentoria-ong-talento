@@ -1,6 +1,6 @@
 import type { CSSProperties } from "react";
 import Link from "next/link";
-import { PencilSimple, Sparkle, VideoCamera } from "@phosphor-icons/react/dist/ssr";
+import { ArrowSquareOut, PencilSimple, Sparkle, VideoCamera } from "@phosphor-icons/react/dist/ssr";
 import { EditarLinkDialog } from "@/components/editar-link-dialog";
 import { JovemAgendarDialog } from "@/components/jovem-agendar-dialog";
 import { JovemAgendarSugestao } from "@/components/jovem-agendar-sugestao";
@@ -12,6 +12,7 @@ import {
   formatDiaSemana,
   linkSeguro,
   podeEntrarAgora,
+  provedorDaChamada,
   toDateStr,
 } from "@/lib/ciclo";
 import type { JovemEncontro } from "@/lib/queries-jovem";
@@ -99,8 +100,9 @@ export function ProximoEncontro({
         </p>
         <Acoes>
           {/* QW5: "Entrar" preenchido só na janela da chamada (30 min
-              antes → 2 h depois). Fora dela o link segue à mão, discreto;
-              sem link, a saída honesta é a agenda */}
+              antes → 2 h depois). Fora dela o link segue à mão — mas é a
+              ação primária mesmo assim (QA 25/11): cor de marca, o
+              provedor no rótulo e ícone de externo */}
           {link && podeEntrarAgora(proximo.data_hora) ? (
             <a
               href={link}
@@ -117,13 +119,13 @@ export function ProximoEncontro({
               href={link}
               target="_blank"
               rel="noopener noreferrer"
-              className={cn(
-                buttonVariants({ variant: "outline", size: "lg" }),
-                "w-full bg-background sm:w-auto"
-              )}
+              className={cn(buttonVariants({ size: "lg" }), "w-full sm:w-auto")}
             >
               <VideoCamera size={18} aria-hidden />
-              Link da chamada
+              {provedorDaChamada(link)
+                ? `Abrir no ${provedorDaChamada(link)}`
+                : "Abrir a chamada"}
+              <ArrowSquareOut size={16} aria-hidden />
               <span className="sr-only"> (abre em nova aba)</span>
             </a>
           ) : (

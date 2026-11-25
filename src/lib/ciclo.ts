@@ -2818,6 +2818,31 @@ export function linkSeguro(url: string | null | undefined): string | null {
   return url != null && /^https?:\/\//i.test(url) ? url : null;
 }
 
+/** O provedor da chamada pelo host — o rótulo do botão diz onde a pessoa
+ *  aterrissa ("Abrir no Google Meet"). null = link válido de provedor
+ *  desconhecido (ou link inseguro): aí vale o rótulo genérico. */
+export function provedorDaChamada(
+  url: string | null | undefined
+): string | null {
+  const seguro = linkSeguro(url);
+  if (!seguro) return null;
+  let host: string;
+  try {
+    host = new URL(seguro).hostname.toLowerCase();
+  } catch {
+    return null;
+  }
+  if (host === "meet.google.com") return "Google Meet";
+  if (host === "zoom.us" || host.endsWith(".zoom.us")) return "Zoom";
+  if (
+    host === "teams.microsoft.com" ||
+    host === "teams.live.com" ||
+    host.endsWith(".teams.microsoft.com")
+  )
+    return "Microsoft Teams";
+  return null;
+}
+
 /** Janela do "Entrar" na chamada (493/QW5): de 30 min antes a 2 h depois do
  *  horário marcado. Dentro dela a chamada é a ação primária; fora, o link
  *  segue acessível mas discreto — um "Entrar" preenchido o dia inteiro
