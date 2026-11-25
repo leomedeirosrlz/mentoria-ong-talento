@@ -46,7 +46,7 @@ export type PdmNo = PdmItem & { filhos: PdmNo[] };
 // ---------- constantes ----------
 
 export const PDM_MAX_METAS = 10;
-export const PDM_MAX_SUBITENS = 20;
+export const PDM_MAX_SUBITENS = 40;
 export const PDM_MAX_VISAO = 2000;
 
 export const PDM_STATUS_LABEL: Record<PdmItemStatus, string> = {
