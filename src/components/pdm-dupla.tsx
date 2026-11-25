@@ -290,8 +290,8 @@ export function PdmDupla({
             aria-label={`${progresso.atingidas} de ${progresso.total} metas atingidas`}
           >
             <div
-              className="h-full rounded-full bg-[var(--brand-lime)] transition-[width]"
-              style={{ width: `${progresso.pct}%` }}
+              className="h-full w-full origin-left rounded-full bg-[var(--brand-lime)] transition-transform"
+              style={{ transform: `scaleX(${progresso.pct / 100})` }}
             />
           </div>
         </div>

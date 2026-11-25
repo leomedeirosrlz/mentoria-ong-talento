@@ -427,8 +427,8 @@ function CardMentorado({
           className="mt-1.5 h-2 overflow-hidden rounded-full bg-muted"
         >
           <div
-            className="h-full rounded-full bg-[var(--ok)] transition-[width]"
-            style={{ width: `${pct}%` }}
+            className="h-full w-full origin-left rounded-full bg-[var(--ok)] transition-transform"
+            style={{ transform: `scaleX(${pct / 100})` }}
           />
         </div>
       </div>

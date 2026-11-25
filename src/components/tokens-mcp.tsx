@@ -16,6 +16,7 @@ import {
   useMemo,
   useState,
   useSyncExternalStore,
+  type CSSProperties,
 } from "react";
 import {
   Check,
@@ -243,8 +244,10 @@ export function TokensMcp({
         Copiar prompt com token
       </Button>
 
+      {/* revelação: o token único aparece sob a ação — cascata de
+          entrada (.animate-enter), não slide nem crossfade (spec 028) */}
       {tokenNovo && (
-        <div className="space-y-1.5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn-bg)]/40 p-2.5">
+        <div className="animate-enter space-y-1.5 rounded-lg border border-[var(--warn)]/40 bg-[var(--warn-bg)]/40 p-2.5">
           <p className="text-[11px] font-medium">
             Copie agora, o token não aparece de novo:
           </p>
@@ -293,10 +296,11 @@ export function TokensMcp({
         </div>
       ) : (
         <ul className="space-y-1.5">
-          {tokens.map((t) => (
+          {tokens.map((t, i) => (
             <li
               key={t.id}
-              className="flex items-center gap-2 rounded-lg border border-border px-2.5 py-2"
+              className="animate-enter flex items-center gap-2 rounded-lg border border-border px-2.5 py-2"
+              style={{ "--i": i } as CSSProperties}
             >
               <Key
                 size={14}

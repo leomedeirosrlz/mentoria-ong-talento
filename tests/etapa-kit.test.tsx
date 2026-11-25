@@ -90,6 +90,39 @@ describe("useTrocaDeEtapa", () => {
     expect(document.activeElement).toBe(alvo.querySelector("h2"));
     desmontar();
   });
+
+  it("direcaoInicial vale no mount — remount vindo de um Voltar não desliza 'pra frente'", () => {
+    function SondaVolta() {
+      const { direcao } = useTrocaDeEtapa(3, -1);
+      return <p data-p="dir">{direcao}</p>;
+    }
+    const { alvo, desmontar } = montar(<SondaVolta />);
+    expect(alvo.querySelector("[data-p=dir]")!.textContent).toBe("-1");
+    desmontar();
+  });
+
+  it("reiniciar volta à primeira etapa com direção de avanço e sem agenda", () => {
+    const { alvo, desmontar } = montar(<Sonda />);
+    act(() => clicar(botao(alvo, "prox")));
+    act(() => clicar(botao(alvo, "ant")));
+    act(() => clicar(botao(alvo, "reset")));
+    expect(alvo.querySelector("[data-p=etapa]")!.textContent).toBe("0");
+    expect(alvo.querySelector("[data-p=dir]")!.textContent).toBe("1");
+    desmontar();
+  });
+
+  it("a agenda de foco é consumida uma vez — o commit seguinte não refoca", () => {
+    const { alvo, desmontar } = montar(<Sonda />);
+    const h2 = alvo.querySelector("h2")!;
+    const espiar = vi.spyOn(h2, "focus");
+    act(() => clicar(botao(alvo, "prox")));
+    expect(espiar).toHaveBeenCalledTimes(1);
+    // commit novo sem pendente (reiniciar limpa a agenda): se a agenda
+    // re-disparasse, qualquer render futuro roubaria o foco de volta
+    act(() => clicar(botao(alvo, "reset")));
+    expect(espiar).toHaveBeenCalledTimes(1);
+    desmontar();
+  });
 });
 
 describe("Etapa", () => {
@@ -112,6 +145,18 @@ describe("Etapa", () => {
     expect(divs[1].style.getPropertyValue("--dir")).toBe("-8px");
     // hidden não desmonta: o input continua queryable → FormData íntegro
     expect(alvo.querySelector("input[name=a]")).not.toBeNull();
+    desmontar();
+  });
+
+  it("as='section' preserva o landmark do wizard por seções", () => {
+    const { alvo, desmontar } = montar(
+      <Etapa ativa direcao={1} as="section">
+        <input name="x" />
+      </Etapa>
+    );
+    const sec = alvo.querySelector("section");
+    expect(sec).not.toBeNull();
+    expect(sec!.style.getPropertyValue("--dir")).toBe("8px");
     desmontar();
   });
 });
@@ -153,6 +198,22 @@ describe("FadeTroca", () => {
     expect(document.activeElement).not.toBe(
       alvo.querySelector("[data-p=b]")!.parentElement
     );
+    desmontar();
+  });
+
+  it("centralizar rola o painel entrante pra área visível antes do foco", () => {
+    const rolar = vi.spyOn(HTMLElement.prototype, "scrollIntoView");
+    const { atualizar, desmontar } = montar(
+      <FadeTroca chave="a" foco centralizar>
+        <p>a</p>
+      </FadeTroca>
+    );
+    atualizar(
+      <FadeTroca chave="b" foco centralizar>
+        <p>b</p>
+      </FadeTroca>
+    );
+    expect(rolar).toHaveBeenCalled();
     desmontar();
   });
 });
@@ -243,6 +304,107 @@ describe("WizardPassos", () => {
     );
     expect((alvo.querySelectorAll(".animate-enter-x")[1] as HTMLElement).hidden).toBe(false);
     expect(recebidos).toHaveLength(0);
+    desmontar();
+  });
+
+  it("stepper marca aria-current=step e o pulo leva a direção do delta", () => {
+    const { alvo, desmontar } = montar(<Wizard onSubmit={() => {}} />);
+    const circulos = [...alvo.querySelectorAll("button[aria-label^='Etapa']")];
+    expect(circulos).toHaveLength(3);
+    expect(circulos[0].getAttribute("aria-current")).toBe("step");
+    expect(circulos[1].getAttribute("aria-current")).toBeNull();
+
+    // pular 0 → 2: mesma direção do Avançar (entra pela direita)
+    act(() => clicar(circulos[2]));
+    const etapas = alvo.querySelectorAll(".animate-enter-x");
+    expect((etapas[2] as HTMLElement).hidden).toBe(false);
+    expect(
+      (etapas[2] as HTMLElement).style.getPropertyValue("--dir")
+    ).toBe("8px");
+    expect(circulos[2].getAttribute("aria-current")).toBe("step");
+
+    // voltar é livre e entra pela esquerda
+    act(() => clicar(circulos[0]));
+    const deNovo = alvo.querySelectorAll(".animate-enter-x");
+    expect((deNovo[0] as HTMLElement).hidden).toBe(false);
+    expect(
+      (deNovo[0] as HTMLElement).style.getPropertyValue("--dir")
+    ).toBe("-8px");
+    desmontar();
+  });
+});
+
+// ── wizard com `required` no 2º passo: a validação mora na superfície ──
+function WizardValidacao() {
+  return (
+    <WizardPassos
+      passos={[
+        {
+          titulo: "Um",
+          icone: User,
+          conteudo: <input name="livre" />,
+        },
+        {
+          titulo: "Dois",
+          icone: FileText,
+          conteudo: <input name="obrig" required />,
+        },
+        {
+          titulo: "Três",
+          icone: Check,
+          conteudo: <input name="fim" />,
+        },
+      ]}
+      pending={false}
+      submitLabel="Salvar"
+      saveAnywhere
+      onSubmit={() => {}}
+    />
+  );
+}
+
+describe("WizardPassos — validação", () => {
+  it("pular pra frente com a etapa atual inválida fica e reporta", () => {
+    const { alvo, desmontar } = montar(<WizardValidacao />);
+    const circulos = [...alvo.querySelectorAll("button[aria-label^='Etapa']")];
+    // vai pro passo 2 (o do required) e tenta pular direto pro 3
+    act(() => clicar(circulos[1]));
+    const obrig = alvo.querySelector(
+      "input[name=obrig]"
+    ) as HTMLInputElement;
+    // jsdom não desenha o balão nativo — medimos a chamada, não o balão;
+    // o checkValidity na instância deixa o required determinístico
+    const reportar = vi.fn(() => true);
+    obrig.reportValidity = reportar;
+    obrig.checkValidity = () => false;
+    act(() => clicar(circulos[2]));
+    expect(reportar).toHaveBeenCalledTimes(1);
+    // ficou no passo 2 — o pulo pra frente exige a etapa atual válida
+    const etapas = alvo.querySelectorAll(".animate-enter-x");
+    expect((etapas[1] as HTMLElement).hidden).toBe(false);
+    expect((etapas[2] as HTMLElement).hidden).toBe(true);
+    desmontar();
+  });
+
+  it("submit no último passo encontra o inválido escondido, navega e reporta visível", () => {
+    const { alvo, desmontar } = montar(<WizardValidacao />);
+    const circulos = [...alvo.querySelectorAll("button[aria-label^='Etapa']")];
+    // vai pro último passo; o required vazio fica pra trás no 2º, `hidden`
+    act(() => clicar(circulos[2]));
+    const obrig = alvo.querySelector(
+      "input[name=obrig]"
+    ) as HTMLInputElement;
+    const reportar = vi.fn(() => true);
+    obrig.reportValidity = reportar;
+    obrig.checkValidity = () => false;
+    // o submit cobre TODAS as etapas: reportValidity num passo `hidden`
+    // falha calado, então o kit navega primeiro e só depois reporta
+    // (invalidoPendente — efeito pós-commit, não no handler)
+    const form = alvo.querySelector("form")!;
+    act(() => submeter(form));
+    const etapas = alvo.querySelectorAll(".animate-enter-x");
+    expect((etapas[1] as HTMLElement).hidden).toBe(false);
+    expect(reportar).toHaveBeenCalledTimes(1);
     desmontar();
   });
 });

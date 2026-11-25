@@ -3534,9 +3534,13 @@ export function AgendaCalendario({
                           )}
                         >
                           {passouN && (
+                            // fill ancorado na base: scaleY a partir do
+                            // bottom é o equivalente em transform do
+                            // height% (spec 028 — nada de transition
+                            // de layout)
                             <span
-                              className="absolute inset-x-0 bottom-0 bg-[var(--brand-lime)] transition-[height] duration-500 ease-snappy"
-                              style={{ height: `${pct}%` }}
+                              className="absolute inset-x-0 bottom-0 h-full origin-bottom bg-[var(--brand-lime)] transition-transform duration-500 ease-snappy"
+                              style={{ transform: `scaleY(${pct / 100})` }}
                             />
                           )}
                           {passouN && total > 0 && feitos < total && (

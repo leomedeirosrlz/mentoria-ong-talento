@@ -94,12 +94,12 @@ export function CaminhosFluxo({
             >
               <span
                 className={cn(
-                  "block h-full rounded-full transition-[width] duration-500 ease-snappy",
+                  "block h-full w-full origin-left rounded-full transition-transform duration-500 ease-snappy",
                   animate && "fill-grow"
                 )}
                 style={
                   {
-                    width: `${(c.pessoas / max) * 100}%`,
+                    transform: `scaleX(${c.pessoas / max})`,
                     backgroundColor: "var(--chart-2)",
                     ...(animate ? { "--i": idx } : {}),
                   } as CSSProperties

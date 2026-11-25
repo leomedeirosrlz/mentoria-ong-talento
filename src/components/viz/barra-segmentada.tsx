@@ -105,7 +105,10 @@ export function BarraSegmentada({
                   // legenda (no toque a legenda nomeada já cobre)
                   title={`${s.valor} ${s.rotulo}`}
                   // transition-[width]: update de dados (refresh/filtro)
-                  // interpola em vez de repaint seco — reduced-motion zera
+                  // interpola em vez de repaint seco — reduced-motion zera.
+                  // Exceção deliberada registrada da spec 028: segmentos
+                  // empilhados proporcionais não têm equivalente em
+                  // transform (scaleX quebraria as frações entre irmãos)
                   className={cn(
                     "transition-[width] duration-500 ease-snappy",
                     s.cls ?? SEGMENTO_NEUTRO
