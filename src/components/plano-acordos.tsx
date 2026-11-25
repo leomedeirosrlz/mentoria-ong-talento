@@ -33,6 +33,14 @@ import {
 import { toast } from "@/lib/toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { AcoesMenu } from "@/components/acoes-menu";
 import {
   SeletorDiaHora,
@@ -139,6 +147,10 @@ export function PlanoAcordosCard({
   const [decisaoLocal, setDecisaoLocal] = useState<Record<string, boolean>>(
     {}
   );
+  // aceite/contestação encerram a proposta — trava a fileira de resposta
+  // no mesmo instante em vez de esperar o revalidate (QA 25/11)
+  const [respondido, setRespondido] = useState(false);
+  const [confirmandoContestacao, setConfirmandoContestacao] = useState(false);
   const resumo = resumoCombinado(plano, realizados);
   const aberto = resumo.aberto;
   // a data do passo cruzou o número (QA 25/11): a tag explica a ordem
@@ -215,10 +227,18 @@ export function PlanoAcordosCard({
           : await responderPlano(plano.id, acao, undefined, duplaId);
       if ("error" in r) {
         setErro(r.error);
+        toast.error(r.error);
         return;
       }
+      setRespondido(true);
       if (r.novaVersao)
         toast.success("Versão recalculada já vale.");
+      else
+        toast.success(
+          acao === "aceitar"
+            ? "Combinado aceito."
+            : "Contestação enviada. A equipe foi avisada."
+        );
       router.refresh();
     });
   };
@@ -640,7 +660,7 @@ export function PlanoAcordosCard({
         </p>
       )}
 
-      {aberto && podeResponder && estado === "proposto_staff_falta_meu" && (
+      {aberto && podeResponder && !respondido && estado === "proposto_staff_falta_meu" && (
         <div className="flex flex-wrap gap-2 pt-1">
           <Button size="sm" disabled={pendente} onClick={() => responder("aceitar")}>
             <Check aria-hidden />
@@ -651,7 +671,7 @@ export function PlanoAcordosCard({
               size="sm"
               variant="outline"
               disabled={pendente}
-              onClick={() => responder("contestar")}
+              onClick={() => setConfirmandoContestacao(true)}
             >
               <X aria-hidden />
               Não serve pra mim
@@ -659,7 +679,7 @@ export function PlanoAcordosCard({
           )}
         </div>
       )}
-      {aberto && podeResponder && estado === "ativo_sem_minha_ciencia" && (
+      {aberto && podeResponder && !respondido && estado === "ativo_sem_minha_ciencia" && (
         <div className="flex flex-wrap gap-2 pt-1">
           <Button size="sm" disabled={pendente} onClick={() => responder("aceitar")}>
             <Check aria-hidden />
@@ -670,7 +690,7 @@ export function PlanoAcordosCard({
               size="sm"
               variant="outline"
               disabled={pendente}
-              onClick={() => responder("contestar")}
+              onClick={() => setConfirmandoContestacao(true)}
             >
               <X aria-hidden />
               Não serve pra mim
@@ -678,13 +698,13 @@ export function PlanoAcordosCard({
           )}
         </div>
       )}
-      {aberto && podeResponder && estado === "ativo" && contestavel && (
+      {aberto && podeResponder && !respondido && estado === "ativo" && contestavel && (
         <div className="space-y-2 pt-1">
           <Button
             size="sm"
             variant="outline"
             disabled={pendente}
-            onClick={() => responder("contestar")}
+            onClick={() => setConfirmandoContestacao(true)}
           >
             <X aria-hidden />
             Não serve pra mim
@@ -695,6 +715,41 @@ export function PlanoAcordosCard({
           </p>
         </div>
       )}
+
+      {/* QA 25/11: contestar encerra o plano — confirmação explícita
+          antes do POST, no padrão dos diálogos do app */}
+      <Dialog
+        open={confirmandoContestacao}
+        onOpenChange={setConfirmandoContestacao}
+      >
+        <DialogContent size="sm">
+          <DialogHeader>
+            <DialogTitle>O plano não serve pra você?</DialogTitle>
+          </DialogHeader>
+          <DialogDescription className="leading-relaxed">
+            A contestação encerra esse combinado. A equipe é avisada e um
+            plano novo pode nascer da conversa de vocês.
+          </DialogDescription>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmandoContestacao(false)}
+            >
+              Voltar
+            </Button>
+            <Button
+              variant="destructive"
+              disabled={pendente}
+              onClick={() => {
+                setConfirmandoContestacao(false);
+                responder("contestar");
+              }}
+            >
+              Sim, não serve pra mim
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {seletor && passoSeletor && sugSeletor && sugestoes && (
         <SeletorDiaHora
