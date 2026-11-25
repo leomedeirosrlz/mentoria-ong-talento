@@ -196,10 +196,10 @@ export default async function JovemPerfil({
           seed={me.id}
         />
         <div className="px-4 pb-5 sm:px-6 sm:pb-6">
-          {/* justify-start + wrap: com a foto o ghost fica colado no
-              avatar e os selos (ml-auto) caem pra linha de baixo em vez de
-              espremer em 390px — em uma linha só quando cabe */}
-          <div className="flex flex-wrap items-end justify-start gap-3">
+          {/* wrap só entre blocos: o grupo de selos é flex-nowrap e, quando
+              não cabe ao lado da foto, desce inteiro pra borda esquerda do
+              bloco — nunca quebra peça por linha nem invade a câmera */}
+          <div className="flex flex-wrap items-end justify-start gap-x-4 gap-y-3">
             <FotoPerfil
               nome={nomeTela}
               pasta={me.id}

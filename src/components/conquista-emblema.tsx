@@ -43,6 +43,7 @@ export function ConquistaEmblema({
   estado = "ganho",
   movimento = "entra",
   className,
+  sizeClassName,
 }: {
   glifo: ConquistaGlifo;
   /** o par da conquista — ignorado nos estados apagados */
@@ -51,27 +52,30 @@ export function ConquistaEmblema({
   estado?: "ganho" | "proximo" | "futuro";
   movimento?: MovimentoSelo;
   className?: string;
+  /** caixa responsiva com !important — o canvas repinta no clientWidth,
+   *  então a peça troca de medida sem redimensionar bitmap por CSS */
+  sizeClassName?: string;
 }) {
   const ganho = estado === "ganho";
   const anel =
     estado === "proximo" &&
     "ring-2 ring-[var(--destaque)] ring-offset-2 ring-offset-card";
   const squircle = (
-    <Squircle glifo={glifo} tom={tom} size={size} ganho={ganho} className={cn(anel, className)} />
+    <Squircle glifo={glifo} tom={tom} size={size} ganho={ganho} className={cn(anel, sizeClassName, className)} />
   );
   const arte = arteDoGlifo(glifo);
   if (!arte) return squircle;
   return (
     <span
       aria-hidden
-      className={cn("grid shrink-0 place-items-center rounded-[28%]", anel)}
+      className={cn("grid shrink-0 place-items-center rounded-[28%]", anel, sizeClassName)}
       style={{ width: size, height: size }}
     >
       <SeloCanvas
         arte={arte}
         size={size}
         movimento={ganho ? movimento : "quieto"}
-        className={cn(!ganho && "opacity-55 grayscale", className)}
+        className={cn(sizeClassName, !ganho && "opacity-55 grayscale", className)}
       />
     </span>
   );
