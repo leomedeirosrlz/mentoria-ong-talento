@@ -2188,7 +2188,7 @@ function PessoaRow({
             size={40}
           />
           <span className="min-w-0">
-            <span className="block truncate text-sm font-medium underline-offset-4 transition-colors group-hover:underline">
+            <span className="block text-sm font-medium underline-offset-4 transition-colors group-hover:underline">
               {marca ? (
                 <HighlightText
                   texto={p.nome_social ?? p.nome}
@@ -2599,7 +2599,7 @@ function MentoradoRow({
             <span className="flex items-center gap-1.5 text-sm font-medium">
               <span
                 className={cn(
-                  "truncate underline-offset-4 transition-colors group-hover:underline",
+                  "underline-offset-4 transition-colors group-hover:underline",
                   fora && "text-muted-foreground"
                 )}
               >

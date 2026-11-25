@@ -11,6 +11,7 @@ import { avatarPublicUrl } from "@/lib/avatar";
 import { Avatar } from "@/components/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
+import { ExpandirTexto } from "@/components/expandir-texto";
 import { cn } from "@/lib/utils";
 
 /** A anatomia rica do card de especialista (mock v6), extraída do
@@ -59,7 +60,7 @@ export function EspecialistaCatalogoCard({
         size={44}
       />
       <div className="min-w-0 flex-1">
-        <p className="truncate font-medium" title={nome}>
+        <p className="font-medium" title={nome}>
           {nome}
         </p>
         {linha && (
@@ -73,12 +74,18 @@ export function EspecialistaCatalogoCard({
             <span className="truncate">{lugar}</span>
           </p>
         )}
+        {/* QA 25/11: o badge dividia a mesma linha do nome e vencia o
+            truncate ("Sofia Nog…"). Ele desce pra linha própria — nome
+            nunca é o que cede */}
+        {badge && (
+          <Badge
+            variant="outline"
+            className={cn("mt-1.5", badge.cls)}
+          >
+            {badge.texto}
+          </Badge>
+        )}
       </div>
-      {badge && (
-        <Badge variant="outline" className={cn("shrink-0", badge.cls)}>
-          {badge.texto}
-        </Badge>
-      )}
     </div>
   );
 
@@ -119,9 +126,12 @@ export function EspecialistaCatalogoCard({
         )}
 
         {e.bio && (
-          <p className="line-clamp-2 text-sm leading-relaxed break-words text-muted-foreground sm:line-clamp-3">
+          <ExpandirTexto
+            linhas={2}
+            className="text-sm leading-relaxed break-words text-muted-foreground"
+          >
             {e.bio}
-          </p>
+          </ExpandirTexto>
         )}
 
         {/* ficha curta recolhível — campo vazio não renderiza (a bio segue

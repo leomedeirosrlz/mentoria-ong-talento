@@ -504,7 +504,7 @@ function DiretorioCard({
               size={44}
             />
             <span className="min-w-0 flex-1">
-              <span className="block truncate font-medium underline-offset-4 transition-colors group-hover:underline" title={nome}>
+              <span className="block font-medium underline-offset-4 transition-colors group-hover:underline" title={nome}>
                 {marca ? (
                   <HighlightText texto={nome} query={marca} />
                 ) : (
