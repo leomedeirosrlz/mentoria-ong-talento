@@ -16,7 +16,7 @@ A família de badges ficou poluída, estática e feia; o selo de nível vivia nu
 
 ## Requisitos
 
-- **FR-001** Header sem caixa: só as peças (até 3), 64px, `aria-label` com o nome; cada uma abre o detalhe da estante.
+- **FR-001** Header sem caixa: só as peças (até 3), 48px no mobile e 56px a partir de `sm`, `aria-label` com o nome; cada uma abre o detalhe da estante.
 - **FR-002** O jovem escolhe até 3 entre faixas ganhas e a estante; a ordem de toque é a ordem de exibição; com 3 marcadas as demais travam; "Usar sugestão" volta ao padrão (faixa atual + 2 mais recentes).
 - **FR-003** Estante, "Ainda por vir" e a régua de faixas ficam em expansões fechadas; a escolha rola dentro do dialog, nunca na página.
 - **FR-004** 390px e desktop sem rolagem lateral.

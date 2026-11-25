@@ -37,11 +37,13 @@ export function VitrineSelos({
   escolhidas: string[];
   nivel: NiveisJornada | null;
 }) {
+  // -ms-2 compensa a margem transparente da arte: a tinta da primeira peça
+  // nasce na mesma linha ótica do avatar e a caixa continua dentro do padding do card
   return (
     <div
       role="group"
       aria-label="Selos do perfil"
-      className="ml-auto flex items-center gap-0.5"
+      className="-ms-2 flex flex-nowrap items-end"
     >
       {pecas.map((p) => (
         <Dialog key={p.chave}>
@@ -49,12 +51,13 @@ export function VitrineSelos({
             aria-label={`${
               p.origem === "nivel" ? p.faixa.titulo : p.conquista.titulo
             }. Abrir detalhe`}
-            className="rounded-xl p-0.5 outline-none transition-transform duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none"
+            className="grid size-12 place-items-center rounded-xl outline-none transition-transform duration-150 ease-[cubic-bezier(0.2,0,0,1)] hover:-translate-y-0.5 focus-visible:ring-2 focus-visible:ring-ring motion-reduce:transition-none sm:size-14"
           >
             <ConquistaEmblema
               glifo={p.origem === "nivel" ? p.faixa.glifo : p.conquista.glifo}
               tom={p.origem === "nivel" ? p.faixa.tom : p.conquista.tom}
-              size={64}
+              size={48}
+              sizeClassName="size-12! sm:size-14!"
               movimento="vivo"
             />
           </DialogTrigger>
@@ -134,7 +137,7 @@ export function EscolherSelos({
               variant="ghost"
               size="icon-sm"
               aria-label="Escolher os selos do perfil"
-              className="text-muted-foreground"
+              className="ms-2 size-11! self-end text-muted-foreground"
             />
           }
         >
@@ -189,7 +192,8 @@ export function EscolherSelos({
                     <ConquistaEmblema
                       glifo={o.glifo}
                       tom={o.tom}
-                      size={52}
+                      size={48}
+                      sizeClassName="size-12! sm:size-14!"
                       movimento="quieto"
                     />
                     <span className="line-clamp-2 text-xs leading-tight font-medium">
