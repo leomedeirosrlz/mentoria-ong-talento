@@ -72,7 +72,7 @@ function EspecialistaPreview({ e }: { e: JovemEspecialista }) {
           </span>
         )}
         {experiencia && (
-          <span className="mt-1.5 line-clamp-2 block text-xs leading-relaxed text-muted-foreground">
+          <span className="mt-1.5 line-clamp-2 block break-words text-xs leading-relaxed text-muted-foreground">
             {experiencia}
           </span>
         )}
@@ -160,11 +160,11 @@ export function SugestaoEspecialistaCard({
           <p className="text-sm font-semibold">
             {autor} sugeriu um especialista pra você
           </p>
-          <p className="mt-1 text-sm leading-relaxed text-muted-foreground">
+          <p className="mt-1 text-sm leading-relaxed break-words text-muted-foreground">
             {s.demanda}
           </p>
           {s.motivo && (
-            <p className="mt-1.5 text-sm leading-relaxed">
+            <p className="mt-1.5 text-sm leading-relaxed break-words">
               <span className="font-medium">Objetivo:</span> {s.motivo}
             </p>
           )}
@@ -178,7 +178,7 @@ export function SugestaoEspecialistaCard({
           ) : s.desejado?.nome ? (
             // indicado fora do catálogo (inativo/removido): nome sem ficha
             // inventada — o resto o diálogo resolve na seleção
-            <p className="mt-1.5 text-sm">
+            <p className="mt-1.5 text-sm break-words">
               <span className="font-medium">Pensando em:</span>{" "}
               {s.desejado.nome}
             </p>

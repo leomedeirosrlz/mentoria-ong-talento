@@ -1,18 +1,17 @@
 import Link from "next/link";
 import { EnvelopeSimple, WhatsappLogo } from "@phosphor-icons/react/dist/ssr";
 import { Avatar } from "@/components/avatar";
-import { Badge } from "@/components/ui/badge";
 import { buttonVariants } from "@/components/ui/button";
 import { avatarPublicUrl } from "@/lib/avatar";
 import { waLink } from "@/lib/ciclo";
 import { msgApresentacaoJovem } from "@/lib/whatsapp-msgs";
-import type { ColegaTurma, JovemContato } from "@/lib/types";
+import type { JovemContato } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-// As linhas da rede do jovem — componente compartilhado entre a página
-// /jovem/pessoas e a seção "Sua rede" do /jovem/perfil (spec 023): a
-// mesma pessoa, o mesmo canal, os dois lugares. Server-safe (Phosphor
-// dist/ssr), pra render em qualquer pai.
+// As linhas da rede do jovem — a seção "Sua rede" do /jovem/perfil
+// (spec 023). Colega de turma não entra: REALIZA-525 tirou a turma da
+// seção (ela mora na faceta "Colegas" do diretório), então a linha de
+// colega foi junto — o avatar+cidade+opt-in voltariam com ela.
 
 /** Adulto da rede — avatar + nome (com vínculo e o estado da dupla quando
  *  não é ativa) + WhatsApp/e-mail diretos. */
@@ -81,86 +80,6 @@ export function ContatoLinha({
           </a>
         )}
       </div>
-    </li>
-  );
-}
-
-/** Colega de turma — foto quando o cadastro tem (a mesma decisão do
- *  diretório: jovem com conta aparece com imagem); cidade/UF e
- *  interesses pra ter ideia de quem é; WhatsApp só quando o colega
- *  compartilhou. */
-export function ColegaLinha({
-  c,
-  nomeJovem,
-}: {
-  c: ColegaTurma;
-  nomeJovem: string;
-}) {
-  const nome = c.nome_social || c.nome || "?";
-  const local = [c.cidade, c.uf].filter(Boolean).join(" · ");
-  const interesses = c.interesses ?? [];
-  const wa = waLink(
-    c.whatsapp,
-    `Olá! Sou ${nomeJovem}, da sua turma no programa Realiza.vc.`
-  );
-  return (
-    <li className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-      <Link
-        href={`/jovem/pessoas/${c.id}`}
-        prefetch={false}
-        className="flex min-w-0 flex-1 items-center gap-3 rounded-md outline-none transition-colors focus-visible:ring-3 focus-visible:ring-ring/50"
-      >
-        <Avatar
-          nome={nome}
-          papel="mentorado"
-          src={c.avatar_path ? avatarPublicUrl(c.avatar_path) : null}
-          size={40}
-        />
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium">{nome}</p>
-          {local && (
-            <p className="truncate text-xs text-muted-foreground">{local}</p>
-          )}
-          {interesses.length > 0 && (
-            <span className="mt-1 flex flex-wrap gap-1">
-              {interesses.slice(0, 4).map((i) => (
-                <Badge
-                  key={i}
-                  variant="outline"
-                  className="bg-muted font-normal text-muted-foreground"
-                >
-                  {i}
-                </Badge>
-              ))}
-              {interesses.length > 4 && (
-                <span className="self-center text-[11px] text-muted-foreground">
-                  +{interesses.length - 4}
-                </span>
-              )}
-            </span>
-          )}
-        </div>
-      </Link>
-      {wa ? (
-        <a
-          href={wa}
-          target="_blank"
-          rel="noopener noreferrer"
-          aria-label={`Conversar com ${nome} no WhatsApp`}
-          className={cn(
-            buttonVariants({ variant: "outline", size: "sm" }),
-            "shrink-0"
-          )}
-        >
-          <WhatsappLogo size={15} aria-hidden />
-          <span className="sr-only sm:not-sr-only sm:inline">WhatsApp</span>
-          <span className="sr-only"> (abre em nova aba)</span>
-        </a>
-      ) : (
-        <span className="shrink-0 text-xs text-muted-foreground">
-          não compartilhou o contato
-        </span>
-      )}
     </li>
   );
 }

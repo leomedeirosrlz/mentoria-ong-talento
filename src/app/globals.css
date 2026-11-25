@@ -957,6 +957,10 @@
     @apply bg-background text-foreground;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* a página nunca rola na horizontal (REALIZA-525): qualquer filho que
+       estoure é cortado na borda em vez de abrir scroll — `clip` não cria
+       contexto de scroll, então position:sticky segue funcionando */
+    overflow-x: clip;
   }
   html {
     @apply font-sans;

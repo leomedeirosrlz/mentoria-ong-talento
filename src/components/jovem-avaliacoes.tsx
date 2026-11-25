@@ -165,7 +165,7 @@ export function VerAvaliacaoButton({
           onClick={() => setOpen(true)}
           aria-label="Ver sua avaliação"
           title="Ver sua avaliação"
-          className="inline-flex min-h-8 items-center rounded-md px-1.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          className="inline-flex min-h-11 items-center rounded-md px-1.5 transition-colors hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring md:min-h-8"
         >
           {label}
         </button>

@@ -12,14 +12,17 @@ import {
   test,
 } from "../helpers";
 
-// Diretório do jovem (spec 023 / migration 0239) contra backend real:
+// Diretório do jovem (spec 023 / migration 0239 / REALIZA-525) contra
+// backend real:
 //   * /jovem/pessoas é o diretório do programa — adultos com papel, os
 //     jovens com conta e o catálogo; a faceta "Minha rede" recorta a rede
-//     dele (jovem_contatos ∪ mentorados_turma) e nenhum card abre canal;
-//   * a seção "Sua rede" do /jovem/perfil mostra as mesmas pessoas com os
-//     canais de sempre — WhatsApp de colega atrás do opt-in
-//     contato_compartilhado (RPC set_contato_compartilhado, toggle no
-//     Perfil do DONO);
+//     dele (jovem_contatos ∪ mentorados_turma) dentro do painel "Filtros"
+//     (525) e o card da rede abre o WhatsApp que a view já entrega —
+//     colega atrás do opt-in contato_compartilhado;
+//   * a seção "Sua rede" do /jovem/perfil ficou só com os adultos das
+//     duplas (525) — os colegas vivem na faceta "Colegas" do diretório,
+//     com o canal atrás do mesmo opt-in (RPC set_contato_compartilhado,
+//     toggle no Perfil do DONO);
 //   * profiles_select apertado: staff não-coord não lê profile role=mentorado
 //     fora das duplas dele — conferido na UI (/pessoas) e com o JWT real dele
 //     no PostgREST;
@@ -160,9 +163,32 @@ async function restaurarColega() {
 const cardDe = (page: import("@playwright/test").Page, nome: string) =>
   page.getByRole("link", { name: `Abrir perfil de ${nome}`, exact: true });
 
-const pill = (page: import("@playwright/test").Page, nome: string) =>
-  page.getByRole("group", { name: "Filtrar por vínculo" })
-    .getByRole("button", { name: nome, exact: true });
+const cardInteiroDe = (
+  page: import("@playwright/test").Page,
+  nome: string
+) => cardDe(page, nome).locator("xpath=ancestor::*[@data-slot='card']");
+
+const filtros = (page: import("@playwright/test").Page) =>
+  page.getByRole("button", { name: /^Filtros/ });
+
+/** O gesto do painel de filtros (525): abre "Filtros", marca a opção pelo
+ *  label-pill (o rádio é sr-only — quem recebe o clique é o label, mesma
+ *  régua do login por senha) e aplica de uma vez. */
+async function aplicarFaceta(
+  page: import("@playwright/test").Page,
+  nome: string
+) {
+  await filtros(page).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog
+    .locator("label", {
+      has: page.getByRole("radio", { name: nome, exact: true }),
+    })
+    .click();
+  await dialog.getByRole("button", { name: /^Aplicar/ }).click();
+  await expect(dialog).toHaveCount(0);
+}
 
 test.describe("diretório do jovem (spec 023 / 0239)", () => {
   test.beforeEach(restaurarColega);
@@ -176,16 +202,27 @@ test.describe("diretório do jovem (spec 023 / 0239)", () => {
 
     // a ficha dele existe no diretório (mentorados.nome, não o login) —
     // e dentro da faceta "Minha rede" por ser colega de turma
-    await pill(page, "Minha rede").click();
+    await aplicarFaceta(page, "Minha rede");
     await expect(cardDe(page, "Jovem E2E Sem DPP")).toBeVisible();
     await expect(cardDe(page, "Mentor E2E")).toBeVisible();
     await expect(cardDe(page, "Coordenação E2E")).toBeVisible();
 
-    // opt-in fechado: o card existe, mas nenhum canal viaja — nem no
-    // diretório inteiro, nem como wa.me com número null
+    // 525: o card da rede abre o WhatsApp que a view já entrega — o
+    // especialista da trilha dele (único adulto e2e com número) tem o
+    // ícone; o colega com opt-in fechado não. mailto nunca viaja
     const main = page.getByRole("main");
-    await expect(main.locator('a[href*="wa.me"]')).toHaveCount(0);
     await expect(main.locator('a[href^="mailto:"]')).toHaveCount(0);
+    await expect(
+      cardInteiroDe(page, "Esp E2E").getByRole("link", {
+        name: /Conversar com Esp E2E no WhatsApp/,
+      })
+    ).toHaveAttribute("href", /wa\.me\/5511999000070/);
+    await expect(
+      cardInteiroDe(page, "Jovem E2E Sem DPP").locator('a[href*="wa.me"]')
+    ).toHaveCount(0);
+    await expect(
+      cardInteiroDe(page, "Mentor E2E").locator('a[href*="wa.me"]')
+    ).toHaveCount(0);
 
     // e a ficha dele mostra o estado honesto em vez do botão
     await cardDe(page, "Jovem E2E Sem DPP").click();
@@ -316,29 +353,24 @@ test.describe("diretório do jovem (spec 023 / 0239)", () => {
     );
     expect(ficha.contato_compartilhado).toBe(true);
 
-    // a seção "Sua rede" do perfil dele espelha a simetria: o jovem (ficha
-    // "Mentorada E2E") é colega dele de volta — com o contato fechado
-    const redeJovem2 = page.locator(
-      'section[aria-labelledby="sua-rede-titulo"]'
-    );
-    const linhaJovem = redeJovem2.locator("li", {
-      hasText: "Mentorada E2E",
-    });
-    await expect(linhaJovem).toBeVisible();
+    // a simetria espelha no diretório (525): o jovem (ficha "Mentorada
+    // E2E") é colega dele de volta e aparece na faceta "Minha rede" —
+    // com o contato fechado, o card não tem WhatsApp
+    await page.goto("/jovem/pessoas");
+    await aplicarFaceta(page, "Minha rede");
+    await expect(cardDe(page, "Mentorada E2E")).toBeVisible();
     await expect(
-      linhaJovem.getByText("não compartilhou o contato")
-    ).toBeVisible();
+      cardInteiroDe(page, "Mentorada E2E").locator('a[href*="wa.me"]')
+    ).toHaveCount(0);
 
-    // lado do COLEGA: relogado como jovem, o opt-in destravou o botão na
-    // "Sua rede" do perfil — href aponta pro número da ficha, nunca vazio
+    // lado do COLEGA: relogado como jovem, o opt-in destravou o ícone no
+    // card do diretório — o href aponta pro número da ficha, nunca vazio
     await relogar(page, JOVEM_EMAIL, SENHA);
-    await page.goto("/jovem/perfil");
-    const rede = page.locator(
-      'section[aria-labelledby="sua-rede-titulo"]'
-    );
-    const wa = rede
-      .locator("li", { hasText: "Jovem E2E Sem DPP" })
-      .getByRole("link", { name: /WhatsApp/ });
+    await page.goto("/jovem/pessoas");
+    await aplicarFaceta(page, "Minha rede");
+    const wa = cardInteiroDe(page, "Jovem E2E Sem DPP").getByRole("link", {
+      name: /WhatsApp/,
+    });
     await expect(wa).toBeVisible();
     await expect(wa).toHaveAttribute(
       "href",
@@ -453,7 +485,7 @@ test.describe("diretório do jovem (spec 023 / 0239)", () => {
 
     // mas a rede dela segue escopada às duplas/turma dela — a faceta
     // "Minha rede" é quem não pode vazar
-    await pill(page, "Minha rede").click();
+    await aplicarFaceta(page, "Minha rede");
     await expect(cardDe(page, "Coordenação E2E")).toHaveCount(0);
     await expect(cardDe(page, "Jovem E2E Sem DPP")).toHaveCount(0);
     await expect(cardDe(page, "Mentor E2E")).toHaveCount(0);

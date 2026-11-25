@@ -26,6 +26,13 @@ export type DiretorioPessoa = JovemDiretorioEntry & {
   /** Selo de dupla que não está mais em curso ("trilha concluída",
    *  "mentoria pausada") — null quando a dupla vive ou não há dupla. */
   selo: string | null;
+  /** WhatsApp projetado do contato da rede (ou do colega com opt-in) —
+   *  o mesmo dado que a ficha já mostra; null fora da rede ou quando o
+   *  colega não compartilhou. O card da rede abre o canal daqui. */
+  whatsapp: string | null;
+  /** E-mail do contato da rede — null fora da rede (a view não projeta
+   *  e-mail de colega: o canal dele é só o WhatsApp opt-in). */
+  email: string | null;
 };
 
 /** Selo honesto de dupla não-ativa — o mesmo texto da linha e da ficha. */
@@ -82,17 +89,18 @@ export function enriqueceDiretorio(
       pesoStatus(x?.dupla_id ? porDupla.get(x.dupla_id)?.status : null);
     if (!atual || peso(c) < peso(atual)) contatoPorId.set(c.id, c);
   }
-  const colegaIds = new Set(
-    colegas.map((c) => c.id).filter((id): id is string => id != null)
-  );
+  const colegaPorId = new Map<string, ColegaTurma>();
+  for (const c of colegas) {
+    if (c.id != null) colegaPorId.set(c.id, c);
+  }
 
   return entradas.map((e) => {
     const contato = contatoPorId.get(e.id);
-    const ehColega = colegaIds.has(e.id);
-    const rede = e.minha_rede || contato != null || ehColega;
+    const colega = colegaPorId.get(e.id);
+    const rede = e.minha_rede || contato != null || colega != null;
     const vinculo = contato
       ? vinculoDeContato(contato)
-      : ehColega
+      : colega
         ? "Colega da turma"
         : null;
     const dupla =
@@ -102,6 +110,10 @@ export function enriqueceDiretorio(
       rede,
       vinculo,
       selo: seloDuplaLabel(dupla?.status, dupla?.trilha),
+      // o canal mora na mesma fonte da ficha: jovem_contatos pros adultos
+      // da rede, mentorados_turma pro colega (whatsapp null sem opt-in)
+      whatsapp: contato?.whatsapp ?? colega?.whatsapp ?? null,
+      email: contato?.email ?? null,
     };
   });
 }

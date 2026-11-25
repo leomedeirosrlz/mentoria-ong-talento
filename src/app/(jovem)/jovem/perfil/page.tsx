@@ -4,7 +4,6 @@ import { redirect } from "next/navigation";
 import { cookies } from "next/headers";
 import {
   getJovemAssinaturas,
-  getJovemColegas,
   getJovemContatos,
   getJovemDuplas,
   getJovemEncaminhamentos,
@@ -34,7 +33,7 @@ import {
   FotoPerfil,
 } from "./perfil-form";
 import { PrivacidadeCard } from "./privacidade-card";
-import { ContatoLinha, ColegaLinha } from "@/components/jovem-rede";
+import { ContatoLinha } from "@/components/jovem-rede";
 import { agrupaContatosPorPessoa } from "@/lib/jovem-contatos";
 import { seloDuplaLabel, vinculoDeContato } from "@/lib/jovem-diretorio";
 import { demoRole } from "@/lib/demo/mode";
@@ -71,7 +70,6 @@ export default async function JovemPerfil({
     detalhe,
     duplas,
     contatosRede,
-    colegas,
     encontros,
     avaliacoes,
     encaminhamentos,
@@ -84,10 +82,10 @@ export default async function JovemPerfil({
     cSel ? getChamadoDetalhe(cSel) : Promise.resolve(null),
     // jornada/conquistas: mesmas leituras cacheadas da home
     getJovemDuplas(),
-    // "Sua rede" (023): os adultos das duplas + os colegas de turma —
-    // mesmas fontes que alimentavam a página /pessoas antiga
+    // "Sua rede" (023): os adultos das duplas — REALIZA-525 tirou os
+    // colegas daqui (a turma toda virava lista gigante); eles seguem na
+    // faceta "Colegas" do diretório /pessoas
     getJovemContatos(),
-    getJovemColegas(),
     getJovemEncontros(),
     getJovemAvaliacoes(),
     getJovemEncaminhamentos(),
@@ -152,8 +150,9 @@ export default async function JovemPerfil({
     .join(" · ");
 
   // "Sua rede" (023): os adultos das duplas dedup por pessoa (mesma régua
-  // do merge do diretório) + os colegas de turma — as mesmas linhas e os
-  // mesmos canais da página /pessoas que a seção substituiu
+  // do merge do diretório) — REALIZA-525 tirou os colegas: a turma cheia
+  // afogava as 3-5 pessoas que o jovem de fato chama, e elas seguem a um
+  // clique na faceta "Colegas" do /pessoas
   const porDupla = new Map(
     duplas.map((d) => [d.id, { status: d.status, trilha: d.trilha }])
   );
@@ -237,9 +236,10 @@ export default async function JovemPerfil({
           {/* 023: a rede sai do corpo de /jovem/pessoas (virou diretório)
               e ganha seção própria — as mesmas linhas compartilhadas
               (jovem-rede): avatar, vínculo na voz dele, selo de dupla
-              não-ativa e os canais de sempre (WhatsApp do colega atrás do
-              opt-in dele). O catálogo não se duplica: um link discreto
-              aponta pra ele */}
+              não-ativa e os canais de sempre. REALIZA-525: só os adultos
+              com vínculo ficam aqui — os colegas de turma saíram (vivem
+              na faceta "Colegas" do diretório). O catálogo não se
+              duplica: um link discreto aponta pra ele */}
           <section
             aria-labelledby="sua-rede-titulo"
             className="animate-enter rounded-xl bg-card p-6 shadow-[var(--shadow-border)]"
@@ -250,7 +250,7 @@ export default async function JovemPerfil({
                   Sua rede
                 </h2>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Mentor, especialista, equipe e os colegas da sua turma.
+                  Mentor, especialista e equipe do seu programa.
                 </p>
               </div>
               <Link
@@ -265,7 +265,7 @@ export default async function JovemPerfil({
                 />
               </Link>
             </div>
-            {rede.length === 0 && colegas.length === 0 ? (
+            {rede.length === 0 ? (
               <p className="mt-4 text-sm text-muted-foreground">
                 Quando a sua rede se formar, as pessoas aparecem aqui.
               </p>
@@ -282,9 +282,6 @@ export default async function JovemPerfil({
                     vinculo={vinculoDeContato(c)}
                     nomeJovem={nomeTela}
                   />
-                ))}
-                {colegas.map((c) => (
-                  <ColegaLinha key={c.id} c={c} nomeJovem={nomeTela} />
                 ))}
               </ul>
             )}

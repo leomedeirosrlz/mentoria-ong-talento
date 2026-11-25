@@ -1,23 +1,46 @@
 import { entrarNaDemo, expect, test } from "../helpers";
 
-// REALIZA-484 + spec 023 — /jovem/pessoas virou o DIRETÓRIO do programa:
-// default "Todos" (adultos com papel, jovens com conta e o catálogo de
-// especialistas), pills de vínculo, chips de tema, busca e a rede dela
-// marcada com selo — nunca um segundo catálogo: nenhum card abre canal
-// nem carrega CTA de pedido. A ficha enriquece com a projeção pública
-// que as views já liberam sem abrir leitura em profiles. A persona
-// mentorado (Bia) cobre os cenários: rede marcada, gente de fora da
-// rede, especialista da trilha, especialista de catálogo e colega.
+// REALIZA-484 + spec 023 + REALIZA-525 — /jovem/pessoas virou o
+// DIRETÓRIO do programa: default "Todos" (adultos com papel, jovens com
+// conta e o catálogo de especialistas), busca e a rede dela marcada com
+// selo. Os filtros saíram das pills expostas (estouravam o celular) pro
+// painel único "Filtros" (525): vínculo e tema são rádios do modal,
+// aplicados de uma vez com a contagem viva no gatilho. O card da rede
+// abre o WhatsApp que a view já entrega — o mesmo dado da ficha, nunca
+// um canal não-autorizado. A persona mentorado (Bia) cobre os cenários.
 
 // o card do diretório navega por UM link nomeado (aria-label "Abrir
 // perfil de …") — o nome acessível não se mistura com os chips
 const cardDe = (page: import("@playwright/test").Page, nome: string) =>
   page.getByRole("link", { name: `Abrir perfil de ${nome}` });
 
-const pill = (page: import("@playwright/test").Page, nome: string) =>
-  page
-    .getByRole("group", { name: "Filtrar por vínculo" })
-    .getByRole("button", { name: nome, exact: true });
+const cardInteiroDe = (
+  page: import("@playwright/test").Page,
+  nome: string
+) => cardDe(page, nome).locator("xpath=ancestor::*[@data-slot='card']");
+
+const filtros = (page: import("@playwright/test").Page) =>
+  page.getByRole("button", { name: /^Filtros/ });
+
+/** O gesto completo do painel: abre "Filtros", marca a opção pelo label
+ *  (o rádio é sr-only — quem recebe o clique é a pill que o envolve, a
+ *  mesma régua do login por senha) e aplica. Sheet no mobile e Dialog
+ *  no desktop expõem o mesmo role="dialog". */
+async function aplicarFaceta(
+  page: import("@playwright/test").Page,
+  nome: string
+) {
+  await filtros(page).click();
+  const dialog = page.getByRole("dialog");
+  await expect(dialog).toBeVisible();
+  await dialog
+    .locator("label", {
+      has: page.getByRole("radio", { name: nome, exact: true }),
+    })
+    .click();
+  await dialog.getByRole("button", { name: /^Aplicar/ }).click();
+  await expect(dialog).toHaveCount(0);
+}
 
 test.describe("jovem — diretório Pessoas", () => {
   test("o diretório abre em Todos — a rede marcada e o programa inteiro", async ({
@@ -26,12 +49,9 @@ test.describe("jovem — diretório Pessoas", () => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/pessoas");
 
-    // default "Todos": as pills de vínculo, a contagem anunciada e a
-    // rede dela marcada no meio do programa inteiro
-    await expect(pill(page, "Todos")).toHaveAttribute(
-      "aria-pressed",
-      "true"
-    );
+    // default "Todos": nenhum filtro ativo (o gatilho não ganha contagem),
+    // a contagem anunciada e a rede dela marcada no meio do programa
+    await expect(filtros(page)).toHaveAccessibleName("Filtros");
     await expect(
       page.getByRole("status").filter({ hasText: /\d+ pessoas/ })
     ).toBeVisible();
@@ -52,18 +72,38 @@ test.describe("jovem — diretório Pessoas", () => {
     // mentora de outra dupla e o catálogo completo, sem selo de rede
     await expect(cardDe(page, "Beatriz Lins")).toBeVisible();
     await expect(cardDe(page, "Marcos Vinícius")).toBeVisible();
-    const beatriz = cardDe(page, "Beatriz Lins").locator(
-      "xpath=ancestor::*[@data-slot='card']"
-    );
+    const beatriz = cardInteiroDe(page, "Beatriz Lins");
     await expect(beatriz.getByText("Sua rede")).toHaveCount(0);
 
-    // nenhum card abre canal — wa.me/mailto nunca viajam no diretório
+    // REALIZA-525: o WhatsApp abre no card da rede — o mesmo canal da
+    // ficha (mentor/colega com opt-in). mailto nunca viaja no diretório,
+    // e quem não é da rede dela segue sem canal algum
     const main = page.getByRole("main");
     await expect(main.locator('a[href^="mailto:"]')).toHaveCount(0);
-    await expect(main.locator('a[href*="wa.me"]')).toHaveCount(0);
+    await expect(
+      cardInteiroDe(page, "Ricardo Tavares").getByRole("link", {
+        name: /Conversar com Ricardo Tavares no WhatsApp/,
+      })
+    ).toHaveAttribute("href", /wa\.me\/5511987654003/);
+    await expect(
+      cardInteiroDe(page, "Caio Henrique Oliveira").getByRole("link", {
+        name: /Conversar com Caio Henrique Oliveira no WhatsApp/,
+      })
+    ).toHaveAttribute("href", /wa\.me\/5511976123002/);
+    // Dandara é rede (colega) mas não compartilhou — sem botão
+    await expect(
+      cardInteiroDe(page, "Dandara Souza").locator('a[href*="wa.me"]')
+    ).toHaveCount(0);
+    await expect(beatriz.locator('a[href*="wa.me"]')).toHaveCount(0);
+    // e o card do especialista da trilha dela também abre o canal
+    await expect(
+      cardInteiroDe(page, "Sofia Nogueira").getByRole("link", {
+        name: /Conversar com Sofia Nogueira no WhatsApp/,
+      })
+    ).toHaveAttribute("href", /wa\.me\/5511987654004/);
 
     // "Minha rede" recorta sem recarregar — a URL registra o estado
-    await pill(page, "Minha rede").click();
+    await aplicarFaceta(page, "Minha rede");
     await expect(page).toHaveURL(/\?papel=rede/);
     await expect(cardDe(page, "Ricardo Tavares")).toBeVisible();
     await expect(cardDe(page, "Sofia Nogueira")).toBeVisible();
@@ -73,7 +113,7 @@ test.describe("jovem — diretório Pessoas", () => {
     await expect(cardDe(page, "Marcos Vinícius")).toHaveCount(0);
 
     // "Especialistas" abre o catálogo rico — a linha "Atende:" mora aqui
-    await pill(page, "Especialistas").click();
+    await aplicarFaceta(page, "Especialistas");
     await expect(page).toHaveURL(/papel=especialistas/);
     await expect(cardDe(page, "Sofia Nogueira")).toBeVisible();
     await expect(cardDe(page, "Marcos Vinícius")).toBeVisible();
@@ -94,6 +134,73 @@ test.describe("jovem — diretório Pessoas", () => {
       page.getByRole("status").filter({ hasText: /1 de \d+/ })
     ).toBeVisible();
     await expect(page).toHaveURL(/busca=Sofia/);
+  });
+
+  test("o painel Filtros aplica vínculo + tema num gesto — e a página nunca rola na horizontal", async ({
+    page,
+  }) => {
+    // 390px: a largura que motivou a 525 — o FormSurface vira a folha de
+    // rodapé (mesmo role=dialog) com as opções todas dentro da tela
+    await page.setViewportSize({ width: 390, height: 844 });
+    await entrarNaDemo(page, "mentorado");
+    await page.goto("/jovem/pessoas");
+
+    // nenhuma régua de pills exposta — o diretório só tem a entrada Filtros
+    await expect(
+      page.getByRole("group", { name: "Filtrar por vínculo" })
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("group", { name: "Filtrar por tema" })
+    ).toHaveCount(0);
+    // e a página não ganha scroll horizontal — o vazamento que as pills
+    // causavam não volta por outro caminho
+    const larguraOk = await page.evaluate(
+      () =>
+        document.documentElement.scrollWidth <=
+        document.documentElement.clientWidth
+    );
+    expect(larguraOk).toBe(true);
+
+    // a folha de rodapé abre com os dois fieldsets e o rascunho não
+    // aplica até o "Aplicar" — o rádio é sr-only, quem clica é a pill
+    await filtros(page).click();
+    const dialog = page.getByRole("dialog");
+    await expect(dialog).toBeVisible();
+    await expect(
+      dialog.getByRole("radio", { name: "Minha rede" })
+    ).toBeAttached();
+    await expect(
+      dialog.getByRole("button", { name: "Aplicar" })
+    ).toBeVisible();
+    await dialog
+      .locator("label", {
+        has: page.getByRole("radio", { name: "Minha rede", exact: true }),
+      })
+      .click();
+    await dialog
+      .locator("label", {
+        has: page.getByRole("radio", { name: /^matemática/ }),
+      })
+      .click();
+    // rascunho ≠ aplicado: a URL e a contagem do gatilho só mudam no Aplicar
+    await expect(page).not.toHaveURL(/papel=rede/);
+    await dialog.getByRole("button", { name: "Aplicar (2)" }).click();
+    await expect(dialog).toHaveCount(0);
+
+    await expect(page).toHaveURL(/papel=rede/);
+    await expect(page).toHaveURL(/area=matem/);
+    await expect(filtros(page)).toHaveAccessibleName("Filtros, 2 ativos");
+    // matemática dentro da rede dela = a especialista da trilha
+    await expect(cardDe(page, "Sofia Nogueira")).toBeVisible();
+    await expect(cardDe(page, "Ricardo Tavares")).toHaveCount(0);
+
+    // o foco volta pro gatilho que abriu a folha — convenção do kit
+    await expect(filtros(page)).toBeFocused();
+
+    // "Limpar filtros" zera os dois de uma vez
+    await page.getByRole("button", { name: "Limpar filtros" }).click();
+    await expect(filtros(page)).toHaveAccessibleName("Filtros");
+    await expect(cardDe(page, "Ricardo Tavares")).toBeVisible();
   });
 
   test("ficha do mentor — origem do vínculo e os canais que a view já dá", async ({
