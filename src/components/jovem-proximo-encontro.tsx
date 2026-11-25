@@ -23,6 +23,7 @@ import { cn } from "@/lib/utils";
  *  agendar) são os que já existem em /jovem/agenda. */
 export function ProximoEncontro({
   proximo,
+  adiantado = false,
   rotulo,
   sessao = false,
   hoje,
@@ -35,6 +36,9 @@ export function ProximoEncontro({
 }: {
   /** Próximo encontro agendado/remarcado com data futura; null = nenhum. */
   proximo: JovemEncontro | null;
+  /** A data cruzou o número (QA 25/11): o encontro foi marcado antes de
+   *  um passo menor ainda pendente — a tag explica a ordem. */
+  adiantado?: boolean;
   /** "6º encontro com Ricardo" ou "Sessão 3 com Sofia", montado na página. */
   rotulo: string | null;
   /** O próximo é sessão de especialista (ou a única trilha viva é a esp) —
@@ -79,9 +83,16 @@ export function ProximoEncontro({
         titulo={sessao ? "Sua próxima sessão" : "Seu próximo encontro"}
         plano={plano}
       >
-        <p className="mt-2 text-xl font-semibold tracking-tight text-balance">
-          {rotulo ?? (sessao ? `Sessão ${proximo.numero}` : `${proximo.numero}º encontro`)}
-        </p>
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-2">
+          <p className="text-xl font-semibold tracking-tight text-balance">
+            {rotulo ?? (sessao ? `Sessão ${proximo.numero}` : `${proximo.numero}º encontro`)}
+          </p>
+          {adiantado && (
+            <span className="text-xs font-medium text-muted-foreground">
+              adiantado
+            </span>
+          )}
+        </div>
         <p className="mt-1 text-sm">
           {quando}
           {remarcado}

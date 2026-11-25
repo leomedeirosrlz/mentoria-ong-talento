@@ -141,6 +141,11 @@ export function PlanoAcordosCard({
   );
   const resumo = resumoCombinado(plano, realizados);
   const aberto = resumo.aberto;
+  // a data do passo cruzou o número (QA 25/11): a tag explica a ordem
+  // em vez de ler como lista fora de ordem
+  const adiantadoPorNumero = new Map(
+    resumo.passos.map((x) => [x.numero, x.adiantado])
+  );
   const aplicados = new Map(
     (plano.passos ?? []).map((p) => [p.numero, p])
   );
@@ -440,6 +445,11 @@ export function PlanoAcordosCard({
                       ? `${p.numero}º encontro · ${p.titulo}`
                       : `${p.numero}º encontro`}
                 </span>
+                {adiantadoPorNumero.get(p.numero) && (
+                  <span className="text-xs text-muted-foreground">
+                    adiantado
+                  </span>
+                )}
                 {aplicado ? (
                   <span className="text-muted-foreground">
                     · {tagSessao ? `${tagSessao} · ` : ""}marcado pra{" "}

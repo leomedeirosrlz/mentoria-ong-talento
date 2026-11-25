@@ -64,6 +64,7 @@ import { getMe } from "@/lib/queries";
 import { getJovemAvaliacoes } from "@/lib/queries-avaliacao";
 import type { JovemEncontro } from "@/lib/queries-jovem";
 import { combinadoDoJovem } from "@/lib/plano-combinado";
+import { encontrosPrevistos } from "@/lib/proximo-encontro";
 import { montarPlanoEmDia } from "@/lib/plano-em-dia";
 import { carregarRoteirosDaDupla } from "@/lib/plano-roteiros-servico";
 import { PlanoAcordosCard } from "@/components/plano-acordos";
@@ -539,22 +540,21 @@ export default async function JovemAgenda() {
     chamados: [],
   });
 
-  // futuros = agendado/remarcado com data pra frente; o resto é histórico
-  // (inclui agendado já passado — "estava marcado e não rolou" é histórico,
-  // não futuro)
-  const futuros = encontros
-    .filter(
-      (e) =>
-        (e.status === "agendado" || e.status === "remarcado") &&
-        e.data_hora != null &&
-        new Date(e.data_hora).getTime() >= agora
-    )
-    .sort(
-      (a, b) =>
-        new Date(a.data_hora!).getTime() - new Date(b.data_hora!).getTime()
-    );
+  // futuros = a régua única do "próximo encontro" (QA 25/11): por data,
+  // com fila por dupla — a pendência do 5º da DPP não marca a sessão do
+  // especialista; o adiantado sai marcado em vez de ler fora de ordem.
+  // O resto é histórico (inclui agendado já passado — "estava marcado e
+  // não rolou" é histórico, não futuro)
+  const futuros = encontrosPrevistos(encontros, new Date(agora), {
+    fila: (e) => e.dupla_id,
+    numerosOficiais: (fila) =>
+      jornada?.dupla_id === fila
+        ? datasOficiaisDe(jornada.cronograma).map((o) => o.numero)
+        : [],
+  });
+  const futurosIds = new Set(futuros.map((e) => e.id));
   const passados = encontros
-    .filter((e) => !futuros.includes(e))
+    .filter((e) => !futurosIds.has(e.id))
     .sort(
       (a, b) =>
         new Date(b.realizado_em ?? b.data_hora ?? 0).getTime() -
@@ -900,6 +900,7 @@ export default async function JovemAgenda() {
                       duplaAtiva={ativaPorDupla.get(e.dupla_id) ?? false}
                       trilha={trilhaPorDupla.get(e.dupla_id) ?? "dpp"}
                       rotulo={rotuloDaLinha(e)}
+                      adiantado={e.adiantado}
                       sugestoes={
                         e.dupla_id === duplaDpp?.id ? sugestoesAgendar : null
                       }

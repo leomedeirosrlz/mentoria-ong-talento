@@ -25,6 +25,7 @@ import type {
 } from "./types";
 import { temPapel } from "./types";
 import { turmaLonga } from "./turma";
+import { encontrosPrevistos, type Previsto } from "./proximo-encontro";
 
 export type Semaforo = "ok" | "atencao" | "risco";
 
@@ -1201,7 +1202,7 @@ export type DuplaSaude = {
   };
   esperado: number;
   feitos: number;
-  proximo: Encontro | null;
+  proximo: Previsto<Encontro> | null;
   registroPendente: boolean;
   /** Pedido de apoio do MENTOR, marcado no registro do encontro. */
   pediuApoio: boolean;
@@ -1745,16 +1746,19 @@ export function saudadeDaDupla(dupla: Dupla, eventos: CicloEvento[], hoje = new 
       defasados.length -
       [...limbo].filter((n) => numerosEsperados.has(n)).length -
       numerosAcordados.size;
+  // a régua única do "próximo" (QA 25/11): por data, com os passos
+  // oficiais como pendência — um agendado de número maior marcado
+  // antes de um menor sai com `adiantado` (especialista não tem
+  // calendário: pendência só vem das rows)
   const proximo =
-    dupla.encontros
-      .filter(
-        (e) =>
-          (e.status === "agendado" || e.status === "remarcado") &&
-          e.data_hora &&
-          new Date(e.data_hora) >= hoje
-      )
-      .sort((a, b) => new Date(a.data_hora!).getTime() - new Date(b.data_hora!).getTime())[0] ??
-    null;
+    encontrosPrevistos(dupla.encontros, hoje, {
+      numerosOficiais: () =>
+        ehEspecialista
+          ? []
+          : eventos
+              .filter((e) => e.tipo === "encontro" && e.numero != null)
+              .map((e) => e.numero!),
+    })[0] ?? null;
 
   const pediuApoio = dupla.encontros.some((e) => e.registro?.precisa_apoio);
   // o "preciso de ajuda" da avaliação estrela (0071) é o outro canal de

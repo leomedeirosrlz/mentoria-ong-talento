@@ -81,6 +81,7 @@ import {
   combinadoDoJovem,
   propostoEmDoPlano,
 } from "@/lib/plano-combinado";
+import { encontrosPrevistos } from "@/lib/proximo-encontro";
 import { getRoteirosPlanos } from "@/lib/queries";
 import { materiaisComRoteiroPlano } from "@/lib/plano-roteiros";
 import { quemCombinou, suaSemana } from "@/lib/sua-semana";
@@ -216,17 +217,16 @@ export default async function JovemHome() {
   const supervisores = porPapel("supervisor");
   const coordenacao = porPapel("coordenacao");
 
-  const futuros = encontros
-    .filter(
-      (e) =>
-        (e.status === "agendado" || e.status === "remarcado") &&
-        e.data_hora != null &&
-        new Date(e.data_hora) >= agora
-    )
-    .sort(
-      (a, b) =>
-        new Date(a.data_hora!).getTime() - new Date(b.data_hora!).getTime()
-    );
+  // a régua única do "próximo encontro" (QA 25/11): por data, com fila
+  // por dupla — a pendência do 5º da DPP não marca a sessão do
+  // especialista; o adiantado sai marcado em vez de ler fora de ordem
+  const futuros = encontrosPrevistos(encontros, agora, {
+    fila: (e) => e.dupla_id,
+    numerosOficiais: (fila) =>
+      jornada?.dupla_id === fila
+        ? datasOficiaisDe(jornada.cronograma).map((o) => o.numero)
+        : [],
+  });
   const proximo = futuros[0] ?? null;
 
   // trilha por dupla (a view jovem_duplas entrega — a tabela `duplas` não é
@@ -703,6 +703,11 @@ export default async function JovemHome() {
           saudação, com uma única ação conforme o estado */}
       <ProximoEncontro
         proximo={proximo}
+        adiantado={
+          proximo != null &&
+          proximo.adiantado &&
+          trilhaPorDupla.get(proximo.dupla_id) !== "especialista"
+        }
         rotulo={proximo ? rotuloEncontro(proximo) : null}
         sessao={
           proximo != null

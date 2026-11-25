@@ -49,6 +49,7 @@ export function EncontroLinha({
   nota,
   meId,
   temMedia = true,
+  adiantado = false,
   sugestoes = null,
 }: {
   e: JovemEncontro;
@@ -81,6 +82,10 @@ export function EncontroLinha({
   /** a dupla já tem o lote da média (≥3 respostas) — a copy do toggle no
    *  detalhe da avaliação não promete média que não existe (027/FR-003). */
   temMedia?: boolean;
+  /** A data cruzou o número (QA 25/11): o encontro foi marcado antes de
+   *  um passo menor ainda pendente — a tag explica a ordem na lista.
+   *  Só DPP: sessão de especialista não tem fila de cronograma. */
+  adiantado?: boolean;
   /** Pacote do motor — vai pro remarcar do DPP (chips de dia/hora). Só a
    *  dupla DPP ativa tem pacote; as demais linhas recebem null. */
   sugestoes?: SeletorSugestoes | null;
@@ -130,7 +135,14 @@ export function EncontroLinha({
         )}
       </span>
       <div className="min-w-0 flex-1 basis-48">
-        <p className="text-sm font-medium">{rotulo}</p>
+        <p className="text-sm font-medium">
+          {rotulo}
+          {adiantado && trilha !== "especialista" && (
+            <span className="ms-1.5 text-xs font-normal text-muted-foreground">
+              · adiantado
+            </span>
+          )}
+        </p>
         <p className="mt-0.5 text-xs text-muted-foreground">
           {quando ? formatDateTime(quando) : "data a combinar"}
         </p>

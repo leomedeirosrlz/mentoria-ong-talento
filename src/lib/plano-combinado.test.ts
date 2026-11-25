@@ -144,6 +144,41 @@ describe("resumoCombinado", () => {
     expect(r.proximo?.numero).toBe(14);
     expect(r.ate).toBe("2026-01-20");
   });
+
+  it("a data cruzando o número marca adiantado; o próximo segue pela data (QA 25/11)", () => {
+    const r = resumoCombinado({
+      ...planoBase,
+      status: "aceito",
+      aceites: { mentor: true, mentorado: false },
+      escopo: {
+        ritmo: 2,
+        janela: { inicio: "2026-01-12", fim: "2026-02-10" },
+        passos: [
+          { numero: 14, data: "2026-01-20", acao: "agendar" },
+          { numero: 15, data: "2026-01-13", acao: "agendar" },
+        ],
+      },
+      passos: [
+        // o 15º já foi aplicado pra 13/01 — antes do 14º ainda pendente
+        { numero: 15, data_nova: "2026-01-13T19:00:00-03:00" },
+      ],
+    });
+    const p15 = r.passos.find((x) => x.numero === 15);
+    const p14 = r.passos.find((x) => x.numero === 14);
+    expect(p15?.adiantado).toBe(true);
+    expect(p14?.adiantado).toBe(false);
+    // o próximo pendente é o 14º (único sem data marcada)
+    expect(r.proximo?.numero).toBe(14);
+  });
+
+  it("ordem alinhada entre número e data não marca nada", () => {
+    const r = resumoCombinado({
+      ...planoBase,
+      status: "aceito",
+      aceites: { mentor: true, mentorado: false },
+    });
+    expect(r.passos.every((x) => !x.adiantado)).toBe(true);
+  });
 });
 
 // ---------- aceitesDoPlano / combinadoDoJovem — projeções 0225 ----------
@@ -293,6 +328,7 @@ describe("fraseDoCombinado", () => {
           data: "2026-01-13",
           estado: "pendente",
           marcadoEm: null,
+          adiantado: false,
         },
       },
       "mentor",
