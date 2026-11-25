@@ -139,7 +139,11 @@ export function RecessoDecisao({
     <>
       {recessos.map((r) => {
         const decidido = r.declaradoEm != null && r.usa != null;
-        const compacto = decidido && !editando.has(r.cicloEventoId);
+        // o colapso só vale onde o "Editar" reabre a decisão — na versão
+        // só-leitura (card do plano, staff) ele esconderia a autoria pra
+        // sempre, então ali a linha segue expandida
+        const compacto =
+          decidido && podeDeclarar && !editando.has(r.cicloEventoId);
         if (compacto) {
           return (
             <div
