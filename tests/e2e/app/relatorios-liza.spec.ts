@@ -21,12 +21,15 @@ const KEY = () => process.env.E2E_SUPABASE_SERVICE_ROLE_KEY!;
 
 /** JWT do usuário logado na página — @supabase/ssr guarda a sessão em
  *  cookies httpOnly "sb-<ref>-auth-token[.N]" (chunks ordenados, valor
- *  "base64-<json>"). É como o e2e chama REST como o papel real, não como
- *  service role. */
+ *  "base64-<json>"); no modo proxy local o storageKey vira "realiza-auth"
+ *  (src/lib/supabase/config.ts), mesmo formato e mesmo chunking. É como o
+ *  e2e chama REST como o papel real, não como service role. */
 async function tokenDaPagina(page: Page): Promise<string> {
   const cookies = await page.context().cookies();
   const chunks = cookies
-    .filter((c) => c.name.match(/^sb-.+-auth-token(\.\d+)?$/))
+    .filter((c) =>
+      c.name.match(/^(sb-.+-auth-token|realiza-auth)(\.\d+)?$/)
+    )
     .sort((a, b) => a.name.localeCompare(b.name));
   if (!chunks.length) throw new Error("cookie de sessão supabase não achado");
   let raw = decodeURIComponent(chunks.map((c) => c.value).join(""));

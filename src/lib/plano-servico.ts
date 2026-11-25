@@ -1,13 +1,17 @@
-import "server-only";
-
 /** Insumos do planner lidos com o client de serviço (REALIZA-518): a
  *  simulação e a proposta valem pros três públicos — mentor, jovem e
  *  equipe — e o jovem não lê `duplas`/grades pela RLS. A AUTORIZAÇÃO é
  *  checada pelas RPCs do próprio chamador (o papel real mora no banco,
  *  nunca na tela); depois dela a leitura de referência é idêntica pra
  *  qualquer papel. Escrita segue só via RPCs definer — o client de
- *  serviço aqui nunca grava. */
+ *  serviço aqui nunca grava.
+ *
+ *  Server-side only, mas SEM o literal `import "server-only"` (527): a
+ *  Liza importa contextoPlanoCom em ia/tools.ts, que os testes de
+ *  contrato carregam no vitest — o pacote veneno não existe fora do
+ *  Next. Não importar de client components. */
 
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 import { gradeCombinada } from "./ciclo";
@@ -55,7 +59,18 @@ export async function contextoPlano(
   duplaId: string,
   eventos: CicloEvento[]
 ): Promise<ContextoPlano> {
-  const supabase = await createClient();
+  return contextoPlanoCom(await createClient(), duplaId, eventos);
+}
+
+/** O miolo do contextoPlano com o client da sessão injetado (REALIZA-527):
+ *  a Liza já segura o supabase do chamador dentro da tool — criar outro
+ *  por cookies não existe no transporte MCP. Autorização idêntica: as
+ *  RPCs leem o JWT do client passado. */
+export async function contextoPlanoCom(
+  supabase: SupabaseClient,
+  duplaId: string,
+  eventos: CicloEvento[]
+): Promise<ContextoPlano> {
   const svc = createServiceClient();
   const { data: row, error: erroDupla } = await svc
     .from("duplas")
@@ -123,6 +138,20 @@ export async function contextoPlano(
     diasComuns: new Set(comuns.map((c) => c.dia)).size,
     emails: { mentor: prof?.email ?? null, jovem: jv?.email ?? null },
   };
+}
+
+/** Ciclo_eventos com o client de serviço (REALIZA-527): catálogo de
+ *  domínio, idêntico pra qualquer papel — a RLS deixa o jovem de fora e
+ *  a Liza precisa dos recessos/feriados pra projetar o plano dele. Mesma
+ *  régua da leitura de referência acima: a autorização é da sessão, o
+ *  conteúdo é universal. */
+export async function getCicloEventosPlano(): Promise<CicloEvento[]> {
+  const { data, error } = await createServiceClient()
+    .from("ciclo_eventos")
+    .select("*")
+    .order("ordem", { ascending: true });
+  if (error) throw error;
+  return (data ?? []) as CicloEvento[];
 }
 
 /** Sobrepõe as decisões em aberto na simulação: rows hipotéticas pra

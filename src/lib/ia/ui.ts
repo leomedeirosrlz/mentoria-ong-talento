@@ -12,10 +12,11 @@
  *  intermediário, não resposta. Tool negada/erro nunca vira card.
  *
  *  Mudou um kind aqui → muda o card (assistente-cards.tsx), o dataset da
- *  demo (lib/demo/ia-ui.ts) e a nota de cards em prompts.ts. */
+ *  demo (lib/demo/ia.ts) e a nota de cards em prompts.ts. */
 
 import type { Semaforo } from "@/lib/ciclo";
 import type { DuplaDesfecho } from "@/lib/dupla-desfecho";
+import type { DocBloco } from "@/lib/materiais-documentos";
 import type {
   AppRole,
   AvaliacaoJovem,
@@ -224,6 +225,25 @@ export type UiPlano = {
   }[];
   /** limbo/registro pendente que vem antes do plano */
   pendencias: { numero: number; estado: "limbo" | "pendente_registro" }[];
+  /** Recessos do cronograma ainda sem decisão da dupla (527) — travam a
+   *  proposta até a dupla responder (declarar_recesso / wizard). */
+  recessos_pendentes: {
+    ciclo_evento_id: string;
+    titulo: string;
+    inicio: string;
+    fim: string;
+  }[];
+  /** Grade semanal dos dois lados (518): quem já marcou e os dias em
+   *  comum — o card diz por que as datas preferem (ou não) certos dias. */
+  grade: {
+    mentor: boolean;
+    jovem: boolean;
+    dias_comuns: number;
+    sem_grade: boolean;
+  } | null;
+  /** Rascunho do documento do combinado (montarDocCombinado, o mesmo do
+   *  wizard da aba Agora) — o card deixa a dupla ler o que vai propor. */
+  doc: DocBloco[] | null;
   avisos: string[];
   /** Nível nomeado de flexibilização (FR-011) + ação sugerida. */
   nivel:
@@ -244,9 +264,12 @@ export type UiPlano = {
     status: string;
     versao: number;
     aprovado_lado: "mentor" | "mentorado" | null;
-    /** os dois aceites (0224) */
+    /** ciência de cada lado (0225 — o aceite é ÚNICO, um carimbo basta) */
     aceito_mentor: boolean;
     aceito_mentorado: boolean;
+    /** quem falta aceitar (aceite ÚNICO, 0225) — "dupla" = nenhum lado
+     *  carimbou (proposta da equipe esperando a dupla) */
+    falta: "mentor" | "mentorado" | "dupla" | null;
     expira_em: string;
     ritmo: number | null;
   } | null;
@@ -404,6 +427,11 @@ export const STATUS_TOOL: Record<string, string> = {
   marcar_situacao_mentorado: "Preparando a mudança de situação…",
   emitir_link_instrumento: "Preparando o link do instrumento…",
   agendar_encontro: "Preparando o agendamento…",
+  jovem_agendar_encontro: "Preparando o agendamento…",
+  jovem_registrar_encontro: "Preparando o registro do encontro…",
+  declarar_recesso: "Preparando a decisão do recesso…",
+  disponibilidade_semana: "Preparando sua grade semanal…",
+  jovem_pedir_especialista: "Preparando o pedido de especialista…",
   editar_campo_pessoa: "Preparando a edição…",
 };
 
@@ -611,6 +639,23 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
           null,
         passos,
         pendencias,
+        recessos_pendentes: arr(d.recessos_pendentes)
+          .map((r) => ({
+            ciclo_evento_id: String(r.ciclo_evento_id ?? ""),
+            titulo: String(r.titulo ?? ""),
+            inicio: String(r.inicio ?? ""),
+            fim: String(r.fim ?? ""),
+          }))
+          .filter((r) => r.ciclo_evento_id),
+        grade: obj(d.grade)
+          ? {
+              mentor: obj(d.grade)?.mentor === true,
+              jovem: obj(d.grade)?.jovem === true,
+              dias_comuns: num(obj(d.grade)?.dias_comuns),
+              sem_grade: obj(d.grade)?.sem_grade === true,
+            }
+          : null,
+        doc: Array.isArray(d.doc) ? (d.doc as UiPlano["doc"]) : null,
         avisos: (Array.isArray(d.avisos) ? d.avisos : [])
           .map((a) => str(a))
           .filter((a): a is string => a != null),
@@ -633,6 +678,11 @@ export function uiDaTool(nome: string, dados: unknown): UiBloco | null {
                 | null,
               aceito_mentor: plano.aceito_mentor === true,
               aceito_mentorado: plano.aceito_mentorado === true,
+              falta: (str(plano.falta) ?? null) as
+                | "mentor"
+                | "mentorado"
+                | "dupla"
+                | null,
               expira_em: String(plano.expira_em ?? ""),
               ritmo: plano.ritmo == null ? null : num(plano.ritmo),
             }

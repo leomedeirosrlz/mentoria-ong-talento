@@ -33,7 +33,12 @@ test.describe("assistente", () => {
 
     const fab = page.locator('[aria-controls="painel-assistente"]');
     // bolha desligada por padrão (IA_BOLHA != 1) enquanto a rodada de UI não
-    // fecha — o CI liga a flag pra exercitar a feature
+    // fecha — o CI liga a flag pra exercitar a feature. O FAB é chunk lazy:
+    // count() na hora da navegação ainda não viu o mount (~1s de hidratação),
+    // então espera o attach antes de concluir que a flag está off
+    await fab
+      .waitFor({ state: "attached", timeout: 5_000 })
+      .catch(() => {});
     if ((await fab.count()) === 0) {
       test.skip(true, "bolha desligada (IA_BOLHA != 1)");
     }

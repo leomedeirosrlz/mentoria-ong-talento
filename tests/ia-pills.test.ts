@@ -127,6 +127,33 @@ describe("catálogo × allowlist (FR-011)", () => {
       )
     ).toBe(false);
   });
+
+  it("`papeis` da pill corta o recorte da pergunta, não o grant (527)", () => {
+    // "Quantos chamados abertos?" promete a fila da operação, mas a tool
+    // do mentor devolve só os pedidos dele — a pill fica pra equipe
+    // mesmo com grant em chamados_resumo
+    const texto = "Quantos chamados abertos?";
+    expect(
+      catalogo(["coordenacao"], "/agenda").some((p) => p.texto === texto)
+    ).toBe(true);
+    expect(
+      catalogo(["supervisor"], "/agenda").some((p) => p.texto === texto)
+    ).toBe(true);
+    for (const pagina of ["/agenda", "/", "/duplas", FICHA]) {
+      for (const papel of ["mentor_dpp", "mentor_especialista"] as const) {
+        expect(
+          catalogo([papel], pagina).some((p) => p.texto === texto),
+          `${papel} em ${pagina} não devia ver "${texto}"`
+        ).toBe(false);
+      }
+    }
+    // o recorte soma com o grant: híbrido mentor+equipe vê a pill
+    expect(
+      catalogo(["mentor_dpp", "coordenacao"], "/agenda").some(
+        (p) => p.texto === texto
+      )
+    ).toBe(true);
+  });
 });
 
 // ---------- rotação (FR-012/013) ----------

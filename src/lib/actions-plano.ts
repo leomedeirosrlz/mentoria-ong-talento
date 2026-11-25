@@ -386,16 +386,6 @@ export async function combinarPlano(
   return r;
 }
 
-/** "Propor à dupla" (513/518): mesmo gesto do combinar sem decisões —
- *  mantido pro botão legado e pra Liza, que propõe com o ritmo que o
- *  planner devolveu. */
-export async function proporPlano(
-  duplaId: string,
-  ritmo?: number
-): Promise<Resultado> {
-  return combinarPlano(duplaId, { ritmo: ritmo ?? 1 });
-}
-
 /** Mesmas datas dos passos? — o comparador do "aceite que recalcula":
  *  o que o banco gravou vs. o que a decisão nova de recesso projeta. */
 function mesmaDatas(a: DuplaPlanoEscopo, b: EscopoProposta): boolean {

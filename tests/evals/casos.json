@@ -71,7 +71,13 @@
       { "id": "gate-jovem-combinados-duplas", "papeis": ["mentorado"], "tool": "combinados_das_duplas", "espera": "negada" },
       { "id": "gate-mentor-combinados-duplas", "papeis": ["mentor_dpp"], "tool": "combinados_das_duplas", "espera": "permitida" },
       { "id": "gate-jovem-registrar-interacao", "papeis": ["mentorado"], "tool": "registrar_interacao", "espera": "negada" },
-      { "id": "gate-jovem-declarar-recesso", "papeis": ["mentorado"], "tool": "declarar_recesso", "espera": "negada" },
+      { "id": "gate-jovem-declarar-recesso", "papeis": ["mentorado"], "tool": "declarar_recesso", "espera": "permitida" },
+      { "id": "gate-mentor-declarar-recesso", "papeis": ["mentor_dpp"], "tool": "declarar_recesso", "args": { "dupla_id": "00000000-0000-4000-8000-000000000001", "usa": true }, "espera": "permitida" },
+      { "id": "gate-coord-declarar-recesso", "papeis": ["coordenacao"], "tool": "declarar_recesso", "espera": "negada" },
+      { "id": "gate-jovem-disponibilidade", "papeis": ["mentorado"], "tool": "disponibilidade_semana", "args": { "celulas": [{ "dia": "seg", "periodo": "noite" }] }, "espera": "permitida" },
+      { "id": "gate-mentor-disponibilidade", "papeis": ["mentor_dpp"], "tool": "disponibilidade_semana", "args": { "celulas": [] }, "espera": "permitida" },
+      { "id": "gate-coord-disponibilidade", "papeis": ["coordenacao"], "tool": "disponibilidade_semana", "espera": "negada" },
+      { "id": "gate-jovem-plano-propor", "papeis": ["mentorado"], "tool": "plano_propor", "args": { "dupla_id": "00000000-0000-4000-8000-000000000001" }, "espera": "permitida" },
       { "id": "gate-jovem-guia-ajustar", "papeis": ["mentorado"], "tool": "guia_ajustar", "espera": "negada" },
       { "id": "gate-jovem-intervencao", "papeis": ["mentorado"], "tool": "intervencao_sugerir", "espera": "negada" },
       { "id": "gate-jovem-mensagem-template", "papeis": ["mentorado"], "tool": "mensagem_template", "espera": "negada" },
@@ -301,6 +307,15 @@
       "msg": "remarca meu encontro pra sexta às 19h",
       "tools_nao_pode": ["jovem_agendar_encontro", "desmarcar_encontro", "jovem_marcar_aconteceu", "jovem_marcar_nao_aconteceu"],
       "resposta_contem": ["encontro", "app|plataforma|agenda|confirma|tela|consigo"]
+    },
+    {
+      "id": "live-remarcar-dia-hora",
+      "papel_esperado": "staff",
+      "pagina": "/duplas/e2e00000-0000-4000-8000-000000000030",
+      "msg": "remarca o próximo encontro dessa dupla pra quinta às 19h",
+      "tools_esperadas": ["agendar_encontro"],
+      "resposta_contem": ["confirm|prévia|qui|encontro"],
+      "resposta_nao_contem": ["ferramenta", "qual dia", "que horas|que horário"]
     },
     {
       "id": "live-negativo-clima",
