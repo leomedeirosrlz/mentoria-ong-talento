@@ -4,6 +4,7 @@ import { montarRoteiroDoPlano } from "@/lib/plano-roteiros-servico";
 import type { LadoPlano } from "@/lib/plano-servico";
 import { parseDocBlocos } from "@/lib/doc-bloco-schema";
 import {
+  blocosParaJovem,
   roteiroForaDeVersao,
   rotuloStatusRoteiro,
 } from "@/lib/plano-roteiros";
@@ -85,6 +86,12 @@ export async function RoteiroSemana({
     .filter((x) => x.status === "substituido")
     .sort((a, b) => a.versao - b.versao);
 
+  // QA 25/11: o doc é um só, mas a leitura do jovem corta o que é do(a)
+  // mentor(a) — preparação, pós-encontro e a nota — e derruba os
+  // checkboxes que não persistem
+  const paraLado = (bs: ReturnType<typeof blocosParaJovem>) =>
+    lado === "mentorado" ? blocosParaJovem(bs) : bs;
+
   return (
     <div className="space-y-4">
       {/* versões substituídas seguem legíveis — trilha do combinado */}
@@ -110,13 +117,13 @@ export async function RoteiroSemana({
           kicker={`${numero}º encontro · guia da dupla`}
           titulo={tituloDoc}
           meta={metaDe(atual)}
-          blocos={
+          blocos={paraLado(
             parseDocBlocos(atual.conteudo) ??
-            // conteúdo inválido nunca renderiza: cai no guia do corpus
-            (plano
-              ? await montarRoteiroDoPlano(dupla, plano, numero, eventos)
-              : [])
-          }
+              // conteúdo inválido nunca renderiza: cai no guia do corpus
+              (plano
+                ? await montarRoteiroDoPlano(dupla, plano, numero, eventos)
+                : [])
+          )}
           voltar={{ href: voltarHref, rotulo: "Voltar" }}
         >
           {atual.status === "rascunho" && !pedida && (
@@ -140,11 +147,11 @@ export async function RoteiroSemana({
               : "A semana ainda não tem roteiro. A equipe publica quando ele estiver pronto."
           }
           meta="Prévia · ainda não publicado"
-          blocos={
+          blocos={paraLado(
             plano
               ? await montarRoteiroDoPlano(dupla, plano, numero, eventos)
               : []
-          }
+          )}
           voltar={{ href: voltarHref, rotulo: "Voltar" }}
         >
           {lado === "staff" && (

@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import {
+  blocosParaJovem,
   contextoRoteiro,
   materiaisComRoteiroPlano,
   montarDocCombinado,
@@ -135,6 +136,129 @@ describe("montarRoteiro — corpus + contexto + ajustes", () => {
   it("sem contexto nenhum → o corpus puro", () => {
     const blocos = montarRoteiro(corpusFake, { numero: 7 });
     expect(blocos[0]).toMatchObject({ kind: "subtitulo", texto: "Ficha do encontro" });
+  });
+});
+
+describe("blocosParaJovem — a versão do jovem (QA 25/11)", () => {
+  const completo = montarRoteiro(
+    {
+      ...corpusFake,
+      secoes: [
+        corpusFake.secoes[0],
+        {
+          secao: "antes",
+          titulo: "7º encontro · Antes do encontro",
+          grupo: null,
+          nivel: 2,
+          anchor: "antes",
+          fase: null,
+          blocos: [
+            { kind: "par", html: "Antes, a dupla se prepara." },
+            { kind: "subtitulo", texto: "Preparação do(a) mentor(a)", nivel: 3 },
+            { kind: "lista", itens: ["Revisar a ficha"], check: true },
+            { kind: "subtitulo", texto: "O que o(a) jovem traz", nivel: 3 },
+            { kind: "par", html: "As metas que definiu." },
+          ],
+        },
+        corpusFake.secoes[1],
+        {
+          secao: "encerramento",
+          titulo: "7º encontro · Encerramento e tarefa",
+          grupo: null,
+          nivel: 2,
+          anchor: "encerramento",
+          fase: null,
+          blocos: [
+            { kind: "subtitulo", texto: "Antes de finalizar", nivel: 3 },
+            { kind: "lista", itens: ["Checkout breve"], check: true },
+            {
+              kind: "subtitulo",
+              texto: "Tarefa do(a) jovem para o próximo encontro",
+              nivel: 3,
+            },
+            { kind: "par", html: "Desdobrar as metas." },
+          ],
+        },
+        {
+          secao: "depois",
+          titulo: "7º encontro · Depois do encontro",
+          grupo: null,
+          nivel: 2,
+          anchor: "depois",
+          fase: null,
+          blocos: [{ kind: "par", html: "O mentor registra." }],
+        },
+        {
+          secao: "nota",
+          titulo: "7º encontro · Nota ao mentor",
+          grupo: null,
+          nivel: 2,
+          anchor: "nota",
+          fase: null,
+          blocos: [{ kind: "par", html: "O papel do mentor." }],
+        },
+      ],
+    },
+    { numero: 7, passo: { data: "2026-12-02" } }
+  );
+
+  it("fica a pauta, o que ele leva e a tarefa; sai o que é do(a) mentor(a)", () => {
+    const subs = blocosParaJovem(completo)
+      .filter((b) => b.kind === "subtitulo")
+      .map((b) => (b as { texto: string }).texto);
+    expect(subs).toEqual([
+      "Ficha do encontro",
+      "Antes do encontro",
+      "O que o(a) jovem traz",
+      "Durante o encontro",
+      "Momento 1",
+      "Encerramento e tarefa",
+      "Tarefa do(a) jovem para o próximo encontro",
+    ]);
+    const texto = JSON.stringify(blocosParaJovem(completo));
+    expect(texto).not.toContain("Revisar a ficha");
+    expect(texto).not.toContain("O mentor registra");
+    expect(texto).not.toContain("O papel do mentor");
+    // o contexto do plano ("Do plano de vocês") segue na abertura
+    expect(blocosParaJovem(completo)[0]).toMatchObject({
+      kind: "callout",
+      tom: "tip",
+    });
+  });
+
+  it("checkbox que não persiste vira lista comum — nenhum check sobra", () => {
+    const checks = blocosParaJovem(completo).filter(
+      (b) => b.kind === "lista" && (b as { check?: boolean }).check
+    );
+    expect(checks).toEqual([]);
+  });
+
+  it("seção cujo conteúdo é todo do(a) mentor(a) some com o título", () => {
+    const soMentor = montarRoteiro(
+      {
+        ...corpusFake,
+        secoes: [
+          corpusFake.secoes[0],
+          {
+            secao: "antes",
+            titulo: "7º encontro · Antes do encontro",
+            grupo: null,
+            nivel: 2,
+            anchor: "antes",
+            fase: null,
+            blocos: [
+              { kind: "subtitulo", texto: "Preparação do(a) mentor(a)", nivel: 3 },
+              { kind: "par", html: "Revise o guia." },
+            ],
+          },
+        ],
+      },
+      { numero: 7 }
+    );
+    const subs = blocosParaJovem(soMentor)
+      .filter((b) => b.kind === "subtitulo")
+      .map((b) => (b as { texto: string }).texto);
+    expect(subs).toEqual(["Ficha do encontro"]);
   });
 });
 

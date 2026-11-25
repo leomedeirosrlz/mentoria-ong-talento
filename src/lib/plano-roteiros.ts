@@ -1,6 +1,6 @@
 import { escapeDocHtml } from "./doc-bloco-schema";
 import type { DocBloco } from "./materiais-documentos";
-import type { CorpusDoc } from "./materiais/corpus-doc";
+import { normTitulo, type CorpusDoc } from "./materiais/corpus-doc";
 import {
   diaCurto,
   diaMes,
@@ -122,6 +122,49 @@ export function montarRoteiro(
     blocos.push(...s.blocos);
   }
   return blocos;
+}
+
+/** Seções que ficam fora da versão do jovem (QA 25/11): preparação e
+ *  pós-encontro são do(a) mentor(a), e os checklists não persistem —
+ *  na tela dele viravam checkbox morto. O doc segue único (mesmo
+ *  `conteudo` pros dois lados); o corte é de leitura, no render do
+ *  mentorado. */
+const ROTEIRO_JOVEM_CORTA_L2 = /^(depois do encontro|nota ao mentor)\b/;
+const ROTEIRO_JOVEM_CORTA_L3 = /^(preparacao|antes de finalizar)\b/;
+
+/** Versão do jovem do roteiro: fica a ficha (pauta e o que ele leva), a
+ *  agenda dos momentos e a tarefa combinada; saem preparação do(a)
+ *  mentor(a), pós-encontro e a nota ao mentor. As listas de marcação
+ *  que sobrevivem viram lista comum — checkbox que não marca é ruído. */
+export function blocosParaJovem(blocos: readonly DocBloco[]): DocBloco[] {
+  const out: DocBloco[] = [];
+  let cortaL2 = false;
+  let cortaL3 = false;
+  // título de L2 viva segura o lugar até algo sobreviver embaixo — uma
+  // seção cujos filhos caem todos some junto com o título
+  let l2Pendente: DocBloco | null = null;
+  const empurra = (b: DocBloco) => {
+    if (l2Pendente) {
+      out.push(l2Pendente);
+      l2Pendente = null;
+    }
+    out.push(b.kind === "lista" && b.check ? { ...b, check: false } : b);
+  };
+  for (const b of blocos) {
+    if (b.kind === "subtitulo") {
+      if (b.nivel === 3) {
+        cortaL3 = ROTEIRO_JOVEM_CORTA_L3.test(normTitulo(b.texto));
+      } else {
+        cortaL2 = ROTEIRO_JOVEM_CORTA_L2.test(normTitulo(b.texto));
+        cortaL3 = false;
+        l2Pendente = cortaL2 ? null : b;
+        continue;
+      }
+    }
+    if (cortaL2 || cortaL3) continue;
+    empurra(b);
+  }
+  return out;
 }
 
 /** Status legível do roteiro na lista da ficha. */
