@@ -217,7 +217,10 @@ export const INSTRUMENTO_INFO: Record<
   },
   pdm: {
     titulo: "PDM",
-    resumo: "O documento central: visão e de 3 a 8 metas, cada uma com indicador, prazo e desdobramento sob ela.",
+    // 526 — a linha é a RESPOSTA (o form por link), não o documento: o
+    // que o jovem responde aqui projeta itens no Plano de desenvolvimento
+    // da ficha. Sem essa ponte a linha lia o próprio doc.
+    resumo: "O form que o jovem responde nos encontros 1 a 4: visão, metas e desdobramentos viram itens do Plano de desenvolvimento da ficha.",
   },
   roda_vida: {
     titulo: "Roda da Vida",

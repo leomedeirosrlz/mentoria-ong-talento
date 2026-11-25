@@ -4311,6 +4311,53 @@ export async function marcarCombinadoFeito(id: string, feito: boolean) {
   return { ok: true };
 }
 
+/** O jovem cria um combinado próprio (REALIZA-526): nasce "livre" — sem
+ *  âncora de encontro nem de registro (numero/registro_id null, nullable
+ *  desde 0157) e sempre responsavel='mentorado', então ele aparece na
+ *  jovem_encaminhamentos como qualquer combinado dele e o marcar_combinado
+ *  segue valendo. O reconcile do salvarRegistro não toca (só mexe nas
+ *  linhas do registro editado — registro_id dele).
+ *  ESCRITA REAL depende da policy que o lead aplica — SQL sugerido no
+ *  relatório da frente (encaminhamentos_mentorado_insert FOR INSERT WITH
+ *  CHECK: my_role()='mentorado' + responsavel='mentorado' + numero is null
+ *  + registro_id is null + dupla_id in jovem_duplas). Sem ela o insert
+ *  responde RLS e a UI mostra o erro honesto — nada de cast por cima. */
+export async function criarCombinadoJovem(
+  duplaId: string,
+  descricao: string,
+  prazo?: string | null
+) {
+  if (await demoAtivo()) return { error: DEMO_MSG };
+  const { supabase, me: eu } = await me();
+  if (!eu) return { error: "Sessão expirada. Entre de novo." };
+  if (eu.role !== "mentorado") {
+    return { error: "Só o mentorado cria os próprios combinados." };
+  }
+
+  const limpo = descricao.trim();
+  if (limpo.length < 2)
+    return { error: "Escreva o combinado antes de adicionar." };
+  if (limpo.length > 500)
+    return { error: "Combinado muito longo (máx. 500 caracteres)." };
+  const prazoLimpo = prazo?.trim() ?? "";
+  if (prazoLimpo && !/^\d{4}-\d{2}-\d{2}$/.test(prazoLimpo)) {
+    return { error: "Confira a data do prazo." };
+  }
+
+  const { error } = await supabase.from("encaminhamentos").insert({
+    dupla_id: duplaId,
+    numero: null,
+    descricao: limpo,
+    responsavel: "mentorado",
+    prazo: prazoLimpo || null,
+    created_by: eu.id,
+  });
+  if (error) return { error: erroAmigavel(error) };
+
+  revalidatePath("/jovem");
+  return { ok: true };
+}
+
 /** "Preciso de ajuda" do jovem — 0084: o dialog novo chama abrirChamado
  *  (NovoChamadoDialog, papel mentorado → opções na linguagem dele). Fica o
  *  wrapper por compat: mensagem solta vira chamado de urgência. */

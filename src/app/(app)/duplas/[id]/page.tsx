@@ -1563,6 +1563,7 @@ export default async function DuplaPage({
               dupla.status === "ativa" || dupla.status === "pausada"
             }
             remetenteMentorNome={souMentor ? (me.nome_social ?? me.nome) : undefined}
+            souMentor={souMentor}
           />
         </section>
       )}

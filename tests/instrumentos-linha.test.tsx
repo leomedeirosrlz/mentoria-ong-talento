@@ -65,7 +65,7 @@ function item(
   };
 }
 
-function montarLista(itens: InstrumentoDupla[]) {
+function montarLista(itens: InstrumentoDupla[], souMentor = false) {
   return montar(
     <InstrumentosDupla
       duplaId="d1"
@@ -76,6 +76,7 @@ function montarLista(itens: InstrumentoDupla[]) {
       mentorWhatsapp="5511912345678"
       podeEnviar
       jornadaViva
+      souMentor={souMentor}
     />
   );
 }
@@ -235,6 +236,74 @@ describe("remate da linha de instrumento (022)", () => {
       expect.stringContaining("/f/tok1")
     );
     expect(primaria(li)?.textContent).toContain("Copiado");
+    desmontar();
+  });
+});
+
+// 526 — o checklist de competências é a exceção da lista: o respondente é
+// o mentor, não o jovem. Na mão dele a linha vira a ação de responder o
+// próprio link; na mão da coord segue o gesto de envio ao mentor.
+describe("checklist de competências — ownership e ação (526)", () => {
+  it("na mão do mentor: 'Responder agora' abre o /f/ vivo e o ⋯ não nudga pra si", async () => {
+    const { alvo, desmontar } = montarLista(
+      [
+        item("competencias_mentor", [
+          entrega({ status: "pendente", destino: "mentor" }),
+        ]),
+      ],
+      true
+    );
+    const li = linhaDe(alvo, "competencias_mentor");
+    expect(badges(li).map((b) => b.textContent)).toEqual([
+      "pra você responder",
+    ]);
+    expect(li.textContent).toContain("responde você");
+    const link = li.querySelector<HTMLAnchorElement>('a[href="/f/tok1"]');
+    expect(link?.textContent).toContain("Responder agora");
+    act(() => clicar(gatilhoMenu(li)!));
+    await assentar();
+    const popup = document.querySelector(
+      '[data-slot="dropdown-menu-content"]'
+    );
+    const rotulos = [...popup!.querySelectorAll('[role="menuitem"]')].map(
+      (i) => i.textContent
+    );
+    expect(rotulos).toContain("Copiar link");
+    expect(rotulos).not.toContain("Enviar no WhatsApp");
+    desmontar();
+  });
+
+  it("na mão da coord: 'aguardando o mentor' + primária Copiar link", () => {
+    const { alvo, desmontar } = montarLista([
+      item("competencias_mentor", [
+        entrega({ status: "pendente", destino: "mentor" }),
+      ]),
+    ]);
+    const li = linhaDe(alvo, "competencias_mentor");
+    expect(badges(li).map((b) => b.textContent)).toEqual([
+      "aguardando o mentor",
+    ]);
+    expect(li.textContent).toContain("responde o mentor");
+    expect(primaria(li)?.textContent).toContain("Copiar link");
+    desmontar();
+  });
+
+  it("respondido + 2ª marcação aberta: 'Responder agora' convive com 'Ver resposta'", () => {
+    const { alvo, desmontar } = montarLista(
+      [
+        item("competencias_mentor", [
+          entrega({ ...RESPONDIDA, destino: "mentor" }),
+          entrega({ status: "pendente", destino: "mentor" }),
+        ]),
+      ],
+      true
+    );
+    const li = linhaDe(alvo, "competencias_mentor");
+    expect(badges(li).map((b) => b.textContent)).toEqual(["respondido"]);
+    expect(li.textContent).toContain("link aberto pra você");
+    expect(
+      li.querySelector<HTMLAnchorElement>('a[href="/f/tok1"]')?.textContent
+    ).toContain("Responder agora");
     desmontar();
   });
 });

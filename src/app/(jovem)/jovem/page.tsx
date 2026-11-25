@@ -936,7 +936,11 @@ export default async function JovemHome() {
         </h2>
         <Card className="animate-enter">
           <CardContent className="px-4 py-0 sm:px-5">
-            <JovemCombinados itens={encaminhamentos} hoje={hoje} />
+            <JovemCombinados
+              itens={encaminhamentos}
+              hoje={hoje}
+              duplaId={duplaEmCurso ? (duplaAtual?.id ?? null) : null}
+            />
           </CardContent>
         </Card>
       </section>

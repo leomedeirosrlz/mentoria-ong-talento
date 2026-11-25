@@ -112,12 +112,13 @@ test.describe("mentorado — home, página e ciclo de vida", () => {
       dialog.getByText(/Professor de curso técnico aos sábados/)
     ).toBeVisible();
     // "qualquer" não inventa perfil: troca pelo primeiro card do pool (o
-    // card do mural) e a nota explica que a coordenação conecta
+    // card do mural é clicável inteiro, 526) e a nota explica que a
+    // coordenação conecta
     await dialog.getByRole("button", { name: "Trocar" }).click();
     await dialog
       .locator("#sug-esp-pool li")
       .first()
-      .getByRole("button", { name: "Selecionar", exact: true })
+      .getByRole("button")
       .click();
     await expect(
       dialog.getByText(/a coordenação conecta você/)
