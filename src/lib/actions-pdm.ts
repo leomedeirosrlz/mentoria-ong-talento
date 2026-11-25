@@ -2,6 +2,7 @@
 
 import { createClient } from "./supabase/server";
 import { demoAtivo } from "./demo/mode";
+import { PDM_MAX_METAS, PDM_MAX_SUBITENS } from "@/lib/pdm";
 
 // Server actions do PDM vivo (REALIZA-181): casca fina sobre as RPCs
 // escopadas — quem decide permissão, caps e carimbos é o banco; aqui só a
@@ -14,10 +15,10 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 
 function erroAmigavel(e: { message?: string; code?: string } | null): string {
   const msg = e?.message ?? "";
-  if (msg.includes("máximo 10 metas"))
-    return "O PDM comporta no máximo 10 metas. Descarte uma antes de criar outra.";
-  if (msg.includes("máximo 20 subitens"))
-    return "O PDM comporta no máximo 20 subitens no total. Descarte ou conclua alguns antes de criar novos.";
+  if (msg.includes(`máximo ${PDM_MAX_METAS} metas`))
+    return `O PDM comporta no máximo ${PDM_MAX_METAS} metas. Descarte uma antes de criar outra.`;
+  if (msg.includes(`máximo ${PDM_MAX_SUBITENS} subitens`))
+    return `O PDM comporta no máximo ${PDM_MAX_SUBITENS} subitens no total. Descarte ou conclua alguns antes de criar novos.`;
   if (msg.includes("sem permissão"))
     return "Você não pode editar o PDM desta dupla.";
   if (msg.includes("mesmo nível"))

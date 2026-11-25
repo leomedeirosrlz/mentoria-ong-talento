@@ -203,8 +203,8 @@ describe("parseSubmetasLinhas", () => {
     ).toEqual(["Treinar 1.500 questões até dezembro"]);
   });
 
-  it("corta em 20 linhas sem falhar", () => {
-    const linhas = Array.from({ length: 30 }, (_, i) => `${i + 1}. item ${i + 1}`).join("\n");
+  it("corta no teto sem falhar", () => {
+    const linhas = Array.from({ length: 60 }, (_, i) => `${i + 1}. item ${i + 1}`).join("\n");
     const r = parseSubmetasLinhas(linhas);
     expect(r).toHaveLength(PDM_MAX_SUBITENS);
     expect(r[0]).toBe("item 1");

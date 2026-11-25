@@ -3,9 +3,11 @@
 > Registro bruto para o pipeline `feedback → recon → issues → specs → implementação → review`.
 > As imagens citadas são as do feedback enviado no chat.
 
-**Status (25/11, fim do dia):** as seis frentes foram implementadas e estão em
-`staging` (commit `2bb20283`, deploy `dpl_GxdkGb8vehb4WfLVMjQ2MSFMDVLo` em
-`https://staging.realiza.vc`). Gate: typegen/tsc limpos, eslint 0 erros,
+**Status (25/11, fim do dia):** as seis frentes foram implementadas, corrigidas
+na QA visual e publicadas em **produção** — `mentoria.realiza.vc`, deploy
+`realiza-2st3evx2j`, PR #223 (merge `3af8e8fa`). Banco de produção migrado até
+a `0240` (backup de schema e dados antes do push). Staging acompanha no mesmo
+commit (`368ee53b`). Gate: typegen/tsc limpos, eslint 0 erros,
 vitest 3290 verdes, guard 11/11, build ok, full demo 297/297. A segunda
 passada de QA visual (`_recon/qa-visual-1125.md`) encontrou 9 pontos que o
 cliente já havia pedido e que passaram batido — todos corrigidos na rodada

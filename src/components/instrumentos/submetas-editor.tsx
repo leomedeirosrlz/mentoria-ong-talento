@@ -161,7 +161,7 @@ export function SubmetasEditor({
 
       {cheio ? (
         <p className="text-xs text-muted-foreground">
-          Até {PDM_MAX_SUBITENS} submetas por meta.
+          Até {PDM_MAX_SUBITENS} submetas no plano.
         </p>
       ) : (
         <Button
