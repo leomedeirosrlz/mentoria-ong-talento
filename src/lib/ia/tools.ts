@@ -8,7 +8,11 @@
 // Cada tool declara: nome, descrição em pt-BR (é o que o modelo lê pra
 // escolher), schema zod dos args, `roles` (gate ANTES de rodar — a tool não
 // existe pro papel que não deveria chamá-la) e `run` — que só recebe o
-// client do próprio usuário, nunca service role.
+// client do próprio usuário, nunca service role. A exceção é a superfície
+// do plano "ficar em dia" (527): dupla e grade dos dois lados são
+// referência cruzada que a RLS não entrega — leitura idêntica à da
+// action do combinado (contextoPlano, 518), DEPOIS das RPCs de sessão
+// provarem o acesso; escrita segue só por RPC definer.
 //
 // Toda chamada grava ia_eventos (0083): canal, tool, args canônicos, ok/erro
 // e latência — inclusive as rejeitadas, porque "o que a IA tentou" também é
@@ -17,12 +21,29 @@
 import { createHash } from "crypto";
 import { z } from "zod";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { comparaNome, encontroTemConteudo, saudadeDaDupla, toDateStr } from "@/lib/ciclo";
+import {
+  comparaNome,
+  encontroTemConteudo,
+  formatDiaHora,
+  parseDisponibilidade,
+  recessosAlterados,
+  saudadeDaDupla,
+  toDateStr,
+} from "@/lib/ciclo";
 import {
   escopoDaProposta,
+  fusaoPedeAvisoPratica,
+  gruposDeSessao,
   montarPlanoEmDia,
   rotuloRitmo,
 } from "@/lib/plano-em-dia";
+import { montarDocCombinado } from "@/lib/plano-roteiros";
+import { aceitesDoPlano } from "@/lib/plano-combinado";
+import {
+  comDecisoesRecesso,
+  contextoPlanoCom,
+  getCicloEventosPlano,
+} from "@/lib/plano-servico";
 import { filaMentorados, filaMentores, tetoMentor } from "@/lib/fila";
 import { saudeDoRecorte } from "@/lib/agenda-coordenacao";
 import type { Achado } from "@/lib/relatorios/leituras";
@@ -35,7 +56,9 @@ import { temPapel } from "@/lib/types";
 import type {
   AppRole,
   CicloEvento,
+  Disponibilidade,
   Dupla,
+  DuplaPlanoEscopo,
   Mentorado,
   Profile,
 } from "@/lib/types";
@@ -477,6 +500,22 @@ async function rotuloSolicitacao(
   return s?.mentorado_nome_social ?? s?.mentorado_nome ?? null;
 }
 
+/** Args do plano_em_dia (527 — a tool espelha o planner do combinado):
+ *  simulações sem escrita — ritmo pedido, "combinar sem a grade", sessão
+ *  fusa e decisões de recesso hipotéticas. */
+type PlanoEmDiaArgs = {
+  dupla_id: string;
+  ritmo?: number;
+  sem_grade?: boolean;
+  fusao?: number[][];
+  decisoes_recesso?: { ciclo_evento_id: string; usa: boolean }[];
+};
+
+/** Args do plano_propor — o escopo sai do mesmo planner; as decisões de
+ *  recesso são gravadas pela dupla na mesma proposta (snapshot no
+ *  escopo.decisoes, como o wizard da aba Agora). */
+type PlanoProporArgs = PlanoEmDiaArgs;
+
 /** Saída do resumo_semana a partir das duplas vivas — pura, pra a demo
  *  (/demo, dataset em memória) responder pelo MESMO caminho da tool. */
 export function projetarResumo(
@@ -869,25 +908,66 @@ export const IA_TOOLS = {
   plano_em_dia: {
     nome: "plano_em_dia",
     descricao:
-      "Plano de recuperação de uma dupla DPP atrasada ('ficar em dia'): passo a passo determinístico com data sugerida por encontro, no ritmo mais leve que fecha antes do encerramento (1 por semana, até 2, até 3 ou até 1 por dia), respeitando os intervalos de prática/tarefa do guia, os recessos, os feriados nacionais e o encerramento do ciclo. Devolve o estado (em_dia, recuperacao ou conversa: nem 1 por dia fecha, o caminho é a coordenação), cada passo com a ação (agendar, remarcar ou já marcado; vence_no_caminho = oficial que vence enquanto a dupla recupera), pendências de registro que vêm antes de qualquer plano, a data em que a dupla volta pro calendário oficial, quantos encontros cabem até o encerramento e o efeito de seguir no recesso. Use pra 'como a dupla X fica em dia?', 'ela começou atrasada, o que fazer?', 'monta um plano de recuperação', 'dá pra adiantar encontro?'. null quando a dupla não existe ou está fora do alcance do papel.",
-    schema: duplaIdArgs,
+      "Plano de recuperação de uma dupla DPP atrasada ('ficar em dia'): passo a passo determinístico com data sugerida por encontro, no ritmo mais leve que fecha antes do encerramento (1 por semana, até 2, até 3 ou até 1 por dia), respeitando os intervalos de prática/tarefa do guia, os recessos, os feriados nacionais, a grade de disponibilidade combinada da dupla (quando os dois lados já marcaram) e o encerramento do ciclo. Devolve o estado (em_dia, recuperacao ou conversa: nem 1 por dia fecha, o caminho é a coordenação), cada passo com a ação (agendar, remarcar ou já marcado; vence_no_caminho = oficial que vence enquanto a dupla recupera), pendências de registro que vêm antes de qualquer plano, os recessos ainda sem decisão que travam a proposta, o estado da grade dos dois lados, a data em que a dupla volta pro calendário oficial, quantos encontros cabem até o encerramento e o efeito de seguir no recesso. Os argumentos simulam o combinado SEM GRAVAR: ritmo pedido, sem_grade (combinar sem a disponibilidade), fusao (encontros juntos na mesma sessão) e decisoes_recesso ('e se a dupla decidir X?'). Use pra 'como a dupla X fica em dia?', 'ela começou atrasada, o que fazer?', 'monta um plano de recuperação', 'dá pra adiantar encontro?'. null quando a dupla não existe ou está fora do alcance do papel.",
+    schema: z
+      .object({
+        dupla_id: z.uuid().describe("id da dupla (uuid)"),
+        ritmo: z
+          .number()
+          .int()
+          .min(1)
+          .optional()
+          .describe("encontros por semana na simulação (sem teto; omita pro mais leve que fecha)"),
+        sem_grade: z
+          .boolean()
+          .optional()
+          .describe("true = simula combinando sem a grade de disponibilidade"),
+        fusao: z
+          .array(z.array(z.number().int().min(1)).min(2))
+          .optional()
+          .describe("sessões combinadas: grupos de números de encontro na mesma sessão"),
+        decisoes_recesso: z
+          .array(
+            z.object({
+              ciclo_evento_id: z.uuid(),
+              usa: z.boolean(),
+            })
+          )
+          .optional()
+          .describe("simula 'e se a dupla decidir X sobre o recesso' sem gravar — recessos_pendentes lista os ids"),
+      })
+      .strict(),
     // DPP-only tool: especialista track has no official calendar to catch
     // up to (the planner itself returns aplicavel:false) and the youth
     // never sees scheduling machinery — that's the pair's gesture
     roles: ["coordenacao", "supervisor", "mentor_dpp"],
-    run: async ({ dupla_id }: z.infer<typeof duplaIdArgs>, ctx) => {
-      const [d, eventos] = await Promise.all([
-        getDuplaIa(ctx.supabase, dupla_id),
-        getCicloEventosIa(ctx.supabase),
+    run: async (a: PlanoEmDiaArgs, ctx) => {
+      const [eventos, cx] = await Promise.all([
+        // catálogo por serviço (527): a RLS deixa o jovem de fora de
+        // ciclo_eventos e o dado é idêntico pra qualquer papel
+        getCicloEventosPlano(),
+        contextoPlanoCom(ctx.supabase, a.dupla_id, []),
       ]);
-      if (!d) return null;
+      if ("error" in cx) return null;
+      const d = cx.dupla;
+      const duplaSim = comDecisoesRecesso(
+        d,
+        (a.decisoes_recesso ?? []).map((x) => ({
+          cicloEventoId: x.ciclo_evento_id,
+          usa: x.usa,
+        }))
+      );
+      const agora = new Date();
       const r = montarPlanoEmDia({
-        dupla: d as unknown as Dupla,
+        dupla: duplaSim,
         eventos,
-        hoje: new Date(),
+        ritmo: a.ritmo,
+        disponibilidade: a.sem_grade === true ? null : cx.combinada,
+        fusao: a.fusao,
+        hoje: agora,
       });
       if (!r.aplicavel) {
-        return { dupla_id, trilha: d.trilha, aplicavel: false, motivo: r.motivo };
+        return { dupla_id: a.dupla_id, trilha: d.trilha, aplicavel: false, motivo: r.motivo };
       }
       // overlay persistido (0219): o plano vivo da dupla, quando existe —
       // o card conta que já é combinado, não só proposta
@@ -895,8 +975,71 @@ export const IA_TOOLS = {
         (d.planos ?? []).find((p) =>
           ["proposto", "aceito", "ativo"].includes(p.status)
         ) ?? null;
+      // aceite ÚNICO (0225): quem falta aceitar, na régua canônica
+      const aceites = vivo ? aceitesDoPlano(vivo) : null;
+      const falta =
+        vivo?.status === "proposto" && aceites
+          ? !aceites.mentor && !aceites.mentorado
+            ? "dupla"
+            : !aceites.mentor
+              ? "mentor"
+              : !aceites.mentorado
+                ? "mentorado"
+                : null
+          : null;
+      // rascunho do combinado (527): a mesma montagem do "Ler o
+      // documento" do wizard — o card deixa a dupla ler o que vai propor.
+      // Recessos = pendente com a resposta simulada + decidido na janela
+      // (o decidido já entra no dupla_sim e o planner o respeita)
+      const e =
+        r.estado === "recuperacao"
+          ? escopoDaProposta(r, toDateStr(agora))
+          : null;
+      const evPorId = new Map(eventos.map((ev) => [ev.id, ev]));
+      const pendenteIds = new Set(
+        r.recessosPendentes.map((p) => p.cicloEventoId)
+      );
+      const usaSim = new Map(
+        (a.decisoes_recesso ?? []).map((x) => [x.ciclo_evento_id, x.usa])
+      );
+      const hojeStr = toDateStr(agora);
+      const doc =
+        e && "escopo" in e
+          ? montarDocCombinado({
+              status: "proposto",
+              versao: vivo ? vivo.versao + 1 : 1,
+              quemPropos:
+                cx.lado === "staff" ? "A equipe" : "Vocês",
+              escopo: e.escopo as DuplaPlanoEscopo,
+              recessos: [
+                ...r.recessosPendentes.map((rec) => ({
+                  titulo: rec.titulo,
+                  inicio: rec.inicio,
+                  fim: rec.fim,
+                  usa: usaSim.get(rec.cicloEventoId) ?? null,
+                })),
+                ...(d.recessos ?? [])
+                  .filter((rec) => {
+                    if (pendenteIds.has(rec.ciclo_evento_id)) return false;
+                    const ev = evPorId.get(rec.ciclo_evento_id);
+                    return (
+                      ev != null && (ev.data_fim ?? ev.data ?? "") >= hojeStr
+                    );
+                  })
+                  .map((rec) => {
+                    const ev = evPorId.get(rec.ciclo_evento_id)!;
+                    return {
+                      titulo: ev.titulo,
+                      inicio: ev.data ?? "",
+                      fim: ev.data_fim ?? ev.data ?? "",
+                      usa: usaSim.get(rec.ciclo_evento_id) ?? rec.usa,
+                    };
+                  }),
+              ],
+            })
+          : null;
       return {
-        dupla_id,
+        dupla_id: a.dupla_id,
         trilha: d.trilha,
         // a dupla já vem carregada — o card nomeia sem nova query (026)
         mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
@@ -905,6 +1048,7 @@ export const IA_TOOLS = {
         em_dia: r.emDia,
         estado: r.estado,
         nivel: r.nivel,
+        ritmo: r.ritmo,
         sugestao: r.sugestao,
         plano: vivo
           ? {
@@ -912,12 +1056,28 @@ export const IA_TOOLS = {
               status: vivo.status,
               versao: vivo.versao,
               aprovado_lado: vivo.aprovado_lado,
-              aceito_mentor: vivo.aceito_mentor_em != null,
-              aceito_mentorado: vivo.aceito_mentorado_em != null,
+              aceito_mentor: aceites?.mentor === true,
+              aceito_mentorado: aceites?.mentorado === true,
+              falta,
               expira_em: vivo.expira_em,
               ritmo: vivo.escopo?.ritmo ?? null,
             }
           : null,
+        // grade combinada (518): quem já marcou e os dias em comum —
+        // dias_comuns 0 diz ao modelo pra pedir a grade antes de propor
+        grade: {
+          mentor: cx.gradeMentor != null,
+          jovem: cx.gradeJovem != null,
+          dias_comuns: cx.diasComuns,
+          sem_grade: a.sem_grade === true,
+        },
+        recessos_pendentes: r.recessosPendentes.map((rec) => ({
+          ciclo_evento_id: rec.cicloEventoId,
+          titulo: rec.titulo,
+          inicio: rec.inicio,
+          fim: rec.fim,
+        })),
+        doc,
         pendencias_registro: r.pendenciasRegistro.map((p) => ({
           encontro_id: p.encontroId,
           numero: p.numero,
@@ -949,7 +1109,7 @@ export const IA_TOOLS = {
   plano_propor: {
     nome: "plano_propor",
     descricao:
-      "Propõe e GRAVA o plano 'ficar em dia' de uma dupla DPP (0219/0224): o escopo sai do mesmo planner do plano_em_dia — encontros devidos e os que vencem no caminho, janela até o encerramento, ritmo combinado e o nível calculado — e a proposta fica persistida pra dupla aceitar ou contestar. O aceite é ÚNICO: o primeiro lado da dupla que aceita já põe o plano pra valer (mentor que propõe já conta como o aceite dele) e o outro é avisado. Sem ritmo, usa o mais leve que fecha; o banco só exige ritmo >= 1 encontro por semana. Dupla em dia ou em 'conversa' (nem 1 por dia fecha) não tem proposta: aí o caminho é a coordenação. Só um plano aberto por dupla — contestado é terminal, acordo novo é versão nova. plano_em_dia mostra a prévia antes." +
+      "Propõe e GRAVA o plano 'ficar em dia' de uma dupla DPP (0219/0224): o escopo sai do mesmo planner do plano_em_dia — encontros devidos e os que vencem no caminho, janela até o encerramento, ritmo combinado e o nível calculado — e a proposta fica persistida pra dupla aceitar ou contestar. O aceite é ÚNICO: o primeiro lado da dupla que aceita já põe o plano pra valer (mentor ou jovem que propõe já conta como o aceite desse lado) e o outro é avisado. Sem ritmo, usa o mais leve que fecha; o banco só exige ritmo >= 1 encontro por semana. As decisões do combinado entram na proposta: decisoes_recesso declara cada recesso antes de propor (só a dupla declara — equipe com recesso pendente recebe a recusa do banco), sem_grade combina sem a disponibilidade e fusao junta encontros na mesma sessão. Dupla em dia ou em 'conversa' (nem 1 por dia fecha) não tem proposta: aí o caminho é a coordenação. Só um plano aberto por dupla — contestado é terminal, acordo novo é versão nova. plano_em_dia mostra a prévia antes." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -960,9 +1120,28 @@ export const IA_TOOLS = {
           .min(1)
           .optional()
           .describe("encontros por semana, mínimo 1 e sem teto (a janela e a grade limitam na prática); omita pra usar o mais leve que fecha"),
+        sem_grade: z
+          .boolean()
+          .optional()
+          .describe("true = combina sem a grade de disponibilidade"),
+        fusao: z
+          .array(z.array(z.number().int().min(1)).min(2))
+          .optional()
+          .describe("sessões combinadas: grupos de números de encontro na mesma sessão de 2h"),
+        decisoes_recesso: z
+          .array(
+            z.object({
+              ciclo_evento_id: z.uuid(),
+              usa: z.boolean(),
+            })
+          )
+          .optional()
+          .describe("decisão da dupla sobre cada recesso pendente — recessos_pendentes do plano_em_dia lista os ids; só a dupla declara"),
       })
       .strict(),
-    roles: ["coordenacao", "supervisor", "mentor_dpp"],
+    // o jovem propõe pelo app (wizard da aba Agora) e pela RPC — paridade
+    // no chat (527); equipe propõe sem poder declarar recesso
+    roles: ["coordenacao", "supervisor", "mentor_dpp", "mentorado"],
     escreve: true,
     resumo: async (a: { dupla_id: string; ritmo?: number }, supabase) => {
       const dupla = await rotuloDupla(supabase, a.dupla_id);
@@ -971,31 +1150,83 @@ export const IA_TOOLS = {
         ? `${base} com ${rotuloRitmo(a.ritmo)}`
         : `${base} no ritmo mais leve que fecha`;
     },
-    run: async (a: { dupla_id: string; ritmo?: number }, ctx) => {
-      const [d, eventos] = await Promise.all([
-        getDuplaIa(ctx.supabase, a.dupla_id),
-        getCicloEventosIa(ctx.supabase),
+    run: async (a: PlanoProporArgs, ctx) => {
+      const [eventos, cx] = await Promise.all([
+        // idem plano_em_dia (527): o jovem propõe e a RLS o deixa sem
+        // ciclo_eventos — catálogo de domínio via serviço
+        getCicloEventosPlano(),
+        contextoPlanoCom(ctx.supabase, a.dupla_id, []),
       ]);
-      if (!d) throw new ErroTool("Não encontrei essa dupla.");
+      if ("error" in cx) throw new ErroTool(cx.error);
+      const decisoes = (a.decisoes_recesso ?? []).map((x) => ({
+        cicloEventoId: x.ciclo_evento_id,
+        usa: x.usa,
+      }));
+      // a decisão de recesso é só da dupla — o mesmo gesto do combinarPlano
+      // (518): só o que MUDOU viaja (a RPC é upsert cego e regravar a mesma
+      // resposta roubaria a autoria) e staff que tenta declarar recebe a
+      // recusa honesta do banco
+      for (const dec of recessosAlterados(cx.dupla.recessos ?? [], decisoes)) {
+        await rpcEscreve(ctx, "declarar_recesso", {
+          p_dupla: a.dupla_id,
+          p_evento: dec.cicloEventoId,
+          p_usa: dec.usa,
+        });
+      }
+      const dupla = comDecisoesRecesso(cx.dupla, decisoes);
       const agora = new Date();
       const r = montarPlanoEmDia({
-        dupla: d as unknown as Dupla,
+        dupla,
         eventos,
         ritmo: a.ritmo,
+        disponibilidade: a.sem_grade === true ? null : cx.combinada,
+        fusao: a.fusao,
         hoje: agora,
       });
       if (!r.aplicavel) throw new ErroTool(r.motivo);
+      if (r.recessosPendentes.length) {
+        throw new ErroTool("Falta a dupla confirmar o recesso.");
+      }
+      // 018: fusão só nos passos que o combinado controla (travado fora)
+      const gs = gruposDeSessao(
+        a.fusao,
+        r.passos.filter((p) => p.acao !== "travado").map((p) => p.numero)
+      );
+      if ("erro" in gs) throw new ErroTool(gs.erro);
       const e = escopoDaProposta(r, toDateStr(agora));
       if ("erro" in e) throw new ErroTool(e.erro);
+      const escopo = {
+        ...e.escopo,
+        // snapshot das decisões do gesto (518) — o aceite compara pra
+        // detectar "a resposta mudou depois da proposta"
+        decisoes: {
+          recessos: decisoes,
+          sem_grade: a.sem_grade === true,
+          ...(gs.grupos.length
+            ? {
+                fusao: {
+                  aceita: true,
+                  aviso_pratica: fusaoPedeAvisoPratica(gs.grupos),
+                  pares: gs.grupos,
+                },
+              }
+            : {}),
+        },
+      };
       const res = await rpcEscreve(ctx, "plano_propor", {
         p_dupla: a.dupla_id,
-        p_escopo: e.escopo,
+        p_escopo: escopo,
         p_via: "liza",
       });
       await emitirProdutoEvento(ctx.supabase, {
         superficie: "ia",
         acao: "plano_proposto",
-        meta: { dupla_id: a.dupla_id, ritmo: e.escopo.ritmo, nivel: r.nivel },
+        meta: {
+          dupla_id: a.dupla_id,
+          ritmo: escopo.ritmo,
+          nivel: r.nivel,
+          sem_grade: a.sem_grade === true,
+        },
       });
       return res;
     },
@@ -1072,7 +1303,7 @@ export const IA_TOOLS = {
       supabase
     ) => {
       const dupla = await rotuloPlano(supabase, a.plano_id);
-      return `Aplicar o passo do ${a.numero}º encontro${dupla ? ` de ${dupla}` : ""} em ${a.data_hora}`;
+      return `Aplicar o passo do ${a.numero}º encontro${dupla ? ` de ${dupla}` : ""} em ${formatDiaHora(a.data_hora)}`;
     },
     run: async (
       a: { plano_id: string; numero: number; data_hora: string; link?: string; motivo?: string },
@@ -2422,7 +2653,7 @@ export const IA_TOOLS = {
       supabase
     ) => {
       const dupla = await rotuloDupla(supabase, a.dupla_id);
-      return `Agendar o ${a.numero}º encontro${dupla ? ` de ${dupla}` : ""} em ${a.data_hora}`;
+      return `Agendar o ${a.numero}º encontro${dupla ? ` de ${dupla}` : ""} em ${formatDiaHora(a.data_hora)}`;
     },
     run: async (
       a: {
@@ -2519,7 +2750,7 @@ export const IA_TOOLS = {
       supabase
     ) => {
       const dupla = await rotuloDupla(supabase, a.dupla_id);
-      return `Registrar o ${a.numero}º encontro${dupla ? ` de ${dupla}` : ""} como realizado em ${a.data_hora}`;
+      return `Registrar o ${a.numero}º encontro${dupla ? ` de ${dupla}` : ""} como realizado em ${formatDiaHora(a.data_hora)}`;
     },
     run: async (
       a: { dupla_id: string; numero: number; data_hora: string },
@@ -2551,7 +2782,7 @@ export const IA_TOOLS = {
   declarar_recesso: {
     nome: "declarar_recesso",
     descricao:
-      "Declara a decisão da dupla sobre um recesso do calendário oficial: usa=true é 'vamos pausar os encontros' (também é o padrão quando nada foi declarado — o planner empurra sugestões pra depois da janela) e usa=false é 'vamos seguir nos encontrando' (aí a janela fica disponível pra dupla: o planner pode sugerir datas dentro dela e a agenda trata o período como combinado). A decisão é por dupla e por período de recesso; a última declaração vale, com a data da mudança. Sem ciclo_evento_id vale o recesso vigente ou o próximo do cronograma da dupla — ficha_dupla lista os recessos com os ids. Quem declara é o mentor da dupla (a decisão é combinada com o jovem fora da tela) ou a coordenação; o mentorado acompanha a decisão na agenda dele." +
+      "Declara a decisão da dupla sobre um recesso do calendário oficial: usa=true é 'vamos pausar os encontros' (também é o padrão quando nada foi declarado — o planner empurra sugestões pra depois da janela) e usa=false é 'vamos seguir nos encontrando' (aí a janela fica disponível pra dupla: o planner pode sugerir datas dentro dela e a agenda trata o período como combinado). A decisão é por dupla e por período de recesso; a última declaração vale, com a data da mudança. Sem ciclo_evento_id vale o recesso vigente ou o próximo do cronograma da dupla — ficha_dupla lista os recessos com os ids. Só a dupla declara (a RPC revalida): o mentor dela ou o jovem; a coordenação acompanha, não decide pela dupla." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -2569,7 +2800,9 @@ export const IA_TOOLS = {
           ),
       })
       .strict(),
-    roles: ["coordenacao", "mentor_dpp"],
+    // 0234: a RPC aceita só a dupla (mentor via my_profile_id, jovem via
+    // my_mentorado_id) — coord na allowlist prometia o que o banco recusa
+    roles: ["mentor_dpp", "mentorado"],
     escreve: true,
     resumo: async (a: { dupla_id: string; usa: boolean }, supabase) => {
       const dupla = await rotuloDupla(supabase, a.dupla_id);
@@ -2581,11 +2814,14 @@ export const IA_TOOLS = {
     ) => {
       let evento = a.ciclo_evento_id ?? null;
       if (!evento) {
-        const [d, evs] = await Promise.all([
-          getDuplaIa(ctx.supabase, a.dupla_id),
-          getCicloEventosIa(ctx.supabase),
+        const [cx, evs] = await Promise.all([
+          // 527: jovem declara também — dupla e calendário saem pela
+          // leitura de serviço do contextoPlano, não pela RLS do papel
+          contextoPlanoCom(ctx.supabase, a.dupla_id, []),
+          getCicloEventosPlano(),
         ]);
-        if (!d) throw new ErroTool("Não encontrei essa dupla.");
+        if ("error" in cx) throw new ErroTool(cx.error);
+        const d = cx.dupla;
         const hoje = toDateStr(new Date());
         const cand = evs
           .filter(
@@ -2607,6 +2843,55 @@ export const IA_TOOLS = {
         p_evento: evento,
         p_usa: a.usa,
       });
+    },
+  },
+
+  disponibilidade_semana: {
+    nome: "disponibilidade_semana",
+    descricao:
+      "Grava a grade semanal de disponibilidade do PRÓPRIO usuário (os dias e períodos em que ele consegue ter encontro: seg/ter/qua/qui/sex/sab/dom × manha/tarde/noite). É a grade que o plano 'ficar em dia' cruza com a do outro lado da dupla pra sugerir datas — cada lado responde a sua. Lista vazia limpa a grade (a dupla volta a combinar sem ela). O plano_em_dia diz se a grade do chamador tá faltando quando grade.dias_comuns é 0. Use quando a pessoa passar a disponibilidade em texto ('seg à noite e qua à tarde')." +
+      ESCRITA_DOC,
+    schema: z
+      .object({
+        celulas: z
+          .array(
+            z.object({
+              dia: z.enum(["seg", "ter", "qua", "qui", "sex", "sab", "dom"]),
+              periodo: z.enum(["manha", "tarde", "noite"]),
+            })
+          )
+          .max(21)
+          .describe("as células livres da semana — vazio limpa a grade"),
+      })
+      .strict(),
+    // cada lado responde a sua — staff não edita grade de ninguém (518)
+    roles: ["mentor_dpp", "mentorado"],
+    escreve: true,
+    resumo: (a: { celulas?: { dia: string; periodo: string }[] }) =>
+      a.celulas?.length
+        ? `Salvar sua grade semanal (${a.celulas.length} ${a.celulas.length === 1 ? "período livre" : "períodos livres"})`
+        : "Limpar sua grade semanal",
+    run: async (a: { celulas: { dia: string; periodo: string }[] }, ctx) => {
+      // round-trip pelo parser do domínio — a RPC/coluna revalida no banco
+      const grade: Disponibilidade | null = a.celulas.length
+        ? { celulas: a.celulas as Disponibilidade["celulas"] }
+        : null;
+      const parsed = parseDisponibilidade(JSON.stringify(grade));
+      if (parsed && "error" in parsed) throw new ErroTool(parsed.error);
+      // os mesmos caminhos do salvarDisponibilidadePlano (518): jovem pela
+      // RPC do papel, mentor pelo self-update do cadastro
+      if (ctx.papeis.includes("mentorado") && !ctx.papeis.includes("mentor_dpp")) {
+        return rpcEscreve(ctx, "set_disponibilidade_mentorado", {
+          p_grade: parsed,
+        });
+      }
+      const { data: pid } = await ctx.supabase.rpc("my_profile_id");
+      const { error } = await ctx.supabase
+        .from("mentor_profiles")
+        .update({ disponibilidade: parsed })
+        .eq("profile_id", pid);
+      if (error) throw new ErroTool("Não consegui salvar sua grade agora.");
+      return { salvo: true, celulas: a.celulas.length };
     },
   },
 
@@ -2734,7 +3019,7 @@ export const IA_TOOLS = {
       supabase
     ) => {
       const nome = await rotuloSolicitacao(supabase, a.solicitacao_id);
-      return `Contra-propor o horário ${a.slot}${nome ? ` pro pedido de ${nome}` : ""}`;
+      return `Contra-propor o horário ${formatDiaHora(a.slot)}${nome ? ` pro pedido de ${nome}` : ""}`;
     },
     run: async (
       a: { solicitacao_id: string; slot: string; mensagem?: string },
@@ -2891,9 +3176,32 @@ export const IA_TOOLS = {
           },
         });
       }
+      // o card de documento precisa de quem recebe e da ponte (527): a
+      // ficha já traz nomes e whatsapps no escopo do papel — jovem sem
+      // WhatsApp cai no repasse pro mentor, os dois sem número = só copiar
+      const ficha = d?.token
+        ? await getDuplaIa(ctx.supabase, a.dupla_id).catch(() => null)
+        : null;
       return {
         url: d?.token ? `/f/${d.token}` : null,
+        token: d?.token ?? null,
+        sistema: a.sistema,
         reutilizado: d?.reutilizado === true,
+        // quem assina o convite (msgLinkWhatsApp): do número do mentor a
+        // voz "a equipe" lê errado — ele assina como pessoa
+        remetente: ctx.papel === "mentor_dpp" ? "mentor" : "equipe",
+        jovem: ficha?.mentorado
+          ? {
+              nome: ficha.mentorado.nome_social ?? ficha.mentorado.nome,
+              whatsapp: ficha.mentorado.whatsapp ?? null,
+            }
+          : null,
+        mentor: ficha?.mentor
+          ? {
+              nome: ficha.mentor.nome_social ?? ficha.mentor.nome,
+              whatsapp: ficha.mentor.whatsapp ?? null,
+            }
+          : null,
       };
     },
   },
@@ -2930,7 +3238,7 @@ export const IA_TOOLS = {
       supabase
     ) => {
       const dupla = await rotuloDupla(supabase, a.dupla_id);
-      return `Agendar o ${a.numero}º encontro${dupla ? ` de ${dupla}` : " da dupla"} em ${a.data_hora}`;
+      return `Agendar o ${a.numero}º encontro${dupla ? ` de ${dupla}` : " da dupla"} em ${formatDiaHora(a.data_hora)}`;
     },
     run: async (
       a: { dupla_id: string; numero: number; data_hora: string; link?: string; motivo?: string },

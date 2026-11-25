@@ -91,6 +91,9 @@ const ARGS_MINIMOS: Record<string, Record<string, unknown>> = {
   },
   jovem_desfazer_retroativo: { encontro_id: UUID },
   declarar_recesso: { dupla_id: UUID, usa: false },
+  disponibilidade_semana: {
+    celulas: [{ dia: "seg", periodo: "noite" }],
+  },
   jovem_pedir_especialista: {},
   confirmar_sugestao_especialista: { solicitacao_id: UUID },
   aceitar_solicitacao: { solicitacao_id: UUID },

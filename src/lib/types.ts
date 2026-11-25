@@ -623,8 +623,8 @@ export type DuplaPlano = {
   aprovado_por: string | null;
   aprovado_lado: "mentor" | "mentorado" | null;
   aprovado_em: string | null;
-  /** Aceite de cada lado (0224): o plano só sai de `proposto` com os dois.
-   *  `aprovado_*` segue gravando o primeiro lado que aceitou. */
+  /** Ciência de cada lado (0225 — aceite ÚNICO): um carimbo da dupla já
+   *  põe o plano pra valer; `aprovado_*` grava quem aceitou primeiro. */
   aceito_mentor_em?: string | null;
   aceito_mentorado_em?: string | null;
   contestado_por: string | null;

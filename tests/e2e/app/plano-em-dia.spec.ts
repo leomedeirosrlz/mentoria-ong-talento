@@ -108,7 +108,10 @@ test.describe("plano pra ficar em dia + registro encadeado (REALIZA-397)", () =>
       for (const r of await dialog
         .locator("label", { hasText: "Vamos seguir nos encontrando" })
         .all()) {
+        // as perguntas ficam montadas e a inativa leva `hidden` — clicar
+        // na label escondida trava o click; só responde a da tela ativa
         if (
+          (await r.isVisible()) &&
           !(await r
             .locator('input[type="radio"]')
             .isChecked()

@@ -21,6 +21,7 @@ import {
   Clock,
   Lifebuoy,
   WarningCircle,
+  WhatsappLogo,
 } from "@phosphor-icons/react";
 import type {
   UiAgenda,
@@ -90,6 +91,16 @@ import {
 import { T } from "@/components/motion";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { BarraSegmentada } from "@/components/viz";
+import { CopiarLink } from "@/components/forms/copiar-link";
+import {
+  msgLinkWhatsApp,
+  msgLinkWhatsAppRepasse,
+  primeiroNome as primeiroNomeLink,
+} from "@/components/forms/link-shared";
+import { useOrigem } from "@/components/forms/use-origem";
+import { DocBlocos } from "@/components/material-documento";
+import { INSTRUMENTO_INFO } from "@/lib/forms/schema";
+import { waLink } from "@/lib/ciclo";
 import { cn } from "@/lib/utils";
 
 // ---------- vocabulário compartilhado ----------
@@ -927,14 +938,33 @@ const NIVEL_PLANO: Record<
   conversa_coord: { rotulo: () => "Conversa com a coordenação", tom: "risco" },
 };
 
+/** A leitura da grade semanal (518): quem já marcou e o que falta — o
+ *  sinal pra pedir a grade no chat antes de propor (dias_comuns 0 com os
+ *  dois lados marcados = grades não se cruzam, a saída é sem_grade). */
+function gradeTexto(g: NonNullable<UiPlano["grade"]>): string | null {
+  if (g.sem_grade) return "Combinado sem a grade de disponibilidade.";
+  if (!g.mentor && !g.jovem)
+    return "Nenhum lado marcou a disponibilidade semanal ainda: dá pra pedir no chat ou combinar sem ela.";
+  if (!g.mentor || !g.jovem)
+    return `Só ${g.mentor ? "o mentor" : "o jovem"} marcou a grade: sem a outra as datas não cruzam.`;
+  if (g.dias_comuns === 0)
+    return "As grades dos dois não se cruzam em nenhum dia: dá pra combinar sem ela.";
+  return null;
+}
+
 /** O plano de recuperação sai pronto do planner — o card nomeia a dupla,
- *  resume o custo numa dobra e guarda o detalhe a um toque; quem agenda
- *  é a dupla, por isso o rodapé leva à ficha (a Liza propõe, nunca grava
- *  cronograma). */
+ *  resume o custo numa dobra e guarda o detalhe a um toque (527): os
+ *  bloqueios do combinado (recesso sem decisão, grade faltando) leem
+ *  junto do plano e o rascunho do documento abre sob "Ler o combinado",
+ *  pra dupla revisar antes de pedir pra publicar. Combinado gravado
+ *  vira pill com o aceite único. Quem agenda é a dupla, por isso o
+ *  rodapé leva à ficha (a Liza propõe, nunca grava cronograma). */
 export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
   const agora = useAgora();
   const [aberto, setAberto] = useState(false);
+  const [docAberto, setDocAberto] = useState(false);
   const passosId = useId();
+  const docId = useId();
   const estado = b.estado ?? (b.em_dia ? "em_dia" : "recuperacao");
   const conversa = estado === "conversa";
   const marcados = b.passos.filter((p) => p.acao === "travado").length;
@@ -1007,7 +1037,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
       meta={meta}
       rodape={
         <Rodape href={`${r.encontros(b.dupla_id)}#plano-em-dia`}>
-          Ver encontros na ficha
+          {b.plano ? "Ver o combinado na ficha" : "Combinar o plano na ficha"}
         </Rodape>
       }
     >
@@ -1072,6 +1102,81 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         </p>
       )}
 
+      {/* o que trava a proposta (527): recesso sem decisão e grade
+          faltando leem junto do plano — a plano_propor recusa os dois */}
+      {b.recessos_pendentes.length > 0 && (
+        <div className="mt-2 rounded-lg bg-[var(--warn-bg)] px-2.5 py-2">
+          <p className="text-xs font-semibold text-[var(--warn-text)]">
+            A dupla decide sobre{" "}
+            {plural(b.recessos_pendentes.length, "o recesso", "os recessos")}{" "}
+            antes de propor
+          </p>
+          <ul className="mt-1 space-y-0.5">
+            {b.recessos_pendentes.map((rec) => (
+              <li
+                key={rec.ciclo_evento_id}
+                className="text-xs text-muted-foreground"
+              >
+                {rec.titulo}
+                {valida(rec.inicio)
+                  ? `, ${diaMesCurto(rec.inicio)} a ${valida(rec.fim) ? diaMesCurto(rec.fim) : "?"}`
+                  : ""}
+                : pausa ou segue nos encontros?
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      {b.grade && gradeTexto(b.grade) && (
+        <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+          <Clock size={13} aria-hidden className="mt-0.5 shrink-0" />
+          {gradeTexto(b.grade)}
+        </p>
+      )}
+
+      {/* rascunho do combinado — a dupla lê o que a proposta grava antes
+          de pedir pra publicar (mesma montagem do wizard da aba Agora) */}
+      {b.doc && b.doc.length > 0 && (
+        <div className="mt-2">
+          <AnimatePresence initial={false}>
+            {docAberto && (
+              <motion.div
+                id={docId}
+                key="doc"
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: "auto", opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                transition={T.panel}
+                style={{ overflow: "clip" }}
+                className="space-y-3 rounded-lg border border-border/60 bg-background px-3 py-2.5 text-sm"
+              >
+                <DocBlocos blocos={b.doc} />
+              </motion.div>
+            )}
+          </AnimatePresence>
+          <Button
+            type="button"
+            variant="ghost"
+            aria-expanded={docAberto}
+            aria-controls={docAberto ? docId : undefined}
+            onClick={() => setDocAberto((v) => !v)}
+            className="h-auto min-h-11 w-full items-center justify-between gap-2 px-2.5 py-2 text-left text-xs font-semibold hover:bg-muted/50 active:not-aria-[haspopup]:scale-100 md:min-h-11"
+          >
+            {docAberto ? "Fechar o combinado" : "Ler o combinado"}
+            <CaretDown
+              size={14}
+              weight="bold"
+              aria-hidden
+              className={cn(
+                "shrink-0 text-muted-foreground transition-transform duration-200 ease-snappy",
+                docAberto && "rotate-180"
+              )}
+            />
+          </Button>
+        </div>
+      )}
+
       {b.passos.length > 0 && (
         <ol className="mt-1 divide-y divide-border/60">
           {b.passos.slice(0, PASSOS_DOBRA).map(passoLi)}
@@ -1105,7 +1210,7 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
             onClick={() => setAberto((v) => !v)}
             className="h-auto min-h-11 w-full items-center justify-between gap-2 px-2.5 py-2 text-left text-xs font-semibold hover:bg-muted/50 active:not-aria-[haspopup]:scale-100 md:min-h-11"
           >
-            {aberto ? "Ver menos" : `Ver os ${b.passos.length} passos`}
+            {aberto ? "Ver menos" : `Ver mais ${resto.length} passos`}
             <CaretDown
               size={14}
               weight="bold"
@@ -1128,18 +1233,26 @@ export function CardPlano({ b, r = rotas(false) }: { b: UiPlano; r?: Rotas }) {
         </p>
       )}
       {b.plano && (
-        <p className="mt-1.5 text-xs text-muted-foreground">
-          Combinado gravado: {STATUS_PLANO[b.plano.status] ?? b.plano.status}
-          {b.plano.versao > 1 ? ` (v${b.plano.versao})` : ""}
-          {b.plano.status === "proposto"
-            ? b.plano.aceito_mentor && !b.plano.aceito_mentorado
-              ? " · falta o aceite do jovem"
-              : b.plano.aceito_mentorado && !b.plano.aceito_mentor
-                ? " · falta o aceite do mentor"
-                : " · falta o aceite dos dois"
-            : ""}
-          .
-        </p>
+        <div className="mt-2 flex flex-wrap items-center gap-1.5 border-t border-border/60 pt-2">
+          <Pill tom={TOM_PLANO[b.plano.status] ?? "neutro"}>
+            Combinado {STATUS_PLANO[b.plano.status] ?? b.plano.status}
+          </Pill>
+          <span className="text-xs text-muted-foreground">
+            {b.plano.versao > 1 ? `v${b.plano.versao}` : ""}
+            {b.plano.status === "proposto"
+              ? // aceite ÚNICO (0225): um aceite da dupla já põe pra valer —
+                // `falta` nomeia quem pode carimbar e os booleans cobrem o
+                // row legado da era bilateral (proposto com um carimbo só)
+                b.plano.falta === "mentor" ||
+                  (b.plano.falta == null && b.plano.aceito_mentorado && !b.plano.aceito_mentor)
+                ? " · o aceite do mentor põe pra valer"
+                  : b.plano.falta === "mentorado" ||
+                      (b.plano.falta == null && b.plano.aceito_mentor && !b.plano.aceito_mentorado)
+                    ? " · o aceite do jovem põe pra valer"
+                    : `${b.plano.versao > 1 ? " · " : ""}um aceite da dupla põe pra valer`
+              : ""}
+          </span>
+        </div>
       )}
       {b.avisos.length > 0 && (
         <ul className="mt-2 space-y-1 border-t border-border/60 pt-2">
@@ -1165,6 +1278,15 @@ const STATUS_PLANO: Record<string, string> = {
   concluido: "concluído",
   expirado: "expirado",
   contestado: "contestado",
+};
+
+/** Tom da pill do combinado — proposto pede o aceite (info), o que já
+ *  vale lê ok e o que espera revisão lê atenção. */
+const TOM_PLANO: Record<string, Tom> = {
+  proposto: "info",
+  aceito: "ok",
+  ativo: "ok",
+  contestado: "atencao",
 };
 
 // ---------- plano do jovem ----------
@@ -1205,7 +1327,7 @@ export function CardPlanoJovem({ b }: { b: UiPlanoJovem }) {
                 {p.numero}
               </span>
               <span className="min-w-0 flex-1 text-sm">
-                {p.numero}º encontro —{" "}
+                {p.numero}º encontro ·{" "}
                 <span className="text-muted-foreground">
                   {aplicado
                     ? `marcado pra ${valida(aplicado.data_nova) ? diaSemanaCurto(aplicado.data_nova) : "a definir"}`
@@ -1801,6 +1923,17 @@ export function CardJornada({ b }: { b: UiJornada }) {
  *  executa). Confirmar chama o endpoint determinístico e o resultado da
  *  escrita fica inline; Cancelar descarta e a prévia expira sozinha.
  *  Uso único: confirmado, recusado, cancelado ou expirado, o card trava. */
+/** O que a emitir_link_instrumento devolve além do url (527): quem recebe
+ *  e a ponte de WhatsApp pra o card virar o gesto de envio completo. */
+type DocFeito = {
+  token: string;
+  sistema: string;
+  url: string;
+  remetente: "mentor" | "equipe";
+  jovem: { nome: string | null; whatsapp: string | null } | null;
+  mentor: { nome: string | null; whatsapp: string | null } | null;
+};
+
 export function CardConfirmacao({ b }: { b: UiConfirmacao }) {
   type Estado =
     | "pendente"
@@ -1812,6 +1945,8 @@ export function CardConfirmacao({ b }: { b: UiConfirmacao }) {
   const [estado, setEstado] = useState<Estado>("pendente");
   const [detalhe, setDetalhe] = useState<string | null>(null);
   const [url, setUrl] = useState<string | null>(null);
+  const [doc, setDoc] = useState<DocFeito | null>(null);
+  const origem = useOrigem();
   // o prazo visual espelha o do banco (a linha tem expira_em) — vencer
   // aqui poupa um clique fadado a falhar no servidor
   const [expiraEm] = useState(() => Date.now() + b.expira_em_minutos * 60_000);
@@ -1842,7 +1977,7 @@ export function CardConfirmacao({ b }: { b: UiConfirmacao }) {
         | {
             ok?: boolean;
             erro?: string;
-            dados?: { url?: string | null } | null;
+            dados?: ({ url?: string | null } & Partial<DocFeito>) | null;
           }
         | null;
       if (!res.ok || !j) {
@@ -1852,7 +1987,21 @@ export function CardConfirmacao({ b }: { b: UiConfirmacao }) {
         return;
       }
       if (j.ok) {
-        setUrl(j.dados?.url ?? null);
+        const dados = j.dados;
+        setUrl(dados?.url ?? null);
+        // card de documento (527): token+sistema = emitir_link_instrumento
+        setDoc(
+          dados?.token && dados.sistema && dados.url
+            ? {
+                token: dados.token,
+                sistema: dados.sistema,
+                url: dados.url,
+                remetente: dados.remetente === "mentor" ? "mentor" : "equipe",
+                jovem: dados.jovem ?? null,
+                mentor: dados.mentor ?? null,
+              }
+            : null
+        );
         setEstado("feito");
       } else {
         // o servidor é quem sabe: recusa de domínio consumiu a prévia e
@@ -1876,7 +2025,9 @@ export function CardConfirmacao({ b }: { b: UiConfirmacao }) {
       }
     >
       <p className="text-sm leading-snug">{b.resumo}</p>
-      {estado === "feito" ? (
+      {estado === "feito" && doc ? (
+        <BlocoDocFeito doc={doc} origem={origem} />
+      ) : estado === "feito" ? (
         <div className="mt-2.5 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm font-medium text-[var(--ok-text)]">
           <CheckCircle size={16} aria-hidden className="shrink-0" />
           Feito.
@@ -1933,6 +2084,88 @@ export function CardConfirmacao({ b }: { b: UiConfirmacao }) {
         </>
       )}
     </Cartao>
+  );
+}
+
+/** O link emitido pronto pra sair (527): o título do instrumento, a URL
+ *  pra copiar e o WhatsApp já com a mensagem — direto pro jovem quando
+ *  ele tem número; repasse pelo mentor quando não tem (a mensagem pede a
+ *  ponte, como o lote da ficha); sem nenhum número, só o copiar. */
+function BlocoDocFeito({ doc, origem }: { doc: DocFeito; origem: string }) {
+  const titulo =
+    INSTRUMENTO_INFO[doc.sistema as keyof typeof INSTRUMENTO_INFO]?.titulo ??
+    doc.sistema;
+  const wa = doc.jovem?.whatsapp
+    ? {
+        href: waLink(
+          doc.jovem.whatsapp,
+          msgLinkWhatsApp(
+            titulo,
+            doc.jovem.nome,
+            doc.token,
+            origem,
+            doc.remetente === "mentor"
+              ? (doc.mentor?.nome ?? undefined)
+              : undefined
+          )
+        ),
+        repasse: false,
+      }
+    : doc.mentor?.whatsapp && doc.jovem
+      ? {
+          href: waLink(
+            doc.mentor.whatsapp,
+            msgLinkWhatsAppRepasse(
+              titulo,
+              doc.mentor.nome,
+              doc.jovem.nome,
+              doc.token,
+              origem
+            )
+          ),
+          repasse: true,
+        }
+      : null;
+  return (
+    <div className="mt-2.5">
+      <p className="flex items-start gap-1.5 text-sm font-medium text-[var(--ok-text)]">
+        <CheckCircle size={16} aria-hidden className="mt-0.5 shrink-0" />
+        Link de &quot;{titulo}&quot; pronto
+        {doc.jovem?.nome ? ` pra ${primeiroNomeLink(doc.jovem.nome)}` : ""}.
+      </p>
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <code className="rounded-md bg-muted px-1.5 py-1 font-mono text-xs">
+          {doc.url}
+        </code>
+        <CopiarLink token={doc.token} />
+        {wa?.href && (
+          <a
+            href={wa.href}
+            target="_blank"
+            rel="noreferrer"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "sm" }),
+              "gap-1.5"
+            )}
+          >
+            <WhatsappLogo aria-hidden />
+            WhatsApp{wa.repasse ? " pro mentor" : ""}
+          </a>
+        )}
+      </div>
+      {wa?.repasse && doc.jovem?.nome && (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          {primeiroNomeLink(doc.jovem.nome)} não tem WhatsApp cadastrado: a
+          mensagem pede o repasse.
+        </p>
+      )}
+      {!wa && (
+        <p className="mt-1.5 text-xs text-muted-foreground">
+          Sem WhatsApp cadastrado na dupla: copie o link e envie pelo canal
+          de sempre.
+        </p>
+      )}
+    </div>
   );
 }
 

@@ -106,8 +106,16 @@ export const PILLS_TOOL_ROLES = {
 export type PillTool = keyof typeof PILLS_TOOL_ROLES;
 
 /** Uma sugestão do catálogo: o texto do chip (pergunta que a pessoa
- *  escreveria — ≤60, pt-BR, sem travessão) e a tool que a responde. */
-export type Pill = { texto: string; tool: PillTool };
+ *  escreveria — ≤60, pt-BR, sem travessão) e a tool que a responde.
+ *  `papeis` é o recorte da PERGUNTA, quando mais estreito que o da tool:
+ *  "Quantos chamados abertos?" é pergunta de equipe — o mentor tem grant
+ *  em chamados_resumo, mas a tool dele devolve só os pedidos dele, não a
+ *  fila da operação. Ausente = a pergunta vale pra quem tem grant. */
+export type Pill = {
+  texto: string;
+  tool: PillTool;
+  papeis?: readonly AppRole[];
+};
 
 // ---------- catálogo por contexto ----------
 // Ordem interna = relevância pra página (o chip do balão usa a primeira).
@@ -174,7 +182,14 @@ const AGENDA_STAFF: Pill[] = [
   { texto: "Escreva um lembrete pra dupla", tool: "mensagem_template" },
   { texto: "Como foi a semana passada?", tool: "historico_encontros" },
   { texto: "Tem combinado vencido?", tool: "combinados_das_duplas" },
-  { texto: "Quantos chamados abertos?", tool: "chamados_resumo" },
+  // a fila de chamados é recorte de equipe — pro mentor a tool devolve
+  // só os pedidos dele, e a promessa da pill era a contagem da operação
+  {
+    texto: "Quantos chamados abertos?",
+    tool: "chamados_resumo",
+    papeis: ["coordenacao", "supervisor"],
+  },
+  { texto: "Como está minha dupla?", tool: "resumo_dupla" },
   { texto: "O que diz o guia sobre remarcação?", tool: "guia_consulta" },
 ];
 
@@ -205,7 +220,11 @@ const COORD_GENERICO: Pill[] = [
   { texto: "Quem está aguardando par?", tool: "aguardando_par" },
   { texto: "Quem tem vaga pra parear?", tool: "capacidade_mentores" },
   { texto: "Encontros desta semana", tool: "agenda_do_periodo" },
-  { texto: "Quantos chamados abertos?", tool: "chamados_resumo" },
+  {
+    texto: "Quantos chamados abertos?",
+    tool: "chamados_resumo",
+    papeis: ["coordenacao", "supervisor"],
+  },
   { texto: "Como foi o último mês de encontros?", tool: "historico_encontros" },
   { texto: "O que diz o guia sobre a Roda da Vida?", tool: "guia_consulta" },
 ];
@@ -216,7 +235,11 @@ const SUPERVISOR_GENERICO: Pill[] = [
   { texto: "Encontros desta semana", tool: "agenda_do_periodo" },
   { texto: "Tem combinado vencido?", tool: "combinados_das_duplas" },
   { texto: "Escreva um lembrete pra dupla", tool: "mensagem_template" },
-  { texto: "Quantos chamados abertos?", tool: "chamados_resumo" },
+  {
+    texto: "Quantos chamados abertos?",
+    tool: "chamados_resumo",
+    papeis: ["coordenacao", "supervisor"],
+  },
   { texto: "Como foi o último mês de encontros?", tool: "historico_encontros" },
 ];
 
@@ -228,7 +251,11 @@ const MENTOR_PADRAO: Pill[] = [
   { texto: "Próximos encontros", tool: "agenda_do_periodo" },
   { texto: "Tem combinado vencido?", tool: "combinados_das_duplas" },
   { texto: "Escreva um lembrete pra dupla", tool: "mensagem_template" },
-  { texto: "Quantos chamados abertos?", tool: "chamados_resumo" },
+  {
+    texto: "Quantos chamados abertos?",
+    tool: "chamados_resumo",
+    papeis: ["coordenacao", "supervisor"],
+  },
   { texto: "O que é o PDM?", tool: "guia_consulta" },
   { texto: "Como dar um feedback construtivo?", tool: "guia_consulta" },
 ];
@@ -257,8 +284,10 @@ export function catalogo(papeis: AppRole[], pagina: string): Pill[] {
   else if (papeis.includes("coordenacao")) lista = COORD_GENERICO;
   else if (papeis.includes("supervisor")) lista = SUPERVISOR_GENERICO;
   else lista = MENTOR_PADRAO;
-  return lista.filter((p) =>
-    PILLS_TOOL_ROLES[p.tool].some((r) => papeis.includes(r))
+  return lista.filter(
+    (p) =>
+      (!p.papeis || p.papeis.some((r) => papeis.includes(r))) &&
+      PILLS_TOOL_ROLES[p.tool].some((r) => papeis.includes(r))
   );
 }
 

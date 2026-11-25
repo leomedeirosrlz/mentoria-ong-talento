@@ -9,8 +9,14 @@
 
 import { projetarFicha, projetarResumo } from "@/lib/ia/tools";
 import type { DuplaIa } from "@/lib/ia/queries";
-import { montarPlanoEmDia, type PlanoAplicavel } from "@/lib/plano-em-dia";
-import type { Dupla } from "@/lib/types";
+import {
+  escopoDaProposta,
+  montarPlanoEmDia,
+  type PlanoAplicavel,
+} from "@/lib/plano-em-dia";
+import { montarDocCombinado } from "@/lib/plano-roteiros";
+import { gradeCombinada, toDateStr } from "@/lib/ciclo";
+import type { Disponibilidade, Dupla, DuplaPlanoEscopo } from "@/lib/types";
 import { uiDaTool, type UiBloco } from "@/lib/ia/ui";
 import { leituraAderencia } from "@/lib/relatorios/leituras-aderencia";
 import { resumoAderencia } from "@/lib/relatorios/operacional";
@@ -237,6 +243,21 @@ export async function responderDemoIa(
     };
   }
 
+  // emitir link de instrumento (527): na vida real a escrita passa pelo
+  // card de confirmação e o "feito" mostra o link com Copiar + WhatsApp
+  // (repasse pro mentor quando o jovem não tem número). Na demo não há
+  // token — o texto conta o gesto em vez de inventar URL
+  if (
+    role !== "mentorado" &&
+    /emit|link/.test(p) &&
+    /roda|vis[aã]o|pdm|metas|instrumento|formul[aá]rio/.test(p)
+  ) {
+    return {
+      content: `Na demonstração o link sairia pelo card de confirmação: depois do "sim" ele já mostra o link pronto com Copiar e o botão de WhatsApp pra enviar direto pra pessoa (ou pro mentor repassar quando ela não tem número cadastrado).${sugestoes(["Como está minha dupla?", "Próximos encontros"])}`,
+      ui: [],
+    };
+  }
+
   // catch-up (REALIZA-397): o plano sai do mesmo planner da ficha — roda
   // antes do branch de agenda, que casaria com "adiantar encontros". A
   // dupla nomeada no pedido ("e a dupla do Caio?") resolve antes de
@@ -247,11 +268,36 @@ export async function responderDemoIa(
     role !== "mentorado" &&
     /ficar em dia|atrasad|recupera|adiant|plano d[ae] recupera|plano pra ficar/.test(p)
   ) {
-    // mesmo payload da tool plano_em_dia (src/lib/ia/tools.ts): o
-    // projetor fica com o que conhece e o resto já viaja pra quando a
-    // projeção ganhar os campos novos
-    const uiPlano = (d: DuplaIa, r: PlanoAplicavel) =>
-      uiDaTool("plano_em_dia", {
+    // mesmo payload da tool plano_em_dia (src/lib/ia/tools.ts): grade,
+    // recessos pendentes e o rascunho do combinado saem dos mesmos dados
+    // do contextoPlano — o card demo mostra o bloqueio e o documento de
+    // verdade (527)
+    const gradeDe = (d: DuplaIa) => {
+      const gM =
+        ((d.mentor as { disponibilidade?: Disponibilidade | null } | null)
+          ?.disponibilidade ?? null) as Disponibilidade | null;
+      const gJ =
+        ((d.mentorado as { disponibilidade?: Disponibilidade | null } | null)
+          ?.disponibilidade ?? null) as Disponibilidade | null;
+      // mesma régua do contextoPlano: interseção só com os DOIS lados
+      const comuns = gradeCombinada(gM, gJ)?.celulas ?? [];
+      return {
+        gM,
+        gJ,
+        combinada: comuns.length ? { celulas: comuns } : null,
+        diasComuns: new Set(comuns.map((c) => c.dia)).size,
+      };
+    };
+    const uiPlano = (d: DuplaIa, r: PlanoAplicavel) => {
+      const g = gradeDe(d);
+      const hojeStr = toDateStr(new Date());
+      const e =
+        r.estado === "recuperacao" ? escopoDaProposta(r, hojeStr) : null;
+      const pendenteIds = new Set(
+        r.recessosPendentes.map((x) => x.cicloEventoId)
+      );
+      const evPorId = new Map(eventos.map((ev) => [ev.id, ev]));
+      return uiDaTool("plano_em_dia", {
         dupla_id: d.id,
         mentor: d.mentor?.nome_social ?? d.mentor?.nome ?? null,
         mentorado: d.mentorado?.nome_social ?? d.mentorado?.nome ?? null,
@@ -260,8 +306,56 @@ export async function responderDemoIa(
         em_dia: r.emDia,
         estado: r.estado,
         nivel: r.nivel,
+        ritmo: r.ritmo,
         sugestao: r.sugestao,
         plano: null,
+        grade: {
+          mentor: g.gM != null,
+          jovem: g.gJ != null,
+          dias_comuns: g.diasComuns,
+          sem_grade: false,
+        },
+        recessos_pendentes: r.recessosPendentes.map((x) => ({
+          ciclo_evento_id: x.cicloEventoId,
+          titulo: x.titulo,
+          inicio: x.inicio,
+          fim: x.fim,
+        })),
+        doc:
+          e && "escopo" in e
+            ? montarDocCombinado({
+                status: "proposto",
+                versao: 1,
+                quemPropos: STAFF.includes(role) ? "A equipe" : "Vocês",
+                escopo: e.escopo as DuplaPlanoEscopo,
+                recessos: [
+                  ...r.recessosPendentes.map((x) => ({
+                    titulo: x.titulo,
+                    inicio: x.inicio,
+                    fim: x.fim,
+                    usa: null as boolean | null,
+                  })),
+                  ...(d.recessos ?? [])
+                    .filter((rec) => {
+                      if (pendenteIds.has(rec.ciclo_evento_id)) return false;
+                      const ev = evPorId.get(rec.ciclo_evento_id);
+                      return (
+                        ev != null &&
+                        (ev.data_fim ?? ev.data ?? "") >= hojeStr
+                      );
+                    })
+                    .map((rec) => {
+                      const ev = evPorId.get(rec.ciclo_evento_id)!;
+                      return {
+                        titulo: ev.titulo,
+                        inicio: ev.data ?? "",
+                        fim: ev.data_fim ?? ev.data ?? "",
+                        usa: rec.usa as boolean | null,
+                      };
+                    }),
+                ],
+              })
+            : null,
         pendencias_registro: r.pendenciasRegistro.map((p2) => ({
           encontro_id: p2.encontroId,
           numero: p2.numero,
@@ -287,6 +381,7 @@ export async function responderDemoIa(
         encerramento: r.encerramento,
         avisos: r.avisos,
       });
+    };
     const textoPlano = `Na demonstração o plano é de exemplo, calculado pelo mesmo motor da ficha da dupla. A sequência com as datas sugeridas tá acima: dois encontros por semana quando couber, respeitando os intervalos do guia. Quem agenda é a dupla, na ficha.${sugestoes(["Resumo da semana", "Escreva um lembrete pra dupla"])}`;
     let ui: UiBloco | null = null;
     let content: string;
@@ -295,6 +390,7 @@ export async function responderDemoIa(
       const r = montarPlanoEmDia({
         dupla: nomeada as unknown as Dupla,
         eventos,
+        disponibilidade: gradeDe(nomeada).combinada,
         hoje: new Date(),
       });
       if (!r.aplicavel) {
@@ -323,6 +419,7 @@ export async function responderDemoIa(
         const r = montarPlanoEmDia({
           dupla: d as unknown as Dupla,
           eventos,
+          disponibilidade: gradeDe(d).combinada,
           hoje: new Date(),
         });
         if (r.aplicavel && !r.emDia && r.passos.length) {

@@ -203,6 +203,7 @@ describe("registry", () => {
         "declarar_recesso",
         "desmarcar_encontro",
         "devolver_chamado_fila",
+        "disponibilidade_semana",
         "duplas_do_usuario",
         "duplas_panorama",
         "editar_campo_pessoa",
@@ -282,6 +283,22 @@ describe("registry", () => {
     ] as const) {
       expect(IA_TOOLS[n].roles).toEqual(["mentorado"]);
     }
+    // 527 — o gesto do combinado é da dupla: recesso e grade são só dos
+    // dois lados (a RPC recusa staff), e o jovem propõe como no app
+    expect(IA_TOOLS.declarar_recesso.roles).toEqual([
+      "mentor_dpp",
+      "mentorado",
+    ]);
+    expect(IA_TOOLS.disponibilidade_semana.roles).toEqual([
+      "mentor_dpp",
+      "mentorado",
+    ]);
+    expect(IA_TOOLS.plano_propor.roles).toEqual([
+      "coordenacao",
+      "supervisor",
+      "mentor_dpp",
+      "mentorado",
+    ]);
   });
 });
 
@@ -2290,5 +2307,41 @@ describe("resumo de confirmação — zero uuid em texto visível (FR-010)", () 
         supabase
       )
     ).toBe("Usar o recesso na dupla");
+  });
+
+  it("datas nos resumos saem legíveis, nunca ISO cru (527)", async () => {
+    const { supabase } = supaFake({ tabelas: TABELAS_NOMES });
+    const ISO_RE = /\d{4}-\d{2}-\d{2}T/;
+    const casos: [string, Record<string, unknown>][] = [
+      [
+        "plano_aplicar_passo",
+        { plano_id: UUID, numero: 3, data_hora: "2026-12-01T19:00:00-03:00" },
+      ],
+      [
+        "agendar_encontro",
+        { dupla_id: UUID, numero: 5, data_hora: "2026-12-01T19:00:00-03:00" },
+      ],
+      [
+        "jovem_agendar_encontro",
+        { dupla_id: UUID, numero: 5, data_hora: "2026-12-01T19:00:00-03:00" },
+      ],
+      [
+        "jovem_registrar_retroativo",
+        { dupla_id: UUID, numero: 4, data_hora: "2026-11-28T15:00:00-03:00" },
+      ],
+      [
+        "contra_propor_solicitacao",
+        { solicitacao_id: UUID, slot: "2026-12-02T19:00:00-03:00" },
+      ],
+    ];
+    for (const [nome, args] of casos) {
+      const r = await resumoDe(nome as (typeof IA_TOOL_NOMES)[number])!(
+        args as never,
+        supabase
+      );
+      expect(r, `resumo de ${nome}`).not.toMatch(ISO_RE);
+      // a data continua presente, só que na forma que a pessoa lê
+      expect(r, `resumo de ${nome}`).toMatch(/\d{2}\/\d{2} às \d{2}:\d{2}/);
+    }
   });
 });

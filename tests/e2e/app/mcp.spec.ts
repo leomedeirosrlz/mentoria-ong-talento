@@ -95,6 +95,9 @@ test.describe("servidor MCP (/api/mcp)", () => {
       "guia_consulta",
       "agenda_do_periodo",
       "plano_em_dia",
+      "plano_propor",
+      "declarar_recesso",
+      "disponibilidade_semana",
     ])
       expect(nomes).toContain(t);
     // staff de coord/sup e a praia do mentorado ficam de fora
@@ -125,6 +128,12 @@ test.describe("servidor MCP (/api/mcp)", () => {
       "guia_consulta",
       "ficha_dupla",
       "instrumentos_da_dupla",
+      // 527: o jovem propõe o plano e decide o recesso — paridade com o
+      // wizard da aba Agora (a RPC revalida ser a dupla dele)
+      "plano_propor",
+      "declarar_recesso",
+      "disponibilidade_semana",
+      "meu_plano",
     ])
       expect(nomes).toContain(t);
     for (const t of [

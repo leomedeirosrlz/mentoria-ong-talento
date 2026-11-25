@@ -1,3 +1,5 @@
+import { readFileSync } from "node:fs";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
 import {
   avaliacaoCobreNumero,
@@ -277,6 +279,33 @@ describe("Liza — ritmo livre e aceite único (P1-3)", () => {
     expect(d).not.toContain("1 a 7");
     expect(d).not.toMatch(/dois lados/i);
     expect(IA_TOOLS.plano_responder.descricao).toContain("ÚNICO");
+  });
+
+  it("aceite único na superfície inteira — descrições e o card da Liza (527)", () => {
+    // a régua do aceite é ÚNICA (0225): nenhuma tool do plano promete o
+    // contrato bilateral nem a copy do CardPlano diz "aceite dos dois"
+    for (const n of [
+      "plano_propor",
+      "plano_responder",
+      "declarar_recesso",
+    ] as const) {
+      const d = IA_TOOLS[n].descricao;
+      expect(d, `descricao de ${n}`).not.toMatch(
+        /aceite dos dois|dos dois lados/i
+      );
+    }
+    // o card é tsx — o guard lê a fonte como o materiais-anel faz
+    const cards = readFileSync(
+      path.join(process.cwd(), "src/components/assistente-cards.tsx"),
+      "utf8"
+    );
+    expect(cards).not.toMatch(/aceite dos dois|dos dois lados/i);
+    // e o tipo espelha o contrato novo, não a era 0224
+    const types = readFileSync(
+      path.join(process.cwd(), "src/lib/types.ts"),
+      "utf8"
+    );
+    expect(types).not.toMatch(/só sai de `?proposto`? com os dois/i);
   });
 });
 

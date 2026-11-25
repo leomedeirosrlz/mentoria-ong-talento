@@ -454,6 +454,61 @@ describe("uiDaTool — plano_em_dia (026/FR-004)", () => {
     expect(b.estado).toBe("em_dia");
     expect(b.passos).toHaveLength(0);
   });
+
+  it("campos do combinado (527): grade, recessos pendentes, doc e falta", () => {
+    const b = uiDaTool("plano_em_dia", {
+      ...payload,
+      estado: "recuperacao",
+      nivel: "semana_dupla",
+      grade: { mentor: true, jovem: false, dias_comuns: 0, sem_grade: false },
+      recessos_pendentes: [
+        {
+          ciclo_evento_id: "ev-1",
+          titulo: "Recesso de verão",
+          inicio: "2026-12-20",
+          fim: "2027-01-05",
+        },
+        { ciclo_evento_id: "", titulo: "sem id sai" },
+      ],
+      doc: [{ kind: "par", html: "<b>Vocês propuseram</b>" }],
+      plano: {
+        id: "p-1",
+        status: "proposto",
+        versao: 1,
+        aprovado_lado: null,
+        aceito_mentor: false,
+        aceito_mentorado: false,
+        falta: "dupla",
+        expira_em: "2026-12-05",
+        ritmo: 2,
+      },
+    }) as UiPlano;
+    expect(b.grade).toEqual({
+      mentor: true,
+      jovem: false,
+      dias_comuns: 0,
+      sem_grade: false,
+    });
+    // recesso sem id não vira item clicável
+    expect(b.recessos_pendentes).toEqual([
+      {
+        ciclo_evento_id: "ev-1",
+        titulo: "Recesso de verão",
+        inicio: "2026-12-20",
+        fim: "2027-01-05",
+      },
+    ]);
+    expect(b.doc).toEqual([{ kind: "par", html: "<b>Vocês propuseram</b>" }]);
+    expect(b.plano?.falta).toBe("dupla");
+  });
+
+  it("payload velho sem os campos novos degrada pra null/vazio", () => {
+    const b = uiDaTool("plano_em_dia", payload) as UiPlano;
+    expect(b.grade).toBeNull();
+    expect(b.recessos_pendentes).toEqual([]);
+    expect(b.doc).toBeNull();
+    expect(b.plano).toBeNull();
+  });
 });
 
 describe("uiDaTool — resumo_semana e duplas_panorama (026/FR-007)", () => {
