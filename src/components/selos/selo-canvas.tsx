@@ -57,9 +57,23 @@ export function SeloCanvas({
       gatilho.addEventListener("pointerenter", repete);
       gatilho.addEventListener("focus", repete);
     }
+    // quando a pessoa troca prefers-reduced-motion com o selo na tela,
+    // limpa a chave do frame pra pintar o repouso (o clock já sabe parar)
+    const mq =
+      typeof matchMedia === "undefined"
+        ? null
+        : matchMedia("(prefers-reduced-motion: reduce)");
+    const aoTrocarMovimento = () => {
+      // pinta o repouso explicitamente: o tick seguinte pode ser pulado
+      // pela chave e o canvas ficaria no último frame animado
+      if (mq?.matches) paint(canvas, icon, icon.still ?? 0, 1, PALETA_REALIZA);
+      else player.set({});
+    };
+    mq?.addEventListener("change", aoTrocarMovimento);
     return () => {
       gatilho?.removeEventListener("pointerenter", repete);
       gatilho?.removeEventListener("focus", repete);
+      mq?.removeEventListener("change", aoTrocarMovimento);
       player.stop();
     };
   }, [arte, movimento]);

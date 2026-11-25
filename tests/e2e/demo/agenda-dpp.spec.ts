@@ -78,11 +78,11 @@ test.describe("agenda demo do mentor DPP — Minha agenda / Por mentorado / Cale
     // mockup) vem no lugar do botão de chamada — a projeção sequer carrega
     // `link`, então o item não pode ter link nem botão de entrar
     const guest = page
-      .locator("article, li")
-      .filter({ hasText: /não participa|só acompanhamento/i })
-      .filter({ hasText: /Sofia|especialista/i })
+      .locator("article")
+      .filter({ hasText: "Sessão com Sofia Nogueira" })
       .first();
     await expect(guest).toBeVisible();
+    await expect(guest.getByText(/Trilha de especialista/)).toBeVisible();
     await expect(
       guest.getByRole("link", { name: /entrar|meet|chamada/i })
     ).toHaveCount(0);
@@ -179,7 +179,7 @@ test.describe("agenda demo do mentor DPP — Minha agenda / Por mentorado / Cale
     );
     await expect(trilhaSofia).toBeVisible();
     await expect(
-      trilhaSofia.getByText(/acompanha, não participa/i)
+      trilhaSofia.getByText(/Trilha especialista · Sofia Nogueira/)
     ).toBeVisible();
     await expect(
       trilhaSofia.getByText(/registro entregue/i).first()

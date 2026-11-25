@@ -213,7 +213,7 @@ export function JovemCombinados({
           <Checkbox
             checked={feito}
             disabled={pending && pendingId === t.id}
-            onCheckedChange={() => marcar(t, feito)}
+            onCheckedChange={(marcado) => marcar(t, !!marcado)}
             className="mt-0.5 group-hover:border-foreground"
           />
           <span className="block min-w-0 flex-1">

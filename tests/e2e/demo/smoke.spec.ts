@@ -136,12 +136,12 @@ test("mentorado: card → wizard do 1º acesso → home do /jovem, e volta pra s
     hasText: "Resolver os 10 exercícios",
   });
   await pendente.click();
+  // 526: na demo o combinado do jovem também muta em estado local
   await expect(
-    page.getByText("Modo demonstração. Nada é gravado de verdade.")
+    page.getByText("Combinado marcado como feito.")
   ).toBeVisible();
-  await expect(
-    combinados.getByRole("checkbox").first()
-  ).not.toBeChecked();
+  await page.getByRole("button", { name: /Ver \d+ feitos/ }).click();
+  await expect(pendente.getByRole("checkbox")).toBeChecked();
 
   // a DemoBar segue no shell da jovem — trocar de papel volta pra staff
   const demoTrigger = page.getByRole("button", {
