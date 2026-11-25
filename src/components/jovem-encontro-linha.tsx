@@ -94,8 +94,22 @@ export function EncontroLinha({
     e.status === "agendado" &&
     e.data_hora != null &&
     new Date(e.data_hora).getTime() <= agora;
+  const status =
+    e.status === "realizado" ? null : passadoSemDesfecho && !duplaAtiva ? (
+      <Badge
+        variant="outline"
+        className="border-[var(--warn)]/50 text-[var(--warn-text)]"
+      >
+        Aconteceu?
+      </Badge>
+    ) : passadoSemDesfecho ? null : (
+      <Badge variant="outline" className={st.cls}>
+        {st.rotulo}
+      </Badge>
+    );
+
   return (
-    <div className="relative flex flex-wrap items-start gap-x-3 gap-y-1.5 py-2.5 ps-4 pe-28 sm:ps-5 sm:pe-5">
+    <div className="relative flex flex-wrap items-start gap-x-3 gap-y-1.5 py-2.5 ps-4 pe-16 sm:ps-5 sm:pe-5">
       <span
         aria-hidden
         className={cn(
@@ -128,12 +142,13 @@ export function EncontroLinha({
         {nota && (
           <p className="mt-0.5 text-xs text-muted-foreground">{nota}</p>
         )}
+        {status && <div className="mt-1 flex sm:hidden">{status}</div>}
       </div>
       {/* no celular o ⋯ fica ancorado no canto superior direito do card,
           com o status logo abaixo dele (mesma leitura do ⋯ do card de
           dupla); em sm+ a fileira volta pro fim da linha, alinhada ao
           texto */}
-      <div className="absolute right-4 top-2.5 flex flex-col-reverse items-end gap-1 sm:static sm:order-none sm:ml-auto sm:flex-row sm:items-center sm:gap-2">
+      <div className="absolute right-3 top-2 flex items-center gap-1 sm:static sm:order-none sm:ml-auto sm:gap-2">
         {aval && (
           <VerAvaliacaoButton
             quiet
@@ -142,22 +157,9 @@ export function EncontroLinha({
             label={<Estrelas n={aval.estrelas} size={13} />}
           />
         )}
-        {/* 507: sem a dupla viva o gesto não se sustenta — a pergunta do
-            badge vira o status. O realizado não carimba "Aconteceu" de
-            novo e os demais seguem a tabela de status */}
-        {e.status === "realizado" ? null : passadoSemDesfecho &&
-          !duplaAtiva ? (
-          <Badge
-            variant="outline"
-            className="border-[var(--warn)]/50 text-[var(--warn-text)]"
-          >
-            Aconteceu?
-          </Badge>
-        ) : passadoSemDesfecho ? null : (
-          <Badge variant="outline" className={st.cls}>
-            {st.rotulo}
-          </Badge>
-        )}
+        {/* no celular o status mora embaixo da data (dentro do texto);
+            aqui fica só no sm+, à esquerda do ⋯ */}
+        {status && <div className="hidden sm:flex">{status}</div>}
         {/* 530: uma decisiva à vista + ⋯ — EncontroLinhaAcoes carrega as
             mesmas réguas dos botões que a fileira tinha soltos (janela do
             Entrar, DPP-only do remarcar/editar link, trio do vencido,

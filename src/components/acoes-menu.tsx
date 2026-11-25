@@ -45,8 +45,8 @@ export function AcoesMenu({
       <DropdownMenuTrigger
         aria-label={label}
         className={cn(
-          buttonVariants({ variant: "outline", size: "sm" }),
-          "w-11 shrink-0 px-0 text-muted-foreground md:w-auto md:px-2.5",
+          buttonVariants({ variant: "ghost", size: "sm" }),
+          "w-11 shrink-0 px-0 text-muted-foreground hover:bg-muted/60 md:w-auto md:px-2.5",
           className
         )}
       >

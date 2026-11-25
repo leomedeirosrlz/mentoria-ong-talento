@@ -388,7 +388,7 @@ export function PlanoAcordosCard({
       {estado === "proposto_staff_falta_meu" && (
         <p className="text-sm text-muted-foreground">
           {propostaPor} propôs esse plano. Um aceite da dupla põe o
-          combinado pra valer. O outro lado recebe o aviso.
+          plano pra valer. O outro lado recebe o aviso.
         </p>
       )}
       {estado === "proposto_staff_falta_outro" && meuLado != null && (
@@ -680,7 +680,7 @@ export function PlanoAcordosCard({
             Não serve pra mim
           </Button>
           <p className="text-xs text-muted-foreground">
-            O combinado vale. Se algo mudou, ainda dá pra
+            O plano vale. Se algo mudou, ainda dá pra
             contestar antes do próximo encontro.
           </p>
         </div>
@@ -697,7 +697,7 @@ export function PlanoAcordosCard({
           descricao={
             seletor.grupo
               ? `${listaEncontros(seletor.grupo)} encontros · sessão combinada de ${rotuloDuracao(passoSeletor.duracao_min ?? DURACAO_SESSAO_MIN)}`
-              : `${passoSeletor.numero}º encontro · passo do combinado`
+              : `${passoSeletor.numero}º encontro · passo do plano`
           }
           rotuloConfirmar={seletor.grupo ? "Marcar sessão" : "Confirmar data"}
           inicial={{

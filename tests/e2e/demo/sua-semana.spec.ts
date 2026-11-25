@@ -20,7 +20,7 @@ test.describe("Sua semana — jovem", () => {
     // "este é o Nº" só aparece quando o encontro em destaque é passo do
     // plano (exercido no card do mentor). Aqui ficam status, ritmo,
     // progresso e os gestos no mesmo lugar do hero
-    await expect(page.getByText("Plano combinado")).toBeVisible();
+    await expect(page.getByText("Pra ficar em dia")).toBeVisible();
     await expect(
       page.getByText("até 2 encontros por semana")
     ).toBeVisible();
@@ -49,7 +49,7 @@ test.describe("Sua semana — mentor", () => {
     await expect(
       semana.getByRole("heading", { name: "Sua semana" })
     ).toBeVisible();
-    await expect(semana.getByText("Plano combinado")).toBeVisible();
+    await expect(semana.getByText("Pra ficar em dia")).toBeVisible();
     // o mentor propôs — "você combinou", nunca o próprio nome
     await expect(
       semana.getByText(/encontro do plano que você combinou\./)

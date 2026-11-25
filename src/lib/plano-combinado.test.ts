@@ -298,7 +298,7 @@ describe("fraseDoCombinado", () => {
       "mentor",
       "Dandara"
     );
-    expect(f.pill).toBe("Plano combinado");
+    expect(f.pill).toBe("Pra ficar em dia");
     expect(`${f.texto} ${f.cta}`).not.toMatch(/aceit/i);
   });
 });

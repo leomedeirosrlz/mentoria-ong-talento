@@ -19,7 +19,6 @@ import {
   SeletorDiaHora,
   ddmm,
   dowLongo,
-  fimDe,
 } from "@/components/seletor-dia-hora";
 
 // ---------- cartão "Próximo passo" + seletor de dia/horário (REALIZA-481) ----------
@@ -189,8 +188,8 @@ export function JovemAgendarSugestao({
                 aria-hidden
                 className="shrink-0 text-muted-foreground"
               />
-              {dowLongo(principal.data).replace("-feira", "")}, {dataCurta}, das{" "}
-              {principal.hora} às {fimDe(principal.hora, sugestoes.duracaoMin)}
+              {dowLongo(principal.data).replace("-feira", "")}, {dataCurta}, às{" "}
+              {principal.hora}
             </p>
             <p className="flex items-center gap-2 text-xs text-muted-foreground">
               <ClockCounterClockwise size={14} aria-hidden className="shrink-0" />
