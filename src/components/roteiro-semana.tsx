@@ -4,10 +4,10 @@ import { montarRoteiroDoPlano } from "@/lib/plano-roteiros-servico";
 import type { LadoPlano } from "@/lib/plano-servico";
 import { parseDocBlocos } from "@/lib/doc-bloco-schema";
 import {
-  blocosParaJovem,
   roteiroForaDeVersao,
   rotuloStatusRoteiro,
 } from "@/lib/plano-roteiros";
+import { blocosParaJovem } from "@/lib/roteiro-jovem";
 import { diaMes } from "@/lib/plano-combinado";
 import { RoteiroDoc } from "@/components/roteiro-doc";
 import { RoteiroEditor } from "@/components/roteiro-editor";
