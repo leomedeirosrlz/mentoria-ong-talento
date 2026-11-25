@@ -145,7 +145,7 @@ export function EncontroLinha({
         {status && <div className="mt-1 flex sm:hidden">{status}</div>}
       </div>
       {/* no celular o ⋯ fica ancorado no canto superior direito do card,
-          com o status logo abaixo dele (mesma leitura do ⋯ do card de
+          ao lado das estrelas da avaliação (mesma leitura do ⋯ do card de
           dupla); em sm+ a fileira volta pro fim da linha, alinhada ao
           texto */}
       <div className="absolute right-3 top-2 flex items-center gap-1 sm:static sm:order-none sm:ml-auto sm:gap-2">

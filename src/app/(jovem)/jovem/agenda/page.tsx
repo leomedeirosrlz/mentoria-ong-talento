@@ -567,7 +567,7 @@ export default async function JovemAgenda() {
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Agenda</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Seus encontros com o mentor e com especialistas. As datas vocês combinam aqui.
+            Seus encontros com o mentor e especialistas. As datas vocês combinam aqui.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -875,7 +875,7 @@ export default async function JovemAgenda() {
             </span>
             <p>
               Nenhum encontro por aqui ainda. Quando a dupla marcar o
-              primeiro, ele aparece nesta agenda.
+              primeiro, ele aparece aqui.
             </p>
           </CardContent>
         </Card>
