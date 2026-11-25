@@ -10,7 +10,8 @@ vi.mock("next/headers", () => ({
 }));
 
 import { responderDemoIa } from "./ia";
-import type { UiBloco, UiPlano } from "@/lib/ia/ui";
+import { demoJovemPlano } from "./queries";
+import type { UiBloco, UiPlano, UiPlanoJovem } from "@/lib/ia/ui";
 
 beforeEach(() => {
   demo.role = "mentor_dpp";
@@ -21,6 +22,53 @@ const blocoJson = (content: string, tag: string) =>
 
 const planoDe = (ui: UiBloco[]): UiPlano | null =>
   ui.find((b): b is UiPlano => b.kind === "plano") ?? null;
+
+const planoJovemDe = (ui: UiBloco[]): UiPlanoJovem | null =>
+  ui.find((b): b is UiPlanoJovem => b.kind === "plano_jovem") ?? null;
+
+// QA 25/11: nenhuma resposta da demo pode vazar implementação — o texto
+// honesto fala "na demonstração" / "com os seus dados", nunca RPC, nome
+// de função, rota ou "ambiente real"
+const MECANICA = /\bRPC\b|jovem_\w+|ambiente real|rota real|mesmo motor|\bview\b|\btabela\b|\bfunção\b/i;
+
+describe("responderDemoIa — sem vazamento de implementação (QA 25/11)", () => {
+  const perguntas: [string, string][] = [
+    ["mentor_dpp", "e a adesão?"],
+    ["mentor_dpp", "resumo da semana"],
+    ["mentor_dpp", "próximos encontros"],
+    ["coordenacao", "como a dupla do Caio vai ficar em dia?"],
+    ["mentor_dpp", "escreva um lembrete pra dupla"],
+    ["mentorado", "como tá minha jornada?"],
+    ["mentorado", "o que tenho pra fazer?"],
+    ["mentorado", "quando é o próximo encontro?"],
+    ["mentorado", "quem é meu mentor?"],
+    ["mentorado", "meu plano"],
+    ["mentorado", "o que é o PDM?"],
+    ["mentorado", "nos encontramos sem agendar"],
+    ["mentorado", "quais meus pedidos de especialista?"],
+  ];
+  for (const [role, pergunta] of perguntas) {
+    it(`[${role}] "${pergunta}"`, async () => {
+      demo.role = role;
+      const r = await responderDemoIa(pergunta);
+      if (r) expect(r.content).not.toMatch(MECANICA);
+    });
+  }
+
+  it("meu_plano projeta o plano do dataset, não um payload fixo", async () => {
+    demo.role = "mentorado";
+    const r = await responderDemoIa("meu plano");
+    const card = planoJovemDe(r!.ui);
+    const esperado = demoJovemPlano("mentorado");
+    expect(card).not.toBeNull();
+    expect(esperado).not.toBeNull();
+    expect(card!.status).toBe(esperado!.status);
+    expect(card!.versao).toBe(esperado!.versao);
+    expect(card!.passos_aplicados.length).toBe(
+      esperado!.passos_aplicados.length
+    );
+  });
+});
 
 describe("responderDemoIa — aderência (REALIZA-465)", () => {
   it("responde 'e a adesão' com número e próximo passo, não o fallback", async () => {
@@ -115,7 +163,7 @@ describe("responderDemoIa — ficar em dia (026/FR-016)", () => {
     expect(r).not.toBeNull();
     const plano = planoDe(r!.ui);
     expect(plano?.dupla_id).toBe("de000000-0000-4000-8000-000000001537");
-    expect(r!.content).toContain("mesmo motor da ficha");
+    expect(r!.content).toContain("mesma conta da ficha");
   });
 
   it("dupla em dia nomeada ganha resposta honesta, não o plano de outra", async () => {

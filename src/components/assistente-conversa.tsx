@@ -192,7 +192,7 @@ function agruparConversas(lista: Conversa[]) {
 }
 
 const DEMO_FALLBACK =
-  "Na demonstração a Liza tem respostas de exemplo. No ambiente real ela responde com os seus dados e os guias oficiais.";
+  "Na demonstração a Liza tem respostas de exemplo. Com os seus dados ela responde com eles e com os guias oficiais.";
 
 const FALHA =
   "Não consegui responder agora. Tente de novo em instantes.";
@@ -202,19 +202,19 @@ const FALHA =
 const DEMO_RESPOSTAS: [RegExp, string][] = [
   [
     /resumo|semana/i,
-    "Na demonstração o resumo sai de exemplo: há duplas em dia, uma pedindo apoio e outra com encontro atrasado. No ambiente real esta resposta vem dos seus dados.",
+    "Na demonstração o resumo sai de exemplo: há duplas em dia, uma pedindo apoio e outra com encontro atrasado. Com os seus dados esta resposta vem deles.",
   ],
   [
     /aguardando|par|fila/i,
-    "Na demonstração a fila mostra um jovem esperando par e uma mentora com vaga livre. No ambiente real é a fila de verdade.",
+    "Na demonstração a fila mostra um jovem esperando par e uma mentora com vaga livre. Com os seus dados é a fila de verdade.",
   ],
   [
     /capacidade|mentores/i,
-    "Na demonstração cada mentor ativo tem 1 ou 2 vagas conforme a trilha. No ambiente real a ocupação sai do cadastro.",
+    "Na demonstração cada mentor ativo tem 1 ou 2 vagas conforme a trilha. Com os seus dados a ocupação sai do cadastro.",
   ],
   [
     /dupla|encontro|registro|agenda/i,
-    "Na demonstração a sua dupla de exemplo tem encontros marcados e registros em dia. No ambiente real o assistente consulta a sua dupla.",
+    "Na demonstração a sua dupla de exemplo tem encontros marcados e registros em dia. Com os seus dados o assistente consulta a sua dupla.",
   ],
 ];
 

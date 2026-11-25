@@ -31,6 +31,7 @@ import {
   demoJovemDuplas,
   demoJovemEncaminhamentos,
   demoJovemEncontros,
+  demoJovemPlano,
   demoSolicitacoesVisiveis,
 } from "./queries";
 
@@ -153,7 +154,7 @@ export async function responderDemoIa(
     if (!d) {
       return {
         content:
-          `Na demonstração a Liza perguntaria qual dupla antes de montar o texto, igual à rota real.\n\n` +
+          `Na demonstração a Liza perguntaria qual dupla antes de montar o texto, como faria com os seus dados.\n\n` +
           `\`\`\`escolha\n${JSON.stringify({
             pergunta: `Pra qual dupla eu monto a ${rotuloTemplate}?`,
             opcoes: duplas.slice(0, 5).map((x) => ({
@@ -212,7 +213,7 @@ export async function responderDemoIa(
           : `${jovemPrimeiro},\n\nGostei muito da nossa conversa. A sua abertura vai fazer diferença no nosso trabalho.\n\nSempre que a conversa gerar alguma reflexão, anote e traga no próximo encontro. Se for algo urgente, me chame antes.\n\nPróxima tarefa: ${pendente?.descricao ?? "revisar os combinados do último encontro"}. Prazo: ${fmtDia(pendente?.prazo) ?? "até o próximo encontro"}.\n\nNosso próximo encontro: ${fmtDiaHora(proximo?.data_hora) ?? "a combinar"}, já agendado na plataforma.\n\nAbraço!`;
     return {
       content:
-        `Na demonstração os dados são de exemplo: no ambiente real a Liza puxa nomes, contatos${slugDemo === "mensagem-indicadas" ? " e os links de cada indicada" : ", tarefas e agenda"} da própria plataforma.\n\n` +
+        `Na demonstração os dados são de exemplo: com os seus dados a Liza usa nomes, contatos${slugDemo === "mensagem-indicadas" ? " e os links de cada indicada" : ", tarefas e agenda"} da própria plataforma.\n\n` +
         `\`\`\`rascunho\n${JSON.stringify({
           canal: "whatsapp",
           para:
@@ -382,7 +383,7 @@ export async function responderDemoIa(
         avisos: r.avisos,
       });
     };
-    const textoPlano = `Na demonstração o plano é de exemplo, calculado pelo mesmo motor da ficha da dupla. A sequência com as datas sugeridas tá acima: dois encontros por semana quando couber, respeitando os intervalos do guia. Quem agenda é a dupla, na ficha.${sugestoes(["Resumo da semana", "Escreva um lembrete pra dupla"])}`;
+    const textoPlano = `Na demonstração o plano é de exemplo, calculado pela mesma conta da ficha da dupla. A sequência com as datas sugeridas tá acima: dois encontros por semana quando couber, respeitando os intervalos do guia. Quem agenda é a dupla, na ficha.${sugestoes(["Resumo da semana", "Escreva um lembrete pra dupla"])}`;
     let ui: UiBloco | null = null;
     let content: string;
     const nomeada = resolverDuplaNomeada(pergunta, duplas);
@@ -396,7 +397,7 @@ export async function responderDemoIa(
       if (!r.aplicavel) {
         // trilha de especialista, pausa ou falta de calendário: o motivo
         // do planner já é a resposta honesta da rota real
-        content = `Na demonstração a resposta é a mesma da rota real: ${r.motivo}${sugestoes(["Resumo da semana"])}`;
+        content = `Na demonstração vale o mesmo motivo que a ficha mostraria: ${r.motivo}${sugestoes(["Resumo da semana"])}`;
       } else {
         ui = uiPlano(nomeada, r);
         const jovem = (
@@ -409,7 +410,7 @@ export async function responderDemoIa(
             ? jovem
             : `d${jovem.endsWith("a") ? "a" : "o"} ${jovem}`;
         content = r.emDia
-          ? `Na demonstração a dupla ${rotulo} já está em dia, então não existe plano de recuperação pra ela.${ui ? " O card acima sai do mesmo motor da ficha e mostra os encontros marcados." : " No ambiente real o mesmo motor da ficha faz essa conta."}${sugestoes(["Resumo da semana"])}`
+          ? `Na demonstração a dupla ${rotulo} já está em dia, então não existe plano de recuperação pra ela.${ui ? " O card acima faz a mesma conta da ficha e mostra os encontros marcados." : " Com os seus dados a ficha faz essa mesma conta."}${sugestoes(["Resumo da semana"])}`
           : ui
             ? textoPlano
             : `Na demonstração a conta da dupla ${rotulo} não fecha antes do encerramento. ${r.sugestao ?? "Nem com 1 encontro por dia o plano fecha."}${sugestoes(["Resumo da semana"])}`;
@@ -429,7 +430,7 @@ export async function responderDemoIa(
       }
       content = ui
         ? textoPlano
-        : `Na demonstração nenhuma dupla está atrasada o bastante pra um plano de recuperação. No ambiente real a Liza monta o plano com o mesmo motor do card "Para ficar em dia".${sugestoes(["Resumo da semana"])}`;
+        : `Na demonstração nenhuma dupla está atrasada o bastante pra um plano de recuperação. Com os seus dados a Liza monta o plano pela mesma conta do card "Para ficar em dia".${sugestoes(["Resumo da semana"])}`;
     }
     return { content, ui: ui ? [ui] : [] };
   }
@@ -485,35 +486,23 @@ export async function responderDemoIa(
       const ui = uiAjuda(p);
       return {
         content: ui
-          ? `Na demonstração a resposta sai da ajuda oficial, igual ao card acima. No ambiente real a Liza também consulta os guias do programa.${sugestoes(["Como tá minha jornada?", "O que tenho pra fazer?"])}`
-          : `Na demonstração a Liza responde dúvidas do programa com a ajuda oficial. No ambiente real ela também consulta os guias.${sugestoes(["Quem é meu mentor?"])}`,
+          ? `Na demonstração a resposta sai da ajuda oficial, igual ao card acima. Com os seus dados a Liza também consulta os guias do programa.${sugestoes(["Como tá minha jornada?", "O que tenho pra fazer?"])}`
+          : `Na demonstração a Liza responde dúvidas do programa com a ajuda oficial. Com os seus dados ela também consulta os guias.${sugestoes(["Quem é meu mentor?"])}`,
         ui: ui ? [ui] : [],
       };
     }
     // o combinado do plano "ficar em dia" (459): a rota real chama
-    // meu_plano (jovem_plano, recorte sem semáforo) — a demo devolve um
-    // plano aceito de exemplo na MESMA projeção
+    // meu_plano (o recorte do jovem, sem semáforo) — a demo projeta o
+    // MESMO card a partir do plano do dataset, não de um payload fixo
     // "combinado" sozinho continua caindo nos combinados/tarefas — o
     // branch dele vem depois; aqui só plano/ficar em dia
     if (/plano|ficar em dia/.test(p)) {
-      const hoje = Date.now();
-      const em = (dias: number) => new Date(hoje + dias * 86_400_000).toISOString();
-      const ui = uiDaTool("meu_plano", {
-        status: "aceito",
-        versao: 1,
-        ritmo: "2",
-        aprovado_lado: "mentor",
-        expira_em: em(14),
-        passos: [
-          { numero: 4, data: em(3).slice(0, 10), acao: "remarcar" },
-          { numero: 5, data: em(10).slice(0, 10), acao: "remarcar" },
-        ],
-        passos_aplicados: [
-          { numero: 4, data_nova: em(3), aplicado_em: new Date(hoje).toISOString() },
-        ],
-      });
+      const plano = demoJovemPlano(role);
+      const ui = plano ? uiDaTool("meu_plano", plano) : null;
       return {
-        content: `Na demonstração o combinado é de exemplo. No ambiente real ele sai da RPC jovem_plano — o recorte do jovem do plano "ficar em dia", sem os detalhes internos da equipe. Aceitar e confirmar datas valem pra você e pro seu mentor.${sugestoes(["Quando é o próximo encontro?", "O que tenho pra fazer?"])}`,
+        content: plano
+          ? `Na demonstração o combinado é de exemplo — é o recorte que o jovem vê do plano "ficar em dia", sem os detalhes internos da equipe. Aceitar e confirmar datas valem pra você e pro seu mentor.${sugestoes(["Quando é o próximo encontro?", "O que tenho pra fazer?"])}`
+          : `Na demonstração a dupla ainda não tem um plano "ficar em dia". Ele aparece quando a equipe propõe e alguém da dupla aceita.${sugestoes(["Como tá minha jornada?"])}`,
         ui: ui ? [ui] : [],
       };
     }
@@ -526,7 +515,7 @@ export async function responderDemoIa(
       )
     ) {
       return {
-        content: `Na demonstração a Liza perguntaria qual encontro do guia a sessão cobriu e prepararia o registro pra você confirmar no card — ele já nasce realizado e o seu mentor é avisado pra contar como foi. No ambiente real vale pra passo oficial que já venceu; o último encontro e os da trilha de especialista seguem com o mentor.${sugestoes(["Quando é o próximo encontro?", "O que tenho pra fazer?"])}`,
+        content: `Na demonstração a Liza perguntaria qual encontro do guia a sessão cobriu e prepararia o registro pra você confirmar no card — ele já nasce realizado e o seu mentor é avisado pra contar como foi. Com os seus dados vale pra passo oficial que já venceu; o último encontro e os da trilha de especialista seguem com o mentor.${sugestoes(["Quando é o próximo encontro?", "O que tenho pra fazer?"])}`,
         ui: [],
       };
     }

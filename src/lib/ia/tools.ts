@@ -331,7 +331,7 @@ const adocaoCoorteArgs = z
       .max(12)
       .optional()
       .describe(
-        "quantas coortes semanais recentes (padrão 8 — a RPC devolve no máx 12)"
+        "quantas coortes semanais recentes (padrão 8 — no máx 12)"
       ),
   })
   .strict();
@@ -1109,7 +1109,7 @@ export const IA_TOOLS = {
   plano_propor: {
     nome: "plano_propor",
     descricao:
-      "Propõe e GRAVA o plano 'ficar em dia' de uma dupla DPP (0219/0224): o escopo sai do mesmo planner do plano_em_dia — encontros devidos e os que vencem no caminho, janela até o encerramento, ritmo combinado e o nível calculado — e a proposta fica persistida pra dupla aceitar ou contestar. O aceite é ÚNICO: o primeiro lado da dupla que aceita já põe o plano pra valer (mentor ou jovem que propõe já conta como o aceite desse lado) e o outro é avisado. Sem ritmo, usa o mais leve que fecha; o banco só exige ritmo >= 1 encontro por semana. As decisões do plano (recessos, grade, fusão) entram na proposta: decisoes_recesso declara cada recesso antes de propor (só a dupla declara — equipe com recesso pendente recebe a recusa do banco), sem_grade combina sem a disponibilidade e fusao junta encontros na mesma sessão. Dupla em dia ou em 'conversa' (nem 1 por dia fecha) não tem proposta: aí o caminho é a coordenação. Só um plano aberto por dupla — contestado é terminal, acordo novo é versão nova. plano_em_dia mostra a prévia antes." +
+      "Propõe e GRAVA o plano 'ficar em dia' de uma dupla DPP: o escopo sai do mesmo planner do plano_em_dia — encontros devidos e os que vencem no caminho, janela até o encerramento, ritmo combinado e o nível calculado — e a proposta fica persistida pra dupla aceitar ou contestar. O aceite é ÚNICO: o primeiro lado da dupla que aceita já põe o plano pra valer (mentor ou jovem que propõe já conta como o aceite desse lado) e o outro é avisado. Sem ritmo, usa o mais leve que fecha; o mínimo é 1 encontro por semana. As decisões do plano (recessos, grade, fusão) entram na proposta: decisoes_recesso declara cada recesso antes de propor (só a dupla declara — a equipe com recesso pendente é recusada), sem_grade combina sem a disponibilidade e fusao junta encontros na mesma sessão. Dupla em dia ou em 'conversa' (nem 1 por dia fecha) não tem proposta: aí o caminho é a coordenação. Só um plano aberto por dupla — contestado é terminal, acordo novo é versão nova. plano_em_dia mostra a prévia antes." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -1275,7 +1275,7 @@ export const IA_TOOLS = {
   plano_aplicar_passo: {
     nome: "plano_aplicar_passo",
     descricao:
-      "Aplica um passo do plano 'ficar em dia' aceito: grava a data combinada do encontro do escopo e anota no ledger do plano — uma RPC só, atômica. Vale pro mentor e pro jovem (o combinado é dos dois). Só números do escopo, só data futura dentro da janela, remarcar pede motivo; repetir o mesmo passo devolve o que já existe (idempotente)." +
+      "Aplica um passo do plano 'ficar em dia' aceito: grava a data combinada do encontro do escopo e anota no histórico do plano — uma gravação só, atômica. Vale pro mentor e pro jovem (o combinado é dos dois). Só números do escopo, só data futura dentro da janela, remarcar pede motivo; repetir o mesmo passo devolve o que já existe (idempotente)." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -1329,7 +1329,7 @@ export const IA_TOOLS = {
   resumo_dupla: {
     nome: "resumo_dupla",
     descricao:
-      "Resumo consolidado da dupla, gerado pelo job diário (0221): semáforo, motivos e sinais, encontros feitos × esperados, próximos encontros, pendências de registro, perfil e interesses do jovem e o plano 'ficar em dia' vigente. A própria RPC recorta por papel — pro mentorado chega sem semáforo/motivos/sinais. null quando o job ainda não gerou. Use pra uma visão rápida e barata da dupla; ficha_dupla dá o detalhe vivo.",
+      "Resumo consolidado da dupla, gerado pelo resumo diário: semáforo, motivos e sinais, encontros feitos × esperados, próximos encontros, pendências de registro, perfil e interesses do jovem e o plano 'ficar em dia' vigente. O resultado já vem recortado por papel — pro mentorado chega sem semáforo/motivos/sinais. null quando o resumo diário ainda não rodou. Use pra uma visão rápida e barata da dupla; ficha_dupla dá o detalhe vivo.",
     schema: duplaIdArgs,
     roles: TODOS_PAPEIS,
     run: async ({ dupla_id }: z.infer<typeof duplaIdArgs>, ctx) => {
@@ -1342,7 +1342,7 @@ export const IA_TOOLS = {
   meu_plano: {
     nome: "meu_plano",
     descricao:
-      "O combinado do plano 'ficar em dia' da própria dupla do jovem (0219 — jovem_plano): status, versão, ritmo combinado, os passos com datas e os passos já aplicados. Sem semáforo nem motivos internos — só o que a dupla combinou. null quando não há plano.",
+      "O combinado do plano 'ficar em dia' da própria dupla do jovem: status, versão, ritmo combinado, os passos com datas e os passos já aplicados. Sem semáforo nem motivos internos — só o que a dupla combinou. null quando não há plano.",
     schema: semArgs,
     roles: ["mentorado"],
     run: async (_args: z.infer<typeof semArgs>, ctx) => {
@@ -1355,7 +1355,7 @@ export const IA_TOOLS = {
   intervencao_sugerir: {
     nome: "intervencao_sugerir",
     descricao:
-      "Sugere uma intervenção estruturada na dupla (0220): troca_mentor, troca_mentorado, pausa, dpp_para_esp (encerrar a trilha DPP seguindo com a especialista) ou encerramento — com evidências e o destino ('auxiliar' = supervisor da dupla, 'coordenacao'). A Liza SUGERE, nunca executa: quem decide é a equipe, pela fila de intervenções na ficha da dupla (chamado ou mensagem)." +
+      "Sugere uma intervenção estruturada na dupla: troca_mentor, troca_mentorado, pausa, dpp_para_esp (encerrar a trilha DPP seguindo com a especialista) ou encerramento — com evidências e o destino ('auxiliar' = supervisor da dupla, 'coordenacao'). A Liza SUGERE, nunca executa: quem decide é a equipe, pela fila de intervenções na ficha da dupla (chamado ou mensagem)." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -1415,7 +1415,7 @@ export const IA_TOOLS = {
   guia_ajustar: {
     nome: "guia_ajustar",
     descricao:
-      "Personaliza o guia de um encontro da dupla (0220): lista de ajustes, cada um com sugestao e justificativa — o guia oficial continua sendo a base, os ajustes ficam ancorados a ele e aparecem na ficha e no preparo. Regravar o mesmo número substitui a lista inteira." +
+      "Personaliza o guia de um encontro da dupla: lista de ajustes, cada um com sugestao e justificativa — o guia oficial continua sendo a base, os ajustes ficam ancorados a ele e aparecem na ficha e no preparo. Regravar o mesmo número substitui a lista inteira." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -1469,7 +1469,7 @@ export const IA_TOOLS = {
   guia_limpar: {
     nome: "guia_limpar",
     descricao:
-      "Volta um encontro da dupla ao guia oficial (0220): apaga os ajustes personalizados daquele número — a ficha e o preparo passam a mostrar só o guia base." +
+      "Volta um encontro da dupla ao guia oficial: apaga os ajustes personalizados daquele número — a ficha e o preparo passam a mostrar só o guia base." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -2098,7 +2098,7 @@ export const IA_TOOLS = {
   instrumentos_da_dupla: {
     nome: "instrumentos_da_dupla",
     descricao:
-      "Os 4 instrumentos oficiais da jornada (Visão, Metas, PDM e Roda da Vida) de uma dupla: definição, links emitidos e as respostas já dadas — mesma leitura da RPC instrumentos_da_dupla, que decide o escopo (coord, mentor e supervisor da dupla e o próprio jovem).",
+      "Os 4 instrumentos oficiais da jornada (Visão, Metas, PDM e Roda da Vida) de uma dupla: definição, links emitidos e as respostas já dadas — já recortada pelo papel de quem lê (coord, mentor e supervisor da dupla e o próprio jovem).",
     schema: duplaIdArgs,
     roles: TODOS_PAPEIS,
     run: async ({ dupla_id }: z.infer<typeof duplaIdArgs>, ctx) => {
@@ -2128,7 +2128,7 @@ export const IA_TOOLS = {
   minha_dupla: {
     nome: "minha_dupla",
     descricao:
-      "A dupla do jovem que está falando: mentor, supervisor, trilha, turma e status — sem precisar de id, a view jovem_duplas já é escopada. Use pra 'quem é meu mentor?', 'minha dupla', 'com quem eu converso' e antes de abrir instrumentos da própria dupla (o dupla_id que ela devolve é bastidor: só em args de tool, nunca no texto).",
+      "A dupla do jovem que está falando: mentor, supervisor, trilha, turma e status — sem precisar de id, já vem escopada. Use pra 'quem é meu mentor?', 'minha dupla', 'com quem eu converso' e antes de abrir instrumentos da própria dupla (o dupla_id que ela devolve é bastidor: só em args de tool, nunca no texto).",
     schema: semArgs,
     roles: ["mentorado"],
     run: async (_args: z.infer<typeof semArgs>, ctx) => {
@@ -2429,7 +2429,7 @@ export const IA_TOOLS = {
   comentar_chamado: {
     nome: "comentar_chamado",
     descricao:
-      "Escreve no chamado como a pessoa logada (autor vira mensagem pública; equipe vira nota ou resposta conforme a RPC decide)." +
+      "Escreve no chamado como a pessoa logada (autor vira mensagem pública; equipe vira nota ou resposta conforme o tipo de autor)." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -2451,7 +2451,7 @@ export const IA_TOOLS = {
   acrescentar_info_chamado: {
     nome: "acrescentar_info_chamado",
     descricao:
-      "Acrescenta informação ao próprio chamado aberto (só o autor; a RPC barra os demais)." +
+      "Acrescenta informação ao próprio chamado aberto (só o autor; os demais não podem)." +
       ESCRITA_DOC,
     schema: z
       .object({
@@ -2782,7 +2782,7 @@ export const IA_TOOLS = {
   declarar_recesso: {
     nome: "declarar_recesso",
     descricao:
-      "Declara a decisão da dupla sobre um recesso do calendário oficial: usa=true é 'vamos pausar os encontros' (também é o padrão quando nada foi declarado — o planner empurra sugestões pra depois da janela) e usa=false é 'vamos seguir nos encontrando' (aí a janela fica disponível pra dupla: o planner pode sugerir datas dentro dela e a agenda trata o período como combinado). A decisão é por dupla e por período de recesso; a última declaração vale, com a data da mudança. Sem ciclo_evento_id vale o recesso vigente ou o próximo do cronograma da dupla — ficha_dupla lista os recessos com os ids. Só a dupla declara (a RPC revalida): o mentor dela ou o jovem; a coordenação acompanha, não decide pela dupla." +
+      "Declara a decisão da dupla sobre um recesso do calendário oficial: usa=true é 'vamos pausar os encontros' (também é o padrão quando nada foi declarado — o planner empurra sugestões pra depois da janela) e usa=false é 'vamos seguir nos encontrando' (aí a janela fica disponível pra dupla: o planner pode sugerir datas dentro dela e a agenda trata o período como combinado). A decisão é por dupla e por período de recesso; a última declaração vale, com a data da mudança. Sem ciclo_evento_id vale o recesso vigente ou o próximo do cronograma da dupla — ficha_dupla lista os recessos com os ids. Só a dupla declara (a gravação revalida): o mentor dela ou o jovem; a coordenação acompanha, não decide pela dupla." +
       ESCRITA_DOC,
     schema: z
       .object({
