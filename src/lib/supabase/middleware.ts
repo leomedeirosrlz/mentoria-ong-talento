@@ -45,8 +45,13 @@ export async function updateSession(request: NextRequest) {
     }
   );
 
-  const { data } = await supabase.auth.getClaims();
-  const user = data?.claims ? { id: data.claims.sub as string } : null;
+  // Saída de emergência: /auth/sair-limpo precisa rodar MESMO com o token
+  // quebrado (é justamente o caso de uso). Sem este bypass, o getClaims
+  // abaixo estoura antes do handler e a pessoa fica sem como limpar a
+  // sessão — o bug do cookie velho pós-deploy.
+  if (request.nextUrl.pathname === "/auth/sair-limpo") {
+    return NextResponse.next({ request });
+  }
 
   const p = request.nextUrl.pathname;
   const isPublic =
@@ -84,6 +89,31 @@ export async function updateSession(request: NextRequest) {
     // (ia_mcp_autorizar), que responde 401 JSON — nunca redirect.
     p === "/api/mcp" ||
     p === "/privacidade";
+
+  let user: { id: string } | null = null;
+  try {
+    const { data } = await supabase.auth.getClaims();
+    user = data?.claims ? { id: data.claims.sub as string } : null;
+  } catch {
+    // token ilegível/sem refresh (o cookie velho pós-deploy): não derruba
+    // a request. Em rota pública segue como anônimo — o /login abre e a
+    // pessoa consegue entrar; em rota privada limpa os cookies de auth e
+    // manda pro login, que é a auto-recuperação no lugar do 500.
+    if (isPublic) {
+      return NextResponse.next({ request });
+    }
+    const destino = request.nextUrl.clone();
+    destino.pathname = "/login";
+    destino.search = "?motivo=sessao";
+    const res = NextResponse.redirect(destino);
+    for (const c of request.cookies.getAll()) {
+      if (c.name.startsWith("sb-")) {
+        res.cookies.set(c.name, "", { path: "/", maxAge: 0 });
+      }
+    }
+    return res;
+  }
+
 
   if (!user && !isPublic) {
     const url = request.nextUrl.clone();

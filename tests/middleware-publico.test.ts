@@ -66,3 +66,34 @@ describe("updateSession — allowlist pública por token", () => {
     expect(interno.headers.get("location")).toBe("http://app.test/duplas");
   });
 });
+
+describe("updateSession — sessão quebrada não prende ninguém", () => {
+  it("a saída de emergência roda mesmo com getClaims estourando", async () => {
+    m.claims.mockRejectedValue(new Error("refresh token not found"));
+    const res = await updateSession(
+      new NextRequest("http://app.test/auth/sair-limpo")
+    );
+    expect(res.headers.get("location")).toBeNull();
+  });
+
+  it("token quebrado em rota interna limpa o cookie e volta pro login", async () => {
+    m.claims.mockRejectedValue(new Error("refresh token not found"));
+    const res = await updateSession(
+      new NextRequest("http://app.test/duplas/abc", {
+        headers: { cookie: "sb-ref-auth-token=velho; outro=1" },
+      })
+    );
+    expect(res.headers.get("location")).toBe(
+      "http://app.test/login?motivo=sessao"
+    );
+    expect(res.headers.getSetCookie().join(";")).toContain(
+      "sb-ref-auth-token="
+    );
+  });
+
+  it("token quebrado em rota pública segue como anônimo", async () => {
+    m.claims.mockRejectedValue(new Error("refresh token not found"));
+    const res = await updateSession(new NextRequest("http://app.test/login"));
+    expect(res.headers.get("location")).toBeNull();
+  });
+});

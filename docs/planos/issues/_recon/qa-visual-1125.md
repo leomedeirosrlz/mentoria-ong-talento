@@ -17,7 +17,7 @@
 | 6 | "Sua rede" em colega de turma | Dandara ("Colega da turma") com selo verde "Sua rede" | selo removido; vínculo do card passa a ser a única fonte |
 | 7 | Rodapé do modal de Filtros deixava conteúdo à mostra | faixa de 16px do `p-4` da sheet sob o "Aplicar" | `pb-0` na sheet; respiro mora no rodapé sticky |
 | 8 | ⋯ dos cards da agenda solto no meio | fileira própria com `ps-12` no mobile | topo à direita, mesmo padrão do card de dupla (`dupla-linha`); reusa `AcoesMenu` |
-| 9 | Erro pós-deploy prendia a pessoa no "recarregar" | cookie de auth velho → boundary sem saída | `CartaoErro` compartilhado com "Sair e entrar de novo" (`recuperarSessao` limpa `sb-*`/demo e vai pro login) |
+| 9 | Erro pós-deploy prendia a pessoa no "recarregar" | cookie de auth velho → boundary sem saída | `CartaoErro` compartilhado com "Sair e entrar de novo" (link GET `/auth/sair-limpo`, que apaga `sb-*`/demo e volta pro login) + `global-error` com o mesmo par de botões + middleware auto-recupera: `getClaims` que estoura não vira 500, limpa o cookie e manda pro login |
 | 10 | "Sem data ainda" acima de uma data concreta | card do próximo passo | copy trocada por "Sugestão pra destravar o próximo passo" |
 | 11 | Histórico do jovem sem o nome da especialista | `espPorDupla` só mapeava trilhas `ativas` | mapa cobre todas as trilhas de especialista; "Sessão 5 com Sofia" |
 
