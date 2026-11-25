@@ -27,6 +27,7 @@ import {
 } from "@/lib/plano-combinado";
 import { DURACAO_SESSAO_MIN } from "@/lib/plano-em-dia.data";
 import {
+  ocupadoEmChoque,
   partesSP,
   type OcupadoRotulado,
 } from "@/lib/sugestoes-encontro";
@@ -243,8 +244,46 @@ export function PlanoAcordosCard({
     });
   };
 
+  // a sugestão dos outros passos pendentes reserva o instante (QA 25/11):
+  // o chip marca indisponível no seletor e o Confirmar avisa em vez de
+  // gravar em cima do que a tela ofereceu a outro passo
+  const ocupadosSugs = (excluir: readonly number[]): OcupadoRotulado[] =>
+    [...sugs.entries()]
+      .filter(([n, s]) => s != null && !excluir.includes(n))
+      .map(([n, s]) => ({
+        inicio: `${s!.data}T${s!.hora}:00-03:00`,
+        rotulo: `sugestão do ${n}º encontro`,
+        rotuloArtigo: `a sugestão do ${n}º encontro`,
+      }));
+
+  // choque com os passos do próprio plano e com a agenda (QA 25/11): o
+  // seletor marca o slot ocupado, mas o Confirmar direto e o par
+  // date+time aceitavam o instante oferecido a outro passo sem aviso.
+  // `numeros` = quem está sendo marcado (a sessão combina o grupo).
+  const choquePasso = (
+    numeros: readonly number[],
+    data: string,
+    hora: string,
+    duracaoMin?: number
+  ): string | null => {
+    const c = ocupadoEmChoque(
+      new Date(`${data}T${hora}:00-03:00`),
+      [...ocupadosRotulados, ...ocupadosSugs(numeros)],
+      duracaoMin ?? 60
+    );
+    if (!c) return null;
+    return c.rotuloArtigo
+      ? `Esse horário choca com ${c.rotuloArtigo}. Escolha outra data ou horário.`
+      : "Esse horário já está ocupado. Escolha outra data ou horário.";
+  };
+
   const aplicar = (numero: number, data: string, hora: string) => {
     setErroPasso(null);
+    const choque = choquePasso([numero], data, hora, sugestoes?.duracaoMin);
+    if (choque) {
+      setErroPasso({ numero, texto: choque });
+      return;
+    }
     iniciar(async () => {
       const r = await aplicarPassoPlano(
         plano.id,
@@ -269,6 +308,11 @@ export function PlanoAcordosCard({
   // ganham a mesma data/hora e o mesmo sessao_id numa RPC
   const aplicarSessao = (numeros: number[], data: string, hora: string) => {
     setErroPasso(null);
+    const choque = choquePasso(numeros, data, hora, DURACAO_SESSAO_MIN);
+    if (choque) {
+      setErroPasso({ numero: numeros[0], texto: choque });
+      return;
+    }
     iniciar(async () => {
       const r = await aplicarSessaoPlano(
         plano.id,
@@ -787,7 +831,10 @@ export function PlanoAcordosCard({
                 ? (passoSeletor.duracao_min ?? DURACAO_SESSAO_MIN)
                 : sugestoes.duracaoMin,
             }),
-            ocupados: ocupadosRotulados,
+            ocupados: [
+              ...ocupadosRotulados,
+              ...ocupadosSugs(seletor.grupo ?? [passoSeletor.numero]),
+            ],
             janela,
           }}
           pending={pendente}

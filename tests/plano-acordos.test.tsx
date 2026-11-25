@@ -4,6 +4,9 @@
 // mesmo instante (as datas combinadas iguais clampam no mesmo min) e,
 // depois de confirmar um passo, os seguintes não reoferecem o instante
 // confirmado — ele entra nos ocupados antes do refresh devolver tudo.
+// QA 25/11: a sugestão de um passo reserva o instante — no seletor do
+// outro passo ela vira chip indisponível e o confirm cai no livre seguinte
+// em vez de gravar em cima do que a tela ofereceu.
 
 import { act } from "react";
 import { describe, expect, it, vi } from "vitest";
@@ -98,7 +101,7 @@ describe("sugestões dos passos pendentes (507)", () => {
     expect(textos[1]).not.toContain("às 19:00");
   });
 
-  it("confirmar um passo tira o instante dele da sugestão do seguinte", async () => {
+  it("o instante sugerido a outro passo vira choque no seletor (QA 25/11)", async () => {
     const { alvo, desmontar } = montar(
       <PlanoAcordosCard
         plano={planoCom([
@@ -113,7 +116,8 @@ describe("sugestões dos passos pendentes (507)", () => {
     // o 4º nasce sugerindo qua 02/12 às 19:00
     expect(linhas(alvo)[1].textContent).toContain("qua 02/12 às 19:00");
 
-    // move o 3º pra esse mesmo instante pelo seletor ("Outra data" no ⋯)
+    // move o 3º pro dia do 4º pelo seletor ("Outra data" no ⋯): o 19:00
+    // já está oferecido a ele — chip indisponível, não grava por cima
     const li3 = linhas(alvo)[0];
     await outraData(li3);
     const dlg = document.querySelector('[role="dialog"], [data-slot="sheet-content"]') ?? document.body;
@@ -122,23 +126,75 @@ describe("sugestões dos passos pendentes (507)", () => {
     const dia = dlg.querySelector<HTMLInputElement>('input[type="date"]')!;
     act(() => digitar(dia, "2026-12-02"));
     await assentar();
+    const chip19 = [...dlg.querySelectorAll('[role="radio"]')].find(
+      (r) => r.getAttribute("aria-label")?.startsWith("19:00")
+    );
+    expect(chip19?.getAttribute("aria-label")).toContain("indisponível");
+    expect(chip19?.getAttribute("aria-label")).toContain(
+      "sugestão do 4º encontro"
+    );
+    expect(chip19?.getAttribute("aria-disabled")).toBe("true");
+
+    // o confirm cai no primeiro livre — 19:00 e 19:30 chocam a sugestão
+    // do 4º, então o motor propõe 20:00
     act(() => clicar(botao(dlg as ParentNode, "Confirmar data")));
     await assentar();
 
     expect(aplicarPassoPlano).toHaveBeenCalledWith(
       "pl1",
       3,
-      "2026-12-02T19:00:00-03:00",
+      "2026-12-02T20:00:00-03:00",
       undefined,
       undefined,
       undefined
     );
     const textos = linhas(alvo).map((li) => li.textContent ?? "");
-    expect(textos[0]).toContain("Marcado pra qua 02/12 às 19:00");
-    // o 4º não pode reoferecer o instante que o 3º acabou de tomar —
-    // 19:00 choca 19:00 e 19:30, então o próximo livre é 20:00
-    expect(textos[1]).toContain("sugestão qua 02/12 às 20:00");
-    expect(textos[1]).not.toContain("às 19:00");
+    expect(textos[0]).toContain("Marcado pra qua 02/12 às 20:00");
+    // o 4º não reoferece o instante que o 3º acabou de tomar — o 19:00
+    // ficou livre de novo e volta a ser a sugestão dele
+    expect(textos[1]).toContain("sugestão qua 02/12 às 19:00");
+    expect(textos[1]).not.toContain("às 20:00");
+    desmontar();
+  });
+
+  it("forçar um horário que choca a sugestão do outro passo avisa e não grava", async () => {
+    const { alvo, desmontar } = montar(
+      <PlanoAcordosCard
+        plano={planoCom([
+          { numero: 3, data: "2026-12-01" },
+          { numero: 4, data: "2026-12-02" },
+        ])}
+        podeResponder={false}
+        podeAplicar
+        sugestoes={SUGESTOES}
+      />
+    );
+    const li3 = linhas(alvo)[0];
+    await outraData(li3);
+    const dlg = document.querySelector('[role="dialog"], [data-slot="sheet-content"]') ?? document.body;
+    act(() => clicar(botao(dlg as ParentNode, "Outro dia")));
+    await assentar();
+    act(() =>
+      digitar(
+        dlg.querySelector<HTMLInputElement>('input[type="date"]')!,
+        "2026-12-02"
+      )
+    );
+    await assentar();
+    // digita 19:00 à mão — o horário que o 4º já tem como sugestão
+    act(() => clicar(botao(dlg as ParentNode, "Outro horário")));
+    await assentar();
+    act(() =>
+      digitar(
+        dlg.querySelector<HTMLInputElement>('input[type="time"]')!,
+        "19:00"
+      )
+    );
+    await assentar();
+    expect(dlg.textContent).toContain("a sugestão do 4º encontro");
+    expect(
+      botao(dlg as ParentNode, "Confirmar data").getAttribute("disabled")
+    ).not.toBeNull();
     desmontar();
   });
 
