@@ -142,7 +142,7 @@ export function EncontroLinha({
         {nota && (
           <p className="mt-0.5 text-xs text-muted-foreground">{nota}</p>
         )}
-        {status && <div className="mt-1 flex sm:hidden">{status}</div>}
+        {status && <div className="mt-1 flex">{status}</div>}
       </div>
       {/* no celular o ⋯ fica ancorado no canto superior direito do card,
           ao lado das estrelas da avaliação (mesma leitura do ⋯ do card de
@@ -157,9 +157,6 @@ export function EncontroLinha({
             label={<Estrelas n={aval.estrelas} size={13} />}
           />
         )}
-        {/* no celular o status mora embaixo da data (dentro do texto);
-            aqui fica só no sm+, à esquerda do ⋯ */}
-        {status && <div className="hidden sm:flex">{status}</div>}
         {/* 530: uma decisiva à vista + ⋯ — EncontroLinhaAcoes carrega as
             mesmas réguas dos botões que a fileira tinha soltos (janela do
             Entrar, DPP-only do remarcar/editar link, trio do vencido,
