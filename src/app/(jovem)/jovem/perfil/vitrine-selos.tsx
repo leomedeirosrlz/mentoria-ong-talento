@@ -37,13 +37,14 @@ export function VitrineSelos({
   escolhidas: string[];
   nivel: NiveisJornada | null;
 }) {
-  // -ms-2 compensa a margem transparente da arte: a tinta da primeira peça
-  // nasce na mesma linha ótica do avatar e a caixa continua dentro do padding do card
+  // Mobile: o grupo desce inteiro e começa na mesma linha do nome (padding
+  // do card). Desktop: encosta na direita do bloco, com -me-1 pra tinta da
+  // última peça fechar na mesma linha ótica do padding.
   return (
     <div
       role="group"
       aria-label="Selos do perfil"
-      className="-ms-2 flex flex-nowrap items-end"
+      className="flex flex-nowrap items-end gap-0.5 sm:ml-auto sm:-me-1"
     >
       {pecas.map((p) => (
         <Dialog key={p.chave}>
