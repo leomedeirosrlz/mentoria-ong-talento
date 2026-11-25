@@ -95,7 +95,7 @@ export function EncontroLinha({
     e.data_hora != null &&
     new Date(e.data_hora).getTime() <= agora;
   return (
-    <div className="flex flex-wrap items-start gap-x-3 gap-y-1.5 px-4 py-2.5 sm:px-5">
+    <div className="relative flex flex-wrap items-start gap-x-3 gap-y-1.5 py-2.5 ps-4 pe-28 sm:ps-5 sm:pe-5">
       <span
         aria-hidden
         className={cn(
@@ -129,11 +129,11 @@ export function EncontroLinha({
           <p className="mt-0.5 text-xs text-muted-foreground">{nota}</p>
         )}
       </div>
-      {/* o ⋯ e o status sobem pro topo à direita no celular (mesma norma
-          do card da dupla): a linha própria com ps-12 deixava o botão
-          solto no meio do card. Em sm+ a fileira volta a crescer à
-          direita, alinhada ao texto */}
-      <div className="order-2 ml-auto flex flex-col-reverse items-end gap-1 sm:order-none sm:flex-row sm:items-center sm:gap-2">
+      {/* no celular o ⋯ fica ancorado no canto superior direito do card,
+          com o status logo abaixo dele (mesma leitura do ⋯ do card de
+          dupla); em sm+ a fileira volta pro fim da linha, alinhada ao
+          texto */}
+      <div className="absolute right-4 top-2.5 flex flex-col-reverse items-end gap-1 sm:static sm:order-none sm:ml-auto sm:flex-row sm:items-center sm:gap-2">
         {aval && (
           <VerAvaliacaoButton
             quiet
