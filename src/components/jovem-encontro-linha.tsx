@@ -133,7 +133,7 @@ export function EncontroLinha({
           do card da dupla): a linha própria com ps-12 deixava o botão
           solto no meio do card. Em sm+ a fileira volta a crescer à
           direita, alinhada ao texto */}
-      <div className="order-2 ml-auto flex flex-wrap items-start justify-end gap-2 sm:order-none sm:items-center">
+      <div className="order-2 ml-auto flex flex-col-reverse items-end gap-1 sm:order-none sm:flex-row sm:items-center sm:gap-2">
         {aval && (
           <VerAvaliacaoButton
             quiet
@@ -142,19 +142,6 @@ export function EncontroLinha({
             label={<Estrelas n={aval.estrelas} size={13} />}
           />
         )}
-        {/* 530: uma decisiva à vista + ⋯ — EncontroLinhaAcoes carrega as
-            mesmas réguas dos botões que a fileira tinha soltos (janela do
-            Entrar, DPP-only do remarcar/editar link, trio do vencido,
-            retroativo dele). Sem gesto rende nada e sobra o status */}
-        <EncontroLinhaAcoes
-          e={e}
-          agora={agora}
-          duplaAtiva={duplaAtiva}
-          trilha={trilha}
-          meId={meId}
-          futuro={futuro}
-          sugestoes={sugestoes}
-        />
         {/* 507: sem a dupla viva o gesto não se sustenta — a pergunta do
             badge vira o status. O realizado não carimba "Aconteceu" de
             novo e os demais seguem a tabela de status */}
@@ -171,6 +158,19 @@ export function EncontroLinha({
             {st.rotulo}
           </Badge>
         )}
+        {/* 530: uma decisiva à vista + ⋯ — EncontroLinhaAcoes carrega as
+            mesmas réguas dos botões que a fileira tinha soltos (janela do
+            Entrar, DPP-only do remarcar/editar link, trio do vencido,
+            retroativo dele). Sem gesto rende nada e sobra o status */}
+        <EncontroLinhaAcoes
+          e={e}
+          agora={agora}
+          duplaAtiva={duplaAtiva}
+          trilha={trilha}
+          meId={meId}
+          futuro={futuro}
+          sugestoes={sugestoes}
+        />
       </div>
     </div>
   );
