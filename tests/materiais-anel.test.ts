@@ -3,10 +3,12 @@
 // ABAIXO dos filhos opacos (a capa bg-[var(--ict)] e a lombada cobriam o
 // contorno) — o anel "abraçava uma div interna". O padrão local virou
 // outline com offset negativo, que pinta por cima dos filhos e segue o
-// radius. InstrumentoCard e MaterialCard são funções privadas do page
-// server component, então o assert é de fonte, escopado por bloco: os
-// três pontos do padrão (shell do gesto, tira "Ler o guia", âncora do
-// MaterialCard) carregam outline e nenhum volta a ring-inset.
+// radius. InstrumentoCard é função privada do page server component e o
+// MaterialCard virou componente compartilhado (spec 029 — a mesma
+// anatomia serve staff e jovem), então o assert é de fonte, escopado
+// por bloco em cada arquivo: os três pontos do padrão (shell do gesto,
+// tira "Ler o guia", âncora do MaterialCard) carregam outline e nenhum
+// volta a ring-inset.
 
 import { readFileSync } from "node:fs";
 import path from "node:path";
@@ -14,6 +16,11 @@ import { describe, expect, it } from "vitest";
 
 const SRC = readFileSync(
   path.join(process.cwd(), "src/app/(jovem)/jovem/materiais/page.tsx"),
+  "utf8"
+);
+
+const SRC_CARD = readFileSync(
+  path.join(process.cwd(), "src/components/material-card.tsx"),
   "utf8"
 );
 
@@ -61,7 +68,11 @@ describe("anel do card-estante (022/US1)", () => {
   });
 
   it("a âncora do MaterialCard troca ring-inset por outline", () => {
-    const ancora = bloco('href={href}', "{capa}");
+    // o card compartilhado (spec 029) concentra a classe do link no
+    // linkCls — é lá que o anel mora, sobre a capa opaca
+    const i = SRC_CARD.indexOf("const linkCls");
+    expect(i).toBeGreaterThan(-1);
+    const ancora = SRC_CARD.slice(i, SRC_CARD.indexOf(";", i));
     expect(ancora).not.toContain("ring-inset");
     expect(ancora).toContain("focus-visible:outline-2");
     expect(ancora).toContain("focus-visible:-outline-offset-2");

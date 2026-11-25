@@ -283,15 +283,28 @@ test.describe("demo — Materiais do mentorado", () => {
     await expect(jornada.locator('a[href^="/f/"]')).toHaveCount(0);
   });
 
-  test("acervo em grade: 1 coluna no celular, 2 no tablet, 3 no desktop", async ({
+  test("acervo em grade: Cartões explícito → 1 coluna no celular, 2 no tablet, 3 no desktop", async ({
     page,
   }) => {
     await entrarNaDemo(page, "mentorado");
     await page.goto("/jovem/materiais");
 
+    const acervo = page.locator("section#acervo");
+    // spec 029: o default do mobile virou Lista — a grade existe nas duas
+    // views, mas só é medida com Cartões escolhido de propósito (a escolha
+    // explícita vence o viewport em qualquer largura)
+    await acervo
+      .getByRole("group", { name: "Modo de visualização" })
+      .getByRole("button", { name: "Cartões" })
+      .click();
+    await expect(
+      acervo
+        .getByRole("group", { name: "Modo de visualização" })
+        .getByRole("button", { name: "Cartões" })
+    ).toHaveAttribute("aria-pressed", "true");
+
     // a grade dos prontos — no dataset demo o grupo visível é "Links"
     // (2 materiais); os demais entram nos mesmos contêineres de grid
-    const acervo = page.locator("section#acervo");
     const grupoLinks = acervo.locator("section", {
       has: page.getByRole("heading", { name: "Links", exact: true }),
     });

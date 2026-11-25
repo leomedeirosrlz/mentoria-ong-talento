@@ -2551,6 +2551,22 @@ export function formatDiaNum(iso: string | null | undefined): string {
   return d.toLocaleDateString("pt-BR", { day: "2-digit", timeZone: TZ });
 }
 
+/** "4 de nov." — dia + mês abreviado COM o ponto do Intl (a abreviação é
+ *  parte do formato: "nov." não é pontuação da frase). Compacto pro
+ *  summary do <details> das estações futuras e dos materiais trancados
+ *  do acervo — saiu da página de materiais do jovem (spec 029) pra
+ *  servir a trilha e a biblioteca. */
+export function diaMesCurto(iso: string | null | undefined): string {
+  if (!iso) return "";
+  const d = paraData(iso);
+  if (isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("pt-BR", {
+    day: "numeric",
+    month: "short",
+    timeZone: TZ,
+  });
+}
+
 /** "set" — mês abreviado sem o ponto que o Intl pt-BR devolve ("set."). */
 export function formatMesAbrev(iso: string | null | undefined): string {
   if (!iso) return "";
