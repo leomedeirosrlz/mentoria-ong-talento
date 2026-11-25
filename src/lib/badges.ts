@@ -6,10 +6,10 @@ import type {
 } from "./conquistas";
 import type { EstacaoChave } from "./jornada";
 
-// Ilustração isométrica de cada glifo de conquista (016): o slug do
-// arquivo em public/badges, gerado por scripts/gerar-badges.mjs. Glifo sem
-// entrada (estação nova, por exemplo) fica com o emblema squircle — o
-// mesmo fallback de quando o arquivo não carrega.
+// Qual selo isométrico veste cada glifo de conquista (REALIZA-529). O id é
+// o `name` do Icon em src/lib/selos (arte desenhada com o kit
+// fun-isometric e animada no canvas). Glifo sem entrada fica com o emblema
+// squircle — o mesmo fallback de antes.
 
 const PHOSPHOR: Record<ConquistaPhosphor, string> = {
   flag: "marco-primeiro",
@@ -39,31 +39,25 @@ const NIVEL: Record<NivelChave, string> = {
   completa: "nivel-completa",
 };
 
-/** Caminho público da ilustração do glifo — null quando não há desenho. */
+/** O id do selo do glifo — null quando não há desenho. */
 export function arteDoGlifo(glifo: ConquistaGlifo): string | null {
-  const slug =
-    glifo.tipo === "phosphor"
-      ? PHOSPHOR[glifo.nome]
-      : glifo.tipo === "nivel"
-        ? NIVEL[glifo.chave]
-        : glifo.tipo === "familia"
-          ? `fam-${glifo.familia}-${glifo.tier}`
-          : ESTACAO[glifo.chave];
-  return slug ? `/badges/${slug}.svg` : null;
+  return glifo.tipo === "phosphor"
+    ? PHOSPHOR[glifo.nome]
+    : glifo.tipo === "nivel"
+      ? NIVEL[glifo.chave]
+      : glifo.tipo === "familia"
+        ? `fam-${glifo.familia}-${glifo.tier}`
+        : (ESTACAO[glifo.chave] ?? null);
 }
 
-/** Todos os caminhos registrados — o teste confere que cada um existe. */
+/** Todos os ids registrados — o teste confere que cada um tem desenho. */
 export const ARTES_REGISTRADAS: readonly string[] = [
-  ...new Set(
-    [
-      ...Object.values(PHOSPHOR),
-      ...Object.values(ESTACAO),
-      ...Object.values(NIVEL),
-      ...Object.entries(FAMILIA_TIERS).flatMap(([fam, n]) =>
-        Array.from({ length: n }, (_, i) => `fam-${fam}-${i + 1}`)
-      ),
-    ]
-      .filter((s): s is string => !!s)
-      .map((s) => `/badges/${s}.svg`)
-  ),
+  ...new Set([
+    ...Object.values(PHOSPHOR),
+    ...Object.values(ESTACAO),
+    ...Object.values(NIVEL),
+    ...Object.entries(FAMILIA_TIERS).flatMap(([fam, n]) =>
+      Array.from({ length: n }, (_, i) => `fam-${fam}-${i + 1}`)
+    ),
+  ]),
 ];
