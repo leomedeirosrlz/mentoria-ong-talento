@@ -1,32 +1,17 @@
 import {
   CalendarBlank,
-  CalendarDots,
   CheckCircle,
-  VideoCamera,
   XCircle,
 } from "@phosphor-icons/react/dist/ssr";
 import { Badge } from "@/components/ui/badge";
-import { Button, buttonVariants } from "@/components/ui/button";
 import {
   VerAvaliacaoButton,
   type AvaliacaoFeita,
 } from "@/components/jovem-avaliacoes";
-import { JovemAgendarDialog } from "@/components/jovem-agendar-dialog";
-import { JovemRetroativoDialog } from "@/components/jovem-retroativo-dialog";
-import { EditarLinkDialog } from "@/components/editar-link-dialog";
-import {
-  AconteceuJovem,
-  DesmarcarEncontroJovem,
-  DesfazerRetroativoJovem,
-  NaoAconteceuJovem,
-} from "@/components/jovem-encontro-acoes";
+import { EncontroLinhaAcoes } from "@/components/jovem-encontro-acoes-menu";
+import type { SeletorSugestoes } from "@/components/seletor-dia-hora";
 import { Estrelas } from "@/components/estrelas";
-import {
-  formatDateTime,
-  linkSeguro,
-  maxEncontros,
-  podeEntrarAgora,
-} from "@/lib/ciclo";
+import { formatDateTime } from "@/lib/ciclo";
 import type { JovemEncontro } from "@/lib/queries-jovem";
 import { cn } from "@/lib/utils";
 
@@ -64,6 +49,7 @@ export function EncontroLinha({
   nota,
   meId,
   temMedia = true,
+  sugestoes = null,
 }: {
   e: JovemEncontro;
   futuro?: boolean;
@@ -95,32 +81,19 @@ export function EncontroLinha({
   /** a dupla já tem o lote da média (≥3 respostas) — a copy do toggle no
    *  detalhe da avaliação não promete média que não existe (027/FR-003). */
   temMedia?: boolean;
+  /** Pacote do motor — vai pro remarcar do DPP (chips de dia/hora). Só a
+   *  dupla DPP ativa tem pacote; as demais linhas recebem null. */
+  sugestoes?: SeletorSugestoes | null;
 }) {
   const st = STATUS[e.status];
   const quando = e.status === "realizado" && e.realizado_em ? e.realizado_em : e.data_hora;
-  // agendado futuro = remarcar/desmarcar (0072). Só status 'agendado' — é o
-  // único que as RPCs movem (remarcado/legado não ganha botão: recusariam)
-  const agendadoFuturo =
-    e.status === "agendado" &&
-    duplaAtiva &&
-    e.data_hora != null &&
-    new Date(e.data_hora).getTime() > agora;
   // "agendado" com o horário vencido não é mais um plano — é uma pendência.
-  // Com a dupla viva o trio da seção do topo mora aqui também (507); sem
-  // ela fica a pergunta do badge, como status
+  // Com a dupla viva o trio da seção do topo mora no EncontroLinhaAcoes
+  // (507); sem ela fica a pergunta do badge, como status
   const passadoSemDesfecho =
     e.status === "agendado" &&
     e.data_hora != null &&
     new Date(e.data_hora).getTime() <= agora;
-  // retroativo do jovem (0207): o realizado que ELE criou é editável
-  // (corrigir data) e desfazível enquanto o mentor não registra — o gate
-  // de verdade mora na RPC; aqui o affordance é por autoria
-  const retroDele =
-    e.status === "realizado" &&
-    duplaAtiva &&
-    trilha !== "especialista" &&
-    meId != null &&
-    e.created_by === meId;
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5 px-4 py-2.5 sm:px-5">
       <span
@@ -161,58 +134,6 @@ export function EncontroLinha({
           empurrava pro canto e deixava o buraco à esquerda; badge/strela
           que ainda cabe segue na mesma linha. Em sm+ volta pra direita */}
       <div className="flex flex-wrap items-center justify-start gap-2 ps-12 sm:ms-auto sm:justify-end sm:ps-0">
-        {/* Entrar é a ação decisiva só na janela da chamada (QW5: 30 min
-            antes até 2 h depois — mesma régua da home e da ficha). Fora
-            dela o link segue acessível, mas discreto. */}
-        {futuro &&
-          linkSeguro(e.link) &&
-          (podeEntrarAgora(e.data_hora, agora) ? (
-            <a
-              href={linkSeguro(e.link)!}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={buttonVariants({ variant: "default", size: "sm" })}
-            >
-              <VideoCamera size={15} aria-hidden />
-              Entrar
-              <span className="sr-only"> na chamada (abre em nova aba)</span>
-            </a>
-          ) : (
-            <a
-              href={linkSeguro(e.link)!}
-              target="_blank"
-              rel="noopener noreferrer"
-              className={buttonVariants({ variant: "outline", size: "sm" })}
-            >
-              <VideoCamera size={15} aria-hidden />
-              Link da chamada
-              <span className="sr-only"> (abre em nova aba)</span>
-            </a>
-          ))}
-        {/* o lápis troca só o link e só em agendado futuro (a action roteia
-            o jovem pela RPC da 0072, DPP-only — ela recusa a linha já
-            vencida) */}
-        {agendadoFuturo && trilha !== "especialista" && (
-          <EditarLinkDialog encontroId={e.id} linkAtual={e.link} />
-        )}
-        {agendadoFuturo && (
-          <>
-            {trilha !== "especialista" && (
-              <JovemAgendarDialog
-                duplaId={e.dupla_id}
-                numero={e.numero}
-                atual={e}
-                trigger={
-                  <Button variant="outline" size="sm">
-                    <CalendarDots size={15} aria-hidden />
-                    Remarcar
-                  </Button>
-                }
-              />
-            )}
-            <DesmarcarEncontroJovem encontroId={e.id} />
-          </>
-        )}
         {aval && (
           <VerAvaliacaoButton
             quiet
@@ -221,55 +142,31 @@ export function EncontroLinha({
             label={<Estrelas n={aval.estrelas} size={13} />}
           />
         )}
-        {retroDele && (
-          <>
-            <JovemRetroativoDialog
-              duplaId={e.dupla_id}
-              atual={e}
-              trigger={
-                <Button variant="ghost" size="sm">
-                  Corrigir
-                </Button>
-              }
-            />
-            <DesfazerRetroativoJovem encontroId={e.id} />
-          </>
-        )}
-        {/* 507: o vencido com dupla ativa recebe aqui o trio da seção
-            "Precisa de você" — mesmas RPCs e mesmos gates (o "Aconteceu"
-            some no passo final, Remarcar é DPP-only). Sem a dupla viva o
-            gesto não se sustenta: a pergunta do badge vira o status. O
-            realizado não carimba "Aconteceu" de novo (ser o que é já
-            basta) e os demais seguem a tabela de status */}
-        {e.status === "realizado" ? null : passadoSemDesfecho && duplaAtiva ? (
-          <>
-            {e.numero <
-              maxEncontros(
-                trilha === "especialista" ? "especialista" : "dpp"
-              ) && <AconteceuJovem encontroId={e.id} variant="outline" />}
-            {trilha !== "especialista" && (
-              <JovemAgendarDialog
-                duplaId={e.dupla_id}
-                numero={e.numero}
-                atual={e}
-                trigger={
-                  <Button variant="ghost" size="sm">
-                    <CalendarDots size={15} aria-hidden />
-                    Remarcar
-                  </Button>
-                }
-              />
-            )}
-            <NaoAconteceuJovem encontroId={e.id} />
-          </>
-        ) : passadoSemDesfecho ? (
+        {/* 530: uma decisiva à vista + ⋯ — EncontroLinhaAcoes carrega as
+            mesmas réguas dos botões que a fileira tinha soltos (janela do
+            Entrar, DPP-only do remarcar/editar link, trio do vencido,
+            retroativo dele). Sem gesto rende nada e sobra o status */}
+        <EncontroLinhaAcoes
+          e={e}
+          agora={agora}
+          duplaAtiva={duplaAtiva}
+          trilha={trilha}
+          meId={meId}
+          futuro={futuro}
+          sugestoes={sugestoes}
+        />
+        {/* 507: sem a dupla viva o gesto não se sustenta — a pergunta do
+            badge vira o status. O realizado não carimba "Aconteceu" de
+            novo e os demais seguem a tabela de status */}
+        {e.status === "realizado" ? null : passadoSemDesfecho &&
+          !duplaAtiva ? (
           <Badge
             variant="outline"
             className="border-[var(--warn)]/50 text-[var(--warn-text)]"
           >
             Aconteceu?
           </Badge>
-        ) : (
+        ) : passadoSemDesfecho ? null : (
           <Badge variant="outline" className={st.cls}>
             {st.rotulo}
           </Badge>

@@ -8,6 +8,7 @@ import {
   limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
+  preencherDiaHora,
   relogar,
   test,
   confirmarNoDialogAgendar,
@@ -35,8 +36,8 @@ test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app")
 
 /** Agendado direto no banco na dupla fixture — piso dos gestos de link e
  *  remarcação (o teste não exercita o agendar). `emDiasFuturo` negativo cria
- *  o "agendado que já passou" do limbo. Data truncada no MINUTO: o
- *  datetime-local não carrega segundos e a action lê o valor naïve como
+ *  o "agendado que já passou" do limbo. Data truncada no MINUTO: o par
+ *  dia/hora não carrega segundos e a action lê o valor naïve como
  *  -03:00 — uma sobra de :42s marcaria a data como "mudada" num re-submit. */
 function criarAgendado(numero: number, emDiasFuturo: number, link?: string) {
   const ms = Math.floor((Date.now() + emDiasFuturo * 86400e3) / 60000) * 60000;
@@ -50,7 +51,8 @@ function criarAgendado(numero: number, emDiasFuturo: number, link?: string) {
   });
 }
 
-/** "YYYY-MM-DDTHH:mm" pro datetime-local — sempre relativo a agora. */
+/** "YYYY-MM-DDTHH:mm" — sempre relativo a agora; fatiado em dia+hora pros
+ *  campos nativos do SeletorDiaHora (530, sem datetime-local). */
 function emDias(dias: number, hora = "19:00") {
   const d = new Date(Date.now() + dias * 86400e3);
   const p = (n: number) => String(n).padStart(2, "0");
@@ -146,7 +148,7 @@ test.describe("mentor DPP — fluxos reais", () => {
     // exercitar o agendamento de verdade; o cleanup no afterEach desfaz.
     const futuro = new Date(Date.now() + 3 * 86400e3);
     const ymd = `${futuro.getFullYear()}-${String(futuro.getMonth() + 1).padStart(2, "0")}-${String(futuro.getDate()).padStart(2, "0")}`;
-    await dialog.locator("#data_hora").fill(`${ymd}T19:00`);
+    await preencherDiaHora(dialog, `${ymd}T19:00`);
 
     await confirmarNoDialogAgendar(dialog, "Confirmar agendamento");
 
@@ -160,9 +162,9 @@ test.describe("mentor DPP — fluxos reais", () => {
   });
 
   test.describe("link da chamada e remarcação por linha (REALIZA-23)", () => {
-    // o datetime-local é naïve e a action interpreta como -03:00 — browser
-    // fora do fuso de SP reescreveria o instante num re-submit e a RPC
-    // cobraria motivo à toa (mesmo guard do jovem-agenda)
+    // os campos dia/hora são naïve e a action interpreta como -03:00 —
+    // browser fora do fuso de SP reescreveria o instante num re-submit e
+    // a RPC cobraria motivo à toa (mesmo guard do jovem-agenda)
     test.use({ timezoneId: "America/Sao_Paulo" });
 
     test.beforeEach(async () => {
@@ -212,9 +214,10 @@ test.describe("mentor DPP — fluxos reais", () => {
       await expect(page.getByText("Link atualizado.")).toBeVisible({ timeout: 15_000 });
       await expect(dialog).not.toBeVisible({ timeout: 15_000 });
 
-      // o chip "Entrar na chamada" aponta o link novo
+      // o chip da chamada aponta o link novo — fora da janela do encontro
+      // o rótulo é "Link da chamada" (QW5), não "Entrar na chamada"
       await expect(
-        linha.getByRole("link", { name: /Entrar na chamada/ })
+        linha.getByRole("link", { name: /^(Entrar na|Link da) chamada$/ })
       ).toHaveAttribute("href", "https://meet.google.com/e2e-ficha", {
         timeout: 15_000,
       });
@@ -246,7 +249,7 @@ test.describe("mentor DPP — fluxos reais", () => {
       const linha = linhaFicha(page, String(enc.id));
       await abrirProximosSePreciso(linha, page);
       await expect(
-        linha.getByRole("link", { name: /Entrar na chamada/ })
+        linha.getByRole("link", { name: /^(Entrar na|Link da) chamada$/ })
       ).toHaveAttribute("href", "https://meet.google.com/e2e-velho");
 
       await linha
@@ -265,7 +268,7 @@ test.describe("mentor DPP — fluxos reais", () => {
 
       // chip some da linha, lápis fica — sem link o gesto vira "adicionar"
       await expect(
-        linha.getByRole("link", { name: /Entrar na chamada/ })
+        linha.getByRole("link", { name: /^(Entrar na|Link da) chamada$/ })
       ).toHaveCount(0, { timeout: 15_000 });
       await expect(
         linha.getByRole("button", { name: "Editar link da chamada" })
@@ -300,7 +303,7 @@ test.describe("mentor DPP — fluxos reais", () => {
       ).toBeVisible();
 
       const alvo = emDias(6);
-      await dialog.locator("#data_hora").fill(alvo);
+      await preencherDiaHora(dialog, alvo);
       // a data mudou → o hint some e o motivo passa a ser exigido
       await expect(
         dialog.getByText("Só precisa se mudar a data.")

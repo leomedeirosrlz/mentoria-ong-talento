@@ -43,6 +43,7 @@ export function JovemAgendarSugestao({
   sugestoes,
   titulo = "Próximo passo",
   plano,
+  retro,
 }: {
   duplaId: string;
   /** Nº pré-selecionado — o próximo livre depois do último realizado. */
@@ -56,6 +57,9 @@ export function JovemAgendarSugestao({
   /** "Sua semana" (combinado da dupla) — extensão do hero, como a
    *  `plano` da Casca dos demais ramos do ProximoEncontro. */
   plano?: ReactNode;
+  /** Caminho do "já aconteceu" — o Registrar encontro do header mora
+   *  também na fileira de gestos do cartão (530). */
+  retro?: ReactNode;
 }) {
   const router = useRouter();
   const [pending, start] = useTransition();
@@ -209,6 +213,7 @@ export function JovemAgendarSugestao({
             >
               Escolher outro dia
             </Button>
+            {retro}
           </div>
           {aviso && (
             <p role="status" className="mt-2 text-sm text-destructive">

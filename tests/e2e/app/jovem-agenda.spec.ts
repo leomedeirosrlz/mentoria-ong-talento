@@ -1,5 +1,6 @@
 import type { Locator, Page } from "@playwright/test";
 import {
+  abrirMenuEncontro,
   agirComConfirma,
   appEnvOk,
   atualizarViaServiceRole,
@@ -11,6 +12,7 @@ import {
   limparEncontrosDaDupla,
   limparViaServiceRole,
   loginComSenha,
+  preencherDiaHora,
   restComoUsuario,
   test,
 } from "../helpers";
@@ -49,7 +51,8 @@ const TIPOS_AGENDA = [
 
 test.skip(!appEnvOk(), "sem credenciais de teste (E2E_*) — pula specs de app");
 
-/** "YYYY-MM-DDTHH:mm" pro datetime-local — sempre relativo a agora. */
+/** "YYYY-MM-DDTHH:mm" — sempre relativo a agora; o spec fatia em dia+hora
+ *  pros campos nativos do SeletorDiaHora (530, sem datetime-local). */
 function emDias(dias: number, hora = "19:00") {
   const d = new Date(Date.now() + dias * 86400e3);
   const p = (n: number) => String(n).padStart(2, "0");
@@ -175,7 +178,7 @@ async function convergirPiso() {
 /** Agendado direto no banco — piso dos fluxos que não exercitam o agendar
  *  em si (remarcar, desmarcar, não aconteceu, guardas). `emDiasFuturo`
  *  negativo cria o "agendado que já passou" do botão Não aconteceu.
- *  A data é truncada no MINUTO: o datetime-local não carrega segundos e a
+ *  A data é truncada no MINUTO: o par dia/hora não carrega segundos e a
  *  action interpreta o valor naïve como -03:00 — um timestamp com :42s não
  *  sobreviveria a um re-submit inalterado (a RPC veria a data "mudada" e
  *  cobraria motivo). As rows que o app grava já nascem com :00s — o
@@ -200,9 +203,9 @@ async function entrarComoJovem(page: Page) {
 }
 
 test.describe("mentorado — agenda livre (REALIZA-110)", () => {
-  // o datetime-local é naïve e a action interpreta como -03:00 — browser
-  // fora do fuso de SP (ex.: runner UTC) reescreveria o instante num
-  // re-submit "sem mudar a data" e a RPC cobraria motivo à toa
+  // os campos dia/hora são naïve e a action interpreta como -03:00 —
+  // browser fora do fuso de SP (ex.: runner UTC) reescreveria o instante
+  // num re-submit "sem mudar a data" e a RPC cobraria motivo à toa
   test.use({ timezoneId: "America/Sao_Paulo" });
   test.beforeEach(convergirPiso);
   test.afterEach(convergirPiso);
@@ -214,18 +217,21 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     await page.goto("/jovem/agenda");
 
     const dialog = page.getByRole("dialog");
+    // 530: com sugestão no topo o CTA "Agendar encontro" do header some —
+    // o caminho real é "Escolher outro dia" do hero (abre o seletor do
+    // encontro sugerido) e o "Outro encontro" revela o select de nº
     await agirComConfirma(
-      () => page.getByRole("button", { name: "Agendar encontro" }).click(),
+      () => page.getByRole("button", { name: "Escolher outro dia" }).click(),
       () => dialog.isVisible()
     );
 
     // o Select lista os nº livres (8 e 16 estão nas fixtures) — pro jovem o
     // hint de data oficial não chega (ciclo_eventos é RLS-vazio pra ele)
-    await dialog.locator("#numero-select").click();
+    await dialog.getByRole("button", { name: "Outro encontro" }).click();
+    await dialog.getByRole("combobox", { name: "Qual encontro?" }).click();
     await page.getByRole("option", { name: /^6º encontro/ }).click();
 
-    await dialog.locator("#data_hora").fill(emDias(7));
-    await dialog.locator("#link").fill("https://meet.google.com/e2e-agenda");
+    await preencherDiaHora(dialog, emDias(7));
     await dialog
       .getByRole("button", { name: "Confirmar agendamento" })
       .click();
@@ -235,7 +241,8 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     });
     await expect(dialog).not.toBeVisible({ timeout: 15_000 });
 
-    // a linha nova cai em Próximos — com o "Entrar" do link opcional
+    // a linha nova cai em Próximos — o link entra depois pelo ⋯ (530: a
+    // sugestão é o fluxo enxuto, "Editar link da chamada" é gesto dela)
     const proximos = page.locator(
       'section[aria-labelledby="agenda-proximos"]'
     );
@@ -243,9 +250,23 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     await expect(linha6.getByText("Agendado")).toBeVisible({
       timeout: 15_000,
     });
+    await abrirMenuEncontro(page, linha6);
+    await page
+      .getByRole("menuitem", { name: "Editar link da chamada" })
+      .click();
+    await dialog.locator("#link").fill("https://meet.google.com/e2e-agenda");
+    await dialog.getByRole("button", { name: "Salvar" }).click();
+    await expect(page.getByText("Link atualizado.")).toBeVisible({
+      timeout: 15_000,
+    });
+    await expect(dialog).not.toBeVisible({ timeout: 15_000 });
+    await abrirMenuEncontro(page, linha6);
     await expect(
-      linha6.getByRole("link", { name: /Entrar/ })
-    ).toBeVisible({ timeout: 15_000 });
+      page.getByRole("menuitem", { name: "Link da chamada", exact: true })
+    ).toHaveAttribute("href", "https://meet.google.com/e2e-agenda", {
+      timeout: 15_000,
+    });
+    await page.keyboard.press("Escape");
 
     // write real: row agendada na dupla, com autoria do jovem
     const rows = await buscarViaServiceRole<
@@ -301,7 +322,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
       await expect(dialog.locator("#numero-select")).toContainText(
         "1º encontro"
       );
-      await dialog.locator("#data_hora").fill(emDias(7));
+      await preencherDiaHora(dialog, emDias(7));
       await dialog
         .getByRole("button", { name: "Confirmar agendamento" })
         .click();
@@ -339,7 +360,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
       () => dialog.isVisible()
     );
 
-    await dialog.locator("#data_hora").fill(emDias(14));
+    await preencherDiaHora(dialog, emDias(14));
     // a data mudou → o hint some e o motivo passa a ser exigido
     await expect(
       dialog.getByText("Só precisa se mudar a data.")
@@ -433,9 +454,13 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
       'section[aria-labelledby="agenda-proximos"]'
     );
     const dialog = page.getByRole("dialog");
+    // "Desmarcar" mora no ⋯ da linha — a primária do agendado sem link é
+    // o "Remarcar" (530)
     await agirComConfirma(
       () =>
-        linha(proximos, 10).getByRole("button", { name: "Desmarcar" }).click(),
+        abrirMenuEncontro(page, linha(proximos, 10)).then(() =>
+          page.getByRole("menuitem", { name: "Desmarcar" }).click()
+        ),
       () =>
         dialog
           .getByRole("heading", { name: "Desmarcar o encontro?" })
@@ -470,16 +495,17 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     await entrarComoJovem(page);
     await page.goto("/jovem/agenda");
 
-    // agendado vencido cai no histórico — o botão é o "Não aconteceu"
+    // agendado vencido cai no histórico — "Não aconteceu" mora no ⋯ da
+    // linha (a primária do limbo é o "Aconteceu", 530)
     const historico = page.locator(
       'section[aria-labelledby="agenda-historico"]'
     );
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
       () =>
-        linha(historico, 6)
-          .getByRole("button", { name: "Não aconteceu" })
-          .click(),
+        abrirMenuEncontro(page, linha(historico, 6)).then(() =>
+          page.getByRole("menuitem", { name: "Não aconteceu" }).click()
+        ),
       () =>
         dialog
           .getByRole("heading", { name: "O encontro não aconteceu?" })
@@ -525,26 +551,21 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     const historico = page.locator(
       'section[aria-labelledby="agenda-historico"]'
     );
-    // confirma no estado final, não no toast (passageiro): "Avaliar" só
-    // aparece quando o write virou realizado. O click tem teto próprio —
-    // o botão desabilita em "Salvando…" enquanto a action roda e um
-    // click sem timeout esperaria nela em vez de pollar
-    const avaliar = linha(historico, 7).getByRole("button", {
-      name: "Avaliar",
+    // confirma no estado final, não no toast (passageiro): o agendado do
+    // jovem vira realizado DELE (created_by=jovem → retroDele) e a linha
+    // ganha o "Corrigir" à vista — a pendência "Avaliar" não serve de
+    // régua porque pode cair no "e mais N" colapsado. O click tem teto
+    // próprio — um click sem timeout esperaria no botão preso
+    const corrigir = linha(historico, 7).getByRole("button", {
+      name: "Corrigir",
     });
     await agirComConfirma(
       () =>
         linha(historico, 7)
           .getByRole("button", { name: "Aconteceu", exact: true })
           .click({ timeout: 5_000 }),
-      () => avaliar.isVisible()
+      () => corrigir.isVisible()
     );
-    // a confirmação durável é o badge da linha — o toast nasce antes do
-    // router.refresh() e expira nele em staging frio (por isso a convenção
-    // do spec de confirmar no estado final, não no passageiro)
-    await expect(
-      linha(historico, 7).getByText("Aconteceu", { exact: true })
-    ).toBeVisible({ timeout: 15_000 });
 
     const [row] = await buscarViaServiceRole<
       { status: string; realizado_em: string | null; data_hora: string }[]
@@ -569,7 +590,13 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
         "notificacoes",
         `select=titulo,corpo,href&profile_id=eq.${IDS.mentorProfile}&tipo=eq.lembrete`
       )
-    ).filter((n) => /confirmou o 7º encontro$/.test(n.titulo));
+    ).filter(
+      (n) =>
+        /confirmou o 7º encontro$/.test(n.titulo) &&
+        // runs anteriores falhas deixam lembretes órfãos do mesmo título —
+        // o href ancora no encontro DESTA run
+        n.href === `/duplas/${DUPLA_ID}#registrar-${String(enc.id)}`
+    );
     expect(lembretes).toHaveLength(1);
     expect(lembretes[0]!.href).toBe(
       `/duplas/${DUPLA_ID}#registrar-${String(enc.id)}`
@@ -688,7 +715,7 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     const numero = titulo.match(/(\d+)º/)?.[1];
     expect(numero).toBeTruthy();
 
-    await dialog.locator("#data_hora").fill(naTerca(6));
+    await preencherDiaHora(dialog, naTerca(6));
     await dialog
       .getByRole("button", { name: "Confirmar agendamento" })
       .click();
@@ -731,9 +758,13 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     );
     const linha5 = linha(proximos, 5);
     const dialog = page.getByRole("dialog");
+    // o lápis mora no ⋯ da linha — a primária do agendado sem link é o
+    // "Remarcar" (530)
     await agirComConfirma(
       () =>
-        linha5.getByRole("button", { name: "Editar link da chamada" }).click(),
+        abrirMenuEncontro(page, linha5).then(() =>
+          page.getByRole("menuitem", { name: "Editar link da chamada" }).click()
+        ),
       () =>
         dialog
           .getByRole("heading", { name: "Editar link da chamada" })
@@ -748,12 +779,15 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
       timeout: 15_000,
     });
     await expect(dialog).not.toBeVisible({ timeout: 15_000 });
-    // o chip "Entrar" da linha aponta o link novo
+    // "Link da chamada" fora da janela vira item do ⋯ (530) — abre o
+    // menu e o href do menuitem aponta o link novo (+12d nunca é janela)
+    await abrirMenuEncontro(page, linha5);
     await expect(
-      linha5.getByRole("link", { name: /Entrar/ })
+      page.getByRole("menuitem", { name: "Link da chamada", exact: true })
     ).toHaveAttribute("href", "https://meet.google.com/e2e-jovem", {
       timeout: 15_000,
     });
+    await page.keyboard.press("Escape");
 
     // write real via RPC — a data não muda, então motivo não é cobrado
     const [row] = await buscarViaServiceRole<
@@ -786,20 +820,28 @@ test.describe("mentorado — agenda livre (REALIZA-110)", () => {
     await entrarComoJovem(page);
     await page.goto("/jovem/agenda");
 
-    // agendado vencido cai no histórico — ao lado do "Não aconteceu" agora
-    // mora o "Remarcar" (a RPC aceita fonte passada → alvo futuro)
+    // agendado vencido cai no histórico — o "Remarcar" mora no ⋯ da linha
+    // junto do "Não aconteceu" (a RPC aceita fonte passada → alvo futuro).
+    // A lista densa mostra só os 5 mais recentes: quando há mais, o nº4
+    // antigo pede o "Ver histórico completo" antes de localizar a linha
     const historico = page.locator(
       'section[aria-labelledby="agenda-historico"]'
     );
+    const verTudo = historico.getByRole("button", {
+      name: /Ver histórico completo/,
+    });
+    if (await verTudo.isVisible().catch(() => false)) await verTudo.click();
     const dialog = page.getByRole("dialog");
     await agirComConfirma(
       () =>
-        linha(historico, 4).getByRole("button", { name: "Remarcar" }).click(),
+        abrirMenuEncontro(page, linha(historico, 4)).then(() =>
+          page.getByRole("menuitem", { name: "Remarcar" }).click()
+        ),
       () =>
         dialog.getByRole("heading", { name: "4º encontro" }).isVisible()
     );
 
-    await dialog.locator("#data_hora").fill(emDias(9));
+    await preencherDiaHora(dialog, emDias(9));
     // data mudou → o hint some e o motivo passa a ser exigido
     await expect(
       dialog.getByText("Só precisa se mudar a data.")
@@ -878,10 +920,15 @@ test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
     await page.goto("/jovem/agenda");
 
     const dialog = page.getByRole("dialog");
+    // o gatilho do header encurtou pra "Registrar encontro" (530) e fica
+    // sempre visível — sem elegível o dialog abre o empty-state. O card
+    // "Próximo passo" pode render um gatilho irmão com o mesmo rótulo →
+    // .first() pega o do header (os dois abrem o mesmo dialog)
     await agirComConfirma(
       () =>
         page
-          .getByRole("button", { name: "Registrar encontro já realizado" })
+          .getByRole("button", { name: "Registrar encontro" })
+          .first()
           .click(),
       () =>
         dialog
@@ -893,7 +940,7 @@ test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
 
     await dialog.locator("#retro-numero-select").click();
     await page.getByRole("option", { name: "6º encontro" }).click();
-    await dialog.locator("#data_hora").fill(emDias(-3));
+    await preencherDiaHora(dialog, emDias(-3));
     await dialog
       .getByRole("button", { name: "Registrar encontro" })
       .click();
@@ -903,24 +950,26 @@ test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
     ).toBeVisible({ timeout: 15_000 });
     await expect(dialog).not.toBeVisible({ timeout: 15_000 });
 
-    // born-realizado no histórico: badge "Aconteceu", CTA Avaliar e os
-    // gestos do criador (Corrigir/Desfazer enquanto o mentor não registra)
+    // born-realizado no histórico: o realizado não carimba badge (o
+    // CheckCircle já diz) e a linha ganha os gestos do criador (Corrigir à
+    // vista / Desfazer no ⋯ — enquanto o mentor não registra). O
+    // "avaliável" se prova no avaliacao_links mintado pela 0071 (abaixo) —
+    // a pendência "Avaliar" pode cair no "e mais N" colapsado e não é
+    // régua confiável
     const historico = page.locator(
       'section[aria-labelledby="agenda-historico"]'
     );
     const linha6 = linha(historico, 6);
     await expect(
-      linha6.getByText("Aconteceu", { exact: true })
-    ).toBeVisible({ timeout: 15_000 });
-    await expect(
-      linha6.getByRole("button", { name: "Avaliar" })
-    ).toBeVisible();
-    await expect(
       linha6.getByRole("button", { name: "Corrigir" })
-    ).toBeVisible();
+    ).toBeVisible({ timeout: 15_000 });
+    // "Desfazer" mora no ⋯ da linha — a primária do retroativo dele é o
+    // "Corrigir" (530)
+    await abrirMenuEncontro(page, linha6);
     await expect(
-      linha6.getByRole("button", { name: "Desfazer" })
+      page.getByRole("menuitem", { name: "Desfazer" })
     ).toBeVisible();
+    await page.keyboard.press("Escape");
 
     // write real: realizado, origem externo, autoria do jovem — data e
     // realizado_em são o instante declarado
@@ -958,7 +1007,13 @@ test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
         "notificacoes",
         `select=titulo,corpo,href&profile_id=eq.${IDS.mentorProfile}&tipo=eq.lembrete`
       )
-    ).filter((n) => /registrou o 6º encontro$/.test(n.titulo));
+    ).filter(
+      (n) =>
+        /registrou o 6º encontro$/.test(n.titulo) &&
+        // lembretes órfãos de runs falhas dividem o título — o href
+        // ancora no encontro DESTA run
+        n.href === `/duplas/${DUPLA_ID}#registrar-${String(row.id)}`
+    );
     expect(lembretes).toHaveLength(1);
     expect(lembretes[0]!.href).toBe(
       `/duplas/${DUPLA_ID}#registrar-${String(row.id)}`
@@ -990,7 +1045,7 @@ test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
           .getByRole("heading", { name: "Corrigir a data do 7º encontro" })
           .isVisible()
     );
-    await dialog.locator("#data_hora").fill(emDias(-6));
+    await preencherDiaHora(dialog, emDias(-6));
     await dialog
       .getByRole("button", { name: "Salvar correção" })
       .click();
@@ -1013,11 +1068,18 @@ test.describe("mentorado — retroativo (REALIZA-437 / migration 0207)", () => {
       new Date(corrigido.data_hora).getTime()
     );
 
-    // Desfazer: a row sai e a avaliação/link vão junto (filhos NO ACTION)
-    await linha7.getByRole("button", { name: "Desfazer" }).click();
-    await expect(
-      dialog.getByRole("heading", { name: "Desfazer o registro?" })
-    ).toBeVisible();
+    // Desfazer (menu ⋯ da linha): a row sai e a avaliação/link vão junto
+    // (filhos NO ACTION)
+    await agirComConfirma(
+      () =>
+        abrirMenuEncontro(page, linha7).then(() =>
+          page.getByRole("menuitem", { name: "Desfazer" }).click()
+        ),
+      () =>
+        dialog
+          .getByRole("heading", { name: "Desfazer o registro?" })
+          .isVisible()
+    );
     await dialog
       .getByRole("button", { name: "Sim, desfazer" })
       .click();

@@ -1,25 +1,30 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { cloneElement, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { ClockCounterClockwise } from "@phosphor-icons/react";
 import { toast } from "@/lib/toast";
 import { registrarRetroativoJovem } from "@/lib/actions-jovem";
 import type { JovemEncontro } from "@/lib/queries-jovem";
+import { elementoReal } from "@/lib/elemento-lazy";
 import { Button } from "@/components/ui/button";
 import {
-  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
 } from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from "@/components/ui/select";
+import { SeletorDiaHora } from "@/components/seletor-dia-hora";
 
-/** datetime-local espera horário local — toISOString exibiria UTC (3h adiantado). */
-function paraInputLocal(d: Date): string {
+/** ISO → par civil local pro seletor (data "YYYY-MM-DD" + "HH:mm"). */
+function splitLocal(iso: string): { data: string; hora: string } {
+  const d = new Date(iso);
   const p = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+  return {
+    data: `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`,
+    hora: `${p(d.getHours())}:${p(d.getMinutes())}`,
+  };
 }
 
 /**
@@ -28,47 +33,114 @@ function paraInputLocal(d: Date): string {
  * hora e o mentor é avisado pra contar como foi no registro (segue devido).
  * Com `atual` vira a correção de data do retroativo que ele mesmo criou —
  * mesma RPC, upsert por (dupla,numero); o banco só deixa mexer enquanto o
- * mentor não registrou.
+ * mentor não registrou. O "quando foi" usa o SeletorDiaHora em modo
+ * retroativo (530): dois campos nativos, dia limitado a hoje pra trás.
  */
 export function JovemRetroativoDialog({
   duplaId,
   numeros,
   atual,
   trigger,
+  open: openProp,
+  onOpenChange,
 }: {
   duplaId: string;
   /** Candidatos do Select — nº sem row na agenda (criação). */
   numeros?: number[];
   /** Correção de um retroativo criado por ele — fixa o nº e pré-preenche a data. */
   atual?: JovemEncontro | null;
-  /** Elemento do trigger — cada ponto da UI escolhe a aparência. */
-  trigger: React.ReactElement;
+  /** Elemento do trigger — `null` suprime (o menu abre controlado). */
+  trigger?: React.ReactElement | null;
+  /** Modo controlado (opcional) — o ⋯ da linha abre o dialog direto. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const [numero, setNumero] = useState("");
-  const [quando, setQuando] = useState("");
+  const [openInterno, setOpenInterno] = useState(false);
+  const open = openProp ?? openInterno;
+  const [aviso, setAviso] = useState<string | null>(null);
   const [pending, start] = useTransition();
   const router = useRouter();
-  // teto do datetime-local: retroativo é sempre pra trás (o server revalida)
-  const agora = paraInputLocal(new Date());
   const numeroFixo = atual?.numero ?? null;
   const dataAtual = atual?.realizado_em ?? atual?.data_hora ?? null;
+  const semElegivel = !atual && numeros != null && numeros.length === 0;
 
-  function submit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const n = numeroFixo ?? (numero !== "" ? Number(numero) : null);
-    if (n == null) {
-      toast.error("Escolha qual encontro foi.");
-      return;
-    }
-    const local = String(new FormData(e.currentTarget).get("data_hora") ?? "");
-    if (!local) return;
-    // datetime-local é naïve — vai cru; o server lê como horário de SP
+  // estado fresco por abertura — o seletor reseta os campos na borda de
+  // subida; aqui cai o aviso de uma visita anterior
+  const [abertoAntes, setAbertoAntes] = useState(open);
+  if (open !== abertoAntes) {
+    setAbertoAntes(open);
+    if (open) setAviso(null);
+  }
+
+  function mudaOpen(o: boolean) {
+    setOpenInterno(o);
+    onOpenChange?.(o);
+  }
+
+  // o gatilho mora fora da superfície — o seletor já É o dialog/sheet
+  // trigger via RSC chega lazy — resolve antes de clonar (elementoReal)
+  const gatilho =
+    trigger === null
+      ? null
+      : cloneElement(
+          elementoReal(
+            trigger ?? (
+              <Button variant="outline" size="sm">
+                Registrar encontro
+              </Button>
+            )
+          ),
+          { onClick: () => mudaOpen(true), "aria-haspopup": "dialog" }
+        );
+
+  if (semElegivel) {
+    return (
+      <>
+        {gatilho}
+        <Dialog open={open} onOpenChange={mudaOpen}>
+          <DialogContent size="md">
+            <DialogHeader>
+              <DialogTitle>Registrar encontro que já aconteceu</DialogTitle>
+              <DialogDescription className="leading-relaxed">
+                Se vocês se encontraram sem agendar por aqui (combinaram por
+                WhatsApp, por exemplo), conte quando foi. O encontro já entra
+                como realizado e você pode avaliar na hora. Seu mentor é
+                avisado pra contar como foi no registro dele.
+              </DialogDescription>
+            </DialogHeader>
+            {/* sem passo elegível a copy não manda "pedir pro mentor" — ela
+                explica a fronteira: o que falta na lista é passo ainda não
+                vencido no guia ou o encontro de encerramento, e esses são
+                dele por desenho, não por falta de permissão do jovem */}
+            <p className="text-sm leading-relaxed text-muted-foreground">
+              Todos os encontros do guia que já venceram estão na sua agenda.
+              O que falta entrar é um passo que ainda não chegou no calendário
+              oficial ou o encontro de encerramento. Esse quem registra é o
+              seu mentor, que fecha a jornada com vocês.
+            </p>
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => mudaOpen(false)}
+              >
+                Entendi
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </>
+    );
+  }
+
+  function confirmar(data: string, hora: string, n: number) {
+    // o par civil vai naïve — o server lê como horário de SP
+    const local = `${data}T${hora}`;
     start(async () => {
       try {
         const res = await registrarRetroativoJovem(duplaId, n, local);
         if (res?.error) {
-          toast.error(res.error);
+          setAviso(res.error);
           return;
         }
         toast.success(
@@ -76,7 +148,7 @@ export function JovemRetroativoDialog({
             ? "Data corrigida."
             : `${n}º encontro registrado. Já dá pra avaliar.`
         );
-        setOpen(false);
+        mudaOpen(false);
         router.refresh();
       } catch {
         toast.error("Sem conexão. Tente de novo.");
@@ -85,117 +157,35 @@ export function JovemRetroativoDialog({
   }
 
   return (
-    <Dialog
-      open={open}
-      onOpenChange={(o) => {
-        setOpen(o);
-        if (o) {
-          setNumero("");
-          setQuando(dataAtual ? paraInputLocal(new Date(dataAtual)) : "");
-        } else {
-          setNumero("");
-          setQuando("");
+    <>
+      {gatilho}
+      <SeletorDiaHora
+        aberto={open}
+        onAberto={mudaOpen}
+        numero={numeroFixo ?? numeros?.[0] ?? 0}
+        numeros={atual ? [] : (numeros ?? [])}
+        encontroPrimario={!atual && (numeros?.length ?? 0) > 0}
+        idEncontro="retro-numero-select"
+        rotuloEncontro="Qual encontro foi"
+        modo="retroativo"
+        rotuloDia="Quando foi"
+        titulo={
+          atual
+            ? `Corrigir a data do ${numeroFixo}º encontro`
+            : "Registrar encontro que já aconteceu"
         }
-      }}
-    >
-      <DialogTrigger render={trigger} />
-      <DialogContent size="md">
-        <DialogHeader>
-          <DialogTitle>
-            {atual
-              ? `Corrigir a data do ${numeroFixo}º encontro`
-              : "Registrar encontro que já aconteceu"}
-          </DialogTitle>
-          <DialogDescription className="leading-relaxed">
-            {atual
-              ? "O encontro continua realizado, só com a data certa."
-              : "Se vocês se encontraram sem agendar por aqui (combinaram por WhatsApp, por exemplo), conte quando foi. O encontro já entra como realizado e você pode avaliar na hora. Seu mentor é avisado pra contar como foi no registro dele."}
-          </DialogDescription>
-        </DialogHeader>
-        {!atual && numeros && numeros.length === 0 ? (
-          /* sem passo elegível a copy não manda "pedir pro mentor" — ela
-             explica a fronteira: o que falta na lista é passo ainda não
-             vencido no guia ou o encontro de encerramento, e esses são
-             dele por desenho, não por falta de permissão do jovem */
-          <>
-          <p className="text-sm leading-relaxed text-muted-foreground">
-            Todos os encontros do guia que já venceram estão na sua agenda.
-            O que falta entrar é um passo que ainda não chegou no calendário
-            oficial ou o encontro de encerramento. Esse quem registra é o
-            seu mentor, que fecha a jornada com vocês.
-          </p>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-            >
-              Entendi
-            </Button>
-          </DialogFooter>
-          </>
-        ) : (
-        <form onSubmit={submit} className="space-y-4">
-          {!atual && numeros && numeros.length > 0 && (
-            <div className="space-y-2">
-              <Label id="retro-numero-label">Qual encontro foi</Label>
-              <Select
-                name="numero"
-                required
-                value={numero}
-                items={Object.fromEntries(
-                  numeros.map((n) => [String(n), `${n}º encontro`])
-                )}
-                onValueChange={(v) => setNumero(v ?? "")}
-              >
-                <SelectTrigger
-                  id="retro-numero-select"
-                  aria-labelledby="retro-numero-label retro-numero-select"
-                >
-                  <SelectValue placeholder="Escolha o encontro" />
-                </SelectTrigger>
-                <SelectContent>
-                  {numeros.map((n) => (
-                    <SelectItem key={n} value={String(n)}>
-                      {n}º encontro
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-          <div className="space-y-2">
-            <Label htmlFor="data_hora">Quando foi</Label>
-            <Input
-              id="data_hora"
-              name="data_hora"
-              type="datetime-local"
-              required
-              max={agora}
-              value={quando}
-              onChange={(e) => setQuando(e.target.value)}
-            />
-          </div>
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={() => setOpen(false)}
-            >
-              Cancelar
-            </Button>
-            <Button type="submit" disabled={pending}>
-              <ClockCounterClockwise size={16} />
-              {pending
-                ? "Salvando…"
-                : atual
-                  ? "Salvar correção"
-                  : "Registrar encontro"}
-            </Button>
-          </DialogFooter>
-        </form>
-        )}
-      </DialogContent>
-    </Dialog>
+        descricao={
+          atual
+            ? "O encontro continua realizado, só com a data certa."
+            : "Se vocês se encontraram sem agendar por aqui (combinaram por WhatsApp, por exemplo), conte quando foi. O encontro já entra como realizado e você pode avaliar na hora. Seu mentor é avisado pra contar como foi no registro dele."
+        }
+        inicial={dataAtual ? splitLocal(dataAtual) : null}
+        rotuloConfirmar={atual ? "Salvar correção" : "Registrar encontro"}
+        pending={pending}
+        aviso={aviso}
+        onAviso={setAviso}
+        onConfirmar={confirmar}
+      />
+    </>
   );
 }

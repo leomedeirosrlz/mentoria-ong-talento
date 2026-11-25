@@ -248,14 +248,7 @@ export function JovemShell({
             AppShell; 6 labels a 375px colidiam) */}
         <nav
           aria-label="Navegação principal"
-          className={cn(
-            "fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] md:hidden",
-            // idem AppShell — a faixa direita reserva o lugar do FAB da
-            // Liza (505), que encaixa na barra em vez de flutuar por cima
-            assistente
-              ? "pr-[max(4.25rem,calc(env(safe-area-inset-right)+3.25rem))]"
-              : "pr-[max(1rem,env(safe-area-inset-right))]"
-          )}
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))] md:hidden"
         >
           <div className="flex">
             {visiveis.map((item) => {
@@ -270,9 +263,7 @@ export function JovemShell({
                     at
                       ? "font-semibold text-sidebar-foreground"
                       : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground",
-                    // a faixa da Liza encolhe as células — "Especialistas"
-                    // em 11px transbordava; 10px segue legível e cabe
-                    assistente ? "text-[10px] tracking-tight" : "text-[11px]"
+                    "text-[11px]"
                   )}
                 >
                   {at && (
@@ -296,7 +287,7 @@ export function JovemShell({
                   menuAtivo
                     ? "font-semibold text-sidebar-foreground"
                     : "font-medium text-sidebar-foreground/75 active:text-sidebar-foreground",
-                  assistente ? "text-[10px] tracking-tight" : "text-[11px]"
+                  "text-[11px]"
                 )}
               >
                 {/* a rota atual mora no menu → o indicador viaja pra

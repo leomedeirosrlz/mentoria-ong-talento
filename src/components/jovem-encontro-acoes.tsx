@@ -56,18 +56,40 @@ export function AconteceuJovem({
 /** "Não aconteceu" do jovem (0072) — encontro agendado já passado, qualquer
  *  trilha da dupla ativa. A cópia não promete desfazer: quem reverte a
  *  marcação é o mentor (o jovem não tem update em encontros). */
-export function NaoAconteceuJovem({ encontroId }: { encontroId: string }) {
-  const [open, setOpen] = useState(false);
+export function NaoAconteceuJovem({
+  encontroId,
+  trigger,
+  open: openProp,
+  onOpenChange,
+}: {
+  encontroId: string;
+  /** Elemento do trigger — `null` suprime (o ⋯ da linha abre controlado). */
+  trigger?: React.ReactElement | null;
+  /** Modo controlado (opcional) — o menu de ações abre o dialog direto. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [openInterno, setOpenInterno] = useState(false);
+  const open = openProp ?? openInterno;
   const [pending, start] = useTransition();
   const router = useRouter();
 
+  function mudaOpen(o: boolean) {
+    setOpenInterno(o);
+    onOpenChange?.(o);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={
-        <Button variant="ghost" size="sm">
-          Não aconteceu
-        </Button>
-      } />
+    <Dialog open={open} onOpenChange={mudaOpen}>
+      {trigger !== null && (
+        <DialogTrigger render={
+          trigger ?? (
+            <Button variant="ghost" size="sm">
+              Não aconteceu
+            </Button>
+          )
+        } />
+      )}
       <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>O encontro não aconteceu?</DialogTitle>
@@ -77,7 +99,7 @@ export function NaoAconteceuJovem({ encontroId }: { encontroId: string }) {
           ou foi engano, seu mentor registra como foi na ficha dele.
         </DialogDescription>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="outline" onClick={() => mudaOpen(false)}>
             Cancelar
           </Button>
           <Button
@@ -90,7 +112,7 @@ export function NaoAconteceuJovem({ encontroId }: { encontroId: string }) {
                   if (res?.error) toast.error(res.error);
                   else {
                     toast.success("Encontro marcado como não realizado.");
-                    setOpen(false);
+                    mudaOpen(false);
                     router.refresh();
                   }
                 } catch {
@@ -110,18 +132,40 @@ export function NaoAconteceuJovem({ encontroId }: { encontroId: string }) {
 /** "Desmarcar" do jovem (0072) — tira o agendado FUTURO da agenda; a RPC é
  *  bilateral, então o gesto vale pra dupla inteira (o mentor é avisado pelo
  *  sino). Passado não se desmarca — vira "não aconteceu". */
-export function DesmarcarEncontroJovem({ encontroId }: { encontroId: string }) {
-  const [open, setOpen] = useState(false);
+export function DesmarcarEncontroJovem({
+  encontroId,
+  trigger,
+  open: openProp,
+  onOpenChange,
+}: {
+  encontroId: string;
+  /** Elemento do trigger — `null` suprime (o ⋯ da linha abre controlado). */
+  trigger?: React.ReactElement | null;
+  /** Modo controlado (opcional) — o menu de ações abre o dialog direto. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [openInterno, setOpenInterno] = useState(false);
+  const open = openProp ?? openInterno;
   const [pending, start] = useTransition();
   const router = useRouter();
 
+  function mudaOpen(o: boolean) {
+    setOpenInterno(o);
+    onOpenChange?.(o);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={
-        <Button variant="ghost" size="sm">
-          Desmarcar
-        </Button>
-      } />
+    <Dialog open={open} onOpenChange={mudaOpen}>
+      {trigger !== null && (
+        <DialogTrigger render={
+          trigger ?? (
+            <Button variant="ghost" size="sm">
+              Desmarcar
+            </Button>
+          )
+        } />
+      )}
       <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Desmarcar o encontro?</DialogTitle>
@@ -131,7 +175,7 @@ export function DesmarcarEncontroJovem({ encontroId }: { encontroId: string }) {
           quando combinarem uma nova data.
         </DialogDescription>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="outline" onClick={() => mudaOpen(false)}>
             Cancelar
           </Button>
           <Button
@@ -144,7 +188,7 @@ export function DesmarcarEncontroJovem({ encontroId }: { encontroId: string }) {
                   if (res?.error) toast.error(res.error);
                   else {
                     toast.success("Encontro desmarcado.");
-                    setOpen(false);
+                    mudaOpen(false);
                     router.refresh();
                   }
                 } catch {
@@ -164,18 +208,40 @@ export function DesmarcarEncontroJovem({ encontroId }: { encontroId: string }) {
 /** "Desfazer" do retroativo do jovem (0207) — apaga o realizado que ELE
  *  criou enquanto o mentor não registrou (o registro sela o fato). A
  *  avaliação dele cai junto: sem encontro, ela ficava pendurada em nada. */
-export function DesfazerRetroativoJovem({ encontroId }: { encontroId: string }) {
-  const [open, setOpen] = useState(false);
+export function DesfazerRetroativoJovem({
+  encontroId,
+  trigger,
+  open: openProp,
+  onOpenChange,
+}: {
+  encontroId: string;
+  /** Elemento do trigger — `null` suprime (o ⋯ da linha abre controlado). */
+  trigger?: React.ReactElement | null;
+  /** Modo controlado (opcional) — o menu de ações abre o dialog direto. */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}) {
+  const [openInterno, setOpenInterno] = useState(false);
+  const open = openProp ?? openInterno;
   const [pending, start] = useTransition();
   const router = useRouter();
 
+  function mudaOpen(o: boolean) {
+    setOpenInterno(o);
+    onOpenChange?.(o);
+  }
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger render={
-        <Button variant="ghost" size="sm">
-          Desfazer
-        </Button>
-      } />
+    <Dialog open={open} onOpenChange={mudaOpen}>
+      {trigger !== null && (
+        <DialogTrigger render={
+          trigger ?? (
+            <Button variant="ghost" size="sm">
+              Desfazer
+            </Button>
+          )
+        } />
+      )}
       <DialogContent size="sm">
         <DialogHeader>
           <DialogTitle>Desfazer o registro?</DialogTitle>
@@ -185,7 +251,7 @@ export function DesfazerRetroativoJovem({ encontroId }: { encontroId: string }) 
           respondeu. Se aconteceu de verdade, registre de novo quando quiser.
         </DialogDescription>
         <DialogFooter>
-          <Button variant="outline" onClick={() => setOpen(false)}>
+          <Button variant="outline" onClick={() => mudaOpen(false)}>
             Cancelar
           </Button>
           <Button
@@ -198,7 +264,7 @@ export function DesfazerRetroativoJovem({ encontroId }: { encontroId: string }) 
                   if (res?.error) toast.error(res.error);
                   else {
                     toast.success("Registro desfeito.");
-                    setOpen(false);
+                    mudaOpen(false);
                     router.refresh();
                   }
                 } catch {

@@ -483,8 +483,12 @@ function CardMentorado({
         <TrilhasAnteriores trilhas={trilhasAnteriores} />
       )}
 
-      {/* pendências acionáveis — deep link direto pro ponto da ficha */}
-      <section aria-label="Pendências da dupla" className="min-w-0 space-y-2">
+      {/* pendências acionáveis — deep link direto pro ponto da ficha.
+          Linhas divididas, sem caixa por item: o warn já mora no ícone */}
+      <section
+        aria-label="Pendências da dupla"
+        className="min-w-0 space-y-2 border-t border-border/60 pt-4"
+      >
         <h4 className="text-xs sm:text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
           Pendências da dupla
         </h4>
@@ -493,13 +497,13 @@ function CardMentorado({
             Nada pendente. A dupla está em dia.
           </p>
         ) : (
-          <ul className="space-y-1.5">
+          <ul className="divide-y divide-border/60">
             {registrosPendentes.map((e) => {
               const noLimbo = limboAberto(e, agoraMs, cobertos);
               return (
                 <li
                   key={e.id}
-                  className="flex flex-wrap items-center gap-3 rounded-lg bg-[var(--warn)]/8 px-3 py-2.5"
+                  className="flex flex-wrap items-center gap-3 py-2.5"
                 >
                   <Clock
                     size={18}
@@ -538,7 +542,7 @@ function CardMentorado({
             {combinadosVencidos.map((t) => (
               <li
                 key={t.id}
-                className="flex flex-wrap items-center gap-3 rounded-lg bg-[var(--warn)]/8 px-3 py-2.5"
+                className="flex flex-wrap items-center gap-3 py-2.5"
               >
                 <ClipboardText
                   size={18}
@@ -563,7 +567,7 @@ function CardMentorado({
                 mas o fechamento não — a decisão é da coordenação, na ficha
                 da dupla */}
             {encerramentoPendente && (
-              <li className="flex flex-wrap items-center gap-3 rounded-lg bg-[var(--warn)]/8 px-3 py-2.5">
+              <li className="flex flex-wrap items-center gap-3 py-2.5">
                 <FlagCheckered
                   size={18}
                   aria-hidden
@@ -732,7 +736,7 @@ function ProximoEncontro({
   }
 
   return (
-    <div className="flex min-w-0 items-start gap-3 rounded-lg bg-muted/50 px-4 py-3 shadow-[var(--shadow-inset)]">
+    <div className="flex min-w-0 items-start gap-3 border-t border-border/60 pt-4">
       <CalendarDots
         size={20}
         aria-hidden
@@ -795,7 +799,7 @@ function TrilhaBlock({
   return (
     <section
       aria-label={`Trilha de especialista · ${nomeEsp}`}
-      className="min-w-0 space-y-3 rounded-lg border border-dashed border-[var(--warn)]/50 bg-[var(--warn)]/8 p-4"
+      className="min-w-0 space-y-3 border-t border-border/60 pt-4"
     >
       {/* flex-wrap + piso de largura no texto: a 390px o selo dividia a
           linha e espremia a explicação numa coluna de duas palavras */}
@@ -806,16 +810,14 @@ function TrilhaBlock({
           className="mt-0.5 shrink-0 text-[var(--warn-text)]"
         />
         <div className="min-w-[min(100%,12rem)] flex-1">
-          <p className="text-sm font-semibold">Você acompanha, não participa</p>
-          <p className="text-xs text-muted-foreground">
-            Trilha com {nomeEsp}
-            {trilha.demanda && (
-              <>
-                {" · "}
-                <span className="italic">{trilha.demanda}</span>
-              </>
-            )}
+          <p className="text-sm font-semibold">
+            Trilha especialista · {nomeEsp}
           </p>
+          {trilha.demanda && (
+            <p className="text-xs italic text-muted-foreground">
+              {trilha.demanda}
+            </p>
+          )}
         </div>
         <div className="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
           <TrilhaPrazoBadge
@@ -1177,6 +1179,18 @@ function TrilhasAnteriores({ trilhas }: { trilhas: TrilhaJovem[] }) {
 
 const PASSOS_PEDIDO = ["Pedido", "Mural", "Aceite", "Trilha"] as const;
 
+/** Título curto do pedido em voo — diz onde a bola está sem repetir a
+ *  legenda inteira do stepper (que fala por fase, não por estado). */
+const STATUS_PEDIDO_CURTO: Partial<
+  Record<SolicitacaoEspecialistaStatus, string>
+> = {
+  sugerida: "aguardando o jovem",
+  aberta: "aguardando aceite",
+  aguardando_coord: "aguardando aceite",
+  contra_proposta: "negociando horário",
+  aceita: "trilha nascendo",
+};
+
 function PedidoEspecialistaBlock({
   solicitacao,
   primeiroNome,
@@ -1256,7 +1270,7 @@ function PedidoEspecialistaBlock({
   return (
     <section
       aria-label="Pedido de especialista em andamento"
-      className="min-w-0 space-y-3 rounded-lg border border-dashed border-[var(--warn)]/50 bg-[var(--warn)]/8 p-4"
+      className="min-w-0 space-y-3 border-t border-border/60 pt-4"
     >
       {/* flex-wrap + piso de largura no texto: a 390px o selo dividia a
           linha e espremia a explicação numa coluna de duas palavras */}
@@ -1267,7 +1281,9 @@ function PedidoEspecialistaBlock({
           className="mt-0.5 shrink-0 text-[var(--warn-text)]"
         />
         <div className="min-w-[min(100%,12rem)] flex-1">
-          <p className="text-sm font-semibold">Você acompanha, não participa</p>
+          <p className="text-sm font-semibold">
+            Pedido de especialista · {STATUS_PEDIDO_CURTO[efetivo] ?? efetivo}
+          </p>
           <p className="text-xs text-muted-foreground">
             {primeiroNome} ainda <b>não tem trilha</b>
             {tema && (
@@ -1342,7 +1358,7 @@ function SemTrilhaBlock({
   return (
     <section
       aria-label="Trilha de especialista"
-      className="flex min-w-0 flex-wrap items-center gap-3 rounded-lg border border-dashed border-border px-4 py-3"
+      className="flex min-w-0 flex-wrap items-center gap-3 border-t border-border/60 pt-4"
     >
       <Sparkle
         size={18}

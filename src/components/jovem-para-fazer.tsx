@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import Link from "next/link";
 import { Collapsible } from "@base-ui/react/collapsible";
 import {
@@ -14,6 +15,7 @@ import {
   Signature,
   Sparkle,
   Star,
+  XCircle,
 } from "@phosphor-icons/react";
 import { maxEncontros } from "@/lib/ciclo";
 import type { PendenciaJovem, TipoPendencia } from "@/lib/pendencias-jovem";
@@ -22,6 +24,7 @@ import {
   AvaliarPendenteButton,
   type AvaliacaoPendente,
 } from "@/components/jovem-avaliacoes";
+import { AcoesMenu, type AcaoMenuItem } from "@/components/acoes-menu";
 import {
   AconteceuJovem,
   NaoAconteceuJovem,
@@ -222,28 +225,7 @@ function acoesPendencia({
       // sem a row ou com a dupla parada não há gesto honesto a oferecer —
       // as RPCs (0072/0121) recusariam na hora
       if (!ctx?.ativa) return null;
-      const encerramento = ctx.e.numero >= maxEncontros(ctx.esp ? "especialista" : "dpp");
-      return (
-        <>
-          {!encerramento && (
-            <AconteceuJovem encontroId={ctx.e.id} variant={cheio} />
-          )}
-          {!ctx.esp && (
-            <JovemAgendarDialog
-              duplaId={ctx.e.dupla_id}
-              numero={ctx.e.numero}
-              atual={ctx.e}
-              trigger={
-                <Button variant="ghost" size="sm">
-                  <CalendarDots size={15} aria-hidden />
-                  Remarcar
-                </Button>
-              }
-            />
-          )}
-          <NaoAconteceuJovem encontroId={ctx.e.id} />
-        </>
-      );
+      return <PendenciaEncontroAcoes e={ctx.e} esp={ctx.esp} cheio={cheio} />;
     }
 
     case "registro_retroativo":
@@ -330,4 +312,89 @@ function acoesPendencia({
         </Link>
       ) : null;
   }
+}
+
+// tamanho e cor explícitos — alinha o texto do item com o da linha (mesma
+// norma do ICONE do ⋯ da dupla)
+const ICONE_MENU = "size-4 shrink-0 text-muted-foreground";
+
+/** O trio do "encontro sem desfecho" (507) no formato 530: a decisiva à
+ *  vista — "Aconteceu" (Remarcar sobe no passo de encerramento, quando ele
+ *  some — o fecho do ciclo é do mentor) — e o resto no ⋯. Remarcar é
+ *  DPP-only (a RPC recusa a trilha de especialista); "não aconteceu" vale
+ *  em qualquer trilha. Com uma ação só ela fica solta, sem ⋯. */
+function PendenciaEncontroAcoes({
+  e,
+  esp,
+  cheio,
+}: {
+  e: JovemEncontro;
+  /** trilha de especialista — remarcar por aqui é DPP-only. */
+  esp: boolean;
+  /** destaque do motor (só o 1º item) — a única variante preenchida. */
+  cheio: "default" | "outline";
+}) {
+  const [dialog, setDialog] = useState<"remarcar" | "nao" | null>(null);
+  const encerramento = e.numero >= maxEncontros(esp ? "especialista" : "dpp");
+  const temAconteceu = !encerramento;
+  const temRemarcar = !esp;
+
+  // ação única (encerramento na trilha esp): "não aconteceu" solto, sem ⋯
+  if (!temAconteceu && !temRemarcar)
+    return <NaoAconteceuJovem encontroId={e.id} />;
+
+  const remarcarNoMenu = temRemarcar && temAconteceu;
+  const itens: AcaoMenuItem[] = [];
+  if (remarcarNoMenu)
+    itens.push({
+      id: "remarcar",
+      rotulo: "Remarcar",
+      icone: <CalendarDots aria-hidden className={ICONE_MENU} />,
+      onEscolher: () => setDialog("remarcar"),
+    });
+  itens.push({
+    id: "nao",
+    rotulo: "Não aconteceu",
+    icone: <XCircle aria-hidden className={ICONE_MENU} />,
+    onEscolher: () => setDialog("nao"),
+  });
+
+  return (
+    <>
+      {temAconteceu ? (
+        <AconteceuJovem encontroId={e.id} variant={cheio} />
+      ) : (
+        <JovemAgendarDialog
+          duplaId={e.dupla_id}
+          numero={e.numero}
+          atual={e}
+          trigger={
+            <Button variant="ghost" size="sm">
+              <CalendarDots size={15} aria-hidden />
+              Remarcar
+            </Button>
+          }
+        />
+      )}
+      <AcoesMenu itens={itens} label="Ações" />
+      {/* dialogs fora do popup, controlados — fechar o menu não os desmonta
+          e o foco volta pro ⋯ ao sair */}
+      {remarcarNoMenu && (
+        <JovemAgendarDialog
+          duplaId={e.dupla_id}
+          numero={e.numero}
+          atual={e}
+          trigger={null}
+          open={dialog === "remarcar"}
+          onOpenChange={(o) => setDialog(o ? "remarcar" : null)}
+        />
+      )}
+      <NaoAconteceuJovem
+        encontroId={e.id}
+        trigger={null}
+        open={dialog === "nao"}
+        onOpenChange={(o) => setDialog(o ? "nao" : null)}
+      />
+    </>
+  );
 }

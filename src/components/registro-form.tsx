@@ -1422,7 +1422,11 @@ export function RegistroForm({
           // página fica sob o overlay e não interfere
           <DialogFooter sticky>{botoes}</DialogFooter>
         ) : (
-          <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] -mx-5 -mb-5 flex items-center gap-2 rounded-b-xl border-t bg-card px-5 py-3 md:bottom-0">
+          // pr-16 no mobile: o FAB da Liza flutua nesta mesma faixa (acima
+          // da bottom-nav, 530) — a faixa direita reserva o lugar dele e o
+          // Avançar/Salvar nunca nasce coberto. No md+ o footer ancora no
+          // painel e o FAB vai pro canto do viewport: sem reserva.
+          <div className="sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] -mx-5 -mb-5 flex items-center gap-2 rounded-b-xl border-t bg-card pl-5 pr-16 py-3 md:pr-5 md:bottom-0">
             {botoes}
           </div>
         );
