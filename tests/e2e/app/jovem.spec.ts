@@ -609,6 +609,30 @@ test.describe("mentorado — shell /jovem", () => {
     ).toBeDisabled();
   });
 
+  test("perfil: a faixa nova avisa uma vez — o toast de level-up (024)", async ({
+    page,
+  }) => {
+    // baseline local abaixo da faixa real: o caminho do encontro
+    // retroativo ou da correção da coordenação (FR-012). A chave é por
+    // ficha (mentorado.id) e só se semeia quando ausente — senão o init
+    // script re-zeraria a baseline na segunda navegação do teste
+    await page.addInitScript((id) => {
+      const k = `realiza:nivel:${id}`;
+      if (localStorage.getItem(k) === null) localStorage.setItem(k, "-1");
+    }, IDS.mentorado);
+    await page.goto("/jovem/perfil");
+    await expect(page.getByText(/^Subiu de nível: /)).toBeVisible();
+    // a baseline gravada segura a próxima visita: um toast por faixa nova.
+    // O assert negativo pede a página hidratada + um respiro — o efeito
+    // do notifier roda no mount, contagem 0 imediata seria falso passe
+    await page.goto("/jovem/perfil");
+    await expect(
+      page.getByRole("heading", { name: "Mentorada E2E", level: 1 })
+    ).toBeVisible();
+    await page.waitForTimeout(1200);
+    await expect(page.getByText(/^Subiu de nível: /)).toHaveCount(0);
+  });
+
   test("perfil edita os dados dele pelo lápis — o gesto do perfil de todos", async ({
     page,
   }) => {
