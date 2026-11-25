@@ -66,7 +66,7 @@ export function SuaSemanaPlano({
           combinado" — só quando o próximo é passo do plano */}
       {semana.vinculo != null && (
         <p className="text-sm font-medium">
-          Este é o {semana.vinculo}º encontro do plano que {quem} combinou.
+          O {semana.vinculo}º encontro é passo do combinado com {quem}.
         </p>
       )}
 

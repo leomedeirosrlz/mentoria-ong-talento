@@ -81,7 +81,7 @@ function rotuloNo(no: NoJornada, atual: boolean, sessao: boolean): string {
       base = `${n}, realizad${oa} em ${formatDate(quandoReal)}, registro pendente`;
       break;
     case "limbo":
-      base = `${n}, agendad${oa} para ${formatDate(no.encontro?.data_hora)}, já passou, falta confirmar`;
+      base = `${n}, agendad${oa} para ${formatDate(no.encontro?.data_hora)}, já passou, aguardando confirmação`;
       break;
     case "agendado":
       base = `${n}, agendad${oa} para ${formatDate(no.encontro?.data_hora)}`;
@@ -108,7 +108,7 @@ function textoProximo(no: NoJornada | undefined, sessao: boolean): string | null
   const passo = sessao ? `sessão ${no.numero}` : `${no.numero}º`;
   const oa = sessao ? "a" : "o";
   if (no.estado === "limbo")
-    return `${proxim}: ${passo} · agendad${oa} ${formatDate(no.encontro?.data_hora)}, falta confirmar`;
+    return `${proxim}: ${passo} · agendad${oa} ${formatDate(no.encontro?.data_hora)}, aguardando confirmação`;
   if (no.estado === "agendado")
     return `${proxim}: ${passo} · agendad${oa} ${formatDateTime(no.encontro?.data_hora)}`;
   if (no.estado === "nao_aconteceu")
