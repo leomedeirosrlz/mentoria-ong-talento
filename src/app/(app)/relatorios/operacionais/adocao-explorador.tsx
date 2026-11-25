@@ -10,6 +10,7 @@ import {
   X,
 } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { FadeTroca } from "@/components/ui/etapa";
 import { Textarea } from "@/components/ui/textarea";
 import { filterChipCls, FilterChipRow } from "@/components/ui/filter-chip";
 import { cn } from "@/lib/utils";
@@ -138,243 +139,253 @@ export function AdocaoExplorador({ desde }: { desde: string }) {
     }
   };
 
-  if (!aberto) {
-    return (
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <p className="text-sm text-muted-foreground">
-          Console SQL sobre os gestos do período, rodando no navegador.
-          A primeira abertura baixa o motor (~10&nbsp;MB).
-        </p>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={abrir}
-          aria-expanded={false}
-        >
-          <CaretDown aria-hidden />
-          Abrir o explorador
-        </Button>
-      </div>
-    );
-  }
-
+  // fechado → preparando → pronto/falha é troca de estado do mesmo
+  // bloco: crossfade do kit (spec 028), não corte seco. O foco vai pro
+  // painel entrante — o botão que disparou a troca desmonta junto, e sem
+  // ele quem abriu pelo teclado ficava órfão. Só o "preparando" não
+  // recebe foco: é uma fase de espera que muda sozinha (boot assíncrono)
+  // e roubar foco no meio dela largaria a pessoa num painel vazio.
   return (
-    <div className="space-y-3">
-      {/* régua interna: dataset carregado + ações de sessão */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-        <p className="text-xs text-muted-foreground">
-          {fase === "pronto" && info
-            ? info.gestos === 0
-              ? "Nenhum gesto exportado no período."
-              : `${info.gestos.toLocaleString("pt-BR")} gestos` +
-                (info.primeiro && info.ultimo
-                  ? ` · ${formatDate(info.primeiro.toISOString().slice(0, 10))} a ${formatDate(info.ultimo.toISOString().slice(0, 10))}`
-                  : "") +
-                ` · tabela ${TABELA_EVENTOS}`
-            : etapa === "motor"
-              ? "Preparando o motor de consulta…"
-              : "Baixando os gestos do período…"}
-        </p>
-        <div className="flex items-center gap-2">
-          {fase === "pronto" && (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => void recarregar()}
-              disabled={recarregando}
-            >
-              <ArrowClockwise
-                aria-hidden
-                className={cn(recarregando && "animate-spin")}
-              />
-              Atualizar dados
-            </Button>
-          )}
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => setAberto(false)}
-            aria-expanded={true}
-          >
-            <X aria-hidden />
-            Fechar
-          </Button>
-        </div>
-      </div>
-
-      {fase === "falha" ? (
-        <div
-          role="alert"
-          className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm"
-        >
-          <p className="font-medium">Não foi possível abrir o explorador</p>
-          <p className="mt-0.5 text-muted-foreground">{erroFatal}</p>
+    <FadeTroca
+      chave={!aberto ? "fechado" : fase}
+      foco={!aberto || fase !== "preparando"}
+      centralizar
+    >
+      {!aberto ? (
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+          <p className="text-sm text-muted-foreground">
+            Console SQL sobre os gestos do período, rodando no navegador.
+            A primeira abertura baixa o motor (~10&nbsp;MB).
+          </p>
           <Button
             variant="outline"
             size="sm"
-            className="mt-2"
-            onClick={tentarDeNovo}
+            onClick={abrir}
+            aria-expanded={false}
           >
-            <ArrowClockwise aria-hidden />
-            Tentar de novo
+            <CaretDown aria-hidden />
+            Abrir o explorador
           </Button>
         </div>
-      ) : fase === "preparando" ? (
-        <div className="space-y-1.5 py-2">
-          <p className="animate-pulse text-sm text-muted-foreground">
-            {etapa === "motor"
-              ? "Baixando o motor de consulta · só na primeira vez…"
-              : "Baixando os gestos do período…"}
-          </p>
-          <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
-            <div className="h-full w-1/3 animate-pulse rounded-full bg-muted-foreground/30" />
-          </div>
-        </div>
-      ) : fase === "pronto" ? (
-        <>
-          {/* chips de pergunta pronta — cada um injeta a SQL na caixa e
-              roda; a query fica visível e editável (também ensina o
-              esquema: o preset é o exemplo vivo). Mesma pill da régua. */}
-          <FilterChipRow role="group" aria-label="Consultas prontas" className="gap-1.5">
-            {CONSULTAS_PRESET.map((p) => (
-              <button
-                key={p.id}
-                type="button"
-                disabled={rodando}
-                aria-pressed={sql === p.sql}
-                onClick={() => {
-                  setSql(p.sql);
-                  void rodar(p.sql);
-                }}
-                className={cn(filterChipCls(sql === p.sql), "disabled:opacity-50")}
-              >
-                {p.rotulo}
-              </button>
-            ))}
-          </FilterChipRow>
-
-          <div className="space-y-2">
-            <label htmlFor="adocao-sql" className="sr-only">
-              Consulta SQL
-            </label>
-            <Textarea
-              id="adocao-sql"
-              value={sql}
-              onChange={(e) => setSql(e.target.value)}
-              onKeyDown={(e) => {
-                if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
-                  e.preventDefault();
-                  void rodar();
-                }
-              }}
-              spellCheck={false}
-              rows={5}
-              className="min-h-24 font-mono text-[13px] leading-relaxed"
-              placeholder={`select * from ${TABELA_EVENTOS} limit 20`}
-              aria-invalid={!!erroSql}
-            />
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
-              <p className="text-[11px] text-muted-foreground">
-                Só leitura (SELECT). <Command aria-hidden className="inline size-3 align-[-1px]" />
-                +Enter roda. Resultado limitado a {LIMITE_LINHAS} linhas.
-              </p>
+      ) : (
+        <div className="space-y-3">
+          {/* régua interna: dataset carregado + ações de sessão */}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+            <p className="text-xs text-muted-foreground">
+              {fase === "pronto" && info
+                ? info.gestos === 0
+                  ? "Nenhum gesto exportado no período."
+                  : `${info.gestos.toLocaleString("pt-BR")} gestos` +
+                    (info.primeiro && info.ultimo
+                      ? ` · ${formatDate(info.primeiro.toISOString().slice(0, 10))} a ${formatDate(info.ultimo.toISOString().slice(0, 10))}`
+                      : "") +
+                    ` · tabela ${TABELA_EVENTOS}`
+                : etapa === "motor"
+                  ? "Preparando o motor de consulta…"
+                  : "Baixando os gestos do período…"}
+            </p>
+            <div className="flex items-center gap-2">
+              {fase === "pronto" && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => void recarregar()}
+                  disabled={recarregando}
+                >
+                  <ArrowClockwise
+                    aria-hidden
+                    className={cn(recarregando && "animate-spin")}
+                  />
+                  Atualizar dados
+                </Button>
+              )}
               <Button
+                variant="ghost"
                 size="sm"
-                onClick={() => void rodar()}
-                disabled={rodando}
+                onClick={() => setAberto(false)}
+                aria-expanded={true}
               >
-                <Play aria-hidden />
-                {rodando ? "Rodando…" : "Rodar consulta"}
+                <X aria-hidden />
+                Fechar
               </Button>
             </div>
           </div>
 
-          {erroSql && (
+          {fase === "falha" ? (
             <div
               role="alert"
-              className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5"
+              className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-3 text-sm"
             >
-              <p className="flex items-center gap-1.5 text-xs font-medium">
-                <WarningCircle aria-hidden className="size-3.5" />
-                A consulta não rodou
-              </p>
-              <pre className="mt-1 whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-muted-foreground">
-                {erroSql}
-              </pre>
+              <p className="font-medium">Não foi possível abrir o explorador</p>
+              <p className="mt-0.5 text-muted-foreground">{erroFatal}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                className="mt-2"
+                onClick={tentarDeNovo}
+              >
+                <ArrowClockwise aria-hidden />
+                Tentar de novo
+              </Button>
             </div>
-          )}
-
-          {resultado && (
-            <div className="space-y-1.5">
-              <p className="text-[11px] tabular-nums text-muted-foreground">
-                {resultado.truncado
-                  ? `Mais de ${LIMITE_LINHAS.toLocaleString("pt-BR")} linhas, mostrando as primeiras ${LIMITE_LINHAS} · `
-                  : `${resultado.linhas.length.toLocaleString("pt-BR")} ${
-                      resultado.linhas.length === 1 ? "linha" : "linhas"
-                    } · `}
-                {resultado.ms} ms
+          ) : fase === "preparando" ? (
+            <div className="space-y-1.5 py-2">
+              <p className="animate-pulse text-sm text-muted-foreground">
+                {etapa === "motor"
+                  ? "Baixando o motor de consulta · só na primeira vez…"
+                  : "Baixando os gestos do período…"}
               </p>
-              {resultado.linhas.length === 0 ? (
-                <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
-                  A consulta voltou sem linhas.
-                </p>
-              ) : (
-                <div className="scroll-fina max-h-[55dvh] overflow-auto rounded-lg border border-border [scrollbar-gutter:stable]">
-                  <table className="w-full min-w-max border-separate border-spacing-0 text-left text-[13px] leading-snug">
-                    <thead>
-                      <tr className="bg-muted">
-                        <th
-                          aria-hidden
-                          className="sticky left-0 top-0 z-30 w-10 border-b border-r border-border px-1 py-1.5 text-center text-[10px] tabular-nums font-normal text-muted-foreground"
-                        />
-                        {resultado.colunas.map((c) => (
-                          <th
-                            key={c}
-                            scope="col"
-                            className="sticky top-0 z-20 max-w-72 border-b border-border bg-muted px-2.5 py-1.5 text-left text-xs font-medium text-foreground"
-                          >
-                            <span className="break-words">{c}</span>
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {resultado.linhas.map((linha, i) => (
-                        <tr key={i} className="hover:bg-[var(--brand-lime)]/8">
-                          <td className="sticky left-0 z-10 w-10 border-b border-r border-border bg-card px-1 py-1 text-center text-[10px] tabular-nums text-muted-foreground select-none">
-                            {i + 1}
-                          </td>
-                          {linha.map((v, j) => {
-                            const txt = fmtCelula(v);
-                            return (
-                              <td
-                                key={j}
-                                className="max-w-72 border-b border-border px-2.5 py-1 align-top tabular-nums"
-                              >
-                                <span
-                                  className="block max-w-72 truncate"
-                                  title={txt.length > 40 ? txt : undefined}
-                                >
-                                  {txt || (
-                                    <span className="text-muted-foreground/50">
-                                      —
-                                    </span>
-                                  )}
-                                </span>
-                              </td>
-                            );
-                          })}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
+              <div className="h-1 w-full overflow-hidden rounded-full bg-muted">
+                <div className="h-full w-1/3 animate-pulse rounded-full bg-muted-foreground/30" />
+              </div>
+            </div>
+          ) : fase === "pronto" ? (
+            <>
+              {/* chips de pergunta pronta — cada um injeta a SQL na caixa e
+                  roda; a query fica visível e editável (também ensina o
+                  esquema: o preset é o exemplo vivo). Mesma pill da régua. */}
+              <FilterChipRow role="group" aria-label="Consultas prontas" className="gap-1.5">
+                {CONSULTAS_PRESET.map((p) => (
+                  <button
+                    key={p.id}
+                    type="button"
+                    disabled={rodando}
+                    aria-pressed={sql === p.sql}
+                    onClick={() => {
+                      setSql(p.sql);
+                      void rodar(p.sql);
+                    }}
+                    className={cn(filterChipCls(sql === p.sql), "disabled:opacity-50")}
+                  >
+                    {p.rotulo}
+                  </button>
+                ))}
+              </FilterChipRow>
+
+              <div className="space-y-2">
+                <label htmlFor="adocao-sql" className="sr-only">
+                  Consulta SQL
+                </label>
+                <Textarea
+                  id="adocao-sql"
+                  value={sql}
+                  onChange={(e) => setSql(e.target.value)}
+                  onKeyDown={(e) => {
+                    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+                      e.preventDefault();
+                      void rodar();
+                    }
+                  }}
+                  spellCheck={false}
+                  rows={5}
+                  className="min-h-24 font-mono text-[13px] leading-relaxed"
+                  placeholder={`select * from ${TABELA_EVENTOS} limit 20`}
+                  aria-invalid={!!erroSql}
+                />
+                <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                  <p className="text-[11px] text-muted-foreground">
+                    Só leitura (SELECT). <Command aria-hidden className="inline size-3 align-[-1px]" />
+                    +Enter roda. Resultado limitado a {LIMITE_LINHAS} linhas.
+                  </p>
+                  <Button
+                    size="sm"
+                    onClick={() => void rodar()}
+                    disabled={rodando}
+                  >
+                    <Play aria-hidden />
+                    {rodando ? "Rodando…" : "Rodar consulta"}
+                  </Button>
+                </div>
+              </div>
+
+              {erroSql && (
+                <div
+                  role="alert"
+                  className="animate-enter rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2.5"
+                >
+                  <p className="flex items-center gap-1.5 text-xs font-medium">
+                    <WarningCircle aria-hidden className="size-3.5" />
+                    A consulta não rodou
+                  </p>
+                  <pre className="mt-1 whitespace-pre-wrap font-mono text-[11px] leading-relaxed text-muted-foreground">
+                    {erroSql}
+                  </pre>
                 </div>
               )}
-            </div>
-          )}
-        </>
-      ) : null}
-    </div>
+
+              {resultado && (
+                <div className="animate-enter space-y-1.5">
+                  <p className="text-[11px] tabular-nums text-muted-foreground">
+                    {resultado.truncado
+                      ? `Mais de ${LIMITE_LINHAS.toLocaleString("pt-BR")} linhas, mostrando as primeiras ${LIMITE_LINHAS} · `
+                      : `${resultado.linhas.length.toLocaleString("pt-BR")} ${
+                          resultado.linhas.length === 1 ? "linha" : "linhas"
+                        } · `}
+                    {resultado.ms} ms
+                  </p>
+                  {resultado.linhas.length === 0 ? (
+                    <p className="rounded-lg border border-dashed border-border px-3 py-6 text-center text-sm text-muted-foreground">
+                      A consulta voltou sem linhas.
+                    </p>
+                  ) : (
+                    <div className="scroll-fina max-h-[55dvh] overflow-auto rounded-lg border border-border [scrollbar-gutter:stable]">
+                      <table className="w-full min-w-max border-separate border-spacing-0 text-left text-[13px] leading-snug">
+                        <thead>
+                          <tr className="bg-muted">
+                            <th
+                              aria-hidden
+                              className="sticky left-0 top-0 z-30 w-10 border-b border-r border-border px-1 py-1.5 text-center text-[10px] tabular-nums font-normal text-muted-foreground"
+                            />
+                            {resultado.colunas.map((c) => (
+                              <th
+                                key={c}
+                                scope="col"
+                                className="sticky top-0 z-20 max-w-72 border-b border-border bg-muted px-2.5 py-1.5 text-left text-xs font-medium text-foreground"
+                              >
+                                <span className="break-words">{c}</span>
+                              </th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {resultado.linhas.map((linha, i) => (
+                            <tr key={i} className="hover:bg-[var(--brand-lime)]/8">
+                              <td className="sticky left-0 z-10 w-10 border-b border-r border-border bg-card px-1 py-1 text-center text-[10px] tabular-nums text-muted-foreground select-none">
+                                {i + 1}
+                              </td>
+                              {linha.map((v, j) => {
+                                const txt = fmtCelula(v);
+                                return (
+                                  <td
+                                    key={j}
+                                    className="max-w-72 border-b border-border px-2.5 py-1 align-top tabular-nums"
+                                  >
+                                    <span
+                                      className="block max-w-72 truncate"
+                                      title={txt.length > 40 ? txt : undefined}
+                                    >
+                                      {txt || (
+                                        <span className="text-muted-foreground/50">
+                                          —
+                                        </span>
+                                      )}
+                                    </span>
+                                  </td>
+                                );
+                              })}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              )}
+            </>
+          ) : null}
+        </div>
+      )}
+    </FadeTroca>
   );
 }
 

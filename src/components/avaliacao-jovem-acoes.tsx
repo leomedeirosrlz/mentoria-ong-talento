@@ -48,17 +48,17 @@ export function CopiarLinkAvaliacao({ url }: { url: string }) {
       >
         <LinkSimple
           className={cn(
-            `transition-all duration-150 ${EASE}`,
-            copiado && "scale-25 opacity-0 blur-[4px]"
+            `transition-[opacity,scale] duration-150 ${EASE}`,
+            copiado && "scale-25 opacity-0"
           )}
         />
         <Check
           weight="bold"
           className={cn(
-            `absolute text-[var(--ok)] transition-all duration-150 ${EASE}`,
+            `absolute text-[var(--ok)] transition-[opacity,scale] duration-150 ${EASE}`,
             copiado
-              ? "scale-100 opacity-100 blur-[0px]"
-              : "scale-25 opacity-0 blur-[4px]"
+              ? "scale-100 opacity-100"
+              : "scale-25 opacity-0"
           )}
         />
       </span>

@@ -1109,9 +1109,13 @@ function ChamadoComposer({
   }
 
   return (
+    // a troca interno↔público anima a MOLDURA do composer (tint + borda
+    // pontilhada) — o Textarea segue montado: remontar apagaria o
+    // rascunho e soltaria a seleção (spec 028: cores transicionam, o
+    // campo não vira crossfade)
     <div
       className={cn(
-        "border-t px-4 py-4 sm:px-5",
+        "border-t px-4 py-4 sm:px-5 transition-colors",
         interno ? "border-[var(--warn)]/40 bg-[var(--warn)]/[0.05]" : "border-border"
       )}
     >
@@ -1150,7 +1154,7 @@ function ChamadoComposer({
       {interno && mencoes.length > 0 && (
         <div
           role="group"
-          className="mb-2 flex flex-wrap items-center gap-1.5"
+          className="animate-enter mb-2 flex flex-wrap items-center gap-1.5"
           aria-label="Pessoas marcadas"
         >
           {mencoes.map((m) => (

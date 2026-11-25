@@ -107,4 +107,38 @@ test.describe("demo — aba Adoção, painéis ricos", () => {
       page.getByText(/só Mentor DPP/).first()
     ).toBeVisible();
   });
+
+  // spec 028 — o explorador troca de ESTADO (fechado→preparando→…) pelo
+  // crossfade do kit; o contrato de foco: "preparando" é fase de espera
+  // que se resolve sozinha e não recebe foco (roubar foco no meio dela
+  // largaria a pessoa num painel vazio), fechado recebe de volta
+  test("explorador: abrir não rouba foco na espera; fechar devolve ao painel", async ({
+    page,
+  }) => {
+    await page.getByRole("button", { name: "Abrir o explorador" }).click();
+
+    // a fase de espera entrou pelo crossfade — e o foco NÃO viajou pra
+    // ela (o botão que disparou desmontou; foco cai no body, não no
+    // painel vazio). O boot do DuckDB não precisa terminar pro contrato
+    await expect(
+      page.getByText(/Preparando o motor de consulta|Baixando o motor de consulta/).first()
+    ).toBeVisible();
+    expect(
+      await page.evaluate(
+        () =>
+          document.activeElement === document.body ||
+          document.activeElement === document.documentElement
+      )
+    ).toBe(true);
+
+    // fechar volta pro estado fechado — aí sim o painel entrante recebe
+    // o foco (quem abriu pelo teclado não fica órfão)
+    await page.getByRole("button", { name: "Fechar" }).click();
+    await expect(
+      page.getByRole("button", { name: "Abrir o explorador" })
+    ).toBeVisible();
+    await expect(page.locator("div:focus")).toContainText(
+      "Console SQL sobre os gestos"
+    );
+  });
 });

@@ -120,9 +120,9 @@ export function NumerosSemanaSecao({
                     className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-muted"
                   >
                     <div
-                      className="h-full rounded-full bg-[var(--brand-lime)] transition-[width] duration-500 ease-snappy"
+                      className="h-full w-full origin-left rounded-full bg-[var(--brand-lime)] transition-transform duration-500 ease-snappy"
                       style={{
-                        width: `${(c.comRegistro / c.total) * 100}%`,
+                        transform: `scaleX(${c.comRegistro / c.total})`,
                       }}
                     />
                   </div>

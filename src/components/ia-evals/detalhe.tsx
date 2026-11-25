@@ -339,8 +339,8 @@ function Comparativo({
                 className="h-2 w-24 shrink-0 overflow-hidden rounded-full bg-muted sm:w-32"
               >
                 <span
-                  className="block h-full rounded-full bg-[var(--ok)] transition-[width] duration-500 ease-snappy"
-                  style={{ width: `${((l.rate ?? 0) * 100).toFixed(1)}%` }}
+                  className="block h-full w-full origin-left rounded-full bg-[var(--ok)] transition-transform duration-500 ease-snappy"
+                  style={{ transform: `scaleX(${l.rate ?? 0})` }}
                 />
               </span>
               <span className="w-14 shrink-0 text-right text-sm font-semibold tabular-nums">
@@ -718,9 +718,9 @@ export function DetalheRun({
           className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted"
         >
           <div
-            className="relative h-full bg-primary transition-[width] duration-500 ease-snappy"
+            className="relative h-full w-full origin-left bg-primary transition-transform duration-500 ease-snappy"
             style={{
-              width: `${stats.total ? (feitos / stats.total) * 100 : 0}%`,
+              transform: `scaleX(${stats.total ? feitos / stats.total : 0})`,
             }}
           >
             {driving && (

@@ -85,7 +85,9 @@ const FAB_CLS =
 // tamanho vem de --painel-w/--painel-h (inline, redimensionável); o min()
 // segura viewport estreita e o --available-height do positioner segura
 // o topo. A transição de tamanho só liga no toggle Expandir — no arrasto
-// o data-redimensionando desliga pra seguir o ponteiro 1:1. O zoom-90 (no
+// o data-redimensionando desliga pra seguir o ponteiro 1:1. Tween
+// deliberado de tamanho de painel — exceção registrada da spec 028: o
+// conteúdo interno não pode escalar. O zoom-90 (no
 // lugar do -95 padrão) dá mais viagem à entrada: o painel "nasce" da bolha
 // — a origem é o canto ancorado no FAB (transform-origin do positioner)
 const PAINEL_CLS =

@@ -529,6 +529,11 @@ export function RegistrosPainel({
                               const cor = corDe.get(c.cronogramaId)!;
                               const seg = (
                                 <span key={c.cronogramaId}>
+                                  {/* transition-[height,bottom]: segmentos
+                                      empilhados do gráfico não têm equivalente
+                                      em transform (scaleY moveria o conjunto
+                                      inteiro) — tween deliberado de dados,
+                                      reduced-motion zera (spec 028) */}
                                   <span
                                     className="absolute inset-x-0 transition-[height,bottom] duration-500 ease-snappy"
                                     style={{
@@ -993,7 +998,9 @@ function ScatterEstrelas({
                   className="absolute size-2 -translate-x-1/2 -translate-y-1/2 rounded-full opacity-80 transition-[left,top] duration-300 ease-snappy"
                   style={{
                     // pontos do mesmo slot+trilho se espalham na faixa da
-                    // coluna — a densidade lê sem sobrepor
+                    // coluna — a densidade lê sem sobrepor. O transition-[left,top]
+                    // é exceção registrada da spec 028: posição de marcador
+                    // não vira transform sem medir o container
                     left: `${
                       xBase(si) +
                       offTurma +

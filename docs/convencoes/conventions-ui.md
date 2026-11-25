@@ -41,4 +41,14 @@ Contexto e decisões em `docs/planos/dores-ux-2026-10/` (README + `_convencoes-e
 
 ## Movimento
 
-Entrada de lista/card: `.animate-enter` + `--i` inline (stagger 0–10). **Troca de filtro, busca ou ordenação sempre anima** — re-key no container da lista remonta as linhas e re-roda a entrada (≤300ms, fade+slide); nunca um repaint seco de tabela inteira. O guard global de `prefers-reduced-motion` em `globals.css` já zera tudo — não adicionar media query por componente nem desligar a animação à mão.
+A gramática é uma só (spec 028; o kit mora em `src/components/ui/etapa.tsx`) — cada idioma tem uma camada, e animar na camada errada é bug de design:
+
+- **Slide = navegação de etapa** (wizard, fluxo de perguntas): `Etapa` + `useTrocaDeEtapa` — translateX direcional curto (≤8px via `--dir`; +1 avança, −1 volta). Passos ficam montados sob `hidden`: inputs não-controlados seguem no FormData e no rascunho. O heading da etapa nova recebe foco pós-commit — nunca no handler, que pegaria o passo ainda escondido.
+- **Crossfade = troca de estado no mesmo lugar** (form→resultado, fechado→carregando→pronto): `FadeTroca` (~180ms, sem direção). O painel entrante recebe foco — fases de espera que se resolvem sozinhas ficam de fora (`foco={fase !== "preparando"}`).
+- **Cascata = revelação dentro de uma tela**: `.animate-enter` + `--i` inline (stagger 0–10). **Troca de filtro, busca ou ordenação sempre anima** — re-key no container da lista remonta as linhas e re-roda a entrada (≤300ms, fade+slide); nunca um repaint seco de tabela inteira.
+- **`data-open` = overlay** (dialog, sheet, popover): o kit do componente já aplica.
+- **Remount por `key` = gesto direto que troca conteúdo** (eixo da roda por seta/arraste): fade curto só de entrada — um crossfade `mode="wait"` ficaria atrás do dedo.
+
+**Propriedades:** só `transform`, `opacity` e `background-color` animam. `transition-all` é proibido; `transition-[width|height|max-width|left|top|margin]` também — barra de progresso desenha `scaleX` com `origin-left` + `transition-transform`, nunca `width`. `will-change` só just-in-time. Marcador que segue o ponteiro 1:1 não transiciona posição (ficaria atrás do dedo). Exceções são documentadas in situ com "(spec 028)": segmentos empilhados de gráfico (`barra-segmentada`/`registros-painel`), marcador `left,top` de `sparkline`, tween `width,height` do `assistente-bolha`, `transition-[height]` do `Collapsible.Panel`.
+
+**Reduced-motion é global:** o guard de `prefers-reduced-motion` em `globals.css` + `MotionConfig reducedMotion="user"` do layout zeram tudo — não adicionar media query por componente, `useReducedMotion` local nem desligar animação à mão.

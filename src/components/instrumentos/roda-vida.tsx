@@ -123,6 +123,9 @@ export function RodaVida({
   function passo(delta: number) {
     const i = (ativo + delta + total) % total;
     setAtivo(i);
+    // as setas não anunciam nada sozinhas — sem isso o leitor de tela
+    // ficava mudo sobre qual área ganhou o foco
+    setAnuncio(areas[i].label);
   }
 
   // a "volta completa" é a roda toda respondida — o contador + o badge
@@ -171,7 +174,15 @@ export function RodaVida({
           >
             <CaretLeft size={20} weight="bold" aria-hidden />
           </Button>
-          <div className="min-w-0 flex-1 text-center">
+          {/* fade curto SÓ de entrada entre eixos (spec 028, camada troca
+              de estado): o eixo troca por gesto direto — seta, arraste na
+              roda, toque no slider — e um crossfade mode="wait" ficaria
+              atrás do dedo; a remontagem por key re-dispara o fade-in e
+              o guard global de reduced-motion já zera */}
+          <div
+            key={ativo}
+            className="min-w-0 flex-1 animate-in text-center fade-in duration-150"
+          >
             <p className="text-[11px] font-semibold tracking-[0.08em] text-muted-foreground">
               {quadAtivo ? `${quadAtivo} · ` : ""}Área {ativo + 1} de {total}
             </p>

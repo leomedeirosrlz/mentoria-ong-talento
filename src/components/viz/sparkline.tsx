@@ -224,7 +224,9 @@ export function Sparkline({
             })}
           </svg>
           {/* dots HTML — circulo nítido + label onde o SVG distorceria;
-              transition-[left,top] interpola mudanças de dado */}
+              transition-[left,top] interpola mudanças de dado — exceção
+              registrada da spec 028: posição de marcador não vira
+              transform sem medir o container */}
           {series.map((s, si) => {
             const cor = s.cor ?? CORES_SERIE[si % CORES_SERIE.length];
             let ultimo = -1;

@@ -232,6 +232,46 @@ test.describe("demo — instrumentos oficiais da jornada", () => {
     await expect(reflexao.locator(FG).first()).toBeVisible();
   });
 
+  // spec 028 — o eixo da roda troca por gesto direto: fade curto só de
+  // entrada no cartão (um crossfade wait ficaria atrás do dedo) e a
+  // seta anuncia a área nova no aria-live (o leitor de tela ficava mudo)
+  test("/f/<token>: eixo da roda troca com fade curto + anúncio; reduce zera", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "mentorado");
+    await page.goto(`/f/${TOK_RODA_EDUARDO}`);
+
+    const tituloEixo = (nome: string) =>
+      page.getByRole("heading", { level: 3, name: nome, exact: true });
+    await expect(tituloEixo("Saúde e disposição")).toBeVisible();
+
+    // a seta troca o eixo — o cartão remonta por key (re-dispara o
+    // fade-in) e a área nova sai pelo aria-live sr-only
+    await page.getByRole("button", { name: "Próxima área" }).click();
+    await expect(tituloEixo("Intelecto e cultura")).toBeVisible();
+    await expect(page.locator('p[aria-live="polite"]')).toHaveText(
+      "Intelecto e cultura"
+    );
+
+    // fade curto de troca de estado (~150ms) — não é slide de navegação
+    const cardEixo = tituloEixo("Intelecto e cultura").locator("..");
+    const dur = await cardEixo.evaluate(
+      (el) => getComputedStyle(el).animationDuration
+    );
+    expect(parseFloat(dur)).toBeGreaterThan(0.05);
+    expect(parseFloat(dur)).toBeLessThanOrEqual(0.2);
+
+    // o guard global zera: o próximo remount já nasce parado
+    // (serializado em segundos: 0.01ms → "1e-05s")
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    await page.getByRole("button", { name: "Próxima área" }).click();
+    await expect(tituloEixo("Equilíbrio emocional")).toBeVisible();
+    const durReduce = await tituloEixo("Equilíbrio emocional")
+      .locator("..")
+      .evaluate((el) => getComputedStyle(el).animationDuration);
+    expect(parseFloat(durReduce)).toBeLessThan(0.05);
+  });
+
   // REALIZA-440/441 — a página por instrumento do mentor: o seletor de
   // mentorado filtra por ?dupla= (a régua linka a dupla em foco), a linha
   // já resume o resultado e "Ver resposta" expande a leitura completa

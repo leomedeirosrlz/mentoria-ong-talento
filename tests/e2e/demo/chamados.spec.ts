@@ -277,6 +277,72 @@ test.describe("demo — chamados (WP1)", () => {
     await expect(pendente).toHaveCount(0);
   });
 
+  // spec 028 — a troca interno↔público anima a MOLDURA do composer por
+  // transition-colors (cores podem transicionar); o campo nunca remonta,
+  // senão o rascunho e a seleção iam embora num crossfade indevido
+  test("modo interno↔público transiciona a moldura e preserva o rascunho", async ({
+    page,
+  }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(`/chamados?c=${CH_REGISTRO}`);
+
+    const interno = page.getByRole("radio", { name: "Nota interna" });
+    const publico = page.getByRole("radio", {
+      name: "Responder a Fernanda",
+    });
+    await expect(interno).toHaveAttribute("aria-checked", "true");
+
+    // a moldura é o pai do seletor de tipo — transition-colors expande
+    // numa lista de cores/borda; nada de `all` nem propriedade de layout
+    const moldura = page
+      .getByRole("radiogroup", { name: "Tipo de mensagem" })
+      .locator("..");
+    const prop = await moldura.evaluate(
+      (el) => getComputedStyle(el).transitionProperty
+    );
+    expect(prop).toMatch(/color/);
+    expect(prop).not.toMatch(/\ball\b|width|height/);
+
+    // escreve no modo interno, marca o campo e troca pro público: mesmo
+    // nó de DOM (a sonda sobrevive a um remount falso) e o texto intacto
+    const campo = page.getByRole("textbox", { name: "Nota interna" });
+    await campo.fill("rascunho que não pode sumir");
+    await campo.evaluate(
+      (el) => ((el as HTMLElement).dataset.probe = "ok")
+    );
+    await publico.click();
+    const campoPublico = page.getByRole("textbox", {
+      name: /Resposta a/,
+    });
+    await expect(campoPublico).toHaveValue("rascunho que não pode sumir");
+    await expect(campoPublico).toHaveAttribute("data-probe", "ok");
+    await expect(publico).toHaveAttribute("aria-checked", "true");
+
+    // reduced-motion zera a transição da moldura junto (0.01ms → "1e-05s")
+    await page.emulateMedia({ reducedMotion: "reduce" });
+    const durReduce = await moldura.evaluate(
+      (el) => getComputedStyle(el).transitionDuration
+    );
+    expect(parseFloat(durReduce)).toBeLessThan(0.05);
+  });
+
+  test("menção entra revelada na fileira do composer", async ({ page }) => {
+    await entrarNaDemo(page, "coordenacao");
+    await page.goto(`/chamados?c=${CH_REGISTRO}`);
+
+    const campo = page.getByRole("textbox", { name: "Nota interna" });
+    await campo.fill("vou conversar com o @pau");
+    await campo.press("Enter");
+
+    // os chips de menção chegam por revelação (cascata do kit), não por
+    // crossfade — o grupo nasce com .animate-enter e some na remoção
+    const marcadas = page.getByRole("group", { name: "Pessoas marcadas" });
+    await expect(marcadas).toHaveClass(/animate-enter/);
+    await expect(
+      marcadas.getByRole("button", { name: /Remover marcação de Paulo/ })
+    ).toBeVisible();
+  });
+
   test("mentor não tem menções nem composer interno", async ({ page }) => {
     await entrarNaDemo(page, "mentor_dpp");
     await page.goto(`/chamados?c=${CH_AGENDA}`);
